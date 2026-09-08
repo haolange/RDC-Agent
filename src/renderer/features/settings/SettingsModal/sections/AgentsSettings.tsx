@@ -41,7 +41,7 @@ const getAgentCardDescription = (agent: AgentManifestDraft, t: Translate): strin
   return key ? t(key) : agent.description;
 };
 
-const createNewAgent = (existing: AgentManifestDraft[]): AgentManifestDraft => {
+const createNewAgent = (existing: AgentManifestDraft[], t: Translate): AgentManifestDraft => {
   const base = 'custom-agent';
   let index = 1;
   let id = base;
@@ -53,9 +53,9 @@ const createNewAgent = (existing: AgentManifestDraft[]): AgentManifestDraft => {
   return {
     id,
     fileName: `${id}.agent.md`,
-    name: 'Custom Agent',
-    description: 'Describe what this Agent is responsible for.',
-    argumentHint: 'Describe the task for this Agent',
+    name: t('settings.agentDefaultName'),
+    description: t('settings.agentDefaultDescription'),
+    argumentHint: t('settings.agentDefaultArgumentHint'),
     target: 'rdc-agent',
     models: [],
     icon: 'spark',
@@ -68,7 +68,7 @@ const createNewAgent = (existing: AgentManifestDraft[]): AgentManifestDraft => {
     agents: [],
     handoffs: [],
     metadata: {},
-    instructions: 'You are a focused RDC-Agent specialist. Follow the current project context and report evidence clearly.',
+    instructions: t('settings.agentDefaultInstructions'),
     enabled: true,
   };
 };
@@ -99,7 +99,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
 
   const addAgent = () => {
     onAgentManifestDraftsChange((current) => {
-      const next = createNewAgent(current);
+      const next = createNewAgent(current, t);
       setSelectedAgentId(next.id);
       return [...current, next];
     });

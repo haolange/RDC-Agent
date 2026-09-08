@@ -34,7 +34,9 @@
 }
 
 .composer-user-input-option:hover:not(:disabled),
-.composer-user-input-custom-select:hover:not(:disabled) {
+.composer-user-input-custom-select:hover:not(:disabled),
+.composer-user-input-option:focus-visible:not(:disabled),
+.composer-user-input-custom-select:focus-visible:not(:disabled) {
   border-color: var(--token-border-strong);
   background: color-mix(in srgb, var(--token-bg-raised) 72%, transparent);
 }

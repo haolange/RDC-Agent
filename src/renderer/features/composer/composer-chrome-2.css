@@ -1,5 +1,6 @@
 .composer-agent-pill:hover,
-.composer-agent-pill.open {
+.composer-agent-pill.open,
+.composer-agent-pill:focus-visible {
   border-color: color-mix(in srgb, var(--composer-mode-accent) 24%, var(--token-border-strong));
   background: color-mix(in srgb, var(--composer-mode-accent) 8%, var(--token-interactive-hover));
 }
@@ -61,7 +62,8 @@
 
 .composer-model-pill:hover,
 .composer-model-pill.open,
-.composer-model-pill.is-override {
+.composer-model-pill.is-override,
+.composer-model-pill:focus-visible {
   border-color: color-mix(in srgb, var(--composer-mode-accent) 24%, var(--token-border-strong));
   background: color-mix(in srgb, var(--composer-mode-accent) 8%, var(--token-interactive-hover));
 }
@@ -206,7 +208,8 @@
   background: color-mix(in srgb, var(--composer-mode-accent) 10%, transparent);
 }
 
-.composer-model-item:hover:not(:disabled) {
+.composer-model-item:hover:not(:disabled),
+.composer-model-item:focus-visible:not(:disabled) {
   background: var(--token-interactive-hover);
   color: var(--token-text-heading);
 }

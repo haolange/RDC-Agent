@@ -173,9 +173,9 @@
   outline-offset: 2px;
 }
 
-.settings-center-search input:focus-visible { outline: none; box-shadow: none; }
 
-.settings-manifest-card:not(.is-active):hover { border-color: var(--token-border-muted); background: var(--token-interactive-hover); }
+.settings-manifest-card:not(.is-active):hover,
+.settings-manifest-card:not(.is-active):focus-visible { border-color: var(--token-border-muted); background: var(--token-interactive-hover); }
 
 .settings-provider-row-main { min-width: 0; }
 

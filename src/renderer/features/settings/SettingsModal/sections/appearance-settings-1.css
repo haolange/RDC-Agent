@@ -27,7 +27,8 @@
     background var(--transition-fast);
 }
 
-.appearance-mode-tile:hover {
+.appearance-mode-tile:hover,
+.appearance-mode-tile:focus-visible {
   border-color: var(--token-border-default);
   background: var(--token-interactive-hover);
 }

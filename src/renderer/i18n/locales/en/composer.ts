@@ -52,4 +52,7 @@ export const enComposer = {
   'composer.markdownPreview': 'Preview',
   'composer.markdownWriteTip': 'Edit Markdown source',
   'composer.markdownPreviewTip': 'Preview rendered Markdown',
+  'composer.slashHintNavigate': 'Navigate',
+  'composer.slashHintSelect': 'Select',
+  'composer.slashHintDismiss': 'Dismiss',
 } as const;

@@ -32,7 +32,8 @@
 }
 
 .slash-command-item:hover,
-.slash-command-item.selected {
+.slash-command-item:focus-visible,
+.slash-command-item.is-selected {
   background: var(--token-interactive-hover);
   color: var(--token-text-heading);
 }

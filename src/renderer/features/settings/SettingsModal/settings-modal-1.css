@@ -107,7 +107,9 @@
   grid-template-columns: var(--space-10) minmax(0, 1fr);
 }
 
-.settings-manifest-card:hover, .settings-manifest-card.is-active {
+.settings-manifest-card:hover,
+.settings-manifest-card.is-active,
+.settings-manifest-card:focus-visible {
   border-color: color-mix(in srgb, var(--token-border-focus) 30%, var(--token-border-muted));
   background: color-mix(in srgb, var(--token-bg-raised) 62%, transparent);
 }

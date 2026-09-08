@@ -261,7 +261,8 @@
   text-align: left;
 }
 
-.settings-runtime-resource:hover {
+.settings-runtime-resource:hover,
+.settings-runtime-resource:focus-visible {
   border-color: var(--token-border-strong);
   background: var(--token-interactive-hover);
 }

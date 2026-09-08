@@ -158,7 +158,7 @@ const capturePanel = [
   read('src/renderer/features/right-rail/CapturePanel.tsx'),
   read('src/renderer/features/right-rail/capturePanelActions.ts'),
 ].join('\n');
-for (const required of ['RdxContextPanelViewModel', "'Open'", "'Preview'", "'Refresh'", "'Copy'", "'Clear'", 'capture.openProjectInput', 'context.openHumanPreview', 'capture.clearOpenedState', 'right-rail-capture-open-row', 'right-rail-capture-open-button']) {
+for (const required of ['RdxContextPanelViewModel', 'control.captureOpen', 'control.rightRail.artifacts.preview', 'control.captureLibraryRefresh', 'control.rightRail.outputs.copy', 'control.rightRail.capture.clear', 'capture.openProjectInput', 'context.openHumanPreview', 'capture.clearOpenedState', 'right-rail-capture-open-row', 'right-rail-capture-open-button']) {
   requireText(capturePanel, required, `CapturePanel must retain ${required}`);
 }
 forbidText(capturePanel, 'right-rail-capture-summary', 'CapturePanel must not duplicate the selected capture above its picker');

@@ -1,4 +1,13 @@
-.settings-field .input:hover, .settings-option-block .input:hover, .settings-model-adder-row .input:hover, .settings-select-trigger:hover, .settings-rdx-cli-input:hover {
+.settings-field .input:hover,
+.settings-option-block .input:hover,
+.settings-model-adder-row .input:hover,
+.settings-select-trigger:hover,
+.settings-rdx-cli-input:hover,
+.settings-field .input:focus-visible,
+.settings-option-block .input:focus-visible,
+.settings-model-adder-row .input:focus-visible,
+.settings-select-trigger:focus-visible,
+.settings-rdx-cli-input:focus-visible {
   border-color: var(--input-border-hover);
   background: var(--input-bg-hover);
 }
@@ -16,7 +25,8 @@
   --settings-content-max: 1600px;
 }
 
-.settings-provider-row:hover {
+.settings-provider-row:hover,
+.settings-provider-row:focus-visible {
   border-color: var(--token-border-default);
   background: var(--settings-card-bg-hover);
 }
@@ -100,7 +110,8 @@
   justify-content: center;
 }
 
-.settings-manifest-card:hover {
+.settings-manifest-card:hover,
+.settings-manifest-card:focus-visible {
   border-color: var(--token-border-muted);
   background: var(--token-interactive-hover);
 }
@@ -256,7 +267,10 @@
   content: "-";
 }
 
-.settings-advanced-panel > summary:hover, .settings-rdx-action-card > summary:hover {
+.settings-advanced-panel > summary:hover,
+.settings-rdx-action-card > summary:hover,
+.settings-advanced-panel > summary:focus-visible,
+.settings-rdx-action-card > summary:focus-visible {
   background: var(--token-interactive-hover);
 }
 

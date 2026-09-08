@@ -17,7 +17,7 @@ export const enSidebar = {
   'sidebar.renameProjectTitle': 'Rename Project',
   'sidebar.menuNewSession': 'New Session',
   'sidebar.menuDelete': 'Delete',
-  'sidebar.sessions': 'Threads',
+  'sidebar.sessions': 'Sessions',
   'sidebar.addSession': 'New Session',
   'sidebar.removeSession': 'Remove Session',
   'sidebar.removeSessionFailed': 'Failed to remove session.',

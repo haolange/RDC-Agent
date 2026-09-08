@@ -75,7 +75,14 @@
   transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.settings-field .input:hover, .settings-option-block .input:hover, .settings-model-adder-row .input:hover, .settings-select-trigger:hover {
+.settings-field .input:hover,
+.settings-option-block .input:hover,
+.settings-model-adder-row .input:hover,
+.settings-select-trigger:hover,
+.settings-field .input:focus-visible,
+.settings-option-block .input:focus-visible,
+.settings-model-adder-row .input:focus-visible,
+.settings-select-trigger:focus-visible {
   border-color: var(--token-border-strong);
   background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 }
@@ -209,7 +216,10 @@
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
-.settings-segment:hover, .settings-inline-pills .user-menu-pill:hover {
+.settings-segment:hover,
+.settings-inline-pills .user-menu-pill:hover,
+.settings-segment:focus-visible,
+.settings-inline-pills .user-menu-pill:focus-visible {
   background: color-mix(in srgb, var(--token-bg-raised) 72%, transparent);
   border-color: var(--token-border-default);
   color: var(--token-text-heading);

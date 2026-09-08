@@ -29,7 +29,9 @@
   border-color: transparent;
 }
 
-.settings-managed-row:hover, .settings-managed-row:focus-within {
+.settings-managed-row:hover,
+.settings-managed-row:focus-within,
+.settings-managed-row:focus-visible {
   border-color: var(--token-border-card);
   background: color-mix(in srgb, var(--token-bg-raised) 72%, transparent);
 }
@@ -118,7 +120,9 @@
   transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
 
-.settings-managed-row:hover .settings-row-actions, .settings-managed-row:focus-within .settings-row-actions {
+.settings-managed-row:hover .settings-row-actions,
+.settings-managed-row:focus-within .settings-row-actions,
+.settings-managed-row:focus-visible .settings-row-actions {
   opacity: 1;
   transform: translateX(0);
 }

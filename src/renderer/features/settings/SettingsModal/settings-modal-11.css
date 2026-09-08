@@ -49,7 +49,9 @@
   content: "";
 }
 
-.settings-scope-tab:hover, .settings-scope-tab.is-active {
+.settings-scope-tab:hover,
+.settings-scope-tab.is-active,
+.settings-scope-tab:focus-visible {
   color: var(--token-text-heading);
 }
 

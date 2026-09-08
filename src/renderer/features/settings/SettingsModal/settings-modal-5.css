@@ -238,7 +238,8 @@
     background var(--transition-fast);
 }
 
-.settings-provider-oauth-technical > summary:hover {
+.settings-provider-oauth-technical > summary:hover,
+.settings-provider-oauth-technical > summary:focus-visible {
   color: var(--token-text-body);
   background: color-mix(in srgb, var(--token-border-focus) 6%, var(--token-surface-sunken));
 }

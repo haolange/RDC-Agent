@@ -70,7 +70,8 @@
   flex: 0 0 auto;
 }
 
-.sidebar-knowledge-trigger:hover .sidebar-knowledge-icon {
+.sidebar-knowledge-trigger:hover .sidebar-knowledge-icon,
+.sidebar-knowledge-trigger:focus-visible .sidebar-knowledge-icon {
   color: var(--token-border-focus);
 }
 

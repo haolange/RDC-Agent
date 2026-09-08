@@ -97,12 +97,13 @@
   transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
 }
 
-.user-menu-pill:hover {
+.user-menu-pill:hover,
+.user-menu-pill:focus-visible {
   color: var(--token-text-heading);
   border-color: var(--token-border-strong);
 }
 
-.user-menu-pill.active {
+.user-menu-pill.is-selected {
   background: color-mix(in srgb, var(--token-accent-primary) 14%, transparent);
   border-color: color-mix(in srgb, var(--token-accent-primary) 36%, transparent);
   color: var(--token-text-heading);
@@ -123,7 +124,8 @@
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.user-menu-settings-button:hover {
+.user-menu-settings-button:hover,
+.user-menu-settings-button:focus-visible {
   box-shadow: var(--shadow-panel);
 }
 

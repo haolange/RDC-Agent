@@ -52,4 +52,7 @@ export const zhComposer = {
   'composer.markdownPreview': '预览',
   'composer.markdownWriteTip': '编辑 Markdown 原文',
   'composer.markdownPreviewTip': '预览渲染后的 Markdown',
+  'composer.slashHintNavigate': '浏览',
+  'composer.slashHintSelect': '选择',
+  'composer.slashHintDismiss': '关闭',
 } as const;

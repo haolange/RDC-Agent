@@ -1,0 +1,15 @@
+export const zhDevice = {
+  'device.localReplay': '本地回放',
+  'device.localReplayReady': '本地回放已就绪',
+  'device.ready': '就绪',
+  'device.noDevice': '无设备',
+  'device.local': '本地',
+  'device.replayDevice': '回放设备：{summary}',
+  'device.status.offline': '离线',
+  'device.status.loading': '加载中',
+  'device.status.connected': '已连接',
+  'device.status.online': '在线',
+  'device.apkForceReplaced': '已强制替换 APK',
+  'device.apkInstalled': '已安装 APK',
+  'device.apkVerified': '已校验 APK',
+} as const;

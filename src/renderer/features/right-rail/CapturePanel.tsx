@@ -17,6 +17,7 @@ import { useWorkflowStore } from '../../stores/workflowStore';
 import { Button } from '../../ui/Button';
 import { DropdownSelect, type DropdownOption } from '../../ui/DropdownSelect';
 import { compactActionError } from './rightRailErrorUtils';
+import { useI18n } from '../../i18n';
 
 type ActionName = 'open' | 'preview' | 'clear' | 'refresh' | null;
 
@@ -42,6 +43,7 @@ const RefreshGlyph: React.FC = () => (
 );
 
 export const CapturePanel: React.FC<{ task: TaskContextPanelViewModel; capture: RdxContextPanelViewModel }> = ({ task, capture: rdx }) => {
+  const { t } = useI18n();
   const devices = useDeviceStore((state) => state.devices);
   const selectedDevice = useDeviceStore((state) => state.selectedDevice);
   const setSelectedDevice = useDeviceStore((state) => state.setSelectedDevice);
@@ -110,26 +112,26 @@ export const CapturePanel: React.FC<{ task: TaskContextPanelViewModel; capture: 
   };
   const captureIsOpen = Boolean(rdx.capture);
   const selectedCaptureIsOpen = selectedInput?.inputId === rdx.capture?.inputId;
-  return <div className="right-rail-capture-panel" aria-label="Capture controls">
+  return <div className="right-rail-capture-panel" aria-label={t('control.rightRail.capture.controls')}>
     <div className="right-rail-capture-file-row">
       <div className="right-rail-capture-input-picker">
         <span className="right-rail-capture-picker-icon" aria-hidden="true"><CaptureFileGlyph /></span>
         <div className="right-rail-capture-file-copy">
           <DropdownSelect
-            ariaLabel="Capture"
+            ariaLabel={t('control.rightRail.capture.title')}
             dataTestId="right-rail-capture-input"
             options={captureOptions}
             value={selectedInputId}
             onChange={setSelectedInputId}
-            placeholder="Choose capture"
-            emptyLabel="No project captures"
+            placeholder={t('control.rightRail.capture.choose')}
+            emptyLabel={t('control.rightRail.capture.emptyInputs')}
             className="right-rail-capture-dropdown"
             triggerClassName="right-rail-capture-dropdown-trigger"
           />
-          {selectedInput ? <span className="right-rail-capture-file-meta">{formatSize(selectedInput.sizeBytes) || 'Size unavailable'}</span> : null}
+          {selectedInput ? <span className="right-rail-capture-file-meta">{formatSize(selectedInput.sizeBytes) || t('control.rightRail.capture.sizeUnavailable')}</span> : null}
         </div>
       </div>
-      <Button className="right-rail-capture-refresh-button" variant="ghost" size="sm" aria-label={activeAction === 'refresh' ? 'Refreshing' : 'Refresh'} title="Refresh captures and replay devices" onClick={() => void runAction('refresh', async () => {
+      <Button className="right-rail-capture-refresh-button" variant="ghost" size="sm" aria-label={activeAction === 'refresh' ? t('control.captureLibraryRefreshing') : t('control.captureLibraryRefresh')} title={t('control.rightRail.capture.refreshTitle')} onClick={() => void runAction('refresh', async () => {
         if (!scope) return null;
         await Promise.all([
           refreshProjectCaptureInputs(scope.projectId),
@@ -139,28 +141,28 @@ export const CapturePanel: React.FC<{ task: TaskContextPanelViewModel; capture: 
       })} disabled={!scope || activeAction !== null}><RefreshGlyph /></Button>
     </div>
     <div className="right-rail-capture-replay-group">
-      <span className="right-rail-capture-control-label">Replay device</span>
+      <span className="right-rail-capture-control-label">{t('control.sessionContextDevice')}</span>
       <div className="right-rail-capture-open-row">
         <DropdownSelect
-          ariaLabel="Replay device"
+          ariaLabel={t('control.sessionContextDevice')}
           dataTestId="right-rail-replay-device"
           options={deviceOptions}
           value={selectedDevice}
           onChange={setSelectedDevice}
-          placeholder="Device"
-          emptyLabel="No replay devices"
+          placeholder={t('control.rightRail.capture.devicePlaceholder')}
+          emptyLabel={t('control.rightRail.capture.noDevices')}
           className="right-rail-device-picker"
           triggerClassName="right-rail-device-picker-trigger"
           menuAlign="end"
         />
-        <Button className="right-rail-capture-open-button" variant="primary" size="md" onClick={() => void openInput()} disabled={!scope || !selectedInput || !selectedDevice || activeAction !== null}>{activeAction === 'open' ? 'Opening...' : selectedCaptureIsOpen ? 'Reopen' : 'Open'}</Button>
+        <Button className="right-rail-capture-open-button" variant="primary" size="md" onClick={() => void openInput()} disabled={!scope || !selectedInput || !selectedDevice || activeAction !== null}>{activeAction === 'open' ? t('control.rightRail.capture.opening') : selectedCaptureIsOpen ? t('control.rightRail.capture.reopen') : t('control.captureOpen')}</Button>
       </div>
     </div>
     {captureIsOpen ? <div className="right-rail-inline-actions right-rail-capture-utility-actions">
-        <Button variant="ghost" size="sm" onClick={() => void togglePreview()} disabled={!scope || activeAction !== null}>{activeAction === 'preview' ? 'Working...'  : rdx.capture?.humanPreviewStatus === 'open' ? 'Close preview' : 'Preview'}</Button>
-        <Button variant="ghost" size="sm" onClick={copyRuntimeContext} disabled={!rdx.runtime.contextId && !rdx.runtime.replaySessionId && !rdx.capture?.replaySessionId}>Copy</Button>
-        <Button variant="ghost" size="sm" onClick={() => void clearCapture()} disabled={!scope || activeAction !== null}>{activeAction === 'clear' ? 'Clearing...'  : 'Clear'}</Button>
+        <Button variant="ghost" size="sm" onClick={() => void togglePreview()} disabled={!scope || activeAction !== null}>{activeAction === 'preview' ? t('control.rightRail.capture.working') : rdx.capture?.humanPreviewStatus === 'open' ? t('control.rightRail.capture.closePreview') : t('control.rightRail.artifacts.preview')}</Button>
+        <Button variant="ghost" size="sm" onClick={copyRuntimeContext} disabled={!rdx.runtime.contextId && !rdx.runtime.replaySessionId && !rdx.capture?.replaySessionId}>{t('control.rightRail.outputs.copy')}</Button>
+        <Button variant="ghost" size="sm" onClick={() => void clearCapture()} disabled={!scope || activeAction !== null}>{activeAction === 'clear' ? t('control.rightRail.capture.clearing') : t('control.rightRail.capture.clear')}</Button>
       </div> : null}
-    {diagnostic ? <div className="right-rail-diagnostic"><span>{diagnostic.summary}</span><Button variant="ghost" size="sm" onClick={() => handleDiagnostic(diagnostic)}>{diagnostic.action === 'settings' ? 'Settings' : diagnostic.action === 'change_device' ? 'Change' : diagnostic.action === 'copy' ? 'Copy' : diagnostic.actionLabel}</Button></div> : null}
+    {diagnostic ? <div className="right-rail-diagnostic"><span>{diagnostic.summary}</span><Button variant="ghost" size="sm" onClick={() => handleDiagnostic(diagnostic)}>{diagnostic.action === 'settings' ? t('settings.title') : diagnostic.action === 'change_device' ? t('control.rightRail.capture.changeDevice') : diagnostic.action === 'copy' ? t('control.rightRail.outputs.copy') : diagnostic.actionLabel}</Button></div> : null}
   </div>;
 };

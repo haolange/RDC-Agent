@@ -231,7 +231,8 @@
   transition: transform var(--transition-fast), background var(--transition-fast);
 }
 
-.composer-effort-toggle:hover:not(:disabled) {
+.composer-effort-toggle:hover:not(:disabled),
+.composer-effort-toggle:focus-visible:not(:disabled) {
   border-color: var(--token-border-strong);
 }
 
