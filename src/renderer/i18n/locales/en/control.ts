@@ -32,6 +32,7 @@ export const enControl = {
   'control.rightRail.artifacts.storeDegraded': 'Investigation store is degraded; this is not an empty artifact list.',
   'control.rightRail.outputs.empty': 'Outputs created during this task appear here.',
   'control.rightRail.context.empty': 'Tools and referenced files used in this task appear here.',
+  'control.rightRail.context.resources': 'Task context resources',
   'control.rightRail.capture.empty': 'Import a .rdc file to this project to open and preview it here.',
   'control.rightRail.artifacts.kind.world_state': 'World state',
   'control.rightRail.artifacts.kind.evidence': 'Evidence',

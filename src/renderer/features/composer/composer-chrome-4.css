@@ -7,3 +7,49 @@
     transition: none;
   }
 }
+
+/* Narrow composer: keep one row. Collapse chrome to icons; model label fades. */
+@container composer (max-width: 560px) {
+  .composer-footer-bar {
+    flex-wrap: nowrap;
+    gap: var(--space-2);
+  }
+
+  .composer-toolbar-group {
+    gap: var(--space-1);
+  }
+
+  .composer-agent-pill-label,
+  .composer-agent-pill-caret,
+  .composer-permission-pill-label,
+  .composer-permission-pill-caret,
+  .composer-effort-pill-label,
+  .composer-effort-pill-caret,
+  .composer-effort-pill-modes,
+  .composer-model-pill-caret {
+    display: none;
+  }
+
+  .composer-agent-pill,
+  .composer-permission-pill,
+  .composer-effort-pill {
+    width: var(--control-height-sm);
+    min-width: var(--control-height-sm);
+    max-width: var(--control-height-sm);
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .composer-model-pill {
+    min-width: 0;
+    max-width: 8rem;
+    padding-inline: var(--space-2);
+  }
+}
+
+@container composer (max-width: 420px) {
+  .composer-model-pill {
+    max-width: 6rem;
+  }
+}

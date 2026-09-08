@@ -6,6 +6,8 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  container-type: inline-size;
+  container-name: empty-workbench;
   /* Dark: flat app fill — any center oval reads as a stage against sidebars. */
   background: var(--token-bg-app);
 }
@@ -205,10 +207,19 @@ html[data-resolved-theme='light'] .empty-workbench-prompt {
   }
 }
 
-@container (max-width: 560px) {
+@container empty-workbench (max-width: 560px) {
   .empty-workbench-tool-grid {
     grid-template-columns: minmax(0, 1fr);
     width: min(100%, 360px);
     margin: 0 auto;
+  }
+
+  .empty-workbench-tool-card {
+    align-items: center;
+    text-align: center;
+  }
+
+  .empty-workbench-tool-copy {
+    align-items: center;
   }
 }

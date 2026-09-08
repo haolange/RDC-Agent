@@ -178,15 +178,6 @@
 /* Faster / Smarter end labels */
 
 @media (max-width: 640px) {
-  .composer-effort-pill-label {
-    display: none;
-  }
-
-  .composer-effort-pill {
-    max-width: none;
-    padding: 0 var(--space-2);
-  }
-
   .composer-effort-popup {
     position: fixed;
     left: var(--space-2);

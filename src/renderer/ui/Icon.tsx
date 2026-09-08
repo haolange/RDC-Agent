@@ -31,7 +31,8 @@ export type IconName =
   | 'conflict'
   | 'folder'
   | 'upload'
-  | 'filter';
+  | 'filter'
+  | 'shield';
 
 type IconPart =
   | { d: string }
@@ -93,6 +94,9 @@ const ICONS: Record<IconName, readonly IconPart[]> = {
   folder: [{ d: 'M3 7V5h6l2 2h10v13H3V7Z' }],
   upload: [{ d: 'M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6' }],
   filter: [{ d: 'M4 7h7m4 0h5M4 17h3m4 0h9M11 4v6M7 14v6' }],
+  shield: [
+    { d: 'M12 3 5.5 6v5.5c0 4.2 2.7 7.9 6.5 9.5 3.8-1.6 6.5-5.3 6.5-9.5V6z' },
+  ],
 };
 
 export interface IconProps {

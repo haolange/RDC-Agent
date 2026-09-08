@@ -9,8 +9,7 @@
  *  - token definition file (design-system.css) may reference primitives.
  *    styles/global/* is not exempt; reduced-motion !important in base.css is
  *    the single documented exception.
- *  - SVG presentation-attribute injection for the Right Rail empty visuals is the
- *    single documented exception for `stop-color` primitives (scoped to that file).
+ *  - Right Rail empty visuals use semantic `--token-*` stop-color classes.
  *
  * Hits are locked by scripts/fidelity/design-tokens-baseline.json (B0 ratchet).
  * Debt may only decrease; a decrease must update the baseline in the same change.

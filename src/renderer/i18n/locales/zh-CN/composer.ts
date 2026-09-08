@@ -55,4 +55,12 @@ export const zhComposer = {
   'composer.slashHintNavigate': '浏览',
   'composer.slashHintSelect': '选择',
   'composer.slashHintDismiss': '关闭',
+  'composer.permission.default': '默认',
+  'composer.permission.auto-review': '自动审查',
+  'composer.permission.full-access': '完全访问',
+  'composer.permission.custom': '自定义',
+  'composer.permission.defaultDesc': '工作区常规操作直接执行，外部或高风险操作先询问',
+  'composer.permission.auto-reviewDesc': '低风险操作自动通过，高风险操作自动拦截',
+  'composer.permission.full-accessDesc': '信任模式，所有操作直接放行（类 Yolo）',
+  'composer.permission.customDesc': '按当前应用设置里的访问根目录执行',
 } as const;

@@ -41,6 +41,9 @@ const requiredFiles = [
   'src/renderer/features/right-rail/RightRailArtifactGlyphs.tsx',
   'src/renderer/features/right-rail/RightRailOutputList.tsx',
   'src/renderer/features/right-rail/RightRailContext.tsx',
+  'src/renderer/features/right-rail/RightRailEmptyState.tsx',
+  'src/renderer/features/right-rail/RightRailEmptyVisuals.tsx',
+  'src/renderer/features/right-rail/RightRailEmptyVisuals.css',
   'src/renderer/features/right-rail/CapturePanel.tsx',
   'src/renderer/features/right-rail/RightRail.css',
   'src/renderer/app/WorkbenchPanelDrawer.tsx',
@@ -144,7 +147,7 @@ for (const forbidden of ['PlanArtifactPreview', 'isPlanArtifact', "artifact.type
 }
 
 const context = read('src/renderer/features/right-rail/RightRailContext.tsx');
-for (const requiredArea of ['TaskContextPanelViewModel', 'TaskContextResource', 'Task context resources']) {
+for (const requiredArea of ['TaskContextPanelViewModel', 'TaskContextResource', "t('control.rightRail.context.resources')", "t('control.rightRail.outputs.open')"]) {
   requireText(context, requiredArea, `RightRailContext must retain ${requiredArea}`);
 }
 for (const forbidden of ['context?: ContextPanelViewModel', 'Rdx', 'Capture', 'Preview', 'Refresh', 'Copy', 'Clear', '<details', 'Session details', 'Replay options', 'Runtime details', 'Context ID', 'Replay session', 'Capture file', 'Remote ID', 'cliSummary', '<Fact label="CLI"', 'toolCount', 'namespace inventory']) {
@@ -163,9 +166,17 @@ for (const required of ['RdxContextPanelViewModel', 'control.captureOpen', 'cont
 }
 forbidText(capturePanel, 'right-rail-capture-summary', 'CapturePanel must not duplicate the selected capture above its picker');
 
-const rightRailCss = read('src/renderer/features/right-rail/RightRail.css');
-for (const required of ['.right-rail-empty-state', '.ui-empty-state-title', 'grid-template-rows:', 'flex: 0 0 auto', 'font-size: var(--text-sm)', 'font-size: var(--text-xs)', '.right-rail-capture-panel', '.right-rail-capture-open-row', '.project-capture-import-section', '.project-capture-input-list', '.right-rail-investigation-list', '.right-rail-investigation-row']) {
-  requireText(rightRailCss, required, `RightRail.css must retain ${required}`);
+const emptyState = read('src/renderer/features/right-rail/RightRailEmptyState.tsx');
+for (const required of ['RightRailEmptyVisual', 'EmptyState', 'visual=']) {
+  requireText(emptyState, required, `RightRailEmptyState must retain ${required}`);
+}
+
+const rightRailCss = [
+  read('src/renderer/features/right-rail/RightRail.css'),
+  read('src/renderer/features/right-rail/RightRailEmptyVisuals.css'),
+].join('\n');
+for (const required of ['.right-rail-empty-state', '.ui-empty-state-title', '.right-rail-empty-visual', 'grid-template-rows:', 'flex: 0 0 auto', 'font-size: var(--text-sm)', 'font-size: var(--text-xs)', '.right-rail-capture-panel', '.right-rail-capture-open-row', '.project-capture-import-section', '.project-capture-input-list', '.right-rail-investigation-list', '.right-rail-investigation-row']) {
+  requireText(rightRailCss, required, `Right rail CSS must retain ${required}`);
 }
 for (const forbidden of ['.control-panel', '.cp-section', '.capture-library', '.panel-action-btn', 'trace-plan-preview', 'is-plan', '.right-rail-details', '.right-rail-context-area-heading', '.right-rail-rdx-context', '.right-rail-section:not(.is-empty)', '.right-rail-section.is-empty', '.right-rail-capture-summary']) {
   forbidText(rightRailCss, forbidden, `RightRail.css must not retain ${forbidden}`);

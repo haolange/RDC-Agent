@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SessionRecord } from '@shared/types/session';
 import { useI18n } from '../../i18n';
 import { Pill } from '../../ui/Pill';
@@ -37,6 +37,8 @@ export const ComposerModelOverrideMenu: React.FC<{
   const { t } = useI18n();
   const menu = useComposerMenu('model');
   const searchRef = useRef<HTMLInputElement>(null);
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const [labelOverflows, setLabelOverflows] = useState(false);
   const [query, setQuery] = useState('');
   const [saveError, setSaveError] = useState('');
   const providers = useAppSettingsStore((state) => state.settings.llm.providers);
@@ -66,6 +68,18 @@ export const ComposerModelOverrideMenu: React.FC<{
   const assignTrigger = useCallback((node: HTMLButtonElement | null) => {
     menu.setTrigger(node);
   }, [menu]);
+
+  useLayoutEffect(() => {
+    const el = labelRef.current;
+    if (!el) return undefined;
+    const update = () => {
+      setLabelOverflows(el.scrollWidth > el.clientWidth + 1);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [pillLabel]);
 
   useEffect(() => {
     if (!menu.open) {
@@ -140,7 +154,12 @@ export const ComposerModelOverrideMenu: React.FC<{
         title={pillLabel}
         onClick={() => menu.toggle()}
       >
-        <span className="composer-model-pill-label">{pillLabel}</span>
+        <span
+          ref={labelRef}
+          className={`composer-model-pill-label${labelOverflows ? ' is-overflowing' : ''}`}
+        >
+          {pillLabel}
+        </span>
         <span className="composer-model-pill-caret" aria-hidden="true">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="6 9 12 15 18 9" />

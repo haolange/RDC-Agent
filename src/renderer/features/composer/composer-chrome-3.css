@@ -183,7 +183,7 @@
     position: fixed;
     left: var(--space-2);
     right: var(--space-2);
-    bottom: calc(var(--space-16) + var(--control-height-md) + var(--space-3));
+    bottom: calc(var(--space-16) + var(--control-height-sm) + var(--space-3));
     width: auto;
   }
 

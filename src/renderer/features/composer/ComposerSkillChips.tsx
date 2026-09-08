@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '../../ui/Icon';
 
 export const ComposerSkillChips: React.FC<{
   pendingSkillIds: string[];
@@ -27,7 +28,7 @@ export const ComposerSkillChips: React.FC<{
             onClick={() => removePendingSkill(skillId)}
             aria-label={removeArmedSkillLabel(skillId)}
           >
-            ×
+            <Icon name="close" size={12} />
           </button>
         </div>
       ))}

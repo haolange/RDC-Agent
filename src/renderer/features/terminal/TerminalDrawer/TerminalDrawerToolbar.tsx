@@ -53,7 +53,7 @@ export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm
         <div ref={filterMenuRef} className="runtime-terminal-filter-menu">
           <button
             type="button"
-            className={`runtime-terminal-tool-button ${filtersOpen ? 'active' : ''}`}
+            className={`runtime-terminal-tool-button ${filtersOpen ? 'is-active' : ''}`}
             data-testid="runtime-terminal-filter-toggle"
             aria-haspopup="menu"
             aria-expanded={filtersOpen}
@@ -110,7 +110,7 @@ export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm
 
         <button
           type="button"
-          className={`runtime-terminal-tool-button ${followOutput ? 'active' : ''}`}
+          className={`runtime-terminal-tool-button ${followOutput ? 'is-active' : ''}`}
           data-testid="runtime-terminal-follow"
           aria-pressed={followOutput}
           onClick={() => setFollowOutput(!followOutput)}

@@ -4,6 +4,8 @@
 .composer-shell {
   --composer-mode-accent: var(--token-accent-primary);
   --composer-shell-radius: var(--radius-lg);
+  container-type: inline-size;
+  container-name: composer;
   position: relative;
   isolation: isolate;
   display: flex;
@@ -118,7 +120,8 @@
 
 .composer-toolbar-group-right {
   margin-left: auto;
-  flex: 0 0 auto;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .composer-usage-indicator {

@@ -62,6 +62,14 @@
   position: relative;
 }
 
+.composer-permission-pill-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: inherit;
+}
+
 .composer-permission-pill {
   display: inline-flex;
   align-items: center;

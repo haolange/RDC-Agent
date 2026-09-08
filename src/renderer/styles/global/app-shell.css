@@ -75,7 +75,7 @@
   color: var(--token-text-heading);
 }
 
-.mode-switcher-item.active {
+.mode-switcher-item.is-active {
   background: linear-gradient(135deg, color-mix(in srgb, var(--token-accent-primary) 18%, transparent), color-mix(in srgb, var(--token-accent-primary) 18%, transparent));
   color: var(--token-text-heading);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--token-accent-primary) 24%, transparent);
@@ -311,7 +311,7 @@ html[data-resolved-theme='light'] .app-main {
   color: var(--token-text-heading);
 }
 
-.main-utility-toggle.active {
+.main-utility-toggle.is-active {
   color: var(--token-text-heading);
   border-color: color-mix(in srgb, var(--token-accent-primary) 36%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--token-accent-primary) 12%, transparent);
@@ -936,13 +936,14 @@ html[data-resolved-theme='light'] .app-main {
 }
 
 .chat-send-button {
-  min-width: 48px;
-  height: var(--control-height-md);
+  width: var(--control-height-sm);
+  min-width: var(--control-height-sm);
+  height: var(--control-height-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-3);
+  gap: 0;
+  padding: 0;
   border-radius: var(--control-radius);
   border: 1px solid var(--token-border-default);
   background: color-mix(in srgb, var(--token-bg-shell) 86%, transparent);
@@ -996,8 +997,8 @@ html[data-resolved-theme='light'] .app-main {
 }
 
 .chat-send-button.icon-only {
-  width: 44px;
-  min-width: 44px;
+  width: var(--control-height-sm);
+  min-width: var(--control-height-sm);
   padding: 0;
 }
 

@@ -173,9 +173,9 @@ const DropdownSelectMenuPortal: React.FC<DropdownSelectMenuProps> = ({
               type="button"
               className={[
                 'dropdown-select-option',
-                isSelected ? 'selected' : '',
-                isActive ? 'active' : '',
-                option.disabled ? 'disabled' : '',
+                isSelected ? 'is-selected' : '',
+                isActive ? 'is-active' : '',
+                option.disabled ? 'is-disabled' : '',
                 option.swatchColor ? 'has-swatch' : '',
                 optionClassName,
               ].filter(Boolean).join(' ')}

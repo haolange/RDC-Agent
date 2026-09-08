@@ -1,51 +1,23 @@
 import React, { useCallback } from 'react';
 import type { AgentPermissionMode } from '@shared/types/settings';
+import { useI18n } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
+import { Icon } from '../../ui/Icon';
 import { Pill } from '../../ui/Pill';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useComposerMenu } from './useComposerMenuRegistry';
 
-const PERMISSION_MODES: Array<{
-  id: AgentPermissionMode;
-  label: string;
-  labelZh: string;
-  description: string;
-  descriptionZh: string;
-}> = [
-  {
-    id: 'default',
-    label: 'Default',
-    labelZh: '默认',
-    description: 'Workspace routine actions run; external or risky actions ask first.',
-    descriptionZh: '工作区常规操作直接执行，外部或高风险操作先询问',
-  },
-  {
-    id: 'auto-review',
-    label: 'Auto-review',
-    labelZh: '自动审查',
-    description: 'Risky actions are reviewed by policy before they continue.',
-    descriptionZh: '低风险操作自动通过，高风险操作自动拦截',
-  },
-  {
-    id: 'full-access',
-    label: 'Full access',
-    labelZh: '完全访问',
-    description: 'Trusted mode for direct local file and command access.',
-    descriptionZh: '信任模式，所有操作直接放行（类 Yolo）',
-  },
-  {
-    id: 'custom',
-    label: 'Custom',
-    labelZh: '自定义',
-    description: 'Use local access roots from the current app settings.',
-    descriptionZh: '按当前应用设置里的访问根目录执行',
-  },
-];
+const PERMISSION_MODES: AgentPermissionMode[] = ['default', 'auto-review', 'full-access', 'custom'];
+
+const labelKey = (id: AgentPermissionMode): TranslationKey => `composer.permission.${id}`;
+const descKey = (id: AgentPermissionMode): TranslationKey => `composer.permission.${id}Desc`;
 
 export const PermissionModeSelector: React.FC = () => {
+  const { t } = useI18n();
   const menu = useComposerMenu('permission');
   const mode = useAppSettingsStore((state) => state.settings.agentRuntime?.permissions?.mode ?? 'default');
   const setMode = useAppSettingsStore((state) => state.setAgentPermissionMode);
-  const current = PERMISSION_MODES.find((entry) => entry.id === mode) ?? PERMISSION_MODES[0];
+  const current = PERMISSION_MODES.includes(mode) ? mode : 'default';
   const setRootRef = useCallback((node: HTMLDivElement | null) => {
     menu.setRoot(node);
   }, [menu]);
@@ -66,33 +38,34 @@ export const PermissionModeSelector: React.FC = () => {
         className={`composer-permission-pill ${menu.open ? 'open' : ''}`}
         selected={menu.open}
         data-testid="composer-permission-pill"
-        data-mode={current.id}
+        data-mode={current}
         aria-haspopup="menu"
         aria-expanded={menu.open}
-        title={`当前模式：${current.labelZh}（${current.descriptionZh}）`}
+        title={`${t(labelKey(current))} — ${t(descKey(current))}`}
         onClick={() => menu.toggle()}
       >
-        <span className="composer-permission-pill-label">{current.label}</span>
+        <span className="composer-permission-pill-icon" aria-hidden="true">
+          <Icon name="shield" size={14} />
+        </span>
+        <span className="composer-permission-pill-label">{t(labelKey(current))}</span>
         <span className="composer-permission-pill-caret" aria-hidden="true">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+          <Icon name="chevron-down" size={12} />
         </span>
       </Pill>
       {menu.open ? (
         <div className="composer-permission-popup" role="menu">
           {PERMISSION_MODES.map((entry) => (
             <button
-              key={entry.id}
+              key={entry}
               type="button"
-              className={`composer-permission-menu-item ${entry.id === mode ? 'is-selected' : ''}`}
-              data-mode={entry.id}
+              className={`composer-permission-menu-item ${entry === mode ? 'is-selected' : ''}`}
+              data-mode={entry}
               role="menuitemradio"
-              aria-checked={entry.id === mode}
-              onClick={() => selectMode(entry.id)}
+              aria-checked={entry === mode}
+              onClick={() => selectMode(entry)}
             >
-              <span className="composer-permission-menu-label">{entry.label}</span>
-              <span className="composer-permission-menu-desc">{entry.descriptionZh}</span>
+              <span className="composer-permission-menu-label">{t(labelKey(entry))}</span>
+              <span className="composer-permission-menu-desc">{t(descKey(entry))}</span>
             </button>
           ))}
         </div>
