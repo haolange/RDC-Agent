@@ -104,7 +104,11 @@
   border-radius: var(--radius-md);
 }
 
-.settings-managed-row:hover, .settings-managed-row:focus-within, .settings-managed-row.is-active:hover {
+.settings-managed-row:hover,
+.settings-managed-row:focus-within,
+.settings-managed-row.is-active:hover,
+.settings-managed-row:focus-visible,
+.settings-managed-row.is-active:focus-visible {
   border-color: color-mix(in srgb, var(--token-border-focus) 28%, var(--token-border-muted));
   background: color-mix(in srgb, var(--token-bg-raised) 62%, transparent);
 }
@@ -156,7 +160,8 @@
   transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
-.settings-agent-icon-option:hover {
+.settings-agent-icon-option:hover,
+.settings-agent-icon-option:focus-visible {
   border-color: var(--token-border-strong);
   background: color-mix(in srgb, var(--token-bg-raised) 74%, transparent);
 }

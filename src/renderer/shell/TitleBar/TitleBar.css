@@ -19,7 +19,8 @@
   -webkit-app-region: no-drag;
 }
 
-.window-control:hover {
+.window-control:hover,
+.window-control:focus-visible {
   color: var(--token-text-heading);
   background: color-mix(in srgb, var(--token-bg-raised) 92%, transparent);
 }
@@ -80,7 +81,8 @@
   left: 0;
 }
 
-.window-control.close:hover {
+.window-control.close:hover,
+.window-control.close:focus-visible {
   color: white;
   background: color-mix(in srgb, var(--token-status-error) 92%, transparent);
 }

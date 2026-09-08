@@ -17,7 +17,7 @@ export const zhSidebar = {
   'sidebar.renameProjectTitle': '重命名项目',
   'sidebar.menuNewSession': '新建会话',
   'sidebar.menuDelete': '删除',
-  'sidebar.sessions': '线程',
+  'sidebar.sessions': '会话',
   'sidebar.addSession': '新建会话',
   'sidebar.removeSession': '删除会话',
   'sidebar.removeSessionFailed': '删除会话失败。',

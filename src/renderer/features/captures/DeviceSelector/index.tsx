@@ -2,12 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDeviceStore } from '../../../stores/deviceStore';
 import type { ReplayDeviceEntry } from '@shared/types/device';
+import { useI18n } from '../../../i18n';
 import { useDynStyle } from '../../../lib/useDynStyle';
 import {
   DeviceStatusIcon,
   DeviceTypeIcon,
   getBootstrapSummary,
-  StatusText,
+  STATUS_TEXT_KEYS,
   type DeviceSelectorVariant,
 } from './DeviceSelectorParts';
 import {
@@ -40,6 +41,7 @@ const DeviceSelectorDropdown: React.FC<{
   selectedDevice,
   onSelect,
 }) => {
+  const { t } = useI18n();
   const dynStyle = useDynStyle({
     left: `${dropdownPosition.left}px`,
     top: `${dropdownPosition.top}px`,
@@ -57,7 +59,7 @@ const DeviceSelectorDropdown: React.FC<{
     >
       {devices.map((device) => {
         const selectable = device.type === 'local' || device.status === 'connected' || device.status === 'online';
-        const bootstrapSummary = getBootstrapSummary(device);
+        const bootstrapSummary = getBootstrapSummary(device, t);
         return (
           <button
             key={device.id}
@@ -71,12 +73,12 @@ const DeviceSelectorDropdown: React.FC<{
                 <DeviceTypeIcon type={device.type} />
                 <div className="device-option-copy">
                   <span className="device-option-name">{device.label}</span>
-                  <span className="device-option-detail">{device.detailText ?? (device.type === 'local' ? 'Local replay ready' : 'Ready')}</span>
+                  <span className="device-option-detail">{device.detailText ?? (device.type === 'local' ? t('device.localReplayReady') : t('device.ready'))}</span>
                 </div>
               </div>
               <div className="device-option-trailing">
-                <DeviceStatusIcon device={device} />
-                <span className={`device-option-status ${device.status}`}>{StatusText[device.status]}</span>
+                <DeviceStatusIcon device={device} connectedLabel={t('device.status.connected')} />
+                <span className={`device-option-status ${device.status}`}>{t(STATUS_TEXT_KEYS[device.status])}</span>
               </div>
             </div>
             {device.serial && <div className="device-option-meta">{device.serial}</div>}
@@ -93,6 +95,7 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
   variant = 'sidebar',
   collapsed = false,
 }) => {
+  const { t } = useI18n();
   const { devices, selectedDevice, setSelectedDevice, startDeviceWatch, stopDeviceWatch, activateDevice } = useDeviceStore();
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -111,15 +114,15 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
 
   const selectedEntry = devices.find((device) => device.id === selectedDevice) ?? devices[0];
   const selectedSummary = selectedEntry?.type === 'local'
-    ? 'Local Replay'
-    : (selectedEntry?.label ?? 'No Device');
+    ? t('device.localReplay')
+    : (selectedEntry?.label ?? t('device.noDevice'));
   const utilityLabel = selectedEntry?.type === 'local'
-    ? 'Local'
-    : (selectedEntry?.label ?? 'No Device');
+    ? t('device.local')
+    : (selectedEntry?.label ?? t('device.noDevice'));
   const selectedStatus = selectedEntry?.type === 'local'
-    ? 'Local'
-    : StatusText[selectedEntry?.status ?? 'offline'];
-  const triggerTitle = `Replay Device: ${selectedSummary}`;
+    ? t('device.local')
+    : t(STATUS_TEXT_KEYS[selectedEntry?.status ?? 'offline']);
+  const triggerTitle = t('device.replayDevice', { summary: selectedSummary });
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

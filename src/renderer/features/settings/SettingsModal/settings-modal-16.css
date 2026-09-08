@@ -1,4 +1,6 @@
-.settings-page-agents .settings-manifest-card:hover, .settings-page-agents .settings-manifest-card.is-active {
+.settings-page-agents .settings-manifest-card:hover,
+.settings-page-agents .settings-manifest-card.is-active,
+.settings-page-agents .settings-manifest-card:focus-visible {
   border-color: color-mix(in srgb, var(--token-border-focus) 26%, var(--token-border-muted));
   background: color-mix(in srgb, var(--token-bg-raised) 54%, transparent);
 }
@@ -139,13 +141,16 @@
   color: var(--token-text-body);
 }
 
-.settings-skill-row .settings-row-action:hover {
+.settings-skill-row .settings-row-action:hover,
+.settings-skill-row .settings-row-action:focus-visible {
   border-color: var(--token-border-strong);
   background: var(--token-interactive-hover);
   color: var(--token-text-heading);
 }
 
-.settings-skill-row:hover .settings-row-actions, .settings-skill-row:focus-within .settings-row-actions {
+.settings-skill-row:hover .settings-row-actions,
+.settings-skill-row:focus-within .settings-row-actions,
+.settings-skill-row:focus-visible .settings-row-actions {
   visibility: visible;
   opacity: 1;
 }

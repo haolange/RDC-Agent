@@ -67,7 +67,8 @@ html[data-reduce-motion='on'] .composer-markdown-toolbar {
     box-shadow var(--transition-fast);
 }
 
-.composer-markdown-tab:hover:not(:disabled):not(.is-active) {
+.composer-markdown-tab:hover:not(:disabled):not(.is-active),
+.composer-markdown-tab:focus-visible:not(:disabled):not(.is-active) {
   color: var(--token-text-body);
 }
 

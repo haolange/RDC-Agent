@@ -1,0 +1,15 @@
+export const enDevice = {
+  'device.localReplay': 'Local replay',
+  'device.localReplayReady': 'Local replay ready',
+  'device.ready': 'Ready',
+  'device.noDevice': 'No device',
+  'device.local': 'Local',
+  'device.replayDevice': 'Replay device: {summary}',
+  'device.status.offline': 'Offline',
+  'device.status.loading': 'Loading',
+  'device.status.connected': 'Connected',
+  'device.status.online': 'Online',
+  'device.apkForceReplaced': 'APK force replaced',
+  'device.apkInstalled': 'APK installed',
+  'device.apkVerified': 'APK verified',
+} as const;

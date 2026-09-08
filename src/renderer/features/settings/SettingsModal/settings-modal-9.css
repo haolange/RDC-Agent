@@ -258,7 +258,8 @@
   color: var(--token-text-body);
 }
 
-.settings-inline-pills .user-menu-pill:hover {
+.settings-inline-pills .user-menu-pill:hover,
+.settings-inline-pills .user-menu-pill:focus-visible {
   background: var(--token-interactive-hover);
   color: var(--token-text-heading);
 }

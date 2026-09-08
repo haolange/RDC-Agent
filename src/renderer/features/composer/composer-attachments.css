@@ -137,7 +137,9 @@
 .composer-attachment-card:hover .composer-attachment-card-remove,
 .composer-attachment-card:focus-within .composer-attachment-card-remove,
 .composer-skill-chip:hover .composer-skill-chip-remove,
-.composer-skill-chip:focus-within .composer-skill-chip-remove {
+.composer-skill-chip:focus-within .composer-skill-chip-remove,
+.composer-attachment-card:focus-visible .composer-attachment-card-remove,
+.composer-skill-chip:focus-visible .composer-skill-chip-remove {
   opacity: 1;
   pointer-events: auto;
 }

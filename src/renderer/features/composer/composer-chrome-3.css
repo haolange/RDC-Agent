@@ -42,7 +42,8 @@
   text-align: left;
 }
 
-.composer-agent-menu-item:hover:not(:disabled) {
+.composer-agent-menu-item:hover:not(:disabled),
+.composer-agent-menu-item:focus-visible:not(:disabled) {
   background: var(--token-interactive-hover);
   color: var(--token-text-heading);
 }

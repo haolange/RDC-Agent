@@ -79,7 +79,8 @@
 }
 
 .composer-permission-pill:hover:not(:disabled),
-.composer-permission-pill.open {
+.composer-permission-pill.open,
+.composer-permission-pill:focus-visible:not(:disabled) {
   border-color: var(--token-border-strong);
   background: var(--token-bg-raised);
 }
@@ -216,7 +217,8 @@
 }
 
 .composer-effort-pill:hover:not(:disabled),
-.composer-effort-pill.open {
+.composer-effort-pill.open,
+.composer-effort-pill:focus-visible:not(:disabled) {
   border-color: var(--token-border-strong);
   background: var(--token-bg-raised);
 }

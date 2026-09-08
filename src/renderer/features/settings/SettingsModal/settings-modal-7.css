@@ -106,7 +106,8 @@
   white-space: nowrap;
 }
 
-.settings-secret-toggle:hover:not(:disabled) {
+.settings-secret-toggle:hover:not(:disabled),
+.settings-secret-toggle:focus-visible:not(:disabled) {
   color: var(--token-text-heading);
 }
 
@@ -213,7 +214,8 @@
   cursor: pointer;
 }
 
-.settings-model-row-remove:hover {
+.settings-model-row-remove:hover,
+.settings-model-row-remove:focus-visible {
   background: color-mix(in srgb, var(--token-status-error) 12%, transparent);
   color: var(--token-status-error);
 }

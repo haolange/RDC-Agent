@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ReplayDeviceEntry } from '@shared/types/device';
+import type { TranslationKey } from '../../../i18n';
 
 export const DROPDOWN_MIN_WIDTH = 280;
 export const VIEWPORT_MARGIN = 16;
@@ -33,14 +34,17 @@ export const DeviceTypeIcon: React.FC<{ type: ReplayDeviceEntry['type'] }> = ({ 
   );
 };
 
-export const StatusText: Record<ReplayDeviceEntry['status'], string> = {
-  offline: 'Offline',
-  loading: 'Loading',
-  connected: 'Connected',
-  online: 'Online',
+export const STATUS_TEXT_KEYS: Record<ReplayDeviceEntry['status'], TranslationKey> = {
+  offline: 'device.status.offline',
+  loading: 'device.status.loading',
+  connected: 'device.status.connected',
+  online: 'device.status.online',
 };
 
-export function getBootstrapSummary(device: ReplayDeviceEntry): string | null {
+export function getBootstrapSummary(
+  device: ReplayDeviceEntry,
+  t: (key: TranslationKey) => string,
+): string | null {
   if (device.type !== 'android' || !device.bootstrap) {
     return null;
   }
@@ -50,11 +54,11 @@ export function getBootstrapSummary(device: ReplayDeviceEntry): string | null {
     summary.push(device.bootstrap.packageName);
   }
   if (device.bootstrap.installMode === 'force_replace') {
-    summary.push('APK force replaced');
+    summary.push(t('device.apkForceReplaced'));
   } else if (device.bootstrap.installedApk) {
-    summary.push('APK installed');
+    summary.push(t('device.apkInstalled'));
   } else if (device.bootstrap.packageName) {
-    summary.push('APK verified');
+    summary.push(t('device.apkVerified'));
   }
   if (device.bootstrap.abi) {
     summary.push(device.bootstrap.abi);
@@ -63,15 +67,18 @@ export function getBootstrapSummary(device: ReplayDeviceEntry): string | null {
   return summary.length > 0 ? summary.join(' · ') : null;
 }
 
-export const DeviceStatusIcon: React.FC<{ device: ReplayDeviceEntry }> = ({ device }) => {
+export const DeviceStatusIcon: React.FC<{
+  device: ReplayDeviceEntry;
+  connectedLabel: string;
+}> = ({ device, connectedLabel }) => {
   if (device.status === 'online') {
-    return <span className="device-status-icon online">✓</span>;
+    return <span className="device-status-icon online" aria-hidden="true">✓</span>;
   }
   if (device.status === 'connected') {
-    return <span className="device-status-icon connected">Connected</span>;
+    return <span className="device-status-icon connected">{connectedLabel}</span>;
   }
   if (device.status === 'loading') {
     return <span className="device-status-icon loading" aria-hidden="true" />;
   }
-  return <span className="device-status-icon offline">✕</span>;
+  return <span className="device-status-icon offline" aria-hidden="true">✕</span>;
 };

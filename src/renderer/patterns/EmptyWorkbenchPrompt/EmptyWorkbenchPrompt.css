@@ -100,7 +100,8 @@ html[data-resolved-theme='light'] .empty-workbench-prompt {
   opacity: 0.42;
 }
 
-.empty-workbench-tool-card:hover {
+.empty-workbench-tool-card:hover,
+.empty-workbench-tool-card:focus-visible {
   border-color: color-mix(in srgb, var(--empty-card-accent) 40%, var(--token-border-muted));
   background:
     linear-gradient(

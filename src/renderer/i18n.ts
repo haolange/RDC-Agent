@@ -7,6 +7,7 @@ import { enComposer } from './i18n/locales/en/composer';
 import { enContextBreakdown } from './i18n/locales/en/contextBreakdown';
 import { enContextMenu } from './i18n/locales/en/contextMenu';
 import { enControl } from './i18n/locales/en/control';
+import { enDevice } from './i18n/locales/en/device';
 import { enDialog } from './i18n/locales/en/dialog';
 import { enEmptyWorkbench } from './i18n/locales/en/emptyWorkbench';
 import { enFont } from './i18n/locales/en/font';
@@ -26,6 +27,7 @@ import { zhComposer } from './i18n/locales/zh-CN/composer';
 import { zhContextBreakdown } from './i18n/locales/zh-CN/contextBreakdown';
 import { zhContextMenu } from './i18n/locales/zh-CN/contextMenu';
 import { zhControl } from './i18n/locales/zh-CN/control';
+import { zhDevice } from './i18n/locales/zh-CN/device';
 import { zhDialog } from './i18n/locales/zh-CN/dialog';
 import { zhEmptyWorkbench } from './i18n/locales/zh-CN/emptyWorkbench';
 import { zhFont } from './i18n/locales/zh-CN/font';
@@ -47,6 +49,7 @@ const englishTranslations = {
   ...enContextBreakdown,
   ...enContextMenu,
   ...enControl,
+  ...enDevice,
   ...enDialog,
   ...enEmptyWorkbench,
   ...enFont,
@@ -71,6 +74,7 @@ const zhCnOverrides: Partial<Record<TranslationKey, string>> = {
   ...zhContextBreakdown,
   ...zhContextMenu,
   ...zhControl,
+  ...zhDevice,
   ...zhDialog,
   ...zhEmptyWorkbench,
   ...zhFont,

@@ -29,11 +29,11 @@ const RailSection: React.FC<{ id: 'progress' | 'artifacts' | 'outputs' | 'contex
   </section>
 );
 
-const ProgressList: React.FC<{ tasks: ProgressTask[] }> = ({ tasks }) => (
+const ProgressList: React.FC<{ tasks: ProgressTask[]; locateLabel: string }> = ({ tasks, locateLabel }) => (
   <ol className="right-rail-progress">
     {tasks.map((task) => (
       <li key={task.id} className={`right-rail-task-row status-${task.status}`}>
-        <button type="button" onClick={() => focusWorkProcessTask(task.id)} title="Locate in Work Process">
+        <button type="button" onClick={() => focusWorkProcessTask(task.id)} title={locateLabel}>
           <TaskStatusMarker status={task.status} order={task.order} />
           <span className="right-rail-task-copy"><strong>{task.title}</strong>{task.blockerSummary ? <small>{task.blockerSummary}</small> : null}</span>
         </button>
@@ -57,8 +57,8 @@ export const TraceRightPanel: React.FC = () => {
   const hasCapture = Boolean(taskContext && captureContext && (captureContext.capture || captureContext.availableCaptures.length || captureContext.diagnostics.length));
 
   return (
-    <aside className="right-rail" aria-label="Session inspector">
-      <RailSection id="progress" title={t('control.rightRail.progress.title')}>{tasks.length ? <ProgressList tasks={tasks} /> : <EmptyState kind="progress" copy={t('control.rightRail.progress.empty')} />}</RailSection>
+    <aside className="right-rail" aria-label={t('control.rightRail.inspector')}>
+      <RailSection id="progress" title={t('control.rightRail.progress.title')}>{tasks.length ? <ProgressList tasks={tasks} locateLabel={t('control.rightRail.locateTask')} /> : <EmptyState kind="progress" copy={t('control.rightRail.progress.empty')} />}</RailSection>
       <RailSection id="artifacts" title={t('control.rightRail.artifacts.title')}>{hasArtifacts ? <RightRailArtifactList artifacts={artifacts} /> : <EmptyState kind="artifacts" copy={artifacts.storeDegraded ? t('control.rightRail.artifacts.storeDegraded') : t('control.rightRail.artifacts.empty')} />}</RailSection>
       <RailSection id="outputs" title={t('control.rightRail.outputs.title')}>{hasOutputs ? <RightRailOutputList current={outputs.current} previous={outputs.previous} /> : <EmptyState kind="outputs" copy={t('control.rightRail.outputs.empty')} />}</RailSection>
       <RailSection id="context" title={t('control.rightRail.context.title')}>{hasTaskContext && taskContext ? <RightRailContext task={taskContext} /> : <EmptyState kind="context" copy={t('control.rightRail.context.empty')} />}</RailSection>

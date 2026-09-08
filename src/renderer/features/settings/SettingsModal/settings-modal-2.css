@@ -80,7 +80,8 @@
   background: var(--token-interactive-rest);
 }
 
-.settings-model-provider-trigger:hover {
+.settings-model-provider-trigger:hover,
+.settings-model-provider-trigger:focus-visible {
   background: var(--token-interactive-hover);
 }
 
@@ -125,7 +126,8 @@
   background: var(--token-interactive-rest);
 }
 
-.settings-model-option:hover:not(:disabled) {
+.settings-model-option:hover:not(:disabled),
+.settings-model-option:focus-visible:not(:disabled) {
   background: var(--token-interactive-hover);
 }
 

@@ -99,7 +99,8 @@
   transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.footer-entry:hover {
+.footer-entry:hover,
+.footer-entry:focus-visible {
   background:
     linear-gradient(180deg, rgb(255 255 255 / 0.05), transparent 58%),
     color-mix(in srgb, var(--token-bg-panel) 98%, transparent);
@@ -168,7 +169,8 @@
               color var(--transition-base) var(--ease-standard);
 }
 
-.footer-entry:hover .footer-entry-chevron {
+.footer-entry:hover .footer-entry-chevron,
+.footer-entry:focus-visible .footer-entry-chevron {
   opacity: 1;
   color: var(--token-text-body);
   transform: translateX(2px);

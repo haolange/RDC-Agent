@@ -58,7 +58,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
                   selected={settings.appearance.language === 'en'}
                   onClick={() => void onLanguageChange('en')}
                 >
-                  English
+                  {t('language.en')}
                 </Pill>
               </div>
             </SettingsField>

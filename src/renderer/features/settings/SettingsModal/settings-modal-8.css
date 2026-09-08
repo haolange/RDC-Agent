@@ -238,7 +238,8 @@
   transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
-.settings-checkbox-row input[type='checkbox']:hover {
+.settings-checkbox-row input[type='checkbox']:hover,
+.settings-checkbox-row input[type='checkbox']:focus-visible {
   border-color: var(--token-border-strong);
   background: var(--input-bg-hover);
 }

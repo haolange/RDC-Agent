@@ -167,17 +167,17 @@ export const UserMenu: React.FC<UserMenuProps> = ({
           <div className="user-menu-pill-group">
             <button
               type="button"
-              className={`user-menu-pill ${settings.appearance.language === 'zh-CN' ? 'active' : ''}`}
+              className={`user-menu-pill ${settings.appearance.language === 'zh-CN' ? 'is-selected' : ''}`}
               onClick={() => void onLanguageChange('zh-CN')}
             >
-              简体中文
+              {t('language.zh')}
             </button>
             <button
               type="button"
-              className={`user-menu-pill ${settings.appearance.language === 'en' ? 'active' : ''}`}
+              className={`user-menu-pill ${settings.appearance.language === 'en' ? 'is-selected' : ''}`}
               onClick={() => void onLanguageChange('en')}
             >
-              English
+              {t('language.en')}
             </button>
           </div>
         </div>
@@ -189,7 +189,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
               <button
                 key={theme}
                 type="button"
-                className={`user-menu-pill ${settings.appearance.theme === theme ? 'active' : ''}`}
+                className={`user-menu-pill ${settings.appearance.theme === theme ? 'is-selected' : ''}`}
                 onClick={() => void onThemeChange(theme)}
               >
                 {t(`theme.${theme}`)}
@@ -205,7 +205,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
               <button
                 key={size}
                 type="button"
-                className={`user-menu-pill ${settings.appearance.fontScale === size ? 'active' : ''}`}
+                className={`user-menu-pill ${settings.appearance.fontScale === size ? 'is-selected' : ''}`}
                 onClick={() => void onFontScaleChange(size)}
               >
                 {t(`font.${size}`)}

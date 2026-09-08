@@ -7,6 +7,8 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { CommandListResult } from '@shared/types/command';
+import { useI18n } from '../../i18n';
+import { Kbd } from '../../ui/Kbd';
 import './SlashCommandPopover.css';
 
 type CommandItem = CommandListResult['commands'][number];
@@ -22,6 +24,7 @@ export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({
   onSelect,
   onDismiss,
 }) => {
+  const { t } = useI18n();
   const [commands, setCommands] = useState<CommandItem[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -85,7 +88,7 @@ export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({
       {filtered.map((cmd, idx) => (
         <div
           key={cmd.id}
-          className={`slash-command-item${idx === selectedIndex ? ' selected' : ''}`}
+          className={`slash-command-item${idx === selectedIndex ? ' is-selected' : ''}`}
           role="option"
           aria-selected={idx === selectedIndex}
           title={cmd.description}
@@ -98,7 +101,7 @@ export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({
         </div>
       ))}
       <div className="slash-command-footer">
-        <kbd>↑↓</kbd> navigate <kbd>Enter</kbd> select <kbd>Esc</kbd> dismiss
+        <Kbd>↑↓</Kbd> {t('composer.slashHintNavigate')} <Kbd>Enter</Kbd> {t('composer.slashHintSelect')} <Kbd>Esc</Kbd> {t('composer.slashHintDismiss')}
       </div>
     </div>
   );
