@@ -65,8 +65,8 @@ export const CapturePanel: React.FC<{ task: TaskContextPanelViewModel; capture: 
   })), [rdx.availableCaptures]);
   const deviceOptions = useMemo<DropdownOption[]>(() => devices.map((device) => ({
     value: device.id,
-    label: device.label,
-  })), [devices]);
+    label: device.type === 'local' ? t('device.local') : device.label,
+  })), [devices, t]);
   useEffect(() => setSelectedInputId(selectedInput?.inputId ?? ''), [selectedInput?.inputId]);
   const refreshProjection = useCallback(async () => {
     if (!scope) return;

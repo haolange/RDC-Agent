@@ -72,8 +72,8 @@ const DeviceSelectorDropdown: React.FC<{
               <div className="device-option-leading">
                 <DeviceTypeIcon type={device.type} />
                 <div className="device-option-copy">
-                  <span className="device-option-name">{device.label}</span>
-                  <span className="device-option-detail">{device.detailText ?? (device.type === 'local' ? t('device.localReplayReady') : t('device.ready'))}</span>
+                  <span className="device-option-name">{device.type === 'local' ? t('device.local') : device.label}</span>
+                  <span className="device-option-detail">{device.type === 'local' ? t('device.localReplayReady') : (device.detailText ?? t('device.ready'))}</span>
                 </div>
               </div>
               <div className="device-option-trailing">

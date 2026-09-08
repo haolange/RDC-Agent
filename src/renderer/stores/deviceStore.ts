@@ -24,7 +24,6 @@ const LOCAL_DEVICE: ReplayDeviceEntry = {
   type: 'local',
   status: 'online',
   transport: 'local',
-  detailText: 'Local replay ready',
 };
 
 function normalizeDevices(devices: ReplayDeviceEntry[], selectedDevice: string): Pick<DeviceState, 'devices' | 'selectedDevice'> {
