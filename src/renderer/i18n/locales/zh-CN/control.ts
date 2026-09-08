@@ -32,6 +32,7 @@ export const zhControl = {
   'control.rightRail.artifacts.storeDegraded': '调查记录损坏或事务不完整，这不是空列表。',
   'control.rightRail.outputs.empty': '本次任务产生的输出文件会在此显示。',
   'control.rightRail.context.empty': '本次任务用到的工具与被引用文件会在此显示。',
+  'control.rightRail.context.resources': '任务上下文资源',
   'control.rightRail.capture.empty': '先向项目导入 `.rdc`，即可在此打开与预览。',
   'control.rightRail.artifacts.kind.world_state': '世界状态',
   'control.rightRail.artifacts.kind.evidence': '证据',

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { TaskContextPanelViewModel, TaskContextResource } from '@shared/types/trace';
 import { openAppPath } from '../../hooks/appShellBridge';
+import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 
 const ResourceMark: React.FC<{ resource: TaskContextResource }> = ({ resource }) => {
@@ -23,6 +24,7 @@ const ResourceMark: React.FC<{ resource: TaskContextResource }> = ({ resource })
 };
 
 const ResourceRow: React.FC<{ resource: TaskContextResource }> = ({ resource }) => {
+  const { t } = useI18n();
   const description = resource.summary?.trim();
   const tooltip = [resource.label, description].filter(Boolean).join(' — ');
   return (
@@ -39,22 +41,25 @@ const ResourceRow: React.FC<{ resource: TaskContextResource }> = ({ resource }) 
           variant="ghost"
           size="sm"
           className="right-rail-row-action"
-          aria-label={'Open ' + resource.label}
+          aria-label={`${t('control.rightRail.outputs.open')} ${resource.label}`}
           onClick={() => void openAppPath(resource.path!)}
         >
-          Open
+          {t('control.rightRail.outputs.open')}
         </Button>
       ) : null}
     </div>
   );
 };
 
-export const RightRailContext: React.FC<{ task: TaskContextPanelViewModel }> = ({ task }) => (
-  <div className="right-rail-context" aria-label="Task context resources">
-    <div className="right-rail-resource-list">
-      {task.resources.map((resource) => <ResourceRow key={resource.id} resource={resource} />)}
+export const RightRailContext: React.FC<{ task: TaskContextPanelViewModel }> = ({ task }) => {
+  const { t } = useI18n();
+  return (
+    <div className="right-rail-context" aria-label={t('control.rightRail.context.resources')}>
+      <div className="right-rail-resource-list">
+        {task.resources.map((resource) => <ResourceRow key={resource.id} resource={resource} />)}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default RightRailContext;

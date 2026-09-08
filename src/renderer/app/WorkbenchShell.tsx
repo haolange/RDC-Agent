@@ -168,7 +168,7 @@ export function WorkbenchShell({
             <DeviceSelector variant="utility" />
             <button
               type="button"
-              className={`main-utility-toggle terminal-pill ${isTerminalOpen ? 'active' : ''} ${activityAlertSeverity ? `terminal-${activityAlertSeverity}` : ''}`}
+              className={`main-utility-toggle terminal-pill ${isTerminalOpen ? 'is-active' : ''} ${activityAlertSeverity ? `terminal-${activityAlertSeverity}` : ''}`}
               onClick={onToggleTerminal}
               data-testid="terminal-toggle"
               aria-label={isTerminalOpen ? t('terminal.close') : t('terminal.open')}

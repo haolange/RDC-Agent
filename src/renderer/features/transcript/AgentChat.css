@@ -111,9 +111,15 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   cursor: pointer;
 }
 
-.message-attachment-pill:hover {
+.message-attachment-pill:hover,
+.message-attachment-pill:focus-visible {
   background: var(--token-interactive-hover);
   border-color: var(--token-border-strong);
+}
+
+.message-attachment-pill:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
 }
 
 .message-attachment-pill-icon {
@@ -1283,7 +1289,8 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   max-width: 100%;
 }
 
-.work-process-source-pill:hover {
+.work-process-source-pill:hover,
+.work-process-source-pill:focus-visible {
   border-color: var(--token-border-strong);
   color: var(--token-text-body);
 }

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
+import { Icon } from '../../ui/Icon';
 import { ModeGlyph } from '../../ui/ModeGlyph';
 import { Pill } from '../../ui/Pill';
 import { useI18n } from '../../i18n';
@@ -144,7 +145,7 @@ export const ComposerAgentMenu: React.FC<{
                   ) : null}
                 </span>
                 <span className="composer-agent-menu-item-check" aria-hidden="true">
-                  {isSelected ? '✓' : ''}
+                  {isSelected ? <Icon name="check" size={12} /> : null}
                 </span>
                 {agent.description ? (
                   <span className="composer-agent-menu-item-tooltip" role="tooltip">

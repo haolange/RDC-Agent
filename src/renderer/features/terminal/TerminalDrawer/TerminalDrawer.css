@@ -322,7 +322,7 @@ body.terminal-resizing {
   color: var(--token-text-heading);
 }
 
-.runtime-terminal-tool-button.active {
+.runtime-terminal-tool-button.is-active {
   border-color: color-mix(in srgb, var(--token-accent-primary) 32%, transparent);
   background: color-mix(in srgb, var(--token-accent-primary) 12%, transparent);
   color: var(--token-text-heading);

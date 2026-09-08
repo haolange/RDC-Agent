@@ -137,9 +137,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 ## 空态
 
-所有空态使用统一 `<EmptyState title description? actions?>`（restrained，无插画、无渐变几何体）。Right Rail 五卡、Settings 资源列表、Knowledge 列表、Sidebar 共用同一组件。文案一句 honest copy；需要操作时把按钮放进 `actions` 槽。
-
-Right Rail 五卡空态使用统一 `<EmptyState>`，无插画。`check:design-tokens` 不再豁免 `stop-color`。
+所有空态使用统一 `<EmptyState title description? actions? visual?>`。Settings 资源列表、Knowledge 列表、Sidebar 只用文案，不放装饰几何体。Right Rail 五卡通过可选 `visual` 槽恢复 token 着色的等距场景（`RightRailEmptyVisuals`，轻模糊、语义 `stop-color`），配一句 honest copy；需要操作时把按钮放进 `actions` 槽。`check:design-tokens` 不豁免 primitive `stop-color`。
 
 ## Composer 附件卡
 
@@ -172,7 +170,7 @@ Right Rail 五卡空态使用统一 `<EmptyState>`，无插画。`check:design-t
 ## 窄屏 Workbench
 
 - `<=720px` 时桌面工作区最小宽度必须解除，主区与 Composer 以真实 viewport 收缩，不得用 `overflow: hidden` 掩盖被裁掉的桌面宽度。
-- `<=480px` 时 Composer Footer 使用两层、每层不换行的工具栏：Attach / Agent / Permission 在第一层，Model / Effort / Usage / Send 在第二层；所有控件必须可点击，不得互相覆盖。
+- Composer Footer 始终单行、控件高 `--control-height-sm`（含发送按钮）。缩窄时禁止折成两行；Agent / Permission / Effort 收成 28 图标，Model 保留名称但设最长宽度，溢出用线性渐隐而不是省略号。
 - Agent / Permission / Effort / Usage / Model 菜单在窄屏锚定到 Composer 上方并完整位于 viewport 内；同一时刻只开一个；running 与 selected 分列，约 8px 状态点使用 semantic status token，`prefers-reduced-motion: reduce` 时停止动画。
 - Browser 验收至少覆盖约 390px viewport、水平溢出、菜单 selected/running、键盘导航、Escape 焦点返回及 reduced-motion。
 
@@ -224,7 +222,7 @@ pnpm run typecheck
 | 刻度 control 28/32/36、radius 4/6/8/12、duration 120/180/240 | 文档权威；token 文件 B1 已改值 | B1 已落地 |
 | `:hover` 必配 `:focus-visible`；禁无替代 `outline: none` | 无自动门禁 | **B8** 扫描清零 |
 | 分子组件清单与交互态 / CSS 变量 variant / 禁内联 style | `src/renderer/ui` 已落地；luna 审查 | **B2** 已落地 |
-| 统一 `EmptyState`（无插画） | 组件已落地；Right Rail 玻璃空态仍在 | **B2** 组件；**B7** 替换五卡空态 |
+| 统一 `EmptyState` + 可选 visual | 组件已落地；Right Rail 五卡恢复 token 着色等距场景 | **B2** 组件；二次收敛恢复 visual |
 | Composer 禁 energy orbit / 流光 | `check:work-process` 禁止 orbit keyframe / `::before` bloom | **B6** 已落地 |
 | DropdownSelect 禁 backdrop blur | `check:appearance` 要求实色 `--token-bg-shell`、禁止 blur | B1 已反转 |
 | Preview 引用运行时 CSS，删除 `designs/tokens/*` | Preview 已改；副本已删并入 `retired` | **B2** 已落地 |

@@ -1,0 +1,80 @@
+.right-rail-empty-visual {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: calc(var(--control-height-sm) * 4);
+  --rr-eg-shadow-color: var(--token-text-heading);
+  --rr-eg-shadow-op: 0.22;
+  --rr-eg-shade-op: 0.12;
+  --rr-eg-sheen-op: 0.18;
+  --rr-eg-edge-op: 0.36;
+}
+
+:root[data-resolved-theme='light'] .right-rail-empty-visual {
+  --rr-eg-shadow-op: 0.12;
+  --rr-eg-shade-op: 0.08;
+  --rr-eg-sheen-op: 0.28;
+  --rr-eg-edge-op: 0.48;
+}
+
+.rr-eg-blue-hi { stop-color: var(--token-accent-primary); stop-opacity: 0.88; }
+.rr-eg-blue-lo { stop-color: var(--token-accent-primary); stop-opacity: 0.62; }
+.rr-eg-sky-hi { stop-color: var(--token-accent-primary); stop-opacity: 0.78; }
+.rr-eg-sky-lo { stop-color: var(--token-status-info); stop-opacity: 0.62; }
+.rr-eg-green-hi { stop-color: var(--token-status-success); stop-opacity: 0.88; }
+.rr-eg-green-lo { stop-color: var(--token-status-success); stop-opacity: 0.62; }
+.rr-eg-amber-hi { stop-color: var(--token-status-warning); stop-opacity: 0.88; }
+.rr-eg-amber-lo { stop-color: var(--token-status-warning); stop-opacity: 0.64; }
+.rr-eg-purple-hi { stop-color: var(--token-illustration-purple); stop-opacity: 0.88; }
+.rr-eg-purple-lo { stop-color: var(--token-illustration-purple); stop-opacity: 0.62; }
+.rr-eg-pink-hi { stop-color: var(--token-context-subagents); stop-opacity: 0.88; }
+.rr-eg-pink-lo { stop-color: var(--token-context-subagents); stop-opacity: 0.62; }
+.rr-eg-glass-hi { stop-color: var(--token-text-inverse); stop-opacity: 0.72; }
+.rr-eg-glass-fade { stop-color: var(--token-text-inverse); stop-opacity: 0; }
+
+.rr-eg-face-shade { fill: var(--token-text-heading); opacity: var(--rr-eg-shade-op); }
+.rr-eg-face-sheen { fill: var(--token-text-inverse); opacity: var(--rr-eg-sheen-op); }
+.rr-eg-edge {
+  fill: none;
+  stroke: var(--token-text-inverse);
+  stroke-opacity: var(--rr-eg-edge-op);
+  stroke-width: 1;
+}
+.rr-eg-shadow { fill: var(--rr-eg-shadow-color); opacity: var(--rr-eg-shadow-op); }
+
+.progress-visual .rr-eg-thread {
+  fill: none;
+  stroke: var(--token-text-placeholder);
+  stroke-width: 1.25;
+}
+.progress-visual .rr-eg-active-glow { fill: var(--token-status-warning); opacity: 0.4; }
+.progress-visual .rr-eg-active-core {
+  fill: var(--token-text-inverse);
+  fill-opacity: 0.95;
+  stroke: var(--token-status-warning);
+}
+
+.output-visual .rr-eg-tray {
+  fill: var(--token-bg-muted);
+  stroke: var(--token-border-strong);
+  stroke-width: 1.5;
+}
+.output-visual .rr-eg-doc-back { opacity: 0.55; }
+.output-visual .rr-eg-doc-fold { fill: var(--token-text-inverse); fill-opacity: 0.45; }
+.output-visual .rr-eg-doc-mark { fill: var(--token-text-inverse); fill-opacity: 0.6; }
+
+.artifacts-visual .rr-eg-link-glow { stroke: var(--token-illustration-purple); stroke-opacity: 0.28; stroke-width: 4; }
+.artifacts-visual .rr-eg-link { stroke-width: 1.75; }
+.artifacts-visual .rr-eg-node { fill: var(--token-text-inverse); fill-opacity: 0.9; }
+
+.context-visual .rr-eg-link-glow { stroke: var(--token-accent-primary); stroke-opacity: 0.28; stroke-width: 4; }
+.context-visual .rr-eg-link { stroke-width: 1.75; }
+.context-visual .rr-eg-node { fill: var(--token-text-inverse); fill-opacity: 0.9; }
+
+.capture-visual .rr-eg-rec-glow { fill: var(--token-status-error); opacity: 0.36; }
+.capture-visual .rr-eg-rec {
+  fill: var(--token-status-error);
+  stroke: var(--token-text-inverse);
+  stroke-opacity: 0.6;
+}
+.capture-visual .rr-eg-play { fill: var(--token-accent-primary); }

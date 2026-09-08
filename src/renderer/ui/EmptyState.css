@@ -35,7 +35,13 @@
   margin-top: var(--space-2);
 }
 
-/* Fidelity baseline aliases until B9 re-extract. No illustration. */
+.ui-empty-state-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
 .resource-empty-state-icon {
   display: none;
 }

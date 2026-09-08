@@ -200,17 +200,18 @@
 }
 
 .dropdown-select-option:hover:not(:disabled),
-.dropdown-select-option.active {
+.dropdown-select-option:focus-visible:not(:disabled),
+.dropdown-select-option.is-active {
   background: color-mix(in srgb, var(--token-bg-raised) 72%, transparent);
   color: var(--token-text-heading);
 }
 
-.dropdown-select-option.selected {
+.dropdown-select-option.is-selected {
   background: color-mix(in srgb, var(--token-bg-raised) 55%, transparent);
   color: var(--token-text-heading);
 }
 
-.dropdown-select-option.disabled {
+.dropdown-select-option.is-disabled {
   opacity: 0.48;
   cursor: not-allowed;
 }
