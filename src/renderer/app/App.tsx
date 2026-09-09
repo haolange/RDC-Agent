@@ -8,6 +8,7 @@ import { useComposer } from '../features/composer/useComposer';
 import { CommandPalette } from '../patterns/CommandPalette';
 import { NotificationToast } from './NotificationToast';
 import { AppProviders } from './AppProviders';
+import { AppShell } from '../shell/AppShell';
 import { WorkbenchShell } from './WorkbenchShell';
 import { useWorkbenchLayout } from './useWorkbenchLayout';
 import { useAppBootstrap } from './bootstrap/useAppBootstrap';
@@ -27,7 +28,7 @@ const App: React.FC = () => {
   const [, setConnectionStatus] = useState<'connected' | 'degraded' | 'offline'>('offline');
   const [windowMaximized, setWindowMaximized] = useState(false);
   const [shellNotice, setShellNotice] = useState<string | null>(null);
-  const [userMenuAnchor, setUserMenuAnchor] = useState<DOMRect | null>(null);
+  const [userMenuAnchor, setUserMenuAnchor] = useState<{ element: HTMLButtonElement; rect: DOMRect } | null>(null);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [knowledgeCenterOpen, setKnowledgeCenterOpen] = useState(false);
   const [runtimeTestMode, setRuntimeTestMode] = useState<boolean | null>(null);
@@ -147,8 +148,8 @@ const App: React.FC = () => {
 
   return (
     <AppProviders>
-      <div className="app-container">
-        <TitleBar
+      <AppShell
+        titleBar={<TitleBar
           effectiveLeftCollapsed={layout.effectiveLeftCollapsed}
           effectiveRightCollapsed={layout.effectiveRightCollapsed}
           isRightRailVisible={layout.isRightRailVisible}
@@ -168,9 +169,9 @@ const App: React.FC = () => {
           onMinimize={handleWindowMinimize}
           onToggleMaximize={handleWindowToggleMaximize}
           onClose={handleWindowClose}
-        />
+        />}
 
-        <WorkbenchShell
+        body={<WorkbenchShell
           appBodyRef={layout.appBodyRef}
           isResizing={layout.isResizing}
           resolvedWidths={layout.resolvedWidths}
@@ -195,13 +196,20 @@ const App: React.FC = () => {
           mainPage={<DebuggerPage mode={currentMode} />}
           t={t}
           onOpenKnowledgeCenter={() => setKnowledgeCenterOpen(true)}
-          onUserMenuOpen={(event) => setUserMenuAnchor(event.currentTarget.getBoundingClientRect())}
+          isUserMenuOpen={Boolean(userMenuAnchor)}
+          onUserMenuToggle={(event) => {
+            const element = event.currentTarget;
+            const rect = element.getBoundingClientRect();
+            setUserMenuAnchor((current) => current ? null : { element, rect });
+          }}
           onToggleTerminal={() => toggleTerminalOpen()}
           onStartDrag={layout.startDragging}
-        />
+        />}
+        overlays={<>
 
         <UserMenu
-          anchorRect={userMenuAnchor}
+          anchorRect={userMenuAnchor?.rect ?? null}
+          anchorElement={userMenuAnchor?.element ?? null}
           open={Boolean(userMenuAnchor)}
           settings={settings}
           onClose={() => setUserMenuAnchor(null)}
@@ -234,7 +242,8 @@ const App: React.FC = () => {
         />
 
         <NotificationToast />
-      </div>
+        </>}
+      />
     </AppProviders>
   );
 };

@@ -1,0 +1,14 @@
+.chat-send-button {
+  --btn-radius: var(--radius-full);
+  --btn-padding-sm: 0;
+  --btn-primary-bg: var(--composer-mode-accent);
+  --btn-primary-bg-hover: color-mix(in srgb, var(--composer-mode-accent) 88%, var(--token-text-heading));
+  flex: 0 0 var(--control-height-sm);
+  width: var(--control-height-sm);
+  min-width: var(--control-height-sm);
+  height: var(--control-height-sm);
+}
+
+.chat-send-button:focus-visible {
+  outline-color: var(--composer-mode-accent);
+}

@@ -8,6 +8,7 @@ import './UserMenu.css';
 
 interface UserMenuProps {
   anchorRect: DOMRect | null;
+  anchorElement: HTMLButtonElement | null;
   open: boolean;
   settings: AppSettings;
   onClose: () => void;
@@ -30,6 +31,7 @@ const clamp = (value: number, min: number, max: number): number => {
 
 export const UserMenu: React.FC<UserMenuProps> = ({
   anchorRect,
+  anchorElement,
   open,
   settings,
   onClose,
@@ -40,6 +42,16 @@ export const UserMenu: React.FC<UserMenuProps> = ({
 }) => {
   const { t } = useI18n();
   const menuRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    // Wait for the anchor drawer's focus restoration and measured visibility.
+    const frame = requestAnimationFrame(() => {
+      returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
   const [position, setPosition] = useState({ left: VIEWPORT_MARGIN, top: VIEWPORT_MARGIN, ready: false });
 
   useEffect(() => {
@@ -47,12 +59,16 @@ export const UserMenu: React.FC<UserMenuProps> = ({
 
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (menuRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target) || anchorElement?.contains(target)) return;
       onClose();
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus();
+      }
     };
 
     document.addEventListener('mousedown', handlePointerDown);
@@ -61,7 +77,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open, onClose]);
+  }, [open, onClose, anchorElement]);
 
   const updatePosition = useCallback(() => {
     const menuElement = menuRef.current;
@@ -145,6 +161,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
       <div
         ref={menuRef}
         className="user-menu-popover visible"
+        id="sidebar-user-menu"
         data-testid="sidebar-user-menu"
         role="dialog"
         aria-modal="false"

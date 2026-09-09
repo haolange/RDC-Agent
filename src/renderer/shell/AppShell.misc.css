@@ -1,59 +1,34 @@
-
-.mode-empty-page {
-  height: 100%;
-  background: var(--token-bg-app);
-}
-
 .loading-screen {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100vh;
   gap: var(--space-6);
-  background:
-    radial-gradient(circle at center, color-mix(in srgb, var(--token-accent-primary) 10%, transparent), transparent 26%),
-    var(--token-bg-app);
-}
-
-.loading-screen::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgb(255 255 255 / 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.03) 1px, transparent 1px);
-  background-size: 48px 48px;
-  opacity: 0.25;
-  mask-image: radial-gradient(circle at center, black 40%, transparent 88%);
+  background: var(--token-bg-app);
 }
 
 .loading-logo {
-  position: relative;
-  width: 68px;
-  height: 68px;
+  width: var(--space-12);
+  height: var(--space-12);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, var(--token-accent-primary), var(--token-accent-primary));
-  color: white;
-  font-size: var(--text-2xl);
-  font-weight: var(--font-bold);
-  box-shadow: var(--shadow-glow-strong);
-  animation: pulse-glow 2.4s ease-in-out infinite;
+  border-radius: var(--radius-md);
+  background: var(--token-bg-panel);
+  color: var(--token-text-heading);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
 }
 
 .loading-text {
   color: var(--token-text-body);
-  font-size: var(--text-md);
-  font-weight: var(--font-medium);
+  font-size: var(--text-sm);
 }
 
 .loading-bar {
-  width: 220px;
-  height: 3px;
+  width: 14rem;
+  height: var(--space-1);
   border-radius: var(--radius-full);
   background: var(--token-bg-raised);
   overflow: hidden;
@@ -64,231 +39,11 @@
   display: block;
   width: 36%;
   height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--token-accent-primary), var(--token-accent-primary));
+  background: var(--token-accent-primary);
   animation: loading-shimmer 1.5s ease-in-out infinite;
 }
 
 @keyframes loading-shimmer {
   0% { transform: translateX(-120%); }
   100% { transform: translateX(320%); }
-}
-
-/* Button / icon-button / input 已迁到 src/renderer/ui，由 global.css → kit.css 导入。 */
-
-.panel {
-  background: var(--token-bg-shell);
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
-  background: var(--token-bg-panel);
-  border-bottom: 1px solid var(--token-border-default);
-}
-
-.panel-title {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
-}
-
-.panel-content {
-  padding: var(--space-4);
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-0-5) var(--space-2);
-  border-radius: var(--radius-full);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-}
-
-.badge-default {
-  background: var(--token-bg-raised);
-  color: var(--token-text-body);
-}
-
-.badge-primary {
-  background: color-mix(in srgb, var(--token-accent-primary) 15%, transparent);
-  color: var(--token-accent-primary);
-}
-
-.badge-success {
-  background: color-mix(in srgb, var(--token-status-success) 15%, transparent);
-  color: var(--token-status-success);
-}
-
-.badge-warning {
-  background: color-mix(in srgb, var(--token-status-warning) 15%, transparent);
-  color: var(--token-status-warning);
-}
-
-.badge-error {
-  background: color-mix(in srgb, var(--token-status-error) 15%, transparent);
-  color: var(--token-status-error);
-}
-
-/* status-dot variants defined in design-system.css */
-.status-dot.online { background: var(--token-status-success); box-shadow: 0 0 8px color-mix(in srgb, var(--token-status-success) 60%, transparent); }
-
-.tooltip {
-  position: relative;
-}
-
-.tooltip::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 6px);
-  transform: translateX(-50%);
-  padding: var(--space-2) var(--space-2);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--token-border-default);
-  background: var(--token-bg-raised);
-  color: var(--token-text-heading);
-  font-size: var(--text-xs);
-  white-space: nowrap;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity var(--transition-fast), visibility var(--transition-fast), transform var(--transition-fast);
-  pointer-events: none;
-  z-index: var(--z-tooltip);
-}
-
-.tooltip:hover::after {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) translateY(-2px);
-}
-
-/* scrollbar-thin defined in design-system.css */
-
-.feature-placeholder {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  overflow: hidden;
-}
-
-.feature-placeholder::before,
-.feature-placeholder::after {
-  content: '';
-  position: absolute;
-  border-radius: var(--radius-full);
-  filter: blur(32px);
-  opacity: 0.45;
-}
-
-.feature-placeholder::before {
-  width: 260px;
-  height: 260px;
-  background: color-mix(in srgb, var(--token-accent-primary) 18%, transparent);
-  top: 12%;
-  left: 14%;
-}
-
-.feature-placeholder::after {
-  width: 220px;
-  height: 220px;
-  background: color-mix(in srgb, var(--token-accent-primary) 16%, transparent);
-  right: 12%;
-  bottom: 16%;
-}
-
-.feature-placeholder-card {
-  position: relative;
-  z-index: 1;
-  width: min(560px, calc(100% - 48px));
-  padding: var(--space-10);
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-xl);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--token-bg-panel) 96%, transparent), color-mix(in srgb, var(--token-bg-shell) 96%, transparent)),
-    var(--token-bg-shell);
-  box-shadow: var(--shadow-xl);
-  text-align: center;
-}
-
-.feature-placeholder-icon {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto var(--space-5);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--token-accent-primary) 18%, transparent), color-mix(in srgb, var(--token-accent-primary) 22%, transparent));
-  color: var(--token-accent-primary);
-  border: 1px solid var(--token-border-default);
-}
-
-.feature-placeholder-title {
-  margin-bottom: var(--space-3);
-  font-size: var(--text-4xl);
-  font-weight: var(--font-bold);
-  letter-spacing: -0.03em;
-}
-
-.feature-placeholder-description {
-  max-width: 420px;
-  margin: 0 auto;
-  color: var(--token-text-body);
-  font-size: var(--text-md);
-  line-height: var(--leading-relaxed);
-}
-
-.feature-placeholder-status {
-  width: fit-content;
-  margin: var(--space-6) auto 0;
-  padding: var(--space-2) var(--space-2);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--token-border-default);
-  background: var(--token-bg-raised);
-  color: var(--token-text-caption);
-  font-size: var(--text-xs);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-:root[data-resolved-theme='light'] body {
-  background:
-    radial-gradient(circle at top, color-mix(in srgb, var(--token-accent-primary) 12%, transparent), transparent 26%),
-    radial-gradient(circle at 80% 10%, color-mix(in srgb, var(--token-accent-primary) 8%, transparent), transparent 22%),
-    var(--token-bg-app);
-}
-
-:root[data-resolved-theme='light'] html {
-  color-scheme: light;
-}
-
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible,
-[role='button']:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px var(--token-bg-shell),
-    0 0 0 4px color-mix(in srgb, var(--token-accent-primary) 38%, transparent);
-}
-
-button:focus:not(:focus-visible),
-input:focus:not(:focus-visible),
-textarea:focus:not(:focus-visible),
-select:focus:not(:focus-visible),
-[role='button']:focus:not(:focus-visible) {
-  box-shadow: none;
 }

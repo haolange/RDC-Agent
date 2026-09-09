@@ -123,7 +123,7 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
-  background: color-mix(in srgb, var(--token-bg-shell) 92%, transparent);
+  background: var(--token-bg-shell);
   overflow: hidden;
   border-right: 1px solid var(--token-border-card);
   transition: background var(--transition-base), border-color var(--transition-base);
@@ -177,9 +177,7 @@
   gap: var(--space-2);
   padding: var(--space-3) var(--space-3) var(--space-3);
   border-top: 1px solid var(--token-border-card);
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.015), transparent 65%),
-    color-mix(in srgb, var(--token-bg-shell) 95%, transparent);
+  background: var(--token-bg-shell);
 }
 
 .app-sidebar-footer.collapsed {
@@ -931,89 +929,6 @@ html[data-resolved-theme='light'] .app-main {
   box-shadow: none;
 }
 
-.chat-input-wrapper .chat-send-button {
-  flex: 0 0 auto;
-}
-
-.chat-send-button {
-  width: var(--control-height-sm);
-  min-width: var(--control-height-sm);
-  height: var(--control-height-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  padding: 0;
-  border-radius: var(--control-radius);
-  border: 1px solid var(--token-border-default);
-  background: color-mix(in srgb, var(--token-bg-shell) 86%, transparent);
-  color: var(--token-text-heading);
-  box-shadow: none;
-  cursor: pointer;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast), filter var(--transition-fast);
-}
-
-.chat-send-button:hover:not(:disabled),
-.chat-send-button:focus-visible:not(:disabled) {
-  transform: translateY(-1px);
-  background: var(--token-bg-shell);
-}
-
-.chat-send-button:disabled {
-  opacity: 0.72;
-  filter: saturate(0.8);
-  cursor: not-allowed;
-}
-
-.chat-send-button.primary {
-  border-color: color-mix(in srgb, var(--composer-mode-accent) 22%, var(--token-border-default));
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--composer-mode-accent) 86%, var(--token-accent-primary)),
-    color-mix(in srgb, var(--composer-mode-accent) 18%, var(--token-accent-primary))
-  );
-  color: var(--token-text-inverse);
-}
-
-.chat-send-button.primary:hover:not(:disabled),
-.chat-send-button.primary:focus-visible:not(:disabled) {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--composer-mode-accent) 92%, var(--token-accent-primary)),
-    color-mix(in srgb, var(--composer-mode-accent) 26%, var(--token-accent-primary))
-  );
-}
-
-.chat-send-button.primary.is-stop {
-  background: var(--token-bg-shell);
-  border-color: color-mix(in srgb, var(--token-status-error) 32%, transparent);
-  color: var(--token-status-error);
-}
-
-.chat-send-button.primary.is-stop:hover:not(:disabled),
-.chat-send-button.primary.is-stop:focus-visible:not(:disabled) {
-  background: color-mix(in srgb, var(--token-status-error) 10%, transparent);
-  border-color: color-mix(in srgb, var(--token-status-error) 46%, transparent);
-}
-
-.chat-send-button.icon-only {
-  width: var(--control-height-sm);
-  min-width: var(--control-height-sm);
-  padding: 0;
-}
-
-.chat-send-button-label {
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
-}
-
-.chat-stop-button {
-  background: var(--token-bg-shell);
-  border-color: color-mix(in srgb, var(--token-status-error) 26%, transparent);
-  color: var(--token-status-error);
-  box-shadow: none;
-}
-
 .input-bar-placeholder {
   display: flex;
   align-items: center;
@@ -1045,7 +960,7 @@ html[data-resolved-theme='light'] .app-main {
   height: 100%;
   min-width: 0;
   min-height: 0;
-  background: color-mix(in srgb, var(--token-bg-shell) 92%, transparent);
+  background: var(--token-bg-shell);
   overflow: hidden;
   border-left: 1px solid var(--token-border-card);
   transition: background var(--transition-base), border-color var(--transition-base);

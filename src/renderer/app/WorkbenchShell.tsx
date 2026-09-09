@@ -3,6 +3,7 @@ import { ControlPanel } from '../features/right-rail';
 import { DeviceSelector } from '../features/captures/DeviceSelector';
 import { Sidebar } from '../features/sidebar/Sidebar';
 import { TerminalDrawer } from '../features/terminal/TerminalDrawer';
+import { Button } from '../ui/Button';
 import { ProfileAvatar } from '../patterns/ProfileAvatar';
 import { Composer } from '../features/composer/Composer';
 import type { ComposerController } from '../features/composer/useComposer';
@@ -38,7 +39,8 @@ export interface WorkbenchShellProps {
   mainPage: ReactNode;
   t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   onOpenKnowledgeCenter: () => void;
-  onUserMenuOpen: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  isUserMenuOpen: boolean;
+  onUserMenuToggle: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onToggleTerminal: () => void;
   onStartDrag: (side: DragSide, startWidth: number) => (event: React.PointerEvent<HTMLDivElement>) => void;
 }
@@ -68,7 +70,8 @@ export function WorkbenchShell({
   mainPage,
   t,
   onOpenKnowledgeCenter,
-  onUserMenuOpen,
+  isUserMenuOpen,
+  onUserMenuToggle,
   onToggleTerminal,
   onStartDrag,
 }: WorkbenchShellProps) {
@@ -88,9 +91,9 @@ export function WorkbenchShell({
     </nav>
     {(isLeftDrawerMode || !effectiveLeftCollapsed) && (
       <div className="app-sidebar-footer" data-testid="sidebar-footer">
-        <button
-          type="button"
-          className="footer-entry sidebar-footer-entry sidebar-knowledge-trigger"
+        <Button
+          variant="ghost"
+          className="footer-entry sidebar-footer-entry"
           data-testid="sidebar-knowledge-center-trigger"
           onClick={() => { onCloseLeftDrawer(); onOpenKnowledgeCenter(); }}
           title={t('knowledgeCenter.title')}
@@ -107,12 +110,15 @@ export function WorkbenchShell({
               <span className="footer-entry-title">{t('knowledgeCenter.sidebarLabel')}</span>
             </span>
           </span>
-        </button>
-        <button
-          type="button"
-          className="footer-entry footer-user-trigger sidebar-user-trigger sidebar-footer-entry"
+        </Button>
+        <Button
+          variant="ghost"
+          className="footer-entry sidebar-footer-entry"
           data-testid="sidebar-user-settings-trigger"
-          onClick={(event) => { onCloseLeftDrawer(); onUserMenuOpen(event); }}
+          aria-haspopup="dialog"
+          aria-expanded={isUserMenuOpen}
+          aria-controls={isUserMenuOpen ? 'sidebar-user-menu' : undefined}
+          onClick={(event) => { onCloseLeftDrawer(); onUserMenuToggle(event); }}
           title={t('sidebar.userSettings')}
           aria-label={t('sidebar.userSettings')}
         >
@@ -133,7 +139,7 @@ export function WorkbenchShell({
               </svg>
             </span>
           </span>
-        </button>
+        </Button>
       </div>
     )}
   </>;
@@ -165,7 +171,7 @@ export function WorkbenchShell({
             </div>
           )}
           <div className="main-floating-utilities">
-            <DeviceSelector variant="utility" />
+            <DeviceSelector />
             <button
               type="button"
               className={`main-utility-toggle terminal-pill ${isTerminalOpen ? 'is-active' : ''} ${activityAlertSeverity ? `terminal-${activityAlertSeverity}` : ''}`}

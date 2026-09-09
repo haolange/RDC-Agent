@@ -1,6 +1,5 @@
 export const zhProjectCapture = {
   'projectCapture.title': 'Capture 文件',
-  'projectCapture.description': '为此项目导入 RenderDoc capture。',
   'projectCapture.import': '导入 .rdc',
   'projectCapture.importing': '正在导入…',
   'projectCapture.refreshing': '正在刷新…',

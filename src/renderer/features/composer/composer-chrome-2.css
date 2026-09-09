@@ -42,6 +42,14 @@
 
 .composer-model-menu {
   position: relative;
+  flex: 0 1 12rem;
+  min-width: 0;
+}
+
+.composer-agent-menu,
+.composer-permission-menu,
+.composer-effort-menu {
+  flex: 0 0 auto;
 }
 
 .composer-model-pill {
@@ -51,8 +59,7 @@
   height: var(--control-height-sm);
   min-height: var(--control-height-sm);
   min-width: 0;
-  flex: 1 1 auto;
-  max-width: 12rem;
+  width: 100%;
   padding: 0 var(--space-3);
   border-radius: var(--control-radius);
   border: 1px solid var(--token-border-default);

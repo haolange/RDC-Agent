@@ -30,6 +30,7 @@ export type IconName =
   | 'inbox'
   | 'conflict'
   | 'folder'
+  | 'refresh'
   | 'upload'
   | 'filter'
   | 'shield';
@@ -92,6 +93,7 @@ const ICONS: Record<IconName, readonly IconPart[]> = {
   inbox: [{ d: 'M4 4h16v16H4V4Zm0 10h5l2 3h2l2-3h5' }],
   conflict: [{ d: 'M7 3v14m-3-3 3 3 3-3M17 21V7m-3 3 3-3 3 3' }],
   folder: [{ d: 'M3 7V5h6l2 2h10v13H3V7Z' }],
+  refresh: [{ d: 'M20 7v5h-5M4 17v-5h5M6.1 6.1A8 8 0 0 1 19.5 10M4.5 14a8 8 0 0 0 13.4 3.9' }],
   upload: [{ d: 'M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6' }],
   filter: [{ d: 'M4 7h7m4 0h5M4 17h3m4 0h9M11 4v6M7 14v6' }],
   shield: [
