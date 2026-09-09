@@ -136,7 +136,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     const service = new AgentRuntimeConfigService();
     const metadata = service.listSkillMetadata();
     const ids = metadata.map((skill) => skill.id).sort();
-    expect(MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS).toHaveLength(21);
+    expect(MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS).toHaveLength(22);
     expect(GENERAL_SKILL_IDS).toHaveLength(6);
     expect([...CANONICAL_SKILL_IDS].sort()).toEqual(ids);
     expect(new Set(ids).size).toBe(ids.length);
@@ -146,7 +146,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     for (const skill of metadata) {
       expect(skill.scope).toBe('builtin');
       expect(skillLane(skill.id)).toBeTruthy();
-      expect(skillCallEntry(skill.id)).toMatch(/agent\.md-skills|composer-\$skill/);
+      expect(skillCallEntry(skill.id)).toMatch(/agent\.md-skills|task-matched-or-explicit/);
       const loaded = service.loadSkill(skill.id);
       expect(loaded?.id).toBe(skill.id);
       expect(loaded?.instructions.length).toBeGreaterThan(0);
@@ -154,7 +154,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     for (const id of PLAN_ONLY_CONFLICT_SKILL_IDS) {
       expect(skillLane(id)).toBe('general');
       expect(isPlanOnlyConflictSkill(id)).toBe(true);
-      expect(service.loadSkill(id)?.allowedTools).toEqual(expect.arrayContaining(['shell']));
+      expect(service.loadSkill(id)?.allowedTools).toEqual([]);
     }
     const { readFileSync } = await import('node:fs');
     const { join } = await import('node:path');
@@ -169,18 +169,13 @@ describe('AgentRuntimeConfigService scoped resources', () => {
       }
     }
     const provenance = service.loadSkill('artifact-provenance');
-    expect(provenance?.allowedTools).toEqual(expect.arrayContaining([
-      'investigation_read',
-      'investigation_write',
-      'investigation_list',
-      'artifact_read',
-    ]));
+    expect(provenance?.allowedTools).toEqual([]);
     expect(provenance?.instructions).toContain('sourceRefs.length >= 1');
     const execution = service.loadSkill('renderdoc-execution');
     const causal = service.loadSkill('debugger-causal-method');
     const architecture = service.loadSkill('analyzer-architecture-method');
     for (const skill of [execution, causal, architecture]) {
-      expect(skill?.allowedTools).toEqual(expect.arrayContaining(['subagent', 'task_create', 'shell']));
+      expect(skill?.allowedTools).toEqual([]);
     }
     const coordinator = service.loadSkill('debugger-coordinator');
     expect(coordinator?.allowedTools.some((tool) => (

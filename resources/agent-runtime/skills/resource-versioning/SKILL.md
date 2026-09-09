@@ -1,7 +1,6 @@
 ---
 name: resource-versioning
 description: Trace resource producers, consumers, and versions across the current World State.
-allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read, rdx_context, shell, task_create, subagent]
 ---
 
 # Resource Versioning

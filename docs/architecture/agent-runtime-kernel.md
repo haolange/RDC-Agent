@@ -94,3 +94,8 @@ After at least one visible process section exists, a later answer-only `llm_turn
 - Work Process contract: `pnpm run check:work-process` and `pnpm run check:work-process-tool-coverage`
 - Architecture/fidelity/shared export checks after renderer or shared-contract changes
 - Shell smoke after window, preload, IPC, workspace permission, or RDX CLI invocation boundary changes
+
+
+## 通用完成接口与任务绑定
+
+AgentTurnRunner / ConversationTurnRunner 仅调用注入的 TurnCompletionValidator。AgentOrchestrator / ConversationService 组合现有 Investigation 校验器；prepareTurn 由主进程根据真实派发者选择校验策略并冻结 TaskCompletionBinding。普通 General turn 没有领域完成要求。RDX Capsule 扩展由 sessions/RdxDelegation 验证及注入；通用 Capsule 编译器不含租约方法段。详见 runtime-kernel 的结构化交接契约。

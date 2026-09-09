@@ -39,7 +39,7 @@ export function isAgentToolSpecConcurrencySafe(spec?: AgentToolSpec): boolean {
 
 /**
  * Classify one call. Missing spec → unsafe.
- * `subagent` is concurrent only when requiresRdxLease === false.
+ * `subagent` is concurrent only without domain capability requests.
  */
 export function isToolCallConcurrencySafe(input: {
   name: string;
@@ -51,7 +51,7 @@ export function isToolCallConcurrencySafe(input: {
     return false;
   }
   if (name === 'subagent') {
-    return input.args?.requiresRdxLease === false;
+    return Boolean(input.args) && !('requiresRdxLease' in input.args!) && input.args?.domainExtensions === undefined;
   }
   return isAgentToolSpecConcurrencySafe(input.spec);
 }

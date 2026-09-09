@@ -1,3 +1,4 @@
+import { parseRdxNativeResult } from './RdxNativeProtocol';
 import fs from 'fs';
 import path from 'path';
 import type {
@@ -183,10 +184,11 @@ export class RdxCliInvokerService {
       env?: Record<string, string>;
       runId?: string;
       abortSignal?: AbortSignal;
+      settings?: RdxCliInvokerSettings;
     } = {},
   ): Promise<CLIResult> {
     const startTime = nowMs();
-    const settings = this.getSettings();
+    const settings = options.settings ?? this.getSettings();
     const unavailableReason = this.getAvailabilityFailure(settings);
     if (unavailableReason) {
       return {
@@ -275,22 +277,10 @@ export class RdxCliInvokerService {
         abortSignal: request.abortSignal,
       });
 
+      request.abortSignal?.throwIfAborted();
+      parseRdxNativeResult(result);
       if (result.stdout.trim()) {
-        let parsed: Record<string, unknown> | null = null;
-        try {
-          parsed = JSON.parse(result.stdout);
-        } catch {
-          if (result.exitCode === 0) {
-            response = {
-              ok: true,
-              data: { raw: result.stdout },
-              duration_ms: nowMs() - startTime,
-              trace_id: generateEventId('tool'),
-            };
-            this.emitInvocationTrace(request, response);
-            return response;
-          }
-        }
+        const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
 
         if (parsed) {
           if (parsed.ok === false) {

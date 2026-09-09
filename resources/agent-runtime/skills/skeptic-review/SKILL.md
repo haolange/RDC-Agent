@@ -1,7 +1,6 @@
 ---
 name: skeptic-review
 description: Challenge Claims from Evidence, Experiments, negatives, and unknowns. Do not rewrite the Generator narrative.
-allowed-tools: [investigation_read, investigation_write, investigation_list, knowledge_search, knowledge_read, shell, task_create, subagent]
 ---
 
 # Skeptic Review

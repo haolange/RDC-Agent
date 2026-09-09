@@ -21,7 +21,7 @@ export interface DelegationCapsule {
   inputArtifactRefs: string[];
   outputRequirements: string;
   budget: DelegationCapsuleBudget;
-  requiresRdxLease: boolean;
+  domainExtensions?: Record<string, Record<string, boolean>>;
   profile?: string;
   model?: string;
 }
@@ -34,7 +34,6 @@ const REQUIRED_KEYS = [
   'inputArtifactRefs',
   'outputRequirements',
   'budget',
-  'requiresRdxLease',
 ] as const;
 
 function fail(detail: string): never {
@@ -109,9 +108,11 @@ export function parseDelegationCapsule(input: unknown): DelegationCapsule {
     }
   }
 
-  if (typeof record.requiresRdxLease !== 'boolean') {
-    fail('requiresRdxLease must be a boolean.');
-  }
+  if ('requiresRdxLease' in record) fail('requiresRdxLease was removed; use optional domainExtensions.');
+  const domainExtensions = record.domainExtensions;
+  if (domainExtensions !== undefined && (!domainExtensions || typeof domainExtensions !== 'object' || Array.isArray(domainExtensions)
+    || Object.values(domainExtensions).some(value => !value || typeof value !== 'object' || Array.isArray(value)
+      || Object.values(value).some(flag => typeof flag !== 'boolean')))) fail('domainExtensions must contain boolean capability requests.');
 
   const budgetValue = record.budget;
   if (!budgetValue || typeof budgetValue !== 'object' || Array.isArray(budgetValue)) {
@@ -134,7 +135,7 @@ export function parseDelegationCapsule(input: unknown): DelegationCapsule {
       maxWallTimeMs: maxWallTimeMs!,
       ...(maxSubagents !== undefined ? { maxSubagents } : {}),
     },
-    requiresRdxLease: record.requiresRdxLease,
+    ...(domainExtensions ? { domainExtensions: domainExtensions as Record<string, Record<string, boolean>> } : {}),
   };
 
   if (typeof record.profile === 'string' && record.profile.trim()) {
@@ -154,6 +155,7 @@ export function freezeDelegationCapsule(capsule: DelegationCapsule): DelegationC
     && Object.isFrozen(capsule.acceptedFacts)
     && Object.isFrozen(capsule.forbiddenPaths)
     && Object.isFrozen(capsule.inputArtifactRefs)
+    && (!capsule.domainExtensions || (Object.isFrozen(capsule.domainExtensions) && Object.values(capsule.domainExtensions).every(Object.isFrozen)))
   ) {
     return capsule;
   }
@@ -165,7 +167,7 @@ export function freezeDelegationCapsule(capsule: DelegationCapsule): DelegationC
     inputArtifactRefs: Object.freeze([...capsule.inputArtifactRefs]),
     outputRequirements: capsule.outputRequirements,
     budget: Object.freeze({ ...capsule.budget }),
-    requiresRdxLease: capsule.requiresRdxLease,
+    ...(capsule.domainExtensions ? { domainExtensions: Object.freeze(Object.fromEntries(Object.entries(capsule.domainExtensions).map(([key, value]) => [key, Object.freeze({ ...value })]))) } : {}),
     ...(capsule.profile ? { profile: capsule.profile } : {}),
     ...(capsule.model ? { model: capsule.model } : {}),
   }) as DelegationCapsule;
@@ -181,8 +183,7 @@ export const DELEGATION_CAPSULE_JSON_SCHEMA = {
     'inputArtifactRefs',
     'outputRequirements',
     'budget',
-    'requiresRdxLease',
-  ],
+    ],
   properties: {
     mission: { type: 'string', description: 'Mission the child must serve.' },
     task: { type: 'string', description: 'Concrete task for this delegation.' },
@@ -211,10 +212,7 @@ export const DELEGATION_CAPSULE_JSON_SCHEMA = {
         maxSubagents: { type: 'integer', minimum: 1, description: 'Optional nested subagent budget.' },
       },
     },
-    requiresRdxLease: {
-      type: 'boolean',
-      description: 'true = needs the parent RDX lease (serial). false = offline, may join a concurrent group.',
-    },
+    domainExtensions: { type: 'object', description: 'Optional domain-owned capability requests; omitted for ordinary tasks.' },
     profile: { type: 'string', description: 'Target profile id. Defaults to the caller profile.' },
     model: { type: 'string', description: 'Optional canonical providerId:modelId. Does not inherit the parent session override.' },
   },

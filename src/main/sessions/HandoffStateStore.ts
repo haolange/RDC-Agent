@@ -1,3 +1,6 @@
+import * as fs from 'node:fs';
+import type { HandoffContract } from '@shared/types/handoffContract';
+import { assertHandoffTransition } from './handoffExecution';
 import * as path from 'node:path';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import {
@@ -19,6 +22,7 @@ export interface PrepareHandoffInput {
   sourceRequestId: string;
   sourceAgentId: string;
   toAgentId: string;
+  contract: HandoffContract;
   prompt: string;
   label: string;
   declaredModel: string | null;
@@ -53,6 +57,18 @@ export class HandoffStateStore {
   readDocument(sessionId: string): HandoffStateDocument | null {
     const filePath = this.getHandoffStatePath(sessionId);
     if (!filePath) return null;
+    if (fs.existsSync(filePath)) {
+      const raw = fs.readFileSync(filePath);
+      let old: unknown;
+      try { old = JSON.parse(raw.toString('utf8')); }
+      catch { return this.host.io.readJson(filePath, HANDOFF_STATE_MIGRATIONS); }
+      if (old && typeof old === 'object' && 'schemaVersion' in old && old.schemaVersion === '1') {
+        const archive = filePath + '.v1-archive';
+        if (!fs.existsSync(archive)) fs.writeFileSync(archive, raw, { flag: 'wx' });
+        else if (!fs.readFileSync(archive).equals(raw)) throw handoffConflict('v1 archive differs; migration stopped.');
+        this.host.io.writeJsonAtomic(filePath, { ...toHandoffStateDocument(null), migrationNotice: '旧交接已原样归档，未推测执行周期；待续跑交接已停用，请按当前目标重新建立交接。' });
+      }
+    }
     return this.host.io.readJson(filePath, HANDOFF_STATE_MIGRATIONS);
   }
 
@@ -138,6 +154,7 @@ export class HandoffStateStore {
     if (reserved && reserved !== input.handoffId) {
       throw new Error(`${HANDOFF_ERROR.ALREADY_ACTIVE}: session already has an unfinished handoff.`);
     }
+    assertHandoffTransition(input, this.readDocument(sessionId)?.history ?? []);
     if (input.depth > HANDOFF_CHAIN_LIMIT) {
       throw new Error(`${HANDOFF_ERROR.CHAIN_LIMIT}: handoff chain exceeds ${HANDOFF_CHAIN_LIMIT}.`);
     }
@@ -153,6 +170,7 @@ export class HandoffStateStore {
       toAgentId: input.toAgentId,
       chainRoot: input.chainRoot,
       depth: input.depth,
+      contract: structuredClone(input.contract),
       prompt: input.prompt,
       label: input.label,
       declaredModel: input.declaredModel,

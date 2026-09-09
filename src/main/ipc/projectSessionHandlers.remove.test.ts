@@ -16,7 +16,7 @@ const { handlers, syncSessionSlots, storage, conversation } = vi.hoisted(() => (
     setCurrentSessionId: vi.fn(async () => undefined),
     setCurrentProjectId: vi.fn(),
     getLatestRun: vi.fn(() => null),
-    handoffs: { getActive: vi.fn((): { handoffId: string; lifecycle: string; toAgentId: string } | null => null) },
+    handoffs: { readDocument: vi.fn(() => null), getActive: vi.fn((): { handoffId: string; lifecycle: string; toAgentId: string } | null => null) },
   },
 }));
 

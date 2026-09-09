@@ -21,8 +21,12 @@ describe('Mission turn completion gate', () => {
   it('is wired on AgentTurnRunner and ConversationTurnRunner', () => {
     const runner = readFileSync(path.join(repoRoot, 'src/main/workflow/debugger/AgentTurnRunner.ts'), 'utf8');
     const conversation = readFileSync(path.join(repoRoot, 'src/main/conversation/ConversationTurnRunner.ts'), 'utf8');
-    expect(runner).toMatch(/enforceMissionTurnCompletion/);
-    expect(conversation).toMatch(/enforceMissionTurnCompletion/);
+    expect(runner).toMatch(/validateCompletion/);
+    expect(conversation).toMatch(/validateCompletion/);
+    expect(runner + conversation).not.toMatch(/import.*missionCompletionContract/);
+    for (const file of ['src/main/workflow/debugger/AgentOrchestrator.ts', 'src/main/conversation/ConversationService.ts']) {
+      expect(readFileSync(path.join(repoRoot, file), 'utf8')).toMatch(/validateCompletion: enforceMissionTurnCompletion/);
+    }
   });
 
   it('does not affect General', () => {

@@ -1,3 +1,4 @@
+import type { HandoffContract } from '@shared/types/handoffContract';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({
@@ -103,6 +104,15 @@ import { RuntimeToolAssembly } from './RuntimeToolAssembly';
 import { TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 
+vi.mock('../../sessions/SessionArtifactResolver', () => ({ sessionArtifactResolver: {
+  read: (_session: string, uri: string) => ({ uri, category: uri.includes('plans') ? 'plans' : 'investigation', mimeType: uri.includes('plans') ? 'text/markdown' : 'application/json', hash: 'a'.repeat(64) }),
+} }));
+function handoffContract(target: string): HandoffContract {
+  const ref = { uri: 'session://plans/plan.md', hash: 'a'.repeat(64) };
+  return target === 'general'
+    ? { intent: 'execute', plan: ref, requiredSkillIds: ['renderdoc-execution'], returnTo: 'debugger', deliveryRequirements: 'checkpoint' }
+    : { intent: 'return', executionHandoffId: 'executing', artifacts: [ref] };
+}
 function createAssembly(): RuntimeToolAssembly {
   return new RuntimeToolAssembly({
     mcp: {
@@ -228,7 +238,7 @@ describe('RuntimeToolAssembly', () => {
       enabledProfileIds: ['debugger', 'general'],
     } as never;
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
-    const result = await tool.execute('tc-handoff', { agent: 'general', prompt: 'continue', label: 'Go' });
+    const result = await tool.execute('tc-handoff', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).not.toBe(true);
     expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
       'agent.before-handoff',
@@ -273,7 +283,7 @@ describe('RuntimeToolAssembly', () => {
       enabledProfileIds: ['debugger', 'general'],
     } as never;
     const tool = assembly.createAgentHandoffTool('general', 'session-b', handle);
-    const result = await tool.execute('tc-replan', { agent: 'debugger', prompt: 'Replan the mission.', label: 'Replan' });
+    const result = await tool.execute('tc-replan', { agent: 'debugger', contract: handoffContract('debugger'), prompt: 'Replan the mission.', label: 'Replan' });
     expect(result.isError).not.toBe(true);
     expect(listCheckpoints).toHaveBeenCalledWith('session-b', { kind: 'checkpoint' });
     expect(readCheckpoint).toHaveBeenCalledWith('session-b', 'art-cp-1');
@@ -311,7 +321,7 @@ describe('RuntimeToolAssembly', () => {
       enabledProfileIds: ['debugger', 'general'],
     } as never;
     const tool = assembly.createAgentHandoffTool('general', 'session-c', handle);
-    await tool.execute('tc-missing', { agent: 'debugger', prompt: 'Replan the mission.', label: 'Replan' });
+    await tool.execute('tc-missing', { agent: 'debugger', contract: handoffContract('debugger'), prompt: 'Replan the mission.', label: 'Replan' });
     expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
       'agent.before-handoff',
       expect.objectContaining({
@@ -362,7 +372,7 @@ describe('RuntimeToolAssembly', () => {
       enabledProfileIds: ['analyzer', 'general'],
     } as never;
     const tool = assembly.createAgentHandoffTool('general', 'session-d', handle);
-    const result = await tool.execute('tc-mixed', { agent: 'analyzer', prompt: 'Replan architecture.', label: 'Replan' });
+    const result = await tool.execute('tc-mixed', { agent: 'analyzer', contract: handoffContract('analyzer'), prompt: 'Replan architecture.', label: 'Replan' });
     expect(result.isError).not.toBe(true);
     expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
       'agent.before-handoff',
@@ -400,7 +410,7 @@ describe('RuntimeToolAssembly', () => {
       enabledProfileIds: ['analyzer', 'general'],
     } as never;
     const tool = assembly.createAgentHandoffTool('general', 'session-e', handle);
-    await tool.execute('tc-no-analyzer-cp', { agent: 'analyzer', prompt: 'Replan architecture.', label: 'Replan' });
+    await tool.execute('tc-no-analyzer-cp', { agent: 'analyzer', contract: handoffContract('analyzer'), prompt: 'Replan architecture.', label: 'Replan' });
     const beforeCall = dispatchRuntimeHooks.mock.calls.find((call) => call[0] === 'agent.before-handoff');
     expect(beforeCall?.[1].payload).not.toHaveProperty('checkpointId');
   });
@@ -416,7 +426,7 @@ describe('RuntimeToolAssembly', () => {
       enabledProfileIds: ['debugger', 'general'],
     } as never;
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
-    const result = await tool.execute('tc-after-denied', { agent: 'general', prompt: 'continue', label: 'Go' });
+    const result = await tool.execute('tc-after-denied', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({ type: 'text', text: 'HOOK_DENIED: agent.after-handoff' });
     expect(createPreparedDraft).toHaveBeenCalled();
@@ -441,7 +451,7 @@ describe('RuntimeToolAssembly', () => {
       enabledProfileIds: ['debugger', 'general'],
     } as never;
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
-    const result = await tool.execute('tc-hook-throw', { agent: 'general', prompt: 'continue', label: 'Go' });
+    const result = await tool.execute('tc-hook-throw', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);
     expect(createPreparedDraft).toHaveBeenCalled();
     expect(prepareHandoff).not.toHaveBeenCalled();
@@ -464,7 +474,7 @@ describe('RuntimeToolAssembly', () => {
       enabledProfileIds: ['debugger', 'general'],
     } as never;
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
-    const result = await tool.execute('tc-persist-fail', { agent: 'general', prompt: 'continue', label: 'Go' });
+    const result = await tool.execute('tc-persist-fail', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);
     expect(createPreparedDraft).toHaveBeenCalled();
     expect(prepareHandoff).toHaveBeenCalled();
@@ -484,7 +494,7 @@ describe('RuntimeToolAssembly', () => {
       enabledProfileIds: ['debugger', 'general'],
     } as never;
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
-    const result = await tool.execute('tc-denied', { agent: 'general', prompt: 'continue', label: 'Go' });
+    const result = await tool.execute('tc-denied', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);
     expect(createPreparedDraft).not.toHaveBeenCalled();
     expect(prepareHandoff).not.toHaveBeenCalled();
@@ -502,7 +512,7 @@ describe('RuntimeToolAssembly', () => {
       enabledProfileIds: ['debugger', 'general'],
     } as never;
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
-    const result = await tool.execute('tc-second', { agent: 'general', prompt: 'continue', label: 'Go' });
+    const result = await tool.execute('tc-second', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringMatching(/HANDOFF_ALREADY_ACTIVE/) });
     expect(createPreparedDraft).not.toHaveBeenCalled();
@@ -510,8 +520,8 @@ describe('RuntimeToolAssembly', () => {
     expect(handle.pendingHandoff).toBeNull();
   });
 
-  it('rejects depth 4 before drafting or persisting', async () => {
-    computeNextChain.mockReturnValueOnce({ chainRoot: 'root', depth: 4 });
+  it('rejects depth 6 before drafting or persisting', async () => {
+    computeNextChain.mockReturnValueOnce({ chainRoot: 'root', depth: 6 });
     const assembly = createAssembly();
     const handle = new TurnHandle({ sessionKey: 'session-a', turnId: 'turn-a', runId: 'run-a', generation: 1 });
     handle.eventSink = { sessionId: 'session-a', requestId: 'req-1' } as never;
@@ -521,7 +531,7 @@ describe('RuntimeToolAssembly', () => {
       enabledProfileIds: ['debugger', 'general'],
     } as never;
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
-    const result = await tool.execute('tc-depth', { agent: 'general', prompt: 'continue', label: 'Go' });
+    const result = await tool.execute('tc-depth', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringMatching(/HANDOFF_CHAIN_LIMIT/) });
     expect(createPreparedDraft).not.toHaveBeenCalled();
@@ -544,7 +554,7 @@ describe('RuntimeToolAssembly', () => {
       enabledProfileIds: ['debugger', 'general'],
     } as never;
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
-    const result = await tool.execute('tc-model', { agent: 'general', prompt: 'continue', label: 'Go' });
+    const result = await tool.execute('tc-model', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringMatching(/HANDOFF_MODEL_INVALID/) });
     expect(createPreparedDraft).not.toHaveBeenCalled();

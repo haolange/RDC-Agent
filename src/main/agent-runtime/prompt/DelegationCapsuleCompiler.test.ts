@@ -20,7 +20,7 @@ function validCapsule(overrides: Partial<DelegationCapsule> = {}): DelegationCap
     inputArtifactRefs: ['session://tool-outputs/notes/a.md'],
     outputRequirements: 'Return the event id and evidence refs.',
     budget: { maxToolCalls: 8, maxWallTimeMs: 60_000 },
-    requiresRdxLease: false,
+
     ...overrides,
   };
 }
@@ -35,7 +35,7 @@ describe('DelegationCapsule', () => {
     expect(prompt).toContain('Delegation Mission');
     expect(prompt).toContain('inspect the color target');
     expect(prompt).toContain('session://tool-outputs/notes/a.md');
-    expect(prompt).toContain('requiresRdxLease: false');
+    expect(prompt).not.toContain('# RDX Lease');
     expect(Object.isFrozen(capsule)).toBe(true);
     expect(Object.isFrozen(capsule.budget)).toBe(true);
     expect(Object.isFrozen(segments)).toBe(true);

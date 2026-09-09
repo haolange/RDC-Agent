@@ -49,12 +49,13 @@ Progressive Skill 面：
 
 Skill `allowed-tools` **只能收窄、永不扩展** effective profile tool set。
 
-多 skill 同时激活（preload + `skill_read`）时：
+prepareTurn 冻结多个预载 skill 时：
 
 ```text
 allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 ```
 
+- `skill_read` 只读取方法，不重新收窄本轮冻结工具集；
 - 某个 skill 未声明或声明空列表：该 skill **不参与**收窄；
 - 元工具豁免（如 `skills` / `skill_read` / `ask_user` / `tool_search`）由 `intersectSkillAllowedTools` 保留；
 - 实现：`combineActiveSkillAllowlists`（`DebuggerRuntimePolicy.ts`），Orchestrator 执行路径调用。
@@ -74,3 +75,10 @@ Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / In
 ## Provider Account（产品）
 
 Account providers 是登录产品。Super Grok Account：xAI 公共 native-client + PKCE；默认浏览器一次性码粘贴；Device Code 为显式 headless 替代。不得导入 `~/.grok/auth.json` 或共享 refresh token。xAI (Grok) API-key 为独立 provider。
+
+
+## 任务匹配与交接预载
+
+General 默认只预载 execution-orchestrator；renderdoc-investigation 按真实调查目标匹配，简单问答不路由。显式 Skill、profile 默认 Skill 和 execute 合同的 requiredSkillIds 合并去重；prepareTurn 校验可用性与工具权限交集，冻结来源，来源变化要求重新准备。skill_read 仍只读方法，不重算在途权限。
+
+Plan / handoff v2 / 两轮预算 / 领域完成校验的权威约定见 [runtime-kernel.md](../contracts/runtime-kernel.md#通用-harness-与结构化交接2026-09-09)。

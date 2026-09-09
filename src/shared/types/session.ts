@@ -40,6 +40,8 @@ export interface SessionModelOverride {
 }
 
 export interface SessionRecord {
+  /** Main-derived migration notice; not a writable session field. */
+  handoffNotice?: string;
   sessionId: string;
   projectId: string;
   title: string;

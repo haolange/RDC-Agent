@@ -190,7 +190,7 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     });
     expect(bigLoopOk).toMatchObject({ status: 'completed', allowed: true });
 
-    const chainLimit = await engine.test('mission-plan-handoff-check', {
+    const secondEvaluation = await engine.test('mission-plan-handoff-check', {
       event: 'agent.before-handoff',
       agentId: 'general',
       sessionId: 'session-a',
@@ -204,8 +204,7 @@ describe('HookEngine', { timeout: 20_000 }, () => {
         checkpointId: 'cp-1',
       },
     });
-    expect(chainLimit.status).toBe('failed');
-    expect(chainLimit.allowed).toBe(false);
+    expect(secondEvaluation).toMatchObject({ status: 'completed', allowed: true }); // Main owns cycle counting; the second return remains available.
 
     const readyDenied = await engine.test('artifact-integrity', {
       event: 'tool.before-call',

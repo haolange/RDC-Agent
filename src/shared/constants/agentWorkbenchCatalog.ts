@@ -1,3 +1,4 @@
+import { HANDOFF_CONTRACT_JSON_SCHEMA } from '../types/handoffContract';
 export type AgentWorkbenchToolPermission =
   | 'readonly'
   | 'mutation'
@@ -338,7 +339,7 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     id: 'agent_handoff',
     label: 'Agent Handoff',
     permission: 'readonly',
-    inputSchema: { type: 'object', required: ['agent'], properties: { agent: { type: 'string' }, label: { type: 'string' }, prompt: { type: 'string' } } },
+    inputSchema: { type: 'object', required: ['agent', 'prompt', 'contract'], properties: { agent: { type: 'string' }, label: { type: 'string' }, prompt: { type: 'string' }, contract: HANDOFF_CONTRACT_JSON_SCHEMA } },
     resultSummary: 'Creates an implementation or specialist handoff summary.',
     icon: 'route',
     approvalRequired: false,
@@ -357,7 +358,6 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
         'inputArtifactRefs',
         'outputRequirements',
         'budget',
-        'requiresRdxLease',
       ],
       properties: {
         mission: { type: 'string' },
@@ -375,7 +375,7 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
             maxSubagents: { type: 'integer', minimum: 1 },
           },
         },
-        requiresRdxLease: { type: 'boolean' },
+        domainExtensions: { type: 'object' },
         profile: { type: 'string' },
         model: { type: 'string' },
       },

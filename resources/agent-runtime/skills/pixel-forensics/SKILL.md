@@ -1,7 +1,6 @@
 ---
 name: pixel-forensics
 description: Diagnose pixel history, overdraw, and color errors from region-scoped visual evidence.
-allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read, read_image, rdx_context, shell, task_create, subagent]
 ---
 
 # Pixel Forensics

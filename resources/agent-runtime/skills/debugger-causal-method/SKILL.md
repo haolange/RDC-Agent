@@ -1,7 +1,6 @@
 ---
 name: debugger-causal-method
 description: Write Debugger First Bad Event, Hypothesis Matrix, and Counterfactual records on existing rdc.investigation.v1 kinds.
-allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read, rdx_context, rdx_probe, plan_artifact, agent_handoff, shell, task_create, subagent]
 ---
 
 # Debugger Causal Method
@@ -24,7 +23,7 @@ A prose guess is not a First Bad Event. Do not mark `ready` without provenance (
 Shape: one `ClaimSet` (`kind: claim_set`) of competing `hypothesis` Claims.
 
 1. Write at least two mutually distinguishable hypotheses. Each item is a `ClaimRecord` with `claimKind: hypothesis`, `epistemic: inferred`, `experimentId: null`, and a non-empty `scope`.
-2. Link rivals with `supports` / `contradicts` using resolvable `claimId`s. Keep the driver-blame hypothesis visible until a distinguishing check rejects it.
+2. Link rivals with `supports` / `contradicts` using resolvable `claimId`s. Keep evidence-backed, distinguishable alternative explanations visible until checked; do not invent a driver-blame hypothesis.
 3. Name the smallest check that would confirm one row and reject another. That check becomes a Task subject later; do not write the matrix into `TaskRecord`.
 
 Do not promote a matrix row to `causal_conclusion` here.
@@ -38,4 +37,4 @@ Shape: one qualifying `ExperimentRecord` plus a Claim that is `claimKind: causal
 3. Rollback must set `executed === true`, `baselineRestored === true`, and `verifyEvidenceIds.length >= 1` (each resolvable). Status must be `recorded` or `rolled_back`.
 4. Only then write the causal / counterfactual Claim with that `experimentId`. A Debugger root-cause Claim also fills the seven-tuple `rootCause` (Trigger · Fault Location · Failure Mechanism · Propagation · Manifestation · Scope · Counterfactual Evidence).
 
-`S-CAUSAL-01` and `S-RDC-01` stay machine-enforced. A Claim without a qualifying Experiment must not become `ready`. Do not persist Knowledge. Do not call `memory_write` from this skill. `allowed-tools` keeps `subagent`, `task_create`, and `shell` so arming this skill with `$renderdoc-execution` does not shrink the Debugger closed loop.
+`S-CAUSAL-01` and `S-RDC-01` stay machine-enforced. A Claim without a qualifying Experiment must not become `ready`. Do not persist Knowledge. Do not call `memory_write` from this skill.

@@ -1,7 +1,6 @@
 ---
 name: report-composition
 description: Compose an Investigation report as a View that must not raise Claim rank or rewrite measured facts.
-allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read, shell, task_create, subagent]
 ---
 
 # Report Composition

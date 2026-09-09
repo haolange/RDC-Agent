@@ -5,7 +5,7 @@ import { HandoffController } from './HandoffController';
 describe('HandoffController frozen turn authority', () => {
   it('uses frozen project profile handoffs and enabled ids without rereading mutable settings', () => {
     const controller = new HandoffController();
-    const allowed = controller.resolve('plan', 'edit', undefined, undefined, {
+    const allowed = controller.resolve('plan', 'edit', 'Explicit summary', undefined, {
       sourceHandoffs: [{ agent: 'edit', label: 'Implement', prompt: 'Apply the plan.', send: true }],
       enabledProfileIds: ['plan', 'edit'],
     });
@@ -17,7 +17,7 @@ describe('HandoffController frozen turn authority', () => {
       sourceHandoffs: [{ agent: 'edit', label: 'Implement', prompt: 'Apply the plan.' }],
       enabledProfileIds: ['plan', 'edit', 'debugger'],
     })).toMatchObject({ valid: false, code: HANDOFF_ERROR.NOT_DECLARED });
-    expect(controller.resolve('plan', 'edit', undefined, undefined, {
+    expect(controller.resolve('plan', 'edit', 'Explicit summary', undefined, {
       sourceHandoffs: [{ agent: 'edit', label: 'Implement', prompt: 'Apply the plan.' }],
       enabledProfileIds: ['plan'],
     })).toMatchObject({ valid: false, code: HANDOFF_ERROR.TARGET_DISABLED });
@@ -58,26 +58,26 @@ describe('HandoffController frozen turn authority', () => {
 
   it('rejects a second handoff while one is already active', () => {
     const controller = new HandoffController();
-    expect(controller.resolve('plan', 'edit', undefined, undefined, {
+    expect(controller.resolve('plan', 'edit', 'Explicit summary', undefined, {
       sourceHandoffs: [{ agent: 'edit', label: 'Implement', prompt: 'Apply the plan.' }],
       enabledProfileIds: ['plan', 'edit'],
       hasActiveHandoff: true,
     })).toMatchObject({ valid: false, code: HANDOFF_ERROR.ALREADY_ACTIVE });
   });
 
-  it('rejects a fourth hop on the same user root chain', () => {
+  it('rejects a sixth hop on the same user root chain', () => {
     const controller = new HandoffController();
-    expect(controller.resolve('plan', 'edit', undefined, undefined, {
+    expect(controller.resolve('plan', 'edit', 'Explicit summary', undefined, {
       sourceHandoffs: [{ agent: 'edit', label: 'Implement', prompt: 'Apply the plan.' }],
       enabledProfileIds: ['plan', 'edit'],
-      nextDepth: 4,
+      nextDepth: 6,
       chainRoot: 'root-1',
     })).toMatchObject({ valid: false, code: HANDOFF_ERROR.CHAIN_LIMIT });
   });
 
   it('rejects an illegal declaredModel without writing', () => {
     const controller = new HandoffController();
-    expect(controller.resolve('plan', 'edit', undefined, undefined, {
+    expect(controller.resolve('plan', 'edit', 'Explicit summary', undefined, {
       sourceHandoffs: [{
         agent: 'edit',
         label: 'Implement',

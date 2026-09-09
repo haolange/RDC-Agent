@@ -1,6 +1,7 @@
+import { resolveRdxDelegation } from '../../sessions/RdxDelegation';
 /**
  * SubagentRunner — isolated sub-agent turns and the subagent tool.
- * Capsule fields are required. Offline children (requiresRdxLease=false) may
+ * Capsule fields are required. Ordinary children (no domain extensions) may
  * join a consecutive concurrency-safe group; lease-holding children are serial.
  */
 
@@ -63,6 +64,7 @@ export class SubagentRunner {
     model?: string;
   }): Promise<{ text: string; status: SubagentResultStatus; subagentId: string }> {
     const capsule = input.capsule;
+    const rdxDelegation = resolveRdxDelegation(capsule.domainExtensions);
     const task = capsule.task;
     // Resolve and authorize the exact project profile before mutating parent budgets or emitting a child event.
     const childSettings = settingsService.getAll();
@@ -171,14 +173,14 @@ export class SubagentRunner {
         throw new DOMException('Aborted', 'AbortError');
       }
       const frozenCapsule = freezeDelegationCapsule(capsule);
-      const capsuleSegments = compileDelegationCapsule(frozenCapsule);
-      if (frozenCapsule.requiresRdxLease) {
+      const capsuleSegments = [...compileDelegationCapsule(frozenCapsule), ...rdxDelegation.segments];
+      if (rdxDelegation.requiresLease) {
         if (!input.parentSessionId?.trim()) {
-          throw new Error('RDX_LEASE_DELEGATE_DENIED: requiresRdxLease=true but no parent session.');
+          throw new Error('RDX_LEASE_DELEGATE_DENIED: RDX capability requested but no parent session.');
         }
         const ownerTurnId = input.parentTurn?.turnId?.trim() ?? '';
         if (!ownerTurnId) {
-          throw new Error('RDX_LEASE_DELEGATE_DENIED: requiresRdxLease=true but parent turn id is missing.');
+          throw new Error('RDX_LEASE_DELEGATE_DENIED: RDX capability requested but parent turn id is missing.');
         }
         grantDelegatedLease({
           parentSessionId: input.parentSessionId,
@@ -203,7 +205,7 @@ export class SubagentRunner {
           modelOverride: modelOverride ?? null,
           extraPromptSegments: capsuleSegments,
           frozenDelegationCapsule: frozenCapsule,
-          excludeRdxLeaseTools: !frozenCapsule.requiresRdxLease,
+          excludeRdxLeaseTools: !rdxDelegation.requiresLease,
           onEvent: (event: SharedAgentEvent) => {
             if (input.parentTurn && !input.parentTurn.isLive(input.parentTurn.generation)) {
               return;
@@ -348,7 +350,7 @@ export class SubagentRunner {
     > = {
       name: 'subagent',
       label: 'Subagent',
-      description: 'Delegate a structured Delegation Capsule to an isolated sub-agent. Required fields: mission, task, acceptedFacts, forbiddenPaths, inputArtifactRefs, outputRequirements, budget, requiresRdxLease. Offline children set requiresRdxLease=false and may join a concurrent group; lease-holding children are serial. Optional model is a canonical providerId:modelId and does not inherit the parent session override.',
+      description: 'Delegate a structured Delegation Capsule to an isolated sub-agent. Required fields: mission, task, acceptedFacts, forbiddenPaths, inputArtifactRefs, outputRequirements, budget. Optional domainExtensions request domain-owned capabilities. Ordinary children have no extensions; capability-bearing children are serial. Optional model is a canonical providerId:modelId and does not inherit the parent session override.',
       parameters: DELEGATION_CAPSULE_JSON_SCHEMA as unknown as AgentTool['parameters'],
       permissionHint: 'readonly',
       spec: {

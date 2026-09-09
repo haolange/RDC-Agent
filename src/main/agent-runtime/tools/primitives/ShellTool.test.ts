@@ -100,6 +100,7 @@ describe('shellTrailer', () => {
   it('writes UTF-8 through an independent StreamWriter and keeps 5.1 OEM decode', () => {
     const wrapped = wrapPowerShellCommand('Write-Output 中文', 'RDX_SHELL_UTF8');
     expect(wrapped).toContain('New-Object System.Text.UTF8Encoding $false');
+    expect(wrapped).not.toContain('[Console]::OutputEncoding =');
     expect(wrapped).toContain('$PSNativeCommandUseErrorActionPreference = $false');
     expect(wrapped).toContain('[System.Text.Encoding]::Default');
     expect(wrapped).toContain('2>$__errFile');
@@ -238,4 +239,19 @@ describe('ShellTool', () => {
     expect(text).toMatch(/以太网|Ethernet|适配器|adapter/i);
     expect(result.isError).not.toBe(true);
   });
+  it('preserves PowerShell Unicode and caller-selected UTF-8 native output', { timeout: 30_000 }, async () => {
+    if (process.platform !== 'win32') return;
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-shell-utf8-'));
+    roots.push(root);
+    const result = await shellTool.execute('s-utf8', {
+      command: "Write-Output '中文样本'; [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); node -e \"process.stdout.write(String.fromCharCode(20013,25991))\"",
+      timeout: 20_000,
+    }, undefined, undefined, { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null });
+    const text = result.content[0]?.type === 'text' ? result.content[0].text : '';
+    expect(text).toContain('中文样本');
+    expect(text.match(/中文/g)).toHaveLength(2);
+    expect(text).not.toContain('\uFFFD');
+    expect(result.isError).not.toBe(true);
+  });
+
 });

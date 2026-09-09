@@ -294,13 +294,23 @@ describe('ColdData path ingest', () => {
     expect(quarantined.candidateCreated).toBe(false);
   });
 
-  it('ingests the two real ColdData cases into disposable Drafts only', async () => {
-    const cases = [
-      'C:\\Users\\Vip\\Desktop\\ColdData\\BugFull案例01.txt',
-      'C:\\Users\\Vip\\Desktop\\ColdData\\BugFull案例02.txt',
-    ];
+  it('ingests synthetic Chinese-path ColdData fixtures into disposable Drafts only', async () => {
+    const root = tempRoot('rdc-know-fixtures-');
+    const cases = [1, 2].map((index) => {
+      const filePath = path.join(root, '案例' + index + '.txt');
+      writeFileSync(filePath, [
+        'case_id: synthetic-' + index,
+        'title: Synthetic sanitization fixture',
+        'meta:',
+        '  status: fixed',
+        'symptoms: 企业微信截图.png and HairBlack.txt are missing',
+        'assets:',
+        '  - file: 企业微信截图.png',
+        '  - file: HairBlack.txt',
+      ].join('\n'), 'utf8');
+      return filePath;
+    });
     const before = cases.map((filePath) => ({ filePath, ...sourceFingerprint(filePath) }));
-    const root = tempRoot('rdc-know-real-');
     const candidates = createDisposableCandidateService(root);
     for (const [index, filePath] of cases.entries()) {
       const result = await candidates.ingestColdDataPathToStaging(filePath, {

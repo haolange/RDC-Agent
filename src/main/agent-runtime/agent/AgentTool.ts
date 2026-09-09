@@ -1,3 +1,4 @@
+import type { RdxTurnBinding } from '../../tools/RdxTurnBindings';
 import type {
   ImageContent,
   JsonSchema,
@@ -16,6 +17,11 @@ export type AgentToolPermissionHint = 'readonly' | 'session_mutation' | 'mutatio
  * - `projectId` / `sessionId`：用于事件/审计关联。
  */
 export interface ToolExecutionContext {
+  /** Main-owned, private execution binding; never serialized to the model. */
+  rdxBinding?: RdxTurnBinding;
+  agentId?: string;
+  turnId?: string;
+  excludeRdxLeaseTools?: boolean;
   workspaceRoot: string;
   projectRootPath: string | null;
   projectId: string | null;

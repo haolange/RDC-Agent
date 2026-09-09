@@ -4,7 +4,7 @@ Verifier 结论落盘。本文件是二次收敛（U00–U07）与 T18 现场取
 
 **Browser 证据路径在仓库外** `%LOCALAPPDATA%/rdc-agent-qa/<sha>/`。条目若引用 Browser 证据，只记相对该目录的路径、build SHA、QA `projectId` / `sessionId`、viewport、theme/motion、DOM selector、IPC channel + 结果码。**禁止**写入 token / cookie / secret / qaBootstrap。
 
-`pnpm run check:acceptance-ledger` 已由 **U04** 落地并接入 CI / `check:gates`。U00–U07 现场行已 verified。
+`pnpm run check:acceptance-ledger` 已由 **U04** 落地并接入 CI / `check:gates`。历史状态按下表记录；U06-t17-completed 的真实实验结论已于 2026-09-09 撤回，见该行纠正。
 
 Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verified` 行的 Commit SHA（短或长）必须存在于 `git rev-list HEAD`；空 / `—` 只允许非 verified。不得伪造。
 
@@ -56,7 +56,10 @@ Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verifie
 | U05-mcp-high-impact | 本轮无 MCP server；FULL_ACCESS=0 拒 trust/revoke。不宣称 Memory 审批已做 | `mcp.getStatusSummary` + `/invoke` | build `85bb50ce`；project `proj_a99a24c68de3`；session `sess_5e7563cc40a9`；1440×900 Dark motion=off；`mcp.getStatusSummary` 返回 `[]`；FULL_ACCESS=0：`rdx-runtime:trustMcp`/`revokeMcp`/`trustHook` 403。Tool approval 见已 verified 的 U02-read-roots-code（`conversation:answerToolApproval` deny `success:true`）。Memory 审批不在 U05 范围 | verified | 85bb50ce | 2026-09-05 |
 | U06-t15-completed | T15 Debugger + WhiteHair（Android adb）正常 `completed`：checkpoint + ready report + `final_answer` 引用；负路径见已 verified 的 T18-t15-debugger-neg | 磁盘 `run.json` schemaVersion `'3'` + investigation index + luna 机器校验 | build `85bb50ce`；project `proj_a99a24c68de3`；session `sess_257be2c23d01`；run `run_2dad9f141f927f53` `kind:mission` `profileId:debugger` `status:completed`；device `android-e38b8019` serial `e38b8019` transport `adb_android` status `online`；checkpoint `cp-whitehair-eid167` `invart-6986d572b212-1788550160621`；ready report `invart-173a94986fc4-1788550214355` `sha256:3316c40ecc39baeed4a9c591fbcd539254f5cb4f908ec6317d4261b39b62cce5` `reportContract.status=complete`；final_answer 含 artifactId+hash；sourceRefs 8 条与 index hash 一致；Capture SHA256 不变 `03DF08D14E6D5819E5173209D9AC1218C2F740010104EC911A7873E97A258D42`；`workflow:listActiveRuns` `runs=[]`；1440×900 Dark motion=off；截图 `u06-t15-session.png`；JSON `u06-machine-check.json` | verified | 85bb50ce | 2026-09-05 |
 | U06-t16-completed | T16 Analyzer + 中文 1.57GB capture：Observed/Reconstructed/Authoring 三层 claim + ready report complete；cancel 无迟到写入 | 磁盘 `run.json` + investigation + `conversation:cancelActiveTurn` | build `85bb50ce`；project `proj_a99a24c68de3`；session `sess_cff62330e3a7`；run `run_0f8e5559dec166c5` `kind:mission` `profileId:analyzer` `status:completed`；claims `cl-obs-capture-open`/`observed_fact`、`cl-der-active-event-147`/`derived_structure`、`cl-auth-filename-scene`/`semantic_inference`；checkpoint `cp-yanjing-v1` `invart-fb3119318569-1788552218039`；ready report `invart-e924efb74e67-1788553110003` `sha256:a38491c36d4079f987b1ec80e3df64a7dd715096f70203998d61cc8a530d8ce9` `reportContract.status=complete`；final_answer 含 artifactId+hash；sourceRefs 6 条一致；Capture SHA256 不变 `0A79926A92E7E659989BEFC2322DC93B65782252FC5BE2DE33496142735A4094`；`.right-rail` Capture 文案含 `眼睛泪腺白点.rdc` `1.5 GB`；`investigation:read` ok；cancel `conversation:cancelActiveTurn` success phase=`running` requestId `def4819a-5ae8-43d5-addb-5ad787c875f7` run `run_a17c5bdab038b000` cancelled；index hash 前后 `1A7E736B22B7B1489934D5106B4A308EF24F4FA6FF17BCCC24905A21083AACE1` lateWrites=0；1440×900 Dark motion=off；截图 `u06-t16-session.png` `u06-t16-capture-chinese.png`；JSON `u06-machine-check.json` | verified | 85bb50ce | 2026-09-05 |
-| U06-t17-completed | T17 Optimizer：A-B-A Experiment `rolled_back` + rollback 三条件 + 工程 hash 前后一致 + ready report complete；Mission 侧 shell/write 被拒 | 磁盘 `run.json` + ExperimentRecord + 工程 manifest | build `85bb50ce`；project `proj_a99a24c68de3`；session `sess_db9dfe15578b`；run `run_85f6c28295a4e8b7` `kind:mission` `profileId:optimizer` `status:completed`；Android WhiteHair 当时 `Remote side of network connection is busy`，按计划改 Local 中文 capture；experiment `exp-opt-lacrimal-aba` `invart-exp-opt-lacrimal-aba` `status=rolled_back` `intervention.type=shader_replace` `rollback.executed=true` `baselineRestored=true` verifyEvidenceIds `ev-rollback-verify` `ev-shell-denied` `ev-write-denied`；未向 General handoff（Mission 侧 mutate 被拒，捕获未改）；checkpoint `cp-opt-lacrimal-v1`；ready report `invart-report-opt-lacrimal-ready` `sha256:11792293953c9ba73da74668a29baebd61f91596edab28f7499113bed1f426f6` `reportContract.status=complete`；final_answer 含 artifactId+hash；sourceRefs 8 条一致；工程目录 manifest SHA256 前后 `75444ef2b563eea2ac2df4fbb1f066fcf435e7435c6793a3eddf2ef33b4970f6`；`workflow:listActiveRuns` `runs=[]`；1440×900 Dark motion=off；截图 `u06-t17-session.png`；JSON `u06-machine-check.json` | verified | 85bb50ce | 2026-09-05 |
+| U06-t17-completed | T17 Optimizer：A-B-A Experiment `rolled_back` + rollback 三条件 + 工程 hash 前后一致 + ready report complete；Mission 侧 shell/write 被拒 | 磁盘 `run.json` + ExperimentRecord + 工程 manifest | build `85bb50ce`；project `proj_a99a24c68de3`；session `sess_db9dfe15578b`；run `run_85f6c28295a4e8b7` `kind:mission` `profileId:optimizer` `status:completed`；Android WhiteHair 当时 `Remote side of network connection is busy`，按计划改 Local 中文 capture；experiment `exp-opt-lacrimal-aba` `invart-exp-opt-lacrimal-aba` `status=rolled_back` `intervention.type=shader_replace` `rollback.executed=true` `baselineRestored=true` verifyEvidenceIds `ev-rollback-verify` `ev-shell-denied` `ev-write-denied`；未向 General handoff（Mission 侧 mutate 被拒，捕获未改）；checkpoint `cp-opt-lacrimal-v1`；ready report `invart-report-opt-lacrimal-ready` `sha256:11792293953c9ba73da74668a29baebd61f91596edab28f7499113bed1f426f6` `reportContract.status=complete`；final_answer 含 artifactId+hash；sourceRefs 8 条一致；工程目录 manifest SHA256 前后 `75444ef2b563eea2ac2df4fbb1f066fcf435e7435c6793a3eddf2ef33b4970f6`；`workflow:listActiveRuns` `runs=[]`；1440×900 Dark motion=off；截图 `u06-t17-session.png`；JSON `u06-machine-check.json` | failed | 85bb50ce | 2026-09-05 |
+
+**2026-09-09 纠正 U06-t17-completed**：保留以上原日期、SHA、run、截图与 hash 供追溯；撤回“真实 A-B-A 已完成”的结论。原记录明确未向 General 交接、mutate 被拒，不能证明介入或回滚实际发生。权限拒绝与磁盘 hash 不变仅支持负路径；新的 verified 必须通过原生执行回执和恢复测量门禁。历史 verified 不自动代表当前版本验收。
+
 | U07-release | 全量门禁 + coverage + build + pack；ledger 零 `planned`；交还 `instance.lock` | `check:gates` / `test:coverage` / `check:coverage-ratchet` / `build` / `pack` / `RDC_LEDGER_REQUIRE_ZERO_PLANNED=1` | coverage 2398/2398；ratchet lines 73.32 / functions 75.68 / branches 60.53 / statements 71.04；`electron-vite build` 绿；unpacked `release/win-unpacked` 无 pnpm/lockfile/launcher/cache；local pack 因 winCodeSign Darwin symlink 无管理员权限，用 `--config.win.signAndEditExecutable=false`（与「local pack stays unsigned」一致）；luna 首轮 MAJOR：两处「源码仍含 Semantic / Embedding，由 U02 删除」已在 `a31d6c00` 改成已删除；QA `instance.lock` owner pid 71808 已死。本行 SHA 为门禁/coverage/build/pack 落地提交 | verified | a31d6c00 | 2026-09-05 |
 | T18-colddata-draft | ColdData → session Draft：`knowledge:coldDataImport` 两份桌面案例；`candidateCreated: false`；`sourceStatus: fixed`；`verified: false`；再导入 `conflict` | T18 canonical Browser QA | 仓库外 QA 记录；见 `DESIGN.md` T18 已证组 | verified | b68e4f29 | 2026-09-03 |
 | T18-colddata-source | ColdData 源不变：`BugFull案例01.txt` SHA256 `b3885f07…c381d0`；`BugFull案例02.txt` `bfa12c54…7e35e5`；与 Draft `sourceHash` 一致 | T18 源 hash 复核 | 见 `DESIGN.md` T18 已证组 | verified | b68e4f29 | 2026-09-03 |
@@ -78,3 +81,61 @@ Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verifie
 | UI-B8-copy-a11y | Threads→Sessions；DeviceSelector/Slash/Rail/Agent 模板入 i18n；Settings 搜索焦点环；hover 配 focus-visible | `check:right-rail` i18n keys | disposable ZH 工作台/User menu/Settings/Knowledge；device aria-label「回放设备：本地回放」；无 FULL_ACCESS 故 EN 未持久化 | verified | 634892ff | 2026-09-08 |
 | UI-B9-finalize | fidelity 基线复核；docs 路径；全门禁 + build；交还桌面启动权后 push | `check:fidelity` `check:legacy-residue` `check:gates` `typecheck` `lint` `build` | disposable FULL_ACCESS=1；project `proj_5b660f23c308` session `sess_316a6244e3a4`；1440 五卡 EmptyState + Composer pill 高 28 + 九 Settings 节 + 搜索 compaction→策略 + 六 Knowledge lane 无 Semantic + 底栏互斥 + fail-closed unknown/internal/secret/desktop-only 403 且 `session:list` 200；390 `bodyMin=0` overflowX=false drawer=true；Appearance `settings:set` light 持久化后恢复 dark。截图 `%LOCALAPPDATA%/Temp/cursor/screenshots/b9-*.png`。无真实 turn 故 Memory/Tool 审批未跑。command palette 合成 Ctrl+K 未打开属自动化限制 | verified | 8836d929 | 2026-09-08 |
 | UI-C2-second-pass | Composer 底栏单行同高 28、窄屏图标化、model 线性渐隐；空工作台窄卡居中；Right Rail 空态恢复 restrained visual；审查漏项收口 | `check:design-tokens` `check:renderer-structure` `check:right-rail` `check:appearance` `check:fidelity` `check:work-process` `typecheck` `lint` | disposable `qa-1788837336836-70ed95920ab5d922`；project `proj_da20cf5406f2` session `sess_92b9da32c26c`；1440 send/pill 均为 28、footer nowrap、五卡 visual 112×200 + honest copy；390 footerH=30 nowrap、agent/permission/effort 收成 28 图标、model 仍显示且 max-width 6rem、三卡 `align-items:center`、`bodyMin=0` overflowX=false。截图 `%LOCALAPPDATA%/Temp/cursor/screenshots/c2-*.png` | verified | bda24070 | 2026-09-08 |
+
+
+## 2026-09-09 原生协议与指令收敛验证（未提交工作树）
+
+本节记录本地工作树的实测结果，不为未提交代码填写 verified/Commit SHA，也不追认 U06 旧实验。
+
+- 外部原生 parser：生产 invoker 编译出的全部 probe argv / JSON 标志通过；虚构动词和应用 session ID 参数被拒。
+- 真实本地 replay：临时 capture 副本、独立 daemon context，生产 executeRdxShell 及签名回执写入路径完成 shader 介入、渲染目标导出、回滚、恢复。测试签名 key 注入隔离存储；OS safeStorage 的生产签名能力没有用该单测替代验收。
+- 两次成功验证的末次制品位于本机临时目录 rdc-native-receipts-6ufgG6；baseline/restored PNG SHA256 均为 00290fb97b6c6fd1f106e152615a171cd82c67ce6ee81447e8a398efad8946b8，variant 为 1efbcedcdc3f85f444c0acbbf20dfb4216532ec86f051e05cc18f41554bdae81。源与副本 capture hash 均保持 c50cd1e7c29241c64fd33faf07cb35e802f9dc85692a8512aa36db01c956b385；finally 回滚遗留 replacement 并停止本次 daemon。
+- screenshot 显示链在此前实验中未反映变体；成功结论仅覆盖实际 render-target texture export，不能扩写为 preview/screenshot 呈现正确。Remote/Android 无本轮设备正路径证据。
+- disposable Browser QA smoke 通过 /qa cookie bootstrap、/app 鉴权、Origin 拒绝、app:getMeta；完整 GUI 点击/截图因自动化运行器 Windows CreateProcessWithLogonW 1385 未完成。未使用真实用户会话。QA 已停止，canonical instance.lock 不存在，桌面启动权已交还。
+- typecheck、lint、check:gates、build 与最终 coverage 结果见本节末尾。此前 ShellTool OEM 中文 stdout 失败已定位为 wrapper 强制 UTF-8 解码；移除全局 Console 编码覆盖，保留 UTF-8 文件输出，并补 PowerShell Unicode / 调用方显式 UTF-8 原生程序回归。未降低断言。
+
+指令成本只测静态注入正文：相同 profile + 默认 coordinator，使用仓库 gpt-tokenizer 估算；不包括系统/工具 schema、用户历史、按需方法、项目根指令，也不冒充完整模型请求 token。普通任务与 Knowledge 查询均以 General 默认入口为基准，是否实际调用 Knowledge 由任务决定。
+
+- General（普通任务 / Knowledge 查询）：正文字符 3337→1102；估算 token 691→310。
+- Debugger：正文字符 6588→1543；估算 token 1469→462。
+- Analyzer：正文字符 6873→1643；估算 token 1507→466。
+- Optimizer：正文字符 6651→1573；估算 token 1462→467。
+
+根 AGENTS 归一化换行后 35377→7563 字符。四个 coordinator 文件（含 frontmatter）分别为 613 / 958 / 1061 / 993 字符，27 个技能 ID 保持。静态正文数字与下述完整 PromptPlan / 真实请求数字分别记录。
+
+
+真实请求成本验证（用户限定最多两次，无重试）：生产 PromptPlanBuilder，General 同一段合成代码问题、相同 DeepSeek V4 Flash 参数，before/after 各一次，均正确修复 i<n 边界，无提问、无 handoff。before input/output/total = 1644/137/1781；after = 1200/210/1410；cache hit 均为 0。输入下降 27.0%，总 token 下降 20.8%。这是受预算约束的单轮文本对照，不是五场景多轮 Mission 成本结论；工具轮数未测。请求预算文件 used=2，禁止默认测试触发外部调用。完整 PromptPlan 字符数：General 7184→4949、Debugger 10449→5404、Analyzer 10725→5495、Optimizer 10514→5436；制品在本机临时 rdc-convergence-bench-c3f1cbdb20/instruction-cost。
+
+应用生命周期实测：RdxNativeLifecycle.test.ts 使用真实 production SessionService → configured action → ShellInvocationService / invoker，副本 capture open、registry/context query、preview status/off、context clear/lease 清除通过；finally 停止独立 daemon，源与副本 hash 不变。preview off 必须收到所属 context 且 preview.enabled=false 才显示关闭；openPreview 空成功载荷不再被补成 open。Android prepared remote 只消费一次，成功或失败后重试都须重新连接，已有单测；真实 adb devices -l 列表为空，Android 正路径仍受硬件阻塞。
+
+GUI 验收仍待外部条件：浏览器自动化与独立桌面自动化内核均在启动时返回 Windows CreateProcessWithLogonW 1385，无法点击或截图；HTTP smoke 不替代 GUI。实际 render-target A-B-A 结果不替代 screenshot 显示链验证，也不替代真实 provider 多轮 Mission roundtrip / OS safeStorage 的完整产品验收。
+
+最终本地门禁（2026-09-09）：pnpm 11.7.0；typecheck、lint、check:gates、build、git diff --check 均通过。全量 333 个测试文件通过 / 4 个外部测试文件默认跳过，2471 tests passed / 4 skipped；四个 opt-in 外部测试（native parser、签名 A-B-A、应用 lifecycle、两请求成本）均已分别显式运行通过。coverage ratchet：lines 73.44%、functions 75.70%、branches 60.78%、statements 71.14%。shared export 基线已为新增编译入口重建；未改 CSS，renderer fidelity 基线保持。
+
+
+## 2026-09-09 第二阶段：通用 Harness、交接 v2 与 GUI 验证
+
+本节为当前未提交工作树验证，基底 HEAD 为 9be5141cd33225111aa7c1313c8b92389d0aa58a；不把旧 SHA 的 verified 扩大为本次真实模型验收。上节关于 GUI 1385 的阻塞描述保留为历史，本节记录其解除。
+
+实现：General/core/execution-orchestrator 常驻正文通用化；新增 renderdoc-investigation（28 个 builtin Skills）；三种 Mission 使用六块共享 Markdown Plan。agent_handoff 的 route/execute/return 合同绑定 Plan URI/hash、必需 Skill、真实返回对象及交付要求；主进程冻结校验策略，收口通过通用接口连接现有 Investigation 校验器。两轮执行均允许回评估，第三轮拒绝；[INCOMPLETE] 出口只结束 turn，不提升报告状态。handoff v1 原字节归档、v2 单轨、旧待续跑显示重新建立提示。普通 Capsule 无 RDX 段，显式领域扩展仍受租约、串行与回收约束。
+
+实际通过：
+
+- pnpm 11.7.0 typecheck、lint、check:gates、build。完整 tests 为 337 files passed / 4 skipped，2482 tests passed / 4 skipped；coverage ratchet lines 73.50%、functions 75.77%、branches 60.96%、statements 71.21%。Windows 沙箱阻止 Knowledge 安全测试 realpath 访问祖先目录，完整门禁在宿主环境执行，未修改产品路径检查。
+- HandoffProviderFixture 使用确定性 ProviderStrategy + 真实 AgentLoop、RuntimeToolAssembly、HandoffStateStore、SessionArtifactResolver、InvestigationArtifactService；三类代表 Plan、直接 Mission/General 路由、Small Loop、一次 Big Loop、第二次回评估、第三轮拒绝、错误返回、重复 consume、取消和重启降级通过。另有缺失/损坏/hash/跨 session 引用、必需 Skill 去重/缺失/权限冲突及 v1 原字节迁移单测。它不是实际模型规划质量验收。
+- 真实原生 CLI 两项通过：RdxNativeExecution 验证实际 render-target texture 的 A-B-A 与主进程签名回执，RdxNativeLifecycle 验证应用 action 打开、所属 context、preview off 和关闭租约。原生 runtime state 在独立临时 tools root；现有共享 CLI context 达到数量上限时不删除用户 context。源 capture 与副本 hash 保持不变。制品为本机临时 rdc-native-receipts-ifHtEo / rdc-native-lifecycle-pHnpni；测试签名 key 不等于 OS safeStorage 的产品验收。
+- GUI 宿主恢复：策略备份 rdc-gui-rights-20260909-163648/before.inf，仅为 CodexSandboxUsers 增补 SeInteractiveLogonRight，其他登录策略及 elevated 沙箱不变；普通执行与 CUA 宿主均启动成功。
+- disposable Browser QA 实际访问一次性 /qa 后的同源 /app，点击 Settings / General 指令、Skills 设置、Plan 展开、失败详情，键盘 Enter 收起，检查 disabled / selected / focus；820px 窄屏 document.scrollWidth=clientWidth=820。Composer 本地 /skills renderdoc-investigation 显示待发送预载，未发送模型请求；旧 v1 fixture 在真实 session select 后显示迁移提示并生成 v2 与归档。会话/Plan/Checkpoint 为生产存储服务写入的明确 GUI fixture，错误行是显示样本，不冒充真实模型轨迹。截图 qa-general.png、qa-plan-wide.png、qa-plan-narrow.png、qa-skill-entry.png、qa-handoff-migration.png 保存在本轮仓库外可视化产物目录。
+- Browser QA launcher 66464/Electron 48132 及子进程已停止；桌面 scripts/start-rdc-agent.cmd 另以临时用户目录实启。沙箱桌面 GPU 启动失败，宿主环境同入口加载 file renderer 成功、无占锁失败；launcher 59152/Electron 3816 及子进程已停止。canonical instance.lock 不存在，临时锁 owner 已死；桌面启动权已交还。
+
+离线成本比较使用生产 PromptPlanBuilder；相同工具能力、日期、权限、空外部历史和项目指令，覆盖 core、profile、完整 Skill 目录与按需正文。HEAD 为历史基底，并非第二阶段开始前快照；下列数字为字符和估算，非真实账单 token。本阶段零真实 LLM 请求，先前两个授权请求已耗尽。
+
+- 普通聊天 / 轻量 coding（各一项）：10606 → 8418 字符（-2188）；当前估算 2103 token。
+- Debugger 规划：13871 → 9105 字符（-4766）；当前估算 2274 token。
+- Analyzer 规划：14147 → 9134 字符（-5013）；当前估算 2282 token。
+- Optimizer 规划：13936 → 9124 字符（-4812）；当前估算 2279 token。
+- General 调查执行（含三项方法）：17919 → 14445 字符（-3474）；当前估算 3609 token。
+
+当前 General 调查执行比普通 General 额外 6027 字符，体现领域方法按需成本；不预设真实多轮节省比例。完整分段结果在本轮 prompt-cost.json，左全局→虚线→右细节图已同步。
+
+后续专项：Android 真机；真实多轮 Mission 稳定性、正确性与设计符合性；原生 screenshot/preview 呈现链；生产 safeStorage 签名完整产品验收。既有 CLI/fixture/GUI 结果均不替代这些专项。未提交或推送，未创建或切换分支。

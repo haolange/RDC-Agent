@@ -76,7 +76,7 @@ import type {
   ResolvedRuntimeTools,
   ToolExecutorRuntimeContext,
 } from './orchestratorTypes';
-import { enforceMissionTurnCompletion } from '../../investigation/missionCompletionContract';
+import type { TurnCompletionValidator } from '../../agent-runtime/agent/TurnCompletionValidator';
 
 export function hasActualProviderUsage(message: AssistantMessage): boolean {
   return message.stopReason !== 'error';
@@ -87,6 +87,7 @@ export function shouldWarnEmptyAssistantCompletion(message: AssistantMessage): b
 }
 
 export interface AgentTurnRunnerDeps {
+  validateCompletion: TurnCompletionValidator;
   slots: AgentSlotRegistry;
   mcp: McpConnectionCoordinator;
   deferredActivation: DeferredToolActivationTracker;
@@ -754,11 +755,14 @@ export class AgentTurnRunner {
       // Agent.prompt 内部跑完整循环；返回值是新增的全部消息，
       // 我们只在订阅里收集助手文本，最后返回 `responseText`。
       await activeSlot.agent.prompt(userMessage);
-      enforceMissionTurnCompletion({
+      this.deps.validateCompletion({
+        taskBinding: turnHandle.runtimePlan?.taskBinding,
         profileId: input.agentId,
+        turnId: turnHandle.turnId,
         sessionId: executionScopeId,
         finalAnswerText: responseText,
         pendingHandoff: Boolean(turnHandle.pendingHandoff),
+        pendingHandoffTarget: turnHandle.pendingHandoff?.toProfile,
       });
       return responseText;
     } catch (error) {

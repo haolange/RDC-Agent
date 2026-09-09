@@ -31,6 +31,7 @@ function createStore() {
 
 function prepare(store: HandoffStateStore, overrides: Partial<Parameters<HandoffStateStore['prepare']>[1]> = {}) {
   return store.prepare('sess_1', {
+    contract: { intent: 'route' },
     sourceTurnId: 'turn-1',
     sourceRequestId: 'req-1',
     sourceAgentId: 'plan',
@@ -78,6 +79,7 @@ describe('HandoffStateStore durable lifecycle', () => {
     ];
     for (const reason of reasons) {
       const next = prepare(store, {
+        contract: { intent: 'route' },
         sourceTurnId: `turn-${reason}`,
         sourceRequestId: `req-${reason}`,
         chainRoot: `root-${reason}`,
@@ -94,6 +96,7 @@ describe('HandoffStateStore durable lifecycle', () => {
   it('keeps createPreparedDraft in memory until persist, and abandons without writing', () => {
     const { store, sessionPath } = createStore();
     const draft = store.createPreparedDraft('sess_1', {
+      contract: { intent: 'route' },
       sourceTurnId: 'turn-1',
       sourceRequestId: 'req-1',
       sourceAgentId: 'plan',
@@ -109,6 +112,7 @@ describe('HandoffStateStore durable lifecycle', () => {
     expect(store.getActive('sess_1')).toBeNull();
     expect(fs.existsSync(path.join(sessionPath, 'handoff-state.json'))).toBe(false);
     expect(() => store.createPreparedDraft('sess_1', {
+      contract: { intent: 'route' },
       sourceTurnId: 'turn-2',
       sourceRequestId: 'req-2',
       sourceAgentId: 'plan',
@@ -123,6 +127,7 @@ describe('HandoffStateStore durable lifecycle', () => {
     store.abandonDraft('sess_1', draft.handoffId);
     expect(store.getActive('sess_1')).toBeNull();
     const persisted = store.prepare('sess_1', {
+      contract: { intent: 'route' },
       sourceTurnId: 'turn-1',
       sourceRequestId: 'req-1',
       sourceAgentId: 'plan',
@@ -147,7 +152,7 @@ describe('HandoffStateStore durable lifecycle', () => {
     expect(store.getActive('sess_1')?.handoffId).toBe(prepared.handoffId);
     const committed = store.commit('sess_1', 'turn-1');
     expect(committed.lifecycle).toBe('committed');
-    expect(() => prepare(store, { sourceTurnId: 'turn-2', sourceRequestId: 'req-2' }))
+    expect(() => prepare(store, { contract: { intent: 'route' }, sourceTurnId: 'turn-2', sourceRequestId: 'req-2' }))
       .toThrow(/HANDOFF_ALREADY_ACTIVE/);
   });
 
@@ -167,7 +172,7 @@ describe('HandoffStateStore durable lifecycle', () => {
     prepare(store);
     expect(store.cancel('sess_1', 'user_stop')?.lifecycle).toBe('cancelled');
     expect(store.getActive('sess_1')).toBeNull();
-    prepare(store, { sourceTurnId: 'turn-2', sourceRequestId: 'req-2', chainRoot: 'root-2' });
+    prepare(store, { contract: { intent: 'route' }, sourceTurnId: 'turn-2', sourceRequestId: 'req-2', chainRoot: 'root-2' });
     store.commit('sess_1', 'turn-2');
     expect(store.cancel('sess_1', 'user_stop')?.cancelReason).toBe('user_stop');
   });
@@ -176,11 +181,11 @@ describe('HandoffStateStore durable lifecycle', () => {
     const { store } = createStore();
     prepare(store);
     expect(store.cancel('sess_1', 'rewrite')?.cancelReason).toBe('rewrite');
-    prepare(store, { sourceTurnId: 'turn-2', sourceRequestId: 'req-2', chainRoot: 'root-2' });
+    prepare(store, { contract: { intent: 'route' }, sourceTurnId: 'turn-2', sourceRequestId: 'req-2', chainRoot: 'root-2' });
     expect(store.cancel('sess_1', 'manual_switch')?.cancelReason).toBe('manual_switch');
   });
 
-  it('rejects a chain deeper than 3 at prepare without writing', () => {
+  it('rejects a chain beyond the structural bound at prepare without writing', () => {
     const { store, sessionPath } = createStore();
     expect(() => prepare(store, { depth: HANDOFF_CHAIN_LIMIT + 1 })).toThrow(/HANDOFF_CHAIN_LIMIT/);
     expect(fs.existsSync(path.join(sessionPath, 'handoff-state.json'))).toBe(false);
@@ -208,15 +213,17 @@ describe('HandoffStateStore durable lifecycle', () => {
       depth: 4,
     });
     expect(() => prepare(store, {
+      contract: { intent: 'route' },
       sourceTurnId: 'turn-continue',
       sourceRequestId: 'req-continue',
       chainRoot: 'root-a',
       depth: 4,
-    })).toThrow(/HANDOFF_CHAIN_LIMIT/);
+    })).toThrow(/HANDOFF_STATE_CONFLICT/);
     const next = store.computeNextChain('sess_1', 'edit', 'turn-user-new');
     expect(next.depth).toBe(1);
     expect(next.chainRoot).not.toBe('root-a');
     expect(prepare(store, {
+      contract: { intent: 'route' },
       sourceTurnId: 'turn-user-new',
       sourceRequestId: 'req-user-new',
       chainRoot: next.chainRoot,
@@ -229,7 +236,7 @@ describe('HandoffStateStore durable lifecycle', () => {
     prepare(store);
     expect(store.cancel('sess_1', 'superseded')?.lifecycle).toBe('cancelled');
     expect(store.getActive('sess_1')).toBeNull();
-    expect(prepare(store, { sourceTurnId: 'turn-2', sourceRequestId: 'req-2' }).lifecycle).toBe('prepared');
+    expect(prepare(store, { contract: { intent: 'route' }, sourceTurnId: 'turn-2', sourceRequestId: 'req-2' }).lifecycle).toBe('prepared');
   });
 
   it('allows a new prepare after auto-send preflight failure cancels committed', () => {
@@ -239,7 +246,7 @@ describe('HandoffStateStore durable lifecycle', () => {
     expect(store.getActive('sess_1')?.lifecycle).toBe('committed');
     expect(store.cancel('sess_1', 'invalid_model')?.cancelReason).toBe('invalid_model');
     expect(store.getActive('sess_1')).toBeNull();
-    expect(prepare(store, { sourceTurnId: 'turn-auto', sourceRequestId: 'req-auto' }).lifecycle)
+    expect(prepare(store, { contract: { intent: 'route' }, sourceTurnId: 'turn-auto', sourceRequestId: 'req-auto' }).lifecycle)
       .toBe('prepared');
   });
 
@@ -249,7 +256,7 @@ describe('HandoffStateStore durable lifecycle', () => {
     expect(store.getActive('sess_1')?.lifecycle).toBe('prepared');
     expect(store.cancel('sess_1', 'superseded')?.cancelReason).toBe('superseded');
     expect(store.getActive('sess_1')).toBeNull();
-    expect(prepare(store, { sourceTurnId: 'turn-persist', sourceRequestId: 'req-persist' }).lifecycle)
+    expect(prepare(store, { contract: { intent: 'route' }, sourceTurnId: 'turn-persist', sourceRequestId: 'req-persist' }).lifecycle)
       .toBe('prepared');
   });
 

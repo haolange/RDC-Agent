@@ -1,3 +1,5 @@
+import { handoffPromptSegments } from '../../sessions/handoffPrompt';
+import { handoffRequiredSkillIds } from '../../sessions/handoffSkills';
 /**
  * PromptPlanForTurn — build PromptPlan for Debug sendMessage / profile turns.
  */
@@ -20,7 +22,7 @@ import { scopedInstructionResolver } from '../../runtime/ScopedInstructionResolv
 import { agentManifestService } from '../../settings/AgentManifestService';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import { settingsService } from '../../settings/SettingsService';
-import { normalizeToolName } from './DebuggerRuntimePolicy';
+import { combineActiveSkillAllowlists, normalizeToolName } from './DebuggerRuntimePolicy';
 
 export class PromptPlanForTurn {
   systemPromptForAgent(agentId: AgentRole, prompt?: string): string {
@@ -89,7 +91,7 @@ export class PromptPlanForTurn {
     const preloadSkillIds = mergeTurnPreloadSkillIds({
       profileSkills,
       messageText: input.messageText ?? '',
-      pendingSkillIds: input.preloadSkillIds,
+      pendingSkillIds: [...(input.preloadSkillIds ?? []), ...handoffRequiredSkillIds(input.sessionId, input.agentId)],
     });
     const preloadedSkills = [];
     for (const skillId of preloadSkillIds) {
@@ -99,8 +101,9 @@ export class PromptPlanForTurn {
       }
       preloadedSkills.push(skill);
     }
-    const tools = (plan ? [...plan.toolAllowlist] : input.toolAllowlist)
+    const baseTools = (plan ? [...plan.toolAllowlist] : input.toolAllowlist)
       .map((toolName) => normalizeToolName(toolName));
+    const tools = combineActiveSkillAllowlists(baseTools, preloadedSkills.map(skill => skill.allowedTools ?? [])) ?? baseTools;
     const permissionSettings = plan?.permissionSettings ?? runtimeSettings.agentRuntime.permissions;
     const promptClock = resolvePromptClock();
     return promptPlanBuilder.build({
@@ -117,7 +120,7 @@ export class PromptPlanForTurn {
       currentDate: promptClock.currentDate,
       timeZone: promptClock.timeZone,
       contextWindowTokens: input.contextWindowTokens,
-      extraSegments: input.extraSegments,
+      extraSegments: [...(input.extraSegments ?? []), ...handoffPromptSegments(input.sessionId, input.agentId)],
     });
   }
 }

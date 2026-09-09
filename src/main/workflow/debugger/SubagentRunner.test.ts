@@ -62,7 +62,7 @@ function testCapsule(overrides: Partial<DelegationCapsule> = {}): DelegationCaps
     inputArtifactRefs: [],
     outputRequirements: 'Return a short evidence summary',
     budget: { maxToolCalls: 8, maxWallTimeMs: 60_000 },
-    requiresRdxLease: false,
+
     ...overrides,
   };
 }
@@ -344,7 +344,7 @@ describe('SubagentRunner', () => {
           expect.objectContaining({ kind: 'delegation-capsule', id: 'delegation:task' }),
         ]),
         excludeRdxLeaseTools: true,
-        frozenDelegationCapsule: expect.objectContaining({ requiresRdxLease: false }),
+        frozenDelegationCapsule: expect.objectContaining({}),
       }),
     );
   });
@@ -386,7 +386,7 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      capsule: testCapsule({ requiresRdxLease: true }),
+      capsule: testCapsule({ domainExtensions: { rdx: { requiresLease: true } } }),
       parentSessionId: 'parent',
       projectId: 'proj-1',
       parentTurn,
@@ -421,7 +421,7 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      capsule: testCapsule({ requiresRdxLease: true }),
+      capsule: testCapsule({ domainExtensions: { rdx: { requiresLease: true } } }),
       parentSessionId: 'parent',
       projectId: 'proj-1',
       parentTurn: {
@@ -452,7 +452,7 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      capsule: testCapsule({ requiresRdxLease: true }),
+      capsule: testCapsule({ domainExtensions: { rdx: { requiresLease: true } } }),
       parentSessionId: 'parent',
       projectId: 'proj-1',
       parentTurn: {

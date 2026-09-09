@@ -1,81 +1,68 @@
 import { z } from 'zod';
 
-export const RDX_PROBE_ACTIONS = [
-  'enumerate',
-  'doctor',
-  'version',
-  'probe',
-  'lease_open',
-  'lease_close',
-  'preview_status',
-] as const;
-
+export const RDX_PROBE_ACTIONS = ['enumerate', 'doctor', 'version', 'probe', 'lease_open', 'lease_close', 'preview_status'] as const;
 export type RdxProbeAction = (typeof RDX_PROBE_ACTIONS)[number];
-
 export const RDX_PROBE_ACTION_SET = new Set<string>(RDX_PROBE_ACTIONS);
 
-/**
- * Closed Settings-facing keys rdx_probe may invoke through tooling.rdxCli.
- * Settings today has a generic CLI invoker, not named read-only actions —
- * this allowlist is the only action surface Mission may reach.
- */
+/** Semantic query ids, not executable names or a user-extensible command allowlist. */
 export const RDX_PROBE_READONLY_CLI_ACTIONS = [
-  'enumerate',
-  'doctor',
-  'version',
-  'probe',
-  'preview-status',
-  'preview_status',
-  'lease-open',
-  'lease_open',
-  'lease-close',
-  'lease_close',
+  'context_status', 'event_list', 'event_show', 'pipeline_show', 'resource_list', 'vfs_ls', 'vfs_cat',
 ] as const;
-
 export const RDX_PROBE_READONLY_CLI_ACTION_SET = new Set<string>(RDX_PROBE_READONLY_CLI_ACTIONS);
-
-const RDX_PROBE_MUTATE_ACTION_PATTERN = /(?:shader[-_.]?replace|replay[-_.]?mutate|write[-_.]?capture|edit[-_.]?capture|apply[-_.]?patch|hotfix|argv)/i;
+const QueryArgs = z.object({
+  action: z.enum(RDX_PROBE_READONLY_CLI_ACTIONS).optional(),
+  eventId: z.string().regex(/^\d+$/u).optional(),
+  path: z.string().min(1).max(512).optional(),
+}).strict();
 
 export const RdxProbeInputSchema = z.object({
   action: z.enum(RDX_PROBE_ACTIONS),
   capturePath: z.string().min(1).optional(),
   contextId: z.string().min(1).optional(),
-  args: z.record(z.string(), z.string()).optional(),
-}).strict();
-
+  args: QueryArgs.optional(),
+}).strict().superRefine((input, ctx) => {
+  if (input.action !== 'probe' && input.args && Object.keys(input.args).length > 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Only probe accepts query args.' });
+  }
+  if (input.capturePath && input.action !== 'lease_open') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Only lease_open accepts capturePath.' });
+  }
+  if (input.action === 'probe') {
+    const query = input.args?.action ?? 'context_status';
+    const event = input.args?.eventId;
+    const vfsPath = input.args?.path;
+    if (query === 'event_show' && !event) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'event_show requires eventId.' });
+    }
+    if (event && !['event_show', 'pipeline_show'].includes(query)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'eventId is not allowed for this query.' });
+    }
+    if (vfsPath && !['vfs_ls', 'vfs_cat'].includes(query)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'path is not allowed for this query.' });
+    }
+    if (['vfs_ls', 'vfs_cat'].includes(query)) {
+      const p = vfsPath ?? '/';
+      if (!p.startsWith('/') || p.includes('\\') || p.split('/').includes('..')
+        || [...p].some((character) => character.charCodeAt(0) < 32) || (query === 'vfs_cat' && ['/', '/draws', '/resources', '/textures', '/buffers'].includes(p))) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'VFS reads require a bounded, canonical virtual path.' });
+      }
+    }
+  }
+});
 export type RdxProbeInput = z.infer<typeof RdxProbeInputSchema>;
 
-export function isRdxProbeMutateActionName(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed) return false;
-  return RDX_PROBE_MUTATE_ACTION_PATTERN.test(trimmed);
-}
-
-export function resolveRdxProbeCliAction(action: RdxProbeAction, args?: Record<string, string>): string {
-  if (action === 'preview_status') return 'preview-status';
-  if (action === 'lease_open') return 'lease-open';
-  if (action === 'lease_close') return 'lease-close';
-  if (action === 'probe') {
-    const requested = (args?.action ?? args?.name ?? 'probe').trim();
-    if (!requested || isRdxProbeMutateActionName(requested)) {
-      throw new Error(`RDX_PROBE_MUTATE_DENIED: probe action "${requested}" is not a read-only Settings action.`);
-    }
-    if (!RDX_PROBE_READONLY_CLI_ACTION_SET.has(requested)) {
-      throw new Error(`RDX_PROBE_ACTION_DENIED: "${requested}" is not on the rdx_probe read-only allowlist.`);
-    }
-    return requested === 'preview_status' ? 'preview-status' : requested;
+/** Compile only parser-backed native rdx commands. Global args are added by the invoker. */
+export function compileRdxProbe(input: RdxProbeInput): { command: string; args: string[]; needsContext: boolean } {
+  const parsed = RdxProbeInputSchema.parse(input);
+  if (parsed.action === 'version' || parsed.action === 'doctor') {
+    return { command: parsed.action, args: parsed.action === 'version' ? ['--json'] : [], needsContext: false };
   }
-  return action;
-}
-
-export function assertRdxProbeArgsReadOnly(args?: Record<string, string>): void {
-  if (!args) return;
-  for (const [key, value] of Object.entries(args)) {
-    if (isRdxProbeMutateActionName(key) || isRdxProbeMutateActionName(value)) {
-      throw new Error(`RDX_PROBE_MUTATE_DENIED: argument "${key}" is not a read-only Settings action.`);
-    }
-    if (key === 'argv' || key === 'rawArgv' || key === 'command') {
-      throw new Error('RDX_PROBE_MUTATE_DENIED: arbitrary argv / command passthrough is forbidden.');
-    }
-  }
+  if (parsed.action === 'enumerate') return { command: 'tools', args: ['list'], needsContext: false };
+  if (parsed.action === 'preview_status') return { command: 'session', args: ['preview', 'status'], needsContext: true };
+  const query = parsed.args?.action ?? 'context_status';
+  const [command, verb] = query.split('_');
+  const args = [verb!];
+  if (parsed.args?.eventId) args.push('--event-id', parsed.args.eventId);
+  if (query.startsWith('vfs_')) args.push('--path', parsed.args?.path ?? '/');
+  return { command: command!, args, needsContext: true };
 }

@@ -1,3 +1,5 @@
+import { RdxExecutionReceipts } from '../tools/RdxExecutionReceipts';
+import { assertExecutionEvidence } from './investigationExecutionEvidence';
 import * as path from 'path';
 import { generateEventId } from '@shared/utils/id';
 import {
@@ -95,6 +97,7 @@ export type {
 } from './investigationArtifactWrite';
 
 export class InvestigationArtifactService {
+  private readonly receiptStore: RdxExecutionReceipts;
   private readonly resolver: SessionArtifactResolver;
   private readonly now: () => Date;
   private readonly onPersistBoundary?: InvestigationArtifactServiceDeps['onPersistBoundary'];
@@ -103,6 +106,7 @@ export class InvestigationArtifactService {
 
   constructor(deps: InvestigationArtifactServiceDeps = {}) {
     this.resolver = deps.resolver ?? sessionArtifactResolver;
+    this.receiptStore = deps.receiptStore ?? new RdxExecutionReceipts(this.resolver);
     this.now = deps.now ?? (() => new Date());
     this.onPersistBoundary = deps.onPersistBoundary;
     this.lockMaxAttempts = deps.lockMaxAttempts;
@@ -128,6 +132,13 @@ export class InvestigationArtifactService {
     const lookup = this.createRawLookup(sessionId);
     const mission = requireCanonicalWriteMission(kindEntry.kind, input.mission, parsed);
     this.assertRecordInvariants(sessionId, kindEntry.kind, parsed, lookup, mission);
+    if (kindEntry.kind === 'experiment') this.assertExecutionEvidence(sessionId, parsed as ExperimentRecord);
+    if (kindEntry.kind === 'report' && input.status === 'ready') {
+      for (const id of (parsed as InvestigationReport).experimentIds) {
+        const experiment = lookup.getExperiment(id);
+        if (experiment) this.assertExecutionEvidence(sessionId, experiment);
+      }
+    }
     const artifactId = input.artifactId?.trim() || generateEventId('invart');
     const supersedes = input.supersedes?.trim() || undefined;
     this.assertUniqueIds(sessionId, {
@@ -511,6 +522,10 @@ export class InvestigationArtifactService {
       const message = error instanceof SessionArtifactError || error instanceof Error ? error.message : String(error);
       throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', message, { invariantId: 'S-CTX-01' });
     }
+  }
+
+  assertExecutionEvidence(sessionId: string, experiment: ExperimentRecord): void {
+    assertExecutionEvidence(sessionId, experiment, this.receiptStore);
   }
 
   assertContentRef(sessionId: string, uri: string, expectedHash: string): void {

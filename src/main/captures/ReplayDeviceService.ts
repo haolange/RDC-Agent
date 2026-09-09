@@ -2,6 +2,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { rdxShellActionService } from '../tools/RdxShellActionService';
+import type { RdxShellActionSettings } from '@shared/types/settings';
+type RemoteActivationOptions = { action?: RdxShellActionSettings; signal?: AbortSignal };
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
@@ -209,13 +211,15 @@ export class ReplayDeviceService {
     }
   }
 
-  async activateDevice(deviceId: string): Promise<ReplayDeviceEntry> {
+  async activateDevice(deviceId: string, options: RemoteActivationOptions = {}): Promise<ReplayDeviceEntry> {
+    options.signal?.throwIfAborted();
     const existingPromise = this.activationPromises.get(deviceId);
     if (existingPromise) {
+      if (options.action) throw new Error('RDX_REMOTE_BUSY: cannot join an activation outside the frozen turn binding.');
       return existingPromise;
     }
 
-    const activationPromise = this.performActivation(deviceId)
+    const activationPromise = this.performActivation(deviceId, options)
       .finally(() => {
         this.activationPromises.delete(deviceId);
       });
@@ -450,7 +454,7 @@ export class ReplayDeviceService {
       .filter((device): device is ReplayDeviceEntry => device !== null);
   }
 
-  private async performActivation(deviceId: string): Promise<ReplayDeviceEntry> {
+  private async performActivation(deviceId: string, options: RemoteActivationOptions): Promise<ReplayDeviceEntry> {
     const device = this.devices.get(deviceId);
     if (!device) {
       throw new Error(`Replay device ${deviceId} not found.`);
@@ -483,7 +487,7 @@ export class ReplayDeviceService {
 
     try {
       const activated = await Promise.race([
-        this.activateRemoteDevice(deviceId),
+        this.activateRemoteDevice(deviceId, options),
         timeoutPromise,
       ]);
       this.updateDevice(activated);
@@ -502,7 +506,7 @@ export class ReplayDeviceService {
     }
   }
 
-  private async activateRemoteDevice(deviceId: string): Promise<ReplayDeviceEntry> {
+  private async activateRemoteDevice(deviceId: string, options: RemoteActivationOptions): Promise<ReplayDeviceEntry> {
     const device = this.devices.get(deviceId);
     if (!device?.serial) {
       throw new Error('Android device serial is missing.');
@@ -523,7 +527,7 @@ export class ReplayDeviceService {
       deviceType: device.type,
       deviceSerial: device.serial,
       transport: device.transport,
-    });
+    }, { action: options.action, abortSignal: options.signal });
     if (!result.ok) {
       throw new Error(result.error ?? 'RDX connectRemote action failed.');
     }

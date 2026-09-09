@@ -121,4 +121,19 @@ describe('RdxShellActionService unconfigured fail-closed', () => {
       await expectUnconfigured(actionId);
     },
   );
+  it.each(['', 'plain text', '{}', '{"ok":true,"data":{}}'])('rejects noncanonical successful process stdout %j', async (stdout) => {
+    getAll.mockReturnValue({ tooling: { rdxActions: actionMap({ closeRuntime: { ...emptyAction(), enabled: true, command: 'native-rdx' } }) } });
+    invoke.mockResolvedValue({ exitCode: 0, stdout, stderr: '', duration_ms: 1 });
+    const result = await rdxShellActionService.runAction('closeRuntime');
+    expect(result.ok).toBe(false);
+  });
+  it('requires both canonical ok and process success', async () => {
+    getAll.mockReturnValue({ tooling: { rdxActions: actionMap({ closeRuntime: { ...emptyAction(), enabled: true, command: 'native-rdx' } }) } });
+    const stdout = JSON.stringify({ ok: true, result_kind: 'rdx.context.clear', data: {} });
+    invoke.mockResolvedValue({ exitCode: 1, stdout, stderr: '', duration_ms: 1 });
+    expect((await rdxShellActionService.runAction('closeRuntime')).ok).toBe(false);
+    invoke.mockResolvedValue({ exitCode: 0, stdout, stderr: '', duration_ms: 1 });
+    expect((await rdxShellActionService.runAction('closeRuntime')).ok).toBe(true);
+  });
+
 });

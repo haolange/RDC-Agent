@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { AgentState, AgentTimelineEntry } from '@shared/types/agent';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
 import type { ToolTraceEntry } from '@shared/types/tool';
@@ -69,6 +69,15 @@ export function useIpcEventBridge(options: {
   const setWorkflowState = useWorkflowStore((state) => state.setWorkflowState);
   const setReasoningSummaries = useConversationStore((state) => state.setReasoningSummaries);
   const activeSessionId = useProjectStore((state) => state.currentSession?.sessionId ?? null);
+  const handoffNotice = useProjectStore((state) => state.currentSession?.handoffNotice);
+  const shownHandoffNotices = useRef(new Set<string>());
+  useEffect(() => {
+    if (!activeSessionId || !handoffNotice) return;
+    const key = activeSessionId + ':' + handoffNotice;
+    if (shownHandoffNotices.current.has(key)) return;
+    shownHandoffNotices.current.add(key);
+    showNotice(handoffNotice);
+  }, [activeSessionId, handoffNotice, showNotice]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;

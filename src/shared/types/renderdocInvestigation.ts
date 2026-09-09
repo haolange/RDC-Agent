@@ -346,6 +346,8 @@ export interface ExperimentRollback {
 }
 
 export interface ExperimentRecord {
+  /** Main-signed native execution receipts; absent on historical records. */
+  executionEvidence?: Record<"baseline" | "intervention" | "variant" | "rollback" | "restored", InvestigationContentRef>;
   experimentId: string;
   hypothesisClaimId: string;
   intervention: ExperimentIntervention;

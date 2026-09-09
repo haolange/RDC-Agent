@@ -1,3 +1,4 @@
+import { getRdxTurnBinding } from '../../tools/RdxTurnBindings';
 /**
  * ToolExecutorFactory — createToolExecutor and tool-call mediation helpers.
  */
@@ -289,6 +290,10 @@ export class ToolExecutorFactory {
             return denyTool('A blocking lifecycle hook denied this tool call.');
           }
           const toolContext: ToolExecutionContext = {
+            rdxBinding: plan ? getRdxTurnBinding(plan) : undefined,
+            agentId,
+            turnId: runtimeContext?.turnId,
+            excludeRdxLeaseTools: plan?.excludeRdxLeaseTools,
             workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
             projectRootPath,
             projectId: runtimeContext?.projectId ?? plan?.projectId ?? null,

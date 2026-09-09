@@ -1,3 +1,4 @@
+import type { HandoffContract } from './handoffContract';
 /**
  * Session-owned durable Profile Handoff state machine.
  * AgentHandoffDefinition is only a manifest route declaration — not this record.
@@ -16,7 +17,9 @@ export type ProfileHandoffCancelReason =
   | 'depth_exceeded'
   | 'superseded';
 
-export const HANDOFF_CHAIN_LIMIT = 3;
+export const HANDOFF_EXECUTION_CYCLE_LIMIT = 2;
+/** One route plus two execution/return pairs. */
+export const HANDOFF_CHAIN_LIMIT = 5;
 
 /** Auto-send waits only on turn-idle events while the source turn still occupies the slot. */
 export const HANDOFF_AUTO_SEND_MAX_IDLE_OBSERVATIONS = 8;
@@ -27,6 +30,7 @@ export const HANDOFF_ERROR = {
   TARGET_DISABLED: 'HANDOFF_TARGET_DISABLED',
   ALREADY_ACTIVE: 'HANDOFF_ALREADY_ACTIVE',
   CHAIN_LIMIT: 'HANDOFF_CHAIN_LIMIT',
+  CYCLE_LIMIT: 'HANDOFF_CYCLE_LIMIT',
   MODEL_INVALID: 'HANDOFF_MODEL_INVALID',
   STATE_CONFLICT: 'HANDOFF_STATE_CONFLICT',
   RESTART_DEGRADED: 'HANDOFF_RESTART_DEGRADED',
@@ -43,6 +47,7 @@ export interface ProfileHandoffState {
   toAgentId: string;
   chainRoot: string;
   depth: number;
+  contract: HandoffContract;
   prompt: string;
   label: string;
   /** Field is always present; value may be null. Canonical `providerId:modelId` when set. */
@@ -58,7 +63,8 @@ export interface ProfileHandoffState {
 }
 
 export interface HandoffStateDocument {
-  schemaVersion: '1';
+  schemaVersion: '2';
+  migrationNotice?: string;
   active: ProfileHandoffState | null;
   history?: ProfileHandoffState[];
 }

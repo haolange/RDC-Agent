@@ -14,6 +14,7 @@ export function projectSessionAgentId(
 
 export function projectSessionForClient(session: SessionRecord): SessionRecord {
   const agentId = projectSessionAgentId(session, storageAdapter.handoffs.getActive(session.sessionId));
-  if (agentId === session.agentId) return session;
-  return { ...session, agentId };
+  const handoffNotice = storageAdapter.handoffs.readDocument(session.sessionId)?.migrationNotice;
+  if (agentId === session.agentId && !handoffNotice) return session;
+  return { ...session, agentId, ...(handoffNotice ? { handoffNotice } : {}) };
 }
