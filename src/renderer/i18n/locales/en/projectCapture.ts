@@ -1,6 +1,5 @@
 export const enProjectCapture = {
   'projectCapture.title': 'Capture files',
-  'projectCapture.description': 'Import RenderDoc captures for this project.',
   'projectCapture.import': 'Import .rdc',
   'projectCapture.importing': 'Importing…',
   'projectCapture.refreshing': 'Refreshing…',

@@ -9,7 +9,6 @@ import {
   DeviceTypeIcon,
   getBootstrapSummary,
   STATUS_TEXT_KEYS,
-  type DeviceSelectorVariant,
 } from './DeviceSelectorParts';
 import {
   useDeviceDropdownPosition,
@@ -17,15 +16,8 @@ import {
 } from './useDeviceDropdownPosition';
 import './DeviceSelector.css';
 
-interface DeviceSelectorProps {
-  variant?: DeviceSelectorVariant;
-  collapsed?: boolean;
-}
-
 const DeviceSelectorDropdown: React.FC<{
   menuRef: React.Ref<HTMLDivElement>;
-  variant: DeviceSelectorVariant;
-  collapsed: boolean;
   dropdownTestId: string;
   dropdownPosition: DeviceDropdownPosition;
   devices: ReplayDeviceEntry[];
@@ -33,8 +25,6 @@ const DeviceSelectorDropdown: React.FC<{
   onSelect: (device: ReplayDeviceEntry) => void;
 }> = ({
   menuRef,
-  variant,
-  collapsed,
   dropdownTestId,
   dropdownPosition,
   devices,
@@ -52,7 +42,7 @@ const DeviceSelectorDropdown: React.FC<{
   return (
     <div
       ref={menuRef}
-      className={`device-selector-dropdown variant-${variant} placement-${dropdownPosition.placement} ${collapsed ? 'collapsed' : ''}`}
+      className={`device-selector-dropdown placement-${dropdownPosition.placement}`}
       data-testid={dropdownTestId}
       role="listbox"
       {...dynStyle}
@@ -91,23 +81,17 @@ const DeviceSelectorDropdown: React.FC<{
   );
 };
 
-export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
-  variant = 'sidebar',
-  collapsed = false,
-}) => {
+export const DeviceSelector: React.FC = () => {
   const { t } = useI18n();
   const { devices, selectedDevice, setSelectedDevice, startDeviceWatch, stopDeviceWatch, activateDevice } = useDeviceStore();
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const isUtility = variant === 'utility';
-  const dropdownTestId = isUtility ? 'utility-device-selector-dropdown' : 'sidebar-device-selector-dropdown';
-  const triggerTestId = isUtility ? 'utility-device-selector-trigger' : 'sidebar-device-selector-trigger';
+  const dropdownTestId = 'utility-device-selector-dropdown';
+  const triggerTestId = 'utility-device-selector-trigger';
 
   const dropdownPosition = useDeviceDropdownPosition({
     isOpen,
-    variant,
-    collapsed,
     triggerRef,
     menuRef,
   });
@@ -119,9 +103,6 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
   const utilityLabel = selectedEntry?.type === 'local'
     ? t('device.local')
     : (selectedEntry?.label ?? t('device.noDevice'));
-  const selectedStatus = selectedEntry?.type === 'local'
-    ? t('device.local')
-    : t(STATUS_TEXT_KEYS[selectedEntry?.status ?? 'offline']);
   const triggerTitle = t('device.replayDevice', { summary: selectedSummary });
 
   useEffect(() => {
@@ -176,13 +157,11 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
   };
 
   return (
-    <div className={`device-selector-container variant-${variant} ${collapsed ? 'collapsed' : ''}`}>
+    <div className="device-selector-container">
       <div className="device-selector-group">
         <button
           ref={triggerRef}
-          className={isUtility
-            ? 'device-selector-trigger device-selector-trigger-utility main-utility-toggle'
-            : `device-selector-trigger footer-entry sidebar-footer-entry ${collapsed ? 'collapsed' : ''}`}
+          className="device-selector-trigger device-selector-trigger-utility main-utility-toggle"
           data-testid={triggerTestId}
           onClick={handleToggleOpen}
           aria-expanded={isOpen}
@@ -193,7 +172,6 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
           <span className={`device-selector-trigger-icon ${selectedEntry?.type === 'android' ? 'android' : 'local'}`}>
             <DeviceTypeIcon type={selectedEntry?.type ?? 'local'} />
           </span>
-          {isUtility ? (
             <>
               <span className="device-selector-utility-label">{utilityLabel}</span>
               <svg
@@ -205,36 +183,11 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
                 <path d="M6 8L1 3h10l-5 5z" />
               </svg>
             </>
-          ) : (
-            <>
-              <span className="footer-entry-main">
-                <span className="device-selector-trigger-main">
-                  {!collapsed && (
-                    <span className="device-selector-copy footer-entry-copy">
-                      <span className="device-selector-summary footer-entry-title">{selectedSummary}</span>
-                    </span>
-                  )}
-                </span>
-              </span>
-              {!collapsed && (
-                <span className="device-selector-trigger-meta footer-entry-trailing">
-                  <span className={`device-selector-trigger-status footer-entry-status ${selectedEntry?.type === 'local' || selectedEntry?.status === 'connected' || selectedEntry?.status === 'online' ? 'accent' : ''}`}>
-                    {selectedStatus}
-                  </span>
-                  <svg className={`device-selector-arrow footer-entry-chevron ${isOpen ? 'open' : ''}`} viewBox="0 0 12 12" fill="currentColor">
-                    <path d="M6 8L1 3h10l-5 5z" />
-                  </svg>
-                </span>
-              )}
-            </>
-          )}
         </button>
       </div>
       {isOpen && createPortal(
         <DeviceSelectorDropdown
           menuRef={menuRef}
-          variant={variant}
-          collapsed={collapsed}
           dropdownTestId={dropdownTestId}
           dropdownPosition={dropdownPosition}
           devices={devices}

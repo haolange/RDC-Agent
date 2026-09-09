@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applyDebtRatchet, assertContractIntegrity } from './renderer-contract.mjs';
+import { applyDebtRatchet, assertContractIntegrity, contractRel } from './renderer-contract.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -137,6 +137,27 @@ for (const globalCss of ['src/renderer/styles/global/app-shell.css']) {
       fail(`${globalCss}: feature selector "${forbiddenPrefix}" must live in the owning feature directory, not styles/global`);
     }
   }
+}
+
+// Required shell CSS must be reachable from the real renderer entry, not merely
+// present beside an unused component. Follow runtime imports and CSS imports.
+const reachable = new Set();
+const visitRuntime = (relative) => {
+  if (reachable.has(relative)) return;
+  reachable.add(relative);
+  const content = fs.readFileSync(path.join(root, relative), 'utf8');
+  const imports = /(?:\b(?:import|export)\s+(?!type\b)(?:[^;'"\n]*?\s+from\s*)?|@import\s*)['"]([^'"]+)['"]/g;
+  for (const match of content.matchAll(imports)) {
+    if (!match[1].startsWith('.')) continue;
+    const base = path.posix.normalize(path.posix.join(path.posix.dirname(relative), match[1]));
+    const target = [base, `${base}.tsx`, `${base}.ts`, `${base}/index.tsx`, `${base}/index.ts`]
+      .find((candidate) => /\.(?:tsx?|css)$/.test(candidate) && fs.existsSync(path.join(root, candidate)));
+    if (target) visitRuntime(target);
+  }
+};
+visitRuntime(contractRel('main.mainTsx'));
+for (const key of ['shell.appShellCss', 'shell.appShellMiscCss']) {
+  if (!reachable.has(contractRel(key))) fail(`${contractRel(key)}: disconnected from renderer entry`);
 }
 
 assertContractIntegrity(fail);

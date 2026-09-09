@@ -2,7 +2,10 @@ import React, { useCallback, useMemo, useState } from 'react';
 import type { ProjectInputRecord } from '@shared/types/session';
 import { importProjectInputs, refreshProjectInputs } from './projectCaptureActions';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../../ui/Button';
+import { SectionHeader } from '../../ui/SectionHeader';
+import { EmptyState } from '../../ui/EmptyState';
+import { IconButton } from '../../ui/IconButton';
+import { Icon } from '../../ui/Icon';
 import { useI18n } from '../../i18n';
 
 const formatSize = (size: number): string => {
@@ -71,19 +74,35 @@ export const ProjectCaptureImportPanel: React.FC = () => {
   return (
     <aside className="right-rail project-capture-rail" aria-label={t('projectCapture.title')} data-testid="project-capture-import-panel">
       <section className="right-rail-section project-capture-import-section">
-        <h2 className="right-rail-section-heading">{t('projectCapture.title')}</h2>
+        <SectionHeader
+          className="project-capture-header"
+          title={t('projectCapture.title')}
+          actions={<>
+            <IconButton
+              label={t(activeAction === 'import' ? 'projectCapture.importing' : 'projectCapture.import')}
+              title={t('projectCapture.import')}
+              size="sm"
+              onClick={() => void run('import')}
+              disabled={activeAction !== null}
+              aria-busy={activeAction === 'import'}
+            >
+              <Icon name="plus" size={16} />
+            </IconButton>
+            <IconButton
+              label={t(activeAction === 'refresh' ? 'projectCapture.refreshing' : 'sidebar.refresh')}
+              title={t('sidebar.refresh')}
+              size="sm"
+              onClick={() => void run('refresh')}
+              disabled={activeAction !== null}
+              aria-busy={activeAction === 'refresh'}
+            >
+              <Icon name="refresh" size={16} />
+            </IconButton>
+          </>}
+        />
         <div className="right-rail-section-content">
-          <p>{t('projectCapture.description')}</p>
-          <div className="project-capture-import-actions">
-            <Button className="project-capture-import-primary" variant="primary" size="md" onClick={() => void run('import')} disabled={activeAction !== null}>
-              {t(activeAction === 'import' ? 'projectCapture.importing' : 'projectCapture.import')}
-            </Button>
-            <Button className="project-capture-import-refresh" variant="secondary" size="md" onClick={() => void run('refresh')} disabled={activeAction !== null}>
-              {t(activeAction === 'refresh' ? 'projectCapture.refreshing' : 'sidebar.refresh')}
-            </Button>
-          </div>
           {error ? <div className="project-capture-import-error" role="alert">{error}</div> : null}
-          {inputs.length ? <div className="project-capture-input-list" role="list" aria-label={t('projectCapture.title')}>{inputs.map((input) => <InputRow key={input.inputId} input={input} />)}</div> : <p className="project-capture-inputs-empty">{t('projectCapture.empty')}</p>}
+          {inputs.length ? <div className="project-capture-input-list" role="list" aria-label={t('projectCapture.title')}>{inputs.map((input) => <InputRow key={input.inputId} input={input} />)}</div> : <EmptyState className="right-rail-empty-state" title={t('projectCapture.empty')} />}
         </div>
       </section>
     </aside>

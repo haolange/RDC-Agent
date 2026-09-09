@@ -114,14 +114,14 @@
 }
 
 .composer-toolbar-group-left {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
 }
 
 .composer-toolbar-group-right {
   margin-left: auto;
   min-width: 0;
-  flex: 0 1 auto;
+  flex: 1 1 0;
+  justify-content: flex-end;
 }
 
 .composer-usage-indicator {

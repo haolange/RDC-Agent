@@ -237,3 +237,15 @@ pnpm run typecheck
 Knowledge Case 详情正文按章节分节，目录使用可换行的链接控件；缺失章节统一提示，不重复渲染空白章节。卡片信息使用带 aria-expanded 的统一 Button 展开，元数据分组排版。完整 JSON 对象 / 数组仅在阅读层转为字段与列表，保留未知字段及所有值；普通 Markdown 和无法解析的内容保持原文，禁止回写或改变知识事实。
 
 Case 阅读层按内容安排主次：预期 / 实际使用并列对照，短属性使用紧凑网格与行内列表；禁止递归缩进线和宽标签列。证据摘要常驻，来源及参数由统一按钮按需展开，不将编号、参数置于摘要之前占据正文。窄屏对照改为纵向排列。
+
+### 工作台壳层接线与项目 Capture 面板
+
+`app/App.tsx` 实际使用 `shell/AppShell` 组合 TitleBar / WorkbenchShell / overlays；壳层 CSS 必须从 `main.tsx` 的运行时 import 图可达，不能只保留组件文件。`check:renderer-structure` 检查这一接线。
+
+侧栏 Knowledge / 用户入口共用 ghost Button、36px 行高、24px 图标轨与一致文本起点，使用实色 sidebar，不保留原生灰按钮、58px 用户卡或渐变装饰。项目 Capture 面板共用 SectionHeader / Button / EmptyState，与 Session rail 使用同一 panel 刻度；列表仅展示文件与大小，不伪装成可点击控件。冗余导入说明与局部 primary 样式已删除。DeviceSelector 仅保留工作台顶部入口，退役 sidebar variant。
+
+Composer Send / Stop 共用 Button 的 primary / danger 状态，尺寸固定 28×28；圆角与 padding 通过 `--btn-*` 配置，避免全局 CSS 加载顺序覆盖。Send 是 agent accent 实色与向上箭头，Stop 为停止方块；禁用、hover、按下使用共享 Button 行为，焦点环跟随 agent accent。不保留全局 chat-send-button 渐变与 icon-only / label 旧分支。
+
+用户入口再次点击直接关闭菜单；外部点击处理须排除入口自身，避免 mousedown 关闭后 click 重开。入口使用 aria-expanded / aria-controls，与弹层状态一致，保留 Escape 焦点返回。项目 Capture 的导入与刷新使用 SectionHeader actions 内两个 28px IconButton（加号 / 刷新），共用默认、hover、focus、disabled 状态和可访问名称，不保留独立文字按钮行。
+
+Composer 宽度分配：左组及图标 menu wrapper 不参与压缩；右组允许收缩，Model wrapper 与 pill 贯通 min-width:0 / width:100%。窄宽规则具有足够 specificity，不受后加载 Pill / Effort 基础样式覆盖。禁止 viewport 规则恢复右组 flex-shrink:0。<=720px 主内容轨道使用留白内全宽，不继续使用桌面 77% 上限；Model 只对实际溢出文本渐隐，保留完整 title。

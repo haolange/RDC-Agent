@@ -20,6 +20,7 @@ import { ComposerMarkdownInput, type ComposerMarkdownMode } from './ComposerMark
 import { ComposerMarkdownModeTabs } from './ComposerMarkdownModeTabs';
 import { ComposerAgentMenu } from './ComposerAgentMenu';
 import { ComposerMenuRegistryProvider, useComposerMenu } from './useComposerMenuRegistry';
+import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { ComposerAttachIngest } from './ComposerAttachIngest';
@@ -269,9 +270,10 @@ export const Composer: React.FC<ComposerProps> = ({
             stale={usageStale}
             estimated={usageEstimated}
           />
-          <button
-            type="button"
-            className={`chat-send-button primary ${isComposerBusy ? 'is-stop' : ''}`}
+          <Button
+            variant={isComposerBusy ? 'danger' : 'primary'}
+            size="sm"
+            className="chat-send-button"
             data-testid={isComposerBusy ? 'debugger-stop-button' : 'debugger-start-button'}
             onClick={() => void (isComposerBusy ? handlePrimaryStop() : handlePromptSend())}
             disabled={primaryButtonDisabled}
@@ -284,11 +286,10 @@ export const Composer: React.FC<ComposerProps> = ({
               </svg>
             ) : (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                <path d="M12 19V5m-6 6 6-6 6 6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

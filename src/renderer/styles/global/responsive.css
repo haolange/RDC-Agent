@@ -70,23 +70,6 @@
     border-radius: var(--composer-shell-radius);
   }
 
-  .composer-footer-bar {
-    align-items: center;
-    flex-wrap: nowrap;
-  }
-
-  .composer-toolbar-group-left,
-  .composer-toolbar-group-right {
-    width: auto;
-    flex-wrap: nowrap;
-  }
-
-  .composer-toolbar-group-right {
-    flex: 0 0 auto;
-    margin-left: auto;
-    justify-content: flex-end;
-  }
-
   .composer-permission-popup {
     left: auto;
     right: 0;
@@ -94,6 +77,10 @@
 }
 
 @media (max-width: 720px) {
+  .app-main {
+    --workbench-rail-max-width: 100%;
+  }
+
   .app-body {
     min-width: 0;
     grid-template-columns:
@@ -131,30 +118,10 @@
     padding: var(--space-2);
   }
 
-  .app-sidebar-footer .sidebar-user-trigger {
-    width: 100%;
-    min-height: var(--control-height-lg);
-    justify-content: center;
-    padding: 0;
-  }
 
-  .app-sidebar-footer .footer-entry-copy,
-  .app-sidebar-footer .footer-entry-trailing {
-    display: none;
-  }
 }
 
 @media (max-width: 640px) {
-  .chat-send-button-label {
-    display: none;
-  }
-
-  .chat-send-button {
-    width: var(--control-height-sm);
-    min-width: var(--control-height-sm);
-    padding: 0;
-  }
-
   .composer-textarea {
     min-height: 52px;
     font-size: var(--text-base);

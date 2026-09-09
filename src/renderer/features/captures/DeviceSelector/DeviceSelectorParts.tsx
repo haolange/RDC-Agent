@@ -6,7 +6,6 @@ export const DROPDOWN_MIN_WIDTH = 280;
 export const VIEWPORT_MARGIN = 16;
 export const ANCHOR_GAP = 8;
 
-export type DeviceSelectorVariant = 'sidebar' | 'utility';
 export type DropdownPlacement = 'above' | 'below';
 
 export const clamp = (value: number, min: number, max: number): number => {

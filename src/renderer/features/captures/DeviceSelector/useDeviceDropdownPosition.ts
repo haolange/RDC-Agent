@@ -3,7 +3,6 @@ import {
   ANCHOR_GAP,
   clamp,
   DROPDOWN_MIN_WIDTH,
-  type DeviceSelectorVariant,
   type DropdownPlacement,
   VIEWPORT_MARGIN,
 } from './DeviceSelectorParts';
@@ -18,13 +17,10 @@ export interface DeviceDropdownPosition {
 
 export function useDeviceDropdownPosition(options: {
   isOpen: boolean;
-  variant: DeviceSelectorVariant;
-  collapsed: boolean;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   menuRef: React.RefObject<HTMLDivElement | null>;
 }) {
-  const { isOpen, variant, collapsed, triggerRef, menuRef } = options;
-  const isUtility = variant === 'utility';
+  const { isOpen, triggerRef, menuRef } = options;
   const [dropdownPosition, setDropdownPosition] = useState<DeviceDropdownPosition>({
     left: VIEWPORT_MARGIN,
     top: VIEWPORT_MARGIN,
@@ -50,17 +46,11 @@ export function useDeviceDropdownPosition(options: {
       return;
     }
 
-    const measuredWidth = isUtility
-      ? Math.max(dropdownElement?.offsetWidth ?? 0, DROPDOWN_MIN_WIDTH)
-      : Math.max(
-        collapsed ? DROPDOWN_MIN_WIDTH : triggerRect.width,
-        dropdownElement?.offsetWidth ?? 0,
-        DROPDOWN_MIN_WIDTH,
-      );
+    const measuredWidth = Math.max(dropdownElement?.offsetWidth ?? 0, DROPDOWN_MIN_WIDTH);
     const width = Math.min(measuredWidth, viewportWidth - VIEWPORT_MARGIN * 2);
     const measuredHeight = dropdownElement?.offsetHeight ?? 320;
     const maxLeft = viewportWidth - width - VIEWPORT_MARGIN;
-    const leftCandidate = isUtility ? triggerRect.right - width : triggerRect.left;
+    const leftCandidate = triggerRect.right - width;
     const left = clamp(leftCandidate, VIEWPORT_MARGIN, maxLeft);
     const preferredTop = triggerRect.top - measuredHeight - ANCHOR_GAP;
     const placement: DropdownPlacement = preferredTop >= VIEWPORT_MARGIN ? 'above' : 'below';
@@ -77,7 +67,7 @@ export function useDeviceDropdownPosition(options: {
       ready: true,
       placement,
     });
-  }, [collapsed, isUtility, menuRef, triggerRef]);
+  }, [menuRef, triggerRef]);
 
   useEffect(() => {
     if (!isOpen) {

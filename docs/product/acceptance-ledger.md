@@ -139,3 +139,41 @@ GUI 验收仍待外部条件：浏览器自动化与独立桌面自动化内核�
 当前 General 调查执行比普通 General 额外 6027 字符，体现领域方法按需成本；不预设真实多轮节省比例。完整分段结果在本轮 prompt-cost.json，左全局→虚线→右细节图已同步。
 
 后续专项：Android 真机；真实多轮 Mission 稳定性、正确性与设计符合性；原生 screenshot/preview 呈现链；生产 safeStorage 签名完整产品验收。既有 CLI/fixture/GUI 结果均不替代这些专项。未提交或推送，未创建或切换分支。
+
+
+## 2026-09-09 截图反馈：工作台 UI 遗漏收敛（未提交工作区实测）
+
+基底 `8d35ed310ffa6a1ea3d31142fdc7be210aab3f53`；本段记录当前工作区实测，不借用历史 SHA 标记新 diff 为已提交 verified。源码差异指纹（`git diff -- src scripts` 加新增 ComposerSendButton.css 原字节的 SHA-256）：`84d96c93c653a074de59e43ea1837a9393cfde5c0c5f219d334795718f34b034`。
+
+修复范围：App 实际接入 AppShell；Knowledge / 用户入口共享 ghost Button 与 36px 行高；项目 Capture 共用 SectionHeader / Button / EmptyState 与紧凑文件行；Send / Stop 共享 Button 状态，28×28、agent accent 实色发送、变量配置圆角；用户菜单初始焦点与 Escape 返回。删除未接线壳层里的旧 footer / placeholder / 装饰与全局 focus 覆盖、原侧栏设备 variant、旧发送/停止样式及重复 Capture 覆盖。sidebar 为实色。增加壳层 CSS 从 renderer 入口可达性门禁，fidelity 清单只移除本轮实际退役 class。
+
+实际通过：
+
+- typecheck、lint、完整 check:gates、最终 build、git diff --check；最终完整测试 337 files passed / 4 skipped，2482 tests passed / 4 skipped。受影响 renderer 单测 23 files / 107 tests 通过。覆盖率 lines 73.50%、functions 75.77%、branches 60.96%、statements 71.21%，coverage ratchet 通过。首次并行覆盖率有三个负载超时，降低到两个 worker 后完整通过；Knowledge 沙箱祖先路径限制通过宿主执行复核，未放宽断言或产品校验。
+- disposable Browser QA 同源真实应用：空 Capture、`project.inputs.importPaths` 导入两个明确 UI 列表样本、刷新 busy/disabled → 两文件列表；中英文、Light/Dark；长中文文件名与完整 title/accessible label；Knowledge 打开关闭、顶部本地设备选择；Send 空草稿禁用/有草稿启用，Tab 可到 Send 且 agent accent 焦点可见，未点击发送。
+- 最终 390 CSS px：`documentElement.scrollWidth = innerWidth = 390`，七个 Composer 控件高均约 27.992px（显示比例下等于 28px）；右侧文件抽屉、左侧导航抽屉均可开关。用户菜单首项获得焦点，Escape 在宽屏返回用户入口、窄屏返回左栏展开按钮；侧栏入口同高约 35.994px，Send 圆角 9999px、background-image 为 none。
+- Browser 截图相对证据目录：`8d35ed31/ui-convergence-20260909/ui-workbench-dark.png`、`ui-workbench-light.png`、`ui-capture-390-dark.png`、`ui-composer-390-light.png`。最终 QA projectId `proj_bd3db12a4f21`，无 session、无模型请求。列表文件内容明确为 UI fixture，不代表真实 capture 回放；原生文件选择器、真实模型运行中的 Stop、Remote/Android 未作本轮实机验收。
+- `scripts/start-rdc-agent.cmd` 使用独立临时用户目录实启，加载 `file:///.../out/renderer/index.html`，无占锁失败。测试 Electron owner 60776 / 20544 / 70060 / 22408 / 38716 及对应 launcher/子进程均停止；canonical instance.lock 不存在。桌面启动权已交还。
+
+未创建/切换分支，未提交或推送；既有 `.cursor/` 未修改。
+
+## 2026-09-09 用户菜单切换与 Capture 标题栏补充验收（未提交工作区）
+
+- 来源：用户补充截图。基线仍为 `8d35ed310ffa6a1ea3d31142fdc7be210aab3f53`；当前 `git diff -- src scripts` 加新增 ComposerSendButton.css 字节的 SHA-256：`778c2e1d8414ee620b5979dbbaa7979f21dcfb5ddbd86a8806d48677bd566406`。此前验收段落保留为历史，不代表本次 diff 的全量测试结果。
+- 菜单：真实 Browser 鼠标连续点击入口，open true → false；Enter 同样切换；Escape 关闭并返回入口焦点；点击 Capture 标题关闭菜单；aria-expanded 同步。
+- Capture：两个操作迁入 SectionHeader actions，共用 IconButton；旧 actions / primary / refresh 局部类已退役。真实刷新成功保留两条隔离 fixture；中英文与深浅色桌面实测，两个按钮均约 28×28 CSS px；390px 窄屏几何检测无横向溢出。
+- 本次门禁：typecheck、lint、check:right-rail、check:design-tokens、check:renderer-structure、check:appearance、git diff --check 通过；sidebar / scopedCapture 定向测试 2 文件 2 测试通过。桌面 launcher 本次重建并加载 renderer 成功。
+- 限制：本次为局部 UI 回归，不冒充此前全量 tests/coverage 对新 diff 的证明；未操作真实账号或原生导入文件对话框。项目和 capture 均为隔离 QA 测试资料。
+- Browser 证据：`ui-convergence-20260909/ui-followup-dark.png`、`ui-convergence-20260909/ui-followup-light.png`（基线 SHA 的本机 QA 目录）。
+- 启动权：本轮 Browser owner 44420 / launcher 19376 与 desktop owner 49416 / launcher 45560 均已停止；canonical instance.lock 不存在。桌面启动权已交还。
+
+## 2026-09-09 Composer 窄宽穿插修复（未提交工作区）
+
+- 基线 `8d35ed310ffa6a1ea3d31142fdc7be210aab3f53`，当前 source/scripts diff 加新增 ComposerSendButton.css 字节 SHA-256 `21f7d66c908bc978bb51f77c819b59062ca69af5c47e734be30c5c9b982a6371`。此前全量测试记录只证明此前快照。
+- 删除 responsive.css 的 Composer footer/group 重复布局；固定图标与左组尺寸，仅 Model wrapper 可收缩。窄屏保留单行及图标化，Model 宽度自适应并仅在实际溢出时渐隐。<=720px 内容轨道取消桌面 77% 上限。
+- 最新 build Browser：320px / 390px / 1023px viewport 均测量按钮无相交且同一行；1023px 时 Composer 宽584px。320px 模型文字46px、内容80px，mask生效；390px能容纳时mask=none。中英文、深浅色已观察；模型菜单可打开、Escape关闭。使用隔离项目与无provider状态，未请求模型。
+- 验证：typecheck / lint / build / design-tokens / appearance / renderer-structure / diff whitespace 通过；Composer 20文件101测试通过。未再次执行全库 tests/coverage。
+- 截图：`ui-convergence-20260909/composer-320.png`、`ui-convergence-20260909/composer-390.png`，本机基线SHA的QA目录。
+- 最终桌面入口已加载 renderer；QA 24964/42780 与桌面 31976/56528 均已关闭，canonical instance.lock 不存在。桌面启动权已交还。
+
+- 2026-09-09 完整改动约束复核：修复 touched Composer CSS 的 CRLF 与 fidelity 精确匹配冲突，按 .gitattributes 归一 LF；未改变动画语义或放宽门禁。当前完整 `pnpm run check:gates` exit 0（含 fidelity、architecture、session-projection、right-rail、legacy-residue、acceptance-ledger、design-tokens、renderer-structure）。全库 tests/coverage 仍以各历史快照为界，不冒充本次重跑。
