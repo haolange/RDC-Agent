@@ -1,3 +1,5 @@
+import { resolveInvestigationTaskBinding } from '../../investigation/investigationTaskBinding';
+import { enforceMissionTurnCompletion } from '../../investigation/missionCompletionContract';
 /**
  * AgentOrchestrator — façade over turn preparation, tool assembly, executor,
  * turn runner, subagent runner, and prompt-plan helpers.
@@ -114,6 +116,7 @@ export class AgentOrchestrator {
     });
 
     this.turnPrep = new TurnPreparationService({
+      resolveTaskBinding: resolveInvestigationTaskBinding,
       mcp: this.mcp,
       deferredActivation: this.deferredActivation,
       resolveRuntimeTools: (...args) => this.tools.resolveRuntimeTools(...args),
@@ -122,6 +125,7 @@ export class AgentOrchestrator {
     this.profilePrep = new ProfileTurnPreparation(this.turnPrep);
 
     this.turnRunner = new AgentTurnRunner({
+      validateCompletion: enforceMissionTurnCompletion,
       slots: this.slots,
       mcp: this.mcp,
       deferredActivation: this.deferredActivation,
@@ -733,7 +737,7 @@ export class AgentOrchestrator {
         status,
       },
     });
-    this.notifyAgentStateChanged(state);
+    workflowProjectionPublisher.publishAgentStatus(state);
   }
 
   private async recordMessage(
@@ -769,10 +773,6 @@ export class AgentOrchestrator {
     }
 
     this.notifyMessage(message, context?.sessionId);
-  }
-
-  private notifyAgentStateChanged(state: AgentState): void {
-    workflowProjectionPublisher.publishAgentStatus(state);
   }
 
   private notifyMessage(message: AgentMessage, sessionId?: string): void {

@@ -350,6 +350,10 @@ export class AgentPermissionPolicyService {
       return denied(`Policy deniedTools blocked tool "${input.toolCall.name}".`, 'high');
     }
 
+    if (toolName === 'shell' && input.toolCall.arguments.rdx && input.agentId !== 'general') {
+      return denied('RDX_EXECUTION_DENIED: General only.', 'high');
+    }
+
     // Catastrophic shell patterns are hard-denied in every mode, including full-access.
     if (toolName === 'shell') {
       const command = extractStringArg(input.toolCall, 'command');
@@ -427,6 +431,7 @@ export class AgentPermissionPolicyService {
 
     if (toolName === 'shell') {
       const command = extractStringArg(input.toolCall, 'command');
+      if (input.toolCall.arguments.rdx) return request(mode, 'Native RDX operation requires review: ' + JSON.stringify(input.toolCall.arguments.rdx), 'high');
       if (!command) return denied('Shell command is empty.', 'medium');
       if (isCommandAllowedByRule(command, permissions)) {
         return { action: 'allow', risk: 'low', temporaryPathRoots: [] };

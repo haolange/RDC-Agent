@@ -1,3 +1,4 @@
+import { executeRdxShell, type RdxShellInput } from '../../../tools/executeRdxShell';
 /**
  * ShellTool — spawn a fresh interpreter for each call and persist only cwd.
  */
@@ -25,7 +26,8 @@ import {
 } from './shellTrailer';
 
 interface ShellParams {
-  command: string;
+  command?: string;
+  rdx?: RdxShellInput;
   timeout?: number;
 }
 
@@ -78,7 +80,7 @@ function resolveReportedExitCode(trailerExit: number | undefined, processCode: n
   return processCode;
 }
 
-export const shellTool: AgentTool<ShellParams, ShellDetails> = {
+export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operation?: string; receipt?: import("@shared/types/renderdocInvestigation").InvestigationContentRef }> = {
   name: 'shell',
   label: '终端命令',
   get description() {
@@ -97,12 +99,21 @@ export const shellTool: AgentTool<ShellParams, ShellDetails> = {
         type: 'string',
         description: 'The shell command to execute in the current session working directory',
       },
+      rdx: {
+        type: 'object', additionalProperties: false, required: ['operation', 'args'],
+        properties: {
+          operation: { type: 'string', description: 'Native session-scoped rd.shader/perf/event/pipeline/resource/export operation. General only.' },
+          args: { type: 'object', description: 'Native operation arguments; replay/context identity is injected by main.' },
+          experimentId: { type: 'string', description: 'Bind a signed execution receipt to this experiment. Required for investigation closure.' },
+        },
+      },
       timeout: {
         type: 'number',
         description: `Timeout in milliseconds (default: ${SHELL_DEFAULT_TIMEOUT_MS}, max: ${SHELL_MAX_TIMEOUT_MS})`,
       },
     },
-    required: ['command'],
+    additionalProperties: false,
+    oneOf: [{ required: ['command'], not: { required: ['rdx'] } }, { required: ['rdx'], not: { required: ['command'] } }],
   },
   spec: {
     isReadOnly: false,
@@ -115,6 +126,8 @@ export const shellTool: AgentTool<ShellParams, ShellDetails> = {
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, onUpdate, context) {
+    if ((typeof params.command === 'string') === Boolean(params.rdx)) throw new Error('SHELL_INPUT: provide exactly one of command or rdx.');
+    if (params.rdx) return withSessionShellLock(context?.sessionId ?? null, () => executeRdxShell(params.rdx!, _toolCallId, signal, context));
     return withSessionShellLock(context?.sessionId ?? null, () => executeShellCommand(
       params,
       signal,
@@ -130,7 +143,7 @@ async function executeShellCommand(
   onUpdate: Parameters<typeof shellTool.execute>[3],
   context: Parameters<typeof shellTool.execute>[4],
 ): Promise<AgentToolResult<ShellDetails>> {
-    const command = params.command;
+    const command = params.command!;
     const timeoutMs = Math.max(
       1,
       Math.min(

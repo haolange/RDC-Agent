@@ -1,7 +1,6 @@
 ---
 name: capture-facts
 description: Record observed capture facts as Evidence and World State without promoting inferences.
-allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read, rdx_context, knowledge_search, knowledge_read, shell, task_create, subagent]
 ---
 
 # Capture Facts

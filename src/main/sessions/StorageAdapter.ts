@@ -311,9 +311,6 @@ export class StorageAdapter implements StorageHost {
     return this.sessions.getSessionAttachmentsManifestPath(sessionId);
   }
 
-  writeSessionPlanArtifact(sessionId: string, content: string): string {
-    return this.sessions.writeSessionPlanArtifact(sessionId, content);
-  }
 
   getSessionUsagePath(sessionId: string): string | null {
     return this.context.getSessionUsagePath(sessionId);

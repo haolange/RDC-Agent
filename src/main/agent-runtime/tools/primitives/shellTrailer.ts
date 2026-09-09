@@ -55,10 +55,8 @@ export function wrapPowerShellCommand(command: string, marker: string): string {
   const encoded = Buffer.from(command, 'utf8').toString('base64');
   return [
     'try { $PSNativeCommandUseErrorActionPreference = $false } catch { }',
-    'if ($PSVersionTable.PSVersion.Major -ge 6) {',
-    '  try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }',
-    '  try { $OutputEncoding = [Console]::OutputEncoding } catch { }',
-    '}',
+    // Keep PowerShell's native decoder aligned with the inherited console/OEM code page.
+    // Only our own writer is UTF-8; forcing Console.OutputEncoding corrupts legacy native output.
     '$__stdout = New-Object System.IO.StreamWriter([Console]::OpenStandardOutput(), (New-Object System.Text.UTF8Encoding $false))',
     '$__stdout.AutoFlush = $true',
     'function Write-RdxLine([string]$Line) { $__stdout.WriteLine($Line) }',

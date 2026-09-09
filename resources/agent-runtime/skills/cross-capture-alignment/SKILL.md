@@ -1,7 +1,6 @@
 ---
 name: cross-capture-alignment
 description: Align facts across captures on explicit scope axes without over-generalizing.
-allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read, rdx_context, knowledge_search, knowledge_read, shell, task_create, subagent]
 ---
 
 # Cross Capture Alignment

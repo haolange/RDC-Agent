@@ -70,3 +70,35 @@ Reasoning 使用 `raw | summary | opaque | none | unknown`。语义来自 Provid
 - Request snapshot list / detail
 
 Memory 与 Knowledge 使用独立 scoped preload domain（`memory` / `knowledge`）。Renderer 不获得任意 tool execute、任意 shell、Secret 或 provider protected payload 接口。
+
+
+## 原生 CLI 与执行回执（2026-09-09）
+
+只支持原生 rdx 协议；Settings 保留 executable、argsPrefix、工作目录、环境、超时和桌面 actions。prepareTurn 把 CLI/actions 深拷贝冻结在主进程私有 binding；EffectiveRuntimePlan 只序列化指纹，不暴露 env。执行中修改 Settings 不改变当前调用。
+
+rdx_probe 保留七个应用 action，映射如下：
+
+| 应用 action | 原生命令 |
+| --- | --- |
+| version | version --json（原生 parser 的子命令会覆盖前置 JSON 标志） |
+| doctor | --json doctor |
+| enumerate | --json tools list |
+| preview_status | --json --daemon-context <owned> session preview status |
+| probe | 封闭 context status / event list,show / pipeline show / resource list / vfs ls,cat |
+| lease_open / lease_close | 应用的 owning session/capture 生命周期；先核对真实 context 状态，不生成虚构 CLI 动词 |
+
+event/path 参数逐操作校验，不接收任意 argv 或 regex 猜测的“只读” operation。VFS 只允许 canonical 窄路径，cat 不读根/大目录。contextId 不允许切到别的 session；应用 session ID 不作为 replay --session-id 传递。非零退出、空/非法 JSON、ok:false、取消、超时或 context 不匹配均失败；失败关闭不清 lease，也不终止无关 shell 子进程。Desktop actions 同样要求原生 canonical JSON。
+
+General 使用已有 shell 工具的结构化模式：
+```json
+{"rdx":{"operation":"rd.perf.get_frame_timing","args":{},"experimentId":"exp-1"}}
+```
+command 与 rdx 互斥，schema 和执行入口均检查。operation 当前限定 session-scoped rd.shader/perf/event/pipeline/resource/export；原生目录仍由外部 CLI 维护，不向 prompt 展开完整 schema。主进程注入 replay session_id 与 owning daemon context，拒绝模型指定身份。Mission/offline child/delegated mutation/default context fail-closed；串行调用沿用 ShellInvocationService/ProcessSupervisor 与 shell 审批。
+
+有 experimentId 的成功调用写入 session tool-outputs：主进程签名回执绑定 session/project/turn/toolCall/experiment/context/leaseVersion/replaySession、operation、参数指纹、退出码、结果 hash 和开始/结束时间。签名 key 由 OS safeStorage 保管，不进 prompt/IPC/trace；先确认可签名再执行，落盘遵守 SessionArtifactResolver 配额/原子写/取消边界。普通查询不强制永久落盘；手写文件或 shell 回显不能成为可信回执。
+
+Experiment.executionEvidence 为可选五阶段引用组。历史无该字段可读；新关闭、ready report 与 Mission 完成必须验证成功签名、同 experiment/context/lease、顺序及同参数测量。当前介入/恢复支持 edit_and_replace → 同 replacement_id 的 revert_replacement；测量为 frame timing、event durations、counters、screenshot 或 texture export。拒绝/未执行/缺恢复测量不算回滚。回执证明执行及结果，不自动证明因果、质量、噪声或优化收益。
+
+验证：RdxNativeParser.test.ts 接受显式 RDX_NATIVE_TOOLS_ROOT / RDX_NATIVE_PYTHON，用外部实际 parser 校验生产 argv 与 JSON 标志。RdxNativeExecution.test.ts 仅在显式 RDX_NATIVE_PYTHON / RDX_NATIVE_CAPTURE / RDX_NATIVE_ALLOW_MUTATION=1 下，对临时副本进行真实像素介入、签名证据与回滚，finally 停 daemon；默认单测不碰真实 capture。
+
+Human preview 关闭由 main 使用当前配置 CLI 的冻结快照编译原生 `session preview off`；不新增 closePreview 配置项。只有所属 context 的 canonical 成功结果且 `preview.enabled === false` 才投影 closed，失败保留错误并保持 capture lease。openPreview 缺少 enabled=true 不能投影 open。远程 prepared handle 在 open 前单次消费，失败后必须重新 connectRemote。

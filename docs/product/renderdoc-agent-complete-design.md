@@ -152,7 +152,8 @@ RDX 仍是外部 CLI：Agent 像人类一样用通用 `shell` 调用，经定向
 | `sourceAgentId` | 源 profile |
 | `toAgentId` | 目标 profile |
 | `chainRoot` | 用户 root 链 id |
-| `depth` | 相对 root 的深度；每用户 root 链最多 3 |
+| `contract` | route / execute / return；Plan URI/hash、必需 Skill、真实返回对象、执行绑定与产物引用见 runtime-kernel |
+| `depth` | 相对 root 的深度；每用户 root 最多两轮执行与回评估，初始 route 不计，结构深度最多 5 |
 | `prompt` | 交接正文（含 plan / artifact refs，不含 secret） |
 | `label` | 人类可读标签 |
 | `declaredModel` | **字段必存在，值可为 `null`**。非空时为 canonical `providerId:modelId` |
@@ -187,12 +188,12 @@ RDX 仍是外部 CLI：Agent 像人类一样用通用 `shell` 调用，经定向
 - 只有 `AgentTool.spec.isConcurrencySafe === true` 才安全；**缺省 `false`**。
 - 只并发**连续**安全组；unsafe 调用独占，切开前后组。
 - 下列工具一律串行：`shell`、write、task mutation、RDX / Live Capture（含 `rdx_probe`）、MCP、ask、handoff、`output_register`。
-- `requiresRdxLease=true` 的 child 必须通过显式、受限、生命周期绑定的 delegated lease 取得 parent RDX context 并串行；child 完成/取消立即撤销。`requiresRdxLease=false` 的 child **在 allowlist 层**就不能拿到 `rdx_context` / `rdx_probe` / `shell` 中的 RDX 路径。禁止并发 RDX 双 owner。
+- `domainExtensions.rdx.requiresLease=true` 的 child 必须通过显式、受限、生命周期绑定的 delegated lease 取得 parent RDX context 并串行；child 完成/取消立即撤销。未请求 `domainExtensions.rdx` 的 child **在 allowlist 层**就不能拿到 `rdx_context` / `rdx_probe` / `shell` 中的 RDX 路径。禁止并发 RDX 双 owner。
 - `callIndex` 保持稳定顺序，UI / Trace / 结果回灌都按它排序。
 - dispatch 前原子扣减预算；扣减失败整组不开。
 - abort 必须 `Promise.allSettled` join，不得丢孤儿进程。
 - 部分失败不连坐同组其余**已发出**调用的结果记录，但不得继续开新组。
-- offline subagent 必须 `requiresRdxLease=false`；需要 RDX lease 的工作不得进并发组。
+- offline subagent 不请求 `domainExtensions.rdx`；需要 RDX lease 的工作不得进并发组。
 
 ---
 
@@ -449,7 +450,7 @@ Planning Orchestrator 宽语义、低 raw；Specialist 窄而深；Skeptic 干�
 
 每次委托 Sub-Agent 即时编译，**不是**新平台文件类型。语义必须包含：身份、Mission、Task、原因、已确认事实、竞争 Hypothesis、相关 Challenge、当前 World State、输入 Artifact、相关 Knowledge、已证伪路径、不应重复的实验、输出要求、原始 Evidence 的可恢复引用。
 
-offline subagent 的 Capsule 不得携带 RDX lease；`requiresRdxLease` 必须为 `false`。Debugger 纵切把该 Capsule 写成 `$debugger-coordinator` / `$renderdoc-execution` 的委托纪律，而不是新平台文件类型。
+offline subagent 的 Capsule 不得携带 RDX lease；省略 `domainExtensions.rdx`。Debugger 纵切把该 Capsule 写成 `$debugger-coordinator` / `$renderdoc-execution` 的委托纪律，而不是新平台文件类型。
 
 ### 10.3 三层 Compaction
 
@@ -660,7 +661,7 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 | 实验状态污染 | World State + 事务 + `S-RDC-01` |
 | Context 无限累积 | 三层 Compaction + Delta Loop |
 | Compact 提升推断等级 | `S-CLAIM-01` |
-| 多 Agent 抢同一 Replay | Live 串行；offline `requiresRdxLease=false` |
+| 多 Agent 抢同一 Replay | Live 串行；offline 未请求 `domainExtensions.rdx` |
 | Knowledge Poisoning | Candidate / Scope / Promotion / Conflict / Negative |
 | Confirmation Bias | Contradiction Injection + 独立 Skeptic |
 | Report 漂移 | 只消费 Accepted Claims 与真实 Artifact |
@@ -714,3 +715,14 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 - **U06**：三条 Mission 正常 `completed` 闭环（不得写成已验收）。
 
 禁止再写「Run 当前实现仍为 v2」「Wave 3 已落地独立 Embedding」作为现行差距。连续安全工具并发组仍按 `DESIGN.md` §F。Mission plan-only + `rdx_probe` 见裁决 J。后续按 `DESIGN.md` 裁决落地，落地一项删除一项旧路径。
+
+
+## 垂直指令与执行真实性收敛（2026-09-09）
+
+以 DESIGN.md 的同名裁决为准。General 直接处理普通代码调试、解释与性能修复；只把明确 RenderDoc/capture 调查转 Mission。标准闭环为 Mission 规划 → General 执行 → 原 Mission 评估与报告，General 的实际 handoff continuation turn 不得直接宣告 Mission 完成。深度不足或能力缺失保留 checkpoint 与未完成位置，取消/重启语义不变。
+
+General 的 execution-orchestrator 只定义通用工作方法；三个 Mission coordinator 保存目标、计划产物、handoff 与方法路由；共享执行/Small Loop/Big Loop/capsule 只在 renderdoc-execution 维护。报告按需读对应 Mission 章节。先获取可安全读取的上下文，再问不可获取输入或必需决策；不重复已授权步骤。相似案例只在相关历史问题时检索，单次 lookup 不强制 Scout。保留原 27 个 skill ID，新增 renderdoc-investigation 入口（共 28 个）；读取方法不重新武装本轮权限。
+
+Knowledge 保留 markdown-first 六 lane 五服务与 human review；不恢复 Embedding、第二索引、自动 Candidate 或 Memory。Scout 正文与四工具权限一致；rdc-context 通过 rdx_context 查询拥有的状态；debug 明确只读诊断；verify 报告本技能实际可验证的受影响面。删除强制 driver-blame 假设，保留有证据且可区分的替代解释。
+
+Experiment 可选 executionEvidence 五阶段引用的字段、签名、顺序、ownership 和 rollback 门禁见 docs/architecture/rdx-runtime.md。历史记录不改写、不追认；新关闭与新完成失败时不得补造布尔字段。U06 Optimizer 原验收保留取证信息，但撤回缺乏真实介入依据的完成结论。

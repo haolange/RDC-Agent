@@ -75,7 +75,8 @@ export class HandoffController {
     }
 
     const declared = sourceHandoffs.find((handoff) => handoff.agent === target);
-    const prompt = (promptOverride?.trim() || declared?.prompt || `Continue from ${fromAgentId} as ${target}.`).trim();
+    const prompt = promptOverride?.trim() ?? '';
+    if (!prompt) return fail(HANDOFF_ERROR.STATE_CONFLICT, 'A non-empty handoff summary is required.');
     const label = (labelOverride?.trim() || declared?.label || `Hand off to ${target}`).trim();
     const send = declared?.send === true;
     const declaredModel = typeof declared?.model === 'string' && declared.model.trim()

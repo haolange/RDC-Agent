@@ -182,6 +182,13 @@ export const ClaimSetSchema: ZodType<ClaimSet> = z.object({
 }).strict();
 
 export const ExperimentRecordSchema: ZodType<ExperimentRecord> = z.object({
+  executionEvidence: z.object({
+    baseline: z.object({ uri: nonEmpty, expectedHash: nonEmpty }).strict(),
+    intervention: z.object({ uri: nonEmpty, expectedHash: nonEmpty }).strict(),
+    variant: z.object({ uri: nonEmpty, expectedHash: nonEmpty }).strict(),
+    rollback: z.object({ uri: nonEmpty, expectedHash: nonEmpty }).strict(),
+    restored: z.object({ uri: nonEmpty, expectedHash: nonEmpty }).strict(),
+  }).strict().optional(),
   experimentId: nonEmpty,
   hypothesisClaimId: nonEmpty,
   intervention: z.object({

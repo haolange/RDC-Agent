@@ -1,7 +1,6 @@
 ---
 name: optimization-experiment
 description: Run cost experiments with a real intervention, exclusive World State, and verified rollback.
-allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read, rdx_context, shell, task_create, subagent]
 ---
 
 # Optimization Experiment

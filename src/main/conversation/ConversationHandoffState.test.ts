@@ -18,6 +18,7 @@ const {
     consume: vi.fn(),
     cancel: vi.fn(),
     hydrate: vi.fn(),
+    readDocument: vi.fn(() => null),
     isLiveThisProcess: vi.fn(),
   },
 }));
@@ -91,6 +92,7 @@ import type { ActiveConversationTurn } from './ConversationRoutePreflight';
 const committed: ProfileHandoffState = {
   handoffId: 'handoff-1',
   lifecycle: 'committed',
+  contract: { intent: 'route' },
   sourceTurnId: 'turn-src',
   sourceRequestId: 'req-src',
   sourceAgentId: 'plan',

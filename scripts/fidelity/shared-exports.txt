@@ -123,7 +123,6 @@ ArtifactStatus
 assertChannelCapabilityCoverage
 assertHexOrNull
 assertNoJsonlDiagnostics
-assertRdxProbeArgsReadOnly
 assignDefaultCaptureRoles
 AssistantMessageDiagnostic
 AssistantMessageNode
@@ -216,6 +215,7 @@ CompiledProviderCatalog
 CompiledProviderCatalogIndex
 CompiledProviderSurface
 compileProviderCatalog
+compileRdxProbe
 compileThemeChrome
 COMPOSE_ACCENT_FALLBACK
 ComposeAccentCssVars
@@ -547,7 +547,6 @@ isMissionProfileId
 isNamedReasoningLevel
 isPlanOnlyConflictSkill
 isRdxLeaseToolName
-isRdxProbeMutateActionName
 isReasoningSelection
 isRendererEventChannel
 isRendererInvokeChannel
@@ -924,7 +923,6 @@ resolveInvestigationKind
 resolveModelControls
 resolveOnSelection
 resolvePlanningOutputTokens
-resolveRdxProbeCliAction
 resolveTurnOutputTokens
 resolveVisibleConversationMessages
 ResourceProvenance

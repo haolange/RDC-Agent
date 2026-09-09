@@ -1,7 +1,6 @@
 ---
 name: pass-graph-analysis
 description: Reconstruct pass graphs from capture structure and keep observed names separate from inferred ones.
-allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read, rdx_context, knowledge_search, knowledge_read, shell, task_create, subagent]
 ---
 
 # Pass Graph Analysis

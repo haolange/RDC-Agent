@@ -29,7 +29,7 @@ import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeSta
 import { EMPTY_CANONICAL_ASSISTANT_OUTPUT, requireCanonicalFinalAnswer } from './CanonicalAssistantOutput';
 import { hydrateFrozenUserContent } from './ConversationAttachmentMaterializer';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
-import { enforceMissionTurnCompletion } from '../investigation/missionCompletionContract';
+import type { TurnCompletionValidator } from '../agent-runtime/agent/TurnCompletionValidator';
 import { buildHandoffAgentEvent } from './profileHandoffEvents';
 import type { PendingHandoff } from '../workflow/debugger/TurnCoordinator';
 import type {
@@ -66,6 +66,7 @@ export interface CompleteProfileTurnInput {
   }
 
 export interface ConversationTurnRunnerHost {
+  validateCompletion: TurnCompletionValidator;
   persistConversationSnapshot(sessionId: string | null | undefined, message: ConversationMessage): Error | null;
   emitConversationEvent(event: ConversationStreamEvent): void;
   publishConversationTrace(traceSessionId: string, messages: ConversationMessage[], persistedSessionId?: string | null): void;
@@ -511,11 +512,14 @@ export async function completeProfileTurn(
       );
 
       requireCanonicalFinalAnswer(canonicalOutput);
-      enforceMissionTurnCompletion({
+      host.validateCompletion({
+        taskBinding: input.preparedTurn.runtime.effectivePlan.taskBinding,
         profileId: conversationAgentId,
+        turnId: assistantMessage.turnId,
         sessionId,
         finalAnswerText: canonicalOutput.finalAnswerText,
         pendingHandoff: Boolean(terminalHandoff),
+        pendingHandoffTarget: (terminalHandoff as PendingHandoff | null)?.toProfile,
       });
     } catch (error) {
       llmDiagnostic = createTurnFailedDiagnostic(routePreflight, error);

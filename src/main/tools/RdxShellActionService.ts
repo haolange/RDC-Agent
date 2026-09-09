@@ -140,53 +140,24 @@ const parseErrorDiagnostic = (value: unknown): RdxActionDiagnostic | undefined =
 };
 
 const parseJsonPayload = (stdout: string): ParsedActionPayload => {
-  const trimmed = stdout.trim();
-  if (!trimmed) {
-    return { data: {} };
+  if (!stdout.trim()) throw new Error('RDX action requires canonical JSON stdout.');
+  const parsed: unknown = JSON.parse(stdout);
+  if (!isRecord(parsed) || typeof parsed.ok !== 'boolean'
+    || typeof parsed.result_kind !== 'string' || !parsed.result_kind || !isRecord(parsed.data)) {
+    throw new Error('RDX action requires a native rdx canonical JSON envelope.');
   }
-  const parsed = JSON.parse(trimmed) as unknown;
-  if (!isRecord(parsed)) {
-    throw new Error('RDX action stdout must be a JSON object.');
-  }
-
-  if (typeof parsed.ok === 'boolean' && ('data' in parsed || 'result_kind' in parsed || 'error' in parsed)) {
-    const envelopeData = isRecord(parsed.data) ? parsed.data : {};
-    const data = { ...envelopeData };
-    const envelopeContextId =
-      typeof parsed.context_id === 'string' && parsed.context_id.trim()
-        ? parsed.context_id.trim()
-        : typeof parsed.contextId === 'string' && parsed.contextId.trim()
-          ? parsed.contextId.trim()
-          : undefined;
-    if (
-      envelopeContextId
-      && typeof data.context_id !== 'string'
-      && typeof data.contextId !== 'string'
-    ) {
-      data.context_id = envelopeContextId;
-    }
-    const diagnostic = parsed.ok ? undefined : parseErrorDiagnostic(parsed.error);
-    return {
-      data: {
-        ...data,
-        _rdxEnvelope: parsed,
-      },
-      ok: parsed.ok,
-      error: diagnostic ? formatRdxActionDiagnostic(diagnostic) : undefined,
-      diagnostic,
-    };
-  }
-
-  return { data: parsed };
+  const diagnostic = parsed.ok ? undefined : parseErrorDiagnostic(parsed.error);
+  return { data: { ...parsed.data, _rdxEnvelope: parsed }, ok: parsed.ok,
+    error: diagnostic ? formatRdxActionDiagnostic(diagnostic) : undefined, diagnostic };
 };
 
 class RdxShellActionService {
   async runAction(
     actionId: RdxActionId,
     variables: RdxShellActionVariables = {},
-    options: { env?: Record<string, string>; abortSignal?: AbortSignal } = {},
+    options: { env?: Record<string, string>; abortSignal?: AbortSignal; action?: RdxShellActionSettings } = {},
   ): Promise<RdxShellActionResult> {
-    const action = settingsService.getAll().tooling.rdxActions[actionId];
+    const action = options.action ?? settingsService.getAll().tooling.rdxActions[actionId];
     if (!isActionConfigured(action)) {
       const message = `RDX action "${actionId}" is not configured. Configure it in Settings → Tools → RDX shell actions.`;
       runtimeLogService.log({
@@ -245,7 +216,8 @@ class RdxShellActionService {
     let payloadError: string | undefined;
     let diagnostic: RdxActionDiagnostic | undefined;
     let parseError: string | undefined;
-    if (result.stdout.trim()) {
+    options.abortSignal?.throwIfAborted();
+    {
       try {
         const parsedPayload = parseJsonPayload(result.stdout);
         data = parsedPayload.data;
@@ -257,7 +229,7 @@ class RdxShellActionService {
       }
     }
 
-    const ok = result.exitCode === 0 && !parseError && payloadOk !== false;
+    const ok = result.exitCode === 0 && !parseError && payloadOk === true;
     const error = ok
       ? undefined
       : parseError

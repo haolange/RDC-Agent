@@ -1,3 +1,4 @@
+import { enforceMissionTurnCompletion } from '../investigation/missionCompletionContract';
 /**
  * ConversationService — orchestrates conversation send/stop/rewrite/approval flows.
  *
@@ -792,6 +793,7 @@ export class ConversationService {
 
   private createTurnRunnerHost() {
     return {
+      validateCompletion: enforceMissionTurnCompletion,
       persistConversationSnapshot,
       emitConversationEvent,
       publishConversationTrace: (

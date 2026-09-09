@@ -27,7 +27,10 @@ import {
   rdxShellActionService,
   type RdxShellActionResult,
 } from '../tools/RdxShellActionService';
-import { processSupervisor } from '../runtime/ProcessSupervisor';
+import { settingsService } from '../settings/SettingsService';
+import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
+import { parseRdxNativeResult } from '../tools/RdxNativeProtocol';
+import type { RdxTurnBinding } from '../tools/RdxTurnBindings';
 import { setRdxRuntimeContextForSession, clearRdxContextLeases } from './RdxRuntimeContextRegistry';
 
 interface PreviewLoadResult {
@@ -43,6 +46,8 @@ const emptyPreviewLoadResult = (): PreviewLoadResult => ({
   error: null,
   attempts: [],
 });
+
+interface RdxLifecycleOptions { binding?: RdxTurnBinding; signal?: AbortSignal }
 
 export class RdxSessionService {
   private contextId: string | null = null;
@@ -60,16 +65,16 @@ export class RdxSessionService {
     updatedAt: Date.now(),
   };
 
-  async openProjectInput(request: OpenProjectInputRequest): Promise<OpenedCaptureState> {
-    await this.closeOrReplaceOpenedCapture();
+  async openProjectInput(request: OpenProjectInputRequest, options: RdxLifecycleOptions = {}): Promise<OpenedCaptureState> {
+    await this.closeOrReplaceOpenedCapture(options);
 
     let replayDevice = request.replayDevice;
     const isRemoteReplay = replayDevice.type === 'android';
     if (isRemoteReplay) {
-      replayDevice = await this.ensureReplayDeviceReady(replayDevice);
+      replayDevice = await this.ensureReplayDeviceReady(replayDevice, options);
     }
     const preparedRemote = isRemoteReplay
-      ? replayDeviceService.peekPreparedRemote(replayDevice.id)
+      ? replayDeviceService.consumePreparedRemote(replayDevice.id)
       : null;
 
     const capture: CaptureDescriptor = {
@@ -90,10 +95,11 @@ export class RdxSessionService {
     // Local opens use {{inputId}} as daemon-context; clear stale half-open state first.
     // Remote opens must keep the prepared connectRemote context — do not clear it here.
     if (!isRemoteReplay) {
-      await this.clearDaemonContext(request.inputId);
+      await this.clearDaemonContext(request.inputId, options);
     }
 
     let resultData: Record<string, unknown>;
+    let runtimeContext: RdxRuntimeContext;
     try {
       if (isRemoteReplay) {
         if (!preparedRemote?.contextId || !preparedRemote.remoteId) {
@@ -115,6 +121,8 @@ export class RdxSessionService {
           backend: 'remote',
         }, {
           env: this.buildRuntimeContextEnv(),
+          action: options.binding?.actions.openRemoteCapture,
+          abortSignal: options.signal,
         });
         if (!result.ok) {
           throw new Error(this.formatActionFailure('openRemoteCapture', result));
@@ -143,6 +151,8 @@ export class RdxSessionService {
           backend: 'local',
         }, {
           env: this.buildRuntimeContextEnv(),
+          action: options.binding?.actions.openCapture,
+          abortSignal: options.signal,
         });
         if (!result.ok) {
           if (isLocalReplayUnsupportedDiagnostic(result.diagnostic, result.error)) {
@@ -159,21 +169,21 @@ export class RdxSessionService {
         }
         resultData = result.data;
       }
+      runtimeContext = this.extractRuntimeContext(resultData, {
+        backend: isRemoteReplay ? 'remote' : 'local',
+        deviceId: replayDevice.id,
+        deviceLabel: replayDevice.label,
+      });
     } catch (error) {
       capture.status = 'error';
       this.captures = [capture];
       this.remoteStatus = 'error';
       if (!isRemoteReplay) {
-        await this.clearDaemonContext(request.inputId);
+        await this.clearDaemonContext(request.inputId, options);
       }
       throw error;
     }
 
-    const runtimeContext = this.extractRuntimeContext(resultData, {
-      backend: isRemoteReplay ? 'remote' : 'local',
-      deviceId: replayDevice.id,
-      deviceLabel: replayDevice.label,
-    });
     this.applyRuntimeContext(runtimeContext, request.sessionId, request.projectId ?? null);
     const captureIndex = this.captures.findIndex((item) => item.id === capture.id);
     this.captures[captureIndex] = {
@@ -199,9 +209,9 @@ export class RdxSessionService {
     return openedCapture;
   }
 
-  async closeOrReplaceOpenedCapture(): Promise<void> {
+  async closeOrReplaceOpenedCapture(options: RdxLifecycleOptions = {}): Promise<void> {
     const previousCapture = this.openedCapture;
-    await this.teardownRuntime();
+    await this.teardownRuntime(options);
     this.resetRuntimeState(previousCapture);
     if (previousCapture) {
       runtimeLogService.log({
@@ -267,7 +277,23 @@ export class RdxSessionService {
 
   async closeHumanPreviewWindow(scope: SessionScope): Promise<ContextSnapshot | null> {
     if (!this.isOwnedBy(scope)) return null;
-    this.setHumanPreview({ status: 'closed' });
+    const owner = this.runtimeContext;
+    if (!owner || owner.contextId === 'default') return null;
+    const settings = structuredClone(settingsService.getAll().tooling.rdxCli);
+    settings.argsPrefix = [...settings.argsPrefix.filter(arg => arg !== '--json'), '--json'];
+    try {
+      const result = parseRdxNativeResult(await rdxCliInvokerService.executeCLI(
+        'session', ['preview', 'off', '--daemon-context', owner.contextId], { settings },
+      ), owner.contextId);
+      const preview = result.data.preview as Record<string, unknown> | undefined;
+      if (preview?.enabled !== false) throw new Error('RDX_PREVIEW_UNCONFIRMED: native preview close was not confirmed.');
+      if (this.runtimeContext === owner) this.setHumanPreview({ status: 'closed', sessionId: owner.replaySessionId });
+    } catch (error) {
+      if (this.runtimeContext === owner) this.setHumanPreview({
+        status: 'error', sessionId: owner.replaySessionId,
+        lastError: error instanceof Error ? error.message : String(error),
+      });
+    }
     return this.snapshotContextForSession(scope);
   }
   async switchActiveCapture(captureId: string): Promise<void> {
@@ -283,7 +309,7 @@ export class RdxSessionService {
     this.activeCaptureId = captureId;
   }
 
-  private async ensureReplayDeviceReady(device: ReplayDeviceEntry): Promise<ReplayDeviceEntry> {
+  private async ensureReplayDeviceReady(device: ReplayDeviceEntry, options: RdxLifecycleOptions): Promise<ReplayDeviceEntry> {
     if (device.type === 'local') {
       return device;
     }
@@ -302,7 +328,7 @@ export class RdxSessionService {
       return currentDevice;
     }
 
-    const activatedDevice = await replayDeviceService.activateDevice(currentDevice.id);
+    const activatedDevice = await replayDeviceService.activateDevice(currentDevice.id, { action: options.binding?.actions.connectRemote, signal: options.signal });
     if (activatedDevice.type === 'local' || !['connected', 'online'].includes(activatedDevice.status)) {
       throw new Error(
         activatedDevice.activationErrorMessage
@@ -319,9 +345,11 @@ export class RdxSessionService {
     fallback: { backend: 'local' | 'remote'; deviceId?: string; deviceLabel?: string },
   ): RdxRuntimeContext {
     const contextId = this.readString(data, ['contextId', 'context_id', 'RDX_CONTEXT_ID']);
-    if (!contextId) {
-      throw new Error('RDX action result must include contextId/context_id.');
+    if (!contextId || contextId === 'default') {
+      throw new Error('RDX action result must include a non-default owning context_id.');
     }
+    const replaySessionId = this.readString(data, ['session_id']);
+    if (!replaySessionId) throw new Error('RDX action result must include native replay session_id.');
     const runtimeOwner = this.readString(data, ['runtimeOwner', 'runtime_owner', 'RDX_RUNTIME_OWNER'])
       ?? DEFAULT_RUNTIME_OWNER;
     const ownerLeaseId = this.readString(data, ['ownerLeaseId', 'owner_lease_id', 'RDX_OWNER_LEASE_ID'])
@@ -330,7 +358,7 @@ export class RdxSessionService {
       contextId,
       runtimeOwner,
       ownerLeaseId,
-      replaySessionId: this.readString(data, ['replaySessionId', 'replay_session_id', 'sessionId', 'session_id']),
+      replaySessionId,
       captureFileId: this.readString(data, ['captureFileId', 'capture_file_id']),
       captureId: this.readString(data, ['captureId', 'capture_id']),
       backend: this.readString(data, ['backend']) === 'remote' ? 'remote' : fallback.backend,
@@ -424,7 +452,7 @@ export class RdxSessionService {
     return result.error ?? `RDX ${actionId} action failed.`;
   }
 
-  private async clearDaemonContext(contextId: string | null | undefined): Promise<void> {
+  private async clearDaemonContext(contextId: string | null | undefined, options: RdxLifecycleOptions = {}): Promise<void> {
     const normalized = typeof contextId === 'string' ? contextId.trim() : '';
     if (!normalized) {
       return;
@@ -433,6 +461,8 @@ export class RdxSessionService {
       contextId: normalized,
     }, {
       env: this.buildRuntimeContextEnv(),
+          action: options.binding?.actions.closeRuntime,
+          abortSignal: options.signal,
     });
     if (!result.ok) {
       runtimeLogService.log({
@@ -494,9 +524,9 @@ export class RdxSessionService {
     return this.isOwnedBy(scope) && this.openedCapture ? { ...this.openedCapture } : null;
   }
 
-  async clearOpenedCaptureForSession(scope: SessionScope): Promise<boolean> {
+  async clearOpenedCaptureForSession(scope: SessionScope, options: RdxLifecycleOptions = {}): Promise<boolean> {
     if (!this.isOwnedBy(scope)) return false;
-    await this.closeOrReplaceOpenedCapture();
+    await this.closeOrReplaceOpenedCapture(options);
     return true;
   }
 
@@ -537,7 +567,7 @@ export class RdxSessionService {
     const preview = result.data?.preview && typeof result.data.preview === 'object'
       ? result.data.preview as Record<string, unknown>
       : {};
-    const enabled = typeof preview.enabled === 'boolean' ? preview.enabled : fallbackStatus === 'open';
+    const enabled = preview.enabled === true;
     const status: HumanPreviewSnapshot['status'] = fallbackStatus === 'closed'
       ? 'closed'
       : enabled
@@ -675,7 +705,7 @@ export class RdxSessionService {
     };
   }
 
-  private async teardownRuntime(): Promise<void> {
+  private async teardownRuntime(options: RdxLifecycleOptions = {}): Promise<void> {
     const previousContext = this.runtimeContext;
 
     let closeOk = true;
@@ -691,6 +721,8 @@ export class RdxSessionService {
         captureId: previousContext.captureId,
       }, {
         env: this.buildRuntimeContextEnv(),
+          action: options.binding?.actions.closeRuntime,
+          abortSignal: options.signal,
       });
       closeOk = result.ok;
       if (!result.ok) {
@@ -710,39 +742,7 @@ export class RdxSessionService {
       return;
     }
 
-    // Stage 2: grace wait for external RDX daemon / child to exit
-    await new Promise((resolve) => setTimeout(resolve, 1_500));
-
-    // Stage 3: force-terminate supervised shell children
-    try {
-      const { shellInvocationService } = await import('../tools/ShellInvocationService');
-      shellInvocationService.terminateAll();
-    } catch (error) {
-      runtimeLogService.log({
-        scope: 'app',
-        namespace: 'context',
-        severity: 'warning',
-        title: 'RDX force terminate warning',
-        summary: error instanceof Error ? error.message : String(error),
-      });
-    }
-
-    const remaining = processSupervisor.list();
-    if (!closeOk && previousContext) {
-      runtimeLogService.log({
-        scope: 'app',
-        namespace: 'context',
-        severity: 'warning',
-        title: 'RDX runtime close failed',
-        summary: `Context ${previousContext.contextId} close failed; ProcessSupervisor retains any unconfirmed_orphan children.`,
-        raw: {
-          contextId: previousContext.contextId,
-          runtimeOwner: previousContext.runtimeOwner,
-          ownerLeaseId: previousContext.ownerLeaseId,
-          supervised: remaining,
-        },
-      });
-    }
+    if (!closeOk) throw new Error('RDX_CLOSE_FAILED: runtime close was not confirmed; ownership is retained.');
   }
 
   private resetRuntimeState(previousCapture: OpenedCaptureState | null): void {

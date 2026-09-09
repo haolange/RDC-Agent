@@ -716,6 +716,7 @@ export const unwrapToolContentLayer = (
     const commandText = sanitizeContentText(
       stringifyPreview(
         argsRecord?.command
+        ?? readNestedValue(argsRecord ?? {}, ['rdx', 'operation'])
         ?? argsRecord?.cmd
         ?? details?.command
         ?? record?.command

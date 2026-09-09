@@ -1,6 +1,6 @@
 /**
  * Canonical builtin Skill inventory for T12.
- * 21 Mission / Knowledge / Coordinator + 6 general. No orphan, duplicate, or legacy names.
+ * 22 Mission / Knowledge / Coordinator + 6 general. No orphan, duplicate, or legacy names.
  */
 
 import { isMissionAgentId } from '../types/agent';
@@ -25,6 +25,7 @@ export const MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS = [
   'skeptic-review',
   'report-composition',
   'renderdoc-execution',
+  'renderdoc-investigation',
   'capture-preflight',
   'capture-facts',
   'artifact-provenance',
@@ -44,7 +45,7 @@ export const CANONICAL_SKILL_IDS = [
 ] as const;
 
 export type CanonicalSkillId = (typeof CANONICAL_SKILL_IDS)[number];
-export type SkillCallEntry = 'agent.md-skills' | 'composer-$skill';
+export type SkillCallEntry = 'agent.md-skills' | 'task-matched-or-explicit';
 export type CanonicalSkillLane = 'general' | 'mission-knowledge-coordinator';
 
 /** Skills whose tool surface conflicts with Mission plan-only and must stay on General. */
@@ -71,7 +72,7 @@ export const FORBIDDEN_SKILL_NAMES = [
 ] as const;
 
 export function skillCallEntry(id: string): SkillCallEntry {
-  return ARMED_SKILL_IDS.has(id) ? 'agent.md-skills' : 'composer-$skill';
+  return ARMED_SKILL_IDS.has(id) ? 'agent.md-skills' : 'task-matched-or-explicit';
 }
 
 export function skillLane(id: string): CanonicalSkillLane | null {

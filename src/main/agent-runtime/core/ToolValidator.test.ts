@@ -11,6 +11,18 @@ function def(parameters: ToolDefinition['parameters'], name = 'demo'): ToolDefin
 }
 
 describe('ToolValidator', () => {
+  it('enforces command/rdx exclusive schema modes before dispatch', () => {
+    const tool = def({ type: 'object', properties: { command: { type: 'string' }, rdx: { type: 'object' } },
+      oneOf: [{ required: ['command'], not: { required: ['rdx'] } }, { required: ['rdx'], not: { required: ['command'] } }] });
+    expect(validator.validate(tool, { command: 'echo ok' })).toEqual({ command: 'echo ok' });
+    expect(validator.validate(tool, { rdx: {} })).toEqual({ rdx: {} });
+    for (const args of [{}, { command: 'echo ok', rdx: {} }, { command: true }]) {
+      expect(() => validator.validate(tool, args)).toThrow(ToolValidationError);
+    }
+    expect(() => validator.validate(def({ oneOf: [] }), {})).toThrow();
+    expect(() => validator.validate(def({ oneOf: [{ unsupported: true }] }), {})).toThrow();
+  });
+
   it('accepts valid object args and coerces non-safe string numbers', () => {
     const result = validator.validate(
       def({
@@ -129,7 +141,7 @@ describe('ToolValidator', () => {
       def({
         type: 'object',
         properties: {
-          mode: { oneOf: [{ type: 'string' }, { type: 'number' }] } as never,
+          mode: { anyOf: [{ type: 'string' }, { type: 'number' }] } as never,
         },
       }),
       { mode: 'a' },

@@ -1,17 +1,9 @@
 ---
 name: rdc-context
 description: Summarize the active project, capture, and RenderDoc session context before deeper investigation.
-allowed-tools: [read_file, glob, grep]
+allowed-tools: [rdx_context, read_file, glob, grep]
 ---
 
 # RDC Context
-
-Use the available project, session, capture-context, and RDX runtime tools to report:
-
-- active project and selected session;
-- attached or opened `.rdc` capture;
-- current RenderDoc/RDX runtime state;
-- the user goal and constraints;
-- missing evidence that should be collected next.
-
-Keep the result short, factual, and grounded in live state.
+先调用 session-owned rdx_context，报告当前项目、session、打开的 capture、replay 状态和所有权。无 lease 如实报告，不从文件内容推测 live 状态。
+按需读取项目文件补充目标、约束与下一步所缺证据。保持简短，不读取原始 .rdc bytes。

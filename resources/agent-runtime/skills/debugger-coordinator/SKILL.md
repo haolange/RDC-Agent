@@ -1,58 +1,12 @@
 ---
 name: debugger-coordinator
-description: Coordinate Debugger planning so root-cause uncertainty decreases before any execution handoff.
+description: Plan and evaluate debugger investigations using bounded strategies and evidence.
 ---
 
-# Debugger Coordinator
+# debugger Coordinator
 
-Plan first. The goal is to minimize root-cause uncertainty for an incorrect result. Do not invent a second runtime, TaskStore, or InvestigationGraph.
-
-## Planning
-
-1. Capture the expected result, the observed result, and the reproduction condition. Ask when any of those three is missing.
-2. Stay plan-only: use only read/search/web, `ask_user`, handoff, tasks (no `output_register`), `plan_artifact`, `investigation_*`, `knowledge_*` (no persist), memory read, `rdx_context`, and `rdx_probe`. Do not use shell or the code interpreter. General executes Live RDC mutate via shell after handoff.
-3. Retrieve similar cases with `$knowledge-scout`. Persistent Knowledge writes stay human-confirmed. Do not create a Session Candidate unless the user asked.
-4. Name the smallest distinguishing check that would confirm or reject the current cause.
-5. Write a versioned plan artifact that names: suspected component, First Bad Event check, Hypothesis Matrix rows, the qualifying Experiment, Skeptic, and Report. Then durable-handoff to General (`send: true`).
-6. When the plan needs a method, cite an on-demand skill. Do not preload them:
-   `$capture-preflight`, `$capture-facts`, `$debugger-causal-method`, `$pass-graph-analysis`, `$shader-ir-analysis`, `$pixel-forensics`, `$artifact-provenance`, `$optimization-experiment`, `$renderdoc-execution`, `$skeptic-review`, `$report-composition`. Live RDC CLI stays on General via `$rdx-cli-shell`.
-
-Use `investigation_*` for session-owned `rdc.investigation.v1` Evidence / Claim / Experiment / Challenge / Checkpoint. Causal claims need a qualifying Experiment (`S-CAUSAL-01`). Report and compact projections must not raise Claim rank (`S-CLAIM-01`).
-
-## Durable Handoff
-
-Handoff is the existing `ProfileHandoffState` machine (`prepared` → `committed` → `consumed`). `send: true` auto-continues after commit. Each user root chain allows at most 3 handoffs. A process restart does not auto-fire an unconsumed handoff. Stop / Rewrite / branch / manual switch cancels the active handoff. Approvals do not inherit. Do not treat `AgentHandoffDefinition` as the durable record.
-
-## Execution (General owns the tools)
-
-After handoff, General expands the plan into a Task graph and collects evidence through the Settings-configured RDX CLI. First Bad Event, Hypothesis Matrix, and Counterfactual Artifact shapes live in `$debugger-causal-method`. Do not write those fields into Tasks, Profiles, or Messages. Tasks may only store a subject and a `taskRef` back from Evidence.
-
-## Small Loop
-
-Trigger: missing evidence, a live alternative, a confound, scope growth, unvalidated visual regression, or undersampling. Do not replan the Mission.
-
-1. Execution writes candidate Claims.
-2. Open an independent context and load `$skeptic-review`. Skeptic writes `ChallengeRecord`s; it does not rewrite the Generator narrative.
-3. For each `open` Challenge, General creates one follow-up Task with `task_create`. Subject quotes `challengeId` and `requiredFollowUp`. Do not add domain fields to `TaskRecord`.
-4. After the follow-up, update the Iteration Memory Artifact: a `claim_set` titled Iteration Memory whose items are the current accepted / active / rejected Claims, `sourceRefs` pointing at Evidence and Challenge artifacts, and a summary that names blockers, resolved `challengeId`s, and the delta. Supersede the previous Iteration Memory artifact.
-5. Retry only the follow-up path.
-
-Iteration Memory is a Session Artifact. `memory_write` still requires explicit user intent or approval. Do not auto-extract conversation into Memory.
-
-## Big Loop
-
-Trigger: wrong bug family, collapsed structural assumption, missing capability, verifier repeating the same structural gap, changed user goal, or context nearly exhausted while the plan has drifted.
-
-1. Write a `MissionCheckpoint` (`kind: checkpoint`). Every listed `claimId` / `experimentId` / `challengeId` / `artifactId` / `currentWorldStateId` must resolve.
-2. Handoff back to Debugger with `checkpointId` in the prompt (and payload when the tool allows). Consume one durable-handoff depth.
-3. Debugger re-retrieves Knowledge, writes a new plan version, and hands off to General again.
-
-If the chain would exceed depth 3, stop and ask the user. After restart, wait for a manual continue.
-
-## Delegation Capsule
-
-When delegating a subagent, compile a capsule in the handoff / task prompt. This is not a new platform file type. Include: identity, Mission, Task, reason, accepted facts, competing hypotheses, related Challenges, current World State, input artifact ids, relevant Knowledge refs, falsified paths, experiments not to retry, output requirements, and recoverable Evidence refs (`artifactId` + hash). Offline subagents must set `requiresRdxLease: false`.
-
-## Bounds
-
-Do not write, edit, git-mutate, or manage files. Do not use shell or the code interpreter. Do not add unregistered tool tokens. Do not weaken `S-CLAIM-01` / `S-CAUSAL-01` / `S-RDC-01`. Embedding models stay out of the Agent picker. Mission uses `rdx_context` + `rdx_probe` only; General executes Live RDC mutate via the Settings-configured CLI after handoff. Analyzer and Optimizer vertical slices are not this skill.
+保持 plan-only：用受控 rdx_context／rdx_probe 获取已有输入事实；执行交给 General，不运行 shell／interpreter。先读可获取上下文；只有无法获取的必需信息和阻塞决策才询问。
+读取 $renderdoc-execution 的六块共享 Plan 模板及交接合同，再用 $debugger-causal-method 填写领域策略。重点：预期与实际、复现条件、First Bad Event 定位策略、竞争假设、区分检查、因果介入与回滚。
+Knowledge 按相关性读取并保留适用范围、反例、失败和冲突，不把相似案例当成本 capture 的事实。候选方向有预测与区分检查，不固定候选数或强制全阶段。
+写新版本 plan_artifact 和可解析 Checkpoint。用 execute 交接绑定 Plan URI/hash、renderdoc-execution 与 debugger-causal-method 等必需 Skill、returnTo=debugger 和交付要求。
+General 返回后读取本周期产物，按需用 $skeptic-review 和 $report-composition 评估证据、未解 Challenge、反证及限制。需要 Big Loop 时引用 Checkpoint 写新策略和变化依据；遵守共享的两轮完整周期。耗尽时保存 Checkpoint 并明确未完成，不以工具成功代替领域完成。

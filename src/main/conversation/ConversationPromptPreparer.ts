@@ -1,3 +1,5 @@
+import { handoffPromptSegments } from '../sessions/handoffPrompt';
+import { handoffRequiredSkillIds } from '../sessions/handoffSkills';
 import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
 import { promptPlanBuilder, resolvePromptClock } from '../agent-runtime/prompt';
 import { settingsService } from '../settings/SettingsService';
@@ -6,7 +8,7 @@ import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService
 import { scopedInstructionResolver } from '../runtime/ScopedInstructionResolver';
 import { appPathService } from '../runtime/AppPathService';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { normalizeToolName, resolveAgentToolAllowlistFromDefinition } from '../workflow/debugger/DebuggerRuntimePolicy';
+import { combineActiveSkillAllowlists, normalizeToolName, resolveAgentToolAllowlistFromDefinition } from '../workflow/debugger/DebuggerRuntimePolicy';
 import { repairConversationBranchState, resolveVisibleConversationMessages } from './ConversationBranchResolver';
 import type {
   AgentRoutePreflightOk,
@@ -43,7 +45,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${input.agentId}`);
   }
 
-  const allowedToolNames = resolveAgentToolAllowlistFromDefinition(input.agentId, definition.tools)
+  let allowedToolNames = resolveAgentToolAllowlistFromDefinition(input.agentId, definition.tools)
     .map((toolName) => normalizeToolName(toolName));
   const activePaths = [
     projectRootPath,
@@ -60,7 +62,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
   const preloadSkillIds = mergeTurnPreloadSkillIds({
     profileSkills: definition.skills,
     messageText: input.messageText,
-    pendingSkillIds: input.preloadSkillIds,
+    pendingSkillIds: [...(input.preloadSkillIds ?? []), ...handoffRequiredSkillIds(input.context.session?.sessionId, input.agentId)],
   });
   const preloadedSkills = [];
   for (const skillId of preloadSkillIds) {
@@ -70,11 +72,13 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     }
     preloadedSkills.push(skill);
   }
+  allowedToolNames = combineActiveSkillAllowlists(allowedToolNames, preloadedSkills.map(skill => skill.allowedTools ?? [])) ?? allowedToolNames;
   const promptClock = resolvePromptClock();
   const promptPlan = promptPlanBuilder.build({
     profile: definition,
     scopedInstructions,
     preloadedSkills,
+    extraSegments: handoffPromptSegments(input.context.session?.sessionId, input.agentId),
     skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined, input.agentId),
     tools: allowedToolNames,
     workDir: projectRootPath ?? '',
@@ -103,7 +107,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
   const overlayDiagnostics = resolveEffectiveAgentSnapshot(input.agentId, projectRootPath).overlayDiagnostics;
   return {
     projectRootPath,
-    effectiveProfile: definition,
+    effectiveProfile: { ...definition, skills: preloadSkillIds },
     effectiveProfileIds: (() => {
       const ids = effectiveProfiles.filter((profile) => profile.enabled).map((profile) => profile.id);
       return ids.length > 0 ? ids : [definition.id];

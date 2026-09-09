@@ -26,9 +26,7 @@ if (/\bembedding(s)?\b/i.test(toAgentId)) {
   fail('mission-plan-handoff-check: Embedding models must not enter Agent/handoff picker');
 }
 
-if (Number.isFinite(depth) && depth > 3) {
-  fail('mission-plan-handoff-check: handoff chain limit is 3');
-}
+// Execution-cycle accounting is owned by HandoffStateStore, never duplicated in hooks.
 
 // Production payload: { fromAgentId, toAgentId, label, prompt, depth, isBigLoop, checkpointId? }.
 // isBigLoop is computed by the caller from from/to/depth; this hook also recomputes so

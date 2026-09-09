@@ -43,6 +43,7 @@ import { turnCoordinator } from './TurnCoordinator';
 
 function createRunner(): AgentTurnRunner {
   return new AgentTurnRunner({
+    validateCompletion: () => undefined,
     slots: {} as AgentSlotRegistry,
     mcp: {} as McpConnectionCoordinator,
     deferredActivation: {

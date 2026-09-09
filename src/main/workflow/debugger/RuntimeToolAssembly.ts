@@ -1,3 +1,7 @@
+import { validateInvestigationHandoff } from '../../investigation/investigationHandoffValidation';
+import { HANDOFF_CONTRACT_JSON_SCHEMA } from '@shared/types/handoffContract';
+import { validateHandoffArtifacts } from '../../sessions/handoffArtifacts';
+import { writeSessionPlanArtifact } from '../../sessions/sessionPlanArtifact';
 /**
  * RuntimeToolAssembly — resolveRuntimeTools / workbench / MCP catalog tools.
  */
@@ -278,7 +282,7 @@ export class RuntimeToolAssembly {
     sessionId?: string | null,
     turnHandle?: TurnHandle | null,
   ): AgentTool<
-    { agent?: string; label?: string; prompt?: string },
+    { agent?: string; label?: string; prompt?: string; contract?: unknown },
     { fromAgentId: AgentRole; toAgentId: string; label: string; prompt: string; valid: boolean }
   > {
     const getActiveTurn = this.deps.getActiveTurn;
@@ -289,11 +293,12 @@ export class RuntimeToolAssembly {
       description: 'Request a handoff to another agent profile. The runtime validates the target against the current profile handoffs and prepares the receiving prompt. The actual profile switch is applied by the orchestrator after this turn.',
       parameters: {
         type: 'object',
-        required: ['agent'],
+        required: ['agent', 'prompt', 'contract'],
         properties: {
-          agent: { type: 'string', description: 'Target agent profile id, such as edit, debugger, analyzer, or optimizer.' },
+          contract: HANDOFF_CONTRACT_JSON_SCHEMA,
+          agent: { type: 'string', description: 'Declared target agent profile id.' },
           label: { type: 'string', description: 'Short handoff label. Defaults to the declared handoff label.' },
-          prompt: { type: 'string', description: 'Implementation or specialist prompt for the receiving agent. Defaults to the declared handoff prompt.' },
+          prompt: { type: 'string', description: 'Implementation or specialist prompt for the receiving agent. Required summary of the objective, evidence and current gaps.' },
         },
       },
       permissionHint: 'readonly',
@@ -350,6 +355,13 @@ export class RuntimeToolAssembly {
             details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false },
           };
         }
+        let contract;
+        try {
+          contract = validateHandoffArtifacts(resolvedSessionId, args.contract);
+          validateInvestigationHandoff({ sessionId: resolvedSessionId, sourceAgentId: agentId, targetAgentId: target, contract, taskBinding: turn?.runtimePlan?.taskBinding });
+        } catch (error) {
+          return { content: [{ type: 'text', text: String(error) }], isError: true, details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false } };
+        }
         const projectRoot = turn?.runtimePlan?.projectRootPath ?? undefined;
         const handoffAllowed = await dispatchRuntimeHooks('agent.before-handoff', {
           agentId,
@@ -372,6 +384,7 @@ export class RuntimeToolAssembly {
           };
         }
         const prepareInput = {
+          contract,
           sourceTurnId,
           sourceRequestId,
           sourceAgentId: agentId,
@@ -454,7 +467,7 @@ export class RuntimeToolAssembly {
     return {
       name: 'plan_artifact',
       label: 'Write Plan Artifact',
-      description: 'Write or replace the current session plan artifact. This cannot edit arbitrary workspace files.',
+      description: 'Write a new versioned Markdown plan artifact and return its URI and hash. This cannot edit arbitrary workspace files.',
       parameters: {
         type: 'object',
         required: ['content'],
@@ -483,10 +496,11 @@ export class RuntimeToolAssembly {
         const title = typeof args.title === 'string' && args.title.trim()
           ? args.title.trim()
           : 'Agent Plan';
-        const artifactPath = storageAdapter.writeSessionPlanArtifact(sessionId, `# ${title}\n\n${body}\n`);
+        const artifact = writeSessionPlanArtifact(sessionId, `# ${title}\n\n${body}\n`);
+        const artifactPath = artifact.uri;
         return {
-          content: [{ type: 'text', text: `Plan artifact saved: ${artifactPath}` }],
-          details: { sessionId, artifactPath },
+          content: [{ type: 'text', text: `Plan artifact saved: ${artifactPath}\nsha256: ${artifact.hash}` }],
+          details: { sessionId, artifactPath, uri: artifact.uri, hash: artifact.hash },
         };
       },
     };

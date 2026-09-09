@@ -1,3 +1,6 @@
+import { allowsBudgetPause } from './missionBudgetPause';
+import { storageAdapter } from '../sessions/StorageAdapter';
+import type { TurnCompletionInput } from '../agent-runtime/agent/TurnCompletionValidator';
 import { isMissionAgentId } from '@shared/types/agent';
 import {
   ANALYZER_EXPLANATION_LAYERS,
@@ -59,11 +62,13 @@ export function finalAnswerCitesReport(text: string, artifactId: string, content
   return text.includes(artifactId) && text.includes(contentHash);
 }
 
-export interface MissionCompletionInput {
+export interface MissionCompletionInput extends TurnCompletionInput {
   profileId: string;
+  turnId?: string;
   sessionId?: string | null;
   finalAnswerText: string;
   pendingHandoff?: boolean;
+  pendingHandoffTarget?: string;
   service?: InvestigationArtifactService;
 }
 
@@ -75,8 +80,26 @@ export interface MissionCompletionReceipt {
 }
 
 export function enforceMissionTurnCompletion(input: MissionCompletionInput): MissionCompletionReceipt | void {
+  if (input.taskBinding) {
+    const binding = input.taskBinding;
+    if (!input.pendingHandoff || input.pendingHandoffTarget !== binding.returnTo) {
+      throw new MissionCompletionError('mission_method', 'Bound execution must return to ' + binding.returnTo + ' for evaluation.');
+    }
+    const pending = input.sessionId ? storageAdapter.handoffs.getActive(input.sessionId) : null;
+    if (!pending || pending.contract.intent !== 'return' || pending.contract.executionHandoffId !== binding.handoffId) {
+      throw new MissionCompletionError('mission_method', 'Execution return must match the frozen task binding.');
+    }
+    if (binding.validationPolicy === 'renderdoc-investigation') {
+      const service = input.service ?? investigationArtifactService;
+      const checkpoint = resolveMissionCheckpoint(service, input.sessionId!, binding.returnTo as InvestigationMission);
+      if (!checkpoint || Date.parse(checkpoint.manifest.createdAt) < binding.dispatchedAt || !pending.contract.artifacts.some(ref => ref.uri === checkpoint.contentUri && ref.hash.replace(/^sha256:/, '') === checkpoint.contentHash.replace(/^sha256:/, ''))) {
+        throw new MissionCompletionError('missing_checkpoint', 'Return must include the updated domain Checkpoint URI and hash.');
+      }
+    }
+  }
   if (!isMissionAgentId(input.profileId)) return;
   if (input.pendingHandoff) return;
+  if (allowsBudgetPause(input, input.service ?? investigationArtifactService)) return;
   return assertMissionTurnCompletion(input);
 }
 
@@ -226,6 +249,10 @@ function assertMissionMethodSurface(
   service: InvestigationArtifactService,
   sessionId: string,
 ): void {
+  for (const id of report.experimentIds) {
+    const experiment = service.createLookup(sessionId).getExperiment(id);
+    if (experiment) service.assertExecutionEvidence(sessionId, experiment);
+  }
   if (mission === 'analyzer') {
     const present = new Set<AnalyzerExplanationLayer>();
     for (const claim of report.claims) {

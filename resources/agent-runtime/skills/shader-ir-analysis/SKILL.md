@@ -1,7 +1,6 @@
 ---
 name: shader-ir-analysis
 description: Analyze shader source or IR from hashed artifacts without promoting derived notes to observed facts.
-allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read, read_file, knowledge_search, knowledge_read, shell, task_create, subagent]
 ---
 
 # Shader IR Analysis

@@ -58,7 +58,7 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 - **禁止** RDX global mirror、`legacyGlobalMirror`、`getRdxRuntimeContext` 全局 API。
 - 工具读上下文前必须校验 lease 所有权；空 `sessionId` fail-closed（不写任何全局镜像）。
 - UI 无 session 摘要可经 `getMostRecentRdxContextLease`；工具路径仍须显式 `sessionId` + ownership assert。
-- **Delegated lease**：parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease（`delegatedFrom`），使 `requiresRdxLease=true` 的 child 取得 parent RDX context 并串行；同一 parent 同时只允许一条 live delegated lease；无 parent lease 则 fail-closed，不得静默创建。child 完成/取消/抛错立即 `revokeDelegatedLease`，parent lease 不变。child lease 不可再转授。`requiresRdxLease=false` 的 child **在 allowlist 层**就不能拿到 `rdx_context` / `rdx_probe`（`shell` 可保留，但不继承 parent lease）。禁止并发 RDX 双 owner。Mission 只读面走 `rdx_probe`，不得获得 generic shell。
+- **Delegated lease**：parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease（`delegatedFrom`），使 `domainExtensions.rdx.requiresLease=true` 的 child 取得 parent RDX context 并串行；同一 parent 同时只允许一条 live delegated lease；无 parent lease 则 fail-closed，不得静默创建。child 完成/取消/抛错立即 `revokeDelegatedLease`，parent lease 不变。child lease 不可再转授。未请求 RDX 领域扩展 的 child **在 allowlist 层**就不能拿到 `rdx_context` / `rdx_probe`（`shell` 可保留，但不继承 parent lease）。禁止并发 RDX 双 owner。Mission 只读面走 `rdx_probe`，不得获得 generic shell。
 
 ## Hook Trust
 
@@ -101,3 +101,12 @@ Decision lattice 为 `allow < auto_review < ask_user < deny`。`approvalFloorByT
 - `src/main/agent-runtime/permissions/*`
 - `src/main/testing/contracts/securityContract.test.ts`（矩阵入口）
 - 门禁：`pnpm run check:orchestrator-facade`（禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext`）
+
+
+## 原生 RDX 执行证据
+
+shell 的 command 与 rdx 互斥；ToolValidator oneOf/not 与执行入口双重检查。结构化模式仍是 shell 审批，不属于只读自动许可。General 之外即使 Full access 也拒绝；本机冻结配置、owning project/session lease、非 default context、非 delegated/offline child 同时成立才执行。模型不可传 replay/context identity。
+
+执行回执仅由主进程在真实原生成功调用后签名，key 在 safeStorage；模型提交的 result JSON、普通 shell 输出或 artifact hash 本身不具备 provenance。签名校验与 SessionArtifactResolver 所有权/hash 同时成立才可引用。实验关闭和新完成必须满足五阶段真实调用与同 replacement 的回滚；旧记录只保留可读性。详见 docs/architecture/rdx-runtime.md。
+
+Skill 权限只在 prepareTurn 对预载集合取交集；skill_read 只读方法。RenderDoc 方法技能没有局部执行工具白名单；profile/policy/lease 仍强制授权。Knowledge Scout 仍只有四个 Knowledge 只读工具，文件补证属于调用方独立步骤。

@@ -1,7 +1,6 @@
 ---
 name: analyzer-architecture-method
 description: Write Analyzer Architecture Model versions on existing rdc.investigation.v1 kinds without crossing Observed / Reconstructed / Authoring layers.
-allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read, rdx_context, shell, task_create, subagent]
 ---
 
 # Analyzer Architecture Method
@@ -31,4 +30,4 @@ Shape: one `ClaimSet` (`kind: claim_set`) titled Architecture Model.
 
 ## Bounds
 
-Do not persist Knowledge. Do not call `memory_write`. Do not write these fields into Tasks, Profiles, or Messages. RDX runs only through the Settings-configured CLI. `allowed-tools` keeps `subagent`, `task_create`, and `shell` so arming this skill does not shrink the Analyzer closed loop.
+Do not persist Knowledge. Do not call `memory_write`. Do not write these fields into Tasks, Profiles, or Messages. RDX runs only through the Settings-configured CLI.

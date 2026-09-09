@@ -3,8 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { StorageIo } from './StorageIo';
-import type { StorageHost } from './storageHost';
-import { SessionRecordStore } from './SessionRecordStore';
+import { SessionArtifactResolver } from './SessionArtifactResolver';
+import { writeSessionPlanArtifact } from './sessionPlanArtifact';
 
 describe('writeSessionPlanArtifact', () => {
   const roots: string[] = [];
@@ -28,19 +28,10 @@ describe('writeSessionPlanArtifact', () => {
       updatedAt: 1,
     }), 'utf8');
 
-    const store = new SessionRecordStore({
-      io: new StorageIo(),
-      projects: {
-        listProjects: () => [{ projectId: 'p' }],
-        ensureProjectSessionsRoot: () => projectsRoot,
-        touchProject: () => undefined,
-        setCurrentProjectId: () => undefined,
-        setCurrentSessionId: () => undefined,
-      },
-    } as unknown as StorageHost);
+    const resolver = new SessionArtifactResolver({ resolveSessionPath: () => sessionPath, io: new StorageIo() });
 
-    const first = store.writeSessionPlanArtifact('sess', '# first');
-    const second = store.writeSessionPlanArtifact('sess', '# second');
+    const first = writeSessionPlanArtifact('sess', '# first', resolver).uri;
+    const second = writeSessionPlanArtifact('sess', '# second', resolver).uri;
     expect(path.basename(first)).toMatch(/^plan-\d{4}-\d{2}-\d{2}T\d+Z-[a-z0-9]+\.md$/);
     expect(path.basename(second)).toMatch(/^plan-\d{4}-\d{2}-\d{2}T\d+Z-[a-z0-9]+\.md$/);
     expect(path.basename(first)).not.toBe('plan.md');

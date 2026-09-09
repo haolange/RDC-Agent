@@ -40,16 +40,16 @@ describe('toolConcurrency', () => {
   it('allows offline subagent and serializes lease-holding subagent', () => {
     expect(isToolCallConcurrencySafe({
       name: 'subagent',
-      args: { requiresRdxLease: false },
+      args: {  },
     })).toBe(true);
     expect(isToolCallConcurrencySafe({
       name: 'subagent',
-      args: { requiresRdxLease: true },
+      args: { domainExtensions: { rdx: { requiresLease: true } } },
     })).toBe(false);
     expect(isToolCallConcurrencySafe({
       name: 'subagent',
       args: { task: 'x' },
-    })).toBe(false);
+    })).toBe(true);
   });
 
   it('splits consecutive safe groups around unsafe calls', () => {

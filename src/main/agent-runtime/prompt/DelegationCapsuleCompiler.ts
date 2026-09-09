@@ -69,15 +69,7 @@ export function compileDelegationCapsule(capsule: DelegationCapsule): PromptSegm
     budgetLines.push(`maxSubagents: ${capsule.budget.maxSubagents}`);
   }
   pushSegment(segments, 'delegation:budget', budgetLines.join('\n'));
-  pushSegment(
-    segments,
-    'delegation:lease',
-    `# RDX Lease\n\nrequiresRdxLease: ${capsule.requiresRdxLease ? 'true' : 'false'}\n${
-      capsule.requiresRdxLease
-        ? 'This child may use a delegated parent RDX / Live Capture lease. Do not run in a concurrent tool group.'
-        : 'This child is offline. Do not request or assume an RDX lease.'
-    }`,
-  );
+
   return Object.freeze(segments.map((segment) => Object.freeze(segment))) as PromptSegment[];
 }
 

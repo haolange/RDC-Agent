@@ -452,13 +452,13 @@ describe('ToolExecutorFactory', () => {
       type: 'toolCall',
       id: 'off',
       name: 'subagent',
-      arguments: { requiresRdxLease: false },
+      arguments: {  },
     })).toBe(true);
     expect(executor.isConcurrencySafe?.({
       type: 'toolCall',
       id: 'live',
       name: 'subagent',
-      arguments: { requiresRdxLease: true },
+      arguments: { domainExtensions: { rdx: { requiresLease: true } } },
     })).toBe(false);
     expect(executor.reserveDispatchBudget?.([
       { type: 'toolCall', id: 'g1', name: 'read_file', arguments: {} },

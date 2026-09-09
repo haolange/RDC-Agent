@@ -1,8 +1,12 @@
+import { assertHandoffSkillCompatibility } from '../../sessions/handoffSkillCompatibility';
+import type { TaskCompletionBinding } from '../../agent-runtime/agent/TurnCompletionValidator';
+import { handoffRequiredSkillIds } from '../../sessions/handoffSkills';
 /**
  * TurnPreparationService — prepareTurnContext (compaction / cache / effectivePlan freeze).
  */
 
 import { createHash } from 'crypto';
+import { bindRdxTurn, freezeRdxTurnBinding, rdxBindingFingerprint } from '../../tools/RdxTurnBindings';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
@@ -76,11 +80,15 @@ function resolveSkillIntersection(
   toolAllowlist: readonly string[],
   projectRootPath: string | null,
   agentId: AgentRole,
+  promptPlan: PromptPlan,
 ): string[] | null {
   const skillAllowedLists: string[][] = [];
   for (const skillId of profileSkills) {
     const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined, agentId);
-    if (skill?.allowedTools?.length) {
+    if (!skill) throw new Error('SKILL_UNAVAILABLE: ' + skillId);
+    const frozen = promptPlan.segments.find(segment => segment.id === 'skill:' + skillId && segment.kind === 'preloaded-skill');
+    if (frozen && frozen.sourceHash !== skill.sourceHash) throw new Error('SKILL_SOURCE_CHANGED: rebuild preparation for ' + skillId);
+    if (skill.allowedTools?.length) {
       skillAllowedLists.push([...skill.allowedTools]);
     }
   }
@@ -88,6 +96,7 @@ function resolveSkillIntersection(
 }
 
 export interface TurnPreparationServiceDeps {
+  resolveTaskBinding: (sessionId: string | null, agentId: string) => TaskCompletionBinding | null;
   mcp: McpConnectionCoordinator;
   deferredActivation: DeferredToolActivationTracker;
   resolveRuntimeTools: (
@@ -164,11 +173,24 @@ export class TurnPreparationService {
     // Compile the immutable policy before acquiring any external MCP lease.
     // Invalid policy must not spawn processes or establish network connections.
     const turnSettings = settingsService.getAll();
+    const rdxBinding = freezeRdxTurnBinding(turnSettings.tooling.rdxCli, turnSettings.tooling.rdxActions);
     const compiledPolicy = compileEffectivePolicy(input.projectRootPath);
     const contextCompactionPercent = resolveEffectiveCompactionPercent(
       turnSettings.agentRuntime.context.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
       compiledPolicy.contextCompactionPercent,
     );
+    const profile = { ...input.effectiveProfile, skills: [...new Set([...input.effectiveProfile.skills, ...input.promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)), ...handoffRequiredSkillIds(input.sessionId, input.agentId)])] };
+    const profileSkills = profile.skills;
+    const skillIntersection = resolveSkillIntersection(
+      profileSkills,
+      input.toolAllowlist,
+      input.projectRootPath,
+      input.agentId,
+      input.promptPlan,
+    );
+    const taskBinding = this.deps.resolveTaskBinding(input.sessionId, input.agentId);
+    assertHandoffSkillCompatibility({ binding: taskBinding, agentId: input.agentId, tools: input.toolAllowlist, intersection: skillIntersection, deniedTools: compiledPolicy.deniedTools });
+    const preparedToolAllowlist = skillIntersection ?? input.toolAllowlist;
     const acquiredMcp = await this.deps.mcp.acquireConnections(
       input.agentId,
       input.projectRootPath,
@@ -183,7 +205,7 @@ export class TurnPreparationService {
     const excludeRdxLeaseTools = input.excludeRdxLeaseTools === true;
     const runtimeTools = this.deps.resolveRuntimeTools(
       input.agentId,
-      input.toolAllowlist,
+      preparedToolAllowlist,
       input.sessionId,
       undefined,
       input.projectId,
@@ -323,14 +345,6 @@ export class TurnPreparationService {
     }
     const initialMessages = compactedMessages.slice(0, -1);
     // prepareTurn 唯一一次解析 settings → 写入 effectivePlan；runAgentTurn/Executor 不得再读。
-    const profile = input.effectiveProfile;
-    const profileSkills = profile.skills;
-    const skillIntersection = resolveSkillIntersection(
-      profileSkills,
-      input.toolAllowlist,
-      input.projectRootPath,
-      input.agentId,
-    );
     const knowledgeResolution = resolveKnowledgeReadRoots({
       userKnowledgePath: appPathService.getUserRdxPaths().knowledgePath,
       projectKnowledgePath: input.projectRootPath
@@ -338,6 +352,8 @@ export class TurnPreparationService {
         : null,
     });
     const effectivePlan = buildEffectiveRuntimePlan({
+      taskBinding,
+      rdxBindingFingerprint: rdxBindingFingerprint(rdxBinding),
       agentId: input.agentId,
       projectRootPath: input.projectRootPath,
       projectId: input.projectId,
@@ -363,6 +379,7 @@ export class TurnPreparationService {
       excludeRdxLeaseTools,
       delegationCapsule: input.frozenDelegationCapsule ?? null,
     });
+    bindRdxTurn(effectivePlan, rdxBinding);
     const summary: PreparedTurnContextSummary = {
       requestId: input.requestId,
       turnId: input.turnId,

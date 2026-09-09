@@ -1,8 +1,9 @@
+import { HandoffContractSchema } from '@shared/types/handoffContract';
 import { z, type ZodType } from 'zod';
 import type { HandoffStateDocument, ProfileHandoffState } from '@shared/types/profileHandoff';
 import type { StorageMigration } from './storageSchema';
 
-export const CURRENT_HANDOFF_STATE_SCHEMA_VERSION = '1';
+export const CURRENT_HANDOFF_STATE_SCHEMA_VERSION = '2';
 
 const ProfileHandoffLifecycleSchema = z.enum(['prepared', 'committed', 'consumed', 'cancelled']);
 
@@ -27,7 +28,8 @@ export const ProfileHandoffStateSchema: ZodType<ProfileHandoffState> = z.object(
   toAgentId: z.string().min(1),
   chainRoot: z.string().min(1),
   depth: z.number().int().positive(),
-  prompt: z.string(),
+  contract: HandoffContractSchema,
+  prompt: z.string().trim().min(1),
   label: z.string(),
   declaredModel: z.string().min(1).nullable(),
   send: z.boolean(),
@@ -39,14 +41,15 @@ export const ProfileHandoffStateSchema: ZodType<ProfileHandoffState> = z.object(
   continuationTurnId: z.string().min(1).optional(),
 });
 
-export const HandoffStateDocumentV1Schema = z.object({
-  schemaVersion: z.literal('1'),
+export const HandoffStateDocumentV2Schema = z.object({
+  schemaVersion: z.literal('2'),
+  migrationNotice: z.string().min(1).optional(),
   active: ProfileHandoffStateSchema.nullable(),
   history: z.array(ProfileHandoffStateSchema).optional(),
 });
 
 export const HANDOFF_STATE_MIGRATIONS: StorageMigration<HandoffStateDocument>[] = [
-  { schemaVersion: '1', schema: HandoffStateDocumentV1Schema as ZodType<HandoffStateDocument> },
+  { schemaVersion: '2', schema: HandoffStateDocumentV2Schema as ZodType<HandoffStateDocument> },
 ];
 
 export function toHandoffStateDocument(

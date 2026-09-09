@@ -570,19 +570,6 @@ export class SessionRecordStore {
     return path.join(location.sessionPath, 'attachments.json');
   }
 
-  writeSessionPlanArtifact(sessionId: string, content: string): string {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) {
-      throw new Error(`Session not found for plan artifact: ${sessionId}`);
-    }
-    const artifactsDir = path.join(location.sessionPath, 'artifacts');
-    this.host.io.ensureDir(artifactsDir);
-    const stamp = new Date().toISOString().replace(/[:.]/g, '');
-    const artifactPath = path.join(artifactsDir, `plan-${stamp}-${generateShortId()}.md`);
-    fs.writeFileSync(artifactPath, content, 'utf8');
-    return artifactPath;
-  }
-
   async appendActionEvent(sessionId: string, event: ActionEvent): Promise<void> {
     appendJsonl(this.getActionChainPath(sessionId), event);
     this.updateSession(sessionId, {});

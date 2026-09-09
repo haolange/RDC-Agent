@@ -1,3 +1,4 @@
+import type { TaskCompletionBinding } from './agent/TurnCompletionValidator';
 import { createHash, randomBytes } from 'crypto';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
@@ -25,6 +26,7 @@ export interface FrozenHandoffDefinition {
 export const EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION = 3 as const;
 
 export interface EffectiveRuntimePlan {
+  taskBinding: Readonly<TaskCompletionBinding> | null;
   schemaVersion: typeof EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION;
   planId: string;
   fingerprint: string;
@@ -76,10 +78,13 @@ export interface EffectiveRuntimePlan {
   /** Frozen Delegation Capsule when this plan was prepared for a subagent child. */
   delegationCapsule: DelegationCapsule | null;
   /** Frozen at plan build; Prompt 与 Executor 共用。 */
+  rdxBindingFingerprint?: string;
   createdAt: number;
 }
 
 export interface BuildEffectiveRuntimePlanInput {
+  taskBinding?: TaskCompletionBinding | null;
+  rdxBindingFingerprint?: string;
   agentId: string;
   projectRootPath: string | null;
   projectId?: string | null;
@@ -213,7 +218,9 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     input.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
     policy.contextCompactionPercent,
   );
+  const taskBinding = input.taskBinding ? Object.freeze({ ...input.taskBinding }) : null;
   const fingerprint = stableHash([
+    taskBinding,
     EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION,
     input.agentId,
     input.projectRootPath,
@@ -237,10 +244,12 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     requestPlanFingerprint,
     promptPlanFingerprint,
     attachmentManifestFingerprint,
+    input.rdxBindingFingerprint ?? null,
     excludeRdxLeaseTools,
     delegationCapsule,
   ]);
   return {
+    taskBinding,
     schemaVersion: EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION,
     planId: `plan_${randomBytes(8).toString('hex')}`,
     fingerprint,
@@ -269,6 +278,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     attachmentManifestFingerprint,
     excludeRdxLeaseTools,
     delegationCapsule,
+    rdxBindingFingerprint: input.rdxBindingFingerprint,
     createdAt: Date.now(),
   };
 }

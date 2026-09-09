@@ -189,9 +189,10 @@ describe('combineActiveSkillAllowlists', () => {
       'tool_search',
     ];
     const skillLists = DEBUGGER_LOOP_SKILLS.map((skillId) => readSkillAllowedTools(skillId));
-    expect(skillLists.every((list) => list.length > 0)).toBe(true);
+    expect(skillLists.every((list) => list.length === 0)).toBe(true);
     const combined = combineActiveSkillAllowlists(runtime, skillLists);
-    expect(combined).toEqual(expect.arrayContaining(['subagent', 'task_create']));
-    expect(combined).not.toContain('shell');
+    expect(combined).toBeNull(); // no skill restriction: profile remains authoritative
+    expect(runtime).toEqual(expect.arrayContaining(['subagent', 'task_create']));
+    expect(runtime).not.toContain('shell');
   });
 });

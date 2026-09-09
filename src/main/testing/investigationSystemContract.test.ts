@@ -528,11 +528,10 @@ describe('investigation system contract', () => {
     expect(method).toMatch(/Hypothesis Matrix/);
     expect(method).toMatch(/Counterfactual/);
     const execution = readRepo('resources/agent-runtime/skills/renderdoc-execution/SKILL.md');
-    for (const source of [method, execution]) {
-      expect(source).toMatch(/subagent/);
-      expect(source).toMatch(/task_create/);
-      expect(source).toMatch(/\bshell\b/);
-    }
+    for (const source of [method, execution]) expect(source).not.toMatch(/^allowed-tools:/m);
+    expect(execution).toMatch(/subagent/);
+    expect(execution).toMatch(/task_create/);
+    expect(execution).toMatch(/executionEvidence/);
   });
 
   it('investigation.contract.s-rdc.positive-negative', () => {
@@ -690,7 +689,7 @@ describe('investigation system contract', () => {
     expect(method).toMatch(/Architecture Model/);
     const coordinator = readRepo('resources/agent-runtime/skills/analyzer-coordinator/SKILL.md');
     expect(coordinator).toMatch(/\$analyzer-architecture-method/);
-    expect(coordinator).toMatch(/claimKind/);
+    expect(coordinator).toContain('Observed / Reconstructed / Authoring');
   });
 
   it('investigation.contract.optimizer.rollback-close', () => {
@@ -924,13 +923,13 @@ describe('investigation system contract', () => {
 
   it('investigation.contract.mission.completion', () => {
     expect.hasAssertions();
-    expect(MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS).toHaveLength(21);
+    expect(MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS).toHaveLength(22);
     expect(GENERAL_SKILL_IDS).toHaveLength(6);
-    expect(CANONICAL_SKILL_IDS).toHaveLength(27);
+    expect(CANONICAL_SKILL_IDS).toHaveLength(28);
     const runner = readRepo('src/main/workflow/debugger/AgentTurnRunner.ts');
     const conversation = readRepo('src/main/conversation/ConversationTurnRunner.ts');
-    expect(runner).toMatch(/enforceMissionTurnCompletion/);
-    expect(conversation).toMatch(/enforceMissionTurnCompletion/);
+    expect(runner).toMatch(/validateCompletion/);
+    expect(conversation).toMatch(/validateCompletion/);
     expect(runner).toMatch(/pendingHandoff/);
     expect(enforceMissionTurnCompletion({
       profileId: 'general',

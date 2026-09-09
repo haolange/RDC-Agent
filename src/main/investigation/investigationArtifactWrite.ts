@@ -43,6 +43,7 @@ export interface InvestigationReadResult {
 }
 
 export interface InvestigationArtifactServiceDeps {
+  receiptStore?: import("../tools/RdxExecutionReceipts").RdxExecutionReceipts;
   resolver?: SessionArtifactResolver;
   now?: () => Date;
   onPersistBoundary?: (boundary: InvestigationPersistBoundary, info: {

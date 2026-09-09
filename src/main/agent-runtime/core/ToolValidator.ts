@@ -19,6 +19,8 @@ export class ToolValidationError extends Error {
 /** Closed supported JSON Schema subset — unknown keywords fail-closed. */
 const SUPPORTED_SCHEMA_KEYS = new Set([
   'type',
+  'oneOf',
+  'not',
   'enum',
   'const',
   'default',
@@ -91,6 +93,19 @@ function assertSupportedSchema(
         toolName,
       );
     }
+  }
+  if (schema.oneOf !== undefined) {
+    if (!Array.isArray(schema.oneOf) || schema.oneOf.length < 1 || schema.oneOf.length > 16) {
+      throw new ToolValidationError('oneOf must contain 1-16 schemas', path, toolName);
+    }
+    for (const [index, branch] of schema.oneOf.entries()) {
+      if (!branch || typeof branch !== 'object' || Array.isArray(branch)) throw new ToolValidationError('invalid oneOf branch', path, toolName);
+      assertSupportedSchema(branch as JsonSchema, path + '.oneOf.' + index, toolName, depth + 1, counters);
+    }
+  }
+  if (schema.not !== undefined) {
+    if (!schema.not || typeof schema.not !== 'object' || Array.isArray(schema.not)) throw new ToolValidationError('invalid not schema', path, toolName);
+    assertSupportedSchema(schema.not as JsonSchema, path + '.not', toolName, depth + 1, counters);
   }
   if (schema.additionalProperties !== undefined && schema.additionalProperties !== false) {
     throw new ToolValidationError(
@@ -175,6 +190,20 @@ export class ToolValidator {
 
     if (value === undefined && schema.default !== undefined) {
       value = schema.default;
+    }
+
+    const matches = (candidate: JsonSchema): boolean => {
+      try { this.validateValue(value, candidate, path, toolName, true, depth + 1); return true; }
+      catch (error) { if (error instanceof ToolValidationError) return false; throw error; }
+    };
+    if (Array.isArray(schema.oneOf) && schema.oneOf.filter((branch) => matches(branch as JsonSchema)).length !== 1) {
+      throw new ToolValidationError('oneOf requires exactly one matching input mode', path, toolName);
+    }
+    if (schema.not && matches(schema.not as JsonSchema)) throw new ToolValidationError('not schema matched a forbidden input', path, toolName);
+    if (!schema.type && Array.isArray(schema.required) && value && typeof value === 'object' && !Array.isArray(value)) {
+      for (const key of schema.required) {
+        if (!Object.prototype.hasOwnProperty.call(value, key)) throw new ToolValidationError('missing required ' + key, path, toolName);
+      }
     }
 
     if (Object.prototype.hasOwnProperty.call(schema, 'const')) {

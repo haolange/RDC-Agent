@@ -54,9 +54,7 @@ export {
   RDX_PROBE_ACTIONS,
   RDX_PROBE_READONLY_CLI_ACTIONS,
   RdxProbeInputSchema,
-  assertRdxProbeArgsReadOnly,
-  isRdxProbeMutateActionName,
-  resolveRdxProbeCliAction,
+  compileRdxProbe,
 } from './rdxProbe';
 export {
   AGENT_SEED_ACCENTS,

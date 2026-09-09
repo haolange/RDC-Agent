@@ -1,3 +1,5 @@
+import { RdxExecutionReceipts } from '../tools/RdxExecutionReceipts';
+import { seedExecutionEvidence } from './investigationExecutionFixtures';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -22,6 +24,7 @@ import { serializeInvestigationJson } from './investigationHash';
 import { InvestigationArtifactService } from './InvestigationArtifactService';
 import type { InvestigationArtifactServiceDeps } from './investigationArtifactWrite';
 
+const receiptStores = new WeakMap<InvestigationArtifactService, RdxExecutionReceipts>();
 export const SESSION_ID = 'inv-session';
 export const SESSION_B_ID = 'inv-session-b';
 
@@ -34,11 +37,13 @@ export function createInvestigationHarness(
   const resolver = new SessionArtifactResolver({
     resolveSessionPath: (id) => (id === sessionId ? sessionPath : null),
   });
+  const receiptStore = new RdxExecutionReceipts(resolver, () => 'test-receipt-key');
   const service = new InvestigationArtifactService({
-    resolver,
+    resolver, receiptStore,
     now: () => new Date('2026-09-01T00:00:00.000Z'),
     ...extras,
   });
+  receiptStores.set(service, receiptStore);
   return { sessionPath, resolver, service, sessionId };
 }
 
@@ -50,11 +55,13 @@ export function reopenInvestigationHarness(
   const resolver = new SessionArtifactResolver({
     resolveSessionPath: (id) => (id === sessionId ? sessionPath : null),
   });
+  const receiptStore = new RdxExecutionReceipts(resolver, () => 'test-receipt-key');
   const service = new InvestigationArtifactService({
-    resolver,
+    resolver, receiptStore,
     now: () => new Date('2026-09-01T00:00:00.000Z'),
     ...extras,
   });
+  receiptStores.set(service, receiptStore);
   return { sessionPath, resolver, service, sessionId };
 }
 
@@ -63,10 +70,12 @@ export function createMultiSessionInvestigationHarness(ids: string[] = [SESSION_
   const resolver = new SessionArtifactResolver({
     resolveSessionPath: (id) => paths[id] ?? null,
   });
+  const receiptStore = new RdxExecutionReceipts(resolver, () => 'test-receipt-key');
   const service = new InvestigationArtifactService({
-    resolver,
+    resolver, receiptStore,
     now: () => new Date('2026-09-01T00:00:00.000Z'),
   });
+  receiptStores.set(service, receiptStore);
   return { paths, resolver, service };
 }
 
@@ -293,6 +302,10 @@ export function writeDraft(
     mission: 'debugger' | 'analyzer' | 'optimizer';
   }> = {},
 ) {
+  if (kind === 'experiment' && receiptStores.has(service)) {
+    const experiment = record as ExperimentRecord;
+    if (!experiment.executionEvidence) record = { ...experiment, executionEvidence: seedExecutionEvidence(receiptStores.get(service)!, SESSION_ID, experiment.experimentId) };
+  }
   return service.writeRecord(SESSION_ID, {
     kind,
     mission: extras.mission ?? 'debugger',
