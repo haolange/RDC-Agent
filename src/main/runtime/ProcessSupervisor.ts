@@ -1,3 +1,4 @@
+import { retainResourceUntilExit, currentProcessExecutionOwner } from './ResourceExecutionLifetime';
 /**
  * ProcessSupervisor — unified child-process registry with tree kill + ring buffers.
  *
@@ -112,6 +113,7 @@ interface RegistryEntry {
   abortSignal: AbortSignal | null;
   startedAt: number;
   unconfirmed: boolean;
+  executionSessionId?: string;
 }
 
 function terminateTree(pid: number | undefined, signal: NodeJS.Signals = 'SIGTERM'): void {
@@ -149,6 +151,17 @@ export class ProcessSupervisor {
       owner: entry.supervised.owner,
       pid: entry.supervised.pid,
     }));
+  }
+
+  /** Child completion is not process exit; callers must keep cancellation pending. */
+  hasUnconfirmedProcesses(sessionId: string): boolean {
+    return [...this.registry.values()].some((entry) => entry.unconfirmed && entry.executionSessionId === sessionId);
+  }
+
+  async joinExecutionProcesses(sessionId: string): Promise<void> {
+    await Promise.all([...this.registry.values()]
+      .filter((entry) => entry.executionSessionId === sessionId)
+      .map((entry) => entry.supervised.exit));
   }
 
   spawn(
@@ -222,6 +235,7 @@ export class ProcessSupervisor {
 
     const entry: RegistryEntry = {
       supervised: null as unknown as SupervisedProcess,
+      executionSessionId: currentProcessExecutionOwner(),
       child,
       resolveExit,
       exitInfo: null,
@@ -324,6 +338,7 @@ export class ProcessSupervisor {
         });
         const observed = await Promise.race([exitPromise, deadline]);
         if (deadlineTimer) clearTimeout(deadlineTimer);
+        if (observed.reason === 'unconfirmed_orphan') retainResourceUntilExit(exitPromise);
         return observed;
       },
     };

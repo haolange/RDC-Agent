@@ -15,6 +15,26 @@ export {
 } from './TaskRegistry';
 
 export {
+  TASK_SCHEMA_VERSION,
+  type TaskDisposition,
+  type TaskCompletionResult,
+  type TaskBudgetState,
+  type TaskExecutionStatus,
+  type TaskExecutionRecord,
+  type TaskExecutionMessage,
+  type TaskMessageKind,
+  type TaskRootBudgetRecord,
+  type StartTaskExecutionOptions,
+  type SettleTaskExecutionOptions,
+} from './TaskContracts';
+
+export {
+  registerTaskExecutionCancellationOwner,
+  cancelOwnedTaskExecution,
+} from './TaskExecutionOwners';
+export { registerDelegatedTaskScope, getDelegatedTaskScope } from './DelegatedTaskScopes';
+
+export {
   type TaskStore,
   FileTaskStore,
   MemoryTaskStore,
@@ -27,6 +47,7 @@ export {
   createTaskGetTool,
   createTaskListTool,
   createTaskStopTool,
+  type TaskToolExecutionContext,
 } from './TaskTools';
 
 export {

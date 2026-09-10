@@ -11,6 +11,7 @@ export interface ShellInvocationRequest {
   env?: Record<string, string>;
   timeoutMs?: number;
   runId?: string;
+  contextId?: string;
   abortSignal?: AbortSignal;
 }
 
@@ -26,7 +27,7 @@ export function resolveExitCode(code: number | null, signal: NodeJS.Signals | nu
 }
 
 export class ShellInvocationService {
-  private activeProcesses = new Map<string, { supervised: SupervisedProcess; runId?: string }>();
+  private activeProcesses = new Map<string, { supervised: SupervisedProcess; runId?: string; contextId?: string }>();
 
   async invoke(request: ShellInvocationRequest): Promise<CLIResult> {
     const startTime = nowMs();
@@ -56,7 +57,7 @@ export class ShellInvocationService {
     });
 
     const procId = supervised.id;
-    this.activeProcesses.set(procId, { supervised, runId: request.runId });
+    this.activeProcesses.set(procId, { supervised, runId: request.runId, contextId: request.contextId });
 
     try {
       const info = await supervised.join(request.timeoutMs ?? 120_000);
@@ -82,6 +83,7 @@ export class ShellInvocationService {
       if (info.reason === 'unconfirmed_orphan') {
         return {
           exitCode: 1,
+          processExitReason: 'unconfirmed_orphan',
           stdout,
           stderr: stderr || 'Process termination was not confirmed; the process is quarantined as an orphan.',
           duration_ms: nowMs() - startTime,
@@ -94,8 +96,16 @@ export class ShellInvocationService {
         duration_ms: nowMs() - startTime,
       };
     } finally {
-      this.activeProcesses.delete(procId);
+      if (supervised.orphaned) {
+        void supervised.exit.then(() => { this.activeProcesses.delete(procId); });
+      } else {
+        this.activeProcesses.delete(procId);
+      }
     }
+  }
+
+  hasUnconfirmedProcesses(contextId?: string): boolean {
+    return Array.from(this.activeProcesses.values()).some(({ supervised, contextId: owner }) => supervised.orphaned && (!contextId || owner === contextId));
   }
 
   abortRun(runId: string): void {
@@ -109,7 +119,7 @@ export class ShellInvocationService {
     for (const active of this.activeProcesses.values()) {
       active.supervised.abort('supervisor_kill');
     }
-    this.activeProcesses.clear();
+    // Entries remain tracked until invoke observes close; abort is not exit evidence.
   }
 }
 

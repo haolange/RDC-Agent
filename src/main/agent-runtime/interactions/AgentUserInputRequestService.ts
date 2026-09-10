@@ -1,3 +1,4 @@
+import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from './DelegatedInteractionOwner';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 import type {
@@ -12,6 +13,7 @@ import {
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
 
 interface PendingUserInputRequest {
+  delegatedOwner?: DelegatedInteractionOwner;
   agentId: AgentRole;
   sessionId: string | null;
   turnId: string;
@@ -75,6 +77,7 @@ export class AgentUserInputRequestService {
 
     return new Promise<string>((resolve, reject) => {
       const pending: PendingUserInputRequest = {
+        delegatedOwner: getDelegatedInteractionOwner(input.sessionId),
         agentId: input.agentId,
         sessionId: input.sessionId ?? null,
         turnId,
@@ -112,12 +115,17 @@ export class AgentUserInputRequestService {
     });
   }
 
+  isPending(sessionId: string, turnId: string, toolCallId: string): boolean {
+    const pending = this.pending.get(keyFor(turnId, toolCallId));
+    return !!pending && (pending.delegatedOwner?.ownerSessionId ?? pending.sessionId) === sessionId;
+  }
+
   answer(input: AgentUserInputAnswerInput): AgentUserInputAnswerResult {
     const pending = this.pending.get(keyFor(input.turnId, input.toolCallId));
     if (!pending) {
       return { success: false, error: 'No pending user input request was found for this turn.' };
     }
-    if (input.sessionId && pending.sessionId && input.sessionId !== pending.sessionId) {
+    if ((input.sessionId ?? null) !== (pending.delegatedOwner?.ownerSessionId ?? pending.sessionId)) {
       return { success: false, error: 'Pending user input request belongs to a different session.' };
     }
 
@@ -200,7 +208,8 @@ export class AgentUserInputRequestService {
     type: 'approval.requested' | 'approval.answered',
     payload: AgentApprovalEventPayload,
   ): void {
-    pending.onEvent?.(buildSharedAgentEvent(type, payload, pending.context));
+    const owner = pending.delegatedOwner;
+    pending.onEvent?.(buildSharedAgentEvent(type, owner ? { ...payload, delegatedRequest: { executionId: owner.executionId, childSessionId: owner.childSessionId, turnId: pending.turnId } } : payload, owner ? { ...pending.context, sessionId: owner.ownerSessionId } : pending.context));
   }
 }
 

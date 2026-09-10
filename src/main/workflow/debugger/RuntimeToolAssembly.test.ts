@@ -101,6 +101,9 @@ vi.mock('../../settings/SettingsService', () => ({
 import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
 import { resolveAgentToolAllowlistFromDefinition } from './DebuggerRuntimePolicy';
 import { RuntimeToolAssembly } from './RuntimeToolAssembly';
+import { toolValidator } from '../../agent-runtime/core/ToolValidator';
+import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
+import { TaskRegistry, createSessionTaskStore, registerDelegatedTaskScope } from '../../agent-runtime/tasks';
 import { TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 
@@ -127,6 +130,24 @@ function createAssembly(): RuntimeToolAssembly {
 }
 
 describe('RuntimeToolAssembly', () => {
+  it('validates structured completion through the actual executor schema boundary', async () => {
+    const turn = { completionDeclaration: undefined } as unknown as TurnHandle;
+    const tool = createAssembly().createTurnCompletionTool(turn);
+    const args = {
+      disposition: 'completed',
+      result: { summary: 'Verified', outputs: { analysis: 'Scoped evidence' }, counterevidence: [], unresolved: [], scope: 'fixture', sideEffects: [], recoveryState: [] },
+    };
+    const validated = toolValidator.validate(toolToDefinition(tool), args);
+    await tool.execute('completion', validated);
+    expect(turn.completionDeclaration).toMatchObject(args);
+    await expect(tool.execute('invalid-output', toolValidator.validate(toolToDefinition(tool), {
+      ...args, result: { ...args.result, outputs: { analysis: { unauthorized: true } } },
+    }))).rejects.toThrow('result.outputs values must be strings');
+    expect(() => toolValidator.validate(toolToDefinition(tool), {
+      ...args, result: { ...args.result, authority: 'expanded' },
+    })).toThrow('未声明字段');
+  });
+
   beforeEach(() => {
     dispatchRuntimeHooks.mockReset();
     dispatchRuntimeHooks.mockImplementation(async () => true);
@@ -216,6 +237,29 @@ describe('RuntimeToolAssembly', () => {
     expect(tools.some((tool) => tool.name.includes('task') || tool.name === 'task_create' || tool.name.length > 0)).toBe(true);
   });
 
+  it('limits a Task-owned child session to a durable descendant subtree', async () => {
+    const ownerSessionId = `owner-${Date.now()}`;
+    const childSessionId = `${ownerSessionId}::subagent::child`;
+    const registry = new TaskRegistry(createSessionTaskStore(ownerSessionId));
+    const root = await registry.createTask('Owned root');
+    const execution = await registry.startExecution(root.id, { mode: 'subagent' });
+    const release = registerDelegatedTaskScope(childSessionId, { ownerSessionId, rootTaskId: root.id, executionId: execution.id, generation: execution.generation });
+    try {
+      const tools = createAssembly().createTaskRuntimeTools(childSessionId);
+      const create = tools.find((tool) => tool.name === 'task_create')!;
+      const get = tools.find((tool) => tool.name === 'task_get')!;
+      const created = await create.execute('create-child', { tasks: [{ subject: 'Child work' }] });
+      const childId = (created.details as { ids: string[] }).ids[0]!;
+      await expect(registry.getTask(childId)).resolves.toMatchObject({ parentTaskId: root.id });
+      await expect(get.execute('read-root', { taskId: root.id })).rejects.toThrow(/TASK_SCOPE_DENIED/);
+      const report = tools.find((tool) => tool.name === 'subagent_report')!;
+      await report.execute('report', { kind: 'progress', body: 'Evidence search complete.' });
+      await expect(registry.consumeExecutionMessages(execution.id, 0, 'to_parent')).resolves.toMatchObject({ messages: [expect.objectContaining({ body: 'Evidence search complete.' })] });
+    } finally {
+      release();
+    }
+  });
+
   it('keeps output publication on General task tokens and drops it for Mission', () => {
     const assembly = createAssembly();
     const handle = new TurnHandle({ sessionKey: 'session-a', turnId: 'turn-a', runId: 'run-a', generation: 1 });
@@ -251,7 +295,7 @@ describe('RuntimeToolAssembly', () => {
           label: 'Go',
           prompt: 'continue',
           depth: 1,
-          isBigLoop: false,
+          contract: handoffContract('general'),
         },
       }),
     );
@@ -261,158 +305,25 @@ describe('RuntimeToolAssembly', () => {
     );
   });
 
-  it('passes a dereferenceable MissionCheckpoint id on Big Loop handoff and omits fabricated fields', async () => {
-    computeNextChain.mockReturnValueOnce({ chainRoot: 'root', depth: 2 });
-    listCheckpoints.mockReturnValueOnce([{
-      artifactId: 'art-cp-1',
-      kind: 'checkpoint',
-      status: 'draft',
-      recordKey: 'cp-1',
-      createdAt: '2026-09-01T00:00:00.000Z',
-    }]);
-    readCheckpoint.mockReturnValueOnce({
-      record: { checkpointId: 'cp-1' },
-      manifest: { mission: 'debugger' },
-    });
+  it('passes only the explicit contract regardless of identity, depth or stored checkpoints', async () => {
+    computeNextChain.mockReturnValueOnce({ chainRoot: 'root', depth: 4 });
     const assembly = createAssembly();
     const handle = new TurnHandle({ sessionKey: 'session-b', turnId: 'turn-b', runId: 'run-b', generation: 1 });
     handle.eventSink = { sessionId: 'session-b', requestId: 'req-2' } as never;
     handle.runtimePlan = {
-      projectRootPath: 'D:/project',
-      profileHandoffs: [{ agent: 'debugger', label: 'Replan', prompt: 'Replan the mission.' }],
+      profileHandoffs: [{ agent: 'debugger', label: 'Review', prompt: 'Review evidence.' }],
       enabledProfileIds: ['debugger', 'general'],
     } as never;
-    const tool = assembly.createAgentHandoffTool('general', 'session-b', handle);
-    const result = await tool.execute('tc-replan', { agent: 'debugger', contract: handoffContract('debugger'), prompt: 'Replan the mission.', label: 'Replan' });
+    const contract = handoffContract('debugger');
+    const result = await assembly.createAgentHandoffTool('general', 'session-b', handle)
+      .execute('call', { agent: 'debugger', contract, prompt: 'Review evidence.' });
     expect(result.isError).not.toBe(true);
-    expect(listCheckpoints).toHaveBeenCalledWith('session-b', { kind: 'checkpoint' });
-    expect(readCheckpoint).toHaveBeenCalledWith('session-b', 'art-cp-1');
-    expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
-      'agent.before-handoff',
-      expect.objectContaining({
-        agentId: 'general',
-        sessionId: 'session-b',
-        payload: {
-          fromAgentId: 'general',
-          toAgentId: 'debugger',
-          label: 'Replan',
-          prompt: 'Replan the mission.',
-          depth: 2,
-          isBigLoop: true,
-          checkpointId: 'cp-1',
-        },
-      }),
-    );
-    const beforeCall = dispatchRuntimeHooks.mock.calls.find((call) => call[0] === 'agent.before-handoff');
-    expect(beforeCall?.[1].payload).not.toHaveProperty('loop');
-    expect(beforeCall?.[1].payload).not.toHaveProperty('missionLoop');
-    expect(beforeCall?.[1].payload).not.toHaveProperty('reasonForReplan');
-  });
-
-  it('does not invent a checkpointId when no MissionCheckpoint is persisted', async () => {
-    computeNextChain.mockReturnValueOnce({ chainRoot: 'root', depth: 2 });
-    listCheckpoints.mockReturnValueOnce([]);
-    const assembly = createAssembly();
-    const handle = new TurnHandle({ sessionKey: 'session-c', turnId: 'turn-c', runId: 'run-c', generation: 1 });
-    handle.eventSink = { sessionId: 'session-c', requestId: 'req-3' } as never;
-    handle.runtimePlan = {
-      projectRootPath: 'D:/project',
-      profileHandoffs: [{ agent: 'debugger', label: 'Replan', prompt: 'Replan the mission.' }],
-      enabledProfileIds: ['debugger', 'general'],
-    } as never;
-    const tool = assembly.createAgentHandoffTool('general', 'session-c', handle);
-    await tool.execute('tc-missing', { agent: 'debugger', contract: handoffContract('debugger'), prompt: 'Replan the mission.', label: 'Replan' });
-    expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
-      'agent.before-handoff',
-      expect.objectContaining({
-        payload: {
-          fromAgentId: 'general',
-          toAgentId: 'debugger',
-          label: 'Replan',
-          prompt: 'Replan the mission.',
-          depth: 2,
-          isBigLoop: true,
-        },
-      }),
-    );
-    const beforeCall = dispatchRuntimeHooks.mock.calls.find((call) => call[0] === 'agent.before-handoff');
-    expect(beforeCall?.[1].payload).not.toHaveProperty('checkpointId');
-  });
-
-  it('filters MissionCheckpoint by target mission and ignores a newer Debugger checkpoint', async () => {
-    computeNextChain.mockReturnValueOnce({ chainRoot: 'root', depth: 2 });
-    listCheckpoints.mockReturnValueOnce([
-      {
-        artifactId: 'art-cp-debugger',
-        kind: 'checkpoint',
-        status: 'draft',
-        recordKey: 'cp-debugger',
-        createdAt: '2026-09-01T02:00:00.000Z',
-      },
-      {
-        artifactId: 'art-cp-analyzer',
-        kind: 'checkpoint',
-        status: 'draft',
-        recordKey: 'cp-analyzer',
-        createdAt: '2026-09-01T00:00:00.000Z',
-      },
-    ]);
-    readCheckpoint.mockImplementation((_sessionId, artifactId) => {
-      if (artifactId === 'art-cp-debugger') {
-        return { record: { checkpointId: 'cp-debugger' }, manifest: { mission: 'debugger' } };
-      }
-      return { record: { checkpointId: 'cp-analyzer' }, manifest: { mission: 'analyzer' } };
-    });
-    const assembly = createAssembly();
-    const handle = new TurnHandle({ sessionKey: 'session-d', turnId: 'turn-d', runId: 'run-d', generation: 1 });
-    handle.eventSink = { sessionId: 'session-d', requestId: 'req-4' } as never;
-    handle.runtimePlan = {
-      projectRootPath: 'D:/project',
-      profileHandoffs: [{ agent: 'analyzer', label: 'Replan', prompt: 'Replan architecture.' }],
-      enabledProfileIds: ['analyzer', 'general'],
-    } as never;
-    const tool = assembly.createAgentHandoffTool('general', 'session-d', handle);
-    const result = await tool.execute('tc-mixed', { agent: 'analyzer', contract: handoffContract('analyzer'), prompt: 'Replan architecture.', label: 'Replan' });
-    expect(result.isError).not.toBe(true);
-    expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
-      'agent.before-handoff',
-      expect.objectContaining({
-        payload: expect.objectContaining({
-          toAgentId: 'analyzer',
-          isBigLoop: true,
-          checkpointId: 'cp-analyzer',
-        }),
-      }),
-    );
-    const beforeCall = dispatchRuntimeHooks.mock.calls.find((call) => call[0] === 'agent.before-handoff');
-    expect(beforeCall?.[1].payload).not.toMatchObject({ checkpointId: 'cp-debugger' });
-  });
-
-  it('does not hand a Debugger checkpoint to Analyzer planning when no Analyzer checkpoint exists', async () => {
-    computeNextChain.mockReturnValueOnce({ chainRoot: 'root', depth: 2 });
-    listCheckpoints.mockReturnValueOnce([{
-      artifactId: 'art-cp-debugger-only',
-      kind: 'checkpoint',
-      status: 'draft',
-      recordKey: 'cp-debugger-only',
-      createdAt: '2026-09-01T03:00:00.000Z',
-    }]);
-    readCheckpoint.mockReturnValueOnce({
-      record: { checkpointId: 'cp-debugger-only' },
-      manifest: { mission: 'debugger' },
-    });
-    const assembly = createAssembly();
-    const handle = new TurnHandle({ sessionKey: 'session-e', turnId: 'turn-e', runId: 'run-e', generation: 1 });
-    handle.eventSink = { sessionId: 'session-e', requestId: 'req-5' } as never;
-    handle.runtimePlan = {
-      projectRootPath: 'D:/project',
-      profileHandoffs: [{ agent: 'analyzer', label: 'Replan', prompt: 'Replan architecture.' }],
-      enabledProfileIds: ['analyzer', 'general'],
-    } as never;
-    const tool = assembly.createAgentHandoffTool('general', 'session-e', handle);
-    await tool.execute('tc-no-analyzer-cp', { agent: 'analyzer', contract: handoffContract('analyzer'), prompt: 'Replan architecture.', label: 'Replan' });
-    const beforeCall = dispatchRuntimeHooks.mock.calls.find((call) => call[0] === 'agent.before-handoff');
-    expect(beforeCall?.[1].payload).not.toHaveProperty('checkpointId');
+    const before = dispatchRuntimeHooks.mock.calls.find(call => call[0] === 'agent.before-handoff');
+    expect(before?.[1].payload).toMatchObject({ contract, depth: 4 });
+    expect(before?.[1].payload).not.toHaveProperty('isBigLoop');
+    expect(before?.[1].payload).not.toHaveProperty('checkpointId');
+    expect(listCheckpoints).not.toHaveBeenCalled();
+    expect(readCheckpoint).not.toHaveBeenCalled();
   });
 
   it('rolls back after-handoff deny without persisting or leaving pendingHandoff', async () => {

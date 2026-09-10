@@ -22,6 +22,8 @@ import { storageAdapter } from '../sessions/StorageAdapter';
 import type { ResolvedConversationContext } from './ConversationRoutePreflight';
 import { emitConversationEvent } from './ConversationTurnTerminal';
 import { buildHandoffAgentEvent } from './profileHandoffEvents';
+import { TaskRegistry, createSessionTaskStore } from '../agent-runtime/tasks';
+import { releasePreparedHandoffExecutionOwner } from '../workflow/debugger/DirectTaskTurnLifecycle';
 
 export interface ConversationHandoffAutoSendInput extends ConversationSendRequest {
   sessionId: string;
@@ -88,11 +90,13 @@ export class ConversationHandoffOps {
     this.inFlightStarts.clear();
   }
 
-  cancelUnfinishedHandoff(sessionId: string | null | undefined, reason: ProfileHandoffCancelReason): void {
+  async cancelUnfinishedHandoff(sessionId: string | null | undefined, reason: ProfileHandoffCancelReason): Promise<void> {
     if (!sessionId) return;
     this.dropAutoSend(sessionId);
     const cancelled = storageAdapter.handoffs.cancel(sessionId, reason);
     if (cancelled) {
+      releasePreparedHandoffExecutionOwner(cancelled.taskExecution?.executionId);
+      await this.settleTaskExecution(sessionId, cancelled, 'cancelled', `Handoff cancelled: ${reason}`);
       this.emitCancelledHandoff(sessionId, cancelled);
     }
   }
@@ -109,13 +113,39 @@ export class ConversationHandoffOps {
     return active?.lifecycle === 'committed' ? active : null;
   }
 
-  commitPreparedHandoff(sessionId: string, sourceTurnId: string): ProfileHandoffState | null {
+  async commitPreparedHandoff(sessionId: string, sourceTurnId: string): Promise<ProfileHandoffState | null> {
     try {
-      return storageAdapter.handoffs.commit(sessionId, sourceTurnId);
+      const committed = storageAdapter.handoffs.commit(sessionId, sourceTurnId);
+      if (committed.taskExecution && committed.taskResult) {
+        await this.settleTaskExecution(sessionId, committed);
+      }
+      return committed;
     } catch {
-      this.cancelUnfinishedHandoff(sessionId, 'superseded');
+      await this.cancelUnfinishedHandoff(sessionId, 'superseded');
       return null;
     }
+  }
+
+  private async settleTaskExecution(
+    sessionId: string,
+    handoff: ProfileHandoffState,
+    forcedStatus?: 'cancelled',
+    forcedSummary?: string,
+  ): Promise<void> {
+    const binding = handoff.taskExecution;
+    if (!binding) return;
+    const result = forcedStatus
+      ? { disposition: 'cancelled' as const, summary: forcedSummary ?? 'Handoff cancelled.', outputs: {} }
+      : handoff.taskResult;
+    if (!result) return;
+    const ownedRegistry = new TaskRegistry(createSessionTaskStore(sessionId));
+    await ownedRegistry.settleExecution(binding.executionId, {
+      expectedGeneration: binding.generation,
+      status: result.disposition === 'completed' ? 'completed'
+        : result.disposition === 'partial' ? 'partial'
+          : result.disposition === 'cancelled' ? 'cancelled' : 'blocked',
+      result,
+    });
   }
 
   consumeCommittedHandoff(
@@ -198,7 +228,7 @@ export class ConversationHandoffOps {
 
     const session = storageAdapter.readSession(sessionId);
     if (!session) {
-      this.cancelLeftoverAutoSendHandoff(sessionId, 'superseded');
+      await this.cancelLeftoverAutoSendHandoff(sessionId, 'superseded');
       return;
     }
     agentToolApprovalRequestService.cancelTurn(committed.sourceTurnId);
@@ -241,7 +271,7 @@ export class ConversationHandoffOps {
       autoSendError = error;
       // Stop / cancel / preflight / invalid_model — never retry auto-send.
     }
-    this.cancelLeftoverAutoSendHandoff(
+    await this.cancelLeftoverAutoSendHandoff(
       sessionId,
       cancelReasonForAutoSendFailure(autoSendError),
     );
@@ -297,12 +327,12 @@ export class ConversationHandoffOps {
     emitConversationEvent(buildHandoffAgentEvent('handoff.cancelled', sessionId, cancelled));
   }
 
-  private cancelLeftoverAutoSendHandoff(
+  private async cancelLeftoverAutoSendHandoff(
     sessionId: string,
     reason: ProfileHandoffCancelReason,
-  ): void {
+  ): Promise<void> {
     const leftover = storageAdapter.handoffs.getActive(sessionId);
     if (!leftover || !isActiveHandoffLifecycle(leftover.lifecycle)) return;
-    this.cancelUnfinishedHandoff(sessionId, reason);
+    await this.cancelUnfinishedHandoff(sessionId, reason);
   }
 }

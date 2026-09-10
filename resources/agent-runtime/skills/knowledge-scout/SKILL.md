@@ -1,7 +1,7 @@
 ---
 name: knowledge-scout
 description: Search, read, and compile scoped Knowledge into a sourced Brief or Pack without writing or promoting cards.
-allowed-tools: [knowledge_browse, knowledge_search, knowledge_read, knowledge_compile]
+allowed-tools: [subagent_report, turn_complete, artifact_read, knowledge_browse, knowledge_search, knowledge_read, knowledge_compile]
 ---
 
 # Knowledge Scout
@@ -15,3 +15,5 @@ Use this skill for Knowledge retrieval that is larger than a single deterministi
 5. Return the Pack or card refs. Do not dump the full retrieval transcript.
 
 Do not create session candidates from this skill. Do not persist or promote cards.
+
+Use `subagent_report` only for meaningful progress, a blocker, or a required decision within the assigned scope. Do not send routine heartbeats or expand authority through messages. Finish with the structured result and evidence references.

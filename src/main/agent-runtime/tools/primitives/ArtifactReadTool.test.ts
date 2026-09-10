@@ -82,4 +82,15 @@ describe('ArtifactReadTool', () => {
       text: expect.stringContaining('ARTIFACT_PATH_ESCAPE'),
     });
   });
+  it('returns native image evidence with its hash and rejects text-only routes', async () => {
+    read.mockImplementation((_session, _uri, options) => ({ uri: 'session://tool-outputs/before.png', mimeType: 'image/png', hash: 'abc123', bytes: 3, offset: 1, limit: 2000, truncated: false, ...(options.includeImageData ? { imageData: 'YWJj' } : {}) }));
+    const context = { workspaceRoot: 'D:/ws', projectRootPath: 'D:/ws', projectId: null, sessionId: 'sess-1' };
+    const result = await artifactReadTool.execute('visual', { uri: 'session://tool-outputs/before.png', expectedHash: 'abc123' }, undefined, undefined, { ...context, visionInputMode: 'native' });
+    expect(result.content).toEqual([{ type: 'text', text: expect.stringContaining('sha256=abc123') }, { type: 'image', data: 'YWJj', mimeType: 'image/png' }]);
+    expect(read).toHaveBeenLastCalledWith('sess-1', 'session://tool-outputs/before.png', expect.objectContaining({ expectedHash: 'abc123', includeImageData: true }));
+    const denied = await artifactReadTool.execute('text', { uri: 'session://tool-outputs/before.png' }, undefined, undefined, { ...context, visionInputMode: 'disabled' });
+    expect(denied.isError).toBe(true);
+    expect(denied.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('VISION_INPUT_UNSUPPORTED') });
+  });
+
 });

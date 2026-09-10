@@ -1,23 +1,5 @@
+import { reconcileDelegatedInteractionRequests } from './DelegatedInteractionRecovery';
 import { enforceMissionTurnCompletion } from '../investigation/missionCompletionContract';
-/**
- * ConversationService — orchestrates conversation send/stop/rewrite/approval flows.
- *
- * Skill preload: ConversationPromptPreparer calls `mergeTurnPreloadSkillIds` to merge
- * profile/$skill/pending skill preload ids. Missing preload skills fail closed with
- * `SKILL_UNAVAILABLE`.
- *
- * PromptPlan: `promptPlanBuilder.build` creates the system instruction plan.
- * Route capability is passed via `routeCapability: input.routePreflight.routeCapability`.
- * Permission settings: `permissionSettings: runtimeSettings.agentRuntime.permissions`.
- * Tool approval resume is exposed via `answerToolApproval`.
- *
- * Preflight path: `prepareTurnContext` → `prepareConversationPrompt` →
- * `materializeAgentUserInput` → `preparedTurn` with `requestId` idempotency.
- * Terminal paths call `releaseProviderRuntimeCredentials` to release the credential lease.
- *
- * Canonical output: ConversationTurnRunner calls `requireCanonicalFinalAnswer(canonicalOutput)`
- * to ensure terminal content comes from canonical final state.
- */
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -72,8 +54,9 @@ import { canonicalJson } from './ConversationRoutePreflight';
 import { prepareConversationPrompt as buildConversationPrompt, type PrepareConversationPromptInput } from './ConversationPromptPreparer';
 import { hashAttachmentContents } from './ConversationAttachmentHashing';
 import { ConversationHandoffOps } from './ConversationHandoffOps';
+import { ConversationBackgroundContinuation, type BackgroundContinuationEvent } from './ConversationBackgroundContinuation';
 import { startProfileTurn as runStartProfileTurn } from './ConversationTurnStarter';
-import { completeProfileTurn as runCompleteProfileTurn, type CompleteProfileTurnInput } from './ConversationTurnRunner';
+import { completeProfileTurn as runCompleteProfileTurn, type CompleteProfileTurnInput, type ConversationTurnRunnerHost } from './ConversationTurnRunner';
 import {
   persistConversationSnapshot,
   assertTerminalContextOwnership,
@@ -88,16 +71,13 @@ interface ConversationContextInput extends ConversationSendRequest {
   fallbackSessionId?: string | null;
   fallbackRunId?: string | null;
 }
-
 interface ConversationRewriteContextInput extends ConversationRewriteFromMessageRequest {
   fallbackProjectId?: string | null;
   fallbackSessionId?: string | null;
   fallbackRunId?: string | null;
 }
-
 export class ConversationService {
-  private acceptingTurns = true;
-  private activeTurns = new Map<string, ActiveConversationTurn>();
+  private acceptingTurns = true; private activeTurns = new Map<string, ActiveConversationTurn>();
   private readonly preparingRequests = new Map<string, {
     requestId: string;
     controller: AbortController;
@@ -110,6 +90,7 @@ export class ConversationService {
   private readonly sendRequests = new Map<string, Promise<ConversationTurnResult>>();
   private readonly sendRequestFingerprints = new Map<string, string>();
   private readonly activeSendScopes = new Map<string, string>();
+  private readonly backgroundContinuations = new ConversationBackgroundContinuation((event) => this.runBackgroundContinuation(event));
   private readonly handoffs = new ConversationHandoffOps({
     hasActiveTurnForSession: (sessionId) => Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === sessionId),
     runIdempotentTurn: (input, operation) => this.runIdempotentTurn(input, operation),
@@ -119,6 +100,14 @@ export class ConversationService {
       input.turnControls, input.requestId, input.controller, undefined, input.requestFingerprint,
     ),
   });
+  constructor() {
+    agentOrchestrator.backgroundSubagents.onEvent = (event) => {
+      if (event.type === 'settled' || event.type === 'message') {
+        this.backgroundContinuations.onSettled(event);
+        if (!Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === event.sessionId)) this.notifySessionTurnIdle(event.sessionId);
+      }
+    };
+  }
 
   stopAcceptingTurns(): void {
     this.acceptingTurns = false;
@@ -134,13 +123,18 @@ export class ConversationService {
       turn.stop();
     }
     await Promise.allSettled(active.map((turn) => turn.stopped));
+    await agentOrchestrator.backgroundSubagents.abortAll();
   }
 
   async getHistory(sessionId: string): Promise<{
     messages: ConversationMessage[];
     branchState: ConversationBranchState | null;
   }> {
-    const allMessages = storageAdapter.readConversationHistory(sessionId);
+    const allMessages = storageAdapter.readConversationHistory(sessionId).map((message) => {
+      const recovered = reconcileDelegatedInteractionRequests(sessionId, message);
+      if (recovered !== message) storageAdapter.appendConversationMessage(sessionId, recovered);
+      return recovered;
+    });
     const branchState = this.readRepairedBranchState(sessionId, allMessages);
     return {
       // The renderer owns visible projection and needs sibling anchors to keep
@@ -151,6 +145,9 @@ export class ConversationService {
   }
 
   async clearHistory(sessionId: string): Promise<ConversationMessage[]> {
+    this.backgroundContinuations.suppress(sessionId);
+    const stopped = await this.cancelActiveTurn({ sessionId });
+    if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${sessionId}.`);
     storageAdapter.writeConversationHistory(sessionId, []);
     storageAdapter.clearSessionContextState(sessionId);
     publishConversationTrace(sessionId, [], sessionId, publishTraceProjection);
@@ -216,12 +213,20 @@ export class ConversationService {
       .sort((left, right) => right.startedAt - left.startedAt);
     const target = candidates[0];
     if (!target) {
-      if (request.sessionId) this.cancelUnfinishedHandoff(request.sessionId, 'user_stop');
+      if (request.sessionId) await this.cancelUnfinishedHandoff(request.sessionId, 'user_stop');
+      if (request.sessionId) {
+        this.backgroundContinuations.suppress(request.sessionId);
+        await agentOrchestrator.backgroundSubagents.abortSession(request.sessionId);
+        return { success: true, phase: 'running' };
+      }
       return { success: false, error: 'No active conversation turn.' };
     }
 
-    this.cancelUnfinishedHandoff(target.sessionId, 'user_stop');
+    await this.cancelUnfinishedHandoff(target.sessionId, 'user_stop');
+    if (target.sessionId) this.backgroundContinuations.suppress(target.sessionId);
     target.stop();
+    await target.stopped;
+    if (target.sessionId) await agentOrchestrator.backgroundSubagents.abortSession(target.sessionId);
     return {
       success: true,
       phase: 'running',
@@ -250,9 +255,23 @@ export class ConversationService {
       if (sessionId) this.notifySessionTurnIdle(sessionId);
     }
   }
-
   private notifySessionTurnIdle(sessionId: string): void {
     this.handoffs.notifySessionTurnIdle(sessionId);
+    this.backgroundContinuations.notifyIdle(sessionId);
+  }
+  private async runBackgroundContinuation(pending: BackgroundContinuationEvent): Promise<void> {
+    const sessionId = pending.sessionId;
+    if (!this.acceptingTurns || Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === sessionId)) return;
+    const session = storageAdapter.readSession(sessionId); if (!session) return;
+    const requestId = generateEventId('request');
+    const input: ConversationContextInput = {
+      requestId, sessionId, projectId: session.projectId, agentId: pending.parentAgentId, profileId: pending.parentAgentId,
+      message: '', turnControls: session.turnControls ?? { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
+    };
+    await this.runIdempotentTurn(input, async (resolvedRequestId, controller, requestFingerprint) => {
+      const context = await this.resolveContext(input);
+      return this.startProfileTurn(context, input.profileId ?? null, input.agentId ?? null, '', [], [], undefined, input.turnControls, resolvedRequestId, controller, undefined, requestFingerprint, undefined, pending.policyBudget);
+    });
   }
 
   private getPreparingRequestByRequestId(requestId: string) {
@@ -529,6 +548,8 @@ export class ConversationService {
 
   async sendMessage(input: ConversationContextInput): Promise<ConversationTurnResult> {
     const trimmed = input.message.trim();
+    const requestedSessionId = input.sessionId ?? input.fallbackSessionId;
+    if (requestedSessionId) this.backgroundContinuations.resume(requestedSessionId);
     return this.runIdempotentTurn(input, async (requestId, controller, requestFingerprint, attachments) => {
         const context = await this.resolveContext(input);
         if (context.session && Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === context.session?.sessionId)) {
@@ -791,7 +812,7 @@ export class ConversationService {
     };
   }
 
-  private createTurnRunnerHost() {
+  private createTurnRunnerHost(): ConversationTurnRunnerHost {
     return {
       validateCompletion: enforceMissionTurnCompletion,
       persistConversationSnapshot,
@@ -806,22 +827,20 @@ export class ConversationService {
       assertTerminalContextOwnership,
       ephemeralTraceSessionId,
       commitPreparedHandoff: (sessionId: string, sourceTurnId: string) => this.commitPreparedHandoff(sessionId, sourceTurnId),
-      cancelUnfinishedHandoff: (sessionId: string, reason: ProfileHandoffCancelReason) => {
-        this.cancelUnfinishedHandoff(sessionId, reason);
-      },
+      cancelUnfinishedHandoff: (sessionId: string, reason: ProfileHandoffCancelReason) => this.cancelUnfinishedHandoff(sessionId, reason),
       scheduleHandoffAutoSend: (sessionId: string) => this.scheduleHandoffAutoSend(sessionId),
     };
   }
 
-  cancelUnfinishedHandoff(sessionId: string | null | undefined, reason: ProfileHandoffCancelReason): void {
-    this.handoffs.cancelUnfinishedHandoff(sessionId, reason);
+  cancelUnfinishedHandoff(sessionId: string | null | undefined, reason: ProfileHandoffCancelReason): Promise<void> {
+    return this.handoffs.cancelUnfinishedHandoff(sessionId, reason);
   }
 
   notifyHydratedHandoff(sessionId: string, result: ProfileHandoffState | null): void {
     this.handoffs.notifyHydratedHandoff(sessionId, result);
   }
 
-  private commitPreparedHandoff(sessionId: string, sourceTurnId: string): ProfileHandoffState | null {
+  private commitPreparedHandoff(sessionId: string, sourceTurnId: string): Promise<ProfileHandoffState | null> {
     return this.handoffs.commitPreparedHandoff(sessionId, sourceTurnId);
   }
 
@@ -847,6 +866,7 @@ export class ConversationService {
     configurationCommit?: ConversationSendRequest['configurationCommit'],
     requestFingerprint?: string,
     excludeTurnId?: string,
+    policyBudget?: import('../workflow/debugger/TurnCoordinator').PolicyBudgetState,
   ): Promise<ConversationTurnResult> {
     return runStartProfileTurn(
       this.createTurnStarterHost(),
@@ -864,6 +884,7 @@ export class ConversationService {
       configurationCommit,
       requestFingerprint,
       excludeTurnId,
+      policyBudget,
     );
   }
 

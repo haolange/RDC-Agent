@@ -49,6 +49,8 @@ import {
   storageAdapter,
   streamTestModeStub,
   SubagentRunner,
+  createBackgroundSubagentService,
+  type BackgroundSubagentService,
   TokenizerService,
   ToolExecutorFactory,
   turnCoordinator,
@@ -82,6 +84,7 @@ export class AgentOrchestrator {
   private readonly profilePrep: ProfileTurnPreparation;
   private readonly turnRunner: AgentTurnRunner;
   private readonly subagents: SubagentRunner;
+  readonly backgroundSubagents: BackgroundSubagentService;
   private readonly memoryUi: OrchestratorMemoryUi;
 
   constructor() {
@@ -95,6 +98,8 @@ export class AgentOrchestrator {
       systemPromptForAgent: (agentId, prompt) => this.promptPlan.systemPromptForAgent(agentId, prompt),
       getActiveTurn,
     });
+    this.backgroundSubagents = createBackgroundSubagentService(this.subagents);
+    this.subagents.setBackgroundStarter((input) => this.backgroundSubagents.start(input));
 
     this.tools = new RuntimeToolAssembly({
       mcp: this.mcp,
@@ -102,6 +107,8 @@ export class AgentOrchestrator {
       getMemoryStore: (scope, projectRootPath) => this.getMemoryStore(scope, projectRootPath),
       createSubagentTools: (parentAgentId, sessionId, turnHandle) =>
         this.subagents.createSubagentTools(parentAgentId, sessionId, turnHandle),
+      createBackgroundTools: (parentAgentId, sessionId, turnHandle) =>
+        this.backgroundSubagents.createTools(parentAgentId, sessionId, turnHandle),
       getMcpServerStatusSummary: (projectRootPath, query) =>
         this.mcp.getMcpServerStatusSummary(projectRootPath, query),
     });
@@ -582,13 +589,14 @@ export class AgentOrchestrator {
         contextDiagnostic: preparedTurn.contextDiagnostic,
         preparedRuntime: preparedTurn.runtime,
         terminalContext: options?.onTerminalContext
-          ? (messages, status, pendingHandoff) => options.onTerminalContext?.({
+          ? (messages, status, pendingHandoff, completionDeclaration) => options.onTerminalContext?.({
               messages,
               executionIdentity: planning.plan.executionIdentity,
               status,
               selectedTurnCount: preparedTurn!.contextDiagnostic.selectedTurnCount,
               filteredArtifactCount: preparedTurn!.contextDiagnostic.filteredArtifactCount,
               pendingHandoff,
+              completionDeclaration,
             })
           : undefined,
       });
@@ -624,18 +632,9 @@ export class AgentOrchestrator {
     }
   }
 
-  async runSubagent(input: Parameters<SubagentRunner['runSubagent']>[0]): Promise<Awaited<ReturnType<SubagentRunner['runSubagent']>>> {
-    return this.subagents.runSubagent(input);
-  }
-
-  createSubagentTools(parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null) {
-    return this.subagents.createSubagentTools(parentAgentId, sessionId, turnHandle);
-  }
-
-  async abortAndJoin(
-    sessionId: string | null | undefined,
-    options?: { graceMs?: number; forceAfterMs?: number; reason?: AbortReason },
-  ): Promise<void> {
+  async runSubagent(input: Parameters<SubagentRunner['runSubagent']>[0]): Promise<Awaited<ReturnType<SubagentRunner['runSubagent']>>> { return this.subagents.runSubagent(input); }
+  createSubagentTools(parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null) { return this.subagents.createSubagentTools(parentAgentId, sessionId, turnHandle); }
+  async abortAndJoin(sessionId: string | null | undefined, options?: { graceMs?: number; forceAfterMs?: number; reason?: AbortReason }): Promise<void> {
     const key = sessionId?.trim();
     if (!key) return;
     // use resolved key without generating a new ephemeral scope

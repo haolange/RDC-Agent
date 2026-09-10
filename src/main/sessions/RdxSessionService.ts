@@ -1,3 +1,4 @@
+import { shellInvocationService } from '../tools/ShellInvocationService';
 /**
  * RdxSessionService - RDX runtime context state and configured shell actions.
  */
@@ -31,7 +32,7 @@ import { settingsService } from '../settings/SettingsService';
 import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import { parseRdxNativeResult } from '../tools/RdxNativeProtocol';
 import type { RdxTurnBinding } from '../tools/RdxTurnBindings';
-import { setRdxRuntimeContextForSession, clearRdxContextLeases } from './RdxRuntimeContextRegistry';
+import { setRdxRuntimeContextForSession, clearRdxContextLeases, getDelegatedChildSessionId } from './RdxRuntimeContextRegistry';
 
 interface PreviewLoadResult {
   preview: OpenedCapturePreview | null;
@@ -66,6 +67,7 @@ export class RdxSessionService {
   };
 
   async openProjectInput(request: OpenProjectInputRequest, options: RdxLifecycleOptions = {}): Promise<OpenedCaptureState> {
+    if (shellInvocationService.hasUnconfirmedProcesses(request.inputId)) throw new Error('RDX_RECOVERY_BLOCKED: native process exit has not been observed.');
     await this.closeOrReplaceOpenedCapture(options);
 
     let replayDevice = request.replayDevice;
@@ -283,7 +285,7 @@ export class RdxSessionService {
     settings.argsPrefix = [...settings.argsPrefix.filter(arg => arg !== '--json'), '--json'];
     try {
       const result = parseRdxNativeResult(await rdxCliInvokerService.executeCLI(
-        'session', ['preview', 'off', '--daemon-context', owner.contextId], { settings },
+        'session', ['preview', 'off', '--daemon-context', owner.contextId], { settings, contextId: owner.contextId },
       ), owner.contextId);
       const preview = result.data.preview as Record<string, unknown> | undefined;
       if (preview?.enabled !== false) throw new Error('RDX_PREVIEW_UNCONFIRMED: native preview close was not confirmed.');
@@ -706,6 +708,11 @@ export class RdxSessionService {
   }
 
   private async teardownRuntime(options: RdxLifecycleOptions = {}): Promise<void> {
+    const ownerSessionId = this.openedCapture?.ownerSessionId;
+    if (ownerSessionId && getDelegatedChildSessionId(ownerSessionId)) {
+      throw new Error('RDX_LEASE_DUAL_OWNER: join delegated execution before capture lifecycle changes.');
+    }
+    if (this.runtimeContext?.contextId && shellInvocationService.hasUnconfirmedProcesses(this.runtimeContext.contextId)) throw new Error('RDX_RECOVERY_BLOCKED: native process exit has not been observed.');
     const previousContext = this.runtimeContext;
 
     let closeOk = true;

@@ -41,6 +41,7 @@ import {
   resolveEnabledAgentDefinition,
 } from './ConversationRoutePreflight';
 import type { CompleteProfileTurnInput } from './ConversationTurnRunner';
+import type { PolicyBudgetState } from '../workflow/debugger/TurnCoordinator';
 import {
   createContinuationDropNotice,
   shouldAnnounceContinuationDrop,
@@ -80,6 +81,7 @@ export async function startProfileTurn(
   configurationCommit?: ConversationSendRequest['configurationCommit'],
   requestFingerprint?: string,
   excludeTurnId?: string,
+  policyBudget?: PolicyBudgetState,
 ): Promise<ConversationTurnResult> {
   const pendingProjectRootPath = context.projectId
     ? storageAdapter.getProjectById(context.projectId)?.rootPath ?? null
@@ -587,6 +589,7 @@ export async function startProfileTurn(
       planning,
       preparedPrompt,
       preparedTurn,
+      policyBudget,
     }).catch((error) => {
       agentOrchestrator.releaseProviderRuntimeCredentials(preparedTurn.runtime.credentialHandle);
       console.error(`[ConversationService] Background turn ${turnId} failed before terminal cleanup:`, error);

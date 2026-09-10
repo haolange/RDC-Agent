@@ -39,6 +39,17 @@ export const ProfileHandoffStateSchema: ZodType<ProfileHandoffState> = z.object(
   cancelledAt: z.number().optional(),
   cancelReason: ProfileHandoffCancelReasonSchema.optional(),
   continuationTurnId: z.string().min(1).optional(),
+  taskExecution: z.object({
+    taskId: z.string().min(1),
+    executionId: z.string().min(1),
+    generation: z.number().int().positive(),
+    taskRevision: z.number().int().positive(),
+  }).strict().optional(),
+  taskResult: z.object({
+    disposition: z.enum(['completed', 'partial', 'blocked', 'cancelled']),
+    summary: z.string().min(1),
+    outputs: z.record(z.string(), z.string()),
+  }).strict().optional(),
 });
 
 export const HandoffStateDocumentV2Schema = z.object({

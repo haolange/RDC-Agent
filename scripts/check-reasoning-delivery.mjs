@@ -159,6 +159,8 @@ const traceServiceSource = fs.readFileSync('src/main/agent-trace/TraceService.ts
 const traceEmitterSource = fs.readFileSync('src/main/agent-trace/TraceEventEmitter.ts', 'utf8');
 const canonicalOutputSource = fs.readFileSync('src/main/conversation/CanonicalAssistantOutput.ts', 'utf8');
 const conversationServiceSource = fs.readFileSync('src/main/conversation/ConversationService.ts', 'utf8');
+const conversationTurnRunnerSource = fs.readFileSync('src/main/conversation/ConversationTurnRunner.ts', 'utf8');
+const conversationCanonicalSources = `${conversationServiceSource}\n${conversationTurnRunnerSource}`;
 const traceCanonicalSource = fs.readFileSync('src/main/agent-trace/TraceService.ts', 'utf8');
 const kimiSurface = getLoadedProviderSurface('kimi-coding-plan');
 
@@ -175,10 +177,10 @@ assert(!traceEmitterSource.includes("event.type === 'message_end'"), 'core messa
 assert(!traceEmitterSource.includes('synthesizeFromConversation'), 'Conversation-wide thought synthesis must remain removed.');
 assert(canonicalOutputSource.includes("outputPhase !== 'final_answer'"), 'Canonical output reducer must allow only final_answer to write assistant final text.');
 assert(canonicalOutputSource.includes('PROVIDER_STREAM_MISSING_FINAL_ANSWER'), 'Canonical output reducer must fail closed when final_answer is absent.');
-assert(conversationServiceSource.includes('requireCanonicalFinalAnswer(canonicalOutput)'), 'Conversation terminal content must come from canonical final state.');
-assert(!/event\.type === 'tool\.started'[\s\S]{0,240}beginAssistantContentLoop\(\)/u.test(conversationServiceSource), 'Tool lifecycle events must not consume the pending assistant loop transition.');
-assert(!conversationServiceSource.includes('currentLoopText.trim() || rawResponse || visibleResponse'), 'Conversation terminal content must not fall back to loop text.');
-assert(!conversationServiceSource.includes('rawResponse ||'), 'Conversation terminal content must not restore raw provider text fallback.');
+assert(conversationTurnRunnerSource.includes('requireCanonicalFinalAnswer(canonicalOutput)'), 'Conversation terminal content must come from canonical final state.');
+assert(!/event\.type === 'tool\.started'[\s\S]{0,240}beginAssistantContentLoop\(\)/u.test(conversationCanonicalSources), 'Tool lifecycle events must not consume the pending assistant loop transition.');
+assert(!conversationCanonicalSources.includes('currentLoopText.trim() || rawResponse || visibleResponse'), 'Conversation terminal content must not fall back to loop text.');
+assert(!conversationCanonicalSources.includes('rawResponse ||'), 'Conversation terminal content must not restore raw provider text fallback.');
 assert(traceCanonicalSource.includes("block.result?.outputPhase === 'final_answer'"), 'Trace reload must read only explicit final_answer blocks.');
 assert(openaiCompatibleSource.includes('Provider emitted another semantic Chat Completions choice after finish_reason.'), 'Chat Completions must reject semantic choices after finish_reason.');
 assert(openaiResponsesSource.includes('providerTerminalSeen'), 'Responses must reject events after its terminal event.');

@@ -127,6 +127,10 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         label: 'project:remove',
         maxBytes: 4 * 1024,
       });
+      await Promise.all(storageAdapter.listSessions(projectId).map(async (session) => {
+        const stopped = await conversationService.cancelActiveTurn({ sessionId: session.sessionId });
+        if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${session.sessionId}.`);
+      }));
       storageAdapter.removeProject(projectId);
       if (state.currentProjectId === projectId) {
         state.currentProjectId = null;
@@ -259,7 +263,8 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       }
 
       conversationService.cancelUnfinishedHandoff(id, 'session_close');
-      await conversationService.cancelActiveTurn({ sessionId: id });
+      const stopped = await conversationService.cancelActiveTurn({ sessionId: id });
+      if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${id}.`);
 
       const runs = storageAdapter.listRuns(id);
       const activeRun = runs.find((run) => ['queued', 'running', 'stopping'].includes(run.status));

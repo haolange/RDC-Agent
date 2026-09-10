@@ -21,6 +21,7 @@ vi.mock('../workflow/debugger/AgentOrchestrator', () => ({
   agentOrchestrator: {
     releaseProviderRuntimeCredentials: vi.fn(),
     refreshProviderRuntimeCredentials: vi.fn(),
+    backgroundSubagents: { onEvent: undefined, abortAll: vi.fn(), abortSession: vi.fn(), stopAccepting: vi.fn() },
   },
 }));
 
@@ -32,6 +33,7 @@ vi.mock('../agent-trace/TraceService', () => ({
 
 import { conversationService } from './ConversationService';
 import { storageAdapter } from '../sessions/StorageAdapter';
+import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 
 type IdempotentService = {
   runIdempotentTurn: (
@@ -43,6 +45,9 @@ type IdempotentService = {
   preparingRequests: Map<string, unknown>;
   activeSendScopes: Map<string, string>;
   acceptingTurns: boolean;
+  activeTurns: Map<string, unknown>;
+  resolveContext: ReturnType<typeof vi.fn>;
+  startProfileTurn: ReturnType<typeof vi.fn>;
 };
 
 describe('ConversationService idempotency scoping', () => {
@@ -56,7 +61,21 @@ describe('ConversationService idempotency scoping', () => {
     service.sendRequestFingerprints.clear();
     service.preparingRequests.clear();
     service.activeSendScopes.clear();
+    service.activeTurns.clear();
     service.acceptingTurns = true;
+  });
+
+  it('starts one idle parent continuation when an ordinary background execution settles', async () => {
+    const service = conversationService as unknown as IdempotentService;
+    const liveRootBudget = { toolCalls: 1 };
+    vi.mocked(storageAdapter.readSession).mockReturnValue({ sessionId: 'session-a', projectId: 'project-a', agentId: 'general', turnControls: { reasoningLevel: 'off', maxContextMode: false, fastModel: false } } as never);
+    service.resolveContext = vi.fn(async () => ({ session: { sessionId: 'session-a', projectId: 'project-a' }, projectId: 'project-a', currentRun: null }));
+    service.startProfileTurn = vi.fn(async () => ({ requestId: 'auto', session: { sessionId: 'session-a' } }));
+    agentOrchestrator.backgroundSubagents.onEvent?.({ sessionId: 'session-a', executionId: 'execution-1', parentAgentId: 'general', type: 'settled', policyBudget: liveRootBudget as never });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(service.startProfileTurn).toHaveBeenCalledOnce();
+    expect(service.startProfileTurn.mock.calls[0]?.[13]).toBe(liveRootBudget);
   });
 
   it('does not share in-flight promises across sessions with the same requestId', async () => {

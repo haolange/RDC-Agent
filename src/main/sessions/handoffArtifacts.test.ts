@@ -58,7 +58,7 @@ describe('bound plan and skill preparation', () => {
 
 describe('optional RDX delegation capability', () => {
   it('keeps ordinary capsules domain-free and freezes explicit requests', () => {
-    const capsule = { mission: 'summarize', task: 'read notes', acceptedFacts: [], forbiddenPaths: [], inputArtifactRefs: [], outputRequirements: 'brief answer', budget: { maxToolCalls: 2, maxWallTimeMs: 1000 } };
+    const capsule = { goal: 'summarize', scope: 'notes', hypotheses: [], challengeRefs: [], stopConditions: [], requiredSkillIds: [], task: 'read notes', acceptedFacts: [], negativePaths: [], inputArtifactRefs: [], outputRequirements: 'brief answer', budget: { maxToolCalls: 2, maxWallTimeMs: 1000 } };
     expect(parseDelegationCapsule(capsule).domainExtensions).toBeUndefined();
     expect(resolveRdxDelegation()).toEqual({ requiresLease: false, segments: [] });
     const delegated = parseDelegationCapsule({ ...capsule, domainExtensions: { rdx: { requiresLease: true } } });

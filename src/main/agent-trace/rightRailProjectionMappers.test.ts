@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { ContextSnapshot, OpenedCaptureState, RunSummary } from '@shared/types/session';
 import type { TraceArtifactRecord } from '@shared/types/trace';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
+import { TASK_SCHEMA_VERSION } from '../agent-runtime/tasks/TaskContracts';
 import { dedupeSessionArtifactSources, type SessionArtifactSource } from '../sessions/SessionArtifactSource';
 import { buildRdxContext, buildTaskContext, mapRightRailOutputs, mapRightRailProgress } from './rightRailProjectionMappers';
 
 const task = (id: string, status: TaskRecord['status'], createdAt: number, statusReason?: string): TaskRecord => ({
-  id, subject: id, description: '', status, statusReason, blockedBy: [], blocks: [], createdAt, updatedAt: createdAt,
+  schemaVersion: TASK_SCHEMA_VERSION, id, subject: id, description: '', status, statusReason, blockedBy: [], blocks: [],
+  completionRequirements: [], executionRequired: true, executionIds: [], revision: 1, createdAt, updatedAt: createdAt,
 });
 
 const source = (

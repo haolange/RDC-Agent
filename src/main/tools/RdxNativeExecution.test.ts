@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { InvestigationContentRef, ExperimentRecord } from '@shared/types/renderdocInvestigation';
 import { DEFAULT_RDX_ACTIONS, DEFAULT_RDX_CLI_INVOKER } from '../settings/settingsDefaults';
 import { SessionArtifactResolver } from '../sessions/SessionArtifactResolver';
-import { setRdxRuntimeContextForSession } from '../sessions/RdxRuntimeContextRegistry';
+import { setRdxRuntimeContextForSession, getRdxContextLease } from '../sessions/RdxRuntimeContextRegistry';
 import { RdxExecutionReceipts } from './RdxExecutionReceipts';
 import { rdxCliInvokerService } from './RdxCliInvokerService';
 import { parseRdxNativeResult } from './RdxNativeProtocol';
@@ -56,7 +56,7 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
         captureFileId: String(opened.data.capture_file_id), backend: 'local', updatedAt: Date.now(),
       }, { projectId: 'qa-project' });
       const context = { workspaceRoot: directory, projectRootPath: directory, projectId: 'qa-project',
-        sessionId, turnId: 'qa-turn', agentId: 'general', rdxBinding: freezeRdxTurnBinding(settings, DEFAULT_RDX_ACTIONS) };
+        sessionId, turnId: 'qa-turn', agentId: 'general', rdxBinding: freezeRdxTurnBinding(settings, DEFAULT_RDX_ACTIONS, getRdxContextLease(sessionId)) };
       const invoke = async (phase: string, operation: string, args: Record<string, unknown>) => {
         const result = await executeRdxShell({ operation, args, experimentId: 'qa-aba' }, phase, undefined, context);
         expect(result.isError).not.toBe(true);

@@ -1,3 +1,4 @@
+import { DELEGATION_CAPSULE_JSON_SCHEMA } from '../types/delegationCapsule';
 import { HANDOFF_CONTRACT_JSON_SCHEMA } from '../types/handoffContract';
 export type AgentWorkbenchToolPermission =
   | 'readonly'
@@ -224,6 +225,45 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     approvalRequired: true,
   },
   {
+    id: 'turn_complete',
+    label: 'Complete Turn',
+    permission: 'readonly',
+    inputSchema: {
+      type: 'object',
+      required: ['disposition'],
+      properties: {
+        disposition: { type: 'string', enum: ['completed', 'partial', 'blocked', 'cancelled', 'budget_paused'] },
+        evidenceRefs: {
+          type: 'array',
+          items: {
+            type: 'object', required: ['uri', 'hash'],
+            properties: { uri: { type: 'string' }, hash: { type: 'string' } },
+          },
+        },
+      },
+    },
+    resultSummary: 'Declares a typed turn disposition and optional evidence references.',
+    icon: 'check-circle',
+    approvalRequired: false,
+  },
+  {
+    id: 'subagent_report', label: 'Report Subagent Progress', permission: 'readonly',
+    inputSchema: { type: 'object', required: ['kind', 'body'], properties: { kind: { type: 'string', enum: ['progress', 'blocked', 'decision_required'] }, body: { type: 'string' } } },
+    resultSummary: 'Queues meaningful progress, a blocker, or a decision request for the owning execution.', icon: 'workflow', approvalRequired: false,
+  },
+  ...[
+    ['background_query', 'Query Background Task', 'Reads one durable execution snapshot.'],
+    ['background_wait', 'Wait Background Task', 'Waits on the live completion event and returns the durable result.'],
+    ['background_result', 'Background Result', 'Reads the bounded structured result and mailbox cursor.'],
+    ['background_message', 'Message Background Task', 'Queues data for the next safe child request boundary.'],
+    ['background_cancel', 'Cancel Background Task', 'Aborts and joins a background execution.'],
+    ['background_join', 'Join Background Task', 'Joins a live execution and reads its durable state.'],
+  ].map(([id, label, resultSummary]) => ({
+    id, label, permission: 'readonly' as const,
+    inputSchema: { type: 'object', required: ['executionId'], properties: { executionId: { type: 'string' }, generation: { type: 'number' }, cursor: { type: 'number' }, body: { type: 'string' } } },
+    resultSummary, icon: 'workflow', approvalRequired: false,
+  })),
+  {
     id: 'task_list',
     label: 'Tasks',
     permission: 'readonly',
@@ -348,38 +388,7 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     id: 'subagent',
     label: 'Subagent',
     permission: 'readonly',
-    inputSchema: {
-      type: 'object',
-      required: [
-        'mission',
-        'task',
-        'acceptedFacts',
-        'forbiddenPaths',
-        'inputArtifactRefs',
-        'outputRequirements',
-        'budget',
-      ],
-      properties: {
-        mission: { type: 'string' },
-        task: { type: 'string' },
-        acceptedFacts: { type: 'array', items: { type: 'string' } },
-        forbiddenPaths: { type: 'array', items: { type: 'string' } },
-        inputArtifactRefs: { type: 'array', items: { type: 'string' } },
-        outputRequirements: { type: 'string' },
-        budget: {
-          type: 'object',
-          required: ['maxToolCalls', 'maxWallTimeMs'],
-          properties: {
-            maxToolCalls: { type: 'integer', minimum: 1 },
-            maxWallTimeMs: { type: 'integer', minimum: 1 },
-            maxSubagents: { type: 'integer', minimum: 1 },
-          },
-        },
-        domainExtensions: { type: 'object' },
-        profile: { type: 'string' },
-        model: { type: 'string' },
-      },
-    },
+    inputSchema: DELEGATION_CAPSULE_JSON_SCHEMA,
     resultSummary: 'Delegates a structured capsule to an isolated sub-agent and returns its answer.',
     icon: 'bot',
     approvalRequired: false,

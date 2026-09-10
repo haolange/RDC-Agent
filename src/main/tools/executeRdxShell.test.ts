@@ -3,9 +3,9 @@ import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { DEFAULT_RDX_ACTIONS, DEFAULT_RDX_CLI_INVOKER } from '../settings/settingsDefaults';
 import { freezeRdxTurnBinding } from './RdxTurnBindings';
 import { executeRdxShell, RdxShellInputSchema } from './executeRdxShell';
-const mock = vi.hoisted(() => ({ execute: vi.fn(), lease: vi.fn(), prepare: vi.fn(), write: vi.fn() }));
+const mock = vi.hoisted(() => ({ execute: vi.fn(), lease: vi.fn(), prepare: vi.fn(), write: vi.fn(), quarantine: vi.fn() }));
 vi.mock('./RdxCliInvokerService', () => ({ rdxCliInvokerService: { executeCLI: mock.execute } }));
-vi.mock('../sessions/RdxRuntimeContextRegistry', () => ({ getRdxContextLease: mock.lease }));
+vi.mock('../sessions/RdxRuntimeContextRegistry', () => ({ assertRdxContextLeaseOwnership: mock.lease, quarantineRdxContext: mock.quarantine }));
 vi.mock('./RdxExecutionReceipts', async (importOriginal) => {
   const original = await importOriginal<typeof import('./RdxExecutionReceipts')>();
   return { ...original, rdxExecutionReceipts: { prepare: mock.prepare, write: mock.write } };
@@ -13,7 +13,7 @@ vi.mock('./RdxExecutionReceipts', async (importOriginal) => {
 const context: ToolExecutionContext = {
   workspaceRoot: '/project', projectRootPath: '/project', projectId: 'project', sessionId: 'session', turnId: 'turn',
   agentId: 'general', rdxBinding: freezeRdxTurnBinding({ ...DEFAULT_RDX_CLI_INVOKER,
-    enabled: true, command: 'native-rdx', env: { FROZEN: 'yes' } }, DEFAULT_RDX_ACTIONS),
+    enabled: true, command: 'native-rdx', env: { FROZEN: 'yes' } }, DEFAULT_RDX_ACTIONS, { contextId: 'owned-context', version: 7, ownerSessionId: 'session' }),
 };
 const lease = { contextId: 'owned-context', version: 7, ownerProjectId: 'project', ownerSessionId: 'session',
   runtimeContext: { replaySessionId: 'native-replay' } };
@@ -58,6 +58,7 @@ describe('structured RDX shell', () => {
     mock.execute.mockResolvedValue(result);
     await expect(executeRdxShell(input, 'call', undefined, context)).rejects.toThrow();
     expect(mock.write).not.toHaveBeenCalled();
+    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.stringContaining('uncertain'));
   });
   it('does not issue a receipt if cancelled or ownership changes while running', async () => {
     const controller = new AbortController();
@@ -92,3 +93,10 @@ describe('structured RDX shell', () => {
    await expect(executeRdxShell(input, 'call', undefined, context)).rejects.toThrow(/mismatch/);
    expect(mock.write).not.toHaveBeenCalled();
  });
+
+it('rejects using a newly rebound identity in an old prepared turn before invoking native code', async () => {
+  mock.lease.mockReturnValue({ ...lease, version: 8 });
+  await expect(executeRdxShell(input, 'call', undefined, context)).rejects.toThrow(/prepare/);
+  expect(mock.execute).not.toHaveBeenCalled();
+  expect(mock.quarantine).not.toHaveBeenCalled();
+});

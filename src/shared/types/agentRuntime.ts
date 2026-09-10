@@ -137,6 +137,7 @@ export interface AgentTaskEventPayload extends AgentEventBasePayload {
 }
 
 export interface AgentApprovalEventPayload extends AgentEventBasePayload {
+  delegatedRequest?: { executionId: string; childSessionId: string; turnId: string };
   approvalId: string;
   title: string;
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';

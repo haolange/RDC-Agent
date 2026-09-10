@@ -208,6 +208,7 @@ class RdxShellActionService {
       cwd: action.workingDirectory ? substitute(action.workingDirectory, resolvedVariables) : undefined,
       env,
       timeoutMs: action.timeoutMs,
+      contextId: String(variables.contextId ?? variables.inputId ?? env.RDX_CONTEXT_ID ?? ''),
       abortSignal: options.abortSignal,
     });
 

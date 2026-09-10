@@ -153,6 +153,75 @@ export class AgentSeedMigrationService {
     );
   }
 
+  /**
+   * Persist an explicit user copy-on-write and its migration ownership under
+   * the same directory lock. Historical shadow detection remains unchanged;
+   * only writes through the public settings API receive this protected action.
+   */
+  writeExplicitUserOverride(agentsPath: string, fileName: string, content: string): void {
+    this.io.ensureDir(agentsPath);
+    withDirectoryFileLockSync(
+      agentsPath,
+      {
+        lockFileName: '.seed-migration.lock',
+        timeoutCode: 'SEED_MIGRATION_LOCK_TIMEOUT',
+        maxAttempts: this.lockOptions.maxAttempts,
+      },
+      () => {
+        const markerPath = path.join(agentsPath, SEED_MIGRATION_MARKER_NAME);
+        let marker = this.peekMarker(markerPath).marker;
+        if (!marker) marker = this.migrateUserAgentsLocked(agentsPath).marker;
+        if (!marker) throw new Error('SEED_MIGRATION_MARKER_REQUIRED: explicit user override could not be recorded.');
+
+        const filePath = path.join(agentsPath, fileName);
+        const previous = fs.existsSync(filePath) ? fs.readFileSync(filePath) : null;
+        const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+        try {
+          fs.writeFileSync(temporaryPath, content, 'utf8');
+          fs.renameSync(temporaryPath, filePath);
+        } finally {
+          try { fs.rmSync(temporaryPath, { force: true }); } catch { /* best effort */ }
+        }
+
+        const filenameId = idFromFileName(fileName);
+        const semantic = extractSeedSemanticManifest(content, filenameId);
+        const action: SeedMigrationActionRecord = {
+          file: fileName,
+          frontmatterId: readSeedFrontmatterId(content),
+          filenameId,
+          action: (BUILTIN_SEED_AGENT_IDS as readonly string[]).includes(filenameId)
+            ? 'retained-override'
+            : 'retained-custom',
+          hashBefore: hashRawContent(content),
+          canonicalHash: hashCanonicalAgentSemantics(semantic),
+          reason: 'explicit user save through AgentManifestService',
+        };
+        const actions = marker.actions.filter((entry) => entry.file !== fileName);
+        actions.push(action);
+        try {
+          this.writeCompletedMarker(markerPath, agentsPath, actions, marker.diagnostics);
+        } catch (error) {
+          this.restoreExplicitOverride(filePath, previous);
+          throw error;
+        }
+      },
+    );
+  }
+
+  private restoreExplicitOverride(filePath: string, previous: Buffer | null): void {
+    if (previous === null) {
+      fs.rmSync(filePath, { force: true });
+      return;
+    }
+    const restorePath = `${filePath}.${process.pid}.${Date.now()}.restore`;
+    try {
+      fs.writeFileSync(restorePath, previous);
+      fs.renameSync(restorePath, filePath);
+    } finally {
+      try { fs.rmSync(restorePath, { force: true }); } catch { /* best effort */ }
+    }
+  }
+
   private migrateUserAgentsLocked(agentsPath: string): SeedMigrationResult {
     const markerPath = path.join(agentsPath, SEED_MIGRATION_MARKER_NAME);
     const peeked = this.peekMarker(markerPath);

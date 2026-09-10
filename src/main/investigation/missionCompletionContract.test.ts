@@ -55,6 +55,10 @@ describe('missionCompletionContract', () => {
     })).not.toThrow();
   });
 
+  it.each(['partial', 'blocked', 'cancelled'] as const)('allows honest %s without promoting a report', disposition => {
+    expect(() => enforceMissionTurnCompletion({ profileId: 'debugger', sessionId: SESSION_ID, finalAnswerText: 'Unresolved.', disposition })).not.toThrow();
+  });
+
   it.each(MISSIONS)('%s cannot complete without a report', (mission) => {
     const { service } = createInvestigationHarness();
     seedCheckpoint(service, mission);

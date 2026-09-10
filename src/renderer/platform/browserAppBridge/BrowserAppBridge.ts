@@ -6,6 +6,7 @@ import {
   type RendererEventChannel,
   type RendererInvokeChannel,
 } from '@shared/renderer-api';
+import { connectBrowserEventStream } from './browserEventStream';
 
 const BRIDGE_MARKER = '__RDC_AGENT_BROWSER_APP_BRIDGE__';
 
@@ -28,7 +29,7 @@ function detectPlatform(): NodeJS.Platform {
 class BrowserAppBridgeClient implements RendererApiTransport {
   private readonly bridgeOrigin = window.location.origin;
   private readonly listeners = new Map<RendererEventChannel, Set<RendererEventCallback>>();
-  private eventSource: EventSource | null = null;
+  private disconnectEventStream: (() => void) | null = null;
   private readonly platform = detectPlatform();
   readonly api: ElectronAPI;
 
@@ -60,10 +61,10 @@ class BrowserAppBridgeClient implements RendererApiTransport {
   }
 
   addListener(channel: RendererEventChannel, callback: RendererEventCallback): void {
-    this.ensureEventSource();
     const channelListeners = this.listeners.get(channel) ?? new Set<RendererEventCallback>();
     channelListeners.add(callback);
     this.listeners.set(channel, channelListeners);
+    this.ensureEventStream();
   }
 
   removeListener(channel: RendererEventChannel, callback: RendererEventCallback): void {
@@ -71,22 +72,28 @@ class BrowserAppBridgeClient implements RendererApiTransport {
     if (!channelListeners) return;
     channelListeners.delete(callback);
     if (channelListeners.size === 0) this.listeners.delete(channel);
+    this.stopEventStreamIfIdle();
   }
 
   removeAllListeners(channel: RendererEventChannel): void {
     this.listeners.delete(channel);
+    this.stopEventStreamIfIdle();
   }
 
-  private ensureEventSource(): void {
-    if (this.eventSource) return;
+  private ensureEventStream(): void {
+    if (this.disconnectEventStream) return;
     const eventsUrl = new URL('/events', this.bridgeOrigin);
-    this.eventSource = new EventSource(eventsUrl.toString(), { withCredentials: true });
-    this.eventSource.onmessage = (event) => {
-      const payload = JSON.parse(event.data) as { channel: RendererEventChannel; args?: unknown[] };
+    this.disconnectEventStream = connectBrowserEventStream(eventsUrl.toString(), (payload) => {
       const channelListeners = this.listeners.get(payload.channel);
       if (!channelListeners) return;
       for (const listener of channelListeners) listener(...(payload.args ?? []));
-    };
+    });
+  }
+
+  private stopEventStreamIfIdle(): void {
+    if (this.listeners.size > 0 || !this.disconnectEventStream) return;
+    this.disconnectEventStream();
+    this.disconnectEventStream = null;
   }
 }
 

@@ -48,6 +48,7 @@ export { resolveExecutionScopeId, createEphemeralScopeId, isTransientExecutionSc
 export { OrchestratorMemoryUi } from './OrchestratorMemoryUi';
 export { AgentTurnRunner } from './AgentTurnRunner';
 export { SubagentRunner } from './SubagentRunner';
+export { createBackgroundSubagentService, type BackgroundSubagentService } from './BackgroundSubagentService';
 export {
   createProfileTestResponse,
   createTestModeStub,

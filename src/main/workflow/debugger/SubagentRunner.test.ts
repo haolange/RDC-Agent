@@ -1,3 +1,4 @@
+import { AgentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({
@@ -43,7 +44,7 @@ vi.mock('../../settings/EffectiveModelResolver', () => ({
 }));
 
 import { SubagentRunner } from './SubagentRunner';
-import { createSubagentBudgetState, type TurnHandle } from './TurnCoordinator';
+import { createSubagentBudgetState, createPolicyBudgetState, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import {
   assertRdxContextLeaseOwnership,
@@ -55,10 +56,11 @@ import type { RdxRuntimeContext } from '@shared/types/session';
 
 function testCapsule(overrides: Partial<DelegationCapsule> = {}): DelegationCapsule {
   return {
-    mission: 'Inspect the capture',
+    goal: 'Inspect the capture',
     task: 'inspect',
-    acceptedFacts: ['Frame presents a triangle'],
-    forbiddenPaths: ['Do not mutate shaders'],
+    acceptedFacts: [{ statement: 'Frame presents a triangle', sourceRefs: [], qualification: 'caller observation' }],
+    negativePaths: [{ path: 'shader mutation', reason: 'read-only task', applicableWhen: 'current scope', recheckWhen: 'explicit new authorization' }],
+    scope: 'bounded read-only inspection', hypotheses: [], challengeRefs: [], stopConditions: [], requiredSkillIds: [],
     inputArtifactRefs: [],
     outputRequirements: 'Return a short evidence summary',
     budget: { maxToolCalls: 8, maxWallTimeMs: 60_000 },
@@ -262,7 +264,26 @@ describe('SubagentRunner', () => {
     expect(tool.name).toBe('subagent');
     const result = await tool.execute('tc-1', testCapsule({ task: 'do work' }) as unknown as Record<string, unknown>);
     expect(result.details).toMatchObject({ profile: 'debugger', status: 'complete' });
-    expect(result.content[0]).toMatchObject({ type: 'text', text: 'child done' });
+    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('Subagent result persistence failed') });
+    expect((result.content[0] as { text: string }).text).not.toContain('child done');
+  });
+
+  it('uses the canonical subagent tool to start a Task-owned background execution', async () => {
+    const runner = new SubagentRunner({
+      sendProfileMessage: async () => 'unused',
+      systemPromptForAgent: () => 'fallback',
+      getActiveTurn: () => null,
+    });
+    const start = vi.fn(async () => ({ id: 'execution-1', generation: 3 }) as never);
+    runner.setBackgroundStarter(start);
+    const [tool] = runner.createSubagentTools('debugger', 'sess-1');
+    const result = await tool.execute('tc-bg', {
+      ...testCapsule({ task: 'explore' }),
+      taskId: 'task-1',
+      mode: 'background',
+    } as unknown as Record<string, unknown>);
+    expect(start).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'sess-1', taskId: 'task-1' }));
+    expect(result.details).toMatchObject({ executionId: 'execution-1', generation: 3, status: 'running' });
   });
 
   it('fails closed when the capsule is missing required fields', async () => {
@@ -336,12 +357,12 @@ describe('SubagentRunner', () => {
     });
     expect(sendProfileMessage).toHaveBeenCalledWith(
       'ask',
-      'inspect',
+      expect.stringContaining('"task":"inspect"'),
       expect.objectContaining({
         modelOverride: { providerId: 'openai', modelId: 'gpt-5.6-sol' },
         sessionId: expect.stringContaining('::subagent::'),
         extraPromptSegments: expect.arrayContaining([
-          expect.objectContaining({ kind: 'delegation-capsule', id: 'delegation:task' }),
+          expect.objectContaining({ kind: 'delegation-capsule', id: 'delegation:contract' }),
         ]),
         excludeRdxLeaseTools: true,
         frozenDelegationCapsule: expect.objectContaining({}),
@@ -468,4 +489,45 @@ describe('SubagentRunner', () => {
     expect(result.text).toMatch(/RDX_LEASE_DELEGATE_DENIED/);
     expect(sendProfileMessage).not.toHaveBeenCalled();
   });
+});
+
+
+it('enforces Capsule budget in child requests and aborts a pending provider at its deadline', async () => {
+  const parent = createPolicyBudgetState({ maxToolCalls: 100, maxSubagents: 10, maxChildDepth: 3, maxWallTimeMs: 60000 });
+  let captured = false;
+  const runner = new SubagentRunner({
+    sendProfileMessage: async (_agent, _content, options) => {
+      captured = true;
+      expect(options?.policyBudget?.maxToolCalls).toBe(1);
+      expect(reserveDispatchBudget(options?.policyBudget, { toolCalls: 1, subagents: 0 }).ok).toBe(true);
+      expect(reserveDispatchBudget(options?.policyBudget, { toolCalls: 1, subagents: 0 }).ok).toBe(false);
+      return new Promise<string>((_resolve, reject) => {
+        options?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+      });
+    },
+    systemPromptForAgent: () => 'profile',
+    getActiveTurn: () => null,
+  });
+  const result = await runner.runSubagent({ parentAgentId: 'general', targetProfile: 'general', parentToolCallId: 'dispatch', parentSessionId: 'budget-parent', policyBudget: parent, capsule: testCapsule({ budget: { maxToolCalls: 1, maxSubagents: 0, maxWallTimeMs: 30 } }) });
+  expect(captured).toBe(true); expect(result.status).toBe('cancelled');
+  expect(parent.maxToolCalls).toBe(100); expect(parent.toolCalls).toBe(1); expect(parent.subagents).toBe(1);
+});
+
+
+it('forwards a child approval with its actual execution identity and controlled parent answer', async () => {
+  const approvals = new AgentToolApprovalRequestService();
+  const events: import('@shared/types/agentRuntime').AgentEvent[] = [];
+  const runner = new SubagentRunner({
+    getActiveTurn: () => null, systemPromptForAgent: () => 'profile',
+    sendProfileMessage: async (_agent, _content, options) => {
+      const approved = await approvals.request({ agentId: 'general', sessionId: options!.sessionId, turnId: 'child-permission-turn', toolCallId: 'mutation', toolName: 'shell', reason: 'Write scoped output', risk: 'high', context: { sessionId: options!.sessionId, turnId: 'child-permission-turn' }, signal: options?.signal, onEvent: options?.onEvent });
+      return approved ? 'approved child output' : 'denied';
+    },
+  });
+  const result = await runner.runSubagent({ parentAgentId: 'general', targetProfile: 'general', parentToolCallId: 'dispatch-tool', executionId: 'durable-execution-7', parentSessionId: 'parent', capsule: testCapsule(), parentOnEvent: (event) => {
+    events.push(event);
+    if (event.type === 'approval.requested') expect(approvals.answer({ sessionId: 'parent', turnId: 'child-permission-turn', approvalId: 'tool-approval-mutation', approved: true }).success).toBe(true);
+  } });
+  expect(result.status).toBe('complete');
+  expect(events.find((event) => event.type === 'approval.requested')).toMatchObject({ sessionId: 'parent', payload: { delegatedRequest: { executionId: 'durable-execution-7', turnId: 'child-permission-turn' }, risk: 'high' } });
 });

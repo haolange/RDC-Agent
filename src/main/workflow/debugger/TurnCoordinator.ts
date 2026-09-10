@@ -1,3 +1,4 @@
+import { policyBudgetChain } from './DelegationBudget';
 /**
  * TurnCoordinator — per-session turn handles; eliminates turn-global mutable state.
  *
@@ -31,6 +32,20 @@ export interface TurnEventSink {
   projectRootPath?: string | null;
   projectId?: string | null;
   agentId?: AgentRole;
+}
+
+export interface TurnCompletionDeclaration {
+  disposition: 'completed' | 'partial' | 'blocked' | 'cancelled' | 'budget_paused';
+  evidenceRefs: readonly { uri: string; hash: string }[];
+  result?: {
+    summary: string;
+    outputs: Record<string, string>;
+    counterevidence: readonly string[];
+    unresolved: readonly string[];
+    scope: string;
+    sideEffects: readonly string[];
+    recoveryState: readonly string[];
+  };
 }
 
 export interface TurnDeferredActivation {
@@ -95,17 +110,17 @@ export function reserveDispatchBudget(
   cost: { toolCalls: number; subagents: number },
 ): { ok: true } | { ok: false; limit: string } {
   if (!policy) return { ok: true };
-  if (Date.now() - policy.wallStartedAt >= policy.maxWallTimeMs) {
-    return { ok: false, limit: 'maxWallTimeMs' };
+  const chain = policyBudgetChain(policy);
+  // Check every ceiling before mutating any ledger; same-turn reservations are atomic.
+  for (const budget of chain) {
+    if (Date.now() - budget.wallStartedAt >= budget.maxWallTimeMs) return { ok: false, limit: 'maxWallTimeMs' };
+    if (budget.toolCalls + cost.toolCalls > budget.maxToolCalls) return { ok: false, limit: 'maxToolCalls' };
+    if (budget.subagents + cost.subagents > budget.maxSubagents) return { ok: false, limit: 'maxSubagents' };
   }
-  if (policy.toolCalls + cost.toolCalls > policy.maxToolCalls) {
-    return { ok: false, limit: 'maxToolCalls' };
+  for (const budget of chain) {
+    budget.toolCalls += cost.toolCalls;
+    budget.subagents += cost.subagents;
   }
-  if (policy.subagents + cost.subagents > policy.maxSubagents) {
-    return { ok: false, limit: 'maxSubagents' };
-  }
-  policy.toolCalls += cost.toolCalls;
-  policy.subagents += cost.subagents;
   policy.reservedSubagentSlots = (policy.reservedSubagentSlots ?? 0) + cost.subagents;
   return { ok: true };
 }
@@ -199,6 +214,8 @@ export class TurnHandle {
   readonly policyBudget: PolicyBudgetState;
   /** Frozen runtime authority installed before any tool can execute. */
   runtimePlan: EffectiveRuntimePlan | null = null;
+  /** Structured model-declared completion, populated only by turn_complete. */
+  completionDeclaration: TurnCompletionDeclaration | null = null;
 
   eventSink: TurnEventSink | null = null;
   deferredActivation: TurnDeferredActivation | null = null;
@@ -231,10 +248,11 @@ export class TurnHandle {
     this.subagentBudget = input.subagentBudget ?? createSubagentBudgetState();
     this.policyBudget = input.policyBudget ?? createPolicyBudgetState();
     assertPolicyWallTimeAllowed(this.policyBudget.maxWallTimeMs);
-    if (this.policyBudget.maxWallTimeMs > 0 && this.policyBudget.maxWallTimeMs < 2_147_000_000) {
+    const remainingWallMs = this.policyBudget.maxWallTimeMs - (Date.now() - this.policyBudget.wallStartedAt);
+    if (remainingWallMs < 2_147_000_000) {
       this.wallTimer = setTimeout(() => {
         void this.abortAndJoin({ reason: 'timeout' });
-      }, this.policyBudget.maxWallTimeMs);
+      }, Math.max(0, remainingWallMs));
       this.wallTimer.unref?.();
     }
 
@@ -584,4 +602,3 @@ export class TurnCoordinator {
 }
 
 export const turnCoordinator = new TurnCoordinator();
-

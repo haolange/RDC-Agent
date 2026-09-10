@@ -7,6 +7,7 @@ import { TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES } from '@shared/types/sessionAr
 import { SessionArtifactResolver } from '../../sessions/SessionArtifactResolver';
 import { resetSessionArtifactQuotaLedger } from '../../sessions/SessionArtifactQuota';
 import { StorageIo } from '../../sessions/StorageIo';
+import { grantDelegatedArtifactAccess, resolveDelegatedArtifactRead } from '../../sessions/DelegatedArtifactAccess';
 import { artifactizeToolResult } from './ToolResultArtifactizer';
 
 const roots: string[] = [];
@@ -71,9 +72,11 @@ describe('ToolResultArtifactizer', () => {
       path.join(sessionPath, 'session-artifacts', 'tool-outputs', 'tc-big.json'),
       'utf8',
     );
-    expect(stored).toContain(huge);
+    const reconstructed = (JSON.parse(stored) as { chunks: string[] }).chunks.join('');
+    expect(reconstructed).toContain(huge);
+    expect(stored.split('\n').every((line) => line.length < 25000)).toBe(true);
     expect(JSON.stringify(result.content).length).toBeLessThan(huge.length);
-    const envelope = JSON.parse(stored) as {
+    const envelope = JSON.parse(reconstructed) as {
       owner: string;
       source: { toolName: string; toolCallId: string };
       hash: string;
@@ -90,16 +93,16 @@ describe('ToolResultArtifactizer', () => {
     expect(envelope.size).toBeGreaterThan(TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES);
     const envelopeFileHash = crypto.createHash('sha256').update(stored, 'utf8').digest('hex');
     expect(envelope.hash).not.toBe(envelopeFileHash);
-    expect(String((result.details as { hash: string }).hash)).toBe(envelope.hash);
+    expect(String((result.details as { hash: string }).hash)).toBe(envelopeFileHash);
     expect((result.details as { bytes: number }).bytes).toBe(envelope.size);
     const read = resolverFor(sessionPath).read('sess-1', 'session://tool-outputs/tc-big.json');
-    expect(read.owner).toBe('sess-1');
-    expect(read.source).toEqual({ toolName: 'grep', toolCallId: 'tc-big' });
-    expect(read.hash).toBe(envelope.hash);
-    expect(read.hash).not.toBe(envelopeFileHash);
-    expect(read.bytes).toBe(envelope.size);
+    expect(read.owner).toBeUndefined();
+    expect(read.source).toBeUndefined();
+    expect(read.hash).toBe(envelopeFileHash);
+    expect(read.hash).not.toBe(envelope.hash);
+    expect(read.bytes).toBe(Buffer.byteLength(stored));
     expect(read.mimeType).toBe(envelope.mime);
-    expect(read.bytes).not.toBe(Buffer.byteLength(stored, 'utf8'));
+    expect(read.bytes).toBe(Buffer.byteLength(stored, 'utf8'));
   });
 
   it('fail-closes instead of silently truncating when offload cannot run', () => {
@@ -114,4 +117,31 @@ describe('ToolResultArtifactizer', () => {
     expect(JSON.stringify(denied)).toMatch(/ARTIFACT_SESSION_DENIED/);
     expect(JSON.stringify(denied)).not.toContain(huge.slice(0, 80));
   });
+  it('stores large child error output under root, grants exact readback and preserves critical tail', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-child-offload-')); roots.push(root);
+    fs.writeFileSync(path.join(root, 'session.json'), '{}');
+    const resolver = resolverFor(root);
+    const release = grantDelegatedArtifactAccess('child-one', 'sess-1', [], resolver);
+    try {
+      const original = { isError: true, content: [{ type: 'text' as const, text: 'z'.repeat(100000) + 'CRITICAL: same driver only; recheck on change' }] };
+      const output = artifactizeToolResult({ sessionId: 'child-one', toolCallId: 'same-call', toolName: 'grep', result: original, resolver });
+      expect(output.isError).toBe(true);
+      const details = output.details as { ref: string; hash: string };
+      const scope = resolveDelegatedArtifactRead('child-one', details.ref, details.hash);
+      expect(scope.sessionId).toBe('sess-1');
+      let lines: string[] = [];
+      for (let offset = 1; ; offset += 2) {
+        const page = resolver.read(scope.sessionId, details.ref, { expectedHash: details.hash, offset, limit: 2 });
+        lines = [...lines, page.text!]; if (!page.truncated) break;
+      }
+      const envelope = JSON.parse(JSON.parse(lines.join('\n')).chunks.join(''));
+      expect(envelope.content).toEqual(original.content);
+      expect(details.ref).not.toBe('session://tool-outputs/same-call.json');
+    } finally { release(); }
+  });
+  it('keeps explicit artifact vision content through result artifactization', () => {
+    const visual = { content: [{ type: 'text' as const, text: 'session://tool-outputs/diff.png sha256=verified ROI=whole-frame' }, { type: 'image' as const, data: 'a'.repeat(50000), mimeType: 'image/png' }] };
+    expect(artifactizeToolResult({ sessionId: 'sess-1', toolCallId: 'visual', toolName: 'artifact_read', result: visual })).toBe(visual);
+  });
+
 });

@@ -1,3 +1,4 @@
+import { resolveDelegatedArtifactRead } from '../../../sessions/DelegatedArtifactAccess';
 import type { AgentTool } from '../../agent/AgentTool';
 import {
   ARTIFACT_READ_MAX_OUTPUT_BYTES,
@@ -82,10 +83,12 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
       };
     }
     try {
-      const result = sessionArtifactResolver.read(context.sessionId, params.uri, {
+      const scope = resolveDelegatedArtifactRead(context.sessionId, params.uri, params.expectedHash);
+      const result = sessionArtifactResolver.read(scope.sessionId, params.uri, {
         offset: params.offset,
         limit: params.limit,
-        expectedHash: params.expectedHash,
+        expectedHash: scope.expectedHash,
+        ...(context.visionInputMode === 'native' ? { includeImageData: true } : {}),
       });
       const header = [
         result.uri,
@@ -96,11 +99,15 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
         result.source ? `source=${result.source.toolName}/${result.source.toolCallId}` : null,
         result.truncated ? 'truncated=true' : null,
       ].filter(Boolean).join(' · ');
-      const body = result.mimeType.startsWith('image/')
-        ? `[image omitted from text window; ${result.mimeType}, ${result.bytes} bytes]`
-        : (result.text ?? '');
+      if (result.mimeType.startsWith('image/') && !result.imageData) {
+        throw new Error('VISION_INPUT_UNSUPPORTED: image evidence requires a native vision route.');
+      }
+      const body = result.text ?? '';
       return {
-        content: [{ type: 'text', text: body ? `${header}\n\n${body}` : header }],
+        content: [
+          { type: 'text', text: body ? `${header}\n\n${body}` : header },
+          ...(result.imageData ? [{ type: 'image' as const, data: result.imageData, mimeType: result.mimeType }] : []),
+        ],
         details: {
           uri: result.uri,
           mimeType: result.mimeType,

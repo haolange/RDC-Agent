@@ -166,7 +166,7 @@ describe('combineActiveSkillAllowlists', () => {
     expect(combined).not.toContain('grep');
   });
 
-  it('keeps Debugger closed-loop tools when method skills are armed together', () => {
+  it('keeps execution methods unrestricted and independently freezes review capabilities', () => {
     const runtime = [
       'task_create',
       'task_update',
@@ -188,11 +188,15 @@ describe('combineActiveSkillAllowlists', () => {
       'skill_read',
       'tool_search',
     ];
-    const skillLists = DEBUGGER_LOOP_SKILLS.map((skillId) => readSkillAllowedTools(skillId));
+    const skillLists = DEBUGGER_LOOP_SKILLS.filter((id) => id !== 'skeptic-review').map((skillId) => readSkillAllowedTools(skillId));
     expect(skillLists.every((list) => list.length === 0)).toBe(true);
     const combined = combineActiveSkillAllowlists(runtime, skillLists);
     expect(combined).toBeNull(); // no skill restriction: profile remains authoritative
     expect(runtime).toEqual(expect.arrayContaining(['subagent', 'task_create']));
     expect(runtime).not.toContain('shell');
+    const review = combineActiveSkillAllowlists(runtime, [readSkillAllowedTools('skeptic-review')]);
+    expect(review).toContain('artifact_read');
+    expect(review).not.toContain('rdx_probe');
+    expect(review).not.toContain('subagent');
   });
 });

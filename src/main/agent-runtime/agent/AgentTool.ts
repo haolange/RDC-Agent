@@ -33,6 +33,8 @@ export interface ToolExecutionContext {
 }
 
 export interface AgentToolSpec {
+  /** Dispatch/wait only: delegated effects acquire their own resource claims. */
+  readonly orchestration?: boolean;
   readonly isReadOnly: boolean;
   readonly isConcurrencySafe: boolean;
   readonly isDestructive: boolean;

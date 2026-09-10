@@ -158,8 +158,8 @@ describe('ConversationService durable handoff wiring', () => {
     expect(startProfileTurn).not.toHaveBeenCalled();
   });
 
-  it('cancels unfinished handoff on Stop and does not inherit approvals', () => {
-    conversationService.cancelUnfinishedHandoff('sess_1', 'user_stop');
+  it('cancels unfinished handoff on Stop and does not inherit approvals', async () => {
+    await conversationService.cancelUnfinishedHandoff('sess_1', 'user_stop');
     expect(handoffs.cancel).toHaveBeenCalledWith('sess_1', 'user_stop');
     expect(cancelTurn).toHaveBeenCalledWith('turn-src');
     expect(cancelUserInput).toHaveBeenCalledWith('turn-src');
@@ -214,14 +214,14 @@ describe('ConversationService durable handoff wiring', () => {
     expect(storageAdapter.updateSession).toHaveBeenCalledWith('sess_1', { agentId: 'edit' });
   });
 
-  it('cancels prepared when persistConversationSnapshot returns an error', () => {
+  it('cancels prepared when persistConversationSnapshot returns an error', async () => {
     const host = {
       commitPreparedHandoff: vi.fn(),
       cancelUnfinishedHandoff: vi.fn(),
       scheduleHandoffAutoSend: vi.fn(),
       emitConversationEvent: vi.fn(),
     };
-    settleSourceHandoffAfterTerminal(host as never, {
+    await settleSourceHandoffAfterTerminal(host as never, {
       terminalCommitted: false,
       assistantStatus: 'error',
       sessionId: 'sess_1',
@@ -240,14 +240,14 @@ describe('ConversationService durable handoff wiring', () => {
     expect(host.scheduleHandoffAutoSend).not.toHaveBeenCalled();
   });
 
-  it('cancels prepared when the source turn ends in error', () => {
+  it('cancels prepared when the source turn ends in error', async () => {
     const host = {
       commitPreparedHandoff: vi.fn(),
       cancelUnfinishedHandoff: vi.fn(),
       scheduleHandoffAutoSend: vi.fn(),
       emitConversationEvent: vi.fn(),
     };
-    settleSourceHandoffAfterTerminal(host as never, {
+    await settleSourceHandoffAfterTerminal(host as never, {
       terminalCommitted: true,
       assistantStatus: 'error',
       sessionId: 'sess_1',
@@ -266,14 +266,14 @@ describe('ConversationService durable handoff wiring', () => {
     expect(host.scheduleHandoffAutoSend).not.toHaveBeenCalled();
   });
 
-  it('does not commit or auto-send when commitConversationTerminal throws', () => {
+  it('does not commit or auto-send when commitConversationTerminal throws', async () => {
     const host = {
       commitPreparedHandoff: vi.fn(),
       cancelUnfinishedHandoff: vi.fn(),
       scheduleHandoffAutoSend: vi.fn(),
       emitConversationEvent: vi.fn(),
     };
-    settleSourceHandoffAfterTerminal(host as never, {
+    await settleSourceHandoffAfterTerminal(host as never, {
       terminalCommitted: false,
       assistantStatus: 'error',
       sessionId: 'sess_1',
@@ -383,14 +383,14 @@ describe('ConversationService durable handoff wiring', () => {
     expect(handoffs.cancel).not.toHaveBeenCalled();
   });
 
-  it('cancels prepared when commitPreparedHandoff returns null', () => {
+  it('cancels prepared when commitPreparedHandoff returns null', async () => {
     const host = {
       commitPreparedHandoff: vi.fn(() => null),
       cancelUnfinishedHandoff: vi.fn(),
       scheduleHandoffAutoSend: vi.fn(),
       emitConversationEvent: vi.fn(),
     };
-    settleSourceHandoffAfterTerminal(host as never, {
+    await settleSourceHandoffAfterTerminal(host as never, {
       terminalCommitted: true,
       assistantStatus: 'complete',
       sessionId: 'sess_1',

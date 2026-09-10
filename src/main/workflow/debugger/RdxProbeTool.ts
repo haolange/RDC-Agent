@@ -7,11 +7,11 @@ import { rdxCliInvokerService } from '../../tools/RdxCliInvokerService';
 import { parseRdxNativeResult } from '../../tools/RdxNativeProtocol';
 import { openProbeLease, closeProbeLease } from '../../tools/RdxProbeLifecycle';
 import type { RdxTurnBinding } from '../../tools/RdxTurnBindings';
-import { getRdxContextLease, type RdxContextLease } from '../../sessions/RdxRuntimeContextRegistry';
+import { assertRdxContextLeaseOwnership, getRdxContextLease, type RdxContextLease } from '../../sessions/RdxRuntimeContextRegistry';
 
 export interface RdxProbeToolDeps {
   getRdxCliSettings?: () => RdxCliInvokerSettings;
-  executeCli?: (command: string, args?: string[], options?: { abortSignal?: AbortSignal; settings?: RdxCliInvokerSettings }) => Promise<CLIResult>;
+  executeCli?: (command: string, args?: string[], options?: { abortSignal?: AbortSignal; settings?: RdxCliInvokerSettings; contextId?: string }) => Promise<CLIResult>;
   getLease?: (sessionId: string | null | undefined) => RdxContextLease | null;
   openLease?: typeof openProbeLease;
   closeLease?: typeof closeProbeLease;
@@ -61,12 +61,16 @@ export function createRdxProbeTool(
         const ownerProject = projectId ?? context?.projectId ?? null;
         const lifecycle = input.action === 'lease_open' || input.action === 'lease_close';
         let lease = getLease(ownerSession);
+        if (!deps.getLease && lease && !assertRdxContextLeaseOwnership({ sessionId: ownerSession, projectId: ownerProject })
+          && !(lifecycle && lease.quarantineReason && !lease.delegatedFrom)) {
+          throw new Error('RDX_PROBE_OWNER: control is delegated or the binding requires recovery.');
+        }
         if (lease && (lease.ownerSessionId !== ownerSession || lease.ownerProjectId !== ownerProject
           || (input.contextId && input.contextId !== lease.contextId))) {
           throw new Error('RDX_PROBE_OWNER: lease ownership/context mismatch.');
         }
         if (lifecycle && !ownerSession) throw new Error('RDX_PROBE_SESSION_REQUIRED: lease lifecycle requires an owning session.');
-        if (input.action === 'lease_open' && !lease) {
+        if (input.action === 'lease_open' && (!lease || lease.quarantineReason)) {
           if (!binding) throw new Error('RDX_PROBE_UNCONFIGURED: lifecycle needs a frozen action binding.');
           await (deps.openLease ?? openProbeLease)(input, ownerSession!, ownerProject, binding, signal);
           lease = getLease(ownerSession);
@@ -75,11 +79,17 @@ export function createRdxProbeTool(
         if ((compiled.needsContext || lifecycle) && (!lease || lease.contextId === 'default')) {
           throw new Error('RDX_PROBE_OWNER: no non-default daemon context is owned by this session.');
         }
+        if (!deps.getLease && compiled.needsContext && !lifecycle && lease) {
+          const identity = binding?.identity;
+          if (!identity || identity.ownerSessionId !== ownerSession || identity.version !== lease.version || identity.contextId !== lease.contextId) {
+            throw new Error('RDX_PROBE_OWNER: binding changed since prepareTurn; prepare a new turn.');
+          }
+        }
         const args = [...compiled.args];
         if (lease && compiled.needsContext) args.push('--daemon-context', lease.contextId);
         // --json is global in the native parser, never an application session argument.
         const frozenSettings = { ...settings, argsPrefix: [...settings.argsPrefix, '--json'] };
-        const cli = await executeCli(compiled.command, args, { abortSignal: signal, settings: frozenSettings });
+        const cli = await executeCli(compiled.command, args, { abortSignal: signal, settings: frozenSettings, contextId: lease?.contextId });
         signal?.throwIfAborted();
         const expectedContext = compiled.command === 'context' ? lease?.contextId : undefined;
         const payload = parseRdxNativeResult(cli, expectedContext);
@@ -92,17 +102,33 @@ export function createRdxProbeTool(
           await (deps.closeLease ?? closeProbeLease)(ownerSession!, ownerProject, binding as RdxTurnBinding, signal);
         }
         const after = getLease(ownerSession);
-        const text = JSON.stringify(payload);
+        const reprepareRequired = lifecycle && !sameIdentity(binding?.identity ?? null, after);
+        const responsePayload = reprepareRequired
+          ? {
+              ...(payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : { result: payload }),
+              reprepareRequired: true,
+              message: 'RDX runtime identity changed. Prepare a new turn before any further RDX operation.',
+            }
+          : payload;
+        const text = JSON.stringify(responsePayload);
         const stdout = truncateOutput(text, 16 * 1024);
         return {
           content: [{ type: 'text', text: stdout }],
           details: {
             action: input.action, cliAction: compiled.command, exitCode: cli.exitCode, stdout,
             truncated: stdout !== text, durationMs: cli.duration_ms,
+            reprepareRequired,
             worldStateStamp: { sessionId: ownerSession, contextId: after?.contextId ?? null, version: after?.version ?? null },
           },
         };
       } catch (error) { return fail(error); }
     },
   };
+}
+
+function sameIdentity(identity: RdxTurnBinding['identity'], lease: RdxContextLease | null): boolean {
+  if (!identity || !lease) return identity === null && lease === null;
+  return identity.ownerSessionId === lease.ownerSessionId
+    && identity.contextId === lease.contextId
+    && identity.version === lease.version;
 }

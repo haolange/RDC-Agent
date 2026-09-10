@@ -138,7 +138,6 @@ describe('HookEngine', { timeout: 20_000 }, () => {
         label: 'Execute with General',
         prompt: 'Execute the approved plan.',
         depth: 1,
-        isBigLoop: false,
       },
     });
     expect(handoff).toMatchObject({ status: 'completed', allowed: true });
@@ -153,7 +152,6 @@ describe('HookEngine', { timeout: 20_000 }, () => {
         label: 'Debug with Debugger',
         prompt: 'Investigate the current failure.',
         depth: 1,
-        isBigLoop: false,
       },
     });
     expect(initialMission).toMatchObject({ status: 'completed', allowed: true });
@@ -168,11 +166,10 @@ describe('HookEngine', { timeout: 20_000 }, () => {
         label: 'Replan with Debugger',
         prompt: 'Replan the mission.',
         depth: 2,
-        isBigLoop: true,
       },
     });
-    expect(bigLoopMissing.status).toBe('failed');
-    expect(bigLoopMissing.allowed).toBe(false);
+    expect(bigLoopMissing.status).toBe('completed');
+    expect(bigLoopMissing.allowed).toBe(true);
 
     const bigLoopOk = await engine.test('mission-plan-handoff-check', {
       event: 'agent.before-handoff',
@@ -184,8 +181,6 @@ describe('HookEngine', { timeout: 20_000 }, () => {
         label: 'Replan with Debugger',
         prompt: 'Replan from the persisted MissionCheckpoint.',
         depth: 2,
-        isBigLoop: true,
-        checkpointId: 'cp-1',
       },
     });
     expect(bigLoopOk).toMatchObject({ status: 'completed', allowed: true });
@@ -200,8 +195,6 @@ describe('HookEngine', { timeout: 20_000 }, () => {
         label: 'Replan with Debugger',
         prompt: 'Replan from the persisted MissionCheckpoint.',
         depth: 4,
-        isBigLoop: true,
-        checkpointId: 'cp-1',
       },
     });
     expect(secondEvaluation).toMatchObject({ status: 'completed', allowed: true }); // Main owns cycle counting; the second return remains available.

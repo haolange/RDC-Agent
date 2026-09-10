@@ -11,6 +11,7 @@ export interface RequestEnvelopeInput {
   route: { providerId: string; modelId: string; protocol: string };
   requestPlan: RequestPlan;
   messages: unknown[];
+  mailboxDeliveries?: RequestEnvelopeSnapshot['mailboxDeliveries'];
   tools: unknown[];
   controls: Record<string, unknown>;
   reasoning: RequestEnvelopeSnapshot['reasoning'];
@@ -42,6 +43,7 @@ export class RequestEnvelopeBuilder {
       requestPlan: requestPlan.value as unknown as RequestPlan,
       promptPlan: promptPlan.value as PromptPlan,
       messages: messages.value as unknown[],
+      mailboxDeliveries: input.mailboxDeliveries,
       tools: tools.value as unknown[],
       controls: controls.value as Record<string, unknown>,
       reasoning: input.reasoning,

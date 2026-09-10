@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import type { RdxProbeInput } from '@shared/constants/rdxProbe';
 import type { RdxTurnBinding } from './RdxTurnBindings';
-import { getRdxContextLease, getMostRecentRdxContextLease } from '../sessions/RdxRuntimeContextRegistry';
+import { getRdxContextLease, getMostRecentRdxContextLease, getDelegatedChildSessionId } from '../sessions/RdxRuntimeContextRegistry';
 
 /** Reuse the product capture lifecycle; never mint a lease for an arbitrary context id. */
 export async function openProbeLease(
@@ -36,6 +36,7 @@ export async function closeProbeLease(
 ): Promise<void> {
   if (!projectId) throw new Error('RDX_PROBE_OWNER: project is required.');
   const lease = getRdxContextLease(sessionId);
+  if (getDelegatedChildSessionId(sessionId)) throw new Error('RDX_LEASE_DUAL_OWNER: join delegated execution before closing.');
   if (lease?.delegatedFrom) throw new Error('RDX_PROBE_OWNER: a delegated lease cannot close its parent capture.');
   const { rdxSessionService } = await import('../sessions');
   const closed = await rdxSessionService.clearOpenedCaptureForSession({ sessionId, projectId }, { binding, signal });

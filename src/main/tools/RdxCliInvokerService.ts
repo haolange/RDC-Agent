@@ -183,6 +183,7 @@ export class RdxCliInvokerService {
       cwd?: string;
       env?: Record<string, string>;
       runId?: string;
+      contextId?: string;
       abortSignal?: AbortSignal;
       settings?: RdxCliInvokerSettings;
     } = {},
@@ -214,6 +215,7 @@ export class RdxCliInvokerService {
       },
       timeoutMs: options.timeout ?? settings.timeoutMs,
       runId: options.runId,
+      contextId: options.contextId,
       abortSignal: options.abortSignal,
     });
   }
@@ -274,6 +276,7 @@ export class RdxCliInvokerService {
       const result = await this.executeCLI('call', cliArgs, {
         timeout: this.getSettings().timeoutMs,
         runId: request.runId,
+        contextId: request.contextId,
         abortSignal: request.abortSignal,
       });
 

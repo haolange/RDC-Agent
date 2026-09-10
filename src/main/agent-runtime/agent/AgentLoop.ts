@@ -79,27 +79,16 @@ export interface AgentLoopConfig {
   maxToolConcurrency?: number;
   /** 外部 abort 信号；触发时会中止 provider 流并以 AbortError 终止。 */
   signal?: AbortSignal;
-  /**
-   * 后台任务运行器（可选）。
-   *
-   * 每轮 LLM 调用前调用 `buildNotificationMessage()`，将已完成但未通知的
-   * 后台任务结果作为系统通知注入到上下文。使用接口而非具体类，避免循环依赖。
-   */
-  backgroundTaskRunner?: { buildNotificationMessage(): string | null };
-  /**
-   * Cron 调度器（可选）。
-   *
-   * 每轮 LLM 调用前调用 `getPendingPrompts()`，将到期的 cron 任务以
-   * `<cron_triggered>...</cron_triggered>` 形式注入为 user 消息。
-   */
   /** 错误恢复管理器（可选）。集成后 LLM 错误会触发自动重试/模型切换/压缩。 */
   errorRecovery?: ErrorRecovery;
   onRequest?: (input: {
     model: Model;
     context: Context;
     streamOptions: StreamOptions;
+    mailboxDeliveries?: import('@shared/types/rdxRuntime').RequestEnvelopeSnapshot['mailboxDeliveries'];
   }) => Promise<string | undefined> | string | undefined;
   onResponse?: (requestId: string | undefined, message: AssistantMessage) => Promise<void> | void;
+  beforeRequestMessages?: () => Promise<{ messages: Message[]; mailboxDeliveries?: import('@shared/types/rdxRuntime').RequestEnvelopeSnapshot['mailboxDeliveries']; commit?: () => Promise<void> }>;
 }
 
 /** Agent 上下文（messages 可在 loop 内增长；tools 经 runtime revision COW）。 */
@@ -253,22 +242,6 @@ async function runAgentLoop(
     }
   };
 
-  // Background Task & Cron 注入点：每轮 LLM 调用前注入已完成后台任务通知 + 到期 cron。
-  const injectScheduled = (): void => {
-    const injected: UserMessage[] = [];
-    if (config.backgroundTaskRunner) {
-      const notification = config.backgroundTaskRunner.buildNotificationMessage();
-      if (notification) {
-        injected.push({
-          role: 'user',
-          content: [{ type: 'text', text: notification }],
-          timestamp: Date.now(),
-        });
-      }
-    }
-    injectPending(injected);
-  };
-
   try {
     stream.push({ type: 'agent_start' });
 
@@ -305,10 +278,7 @@ async function runAgentLoop(
       }
       stream.push({ type: 'turn_start', turn: state.turn });
 
-      // 5. 注入 scheduled（background/cron）
-      injectScheduled();
-
-      // 6. 调用 LLM 生成助手消息（带错误恢复，内部是独立 transition 子状态机）
+      // 5. 调用 LLM 生成助手消息（带错误恢复，内部是独立 transition 子状态机）
       const ephemeralInstruction = runtimeNoProgressInstruction;
       runtimeNoProgressInstruction = undefined;
       const { message: assistantMessage } = await streamAssistantResponseWithRecovery(
@@ -620,6 +590,8 @@ async function streamAssistantResponse(
   if (config.transformContext) {
     messages = await applyTransformContext(context.messages, config, stream);
   }
+  const pendingMailbox = await config.beforeRequestMessages?.();
+  if (pendingMailbox?.messages.length) messages = [...messages, ...pendingMailbox.messages];
   if (ephemeralInstruction) {
     messages = [
       ...messages,
@@ -666,7 +638,9 @@ async function streamAssistantResponse(
     signal: stream.signal,
   };
 
-  const requestId = await config.onRequest?.({ model: config.model, context: llmContext, streamOptions });
+  const requestId = await config.onRequest?.({ model: config.model, context: llmContext, streamOptions, mailboxDeliveries: pendingMailbox?.mailboxDeliveries });
+  await pendingMailbox?.commit?.();
+  if (pendingMailbox?.messages.length) context.messages.push(...pendingMailbox.messages);
 
   // 6. 调用 provider，转发事件
   const response = provider.stream(config.model, llmContext, streamOptions);

@@ -132,6 +132,7 @@ export interface ConversationMessageDiagnostic {
 }
 
 export interface ConversationToolCall {
+  delegatedRequest?: { executionId: string; childSessionId: string; turnId: string; toolCallId: string };
   id: string;
   toolName: string;
   status: ConversationToolCallStatus;

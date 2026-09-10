@@ -63,6 +63,7 @@ export interface CompleteProfileTurnInput {
     };
     preparedPrompt: PreparedConversationPrompt;
     preparedTurn: PreparedAgentTurnContext;
+    policyBudget?: import('../workflow/debugger/TurnCoordinator').PolicyBudgetState;
   }
 
 export interface ConversationTurnRunnerHost {
@@ -80,12 +81,12 @@ export interface ConversationTurnRunnerHost {
     branchId: string,
   ): void;
   ephemeralTraceSessionId(turnId: string): string;
-  commitPreparedHandoff(sessionId: string, sourceTurnId: string): import('@shared/types/profileHandoff').ProfileHandoffState | null;
-  cancelUnfinishedHandoff(sessionId: string, reason: import('@shared/types/profileHandoff').ProfileHandoffCancelReason): void;
+  commitPreparedHandoff(sessionId: string, sourceTurnId: string): Promise<import('@shared/types/profileHandoff').ProfileHandoffState | null>;
+  cancelUnfinishedHandoff(sessionId: string, reason: import('@shared/types/profileHandoff').ProfileHandoffCancelReason): Promise<void>;
   scheduleHandoffAutoSend(sessionId: string): void;
 }
 
-export function settleSourceHandoffAfterTerminal(
+export async function settleSourceHandoffAfterTerminal(
   host: ConversationTurnRunnerHost,
   input: {
     terminalCommitted: boolean;
@@ -94,12 +95,12 @@ export function settleSourceHandoffAfterTerminal(
     sourceTurnId: string;
     pendingHandoff: PendingHandoff | null;
   },
-): void {
+): Promise<void> {
   const { terminalCommitted, assistantStatus, sessionId, sourceTurnId, pendingHandoff } = input;
   if (!sessionId) return;
 
   if (!terminalCommitted || assistantStatus === 'error' || assistantStatus === 'stopped') {
-    host.cancelUnfinishedHandoff(
+    await host.cancelUnfinishedHandoff(
       sessionId,
       assistantStatus === 'stopped' ? 'user_stop' : 'superseded',
     );
@@ -109,9 +110,9 @@ export function settleSourceHandoffAfterTerminal(
     return;
   }
 
-  const committed = host.commitPreparedHandoff(sessionId, sourceTurnId);
+  const committed = await host.commitPreparedHandoff(sessionId, sourceTurnId);
   if (!committed) {
-    host.cancelUnfinishedHandoff(sessionId, 'superseded');
+    await host.cancelUnfinishedHandoff(sessionId, 'superseded');
     return;
   }
   host.emitConversationEvent(buildHandoffAgentEvent('handoff.requested', sessionId, committed));
@@ -145,13 +146,13 @@ export async function completeProfileTurn(
   let streamScheduler: ConversationStreamPatchScheduler | null = null;
   let conversationPersistenceError: Error | null = null;
   let sourceHandoffSettled = false;
-  const settleSourceHandoff = (
+  const settleSourceHandoff = async (
     terminalCommitted: boolean,
     assistantStatus: ConversationMessage['status'],
-  ): void => {
+  ): Promise<void> => {
     if (sourceHandoffSettled || !sessionId) return;
     sourceHandoffSettled = true;
-    settleSourceHandoffAfterTerminal(host, {
+    return settleSourceHandoffAfterTerminal(host, {
       terminalCommitted,
       assistantStatus,
       sessionId,
@@ -205,7 +206,6 @@ export async function completeProfileTurn(
           message: assistantMessage,
         });
         host.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
-        settleSourceHandoff(false, 'error');
         return;
       }
     }
@@ -491,6 +491,10 @@ export async function completeProfileTurn(
           userContent: userInput.content,
           visibleTurnIds: prepared.visibleTurnIds,
           activeBranchId: assistantMessage.branchId ?? input.userMessage.branchId ?? ROOT_BRANCH_ID,
+          policyBudget: input.policyBudget,
+          beforeProviderRequestMessages: sessionId
+            ? () => agentOrchestrator.backgroundSubagents.beforeParentProviderRequestMessages(sessionId)
+            : undefined,
           onTerminalContext: (result) => {
             terminalContext.value = {
               messages: result.messages,
@@ -676,7 +680,7 @@ export async function completeProfileTurn(
           message: assistantMessage,
         } as ConversationStreamEvent);
         host.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
-        settleSourceHandoff(true, assistantMessage.status);
+        await settleSourceHandoff(true, assistantMessage.status);
       } catch (error) {
         console.error(`[ConversationService] Terminal transaction failed for ${assistantMessage.turnId}:`, error);
         assistantMessage = {
@@ -690,7 +694,7 @@ export async function completeProfileTurn(
           },
           updatedAt: nowMs(),
         };
-        settleSourceHandoff(false, 'error');
+        await settleSourceHandoff(false, 'error');
         host.emitConversationEvent({
           type: 'message_errored',
           sessionId,
@@ -706,7 +710,7 @@ export async function completeProfileTurn(
         || assistantMessage.status === 'error'
         || assistantMessage.status === 'stopped';
       if (turnFailed) {
-        settleSourceHandoff(
+        await settleSourceHandoff(
           false,
           assistantMessage.status === 'stopped' ? 'stopped' : 'error',
         );

@@ -232,23 +232,27 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/prompt/PromptAssembler.ts')), 'PromptAssembler must be removed after PromptPlan formalization.');
 
   const conversationService = read('src/main/conversation/ConversationService.ts');
-  assert(conversationService.includes('mergeTurnPreloadSkillIds'), 'ConversationService must merge profile/$skill/pending skill preload ids.');
-  assert(conversationService.includes('SKILL_UNAVAILABLE'), 'ConversationService must fail closed on missing preload skills.');
+  const conversationPromptPreparer = read('src/main/conversation/ConversationPromptPreparer.ts');
+  const conversationTurnStarter = read('src/main/conversation/ConversationTurnStarter.ts');
+  const conversationTurnRunner = read('src/main/conversation/ConversationTurnRunner.ts');
+  const conversationRuntimeSources = [conversationService, conversationPromptPreparer, conversationTurnStarter, conversationTurnRunner].join('\n');
+  assert(conversationPromptPreparer.includes('mergeTurnPreloadSkillIds'), 'Conversation prompt preparation must merge profile/$skill/pending skill preload ids.');
+  assert(conversationPromptPreparer.includes('SKILL_UNAVAILABLE'), 'Conversation prompt preparation must fail closed on missing preload skills.');
   for (const forbidden of ['buildProfileSystemPrompt', 'buildProfileCatalogPrompt', 'buildProfileTurnPrompt', 'mentionsTextualToolCall', 'traceHasRuntimeToolCalls', 'AGENT_WORKBENCH_TOOL_CATALOG']) {
-    assert(!conversationService.includes(forbidden), `ConversationService must not keep legacy prompt/text-tool logic: ${forbidden}.`);
+    assert(!conversationRuntimeSources.includes(forbidden), `Conversation runtime must not keep legacy prompt/text-tool logic: ${forbidden}.`);
   }
   for (const forbidden of ['TASK_FILE_PATTERN', 'readFileSync(taskFilePath', 'fs.existsSync(taskFilePath']) {
-    assert(!conversationService.includes(forbidden), `ConversationService must not preload local files outside the tool permission policy: ${forbidden}.`);
+    assert(!conversationRuntimeSources.includes(forbidden), `Conversation runtime must not preload local files outside the tool permission policy: ${forbidden}.`);
   }
-  assert(conversationService.includes('promptPlanBuilder.build'), 'ConversationService must build a PromptPlan for system instructions.');
-  assert(conversationService.includes('routeCapability: input.routePreflight.routeCapability'), 'ConversationService must pass the frozen route capability into PromptPlanBuilder.');
-  assert(conversationService.includes('permissionSettings: runtimeSettings.agentRuntime.permissions'), 'ConversationService must pass runtime permission settings into PromptPlanBuilder.');
+  assert(conversationPromptPreparer.includes('promptPlanBuilder.build'), 'Conversation prompt preparation must build a PromptPlan for system instructions.');
+  assert(conversationPromptPreparer.includes('routeCapability: input.routePreflight.routeCapability'), 'Conversation prompt preparation must pass the frozen route capability into PromptPlanBuilder.');
+  assert(conversationPromptPreparer.includes('permissionSettings: runtimeSettings.agentRuntime.permissions'), 'Conversation prompt preparation must pass runtime permission settings into PromptPlanBuilder.');
   assert(conversationService.includes('answerToolApproval'), 'ConversationService must expose tool approval resume.');
   for (const token of ['prepareTurnContext', 'prepareConversationPrompt', 'materializeAgentUserInput', 'preparedTurn', 'requestId']) {
-    assert(conversationService.includes(token), `Conversation preflight path must include ${token}.`);
+    assert(conversationRuntimeSources.includes(token), `Conversation preflight path must include ${token}.`);
   }
-  assert(conversationService.includes('releaseProviderRuntimeCredentials'), 'Every conversation terminal path must release the opaque credential lease.');
-  assert(!conversationService.includes('previewNextRequestContext'), 'ConversationService must not restore draft-time context preview work.');
+  assert(conversationRuntimeSources.includes('releaseProviderRuntimeCredentials'), 'Every conversation terminal path must release the opaque credential lease.');
+  assert(!conversationRuntimeSources.includes('previewNextRequestContext'), 'Conversation runtime must not restore draft-time context preview work.');
 
   const contextJournal = read('src/main/conversation/SessionContextJournal.ts');
   for (const token of ['filteredArtifactCount', 'decideContinuationReplay', 'canonicalizeTerminalContextMessages', 'schemaVersion !== 2']) {

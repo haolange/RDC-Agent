@@ -188,6 +188,13 @@ export interface RequestEnvelopeSnapshot {
   requestPlan: import('./providerCapability').RequestPlan;
   promptPlan: PromptPlan;
   messages: unknown[];
+  mailboxDeliveries?: Array<{
+    executionId: string;
+    generation: number;
+    direction: 'to_parent' | 'to_child';
+    throughSequence: number;
+    messageIds: string[];
+  }>;
   tools: unknown[];
   controls: Record<string, unknown>;
   reasoning: ProviderReasoningContract;

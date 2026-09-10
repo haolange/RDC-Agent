@@ -127,7 +127,7 @@ Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only
 
 同轮工具并发：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。`ConcurrentToolScheduler` 只并发**连续**安全组；`shell` / write / task mutation / RDX（含 `rdx_probe`） / MCP / ask / handoff / `output_register` 与需要 RDX lease 的 `subagent` 一律串行。offline `subagent` 不请求 `domainExtensions.rdx`，且 **在 allowlist 层**就不能拿到 `rdx_context` / `rdx_probe` / `shell` 中的 RDX 路径。`domainExtensions.rdx.requiresLease=true` 的 child 必须经显式、受限、生命周期绑定的 delegated lease 取得 parent 上下文并串行。禁止并发 RDX 双 owner。`callIndex` 稳定回填。`reserveDispatchBudget` 在 dispatch 前原子扣减 `maxToolCalls` / `maxSubagents` / wall clock；失败整组不开。组内部分失败不连坐已发出调用，但不得继续开新组。abort 必须 `Promise.allSettled` join。
 
-`subagent` 只接受 Delegation Capsule（`mission` / `task` / `acceptedFacts` / `forbiddenPaths` / `inputArtifactRefs` / `outputRequirements` / `budget`；可选 `domainExtensions`）。缺字段 fail-closed。capsule 编译器产出 `delegation-capsule` PromptPlan 分段并注入子 Prompt。
+`subagent` 只接受有界 Delegation Capsule：goal/task/scope、带 sourceRefs/qualification 的 acceptedFacts、hypotheses、challengeRefs、带理由/适用/重验条件的 negativePaths、inputArtifactRefs、outputRequirements、stopConditions、requiredSkillIds 和 budget；可选 domainExtensions 仅申请能力。缺字段、超限或非法引用 fail-closed。compiler 只向 system PromptPlan 加入 runtime 编写的解释规则，完整 Capsule 数据进入隔离子执行的 user 输入，不复制父历史。必需 Skill 在 prepareTurn 预载并冻结。
 
 Temporary 外部路径只经当前 `ToolExecutionContext.temporaryAllowedPathRoots`，不得全局泄漏。
 
@@ -161,7 +161,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 无内置 RDX toolchain。**General** 与 UI 的 Open capture / remote / preview / close 以及 Live RDC mutate 走 Settings shell action / `shell` → `ShellInvocationService`，且必须持有 exclusive lease。**Mission planner** 禁止 `shell` 与 `code_interpreter`；只通过受控只读 `rdx_probe` + `rdx_context` 访问 RDX（见 `DESIGN.md` 裁决 J）。`rdx_probe` 唯一执行路径是 Settings `tooling.rdxCli` 已配置的只读 shell action；仓库不得硬编码 CLI 路径。已打开 `.rdc` 由 `ownerSessionId` 拥有；不匹配 fail-closed。Local + Android-origin capture 不得静默 fallback remote。
 
-RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）。禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext` 全局 API；工具路径经 `assertRdxContextLeaseOwnership`，不得回退 parent。parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease；child 结束立即 `revokeDelegatedLease`。未请求 `domainExtensions.rdx` 的 child 在 allowlist 编译期不得看到 `rdx_context` / `rdx_probe`。
+RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）。禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext` 全局 API；工具路径经 `assertRdxContextLeaseOwnership`，不得回退 parent。parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease；child 结束经实际停止确认后 `revokeDelegatedLease`；未确认时父资源保持隔离。未请求 `domainExtensions.rdx` 的 child 在 allowlist 编译期不得看到 `rdx_context` / `rdx_probe`。
 
 ## Model Capability（摘要）
 
@@ -184,6 +184,47 @@ General 为默认通用工作身份。核心正文只负责可信上下文、授
 
 agent_handoff 要求非空摘要和严格 contract：route；execute（Plan URI/hash、requiredSkillIds、returnTo、deliveryRequirements）；return（executionHandoffId、产物 URI/hash）。returnTo 必须等于实际派发者。Plan 经 session artifact plans 类别版本化，历史文件不迁移或删除。接收 prepareTurn 校验引用、预加载必需 Skill、去重、冻结来源与权限交集；来源变化重新准备，缺失或权限冲突拒绝。通用 turn 仅调用 TurnCompletionValidator，组合层选择 Investigation 校验策略并冻结任务绑定。
 
-每个 root 一次初始路由、最多两轮 execute/return；Small Loop 不消耗新周期，重复 consume 不重复扣数。第二轮允许回评估，第三轮执行拒绝。额度耗尽但未完成时，Mission 用 [INCOMPLETE] 开头，绑定最后回交 Checkpoint URI/contentHash 并列明 unresolvedFrontier，等待新用户指令；这只是 turn 结束，绝不提升领域报告状态。handoff-state schema v2；v1 原字节保存 .v1-archive，旧待续跑停止并展示重新建立提示，运行仅读 v2。重启降级、取消、事件驱动续跑保持原契约。
+每个 root 一次初始路由、最多两轮 execute/return；Small Loop 不消耗新周期，重复 consume 不重复扣数。第二轮允许回评估，第三轮执行拒绝。额度耗尽但未完成时，Mission 通过 turn_complete 的 budget_paused disposition 与 evidenceRefs 绑定最后回交 Checkpoint URI/hash，正文说明 unresolvedFrontier，等待新用户指令；这只是 turn 结束，绝不提升领域报告状态。handoff-state schema v2；v1 原字节保存 .v1-archive，旧待续跑停止并展示重新建立提示，运行仅读 v2。重启降级、取消、事件驱动续跑保持原契约。
 
-普通 Capsule 省略领域扩展且没有 RDX Lease prompt 段；仅 RDX 模块接受 domainExtensions.rdx.requiresLease=true 并注入租约上下文。缺省无 RDX，授权子代理串行且 finally 撤销；旧顶层字段拒绝，不保留双轨。
+普通 Capsule 省略领域扩展且没有 RDX Lease prompt 段；仅 RDX 模块接受 domainExtensions.rdx.requiresLease=true 并注入租约上下文。缺省无 RDX；同一 live context 的租约独占覆盖完整子执行区间，其他安全工作仍可并行；finally 撤销须携带停止证明，否则隔离父资源；旧顶层字段拒绝，不保留双轨。
+
+
+### Harness / 领域与上下文边界（2026-09-09 收敛）
+
+通用完成检查按冻结 execution binding 校验回到实际派发者及 executionHandoffId，不按 Mission/General 身份或 depth 推断 Big Loop。handoff Hook 只接收显式 contract；Checkpoint 与实验回执内容校验在领域服务。completed 才断言领域完成；partial/blocked/cancelled 不提升报告，绑定执行仍须合法回交或走取消生命周期。自然语言前缀不控制终态。
+
+子执行 artifact_read 只读取显式授予且 hash 冻结的同一所属 Session 引用，嵌套委派取子集。子执行调查输出保存到原调查，输入引用的读权限不授予覆盖权限；只能更新本子执行新建的输出。退出撤销临时访问权，已保存产物继续归原 Session 所有。
+
+Compact 使用原始 Journal、Task/执行记录及应用层组装的领域记录，不由通用 compactor 猜测调查步骤。压缩前保存可按行读取的分块 JSON 权威 Checkpoint，模型只看到有界权威记录与原始文本；不逐条截去长消息尾部。保存失败、hash 复核失败或原始输入超过安全界限时保留原 view，禁止静默丢失。原始图像/测量产物按 URI/hash 保留，摘要须保留来源资格、适用条件和反证的重验条件。
+
+RDX delegated lease 暂停父控制权，父级 rebind/clear/close 必须先 join；原生结果不确定时隔离匹配版本，迟到失败不得隔离新版本。CLI 进程未观察 close 继续跟踪，相关 context 恢复受阻；观察实际 close 后可进入原有 capture close/open 验证并重新 prepareTurn。重开只恢复绑定，不证明实验 rollback。
+
+
+### Task 执行、消息与资源生命周期
+
+单一 TaskStore 的 canonical schema 为 v2（task-state.v2.json）。Task 保存目标、依赖、父任务、完成要求、修订与执行关联；TaskExecution 独立保存 executionId、taskRevision、generation、父执行、运行状态、共享预算快照、结果及可选冻结计划引用。取消或修订不会让旧结果覆盖新实例。不存在全局唯一 in_progress 限制；依赖存在、无环、已满足，以及完成要求的输出键与执行终态由 TaskRegistry 校验。要求覆盖是否完整、科学结论是否成立仍由模型及领域证据合同负责。
+
+迁移先将 v1 文件原字节以 hash 命名保存到 archive/v1，再写 canonical v2；旧状态带 v1-archived-unverified 标记，不伪造执行证明。活动运行只读写 v2。runtimeInstanceId 变化使未结束执行转 interrupted；持久化恢复不自动启动模型、工具或重置预算。显式重试/恢复创建新执行，并继承限制与已消费预算。
+
+subagent（mode=background） 必须绑定 Task，持久化启动状态后返回执行标识。query/result 读取状态与结果；wait/join 等待既有执行；message 提交有限补充；cancel 和 task_stop 取消执行树并 join。父回复可以结束而 Task 继续托管；父 Task 正式完成检查子任务、阻塞、失败及结果。用户 Stop、会话删除和应用退出清理运行树；未观察进程退出不能声明清理完成。
+
+后台 subagent 的生命周期由持久 Task 与 mailbox 投影，不进入父回复的同步 subagent continuation，也不由父回复 finalizeTrace 提前结束；审批/信息请求仍走受控入口。结构化 turn_complete 的 disposition、evidenceRefs 位于顶层，result 包含 summary、outputs、counterevidence、unresolved、scope、sideEffects、recoveryState。unresolved 表达认识与适用条件，不自动成为 missingRequirements；完成要求仍由 Task 的必需输出及执行状态校验，不能由通用 runtime 推测科学结论。
+
+TaskRootBudget 是同一 TaskStore 中的持久预算记录，以 execution.rootBudgetId 关联，不是第二个执行器或独立预算存储。直接执行、同步与后台子执行、handoff 共用根账本；Capsule 的局部上限及已消费量另存当前执行，派发、重试与恢复只收窄局部上限，不把 child 上限写成 root 上限。同步与后台均恢复本执行局部计数，并在工具效果前等待预算预留持久化；保存失败不得执行效果。parent 回复结束后，后台事件续跑沿用同一 live root ledger，不能创建零消费账本。
+
+同一 root 的首次并发绑定串行提交，旧持久消费与新上下文独立消费只合并一次；后续绑定同一 live ledger 不重复计费。root 的计数不下降、cap 不增加、deadline 不延后。已经绑定 root A 的 live ledger 再请求不同 root B 时显式拒绝 TASK_ROOT_BUDGET_REBIND_DENIED，保留 A/B 与观察者归属，须由独立执行上下文处理，不能静默换绑。已有执行的重试继续使用原 rootBudgetId，不允许借新父轮次脱离旧预算。
+
+handoff Task 的取消所有权从 durable prepared 实例转交 receiving turn。已 consumed 但接收者尚未登记的空隙内，取消保留 cancelling 并拒绝宣称清理完成；接收者登记时读取此取消意图，在首个 Provider 请求或工具效果前 abort/join。同一接收 turn 内 task_stop 或 task_update(cancelled) 只请求停止，避免等待自身；最终取消记录在 producer 与所属进程退出确认之后提交。
+
+消息存入同一 TaskStore，绑定 taskId/executionId/generation/sequence，区分 to_parent/to_child。有效进展、阻塞、决策请求和结果经安全请求边界消费；游标去重，失效代次不能推进现任务。消息是有来源的数据，不改变冻结 PromptPlan 或授权。UI 事件不等于模型通知；不建立固定频率父模型轮询。审批继续使用现有受控入口，消息不继承审批。
+
+资源仲裁按真实项目路径（含符号链接/junction 解析）或所属 Session 锁定。安全读可共享，unsafe 工具和 Hook 外部效果互斥；审批在工具效果锁之前。调度/等待工具以内部 orchestration 元数据绕开它们所等待的子执行效果锁，实际子工具仍各自仲裁。ProcessSupervisor 的 unconfirmed_orphan 结果只表示有界等待结束，资源锁与原进程记录继续保留到真实 close/error。按执行会话查询/等待进程退出供 Task 取消收口使用；隔离资源阻止新效果，无关资源不受阻。
+
+Small/Big Loop、Scout/Skeptic 委派和补证方向由实际加载的 Skill 与模型决定。runtime 不根据 Agent 名称、depth、正文前缀或关键词启动下一轮。root 两轮 execute/return 预算是硬上限，不是自动循环次数。
+
+
+子执行的审批/信息请求在主进程绑定 ownerSessionId 与真实 child turn/request/execution 标识。父会话只投影待响应控件，答案仍进入原子请求服务并一次性消费；其他会话、缺失所有者和重复响应拒绝。后台请求可更新已结束父回复的 Work Process，不撤回正文或自动重开父模型。历史读取将进程重启后已无 pending 记录的子请求标为中断/取消，不能复活旧审批权限。
+
+显式 artifact_read 图像在 native vision 路由返回标准 image block 与原 URI/hash；非视觉路由明确拒绝，不用省略提示冒充已审图。该显式读回不会再被大结果外置器换回引用，仍受原生请求预算及产物大小限制。子执行的大工具结果（包括错误）写回已登记根 Session，使用执行隔离路径并登记精确只读引用；长文本以可逆 JSON chunks 分页保存。引用文件 hash 与历史 envelope payload hash 依既有 resolver 合同区分，旧产物仍可读取。
+
+项目根不能证明 shell/MCP 的副作用彼此隔离。unsafe effects 与 Hook effects 除 canonical 项目/会话排他区间外，共享一个保守串行区间；安全只读工作可并行。未观察进程退出时两个区间均保留，无关安全读不被该全局 unsafe 区间阻塞。

@@ -16,6 +16,14 @@
 - 本文重组桌面《RenderDoc Agent 完整设计书》的领域契约，并叠加仓库化裁决。桌面书不是权威。
 - 本机 `ColdData` 原料与原始导出截图**不进入本仓库**；CI 只用脱敏 fixture（文件名如 `symptom-compare-<shortHash>.png`）。
 
+### 2026-09-09 Harness 边界收敛
+
+本设计中的 Mission → General → Scout/Skeptic → 补证 → 回评估是实际 .agent/Skill 中的领域方法，不能成为通用 runtime 固定拓扑。普通 General 任务直接完成；单次 lookup 不强制委派。Scout 和 Skeptic 是隔离 General 子执行的职责，分别通过 requiredSkillIds 预载 knowledge-scout / skeptic-review；Skeptic 不继承生成者叙事或 RDX lease。原 Mission 保留最终评估。
+
+通用 runtime 强制任务依赖、执行实例、代次、资源所有权、预算、取消/join 和明确返回绑定。领域工具校验原生绑定、签名回执和调查记录。方法选择、Challenge 补证和战略改变由模型依指令决定；Hook 不按身份/depth 反推 Big Loop，不自动选择最近 Checkpoint。部分结果通过结构化 disposition/evidenceRefs 声明，不通过正文关键词触发隐藏流程。
+
+验证状态以 acceptance-ledger 的本轮记录为准；历史 T18/U06 不能为后来 diff、后台合同或当前原生实验提供验证证明。
+
 ---
 
 ## 1. 产品定义与三个目标函数
@@ -108,7 +116,7 @@ Embedding capability / Semantic lane **已删除**，见 `DESIGN.md` 裁决 C。
 
 ### 3.4 Durable Handoff（已落地）
 
-`ProfileHandoffState` 经 `HandoffStateStore` 写入 `<sessionPath>/handoff-state.json`。现有 `AgentHandoffDefinition` 仍只是 manifest 路由声明，不是该状态机。Debugger Big Loop 走同一套机器（链上限 3，重启不自动开火）。事务顺序：内存草稿 prepare → 绑定 `turn.pendingHandoff` → after-hook → 持久化；Hook 拒绝/抛错或持久化失败必须 cancel/rollback，不得遗留 active prepared。`send:true` 由源 turn complete / turn-idle 事件驱动，同一 `handoffId` 一次 generation，有界 idle 观察，禁止 microtask 自递归。**源码与定向测试已落地。**产品级自动续跑 / pill 闭环仍须在有 session 的 Browser QA 中验收。
+`ProfileHandoffState` 经 `HandoffStateStore` 写入 `<sessionPath>/handoff-state.json`。现有 `AgentHandoffDefinition` 仍只是 manifest 路由声明，不是该状态机。Debugger Big Loop 走同一套机器（每 root 一次 route、最多两轮 execute/return，重启不自动执行）。事务顺序：内存草稿 prepare → 绑定 `turn.pendingHandoff` → after-hook → 持久化；Hook 拒绝/抛错或持久化失败必须 cancel/rollback，不得遗留 active prepared。`send:true` 由源 turn complete / turn-idle 事件驱动，同一 `handoffId` 一次 generation，有界 idle 观察，禁止 microtask 自递归。**源码与定向测试已落地。**产品级自动续跑 / pill 闭环仍须在有 session 的 Browser QA 中验收。
 
 ### 3.5 并发（目标态 / 迁移中）
 
@@ -431,9 +439,11 @@ Optimizer 另用五层 Bottleneck（Cost Location → Candidate Limiter → Mech
 
 ## 10. Context 工程
 
+本轮实现裁决：下列 L0–L5 只是选择输入时的内容分类，不新增六层 Context store、摘要 Agent 或调度器。实际权威是 PromptPlan、Journal、Task/执行记录与 Session Artifact。Capsule 由调用方直接组织，runtime 验证后作为有界 user 数据传入子上下文；source 文字不提升为 system 指令。原始证据默认外置，当前事实、适用条件和否定路径重验条件必须可按保存的引用恢复。
+
 严格区分 History（发生过的全部）、State/Memory（仍有效）、Context（下次推理实际看到的 token）。目标：在预算 \(B\) 内最大化决策质量。
 
-### 10.1 六层
+### 10.1 上下文选择维度（非六层存储）
 
 | 层 | 内容 | 驻留 |
 | --- | --- | --- |
@@ -448,7 +458,7 @@ Planning Orchestrator 宽语义、低 raw；Specialist 窄而深；Skeptic 干�
 
 ### 10.2 Delegation Context Capsule
 
-每次委托 Sub-Agent 即时编译，**不是**新平台文件类型。语义必须包含：身份、Mission、Task、原因、已确认事实、竞争 Hypothesis、相关 Challenge、当前 World State、输入 Artifact、相关 Knowledge、已证伪路径、不应重复的实验、输出要求、原始 Evidence 的可恢复引用。
+每次委托 Sub-Agent 即时编译，**不是**新平台文件类型。通用字段为 goal/task/scope、事实及来源资格、竞争假设、Challenge 引用、输入引用、否定路径的理由/适用条件/重验条件、能力请求、预算、停止条件和输出要求。Mission、World State、实验等领域内容按任务需要置于有来源的数据或引用，不能成为通用 schema 的必填领域字段。
 
 offline subagent 的 Capsule 不得携带 RDX lease；省略 `domainExtensions.rdx`。Debugger 纵切把该 Capsule 写成 `$debugger-coordinator` / `$renderdoc-execution` 的委托纪律，而不是新平台文件类型。
 
@@ -688,7 +698,7 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 
 ## 21. 明确禁止
 
-- 平台级 InvestigationGraph、第二 TaskStore、第二 Agent Runtime、Mailbox / Blackboard。
+- 平台级 InvestigationGraph、第二 TaskStore、第二 Agent Runtime，以及领域专用 Mailbox / Blackboard；通用 TaskStore 内按执行代次绑定的持久消息属于运行生命周期，不是第二套领域存储。
 - 向 `TaskRecord` / `AgentProfile` / `ConversationMessage` 增加领域字段。
 - 194 个 RDX Agent Tool、RDX MCP、把 catalog 展开给模型。
 - 自动 Memory / Knowledge / Candidate / Promote；LLM 自治写 Knowledge。
@@ -723,6 +733,18 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 
 General 的 execution-orchestrator 只定义通用工作方法；三个 Mission coordinator 保存目标、计划产物、handoff 与方法路由；共享执行/Small Loop/Big Loop/capsule 只在 renderdoc-execution 维护。报告按需读对应 Mission 章节。先获取可安全读取的上下文，再问不可获取输入或必需决策；不重复已授权步骤。相似案例只在相关历史问题时检索，单次 lookup 不强制 Scout。保留原 27 个 skill ID，新增 renderdoc-investigation 入口（共 28 个）；读取方法不重新武装本轮权限。
 
-Knowledge 保留 markdown-first 六 lane 五服务与 human review；不恢复 Embedding、第二索引、自动 Candidate 或 Memory。Scout 正文与四工具权限一致；rdc-context 通过 rdx_context 查询拥有的状态；debug 明确只读诊断；verify 报告本技能实际可验证的受影响面。删除强制 driver-blame 假设，保留有证据且可区分的替代解释。
+Knowledge 保留 markdown-first 六 lane 五服务与 human review；不恢复 Embedding、第二索引、自动 Candidate 或 Memory。Scout 正文与实际加载 Skill 的受限工具交集一致；rdc-context 通过 rdx_context 查询拥有的状态；debug 明确只读诊断；verify 报告本技能实际可验证的受影响面。删除强制 driver-blame 假设，保留有证据且可区分的替代解释。
 
 Experiment 可选 executionEvidence 五阶段引用的字段、签名、顺序、ownership 和 rollback 门禁见 docs/architecture/rdx-runtime.md。历史记录不改写、不追认；新关闭与新完成失败时不得补造布尔字段。U06 Optimizer 原验收保留取证信息，但撤回缺乏真实介入依据的完成结论。
+
+
+### 2026-09-10 实施边界补充
+
+通用 Task/执行及后台工具遵守 docs/contracts/runtime-kernel.md，不增建 Investigation store。RDC 证据仍以所属 Session Artifact 的调查记录为权威，子执行输入只读授权不允许覆盖父产物。Scout/Skeptic 为 General 的受约束独立子上下文和冻结 Skill，非新增官方身份。General 创建补证 Task 并局部推进；战略变化回交原 Mission，原 Mission 保留最终评估，没有隐藏总裁决模型。
+
+进程退出、RDX 状态已知与实验恢复是三项不同证据。确认进程退出才可结束资源清理；验证新 binding 才能恢复受控访问；baseline/intervention/variant/rollback/restored 回执才支持实验恢复结论。重新打开 capture 不代替 rollback。参见 acceptance-ledger.md 的各次实际验证范围，静态契约、受控 Provider fixture、真实 native CLI 和真实模型不得互相替代。
+
+
+RDC 委派沿用通用 root/child-local 双层预算，不独立计费或恢复额度：同步与后台 Scout/Skeptic 恢复各自局部执行账本，根上限不被局部 Capsule 改写，根消费与 deadline 不因重新委派或回评估重置。已有 live root 不能静默换绑另一旧调查 root；此请求由 runtime 明确拒绝，模型需在授权范围内组织独立执行上下文。同 root 并发绑定由 runtime 保证只合并一次，不由指令手工扣账。
+
+Mission/General handoff 的 prepared/consumed/接收执行取消转交遵守通用合同。取消已发生时，接收者必须在新 Provider 请求或领域工具效果前承接 Stop；只有 producer 与进程退出确认后才能记任务 cancelled。取消不证明实验 rollback，不能替代领域回执。以上是实现合同；最终验证状态仍以 acceptance ledger 中的对应证据为准。

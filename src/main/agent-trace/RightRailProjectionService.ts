@@ -2,6 +2,7 @@ import type { ActionEvent } from '@shared/types/evidence';
 import type { RunSummary } from '@shared/types/session';
 import type { RightPanelViewModel } from '@shared/types/trace';
 import { createSessionTaskStore } from '../agent-runtime/tasks/sessionTaskStore';
+import { TaskRegistry } from '../agent-runtime/tasks/TaskRegistry';
 import { rdxSessionService } from '../sessions';
 import { listSessionArtifactSources } from '../sessions/SessionArtifactSource';
 import { storageAdapter } from '../sessions/StorageAdapter';
@@ -43,9 +44,10 @@ export class RightRailProjectionService {
     const session = storageAdapter.readSession(input.sessionId);
     if (!session) return emptyRightPanel(input.sessionId);
 
+    const taskRegistry = new TaskRegistry(createSessionTaskStore(input.sessionId));
     const [sources, taskRecords, conversations, requestSnapshots, artifacts] = await Promise.all([
       listSessionArtifactSources(input.sessionId),
-      createSessionTaskStore(input.sessionId).listTasks().catch(() => []),
+      taskRegistry.reconcileInterruptedExecutions().then(() => taskRegistry.listTasks()),
       Promise.resolve(storageAdapter.readConversationHistory(input.sessionId)),
       Promise.resolve().then(() => requestSnapshotStore.list(input.sessionId)).catch(() => []),
       Promise.resolve().then(() => mapRightRailInvestigationArtifacts(input.sessionId)),

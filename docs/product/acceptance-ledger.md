@@ -177,3 +177,91 @@ GUI 验收仍待外部条件：浏览器自动化与独立桌面自动化内核�
 - 最终桌面入口已加载 renderer；QA 24964/42780 与桌面 31976/56528 均已关闭，canonical instance.lock 不存在。桌面启动权已交还。
 
 - 2026-09-09 完整改动约束复核：修复 touched Composer CSS 的 CRLF 与 fidelity 精确匹配冲突，按 .gitattributes 归一 LF；未改变动画语义或放宽门禁。当前完整 `pnpm run check:gates` exit 0（含 fidelity、architecture、session-projection、right-rail、legacy-residue、acceptance-ledger、design-tokens、renderer-structure）。全库 tests/coverage 仍以各历史快照为界，不冒充本次重跑。
+
+
+## 2026-09-10 通用 Harness 收敛：领域/上下文定向验证（集成待收口）
+
+基线 `cfb7eaa0e24d7a7eb74afa25ff246d2551f4bae7`，本轮未提交工作区。下列为受控测试，不代表真实模型、native RDX 或最终全库验证。修改期间跨过零点；五日审查入口仍采用任务开始时 2026-09-05 至 2026-09-09 的窗口，提交明细由本轮审查记录给出。
+
+- 已验证：通用 handoff 不推断 Big Loop、不自动绑定最新 Checkpoint；普通 General 不受 Mission 完成要求；执行绑定不能用 partial 绕过返回。领域/Hook/完成/RDX 初始组合 9 文件 122 测试通过，后续 RDX 身份与 orphan scope 修正已单独复测。
+- 已验证：父子 RDX 控制互斥；未确认 native close 继续托管，相关 context 隔离、无关 context 不被锁住；恢复失败保留绑定；确认 close/open 后产生新版本，旧 prepared turn 拒绝执行。重开不作为 rollback 证明。
+- 已验证：Capsule 数据仅进入子 user 输入，必需 Skill 显式预载；输入 hash 授权只读，子输出归原调查且重开仍可读；不能借 read grant 覆盖父产物。嵌套执行只向直接父级转交已登记输出的只读引用。
+- 已验证：压缩 Checkpoint 保存完整原始 Journal、Task/执行及领域权威记录；50k 字符消息尾部条件保留，archive 分块可分页重建；写失败/校验失败报错，保存失败不提交新 view。相关 context、Skill/PromptPlan 定向测试通过。
+- `TODO(UNVERIFIED)`：最终后台执行合同、父 Provider 实际请求端到端、全部 tests/coverage/gates/build、disposable Browser QA 与真实模型/原生设备场景由集成收口阶段验证。本段不得独立作为整项完成依据。
+- 本子任务未启动 QA/Electron，未占用桌面启动锁；若集成阶段启动，必须另记录清理及「桌面启动权已交还」。
+
+
+## 2026-09-10 Harness 审查依据及新增定向证据（全量验收仍待收口）
+
+审查入口：北京时间 2026-09-05 00:00（含）至 2026-09-10 00:00（不含），使用本地 Git 提交时间窗口 `git log --since=2026-09-05T00:00:00+08:00 --until=2026-09-10T00:00:00+08:00`，共 33 提交；当前实施跨过零点，不把窗口无记录地滑动。基底 HEAD cfb7eaa0e24d7a7eb74afa25ff246d2551f4bae7，交付为未提交工作区，`.cursor/` 保留；桌面原稿未修改。
+
+| Harness-audit-1 | 保留单一 loop、prepareTurn 冻结、权限交集、共享预算、代次过滤、durable handoff、领域原生回执；移除 General→Mission+depth 推断 Big Loop、隐式最新 Checkpoint 选择及正文前缀控制终态。通用校验执行回交绑定，领域继续验证 Checkpoint/实验/报告。 | 五日提交审查：8d35ed31；最终工作区验证待收口 | — | planned | — | 2026-09-10 |
+| Harness-audit-2 | 保留历史及 shadow seed 退役与 v2 迁移，不恢复官方 Scout/Skeptic 身份或旧 seed 双轨。 | 五日提交审查：7fdd56f1；最终工作区验证待收口 | — | planned | — | 2026-09-10 |
+| Harness-audit-3 | 保留六 lane markdown-first Knowledge、固定 read roots、无 Embedding；Scout 仅追加受控 artifact_read 和 turn_complete，不增加 Candidate/持久 Memory 自动写入。 | 五日提交审查：3bff8172、a31d6c00；最终工作区验证待收口 | — | planned | — | 2026-09-10 |
+| Harness-audit-4 | 保留 legacy residue 与组合门禁；更新被本轮 canonical Task/结构化完成替代的测试和断言。 | 五日提交审查：60ed27dc、36fff8a4；最终工作区验证待收口 | — | planned | — | 2026-09-10 |
+| Harness-audit-5 | 权威边界及阶段验收历史作为来源保留；不拿旧 verified 行证明当前工作区。 | 五日提交审查：fbf5d639、5caefbbc；527e172a、9705c04b、5b158e9b、a21f7c37、85bb50ce、71a81a99、f5ff7205、c88be040；最终工作区验证待收口 | — | planned | — | 2026-09-10 |
+| Harness-audit-6 | UI/本地化/分层/验收历史保留；沿当前会话投影接线检查，不以领域边界修复为由重写既有 UI。 | 五日提交审查：cc473444、9f27d43b、f397d3d4、66c2bc7c、035caedc、e9d72b0d、45a51b15、b71efb41、093caa82、950fb311、634892ff、8836d929、3a4037f4、bda24070、053330b5、9be5141c、cfb7eaa0；最终工作区验证待收口 | — | planned | — | 2026-09-10 |
+
+新增受控验证：资源仲裁、ProcessSupervisor bounded join、ToolExecutorFactory、toolConcurrency、DebuggerRuntimePolicy、HandoffProviderFixture、Investigation contracts 共 **7 文件 58 测试通过**（2026-09-10 00:26，两个 worker）；相关实现 ESLint 通过。覆盖预取消、取消排队写任务后读任务放行、进程未退出隔离及真实 close 后解锁、精确执行会话进程所有权、结构化预算暂停与两轮执行约束。Knowledge 来源门禁已更新，沙箱运行的两项 realpath EPERM 不能解释为产品失败或通过；宿主复核由全量阶段记录。
+
+原生专项（主执行者报告，2026-09-10 00:21:48）：独立临时 tools 与 vkcube 副本，**2 文件 2 测试通过**，约 27.83s；证据位于本机 TEMP/rdc-native-receipts-LymeYf/validation.json 与 TEMP/rdc-native-lifecycle-jPMM8H。A/restored SHA-256 `52e503065984534330ee321dbca53e164f87ee4d646b5826fc2041bbd28d13c3`，B `e1d873b5e3bdef3d6bfa784b83fe6b5c83e892e275daee8401ae66ca6f7e1357`，源 capture 未修改。这证明该次 native 回执/生命周期路径，不是后来资源仲裁 diff、真实模型调查或 Remote/Android 验证。
+
+当前责任边界：runtime 强制权限、依赖/代次/执行结果、预算、消息所有权与消费、取消/join、进程资源和产物完整性；实际加载的 execution-orchestrator/renderdoc-execution/knowledge-scout/skeptic-review 指令决定工作拆分、探索、独立审查、补证及回评估。计划要求覆盖与科学结论不可由通用代码猜测。
+
+`TODO(UNVERIFIED)`：最终后台消息/收口/取消集成、父子实际 Provider 输入验收、全量 tests/coverage/check:gates/build、Browser QA 和真实模型场景仍须以最终同一 diff 单独收口。执行期间的局部绿色记录不自动升级整项状态；不得承诺总 token 下降。若主执行阶段启动 QA/Electron，须在最终记录补充进程清理和桌面启动权交还证据。
+
+- 2026-09-10 00:27 宿主复核：check-knowledge-system 与 check-investigation-system 均 PASS、hits 0，涵盖上述最新契约 fixture 更新；沙箱 EPERM 未通过修改安全检查规避。
+
+- 2026-09-10 00:33 追加 Capsule 本地预算实现：子账本按本地上限预留，消费同步计入所有祖先；不修改父上限，不复制账本替代共享计费。派发、嵌套和重试不能重置根消耗；截止时间继承祖先 deadline，并取消等待中的 Provider。DelegationBudget/SubagentRunner/TurnCoordinator/ToolExecutorFactory **4 文件 43 测试通过**；类型检查通过。实际加载 Skill/PromptPlan/scoped resources **5 文件 20 测试通过**。后续同一文件并行集成仍须全量复测。
+
+- 2026-09-10 00:47 追加子执行审批/信息请求验证：exact parent owner 响应、跨会话/null/child 身份拒绝、单次消费、取消与迟到响应；完成后的父消息投影保留正文和状态，控件使用真实 child turn/toolCallId；重启后无主进程 pending 的旧问题取消。相关 **7 文件 34 测试通过**。受影响类型检查/ESLint 已分次执行，最终集成与 Browser 控件操作仍待主执行者收口。
+
+- 2026-09-10 01:02–01:04 新增受控证据：ExplorationReviewProviderFixture 实际 AgentLoop / SubagentRunner / PromptPlan / 领域工具 / handoff 捕获父子 Provider 输入，Scout 与 Skeptic 独立会话，原始来源未整体回灌；Challenge 后 General 读取原证据核查条件并回原 Mission，缺少 driver Y 实测诚实保持 partial。图像经过 artifact_read、结果外置路径后仍以 image block 到达子 Provider 输入。此为受控 Provider fixture，不是真实模型科学判断或新 driver 实验。
+- 同期 ArtifactReadTool + ToolResultArtifactizer 2 文件 9 测试通过：根 Session 托管子执行大结果、精确 hash/read grant、分页重建完整错误尾部、视觉内容不被重复外置。ToolResourceArbiter 1 文件 10 测试通过：跨项目 unsafe effects 保守串行、无关只读并行；未确认退出同时保留局部与全局 unsafe 资源，真实退出解锁。最后全库验证仍由最终 diff 收口。
+
+- 2026-09-10 01:17:14 主执行者重新验证最终资源仲裁路径：RdxNativeLifecycle + RdxNativeExecution **2 文件 2 测试通过**，28.68s；证据 TEMP/rdc-native-lifecycle-Qir217 与 TEMP/rdc-native-receipts-y1oZ6I/validation.json。限定 python/rdx 且 command 含本轮 rdc-native- 的进程检查为空。这是该次本机原生路径证据，不能升级为真实模型、Remote/Android 或尚在修复的后台集成验收。
+
+## 2026-09-10 Harness 最终收口（未提交工作区）
+
+本节替代上方本轮各阶段的“集成待收口”状态；那些日期、失败与局部证据保留为历史。基底 HEAD 为 `cfb7eaa0e24d7a7eb74afa25ff246d2551f4bae7`，未提交或推送、未切换分支，`.cursor/` 和桌面设计原稿未修改。最终 src/scripts/resources 共 165 个修改或新增文件的原字节清单 SHA-256 为 `255676af6c62e98f0dd01bd90597a8fea394f604a811d27e2efca84442e46501`，冻结于 2026-09-10 12:59；权威文档在其后补齐验收记录。未给本地 diff 冒填已提交 verified SHA。
+
+### 已有能力、实际缺口及关闭结果
+
+- **单一 AgentLoop、prepareTurn、持久 handoff、领域回执**：删除按 General/Mission/depth 推断 Big Loop、最新 Checkpoint 隐式选择和正文前缀控制；通用执行返回绑定独立于领域完成证据。验证：HandoffProviderFixture、通用完成及领域合同；普通 General 真实简单问答与后台工作均不进入 RDC 流程。
+- **TaskStore 和子执行**：canonical Task v2 区分逻辑任务/执行/代次，绑定依赖和必需输出；补后台托管、取消/join、事件消费及共享预算；替代旧 v1 运行读写。验证：最终全量包含依赖、重试、预算预留失败、取消间隙、停止自身、重复/迟到事件、重启手动恢复与存储失败负路径。
+- **Capsule、PromptPlan、Session Artifact**：结构化且有界回传，原始输出保存在所属 Session；Compact 从权威记录保存并核验后提交；必需 Skill 冻结。验证：受控真实 Provider 请求构建链、原图 image block、跨 Session 拒绝、hash/分页重建、失败不丢上下文；真实 OAuth 请求及重启读取另见下文。
+- **六 lane Knowledge、RDX 独占控制**：保留无 Embedding/无自动晋升；按完整执行区间控制 live lease，未知退出隔离、mutation 不确定先核对、主进程受控重绑定。验证：原生 parser 与 A-B-A/close/open 独立专项已通过；资源/权限/迟到回执负路径进入最终全量。
+- **Browser 事件流、Agent seed COW**：真实 QA 发现 GET EventSource 缺 Origin 导致 401、显式 model-only override 被 seed 当 shadow 清除。验证：改同源 POST fetch SSE，严格 cookie/Origin 不变；显式用户保存使用同一迁移锁与 retained marker、保存失败恢复原字节；实际 UI 事件与重启后 Luna 路由保留。
+- **结构化完成和后台适配器**：真实 QA 发现 turn_complete outputs schema 与通用校验器冲突、unresolved 被错误提升为 missingRequirements、后台事件污染同步等待/最终回复。验证：保留字符串输出类型及必需输出校验；未解条件按原认识等级回传；后台生命周期只经 Task/mailbox，审批入口保留。定向 5 文件 45 测试及最终全量通过，随后真实模型复验通过。
+
+五日 33 提交的分类与依据为上方 Harness-audit-1 至 6，审查现已关闭。8d35ed31 中的通用循环/冻结/领域回执机制保留，越界调度与完成推断删除；7fdd56f1 历史 seed 迁移保留，修正显式用户配置被清除的路径；3bff8172/a31d6c00 六 lane 与 60ed27dc/36fff8a4 legacy/gates 机制保留；其他 UI、架构与历史验收提交沿调用链复核，未扩展无关设计。未以改名、新配置或兼容双轨代替收敛。
+
+### 最终验证
+
+- 完整 `vitest run --coverage --maxWorkers=2`：**361 文件通过 / 4 文件按既有开关跳过，2619 测试通过 / 4 跳过**；2026-09-10 12:59:04 开始，163.25 秒，exit 0。覆盖率 statements 72.00%、branches 62.00%、functions 76.53%、lines 74.31%；coverage ratchet exit 0。跳过项为三项显式原生测试与双请求成本比较；前三项已另跑，未虚构新的成本比较。
+- 最终 typecheck、lint、build 通过；最终 check:gates 与 whitespace 核对由本节追加记录给出。未删测试、未放宽阈值，Knowledge realpath 检查通过主机身份运行，未绕过权限逻辑。日志为本机 TEMP 下 `rdc-harness-final-{coverage-3,ratchet-3,typecheck-6,lint-6,build-3}.log`。
+- 受控模型集成：ExplorationReviewProviderFixture 使用生产 AgentLoop / SubagentRunner / PromptPlan / handoff，Scout 独立探索、Skeptic 独立上下文形成 Challenge、General 按引用补证、回原 Mission 评估；未测 driver Y 保留 partial。该测试证明执行和输入契约，不冒充真实模型科学结论。
+- 原生专项最终资源路径：01:17:14 的 RdxNativeLifecycle/RdxNativeExecution 2 文件 2 测试、28.68 秒；A/restored hash `52e503065984534330ee321dbca53e164f87ee4d646b5826fc2041bbd28d13c3`，B `e1d873b5e3bdef3d6bfa784b83fe6b5c83e892e275daee8401ae66ca6f7e1357`。本轮后续修复不修改这些原生/资源源码。证据 TEMP/rdc-native-receipts-y1oZ6I/validation.json 与 TEMP/rdc-native-lifecycle-Qir217。
+
+### 真实 Browser / OAuth 行为证据
+
+按用户授权，以本设备授权的隔离副本打开 `D:\Projects\agentTest\rdc`，project `proj_fb313da0eedd`、新 session `sess_9fd6daa3c1e2`；真实路由 **chatgpt-account / gpt-5.6-luna / low**，由保存的 Provider 请求与 usage 验证。以下为真实应用，不是 renderer demo 或 fixture server。原项目 capture 未打开或修改。
+
+- 简单 General 请求 19×29 得 551，未创建 Task 或调用工具；POST SSE 正常使 UI 退出 Working。
+- 两个独立后台执行 `execution_1789016216461_aba0744d` 与 `execution_1789016217025_9c06b17f`，实际 Provider 运行区间重叠 **59710ms**。父 turn `turn-ec808cbbc916-1789016181581` 于 12:57:02.604 正常结束；子请求持续至 12:58:00.161 / 12:58:03.254。父回复后执行未被停止，完成后由事件分别续跑父模型，无模型轮询工具。
+- 两个执行均 completed，analysis 分别 3423 / 3851 UTF-8 字节，4 / 5 条 unresolved 与 scope 保留；父输入只有有界投影、明确 externalizedFields 和 URI/hash，未回灌完整子分析或 transcript。实际请求逐项断言路由、Low、父历史隔离、条件保留及 artifact 字节 hash。可复查证据 TEMP/rdc-harness-real-qa-evidence/real-background-provider-proof.json 及脱敏 Provider records；不据此推断总 token 必然降低。
+- 重启后无自动续跑；显式新请求经 artifact_read 读取 A 的同一 hash `40f1591d6fb54de6419154091f835b1b84439f775e49e42890995cd755ef7925`，恢复第一项测试输入/预期、顺序域未定条件与“仅设计、未执行”的适用范围。B hash `bddd5c69e534994b7f054b797b2a3b8ed3958a2ce933834077f9bf66363ab966` 同样通过磁盘字节核验。
+- 真实运行的 QA-CANCEL `execution_1789016583064_374941db`：父回复先结束，点击 **Stop all session work**，545ms 后取消/join 完成并持久化 cancelled；UI 停止入口消失，后续未自动唤醒父模型。证据 real-cancel-proof.json 与 task-state-final.v2.json。取消期间没有 shell/RDX 副作用。
+- 初次真实 QA 的失败记录原样保留：schema 拒绝、错误完成判定、父 final_answer 缺失；未用后来的成功覆盖旧执行。修复后的新执行具有独立 ID，未用重试重置旧预算。
+
+### 责任、边界与桌面交还
+
+runtime 强制权限/所有权/依赖/执行代次/输出存在/预算/取消/join/消息消费/产物完整性；调用方组织 Capsule，实际加载的 Agent/Skill/Prompt 与模型选择直接执行、重探索委派、独立审查、补证和 Small/Big Loop。Mission 最终评估仍在原 Mission；root 两轮 execute/return 是上限，不是自动循环次数。RDC 证据有效性、签名回执、实验恢复保留在领域工具与受控扩展。
+
+本轮已复现的实现缺陷全部修正并复验。外部资格边界仍明确：Remote/Android 真机、本任务以外的 provider/model 组合、真实模型完整 RDC 科学调查的质量/稳定性未由上述受控链路证明；没有将其冒标为通过，也没有以这些限制掩盖已知实现失败。
+
+本轮 Browser/Electron 已停止；最终桌面 `scripts/start-rdc-agent.cmd` 以新临时目录实启并加载 file renderer，未发生占锁失败。最后 Browser lock owner 36264、desktop owner 30448 均已退出；canonical `%APPDATA%/rdc-agent/instance.lock` 不存在，临时锁仅保留死 owner。授权副本及其 Local State 已删除，canonical 授权仍保留；未停止用户其他进程。**桌面启动权已交还**。
+
+- 最终归档：上述 TEMP 证据已复制到仓库约定的本机 QA 路径 %LOCALAPPDATA%/rdc-agent-qa/cfb7eaa0/harness-20260910/，Provider 记录均为应用脱敏副本，无 token/cookie/secret。13:07 最终源指纹复核一致、git diff --check 通过。第一次最终 gates 在 ledger 三列表格上被固定七列 schema 拒绝，已改为条目说明，未修改门禁。
+
+- 2026-09-10 13:10 最终聚合 check:gates exit 0，包含 contracts/Agent capability、会话投影、右栏、Knowledge/Investigation、legacy residue、acceptance ledger、Provider、release config、design tokens 与 renderer structure。日志 rdc-harness-final-gates-6.log；格式修正未触及冻结源码。最终 git diff --check 通过。

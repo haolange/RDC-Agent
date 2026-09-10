@@ -31,6 +31,8 @@ vi.mock('child_process', () => ({
   spawnSync: childState.spawnSync,
 }));
 
+import { withProcessExecutionOwner } from './ResourceExecutionLifetime';
+import { ToolResourceArbiter } from '../workflow/debugger/ToolResourceArbiter';
 import { ProcessSupervisor } from './ProcessSupervisor';
 
 describe('ProcessSupervisor bounded join', () => {
@@ -43,15 +45,28 @@ describe('ProcessSupervisor bounded join', () => {
 
   it('returns unconfirmed_orphan when forced termination has no close event', async () => {
     const supervisor = new ProcessSupervisor();
-    const supervised = supervisor.spawn('other', 'fake-command', [], { isolateProcessGroup: false });
+    const supervised = await withProcessExecutionOwner('parent::subagent::child', async () => supervisor.spawn('other', 'fake-command', [], { isolateProcessGroup: false }));
 
-    const info = await supervised.join(1);
+    const arbiter = new ToolResourceArbiter();
+    const info = await arbiter.runExclusive('project', undefined, () => supervised.join(1));
+    await expect(arbiter.runExclusive('project', undefined, async () => 'bad')).rejects.toThrow('quarantined');
     expect(info.reason).toBe('unconfirmed_orphan');
     expect(supervised.orphaned).toBe(true);
     expect(supervisor.size).toBe(1);
+    expect(supervisor.hasUnconfirmedProcesses('parent::subagent::child')).toBe(true);
+    expect(supervisor.hasUnconfirmedProcesses('other-child')).toBe(false);
+    let joined = false;
+    const join = supervisor.joinExecutionProcesses('parent::subagent::child').then(() => { joined = true; });
+    await Promise.resolve();
+    expect(joined).toBe(false);
 
     childState.child.emit('close', 0, null);
     await expect(supervised.exit).resolves.toMatchObject({ reason: 'timeout' });
     expect(supervisor.size).toBe(0);
+    await join;
+    expect(joined).toBe(true);
+    expect(supervisor.hasUnconfirmedProcesses('parent::subagent::child')).toBe(false);
+    await new Promise((resolve) => setImmediate(resolve));
+    await expect(arbiter.runExclusive('project', undefined, async () => 'recovered')).resolves.toBe('recovered');
   }, 10_000);
 });
