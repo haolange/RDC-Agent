@@ -20,9 +20,7 @@ import { statusCommand } from './builtins/status';
 import { agentsCommand } from './builtins/agents';
 import { versionCommand } from './builtins/version';
 import { undoCommand } from './builtins/undo';
-import { compactCommand } from './builtins/compact';
 import { resumeCommand } from './builtins/resume';
-import { summaryCommand } from './builtins/summary';
 import { costCommand } from './builtins/cost';
 import { usageCommand } from './builtins/usage';
 import { permissionsCommand } from './builtins/permissions';
@@ -58,9 +56,7 @@ function registerBuiltins(registry: CommandRegistry): void {
     agentsCommand,
     versionCommand,
     undoCommand,
-    compactCommand,
     resumeCommand,
-    summaryCommand,
     costCommand,
     usageCommand,
     permissionsCommand,

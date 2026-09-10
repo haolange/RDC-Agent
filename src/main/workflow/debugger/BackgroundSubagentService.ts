@@ -79,11 +79,11 @@ export class BackgroundSubagentService {
     const executionsBeforeStart = await registry.listExecutions();
     const durableParent = input.parentExecutionId ? executionsBeforeStart.find((candidate) => candidate.id === input.parentExecutionId) ?? null : null;
     const previousTaskExecution = [...executionsBeforeStart].reverse().find((candidate) => candidate.taskId === input.taskId && candidate.rootBudgetId);
-    const existingRootBudgetId = durableParent?.rootBudgetId ?? previousTaskExecution?.rootBudgetId ?? input.rootBudgetId ?? `task:${rootTaskId}`;
+    const existingRootBudgetId = durableParent?.rootBudgetId ?? previousTaskExecution?.rootBudgetId ?? input.rootBudgetId;
     const rootPolicyBudget = input.policyBudget ? policyBudgetChain(input.policyBudget).at(-1)! : undefined;
     const rootBudgetId = rootPolicyBudget
       ? await bindTaskRootBudget(registry, input.sessionId, rootPolicyBudget, existingRootBudgetId)
-      : existingRootBudgetId;
+      : existingRootBudgetId ?? `task:${rootTaskId}`;
     const durableRoot = await registry.getRootBudget(rootBudgetId);
     if (input.policyBudget && durableParent?.budget) {
       input.policyBudget.toolCalls = Math.max(input.policyBudget.toolCalls, durableParent.budget.toolCalls);

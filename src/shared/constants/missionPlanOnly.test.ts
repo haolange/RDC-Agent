@@ -16,7 +16,7 @@ describe('mission plan-only allowlist', () => {
       'output',
       'rdx_probe',
     ]);
-    expect(expanded).toEqual(expect.arrayContaining(['read_file', 'task_create', 'task_stop', 'rdx_probe']));
+    expect(expanded).toEqual(expect.arrayContaining(['read_file', 'task_create', 'task_stop', 'turn_complete', 'background_join', 'background_cancel', 'rdx_probe']));
     expect(expanded).not.toContain('shell');
     expect(expanded).not.toContain('code_interpreter');
     expect(expanded).not.toContain('output_register');

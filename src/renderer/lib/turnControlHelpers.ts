@@ -22,6 +22,7 @@ export function resolveTurnControlsForCapabilityChange(input: {
   sessionControls: SessionTurnControlsInput;
   currentControls: ConversationTurnControls;
   rememberedControls: ConversationTurnControls | undefined;
+  sameModelRoute?: boolean;
 }): ConversationTurnControls {
   const {
     previousCapabilityKey,
@@ -33,13 +34,14 @@ export function resolveTurnControlsForCapabilityChange(input: {
     rememberedControls,
   } = input;
 
-  if (sessionChanged || sessionControlsChanged || previousCapabilityKey === null) {
+  if (sessionChanged || sessionControlsChanged) {
     return buildInitialTurnControls(capability, sessionControls);
   }
+  if (previousCapabilityKey === null) return rememberedControls ? sanitizeTurnControls(rememberedControls, capability) : buildInitialTurnControls(capability, sessionControls);
   if (previousCapabilityKey !== nextCapabilityKey) {
     return rememberedControls
       ? sanitizeTurnControls(rememberedControls, capability)
-      : buildInitialTurnControls(capability, null);
+      : input.sameModelRoute ? sanitizeTurnControls(input.currentControls, capability) : buildInitialTurnControls(capability, null);
   }
   return sanitizeTurnControls(input.currentControls, capability);
 }

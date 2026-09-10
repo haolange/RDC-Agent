@@ -26,6 +26,8 @@ import type {
 import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
 
 export interface FrozenAttachmentManifestEntry {
+  material?: import('@shared/types/materialContext').MaterialContext;
+  sourceHash?: string;
   attachmentId: string;
   fileName: string;
   filePath: string;
@@ -133,8 +135,6 @@ export interface PreparedAgentTurnContext {
     filteredArtifactCount: number;
     replayedArtifactCount: number;
     continuationDecisionCounts: Array<{ reason: string; count: number }>;
-    derivedContextStatus: 'none' | 'applied' | 'stale';
-    compactedTurnCount: number;
     compactionState: 'prepared' | 'not-required';
     knowledgeReadRootDiagnostics?: ReadonlyArray<{
       candidate: string;

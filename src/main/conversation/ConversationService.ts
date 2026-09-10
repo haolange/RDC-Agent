@@ -38,7 +38,6 @@ import { rdxSessionService } from '../sessions';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { sessionContextJournal } from './SessionContextJournal';
-import { compactConversationHistory } from './ConversationHistoryCompaction';
 import {
   createDefaultBranchState,
   normalizeBranchId,
@@ -170,14 +169,10 @@ export class ConversationService {
       sessionId,
       sessionContextJournal.readEntries(sessionId).filter((entry) => entry.turnId !== lastUserMessage.turnId),
     );
-    storageAdapter.clearSessionDerivedContextView(sessionId);
     publishConversationTrace(sessionId, nextHistory, sessionId, publishTraceProjection);
     return nextHistory;
   }
 
-  compactHistory(sessionId: string) {
-    return compactConversationHistory(sessionId);
-  }
   async cancelActiveTurn(
     request: ConversationCancelActiveTurnRequest = {},
   ): Promise<ConversationCancelActiveTurnResult> {
@@ -333,6 +328,7 @@ export class ConversationService {
           fileName: attachment.fileName,
           mimeType: attachment.mimeType ?? null,
           declaredSize: attachment.size ?? null,
+          material: attachment.material ?? null,
           contentHash: contentHashes[index],
         }))
         .digest('hex')

@@ -1,14 +1,13 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { createdAtFromTaskId, orderTasks } from './taskProjection';
+import { orderTasks } from './taskProjection';
 import {
   TASK_SCHEMA_VERSION,
   type TaskExecutionMessage,
   type TaskExecutionRecord,
   type TaskRecord,
   type TaskRootBudgetRecord,
-  type TaskStatus,
 } from './TaskContracts';
 
 interface TaskStateDocument {
@@ -49,12 +48,10 @@ const initializations = new Map<string, Promise<void>>();
 export class FileTaskStore implements TaskStore {
   private readonly root: string;
   private readonly statePath: string;
-  private readonly archiveDir: string;
 
   constructor(tasksDir: string) {
     this.root = path.resolve(tasksDir);
-    this.statePath = path.join(this.root, 'task-state.v2.json');
-    this.archiveDir = path.join(this.root, 'archive', 'v1');
+    this.statePath = path.join(this.root, 'task-state.json');
   }
 
   async withLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
@@ -143,34 +140,24 @@ export class FileTaskStore implements TaskStore {
       pending = this.initialize();
       initializations.set(this.root, pending);
     }
-    await pending;
+    try { await pending; } catch (error) {
+      if (initializations.get(this.root) === pending) initializations.delete(this.root);
+      throw error;
+    }
   }
 
   private async initialize(): Promise<void> {
-    await fs.mkdir(this.archiveDir, { recursive: true });
+    await fs.mkdir(this.root, { recursive: true });
     try {
       await this.readStateFile();
       return;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
-
-    const state = emptyState();
-    const entries = await fs.readdir(this.root);
-    for (const name of entries.filter((entry) => /^task_.*\.json$/u.test(entry))) {
-      const source = path.join(this.root, name);
-      const bytes = await fs.readFile(source);
-      const parsed = JSON.parse(bytes.toString('utf8')) as Partial<TaskRecord>;
-      if (typeof parsed.schemaVersion === 'number' && parsed.schemaVersion > TASK_SCHEMA_VERSION) {
-        throw new Error(`Unsupported task schema version ${parsed.schemaVersion} in ${name}.`);
-      }
-      const task = migrateLegacyTask(parsed);
-      if (!task) throw new Error(`Invalid legacy task record: ${name}.`);
-      state.tasks[task.id] = task;
-      const digest = crypto.createHash('sha256').update(bytes).digest('hex');
-      await writeAtomic(path.join(this.archiveDir, `${safe(task.id)}.${digest}.json`), bytes, true);
+    if ((await fs.readdir(this.root)).length) {
+      throw new Error('TASK_STORAGE_REQUIRES_CONVERSION: nonempty task storage has no current task-state.json; original files were preserved.');
     }
-    await this.writeState(state);
+    await this.writeState(emptyState());
   }
 
   private async readStateFile(): Promise<TaskStateDocument> {
@@ -235,67 +222,25 @@ function emptyState(): TaskStateDocument {
   return { schemaVersion: TASK_SCHEMA_VERSION, tasks: {}, executions: {}, messages: {}, rootBudgets: {} };
 }
 
-function migrateLegacyTask(parsed: Partial<TaskRecord>): TaskRecord | null {
-  if (!parsed || typeof parsed.id !== 'string' || typeof parsed.subject !== 'string') return null;
-  const createdAt = typeof parsed.createdAt === 'number' ? parsed.createdAt : createdAtFromTaskId(parsed.id);
-  const legacyStatus = normalizeLegacyStatus(parsed.status);
-  return {
-    schemaVersion: TASK_SCHEMA_VERSION,
-    id: parsed.id,
-    subject: parsed.subject,
-    description: typeof parsed.description === 'string' ? parsed.description : '',
-    status: legacyStatus === 'completed' || legacyStatus === 'in_progress' ? 'blocked' : legacyStatus,
-    statusReason: legacyStatus === 'completed' || legacyStatus === 'in_progress' ? 'Migrated historical state has no execution proof and requires explicit recovery.' : parsed.statusReason,
-    disposition: legacyStatus === 'cancelled' ? 'cancelled' : legacyStatus === 'blocked' || legacyStatus === 'completed' || legacyStatus === 'in_progress' ? 'blocked' : undefined,
-    owner: typeof parsed.owner === 'string' ? parsed.owner : undefined,
-    parentTaskId: undefined,
-    blockedBy: strings(parsed.blockedBy),
-    blocks: strings(parsed.blocks),
-    completionRequirements: [],
-    executionRequired: true,
-    executionIds: [],
-    revision: 1,
-    metadata: { ...(isRecord(parsed.metadata) ? parsed.metadata : {}), migration: 'v1-archived-unverified' },
-    createdAt,
-    updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : createdAt,
-  };
-}
-
-function normalizeLegacyStatus(value: unknown): TaskStatus {
-  if (value === 'in_progress' || value === 'blocked' || value === 'completed' || value === 'cancelled') return value;
-  if (value === 'deleted') return 'cancelled';
-  return 'pending';
-}
-
-async function writeAtomic(target: string, bytes: Buffer, exclusive = false): Promise<void> {
+async function writeAtomic(target: string, bytes: Buffer): Promise<void> {
   await fs.mkdir(path.dirname(target), { recursive: true });
   const temporary = `${target}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`;
   await fs.writeFile(temporary, bytes, { flag: 'wx' });
   try {
-    if (exclusive) {
-      await fs.copyFile(temporary, target, fs.constants.COPYFILE_EXCL);
-      await fs.unlink(temporary);
-    } else {
-      await fs.rename(temporary, target);
+    // Keep the same candidate and store lock while a transient Windows reader
+    // releases the destination. Never remove the authoritative file first.
+    for (let attempt = 0; ; attempt++) {
+      try { await fs.rename(temporary, target); break; }
+      catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (attempt >= 3 || (code !== 'EPERM' && code !== 'EBUSY')) throw error;
+        await new Promise(resolve => setTimeout(resolve, 10 * 2 ** attempt));
+      }
     }
   } catch (error) {
     await fs.unlink(temporary).catch(() => undefined);
-    if (exclusive && (error as NodeJS.ErrnoException).code === 'EEXIST') {
-      const existing = await fs.readFile(target);
-      if (existing.equals(bytes)) return;
-      throw new Error(`Task archive collision contains different bytes: ${target}`);
-    }
     throw error;
   }
-}
-
-function strings(value: unknown): string[] {
-  return Array.isArray(value) ? [...new Set(value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0))] : [];
-}
-
-function safe(value: string): string {
-  if (!/^[\w.-]+$/u.test(value)) throw new Error(`Invalid task storage id: ${value}`);
-  return value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -63,16 +63,11 @@ describe('two complete handoff cycles', () => {
     expect(store.readDocument('session')!.history).toHaveLength(1);
   });
 
-  it('archives v1 bytes verbatim, never resumes its pending transfer, and persists only v2', () => {
+  it('rejects noncurrent handoff storage without writing or resuming it', () => {
     const { root, store } = setup();
-    const original = '{"schemaVersion":"1","active":{"handoffId":"old","lifecycle":"committed","send":true},"history":[{"old":"opaque history"}]}';
+    const original = '{"schemaVersion":"1","active":{"handoffId":"old","lifecycle":"committed","send":true}}';
     fs.writeFileSync(path.join(root, 'handoff-state.json'), original);
-    expect(store.hydrate('session')).toBeNull();
-    expect(fs.readFileSync(path.join(root, 'handoff-state.json.v1-archive'), 'utf8')).toBe(original);
-    expect(store.readDocument('session')).toMatchObject({ schemaVersion: '2', active: null });
-    expect(store.readDocument('session')?.migrationNotice).toContain('重新建立交接');
-    dispatch(store, 'general', 'debugger', 'user', { intent: 'route' });
-    expect(store.readDocument('session')!.history).toHaveLength(1);
-    expect(fs.readFileSync(path.join(root, 'handoff-state.json.v1-archive'), 'utf8')).toBe(original);
+    expect(() => store.hydrate('session')).toThrow(/STORAGE_SCHEMA/);
+    expect(fs.readFileSync(path.join(root, 'handoff-state.json'), 'utf8')).toBe(original);
   });
 });

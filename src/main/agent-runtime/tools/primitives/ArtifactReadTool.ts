@@ -1,7 +1,7 @@
 import { resolveDelegatedArtifactRead } from '../../../sessions/DelegatedArtifactAccess';
 import type { AgentTool } from '../../agent/AgentTool';
 import {
-  ARTIFACT_READ_MAX_OUTPUT_BYTES,
+  ARTIFACT_TOOL_PAGE_BYTES,
   ARTIFACT_READ_MAX_OUTPUT_LINES,
   SessionArtifactError,
 } from '@shared/types/sessionArtifact';
@@ -10,6 +10,7 @@ import { sessionArtifactResolver } from '../../../sessions/SessionArtifactResolv
 interface ArtifactReadParams {
   uri: string;
   offset?: number;
+  column?: number;
   limit?: number;
   expectedHash?: string;
 }
@@ -23,6 +24,7 @@ interface ArtifactReadDetails {
   offset: number;
   limit: number;
   totalLines?: number;
+  next?: { offset: number; column: number };
   owner?: string;
   source?: { toolName: string; toolCallId: string };
 }
@@ -32,7 +34,7 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
   label: '读取会话产物',
   description:
     'Read a session-owned artifact by session:// URI. Only the owning session can be read. '
-    + `Returns at most ${ARTIFACT_READ_MAX_OUTPUT_BYTES} bytes / ${ARTIFACT_READ_MAX_OUTPUT_LINES} lines.`,
+    + `Returns at most ${ARTIFACT_TOOL_PAGE_BYTES} bytes / ${ARTIFACT_READ_MAX_OUTPUT_LINES} lines. Follow the returned next offset and column with the same expectedHash; concatenate page bodies without adding separators.`,
   parameters: {
     type: 'object',
     properties: {
@@ -44,6 +46,7 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
         type: 'integer',
         description: 'Start line number (1-based, default: 1). Ignored for images.',
       },
+      column: { type: 'integer', minimum: 0, description: 'UTF-16 column within the starting line, default 0. Use the exact next.column returned for a split line.' },
       limit: {
         type: 'integer',
         description: `Maximum lines to return (default/max: ${ARTIFACT_READ_MAX_OUTPUT_LINES}).`,
@@ -86,6 +89,8 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
       const scope = resolveDelegatedArtifactRead(context.sessionId, params.uri, params.expectedHash);
       const result = sessionArtifactResolver.read(scope.sessionId, params.uri, {
         offset: params.offset,
+        column: params.column,
+        maxBytes: ARTIFACT_TOOL_PAGE_BYTES,
         limit: params.limit,
         expectedHash: scope.expectedHash,
         ...(context.visionInputMode === 'native' ? { includeImageData: true } : {}),
@@ -97,7 +102,7 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
         `sha256=${result.hash}`,
         result.owner ? `owner=${result.owner}` : null,
         result.source ? `source=${result.source.toolName}/${result.source.toolCallId}` : null,
-        result.truncated ? 'truncated=true' : null,
+        result.next ? `next=${JSON.stringify(result.next)}; continue with same URI/hash, concatenate bodies verbatim` : null,
       ].filter(Boolean).join(' · ');
       if (result.mimeType.startsWith('image/') && !result.imageData) {
         throw new Error('VISION_INPUT_UNSUPPORTED: image evidence requires a native vision route.');
@@ -117,6 +122,7 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
           offset: result.offset,
           limit: result.limit,
           totalLines: result.totalLines,
+          next: result.next,
           owner: result.owner,
           source: result.source,
         },

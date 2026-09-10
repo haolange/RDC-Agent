@@ -354,6 +354,7 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
               prompt: { type: 'string' },
               description: { type: 'string' },
               allowFreeform: { type: 'boolean' },
+              required: { type: 'boolean' },
               options: {
                 type: 'array',
                 items: {
@@ -698,13 +699,6 @@ export const AGENT_WORKBENCH_COMMAND_CATALOG: AgentWorkbenchCommandDeclaration[]
     label: 'Help',
     description: 'Show available profile commands and tool boundaries.',
     relatedTools: [],
-    permission: 'readonly',
-  },
-  {
-    command: '/compact',
-    label: 'Compact',
-    description: 'Request context compaction when the profile can manage context.',
-    relatedTools: ['memory_read'],
     permission: 'readonly',
   },
   {

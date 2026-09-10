@@ -1,23 +1,13 @@
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { PromptPlan } from '@shared/types/rdxRuntime';
-import type { CompiledPromptCache, DerivedContextView } from '@shared/types/semanticContext';
+import type { CompiledPromptCache } from '@shared/types/semanticContext';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 
 export interface PromptCacheCompileInput {
   promptPlan: PromptPlan;
   requestPlan: RequestPlan;
   tools: unknown[];
-  derivedContextView?: DerivedContextView;
 }
-
-const contextFingerprintFor = (
-  view: DerivedContextView | undefined,
-): string | undefined => (view
-  ? hashScopedResource({
-      sourceHash: view.sourceHash,
-      contentHash: view.handoff.contentHash,
-    })
-  : undefined);
 
 const disabledCache = (
   input: PromptCacheCompileInput,
@@ -32,9 +22,6 @@ const disabledCache = (
   stableSegmentIds: [...input.promptPlan.stablePrefix.segmentIds],
   stableTokenEstimate: input.promptPlan.stablePrefix.tokenEstimate,
   providerReported: input.requestPlan.cachePlan.telemetry.length > 0,
-  ...(contextFingerprintFor(input.derivedContextView)
-    ? { contextFingerprint: contextFingerprintFor(input.derivedContextView) }
-    : {}),
   reason,
 });
 
@@ -56,7 +43,6 @@ export class PromptCacheCompiler {
       promptPrefix: input.promptPlan.stablePrefix.fingerprint,
       tools: input.tools,
     });
-    const contextFingerprint = contextFingerprintFor(input.derivedContextView);
     const providerReported = plan.telemetry.length > 0;
     const requestKey = plan.keyCarrier === 'prompt-cache-key'
       ? `rdc:${prefixFingerprint.slice(0, 48)}`
@@ -110,7 +96,6 @@ export class PromptCacheCompiler {
       breakpointCarrier: plan.breakpointCarrier,
       ttl: plan.ttl,
       prefixFingerprint,
-      ...(contextFingerprint ? { contextFingerprint } : {}),
       ...(requestKey ? { requestKey } : {}),
       breakpoint,
       stableSegmentIds: [...input.promptPlan.stablePrefix.segmentIds],

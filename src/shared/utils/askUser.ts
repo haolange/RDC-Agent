@@ -73,6 +73,7 @@ export const normalizeAskUserQuestions = (value: unknown): ConversationAskUserQu
       description,
       options,
       allowFreeform,
+      ...(typeof questionRecord.required === 'boolean' ? { required: questionRecord.required } : {}),
     }];
   });
 };
@@ -93,10 +94,11 @@ export const normalizeAskUserAnswers = (
     const answerRecord = asRecord(entry);
     if (!answerRecord) return [];
     const questionId = readNonEmptyString(answerRecord.questionId);
-    const answer = readNonEmptyString(answerRecord.answer);
+    const responseKind = answerRecord.responseKind === 'unknown' || answerRecord.responseKind === 'skipped' ? answerRecord.responseKind : undefined;
+    const answer = readNonEmptyString(answerRecord.answer) ?? (responseKind === 'unknown' ? 'Unknown; no assumption confirmed.' : responseKind === 'skipped' ? 'Optional question skipped; no decision made.' : null);
     if (!questionId || !answer || !questionIds.has(questionId)) return [];
     const selectedOptionId = readNonEmptyString(answerRecord.selectedOptionId) ?? undefined;
-    return [{ questionId, answer, selectedOptionId }];
+    return [{ questionId, answer, selectedOptionId, ...(responseKind ? { responseKind } : {}) }];
   });
 };
 
@@ -104,11 +106,11 @@ export const formatAskUserAnswersForToolResult = (
   questions: ConversationAskUserQuestion[],
   answers: ConversationAskUserAnswer[],
 ): string => {
-  const answerByQuestionId = new Map(answers.map((answer) => [answer.questionId, answer.answer]));
+  const answerByQuestionId = new Map(answers.map((answer) => [answer.questionId, answer]));
   return questions
     .map((question, index) => {
-      const answer = answerByQuestionId.get(question.questionId) ?? '';
-      return `Q${index + 1}: ${question.prompt}\nA${index + 1}: ${answer}`;
+      const answer = answerByQuestionId.get(question.questionId);
+      return `Q${index + 1}: ${question.prompt}\nA${index + 1}: ${answer?.answer ?? ''}${answer?.responseKind ? `\nResponse status: ${answer.responseKind}; not an approval or verified observation.` : ''}`;
     })
     .join('\n\n');
 };

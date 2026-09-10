@@ -12,7 +12,7 @@ import {
   type ProfileHandoffState,
 } from '@shared/types/profileHandoff';
 import {
-  HANDOFF_STATE_MIGRATIONS,
+  HandoffStateDocumentSchema,
   toHandoffStateDocument,
 } from './handoffStateSchema';
 import type { StorageHost } from './storageHost';
@@ -59,19 +59,10 @@ export class HandoffStateStore {
   readDocument(sessionId: string): HandoffStateDocument | null {
     const filePath = this.getHandoffStatePath(sessionId);
     if (!filePath) return null;
-    if (fs.existsSync(filePath)) {
-      const raw = fs.readFileSync(filePath);
-      let old: unknown;
-      try { old = JSON.parse(raw.toString('utf8')); }
-      catch { return this.host.io.readJson(filePath, HANDOFF_STATE_MIGRATIONS); }
-      if (old && typeof old === 'object' && 'schemaVersion' in old && old.schemaVersion === '1') {
-        const archive = filePath + '.v1-archive';
-        if (!fs.existsSync(archive)) fs.writeFileSync(archive, raw, { flag: 'wx' });
-        else if (!fs.readFileSync(archive).equals(raw)) throw handoffConflict('v1 archive differs; migration stopped.');
-        this.host.io.writeJsonAtomic(filePath, { ...toHandoffStateDocument(null), migrationNotice: '旧交接已原样归档，未推测执行周期；待续跑交接已停用，请按当前目标重新建立交接。' });
-      }
-    }
-    return this.host.io.readJson(filePath, HANDOFF_STATE_MIGRATIONS);
+    if (!fs.existsSync(filePath)) return null;
+    const parsed = HandoffStateDocumentSchema.safeParse(JSON.parse(fs.readFileSync(filePath, 'utf8')));
+    if (!parsed.success) throw new Error('STORAGE_SCHEMA: invalid current handoff document; original file retained.');
+    return parsed.data;
   }
 
   getActive(sessionId: string): ProfileHandoffState | null {

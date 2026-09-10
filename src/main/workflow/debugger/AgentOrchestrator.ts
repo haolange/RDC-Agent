@@ -495,6 +495,7 @@ export class AgentOrchestrator {
             ),
           });
       if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
+      if (options?.frozenDelegationCapsule?.reasoningLevel && planning.plan.reasoningWire.selection !== options.frozenDelegationCapsule.reasoningLevel) throw new Error('DELEGATION_REASONING_UNSUPPORTED: selected route cannot honor the requested reasoning level.');
       const capability = preparedTurn?.effectiveModel
         ?? resolveEffectiveModel(routeProviderId, routeModelId, settings);
       if (!capability) throw new Error(`MODEL_UNAVAILABLE: ${routeProviderId}/${routeModelId}`);

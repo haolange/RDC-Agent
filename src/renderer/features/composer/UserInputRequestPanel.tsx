@@ -44,7 +44,7 @@ export const UserInputRequestPanel: React.FC<{
   const hasValidQuestions = questionCount > 0;
   const currentDraft = currentQuestion ? drafts[currentQuestion.questionId] : undefined;
   const selectedOptionId = currentDraft?.selectedOptionId;
-  const customAnswer = selectedOptionId ? '' : currentDraft?.answer ?? '';
+  const customAnswer = selectedOptionId || currentDraft?.responseKind ? '' : currentDraft?.answer ?? '';
   const isBatch = questionCount > 1;
   const isLastQuestion = currentIndex >= questionCount - 1;
   const currentAnswered = currentQuestion ? isQuestionAnswered(currentQuestion, drafts) : false;
@@ -259,6 +259,14 @@ export const UserInputRequestPanel: React.FC<{
 
       <div className="composer-user-input-footer">
         <span className="composer-user-input-hint">{footerHint}</span>
+        {currentQuestion ? (['unknown', ...(currentQuestion.required === false ? ['skipped'] : [])] as const).map(kind => (
+          <Button key={kind} variant="ghost" size="sm" disabled={isSubmitting}
+            aria-pressed={currentDraft?.responseKind === kind}
+            className={currentDraft?.responseKind === kind ? 'is-selected' : undefined}
+            onClick={() => { setDrafts(previous => ({ ...previous, [currentQuestion.questionId]: { answer: t(kind === 'unknown' ? 'chat.userInputUnknown' : 'chat.userInputSkip'), responseKind: kind as 'unknown' | 'skipped' } })); setError(null); }}>
+            {t(kind === 'unknown' ? 'chat.userInputUnknown' : 'chat.userInputSkip')}
+          </Button>
+        )) : null}
         <Button
           variant="primary"
           size="sm"

@@ -57,6 +57,13 @@ describe('searchTools', () => {
     expect(page.matches.map((m) => m.name)).toEqual(['read_file', 'write_file', 'grep']);
   });
 
+  it('discovers an exact named capability within a descriptive multi-word request without widening the effective set', () => {
+    const tools = [fakeTool({ name: 'subagent', description: 'Delegate to an isolated sub-agent in background mode', category: 'task' }), fakeTool({ name: 'background_wait', category: 'task' })];
+    expect(searchTools(tools, { query: 'subagent background isolated execution', category: 'task', requires_approval: false }).matches[0]?.name).toBe('subagent');
+    expect(searchTools(tools, { query: 'subagent', category: 'web' }).total).toBe(0);
+    expect(searchTools([tools[1]!], { query: 'subagent' }).total).toBe(0);
+  });
+
   it('sorts by name when query is empty', () => {
     const page = searchTools(catalog, {});
     expect(page.matches.map((m) => m.name)).toEqual([
@@ -135,7 +142,7 @@ describe('formatToolSearchResult', () => {
     const page = searchTools([], { query: 'task_create' });
     const text = formatToolSearchResult(page);
     expect(text).toContain('NO_MATCH_IN_EFFECTIVE_TOOL_SET');
-    expect(text).toContain('This result is authoritative.');
+    expect(text).toContain('authoritative for these search filters only');
     expect(text).toContain(page.scopeFingerprint);
   });
 });

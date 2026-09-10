@@ -72,6 +72,8 @@ export type SessionAttachmentKind = 'image' | 'file';
 export type SessionAttachmentLayer = 'image' | 'text' | 'pdf' | 'binary';
 
 export interface SessionAttachmentRecord {
+  material?: import('@shared/types/materialContext').MaterialContext;
+  sourceHash?: string;
   attachmentId: string;
   sessionId: string;
   projectId: string;
@@ -316,10 +318,6 @@ export interface PreparedTurnContextSummary {
     replayedArtifactCount: number;
     droppedArtifactCount: number;
     decisionCounts: Array<{ reason: string; count: number }>;
-  };
-  derivedContext: {
-    status: 'none' | 'applied' | 'stale';
-    compactedTurnCount: number;
   };
   cache: {
     enabled: boolean;

@@ -17,7 +17,6 @@ import {
   ConversationAnswerUserInputArgsSchema,
   ConversationCancelActiveTurnArgsSchema,
   ConversationClearHistoryArgsSchema,
-  ConversationCompactHistoryArgsSchema,
   ConversationGetAttachmentPreviewArgsSchema,
   ConversationGetHistoryArgsSchema,
   ConversationGetToolImagePreviewArgsSchema,
@@ -148,22 +147,6 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
         return { success: false, messages: [], error: 'No session selected.' };
       }
       return { success: true, messages: await conversationService.undoLastTurn(sessionId) };
-    } catch (error) {
-      return { success: false, messages: [], error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-
-  ipcMain.handle('conversation:compactHistory', async (_event, ...rawArgs: unknown[]) => {
-    try {
-      const [sessionId] = parseIpcArgs(ConversationCompactHistoryArgsSchema, rawArgs, {
-        label: 'conversation:compactHistory',
-        maxBytes: 4 * 1024,
-      });
-      if (!sessionId) {
-        return { success: false, messages: [], error: 'No session selected.' };
-      }
-      const compacted = await conversationService.compactHistory(sessionId);
-      return { success: true, ...compacted };
     } catch (error) {
       return { success: false, messages: [], error: error instanceof Error ? error.message : String(error) };
     }

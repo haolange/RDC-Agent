@@ -113,3 +113,13 @@ describe('AgentUserInputRequestService', () => {
     await expect(requestPromise).resolves.toContain('Q2: What keyword should summarize the repo?');
   });
 });
+
+it('preserves unknown and optional skipped answers without selecting a cause or granting approval', async () => {
+  const turnId = 'clarification-status'; const toolCallId = 'clarification-tool';
+  const pending = agentUserInputRequestService.request({ agentId: 'debugger', sessionId: 'session-ask-user', turnId, toolCallId,
+    questions: [{ questionId: 'cause', prompt: 'What changes visually?', options: [], allowFreeform: true }, { questionId: 'reference', prompt: 'Do you have a reference?', options: [], allowFreeform: true, required: false }], context: eventContext });
+  expect(agentUserInputRequestService.answer({ sessionId: 'session-ask-user', turnId, toolCallId, answers: [{ questionId: 'cause', answer: '', responseKind: 'skipped' }, { questionId: 'reference', answer: '', responseKind: 'skipped' }] }).success).toBe(false);
+  expect(agentUserInputRequestService.answer({ sessionId: 'session-ask-user', turnId, toolCallId, answers: [{ questionId: 'cause', answer: '', responseKind: 'unknown' }, { questionId: 'reference', answer: '', responseKind: 'skipped' }] }).success).toBe(true);
+  const result = await pending;
+  expect(result).toContain('Response status: unknown'); expect(result).toContain('Response status: skipped'); expect(result).toContain('not an approval or verified observation');
+});

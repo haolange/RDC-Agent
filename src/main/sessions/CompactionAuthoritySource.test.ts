@@ -25,3 +25,16 @@ describe('authoritative compaction checkpoint', () => {
     await expect(saveCompactionAuthoritySource('session', [])).rejects.toThrow(/hash mismatch/);
   });
 });
+
+it('archives original images as native readable references and excludes private provider state', async () => {
+  const messages = [{ role: 'user' as const, content: [{ type: 'image' as const, data: Buffer.from('original-image').toString('base64'), mimeType: 'image/png' }], timestamp: 1 },
+    { role: 'assistant' as const, content: [{ type: 'thinking' as const, thinking: 'private reasoning' }, { type: 'text' as const, text: 'Hypothesis only' }], providerState: { opaque: 'do-not-expose' }, timestamp: 2 }] as never;
+  const saved = await saveCompactionAuthoritySource('session', messages);
+  expect(io.write.mock.calls[0][2]).toEqual(Buffer.from('original-image'));
+  expect(saved.context).toContain('media-');
+  const manifest = JSON.parse(io.write.mock.calls.at(-1)![2] as string);
+  const recovered = manifest.chunks.join('');
+  expect(recovered).toContain('Original image: session://');
+  expect(recovered).toContain('Hypothesis only');
+  expect(recovered).not.toContain('private reasoning'); expect(recovered).not.toContain('do-not-expose');
+});

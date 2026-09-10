@@ -3,7 +3,6 @@ import type { ConversationMessage } from '@shared/types/conversation';
 import type { AgentMode } from '@shared/types/layout';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { AgentPermissionMode, AppTheme } from '@shared/types/settings';
-import { formatTokenCount } from '@shared/utils/tokens';
 import { translate } from '../../i18n';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -186,29 +185,6 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
         content,
         format === 'json' ? 'application/json' : 'text/markdown',
       );
-      return;
-    }
-    case 'compact-session': {
-      const sessionId = getPayloadString(action, 'sessionId') || context.currentSession?.sessionId;
-      if (!sessionId) {
-        context.showNotice('No session selected.');
-        return;
-      }
-      const result = await electronAPI.conversation.compactHistory(sessionId);
-      if (result.success) {
-        context.setConversationMessages(result.messages);
-        const language = useAppSettingsStore.getState().settings.appearance.language;
-        context.showNotice(result.status === 'compacted' && result.contextView
-          ? translate(language, 'composer.compact.created', {
-            count: result.contextView.sourceTurnIds.length,
-          })
-          : translate(language, 'composer.compact.withinThreshold', {
-            occupied: formatTokenCount(result.occupiedTokens ?? 0),
-            threshold: formatTokenCount(result.compactionThresholdTokens ?? 0),
-          }));
-      } else {
-        context.showNotice(result.error ?? 'Compaction failed.');
-      }
       return;
     }
     case 'undo-session': {

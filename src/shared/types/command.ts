@@ -49,7 +49,6 @@ export type CommandUiAction =
   | { type: 'switch-permissions'; payload: { mode: string } }
   | { type: 'resume-session'; payload: { sessionId: string } }
   | { type: 'export-session'; payload: { sessionId: string; format?: 'markdown' | 'json' } }
-  | { type: 'compact-session'; payload: { sessionId: string } }
   | { type: 'undo-session'; payload: { sessionId: string } }
   | { type: 'clear-session'; payload: { sessionId: string } }
   | { type: 'run-skill'; payload: { skillId: string } };

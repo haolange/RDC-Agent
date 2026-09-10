@@ -58,13 +58,16 @@ export function searchTools(tools: ToolSearchToolInfo[], params: ToolSearchParam
   const limit = clampLimit(params.limit);
   const offset = clampOffset(params.offset);
 
+  const terms = query.split(/\s+/u).filter(Boolean);
+  const score = (tool: ToolSearchToolInfo): number => {
+    const name = tool.name.toLowerCase();
+    const description = tool.description.toLowerCase();
+    return terms.reduce((total, term) => total + (name === term ? 100 : name.includes(term) ? 10 : description.includes(term) ? 1 : 0), 0);
+  };
   let matches = tools.slice();
 
   if (query) {
-    matches = matches.filter((tool) => (
-      tool.name.toLowerCase().includes(query)
-      || tool.description.toLowerCase().includes(query)
-    ));
+    matches = matches.filter((tool) => score(tool) > 0);
   }
   if (category) {
     matches = matches.filter((tool) => (tool.spec?.category ?? '').toLowerCase() === category);
@@ -74,14 +77,7 @@ export function searchTools(tools: ToolSearchToolInfo[], params: ToolSearchParam
   }
 
   if (query) {
-    matches.sort((a, b) => {
-      const aNameHit = a.name.toLowerCase().includes(query);
-      const bNameHit = b.name.toLowerCase().includes(query);
-      if (aNameHit !== bNameHit) {
-        return aNameHit ? -1 : 1;
-      }
-      return a.name.localeCompare(b.name);
-    });
+    matches.sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
   } else {
     matches.sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -112,7 +108,7 @@ export function formatToolSearchResult(page: ToolSearchPage): string {
       'No matching tools exist in the effective tool set for this turn.',
       `Code: ${page.code}`,
       `Effective tool set fingerprint: ${page.scopeFingerprint}`,
-      'This result is authoritative. Do not repeat the same search unless the effective tool set fingerprint changes.',
+      'This result is authoritative for these search filters only, not proof that a capability is unavailable. Try its exact tool name without category/approval filters, or list tools with an empty query. Do not repeat identical filters unless the effective tool set fingerprint changes.',
     ].join('\n');
   }
 
@@ -167,7 +163,7 @@ export function createToolSearchTool(getAllTools: () => ToolSearchToolInfo[]): A
     parameters: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Search query (partial name or description match)' },
+        query: { type: 'string', description: 'Search keywords (space-separated; ranked name or description matches)' },
         category: { type: 'string', description: 'Filter by category (file, search, system, comm, web, task)' },
         requires_approval: { type: 'boolean', description: 'Filter by whether the tool requires approval' },
         limit: { type: 'number', description: `Max results to return (default ${DEFAULT_LIMIT}, max ${MAX_LIMIT})` },

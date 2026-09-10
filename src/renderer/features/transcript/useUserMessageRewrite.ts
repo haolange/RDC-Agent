@@ -95,6 +95,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         message: nextContent,
         attachments: message.attachments?.map((attachment) => ({
           sourcePath: attachment.filePath,
+          material: attachment.material,
           fileName: attachment.fileName,
           mimeType: attachment.mimeType,
           size: attachment.size,

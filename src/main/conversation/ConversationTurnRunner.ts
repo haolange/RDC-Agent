@@ -31,7 +31,7 @@ import { hydrateFrozenUserContent } from './ConversationAttachmentMaterializer';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
 import type { TurnCompletionValidator } from '../agent-runtime/agent/TurnCompletionValidator';
 import { buildHandoffAgentEvent } from './profileHandoffEvents';
-import type { PendingHandoff } from '../workflow/debugger/TurnCoordinator';
+import type { PendingHandoff, TurnCompletionDeclaration } from '../workflow/debugger/TurnCoordinator';
 import type {
   ActiveConversationTurn,
   AgentRoutePreflightOk,
@@ -169,6 +169,7 @@ export async function completeProfileTurn(
     status: 'complete' | 'stopped' | 'error';
   } | null } = { value: null };
   let terminalHandoff: PendingHandoff | null = null;
+  const terminalCompletion: { value: TurnCompletionDeclaration | null } = { value: null };
 
   const applyAssistantMessagePatch = (
     type: ConversationStreamEvent['type'],
@@ -502,6 +503,7 @@ export async function completeProfileTurn(
               status: result.status,
             };
             terminalHandoff = result.pendingHandoff ?? null;
+            terminalCompletion.value = result.completionDeclaration ?? null;
           },
           onEvent: createAgentEventHandler({
             host, sessionId, input, agentLabel, turnStreamState,
@@ -522,6 +524,8 @@ export async function completeProfileTurn(
         turnId: assistantMessage.turnId,
         sessionId,
         finalAnswerText: canonicalOutput.finalAnswerText,
+        disposition: terminalCompletion.value?.disposition,
+        evidenceRefs: terminalCompletion.value?.evidenceRefs,
         pendingHandoff: Boolean(terminalHandoff),
         pendingHandoffTarget: (terminalHandoff as PendingHandoff | null)?.toProfile,
       });

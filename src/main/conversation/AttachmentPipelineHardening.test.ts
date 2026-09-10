@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -123,4 +124,18 @@ describe('staging quota and preview realpath', () => {
       path.join(link, 'secret.png'),
     )).toThrow(/IMAGE_PREVIEW_PATH_ESCAPE|symlink/i);
   });
+});
+
+it('carries material context into the actual input and rejects changed committed bytes', async () => {
+  const filePath = path.join(tempRoot, 'constraint.md'); const text = 'No reference image; preserve normal highlights.';
+  fs.writeFileSync(filePath, text);
+  const material = { intent: 'Only tear duct bright dots', documentLocation: 'Section 2, paragraph 3', comparison: { group: 'eye', role: 'baseline' as const, conditions: 'same camera and exposure' } };
+  const record = { attachmentId: 'material', fileName: 'constraint.md', filePath, sourceHash: createHash('sha256').update(text).digest('hex'), material, kind: 'file' as const, layer: 'text' as const, mimeType: 'text/markdown', size: Buffer.byteLength(text), sessionId: 'session', projectId: 'project', createdAt: 1 };
+  const input = await materializeAgentUserInput('help', [record], 'disabled');
+  expect(JSON.stringify(input.content)).toContain('Only tear duct bright dots');
+  expect(JSON.stringify(input.content)).toContain('not verified observations or authorization');
+  expect(input.attachmentManifest[0]).toMatchObject({ material, sourceHash: record.sourceHash });
+  expect(await hydrateFrozenUserContent(input.content, input.attachmentManifest, [record])).toEqual(input.content);
+  fs.writeFileSync(filePath, 'Changed after prepare');
+  await expect(hydrateFrozenUserContent(input.content, input.attachmentManifest, [record])).rejects.toThrow('ATTACHMENT_SOURCE_CHANGED');
 });

@@ -20,6 +20,7 @@ export interface CompactionHandoffExecution {
   plan: RequestPlan;
   credentialHandle: string;
   transcript: string;
+  signal?: AbortSignal;
 }
 
 export function buildCompactionPromptPlan(transcript: string): PromptPlan {
@@ -55,6 +56,7 @@ export function buildCompactionPromptPlan(transcript: string): PromptPlan {
 export async function executeCompactionHandoff(
   input: CompactionHandoffExecution,
 ): Promise<AssistantMessage> {
+  input.signal?.throwIfAborted();
   const promptPlan = buildCompactionPromptPlan(input.transcript);
   const turnId = generateEventId('compaction-handoff');
   const messages = [{
@@ -120,12 +122,14 @@ export async function executeCompactionHandoff(
       reasoning: input.plan.reasoningWire,
       temperature: input.plan.temperature,
       maxTokens: COMPACTION_MAX_OUTPUT_TOKENS,
+      signal: input.signal,
     },
   );
   for await (const _event of stream) {
     // Drain the stream so terminal errors settle before result().
   }
   const message = await stream.result();
+  input.signal?.throwIfAborted();
   requestSnapshotStore.complete(snapshot.id, input.sessionId, turnId, {
     inputTokens: message.usage.inputTokens,
     outputTokens: message.usage.outputTokens,
@@ -135,6 +139,9 @@ export async function executeCompactionHandoff(
     cacheMissTokens: message.usage.cacheMissTokens,
     reasoningTokens: message.usage.reasoningTokens,
   });
+  if (message.stopReason !== 'stop') {
+    throw new Error(`COMPACTION_INCOMPLETE: provider ended with ${message.stopReason}; original context retained.`);
+  }
   const text = message.content
     .filter((block) => block.type === 'text')
     .map((block) => block.text)

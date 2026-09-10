@@ -188,7 +188,6 @@ describe('AgentOrchestrator prepared turn context', () => {
       contextWindowTokens: 500_000,
       contextMode: 'normal',
       compactionApplied: false,
-      derivedContext: { status: 'none', compactedTurnCount: 0 },
       cache: {
         enabled: false,
         breakpoint: 'none',

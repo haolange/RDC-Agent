@@ -11,7 +11,7 @@ import { generateEventId, nowMs } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
 import { resolveTurnOutputTokens } from '@shared/utils/contextBudget';
 import { Agent } from '../../agent-runtime/agent/Agent';
-import { ContextManager } from '../../agent-runtime/agent/ContextManager';
+import { createExecutionContextManager } from '../../agent-runtime/context/ExecutionContextWindow';
 import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
 import { ErrorRecovery } from '../../agent-runtime/agent/ErrorRecovery';
 import type { ToolExecutor } from '../../agent-runtime/agent/AgentLoop';
@@ -205,19 +205,18 @@ export class AgentTurnRunner {
       resolveEffectiveModel(providerId, modelId, settingsService.getAll()),
     )).reasoningContract;
 
-    const contextManager = new ContextManager({
-      modelId,
-      contextTokenLimit: resolvedContextTokenLimit,
-      toolResultBudget: 200 * 1024,
-      keepRecentToolResults: 3,
-      tokenizer: this.deps.tokenizerService,
+    const contextManager = createExecutionContextManager({
+      sessionId: executionScopeId, provider: routeProvider,
+      model: resolveEffectiveModel(providerId, modelId, settingsService.getAll()),
+      plan: streamOptions.requestPlan, credentialHandle: streamOptions.credentialHandle,
+      config: { modelId, contextTokenLimit: resolvedContextTokenLimit, tokenizer: this.deps.tokenizerService },
     });
 
     // ErrorRecovery：错误分类与恢复策略（retry/reactive_compact/continue/abort）。
     // fallbackModel 暂省略（无 settings route fallback 配置时只做非 switch 恢复）。
     const errorRecovery = new ErrorRecovery({ primaryModel: agentModel });
 
-    const agent = new Agent({
+    const agent: Agent = new Agent({
       initialState: {
         model: agentModel,
         systemPrompt,
@@ -229,14 +228,15 @@ export class AgentTurnRunner {
       toolExecutor,
       streamOptions,
       maxTurns: this.resolveMaxTurns(agentId, policyMaxTurns, profileMaxTurns),
-      // transformContext：长对话接近窗口上限时自动压缩历史。
-      transformContext: (messages, signal) => contextManager.compress(messages, signal),
-      // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
+      transformContext: (messages, signal, onProgress) => {
+        contextManager.setRequestTokenLimit(requestCompactionThreshold - promptPlan.totalTokenEstimate - charsToTokens(JSON.stringify(agent.state.tools).length));
+        return contextManager.compress(messages, signal, onProgress);
+      },
       errorRecovery,
       resolveMaxTokens: (messages) => resolveTurnOutputTokens({
         contextWindowTokens: streamOptions.requestPlan.contextWindowTokens,
         maxOutputTokens: streamOptions.requestPlan.maxOutputTokens,
-        promptTokens: this.deps.tokenizerService.countMessagesTokens(messages, modelId),
+        promptTokens: promptPlan.totalTokenEstimate + charsToTokens(JSON.stringify(agent.state.tools).length) + this.deps.tokenizerService.countMessagesTokens(messages, modelId),
       }),
       onRequest: async ({ model, context: requestContext, streamOptions: requestOptions, mailboxDeliveries }) => {
         const callIndex = requestSnapshotStore.nextCallIndex(executionScopeId, turnSignature || undefined);

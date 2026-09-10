@@ -8,10 +8,8 @@ import {
   toSessionAttachmentManifest,
   SESSION_USAGE_MIGRATIONS,
   SESSION_SHELL_STATE_MIGRATIONS,
-  SESSION_CONTEXT_VIEW_MIGRATIONS,
   toSessionUsageManifest,
   toSessionShellStateManifest,
-  toSessionContextViewManifest,
   SESSION_RUN_MIGRATIONS,
   CONVERSATION_TURN_COMMIT_MIGRATIONS,
   CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
@@ -224,68 +222,6 @@ describe('session shell-state schema', () => {
       { schemaVersion: '9', state: { cwd: 'D:/Projects/app' } },
       SESSION_SHELL_STATE_MIGRATIONS,
       'shell-state.json',
-    )).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-  });
-});
-
-describe('session context-view schema', () => {
-  const legalView = {
-    schemaVersion: 1 as const,
-    viewId: 'context-view-test',
-    scope: 'session' as const,
-    sessionId: 'session-1',
-    branchId: 'branch-root',
-    sourceTurnIds: ['turn-1'],
-    retainedTurnIds: ['turn-2'],
-    sourceHash: 'hash-source',
-    createdAt: 1,
-    handoff: {
-      schemaVersion: 1 as const,
-      handoffId: 'handoff-test',
-      kind: 'derived-compaction' as const,
-      derivation: 'model-generated' as const,
-      objective: 'Inspect the capture.',
-      decisions: [],
-      constraints: [],
-      facts: [],
-      openWork: [],
-      resourceRefs: [],
-      source: {
-        turnIds: ['turn-1'],
-        messageCount: 1,
-        messageHashes: ['hash-message'],
-        sourceHash: 'hash-source',
-      },
-      contentHash: 'hash-content',
-    },
-  };
-
-  it('wraps a legacy bare view without derivation as v1 extractive', () => {
-    const { derivation: _derivation, ...legacyHandoff } = legalView.handoff;
-    const legacyView = { ...legalView, handoff: legacyHandoff };
-    const parsed = parseStoredDocument(legacyView, SESSION_CONTEXT_VIEW_MIGRATIONS, 'context-view.json');
-    expect(parsed.schemaVersion).toBe('1');
-    expect(parsed.view.handoff.derivation).toBe('deterministic-extractive');
-  });
-
-  it('wraps a legacy bare view as v1', () => {
-    expect(parseStoredDocument(legalView, SESSION_CONTEXT_VIEW_MIGRATIONS, 'context-view.json'))
-      .toEqual({ schemaVersion: '1', view: legalView });
-  });
-
-  it('accepts a current wrapped document', () => {
-    expect(parseStoredDocument(
-      toSessionContextViewManifest(legalView),
-      SESSION_CONTEXT_VIEW_MIGRATIONS,
-      'context-view.json',
-    )).toEqual({ schemaVersion: '1', view: legalView });
-  });
-
-  it('fail-closes an unknown higher context-view schemaVersion', () => {
-    expect(() => parseStoredDocument(
-      { schemaVersion: '9', view: legalView },
-      SESSION_CONTEXT_VIEW_MIGRATIONS,
-      'context-view.json',
     )).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
   });
 });

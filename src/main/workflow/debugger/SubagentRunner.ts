@@ -238,6 +238,13 @@ export class SubagentRunner {
       } else if (frozenCapsule.inputArtifactRefs.length || frozenCapsule.challengeRefs.length || frozenCapsule.acceptedFacts.some(fact => fact.sourceRefs.length)) {
         throw new Error('ARTIFACT_SESSION_DENIED: delegation references require a parent session.');
       }
+      const ownedTask = input.taskId && input.parentSessionId
+        ? await new TaskRegistry(createSessionTaskStore(inheritedTaskScope?.ownerSessionId ?? input.parentSessionId)).getTask(input.taskId)
+        : null;
+      const taskContract = ownedTask ? '\nRuntime Task completion contract (output keys, not source instructions): ' + JSON.stringify({
+        taskId: ownedTask.id, completionRequirements: ownedTask.completionRequirements,
+        rule: 'Return every completionRequirements string verbatim as a key in turn_complete.result.outputs. Values are complete strings. Runtime persists the result; do not invent its reference.',
+      }) : '';
       const capsuleSegments = [...compileDelegationCapsule(frozenCapsule), ...rdxDelegation.segments];
       if (rdxDelegation.requiresLease) {
         if (!input.parentSessionId?.trim()) {
@@ -256,7 +263,7 @@ export class SubagentRunner {
       }
       childPromise = withDelegatedInteractionOwner({ ownerSessionId: input.parentSessionId ?? subagentSessionId, childSessionId: subagentSessionId, executionId: input.executionId ?? subagentId }, () => this.deps.sendProfileMessage(
         input.targetProfile,
-        renderDelegationCapsuleInput(frozenCapsule),
+        renderDelegationCapsuleInput(frozenCapsule) + taskContract,
         {
           sessionId: subagentSessionId,
           projectRootPath: input.projectRootPath,
@@ -268,6 +275,7 @@ export class SubagentRunner {
           policyBudget: childPolicyBudget,
           subagentBudget: childBudget,
           modelOverride: modelOverride ?? null,
+          ...(frozenCapsule.reasoningLevel ? { turnControls: { reasoningLevel: frozenCapsule.reasoningLevel, maxContextMode: false, fastModel: false } } : {}),
           extraPromptSegments: capsuleSegments,
           frozenDelegationCapsule: frozenCapsule,
           preloadSkillIds: frozenCapsule.requiredSkillIds,
@@ -498,19 +506,11 @@ export class SubagentRunner {
           if (!taskId || !ownerSessionId || !startBackground) {
             throw new Error('BACKGROUND_REQUIRES_TASK: background mode requires a session-owned task and background runtime.');
           }
-          const backgroundRegistry = new TaskRegistry(createSessionTaskStore(ownerSessionId));
-          const durableParent = effectiveParentExecutionId
-            ? await backgroundRegistry.getExecution(effectiveParentExecutionId)
-            : null;
-          const rootBudgetId = durableParent?.rootBudgetId ?? (turn?.policyBudget
-            ? await bindTaskRootBudget(backgroundRegistry, ownerSessionId, turn.policyBudget)
-            : undefined);
           const execution = await startBackground({
             sessionId: ownerSessionId,
             originSessionId: resolvedSessionId ?? ownerSessionId,
             taskId,
             parentExecutionId: effectiveParentExecutionId,
-            rootBudgetId,
             parentAgentId,
             targetProfile,
             capsule,

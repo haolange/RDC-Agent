@@ -43,6 +43,7 @@ vi.mock('../../settings/EffectiveModelResolver', () => ({
   },
 }));
 
+import { TaskRegistry, type TaskRecord } from '../../agent-runtime/tasks';
 import { SubagentRunner } from './SubagentRunner';
 import { createSubagentBudgetState, createPolicyBudgetState, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
@@ -132,6 +133,19 @@ describe('SubagentRunner', () => {
     expect(parentEvents.some((e) => e.type === 'subagent.started')).toBe(true);
     expect(parentEvents.some((e) => e.type === 'subagent.delta')).toBe(true);
     expect(parentEvents.some((e) => e.type === 'subagent.completed')).toBe(true);
+  });
+
+  it('passes authoritative Task output keys to the isolated child without parent history', async () => {
+    const getTask = vi.spyOn(TaskRegistry.prototype, 'getTask').mockResolvedValue({ id: 'owned', completionRequirements: ['analysis', 'limitations'] } as TaskRecord);
+    let request = '';
+    const runner = new SubagentRunner({ sendProfileMessage: async (_profile, content) => { request = content; return 'done'; }, systemPromptForAgent: () => 'stable', getActiveTurn: () => null });
+    try {
+      const result = await runner.runSubagent({ parentAgentId: 'general', parentSessionId: 'task-contract-parent', parentToolCallId: 'call', taskId: 'owned', targetProfile: 'general', capsule: testCapsule() });
+      expect(result.status).toBe('complete');
+      expect(getTask).toHaveBeenCalledWith('owned');
+      expect(request).toContain('"completionRequirements":["analysis","limitations"]');
+      expect(request).toContain('Delegated task capsule');
+    } finally { getTask.mockRestore(); }
   });
 
   it('runSubagent marks cancelled when parent already aborted', async () => {
@@ -351,7 +365,7 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      capsule: testCapsule(),
+      capsule: { ...testCapsule(), reasoningLevel: 'low' },
       parentSessionId: 'parent',
       model: 'openai:gpt-5.6-sol',
     });
@@ -360,6 +374,7 @@ describe('SubagentRunner', () => {
       expect.stringContaining('"task":"inspect"'),
       expect.objectContaining({
         modelOverride: { providerId: 'openai', modelId: 'gpt-5.6-sol' },
+        turnControls: { reasoningLevel: 'low', maxContextMode: false, fastModel: false },
         sessionId: expect.stringContaining('::subagent::'),
         extraPromptSegments: expect.arrayContaining([
           expect.objectContaining({ kind: 'delegation-capsule', id: 'delegation:contract' }),

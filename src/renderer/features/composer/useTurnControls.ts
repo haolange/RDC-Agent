@@ -44,6 +44,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const lastSessionIdRef = useRef<string | null>(null);
   const lastCapabilityKeyRef = useRef<string | null>(null);
   const lastSessionControlsKeyRef = useRef<string>('none');
+  const lastRouteIdentityRef = useRef<string | null>(null);
   const retryCapability = useEffectiveModelCapability(
     agentId,
     routeFingerprint,
@@ -56,6 +57,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
     ? `${agentId}:${capability.providerId}:${capability.modelId}:${capability.route.protocol}:${capability.catalogRevision}:${capability.routeRevision}`
     : null;
   const sessionControlsKey = buildSessionTurnControlsKey(sessionControls);
+  const routeIdentity = capability ? `${capability.providerId}:${capability.modelId}:${capability.route.protocol}` : null;
 
   useEffect(() => {
     const sessionChanged = lastSessionIdRef.current !== sessionId;
@@ -65,6 +67,8 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
 
     if (sessionChanged) clearRememberedControls();
     if (!capability || !capabilityKey) {
+      if (!sessionChanged && previousCapabilityKey) rememberControls(previousCapabilityKey, store.turnControls);
+      lastCapabilityKeyRef.current = null;
       if (sessionChanged || sessionControlsChanged) {
         setTurnControls(buildInitialTurnControls(null, sessionControls));
       }
@@ -90,10 +94,12 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
       sessionControls,
       currentControls: store.turnControls,
       rememberedControls,
+      sameModelRoute: lastRouteIdentityRef.current === routeIdentity,
     }));
 
     lastSessionIdRef.current = sessionId;
     lastCapabilityKeyRef.current = capabilityKey;
+    lastRouteIdentityRef.current = routeIdentity;
     lastSessionControlsKeyRef.current = sessionControlsKey;
   }, [
     sessionId,
@@ -101,6 +107,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
     sessionControls,
     capability,
     capabilityKey,
+    routeIdentity,
     setTurnControls,
     rememberControls,
     clearRememberedControls,

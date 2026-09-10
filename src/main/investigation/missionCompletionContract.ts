@@ -94,6 +94,9 @@ export function enforceMissionTurnCompletion(input: MissionCompletionInput): Mis
   }
   if (!isMissionAgentId(input.profileId)) return;
   if (input.pendingHandoff) return;
+  // Ending a conversational reply does not declare the investigation complete.
+  // Task return bindings above remain mandatory even for ordinary replies.
+  if (!input.disposition) return;
   if (input.disposition === 'partial' || input.disposition === 'blocked' || input.disposition === 'cancelled') return;
   if (allowsBudgetPause(input, input.service ?? investigationArtifactService)) return;
   return assertMissionTurnCompletion(input);

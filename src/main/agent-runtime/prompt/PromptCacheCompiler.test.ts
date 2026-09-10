@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { CachePlan, RequestPlan } from '@shared/types/providerCapability';
 import type { PromptPlan } from '@shared/types/rdxRuntime';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import { assembleDerivedContextView, testHandoffSections } from '../context/StructuredHandoffBuilder';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { PromptCacheCompiler } from './PromptCacheCompiler';
 
@@ -90,30 +89,19 @@ const openAiCachePlan: CachePlan = {
 };
 
 describe('PromptCacheCompiler', () => {
-  it('keeps request routing keys stable while derived context changes', () => {
+  it('keeps request routing keys stable for the same frozen prefix and tools', () => {
     const compiler = new PromptCacheCompiler();
-    const firstView = assembleDerivedContextView(
-      [{ role: 'user', content: 'first context', timestamp: 1 }],
-      { scope: 'ephemeral', createdAt: 1, sections: testHandoffSections('first context') },
-    );
-    const secondView = assembleDerivedContextView(
-      [{ role: 'user', content: 'second context', timestamp: 2 }],
-      { scope: 'ephemeral', createdAt: 2, sections: testHandoffSections('second context') },
-    );
     const first = compiler.compile({
       promptPlan: promptPlan(),
       requestPlan: requestPlan(openAiCachePlan),
       tools: [{ name: 'read_file' }],
-      derivedContextView: firstView,
     });
     const second = compiler.compile({
       promptPlan: promptPlan(),
       requestPlan: requestPlan(openAiCachePlan),
       tools: [{ name: 'read_file' }],
-      derivedContextView: secondView,
     });
     expect(first.requestKey).toBe(second.requestKey);
-    expect(first.contextFingerprint).not.toBe(second.contextFingerprint);
     expect(first).toMatchObject({
       enabled: true,
       breakpoint: 'automatic-and-explicit',

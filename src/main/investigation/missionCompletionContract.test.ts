@@ -55,6 +55,11 @@ describe('missionCompletionContract', () => {
     })).not.toThrow();
   });
 
+  it.each(MISSIONS)('%s can clarify an intent without claiming investigation completion', profileId => {
+    expect(() => enforceMissionTurnCompletion({ profileId, sessionId: SESSION_ID, finalAnswerText: 'What should this area look like?' })).not.toThrow();
+    expect(() => enforceMissionTurnCompletion({ profileId, sessionId: SESSION_ID, finalAnswerText: 'Done.', disposition: 'completed', service: createInvestigationHarness().service })).toThrow(MissionCompletionError);
+  });
+
   it.each(['partial', 'blocked', 'cancelled'] as const)('allows honest %s without promoting a report', disposition => {
     expect(() => enforceMissionTurnCompletion({ profileId: 'debugger', sessionId: SESSION_ID, finalAnswerText: 'Unresolved.', disposition })).not.toThrow();
   });

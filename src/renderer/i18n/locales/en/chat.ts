@@ -1,4 +1,6 @@
 export const enChat = {
+  'chat.userInputUnknown': "I don't know",
+  'chat.userInputSkip': 'Skip this question',
   'chat.you': 'You',
   'chat.system': 'System',
   'chat.thinking': 'Thinking',
@@ -180,6 +182,9 @@ export const enChat = {
   'chat.workProcessVerb.investigationListComplete': 'Listed investigation artifacts',
   'chat.workProcessVerb.investigationListRunning': 'Listing investigation artifacts',
   'chat.workProcessCompactTitle': 'Earlier work summarized',
+  'chat.workProcessCompactRunning': 'Preparing context',
+  'chat.workProcessCompactComplete': 'Context automatically compacted',
+  'chat.workProcessCompactFailed': 'Context preparation failed',
   'chat.workProcessCompactAuto': 'Automatic compaction',
   'chat.workProcessCompactManual': 'Manual compaction',
   'chat.workProcessTaskSnapshotCount': '{completed} of {total} completed',

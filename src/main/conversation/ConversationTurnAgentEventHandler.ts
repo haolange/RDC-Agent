@@ -141,29 +141,40 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
             if (event.type === 'context.compacted') {
               const payload = event.payload as {
                 summary?: string;
+                compactionId?: string;
+                usage?: { inputTokens: number; outputTokens: number };
+                status?: 'running' | 'complete' | 'error';
+                sourceUri?: string;
+                sourceHash?: string;
                 messagesBefore?: number;
                 messagesAfter?: number;
                 tokensBefore?: number;
                 tokensAfter?: number;
               };
               const summary = typeof payload.summary === 'string' ? payload.summary.trim() : '';
-              if (summary && !seenCompactionSummaries.has(summary)) {
-                seenCompactionSummaries.add(summary);
+              const status = payload.status ?? 'complete';
+              const identity = payload.compactionId ?? event.id;
+              const notificationKey = `${identity}:${status}`;
+              if (summary && !seenCompactionSummaries.has(notificationKey)) {
+                seenCompactionSummaries.add(notificationKey);
                 commitAssistantMessage('message_patched', {
-                  workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, `compaction-${event.id}`, {
+                  workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, `compaction-${identity}`, {
                     kind: 'compaction',
-                    title: '自动压缩',
+                    title: status === 'running' ? '正在整理上下文' : status === 'complete' ? '上下文已自动压缩' : '上下文整理失败',
                     stage: 'context',
-                    status: 'complete',
+                    status,
                     summary,
                     compactionStats: {
                       provenance: 'auto',
+                      usage: payload.usage,
+                      sourceUri: payload.sourceUri,
+                      sourceHash: payload.sourceHash,
                       messagesBefore: payload.messagesBefore,
                       messagesAfter: payload.messagesAfter,
                       tokensBefore: payload.tokensBefore,
                       tokensAfter: payload.tokensAfter,
                     },
-                    completedAt: nowMs(),
+                    ...(status === 'running' ? { startedAt: nowMs() } : { completedAt: nowMs() }),
                   }),
                 });
               }

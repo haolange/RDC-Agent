@@ -142,6 +142,13 @@ export class AgentUserInputRequestService {
     for (const question of pending.questions) {
       const answer = answerByQuestionId.get(question.questionId);
       if (!answer) continue;
+      if (answer.responseKind === 'skipped' && question.required !== false) {
+        return { success: false, error: `Question ${question.questionId} is required; answer or choose unknown.` };
+      }
+      if (answer.responseKind === 'unknown' || answer.responseKind === 'skipped') {
+        if (answer.selectedOptionId) return { success: false, error: 'An unknown or skipped answer cannot select a proposed explanation.' };
+        continue;
+      }
       if (!question.allowFreeform && !answer.selectedOptionId) {
         return { success: false, error: `Question ${question.questionId} requires one of the provided options.` };
       }

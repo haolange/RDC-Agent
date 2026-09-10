@@ -13,10 +13,7 @@ import {
   type SessionContextTurnEntry,
 } from './SessionContextJournal';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import {
-  assembleDerivedContextView,
-  testHandoffSections,
-} from '../agent-runtime/context/StructuredHandoffBuilder';
+
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -353,7 +350,6 @@ describe('SessionContextJournal v2', () => {
       });
     });
     vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue(entries);
-    vi.spyOn(storageAdapter, 'readSessionDerivedContextView').mockReturnValue(null);
 
     const result = journal.materialize(
       'session-1',
@@ -439,7 +435,6 @@ describe('SessionContextJournal v2', () => {
           ...terminal,
         ],
       })]);
-      vi.spyOn(storageAdapter, 'readSessionDerivedContextView').mockReturnValue(null);
       const sameRoute = journal.materialize('session-1', ['turn-1'], plan);
       expect(sameRoute.replayedArtifactCount).toBe(1);
       expect(sameRoute.filteredArtifactCount).toBe(0);
@@ -491,7 +486,6 @@ describe('SessionContextJournal v2', () => {
       ],
     }));
     vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue(entries);
-    vi.spyOn(storageAdapter, 'readSessionDerivedContextView').mockReturnValue(null);
 
     const result = journal.materialize(
       'session-1',
@@ -577,7 +571,6 @@ describe('SessionContextJournal v2', () => {
       ],
     })]);
 
-    vi.spyOn(storageAdapter, 'readSessionDerivedContextView').mockReturnValue(null);
     const result = journal.materialize('session-1', ['turn-1'], anthropicPlan);
     expect(result.filteredArtifactCount).toBe(1);
     expect(result.messages.map((message) => message.role)).toEqual(['user', 'assistant', 'toolResult']);
@@ -587,180 +580,4 @@ describe('SessionContextJournal v2', () => {
     ]);
   });
 
-  it('applies a valid structured derived view and then replays retained and new turns', () => {
-    const journal = new SessionContextJournal();
-    const first = entry({
-      turnId: 'turn-1',
-      userMessageId: 'user-1',
-      assistantMessageId: 'assistant-1',
-      messages: [
-        { role: 'user', content: 'Inspect the capture.', timestamp: 1 },
-        assistant([{ type: 'text', text: 'Found event 42.' }]),
-      ],
-    });
-    const second = entry({
-      turnId: 'turn-2',
-      userMessageId: 'user-2',
-      assistantMessageId: 'assistant-2',
-      messages: [{ role: 'user', content: 'Keep the finding.', timestamp: 2 }],
-    });
-    const third = entry({
-      turnId: 'turn-3',
-      userMessageId: 'user-3',
-      assistantMessageId: 'assistant-3',
-      messages: [{ role: 'user', content: 'Continue.', timestamp: 3 }],
-    });
-    const view = assembleDerivedContextView(first.messages, {
-      scope: 'session',
-      sessionId: 'session-1',
-      branchId: 'branch-root',
-      sourceTurnIds: ['turn-1'],
-      retainedTurnIds: ['turn-2'],
-      messageSourceRefs: ['turn:turn-1:message:0', 'turn:turn-1:message:1'],
-      createdAt: 10,
-      sections: testHandoffSections('Inspect the capture.'),
-    });
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([first, second, third]);
-    vi.spyOn(storageAdapter, 'readSessionDerivedContextView').mockReturnValue(view);
-
-    const result = journal.materialize(
-      'session-1',
-      ['turn-1', 'turn-2', 'turn-3'],
-      responsesPlan,
-      'branch-root',
-    );
-
-    expect(result).toMatchObject({
-      derivedContextStatus: 'applied',
-      compactedTurnCount: 1,
-      selectedTurnCount: 3,
-      derivedContextView: { viewId: view.viewId },
-    });
-    expect(result.messages[0]).toMatchObject({
-      role: 'user',
-      derivedContext: { viewId: view.viewId, sourceHash: view.sourceHash },
-    });
-    expect(result.messages.slice(1).map((message) => message.role)).toEqual(['user', 'user']);
-  });
-
-  it('fails closed to the canonical transcript when a derived view is stale', () => {
-    const journal = new SessionContextJournal();
-    const first = entry({
-      turnId: 'turn-1',
-      messages: [{ role: 'user', content: 'Current source.', timestamp: 1 }],
-    });
-    const second = entry({
-      turnId: 'turn-2',
-      userMessageId: 'user-2',
-      assistantMessageId: 'assistant-2',
-      messages: [{ role: 'user', content: 'Latest turn.', timestamp: 2 }],
-    });
-    const staleView = assembleDerivedContextView(
-      [{ role: 'user', content: 'Old source.', timestamp: 1 }],
-      {
-        scope: 'session',
-        sessionId: 'session-1',
-        branchId: 'branch-root',
-        sourceTurnIds: ['turn-1'],
-        retainedTurnIds: ['turn-2'],
-        createdAt: 10,
-        sections: testHandoffSections('Old source.'),
-      },
-    );
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([first, second]);
-    vi.spyOn(storageAdapter, 'readSessionDerivedContextView').mockReturnValue(staleView);
-
-    const result = journal.materialize(
-      'session-1',
-      ['turn-1', 'turn-2'],
-      responsesPlan,
-      'branch-root',
-    );
-
-    expect(result).toMatchObject({ derivedContextStatus: 'stale', compactedTurnCount: 0 });
-    expect(result.derivedContextView).toBeUndefined();
-    expect(result.messages.map((message) => message.role)).toEqual(['user', 'user']);
-    expect(result.messages[0]).not.toHaveProperty('derivedContext');
-  });
-
-  it('skips derived compaction while occupancy is within the compaction line', () => {
-    const journal = new SessionContextJournal();
-    const clear = vi.spyOn(storageAdapter, 'clearSessionDerivedContextView').mockImplementation(() => undefined);
-    const write = vi.spyOn(storageAdapter, 'writeSessionDerivedContextView').mockImplementation(() => undefined);
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([
-      entry({ turnId: 'turn-1' }),
-      entry({ turnId: 'turn-2' }),
-      entry({ turnId: 'turn-3' }),
-      entry({ turnId: 'turn-4' }),
-    ]);
-
-    expect(journal.createDerivedView(
-      'session-1',
-      ['turn-1', 'turn-2', 'turn-3', 'turn-4'],
-      'branch-root',
-      { occupiedTokens: 100_000, compactionThresholdTokens: 160_000 },
-    )).toBeNull();
-    expect(clear).toHaveBeenCalledWith('session-1');
-    expect(write).not.toHaveBeenCalled();
-  });
-
-  it('compacts older turns when occupancy exceeds the compaction line', () => {
-    const journal = new SessionContextJournal();
-    vi.spyOn(storageAdapter, 'clearSessionDerivedContextView').mockImplementation(() => undefined);
-    const write = vi.spyOn(storageAdapter, 'writeSessionDerivedContextView').mockImplementation(() => undefined);
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([
-      entry({
-        turnId: 'turn-1',
-        messages: [{ role: 'user', content: 'Oldest.', timestamp: 1 }],
-      }),
-      entry({
-        turnId: 'turn-2',
-        userMessageId: 'user-2',
-        assistantMessageId: 'assistant-2',
-        messages: [{ role: 'user', content: 'Older.', timestamp: 2 }],
-      }),
-      entry({
-        turnId: 'turn-3',
-        userMessageId: 'user-3',
-        assistantMessageId: 'assistant-3',
-        messages: [{ role: 'user', content: 'Recent.', timestamp: 3 }],
-      }),
-      entry({
-        turnId: 'turn-4',
-        userMessageId: 'user-4',
-        assistantMessageId: 'assistant-4',
-        messages: [{ role: 'user', content: 'Latest.', timestamp: 4 }],
-      }),
-    ]);
-
-    const view = journal.createDerivedView(
-      'session-1',
-      ['turn-1', 'turn-2', 'turn-3', 'turn-4'],
-      'branch-root',
-      { occupiedTokens: 180_000, compactionThresholdTokens: 160_000 },
-      3,
-      testHandoffSections('Oldest.'),
-    );
-    expect(view?.sourceTurnIds).toEqual(['turn-1']);
-    expect(view?.retainedTurnIds).toEqual(['turn-2', 'turn-3', 'turn-4']);
-    expect(write).toHaveBeenCalled();
-  });
-
-  it('fails closed when occupancy exceeds the line but handoff sections are missing', () => {
-    const journal = new SessionContextJournal();
-    vi.spyOn(storageAdapter, 'clearSessionDerivedContextView').mockImplementation(() => undefined);
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([
-      entry({ turnId: 'turn-1' }),
-      entry({ turnId: 'turn-2' }),
-      entry({ turnId: 'turn-3' }),
-      entry({ turnId: 'turn-4' }),
-    ]);
-
-    expect(() => journal.createDerivedView(
-      'session-1',
-      ['turn-1', 'turn-2', 'turn-3', 'turn-4'],
-      'branch-root',
-      { occupiedTokens: 180_000, compactionThresholdTokens: 160_000 },
-    )).toThrow(/COMPACTION_SECTIONS_REQUIRED/);
-  });
 });

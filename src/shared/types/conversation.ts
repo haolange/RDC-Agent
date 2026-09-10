@@ -54,7 +54,10 @@ export interface ConversationTaskSnapshot {
 }
 
 export interface ConversationCompactionStats {
+  usage?: { inputTokens: number; outputTokens: number };
   provenance: ConversationCompactionProvenance;
+  sourceUri?: string;
+  sourceHash?: string;
   messagesBefore?: number;
   messagesAfter?: number;
   tokensBefore?: number;
@@ -315,6 +318,7 @@ export interface ConversationGetAttachmentPreviewResult {
 }
 
 export interface ConversationAttachmentInput {
+  material?: import('@shared/types/materialContext').MaterialContext;
   sourcePath: string;
   fileName: string;
   mimeType?: string | null;
@@ -394,12 +398,14 @@ export interface ConversationAskUserQuestion {
   description?: string;
   options: ConversationAskUserOption[];
   allowFreeform: boolean;
+  required?: boolean;
 }
 
 export interface ConversationAskUserAnswer {
   questionId: string;
   answer: string;
   selectedOptionId?: string;
+  responseKind?: 'answered' | 'unknown' | 'skipped';
 }
 
 export interface ConversationAnswerUserInputRequest {

@@ -1,10 +1,3 @@
-import type { DerivedContextView } from '@shared/types/semanticContext';
-import {
-  assembleDerivedContextView,
-  computeContextSourceHash,
-  createStructuredHandoffMessage,
-  type ModelHandoffSections,
-} from '../agent-runtime/context/StructuredHandoffBuilder';
 import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
@@ -47,9 +40,6 @@ export interface SessionContextMaterialization {
   replayedArtifactCount: number;
   filteredArtifactCount: number;
   artifactDecisions: SessionContextArtifactDecision[];
-  derivedContextStatus: 'none' | 'applied' | 'stale';
-  derivedContextView?: DerivedContextView;
-  compactedTurnCount: number;
 }
 
 /**
@@ -133,46 +123,13 @@ export class SessionContextJournal {
     sessionId: string,
     visibleTurnIds: string[],
     requestPlan: RequestPlan,
-    activeBranchId?: string,
+    _activeBranchId?: string,
   ): SessionContextMaterialization {
     const entries = this.readEntries(sessionId);
     const entryByTurn = new Map(entries.map((entry) => [entry.turnId, entry]));
     const missingTurnIds = visibleTurnIds.filter((turnId) => !entryByTurn.has(turnId));
     if (missingTurnIds.length > 0) {
       throw new Error('Session context journal is incomplete for ' + missingTurnIds.length + ' visible turn(s).');
-    }
-
-    const storedView = storageAdapter.readSessionDerivedContextView(sessionId);
-    let derivedContextStatus: SessionContextMaterialization['derivedContextStatus'] = 'none';
-    let appliedView: DerivedContextView | undefined;
-    let compactedTurnCount = 0;
-    let materializedTurnIds = visibleTurnIds;
-    const prefixMessages: Message[] = [];
-    if (storedView) {
-      const sourceCount = storedView.sourceTurnIds.length;
-      const sourceIsPrefix = sourceCount > 0
-        && storedView.sourceTurnIds.every((turnId, index) => visibleTurnIds[index] === turnId);
-      const retainedFollowSource = storedView.retainedTurnIds.every(
-        (turnId, index) => visibleTurnIds[sourceCount + index] === turnId,
-      );
-      const sourceMessages = sourceIsPrefix
-        ? storedView.sourceTurnIds.flatMap((turnId) => entryByTurn.get(turnId)?.messages ?? [])
-        : [];
-      const sourceHashMatches = sourceIsPrefix
-        && computeContextSourceHash(sourceMessages, storedView.sourceTurnIds) === storedView.sourceHash;
-      const ownerMatches = storedView.schemaVersion === 1
-        && storedView.scope === 'session'
-        && storedView.sessionId === sessionId
-        && (!activeBranchId || storedView.branchId === activeBranchId);
-      if (ownerMatches && sourceHashMatches && retainedFollowSource) {
-        derivedContextStatus = 'applied';
-        appliedView = storedView;
-        compactedTurnCount = sourceCount;
-        materializedTurnIds = visibleTurnIds.slice(sourceCount);
-        prefixMessages.push(createStructuredHandoffMessage(storedView));
-      } else {
-        derivedContextStatus = 'stale';
-      }
     }
 
     let filteredArtifactCount = 0;
@@ -182,7 +139,7 @@ export class SessionContextJournal {
     // 制品按 retention-expired 丢弃，required 制品仍走 replay policy。
     const retentionStartIndex = Math.max(0, visibleTurnIds.length - CONTINUATION_RETENTION_TURNS);
     const retainedForReplay = new Set(visibleTurnIds.slice(retentionStartIndex));
-    const messages = materializedTurnIds.flatMap((turnId) => {
+    const messages = visibleTurnIds.flatMap((turnId) => {
       const entry = entryByTurn.get(turnId);
       if (!entry) return [];
       const withinRetention = retainedForReplay.has(turnId);
@@ -195,58 +152,14 @@ export class SessionContextJournal {
       });
     });
     return {
-      messages: [...prefixMessages, ...messages],
+      messages,
       selectedTurnCount: visibleTurnIds.length,
       replayedArtifactCount,
       filteredArtifactCount,
       artifactDecisions,
-      derivedContextStatus,
-      ...(appliedView ? { derivedContextView: appliedView } : {}),
-      compactedTurnCount,
     };
   }
 
-  createDerivedView(
-    sessionId: string,
-    visibleTurnIds: string[],
-    branchId: string,
-    occupancy: { occupiedTokens: number; compactionThresholdTokens: number },
-    keepRecentTurns = 3,
-    sections?: ModelHandoffSections,
-  ): DerivedContextView | null {
-    const withinCompactionLine = occupancy.occupiedTokens <= occupancy.compactionThresholdTokens;
-    if (withinCompactionLine || visibleTurnIds.length <= keepRecentTurns) {
-      storageAdapter.clearSessionDerivedContextView(sessionId);
-      return null;
-    }
-    if (!sections) {
-      throw new Error('COMPACTION_SECTIONS_REQUIRED: model-generated handoff sections are missing.');
-    }
-    const entries = this.readEntries(sessionId);
-    const entryByTurn = new Map(entries.map((entry) => [entry.turnId, entry]));
-    const missingTurnIds = visibleTurnIds.filter((turnId) => !entryByTurn.has(turnId));
-    if (missingTurnIds.length > 0) {
-      throw new Error('Cannot compact an incomplete session context journal.');
-    }
-    const sourceTurnIds = visibleTurnIds.slice(0, -keepRecentTurns);
-    const retainedTurnIds = visibleTurnIds.slice(-keepRecentTurns);
-    const sourceEntries = sourceTurnIds.map((turnId) => entryByTurn.get(turnId)!);
-    const sourceMessages = sourceEntries.flatMap((entry) => entry.messages);
-    const messageSourceRefs = sourceEntries.flatMap((entry) =>
-      entry.messages.map((_, index) => 'turn:' + entry.turnId + ':message:' + index),
-    );
-    const view = assembleDerivedContextView(sourceMessages, {
-      scope: 'session',
-      sessionId,
-      branchId,
-      sourceTurnIds,
-      retainedTurnIds,
-      messageSourceRefs,
-      sections,
-    });
-    storageAdapter.writeSessionDerivedContextView(sessionId, view);
-    return view;
-  }
   append(sessionId: string, entry: SessionContextTurnEntry): void {
     const canonicalEntry = canonicalizeSessionContextTurnEntry(entry);
     const duplicate = this.readEntries(sessionId).find((candidate) => candidate.turnId === entry.turnId);

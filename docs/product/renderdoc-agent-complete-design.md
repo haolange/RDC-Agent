@@ -470,7 +470,7 @@ offline subagent 的 Capsule 不得携带 RDX lease；省略 `domainExtensions.r
 | L2 Task / Episode | Task 完成后压缩动作流 | Outcome、Accepted Evidence、Rejected Attempts、产物、未决问题、副作用 |
 | L3 Mission Compact | Big Loop / 预算耗尽 / 跨会话恢复 | 从 Tasks、Accepted Claims、Evidence、Experiment、Challenges、Manifest **重新生成**，禁止对已失真 Summary 再压缩 |
 
-图片不得只留自然语言摘要：Visual Claim + Summary + Before / After / Diff Artifact + Region。现有 `/compact` 的 `StructuredHandoff` 仍是实现载体；凡 compact / report / view 投影出的 Claim 必须带非空 `compactProvenance`，遵守 §8.4 算法与 `S-CLAIM-01` / `S-CTX-01`。
+图片不得只留自然语言摘要：Visual Claim + Summary + Before / After / Diff Artifact + Region。自动压缩复用 `StructuredHandoff`、PromptPlan 与可恢复原始来源；产品无手动压缩入口；凡 compact / report / view 投影出的 Claim 必须带非空 `compactProvenance`，遵守 §8.4 算法与 `S-CLAIM-01` / `S-CTX-01`。
 
 ---
 
@@ -748,3 +748,21 @@ Experiment 可选 executionEvidence 五阶段引用的字段、签名、顺序�
 RDC 委派沿用通用 root/child-local 双层预算，不独立计费或恢复额度：同步与后台 Scout/Skeptic 恢复各自局部执行账本，根上限不被局部 Capsule 改写，根消费与 deadline 不因重新委派或回评估重置。已有 live root 不能静默换绑另一旧调查 root；此请求由 runtime 明确拒绝，模型需在授权范围内组织独立执行上下文。同 root 并发绑定由 runtime 保证只合并一次，不由指令手工扣账。
 
 Mission/General handoff 的 prepared/consumed/接收执行取消转交遵守通用合同。取消已发生时，接收者必须在新 Provider 请求或领域工具效果前承接 Stop；只有 producer 与进程退出确认后才能记任务 cancelled。取消不证明实验 rollback，不能替代领域回执。以上是实现合同；最终验证状态仍以 acceptance ledger 中的对应证据为准。
+
+
+## 产品连续性收敛（2026-09-10）
+
+桌面完整设计书用于领域目标核对；本轮用户补充约束优先。Investigation 仍为垂直 Session Artifact，Context 复用 PromptPlan 与引用，Knowledge 六 lane、无 Embedding、无自动晋升，两轮 execute/return 与重启手动继续不变。已有 Harness 实现复用，不建立版本命名的平行引擎或存储。
+
+澄清是目标形成：先读可获取材料，再用少量渐进问题确认区域、期望、参考与验收；允许不知道、非必需问题跳过及自由补充。回答进入实际工具结果、计划和 Task 修订，不能升级为工具观察、已验证原因或 mutation 授权。普通 General 和简单问题沿直接执行路径；重探索与独立审查按方法 Skill 委派。
+
+材料支持原始附件 hash、用户意图、归一化 ROI、文档位置、时间范围及 Before/Reference/After/Diff 配对条件。派生窗口须引用持久原文与媒体；存在引用不表示模型已看见。来源变化使冻结附件读取失败，用户修订与工具事实分开保留。自动压缩无普通用户入口，原始可见历史不删除，失败保留原窗口。
+
+本轮真实 Debugger 材料为眼睛泪腺白点 capture；没有参考图，事件 6152 仅为线索，IBL/specular/leakage 仅为竞争假设。必须保留正常高光，不能以整体压暗或局部未复现宣称修复。真实项目 Ground Truth 继续按已约定分期；受控 fixture、真实模型请求与原生 RDX 证据分别登记。Debugger 不替代 Analyzer/Optimizer 的旅程验收。实现及实测边界见 acceptance ledger。
+
+普通澄清、材料确认和下一步回复不自动宣告调查完成。领域扩展仅在显式 `turn_complete(completed)` 时校验完整报告；逻辑 Task 的必需执行与交付要求、绑定委派的返回合同仍独立强制。文本里的“完成”不构成运行时完成证据。
+
+
+材料交互保留原始文件、来源 hash、用户意图、归一化 ROI、文档位置、音视频时间范围和比较组/角色/条件。Composer 可选择区域并补充描述，transcript 原位打开原图与条件，比较按同组材料展开；这些是用户标注，不自动升级为工具观察。派生视图不得覆盖原图或把人工示意图标成 capture 证据。任务来源与用户后续修订分别进入 Journal 和委派，模型必须说明来源差异。
+
+同一会话可见分支内，分多条消息上传的同组材料也在原图对照中一起展示；不跨 Session 聚合。原附件仍为打开入口，Esc 关闭恢复该入口焦点。

@@ -148,6 +148,18 @@ describe('RuntimeToolAssembly', () => {
     })).toThrow('未声明字段');
   });
 
+  it('returns domain rejection before recording completion so the model can correct its declaration', async () => {
+    const turn = { completionDeclaration: undefined } as unknown as TurnHandle;
+    const tool = createAssembly().createTurnCompletionTool(turn, async value => {
+      await Promise.resolve();
+      if (value.disposition === 'completed') throw new Error('REPORT_REQUIRED');
+    });
+    await expect(tool.execute('wrong-completion', { disposition: 'completed' })).rejects.toThrow('REPORT_REQUIRED');
+    expect(turn.completionDeclaration).toBeUndefined();
+    await tool.execute('corrected', { disposition: 'partial' });
+    expect(turn.completionDeclaration?.disposition).toBe('partial');
+  });
+
   beforeEach(() => {
     dispatchRuntimeHooks.mockReset();
     dispatchRuntimeHooks.mockImplementation(async () => true);

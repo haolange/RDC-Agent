@@ -275,11 +275,10 @@ export function translateCoreToSharedAgentEvent(
       );
     }
     case 'compaction': {
+      const { type: _type, ...progress } = event;
       return buildSharedAgentEvent(
         'context.compacted',
-        {
-          summary: event.summary,
-        },
+        progress,
         context,
       );
     }

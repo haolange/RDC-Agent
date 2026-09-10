@@ -1,3 +1,4 @@
+import { enforceMissionTurnCompletion } from '../../investigation/missionCompletionContract';
 import { validateInvestigationHandoff } from '../../investigation/investigationHandoffValidation';
 import { HANDOFF_CONTRACT_JSON_SCHEMA } from '@shared/types/handoffContract';
 import { validateHandoffArtifacts } from '../../sessions/handoffArtifacts';
@@ -19,7 +20,7 @@ import { handoffController } from '../../agent-runtime/agent/HandoffController';
 import { isHandoffDeclaredModelValid } from '../../sessions/profileHandoffModel';
 import { settingsService } from '../../settings/SettingsService';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
-import { TaskRegistry, createSessionTaskStore, type TaskCompletionResult, type TaskExecutionRecord } from '../../agent-runtime/tasks';
+import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope, type TaskCompletionResult, type TaskExecutionRecord } from '../../agent-runtime/tasks';
 import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
@@ -106,7 +107,7 @@ export class RuntimeToolAssembly {
     return assembleTaskRuntimeTools({ sessionId, turnHandle, getActiveTurn: this.deps.getActiveTurn });
   }
 
-  createTurnCompletionTool(turnHandle?: TurnHandle | null): AgentTool {
+  createTurnCompletionTool(turnHandle?: TurnHandle | null, validate?: (value: TurnCompletionDeclaration) => void | Promise<void>): AgentTool {
     return {
       name: 'turn_complete',
       label: 'Complete Turn',
@@ -122,7 +123,7 @@ export class RuntimeToolAssembly {
           result: {
             type: 'object', required: ['summary', 'outputs', 'counterevidence', 'unresolved', 'scope', 'sideEffects', 'recoveryState'], additionalProperties: false,
             properties: {
-              summary: { type: 'string', maxLength: 4000 }, outputs: { type: 'object', description: 'Named string outputs matching the Task completion requirements.' },
+              summary: { type: 'string', maxLength: 4000 }, outputs: { type: 'object', description: 'Named string outputs matching the Task completion requirements. Serialize structured values as strings.' },
               counterevidence: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
               unresolved: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
               scope: { type: 'string', maxLength: 4000 }, sideEffects: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
@@ -148,7 +149,9 @@ export class RuntimeToolAssembly {
           if (rawResult && Object.values(rawResult.outputs ?? {}).some((value) => typeof value !== 'string')) {
             throw new Error('TURN_COMPLETION_INVALID: result.outputs values must be strings.');
           }
-          turnHandle.completionDeclaration = { disposition: disposition as TurnCompletionDeclaration['disposition'], evidenceRefs, ...(rawResult ? { result: rawResult } : {}) };
+          const declaration = { disposition: disposition as TurnCompletionDeclaration['disposition'], evidenceRefs, ...(rawResult ? { result: rawResult } : {}) };
+          await validate?.(declaration);
+          turnHandle.completionDeclaration = declaration;
         }
         return { content: [{ type: 'text', text: `Turn completion recorded: ${String(disposition)}.` }] };
       },
@@ -178,7 +181,7 @@ export class RuntimeToolAssembly {
             content: [{
               type: 'text',
               text: sessionId
-                ? 'No RDX runtime context lease is owned by this session.'
+                ? 'The capture is not open in this session. Ask the user to select the capture and click Open in the Capture section. Preserve the confirmed goal; do not describe internal leases or diagnose a rendering cause.'
                 : 'RDX runtime context requires an owning sessionId (no global fallback).',
             }],
             details: { available: false },
@@ -199,7 +202,7 @@ export class RuntimeToolAssembly {
     return {
       name: 'ask_user',
       label: 'Ask User',
-      description: 'Ask the user for a decision or missing information. Use this when progress depends on user input.',
+      description: 'Help form the user goal, scope, expected result and acceptance criteria, or request information that materially changes the plan. Read available materials first; ask a few progressive questions without requiring a diagnosis. Unknown and optional skip are supported. Answers do not grant approval.',
       parameters: {
         type: 'object',
         required: ['questions'],
@@ -207,7 +210,7 @@ export class RuntimeToolAssembly {
           questions: {
             type: 'array',
             minItems: 1,
-            description: 'Batch of user questions. A single question is represented as an array with one item.',
+            description: 'Ask one to three questions per round when useful; continue progressively after answers instead of front-loading a questionnaire. A single question is an array with one item.',
             items: {
               type: 'object',
               required: ['prompt'],
@@ -216,9 +219,10 @@ export class RuntimeToolAssembly {
                 prompt: { type: 'string', description: 'The concise question to ask the user.' },
                 description: { type: 'string', description: 'Optional supporting context shown below the question title.' },
                 allowFreeform: { type: 'boolean', description: 'Whether the user may type a custom answer. Defaults to true.' },
+                required: { type: 'boolean', description: 'Set false for questions the user may explicitly skip. Unknown is always available. Answers form requirements, never mutation approval.' },
                 options: {
                   type: 'array',
-                  description: 'Optional mutually exclusive choices.',
+                  description: 'Optional mutually exclusive SINGLE-SELECT choices. Never say multiple selection is available; the user can supplement freely.',
                   items: {
                     type: 'object',
                     required: ['label'],
@@ -815,7 +819,16 @@ export class RuntimeToolAssembly {
     for (const tool of this.createTaskRuntimeTools(sessionId, turnHandle)) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
-    const turnCompletionTool = this.createTurnCompletionTool(turnHandle);
+    const turnCompletionTool = this.createTurnCompletionTool(turnHandle, async declaration => {
+      const scope = sessionId ? getDelegatedTaskScope(sessionId) : null;
+      if (scope && declaration.disposition === 'completed') {
+        const task = await new TaskRegistry(createSessionTaskStore(scope.ownerSessionId)).getTask(scope.rootTaskId);
+        if (!task) throw new Error('TASK_NOT_FOUND: cannot declare completion without the owning Task.');
+        const missing = task.completionRequirements.filter(key => !declaration.result?.outputs[key]);
+        if (missing.length) throw new Error(`TURN_COMPLETION_INVALID: result.outputs must contain these exact Task keys: ${JSON.stringify(missing)}. Correct the structured result before completing.`);
+      }
+      enforceMissionTurnCompletion({ profileId: agentId, sessionId, disposition: declaration.disposition, evidenceRefs: declaration.evidenceRefs, finalAnswerText: JSON.stringify(declaration) });
+    });
     availableTools.set(turnCompletionTool.name, turnCompletionTool);
     if (!excludeRdxLeaseTools) {
       const rdxContextTool = this.createRdxContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);

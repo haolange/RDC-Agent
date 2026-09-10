@@ -82,6 +82,7 @@ export interface AgentOptions {
   transformContext?: (
     messages: AgentMessage[],
     signal?: AbortSignal,
+    onProgress?: (progress: import('../core/types').CompactionProgress) => void,
   ) => Promise<TransformContextResult>;
   /** 动态 API key 获取（支持 OAuth token 刷新）。 */
   getApiKey?: (provider: string) => Promise<string | undefined>;

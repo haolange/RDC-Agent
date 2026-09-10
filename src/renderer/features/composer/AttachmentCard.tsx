@@ -1,3 +1,6 @@
+import { MaterialContextEditor } from '../../patterns/MaterialContextEditor';
+import { Button } from '../../ui';
+import type { MaterialContext } from '@shared/types/materialContext';
 import React, { useEffect, useState } from 'react';
 import type { PendingAttachmentDraft } from '../../types/attachments';
 import { ellipsizeFileName, fileExtensionLabel, formatBytes } from '../../services/attachmentHelpers';
@@ -19,6 +22,7 @@ export const AttachmentCard: React.FC<{
   visionUnsupportedLabel: string;
   removeLabel: string;
   onRemove: (attachmentId: string) => void;
+  onMaterialChange: (attachmentId: string, material: MaterialContext) => void;
 }> = ({
   attachment,
   composerScopeKey,
@@ -26,8 +30,10 @@ export const AttachmentCard: React.FC<{
   visionUnsupportedLabel,
   removeLabel,
   onRemove,
+  onMaterialChange,
 }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const [editing, setEditing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const failed = Boolean(attachment.error);
   const warning = !failed && attachment.layer === 'image' && visionUnsupported;
@@ -70,6 +76,8 @@ export const AttachmentCard: React.FC<{
         </span>
         <span className="composer-attachment-card-meta">{meta}</span>
       </span>
+      {!failed && <Button variant="ghost" onClick={() => setEditing(true)} aria-label={language === 'zh-CN' ? `说明 ${attachment.fileName}` : `Describe ${attachment.fileName}`}>{language === 'zh-CN' ? '说明' : 'Details'}</Button>}
+      {editing && <MaterialContextEditor fileName={attachment.fileName} previewUrl={previewUrl} value={attachment.material} onSave={value => onMaterialChange(attachment.id, value)} onClose={() => setEditing(false)} />}
       <button
         type="button"
         className="composer-attachment-card-remove"

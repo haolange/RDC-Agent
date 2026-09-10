@@ -1,0 +1,23 @@
+.material-context-overlay { position: fixed; inset: 0; z-index: var(--z-overlay); display: grid; place-items: center; padding: var(--space-4); background: var(--modal-backdrop); }
+.material-context-editor { width: min(48rem, 100%); max-height: 90vh; overflow: auto; display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--token-border-default); border-radius: var(--radius-lg); background: var(--token-surface-raised); color: var(--token-text-body); box-shadow: var(--token-shadow-popover); }
+.material-context-editor h2 { margin: 0; font-size: var(--text-lg); overflow-wrap: anywhere; }
+.material-context-editor p, .material-context-editor label, .material-context-editor summary { margin: 0; font-size: var(--text-sm); }
+.material-context-editor label, .material-context-editor details[open] { display: grid; gap: var(--space-2); }
+.material-context-editor details[open] { gap: var(--space-3); }
+.material-context-editor select { min-height: var(--control-height-md); color: var(--token-text-body); background: var(--token-surface-raised); border: 1px solid var(--token-border-default); border-radius: var(--radius-sm); font-size: var(--text-sm); }
+.material-context-editor :focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: 2px; }
+.material-context-image { width: 100%; max-height: 40vh; touch-action: none; cursor: crosshair; }
+.material-context-image rect { fill: none; stroke: var(--token-border-focus); stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.material-context-probe { display: none; }
+.material-context-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.material-context-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+
+.material-context-viewer { width: min(70rem, 100%); }
+.material-context-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr)); gap: var(--space-4); }
+.material-context-gallery figure { margin: 0; display: grid; align-content: start; gap: var(--space-2); min-width: 0; }
+.material-context-gallery figcaption { font-size: var(--text-sm); overflow-wrap: anywhere; }
+.material-context-gallery code { overflow-wrap: anywhere; font-size: var(--text-xs); }
+.material-context-preview { position: relative; width: fit-content; max-width: 100%; margin: auto; }
+.material-context-preview img { display: block; width: auto; height: auto; max-width: 100%; max-height: 45vh; }
+.material-context-preview svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.material-context-preview rect { fill: none; stroke: var(--token-border-focus); stroke-width: 2px; vector-effect: non-scaling-stroke; }

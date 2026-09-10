@@ -344,25 +344,6 @@ export class StorageAdapter implements StorageHost {
     return this.context.clearSessionContextState(sessionId);
   }
 
-  getSessionDerivedContextViewPath(sessionId: string): string {
-    return this.context.getSessionDerivedContextViewPath(sessionId);
-  }
-
-  readSessionDerivedContextView(sessionId: string): import('@shared/types/semanticContext').DerivedContextView | null {
-    return this.context.readSessionDerivedContextView(sessionId);
-  }
-
-  writeSessionDerivedContextView(
-    sessionId: string,
-    view: import('@shared/types/semanticContext').DerivedContextView,
-  ): void {
-    return this.context.writeSessionDerivedContextView(sessionId, view);
-  }
-
-  clearSessionDerivedContextView(sessionId: string): void {
-    return this.context.clearSessionDerivedContextView(sessionId);
-  }
-
   getSessionContextJournalPath(sessionId: string): string {
     return this.context.getSessionContextJournalPath(sessionId);
   }

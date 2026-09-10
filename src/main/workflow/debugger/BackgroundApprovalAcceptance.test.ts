@@ -12,7 +12,8 @@ import { TaskRegistry } from '../../agent-runtime/tasks/TaskRegistry';
 import { AgentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { SubagentRunner } from './SubagentRunner';
 import { createBackgroundSubagentService } from './BackgroundSubagentService';
-import { TurnHandle } from './TurnCoordinator';
+import { TurnHandle, createPolicyBudgetState } from './TurnCoordinator';
+import { bindTaskRootBudget } from './TaskRootBudget';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 const store = new MemoryTaskStore();
 it('canonical background dispatch projects the child approval after parent reply and enforces owner-scoped answer', async () => {
@@ -65,4 +66,27 @@ it('keeps the immediate parent artifact allowlist when a nested background task 
   expect((await service.query('owner', executionId))?.status).toBe('failed');
   expect(artifacts.contents.some((content) => JSON.parse(content).chunks.join('').includes('nested delegation exceeds granted refs'))).toBe(true);
  } finally { parent.close(); releaseArtifacts(); releaseTask(); }
+});
+
+it('restores the previous Task execution root before binding a fresh parent request for background retry', async () => {
+ const registry = new TaskRegistry(store);
+ const task = await registry.createTask('retry after restart');
+ const original = createPolicyBudgetState({ maxToolCalls: 40, maxSubagents: 5, maxChildDepth: 3, maxWallTimeMs: 600000 });
+ original.toolCalls = 7;
+ const rootId = await bindTaskRootBudget(registry, 'retry-owner', original);
+ const old = await registry.startExecution(task.id, { mode: 'direct', rootBudgetId: rootId });
+ await registry.settleExecution(old.id, { status: 'blocked', expectedGeneration: old.generation, result: { disposition: 'blocked', summary: 'requires retry', outputs: {}, evidenceRefs: [], counterevidence: [], unresolved: ['retry'], scope: 'fixture', sideEffects: [], recoveryState: [] } });
+ const runner = new SubagentRunner({ getActiveTurn: () => null, systemPromptForAgent: () => 'General', sendProfileMessage: async () => 'bounded result' });
+ const service = createBackgroundSubagentService(runner); runner.setBackgroundStarter(input => service.start(input));
+ const live = createPolicyBudgetState({ maxToolCalls: 40, maxSubagents: 5, maxChildDepth: 3, maxWallTimeMs: 600000 });
+ live.toolCalls = 2;
+ const parent = new TurnHandle({ sessionKey: 'retry-owner', turnId: 'resumed-turn', generation: 1, policyBudget: live });
+ parent.runtimePlan = { profileDelegates: ['general'] } as never;
+ const result = await runner.createSubagentTools('general', 'retry-owner', parent)[0]!.execute('retry', { mode: 'background', taskId: task.id, goal: 'check', task: 'check', scope: 'one source', acceptedFacts: [], hypotheses: [], challengeRefs: [], negativePaths: [], inputArtifactRefs: [], requiredSkillIds: [], stopConditions: ['done'], outputRequirements: 'result', budget: { maxToolCalls: 3, maxWallTimeMs: 10000 } });
+ const id = (result.details as { executionId: string }).executionId;
+ expect(id).toBeTruthy(); await service.join(id);
+ expect((await registry.getExecution(id))?.rootBudgetId).toBe(rootId);
+ expect(live.toolCalls).toBeGreaterThanOrEqual(9);
+ expect(live.wallStartedAt).toBe(original.wallStartedAt);
+ expect((await registry.getExecution(old.id))?.status).toBe('blocked');
 });

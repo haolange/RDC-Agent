@@ -32,7 +32,6 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'conversation:switchBranch': 'mutation',
   'conversation:clearHistory': 'mutation',
   'conversation:undoLastTurn': 'mutation',
-  'conversation:compactHistory': 'mutation',
   'conversation:getToolImagePreview': 'read',
   'conversation:stageAttachments': 'mutation',
   'conversation:releaseAttachments': 'mutation',

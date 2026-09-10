@@ -52,7 +52,7 @@ export const ProfileHandoffStateSchema: ZodType<ProfileHandoffState> = z.object(
   }).strict().optional(),
 });
 
-export const HandoffStateDocumentV2Schema = z.object({
+export const HandoffStateDocumentSchema = z.object({
   schemaVersion: z.literal('2'),
   migrationNotice: z.string().min(1).optional(),
   active: ProfileHandoffStateSchema.nullable(),
@@ -60,7 +60,7 @@ export const HandoffStateDocumentV2Schema = z.object({
 });
 
 export const HANDOFF_STATE_MIGRATIONS: StorageMigration<HandoffStateDocument>[] = [
-  { schemaVersion: '2', schema: HandoffStateDocumentV2Schema as ZodType<HandoffStateDocument> },
+  { schemaVersion: '2', schema: HandoffStateDocumentSchema as ZodType<HandoffStateDocument> },
 ];
 
 export function toHandoffStateDocument(

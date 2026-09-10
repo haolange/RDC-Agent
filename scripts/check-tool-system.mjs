@@ -319,8 +319,8 @@ function main() {
     'utf8',
   );
   assert(
-    contextManager.includes('ToolResultSummarizer'),
-    'ContextManager must wire ToolResultSummarizer into toolResultBudget truncation',
+    !contextManager.includes('ToolResultSummarizer') && contextManager.includes('CONTEXT_CANNOT_FIT'),
+    'ContextManager must preserve original evidence and reject an unsafe window instead of truncating tool results',
   );
 
   const permissionPolicy = fs.readFileSync(

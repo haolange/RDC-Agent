@@ -1,3 +1,4 @@
+import { MaterialContextSchema } from '@shared/types/materialContext';
 import { z } from 'zod';
 import { ipcId, ipcNonEmptyString, ipcString, ipcStringArray } from './IpcPayloadGuard';
 import { SessionIdArgsSchema } from './commonIpcSchemas';
@@ -20,6 +21,7 @@ const ConversationTurnControlsSchema = z.object({
 }).strict();
 
 const ConversationAttachmentInputSchema = z.object({
+  material: MaterialContextSchema.optional(),
   sourcePath: ipcNonEmptyString(4096, 'sourcePath'),
   fileName: ipcNonEmptyString(512, 'fileName'),
   mimeType: z.union([ipcString(200, 'mimeType'), z.null()]).optional(),
@@ -136,6 +138,7 @@ export const ConversationAnswerUserInputArgsSchema = z.tuple([
       questionId: ipcNonEmptyString(200, 'questionId'),
       answer: ipcString(20_000, 'answer'),
       selectedOptionId: ipcString(200, 'selectedOptionId').optional(),
+      responseKind: z.enum(['answered', 'unknown', 'skipped']).optional(),
     }).strict()).max(32),
   }).strict(),
 ]);
