@@ -32,7 +32,7 @@ export const readAskUserQuestions = (call: ConversationToolCall): ConversationAs
 
 export const findPendingUserInput = (messages: ConversationMessage[]): PendingUserInputRequest | null => {
   const assistantMessages = messages
-    .filter((message) => message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming'))
+    .filter((message) => message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming' || message.workTrace?.blocks.some((block) => block.toolCalls.some((call) => call.delegatedRequest && (call.status === 'running' || call.status === 'pending')))))
     .sort((left, right) => right.createdAt - left.createdAt);
 
   for (const message of assistantMessages) {
@@ -44,8 +44,8 @@ export const findPendingUserInput = (messages: ConversationMessage[]): PendingUs
 
         return {
           sessionId: message.sessionId,
-          turnId: message.turnId,
-          toolCallId: call.id,
+          turnId: call.delegatedRequest?.turnId ?? message.turnId,
+          toolCallId: call.delegatedRequest?.toolCallId ?? call.id,
           questions: readAskUserQuestions(call),
           agentId: message.agentId,
         };

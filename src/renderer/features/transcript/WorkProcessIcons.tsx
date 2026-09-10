@@ -34,8 +34,7 @@ const renderIconPath = (icon: WorkProcessIconKey): ReactElement => {
           <path d="M13 10v6" />
         </>
       );
-    case 'fileEdit':
-      return <path d="M5 19h4l9.5-9.5a2.1 2.1 0 0 0-3-3L6 16l-1 3Zm10-11 3 3" />;
+    case 'fileEdit': return <path d="M5 19h4l9.5-9.5a2.1 2.1 0 0 0-3-3L6 16l-1 3Zm10-11 3 3" />;
     case 'fileDelete':
       return (
         <>
@@ -231,6 +230,7 @@ const renderIconPath = (icon: WorkProcessIconKey): ReactElement => {
       );
     case 'brain':
       return <path d="M8 5a3 3 0 0 0-3 3v1.5A3.5 3.5 0 0 0 5.5 16 3 3 0 0 0 11 17V7.5A2.5 2.5 0 0 0 8 5Zm8 0a3 3 0 0 1 3 3v1.5a3.5 3.5 0 0 1-.5 6.5A3 3 0 0 1 13 17V7.5A2.5 2.5 0 0 1 16 5Z" />;
+    case 'subagentReport': return <><path d="M5 5h14v11H9l-4 3V5Z" /><path d="M8 9h8m-8 3h5" /></>;
     case 'taskCreate':
       return (
         <>
@@ -239,7 +239,7 @@ const renderIconPath = (icon: WorkProcessIconKey): ReactElement => {
           <path d="M19 16v4m-2-2h4" />
         </>
       );
-    case 'taskUpdate':
+    case 'turnComplete': case 'backgroundMessage': case 'taskUpdate':
       return (
         <>
           <path d="M8 6h11M8 12h11M8 18h11" />
@@ -247,6 +247,7 @@ const renderIconPath = (icon: WorkProcessIconKey): ReactElement => {
           <path d="M18 15l2 2-2 2" />
         </>
       );
+    case 'backgroundQuery': case 'backgroundWait': case 'backgroundResult': case 'backgroundJoin':
     case 'taskGet':
       return (
         <>
@@ -257,6 +258,7 @@ const renderIconPath = (icon: WorkProcessIconKey): ReactElement => {
       );
     case 'taskList':
       return <path d="M8 6h11M8 12h11M8 18h11M4 6h.01M4 12h.01M4 18h.01" />;
+    case 'backgroundCancel':
     case 'taskStop':
       return (
         <>

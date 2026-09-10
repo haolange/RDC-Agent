@@ -47,6 +47,7 @@ function registerShutdownDisposables(): void {
     phase: 'stop_accepting_turns',
     dispose: () => {
       conversationService.stopAcceptingTurns();
+      agentOrchestrator.backgroundSubagents.stopAccepting();
     },
   });
   shutdownCoordinator.register({

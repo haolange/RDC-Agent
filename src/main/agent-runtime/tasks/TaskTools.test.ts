@@ -52,6 +52,18 @@ describe('TaskTools', () => {
     const stopped = await byName.task_stop!.execute('s1', { taskId });
     expect(textOf(stopped)).toContain('Stopped');
     expect((await registry.getTask(taskId))?.status).toBe('cancelled');
-    expect(byName.task_stop!.description).toContain('Stop/cancel by marking cancelled');
+    expect(byName.task_stop!.description).toContain('wait for managed producers to stop');
+  });
+
+  it('creates a durable parent-child Task relationship through the tool surface', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-tools-'));
+    roots.push(dir);
+    const registry = new TaskRegistry(dir);
+    const create = createTaskTools(registry).find((tool) => tool.name === 'task_create')!;
+    const parent = await create.execute('parent', { tasks: [{ subject: 'Parent' }] });
+    const parentTaskId = (parent.details as { ids: string[] }).ids[0]!;
+    const child = await create.execute('child', { tasks: [{ subject: 'Child', parentTaskId }] });
+    const childTaskId = (child.details as { ids: string[] }).ids[0]!;
+    await expect(registry.getTask(childTaskId)).resolves.toMatchObject({ parentTaskId });
   });
 });

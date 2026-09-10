@@ -82,7 +82,7 @@ function providerStream(message: AssistantMessage): EventStream<AssistantMessage
   const stream = new EventStream<AssistantMessageEvent, AssistantMessage>();
   void Promise.resolve().then(() => {
     stream.push({ type: 'start', partial: { ...message, content: [] } });
-    stream.push({ type: 'done', reason: 'toolUse', message });
+    stream.push({ type: 'done', reason: message.stopReason, message });
     stream.complete(message);
   });
   return stream;
@@ -137,6 +137,24 @@ const toolExecutor = {
 };
 
 describe('AgentLoop progress termination', () => {
+  it('commits mailbox data at a request boundary and retains it in later provider requests', async () => {
+    const requestContexts: string[] = []; let calls = 0; let commits = 0;
+    const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: (_model, context) => {
+      requestContexts.push(textFromContext(context)); calls += 1;
+      const message = calls < 3 ? toolUseMessage(calls) : { ...toolUseMessage(calls), content: [{ type: 'text' as const, text: 'done' }], stopReason: 'stop' as const };
+      return providerStream(message);
+    } };
+    const { stream } = agentLoop([], createContext(), {
+      model: TEST_MODEL, convertToLlm: (messages) => messages as Message[], maxTurns: 5,
+      streamOptions: { requestPlan: TEST_REQUEST_PLAN } satisfies StreamOptions,
+      beforeRequestMessages: async () => calls === 1 ? { messages: [{ role: 'user', content: 'owner condition', timestamp: Date.now() }], commit: async () => { commits += 1; } } : { messages: [] },
+    }, provider, toolExecutor);
+    await consume(stream);
+    expect(requestContexts[0]).not.toContain('owner condition');
+    expect(requestContexts[1]).toContain('owner condition');
+    expect(requestContexts[2]).toContain('owner condition');
+    expect(commits).toBe(1);
+  });
   it('injects one ephemeral warning and stops after the third identical tool round', async () => {
     const requestContexts: string[] = [];
     let calls = 0;

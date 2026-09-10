@@ -60,6 +60,18 @@ export interface ProfileHandoffState {
   cancelReason?: ProfileHandoffCancelReason;
   /** Target turn that consumed this handoff; only that turn may continue the chain. */
   continuationTurnId?: string;
+  /** Optional generic Task execution owned by this handoff chain. */
+  taskExecution?: {
+    taskId: string;
+    executionId: string;
+    generation: number;
+    taskRevision: number;
+  };
+  taskResult?: {
+    disposition: 'completed' | 'partial' | 'blocked' | 'cancelled';
+    summary: string;
+    outputs: Record<string, string>;
+  };
 }
 
 export interface HandoffStateDocument {

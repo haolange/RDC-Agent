@@ -19,7 +19,7 @@ export interface PendingToolApprovalRequest {
 
 const findPendingToolApproval = (messages: ConversationMessage[]): PendingToolApprovalRequest | null => {
   const assistantMessages = messages
-    .filter((message) => message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming'))
+    .filter((message) => message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming' || message.workTrace?.blocks.some((block) => block.toolCalls.some((call) => call.delegatedRequest && call.approval?.status === 'pending'))))
     .sort((left, right) => right.createdAt - left.createdAt);
 
   for (const message of assistantMessages) {
@@ -28,7 +28,7 @@ const findPendingToolApproval = (messages: ConversationMessage[]): PendingToolAp
         if (toolCall.approval?.status !== 'pending') continue;
         return {
           sessionId: message.sessionId,
-          turnId: message.turnId,
+          turnId: toolCall.delegatedRequest?.turnId ?? message.turnId,
           approvalId: toolCall.approval.approvalId,
           toolCallId: toolCall.id,
           toolName: toolCall.toolName,

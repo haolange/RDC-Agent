@@ -389,6 +389,38 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 }, loopScopedDenied ? currentLoopOptions() : undefined),
               });
             }
+            if (event.type === 'approval.requested' || event.type === 'approval.answered') {
+              const payload = event.payload as import('@shared/types/agentRuntime').AgentApprovalEventPayload;
+              if (payload.delegatedRequest) {
+                const originalToolCallId = payload.toolCallId ?? payload.approvalId;
+                const delegatedRequest = { ...payload.delegatedRequest, toolCallId: originalToolCallId };
+                const pending = payload.status === 'pending';
+                const rejected = payload.status === 'rejected' || payload.status === 'cancelled';
+                if (event.sessionId !== sessionId) return;
+                const message = { ...turnStreamState.assistantMessage, updatedAt: nowMs(),
+                  workTrace: upsertRuntimeToolCall(turnStreamState.assistantMessage.workTrace, {
+                    id: `${delegatedRequest.childSessionId}::${originalToolCallId}`,
+                    toolName: payload.toolName ?? 'approval',
+                    delegatedRequest,
+                    status: pending ? 'running' : rejected ? 'error' : 'complete',
+                    argsPreview: `Child execution ${delegatedRequest.executionId}`,
+                    userInputQuestions: payload.kind === 'ask_user' ? normalizeAskUserQuestions({ questions: payload.questions }) : undefined,
+                    resultPreview: pending ? undefined : String(payload.answer ?? 'Response delivered to child execution.'),
+                    approval: payload.kind === 'ask_user' ? undefined : {
+                      approvalId: payload.approvalId, status: payload.status, reason: payload.reason,
+                      risk: typeof payload.risk === 'string' ? payload.risk : undefined, reviewer: typeof payload.reviewer === 'string' ? payload.reviewer : undefined,
+                    },
+                  }),
+                };
+                const failure = host.persistConversationSnapshot(sessionId, message);
+                if (failure) throw failure;
+                turnStreamState.assistantMessage = message;
+                host.emitConversationEvent({ type: 'message_patched', sessionId: sessionId ?? '', turnId: message.turnId, message });
+                host.publishConversationTrace(sessionId ?? '', [input.userMessage, message], sessionId);
+                // A child question does not retract the parent's final reply or mutate its loop continuation.
+                return;
+              }
+            }
             if (event.type === 'approval.requested') {
               const payload = event.payload as {
                 approvalId?: string;

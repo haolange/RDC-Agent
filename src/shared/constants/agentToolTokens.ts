@@ -3,7 +3,7 @@
  * Single source of truth for seed manifests, allowlist expansion, and Settings diagnostics.
  */
 
-/** All builtin AgentTool ids after Investigation tools (49). */
+/** All builtin AgentTool ids after Task-owned background execution tools (56). */
 export const BUILTIN_AGENT_TOOL_IDS = [
   'shell',
   'read_file',
@@ -30,6 +30,14 @@ export const BUILTIN_AGENT_TOOL_IDS = [
   'task_get',
   'task_list',
   'task_stop',
+  'turn_complete',
+  'subagent_report',
+  'background_query',
+  'background_wait',
+  'background_result',
+  'background_message',
+  'background_cancel',
+  'background_join',
   'ask_user',
   'agent_handoff',
   'memory_search',
@@ -92,6 +100,14 @@ export const BUILTIN_AGENT_TOOL_TIERS: Record<BuiltinAgentToolId, BuiltinAgentTo
   task_get: 'extended',
   task_list: 'extended',
   task_stop: 'extended',
+  turn_complete: 'core',
+  subagent_report: 'core',
+  background_query: 'core',
+  background_wait: 'core',
+  background_result: 'core',
+  background_message: 'core',
+  background_cancel: 'core',
+  background_join: 'core',
   ask_user: 'core',
   agent_handoff: 'extended',
   memory_search: 'extended',
@@ -140,7 +156,7 @@ export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
   'vscode/askQuestions': ['ask_user'],
   agent: ['agent_handoff'],
   handoff: ['agent_handoff'],
-  task: ['task_create', 'task_update', 'task_get', 'task_list', 'task_stop', 'output_register'],
+  task: ['task_create', 'task_update', 'task_get', 'task_list', 'task_stop', 'turn_complete', 'subagent_report', 'background_query', 'background_wait', 'background_result', 'background_message', 'background_cancel', 'background_join', 'output_register'],
   memory: ['memory_search', 'memory_read'],
   'memory-write': ['memory_write', 'memory_delete'],
   'file-manage': ['delete_file', 'move_file', 'copy_file', 'notebook_edit'],

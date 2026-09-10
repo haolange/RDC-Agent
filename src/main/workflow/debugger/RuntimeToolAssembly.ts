@@ -9,7 +9,6 @@ import { writeSessionPlanArtifact } from '../../sessions/sessionPlanArtifact';
 import type { AgentRole } from '@shared/types/agent';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
-import { generateEventId, nowMs } from '@shared/utils/id';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
 import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
@@ -20,15 +19,13 @@ import { handoffController } from '../../agent-runtime/agent/HandoffController';
 import { isHandoffDeclaredModelValid } from '../../sessions/profileHandoffModel';
 import { settingsService } from '../../settings/SettingsService';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
-import { createTaskTools, TaskRegistry, MemoryTaskStore, createSessionTaskStore, projectTaskItems } from '../../agent-runtime/tasks';
-import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
+import { TaskRegistry, createSessionTaskStore, type TaskCompletionResult, type TaskExecutionRecord } from '../../agent-runtime/tasks';
 import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { createKnowledgeTools } from '../../knowledge/KnowledgeTools';
 import { createInvestigationTools } from '../../investigation/InvestigationTools';
-import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import {
   expandCanonicalToolToken,
@@ -37,72 +34,36 @@ import {
 } from './DebuggerRuntimePolicy';
 import { isRdxLeaseToolName } from '@shared/constants/rdxLeaseTools';
 import { createRdxProbeTool } from './RdxProbeTool';
-import type { TurnHandle } from './TurnCoordinator';
+import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
+import { createTaskRuntimeTools as assembleTaskRuntimeTools } from './TaskRuntimeTools';
+import { registerPreparedHandoffExecutionOwner } from './DirectTaskTurnLifecycle';
+import { bindTaskRootBudget } from './TaskRootBudget';
 
 export interface RuntimeToolAssemblyDeps {
   mcp: McpConnectionCoordinator;
   getActiveTurn: (sessionId?: string | null) => TurnHandle | null;
   getMemoryStore: (scope: 'user' | 'project', projectRootPath?: string | null) => MemoryStore;
   createSubagentTools: (parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null) => AgentTool[];
+  createBackgroundTools?: (parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null) => AgentTool[];
   getMcpServerStatusSummary: (projectRootPath?: string | null, query?: string) => MCPServerStatusSummary[];
 }
 
-const MISSION_PLANNING_AGENT_IDS = new Set(['debugger', 'analyzer', 'optimizer']);
-
-function isBigLoopReplan(fromAgentId: string, toAgentId: string, depth: number): boolean {
-  return fromAgentId === 'general'
-    && MISSION_PLANNING_AGENT_IDS.has(toAgentId)
-    && Number.isFinite(depth)
-    && depth >= 2;
-}
-
-function resolvePersistedMissionCheckpointId(sessionId: string, toAgentId: string): string | undefined {
-  if (!MISSION_PLANNING_AGENT_IDS.has(toAgentId)) return undefined;
-  try {
-    const live = investigationArtifactService.list(sessionId, { kind: 'checkpoint' })
-      .filter((entry) => entry.status !== 'superseded' && entry.recordKey.trim());
-    const matching: Array<{ createdAt: string; checkpointId: string }> = [];
-    for (const entry of live) {
-      const result = investigationArtifactService.readRecord(sessionId, entry.artifactId);
-      const mission = result.manifest && typeof result.manifest === 'object'
-        ? (result.manifest as { mission?: unknown }).mission
-        : undefined;
-      if (mission !== toAgentId) continue;
-      const checkpointId = typeof (result.record as { checkpointId?: unknown })?.checkpointId === 'string'
-        ? (result.record as { checkpointId: string }).checkpointId.trim()
-        : '';
-      if (!checkpointId) continue;
-      matching.push({ createdAt: entry.createdAt, checkpointId });
-    }
-    if (matching.length === 0) return undefined;
-    return matching.reduce((best, entry) => (entry.createdAt > best.createdAt ? entry : best)).checkpointId;
-  } catch {
-    return undefined;
+function readHandoffTaskResult(value: unknown): TaskCompletionResult {
+  if (!value || typeof value !== 'object') throw new Error('HANDOFF_TASK_RESULT_REQUIRED: Task-owned return requires a structured taskResult.');
+  const record = value as Record<string, unknown>;
+  if (!['completed', 'partial', 'blocked', 'cancelled'].includes(String(record.disposition))
+    || typeof record.summary !== 'string' || !record.summary.trim()
+    || !record.outputs || typeof record.outputs !== 'object' || Array.isArray(record.outputs)) {
+    throw new Error('HANDOFF_TASK_RESULT_INVALID: disposition, summary, and outputs are required.');
   }
-}
-
-function buildBeforeHandoffPayload(input: {
-  fromAgentId: string;
-  toAgentId: string;
-  label: string;
-  prompt: string;
-  depth: number;
-  sessionId: string;
-}): Record<string, unknown> {
-  const isBigLoop = isBigLoopReplan(input.fromAgentId, input.toAgentId, input.depth);
-  const payload: Record<string, unknown> = {
-    fromAgentId: input.fromAgentId,
-    toAgentId: input.toAgentId,
-    label: input.label,
-    prompt: input.prompt,
-    depth: input.depth,
-    isBigLoop,
-  };
-  const checkpointId = resolvePersistedMissionCheckpointId(input.sessionId, input.toAgentId);
-  if (checkpointId) payload.checkpointId = checkpointId;
-  return payload;
+  const outputs: Record<string, string> = {};
+  for (const [key, output] of Object.entries(record.outputs as Record<string, unknown>)) {
+    if (typeof output !== 'string') throw new Error(`HANDOFF_TASK_RESULT_INVALID: output ${key} must be a string reference.`);
+    outputs[key] = output;
+  }
+  return { disposition: record.disposition as TaskCompletionResult['disposition'], summary: record.summary, outputs };
 }
 
 export class RuntimeToolAssembly {
@@ -142,42 +103,56 @@ export class RuntimeToolAssembly {
   }
 
   createTaskRuntimeTools(sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
-    // subagent（sessionId 含 ::subagent:: 段）用 MemoryTaskStore，随子 context 结束回收；
-    // 顶层 agent 用会话级 FileTaskStore 落盘（${userData}/state/tasks/{sessionId}），供「进度」泳道按会话读取。
-    const resolvedSessionId = sessionId ?? turnHandle?.eventSink?.sessionId ?? null;
-    const isSubagent = resolvedSessionId?.includes('::subagent::') ?? false;
-    const store = isSubagent || !resolvedSessionId
-      ? new MemoryTaskStore()
-      : createSessionTaskStore(resolvedSessionId);
-    const registry = new TaskRegistry(store);
-    // 桥接 task 变更为 AgentEvent，激活 ConversationService 的 task.* 投影。
-    registry.onTaskChange = ({ type, task }) => {
-      if (resolvedSessionId && !isSubagent) {
-        traceProjectionRefreshService.schedule(resolvedSessionId);
-      }
-      const sink = turnHandle?.eventSink ?? this.deps.getActiveTurn(resolvedSessionId)?.eventSink;
-      const onEvent = sink?.onEvent;
-      if (!onEvent) return;
-      if (turnHandle && !turnHandle.isLive(turnHandle.generation)) return;
-      void registry.listTasks().then((tasks) => {
-        if (turnHandle && !turnHandle.isLive(turnHandle.generation)) return;
-        onEvent({
-          id: generateEventId('agent-event'),
-          type: type === 'created' ? 'task.created' : 'task.updated',
-          timestamp: nowMs(),
-          sessionId: sink.sessionId ?? null,
-          agentId: sink.agentId,
-          payload: {
-            taskId: task.id,
-            title: task.subject,
-            status: task.status,
-            statusReason: task.statusReason,
-            snapshot: projectTaskItems(tasks),
+    return assembleTaskRuntimeTools({ sessionId, turnHandle, getActiveTurn: this.deps.getActiveTurn });
+  }
+
+  createTurnCompletionTool(turnHandle?: TurnHandle | null): AgentTool {
+    return {
+      name: 'turn_complete',
+      label: 'Complete Turn',
+      description: 'Declare structured turn completion. Use only when the requested work is complete, partial, blocked, cancelled, or paused by budget.',
+      parameters: {
+        type: 'object',
+        required: ['disposition'],
+        properties: {
+          disposition: { type: 'string', enum: ['completed', 'partial', 'blocked', 'cancelled', 'budget_paused'] },
+          evidenceRefs: {
+            type: 'array', items: { type: 'object', required: ['uri', 'hash'], properties: { uri: { type: 'string' }, hash: { type: 'string' } } },
           },
-        });
-      });
+          result: {
+            type: 'object', required: ['summary', 'outputs', 'counterevidence', 'unresolved', 'scope', 'sideEffects', 'recoveryState'], additionalProperties: false,
+            properties: {
+              summary: { type: 'string', maxLength: 4000 }, outputs: { type: 'object', description: 'Named string outputs matching the Task completion requirements.' },
+              counterevidence: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
+              unresolved: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
+              scope: { type: 'string', maxLength: 4000 }, sideEffects: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
+              recoveryState: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
+            },
+          },
+        },
+      },
+      permissionHint: 'readonly',
+      spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
+      async execute(_toolCallId, args) {
+        const disposition = args.disposition;
+        if (!['completed', 'partial', 'blocked', 'cancelled', 'budget_paused'].includes(String(disposition))) {
+          throw new Error('TURN_COMPLETION_INVALID: disposition is not supported.');
+        }
+        const refs = Array.isArray(args.evidenceRefs) ? args.evidenceRefs : [];
+        const evidenceRefs = refs.filter((ref): ref is { uri: string; hash: string } => (
+          !!ref && typeof ref === 'object' && typeof (ref as Record<string, unknown>).uri === 'string'
+            && typeof (ref as Record<string, unknown>).hash === 'string'
+        ));
+        if (turnHandle) {
+          const rawResult = args.result as TurnCompletionDeclaration['result'] | undefined;
+          if (rawResult && Object.values(rawResult.outputs ?? {}).some((value) => typeof value !== 'string')) {
+            throw new Error('TURN_COMPLETION_INVALID: result.outputs values must be strings.');
+          }
+          turnHandle.completionDeclaration = { disposition: disposition as TurnCompletionDeclaration['disposition'], evidenceRefs, ...(rawResult ? { result: rawResult } : {}) };
+        }
+        return { content: [{ type: 'text', text: `Turn completion recorded: ${String(disposition)}.` }] };
+      },
     };
-    return createTaskTools(registry);
   }
 
   createRdxContextTool(sessionId?: string | null, projectId?: string | null): AgentTool<Record<string, never>, { available: boolean }> {
@@ -282,8 +257,8 @@ export class RuntimeToolAssembly {
     sessionId?: string | null,
     turnHandle?: TurnHandle | null,
   ): AgentTool<
-    { agent?: string; label?: string; prompt?: string; contract?: unknown },
-    { fromAgentId: AgentRole; toAgentId: string; label: string; prompt: string; valid: boolean }
+    { agent?: string; label?: string; prompt?: string; contract?: unknown; taskId?: string; taskResult?: TaskCompletionResult },
+    { fromAgentId: AgentRole; toAgentId: string; label: string; prompt: string; valid: boolean; executionId?: string; generation?: number }
   > {
     const getActiveTurn = this.deps.getActiveTurn;
     const capturedTurn = turnHandle ?? getActiveTurn(sessionId);
@@ -299,6 +274,8 @@ export class RuntimeToolAssembly {
           agent: { type: 'string', description: 'Declared target agent profile id.' },
           label: { type: 'string', description: 'Short handoff label. Defaults to the declared handoff label.' },
           prompt: { type: 'string', description: 'Implementation or specialist prompt for the receiving agent. Required summary of the objective, evidence and current gaps.' },
+          taskId: { type: 'string', description: 'Optional logical Task owned by an execute handoff.' },
+          taskResult: { type: 'object', description: 'Structured result required when returning a Task-owned handoff.' },
         },
       },
       permissionHint: 'readonly',
@@ -367,14 +344,14 @@ export class RuntimeToolAssembly {
           agentId,
           sessionId: resolvedSessionId,
           projectRoot,
-          payload: buildBeforeHandoffPayload({
+          payload: {
             fromAgentId: agentId,
             toAgentId: target,
             label,
             prompt,
             depth,
-            sessionId: resolvedSessionId,
-          }),
+            contract,
+          },
         });
         if (!handoffAllowed) {
           return {
@@ -383,6 +360,33 @@ export class RuntimeToolAssembly {
             details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false },
           };
         }
+        const taskId = typeof args.taskId === 'string' ? args.taskId.trim() : '';
+        const priorTaskBinding = contract.intent === 'return'
+          ? (typeof store.readDocument === 'function' ? (store.readDocument(resolvedSessionId)?.history ?? []) : []).find((entry) => entry.handoffId === contract.executionHandoffId)?.taskExecution
+          : undefined;
+        if (contract.intent === 'return' && taskId) {
+          return { content: [{ type: 'text', text: 'HANDOFF_TASK_INVALID: return uses the frozen execution binding; taskId must be omitted.' }], isError: true, details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false } };
+        }
+        let taskExecution: TaskExecutionRecord | undefined;
+        const taskRegistry = new TaskRegistry(createSessionTaskStore(resolvedSessionId));
+        if (contract.intent === 'execute' && taskId) {
+          const previousExecution = (await taskRegistry.listExecutions(taskId)).at(-1);
+          const rootBudgetId = turn?.policyBudget
+            ? await bindTaskRootBudget(taskRegistry, resolvedSessionId, turn.policyBudget, previousExecution?.rootBudgetId)
+            : undefined;
+          taskExecution = await taskRegistry.startExecution(taskId, {
+            mode: 'handoff',
+            rootBudgetId,
+            frozenPlanRef: `handoff:${sourceTurnId}`,
+            budget: turn?.policyBudget ? {
+              maxToolCalls: turn.policyBudget.maxToolCalls, toolCalls: turn.policyBudget.toolCalls,
+              maxSubagents: turn.policyBudget.maxSubagents, subagents: turn.policyBudget.subagents,
+              maxChildDepth: turn.policyBudget.maxChildDepth, childDepth: turn.subagentBudget.depth,
+              deadlineAt: turn.policyBudget.wallStartedAt + turn.policyBudget.maxWallTimeMs,
+            } : undefined,
+          });
+        }
+        const taskReturnResult = priorTaskBinding ? readHandoffTaskResult(args.taskResult) : undefined;
         const prepareInput = {
           contract,
           sourceTurnId,
@@ -395,6 +399,13 @@ export class RuntimeToolAssembly {
           send,
           chainRoot,
           depth,
+          taskExecution: taskExecution ? {
+            taskId: taskExecution.taskId,
+            executionId: taskExecution.id,
+            generation: taskExecution.generation,
+            taskRevision: taskExecution.taskRevision,
+          } : priorTaskBinding,
+          taskResult: taskReturnResult,
         };
         let draftHandoffId: string | null = null;
         try {
@@ -423,6 +434,9 @@ export class RuntimeToolAssembly {
             ...prepareInput,
             handoffId: draft.handoffId,
           });
+          if (taskExecution) {
+            registerPreparedHandoffExecutionOwner(resolvedSessionId, prepared.handoffId, taskExecution.id);
+          }
           return {
             content: [{
               type: 'text',
@@ -436,6 +450,8 @@ export class RuntimeToolAssembly {
               valid: true,
               handoffId: prepared.handoffId,
               send: prepared.send,
+              executionId: taskExecution?.id ?? priorTaskBinding?.executionId,
+              generation: taskExecution?.generation ?? priorTaskBinding?.generation,
             },
           };
         } catch (error) {
@@ -449,7 +465,15 @@ export class RuntimeToolAssembly {
               store.cancel(resolvedSessionId, 'superseded');
             }
           }
-          const message = error instanceof Error ? error.message : String(error);
+          let settlementError: unknown;
+          if (taskExecution) {
+            try { await taskRegistry.settleExecution(taskExecution.id, {
+              expectedGeneration: taskExecution.generation,
+              status: 'failed',
+              result: { disposition: 'blocked', summary: `Handoff preparation failed: ${error instanceof Error ? error.message : String(error)}`, outputs: {} },
+            }); } catch (failure) { settlementError = failure; }
+          }
+          const message = `${error instanceof Error ? error.message : String(error)}${settlementError ? `; TASK_SETTLEMENT_FAILED: ${settlementError instanceof Error ? settlementError.message : String(settlementError)}` : ''}`;
           return {
             content: [{ type: 'text', text: message }],
             isError: true,
@@ -768,6 +792,7 @@ export class RuntimeToolAssembly {
       ...createKnowledgeTools(sessionId),
       ...createInvestigationTools(sessionId),
       ...this.deps.createSubagentTools(agentId, sessionId, turnHandle),
+      ...(this.deps.createBackgroundTools?.(agentId, sessionId, turnHandle) ?? []),
     ];
   }
 
@@ -790,6 +815,8 @@ export class RuntimeToolAssembly {
     for (const tool of this.createTaskRuntimeTools(sessionId, turnHandle)) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
+    const turnCompletionTool = this.createTurnCompletionTool(turnHandle);
+    availableTools.set(turnCompletionTool.name, turnCompletionTool);
     if (!excludeRdxLeaseTools) {
       const rdxContextTool = this.createRdxContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);
       availableTools.set(rdxContextTool.name, rdxContextTool);

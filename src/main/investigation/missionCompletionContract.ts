@@ -1,6 +1,6 @@
 import { allowsBudgetPause } from './missionBudgetPause';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import type { TurnCompletionInput } from '../agent-runtime/agent/TurnCompletionValidator';
+import { enforceTaskReturnBinding, type TurnCompletionInput } from '../agent-runtime/agent/TurnCompletionValidator';
 import { isMissionAgentId } from '@shared/types/agent';
 import {
   ANALYZER_EXPLANATION_LAYERS,
@@ -82,14 +82,9 @@ export interface MissionCompletionReceipt {
 export function enforceMissionTurnCompletion(input: MissionCompletionInput): MissionCompletionReceipt | void {
   if (input.taskBinding) {
     const binding = input.taskBinding;
-    if (!input.pendingHandoff || input.pendingHandoffTarget !== binding.returnTo) {
-      throw new MissionCompletionError('mission_method', 'Bound execution must return to ' + binding.returnTo + ' for evaluation.');
-    }
     const pending = input.sessionId ? storageAdapter.handoffs.getActive(input.sessionId) : null;
-    if (!pending || pending.contract.intent !== 'return' || pending.contract.executionHandoffId !== binding.handoffId) {
-      throw new MissionCompletionError('mission_method', 'Execution return must match the frozen task binding.');
-    }
-    if (binding.validationPolicy === 'renderdoc-investigation') {
+    enforceTaskReturnBinding(input, pending);
+    if (binding.validationPolicy === 'renderdoc-investigation' && pending?.contract.intent === 'return') {
       const service = input.service ?? investigationArtifactService;
       const checkpoint = resolveMissionCheckpoint(service, input.sessionId!, binding.returnTo as InvestigationMission);
       if (!checkpoint || Date.parse(checkpoint.manifest.createdAt) < binding.dispatchedAt || !pending.contract.artifacts.some(ref => ref.uri === checkpoint.contentUri && ref.hash.replace(/^sha256:/, '') === checkpoint.contentHash.replace(/^sha256:/, ''))) {
@@ -99,6 +94,7 @@ export function enforceMissionTurnCompletion(input: MissionCompletionInput): Mis
   }
   if (!isMissionAgentId(input.profileId)) return;
   if (input.pendingHandoff) return;
+  if (input.disposition === 'partial' || input.disposition === 'blocked' || input.disposition === 'cancelled') return;
   if (allowsBudgetPause(input, input.service ?? investigationArtifactService)) return;
   return assertMissionTurnCompletion(input);
 }

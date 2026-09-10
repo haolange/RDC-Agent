@@ -431,4 +431,27 @@ describe('AgentSeedMigrationService v2', () => {
     expect(actionsOf(result.marker, 'purged-historical').some((entry) => entry.filenameId === 'ask')).toBe(true);
     expect(fs.existsSync(path.join(root, '.migrated'))).toBe(false);
   });
+
+  it('restores the exact prior user file when explicit override ownership cannot be committed', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-explicit-rollback-'));
+    roots.push(root);
+    const fileName = 'custom.agent.md';
+    const filePath = path.join(root, fileName);
+    const original = Buffer.from('---\nid: custom\nname: Original\n---\noriginal bytes\r\n', 'utf8');
+    await writeFile(filePath, original);
+    new AgentSeedMigrationService().migrateUserAgents(root);
+
+    class FailingMarkerIo extends StorageIo {
+      override writeJsonAtomic(): void {
+        throw new Error('marker write failed');
+      }
+    }
+    const service = new AgentSeedMigrationService(new FailingMarkerIo());
+    expect(() => service.writeExplicitUserOverride(
+      root,
+      fileName,
+      '---\nid: custom\nname: Replacement\n---\nreplacement\n',
+    )).toThrow(/marker write failed/);
+    expect(fs.readFileSync(filePath)).toEqual(original);
+  });
 });

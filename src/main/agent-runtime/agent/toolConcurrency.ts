@@ -1,7 +1,8 @@
 /**
  * Concurrency classification for a single tool call.
  * Default is unsafe. Only spec.isConcurrencySafe === true may be concurrent,
- * and hard-serial names / MCP / lease-holding subagents always cut the group.
+ * and hard-serial names / MCP always cut the group. Delegated resource admission
+ * and child effects enforce their own resource claims.
  */
 
 import type { AgentTool, AgentToolSpec } from './AgentTool';
@@ -39,7 +40,7 @@ export function isAgentToolSpecConcurrencySafe(spec?: AgentToolSpec): boolean {
 
 /**
  * Classify one call. Missing spec → unsafe.
- * `subagent` is concurrent only without domain capability requests.
+ * Dispatch safety is declared by the tool; child resource effects acquire separately.
  */
 export function isToolCallConcurrencySafe(input: {
   name: string;
@@ -49,9 +50,6 @@ export function isToolCallConcurrencySafe(input: {
   const name = input.name.trim();
   if (!name || isAlwaysSerialToolName(name)) {
     return false;
-  }
-  if (name === 'subagent') {
-    return Boolean(input.args) && !('requiresRdxLease' in input.args!) && input.args?.domainExtensions === undefined;
   }
   return isAgentToolSpecConcurrencySafe(input.spec);
 }

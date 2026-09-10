@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  countSubagentCalls,
   isAlwaysSerialToolName,
   isToolCallConcurrencySafe,
   partitionConsecutiveSafeGroups,
@@ -37,19 +38,12 @@ describe('toolConcurrency', () => {
     }
   });
 
-  it('allows offline subagent and serializes lease-holding subagent', () => {
-    expect(isToolCallConcurrencySafe({
-      name: 'subagent',
-      args: {  },
-    })).toBe(true);
-    expect(isToolCallConcurrencySafe({
-      name: 'subagent',
-      args: { domainExtensions: { rdx: { requiresLease: true } } },
-    })).toBe(false);
-    expect(isToolCallConcurrencySafe({
-      name: 'subagent',
-      args: { task: 'x' },
-    })).toBe(true);
+  it('requires explicit safe dispatch metadata without guessing from Capsule fields', () => {
+    expect(isToolCallConcurrencySafe({ name: 'subagent', args: { task: 'x' } })).toBe(false);
+    const spec = { orchestration: true, isReadOnly: false, isConcurrencySafe: true, isDestructive: false, category: 'task' as const, requiresApproval: false };
+    expect(isToolCallConcurrencySafe({ name: 'subagent', spec, args: { task: 'x' } })).toBe(true);
+    expect(isToolCallConcurrencySafe({ name: 'subagent', spec, args: { domainExtensions: { rdx: { requiresLease: true } } } })).toBe(true);
+    expect(countSubagentCalls([{ name: 'subagent' }, { name: 'background_wait' }])).toBe(1);
   });
 
   it('splits consecutive safe groups around unsafe calls', () => {

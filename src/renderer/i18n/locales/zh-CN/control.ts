@@ -83,6 +83,7 @@ export const zhControl = {
   'control.rightRail.outputs.missing': '缺失',
   'control.rightRail.inspector': '会话检查器',
   'control.rightRail.locateTask': '在工作过程中定位',
+  'control.rightRail.stopBackground': '停止此会话全部工作',
   'control.rightRail.capture.controls': '抓帧控制',
   'control.rightRail.capture.choose': '选择抓帧',
   'control.rightRail.capture.emptyInputs': '项目中没有抓帧',

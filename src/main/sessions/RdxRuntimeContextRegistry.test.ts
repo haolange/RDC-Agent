@@ -11,6 +11,7 @@ import {
   getDelegatedChildSessionId,
   RDX_LEASE_DELEGATE_DENIED,
   RDX_LEASE_DUAL_OWNER,
+  quarantineRdxContext,
 } from './RdxRuntimeContextRegistry';
 import type { RdxRuntimeContext } from '@shared/types/session';
 
@@ -150,7 +151,7 @@ describe('RdxRuntimeContextRegistry delegated leases', () => {
       projectId: 'p1',
       ownerTurnId: 'turn-1',
     });
-    expect(revokeDelegatedLease('child')).toBe(true);
+    expect(revokeDelegatedLease('child', { operationStopped: true })).toBe(true);
     expect(getRdxContextLease('child')).toBeNull();
     expect(assertRdxContextLeaseOwnership({ sessionId: 'child', projectId: 'p1' })).toBeNull();
     expect(getRdxContextLease('parent')?.contextId).toBe('c1');
@@ -165,7 +166,7 @@ describe('RdxRuntimeContextRegistry delegated leases', () => {
       projectId: 'p1',
       ownerTurnId: 'turn-1',
     });
-    revokeDelegatedLease('child-a');
+    revokeDelegatedLease('child-a', { operationStopped: true });
     const next = grantDelegatedLease({
       parentSessionId: 'parent',
       childSessionId: 'child-b',
@@ -182,5 +183,31 @@ describe('RdxRuntimeContextRegistry delegated leases', () => {
       sessionId: 'parent::subagent::offline',
       projectId: 'p1',
     })).toBeNull();
+  });
+});
+
+describe('exclusive delegated control and uncertain release', () => {
+  beforeEach(clearRdxContextLeases);
+  it('suspends parent operations and rebinding throughout the delegated interval', () => {
+    setRdxRuntimeContextForSession('parent', ctx('c1'));
+    grantDelegatedLease({ parentSessionId: 'parent', childSessionId: 'child', ownerTurnId: 't' });
+    expect(assertRdxContextLeaseOwnership({ sessionId: 'parent' })).toBeNull();
+    expect(assertRdxContextLeaseOwnership({ sessionId: 'child' })).not.toBeNull();
+    expect(() => setRdxRuntimeContextForSession('parent', ctx('c2'))).toThrow(/join/);
+    revokeDelegatedLease('child', { operationStopped: true });
+    expect(assertRdxContextLeaseOwnership({ sessionId: 'parent' })).not.toBeNull();
+  });
+  it('does not return usable parent control when child exit is unconfirmed', () => {
+    setRdxRuntimeContextForSession('parent', ctx('c1'));
+    grantDelegatedLease({ parentSessionId: 'parent', childSessionId: 'child', ownerTurnId: 't' });
+    revokeDelegatedLease('child', { operationStopped: false });
+    expect(assertRdxContextLeaseOwnership({ sessionId: 'parent' })).toBeNull();
+    expect(() => grantDelegatedLease({ parentSessionId: 'parent', childSessionId: 'next', ownerTurnId: 't2' })).toThrow(/recovery/);
+  });
+  it('late failed calls cannot quarantine a rebound identity', () => {
+    const old = setRdxRuntimeContextForSession('s', ctx('c1'))!;
+    const current = setRdxRuntimeContextForSession('s', ctx('c2'))!;
+    quarantineRdxContext('s', old.version, 'late timeout');
+    expect(assertRdxContextLeaseOwnership({ sessionId: 's' })?.version).toBe(current.version);
   });
 });

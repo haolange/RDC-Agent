@@ -390,7 +390,7 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
     return;
   }
 
-  if (url.pathname === '/events' && request.method === 'GET') {
+  if (url.pathname === '/events' && request.method === 'POST') {
     rendererEventHub.connect(response, requestOrigin && allowedOrigins.has(requestOrigin) ? requestOrigin : undefined);
     return;
   }

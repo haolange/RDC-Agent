@@ -1,3 +1,4 @@
+import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
 import { assertHandoffSkillCompatibility } from '../../sessions/handoffSkillCompatibility';
 import type { TaskCompletionBinding } from '../../agent-runtime/agent/TurnCompletionValidator';
 import { handoffRequiredSkillIds } from '../../sessions/handoffSkills';
@@ -173,7 +174,7 @@ export class TurnPreparationService {
     // Compile the immutable policy before acquiring any external MCP lease.
     // Invalid policy must not spawn processes or establish network connections.
     const turnSettings = settingsService.getAll();
-    const rdxBinding = freezeRdxTurnBinding(turnSettings.tooling.rdxCli, turnSettings.tooling.rdxActions);
+    const rdxBinding = freezeRdxTurnBinding(turnSettings.tooling.rdxCli, turnSettings.tooling.rdxActions, assertRdxContextLeaseOwnership({ sessionId: input.sessionId, projectId: input.projectId }));
     const compiledPolicy = compileEffectivePolicy(input.projectRootPath);
     const contextCompactionPercent = resolveEffectiveCompactionPercent(
       turnSettings.agentRuntime.context.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,

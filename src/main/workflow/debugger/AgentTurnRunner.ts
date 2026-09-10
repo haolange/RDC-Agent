@@ -39,6 +39,8 @@ import {
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { agentUserInputRequestService } from '../../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
+import { enforceTaskReturnBinding } from '../../agent-runtime/agent/TurnCompletionValidator';
+import { storageAdapter } from '../../sessions/StorageAdapter';
 import type {
   AssistantMessage,
   AgentEvent as CoreAgentEvent,
@@ -72,11 +74,13 @@ import {
 } from './deferredTools';
 import type {
   AgentTurnOptions,
+  AgentProfileTurnOptions,
   PreparedAgentRuntime,
   ResolvedRuntimeTools,
   ToolExecutorRuntimeContext,
 } from './orchestratorTypes';
 import type { TurnCompletionValidator } from '../../agent-runtime/agent/TurnCompletionValidator';
+import { registerReceivingHandoffTurnOwner, settleJoinedTurnTaskExecutions, settleUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 
 export function hasActualProviderUsage(message: AssistantMessage): boolean {
   return message.stopReason !== 'error';
@@ -148,6 +152,8 @@ export class AgentTurnRunner {
     routeCapabilityOverride?: AgentRouteCapability,
     policyMaxTurns?: number,
     profileMaxTurns?: number | null,
+    beforeRequestMessages?: import('../../agent-runtime/agent/AgentLoop').AgentLoopConfig['beforeRequestMessages'],
+    onProviderRequestCommitted?: AgentProfileTurnOptions['onProviderRequestCommitted'],
   ): AgentSlot {
     if (!promptPlan) {
       throw new Error('PromptPlan is required before creating an agent runtime slot.');
@@ -232,7 +238,7 @@ export class AgentTurnRunner {
         maxOutputTokens: streamOptions.requestPlan.maxOutputTokens,
         promptTokens: this.deps.tokenizerService.countMessagesTokens(messages, modelId),
       }),
-      onRequest: ({ model, context: requestContext, streamOptions: requestOptions }) => {
+      onRequest: async ({ model, context: requestContext, streamOptions: requestOptions, mailboxDeliveries }) => {
         const callIndex = requestSnapshotStore.nextCallIndex(executionScopeId, turnSignature || undefined);
         const snapshot = requestEnvelopeBuilder.build({
           promptPlan,
@@ -246,6 +252,7 @@ export class AgentTurnRunner {
           },
           requestPlan: requestOptions.requestPlan,
           messages: requestContext.messages,
+          mailboxDeliveries,
           tools: requestContext.tools ?? [],
           controls: {
             temperature: requestOptions.temperature,
@@ -262,6 +269,7 @@ export class AgentTurnRunner {
           }),
         });
         requestSnapshotStore.write(snapshot);
+        await onProviderRequestCommitted?.(snapshot.id);
         return snapshot.id;
       },
       onResponse: (requestId, message) => {
@@ -288,6 +296,7 @@ export class AgentTurnRunner {
           estimated: false,
         });
       },
+      beforeRequestMessages,
     });
 
     const slot: AgentSlot = {
@@ -331,7 +340,7 @@ export class AgentTurnRunner {
     initialMessages?: Message[];
     contextDiagnostic?: Record<string, unknown>;
     preparedRuntime?: PreparedAgentRuntime;
-    terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error', pendingHandoff?: import('./TurnCoordinator').PendingHandoff) => void;
+    terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error', pendingHandoff?: import('./TurnCoordinator').PendingHandoff, completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null) => void;
   }): Promise<string> {
     if (!input.providerId || !input.modelId) {
       throw new Error('No provider/model route is configured for this agent.');
@@ -398,6 +407,7 @@ export class AgentTurnRunner {
     let abortListener: (() => void) | null = null;
     let turnEnded = false;
     let setupCleanupComplete = false;
+    const releaseHandoffExecutionOwner = await registerReceivingHandoffTurnOwner(executionScopeId, turnHandle);
     try {
     slotKey = agentSlotKey(executionScopeId, input.agentId);
     const turnGeneration = turnHandle.generation;
@@ -543,6 +553,8 @@ export class AgentTurnRunner {
         ? undefined
         : effectivePlan.policy.maxTurns,
       effectivePlan.profileMaxTurns,
+      input.options?.beforeProviderRequestMessages,
+      input.options?.onProviderRequestCommitted,
     );
     if (!slot) {
       throw new Error('Agent slot setup did not produce a slot.');
@@ -750,23 +762,34 @@ export class AgentTurnRunner {
     }
 
     const initialMessageCount = activeSlot.agent.messages.length;
+    const settleDirectTasks = (stopped: boolean) => settleUnfinishedDirectTasks({ sessionId: input.sessionId, turnId: turnHandle.turnId, generation: turnHandle.generation, stopped });
     let terminalStatus: 'complete' | 'stopped' | 'error' = 'complete';
     try {
-      // Agent.prompt 内部跑完整循环；返回值是新增的全部消息，
-      // 我们只在订阅里收集助手文本，最后返回 `responseText`。
       await activeSlot.agent.prompt(userMessage);
-      this.deps.validateCompletion({
+      if (await settleDirectTasks(false)) throw new Error('TASK_COMPLETION_DENIED: Direct Task executions must be settled before the parent turn completes.');
+      if (turnHandle.completionDeclaration?.disposition === 'cancelled' && !turnHandle.isAborted) {
+        throw new Error('TURN_COMPLETION_INVALID: cancelled requires an actual abort and joined execution.');
+      }
+      const completionInput = {
         taskBinding: turnHandle.runtimePlan?.taskBinding,
         profileId: input.agentId,
         turnId: turnHandle.turnId,
         sessionId: executionScopeId,
         finalAnswerText: responseText,
+        disposition: turnHandle.completionDeclaration?.disposition,
+        evidenceRefs: turnHandle.completionDeclaration?.evidenceRefs,
         pendingHandoff: Boolean(turnHandle.pendingHandoff),
         pendingHandoffTarget: turnHandle.pendingHandoff?.toProfile,
-      });
+      };
+      enforceTaskReturnBinding(
+        completionInput,
+        executionScopeId ? storageAdapter.handoffs.getActive(executionScopeId) : null,
+      );
+      this.deps.validateCompletion(completionInput);
       return responseText;
     } catch (error) {
       terminalStatus = input.options?.signal?.aborted || turnHandle.isAborted ? 'stopped' : 'error';
+      if (terminalStatus !== 'stopped') await settleDirectTasks(false);
       if (terminalStatus === 'error' && isExplicitStructuredToolCallingRejection(error)) {
         try {
           recordObservedToolCallingUnsupported(
@@ -806,13 +829,13 @@ export class AgentTurnRunner {
       }
       agentUserInputRequestService.cancelTurn(input.turnId);
       agentToolApprovalRequestService.cancelTurn(input.turnId);
-      // Terminal context first (ConversationService persists to conversation.jsonl),
-      // then flush in-memory slot messages — disk is the single source of truth.
-      input.terminalContext?.(activeSlot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus, turnHandle.pendingHandoff ?? undefined);
+      input.terminalContext?.(activeSlot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus, turnHandle.pendingHandoff ?? undefined, turnHandle.completionDeclaration);
       this.deps.slots.flush(activeSlot);
       if (turnHandle.isAborted) {
         await turnHandle.abortAndJoin({ reason: turnHandle.reason ?? 'user_stop' });
       }
+      await settleJoinedTurnTaskExecutions({ sessionId: input.sessionId, turnId: turnHandle.turnId,
+        generation: turnHandle.generation, stopped: turnHandle.isAborted, orphaned: turnHandle.isOrphaned });
       if (turnHandle.isOrphaned) {
         // Reserve the key until the orphaned provider/tool loop actually settles.
         this.deps.slots.quarantineSlot(slotKey, activeSlot.agent.activeLoopPromise ?? Promise.resolve());
@@ -820,6 +843,7 @@ export class AgentTurnRunner {
       }
       await mcpLease?.release({ discardIfIdle: turnHandle.isOrphaned });
       turnCoordinator.endTurn(turnHandle);
+      releaseHandoffExecutionOwner?.();
       turnEnded = true;
       await dispatchRuntimeHooks('turn.after-end', {
         agentId: input.agentId,
@@ -857,6 +881,7 @@ export class AgentTurnRunner {
         await mcpLease?.release({ discardIfIdle: turnHandle.isOrphaned });
         if (!turnEnded) {
           turnCoordinator.endTurn(turnHandle);
+          releaseHandoffExecutionOwner?.();
           turnEnded = true;
           await dispatchRuntimeHooks('turn.after-end', {
             agentId: input.agentId,

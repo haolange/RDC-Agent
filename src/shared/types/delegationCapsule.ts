@@ -1,219 +1,58 @@
-/**
- * Delegation Capsule — structured subagent handoff payload.
- * Missing required fields fail-closed. Not a platform file type.
- */
-
-import { parseSessionArtifactUri, SessionArtifactError } from './sessionArtifact';
-
+/** Caller-authored delegation data. Capability requests never grant authority. */
+import { z } from 'zod';
+import { parseSessionArtifactUri } from './sessionArtifact';
 export const DELEGATION_CAPSULE_ERROR = 'DELEGATION_CAPSULE_INVALID';
-
-export interface DelegationCapsuleBudget {
-  maxToolCalls: number;
-  maxWallTimeMs: number;
-  maxSubagents?: number;
-}
-
-export interface DelegationCapsule {
-  mission: string;
-  task: string;
-  acceptedFacts: string[];
-  forbiddenPaths: string[];
-  inputArtifactRefs: string[];
-  outputRequirements: string;
-  budget: DelegationCapsuleBudget;
-  domainExtensions?: Record<string, Record<string, boolean>>;
-  profile?: string;
-  model?: string;
-}
-
-const REQUIRED_KEYS = [
-  'mission',
-  'task',
-  'acceptedFacts',
-  'forbiddenPaths',
-  'inputArtifactRefs',
-  'outputRequirements',
-  'budget',
-] as const;
-
-function fail(detail: string): never {
-  throw new Error(`${DELEGATION_CAPSULE_ERROR}: ${detail}`);
-}
-
-function readRequiredString(record: Record<string, unknown>, key: string): string {
-  if (!(key in record) || record[key] === undefined || record[key] === null) {
-    fail(`missing ${key}.`);
-  }
-  const value = record[key];
-  if (typeof value !== 'string') {
-    fail(`${key} must be a string.`);
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    fail(`${key} must be a non-empty string.`);
-  }
-  return trimmed;
-}
-
-function readStringArray(record: Record<string, unknown>, key: string): string[] {
-  if (!(key in record) || record[key] === undefined || record[key] === null) {
-    fail(`missing ${key}.`);
-  }
-  const value = record[key];
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) {
-    fail(`${key} must be an array of strings.`);
-  }
-  return value.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
-}
-
-function readPositiveInt(record: Record<string, unknown>, key: string, required: boolean): number | undefined {
-  if (!(key in record) || record[key] === undefined || record[key] === null) {
-    if (required) fail(`missing budget.${key}.`);
-    return undefined;
-  }
-  const value = record[key];
-  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
-    fail(`budget.${key} must be a positive integer.`);
-  }
-  return value;
-}
-
-/**
- * Parse and fail-closed validate a Delegation Capsule.
- * Empty arrays are allowed for facts / paths / refs; empty required strings are not.
- */
+export const DELEGATION_CAPSULE_MAX_CHARS = 24_000;
+const text = z.string().trim().min(1).max(4_000);
+const texts = z.array(text).max(32);
+const ref = text.refine(value => { try { parseSessionArtifactUri(value); return true; } catch { return false; } }, 'invalid session artifact URI');
+const refs = z.array(ref).max(32);
+export const DelegationCapsuleSchema = z.object({
+  goal: text, task: text, scope: text,
+  acceptedFacts: z.array(z.object({ statement: text, sourceRefs: refs, qualification: text }).strict()).max(32),
+  hypotheses: texts, challengeRefs: refs,
+  negativePaths: z.array(z.object({ path: text, reason: text, applicableWhen: text, recheckWhen: text }).strict()).max(32),
+  inputArtifactRefs: refs, outputRequirements: text, stopConditions: texts,
+  requiredSkillIds: texts,
+  budget: z.object({ maxToolCalls: z.number().int().positive(), maxWallTimeMs: z.number().int().positive(), maxSubagents: z.number().int().nonnegative().optional() }).strict(),
+  domainExtensions: z.record(z.string(), z.record(z.string(), z.boolean())).optional(),
+  profile: text.optional(), model: text.optional(),
+}).strict();
+export type DelegationCapsule = z.infer<typeof DelegationCapsuleSchema>;
+export type DelegationCapsuleBudget = DelegationCapsule['budget'];
 export function parseDelegationCapsule(input: unknown): DelegationCapsule {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    fail('capsule must be an object.');
+  const parsed = DelegationCapsuleSchema.safeParse(input);
+  if (!parsed.success) throw new Error(`${DELEGATION_CAPSULE_ERROR}: ${parsed.error.message}`);
+  if (JSON.stringify(parsed.data).length > DELEGATION_CAPSULE_MAX_CHARS) {
+    throw new Error(`${DELEGATION_CAPSULE_ERROR}: capsule exceeds ${DELEGATION_CAPSULE_MAX_CHARS} characters; externalize raw material and pass artifact refs.`);
   }
-  const record = input as Record<string, unknown>;
-  for (const key of REQUIRED_KEYS) {
-    if (!(key in record) || record[key] === undefined || record[key] === null) {
-      fail(`missing ${key}.`);
-    }
-  }
-
-  const mission = readRequiredString(record, 'mission');
-  const task = readRequiredString(record, 'task');
-  const outputRequirements = readRequiredString(record, 'outputRequirements');
-  const acceptedFacts = readStringArray(record, 'acceptedFacts');
-  const forbiddenPaths = readStringArray(record, 'forbiddenPaths');
-  const inputArtifactRefs = readStringArray(record, 'inputArtifactRefs');
-  for (const ref of inputArtifactRefs) {
-    try {
-      parseSessionArtifactUri(ref);
-    } catch (error) {
-      const detail = error instanceof SessionArtifactError ? error.message : String(error);
-      fail(`inputArtifactRefs contains an invalid session artifact URI (${detail}).`);
-    }
-  }
-
-  if ('requiresRdxLease' in record) fail('requiresRdxLease was removed; use optional domainExtensions.');
-  const domainExtensions = record.domainExtensions;
-  if (domainExtensions !== undefined && (!domainExtensions || typeof domainExtensions !== 'object' || Array.isArray(domainExtensions)
-    || Object.values(domainExtensions).some(value => !value || typeof value !== 'object' || Array.isArray(value)
-      || Object.values(value).some(flag => typeof flag !== 'boolean')))) fail('domainExtensions must contain boolean capability requests.');
-
-  const budgetValue = record.budget;
-  if (!budgetValue || typeof budgetValue !== 'object' || Array.isArray(budgetValue)) {
-    fail('budget must be an object.');
-  }
-  const budgetRecord = budgetValue as Record<string, unknown>;
-  const maxToolCalls = readPositiveInt(budgetRecord, 'maxToolCalls', true);
-  const maxWallTimeMs = readPositiveInt(budgetRecord, 'maxWallTimeMs', true);
-  const maxSubagents = readPositiveInt(budgetRecord, 'maxSubagents', false);
-
-  const capsule: DelegationCapsule = {
-    mission,
-    task,
-    acceptedFacts,
-    forbiddenPaths,
-    inputArtifactRefs,
-    outputRequirements,
-    budget: {
-      maxToolCalls: maxToolCalls!,
-      maxWallTimeMs: maxWallTimeMs!,
-      ...(maxSubagents !== undefined ? { maxSubagents } : {}),
-    },
-    ...(domainExtensions ? { domainExtensions: domainExtensions as Record<string, Record<string, boolean>> } : {}),
-  };
-
-  if (typeof record.profile === 'string' && record.profile.trim()) {
-    capsule.profile = record.profile.trim();
-  }
-  if (typeof record.model === 'string' && record.model.trim()) {
-    capsule.model = record.model.trim();
-  }
-  return freezeDelegationCapsule(capsule);
+  return freezeDelegationCapsule(parsed.data);
 }
-
-/** Deep-freeze a compiled capsule. Already-frozen input is returned as-is. */
 export function freezeDelegationCapsule(capsule: DelegationCapsule): DelegationCapsule {
-  if (
-    Object.isFrozen(capsule)
-    && Object.isFrozen(capsule.budget)
-    && Object.isFrozen(capsule.acceptedFacts)
-    && Object.isFrozen(capsule.forbiddenPaths)
-    && Object.isFrozen(capsule.inputArtifactRefs)
-    && (!capsule.domainExtensions || (Object.isFrozen(capsule.domainExtensions) && Object.values(capsule.domainExtensions).every(Object.isFrozen)))
-  ) {
-    return capsule;
+  function freeze(value: unknown): void {
+    if (!value || typeof value !== 'object' || Object.isFrozen(value)) return;
+    for (const child of Object.values(value)) freeze(child);
+    Object.freeze(value);
   }
-  return Object.freeze({
-    mission: capsule.mission,
-    task: capsule.task,
-    acceptedFacts: Object.freeze([...capsule.acceptedFacts]),
-    forbiddenPaths: Object.freeze([...capsule.forbiddenPaths]),
-    inputArtifactRefs: Object.freeze([...capsule.inputArtifactRefs]),
-    outputRequirements: capsule.outputRequirements,
-    budget: Object.freeze({ ...capsule.budget }),
-    ...(capsule.domainExtensions ? { domainExtensions: Object.freeze(Object.fromEntries(Object.entries(capsule.domainExtensions).map(([key, value]) => [key, Object.freeze({ ...value })]))) } : {}),
-    ...(capsule.profile ? { profile: capsule.profile } : {}),
-    ...(capsule.model ? { model: capsule.model } : {}),
-  }) as DelegationCapsule;
+  const copy = structuredClone(capsule);
+  freeze(copy);
+  return copy;
 }
-
+const stringSchema = { type: 'string', minLength: 1, maxLength: 4000 };
+const arraySchema = { type: 'array', maxItems: 32, items: stringSchema };
+const object = (properties: Record<string, unknown>) => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 export const DELEGATION_CAPSULE_JSON_SCHEMA = {
-  type: 'object',
-  required: [
-    'mission',
-    'task',
-    'acceptedFacts',
-    'forbiddenPaths',
-    'inputArtifactRefs',
-    'outputRequirements',
-    'budget',
-    ],
-  properties: {
-    mission: { type: 'string', description: 'Mission the child must serve.' },
-    task: { type: 'string', description: 'Concrete task for this delegation.' },
-    acceptedFacts: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'Confirmed facts the child may treat as given. Empty when none.',
-    },
-    forbiddenPaths: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'Paths or experiments the child must not repeat. Empty when none.',
-    },
-    inputArtifactRefs: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'session:// artifact refs the child may read. Empty when none.',
-    },
-    outputRequirements: { type: 'string', description: 'Required child outputs and evidence bar.' },
-    budget: {
-      type: 'object',
-      required: ['maxToolCalls', 'maxWallTimeMs'],
-      properties: {
-        maxToolCalls: { type: 'integer', minimum: 1, description: 'Child tool-call budget.' },
-        maxWallTimeMs: { type: 'integer', minimum: 1, description: 'Child wall-clock budget in ms.' },
-        maxSubagents: { type: 'integer', minimum: 1, description: 'Optional nested subagent budget.' },
-      },
-    },
-    domainExtensions: { type: 'object', description: 'Optional domain-owned capability requests; omitted for ordinary tasks.' },
-    profile: { type: 'string', description: 'Target profile id. Defaults to the caller profile.' },
-    model: { type: 'string', description: 'Optional canonical providerId:modelId. Does not inherit the parent session override.' },
-  },
-} as const;
+  ...object({
+    goal: stringSchema, task: stringSchema, scope: stringSchema,
+    acceptedFacts: { type: 'array', maxItems: 32, items: object({ statement: stringSchema, sourceRefs: arraySchema, qualification: stringSchema }) },
+    hypotheses: arraySchema, challengeRefs: arraySchema,
+    negativePaths: { type: 'array', maxItems: 32, items: object({ path: stringSchema, reason: stringSchema, applicableWhen: stringSchema, recheckWhen: stringSchema }) },
+    inputArtifactRefs: arraySchema, outputRequirements: stringSchema, stopConditions: arraySchema, requiredSkillIds: arraySchema,
+    budget: { type: 'object', required: ['maxToolCalls', 'maxWallTimeMs'], additionalProperties: false, properties: {
+      maxToolCalls: { type: 'integer', minimum: 1 }, maxWallTimeMs: { type: 'integer', minimum: 1 }, maxSubagents: { type: 'integer', minimum: 0 },
+    } },
+    domainExtensions: { type: 'object', description: 'Domain capability requests; no authorization is granted.' },
+    profile: stringSchema, model: stringSchema,
+  }),
+  required: ['goal', 'task', 'scope', 'acceptedFacts', 'hypotheses', 'challengeRefs', 'negativePaths', 'inputArtifactRefs', 'outputRequirements', 'stopConditions', 'requiredSkillIds', 'budget'],
+};

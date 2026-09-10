@@ -2,10 +2,11 @@ import fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type { OpenProjectInputRequest, SessionScope } from '@shared/types/session';
-import { clearRdxContextLeases, getRdxContextLease } from './RdxRuntimeContextRegistry';
+import { clearRdxContextLeases, getRdxContextLease, grantDelegatedLease, revokeDelegatedLease, quarantineRdxContext, assertRdxContextLeaseOwnership } from './RdxRuntimeContextRegistry';
 
 const runAction = vi.fn();
 const nativeCli = vi.hoisted(() => vi.fn());
+const orphanContexts = vi.hoisted(() => new Set<string>());
 vi.mock('../tools/RdxCliInvokerService', () => ({ rdxCliInvokerService: { executeCLI: nativeCli } }));
 const remote = vi.hoisted(() => ({ peek: vi.fn(), consume: vi.fn(), get: vi.fn(), activate: vi.fn() }));
 
@@ -41,7 +42,7 @@ vi.mock('../runtime/ProcessSupervisor', () => ({
 }));
 
 vi.mock('../tools/ShellInvocationService', () => ({
-  shellInvocationService: { terminateAll: vi.fn() },
+  shellInvocationService: { terminateAll: vi.fn(), hasUnconfirmedProcesses: (contextId: string) => orphanContexts.has(contextId) },
 }));
 
 vi.mock('../captures/ReplayDeviceService', () => ({
@@ -103,6 +104,31 @@ describe('RdxSessionService capture ownership fail-closed', () => {
 
   afterEach(() => {
     clearRdxContextLeases();
+  });
+
+  it('refuses close/reopen while a delegated child controls the capture', async () => {
+    const service = new RdxSessionService();
+    await openOwnedCapture(service);
+    grantDelegatedLease({ parentSessionId: ownerScope.sessionId!, childSessionId: 'child', ownerTurnId: 'turn' });
+    await expect(service.clearOpenedCaptureForSession(ownerScope)).rejects.toThrow(/join delegated/);
+    await expect(service.openProjectInput(openRequest)).rejects.toThrow(/join delegated/);
+    expect(runAction).not.toHaveBeenCalled();
+    revokeDelegatedLease('child', { operationStopped: true });
+    expect(await service.clearOpenedCaptureForSession(ownerScope)).toBe(true);
+  });
+
+  it('recovers a quarantined binding only through confirmed close and validated reopen', async () => {
+    const service = new RdxSessionService();
+    await openOwnedCapture(service);
+    const old = getRdxContextLease(ownerScope.sessionId)!;
+    quarantineRdxContext(ownerScope.sessionId!, old.version, 'response lost');
+    expect(assertRdxContextLeaseOwnership({ sessionId: ownerScope.sessionId })).toBeNull();
+    runAction.mockImplementationOnce(async () => ({ ok: false, error: 'unconfirmed close' }));
+    await expect(service.openProjectInput(openRequest)).rejects.toThrow(/not confirmed/);
+    expect(getRdxContextLease(ownerScope.sessionId)?.version).toBe(old.version);
+    expect(assertRdxContextLeaseOwnership({ sessionId: ownerScope.sessionId })).toBeNull();
+    await openOwnedCapture(service);
+    expect(assertRdxContextLeaseOwnership({ sessionId: ownerScope.sessionId })?.version).toBeGreaterThan(old.version);
   });
 
   it('returns null or false when no capture is open', async () => {
@@ -224,7 +250,7 @@ describe('native preview confirmation', () => {
     await openOwnedCapture(service);
     nativeCli.mockResolvedValue({ exitCode, stdout: JSON.stringify({ ok: true, result_kind: 'preview', data }), stderr: '' });
     expect((await service.closeHumanPreviewWindow(ownerScope))?.humanPreview?.status).toBe(status);
-    expect(nativeCli).toHaveBeenCalledWith('session', ['preview', 'off', '--daemon-context', 'ctx-owned'], expect.any(Object));
+    expect(nativeCli).toHaveBeenCalledWith('session', ['preview', 'off', '--daemon-context', 'ctx-owned'], expect.objectContaining({ contextId: 'ctx-owned' }));
     expect(getRdxContextLease(ownerScope.sessionId)).not.toBeNull();
   });
   it('does not invent an open preview from an empty success payload', async () => {
@@ -232,4 +258,22 @@ describe('native preview confirmation', () => {
     await openOwnedCapture(service);
     expect((await service.openHumanPreviewWindow(ownerScope))?.humanPreview?.status).toBe('error');
   });
+});
+
+it('keeps preview orphan scoped to its owner and refuses teardown until actual close', async () => {
+  orphanContexts.clear(); clearRdxContextLeases();
+  const service = new RdxSessionService();
+  await openOwnedCapture(service);
+  nativeCli.mockImplementationOnce(async (_command, _args, options) => {
+    orphanContexts.add(options.contextId);
+    return { exitCode: 1, stdout: '', stderr: 'unconfirmed', processExitReason: 'unconfirmed_orphan' };
+  });
+  try {
+    await service.closeHumanPreviewWindow(ownerScope);
+    await expect(service.clearOpenedCaptureForSession(ownerScope)).rejects.toThrow(/exit has not been observed/);
+    expect(getRdxContextLease(ownerScope.sessionId)).not.toBeNull();
+    orphanContexts.delete('ctx-owned'); // supervised close observed
+    orphanContexts.add('unrelated-context');
+    expect(await service.clearOpenedCaptureForSession(ownerScope)).toBe(true);
+  } finally { orphanContexts.clear(); clearRdxContextLeases(); }
 });

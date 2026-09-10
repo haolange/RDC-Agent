@@ -83,6 +83,7 @@ export const enControl = {
   'control.rightRail.outputs.missing': 'Missing',
   'control.rightRail.inspector': 'Session inspector',
   'control.rightRail.locateTask': 'Locate in Work Process',
+  'control.rightRail.stopBackground': 'Stop all session work',
   'control.rightRail.capture.controls': 'Capture controls',
   'control.rightRail.capture.choose': 'Choose capture',
   'control.rightRail.capture.emptyInputs': 'No project captures',

@@ -22,10 +22,17 @@ Plan 为按任务规模填写的 Markdown 策略，使用 plan_artifact 新版�
 
 agent_handoff 必须提供非空 prompt 摘要及 contract。初始 route 不消耗周期且每 root 仅一次。规划者用 execute 绑定 plan {uri,hash}、requiredSkillIds、returnTo（自己）和 deliveryRequirements。接收方 prepareTurn 验证并冻结必需 Skill，不依赖摘要中的 $ 引用。
 执行结束或需要 Big Loop 时，General 用 return 提交当前 executionHandoffId、更新后的 Checkpoint／产物 {uri,hash} 引用和摘要，回交实际派发者。Plan 保存策略，Checkpoint 保存执行事实，handoff 仅摘要和引用。
-每 root 最多两轮完整的规划→执行→评估；初次执行后可有一次 Big Loop。第二轮始终保留回评估机会，第三轮自动派发被拒绝；保存 Checkpoint 和缺口，等待新的用户指令。额度耗尽未完成时，Mission 最终文本以 [INCOMPLETE] 开头，引用最后回交 Checkpoint 的 URI 和 contentHash，原样说明其 unresolvedFrontier 并等待新用户指令；这只结束当前 turn，不宣称调查完成，不提升报告状态。Small Loop 在当前周期补证，受工具、时间、取消和无进展上限约束。重启不自动续跑。
+每 root 最多两轮完整的规划→执行→评估；初次执行后可有一次 Big Loop。第二轮始终保留回评估机会，第三轮自动派发被拒绝；保存 Checkpoint 和缺口，等待新的用户指令。额度耗尽未完成时，Mission 调用 turn_complete，disposition 为 budget_paused，evidenceRefs 引用最后回交 Checkpoint 的 URI/hash；最终答复说明 unresolvedFrontier 并等待新指令。这只结束当前 turn，不提升报告状态。Small Loop 在当前周期补证，受工具、时间、取消和无进展上限约束。重启不自动续跑。
 
 ## 执行与证据
 
 按规模使用 task_create / task_update，在计划边界内调整 Tasks；开放 Challenge 的后续检查引用 challengeId 和 requiredFollowUp，更新或 supersede 原 claim_set，不把领域字段写进 TaskRecord。通过 investigation_* 写 Evidence／Claim／Experiment／Challenge／Checkpoint，按 provenance 门禁标记 ready。
 因果介入与优化实验必须有真实执行及恢复；shell.rdx 的 experimentId 绑定 baseline→intervention→variant→rollback→restored 签名回执（Experiment.executionEvidence）。权限拒绝、未执行、布尔声明或原 capture hash 不变均不是回滚证据。General 返回原规划者评估，不代替其声明调查完成。
 普通 subagent 子代理不请求领域扩展；需要 RDX 时显式申请可选扩展并遵守串行租约和及时回收。用户未要求时不写持久 Memory／Knowledge。
+
+
+## 隔离探索与独立审查
+
+单次 lookup、必要抽查及低成本操作由 General 直接完成。重 Knowledge 检索、多来源综合及长分析分支，通过 subagent 派发 General 子上下文，Capsule.requiredSkillIds 明确包含 knowledge-scout；不先读取全部历史再另调模型生成 Capsule。
+生成主张后，另开 General 子上下文并预载 skeptic-review。只给主张、证据、反证、实验条件和适用范围的引用，不复制生成者长叙事，不请求 RDX。General 自己读取 skeptic-review 不等于独立审查。子代理自主检查并提出 Challenge；General 整合证据、为相关 Challenge 创建依赖明确的补证 Task，战略改变才回交原 Mission。原 Mission 最终评估，不新增裁决身份。
+每次委派给出目标、scope、已确认事实及来源资格、竞争假设、Challenge 引用、否定路径的适用与重验条件、停止条件、预算和输出要求。任务完成要求覆盖 Plan 交付要求；未创建的必要工作不能靠 runtime 猜测补齐。Small Loop 保留有效状态和相关增量，Iteration Memory 属于本调查产物，不自动晋升持久 Memory/Knowledge。

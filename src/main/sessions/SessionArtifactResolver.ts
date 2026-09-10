@@ -77,6 +77,8 @@ export interface SessionArtifactResolved {
 }
 
 export interface SessionArtifactReadResult {
+  /** Opt-in native vision payload; absent from ordinary IPC reads. */
+  imageData?: string;
   uri: string;
   category: SessionArtifactCategory;
   relativePath: string;
@@ -373,7 +375,7 @@ export class SessionArtifactResolver {
   read(
     sessionId: string | null | undefined,
     uri: string,
-    options?: { offset?: number; limit?: number; expectedHash?: string },
+    options?: { offset?: number; limit?: number; expectedHash?: string; includeImageData?: boolean },
   ): SessionArtifactReadResult {
     const resolved = this.resolve(sessionId, uri);
     if (!fs.existsSync(resolved.absolutePath)) {
@@ -413,6 +415,7 @@ export class SessionArtifactResolver {
     );
     if (mimeType.startsWith('image/')) {
       return {
+        ...(options?.includeImageData ? { imageData: bytes.toString('base64') } : {}),
         uri: resolved.uri,
         category: resolved.category,
         relativePath: resolved.relativePath,

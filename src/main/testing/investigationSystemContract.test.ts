@@ -573,7 +573,7 @@ describe('investigation system contract', () => {
 
   it('investigation.contract.non-invasion', () => {
     expect.hasAssertions();
-    const task = readRepo('src/main/agent-runtime/tasks/TaskRegistry.ts');
+    const task = readRepo('src/main/agent-runtime/tasks/TaskContracts.ts');
     const profile = readRepo('src/shared/types/profile.ts');
     const message = readRepo('src/shared/types/conversation.ts');
     for (const source of [task, profile, message]) {

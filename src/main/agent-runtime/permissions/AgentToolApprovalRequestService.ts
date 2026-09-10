@@ -1,3 +1,4 @@
+import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
@@ -28,6 +29,7 @@ export interface ToolApprovalAnswerResult {
 }
 
 interface PendingToolApprovalRequest extends ToolApprovalRequestInput {
+  delegatedOwner?: DelegatedInteractionOwner;
   sessionId: string | null;
   turnId: string;
   approvalId: string;
@@ -53,6 +55,7 @@ export class AgentToolApprovalRequestService {
     return new Promise<boolean>((resolve, reject) => {
       const pending: PendingToolApprovalRequest = {
         ...input,
+        delegatedOwner: getDelegatedInteractionOwner(input.sessionId),
         sessionId: input.sessionId ?? null,
         turnId,
         approvalId,
@@ -92,6 +95,7 @@ export class AgentToolApprovalRequestService {
     const approvalId = `auto-review-${input.toolCallId}`;
     const synthetic: PendingToolApprovalRequest = {
       ...input,
+      delegatedOwner: getDelegatedInteractionOwner(input.sessionId),
       sessionId: input.sessionId ?? null,
       turnId: input.turnId?.trim() || 'auto-review',
       approvalId,
@@ -126,12 +130,17 @@ export class AgentToolApprovalRequestService {
     return approved;
   }
 
+  isPending(sessionId: string, turnId: string, approvalId: string): boolean {
+    const pending = this.pending.get(keyFor(turnId, approvalId));
+    return !!pending && (pending.delegatedOwner?.ownerSessionId ?? pending.sessionId) === sessionId;
+  }
+
   answer(input: ToolApprovalAnswerInput): ToolApprovalAnswerResult {
     const pending = this.pending.get(keyFor(input.turnId, input.approvalId));
     if (!pending) {
       return { success: false, error: 'No pending approval request was found for this turn.' };
     }
-    if (input.sessionId && pending.sessionId && input.sessionId !== pending.sessionId) {
+    if ((input.sessionId ?? null) !== (pending.delegatedOwner?.ownerSessionId ?? pending.sessionId)) {
       return { success: false, error: 'Pending approval request belongs to a different session.' };
     }
 
@@ -190,7 +199,8 @@ export class AgentToolApprovalRequestService {
     type: 'approval.requested' | 'approval.answered',
     payload: AgentApprovalEventPayload,
   ): void {
-    pending.onEvent?.(buildSharedAgentEvent(type, payload, pending.context));
+    const owner = pending.delegatedOwner;
+    pending.onEvent?.(buildSharedAgentEvent(type, owner ? { ...payload, delegatedRequest: { executionId: owner.executionId, childSessionId: owner.childSessionId, turnId: pending.turnId } } : payload, owner ? { ...pending.context, sessionId: owner.ownerSessionId } : pending.context));
   }
 }
 

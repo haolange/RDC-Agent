@@ -189,6 +189,9 @@ describe('knowledge system contract', () => {
     const scoutTools = skillAllowedTools('knowledge-scout');
     const candidateTools = skillAllowedTools('knowledge-candidate');
     expect(scoutTools).toEqual([
+      'subagent_report',
+      'turn_complete',
+      'artifact_read',
       'knowledge_browse',
       'knowledge_search',
       'knowledge_read',

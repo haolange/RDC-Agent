@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { handlers, syncSessionSlots, storage, conversation } = vi.hoisted(() => ({
+const { handlers, syncSessionSlots, abortBackgroundSession, storage, conversation } = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   syncSessionSlots: vi.fn(),
+  abortBackgroundSession: vi.fn(async () => undefined),
   conversation: {
     cancelUnfinishedHandoff: vi.fn(),
     cancelActiveTurn: vi.fn(async () => ({ success: true })),
@@ -12,7 +13,8 @@ const { handlers, syncSessionSlots, storage, conversation } = vi.hoisted(() => (
     getProjectById: vi.fn(),
     listRuns: vi.fn((): Array<{ runId: string; status: string }> => []),
     removeSession: vi.fn(),
-    listSessions: vi.fn(() => []),
+    removeProject: vi.fn(),
+    listSessions: vi.fn((): Array<{ sessionId: string }> => []),
     setCurrentSessionId: vi.fn(async () => undefined),
     setCurrentProjectId: vi.fn(),
     getLatestRun: vi.fn(() => null),
@@ -35,7 +37,7 @@ vi.mock('../sessions/StorageAdapter', () => ({
 }));
 
 vi.mock('../workflow/debugger/AgentOrchestrator', () => ({
-  agentOrchestrator: { syncSessionSlots },
+  agentOrchestrator: { syncSessionSlots, backgroundSubagents: { abortSession: abortBackgroundSession } },
 }));
 
 vi.mock('../conversation/ConversationService', () => ({
@@ -77,16 +79,36 @@ describe('session:remove slot sync', () => {
   beforeEach(() => {
     handlers.clear();
     syncSessionSlots.mockReset();
+    abortBackgroundSession.mockReset();
+    abortBackgroundSession.mockResolvedValue(undefined);
+    conversation.cancelActiveTurn.mockReset();
+    conversation.cancelActiveTurn.mockResolvedValue({ success: true });
     storage.readSession.mockReset();
     storage.getProjectById.mockReset();
     storage.listRuns.mockReset();
     storage.removeSession.mockReset();
+    storage.removeProject.mockReset();
     storage.listSessions.mockReset();
     storage.listRuns.mockReturnValue([]);
     storage.listSessions.mockReturnValue([]);
     storage.getProjectById.mockReturnValue({ projectId: 'proj_1', rootPath: 'D:/proj_1' });
     storage.handoffs.getActive.mockReset();
     storage.handoffs.getActive.mockReturnValue(null);
+  });
+
+  it('does not remove a project when background abort-and-join fails', async () => {
+    storage.listSessions.mockReturnValue([{ sessionId: 'sess_1' }]);
+    conversation.cancelActiveTurn.mockRejectedValueOnce(new Error('join not confirmed'));
+    registerProjectSessionHandlers({
+      state: { currentSessionId: null, currentProjectId: 'proj_1', currentRunId: null },
+      broadcastToRenderer: vi.fn(), broadcastRunStatusChanged: vi.fn(), applyCurrentLlmConfig: vi.fn(),
+      setRunLifecycleState: vi.fn(async () => undefined),
+      selectCurrentProject: vi.fn(async () => ({ project: null, currentSession: null, currentRun: null })),
+      initializeIpcState: vi.fn(async () => undefined),
+    } as unknown as WorkbenchIpcContext);
+    const result = await handlers.get('project:remove')!({}, 'proj_1');
+    expect(result).toMatchObject({ success: false, error: 'join not confirmed' });
+    expect(storage.removeProject).not.toHaveBeenCalled();
   });
 
   it('calls syncSessionSlots when removing a session', async () => {

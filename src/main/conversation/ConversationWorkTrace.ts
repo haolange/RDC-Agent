@@ -288,6 +288,7 @@ export function upsertRuntimeToolCall(
     block.toolCalls.push({
       id: patch.id,
       toolName: patch.toolName,
+      delegatedRequest: patch.delegatedRequest,
       status: patch.status ?? 'pending',
       providerOutputRef: patch.providerOutputRef ? { ...patch.providerOutputRef } : undefined,
       userInputQuestions: patch.userInputQuestions?.map((question) => ({

@@ -38,3 +38,10 @@ describe('RdxCliInvokerService.getRuntimeSummary', () => {
     expect(JSON.stringify(summary)).not.toContain('recommendedSpecialists');
   });
 });
+
+it('tags context-scoped action invocation ownership separately from native argv', async () => {
+  const service = new RdxCliInvokerService();
+  const invoke = vi.spyOn(service, 'executeCLI').mockResolvedValue({ exitCode: 1, stdout: '', stderr: 'orphan', duration_ms: 1, processExitReason: 'unconfirmed_orphan' });
+  await service.call({ toolName: 'rd.shader.replace', args: {}, contextId: 'owned-context', runId: 'run' });
+  expect(invoke).toHaveBeenCalledWith('call', expect.arrayContaining(['--daemon-context', 'owned-context']), expect.objectContaining({ contextId: 'owned-context', runId: 'run' }));
+});

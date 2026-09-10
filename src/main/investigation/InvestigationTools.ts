@@ -1,3 +1,4 @@
+import { delegatedArtifactOwner, resolveDelegatedArtifactRead, grantDelegatedOutput, assertDelegatedArtifactWrite } from '../sessions/DelegatedArtifactAccess';
 import type { InvestigationMission } from '@shared/types/renderdocInvestigation';
 import type { AgentTool, AgentToolResult } from '../agent-runtime/agent/AgentTool';
 import { InvestigationError, toInvestigationError } from './investigationErrors';
@@ -87,7 +88,8 @@ function createInvestigationReadTool(
       try {
         const artifactId = asString(args.artifactId);
         if (!artifactId) return errorResult(new InvestigationError('INVESTIGATION_SCHEMA_INVALID', 'artifactId is required'));
-        const result = deps.service.readRecord(sessionId, artifactId, asString(args.expectedHash) || undefined);
+        const result = deps.service.readRecord(delegatedArtifactOwner(sessionId) ?? sessionId, artifactId, asString(args.expectedHash) || undefined);
+        if (sessionId) resolveDelegatedArtifactRead(sessionId, result.contentUri, result.contentHash);
         return textResult(
           `${result.manifest.kind}\t${result.manifest.status}\t${result.manifest.title}\n${JSON.stringify(result.record)}`,
           { ok: true, artifactId, manifest: result.manifest, record: result.record, contentHash: result.contentHash },
@@ -160,7 +162,23 @@ function createInvestigationWriteTool(
           status: parseWriteStatus(args.status),
           artifactId: asString(args.artifactId) || undefined,
         };
-        const result = deps.service.writeRecord(sessionId, input);
+        const owner = delegatedArtifactOwner(sessionId);
+        if (owner && sessionId) {
+          for (const ref of input.sourceRefs ?? []) {
+            const source = deps.service.readRecord(owner, ref.artifactId, ref.expectedHash);
+            resolveDelegatedArtifactRead(sessionId, source.contentUri, source.contentHash);
+          }
+          if (input.supersedes) {
+            const previous = deps.service.readRecord(owner, input.supersedes);
+            assertDelegatedArtifactWrite(sessionId, previous.contentUri);
+          }
+          if (input.artifactId) {
+            const existing = deps.service.list(owner).find(item => item.artifactId === input.artifactId);
+            if (existing) assertDelegatedArtifactWrite(sessionId, deps.service.readRecord(owner, existing.artifactId).contentUri);
+          }
+        }
+        const result = deps.service.writeRecord(owner ?? sessionId, input);
+        if (owner && sessionId) grantDelegatedOutput(sessionId, result.contentUri, result.contentHash);
         return textResult(
           `${result.manifest.artifactId}\t${result.manifest.kind}\t${result.manifest.status}\t${result.contentHash}`,
           { ok: true, ...result },
@@ -198,9 +216,14 @@ function createInvestigationListTool(
     },
     async execute(_id, args) {
       try {
-        const items = deps.service.list(sessionId, {
+        const owner = delegatedArtifactOwner(sessionId);
+        const items = deps.service.list(owner ?? sessionId, {
           kind: asString(args.kind) || undefined,
           status: asString(args.status) || undefined,
+        }).filter(item => {
+          if (!owner || !sessionId) return true;
+          const result = deps.service.readRecord(owner, item.artifactId);
+          try { resolveDelegatedArtifactRead(sessionId, result.contentUri, result.contentHash); return true; } catch { return false; }
         });
         const lines = items.map((item) => `${item.artifactId}\t${item.kind}\t${item.status}\t${item.recordKey}`);
         return textResult(

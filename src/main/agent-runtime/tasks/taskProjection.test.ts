@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TaskRecord, TaskStatus } from './TaskRegistry';
+import { TASK_SCHEMA_VERSION } from './TaskContracts';
 import { createdAtFromTaskId, orderTasks, projectTaskItems } from './taskProjection';
 
 const task = (
@@ -8,6 +9,7 @@ const task = (
   createdAt: number,
   extras: Partial<TaskRecord> = {},
 ): TaskRecord => ({
+  schemaVersion: TASK_SCHEMA_VERSION,
   id,
   subject: extras.subject ?? id,
   description: '',
@@ -15,6 +17,10 @@ const task = (
   statusReason: extras.statusReason,
   blockedBy: extras.blockedBy ?? [],
   blocks: extras.blocks ?? [],
+  completionRequirements: [],
+  executionRequired: true,
+  executionIds: [],
+  revision: 1,
   createdAt,
   updatedAt: extras.updatedAt ?? createdAt,
 });

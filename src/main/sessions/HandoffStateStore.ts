@@ -31,6 +31,8 @@ export interface PrepareHandoffInput {
   depth: number;
   /** When set, persist reuses the memory-draft id instead of minting another. */
   handoffId?: string;
+  taskExecution?: ProfileHandoffState['taskExecution'];
+  taskResult?: ProfileHandoffState['taskResult'];
 }
 
 function handoffConflict(detail: string): Error {
@@ -176,6 +178,8 @@ export class HandoffStateStore {
       declaredModel: input.declaredModel,
       send: input.send,
       preparedAt: nowMs(),
+      ...(input.taskExecution ? { taskExecution: { ...input.taskExecution } } : {}),
+      ...(input.taskResult ? { taskResult: structuredClone(input.taskResult) } : {}),
     };
   }
 

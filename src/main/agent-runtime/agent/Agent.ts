@@ -95,6 +95,7 @@ export interface AgentOptions {
   errorRecovery?: ErrorRecovery;
   onRequest?: AgentLoopConfig['onRequest'];
   onResponse?: AgentLoopConfig['onResponse'];
+  beforeRequestMessages?: AgentLoopConfig['beforeRequestMessages'];
 }
 
 // =====================================================================
@@ -388,6 +389,7 @@ export class Agent {
       errorRecovery: opts.errorRecovery,
       onRequest: opts.onRequest,
       onResponse: opts.onResponse,
+      beforeRequestMessages: opts.beforeRequestMessages,
     };
   }
 }

@@ -1,3 +1,5 @@
+import { flushPolicyBudgetObservers } from './DelegationBudget';
+import { withProcessExecutionOwner } from '../../runtime/ResourceExecutionLifetime';
 import { getRdxTurnBinding } from '../../tools/RdxTurnBindings';
 /**
  * ToolExecutorFactory — createToolExecutor and tool-call mediation helpers.
@@ -33,6 +35,7 @@ import { countSubagentCalls, isAgentToolCallConcurrencySafe } from '../../agent-
 import type { ResolvedRuntimeTools, ToolExecutorRuntimeContext } from './orchestratorTypes';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { artifactizeToolResult } from '../../agent-runtime/tools/ToolResultArtifactizer';
+import { toolResourceArbiter, toolResourceKey } from './ToolResourceArbiter';
 
 export interface ToolExecutorFactoryDeps {
   slots: AgentSlotRegistry;
@@ -196,6 +199,7 @@ export class ToolExecutorFactory {
             return this.createPolicyLimitToolResult(toolCall, agentId, reserved.limit);
           }
         }
+        await flushPolicyBudgetObservers(policyBudget);
         let validatedArgs: Record<string, unknown>;
         try {
           validatedArgs = toolValidator.validate(toolToDefinition(tool), toolCall.arguments ?? {});
@@ -301,7 +305,7 @@ export class ToolExecutorFactory {
             visionInputMode: plan?.routeCapability?.visionInputMode ?? 'disabled',
           };
           const injectKnowledgeRoots = isKnowledgeReadFileTool(normalizedName);
-          const result = await withTemporaryPathAccess(
+          const executeToolEffect = () => withProcessExecutionOwner(runtimeContext?.sessionId ?? sessionId, () => withTemporaryPathAccess(
             toolContext,
             [
               ...(permissionDecision.temporaryPathRoots ?? []),
@@ -314,7 +318,20 @@ export class ToolExecutorFactory {
               onUpdate,
               scopedContext,
             ),
-          );
+          ));
+          // Unsafe effects from parent and detached children share the same
+          // session/project gate. The subagent call itself is orchestration;
+          // locking it here would deadlock while awaiting child effects.
+          const ownerSessionId = (runtimeContext?.sessionId ?? sessionId ?? 'ephemeral').split('::subagent::', 1)[0];
+          // Project files/shell state are shared across sessions; use the
+          // canonical project root when available and fall back to session
+          // ownership only for ephemeral/no-project execution.
+          const resourceKey = toolResourceKey(projectRootPath, ownerSessionId);
+          const result = tool.spec?.orchestration === true
+            ? await executeToolEffect()
+            : isAgentToolCallConcurrencySafe(tool, validatedToolCall)
+              ? await toolResourceArbiter.runShared(resourceKey, signal, executeToolEffect)
+              : await toolResourceArbiter.runExclusive(resourceKey, signal, executeToolEffect);
           await this.triggerRuntimeHooks('tool.after-call', agentId, runtimeContext, {
             toolName: toolCall.name,
             toolCallId: toolCall.id,
@@ -365,14 +382,20 @@ export class ToolExecutorFactory {
   ): Promise<boolean> {
     const projectRoot = runtimeContext?.projectRootPath ?? undefined;
     hookEngine.load(appPathService.getUserRdxPaths().hooksPath, projectRoot ?? undefined);
-    const results = await hookEngine.trigger(event, {
+    const results = await toolResourceArbiter.runExclusive(
+      toolResourceKey(projectRoot, runtimeContext?.sessionId ?? 'ephemeral'),
+      undefined,
+      () => withProcessExecutionOwner(runtimeContext?.sessionId, () => hookEngine.trigger(event, {
       event,
       agentId,
       toolName: typeof payload.toolName === 'string' ? payload.toolName : undefined,
       sessionId: runtimeContext?.sessionId ?? undefined,
       projectRoot: projectRoot ?? undefined,
       payload,
-    });
+    }))).catch(() => null);
+    // A quarantined process prevents further hook effects; the original tool
+    // result must still reach the caller without waiting for an unknown exit.
+    if (!results) return false;
     for (const result of results) {
       if (!runtimeContext?.eventContext || !runtimeContext.onEvent) continue;
       runtimeContext.onEvent(buildDiagnosticAgentEvent(runtimeContext.eventContext, {

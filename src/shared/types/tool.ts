@@ -134,6 +134,7 @@ export interface ToolRuntimeSummary {
 }
 
 export interface CLIResult {
+  processExitReason?: 'exit' | 'signal' | 'timeout' | 'abort' | 'spawn_failed' | 'supervisor_kill' | 'unconfirmed_orphan';
   exitCode: number;
   stdout: string;
   stderr: string;

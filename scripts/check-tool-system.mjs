@@ -40,8 +40,8 @@ function main() {
   const { WORK_PROCESS_TOOL_DISPLAY_CATALOG } = require('../src/renderer/features/transcript/workProcessToolCatalog.ts');
 
   assert(
-    BUILTIN_AGENT_TOOL_IDS.length === 49,
-    `BUILTIN_AGENT_TOOL_IDS.length must be 49, got ${BUILTIN_AGENT_TOOL_IDS.length}`,
+    BUILTIN_AGENT_TOOL_IDS.length === 57,
+    `BUILTIN_AGENT_TOOL_IDS.length must be 57, got ${BUILTIN_AGENT_TOOL_IDS.length}`,
   );
 
   const builtinSet = new Set(BUILTIN_AGENT_TOOL_IDS);

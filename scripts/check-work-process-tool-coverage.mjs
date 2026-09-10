@@ -141,6 +141,13 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ taskId: 'task-1' }),
     resultPreview: toolEnvelope('Stopped task-1', { taskId: 'task-1', status: 'stopped' }),
   },
+  turn_complete: { argsPreview: JSON.stringify({ disposition: 'completed' }), resultPreview: toolEnvelope('Turn completion recorded', { disposition: 'completed' }) },
+  background_query: { argsPreview: JSON.stringify({ executionId: 'exec-1' }), resultPreview: toolEnvelope('running', { executionId: 'exec-1' }) },
+  background_wait: { argsPreview: JSON.stringify({ executionId: 'exec-1' }), resultPreview: toolEnvelope('completed', { executionId: 'exec-1' }) },
+  background_result: { argsPreview: JSON.stringify({ executionId: 'exec-1' }), resultPreview: toolEnvelope('result', { executionId: 'exec-1' }) },
+  background_message: { argsPreview: JSON.stringify({ executionId: 'exec-1', body: 'data' }), resultPreview: toolEnvelope('queued', { executionId: 'exec-1' }) },
+  background_cancel: { argsPreview: JSON.stringify({ executionId: 'exec-1' }), resultPreview: toolEnvelope('cancelled', { executionId: 'exec-1' }) },
+  background_join: { argsPreview: JSON.stringify({ executionId: 'exec-1' }), resultPreview: toolEnvelope('joined', { executionId: 'exec-1' }) },
   agent_handoff: {
     argsPreview: JSON.stringify({ agent: 'edit', prompt: 'Implement fix' }),
     resultPreview: toolEnvelope('Handoff ready', { agent: 'edit' }),
@@ -148,6 +155,10 @@ const FIXTURES = {
   subagent: {
     argsPreview: JSON.stringify({ profile: 'reviewer', prompt: 'Review this' }),
     resultPreview: toolEnvelope('Reviewed', { summary: 'Reviewed' }),
+  },
+  subagent_report: {
+    argsPreview: JSON.stringify({ kind: 'progress', body: 'Evidence comparison completed.' }),
+    resultPreview: toolEnvelope('Report queued', { messageId: 'message-1', sequence: 2 }),
   },
   memory_search: {
     argsPreview: JSON.stringify({ scope: 'project', query: 'project-notes' }),
@@ -397,5 +408,5 @@ for (const toolName of allTools) {
   }
 }
 
-// Coverage set is BUILTIN_AGENT_TOOL_IDS (currently 49) plus one MCP fixture.
+// Coverage set is BUILTIN_AGENT_TOOL_IDS (currently 57) plus one MCP fixture.
 console.log(`[work-process-tool-coverage] OK (${builtinIds.length} builtin + 1 MCP fixture)`);

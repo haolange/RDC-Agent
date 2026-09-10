@@ -146,9 +146,9 @@ describe('deterministic provider with production loop, tools, artifacts and dura
     const rejected = await run(mission, { name: 'agent_handoff', args: { agent: 'general', prompt: '第三轮', contract: contract! } });
     expect(rejected.isError).toBe(true); expect(JSON.stringify(rejected)).toMatch(/CYCLE_LIMIT|CHAIN_LIMIT/);
     expect(store.getActive(SESSION_ID)).toBeNull();
-    expect(() => enforceMissionTurnCompletion({ profileId: mission, sessionId: SESSION_ID, turnId: turn, finalAnswerText: '[INCOMPLETE] ' + checkpoint!.contentUri + ' ' + checkpoint!.contentHash + ' 仍需真实设备验证。等待新指令。', service })).not.toThrow();
+    expect(() => enforceMissionTurnCompletion({ profileId: mission, sessionId: SESSION_ID, turnId: turn, finalAnswerText: '仍需真实设备验证。等待新指令。', disposition: 'budget_paused', evidenceRefs: [{ uri: checkpoint!.contentUri, hash: checkpoint!.contentHash }], service })).not.toThrow();
     expect(() => enforceMissionTurnCompletion({ profileId: mission, sessionId: SESSION_ID, turnId: turn, finalAnswerText: '调查已完成', service })).toThrow();
-    expect(() => enforceMissionTurnCompletion({ profileId: mission, sessionId: SESSION_ID, turnId: 'forged-new-turn', finalAnswerText: '[INCOMPLETE] ' + checkpoint!.contentUri + ' ' + checkpoint!.contentHash + ' 仍需真实设备验证。', service })).toThrow();
+    expect(() => enforceMissionTurnCompletion({ profileId: mission, sessionId: SESSION_ID, turnId: 'forged-new-turn', finalAnswerText: '仍需真实设备验证。', disposition: 'budget_paused', evidenceRefs: [{ uri: checkpoint!.contentUri, hash: checkpoint!.contentHash }], service })).toThrow();
     expect(store.readDocument(SESSION_ID)!.history!.filter(item => item.contract.intent === 'return')).toHaveLength(2);
     turn = 'new-user-cancel';
     expect((await run(mission, { name: 'agent_handoff', args: { agent: 'general', prompt: '新的用户指令派发', contract: contract! } })).isError).not.toBe(true);

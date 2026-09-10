@@ -21,6 +21,8 @@ export interface RdxContextLease {
   delegatedFrom?: string;
   /** Parent turn that owns the delegated grant. */
   ownerTurnId?: string;
+  parentVersion?: number;
+  quarantineReason?: string;
 }
 
 export interface GrantDelegatedLeaseInput {
@@ -69,7 +71,7 @@ export function setRdxRuntimeContextForSession(
     const existing = leasesBySession.get(trimmed);
     const delegatedChild = delegatedChildByParent.get(trimmed);
     if (delegatedChild) {
-      revokeDelegatedLease(delegatedChild);
+      throw new Error('RDX_LEASE_DUAL_OWNER: join delegated execution before clearing the parent binding.');
     }
     if (existing?.delegatedFrom && delegatedChildByParent.get(existing.delegatedFrom) === trimmed) {
       delegatedChildByParent.delete(existing.delegatedFrom);
@@ -78,6 +80,9 @@ export function setRdxRuntimeContextForSession(
     return null;
   }
   const existing = leasesBySession.get(trimmed);
+  if (delegatedChildByParent.has(trimmed)) {
+    throw new Error('RDX_LEASE_DUAL_OWNER: join delegated execution before rebinding.');
+  }
   if (existing?.delegatedFrom) {
     return null;
   }
@@ -135,7 +140,12 @@ export function assertRdxContextLeaseOwnership(input: {
   if (!sessionId) return null;
   const lease = leasesBySession.get(sessionId);
   if (!lease) return null;
-  if (lease.ownerSessionId !== sessionId) return null;
+  if (lease.ownerSessionId !== sessionId || lease.quarantineReason || delegatedChildByParent.has(sessionId)) return null;
+  if (lease.delegatedFrom) {
+    const parent = leasesBySession.get(lease.delegatedFrom);
+    if (!parent || parent.quarantineReason || parent.version !== lease.parentVersion
+      || delegatedChildByParent.get(lease.delegatedFrom) !== sessionId) return null;
+  }
   if (input.contextId && lease.contextId !== input.contextId) return null;
   if (input.projectId !== undefined && lease.ownerProjectId !== input.projectId) {
     return null;
@@ -172,6 +182,7 @@ export function grantDelegatedLease(input: GrantDelegatedLeaseInput): RdxContext
   if (!parentLease) {
     failDelegatedLease(RDX_LEASE_DELEGATE_DENIED, 'parent session has no RDX runtime context lease.');
   }
+  if (parentLease.quarantineReason) failDelegatedLease(RDX_LEASE_DELEGATE_DENIED, 'parent binding requires controlled recovery.');
   if (parentLease.delegatedFrom) {
     failDelegatedLease(RDX_LEASE_DELEGATE_DENIED, 'child lease is not independently transferable.');
   }
@@ -202,6 +213,7 @@ export function grantDelegatedLease(input: GrantDelegatedLeaseInput): RdxContext
     runtimeContext: cloneRuntimeContext(parentLease.runtimeContext),
     updatedAt: Date.now(),
     delegatedFrom: parentSessionId,
+    parentVersion: parentLease.version,
     ownerTurnId,
   };
   leasesBySession.set(childSessionId, lease);
@@ -210,10 +222,13 @@ export function grantDelegatedLease(input: GrantDelegatedLeaseInput): RdxContext
 }
 
 /** Remove a child's delegated binding. Parent lease is unchanged. */
-export function revokeDelegatedLease(childSessionId: string): boolean {
+export function revokeDelegatedLease(childSessionId: string, options?: { operationStopped: boolean }): boolean {
   const trimmed = childSessionId.trim();
   if (!trimmed) return false;
   const lease = leasesBySession.get(trimmed);
+  if (lease?.delegatedFrom && (options?.operationStopped !== true || lease.quarantineReason)) {
+    quarantineRdxContext(lease.delegatedFrom, undefined, lease.quarantineReason ?? 'Delegated operation exit was not confirmed.');
+  }
   for (const [parent, child] of delegatedChildByParent) {
     if (child === trimmed) {
       delegatedChildByParent.delete(parent);
@@ -242,4 +257,11 @@ export function clearRdxContextLeases(): void {
 
 export function listRdxContextLeaseSessionIds(): string[] {
   return Array.from(leasesBySession.keys());
+}
+
+/** Preserve an uncertain binding for inspection, while refusing further execution or delegation. */
+export function quarantineRdxContext(sessionId: string, expectedVersion: number | undefined, reason: string): void {
+  const lease = leasesBySession.get(sessionId);
+  if (!lease || (expectedVersion !== undefined && lease.version !== expectedVersion)) return;
+  lease.quarantineReason = reason;
 }

@@ -339,12 +339,16 @@ export class AgentManifestService {
       id: agentId,
       fileName,
     });
-    const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
-    try {
-      await fs.promises.writeFile(temporaryPath, content, 'utf8');
-      await fs.promises.rename(temporaryPath, filePath);
-    } finally {
-      await fs.promises.rm(temporaryPath, { force: true });
+    if (options.scope === 'user') {
+      agentSeedMigrationService.writeExplicitUserOverride(directory, fileName, content);
+    } else {
+      const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+      try {
+        await fs.promises.writeFile(temporaryPath, content, 'utf8');
+        await fs.promises.rename(temporaryPath, filePath);
+      } finally {
+        await fs.promises.rm(temporaryPath, { force: true });
+      }
     }
 
     const ownedFileName = fileNameForId(agentId);

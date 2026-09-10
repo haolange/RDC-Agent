@@ -6,7 +6,7 @@ import type { InvestigationArtifactService } from './InvestigationArtifactServic
 
 /** Ends only the current turn; no report is promoted and no domain completion is asserted. */
 export function allowsBudgetPause(input: TurnCompletionInput, service: InvestigationArtifactService): boolean {
-  if (!input.sessionId || !input.turnId || !input.finalAnswerText.startsWith('[INCOMPLETE]')) return false;
+  if (!input.sessionId || !input.turnId || input.disposition !== 'budget_paused') return false;
   const history = storageAdapter.handoffs.readDocument(input.sessionId)?.history ?? [];
   const last = history.filter(entry => entry.lifecycle === 'consumed').at(-1);
   if (!last || last.toAgentId !== input.profileId || last.continuationTurnId !== input.turnId || last.contract.intent !== 'return') return false;
@@ -18,7 +18,6 @@ export function allowsBudgetPause(input: TurnCompletionInput, service: Investiga
     const record = checkpoint.record as MissionCheckpoint;
     return checkpoint.manifest.mission === input.profileId && !!record.unresolvedFrontier.trim()
       && refs.some(ref => ref.uri === checkpoint.contentUri && ref.hash.replace(/^sha256:/, '') === checkpoint.contentHash.replace(/^sha256:/, ''))
-      && input.finalAnswerText.includes(checkpoint.contentUri) && input.finalAnswerText.includes(checkpoint.contentHash)
-      && input.finalAnswerText.includes(record.unresolvedFrontier);
+      && !!input.evidenceRefs?.some(ref => ref.uri === checkpoint.contentUri && ref.hash.replace(/^sha256:/, '') === checkpoint.contentHash.replace(/^sha256:/, ''));
   });
 }

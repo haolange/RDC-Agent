@@ -41,6 +41,7 @@ const RUNTIME_TOOL_ALIASES: Record<string, string> = {
   task_get: 'task_get',
   task_list: 'task_list',
   task_stop: 'task_stop',
+  turn_complete: 'turn_complete',
   askUser: 'ask_user',
   ask_user: 'ask_user',
   'vscode/askQuestions': 'ask_user',

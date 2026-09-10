@@ -384,6 +384,13 @@ General 为默认通用工作身份。核心正文只负责可信上下文、授
 
 agent_handoff 要求非空摘要和严格 contract：route；execute（Plan URI/hash、requiredSkillIds、returnTo、deliveryRequirements）；return（executionHandoffId、产物 URI/hash）。returnTo 必须等于实际派发者。Plan 经 session artifact plans 类别版本化，历史文件不迁移或删除。接收 prepareTurn 校验引用、预加载必需 Skill、去重、冻结来源与权限交集；来源变化重新准备，缺失或权限冲突拒绝。通用 turn 仅调用 TurnCompletionValidator，组合层选择 Investigation 校验策略并冻结任务绑定。
 
-每个 root 一次初始路由、最多两轮 execute/return；Small Loop 不消耗新周期，重复 consume 不重复扣数。第二轮允许回评估，第三轮执行拒绝。额度耗尽但未完成时，Mission 用 [INCOMPLETE] 开头，绑定最后回交 Checkpoint URI/contentHash 并列明 unresolvedFrontier，等待新用户指令；这只是 turn 结束，绝不提升领域报告状态。handoff-state schema v2；v1 原字节保存 .v1-archive，旧待续跑停止并展示重新建立提示，运行仅读 v2。重启降级、取消、事件驱动续跑保持原契约。
+每个 root 一次初始路由、最多两轮 execute/return；Small Loop 不消耗新周期，重复 consume 不重复扣数。第二轮允许回评估，第三轮执行拒绝。额度耗尽但未完成时，Mission 通过 turn_complete 的 budget_paused disposition 与 evidenceRefs 绑定最后回交 Checkpoint URI/hash，正文说明 unresolvedFrontier，等待新用户指令；这只是 turn 结束，绝不提升领域报告状态。handoff-state schema v2；v1 原字节保存 .v1-archive，旧待续跑停止并展示重新建立提示，运行仅读 v2。重启降级、取消、事件驱动续跑保持原契约。
 
 普通 Capsule 省略领域扩展且没有 RDX Lease prompt 段；仅 RDX 模块接受 domainExtensions.rdx.requiresLease=true 并注入租约上下文。缺省无 RDX，授权子代理串行且 finally 撤销；旧顶层字段拒绝，不保留双轨。
+
+
+### Task 预算与取消所有权（2026-09-10）
+
+通用 harness 的逻辑 Task、执行实例与 root budget 统一持久化在 TaskStore。直接执行、同步/后台子执行及 handoff 共享根预算；Capsule 只收窄 child-local 账本，重试恢复原执行已消费量和原 root 关联。预算预留持久化先于工具效果，父回复结束及事件续跑不重置账本。并发首次绑定同一 root 只合并一次；已绑定 root A 的同一 live ledger 请求 root B 时显式拒绝，保持原账本与观察者归属，不建立多根合并或静默换绑路径。
+
+prepared → consumed → receiving turn 的取消所有权转交不能丢失已请求的 Stop。转交空隙保留 cancelling；接收者先承接取消意图并 abort/join，再允许后续执行边界。任务取消终态须在实际 producer 与所属进程退出后保存；同 turn 取消请求不 self-join。字段与调用合同以 [runtime-kernel](docs/contracts/runtime-kernel.md) 的 Task 执行章节为准，领域调查策略仍由实际加载的指令决定。

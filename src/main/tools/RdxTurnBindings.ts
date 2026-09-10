@@ -1,15 +1,22 @@
 import { createHash } from 'node:crypto';
 import type { RdxActionSettingsMap, RdxCliInvokerSettings } from '@shared/types/settings';
 
+export interface RdxLeaseIdentity {
+  contextId: string;
+  version: number;
+  ownerSessionId: string;
+}
 export interface RdxTurnBinding {
+  identity: RdxLeaseIdentity | null;
   cli: RdxCliInvokerSettings;
   actions: RdxActionSettingsMap;
 }
 
 /** Private turn leases: executable environment is never serialized into Prompt/IPC/Trace. */
 const bindings = new WeakMap<object, RdxTurnBinding>();
-export function freezeRdxTurnBinding(cli: RdxCliInvokerSettings, actions: RdxActionSettingsMap): RdxTurnBinding {
-  const copy = structuredClone({ cli, actions });
+export function freezeRdxTurnBinding(cli: RdxCliInvokerSettings, actions: RdxActionSettingsMap, identity: RdxLeaseIdentity | null = null): RdxTurnBinding {
+  const copy = structuredClone({ cli, actions, identity: identity ? { contextId: identity.contextId, version: identity.version, ownerSessionId: identity.ownerSessionId } : null });
+  if (copy.identity) Object.freeze(copy.identity);
   Object.freeze(copy.cli.argsPrefix);
   Object.freeze(copy.cli.env);
   Object.freeze(copy.cli);

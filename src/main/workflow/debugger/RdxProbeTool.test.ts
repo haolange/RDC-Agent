@@ -4,7 +4,7 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false, decryptString: () => '', encryptString: (v: string) => Buffer.from(v) },
 }));
 import { createRdxProbeTool, type RdxProbeToolDeps } from './RdxProbeTool';
-import { clearRdxContextLeases, getRdxContextLease, setRdxRuntimeContextForSession } from '../../sessions/RdxRuntimeContextRegistry';
+import { clearRdxContextLeases, getRdxContextLease, setRdxRuntimeContextForSession, grantDelegatedLease, quarantineRdxContext } from '../../sessions/RdxRuntimeContextRegistry';
 import type { RdxProbeInput } from '@shared/constants/rdxProbe';
 import { compileRdxProbe, RdxProbeInputSchema } from '@shared/constants/rdxProbe';
 import type { RdxCliInvokerSettings } from '@shared/types/settings';
@@ -12,7 +12,7 @@ import type { RdxTurnBinding } from '../../tools/RdxTurnBindings';
 const settings: RdxCliInvokerSettings = {
   enabled: true, command: 'configured-rdx.exe', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000, catalogPath: '', jsonMode: 'auto',
 };
-const binding = { cli: settings, actions: {} } as RdxTurnBinding;
+const binding = { cli: settings, actions: {}, identity: { contextId: 'ctx', version: 1, ownerSessionId: 's' } } as RdxTurnBinding;
 const context = { sessionId: 's', projectId: 'p', workspaceRoot: '.', projectRootPath: '.', rdxBinding: binding };
 function own() {
   setRdxRuntimeContextForSession('s', { contextId: 'ctx', runtimeOwner: 'rdc-agent', ownerLeaseId: 'lease-s', backend: 'local', updatedAt: 1 }, { projectId: 'p' });
@@ -22,6 +22,45 @@ function result(exitCode = 0, body: unknown = { ok: true, result_kind: 'rd.sessi
 }
 afterEach(clearRdxContextLeases);
 describe('native RDX probe', () => {
+  it('does not probe or close a parent while delegated execution owns its live context', async () => {
+    own();
+    grantDelegatedLease({ parentSessionId: 's', childSessionId: 'child', ownerTurnId: 'turn' });
+    const executeCli = vi.fn();
+    const closeLease = vi.fn();
+    const tool = createRdxProbeTool('s', 'p', { executeCli, closeLease });
+    for (const action of ['probe', 'lease_close'] as const) {
+      expect((await tool.execute('t', { action }, undefined, undefined, context)).isError).toBe(true);
+    }
+    expect(executeCli).not.toHaveBeenCalled();
+    expect(closeLease).not.toHaveBeenCalled();
+  });
+  it('routes quarantined recovery through the controlled lifecycle, then reads the rebound identity', async () => {
+    own();
+    quarantineRdxContext('s', getRdxContextLease('s')!.version, 'response lost');
+    const openLease = vi.fn(async () => { own(); });
+    const executeCli = vi.fn(async () => result());
+    const tool = createRdxProbeTool('s', 'p', { openLease, executeCli });
+    expect((await tool.execute('t', { action: 'probe' }, undefined, undefined, context)).isError).toBe(true);
+    expect(executeCli).not.toHaveBeenCalled();
+    expect((await tool.execute('t', { action: 'lease_open', capturePath: '/registered.rdc' }, undefined, undefined, context)).isError).not.toBe(true);
+    expect(openLease).toHaveBeenCalledOnce();
+    expect(getRdxContextLease('s')?.quarantineReason).toBeUndefined();
+  });
+  it('signals reprepare after first lease identity allocation and rejects old-turn reads', async () => {
+    const initialBinding = { ...binding, identity: null } as RdxTurnBinding;
+    const initialContext = { ...context, rdxBinding: initialBinding };
+    const openLease = vi.fn(async () => { own(); });
+    const executeCli = vi.fn(async () => result());
+    const tool = createRdxProbeTool('s', 'p', { openLease, executeCli });
+    const opened = await tool.execute('open', { action: 'lease_open', capturePath: '/registered.rdc' }, undefined, undefined, initialContext);
+    expect(opened.isError).not.toBe(true);
+    expect(opened.details).toMatchObject({ reprepareRequired: true, worldStateStamp: { contextId: 'ctx' } });
+    expect(opened.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('Prepare a new turn') });
+    const staleRead = await tool.execute('read', { action: 'probe' }, undefined, undefined, initialContext);
+    expect(staleRead.isError).toBe(true);
+    expect(JSON.stringify(staleRead)).toContain('binding changed since prepareTurn');
+    expect(executeCli).toHaveBeenCalledTimes(1);
+  });
   it('requires a configured frozen binding', async () => {
     expect((await createRdxProbeTool('s', 'p').execute('t', { action: 'doctor' })).isError).toBe(true);
   });
@@ -81,6 +120,7 @@ describe('native RDX probe', () => {
     expect(executeCli).toHaveBeenCalledWith('context', ['status', '--daemon-context', 'ctx'], expect.anything());
     expect(closeLease).toHaveBeenCalledWith('s', 'p', binding, undefined);
     expect(getRdxContextLease('s')).toBeNull();
+    expect(r.details).toMatchObject({ reprepareRequired: true, worldStateStamp: { contextId: null } });
   });
   it('rejects a mismatched response or cancellation without clearing a lease', async () => {
     own();

@@ -170,9 +170,9 @@ export const KNOWLEDGE_RULE_REGISTRY = [
     id: 'knowledge.missing.skill.scout-readonly',
     kind: 'missing',
     file: 'resources/agent-runtime/skills/knowledge-scout/SKILL.md',
-    pattern: 'allowed-tools:\\s*\\[knowledge_browse,\\s*knowledge_search,\\s*knowledge_read,\\s*knowledge_compile\\]',
+    pattern: 'allowed-tools:\\s*\\[subagent_report,\\s*turn_complete,\\s*artifact_read,\\s*knowledge_browse,\\s*knowledge_search,\\s*knowledge_read,\\s*knowledge_compile\\]',
     probe: 'source-pattern',
-    note: '$knowledge-scout may only declare the four read Knowledge tools',
+    note: '$knowledge-scout may report meaningful child progress and declare four read Knowledge tools, scoped artifact reads, and structured completion',
   },
   {
     id: 'knowledge.missing.skill.candidate-intent',

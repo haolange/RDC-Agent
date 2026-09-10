@@ -11,14 +11,19 @@ vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() } }));
 vi.mock('../runtime/resolveConfiguredShell', () => ({ resolveConfiguredShell: () => { throw new Error('Offline fixed environment'); } }));
 vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: { readSessionShellCwd: () => null } }));
 const model = 'offline-fixture';
+const headSources = new Map<string, string>();
+let headSkillFiles: string[] | undefined;
+let baselineHead: string;
 function source(file: string, version: 'before' | 'after'): string {
-  return version === 'before' ? execFileSync('git', ['show', 'HEAD:' + file], { encoding: 'utf8' }) : readFileSync(file, 'utf8');
+  if (version === 'after') return readFileSync(file, 'utf8');
+  if (!headSources.has(file)) headSources.set(file, execFileSync('git', ['show', baselineHead + ':' + file], { encoding: 'utf8' }));
+  return headSources.get(file)!;
 }
 function plan(version: 'before' | 'after', id: string, extra: string[] = []) {
   const profileFile = 'resources/agent-runtime/agents/' + id + '.agent.md';
   const profile = parseAgentMarkdownStrict(source(profileFile, version), path.resolve(profileFile), id, '2026-09-09', true);
   if (!profile.ok) throw new Error(profile.reason);
-  const files = version === 'before' ? execFileSync('git', ['ls-tree', '-r', '--name-only', 'HEAD', 'resources/agent-runtime/skills'], { encoding: 'utf8' }).trim().split('\n').filter(file => file.endsWith('/SKILL.md')) : readdirSync('resources/agent-runtime/skills').map(id => 'resources/agent-runtime/skills/' + id + '/SKILL.md');
+  const files = version === 'before' ? (headSkillFiles ??= execFileSync('git', ['ls-tree', '-r', '--name-only', baselineHead, 'resources/agent-runtime/skills'], { encoding: 'utf8' }).trim().split('\n').filter(file => file.endsWith('/SKILL.md'))) : readdirSync('resources/agent-runtime/skills').map(id => 'resources/agent-runtime/skills/' + id + '/SKILL.md');
   const catalog = files.map(file => {
     const parsed = source(file, version).match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)!;
     const metadata = parseYaml(parsed[1]) as { name: string; description: string };
@@ -44,6 +49,8 @@ function plan(version: 'before' | 'after', id: string, extra: string[] = []) {
 
 describe('offline complete PromptPlan comparison', () => {
   it('measures identical task settings with HEAD core/profile/catalog/methods versus working tree, no provider', { timeout: 30000 }, () => {
+    headSources.clear(); headSkillFiles = undefined;
+    baselineHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
     const root = mkdtempSync(path.join(tmpdir(), 'rdc-prompt-cost-'));
     mkdirSync(path.join(root, 'prompts'));
     for (const file of ['identity-collaboration.md', 'agent-loop.md', 'tool-evidence.md', 'completion.md']) writeFileSync(path.join(root, 'prompts', file), source('resources/agent-runtime/prompts/' + file, 'before'));
@@ -64,7 +71,7 @@ describe('offline complete PromptPlan comparison', () => {
         return { ...test, beforeChars: before.systemPrompt.length, afterChars: after.systemPrompt.length, deltaChars: after.systemPrompt.length - before.systemPrompt.length,
           beforeEstimatedTokens: before.totalTokenEstimate, afterEstimatedTokens: after.totalTokenEstimate, segments: after.segments.map(segment => ({ id: segment.id, chars: segment.content.length })) };
       });
-      const report = { baseline: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), note: 'HEAD is historical baseline, not the start of this phase. Full system PromptPlan with identical tools and empty external context; estimates are not billed tokens. No LLM requests.', rows };
+      const report = { baseline: baselineHead, note: 'HEAD is historical baseline, not the start of this phase. Full system PromptPlan with identical tools and empty external context; estimates are not billed tokens. No LLM requests.', rows };
       console.info(JSON.stringify(report));
       if (process.env.RDC_AGENT_OFFLINE_COST_OUTPUT) writeFileSync(process.env.RDC_AGENT_OFFLINE_COST_OUTPUT, JSON.stringify(report, null, 2));
     } finally { rootSpy.mockRestore(); rmSync(root, { recursive: true, force: true }); }

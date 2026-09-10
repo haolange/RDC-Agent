@@ -1,3 +1,5 @@
+const authority = vi.hoisted(() => ({ save: vi.fn() }));
+vi.mock('../../sessions/CompactionAuthoritySource', () => ({ saveCompactionAuthoritySource: authority.save, verifyCompactionAuthoritySource: vi.fn() }));
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { SessionRecord } from '@shared/types/session';
@@ -290,4 +292,11 @@ describe('persistGeneratedSessionCompaction hooks', () => {
     })).resolves.toBeNull();
     expect(createDerivedView).not.toHaveBeenCalled();
   });
+});
+
+it('does not commit a derived view when authoritative checkpoint save fails', async () => {
+  createDerivedView.mockClear(); dispatchRuntimeHooks.mockResolvedValue(true);
+  authority.save.mockRejectedValueOnce(new Error('checkpoint unavailable'));
+  await expect(persistGeneratedSessionCompaction({ sessionId: 'session-1', history: [], visibleTurnIds: ['1', '2', '3', '4'], branchId: 'root', occupiedTokens: 200, compactionThresholdTokens: 100 })).rejects.toThrow(/checkpoint unavailable/);
+  expect(createDerivedView).not.toHaveBeenCalled();
 });

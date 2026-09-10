@@ -144,6 +144,22 @@ describe('HandoffStateStore durable lifecycle', () => {
     expect(store.getActive('sess_1')?.handoffId).toBe(draft.handoffId);
   });
 
+  it('persists an optional generic Task execution and typed return result', () => {
+    const { store } = createStore();
+    const prepared = store.prepare('sess_1', {
+      contract: { intent: 'route' }, sourceTurnId: 'turn-task', sourceRequestId: 'req-task',
+      sourceAgentId: 'general', toAgentId: 'review', prompt: 'Review.', label: 'Review',
+      declaredModel: null, send: true, chainRoot: 'root-task', depth: 1,
+      taskExecution: { taskId: 'task-1', executionId: 'execution-1', generation: 2, taskRevision: 3 },
+      taskResult: { disposition: 'partial', summary: 'Needs one follow-up.', outputs: { report: 'artifact://report' } },
+    });
+    expect(prepared).toMatchObject({
+      taskExecution: { executionId: 'execution-1', generation: 2 },
+      taskResult: { disposition: 'partial', outputs: { report: 'artifact://report' } },
+    });
+    expect(store.readDocument('sess_1')?.active).toMatchObject({ taskExecution: { taskId: 'task-1' } });
+  });
+
   it('writes prepared then commits, and rejects a second active handoff', () => {
     const { store } = createStore();
     const prepared = prepare(store);

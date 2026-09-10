@@ -55,6 +55,8 @@ export interface AgentTurnOptions {
   preloadSkillIds?: string[];
   policyBudget?: PolicyBudgetState;
   subagentBudget?: SubagentBudgetState;
+  beforeProviderRequestMessages?: () => Promise<{ messages: Message[]; commit?: () => Promise<void> }>;
+  onProviderRequestCommitted?: (requestId: string) => Promise<void> | void;
 }
 
 export interface AgentProfileTurnOptions extends AgentTurnOptions {
@@ -96,6 +98,7 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
     selectedTurnCount: number;
     filteredArtifactCount: number;
     pendingHandoff?: PendingHandoff;
+    completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null;
   }) => void;
 }
 

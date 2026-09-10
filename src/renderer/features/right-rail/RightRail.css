@@ -123,6 +123,11 @@
   color: var(--token-text-caption);
 }
 
+.right-rail-task-stop-error {
+  display: block;
+  color: var(--token-status-danger);
+}
+
 .right-rail-task-copy,
 .right-rail-artifact-copy,
 .project-capture-input-copy {

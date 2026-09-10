@@ -7,6 +7,7 @@ import {
   type SessionArtifactizedEnvelope,
 } from '@shared/types/sessionArtifact';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/SessionArtifactResolver';
+import { delegatedArtifactOwner, grantDelegatedOutput } from '../../sessions/DelegatedArtifactAccess';
 import { ToolResultSummarizer } from './ToolResultSummarizer';
 
 const summarizer = new ToolResultSummarizer();
@@ -51,7 +52,9 @@ function serializeEnvelope(
     content: parsed.content,
     details: parsed.details,
   };
-  return { envelope: JSON.stringify(record), record };
+  const serialized = JSON.stringify(record);
+  const chunks = Array.from({ length: Math.ceil(serialized.length / 4000) }, (_, index) => serialized.slice(index * 4000, (index + 1) * 4000));
+  return { envelope: JSON.stringify({ encoding: 'json-chunks', reconstruction: 'Join chunks without separators, then parse JSON.', chunks }, null, 2), record };
 }
 
 function failClosed(code: string, message: string): AgentToolResult {
@@ -68,7 +71,8 @@ function failClosed(code: string, message: string): AgentToolResult {
  */
 export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentToolResult {
   const { result } = input;
-  if (result.isError === true) return result;
+  // Explicit hash-checked artifact image reads already obey the native vision gate and artifact quota.
+  if (input.toolName === 'artifact_read' && result.content.some((item) => item.type === 'image')) return result;
   let serialized: string;
   try {
     serialized = serializeResult(result);
@@ -89,25 +93,29 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
   }
 
   const toolCallId = (input.toolCallId || 'tool').replace(SAFE_TOOL_CALL_ID, '_').slice(0, 80) || 'tool';
-  const relativePath = `${toolCallId}.json`;
+  const ownerSessionId = delegatedArtifactOwner(sessionId) ?? sessionId;
+  const childPrefix = ownerSessionId === sessionId ? '' : `${sha256Hex(Buffer.from(sessionId)).slice(0, 24)}-`;
+  const relativePath = `${childPrefix}${toolCallId}.json`;
   const uri = formatSessionArtifactUri('tool-outputs', relativePath);
   const resolver = input.resolver ?? sessionArtifactResolver;
   const mimeType = 'application/json';
-  const { envelope, record } = serializeEnvelope(sessionId, input.toolName, input.toolCallId || toolCallId, result);
+  const { envelope, record } = serializeEnvelope(ownerSessionId, input.toolName, input.toolCallId || toolCallId, result);
 
   try {
-    const written = resolver.write(sessionId, uri, Buffer.from(envelope, 'utf8'), { mimeType });
+    const written = resolver.write(ownerSessionId, uri, Buffer.from(envelope, 'utf8'), { mimeType });
+    grantDelegatedOutput(sessionId, written.uri, written.hash);
     const summary = summarizer.trySummarize(input.toolName, result, 400)
       ?? `[${input.toolName}] ${record.size} bytes stored`;
     return {
+      isError: result.isError,
       content: [{
         type: 'text',
-        text: `${summary}\nref: ${written.uri}\nhash: ${record.hash}`,
+        text: `${summary}\nref: ${written.uri}\nhash: ${written.hash}`,
       }],
       details: {
         artifactized: true,
         ref: written.uri,
-        hash: record.hash,
+        hash: written.hash,
         summary,
         bytes: record.size,
         mimeType: record.mime,

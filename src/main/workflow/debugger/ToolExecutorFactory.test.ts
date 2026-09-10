@@ -1,3 +1,5 @@
+import { registerPolicyBudgetObserver } from './DelegationBudget';
+import { createPolicyBudgetState } from './TurnCoordinator';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({
@@ -453,7 +455,7 @@ describe('ToolExecutorFactory', () => {
       id: 'off',
       name: 'subagent',
       arguments: {  },
-    })).toBe(true);
+    })).toBe(false); // absent tool metadata never grants concurrent dispatch
     expect(executor.isConcurrencySafe?.({
       type: 'toolCall',
       id: 'live',
@@ -644,4 +646,33 @@ describe('ToolExecutorFactory', () => {
       await Promise.all([rm(userRdx, { recursive: true, force: true }), rm(workspace, { recursive: true, force: true })]);
     }
   });
+});
+
+it('passes the frozen native vision capability into the production tool context', async () => {
+ const execute = vi.fn(async () => ({ content: [{ type: 'text' as const, text: 'ok' }] }));
+ const toolMap = new Map([['artifact_read', { name: 'artifact_read', description: 'read', parameters: { type: 'object', properties: {} }, execute }]]);
+ const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as unknown as AgentSlotRegistry, deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker, getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }), isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+ for (const visionInputMode of ['native', 'disabled'] as const) {
+  const executor = factory.createToolExecutor('general', ['artifact_read'], 'vision-session', { effectivePlan: { toolAllowlist: ['artifact_read'], skillIntersection: null, projectId: null, projectRootPath: null, routeCapability: { visionInputMode } } as never });
+  await executor.execute({ type: 'toolCall', id: visionInputMode, name: 'artifact_read', arguments: {} });
+  expect(execute).toHaveBeenLastCalledWith(visionInputMode, {}, undefined, undefined, expect.objectContaining({ visionInputMode }));
+ }
+});
+
+it('durably saves reserved cost before effects and rejects effects when durable accounting fails', async () => {
+ const execute = vi.fn(async () => ({ content: [{ type: 'text' as const, text: 'ok' }] }));
+ const toolMap = new Map([['read_file', { name: 'read_file', description: 'read', parameters: { type: 'object', properties: {} }, execute }]]);
+ const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as unknown as AgentSlotRegistry, deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker, getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }), isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+ const ledger = createPolicyBudgetState(); let release!: () => void; const persisted: number[] = [];
+ const gate = new Promise<void>((resolve) => { release = resolve; });
+ const unregister = registerPolicyBudgetObserver(ledger, async (snapshot) => { await gate; persisted.push(snapshot.toolCalls); });
+ const executor = factory.createToolExecutor('general', ['read_file'], null, { effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never, policyBudget: ledger });
+ const call = { type: 'toolCall' as const, id: 'persisted', name: 'read_file', arguments: {} };
+ executor.reserveDispatchBudget?.([call]);
+ const running = executor.execute(call);
+ await Promise.resolve(); expect(execute).not.toHaveBeenCalled(); release(); await running;
+ expect(persisted).toEqual([1]); expect(execute).toHaveBeenCalledOnce(); unregister();
+ const fail = registerPolicyBudgetObserver(ledger, async () => { throw new Error('durable budget unavailable'); });
+ await expect(executor.execute({ ...call, id: 'failed-save' })).rejects.toThrow('durable budget unavailable');
+ expect(execute).toHaveBeenCalledOnce(); expect(ledger.toolCalls).toBe(2); fail();
 });
