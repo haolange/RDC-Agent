@@ -1,15 +1,13 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { materializeAgentUserInput } from './ConversationAttachmentMaterializer';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-att-mat-'));
 
-afterEach(() => {
-  fs.rmSync(tempRoot, { recursive: true, force: true });
-  fs.mkdirSync(tempRoot, { recursive: true });
-});
+beforeEach(() => fs.mkdirSync(tempRoot, { recursive: true }));
+afterEach(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
 
 describe('conversation attachment materialization', () => {
   it('inlines text files and keeps binary files as tool-visible paths', async () => {
