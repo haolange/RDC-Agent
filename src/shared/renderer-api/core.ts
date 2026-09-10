@@ -63,7 +63,6 @@ export function createConversationApi(transport: RendererApiTransport): Conversa
     switchBranch: (request) => transport.invoke(INVOKE.conversation.switchBranch, request),
     clearHistory: (sessionId) => transport.invoke(INVOKE.conversation.clearHistory, sessionId),
     undoLastTurn: (sessionId) => transport.invoke(INVOKE.conversation.undoLastTurn, sessionId),
-    compactHistory: (sessionId) => transport.invoke(INVOKE.conversation.compactHistory, sessionId),
     getToolImagePreview: (request) => transport.invoke(INVOKE.conversation.getToolImagePreview, request),
     stageAttachments: (request) => transport.invoke(INVOKE.conversation.stageAttachments, request),
     releaseAttachments: (request) => transport.invoke(INVOKE.conversation.releaseAttachments, request),

@@ -28,6 +28,10 @@ export function grantDelegatedArtifactAccess(childSessionId: string, parentSessi
 export function delegatedArtifactOwner(sessionId: string | null | undefined): string | null {
   return sessionId ? grants.get(sessionId)?.ownerSessionId ?? null : null;
 }
+export function delegatedArtifactReferences(sessionId: string): Array<{ uri: string; hash: string }> | null {
+  const grant = grants.get(sessionId);
+  return grant ? [...grant.refs].map(([uri, hash]) => ({ uri, hash })) : null;
+}
 export function resolveDelegatedArtifactRead(sessionId: string, uri: string, expectedHash?: string): { sessionId: string; expectedHash?: string } {
   const grant = grants.get(sessionId);
   if (!grant) return { sessionId, expectedHash };

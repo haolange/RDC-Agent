@@ -15,8 +15,14 @@ export const SESSION_ARTIFACT_ROOT_DIR = 'session-artifacts';
 /** 单文件上限。 */
 export const SESSION_ARTIFACT_MAX_FILE_BYTES = 2 * 1024 * 1024;
 
+/** Original raster evidence; decoded bytes remain under the session quota. */
+export const SESSION_ARTIFACT_MAX_IMAGE_BYTES = 32 * 1024 * 1024;
+
 /** artifact_read 返回窗：字节。 */
 export const ARTIFACT_READ_MAX_OUTPUT_BYTES = 200 * 1024;
+
+/** Model-facing pages stay bounded and must never be recursively artifactized. */
+export const ARTIFACT_TOOL_PAGE_BYTES = 16 * 1024;
 
 /** artifact_read 返回窗：行。 */
 export const ARTIFACT_READ_MAX_OUTPUT_LINES = 2000;

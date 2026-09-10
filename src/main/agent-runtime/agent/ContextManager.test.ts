@@ -214,154 +214,48 @@ describe('ContextManager', () => {
     });
   });
 
-  describe('compress — 工具结果预算', () => {
-    it('工具结果总大小在预算内时不应修改', async () => {
-      const cm = createContextManager({ toolResultBudget: 1000 });
-      const msgs: AgentMessage[] = [
-        user('hi'),
-        toolResult('tc1', 'read', 'short output'),
-      ];
-      const result = await cm.compress(msgs);
-      expect(result.messages).toHaveLength(2);
-      expect((result.messages[1] as ToolResultMessage).content[0]).toMatchObject({
-        type: 'text',
-        text: 'short output',
-      });
+  describe('recoverable model windows', () => {
+    it('preserves entire tool results including middle qualifications below the request limit', async () => {
+      const text = 'x'.repeat(5000) + ' hypothesis only; not a verified cause';
+      const messages = [user('inspect'), toolResult('call', 'read', text)];
+      expect((await createContextManager().compress(messages)).messages).toEqual(messages);
     });
-
-    it('工具结果超出预算时应截断', async () => {
-      const cm = createContextManager({ toolResultBudget: 100 });
-      const longText = 'x'.repeat(5000);
-      const msgs: AgentMessage[] = [
-        user('hi'),
-        toolResult('tc1', 'read', longText),
-      ];
-      const result = await cm.compress(msgs);
-      const tr = result.messages[1] as ToolResultMessage;
-      const text = tr.content.map((c) => (c as { text: string }).text).join('');
-      expect(text.length).toBeLessThan(longText.length);
-      expect(text).toContain('truncated');
-      expect(result.summary).toBeUndefined();
+    it('does not snip a long sequence of short messages', async () => {
+      const messages = Array.from({ length: 100 }, (_, i) => user(`revision ${i}`));
+      expect((await createContextManager().compress(messages)).messages).toEqual(messages);
     });
-  });
-
-  describe('compress — snip', () => {
-    it('消息数超出 maxMessages 时应 snip 中间部分', async () => {
-      const cm = createContextManager({ maxMessages: 5 });
-      const msgs: AgentMessage[] = [];
-      for (let i = 0; i < 20; i++) {
-        msgs.push(user(`msg ${i}`));
-      }
-      const result = await cm.compress(msgs);
-      // 保留头 3 + 占位符 + 尾 (5 - 3 - 1 = 1) = 5
-      expect(result.messages.length).toBeLessThan(msgs.length);
-      expect(result.messages.some((message) => (
-        message.role === 'user'
-        && (message as UserMessage).content === '[Earlier conversation compacted]'
-      ))).toBe(true);
+    it('fails without a recoverable service instead of deleting old messages', async () => {
+      const messages = [user('x'.repeat(5000)), assistant('later')];
+      const original = structuredClone(messages);
+      await expect(createContextManager({ contextTokenLimit: 20 }).compress(messages)).rejects.toThrow('CONTEXT_CANNOT_FIT');
+      expect(messages).toEqual(original);
     });
-
-    it('消息数未超 maxMessages 时不应 snip', async () => {
-      const cm = createContextManager({ maxMessages: 100 });
-      const msgs: AgentMessage[] = [];
-      for (let i = 0; i < 10; i++) {
-        msgs.push(user(`msg ${i}`));
-      }
-      const result = await cm.compress(msgs);
-      expect(result.messages).toHaveLength(msgs.length);
-      expect(result.summary).toBeUndefined();
+    it('never strips user images to fit', async () => {
+      const messages = [user('look')];
+      messages[0].content = [{ type: 'image', data: 'x'.repeat(4096), mimeType: 'image/png' }];
+      await expect(createContextManager({ contextTokenLimit: 20 }).compress(messages)).rejects.toThrow('CONTEXT_CANNOT_FIT');
+      expect(messages[0].content).toEqual([{ type: 'image', data: 'x'.repeat(4096), mimeType: 'image/png' }]);
     });
-  });
-
-  describe('compress — micro', () => {
-    it('早期工具结果应被 compacted', async () => {
-      const cm = createContextManager({
-        keepRecentToolResults: 1,
-        maxMessages: 100,
-        toolResultBudget: 100000,
-        contextTokenLimit: 80,
-      });
-      const msgs: AgentMessage[] = [
-        user('hello'),
-        toolResult('tc1', 'shell', 'output1-'.repeat(200)),
-        assistant('ok'),
-        toolResult('tc2', 'shell', 'output2'),
-      ];
-      const result = await cm.compress(msgs);
-      // 第一个工具结果应被 compacted
-      const firstTR = result.messages[1] as ToolResultMessage;
-      expect(firstTR.content[0]).toMatchObject({
-        type: 'text',
-        text: '[Earlier tool result compacted]',
-      });
-      // 最后一个工具结果应保留
-      const lastTR = result.messages[3] as ToolResultMessage;
-      expect(lastTR.content[0]).toMatchObject({
-        type: 'text',
-        text: 'output2',
-      });
+    it('preserves full negative evidence and original error flags', async () => {
+      const failed = { ...toolResult('call', 'shell', 'x'.repeat(5000) + ' rollback not confirmed'), isError: true };
+      expect((await createContextManager().compress([failed])).messages).toEqual([failed]);
     });
-
-    it('压缩后的错误工具结果保留 isError 与错误摘录', async () => {
-      const cm = createContextManager({
-        keepRecentToolResults: 1,
-        maxMessages: 100,
-        toolResultBudget: 100000,
-        contextTokenLimit: 80,
-      });
-      const failed: ToolResultMessage = {
-        ...toolResult('tc1', 'shell', `Command failed: exit code 2 — permission denied ${'x'.repeat(400)}`),
-        isError: true,
-      };
-      const msgs: AgentMessage[] = [
-        user('hello'),
-        failed,
-        assistant('ok'),
-        toolResult('tc2', 'shell', 'output2'),
-      ];
-      const result = await cm.compress(msgs);
-      const firstTR = result.messages[1] as ToolResultMessage;
-      expect(firstTR.isError).toBe(true);
-      const text = (firstTR.content[0] as { text: string }).text;
-      expect(text).toContain('[Earlier tool error compacted:');
-      expect(text).toContain('permission denied');
+    it('uses a verified candidate supplied by the maintenance service', async () => {
+      const compact = async () => ({ messages: [user('qualified checkpoint')], summary: 'saved' });
+      expect(await createContextManager({ contextTokenLimit: 20, compact }).compress([user('x'.repeat(5000))])).toEqual({ messages: [expect.objectContaining({ content: 'qualified checkpoint' })], summary: 'saved' });
     });
-  });
-
-  describe('compress — full', () => {
-    it('所有压缩级别都过一遍后应产生摘要', async () => {
-      const cm = createContextManager({
-        contextTokenLimit: 40,
-        toolResultBudget: 10,
-        maxMessages: 2,
-        keepRecentToolResults: 0,
-      });
-      const msgs: AgentMessage[] = [];
-      for (let i = 0; i < 20; i++) {
-        msgs.push(user(`message number ${i} with some content`));
-      }
-      const result = await cm.compress(msgs);
-      expect(Boolean(result.summary) || result.messages.length < msgs.length).toBe(true);
+    it('rejects an oversized candidate without a second lossy fallback', async () => {
+      const messages = [user('x'.repeat(5000))];
+      await expect(createContextManager({ contextTokenLimit: 20, compact: async () => ({ messages }) }).compress(messages)).rejects.toThrow('CONTEXT_CANNOT_FIT');
     });
-
-    it('throws CONTEXT_CANNOT_FIT when even degrade exceeds budget', async () => {
-      const cm = createContextManager({
-        contextTokenLimit: 1,
-        toolResultBudget: 10,
-        maxMessages: 2,
-        keepRecentToolResults: 0,
-      });
-      const msgs: AgentMessage[] = [
-        user('a very long user message that cannot fit a one-token budget even alone'),
-        assistant('reply'),
-      ];
-      await expect(cm.compress(msgs)).rejects.toThrow(/CONTEXT_CANNOT_FIT/);
+    it('propagates storage failures and retains canonical content', async () => {
+      const messages = [user('original revision')];
+      await expect(createContextManager({ compact: async () => { throw new Error('disk full'); } }).compress(messages)).rejects.toThrow('disk full');
+      expect(messages[0].content).toBe('original revision');
     });
-
-    it('throws AbortError when signal is already aborted', async () => {
-      const cm = createContextManager();
+    it('rejects a cancelled maintenance result', async () => {
       const controller = new AbortController();
-      controller.abort();
+      const cm = createContextManager({ compact: async messages => { controller.abort(); return { messages }; } });
       await expect(cm.compress([user('hello')], controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
     });
   });

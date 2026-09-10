@@ -48,7 +48,6 @@ const preparedUsageContext = (turnId: string): PreparedTurnContextSummary => ({
   filteredArtifactCount: 0,
   preparedAt: 10,
   continuation: { executionFingerprint: 'test', strategy: 'semantic-replay', replayedArtifactCount: 0, droppedArtifactCount: 0, decisionCounts: [] },
-  derivedContext: { status: 'none', compactedTurnCount: 0 },
   cache: { enabled: false, mode: 'none', keyCarrier: 'none', breakpointCarrier: 'none', ttl: 'none', breakpoint: 'none', stableTokenEstimate: 0, stableSegmentCount: 0, providerReported: false, reason: 'test' },
 });
 

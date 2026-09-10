@@ -1,79 +1,60 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import * as fsPromises from 'fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FileTaskStore } from './TaskStore';
 import { TaskRegistry } from './TaskRegistry';
+
+vi.mock('fs/promises', async importOriginal => { const actual = await importOriginal<typeof import('fs/promises')>(); return { ...actual, rename: vi.fn(actual.rename) }; });
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
 describe('FileTaskStore', () => {
-  it('keeps a persisted retired terminal task terminal when read', async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-store-'));
-    roots.push(dir);
-    await writeFile(path.join(dir, 'task_retired.json'), JSON.stringify({
-      id: 'task_retired',
-      subject: 'Retired terminal task',
-      description: '',
-      status: 'deleted',
-      blockedBy: [],
-      blocks: [],
-      createdAt: 1,
-      updatedAt: 2,
-    }), 'utf8');
-
-    await expect(new FileTaskStore(dir).loadTask('task_retired')).resolves.toMatchObject({
-      id: 'task_retired',
-      status: 'cancelled',
+  it('retries a transient atomic rename without replacing or duplicating Task state', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-store-')); roots.push(dir);
+    const registry = new TaskRegistry(dir); await registry.createTask('Existing');
+    const target = path.join(dir, 'task-state.json'); const original = await readFile(target, 'utf8');
+    const rename = (await vi.importActual<typeof import('fs/promises')>('fs/promises')).rename; let locked = false;
+    const spy = vi.spyOn(fsPromises, 'rename').mockClear().mockImplementation(async (from, to) => {
+      if (!locked && to === target) { locked = true; expect(await readFile(target, 'utf8')).toBe(original); throw Object.assign(new Error('sharing violation'), { code: 'EPERM' }); }
+      return rename(from, to);
     });
+    try { await registry.createTask('New'); expect(spy).toHaveBeenCalledTimes(2); }
+    finally { spy.mockRestore(); }
+    expect((await registry.listTasks()).map(task => task.subject).sort()).toEqual(['Existing', 'New']);
   });
 
-  it('derives missing createdAt from the task id and orders by that time', async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-store-'));
-    roots.push(dir);
-    await writeFile(path.join(dir, 'task_2000_bb.json'), JSON.stringify({
-      id: 'task_2000_bb',
-      subject: 'Later',
-      description: '',
-      status: 'pending',
-      blockedBy: [],
-      blocks: [],
-    }), 'utf8');
-    await writeFile(path.join(dir, 'task_1000_aa.json'), JSON.stringify({
-      id: 'task_1000_aa',
-      subject: 'Earlier',
-      description: '',
-      status: 'pending',
-      blockedBy: [],
-      blocks: [],
-    }), 'utf8');
-
-    const listed = await new FileTaskStore(dir).listTasks();
-    expect(listed.map((task) => task.id)).toEqual(['task_1000_aa', 'task_2000_bb']);
-    expect(listed[0]?.createdAt).toBe(1000);
+  it('preserves the authoritative state and removes the candidate after persistent rename denial', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-store-')); roots.push(dir);
+    const registry = new TaskRegistry(dir); await registry.createTask('Existing');
+    const target = path.join(dir, 'task-state.json'); const original = await readFile(target, 'utf8');
+    const spy = vi.spyOn(fsPromises, 'rename').mockClear().mockRejectedValue(Object.assign(new Error('denied'), { code: 'EPERM' }));
+    try { await expect(registry.createTask('Rejected')).rejects.toMatchObject({ code: 'EPERM' }); expect(spy).toHaveBeenCalledTimes(4); }
+    finally { spy.mockRestore(); }
+    expect(await readFile(target, 'utf8')).toBe(original);
+    expect((await fsPromises.readdir(dir)).filter(name => name.endsWith('.tmp'))).toEqual([]);
   });
 
-  it('archives the exact legacy bytes and rejects unknown future schemas', async () => {
+  it('never silently converts or overwrites an existing noncurrent store', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-store-'));
     roots.push(dir);
-    const legacy = Buffer.from('{"id":"task_1_old","subject":"Old","status":"completed"}\r\n', 'utf8');
-    await writeFile(path.join(dir, 'task_1_old.json'), legacy);
+    const original = '{"id":"task_old","subject":"Old","status":"completed"}';
+    await writeFile(path.join(dir, 'task_old.json'), original);
     const store = new FileTaskStore(dir);
-    await expect(store.loadTask('task_1_old')).resolves.toMatchObject({ status: 'blocked', disposition: 'blocked' });
-    const archives = await readdir(path.join(dir, 'archive', 'v1'));
-    expect(await readFile(path.join(dir, 'archive', 'v1', archives[0]!))).toEqual(legacy);
-
-    const futureDir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-store-'));
-    roots.push(futureDir);
-    await writeFile(path.join(futureDir, 'task_future.json'), JSON.stringify({ schemaVersion: 99, id: 'task_future', subject: 'Future' }));
-    await expect(new FileTaskStore(futureDir).listTasks()).rejects.toThrow(/Unsupported task schema/);
+    await expect(store.listTasks()).rejects.toThrow('TASK_STORAGE_REQUIRES_CONVERSION');
+    expect(await readFile(path.join(dir, 'task_old.json'), 'utf8')).toBe(original);
+    await expect(readFile(path.join(dir, 'task-state.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+    // A failed initialization is retryable after an explicit offline conversion.
+    await writeFile(path.join(dir, 'task-state.json'), JSON.stringify({ schemaVersion: 2, tasks: {}, executions: {}, messages: {}, rootBudgets: {} }));
+    await expect(store.listTasks()).resolves.toEqual([]);
   });
 
   it('rejects malformed canonical records and dangling execution references', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-store-'));
     roots.push(dir);
-    await writeFile(path.join(dir, 'task-state.v2.json'), JSON.stringify({
+    await writeFile(path.join(dir, 'task-state.json'), JSON.stringify({
       schemaVersion: 2,
       tasks: { broken: { schemaVersion: 2, id: 'broken', subject: 'Broken', blockedBy: [], blocks: [], executionIds: ['missing'], completionRequirements: [], revision: 1 } },
       executions: {},
@@ -98,7 +79,7 @@ describe('FileTaskStore', () => {
       await registry.createTask('Second', { blockedBy: [first.id] });
       const execution = await registry.startExecution(first.id, { mode: 'direct' });
       await registry.appendExecutionMessage(execution.id, { expectedGeneration: execution.generation, kind: 'progress', direction: 'to_parent', body: 'working' });
-      const statePath = path.join(dir, 'task-state.v2.json');
+      const statePath = path.join(dir, 'task-state.json');
       const state = JSON.parse(await readFile(statePath, 'utf8'));
       corrupt(state);
       await writeFile(statePath, JSON.stringify(state));

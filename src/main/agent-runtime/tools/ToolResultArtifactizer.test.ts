@@ -145,3 +145,8 @@ describe('ToolResultArtifactizer', () => {
   });
 
 });
+
+it('does not recursively archive an already bounded artifact page', () => {
+  const page = { content: [{ type: 'text' as const, text: 'Page body with exact next cursor' }], details: { next: { offset: 4, column: 1024 } } };
+  expect(artifactizeToolResult({ sessionId: 'sess', toolCallId: 'read-page', toolName: 'artifact_read', result: page, thresholdBytes: 1 })).toBe(page);
+});

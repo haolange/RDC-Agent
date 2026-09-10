@@ -180,6 +180,7 @@ export const Composer: React.FC<ComposerProps> = ({
         />
       ) : null}
       <ComposerAttachmentTray
+        onMaterialChange={(id, material) => composer.setPendingAttachments(current => current.map(item => item.id === id ? { ...item, material } : item))}
         pendingSkillIds={pendingSkillIds}
         pendingAttachments={pendingAttachments}
         composerScopeKey={composerScopeKey}

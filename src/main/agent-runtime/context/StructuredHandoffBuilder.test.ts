@@ -6,8 +6,18 @@ import {
   createStructuredHandoffMessage,
   parseModelHandoffSections,
   serializeHandoffSourceTranscript,
-  testHandoffSections,
+  type ModelHandoffSections,
 } from './StructuredHandoffBuilder';
+
+const testHandoffSections = (objective: string, extras: Partial<ModelHandoffSections> = {}): ModelHandoffSections => ({
+  objective,
+  constraints: extras.constraints ?? [],
+  progress: extras.progress ?? { done: [], inProgress: [], blocked: [] },
+  decisions: extras.decisions ?? [],
+  failedAttempts: extras.failedAttempts ?? [],
+  nextSteps: extras.nextSteps ?? [],
+  criticalContext: extras.criticalContext ?? [objective],
+});
 
 const assistant = (): AssistantMessage => ({
   role: 'assistant',
@@ -54,6 +64,16 @@ describe('StructuredHandoffBuilder', () => {
     expect(transcript).not.toContain('private chain detail');
     expect(transcript).toContain('REDACTED');
     expect(transcript).toContain('read_file');
+    expect(transcript).not.toContain('tool-secret');
+    expect(transcript).toContain('message:0 timestamp:1');
+    expect(transcript).toContain('call-1');
+  });
+
+  it('preserves tool-only invocation parameters and separately identifies later user revisions', () => {
+    const invocation = { ...assistant(), content: [{ type: 'toolCall' as const, id: 'measure-call', name: 'measure', arguments: { samples: 7, units: 'ms', variant: 'baseline' } }] };
+    const serialized = serializeHandoffSourceTranscript([invocation, { role: 'user', content: 'Later correction: do not rename the blue label.', timestamp: 9 }]);
+    expect(serialized).toContain('"samples":7'); expect(serialized).toContain('"variant":"baseline"');
+    expect(serialized).toContain('message:1 timestamp:9'); expect(serialized).toContain('Later correction');
   });
 
   it('parses model-generated sections and assembles a typed view', () => {
@@ -89,8 +109,8 @@ describe('StructuredHandoffBuilder', () => {
       sourceTurnIds: ['turn-1'],
       retainedTurnIds: ['turn-2'],
       createdAt: 10,
-      maxFactsPerGroup: 4,
-      maxResourceRefs: 8,
+
+
       sections,
     });
     expect(view.handoff.derivation).toBe('model-generated');
@@ -113,20 +133,20 @@ describe('StructuredHandoffBuilder', () => {
     });
   });
 
-  it('supports a minimal non-expanding projection candidate', () => {
+  it('preserves generated facts without dropping them to fit a projection', () => {
     const view = assembleDerivedContextView(
       [{ role: 'user', content: 'Objective only', timestamp: 1 }],
       {
         scope: 'ephemeral',
         createdAt: 1,
-        maxFactsPerGroup: 0,
-        maxResourceRefs: 0,
+
+
         sections: testHandoffSections('Objective only'),
       },
     );
     expect(view.handoff.decisions).toEqual([]);
     expect(view.handoff.constraints).toEqual([]);
-    expect(view.handoff.facts).toEqual([]);
+    expect(view.handoff.facts).toEqual([{ text: 'Objective only', source: 'assistant' }]);
     expect(view.handoff.openWork).toEqual([]);
     expect(view.handoff.resourceRefs).toEqual([]);
   });

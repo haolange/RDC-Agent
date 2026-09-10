@@ -447,7 +447,7 @@ Resume：
 - 重检索由 Knowledge Scout 独立 Context 消费，父级只接收不超过合同预算的 Brief/Pack refs。
 - RDX help 定向读取。
 - 长 Raw 输出和完整 Knowledge Pack 转 Artifact。
-- `/compact` 或自动压缩使用同一 Structured Context/Handoff 路径。
+- 仅自动压缩，复用 Structured Context/Handoff 与受控原始来源；不提供手动命令入口。
 - 不把 TUI 屏幕文本、Search 列表或 Candidate Review 反向复制为新的 Prompt Source。
 
 ## 12. 视觉与终端能力降级

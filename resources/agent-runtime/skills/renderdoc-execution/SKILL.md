@@ -36,3 +36,9 @@ agent_handoff 必须提供非空 prompt 摘要及 contract。初始 route 不消
 单次 lookup、必要抽查及低成本操作由 General 直接完成。重 Knowledge 检索、多来源综合及长分析分支，通过 subagent 派发 General 子上下文，Capsule.requiredSkillIds 明确包含 knowledge-scout；不先读取全部历史再另调模型生成 Capsule。
 生成主张后，另开 General 子上下文并预载 skeptic-review。只给主张、证据、反证、实验条件和适用范围的引用，不复制生成者长叙事，不请求 RDX。General 自己读取 skeptic-review 不等于独立审查。子代理自主检查并提出 Challenge；General 整合证据、为相关 Challenge 创建依赖明确的补证 Task，战略改变才回交原 Mission。原 Mission 最终评估，不新增裁决身份。
 每次委派给出目标、scope、已确认事实及来源资格、竞争假设、Challenge 引用、否定路径的适用与重验条件、停止条件、预算和输出要求。任务完成要求覆盖 Plan 交付要求；未创建的必要工作不能靠 runtime 猜测补齐。Small Loop 保留有效状态和相关增量，Iteration Memory 属于本调查产物，不自动晋升持久 Memory/Knowledge。
+
+## 材料与交付
+
+用户材料中的 material 说明、区域、文档位置、时间范围和对比条件属于用户描述；不得当作已验证原因或 mutation 授权。使用原图分数坐标定位 ROI，核对 capture、事件、分辨率与采样条件后配对 Before/After/Diff。没有参考图时保留正常高光等质量约束，先验证 baseline 与问题区域；整体压暗或本机无法复现不算修复。原始材料路径/hash 与派生产物分开引用；引用存在不代表已经看见图像。跨委派传递有权限的原始材料引用，必要时用 artifact_read 真正查看图像。
+
+默认交付清楚结论、证据和下一步，技术细节按需展开。问题报告保留复现条件、实际/预期、影响范围及未验证项；视觉与优化报告说明画质取舍、测量条件、失败尝试和恢复状态。工程追溯使用调用、实验与回执引用，不要求用户理解内部身份或租约。

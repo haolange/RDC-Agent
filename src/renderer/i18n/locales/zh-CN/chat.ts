@@ -1,4 +1,6 @@
 export const zhChat = {
+  'chat.userInputUnknown': '不知道',
+  'chat.userInputSkip': '跳过此项',
   'chat.you': '你',
   'chat.system': '系统',
   'chat.thinking': '正在思考',
@@ -164,6 +166,9 @@ export const zhChat = {
   'chat.workProcessVerb.investigationListComplete': '已列出调查产物',
   'chat.workProcessVerb.investigationListRunning': '正在列出调查产物',
   'chat.workProcessCompactTitle': '上下文压缩',
+  'chat.workProcessCompactRunning': '正在整理上下文',
+  'chat.workProcessCompactComplete': '上下文已自动压缩',
+  'chat.workProcessCompactFailed': '上下文整理失败',
   'chat.workProcessCompactAuto': '自动压缩',
   'chat.workProcessCompactManual': '手动压缩',
   'chat.workProcessTaskSnapshotCount': '{completed} / {total} 已完成',

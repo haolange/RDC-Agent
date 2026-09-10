@@ -31,22 +31,19 @@ export async function computeTurnPreparation(
   const contextManager = new ContextManager({
     modelId: input.modelId,
     contextTokenLimit: input.messageBudget,
-    toolResultBudget: 200 * 1024,
-    keepRecentToolResults: 3,
     tokenizer: tokenizerService,
   });
   const beforeConversationTokens = contextManager.estimateTokens(input.messages)
     + input.imageTokenAdjustment;
-  const compacted = await contextManager.compress(input.messages, input.signal);
-  const compactedMessages = contextManager.convertToLlm(compacted.messages);
-  const afterConversationTokens = contextManager.estimateTokens(compacted.messages)
-    + input.imageTokenAdjustment;
+  input.signal?.throwIfAborted();
+  // No model call or window installation in the preparation worker.
+  const compactedMessages = contextManager.convertToLlm(input.messages);
+  const afterConversationTokens = beforeConversationTokens;
   return {
     compactedMessages,
     beforeConversationTokens,
     afterConversationTokens,
-    compactionApplied: Boolean(compacted.summary)
-      || JSON.stringify(compacted.messages) !== JSON.stringify(input.messages),
-    classification: contextManager.classifyMessages(compacted.messages),
+    compactionApplied: false,
+    classification: contextManager.classifyMessages(input.messages),
   };
 }

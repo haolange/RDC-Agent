@@ -17,6 +17,7 @@ export interface PendingUserInputRequest {
 export interface UserInputAnswerDraft {
   answer: string;
   selectedOptionId?: string;
+  responseKind?: ConversationAskUserAnswer['responseKind'];
 }
 
 export type UserInputAnswerDrafts = Record<string, UserInputAnswerDraft>;
@@ -64,6 +65,7 @@ export const createRequestFingerprint = (request: PendingUserInputRequest): stri
       question.prompt,
       question.description ?? '',
       question.allowFreeform ? 'freeform' : 'fixed',
+      question.required === false ? 'optional' : 'required',
       ...question.options.map((option) => `${option.optionId}:${option.label}:${option.description ?? ''}`),
     ].join('|')),
   ].join('::')
@@ -113,5 +115,6 @@ export const buildAnswerPayload = (
     questionId: question.questionId,
     answer,
     selectedOptionId: draft?.selectedOptionId,
+    ...(draft?.responseKind ? { responseKind: draft.responseKind } : {}),
   }];
 });

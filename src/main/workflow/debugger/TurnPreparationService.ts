@@ -32,12 +32,6 @@ import { compileEffectivePolicy } from '../../agent-runtime/permissions/PolicyCo
 import { resolveKnowledgeReadRoots } from '../../agent-runtime/knowledgeReadRoots';
 import { appPathService } from '../../runtime/AppPathService';
 import { sessionContextJournal } from '../../conversation/SessionContextJournal';
-import {
-  isWithinSessionCompactionLine,
-  persistGeneratedSessionCompaction,
-} from '../../agent-runtime/context/CompactionHandoffService';
-import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
-import { storageAdapter } from '../../sessions/StorageAdapter';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import { mcpDescriptorHash } from '../../settings/McpTrustService';
 import { settingsService } from '../../settings/SettingsService';
@@ -154,7 +148,7 @@ export class TurnPreparationService {
       modelId: input.requestPlan.effectiveModelId,
       protocol: input.requestPlan.route.protocol,
     };
-    let materialized = input.sessionId
+    const materialized = input.sessionId
       ? sessionContextJournal.materialize(
           input.sessionId,
           input.visibleTurnIds,
@@ -167,8 +161,6 @@ export class TurnPreparationService {
           replayedArtifactCount: 0,
           filteredArtifactCount: 0,
           artifactDecisions: [],
-          derivedContextStatus: 'none' as const,
-          compactedTurnCount: 0,
         };
     throwIfCancelled();
     // Compile the immutable policy before acquiring any external MCP lease.
@@ -231,29 +223,8 @@ export class TurnPreparationService {
       input.requestPlan.contextBudgetTokens,
       contextCompactionPercent,
     );
-    if (input.sessionId && materialized.derivedContextStatus !== 'applied') {
-      const occupiedTokens = storageAdapter.readSessionUsage(input.sessionId)?.occupiedTokens ?? 0;
-      if (!isWithinSessionCompactionLine(
-        occupiedTokens,
-        compactionThreshold,
-        input.visibleTurnIds.length,
-      )) {
-        await persistGeneratedSessionCompaction({
-          sessionId: input.sessionId,
-          history: storageAdapter.readConversationHistory(input.sessionId),
-          visibleTurnIds: input.visibleTurnIds,
-          branchId: input.activeBranchId ?? ROOT_BRANCH_ID,
-          occupiedTokens,
-          compactionThresholdTokens: compactionThreshold,
-        });
-        materialized = sessionContextJournal.materialize(
-          input.sessionId,
-          input.visibleTurnIds,
-          input.requestPlan,
-          input.activeBranchId ?? undefined,
-        );
-      }
-    }
+    const userTimestamp = nowMs();
+    const userMessage: UserMessage = { role: 'user', content: input.content, timestamp: userTimestamp };
     const messageBudget = compactionThreshold - fixedTokens - input.imageTokenAdjustment;
     if (messageBudget <= 0) {
       throw new Error(
@@ -261,8 +232,6 @@ export class TurnPreparationService {
       );
     }
 
-    const userTimestamp = nowMs();
-    const userMessage: UserMessage = { role: 'user', content: input.content, timestamp: userTimestamp };
     const messages = [...materialized.messages, userMessage];
     const computation = await turnPreparationWorkerPool.run({
       messages,
@@ -277,18 +246,13 @@ export class TurnPreparationService {
     const uncompactedInputTokens = fixedTokens + beforeConversationTokens;
     const preparedInputTokens = fixedTokens + afterConversationTokens;
     const compactionApplied = computation.compactionApplied;
-    const effectiveContextView = materialized.derivedContextView;
     const promptCache = promptCacheCompiler.compile({
       promptPlan: input.promptPlan,
       requestPlan: input.requestPlan,
       tools: activeToolDefinitions,
-      ...(effectiveContextView ? { derivedContextView: effectiveContextView } : {}),
     });
-    if (preparedInputTokens > compactionThreshold) {
-      throw new Error(
-        'CONTEXT_CANNOT_FIT: The request cannot fit after compaction. Remove attachments or select a larger context mode.',
-      );
-    }
+    // Preparation measures the complete input. The execution-owned coordinator
+    // validates and compacts at the first provider boundary with a transcript sink.
 
     const isMcp = (definition: ToolDefinition) => isMcpPrefixedToolName(definition.name);
     const isSubagent = (definition: ToolDefinition) => definition.name === 'subagent';
@@ -410,10 +374,6 @@ export class TurnPreparationService {
       breakdown,
       compactionApplied,
       filteredArtifactCount: materialized.filteredArtifactCount,
-      derivedContext: {
-        status: materialized.derivedContextStatus,
-        compactedTurnCount: materialized.compactedTurnCount,
-      },
       continuation: {
         executionFingerprint: input.requestPlan.executionIdentity.fingerprint,
         strategy: input.requestPlan.contextTransitionPlan.strategy,
@@ -451,8 +411,6 @@ export class TurnPreparationService {
         filteredArtifactCount: materialized.filteredArtifactCount,
         replayedArtifactCount: materialized.replayedArtifactCount,
         continuationDecisionCounts: countContinuationDecisions(materialized.artifactDecisions),
-        derivedContextStatus: materialized.derivedContextStatus,
-        compactedTurnCount: materialized.compactedTurnCount,
         compactionState: compactionApplied ? 'prepared' : 'not-required',
         knowledgeReadRootDiagnostics: knowledgeResolution.diagnostics,
       },

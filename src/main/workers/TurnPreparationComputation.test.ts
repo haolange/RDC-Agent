@@ -6,19 +6,14 @@ import { TurnPreparationWorkerPool } from './TurnPreparationWorkerPool';
 const user = (content: string, timestamp: number): UserMessage => ({ role: 'user', content, timestamp });
 
 describe('turn preparation worker computation', () => {
-  it('preserves the current user message while compacting within a bounded request budget', async () => {
+  it('passes complete oversized history to the execution-owned request coordinator', async () => {
     const messages = Array.from({ length: 60 }, (_, index) => user(`history-${index}-${'x'.repeat(40)}`, index));
     messages.push(user('current prompt', 100));
-    const result = await computeTurnPreparation({
-      messages,
-      modelId: 'model',
-      messageBudget: 80,
-      imageTokenAdjustment: 0,
-    });
-
-    expect(result.compactionApplied).toBe(true);
-    expect(result.compactedMessages.at(-1)).toMatchObject({ role: 'user', content: 'current prompt' });
-    expect(result.afterConversationTokens).toBeLessThanOrEqual(result.beforeConversationTokens);
+    const original = structuredClone(messages);
+    const result = await computeTurnPreparation({ messages, modelId: 'model', messageBudget: 80, imageTokenAdjustment: 0 });
+    expect(result.compactedMessages).toEqual(original);
+    expect(result.compactionApplied).toBe(false);
+    expect(messages).toEqual(original);
   });
 
   it('rejects an aborted queued preparation before running local fallback work', async () => {

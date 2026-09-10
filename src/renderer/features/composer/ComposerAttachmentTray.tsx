@@ -4,6 +4,7 @@ import { AttachmentCard } from './AttachmentCard';
 import { ComposerSkillChips } from './ComposerSkillChips';
 
 export const ComposerAttachmentTray: React.FC<{
+  onMaterialChange: (id: string, material: import('@shared/types/materialContext').MaterialContext) => void;
   pendingSkillIds: string[];
   pendingAttachments: PendingAttachmentDraft[];
   composerScopeKey: string;
@@ -15,6 +16,7 @@ export const ComposerAttachmentTray: React.FC<{
   removeAttachmentLabel: (fileName: string) => string;
   visionUnsupportedLabel: string;
 }> = ({
+  onMaterialChange,
   pendingSkillIds,
   pendingAttachments,
   composerScopeKey,
@@ -45,6 +47,7 @@ export const ComposerAttachmentTray: React.FC<{
           visionUnsupportedLabel={visionUnsupportedLabel}
           removeLabel={removeAttachmentLabel(attachment.fileName)}
           onRemove={handlePendingAttachmentRemove}
+          onMaterialChange={onMaterialChange}
         />
       ))}
     </div>

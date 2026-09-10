@@ -66,7 +66,6 @@ const preparedContext: ConversationTurnResult['preparedContext'] = {
     droppedArtifactCount: 0,
     decisionCounts: [],
   },
-  derivedContext: { status: 'none', compactedTurnCount: 0 },
   cache: {
     enabled: false,
     mode: 'none',

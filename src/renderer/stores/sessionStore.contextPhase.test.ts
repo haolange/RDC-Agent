@@ -37,7 +37,6 @@ const prepared = (overrides: Partial<PreparedTurnContextSummary> = {}): Prepared
     droppedArtifactCount: 0,
     decisionCounts: [],
   },
-  derivedContext: overrides.derivedContext ?? { status: 'none', compactedTurnCount: 0 },
   cache: overrides.cache ?? {
     enabled: false,
     mode: 'none',

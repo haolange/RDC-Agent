@@ -29,7 +29,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(presentation.rows).toHaveLength(0);
   });
 
-  it('keeps only the latest human-readable compaction summary', () => {
+  it('keeps both completed checkpoints in the visible history', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'complete',
       updatedAt: now + 20,
@@ -38,7 +38,7 @@ describe('buildWorkProcessPresentation', () => {
         { id: 'compact-2', kind: 'compaction', title: 'Context compacted', summary: 'new counts', status: 'complete', toolCalls: [], startedAt: now + 10, completedAt: now + 15 },
       ],
     });
-    expect(presentation.rows).toEqual([expect.objectContaining({ id: 'compact-2', type: 'summary', text: '自动压缩' })]);
+    expect(presentation.rows).toEqual(['compact-1', 'compact-2'].map(id => expect.objectContaining({ id, type: 'summary', text: '上下文已自动压缩' })));
   });
 
   it('uses authoritative task event rows instead of duplicating task tool receipts', () => {

@@ -52,6 +52,8 @@ describe('ArtifactReadTool', () => {
     expect(result.isError).not.toBe(true);
     expect(read).toHaveBeenCalledWith('sess-1', 'session://tool-outputs/a.json', {
       offset: undefined,
+      column: undefined,
+      maxBytes: 16384,
       limit: undefined,
       expectedHash: 'abc123',
     });

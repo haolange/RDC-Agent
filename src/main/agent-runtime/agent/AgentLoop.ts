@@ -63,6 +63,7 @@ export interface AgentLoopConfig {
   transformContext?: (
     messages: AgentMessage[],
     signal?: AbortSignal,
+    onProgress?: (progress: import('../core/types').CompactionProgress) => void,
   ) => Promise<TransformContextResult>;
   /** LLM 调用选项（temperature/maxTokens 等）。 */
   streamOptions: StreamOptions;
@@ -454,8 +455,7 @@ async function streamAssistantResponseWithRecovery(
             }
             recovery.markReactiveCompactAttempted();
             if (config.transformContext) {
-              const compacted = await applyTransformContext(context.messages, config, stream);
-              context.messages = compacted;
+              await applyTransformContext(context.messages, config, stream);
             }
             continue;
           }
@@ -507,7 +507,7 @@ async function streamAssistantResponseWithRecovery(
           }
           recovery.markReactiveCompactAttempted();
           if (config.transformContext) {
-            context.messages = await applyTransformContext(
+            await applyTransformContext(
               context.messages,
               config,
               stream,
@@ -587,9 +587,6 @@ async function streamAssistantResponse(
 ): Promise<AssistantMessage> {
   // 1. 可选的上下文变换（压缩 / 剪裁）
   let messages: AgentMessage[] = context.messages;
-  if (config.transformContext) {
-    messages = await applyTransformContext(context.messages, config, stream);
-  }
   const pendingMailbox = await config.beforeRequestMessages?.();
   if (pendingMailbox?.messages.length) messages = [...messages, ...pendingMailbox.messages];
   if (ephemeralInstruction) {
@@ -603,6 +600,8 @@ async function streamAssistantResponse(
     ];
   }
 
+  // Mailbox and corrective instructions participate in the same request budget.
+  if (config.transformContext) messages = await applyTransformContext(messages, config, stream);
   // 2. 转换为 LLM Message[]
   const llmMessages = config.convertToLlm(messages);
   let resolvedMaxTokens = config.streamOptions.maxTokens;
@@ -833,11 +832,14 @@ async function applyTransformContext(
   if (!config.transformContext) {
     return currentMessages;
   }
-  const result = await config.transformContext([...currentMessages], stream.signal);
+  let reported = false;
+  const result = await config.transformContext([...currentMessages], stream.signal, progress => {
+    reported = true; stream.push({ type: 'compaction', ...progress });
+  });
   if (Array.isArray(result)) {
     return result;
   }
-  if (result.summary) {
+  if (result.summary && !reported) {
     stream.push({ type: 'compaction', summary: result.summary });
   }
   return result.messages;

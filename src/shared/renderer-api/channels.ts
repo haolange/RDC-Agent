@@ -25,7 +25,6 @@ export const RENDERER_INVOKE_CHANNEL = {
     switchBranch: 'conversation:switchBranch',
     clearHistory: 'conversation:clearHistory',
     undoLastTurn: 'conversation:undoLastTurn',
-    compactHistory: 'conversation:compactHistory',
     getToolImagePreview: 'conversation:getToolImagePreview',
     stageAttachments: 'conversation:stageAttachments',
     releaseAttachments: 'conversation:releaseAttachments',

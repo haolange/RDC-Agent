@@ -190,15 +190,6 @@ export interface ElectronAPI {
       messages: ConversationMessage[];
       error?: string;
     }>;
-    compactHistory: (sessionId: string) => Promise<{
-      success: boolean;
-      status?: 'noop' | 'compacted';
-      messages: ConversationMessage[];
-      contextView?: import('./semanticContext').DerivedContextView | null;
-      occupiedTokens?: number;
-      compactionThresholdTokens?: number;
-      error?: string;
-    }>;
     getToolImagePreview: (request: { sessionId: string; previewId: string }) => Promise<{
       dataUrl: string | null;
       error?: string;

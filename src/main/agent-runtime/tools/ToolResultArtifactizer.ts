@@ -71,8 +71,9 @@ function failClosed(code: string, message: string): AgentToolResult {
  */
 export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentToolResult {
   const { result } = input;
-  // Explicit hash-checked artifact image reads already obey the native vision gate and artifact quota.
-  if (input.toolName === 'artifact_read' && result.content.some((item) => item.type === 'image')) return result;
+  // Artifact reads already enforce paging, hash, scope and vision limits. Rewrapping
+  // their pages creates recursive references and makes original recovery impossible.
+  if (input.toolName === 'artifact_read') return result;
   let serialized: string;
   try {
     serialized = serializeResult(result);

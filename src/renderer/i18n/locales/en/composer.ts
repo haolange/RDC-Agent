@@ -43,8 +43,6 @@ export const enComposer = {
   'composer.model.agentDefaultTitle': 'Do not override; use the model configured for {name}',
   'composer.model.agentDefaultUnset': 'This Agent has no configured model.',
   'composer.model.agentDefaultUnavailable': 'The Agent-configured model is not currently executable.',
-  'composer.compact.withinThreshold': 'Already within the compaction line ({occupied} / {threshold}).',
-  'composer.compact.created': 'Context view created from {count} earlier turns; transcript preserved.',
   'composer.toolApprovalRisk.low': 'Low risk',
   'composer.toolApprovalRisk.medium': 'Medium risk',
   'composer.toolApprovalRisk.high': 'High risk',

@@ -15,6 +15,7 @@ import {
   SESSION_ARTIFACT_ALLOWED_MIME_SET,
   SESSION_ARTIFACT_CATEGORIES,
   SESSION_ARTIFACT_MAX_FILE_BYTES,
+  SESSION_ARTIFACT_MAX_IMAGE_BYTES,
   SESSION_ARTIFACT_MAX_SESSION_BYTES,
   SESSION_ARTIFACT_MAX_TOOL_OUTPUT_FILES,
   SESSION_ARTIFACT_ROOT_DIR,
@@ -90,6 +91,7 @@ export interface SessionArtifactReadResult {
   offset: number;
   limit: number;
   totalLines?: number;
+  next?: { offset: number; column: number };
   owner?: string;
   source?: SessionArtifactSourceRef;
 }
@@ -284,6 +286,7 @@ export class SessionArtifactResolver {
   private readonly resolveSessionPath: (sessionId: string) => string | null;
   private readonly io: StorageIo;
   private readonly maxFileBytes: number;
+  private readonly maxImageBytes: number;
   private readonly maxSessionBytes: number;
   private readonly maxToolOutputFiles: number;
   private readonly reconciledSessionIds = new Set<string>();
@@ -293,6 +296,7 @@ export class SessionArtifactResolver {
     this.resolveSessionPath = deps.resolveSessionPath ?? defaultResolveSessionPath;
     this.io = deps.io ?? new StorageIo();
     this.maxFileBytes = deps.maxFileBytes ?? SESSION_ARTIFACT_MAX_FILE_BYTES;
+    this.maxImageBytes = deps.maxFileBytes ?? SESSION_ARTIFACT_MAX_IMAGE_BYTES;
     this.maxSessionBytes = deps.maxSessionBytes ?? SESSION_ARTIFACT_MAX_SESSION_BYTES;
     this.maxToolOutputFiles = deps.maxToolOutputFiles ?? SESSION_ARTIFACT_MAX_TOOL_OUTPUT_FILES;
   }
@@ -375,7 +379,7 @@ export class SessionArtifactResolver {
   read(
     sessionId: string | null | undefined,
     uri: string,
-    options?: { offset?: number; limit?: number; expectedHash?: string; includeImageData?: boolean },
+    options?: { offset?: number; column?: number; limit?: number; maxBytes?: number; expectedHash?: string; includeImageData?: boolean },
   ): SessionArtifactReadResult {
     const resolved = this.resolve(sessionId, uri);
     if (!fs.existsSync(resolved.absolutePath)) {
@@ -389,10 +393,11 @@ export class SessionArtifactResolver {
       throw new SessionArtifactError('ARTIFACT_NOT_FOUND', 'target is not a regular file.');
     }
     assertNoHardlinkFile(resolved.absolutePath, stat);
-    if (stat.size > this.maxFileBytes) {
+    const fileLimit = MIME_BY_EXTENSION[path.extname(resolved.relativePath).toLowerCase()]?.startsWith('image/') ? this.maxImageBytes : this.maxFileBytes;
+    if (stat.size > fileLimit) {
       throw new SessionArtifactError(
         'ARTIFACT_TOO_LARGE',
-        `${stat.size} bytes exceeds ${this.maxFileBytes} bytes.`,
+        `${stat.size} bytes exceeds ${fileLimit} bytes.`,
       );
     }
     const bytes = fs.readFileSync(resolved.absolutePath);
@@ -431,13 +436,20 @@ export class SessionArtifactResolver {
     }
     const text = bytes.toString('utf8');
     const lines = text.replace(/\r\n/g, '\n').split('\n');
-    const window = lines.slice(offset - 1, offset - 1 + limit);
-    let rendered = window.join('\n');
-    let truncated = offset - 1 + window.length < lines.length;
-    if (Buffer.byteLength(rendered, 'utf8') > ARTIFACT_READ_MAX_OUTPUT_BYTES) {
-      rendered = this.sliceUtf8(rendered, ARTIFACT_READ_MAX_OUTPUT_BYTES);
-      truncated = true;
+    const column = Math.max(0, Math.floor(options?.column ?? 0));
+    const firstLine = lines[offset - 1] ?? '';
+    if (column > firstLine.length || (column > 0 && /[\uDC00-\uDFFF]/.test(firstLine[column] ?? ''))) {
+      throw new SessionArtifactError('ARTIFACT_URI_INVALID', 'Invalid paging column; use the exact returned cursor.');
     }
+    const window = lines.slice(offset - 1, offset - 1 + limit);
+    if (window.length) window[0] = window[0].slice(column);
+    const hasLaterLines = offset - 1 + window.length < lines.length;
+    const selected = window.join('\n') + (hasLaterLines ? '\n' : '');
+    const maxBytes = Math.max(4, Math.min(ARTIFACT_READ_MAX_OUTPUT_BYTES, options?.maxBytes ?? ARTIFACT_READ_MAX_OUTPUT_BYTES));
+    const rendered = this.sliceUtf8(selected, maxBytes);
+    const truncated = hasLaterLines || rendered.length < selected.length;
+    const consumed = rendered.split('\n');
+    const next = truncated ? { offset: offset + consumed.length - 1, column: consumed.length === 1 ? column + rendered.length : consumed[consumed.length - 1].length } : undefined;
     return {
       uri: resolved.uri,
       category: resolved.category,
@@ -450,6 +462,7 @@ export class SessionArtifactResolver {
       offset,
       limit,
       totalLines: lines.length,
+      ...(next ? { next } : {}),
       owner: record.owner,
       source: record.source,
     };
@@ -470,10 +483,11 @@ export class SessionArtifactResolver {
         throw new SessionArtifactError('ARTIFACT_WRITE_FAILED', 'write aborted before reserve.');
       }
       resolved = this.resolve(sessionId, uri);
-      if (bytes.length > this.maxFileBytes) {
+      const fileLimit = detectImageMagicMime(bytes) ? this.maxImageBytes : this.maxFileBytes;
+      if (bytes.length > fileLimit) {
         throw new SessionArtifactError(
           'ARTIFACT_TOO_LARGE',
-          `${bytes.length} bytes exceeds ${this.maxFileBytes} bytes.`,
+          `${bytes.length} bytes exceeds ${fileLimit} bytes.`,
         );
       }
       const mimeType = this.assertAllowedBytes(resolved.relativePath, bytes, options?.mimeType);

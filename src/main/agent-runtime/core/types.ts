@@ -326,7 +326,7 @@ export type AgentEvent =
       args: Record<string, unknown>;
     }
   | { type: 'approval_resolved'; toolCallId: string; approved: boolean }
-  | { type: 'compaction'; summary: string }
+  | ({ type: 'compaction' } & CompactionProgress)
   | {
       type: 'diagnostic';
       code: string;
@@ -388,3 +388,14 @@ export interface CustomAgentMessage {
 
 /** Runtime 与应用层共同消费的消息类型。 */
 export type AgentMessage = Message | CustomAgentMessage;
+
+export interface CompactionProgress {
+  usage?: { inputTokens: number; outputTokens: number };
+  summary: string;
+  compactionId?: string;
+  status?: "running" | "complete" | "error";
+  tokensBefore?: number;
+  tokensAfter?: number;
+  sourceUri?: string;
+  sourceHash?: string;
+}

@@ -1,3 +1,5 @@
+import { describeMaterialContext } from '@shared/types/materialContext';
+import { hashAttachmentContents } from './ConversationAttachmentHashing';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { AttachmentLayer, ConversationAttachmentInput } from '@shared/types/conversation';
@@ -30,6 +32,8 @@ export {
 };
 
 export type AgentInputAttachment = {
+  material?: import('@shared/types/materialContext').MaterialContext;
+  sourceHash?: string;
   attachmentId?: string;
   kind: SessionAttachmentKind;
   layer: AttachmentLayer;
@@ -110,6 +114,7 @@ export async function resolvePendingAttachmentDescriptors(
     } finally {
       await handle.close();
     }
+    const sourceHash = (await hashAttachmentContents([attachment]))[0];
     const classification = classifyAttachmentBytes(
       fileName,
       header,
@@ -121,6 +126,7 @@ export async function resolvePendingAttachmentDescriptors(
     if (classification.layer === 'image') {
       const checked = await assertSafeImageAttachment(filePath, classification.mimeType, fileName);
       resolved.push({
+        material: attachment.material, sourceHash,
         kind: 'image',
         layer: 'image',
         fileName,
@@ -130,6 +136,7 @@ export async function resolvePendingAttachmentDescriptors(
       });
     } else {
       resolved.push({
+        material: attachment.material, sourceHash,
         kind: 'file',
         layer: classification.layer,
         fileName,
@@ -155,7 +162,7 @@ export function imageTokenAdjustmentForContent(content: UserMessage['content']):
 }
 
 function formatAttachmentLine(attachment: AgentInputAttachment): string {
-  return `- ${attachment.fileName} (${attachment.layer}, ${attachment.mimeType}, ${attachment.size} bytes): ${attachment.filePath}`;
+  return `- ${attachment.fileName} (${attachment.layer}, ${attachment.mimeType}, ${attachment.size} bytes): ${attachment.filePath}${attachment.sourceHash ? ` sha256:${attachment.sourceHash}` : ""}${attachment.material ? `\n${describeMaterialContext(attachment.material)}` : ""}`;
 }
 
 async function buildInlineSection(
@@ -188,6 +195,7 @@ async function buildInlineSection(
 
 function toManifestEntry(attachment: AgentInputAttachment, index: number): FrozenAttachmentManifestEntry {
   return {
+    material: attachment.material, sourceHash: attachment.sourceHash,
     attachmentId: attachment.attachmentId ?? `att_prepare_${index}`,
     fileName: attachment.fileName,
     filePath: attachment.filePath,
@@ -300,7 +308,9 @@ function sameManifestEntry(
     && expected.mimeType === actual.mimeType
     && expected.size === actual.size
     && expected.layer === actual.layer
-    && expected.kind === actual.kind;
+    && expected.kind === actual.kind
+    && expected.sourceHash === actual.sourceHash
+    && JSON.stringify(expected.material) === JSON.stringify(actual.material);
 }
 
 export async function hydrateFrozenUserContent(
@@ -314,6 +324,10 @@ export async function hydrateFrozenUserContent(
   for (let index = 0; index < manifest.length; index += 1) {
     const expected = manifest[index]!;
     const actual = importedAttachments[index]!;
+    if (expected.sourceHash) {
+      const hash = (await hashAttachmentContents([{ sourcePath: actual.filePath, fileName: actual.fileName }]))[0];
+      if (hash !== expected.sourceHash) throw new Error(`ATTACHMENT_SOURCE_CHANGED: ${expected.fileName}; prepare the request again.`);
+    }
     if (!sameManifestEntry(expected, actual)) {
       throw new Error(`ATTACHMENT_INVALID: frozen attachment manifest mismatch for ${expected.fileName}.`);
     }

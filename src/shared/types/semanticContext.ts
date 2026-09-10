@@ -84,7 +84,6 @@ export interface CompiledPromptCache {
   breakpointCarrier: ProviderCacheContract['breakpointCarrier'];
   ttl: ProviderCacheContract['ttl'];
   prefixFingerprint?: string;
-  contextFingerprint?: string;
   requestKey?: string;
   breakpoint: 'none' | 'implicit' | 'automatic' | 'explicit' | 'automatic-and-explicit';
   stableSegmentIds: string[];

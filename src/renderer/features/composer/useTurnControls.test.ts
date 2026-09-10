@@ -126,6 +126,25 @@ describe('useTurnControls sync guards', () => {
     })).toEqual(maxControls);
   });
 
+  it('retains user effort when metadata changes within the same model route', () => {
+    const current = { reasoningLevel: 'low' as const, maxContextMode: false, fastModel: false };
+    expect(resolveTurnControlsForCapabilityChange({
+      previousCapabilityKey: 'general:provider:model:old-revision', nextCapabilityKey: 'general:provider:model:new-revision',
+      sessionChanged: false, sessionControlsChanged: false, sameModelRoute: true,
+      capability: noMaxCapability, sessionControls: null, currentControls: current, rememberedControls: undefined,
+    })).toEqual(current);
+  });
+
+  it('keeps restored effort when session hydration selects another agent on the same provider route', () => {
+    const selected = { reasoningLevel: 'low' as const, maxContextMode: false, fastModel: false };
+    expect(resolveTurnControlsForCapabilityChange({ previousCapabilityKey: 'general:provider:model:revision', nextCapabilityKey: 'optimizer:provider:model:revision', sessionChanged: false, sessionControlsChanged: false, sameModelRoute: true, capability: noMaxCapability, sessionControls: selected, currentControls: selected, rememberedControls: undefined })).toEqual(selected);
+  });
+
+  it('restores the current selection after a temporary capability loading state', () => {
+    const selected = { reasoningLevel: 'low' as const, maxContextMode: false, fastModel: false };
+    expect(resolveTurnControlsForCapabilityChange({ previousCapabilityKey: null, nextCapabilityKey: 'route', sessionChanged: false, sessionControlsChanged: false, capability: noMaxCapability, sessionControls: null, currentControls: buildInitialTurnControls(null), rememberedControls: selected })).toEqual(selected);
+  });
+
   it('uses model defaults instead of stale session controls on pure model switch', () => {
     expect(resolveTurnControlsForCapabilityChange({
       previousCapabilityKey: 'ask:deepseek:deepseek-v4-flash',

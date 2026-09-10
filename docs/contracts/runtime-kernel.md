@@ -51,7 +51,7 @@ Scoped Runtime Resolution
 
 切模型不自动 compact、不写迁移事务。`ContinuationReplayPolicy` 按 compiled execution identity 决定同绑定回放 / 跨绑定 drop；普通 Send 与 rewrite 在将丢弃 continuation 制品时插入同一条系统通知。optional 制品保留最近 8 个可见 turn；`requirement: required` 制品不受该窗口过期，只随 compaction 边界终止。
 
-manual `/compact` 与预算触发 auto-compact 共用同一条 LLM 结构化 handoff：`PromptPlan → RequestEnvelope → adapter`，单轮、无工具、禁用 cache write，`StructuredHandoff.derivation = 'model-generated'`。LLM 失败显式报错，不静默回退确定性抽取。低于压缩线返回 `status: 'noop'`，不得写 `complete` 压缩工作块。
+仅自动压缩；产品不提供按钮、菜单、`/compact` 或 `/summary`。会话准备和执行途中复用同一条 LLM 结构化 handoff：`PromptPlan → RequestEnvelope → adapter`，单轮、无工具、禁用 cache write，`StructuredHandoff.derivation = 'model-generated'`。LLM 失败显式报错，不静默回退确定性抽取。低于压缩线原样继续且不生成压缩工作块。首条超大输入先完整外置并核验，不调用摘要模型，也不静默删减。
 
 发送是 next-turn 事务：`preparing → committing → running → terminal`。Preflight 冻结 catalog/route/controls/`PromptPlan`/tools/attachments，并创建主进程 opaque credential lease。失败/取消的 preflight 不留 Session/journal/lease 残渣。Composer 附件先经 `conversation:stageAttachments` 写入 `{userData}/state/staging/attachments/`（进程启动清空）；turn commit 才拷进 session `attachments/`。`ConversationAttachmentMaterializer` 按 image / text / pdf / binary 四层物化：image 走 native vision；text/pdf 按 `min(固定上限, contextBudgetTokens * ratio)` 均分后 inline，prepare 冻结最终 session 逻辑路径与正文，run 只补 image 字节；binary 只给元数据。扫描件 PDF 无文本层写诊断；加载失败 / 加密不伪装成扫描件。SVG 硬拒。
 
@@ -131,7 +131,7 @@ Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only
 
 Temporary 外部路径只经当前 `ToolExecutionContext.temporaryAllowedPathRoots`，不得全局泄漏。
 
-Slash 命令是 runtime 输入，不绕过 profile 权限。基线：`/help` `/compact` `/context` `/memory` `/agents` `/skills` `/mcp` `/status` `/model`。`/model` 参数为 `[provider:model|modelId|default]`；`default` 跟随当前 Agent 配置，与 Composer 底栏共用 EffectiveCatalog + `isAgentToolExecutableModel` 可选集。裸 `default` 先于模型 id 解析，真名叫 `default` 的模型用 canonical `provider:model`。
+Slash 命令是 runtime 输入，不绕过 profile 权限。基线：`/help` `/context` `/memory` `/agents` `/skills` `/mcp` `/status` `/model`。`/model` 参数为 `[provider:model|modelId|default]`；`default` 跟随当前 Agent 配置，与 Composer 底栏共用 EffectiveCatalog + `isAgentToolExecutableModel` 可选集。裸 `default` 先于模型 id 解析，真名叫 `default` 的模型用 canonical `provider:model`。
 
 权限模式：`Default` / `Auto-review` / `Full access` / `Custom(config.toml)`；主进程权威。即使 Full access：二进制/`.rdc` 拒绝进对话、realpath 约束、灾难性 shell 硬拒绝（按平台分集）、`web_*` SSRF fail-closed。agent `shell` 每次新进程，不提供 `run_in_background`。
 
@@ -165,7 +165,7 @@ RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）
 
 ## Model Capability（摘要）
 
-`EffectiveCatalogService` 是唯一能力权威。Composer 跟已提交 Agent route revision，不跟乐观 Settings 投影。Agent/Composer 可执行模型必须通过共享 `isAgentToolExecutableModel` gate（source-backed `toolCalling.supported` + 已实现 structured-tool adapter + 账户 available）；`unknown`/`unsupported` 只留在 Settings catalog。Context 计量相位：`Preparing` → `Current request ~` → `Actual` / idle `Last actual`。缩窗只在 send preflight 派生压缩视图。完整 UI 计量与控件语义见 `docs/ui/workbench-and-transcript.md`。
+`EffectiveCatalogService` 是唯一能力权威。Composer 跟已提交 Agent route revision，不跟乐观 Settings 投影。Agent/Composer 可执行模型必须通过共享 `isAgentToolExecutableModel` gate（source-backed `toolCalling.supported` + 已实现 structured-tool adapter + 账户 available）；`unknown`/`unsupported` 只留在 Settings catalog。Context 计量相位：`Preparing` → `Current request ~` → `Actual` / idle `Last actual`。缩窗在执行拥有的首次或后续安全请求边界安装派生窗口，准备阶段只测量权威历史。完整 UI 计量与控件语义见 `docs/ui/workbench-and-transcript.md`。
 
 ## 相关源码
 
@@ -184,7 +184,7 @@ General 为默认通用工作身份。核心正文只负责可信上下文、授
 
 agent_handoff 要求非空摘要和严格 contract：route；execute（Plan URI/hash、requiredSkillIds、returnTo、deliveryRequirements）；return（executionHandoffId、产物 URI/hash）。returnTo 必须等于实际派发者。Plan 经 session artifact plans 类别版本化，历史文件不迁移或删除。接收 prepareTurn 校验引用、预加载必需 Skill、去重、冻结来源与权限交集；来源变化重新准备，缺失或权限冲突拒绝。通用 turn 仅调用 TurnCompletionValidator，组合层选择 Investigation 校验策略并冻结任务绑定。
 
-每个 root 一次初始路由、最多两轮 execute/return；Small Loop 不消耗新周期，重复 consume 不重复扣数。第二轮允许回评估，第三轮执行拒绝。额度耗尽但未完成时，Mission 通过 turn_complete 的 budget_paused disposition 与 evidenceRefs 绑定最后回交 Checkpoint URI/hash，正文说明 unresolvedFrontier，等待新用户指令；这只是 turn 结束，绝不提升领域报告状态。handoff-state schema v2；v1 原字节保存 .v1-archive，旧待续跑停止并展示重新建立提示，运行仅读 v2。重启降级、取消、事件驱动续跑保持原契约。
+每个 root 一次初始路由、最多两轮 execute/return；Small Loop 不消耗新周期，重复 consume 不重复扣数。第二轮允许回评估，第三轮执行拒绝。额度耗尽但未完成时，Mission 通过 turn_complete 的 budget_paused disposition 与 evidenceRefs 绑定最后回交 Checkpoint URI/hash，正文说明 unresolvedFrontier，等待新用户指令；这只是 turn 结束，绝不提升领域报告状态。handoff-state 只读取当前 schema；未知或旧格式原字节保留并拒绝继续，须先离线备份、转换和验证，不在正常运行时迁移或建立兼容双轨。重启降级、取消、事件驱动续跑保持原契约。
 
 普通 Capsule 省略领域扩展且没有 RDX Lease prompt 段；仅 RDX 模块接受 domainExtensions.rdx.requiresLease=true 并注入租约上下文。缺省无 RDX；同一 live context 的租约独占覆盖完整子执行区间，其他安全工作仍可并行；finally 撤销须携带停止证明，否则隔离父资源；旧顶层字段拒绝，不保留双轨。
 
@@ -202,9 +202,9 @@ RDX delegated lease 暂停父控制权，父级 rebind/clear/close 必须先 joi
 
 ### Task 执行、消息与资源生命周期
 
-单一 TaskStore 的 canonical schema 为 v2（task-state.v2.json）。Task 保存目标、依赖、父任务、完成要求、修订与执行关联；TaskExecution 独立保存 executionId、taskRevision、generation、父执行、运行状态、共享预算快照、结果及可选冻结计划引用。取消或修订不会让旧结果覆盖新实例。不存在全局唯一 in_progress 限制；依赖存在、无环、已满足，以及完成要求的输出键与执行终态由 TaskRegistry 校验。要求覆盖是否完整、科学结论是否成立仍由模型及领域证据合同负责。
+单一 TaskStore 的 canonical 文件为 `task-state.json`（仅当前 schema）。Task 保存目标、依赖、父任务、完成要求、修订与执行关联；TaskExecution 独立保存 executionId、taskRevision、generation、父执行、运行状态、共享预算快照、结果及可选冻结计划引用。取消或修订不会让旧结果覆盖新实例。不存在全局唯一 in_progress 限制；依赖存在、无环、已满足，以及完成要求的输出键与执行终态由 TaskRegistry 校验。要求覆盖是否完整、科学结论是否成立仍由模型及领域证据合同负责。
 
-迁移先将 v1 文件原字节以 hash 命名保存到 archive/v1，再写 canonical v2；旧状态带 v1-archived-unverified 标记，不伪造执行证明。活动运行只读写 v2。runtimeInstanceId 变化使未结束执行转 interrupted；持久化恢复不自动启动模型、工具或重置预算。显式重试/恢复创建新执行，并继承限制与已消费预算。
+旧格式不由 TaskStore 自动迁移。转换须先逐文件备份原字节与 hash，再验证当前文档、依赖和状态后安装 `task-state.json` 并移除被替代的活动文件；历史完成状态不伪造执行证明。正常运行只有当前格式，无法读取时明确拒绝。runtimeInstanceId 变化使未结束执行转 interrupted；持久化恢复不自动启动模型、工具或重置预算。显式重试/恢复创建新执行，并继承限制与已消费预算。
 
 subagent（mode=background） 必须绑定 Task，持久化启动状态后返回执行标识。query/result 读取状态与结果；wait/join 等待既有执行；message 提交有限补充；cancel 和 task_stop 取消执行树并 join。父回复可以结束而 Task 继续托管；父 Task 正式完成检查子任务、阻塞、失败及结果。用户 Stop、会话删除和应用退出清理运行树；未观察进程退出不能声明清理完成。
 
@@ -228,3 +228,19 @@ Small/Big Loop、Scout/Skeptic 委派和补证方向由实际加载的 Skill 与
 显式 artifact_read 图像在 native vision 路由返回标准 image block 与原 URI/hash；非视觉路由明确拒绝，不用省略提示冒充已审图。该显式读回不会再被大结果外置器换回引用，仍受原生请求预算及产物大小限制。子执行的大工具结果（包括错误）写回已登记根 Session，使用执行隔离路径并登记精确只读引用；长文本以可逆 JSON chunks 分页保存。引用文件 hash 与历史 envelope payload hash 依既有 resolver 合同区分，旧产物仍可读取。
 
 项目根不能证明 shell/MCP 的副作用彼此隔离。unsafe effects 与 Hook effects 除 canonical 项目/会话排他区间外，共享一个保守串行区间；安全只读工作可并行。未观察进程退出时两个区间均保留，无关安全读不被该全局 unsafe 区间阻塞。
+
+
+### 材料读取与委派参数的实际可用性
+
+`artifact_read` 返回最多 16 KiB UTF-8 文本及同一 URI/hash 的 `next.offset`（行）和 `next.column`（UTF-16 列）游标；按原序拼接页体可重建超长单行和分块 JSON，不拆开 Unicode 字符。已受控分页的结果不再次外置成包装产物。原始图片单项上限 32 MiB，文本产物仍为 2 MiB，会话配额仍为 96 MiB；超限明确失败，不以缩略图替换原图。
+
+Capsule 的 `profile` 是 Agent 身份，`model` 是 `providerId:modelId`，可选 `reasoningLevel` 经现有 Provider 请求规划校验；不能以推理强度充当身份。`sourceRefs`、`challengeRefs`、`inputArtifactRefs` 都只接受已有受控 URI；自然语言质疑属于 hypotheses/negativePaths。工具搜索按关键词排序，仅在已经过滤的有效工具集中发现；无匹配只证明当前筛选无匹配，不证明能力整体不存在。
+
+压缩先验证原始来源，再持久保存候选，检查取消后原子安装窗口，安装后才发布 after-compact。此前 Provider response ID 不进入新窗口，以免 stateful adapter 绕过可移植续做状态；后续新响应仍可按已验证路由正常续接。签名/加密 reasoning 不进入可读摘要，原始用户历史不删除。原始文本与权威状态无法放入专用调用安全预算时暂停并保留原内容；未声称无限长度或无损压缩。
+
+
+Task 的 completionRequirements 是 result.outputs 的精确键；验收语义写入描述，由模型依据证据判断，runtime 不猜测领域结论。委派时从所属 Task 存储读取这些键，与 Capsule 一起传入隔离子输入；调用方不能用另一个 Capsule 隐去必需交付。turn_complete 在记录声明前返回可修正的合同错误，最终 Task settlement 仍重复验证当前代次、依赖及结果完整性。完整返回与结构化输出先持久化并校验，再发送有界父投影和引用；子代理不需要另一个文件写入工具完成 runtime 自管的结果保存。
+
+后台重试先选择已有 Task 的根预算，再绑定新执行；不先绑定新父轮预算后尝试换根。旧执行、消费与期限保留。自动压缩、角色恢复和 Provider 元数据刷新不重置这些状态。Composer 的推理选择按实际 Provider/模型路由恢复，同一路由下恢复 Agent 身份不应套用模型默认档位。
+
+Task 状态文件的提交保持同一候选文件与原子 rename。短暂 EPERM/EBUSY 在持有存储锁期间最多重试三次（10/20/40 ms）；不删除目标、不重复领域操作。持续失败删除未安装候选、保留权威旧文件并返回原错误，不能宣称结果已持久保存。

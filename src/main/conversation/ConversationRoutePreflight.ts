@@ -530,7 +530,7 @@ export function createTurnFailedDiagnostic(
       agentId: route.agentId,
       code: 'MISSION_COMPLETION_DENIED',
       severity: 'error',
-      userMessage: `${label} 不能把本次 Mission 标为已完成：缺少可解引用的 Checkpoint、ready 报告，或 final_answer 未引用该报告。Partial / Inconclusive / Blocked 不得伪装完成。`,
+      userMessage: `本次调查尚未完成：缺少可核对的调查记录或最终报告。已保留现有记录，请补齐材料或继续调查。`,
       providerId: route.providerId,
       modelId: route.modelId,
       technicalMessage: redactTechnicalMessage(error),

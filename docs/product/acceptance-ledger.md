@@ -265,3 +265,40 @@ runtime 强制权限/所有权/依赖/执行代次/输出存在/预算/取消/jo
 - 最终归档：上述 TEMP 证据已复制到仓库约定的本机 QA 路径 %LOCALAPPDATA%/rdc-agent-qa/cfb7eaa0/harness-20260910/，Provider 记录均为应用脱敏副本，无 token/cookie/secret。13:07 最终源指纹复核一致、git diff --check 通过。第一次最终 gates 在 ledger 三列表格上被固定七列 schema 拒绝，已改为条目说明，未修改门禁。
 
 - 2026-09-10 13:10 最终聚合 check:gates exit 0，包含 contracts/Agent capability、会话投影、右栏、Knowledge/Investigation、legacy residue、acceptance ledger、Provider、release config、design tokens 与 renderer structure。日志 rdc-harness-final-gates-6.log；格式修正未触及冻结源码。最终 git diff --check 通过。
+
+
+## 2026-09-10 产品与执行连续性收敛实测
+
+基线 `e1d137b4`，在当前工作区继续修改；以下是未提交工作区的实测记录，不把该基线 SHA 当作新代码已提交证明。保留上文历史失败与撤回记录。本轮没有另建版本化引擎、Task 存储或 Compact 产品入口。
+
+- 已复用：单一 Agent loop、Task/执行/mailbox/root budget、durable handoff、Journal、Artifact、PromptPlan、资源仲裁；Investigation 与 RDX 仍是领域边界。删除旧 session 派生窗口存储与按头尾/消息大小删减的模型压缩路径，统一在执行安全请求边界维护窗口。
+- 实际加载指令已修正主动目标澄清、少量渐进问题、Unknown/skip/freeform 与授权分离、重知识隔离和独立 Skeptic、全文结果由 runtime 保存。工具搜索、Capsule 模型/推理参数、Task 精确输出键说明与实现相连。
+- 受控测试：原始媒体 hash/授权/配额与读取恢复、Unicode 分页重建、冻结工具配对、候选安装失败/取消/状态变化、Provider opaque 状态隔离、父子预算/迟到消息/取消/join/重启手动恢复由对应合同测试覆盖。不得据此宣称所有 Provider 或原生实验现场通过。
+- 真实产品、真实模型：隔离 userData，项目 `proj_c630c5bea6e8`（`D:/Projects/agentTest/rdc`），全部验收请求采用 ChatGPT OAuth `gpt-5.6-luna` / Low。`sess_bb6c6f8eea3d` 一句帧时间解释直接完成，无 Task/调查强制流程。`sess_fbdb96eea058` 从模糊白点经三题澄清，两个 unknown 与严格保留高光进入后续请求；历史 Mission 完成误判失败已保留，19:08 普通跟进正常结束。
+- Analysis `sess_62810cf73cd4`：用户仅称偶尔卡顿，实际回答形成“新区域、0.5–2 秒、自己恢复、能否稳定复现未知”，20:16 后续回复给可交接记录模板且未猜测原因。19:54 误把澄清标为调查完成导致失败的记录不抹除；完成声明现先向模型返回可修正错误，最终报告门禁保持。
+- Optimizer `sess_fbdb96eea058` 20:08：真实视觉请求收到两幅人工图，模型识别候选去掉右点但改变左侧高光大小/位置/形状及背景，拒绝把它当画质合格或真实项目实验成功；提问收敛质量标准。图像为受控样本，不是 capture Ground Truth。baseline SHA-256 `b5d349fc135787541abc64b2fa39df5f7f35eb58af68dd7ee9d7db0e293258ad`。
+- 材料 GUI：Composer 实际上传、意图/条件/比较组保存、键盘移动 ROI、重启后原图可读。20:22 修复并验证跨消息同组对照；900×700 下 dialog clientWidth=867、scrollWidth=867，两张原图加载成功；Esc 后焦点回到 material-after.png 附件，viewport 已恢复。用户标注与工具观察明确分开。
+- 长任务 `sess_e9b196a26a82`：700 行人工负载（不是测量）；原始来源 `session://tool-outputs/compaction-authority/130b0c66b071.json`，SHA-256 `91fc25741e266c289f8b4686321edd42a4d4b3a2761ab85d47375549a22a3d75`。首次过大输入外置，原始 JSON 可分页恢复。父多次、子执行 `execution_1789042078202_facd8c23` 连续三次真实压缩；压缩调用没有调查工具，实际读取覆盖原始分页，后续不能改名修订与原始不可修改分层。该子执行最终因 Task 输出键不匹配失败，不能以压缩 UI 成功宣称整体验收成功；对应权威键传递及声明预校验已修复并继续复测。
+- 实际 Provider wire：20:20 前收集 52 份实际 fetch JSON body，52 份均 Luna/Low，tool call/result 集合逐份相等；9 次无工具调用，12 份只有 Capsule 用户输入的隔离请求，2 个原生 image payload。请求原 body 保存 SHA-256，导出脱敏结构不含认证头、原始 reasoning 或签名内容，图像载荷以 data URL hash/长度表示。这里的数字证明协议观测，不证明科学结论。
+- 本机证据存于忽略目录 `.local/plans/product-convergence/`（wire-evidence.json、wire、QA 日志、测试日志），原始模型快照及媒体在本轮隔离 userData。不得提交授权副本或 bootstrap。此前全绿不能替代后续 diff；最终测试与清理结果在下方补记。
+- 明确限制：原始文本与权威状态超出专用压缩调用预算时安全暂停，尚未证明任意长度连续压缩；未做 Provider 全路由原生 compaction 实测。完整真实项目 Ground Truth 按用户既有约定分期，本轮图像和长文本 fixture 不替代原生 RDX 因果实验、rollback 或跨设备验证。
+
+
+### 后续复测与证据校验
+
+- 20:24 新 Task `task_1789043133638_485fda58` 的执行 `execution_1789043157477_9d5c8a00` 已 completed，精确输出键为 analysis；完整结果 `session://tool-outputs/subagent-execution_1789043157477_9d5c8a00.json`，SHA-256 `458692f6b5ae68b9430776738d9f1f41a1fddcdc4a3b0b683072e66567f2c4a4`。父回复先结束，终态事件触发原父评估；父在再次自动压缩后正确将旧 artifact 的自述与原始分页证据区分，最终 partial 不冒充科学完成。
+- 独立 wire 校验补齐双遍读取证据：对 `execution_1789042078202_facd8c23` 时段的实际 function_call_output 按 call_id 去重、游标顺序拼接。两遍各 5 页，分别重建同一个 SHA-256 `91fc25741e266c289f8b4686321edd42a4d4b3a2761ab85d47375549a22a3d75`，解析样本序列均严格等于 0–699。见 `double-pass-wire-proof.json`。这证明连续三次子压缩期间真实读取完整原始材料，不撤销该执行的完成字段失败，也不代表人工数据为测量。
+- 最终核心回归：原用户权限完整 coverage 363 文件通过、4 跳过，2633 测试通过、4 跳过；lines 74.41%、functions 76.40%、branches 61.90%、statements 72.05%，coverage ratchet 通过。后续同模型恢复 Agent 身份的单点修复再跑相关 3 文件 49 测试通过；typecheck、lint、check:gates 通过，启动器实际构建并加载。沙箱下 Knowledge 8 项路径/权限相关失败独立记在 coverage-final.log，原用户权限复测全通过，未修改安全断言。
+
+- 20:32 最终构建真实重启与 Session 切换后 General/Optimizer 均保持 Low。Artist 回答“严格保持高光位置/形状/亮度与背景”实际进入下一请求；回复将允许变化范围限定为右侧异常点，保留人工示意限定，未执行实验或修改。
+- 独立 Scout→Skeptic→Challenge 补证→原 Mission 返回的完整调用链由 `ExplorationReviewProviderFixture.test.ts` 在实际 Agent loop/PromptPlan/领域工具组合上验证；这是受控 Provider 证据，不标为真实模型完成原生 RDX 因果闭环。
+
+- 最终 wire 汇总为 64 份，全部 Luna/Low，逐份工具配对无缺失；11 次无工具压缩调用、15 份 Capsule 单用户输入请求。4 个图像载荷的 data URL SHA-256 与本地原图逐字节编码相同，确认没有用缩略图替代原图。统计包含多个安全边界，不等于独立执行数量。
+- 清理：停止本轮 Browser QA、launcher 及 Electron 子进程；隔离 home（模型窗口/压缩阈值覆盖）与 secrets/Local State 授权副本已删除，保留会话及脱敏证据。canonical 桌面入口实际启动到 Settings/RDX/Debugger 初始化，未出现 userData 占锁拒绝，随后关闭本轮桌面实例；QA 与 canonical 锁 owner 均已退出，无残留 launcher。桌面启动权已交还。
+
+- 20:36 最终全量复跑出现一项失败：BackgroundSubagentService 跨会话取消场景在写进度消息时遇到 Windows `EPERM rename task-state.json`（不是取消权限断言失败），其余 2633 项通过。已保留 coverage-delivery.log。补齐同一原子候选文件的有界 EPERM/EBUSY 重试，未引入备份切换或删目标路径；故障注入验证瞬时拒绝后仅提交一次、持续拒绝原文件字节不变且候选清理，相关 2 文件 16 测试通过。重新运行全量回归，结果补记于后。
+
+
+最终复验（20:44–20:45）：`coverage-delivery-recheck.log` 全量 363 文件通过、4 跳过，2636 测试通过、4 跳过；lines 74.42%、functions 76.41%、branches 61.91%、statements 72.07%，ratchet 通过。最终 typecheck、lint、check:gates、diff whitespace 检查通过，AgentOrchestrator façade 799 行（<800）。最后代码重新构建后 canonical 桌面入口成功初始化；本轮桌面 PID 41092 及子进程已停止，锁 owner 已确认死亡，无 QA/desktop launcher 残留。桌面启动权已交还。
+
+实际结果保存补证 `result-persistence-proof.json`：新完成子执行全文 8203 字节，父通知 2479 字节，outputs 超限部分外置；通知引用与真实文件 SHA-256 相同，文件保存时间早于通知。协议配对、原图字节校验、两遍分页重建与本条测试数字均为可复查证据；未将模型自述或 UI 成功当作原生实验成立。

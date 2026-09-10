@@ -108,4 +108,5 @@ export const toConversationAttachmentInputs = (
     mimeType: attachment.mimeType,
     size: attachment.size,
     stagingId: attachment.stagingId,
+    material: attachment.material,
   }));

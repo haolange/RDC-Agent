@@ -103,7 +103,7 @@ export function createTaskCreateTool(
               completionRequirements: {
                 type: 'array',
                 items: { type: 'string' },
-                description: 'Named output keys required before completion',
+                description: 'Exact keys required in result.outputs before completion, e.g. ["analysis"]. Put acceptance prose in description, not here. Every listed string must be returned verbatim as an output key.',
               },
               parentTaskId: { type: 'string', description: 'Optional parent logical Task id.' },
             },

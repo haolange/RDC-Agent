@@ -672,6 +672,8 @@ export class ConversationHistoryStore {
     sourcePaths: string[],
     logicalAttachmentsDir: string,
     classifications?: Array<{
+      material?: SessionAttachmentRecord['material'];
+      sourceHash?: string;
       layer: SessionAttachmentLayer;
       mimeType: string;
       kind: SessionAttachmentKind;
@@ -704,6 +706,7 @@ export class ConversationHistoryStore {
         fs.readFileSync(sourcePath).subarray(0, Math.min(stats.size, 64 * 1024)),
       );
       return {
+        material: classification?.material, sourceHash: classification?.sourceHash,
         attachmentId: `att_${generateShortId()}`,
         sessionId: session.sessionId,
         projectId: session.projectId,

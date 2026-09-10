@@ -426,3 +426,34 @@ function listTemps(sessionPath: string): string[] {
   }
   return found;
 }
+
+
+it('preserves original image bytes beyond the text-artifact limit and retains quota enforcement', () => {
+  const a = makeSession('large-image');
+  const resolver = createResolver({ [a.sessionId]: a.sessionPath });
+  const original = Buffer.alloc(3 * 1024 * 1024);
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(original);
+  const uri = 'session://tool-outputs/original.png';
+  const saved = resolver.write(a.sessionId, uri, original, { mimeType: 'image/png' });
+  const restored = resolver.read(a.sessionId, uri, { expectedHash: saved.hash, includeImageData: true });
+  expect(Buffer.from(restored.imageData!, 'base64').equals(original)).toBe(true);
+  const limited = createResolver({ [a.sessionId]: a.sessionPath }, { maxSessionBytes: 4 * 1024 * 1024 });
+  expect(() => limited.write(a.sessionId, 'session://tool-outputs/another.png', original)).toThrow(/ARTIFACT_QUOTA_EXCEEDED/);
+  expect(() => resolver.write(a.sessionId, 'session://tool-outputs/oversized.txt', 'a'.repeat(3 * 1024 * 1024))).toThrow(/ARTIFACT_TOO_LARGE/);
+});
+
+it('reconstructs long Unicode lines using bounded hash-bound cursors without losing middle evidence', () => {
+  const a = makeSession('paged-unicode'); const resolver = createResolver({ [a.sessionId]: a.sessionPath });
+  const original = '开始\n' + '普通负载🌈'.repeat(4000) + '否定条件：没有真实测量，不能压暗正常高光。' + '尾部数据'.repeat(4000) + '\n最后一行';
+  const written = resolver.write(a.sessionId, 'session://tool-outputs/long.txt', original);
+  let cursor = { offset: 1, column: 0 }; let restored = ''; let pages = 0;
+  for (;;) {
+    const result = resolver.read(a.sessionId, written.uri, { ...cursor, expectedHash: written.hash, maxBytes: 1024, limit: 2 });
+    expect(Buffer.byteLength(result.text!, 'utf8')).toBeLessThanOrEqual(1024);
+    expect(result.text).not.toContain('�'); restored += result.text; pages++;
+    if (!result.next) break;
+    expect(result.next.offset > cursor.offset || result.next.column > cursor.column).toBe(true);
+    cursor = result.next; if (pages > 250) throw new Error('Non-advancing cursor');
+  }
+  expect(restored).toBe(original); expect(pages).toBeGreaterThan(10);
+});

@@ -43,8 +43,6 @@ export const zhComposer = {
   'composer.model.agentDefaultTitle': '不另选模型，按 {name} 的配置使用',
   'composer.model.agentDefaultUnset': '当前 Agent 未配置模型。',
   'composer.model.agentDefaultUnavailable': 'Agent 配置的模型当前不可执行。',
-  'composer.compact.withinThreshold': '已在压缩线内（{occupied} / {threshold}）',
-  'composer.compact.created': '已根据 {count} 个较早回合创建上下文视图；对话原文保留。',
   'composer.toolApprovalRisk.low': '低风险',
   'composer.toolApprovalRisk.medium': '中风险',
   'composer.toolApprovalRisk.high': '高风险',

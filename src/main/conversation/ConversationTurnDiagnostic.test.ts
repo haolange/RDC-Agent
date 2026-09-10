@@ -138,7 +138,7 @@ describe('conversation turn failure classification', () => {
       new MissionCompletionError('missing_report', 'debugger cannot complete without a ready report'),
     );
     expect(diagnostic.code).toBe('MISSION_COMPLETION_DENIED');
-    expect(diagnostic.userMessage).toContain('不能把本次 Mission 标为已完成');
+    expect(diagnostic.userMessage).toContain('本次调查尚未完成');
     expect(diagnostic.userMessage).not.toContain('额度或网络');
   });
 

@@ -147,7 +147,7 @@ describe('deterministic provider with production loop, tools, artifacts and dura
     expect(rejected.isError).toBe(true); expect(JSON.stringify(rejected)).toMatch(/CYCLE_LIMIT|CHAIN_LIMIT/);
     expect(store.getActive(SESSION_ID)).toBeNull();
     expect(() => enforceMissionTurnCompletion({ profileId: mission, sessionId: SESSION_ID, turnId: turn, finalAnswerText: '仍需真实设备验证。等待新指令。', disposition: 'budget_paused', evidenceRefs: [{ uri: checkpoint!.contentUri, hash: checkpoint!.contentHash }], service })).not.toThrow();
-    expect(() => enforceMissionTurnCompletion({ profileId: mission, sessionId: SESSION_ID, turnId: turn, finalAnswerText: '调查已完成', service })).toThrow();
+    expect(() => enforceMissionTurnCompletion({ profileId: mission, sessionId: SESSION_ID, turnId: turn, finalAnswerText: '调查已完成', disposition: 'completed', service })).toThrow();
     expect(() => enforceMissionTurnCompletion({ profileId: mission, sessionId: SESSION_ID, turnId: 'forged-new-turn', finalAnswerText: '仍需真实设备验证。', disposition: 'budget_paused', evidenceRefs: [{ uri: checkpoint!.contentUri, hash: checkpoint!.contentHash }], service })).toThrow();
     expect(store.readDocument(SESSION_ID)!.history!.filter(item => item.contract.intent === 'return')).toHaveLength(2);
     turn = 'new-user-cancel';

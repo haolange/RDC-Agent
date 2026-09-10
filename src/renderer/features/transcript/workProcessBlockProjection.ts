@@ -73,10 +73,6 @@ export function buildPresentationUnits(
   ctx: BlockProjectionContext,
 ): PresentationUnit[] {
   const units: PresentationUnit[] = [];
-  let latestCompactionId: string | undefined;
-  for (const block of blocks) {
-    if (block.kind === 'compaction') latestCompactionId = block.id;
-  }
 
   for (let blockIndex = 0; blockIndex < blocks.length; blockIndex += 1) {
     const block = blocks[blockIndex];
@@ -155,17 +151,18 @@ export function buildPresentationUnits(
     }
 
     if (block.kind === 'compaction') {
-      if (block.id !== latestCompactionId) continue;
       ctx.hasVisibleProcessEvidence = true;
       const stats = block.compactionStats;
-      const detailLines: string[] = [];
+      const detailLines: string[] = block.summary ? [block.summary] : [];
+      if (stats?.usage) detailLines.push(`Compaction provider usage: ${stats.usage.inputTokens} input / ${stats.usage.outputTokens} output tokens`);
+      if (stats?.sourceUri) detailLines.push(`${stats.sourceUri} sha256:${stats.sourceHash ?? ""}`);
       if (stats?.messagesBefore != null && stats.messagesAfter != null) {
         detailLines.push(`${stats.messagesBefore} → ${stats.messagesAfter} messages`);
       }
       if (stats?.tokensBefore != null && stats.tokensAfter != null) {
-        detailLines.push(`${stats.tokensBefore} → ${stats.tokensAfter} tokens`);
+        detailLines.push(`${stats.tokensBefore} → ${stats.tokensAfter} estimated tokens`);
       } else if (stats?.tokensBefore != null) {
-        detailLines.push(`${stats.tokensBefore} tokens`);
+        detailLines.push(`${stats.tokensBefore} estimated tokens`);
       }
       units.push({
         kind: 'standalone',
@@ -173,7 +170,7 @@ export function buildPresentationUnits(
           type: 'summary',
           id: block.id,
           status: block.status,
-          text: stats?.provenance === 'manual' ? '手动压缩' : '自动压缩',
+          text: block.status === 'running' ? '正在整理上下文' : block.status === 'error' ? '上下文整理失败' : '上下文已自动压缩',
           detailLines,
           duration: formatDurationMs(block.startedAt, block.completedAt),
           compactionProvenance: stats?.provenance,

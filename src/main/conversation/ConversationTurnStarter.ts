@@ -244,6 +244,7 @@ export async function startProfileTurn(
         pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
         storageAdapter.sessions.getSessionAttachmentsDir(context.session.sessionId),
         pendingAttachmentDescriptors.map((attachment) => ({
+          material: attachment.material, sourceHash: attachment.sourceHash,
           layer: attachment.layer,
           mimeType: attachment.mimeType,
           kind: attachment.kind,
@@ -257,7 +258,8 @@ export async function startProfileTurn(
           pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
           path.join(reservedSession.finalPath, 'attachments'),
           pendingAttachmentDescriptors.map((attachment) => ({
-            layer: attachment.layer,
+            material: attachment.material, sourceHash: attachment.sourceHash,
+          layer: attachment.layer,
             mimeType: attachment.mimeType,
             kind: attachment.kind,
             fileName: attachment.fileName,
@@ -271,6 +273,7 @@ export async function startProfileTurn(
   const plannedInputAttachments = pendingAttachmentDescriptors.map((attachment, index) => {
     const planned = plannedAttachmentRecords[index]!;
     return {
+      material: planned.material, sourceHash: planned.sourceHash,
       attachmentId: planned.attachmentId,
       kind: planned.kind,
       layer: planned.layer ?? attachment.layer,
