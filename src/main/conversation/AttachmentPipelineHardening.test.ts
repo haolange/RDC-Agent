@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { classifyAttachmentBytes } from './attachmentClassify';
 import { hydrateFrozenUserContent, materializeAgentUserInput } from './ConversationAttachmentMaterializer';
 import { AttachmentStagingService } from './AttachmentStagingService';
@@ -11,10 +11,8 @@ import { toRejectedSendResult } from './conversationSendRejection';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-att-hard-'));
 
-afterEach(() => {
-  fs.rmSync(tempRoot, { recursive: true, force: true });
-  fs.mkdirSync(tempRoot, { recursive: true });
-});
+beforeEach(() => fs.mkdirSync(tempRoot, { recursive: true }));
+afterEach(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
 
 describe('attachment pipeline hardening', () => {
   it('keeps prepare/run inline text identical when physical directories differ', async () => {
