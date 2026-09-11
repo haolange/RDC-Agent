@@ -160,8 +160,9 @@ export function useKnowledgeCenter(open: boolean) {
 
   useEffect(() => {
     if (!open) return;
+    if (spaces.length === 0 && selectedSpaceIds.length === 0) return;
     void refreshQuery();
-  }, [open, refreshQuery]);
+  }, [open, refreshQuery, selectedSpaceIds.length, spaces.length]);
 
   const selectRecord = useCallback((record: KnowledgeCardRecord) => {
     setSelectedCardId(record.cardId);

@@ -1,7 +1,7 @@
-import { Icon, type IconName } from '../../../../ui/Icon';
+import { Icon, type IconName, type IconSize } from '../../../../ui/Icon';
 
-export type KnowledgeIconName = Extract<IconName, 'book' | 'inbox' | 'conflict' | 'folder' | 'upload' | 'filter'>;
+export type KnowledgeIconName = Extract<IconName, 'book' | 'inbox' | 'conflict' | 'upload' | 'filter'>;
 
-export function KnowledgeIcon({ name }: { name: KnowledgeIconName }) {
-  return <Icon name={name} size={18} />;
+export function KnowledgeIcon({ name, size = 18 }: { name: KnowledgeIconName; size?: IconSize }) {
+  return <Icon name={name} size={size} />;
 }
