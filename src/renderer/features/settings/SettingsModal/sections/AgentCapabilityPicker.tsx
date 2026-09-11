@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { Button } from '../../../../ui/Button';
+import { CheckPill } from '../../../../ui/CheckPill';
+import { EmptyState } from '../../../../ui/EmptyState';
+import { Input } from '../../../../ui/Input';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -119,6 +123,7 @@ export const AgentCapabilityPicker: React.FC<AgentCapabilityPickerProps> = ({ gr
 
   return (
     <div className="settings-capability-picker">
+      <p className="settings-capability-note">{t('settings.agentCapabilityNotGrantHint')}</p>
       {groups.map((group) => {
         const options = uniqueCapabilities([...group.options, ...group.values]);
         return (
@@ -130,16 +135,19 @@ export const AgentCapabilityPicker: React.FC<AgentCapabilityPickerProps> = ({ gr
 
             <div className="settings-capability-options" role="group" aria-label={group.label}>
               {options.length > 0 ? options.map((option) => (
-                <label key={option} className="settings-capability-option">
-                  <input
-                    type="checkbox"
-                    checked={group.values.includes(option)}
-                    onChange={() => toggleValue(group, option)}
-                  />
-                  <span>{option}</span>
-                </label>
+                <CheckPill
+                  key={option}
+                  checked={group.values.includes(option)}
+                  onCheckedChange={() => toggleValue(group, option)}
+                  data-testid={`settings-capability-${group.id}-${option}`}
+                >
+                  {option}
+                </CheckPill>
               )) : (
-                <div className="settings-empty settings-empty-dashed">{t('settings.noCapabilityOptions')}</div>
+                <EmptyState
+                  className="settings-capability-empty"
+                  title={t('settings.noCapabilityOptions')}
+                />
               )}
             </div>
 
@@ -150,15 +158,14 @@ export const AgentCapabilityPicker: React.FC<AgentCapabilityPickerProps> = ({ gr
                 addCustomValue(group);
               }}
             >
-              <input
-                className="input"
+              <Input
+                inputSize="sm"
                 value={drafts[group.id] ?? ''}
                 placeholder={t('settings.addCapabilityPlaceholder')}
+                aria-label={t('settings.addCapabilityPlaceholder')}
                 onChange={(event) => setDraft(group.id, event.currentTarget.value)}
               />
-              <button type="submit" className="button button-secondary">
-                {t('settings.add')}
-              </button>
+              <Button type="submit" variant="ghost" size="sm">{t('settings.add')}</Button>
             </form>
           </section>
         );

@@ -1,0 +1,221 @@
+/* General page: profile, language, personalization, resource diagnostics entry and dialog. */
+
+.settings-page-general .settings-general-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-height: 100%;
+  align-content: start;
+}
+
+.settings-page-general .settings-general-top-row {
+  display: grid;
+  grid-template-columns: minmax(20rem, 1.1fr) minmax(14rem, 0.9fr);
+  gap: var(--space-4);
+  align-items: start;
+  min-height: 0;
+}
+
+.settings-page-general .settings-profile-section,
+.settings-page-general .settings-appearance-section {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  height: auto;
+}
+
+.settings-profile-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: center;
+  margin-top: var(--space-3);
+}
+
+.settings-account-avatar,
+.settings-account-avatar-fallback {
+  width: var(--space-16);
+  height: var(--space-16);
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.settings-account-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--token-bg-raised);
+  color: var(--token-text-heading);
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+}
+
+.settings-profile-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* Nickname is a short field: it must not stretch across the whole rail. */
+.settings-profile-fields .settings-field-control .ui-input {
+  max-width: 22rem;
+}
+
+.settings-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.settings-personalization-block {
+  max-width: 68rem;
+}
+
+.settings-personalization-textarea {
+  min-height: calc(var(--space-20) + var(--space-8));
+  line-height: 1.7;
+}
+
+/* Collapsed entry to the resources & diagnostics task dialog. */
+.settings-disclosure-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--control-height-lg);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-panel);
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  text-align: start;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.settings-disclosure-row:hover {
+  border-color: var(--token-border-default);
+  background: var(--token-interactive-hover);
+}
+
+.settings-disclosure-row:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.settings-disclosure-row-icon {
+  flex: none;
+  color: var(--token-text-caption);
+}
+
+.settings-disclosure-row-label {
+  font-weight: var(--font-medium);
+}
+
+.settings-disclosure-row-hint {
+  margin-inline-start: auto;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+}
+
+/* Resources & diagnostics dialog. */
+.settings-path-roots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.settings-path-root {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.settings-path-root-label {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+}
+
+.settings-path-root-value,
+.settings-path-value {
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-sm);
+  background: var(--token-bg-panel);
+  color: var(--token-text-body);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-path-actions,
+.settings-path-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.settings-path-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.settings-path-group-title {
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+}
+
+.settings-path-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.settings-path-row {
+  display: grid;
+  grid-template-columns: minmax(6rem, 0.22fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  min-height: var(--control-height-lg);
+}
+
+.settings-path-row + .settings-path-row {
+  border-top: 1px solid var(--token-border-muted);
+}
+
+.settings-path-name {
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.settings-path-note {
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+@media (max-width: 960px) {
+  .settings-page-general .settings-general-top-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-path-root,
+  .settings-path-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -4,6 +4,7 @@ import {
   KNOWLEDGE_LIFECYCLES,
   KNOWLEDGE_RETRIEVAL_LANES,
 } from '@shared/types/knowledge';
+import { KNOWLEDGE_EXPORT_FORMATS, KNOWLEDGE_EXPORT_SCOPES } from '@shared/types/knowledgeExport';
 import { KnowledgeCardRecordSchema } from '../../knowledge/knowledgeCardSchema';
 import { ipcId, ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 
@@ -86,6 +87,19 @@ export const KnowledgeWriteArgsSchema = z.tuple([
     permissionMode: KnowledgePermissionModeSchema,
     confirmation: KnowledgeConfirmationSchema,
     approvalToken: ipcNonEmptyString(128, 'approvalToken'),
+  }).strict(),
+]);
+
+export const KnowledgeExportArgsSchema = z.tuple([
+  z.object({
+    format: z.enum(KNOWLEDGE_EXPORT_FORMATS),
+    scope: z.enum(KNOWLEDGE_EXPORT_SCOPES),
+    targetPath: ipcNonEmptyString(4096, 'targetPath'),
+    cardRefs: z.array(z.object({
+      spaceId: KnowledgeSpaceIdSchema,
+      relativePath: ipcNonEmptyString(1024, 'relativePath'),
+    }).strict()).max(2000).optional(),
+    spaceId: KnowledgeSpaceIdSchema.optional(),
   }).strict(),
 ]);
 

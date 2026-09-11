@@ -2,7 +2,8 @@ import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { MaterialContext } from '@shared/types/materialContext';
 import { Button } from '../ui';
-import { useModalFocus } from '../hooks/useModalFocus';
+import { useModalFocus } from '../lib/useModalFocus';
+import { useOverlayLayer } from '../lib/overlayStack';
 import { useI18n } from '../i18n';
 import './MaterialContextEditor.css';
 
@@ -14,7 +15,8 @@ export const MaterialContextViewer: React.FC<{
 }> = ({ items, onClose, onOpenOriginal }) => {
   const ref = useRef<HTMLDivElement>(null);
   const { language } = useI18n(); const zh = language === 'zh-CN';
-  useModalFocus({ containerRef: ref, open: true, onClose });
+  const { layerId } = useOverlayLayer(true);
+  useModalFocus({ containerRef: ref, open: true, onClose, layerId });
   return createPortal(<div className="material-context-overlay">
     <div ref={ref} className="material-context-editor material-context-viewer" role="dialog" aria-modal="true" aria-label={zh ? '材料与对照' : 'Materials and comparison'} tabIndex={-1}>
       <h2 tabIndex={0}>{zh ? '材料与对照' : 'Materials and comparison'}</h2>

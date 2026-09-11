@@ -44,6 +44,102 @@
   min-width: 0;
 }
 
+/* Scoped resource pages: toolbar + list/detail split, or one compact empty prompt. */
+.settings-resource-frame {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+  flex: 1;
+}
+
+.settings-resource-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--token-border-muted);
+}
+
+.settings-resource-toolbar-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-resource-empty.ui-empty-state {
+  align-items: flex-start;
+  text-align: start;
+  padding: var(--space-6) 0 0;
+  min-height: 0;
+}
+
+.settings-resource-split {
+  display: grid;
+  grid-template-columns: minmax(13rem, 0.32fr) minmax(0, 0.68fr);
+  gap: var(--space-4);
+  min-height: 0;
+  flex: 1;
+}
+
+.settings-resource-list-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: 0;
+  overflow-y: auto;
+  padding-inline-end: var(--space-1);
+  border-inline-end: 1px solid var(--token-border-muted);
+}
+
+.settings-resource-detail-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.settings-resource-status {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+@media (max-width: 960px) {
+  .settings-resource-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-resource-list-column {
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--token-border-muted);
+    max-height: 14rem;
+  }
+}
+
+.settings-editor-dirty {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-start: var(--space-2);
+  color: var(--token-status-warning);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+}
+
+.settings-editor-dirty::before {
+  content: '';
+  width: var(--space-1);
+  height: var(--space-1);
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
 .settings-choice-group {
   display: inline-flex;
   flex-wrap: wrap;
@@ -51,19 +147,20 @@
   gap: var(--space-2);
 }
 
+/* Scope stays a compact User | Project control; it never spans the page. */
 .settings-scope-bar {
-  width: 100%;
+  width: auto;
+  max-width: max-content;
 }
 
 .settings-scope-bar .ui-tabs-list {
-  display: grid;
+  display: inline-grid;
   grid-template-columns: 1fr 1fr;
-  width: 100%;
   min-height: var(--control-height-md);
 }
 
 .settings-scope-bar .ui-tabs-tab {
-  width: 100%;
+  min-width: 6rem;
   min-height: var(--control-height-md);
 }
 

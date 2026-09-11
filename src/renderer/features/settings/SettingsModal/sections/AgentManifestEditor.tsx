@@ -99,6 +99,8 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                   className="settings-agent-accent-color"
                   layout="inline"
                   label={t('settings.agentAccent')}
+                  areaLabel={t('settings.colorPickerArea')}
+                  hueLabel={t('settings.colorPickerHue')}
                   value={selectedAgent.accent ?? '#33d1ff'}
                   testId="settings-agent-accent"
                   onChange={(accent) => onUpdateAgent({ accent })}

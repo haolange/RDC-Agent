@@ -1,6 +1,7 @@
 import React from 'react';
 import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { Icon } from '../../../../ui/Icon';
 import { Pill } from '../../../../ui/Pill';
 import { SettingsField, SettingsSection } from '../parts';
 import { PersonalizationSettings } from './PersonalizationSettings';
@@ -18,6 +19,7 @@ interface GeneralSettingsProps {
   globalInstructionsDraft: string;
   onGlobalInstructionsDraftChange: (value: string) => void;
   onSavePersonalization: () => void | Promise<void>;
+  onOpenResourceDiagnostics: () => void;
   t: Translate;
 }
 
@@ -31,6 +33,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
   globalInstructionsDraft,
   onGlobalInstructionsDraftChange,
   onSavePersonalization,
+  onOpenResourceDiagnostics,
   t,
 }) => {
   return (
@@ -71,6 +74,17 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
           onSavePersonalization={onSavePersonalization}
           t={t}
         />
+        <button
+          type="button"
+          className="settings-disclosure-row"
+          data-settings-search="resource-diagnostics"
+          data-testid="settings-open-resource-diagnostics"
+          onClick={onOpenResourceDiagnostics}
+        >
+          <Icon name="chevron-right" size={14} className="settings-disclosure-row-icon" />
+          <span className="settings-disclosure-row-label">{t('settings.resourceDiagnosticsTitle')}</span>
+          <span className="settings-disclosure-row-hint">{t('settings.resourceDiagnosticsOpen')}</span>
+        </button>
       </div>
     </section>
   );

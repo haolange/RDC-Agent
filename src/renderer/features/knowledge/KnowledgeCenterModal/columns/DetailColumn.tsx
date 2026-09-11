@@ -26,7 +26,6 @@ export function DetailColumn({ state, write, onClose, onCreateCandidate }: Detai
   const { t } = useI18n();
   const card = state.selectedCard;
   const [metadataOpen, setMetadataOpen] = useState(false);
-  const headerTitle = card?.title ?? t('knowledgeCenter.title');
   const missing = card?.type === 'case'
     ? KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => !card.chapters?.[chapter]?.trim())
     : [];
@@ -35,27 +34,37 @@ export function DetailColumn({ state, write, onClose, onCreateCandidate }: Detai
 
   return (
     <Panel className="knowledge-center-content" data-testid="knowledge-center-detail-column">
-      <div className="knowledge-center-header">
-        <div>
-          {state.narrow && (
-            <Button variant="ghost" size="sm" onClick={() => state.setNarrowPane('list')}>
-              {t('knowledgeCenter.back')}
-            </Button>
-          )}
-          <div className="knowledge-center-header-title">{headerTitle}</div>
-          {card && (
-            <div className="knowledge-center-header-path" title={card.relativePath}>{card.relativePath}</div>
-          )}
+      {/* The modal title bar owns the product title and close; this header only
+          identifies the selected card. */}
+      {card || state.narrow ? (
+        <div className="knowledge-center-header">
+          <div>
+            {state.narrow && (
+              <Button variant="ghost" size="sm" onClick={() => state.setNarrowPane('list')}>
+                {t('knowledgeCenter.back')}
+              </Button>
+            )}
+            {card ? (
+              <>
+                <div className="knowledge-center-header-title">{card.title}</div>
+                <div className="knowledge-center-header-path" title={card.relativePath}>
+                  {card.relativePath}
+                </div>
+              </>
+            ) : null}
+          </div>
+          {state.narrow ? (
+            <IconButton
+              label={t('knowledgeCenter.close')}
+              className="knowledge-center-close"
+              onClick={onClose}
+              data-testid="knowledge-center-close"
+            >
+              <Icon name="close" size={16} />
+            </IconButton>
+          ) : null}
         </div>
-        <IconButton
-          label={t('knowledgeCenter.close')}
-          className="knowledge-center-close"
-          onClick={onClose}
-          data-testid="knowledge-center-close"
-        >
-          <Icon name="close" size={16} />
-        </IconButton>
-      </div>
+      ) : null}
 
       <div className="knowledge-center-body" data-testid="knowledge-center-body">
         {state.loadingDetail && <div className="knowledge-center-status">{t('knowledgeCenter.loading')}</div>}

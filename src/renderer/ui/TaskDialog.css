@@ -1,0 +1,136 @@
+.task-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: var(--modal-backdrop);
+  animation: task-dialog-backdrop-in 120ms ease-out;
+}
+
+.task-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(var(--task-dialog-width), 100%);
+  max-height: min(88vh, 60rem);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-xl);
+  background: var(--token-bg-overlay);
+  box-shadow: var(--token-shadow-modal);
+  animation: task-dialog-in 140ms ease-out;
+}
+
+.task-dialog.is-size-sm { --task-dialog-width: 26rem; }
+.task-dialog.is-size-md { --task-dialog-width: 35rem; }
+.task-dialog.is-size-lg { --task-dialog-width: 47.5rem; }
+
+.task-dialog:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.task-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--token-border-muted);
+}
+
+.task-dialog-heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.task-dialog-title {
+  margin: 0;
+  color: var(--token-text-heading);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.task-dialog-description {
+  margin: var(--space-1) 0 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.task-dialog-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+}
+
+.task-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--token-border-muted);
+}
+
+.task-dialog-footer-spacer {
+  margin-inline-end: auto;
+  min-width: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+}
+
+@keyframes task-dialog-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes task-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2)) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  .task-dialog-overlay {
+    padding: 0;
+  }
+
+  .task-dialog {
+    width: 100%;
+    max-width: none;
+    max-height: 100vh;
+    height: 100vh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .task-dialog-footer {
+    flex-wrap: wrap;
+  }
+
+  .task-dialog-footer .button {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-dialog-overlay,
+  .task-dialog {
+    animation: none;
+  }
+}

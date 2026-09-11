@@ -89,6 +89,7 @@ import type {
   KnowledgeQueryResult,
   SessionKnowledgeCandidate,
 } from './knowledge';
+import type { KnowledgeExportRequest, KnowledgeExportResult } from './knowledgeExport';
 import type {
   InvestigationReadIpcResult,
   InvestigationReadRequest,
@@ -210,6 +211,7 @@ export interface ElectronAPI {
   selectFiles: () => Promise<string[] | null>;
   selectRdcFiles: () => Promise<string[] | null>;
   selectDirectory: () => Promise<string | null>;
+  saveFile: (request: { defaultFileName: string; extension: string }) => Promise<string | null>;
 
   workflow: {
     getState: () => Promise<WorkflowState>;
@@ -293,6 +295,7 @@ export interface ElectronAPI {
       confirmation: KnowledgeHumanConfirmation;
       approvalToken: string;
     }) => Promise<{ card: KnowledgeCardRecord }>;
+    export: (request: KnowledgeExportRequest) => Promise<KnowledgeExportResult>;
   };
 
   rdxRuntime: {

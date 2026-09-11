@@ -1,7 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState, type KeyboardEvent } from 'react';
 import { AGENT_ICON_PRESETS } from '@shared/constants/agents';
 import type { ModeIconKey } from '@shared/types/layout';
+import { Button } from '../../../../ui/Button';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
+import { Popover } from '../../../../ui/Popover';
 import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -18,58 +20,53 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
   t,
 }) => {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const dismiss = (event: PointerEvent) => {
-      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setOpen(false);
-    };
-    document.addEventListener('pointerdown', dismiss);
-    return () => document.removeEventListener('pointerdown', dismiss);
-  }, [open]);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const chooseIcon = (icon: ModeIconKey) => {
     onChange(icon);
     setOpen(false);
-    triggerRef.current?.focus();
+  };
+
+  const onGridKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(gridRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? []);
+    if (items.length === 0) return;
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    const next = event.key === 'Home' ? 0
+      : event.key === 'End' ? items.length - 1
+        : ['ArrowDown', 'ArrowRight'].includes(event.key) ? (current + 1 + items.length) % items.length
+          : ['ArrowUp', 'ArrowLeft'].includes(event.key) ? (current - 1 + items.length) % items.length
+            : null;
+    if (next === null) return;
+    event.preventDefault();
+    items[next]?.focus();
   };
 
   return (
-    <div ref={rootRef} className="settings-agent-icon-picker" aria-label={t('settings.agentIcon')} onKeyDown={(event) => {
-      if (!open) return;
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        setOpen(false);
-        triggerRef.current?.focus();
-        return;
-      }
-      const items = Array.from(rootRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? []);
-      const current = items.indexOf(document.activeElement as HTMLButtonElement);
-      const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
-        : ['ArrowDown', 'ArrowRight'].includes(event.key) ? (current + 1) % items.length
-          : ['ArrowUp', 'ArrowLeft'].includes(event.key) ? (current - 1 + items.length) % items.length : null;
-      if (next != null) { event.preventDefault(); items[next]?.focus(); }
-    }}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className="button button-secondary settings-agent-icon-trigger"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      align="start"
+      className="settings-agent-icon-popover"
+      trigger={(
+        <Button variant="secondary" className="settings-agent-icon-trigger" aria-haspopup="menu">
+          <ModeGlyph mode="ask" icon={value} size={16} strokeWidth={1.9} />
+          <span>{t('settings.changeAgentIcon')}</span>
+        </Button>
+      )}
+    >
+      <div className="settings-agent-icon-popover-title">{t('settings.agentIcon')}</div>
+      <div
+        ref={gridRef}
+        className="settings-agent-icon-grid"
+        role="menu"
+        aria-label={t('settings.agentIcon')}
+        onKeyDown={onGridKeyDown}
       >
-        <ModeGlyph mode="ask" icon={value} size={16} strokeWidth={1.9} />
-        <span>{t('settings.changeAgentIcon')}</span>
-      </button>
-      {open ? (
-        <div className="settings-agent-icon-popover" role="menu" aria-label={t('settings.agentIcon')}>
-          {AGENT_ICON_PRESETS.map((preset) => (
+        {AGENT_ICON_PRESETS.map((preset) => (
           <button
             key={preset.id}
             type="button"
-            className={`settings-agent-icon-option ${value === preset.id ? 'is-active' : ''}`}
+            className={`settings-agent-icon-option${value === preset.id ? ' is-selected' : ''}`}
             role="menuitemradio"
             aria-checked={value === preset.id}
             title={preset.label}
@@ -77,9 +74,8 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
           >
             <ModeGlyph mode="ask" icon={preset.id} size={18} strokeWidth={1.9} />
           </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
+        ))}
+      </div>
+    </Popover>
   );
 };

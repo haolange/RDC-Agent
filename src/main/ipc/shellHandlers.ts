@@ -4,7 +4,7 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, shell, typ
 
 import { appPathService } from '../runtime/AppPathService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
-import { EmptyArgsSchema } from './validation/commonIpcSchemas';
+import { EmptyArgsSchema, SaveFileArgsSchema } from './validation/commonIpcSchemas';
 import {
   AppCopyTextArgsSchema,
   AppGetAvatarDataUrlArgsSchema,
@@ -90,6 +90,19 @@ export function registerShellHandlers(): void {
       properties: ['openDirectory', 'createDirectory'],
     });
     return result.canceled ? null : result.filePaths[0];
+  });
+
+  ipcMain.handle('dialog:saveFile', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(SaveFileArgsSchema, rawArgs, {
+      label: 'dialog:saveFile',
+      maxBytes: 4 * 1024,
+    });
+    const result = await dialog.showSaveDialog({
+      defaultPath: request.defaultFileName,
+      filters: [{ name: request.extension.toUpperCase(), extensions: [request.extension] }],
+      properties: ['createDirectory', 'showOverwriteConfirmation'],
+    });
+    return result.canceled || !result.filePath ? null : result.filePath;
   });
 
   ipcMain.handle('window:minimize', async (event, ...rawArgs: unknown[]) => {

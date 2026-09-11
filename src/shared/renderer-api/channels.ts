@@ -10,6 +10,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     selectFiles: 'dialog:selectFiles',
     selectRdcFiles: 'dialog:selectRdcFiles',
     selectDirectory: 'dialog:selectDirectory',
+    saveFile: 'dialog:saveFile',
     minimizeWindow: 'window:minimize',
     toggleMaximizeWindow: 'window:toggleMaximize',
     closeWindow: 'window:close',
@@ -66,6 +67,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     issueApprovalToken: 'knowledge:issueApprovalToken',
     write: 'knowledge:write',
     promote: 'knowledge:promote',
+    export: 'knowledge:export',
   },
   rdxRuntime: {
     getOverview: 'rdx-runtime:overview',

@@ -7,6 +7,8 @@ import type {
 } from '@shared/types/knowledge';
 import { knowledgeErrorMessage } from './knowledgeCenterModel';
 
+export type KnowledgeImportMode = 'file' | 'paste';
+
 export function useKnowledgeImport(options: {
   open: boolean;
   sessionId: string | null;
@@ -14,6 +16,7 @@ export function useKnowledgeImport(options: {
   onCreated: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<KnowledgeImportMode>('file');
   const [source, setSource] = useState('');
   const [filePath, setFilePath] = useState<string | null>(null);
   const [spaceId, setSpaceId] = useState(options.spaces[0]?.spaceId ?? 'user');
@@ -37,6 +40,7 @@ export function useKnowledgeImport(options: {
 
   const close = useCallback(() => {
     setOpen(false);
+    setMode('file');
     setSource('');
     setFilePath(null);
     setResult(null);
@@ -48,6 +52,14 @@ export function useKnowledgeImport(options: {
     setOpen(true);
   }, [options.spaces]);
 
+  // File and paste are mutually exclusive inputs, so switching clears the other.
+  const changeMode = useCallback((next: KnowledgeImportMode) => {
+    setMode(next);
+    setError(null);
+    if (next === 'file') setSource('');
+    else setFilePath(null);
+  }, []);
+
   const selectFile = useCallback(async () => {
     const paths = await window.electronAPI.selectFiles();
     const next = paths?.[0] ?? null;
@@ -57,7 +69,7 @@ export function useKnowledgeImport(options: {
 
   const importSource = useCallback(async () => {
     if (!options.sessionId) {
-      setError('KNOWLEDGE_SESSION_REQUIRED: Open a session before importing ColdData.');
+      setError('KNOWLEDGE_SESSION_REQUIRED: Open a session before importing knowledge.');
       return;
     }
     setBusy(true);
@@ -104,6 +116,8 @@ export function useKnowledgeImport(options: {
     open,
     openPanel,
     close,
+    mode,
+    setMode: changeMode,
     source,
     setSource,
     filePath,

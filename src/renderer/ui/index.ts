@@ -2,7 +2,12 @@ export { Badge, type BadgeProps, type BadgeTone } from './Badge';
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './Button';
 export { ColorField, type ColorFieldProps } from './ColorField';
 export { Checkbox, type CheckboxProps } from './Checkbox';
-export { ConfirmationDialog, type ConfirmationDialogProps } from './ConfirmationDialog';
+export { CheckPill, type CheckPillProps } from './CheckPill';
+export {
+  ConfirmationDialog,
+  type ConfirmationDialogDetail,
+  type ConfirmationDialogProps,
+} from './ConfirmationDialog';
 export { ContextMenu, type ContextMenuProps } from './ContextMenu';
 export { ActiveSignalText, type ActiveSignalTone } from './ActiveSignalText';
 export { Divider, type DividerProps } from './Divider';
@@ -25,6 +30,8 @@ export { SectionHeader, type SectionHeaderProps } from './SectionHeader';
 export { Select, type SelectOption, type SelectProps } from './Select';
 export { Spinner, type SpinnerProps } from './Spinner';
 export { Switch, type SwitchProps } from './Switch';
-export { Tabs, type TabItem, type TabsProps } from './Tabs';
+export { Tabs, type TabItem, type TabsProps, type TabsVariant } from './Tabs';
+export { TaskDialog, type TaskDialogProps, type TaskDialogSize } from './TaskDialog';
 export { Textarea, type TextareaProps, type TextareaSize } from './Textarea';
+export { UnsavedChangesDialog, type UnsavedChangesDialogProps } from './UnsavedChangesDialog';
 export { Toast, ToastStack, type ToastProps, type ToastTone } from './Toast';

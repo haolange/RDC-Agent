@@ -186,7 +186,14 @@ const colorFieldSource = scriptRead('src/renderer/ui/ColorField.tsx');
 const colorFieldCss = scriptRead('src/renderer/ui/ColorField.css');
 assert(colorFieldSource.includes("layout?: 'grid' | 'inline'"), 'ColorField must support grid and inline layouts');
 assert(colorFieldCss.includes('.color-field-swatch'), 'ColorField must expose a round swatch');
-assert(colorFieldCss.includes('.color-field-native'), 'ColorField must hide the native color input');
+assert(!colorFieldCss.includes('.color-field-native'), 'ColorField must not fall back to the native OS color input');
+assert(colorFieldSource.includes('ColorPickerSurface'), 'ColorField must open the self-drawn picker surface');
+assert(colorFieldSource.includes("from './Popover'"), 'ColorField picker must be anchored by the shared Popover');
+assert(scriptExists('src/renderer/ui/ColorPickerSurface.tsx'), 'self-drawn color picker surface must exist');
+const colorPickerSource = scriptRead('src/renderer/ui/ColorPickerSurface.tsx');
+assert(colorPickerSource.includes("role=\"slider\""), 'Color picker plane and hue rail must expose slider semantics');
+assert(colorPickerSource.includes('onKeyDown={onAreaKeyDown}'), 'Color picker plane must be keyboard reachable');
+assert(colorPickerSource.includes('onKeyDown={onHueKeyDown}'), 'Color picker hue rail must be keyboard reachable');
 assert(colorFieldCss.includes('.color-field--inline'), 'ColorField must define inline layout for Agents look strip');
 assert(!colorFieldCss.includes('--color-bg-'), 'ColorField CSS must use semantic tokens, not primitive --color-bg-*');
 assert(

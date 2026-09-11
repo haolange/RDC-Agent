@@ -1,22 +1,16 @@
 import { useMemo, useState } from 'react';
-import type {
-  AppTheme,
-  ThemeChromeConfig,
-  ThemePresetId,
-  ThemeVariant,
-} from '@shared/types/settings';
+import type { ThemeChromeConfig, ThemePresetId, ThemeVariant } from '@shared/types/settings';
 import { THEME_PRESET_CATALOG, getPresetChrome } from '@shared/theme/presets';
-import { parseRdxThemeV1, serializeRdxThemeV1 } from '@shared/theme/rdxThemeV1';
-import type { useI18n } from '../../../../i18n';
-import { cn } from '../../../../lib/cn';
+import { serializeRdxThemeV1 } from '@shared/theme/rdxThemeV1';
 import { useDynStyle } from '../../../../lib/useDynStyle';
+import { Button } from '../../../../ui/Button';
 import { ColorField } from '../../../../ui/ColorField';
 import { DropdownSelect } from '../../../../ui/DropdownSelect';
+import { AppearanceFontField } from './AppearanceFontField';
+import { ThemeImportDialog } from './ThemeImportDialog';
+import type { AppearanceTranslate } from './appearanceChromeModel';
 
-export type AppearanceTranslate = ReturnType<typeof useI18n>['t'];
-
-const RDC_LIGHT = getPresetChrome('rdc', 'light');
-const RDC_DARK = getPresetChrome('rdc', 'dark');
+export type { AppearanceTranslate };
 
 function useChromeVars(chrome: ThemeChromeConfig) {
   return useDynStyle({
@@ -24,46 +18,6 @@ function useChromeVars(chrome: ThemeChromeConfig) {
     '--ap-ink': chrome.ink,
     '--ap-accent': chrome.accent,
   });
-}
-
-function MiniWindow(props: { chrome: ThemeChromeConfig; className?: string }) {
-  const chromeStyle = useChromeVars(props.chrome);
-  return (
-    <span className={`appearance-mini-win ${props.className ?? ''}`} {...chromeStyle} aria-hidden="true">
-      <span className="appearance-mini-title" />
-      <span className="appearance-mini-body">
-        <span className="appearance-mini-side" />
-        <span className="appearance-mini-main" />
-      </span>
-    </span>
-  );
-}
-
-export function ThemeModeTile(props: {
-  mode: AppTheme;
-  active: boolean;
-  label: string;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={cn('appearance-mode-tile', props.active && 'is-active')}
-      data-testid={`appearance-theme-${props.mode}`}
-      onClick={props.onSelect}
-      aria-pressed={props.active}
-    >
-      {props.mode === 'system' ? (
-        <span className="appearance-mode-preview appearance-mode-preview--system" aria-hidden="true">
-          <MiniWindow chrome={RDC_LIGHT} />
-          <MiniWindow chrome={RDC_DARK} />
-        </span>
-      ) : (
-        <MiniWindow chrome={props.mode === 'light' ? RDC_LIGHT : RDC_DARK} className="appearance-mode-preview" />
-      )}
-      <span className="appearance-mode-label">{props.label}</span>
-    </button>
-  );
 }
 
 export function AppearanceChromePreview(props: {
@@ -77,17 +31,17 @@ export function AppearanceChromePreview(props: {
       className="appearance-preview-pane"
       {...chromeStyle}
       data-testid={`appearance-preview-${props.variant}`}
+      aria-hidden="true"
     >
-      <div className="appearance-preview-side" aria-hidden="true">
+      <div className="appearance-preview-side">
         <span className="appearance-preview-nav appearance-preview-nav--accent" />
         <span className="appearance-preview-nav" />
         <span className="appearance-preview-nav" />
       </div>
       <div className="appearance-preview-main">
-        <div className="appearance-preview-title">{props.label}</div>
-        <div className="appearance-preview-line appearance-preview-line--wide" aria-hidden="true" />
-        <div className="appearance-preview-line appearance-preview-line--mid" aria-hidden="true" />
-        <div className="appearance-preview-cta" aria-hidden="true">Accent</div>
+        <div className="appearance-preview-line appearance-preview-line--wide" />
+        <div className="appearance-preview-line appearance-preview-line--mid" />
+        <div className="appearance-preview-cta" />
       </div>
     </div>
   );
@@ -100,8 +54,6 @@ export function ChromeThemeCard(props: {
   onChange: (chrome: Partial<ThemeChromeConfig>) => void;
 }) {
   const [importOpen, setImportOpen] = useState(false);
-  const [importText, setImportText] = useState('');
-  const [importError, setImportError] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   const presetOptions = useMemo(
@@ -118,11 +70,7 @@ export function ChromeThemeCard(props: {
   );
 
   const handlePreset = (presetId: ThemePresetId) => {
-    const next = getPresetChrome(presetId, props.variant);
-    props.onChange({
-      ...next,
-      fonts: props.chrome.fonts,
-    });
+    props.onChange({ ...getPresetChrome(presetId, props.variant), fonts: props.chrome.fonts });
   };
 
   const handleCopy = async () => {
@@ -136,119 +84,85 @@ export function ChromeThemeCard(props: {
     }
   };
 
-  const handleImport = () => {
-    const result = parseRdxThemeV1(importText, props.variant);
-    if (!result.ok) {
-      setImportError(result.error);
-      return;
-    }
-    props.onChange(result.chrome);
-    setImportError(null);
-    setImportOpen(false);
-    setImportText('');
-  };
+  const title = props.variant === 'light'
+    ? props.t('settings.appearanceLightTheme')
+    : props.t('settings.appearanceDarkTheme');
 
   return (
     <div className="appearance-chrome-card" data-testid={`appearance-chrome-${props.variant}`}>
       <div className="appearance-chrome-header">
-        <div className="settings-section-title">
-          {props.variant === 'light' ? props.t('settings.appearanceLightTheme') : props.t('settings.appearanceDarkTheme')}
-        </div>
+        <div className="settings-section-title">{title}</div>
         <div className="appearance-chrome-actions">
-          <button type="button" className="button button-ghost button-sm" onClick={() => setImportOpen((v) => !v)}>
+          <Button variant="ghost" size="sm" onClick={() => setImportOpen(true)}>
             {props.t('settings.appearanceImport')}
-          </button>
-          <button type="button" className="button button-ghost button-sm" onClick={() => void handleCopy()}>
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => void handleCopy()}>
             {copyState === 'copied'
               ? props.t('settings.appearanceCopied')
               : copyState === 'failed'
                 ? props.t('settings.appearanceCopyFailed')
                 : props.t('settings.appearanceCopyTheme')}
-          </button>
-          <div className="appearance-preset-picker">
-            <DropdownSelect
-              value={props.chrome.presetId}
-              options={presetOptions}
-              onChange={(value) => handlePreset(value as ThemePresetId)}
-              dataTestId={`appearance-preset-${props.variant}`}
-              ariaLabel={props.t('settings.appearancePreset')}
-              variant="inline"
-              menuAlign="end"
-              minMenuWidth={280}
-              className="appearance-preset-dropdown"
-              triggerClassName="appearance-preset-trigger"
-              menuClassName="settings-select-menu appearance-preset-menu"
-            />
-          </div>
+          </Button>
         </div>
       </div>
 
-      {importOpen && (
-        <div className="appearance-import-panel">
-          <textarea
-            className="appearance-import-input input"
-            data-testid={`appearance-import-${props.variant}`}
-            value={importText}
-            placeholder="rdx-theme-v1:{...}"
-            onChange={(event) => setImportText(event.target.value)}
-            rows={3}
-          />
-          {importError && <div className="appearance-import-error" role="alert">{importError}</div>}
-          <div className="appearance-import-actions">
-            <button type="button" className="button button-secondary button-sm" onClick={handleImport}>
-              {props.t('settings.appearanceApplyImport')}
-            </button>
-          </div>
-        </div>
-      )}
+      <AppearanceChromePreview chrome={props.chrome} variant={props.variant} label={title} />
 
       <div className="appearance-chrome-fields">
+        <div className="appearance-preset-picker">
+          <span className="settings-field-label">{props.t('settings.appearancePreset')}</span>
+          <DropdownSelect
+            value={props.chrome.presetId}
+            options={presetOptions}
+            onChange={(value) => handlePreset(value as ThemePresetId)}
+            dataTestId={`appearance-preset-${props.variant}`}
+            ariaLabel={props.t('settings.appearancePreset')}
+            variant="inline"
+            menuAlign="end"
+            minMenuWidth={280}
+            className="appearance-preset-dropdown"
+            triggerClassName="appearance-preset-trigger"
+            menuClassName="settings-select-menu appearance-preset-menu"
+          />
+        </div>
         <ColorField
           label={props.t('settings.appearanceAccent')}
+          areaLabel={props.t('settings.colorPickerArea')}
+          hueLabel={props.t('settings.colorPickerHue')}
           value={props.chrome.accent}
           testId={`appearance-accent-${props.variant}`}
           onChange={(accent) => props.onChange({ accent, presetId: props.chrome.presetId })}
         />
         <ColorField
           label={props.t('settings.appearanceBackground')}
+          areaLabel={props.t('settings.colorPickerArea')}
+          hueLabel={props.t('settings.colorPickerHue')}
           value={props.chrome.surface}
           testId={`appearance-surface-${props.variant}`}
           onChange={(surface) => props.onChange({ surface })}
         />
         <ColorField
           label={props.t('settings.appearanceForeground')}
+          areaLabel={props.t('settings.colorPickerArea')}
+          hueLabel={props.t('settings.colorPickerHue')}
           value={props.chrome.ink}
           testId={`appearance-ink-${props.variant}`}
           onChange={(ink) => props.onChange({ ink })}
         />
-        <label className="appearance-text-field">
-          <span className="settings-field-label">{props.t('settings.appearanceUiFont')}</span>
-          <input
-            type="text"
-            className="input"
-            value={props.chrome.fonts.ui ?? ''}
-            placeholder="System default"
-            data-testid={`appearance-ui-font-${props.variant}`}
-            onChange={(event) => {
-              const value = event.target.value.trim();
-              props.onChange({ fonts: { ...props.chrome.fonts, ui: value || null } });
-            }}
-          />
-        </label>
-        <label className="appearance-text-field">
-          <span className="settings-field-label">{props.t('settings.appearanceCodeFont')}</span>
-          <input
-            type="text"
-            className="input"
-            value={props.chrome.fonts.code ?? ''}
-            placeholder="System default"
-            data-testid={`appearance-code-font-${props.variant}`}
-            onChange={(event) => {
-              const value = event.target.value.trim();
-              props.onChange({ fonts: { ...props.chrome.fonts, code: value || null } });
-            }}
-          />
-        </label>
+        <AppearanceFontField
+          kind="ui"
+          variant={props.variant}
+          value={props.chrome.fonts.ui}
+          onChange={(ui) => props.onChange({ fonts: { ...props.chrome.fonts, ui } })}
+          t={props.t}
+        />
+        <AppearanceFontField
+          kind="code"
+          variant={props.variant}
+          value={props.chrome.fonts.code}
+          onChange={(code) => props.onChange({ fonts: { ...props.chrome.fonts, code } })}
+          t={props.t}
+        />
         <label className="appearance-contrast-field">
           <span className="settings-field-label">
             {props.t('settings.appearanceContrast')}
@@ -264,6 +178,14 @@ export function ChromeThemeCard(props: {
           />
         </label>
       </div>
+
+      <ThemeImportDialog
+        open={importOpen}
+        variant={props.variant}
+        onApply={(chrome) => props.onChange(chrome)}
+        onClose={() => setImportOpen(false)}
+        t={props.t}
+      />
     </div>
   );
 }

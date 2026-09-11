@@ -3,6 +3,10 @@ import type { KnowledgeIndexOverview, KnowledgeQueryRequest, KnowledgeSpace } fr
 import { COLD_DATA_MAX_BYTES } from '../knowledge/coldDataIngest';
 import { knowledgeCandidateService } from '../knowledge/KnowledgeCandidateService';
 import { knowledgeCompileService } from '../knowledge/KnowledgeCompileService';
+import {
+  createDefaultExportDependencies,
+  KnowledgeExportService,
+} from '../knowledge/KnowledgeExportService';
 import { knowledgeIndexService } from '../knowledge/KnowledgeIndexService';
 import { knowledgeQueryService } from '../knowledge/KnowledgeQueryService';
 import { knowledgeWriteService } from '../knowledge/KnowledgeWriteService';
@@ -21,8 +25,14 @@ import {
   KnowledgeOverviewArgsSchema,
   KnowledgePromoteArgsSchema,
   KnowledgeQueryArgsSchema,
+  KnowledgeExportArgsSchema,
   KnowledgeWriteArgsSchema,
 } from './validation/knowledgeSchemas';
+
+const knowledgeExportService = new KnowledgeExportService(createDefaultExportDependencies({
+  getCard: (spaceId, relativePath) => knowledgeQueryService.getCard(spaceId, relativePath),
+  listCards: (spaceId) => knowledgeQueryService.listCards(spaceId),
+}));
 
 function assertKnownSpaces(spaceIds: string[] | undefined): void {
   if (!spaceIds?.length) return;
@@ -323,6 +333,22 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
       return {
         card: await knowledgeWriteService.write(input),
       };
+    } catch (error) {
+      rethrowKnowledgeError(error);
+    }
+  });
+
+  ipcMain.handle('knowledge:export', async (_event, ...rawArgs: unknown[]) => {
+    const [input] = parseIpcArgs(KnowledgeExportArgsSchema, rawArgs, {
+      label: 'knowledge:export',
+      maxBytes: 256 * 1024,
+    });
+    try {
+      const spaceIds = input.scope === 'space'
+        ? [input.spaceId].filter((value): value is string => Boolean(value))
+        : (input.cardRefs ?? []).map((ref) => ref.spaceId);
+      assertKnownSpaces([...new Set(spaceIds)]);
+      return await knowledgeExportService.export(input);
     } catch (error) {
       rethrowKnowledgeError(error);
     }

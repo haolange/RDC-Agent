@@ -14,6 +14,7 @@ import {
 import { createPortal } from 'react-dom';
 import { cn } from '../lib/cn';
 import { useDynStyle } from '../lib/useDynStyle';
+import { isTopOverlayLayer, useOverlayLayer } from '../lib/overlayStack';
 import './Popover.css';
 
 const VIEWPORT_MARGIN = 8;
@@ -51,6 +52,9 @@ export function Popover({
 }: PopoverProps) {
   const triggerRef = useRef<HTMLElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  // An open popover is the topmost dismissible layer, so Escape closes only it
+  // and leaves the modal it was launched from open.
+  const { layerId } = useOverlayLayer(open);
   const [coords, setCoords] = useState({ left: VIEWPORT_MARGIN, top: VIEWPORT_MARGIN, ready: false });
   const positionStyle = useDynStyle({
     left: `${coords.left}px`,
@@ -93,22 +97,25 @@ export function Popover({
     };
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      if (!isTopOverlayLayer(layerId)) return;
       event.preventDefault();
+      event.stopPropagation();
       onOpenChange(false);
       triggerRef.current?.focus();
     };
     const onReposition = () => updatePosition();
     window.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
+    // Capture phase so the popover wins the key before any modal below it.
+    window.addEventListener('keydown', onKeyDown, true);
     window.addEventListener('resize', onReposition);
     window.addEventListener('scroll', onReposition, true);
     return () => {
       window.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('resize', onReposition);
       window.removeEventListener('scroll', onReposition, true);
     };
-  }, [open, onOpenChange, updatePosition]);
+  }, [open, layerId, onOpenChange, updatePosition]);
 
   const triggerNode = cloneElement(trigger, {
     ref: (node: HTMLElement | null) => {

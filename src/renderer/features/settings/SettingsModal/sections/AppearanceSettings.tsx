@@ -8,15 +8,10 @@ import type {
   ThemeVariant,
 } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
-import { Pill } from '../../../../ui/Pill';
 import { Switch } from '../../../../ui/Switch';
+import { Tabs } from '../../../../ui/Tabs';
 import { SettingsField, SettingsSection } from '../parts';
-import {
-  AppearanceChromePreview,
-  ChromeThemeCard,
-  ThemeModeTile,
-} from './AppearanceChromeParts';
-import './AppearanceSettings.css';
+import { ChromeThemeCard } from './AppearanceChromeParts';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -46,22 +41,17 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
 
   return (
     <section className="settings-page settings-page-appearance" data-testid="settings-appearance-page" data-settings-search="appearance">
-      <div className="appearance-mode-grid" role="group" aria-label={t('userMenu.theme')}>
-        {(['system', 'light', 'dark'] as AppTheme[]).map((mode) => (
-          <ThemeModeTile
-            key={mode}
-            mode={mode}
-            active={settings.appearance.theme === mode}
-            label={t(`theme.${mode}`)}
-            onSelect={() => void onThemeChange(mode)}
-          />
-        ))}
-      </div>
-
-      <div className="appearance-live-preview" aria-hidden="true">
-        <AppearanceChromePreview chrome={light} variant="light" label={t('theme.light')} />
-        <AppearanceChromePreview chrome={dark} variant="dark" label={t('theme.dark')} />
-      </div>
+      <Tabs
+        className="appearance-mode-tabs"
+        variant="segmented"
+        label={t('userMenu.theme')}
+        value={settings.appearance.theme}
+        onChange={(mode) => void onThemeChange(mode as AppTheme)}
+        tabs={(['system', 'light', 'dark'] as AppTheme[]).map((mode) => ({
+          id: mode,
+          label: t(`theme.${mode}`),
+        }))}
+      />
 
       <div className="appearance-theme-editors">
         <ChromeThemeCard
@@ -97,32 +87,29 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
             label={t('settings.appearanceReduceMotion')}
             description={t('settings.appearanceReduceMotionHelp')}
           >
-            <div className="settings-choice-group">
-              {(['system', 'on', 'off'] as ReduceMotionPreference[]).map((value) => (
-                <Pill
-                  key={value}
-                  selected={settings.appearance.reduceMotion === value}
-                  data-testid={`appearance-reduce-motion-${value}`}
-                  onClick={() => void onReduceMotionChange(value)}
-                >
-                  {t(`settings.appearanceReduceMotion.${value}`)}
-                </Pill>
-              ))}
-            </div>
+            <Tabs
+              variant="segmented"
+              label={t('settings.appearanceReduceMotion')}
+              value={settings.appearance.reduceMotion}
+              onChange={(value) => void onReduceMotionChange(value as ReduceMotionPreference)}
+              tabs={(['system', 'on', 'off'] as ReduceMotionPreference[]).map((value) => ({
+                id: value,
+                label: t(`settings.appearanceReduceMotion.${value}`),
+              }))}
+            />
           </SettingsField>
 
           <SettingsField layout="row" label={t('userMenu.fontScale')} search="font-scale">
-            <div className="settings-choice-group">
-              {(['small', 'medium', 'large'] as FontScale[]).map((fontScale) => (
-                <Pill
-                  key={fontScale}
-                  selected={settings.appearance.fontScale === fontScale}
-                  onClick={() => void onFontScaleChange(fontScale)}
-                >
-                  {t(`font.${fontScale}`)}
-                </Pill>
-              ))}
-            </div>
+            <Tabs
+              variant="segmented"
+              label={t('userMenu.fontScale')}
+              value={settings.appearance.fontScale}
+              onChange={(value) => void onFontScaleChange(value as FontScale)}
+              tabs={(['small', 'medium', 'large'] as FontScale[]).map((fontScale) => ({
+                id: fontScale,
+                label: t(`font.${fontScale}`),
+              }))}
+            />
           </SettingsField>
 
           <SettingsField

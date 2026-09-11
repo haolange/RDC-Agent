@@ -8,6 +8,8 @@ export interface TabItem {
   disabled?: boolean;
 }
 
+export type TabsVariant = 'underline' | 'segmented';
+
 export interface TabsProps {
   tabs: TabItem[];
   value: string;
@@ -15,6 +17,8 @@ export interface TabsProps {
   children?: ReactNode;
   className?: string;
   label?: string;
+  /** `segmented` renders a compact single-select control instead of page tabs. */
+  variant?: TabsVariant;
 }
 
 export function Tabs({
@@ -24,6 +28,7 @@ export function Tabs({
   children,
   className,
   label,
+  variant = 'underline',
 }: TabsProps) {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -74,7 +79,7 @@ export function Tabs({
   };
 
   return (
-    <div className={cn('ui-tabs', className)}>
+    <div className={cn('ui-tabs', variant === 'segmented' && 'is-segmented', className)}>
       <div className="ui-tabs-list" role="tablist" aria-label={label}>
         {tabs.map((tab, index) => {
           const selected = tab.id === value;

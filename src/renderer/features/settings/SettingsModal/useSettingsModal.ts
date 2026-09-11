@@ -105,7 +105,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const sections: Array<{ id: typeof modalState.activeSection; label: string }> = useMemo(() => [
     { id: 'general', label: t('settings.general') },
     { id: 'appearance', label: t('settings.appearance') },
-    { id: 'workspace', label: t('settings.workspace') },
     { id: 'models', label: t('settings.models') },
     { id: 'agents', label: t('settings.agentManifestTitle') },
     { id: 'skills', label: t('settings.skills') },

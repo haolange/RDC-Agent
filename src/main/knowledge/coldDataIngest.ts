@@ -8,6 +8,7 @@ import {
   type KnowledgeCaseChapters,
   type KnowledgeScope,
 } from '@shared/types/knowledge';
+import { KNOWLEDGE_PACKAGE_SCHEMA } from '@shared/types/knowledgeExport';
 
 export type { ColdDataIngestResult, ColdDataIngestStatus } from '@shared/types/knowledge';
 
@@ -20,6 +21,11 @@ const POSIX_ABS_RE = /(?:^|[\s"'`([{,:=])\/[A-Za-z0-9._-]+/;
 
 export function containsAbsolutePath(text: string): boolean {
   return DRIVE_ABS_RE.test(text) || UNC_ABS_RE.test(text) || POSIX_ABS_RE.test(text);
+}
+
+/** Single secret matcher shared by import and export, so both refuse the same content. */
+export function hasKnowledgeSecret(text: string): boolean {
+  return SECRET_RE.test(text);
 }
 
 function leakedSensitiveReason(...texts: Array<string | undefined>): 'secret-detected' | 'absolute-path' | null {
@@ -221,6 +227,67 @@ function buildBody(title: string, chapters: KnowledgeCaseChapters): string {
   return parts.join('\n\n');
 }
 
+/**
+ * Knowledge packages produced by export come back in as ordinary session
+ * drafts. The package `lifecycle` is metadata only: nothing re-enters as
+ * verified, and a duplicate cardId takes the same conflict path as ColdData.
+ */
+export function ingestKnowledgePackage(doc: Record<string, unknown>, options: {
+  spaceId?: string;
+  existingCardIds?: Iterable<string>;
+}): ColdDataIngestResult {
+  const none: ColdDataIngestResult = {
+    status: 'quarantine',
+    candidateCreated: false,
+    lifecycle: null,
+    verified: false,
+    missingAssets: [],
+  };
+  const cards = Array.isArray(doc.cards) ? doc.cards : [];
+  const first = asRecord(cards[0]);
+  const title = readString(first.title);
+  const relativePath = readString(first.relativePath);
+  if (!title || !relativePath) return { ...none, reason: 'yaml-broken' };
+
+  const spaceId = options.spaceId || 'staging';
+  const cardId = `${spaceId}:${relativePath}`;
+  if (options.existingCardIds && new Set(options.existingCardIds).has(cardId)) {
+    return {
+      status: 'conflict',
+      candidateCreated: false,
+      lifecycle: 'draft',
+      verified: false,
+      missingAssets: [],
+      reason: 'duplicate-case-id',
+    };
+  }
+
+  const record: KnowledgeCardRecord = {
+    cardId,
+    spaceId,
+    relativePath,
+    type: (readString(first.type) as KnowledgeCardRecord['type']) ?? 'fact',
+    lifecycle: 'draft',
+    title,
+    scope: asRecord(first.scope) as KnowledgeScope,
+    relations: [],
+    body: readString(first.body) ?? '',
+    preview: title,
+    ...(readString(first.sourceStatus) ? { sourceStatus: readString(first.sourceStatus) } : {}),
+    ...(readString(first.caseId) ? { caseId: readString(first.caseId) } : {}),
+    ...(first.chapters ? { chapters: asRecord(first.chapters) as KnowledgeCaseChapters } : {}),
+  };
+
+  return {
+    status: 'draft',
+    candidateCreated: false,
+    lifecycle: 'draft',
+    verified: false,
+    record,
+    missingAssets: [],
+  };
+}
+
 export function ingestColdData(source: string, options: {
   spaceId?: string;
   sessionId?: string;
@@ -249,6 +316,12 @@ export function ingestColdData(source: string, options: {
   const doc = asRecord(parsed);
   if (Object.keys(doc).length === 0) {
     return { ...none, reason: 'yaml-broken' };
+  }
+  if (readString(doc.schema) === KNOWLEDGE_PACKAGE_SCHEMA) {
+    return ingestKnowledgePackage(doc, {
+      ...(options.spaceId ? { spaceId: options.spaceId } : {}),
+      ...(options.existingCaseIds ? { existingCardIds: options.existingCaseIds } : {}),
+    });
   }
   const caseId = readString(doc.case_id) || readString(doc.caseId);
   const title = readString(doc.title);

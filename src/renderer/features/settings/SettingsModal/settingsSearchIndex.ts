@@ -53,18 +53,11 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     target: 'appearance',
   },
   {
-    id: 'workspace',
-    section: 'workspace',
-    titleKey: 'settings.workspace',
-    keywords: ['workspace', 'paths', '工作区', '路径'],
-    target: 'workspace',
-  },
-  {
-    id: 'runtime-root',
-    section: 'workspace',
-    titleKey: 'settings.workspaceRuntimeRoot',
-    keywords: ['rdx', 'runtime', 'root', '运行时', '根目录'],
-    target: 'runtime-root',
+    id: 'resource-diagnostics',
+    section: 'general',
+    titleKey: 'settings.resourceDiagnosticsTitle',
+    keywords: ['workspace', 'paths', 'rdx', 'runtime', 'root', 'diagnostics', '工作区', '路径', '资源', '诊断', '根目录'],
+    target: 'resource-diagnostics',
   },
   {
     id: 'models',

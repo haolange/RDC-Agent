@@ -89,6 +89,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   const [pendingDelete, setPendingDelete] = useState<AgentManifestDraft | null>(null);
   const selectedAgent = activeDrafts.find((agent) => agent.id === selectedAgentId) ?? activeDrafts[0] ?? null;
   const selectedId = selectedAgent?.id ?? '';
+  const diagnostics = settings.agents.diagnostics ?? [];
 
   const updateAgent = (patch: Partial<AgentManifestDraft>) => {
     if (!selectedAgent) return;
@@ -140,27 +141,31 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
         <div className="settings-manifest-layout">
           <div className="settings-manifest-list-column">
             <div className="settings-manifest-toolbar settings-manifest-list-toolbar">
+              <span className="settings-manifest-count">
+                {t('settings.agentListCount', { count: activeDrafts.length })}
+              </span>
               <div className="settings-manifest-actions">
-                <Button variant="secondary" onClick={() => void onImportAgentManifest()}>
+                <Button variant="secondary" size="sm" onClick={() => void onImportAgentManifest()}>
                   {t('settings.importAgentManifest')}
                 </Button>
-                <Button variant="secondary" onClick={addAgent}>
+                <Button variant="primary" size="sm" onClick={addAgent}>
                   {t('settings.newAgent')}
                 </Button>
               </div>
             </div>
 
-            {(settings.agents.diagnostics ?? []).length > 0 ? (
-              <div
+            {diagnostics.length > 0 ? (
+              <details
                 className="settings-agent-tool-diagnostics"
                 data-testid="settings-agent-manifest-diagnostics"
               >
+                <summary className="settings-agent-tool-diagnostics-summary">
+                  {t('settings.agentDiagnosticsCount', { count: diagnostics.length })}
+                </summary>
                 <ul className="settings-agent-tool-diagnostics-list">
-                  {(settings.agents.diagnostics ?? []).map((entry) => (
-                    <li key={entry}>{entry}</li>
-                  ))}
+                  {diagnostics.map((entry) => <li key={entry}>{entry}</li>)}
                 </ul>
-              </div>
+              </details>
             ) : null}
 
             <div className="settings-manifest-list" aria-label={t('settings.agentManifestTitle')}>
@@ -204,6 +209,10 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           <ConfirmationDialog
             title={t('settings.deleteAgentTitle')}
             message={t('settings.deleteAgentConfirm', { name: pendingDelete.name || pendingDelete.id })}
+            details={[
+              { label: t('settings.agentName'), value: pendingDelete.name || pendingDelete.id },
+              { label: t('settings.resourceFieldId'), value: pendingDelete.id },
+            ]}
             confirmLabel={t('dialog.delete')}
             cancelLabel={t('dialog.cancel')}
             onCancel={() => setPendingDelete(null)}
