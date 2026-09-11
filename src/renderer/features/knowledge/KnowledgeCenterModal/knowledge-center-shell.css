@@ -65,17 +65,35 @@
   border-right: 1px solid var(--token-border-muted);
 }
 
+/* Title bar owns the two global knowledge actions. */
+.knowledge-center-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--token-border-muted);
+  background: var(--token-bg-shell);
+}
+
+.knowledge-center-topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .knowledge-center-brand {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   min-width: 0;
   min-height: var(--control-height-md);
-  padding-inline: var(--space-3);
   color: var(--token-text-heading);
 }
 
 .knowledge-center-brand-title {
+  margin: 0;
   color: var(--token-text-heading);
   font-size: var(--text-lg);
   font-weight: var(--font-semibold);

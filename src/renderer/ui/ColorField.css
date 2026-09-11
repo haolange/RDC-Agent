@@ -60,12 +60,9 @@
     inset 0 0 0 1px rgb(0 0 0 / 0.18);
 }
 
-.color-field-native {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
+.color-field-popover {
+  width: 15rem;
+  padding: var(--space-3);
 }
 
 .color-field-hex {

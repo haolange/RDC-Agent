@@ -45,6 +45,7 @@ export function createRendererApi(platform: NodeJS.Platform, transport: Renderer
     selectFiles: dialog.selectFiles,
     selectRdcFiles: dialog.selectRdcFiles,
     selectDirectory: dialog.selectDirectory,
+    saveFile: dialog.saveFile,
     workflow: createWorkflowApi(transport),
     trace: createTraceApi(transport),
     agent: createAgentApi(transport),

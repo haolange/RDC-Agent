@@ -27,6 +27,14 @@ export const RunIdArgsSchema = z.tuple([
   ipcId(128, 'runId'),
 ]);
 
+/** Native save dialog: renderer proposes a file name, main owns the real path. */
+export const SaveFileArgsSchema = z.tuple([
+  z.object({
+    defaultFileName: ipcNonEmptyString(256, 'defaultFileName'),
+    extension: z.string().trim().regex(/^[a-z0-9]{1,12}$/, 'extension must be a short lowercase suffix'),
+  }).strict(),
+]);
+
 export const FilePathSchema = ipcNonEmptyString(4096, 'path');
 export const OptionalFilePathSchema = ipcString(4096, 'path');
 export const FilePathArraySchema = z

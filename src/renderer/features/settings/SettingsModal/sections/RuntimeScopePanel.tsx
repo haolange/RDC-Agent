@@ -1,24 +1,19 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import { cn } from '../../../../lib/cn';
-import type { RdxRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdxRuntime';
+import type { RdxRuntimeOverview, ScopedResourceKind } from '@shared/types/rdxRuntime';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { ListRow } from '../../../../ui/ListRow';
-import { SettingsScopeBar } from '../parts';
+import { TaskDialog } from '../../../../ui/TaskDialog';
+import { UnsavedChangesDialog } from '../../../../ui/UnsavedChangesDialog';
+import { ResourceListDetail, SettingsScopeBar } from '../parts';
 import { ScopedResourceEditor } from './ScopedResourceEditor';
-import { uniqueResourceId } from './uniqueResourceId';
-import { contentFromForm, emptyForm, formFromContent, resourceCardMeta, type ResourceFormState } from './scopedResourceForm';
-import { selectFiles } from '../../../../hooks/appShellBridge';
-import {
-  deleteScopedResource,
-  importScopedResource,
-  upsertScopedResource,
-  validateScopedResource,
-} from './runtimeScopeActions';
+import { resourceCardMeta } from './scopedResourceForm';
+import { useRuntimeScopePanel } from './useRuntimeScopePanel';
+import { revealResourceLocation } from './runtimeScopeActions';
 
-const templateId = (kind: ScopedResourceKind): string => `new-${kind}`;
 const kindLabelKey = (kind: ScopedResourceKind): TranslationKey => `settings.kind.${kind}` as TranslationKey;
 
 export const RuntimeScopePanel: React.FC<{
@@ -28,237 +23,177 @@ export const RuntimeScopePanel: React.FC<{
   kinds: ScopedResourceKind[];
   onChanged?: (overview: RdxRuntimeOverview) => void;
   showResourceStrip?: boolean;
-}> = ({ overview, scope, onScopeChange, kinds, onChanged, showResourceStrip = true }) => {
+  /** `dialog` opens the editor as a task sub-dialog (MCP / Hook / Policy). */
+  editorPresentation?: 'inline' | 'dialog';
+}> = ({
+  overview,
+  scope,
+  onScopeChange,
+  kinds,
+  onChanged,
+  showResourceStrip = true,
+  editorPresentation = 'inline',
+}) => {
   const { t } = useI18n();
   const kind = kinds[0];
   const kindLabel = t(kindLabelKey(kind));
-  const resources = useMemo(
-    () => overview?.resources.filter((entry) => entry.scope === scope && kinds.includes(entry.kind)) ?? [],
-    [overview, scope, kinds],
-  );
   const canProject = Boolean(overview?.projectRoot);
   const addDisabled = scope === 'project' && !canProject;
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<ResourceFormState>(() => emptyForm(kind, templateId(kind)));
-  const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<ScopedResourceDocument | null>(null);
+  const panel = useRuntimeScopePanel({ overview, scope, kind, kinds, onChanged });
 
-  useEffect(() => {
-    setSelectedId(null);
-    setCreating(false);
-    setForm(emptyForm(kind, templateId(kind)));
-    setMessage('');
-  }, [scope, kind]);
+  const locationPath = scope === 'project'
+    ? overview?.projectPaths?.[`${kind}sPath`] ?? overview?.projectRoot
+    : overview?.userPaths?.[`${kind}sPath`] ?? overview?.userRoot;
 
-  const selected = resources.find((entry) => entry.id === selectedId) ?? null;
-  const editing = creating || Boolean(selected);
+  const editor = (
+    <ScopedResourceEditor
+      kind={kind}
+      form={panel.form}
+      idLocked={Boolean(panel.selected?.sourcePath) && !panel.creating}
+      busy={panel.busy}
+      dirty={panel.dirty}
+      showHeader={editorPresentation === 'inline'}
+      onChange={panel.patchForm}
+      onSave={() => void panel.save()}
+      onDelete={panel.selected && !panel.creating ? () => panel.setPendingDelete(panel.selected) : undefined}
+      onCancel={panel.closeEditor}
+    />
+  );
 
-  const openResource = (resource: ScopedResourceDocument) => {
-    setCreating(false);
-    setSelectedId(resource.id);
-    setForm(formFromContent(resource.kind, resource.id, resource.content));
-    setMessage('');
-  };
-
-  const startNew = () => {
-    const nextId = uniqueResourceId(templateId(kind), resources.map((resource) => resource.id));
-    setCreating(true);
-    setSelectedId(null);
-    setForm(emptyForm(kind, nextId));
-    setMessage('');
-  };
-
-  const patchForm = (patch: Partial<ResourceFormState>) => setForm((current) => ({ ...current, ...patch }));
-
-  const save = async () => {
-    setBusy(true);
-    setMessage('');
-    try {
-      let content: string;
-      try {
-        content = contentFromForm(kind, form);
-      } catch (error) {
-        setMessage(kind === 'mcp' ? t('settings.resourceArgsInvalid') : String(error));
-        return;
-      }
-      if (creating && resources.some((resource) => resource.id === safeIdPreview(form.id))) {
-        setMessage(t('settings.resourceIdExists'));
-        return;
-      }
-      const request = {
-        kind,
-        scope,
-        id: form.id,
-        content,
-        ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
-      };
-      const validation = await validateScopedResource(request);
-      if (!validation?.valid) {
-        setMessage(validation?.diagnostics.join('\n') || t('settings.resourceArgsInvalid'));
-        return;
-      }
-      const next = await upsertScopedResource(request);
-      if (!next) return;
-      onChanged?.(next);
-      setCreating(false);
-      setSelectedId(safeIdPreview(form.id));
-      const saved = next.resources.find((entry) => entry.scope === scope && entry.kind === kind && entry.id === safeIdPreview(form.id));
-      if (saved) setForm(formFromContent(saved.kind, saved.id, saved.content));
-      setMessage(t('settings.scopeSaved'));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const remove = async () => {
-    const target = pendingDelete;
-    if (!target) return;
-    setBusy(true);
-    try {
-      const next = await deleteScopedResource(
-        target.kind,
-        target.scope,
-        target.id,
-        overview?.projectRoot,
-      );
-      if (next) onChanged?.(next);
-      setSelectedId(null);
-      setCreating(false);
-      setForm(emptyForm(kind, templateId(kind)));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
-      setPendingDelete(null);
-    }
-  };
-
-  const importResource = async () => {
-    setBusy(true);
-    setMessage('');
-    try {
-      const paths = await selectFiles();
-      const filePath = paths?.[0];
-      if (!filePath) return;
-      const result = await importScopedResource({
-        kind,
-        scope,
-        filePath,
-        ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
-      });
-      if (!result) return;
-      onChanged?.(result.overview);
-      const imported = result.overview.resources.find((entry) => entry.scope === scope && entry.kind === kind && entry.id === result.id);
-      if (imported) openResource(imported);
-      setMessage(t('settings.scopeImported'));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const cancelEdit = () => {
-    setCreating(false);
-    if (selected) setForm(formFromContent(selected.kind, selected.id, selected.content));
-    else {
-      setSelectedId(null);
-      setForm(emptyForm(kind, templateId(kind)));
-    }
-    setMessage('');
-  };
+  const actions = (
+    <div className="settings-resource-toolbar-actions">
+      <Button variant="secondary" disabled={addDisabled || panel.busy} onClick={() => void panel.importResource()}>
+        {t('settings.scopeImport')}
+      </Button>
+      <Button variant="primary" disabled={addDisabled || panel.busy} onClick={panel.startNew}>
+        {t('settings.scopeAdd', { kind: kindLabel })}
+      </Button>
+      {locationPath ? (
+        <Button variant="ghost" onClick={() => void revealResourceLocation(locationPath)}>
+          {t('settings.scopeResourceLocation')}
+        </Button>
+      ) : null}
+    </div>
+  );
 
   return (
     <section className="settings-runtime-scope" data-testid="settings-runtime-scope" data-resource-kind={kind}>
-      <div className="settings-runtime-scope-head">
-        <SettingsScopeBar
-          scope={scope}
-          onScopeChange={onScopeChange}
-          canProject={canProject}
-          userLabel={t('settings.scopeUser')}
-          projectLabel={t('settings.scopeProject')}
-          groupLabel={t('settings.resourceScope')}
-        />
-      </div>
-
       {showResourceStrip ? (
-        <div className="settings-runtime-scope-body settings-runtime-scope-body--split">
-          <div className={`settings-manifest-layout settings-runtime-manifest-layout${!editing && resources.length === 0 ? ' is-empty' : ''}`}>
-            <div className="settings-manifest-list-column">
-              <div className="settings-manifest-toolbar settings-manifest-list-toolbar">
-                <div className="settings-manifest-actions">
-                  <Button variant="secondary" disabled={addDisabled || busy} onClick={() => void importResource()}>
-                    {t('settings.scopeImport')}
-                  </Button>
-                  <Button variant="secondary" disabled={addDisabled || busy} onClick={startNew}>
-                    {t('settings.scopeAdd', { kind: kindLabel })}
-                  </Button>
-                </div>
-              </div>
-              <div className="settings-manifest-list" aria-label={t('settings.resourceScope')}>
-                {resources.length ? resources.map((resource) => {
-                  const meta = resourceCardMeta(resource.kind, resource.content);
-                  const selected = !creating && resource.id === selectedId;
-                  return (
-                    <ListRow
-                      key={`${resource.kind}:${resource.id}`}
-                      className={cn('settings-scope-row', `status-${resource.effectiveStatus}`)}
-                      selected={selected}
-                      onClick={() => openResource(resource)}
-                    >
-                      <span className="settings-scope-row-copy">
-                        <strong>{resource.id}</strong>
-                        {meta ? <small>{meta}</small> : null}
-                      </span>
-                    </ListRow>
-                  );
-                }) : (
-                  <EmptyState
-                    className="settings-runtime-list-empty"
-                    title={t('settings.scopeEmpty', { kind: kindLabel })}
-                  />
-                )}
-              </div>
-            </div>
-
-            {editing ? (
-              <ScopedResourceEditor
-                kind={kind}
-                form={form}
-                idLocked={Boolean(selected?.sourcePath) && !creating}
-                busy={busy}
-                onChange={patchForm}
-                onSave={() => void save()}
-                onDelete={selected && !creating ? () => setPendingDelete(selected) : undefined}
-                onCancel={cancelEdit}
+        <ResourceListDetail
+          testId="settings-resource-frame"
+          isEmpty={panel.resources.length === 0 && !panel.editing}
+          emptyTitle={t('settings.scopeEmpty', { kind: kindLabel })}
+          emptyDescription={t('settings.scopeEmptyHint')}
+          status={panel.message || null}
+          toolbar={(
+            <>
+              <SettingsScopeBar
+                scope={scope}
+                onScopeChange={(next) => onScopeChange(next)}
+                canProject={canProject}
+                userLabel={t('settings.scopeUser')}
+                projectLabel={t('settings.scopeProject')}
+                groupLabel={t('settings.resourceScope')}
               />
-            ) : (
-              <div className="settings-runtime-editor-placeholder">
-                <EmptyState title={t('settings.scopeSelectOrCreate', { kind: kindLabel })} />
-              </div>
-            )}
-          </div>
-          {message ? <div className="settings-runtime-result" role="status">{message}</div> : null}
-        </div>
+              {actions}
+            </>
+          )}
+          list={panel.resources.length ? panel.resources.map((resource) => {
+            const meta = resourceCardMeta(resource.kind, resource.content);
+            return (
+              <ListRow
+                key={`${resource.kind}:${resource.id}`}
+                className={cn('settings-scope-row', `status-${resource.effectiveStatus}`)}
+                selected={!panel.creating && resource.id === panel.selectedId}
+                onClick={() => panel.openResource(resource)}
+              >
+                <span className="settings-scope-row-copy">
+                  <strong>{resource.id}</strong>
+                  {meta ? <small>{meta}</small> : null}
+                </span>
+              </ListRow>
+            );
+          }) : (
+            <EmptyState
+              className="settings-runtime-list-empty"
+              title={t('settings.scopeEmpty', { kind: kindLabel })}
+            />
+          )}
+          detail={editorPresentation === 'inline' && panel.editing ? editor : (
+            <div className="settings-runtime-editor-placeholder">
+              <EmptyState title={t('settings.scopeSelectOrCreate', { kind: kindLabel })} />
+            </div>
+          )}
+        />
       ) : null}
-      {pendingDelete ? (
+
+      {editorPresentation === 'dialog' ? (
+        <TaskDialog
+          open={panel.editing}
+          size="md"
+          title={panel.creating
+            ? t('settings.scopeAdd', { kind: kindLabel })
+            : t('settings.scopeEditTitle', { kind: kindLabel })}
+          onClose={panel.closeEditor}
+          closeLabel={t('settings.scopeCancel')}
+          busy={panel.busy}
+          dataTestId="settings-resource-dialog"
+          footer={(
+            <>
+              {panel.dirty ? (
+                <span className="task-dialog-footer-spacer">{t('settings.unsaved')}</span>
+              ) : null}
+              {panel.selected && !panel.creating ? (
+                <Button
+                  variant="danger"
+                  disabled={panel.busy}
+                  onClick={() => panel.setPendingDelete(panel.selected)}
+                >
+                  {t('settings.delete')}
+                </Button>
+              ) : null}
+              <Button variant="ghost" disabled={panel.busy} onClick={panel.closeEditor}>
+                {t('settings.scopeCancel')}
+              </Button>
+              <Button variant="primary" disabled={panel.busy} onClick={() => void panel.save()}>
+                {t('settings.scopeSave')}
+              </Button>
+            </>
+          )}
+        >
+          {editor}
+        </TaskDialog>
+      ) : null}
+
+      {panel.pendingDelete ? (
         <ConfirmationDialog
           title={t('settings.scopeDeleteTitle')}
-          message={t('settings.scopeDeleteConfirm', { id: pendingDelete.id })}
-          confirmLabel={busy ? t('dialog.deleting') : t('dialog.delete')}
+          message={`${t('settings.scopeDeleteConfirm', { id: panel.pendingDelete.id })}\n${t('settings.scopeDeleteImpact')}`}
+          details={[
+            { label: t('settings.scopeDeleteName', { kind: kindLabel }), value: panel.pendingDelete.id },
+            {
+              label: t('settings.resourceScope'),
+              value: panel.pendingDelete.scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser'),
+            },
+          ]}
+          confirmLabel={panel.busy ? t('dialog.deleting') : t('dialog.delete')}
           cancelLabel={t('dialog.cancel')}
-          busy={busy}
-          onCancel={() => setPendingDelete(null)}
-          onConfirm={remove}
+          busy={panel.busy}
+          onCancel={() => panel.setPendingDelete(null)}
+          onConfirm={panel.remove}
+        />
+      ) : null}
+
+      {panel.pendingDiscard ? (
+        <UnsavedChangesDialog
+          title={t('settings.unsavedExitTitle')}
+          message={t('settings.unsavedExitMessage')}
+          keepEditingLabel={t('settings.keepEditing')}
+          discardLabel={t('settings.discardChanges')}
+          onKeepEditing={() => panel.resolveDiscard(false)}
+          onDiscard={() => panel.resolveDiscard(true)}
         />
       ) : null}
     </section>
   );
 };
-
-const safeIdPreview = (value: string): string =>
-  value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || value;

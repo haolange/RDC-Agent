@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useDynStyle } from '../lib/useDynStyle';
+import { ColorPickerSurface } from './ColorPickerSurface';
+import { Popover } from './Popover';
 import './ColorField.css';
 
 export interface ColorFieldProps {
@@ -11,6 +13,9 @@ export interface ColorFieldProps {
   fallbackHex?: string;
   /** `inline` = stacked label + compact chip (Agents look strip). Default = label | control grid (Appearance). */
   layout?: 'grid' | 'inline';
+  /** Accessible names for the picker surfaces. */
+  areaLabel: string;
+  hueLabel: string;
 }
 
 const HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
@@ -23,8 +28,11 @@ export function ColorField({
   className = '',
   fallbackHex = '#33d1ff',
   layout = 'grid',
+  areaLabel,
+  hueLabel,
 }: ColorFieldProps) {
-  const colorInputRef = useRef<HTMLInputElement>(null);
+  const labelId = useId();
+  const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
 
   useEffect(() => {
@@ -42,33 +50,39 @@ export function ColorField({
     className,
   ].filter(Boolean).join(' ');
   const swatchStyle = useDynStyle({ '--color-field-swatch-bg': value });
+  const resolved = HEX_PATTERN.test(value) ? value.toLowerCase() : fallbackHex;
 
   return (
-    <label className={classes}>
-      <span className="settings-field-label color-field-label">{label}</span>
+    <div className={classes}>
+      <span id={labelId} className="settings-field-label color-field-label">{label}</span>
       <span className="color-field-control">
-        <button
-          type="button"
-          className="color-field-swatch"
-          {...swatchStyle}
-          data-testid={`${testId}-swatch`}
-          aria-label={label}
-          onClick={() => colorInputRef.current?.click()}
-        />
-        <input
-          ref={colorInputRef}
-          type="color"
-          className="color-field-native"
-          value={HEX_PATTERN.test(value) ? value : fallbackHex}
-          data-testid={testId}
-          onChange={(event) => onChange(event.target.value.toLowerCase())}
-          tabIndex={-1}
-          aria-hidden="true"
-        />
+        <Popover
+          open={open}
+          onOpenChange={setOpen}
+          align="start"
+          className="color-field-popover"
+          trigger={(
+            <button
+              type="button"
+              className="color-field-swatch"
+              {...swatchStyle}
+              data-testid={`${testId}-swatch`}
+              aria-labelledby={labelId}
+            />
+          )}
+        >
+          <ColorPickerSurface
+            value={resolved}
+            onChange={onChange}
+            testId={testId}
+            areaLabel={areaLabel}
+            hueLabel={hueLabel}
+          />
+        </Popover>
         <input
           type="text"
           className="color-field-hex input"
-          aria-label={label}
+          aria-labelledby={labelId}
           value={draft}
           spellCheck={false}
           data-testid={`${testId}-hex`}
@@ -82,6 +96,6 @@ export function ColorField({
           }}
         />
       </span>
-    </label>
+    </div>
   );
 }

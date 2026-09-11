@@ -5,7 +5,6 @@ import type { SettingsSection } from './types';
 const SECTION_ICON: Record<SettingsSection, IconName> = {
   general: 'nav-general',
   appearance: 'nav-appearance',
-  workspace: 'nav-workspace',
   models: 'nav-models',
   skills: 'nav-skills',
   agents: 'nav-agents',

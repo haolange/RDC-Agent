@@ -1,0 +1,71 @@
+.color-picker-surface {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.color-picker-area {
+  position: relative;
+  width: 100%;
+  height: 9rem;
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(to top, rgb(0 0 0), rgb(0 0 0 / 0)),
+    linear-gradient(to right, rgb(255 255 255), rgb(255 255 255 / 0)),
+    var(--color-picker-hue, hsl(0 100% 50%));
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.color-picker-area:focus-visible,
+.color-picker-hue:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.color-picker-thumb {
+  position: absolute;
+  left: var(--color-picker-x, 0%);
+  top: var(--color-picker-y, 0%);
+  width: var(--space-4);
+  height: var(--space-4);
+  transform: translate(-50%, -50%);
+  border: 2px solid rgb(255 255 255);
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.45);
+  pointer-events: none;
+}
+
+.color-picker-hue {
+  position: relative;
+  width: 100%;
+  height: var(--space-4);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    to right,
+    hsl(0 100% 50%),
+    hsl(60 100% 50%),
+    hsl(120 100% 50%),
+    hsl(180 100% 50%),
+    hsl(240 100% 50%),
+    hsl(300 100% 50%),
+    hsl(360 100% 50%)
+  );
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.color-picker-hue-thumb {
+  position: absolute;
+  left: var(--color-picker-hue-x, 0%);
+  top: 50%;
+  width: var(--space-3);
+  height: calc(100% + var(--space-2));
+  transform: translate(-50%, -50%);
+  border: 2px solid rgb(255 255 255);
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.45);
+  pointer-events: none;
+}

@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { AppSettings } from '@shared/types/settings';
-import { useModalFocus } from '../../../hooks/useModalFocus';
+import { useModalFocus } from '../../../lib/useModalFocus';
+import { useOverlayLayer } from '../../../lib/overlayStack';
 import { useSettingsModal } from './useSettingsModal';
 import { GeneralSettings } from './sections/GeneralSettings';
 import { AppearanceSettings } from './sections/AppearanceSettings';
-import { WorkspaceSettings } from './sections/WorkspaceSettings';
+import { ResourceDiagnosticsDialog } from './sections/ResourceDiagnosticsDialog';
 import { ModelsSettings } from './sections/ModelsSettings';
 import { AgentsSettings } from './sections/AgentsSettings';
 import { ToolsSettings } from './sections/ToolsSettings';
@@ -33,6 +34,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const panelRef = useRef<HTMLDivElement>(null);
   const runtime = useRdxRuntimeOverview(open);
   const [resourceScope, setResourceScope] = useState<'user' | 'project'>('user');
+  const [resourceDiagnosticsOpen, setResourceDiagnosticsOpen] = useState(false);
   const {
     t,
     activeSection,
@@ -97,11 +99,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     }
     onClose();
   }, [connectionDraft, onClose, setConnectionDraft]);
+  const { layerId } = useOverlayLayer(open);
   useModalFocus({
     open,
     containerRef: dialogRef,
     onClose: closeSurface,
     trap: !connectionDraft,
+    layerId,
   });
 
   useEffect(() => {
@@ -168,6 +172,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                   globalInstructionsDraft={globalInstructionsDraft}
                   onGlobalInstructionsDraftChange={setGlobalInstructionsDraft}
                   onSavePersonalization={handleSavePersonalization}
+                  onOpenResourceDiagnostics={() => setResourceDiagnosticsOpen(true)}
                   t={t}
                 />
               )}
@@ -181,15 +186,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                   onUsePointerCursorsChange={setUsePointerCursors}
                   onReduceMotionChange={setReduceMotion}
                   onChromeThemeChange={setChromeTheme}
-                  t={t}
-                />
-              )}
-
-              {activeSection === 'workspace' && (
-                <WorkspaceSettings
-                  overview={runtime.overview}
-                  loading={runtime.loading}
-                  error={runtime.error}
                   t={t}
                 />
               )}
@@ -231,7 +227,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
               {activeSection === 'tools' && (
                 <section className="settings-page settings-page-tools" data-settings-search="tools">
-                <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['mcp']} onChanged={runtime.setOverview} />
+                <header className="settings-section-header">
+                  <div>
+                    <div className="settings-section-title">{t('settings.mcpServicesTitle')}</div>
+                    <div className="settings-section-subtitle">{t('settings.mcpServicesHint')}</div>
+                  </div>
+                </header>
+                <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['mcp']} onChanged={runtime.setOverview} editorPresentation="dialog" />
                 <McpTrustPanel overview={runtime.overview} onChanged={runtime.setOverview} />
                 <McpStatusDashboard />
                 <ToolsSettings
@@ -259,6 +261,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
           </div>
         </div>
       </div>
+
+      <ResourceDiagnosticsDialog
+        open={resourceDiagnosticsOpen}
+        overview={runtime.overview}
+        loading={runtime.loading}
+        error={runtime.error}
+        onClose={() => setResourceDiagnosticsOpen(false)}
+        t={t}
+      />
 
       {connectionDraft && connectionProvider && (
         <ProviderConnectDialog

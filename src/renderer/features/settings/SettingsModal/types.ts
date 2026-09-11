@@ -11,7 +11,6 @@ import type {
 export type SettingsSection =
   | 'general'
   | 'appearance'
-  | 'workspace'
   | 'models'
   | 'skills'
   | 'agents'

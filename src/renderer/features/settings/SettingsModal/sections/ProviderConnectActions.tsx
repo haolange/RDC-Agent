@@ -1,6 +1,7 @@
 import React from 'react';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { Button } from '../../../../ui/Button';
 import type { ProviderConnectionDraft } from '../types';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -19,6 +20,10 @@ interface ProviderConnectActionsProps {
   t: Translate;
 }
 
+/**
+ * Single action bar for the connect dialog. Testing swaps only the button
+ * label, so the footer keeps its height and baseline throughout a test.
+ */
 export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
   draft,
   provider,
@@ -43,20 +48,18 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
     ?? provider.providerAvailability).state === 'unavailable';
 
   return (
-    <div className="settings-actions settings-provider-connect-actions">
-      <button type="button" className="button button-secondary" onClick={onClose}>{t('settings.cancel')}</button>
-      <button
-        type="button"
-        className="button button-secondary"
+    <>
+      <Button variant="ghost" onClick={onClose}>{t('settings.cancel')}</Button>
+      <Button
+        variant="secondary"
         data-testid="settings-provider-connect-test"
         onClick={() => void onTest()}
         disabled={commonBlocked || accountTestBlocked || authModeUnavailable}
       >
         {draft.busy === 'testing' ? t('settings.testing') : t('settings.test')}
-      </button>
-      <button
-        type="button"
-        className="button button-primary"
+      </Button>
+      <Button
+        variant="primary"
         data-testid="settings-provider-connect-save"
         onClick={() => void onSave()}
         disabled={commonBlocked || accountSaveBlocked || noSupportedModels || authModeUnavailable}
@@ -66,7 +69,7 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
           : provider.authMode === 'account'
             ? provider.isConfigured ? t('settings.save') : t('settings.connect')
             : hasFreshTest ? t('settings.save') : t('settings.connect')}
-      </button>
-    </div>
+      </Button>
+    </>
   );
 };

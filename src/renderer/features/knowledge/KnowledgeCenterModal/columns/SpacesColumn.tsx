@@ -1,5 +1,4 @@
 import { KnowledgeIcon } from '../parts/KnowledgeIcon';
-import { Button } from '../../../../ui/Button';
 import { Checkbox } from '../../../../ui/Checkbox';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { InlineError } from '../../../../ui/InlineError';
@@ -9,9 +8,9 @@ import { useI18n } from '../../../../i18n';
 import { IndexStatusBar } from '../parts/IndexStatusBar';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 
-interface SpacesColumnProps { state: ReturnType<typeof useKnowledgeCenter>; onImport: () => void; }
+interface SpacesColumnProps { state: ReturnType<typeof useKnowledgeCenter>; }
 
-export function SpacesColumn({ state, onImport }: SpacesColumnProps) {
+export function SpacesColumn({ state }: SpacesColumnProps) {
   const { t } = useI18n();
   const views = [
     { id: 'cards', label: 'knowledgeCenter.viewCards', icon: 'book' },
@@ -20,10 +19,6 @@ export function SpacesColumn({ state, onImport }: SpacesColumnProps) {
   ] as const;
   return (
     <Panel className="knowledge-center-spaces" data-testid="knowledge-center-spaces">
-      <div className="knowledge-center-brand">
-        <KnowledgeIcon name="book" size={16} />
-        <div className="knowledge-center-brand-title" id="knowledge-center-title">{t('knowledgeCenter.title')}</div>
-      </div>
       <div className="knowledge-center-navigation" role="tablist" aria-label={t('knowledgeCenter.viewLabel')}>
         {views.map(({ id, label, icon }) => (
           <ListRow
@@ -64,10 +59,7 @@ export function SpacesColumn({ state, onImport }: SpacesColumnProps) {
         ))}
       </div>
       <div className="knowledge-center-sidebar-footer">
-        <Button variant="secondary" onClick={onImport} data-testid="knowledge-center-import-open">
-          <KnowledgeIcon name="upload" />{t('knowledgeCenter.importColdData')}
-        </Button>
-        <details className="knowledge-center-index-disclosure">
+        <details className="knowledge-center-index-disclosure" data-testid="knowledge-center-index-tools">
           <summary>{t('knowledgeCenter.indexTools')}</summary>
           <IndexStatusBar index={state.index} rebuilding={state.rebuilding} onRebuild={() => void state.rebuildIndex()} />
         </details>

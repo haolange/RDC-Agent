@@ -44,7 +44,9 @@
 - 缩窗只在发送 preflight 内派生压缩视图而不提前改写历史。
 
 - Composer 底栏 Model override 与 Agent / Permission / Effort / Usage 互斥；390px 不越界。
-- Settings 左侧导航可搜索并跳转高亮；顺序为 Models → Agents → Skills。
+- Settings 左侧导航可搜索并跳转高亮；八项顺序为 常规 → 外观 → Provider → Agents → Skills → Tools → Hooks → Policy，没有 Workspace 一级项。
+- 常规页底部「资源与诊断」打开任务子弹窗，内含只读用户根 / 项目根与九条资源路径的复制 / 打开；根路径不可编辑，不提供迁移。
+- Provider 总览卡片在同一视口下等宽等高；测试连接前 / 中 / 后卡片几何与按钮基线不变；未配置为中性色，只有真实失败才用 error；长错误折成摘要 + 展开。
 
 ## Composer Effort 滑杆
 

@@ -40,6 +40,7 @@ export function createDialogApi(transport: RendererApiTransport): DialogApi {
     selectFiles: () => transport.invoke(INVOKE.shell.selectFiles),
     selectRdcFiles: () => transport.invoke(INVOKE.shell.selectRdcFiles),
     selectDirectory: () => transport.invoke(INVOKE.shell.selectDirectory),
+    saveFile: (request) => transport.invoke(INVOKE.shell.saveFile, request),
   };
 }
 
@@ -115,6 +116,7 @@ export function createKnowledgeApi(transport: RendererApiTransport): KnowledgeAp
     issueApprovalToken: (request) => transport.invoke(INVOKE.knowledge.issueApprovalToken, request),
     write: (request) => transport.invoke(INVOKE.knowledge.write, request),
     promote: (request) => transport.invoke(INVOKE.knowledge.promote, request),
+    export: (request) => transport.invoke(INVOKE.knowledge.export, request),
   };
 }
 

@@ -24,6 +24,10 @@ export async function deleteScopedResource(
   return getElectronApi()?.rdxRuntime.deleteResource(kind, scope, id, projectRoot);
 }
 
+export async function revealResourceLocation(sourcePath: string): Promise<void> {
+  await rdxRuntime()?.revealResource(sourcePath);
+}
+
 export async function importScopedResource(
   request: Parameters<NonNullable<ReturnType<typeof rdxRuntime>>['importResource']>[0],
 ) {

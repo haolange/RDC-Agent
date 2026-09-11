@@ -67,6 +67,7 @@ export const PolicySettings: React.FC<{
         onScopeChange={onScopeChange}
         kinds={['policy']}
         onChanged={onChanged}
+        editorPresentation="dialog"
       />
     </section>
   );

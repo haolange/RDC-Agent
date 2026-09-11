@@ -14,6 +14,12 @@ export interface Hsl {
   l: number;
 }
 
+export interface Hsv {
+  h: number;
+  s: number;
+  v: number;
+}
+
 export function isHexColor(value: unknown): value is string {
   return typeof value === 'string' && HEX_RE.test(value.trim());
 }
@@ -95,6 +101,59 @@ export function hslToRgb({ h, s, l }: Hsl): Rgb {
     g: (gn + m) * 255,
     b: (bn + m) * 255,
   };
+}
+
+/** HSV is the picker geometry: hue rail plus a saturation x value plane. */
+export function rgbToHsv({ r, g, b }: Rgb): Hsv {
+  const rn = r / 255;
+  const gn = g / 255;
+  const bn = b / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const delta = max - min;
+  let h = 0;
+  if (delta !== 0) {
+    if (max === rn) h = ((gn - bn) / delta) % 6;
+    else if (max === gn) h = (bn - rn) / delta + 2;
+    else h = (rn - gn) / delta + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return {
+    h,
+    s: (max === 0 ? 0 : delta / max) * 100,
+    v: max * 100,
+  };
+}
+
+export function hsvToRgb({ h, s, v }: Hsv): Rgb {
+  const sn = s / 100;
+  const vn = v / 100;
+  const c = vn * sn;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = vn - c;
+  let rn = 0;
+  let gn = 0;
+  let bn = 0;
+  if (h < 60) [rn, gn, bn] = [c, x, 0];
+  else if (h < 120) [rn, gn, bn] = [x, c, 0];
+  else if (h < 180) [rn, gn, bn] = [0, c, x];
+  else if (h < 240) [rn, gn, bn] = [0, x, c];
+  else if (h < 300) [rn, gn, bn] = [x, 0, c];
+  else [rn, gn, bn] = [c, 0, x];
+  return {
+    r: (rn + m) * 255,
+    g: (gn + m) * 255,
+    b: (bn + m) * 255,
+  };
+}
+
+export function hexToHsv(hex: string): Hsv {
+  return rgbToHsv(hexToRgb(hex));
+}
+
+export function hsvToHex(hsv: Hsv): string {
+  return rgbToHex(hsvToRgb(hsv));
 }
 
 export function mixRgb(a: Rgb, b: Rgb, t: number): Rgb {

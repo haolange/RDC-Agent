@@ -15,23 +15,46 @@ export const ScopedResourceEditor: React.FC<{
   form: ResourceFormState;
   idLocked: boolean;
   busy: boolean;
+  dirty?: boolean;
+  /** Dialog presentation moves the title and actions into the dialog chrome. */
+  showHeader?: boolean;
   onChange: (patch: Partial<ResourceFormState>) => void;
   onSave: () => void;
   onDelete?: () => void;
   onCancel: () => void;
-}> = ({ kind, form, idLocked, busy, onChange, onSave, onDelete, onCancel }) => {
+}> = ({
+  kind,
+  form,
+  idLocked,
+  busy,
+  dirty = false,
+  showHeader = true,
+  onChange,
+  onSave,
+  onDelete,
+  onCancel,
+}) => {
   const { t } = useI18n();
   const kindLabel = t(kindLabelKey(kind));
   return (
     <div className="settings-runtime-editor settings-manifest-editor" data-testid="settings-runtime-editor">
-      <div className="settings-manifest-editor-head">
-        <div className="settings-section-title">{form.id || t('settings.scopeAdd', { kind: kindLabel })}</div>
-        <div className="settings-manifest-editor-actions">
-          <Button variant="primary" disabled={busy} onClick={onSave}>{t('settings.scopeSave')}</Button>
-          {onDelete ? <Button variant="danger" disabled={busy} onClick={onDelete}>{t('settings.delete')}</Button> : null}
-          <Button variant="ghost" disabled={busy} onClick={onCancel}>{t('settings.cancel')}</Button>
+      {showHeader ? (
+        <div className="settings-manifest-editor-head">
+          <div className="settings-section-title">
+            {form.id || t('settings.scopeAdd', { kind: kindLabel })}
+            {dirty ? (
+              <span className="settings-editor-dirty" data-testid="settings-runtime-editor-dirty">
+                {t('settings.unsaved')}
+              </span>
+            ) : null}
+          </div>
+          <div className="settings-manifest-editor-actions">
+            {onDelete ? <Button variant="danger" disabled={busy} onClick={onDelete}>{t('settings.delete')}</Button> : null}
+            <Button variant="ghost" disabled={busy} onClick={onCancel}>{t('settings.cancel')}</Button>
+            <Button variant="primary" disabled={busy} onClick={onSave}>{t('settings.scopeSave')}</Button>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className="settings-manifest-form-grid settings-runtime-form-grid">
         <SettingsField label={t('settings.resourceFieldId')}>

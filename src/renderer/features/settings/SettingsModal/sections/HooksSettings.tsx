@@ -62,6 +62,7 @@ export const HooksSettings: React.FC<{
         onScopeChange={onScopeChange}
         kinds={['hook']}
         onChanged={onChanged}
+        editorPresentation="dialog"
       />
       <div className="settings-runtime-list">
         {hooks.map((hook) => (

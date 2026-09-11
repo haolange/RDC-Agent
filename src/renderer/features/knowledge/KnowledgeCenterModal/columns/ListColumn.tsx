@@ -1,5 +1,6 @@
 import type { KnowledgeCandidatesResult, KnowledgeLaneHit } from '@shared/types/knowledge';
 import { cn } from '../../../../lib/cn';
+import { Button } from '../../../../ui/Button';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { ListRow } from '../../../../ui/ListRow';
 import { Panel } from '../../../../ui/Panel';
@@ -13,6 +14,7 @@ import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 interface ListColumnProps {
   state: ReturnType<typeof useKnowledgeCenter>;
   inbox: KnowledgeCandidatesResult | null;
+  onImport: () => void;
 }
 
 function emptyReason(
@@ -58,10 +60,12 @@ function HitButton({
   );
 }
 
-export function ListColumn({ state, inbox }: ListColumnProps) {
+export function ListColumn({ state, inbox, onImport }: ListColumnProps) {
   const { t } = useI18n();
   const reason = emptyReason(state, inbox);
   const loading = state.loadingQuery || state.loadingOverview;
+  // The import action belongs next to the empty list, not only in the sidebar.
+  const offerImport = reason === 'knowledgeCenter.emptyNoCards' || reason === 'knowledgeCenter.emptyNoSpaces';
 
   return (
     <Panel className="knowledge-center-list" data-testid="knowledge-center-list">
@@ -81,7 +85,14 @@ export function ListColumn({ state, inbox }: ListColumnProps) {
         {loading && <div className="knowledge-center-empty-inline">{t('knowledgeCenter.loading')}</div>}
         {!loading && reason && (
           <div className="knowledge-center-empty" data-testid="knowledge-center-empty-list">
-            <EmptyState title={t(reason)} />
+            <EmptyState
+              title={t(reason)}
+              actions={offerImport ? (
+                <Button variant="primary" size="sm" onClick={onImport} data-testid="knowledge-center-empty-import">
+                  {t('knowledgeCenter.importKnowledge')}
+                </Button>
+              ) : undefined}
+            />
           </div>
         )}
         {!loading && state.viewMode === 'cards' && !reason && state.hits.map((hit) => (

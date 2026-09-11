@@ -2,7 +2,8 @@ import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MaterialContextSchema, type MaterialContext } from '@shared/types/materialContext';
 import { Button, Input, Textarea } from '../ui';
-import { useModalFocus } from '../hooks/useModalFocus';
+import { useModalFocus } from '../lib/useModalFocus';
+import { useOverlayLayer } from '../lib/overlayStack';
 import { useI18n } from '../i18n';
 import './MaterialContextEditor.css';
 
@@ -19,7 +20,8 @@ export const MaterialContextEditor: React.FC<{
   const [dimensions, setDimensions] = useState({ width: 1000, height: 1000 });
   const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
   const [error, setError] = useState('');
-  useModalFocus({ open: true, containerRef: ref, onClose });
+  const { layerId } = useOverlayLayer(true);
+  useModalFocus({ open: true, containerRef: ref, onClose, layerId });
   const region = draft.region;
   const changeRegion = (next: Region) => setDraft(current => ({ ...current, region: next }));
   const point = (event: React.PointerEvent<SVGSVGElement>) => {

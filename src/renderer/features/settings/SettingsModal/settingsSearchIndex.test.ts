@@ -9,8 +9,7 @@ const titles: Record<string, string> = {
   'settings.appearance': 'Appearance',
   'userMenu.fontScale': 'Font scale',
   'settings.appearanceReduceMotion': 'Reduce motion',
-  'settings.workspace': 'Workspace',
-  'settings.workspaceRuntimeRoot': 'RDX runtime root',
+  'settings.resourceDiagnosticsTitle': 'Resources & diagnostics',
   'settings.models': 'Models',
   'settings.agentManifestTitle': 'Agents',
   'settings.skills': 'Skills',
@@ -24,9 +23,16 @@ describe('settingsSearchIndex', () => {
   it('covers every settings section at least once', () => {
     const sections = new Set(SETTINGS_SEARCH_INDEX.map((entry) => entry.section));
     const expected: SettingsSection[] = [
-      'general', 'appearance', 'workspace', 'models', 'agents', 'skills', 'tools', 'hooks', 'policy',
+      'general', 'appearance', 'models', 'agents', 'skills', 'tools', 'hooks', 'policy',
     ];
     expect([...sections].sort()).toEqual([...expected].sort());
+  });
+
+  it('keeps resource paths reachable from General instead of a Workspace section', () => {
+    const titleOf = (key: string) => titles[key] ?? key;
+    expect(SETTINGS_SEARCH_INDEX.some((entry) => entry.section === ('workspace' as SettingsSection))).toBe(false);
+    expect(matchSettingsSearchEntries('工作区', titleOf).map((entry) => entry.id)).toContain('resource-diagnostics');
+    expect(matchSettingsSearchEntries('paths', titleOf).map((entry) => entry.section)).toContain('general');
   });
 
   it('matches English and Chinese keywords', () => {

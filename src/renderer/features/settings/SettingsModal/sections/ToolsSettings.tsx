@@ -4,6 +4,7 @@ import type { useI18n } from '../../../../i18n';
 import { RdxCliInvokerSettingsFields } from './RdxCliInvokerSettingsFields';
 import { CodeInterpreterSettingsFields } from './CodeInterpreterSettingsFields';
 import { ShellSettingsFields } from './ShellSettingsFields';
+import { LocalToolDisclosure } from './LocalToolDisclosure';
 import { Button } from '../../../../ui/Button';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -51,7 +52,19 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
 
   return (
     <form className="settings-tools-card-stack" onChange={() => setStatus('')} onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <div className="settings-browser-block settings-tool-card" data-testid="settings-rdx-block">
+      <header className="settings-section-header">
+        <div>
+          <div className="settings-section-title">{t('settings.localToolsTitle')}</div>
+          <div className="settings-section-subtitle">{t('settings.localToolsHint')}</div>
+        </div>
+      </header>
+
+      <LocalToolDisclosure
+        icon="nav-tools"
+        title={t('settings.rdxToolchainTitle')}
+        description={t('settings.rdxToolchainHint')}
+        testId="settings-rdx-block"
+      >
         <RdxCliInvokerSettingsFields
           rdxCliDraft={rdxCliDraft}
           rdxActionsDraft={rdxActionsDraft}
@@ -59,17 +72,30 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
           onRdxActionsDraftChange={onRdxActionsDraftChange}
           t={t}
         />
-      </div>
-      <ShellSettingsFields
-        draft={shellDraft}
-        onChange={onShellDraftChange}
-        t={t}
-      />
-      <CodeInterpreterSettingsFields
-        draft={codeInterpreterDraft}
-        onChange={onCodeInterpreterDraftChange}
-        t={t}
-      />
+      </LocalToolDisclosure>
+
+      <LocalToolDisclosure
+        icon="nav-hooks"
+        title={t('settings.shellTitle')}
+        description={t('settings.shellHint')}
+        testId="settings-shell-block"
+      >
+        <ShellSettingsFields draft={shellDraft} onChange={onShellDraftChange} t={t} />
+      </LocalToolDisclosure>
+
+      <LocalToolDisclosure
+        icon="nav-skills"
+        title={t('settings.codeInterpreterTitle')}
+        description={t('settings.codeInterpreterHint')}
+        testId="settings-code-interpreter-block"
+      >
+        <CodeInterpreterSettingsFields
+          draft={codeInterpreterDraft}
+          onChange={onCodeInterpreterDraftChange}
+          t={t}
+        />
+      </LocalToolDisclosure>
+
       <div className="settings-actions settings-actions-split">
         <span className="settings-save-status" role="status">{status}</span>
         <Button type="submit" variant="primary" disabled={saving}>{t('settings.saveTools')}</Button>

@@ -155,7 +155,26 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 知识中心与 Settings 用视窗比例驱动：约 `min(92vw, 1920px) × min(90vh, 1240px)`，带最小尺寸下限；960 堆叠，640 全屏。禁止再写互相覆盖的多段 media query。`--settings-content-max` 随大屏上调，避免内容挤在中间一条。
 
-知识中心与 Settings 的内容使用实色分层、紧凑工具栏与清晰标题，避免嵌套装饰框和重复说明。Knowledge 保持空间 / 列表 / 详情三列（列宽 `224 / minmax(280, 0.8fr) / 1.2fr`），左栏仅放视图与空间导航；类型、生命周期与六条检索通道收进列表的筛选入口，以文字按钮表达多选；索引维护与卡片元数据默认折叠；960px 以下用空间 / 列表 / 详情切换且始终提供关闭入口。Settings 保持九项导航与均分 User / Project 作用域；640px 以下导航单行横向滚动，内容全屏。宽屏下 Light / Dark 编辑器并排，小屏堆叠。资源空态共用 `EmptyState`，不添加装饰性文案；路径、模型名与元数据允许换行。说明文案仅保留操作条件、作用域和必要风险，内部实现细节留在文档。
+知识中心与 Settings 的内容使用实色分层、紧凑工具栏与清晰标题，避免嵌套装饰框和重复说明。Knowledge 保持空间 / 列表 / 详情三列（列宽 `224 / minmax(280, 0.8fr) / 1.2fr`），左栏仅放视图与空间导航；类型、生命周期与六条检索通道收进列表的筛选入口，以文字按钮表达多选；索引维护与卡片元数据默认折叠；960px 以下用空间 / 列表 / 详情切换且始终提供关闭入口。Settings 保持八项导航（常规 / 外观 / Provider / Agents / Skills / Tools / Hooks / Policy）与均分 User / Project 作用域；本机资源根与逐项资源路径只读，经常规页的「资源与诊断」任务子弹窗查看，不作为一级导航。640px 以下导航单行横向滚动，内容全屏。宽屏下 Light / Dark 编辑器并排，小屏堆叠。资源空态共用 `EmptyState`，不添加装饰性文案；路径、模型名与元数据允许换行。说明文案仅保留操作条件、作用域和必要风险，内部实现细节留在文档。
+
+## 任务子弹窗（TaskDialog）
+
+导入、导出、资源编辑、连接配置、写入确认等「离开当前阅读面会丢上下文」的任务，一律用 `src/renderer/ui/TaskDialog`，叠在 Settings / Knowledge 之上，不替换背后的列表、筛选、选择或滚动位置。
+
+- 结构固定 `title`（+可选 `description`）/ `body`（唯一滚动区）/ `footer`（右对齐动作，主要动作在最右）。尺寸档位 `sm 420px` / `md 560px` / `lg 760px`，高度上限 `min(88vh, ...)`，`≤640px` 全屏。
+- 层级 `--z-overlay`，背景 `--token-bg-overlay`，阴影 `--token-shadow-modal`。焦点经 `lib/useModalFocus` 捕获；每个弹层在 `lib/overlayStack` 注册，Escape 与 Tab trap **只**作用栈顶层，关闭后焦点回到触发控件。
+- `ConfirmationDialog` 是 TaskDialog 的 `alertdialog` 变体，承担删除等危险确认（`danger` 主按钮，默认焦点在取消）；`UnsavedChangesDialog` 承担手动保存表单的「继续编辑 / 放弃更改」。自动保存表单失败走自身重试语义，不套这个模板。
+- 禁止 feature 内再造第二套 overlay / backdrop / 焦点栈。
+
+## 轻量选择控件
+
+- **多选**用 `CheckPill`（勾选 + 文字，`role="checkbox"`，`aria-checked`，`is-selected`），用于工具权限、知识筛选的类型 / 生命周期 / 检索通道。禁止为多选画大方框卡片。
+- **单选**用 `Tabs` 的 `variant="segmented"`（`role="tablist"` / `radiogroup`），用于主题模式、字号、减少动效、导入输入方式、导出范围与格式。
+- 动作按钮与选择控件不混同：普通执行 `ghost` / `secondary`，主要动作 `primary`，危险动作 `danger`。
+
+## 颜色选择浮层
+
+`ColorField` 是自绘 `Popover` 取色器：色域（饱和度 × 明度）+ 色相条 + HEX 输入 + 当前色样，指针位置与 HEX 双向同步。色域渐变是选择器本体的合法用途，不得外溢为页面背景。键盘必须可达：触发器 Enter/Space 打开，色域支持方向键步进（Shift 加速），HEX 可直接输入，Escape 关闭并回焦。主题预设仍由 `ThemePresetId` 提供，取色器不替代预设。
 
 ## 右键上下文菜单
 
@@ -178,7 +197,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 原子：`Button`、`IconButton`、`Icon`、`Switch`、`Checkbox`、`Kbd`、`Divider`、`Spinner`、`Toast`。
 
-分子：`Pill`、`SectionHeader`、`Popover`、`Menu`、`Input`、`Textarea`、`SearchField`、`Select`、`ListRow`、`Panel`、`EmptyState`、`InlineError`、`Tabs`、`ColorField`。
+分子：`Pill`、`CheckPill`、`SectionHeader`、`Popover`、`Menu`、`Input`、`Textarea`、`SearchField`、`Select`、`ListRow`、`Panel`、`EmptyState`、`InlineError`、`Tabs`、`ColorField`、`TaskDialog`、`ConfirmationDialog`、`UnsavedChangesDialog`。
 
 每件必须：全部交互态、CSS 变量 variant、共置 CSS ≤300 行、`ui/index.ts` 导出。禁止 feature 再造第二套弹层 / 空态 / 输入。
 
@@ -186,7 +205,8 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 | 产品面 | 组合 |
 |--------|------|
-| Settings 九 section | `SectionHeader` + `Panel` + `ListRow` + `Input` / `Select` / `Switch` + `Button` |
+| Settings 八 section | `SectionHeader` + `Panel` + `ListRow` + `Input` / `Select` / `Switch` + `Button` |
+| 任务子弹窗（导入 / 导出 / 编辑 / 确认） | `TaskDialog`（`title` / `body` / `footer` + `size`），危险确认用 `ConfirmationDialog`，未保存离开用 `UnsavedChangesDialog` |
 | Settings / Composer / Sidebar 弹层 | `Popover` 或 `Menu`（锚定、viewport clamp、Escape 焦点返回） |
 | Knowledge 三列 | `Panel` + `ListRow` + `SearchField` + `Pill` + `EmptyState` + `Tabs` |
 | Composer 底栏 | `Pill` + `Popover` / `Menu`；控件高 `--control-height-sm`（28） |

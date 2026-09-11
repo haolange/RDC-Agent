@@ -205,7 +205,10 @@ async function main() {
     'utf8',
   );
   assert(modelCascade.includes('settings-model-cascade'), 'Agents settings should use the provider/model cascade picker.');
-  assert(modelCascade.includes('aria-expanded={open}'), 'Model cascade should have explicit open state.');
+  assert(
+    modelCascade.includes("from '../../../../ui/Popover'") && modelCascade.includes('open={open}'),
+    'Model cascade must anchor through the shared Popover, which owns open state and aria-expanded.',
+  );
   assert(!modelCascade.includes('splitCanonicalAgentModelId'), 'Model cascade must not synthesize missing selector options from persisted canonical ids.');
   assert(modelCascade.includes('aria-invalid={invalidSelection}'), 'Model cascade should fail closed with explicit validation for an unavailable persisted selection.');
   assert(modelCascade.includes('settings-agent-model-invalid'), 'Model cascade should render a stable unavailable-selection diagnostic anchor.');
