@@ -1,5 +1,6 @@
 import { KnowledgeIcon } from '../parts/KnowledgeIcon';
 import { Button } from '../../../../ui/Button';
+import { Checkbox } from '../../../../ui/Checkbox';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { InlineError } from '../../../../ui/InlineError';
 import { ListRow } from '../../../../ui/ListRow';
@@ -20,42 +21,46 @@ export function SpacesColumn({ state, onImport }: SpacesColumnProps) {
   return (
     <Panel className="knowledge-center-spaces" data-testid="knowledge-center-spaces">
       <div className="knowledge-center-brand">
-        <KnowledgeIcon name="book" />
+        <KnowledgeIcon name="book" size={16} />
         <div className="knowledge-center-brand-title" id="knowledge-center-title">{t('knowledgeCenter.title')}</div>
       </div>
-      <nav className="knowledge-center-navigation" aria-label={t('knowledgeCenter.viewLabel')}>
+      <div className="knowledge-center-navigation" role="tablist" aria-label={t('knowledgeCenter.viewLabel')}>
         {views.map(({ id, label, icon }) => (
           <ListRow
             key={id}
             className="knowledge-center-nav-item"
             selected={state.viewMode === id}
-            aria-pressed={state.viewMode === id}
+            role="tab"
             data-testid={'knowledge-center-view-' + id}
-            leading={<KnowledgeIcon name={icon} />}
+            leading={<KnowledgeIcon name={icon} size={16} />}
             onClick={() => state.setViewMode(id)}
           >
             {t(label)}
           </ListRow>
         ))}
-      </nav>
+      </div>
       <div className="knowledge-center-section-title">{t('knowledgeCenter.spacesTitle')}</div>
-      <div className="knowledge-center-space-list" data-testid="knowledge-center-space-list">
+      <div
+        className="knowledge-center-space-list"
+        role="group"
+        aria-label={t('knowledgeCenter.spacesTitle')}
+        data-testid="knowledge-center-space-list"
+      >
         {state.spaces.length === 0 && (
           <EmptyState className="knowledge-center-empty-inline" title={t('knowledgeCenter.noSpaces')} />
         )}
         {state.spaces.map((space) => (
-          <ListRow
+          <Checkbox
             key={space.spaceId}
-            className="knowledge-center-nav-item"
-            selected={state.selectedSpaceIds.includes(space.spaceId)}
-            aria-pressed={state.selectedSpaceIds.includes(space.spaceId)}
+            className="knowledge-center-space-row"
+            checked={state.selectedSpaceIds.includes(space.spaceId)}
+            onCheckedChange={() => state.toggleSpace(space.spaceId)}
             data-testid={'knowledge-space-' + space.spaceId}
-            leading={<KnowledgeIcon name="folder" />}
-            trailing={<span className="knowledge-center-space-meta">{state.index?.cardsBySpace[space.spaceId] ?? 0}</span>}
-            onClick={() => state.toggleSpace(space.spaceId)}
-          >
-            {space.kind === 'user' ? t('knowledgeCenter.userSpace') : space.label}
-          </ListRow>
+            label={space.kind === 'user' ? t('knowledgeCenter.userSpace') : space.label}
+            trailing={state.index ? (
+              <span className="knowledge-center-space-meta">{state.index.cardsBySpace[space.spaceId] ?? 0}</span>
+            ) : undefined}
+          />
         ))}
       </div>
       <div className="knowledge-center-sidebar-footer">

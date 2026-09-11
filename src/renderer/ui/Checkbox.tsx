@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes } from 'react';
+import type { InputHTMLAttributes, ReactNode } from 'react';
 import { cn } from '../lib/cn';
 import { Icon } from './Icon';
 import './Checkbox.css';
@@ -7,12 +7,14 @@ export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   label?: string;
+  trailing?: ReactNode;
 }
 
 export function Checkbox({
   checked,
   onCheckedChange,
   label,
+  trailing,
   className,
   disabled,
   id,
@@ -33,6 +35,7 @@ export function Checkbox({
         {checked ? <Icon name="check" size={12} /> : null}
       </span>
       {label ? <span className="ui-checkbox-label">{label}</span> : null}
+      {trailing ? <span className="ui-checkbox-trailing">{trailing}</span> : null}
     </label>
   );
 }

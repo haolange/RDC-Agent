@@ -5,8 +5,6 @@
   line-height: var(--leading-tight);
 }
 
-.knowledge-center-navigation,
-.knowledge-center-space-list,
 .knowledge-center-tree {
   display: flex;
   flex-direction: column;
@@ -14,7 +12,6 @@
   min-width: 0;
 }
 
-.knowledge-center-nav-item.ui-list-row,
 .knowledge-center-card-button.ui-list-row,
 .knowledge-center-inbox-row.ui-list-row {
   min-height: var(--control-height-md);
@@ -22,7 +19,6 @@
   padding-block: var(--space-2);
 }
 
-.knowledge-center-nav-item .ui-list-row-body,
 .knowledge-center-card-button .ui-list-row-body,
 .knowledge-center-inbox-row .ui-list-row-body {
   display: flex;
@@ -40,19 +36,13 @@
   overflow-wrap: anywhere;
 }
 
-.knowledge-center-space-meta {
-  color: var(--token-text-caption);
-  font-size: var(--text-xs);
-}
-
 .knowledge-center-search.ui-search-field {
   width: 100%;
   min-height: var(--control-height-md);
   flex-shrink: 0;
 }
 
-.knowledge-center-card-button.is-active,
-.knowledge-center-nav-item.ui-list-row.is-selected {
+.knowledge-center-card-button.is-active {
   background: var(--token-interactive-active);
   color: var(--token-text-heading);
 }

@@ -1,0 +1,101 @@
+/* Knowledge Center left rail: view navigation + space filters.
+ *
+ * One shared grid inside the panel body: 12px row inset, 16px icon lane,
+ * 12px icon-to-text gap, so every text baseline lands at 40px.
+ *
+ * Accent appears exactly twice: the current view's icon and the keyboard focus
+ * ring. Everything else is grayscale, layered with 1px borders and solid fills. */
+
+.knowledge-center-navigation,
+.knowledge-center-space-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* `ListRow` is border-box with a permanent 1px transparent border, so its content
+ * lane starts 1px further in than a plain padded box. Every other left-rail element
+ * carries the same transparent border to land on the exact same lane. */
+.knowledge-center-brand,
+.knowledge-center-spaces .knowledge-center-section-title,
+.knowledge-center-space-row.ui-checkbox,
+.knowledge-center-space-list .knowledge-center-empty-inline {
+  border: 1px solid transparent;
+}
+
+/* Scoped to the left rail: the middle column reuses `.knowledge-center-section-title`
+ * for its Candidates / Drafts separators and must keep its own scale. */
+.knowledge-center-spaces .knowledge-center-section-title {
+  margin-block-start: var(--space-2);
+  padding-inline-start: calc(var(--space-3) + var(--space-4) + var(--space-3));
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+}
+
+.knowledge-center-space-list .knowledge-center-empty-inline {
+  padding-inline: var(--space-3);
+}
+
+/* ── View navigation: single select, marks the current view ── */
+
+.knowledge-center-nav-item.ui-list-row {
+  align-items: center;
+  color: var(--token-text-caption);
+}
+
+.knowledge-center-nav-item.ui-list-row:hover:not(:disabled) {
+  color: var(--token-text-heading);
+}
+
+.knowledge-center-nav-item.ui-list-row.is-selected {
+  background: var(--token-bg-raised);
+  border-color: var(--token-border-default);
+  color: var(--token-text-heading);
+  font-weight: var(--font-medium);
+}
+
+.knowledge-center-nav-item.ui-list-row.is-selected .ui-list-row-leading {
+  color: var(--token-accent-primary);
+}
+
+/* ── Space filters: multi select, on by default, must stay quiet ── */
+
+.knowledge-center-space-row.ui-checkbox {
+  --checkbox-checked-bg: transparent;
+  --checkbox-checked-border: var(--token-border-strong);
+  --checkbox-check-color: var(--token-text-heading);
+  display: flex;
+  width: 100%;
+  gap: var(--space-3);
+  min-height: var(--control-height-md);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+}
+
+.knowledge-center-space-row.ui-checkbox:hover {
+  background: var(--token-interactive-hover);
+}
+
+.knowledge-center-space-row.ui-checkbox:has(.ui-checkbox-input:focus-visible) {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: -2px;
+}
+
+.knowledge-center-space-row .ui-checkbox-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--token-text-caption);
+}
+
+.knowledge-center-space-row:has(.ui-checkbox-input:checked) .ui-checkbox-label {
+  color: var(--token-text-body);
+}
+
+.knowledge-center-space-meta {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+}

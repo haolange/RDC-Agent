@@ -71,6 +71,7 @@
   gap: var(--space-3);
   min-width: 0;
   min-height: var(--control-height-md);
+  padding-inline: var(--space-3);
   color: var(--token-text-heading);
 }
 
