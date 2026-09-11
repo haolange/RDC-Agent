@@ -81,6 +81,9 @@ Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verifie
 | UI-B8-copy-a11y | Threads→Sessions；DeviceSelector/Slash/Rail/Agent 模板入 i18n；Settings 搜索焦点环；hover 配 focus-visible | `check:right-rail` i18n keys | disposable ZH 工作台/User menu/Settings/Knowledge；device aria-label「回放设备：本地回放」；无 FULL_ACCESS 故 EN 未持久化 | verified | 634892ff | 2026-09-08 |
 | UI-B9-finalize | fidelity 基线复核；docs 路径；全门禁 + build；交还桌面启动权后 push | `check:fidelity` `check:legacy-residue` `check:gates` `typecheck` `lint` `build` | disposable FULL_ACCESS=1；project `proj_5b660f23c308` session `sess_316a6244e3a4`；1440 五卡 EmptyState + Composer pill 高 28 + 九 Settings 节 + 搜索 compaction→策略 + 六 Knowledge lane 无 Semantic + 底栏互斥 + fail-closed unknown/internal/secret/desktop-only 403 且 `session:list` 200；390 `bodyMin=0` overflowX=false drawer=true；Appearance `settings:set` light 持久化后恢复 dark。截图 `%LOCALAPPDATA%/Temp/cursor/screenshots/b9-*.png`。无真实 turn 故 Memory/Tool 审批未跑。command palette 合成 Ctrl+K 未打开属自动化限制 | verified | 8836d929 | 2026-09-08 |
 | UI-C2-second-pass | Composer 底栏单行同高 28、窄屏图标化、model 线性渐隐；空工作台窄卡居中；Right Rail 空态恢复 restrained visual；审查漏项收口 | `check:design-tokens` `check:renderer-structure` `check:right-rail` `check:appearance` `check:fidelity` `check:work-process` `typecheck` `lint` | disposable `qa-1788837336836-70ed95920ab5d922`；project `proj_da20cf5406f2` session `sess_92b9da32c26c`；1440 send/pill 均为 28、footer nowrap、五卡 visual 112×200 + honest copy；390 footerH=30 nowrap、agent/permission/effort 收成 28 图标、model 仍显示且 max-width 6rem、三卡 `align-items:center`、`bodyMin=0` overflowX=false。截图 `%LOCALAPPDATA%/Temp/cursor/screenshots/c2-*.png` | verified | bda24070 | 2026-09-08 |
+| UI-D1-settings-eight | Settings 八项导航；Workspace 一级入口删除；资源与诊断改到常规页 TaskDialog；搜索「工作区 / paths」仍跳常规 | `check:settings-agents` disposable Browser QA | disposable session `sess_bf3f3f195297`；八 tab；无 workspace section；截图 `%LOCALAPPDATA%/Temp/cursor/screenshots/` | verified | 032f819 | 2026-09-11 |
+| UI-D1-knowledge-export | `knowledge:export` + `dialog:saveFile`；`rdc.knowledge-package/1` 剔除 provenance 与绝对路径，导出前 secret 扫描；再导入 session Draft、verified=false，重复 cardId 走 conflict；Markdown 只供阅读 | `KnowledgeExportService.test.ts` + live IPC round-trip | disposable；写出 qa-export.yaml / qa-export.md 再导入仍为 draft；7 条单测覆盖 secret、重复 cardId、相对路径 fail-closed | verified | 032f819 | 2026-09-11 |
+| UI-D1-overlay-stack | `overlayStack`：Escape / Tab 只作用栈顶；Popover / TaskDialog / Settings / Knowledge 注册；知识导入弹窗与 backdrop 平级 | typecheck + disposable Browser QA | disposable；颜色 Popover Escape 不关 Settings；知识导入 Tabs 不关 Center | verified | 032f819 | 2026-09-11 |
 
 
 ## 2026-09-09 原生协议与指令收敛验证（未提交工作树）
@@ -302,3 +305,14 @@ runtime 强制权限/所有权/依赖/执行代次/输出存在/预算/取消/jo
 最终复验（20:44–20:45）：`coverage-delivery-recheck.log` 全量 363 文件通过、4 跳过，2636 测试通过、4 跳过；lines 74.42%、functions 76.41%、branches 61.91%、statements 72.07%，ratchet 通过。最终 typecheck、lint、check:gates、diff whitespace 检查通过，AgentOrchestrator façade 799 行（<800）。最后代码重新构建后 canonical 桌面入口成功初始化；本轮桌面 PID 41092 及子进程已停止，锁 owner 已确认死亡，无 QA/desktop launcher 残留。桌面启动权已交还。
 
 实际结果保存补证 `result-persistence-proof.json`：新完成子执行全文 8203 字节，父通知 2479 字节，outputs 超限部分外置；通知引用与真实文件 SHA-256 相同，文件保存时间早于通知。协议配对、原图字节校验、两遍分页重建与本条测试数字均为可复查证据；未将模型自述或 UI 成功当作原生实验成立。
+
+## 2026-09-11 Settings / Knowledge 现代化重设计
+
+实现提交 `032f819`。上表只把实际跑过的三项标为 verified：八项导航、知识包导出再导入、弹层 Escape 分层。门禁侧 `typecheck` / `lint` / `check:gates` / coverage ratchet / `build` 已通过；disposable Browser QA 后 `instance.lock` 不存在，桌面启动权已交还。
+
+本轮明确没有当作已验收的部分：
+
+- 参考图 T03 / H03 / T04 / T05 / A04 / K04 / K05 / K06 / K12 保留现有字段与实现，只跟着共享组件和 CSS 重整，没有按图重排版式。
+- 明暗主题切换、英文 locale、640px 全屏没有逐面板走查。
+- 颜色选择器拖拽受 Browser QA 坐标系限制，改用 HSV 几何单测覆盖往返与色域/色相映射。
+- 参考图橙色 `#cc7d5e` 是 Absoluty 预设，不是产品默认；默认仍是蓝色 `#33d1ff`。Absoluty / Codex / GitHub 预设原样保留。
