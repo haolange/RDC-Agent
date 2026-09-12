@@ -18,9 +18,13 @@ const PATH_LABEL_KEYS: Record<string, TranslationKey> = {
   policiesPath: 'settings.policiesPath',
   knowledgePath: 'settings.knowledgePath',
   memoryPath: 'settings.memoryPath',
+  projectMetadataPath: 'settings.projectMetadataPath',
+  gitignorePath: 'settings.gitignorePath',
+  inputsPath: 'settings.inputsPath',
+  artifactsPath: 'settings.artifactsPath',
 };
 
-const ROOT_KEYS = new Set(['projectRoot', 'userRdxRoot']);
+const ROOT_KEYS = new Set(['projectRoot', 'userRdxRoot', 'projectRdxRoot']);
 
 const pathLabel = (t: Translate, key: string): string => {
   const labelKey = PATH_LABEL_KEYS[key];
@@ -104,11 +108,11 @@ export const ResourceDiagnosticsDialog: React.FC<ResourceDiagnosticsDialogProps>
     >
       <div className="settings-path-roots">
         {rootRow(t('settings.workspaceRuntimeRoot'), overview?.userRoot)}
-        {rootRow(t('settings.workspaceProjectScope'), overview?.projectRoot)}
+        {rootRow(t('settings.workspaceProjectScope'), overview?.projectPaths?.projectRdxRoot)}
       </div>
       {error ? <InlineError>{error}</InlineError> : null}
       {pathRows(t('settings.workspaceUserScope'), overview?.userPaths)}
-      {pathRows(t('settings.workspaceProjectScope'), overview?.projectPaths)}
+      {pathRows(t('settings.workspaceProjectPaths'), overview?.projectPaths)}
       <p className="settings-path-note">{t('settings.resourceDiagnosticsReadOnly')}</p>
     </TaskDialog>
   );

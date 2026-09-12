@@ -1,0 +1,155 @@
+.settings-provider-oauth-code-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.settings-provider-oauth-diagnostic {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  background: var(--token-surface-sunken);
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+}
+
+.settings-oauth-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-oauth-step {
+  display: grid;
+  grid-template-columns: var(--space-6) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.settings-oauth-step-index {
+  display: inline-flex;
+  width: var(--space-6);
+  height: var(--space-6);
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--token-bg-raised);
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+}
+
+.settings-oauth-step[data-state='active'] .settings-oauth-step-index {
+  background: var(--token-accent-primary);
+  color: var(--token-text-inverse);
+}
+
+.settings-oauth-step[data-state='done'] .settings-oauth-step-index {
+  background: var(--token-status-success);
+  color: var(--token-text-inverse);
+}
+
+.settings-oauth-step[data-state='pending'] .settings-oauth-step-body {
+  opacity: 0.7;
+}
+
+.settings-oauth-step-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.settings-oauth-step-title {
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  line-height: 1.6;
+}
+
+.settings-oauth-step-body .settings-help-text {
+  margin: 0;
+}
+
+.settings-oauth-link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+}
+
+.settings-provider-oauth-code-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-provider-oauth-code-card > code {
+  padding: 0 var(--space-3);
+  min-height: var(--control-height-md);
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-md);
+  background: var(--token-surface-raised);
+  color: var(--token-text-heading);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  letter-spacing: 0.04em;
+}
+
+.settings-oauth-waiting,
+.settings-oauth-browser-opened {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height-md);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+}
+
+.settings-oauth-browser-opened .ui-icon {
+  color: var(--token-status-success);
+}
+
+.settings-oauth-browser-opened .button {
+  margin-inline-start: auto;
+}
+
+.settings-provider-oauth-manual-code {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.settings-provider-oauth-manual-code .input {
+  font-family: var(--font-mono);
+}
+
+.settings-provider-oauth-diagnostic {
+  border-color: color-mix(in srgb, var(--token-status-error) 44%, var(--token-border-muted));
+  color: var(--token-text-heading);
+}
+
+.settings-provider-oauth-diagnostic > span,
+.settings-provider-oauth-checklist {
+  color: var(--token-text-body);
+}
+
+.settings-provider-oauth-checklist {
+  margin: 0;
+  padding-left: var(--space-4);
+}

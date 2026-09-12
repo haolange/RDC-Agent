@@ -1,286 +1,104 @@
 import React, { type Dispatch, type SetStateAction } from 'react';
-import type {
-  RdxActionId,
-  RdxActionSettingsMap,
-  RdxCliInvokerSettings,
-  RdxShellActionSettings,
-} from '@shared/types/settings';
+import type { RdxCliInvokerSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { Input } from '../../../../ui/Input';
+import { Switch } from '../../../../ui/Switch';
 import { AutosizeTextarea } from '../AutosizeTextarea';
-import { SettingsSection } from '../parts';
+import { SettingsField } from '../parts';
+import { envToText, splitArgs, textToEnv } from './toolEnvText';
 
 type Translate = ReturnType<typeof useI18n>['t'];
-type TranslationKey = Parameters<Translate>[0];
 
 interface RdxCliInvokerSettingsFieldsProps {
   rdxCliDraft: RdxCliInvokerSettings;
-  rdxActionsDraft: RdxActionSettingsMap;
   onRdxCliDraftChange: Dispatch<SetStateAction<RdxCliInvokerSettings>>;
-  onRdxActionsDraftChange: Dispatch<SetStateAction<RdxActionSettingsMap>>;
   t: Translate;
 }
 
-const RDX_ACTIONS: Array<{
-  id: RdxActionId;
-  labelKey: TranslationKey;
-  hintKey: TranslationKey;
-  argsPlaceholder: string;
-}> = [
-  {
-    id: 'openCapture',
-    labelKey: 'settings.rdxActionOpenCapture',
-    hintKey: 'settings.rdxActionOpenCaptureHint',
-    argsPlaceholder: '--non-interactive --daemon-context {{inputId}} --json capture open --file {{capturePath}} --frame-index 0',
-  },
-  {
-    id: 'openRemoteCapture',
-    labelKey: 'settings.rdxActionOpenRemoteCapture',
-    hintKey: 'settings.rdxActionOpenRemoteCaptureHint',
-    argsPlaceholder: '--non-interactive --daemon-context {{remoteContextId}} --json capture open --file {{capturePath}} --remote-id {{remoteId}} --frame-index 0',
-  },
-  {
-    id: 'connectRemote',
-    labelKey: 'settings.rdxActionConnectRemote',
-    hintKey: 'settings.rdxActionConnectRemoteHint',
-    argsPlaceholder: '--non-interactive --daemon-context {{deviceId}} --json call rd.remote.connect --args-json {"options":{"transport":"adb_android","device_serial":"{{deviceSerial}}"}} --format json',
-  },
-  {
-    id: 'openPreview',
-    labelKey: 'settings.rdxActionOpenPreview',
-    hintKey: 'settings.rdxActionOpenPreviewHint',
-    argsPlaceholder: '--non-interactive --daemon-context {{contextId}} --json session preview on --session-id {{replaySessionId}}',
-  },
-  {
-    id: 'closeRuntime',
-    labelKey: 'settings.rdxActionCloseRuntime',
-    hintKey: 'settings.rdxActionCloseRuntimeHint',
-    argsPlaceholder: '--non-interactive --daemon-context {{contextId}} --json context clear',
-  },
-];
-
+/**
+ * Local RenderDoc CLI toolchain (machine-local). Every field is visible when the
+ * disclosure is open; the enable switch sits in the section head.
+ */
 export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsProps> = ({
   rdxCliDraft,
-  rdxActionsDraft,
   onRdxCliDraftChange,
-  onRdxActionsDraftChange,
   t,
 }) => {
-  const argsPrefixText = rdxCliDraft.argsPrefix.join(' ');
-  const envText = Object.entries(rdxCliDraft.env)
-    .map(([key, value]) => `${key}=${value}`)
-    .join('\n');
-  const patchRdxCliDraft = (patch: Partial<RdxCliInvokerSettings>) => {
-    onRdxCliDraftChange((current) => ({ ...current, ...patch }));
-  };
-  const patchRdxActionDraft = (actionId: RdxActionId, patch: Partial<RdxShellActionSettings>) => {
-    onRdxActionsDraftChange((current) => ({
-      ...current,
-      [actionId]: {
-        ...current[actionId],
-        ...patch,
-      },
-    }));
+  const patch = (next: Partial<RdxCliInvokerSettings>) => {
+    onRdxCliDraftChange((current) => ({ ...current, ...next }));
   };
 
   return (
-    <>
-      <SettingsSection
-        className="settings-tool-section settings-renderdoc-toolchain"
-        title={t('settings.localRenderDocToolchain')}
-        description={t('settings.localRenderDocToolchainHint')}
-      >
-        <div className={`settings-toolchain-status ${rdxCliDraft.enabled ? 'enabled' : 'disabled'}`}>
-          <strong>{rdxCliDraft.enabled ? t('settings.toolchainAvailable') : t('settings.toolchainNotEnabled')}</strong>
-          {rdxCliDraft.command ? <code>{rdxCliDraft.command}</code> : null}
+    <section className="settings-local-tool-form settings-renderdoc-toolchain" data-testid="settings-rdx-toolchain">
+      <header className="settings-local-tool-form-head">
+        <div>
+          <p className="settings-help-text">{t('settings.localRenderDocToolchainHint')}</p>
         </div>
-        <label className="settings-checkbox-row">
-          <input
-            type="checkbox"
+        <label className="settings-switch-row">
+          <span>{rdxCliDraft.enabled ? t('settings.enabled') : t('settings.disabled')}</span>
+          <Switch
             checked={rdxCliDraft.enabled}
-            onChange={(event) => patchRdxCliDraft({ enabled: event.currentTarget.checked })}
+            onCheckedChange={(enabled) => patch({ enabled })}
+            aria-label={t('settings.rdxCliEnabled')}
+            data-testid="settings-rdx-enabled"
           />
-          <span>{t('settings.rdxCliEnabled')}</span>
         </label>
-        <details className="settings-advanced-panel settings-toolchain-details">
-          <summary>
-            <span>{t('settings.advancedToolchainSettings')}</span>
-            <small>{t('settings.advancedToolchainSettingsHint')}</small>
-          </summary>
-          <div className="settings-advanced-content">
-            <label className="settings-input-row">
-              <span className="settings-help-text">{t('settings.rdxCliCommand')}</span>
-              <input
-                className="input settings-rdx-cli-input"
-                value={rdxCliDraft.command}
-                placeholder="C:\\Tools\\rdx\\bin\\rdx.exe"
-                onChange={(event) => patchRdxCliDraft({ command: event.currentTarget.value })}
-              />
-            </label>
-            <label className="settings-input-row">
-              <span className="settings-help-text">{t('settings.rdxCliArgsPrefix')}</span>
-              <input
-                className="input settings-rdx-cli-input"
-                value={argsPrefixText}
-                placeholder="--non-interactive --json"
-                onChange={(event) => patchRdxCliDraft({
-                  argsPrefix: event.currentTarget.value.split(/\s+/).map((entry) => entry.trim()).filter(Boolean),
-                })}
-              />
-            </label>
-            <label className="settings-input-row">
-              <span className="settings-help-text">{t('settings.rdxCliWorkingDirectory')}</span>
-              <input
-                className="input settings-rdx-cli-input"
-                value={rdxCliDraft.workingDirectory}
-                placeholder="C:\\Tools\\rdx"
-                onChange={(event) => patchRdxCliDraft({ workingDirectory: event.currentTarget.value })}
-              />
-            </label>
-            <label className="settings-input-row">
-              <span className="settings-help-text">{t('settings.rdxCliCatalogPath')}</span>
-              <input
-                className="input settings-rdx-cli-input"
-                value={rdxCliDraft.catalogPath}
-                placeholder="C:\\Tools\\rdx\\spec\\tool_catalog.json"
-                onChange={(event) => patchRdxCliDraft({ catalogPath: event.currentTarget.value })}
-              />
-            </label>
-            <label className="settings-input-row">
-              <span className="settings-help-text">{t('settings.rdxCliTimeoutMs')}</span>
-              <input
-                className="input settings-rdx-cli-input"
-                type="number"
-                min={1000}
-                max={600000}
-                step={1000}
-                value={rdxCliDraft.timeoutMs}
-                onChange={(event) => patchRdxCliDraft({ timeoutMs: Number(event.currentTarget.value) })}
-              />
-            </label>
-            <label className="settings-input-row">
-              <span className="settings-help-text">{t('settings.rdxCliEnv')}</span>
-              <AutosizeTextarea
-                maxHeight={180}
-                className="input settings-rdx-cli-input settings-rdx-cli-textarea"
-                value={envText}
-                placeholder="NAME=value"
-                onChange={(event) => {
-                  const env: Record<string, string> = {};
-                  for (const line of event.currentTarget.value.split(/\r?\n/)) {
-                    const separatorIndex = line.indexOf('=');
-                    if (separatorIndex <= 0) continue;
-                    const key = line.slice(0, separatorIndex).trim();
-                    if (!key) continue;
-                    env[key] = line.slice(separatorIndex + 1);
-                  }
-                  patchRdxCliDraft({ env });
-                }}
-              />
-            </label>
-          </div>
-        </details>
-      </SettingsSection>
+      </header>
 
-      <SettingsSection
-        className="settings-tool-section settings-renderdoc-actions"
-        data-testid="settings-rdx-actions"
-        title={t('settings.rdxShellActions')}
-        description={t('settings.rdxShellActionsHint')}
-      >
-        <div className="settings-rdx-action-list">
-          {RDX_ACTIONS.map((entry) => {
-            const action = rdxActionsDraft[entry.id];
-            const argsText = action.args.join(' ');
-            const actionEnvText = Object.entries(action.env)
-              .map(([key, value]) => `${key}=${value}`)
-              .join('\n');
-            return (
-              <details key={entry.id} className="settings-rdx-action-card" data-testid={`settings-rdx-action-${entry.id}`}>
-                <summary className="settings-rdx-action-header">
-                  <div>
-                    <div className="settings-rdx-action-title">{t(entry.labelKey)}</div>
-                    <div className="settings-help-text">{t(entry.hintKey)}</div>
-                  </div>
-                  <span className={`settings-rdx-action-state ${action.enabled ? 'enabled' : 'disabled'}`}>
-                    {action.enabled ? t('settings.enabled') : t('settings.disabled')}
-                  </span>
-                </summary>
-                <div className="settings-advanced-content settings-rdx-action-fields">
-                  <label className="settings-checkbox-row compact">
-                    <input
-                      type="checkbox"
-                      checked={action.enabled}
-                      onChange={(event) => patchRdxActionDraft(entry.id, { enabled: event.currentTarget.checked })}
-                    />
-                    <span>{action.enabled ? t('settings.enabled') : t('settings.disabled')}</span>
-                  </label>
-                  <label className="settings-input-row">
-                    <span className="settings-help-text">{t('settings.rdxActionCommand')}</span>
-                    <input
-                      className="input settings-rdx-cli-input"
-                      value={action.command}
-                      placeholder="rdx"
-                      onChange={(event) => patchRdxActionDraft(entry.id, { command: event.currentTarget.value })}
-                    />
-                  </label>
-                  <label className="settings-input-row">
-                    <span className="settings-help-text">{t('settings.rdxActionArguments')}</span>
-                    <input
-                      className="input settings-rdx-cli-input"
-                      value={argsText}
-                      placeholder={entry.argsPlaceholder}
-                      onChange={(event) => patchRdxActionDraft(entry.id, {
-                        args: event.currentTarget.value.split(/\s+/).map((value) => value.trim()).filter(Boolean),
-                      })}
-                    />
-                  </label>
-                  <label className="settings-input-row">
-                    <span className="settings-help-text">{t('settings.rdxActionWorkingDirectory')}</span>
-                    <input
-                      className="input settings-rdx-cli-input"
-                      value={action.workingDirectory}
-                      placeholder="{{workspaceRoot}}"
-                      onChange={(event) => patchRdxActionDraft(entry.id, { workingDirectory: event.currentTarget.value })}
-                    />
-                  </label>
-                  <label className="settings-input-row">
-                    <span className="settings-help-text">{t('settings.rdxActionTimeoutMs')}</span>
-                    <input
-                      className="input settings-rdx-cli-input"
-                      type="number"
-                      min={1000}
-                      max={600000}
-                      step={1000}
-                      value={action.timeoutMs}
-                      onChange={(event) => patchRdxActionDraft(entry.id, { timeoutMs: Number(event.currentTarget.value) })}
-                    />
-                  </label>
-                  <label className="settings-input-row">
-                    <span className="settings-help-text">{t('settings.rdxActionEnvironment')}</span>
-                    <AutosizeTextarea
-                      maxHeight={180}
-                      className="input settings-rdx-cli-input settings-rdx-cli-textarea"
-                      value={actionEnvText}
-                      placeholder="NAME=value"
-                      onChange={(event) => {
-                        const env: Record<string, string> = {};
-                        for (const line of event.currentTarget.value.split(/\r?\n/)) {
-                          const separatorIndex = line.indexOf('=');
-                          if (separatorIndex <= 0) continue;
-                          const key = line.slice(0, separatorIndex).trim();
-                          if (!key) continue;
-                          env[key] = line.slice(separatorIndex + 1);
-                        }
-                        patchRdxActionDraft(entry.id, { env });
-                      }}
-                    />
-                  </label>
-                </div>
-              </details>
-            );
-          })}
-        </div>
-      </SettingsSection>
-    </>
+      <div className="settings-local-tool-grid">
+        <SettingsField label={t('settings.rdxCliCommand')} layout="row">
+          <Input
+            value={rdxCliDraft.command}
+            placeholder="C:\\Tools\\rdx\\bin\\rdx.exe"
+            spellCheck={false}
+            onChange={(event) => patch({ command: event.currentTarget.value })}
+          />
+        </SettingsField>
+        <SettingsField label={t('settings.rdxCliArgsPrefix')} layout="row" description={t('settings.rdxCliArgsPrefixHint')}>
+          <Input
+            value={rdxCliDraft.argsPrefix.join(' ')}
+            placeholder="--non-interactive --json"
+            spellCheck={false}
+            onChange={(event) => patch({ argsPrefix: splitArgs(event.currentTarget.value) })}
+          />
+        </SettingsField>
+        <SettingsField label={t('settings.rdxCliWorkingDirectory')} layout="row">
+          <Input
+            value={rdxCliDraft.workingDirectory}
+            placeholder="C:\\Tools\\rdx"
+            spellCheck={false}
+            onChange={(event) => patch({ workingDirectory: event.currentTarget.value })}
+          />
+        </SettingsField>
+        <SettingsField label={t('settings.rdxCliCatalogPath')} layout="row">
+          <Input
+            value={rdxCliDraft.catalogPath}
+            placeholder="C:\\Tools\\rdx\\spec\\tool_catalog.json"
+            spellCheck={false}
+            onChange={(event) => patch({ catalogPath: event.currentTarget.value })}
+          />
+        </SettingsField>
+        <SettingsField label={t('settings.rdxCliTimeoutMs')} layout="row">
+          <Input
+            type="number"
+            min={1000}
+            max={600000}
+            step={1000}
+            value={rdxCliDraft.timeoutMs}
+            onChange={(event) => patch({ timeoutMs: Number(event.currentTarget.value) })}
+          />
+        </SettingsField>
+        <SettingsField label={t('settings.rdxCliEnv')} layout="row" description={t('settings.envLineHint')}>
+          <AutosizeTextarea
+            maxHeight={180}
+            className="input settings-rdx-cli-textarea"
+            value={envToText(rdxCliDraft.env)}
+            placeholder="NAME=value"
+            spellCheck={false}
+            onChange={(event) => patch({ env: textToEnv(event.currentTarget.value) })}
+          />
+        </SettingsField>
+      </div>
+    </section>
   );
 };

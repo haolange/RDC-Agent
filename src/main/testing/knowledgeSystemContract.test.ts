@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   BUILTIN_AGENT_TOOL_IDS,
   BUILTIN_AGENT_TOOL_TIERS,
@@ -76,6 +76,17 @@ function draftCard(): KnowledgeCardRecord {
   };
 }
 
+const temporaryRoots: string[] = [];
+function temporaryDirectory(prefix: string): string {
+  const root = mkdtempSync(path.join(tmpdir(), prefix));
+  temporaryRoots.push(root);
+  return root;
+}
+
+afterEach(() => {
+  for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+
 describe('knowledge system contract', () => {
   it('knowledge.contract.tools.registered-permission-deferred', () => {
     expect.hasAssertions();
@@ -104,7 +115,7 @@ describe('knowledge system contract', () => {
 
   it('knowledge.contract.write.human-only-candidate-fullaccess', async () => {
     expect.hasAssertions();
-    const root = mkdtempSync(path.join(tmpdir(), 'rdc-know-write-'));
+    const root = temporaryDirectory('rdc-know-write-');
     const write = new KnowledgeWriteService({
       listSpaces: () => [space(root)],
       writeFile: async (filePath, contents) => {
@@ -129,14 +140,14 @@ describe('knowledge system contract', () => {
       confirmation: { explicitHumanConfirmation: true },
     });
     expect(saved.lifecycle).toBe('draft');
-    const candidates = createDisposableCandidateService(mkdtempSync(path.join(tmpdir(), 'rdc-know-cand-')));
+    const candidates = createDisposableCandidateService(temporaryDirectory('rdc-know-cand-'));
     expect(await candidates.listCandidates('session-1')).toHaveLength(0);
   });
 
   it('knowledge.contract.colddata.sanitized-import', async () => {
     expect.hasAssertions();
     const yaml = readFileSync(fixturePath, 'utf8');
-    const candidates = createDisposableCandidateService(mkdtempSync(path.join(tmpdir(), 'rdc-know-cold-')));
+    const candidates = createDisposableCandidateService(temporaryDirectory('rdc-know-cold-'));
     const result = await candidates.ingestColdDataToStaging(yaml, {
       sessionId: 'session-cold',
       availableAssetNames: ['symptom-compare-a1b2c3d4.png'],
@@ -167,7 +178,7 @@ describe('knowledge system contract', () => {
       .toMatch(/window\.electronAPI\.knowledge\.(?:overview|query|card)/);
     expect(readRepo('src/main/knowledge/KnowledgeTools.ts')).toMatch(/knowledgeQueryService[\s\S]*knowledgeCandidateService/);
 
-    const root = mkdtempSync(path.join(tmpdir(), 'rdc-know-durable-'));
+    const root = temporaryDirectory('rdc-know-durable-');
     const sessionId = 'session-durable';
     const first = createDisposableCandidateService(root);
     await first.createCandidate({
@@ -222,7 +233,7 @@ describe('knowledge system contract', () => {
     expect(combined).not.toContain('knowledge_candidate_create');
     expect(combined).toEqual(expect.arrayContaining(['skills', 'skill_read', 'ask_user', 'tool_search']));
 
-    const store = createDisposableCandidateService(mkdtempSync(path.join(tmpdir(), 'rdc-know-caller-')));
+    const store = createDisposableCandidateService(temporaryDirectory('rdc-know-caller-'));
     const tools = createKnowledgeTools('constructor-session', { candidates: store });
     const create = tools.find((tool) => tool.name === 'knowledge_candidate_create');
     const created = await create?.execute(
@@ -241,7 +252,7 @@ describe('knowledge system contract', () => {
     expect.hasAssertions();
     expect(sourceStatusImpliesVerified('fixed')).toBe(false);
     expect(sourceStatusImpliesVerified('verified')).toBe(true);
-    const root = mkdtempSync(path.join(tmpdir(), 'rdc-know-fixed-'));
+    const root = temporaryDirectory('rdc-know-fixed-');
     const write = new KnowledgeWriteService({
       listSpaces: () => [space(root)],
       writeFile: async (filePath, contents) => {

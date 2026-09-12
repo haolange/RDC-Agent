@@ -95,6 +95,25 @@ describe('Knowledge five services', () => {
     expect(pack).not.toHaveProperty('semanticClaimed');
   });
 
+  it('projects list-row preview/updatedAt into hits and ingest provenance into card detail', async () => {
+    const root = tempDir();
+    mkdirSync(path.join(root, 'facts'), { recursive: true });
+    const card = draftCard();
+    card.sourceHash = 'a'.repeat(64);
+    card.sourceMtimeMs = 1_700_000_000_000;
+    card.sourceSize = 128;
+    writeFileSync(path.join(root, 'facts', 'sample.md'), serializeKnowledgeCard(card), 'utf8');
+    const { query } = createStack({ root });
+    const result = await query.query({ text: 'vulkan', lanes: ['Lexical'] });
+    const hit = result.hits.find((entry) => entry.title === 'Sample fact');
+    expect(hit?.preview).toContain('Body text about Vulkan');
+    expect(hit?.updatedAt).toBe(Date.parse('2026-09-01T00:00:00.000Z'));
+    const detail = await query.getCard('user', 'facts/sample.md');
+    expect(detail?.sourceHash).toBe('a'.repeat(64));
+    expect(detail?.sourceMtimeMs).toBe(1_700_000_000_000);
+    expect(detail?.sourceSize).toBe(128);
+  });
+
   it('rejects writes without human confirmation even in full-access', async () => {
     const root = tempDir();
     const { write } = createStack({ root });

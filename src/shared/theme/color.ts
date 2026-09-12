@@ -229,17 +229,17 @@ export function scaleInkPalette(ink: Rgb, variant: 'dark' | 'light'): Record<str
   if (variant === 'dark') {
     return {
       primary: ink,
-      secondary: mixRgb(ink, { r: 0, g: 0, b: 0 }, 0.22),
-      tertiary: mixRgb(ink, { r: 0, g: 0, b: 0 }, 0.4),
-      muted: mixRgb(ink, { r: 0, g: 0, b: 0 }, 0.55),
+      secondary: mixRgb(ink, { r: 0, g: 0, b: 0 }, 0.18),
+      tertiary: mixRgb(ink, { r: 0, g: 0, b: 0 }, 0.24),
+      muted: mixRgb(ink, { r: 0, g: 0, b: 0 }, 0.28),
       disabled: mixRgb(ink, { r: 0, g: 0, b: 0 }, 0.7),
     };
   }
   return {
     primary: ink,
-    secondary: mixRgb(ink, { r: 255, g: 255, b: 255 }, 0.28),
-    tertiary: mixRgb(ink, { r: 255, g: 255, b: 255 }, 0.42),
-    muted: mixRgb(ink, { r: 255, g: 255, b: 255 }, 0.55),
+    secondary: mixRgb(ink, { r: 255, g: 255, b: 255 }, 0.18),
+    tertiary: mixRgb(ink, { r: 255, g: 255, b: 255 }, 0.22),
+    muted: mixRgb(ink, { r: 255, g: 255, b: 255 }, 0.26),
     disabled: mixRgb(ink, { r: 255, g: 255, b: 255 }, 0.68),
   };
 }

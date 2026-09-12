@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentHandoffDefinition, AgentManifestDefinition, AgentModelOption } from '@shared/types/agentManifest';
 import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
@@ -48,6 +48,7 @@ export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
   const addRef = useRef<HTMLButtonElement | null>(null);
   const labelRefs = useRef(new Map<string, HTMLInputElement>());
   const deleteRefs = useRef(new Map<string, HTMLButtonElement>());
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
   rowKeysRef.current = syncRowKeys(rowKeysRef.current, handoffs.length);
   const rowKeys = rowKeysRef.current;
   const targets = useMemo(
@@ -76,6 +77,7 @@ export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
   const addHandoff = () => {
     const key = crypto.randomUUID();
     pendingFocusRef.current = { key, target: 'label' };
+    setExpandedIndex(handoffs.length);
     commit([...handoffs, emptyHandoff()], [...rowKeysRef.current, key]);
   };
 
@@ -109,13 +111,15 @@ export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
                 forceShowRequired={forceShowRequired}
                 isFirst={index === 0}
                 isLast={index === handoffs.length - 1}
+                expanded={expandedIndex === index}
+                onToggle={() => setExpandedIndex((current) => (current === index ? null : index))}
                 t={t}
                 onChange={(next) => commit(handoffs.map((entry, current) => (
                   current === index ? persistAgentHandoff(next) : entry
                 )), rowKeysRef.current)}
-                onMoveUp={() => commit(swapAt(handoffs, index, -1), swapAt(rowKeysRef.current, index, -1))}
-                onMoveDown={() => commit(swapAt(handoffs, index, 1), swapAt(rowKeysRef.current, index, 1))}
-                onDelete={() => removeHandoff(index)}
+                onMoveUp={() => { setExpandedIndex(index - 1); commit(swapAt(handoffs, index, -1), swapAt(rowKeysRef.current, index, -1)); }}
+                onMoveDown={() => { setExpandedIndex(index + 1); commit(swapAt(handoffs, index, 1), swapAt(rowKeysRef.current, index, 1)); }}
+                onDelete={() => { setExpandedIndex((current) => (current === index ? null : current !== null && current > index ? current - 1 : current)); removeHandoff(index); }}
                 labelRef={(node) => {
                   if (node) labelRefs.current.set(rowKey, node);
                   else labelRefs.current.delete(rowKey);

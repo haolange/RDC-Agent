@@ -112,7 +112,7 @@ const defaultRdxAction = () => ({
   timeoutMs: 60000,
 });
 
-function cloneRdxActions(actions?: Partial<RdxActionSettingsMap>): RdxActionSettingsMap {
+export function cloneRdxActions(actions?: Partial<RdxActionSettingsMap>): RdxActionSettingsMap {
   return {
     openCapture: cloneRdxAction(actions?.openCapture ?? defaultRdxAction()),
     openRemoteCapture: cloneRdxAction(actions?.openRemoteCapture ?? defaultRdxAction()),

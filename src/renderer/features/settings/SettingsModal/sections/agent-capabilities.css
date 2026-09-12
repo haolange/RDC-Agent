@@ -1,0 +1,102 @@
+.settings-capability-picker {
+  display: flex;
+  min-width: 0;
+  gap: var(--space-4);
+  flex-direction: column;
+}
+
+.settings-capability-note {
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.settings-capability-group {
+  display: flex;
+  min-width: 0;
+  min-height: auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--token-border-muted);
+}
+
+.settings-capability-group-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.settings-capability-group-head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--token-text-heading);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-capability-group-head span {
+  flex: 0 0 auto;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+}
+
+.settings-capability-bucket {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.settings-capability-bucket + .settings-capability-bucket {
+  margin-top: var(--space-2);
+}
+
+.settings-capability-bucket-title {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  letter-spacing: 0.02em;
+}
+
+.settings-capability-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+  min-height: auto;
+  max-height: min(24rem, 42vh);
+  gap: var(--space-0-5) var(--space-2);
+  overflow: auto;
+}
+
+.settings-capability-empty.ui-empty-state {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+  text-align: start;
+  padding: 0;
+  min-height: 0;
+}
+
+.settings-capability-custom {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 14rem) auto;
+  justify-content: start;
+  gap: var(--space-2);
+  margin-top: 0;
+}
+
+@media (max-width: 960px) {
+  .settings-capability-picker {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .settings-capability-custom {
+    grid-template-columns: 1fr;
+  }
+}

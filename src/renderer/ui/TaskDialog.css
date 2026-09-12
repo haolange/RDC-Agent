@@ -107,16 +107,11 @@
 
 @media (max-width: 640px) {
   .task-dialog-overlay {
-    padding: 0;
+    padding: var(--space-3);
   }
 
   .task-dialog {
-    width: 100%;
-    max-width: none;
-    max-height: 100vh;
-    height: 100vh;
-    border: 0;
-    border-radius: 0;
+    max-height: calc(100dvh - var(--space-3) * 2);
   }
 
   .task-dialog-footer {

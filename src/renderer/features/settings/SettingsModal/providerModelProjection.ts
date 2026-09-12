@@ -7,6 +7,32 @@ export interface ProjectedProviderModel {
   effectiveModel: EffectiveModel | null;
 }
 
+/** Discovery refreshes facts without replacing the user's unsaved model choices. */
+export function mergeTestedProviderModels(
+  discovered: LlmProviderModel[],
+  current: LlmProviderModel[],
+): LlmProviderModel[] {
+  const matched = new Set<LlmProviderModel>();
+  const refreshed = discovered.map((model) => {
+    const keys = new Set([model.id, ...(model.aliases ?? [])]);
+    const previous = current.find((entry) => [entry.id, ...(entry.aliases ?? [])].some((key) => keys.has(key)));
+    if (!previous) return model;
+    matched.add(previous);
+    return {
+      ...model,
+      enabled: previous.enabled,
+      defaultReasoningSelection: previous.defaultReasoningSelection,
+      defaultBudgetTokens: previous.defaultBudgetTokens,
+      preferredRouteOptionId: previous.preferredRouteOptionId,
+    };
+  });
+  return [...refreshed, ...current.filter((model) => !matched.has(model)).map((model) => ({
+    ...model,
+    availability: 'unknown' as const,
+    availabilityReason: undefined,
+  }))];
+}
+
 export function updateProviderModelPreference(
   catalogOwnership: LlmProviderCatalogOwnership,
   models: LlmProviderModel[],

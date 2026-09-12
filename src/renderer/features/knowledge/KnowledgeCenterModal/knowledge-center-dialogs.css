@@ -1,5 +1,9 @@
 /* Knowledge task sub-dialogs: import, export, write confirmation. */
 
+.knowledge-center-field textarea {
+  font-family: var(--font-mono);
+}
+
 .knowledge-center-field {
   display: flex;
   flex-direction: column;
@@ -16,6 +20,7 @@
 }
 
 .knowledge-center-diff {
+  max-height: min(30vh, 18rem);
   margin: 0;
   padding: var(--space-3);
   border: 1px solid var(--token-border-muted);
@@ -35,6 +40,22 @@
   color: var(--token-status-error);
 }
 
+.knowledge-center-diff-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.knowledge-center-diff-legend {
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--token-text-caption);
+}
+
+.knowledge-center-diff-legend .is-remove { color: var(--token-status-error); }
+.knowledge-center-diff-legend .is-add { color: var(--token-status-success); }
+
 /* Import */
 .knowledge-import-mode .ui-tabs-list {
   width: 100%;
@@ -50,12 +71,48 @@
   background: var(--token-bg-panel);
 }
 
-.knowledge-import-file-name {
+.knowledge-import-file-copy {
+  display: flex;
   flex: 1;
   min-width: 0;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.knowledge-import-file-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.knowledge-import-file-path {
+  color: var(--token-text-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-import-pending {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-raised);
   color: var(--token-text-body);
   font-size: var(--text-xs);
-  overflow-wrap: anywhere;
+}
+
+.knowledge-import-pending .ui-icon {
+  color: var(--token-status-warning);
 }
 
 .knowledge-import-hint,
@@ -179,16 +236,15 @@
 /* Write confirmation */
 .knowledge-write-facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-panel);
 }
 
 .knowledge-write-fact {
+  display: grid;
+  grid-template-columns: minmax(5rem, 0.2fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -198,7 +254,7 @@
 }
 
 .knowledge-write-fact dd {
-  margin: var(--space-1) 0 0;
+  margin: 0;
   color: var(--token-text-heading);
   font-size: var(--text-xs);
   overflow-wrap: anywhere;

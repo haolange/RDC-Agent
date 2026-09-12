@@ -1,0 +1,155 @@
+.settings-manifest-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.settings-manifest-editor {
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-raised);
+}
+
+.settings-manifest-editor {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+.settings-manifest-editor-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  align-items: center;
+  min-height: auto;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--token-border-muted);
+}
+
+.settings-manifest-editor {
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-panel) 88%, var(--token-bg-shell));
+  border-color: var(--token-border-card);
+}
+
+.settings-manifest-editor-actions .button {
+  min-height: var(--btn-height-sm);
+}
+
+.settings-page-agents .settings-manifest-editor {
+  background: color-mix(in srgb, var(--token-bg-panel) 82%, var(--token-bg-shell));
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-md);
+}
+
+.settings-page-agents .settings-manifest-editor {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.settings-page-agents .settings-manifest-editor-head {
+  align-items: center;
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--token-border-muted);
+}
+
+.settings-page-agents .settings-manifest-editor-actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
+.settings-manifest-editor-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+.settings-runtime-editor.settings-manifest-editor {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+@media (max-width: 960px) {
+  .settings-manifest-editor-head {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 960px) {
+
+  .settings-manifest-editor {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 68rem) {
+
+  .settings-page-agents .settings-manifest-editor {
+    height: auto;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 68rem) {
+
+  .settings-page-agents .settings-manifest-editor {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 68rem) {
+
+  .settings-page-agents .settings-manifest-editor-head {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 68rem) {
+
+  .settings-page-agents .settings-manifest-editor-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 68rem) {
+
+  .settings-manifest-editor-body {
+    flex: 0 0 auto;
+    height: auto;
+    max-height: min(42rem, 72vh);
+  }
+}
+
+@media (max-width: 48rem) {
+  .settings-page-agents .settings-manifest-editor {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+}

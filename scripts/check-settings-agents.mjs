@@ -160,6 +160,9 @@ async function main() {
   const settingsModalSource = readSrcFile(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/index.tsx'),
     'utf8',
+  ) + readSrcFile(
+    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/SettingsPageContent.tsx'),
+    'utf8',
   );
   const settingsModalTypes = readSrcFile(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/types.ts'),
@@ -243,11 +246,15 @@ async function main() {
   );
   assert(toolsSettings.includes('RdxCliInvokerSettingsFields'), 'Tools settings should render the local RenderDoc toolchain.');
   assert(!toolsSettings.includes('onUpsertMcpServer'), 'Tools settings must not keep the removed Settings-owned MCP write path.');
-  assert(settingsModalSource.includes("kinds={['mcp']}"), 'Tools settings should expose Project-aware MCP resources through RuntimeScopePanel.');
-  const renderDocToolchain = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RdxCliInvokerSettingsFields.tsx'),
+  const mcpServicesPanel = readSrcFile(
+    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/McpServicesPanel.tsx'),
     'utf8',
   );
+  assert(settingsModalSource.includes('McpServicesPanel') && mcpServicesPanel.includes("kinds={['mcp']}"), 'Tools settings should expose Project-aware MCP resources through RuntimeScopePanel.');
+  const renderDocToolchain = [
+    readSrcFile(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RdxCliInvokerSettingsFields.tsx'), 'utf8'),
+    readSrcFile(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RdxActionsFields.tsx'), 'utf8'),
+  ].join('\n');
   assert(renderDocToolchain.includes('settings.localRenderDocToolchain'), 'Skills & Tools should expose the local RenderDoc toolchain.');
   assert(renderDocToolchain.includes('settings-rdx-actions'), 'Skills & Tools should expose Settings-managed RDX shell actions.');
   assert(renderDocToolchain.includes('openCapture'), 'RDX shell actions should include the open capture action.');
@@ -506,22 +513,27 @@ Reserved historical filename.
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AgentManifestEditor.tsx'),
     'utf8',
   );
-  assert(agentEditorSource.includes("from '../../../../ui/ColorField'"), 'Agents accent must use shared ColorField');
-  assert(agentEditorSource.includes('data-testid="settings-agent-accent"') || agentEditorSource.includes('testId="settings-agent-accent"'), 'Agents accent must keep a stable test id');
-  assert(agentEditorSource.includes('settings-agent-look-strip'), 'Agents Icon+Accent must live in a compact look strip');
-  assert(agentEditorSource.includes('layout="inline"'), 'Agents accent ColorField must use inline layout');
+  const agentIdentitySource = readSrcFile(
+    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AgentIdentityPanel.tsx'),
+    'utf8',
+  );
+  assert(agentIdentitySource.includes("from '../../../../ui/ColorField'"), 'Agents accent must use shared ColorField');
+  assert(agentIdentitySource.includes('testId="settings-agent-accent"'), 'Agents accent must keep a stable test id');
+  assert(agentIdentitySource.includes('AgentIconPresetPicker') && agentIdentitySource.includes('settings-agent-identity-grid'), 'Agents Icon+Accent live in the identity panel (A02), not a separate look strip');
+  assert(agentIdentitySource.includes('layout="inline"'), 'Agents accent ColorField must use inline layout');
   assert(!agentEditorSource.includes('settings-agent-accent-field'), 'Agents must not keep the legacy toolbar accent field markup');
   assert(!agentEditorSource.includes('settings-agent-identity-controls'), 'legacy stacked identity-controls row must be removed');
+  assert(!agentEditorSource.includes('settings-agent-look-strip'), 'legacy look strip must be removed from the route panel');
   assert(!settingsModalCss.includes('.settings-agent-accent-field'), 'legacy Agents accent CSS must be removed');
   assert(!settingsModalCss.includes('.settings-agent-accent-hex'), 'legacy Agents accent hex CSS must be removed');
+  assert(!settingsModalCss.includes('.settings-agent-look-strip'), 'legacy Agents look strip CSS must be removed');
   assert(
-    settingsModalCss.includes('.settings-page-agents .settings-agent-look-strip'),
-    'Agents look strip styles must exist',
+    agentEditorSource.includes('settings-agent-config-status') && agentEditorSource.includes("from '../../../../ui/Switch'"),
+    'Agents route panel must show a read-only configuration status and Switch-based availability flags',
   );
   assert(
-    settingsModalCss.includes('.settings-page-agents .settings-agent-flags')
-      && settingsModalCss.includes('border-radius: var(--radius-full)'),
-    'Agents flags must render as compact pills',
+    agentEditorSource.includes('settings-agent-panels') && agentEditorSource.includes('aria-expanded={open}'),
+    'Agents Identity / Permissions / Handoffs / Instructions must be accordion panels',
   );
 
   console.log('[settings-agents] OK');

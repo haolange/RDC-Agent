@@ -1,5 +1,5 @@
+import { Button } from '../../ui/Button';
 import { MaterialContextEditor } from '../../patterns/MaterialContextEditor';
-import { Button } from '../../ui';
 import type { MaterialContext } from '@shared/types/materialContext';
 import React, { useEffect, useState } from 'react';
 import type { PendingAttachmentDraft } from '../../types/attachments';
@@ -78,7 +78,7 @@ export const AttachmentCard: React.FC<{
       </span>
       {!failed && <Button variant="ghost" onClick={() => setEditing(true)} aria-label={language === 'zh-CN' ? `说明 ${attachment.fileName}` : `Describe ${attachment.fileName}`}>{language === 'zh-CN' ? '说明' : 'Details'}</Button>}
       {editing && <MaterialContextEditor fileName={attachment.fileName} previewUrl={previewUrl} value={attachment.material} onSave={value => onMaterialChange(attachment.id, value)} onClose={() => setEditing(false)} />}
-      <button
+      <Button variant="ghost" size="sm"
         type="button"
         className="composer-attachment-card-remove"
         onClick={() => onRemove(attachment.id)}
@@ -93,7 +93,7 @@ export const AttachmentCard: React.FC<{
             strokeLinecap="round"
           />
         </svg>
-      </button>
+      </Button>
     </div>
   );
 };

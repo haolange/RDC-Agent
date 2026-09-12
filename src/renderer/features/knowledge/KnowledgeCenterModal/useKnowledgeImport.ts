@@ -5,7 +5,9 @@ import type {
   KnowledgeCardRecord,
   KnowledgeSpace,
 } from '@shared/types/knowledge';
+import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { knowledgeErrorMessage } from './knowledgeCenterModel';
+import { useI18n } from '../../../i18n';
 
 export type KnowledgeImportMode = 'file' | 'paste';
 
@@ -15,6 +17,9 @@ export function useKnowledgeImport(options: {
   spaces: KnowledgeSpace[];
   onCreated: () => Promise<void>;
 }) {
+  const { t } = useI18n();
+  const request = useKnowledgeRequestScope(options.open, options.sessionId ?? '');
+  const inboxRequest = useKnowledgeRequestScope(options.open, options.sessionId ?? '');
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<KnowledgeImportMode>('file');
   const [source, setSource] = useState('');
@@ -30,8 +35,14 @@ export function useKnowledgeImport(options: {
       setInbox(null);
       return;
     }
-    setInbox(await window.electronAPI.knowledge.candidates(options.sessionId));
-  }, [options.sessionId]);
+    const seq = inboxRequest.next();
+    try {
+      const next = await window.electronAPI.knowledge.candidates(options.sessionId);
+      if (inboxRequest.isCurrent(seq)) setInbox(next);
+    } catch (err) {
+      if (inboxRequest.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+    }
+  }, [inboxRequest, options.sessionId]);
 
   useEffect(() => {
     if (!options.open) return;
@@ -39,13 +50,20 @@ export function useKnowledgeImport(options: {
   }, [options.open, refreshInbox]);
 
   const close = useCallback(() => {
+    request.next();
+    setBusy(false);
     setOpen(false);
     setMode('file');
     setSource('');
     setFilePath(null);
     setResult(null);
     setError(null);
-  }, []);
+  }, [request]);
+
+  useEffect(() => {
+    close();
+    setInbox(null);
+  }, [close, options.open, options.sessionId]);
 
   const openPanel = useCallback(() => {
     setSpaceId(options.spaces[0]?.spaceId ?? 'user');
@@ -61,17 +79,28 @@ export function useKnowledgeImport(options: {
   }, []);
 
   const selectFile = useCallback(async () => {
-    const paths = await window.electronAPI.selectFiles();
-    const next = paths?.[0] ?? null;
-    setFilePath(next);
-    if (next) setSource('');
-  }, []);
+    const seq = request.next();
+    setBusy(true);
+    setError(null);
+    try {
+      const paths = await window.electronAPI.selectFiles();
+      if (!request.isCurrent(seq)) return;
+      const next = paths?.[0] ?? null;
+      setFilePath(next);
+      if (next) setSource('');
+    } catch (err) {
+      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+    } finally {
+      if (request.isCurrent(seq)) setBusy(false);
+    }
+  }, [request]);
 
   const importSource = useCallback(async () => {
     if (!options.sessionId) {
-      setError('KNOWLEDGE_SESSION_REQUIRED: Open a session before importing knowledge.');
+      setError(t('knowledgeCenter.sessionRequired'));
       return;
     }
+    const seq = request.next();
     setBusy(true);
     setError(null);
     try {
@@ -80,21 +109,24 @@ export function useKnowledgeImport(options: {
         spaceId,
         ...(filePath ? { filePath } : { source }),
       });
+      if (!request.isCurrent(seq)) return;
       setResult(imported);
       await refreshInbox();
+      if (!request.isCurrent(seq)) return;
       await options.onCreated();
     } catch (err) {
-      setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
     } finally {
-      setBusy(false);
+      if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [filePath, options, refreshInbox, source, spaceId]);
+  }, [filePath, options, refreshInbox, request, source, spaceId, t]);
 
   const createCandidate = useCallback(async (card: KnowledgeCardRecord) => {
     if (!options.sessionId) {
-      setError('KNOWLEDGE_SESSION_REQUIRED: Open a session before creating a Candidate.');
+      setError(t('knowledgeCenter.sessionRequired'));
       return;
     }
+    const seq = request.next();
     setBusy(true);
     setError(null);
     try {
@@ -103,16 +135,19 @@ export function useKnowledgeImport(options: {
         card,
         explicitUserIntent: true,
       });
+      if (!request.isCurrent(seq)) return;
       await options.onCreated();
       await refreshInbox();
+      if (request.isCurrent(seq)) close();
     } catch (err) {
-      setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
     } finally {
-      setBusy(false);
+      if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [options, refreshInbox]);
+  }, [close, options, refreshInbox, request, t]);
 
   return {
+    hasSession: Boolean(options.sessionId),
     open,
     openPanel,
     close,

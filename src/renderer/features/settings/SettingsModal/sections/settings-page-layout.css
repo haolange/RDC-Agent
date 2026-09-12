@@ -1,0 +1,105 @@
+.settings-page-general {
+  min-height: 100%;
+}
+
+.settings-page-agents {
+  height: 100%;
+  overflow: hidden;
+}
+
+.settings-center-panel > .settings-page {
+  width: min(100%, var(--settings-content-max));
+  margin: 0 auto;
+}
+
+.settings-page-models {
+  --settings-content-max: 1600px;
+}
+
+.settings-page-general .settings-section {
+  min-width: 0;
+}
+
+.settings-page-agents {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  padding-right: var(--space-1);
+  height: 100%;
+  flex: 1 1 auto;
+}
+
+.settings-page-skills .settings-help-text {
+  font-size: var(--text-base);
+  line-height: 1.55;
+}
+
+.settings-page-skills {
+  gap: var(--space-4);
+}
+
+.settings-page-skills .settings-help-text,
+.settings-page-policy .settings-help-text {
+  margin-top: var(--space-1);
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 960px) {
+
+  .settings-general-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 960px) {
+
+  .settings-page-agents {
+    height: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 960px) {
+
+  .settings-general-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 960px) {
+
+  .settings-page-agents {
+    height: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .settings-profile-actions {
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .settings-profile-actions .button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 68rem) {
+  .settings-page-agents {
+    display: block;
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .settings-field.is-row.settings-policy-threshold { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 760px) {
+  .settings-runtime-actions { flex-wrap: wrap; }
+}

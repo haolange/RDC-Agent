@@ -4,22 +4,15 @@ import type { AppSettings } from '@shared/types/settings';
 import { useModalFocus } from '../../../lib/useModalFocus';
 import { useOverlayLayer } from '../../../lib/overlayStack';
 import { useSettingsModal } from './useSettingsModal';
-import { GeneralSettings } from './sections/GeneralSettings';
-import { AppearanceSettings } from './sections/AppearanceSettings';
 import { ResourceDiagnosticsDialog } from './sections/ResourceDiagnosticsDialog';
-import { ModelsSettings } from './sections/ModelsSettings';
-import { AgentsSettings } from './sections/AgentsSettings';
-import { ToolsSettings } from './sections/ToolsSettings';
-import { McpStatusDashboard } from './sections/McpStatusDashboard';
-import { McpTrustPanel } from './sections/McpTrustPanel';
 import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
 import { SettingsCenterNav } from './SettingsCenterNav';
 import { useRdxRuntimeOverview } from './useRdxRuntimeOverview';
-import { RuntimeScopePanel } from './sections/RuntimeScopePanel';
-import { HooksSettings } from './sections/HooksSettings';
-import { PolicySettings } from './sections/PolicySettings';
 import { Icon } from '../../../ui/Icon';
 import { IconButton } from '../../../ui/IconButton';
+import { UnsavedChangesDialog } from '../../../ui/UnsavedChangesDialog';
+import { useSettingsNavigation } from './useSettingsNavigation';
+import { SettingsPageContent } from './SettingsPageContent';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
@@ -40,46 +33,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     activeSection,
     setActiveSection,
     sections,
-    accountDraft,
-    setAccountDraft,
-    rdxCliDraft,
-    setRdxCliDraft,
-    rdxActionsDraft,
-    setRdxActionsDraft,
-    codeInterpreterDraft,
-    setCodeInterpreterDraft,
-    shellDraft,
-    setShellDraft,
-    agentManifestDrafts,
-    setAgentManifestDrafts,
-    globalInstructionsDraft,
-    setGlobalInstructionsDraft,
     connectionDraft,
     setConnectionDraft,
-    agentManifestSaveState,
-    agentManifestSaveMessage,
-    agentManifestSaveBlocked,
-    accountProviders,
-    providerCatalog,
-    providerCatalogCategories,
     getResolvedProviderLabel,
-    handleAvatarSelect,
-    handleAccountSave,
-    handleRefreshProviderModels,
-    handleDisconnectProvider,
-    handleSaveAgentManifests,
-    handleImportAgentManifest,
-    handleSaveToolsConfig,
-    handleSavePersonalization,
-    setTheme,
-    setLanguage,
-    setFontScale,
-    setComposerMarkdown,
-    setUsePointerCursors,
-    setReduceMotion,
-    setChromeTheme,
     connectionProvider,
-    openProviderConnection,
     updateConnectionDraft,
     updateConnectionModelPreference,
     connectionNeedsCredentials,
@@ -92,13 +49,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     handleStartAccountLogin,
   } = modal;
 
+  const { pendingLeave, keepEditing, discardAndLeave, guardLeave, requestClose, setResourceDraftDirty } =
+    useSettingsNavigation(modal, settings, onClose);
+
   const closeSurface = useCallback(() => {
     if (connectionDraft) {
       setConnectionDraft(null);
       return;
     }
-    onClose();
-  }, [connectionDraft, onClose, setConnectionDraft]);
+    requestClose();
+  }, [connectionDraft, requestClose, setConnectionDraft]);
   const { layerId } = useOverlayLayer(open);
   useModalFocus({
     open,
@@ -115,9 +75,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
   if (!open) return null;
 
+  const activeSectionMeta = sections.find((section) => section.id === activeSection);
+
   return createPortal(
     <>
-      <div className="settings-modal-backdrop" onClick={onClose}>
+      <div className="settings-modal-backdrop" onClick={requestClose}>
         <div
           ref={dialogRef}
           className="settings-modal settings-center"
@@ -140,7 +102,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
             <SettingsCenterNav
               sections={sections}
               activeSection={activeSection}
-              onSelectSection={setActiveSection}
+              onSelectSection={(section) => guardLeave(() => setActiveSection(section))}
               t={t}
             />
 
@@ -148,119 +110,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
           <div className="settings-center-content">
             <div className="settings-modal-header">
-              <div className="settings-modal-title" id="settings-modal-title">
-                {sections.find((section) => section.id === activeSection)?.label}
+              <div className="settings-modal-heading">
+                <div className="settings-modal-title" id="settings-modal-title">
+                  {activeSectionMeta?.label}
+                </div>
+                {activeSectionMeta?.subtitle ? (
+                  <p className="settings-modal-subtitle">{activeSectionMeta.subtitle}</p>
+                ) : null}
               </div>
               <IconButton
                 className="settings-modal-close"
                 label={t('settings.close')}
-                onClick={onClose}
+                onClick={requestClose}
               >
                 <Icon name="close" size={16} />
               </IconButton>
             </div>
 
             <div ref={panelRef} className="settings-center-panel scrollbar-thin" data-testid="settings-center-panel">
-              {activeSection === 'general' && (
-                <GeneralSettings
-                  settings={settings}
-                  accountDraft={accountDraft}
-                  onAccountDraftChange={setAccountDraft}
-                  onAvatarSelect={handleAvatarSelect}
-                  onAccountSave={handleAccountSave}
-                  onLanguageChange={setLanguage}
-                  globalInstructionsDraft={globalInstructionsDraft}
-                  onGlobalInstructionsDraftChange={setGlobalInstructionsDraft}
-                  onSavePersonalization={handleSavePersonalization}
-                  onOpenResourceDiagnostics={() => setResourceDiagnosticsOpen(true)}
-                  t={t}
-                />
-              )}
-
-              {activeSection === 'appearance' && (
-                <AppearanceSettings
-                  settings={settings}
-                  onThemeChange={setTheme}
-                  onFontScaleChange={setFontScale}
-                  onComposerMarkdownChange={setComposerMarkdown}
-                  onUsePointerCursorsChange={setUsePointerCursors}
-                  onReduceMotionChange={setReduceMotion}
-                  onChromeThemeChange={setChromeTheme}
-                  t={t}
-                />
-              )}
-
-              {activeSection === 'models' && (
-                <ModelsSettings
-                  accountProviders={accountProviders}
-                  providerCatalog={providerCatalog}
-                  providerCatalogCategories={providerCatalogCategories}
-                  getResolvedProviderLabel={getResolvedProviderLabel}
-                  onRefreshProviderModels={handleRefreshProviderModels}
-                  onDisconnectProvider={handleDisconnectProvider}
-                  onOpenProviderConnection={openProviderConnection}
-                  t={t}
-                />
-              )}
-
-              {activeSection === 'skills' && (
-                <section className="settings-page settings-page-skills" data-settings-search="skills">
-                  <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['skill']} onChanged={runtime.setOverview} />
-                </section>
-              )}
-
-              {activeSection === 'agents' && (
-                <section className="settings-page settings-page-agents" data-settings-search="agents">
-                <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['agent']} showResourceStrip={false} onChanged={runtime.setOverview} />
-                <AgentsSettings
-                  settings={settings}
-                  agentManifestDrafts={agentManifestDrafts}
-                  onAgentManifestDraftsChange={setAgentManifestDrafts}
-                  onRetrySaveAgentManifests={handleSaveAgentManifests}
-                  onImportAgentManifest={handleImportAgentManifest}
-                  agentManifestSaveState={agentManifestSaveState}
-                  agentManifestSaveMessage={agentManifestSaveMessage}
-                  agentManifestSaveBlocked={agentManifestSaveBlocked}
-                  t={t}
-                /></section>
-              )}
-
-              {activeSection === 'tools' && (
-                <section className="settings-page settings-page-tools" data-settings-search="tools">
-                <header className="settings-section-header">
-                  <div>
-                    <div className="settings-section-title">{t('settings.mcpServicesTitle')}</div>
-                    <div className="settings-section-subtitle">{t('settings.mcpServicesHint')}</div>
-                  </div>
-                </header>
-                <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['mcp']} onChanged={runtime.setOverview} editorPresentation="dialog" />
-                <McpTrustPanel overview={runtime.overview} onChanged={runtime.setOverview} />
-                <McpStatusDashboard />
-                <ToolsSettings
-                  rdxCliDraft={rdxCliDraft}
-                  rdxActionsDraft={rdxActionsDraft}
-                  codeInterpreterDraft={codeInterpreterDraft}
-                  shellDraft={shellDraft}
-                  onRdxCliDraftChange={setRdxCliDraft}
-                  onRdxActionsDraftChange={setRdxActionsDraft}
-                  onCodeInterpreterDraftChange={setCodeInterpreterDraft}
-                  onShellDraftChange={setShellDraft}
-                  onSaveToolsConfig={handleSaveToolsConfig}
-                  t={t}
-                /></section>
-              )}
-
-              {activeSection === 'hooks' && (
-                <HooksSettings overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} onChanged={runtime.setOverview} />
-              )}
-
-              {activeSection === 'policy' && (
-                <PolicySettings overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} onChanged={runtime.setOverview} />
-              )}
+              <SettingsPageContent modal={modal} settings={settings} runtime={runtime}
+                resourceScope={resourceScope} setResourceScope={setResourceScope}
+                onOpenResourceDiagnostics={() => setResourceDiagnosticsOpen(true)}
+                setResourceDraftDirty={setResourceDraftDirty} />
             </div>
           </div>
         </div>
       </div>
+
+      {pendingLeave ? (
+        <UnsavedChangesDialog
+          title={t('settings.unsavedExitTitle')}
+          message={t('settings.unsavedExitMessage')}
+          keepEditingLabel={t('settings.keepEditing')}
+          discardLabel={t('settings.discardChanges')}
+          onKeepEditing={keepEditing}
+          onDiscard={discardAndLeave}
+        />
+      ) : null}
 
       <ResourceDiagnosticsDialog
         open={resourceDiagnosticsOpen}

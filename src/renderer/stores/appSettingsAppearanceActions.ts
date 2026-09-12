@@ -21,45 +21,43 @@ export function createAppSettingsAppearanceActions(get: AppearanceGet): Pick<
   | 'setChromeTheme'
   | 'setContextBreakdownExpanded'
 > {
+  let pending: Promise<unknown> = Promise.resolve();
+  type Patch = Parameters<AppSettingsState['patchSettings']>[0];
+  const save = (patch: Patch | (() => Patch)): Promise<void> => {
+    const next = pending.then(() => get().patchSettings(typeof patch === 'function' ? patch() : patch)).then(() => undefined);
+    pending = next.catch(() => undefined);
+    return next;
+  };
   return {
     setTheme: async (theme: AppTheme) => {
-      await get().patchSettings({ appearance: { theme } });
+      await save({ appearance: { theme } });
     },
     setLanguage: async (language: AppLanguage) => {
-      await get().patchSettings({ appearance: { language } });
+      await save({ appearance: { language } });
     },
     setFontScale: async (fontScale: FontScale) => {
-      await get().patchSettings({ appearance: { fontScale } });
+      await save({ appearance: { fontScale } });
     },
     setComposerMarkdown: async (composerMarkdown: boolean) => {
-      await get().patchSettings({ appearance: { composerMarkdown } });
+      await save({ appearance: { composerMarkdown } });
     },
     setUsePointerCursors: async (usePointerCursors: boolean) => {
-      await get().patchSettings({ appearance: { usePointerCursors } });
+      await save({ appearance: { usePointerCursors } });
     },
     setReduceMotion: async (reduceMotion: ReduceMotionPreference) => {
-      await get().patchSettings({ appearance: { reduceMotion } });
+      await save({ appearance: { reduceMotion } });
     },
     setChromeTheme: async (variant: ThemeVariant, chrome: Partial<ThemeChromeConfig>) => {
-      const current = get().settings.appearance.chromeThemes;
-      await get().patchSettings({
-        appearance: {
-          chromeThemes: {
-            ...current,
-            [variant]: {
-              ...current[variant],
-              ...chrome,
-              fonts: {
-                ...current[variant].fonts,
-                ...(chrome.fonts ?? {}),
-              },
-            },
-          },
-        },
+      await save(() => {
+        const current = get().settings.appearance.chromeThemes;
+        return { appearance: { chromeThemes: { ...current, [variant]: {
+          ...current[variant], ...chrome,
+          fonts: { ...current[variant].fonts, ...chrome.fonts },
+        } } } };
       });
     },
     setContextBreakdownExpanded: async (contextBreakdownExpanded: boolean) => {
-      await get().patchSettings({ appearance: { contextBreakdownExpanded } });
+      await save({ appearance: { contextBreakdownExpanded } });
     },
   };
 }

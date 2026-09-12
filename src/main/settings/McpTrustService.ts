@@ -42,8 +42,12 @@ export function projectOverridesUserExecutable(
 
 export class McpTrustService {
   constructor(
-    private readonly trustStorePath = path.join(appPathService.getAppStatePaths().appStateRoot, 'mcp-trust.json'),
+    private readonly explicitTrustStorePath?: string,
   ) {}
+
+  private get trustStorePath(): string {
+    return this.explicitTrustStorePath ?? path.join(appPathService.getAppStatePaths().appStateRoot, 'mcp-trust.json');
+  }
 
   resolveProjectRealpath(projectRoot: string): string {
     try {

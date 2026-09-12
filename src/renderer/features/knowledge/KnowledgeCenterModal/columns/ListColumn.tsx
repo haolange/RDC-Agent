@@ -1,11 +1,13 @@
-import type { KnowledgeCandidatesResult, KnowledgeLaneHit } from '@shared/types/knowledge';
+import type { KnowledgeCandidatesResult, KnowledgeCardRecord, KnowledgeLaneHit } from '@shared/types/knowledge';
 import { cn } from '../../../../lib/cn';
+import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { ListRow } from '../../../../ui/ListRow';
 import { Panel } from '../../../../ui/Panel';
 import { SearchField } from '../../../../ui/SearchField';
 import { useI18n, type TranslationKey } from '../../../../i18n';
+import { formatKnowledgeTime } from '../knowledgeCenterLabels';
 import { CardBadges } from '../parts/CardBadges';
 import { KnowledgeFilters } from '../parts/KnowledgeFilters';
 import { ConflictRow } from '../parts/ConflictRow';
@@ -38,15 +40,9 @@ function emptyReason(
   return null;
 }
 
-function HitButton({
-  hit: card,
-  active,
-  onSelect,
-}: {
-  hit: KnowledgeLaneHit;
-  active: boolean;
-  onSelect: () => void;
-}) {
+/** Cards row: title + badges, one-line preview, updated time. Order follows the service hits. */
+function HitButton({ hit: card, active, onSelect }: { hit: KnowledgeLaneHit; active: boolean; onSelect: () => void }) {
+  const updated = formatKnowledgeTime(card.updatedAt);
   return (
     <ListRow
       className={cn('knowledge-center-card-button', active && 'is-active')}
@@ -54,8 +50,46 @@ function HitButton({
       onClick={onSelect}
       data-testid={`knowledge-card-${card.cardId}`}
     >
-      <span className="knowledge-center-card-title">{card.title}</span>
-      <CardBadges type={card.type} lifecycle={card.lifecycle} />
+      <span className="knowledge-center-card-head">
+        <span className="knowledge-center-card-title">{card.title}</span>
+        <CardBadges type={card.type} lifecycle={card.lifecycle} />
+      </span>
+      {card.preview && card.preview.trim() !== card.title.trim() ? <span className="knowledge-center-card-preview">{card.preview}</span> : null}
+      {updated ? <span className="knowledge-center-card-time">{updated}</span> : null}
+    </ListRow>
+  );
+}
+
+/** Candidates / drafts row: title, origin, time, pending-review badge. */
+function RecordRow({
+  record,
+  active,
+  pendingLabel,
+  onSelect,
+}: {
+  record: KnowledgeCardRecord;
+  active: boolean;
+  pendingLabel: string;
+  onSelect: () => void;
+}) {
+  const { t } = useI18n();
+  const updated = formatKnowledgeTime(record.updatedAt);
+  const origin = [record.sourceStatus, record.caseId].filter(Boolean).join(' · ');
+  return (
+    <ListRow
+      className={cn('knowledge-center-inbox-row', active && 'is-active')}
+      selected={active}
+      onClick={onSelect}
+      data-testid={`knowledge-candidate-${record.cardId}`}
+      trailing={<Badge tone="warning">{pendingLabel}</Badge>}
+    >
+      <span className="knowledge-center-card-head">
+        <span className="knowledge-center-card-title">{record.title}</span>
+        <CardBadges type={record.type} lifecycle={record.lifecycle} />
+      </span>
+      {origin ? <span className="knowledge-center-card-preview">{t('knowledgeCenter.sourceLabel')}: {origin}</span> : null}
+      {record.preview && record.preview.trim() !== record.title.trim() ? <span className="knowledge-center-card-preview">{record.preview}</span> : null}
+      {updated ? <span className="knowledge-center-card-time">{updated}</span> : null}
     </ListRow>
   );
 }
@@ -66,21 +100,37 @@ export function ListColumn({ state, inbox, onImport }: ListColumnProps) {
   const loading = state.loadingQuery || state.loadingOverview;
   // The import action belongs next to the empty list, not only in the sidebar.
   const offerImport = reason === 'knowledgeCenter.emptyNoCards' || reason === 'knowledgeCenter.emptyNoSpaces';
+  const candidateCount = (inbox?.candidates.length ?? 0) + (inbox?.drafts.length ?? 0);
+  const conflictCount = state.pack?.conflicts.length ?? 0;
+  const hitById = new Map(state.pack?.hits.map((hit) => [hit.cardId, hit] as const) ?? []);
 
   return (
     <Panel className="knowledge-center-list" data-testid="knowledge-center-list">
-      <SearchField
-        className="knowledge-center-search"
-        value={state.searchQuery}
-        onChange={(event) => state.setSearchQuery(event.target.value)}
-        onClear={() => state.setSearchQuery('')}
-        placeholder={t('knowledgeCenter.searchPlaceholder')}
-        data-testid="knowledge-center-search"
-        aria-label={t('knowledgeCenter.searchPlaceholder')}
-        clearLabel={t('knowledgeCenter.close')}
-      />
-
-      <KnowledgeFilters state={state} />
+      {state.viewMode === 'cards' ? (
+        <>
+          <SearchField
+            className="knowledge-center-search"
+            value={state.searchQuery}
+            onChange={(event) => state.setSearchQuery(event.target.value)}
+            onClear={() => state.setSearchQuery('')}
+            placeholder={t('knowledgeCenter.searchPlaceholder')}
+            data-testid="knowledge-center-search"
+            aria-label={t('knowledgeCenter.searchPlaceholder')}
+            clearLabel={t('app.clearSearch')}
+          />
+          <KnowledgeFilters state={state} />
+        </>
+      ) : (
+        <div className="knowledge-center-list-head" data-testid="knowledge-center-list-head">
+          <strong>
+            {state.viewMode === 'candidates' ? t('knowledgeCenter.candidatesTitle') : t('knowledgeCenter.conflictsTitle')}
+            <span className="knowledge-center-list-count">{state.viewMode === 'candidates' ? candidateCount : conflictCount}</span>
+          </strong>
+          <span className="knowledge-center-list-hint">
+            {state.viewMode === 'candidates' ? t('knowledgeCenter.candidatesHint') : t('knowledgeCenter.conflictDescription')}
+          </span>
+        </div>
+      )}
       <div className="knowledge-center-tree" data-testid="knowledge-center-tree">
         {loading && <div className="knowledge-center-empty-inline">{t('knowledgeCenter.loading')}</div>}
         {!loading && reason && (
@@ -103,35 +153,44 @@ export function ListColumn({ state, inbox, onImport }: ListColumnProps) {
             onSelect={() => void state.selectCard(hit.spaceId, hit.relativePath, hit.cardId)}
           />
         ))}
-        {!loading && state.viewMode === 'candidates' && inbox && (
+        {!loading && state.viewMode === 'candidates' && inbox && !reason && (
           <>
-            <div className="knowledge-center-section-title">{t('knowledgeCenter.candidatesSection')}</div>
+            {inbox.candidates.length > 0 ? (
+              <div className="knowledge-center-section-title">{t('knowledgeCenter.candidatesSection')}</div>
+            ) : null}
             {inbox.candidates.map((entry) => (
-              <ListRow
+              <RecordRow
                 key={entry.candidateId}
-                className="knowledge-center-inbox-row"
-                onClick={() => state.selectRecord(entry.card)}
-              >
-                <span className="knowledge-center-card-title">{entry.card.title}</span>
-                <CardBadges type={entry.card.type} lifecycle={entry.card.lifecycle} sourceStatus={entry.card.sourceStatus} />
-              </ListRow>
+                record={entry.card}
+                active={state.selectedCardId === entry.card.cardId && state.selectedCard?.lifecycle === entry.card.lifecycle}
+                pendingLabel={t('knowledgeCenter.pendingReview')}
+                onSelect={() => state.selectRecord(entry.card)}
+              />
             ))}
-            <div className="knowledge-center-section-title">{t('knowledgeCenter.draftsSection')}</div>
+            {inbox.drafts.length > 0 ? (
+              <div className="knowledge-center-section-title">{t('knowledgeCenter.draftsSection')}</div>
+            ) : null}
             {inbox.drafts.map((draft) => (
-              <ListRow
+              <RecordRow
                 key={draft.cardId}
-                className="knowledge-center-inbox-row"
-                onClick={() => state.selectRecord(draft)}
-              >
-                <span className="knowledge-center-card-title">{draft.title}</span>
-                <span className="knowledge-center-badge">{t('knowledgeCenter.draftNotCandidate')}</span>
-                <CardBadges type={draft.type} lifecycle={draft.lifecycle} sourceStatus={draft.sourceStatus} />
-              </ListRow>
+                record={draft}
+                active={state.selectedCardId === draft.cardId && state.selectedCard?.lifecycle === draft.lifecycle}
+                pendingLabel={t('knowledgeCenter.draftNotCandidate')}
+                onSelect={() => state.selectRecord(draft)}
+              />
             ))}
           </>
         )}
         {!loading && state.viewMode === 'conflicts' && state.pack && !reason && state.pack.conflicts.map((conflict) => (
-          <ConflictRow key={`${conflict.leftCardId}:${conflict.rightCardId}`} leftCardId={conflict.leftCardId} rightCardId={conflict.rightCardId} />
+          <ConflictRow
+            key={`${conflict.leftCardId}:${conflict.rightCardId}`}
+            leftCardId={conflict.leftCardId}
+            rightCardId={conflict.rightCardId}
+            left={hitById.get(conflict.leftCardId)}
+            right={hitById.get(conflict.rightCardId)}
+            selected={state.selectedConflict?.leftCardId === conflict.leftCardId && state.selectedConflict?.rightCardId === conflict.rightCardId}
+            onSelect={() => void state.selectConflict(conflict)}
+          />
         ))}
       </div>
     </Panel>

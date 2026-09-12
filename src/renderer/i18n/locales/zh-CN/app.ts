@@ -1,4 +1,5 @@
 export const zhApp = {
+  'app.clearSearch': '清空搜索',
   'app.connected': '已连接',
   'app.degraded': '连接降级',
   'app.offline': '离线',

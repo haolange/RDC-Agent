@@ -334,8 +334,6 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       if (changed) changedProviderIds.add(provider.id);
     }
     const settledSettings = settingsService.getAll();
-    // Permission / appearance / profile patches do not change agent model options.
-    if (!patch.llm) return settledSettings;
     for (const providerId of changedProviderIds) await broadcastCatalog(providerId);
     return withEffectiveAgentModelOptions(settledSettings);
   });

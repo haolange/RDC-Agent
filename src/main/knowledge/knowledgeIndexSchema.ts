@@ -25,6 +25,7 @@ export const KnowledgeIndexEntrySchema = z.object({
   contentHash: z.string().min(1),
   sourceStatus: z.string().optional(),
   caseId: z.string().optional(),
+  preview: z.string().optional(),
 }).strict();
 
 export const KnowledgeIndexSnapshotSchema = z.object({

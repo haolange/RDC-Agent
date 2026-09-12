@@ -30,12 +30,6 @@
   background: linear-gradient(180deg, color-mix(in srgb, var(--token-bg-app) 100%, transparent), color-mix(in srgb, var(--token-bg-app) 97%, transparent));
   }
 
-html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--token-bg-app) 100%, transparent), color-mix(in srgb, var(--token-bg-app) 97%, transparent)),
-    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--token-accent-primary) 2%, transparent), transparent 70%);
-}
-
 .chat-top-transition-fade {
   position: absolute;
   top: var(--chat-top-hard-stop-height);
@@ -2101,4 +2095,3 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 .conversation-message-assistant .conversation-message-row {
   gap: 0;
 }
-

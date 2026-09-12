@@ -45,6 +45,9 @@ export function compileThemeChrome(
   vars['--color-text-tertiary'] = rgbToCssTriplet(texts.tertiary);
   vars['--color-text-muted'] = rgbToCssTriplet(texts.muted);
   vars['--color-text-disabled'] = rgbToCssTriplet(texts.disabled);
+  vars['--color-success'] = variant === 'light' ? '20 108 61' : '34 197 94';
+  vars['--color-warning'] = variant === 'light' ? '122 82 0' : '251 191 36';
+  vars['--color-error'] = variant === 'light' ? '180 35 24' : '255 138 128';
 
   vars['--font-sans'] = chrome.fonts.ui?.trim() || DEFAULT_UI_FONT;
   vars['--font-mono'] = chrome.fonts.code?.trim() || DEFAULT_CODE_FONT;
@@ -52,8 +55,7 @@ export function compileThemeChrome(
   // Semantic surfaces that read from primitives
   vars['--surface-shell'] = `rgb(var(--color-bg-1))`;
   vars['--surface-panel'] = `rgb(var(--color-bg-2))`;
-  vars['--surface-elevated'] =
-    variant === 'light' ? 'rgb(255 255 255 / 0.94)' : 'rgb(var(--color-bg-2))';
+  vars['--surface-elevated'] = 'rgb(var(--color-bg-2))';
   vars['--surface-active'] = 'rgb(var(--color-accent-500) / 0.1)';
   vars['--color-border-focus'] = 'rgb(var(--color-accent-500))';
   // Popover / Context Usage overlay chrome follows Appearance surface (not a fixed slate).
@@ -66,8 +68,7 @@ export function compileThemeChrome(
     vars['--color-border-default'] = '20 30 44 / 0.15';
     vars['--color-border-strong'] = '20 30 44 / 0.24';
     vars['--token-surface-sunken'] = 'rgb(var(--color-bg-2))';
-    vars['--token-surface-raised'] =
-      'linear-gradient(180deg, rgb(255 255 255), rgb(var(--color-bg-1)))';
+    vars['--token-surface-raised'] = 'rgb(var(--color-bg-1))';
   } else {
     vars['--color-border-subtle'] = '255 255 255 / 0.06';
     vars['--color-border-default'] = '255 255 255 / 0.1';

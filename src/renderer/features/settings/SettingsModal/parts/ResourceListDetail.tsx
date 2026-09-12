@@ -44,8 +44,8 @@ export function ResourceListDetail({
           actions={emptyActions}
         />
       ) : (
-        <div className="settings-resource-split">
-          <div className="settings-resource-list-column">{list}</div>
+        <div className={cn('settings-resource-split', !list && 'is-detail-only')}>
+          {list ? <div className="settings-resource-list-column">{list}</div> : null}
           <div className="settings-resource-detail-column">{detail}</div>
         </div>
       )}

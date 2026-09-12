@@ -1,0 +1,128 @@
+.settings-local-tool-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.settings-local-tool-form + .settings-local-tool-form {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--token-border-muted);
+}
+
+.settings-local-tool-form-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.settings-local-tool-form-head .settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-local-tool-form-head .settings-help-text {
+  margin: var(--space-1) 0 0;
+}
+
+.settings-switch-row {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height-md);
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+}
+
+.settings-local-tool-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-local-tool-grid .settings-field.is-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.32fr) minmax(0, 0.68fr);
+  align-items: start;
+}
+
+.settings-local-tool-grid .settings-field-control {
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-local-tool-grid .settings-field.is-row .settings-field-label {
+  padding-top: calc((var(--control-height-md) - var(--text-sm) * 1.4) / 2);
+}
+
+.settings-local-tool-grid .ui-input,
+.settings-local-tool-grid .input {
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-input-with-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.settings-readonly-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: var(--control-height-md);
+  justify-content: center;
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+}
+
+.settings-readonly-status code {
+  color: var(--token-text-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.settings-rdx-cli-textarea {
+  min-height: calc(var(--control-height-md) * 2);
+  resize: vertical;
+}
+
+.settings-interpreter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+
+.settings-interpreter-grid > .settings-field:not(.is-row) {
+  justify-content: flex-start;
+}
+
+.settings-interpreter-artifacts {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 960px) {
+  .settings-interpreter-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 960px) {
+
+  .settings-local-tool-grid .settings-field.is-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 960px) {
+
+  .settings-local-tool-grid .settings-field.is-row .settings-field-label {
+    padding-top: 0;
+  }
+}

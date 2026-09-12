@@ -101,17 +101,20 @@ export function resolveHistoryTurnProfileId(turn: {
 }
 
 export class TraceService {
-  private traceRoot: string;
-  private runStore: TraceRunStore;
-  private eventStore: TraceEventStore;
-  private emitter: TraceEventEmitter;
+  private stores: { run: TraceRunStore; events: TraceEventStore; emitter: TraceEventEmitter } | null = null;
 
-  constructor() {
-    this.traceRoot = appPathService.getAppStatePaths().tracesPath;
-    this.runStore = new TraceRunStore(this.traceRoot);
-    this.eventStore = new TraceEventStore(this.traceRoot);
-    this.emitter = new TraceEventEmitter(this.eventStore);
+  private getStores() {
+    if (!this.stores) {
+      const root = appPathService.getAppStatePaths().tracesPath;
+      const events = new TraceEventStore(root);
+      this.stores = { run: new TraceRunStore(root), events, emitter: new TraceEventEmitter(events) };
+    }
+    return this.stores;
   }
+
+  private get runStore() { return this.getStores().run; }
+  private get eventStore() { return this.getStores().events; }
+  private get emitter() { return this.getStores().emitter; }
 
   getRun(runId: string): AgentRun | null {
     return this.runStore.get(runId);

@@ -1,55 +1,37 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type {
-  KnowledgeCardDetail,
-  KnowledgeCardRecord,
-  KnowledgeIndexOverview,
-  KnowledgeLaneHit,
-  KnowledgePack,
-  KnowledgeSpace,
+import {
+  KNOWLEDGE_RETRIEVAL_LANES,
+  type KnowledgeCardDetail, type KnowledgeIndexOverview,
+  type KnowledgeLaneHit, type KnowledgePack, type KnowledgeSpace,
 } from '@shared/types/knowledge';
-import { KNOWLEDGE_RETRIEVAL_LANES, type KnowledgeRetrievalLane } from '@shared/types/knowledge';
 import { useProjectStore } from '../../../stores/projectStore';
 import {
-  ALL_CARD_TYPES,
-  ALL_LANES,
-  ALL_LIFECYCLES,
-  createRequestSeq,
-  knowledgeErrorMessage,
-  knowledgeQueryKey,
-  toggleSetValue,
-  type KnowledgeNarrowPane,
-  type KnowledgeViewMode,
+  createRequestSeq, knowledgeErrorMessage, knowledgeQueryKey, toggleSetValue,
+  type KnowledgeNarrowPane, type KnowledgeViewMode,
 } from './knowledgeCenterModel';
-import {
-  buildKnowledgeCenterQueryRequest,
-  nextSelectedSpaceIds,
-  runKnowledgeCenterQuery,
-  SEARCH_DEBOUNCE_MS,
-} from './knowledgeCenterQuery';
+import { buildKnowledgeCenterQueryRequest, nextSelectedSpaceIds, runKnowledgeCenterQuery, SEARCH_DEBOUNCE_MS } from './knowledgeCenterQuery';
+import { useKnowledgeSelection } from './useKnowledgeSelection';
+import { useKnowledgeFilters } from './useKnowledgeFilters';
 
 export function useKnowledgeCenter(open: boolean) {
   const sessionId = useProjectStore((state) => state.currentSession?.sessionId ?? null);
   const querySeq = useRef(createRequestSeq());
-  const detailSeq = useRef(createRequestSeq());
+  const overviewSeq = useRef(createRequestSeq());
+  const rebuildSeq = useRef(createRequestSeq());
   const [viewMode, setViewMode] = useState<KnowledgeViewMode>('cards');
   const [narrow, setNarrow] = useState(false);
   const [narrowPane, setNarrowPane] = useState<KnowledgeNarrowPane>('spaces');
   const [spaces, setSpaces] = useState<KnowledgeSpace[]>([]);
   const [index, setIndex] = useState<KnowledgeIndexOverview | null>(null);
   const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([]);
-  const [types, setTypes] = useState(ALL_CARD_TYPES);
-  const [lifecycles, setLifecycles] = useState(ALL_LIFECYCLES);
-  const [lanes, setLanes] = useState<KnowledgeRetrievalLane[]>([...ALL_LANES]);
+  const { types, lifecycles, lanes, toggleType, toggleLifecycle, toggleLane } = useKnowledgeFilters();
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [hits, setHits] = useState<KnowledgeLaneHit[]>([]);
   const [pack, setPack] = useState<KnowledgePack | null>(null);
   const [packQueryKey, setPackQueryKey] = useState<string | null>(null);
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
-  const [selectedCard, setSelectedCard] = useState<KnowledgeCardDetail | null>(null);
   const [loadingOverview, setLoadingOverview] = useState(false);
   const [loadingQuery, setLoadingQuery] = useState(false);
-  const [loadingDetail, setLoadingDetail] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,17 +49,19 @@ export function useKnowledgeCenter(open: boolean) {
   }, [searchQuery]);
 
   const refreshOverview = useCallback(async () => {
+    const seq = overviewSeq.current.next();
     setLoadingOverview(true);
     setError(null);
     try {
       const result = await window.electronAPI.knowledge.overview();
+      if (!overviewSeq.current.isCurrent(seq)) return;
       setSpaces(result.spaces);
       setIndex(result.index);
       setSelectedSpaceIds((current) => nextSelectedSpaceIds(current, result.spaces));
     } catch (err) {
-      setError(knowledgeErrorMessage(err));
+      if (overviewSeq.current.isCurrent(seq)) setError(knowledgeErrorMessage(err));
     } finally {
-      setLoadingOverview(false);
+      if (overviewSeq.current.isCurrent(seq)) setLoadingOverview(false);
     }
   }, []);
 
@@ -88,7 +72,6 @@ export function useKnowledgeCenter(open: boolean) {
     lifecycle: lifecycles,
     lanes,
   }), [debouncedSearch, lanes, lifecycles, selectedSpaceIds, types]);
-
   const refreshQuery = useCallback(async () => {
     const seq = querySeq.current.next();
     setLoadingQuery(true);
@@ -112,76 +95,77 @@ export function useKnowledgeCenter(open: boolean) {
     }
   }, [queryRequest, viewMode]);
 
-  const selectCard = useCallback(async (spaceId: string, relativePath: string, cardId: string) => {
-    const seq = detailSeq.current.next();
-    setSelectedCardId(cardId);
-    setLoadingDetail(true);
-    setError(null);
-    if (narrow) setNarrowPane('detail');
-    try {
-      const result = await window.electronAPI.knowledge.card(spaceId, relativePath);
-      if (!detailSeq.current.isCurrent(seq)) return;
-      setSelectedCard(result.card);
-      if (!result.card) setError('KNOWLEDGE_CARD_NOT_FOUND');
-    } catch (err) {
-      if (!detailSeq.current.isCurrent(seq)) return;
-      setSelectedCard(null);
-      setError(knowledgeErrorMessage(err));
-    } finally {
-      if (detailSeq.current.isCurrent(seq)) setLoadingDetail(false);
-    }
-  }, [narrow]);
+  const showDetail = useCallback(() => { if (narrow) setNarrowPane('detail'); }, [narrow]);
+  const { selectedCardId, selectedCard, loadingDetail, clearCardSelection,
+    selectedConflict, conflictCards, selectConflict, clearConflict, selectCard, selectRecord } =
+    useKnowledgeSelection({ open, queryKey: knowledgeQueryKey(queryRequest), hits, pack,
+      onShowDetail: showDetail, setError });
 
+  /** Jump from a conflict pair to one of its cards in the Cards view. */
+  const openRelatedCard = useCallback((card: Pick<KnowledgeCardDetail, 'spaceId' | 'relativePath' | 'cardId'>) => {
+    clearConflict();
+    setViewMode('cards');
+    void selectCard(card.spaceId, card.relativePath, card.cardId);
+  }, [clearConflict, selectCard]);
   const rebuildIndex = useCallback(async () => {
+    const seq = rebuildSeq.current.next();
     setRebuilding(true);
     try {
       await window.electronAPI.knowledge.indexRebuild();
+      if (!rebuildSeq.current.isCurrent(seq)) return;
       await refreshOverview();
+      if (!rebuildSeq.current.isCurrent(seq)) return;
       await refreshQuery();
     } catch (err) {
-      setError(knowledgeErrorMessage(err));
+      if (rebuildSeq.current.isCurrent(seq)) setError(knowledgeErrorMessage(err));
     } finally {
-      setRebuilding(false);
+      if (rebuildSeq.current.isCurrent(seq)) setRebuilding(false);
     }
   }, [refreshOverview, refreshQuery]);
-
   useEffect(() => {
     if (!open) {
+      querySeq.current.next();
+      overviewSeq.current.next();
+      rebuildSeq.current.next();
+      setLoadingOverview(false);
+      setLoadingQuery(false);
+      setRebuilding(false);
+      setHits([]);
+      setPack(null);
+      setPackQueryKey(null);
       setSearchQuery('');
-      setSelectedCardId(null);
-      setSelectedCard(null);
+      clearCardSelection();
+      clearConflict();
       setError(null);
       setViewMode('cards');
       setNarrowPane('spaces');
       return;
     }
+    const overview = overviewSeq.current;
+    const rebuild = rebuildSeq.current;
     void refreshOverview();
-  }, [open, refreshOverview]);
+    return () => { overview.next(); rebuild.next(); };
+  }, [clearCardSelection, clearConflict, open, refreshOverview]);
 
   useEffect(() => {
     if (!open) return;
     if (spaces.length === 0 && selectedSpaceIds.length === 0) return;
+    const query = querySeq.current;
     void refreshQuery();
+    return () => { query.next(); };
   }, [open, refreshQuery, selectedSpaceIds.length, spaces.length]);
-
-  const selectRecord = useCallback((record: KnowledgeCardRecord) => {
-    setSelectedCardId(record.cardId);
-    setSelectedCard({ ...record, content: record.body, body: record.body });
-    if (narrow) setNarrowPane('detail');
-  }, [narrow]);
-
   const toggleSpace = useCallback((id: string) => setSelectedSpaceIds((cur) => toggleSetValue(cur, id)), []);
-  const toggleType = useCallback((value: (typeof ALL_CARD_TYPES)[number]) => setTypes((cur) => toggleSetValue(cur, value)), []);
-  const toggleLifecycle = useCallback((value: (typeof ALL_LIFECYCLES)[number]) => setLifecycles((cur) => toggleSetValue(cur, value)), []);
-  const toggleLane = useCallback((value: (typeof ALL_LANES)[number]) => {
-    setLanes((cur) => toggleSetValue(cur, value));
-  }, []);
-
+  const changeViewMode = useCallback((next: KnowledgeViewMode) => {
+    clearCardSelection();
+    clearConflict();
+    setViewMode(next);
+  }, [clearCardSelection, clearConflict]);
   return {
-    sessionId, viewMode, setViewMode, narrow, narrowPane, setNarrowPane, spaces, index,
+    sessionId, viewMode, setViewMode: changeViewMode, narrow, narrowPane, setNarrowPane, spaces, index,
     selectedSpaceIds, types, lifecycles, lanes, allLanes: KNOWLEDGE_RETRIEVAL_LANES,
     searchQuery, setSearchQuery, hits, pack, packQueryKey, selectedCardId, selectedCard, loadingOverview,
     loadingQuery, loadingDetail, rebuilding, error, setError, toggleSpace, toggleType,
     toggleLifecycle, toggleLane, selectCard, selectRecord, rebuildIndex, refreshOverview, refreshQuery, queryRequest,
+    selectedConflict, conflictCards, selectConflict, openRelatedCard,
   };
 }

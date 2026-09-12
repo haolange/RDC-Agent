@@ -99,7 +99,12 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
             />
           </SettingsField>
 
-          <SettingsField layout="row" label={t('userMenu.fontScale')} search="font-scale">
+          <SettingsField
+            layout="row"
+            label={t('userMenu.fontScale')}
+            description={t('settings.appearanceFontScaleHelp')}
+            search="font-scale"
+          >
             <Tabs
               variant="segmented"
               label={t('userMenu.fontScale')}

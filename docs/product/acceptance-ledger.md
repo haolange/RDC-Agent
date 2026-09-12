@@ -10,6 +10,13 @@ Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verifie
 
 | Task | Criterion | Gate/Test | Browser evidence ref | Verdict | Commit SHA | Date |
 | --- | --- | --- | --- | --- | --- | --- |
+| UI-composer-focus | 通过原生项目入口进入真实 Composer，复查鼠标／键盘聚焦白框、编辑／预览、附件与 Skill 操作 | Tabs 多实例 ID、禁用和键盘导航单测已过；真实 Composer 待验证 | — | planned | — | 2026-09-12 |
+| UI-knowledge-data | 补齐 K01/K04/K05/K06/K09/K10/K11 实际阅读、元数据、候选、冲突、导入结果、导出与写入确认 | 迟到详情请求回归已过；空态不替代有数据状态 | — | planned | — | 2026-09-12 |
+| UI-project-model | 补齐 T03 Project MCP 信任、T01 有数据表格、A06 已配置模型选择 | 当前仅无配置／空表状态，不证明真实连接 | — | planned | — | 2026-09-12 |
+| UI-provider-auth | 对设备授权、浏览器授权及环境凭据取得实际成功／失败／取消证据 | 初始弹窗及本地 Ollama 请求失败已观察；外部成功态未验证 | — | planned | — | 2026-09-12 |
+| UI-matrix | 补齐 Dark/Light、中英文、1440/1024/640 的受影响状态，修改后重截并由用户审阅 49 面板 | 已观察中文 Dark 1440、英文 Light 640 顶层；中间宽度实测 1023，非精确 1024 | — | planned | — | 2026-09-12 |
+| UI-knowledge-relations | 独立核对 K06 ingest 关系传递及实际冲突数据来源 | 既有关系处理问题；不混入组件重构，不宣称已修复 | — | planned | — | 2026-09-12 |
+| UI-browser-arguments | 独立收敛 Browser 调用中间可选参数 undefined 序列化为 null 的问题 | 保持严格 IPC 校验；不以放宽 null 接受绕过 | — | planned | — | 2026-09-12 |
 | U00-topology | DESIGN / AGENTS / docs 跨文档拓扑一致：四 builtin 唯一；ask/plan/edit 非法 id + 无 custom manifest 运行通道 | 人工对照 `DESIGN.md` 裁决 A；U04 `check:acceptance-ledger` 短语断言 | — | verified | fbf5d639 | 2026-09-05 |
 | U00-six-lanes | Knowledge 目标拓扑为六 lane（Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version）；Embedding / Semantic 不是现行合同 | 人工对照 `DESIGN.md` 裁决 C / G | — | verified | fbf5d639 | 2026-09-05 |
 | U00-read-roots | canonical knowledge 读根合同已写入：`realpath(~/.rdx/knowledge)` + `realpath(<projectRoot>/.rdx/knowledge)` 仅对 `read_file`/`read_image`/`glob`/`grep` 免审批；write/edit/delete/shell/code_interpreter 双层拒绝。U02 改代码 | `docs/contracts/permissions.md`；`DESIGN.md` 裁决 G | — | verified | fbf5d639 | 2026-09-05 |
@@ -316,3 +323,10 @@ runtime 强制权限/所有权/依赖/执行代次/输出存在/预算/取消/jo
 - 明暗主题切换、英文 locale、640px 全屏没有逐面板走查。
 - 颜色选择器拖拽受 Browser QA 坐标系限制，改用 HSV 几何单测覆盖往返与色域/色相映射。
 - 参考图橙色 `#cc7d5e` 是 Absoluty 预设，不是产品默认；默认仍是蓝色 `#33d1ff`。Absoluty / Codex / GitHub 预设原样保留。
+
+## Settings／Knowledge／Composer 发布后待验收项（2026-09-12）
+
+本轮提交包含已有视觉与运行修复及组件职责收敛；代码检查通过不等于 49 面板视觉验收通过。以下待办随本节所在提交发布，不沿用历史 verified 结论。
+
+
+本轮工程验证：typecheck、lint、design-tokens、renderer-structure、fidelity、appearance、settings-agents、knowledge-system、provider-system、hooks、legacy-residue、repository-hygiene、check:gates、build 通过。完整 tests 与 coverage 使用 --maxWorkers=4 复跑，2676 passed / 4 skipped，coverage ratchet 通过；默认并发初跑超时，未调整测试阈值或断言。后续发布不自动关闭以上待办。

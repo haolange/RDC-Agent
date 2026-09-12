@@ -1,0 +1,197 @@
+.settings-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--modal-backdrop);
+}
+
+.settings-center {
+  --settings-sidebar-width: 240px;
+  position: relative;
+  z-index: var(--z-modal);
+  width: min(92vw, 1920px);
+  height: min(90vh, 1240px);
+  min-width: min(45rem, calc(100vw - var(--space-8)));
+  min-height: min(30rem, calc(100vh - var(--space-8)));
+  display: grid;
+  grid-template-columns: var(--settings-sidebar-width) minmax(0, 1fr);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--modal-radius);
+  background: var(--modal-bg);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  animation: fadeInScale var(--transition-base) var(--ease-decelerate);
+  --settings-content-max: 1480px;
+  --settings-card-bg: var(--token-bg-raised);
+  --settings-card-bg-hover: var(--token-interactive-hover);
+  --settings-subtle-bg: var(--token-bg-shell);
+  border-color: var(--modal-border);
+}
+
+.settings-center-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-4);
+  border-right: 1px solid var(--token-border-card);
+  background: var(--token-bg-shell);
+  border-right-color: var(--token-border-muted);
+  overflow-y: auto;
+}
+
+.settings-center-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-1) var(--space-3);
+}
+
+.settings-center-brand-title {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  line-height: 1.2;
+}
+
+.settings-center-brand-subtitle {
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.settings-center-content {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-center-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-6);
+  background: var(--token-bg-panel);
+}
+
+.settings-page {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+@media (max-width: 880px) {
+  .settings-handoff-card-body .settings-field.is-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 880px) {
+
+  .settings-handoff-card-body .settings-field.is-row .settings-field-label {
+    padding-top: 0;
+  }
+}
+
+@media (max-width: 1280px) {
+  .settings-center {
+    --settings-sidebar-width: 216px;
+  }
+}
+
+@media (max-width: 960px) {
+  .settings-modal-backdrop {
+    padding: var(--space-5);
+  }
+}
+
+@media (max-width: 960px) {
+
+  .settings-center {
+    width: min(94vw, calc(100vw - var(--space-4)));
+    height: min(90vh, calc(100vh - var(--space-4)));
+    min-width: 0;
+    min-height: 0;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 960px) {
+
+  .settings-center-sidebar {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    border-right: 0;
+    border-bottom: 1px solid var(--token-border-card);
+  }
+}
+
+@media (max-width: 960px) {
+
+  .settings-center-content,
+.settings-center-panel {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+@media (max-width: 960px) {
+
+  .settings-secret-status {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 960px) {
+  .settings-modal-backdrop {
+    padding: var(--space-2);
+  }
+}
+
+@media (max-width: 960px) {
+
+  .settings-center-sidebar {
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+}
+
+@media (max-width: 960px) {
+
+  .settings-center-panel {
+    padding: var(--space-4);
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-modal-backdrop { padding: 0; }
+}
+
+@media (max-width: 640px) {
+
+  .settings-center {
+    width: 100vw;
+    height: 100vh;
+    min-width: 0;
+    min-height: 0;
+    border-radius: 0;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .settings-center-brand {
+    padding-bottom: var(--space-2);
+  }
+}

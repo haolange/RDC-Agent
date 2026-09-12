@@ -5,9 +5,21 @@
   gap: var(--space-5);
 }
 
-.settings-block.ui-panel {
+.settings-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-5);
   background: var(--settings-card-bg, var(--token-bg-raised));
-  border-color: var(--token-border-card);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+}
+
+.settings-block-body {
+  min-width: 0;
+  min-height: 0;
 }
 
 .settings-field {
@@ -44,6 +56,21 @@
   min-width: 0;
 }
 
+/* Secondary copy under labels, section heads and notes. */
+.settings-help-text {
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-regular);
+  line-height: 1.5;
+}
+
+.settings-section-subtitle {
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
 /* Scoped resource pages: toolbar + list/detail split, or one compact empty prompt. */
 .settings-resource-frame {
   display: flex;
@@ -70,6 +97,12 @@
   gap: var(--space-2);
 }
 
+.settings-resource-empty .ui-empty-state-description {
+  max-width: 64ch;
+  font-size: var(--text-sm);
+  overflow-wrap: normal;
+}
+
 .settings-resource-empty.ui-empty-state {
   align-items: flex-start;
   text-align: start;
@@ -93,6 +126,10 @@
   overflow-y: auto;
   padding-inline-end: var(--space-1);
   border-inline-end: 1px solid var(--token-border-muted);
+}
+
+.settings-resource-split.is-detail-only {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .settings-resource-detail-column {
@@ -164,9 +201,8 @@
   min-height: var(--control-height-md);
 }
 
-.settings-manifest-row .ui-list-row-body,
-.settings-scope-row .ui-list-row-body {
-  white-space: normal;
+.settings-scope-row {
+  --ui-list-row-white-space: normal;
 }
 
 .settings-manifest-row-copy,

@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react';
+import { cn } from '../lib/cn';
 import { useDynStyle } from '../lib/useDynStyle';
 import { ColorPickerSurface } from './ColorPickerSurface';
 import { Popover } from './Popover';
@@ -12,10 +13,14 @@ export interface ColorFieldProps {
   className?: string;
   fallbackHex?: string;
   /** `inline` = stacked label + compact chip (Agents look strip). Default = label | control grid (Appearance). */
+  hideLabel?: boolean;
   layout?: 'grid' | 'inline';
   /** Accessible names for the picker surfaces. */
   areaLabel: string;
   hueLabel: string;
+  /** Popover heading and the "current color" caption rendered next to the live swatch. */
+  pickerTitle: string;
+  currentLabel: string;
 }
 
 const HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
@@ -28,8 +33,11 @@ export function ColorField({
   className = '',
   fallbackHex = '#33d1ff',
   layout = 'grid',
+  hideLabel = false,
   areaLabel,
   hueLabel,
+  pickerTitle,
+  currentLabel,
 }: ColorFieldProps) {
   const labelId = useId();
   const [open, setOpen] = useState(false);
@@ -54,7 +62,7 @@ export function ColorField({
 
   return (
     <div className={classes}>
-      <span id={labelId} className="settings-field-label color-field-label">{label}</span>
+      <span id={labelId} className={cn('color-field-label', hideLabel && 'is-visually-hidden')}>{label}</span>
       <span className="color-field-control">
         <Popover
           open={open}
@@ -71,13 +79,21 @@ export function ColorField({
             />
           )}
         >
-          <ColorPickerSurface
-            value={resolved}
-            onChange={onChange}
-            testId={testId}
-            areaLabel={areaLabel}
-            hueLabel={hueLabel}
-          />
+          <div className="color-field-popover-title">{pickerTitle}</div>
+          <div className="color-field-popover-body">
+            <ColorPickerSurface
+              value={resolved}
+              onChange={onChange}
+              testId={testId}
+              areaLabel={areaLabel}
+              hueLabel={hueLabel}
+            />
+            <div className="color-field-live">
+              <span className="color-field-live-label">{currentLabel}</span>
+              <span className="color-field-live-swatch" {...swatchStyle} aria-hidden="true" />
+              <code className="color-field-live-hex" data-testid={`${testId}-live`}>{resolved}</code>
+            </div>
+          </div>
         </Popover>
         <input
           type="text"

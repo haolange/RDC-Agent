@@ -8,7 +8,7 @@ import {
   isWriteVersionStale,
   issueKnowledgeWrite,
   resolveWriteConfirmPack,
-} from './useKnowledgeWriteConfirm';
+} from './knowledgeWriteConfirm';
 import { knowledgeQueryKey } from './knowledgeCenterModel';
 
 function card(overrides: Partial<KnowledgeCardRecord> = {}): KnowledgeCardRecord {

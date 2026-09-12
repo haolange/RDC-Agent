@@ -69,7 +69,11 @@ const untrustedReason = (scope: 'user' | 'project'): string => (
 );
 
 export class HookEngine {
-  constructor(private readonly trustStorePath = path.join(appPathService.getAppStatePaths().appStateRoot, 'hook-trust.json')) {}
+  constructor(private readonly explicitTrustStorePath?: string) {}
+
+  private get trustStorePath(): string {
+    return this.explicitTrustStorePath ?? path.join(appPathService.getAppStatePaths().appStateRoot, 'hook-trust.json');
+  }
 
   private loaded: LoadedHook[] = [];
 

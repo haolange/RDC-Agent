@@ -1,6 +1,5 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '../../../../lib/cn';
-import { Panel } from '../../../../ui/Panel';
 import { SectionHeader } from '../../../../ui/SectionHeader';
 
 export interface SettingsSectionProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
@@ -19,12 +18,9 @@ export function SettingsSection({
   ...rest
 }: SettingsSectionProps) {
   return (
-    <Panel
-      className={cn('settings-block', className)}
-      header={<SectionHeader title={title} description={description} actions={actions} />}
-      {...rest}
-    >
-      {children}
-    </Panel>
+    <div className={cn('settings-block', className)} {...rest}>
+      <SectionHeader title={title} description={description} actions={actions} />
+      <div className="settings-block-body">{children}</div>
+    </div>
   );
 }

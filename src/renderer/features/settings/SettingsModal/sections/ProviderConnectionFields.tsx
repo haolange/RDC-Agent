@@ -1,6 +1,7 @@
 import React from 'react';
 import type { LlmProviderConnectionField, LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { Button } from '../../../../ui/Button';
 import {
   projectEndpointTemplate,
   resolvePrimarySecretField,
@@ -94,20 +95,15 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
               data-testid="settings-provider-connect-api-key"
               type={connectionDraft.showApiKey && !connectionDraft.usingStoredSecret ? 'text' : 'password'}
               value={connectionDraft.usingStoredSecret ? STORED_SECRET_MASK : connectionDraft.apiKey}
-              onFocus={() => {
-                if (connectionDraft.usingStoredSecret) {
-                  onUpdateConnectionDraft({ usingStoredSecret: false, apiKey: '', showApiKey: false });
-                }
-              }}
+              readOnly={connectionDraft.usingStoredSecret || connectionDraft.busy !== 'idle'}
               onChange={(event) => onUpdateConnectionDraft({
                 apiKey: event.target.value,
                 usingStoredSecret: false,
                 ...resetTest,
               })}
             />
-            <button
-              type="button"
-              className="settings-secret-toggle"
+            <Button
+              size="sm"
               data-testid="settings-provider-connect-api-key-toggle"
               onClick={() => {
                 if (connectionDraft.usingStoredSecret) {
@@ -119,12 +115,12 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
               aria-label={connectionDraft.usingStoredSecret
                 ? t('settings.replaceSecret')
                 : connectionDraft.showApiKey ? t('settings.hideSecret') : t('settings.showSecret')}
-              disabled={!connectionDraft.usingStoredSecret && !connectionDraft.apiKey}
+              disabled={connectionDraft.busy !== 'idle' || (!connectionDraft.usingStoredSecret && !connectionDraft.apiKey)}
             >
               {connectionDraft.usingStoredSecret
                 ? t('settings.replaceSecret')
                 : connectionDraft.showApiKey ? t('settings.hideSecret') : t('settings.showSecret')}
-            </button>
+            </Button>
           </div>
           <span className="settings-help-text">
             {connectionProvider.hasStoredSecret ? t('settings.apiKeyStoredHint') : t('settings.apiKeyConnectHint')}
@@ -157,14 +153,11 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
                   type={visible && !usingStoredSecret ? 'text' : 'password'}
                   value={usingStoredSecret ? STORED_SECRET_MASK : connectionDraft.connectionValues[field.id] ?? ''}
                   placeholder={field.placeholder ?? ''}
-                  onFocus={() => {
-                    if (usingStoredSecret) replaceStoredSecret(field);
-                  }}
+                  readOnly={usingStoredSecret || connectionDraft.busy !== 'idle'}
                   onChange={(event) => updateField(field, event.target.value)}
                 />
-                <button
-                  type="button"
-                  className="settings-secret-toggle"
+                <Button
+                  size="sm"
                   data-testid={`settings-provider-connect-field-toggle-${field.id}`}
                   onClick={() => {
                     if (usingStoredSecret) {
@@ -181,12 +174,12 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
                   aria-label={usingStoredSecret
                     ? t('settings.replaceSecret')
                     : visible ? t('settings.hideSecret') : t('settings.showSecret')}
-                  disabled={!usingStoredSecret && !connectionDraft.connectionValues[field.id]}
+                  disabled={connectionDraft.busy !== 'idle' || (!usingStoredSecret && !connectionDraft.connectionValues[field.id])}
                 >
                   {usingStoredSecret
                     ? t('settings.replaceSecret')
                     : visible ? t('settings.hideSecret') : t('settings.showSecret')}
-                </button>
+                </Button>
               </div>
             ) : (
               <input

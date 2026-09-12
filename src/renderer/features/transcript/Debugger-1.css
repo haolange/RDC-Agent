@@ -7,12 +7,6 @@
   background: var(--token-bg-app);
 }
 
-html[data-resolved-theme='light'] .debugger-page {
-  background:
-    radial-gradient(circle at top, color-mix(in srgb, var(--token-accent-primary) 2%, transparent), transparent 26%),
-    var(--token-bg-app);
-}
-
 .debugger-inline-error {
   margin-top: var(--space-4);
   padding: var(--space-3) var(--space-4);

@@ -27,7 +27,7 @@
 
 .knowledge-center-grid {
   display: grid;
-  grid-template-columns: 224px minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: 14rem minmax(17.5rem, 0.65fr) minmax(0, 1.35fr);
   min-height: 0;
   flex: 1;
 }
@@ -60,8 +60,8 @@
   gap: 0;
 }
 
-.knowledge-center-spaces,
-.knowledge-center-list {
+.knowledge-center-spaces.ui-panel,
+.knowledge-center-list.ui-panel {
   border-right: 1px solid var(--token-border-muted);
 }
 
@@ -130,8 +130,8 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .knowledge-center-spaces,
-  .knowledge-center-list {
+  .knowledge-center-spaces.ui-panel,
+  .knowledge-center-list.ui-panel {
     border-right: 0;
   }
 }

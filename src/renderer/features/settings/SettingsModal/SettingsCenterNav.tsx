@@ -25,17 +25,28 @@ export const SettingsCenterNav: React.FC<{
 }> = ({ sections, activeSection, onSelectSection, t }) => {
   const [query, setQuery] = useState('');
   const navRef = useRef<HTMLDivElement>(null);
+  const [horizontal, setHorizontal] = useState(() => window.matchMedia('(max-width: 960px)').matches);
   const results = useMemo(
     () => matchSettingsSearchEntries(query, t),
     [query, t],
   );
 
   useEffect(() => {
+    const media = window.matchMedia('(max-width: 960px)');
+    const updateOrientation = () => setHorizontal(media.matches);
+    media.addEventListener('change', updateOrientation);
+    return () => media.removeEventListener('change', updateOrientation);
+  }, []);
+
+  useEffect(() => {
     const items = navRef.current?.querySelectorAll<HTMLButtonElement>('[data-settings-nav-item="true"]');
     items?.forEach((item) => {
       item.tabIndex = item.dataset.section === activeSection ? 0 : -1;
+      if (horizontal && item.tabIndex === 0) {
+        item.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
     });
-  }, [activeSection, sections]);
+  }, [activeSection, horizontal, sections]);
 
   const selectEntry = (entry: SettingsSearchEntry) => {
     onSelectSection(entry.section);
@@ -75,7 +86,7 @@ export const SettingsCenterNav: React.FC<{
         aria-label={t('settings.searchPlaceholder')}
         onChange={(event) => setQuery(event.target.value)}
         onClear={() => setQuery('')}
-        clearLabel={t('settings.close')}
+        clearLabel={t('app.clearSearch')}
       />
       {results.length > 0 ? (
         <div className="settings-search-results" role="listbox" data-testid="settings-search-results">
@@ -99,7 +110,7 @@ export const SettingsCenterNav: React.FC<{
         ref={navRef}
         className="settings-center-nav"
         role="tablist"
-        aria-orientation="vertical"
+        aria-orientation={horizontal ? 'horizontal' : 'vertical'}
         onKeyDown={handleNavKeyDown}
       >
         {sections.map((section) => (

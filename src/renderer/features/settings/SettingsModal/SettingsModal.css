@@ -1,10 +1,47 @@
 @import './parts/settings-kit.css';
 @import './settings-primitives.css';
-@import './settings-shell.css';
+
 @import './settings-general.css';
-@import './sections/appearance-settings.css';
-@import './settings-provider.css';
-@import './settings-agents.css';
+
+
+
 @import './settings-resources.css';
-@import './settings-tools.css';
-@import './settings-responsive.css';
+
+@import './settings-mcp.css';
+@import './sections/provider-catalog.css';
+@import './sections/provider-card.css';
+@import './sections/model-cascade-trigger.css';
+@import './sections/model-cascade-menu.css';
+@import './sections/settings-form-fields.css';
+@import './sections/provider-connection-form.css';
+@import './sections/provider-oauth.css';
+@import './sections/provider-oauth-challenge.css';
+@import './sections/provider-model-list.css';
+@import './sections/provider-model-row.css';
+@import './sections/provider-connection-summary.css';
+@import './sections/model-capabilities.css';
+@import './sections/model-preferences.css';
+@import './sections/agent-model-route.css';
+@import './sections/agent-page-layout.css';
+@import './sections/agent-editor.css';
+@import './sections/agent-list-layout.css';
+@import './sections/agent-list-items.css';
+@import './sections/agent-identity.css';
+@import './sections/agent-instructions.css';
+@import './sections/agent-capabilities.css';
+@import './sections/agent-handoff-card.css';
+@import './sections/agent-icons.css';
+@import './sections/agent-save-status.css';
+@import './sections/agent-panels.css';
+@import './sections/local-tools.css';
+@import './sections/resource-trust.css';
+@import './sections/local-tool-fields.css';
+@import './sections/rdx-actions.css';
+@import './sections/settings-shell.css';
+@import './sections/settings-navigation.css';
+@import './sections/settings-header.css';
+@import './sections/settings-page-layout.css';
+@import './sections/appearance-theme.css';
+@import './sections/appearance-preview.css';
+@import './sections/appearance-import.css';
+@import './sections/appearance-font.css';

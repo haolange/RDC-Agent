@@ -18,3 +18,11 @@ export function previewThemeImport(text: string, variant: ThemeVariant): ThemeIm
   const result = parseRdxThemeV1(text, variant);
   return result.ok ? { state: 'valid', chrome: result.chrome } : { state: 'invalid', error: result.error };
 }
+
+export function themeImportErrorMessage(error: string, t: AppearanceTranslate): string {
+  if (error.includes('must start with') || error.includes('not supported')) return t('settings.appearanceImportPrefixError');
+  if (error.includes('Invalid JSON')) return t('settings.appearanceImportJsonError');
+  if (error.includes('variant must be')) return t('settings.appearanceImportVariantError');
+  if (error.includes('but this Import targets')) return t('settings.appearanceImportTargetError');
+  return t('settings.appearanceImportPayloadError');
+}

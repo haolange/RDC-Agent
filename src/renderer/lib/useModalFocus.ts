@@ -53,6 +53,9 @@ export function useModalFocus(options: {
     const frameId = window.requestAnimationFrame(() => {
       const container = containerRef.current;
       if (!container) return;
+      // Preserve an explicit autofocus target chosen by the dialog (for example,
+      // Keep editing / Cancel), rather than replacing it with the first action.
+      if (container.contains(document.activeElement)) return;
       const first = getModalFocusableElements(container)[0];
       (first ?? container).focus();
     });
@@ -73,7 +76,7 @@ export function useModalFocus(options: {
       (first ?? root).focus();
     };
     const frameId = window.requestAnimationFrame(() => {
-      if (!shouldCaptureEscapedFocus(trap)) return;
+      if (!shouldCaptureEscapedFocus(trap) || !isTopOverlayLayer(layerId)) return;
       focusTrapRoot();
     });
     const handleKeyDown = (event: KeyboardEvent) => {

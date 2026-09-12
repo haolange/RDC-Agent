@@ -13,7 +13,7 @@ import {
   type KnowledgeIndexEntry,
   type KnowledgeIndexSnapshot,
 } from './knowledgeLanes';
-import { toPosixRelative, walkMarkdownFiles } from './knowledgeFs';
+import { extractPreview, toPosixRelative, walkMarkdownFiles } from './knowledgeFs';
 
 export interface KnowledgeIndexDependencies {
   listSpaces(): KnowledgeSpace[];
@@ -65,6 +65,7 @@ function toEntry(
   const parsed = parseKnowledgeFrontmatter(source, { spaceId: space.spaceId, relativePath });
   const headings = [...source.matchAll(/^#{1,3}\s+(.+)$/gm)].map((match) => match[1].trim());
   const lexical = [parsed.record.title, parsed.body, relativePath].join('\n').toLocaleLowerCase();
+  const preview = parsed.record.preview ?? extractPreview(parsed.body);
   return {
     cardId: parsed.record.cardId || `${space.spaceId}:${relativePath}`,
     spaceId: space.spaceId,
@@ -80,6 +81,7 @@ function toEntry(
     contentHash: contentHashOf(source),
     sourceStatus: parsed.record.sourceStatus,
     caseId: parsed.record.caseId,
+    ...(preview ? { preview } : {}),
   };
 }
 

@@ -1,5 +1,6 @@
 .ui-list-row {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
@@ -47,5 +48,5 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: var(--ui-list-row-white-space, nowrap);
 }

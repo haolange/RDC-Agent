@@ -35,7 +35,7 @@
 }
 
 .dropdown-select-trigger.variant-field:hover:not(:disabled),
-.dropdown-select.open .dropdown-select-trigger.variant-field {
+.dropdown-select.is-open .dropdown-select-trigger.variant-field {
   border-color: var(--token-border-strong);
   background: var(--token-bg-panel);
   box-shadow: none;
@@ -49,7 +49,7 @@
 }
 
 .dropdown-select-trigger.variant-inline:hover:not(:disabled),
-.dropdown-select.open .dropdown-select-trigger.variant-inline {
+.dropdown-select.is-open .dropdown-select-trigger.variant-inline {
   color: var(--token-text-heading);
 }
 
@@ -82,7 +82,7 @@
     color var(--transition-fast);
 }
 
-.dropdown-select.open .dropdown-select-trigger-caret {
+.dropdown-select.is-open .dropdown-select-trigger-caret {
   transform: rotate(180deg);
   color: var(--token-text-body);
 }
@@ -106,7 +106,7 @@
 .dropdown-select-menu {
   --dropdown-caret-x: 20px;
   position: fixed;
-  z-index: var(--z-dropdown, 30);
+  z-index: var(--z-floating);
   padding: 0;
   overflow: visible;
   border: 1px solid var(--token-border-default);

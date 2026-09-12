@@ -1,4 +1,5 @@
 export const enApp = {
+  'app.clearSearch': 'Clear search',
   'app.connected': 'Connected',
   'app.degraded': 'Degraded',
   'app.offline': 'Offline',
