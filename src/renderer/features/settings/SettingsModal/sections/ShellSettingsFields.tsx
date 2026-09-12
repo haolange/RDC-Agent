@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import type { AgentShellSettings, ResolvedShellSnapshot } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { selectFiles } from '../../../../hooks/appShellBridge';
+import { Button } from '../../../../ui/Button';
 import { Input } from '../../../../ui/Input';
-import { SettingsField, SettingsSection } from '../parts';
+import { InlineError } from '../../../../ui/InlineError';
+import { SettingsField } from '../parts';
 import { getResolvedShell } from './shellSettingsActions';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -13,11 +16,11 @@ interface ShellSettingsFieldsProps {
   t: Translate;
 }
 
-export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({
-  draft,
-  onChange,
-  t,
-}) => {
+/**
+ * Agent Shell (machine-local): executable override with a real file picker, plus the
+ * read-only detection result from main. Nothing here claims a shell is installed.
+ */
+export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft, onChange, t }) => {
   const [resolved, setResolved] = useState<ResolvedShellSnapshot | null>(null);
 
   useEffect(() => {
@@ -42,42 +45,61 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({
     };
   }, [draft.executable]);
 
+  const browse = async () => {
+    const paths = await selectFiles();
+    const next = paths?.[0];
+    if (next) onChange({ ...draft, executable: next });
+  };
+
   return (
-    <SettingsSection
-      className="settings-tool-card"
-      data-testid="settings-agent-shell"
-      data-settings-search="agent-shell"
-      title={t('settings.shellTitle')}
-      description={t('settings.shellHint')}
-    >
-      <SettingsField label={t('settings.shellExecutable')}>
-        <Input
-          type="text"
-          data-testid="settings-agent-shell-executable"
-          value={draft.executable}
-          onChange={(event) => onChange({ ...draft, executable: event.target.value })}
-          placeholder="C:\Program Files\PowerShell\7\pwsh.exe"
-        />
-      </SettingsField>
-      <div className="settings-help-text" data-testid="settings-agent-shell-diagnostics">
-        {resolved?.ok ? (
-          <>
-            <p>
-              {t('settings.shellResolved')}
-              {': '}
-              {resolved.label}
-              {resolved.version ? ` ${resolved.version}` : ''}
-              {' · '}
-              <code>{resolved.executable}</code>
-            </p>
-            {resolved.kind === 'windows-powershell' ? (
-              <p data-testid="settings-agent-shell-upgrade">{t('settings.shellUpgradePwsh')}</p>
-            ) : null}
-          </>
-        ) : resolved ? (
-          <p data-testid="settings-agent-shell-error">{resolved.error}</p>
-        ) : null}
+    <section className="settings-local-tool-form" data-testid="settings-agent-shell" data-settings-search="agent-shell">
+      <header className="settings-local-tool-form-head">
+        <div>
+          <p className="settings-help-text">{t('settings.shellHint')}</p>
+        </div>
+      </header>
+
+      <div className="settings-local-tool-grid">
+        <SettingsField label={t('settings.shellExecutable')} layout="row">
+          <div className="settings-input-with-action">
+            <Input
+              type="text"
+              data-testid="settings-agent-shell-executable"
+              value={draft.executable}
+              spellCheck={false}
+              onChange={(event) => onChange({ ...draft, executable: event.target.value })}
+              placeholder="C:\Program Files\PowerShell\7\pwsh.exe"
+            />
+            <Button variant="secondary" size="md" onClick={() => void browse()} data-testid="settings-agent-shell-browse">
+              {t('settings.browse')}
+            </Button>
+          </div>
+        </SettingsField>
+
+        <SettingsField label={t('settings.shellDetected')} layout="row">
+          <div className="settings-readonly-status" data-testid="settings-agent-shell-diagnostics">
+            {resolved?.ok ? (
+              <>
+                <strong>
+                  {resolved.label}
+                  {resolved.version ? ` ${resolved.version}` : ''}
+                </strong>
+                <code>{resolved.executable}</code>
+              </>
+            ) : resolved ? (
+              <InlineError data-testid="settings-agent-shell-error">{resolved.error}</InlineError>
+            ) : (
+              <span className="settings-help-text">{t('settings.shellDetecting')}</span>
+            )}
+          </div>
+        </SettingsField>
       </div>
-    </SettingsSection>
+
+      {resolved?.ok && resolved.kind === 'windows-powershell' ? (
+        <p className="settings-help-text settings-runtime-editor-note" data-testid="settings-agent-shell-upgrade">
+          {t('settings.shellUpgradePwsh')}
+        </p>
+      ) : null}
+    </section>
   );
 };

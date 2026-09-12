@@ -67,7 +67,9 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
         {draft.busy === 'saving'
           ? t('settings.saving')
           : provider.authMode === 'account'
-            ? provider.isConfigured ? t('settings.save') : t('settings.connect')
+            ? accountRequiresCode && !accountConnected
+              ? t('settings.oauthContinue')
+              : provider.isConfigured ? t('settings.save') : t('settings.connect')
             : hasFreshTest ? t('settings.save') : t('settings.connect')}
       </Button>
     </>

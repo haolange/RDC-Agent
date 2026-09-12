@@ -1,0 +1,153 @@
+.settings-handoff-editor {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.settings-handoff-list {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-handoff-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-raised);
+  overflow: hidden;
+}
+
+.settings-handoff-card[data-invalid='true'] {
+  border-color: var(--token-status-error);
+}
+
+.settings-handoff-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-2) var(--space-1) 0;
+}
+
+.settings-handoff-card-toggle {
+  display: flex;
+  min-width: 0;
+  min-height: var(--control-height-lg);
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--token-text-heading);
+  text-align: start;
+  cursor: pointer;
+}
+
+.settings-handoff-card-toggle:hover {
+  background: var(--token-interactive-hover);
+}
+
+.settings-handoff-card-toggle:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: -2px;
+}
+
+.settings-handoff-card-toggle .ui-icon {
+  flex: none;
+  color: var(--token-text-caption);
+}
+
+.settings-handoff-card-index {
+  display: inline-flex;
+  flex: none;
+  min-width: var(--space-6);
+  justify-content: center;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-handoff-card-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--token-text-heading);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-handoff-card-target {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-handoff-card-warning {
+  color: var(--token-status-error);
+}
+
+.settings-handoff-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.settings-handoff-delete:not(:disabled):hover,
+.settings-handoff-delete:not(:disabled):focus-visible {
+  color: var(--token-status-error);
+}
+
+.settings-handoff-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--token-border-muted);
+}
+
+.settings-handoff-card-body[hidden] {
+  display: none;
+}
+
+.settings-handoff-card-body .settings-field.is-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr);
+  align-items: start;
+}
+
+.settings-handoff-card-body .settings-field.is-row .settings-field-label {
+  padding-top: calc((var(--control-height-md) - var(--text-sm) * 1.4) / 2);
+}
+
+.settings-handoff-card-body .settings-field-control {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.settings-handoff-card-body .ui-input,
+.settings-handoff-card-body .input {
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-handoff-error {
+  color: var(--token-status-error);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.settings-handoff-add {
+  display: flex;
+  justify-content: flex-start;
+}

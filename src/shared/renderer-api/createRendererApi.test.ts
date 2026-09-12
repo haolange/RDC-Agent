@@ -56,6 +56,17 @@ function listApiFunctions(value: unknown, prefix = ''): Array<{ path: string; fn
 }
 
 describe('canonical renderer API', () => {
+  it('preserves optional resource deletion arguments across JSON transport', async () => {
+    const transport = new RecordingTransport();
+    const api = createRendererApi('win32', transport);
+    await api.rdxRuntime.deleteResource('skill', 'user', 'audit');
+    await api.rdxRuntime.deleteResource('skill', 'project', 'audit', 'D:/QA/project');
+    expect(JSON.parse(JSON.stringify(transport.invocations)).map((call: { args: unknown[] }) => call.args)).toEqual([
+      ['skill', 'user', 'audit'],
+      ['skill', 'project', 'audit', 'D:/QA/project'],
+    ]);
+  });
+
   it('omits an absent overview project argument across JSON transport', async () => {
     const transport = new RecordingTransport();
     const api = createRendererApi('win32', transport);

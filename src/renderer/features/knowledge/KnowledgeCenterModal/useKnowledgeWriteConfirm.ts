@@ -1,7 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { KnowledgeCardRecord, KnowledgePack, KnowledgeQueryRequest } from '@shared/types/knowledge';
 import type { AgentPermissionMode } from '@shared/types/settings';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
+import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { diffKnowledgeCard, rollbackBasis } from './knowledgeCardDiff';
 import { detailToRecord, knowledgeErrorMessage, type KnowledgeWriteAction } from './knowledgeCenterModel';
 import {
@@ -13,22 +14,14 @@ import {
   resolveWriteConfirmPack,
 } from './knowledgeWriteConfirm';
 
-export {
-  canSubmitKnowledgeWrite,
-  collectCardContradicts,
-  evaluateWriteGate,
-  isWritePackStale,
-  isWriteVersionStale,
-  issueKnowledgeWrite,
-  resolveWriteConfirmPack,
-} from './knowledgeWriteConfirm';
-
 export function useKnowledgeWriteConfirm(options: {
+  active: boolean;
   pack?: KnowledgePack | null;
   packQueryKey?: string | null;
   queryRequest: KnowledgeQueryRequest;
   onWritten: () => Promise<void>;
 }) {
+  const request = useKnowledgeRequestScope(options.active);
   const permissionMode = useAppSettingsStore((state) => state.settings.agentRuntime.permissions.mode) as AgentPermissionMode;
   const [open, setOpen] = useState(false);
   const [action, setAction] = useState<KnowledgeWriteAction>('save');
@@ -48,6 +41,8 @@ export function useKnowledgeWriteConfirm(options: {
   const contradicts = collectCardContradicts(pack, after);
 
   const close = useCallback(() => {
+    request.next();
+    setBusy(false);
     setOpen(false);
     setChangeReason('');
     setConfirmed(false);
@@ -56,9 +51,12 @@ export function useKnowledgeWriteConfirm(options: {
     setGatePack(null);
     setPackReady(false);
     setError(null);
-  }, []);
+  }, [request]);
+
+  useEffect(() => { if (!options.active) close(); }, [close, options.active]);
 
   const openFor = useCallback(async (nextAction: KnowledgeWriteAction, current: KnowledgeCardRecord) => {
+    const seq = request.next();
     const next = { ...current };
     if (nextAction === 'promote-verified') next.lifecycle = 'verified';
     if (nextAction === 'promote-promoted') next.lifecycle = 'promoted';
@@ -68,7 +66,9 @@ export function useKnowledgeWriteConfirm(options: {
     setBefore(current);
     setAfter(next);
     setOpenedUpdatedAt(current.updatedAt);
-    setBasis(await rollbackBasis(current.body));
+    const rollback = await rollbackBasis(current.body);
+    if (!request.isCurrent(seq)) return;
+    setBasis(rollback);
     setChangeReason('');
     setConfirmed(false);
     setAcknowledgedConflicts(false);
@@ -78,6 +78,7 @@ export function useKnowledgeWriteConfirm(options: {
     setOpen(true);
     try {
       const latest = await window.electronAPI.knowledge.card(current.spaceId, current.relativePath);
+      if (!request.isCurrent(seq)) return;
       if (isWriteVersionStale(latest.card, current.updatedAt)) {
         setVersionStale(true);
       }
@@ -87,12 +88,13 @@ export function useKnowledgeWriteConfirm(options: {
         queryRequest: options.queryRequest,
         compile: (request) => window.electronAPI.knowledge.compile(request),
       });
+      if (!request.isCurrent(seq)) return;
       setGatePack(nextPack);
       setPackReady(true);
     } catch (err) {
-      setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
     }
-  }, [options.pack, options.packQueryKey, options.queryRequest]);
+  }, [options.pack, options.packQueryKey, options.queryRequest, request]);
 
   const submit = useCallback(async () => {
     if (!after) return;
@@ -104,6 +106,7 @@ export function useKnowledgeWriteConfirm(options: {
       setError(block);
       return;
     }
+    const seq = request.next();
     setBusy(true);
     setError(null);
     try {
@@ -114,6 +117,7 @@ export function useKnowledgeWriteConfirm(options: {
         permissionMode,
         api: window.electronAPI.knowledge,
       });
+      if (!request.isCurrent(seq)) return;
       if (!result.ok) {
         if (result.stale) {
           setVersionStale(true);
@@ -123,13 +127,13 @@ export function useKnowledgeWriteConfirm(options: {
         return;
       }
       await options.onWritten();
-      close();
+      if (request.isCurrent(seq)) close();
     } catch (err) {
-      setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
     } finally {
-      setBusy(false);
+      if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [acknowledgedConflicts, action, after, before, changeReason, close, confirmed, contradicts, openedUpdatedAt, options, packReady, permissionMode]);
+  }, [acknowledgedConflicts, action, after, before, changeReason, close, confirmed, contradicts, openedUpdatedAt, options, packReady, permissionMode, request]);
 
   return {
     open,

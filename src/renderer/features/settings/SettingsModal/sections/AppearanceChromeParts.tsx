@@ -129,6 +129,8 @@ export function ChromeThemeCard(props: {
           label={props.t('settings.appearanceAccent')}
           areaLabel={props.t('settings.colorPickerArea')}
           hueLabel={props.t('settings.colorPickerHue')}
+          pickerTitle={props.t('settings.colorPickerTitle')}
+          currentLabel={props.t('settings.colorPickerCurrent')}
           value={props.chrome.accent}
           testId={`appearance-accent-${props.variant}`}
           onChange={(accent) => props.onChange({ accent, presetId: props.chrome.presetId })}
@@ -137,6 +139,8 @@ export function ChromeThemeCard(props: {
           label={props.t('settings.appearanceBackground')}
           areaLabel={props.t('settings.colorPickerArea')}
           hueLabel={props.t('settings.colorPickerHue')}
+          pickerTitle={props.t('settings.colorPickerTitle')}
+          currentLabel={props.t('settings.colorPickerCurrent')}
           value={props.chrome.surface}
           testId={`appearance-surface-${props.variant}`}
           onChange={(surface) => props.onChange({ surface })}
@@ -145,6 +149,8 @@ export function ChromeThemeCard(props: {
           label={props.t('settings.appearanceForeground')}
           areaLabel={props.t('settings.colorPickerArea')}
           hueLabel={props.t('settings.colorPickerHue')}
+          pickerTitle={props.t('settings.colorPickerTitle')}
+          currentLabel={props.t('settings.colorPickerCurrent')}
           value={props.chrome.ink}
           testId={`appearance-ink-${props.variant}`}
           onChange={(ink) => props.onChange({ ink })}

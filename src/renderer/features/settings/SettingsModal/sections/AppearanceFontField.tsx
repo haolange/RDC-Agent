@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import type { ThemeVariant } from '@shared/types/settings';
 import { Input } from '../../../../ui/Input';
+import { Button } from '../../../../ui/Button';
 import { IconButton } from '../../../../ui/IconButton';
 import { Icon } from '../../../../ui/Icon';
 import { Popover } from '../../../../ui/Popover';
+import { useDynStyle } from '../../../../lib/useDynStyle';
 import type { AppearanceTranslate } from './appearanceChromeModel';
 
 /**
@@ -22,10 +24,50 @@ interface AppearanceFontFieldProps {
   t: AppearanceTranslate;
 }
 
+interface FontOptionProps {
+  family: string | null;
+  selected: boolean;
+  sample: string;
+  label: string;
+  onSelect: () => void;
+}
+
+/** One candidate row: the sample sentence rendered in that family, the family name underneath. */
+function FontOption({ family, selected, sample, label, onSelect }: FontOptionProps) {
+  const style = useDynStyle({ '--ap-font-sample': family ?? 'inherit' });
+  return (
+    <Button
+      variant="ghost"
+      role="radio"
+      aria-checked={selected}
+      className={`appearance-font-option${selected ? ' is-selected' : ''}`}
+      onClick={onSelect}
+    >
+      <span className="appearance-font-option-mark" aria-hidden="true" />
+      <span className="appearance-font-option-copy">
+        <span className="appearance-font-option-sample" {...style}>{sample}</span>
+        <span className="appearance-font-option-name">{label}</span>
+      </span>
+    </Button>
+  );
+}
+
+function FontPreview({ family, sample, title }: { family: string | null; sample: string; title: string }) {
+  const style = useDynStyle({ '--ap-font-sample': family ?? 'inherit' });
+  return (
+    <div className="appearance-font-preview">
+      <div className="appearance-font-preview-title">{title}</div>
+      <div className="appearance-font-option-sample appearance-font-preview-sample" {...style}>{sample}</div>
+    </div>
+  );
+}
+
 export function AppearanceFontField({ kind, variant, value, onChange, t }: AppearanceFontFieldProps) {
   const [open, setOpen] = useState(false);
   const label = kind === 'ui' ? t('settings.appearanceUiFont') : t('settings.appearanceCodeFont');
   const suggestions = kind === 'ui' ? UI_FONT_SUGGESTIONS : CODE_FONT_SUGGESTIONS;
+  const sample = t('settings.appearanceFontSample');
+  const systemDefault = t('settings.appearanceFontSystemDefault');
 
   const apply = (next: string | null) => {
     onChange(next);
@@ -39,7 +81,7 @@ export function AppearanceFontField({ kind, variant, value, onChange, t }: Appea
         <Input
           value={value ?? ''}
           aria-labelledby={`appearance-font-${kind}-${variant}`}
-          placeholder={t('settings.appearanceFontSystemDefault')}
+          placeholder={systemDefault}
           spellCheck={false}
           data-testid={`appearance-${kind}-font-${variant}`}
           onChange={(event) => {
@@ -62,26 +104,30 @@ export function AppearanceFontField({ kind, variant, value, onChange, t }: Appea
             </IconButton>
           )}
         >
-          <div className="appearance-font-popover-title">{t('settings.appearanceFontSuggestions')}</div>
-          <button
-            type="button"
-            className={`appearance-font-option${value === null ? ' is-selected' : ''}`}
-            aria-pressed={value === null}
-            onClick={() => apply(null)}
-          >
-            {t('settings.appearanceFontSystemDefault')}
-          </button>
-          {suggestions.map((family) => (
-            <button
-              key={family}
-              type="button"
-              className={`appearance-font-option${value === family ? ' is-selected' : ''}`}
-              aria-pressed={value === family}
-              onClick={() => apply(family)}
-            >
-              {family}
-            </button>
-          ))}
+          <div className="appearance-font-popover-head">
+            <div className="appearance-font-popover-title">{t('settings.appearanceFontSuggestions')}</div>
+            <p className="appearance-font-popover-note">{t('settings.appearanceFontSuggestionsHint')}</p>
+          </div>
+          <div className="appearance-font-options" role="radiogroup" aria-label={label}>
+            <FontOption
+              family={null}
+              selected={value === null}
+              sample={sample}
+              label={systemDefault}
+              onSelect={() => apply(null)}
+            />
+            {suggestions.map((family) => (
+              <FontOption
+                key={family}
+                family={family}
+                selected={value === family}
+                sample={sample}
+                label={family}
+                onSelect={() => apply(family)}
+              />
+            ))}
+          </div>
+          <FontPreview family={value} sample={sample} title={t('settings.appearanceFontPreview')} />
           <p className="appearance-font-popover-note">{t('settings.appearanceFontFreeTextHint')}</p>
         </Popover>
       </div>

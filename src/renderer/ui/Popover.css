@@ -1,6 +1,6 @@
 .ui-popover {
   position: fixed;
-  z-index: var(--z-popover);
+  z-index: var(--z-floating);
   min-width: calc(var(--control-height-md) * 6);
   max-width: min(360px, calc(100vw - var(--space-4)));
   padding: var(--space-1);

@@ -6,7 +6,11 @@ import { appPathService } from '../../runtime/AppPathService';
 const safeSegment = (value: string): string => value.replace(/[^a-zA-Z0-9._-]/g, '-');
 
 export class RequestSnapshotStore {
-  constructor(private readonly rootPath = appPathService.getAppStatePaths().llmCallsPath) {}
+  constructor(private readonly explicitRootPath?: string) {}
+
+  private get rootPath(): string {
+    return this.explicitRootPath ?? appPathService.getAppStatePaths().llmCallsPath;
+  }
 
   nextCallIndex(sessionId: string | undefined, turnId: string | undefined): number {
     const dir = this.turnPath(sessionId, turnId);

@@ -21,6 +21,16 @@ afterEach(() => {
 });
 
 describe('RdxRuntimeService', () => {
+  it('rejects malformed Skill frontmatter without overwriting the saved instructions', () => {
+    const request = { kind: 'skill' as const, scope: 'user' as const, id: 'validation-test', content: 'Plain Markdown instructions.' };
+    const saved = service.upsert(request);
+    const invalid = { ...request, content: '---\nname: [\n---\nInvalid draft.' };
+    expect(service.validate(invalid).length).toBeGreaterThan(0);
+    expect(() => service.upsert(invalid)).toThrow();
+    expect(fs.readFileSync(saved.sourcePath, 'utf8')).toBe('Plain Markdown instructions.\n');
+    expect(service.validate({ ...request, content: '---\nname: validation-test\nallowed-tools: []\n---\nValid.' })).toEqual([]);
+  });
+
   it('writes user and project resources to canonical isolated paths with provenance status', () => {
     const project = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-runtime-project-'));
     try {

@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { RdxRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdxRuntime';
 import { useI18n } from '../../../../i18n';
-import { selectFiles } from '../../../../hooks/appShellBridge';
 import { emptyForm, formFromContent, type ResourceFormState } from './scopedResourceForm';
 import { uniqueResourceId } from './uniqueResourceId';
-import { deleteScopedResource, importScopedResource } from './runtimeScopeActions';
-import { saveScopedResource, templateResourceId } from './runtimeScopeMutations';
+import { deleteScopedResource } from './runtimeScopeActions';
+import { importScopedResourceFromPicker, saveScopedResource, templateResourceId } from './runtimeScopeMutations';
 
 export { normalizeResourceId, templateResourceId } from './runtimeScopeMutations';
 
@@ -37,11 +36,14 @@ export function useRuntimeScopePanel({
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ScopedResourceDocument | null>(null);
   const [pendingDiscard, setPendingDiscard] = useState<(() => void) | null>(null);
+  /** Dialog presentation: the selection drives a read-only detail; the editor opens only on explicit edit. */
+  const [dialogEditing, setDialogEditing] = useState(false);
 
   const reset = () => {
     const next = emptyForm(kind, templateResourceId(kind));
     setSelectedId(null);
     setCreating(false);
+    setDialogEditing(false);
     setForm(next);
     setBaseline(next);
     setMessage('');
@@ -83,6 +85,20 @@ export function useRuntimeScopePanel({
 
   const closeEditor = () => guard(reset);
 
+  const openDialogEditor = () => {
+    setMessage('');
+    setDialogEditing(true);
+  };
+
+  /** Closes the dialog but keeps the selection so the read-only detail stays put. */
+  const closeDialogEditor = () => guard(() => {
+    setForm(baseline);
+    setCreating(false);
+    setDialogEditing(false);
+    setMessage('');
+    if (creating) setSelectedId(null);
+  });
+
   const patchForm = (patch: Partial<ResourceFormState>) =>
     setForm((current) => ({ ...current, ...patch }));
 
@@ -113,6 +129,7 @@ export function useRuntimeScopePanel({
       const savedForm = saved ? formFromContent(saved.kind, saved.id, saved.content) : form;
       setForm(savedForm);
       setBaseline(savedForm);
+      setDialogEditing(false);
       setMessage(t('settings.scopeSaved'));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
@@ -141,24 +158,17 @@ export function useRuntimeScopePanel({
     setBusy(true);
     setMessage('');
     try {
-      const paths = await selectFiles();
-      const filePath = paths?.[0];
-      if (!filePath) return;
-      const result = await importScopedResource({
+      const result = await importScopedResourceFromPicker({
         kind,
         scope,
-        filePath,
         ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
       });
       if (!result) return;
       onChanged?.(result.overview);
-      const imported = result.overview.resources.find(
-        (entry) => entry.scope === scope && entry.kind === kind && entry.id === result.id,
-      );
-      if (imported) {
-        const next = formFromContent(imported.kind, imported.id, imported.content);
+      if (result.imported) {
+        const next = formFromContent(result.imported.kind, result.imported.id, result.imported.content);
         setCreating(false);
-        setSelectedId(imported.id);
+        setSelectedId(result.imported.id);
         setForm(next);
         setBaseline(next);
       }
@@ -169,31 +179,15 @@ export function useRuntimeScopePanel({
       setBusy(false);
     }
   };
-
   return {
-    resources,
-    selected,
-    selectedId,
-    creating,
-    editing,
-    dirty,
-    form,
-    message,
-    busy,
-    pendingDelete,
-    pendingDiscard,
-    setPendingDelete,
+    resources, selected, selectedId, creating, editing, dirty, form, message, busy,
+    pendingDelete, pendingDiscard, setPendingDelete,
     resolveDiscard: (accept: boolean) => {
       const action = pendingDiscard;
       setPendingDiscard(null);
       if (accept) action?.();
     },
-    openResource,
-    startNew,
-    closeEditor,
-    patchForm,
-    save,
-    remove,
-    importResource,
+    openResource, startNew, closeEditor, dialogEditing, openDialogEditor, closeDialogEditor,
+    patchForm, save, remove, guard, importResource: () => guard(() => void importResource()),
   };
 }

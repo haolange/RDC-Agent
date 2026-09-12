@@ -167,6 +167,8 @@
   --z-popover: 600;
   --z-tooltip: 700;
   --z-overlay: 900;
+  /* Transient menus / popovers must float above whichever surface opened them, including task dialogs. */
+  --z-floating: 950;
   --z-notification: 1000;
 
   /* Easing */
@@ -196,7 +198,8 @@
   --sidebar-width: 240px;
 }
 
-:root[data-resolved-theme='light'] {
+/* Equal specificity to the base defaults; adopted Appearance chrome wins. */
+:root:where([data-resolved-theme='light']) {
   --color-primary-50: 224 233 255;
   --color-primary-100: 207 221 255;
   --color-primary-200: 181 202 255;
@@ -241,10 +244,10 @@
   --surface-shell: rgb(var(--color-bg-1));
   --surface-panel: rgb(var(--color-bg-1));
   --surface-panel-strong: rgb(var(--color-bg-1));
-  --surface-panel-muted: rgb(var(--color-bg-0) / 0.88);
-  --surface-card: rgb(255 255 255 / 0.72);
-  --surface-card-hover: rgb(255 255 255 / 0.92);
-  --surface-elevated: rgb(255 255 255 / 0.94);
+  --surface-panel-muted: rgb(var(--color-bg-0));
+  --surface-card: rgb(var(--color-bg-1));
+  --surface-card-hover: rgb(var(--color-bg-2));
+  --surface-elevated: rgb(var(--color-bg-2));
   --surface-active: rgb(var(--color-accent-500) / 0.1);
 
   /* Semantic surface aliases — light theme overrides */
@@ -263,8 +266,7 @@
   --highlight-edge: inset 0 1px 0 rgb(255 255 255 / 0.85);
   /* Light code/console surfaces read as clearly recessed against white panels */
   --token-surface-sunken: rgb(var(--color-bg-2));
-  /* Light raised cards are white, not gray */
-  --token-surface-raised: linear-gradient(180deg, rgb(255 255 255), rgb(var(--color-bg-1)));
+  --token-surface-raised: rgb(var(--color-bg-1));
 
   /* Effort 强度渐进指示专用，不得挪作装饰。普通档：低浅 → 高深（不含 Max）。 */
   --token-effort-fill-1:       hsl(265 40% 86%);
@@ -799,7 +801,7 @@ html[data-reduce-motion='on'] .active-signal-text.is-active {
   --token-illustration-purple: rgb(var(--color-purple));
 
   /* ── Muted/dim surfaces ── */
-  --token-bg-muted:            color-mix(in srgb, var(--token-bg-raised) 60%, transparent);
+  --token-bg-muted:            var(--token-bg-raised);
   --token-border-subtle:       color-mix(in srgb, var(--token-border-muted) 50%, transparent);
 
   /* ── Status ── */
@@ -890,7 +892,7 @@ html[data-reduce-motion='on'] .active-signal-text.is-active {
   --input-height-md:           var(--control-height-md);
   --input-height-lg:           var(--control-height-lg);
   --input-bg:                  var(--token-bg-muted);
-  --input-bg-hover:            color-mix(in srgb, var(--token-bg-raised) 72%, transparent);
+  --input-bg-hover:            var(--token-bg-raised);
   --input-border:              var(--token-border-input);
   --input-border-hover:        var(--token-border-strong);
   --input-border-focus:        var(--token-border-focus);

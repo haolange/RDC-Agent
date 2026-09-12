@@ -1,0 +1,72 @@
+.settings-model-cascade {
+  width: 100%;
+  align-self: start;
+}
+
+.settings-model-cascade-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  min-height: var(--control-height-md);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--settings-subtle-bg);
+  color: var(--token-text-heading);
+  text-align: start;
+  cursor: pointer;
+}
+
+.settings-model-cascade-trigger:hover {
+  border-color: var(--token-border-default);
+}
+
+.settings-model-cascade-trigger:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 1px;
+}
+
+.settings-model-cascade-trigger[aria-invalid='true'] {
+  border-color: var(--token-status-error);
+}
+
+.settings-model-cascade-trigger-copy {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.settings-model-cascade-trigger .ui-icon {
+  flex: none;
+  color: var(--token-text-caption);
+}
+
+.settings-model-cascade-invalid {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--token-status-error);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.settings-model-cascade-trigger span,
+.settings-model-cascade-trigger strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-model-cascade-trigger strong {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+}
+
+.settings-model-cascade-trigger span {
+  color: var(--token-text-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}

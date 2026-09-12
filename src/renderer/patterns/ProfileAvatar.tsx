@@ -13,7 +13,7 @@ interface ProfileAvatarProps {
 
 const getInitials = (nickname: string): string => {
   const normalized = nickname.trim();
-  return (normalized || 'RA').slice(0, 2).toUpperCase();
+  return (normalized || 'RD').slice(0, 2).toUpperCase();
 };
 
 export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({

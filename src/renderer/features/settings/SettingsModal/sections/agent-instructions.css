@@ -1,0 +1,105 @@
+.settings-agent-instructions {
+  min-height: var(--space-20);
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.settings-agent-tool-diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--token-status-error) 44%, var(--token-border-muted));
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+}
+
+.settings-agent-tool-diagnostics-list {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.settings-agent-tool-diagnostics-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.settings-agent-tool-diagnostics-list code {
+  color: var(--token-status-error);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.settings-agent-instructions,
+.settings-rdx-cli-textarea,
+.settings-agent-textarea-compact {
+  line-height: 1.5;
+}
+
+.settings-agent-textarea-compact {
+  min-height: var(--input-height-lg);
+  resize: vertical;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.settings-agent-instructions-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.settings-agent-instructions--editor {
+  min-height: calc(var(--space-20) * 2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+
+.settings-agent-diagnostics-row {
+  padding: 0;
+}
+
+.settings-agent-diagnostics-toggle {
+  display: flex;
+  width: 100%;
+  min-height: var(--control-height-md);
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  text-align: start;
+  cursor: pointer;
+}
+
+.settings-agent-diagnostics-toggle:hover {
+  background: var(--token-interactive-hover);
+}
+
+.settings-agent-diagnostics-toggle:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: -2px;
+}
+
+.settings-agent-diagnostics-icon {
+  color: var(--token-status-warning);
+}
+
+.settings-agent-diagnostics-link {
+  margin-inline-start: auto;
+  color: var(--token-accent-primary);
+  font-size: var(--text-xs);
+}

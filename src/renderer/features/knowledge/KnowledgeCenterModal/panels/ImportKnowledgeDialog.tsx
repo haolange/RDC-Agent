@@ -1,4 +1,5 @@
 import { Button } from '../../../../ui/Button';
+import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { Select } from '../../../../ui/Select';
 import { Tabs } from '../../../../ui/Tabs';
@@ -14,6 +15,14 @@ const IMPORT_STATUS_KEYS: Record<ColdDataIngestStatus, TranslationKey> = {
   conflict: 'knowledgeCenter.importStatusConflict',
 };
 
+const IMPORT_STATUS_HINT_KEYS: Record<ColdDataIngestStatus, TranslationKey> = {
+  draft: 'knowledgeCenter.importStatusDraftHint',
+  quarantine: 'knowledgeCenter.importStatusQuarantineHint',
+  conflict: 'knowledgeCenter.importStatusConflictHint',
+};
+
+const fileNameOf = (filePath: string): string => filePath.split(/[\\/]/).pop() ?? filePath;
+
 interface ImportKnowledgeDialogProps {
   importer: ReturnType<typeof useKnowledgeImport>;
   spaces: KnowledgeSpace[];
@@ -26,7 +35,7 @@ interface ImportKnowledgeDialogProps {
 export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialogProps) {
   const { t } = useI18n();
   const result = importer.result;
-  const canImport = !importer.busy && Boolean(importer.filePath || importer.source.trim());
+  const canImport = importer.hasSession && !importer.busy && Boolean(importer.filePath || importer.source.trim());
 
   const footer = result ? (
     <>
@@ -36,7 +45,7 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
       {result.status === 'draft' && result.record ? (
         <Button
           variant="primary"
-          disabled={importer.busy}
+          disabled={importer.busy || !importer.hasSession}
           data-testid="knowledge-center-import-create-candidate"
           onClick={() => void importer.createCandidate(result.record!)}
         >
@@ -85,6 +94,7 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
               <span>{t('knowledgeCenter.importNotVerified')}</span>
             </div>
           </div>
+          <p className="knowledge-import-hint" data-testid="knowledge-center-import-status-hint">{t(IMPORT_STATUS_HINT_KEYS[result.status])}</p>
 
           {result.record ? (
             <div className="knowledge-import-result-card">
@@ -99,15 +109,16 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
             <summary>{t('knowledgeCenter.importResultDetails')}</summary>
             <dl className="knowledge-import-result-grid">
               <div>
-                <dt>{t('knowledgeCenter.importCandidateCreatedFalse')}</dt>
-                <dd>{String(result.candidateCreated)}</dd>
+                <dt>{t('knowledgeCenter.importCandidateState')}</dt>
+                <dd>{t('knowledgeCenter.draftNotCandidate')}</dd>
               </div>
               <div>
-                <dt>{t('knowledgeCenter.importVerifiedFalse')}</dt>
-                <dd>{String(result.verified)}</dd>
+                <dt>{t('knowledgeCenter.importVerificationState')}</dt>
+                <dd>{t('knowledgeCenter.importNotVerified')}</dd>
               </div>
             </dl>
           </details>
+          {importer.error && <InlineError>{importer.error}</InlineError>}
         </>
       ) : (
         <>
@@ -119,7 +130,7 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
               value={importer.spaceId}
               disabled={importer.busy}
               onChange={(value) => importer.setSpaceId(value)}
-              options={spaces.map((space) => ({ value: space.spaceId, label: space.label }))}
+              options={spaces.map((space) => ({ value: space.spaceId, label: space.kind === 'user' ? t('knowledgeCenter.userSpace') : space.label }))}
             />
           </label>
 
@@ -137,12 +148,15 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
 
           {importer.mode === 'file' ? (
             <div className="knowledge-import-file" data-testid="knowledge-center-import-file">
-              <span className="knowledge-import-file-name">
-                {importer.filePath ?? t('knowledgeCenter.importNoFile')}
+              <span className="knowledge-import-file-copy">
+                <span className="knowledge-import-file-name">
+                  {importer.filePath ? fileNameOf(importer.filePath) : t('knowledgeCenter.importNoFile')}
+                  {importer.filePath ? (
+                    <span className="knowledge-center-badge">{t('knowledgeCenter.importPendingValidation')}</span>
+                  ) : null}
+                </span>
+                {importer.filePath ? <code className="knowledge-import-file-path" title={importer.filePath}>{importer.filePath}</code> : null}
               </span>
-              {importer.filePath ? (
-                <span className="knowledge-center-badge">{t('knowledgeCenter.importPendingValidation')}</span>
-              ) : null}
               <Button variant="secondary" size="sm" disabled={importer.busy} onClick={() => void importer.selectFile()}>
                 {importer.filePath
                   ? t('knowledgeCenter.importReplaceFile')
@@ -151,7 +165,7 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
             </div>
           ) : (
             <label className="knowledge-center-field">
-              <span>{t('knowledgeCenter.importPasteYaml')}</span>
+              <span>{t('knowledgeCenter.importContentYaml')}</span>
               <Textarea
                 value={importer.source}
                 rows={10}
@@ -163,7 +177,14 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
             </label>
           )}
 
+          {!importer.hasSession ? <InlineError>{t('knowledgeCenter.sessionRequired')}</InlineError> : null}
           <p className="knowledge-import-hint">{t('knowledgeCenter.importFormatHint')}</p>
+          {(importer.filePath || importer.source.trim()) && !importer.error ? (
+            <p className="knowledge-import-pending" role="status" data-testid="knowledge-center-import-pending">
+              <Icon name="warning" size={14} />
+              {t('knowledgeCenter.importPendingHint')}
+            </p>
+          ) : null}
           {importer.error && (
             <InlineError data-testid="knowledge-center-import-error">{importer.error}</InlineError>
           )}

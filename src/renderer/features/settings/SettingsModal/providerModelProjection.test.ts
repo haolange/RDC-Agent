@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { LlmProviderModel } from '@shared/types/settings';
-import { projectProviderModels, updateProviderModelPreference } from './providerModelProjection';
+import { mergeTestedProviderModels, projectProviderModels, updateProviderModelPreference } from './providerModelProjection';
+
+it('refreshes discovered facts while retaining enabled choices and preferences, including models absent from discovery', () => {
+  const result = mergeTestedProviderModels([
+    { id: 'canonical', aliases: ['alias'], label: 'Live label', enabled: false, availability: 'available' },
+    { id: 'new', label: 'New model', enabled: true },
+  ], [
+    { id: 'alias', label: 'Old label', enabled: true, defaultReasoningSelection: 'high' },
+    { id: 'missing', label: 'Missing', enabled: false, availability: 'available' },
+  ]);
+  expect(result).toEqual([
+    expect.objectContaining({ id: 'canonical', label: 'Live label', enabled: true, availability: 'available', defaultReasoningSelection: 'high' }),
+    expect.objectContaining({ id: 'new', enabled: true }),
+    expect.objectContaining({ id: 'missing', enabled: false, availability: 'unknown' }),
+  ]);
+});
 
 function effectiveModel(modelId: string, label: string): EffectiveModel {
   return {

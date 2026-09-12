@@ -105,6 +105,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
         placeholder={t('settings.searchProviders')}
         onChange={(event) => setQuery(event.target.value)}
         onClear={() => setQuery('')}
+            clearLabel={t('app.clearSearch')}
         data-testid="settings-provider-search"
       />
 

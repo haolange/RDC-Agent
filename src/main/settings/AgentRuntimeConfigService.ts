@@ -5,7 +5,7 @@ import type {
   AgentRuntimeMcpDescriptor,
   AgentRuntimeSkillDescriptor,
 } from '@shared/types/agentRuntime';
-import type { MCPTransport } from '@shared/types/mcp';
+import { MCP_TRANSPORTS as MCP_TRANSPORT_LIST, type MCPTransport } from '@shared/types/mcp';
 import type { ScopedResourceCandidate, SkillLoadResult, SkillMetadata } from '@shared/types/rdxRuntime';
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
@@ -16,7 +16,7 @@ import {
 } from './McpTrustService';
 import { isSkillVisibleToProfile } from '@shared/constants/canonicalSkills';
 
-const MCP_TRANSPORTS = new Set<MCPTransport>(['stdio', 'streamable-http']);
+const MCP_TRANSPORTS = new Set<MCPTransport>(MCP_TRANSPORT_LIST);
 
 const toRuntimeId = (value: string, fallback = 'custom'): string =>
   value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || fallback;

@@ -5,6 +5,7 @@ export type ResourceFormState = {
   body: string;
   name: string;
   transport: string;
+  url: string;
   command: string;
   argsText: string;
   enabled: boolean;
@@ -22,6 +23,7 @@ export const emptyForm = (kind: ScopedResourceKind, id: string): ResourceFormSta
       : '',
   name: id,
   transport: 'stdio',
+  url: '',
   command: '',
   argsText: '[]',
   enabled: true,
@@ -41,6 +43,7 @@ export const formFromContent = (kind: ScopedResourceKind, id: string, content: s
         id?: string;
         name?: string;
         transport?: string;
+        url?: string;
         command?: string;
         args?: unknown[];
         enabledByDefault?: boolean;
@@ -50,6 +53,7 @@ export const formFromContent = (kind: ScopedResourceKind, id: string, content: s
         id: String(parsed.id ?? id),
         name: String(parsed.name ?? parsed.id ?? id),
         transport: String(parsed.transport ?? 'stdio'),
+        url: String(parsed.url ?? ''),
         command: String(parsed.command ?? ''),
         argsText: JSON.stringify(Array.isArray(parsed.args) ? parsed.args : [], null, 2),
         enabled: parsed.enabledByDefault !== false,
@@ -96,6 +100,7 @@ export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormStat
       id: form.id,
       name: form.name || form.id,
       transport: form.transport || 'stdio',
+      ...(form.transport === 'streamable-http' && form.url.trim() ? { url: form.url.trim() } : {}),
       command: form.command,
       args,
       enabledByDefault: form.enabled,
@@ -115,6 +120,14 @@ export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormStat
   return form.body;
 };
 
+/** Reads `description:` out of a SKILL.md frontmatter block; empty when there is no frontmatter. */
+export const skillFrontmatterDescription = (content: string): string => {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content);
+  if (!match) return '';
+  const line = match[1].split(/\r?\n/).find((entry) => entry.startsWith('description:'));
+  return line ? line.slice('description:'.length).trim().replace(/^["']|["']$/g, '') : '';
+};
+
 export const resourceCardMeta = (kind: ScopedResourceKind, content: string): string => {
   if (kind === 'mcp') {
     try {
@@ -125,6 +138,9 @@ export const resourceCardMeta = (kind: ScopedResourceKind, content: string): str
   if (kind === 'hook') {
     const event = content.split(/\r?\n/).find((line) => line.startsWith('event:'));
     return event ? event.slice(6).trim() : '';
+  }
+  if (kind === 'skill') {
+    return skillFrontmatterDescription(content);
   }
   return '';
 };

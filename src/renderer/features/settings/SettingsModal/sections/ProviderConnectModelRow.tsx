@@ -66,11 +66,13 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
     >
       <div className="settings-model-row-main">
         <span className="settings-model-row-check" title={statusTitle}>{statusLabel}</span>
-        <span className="settings-model-row-label" title={model.label}>{model.label}</span>
+        <span className="settings-model-row-identity">
+          <span className="settings-model-row-label" title={model.label}>{model.label}</span>
         <span className="settings-model-capability-badge" data-testid={`settings-provider-model-capability-badge-${model.id}`}>
           {provider.catalogOwnership !== 'user-managed'
             ? t('settings.providers.capability.appManagedBadge')
             : t('settings.providers.capability.userManagedBadge')}
+        </span>
         </span>
         <Switch
           checked={model.enabled}
@@ -88,7 +90,7 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
         >
           <span className="settings-model-capability-toggle-label">{t('settings.providers.capability.toggle')}</span>
           <svg
-            className={`settings-model-capability-chevron${expanded ? ' expanded' : ''}`}
+            className={`settings-model-capability-chevron${expanded ? ' is-expanded' : ''}`}
             width="14"
             height="14"
             viewBox="0 0 24 24"

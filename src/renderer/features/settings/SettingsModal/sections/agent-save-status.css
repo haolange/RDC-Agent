@@ -1,0 +1,56 @@
+.settings-agent-autosave {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height-sm);
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+}
+
+.settings-agent-autosave-icon {
+  flex: none;
+}
+
+.settings-agent-autosave[data-state='saved'] .settings-agent-autosave-icon,
+.settings-agent-autosave[data-state='idle'] .settings-agent-autosave-icon {
+  color: var(--token-status-success);
+}
+
+.settings-agent-autosave[data-state='saving'] .settings-agent-autosave-icon {
+  color: var(--token-text-caption);
+}
+
+.settings-agent-autosave[data-state='error'] {
+  color: var(--token-status-error);
+}
+
+.settings-agent-autosave.is-compact {
+  margin-inline-start: auto;
+  font-size: var(--text-xs);
+}
+
+.settings-agent-config-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height-md);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-raised);
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+}
+
+.settings-agent-config-status-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--token-text-placeholder);
+}
+
+.settings-agent-config-status[data-tone='success'] .settings-agent-config-status-dot { background: var(--token-status-success); }
+
+.settings-agent-config-status[data-tone='warning'] .settings-agent-config-status-dot { background: var(--token-status-warning); }
+
+.settings-agent-config-status[data-tone='error'] .settings-agent-config-status-dot { background: var(--token-status-error); }

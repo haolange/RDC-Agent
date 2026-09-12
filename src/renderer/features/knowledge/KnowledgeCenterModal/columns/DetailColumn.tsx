@@ -1,44 +1,49 @@
 import { useState } from 'react';
 import { KNOWLEDGE_CASE_CHAPTERS } from '@shared/types/knowledge';
 import { MessageMarkdown } from '../../../../patterns/Markdown/MessageMarkdown';
+import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { Icon } from '../../../../ui/Icon';
-import { IconButton } from '../../../../ui/IconButton';
 import { Panel } from '../../../../ui/Panel';
 import { useI18n } from '../../../../i18n';
-import { CHAPTER_LABEL_KEYS } from '../knowledgeCenterLabels';
+import { CHAPTER_LABEL_KEYS, formatKnowledgeTime } from '../knowledgeCenterLabels';
 import { detailToRecord } from '../knowledgeCenterModel';
 import { CaseChapterContent } from '../parts/CaseChapterContent';
 import '../parts/KnowledgeDetail.css';
+import { CardBadges } from '../parts/CardBadges';
 import { CardMetaGrid } from '../parts/CardMetaGrid';
+import { ConflictCompare } from '../parts/ConflictCompare';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 import type { useKnowledgeWriteConfirm } from '../useKnowledgeWriteConfirm';
 
 interface DetailColumnProps {
   state: ReturnType<typeof useKnowledgeCenter>;
   write: ReturnType<typeof useKnowledgeWriteConfirm>;
-  onClose: () => void;
   onCreateCandidate: () => void;
 }
 
-export function DetailColumn({ state, write, onClose, onCreateCandidate }: DetailColumnProps) {
+export function DetailColumn({ state, write, onCreateCandidate }: DetailColumnProps) {
   const { t } = useI18n();
   const card = state.selectedCard;
+  const conflict = state.viewMode === 'conflicts' ? state.selectedConflict : null;
   const [metadataOpen, setMetadataOpen] = useState(false);
   const missing = card?.type === 'case'
     ? KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => !card.chapters?.[chapter]?.trim())
     : [];
   const isDraft = card?.lifecycle === 'draft';
   const isCandidateView = state.viewMode === 'candidates';
+  const space = card ? state.spaces.find((entry) => entry.spaceId === card.spaceId) : undefined;
+  const spaceLabel = space?.kind === 'user' ? t('knowledgeCenter.userSpace') : (space?.label ?? card?.spaceId ?? '');
+  const updated = formatKnowledgeTime(card?.updatedAt);
+  const origin = card ? [card.sourceStatus, card.caseId].filter(Boolean).join(' · ') : '';
 
   return (
     <Panel className="knowledge-center-content" data-testid="knowledge-center-detail-column">
-      {/* The modal title bar owns the product title and close; this header only
-          identifies the selected card. */}
+      {/* The modal title bar owns the product title and close; this header only identifies the selected card. */}
       {card || state.narrow ? (
         <div className="knowledge-center-header">
-          <div>
+          <div className="knowledge-center-header-copy">
             {state.narrow && (
               <Button variant="ghost" size="sm" onClick={() => state.setNarrowPane('list')}>
                 {t('knowledgeCenter.back')}
@@ -46,44 +51,70 @@ export function DetailColumn({ state, write, onClose, onCreateCandidate }: Detai
             )}
             {card ? (
               <>
-                <div className="knowledge-center-header-title">{card.title}</div>
-                <div className="knowledge-center-header-path" title={card.relativePath}>
-                  {card.relativePath}
+                <h1 className="knowledge-center-header-title">{card.title}</h1>
+                <div className="knowledge-center-meta-line" data-testid="knowledge-center-meta-line">
+                  {isCandidateView ? <Badge tone="warning">{t('knowledgeCenter.pendingReview')}</Badge> : null}
+                  <CardBadges type={card.type} lifecycle={card.lifecycle} sourceStatus={card.sourceStatus} />
+                  {updated ? <span>{t('knowledgeCenter.updatedAtPrefix')} {updated}</span> : null}
+                  <span>{t('knowledgeCenter.spaceLabel')} {spaceLabel}</span>
+                  {isCandidateView && origin ? <span>{t('knowledgeCenter.sourceLabel')} {origin}</span> : null}
                 </div>
               </>
             ) : null}
           </div>
-          {state.narrow ? (
-            <IconButton
-              label={t('knowledgeCenter.close')}
-              className="knowledge-center-close"
-              onClick={onClose}
-              data-testid="knowledge-center-close"
-            >
-              <Icon name="close" size={16} />
-            </IconButton>
-          ) : null}
+          <div className="knowledge-center-header-actions">
+            {card ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="knowledge-detail-info-toggle"
+                aria-expanded={metadataOpen}
+                aria-controls="knowledge-card-information"
+                onClick={() => setMetadataOpen(!metadataOpen)}
+                data-testid="knowledge-center-metadata-toggle"
+              >
+                {t('knowledgeCenter.metadata')}
+                <Icon name={metadataOpen ? 'chevron-up' : 'chevron-down'} size={14} />
+              </Button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
       <div className="knowledge-center-body" data-testid="knowledge-center-body">
         {state.loadingDetail && <div className="knowledge-center-status">{t('knowledgeCenter.loading')}</div>}
-        {!state.loadingDetail && !card && (
+        {conflict ? (
+          <ConflictCompare
+            conflict={conflict}
+            left={state.conflictCards.left}
+            right={state.conflictCards.right}
+            loading={state.loadingDetail}
+            onOpenCard={state.openRelatedCard}
+          />
+        ) : null}
+        {!state.loadingDetail && !card && !conflict && (
           <div className="knowledge-center-empty" data-testid="knowledge-center-empty-detail">
-            <EmptyState title={t('knowledgeCenter.selectPrompt')} />
+            <EmptyState
+              title={t(state.viewMode === 'conflicts' ? 'knowledgeCenter.selectConflictPrompt' : isCandidateView ? 'knowledgeCenter.selectCandidatePrompt' : 'knowledgeCenter.selectPrompt')}
+              description={state.viewMode === 'cards' ? t('knowledgeCenter.emptyDetailHint') : undefined}
+            />
           </div>
         )}
         {!state.loadingDetail && card && (
           <article data-testid="knowledge-center-detail">
-            <div className="knowledge-detail-info">
-              <Button variant="ghost" className="knowledge-detail-info-toggle" aria-expanded={metadataOpen}
-                aria-controls="knowledge-card-information" onClick={() => setMetadataOpen(!metadataOpen)}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>
-                {t('knowledgeCenter.metadata')}
-                <svg className="knowledge-detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
-              </Button>
-              {metadataOpen && <div id="knowledge-card-information"><CardMetaGrid card={card} /></div>}
-            </div>
+            {metadataOpen ? (
+              <div id="knowledge-card-information" className="knowledge-detail-info">
+                <CardMetaGrid
+                  card={card}
+                  spaceLabel={spaceLabel}
+                  onOpenRelation={(targetCardId) => {
+                    const hit = state.hits.find((entry) => entry.cardId === targetCardId)
+                      ?? state.pack?.hits.find((entry) => entry.cardId === targetCardId);
+                    if (hit) state.openRelatedCard(hit);
+                  }}
+                />
+              </div>
+            ) : null}
             {card.type === 'case' && (
               <nav className="knowledge-center-chapters" data-testid="knowledge-center-chapters">
                 {KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => card.chapters?.[chapter]?.trim()).map((chapter) => (
@@ -131,9 +162,10 @@ export function DetailColumn({ state, write, onClose, onCreateCandidate }: Detai
               </Button>
               <Button
                 variant="primary"
+                data-testid="knowledge-center-primary-write"
                 onClick={() => void write.openFor(isCandidateView ? 'persist-draft' : 'save', detailToRecord(card))}
               >
-                {isCandidateView ? t('knowledgeCenter.persistDraft') : t('knowledgeCenter.save')}
+                {isCandidateView ? t('knowledgeCenter.saveAsDraft') : t('knowledgeCenter.save')}
               </Button>
             </>
           )}

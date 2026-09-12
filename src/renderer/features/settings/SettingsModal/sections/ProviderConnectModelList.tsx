@@ -5,6 +5,7 @@ import type { useI18n } from '../../../../i18n';
 import { getEffectiveCatalog, subscribeEffectiveCatalogChanged } from './providerCatalogActions';
 import { snapshotMatchesProvider } from '../modelCapabilitySummaryUtils';
 import { projectProviderModels } from '../providerModelProjection';
+import { SearchField } from '../../../../ui/SearchField';
 import { ProviderConnectModelRow } from './ProviderConnectModelRow';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -35,6 +36,7 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   const [snapshot, setSnapshot] = useState<EffectiveCatalogSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [query, setQuery] = useState('');
   const catalogAccountId = discoveryAccountId?.trim()
     || provider.activeAccountId
     || `anonymous:${provider.id}`;
@@ -77,7 +79,7 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   const availableModelCount = useMemo(
     () => resolvedModels.filter(({ model, effectiveModel }) => (
       effectiveModel?.availability ?? model.availability
-    ) !== 'unavailable').length,
+    ) === 'available').length,
     [resolvedModels],
   );
   useEffect(() => onModelCountChange(resolvedModels.length), [onModelCountChange, resolvedModels.length]);
@@ -85,6 +87,12 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
     effectiveModel?.availability ?? model.availability
   ) === 'unavailable');
   const rowLoading = loading || snapshot?.refreshing === true;
+  const needle = query.trim().toLowerCase();
+  const visibleModels = needle
+    ? resolvedModels.filter(({ model, effectiveModel }) => [model.id, model.label, effectiveModel?.label]
+      .some((field) => field?.toLowerCase().includes(needle)))
+    : resolvedModels;
+  const showSearch = resolvedModels.length > 5;
 
   return (
     <div className="settings-model-section settings-provider-connect-models" data-testid="settings-provider-connect-models">
@@ -113,8 +121,32 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
           {t('settings.providers.allModelsUnavailableHint')}
         </div>
       ) : null}
-      <div className="settings-model-list" data-empty-label={t('settings.testBeforeSaveHint')}>
-        {resolvedModels.map(({ model, effectiveModel }) => (
+      {showSearch ? (
+        <div className="settings-model-search">
+          <SearchField
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onClear={() => setQuery('')}
+            clearLabel={t('app.clearSearch')}
+            placeholder={t('settings.searchModelPlaceholder')}
+            aria-label={t('settings.searchModelPlaceholder')}
+            data-testid="settings-provider-model-search"
+          />
+        </div>
+      ) : null}
+      {resolvedModels.length > 0 ? (
+        <div className="settings-model-columns" aria-hidden="true">
+          <span>{t('settings.providers.columns.availability')}</span>
+          <span>{t('settings.providers.columns.model')}</span>
+          <span>{t('settings.providers.columns.enabled')}</span>
+          <span>{t('settings.providers.columns.capability')}</span>
+        </div>
+      ) : null}
+      <div className="settings-model-list scrollbar-thin" data-empty-label={t('settings.testBeforeSaveHint')} data-testid="settings-provider-model-list">
+        {needle && visibleModels.length === 0 ? (
+          <div className="settings-model-list-no-match" role="status">{t('settings.providers.noModelMatch')}</div>
+        ) : null}
+        {visibleModels.map(({ model, effectiveModel }) => (
           <ProviderConnectModelRow
             key={model.id}
             provider={provider}

@@ -258,6 +258,14 @@ Knowledge Case 详情正文按章节分节，目录使用可换行的链接控�
 
 Case 阅读层按内容安排主次：预期 / 实际使用并列对照，短属性使用紧凑网格与行内列表；禁止递归缩进线和宽标签列。证据摘要常驻，来源及参数由统一按钮按需展开，不将编号、参数置于摘要之前占据正文。窄屏对照改为纵向排列。
 
+### Settings / Knowledge / Composer 组件所有权
+
+- Settings 入口装配导航与弹层，`SettingsPageContent` 组合页面；`useSettingsNavigation` 统一未保存导航，各领域 controller 保留独立草稿、校验与保存语义。页面展示组件不直接调用 IPC。
+- Knowledge 查询、选中详情、导入、导出和写入各有明确 controller。`useKnowledgeSelection` 是详情选择的唯一来源；查询或会话切换、关闭及卸载使旧请求失效。失效只阻止迟到结果更新界面，不冒充取消已经提交的写操作。
+- Composer 编辑／预览使用共享 segmented `Tabs`。Tabs 的 DOM ID 按实例生成；没有对应面板的选择控件不输出 `aria-controls`。编辑器内部焦点由 Composer 外壳呈现，不全局关闭焦点样式。
+- 基础控件负责焦点、选中、禁用与内容尺寸；领域层通过语义变量配置布局。ListRow 不因父列表高度不足而压缩内容，列表自己滚动。ColorField 的紧凑布局与隐藏标签由组件自身管理。
+- Provider、Agents、Tools、Appearance 与 Knowledge 的样式按展示职责组织；响应式规则跟随所属组件。CSS 入口仅声明加载关系，不恢复已替代的集中覆盖文件。
+
 ### 工作台壳层接线与项目 Capture 面板
 
 `app/App.tsx` 实际使用 `shell/AppShell` 组合 TitleBar / WorkbenchShell / overlays；壳层 CSS 必须从 `main.tsx` 的运行时 import 图可达，不能只保留组件文件。`check:renderer-structure` 检查这一接线。

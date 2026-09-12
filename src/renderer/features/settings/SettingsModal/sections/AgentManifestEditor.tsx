@@ -1,25 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
-import type { AgentManifestDraft } from '@shared/types/agentManifest';
+import type { AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { useDynStyle } from '../../../../lib/useDynStyle';
+import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
-import { ColorField } from '../../../../ui/ColorField';
-import { Input } from '../../../../ui/Input';
+import { Icon, type IconName } from '../../../../ui/Icon';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
+import { Switch } from '../../../../ui/Switch';
 import { AutosizeTextarea } from '../AutosizeTextarea';
 import { SettingsField, SettingsSection } from '../parts';
+import { AgentIdentityPanel } from './AgentIdentityPanel';
 import { AgentCapabilityPicker, buildAgentCapabilityGroups } from './AgentCapabilityPicker';
 import { AgentHandoffEditor } from './AgentHandoffEditor';
-import { AgentIconPresetPicker } from './AgentIconPresetPicker';
 import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
+import { AgentAutosaveStatus } from './AgentAutosaveStatus';
 
 type Translate = ReturnType<typeof useI18n>['t'];
+type AgentPanel = 'identity' | 'permissions' | 'handoffs' | 'instructions';
+export type AgentProvenanceScope = AgentManifestDefinition['provenance'] extends infer P
+  ? P extends { scope: infer S } ? S : never
+  : never;
 
 interface AgentManifestEditorProps {
   settings: AppSettings;
   selectedAgent: AgentManifestDraft;
+  /** Read-only origin of the definition (builtin / user / project); new drafts have none yet. */
+  provenanceScope: AgentProvenanceScope | null;
   onUpdateAgent: (patch: Partial<AgentManifestDraft>) => void;
   onDuplicateAgent: () => void;
   onDeleteAgent: () => void;
@@ -30,9 +38,35 @@ interface AgentManifestEditorProps {
   t: Translate;
 }
 
+const PANELS: Array<{ id: AgentPanel; icon: IconName }> = [
+  { id: 'identity', icon: 'user' },
+  { id: 'permissions', icon: 'lock' },
+  { id: 'handoffs', icon: 'link' },
+  { id: 'instructions', icon: 'nav-skills' },
+];
+
+/** Read-only configuration status derived from the enabled flag and the projected model option. */
+function configStatus(agent: AgentManifestDraft, settings: AppSettings, t: Translate): { label: string; tone: 'success' | 'warning' | 'error' | 'primary' } {
+  if (!agent.enabled) return { label: t('settings.disabled'), tone: 'primary' };
+  const modelId = agent.models[0] ?? '';
+  if (!modelId) return { label: t('settings.agentStatusNoModel'), tone: 'warning' };
+  const option = settings.agents.modelOptions.find((entry) => entry.canonicalId === modelId);
+  if (!option) return { label: t('settings.routeReasonModelInvalid'), tone: 'error' };
+  if (option.status === 'ready') return { label: t('settings.agentStatusAvailable'), tone: 'success' };
+  return { label: option.disabledReason ?? t('settings.modelUnavailable'), tone: 'warning' };
+}
+
+export function provenanceLabel(scope: AgentProvenanceScope | null, t: Translate): string {
+  if (scope === 'project') return t('settings.scopeProject');
+  if (scope === 'user') return t('settings.scopeUser');
+  if (scope === 'builtin') return t('settings.scopeBuiltin');
+  return t('settings.unsaved');
+}
+
 export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   settings,
   selectedAgent,
+  provenanceScope,
   onUpdateAgent,
   onDuplicateAgent,
   onDeleteAgent,
@@ -42,37 +76,115 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   agentManifestSaveBlocked = false,
   t,
 }) => {
+  const [openPanel, setOpenPanel] = useState<AgentPanel | null>(null);
   const selectedModel = selectedAgent.models[0] ?? '';
   const capabilityGroups = buildAgentCapabilityGroups(settings, selectedAgent, onUpdateAgent, t);
   const toolDiagnostics = diagnoseManifestToolTokens(selectedAgent.tools);
-  const saveStatusMessage = agentManifestSaveState === 'saving'
-    ? t('settings.saving')
-    : agentManifestSaveMessage;
-  const showSaveStatus = agentManifestSaveState === 'saving' || Boolean(agentManifestSaveMessage);
+  const status = configStatus(selectedAgent, settings, t);
   const agentAccentStyle = useDynStyle({
     '--settings-agent-accent': selectedAgent.accent || '#33d1ff',
   });
+  const autosave = (
+    <AgentAutosaveStatus
+      state={agentManifestSaveState}
+      message={agentManifestSaveMessage}
+      blocked={agentManifestSaveBlocked}
+      onRetry={onRetrySaveAgentManifests}
+      compact
+      t={t}
+    />
+  );
+
+  const panelLabel = (panel: AgentPanel): string => (
+    panel === 'identity' ? t('settings.agentAdvancedIdentity')
+      : panel === 'permissions' ? t('settings.agentAdvancedCapabilities')
+        : panel === 'handoffs' ? t('settings.handoffs')
+          : t('settings.agentAdvancedInstructions')
+  );
+  const panelHint = (panel: AgentPanel): string => (
+    panel === 'identity' ? t('settings.agentAdvancedIdentityHint')
+      : panel === 'permissions' ? t('settings.agentAdvancedCapabilitiesHint')
+        : panel === 'handoffs' ? t('settings.agentHandoffsHint')
+          : t('settings.agentInstructionsHint')
+  );
+
+  const renderPanelBody = (panel: AgentPanel) => {
+    if (panel === 'identity') {
+      return <AgentIdentityPanel agent={selectedAgent} onUpdateAgent={onUpdateAgent} t={t} />;
+    }
+    if (panel === 'permissions') {
+      return (
+        <>
+          <AgentCapabilityPicker groups={capabilityGroups} t={t} />
+          {toolDiagnostics.length > 0 ? (
+            <div className="settings-agent-tool-diagnostics" data-testid="settings-agent-tool-diagnostics" role="status">
+              <div className="settings-agent-tool-diagnostics-title">{t('settings.agentToolDiagnosticsTitle')}</div>
+              <ul className="settings-agent-tool-diagnostics-list">
+                {toolDiagnostics.map((item) => (
+                  <li key={item.token}>
+                    <code>{item.token}</code>
+                    <span>{item.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </>
+      );
+    }
+    if (panel === 'handoffs') {
+      return (
+        <AgentHandoffEditor
+          key={selectedAgent.id}
+          selfId={selectedAgent.id}
+          handoffs={selectedAgent.handoffs}
+          definitions={settings.agents.definitions}
+          modelOptions={settings.agents.modelOptions}
+          forceShowRequired={agentManifestSaveBlocked}
+          onChange={(handoffs) => onUpdateAgent({ handoffs })}
+          t={t}
+        />
+      );
+    }
+    return (
+      <>
+        <div className="settings-agent-instructions-meta">
+          <span className="settings-help-text">
+            {t('settings.agentInstructionsSource')}: <strong>{provenanceLabel(provenanceScope, t)}</strong>
+          </span>
+        </div>
+        <AutosizeTextarea
+          rows={12}
+          maxHeight={720}
+          aria-label={t('settings.agentInstructions')}
+          className="input settings-agent-instructions settings-agent-instructions--editor"
+          value={selectedAgent.instructions}
+          onChange={(event) => onUpdateAgent({ instructions: event.currentTarget.value })}
+        />
+      </>
+    );
+  };
 
   return (
     <div className="settings-manifest-editor" data-testid="settings-agent-manifest-editor">
       <div className="settings-manifest-editor-head">
         <div className="settings-agent-editor-title">
-          <span
-            className="settings-agent-editor-icon"
-            aria-hidden="true"
-            {...agentAccentStyle}
-          >
+          <span className="settings-agent-editor-icon" aria-hidden="true" {...agentAccentStyle}>
             <ModeGlyph mode={selectedAgent.id} icon={selectedAgent.icon ?? 'message-orbit'} size={20} strokeWidth={1.9} />
           </span>
           <div className="settings-agent-editor-copy">
-            <div className="settings-agent-editor-name">{selectedAgent.name}</div>
+            <div className="settings-agent-editor-name">
+              {selectedAgent.name}
+              <Badge tone="primary" data-testid="settings-agent-provenance">{provenanceLabel(provenanceScope, t)}</Badge>
+            </div>
+            <code className="settings-agent-editor-id">{selectedAgent.id}</code>
           </div>
         </div>
         <div className="settings-manifest-editor-actions">
-          <Button variant="ghost" onClick={onDuplicateAgent}>
+          <Button variant="ghost" size="sm" onClick={onDuplicateAgent}>
             {t('settings.duplicateAgent')}
           </Button>
-          <Button variant="danger" onClick={onDeleteAgent}>
+          <Button variant="danger" size="sm" onClick={onDeleteAgent}>
             {t('settings.deleteAgent')}
           </Button>
         </div>
@@ -81,167 +193,84 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
       <div className="settings-manifest-editor-body scrollbar-thin">
         <SettingsSection title={t('settings.agentRouteAvailability')} className="settings-agent-route-panel">
           <div className="settings-agent-route-body">
-            <div
-              className="settings-agent-look-strip"
-              data-testid="settings-agent-look"
-              {...agentAccentStyle}
-            >
-              <div className="settings-agent-route-row settings-agent-look-icon-row">
-                <span className="settings-field-label settings-agent-look-label">{t('settings.agentIcon')}</span>
-                <AgentIconPresetPicker
-                  value={selectedAgent.icon ?? 'message-orbit'}
-                  onChange={(icon) => onUpdateAgent({ icon })}
+            <div className="settings-agent-route-grid">
+              <SettingsField label={t('settings.modelFieldLabel')} className="settings-model-route-row">
+                <AgentModelCascadeSelect
+                  value={selectedModel}
+                  options={settings.agents.modelOptions}
+                  onChange={(model) => onUpdateAgent({ models: [model] })}
                   t={t}
                 />
-              </div>
-              <div className="settings-agent-route-row settings-agent-look-accent-row">
-                <ColorField
-                  className="settings-agent-accent-color"
-                  layout="inline"
-                  label={t('settings.agentAccent')}
-                  areaLabel={t('settings.colorPickerArea')}
-                  hueLabel={t('settings.colorPickerHue')}
-                  value={selectedAgent.accent ?? '#33d1ff'}
-                  testId="settings-agent-accent"
-                  onChange={(accent) => onUpdateAgent({ accent })}
-                />
-              </div>
-              <p className="settings-agent-look-hint">{t('settings.agentAccentHelp')}</p>
+              </SettingsField>
+              <SettingsField label={t('settings.agentStatus')}>
+                <div className="settings-agent-config-status" data-testid="settings-agent-config-status" data-tone={status.tone}>
+                  <span className="settings-agent-config-status-dot" aria-hidden="true" />
+                  {status.label}
+                </div>
+              </SettingsField>
             </div>
 
-            <SettingsField
-              className="settings-agent-route-row settings-model-route-row"
-              layout="row"
-              label={t('settings.modelFieldLabel')}
-            >
-              <AgentModelCascadeSelect
-                value={selectedModel}
-                options={settings.agents.modelOptions}
-                onChange={(model) => onUpdateAgent({ models: [model] })}
-                t={t}
-              />
-            </SettingsField>
-
-            <SettingsField
-              className="settings-agent-route-row settings-agent-availability-row"
-              layout="row"
-              label={t('settings.agentAvailability')}
-            >
-              <div className="settings-agent-flags">
-                <label className="settings-checkbox-row compact">
-                  <input type="checkbox" checked={selectedAgent.enabled} onChange={(event) => onUpdateAgent({ enabled: event.currentTarget.checked })} />
-                  <span>{t('settings.agentEnabled')}</span>
-                </label>
-                <label className="settings-checkbox-row compact">
-                  <input type="checkbox" checked={selectedAgent.userInvocable} onChange={(event) => onUpdateAgent({ userInvocable: event.currentTarget.checked })} />
-                  <span>{t('settings.userInvocable')}</span>
-                </label>
-                <label className="settings-checkbox-row compact">
-                  <input type="checkbox" checked={selectedAgent.disableModelInvocation} onChange={(event) => onUpdateAgent({ disableModelInvocation: event.currentTarget.checked })} />
-                  <span>{t('settings.disableModelInvocation')}</span>
-                </label>
-              </div>
-            </SettingsField>
+            <div className="settings-agent-flags" role="group" aria-label={t('settings.agentAvailability')}>
+              <label className="settings-agent-flag">
+                <span className="settings-field-label">{t('settings.agentEnabled')}</span>
+                <span className="settings-switch-row">
+                  <Switch checked={selectedAgent.enabled} onCheckedChange={(enabled) => onUpdateAgent({ enabled })} aria-label={t('settings.agentEnabled')} />
+                  <span>{selectedAgent.enabled ? t('settings.enabled') : t('settings.disabled')}</span>
+                </span>
+              </label>
+              <label className="settings-agent-flag">
+                <span className="settings-field-label">{t('settings.userInvocable')}</span>
+                <span className="settings-switch-row">
+                  <Switch checked={selectedAgent.userInvocable} onCheckedChange={(userInvocable) => onUpdateAgent({ userInvocable })} aria-label={t('settings.userInvocable')} />
+                  <span>{selectedAgent.userInvocable ? t('settings.enabled') : t('settings.disabled')}</span>
+                </span>
+              </label>
+              <label className="settings-agent-flag">
+                <span className="settings-field-label">{t('settings.disableModelInvocation')}</span>
+                <span className="settings-switch-row">
+                  <Switch checked={selectedAgent.disableModelInvocation} onCheckedChange={(disableModelInvocation) => onUpdateAgent({ disableModelInvocation })} aria-label={t('settings.disableModelInvocation')} />
+                  <span>{selectedAgent.disableModelInvocation ? t('settings.enabled') : t('settings.disabled')}</span>
+                </span>
+              </label>
+            </div>
           </div>
         </SettingsSection>
 
-        <details className="settings-advanced-panel">
-          <summary>
-            <span>{t('settings.agentAdvancedIdentity')}</span>
-            <small>{t('settings.agentAdvancedIdentityHint')}</small>
-          </summary>
-          <div className="settings-advanced-content">
-            <div className="settings-manifest-form-grid settings-agent-identity-grid">
-              <SettingsField className="settings-input-row" label={t('settings.agentName')}>
-                <Input value={selectedAgent.name} onChange={(event) => onUpdateAgent({ name: event.currentTarget.value })} />
-              </SettingsField>
-              <label className="settings-input-row">
-                <span className="settings-field-label">{t('settings.agentArgumentHint')}</span>
-                <AutosizeTextarea rows={1} maxHeight={132} className="input settings-agent-textarea-compact" value={selectedAgent.argumentHint} onChange={(event) => onUpdateAgent({ argumentHint: event.currentTarget.value })} />
-              </label>
-              <label className="settings-input-row">
-                <span className="settings-field-label">{t('settings.agentDescription')}</span>
-                <AutosizeTextarea rows={1} maxHeight={132} className="input settings-agent-textarea-compact settings-agent-description-field" value={selectedAgent.description} onChange={(event) => onUpdateAgent({ description: event.currentTarget.value })} />
-              </label>
-            </div>
-          </div>
-        </details>
-
-        <details className="settings-advanced-panel">
-          <summary>
-            <span>{t('settings.agentAdvancedCapabilities')}</span>
-            <small>{t('settings.agentAdvancedCapabilitiesHint')}</small>
-          </summary>
-          <div className="settings-advanced-content">
-            <AgentCapabilityPicker groups={capabilityGroups} t={t} />
-            {toolDiagnostics.length > 0 ? (
-              <div
-                className="settings-agent-tool-diagnostics"
-                data-testid="settings-agent-tool-diagnostics"
-                role="status"
-              >
-                <div className="settings-agent-tool-diagnostics-title">
-                  {t('settings.agentToolDiagnosticsTitle')}
-                </div>
-                <ul className="settings-agent-tool-diagnostics-list">
-                  {toolDiagnostics.map((item) => (
-                    <li key={item.token}>
-                      <code>{item.token}</code>
-                      <span>{item.message}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
-        </details>
-
-        <details className="settings-advanced-panel">
-          <summary>
-            <span>{t('settings.handoffs')}</span>
-            <small>{t('settings.agentHandoffsHint')}</small>
-          </summary>
-          <div className="settings-advanced-content">
-            <AgentHandoffEditor
-              key={selectedAgent.id}
-              selfId={selectedAgent.id}
-              handoffs={selectedAgent.handoffs}
-              definitions={settings.agents.definitions}
-              modelOptions={settings.agents.modelOptions}
-              forceShowRequired={agentManifestSaveBlocked}
-              onChange={(handoffs) => onUpdateAgent({ handoffs })}
-              t={t}
-            />
-          </div>
-        </details>
-
-        <details className="settings-advanced-panel">
-          <summary>
-            <span>{t('settings.agentAdvancedInstructions')}</span>
-          </summary>
-          <div className="settings-advanced-content">
-            <AutosizeTextarea
-              rows={2}
-              maxHeight={520}
-              aria-label={t('settings.agentInstructions')}
-              className="input settings-agent-instructions"
-              value={selectedAgent.instructions}
-              onChange={(event) => onUpdateAgent({ instructions: event.currentTarget.value })}
-            />
-          </div>
-        </details>
-      </div>
-
-      {showSaveStatus ? (
-        <div className={`settings-agent-autosave-status ${agentManifestSaveState}`}>
-          <span>{saveStatusMessage}</span>
-          {agentManifestSaveState === 'error' && !agentManifestSaveBlocked ? (
-            <Button variant="secondary" onClick={() => void onRetrySaveAgentManifests()}>
-              {t('settings.retry')}
-            </Button>
-          ) : null}
+        <div className="settings-agent-panels" data-testid="settings-agent-panels">
+          {PANELS.map(({ id, icon }) => {
+            const open = openPanel === id;
+            return (
+              <section key={id} className={`settings-agent-panel${open ? ' is-open' : ''}`} data-panel={id}>
+                <button
+                  type="button"
+                  className="settings-agent-panel-toggle"
+                  aria-expanded={open}
+                  aria-controls={`settings-agent-panel-${id}`}
+                  data-testid={`settings-agent-panel-${id}`}
+                  onClick={(event) => {
+                    const section = event.currentTarget.parentElement;
+                    setOpenPanel(open ? null : id);
+                    if (!open) requestAnimationFrame(() => section?.scrollIntoView({ block: 'nearest' }));
+                  }}
+                >
+                  <Icon name={icon} size={16} className="settings-agent-panel-icon" />
+                  <span className="settings-agent-panel-copy">
+                    <span className="settings-agent-panel-title">{panelLabel(id)}</span>
+                    {!open ? <span className="settings-agent-panel-hint">{panelHint(id)}</span> : null}
+                  </span>
+                  {open ? autosave : null}
+                  <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} className="settings-agent-panel-caret" />
+                </button>
+                {open ? (
+                  <div id={`settings-agent-panel-${id}`} className="settings-agent-panel-body">
+                    {renderPanelBody(id)}
+                  </div>
+                ) : null}
+              </section>
+            );
+          })}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 };

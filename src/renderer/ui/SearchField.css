@@ -16,6 +16,10 @@
   padding-left: var(--space-8);
 }
 
+.ui-search-field .ui-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
 .ui-search-field.has-clear .ui-input {
   padding-right: var(--space-8);
 }

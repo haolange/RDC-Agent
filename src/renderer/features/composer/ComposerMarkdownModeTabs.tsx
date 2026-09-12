@@ -1,4 +1,5 @@
 import React from 'react';
+import { Tabs } from '../../ui/Tabs';
 import { useI18n } from '../../i18n';
 import type { ComposerMarkdownMode } from './ComposerMarkdownInput';
 import './ComposerMarkdownInput.css';
@@ -9,51 +10,25 @@ interface ComposerMarkdownModeTabsProps {
   disabled?: boolean;
 }
 
-/** Write/Preview capsule — lives in the composer footer, never over prompt text. */
+/** Mode selection is positioned above the composer by its layout wrapper. */
 export const ComposerMarkdownModeTabs: React.FC<ComposerMarkdownModeTabsProps> = ({
   mode,
   onModeChange,
   disabled = false,
 }) => {
   const { t } = useI18n();
-  const writeLabel = t('composer.markdownWrite');
-  const previewLabel = t('composer.markdownPreview');
-  const writeTip = t('composer.markdownWriteTip');
-  const previewTip = t('composer.markdownPreviewTip');
-
   return (
-    <div
-      className="composer-markdown-toolbar"
-      role="tablist"
-      aria-label={t('settings.composerMarkdown')}
-      data-testid="composer-markdown-toolbar"
-    >
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === 'write'}
-        aria-label={writeTip}
-        title={writeTip}
-        className={`composer-markdown-tab ${mode === 'write' ? 'is-active' : ''}`}
-        data-testid="composer-markdown-tab-write"
-        onClick={() => onModeChange('write')}
-        disabled={disabled}
-      >
-        {writeLabel}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === 'preview'}
-        aria-label={previewTip}
-        title={previewTip}
-        className={`composer-markdown-tab ${mode === 'preview' ? 'is-active' : ''}`}
-        data-testid="composer-markdown-tab-preview"
-        onClick={() => onModeChange('preview')}
-        disabled={disabled}
-      >
-        {previewLabel}
-      </button>
+    <div className="composer-markdown-toolbar" data-testid="composer-markdown-toolbar">
+      <Tabs
+        variant="segmented"
+        label={t('settings.composerMarkdown')}
+        value={mode}
+        onChange={(next) => onModeChange(next === 'preview' ? 'preview' : 'write')}
+        tabs={[
+          { id: 'write', label: t('composer.markdownWrite'), description: t('composer.markdownWriteTip'), disabled },
+          { id: 'preview', label: t('composer.markdownPreview'), description: t('composer.markdownPreviewTip'), disabled },
+        ]}
+      />
     </div>
   );
 };

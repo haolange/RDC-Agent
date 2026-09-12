@@ -4,6 +4,7 @@ import type { useI18n } from '../../../i18n';
 import type { ProviderConnectionDraft } from './types';
 import { getErrorMessage } from './utils';
 import type { useProviderConnectionDraft } from './useProviderConnectionDraft';
+import { mergeTestedProviderModels } from './providerModelProjection';
 import {
   getConnectionDraftSignature,
   getConnectionRequestValues,
@@ -63,7 +64,7 @@ export const useProviderConnectionActions = (
           testedAuthMode: connectionDraft.authMode,
           testedConnectionSignature: getConnectionDraftSignature(connectionDraft),
           discoveryAccountId: result.discoveryAccountId ?? null,
-          models: result.models,
+          models: mergeTestedProviderModels(result.models, connectionDraft.models),
         });
         await refreshLocalSettings(connectionDraft.providerId);
         return;
@@ -91,7 +92,7 @@ export const useProviderConnectionActions = (
         testedAuthMode: connectionDraft.authMode,
         testedConnectionSignature: getConnectionDraftSignature(connectionDraft),
         discoveryAccountId: result.discoveryAccountId ?? null,
-        models: result.models,
+        models: mergeTestedProviderModels(result.models, connectionDraft.models),
       });
     } catch (error) {
       updateConnectionDraft({

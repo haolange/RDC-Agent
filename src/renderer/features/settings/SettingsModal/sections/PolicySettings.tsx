@@ -46,7 +46,14 @@ export const PolicySettings: React.FC<{
         description={t('settings.compactionThresholdHint')}
         data-testid="settings-agent-runtime-block"
       >
-        <SettingsField label={t('settings.compactionThreshold')} search="compaction" testId="settings-compaction-threshold">
+        <SettingsField
+          label={t('settings.compactionThreshold')}
+          description={t('settings.compactionThresholdScope')}
+          layout="row"
+          className="settings-policy-threshold"
+          search="compaction"
+          testId="settings-compaction-threshold"
+        >
           <Select
             dataTestId="settings-compaction-threshold"
             ariaLabel={t('settings.compactionThreshold')}
@@ -68,6 +75,7 @@ export const PolicySettings: React.FC<{
         kinds={['policy']}
         onChanged={onChanged}
         editorPresentation="dialog"
+        emptyDescriptionExtra={t('settings.policyEmptyBaseline')}
       />
     </section>
   );

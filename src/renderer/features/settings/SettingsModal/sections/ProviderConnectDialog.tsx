@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { Input } from '../../../../ui/Input';
 import { TaskDialog } from '../../../../ui/TaskDialog';
@@ -11,6 +12,7 @@ import { ProviderConnectionFields } from './ProviderConnectionFields';
 import { ProviderAuthModeField } from './ProviderAuthModeField';
 import { ProviderConnectModelList } from './ProviderConnectModelList';
 import { ProviderConnectActions } from './ProviderConnectActions';
+import { ProviderConnectionStatusLine, ProviderDiscoveryEmpty, ProviderProtocolSummary, connectionPhase } from './ProviderConnectSummary';
 import { SettingsField } from '../parts';
 import { shouldUseProviderDocsLink } from '../providerConnectionState';
 
@@ -54,6 +56,9 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
   const [modelCount, setModelCount] = useState(0);
   const authMode = connectionProvider.authMode;
+  const phase = connectionPhase(connectionDraft, connectionHasFreshTest);
+  const unavailableCount = connectionDraft.models.filter((model) => model.availability === 'unavailable').length;
+  const showDiscoveryEmpty = (authMode === 'environment' || authMode === 'local') && connectionDraft.models.length === 0;
 
   return (
     <TaskDialog
@@ -119,10 +124,11 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         )}
 
         {authMode === 'local' && connectionProvider.baseUrlEditable && (
-          <SettingsField label={t('settings.providerBaseUrl')}>
+          <SettingsField label={t('settings.providerBaseUrl')} description={t('settings.localProviderConnectHint')}>
             <Input
               data-testid="settings-provider-connect-base-url"
               value={connectionDraft.baseUrl}
+              placeholder="http://localhost:11434"
               spellCheck={false}
               onChange={(event) => onUpdateConnectionDraft({
                 baseUrl: event.target.value,
@@ -136,14 +142,26 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
           </SettingsField>
         )}
 
-        {authMode === 'local' && (
-          <p className="settings-provider-notice">{t('settings.localProviderConnectHint')}</p>
+        {authMode === 'environment' && (
+          <>
+            <SettingsField label={t('settings.providers.authSource')} description={t('settings.environmentProviderConnectHint')}>
+              <div className="settings-provider-readonly" data-testid="settings-provider-environment-notice">
+                <Icon name="lock" size={14} />
+                {t('settings.providers.authSourceEnvironment')}
+              </div>
+            </SettingsField>
+          </>
         )}
 
-        {authMode === 'environment' && (
-          <p className="settings-provider-notice" data-testid="settings-provider-environment-notice">
-            {t('settings.environmentProviderConnectHint')}
-          </p>
+        <SettingsField label={t('settings.providers.connectionStatus')}>
+          <ProviderConnectionStatusLine phase={phase} t={t} />
+        </SettingsField>
+
+        {authMode !== 'account' && (
+          <details className="settings-provider-summary" data-testid="settings-provider-summary">
+            <summary>{t('settings.providers.summary.title')}</summary>
+            <ProviderProtocolSummary provider={connectionProvider} t={t} />
+          </details>
         )}
 
         {authMode === 'account' && (
@@ -181,6 +199,24 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
           </p>
         )}
 
+        {showDiscoveryEmpty ? (
+          <section className="settings-provider-discovery" data-testid="settings-provider-discovery">
+            <div className="settings-provider-discovery-head">
+              <strong>{authMode === 'local' ? t('settings.localProviderModelsTitle') : t('settings.providers.discoveryTitle')}</strong>
+              <span className="settings-help-text">{t('settings.localProviderModelsHint')}</span>
+            </div>
+            <ProviderDiscoveryEmpty t={t} />
+          </section>
+        ) : null}
+
+        {authMode === 'local' && unavailableCount > 0 ? (
+          <p className="settings-provider-notice settings-provider-notice--warning" data-testid="settings-provider-unavailable-summary">
+            <Icon name="warning" size={14} />
+            {t('settings.localProviderUnavailableSummary', { count: unavailableCount })}
+          </p>
+        ) : null}
+
+        {showDiscoveryEmpty || (authMode === 'account' && !connectionAccountConnected) ? null : (
         <ProviderConnectModelList
           provider={connectionProvider}
           models={connectionDraft.models}
@@ -192,6 +228,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
           onModelCountChange={setModelCount}
           t={t}
         />
+        )}
       </div>
     </TaskDialog>
   );

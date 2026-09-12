@@ -1,0 +1,74 @@
+.settings-agent-panels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.settings-agent-panel {
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-panel);
+  overflow: hidden;
+}
+
+.settings-agent-panel.is-open {
+  border-color: var(--token-border-default);
+}
+
+.settings-agent-panel-toggle {
+  display: flex;
+  width: 100%;
+  min-height: var(--control-height-lg);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--token-text-heading);
+  text-align: start;
+  cursor: pointer;
+}
+
+.settings-agent-panel-toggle:hover {
+  background: var(--token-interactive-hover);
+}
+
+.settings-agent-panel-toggle:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: -2px;
+}
+
+.settings-agent-panel-icon,
+.settings-agent-panel-caret {
+  flex: none;
+  color: var(--token-text-caption);
+}
+
+.settings-agent-panel-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.settings-agent-panel-title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+}
+
+.settings-agent-panel-hint {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-agent-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--token-border-muted);
+}

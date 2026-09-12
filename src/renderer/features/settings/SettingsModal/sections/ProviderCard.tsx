@@ -81,7 +81,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
 
       {status.detail ? (
         <div className="settings-provider-card-error">
-          <button
+          <Button variant="ghost" size="sm"
             type="button"
             className="settings-provider-card-error-toggle"
             aria-expanded={errorExpanded}
@@ -89,7 +89,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
             onClick={() => setErrorExpanded((current) => !current)}
           >
             {errorExpanded ? t('settings.providerErrorCollapse') : t('settings.providerErrorExpand')}
-          </button>
+          </Button>
           {errorExpanded ? (
             <p className="settings-provider-card-error-detail">{status.detail}</p>
           ) : null}

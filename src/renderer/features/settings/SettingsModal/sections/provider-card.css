@@ -1,0 +1,168 @@
+.settings-provider-card {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-raised);
+}
+
+.settings-provider-card-identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.settings-provider-card-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-8);
+  height: var(--space-8);
+  flex: none;
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-panel);
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.settings-provider-card-name {
+  min-width: 0;
+  color: var(--token-text-heading);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-provider-card-models {
+  flex: none;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.settings-provider-card-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.settings-provider-card-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  flex: none;
+  border-radius: var(--radius-full);
+  /* Unconfigured is a neutral fact, not a warning. */
+  background: var(--token-text-placeholder);
+}
+
+.settings-provider-card.is-tone-connected .settings-provider-card-dot {
+  background: var(--token-status-success);
+}
+
+.settings-provider-card.is-tone-error .settings-provider-card-dot {
+  background: var(--token-status-error);
+}
+
+.settings-provider-card-status-label {
+  min-width: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-provider-card.is-tone-connected .settings-provider-card-status-label {
+  color: var(--token-status-success);
+}
+
+.settings-provider-card.is-tone-error .settings-provider-card-status-label {
+  color: var(--token-status-error);
+}
+
+.settings-provider-card-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  align-content: start;
+}
+
+.settings-provider-card-summary-row {
+  display: grid;
+  grid-template-columns: minmax(3.5rem, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.settings-provider-card-summary-row dt {
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+}
+
+.settings-provider-card-summary-row dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-provider-card-summary-row dd.is-placeholder {
+  color: var(--token-text-placeholder);
+}
+
+.settings-provider-card-error {
+  min-width: 0;
+}
+
+.settings-provider-card-error-toggle {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--token-status-error);
+  font-size: var(--text-xs);
+  text-align: start;
+  cursor: pointer;
+}
+
+.settings-provider-card-error-toggle:hover {
+  text-decoration: underline;
+}
+
+.settings-provider-card-error-toggle:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.settings-provider-card-error-detail {
+  margin: var(--space-2) 0 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.settings-provider-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height-sm);
+}
+
+.settings-provider-card-primary {
+  margin-inline-start: auto;
+  min-width: 5rem;
+}

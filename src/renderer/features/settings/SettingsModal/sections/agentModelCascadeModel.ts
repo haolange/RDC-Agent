@@ -50,15 +50,3 @@ export function buildAgentModelGroups(
     availableCount: providerOptions.filter((option) => option.configured).length,
   }));
 }
-
-export function resolveActiveProviderId(
-  groups: AgentModelProviderGroup[],
-  requested: string,
-  selectedProviderId: string | undefined,
-): string {
-  if (groups.some((group) => group.providerId === requested)) return requested;
-  if (selectedProviderId && groups.some((group) => group.providerId === selectedProviderId)) {
-    return selectedProviderId;
-  }
-  return groups[0]?.providerId ?? '';
-}

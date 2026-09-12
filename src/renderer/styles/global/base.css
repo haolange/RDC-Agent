@@ -51,13 +51,6 @@ body {
   transition: background var(--transition-base), color var(--transition-base);
 }
 
-html[data-resolved-theme='light'] body {
-  background:
-    radial-gradient(circle at top, color-mix(in srgb, var(--token-accent-primary) 4%, transparent), transparent 24%),
-    radial-gradient(circle at 78% 8%, color-mix(in srgb, var(--token-accent-primary) 3%, transparent), transparent 18%),
-    var(--token-bg-app);
-}
-
 button,
 input,
 textarea,
@@ -100,4 +93,3 @@ a {
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
-

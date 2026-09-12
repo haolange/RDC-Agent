@@ -1,0 +1,187 @@
+.settings-model-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.settings-profile-actions,
+.settings-actions,
+.settings-path-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.settings-provider-notice {
+  padding: var(--space-3) var(--space-3);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--token-bg-raised) 36%, transparent);
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.settings-provider-notice.error {
+  border-color: color-mix(in srgb, var(--token-status-error) 34%, transparent);
+  background: color-mix(in srgb, var(--token-status-error) 8%, transparent);
+  color: var(--token-status-error);
+}
+
+.settings-secret-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.settings-secret-input {
+  min-width: 0;
+  padding-right: var(--space-3);
+  font-family: var(--font-mono);
+}
+
+.settings-provider-notice--warning {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--token-status-warning);
+}
+
+.settings-provider-connect-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.settings-provider-auth-field {
+  gap: var(--space-2);
+}
+
+.settings-provider-connection-fields {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.settings-connection-field-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.settings-provider-credential-options,
+.settings-provider-endpoint-preview {
+  display: grid;
+  justify-content: stretch;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
+}
+
+.settings-provider-endpoint-preview {
+  grid-template-columns: minmax(8rem, 0.3fr) minmax(0, 0.7fr);
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.settings-provider-endpoint-preview code {
+  min-width: 0;
+  color: var(--token-text-body);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.settings-provider-auth-options {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
+}
+
+.settings-provider-auth-option {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.settings-provider-auth-option.is-active {
+  border-color: var(--token-border-focus);
+  background: color-mix(in srgb, var(--token-border-focus) 14%, var(--token-surface-raised));
+  color: var(--token-text-heading);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--token-border-focus) 18%, transparent);
+}
+
+.settings-provider-auth-state--unknown {
+  color: var(--token-status-warning);
+}
+
+.settings-provider-auth-state--unavailable {
+  color: var(--token-status-error);
+}
+
+.settings-provider-connect-actions {
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  margin: 0 calc(var(--space-5) * -1) calc(var(--space-5) * -1);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border-top: 1px solid var(--token-border-muted);
+  background: var(--modal-bg);
+}
+
+@media (max-width: 960px) {
+
+  .settings-model-section-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .settings-provider-connect-actions {
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .settings-provider-connect-actions .button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .settings-provider-connect-dialog {
+    width: calc(100vw - var(--space-4));
+    max-height: calc(100vh - var(--space-4));
+  }
+}
+
+@media (max-width: 560px) {
+  .settings-provider-connect-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+
+  .settings-provider-connect-dialog[data-model-list-size='short'],
+.settings-provider-connect-dialog[data-model-list-size='medium'],
+.settings-provider-connect-dialog[data-model-list-size='long'] {
+    width: calc(100vw - var(--space-4));
+    max-height: calc(100vh - var(--space-4));
+  }
+}

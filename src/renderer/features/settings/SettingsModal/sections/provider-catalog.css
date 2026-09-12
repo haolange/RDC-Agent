@@ -1,0 +1,91 @@
+.settings-provider-search.ui-search-field {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.settings-provider-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-provider-group + .settings-provider-group {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--token-border-muted);
+}
+
+.settings-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.settings-provider-upcoming {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--token-border-muted);
+}
+
+.settings-provider-upcoming-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--control-height-md);
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.settings-provider-upcoming-summary:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.settings-provider-upcoming-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+}
+
+.settings-provider-upcoming .settings-provider-card {
+  opacity: 0.7;
+}
+
+.settings-models-page {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.settings-provider-upcoming {
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  background: var(--token-surface-sunken);
+}
+
+.settings-provider-upcoming-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.settings-provider-upcoming-body {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+@media (max-width: 640px) {
+
+  .settings-provider-grid { grid-template-columns: minmax(0, 1fr); }
+}

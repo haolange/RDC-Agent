@@ -107,7 +107,7 @@ export function ExportKnowledgeDialog({ exporter, spaces }: ExportKnowledgeDialo
                 value={exporter.spaceId}
                 disabled={exporter.busy}
                 onChange={exporter.setSpaceId}
-                options={spaces.map((space) => ({ value: space.spaceId, label: space.label }))}
+                options={spaces.map((space) => ({ value: space.spaceId, label: space.kind === 'user' ? t('knowledgeCenter.userSpace') : space.label }))}
               />
             </label>
           ) : null}

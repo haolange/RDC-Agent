@@ -34,6 +34,7 @@ export interface KnowledgeIndexEntry {
   contentHash: string;
   sourceStatus?: string;
   caseId?: string;
+  preview?: string;
 }
 
 export const KNOWLEDGE_INDEX_SCHEMA_VERSION = 1 as const;

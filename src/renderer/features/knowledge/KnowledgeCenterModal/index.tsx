@@ -38,13 +38,15 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
     },
   });
   const exporter = useKnowledgeExport({
+    active: open,
     spaces: state.spaces,
     hits: state.hits,
-    selected: state.selectedCard
+    selected: state.viewMode === 'cards' && state.selectedCard
       ? { spaceId: state.selectedCard.spaceId, relativePath: state.selectedCard.relativePath }
       : null,
   });
   const write = useKnowledgeWriteConfirm({
+    active: open,
     pack: state.pack,
     packQueryKey: state.packQueryKey,
     queryRequest: state.queryRequest,
@@ -122,7 +124,7 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
                 {t('knowledgeCenter.exportKnowledge')}
               </Button>
               {!state.narrow ? (
-                <IconButton label={t('knowledgeCenter.close')} size="sm" onClick={onClose}>
+                <IconButton label={t('knowledgeCenter.close')} size="sm" onClick={onClose} data-testid="knowledge-center-close">
                   <Icon name="close" size={16} />
                 </IconButton>
               ) : null}
@@ -145,6 +147,7 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
               <IconButton
                 label={t('knowledgeCenter.close')}
                 className="knowledge-center-narrow-close"
+                data-testid="knowledge-center-close"
                 onClick={onClose}
               >
                 <Icon name="close" size={16} />
@@ -158,7 +161,6 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
               <DetailColumn
                 state={state}
                 write={write}
-                onClose={onClose}
                 onCreateCandidate={() => {
                   if (state.selectedCard) void importer.createCandidate(detailToRecord(state.selectedCard));
                 }}

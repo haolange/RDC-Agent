@@ -1,3 +1,4 @@
+import { Button } from '../../ui/Button';
 import React from 'react';
 import { Icon } from '../../ui/Icon';
 
@@ -22,14 +23,14 @@ export const ComposerSkillChips: React.FC<{
             <span className="composer-skill-chip-name">${skillId}</span>
             <span className="composer-skill-chip-meta">{armedSkillMeta}</span>
           </span>
-          <button
+          <Button variant="ghost" size="sm"
             type="button"
             className="composer-skill-chip-remove"
             onClick={() => removePendingSkill(skillId)}
             aria-label={removeArmedSkillLabel(skillId)}
           >
             <Icon name="close" size={12} />
-          </button>
+          </Button>
         </div>
       ))}
     </>

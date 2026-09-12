@@ -3,7 +3,8 @@
  */
 
 /** MCP 传输类型 */
-export type MCPTransport = 'stdio' | 'streamable-http';
+export const MCP_TRANSPORTS = ['stdio', 'streamable-http'] as const;
+export type MCPTransport = (typeof MCP_TRANSPORTS)[number];
 
 /**
  * MCP 连接状态。

@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
 import type { AgentHandoffDefinition, AgentManifestDefinition, AgentModelOption } from '@shared/types/agentManifest';
 import type { TranslationKey, useI18n } from '../../../../i18n';
-import { Button } from '../../../../ui/Button';
+import { Checkbox } from '../../../../ui/Checkbox';
+import { Icon } from '../../../../ui/Icon';
+import { IconButton } from '../../../../ui/IconButton';
+import { Input } from '../../../../ui/Input';
+import { Select } from '../../../../ui/Select';
 import { AutosizeTextarea } from '../AutosizeTextarea';
+import { SettingsField } from '../parts';
 import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
 import {
   AGENT_HANDOFF_ISSUE_KEYS,
@@ -23,7 +28,9 @@ interface AgentHandoffCardProps {
   forceShowRequired: boolean;
   isFirst: boolean;
   isLast: boolean;
+  expanded: boolean;
   t: Translate;
+  onToggle: () => void;
   onChange: (handoff: AgentHandoffDefinition) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -32,6 +39,7 @@ interface AgentHandoffCardProps {
   deleteRef: (node: HTMLButtonElement | null) => void;
 }
 
+/** One handoff rule: a collapsible numbered card; only one card is expanded at a time. */
 export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
   index,
   handoff,
@@ -41,7 +49,9 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
   forceShowRequired,
   isFirst,
   isLast,
+  expanded,
   t,
+  onToggle,
   onChange,
   onMoveUp,
   onMoveDown,
@@ -69,30 +79,51 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
       ? { id: issue.field === 'model' ? (handoff.model ?? '') : handoff.agent }
       : undefined,
   );
+  const renderErrors = (field: Field) => visible(field).map((issue) => (
+    <small key={issue.code} id={errorId(field)} className="settings-handoff-error" role="alert">{errorText(issue)}</small>
+  ));
+  const targetName = targets.find((agent) => agent.id === handoff.agent)?.name || handoff.agent;
+  const bodyId = `settings-handoff-body-${index}`;
 
   return (
     <article
-      className="settings-handoff-card"
+      className={`settings-handoff-card${expanded ? ' is-expanded' : ''}`}
       data-testid={`settings-agent-handoff-card-${index}`}
       data-invalid={shown ? 'true' : undefined}
     >
       <div className="settings-handoff-card-head">
-        <strong className="settings-handoff-card-title">
-          {handoff.label.trim() || t('settings.agentHandoffUntitled')}
-        </strong>
+        <button
+          type="button"
+          className="settings-handoff-card-toggle"
+          aria-expanded={expanded}
+          aria-controls={bodyId}
+          onClick={onToggle}
+        >
+          <span className="settings-handoff-card-index">{index + 1}</span>
+          <Icon name={expanded ? 'chevron-down' : 'chevron-right'} size={14} />
+          <strong className="settings-handoff-card-title">
+            {handoff.label.trim() || t('settings.agentHandoffUntitled')}
+          </strong>
+          {!expanded && targetName ? <small className="settings-handoff-card-target">→ {targetName}</small> : null}
+          {shown ? <Icon name="warning" size={14} className="settings-handoff-card-warning" /> : null}
+        </button>
         <div className="settings-handoff-card-actions">
-          <Button variant="ghost" aria-label={t('settings.agentHandoffMoveUp')} disabled={isFirst} onClick={onMoveUp}>↑</Button>
-          <Button variant="ghost" aria-label={t('settings.agentHandoffMoveDown')} disabled={isLast} onClick={onMoveDown}>↓</Button>
-          <Button variant="danger" ref={deleteRef} onClick={onDelete}>{t('settings.delete')}</Button>
+          <IconButton label={t('settings.agentHandoffMoveUp')} size="sm" disabled={isFirst} onClick={onMoveUp}>
+            <Icon name="arrow-up" size={14} />
+          </IconButton>
+          <IconButton label={t('settings.agentHandoffMoveDown')} size="sm" disabled={isLast} onClick={onMoveDown}>
+            <Icon name="arrow-down" size={14} />
+          </IconButton>
+          <IconButton label={t('settings.delete')} size="sm" className="settings-handoff-delete" ref={deleteRef} onClick={onDelete}>
+            <Icon name="trash" size={14} />
+          </IconButton>
         </div>
       </div>
 
-      <div className="settings-handoff-grid">
-        <label className="settings-input-row">
-          <span className="settings-field-label">{t('settings.agentHandoffLabel')}</span>
-          <input
+      <div id={bodyId} className="settings-handoff-card-body" hidden={!expanded}>
+        <SettingsField label={t('settings.agentHandoffLabel')} layout="row">
+          <Input
             ref={labelRef}
-            className="input"
             value={handoff.label}
             placeholder={t('settings.agentHandoffLabelPlaceholder')}
             aria-invalid={visible('label').length > 0}
@@ -100,39 +131,30 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
             onBlur={() => setTouched((current) => ({ ...current, label: true }))}
             onChange={(event) => patch({ label: event.currentTarget.value })}
           />
-          {visible('label').map((issue) => (
-            <small key={issue.code} id={errorId('label')} className="settings-handoff-error" role="alert">{errorText(issue)}</small>
-          ))}
-        </label>
+          {renderErrors('label')}
+        </SettingsField>
 
-        <label className="settings-input-row">
-          <span className="settings-field-label">{t('settings.agentHandoffTarget')}</span>
-          <select
-            className="input settings-handoff-target-select"
-            data-testid={`settings-agent-handoff-target-${index}`}
+        <SettingsField label={t('settings.agentHandoffTarget')} layout="row">
+          <Select
+            dataTestId={`settings-agent-handoff-target-${index}`}
+            ariaLabel={t('settings.agentHandoffTarget')}
             value={handoff.agent}
-            aria-invalid={visible('agent').length > 0}
-            aria-describedby={visible('agent').length > 0 ? errorId('agent') : undefined}
-            onBlur={() => setTouched((current) => ({ ...current, agent: true }))}
-            onChange={(event) => patch({ agent: event.currentTarget.value })}
-          >
-            {handoff.agent === '' ? (
-              <option value="" disabled hidden>{t('settings.agentHandoffTargetPlaceholder')}</option>
-            ) : null}
-            {staleTarget ? <option value={handoff.agent}>{handoff.agent}</option> : null}
-            {targets.map((agent) => (
-              <option key={agent.id} value={agent.id} title={`${agent.name} · ${agent.id}`}>{agent.name}</option>
-            ))}
-          </select>
-          {visible('agent').map((issue) => (
-            <small key={issue.code} id={errorId('agent')} className="settings-handoff-error" role="alert">{errorText(issue)}</small>
-          ))}
-        </label>
+            placeholder={t('settings.agentHandoffTargetPlaceholder')}
+            onChange={(value) => {
+              setTouched((current) => ({ ...current, agent: true }));
+              patch({ agent: value });
+            }}
+            options={[
+              ...(staleTarget ? [{ value: handoff.agent, label: `${handoff.agent} ${t('settings.resourceEnumUnsupported')}` }] : []),
+              ...targets.map((agent) => ({ value: agent.id, label: agent.name })),
+            ]}
+          />
+          {renderErrors('agent')}
+        </SettingsField>
 
-        <label className="settings-input-row settings-handoff-prompt">
-          <span className="settings-field-label">{t('settings.agentHandoffPrompt')}</span>
+        <SettingsField label={t('settings.agentHandoffPrompt')} layout="row" className="settings-handoff-prompt">
           <AutosizeTextarea
-            rows={2}
+            rows={3}
             maxHeight={220}
             className="input"
             value={handoff.prompt}
@@ -142,49 +164,39 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
             onBlur={() => setTouched((current) => ({ ...current, prompt: true }))}
             onChange={(event) => patch({ prompt: event.currentTarget.value })}
           />
-          {visible('prompt').map((issue) => (
-            <small key={issue.code} id={errorId('prompt')} className="settings-handoff-error" role="alert">{errorText(issue)}</small>
-          ))}
-        </label>
-      </div>
+          {renderErrors('prompt')}
+        </SettingsField>
 
-      <div className="settings-handoff-model">
-        <span className="settings-field-label">{t('settings.agentHandoffModel')}</span>
-        <div className="settings-handoff-model-row">
+        <SettingsField label={t('settings.agentHandoffModel')} layout="row">
           <AgentModelCascadeSelect
             value={handoff.model ?? ''}
             options={modelOptions}
-            onChange={(model) => patch({ model })}
+            inherit={{
+              label: targetName
+                ? t('settings.agentHandoffModelInheritNamed', { name: targetName })
+                : t('settings.agentHandoffModelInherit'),
+              description: t('settings.agentHandoffModelInheritHint'),
+            }}
+            onChange={(model) => patch({ model: model || undefined })}
             t={t}
           />
-          <Button
-            variant="ghost"
-            disabled={!handoff.model}
-            onClick={() => patch({ model: undefined })}
-          >
-            {t('settings.agentHandoffModelInherit')}
-          </Button>
-        </div>
-        {visible('model').map((issue) => (
-          <small key={issue.code} id={errorId('model')} className="settings-handoff-error" role="alert">{errorText(issue)}</small>
-        ))}
-      </div>
+          {renderErrors('model')}
+        </SettingsField>
 
-      <div className="settings-handoff-flags">
-        <div className="settings-handoff-flag">
-          <label className="settings-checkbox-row compact">
-            <input type="checkbox" checked={handoff.send === true} onChange={(event) => patch({ send: event.currentTarget.checked || undefined })} />
-            <span>{t('settings.agentHandoffSend')}</span>
-          </label>
-          <p className="settings-help-text">{t('settings.agentHandoffSendHelp')}</p>
-        </div>
-        <div className="settings-handoff-flag">
-          <label className="settings-checkbox-row compact">
-            <input type="checkbox" checked={handoff.showContinueOn === true} onChange={(event) => patch({ showContinueOn: event.currentTarget.checked || undefined })} />
-            <span>{t('settings.agentHandoffShowContinueOn')}</span>
-          </label>
-          <p className="settings-help-text">{t('settings.agentHandoffShowContinueOnHelp')}</p>
-        </div>
+        <SettingsField label={t('settings.agentHandoffSend')} layout="row">
+          <Checkbox
+            checked={handoff.send === true}
+            onCheckedChange={(checked) => patch({ send: checked || undefined })}
+            label={t('settings.agentHandoffSendHelp')}
+          />
+        </SettingsField>
+        <SettingsField label={t('settings.agentHandoffShowContinueOn')} layout="row">
+          <Checkbox
+            checked={handoff.showContinueOn === true}
+            onCheckedChange={(checked) => patch({ showContinueOn: checked || undefined })}
+            label={t('settings.agentHandoffShowContinueOnHelp')}
+          />
+        </SettingsField>
       </div>
     </article>
   );

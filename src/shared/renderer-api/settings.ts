@@ -22,7 +22,7 @@ export function createRdxRuntimeApi(transport: RendererApiTransport): ElectronAP
     upsertResource: (request) => transport.invoke(INVOKE.rdxRuntime.upsertResource, request),
     importResource: (request) => transport.invoke(INVOKE.rdxRuntime.importResource, request),
     deleteResource: (kind, scope, id, projectRoot) => (
-      transport.invoke(INVOKE.rdxRuntime.deleteResource, kind, scope, id, projectRoot)
+      transport.invoke(INVOKE.rdxRuntime.deleteResource, kind, scope, id, ...(projectRoot === undefined ? [] : [projectRoot]))
     ),
     revealResource: (sourcePath) => transport.invoke(INVOKE.rdxRuntime.revealResource, sourcePath),
     trustHook: (projectRoot, hookId) => transport.invoke(INVOKE.rdxRuntime.trustHook, projectRoot, hookId),

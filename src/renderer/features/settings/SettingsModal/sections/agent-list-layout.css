@@ -1,0 +1,106 @@
+.settings-manifest-list-column {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-3);
+  background: var(--token-bg-shell);
+}
+
+.settings-manifest-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  padding: 0;
+  margin-bottom: var(--space-3);
+}
+
+.settings-manifest-list {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 0 1 auto;
+  padding: 0 var(--space-1) 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding-right: var(--space-1);
+}
+
+.settings-manifest-list-toolbar .settings-manifest-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-manifest-list-column {
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-panel) 88%, var(--token-bg-shell));
+  border-color: var(--token-border-card);
+}
+
+.settings-page-agents .settings-manifest-list-column {
+  background: color-mix(in srgb, var(--token-bg-panel) 82%, var(--token-bg-shell));
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-md);
+}
+
+.settings-page-agents .settings-manifest-list {
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.settings-page-agents .settings-manifest-list-column {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+}
+
+.settings-page-agents .settings-manifest-list-toolbar {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 960px) {
+
+  .settings-page-agents .settings-manifest-list-column {
+    height: auto;
+    max-height: 15rem;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 960px) {
+
+  .settings-page-agents .settings-manifest-list {
+    overflow-y: auto;
+    min-height: var(--space-12);
+  }
+}
+
+@media (max-width: 68rem) {
+
+  .settings-page-agents .settings-manifest-list-column {
+    height: auto;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 48rem) {
+  .settings-page-agents .settings-manifest-list-column {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+}

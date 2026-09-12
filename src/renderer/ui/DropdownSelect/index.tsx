@@ -17,6 +17,7 @@ import {
 } from './dropdownSelectUtils';
 import { DropdownSelectMenu, DropdownSelectTrigger } from './DropdownSelectPrimitives';
 import type { DropdownSelectProps } from './types';
+import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
 import './DropdownSelect.css';
 
 export type { DropdownOption } from './types';
@@ -41,6 +42,7 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const { layerId } = useOverlayLayer(open);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [menuPosition, setMenuPosition] = useState({
     left: VIEWPORT_MARGIN,
@@ -138,8 +140,10 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isTopOverlayLayer(layerId)) return;
       if (event.key === 'Escape') {
         event.preventDefault();
+        event.stopPropagation();
         closeMenu();
         triggerRef.current?.focus();
         return;
@@ -183,7 +187,7 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [activeIndex, closeMenu, commitSelection, open, options]);
+  }, [activeIndex, closeMenu, commitSelection, layerId, open, options]);
 
   useEffect(() => {
     if (!open) {
@@ -222,7 +226,7 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
   }, [open, options, updateMenuPosition, value]);
 
   const handleTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (disabled) {
+    if (disabled || open) {
       return;
     }
 
@@ -242,8 +246,8 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
   const rootClassName = [
     'dropdown-select',
     `variant-${variant}`,
-    open ? 'open' : '',
-    disabled ? 'disabled' : '',
+    open ? 'is-open' : '',
+    disabled ? 'is-disabled' : '',
     className,
   ].filter(Boolean).join(' ');
 

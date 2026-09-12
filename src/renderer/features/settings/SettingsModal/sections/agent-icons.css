@@ -1,0 +1,112 @@
+.settings-manifest-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-10);
+  height: var(--space-10);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-shell) 64%, transparent);
+}
+
+.settings-agent-icon-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-12);
+  height: var(--space-12);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-raised) 42%, transparent);
+  color: var(--token-text-body);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.settings-agent-icon-option:hover,
+.settings-agent-icon-option:focus-visible {
+  border-color: var(--token-border-strong);
+  background: color-mix(in srgb, var(--token-bg-raised) 74%, transparent);
+}
+
+.settings-agent-icon-option.is-selected {
+  border-color: var(--token-accent-primary);
+  background: var(--token-interactive-active);
+}
+
+.settings-agent-icon-option-check {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--token-accent-primary);
+  color: var(--token-text-inverse);
+}
+
+.settings-agent-icon-option:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.settings-agent-icon-popover.ui-popover {
+  width: min(22rem, calc(100vw - var(--space-16)));
+  max-width: min(22rem, calc(100vw - var(--space-16)));
+  max-height: min(24rem, calc(100vh - var(--space-16)));
+  overflow-y: auto;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-overlay);
+  box-shadow: var(--token-shadow-popover);
+}
+
+.settings-agent-icon-popover-title {
+  margin-bottom: var(--space-3);
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+}
+
+.settings-agent-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--space-12), 1fr));
+  gap: var(--space-2);
+}
+
+.settings-agent-editor-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  width: var(--space-10);
+  height: var(--space-10);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-raised) 52%, transparent);
+  color: var(--token-text-heading);
+}
+
+.settings-agent-icon-trigger {
+  gap: var(--space-2);
+  min-height: var(--btn-height-sm);
+}
+
+.settings-page-agents .settings-agent-editor-icon {
+  color: var(--settings-agent-accent, var(--token-text-heading));
+  background: color-mix(in srgb, var(--settings-agent-accent, var(--token-border-focus)) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--settings-agent-accent, var(--token-border-focus)) 34%, transparent);
+}
+
+.settings-page-agents .settings-agent-icon-popover {
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 8;
+  width: min(22rem, calc(100vw - var(--space-16)));
+  max-height: min(24rem, calc(100vh - var(--space-16)));
+  grid-template-columns: repeat(auto-fit, minmax(var(--space-12), 1fr));
+}

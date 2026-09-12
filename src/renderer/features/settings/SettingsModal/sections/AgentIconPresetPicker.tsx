@@ -2,6 +2,7 @@ import React, { useRef, useState, type KeyboardEvent } from 'react';
 import { AGENT_ICON_PRESETS } from '@shared/constants/agents';
 import type { ModeIconKey } from '@shared/types/layout';
 import { Button } from '../../../../ui/Button';
+import { Icon } from '../../../../ui/Icon';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { Popover } from '../../../../ui/Popover';
 import type { useI18n } from '../../../../i18n';
@@ -51,10 +52,11 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
         <Button variant="secondary" className="settings-agent-icon-trigger" aria-haspopup="menu">
           <ModeGlyph mode="ask" icon={value} size={16} strokeWidth={1.9} />
           <span>{t('settings.changeAgentIcon')}</span>
+          <Icon name="chevron-down" size={14} />
         </Button>
       )}
     >
-      <div className="settings-agent-icon-popover-title">{t('settings.agentIcon')}</div>
+      <div className="settings-agent-icon-popover-title">{t('settings.chooseAgentIcon')}</div>
       <div
         ref={gridRef}
         className="settings-agent-icon-grid"
@@ -73,6 +75,11 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
             onClick={() => chooseIcon(preset.id)}
           >
             <ModeGlyph mode="ask" icon={preset.id} size={18} strokeWidth={1.9} />
+            {value === preset.id ? (
+              <span className="settings-agent-icon-option-check" aria-hidden="true">
+                <Icon name="check" size={12} />
+              </span>
+            ) : null}
           </button>
         ))}
       </div>

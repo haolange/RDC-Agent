@@ -86,6 +86,8 @@ function toHit(entry: KnowledgeIndexEntry, lanes: KnowledgeRetrievalLane[], scor
     title: entry.title,
     type: entry.type,
     lifecycle: entry.lifecycle,
+    ...(entry.preview ? { preview: entry.preview } : {}),
+    updatedAt: entry.updatedAt,
     score,
     lanes,
   };

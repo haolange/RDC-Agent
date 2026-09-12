@@ -1,10 +1,11 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { KnowledgeLaneHit, KnowledgeSpace } from '@shared/types/knowledge';
 import type {
   KnowledgeExportFormat,
   KnowledgeExportResult,
   KnowledgeExportScope,
 } from '@shared/types/knowledgeExport';
+import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { knowledgeErrorMessage } from './knowledgeCenterModel';
 
 const EXTENSION: Record<KnowledgeExportFormat, string> = {
@@ -13,10 +14,12 @@ const EXTENSION: Record<KnowledgeExportFormat, string> = {
 };
 
 export function useKnowledgeExport(options: {
+  active: boolean;
   spaces: KnowledgeSpace[];
   hits: KnowledgeLaneHit[];
   selected: { spaceId: string; relativePath: string } | null;
 }) {
+  const request = useKnowledgeRequestScope(options.active);
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState<KnowledgeExportScope>('filtered');
   const [format, setFormat] = useState<KnowledgeExportFormat>('package');
@@ -36,10 +39,14 @@ export function useKnowledgeExport(options: {
   const pendingCount = counts[scope];
 
   const close = useCallback(() => {
+    request.next();
+    setBusy(false);
     setOpen(false);
     setError(null);
     setResult(null);
-  }, []);
+  }, [request]);
+
+  useEffect(() => { if (!options.active) close(); }, [close, options.active]);
 
   const openPanel = useCallback(() => {
     setScope(options.selected ? 'selected' : 'filtered');
@@ -50,30 +57,32 @@ export function useKnowledgeExport(options: {
   }, [options.selected, options.spaces]);
 
   const run = useCallback(async () => {
+    const seq = request.next();
     setError(null);
-    // Cancelling the save dialog must not produce a partial file or a result row.
-    const targetPath = await window.electronAPI.saveFile({
-      defaultFileName: `knowledge-export.${EXTENSION[format]}`,
-      extension: EXTENSION[format],
-    });
-    if (!targetPath) return;
     setBusy(true);
     try {
+      // The native picker can fail or be cancelled before export starts.
+      const targetPath = await window.electronAPI.saveFile({
+        defaultFileName: `knowledge-export.${EXTENSION[format]}`,
+        extension: EXTENSION[format],
+      });
+      if (!targetPath || !request.isCurrent(seq)) return;
       const cardRefs = scope === 'selected'
         ? (options.selected ? [options.selected] : [])
         : options.hits.map((hit) => ({ spaceId: hit.spaceId, relativePath: hit.relativePath }));
-      setResult(await window.electronAPI.knowledge.export({
+      const exported = await window.electronAPI.knowledge.export({
         format,
         scope,
         targetPath,
         ...(scope === 'space' ? { spaceId } : { cardRefs }),
-      }));
+      });
+      if (request.isCurrent(seq)) setResult(exported);
     } catch (err) {
-      setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
     } finally {
-      setBusy(false);
+      if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [format, options.hits, options.selected, scope, spaceId]);
+  }, [format, options.hits, options.selected, request, scope, spaceId]);
 
   return {
     open,

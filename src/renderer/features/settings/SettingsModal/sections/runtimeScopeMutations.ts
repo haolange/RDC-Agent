@@ -1,6 +1,7 @@
-import type { RdxRuntimeOverview, ScopedResourceKind } from '@shared/types/rdxRuntime';
+import type { RdxRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdxRuntime';
+import { selectFiles } from '../../../../hooks/appShellBridge';
 import { contentFromForm, type ResourceFormState } from './scopedResourceForm';
-import { upsertScopedResource, validateScopedResource } from './runtimeScopeActions';
+import { importScopedResource, upsertScopedResource, validateScopedResource } from './runtimeScopeActions';
 
 export const templateResourceId = (kind: ScopedResourceKind): string => `new-${kind}`;
 
@@ -57,4 +58,26 @@ export async function saveScopedResource(input: {
   const overview = await upsertScopedResource(request);
   if (!overview) return { ok: false, messageKey: 'resourceArgsInvalid' };
   return { ok: true, overview, id: nextId };
+}
+
+/** Picks a file through the real dialog and imports it into the scope; `null` when the user cancelled. */
+export async function importScopedResourceFromPicker(input: {
+  kind: ScopedResourceKind;
+  scope: 'user' | 'project';
+  projectRoot?: string;
+}): Promise<{ overview: RdxRuntimeOverview; imported: ScopedResourceDocument | null } | null> {
+  const paths = await selectFiles();
+  const filePath = paths?.[0];
+  if (!filePath) return null;
+  const result = await importScopedResource({
+    kind: input.kind,
+    scope: input.scope,
+    filePath,
+    ...(input.projectRoot ? { projectRoot: input.projectRoot } : {}),
+  });
+  if (!result) return null;
+  const imported = result.overview.resources.find(
+    (entry) => entry.scope === input.scope && entry.kind === input.kind && entry.id === result.id,
+  ) ?? null;
+  return { overview: result.overview, imported };
 }

@@ -149,6 +149,10 @@ export interface KnowledgeCardDetail extends KnowledgeCardSummary {
   sourceStatus?: string;
   caseId?: string;
   chapters?: KnowledgeCaseChapters;
+  /** Ingest provenance projected from the card record; absent for hand-written cards. */
+  sourceHash?: string;
+  sourceMtimeMs?: number;
+  sourceSize?: number;
 }
 
 export interface KnowledgeHumanConfirmation {
@@ -184,6 +188,9 @@ export interface KnowledgeLaneHit {
   title: string;
   type?: KnowledgeCardType;
   lifecycle?: KnowledgeLifecycle;
+  /** List-row projection; comes from the index entry, absent until the index is rebuilt. */
+  preview?: string;
+  updatedAt?: number;
   score: number;
   lanes: KnowledgeRetrievalLane[];
   chunkIndex?: number;
