@@ -12,6 +12,8 @@
 
 窄屏或自动收起左侧导航时，标题栏的左侧按钮打开导航抽屉，项目、会话、知识中心与用户设置仍可达。抽屉与右侧检查抽屉互斥，支持 Escape、焦点约束与关闭后焦点返回；关闭时不占主工作区宽度。
 
+Docked 左导航与右检查栏在可见接缝可拖以改变栏宽；进入抽屉或自动收起后该接缝不再提供拖拽。
+
 Workbench page shell、Local utilities、composer、transcript 共用 `--workbench-outer-rail-width`（源自 `WORKBENCH_CHAT_RAIL_MAX_WIDTH`）。禁止更窄 content-rail 把 composer 挤歪。
 
 - 用户 prompt：右对齐 raised bubble（`fit-content`、`--token-surface-raised`）。

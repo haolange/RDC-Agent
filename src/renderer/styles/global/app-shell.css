@@ -112,6 +112,13 @@
 
 .app-body.is-resizing {
   transition: none;
+  cursor: col-resize;
+  user-select: none;
+}
+
+.app-body.is-resizing * {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .app-sidebar-left {

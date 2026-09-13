@@ -10,6 +10,7 @@ import type { ComposerController } from '../features/composer/useComposer';
 import type { TranslationKey } from '../i18n';
 import { APP_RESIZE_HANDLE_WIDTH } from '@shared/constants/layout';
 import { useDynStyle } from '../lib/useDynStyle';
+import { isDockedResizeHandleVisible, ResizeHandle } from '../shell/ResizeHandle';
 import { WorkbenchPanelDrawer } from './WorkbenchPanelDrawer';
 
 type DragSide = 'left' | 'right';
@@ -76,11 +77,13 @@ export function WorkbenchShell({
   onStartDrag,
 }: WorkbenchShellProps) {
   const showDockedRightRail = isRightRailVisible && !isRightRailDrawerMode;
+  const showLeftResizeHandle = isDockedResizeHandleVisible(!isLeftDrawerMode, effectiveLeftCollapsed);
+  const showRightResizeHandle = isDockedResizeHandleVisible(showDockedRightRail, effectiveRightCollapsed);
   const shellDynStyle = useDynStyle({
     '--left-sidebar-width': `${resolvedWidths.left}px`,
     '--right-panel-width': `${resolvedWidths.right}px`,
-    '--left-resize-handle-width': `${effectiveLeftCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
-    '--right-resize-handle-width': `${!isRightRailVisible || effectiveRightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
+    '--left-resize-handle-width': `${showLeftResizeHandle ? APP_RESIZE_HANDLE_WIDTH : 0}px`,
+    '--right-resize-handle-width': `${showRightResizeHandle ? APP_RESIZE_HANDLE_WIDTH : 0}px`,
     '--workbench-rail-max-width': workbenchRailMaxWidth,
     '--workbench-inline-mode': bothSidebarsCollapsed ? 'dual-collapsed' : 'sidebar-open',
   });
@@ -157,11 +160,11 @@ export function WorkbenchShell({
         {!isLeftDrawerMode ? sidebarContent : null}
       </aside>
 
-      <div
-        className={`panel-resize-handle panel-resize-handle-left ${effectiveLeftCollapsed ? 'disabled' : ''}`}
-        onPointerDown={!effectiveLeftCollapsed ? onStartDrag('left', resolvedWidths.left) : undefined}
-        aria-hidden="true"
-      />
+      {showLeftResizeHandle ? (
+        <ResizeHandle side="left" onDragStart={onStartDrag('left', resolvedWidths.left)} />
+      ) : (
+        <div aria-hidden="true" />
+      )}
 
       <main className={`app-main ${isTerminalOpen ? 'terminal-open' : ''}`}>
         <div className="main-content">
@@ -203,11 +206,11 @@ export function WorkbenchShell({
 
       {showDockedRightRail && (
         <>
-          <div
-            className={`panel-resize-handle panel-resize-handle-right ${effectiveRightCollapsed ? 'disabled' : ''}`}
-            onPointerDown={!effectiveRightCollapsed ? onStartDrag('right', resolvedWidths.right) : undefined}
-            aria-hidden="true"
-          />
+          {showRightResizeHandle ? (
+            <ResizeHandle side="right" onDragStart={onStartDrag('right', resolvedWidths.right)} />
+          ) : (
+            <div aria-hidden="true" />
+          )}
 
           <aside
             className={`app-sidebar-right ${effectiveRightCollapsed ? 'collapsed' : ''}`}
