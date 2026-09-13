@@ -96,6 +96,7 @@
 .app-body {
   flex: 1;
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   grid-template-columns:
     var(--left-sidebar-width, 256px)
     var(--left-resize-handle-width, 8px)
@@ -1001,4 +1002,22 @@
   margin-left: var(--space-0-5);
   background: color-mix(in srgb, var(--token-bg-panel) 90%, transparent);
   box-shadow: inset 0 0 0 1px var(--token-border-muted);
+}
+
+.right-panel-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+
+.right-panel-body.collapsed {
+  opacity: 0;
+  transform: translateX(12px);
+  pointer-events: none;
 }

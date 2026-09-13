@@ -1,45 +1,23 @@
+import type { CaptureReplayApplyRequest, CaptureReplayBindingRequest, CaptureReplayHistoryRequest } from '@shared/types/captureReplay';
 import { getElectronApi } from '../../platform/getElectronApi';
-
 export type CaptureScope = { projectId: string; sessionId: string };
-
-export async function getOpenedCaptureState(scope: CaptureScope) {
-  return getElectronApi()?.capture.getOpenedState(scope) ?? null;
-}
-
-export async function getContextSnapshot(scope: CaptureScope) {
-  return getElectronApi()?.context.get(scope) ?? null;
-}
-
-export async function getTraceProjection(sessionId: string) {
-  return getElectronApi()?.trace.getProjection(sessionId) ?? { success: false, presentation: null };
-}
-
-export async function openProjectCaptureInput(request: {
-  projectId: string;
-  sessionId: string;
-  inputId: string;
-  filePath: string;
-  replayDeviceId?: string | null;
-}) {
-  const { replayDeviceId, ...rest } = request;
-  return getElectronApi()?.capture.openProjectInput({
-    ...rest,
-    replayDeviceId: replayDeviceId ?? '',
-  });
-}
-
-export async function closeHumanPreview(scope: CaptureScope) {
-  return getElectronApi()?.context.closeHumanPreview(scope);
-}
-
-export async function openHumanPreview(scope: CaptureScope) {
-  return getElectronApi()?.context.openHumanPreview(scope);
-}
-
-export async function clearOpenedCapture(scope: CaptureScope) {
-  return getElectronApi()?.capture.clearOpenedState(scope);
-}
-
-export async function refreshProjectCaptureInputs(projectId: string) {
-  return getElectronApi()?.project.inputs.refresh(projectId);
-}
+const api = () => {
+  const bridge = getElectronApi();
+  if (!bridge) throw new Error('Application connection is unavailable');
+  return bridge;
+};
+export const getOpenedCaptureState = (scope: CaptureScope) => api().capture.getOpenedState(scope);
+export const getContextSnapshot = (scope: CaptureScope) => api().context.get(scope);
+export const getTraceProjection = (sessionId: string) => api().trace.getProjection(sessionId);
+export const getReplayState = (scope: CaptureScope) => api().capture.getReplayState(scope);
+export const getReplaySelection = (scope: CaptureScope) => api().capture.getReplaySelection(scope);
+export const applyReplayEvent = (request: CaptureReplayApplyRequest) => api().capture.applyReplayEvent(request);
+export const refreshReplayFrame = (scope: CaptureReplayBindingRequest) => api().capture.refreshFrame(scope);
+export const subscribeReplay = (listener: Parameters<ReturnType<typeof api>['events']['onCaptureReplayChanged']>[0]) => api().events.onCaptureReplayChanged(listener);
+export const listReplayHistory = (request: CaptureReplayHistoryRequest) => api().capture.listReplayHistory(request);
+export const readReplayImage = (request: CaptureScope & { captureHash: string; imageHash: string }) => api().capture.readReplayImage(request);
+export const clearReplayHistory = (request: CaptureScope & { captureHash: string }) => api().capture.clearReplayHistory(request);
+export const clearOpenedCapture = (scope: CaptureReplayBindingRequest) => api().capture.clearOpenedState(scope);
+export const refreshProjectCaptureInputs = (projectId: string) => api().project.inputs.refresh(projectId);
+export const refreshReplayDevices = () => api().device.refresh();
+export const openProjectCaptureInput = (request: CaptureReplayBindingRequest & { inputId: string; filePath: string; replayDeviceId: string }) => api().capture.openProjectInput(request);

@@ -16,6 +16,7 @@ appearance-contrast-${props.variant}
 appearance-import-${variant}
 appearance-import-preview
 appearance-preview-${props.variant}
+capture-color-target
 chat-messages
 composer-attach-button
 composer-attach-file-input
@@ -127,6 +128,7 @@ mode-menu-item-${agent.id}
 open-settings-entry
 project-capture-import-panel
 right-rail-${id}
+right-rail-capture
 right-rail-capture-input
 right-rail-drawer
 right-rail-replay-device

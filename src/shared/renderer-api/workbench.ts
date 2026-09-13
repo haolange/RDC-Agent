@@ -21,6 +21,8 @@ export function createProjectApi(transport: RendererApiTransport): ProjectApi {
     inputs: {
       list: (projectId) => transport.invoke(INVOKE.project.listInputs, projectId),
       refresh: (projectId) => transport.invoke(INVOKE.project.refreshInputs, projectId),
+      prepareRemove: (projectId, inputId) => transport.invoke(INVOKE.project.prepareRemoveInput, projectId, inputId),
+      remove: (projectId, inputId, approvalToken) => transport.invoke(INVOKE.project.removeInput, projectId, inputId, approvalToken),
       import: (projectId) => transport.invoke(INVOKE.project.importInput, projectId),
       importPaths: (projectId, filePaths) => (
         transport.invoke(INVOKE.project.importInputPaths, projectId, filePaths)
@@ -64,6 +66,13 @@ export function createRuntimeLogApi(transport: RendererApiTransport): RuntimeLog
 
 export function createCaptureApi(transport: RendererApiTransport): CaptureApi {
   return {
+    getReplaySelection: (scope) => transport.invoke(INVOKE.capture.getReplaySelection, scope),
+    listReplayHistory: (request) => transport.invoke(INVOKE.capture.listReplayHistory, request),
+    readReplayImage: (request) => transport.invoke(INVOKE.capture.readReplayImage, request),
+    clearReplayHistory: (request) => transport.invoke(INVOKE.capture.clearReplayHistory, request),
+    getReplayState: (scope) => transport.invoke(INVOKE.capture.getReplayState, scope),
+    applyReplayEvent: (request) => transport.invoke(INVOKE.capture.applyReplayEvent, request),
+    refreshFrame: (scope) => transport.invoke(INVOKE.capture.refreshFrame, scope),
     list: (scope) => transport.invoke(INVOKE.capture.list, scope),
     select: (request) => transport.invoke(INVOKE.capture.select, request),
     openProjectInput: (request) => transport.invoke(INVOKE.capture.openProjectInput, request),
@@ -75,8 +84,6 @@ export function createCaptureApi(transport: RendererApiTransport): CaptureApi {
 export function createContextApi(transport: RendererApiTransport): ContextApi {
   return {
     get: (scope) => transport.invoke(INVOKE.context.get, scope),
-    openHumanPreview: (scope) => transport.invoke(INVOKE.context.openHumanPreview, scope),
-    closeHumanPreview: (scope) => transport.invoke(INVOKE.context.closeHumanPreview, scope),
   };
 }
 

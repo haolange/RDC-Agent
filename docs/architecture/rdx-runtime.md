@@ -101,4 +101,16 @@ Experiment.executionEvidence 为可选五阶段引用组。历史无该字段可
 
 验证：RdxNativeParser.test.ts 接受显式 RDX_NATIVE_TOOLS_ROOT / RDX_NATIVE_PYTHON，用外部实际 parser 校验生产 argv 与 JSON 标志。RdxNativeExecution.test.ts 仅在显式 RDX_NATIVE_PYTHON / RDX_NATIVE_CAPTURE / RDX_NATIVE_ALLOW_MUTATION=1 下，对临时副本进行真实像素介入、签名证据与回滚，finally 停 daemon；默认单测不碰真实 capture。
 
-Human preview 关闭由 main 使用当前配置 CLI 的冻结快照编译原生 `session preview off`；不新增 closePreview 配置项。只有所属 context 的 canonical 成功结果且 `preview.enabled === false` 才投影 closed，失败保留错误并保持 capture lease。openPreview 缺少 enabled=true 不能投影 open。远程 prepared handle 在 open 前单次消费，失败后必须重新 connectRemote。
+## 内嵌回放、观察与 Session ownership
+
+应用生命周期的唯一入口为 session-scoped `RdxSessionService`，每个 binding 持有 `RdxSessionRuntime`。Open 对原文件计算完整 SHA-256，main 分配 UUID daemon context，action 使用 `{{contextId}}`。只接受匹配的 native identity，关闭失败保留原 owning context。Android 设备预留先于连接，另一 session 不能抢占。
+
+`rd.session.get_replay_events` 返回完整事件列表；`rd.session.observe` 在原生串行区内应用事件、解析目标并导出画面。默认 final_output 只使用 Present 资源证据，无法识别时不冒充最终输出。Remote 当前能力为 unsupported，Local 图片路径并不能证明设备屏幕显示。
+
+`executeRdxShell` 与人工操作共享 context 队列；native 返回及签名回执完成后才观察并记录足迹，使用该 turn 的冻结 CLI。当前 perf API 是自包含的 awaited measurement（sample_counters/get_event_durations/get_frame_timing/get_pipeline_statistics），观察发生于该命令完成之后，不插入 sampling 内部；enumerate/describe_counter 不产生观察。多条命令构成的 experiment 是证据生命周期，不是持续采样事务：命令之间的观察会执行 replay/export，不承诺整个 experiment 零扰动。
+
+远程打开期间通过冻结 CLI 查询所属 daemon 的 `active_operation`；只有原生 transfer stage 才显示传输阶段，查询失败不推测进度。足迹记录原生 `revision`、实际替换/恢复状态和显示参数。观察无法确认 EID 时保存无图片的失败事实；实时 Agent 画面与操作元数据成对投影，不读取手动回放图片。
+
+生成图片在 main 自有临时目录中读取后清理；frame projection 仅含验证后的 data URL。每个 session 历史通过 ReplayHistoryStore 原子提交，图片 hash 去重；回看不执行 native call。输入删除关闭所有关联绑定，正常 close 保留历史。
+
+完整项目输入扫描先提交已确认的 `ProjectRecord.inputs`，并经 `project:inputsChanged` 广播，再执行原生回放释放和足迹 reconciliation。清理状态独立保存在 `ProjectRecord.replayCleanupPending`（请求时间、相关 capture 内容 hash、最近失败原因）；清理成功后移除此记录。清理失败不会回填旧输入，也不会把已不存在的最后一个 RDC 重新投影为可操作文件。重启或手动刷新基于新的完整扫描重试待清理工作；未完成扫描、目录离线或访问失败不更新输入列表、不启动缺失清理。后台错误通过 `project:inputsError` 进入现有全局通知，不能挤入原 Capture 空态。

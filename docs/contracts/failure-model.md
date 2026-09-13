@@ -124,3 +124,7 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 - Integrity 存储：`src/shared/utils/jsonl.test.ts`、`src/main/testing/contracts/storageFaultContract.test.ts`
 - Availability 取消：`TurnCoordinator.test.ts`、`ProcessSupervisor.test.ts`、`cancellationContract.test.ts`
 - Security 矩阵：`securityContract.test.ts`
+
+## Capture 分阶段失败
+
+Open 失败、图片获取失败、设备显示不支持、Close 未确认分别投影。native context 已打开而图片失败时保留 lease，重试只请求图片。无颜色输出不可复用上一事件图片。关闭和半开恢复失败保留 context/设备占用，必须显式关闭确认；不以清空 UI 模拟释放。历史写失败或达到配额后明确未保存，已有历史保持不变。Remote `unsupported` 是能力边界，不能投影显示成功。

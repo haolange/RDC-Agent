@@ -64,6 +64,9 @@ export function createEventSubscriptionApi(transport: RendererApiTransport): Eve
         callback(payload as { projectId: string; inputs: ProjectInputRecord[] })
       ))
     ),
+    onProjectInputsError: (callback) => transport.subscribe(EVENT.workbench.projectInputsError,
+      payload => callback(payload as { projectId: string; error: string })),
+    onCaptureReplayChanged: (callback) => transport.subscribe(EVENT.workbench.captureReplayChanged, payload => callback(payload as import('../types/captureReplay').CaptureReplayState)),
     onOpenedCaptureStateChanged: (callback) => (
       transport.subscribe(EVENT.workbench.openedCaptureStateChanged, (payload) => (
         callback(payload as SessionScopedPayload<OpenedCaptureState | null>)

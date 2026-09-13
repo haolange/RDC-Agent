@@ -41,7 +41,7 @@ sequenceDiagram
   participant Shell as ShellInvocationService
   participant CLI as System-installed RDX CLI
 
-  UI->>IPC: capture:openProjectInput / context:openHumanPreview
+  UI->>IPC: capture:openProjectInput / capture:refreshFrame
   IPC->>Session: openProjectInput or preview
   alt Local Replay Device
     Session->>Action: openCapture
@@ -57,7 +57,7 @@ sequenceDiagram
   IPC-->>UI: context:changed and opened capture state
 ```
 
-RDX command details are Settings data under `settings.tooling.rdxActions` (`openCapture`, `openRemoteCapture`, `connectRemote`, `openPreview`, `closeRuntime`). The repository does not hardcode RDX CLI tool names, command args, cwd, env, or fallback repository paths in renderer/preload/main call sites for these vertical UI actions.
+RDX command details are Settings data under `settings.tooling.rdxActions` (`openCapture`, `openRemoteCapture`, `connectRemote`, `closeRuntime`). The repository does not hardcode RDX CLI tool names, command args, cwd, env, or fallback repository paths in renderer/preload/main call sites for these vertical UI actions.
 
 Local Open uses `capture open --file {{capturePath}}`. Remote Open uses the same facade with `--remote-id {{remoteId}}` after `connectRemote` prepares a live handle. Failures must expose structured diagnostics (`message`, optional `classification` / `fix_hint`) rather than truncated CLI stderr alone.
 

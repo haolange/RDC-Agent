@@ -83,7 +83,7 @@ function registerShutdownDisposables(): void {
     id: 'rdx.close-runtime',
     phase: 'terminate_processes',
     dispose: async () => {
-      await rdxSessionService.closeOrReplaceOpenedCapture();
+      await rdxSessionService.closeAll();
     },
   });
   shutdownCoordinator.register({

@@ -102,7 +102,12 @@ export function sanitizeRdxShellActionSettings(
   return {
     enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : fallback.enabled,
     command: typeof candidate.command === 'string' ? candidate.command.trim() : fallback.command,
-    args: sanitizeStringArray(candidate.args ?? fallback.args),
+    args: sanitizeStringArray(candidate.args ?? fallback.args).map((arg, index, args) => {
+      // Canonicalize the retired input-derived context only at the settings boundary.
+      if (arg === '{{inputId}}' && args[index - 1] === '--daemon-context') return '{{contextId}}';
+      if (arg === '--daemon-context={{inputId}}') return '--daemon-context={{contextId}}';
+      return arg;
+    }),
     workingDirectory: typeof candidate.workingDirectory === 'string' ? candidate.workingDirectory.trim() : fallback.workingDirectory,
     env: sanitizeStringRecord(candidate.env ?? fallback.env),
     timeoutMs,
@@ -119,7 +124,6 @@ export function sanitizeRdxActionsSettings(value: unknown): RdxActionSettingsMap
     ),
     connectRemote: sanitizeRdxShellActionSettings(candidate.connectRemote, DEFAULT_RDX_ACTIONS.connectRemote),
     closeRuntime: sanitizeRdxShellActionSettings(candidate.closeRuntime, DEFAULT_RDX_ACTIONS.closeRuntime),
-    openPreview: sanitizeRdxShellActionSettings(candidate.openPreview, DEFAULT_RDX_ACTIONS.openPreview),
   };
 }
 

@@ -110,3 +110,9 @@ shell 的 command 与 rdx 互斥；ToolValidator oneOf/not 与执行入口双重
 执行回执仅由主进程在真实原生成功调用后签名，key 在 safeStorage；模型提交的 result JSON、普通 shell 输出或 artifact hash 本身不具备 provenance。签名校验与 SessionArtifactResolver 所有权/hash 同时成立才可引用。实验关闭和新完成必须满足五阶段真实调用与同 replacement 的回滚；旧记录只保留可读性。详见 docs/architecture/rdx-runtime.md。
 
 Skill 权限只在 prepareTurn 对预载集合取交集；skill_read 只读方法。RenderDoc 方法技能没有局部执行工具白名单；profile/policy/lease 仍强制授权。Knowledge Scout 仍只有四个 Knowledge 只读工具，文件补证属于调用方独立步骤。
+
+## Capture 回放与足迹
+
+捕获操作使用显式 SessionScope，main 校验 session/project 与已登记输入。图片导出路径由 main 创建；原生返回必须匹配该精确路径，再读取图片并清理临时目录。renderer 仅收到验证后的图片，不接受任意文件路径。历史 API 校验 session/project 和 SHA-256 标识，不能越权访问其他项目。
+
+`capture:applyReplayEvent`、`capture:refreshFrame` 为 mutation；历史读取为 read，历史清除为 high-impact。Project RDC 删除使用一次性 approvalToken；它与仅清理足迹不是同一操作。手动操作必须通过 Agent 生命周期锁和 owning native context 队列。

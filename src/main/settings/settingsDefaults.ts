@@ -141,7 +141,6 @@ export const DEFAULT_RDX_ACTIONS: RdxActionSettingsMap = {
   openRemoteCapture: createDefaultRdxAction(),
   connectRemote: createDefaultRdxAction(),
   closeRuntime: createDefaultRdxAction(),
-  openPreview: createDefaultRdxAction(),
 };
 
 export const DEFAULT_CODE_INTERPRETER: CodeInterpreterSettings = {

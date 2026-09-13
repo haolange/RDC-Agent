@@ -166,8 +166,6 @@ export function buildRdxContext(input: {
       replaySessionId: opened.replaySessionId || undefined,
       openedAt: toIso(opened.openedAt),
       previewAvailable: Boolean(opened.preview),
-      humanPreviewStatus: input.contextSnapshot?.humanPreview?.status,
-      humanPreviewError: input.contextSnapshot?.humanPreview?.lastError,
     } : null,
     availableCaptures: input.availableCaptures,
     runtime: {

@@ -1,168 +1,123 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import type { RdxContextCaptureInput, RdxContextDiagnostic, RdxContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
+import { useCallback, useMemo, useState } from 'react';
+import type { RdxContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
 import { copyAppText } from '../../hooks/appShellBridge';
-import {
-  clearOpenedCapture,
-  closeHumanPreview,
-  getContextSnapshot,
-  getOpenedCaptureState,
-  getTraceProjection,
-  openHumanPreview,
-  openProjectCaptureInput,
-  refreshProjectCaptureInputs,
-} from './capturePanelActions';
 import { useDeviceStore } from '../../stores/deviceStore';
-import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
+import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { Button } from '../../ui/Button';
-import { DropdownSelect, type DropdownOption } from '../../ui/DropdownSelect';
-import { compactActionError } from './rightRailErrorUtils';
+import { DropdownSelect } from '../../ui/DropdownSelect';
 import { useI18n } from '../../i18n';
+import { CaptureFrame } from './CaptureFrame';
+import { CaptureHistory } from './CaptureHistory';
+import { useCaptureReplay } from './useCaptureReplay';
+import { clearOpenedCapture, clearReplayHistory, getTraceProjection, openProjectCaptureInput, refreshProjectCaptureInputs, refreshReplayDevices, refreshReplayFrame, type CaptureScope } from './capturePanelActions';
+import './CaptureReplay.css';
 
-type ActionName = 'open' | 'preview' | 'clear' | 'refresh' | null;
+type Action = 'open' | 'close' | 'refresh' | 'image' | 'clearHistory';
+const sizeLabel = (size: number) => size >= 1024 ** 3 ? `${(size / 1024 ** 3).toFixed(1)} GB` : `${(size / 1024 ** 2).toFixed(1)} MB`;
 
-const formatSize = (size?: number): string => {
-  if (typeof size !== 'number') return '';
-  if (size >= 1024 * 1024 * 1024) return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-  return `${Math.max(1, Math.round(size / 1024))} KB`;
-};
-
-const CaptureFileGlyph: React.FC = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M6 3.5h7l5 5V20.5H6z" />
-    <path d="M13 3.5v5h5M9 14h6M9 17h4" />
-  </svg>
-);
-
-const RefreshGlyph: React.FC = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M19 8a7.5 7.5 0 1 0 .4 7" />
-    <path d="M19 3.5V8h-4.5" />
-  </svg>
-);
-
-export const CapturePanel: React.FC<{ task: TaskContextPanelViewModel; capture: RdxContextPanelViewModel }> = ({ task, capture: rdx }) => {
+function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: RdxContextPanelViewModel }) {
   const { t } = useI18n();
-  const devices = useDeviceStore((state) => state.devices);
-  const selectedDevice = useDeviceStore((state) => state.selectedDevice);
-  const setSelectedDevice = useDeviceStore((state) => state.setSelectedDevice);
-  const refreshDevices = useDeviceStore((state) => state.refreshDevices);
-  const [selectedInputId, setSelectedInputId] = useState('');
-  const [activeAction, setActiveAction] = useState<ActionName>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const scope = useMemo(
-    () => task.projectId && task.sessionId ? { projectId: task.projectId, sessionId: task.sessionId } : null,
-    [task.projectId, task.sessionId],
-  );
-  const selectedInput = useMemo(
-    () => rdx.availableCaptures.find((item) => item.inputId === selectedInputId) ?? rdx.availableCaptures.find((item) => item.inputId === rdx.capture?.inputId) ?? rdx.availableCaptures[0] ?? null,
-    [rdx.availableCaptures, rdx.capture?.inputId, selectedInputId],
-  );
-  const captureOptions = useMemo<DropdownOption[]>(() => rdx.availableCaptures.map((input) => ({
-    value: input.inputId,
-    label: input.fileName,
-  })), [rdx.availableCaptures]);
-  const deviceOptions = useMemo<DropdownOption[]>(() => devices.map((device) => ({
-    value: device.id,
-    label: device.type === 'local' ? t('device.local') : device.label,
-  })), [devices, t]);
-  useEffect(() => setSelectedInputId(selectedInput?.inputId ?? ''), [selectedInput?.inputId]);
+  const { state, selection, error: connectionError, reload, receive } = useCaptureReplay(scope);
+  const devices = useDeviceStore((value) => value.devices);
+  const [draft, setDraft] = useState<{ inputId: string; deviceId: string } | null>(null);
+  const [action, setAction] = useState<Action | null>(null);
+  const [error, setError] = useState<{ message: string; action: Action } | null>(null);
+  const [tab, setTab] = useState<'frame' | 'history'>('frame');
+  const [more, setMore] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [historyEpoch, setHistoryEpoch] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const actualInputId = state?.inputId ?? selection?.inputId ?? capture.availableCaptures[0]?.inputId ?? '';
+  const actualDeviceId = state?.replayDeviceId ?? selection?.deviceId ?? 'local';
+  const chosen = draft ?? { inputId: actualInputId, deviceId: actualDeviceId };
+  const selectedInput = capture.availableCaptures.find((input) => input.inputId === chosen.inputId) ?? capture.availableCaptures[0];
+  const open = Boolean(state?.contextId);
+  const pending = open && (chosen.inputId !== actualInputId || chosen.deviceId !== actualDeviceId);
+  const phaseBusy = Boolean(state && ['validating', 'connecting', 'transferring', 'opening', 'loading_image', 'closing'].includes(state.phase));
+  const locked = Boolean(state?.interactionLock);
+  const disabled = locked || phaseBusy || action !== null || !state;
+  const captureHash = state?.captureHash ?? selection?.captureSha256 ?? null;
+  const partial = state?.phase === 'ready' && Boolean(state.error || state.warning || ['unsupported', 'error', 'pending'].includes(state.devicePresentation.status));
   const refreshProjection = useCallback(async () => {
-    if (!scope) return;
-    const [openedCapture, contextSnapshot, traceResult] = await Promise.all([
-      getOpenedCaptureState(scope).catch(() => null),
-      getContextSnapshot(scope).catch(() => null),
-      getTraceProjection(scope.sessionId).catch(() => ({ success: false, presentation: null })),
-    ]);
-    const projection = useSessionProjectionStore.getState();
-    projection.projectOpenedCapture(scope.sessionId, openedCapture);
-    projection.projectContextSnapshot(scope.sessionId, contextSnapshot);
-    if (traceResult.success && traceResult.presentation) {
-      projection.projectTrace(scope.sessionId, traceResult.presentation);
-      useWorkflowStore.getState().setTracePresentation(traceResult.presentation);
+    await reload();
+    const result = await getTraceProjection(scope.sessionId);
+    if (result.success && result.presentation) {
+      useSessionProjectionStore.getState().projectTrace(scope.sessionId, result.presentation);
+      if (useProjectStore.getState().currentSession?.sessionId === scope.sessionId) useWorkflowStore.getState().setTracePresentation(result.presentation);
     }
-  }, [scope]);
-  useEffect(() => { void refreshProjection(); }, [refreshProjection]);
-  const runAction = async (action: Exclude<ActionName, null>, body: () => Promise<string | null | undefined>) => {
-    setActiveAction(action); setActionError(null);
-    try { setActionError((await body()) || null); await refreshProjection(); } catch (error) { setActionError(error instanceof Error ? error.message : String(error)); } finally { setActiveAction(null); }
+  }, [reload, scope]);
+  const run = async (operation: Action) => {
+    if (disabled || !state) return;
+    setAction(operation); setError(null);
+    try {
+      if (operation === 'open' && selectedInput) {
+        const result = await openProjectCaptureInput({ ...scope, bindingGeneration: state.generation, inputId: selectedInput.inputId, filePath: selectedInput.filePath, replayDeviceId: chosen.deviceId });
+        if (!result.success) throw new Error(result.error);
+        setDraft(null);
+      } else if (operation === 'close') {
+        const result = await clearOpenedCapture({ ...scope, bindingGeneration: state.generation });
+        if (!result.success) throw new Error(result.error);
+      } else if (operation === 'image') receive(await refreshReplayFrame({ ...scope, bindingGeneration: state.generation }));
+      else if (operation === 'refresh') {
+        const [result, nextDevices] = await Promise.all([refreshProjectCaptureInputs(scope.projectId), refreshReplayDevices()]);
+        useDeviceStore.getState().setDevices(nextDevices);
+        useProjectStore.getState().updateProjectInputs(scope.projectId, result.inputs);
+      } else if (operation === 'clearHistory' && captureHash) {
+        await clearReplayHistory({ ...scope, captureHash });
+        setConfirmClear(false); setMore(false); setHistoryEpoch((value) => value + 1);
+      }
+      await refreshProjection();
+    } catch (reason) { setError({ message: reason instanceof Error ? reason.message : String(reason), action: operation }); }
+    finally { setAction(null); }
   };
-  const openInput = (input: RdxContextCaptureInput | null = selectedInput) => runAction('open', async () => !scope || !input ? null : (await openProjectCaptureInput({ ...scope, inputId: input.inputId, filePath: input.filePath, replayDeviceId: selectedDevice }))?.error);
-  const togglePreview = () => runAction('preview', async () => {
-    if (!scope) return null;
-    return rdx.capture?.humanPreviewStatus === 'open'
-      ? (await closeHumanPreview(scope))?.error
-      : (await openHumanPreview(scope))?.error;
-  });
-  const clearCapture = () => runAction('clear', async () => scope ? (await clearOpenedCapture(scope))?.error : null);
-  const copyRuntimeContext = () => {
-    const value = rdx.runtime.contextId ?? rdx.runtime.replaySessionId ?? rdx.capture?.replaySessionId;
-    if (value) void copyAppText(value);
-  };
-  const diagnostic = useMemo(() => {
-    const first = actionError ? { summary: actionError, action: 'retry' as const } : rdx.capture?.humanPreviewError ? { summary: rdx.capture.humanPreviewError, action: 'copy' as const } : rdx.diagnostics[0];
-    return first ? { ...first, ...compactActionError(first.summary) } : null;
-  }, [actionError, rdx.capture?.humanPreviewError, rdx.diagnostics]);
-  const handleDiagnostic = (item: { summary: string; action: RdxContextDiagnostic['action'] }) => {
-    if (item.action === 'retry') return void openInput();
-    if (item.action === 'change_device') return void document.querySelector<HTMLElement>('[data-testid="right-rail-replay-device"]')?.focus();
-    if (item.action === 'settings') return void window.dispatchEvent(new Event('rdx:open-settings'));
-    if (item.action === 'copy') void copyAppText(item.summary);
-  };
-  const captureIsOpen = Boolean(rdx.capture);
-  const selectedCaptureIsOpen = selectedInput?.inputId === rdx.capture?.inputId;
-  return <div className="right-rail-capture-panel" aria-label={t('control.rightRail.capture.controls')}>
-    <div className="right-rail-capture-file-row">
-      <div className="right-rail-capture-input-picker">
-        <span className="right-rail-capture-picker-icon" aria-hidden="true"><CaptureFileGlyph /></span>
-        <div className="right-rail-capture-file-copy">
-          <DropdownSelect
-            ariaLabel={t('control.rightRail.capture.title')}
-            dataTestId="right-rail-capture-input"
-            options={captureOptions}
-            value={selectedInputId}
-            onChange={setSelectedInputId}
-            placeholder={t('control.rightRail.capture.choose')}
-            emptyLabel={t('control.rightRail.capture.emptyInputs')}
-            className="right-rail-capture-dropdown"
-            triggerClassName="right-rail-capture-dropdown-trigger"
-          />
-          {selectedInput ? <span className="right-rail-capture-file-meta">{formatSize(selectedInput.sizeBytes) || t('control.rightRail.capture.sizeUnavailable')}</span> : null}
-        </div>
-      </div>
-      <Button className="right-rail-capture-refresh-button" variant="ghost" size="sm" aria-label={activeAction === 'refresh' ? t('control.captureLibraryRefreshing') : t('control.captureLibraryRefresh')} title={t('control.rightRail.capture.refreshTitle')} onClick={() => void runAction('refresh', async () => {
-        if (!scope) return null;
-        await Promise.all([
-          refreshProjectCaptureInputs(scope.projectId),
-          refreshDevices(),
-        ]);
-        return null;
-      })} disabled={!scope || activeAction !== null}><RefreshGlyph /></Button>
+  const imageErrorKeys: Record<string, Parameters<typeof t>[0]> = { no_color_output: 'control.replay.noOutput', missing_target: 'control.replay.missingTarget', export_failure: 'control.replay.exportFailed' };
+  const diagnostic = error?.message ?? connectionError ?? (state?.error ? imageErrorKeys[state.error.code] ? t(imageErrorKeys[state.error.code]) : state.error.message : null);
+  const retry: Action = error?.action ?? (state?.error?.retry === 'close' ? 'close' : state?.error?.retry === 'open' ? 'open' : 'image');
+  return <div className="capture-replay-panel" aria-label={t('control.rightRail.capture.controls')}>
+    <div className="capture-replay-status-row">
+      <h2 className="right-rail-section-heading">{t('control.rightRail.capture.title')}</h2>
+      <span role="status" className={`capture-replay-status${state?.error ? ' is-error' : ''}`}>{pending ? t('control.replay.pending') : partial ? t('control.replay.partial') : t(`control.replay.${state?.phase ?? 'closed'}`)}</span>
+      <Button variant="ghost" size="sm" aria-label={t('control.replay.more')} aria-expanded={more} onClick={() => setMore(!more)}>⋯</Button>
     </div>
-    <div className="right-rail-capture-replay-group">
-      <span className="right-rail-capture-control-label">{t('control.sessionContextDevice')}</span>
-      <div className="right-rail-capture-open-row">
-        <DropdownSelect
-          ariaLabel={t('control.sessionContextDevice')}
-          dataTestId="right-rail-replay-device"
-          options={deviceOptions}
-          value={selectedDevice}
-          onChange={setSelectedDevice}
-          placeholder={t('control.rightRail.capture.devicePlaceholder')}
-          emptyLabel={t('control.rightRail.capture.noDevices')}
-          className="right-rail-device-picker"
-          triggerClassName="right-rail-device-picker-trigger"
-          menuAlign="end"
-        />
-        <Button className="right-rail-capture-open-button" variant="primary" size="md" onClick={() => void openInput()} disabled={!scope || !selectedInput || !selectedDevice || activeAction !== null}>{activeAction === 'open' ? t('control.rightRail.capture.opening') : selectedCaptureIsOpen ? t('control.rightRail.capture.reopen') : t('control.captureOpen')}</Button>
-      </div>
+    {more && <div className="capture-replay-menu">
+      <Button variant="ghost" size="sm" disabled={!state?.contextId} onClick={() => {
+        if (state?.contextId) void copyAppText(state.contextId).then(() => setCopied(true)).catch((reason) => setError({ message: String(reason), action: 'refresh' }));
+      }}>{t(copied ? 'control.replay.copied' : 'control.replay.copyContext')}</Button>
+      <Button variant="ghost" size="sm" disabled={disabled || !captureHash} onClick={() => setConfirmClear(true)}>{t('control.replay.clearHistory')}</Button>
+      {confirmClear && <><span>{t('control.replay.clearConfirm')}</span><Button variant="danger" size="sm" disabled={disabled} onClick={() => void run('clearHistory')}>{t('control.replay.confirm')}</Button><Button variant="ghost" size="sm" onClick={() => setConfirmClear(false)}>{t('control.replay.cancel')}</Button></>}
+    </div>}
+    <div className="capture-replay-file-row" title={selectedInput?.filePath}>
+      <DropdownSelect dataTestId="right-rail-capture-input" ariaLabel={t('control.rightRail.capture.title')} value={selectedInput?.inputId ?? ''}
+        options={capture.availableCaptures.map((input) => ({ value: input.inputId, label: input.fileName }))} disabled={disabled}
+        onChange={(inputId) => setDraft({ ...chosen, inputId })} />
+      <small>{selectedInput ? sizeLabel(selectedInput.sizeBytes) : ''}</small>
     </div>
-    {captureIsOpen ? <div className="right-rail-inline-actions right-rail-capture-utility-actions">
-        <Button variant="ghost" size="sm" onClick={() => void togglePreview()} disabled={!scope || activeAction !== null}>{activeAction === 'preview' ? t('control.rightRail.capture.working') : rdx.capture?.humanPreviewStatus === 'open' ? t('control.rightRail.capture.closePreview') : t('control.rightRail.artifacts.preview')}</Button>
-        <Button variant="ghost" size="sm" onClick={copyRuntimeContext} disabled={!rdx.runtime.contextId && !rdx.runtime.replaySessionId && !rdx.capture?.replaySessionId}>{t('control.rightRail.outputs.copy')}</Button>
-        <Button variant="ghost" size="sm" onClick={() => void clearCapture()} disabled={!scope || activeAction !== null}>{activeAction === 'clear' ? t('control.rightRail.capture.clearing') : t('control.rightRail.capture.clear')}</Button>
-      </div> : null}
-    {diagnostic ? <div className="right-rail-diagnostic"><span>{diagnostic.summary}</span><Button variant="ghost" size="sm" onClick={() => handleDiagnostic(diagnostic)}>{diagnostic.action === 'settings' ? t('settings.title') : diagnostic.action === 'change_device' ? t('control.rightRail.capture.changeDevice') : diagnostic.action === 'copy' ? t('control.rightRail.outputs.copy') : diagnostic.actionLabel}</Button></div> : null}
+    <div className="capture-replay-device-row">
+      <DropdownSelect dataTestId="right-rail-replay-device" ariaLabel={t('control.sessionContextDevice')} value={chosen.deviceId} disabled={disabled}
+        options={devices.map((device) => ({ value: device.id, label: device.type === 'local' ? t('device.local') : device.label, disabled: !['online', 'connected'].includes(device.status) }))}
+        onChange={(deviceId) => setDraft({ ...chosen, deviceId })} />
+      <Button variant="ghost" size="sm" aria-label={t('control.replay.refresh')} aria-busy={action === 'refresh'} disabled={disabled} onClick={() => void run('refresh')}>↻</Button>
+      <Button variant={open ? 'secondary' : 'primary'} size="sm" disabled={disabled || !selectedInput} onClick={() => void run(pending || !open ? 'open' : 'close')}>{t(pending ? 'control.replay.switch' : open ? 'control.replay.close' : 'control.captureOpen')}</Button>
+    </div>
+    {pending && <div className="capture-replay-pending"><small>{capture.availableCaptures.find((input) => input.inputId === actualInputId)?.fileName} · {devices.find((device) => device.id === actualDeviceId)?.label}</small><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDraft(null)}>{t('control.replay.cancel')}</Button></div>}
+    {locked && <div className="capture-replay-feedback" role="status" title={state?.interactionLock ?? undefined}>{t('control.replay.locked')}</div>}
+    {state?.warning && <div className="capture-replay-feedback" role="status">{state.warning.message}</div>}
+    <div className="capture-replay-tabs" role="tablist" aria-label={t('control.rightRail.capture.title')}>
+      {(['frame', 'history'] as const).map((id) => <Button key={id} variant="ghost" size="sm" role="tab" id={`capture-${id}-tab`} aria-controls={`capture-${id}-panel`} aria-selected={tab === id}
+        tabIndex={tab === id ? 0 : -1} className={tab === id ? 'is-selected' : ''} onClick={() => setTab(id)} onKeyDown={(event) => {
+          if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); const next = event.key === 'Home' ? 'frame' : event.key === 'End' ? 'history' : id === 'frame' ? 'history' : 'frame'; setTab(next); document.getElementById(`capture-${next}-tab`)?.focus(); }
+        }}>{t(`control.replay.${id}`)}</Button>)}
+    </div>
+    <div hidden={tab !== 'frame'}><CaptureFrame scope={scope} state={state} disabled={disabled || !open || pending || tab !== 'frame' || state?.error?.retry === 'close'} receive={receive} /></div>
+    <div hidden={tab !== 'history'}><CaptureHistory key={`${captureHash ?? 'none'}:${historyEpoch}`} scope={scope} captureHash={captureHash} state={state} active={tab === 'history'} /></div>
+    {diagnostic && <div className="capture-replay-feedback is-error" role="alert"><span>{diagnostic}</span>{(error || state?.error?.retry) && <Button variant="ghost" size="sm" disabled={disabled} onClick={() => void run(retry)}>{t(retry === 'close' ? 'control.replay.retryClose' : retry === 'open' ? 'control.replay.retryOpen' : 'control.replay.retryImage')}</Button>}</div>}
   </div>;
-};
+}
+
+export function CapturePanel({ task, capture }: { task: TaskContextPanelViewModel; capture: RdxContextPanelViewModel }) {
+  const { t } = useI18n();
+  const scope = useMemo(() => task.projectId && task.sessionId ? { projectId: task.projectId, sessionId: task.sessionId } : null, [task.projectId, task.sessionId]);
+  return scope ? <ScopedCapturePanel key={`${scope.projectId}:${scope.sessionId}`} scope={scope} capture={capture} /> : <span>{t('control.replay.noSession')}</span>;
+}

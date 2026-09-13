@@ -108,3 +108,7 @@ Browser QA 默认 disposable start:agent-browser，使用完整 one-time /qa?qaB
 ## Right Rail single-track gate
 
 Session rail 为 Progress / Artifacts / Outputs / Context / Capture，投影契约见 `docs/contracts/session-projection.md`。
+
+## Capture replay 改动门禁
+
+项目 RDC 为空的原空态必须保持。修改 Capture 时同时核对 per-session runtime、context 串行执行、Agent 生命周期锁、requested/applied/image EID 和内容 hash。内嵌回放不得恢复应用 human-preview 窗口或旧 Settings action；不要删除 Tools 独立 CLI 的有效窗口能力。足迹与用户 capture/正式证据分开管理。Android 设备呈现必须有真实回执，`unsupported` 不能标绿。除既有专项门禁，运行 `RdxSessionRuntime`、`RdxSessionService`、`executeRdxShell`、ReplayHistoryStore 的受影响测试。

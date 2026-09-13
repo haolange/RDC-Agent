@@ -35,6 +35,8 @@ vi.mock('electron', () => ({
 vi.mock('../sessions/StorageAdapter', () => ({
   storageAdapter: storage,
 }));
+vi.mock('./projectInputLifecycleHandlers', () => ({ registerProjectInputLifecycleHandlers: vi.fn() }));
+vi.mock('../sessions', () => ({ rdxSessionService: { clearOpenedCaptureForSession: vi.fn(async () => true) } }));
 
 vi.mock('../workflow/debugger/AgentOrchestrator', () => ({
   agentOrchestrator: { syncSessionSlots, backgroundSubagents: { abortSession: abortBackgroundSession } },

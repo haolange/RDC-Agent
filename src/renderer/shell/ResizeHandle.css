@@ -1,4 +1,4 @@
-﻿/* Enhanced resize handle with visual feedback */
+/* Enhanced resize handle with visual feedback */
 .panel-resize-handle {
   position: relative;
   width: 100%;
@@ -44,22 +44,4 @@
 
 .panel-resize-handle.disabled:hover::after {
   background: transparent;
-}
-
-.right-panel-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  opacity: 1;
-  transform: translateX(0);
-  transition: opacity var(--transition-base), transform var(--transition-base);
-}
-
-.right-panel-body.collapsed {
-  opacity: 0;
-  transform: translateX(12px);
-  pointer-events: none;
 }

@@ -45,7 +45,6 @@ const FAIL_CLOSED_ACTIONS = [
   'openCapture',
   'openRemoteCapture',
   'connectRemote',
-  'openPreview',
   'closeRuntime',
 ] as const satisfies readonly RdxActionId[];
 
@@ -56,7 +55,6 @@ const actionMap = (overrides: Partial<RdxActionSettingsMap> = {}): RdxActionSett
   openRemoteCapture: emptyAction(),
   connectRemote: emptyAction(),
   closeRuntime: emptyAction(),
-  openPreview: emptyAction(),
   ...overrides,
 });
 

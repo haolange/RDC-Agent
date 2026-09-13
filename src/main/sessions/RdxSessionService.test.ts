@@ -1,279 +1,212 @@
-import fs from 'node:fs';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ReplayDeviceEntry } from '@shared/types/device';
-import type { OpenProjectInputRequest, SessionScope } from '@shared/types/session';
-import { clearRdxContextLeases, getRdxContextLease, grantDelegatedLease, revokeDelegatedLease, quarantineRdxContext, assertRdxContextLeaseOwnership } from './RdxRuntimeContextRegistry';
-
-const runAction = vi.fn();
-const nativeCli = vi.hoisted(() => vi.fn());
-const orphanContexts = vi.hoisted(() => new Set<string>());
-vi.mock('../tools/RdxCliInvokerService', () => ({ rdxCliInvokerService: { executeCLI: nativeCli } }));
-const remote = vi.hoisted(() => ({ peek: vi.fn(), consume: vi.fn(), get: vi.fn(), activate: vi.fn() }));
-
-vi.mock('electron', () => ({
-  nativeImage: {
-    createFromPath: () => ({
-      isEmpty: () => true,
-      getSize: () => ({ width: 0, height: 0 }),
-      toDataURL: () => '',
-    }),
-  },
-  BrowserWindow: class { static getAllWindows() { return []; } },
-  app: {
-    getPath: () => process.cwd(),
-    getAppPath: () => process.cwd(),
-  },
-}));
-
-vi.mock('../tools/RdxShellActionService', () => ({
-  rdxShellActionService: {
-    runAction: (...args: unknown[]) => runAction(...args),
-  },
-  formatRdxActionDiagnostic: (diagnostic: { message: string }) => diagnostic.message,
-  isLocalReplayUnsupportedDiagnostic: () => false,
-}));
-
-vi.mock('../runtime/RuntimeLogService', () => ({
-  runtimeLogService: { log: vi.fn() },
-}));
-
-vi.mock('../runtime/ProcessSupervisor', () => ({
-  processSupervisor: { list: () => [] },
-}));
-
-vi.mock('../tools/ShellInvocationService', () => ({
-  shellInvocationService: { terminateAll: vi.fn(), hasUnconfirmedProcesses: (contextId: string) => orphanContexts.has(contextId) },
-}));
-
-vi.mock('../captures/ReplayDeviceService', () => ({
-  replayDeviceService: {
-    peekPreparedRemote: remote.peek,
-    consumePreparedRemote: remote.consume,
-    getDeviceById: remote.get,
-    activateDevice: remote.activate,
-  },
-}));
-
-import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { clearRdxContextLeases, setRdxRuntimeContextForSession, quarantineRdxContext } from './RdxRuntimeContextRegistry';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { OpenProjectInputRequest } from '@shared/types/session';
+const mocks = vi.hoisted(() => ({ close: vi.fn(), observe: vi.fn(), events: vi.fn(), append: vi.fn(), hash: vi.fn(), saveSelection: vi.fn() }));
+vi.mock('../captures/replay/captureContentHash', () => ({ hashCaptureFile: mocks.hash }));
+vi.mock('./StorageAdapter', () => ({ storageAdapter: { getProjectById: () => ({ rootPath: '/project' }) } }));
+vi.mock('../captures/replay/ReplayHistoryStore', () => ({ replayHistoryStore: { saveSelection: mocks.saveSelection, append: mocks.append } }));
+vi.mock('../tools/ShellInvocationService', () => ({ shellInvocationService: { hasUnconfirmedProcesses: () => false } }));
+vi.mock('./RdxReplayObservation', () => ({ observeReplay: mocks.observe, readReplayEvents: mocks.events }));
+vi.mock('./RdxSessionRuntime', () => ({ RdxSessionRuntime: class {
+  opened: Record<string, unknown> | null = null;
+  async openProjectInput(request: OpenProjectInputRequest) {
+    this.opened = { ...request, ownerSessionId: request.sessionId, contextId: `context-${request.sessionId}`,
+      runtimeContext: { contextId: `context-${request.sessionId}`, replaySessionId: `native-${request.sessionId}` } };
+    return this.opened;
+  }
+  getCliSettings() { return undefined; }
+  getContextId() { return this.opened?.contextId ?? null; }
+  snapshotOpenedCaptureForSession() { return this.opened; }
+  snapshotContextForSession() { return this.opened; }
+  async clearOpenedCaptureForSession() { if (!this.opened) return false; await mocks.close(); this.opened = null; return true; }
+} }));
 import { RdxSessionService } from './RdxSessionService';
-
-const ownerScope: SessionScope = { projectId: 'project-a', sessionId: 'session-a' };
-const wrongSession: SessionScope = { projectId: 'project-a', sessionId: 'session-b' };
-const wrongProject: SessionScope = { projectId: 'project-b', sessionId: 'session-a' };
-
-const localDevice: ReplayDeviceEntry = {
-  id: 'local',
-  label: 'Local',
-  type: 'local',
-  status: 'online',
-  transport: 'local',
-};
-
-const openRequest: OpenProjectInputRequest = {
-  projectId: ownerScope.projectId,
-  sessionId: ownerScope.sessionId,
-  inputId: 'input-a',
-  filePath: 'C:/captures/sample.rdc',
-  replayDevice: localDevice,
-};
-
-async function openOwnedCapture(service: RdxSessionService): Promise<void> {
-  runAction.mockImplementation(async (actionId: string) => {
-    if (actionId === 'openCapture') {
-      return {
-        ok: true,
-        actionId,
-        data: { context_id: 'ctx-owned', session_id: 'native-session', capture_file_id: 'capture-a' },
-        stdout: '',
-        stderr: '',
-        exitCode: 0,
-      };
-    }
-    return { ok: true, actionId, data: {}, stdout: '', stderr: '', exitCode: 0 };
+import { setRdxInteractionLock, runRdxOperation } from './RdxOperationCoordinator';
+const scope = { projectId: 'p', sessionId: 's1' };
+const request = (sessionId = 's1', remote = false): OpenProjectInputRequest => ({ projectId: 'p', sessionId,
+  inputId: 'capture', filePath: '/project/capture.rdc', replayDevice: { id: remote ? 'android' : 'local',
+    type: remote ? 'android' : 'local', label: 'device', status: 'online', transport: 'local' } });
+beforeEach(() => { clearRdxContextLeases(); vi.clearAllMocks(); mocks.hash.mockReset(); mocks.hash.mockResolvedValue({ sha256: 'a'.repeat(64) }); mocks.close.mockResolvedValue(undefined);
+  mocks.events.mockResolvedValue([{ eventId: 1, name: 'draw' }, { eventId: 9, name: 'present' }]);
+  mocks.observe.mockResolvedValue({ appliedEventId: 9, imageEventId: 9, error: null });
+  setRdxInteractionLock('s1', 'test', false);
+});
+describe('per-session capture lifecycle', () => {
+  it('keeps same capture independent across sessions', async () => {
+    const service = new RdxSessionService(); await service.openProjectInput(request()); await service.openProjectInput(request('s2'));
+    expect(mocks.close).not.toHaveBeenCalled();
+    expect(service.snapshotOpenedCaptureForSession(scope)?.contextId).toBe('context-s1');
+    await service.clearOpenedCaptureForSession(scope);
+    expect(service.snapshotOpenedCaptureForSession({ ...scope, sessionId: 's2' })?.contextId).toBe('context-s2');
   });
-  await service.openProjectInput(openRequest);
-  runAction.mockClear();
-}
-
-describe('RdxSessionService capture ownership fail-closed', () => {
-  beforeEach(() => {
-    runAction.mockReset();
-    for (const fn of Object.values(remote)) fn.mockReset();
-    clearRdxContextLeases();
+  it('retains remote device reservation on close failure', async () => {
+    const service = new RdxSessionService(); await service.openProjectInput(request('s1', true));
+    mocks.close.mockRejectedValueOnce(new Error('close uncertain'));
+    await expect(service.clearOpenedCaptureForSession(scope)).rejects.toThrow('uncertain');
+    await expect(service.openProjectInput(request('s2', true))).rejects.toThrow('DEVICE_IN_USE');
+    expect(service.snapshotOpenedCaptureForSession(scope)).not.toBeNull();
   });
-
-  afterEach(() => {
-    clearRdxContextLeases();
+  it('publishes real stages and final-output observation', async () => {
+    const service = new RdxSessionService(); const phases: string[] = []; service.subscribe(state => phases.push(state.phase));
+    await service.openProjectInput(request());
+    expect(phases).toContain('validating'); expect(phases).toContain('loading_image');
+    expect(mocks.observe).toHaveBeenCalledWith(expect.anything(), { final_output: true }, undefined);
+    expect(service.snapshotReplayForSession(scope).phase).toBe('ready');
   });
-
-  it('refuses close/reopen while a delegated child controls the capture', async () => {
+  it('retains opened context when image loading fails', async () => {
+    mocks.observe.mockRejectedValueOnce(new Error('image unavailable'));
+    const service = new RdxSessionService(); await service.openProjectInput(request());
+    expect(service.snapshotOpenedCaptureForSession(scope)).not.toBeNull();
+    expect(service.snapshotReplayForSession(scope).error?.retry).toBe('image');
+  });
+  it('locks UI throughout Agent preparation and broadcasts lock changes', async () => {
+    const service = new RdxSessionService(); await service.openProjectInput(request());
+    const listener = vi.fn(); service.subscribe(listener); setRdxInteractionLock('s1', 'test', true);
+    expect(listener.mock.lastCall?.[0].interactionLock).toBe('agent_running');
+    await expect(service.clearOpenedCaptureForSession(scope)).rejects.toThrow('LOCKED');
+    await expect(service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 1 })).rejects.toThrow('LOCKED');
+    setRdxInteractionLock('s1', 'test', false);
+    await service.clearOpenedCaptureForSession(scope);
+  });
+  it('does not execute invalid EIDs or stale slider requests', async () => {
+    const service = new RdxSessionService(); await service.openProjectInput(request()); mocks.observe.mockClear();
+    await expect(service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 2 })).rejects.toThrow('INVALID');
+    let release!: () => void; const block = runRdxOperation('context-s1', () => new Promise<void>(resolve => { release = resolve; }));
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    const first = service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 1 });
+    const latest = service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 9 });
+    release(); await block; await Promise.all([first, latest]);
+    expect(mocks.observe).toHaveBeenCalledTimes(1);
+    expect(mocks.observe.mock.calls[0][1]).toEqual({ event_id: 9 });
+  });
+  it('blocks new opens while deletion holds the input boundary', async () => {
     const service = new RdxSessionService();
-    await openOwnedCapture(service);
-    grantDelegatedLease({ parentSessionId: ownerScope.sessionId!, childSessionId: 'child', ownerTurnId: 'turn' });
-    await expect(service.clearOpenedCaptureForSession(ownerScope)).rejects.toThrow(/join delegated/);
-    await expect(service.openProjectInput(openRequest)).rejects.toThrow(/join delegated/);
-    expect(runAction).not.toHaveBeenCalled();
-    revokeDelegatedLease('child', { operationStopped: true });
-    expect(await service.clearOpenedCaptureForSession(ownerScope)).toBe(true);
-  });
-
-  it('recovers a quarantined binding only through confirmed close and validated reopen', async () => {
-    const service = new RdxSessionService();
-    await openOwnedCapture(service);
-    const old = getRdxContextLease(ownerScope.sessionId)!;
-    quarantineRdxContext(ownerScope.sessionId!, old.version, 'response lost');
-    expect(assertRdxContextLeaseOwnership({ sessionId: ownerScope.sessionId })).toBeNull();
-    runAction.mockImplementationOnce(async () => ({ ok: false, error: 'unconfirmed close' }));
-    await expect(service.openProjectInput(openRequest)).rejects.toThrow(/not confirmed/);
-    expect(getRdxContextLease(ownerScope.sessionId)?.version).toBe(old.version);
-    expect(assertRdxContextLeaseOwnership({ sessionId: ownerScope.sessionId })).toBeNull();
-    await openOwnedCapture(service);
-    expect(assertRdxContextLeaseOwnership({ sessionId: ownerScope.sessionId })?.version).toBeGreaterThan(old.version);
-  });
-
-  it('returns null or false when no capture is open', async () => {
-    const service = new RdxSessionService();
-    expect(service.snapshotOpenedCaptureForSession(ownerScope)).toBeNull();
-    expect(service.snapshotContextForSession(ownerScope)).toBeNull();
-    expect(await service.clearOpenedCaptureForSession(ownerScope)).toBe(false);
-    expect(await service.openHumanPreviewWindow(ownerScope)).toBeNull();
-    expect(await service.closeHumanPreviewWindow(ownerScope)).toBeNull();
-    expect(runAction).not.toHaveBeenCalled();
-  });
-
-  it('does not project or mutate capture state for the wrong owner', async () => {
-    const service = new RdxSessionService();
-    await openOwnedCapture(service);
-
-    expect(service.snapshotOpenedCaptureForSession(ownerScope)).toMatchObject({
-      projectId: ownerScope.projectId,
-      ownerSessionId: ownerScope.sessionId,
-      inputId: 'input-a',
+    await service.blockInputOperations('p', 'capture', async () => {
+      await expect(service.openProjectInput(request())).rejects.toThrow('REMOVING');
     });
-    expect(service.snapshotOpenedCaptureForSession(wrongSession)).toBeNull();
-    expect(service.snapshotOpenedCaptureForSession(wrongProject)).toBeNull();
-    expect(service.snapshotContextForSession(wrongSession)).toBeNull();
-    expect(service.snapshotContextForSession(wrongProject)).toBeNull();
-    expect(await service.clearOpenedCaptureForSession(wrongSession)).toBe(false);
-    expect(await service.clearOpenedCaptureForSession(wrongProject)).toBe(false);
-    expect(await service.openHumanPreviewWindow(wrongSession)).toBeNull();
-    expect(await service.closeHumanPreviewWindow(wrongProject)).toBeNull();
-    expect(service.snapshotOpenedCaptureForSession(ownerScope)?.inputId).toBe('input-a');
-    expect(runAction).not.toHaveBeenCalled();
-  });
-
-  it('retains capture ownership when graceful close fails without writing a leak file', async () => {
-    vi.useFakeTimers();
-    const writeSpy = vi.spyOn(fs, 'writeFileSync');
-    const mkdirSpy = vi.spyOn(fs, 'mkdirSync');
-    const unlinkSpy = vi.spyOn(fs, 'unlinkSync');
-    try {
-      const service = new RdxSessionService();
-      await openOwnedCapture(service);
-      runAction.mockImplementation(async (actionId: string) => ({
-        ok: actionId !== 'closeRuntime',
-        actionId,
-        error: actionId === 'closeRuntime' ? 'close failed' : undefined,
-        data: {},
-        stdout: '',
-        stderr: actionId === 'closeRuntime' ? 'boom' : '',
-        exitCode: actionId === 'closeRuntime' ? 1 : 0,
-      }));
-
-      await expect(service.clearOpenedCaptureForSession(ownerScope)).rejects.toThrow('RDX_CLOSE_FAILED');
-      expect(service.snapshotOpenedCaptureForSession(ownerScope)).not.toBeNull();
-
-      const leakMarkerName = ['rdx-runtime-leak', '.json'].join('');
-      const leakWrites = [...writeSpy.mock.calls, ...mkdirSpy.mock.calls, ...unlinkSpy.mock.calls]
-        .map((args) => String(args[0] ?? ''))
-        .filter((filePath) => filePath.includes(leakMarkerName));
-      expect(leakWrites).toEqual([]);
-      expect(runtimeLogService.log).toHaveBeenCalledWith(expect.objectContaining({
-        title: 'RDX runtime close warning',
-        summary: 'close failed',
-      }));
-    } finally {
-      writeSpy.mockRestore();
-      mkdirSpy.mockRestore();
-      unlinkSpy.mockRestore();
-      vi.useRealTimers();
-    }
+    await service.openProjectInput(request());
   });
 });
 
-
-describe('native replay lifecycle validation', () => {
-  beforeEach(() => { runAction.mockReset(); for (const fn of Object.values(remote)) fn.mockReset(); clearRdxContextLeases(); });
-  afterEach(() => { clearRdxContextLeases(); });
-  it.each([
-    { context_id: 'default', session_id: 'native' },
-    { context_id: 'owned' },
-  ])('does not register an invalid native open payload %j', async (data) => {
-    runAction.mockImplementation(async (actionId: string) => ({ ok: true, actionId, data: actionId === 'openCapture' ? data : {}, stdout: '', stderr: '', exitCode: 0 }));
-    const service = new RdxSessionService();
-    await expect(service.openProjectInput(openRequest)).rejects.toThrow(/RDX action result/);
-    expect(getRdxContextLease(ownerScope.sessionId)).toBeNull();
-    expect(service.snapshotOpenedCaptureForSession(ownerScope)).toBeNull();
-  });
-  it.each([true, false])('consumes a remote handle once even when open success=%s', async (success) => {
-    const device: ReplayDeviceEntry = { id: 'android-test', type: 'android', label: 'Test device', status: 'online', transport: 'adb_android', serial: 'synthetic-serial' };
-    const prepared = { contextId: 'remote-owned', remoteId: 'remote-once', deviceId: device.id };
-    let available = true;
-    remote.get.mockReturnValue(device);
-    remote.peek.mockImplementation(() => available ? prepared : null);
-    remote.consume.mockImplementation(() => { available = false; return prepared; });
-    remote.activate.mockResolvedValue({ ...device, status: 'error', lastError: 'Reconnect required' });
-    runAction.mockImplementation(async (actionId: string) => ({ ok: actionId !== 'openRemoteCapture' || success, actionId,
-      data: actionId === 'openRemoteCapture' ? { context_id: 'remote-owned', session_id: 'native-remote' } : {},
-      error: success ? undefined : 'remote failure', stdout: '', stderr: '', exitCode: success ? 0 : 1 }));
-    const service = new RdxSessionService();
-    const opening = service.openProjectInput({ ...openRequest, replayDevice: device });
-    if (success) await opening; else await expect(opening).rejects.toThrow(/remote failure/);
-    expect(remote.consume).toHaveBeenCalledTimes(1);
-    expect(remote.peek()).toBeNull();
-    await expect(service.openProjectInput({ ...openRequest, replayDevice: device })).rejects.toThrow(/Reconnect required/);
-    expect(remote.activate).toHaveBeenCalledTimes(1);
-    expect(runAction.mock.calls.filter(call => call[0] === 'openRemoteCapture')).toHaveLength(1);
-  });
+it('drops an in-flight old observation when replacement has advanced the generation', async () => {
+  const service = new RdxSessionService(); await service.openProjectInput(request());
+  let release!: (value: unknown) => void;
+  mocks.observe.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  const states: Array<{ generation: number; appliedEventId: number | null }> = [];
+  service.subscribe(state => states.push(state));
+  const apply = service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 1 });
+  await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+  const replacement = service.openProjectInput({ ...request(), inputId: 'replacement' });
+  await vi.waitFor(() => expect(service.snapshotReplayForSession(scope).generation).toBe(2));
+  release({ appliedEventId: 1, imageEventId: 1 });
+  await Promise.all([apply, replacement]);
+  expect(states.filter(state => state.generation === 2).some(state => state.appliedEventId === 1)).toBe(false);
 });
-
-describe('native preview confirmation', () => {
-  beforeEach(() => { runAction.mockReset(); nativeCli.mockReset(); clearRdxContextLeases(); });
-  afterEach(() => { clearRdxContextLeases(); });
-  it.each([
-    ['confirmed', 0, { context_id: 'ctx-owned', preview: { enabled: false } }, 'closed'],
-    ['still enabled', 0, { context_id: 'ctx-owned', preview: { enabled: true } }, 'error'],
-    ['wrong context', 0, { context_id: 'other', preview: { enabled: false } }, 'error'],
-    ['failed process', 1, { context_id: 'ctx-owned', preview: { enabled: false } }, 'error'],
-  ] as const)('requires native close confirmation: %s', async (_label, exitCode, data, status) => {
-    const service = new RdxSessionService();
-    await openOwnedCapture(service);
-    nativeCli.mockResolvedValue({ exitCode, stdout: JSON.stringify({ ok: true, result_kind: 'preview', data }), stderr: '' });
-    expect((await service.closeHumanPreviewWindow(ownerScope))?.humanPreview?.status).toBe(status);
-    expect(nativeCli).toHaveBeenCalledWith('session', ['preview', 'off', '--daemon-context', 'ctx-owned'], expect.objectContaining({ contextId: 'ctx-owned' }));
-    expect(getRdxContextLease(ownerScope.sessionId)).not.toBeNull();
-  });
-  it('does not invent an open preview from an empty success payload', async () => {
-    const service = new RdxSessionService();
-    await openOwnedCapture(service);
-    expect((await service.openHumanPreviewWindow(ownerScope))?.humanPreview?.status).toBe('error');
-  });
-});
-
-it('keeps preview orphan scoped to its owner and refuses teardown until actual close', async () => {
-  orphanContexts.clear(); clearRdxContextLeases();
+it('closes and invalidates an opened capture if source bytes changed during native opening', async () => {
+  mocks.hash.mockResolvedValueOnce({ sha256: 'a'.repeat(64) }).mockResolvedValueOnce({ sha256: 'b'.repeat(64) });
   const service = new RdxSessionService();
-  await openOwnedCapture(service);
-  nativeCli.mockImplementationOnce(async (_command, _args, options) => {
-    orphanContexts.add(options.contextId);
-    return { exitCode: 1, stdout: '', stderr: 'unconfirmed', processExitReason: 'unconfirmed_orphan' };
-  });
-  try {
-    await service.closeHumanPreviewWindow(ownerScope);
-    await expect(service.clearOpenedCaptureForSession(ownerScope)).rejects.toThrow(/exit has not been observed/);
-    expect(getRdxContextLease(ownerScope.sessionId)).not.toBeNull();
-    orphanContexts.delete('ctx-owned'); // supervised close observed
-    orphanContexts.add('unrelated-context');
-    expect(await service.clearOpenedCaptureForSession(ownerScope)).toBe(true);
-  } finally { orphanContexts.clear(); clearRdxContextLeases(); }
+  await expect(service.openProjectInput(request())).rejects.toThrow('CHANGED_DURING_OPEN');
+  expect(service.snapshotReplayForSession(scope).captureHash).toBeNull();
+  expect(service.snapshotOpenedCaptureForSession(scope)).toBeNull();
+  expect(mocks.observe).not.toHaveBeenCalled();
+});
+
+it('rejects old binding generation for apply and close after a replacement', async () => {
+  const service = new RdxSessionService(); await service.openProjectInput(request()); await service.openProjectInput(request());
+  await expect(service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 1 })).rejects.toThrow('BINDING_CHANGED');
+  await expect(service.clearOpenedCaptureForSession(scope, { expectedGeneration: 1 })).rejects.toThrow('BINDING_CHANGED');
+  expect(service.snapshotOpenedCaptureForSession(scope)).not.toBeNull();
+});
+it('quarantine blocks manual event/refresh but leaves confirmed close available for recovery', async () => {
+  const service = new RdxSessionService(); await service.openProjectInput(request());
+  const lease = setRdxRuntimeContextForSession('s1', { contextId: 'context-s1', runtimeOwner: 'app', ownerLeaseId: 'owner', replaySessionId: 'native-s1', backend: 'local', updatedAt: Date.now() }, { projectId: 'p' })!;
+  quarantineRdxContext('s1', lease.version, 'uncertain');
+  await expect(service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 1 })).rejects.toThrow('QUARANTINED');
+  await expect(service.refreshFrameForSession({ ...scope, bindingGeneration: 1 })).rejects.toThrow('QUARANTINED');
+  expect(service.snapshotReplayForSession(scope).error?.retry).toBe('close');
+  expect(await service.clearOpenedCaptureForSession(scope)).toBe(true);
+});
+
+it('retains Android reservation across same-device replacement while selection persistence waits', async () => {
+  const service = new RdxSessionService(); await service.openProjectInput(request('s1', true));
+  let release!: () => void;
+  mocks.saveSelection.mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve; }));
+  const replacing = service.openProjectInput(request('s1', true), { expectedGeneration: 1 });
+  await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+  await expect(service.openProjectInput(request('s2', true))).rejects.toThrow('DEVICE_IN_USE');
+  expect(service.getDeviceOwner('android')).toEqual(scope);
+  release(); await replacing;
+  expect(service.getDeviceOwner('android')).toEqual(scope);
+});
+it('rejects stale incoming open and select without altering the replacement', async () => {
+  const service = new RdxSessionService(); await service.openProjectInput(request());
+  await expect(service.openProjectInput(request(), { expectedGeneration: 0 })).rejects.toThrow('BINDING_CHANGED');
+  await expect(service.switchActiveCapture({ ...scope, bindingGeneration: 0 }, 'capture')).rejects.toThrow('BINDING_CHANGED');
+  expect(mocks.close).not.toHaveBeenCalled();
+});
+it('rechecks the Agent lock when a queued close reaches native execution', async () => {
+  const service = new RdxSessionService(); await service.openProjectInput(request());
+  let release!: () => void;
+  const busy = runRdxOperation('context-s1', () => new Promise<void>(resolve => { release = resolve; }));
+  await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+  const closing = service.clearOpenedCaptureForSession(scope);
+  await vi.waitFor(() => expect(service.snapshotReplayForSession(scope).phase).toBe('closing'));
+  setRdxInteractionLock('s1', 'test', true);
+  const rejected = expect(closing).rejects.toThrow('LOCKED');
+  release(); await busy; await rejected;
+  expect(mocks.close).not.toHaveBeenCalled();
+  expect(service.snapshotOpenedCaptureForSession(scope)).not.toBeNull();
+});
+it('does not start native open after Agent preparation arrives during hashing', async () => {
+  const service = new RdxSessionService(); let release!: (value: unknown) => void;
+  mocks.hash.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  const opening = service.openProjectInput(request());
+  await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+  setRdxInteractionLock('s1', 'test', true);
+  const rejected = expect(opening).rejects.toThrow('LOCKED');
+  release({ sha256: 'a'.repeat(64) }); await rejected;
+  expect(service.snapshotOpenedCaptureForSession(scope)).toBeNull();
+});
+it('does not attribute the preceding EID to a failed Agent observation', async () => {
+  const service = new RdxSessionService(); await service.openProjectInput(request());
+  mocks.observe.mockRejectedValueOnce(new Error('native image outcome unknown'));
+  await service.observeAgentOperation(scope, 'rd.event.set_active', 'tool-new');
+  expect(service.snapshotReplayForSession(scope).appliedEventId).toBeNull();
+  expect(service.snapshotReplayForSession(scope).target).toBeNull();
+  expect(mocks.append).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ eventId: null,
+    toolCallId: 'tool-new', failure: expect.stringContaining('RDX_OBSERVE_FAILED') }), undefined);
+});
+it('keeps paired Agent pixels and metadata isolated from manual apply and reports unsaved output', async () => {
+  const service = new RdxSessionService(); await service.openProjectInput(request());
+  const image = { imagePath: '', imageUrl: 'data:image/png;base64,eA==', width: 1, height: 1, source: 'framebuffer_screenshot', updatedAt: 1 };
+  const observation = { nativeRevision: 7, modificationState: 'intervention', displayParameters: { mip: 0, slice: 0, sample: 0, rangeMin: 0, rangeMax: 1 } };
+  mocks.observe.mockResolvedValueOnce({ appliedEventId: 9, imageEventId: 9, image, observation });
+  mocks.append.mockRejectedValueOnce(new Error('REPLAY_QUOTA_EXCEEDED'));
+  await service.observeAgentOperation(scope, 'rd.shader.edit_and_replace', 'agent-tool');
+  const paired = service.snapshotReplayForSession(scope).agentObservation;
+  expect(paired).toMatchObject({ eventId: 9, image, observation, saved: false, saveError: expect.stringContaining('QUOTA') });
+  expect(mocks.append).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ nativeRevision: 7,
+    modificationState: 'intervention', displayParameters: observation.displayParameters }), expect.any(Buffer));
+  mocks.observe.mockResolvedValueOnce({ appliedEventId: 1, imageEventId: 1, image: { ...image, imageUrl: 'data:image/png;base64,eQ==' } });
+  await service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 1 });
+  expect(service.snapshotReplayForSession(scope).agentObservation).toEqual(paired);
+  mocks.observe.mockRejectedValueOnce(new Error('observation failed'));
+  await service.observeAgentOperation(scope, 'rd.event.set_active', 'failed-tool');
+  expect(service.snapshotReplayForSession(scope).agentObservation).toEqual(paired);
+});
+it('correlates lifecycle stages with one main-owned operation ID and assigns fresh mutation IDs', async () => {
+  const service = new RdxSessionService(); const states: Array<{ operationId: string | null; phase: string }> = [];
+  service.subscribe(state => states.push(state));
+  await service.openProjectInput(request());
+  const openId = service.snapshotReplayForSession(scope).operationId;
+  expect(openId).toMatch(/^[0-9a-f-]{36}$/);
+  expect(new Set(states.map(state => state.operationId))).toEqual(new Set([openId]));
+  await service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 1 });
+  const applyId = service.snapshotReplayForSession(scope).operationId;
+  expect(applyId).not.toBe(openId);
+  const offset = states.length;
+  await service.clearOpenedCaptureForSession(scope);
+  const closeId = service.snapshotReplayForSession(scope).operationId;
+  expect(closeId).not.toBe(applyId);
+  expect(new Set(states.slice(offset).map(state => state.operationId))).toEqual(new Set([closeId]));
 });

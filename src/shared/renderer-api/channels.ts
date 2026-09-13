@@ -132,6 +132,8 @@ export const RENDERER_INVOKE_CHANNEL = {
     refreshInputs: 'project:inputs:refresh',
     importInput: 'project:inputs:import',
     importInputPaths: 'project:inputs:importPaths',
+    prepareRemoveInput: 'project:inputs:prepareRemove',
+    removeInput: 'project:inputs:remove',
   },
   device: {
     list: 'device:list',
@@ -162,11 +164,16 @@ export const RENDERER_INVOKE_CHANNEL = {
     openProjectInput: 'capture:openProjectInput',
     getOpenedState: 'capture:getOpenedState',
     clearOpenedState: 'capture:clearOpenedState',
+    getReplaySelection: 'capture:getReplaySelection',
+    listReplayHistory: 'capture:listReplayHistory',
+    readReplayImage: 'capture:readReplayImage',
+    clearReplayHistory: 'capture:clearReplayHistory',
+    getReplayState: 'capture:getReplayState',
+    applyReplayEvent: 'capture:applyReplayEvent',
+    refreshFrame: 'capture:refreshFrame',
   },
   context: {
     get: 'context:get',
-    openHumanPreview: 'context:openHumanPreview',
-    closeHumanPreview: 'context:closeHumanPreview',
   },
   trace: {
     getRun: 'trace:getRun',
@@ -212,7 +219,9 @@ export const RENDERER_EVENT_CHANNEL = {
     captureStatusChanged: 'capture:statusChanged',
     contextChanged: 'context:changed',
     projectInputsChanged: 'project:inputsChanged',
+    projectInputsError: 'project:inputsError',
     openedCaptureStateChanged: 'capture:openedStateChanged',
+    captureReplayChanged: 'capture:replayChanged',
   },
   runtime: {
     logAppended: 'runtime:logAppended',

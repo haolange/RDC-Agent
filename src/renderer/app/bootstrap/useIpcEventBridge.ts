@@ -22,6 +22,7 @@ import { useConversationStore } from '../../stores/conversationStore';
 import { useDeviceStore } from '../../stores/deviceStore';
 import { useEvidenceStore } from '../../stores/evidenceStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useNotificationStore } from '../../stores/notificationStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useLayoutStore } from '../../stores/layoutStore';
@@ -404,6 +405,11 @@ export function useIpcEventBridge(options: {
     const unsubscribeProjectInputsChanged = electronAPI.events.onProjectInputsChanged((payload) => {
       useProjectStore.getState().updateProjectInputs(payload.projectId, payload.inputs);
     });
+    const unsubscribeProjectInputsError = electronAPI.events.onProjectInputsError((payload) => {
+      const title = t('project.inputs.reconcileFailed');
+      useNotificationStore.getState().add({ type: 'error', title, message: `${t('project.inputs.reconcileRetry')} ${payload.error}` });
+      if (useProjectStore.getState().currentProject?.projectId === payload.projectId) showNotice(title);
+    });
 
     const unsubscribeOpenedCaptureStateChanged = electronAPI.events.onOpenedCaptureStateChanged((event) => {
       projectScopedOpenedCapture(event);
@@ -464,6 +470,7 @@ export function useIpcEventBridge(options: {
       unsubscribeRunStatusChanged();
       unsubscribeDeviceStatusChanged();
       unsubscribeProjectInputsChanged();
+      unsubscribeProjectInputsError();
       unsubscribeOpenedCaptureStateChanged();
       unsubscribeRuntimeLogAppended();
       unsubscribeAppThemeChanged();

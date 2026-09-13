@@ -153,7 +153,12 @@
     "main.agentManifestService": "src/main/settings/AgentManifestService.ts",
     "main.settingsService": "src/main/settings/SettingsService.ts",
     "main.settingsProviderSanitize": "src/main/settings/settingsProviderSanitize.ts",
-    "main.settingsServiceHelpers": "src/main/settings/settingsServiceHelpers.ts"
+    "main.settingsServiceHelpers": "src/main/settings/settingsServiceHelpers.ts",
+    "captureReplayHook": "src/renderer/features/right-rail/useCaptureReplay.ts",
+    "captureReplayFrame": "src/renderer/features/right-rail/CaptureFrame.tsx",
+    "captureReplayHistory": "src/renderer/features/right-rail/CaptureHistory.tsx",
+    "captureReplayCss": "src/renderer/features/right-rail/CaptureReplay.css",
+    "rdxSessionService": "src/main/sessions/RdxSessionService.ts"
   },
   "retired": [
     "src/renderer/styles/themes/oklch-themes.css",

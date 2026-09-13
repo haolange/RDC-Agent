@@ -1,16 +1,13 @@
 import fs from 'node:fs';
 import type { RdxProbeInput } from '@shared/constants/rdxProbe';
 import type { RdxTurnBinding } from './RdxTurnBindings';
-import { getRdxContextLease, getMostRecentRdxContextLease, getDelegatedChildSessionId } from '../sessions/RdxRuntimeContextRegistry';
+import { getRdxContextLease, getDelegatedChildSessionId } from '../sessions/RdxRuntimeContextRegistry';
 
 /** Reuse the product capture lifecycle; never mint a lease for an arbitrary context id. */
 export async function openProbeLease(
   input: RdxProbeInput, sessionId: string, projectId: string | null, binding: RdxTurnBinding, signal?: AbortSignal,
 ): Promise<void> {
   if (!projectId || !input.capturePath) throw new Error('RDX_PROBE_CAPTURE_REQUIRED: open a registered project capture first.');
-  if (getMostRecentRdxContextLease()?.ownerSessionId && !getRdxContextLease(sessionId)) {
-    throw new Error('RDX_PROBE_OWNER: another session owns the active capture.');
-  }
   const { storageAdapter } = await import('../sessions/StorageAdapter');
   const session = storageAdapter.readSession(sessionId);
   if (!session || session.projectId !== projectId) throw new Error('RDX_PROBE_OWNER: session/project mismatch.');
@@ -18,7 +15,7 @@ export async function openProbeLease(
   const inputs = await storageAdapter.listProjectInputs(projectId);
   const capture = inputs.find((entry) => fs.realpathSync(entry.filePath) === requested);
   if (!capture) throw new Error('RDX_PROBE_CAPTURE_DENIED: capture is not a registered project input.');
-  if (input.contextId && input.contextId !== capture.inputId) {
+  if (input.contextId && input.contextId !== getRdxContextLease(sessionId)?.contextId) {
     throw new Error('RDX_PROBE_OWNER: context must be allocated by the capture lifecycle.');
   }
   signal?.throwIfAborted();

@@ -212,8 +212,6 @@ export interface RdxContextCaptureViewModel {
   replaySessionId?: string;
   openedAt?: string;
   previewAvailable: boolean;
-  humanPreviewStatus?: 'unavailable' | 'closed' | 'opening' | 'open' | 'error';
-  humanPreviewError?: string;
 }
 
 export interface RdxContextRuntimeViewModel {

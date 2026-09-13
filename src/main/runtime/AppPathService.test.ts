@@ -36,4 +36,18 @@ describe('AppPathService', () => {
     expect(second).toBe(first);
     expect(mkdirSpy.mock.calls.length).toBe(firstCallCount);
   });
+  it('adds replay exclusions to existing project rules without creating an unused replay directory', async () => {
+    const { AppPathService } = await import('./AppPathService');
+    const service = new AppPathService();
+    fs.mkdirSync(path.join(root, '.rdx'));
+    fs.writeFileSync(path.join(root, '.rdx', '.gitignore'), 'custom-rule/');
+    const paths = service.initializeProjectRdx(root);
+    service.initializeProjectRdx(root);
+    expect(paths.replayPath).toBe(path.join(root, '.rdx', 'replay'));
+    expect(fs.existsSync(paths.replayPath)).toBe(false);
+    const ignore = fs.readFileSync(paths.gitignorePath, 'utf8');
+    expect(ignore).toContain('custom-rule/');
+    expect(ignore.match(/^replay\/$/gm)).toHaveLength(1);
+    expect(ignore.match(/^replay\.lock$/gm)).toHaveLength(1);
+  });
 });

@@ -408,8 +408,6 @@ export const zhSettings = {
   'settings.rdxActionOpenRemoteCaptureHint': '在已准备好的 Android/远端 replay handle 上打开 `.rdc`（需 `--remote-id`）。',
   'settings.rdxActionConnectRemote': '连接远端',
   'settings.rdxActionConnectRemoteHint': '连接远端 Replay 或服务目标。',
-  'settings.rdxActionOpenPreview': '打开预览',
-  'settings.rdxActionOpenPreviewHint': '为当前运行上下文打开预览窗口。',
   'settings.rdxActionCloseRuntime': '关闭运行时',
   'settings.rdxActionCloseRuntimeHint': '释放当前 Capture 占用的运行时资源。',
   'settings.rdxActionCommand': '命令',

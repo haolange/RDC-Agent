@@ -306,8 +306,7 @@ export type RdxActionId =
   | 'openCapture'
   | 'openRemoteCapture'
   | 'connectRemote'
-  | 'closeRuntime'
-  | 'openPreview';
+  | 'closeRuntime';
 
 export interface RdxShellActionSettings {
   enabled: boolean;

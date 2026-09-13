@@ -7,10 +7,23 @@ import { appPathService } from '../runtime/AppPathService';
 import type { ProjectRegistry, SelectionState } from './storageTypes';
 import { PROJECT_REGISTRY_MIGRATIONS, SelectionStateSchema } from './storageSchema';
 import { withDirectoryFileLockSync } from './directoryFileLock';
+import { hashCaptureFile } from '../captures/replay/captureContentHash';
+import { safePath } from '../captures/replay/replayFileSafety';
 
 
 export class ProjectWorkspaceStore {
+  private readonly verifiedInputs = new Map<string, { fingerprint: string; sha256: string }>();
+  private readonly inputRefreshes = new Map<string, Promise<ProjectInputRecord[]>>();
+  private inputReconciler?: (project: ProjectRecord, inputs: ProjectInputRecord[]) => Promise<void>;
+  private inputCommitListener?: (projectId: string, inputs: ProjectInputRecord[]) => void;
   constructor(private readonly host: import('./storageHost').StorageHost) {}
+
+  setInputReconciler(callback: (project: ProjectRecord, inputs: ProjectInputRecord[]) => Promise<void>): void {
+    this.inputReconciler = callback;
+  }
+  setInputCommitListener(callback: (projectId: string, inputs: ProjectInputRecord[]) => void): void {
+    this.inputCommitListener = callback;
+  }
 
   getWorkspacePath(): string {
     this.syncRuntimePaths();
@@ -131,9 +144,18 @@ export class ProjectWorkspaceStore {
   }
 
   async refreshProjectInputs(projectId: string): Promise<ProjectInputRecord[]> {
+    const previous = this.inputRefreshes.get(projectId) ?? Promise.resolve([]);
+    const next = previous.catch(() => []).then(() => this.refreshInputsNow(projectId));
+    this.inputRefreshes.set(projectId, next);
+    try { return await next; } finally { if (this.inputRefreshes.get(projectId) === next) this.inputRefreshes.delete(projectId); }
+  }
+
+  private async refreshInputsNow(projectId: string): Promise<ProjectInputRecord[]> {
     const project = this.getProjectById(projectId);
     if (!project) return [];
 
+    await fs.promises.access(project.rootPath);
+    await safePath(project.rootPath, project.inputsPath);
     const normalizedProject = this.normalizeProjectRecord(project);
     const inputs = await this.collectProjectInputs(normalizedProject.inputsPath);
     const nextProject: ProjectRecord = {
@@ -141,7 +163,25 @@ export class ProjectWorkspaceStore {
       inputs,
       inputsUpdatedAt: nowMs(),
     };
+    if (this.inputReconciler) nextProject.replayCleanupPending = {
+      requestedAt: project.replayCleanupPending?.requestedAt ?? nowMs(),
+      captureHashes: [...new Set([...project.inputs.flatMap(input => input.contentSha256 ? [input.contentSha256] : []),
+        ...(project.replayCleanupPending?.captureHashes ?? [])])],
+    };
+    // A complete filesystem scan defines the active inputs even if subsequent native/cache cleanup fails.
     this.persistProject(nextProject);
+    this.inputCommitListener?.(projectId, inputs);
+    if (this.inputReconciler) {
+      try {
+        await this.inputReconciler(project, inputs);
+        delete nextProject.replayCleanupPending;
+        this.persistProject(nextProject);
+      } catch (error) {
+        nextProject.replayCleanupPending = { ...nextProject.replayCleanupPending!, error: error instanceof Error ? error.message : String(error) };
+        this.persistProject(nextProject);
+        throw error;
+      }
+    }
     return nextProject.inputs;
   }
 
@@ -425,7 +465,10 @@ export class ProjectWorkspaceStore {
     } catch {
       rootPath = resolvedRoot;
     }
-    const { resourcePath, knowledgePath, inputsPath } = this.ensureProjectResourceLayout(rootPath);
+    // Normalizing registry metadata must not recreate an offline or externally removed project.
+    const projectPaths = appPathService.getProjectRdxPaths(rootPath);
+    const resourcePath = projectPaths.projectRdxRoot;
+    const { knowledgePath, inputsPath } = projectPaths;
     return {
       ...project,
       rootPath,
@@ -442,8 +485,12 @@ export class ProjectWorkspaceStore {
   private static readonly PROJECT_INPUTS_YIELD_EVERY = 64;
 
   private async collectProjectInputs(inputsPath: string): Promise<ProjectInputRecord[]> {
-    if (!fs.existsSync(inputsPath)) {
-      return [];
+    const projectRoot = path.resolve(inputsPath, '..', '..');
+    await fs.promises.access(projectRoot);
+    await safePath(projectRoot, inputsPath);
+    try { await fs.promises.access(inputsPath); } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw error;
     }
 
     const records: ProjectInputRecord[] = [];
@@ -464,15 +511,21 @@ export class ProjectWorkspaceStore {
         }
 
         const fullPath = path.join(dirPath, entry.name);
+        await safePath(projectRoot, fullPath);
+        if (entry.isSymbolicLink()) throw new Error('PROJECT_INPUTS_UNSAFE_LINK');
         if (entry.isDirectory()) {
           await walk(fullPath, depth + 1);
           continue;
         }
-        if (path.extname(entry.name).toLowerCase() !== '.rdc') {
+        if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== '.rdc') {
           continue;
         }
 
         const stats = await fs.promises.stat(fullPath);
+        const fingerprint = `${stats.dev}:${stats.ino}:${stats.size}:${stats.mtimeMs}:${stats.ctimeMs}`;
+        const cached = this.verifiedInputs.get(fullPath);
+        const contentSha256 = cached?.fingerprint === fingerprint ? cached.sha256 : (await hashCaptureFile(fullPath)).sha256;
+        this.verifiedInputs.set(fullPath, { fingerprint, sha256: contentSha256 });
         records.push({
           inputId: this.createProjectInputId(inputsPath, fullPath),
           fileName: path.basename(fullPath),
@@ -481,6 +534,7 @@ export class ProjectWorkspaceStore {
           discoveredAt: stats.birthtimeMs || stats.ctimeMs || stats.mtimeMs,
           lastModifiedAt: stats.mtimeMs,
           size: stats.size,
+          contentSha256,
         });
       }
     };

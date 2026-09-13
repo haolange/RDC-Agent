@@ -330,3 +330,30 @@ runtime 强制权限/所有权/依赖/执行代次/输出存在/预算/取消/jo
 
 
 本轮工程验证：typecheck、lint、design-tokens、renderer-structure、fidelity、appearance、settings-agents、knowledge-system、provider-system、hooks、legacy-residue、repository-hygiene、check:gates、build 通过。完整 tests 与 coverage 使用 --maxWorkers=4 复跑，2676 passed / 4 skipped，coverage ratchet 通过；默认并发初跑超时，未调整测试阈值或断言。后续发布不自动关闭以上待办。
+
+## 2026-09-13 Session Capture 内嵌回放升级
+
+本轮在当前分支实施，未提交、未推送。Agent 基线 `b046757f21161b60935abc3da0747048d6e51075`，Tools 基线 `6bc341a1dd8718afcfd50cb052829feb311e83fb`；基线不是未提交修改的验收身份。Tools 原有 `.qoder/repowiki` 修改保留。本机执行计划、Tasks 和最小运行回执位于 `.local/replay-upgrade/`；下列记录保留实际失败与复验边界。
+
+- 已实测 Local：通过 disposable Browser QA 连接真实 Electron main、IPC 和原生 CLI；Open 自动选择真实 Present EID 14，输出 603×653 画面。EID 5 没有颜色输出，EID 6 为清屏，连续拖动回到 EID 14 恢复立方体；依据不同画面而非按钮文案判断 apply 成功。capture 完整 SHA-256 为 `00797a27e6316a0cf4369327f9db30a21635fa757673b3f9712af07989145ba8`。原生 smoke 图片用于回放验收，不是 GPU 科学实验的效果证据。
+- 已实测隔离与输入生命周期：同一 RDC 在 A/B 两个 session 中使用不同 context UUID；关闭 B 不关闭 A。改变选择进入待切换，取消保留原绑定，应用切换先关闭旧 context。删除一个同内容输入时，另一个输入的活跃回放保留；删除最后一个输入后，其关联 context 释放、实时图片清空，原有 Capture 空态恢复，不保留新 Tab／滑条／选择器。
+- 已实测 UI：中文／英文、深色／浅色、默认右栏、窄屏 drawer、长文件名、事件输入 Enter、滑条 Home／End、Tab 左右键、drawer Escape。900×700 viewport 请求下实际 CSS 宽度 818，Capture clientWidth 与 scrollWidth 均为 397，没有横向溢出。重启恢复选择资料，没有自动打开或占用设备。
+- 性能小样本：原生 PerformanceObserver Event Timing（16 ms 采集阈值）六个非零 interactionId，p95 为 24 ms，Long Task 为 0；一次 EID 6→14 的请求到 applying 投影约 12.1 ms，到新图片可见约 380.9 ms。该样本不能代表全部设备、capture 或持续拖动分布；原生 apply 与导出在一个串行回执中，未独立测量 GPU／网络分段，不把工具往返时间当作交互性能。
+- 第一轮完整验证：380 个测试文件通过、4 跳过，2733 项测试通过、4 跳过；coverage lines 74.8%、functions 76.6%、branches 62.03%、statements 72.41%，ratchet 通过。typecheck、lint、check:gates 和 build 通过。Tools 后续完整 Python suite 268 通过，Markdown/catalog 25 文件检查通过。后续完整性修复需以新的验证记录覆盖其受影响范围。
+- 发现并修复后复验：共享设备预留空隙、生命周期与 Agent preparation 竞争、迟到 open generation、观察失败误用旧 EID、清理失败阻止空输入投影、历史组件跨 scope 引用、右栏不能滚动、无输出事件永久 applying、手动 Present 事件不能取得最终画面。完整性审查另指出真实传输进度、修改状态／原生 revision 写入和局部失败状态尚需补齐；执行 Tasks 记录修复与独立复验，不以此前绿色结果冒充最终通过。
+- Android 边界：设备 `e38b8019` 可见，已有用户的 RenderDoc helper 正在运行。本轮未重启或停止该 helper。现有绑定的客户端 RemoteServer 没有可确认设备画面呈现的接口，不能用应用内 PNG 或 Win32 输出窗口替代 Android 屏幕验收。Android 呈现保持 `blocked / TODO(UNVERIFIED)`。
+- 模型边界：隔离 QA 未配置 provider；使用现有模型凭据的询问尚未获答复，未复制凭据。Debugger／Analyzer／Optimizer 的真实模型执行、同 EID 修改／恢复与足迹联动保持 `TODO(UNVERIFIED)`；受控测试和持久记录读取不能代替这项证明。
+
+最终修复与验收补证：
+
+- 完整性遗漏已修复并独立复查：原生真实传输回执贯通；revision／修改状态／显示参数写入；失败事实使用未知 EID 且不附旧图；Agent 图片与其操作信息成对投影，手动帧回放不覆盖；错误、最终目标警告和设备呈现不完整均显示局部就绪；main 为每次操作分配独立 operationId，并在同次阶段和结果中保持相关性。独立冻结源码复查 54 项测试通过，在该修复范围内无剩余可操作发现。
+- Android 生命周期收敛：启动前检查两种架构的 helper，查询失败时拒绝继续；移除无条件启动前 force-stop；清理时核对记录的自有 PID 集合。真机只读检查前后均为 arm32 无 PID、arm64 PID 29255，未安装、推配置、启停进程或建立转发。它证明占用识别和保护边界，不证明 Remote 打开或设备显示。
+- 最终构建再次实测 Local Open→EID 5 无输出→EID 6 清屏→EID 14 最终画面→Close。EID 5 卡头显示局部就绪，没有错误重试入口；Close 期间保留画面，确认释放后清除。实际投影包含原生 revision、baseline 状态和 main operationId。
+- 历史读取使用明确标注的受控持久样本，经真实 main IPC 在重启后读取：默认选择最近成功步骤，支持 14→11→未知 EID 的提交顺序，失败步骤无图片，播放到末尾停止；回看时 context 仍为空。打开后手动 apply EID 6，历史仍显示匹配其操作的 EID 11 图像。该样本没有生成假的 Agent 调用、实验修改或消息证据。
+- 最终完整应用验证：381 个文件通过、4 跳过，2749 项测试通过、4 跳过；coverage lines 74.83%、functions 76.59%、branches 62.07%、statements 72.44%，ratchet 通过。与构建／门禁并行的上一轮出现三个既有 Investigation 测试 5 秒超时；重负载结束后以 `--maxWorkers=2` 完整复跑通过，没有修改测试阈值或断言。最终 typecheck、lint、check:gates 和 build 均通过。主 agent 独立重跑最终 Tools 完整 suite：275 通过，20.20 秒。
+- 未提交源码身份：Agent `0d0eaa8027ce60109ae1774746bc142ba232f19f98daae7b038b4b4b3ebf34c0`，Tools `0c9b8aa66cdac3d1fc41765d156e3ea324b36aa61497e390b4ad52acaa6dfb85`。算法为排序后的 Git tracked 与非忽略 untracked 文件路径、NUL、内容 SHA-256、LF 所组成记录的 SHA-256；删除文件用 `DELETED`，符号链接用其链接文本；排除受保护的 `.qoder/` 和本验收文档以避免回执自引用。具体基线和文件数记录于本机 `source-identity.json`。
+- 正式 `scripts/start-rdc-agent.cmd` 使用本轮临时 userData 实际启动，加载最终 `file://` renderer，未出现占锁失败。QA owner 129936、desktop owner 133808 及自有子进程均已停止；原有 canonical lock owner 17064 已死且未被修改。没有停止用户的其他进程。桌面启动权已交还。
+
+完整计划仍不宣称全绿：Android Remote／设备呈现和真实 provider 的 Agent 执行保持上述 `blocked / TODO(UNVERIFIED)`；代码、受控测试、真实 Local 与历史读取各自按实际证据成立。磁盘清理回执在本机 `cleanup-receipt.json` 中记录最终检查结果。
+
+最终收口：仅移除 ResizeHandle.css 文件末尾多余空行后重新 build 通过，两库 git diff --check 通过；上述源码指纹已按最终文件重新计算。本轮临时 QA 项目、capture 副本、测试目录和自有 context 残留已清理，保留最小验收日志与回执。桌面启动权已交还。Android 与真实 provider 验收阻塞保持不变。

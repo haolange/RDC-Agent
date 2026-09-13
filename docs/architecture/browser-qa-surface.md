@@ -47,3 +47,7 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
 - 契约：`createRendererApi.test.ts`、`bridgeSecurity.test.ts`、`BrowserAppBridgeServer.contract.test.ts`
 - Smoke：`pnpm run smoke:agent-browser`
 - Manual: run start:agent-browser, copy the complete one-time `/qa?qaBootstrap=...` URL from the latest log, and verify real Settings/Project/Session/usage, language persistence, and parity. Check high-risk channels both without and with `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`; use explicit canonical userData only for an authorized real-data flow.
+
+## Capture Replay QA
+
+capture:getReplayState/getReplaySelection/listReplayHistory/readReplayImage 为只读面；applyReplayEvent/refreshFrame 为 mutation；clearReplayHistory 为 high-impact，复用共享 channel capability 表。状态事件为 capture:replayChanged，包含完整 scope/generation/revision。QA 应覆盖跨 session 迟到结果、运行锁、非空回放与 RDC 归零原空态。真实 Android 显示验收必须来自设备屏幕与原生回执，不以 Browser 图片或 local export 代替。

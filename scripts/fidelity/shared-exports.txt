@@ -164,6 +164,16 @@ CaptureApi
 CaptureControl
 CaptureDescriptor
 CaptureInfo
+CaptureReplayApplyRequest
+CaptureReplayBindingRequest
+CaptureReplayError
+CaptureReplayEvent
+CaptureReplayHistoryEntry
+CaptureReplayHistoryRequest
+CaptureReplayPhase
+CaptureReplaySelection
+CaptureReplayState
+CaptureReplayTarget
 CaptureRole
 CatalogFactSourceSchema
 CatalogJsonObject
@@ -514,7 +524,6 @@ hslToRgb
 Hsv
 hsvToHex
 hsvToRgb
-HumanPreviewSnapshot
 ImagePreview
 index.ts::*
 INVESTIGATION_ARTIFACT_KINDS
@@ -790,6 +799,8 @@ ProgressTask
 ProgressTaskStatus
 ProjectApi
 ProjectInputRecord
+ProjectInputRemovePreparation
+ProjectInputRemoveResult
 ProjectRecord
 PromptPlan
 PromptPlanMetrics

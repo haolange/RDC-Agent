@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { rdxShellActionService } from '../tools/RdxShellActionService';
 import type { RdxShellActionSettings } from '@shared/types/settings';
-type RemoteActivationOptions = { action?: RdxShellActionSettings; signal?: AbortSignal };
+type RemoteActivationOptions = { contextId?: string; action?: RdxShellActionSettings; signal?: AbortSignal };
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
@@ -215,7 +215,7 @@ export class ReplayDeviceService {
     options.signal?.throwIfAborted();
     const existingPromise = this.activationPromises.get(deviceId);
     if (existingPromise) {
-      if (options.action) throw new Error('RDX_REMOTE_BUSY: cannot join an activation outside the frozen turn binding.');
+      if (options.action || options.contextId) throw new Error('RDX_REMOTE_BUSY: cannot join an activation outside the frozen turn binding.');
       return existingPromise;
     }
 
@@ -527,6 +527,7 @@ export class ReplayDeviceService {
       deviceType: device.type,
       deviceSerial: device.serial,
       transport: device.transport,
+      contextId: options.contextId,
     }, { action: options.action, abortSignal: options.signal });
     if (!result.ok) {
       throw new Error(result.error ?? 'RDX connectRemote action failed.');
