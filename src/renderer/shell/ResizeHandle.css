@@ -1,8 +1,10 @@
 /* Enhanced resize handle with visual feedback */
 .panel-resize-handle {
   position: relative;
+  z-index: 1;
   width: 100%;
   min-width: 0;
+  overflow: visible;
   cursor: col-resize;
   background: transparent;
   transition: background var(--transition-fast) var(--ease-standard);
@@ -11,9 +13,20 @@
 .panel-resize-handle::before {
   content: '';
   position: absolute;
-  inset: 0;
+  top: 0;
+  bottom: 0;
   background: linear-gradient(180deg, transparent, var(--token-border-card), transparent);
   opacity: 0.6;
+}
+
+.panel-resize-handle-left::before {
+  left: calc(-1 * var(--space-2));
+  right: 0;
+}
+
+.panel-resize-handle-right::before {
+  left: 0;
+  right: calc(-1 * var(--space-2));
 }
 
 .panel-resize-handle::after {
@@ -22,8 +35,8 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 3px;
-  height: 24px;
+  width: var(--space-0-5);
+  height: var(--space-6);
   border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--token-text-caption) 0%, transparent);
   transition: background var(--transition-base) var(--ease-standard), height var(--transition-base) var(--ease-standard);
@@ -35,11 +48,16 @@
 
 .panel-resize-handle:active::after {
   background: color-mix(in srgb, var(--token-accent-primary) 80%, transparent);
-  height: 40px;
+  height: var(--space-10);
 }
 
 .panel-resize-handle.disabled {
   cursor: default;
+  pointer-events: none;
+}
+
+.panel-resize-handle.disabled::before {
+  inset: 0;
 }
 
 .panel-resize-handle.disabled:hover::after {

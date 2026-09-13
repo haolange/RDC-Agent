@@ -131,7 +131,7 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 ```
 src/renderer/
   app/            App、bootstrap、WorkbenchShell、theme、overlays、contextMenu
-  shell/          AppShell、TitleBar、PanelZone、UserMenu、TerminalDrawer 壳
+  shell/          AppShell、TitleBar、ResizeHandle、UserMenu
   features/
     transcript/   消息、Work Process（形态不变）
     composer/     Composer 与共置 CSS
