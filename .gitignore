@@ -23,7 +23,6 @@ build/
 
 # Local tool / IDE metadata
 .codex/
-.qoder/
 .idea/
 .vscode/
 .vs/
