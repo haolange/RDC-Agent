@@ -1,0 +1,41 @@
+.capture-replay-panel,
+.capture-replay-content { display: flex; flex-direction: column; min-width: 0; gap: var(--space-2); }
+.capture-replay-status-row,
+.capture-history-toolbar,
+.capture-image-toolbar,
+.capture-replay-pending { display: flex; align-items: center; justify-content: space-between; min-width: 0; gap: var(--space-2); }
+.capture-replay-status { color: var(--token-text-caption); font-size: var(--text-xs); }
+.capture-replay-status.is-error,
+.capture-replay-feedback.is-error { color: var(--token-status-error); }
+.capture-replay-menu { display: flex; flex-wrap: wrap; gap: var(--space-1); padding: var(--space-2); border: 1px solid var(--token-border-subtle); border-radius: var(--radius-sm); }
+.capture-replay-file-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
+.capture-replay-device-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-1); }
+.capture-replay-file-row small,
+.capture-replay-content small,
+.capture-replay-pending small { color: var(--token-text-caption); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.capture-replay-pending small { min-width: 0; }
+.capture-replay-tabs { display: flex; border-bottom: 1px solid var(--token-border-subtle); gap: var(--space-2); }
+.capture-replay-tabs .button { border-radius: 0; border-bottom: 2px solid transparent; }
+.capture-replay-tabs .button.is-selected { border-bottom-color: var(--token-border-focus); color: var(--token-text-heading); }
+.capture-replay-image { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 4 / 3; min-width: 0; overflow: hidden; border: 1px solid var(--token-border-subtle); border-radius: var(--radius-sm); background: var(--token-bg-app); }
+.capture-replay-image img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; position: absolute; inset: 0; }
+.capture-replay-image > span { max-width: 100%; padding: var(--space-3); color: var(--token-text-caption); font-size: var(--text-sm); text-align: center; overflow-wrap: anywhere; }
+.capture-replay-image .capture-image-state { position: absolute; inset: auto 0 0; padding: var(--space-2); border-top: 1px solid var(--token-border-subtle); background: var(--token-bg-panel); }
+.capture-image-toolbar,
+.capture-history-toolbar { color: var(--token-text-caption); font-size: var(--text-xs); }
+.capture-image-toolbar > div { max-width: 55%; }
+.capture-event-controls { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
+.capture-event-input { display: flex; align-items: center; justify-content: center; gap: var(--space-2); min-width: 0; color: var(--token-text-caption); font-size: var(--text-xs); }
+.capture-event-input .input { max-width: 8ch; min-width: 0; text-align: center; font-variant-numeric: tabular-nums; }
+.capture-event-slider { display: block; width: 100%; min-width: 0; height: var(--control-height-sm); margin: 0; accent-color: var(--token-border-focus); cursor: pointer; }
+.capture-event-slider:disabled { cursor: default; opacity: .5; }
+.capture-event-slider:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+.capture-replay-feedback { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); min-height: var(--space-4); color: var(--token-text-caption); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.capture-history-controls { display: flex; align-items: center; gap: var(--space-1); }
+.capture-history-detail { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-1); font-size: var(--text-sm); }
+.capture-history-detail > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.capture-history-detail > small { grid-column: 1; }
+.capture-history-detail > .button { grid-column: 2; grid-row: 1 / span 2; }
+.project-capture-input-actions { display: flex; align-items: center; gap: var(--space-1); }
+
+.capture-replay-status-row .right-rail-section-heading { flex: 1; display: flex; align-items: center; }

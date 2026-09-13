@@ -106,6 +106,7 @@ const ProjectInputSchema = z.object({
   discoveredAt: z.number(),
   lastModifiedAt: z.number(),
   size: z.number(),
+  contentSha256: z.string().regex(/^[a-f0-9]{64}$/u).optional(),
 }).passthrough();
 
 const ProjectRecordSchema = z.object({
@@ -118,6 +119,7 @@ const ProjectRecordSchema = z.object({
   inputsPath: z.string().min(1),
   inputs: z.array(ProjectInputSchema).default([]),
   inputsUpdatedAt: z.number(),
+  replayCleanupPending: z.object({ requestedAt: z.number(), captureHashes: z.array(z.string().regex(/^[a-f0-9]{64}$/u)), error: z.string().optional() }).optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
   lastSessionId: z.string().optional(),

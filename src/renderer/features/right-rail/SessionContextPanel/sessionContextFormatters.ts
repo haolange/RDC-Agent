@@ -28,17 +28,6 @@ export const formatBackendLabel = (
   return backend || '--';
 };
 
-export const formatHumanPreviewLabel = (
-  status: string | undefined,
-  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
-): string => {
-  if (status === 'open') return t('control.humanPreviewOpen');
-  if (status === 'opening') return t('control.humanPreviewOpening');
-  if (status === 'error') return t('control.humanPreviewError');
-  if (status === 'unavailable') return t('control.humanPreviewUnavailable');
-  return t('control.humanPreviewClosed');
-};
-
 export const getSessionContextSummary = (
   openedCapturePath: string | null | undefined,
   inputCount: number,

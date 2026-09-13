@@ -3,7 +3,8 @@ import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { DEFAULT_RDX_ACTIONS, DEFAULT_RDX_CLI_INVOKER } from '../settings/settingsDefaults';
 import { freezeRdxTurnBinding } from './RdxTurnBindings';
 import { executeRdxShell, RdxShellInputSchema } from './executeRdxShell';
-const mock = vi.hoisted(() => ({ execute: vi.fn(), lease: vi.fn(), prepare: vi.fn(), write: vi.fn(), quarantine: vi.fn() }));
+const mock = vi.hoisted(() => ({ execute: vi.fn(), lease: vi.fn(), prepare: vi.fn(), write: vi.fn(), quarantine: vi.fn(), observe: vi.fn() }));
+vi.mock('../sessions', () => ({ rdxSessionService: { observeAgentOperation: mock.observe } }));
 vi.mock('./RdxCliInvokerService', () => ({ rdxCliInvokerService: { executeCLI: mock.execute } }));
 vi.mock('../sessions/RdxRuntimeContextRegistry', () => ({ assertRdxContextLeaseOwnership: mock.lease, quarantineRdxContext: mock.quarantine }));
 vi.mock('./RdxExecutionReceipts', async (importOriginal) => {
@@ -99,4 +100,26 @@ it('rejects using a newly rebound identity in an old prepared turn before invoki
   await expect(executeRdxShell(input, 'call', undefined, context)).rejects.toThrow(/prepare/);
   expect(mock.execute).not.toHaveBeenCalled();
   expect(mock.quarantine).not.toHaveBeenCalled();
+});
+
+it('observes performance output only after native measurement and durable receipt complete with frozen CLI', async () => {
+  const order: string[] = [];
+  mock.execute.mockImplementationOnce(async () => { order.push('measure'); return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: input.operation, data: {} }) }; });
+  mock.write.mockImplementationOnce(() => { order.push('receipt'); return undefined; });
+  mock.observe.mockImplementationOnce(async () => { order.push('observe'); });
+  await executeRdxShell(input, 'call', undefined, context);
+  expect(order).toEqual(['measure', 'receipt', 'observe']);
+  expect(mock.observe).toHaveBeenCalledWith({ projectId: 'project', sessionId: 'session' }, input.operation, 'call', context.rdxBinding?.cli, true);
+});
+
+it('holds one native transaction through observation so concurrent commands cannot change the recorded event', async () => {
+  const order: string[] = []; let release!: () => void;
+  mock.execute.mockImplementation(async () => { order.push('native'); return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: input.operation, data: {} }) }; });
+  mock.observe.mockImplementationOnce(() => new Promise<void>(resolve => { order.push('observe-start'); release = resolve; }));
+  const first = executeRdxShell(input, 'first', undefined, context);
+  await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+  const second = executeRdxShell(input, 'second', undefined, context);
+  await Promise.resolve(); expect(order).toEqual(['native', 'observe-start']);
+  release(); await Promise.all([first, second]);
+  expect(order).toEqual(['native', 'observe-start', 'native']);
 });

@@ -29,13 +29,13 @@ describe.skipIf(!python || !fixture)('native application capture lifecycle', () 
     const capture = path.join(directory, 'capture-copy.rdc');
     copyFileSync(fixture!, capture);
     const before = hash(fixture!);
-    const contextId = 'qa-lifecycle-' + randomUUID().slice(0, 12);
+    let contextId = 'qa-lifecycle-' + randomUUID().slice(0, 12);
     const scope = { projectId: 'qa-project', sessionId: 'qa-session-' + randomUUID() };
     const cli = { ...DEFAULT_RDX_CLI_INVOKER, enabled: true, command: python!,
       argsPrefix: ['-m', 'rdx.cli', '--json'], env: nativeEnv, timeoutMs: 60_000 };
     const actions = structuredClone(DEFAULT_RDX_ACTIONS);
     actions.openCapture = { ...actions.openCapture, enabled: true, command: python!, env: nativeEnv,
-      args: ['-m', 'rdx.cli', '--json', '--daemon-context', '{{inputId}}', 'capture', 'open', '--file', '{{filePath}}'] };
+      args: ['-m', 'rdx.cli', '--json', '--daemon-context', '{{contextId}}', 'capture', 'open', '--file', '{{filePath}}'] };
     actions.closeRuntime = { ...actions.closeRuntime, enabled: true, command: python!, env: nativeEnv,
       args: ['-m', 'rdx.cli', '--json', '--daemon-context', '{{contextId}}', 'context', 'clear'] };
     const binding = freezeRdxTurnBinding(cli, actions);
@@ -48,12 +48,12 @@ describe.skipIf(!python || !fixture)('native application capture lifecycle', () 
     try {
       const opened = await service.openProjectInput({ ...scope, inputId: contextId, filePath: capture,
         replayDevice: { id: 'local', type: 'local', label: 'Local', transport: 'local', status: 'online' } }, { binding });
+      contextId = opened.contextId;
       expect(opened.replaySessionId).toBeTruthy();
       expect(getRdxContextLease(scope.sessionId)?.contextId).toBe(contextId);
       const context = await native('context', ['status']);
       expect(context.data.session_id ?? context.data.current_session_id).toBe(opened.replaySessionId);
-      await native('session', ['preview', 'status']);
-      expect((await service.closeHumanPreviewWindow(scope))?.humanPreview?.status).toBe('closed');
+      expect(service.snapshotReplayForSession(scope).phase).toBe('ready');
       expect(await service.clearOpenedCaptureForSession(scope, { binding })).toBe(true);
       expect(getRdxContextLease(scope.sessionId)).toBeNull();
       expect(service.snapshotContextForSession(scope)).toBeNull();

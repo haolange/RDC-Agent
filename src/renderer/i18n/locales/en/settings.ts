@@ -232,8 +232,6 @@ export const enSettings = {
   'settings.rdxActionOpenRemoteCaptureHint': 'Open a .rdc on a prepared Android/remote replay handle (`--remote-id`).',
   'settings.rdxActionConnectRemote': 'Connect remote',
   'settings.rdxActionConnectRemoteHint': 'Connect to a remote replay or service target.',
-  'settings.rdxActionOpenPreview': 'Open preview',
-  'settings.rdxActionOpenPreviewHint': 'Open a preview window for the current runtime context.',
   'settings.rdxActionCloseRuntime': 'Close runtime',
   'settings.rdxActionCloseRuntimeHint': 'Release runtime resources owned by the current capture.',
   'settings.rdxActionCommand': 'Command',

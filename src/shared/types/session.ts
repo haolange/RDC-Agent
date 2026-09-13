@@ -17,6 +17,23 @@ export interface ProjectInputRecord {
   discoveredAt: number;
   lastModifiedAt: number;
   size: number;
+  /** Absent until the original file has been successfully content-verified. */
+  contentSha256?: string;
+}
+
+export interface ProjectInputRemovePreparation {
+  success: boolean;
+  approvalToken?: string;
+  input?: ProjectInputRecord;
+  affectedSessionIds?: string[];
+  error?: string;
+}
+export interface ProjectInputRemoveResult {
+  success: boolean;
+  inputs: ProjectInputRecord[];
+  fileDeleted?: boolean;
+  cleanupPending?: boolean;
+  error?: string;
 }
 
 export interface ProjectRecord {
@@ -29,6 +46,7 @@ export interface ProjectRecord {
   inputsPath: string;
   inputs: ProjectInputRecord[];
   inputsUpdatedAt: number;
+  replayCleanupPending?: { requestedAt: number; captureHashes: string[]; error?: string };
   createdAt: number;
   updatedAt: number;
   lastSessionId?: string;
@@ -336,13 +354,7 @@ export interface PreparedTurnContextSummary {
   runtimeDiagnostics?: string[];
 }
 
-export interface HumanPreviewSnapshot {
-  status: 'unavailable' | 'closed' | 'opening' | 'open' | 'error';
-  sessionId?: string;
-  boundEventId?: number;
-  lastError?: string;
-  updatedAt: number;
-}
+
 
 export interface RdxRuntimeContext {
   contextId: string;
@@ -371,7 +383,6 @@ export interface ContextSnapshot {
   captureDescriptors: CaptureDescriptor[];
   activeCapture: string;
   deviceLabel: string;
-  humanPreview?: HumanPreviewSnapshot;
   runtimeContext?: RdxRuntimeContext | null;
 }
 

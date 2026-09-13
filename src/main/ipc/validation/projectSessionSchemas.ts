@@ -11,6 +11,8 @@ export const ProjectRemoveArgsSchema = ProjectIdArgsSchema;
 export const ProjectInputsListArgsSchema = ProjectIdArgsSchema;
 export const ProjectInputsRefreshArgsSchema = ProjectIdArgsSchema;
 export const ProjectInputsImportArgsSchema = ProjectIdArgsSchema;
+export const ProjectInputPrepareRemoveArgsSchema = z.tuple([ipcId(128, 'projectId'), ipcId(256, 'inputId')]);
+export const ProjectInputRemoveArgsSchema = z.tuple([ipcId(128, 'projectId'), ipcId(256, 'inputId'), ipcNonEmptyString(512, 'approvalToken')]);
 
 export const ProjectRenameArgsSchema = z.tuple([
   ipcId(128, 'projectId'),

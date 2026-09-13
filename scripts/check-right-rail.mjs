@@ -160,10 +160,13 @@ for (const forbidden of ['TOOL_LABELS', 'Runtime lookup', 'displayLabel']) {
 const capturePanel = [
   read('src/renderer/features/right-rail/CapturePanel.tsx'),
   read('src/renderer/features/right-rail/capturePanelActions.ts'),
+  read('src/renderer/features/right-rail/CaptureFrame.tsx'),
+  read('src/renderer/features/right-rail/CaptureHistory.tsx'),
 ].join('\n');
-for (const required of ['RdxContextPanelViewModel', 'control.captureOpen', 'control.rightRail.artifacts.preview', 'control.captureLibraryRefresh', 'control.rightRail.outputs.copy', 'control.rightRail.capture.clear', 'capture.openProjectInput', 'context.openHumanPreview', 'capture.clearOpenedState', 'right-rail-capture-open-row', 'right-rail-capture-open-button']) {
+for (const required of ['RdxContextPanelViewModel', 'control.captureOpen', 'capture.openProjectInput', 'capture.clearOpenedState', 'capture.applyReplayEvent', 'capture.refreshFrame', 'capture.listReplayHistory', 'capture.readReplayImage', 'capture-replay-device-row', 'role="tablist"', 'aria-selected', 'CaptureFrame', 'CaptureHistory']) {
   requireText(capturePanel, required, `CapturePanel must retain ${required}`);
 }
+for (const retired of ['openHumanPreview', 'closeHumanPreview', 'humanPreviewStatus']) forbidText(capturePanel, retired, `Capture must retire ${retired}`);
 forbidText(capturePanel, 'right-rail-capture-summary', 'CapturePanel must not duplicate the selected capture above its picker');
 
 const emptyState = read('src/renderer/features/right-rail/RightRailEmptyState.tsx');
@@ -173,9 +176,10 @@ for (const required of ['RightRailEmptyVisual', 'EmptyState', 'visual=']) {
 
 const rightRailCss = [
   read('src/renderer/features/right-rail/RightRail.css'),
+  read('src/renderer/features/right-rail/CaptureReplay.css'),
   read('src/renderer/features/right-rail/RightRailEmptyVisuals.css'),
 ].join('\n');
-for (const required of ['.right-rail-empty-state', '.ui-empty-state-title', '.right-rail-empty-visual', 'grid-template-rows:', 'flex: 0 0 auto', 'font-size: var(--text-sm)', 'font-size: var(--text-xs)', '.right-rail-capture-panel', '.right-rail-capture-open-row', '.project-capture-import-section', '.project-capture-input-list', '.right-rail-investigation-list', '.right-rail-investigation-row']) {
+for (const required of ['.right-rail-empty-state', '.ui-empty-state-title', '.right-rail-empty-visual', 'grid-template-rows:', 'flex: 0 0 auto', 'font-size: var(--text-sm)', 'font-size: var(--text-xs)', '.right-rail-capture-panel', '.capture-replay-device-row', '.project-capture-import-section', '.project-capture-input-list', '.right-rail-investigation-list', '.right-rail-investigation-row']) {
   requireText(rightRailCss, required, `Right rail CSS must retain ${required}`);
 }
 for (const forbidden of ['.control-panel', '.cp-section', '.capture-library', '.panel-action-btn', 'trace-plan-preview', 'is-plan', '.right-rail-details', '.right-rail-context-area-heading', '.right-rail-rdx-context', '.right-rail-section:not(.is-empty)', '.right-rail-section.is-empty', '.right-rail-capture-summary']) {

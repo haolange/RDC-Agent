@@ -31,6 +31,7 @@ export interface ProjectRdxPaths {
   memoryPath: string;
   inputsPath: string;
   artifactsPath: string;
+  replayPath: string;
 }
 
 export interface AppStatePaths {
@@ -58,7 +59,7 @@ export interface RuntimePaths extends UserRdxPaths, AppStatePaths {
 
 const CONFIG_FILE_NAME = 'config.json';
 const LOG_FILE_NAME = 'rdc-agent.log';
-const PROJECT_GITIGNORE = ['inputs/', 'artifacts/', 'memory/', 'runtime/', ''].join('\n');
+const PROJECT_GITIGNORE = ['inputs/', 'artifacts/', 'memory/', 'runtime/', 'replay/', 'replay.lock', ''].join('\n');
 const sanitizePathSegment = (value: string): string => value.replace(/[^a-zA-Z0-9_-]/g, '-');
 const normalizePath = (targetPath: string): string => path.resolve(targetPath);
 
@@ -155,6 +156,7 @@ export class AppPathService {
       memoryPath: path.join(projectRdxRoot, 'memory'),
       inputsPath: path.join(projectRdxRoot, 'inputs'),
       artifactsPath: path.join(projectRdxRoot, 'artifacts'),
+      replayPath: path.join(projectRdxRoot, 'replay'),
     };
   }
 
@@ -206,6 +208,14 @@ export class AppPathService {
     ].forEach((directory) => fs.mkdirSync(directory, { recursive: true }));
     if (!fs.existsSync(paths.gitignorePath)) {
       fs.writeFileSync(paths.gitignorePath, PROJECT_GITIGNORE, 'utf8');
+    } else {
+      const current = fs.readFileSync(paths.gitignorePath, 'utf8');
+      if (!current.split(/\r?\n/u).some((line) => line.trim() === 'replay/')) {
+        fs.appendFileSync(paths.gitignorePath, `${current.endsWith('\n') ? '' : '\n'}replay/\n`, 'utf8');
+      }
+      if (!current.split(/\r?\n/u).some((line) => line.trim() === 'replay.lock')) {
+        fs.appendFileSync(paths.gitignorePath, `${current.endsWith('\n') ? '' : '\n'}replay.lock\n`, 'utf8');
+      }
     }
     return paths;
   }

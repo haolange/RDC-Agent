@@ -343,7 +343,7 @@ Enforcement 必须同时发生在：(1) profile allowlist 解析（token 展开�
 
 Right Rail 有两个按选择对象区分的表面。选中 Project 时**只**渲染项目级 `Import .rdc` 输入面与已导入 capture 列表，永不读取 session runtime。
 
-选中 Session 时渲染五张不可折叠圆角卡 `Progress / Artifacts / Outputs / Context / Capture`。Artifacts 只投影 main-owned Investigation Artifacts；Outputs 仍只接受 `output_register`；Capture 保留 scoped `.rdc` 选择、Replay Device、open / preview / refresh / copy / clear 与紧凑诊断。
+选中 Session 时渲染五张不可折叠圆角卡 `Progress / Artifacts / Outputs / Context / Capture`。Artifacts 只投影 main-owned Investigation Artifacts；Outputs 仍只接受 `output_register`；Capture 保留 scoped `.rdc` 选择、Replay Device、open / close / 内嵌帧回放 / Agent 足迹 / refresh 与紧凑诊断。
 
 main-owned `RightRailProjectionService` 为显式 `{ projectId, sessionId }` 组装 `RightPanelViewModel`；renderer 只消费投影，不从 action events、全局 capture、工作目录扫描或 tool catalog 重建 Progress / Artifacts / Outputs / Context / Capture。Progress 是单一规范列表（`RightPanelViewModel.progress: ProgressTask[]`），创建序，已完成项就地保留，并与 transcript `taskProjection` 同序同态。Context 只含被冻结 Prompt 段或成功 tool result 证明的具体任务资源。Capture 在 session 中始终可见：诚实空态或 owner-session 操作面。Outputs 拒绝 inputs 与 plan。Investigation Artifacts 不得混进 Outputs。卡外壳在 empty / populated 之间不变；空内容用安静线框插图，有内容只增高本卡并在兄弟行间使用内部 hairline。Dock 在紧凑桌面宽度仍可用，仅在 `RIGHT_RAIL_DRAWER_BREAKPOINT`（920px）及以下或无法保住最小工作面时变为共享 overlay drawer。静态门禁：`pnpm run check:right-rail`，只认五卡。
 
@@ -394,3 +394,13 @@ agent_handoff 要求非空摘要和严格 contract：route；execute（Plan URI/
 通用 harness 的逻辑 Task、执行实例与 root budget 统一持久化在 TaskStore。直接执行、同步/后台子执行及 handoff 共享根预算；Capsule 只收窄 child-local 账本，重试恢复原执行已消费量和原 root 关联。预算预留持久化先于工具效果，父回复结束及事件续跑不重置账本。并发首次绑定同一 root 只合并一次；已绑定 root A 的同一 live ledger 请求 root B 时显式拒绝，保持原账本与观察者归属，不建立多根合并或静默换绑路径。
 
 prepared → consumed → receiving turn 的取消所有权转交不能丢失已请求的 Stop。转交空隙保留 cancelling；接收者先承接取消意图并 abort/join，再允许后续执行边界。任务取消终态须在实际 producer 与所属进程退出后保存；同 turn 取消请求不 self-join。字段与调用合同以 [runtime-kernel](docs/contracts/runtime-kernel.md) 的 Task 执行章节为准，领域调查策略仍由实际加载的指令决定。
+
+## Session Capture 内嵌回放裁决（2026-09-13）
+
+- 项目 RDC 列表为空时保持原 Capture 空态外观、文案与交互；不挂载新控件、历史或画面。非空时右下角五卡结构不变，Capture 内提供文件、设备、打开/关闭、帧回放和 Agent 足迹。
+- 完整文件扫描确认的输入列表独立提交和广播；最后一个 RDC 消失后，即使回放释放或足迹清理失败，也必须保持真实空态。清理待办单独持久化，不能用旧输入列表保存恢复状态；扫描不完整或项目不可访问时不得推断文件缺失。
+- `RdxSessionService` 按 project/session 管理独立 `RdxSessionRuntime`。native daemon context 由 main 分配，与 inputId 不等价；配置的 lifecycle action 必须使用 `{{contextId}}`，返回身份不一致拒绝绑定。关闭失败、半开失败和未确认子进程保留 owning context，不能清空其他 session lease。
+- Android 设备由单个 session 独占，不抢占。Agent preparing 至 active turn 收口期间禁止人工改变回放；delegated child 未 join 与 native exit 未确认继续锁定。人工和 Agent 原生命令经过同一 context 队列。
+- Open 加载可证的最终呈现颜色输出；事件滑条实际 apply。requested/applied/image EID、generation、revision 分离，迟到画面不得重标为新事件。应用 preview 是 main 校验后交付的内嵌图片；退役独立 human-preview API 和 Settings action。独立 Tools CLI 的窗口输出仍是有效外部功能。
+- 足迹位于 `<project>/.rdx/replay/<sessionId>/<captureSha256>`，内容 SHA-256 与 lease 身份摘要分离。图片最大边 960 px，PNG 保持 alpha；session 256 MiB、project 2 GiB，到限停止保存、不淘汰旧证据。关闭保留历史；重启只恢复选择和历史，不自动打开或占设备。
+- native Remote 当前返回 `unsupported`，不能声称 Android 设备显示已同步。本地 native observation 通过不代表 Android 屏幕呈现通过；真实验收依 acceptance ledger 分项记录。

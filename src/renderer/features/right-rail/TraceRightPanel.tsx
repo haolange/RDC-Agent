@@ -28,7 +28,7 @@ export const TraceRightPanel: React.FC = () => {
   const hasArtifacts = artifacts.rows.length + artifacts.supersededCount + artifacts.truncatedCount > 0;
   const hasOutputs = outputs.current.length + outputs.previous.length > 0;
   const hasTaskContext = Boolean(taskContext?.resources.length);
-  const hasCapture = Boolean(taskContext && captureContext && (captureContext.capture || captureContext.availableCaptures.length || captureContext.diagnostics.length));
+  const hasCapture = Boolean(taskContext && captureContext && captureContext.availableCaptures.length);
   const progressSessionId = tasks[0]?.sessionId ?? 'no-session';
 
   return (
@@ -37,7 +37,7 @@ export const TraceRightPanel: React.FC = () => {
       <RailSection id="artifacts" title={t('control.rightRail.artifacts.title')}>{hasArtifacts ? <RightRailArtifactList artifacts={artifacts} /> : <EmptyState kind="artifacts" copy={artifacts.storeDegraded ? t('control.rightRail.artifacts.storeDegraded') : t('control.rightRail.artifacts.empty')} />}</RailSection>
       <RailSection id="outputs" title={t('control.rightRail.outputs.title')}>{hasOutputs ? <RightRailOutputList current={outputs.current} previous={outputs.previous} /> : <EmptyState kind="outputs" copy={t('control.rightRail.outputs.empty')} />}</RailSection>
       <RailSection id="context" title={t('control.rightRail.context.title')}>{hasTaskContext && taskContext ? <RightRailContext task={taskContext} /> : <EmptyState kind="context" copy={t('control.rightRail.context.empty')} />}</RailSection>
-      <RailSection id="capture" title={t('control.rightRail.capture.title')}>{hasCapture && taskContext && captureContext ? <CapturePanel task={taskContext} capture={captureContext} /> : <EmptyState kind="capture" copy={t('control.rightRail.capture.empty')} />}</RailSection>
+      <>{hasCapture && taskContext && captureContext ? <section className="right-rail-section" data-testid="right-rail-capture"><CapturePanel task={taskContext} capture={captureContext} /></section> : <RailSection id="capture" title={t('control.rightRail.capture.title')}><EmptyState kind="capture" copy={t('control.rightRail.capture.empty')} /></RailSection>}</>
     </aside>
   );
 };

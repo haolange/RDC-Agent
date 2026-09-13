@@ -74,6 +74,14 @@ interface ActiveTurnContext {
 
 ## Right Rail scoped payloads
 
-Right Rail task resources and Capture state are scoped by the full `{ projectId, sessionId, payload }` envelope. `context:get`, `capture:getOpenedState`, preview, and clear requests require an explicit scope and return `null` when no owner scope exists. `context:changed`, `capture:openedStateChanged`, and session capture status updates use the same envelope. Renderer caches background payloads by owner session; only the active session hydrates Context resources and the always-visible Capture area, and late events from another session cannot overwrite either surface.
+Right Rail task resources and Capture state are scoped by the full `{ projectId, sessionId, payload }` envelope. `context:get`, `capture:getOpenedState`, replay apply, and close requests require an explicit scope and return `null` when no owner scope exists. `context:changed`, `capture:openedStateChanged`, and session capture status updates use the same envelope. Renderer caches background payloads by owner session; only the active session hydrates Context resources and the always-visible Capture area, and late events from another session cannot overwrite either surface.
 
 Outputs use the same session-owned projection path. `output_register` writes an explicit run-scoped artifact record after copying one completed project file; a refresh for that session projects it into Outputs. Investigation Artifacts ride the same `tracePresentation.rightPanel` envelope as `Progress / Artifacts / Outputs / Context / Capture` and never mix with Outputs. No renderer-side path discovery or background-session artifact event may populate the active rail.
+
+## Capture Replay projection
+
+`capture:replayChanged` 携带 projectId/sessionId、binding generation 与单调 revision。只有 Active Session 能写当前卡片；其他会话继续拥有其 context。`capture:getReplayState` 读取所属完整快照，不使用全局最近 context。刷新与事件应用仅改变 owning binding；requestedEventId、appliedEventId、imageEventId 不互相代替。切 session 时丢弃旧订阅、请求结果和历史图片结果。RDC 列表为空保持原空态，不因残留历史或错误重新挂载新增内容。
+
+`project:inputsChanged` 反映完整扫描确认并持久化的当前输入，发布不等待回放清理成功。清理错误与待办通过独立 `replayCleanupPending` 和 `project:inputsError` 保留；renderer 不从清理待办、旧 capture binding 或历史足迹恢复已确认不存在的 RDC。最后一个输入删除后，重新挂载或重启仍显示原空态。
+
+Agent preparing 与 active turn 使用独立锁 owner，准备转入运行时不能出现解锁间隙；delegation 和 native process 未确认退出仍为锁定。运行中允许只读足迹，禁止人工打开/关闭/切文件/切设备/事件 apply。

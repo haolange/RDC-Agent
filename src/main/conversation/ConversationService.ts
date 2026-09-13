@@ -1,3 +1,4 @@
+import { acquireRdxPreparationLock, setRdxInteractionLock } from '../sessions/RdxOperationCoordinator';
 import { reconcileDelegatedInteractionRequests } from './DelegatedInteractionRecovery';
 import { enforceMissionTurnCompletion } from '../investigation/missionCompletionContract';
 import { createHash } from 'crypto';
@@ -237,16 +238,16 @@ export class ConversationService {
   answerToolApproval(request: ConversationAnswerToolApprovalRequest): ConversationAnswerToolApprovalResult {
     return agentToolApprovalRequestService.answer(request);
   }
-
   private registerActiveTurn(turn: ActiveConversationTurn): void {
     this.activeTurns.set(turn.turnId, turn);
+    if (turn.sessionId) setRdxInteractionLock(turn.sessionId, turn.turnId, true);
   }
-
   private clearActiveTurn(turnId: string, controller: AbortController): void {
     const active = this.activeTurns.get(turnId);
     if (active?.abortController === controller) {
       const sessionId = active.sessionId;
       this.activeTurns.delete(turnId);
+      if (sessionId) setRdxInteractionLock(sessionId, turnId, false);
       if (sessionId) this.notifySessionTurnIdle(sessionId);
     }
   }
@@ -468,6 +469,7 @@ export class ConversationService {
       if (scopeOwner && scopeOwner !== requestId) {
         throw new Error('CONVERSATION_BUSY: another request is preparing for this conversation.');
       }
+      if (scopeKey.startsWith('session:')) acquireRdxPreparationLock(scopeKey.slice(8), requestId);
       this.activeSendScopes.set(scopeKey, requestId);
       this.preparingRequests.set(idempotencyKey, {
         requestId,
@@ -491,6 +493,7 @@ export class ConversationService {
         agentOrchestrator.releaseProviderRuntimeCredentials(requestState.credentialHandle);
       }
       this.preparingRequests.delete(idempotencyKey);
+      if (scopeKey.startsWith('session:')) setRdxInteractionLock(scopeKey.slice(8), requestId, false);
       if (this.activeSendScopes.get(scopeKey) === requestId) this.activeSendScopes.delete(scopeKey);
     };
 

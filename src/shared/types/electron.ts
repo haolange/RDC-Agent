@@ -1,3 +1,4 @@
+import type { CaptureReplayState, CaptureReplayApplyRequest } from './captureReplay';
 import type {
   WorkflowState,
 } from './workflow';
@@ -394,6 +395,8 @@ export interface ElectronAPI {
       error?: string;
     }>;
     inputs: {
+      prepareRemove: (projectId: string, inputId: string) => Promise<import('./session').ProjectInputRemovePreparation>;
+      remove: (projectId: string, inputId: string, approvalToken: string) => Promise<import('./session').ProjectInputRemoveResult>;
       list: (projectId: string) => Promise<{ inputs: ProjectInputRecord[] }>;
       refresh: (projectId: string) => Promise<{ inputs: ProjectInputRecord[] }>;
       import: (projectId: string) => Promise<{
@@ -472,13 +475,20 @@ export interface ElectronAPI {
   };
 
   capture: {
+    getReplaySelection: (scope: SessionScope) => Promise<import('./captureReplay').CaptureReplaySelection | null>;
+    listReplayHistory: (request: import('./captureReplay').CaptureReplayHistoryRequest) => Promise<{ entries: import('./captureReplay').CaptureReplayHistoryEntry[]; nextSequence?: number }>;
+    readReplayImage: (request: SessionScope & { captureHash: string; imageHash: string }) => Promise<string>;
+    clearReplayHistory: (request: SessionScope & { captureHash: string }) => Promise<void>;
+    getReplayState: (scope: SessionScope) => Promise<CaptureReplayState>;
+    applyReplayEvent: (request: CaptureReplayApplyRequest) => Promise<CaptureReplayState>;
+    refreshFrame: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<CaptureReplayState>;
     list: (scope: SessionScope) => Promise<{ captures: CaptureDescriptor[] }>;
-    select: (request: SessionScope & { captureId: string }) => Promise<{
+    select: (request: SessionScope & { captureId: string; bindingGeneration: number }) => Promise<{
       success: boolean;
       error?: string;
     }>;
     openProjectInput: (
-      request: Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string }
+      request: Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string; bindingGeneration: number }
     ) => Promise<{
       success: boolean;
       openedCapture?: OpenedCaptureState;
@@ -486,7 +496,7 @@ export interface ElectronAPI {
       error?: string;
     }>;
     getOpenedState: (scope: SessionScope) => Promise<OpenedCaptureState | null>;
-    clearOpenedState: (scope: SessionScope) => Promise<{
+    clearOpenedState: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<{
       success: boolean;
       error?: string;
     }>;
@@ -494,16 +504,7 @@ export interface ElectronAPI {
 
   context: {
     get: (scope: SessionScope) => Promise<ContextSnapshot | null>;
-    openHumanPreview: (scope: SessionScope) => Promise<{
-      success: boolean;
-      contextSnapshot?: ContextSnapshot | null;
-      error?: string;
-    }>;
-    closeHumanPreview: (scope: SessionScope) => Promise<{
-      success: boolean;
-      contextSnapshot?: ContextSnapshot | null;
-      error?: string;
-    }>;
+
   };
 
   trace: {
@@ -515,6 +516,7 @@ export interface ElectronAPI {
   };
 
   events: {
+    onCaptureReplayChanged: (callback: (state: CaptureReplayState) => void) => () => void;
     onWorkflowStateChanged: (callback: (state: WorkflowState) => void) => () => void;
     onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; stopReason?: string }) => void) => () => void;
     onRunUsageChanged: (
@@ -530,6 +532,7 @@ export interface ElectronAPI {
     onCaptureStatusChanged: (callback: (status: SessionScopedPayload<unknown>) => void) => () => void;
     onContextChanged: (callback: (snapshot: SessionScopedPayload<ContextSnapshot | null>) => void) => () => void;
     onProjectInputsChanged: (callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void) => () => void;
+    onProjectInputsError: (callback: (payload: { projectId: string; error: string }) => void) => () => void;
     onOpenedCaptureStateChanged: (callback: (state: SessionScopedPayload<OpenedCaptureState | null>) => void) => () => void;
     onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void) => () => void;
     onAppThemeChanged: (callback: (theme: ResolvedTheme) => void) => () => void;

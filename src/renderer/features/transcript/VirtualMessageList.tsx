@@ -7,6 +7,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { ConversationMessage } from '@shared/types/conversation';
 import { useDynStyle } from '../../lib/useDynStyle';
+import { findToolCallMessage } from '../../lib/findToolCallMessage';
 
 const VIRTUALIZE_THRESHOLD = 48;
 
@@ -103,6 +104,30 @@ export const VirtualMessageList: React.FC<Props> = ({
   useEffect(() => {
     updateRange();
   }, [messages.length, updateRange]);
+
+  useEffect(() => {
+    let frame: number | undefined;
+    const locate = (event: Event) => {
+      const detail = (event as CustomEvent<{ projectId: string; sessionId: string; toolCallId: string }>).detail;
+      if (!detail) return;
+      const index = findToolCallMessage(messages, detail);
+      if (index < 0) return;
+      const list = listRef.current;
+      const parent = list?.closest('.chat-messages') as HTMLElement | null;
+      if (!list || !parent) return;
+      if (messages.length > VIRTUALIZE_THRESHOLD) {
+        parent.scrollTop = list.getBoundingClientRect().top - parent.getBoundingClientRect().top + parent.scrollTop + index * estimateHeight;
+        setRange({ start: Math.max(0, index - overscan), end: Math.min(messages.length, index + overscan + 1) });
+      }
+      frame = requestAnimationFrame(() => {
+        const target = Array.from(list.querySelectorAll<HTMLElement>('[data-message-id]')).find((item) => item.dataset.messageId === messages[index].id);
+        target?.scrollIntoView({ block: 'center', behavior: 'auto' });
+        if (target) { target.tabIndex = -1; target.focus({ preventScroll: true }); }
+      });
+    };
+    window.addEventListener('rdx:locate-tool-call', locate);
+    return () => { window.removeEventListener('rdx:locate-tool-call', locate); if (frame !== undefined) cancelAnimationFrame(frame); };
+  }, [messages, estimateHeight, overscan]);
 
   const totalHeight = messages.length * estimateHeight;
   const listDynStyle = useDynStyle(

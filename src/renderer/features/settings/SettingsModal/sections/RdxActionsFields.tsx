@@ -30,7 +30,7 @@ const RDX_ACTIONS: Array<{
     icon: 'folder',
     labelKey: 'settings.rdxActionOpenCapture',
     hintKey: 'settings.rdxActionOpenCaptureHint',
-    argsPlaceholder: '--non-interactive --daemon-context {{inputId}} --json capture open --file {{capturePath}} --frame-index 0',
+    argsPlaceholder: '--non-interactive --daemon-context {{contextId}} --json capture open --file {{capturePath}} --frame-index 0',
   },
   {
     id: 'openRemoteCapture',
@@ -45,13 +45,6 @@ const RDX_ACTIONS: Array<{
     labelKey: 'settings.rdxActionConnectRemote',
     hintKey: 'settings.rdxActionConnectRemoteHint',
     argsPlaceholder: '--non-interactive --daemon-context {{deviceId}} --json call rd.remote.connect --args-json {"options":{"transport":"adb_android","device_serial":"{{deviceSerial}}"}} --format json',
-  },
-  {
-    id: 'openPreview',
-    icon: 'play',
-    labelKey: 'settings.rdxActionOpenPreview',
-    hintKey: 'settings.rdxActionOpenPreviewHint',
-    argsPlaceholder: '--non-interactive --daemon-context {{contextId}} --json session preview on --session-id {{replaySessionId}}',
   },
   {
     id: 'closeRuntime',

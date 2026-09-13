@@ -37,6 +37,8 @@ import { classifyAgentToolEligibility, describeAgentToolIneligibility, isAgentTo
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { resolveEffectiveModel } from '../settings/EffectiveModelResolver';
 import { settingsService } from '../settings/SettingsService';
+import { registerProjectInputLifecycleHandlers } from './projectInputLifecycleHandlers';
+import { rdxSessionService } from '../sessions';
 
 const STALE_RECOVERABLE_RUN_STATUSES: Array<RunSummary['status']> = [
   'planning',
@@ -65,6 +67,7 @@ async function recoverStaleRunOnSelection(run: RunSummary | null): Promise<RunSu
 
 export function registerProjectSessionHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;
+  registerProjectInputLifecycleHandlers(context);
 
   ipcMain.handle('project:list', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'project:list', maxBytes: 1024 });
@@ -130,6 +133,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       await Promise.all(storageAdapter.listSessions(projectId).map(async (session) => {
         const stopped = await conversationService.cancelActiveTurn({ sessionId: session.sessionId });
         if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${session.sessionId}.`);
+        await rdxSessionService.clearOpenedCaptureForSession({ projectId, sessionId: session.sessionId });
       }));
       storageAdapter.removeProject(projectId);
       if (state.currentProjectId === projectId) {
