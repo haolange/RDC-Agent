@@ -186,6 +186,13 @@ for (const forbidden of ['.control-panel', '.cp-section', '.capture-library', '.
   forbidText(rightRailCss, forbidden, `RightRail.css must not retain ${forbidden}`);
 }
 
+const railShell = read('src/renderer/features/right-rail/RightRail.css').match(/^\.right-rail \{[\s\S]*?\n\}/m);
+if (!railShell) fail('RightRail.css must keep a .right-rail shell rule');
+requireText(railShell[0], 'padding: var(--space-3)', '.right-rail shell must use space-3 padding on all sides');
+requireText(railShell[0], 'gap: var(--space-3)', '.right-rail shell must keep space-3 session card gap');
+forbidText(railShell[0], 'padding: var(--space-2)', '.right-rail shell must not use space-2 padding');
+requireText(read('src/renderer/features/right-rail/RightRail.css'), '.project-capture-rail { gap: 0; }', 'Project rail must keep single-card gap: 0');
+
 const drawer = read('src/renderer/app/WorkbenchPanelDrawer.tsx');
 for (const requiredDrawerContract of ['role="dialog"', 'aria-modal="true"', "event.key === 'Escape'", 'returnFocusRef']) {
   requireText(drawer, requiredDrawerContract, `WorkbenchPanelDrawer must retain ${requiredDrawerContract}`);

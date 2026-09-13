@@ -24,6 +24,7 @@ describe('ResizeHandle', () => {
     expect(markup).toContain('data-testid="panel-resize-handle-left"');
     expect(markup).toContain('aria-hidden="true"');
     expect(markup).toContain('panel-resize-handle-left');
+    expect(markup).toContain('panel-resize-handle-hit');
     expect(markup).not.toContain(' disabled');
   });
 
