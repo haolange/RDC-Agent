@@ -1,0 +1,76 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+branch: main
+nodes_managed: true
+exported_at: "2026-09-13T06:49:30Z"
+modules:
+    "":
+        dir_name: RDC-Agent 根工作区（Electron + Agent 运行时聚合）
+        title: RDC-Agent 根工作区（Electron + Agent 运行时聚合）
+        scope:
+            - README.md
+            - DESIGN.md
+            - .gitignore
+            - .eslintrc.cjs
+            - package.json
+            - pnpm-workspace.yaml
+            - tsconfig.json
+            - electron.vite.config.ts
+            - vite.renderer.config.ts
+            - vitest.config.ts
+            - electron-builder.json
+            - .cursorignore
+            - .gitattributes
+            - AGENTS.md
+            - LICENSE
+            - pnpm-lock.yaml
+        source_files: []
+        children:
+            - docs
+            - resources
+            - scripts
+            - tests_and_coverage
+        depends_on: []
+        related_to: []
+    docs:
+        dir_name: RDC-Agent 设计文档与 Design System 预览
+        title: RDC-Agent 设计文档与 Design System 预览
+        scope:
+            - docs/
+            - designs/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    resources:
+        dir_name: Agent 运行时资源（Agent、Skill、Hook、Prompt 与图标）
+        title: Agent 运行时资源（Agent、Skill、Hook、Prompt 与图标）
+        scope:
+            - resources/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: scripts
+    scripts:
+        dir_name: RDC Agent 静态检查与发布工具脚本集
+        title: RDC Agent 静态检查与发布工具脚本集
+        scope:
+            - scripts/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: resources
+            - path: tests_and_coverage
+    tests_and_coverage:
+        dir_name: Work Process CoT 场景化验收演示
+        title: Work Process CoT 场景化验收演示
+        scope:
+            - test/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: scripts

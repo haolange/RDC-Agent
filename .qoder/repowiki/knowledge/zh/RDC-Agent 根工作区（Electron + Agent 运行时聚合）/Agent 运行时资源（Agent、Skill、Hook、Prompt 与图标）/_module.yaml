@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: resources
+title: Agent 运行时资源（Agent、Skill、Hook、Prompt 与图标）
+scope:
+    - resources/
+source_files: []
+depends_on: []
+related_to:
+    - path: scripts
