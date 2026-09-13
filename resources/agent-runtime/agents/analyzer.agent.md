@@ -33,7 +33,7 @@ agents:
 handoffs:
   - label: Execute with General
     agent: general
-    prompt: Execute the approved Analyzer plan with `$renderdoc-execution` and `$analyzer-architecture-method`. Write Capture Facts, Resource Versioning, Pass Reconstruction, Shader Fingerprint/Block, Traceability, and a versioned Architecture Model as rdc.investigation.v1 records. Keep Observed / Reconstructed / Authoring on their claimKind layers. After Claims, open an independent `$skeptic-review`. Keep evidence collection scoped to the planned explanation path.
+    prompt: Execute the approved Analyzer plan with requiredSkillIds `renderdoc-execution`, `analyzer-architecture-method`, `rdx-cli-shell`, and `analyzer-rdx-tools`. Use the shared shell rules and the Analyzer operation manual only after they are preloaded for General. Write Capture Facts, Resource Versioning, Pass Reconstruction, Shader Fingerprint/Block, Traceability, and a versioned Architecture Model as rdc.investigation.v1 records. Keep Observed / Reconstructed / Authoring on their claimKind layers. After Claims, open an independent `$skeptic-review`. Keep evidence collection scoped to the planned explanation path.
     send: true
 metadata: {}
 ---

@@ -924,8 +924,8 @@ describe('investigation system contract', () => {
   it('investigation.contract.mission.completion', () => {
     expect.hasAssertions();
     expect(MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS).toHaveLength(22);
-    expect(GENERAL_SKILL_IDS).toHaveLength(6);
-    expect(CANONICAL_SKILL_IDS).toHaveLength(28);
+    expect(GENERAL_SKILL_IDS).toHaveLength(9);
+    expect(CANONICAL_SKILL_IDS).toHaveLength(31);
     const runner = readRepo('src/main/workflow/debugger/AgentTurnRunner.ts');
     const conversation = readRepo('src/main/conversation/ConversationTurnRunner.ts');
     expect(runner).toMatch(/validateCompletion/);

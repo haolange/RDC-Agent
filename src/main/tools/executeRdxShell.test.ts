@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
-import { DEFAULT_RDX_ACTIONS, DEFAULT_RDX_CLI_INVOKER } from '../settings/settingsDefaults';
+import { DEFAULT_RDX_CLI_INVOKER } from '../settings/settingsDefaults';
 import { freezeRdxTurnBinding } from './RdxTurnBindings';
+import type { RdxOperationDefinition } from '@shared/types/tool';
 import { executeRdxShell, RdxShellInputSchema } from './executeRdxShell';
 const mock = vi.hoisted(() => ({ execute: vi.fn(), lease: vi.fn(), prepare: vi.fn(), write: vi.fn(), quarantine: vi.fn(), observe: vi.fn() }));
 vi.mock('../sessions', () => ({ rdxSessionService: { observeAgentOperation: mock.observe } }));
@@ -11,18 +12,21 @@ vi.mock('./RdxExecutionReceipts', async (importOriginal) => {
   const original = await importOriginal<typeof import('./RdxExecutionReceipts')>();
   return { ...original, rdxExecutionReceipts: { prepare: mock.prepare, write: mock.write } };
 });
+const definition: RdxOperationDefinition = { name: 'rd.perf.get_event_durations', namespace: 'perf', description: 'Measure event durations',
+  input_schema: { type: 'object', properties: { session_id: { type: 'string' } }, required: ['session_id'], additionalProperties: false },
+  scope: 'replay', effects: ['replay_position'], evidence_kind: 'measurement', path_inputs: [], prerequisites: [{ requires: 'session_id' }] };
 const context: ToolExecutionContext = {
   workspaceRoot: '/project', projectRootPath: '/project', projectId: 'project', sessionId: 'session', turnId: 'turn',
   agentId: 'general', rdxBinding: freezeRdxTurnBinding({ ...DEFAULT_RDX_CLI_INVOKER,
-    enabled: true, command: 'native-rdx', env: { FROZEN: 'yes' } }, DEFAULT_RDX_ACTIONS, { contextId: 'owned-context', version: 7, ownerSessionId: 'session' }),
+    enabled: true, command: 'native-rdx', env: { FROZEN: 'yes' } }, [definition], { contextId: 'owned-context', version: 7, ownerSessionId: 'session', runtimeContext: { replaySessionId: 'native-replay', captureFileId: 'native-capture' } }),
 };
 const lease = { contextId: 'owned-context', version: 7, ownerProjectId: 'project', ownerSessionId: 'session',
-  runtimeContext: { replaySessionId: 'native-replay' } };
-const input = { operation: 'rd.perf.get_frame_timing', args: {}, experimentId: 'experiment' };
+  runtimeContext: { replaySessionId: 'native-replay', captureFileId: 'native-capture' } };
+const input = { operation: 'rd.perf.get_event_durations', args: {}, experimentId: 'experiment' };
 beforeEach(() => {
   vi.clearAllMocks();
   mock.lease.mockReturnValue(lease);
-  mock.execute.mockResolvedValue({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: input.operation, data: { duration_ms: 2 } }) });
+  mock.execute.mockResolvedValue({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: input.operation, data: { event_durations: [{ event_id: 11, duration_us: 2 }] } }) });
   mock.write.mockReturnValue({ uri: 'session://tool-outputs/receipt.json', expectedHash: 'sha256:abc' });
 });
 describe('structured RDX shell', () => {
@@ -80,7 +84,7 @@ describe('structured RDX shell', () => {
     expect(mock.write).not.toHaveBeenCalled();
   });
   it('accepts only exact session-scoped native operation syntax', () => {
-    for (const operation of ['rdXshaderXedit_and_replace', 'rd.session.close', 'rd.core.init', 'rd.shader.edit_and_replace;exit']) {
+    for (const operation of ['rdXshaderXedit_and_replace', 'rd.shader.edit_and_replace;exit']) {
       expect(RdxShellInputSchema.safeParse({ operation, args: {} }).success).toBe(false);
     }
   });
@@ -88,10 +92,10 @@ describe('structured RDX shell', () => {
 
  it.each([
    { result_kind: 'rd.shader.edit_and_replace', data: {} },
-   { result_kind: 'rd.perf.get_frame_timing', data: { session_id: 'foreign' } },
+   { result_kind: 'rd.perf.get_event_durations', data: { session_id: 'foreign' } },
  ])('refuses operation/replay mismatch before signing', async (payload) => {
    mock.execute.mockResolvedValue({ exitCode: 0, stdout: JSON.stringify({ ok: true, ...payload }) });
-   await expect(executeRdxShell(input, 'call', undefined, context)).rejects.toThrow(/mismatch/);
+   await expect(executeRdxShell(input, 'call', undefined, context)).rejects.toThrow(/mismatch|result_kind/);
    expect(mock.write).not.toHaveBeenCalled();
  });
 
@@ -104,7 +108,7 @@ it('rejects using a newly rebound identity in an old prepared turn before invoki
 
 it('observes performance output only after native measurement and durable receipt complete with frozen CLI', async () => {
   const order: string[] = [];
-  mock.execute.mockImplementationOnce(async () => { order.push('measure'); return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: input.operation, data: {} }) }; });
+  mock.execute.mockImplementationOnce(async () => { order.push('measure'); return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: input.operation, data: { event_durations: [{ event_id: 11, duration_us: 2 }] } }) }; });
   mock.write.mockImplementationOnce(() => { order.push('receipt'); return undefined; });
   mock.observe.mockImplementationOnce(async () => { order.push('observe'); });
   await executeRdxShell(input, 'call', undefined, context);
@@ -114,7 +118,7 @@ it('observes performance output only after native measurement and durable receip
 
 it('holds one native transaction through observation so concurrent commands cannot change the recorded event', async () => {
   const order: string[] = []; let release!: () => void;
-  mock.execute.mockImplementation(async () => { order.push('native'); return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: input.operation, data: {} }) }; });
+  mock.execute.mockImplementation(async () => { order.push('native'); return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: input.operation, data: { event_durations: [{ event_id: 11, duration_us: 2 }] } }) }; });
   mock.observe.mockImplementationOnce(() => new Promise<void>(resolve => { order.push('observe-start'); release = resolve; }));
   const first = executeRdxShell(input, 'first', undefined, context);
   await vi.waitFor(() => expect(release).toBeTypeOf('function'));
@@ -122,4 +126,44 @@ it('holds one native transaction through observation so concurrent commands cann
   await Promise.resolve(); expect(order).toEqual(['native', 'observe-start']);
   release(); await Promise.all([first, second]);
   expect(order).toEqual(['native', 'observe-start', 'native']);
+});
+
+it('discovers from frozen definitions without CLI execution or receipts', async () => {
+  const result = await executeRdxShell({ discovery: { kind: 'search', query: 'durations', limit: 8 } }, 'find', undefined, context);
+  expect(JSON.stringify(result)).toContain(definition.name); expect(mock.execute).not.toHaveBeenCalled(); expect(mock.write).not.toHaveBeenCalled();
+  const described = await executeRdxShell({ discovery: { kind: 'describe', operation: definition.name } }, 'describe', undefined, context);
+  expect(JSON.stringify(described)).toContain('input_schema');
+});
+it.each(['rd.session.clear_context', 'rd.texture.invented'])('rejects unknown or unauthorized %s before execution', async operation => {
+  await expect(executeRdxShell({ operation, args: {} }, 'call', undefined, context)).rejects.toThrow(/DENIED/);
+  expect(mock.execute).not.toHaveBeenCalled(); expect(mock.quarantine).not.toHaveBeenCalled();
+});
+it('rejects fake measurement success rather than signing zero/empty evidence', async () => {
+  mock.execute.mockResolvedValue({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: input.operation, data: { duration_ms: 0 } }) });
+  await expect(executeRdxShell(input, 'call', undefined, context)).rejects.toThrow(/EVIDENCE_INVALID/); expect(mock.write).not.toHaveBeenCalled();
+});
+
+it.each([11, 12])('verifies temporary replay restoration against context, after=%s', async afterEvent => {
+  const query: RdxOperationDefinition = { ...definition, name: 'rd.buffer.get_data',
+    effects: ['replay_position_temporary'], evidence_kind: null };
+  const bound = { ...context, rdxBinding: freezeRdxTurnBinding(context.rdxBinding!.cli, [query], lease) };
+  const snapshot = (event: number) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true,
+    result_kind: 'rd.session.get_context', data: { context_id: lease.contextId,
+      current_session_id: 'native-replay', runtime: { active_event_id: event } } }) });
+  mock.execute.mockReset();
+  mock.execute.mockResolvedValueOnce(snapshot(11)).mockResolvedValueOnce({ exitCode: 0,
+    stdout: JSON.stringify({ ok: true, result_kind: query.name, data: {
+      session_id: 'native-replay', replay_state_restored: true, restored_event_id: 11 } })
+  }).mockResolvedValueOnce(snapshot(afterEvent));
+  const result = executeRdxShell({ operation: query.name, args: {} }, 'read', undefined, bound);
+  if (afterEvent === 11) {
+    await expect(result).resolves.toBeDefined();
+    expect(mock.quarantine).not.toHaveBeenCalled();
+  } else {
+    await expect(result).rejects.toThrow(/restoration/);
+    expect(mock.quarantine).toHaveBeenCalled();
+  }
+  expect(mock.execute).toHaveBeenCalledTimes(3);
+  expect(mock.observe).not.toHaveBeenCalled();
+  expect(mock.write).not.toHaveBeenCalled();
 });

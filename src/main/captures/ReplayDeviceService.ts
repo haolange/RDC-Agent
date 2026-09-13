@@ -1,9 +1,10 @@
-﻿import { BrowserWindow } from 'electron';
+import { BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { rdxShellActionService } from '../tools/RdxShellActionService';
-import type { RdxShellActionSettings } from '@shared/types/settings';
-type RemoteActivationOptions = { contextId?: string; action?: RdxShellActionSettings; signal?: AbortSignal };
+import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
+import { parseRdxNativeResult } from '../tools/RdxNativeProtocol';
+import type { RdxCliInvokerSettings } from '@shared/types/settings';
+type RemoteActivationOptions = { contextId?: string; signal?: AbortSignal; cli?: RdxCliInvokerSettings };
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
@@ -215,7 +216,7 @@ export class ReplayDeviceService {
     options.signal?.throwIfAborted();
     const existingPromise = this.activationPromises.get(deviceId);
     if (existingPromise) {
-      if (options.action || options.contextId) throw new Error('RDX_REMOTE_BUSY: cannot join an activation outside the frozen turn binding.');
+      if (options.contextId) throw new Error('RDX_REMOTE_BUSY: cannot join an activation outside the frozen turn binding.');
       return existingPromise;
     }
 
@@ -481,18 +482,17 @@ export class ReplayDeviceService {
       activationUpdatedAt: Date.now(),
     });
 
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Timed out while starting the remote server.')), ACTIVATE_TIMEOUT_MS);
-    });
+    const deadline = new AbortController();
+    const timer = setTimeout(() => deadline.abort(new Error('Timed out while starting the remote server.')), ACTIVATE_TIMEOUT_MS);
+    const signal = options.signal ? AbortSignal.any([options.signal, deadline.signal]) : deadline.signal;
 
     try {
-      const activated = await Promise.race([
-        this.activateRemoteDevice(deviceId, options),
-        timeoutPromise,
-      ]);
+      const activated = await this.activateRemoteDevice(deviceId, { ...options, signal });
+      signal.throwIfAborted();
       this.updateDevice(activated);
       return activated;
     } catch (error) {
+      this.preparedRemotes.delete(deviceId);
       const message = error instanceof Error ? error.message : String(error);
       const currentDevice = this.devices.get(deviceId) ?? device;
       const failedDevice = applyActivationFailure(
@@ -503,6 +503,8 @@ export class ReplayDeviceService {
       );
       this.updateDevice(failedDevice);
       return failedDevice;
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -521,29 +523,27 @@ export class ReplayDeviceService {
       activationUpdatedAt: Date.now(),
     });
 
-    const result = await rdxShellActionService.runAction('connectRemote', {
-      deviceId: device.id,
-      deviceLabel: device.label,
-      deviceType: device.type,
-      deviceSerial: device.serial,
-      transport: device.transport,
-      contextId: options.contextId,
-    }, { action: options.action, abortSignal: options.signal });
-    if (!result.ok) {
-      throw new Error(result.error ?? 'RDX connectRemote action failed.');
-    }
-
-    const contextId =
-      readActionString(result.data, ['contextId', 'context_id', 'RDX_CONTEXT_ID'])
-      ?? device.id;
-    const remoteId = readActionString(result.data, ['remoteId', 'remote_id', 'RDX_REMOTE_ID']);
+    if (!options.contextId || !options.cli) throw new Error('RDX_REMOTE_CONTEXT_REQUIRED: remote activation requires an owning context and frozen CLI.');
+    options.signal?.throwIfAborted();
+    const result = parseRdxNativeResult(await rdxCliInvokerService.executeCLI('call', [
+      'rd.remote.connect', '--args-json', JSON.stringify({ options: { transport: 'adb_android', device_serial: device.serial } }),
+      '--daemon-context', options.contextId,
+    ], { contextId: options.contextId, abortSignal: options.signal, settings: options.cli }), options.contextId, 'rd.remote.connect');
+    options.signal?.throwIfAborted();
+    const contextId = options.contextId;
+    const remoteId = readActionString(result.data, ['remote_id']);
     if (!remoteId) {
-      throw new Error('RDX connectRemote action result must include remoteId/remote_id.');
+      throw new Error('RDX remote connect result must include remote_id.');
     }
 
     const bootstrap = parseRemoteBootstrap(result.data);
 
     const validatedAt = Date.now();
+    await this.persistResumeCache({
+      ...device,
+      bootstrap,
+    }, validatedAt);
+    options.signal?.throwIfAborted();
     this.preparedRemotes.set(deviceId, {
       deviceId,
       serial: device.serial,
@@ -552,10 +552,6 @@ export class ReplayDeviceService {
       validatedAt,
       bootstrap,
     });
-    await this.persistResumeCache({
-      ...device,
-      bootstrap,
-    }, validatedAt);
 
     return {
       ...device,

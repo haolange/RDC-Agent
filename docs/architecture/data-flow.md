@@ -37,29 +37,29 @@ sequenceDiagram
   participant UI as Renderer
   participant IPC as Main IPC
   participant Session as RdxSessionService
-  participant Action as RdxShellActionService
+  participant Runtime as RdxSessionRuntime
   participant Shell as ShellInvocationService
   participant CLI as System-installed RDX CLI
 
   UI->>IPC: capture:openProjectInput / capture:refreshFrame
   IPC->>Session: openProjectInput or preview
   alt Local Replay Device
-    Session->>Action: openCapture
+    Session->>Runtime: rd.capture.open_file + rd.capture.open_replay
   else Android Replay Device
-    Session->>Action: connectRemote via ReplayDeviceService then openRemoteCapture
+    Session->>Runtime: rd.remote.connect then capture operations
   end
-  Action->>Shell: command + args + cwd + env
+  Runtime->>Shell: fixed operation + args + frozen CLI settings
   Shell->>CLI: configured shell command
   CLI-->>Shell: stdout / stderr / exit code
-  Shell-->>Action: ShellInvocationResult
-  Action-->>Session: parsed JSON or fail-closed diagnostic
+  Shell-->>Runtime: ShellInvocationResult
+  Runtime-->>Session: parsed JSON or fail-closed diagnostic
   Session-->>IPC: stable RdxRuntimeContext
   IPC-->>UI: context:changed and opened capture state
 ```
 
-RDX command details are Settings data under `settings.tooling.rdxActions` (`openCapture`, `openRemoteCapture`, `connectRemote`, `closeRuntime`). The repository does not hardcode RDX CLI tool names, command args, cwd, env, or fallback repository paths in renderer/preload/main call sites for these vertical UI actions.
+RDX installation details remain under `settings.tooling.rdxCli`. The main session boundary constructs the fixed native operation names and arguments, and freezes CLI settings for each turn; renderer and preload never construct lifecycle commands.
 
-Local Open uses `capture open --file {{capturePath}}`. Remote Open uses the same facade with `--remote-id {{remoteId}}` after `connectRemote` prepares a live handle. Failures must expose structured diagnostics (`message`, optional `classification` / `fix_hint`) rather than truncated CLI stderr alone.
+Local Open invokes `rd.capture.open_file` followed by `rd.capture.open_replay`. Remote Open first invokes `rd.remote.connect`, then passes its returned `remote_id` to the replay operation. Failures expose structured diagnostics (`message`, optional `classification` / `fix_hint`) rather than truncated CLI stderr alone.
 
 ## Trace Projection
 

@@ -29,7 +29,7 @@ describe('native execution evidence', () => {
       if (scenario === 'foreign-experiment') records[0].experimentId = 'old-experiment';
       if (scenario === 'foreign-context') records[2].contextId = 'foreign';
       if (scenario === 'wrong-order') records[2].startedAt = 0;
-      if (scenario === 'missing-intervention') records[1].operation = 'rd.perf.get_frame_timing';
+      if (scenario === 'missing-intervention') records[1].evidence = { kind: 'measurement', method: 'event_durations', conditionsFingerprint: 'b'.repeat(64), values: [2] };
       if (scenario === 'rollback-denied') records[3].exitCode = 1 as 0;
       if (scenario === 'wrong-replacement') records[3].args.replacement_id = 'other';
       if (scenario === 'different-measurement') records[4].operation = 'rd.export.screenshot';
@@ -50,4 +50,12 @@ describe('native execution evidence', () => {
     experiment.executionEvidence.baseline = { uri: fake.uri, expectedHash: fake.hash };
     expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).toThrow(/unsigned/);
   });
+});
+
+it('rejects changed sampling conditions despite identical method and parameters', () => {
+  const { store, experiment } = harness();
+  experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId, records => {
+    if (records[2].evidence.kind === 'measurement') records[2].evidence.conditionsFingerprint = 'c'.repeat(64);
+  });
+  expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).toThrow(/sampling/);
 });

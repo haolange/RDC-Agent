@@ -18,8 +18,8 @@ type PageState = Pick<ReturnType<typeof useSettingsModal>,
   'setChromeTheme' | 'accountProviders' | 'providerCatalog' | 'providerCatalogCategories' | 'getResolvedProviderLabel' |
   'handleRefreshProviderModels' | 'handleDisconnectProvider' | 'openProviderConnection' | 'agentManifestDrafts' | 'setAgentManifestDrafts' |
   'handleSaveAgentManifests' | 'handleImportAgentManifest' | 'agentManifestSaveState' | 'agentManifestSaveMessage' | 'agentManifestSaveBlocked' |
-  'rdxCliDraft' | 'rdxActionsDraft' | 'codeInterpreterDraft' | 'shellDraft' | 'setRdxCliDraft' |
-  'setRdxActionsDraft' | 'setCodeInterpreterDraft' | 'setShellDraft' | 'handleSaveToolsConfig' | 'dirty'>;
+  'rdxCliDraft' | 'codeInterpreterDraft' | 'shellDraft' | 'setRdxCliDraft' |
+  'setCodeInterpreterDraft' | 'setShellDraft' | 'handleSaveToolsConfig' | 'dirty'>;
 interface SettingsPageContentProps {
   modal: PageState;
   settings: AppSettings;
@@ -63,11 +63,9 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
     agentManifestSaveMessage,
     agentManifestSaveBlocked,
     rdxCliDraft,
-    rdxActionsDraft,
     codeInterpreterDraft,
     shellDraft,
     setRdxCliDraft,
-    setRdxActionsDraft,
     setCodeInterpreterDraft,
     setShellDraft,
     handleSaveToolsConfig,
@@ -149,11 +147,9 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
       <McpServicesPanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} onChanged={runtime.setOverview} />
       <ToolsSettings
         rdxCliDraft={rdxCliDraft}
-        rdxActionsDraft={rdxActionsDraft}
         codeInterpreterDraft={codeInterpreterDraft}
         shellDraft={shellDraft}
         onRdxCliDraftChange={setRdxCliDraft}
-        onRdxActionsDraftChange={setRdxActionsDraft}
         onCodeInterpreterDraftChange={setCodeInterpreterDraft}
         onShellDraftChange={setShellDraft}
         onSaveToolsConfig={handleSaveToolsConfig}

@@ -359,3 +359,48 @@ runtime 强制权限/所有权/依赖/执行代次/输出存在/预算/取消/jo
 完整计划仍不宣称全绿：Android Remote／设备呈现和真实 provider 的 Agent 执行保持上述 `blocked / TODO(UNVERIFIED)`；代码、受控测试、真实 Local 与历史读取各自按实际证据成立。磁盘清理回执在本机 `cleanup-receipt.json` 中记录最终检查结果。
 
 最终收口：仅移除 ResizeHandle.css 文件末尾多余空行后重新 build 通过，两库 git diff --check 通过；上述源码指纹已按最终文件重新计算。本轮临时 QA 项目、capture 副本、测试目录和自有 context 残留已清理，保留最小验收日志与回执。桌面启动权已交还。Android 与真实 provider 验收阻塞保持不变。
+
+## 2026-09-13 Tools 操作收敛与应用固定对接
+
+本轮在当前分支实施，未提交或推送。Tools 基线 `7f5b085b999641977863f91cdb984e667db36629`，Agent 基线 `d2aecfad274552b7a1e2df8ad9076af5998120a4`。执行状态沿用 Tools 仓库的 `docs/tool-convergence-tasks.md`；以下只记本轮已验证事实，不借用前轮绿色结果。
+
+- Tools 定义、注册与生成目录为 124 个操作，移除名称不再执行；工具版本 2.0.0，canonical envelope 保持 3.0.0。完整 Python 测试 286 项通过；后续耗时修复的 5 项定向测试独立通过，覆盖全事件返回、数值枚举、秒到微秒换算与非法数据拒绝。source gate 与显式发行包检查已分开，两个新增分支独立验证通过；未生成发行包。
+- 真实小 fixture 验证了管线目标、绑定格式、OBJ 几何、纹理统计不落盘、像素历史、Present 原子观察以及关闭/重开。独立 preview 实测 on、事件切换、off 与专有 daemon 清理通过；没有目视原生窗口，不将协议状态扩大为视觉验收。
+- 应用固定对接的版本、catalog 指纹、身份、取消、关闭失败恢复、冻结配置与 Settings 安装状态测试独立通过；生产 argv 的 7 个固定操作、9 个本地/远端/观察变体通过实际 Tools schema 校验。
+- Android 外部边界：设备 `e38b8019` 在线，一次 connect 返回 `android_helper_occupied`。当时仅检测到 helper 进程，未确认服务被其他会话占用；未重启、未上传 WhiteHair，ping/open_replay/observe 与设备呈现尚未验证。测试自有 daemon 已停止。
+- 真实设置只移除了 tooling.rdxActions、tooling.rdxCli.catalogPath 和 tooling.rdxCli.jsonMode；逐项比较确认其他解析内容不变，配置的 CLI 能返回 schema 1 的 124 项目录。真实 Settings 页面显示可用 2.0.0 / 124 个操作；空 executable 禁用验证、未保存配置提示、深浅主题和 800×700 请求视口的窄窗口表单均经过实际点击检查。已恢复原深色主题，最终比较确认其他设置完全一致，恢复备份已删除。
+- 能力权限和五阶段证据的独立定向检查 60 项通过；三个 Mission 的 requiredSkillIds 交接、General 实际 preload 和可见性检查 59 项通过，四本 Skill 和生成参考校验通过。完整应用测试 2792 项通过、3 项条件跳过；coverage ratchet 通过（lines 74.84%、functions 76.61%、branches 62.12%、statements 72.43%），类型、lint、工程门禁和构建通过。首次完整检查揭示的 schema 互斥定义及 Settings 分层/退役生成基线已修复，只复验直接受影响范围。
+- 大 capture 直接读取 `D:/Projects/agentTest/rdc/.rdx/inputs/眼睛泪腺白点.rdc`，没有复制。真实应用打开最初暴露 native 成功结果缺 context 身份；三个生命周期结果现返回真实身份，应用校验没有放宽。修复后打开、1650 项完整事件索引、EID7388 导航、观察、context 查询、正常关闭与新 context 重新打开通过。requested/applied/image EID 均为 7388，目标为 ResourceId::2002006、slot0，真实画面已目视；窄窗口 Capture 抽屉滚动和控件可达性通过。该 capture 没有可唯一确认的最终 swap-buffer，默认 EID147 无颜色输出，页面如实保留部分就绪及无图事实。
+- 真实 Provider 边界：该真实设置启动后报告 hasConfiguredProvider=false，Composer 没有可选模型，未执行模型请求。真实三个 Mission 消费手册的效果仍未验证，确定性加载链不是模型效果证明。
+- 最终独立真实 GPU 签名 A-B-A 通过（1 项，16 秒）：真实 baseline 像素、shader intervention、不同像素的 variant、真实 replacement 回滚、baseline hash 恢复，以及主进程签发的五阶段回执均验证通过。正式桌面启动脚本复用现有构建启动成功，窗口标题为 RdcAgent - RenderDoc Debug Agent；本轮自有桌面实例已停止。外部 Android 与真实 Provider 边界保持上述未验证状态。
+- 最终清理完成：统一临时根 `Tools/intermediate/tool-convergence-tests`、本轮专属回放 `D:/Projects/agentTest/rdc/.rdx/replay/sess_0cf7f31df1db`、真实设置备份、临时 coverage junction、图像/导出和精确自有 context 残留均已移除。测试目录不同执行身份的 ACL 已分别处理，最终删除无错误且两个根目录均不存在；没有沿链接删除。真实输入、既有回放、用户记录、依赖与当前构建均保留。
+- QA、桌面验证实例及自有子进程已停止；一个自有查询 daemon 正常停止超时后，按已确认 context 和 PID 清理并确认消失。应用正常关闭/重新打开的通过证据独立保留。canonical 桌面锁不存在，桌面启动权已交还。最终两库差异空白检查与 Tools Markdown 27 文件检查通过。
+- Task 已更新：T01–T07 通过；T08 的本地验收和清理通过，仅 Android helper 占用与无真实 Provider 仍为外部阻塞。无剩余本地代码、文档或清理任务；不将未验证的远端及真实模型效果声明为完成。
+
+用户后续要求取消版本分代设定：撤回 Tools 发布号升级，删除应用的 2.x major 门槛及专业手册 toolsContractVersion 绑定。接入依据实际 JSON 格式、catalog 指纹、操作参数和能力；包元数据仅用于诊断。此前 2.0.0 的 UI 记录是当时实测值，不是当前接入要求。定向应用测试 20 项、Tools 文档及 CLI 测试 6 项通过；生成手册新鲜度、类型、lint、构建及差异空白检查通过。本次未启动 QA/Electron，未新增临时测试目录。
+
+## 2026-09-14 Android 连接与 Mission 确定性收敛
+
+执行状态继续使用 Tools/docs/tool-convergence-tasks.md。此前“helper 属于其他用户会话”的推断已撤回；真实模型效果由用户明确安排到后续 debug loop，不再阻塞本轮软件验收。
+
+- Android 设备选择不再提前触发没有 owning context 的连接；Capture 打开后使用冻结 CLI 配置和所属 context 激活设备。移除无法正确拥有会话的 device:activate IPC；应用不实现独立 helper 启停。已连接状态区分启动和借用，不再凭包名宣称 APK 已验证。
+- Tools 连接已有服务时不安装、推送配置、启动或停止它；连接与 Ping 成功才返回句柄。真实测试发现 open_replay 第二次创建 native connection 会报告服务忙，现复用所属连接。clear_context 先完成所属会话与远端清理，再清除身份；失败保留恢复信息。CLI 原始错误码和消息保留到应用错误投影。
+- Debugger、Analyzer、Optimizer 参数化覆盖 Plan/hash、requiredSkillIds、真实内置内容预载、受控执行交接、返回原 Mission；通用篡改、跨会话、权限及冻结负路径复用既有测试。49 项相关测试通过；设备/会话 29 项、native 协议/调用/会话 46 项通过，组间存在重叠，不相加。生成专业参考、Skill 校验、类型、lint、工程门禁和最新桌面构建通过。受控结果不代表真实模型判断成功。
+- 用户无需手动打开 Command。设备最初没有 helper，正常 connect 自动启动通过；随后由测试夹具启动一个本轮自有 helper，CLI 借用、Ping、断开、再连接均通过，借用期间保留该 helper 与原有转发。这验证了复用行为，但不宣称现场存在真实用户预启动进程。
+- 实际设备/Capture 页面打开 WhiteHair，成功传输一次、取得 1178 个事件，首次 EID3029 图像成功并目视。EID3027 无颜色输出；返回 EID3029 后 SaveTexture 返回 29/DataNotAvailable，图像重试再次失败。requested/applied 为 3029，imageEventId 为 null，目标 ResourceId::148783。未认定驱动、服务端或应用根因。T08-D 保持阻塞，不能以首次 PNG 成功替代完整事件导航验收。设备呈现仍为 unsupported。
+- 实际检查设备选择、打开中的禁用状态、错误/重试和 960 像素宽 Capture 抽屉。最新正式桌面构建启动后窗口标题及非零窗口句柄符合预期；原生窗口存在与 Browser 目视证据分别记录。此前未受影响的全量和本地 GPU 验收保留，不重复上传或重跑。
+
+本轮清理已验证：四个专用 CLI daemon 正常停止，QA/桌面自有进程消失；精确归属的转发与测试 helper 清理无错误，最终 ADB 转发和 helper 查询为空。唯一临时根 intermediate/android-convergence 与本轮 replay/sess_e08b0465e44a 已删除；不同 ACL 使用对应身份处理，未沿链接或修改仓库权限。浏览器 QA 标签已关闭、视口恢复，正常桌面启动权已交还。保留真实输入、用户历史、既有回放、当前依赖、Android 安装和应用构建。两库差异空白检查与 Tools 文档检查通过；T08-A/B/C/E 通过，T08-D 因上述真实重复观察失败保持阻塞。
+
+
+## Necessary-capability restoration acceptance
+
+Execution status remains in Tools/docs/tool-convergence-tasks.md. Capture identity, temporary replay restoration proof and complete-replay measurement evidence are implemented at the frozen CLI/serial lease boundary. Shared and three specialist manuals and generated references use the current definitions; no operation count or namespace whitelist grants permission.
+
+Agent full run: 2815 passed, eight failed. Two empty-stdout process failures were incorrectly classified as malformed protocol and were repaired without accepting noncanonical success. Six process/file tests timed out under full concurrency; their original assertions and timeout values passed with two workers. All eight affected files passed (70 tests). Typecheck, lint, guide freshness, engineering gates and application build passed; the subsequent native-error classification change received its direct protocol/session regression.
+
+Isolated Browser QA copied only required current configuration, encrypted secrets under the same OS identity, scoped resources and one 65913-byte capture fixture. Actual Capture open, Present21 → draw15 → no-color17 → draw15, close/reopen and final close passed. At 900×760 the drawer scrolls to Capture controls and Composer remains usable. Progress/Artifacts/output empty states and actual context resources were inspected. During General execution replay controls were disabled and restored afterward.
+
+ClinePass DeepSeek V4 Flash used exactly two recorded Provider requests: one actual shell.rdx pipeline query and one result continuation. The query returned one populated color target, a preserved empty slot and separate depth target; visible replay remained EID15. This is one bounded General integration test, not proof of three Missions' real model reasoning quality. Their deterministic software-chain evidence remains separate.
+
+Android matching-runtime acceptance now passed: Android Studio SDK NDK 27.3.13750724/CMake 3.31.6 built both architectures, and the deployed arm64 service connected. The first native failure was a five-second idle packet receive timeout; polling for a new packet fixes idle disconnect while retaining the partial-packet deadline. CLI and actual Capture UI both passed EID3029 → no-color3027 → EID3029 with fresh 1552×720 images. UI close/reopen returned to EID3029; at 900×760 the drawer exposes image, navigation and close controls. A wrong local-backend selection showed the actual unsupported Vulkan-extension error and recovered through close and device selection. Device presentation remains unsupported. The verified device capture was reused without repeated uploads. No further Provider request was made (2/6 total). Final QA/process cleanup passed: Browser tab/viewport released, own Electron instance and task daemons stopped, device sample/forwards released, isolated configuration/secrets and temporary roots removed. Current builds and installed SDK dependencies remain. Canonical desktop lock is absent; older contexts outside proven task ownership were preserved. Exact results remain in the Tools task ledger.

@@ -1,19 +1,18 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { AppSettings } from '@shared/types/settings';
 import type { useSettingsModal } from './useSettingsModal';
-import { cloneRdxActions } from './useSettingsModalState';
 import type { ManualSaveForm } from './settingsDirtyState';
 
 type NavigationDrafts = Pick<ReturnType<typeof useSettingsModal>,
   'activeSection' | 'dirty' | 'setAccountDraft' | 'setGlobalInstructionsDraft' |
-  'setRdxCliDraft' | 'setRdxActionsDraft' | 'setCodeInterpreterDraft' | 'setShellDraft'>;
+  'setRdxCliDraft' | 'setCodeInterpreterDraft' | 'setShellDraft'>;
 
 /** Owns manual-draft navigation; auto-save controllers retain their own lifecycle. */
 export function useSettingsNavigation(modal: NavigationDrafts, settings: AppSettings, onClose: () => void) {
   const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
   const [resourceDraftDirty, setResourceDraftDirty] = useState(false);
   const { activeSection, dirty, setAccountDraft, setGlobalInstructionsDraft,
-    setRdxCliDraft: resetRdxCliDraft, setRdxActionsDraft: resetRdxActionsDraft,
+    setRdxCliDraft: resetRdxCliDraft,
     setCodeInterpreterDraft: resetCodeInterpreterDraft, setShellDraft: resetShellDraft } = modal;
   /** Manual-save forms that live on the current section; auto-saved pages never block navigation. */
   const sectionForms = useMemo<ManualSaveForm[]>(() => (activeSection === 'general'
@@ -26,11 +25,10 @@ export function useSettingsNavigation(modal: NavigationDrafts, settings: AppSett
     if (sectionForms.includes('personalization')) setGlobalInstructionsDraft(settings.agents.globalInstructions);
     if (sectionForms.includes('tools')) {
       resetRdxCliDraft(settings.tooling.rdxCli);
-      resetRdxActionsDraft(cloneRdxActions(settings.tooling.rdxActions));
       resetCodeInterpreterDraft(settings.tooling.codeInterpreter);
       resetShellDraft(settings.tooling.shell);
     }
-  }, [resetCodeInterpreterDraft, resetRdxActionsDraft, resetRdxCliDraft, resetShellDraft, sectionForms, setAccountDraft, setGlobalInstructionsDraft, settings]);
+  }, [resetCodeInterpreterDraft, resetRdxCliDraft, resetShellDraft, sectionForms, setAccountDraft, setGlobalInstructionsDraft, settings]);
 
   /** Routes navigation / close through the unsaved-changes dialog when the current section has a live manual draft. */
   const guardLeave = useCallback((action: () => void) => {

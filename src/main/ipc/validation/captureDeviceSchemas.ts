@@ -28,7 +28,3 @@ export const CaptureSelectArgsSchema = z.tuple([
     captureId: ipcId(128, 'captureId'),
   }).strict(),
 ]);
-
-export const DeviceActivateArgsSchema = z.tuple([
-  ipcId(128, 'deviceId'),
-]);

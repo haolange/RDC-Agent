@@ -14,7 +14,6 @@ import {
   CaptureSelectArgsSchema,
   CaptureReplayApplyArgsSchema,
   CaptureReplayBindingArgsSchema,
-  DeviceActivateArgsSchema,
   SessionScopeArgsSchema,
 } from './validation/captureDeviceSchemas';
 
@@ -186,13 +185,6 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
   ipcMain.handle('device:refresh', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'device:refresh', maxBytes: 1024 });
     return replayDeviceService.refreshDevices();
-  });
-
-  ipcMain.handle('device:activate', async (_event, ...rawArgs: unknown[]) => {
-    const [deviceId] = parseIpcArgs(DeviceActivateArgsSchema, rawArgs, { label: 'device:activate', maxBytes: 4 * 1024 });
-    const owner = rdxSessionService.getDeviceOwner(deviceId);
-    if (owner) throw new Error(`RDX_DEVICE_IN_USE: ${owner.sessionId}`);
-    return replayDeviceService.activateDevice(deviceId);
   });
 
   ipcMain.handle('device:watch:start', async (_event, ...rawArgs: unknown[]) => {

@@ -304,13 +304,13 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     expect(hardcoded.allowed).toBe(true);
     expect(hardcoded.stderr).toMatch(/hardcoded RenderDoc\/RDX CLI/);
 
-    const settingsAction = await engine.test('rdx-shell-audit', {
+    const configuredShellCall = await engine.test('rdx-shell-audit', {
       event: 'tool.before-call',
       toolName: 'shell',
-      payload: { toolName: 'shell', arguments: { command: 'openCapture' } },
+      payload: { toolName: 'shell', arguments: { command: 'rd.capture.open_file' } },
     });
-    expect(settingsAction).toMatchObject({ status: 'completed', allowed: true });
-    expect(settingsAction.stdout).toMatch(/rdx-shell-audit: ok/);
+    expect(configuredShellCall).toMatchObject({ status: 'completed', allowed: true });
+    expect(configuredShellCall.stdout).toMatch(/rdx-shell-audit: ok/);
   });
 
   it('does not keep AgentHooks or BackgroundTaskRunner as a second surface', () => {

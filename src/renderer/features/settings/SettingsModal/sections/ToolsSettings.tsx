@@ -1,8 +1,7 @@
 import React, { useState, type Dispatch, type SetStateAction } from 'react';
-import type { AgentShellSettings, CodeInterpreterSettings, RdxActionSettingsMap, RdxCliInvokerSettings } from '@shared/types/settings';
+import type { AgentShellSettings, CodeInterpreterSettings, RdxCliInvokerSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { RdxCliInvokerSettingsFields } from './RdxCliInvokerSettingsFields';
-import { RdxActionsFields } from './RdxActionsFields';
 import { CodeInterpreterSettingsFields } from './CodeInterpreterSettingsFields';
 import { ShellSettingsFields } from './ShellSettingsFields';
 import { LocalToolDisclosure } from './LocalToolDisclosure';
@@ -13,11 +12,9 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 interface ToolsSettingsProps {
   rdxCliDraft: RdxCliInvokerSettings;
-  rdxActionsDraft: RdxActionSettingsMap;
   codeInterpreterDraft: CodeInterpreterSettings;
   shellDraft: AgentShellSettings;
   onRdxCliDraftChange: Dispatch<SetStateAction<RdxCliInvokerSettings>>;
-  onRdxActionsDraftChange: Dispatch<SetStateAction<RdxActionSettingsMap>>;
   onCodeInterpreterDraftChange: Dispatch<SetStateAction<CodeInterpreterSettings>>;
   onShellDraftChange: Dispatch<SetStateAction<AgentShellSettings>>;
   onSaveToolsConfig: () => void | Promise<void>;
@@ -28,11 +25,9 @@ interface ToolsSettingsProps {
 
 export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
   rdxCliDraft,
-  rdxActionsDraft,
   codeInterpreterDraft,
   shellDraft,
   onRdxCliDraftChange,
-  onRdxActionsDraftChange,
   onCodeInterpreterDraftChange,
   onShellDraftChange,
   onSaveToolsConfig,
@@ -87,7 +82,6 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
         testId="settings-rdx-block"
       >
         <RdxCliInvokerSettingsFields rdxCliDraft={rdxCliDraft} onRdxCliDraftChange={onRdxCliDraftChange} t={t} />
-        <RdxActionsFields rdxActionsDraft={rdxActionsDraft} onRdxActionsDraftChange={onRdxActionsDraftChange} t={t} />
       </LocalToolDisclosure>
 
       <LocalToolDisclosure

@@ -12,7 +12,6 @@ interface DeviceState {
   refreshDevices: () => Promise<void>;
   startDeviceWatch: () => Promise<void>;
   stopDeviceWatch: () => Promise<void>;
-  activateDevice: (deviceId: string) => Promise<ReplayDeviceEntry | null>;
 }
 
 const DEVICE_WATCH_RENEW_MS = 5000;
@@ -35,7 +34,7 @@ function normalizeDevices(devices: ReplayDeviceEntry[], selectedDevice: string):
   };
 }
 
-export const useDeviceStore = create<DeviceState>((set, get) => ({
+export const useDeviceStore = create<DeviceState>((set) => ({
   devices: [LOCAL_DEVICE],
   selectedDevice: 'local',
 
@@ -47,7 +46,7 @@ export const useDeviceStore = create<DeviceState>((set, get) => ({
       return state;
     }
 
-    if (target.type !== 'local' && !['connected', 'online'].includes(target.status)) {
+    if (target.status === 'loading') {
       return state;
     }
 
@@ -105,19 +104,4 @@ export const useDeviceStore = create<DeviceState>((set, get) => ({
     }
   },
 
-  activateDevice: async (deviceId) => {
-    try {
-      const device = await window.electronAPI.device.activate(deviceId);
-      if (device) {
-        const existing = get().devices.some((entry) => entry.id === device.id);
-        const devices = existing
-          ? get().devices.map((entry) => entry.id === device.id ? device : entry)
-          : [...get().devices, device];
-        set((state) => normalizeDevices(devices, state.selectedDevice));
-      }
-      return device ?? null;
-    } catch {
-      return null;
-    }
-  },
 }));

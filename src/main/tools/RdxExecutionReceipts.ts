@@ -1,6 +1,8 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/SessionArtifactResolver';
+import type { RdxValidatedEvidence } from './RdxValidatedEvidence';
+import { canonicalJson } from './RdxOperationCatalog';
 import { secretStorageService } from '../settings/SecretStorageService';
 
 export interface RdxExecutionReceipt {
@@ -14,6 +16,8 @@ export interface RdxExecutionReceipt {
   leaseVersion: number;
   replaySessionId: string;
   operation: string;
+  definitionsFingerprint: string;
+  evidence: RdxValidatedEvidence;
   argsFingerprint: string;
   args: Record<string, unknown>;
   result: Record<string, unknown>;
@@ -23,7 +27,7 @@ export interface RdxExecutionReceipt {
   exitCode: 0;
 }
 const KEY_REF = 'rdx-execution-receipt-signing-v1';
-export const rdxDigest = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+export const rdxDigest = (value: unknown): string => createHash('sha256').update(canonicalJson(value)).digest('hex');
 
 /** Main-owned key is never part of a tool result, IPC, prompt, or session artifact. */
 function signingKey(): string {
@@ -60,7 +64,8 @@ export class RdxExecutionReceipts {
     const expected = createHmac('sha256', this.key()).update(signed.body).digest();
     if (!timingSafeEqual(expected, Buffer.from(signed.signature, 'hex'))) throw new Error('RDX_RECEIPT_INVALID: signature mismatch');
     const receipt = JSON.parse(signed.body) as RdxExecutionReceipt;
-    if (receipt.schemaVersion !== 1 || receipt.sessionId !== sessionId || receipt.exitCode !== 0
+    if (!receipt.evidence || !['measurement', 'intervention', 'rollback'].includes(receipt.evidence.kind)
+      || !/^[a-f0-9]{64}$/.test(receipt.definitionsFingerprint) || receipt.schemaVersion !== 1 || receipt.sessionId !== sessionId || receipt.exitCode !== 0
       || rdxDigest(receipt.result) !== receipt.resultHash || rdxDigest(receipt.args) !== receipt.argsFingerprint) {
       throw new Error('RDX_RECEIPT_INVALID: ownership or result mismatch');
     }

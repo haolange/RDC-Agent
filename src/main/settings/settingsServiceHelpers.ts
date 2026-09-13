@@ -30,7 +30,6 @@ import {
   DEFAULT_LAYOUT,
   DEFAULT_PROFILE,
   DEFAULT_CODE_INTERPRETER,
-  DEFAULT_RDX_ACTIONS,
   DEFAULT_RDX_CLI_INVOKER,
   DEFAULT_SHELL_TOOLING,
   EMPTY_PATHS,
@@ -152,7 +151,6 @@ export function createDefaultRuntimeSettings(): AppSettings {
     profile: DEFAULT_PROFILE,
     tooling: {
       rdxCli: DEFAULT_RDX_CLI_INVOKER,
-      rdxActions: DEFAULT_RDX_ACTIONS,
       codeInterpreter: DEFAULT_CODE_INTERPRETER,
       shell: DEFAULT_SHELL_TOOLING,
     },

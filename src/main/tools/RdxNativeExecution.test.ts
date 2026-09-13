@@ -1,11 +1,10 @@
 import { isolatedRdxTools } from '../testing/isolatedRdxTools';
 import { createHash, randomUUID } from 'node:crypto';
-import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
+import { copyFileSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync, lstatSync, unlinkSync, rmSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { InvestigationContentRef, ExperimentRecord } from '@shared/types/renderdocInvestigation';
-import { DEFAULT_RDX_ACTIONS, DEFAULT_RDX_CLI_INVOKER } from '../settings/settingsDefaults';
+import { DEFAULT_RDX_CLI_INVOKER } from '../settings/settingsDefaults';
 import { SessionArtifactResolver } from '../sessions/SessionArtifactResolver';
 import { setRdxRuntimeContextForSession, getRdxContextLease } from '../sessions/RdxRuntimeContextRegistry';
 import { RdxExecutionReceipts } from './RdxExecutionReceipts';
@@ -29,9 +28,23 @@ const fixture = process.env.RDX_NATIVE_CAPTURE;
 const enabled = Boolean(python && fixture && process.env.RDX_NATIVE_ALLOW_MUTATION === '1');
 const hash = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex');
 
+function cleanupNativeTestDirectory(directory: string, testRoot: string): void {
+if (path.dirname(path.resolve(directory)) !== testRoot) throw new Error('Refusing cleanup outside the owned test root');
+for (const name of ['rdx', 'binaries', 'cli', 'policy', 'spec']) {
+  const link = path.join(directory, 'tools', name);
+  if (existsSync(link)) {
+    if (!lstatSync(link).isSymbolicLink()) throw new Error('Expected an owned runtime junction');
+    unlinkSync(link);
+  }
+}
+rmSync(directory, { recursive: true, force: true });
+}
+
 describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit disposable capture)', () => {
   it('changes actual pixels, rolls back, and verifies main-issued receipts', { timeout: 180_000 }, async () => {
-    const directory = mkdtempSync(path.join(os.tmpdir(), 'rdc-native-receipts-'));
+    const testRoot = path.resolve(path.dirname(python!), '../../../../intermediate/tool-convergence-tests/agent');
+    mkdirSync(testRoot, { recursive: true });
+    const directory = mkdtempSync(path.join(testRoot, 'native-receipts-'));
     const nativeEnv = isolatedRdxTools(directory, python!);
     const capture = path.join(directory, 'fixture-copy.rdc');
     copyFileSync(fixture!, capture);
@@ -56,7 +69,7 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
         captureFileId: String(opened.data.capture_file_id), backend: 'local', updatedAt: Date.now(),
       }, { projectId: 'qa-project' });
       const context = { workspaceRoot: directory, projectRootPath: directory, projectId: 'qa-project',
-        sessionId, turnId: 'qa-turn', agentId: 'general', rdxBinding: freezeRdxTurnBinding(settings, DEFAULT_RDX_ACTIONS, getRdxContextLease(sessionId)) };
+        sessionId, turnId: 'qa-turn', agentId: 'general', rdxBinding: freezeRdxTurnBinding(settings, (await rdxCliInvokerService.loadCatalog(settings, true)).tools, getRdxContextLease(sessionId)) };
       const invoke = async (phase: string, operation: string, args: Record<string, unknown>) => {
         const result = await executeRdxShell({ operation, args, experimentId: 'qa-aba' }, phase, undefined, context);
         expect(result.isError).not.toBe(true);
@@ -67,7 +80,7 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
       const outputs = (action.data.action as { outputs: string[] }).outputs;
       const textureId = outputs.find((id) => id !== 'ResourceId::0');
       expect(textureId).toBeTruthy();
-      const measurement = { texture_id: textureId, output_path: outputPath, file_format: 'png' };
+      const measurement = { event_id: eventId, texture_id: textureId, output_path: outputPath, file_format: 'png' };
       const baseline = await invoke('baseline', 'rd.export.texture', measurement);
       const baselineHash = hash(outputPath);
       copyFileSync(outputPath, path.join(directory, 'baseline.png'));
@@ -108,6 +121,7 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
         state.receipts = null;
         expect(hash(fixture!)).toBe(before);
         expect(hash(capture)).toBe(before);
+        cleanupNativeTestDirectory(directory, testRoot);
       }
     }
   });

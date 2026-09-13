@@ -5,7 +5,7 @@ description: Consume a bound RenderDoc investigation plan, execute within its st
 
 # RenderDoc Execution
 
-General 消费本次执行绑定中的 Plan URI/hash、必需 Skill、返回对象和交付要求。按绑定读取原 Plan 和 Checkpoint，完成计划边界内的检查；不得静默改写战略目标或覆盖旧 Plan。需要战略改变时保存 Checkpoint，带触发证据回交规划者。CLI 用法见 $rdx-cli-shell，领域记录见本次必需方法，不另造执行引擎。
+General 消费本次执行绑定中的 Plan URI/hash、必需 Skill、返回对象和交付要求。按绑定读取原 Plan 和 Checkpoint，完成计划边界内的检查；不得静默改写战略目标或覆盖旧 Plan。需要战略改变时保存 Checkpoint，带触发证据回交规划者。CLI 用法见 `$rdx-cli-shell`，专业操作成员与参数见本次 handoff 绑定的 `debugger-rdx-tools` / `analyzer-rdx-tools` / `optimizer-rdx-tools` 之一，领域记录见本次必需方法，不另造执行引擎。
 
 ## 共享 Plan 模板
 

@@ -191,13 +191,11 @@ export function createSettingsModalActions({
     const nextSettings = await patchSettings({
       tooling: {
         rdxCli: modalState.rdxCliDraft,
-        rdxActions: modalState.rdxActionsDraft,
         codeInterpreter: modalState.codeInterpreterDraft,
         shell: modalState.shellDraft,
       },
     });
     modalState.setRdxCliDraft(nextSettings.tooling.rdxCli);
-    modalState.setRdxActionsDraft(nextSettings.tooling.rdxActions);
     modalState.setCodeInterpreterDraft(nextSettings.tooling.codeInterpreter);
     modalState.setShellDraft(nextSettings.tooling.shell);
   };

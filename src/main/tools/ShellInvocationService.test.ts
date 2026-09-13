@@ -40,3 +40,9 @@ it('retains an unconfirmed process until actual close and keeps it cancellable',
     expect(service.hasUnconfirmedProcesses()).toBe(false);
   } finally { spawn.mockRestore(); }
 });
+
+it('preserves a complete machine result above the default process ring limit', async () => {
+  const result = await new ShellInvocationService().invoke({ command: process.execPath,
+    args: ['-e', "process.stdout.write(JSON.stringify({data:'x'.repeat(300000)}))"], outputBufferBytes: 8 * 1024 * 1024 });
+  expect(result.exitCode).toBe(0); expect(JSON.parse(result.stdout).data).toHaveLength(300000);
+});

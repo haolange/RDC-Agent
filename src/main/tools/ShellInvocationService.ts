@@ -10,6 +10,7 @@ export interface ShellInvocationRequest {
   cwd?: string;
   env?: Record<string, string>;
   timeoutMs?: number;
+  outputBufferBytes?: number;
   runId?: string;
   contextId?: string;
   abortSignal?: AbortSignal;
@@ -52,6 +53,7 @@ export class ShellInvocationService {
       shell: needsShell,
       windowsHide: true,
       timeoutMs: request.timeoutMs,
+      ringBufferBytes: request.outputBufferBytes,
       abortSignal: request.abortSignal,
       isolateProcessGroup: process.platform !== 'win32',
     });

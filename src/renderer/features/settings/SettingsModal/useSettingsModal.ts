@@ -164,7 +164,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const dirty = useSettingsDirty(settings, {
     tools: {
       rdxCli: modalState.rdxCliDraft,
-      rdxActions: modalState.rdxActionsDraft,
       codeInterpreter: modalState.codeInterpreterDraft,
       shell: modalState.shellDraft,
     },

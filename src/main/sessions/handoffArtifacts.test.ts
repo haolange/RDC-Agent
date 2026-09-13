@@ -15,13 +15,14 @@ import { parseDelegationCapsule } from '@shared/types/delegationCapsule';
 
 const roots: string[] = [];
 afterEach(() => { vi.restoreAllMocks(); for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
-function setup() {
+function setup(mission = 'debugger') {
+  const method = { debugger: 'debugger-causal-method', analyzer: 'analyzer-architecture-method', optimizer: 'optimization-experiment' }[mission];
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-bound-plan-')); roots.push(root);
   for (const session of ['a', 'b']) fs.mkdirSync(path.join(root, session));
   const resolver = new SessionArtifactResolver({ resolveSessionPath: id => ['a', 'b'].includes(id) ? path.join(root, id) : null });
   vi.spyOn(sessionArtifactResolver, 'read').mockImplementation(resolver.read.bind(resolver));
   const plan = resolver.write('a', 'session://plans/plan.md', '# 调查计划\n事实、反例与分支');
-  const contract = { intent: 'execute' as const, plan: { uri: plan.uri, hash: plan.hash }, requiredSkillIds: ['renderdoc-execution', 'debugger-causal-method', 'renderdoc-execution'], returnTo: 'debugger', deliveryRequirements: '当前 Checkpoint 与未解问题' };
+  const contract = { intent: 'execute' as const, plan: { uri: plan.uri, hash: plan.hash }, requiredSkillIds: ['renderdoc-execution', method!, 'rdx-cli-shell', `${mission}-rdx-tools`, 'renderdoc-execution'], returnTo: mission, deliveryRequirements: '当前 Checkpoint 与未解问题' };
   return { resolver, contract };
 }
 
@@ -37,13 +38,13 @@ describe('bound plan and skill preparation', () => {
     expect(() => HandoffContractSchema.parse({ ...contract, validationPolicy: 'skip' })).toThrow();
   });
 
-  it('preloads and deduplicates bound methods without dollar references in the summary', () => {
-    const { contract } = setup();
+  it.each(['debugger', 'analyzer', 'optimizer'])('preloads and deduplicates %s bound methods without dollar references in the summary', (mission) => {
+    const { contract } = setup(mission);
     const active: ProfileHandoffState = { handoffId: 'exec', lifecycle: 'committed', contract,
-      sourceTurnId: 'source', sourceRequestId: 'request', sourceAgentId: 'debugger', toAgentId: 'general',
+      sourceTurnId: 'source', sourceRequestId: 'request', sourceAgentId: mission, toAgentId: 'general',
       chainRoot: 'root', depth: 2, prompt: '按附带计划执行，摘要故意不带任何 Skill 标记。', label: '执行', declaredModel: null, send: true, preparedAt: 1 };
     vi.spyOn(storageAdapter.handoffs, 'getActive').mockReturnValue(active);
-    expect(handoffRequiredSkillIds('a', 'general')).toEqual(['renderdoc-execution', 'debugger-causal-method']);
+    expect(handoffRequiredSkillIds('a', 'general')).toEqual([...new Set(contract.requiredSkillIds)]);
     expect(handoffRequiredSkillIds('a', 'analyzer')).toEqual([]);
     expect(handoffPromptSegments('a', 'general')[0].content).toContain('"handoffId":"exec"');
     expect(handoffPromptSegments('a', 'analyzer')).toEqual([]);

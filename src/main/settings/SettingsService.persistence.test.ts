@@ -90,27 +90,6 @@ describe('SettingsService provider persistence', () => {
     return { settingsPath, workspaceRoot };
   }
 
-  it('persists only exact retired daemon-context action arguments as scoped context templates', async () => {
-    const { settingsPath } = await createVerifiedPersistedSettings();
-    const raw = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    const args = ['capture', 'open', '--daemon-context', '{{inputId}}', '--capture-id', '{{inputId}}',
-      '--daemon-context={{inputId}}', 'prefix-{{inputId}}', '--daemon-context', '{{contextId}}'];
-    raw.tooling = { rdxActions: { openCapture: { enabled: true, command: 'python', args,
-      env: { INPUT: '{{inputId}}' } } } };
-    fs.writeFileSync(settingsPath, JSON.stringify(raw), 'utf8');
-    const { SettingsService } = await import('./SettingsService');
-    new SettingsService().initialize();
-    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    expect(persisted.tooling.rdxActions.openCapture.args).toEqual([
-      'capture', 'open', '--daemon-context', '{{contextId}}', '--capture-id', '{{inputId}}',
-      '--daemon-context={{contextId}}', 'prefix-{{inputId}}', '--daemon-context', '{{contextId}}',
-    ]);
-    expect(persisted.tooling.rdxActions.openCapture.env).toEqual({ INPUT: '{{inputId}}' });
-    new SettingsService().initialize();
-    expect(JSON.parse(fs.readFileSync(settingsPath, 'utf8')).tooling.rdxActions)
-      .toEqual(persisted.tooling.rdxActions);
-  });
-
   it('keeps persisted provider metadata during startup rebuild when secrets are temporarily unavailable', async () => {
     const { settingsPath } = await createVerifiedPersistedSettings();
     const { SettingsService } = await import('./SettingsService');

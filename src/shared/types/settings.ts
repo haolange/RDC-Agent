@@ -289,8 +289,6 @@ export interface ProfileSettings {
   avatarPath?: string;
 }
 
-export type RdxCliJsonMode = 'auto' | 'always';
-
 export interface RdxCliInvokerSettings {
   enabled: boolean;
   command: string;
@@ -298,26 +296,7 @@ export interface RdxCliInvokerSettings {
   workingDirectory: string;
   env: Record<string, string>;
   timeoutMs: number;
-  catalogPath: string;
-  jsonMode: RdxCliJsonMode;
 }
-
-export type RdxActionId =
-  | 'openCapture'
-  | 'openRemoteCapture'
-  | 'connectRemote'
-  | 'closeRuntime';
-
-export interface RdxShellActionSettings {
-  enabled: boolean;
-  command: string;
-  args: string[];
-  workingDirectory: string;
-  env: Record<string, string>;
-  timeoutMs: number;
-}
-
-export type RdxActionSettingsMap = Record<RdxActionId, RdxShellActionSettings>;
 
 export interface CodeInterpreterSettings {
   enabled: boolean;
@@ -352,7 +331,6 @@ export type ResolvedShellSnapshot =
 
 export interface ToolingSettings {
   rdxCli: RdxCliInvokerSettings;
-  rdxActions: RdxActionSettingsMap;
   codeInterpreter: CodeInterpreterSettings;
   shell: AgentShellSettings;
 }
@@ -587,7 +565,6 @@ export type AppSettingsPatch = Partial<{
   profile: Partial<ProfileSettings>;
   tooling: Partial<{
     rdxCli: Partial<RdxCliInvokerSettings>;
-    rdxActions: Partial<Record<RdxActionId, Partial<RdxShellActionSettings>>>;
     codeInterpreter: Partial<CodeInterpreterSettings>;
     shell: Partial<AgentShellSettings>;
   }>;

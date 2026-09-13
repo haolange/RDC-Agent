@@ -5,10 +5,7 @@ import type {
   AgentRuntimeSettings,
   LayoutPreferences,
   ProfileSettings,
-  RdxActionId,
-  RdxActionSettingsMap,
   RdxCliInvokerSettings,
-  RdxShellActionSettings,
   AgentShellSettings,
   CodeInterpreterSettings,
   ToolingSettings,
@@ -44,7 +41,6 @@ export interface PersistedSettingsPayload {
   };
   tooling?: {
     rdxCli?: Partial<RdxCliInvokerSettings>;
-    rdxActions?: Partial<Record<RdxActionId, Partial<RdxShellActionSettings>>>;
     codeInterpreter?: Partial<CodeInterpreterSettings>;
     shell?: Partial<AgentShellSettings>;
   };
@@ -123,24 +119,6 @@ export const DEFAULT_RDX_CLI_INVOKER: RdxCliInvokerSettings = {
   workingDirectory: '',
   env: {},
   timeoutMs: 60000,
-  catalogPath: '',
-  jsonMode: 'auto',
-};
-
-export const createDefaultRdxAction = (): RdxShellActionSettings => ({
-  enabled: false,
-  command: '',
-  args: [],
-  workingDirectory: '',
-  env: {},
-  timeoutMs: 60000,
-});
-
-export const DEFAULT_RDX_ACTIONS: RdxActionSettingsMap = {
-  openCapture: createDefaultRdxAction(),
-  openRemoteCapture: createDefaultRdxAction(),
-  connectRemote: createDefaultRdxAction(),
-  closeRuntime: createDefaultRdxAction(),
 };
 
 export const DEFAULT_CODE_INTERPRETER: CodeInterpreterSettings = {
@@ -158,7 +136,6 @@ export const DEFAULT_SHELL_TOOLING: AgentShellSettings = {
 
 export const DEFAULT_TOOLING: ToolingSettings = {
   rdxCli: DEFAULT_RDX_CLI_INVOKER,
-  rdxActions: DEFAULT_RDX_ACTIONS,
   codeInterpreter: DEFAULT_CODE_INTERPRETER,
   shell: DEFAULT_SHELL_TOOLING,
 };

@@ -1,6 +1,9 @@
-import React, { type Dispatch, type SetStateAction } from 'react';
+import React, { useState, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { RdxCliInvokerSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import type { ToolRuntimeSummary } from '@shared/types/tool';
+import { validateRdxInstallation } from '../../../../platform/rdxInstallation';
+import { Button } from '../../../../ui/Button';
 import { Input } from '../../../../ui/Input';
 import { Switch } from '../../../../ui/Switch';
 import { AutosizeTextarea } from '../AutosizeTextarea';
@@ -24,7 +27,23 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
   onRdxCliDraftChange,
   t,
 }) => {
+  const validationRevision = useRef(0);
+  const [checking, setChecking] = useState(false);
+  const [summary, setSummary] = useState<ToolRuntimeSummary | null>(null);
+  const [message, setMessage] = useState('');
+  const validate = async () => {
+    const revision = ++validationRevision.current;
+    setChecking(true); setSummary(null); setMessage('');
+    try {
+      const result = await validateRdxInstallation(rdxCliDraft);
+      if (revision !== validationRevision.current) return;
+      if (result) setSummary(result); else setMessage(t('settings.rdxSaveBeforeVerify'));
+    } catch (error) { if (revision === validationRevision.current) setMessage(error instanceof Error ? error.message : String(error)); }
+    finally { setChecking(false); }
+  };
   const patch = (next: Partial<RdxCliInvokerSettings>) => {
+    validationRevision.current += 1;
+    setSummary(null); setMessage('');
     onRdxCliDraftChange((current) => ({ ...current, ...next }));
   };
 
@@ -45,11 +64,21 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
         </label>
       </header>
 
+      <div className="settings-local-tool-form-head">
+        <Button size="sm" disabled={checking || !rdxCliDraft.enabled || !rdxCliDraft.command.trim()} onClick={() => void validate()}>
+          {checking ? t('settings.rdxVerifying') : t('settings.rdxVerify')}
+        </Button>
+        <p className="settings-help-text" role="status" aria-live="polite">
+          {message || (summary ? (summary.cli.available
+            ? `${t('settings.rdxVerified')}: ${summary.runtime.version} · ${summary.runtime.catalog.toolCount} ${t('settings.rdxOperations')}`
+            : summary.cli.unavailableReason) : t('settings.rdxVerifyHint'))}
+        </p>
+      </div>
       <div className="settings-local-tool-grid">
         <SettingsField label={t('settings.rdxCliCommand')} layout="row">
           <Input
             value={rdxCliDraft.command}
-            placeholder="C:\\Tools\\rdx\\bin\\rdx.exe"
+            placeholder="C:\\Tools\\rdx\\rdx.bat"
             spellCheck={false}
             onChange={(event) => patch({ command: event.currentTarget.value })}
           />
@@ -57,7 +86,7 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
         <SettingsField label={t('settings.rdxCliArgsPrefix')} layout="row" description={t('settings.rdxCliArgsPrefixHint')}>
           <Input
             value={rdxCliDraft.argsPrefix.join(' ')}
-            placeholder="--non-interactive --json"
+            placeholder="cli/run_cli.py"
             spellCheck={false}
             onChange={(event) => patch({ argsPrefix: splitArgs(event.currentTarget.value) })}
           />
@@ -68,14 +97,6 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
             placeholder="C:\\Tools\\rdx"
             spellCheck={false}
             onChange={(event) => patch({ workingDirectory: event.currentTarget.value })}
-          />
-        </SettingsField>
-        <SettingsField label={t('settings.rdxCliCatalogPath')} layout="row">
-          <Input
-            value={rdxCliDraft.catalogPath}
-            placeholder="C:\\Tools\\rdx\\spec\\tool_catalog.json"
-            spellCheck={false}
-            onChange={(event) => patch({ catalogPath: event.currentTarget.value })}
           />
         </SettingsField>
         <SettingsField label={t('settings.rdxCliTimeoutMs')} layout="row">

@@ -25,32 +25,32 @@ function dispatch(store: HandoffStateStore, source: string, target: string, turn
   store.consume('session', prepared.handoffId, nextTurn);
   return { prepared, nextTurn, input };
 }
-function execution(): HandoffContract { return { intent: 'execute', plan, requiredSkillIds: ['renderdoc-execution'], returnTo: 'debugger', deliveryRequirements: '更新 Checkpoint，提供证据与未解问题。' }; }
+function execution(mission = 'debugger'): HandoffContract { const method = { debugger: 'debugger-causal-method', analyzer: 'analyzer-architecture-method', optimizer: 'optimization-experiment' }[mission]!; return { intent: 'execute', plan, requiredSkillIds: ['renderdoc-execution', method, 'rdx-cli-shell', `${mission}-rdx-tools`], returnTo: mission, deliveryRequirements: '更新 Checkpoint，提供证据与未解问题。' }; }
 
 describe('two complete handoff cycles', () => {
-  it.each([false, true])('permits both evaluations and rejects cycle three (initial route=%s)', route => {
+  it.each(['debugger', 'analyzer', 'optimizer'].flatMap(mission => [false, true].map(route => ({ mission, route }))))('permits both evaluations and rejects cycle three ($mission, route=$route)', ({ mission, route }) => {
     const { store } = setup();
     let turn = 'user-turn';
-    if (route) turn = dispatch(store, 'general', 'debugger', turn, { intent: 'route' }).nextTurn;
+    if (route) turn = dispatch(store, 'general', mission, turn, { intent: 'route' }).nextTurn;
     let root = '';
     for (let cycle = 0; cycle < 2; cycle++) {
-      const run = dispatch(store, 'debugger', 'general', turn, execution()); root = run.prepared.chainRoot;
+      const run = dispatch(store, mission, 'general', turn, execution(mission)); root = run.prepared.chainRoot;
       const before = store.readDocument('session')!.history!.length;
       // Small Loop evidence work does not mutate handoff history or reserve a cycle.
       expect(store.computeNextChain('session', 'general', run.nextTurn).chainRoot).toBe(root);
       expect(store.readDocument('session')!.history).toHaveLength(before);
       expect(() => store.consume('session', run.prepared.handoffId, run.nextTurn)).toThrow(/STATE_CONFLICT/);
-      const returned = dispatch(store, 'general', 'debugger', run.nextTurn, { intent: 'return', executionHandoffId: run.prepared.handoffId, artifacts: [checkpoint] });
+      const returned = dispatch(store, 'general', mission, run.nextTurn, { intent: 'return', executionHandoffId: run.prepared.handoffId, artifacts: [checkpoint] });
       expect(returned.prepared.chainRoot).toBe(root);
       turn = returned.nextTurn;
     }
     const history = store.readDocument('session')!.history!;
     expect(history.filter(entry => entry.contract.intent === 'execute')).toHaveLength(2);
     expect(history.filter(entry => entry.contract.intent === 'return')).toHaveLength(2);
-    expect(() => dispatch(store, 'debugger', 'general', turn, execution())).toThrow(/CYCLE_LIMIT|CHAIN_LIMIT/);
-    expect(() => dispatch(store, 'debugger', 'general', turn, { intent: 'route' })).toThrow(/STATE_CONFLICT|CHAIN_LIMIT/);
+    expect(() => dispatch(store, mission, 'general', turn, execution(mission))).toThrow(/CYCLE_LIMIT|CHAIN_LIMIT/);
+    expect(() => dispatch(store, mission, 'general', turn, { intent: 'route' })).toThrow(/STATE_CONFLICT|CHAIN_LIMIT/);
     expect(store.readDocument('session')!.history).toHaveLength(history.length);
-    expect(store.computeNextChain('session', 'debugger', 'new-user-instruction').chainRoot).not.toBe(root);
+    expect(store.computeNextChain('session', mission, 'new-user-instruction').chainRoot).not.toBe(root);
   });
 
   it('rejects a forged return target, binding id and dispatcher', () => {

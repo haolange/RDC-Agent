@@ -256,9 +256,6 @@ settings-provider-tool-calling-unverified
 settings-provider-unavailable-summary
 settings-provider-upcoming
 settings-provider-user-managed-models
-settings-rdx-action-${candidate.id}
-settings-rdx-action-detail
-settings-rdx-actions
 settings-rdx-enabled
 settings-rdx-toolchain
 settings-resource-diagnostics

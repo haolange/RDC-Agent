@@ -34,7 +34,7 @@ agents:
 handoffs:
   - label: Execute with General
     agent: general
-    prompt: Execute the approved Debugger plan with `$renderdoc-execution` and `$debugger-causal-method`. Write First Bad Event, Hypothesis Matrix, and Counterfactual as rdc.investigation.v1 records. After Claims, open an independent `$skeptic-review`. Keep changes scoped to the planned verification path.
+    prompt: Execute the approved Debugger plan with requiredSkillIds `renderdoc-execution`, `debugger-causal-method`, `rdx-cli-shell`, and `debugger-rdx-tools`. Use the shared shell rules and the Debugger operation manual only after they are preloaded for General. Write First Bad Event, Hypothesis Matrix, and Counterfactual as rdc.investigation.v1 records. After Claims, open an independent `$skeptic-review`. Keep changes scoped to the planned verification path.
     send: true
 metadata: {}
 ---

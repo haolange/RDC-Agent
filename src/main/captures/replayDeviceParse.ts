@@ -144,15 +144,7 @@ export function parseResumeCacheRecord(payload: unknown): DeviceResumeCacheRecor
 }
 
 export function hasBootstrapManagedLaunch(bootstrap?: AndroidBootstrapMetadata): boolean {
-  return Boolean(
-    bootstrap
-    && (
-      bootstrap.startedActivity
-      || bootstrap.installedApk
-      || bootstrap.installMode
-      || bootstrap.uninstalledExisting
-    ),
-  );
+  return bootstrap?.startedActivity === true;
 }
 
 export function buildBootstrapDetailText(bootstrap?: AndroidBootstrapMetadata): string[] {
@@ -167,8 +159,7 @@ export function buildBootstrapDetailText(bootstrap?: AndroidBootstrapMetadata): 
     suffix.push('APK installed');
   } else if (bootstrap.installedApk) {
     suffix.push('APK upgraded');
-  } else if (bootstrap.packageName) {
-    suffix.push('APK verified');
+
   }
 
   if (bootstrap.abi) {
@@ -186,7 +177,7 @@ export function buildRemoteReadyText(bootstrap?: AndroidBootstrapMetadata): stri
     ? 'Started Android RenderDoc and connected'
     : 'Connected to Android RenderDoc server';
   const suffix = buildBootstrapDetailText(bootstrap);
-  return suffix.length > 0 ? `${prefix} 路 ${suffix.join(' 路 ')}` : prefix;
+  return suffix.length > 0 ? `${prefix} · ${suffix.join(' · ')}` : prefix;
 }
 
 export function applyActivationFailure(

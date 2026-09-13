@@ -887,7 +887,6 @@ settings-interpreter-artifacts
 settings-interpreter-grid
 settings-language-section
 settings-link
-settings-local-only
 settings-local-tool
 settings-local-tool-body
 settings-local-tool-caret
@@ -1080,16 +1079,8 @@ settings-provider-summary-grid
 settings-provider-upcoming
 settings-provider-upcoming-body
 settings-provider-upcoming-summary
-settings-rdx-action-detail
-settings-rdx-action-detail-head
-settings-rdx-action-id
-settings-rdx-action-layout
-settings-rdx-action-list
-settings-rdx-action-row
-settings-rdx-action-state
 settings-rdx-cli-textarea
 settings-readonly-status
-settings-renderdoc-actions
 settings-renderdoc-toolchain
 settings-required-field
 settings-resource-detail-column

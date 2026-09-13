@@ -8,7 +8,7 @@ RDX Runtime 是 RDC-Agent 的资源解析、Prompt 构建与运行期可观测�
 - Project Scope 固定为 `<project-root>/.rdx`。
 - 应用内部状态位于 `${userData}/state`，Secret、日志和缓存位于 OS `userData` 下。
 - Project `inputs/`、`artifacts/`、`memory/` 与 runtime state 默认不进入 Git。
-- RDX CLI 与 shell actions 是 User/Device 配置，Project 资源不能覆盖本机执行入口。
+- RDX CLI 安装位置、参数前缀、工作目录、环境与超时是 User/Device 配置，Project 资源不能覆盖本机执行入口。
 
 `ScopedResourceResolver` 对 Agent、Skill、MCP、Hook 使用 `builtin < user < project` 的 whole-resource override，同 ID 的 Project disabled resource 可以隐藏继承项。Policy 只允许收紧；放宽、无效或不可比较的配置 fail-closed。
 
@@ -72,45 +72,49 @@ Reasoning 使用 `raw | summary | opaque | none | unknown`。语义来自 Provid
 Memory 与 Knowledge 使用独立 scoped preload domain（`memory` / `knowledge`）。Renderer 不获得任意 tool execute、任意 shell、Secret 或 provider protected payload 接口。
 
 
-## 原生 CLI 与执行回执（2026-09-09）
+## 原生 CLI、能力与执行回执
 
-只支持原生 rdx 协议；Settings 保留 executable、argsPrefix、工作目录、环境、超时和桌面 actions。prepareTurn 把 CLI/actions 深拷贝冻结在主进程私有 binding；EffectiveRuntimePlan 只序列化指纹，不暴露 env。执行中修改 Settings 不改变当前调用。
+`RdxCliInvokerService` 和 session service 是软件固定对接边界。安装验证读取同一 CLI 的版本与完整 catalog，校验 canonical envelope、catalog schema、内容指纹和软件必需操作的参数契约。生命周期代码生成确定 argv，覆盖本地/远端打开、连接、context 查询、清理关闭、daemon 状态、完整事件索引与原子观察。目录不从独立文件配置读取，机器调用统一 canonical JSON；不匹配时明确升级，不回退旧命令。
 
-rdx_probe 保留七个应用 action，映射如下：
+Settings 保留 executable、argsPrefix、cwd、env 和 timeout，并呈现连接验证与实际版本/能力状态。四个生命周期命令模板、模板变量、catalogPath 和 JSON 模式配置已移除。版本兼容根据软件所需接口判定，不把当前工具总数作为运行条件。
 
-| 应用 action | 原生命令 |
-| --- | --- |
-| version | version --json（原生 parser 的子命令会覆盖前置 JSON 标志） |
-| doctor | --json doctor |
-| enumerate | --json tools list |
-| preview_status | --json --daemon-context <owned> session preview status |
-| probe | 封闭 context status / event list,show / pipeline show / resource list / vfs ls,cat |
-| lease_open / lease_close | 应用的 owning session/capture 生命周期；先核对真实 context 状态，不生成虚构 CLI 动词 |
+`prepareTurn` 冻结 CLI 配置、完整操作定义及其指纹、owning session/context/replay lease 身份。在途 Settings 变化不影响该轮。General 使用已有 shell 的结构化 RDX 模式，普通 command 与 rdx 互斥；轻量发现只返回匹配操作或单个操作说明，不把完整 catalog 展开进每次模型请求。
 
-event/path 参数逐操作校验，不接收任意 argv 或 regex 猜测的“只读” operation。VFS 只允许 canonical 窄路径，cat 不读根/大目录。contextId 不允许切到别的 session；应用 session ID 不作为 replay --session-id 传递。非零退出、空/非法 JSON、ok:false、取消、超时或 context 不匹配均失败；失败关闭不清 lease，也不终止无关 shell 子进程。Desktop actions 同样要求原生 canonical JSON。
+普通执行先校验当前身份、定义的 scope、effects、参数 schema、前置条件和路径。未知操作、未知影响、模型覆盖 session/context 身份、非 owning General、Mission 直接执行、越界路径均在执行前拒绝。replay 操作才注入 replay session_id；daemon context 始终由主进程指定。context 更新只允许用户字段，VFS 只允许当前会话的受限结构化路径。生命周期、remote 控制、全局配置、桌面窗口、清理销毁由应用专门入口管理，目录和 Skill 不能自行授予权限。既有 shell 审批、realpath 路径边界、取消、串行 lease 和未知结果隔离继续生效。
 
-General 使用已有 shell 工具的结构化模式：
-```json
-{"rdx":{"operation":"rd.perf.get_frame_timing","args":{},"experimentId":"exp-1"}}
-```
-command 与 rdx 互斥，schema 和执行入口均检查。operation 当前限定 session-scoped rd.shader/perf/event/pipeline/resource/export；原生目录仍由外部 CLI 维护，不向 prompt 展开完整 schema。主进程注入 replay session_id 与 owning daemon context，拒绝模型指定身份。Mission/offline child/delegated mutation/default context fail-closed；串行调用沿用 ShellInvocationService/ProcessSupervisor 与 shell 审批。
+需要实验执行证据时，主进程在真实执行、身份及结果验证之后签发回执，绑定 session/project/turn/toolCall/experiment/context/lease/replay 身份、操作定义指纹、参数指纹、结果 hash 和执行时间。签名 key 由 OS safeStorage 保管，不进 prompt/IPC/trace；先确认可签名再执行，落盘遵守 SessionArtifactResolver 配额和原子写入边界。普通发现不签执行回执；手写 JSON、普通 shell 回显或目录自称安全/已回滚都不构成可信证据。
 
-有 experimentId 的成功调用写入 session tool-outputs：主进程签名回执绑定 session/project/turn/toolCall/experiment/context/leaseVersion/replaySession、operation、参数指纹、退出码、结果 hash 和开始/结束时间。签名 key 由 OS safeStorage 保管，不进 prompt/IPC/trace；先确认可签名再执行，落盘遵守 SessionArtifactResolver 配额/原子写/取消边界。普通查询不强制永久落盘；手写文件或 shell 回显不能成为可信回执。
+实验验收解释受支持的测量、干预和回滚结果，测量必须包含真实有限数值或可验证图像；不接受空值、伪造零值或成功文案。baseline → intervention → variant → rollback → restored 必须属于同一实验、context 和 lease，顺序有效；测量方法、参数与采样条件一致；回滚对应真实 replacement 并确认已恢复。历史记录不自动取得当前执行证明。签名证明执行和结果，不自动证明因果、质量、噪声或优化收益。
 
-Experiment.executionEvidence 为可选五阶段引用组。历史无该字段可读；新关闭、ready report 与 Mission 完成必须验证成功签名、同 experiment/context/lease、顺序及同参数测量。当前介入/恢复支持 edit_and_replace → 同 replacement_id 的 revert_replacement；测量为 frame timing、event durations、counters、screenshot 或 texture export。拒绝/未执行/缺恢复测量不算回滚。回执证明执行及结果，不自动证明因果、质量、噪声或优化收益。
-
-验证：RdxNativeParser.test.ts 接受显式 RDX_NATIVE_TOOLS_ROOT / RDX_NATIVE_PYTHON，用外部实际 parser 校验生产 argv 与 JSON 标志。RdxNativeExecution.test.ts 仅在显式 RDX_NATIVE_PYTHON / RDX_NATIVE_CAPTURE / RDX_NATIVE_ALLOW_MUTATION=1 下，对临时副本进行真实像素介入、签名证据与回滚，finally 停 daemon；默认单测不碰真实 capture。
+专业手册与共享执行 Skill 经现有 Mission execute handoff 的 requiredSkillIds 传递，并在 General prepareTurn 真正加载。手册是操作知识，主进程执行规则是权限权威。生成参考及示例校验见 `pnpm run check:rdx-tool-guides`。
 
 ## 内嵌回放、观察与 Session ownership
 
-应用生命周期的唯一入口为 session-scoped `RdxSessionService`，每个 binding 持有 `RdxSessionRuntime`。Open 对原文件计算完整 SHA-256，main 分配 UUID daemon context，action 使用 `{{contextId}}`。只接受匹配的 native identity，关闭失败保留原 owning context。Android 设备预留先于连接，另一 session 不能抢占。
+应用生命周期的唯一入口为 session-scoped `RdxSessionService`，每个 binding 持有 `RdxSessionRuntime`。Open 对原文件计算完整 SHA-256，main 分配 UUID daemon context，并通过固定原生 argv 传递。只接受匹配的 native identity，关闭失败保留原 owning context。Android 设备预留先于连接，另一 session 不能抢占。
 
 `rd.session.get_replay_events` 返回完整事件列表；`rd.session.observe` 在原生串行区内应用事件、解析目标并导出画面。默认 final_output 只使用 Present 资源证据，无法识别时不冒充最终输出。Remote 当前能力为 unsupported，Local 图片路径并不能证明设备屏幕显示。
 
-`executeRdxShell` 与人工操作共享 context 队列；native 返回及签名回执完成后才观察并记录足迹，使用该 turn 的冻结 CLI。当前 perf API 是自包含的 awaited measurement（sample_counters/get_event_durations/get_frame_timing/get_pipeline_statistics），观察发生于该命令完成之后，不插入 sampling 内部；enumerate/describe_counter 不产生观察。多条命令构成的 experiment 是证据生命周期，不是持续采样事务：命令之间的观察会执行 replay/export，不承诺整个 experiment 零扰动。
+`executeRdxShell` 与人工操作共享 context 队列；native 返回及签名回执完成后才观察并记录足迹，使用该 turn 的冻结 CLI。测量操作是自包含的 awaited 调用，观察不会插入 sampling 内部；是否刷新由操作影响决定，不按工具名称特判。多条命令构成的 experiment 是证据生命周期，不是持续采样事务：命令之间的观察会执行 replay/export，不承诺整个 experiment 零扰动。
 
 远程打开期间通过冻结 CLI 查询所属 daemon 的 `active_operation`；只有原生 transfer stage 才显示传输阶段，查询失败不推测进度。足迹记录原生 `revision`、实际替换/恢复状态和显示参数。观察无法确认 EID 时保存无图片的失败事实；实时 Agent 画面与操作元数据成对投影，不读取手动回放图片。
 
 生成图片在 main 自有临时目录中读取后清理；frame projection 仅含验证后的 data URL。每个 session 历史通过 ReplayHistoryStore 原子提交，图片 hash 去重；回看不执行 native call。输入删除关闭所有关联绑定，正常 close 保留历史。
 
 完整项目输入扫描先提交已确认的 `ProjectRecord.inputs`，并经 `project:inputsChanged` 广播，再执行原生回放释放和足迹 reconciliation。清理状态独立保存在 `ProjectRecord.replayCleanupPending`（请求时间、相关 capture 内容 hash、最近失败原因）；清理成功后移除此记录。清理失败不会回填旧输入，也不会把已不存在的最后一个 RDC 重新投影为可操作文件。重启或手动刷新基于新的完整扫描重试待清理工作；未完成扫描、目录离线或访问失败不更新输入列表、不启动缺失清理。后台错误通过 `project:inputsError` 进入现有全局通知，不能挤入原 Capture 空态。
+
+RDX 接口只维护当前操作契约；包发布号仅用于安装诊断，不设 major-version 权限门槛。接入必须校验真实 catalog 指纹、参数、能力和 JSON 格式，手册引用当前生成定义，不绑定 V1/V2。
+
+## Android 连接与归属
+
+设备选择只更新选择目标；Capture 打开时才由 RdxSessionRuntime 分配 owning context、冻结 CLI 并预留设备，然后调用同一原生连接。无 context 的 device:activate IPC 已删除。Tools 根据实际状态复用已有 helper 或启动自有 helper，应用不另行启停。设备连接状态只在 connect 与 Ping 都成功后建立；startedActivity 才表示本次启动，包名存在不表示 APK 已验证。失败保留真实错误，可重新打开 Capture 重试。关闭、取消与退出均遵循自有资源清理，借用 helper 必须保留。
+
+远端 replay 必须复用 owning runtime 已持有的 native connection，避免第二条连接触发真实 busy。关闭先经 clear_context 确认所属会话和转发释放，再清除身份；清理失败保留恢复信息。CLI canonical 错误中的原始代码与消息应保留到应用恢复提示。
+
+
+### Capture queries and temporary replay evidence
+
+Frozen turn identity includes the owning capture and replay identities. Capture-scoped queries receive the application's capture ID; model overrides are rejected. Temporary replay queries hold the serial lease while the main process reads context before and after, verifies the restored event and result proof, and rejects identity drift. They do not trigger final-state refresh. Restoration failure quarantines execution.
+
+Frame-timing evidence validates the complete single-queue GPU replay method, seconds, range, samples/warmup, capture and actual replacement set. These checks supplement main-process signed receipts and the existing five-phase experiment validation; catalog claims cannot replace execution proof. Specialist references are generated from the same frozen CLI definitions.
+
+Android 回放使用匹配的 Tools/native 服务。服务端在等待用户下一条操作时保持连接，只有开始接收包后才应用接收超时；应用不通过后台抢占或重启用户 helper 来维持会话。Android 文件传输由同一 CLI 以 ADB 和 SHA256 校验完成，已验证设备副本可复用；连接只拥有本次新建的副本。Capture 的图像导出成功与设备实际呈现分别投影，无设备确认时仍显示同步不可用。

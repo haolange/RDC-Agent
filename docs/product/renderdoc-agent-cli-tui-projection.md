@@ -192,7 +192,7 @@ Knowledge Scout 使用同一披露：
 ```text
 ↳ Debugger → General
   plan: debugger-plan.md
-  armed: renderdoc-execution, rdx-cli-shell, debugger-execution
+  armed: renderdoc-execution, debugger-causal-method, rdx-cli-shell, debugger-rdx-tools
 ```
 
 发生 Handoff 后：
@@ -235,13 +235,15 @@ Profile picker 与 Permission picker 必须是两个独立控件。
 
 ### 7.1 Agent 调用
 
-Agent 像人类一样使用 Shell：
+General 使用结构化 `shell.rdx`。定向发现读取 prepareTurn 冻结的同一份定义，不启动 CLI；执行只提交 operation 与业务参数，身份由主进程注入：
 
-```text
-$ rdx --help
-$ rdx <group> --help
-$ rdx <group> <command> ...
+```json
+{"rdx":{"discovery":{"kind":"search","query":"texture pixel","limit":8}}}
+{"rdx":{"discovery":{"kind":"describe","operation":"rd.texture.get_pixel_history"}}}
+{"rdx":{"operation":"rd.texture.get_pixel_history","args":{"event_id":11,"x":0,"y":0,"target":{"rt_index":0}}}}
 ```
+
+`discovery` 与 `operation` 互斥；Agent 不能提交 session、context 或 lease 身份。
 
 不得：
 
@@ -544,3 +546,7 @@ Agent Knowledge Tool┘                         │
 ```
 
 Desktop、TUI 和 Agent 可以有不同的信息密度和交互形式，但不能有不同的产品语义、stable ref、index revision、scope precedence 或持久写入边界。
+
+## Android Capture 使用
+
+先在顶部选择 Android 设备，再在会话 Capture 入口打开文件。设备选择不会在没有会话身份时提前连接；打开时自动连接，必要时启动 RenderDoc Command。已有 helper 会被复用，不需要用户手动启动或清空进程。连接失败显示实际原因，修复设备或网络条件后重新打开重试。已连接和 APK 安装是不同事实；关闭 Capture 只释放本次会话资源。设备呈现 unsupported 与本地观察 PNG 分别展示。

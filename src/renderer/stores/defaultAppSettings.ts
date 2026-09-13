@@ -16,14 +16,6 @@ const createEmptyAgentRoutes = (): LlmAgentRoute[] =>
     modelId: '',
   }));
 
-const createEmptyRdxAction = () => ({
-  enabled: false,
-  command: '',
-  args: [],
-  workingDirectory: '',
-  env: {},
-  timeoutMs: 60000,
-});
 
 export const DEFAULT_SETTINGS: AppSettings = {
   appearance: createDefaultUiPreferences(),
@@ -48,14 +40,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
       workingDirectory: '',
       env: {},
       timeoutMs: 60000,
-      catalogPath: '',
-      jsonMode: 'auto',
-    },
-    rdxActions: {
-      openCapture: createEmptyRdxAction(),
-      openRemoteCapture: createEmptyRdxAction(),
-      connectRemote: createEmptyRdxAction(),
-      closeRuntime: createEmptyRdxAction(),
     },
     codeInterpreter: {
       enabled: false,

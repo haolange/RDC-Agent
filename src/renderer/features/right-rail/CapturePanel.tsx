@@ -96,7 +96,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     </div>
     <div className="capture-replay-device-row">
       <DropdownSelect dataTestId="right-rail-replay-device" ariaLabel={t('control.sessionContextDevice')} value={chosen.deviceId} disabled={disabled}
-        options={devices.map((device) => ({ value: device.id, label: device.type === 'local' ? t('device.local') : device.label, disabled: !['online', 'connected'].includes(device.status) }))}
+        options={devices.map((device) => ({ value: device.id, label: device.type === 'local' ? t('device.local') : device.label, disabled: device.status === 'loading' }))}
         onChange={(deviceId) => setDraft({ ...chosen, deviceId })} />
       <Button variant="ghost" size="sm" aria-label={t('control.replay.refresh')} aria-busy={action === 'refresh'} disabled={disabled} onClick={() => void run('refresh')}>↻</Button>
       <Button variant={open ? 'secondary' : 'primary'} size="sm" disabled={disabled || !selectedInput} onClick={() => void run(pending || !open ? 'open' : 'close')}>{t(pending ? 'control.replay.switch' : open ? 'control.replay.close' : 'control.captureOpen')}</Button>
