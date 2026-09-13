@@ -1,4 +1,4 @@
-/* Enhanced resize handle with visual feedback */
+/* Visible seam is the adjacent sidebar 1px border. This column only owns cursor + grip. */
 .panel-resize-handle {
   position: relative;
   z-index: 1;
@@ -7,25 +7,19 @@
   overflow: visible;
   cursor: col-resize;
   background: transparent;
-  transition: background var(--transition-fast) var(--ease-standard);
 }
 
-.panel-resize-handle::before {
-  content: '';
+.panel-resize-handle-hit {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  background: linear-gradient(180deg, transparent, var(--token-border-card), transparent);
-  opacity: 0.6;
+  inset: 0;
+  background: transparent;
 }
 
-.panel-resize-handle-left::before {
+.panel-resize-handle-left .panel-resize-handle-hit {
   left: calc(-1 * var(--space-2));
-  right: 0;
 }
 
-.panel-resize-handle-right::before {
-  left: 0;
+.panel-resize-handle-right .panel-resize-handle-hit {
   right: calc(-1 * var(--space-2));
 }
 
@@ -40,6 +34,7 @@
   border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--token-text-caption) 0%, transparent);
   transition: background var(--transition-base) var(--ease-standard), height var(--transition-base) var(--ease-standard);
+  pointer-events: none;
 }
 
 .panel-resize-handle:hover::after {
@@ -56,7 +51,7 @@
   pointer-events: none;
 }
 
-.panel-resize-handle.disabled::before {
+.panel-resize-handle.disabled .panel-resize-handle-hit {
   inset: 0;
 }
 

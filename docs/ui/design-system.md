@@ -24,7 +24,7 @@ RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 
 |------|------|------|------|
 | 控件高度 | `--control-height-sm/md/lg` | 28 / 32 / 36 | pill、列表行、导航项、输入框、按钮统一落在此三档 |
 | 圆角 | `--radius-sm/md/lg/xl/full` | 4 / 6 / 8 / 12 / 9999 | 卡片 `md`；输入与按钮 `sm`；Composer 壳 `lg`；pill `full` |
-| 间距 | `--space-*` | 4 基，禁奇数 px | panel 内边距 `--space-3`；section 间距 `--space-5` |
+| 间距 | `--space-*` | 4 基，禁奇数 px | panel 内边距 `--space-3`（工作台右栏 inspector 外壳同此）；section 间距 `--space-5` |
 | 字号 | `--text-xs/sm/base/lg/xl` | 见 token 文件 | 禁 px 字面量 |
 | 行高 | `--leading-tight/normal` | 两档 | 不再引入第三档 |
 | 时长 | `--duration-fast/base/slow` | 120 / 180 / 240ms | 统一 `--ease-standard`；`--transition-*` 是 `duration + ease` 别名 |

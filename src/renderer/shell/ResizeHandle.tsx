@@ -38,6 +38,8 @@ export function ResizeHandle({ side, disabled = false, onDragStart }: ResizeHand
       data-testid={`panel-resize-handle-${side}`}
       aria-hidden="true"
       onPointerDown={bindResizePointerDown(disabled, onDragStart)}
-    />
+    >
+      <span className="panel-resize-handle-hit" aria-hidden="true" />
+    </div>
   );
 }
