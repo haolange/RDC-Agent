@@ -74,16 +74,6 @@
   }
 }
 
-.settings-local-only {
-  padding: 0 var(--space-2);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-full);
-  color: var(--token-text-caption);
-  font-size: var(--text-xs);
-  font-weight: var(--font-regular);
-  line-height: 1.6;
-}
-
 .settings-tools-save-bar {
   margin-top: var(--space-2);
   padding: var(--space-3) 0;

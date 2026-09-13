@@ -138,7 +138,6 @@ export const RENDERER_INVOKE_CHANNEL = {
   device: {
     list: 'device:list',
     refresh: 'device:refresh',
-    activate: 'device:activate',
     watchStart: 'device:watch:start',
     watchRenew: 'device:watch:renew',
     watchStop: 'device:watch:stop',

@@ -100,9 +100,11 @@ export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operati
         description: 'The shell command to execute in the current session working directory',
       },
       rdx: {
-        type: 'object', additionalProperties: false, required: ['operation', 'args'],
+        type: 'object', additionalProperties: false,
+        oneOf: [{ type: 'object', required: ['operation', 'args'], properties: { operation: {}, args: {}, experimentId: {} }, additionalProperties: false }, { type: 'object', required: ['discovery'], properties: { discovery: {} }, additionalProperties: false }],
         properties: {
-          operation: { type: 'string', description: 'Native session-scoped rd.shader/perf/event/pipeline/resource/export operation. General only.' },
+          discovery: { type: 'object', additionalProperties: false, properties: { kind: { enum: ['search', 'describe'] }, query: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 20 }, operation: { type: 'string' } }, required: ['kind'], oneOf: [{ type: 'object', properties: { kind: { const: 'search' }, query: {}, limit: {} }, required: ['query'], additionalProperties: false }, { type: 'object', properties: { kind: { const: 'describe' }, operation: {} }, required: ['operation'], additionalProperties: false }] },
+          operation: { type: 'string', description: 'Discovered RDX operation allowed by its frozen capability contract. General only.' },
           args: { type: 'object', description: 'Native operation arguments; replay/context identity is injected by main.' },
           experimentId: { type: 'string', description: 'Bind a signed execution receipt to this experiment. Required for investigation closure.' },
         },

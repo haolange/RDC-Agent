@@ -105,7 +105,7 @@ Decision lattice 为 `allow < auto_review < ask_user < deny`。`approvalFloorByT
 
 ## 原生 RDX 执行证据
 
-shell 的 command 与 rdx 互斥；ToolValidator oneOf/not 与执行入口双重检查。结构化模式仍是 shell 审批，不属于只读自动许可。General 之外即使 Full access 也拒绝；本机冻结配置、owning project/session lease、非 default context、非 delegated/offline child 同时成立才执行。模型不可传 replay/context identity。
+shell 的 command 与 rdx 互斥；ToolValidator oneOf/not 与执行入口双重检查。结构化模式仍是 shell 审批，不属于只读自动许可。General 之外即使 Full access 也拒绝；本机冻结配置、owning project/session lease、非 default context、非 delegated/offline child 同时成立才执行。模型不可传 capture/replay/context identity。操作权限按冻结 catalog 的 scope、effects、前置条件、参数和路径声明校验，不按命名空间授权。未知操作或影响 fail-closed；生命周期、remote、全局配置、窗口及销毁仍由应用专门入口管理。Skill 仅提供知识，不能扩权。
 
 执行回执仅由主进程在真实原生成功调用后签名，key 在 safeStorage；模型提交的 result JSON、普通 shell 输出或 artifact hash 本身不具备 provenance。签名校验与 SessionArtifactResolver 所有权/hash 同时成立才可引用。实验关闭和新完成必须满足五阶段真实调用与同 replacement 的回滚；旧记录只保留可读性。详见 docs/architecture/rdx-runtime.md。
 

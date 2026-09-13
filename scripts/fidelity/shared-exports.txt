@@ -877,10 +877,7 @@ RDX_PROBE_ACTIONS
 RDX_PROBE_READONLY_CLI_ACTION_SET
 RDX_PROBE_READONLY_CLI_ACTIONS
 RDX_THEME_V1_PREFIX
-RdxActionId
-RdxActionSettingsMap
 RdxCliInvokerSettings
-RdxCliJsonMode
 RdxContextCaptureInput
 RdxContextCaptureViewModel
 RdxContextDiagnostic
@@ -891,7 +888,6 @@ RdxProbeInput
 RdxProbeInputSchema
 RdxRuntimeContext
 RdxRuntimeOverview
-RdxShellActionSettings
 RdxThemeV1ParseResult
 RdxThemeV1Payload
 readJsonl

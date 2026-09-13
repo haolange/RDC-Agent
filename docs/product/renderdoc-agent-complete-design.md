@@ -143,7 +143,7 @@ Coordinator **不是**新 Runtime，也不是 Profile 新字段。它是：
 
 的组合。Planning Orchestrator 负责理解目标、澄清、有限探测、编排与计划；General 负责 Task 分解、Shell / Sub-Agent、验证与报告。Knowledge Candidate 仅在用户显式意图下由 `knowledge_candidate_create` 创建，不是 General 的默认收尾步骤。
 
-RDX 仍是外部 CLI：Agent 像人类一样用通用 `shell` 调用，经定向 `--help` 发现用法。Settings action 只服务 UI 确定性入口。Catalog 不得展开为模型工具 Schema。Live Capture / shader replace / replay 必须走 exclusive World State，不得进入并发组。
+RDX 仍是外部 CLI：General 通过结构化 `shell.rdx` 调用 prepareTurn 冻结的 Settings CLI binding，使用 `tools list --namespace`、`tools search` 和 `tools describe` 定向发现。Catalog 不展开为模型工具 Schema。共享 `rdx-cli-shell` 只维护身份、错误、输出和副作用规则；三本专业工具手册维护明确成员并由 Tools 2.0 code-owned catalog 生成参数参考。手册知识不能授权操作。Live Capture / shader replace / replay 必须走 exclusive World State，不得进入并发组。
 
 ---
 
@@ -731,7 +731,13 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 
 以 DESIGN.md 的同名裁决为准。General 直接处理普通代码调试、解释与性能修复；只把明确 RenderDoc/capture 调查转 Mission。标准闭环为 Mission 规划 → General 执行 → 原 Mission 评估与报告，General 的实际 handoff continuation turn 不得直接宣告 Mission 完成。深度不足或能力缺失保留 checkpoint 与未完成位置，取消/重启语义不变。
 
-General 的 execution-orchestrator 只定义通用工作方法；三个 Mission coordinator 保存目标、计划产物、handoff 与方法路由；共享执行/Small Loop/Big Loop/capsule 只在 renderdoc-execution 维护。报告按需读对应 Mission 章节。先获取可安全读取的上下文，再问不可获取输入或必需决策；不重复已授权步骤。相似案例只在相关历史问题时检索，单次 lookup 不强制 Scout。保留原 27 个 skill ID，新增 renderdoc-investigation 入口（共 28 个）；读取方法不重新武装本轮权限。
+General 的 execution-orchestrator 只定义通用工作方法；三个 Mission coordinator 保存目标、计划产物、handoff 与方法路由；共享执行/Small Loop/Big Loop/capsule 只在 renderdoc-execution 维护。报告按需读对应 Mission 章节。先获取可安全读取的上下文，再问不可获取输入或必需决策；不重复已授权步骤。相似案例只在相关历史问题时检索，单次 lookup 不强制 Scout。canonical Skill 共 31 个：22 个 Mission / Knowledge / Coordinator 与 9 个 General，其中新增三本专业 RDX 工具手册；读取方法不重新武装本轮权限。
+
+### 专业 RDX 手册与真实预载
+
+Debugger / Analyzer / Optimizer coordinator 在 execute handoff 的 `requiredSkillIds` 中分别绑定领域方法、`renderdoc-execution`、`rdx-cli-shell` 与本方向的 `*-rdx-tools`。`handoffRequiredSkillIds` 只接受同 session、committed、发给当前 General 的 execute 合同；PromptPlan preparation 随后加载并冻结这些 Skill，不能只依赖 handoff prompt 中的 `$skill` 文本。
+
+`resources/agent-runtime/rdx-tool-guide-members.json` 明确三本手册的专业成员；它不是运行时 allowlist。`scripts/generate-rdx-tool-guides.mjs` 从 Tools 2.0 code-owned catalog 生成每项用途、参数约束、结果、影响、前置条件、失败限制和无身份 `shell.rdx` 示例，并校验成员、示例 schema 与 catalog fingerprint。共享 CLI 规则只在 `rdx-cli-shell` 维护一份；专业 SKILL 保持短流程入口，详细参考按需读取。
 
 Knowledge 保留 markdown-first 六 lane 五服务与 human review；不恢复 Embedding、第二索引、自动 Candidate 或 Memory。Scout 正文与实际加载 Skill 的受限工具交集一致；rdc-context 通过 rdx_context 查询拥有的状态；debug 明确只读诊断；verify 报告本技能实际可验证的受影响面。删除强制 driver-blame 假设，保留有证据且可区分的替代解释。
 
@@ -766,3 +772,7 @@ Mission/General handoff 的 prepared/consumed/接收执行取消转交遵守通�
 材料交互保留原始文件、来源 hash、用户意图、归一化 ROI、文档位置、音视频时间范围和比较组/角色/条件。Composer 可选择区域并补充描述，transcript 原位打开原图与条件，比较按同组材料展开；这些是用户标注，不自动升级为工具观察。派生视图不得覆盖原图或把人工示意图标成 capture 证据。任务来源与用户后续修订分别进入 Journal 和委派，模型必须说明来源差异。
 
 同一会话可见分支内，分多条消息上传的同组材料也在原图对照中一起展示；不跨 Session 聚合。原附件仍为打开入口，Esc 关闭恢复该入口焦点。
+
+## 三个 Mission 的确定性验收边界
+
+Debugger、Analyzer、Optimizer 共用现有 Mission → General → 原 Mission 状态机。各方向验证 Plan URI/hash、execute contract、requiredSkillIds、真实内置手册内容预载、受控执行回执与返回检查；共享负路径覆盖篡改/跨 session Plan、缺失 Skill、权限交集冲突、取消和冻结配置。受控测试结果仅证明软件编排与校验，不证明真实模型规划或判断质量；后者在后续 debug loop 使用已有 trace 与正式产物验收。

@@ -8,10 +8,7 @@ import type {
   AgentRuntimeContextSettings,
   AgentRuntimeSettings,
   LayoutPreferences,
-  RdxActionId,
-  RdxActionSettingsMap,
   RdxCliInvokerSettings,
-  RdxShellActionSettings,
   AgentShellSettings,
   CodeInterpreterSettings,
   SidebarLayoutPreference,
@@ -30,13 +27,11 @@ import {
   DEFAULT_AGENT_RUNTIME,
   DEFAULT_LAYOUT,
   DEFAULT_CODE_INTERPRETER,
-  DEFAULT_RDX_ACTIONS,
   DEFAULT_RDX_CLI_INVOKER,
   DEFAULT_SHELL_TOOLING,
   LEFT_DEFAULTS,
   RIGHT_DEFAULTS,
   VALID_PERMISSION_MODES,
-  createDefaultRdxAction,
 } from './settingsDefaults';
 
 export function clamp(value: number, min: number, max: number): number {
@@ -86,44 +81,6 @@ export function sanitizeRdxCliInvokerSettings(
     workingDirectory: typeof candidate.workingDirectory === 'string' ? candidate.workingDirectory.trim() : fallback.workingDirectory,
     env: sanitizeStringRecord(candidate.env ?? fallback.env),
     timeoutMs,
-    catalogPath: typeof candidate.catalogPath === 'string' ? candidate.catalogPath.trim() : fallback.catalogPath,
-    jsonMode: pickEnum(candidate.jsonMode, ['auto', 'always'], fallback.jsonMode),
-  };
-}
-
-export function sanitizeRdxShellActionSettings(
-  value: unknown,
-  fallback: RdxShellActionSettings = createDefaultRdxAction(),
-): RdxShellActionSettings {
-  const candidate = value && typeof value === 'object' ? value as Partial<RdxShellActionSettings> : {};
-  const timeoutMs = typeof candidate.timeoutMs === 'number' && Number.isFinite(candidate.timeoutMs)
-    ? clamp(Math.trunc(candidate.timeoutMs), 1000, 600000)
-    : fallback.timeoutMs;
-  return {
-    enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : fallback.enabled,
-    command: typeof candidate.command === 'string' ? candidate.command.trim() : fallback.command,
-    args: sanitizeStringArray(candidate.args ?? fallback.args).map((arg, index, args) => {
-      // Canonicalize the retired input-derived context only at the settings boundary.
-      if (arg === '{{inputId}}' && args[index - 1] === '--daemon-context') return '{{contextId}}';
-      if (arg === '--daemon-context={{inputId}}') return '--daemon-context={{contextId}}';
-      return arg;
-    }),
-    workingDirectory: typeof candidate.workingDirectory === 'string' ? candidate.workingDirectory.trim() : fallback.workingDirectory,
-    env: sanitizeStringRecord(candidate.env ?? fallback.env),
-    timeoutMs,
-  };
-}
-
-export function sanitizeRdxActionsSettings(value: unknown): RdxActionSettingsMap {
-  const candidate = value && typeof value === 'object' ? value as Partial<Record<RdxActionId, unknown>> : {};
-  return {
-    openCapture: sanitizeRdxShellActionSettings(candidate.openCapture, DEFAULT_RDX_ACTIONS.openCapture),
-    openRemoteCapture: sanitizeRdxShellActionSettings(
-      candidate.openRemoteCapture,
-      DEFAULT_RDX_ACTIONS.openRemoteCapture,
-    ),
-    connectRemote: sanitizeRdxShellActionSettings(candidate.connectRemote, DEFAULT_RDX_ACTIONS.connectRemote),
-    closeRuntime: sanitizeRdxShellActionSettings(candidate.closeRuntime, DEFAULT_RDX_ACTIONS.closeRuntime),
   };
 }
 
@@ -161,7 +118,6 @@ export function sanitizeToolingSettings(value: unknown): ToolingSettings {
   const candidate = value && typeof value === 'object' ? value as Partial<ToolingSettings> : {};
   return {
     rdxCli: sanitizeRdxCliInvokerSettings(candidate.rdxCli),
-    rdxActions: sanitizeRdxActionsSettings(candidate.rdxActions),
     codeInterpreter: sanitizeCodeInterpreterSettings(candidate.codeInterpreter),
     shell: sanitizeAgentShellSettings(candidate.shell),
   };

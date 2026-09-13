@@ -1,20 +1,58 @@
 ---
 name: rdx-cli-shell
-description: Invoke RenderDoc or RDX only through the Settings-configured CLI shell action. General-only; conflicts with Mission plan-only.
+description: Execute discovered RDX operations through the frozen Settings CLI binding, with correct session identity, output, error, evidence, and side-effect handling. General-only.
 ---
 
 # RDX CLI Shell
 
-General 执行原生 rdx 协议；Mission 只用 rdx_context / rdx_probe。先确认 session 拥有非 default daemon context。Settings 中配置的 executable / argsPrefix / cwd / env / timeout 在 prepareTurn 冻结；未配置即失败，不猜路径。
+General 在已打开 capture 的 owning context 中使用结构化 `shell.rdx`。Mission 只规划和评估，不加载本 Skill、不直接执行 RDX。Skill 只提供操作知识，不能授权工具、路径、会话切换或变更；实际可用操作来自 prepareTurn 冻结的同一 CLI catalog，并继续经过主进程能力、身份、路径、审批、取消与串行 lease 检查。
 
-使用互斥于 command 的 shell 参数：
+## 发现与单项说明
+
+General 先从本 turn 冻结的定义做轻量发现；这不会启动 CLI、产生执行回执或展开完整 catalog：
+
 ```json
-{"rdx":{"operation":"rd.perf.get_frame_timing","args":{},"experimentId":"exp-1"}}
+{"rdx":{"discovery":{"kind":"search","query":"texture pixel","limit":8}}}
 ```
-operation 采用原生 rd.shader / perf / event / pipeline / resource / export 名称；按需通过配置 CLI 的 tools list/search 或 --help 发现参数，不向模型展开整个目录。不得传 session_id / context_id：主进程注入 owning replay identity。调用串行，经 General policy/approval；普通 command 回显不能充当可信执行回执。
 
-实验 baseline → intervention → variant → rollback → restored 都使用同一 experimentId；将返回 receipt 原样放入 Experiment.executionEvidence 对应阶段。当前关闭门禁支持 shader edit_and_replace / revert_replacement 和相同参数的帧/事件计时、counter 或 screenshot 测量。rollback 必须匹配 intervention 的 replacement_id，恢复测量仍需证明科学结果；ok 只证明调用成功。取消、失败、缺回执时保持实验未完成并检查状态，不伪造回滚。
+```json
+{"rdx":{"discovery":{"kind":"describe","operation":"rd.texture.get_pixel_history"}}}
+```
 
-编辑前读取原生 get_source / get_disassembly 返回的 edit_plan，确认 can_edit_text / can_build / can_replace、allowed_edit_inputs 与工具链。source representation 不等于 compile encoding；SPIR-V 文本可能需要 spirv-as；DXIL / DXBC disassembly 只读，不能冒充可编译源码。细节见 $shader-ir-analysis。
+`discovery` 与 `operation` 互斥。搜索匹配操作名称和描述，单项说明返回冻结定义的完整参数与能力声明；未知操作必须拒绝。
 
-Remote handle 一旦 consumed 不能复用；重新连接按 Capture 的生命周期操作。preview.display 是预览状态而不是图像内容。VFS 先列窄路径再读叶子，禁止整树展开与 raw .rdc bytes。lease_open/close 是应用生命周期，不是 CLI 命令。
+人类在终端可使用同一安装的 CLI 发现入口：
+
+- `rdx tools list --namespace pipeline --json` 按真源 namespace 列举。
+- `rdx tools search "pixel history" --json` 匹配名称、描述和参数，不等同于 namespace 过滤。
+- `rdx tools describe rd.pipeline.get_state --json` 读取完整参数、结果、前置条件、scope、effects 和证据声明。
+
+优先定向发现，不把完整 catalog 塞进上下文。机器调用只读取 canonical JSON 和 catalog fingerprint。实际接口不匹配时停止并报告升级需求，不切回旧命令、旧 catalog 或兼容参数。
+
+## `shell.rdx` 调用
+
+`shell.command` 与 `shell.rdx` 互斥。Agent 只提交 operation、业务 args，以及确有实验绑定时的 experimentId：
+
+```json
+{"rdx":{"operation":"rd.pipeline.get_state","args":{"event_id":42,"detail":"summary","sections":["output_targets","depth_stencil"]}}}
+```
+
+省略 `capture_file_id`、`session_id`、context、lease 等身份字段；主进程从当前 owning session 注入并拒绝覆盖。capture 打开关闭、context 切换、remote 控制、daemon 生命周期、全局设置、桌面 preview 和 artifact 清理由应用专门入口管理，不通过普通 Agent 操作手册调用。
+
+## 结果、错误与输出
+
+先检查 canonical envelope 的 `ok`，再解释 `data`、`error`、`meta`、`artifacts` 和可选 projection。合法空集合必须有成功语义；读取失败、后端 unsupported、预算耗尽和取消保持各自错误或状态，不能改写成空值、零值或成功。事件结果同时核对 requested/applied/image EID；图片与导出核对归属、路径和实际格式。
+
+默认在内存或 stdout 处理统计、直方图、纹理差异和小型读回。只有用户或 Plan 明确要求证据保存时才提供输出路径；大结果先分页、区域化或限制数量。VFS 与 CLI facade 面向人类和受限浏览，不用 raw `.rdc` 或整树展开绕过主进程路径边界。
+
+effects 描述可能的 replay position、artifact write、shader debug/replace 等真实影响。根据回执判断后续刷新与证据资格，不根据工具名猜测。失败、取消或缺少主进程签名回执时，变更与回滚均保持未证；实验遵循 `$renderdoc-execution` 的 baseline → intervention → variant → rollback → restored 契约。
+
+专业成员、参数与示例分别由 `$debugger-rdx-tools`、`$analyzer-rdx-tools`、`$optimizer-rdx-tools` 提供。只读取当前 handoff 绑定的那一本；运行中使用 `shell.rdx` 的 `describe` 发现核实冻结定义。
+
+## 初始化读取与临时回放
+
+缩略图读取所属 capture 的嵌入数据，不用 replay screenshot 替代。`get_api_calls` 根据事件或 chunk 查询捕获记录；按返回的 object/child/value continuation 继续读取，不把截断参数解释为完整调用。
+
+texture/buffer 的 `state=capture_initial` 只读取捕获实际保存且可重建的帧前内容。不能同时传 `event_id`；缺少初始化来源时停止，不用当前内容替代。小型结果选 `as_base64=true` 并遵守字节预算，大结果用范围或明确输出请求。
+
+`replay_position_temporary` 表示内部可能移动回放位置。主进程在同一串行 lease 内核对调用前后 context、事件及结果恢复证明；这种查询不会被当作最终可见状态变更。恢复失败或证明不一致会隔离调用，不能继续签发成功回执。

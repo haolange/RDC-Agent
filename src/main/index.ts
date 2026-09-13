@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Electron Main Process Entry
  */
 
@@ -686,7 +686,7 @@ async function initializeServices(): Promise<void> {
     const hasConfiguredProvider = settingsService.hasConfiguredProvider();
     console.log('[Main] SettingsService initialized, hasConfiguredProvider:', hasConfiguredProvider);
     
-    await rdxCliInvokerService.loadCatalog();
+    await rdxCliInvokerService.getRuntimeSummary();
     console.log('[Main] RDX CLI invoker initialized');
     runtimeLogService.log({
       scope: 'app',

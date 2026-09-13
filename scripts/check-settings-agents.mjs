@@ -251,13 +251,16 @@ async function main() {
     'utf8',
   );
   assert(settingsModalSource.includes('McpServicesPanel') && mcpServicesPanel.includes("kinds={['mcp']}"), 'Tools settings should expose Project-aware MCP resources through RuntimeScopePanel.');
-  const renderDocToolchain = [
-    readSrcFile(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RdxCliInvokerSettingsFields.tsx'), 'utf8'),
-    readSrcFile(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RdxActionsFields.tsx'), 'utf8'),
-  ].join('\n');
+  const renderDocToolchain = readSrcFile(
+    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RdxCliInvokerSettingsFields.tsx'), 'utf8',
+  );
   assert(renderDocToolchain.includes('settings.localRenderDocToolchain'), 'Skills & Tools should expose the local RenderDoc toolchain.');
-  assert(renderDocToolchain.includes('settings-rdx-actions'), 'Skills & Tools should expose Settings-managed RDX shell actions.');
-  assert(renderDocToolchain.includes('openCapture'), 'RDX shell actions should include the open capture action.');
+  assert(renderDocToolchain.includes('validateRdxInstallation') && renderDocToolchain.includes('summary.runtime.version')
+    && renderDocToolchain.includes('summary.runtime.catalog.toolCount'), 'Installation validation must show actual version and discovered capability count.');
+  assert(renderDocToolchain.includes('summary.cli.unavailableReason') && renderDocToolchain.includes('settings.rdxSaveBeforeVerify'),
+    'Installation validation must preserve explicit failure and unsaved-configuration states.');
+  assert(!toolsSettings.includes('RdxActionsFields') && !renderDocToolchain.includes('catalogPath')
+    && !renderDocToolchain.includes('jsonMode'), 'Settings must not restore lifecycle command templates or separate catalog/JSON modes.');
 
   const composer = readSrcFile(path.join(repoRoot, 'src/renderer/features/composer/Composer.tsx'), 'utf8');
   const composerAgentMenu = readSrcFile(

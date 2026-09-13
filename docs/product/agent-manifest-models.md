@@ -122,4 +122,4 @@ Tasks 能力由 route 与冻结工具集决定，不是独立 profile：只读 r
 
 ## RDX Shell Actions
 
-Open `.rdc`（local `openCapture` / remote `openRemoteCapture`）、connect remote、preview、close runtime are Settings-managed shell actions under `settings.tooling.rdxActions`. The main process executes configured shell actions through `ShellInvocationService`, parses JSON output, and stores stable `RdxRuntimeContext` for later agent/tool use.
+Open `.rdc`, connect remote, preview, and close runtime are fixed native operations executed by the main session boundary through `ShellInvocationService`, using the owning context and frozen CLI installation settings. The main process parses canonical JSON output and stores stable `RdxRuntimeContext` for later agent/tool use.

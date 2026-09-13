@@ -485,37 +485,46 @@ describe('RuntimeToolAssembly', () => {
     expect(handle.pendingHandoff).toBeNull();
   });
 
-  it('hides rdx-cli-shell from Mission skills catalog and skill_read', async () => {
+  it('keeps all RDX execution manuals General-only in catalog and skill_read', async () => {
     const assembly = createAssembly();
+    const rdxSkillIds = [
+      'rdx-cli-shell',
+      'debugger-rdx-tools',
+      'analyzer-rdx-tools',
+      'optimizer-rdx-tools',
+    ] as const;
     for (const mission of ['debugger', 'analyzer', 'optimizer'] as const) {
       const catalog = assembly.createSkillsCatalogTool(mission);
       const listed = await catalog.execute('tc-skills', {});
       const listedText = listed.content[0] && 'text' in listed.content[0] ? listed.content[0].text : '';
-      expect(listedText).not.toMatch(/rdx-cli-shell/);
-      const searched = await catalog.execute('tc-skills-q', { query: 'rdx-cli-shell' });
-      const searchedText = searched.content[0] && 'text' in searched.content[0] ? searched.content[0].text : '';
-      expect(searchedText).toMatch(/No configured skills matched the query/);
-      expect(searched.details).toMatchObject({ count: 0 });
-      const read = await assembly.createSkillReadTool(mission).execute('tc-skill-read', { skill_id: 'rdx-cli-shell' });
-      expect(read.isError).toBe(true);
-      expect(read.content[0]).toMatchObject({
-        type: 'text',
-        text: expect.stringMatching(/Skill is not configured: rdx-cli-shell/),
-      });
+      for (const skillId of rdxSkillIds) {
+        expect(listedText).not.toContain(skillId);
+        const searched = await catalog.execute('tc-skills-q', { query: skillId });
+        const searchedText = searched.content[0] && 'text' in searched.content[0] ? searched.content[0].text : '';
+        expect(searchedText).toMatch(/No configured skills matched the query/);
+        expect(searched.details).toMatchObject({ count: 0 });
+        const read = await assembly.createSkillReadTool(mission).execute('tc-skill-read', { skill_id: skillId });
+        expect(read.isError).toBe(true);
+        expect(read.content[0]).toMatchObject({
+          type: 'text',
+          text: expect.stringMatching(new RegExp(`Skill is not configured: ${skillId}`)),
+        });
+      }
     }
-    const generalCatalog = await assembly.createSkillsCatalogTool('general').execute('tc-skills-general', {
-      query: 'rdx-cli-shell',
-    });
-    const generalText = generalCatalog.content[0] && 'text' in generalCatalog.content[0]
-      ? generalCatalog.content[0].text
-      : '';
-    expect(generalText).toMatch(/rdx-cli-shell/);
-    expect(generalCatalog.details).toMatchObject({ count: 1 });
-    const generalRead = await assembly.createSkillReadTool('general').execute('tc-skill-read-general', {
-      skill_id: 'rdx-cli-shell',
-    });
-    expect(generalRead.isError).not.toBe(true);
-    expect(generalRead.details).toMatchObject({ skillId: 'rdx-cli-shell', agentId: 'general' });
-    expect(generalRead.content[0]).toMatchObject({ type: 'text', text: expect.stringMatching(/shell/) });
+    for (const skillId of rdxSkillIds) {
+      const generalCatalog = await assembly.createSkillsCatalogTool('general').execute('tc-skills-general', {
+        query: skillId,
+      });
+      const generalText = generalCatalog.content[0] && 'text' in generalCatalog.content[0]
+        ? generalCatalog.content[0].text
+        : '';
+      expect(generalText).toContain(skillId);
+      expect(generalCatalog.details).toMatchObject({ count: 1 });
+      const generalRead = await assembly.createSkillReadTool('general').execute('tc-skill-read-general', {
+        skill_id: skillId,
+      });
+      expect(generalRead.isError).not.toBe(true);
+      expect(generalRead.details).toMatchObject({ skillId, agentId: 'general' });
+    }
   });
 });

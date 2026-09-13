@@ -10,9 +10,9 @@ import { compileRdxProbe, RdxProbeInputSchema } from '@shared/constants/rdxProbe
 import type { RdxCliInvokerSettings } from '@shared/types/settings';
 import type { RdxTurnBinding } from '../../tools/RdxTurnBindings';
 const settings: RdxCliInvokerSettings = {
-  enabled: true, command: 'configured-rdx.exe', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000, catalogPath: '', jsonMode: 'auto',
+  enabled: true, command: 'configured-rdx.exe', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000,
 };
-const binding = { cli: settings, actions: {}, identity: { contextId: 'ctx', version: 1, ownerSessionId: 's' } } as RdxTurnBinding;
+const binding = { cli: settings, definitions: [], definitionsFingerprint: '', identity: { contextId: 'ctx', version: 1, ownerSessionId: 's' } } as RdxTurnBinding;
 const context = { sessionId: 's', projectId: 'p', workspaceRoot: '.', projectRootPath: '.', rdxBinding: binding };
 function own() {
   setRdxRuntimeContextForSession('s', { contextId: 'ctx', runtimeOwner: 'rdc-agent', ownerLeaseId: 'lease-s', backend: 'local', updatedAt: 1 }, { projectId: 'p' });

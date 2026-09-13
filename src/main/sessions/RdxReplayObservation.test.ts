@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({ execute: vi.fn() }));
 vi.mock('../tools/RdxCliInvokerService', () => ({ rdxCliInvokerService: { executeCLI: mocks.execute } }));
 vi.mock('../settings/SettingsService', () => ({ settingsService: { getAll: () => ({ tooling: { rdxCli: { argsPrefix: [], enabled: true, command: 'rdx' } } }) } }));
 vi.mock('electron', () => ({ nativeImage: { createFromPath: () => ({ isEmpty: () => false, getSize: () => ({ width: 100, height: 100 }), toDataURL: () => 'data:image/png;base64,eA==' }) } }));
-import { observeReplay } from './RdxReplayObservation';
+import { observeReplay, readReplayEvents } from './RdxReplayObservation';
 const owner = { contextId: 'context', replaySessionId: 'replay', runtimeOwner: 'app', ownerLeaseId: 'lease', backend: 'local' as const, updatedAt: 0 };
 let exportedPath = '';
 function reply(patch: Record<string, unknown> = {}) {
@@ -55,4 +55,16 @@ it('preserves final-output warning while showing actual observed event', async (
   const result = await observeReplay(owner, {});
   expect(result.imageEventId).toBe(9); expect(result.isFinalOutput).toBe(false); expect(result.warning?.code).toBe('final_output_unavailable');
   await expect(fs.stat(path.dirname(exportedPath))).rejects.toHaveProperty('code', 'ENOENT');
+});
+
+it('uses context-scoped observe argv without replay identity parameters', async () => {
+  await observeReplay(owner, { event_id: 9 });
+  const argv = mocks.execute.mock.calls[0][1];
+  expect(JSON.parse(argv[2])).toEqual({ event_id: 9, out_path: exportedPath });
+  expect(argv.slice(-2)).toEqual(['--daemon-context', 'context']);
+});
+it('requests the full context event index with no session parameter', async () => {
+  mocks.execute.mockResolvedValue({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rd.session.get_replay_events', data: { context_id: 'context', session_id: 'replay', complete: true, events: [{ event_id: 1, name: 'Draw' }] } }) });
+  expect(await readReplayEvents(owner)).toEqual([{ eventId: 1, name: 'Draw' }]);
+  expect(JSON.parse(mocks.execute.mock.calls[0][1][2])).toEqual({});
 });

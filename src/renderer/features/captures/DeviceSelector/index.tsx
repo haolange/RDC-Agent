@@ -48,7 +48,7 @@ const DeviceSelectorDropdown: React.FC<{
       {...dynStyle}
     >
       {devices.map((device) => {
-        const selectable = device.type === 'local' || device.status === 'connected' || device.status === 'online';
+        const selectable = device.status !== 'loading';
         const bootstrapSummary = getBootstrapSummary(device, t);
         return (
           <button
@@ -83,7 +83,7 @@ const DeviceSelectorDropdown: React.FC<{
 
 export const DeviceSelector: React.FC = () => {
   const { t } = useI18n();
-  const { devices, selectedDevice, setSelectedDevice, startDeviceWatch, stopDeviceWatch, activateDevice } = useDeviceStore();
+  const { devices, selectedDevice, setSelectedDevice, startDeviceWatch, stopDeviceWatch } = useDeviceStore();
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -132,26 +132,9 @@ export const DeviceSelector: React.FC = () => {
     setIsOpen((open) => !open);
   };
 
-  const handleSelect = async (device: ReplayDeviceEntry) => {
-    if (device.type === 'local') {
-      setSelectedDevice(device.id);
-      setIsOpen(false);
-      return;
-    }
-
-    if (device.status === 'offline') {
-      const activated = await activateDevice(device.id);
-      if (activated && (activated.status === 'connected' || activated.status === 'online')) {
-        setSelectedDevice(activated.id);
-        setIsOpen(false);
-      }
-      return;
-    }
-
-    if (device.status === 'loading') {
-      return;
-    }
-
+  const handleSelect = (device: ReplayDeviceEntry) => {
+    if (device.status === 'loading') return;
+    // Opening a capture creates the owning context and connects the selected device.
     setSelectedDevice(device.id);
     setIsOpen(false);
   };

@@ -35,7 +35,6 @@ export function createDeviceApi(transport: RendererApiTransport): DeviceApi {
   return {
     list: () => transport.invoke(INVOKE.device.list),
     refresh: () => transport.invoke(INVOKE.device.refresh),
-    activate: (deviceId) => transport.invoke(INVOKE.device.activate, deviceId),
     watchStart: () => transport.invoke(INVOKE.device.watchStart),
     watchRenew: () => transport.invoke(INVOKE.device.watchRenew),
     watchStop: () => transport.invoke(INVOKE.device.watchStop),

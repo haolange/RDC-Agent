@@ -13,7 +13,7 @@ async function call(owner: RdxRuntimeContext, operation: string, args: Record<st
   const settings = structuredClone(frozenCli ?? settingsService.getAll().tooling.rdxCli);
   settings.argsPrefix = [...settings.argsPrefix.filter(arg => arg !== '--json'), '--json'];
   const result = parseRdxNativeResult(await rdxCliInvokerService.executeCLI('call', [operation, '--args-json',
-    JSON.stringify({ ...args, session_id: owner.replaySessionId }), '--daemon-context', owner.contextId,
+    JSON.stringify(args), '--daemon-context', owner.contextId,
   ], { contextId: owner.contextId, settings }), owner.contextId);
   if (result.result_kind !== operation || result.data.session_id !== owner.replaySessionId) throw new Error('RDX_OBSERVATION_IDENTITY_MISMATCH');
   return result.data;

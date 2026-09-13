@@ -137,7 +137,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     const metadata = service.listSkillMetadata();
     const ids = metadata.map((skill) => skill.id).sort();
     expect(MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS).toHaveLength(22);
-    expect(GENERAL_SKILL_IDS).toHaveLength(6);
+    expect(GENERAL_SKILL_IDS).toHaveLength(9);
     expect([...CANONICAL_SKILL_IDS].sort()).toEqual(ids);
     expect(new Set(ids).size).toBe(ids.length);
     for (const forbidden of FORBIDDEN_SKILL_NAMES) {
@@ -165,7 +165,9 @@ describe('AgentRuntimeConfigService scoped resources', () => {
         expect(skillCallEntry(skillId)).toBe('agent.md-skills');
       }
       if (profile !== 'general') {
-        expect(source).not.toMatch(/rdx-cli-shell/);
+        for (const skillId of PLAN_ONLY_CONFLICT_SKILL_IDS) {
+          expect(source).not.toMatch(new RegExp(`^  - ${skillId}$`, 'm'));
+        }
       }
     }
     const provenance = service.loadSkill('artifact-provenance');
@@ -183,19 +185,24 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     ))).toBe(false);
   });
 
-  it('hides rdx-cli-shell from Mission catalog and skill_read viewers', async () => {
+  it('hides General-only RDX manuals from Mission catalog and skill_read viewers', async () => {
     const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
     const { isSkillVisibleToProfile } = await import('@shared/constants/canonicalSkills');
     const service = new AgentRuntimeConfigService();
+    const generalOnly = ['rdx-cli-shell', 'debugger-rdx-tools', 'analyzer-rdx-tools', 'optimizer-rdx-tools'];
     for (const mission of ['debugger', 'analyzer', 'optimizer'] as const) {
-      expect(isSkillVisibleToProfile(mission, 'rdx-cli-shell')).toBe(false);
-      expect(service.listSkills(undefined, mission).map((skill) => skill.id)).not.toContain('rdx-cli-shell');
-      expect(service.listSkillMetadata(undefined, mission).map((skill) => skill.id)).not.toContain('rdx-cli-shell');
-      expect(service.loadSkill('rdx-cli-shell', undefined, mission)).toBeNull();
+      for (const skillId of generalOnly) {
+        expect(isSkillVisibleToProfile(mission, skillId)).toBe(false);
+        expect(service.listSkills(undefined, mission).map((skill) => skill.id)).not.toContain(skillId);
+        expect(service.listSkillMetadata(undefined, mission).map((skill) => skill.id)).not.toContain(skillId);
+        expect(service.loadSkill(skillId, undefined, mission)).toBeNull();
+      }
     }
-    expect(isSkillVisibleToProfile('general', 'rdx-cli-shell')).toBe(true);
-    expect(service.listSkills(undefined, 'general').map((skill) => skill.id)).toContain('rdx-cli-shell');
-    expect(service.loadSkill('rdx-cli-shell', undefined, 'general')?.id).toBe('rdx-cli-shell');
-    expect(service.loadSkill('rdx-cli-shell')?.id).toBe('rdx-cli-shell');
+    for (const skillId of generalOnly) {
+      expect(isSkillVisibleToProfile('general', skillId)).toBe(true);
+      expect(service.listSkills(undefined, 'general').map((skill) => skill.id)).toContain(skillId);
+      expect(service.loadSkill(skillId, undefined, 'general')?.id).toBe(skillId);
+      expect(service.loadSkill(skillId)?.id).toBe(skillId);
+    }
   });
 });

@@ -74,6 +74,22 @@ for (const filePath of walkTsx(rendererRoot)) {
   }
 }
 
+// ResizeHandle has a closed side union and renders both its class and test id
+// from that value. Keep the two concrete class contracts only while the
+// implementation remains finite and its SSR test asserts each variant.
+const resizeHandleSource = fs.readFileSync(path.join(rendererRoot, 'shell', 'ResizeHandle.tsx'), 'utf8');
+const resizeHandleTest = fs.readFileSync(path.join(rendererRoot, 'shell', 'ResizeHandle.test.ts'), 'utf8');
+const hasFiniteResizeSides = resizeHandleSource.includes("export type ResizeHandleSide = 'left' | 'right';")
+  && resizeHandleSource.includes('panel-resize-handle-${side}');
+for (const side of ['left', 'right']) {
+  const className = `panel-resize-handle-${side}`;
+  const testAssertsId = resizeHandleTest.includes(`expect(markup).toContain('data-testid="${className}"')`);
+  const testAssertsClass = resizeHandleTest.includes(`expect(markup).toContain('${className}`);
+  if (hasFiniteResizeSides && testAssertsId && testAssertsClass) {
+    classNames.add(className);
+  }
+}
+
 fs.mkdirSync(outDir, { recursive: true });
 
 const classOut = path.join(outDir, 'fidelity-classnames.txt');

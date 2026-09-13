@@ -5,7 +5,6 @@ import type {
   AppSettings,
   LlmAgentRoute,
   LlmProviderEntry,
-  RdxActionSettingsMap,
   RdxCliInvokerSettings,
   AgentShellSettings,
   CodeInterpreterSettings,
@@ -23,7 +22,6 @@ export const useSettingsModalState = (
   const [providerDrafts, setProviderDrafts] = useState<LlmProviderEntry[]>(settings.llm.providers.map(cloneProvider));
   const [agentRouteDrafts, setAgentRouteDrafts] = useState<LlmAgentRoute[]>(settings.llm.agentRoutes.map(cloneRoute));
   const [rdxCliDraft, setRdxCliDraft] = useState<RdxCliInvokerSettings>(settings.tooling.rdxCli);
-  const [rdxActionsDraft, setRdxActionsDraft] = useState<RdxActionSettingsMap>(cloneRdxActions(settings.tooling.rdxActions));
   const [codeInterpreterDraft, setCodeInterpreterDraft] = useState<CodeInterpreterSettings>(
     settings.tooling.codeInterpreter,
   );
@@ -55,7 +53,6 @@ export const useSettingsModalState = (
     setProviderDrafts(providers);
     setAgentRouteDrafts(settings.llm.agentRoutes.map(cloneRoute));
     setRdxCliDraft(settings.tooling.rdxCli);
-    setRdxActionsDraft(cloneRdxActions(settings.tooling.rdxActions));
     setCodeInterpreterDraft(settings.tooling.codeInterpreter);
     setShellDraft(settings.tooling.shell);
     setAgentManifestDrafts(settings.agents.definitions.map((definition) => (
@@ -80,8 +77,6 @@ export const useSettingsModalState = (
     setAgentRouteDrafts,
     rdxCliDraft,
     setRdxCliDraft,
-    rdxActionsDraft,
-    setRdxActionsDraft,
     codeInterpreterDraft,
     setCodeInterpreterDraft,
     shellDraft,
@@ -102,29 +97,3 @@ export const useSettingsModalState = (
     setAgentManifestSaveBlocked,
   };
 };
-
-const defaultRdxAction = () => ({
-  enabled: false,
-  command: '',
-  args: [],
-  workingDirectory: '',
-  env: {},
-  timeoutMs: 60000,
-});
-
-export function cloneRdxActions(actions?: Partial<RdxActionSettingsMap>): RdxActionSettingsMap {
-  return {
-    openCapture: cloneRdxAction(actions?.openCapture ?? defaultRdxAction()),
-    openRemoteCapture: cloneRdxAction(actions?.openRemoteCapture ?? defaultRdxAction()),
-    connectRemote: cloneRdxAction(actions?.connectRemote ?? defaultRdxAction()),
-    closeRuntime: cloneRdxAction(actions?.closeRuntime ?? defaultRdxAction()),
-  };
-}
-
-function cloneRdxAction(action: RdxActionSettingsMap[keyof RdxActionSettingsMap]): RdxActionSettingsMap[keyof RdxActionSettingsMap] {
-  return {
-    ...action,
-    args: [...action.args],
-    env: { ...action.env },
-  };
-}

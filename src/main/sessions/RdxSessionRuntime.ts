@@ -4,7 +4,7 @@ import { parseRdxNativeResult } from '../tools/RdxNativeProtocol';
 import { freezeRdxTurnBinding } from '../tools/RdxTurnBindings';
 import { shellInvocationService } from '../tools/ShellInvocationService';
 /**
- * RdxSessionService - RDX runtime context state and configured shell actions.
+ * RdxSessionService - RDX runtime context state and fixed native CLI lifecycle.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -23,12 +23,6 @@ import type {
   SessionScope,
 } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
-import {
-  formatRdxActionDiagnostic,
-  isLocalReplayUnsupportedDiagnostic,
-  rdxShellActionService,
-  type RdxShellActionResult,
-} from '../tools/RdxShellActionService';
 import type { RdxTurnBinding } from '../tools/RdxTurnBindings';
 import { setRdxRuntimeContextForSession, getDelegatedChildSessionId } from './RdxRuntimeContextRegistry';
 
@@ -39,6 +33,29 @@ interface PreviewLoadResult {
 }
 
 const DEFAULT_RUNTIME_OWNER = 'rdc-agent';
+
+async function callNative(
+  operation: string,
+  args: Record<string, unknown>,
+  contextId: string,
+  binding: RdxTurnBinding,
+  signal?: AbortSignal,
+): Promise<{ ok: boolean; data: Record<string, unknown>; error?: string }> {
+  signal?.throwIfAborted();
+  const result = await rdxCliInvokerService.executeCLI('call', [
+    operation, '--args-json', JSON.stringify(args), '--daemon-context', contextId,
+  ], { contextId, abortSignal: signal, settings: { ...binding.cli, argsPrefix: [...binding.cli.argsPrefix, '--json'] } });
+  try {
+    signal?.throwIfAborted();
+    const payload = parseRdxNativeResult(result, contextId, operation);
+    if (operation === 'rd.capture.open_file' && (typeof payload.data.capture_file_id !== 'string' || !payload.data.capture_file_id)) throw new Error('RDX_CLI_PROTOCOL: capture_file_id is required.');
+    if (operation === 'rd.capture.open_replay' && (typeof payload.data.session_id !== 'string' || !payload.data.session_id)) throw new Error('RDX_CLI_PROTOCOL: session_id is required.');
+    if (operation === 'rd.capture.open_replay' && payload.data.capture_file_id !== args.capture_file_id) throw new Error('RDX_CAPTURE_MISMATCH: replay capture identity does not match the opened file.');
+    return { ok: true, data: payload.data };
+  } catch (error) {
+    return { ok: false, data: {}, error: error instanceof Error ? error.message : String(error) };
+  }
+}
 
 const emptyPreviewLoadResult = (): PreviewLoadResult => ({
   preview: null,
@@ -63,24 +80,18 @@ export class RdxSessionRuntime {
   private runtimeContext: RdxRuntimeContext | null = null;
 
   async openProjectInput(request: OpenProjectInputRequest, options: RdxLifecycleOptions = {}): Promise<OpenedCaptureState> {
+    options.signal?.throwIfAborted();
+    const cli = structuredClone(options.binding?.cli ?? settingsService.getAll().tooling.rdxCli);
+    const catalog = await rdxCliInvokerService.loadCatalog(cli, true);
+    options.signal?.throwIfAborted();
     const allocatedContextId = `rdc-${randomUUID()}`;
     await this.closeOrReplaceOpenedCapture(options);
-
-    const tooling = settingsService.getAll().tooling;
-    this.lifecycleBinding = options.binding ?? freezeRdxTurnBinding(tooling.rdxCli, tooling.rdxActions);
+    this.lifecycleBinding = options.binding ?? freezeRdxTurnBinding(cli, catalog.tools);
     options = { ...options, binding: this.lifecycleBinding };
     this.contextId = allocatedContextId;
     this.ownerScope = request.sessionId ? { projectId: request.projectId, sessionId: request.sessionId } : null;
     let replayDevice = request.replayDevice;
     const isRemoteReplay = replayDevice.type === 'android';
-    if (isRemoteReplay) {
-      options.onStage?.('connecting');
-      replayDevice = await this.ensureReplayDeviceReady(replayDevice, { ...options, contextId: allocatedContextId });
-    }
-    const preparedRemote = isRemoteReplay
-      ? replayDeviceService.consumePreparedRemote(replayDevice.id)
-      : null;
-
     const capture: CaptureDescriptor = {
       id: request.inputId,
       filePath: request.filePath,
@@ -98,84 +109,61 @@ export class RdxSessionRuntime {
 
 
 
-    options.onStage?.('opening');
     let resultData: Record<string, unknown>;
     let runtimeContext: RdxRuntimeContext;
     try {
       if (isRemoteReplay) {
+        options.onStage?.('connecting');
+        replayDevice = await this.ensureReplayDeviceReady(replayDevice, { ...options, contextId: allocatedContextId });
+      }
+      const preparedRemote = isRemoteReplay
+        ? replayDeviceService.consumePreparedRemote(replayDevice.id)
+        : null;
+
+      options.onStage?.('opening');
+      if (isRemoteReplay) {
         if (!preparedRemote?.contextId || !preparedRemote.remoteId || preparedRemote.contextId !== allocatedContextId) {
           throw new Error('Remote replay requires a prepared remote context and remoteId.');
         }
-        const result = await withRdxOpenProgress(allocatedContextId, options.binding!.cli, options.onStage, () => rdxShellActionService.runAction('openRemoteCapture', {
-          projectId: request.projectId,
-          inputId: request.inputId,
-          filePath: request.filePath,
-          capturePath: request.filePath,
-          deviceId: replayDevice.id,
-          deviceLabel: replayDevice.label,
-          deviceType: replayDevice.type,
-          deviceSerial: replayDevice.serial,
-          deviceRemoteId: replayDevice.remoteId,
-          remoteId: preparedRemote.remoteId,
-          remoteContextId: preparedRemote.contextId,
-          contextId: preparedRemote.contextId,
-          backend: 'remote',
-        }, {
-          env: this.buildRuntimeContextEnv(),
-          action: options.binding?.actions.openRemoteCapture,
-          abortSignal: options.signal,
-        }));
+        const result = await withRdxOpenProgress(allocatedContextId, options.binding!.cli, options.onStage, async () => {
+          const openedFile = await callNative('rd.capture.open_file', { file_path: request.filePath, read_only: true }, allocatedContextId, options.binding!, options.signal);
+          if (!openedFile.ok) return openedFile;
+          const opened = await callNative('rd.capture.open_replay', {
+            capture_file_id: openedFile.data.capture_file_id,
+            options: { remote_id: preparedRemote.remoteId },
+          }, allocatedContextId, options.binding!, options.signal);
+          return { ok: opened.ok, data: opened.data, error: opened.error };
+        });
         if (!result.ok) {
-          throw new Error(this.formatActionFailure('openRemoteCapture', result));
+          throw new Error(result.error ?? 'Remote replay open failed.');
         }
+        if (result.data.remote_id !== preparedRemote.remoteId) throw new Error('RDX_REMOTE_MISMATCH: remote replay identity does not match the selected connection.');
         resultData = {
           ...result.data,
           backend: 'remote',
-          remote_id: preparedRemote.remoteId,
           remote_status: 'online',
           device_id: replayDevice.id,
           device_label: replayDevice.label,
-          context_id: this.readString(result.data, ['contextId', 'context_id']) ?? preparedRemote.contextId,
+          context_id: result.data.context_id,
         };
       } else {
-        const result = await rdxShellActionService.runAction('openCapture', {
-          projectId: request.projectId,
-          inputId: request.inputId,
-          filePath: request.filePath,
-          capturePath: request.filePath,
-          deviceId: replayDevice.id,
-          deviceLabel: replayDevice.label,
-          deviceType: replayDevice.type,
-          deviceSerial: replayDevice.serial,
-          deviceRemoteId: replayDevice.remoteId,
-          remoteId: replayDevice.remoteId,
-          backend: 'local',
-          contextId: allocatedContextId,
-        }, {
-          env: this.buildRuntimeContextEnv(),
-          action: options.binding?.actions.openCapture,
-          abortSignal: options.signal,
-        });
+        const openedFile = await callNative('rd.capture.open_file', { file_path: request.filePath, read_only: true }, allocatedContextId, options.binding!, options.signal);
+        const result = openedFile.ok
+          ? await callNative('rd.capture.open_replay', { capture_file_id: openedFile.data.capture_file_id, options: {} }, allocatedContextId, options.binding!, options.signal)
+          : openedFile;
         if (!result.ok) {
-          if (isLocalReplayUnsupportedDiagnostic(result.diagnostic, result.error)) {
-            throw new Error(
-              [
-                'LOCAL_REPLAY_UNSUPPORTED',
-                result.diagnostic
-                  ? formatRdxActionDiagnostic(result.diagnostic)
-                  : (result.error ?? 'Local OpenCapture failed.'),
-              ].join('\n'),
-            );
-          }
-          throw new Error(this.formatActionFailure('openCapture', result));
+          throw new Error(result.error ?? 'Local capture open failed.');
         }
         resultData = result.data;
       }
+      options.signal?.throwIfAborted();
       runtimeContext = this.extractRuntimeContext(resultData, {
         backend: isRemoteReplay ? 'remote' : 'local',
         deviceId: replayDevice.id,
         deviceLabel: replayDevice.label,
       });
+      if (runtimeContext.contextId !== allocatedContextId) throw new Error('RDX_CONTEXT_MISMATCH: native operation returned a different owning context.');
+      if (isRemoteReplay && runtimeContext.remoteId !== preparedRemote?.remoteId) throw new Error('RDX_REMOTE_MISMATCH: native replay belongs to a different remote.');
     } catch (error) {
       capture.status = 'error';
       this.captures = [capture];
@@ -184,7 +172,6 @@ export class RdxSessionRuntime {
       throw error;
     }
 
-    if (runtimeContext.contextId !== allocatedContextId) throw new Error('RDX_CONTEXT_MISMATCH: configure lifecycle actions with {{contextId}}.');
     this.applyRuntimeContext(runtimeContext, request.sessionId, request.projectId ?? null);
     const captureIndex = this.captures.findIndex((item) => item.id === capture.id);
     this.captures[captureIndex] = {
@@ -265,7 +252,11 @@ export class RdxSessionRuntime {
       return currentDevice;
     }
 
-    const activatedDevice = await replayDeviceService.activateDevice(currentDevice.id, { action: options.binding?.actions.connectRemote, signal: options.signal, contextId: options.contextId });
+    const activatedDevice = await replayDeviceService.activateDevice(currentDevice.id, {
+      signal: options.signal,
+      contextId: options.contextId,
+      cli: options.binding?.cli,
+    });
     if (activatedDevice.type === 'local' || !['connected', 'online'].includes(activatedDevice.status)) {
       throw new Error(
         activatedDevice.activationErrorMessage
@@ -281,28 +272,28 @@ export class RdxSessionRuntime {
     data: Record<string, unknown>,
     fallback: { backend: 'local' | 'remote'; deviceId?: string; deviceLabel?: string },
   ): RdxRuntimeContext {
-    const contextId = this.readString(data, ['contextId', 'context_id', 'RDX_CONTEXT_ID']);
+    const contextId = this.readString(data, ['context_id']);
     if (!contextId || contextId === 'default') {
-      throw new Error('RDX action result must include a non-default owning context_id.');
+      throw new Error('RDX native result must include a non-default owning context_id.');
     }
     const replaySessionId = this.readString(data, ['session_id']);
-    if (!replaySessionId) throw new Error('RDX action result must include native replay session_id.');
-    const runtimeOwner = this.readString(data, ['runtimeOwner', 'runtime_owner', 'RDX_RUNTIME_OWNER'])
+    if (!replaySessionId) throw new Error('RDX native result must include native replay session_id.');
+    const runtimeOwner = this.readString(data, ['runtime_owner'])
       ?? DEFAULT_RUNTIME_OWNER;
-    const ownerLeaseId = this.readString(data, ['ownerLeaseId', 'owner_lease_id', 'RDX_OWNER_LEASE_ID'])
+    const ownerLeaseId = this.readString(data, ['owner_lease_id'])
       ?? `${DEFAULT_RUNTIME_OWNER}:${contextId}`;
     return {
       contextId,
       runtimeOwner,
       ownerLeaseId,
       replaySessionId,
-      captureFileId: this.readString(data, ['captureFileId', 'capture_file_id']),
-      captureId: this.readString(data, ['captureId', 'capture_id']),
+      captureFileId: this.readString(data, ['capture_file_id']),
+      captureId: this.readString(data, ['capture_id']),
       backend: this.readString(data, ['backend']) === 'remote' ? 'remote' : fallback.backend,
-      deviceId: this.readString(data, ['deviceId', 'device_id']) ?? fallback.deviceId,
-      deviceLabel: this.readString(data, ['deviceLabel', 'device_label']) ?? fallback.deviceLabel,
-      remoteId: this.readString(data, ['remoteId', 'remote_id']),
-      remoteStatus: this.normalizeRemoteStatus(this.readString(data, ['remoteStatus', 'remote_status'])),
+      deviceId: this.readString(data, ['device_id']) ?? fallback.deviceId,
+      deviceLabel: this.readString(data, ['device_label']) ?? fallback.deviceLabel,
+      remoteId: this.readString(data, ['remote_id']),
+      remoteStatus: this.normalizeRemoteStatus(this.readString(data, ['remote_status'])),
       updatedAt: Date.now(),
       raw: data,
     };
@@ -325,18 +316,6 @@ export class RdxSessionRuntime {
     this.deviceLabel = runtimeContext.deviceLabel ?? this.deviceLabel;
   }
 
-  private buildRuntimeContextEnv(): Record<string, string> {
-    if (!this.runtimeContext) {
-      return {};
-    }
-    return {
-      RDX_CONTEXT_ID: this.runtimeContext.contextId,
-      RDX_RUNTIME_OWNER: this.runtimeContext.runtimeOwner,
-      RDX_OWNER_LEASE_ID: this.runtimeContext.ownerLeaseId,
-      RDX_REPLAY_SESSION_ID: this.runtimeContext.replaySessionId ?? '',
-      RDX_CAPTURE_FILE_ID: this.runtimeContext.captureFileId ?? '',
-    };
-  }
 
   private readString(source: Record<string, unknown>, keys: string[]): string | undefined {
     for (const key of keys) {
@@ -346,13 +325,6 @@ export class RdxSessionRuntime {
       }
     }
     return undefined;
-  }
-
-  private formatActionFailure(actionId: string, result: RdxShellActionResult): string {
-    if (result.diagnostic) {
-      return formatRdxActionDiagnostic(result.diagnostic);
-    }
-    return result.error ?? `RDX ${actionId} action failed.`;
   }
 
   private normalizeRemoteStatus(value: string | undefined): RdxRuntimeContext['remoteStatus'] {
@@ -454,20 +426,9 @@ export class RdxSessionRuntime {
 
     let closeOk = true;
 
-    // Stage 1: graceful close via configured shell action
+    // Stage 1: graceful close via the canonical session operation.
     if (previousContext) {
-      const result = await rdxShellActionService.runAction('closeRuntime', {
-        contextId: previousContext.contextId,
-        runtimeOwner: previousContext.runtimeOwner,
-        ownerLeaseId: previousContext.ownerLeaseId,
-        replaySessionId: previousContext.replaySessionId,
-        captureFileId: previousContext.captureFileId,
-        captureId: previousContext.captureId,
-      }, {
-        env: this.buildRuntimeContextEnv(),
-          action: options.binding?.actions.closeRuntime,
-          abortSignal: options.signal,
-      });
+      const result = await callNative('rd.session.clear_context', {}, previousContext.contextId, options.binding!, options.signal);
       closeOk = result.ok;
       if (!result.ok) {
         runtimeLogService.log({
@@ -475,14 +436,12 @@ export class RdxSessionRuntime {
           namespace: 'context',
           severity: 'warning',
           title: 'RDX runtime close warning',
-          summary: result.error ?? 'closeRuntime action failed.',
+          summary: result.error ?? 'Session clear failed.',
           raw: result,
         });
       }
     } else if (this.contextId) {
-      const result = await rdxShellActionService.runAction('closeRuntime', { contextId: this.contextId }, {
-        action: options.binding?.actions.closeRuntime, abortSignal: options.signal,
-      });
+      const result = await callNative('rd.session.clear_context', {}, this.contextId, options.binding!, options.signal);
       closeOk = result.ok;
     } else { return; }
 
@@ -493,8 +452,9 @@ export class RdxSessionRuntime {
       const response = parseRdxNativeResult(await rdxCliInvokerService.executeCLI('daemon', ['stop', '--daemon-context', this.contextId], {
         contextId: this.contextId, abortSignal: options.signal,
         settings: { ...cli, argsPrefix: [...cli.argsPrefix.filter(arg => arg !== '--json'), '--json'] },
-      }));
-      if (response.result_kind !== 'rdx.daemon.stop') throw new Error('RDX_CLOSE_FAILED: daemon shutdown was not confirmed.');
+      }), this.contextId, 'rdx.daemon.stop');
+      options.signal?.throwIfAborted();
+      if (response.data.stopped !== true) throw new Error('RDX_CLOSE_FAILED: daemon shutdown was not confirmed.');
     }
   }
 

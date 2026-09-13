@@ -201,3 +201,11 @@ describe('ToolValidator', () => {
     }
   });
 });
+
+it('validates actual shell discovery and execution modes without mixed fields', async () => {
+  const { shellTool } = await import('../tools/primitives/ShellTool');
+  const tool = { name: shellTool.name, description: shellTool.description, parameters: shellTool.parameters };
+  const validator = new ToolValidator();
+  for (const rdx of [{ discovery: { kind: 'search', query: 'pixel', limit: 8 } }, { discovery: { kind: 'describe', operation: 'rd.texture.get_pixel_history' } }, { operation: 'rd.texture.get_pixel_history', args: { x: 0 } }]) expect(() => validator.validate(tool, { rdx })).not.toThrow();
+  for (const rdx of [{ discovery: { kind: 'search', query: 'pixel' }, operation: 'rd.core.init' }, { discovery: { kind: 'describe', operation: 'rd.texture.get_pixel_history', query: 'pixel' } }]) expect(() => validator.validate(tool, { rdx })).toThrow();
+});

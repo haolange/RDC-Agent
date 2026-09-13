@@ -4,13 +4,13 @@
 
 ## Product Boundary
 
-RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDoc `.rdc`。它应能作为日常 agent 工作台完成阅读、规划、编辑、搜索、工具调用、handoff、memory 与 subagent 编排，同时保留 capture 打开、replay 上下文、RDX actions、诊断与 RenderDoc 调查等垂直能力。
+RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDoc `.rdc`。它应能作为日常 agent 工作台完成阅读、规划、编辑、搜索、工具调用、handoff、memory 与 subagent 编排，同时保留 capture 打开、replay 上下文、RDX 原生操作、诊断与 RenderDoc 调查等垂直能力。
 
 **发布面是 Windows-only。** `electron-builder.json` 只保留 `win`；mac/linux 安装包与公证不在产品范围内。POSIX launcher wrapper（`.sh`）仅供 Ubuntu CI 的 node 面准备，不是发布目标。Windows release 通道（`RDC_AGENT_RELEASE_CHANNEL=release` 或 git tag）必须提供 `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD`（或 `CSC_*` 别名）；本地 `pnpm run pack` 保持不签名。SBOM 由完整 `pnpm-lock.yaml` 传递依赖图生成 CycloneDX，并记录 git SHA 与 lockfile digest。
 
 **不做** image/video 生成 runtime、media provider 目录面或 `MediaRuntimeService` 类骨架；discovery 对非 agent modality（含 image/video output）保持 fail-closed 剔除。用户附件 vision-input（读图）仍属 agent chat 能力，与生成 media 无关。
 
-产品不是固定模式向导。**四个 builtin 是唯一官方身份**：`general` / `debugger` / `analyzer` / `optimizer`（`resources/agent-runtime/agents`，scope 优先级 `builtin < user < project`，不再写 user seed）。user/project 只能覆盖这四个 id，或新增无关自定义 id。ask/plan/edit 及 S0 specialist id 为历史非法 id，不是顶层身份。仅 `user-invocable` 的 profile 出现在 composer orchestrator 菜单。`/plan` 不再硬切 builtin plan。Session rail 五卡 `Progress / Artifacts / Outputs / Context / Capture` 已落地。durable handoff 状态机已落地。三条 Mission 方法面已接到 Skill / Hook / Capsule（Debugger `$debugger-causal-method`，Analyzer `$analyzer-architecture-method`，Optimizer `$optimization-experiment`）。Investigation 垂直 schema（`rdc.investigation.v1`）、`InvestigationArtifactService` 与三个 deferred 工具已落地；IPC `investigation:read` 已落地；15 个垂直方法 Skill 与 4 个 builtin Hook 模板已落地。Knowledge 目标拓扑是 markdown-first **六 lane**（Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version）+ 五服务 + 五个 deferred 工具 + Knowledge Center 三列 UI；**禁止恢复 Embedding capability / Semantic lane**。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。**T18 ColdData 真实验收已证**（见下文 T18 已证组与 [`docs/product/acceptance-ledger.md`](docs/product/acceptance-ledger.md) `T18-colddata-*`）。产品级 Browser QA 全矩阵见 U05；U06 为历史运行事实；其中 Optimizer 的真实实验完成结论已撤回，不代表当前版本验收。裁决见下文「Current / Target / Migration Adjudications」。
+产品不是固定模式向导。**四个 builtin 是唯一官方身份**：`general` / `debugger` / `analyzer` / `optimizer`（`resources/agent-runtime/agents`，scope 优先级 `builtin < user < project`，不再写 user seed）。user/project 只能覆盖这四个 id，或新增无关自定义 id。ask/plan/edit 及 S0 specialist id 为历史非法 id，不是顶层身份。仅 `user-invocable` 的 profile 出现在 composer orchestrator 菜单。`/plan` 不再硬切 builtin plan。Session rail 五卡 `Progress / Artifacts / Outputs / Context / Capture` 已落地。durable handoff 状态机已落地。三条 Mission 方法面已接到 Skill / Hook / Capsule（Debugger `$debugger-causal-method`，Analyzer `$analyzer-architecture-method`，Optimizer `$optimization-experiment`）。共享 `$rdx-cli-shell` 与 Debugger / Analyzer / Optimizer 三本 RDX 工具手册由 execute handoff 绑定给 General；它们只提供操作知识，权限仍由冻结 catalog、主进程策略与 owning lease 决定。Investigation 垂直 schema（`rdc.investigation.v1`）、`InvestigationArtifactService` 与三个 deferred 工具已落地；IPC `investigation:read` 已落地；15 个垂直方法 Skill 与 4 个 builtin Hook 模板已落地。Knowledge 目标拓扑是 markdown-first **六 lane**（Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version）+ 五服务 + 五个 deferred 工具 + Knowledge Center 三列 UI；**禁止恢复 Embedding capability / Semantic lane**。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。**T18 ColdData 真实验收已证**（见下文 T18 已证组与 [`docs/product/acceptance-ledger.md`](docs/product/acceptance-ledger.md) `T18-colddata-*`）。产品级 Browser QA 全矩阵见 U05；U06 为历史运行事实；其中 Optimizer 的真实实验完成结论已撤回，不代表当前版本验收。裁决见下文「Current / Target / Migration Adjudications」。
 
 唯一运行时路径是 agent loop：解析 profile / model route / policy / tools → 调用 LLM → 执行已批准工具 → 回灌结果 → 产出 final answer。Renderer 不得伪造推理阶段；隐藏 CoT 永不作为 UI 内容展示或持久化。
 
@@ -20,11 +20,12 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 
 ### 垂直能力收敛（2026-09-09）
 
-本节裁决本轮整合；下文旧 CLI action 与技能权限描述须同步收敛。验收以实际证据为准。
+本节裁决原生 CLI、会话权限与技能交接的统一边界。验收以实际证据为准。
 
 - 原生 `rdx` 是唯一 CLI 协议，安装位置仍由本机 Settings 配置。应用 session id 不等于 replay session id；daemon context 必须绑定 owning session，不使用 default。probe 翻译为真实 argv，不发送 lease-open / lease-close / preview-status 假想命令。进程成功、canonical JSON ok:true 与 context 一致后才更新 lease。
 - 四 Agent 身份不变。普通工作留在 General；RenderDoc Mission 走规划 → General 执行 → 原 Mission 评估。方法按需读取，skill_read 不改变当前轮权限；仅 prepareTurn 显式武装参与交集。执行方法不重复列举整个工作流权限，授权由 profile / policy / lease enforcement 决定。
-- General 的 shell 接受互斥的普通 command 或结构化 RDX operation/args。后者经配置的原生 CLI、既有审批与 session lease，主进程生成执行回执；不新增 194 个工具 schema 或 RDX MCP。
+- General 的 shell 接受互斥的普通 command 或结构化 RDX operation/args。后者经配置的原生 CLI、既有审批与 session lease，主进程生成执行回执；目录由同一个配置 CLI 发现；普通操作按冻结定义的能力校验，定向查询和单工具说明按需提供给模型。软件生命周期、remote 控制、全局设置、窗口与销毁操作仍由应用专门入口管理。
+- prepareTurn 同时冻结 capture、replay 与 context 身份；只读 capture 能力使用主进程持有的身份。临时时间点查询须由主进程核对执行前后 context 与恢复结果，恢复失败隔离 lease，不刷新为查询中的临时画面。整帧证据校验 GPU 测量方法、完整范围、采样条件与 replacement，不接受事件总和或 CPU 耗时替代。
 - 新关闭实验须有 baseline / intervention / variant / rollback / restored 的真实执行引用。模型声明、拒绝执行或普通 shell 回显不是已执行实验。旧记录保持可读、不自动追认；新完成判定按当前证据合同执行。
 - 文档变更检查路径与术语；局部代码跑类型、lint 与受影响契约；集成收口跑全套 tests / coverage / gates / build 和必要 Browser QA。发布打包仅在发布配置受影响时执行。
 
@@ -78,7 +79,7 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 - **Secret**：`safeStorage` 不可用则 fail-closed；secret 不得进入 renderer / IPC 明文 / Trace / RequestPlan。
 - **Browser Bridge (debug-only)**: only `RDC_AGENT_BROWSER_QA=1` (launcher browser/browser-dev) starts it. The authoritative entry is the one-time `/qa?qaBootstrap=...` URL printed by the launcher; successful bootstrap mints an HttpOnly `SameSite=Strict` cookie (with `Secure` for HTTPS) and redirects to clean `/app` on the **same bridge origin**. In `browser-dev`, Vite is reverse-proxied through the bridge (including HMR WebSocket); the browser never opens the Vite port and never carries bridge auth or a challenge in a URL query. Cookie-authenticated `/invoke`, `/events`, and `/api/*` require `Origin` equal to the bridge origin. Dev proxy strips `cookie` / `authorization` / `proxy-authorization` / `x-rdc-*` before forwarding to Vite. Programmatic clients may use an explicit Bearer header. Channel capability is a closed `Record<RendererInvokeChannel, BridgeChannelCapability>` in `src/shared/renderer-api/channelCapabilities.ts`; TypeScript forces every new channel to be classified; unknown channels fail closed. `high-impact` additionally requires `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`; `desktop-only` is always denied. Browser and Desktop share the single `src/shared/renderer-api` ElectronAPI factory and channel manifest. This surface is never part of the release default path. See docs/contracts/permissions.md and docs/architecture/browser-qa-surface.md.
 - **MCP project**：同 ID 不可覆盖 user 的 command/args/url/env；变更需 `needsRetrust` + 显式 trust；运行时连接按 `projectRoot + descriptorHash` 建立独立 ref-counted pool，handoff 只属于当前 Turn terminal result。
-- **RDX**：无内置 CLI 副本；Open `.rdc` 等垂直入口只走 Settings 配置的 shell action。Mission 只读面与 `rdx_probe` 见裁决 J。
+- **RDX**：无内置 CLI 副本；Open `.rdc` 等垂直入口只走 Settings 配置的 CLI 与应用固定生命周期对接。Mission 只读面与 `rdx_probe` 见裁决 J。
 - **外部解释器**：`code_interpreter` 只执行 Settings `tooling.codeInterpreter` 配置的本机解释器（默认探测系统 Python）；不内置运行时，不挂 `rdxCli`，未启用 fail-closed。产物经 `RDC_INTERPRETER_ARTIFACTS_DIR` 扫描登记。
 - **`read_image`**：`visionInputMode !== 'native'` 时 `VISION_INPUT_UNSUPPORTED` fail-closed，与附件 vision 输入一致。
 - **图像预览单通道**：工具图只经 session `image-previews` + `conversation:getToolImagePreview`（Zod + active-session gate）给 renderer；大 base64 不得进入 `resultPreview`。模型侧把 tool-result 图桥成紧随的 user image part，禁止静默丢图。用户附件缩略图走 `conversation:getAttachmentPreview`：staging 预览无 session；已提交附件必须带 `sessionId` 且过 active-session gate。
@@ -182,7 +183,7 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 
 - 不新增平台级 InvestigationGraph、第二 TaskStore 或第二 Agent Runtime。
 - `TaskRecord.metadata`、`AgentProfile.metadata`、`ConversationMessage` 禁止领域字段；垂直记录只能引用 task id。
-- 不注册约 194 个 RDX 工具，不把 RDX 做成 MCP。RDX 仍是外部 CLI，无内置副本。**General** 通过 Settings 配置的 shell action / `shell` 执行需要 lease 的 Live RDC 操作。**Mission planner（debugger/analyzer/optimizer）禁止 `shell` 与 `code_interpreter`**；只通过受控只读 `rdx_probe` + `rdx_context`（lease 状态）访问 RDX。
+- 不把 RDX 操作集合注册成独立模型工具，不把 RDX 做成 MCP。RDX 仍是外部 CLI，无内置副本。**General** 通过 Settings 配置的 CLI 与结构化 `shell.rdx` 执行需要 lease 的 Live RDC 操作。**Mission planner（debugger/analyzer/optimizer）禁止 `shell` 与 `code_interpreter`**；只通过受控只读 `rdx_probe` + `rdx_context`（lease 状态）访问 RDX。
 - Knowledge 持久写入仅 human review；`FullAccess` 不可绕过；无自动 Memory / Knowledge / Candidate / Promote。
 - 新结构替代旧结构时直接收敛；默认不保留 legacy / deprecated shim。
 - **禁止恢复** Embedding capability / Semantic lane / `settings.llm.embedding` / `EmbeddingCatalog` / `EmbeddingExecutionService`。Discovery 对 embedding/embeddings modality 继续 fail-closed 剔除。
@@ -292,7 +293,7 @@ T19 逐项裁决（删除 / 保留理由 / 调用方）：
 | | 裁决 |
 | --- | --- |
 | **当前态** | 三 Mission profile 已为严格 plan-only：token 展开剔除 `shell` / `code_interpreter` / `output_register`，四层 enforcement（profile 解析、冻结 EffectiveRuntimePlan、AgentPermissionPolicy hard deny、tool activation）已落地，Full access 不能绕过。`rdx_probe` 已实现（Settings `tooling.rdxCli` 只读 closed allowlist；lease 仅当前 session；raw `.rdc` bytes 不进模型）。T18 ColdData 已证见下文已证组。产品级 Browser QA 全矩阵见 U05；U06 仅保留历史运行事实；Optimizer 真实实验结论已撤回，见 ledger 更正。 |
-| **目标态** | Mission profiles（`debugger` / `analyzer` / `optimizer`）runtime allowlist **仅允许**下列工具。**General** 通过 Settings 配置的 shell action / `shell` 执行需要 lease 的 Live RDC 操作。 |
+| **目标态** | Mission profiles（`debugger` / `analyzer` / `optimizer`）runtime allowlist **仅允许**下列工具。**General** 通过 Settings 配置的 CLI 与结构化 `shell.rdx` 执行需要 lease 的 Live RDC 操作。 |
 | **迁移门禁** | T00 定稿契约；T03 落地四层 enforcement；T06 落地 delegated lease 与 `rdx_probe` 执行。不得只靠 prompt 文案。Full access 不能绕过。 |
 
 Mission profiles runtime allowlist **仅允许**：
@@ -404,3 +405,5 @@ prepared → consumed → receiving turn 的取消所有权转交不能丢失已
 - Open 加载可证的最终呈现颜色输出；事件滑条实际 apply。requested/applied/image EID、generation、revision 分离，迟到画面不得重标为新事件。应用 preview 是 main 校验后交付的内嵌图片；退役独立 human-preview API 和 Settings action。独立 Tools CLI 的窗口输出仍是有效外部功能。
 - 足迹位于 `<project>/.rdx/replay/<sessionId>/<captureSha256>`，内容 SHA-256 与 lease 身份摘要分离。图片最大边 960 px，PNG 保持 alpha；session 256 MiB、project 2 GiB，到限停止保存、不淘汰旧证据。关闭保留历史；重启只恢复选择和历史，不自动打开或占设备。
 - native Remote 当前返回 `unsupported`，不能声称 Android 设备显示已同步。本地 native observation 通过不代表 Android 屏幕呈现通过；真实验收依 acceptance ledger 分项记录。
+
+Android 设备选择不发起脱离 owning context 的连接。连接统一发生在 Capture 会话生命周期中；已有 helper 的借用与自有 helper 的清理由 Tools 实际归属决定，应用不得按设备类型关闭用户服务。确定性 Mission 编排验收与真实模型效果验收分别记录。

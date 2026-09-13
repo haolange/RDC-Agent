@@ -14,7 +14,7 @@ Every change must define verification before implementation. Prefer:
 
 RDX tool execution is not a bundled bridge or repository resource. The current forward path is:
 
-`UI/agent -> Settings shell action or shell -> ShellInvocationService -> system-installed CLI -> JSON runtime context`
+`UI/agent -> fixed session boundary or shell -> ShellInvocationService -> system-installed CLI -> canonical JSON runtime context`
 
 Catalog/runtime summary configuration reads `settings.tooling.rdxCli`:
 
@@ -24,14 +24,13 @@ Catalog/runtime summary configuration reads `settings.tooling.rdxCli`:
 - `workingDirectory`
 - `env`
 - `timeoutMs`
-- `catalogPath`
-- `jsonMode`
+  - catalog is discovered from the configured CLI with `tools list --full`
 
-Open `.rdc` (`openCapture` / `openRemoteCapture`), connect remote, preview, and close runtime read `settings.tooling.rdxActions`. If the CLI/action configuration is disabled or incomplete, execution fails closed with an explicit diagnostic. There is no repository-path fallback.
+Open `.rdc`, connect remote, preview, and close runtime use fixed native RDX operations through the owning session context. CLI installation settings remain configurable; lifecycle command templates are not settings. If the CLI configuration is disabled or incomplete, execution fails closed with an explicit diagnostic.
 
 ## Catalog Contract
 
-The tool catalog is loaded from the configured `catalogPath`. Catalog metadata is exposed through `tool:getCatalog` and `tool:getRuntimeSummary`.
+The tool catalog is loaded from the same configured CLI using `tools list --full`; catalog metadata is exposed through `tool:getCatalog` and `tool:getRuntimeSummary`.
 
 Workbench right rail must **not** render a per-tool `rd.*` inventory, CLI catalog summary, tool count, or namespace counts. The session Capture area consumes the owner-session opened-capture and runtime context snapshot for `.rdc` selection, open/preview state, Replay Device, compact diagnostics, and Copy. contextId/replaySessionId/capture ids, lease/runtime owner, remoteId, and remote status remain owner-scoped agent data. Renderer code cannot invoke arbitrary tools; execution stays on Settings shell actions / shell -> `ShellInvocationService` -> external CLI.
 

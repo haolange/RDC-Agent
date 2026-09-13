@@ -3,20 +3,7 @@
  */
 
 // 工具命名空间
-export type ToolNamespace =
-  | 'capture'
-  | 'session'
-  | 'event'
-  | 'replay'
-  | 'pipeline'
-  | 'shader'
-  | 'texture'
-  | 'resource'
-  | 'export'
-  | 'remote'
-  | 'core'
-  | 'macro'
-  | 'vfs';
+export type ToolNamespace = string;
 
 // 工具定义
 export interface ToolDefinition {
@@ -89,13 +76,25 @@ export interface ToolArtifact {
   metadata: Record<string, unknown>;
 }
 
+export interface RdxOperationDefinition extends Record<string, unknown> {
+  name: string;
+  namespace: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+  scope: 'global' | 'context' | 'replay' | 'capture';
+  effects: string[];
+  evidence_kind: 'measurement' | 'intervention' | 'rollback' | null;
+  path_inputs: Array<{ name: string; access: 'read' | 'write' | 'read_directory' }>;
+}
+
 // 工具目录
 export interface ToolCatalog {
   schema_version: string;
   source_path?: string;
   tool_count?: number;
   generated_at?: string;
-  tools: ToolDefinition[];
+  tools: RdxOperationDefinition[];
+  fingerprint: string;
   namespaces: Record<ToolNamespace, {
     description: string;
     groups: string[];

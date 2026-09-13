@@ -1,6 +1,6 @@
 /**
  * Canonical builtin Skill inventory for T12.
- * 22 Mission / Knowledge / Coordinator + 6 general. No orphan, duplicate, or legacy names.
+ * 22 Mission / Knowledge / Coordinator + 9 general. No orphan, duplicate, or legacy names.
  */
 
 import { isMissionAgentId } from '../types/agent';
@@ -12,6 +12,9 @@ export const GENERAL_SKILL_IDS = [
   'remember',
   'rdc-context',
   'rdx-cli-shell',
+  'debugger-rdx-tools',
+  'analyzer-rdx-tools',
+  'optimizer-rdx-tools',
 ] as const;
 
 export const MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS = [
@@ -49,7 +52,12 @@ export type SkillCallEntry = 'agent.md-skills' | 'task-matched-or-explicit';
 export type CanonicalSkillLane = 'general' | 'mission-knowledge-coordinator';
 
 /** Skills whose tool surface conflicts with Mission plan-only and must stay on General. */
-export const PLAN_ONLY_CONFLICT_SKILL_IDS = ['rdx-cli-shell'] as const;
+export const PLAN_ONLY_CONFLICT_SKILL_IDS = [
+  'rdx-cli-shell',
+  'debugger-rdx-tools',
+  'analyzer-rdx-tools',
+  'optimizer-rdx-tools',
+] as const;
 
 export const SKILL_ARMED_BY_PROFILE: Record<string, readonly string[]> = {
   general: ['execution-orchestrator'],

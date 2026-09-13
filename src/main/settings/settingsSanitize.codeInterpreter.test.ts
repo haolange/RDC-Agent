@@ -3,7 +3,7 @@ import { sanitizeAgentShellSettings, sanitizeCodeInterpreterSettings, sanitizeTo
 
 describe('sanitizeCodeInterpreterSettings', () => {
   it('fills defaults when the field is missing', () => {
-    const tooling = sanitizeToolingSettings({ rdxCli: {}, rdxActions: {} });
+    const tooling = sanitizeToolingSettings({ rdxCli: {} });
     expect(tooling.codeInterpreter).toEqual({
       enabled: false,
       command: '',
@@ -25,7 +25,6 @@ describe('sanitizeCodeInterpreterSettings', () => {
   it('does not accept a project-shaped extra shell payload beyond executable', () => {
     const tooling = sanitizeToolingSettings({
       rdxCli: {},
-      rdxActions: {},
       shell: { executable: '/bin/bash', env: { HOME: '/tmp' }, cwd: '/tmp' },
     });
     expect(tooling.shell).toEqual({ executable: '/bin/bash' });

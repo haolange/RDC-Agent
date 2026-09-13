@@ -1,4 +1,5 @@
 import { parseRdxNativeResult } from './RdxNativeProtocol';
+import { canonicalJson, deepFreeze, validateDefinitions, validateApplicationOperations } from './RdxOperationCatalog';
 import fs from 'fs';
 import path from 'path';
 import type {
@@ -16,32 +17,10 @@ import { settingsService } from '../settings/SettingsService';
 import { shellInvocationService, type ShellInvocationService } from './ShellInvocationService';
 import { resolveRdxBatchInvocation } from './resolveRdxBatchInvocation';
 
-const EMPTY_NAMESPACES: ToolCatalog['namespaces'] = {
-  capture: { description: '', groups: [] },
-  session: { description: '', groups: [] },
-  event: { description: '', groups: [] },
-  replay: { description: '', groups: [] },
-  pipeline: { description: '', groups: [] },
-  shader: { description: '', groups: [] },
-  texture: { description: '', groups: [] },
-  resource: { description: '', groups: [] },
-  export: { description: '', groups: [] },
-  remote: { description: '', groups: [] },
-  core: { description: '', groups: [] },
-  macro: { description: '', groups: [] },
-  vfs: { description: '', groups: [] },
-};
-
-const EMPTY_CATALOG: ToolCatalog = {
-  schema_version: 'unconfigured',
-  tool_count: 0,
-  tools: [],
-  namespaces: EMPTY_NAMESPACES,
-};
-
 export class RdxCliInvokerService {
-  private catalog: ToolCatalog | null = null;
-  private catalogPath: string | null = null;
+  private catalogs = new Map<string, Promise<ToolCatalog>>();
+  private validatedCatalogs = new Map<string, ToolCatalog>();
+  private versions = new Map<string, string>();
   private traceListeners = new Set<(trace: ToolTraceEntry) => void>();
 
   constructor(private readonly shell: ShellInvocationService = shellInvocationService) {}
@@ -51,15 +30,14 @@ export class RdxCliInvokerService {
   }
 
   private createRuntimeMetadata(settings = this.getSettings(), catalog?: Partial<ToolCatalog>): ToolRuntimeMetadata {
-    const catalogPath = settings.catalogPath.trim();
     return {
       source: settings.enabled && settings.command.trim() ? 'configured' : 'unconfigured',
       command: settings.command.trim(),
       workingDirectory: settings.workingDirectory.trim(),
-      version: null,
+      version: this.versions.get(canonicalJson(settings)) ?? null,
       catalog: {
-        path: catalogPath,
-        exists: catalogPath ? fs.existsSync(catalogPath) : false,
+        path: '',
+        exists: !!catalog?.fingerprint,
         schemaVersion: catalog?.schema_version ?? null,
         generatedAt: catalog?.generated_at ?? null,
         toolCount: catalog?.tool_count ?? (Array.isArray(catalog?.tools) ? catalog.tools.length : null),
@@ -82,82 +60,69 @@ export class RdxCliInvokerService {
   }
 
   isAvailable(): boolean {
-    return this.getAvailabilityFailure() === undefined;
+    return this.getAvailabilityFailure() === undefined && this.validatedCatalogs.has(canonicalJson(this.getSettings()));
   }
 
   getRuntimeMetadata(): ToolRuntimeMetadata {
-    return this.createRuntimeMetadata(this.getSettings(), this.catalog ?? undefined);
-  }
-
-  async loadCatalog(): Promise<ToolCatalog> {
     const settings = this.getSettings();
-    const catalogPath = settings.catalogPath.trim();
-    if (!catalogPath) {
-      this.catalog = { ...EMPTY_CATALOG, runtime: this.createRuntimeMetadata(settings) };
-      this.catalogPath = null;
-      return this.catalog;
-    }
-    if (this.catalog && this.catalogPath === catalogPath) {
-      return this.catalog;
-    }
-    if (!fs.existsSync(catalogPath)) {
-      this.catalog = { ...EMPTY_CATALOG, runtime: this.createRuntimeMetadata(settings) };
-      this.catalogPath = catalogPath;
-      return this.catalog;
-    }
-
-    const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf-8')) as ToolCatalog;
-    this.catalog = {
-      ...catalog,
-      runtime: this.createRuntimeMetadata(settings, catalog),
-    };
-    this.catalogPath = catalogPath;
-    return this.catalog;
+    return this.createRuntimeMetadata(settings, this.validatedCatalogs.get(canonicalJson(settings)));
   }
 
-  async getRuntimeSummary(): Promise<ToolRuntimeSummary> {
-    const settings = this.getSettings();
-    const catalog = await this.loadCatalog();
-    const namespaceCounts = new Map<string, number>();
-    for (const tool of catalog.tools ?? []) {
-      namespaceCounts.set(tool.namespace, (namespaceCounts.get(tool.namespace) ?? 0) + 1);
-    }
-
-    const unavailableReason = this.getAvailabilityFailure(settings);
-    const namespaces = Array.from(namespaceCounts.entries()).map(([namespace, toolCount]) => ({
-      namespace: `rd.${namespace}.*`,
-      toolCount,
-      available: !unavailableReason,
-    }));
-
-    return {
-      runtime: this.createRuntimeMetadata(settings, catalog),
-      cli: {
-        available: !unavailableReason,
-        unavailableReason,
-      },
-      namespaces,
-    };
+  async loadCatalog(settings: RdxCliInvokerSettings = this.getSettings(), refresh = false): Promise<ToolCatalog> {
+    const frozen = deepFreeze(structuredClone(settings));
+    const key = canonicalJson(frozen);
+    const unavailable = this.getAvailabilityFailure(frozen);
+    if (unavailable) throw new Error(unavailable);
+    if (refresh) { this.catalogs.delete(key); this.validatedCatalogs.delete(key); this.versions.delete(key); }
+    const cached = this.catalogs.get(key);
+    if (cached) return cached;
+    const loading = (async () => {
+      const version = parseRdxNativeResult(await this.executeCLI('version', ['--json'], { settings: frozen }), undefined, 'rdx.version');
+      if (version.schema_version !== '3.0.0' || version.data.schema_version !== '3.0.0'
+        || typeof version.data.tool_version !== 'string' || !version.data.tool_version.trim()) {
+        throw new Error('RDX_UPGRADE_REQUIRED: the configured CLI must provide the current canonical JSON contract.');
+      }
+      const envelope = parseRdxNativeResult(await this.executeCLI('tools', ['list', '--full', '--json'], { settings: frozen }), undefined, 'rdx.tools.list');
+      if (envelope.schema_version !== '3.0.0' || envelope.data.schema_version !== '1') throw new Error('RDX_UPGRADE_REQUIRED: unsupported catalog envelope schema.');
+      const tools = validateDefinitions(envelope.data.tools, envelope.data.tool_count, envelope.data.fingerprint);
+      validateApplicationOperations(tools);
+      const namespaces: ToolCatalog['namespaces'] = {};
+      for (const tool of tools) namespaces[tool.namespace] ??= { description: '', groups: [] };
+      this.versions.set(key, version.data.tool_version);
+      const catalog: ToolCatalog = deepFreeze({ schema_version: '1', fingerprint: String(envelope.data.fingerprint), tools,
+        tool_count: tools.length, namespaces, runtime: this.createRuntimeMetadata(frozen, { tool_count: tools.length, schema_version: '1', fingerprint: String(envelope.data.fingerprint) }) });
+      this.validatedCatalogs.set(key, catalog);
+      return catalog;
+    })();
+    this.catalogs.set(key, loading);
+    try { return await loading; } catch (error) { this.catalogs.delete(key); this.validatedCatalogs.delete(key); this.versions.delete(key); throw error; }
   }
 
-  private normalizeCliArgs(args: string[]): string[] {
-    const normalized: string[] = [];
-    for (let index = 0; index < args.length; index += 1) {
-      const current = args[index];
-      normalized.push(current === '--context-id' ? '--daemon-context' : current);
+  async getRuntimeSummary(refresh = false): Promise<ToolRuntimeSummary> {
+    const settings = structuredClone(this.getSettings());
+    if (refresh) {
+      const key = canonicalJson(settings);
+      this.catalogs.delete(key); this.validatedCatalogs.delete(key); this.versions.delete(key);
     }
-    return normalized;
+    try {
+      const catalog = await this.loadCatalog(settings);
+      const counts = new Map<string, number>();
+      for (const tool of catalog.tools) counts.set(tool.namespace, (counts.get(tool.namespace) ?? 0) + 1);
+      return { runtime: this.createRuntimeMetadata(settings, catalog), cli: { available: true },
+        namespaces: [...counts].map(([namespace, toolCount]) => ({ namespace: `rd.${namespace}.*`, toolCount, available: true })) };
+    } catch (error) {
+      return { runtime: this.createRuntimeMetadata(settings), cli: { available: false, unavailableReason: error instanceof Error ? error.message : String(error) }, namespaces: [] };
+    }
   }
 
   private buildCommandArgs(settings: RdxCliInvokerSettings, command: string, args: string[]): string[] {
-    const normalized = this.normalizeCliArgs(args);
     const globalArgs: string[] = [];
     const commandArgs: string[] = [];
 
-    for (let index = 0; index < normalized.length; index += 1) {
-      const current = normalized[index];
+    for (let index = 0; index < args.length; index += 1) {
+      const current = args[index];
       if (current === '--daemon-context') {
-        const value = normalized[index + 1];
+        const value = args[index + 1];
         if (value) {
           globalArgs.push(current, value);
           index += 1;
@@ -214,6 +179,7 @@ export class RdxCliInvokerService {
         ...options.env,
       },
       timeoutMs: options.timeout ?? settings.timeoutMs,
+      outputBufferBytes: 8 * 1024 * 1024,
       runId: options.runId,
       contextId: options.contextId,
       abortSignal: options.abortSignal,

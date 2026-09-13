@@ -12,16 +12,12 @@ export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void
 
   ipcMain.handle('tool:getCatalog', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'tool:getCatalog', maxBytes: 1024 });
-    try {
-      return await rdxCliInvokerService.loadCatalog();
-    } catch {
-      return { tools: [], namespaces: {} };
-    }
+    return rdxCliInvokerService.loadCatalog();
   });
 
   ipcMain.handle('tool:getRuntimeSummary', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'tool:getRuntimeSummary', maxBytes: 1024 });
-    return rdxCliInvokerService.getRuntimeSummary();
+    return rdxCliInvokerService.getRuntimeSummary(true);
   });
 
   ipcMain.handle('mcp:getStatusSummary', async (_event, ...rawArgs: unknown[]) => {

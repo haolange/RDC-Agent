@@ -10,7 +10,7 @@ The agent runtime owns agent turns, tool mediation policy, deterministic events,
 - Agent route capability gates tool registration before each turn. Only `native-structured` routes receive tool schemas and enter the tool execution loop.
 - Prompt composition lives in `src/main/agent-runtime/prompt`. Conversation code collects context, but does not hand-code provider/tool prompt fragments.
 - Tool capability comes only from the effective profile manifest ∩ active skill ∩ policy ∩ runtime prerequisites. Empty tools fail-closed (`AGENT_TOOLS_EMPTY`). There is no Ask-readonly / Plan→Edit / custom→Edit hardcoded fallback. General is the Execution Orchestrator; Debugger / Analyzer / Optimizer are Planning Orchestrators. ask/plan/edit and S0 specialist ids are reserved historical ids: drop from the effective snapshot with `AGENT_ID_RESERVED_HISTORICAL`. There is no custom-manifest runtime channel (U01).
-- Mission profiles (`debugger` / `analyzer` / `optimizer`) are plan-only: they must not receive `shell` or `code_interpreter`. They access RDX only through controlled read-only `rdx_probe` plus `rdx_context` (current session lease status). General executes lease-holding Live RDC operations through Settings-configured shell actions and `shell`. RDX-specific app entries are mediated by Settings shell actions and `ShellInvocationService`. See `DESIGN.md` adjudication J.
+- Mission profiles (`debugger` / `analyzer` / `optimizer`) are plan-only: they must not receive `shell` or `code_interpreter`. They access RDX only through controlled read-only `rdx_probe` plus `rdx_context` (current session lease status). General executes lease-holding Live RDC operations through the fixed session boundary and `shell`; installation settings are mediated by `ShellInvocationService`. See `DESIGN.md` adjudication J.
 - No RDC-specific bridge, MCP server, or skill registry is injected as a hidden default tool path.
 - Assistant text is never parsed as an executable tool call. Textual tool-call shaped output produces a diagnostic event only.
 
@@ -23,7 +23,7 @@ Mission planner -> rdx_probe / rdx_context (read-only Settings actions) -> Shell
 General or UI -> shell or Settings shell action (lease-holding Live RDC) -> ShellInvocationService -> system-installed RDX CLI -> RdxRuntimeContext
 ```
 
-`ToolRegistry` continues to mediate runtime tool requests, but RDX CLI command configuration is not stored in the registry. Catalog/runtime summary configuration is stored in `settings.tooling.rdxCli`; openCapture / openRemoteCapture / connect / preview / close command recipes are stored in `settings.tooling.rdxActions`.
+`ToolRegistry` continues to mediate runtime tool requests, but RDX CLI command configuration is not stored in the registry. Installation configuration is stored in `settings.tooling.rdxCli`; the catalog is read from that same CLI and lifecycle operations are fixed in the main session boundary.
 
 General agent tools are mediated by `AgentPermissionPolicy` before execution. The policy combines profile allowlists, permission mode, workspace root, configured readable/writable roots, command allow/deny lists, and tool metadata. Routine workspace inspection can run in `Default`; external files, mutation, network, destructive shell, and unrecognized commands emit approval or auto-review events. Temporary external path access is granted only for the approved tool call and is not a renderer-side bypass.
 
