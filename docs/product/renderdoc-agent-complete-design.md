@@ -81,7 +81,7 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 | Context | 这次推理看什么、如何压缩、如何 drilldown | PromptPlan + Artifactization + Mission Checkpoint |
 | Knowledge | 可复用什么、Scope、验证等级、冲突 | 五服务 + 六 lane markdown-first；canonical 仍在 `~/.rdx/knowledge` 或 `<project-root>/.rdx/knowledge`；读根免审批见 U02 / 裁决 G |
 
-端到端生命周期：用户选择 Mission → Planning Orchestrator → 有限探测与 Knowledge 检索 → plan artifact → durable Handoff → General Execution Orchestrator → Tasks 展开 → Live RDC 串行 + Offline 可并行 → 垂直记录 → Skeptic → Small Loop 或 Big Loop → 报告。Session Candidate **不是**默认产物：仅当用户显式点击 / 命令，或 Agent 在本轮得到明确用户意图后显式调用 `knowledge_candidate_create` 才创建。持久 Promote 仍只能 human review。
+端到端生命周期：用户选择 Mission → Planning Orchestrator → 有限探测与 Knowledge 检索 → `plan_artifact` 用户审阅（拒绝修订同一份，批准冻结）→ durable Handoff → General Execution Orchestrator → Tasks 展开 → Live RDC 串行 + Offline 可并行 → 垂直记录 → Skeptic → Small Loop 或 Big Loop → 报告。Session Candidate **不是**默认产物：仅当用户显式点击 / 命令，或 Agent 在本轮得到明确用户意图后显式调用 `knowledge_candidate_create` 才创建。持久 Promote 仍只能 human review。
 
 ---
 

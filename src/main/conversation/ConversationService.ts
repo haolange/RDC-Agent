@@ -7,10 +7,6 @@ import * as os from 'os';
 import * as path from 'path';
 import type {
   ConversationAttachmentInput,
-  ConversationAnswerToolApprovalRequest,
-  ConversationAnswerToolApprovalResult,
-  ConversationAnswerUserInputRequest,
-  ConversationAnswerUserInputResult,
   ConversationCancelActiveTurnRequest,
   ConversationCancelActiveTurnResult,
   ConversationMessage,
@@ -31,8 +27,11 @@ import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { SessionRecord } from '@shared/types/session';
 import { generateEventId } from '@shared/utils/id';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
-import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
-import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
+import {
+  answerConversationPlanReview,
+  answerConversationToolApproval,
+  answerConversationUserInput,
+} from './ConversationInteractionAnswers';
 import { traceService } from '../agent-trace/TraceService';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
 import { rdxSessionService } from '../sessions';
@@ -231,13 +230,9 @@ export class ConversationService {
     };
   }
 
-  answerUserInput(request: ConversationAnswerUserInputRequest): ConversationAnswerUserInputResult {
-    return agentUserInputRequestService.answer(request);
-  }
-
-  answerToolApproval(request: ConversationAnswerToolApprovalRequest): ConversationAnswerToolApprovalResult {
-    return agentToolApprovalRequestService.answer(request);
-  }
+  answerUserInput = answerConversationUserInput;
+  answerPlanReview = answerConversationPlanReview;
+  answerToolApproval = answerConversationToolApproval;
   private registerActiveTurn(turn: ActiveConversationTurn): void {
     this.activeTurns.set(turn.turnId, turn);
     if (turn.sessionId) setRdxInteractionLock(turn.sessionId, turn.turnId, true);

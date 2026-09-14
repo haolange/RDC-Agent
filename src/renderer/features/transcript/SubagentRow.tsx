@@ -55,6 +55,13 @@ const renderChildRow = (row: WorkProcessRow): React.ReactNode => {
       </li>
     );
   }
+  if (row.type === 'planReview') {
+    return (
+      <li key={row.id} className={`work-process-child-summary status-${row.status}`}>
+        <span className="work-process-child-text">{row.plan.title}</span>
+      </li>
+    );
+  }
   if (row.type === 'userInput') {
     const summary = row.items.map((item) => item.prompt).filter(Boolean).join(' · ');
     return (

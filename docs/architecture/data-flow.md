@@ -28,7 +28,7 @@ sequenceDiagram
   IPC-->>UI: message patches and trace projection
 ```
 
-`.agent.md` is the source for instructions, model, tools, agent handoffs, skills, MCP servers, and invocability. `plan.md` is a normal artifact or message output, not a workflow IPC state.
+`.agent.md` is the source for instructions, model, tools, agent handoffs, skills, MCP servers, and invocability. `plan_artifact` is a human-in-the-loop pause with a live session plan and a frozen approved copy; it is not a Right Rail output.
 
 ## RDX Shell Actions
 

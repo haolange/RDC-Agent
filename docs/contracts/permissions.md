@@ -116,3 +116,7 @@ Skill 权限只在 prepareTurn 对预载集合取交集；skill_read 只读方�
 捕获操作使用显式 SessionScope，main 校验 session/project 与已登记输入。图片导出路径由 main 创建；原生返回必须匹配该精确路径，再读取图片并清理临时目录。renderer 仅收到验证后的图片，不接受任意文件路径。历史 API 校验 session/project 和 SHA-256 标识，不能越权访问其他项目。
 
 `capture:applyReplayEvent`、`capture:refreshFrame` 为 mutation；历史读取为 read，历史清除为 high-impact。Project RDC 删除使用一次性 approvalToken；它与仅清理足迹不是同一操作。手动操作必须通过 Agent 生命周期锁和 owning native context 队列。
+
+## 计划文件操作
+
+plan:* 以当前查看 session + planId/revision/URI/hash 定位持久历史 tool call，由主进程解析创建 Agent 和实际 owning session；不以当前 session 配置补历史身份。导出路径由主进程原生保存对话框选定，保存到项目的路径由主进程固定计算。单次 approvalToken 绑定 action、viewer/owner、计划身份、URI/hash 和规范化目标，确认后复验；不接受 renderer 更换目标，不沿链接写入。取消不签发 token，写盘原子提交并验证，失败保留原文件。

@@ -85,3 +85,5 @@ Outputs use the same session-owned projection path. `output_register` writes an 
 `project:inputsChanged` 反映完整扫描确认并持久化的当前输入，发布不等待回放清理成功。清理错误与待办通过独立 `replayCleanupPending` 和 `project:inputsError` 保留；renderer 不从清理待办、旧 capture binding 或历史足迹恢复已确认不存在的 RDC。最后一个输入删除后，重新挂载或重启仍显示原空态。
 
 Agent preparing 与 active turn 使用独立锁 owner，准备转入运行时不能出现解锁间隙；delegation 和 native process 未确认退出仍为锁定。运行中允许只读足迹，禁止人工打开/关闭/切文件/切设备/事件 apply。
+
+计划门与普通工具审批互斥投影，包括 delegated 请求。子计划的内容与决定绑定 child owner，parent 仅承载显示与回答入口。建议行 Agent 切换成功后才预填/发送；当前会话变化、Stop、请求失效或切换失败必须丢弃迟到结果，不覆盖其他会话草稿。

@@ -9,7 +9,7 @@ General 消费本次执行绑定中的 Plan URI/hash、必需 Skill、返回对�
 
 ## 共享 Plan 模板
 
-Plan 为按任务规模填写的 Markdown 策略，使用 plan_artifact 新版本保存并取得 URI/hash。必须说明以下六块，可明确标注不适用原因：
+Plan 为按任务规模填写的 Markdown 策略。Mission 用 plan_artifact 提交当前计划等待用户审阅；拒绝按意见修订同一份；批准后按返回的 handoff 目标调用 agent_handoff 绑定冻结 Plan URI/hash。必须说明以下六块，可明确标注不适用原因：
 
 1. **目标与边界**：用户目标、成功标准、范围、质量约束、能力上限、输入缺口。
 2. **输入与参考依据**：输入引用、已知事实、未知项；Knowledge 来源、适用条件、反例、失败经验和冲突。相似度只帮助选检查方向，不构成事实或因果证据。

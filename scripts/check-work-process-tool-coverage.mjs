@@ -177,8 +177,19 @@ const FIXTURES = {
     resultPreview: toolEnvelope('Deleted project-notes', { name: 'project-notes' }),
   },
   plan_artifact: {
-    argsPreview: JSON.stringify({ title: 'Plan', content: '# Plan' }),
-    resultPreview: toolEnvelope('Plan artifact ready', { title: 'Plan' }),
+    argsPreview: JSON.stringify({ title: 'Plan', summary: ['Goal'], content: '## Goal\nFind the drop.' }),
+    planReview: {
+      planId: 'plan-1',
+      revision: 1,
+      uri: 'session://plans/plan.md',
+      hash: 'a'.repeat(64),
+      title: 'Plan',
+      summary: ['Goal'],
+      sections: [{ heading: 'Goal', body: 'Find the drop.' }],
+      status: 'awaiting',
+      handoffOptions: [{ label: 'Execute with General', agent: 'general' }],
+    },
+    resultPreview: toolEnvelope('Awaiting plan review', { title: 'Plan' }),
   },
   output_register: {
     argsPreview: JSON.stringify({ path: 'qa-output.md', display_name: 'QA Output' }),
@@ -337,6 +348,7 @@ for (const toolName of allTools) {
     toolName,
     status: 'complete',
     userInputQuestions: fixture.userInputQuestions,
+    planReview: fixture.planReview,
     argsPreview: fixture.argsPreview,
     resultPreview: fixture.resultPreview,
     startedAt: now,
@@ -347,6 +359,13 @@ for (const toolName of allTools) {
     assert(row.type === 'userInput', 'ask_user should render as userInput row');
     assert(row.verb !== 'Asked user', 'ask_user should use localized semantic verb');
     assert(row.items.length > 0 && row.items[0].prompt.length > 0, 'ask_user should expose transcript question items');
+    continue;
+  }
+
+  if (toolName === 'plan_artifact') {
+    assert(row.type === 'planReview', 'plan_artifact with planReview should render as planReview row');
+    assert(row.plan?.title === 'Plan', 'planReview row should expose the plan title');
+    assert(row.plan?.status === 'awaiting', 'planReview fixture should stay awaiting');
     continue;
   }
 

@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import type {
   ConversationAnswerToolApprovalRequest,
+  ConversationAnswerPlanReviewRequest,
   ConversationAnswerUserInputRequest,
   ConversationCancelActiveTurnRequest,
   ConversationRewriteFromMessageRequest,
@@ -13,6 +14,7 @@ import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import {
+  ConversationAnswerPlanReviewArgsSchema,
   ConversationAnswerToolApprovalArgsSchema,
   ConversationAnswerUserInputArgsSchema,
   ConversationCancelActiveTurnArgsSchema,
@@ -167,6 +169,14 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       maxBytes: 256 * 1024,
     }) as [ConversationAnswerUserInputRequest];
     return conversationService.answerUserInput(request);
+  });
+
+  ipcMain.handle('conversation:answerPlanReview', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(ConversationAnswerPlanReviewArgsSchema, rawArgs, {
+      label: 'conversation:answerPlanReview',
+      maxBytes: 32 * 1024,
+    }) as [ConversationAnswerPlanReviewRequest];
+    return conversationService.answerPlanReview(request);
   });
 
   ipcMain.handle('conversation:answerToolApproval', async (_event, ...rawArgs: unknown[]) => {

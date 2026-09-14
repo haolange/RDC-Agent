@@ -83,6 +83,40 @@ export function buildPresentationUnits(
       continue;
     }
 
+    if (block.kind === 'plan_review') {
+      const planReviewRows = ctx.groupProcessRows(block.toolCalls.map((call) => ctx.createToolRow(call)));
+      if (planReviewRows.length > 0) {
+        ctx.hasVisibleProcessEvidence = true;
+        const lastUnit = units[units.length - 1];
+        if (lastUnit?.kind === 'loop') {
+          const sectionRow = lastUnit.rows.find((row): row is Extract<WorkProcessRow, { type: 'section' }> => row.type === 'section');
+          if (sectionRow) {
+            sectionRow.steps.push(...planReviewRows);
+            const shouldDeferMergedRows = shouldDeferMergedSectionSteps(sectionRow);
+            sectionRow.stepsDisclosure = shouldDeferMergedRows ? 'deferred' : 'visible';
+            sectionRow.visibleSteps = aggregateSectionSteps(
+              createVisibleSectionSteps(sectionRow.steps, shouldDeferMergedRows),
+            );
+            sectionRow.stepCount = deps.countToolSteps(sectionRow.steps);
+            if (sectionRow.status === 'complete' && planReviewRows.some((child) => child.status === 'running' || child.status === 'pending')) {
+              sectionRow.status = 'running';
+            }
+            if (planReviewRows.some((child) => child.status === 'error')) {
+              sectionRow.status = 'error';
+              sectionRow.defaultOpen = true;
+            }
+            continue;
+          }
+        }
+        units.push({
+          kind: 'standalone',
+          rows: planReviewRows,
+          loopIds: [],
+        } satisfies StandalonePresentationUnit);
+      }
+      continue;
+    }
+
     if (block.kind === 'user_input') {
       const userInputRows = ctx.groupProcessRows(block.toolCalls.map((call) => ctx.createToolRow(call)));
       if (userInputRows.length > 0) {

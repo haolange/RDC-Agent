@@ -446,8 +446,16 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     id: 'plan_artifact',
     label: 'Plan Artifact',
     permission: 'mutation',
-    inputSchema: { type: 'object', required: ['content'], properties: { title: { type: 'string' }, content: { type: 'string' } } },
-    resultSummary: 'Writes the current plan to the active session artifact.',
+    inputSchema: {
+      type: 'object',
+      required: ['title', 'summary', 'content'],
+      properties: {
+        title: { type: 'string' },
+        summary: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 4 },
+        content: { type: 'string' },
+      },
+    },
+    resultSummary: 'Submits the current session plan for in-loop human review.',
     icon: 'file-check',
     approvalRequired: false,
   },

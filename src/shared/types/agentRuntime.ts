@@ -17,6 +17,7 @@ import type {
   ConversationDiagnosticSeverity,
   ConversationLoopStopReason,
 } from './conversation';
+import type { ConversationPlanReview, PlanReviewDecision } from './planReview';
 import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
 import type { ToolCallResult } from './tool';
 
@@ -142,13 +143,15 @@ export interface AgentApprovalEventPayload extends AgentEventBasePayload {
   title: string;
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   reason?: string;
-  kind?: 'tool' | 'ask_user' | 'run_start';
+  kind?: 'tool' | 'ask_user' | 'run_start' | 'plan_review';
   toolCallId?: string;
   toolName?: string;
   question?: string;
   options?: string[];
   questions?: ConversationAskUserQuestion[];
   answers?: ConversationAskUserAnswer[];
+  planReview?: ConversationPlanReview;
+  decision?: PlanReviewDecision;
   answer?: unknown;
 }
 

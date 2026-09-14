@@ -28,6 +28,11 @@ import {
   upsertWorkBlock,
 } from './ConversationWorkTrace';
 import {
+  applyPlanReviewAnswered,
+  applyPlanReviewRequested,
+  isPlanReviewApprovalPayload,
+} from './ConversationPlanReviewEvents';
+import {
   resolveConversationLoopOutputPhase,
   resolveConversationReasoningState,
   type ConversationLoopContinuationState,
@@ -42,6 +47,7 @@ import {
   summarizeRuntimePayload,
 } from './ConversationRoutePreflight';
 import type { ConversationTurnRunnerHost, CompleteProfileTurnInput } from './ConversationTurnRunner';
+import type { PlanReviewDecision } from '@shared/types/planReview';
 
 export interface TurnStreamState {
   currentLoopText: string;
@@ -416,8 +422,9 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                     status: pending ? 'running' : rejected ? 'error' : 'complete',
                     argsPreview: `Child execution ${delegatedRequest.executionId}`,
                     userInputQuestions: payload.kind === 'ask_user' ? normalizeAskUserQuestions({ questions: payload.questions }) : undefined,
+                    planReview: payload.kind === 'plan_review' ? payload.planReview : undefined,
                     resultPreview: pending ? undefined : String(payload.answer ?? 'Response delivered to child execution.'),
-                    approval: payload.kind === 'ask_user' ? undefined : {
+                    approval: payload.kind === 'ask_user' || payload.kind === 'plan_review' ? undefined : {
                       approvalId: payload.approvalId, status: payload.status, reason: payload.reason,
                       risk: typeof payload.risk === 'string' ? payload.risk : undefined, reviewer: typeof payload.reviewer === 'string' ? payload.reviewer : undefined,
                     },
@@ -440,12 +447,31 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 toolName?: string;
                 kind?: string;
                 questions?: unknown;
+                planReview?: ConversationToolCall['planReview'];
                 risk?: unknown;
                 reviewer?: unknown;
               };
               const approvalId = payload.approvalId ?? `approval-${payload.toolCallId ?? 'runtime'}`;
               const toolCallId = String(payload.toolCallId ?? approvalId);
               const toolName = String(payload.toolName ?? 'approval');
+              if (isPlanReviewApprovalPayload({ kind: payload.kind, toolName })) {
+                pendingContinuation.planReview = true;
+                turnStreamState.turnHadAskPause = true;
+                turnStreamState.pendingNewLoop = true;
+                markLoopCommentary();
+                if (turnStreamState.visibleResponse) {
+                  turnStreamState.visibleResponse = '';
+                  commitVisibleAssistantText();
+                }
+                if (!payload.planReview) return;
+                commitAssistantMessage('message_patched', {
+                  workTrace: applyPlanReviewRequested({
+                    payload,
+                    workTrace: turnStreamState.assistantMessage.workTrace,
+                  }),
+                });
+                return;
+              }
               if (payload.kind === 'ask_user' || normalizeToolName(toolName) === 'ask_user') {
                 pendingContinuation.userInput = true;
                 turnStreamState.turnHadAskPause = true;
@@ -509,8 +535,22 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 kind?: string;
                 toolCallId?: string;
                 toolName?: string;
+                planReview?: ConversationToolCall['planReview'];
+                decision?: PlanReviewDecision;
               };
               const approvalId = payload.approvalId ?? 'runtime';
+              if (isPlanReviewApprovalPayload({ kind: payload.kind, toolName: payload.toolName })) {
+                if (payload.status !== 'cancelled') {
+                  pendingContinuation.planReview = false;
+                }
+                commitAssistantMessage('message_patched', {
+                  workTrace: applyPlanReviewAnswered({
+                    payload,
+                    workTrace: turnStreamState.assistantMessage.workTrace,
+                  }),
+                });
+                return;
+              }
               if (payload.kind === 'ask_user' || normalizeToolName(String(payload.toolName ?? '')) === 'ask_user') {
                 const failed = payload.status === 'rejected' || payload.status === 'cancelled';
                 if (!failed) {
@@ -553,9 +593,13 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
             if (event.type === 'tool.completed') {
               const result = event.payload.result as ToolCallResult | undefined;
               const isAskUserTool = normalizeToolName(String(event.payload.toolName)) === 'ask_user';
+              const isPlanArtifactTool = normalizeToolName(String(event.payload.toolName)) === 'plan_artifact';
               const isHandoffTool = normalizeToolName(String(event.payload.toolName)) === 'agent_handoff';
               if (isAskUserTool && result?.ok) {
                 pendingContinuation.userInput = false;
+              }
+              if (isPlanArtifactTool && result?.ok) {
+                pendingContinuation.planReview = false;
               }
               if (isHandoffTool && result?.ok) {
                 pendingContinuation.handoff = true;
@@ -572,7 +616,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               if (resourceRefs.length > 0) toolCallPatch.resourceRefs = resourceRefs;
               const imagePreviews = extractToolImagePreviews(result);
               if (imagePreviews.length > 0) toolCallPatch.imagePreviews = imagePreviews;
-              if (!(isAskUserTool && result?.ok)) {
+              if (!(isAskUserTool && result?.ok) && !(isPlanArtifactTool && result?.ok)) {
                 toolCallPatch.resultPreview = buildToolResultPreview(event.payload.result ?? {});
               }
               const loopScopedCompleted = isLoopTool(String(event.payload.toolName));

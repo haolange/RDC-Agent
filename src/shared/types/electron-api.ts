@@ -13,6 +13,7 @@ export type {
   EvidenceApi,
   LlmApi,
   InvestigationApi,
+  PlanApi,
   KnowledgeApi,
   MemoryApi,
   McpApi,

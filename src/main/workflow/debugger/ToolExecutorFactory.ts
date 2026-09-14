@@ -16,6 +16,14 @@ import { getWorkspaceRoot, withTemporaryPathAccess } from '../../agent-runtime/t
 import { isKnowledgeReadFileTool } from '../../agent-runtime/knowledgeReadRoots';
 import { buildDiagnosticAgentEvent } from '../../agent-runtime/AgentEventBridge';
 import { agentUserInputRequestService } from '../../agent-runtime/interactions/AgentUserInputRequestService';
+import { agentPlanReviewRequestService } from '../../agent-runtime/interactions/AgentPlanReviewRequestService';
+import { isHandoffContinueAction } from '@shared/types/planReview';
+import {
+  composePlanMarkdown,
+  planArtifactWriter,
+  sectionsFromMarkdown,
+} from '../../sessions/sessionPlanArtifact';
+import { planReviewStateStore } from '../../sessions/PlanReviewStateStore';
 import { agentPermissionPolicyService } from '../../agent-runtime/permissions/AgentPermissionPolicy';
 import { agentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { isToolDeniedByPolicy } from '../../agent-runtime/permissions/PolicyCompiler';
@@ -220,6 +228,9 @@ export class ToolExecutorFactory {
         if (normalizedName === 'ask_user') {
           return this.executeAskUserTool(validatedToolCall, agentId, runtimeContext, signal);
         }
+        if (normalizedName === 'plan_artifact') {
+          return this.executePlanArtifactTool(validatedToolCall, agentId, runtimeContext, signal);
+        }
         const sessionId = runtimeContext?.sessionId ?? null;
         let sessionAttachmentsRoot: string | null = null;
         if (sessionId) {
@@ -411,6 +422,82 @@ export class ToolExecutorFactory {
       }));
     }
     return results.every((result) => result.allowed);
+  }
+
+  async executePlanArtifactTool(
+    toolCall: ToolCall,
+    agentId: AgentRole,
+    runtimeContext: ToolExecutorRuntimeContext | undefined,
+    signal?: AbortSignal,
+  ): Promise<ToolResultMessage> {
+    try {
+      const args = toolCall.arguments ?? {};
+      const title = typeof args.title === 'string' ? args.title.trim() : '';
+      const content = typeof args.content === 'string' ? args.content.trim() : '';
+      const summary = Array.isArray(args.summary)
+        ? args.summary.map((line) => typeof line === 'string' ? line.trim() : '').filter(Boolean)
+        : [];
+      if (!title || !content || summary.length < 1 || summary.length > 4) {
+        throw new Error('plan_artifact requires title, 1-4 summary lines, and content.');
+      }
+      if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
+        throw new Error('plan_artifact requires an active conversation interaction bridge.');
+      }
+      const sessionId = runtimeContext.sessionId ?? null;
+      if (!sessionId) {
+        throw new Error('plan_artifact requires an active session.');
+      }
+      const handoffOptions = (runtimeContext.effectivePlan?.profileHandoffs ?? [])
+        .filter((handoff) => isHandoffContinueAction(handoff) && handoff.label.trim() && handoff.agent.trim())
+        .map((handoff) => ({ label: handoff.label.trim(), agent: handoff.agent.trim() }));
+      if (handoffOptions.length === 0) {
+        throw new Error('PLAN_REVIEW_NO_HANDOFF: plan_artifact requires a declared continue handoff on this profile.');
+      }
+      const turnHandle = this.deps.getActiveTurn(sessionId);
+      if (turnHandle) turnHandle.approvedPlan = null;
+      const markdown = composePlanMarkdown({ title, summary, content });
+      const written = planArtifactWriter.writeLivePlan(sessionId, markdown);
+      const revision = planReviewStateStore.beginRevision(sessionId);
+      const planReview = {
+        planId: revision.planId,
+        revision: revision.revision,
+        uri: written.uri,
+        hash: written.hash,
+        title,
+        summary,
+        sections: sectionsFromMarkdown(markdown),
+        status: 'awaiting' as const,
+        handoffOptions,
+      };
+      const answer = await agentPlanReviewRequestService.request({
+        agentId,
+        sessionId,
+        turnId: runtimeContext.turnId,
+        toolCallId: toolCall.id,
+        planReview,
+        turnHandle,
+        context: runtimeContext.eventContext,
+        onEvent: runtimeContext.onEvent,
+        signal,
+      });
+      return {
+        role: 'toolResult',
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        content: [{ type: 'text', text: answer }],
+        isError: false,
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      return {
+        role: 'toolResult',
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
+        isError: true,
+        timestamp: Date.now(),
+      };
+    }
   }
 
   async executeAskUserTool(

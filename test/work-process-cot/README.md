@@ -32,7 +32,7 @@ npx --yes serve test/work-process-cot
 | `scenarios/05-tool-families.html` | file/search/shell/git/web/generic(mcp) 与 catalog 主要动词 |
 | `scenarios/06-tool-aggregate.html` | ≥8 连续工具自然语言聚合 |
 | `scenarios/07-context-compact.html` | `Earlier work summarized`（无 token/消息计数） |
-| `scenarios/08-plan-and-tasks.html` | `plan_artifact` 工具卡 + 活的 Tasks 快照卡 |
+| `scenarios/08-plan-and-tasks.html` | 计划卡 + 已拒绝壳行 + 活的 Tasks 快照卡 |
 | `scenarios/09-ask-user-approval.html` | ask_user Q/A + 审批行 |
 | `scenarios/10-opaque-answer-only.html` | opaque/answer-only：无 CoT 占位 |
 | `scenarios/11-error-recovery-absent.html` | 有意不出现 error_recovery 蓝字旁白 |
@@ -51,7 +51,7 @@ npx --yes serve test/work-process-cot
 | mcp → plug + generic | index / 05 |
 | ≥8 聚合 | 06 |
 | Compact 安静行 | 07 |
-| Plan = tool 卡，不 pin plan.md | 08 |
+| Plan = 计划卡 + 壳行，不进 Right Rail | 08 |
 | Tasks snapshot pending/in_progress/completed/blocked | 08 |
 | opaque 零占位 | 10 |
 | error_recovery 不进 WP | 11 |

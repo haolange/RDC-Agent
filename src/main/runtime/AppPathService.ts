@@ -29,6 +29,7 @@ export interface ProjectRdxPaths {
   policiesPath: string;
   knowledgePath: string;
   memoryPath: string;
+  plansPath: string;
   inputsPath: string;
   artifactsPath: string;
   replayPath: string;
@@ -154,6 +155,7 @@ export class AppPathService {
       policiesPath: path.join(projectRdxRoot, 'policies'),
       knowledgePath: path.join(projectRdxRoot, 'knowledge'),
       memoryPath: path.join(projectRdxRoot, 'memory'),
+      plansPath: path.join(projectRdxRoot, 'plans'),
       inputsPath: path.join(projectRdxRoot, 'inputs'),
       artifactsPath: path.join(projectRdxRoot, 'artifacts'),
       replayPath: path.join(projectRdxRoot, 'replay'),
@@ -203,6 +205,7 @@ export class AppPathService {
       paths.policiesPath,
       paths.knowledgePath,
       paths.memoryPath,
+      paths.plansPath,
       paths.inputsPath,
       paths.artifactsPath,
     ].forEach((directory) => fs.mkdirSync(directory, { recursive: true }));

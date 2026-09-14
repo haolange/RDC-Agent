@@ -1,0 +1,99 @@
+.plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  height: 16rem;
+  padding: var(--transcript-card-padding);
+  border: var(--transcript-card-border);
+  border-radius: var(--transcript-card-radius);
+  background: var(--token-bg-raised);
+  color: var(--token-text-heading);
+  text-align: left;
+  overflow: hidden;
+  position: relative;
+}
+
+.plan-card.is-awaiting {
+  border-color: var(--token-border-focus);
+}
+
+.plan-card__head,
+.plan-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--token-text-body);
+  font-size: var(--text-xs);
+}
+
+.plan-card__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.plan-card__summary {
+  flex-shrink: 0;
+  max-height: 3lh;
+  overflow: hidden;
+  margin: 0;
+  padding-left: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.plan-card__sections {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: 0;
+  overflow: auto;
+}
+
+.plan-card__section {
+  border: 0;
+}
+
+.plan-card__section-title {
+  font-size: var(--text-sm);
+  color: var(--token-text-body);
+}
+
+.plan-card__section-body {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--token-text-heading);
+  white-space: pre-wrap;
+}
+
+.plan-card__fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--space-6);
+  height: var(--space-2);
+  pointer-events: none;
+  background: linear-gradient(to top, var(--token-bg-raised), transparent);
+}
+
+.plan-card__open {
+  white-space: normal;
+  text-align: left;
+  justify-content: flex-start;
+  width: 100%;
+}
+.plan-card__section-title { cursor: pointer; }
+.plan-card__section-title:hover,
+.plan-card__section-title:focus-visible { color: var(--token-text-heading); }
+.plan-card__section-title:focus-visible { outline: 2px solid var(--token-border-focus); }
+
+.plan-card__open::after { content: ''; position: absolute; inset: 0; }
+.plan-card__section { position: relative; z-index: 1; }
+
+.plan-card__head,
+.plan-card__title,
+.plan-card__foot { flex-shrink: 0; }
+.plan-card__foot { min-width: 0; }
+.plan-card__foot span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

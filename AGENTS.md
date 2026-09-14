@@ -62,7 +62,7 @@ Appearance 详细规则见 docs/ui/appearance-checklist.md；禁止恢复 transl
 - 依赖唯一 pnpm@11.7.0，保留 pnpm-lock.yaml；pnpm-workspace.yaml 固定 store。禁止 npm/Yarn fallback、根盘 store、第二 launcher。node_modules/out/release/下载缓存/prepare state 仅本机；发布包不得带包管理器、lockfile、源码 launcher 或开发缓存。
 - resources 放分发资源，scripts 放可复用脚本；禁止恢复独立 cli/、Playwright e2e/、docs/handover/。designs 只保留 rdc-agent-design-system。
 - 目录与文件按稳定职责命名，不以 v1/v2、new/old、final/final2 等迭代标签建立长期并行路径；协议或存储版本只在确有语义需要的边界表达。已有带版本名且仍被引用的实现，须先核对调用与契约再收敛，禁止凭名字直接删除。不提交乱码，先核实原始字节。
-- 用户资源根固定 ~/.rdx、项目 <project-root>/.rdx；不加可配置根、旧目录 fallback、双写或静默迁移。Project Scope 覆盖 agents/skills/MCP/hooks/policies/knowledge/memory；CLI executable、参数前缀、工作目录、环境、超时和 secret 为本机边界，project 不得覆盖。
+- 用户资源根固定 ~/.rdx、项目 <project-root>/.rdx；不加可配置根、旧目录 fallback、双写或静默迁移。Project Scope 覆盖 agents/skills/MCP/hooks/policies/knowledge/memory；`plans/<sessionId>/` 只在用户点击「保存到项目」时写入。CLI executable、参数前缀、工作目录、环境、超时和 secret 为本机边界，project 不得覆盖。
 - Prompt 调用经 PromptPlan；产品字段、投影与详细状态约束按下方主题路由读取。
 
 ### 本地整洁与清理原则
@@ -88,7 +88,7 @@ Appearance 详细规则见 docs/ui/appearance-checklist.md；禁止恢复 transl
 
 关键边界不得回退：IPC parseIpcArgs + 单次 approvalToken；safeStorage fail-closed、无明文 secret IPC；sandbox:true + CSP 禁 inline；Hook/MCP trust 内容/路径/执行身份变更需 retrust；ProcessSupervisor 未观察 close/error 不移除；Turn generation 丢弃迟到事件；只投影 currentSession；RDX per-session lease 无全局镜像，离线 child 不得获得 RDX，unsafe 工具串行；Run 唯一 v3；Memory 活 pid 锁不回收；Knowledge 单一 main-owned 六 lane 五服务、无 Embedding、无自动 Candidate/Memory；Investigation provenance/hash/事务和认识论边界不放宽。
 
-prepareTurn 冻结 PromptPlan / EffectiveRuntimePlan 和本机 RDX binding。预载 skill allowed-tools 取交集，只收窄；skill_read 只读方法，不重算在途权限。普通任务留 General；Mission plan-only → General 执行 → 原 Mission 评估。RDX 共享 shell 手册与三本专业工具手册只提供知识，必须由 execute handoff 的 requiredSkillIds 真实预载，不能授权操作或替代冻结 catalog。Full access 不绕过 Mission/lease/hard deny。Handoff 单一持久状态机，root 最多两轮执行与回评估（初始 route 不计），事件驱动续跑，失败回滚、重启手动继续，取消规则不变。
+prepareTurn 冻结 PromptPlan / EffectiveRuntimePlan 和本机 RDX binding。预载 skill allowed-tools 取交集，只收窄；skill_read 只读方法，不重算在途权限。普通任务留 General；Mission plan-only → `plan_artifact` 计划门（同意即冻结并只放行同 hash / 同 target 的 execute）→ General 执行 → 原 Mission 评估。RDX 共享 shell 手册与三本专业工具手册只提供知识，必须由 execute handoff 的 requiredSkillIds 真实预载，不能授权操作或替代冻结 catalog。Full access 不绕过 Mission/lease/hard deny。Handoff 单一持久状态机，root 最多两轮执行与回评估（初始 route 不计），事件驱动续跑，失败回滚、重启手动继续，取消规则不变。
 
 shell.command 与 shell.rdx 互斥；结构化 RDX 仅 owning General，经审批与冻结原生 CLI。实验关闭必须验证主进程签名回执 baseline/intervention/variant/rollback/restored。旧记录可读；权限拒绝、未执行或 capture hash 不变不是回滚证据。旧 verified 不代表当前版本。
 

@@ -322,7 +322,7 @@ const groupProcessRows = (rows: WorkProcessRow[]): WorkProcessRow[] => rows;
 const countToolSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, row) => {
   if (row.type === 'section') return total + countToolSteps(row.steps);
   if (row.type === 'toolAggregate') return total + row.children.length;
-  if (row.type === 'tool' || row.type === 'userInput') return total + 1;
+  if (row.type === 'tool' || row.type === 'userInput' || row.type === 'planReview') return total + 1;
   return total;
 }, 0);
 
@@ -349,6 +349,12 @@ const isNumber = (value: unknown): value is number => typeof value === 'number' 
 const createToolRow = (call: ConversationToolCall): WorkProcessRow => {
   if (normalizeToolName(call.toolName) === 'ask_user') {
     return createUserInputRow(call);
+  }
+  if (normalizeToolName(call.toolName) === 'plan_artifact' && call.planReview) {
+    if (call.planReview.status === 'superseded' || call.planReview.status === 'rejected') {
+      return createPlanReviewShellRow(call);
+    }
+    return createPlanReviewRow(call);
   }
   const display = getToolDisplay(call.toolName);
   const approval = createToolApprovalPresentation(call.approval, call.toolName);
@@ -501,6 +507,36 @@ const isApprovalRequiredPreview = (parsedResult: unknown, raw?: string): boolean
 export const createToolRowForPresentation = (
   call: ConversationToolCall,
 ): WorkProcessRow => createToolRow(call);
+
+const createPlanReviewRow = (call: ConversationToolCall): WorkProcessRow => ({
+  type: 'planReview',
+  id: call.id,
+  status: call.status === 'error' ? 'error' : call.planReview?.status === 'approved' ? 'complete' : 'running',
+  plan: call.planReview!,
+  duration: formatDurationMs(call.startedAt, call.completedAt),
+});
+
+const createPlanReviewShellRow = (call: ConversationToolCall): WorkProcessRow => {
+  const rejected = call.planReview?.status === 'rejected';
+  const feedback = call.planReview?.decision?.kind === 'reject' ? call.planReview.decision.feedback : call.resultPreview;
+  return {
+    type: 'tool',
+    id: call.id,
+    status: rejected || call.status === 'error' ? 'complete' : 'complete',
+    verb: rejected ? '已更新计划 · 已拒绝' : '已更新计划',
+    category: '计划产物',
+    icon: 'planArtifact',
+    groupKind: 'runtime',
+    family: 'runtime',
+    toolName: call.toolName,
+    target: call.planReview?.title ?? '',
+    duration: formatDurationMs(call.startedAt, call.completedAt),
+    argsLines: [],
+    previewLines: feedback ? [feedback] : [],
+    rawLines: [],
+    bodyText: feedback || undefined,
+  };
+};
 
 const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
   const questions = call.userInputQuestions ?? [];

@@ -220,6 +220,29 @@
     `;
   }
 
+  function renderPlanReview(plan) {
+    const status = plan.status || 'awaiting';
+    const summary = (plan.summary || []).map((line) => `<li>${esc(line)}</li>`).join('');
+    const sections = (plan.sections || []).slice(0, 3).map((section) => (
+      `<details class="plan-card__section"><summary class="plan-card__section-title">${esc(section.heading || '')}</summary><p class="plan-card__section-body">${esc(section.body || '')}</p></details>`
+    )).join('');
+    return `
+      <button type="button" class="plan-card is-${esc(status)}" data-testid="plan-card">
+        <div class="plan-card__head">
+          <span>${esc(getLocale() === 'en' ? 'Plan' : '计划')}</span>
+          <span>${esc(status)}</span>
+        </div>
+        <h3 class="plan-card__title">${esc(plan.title || '')}</h3>
+        ${summary ? `<ul class="plan-card__summary">${summary}</ul>` : ''}
+        ${sections ? `<div class="plan-card__sections">${sections}</div>` : ''}
+        <div class="plan-card__foot">
+          <span>v${esc(plan.revision ?? 1)}</span>
+          <span>${esc(plan.uri || 'session://plans/plan.md')}</span>
+        </div>
+      </button>
+    `;
+  }
+
   function renderAggregate(aggregate) {
     const cards = (aggregate.tools || []).map((tool) => `<li class="work-process-step kind-tool">${renderToolCard(tool)}</li>`).join('');
     return `
@@ -253,6 +276,7 @@
   function renderSectionItems(items) {
     return (items || []).map((item) => {
       if (item.type === 'tool') return `<li class="work-process-step kind-tool status-${item.tool.status || 'complete'}">${renderToolCard(item.tool, item)}</li>`;
+      if (item.type === 'planReview') return `<li class="work-process-step kind-plan-review status-${item.plan?.status === 'approved' ? 'complete' : 'running'}">${renderPlanReview(item.plan || {})}</li>`;
       if (item.type === 'aggregate') return `<li class="work-process-step kind-aggregate">${renderAggregate(item)}</li>`;
       if (item.type === 'ask_user') return `<li class="work-process-step kind-user-input status-${item.status || 'complete'}">${renderAskUser(item)}</li>`;
       if (item.type === 'approval') return `<li class="work-process-step kind-approval status-${item.status || 'pending'}">${renderApproval(item)}</li>`;

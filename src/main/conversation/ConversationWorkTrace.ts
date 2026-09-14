@@ -17,6 +17,7 @@ const WORK_BLOCK_KINDS = new Set<ConversationWorkBlock['kind']>([
   'llm_turn',
   'approval',
   'user_input',
+  'plan_review',
   'compaction',
   'subagent',
   'handoff',
@@ -81,6 +82,7 @@ function cloneToolCall(toolCall: ConversationToolCall): ConversationToolCall {
       ...question,
       options: question.options.map((option) => ({ ...option })),
     })),
+    planReview: toolCall.planReview ? { ...toolCall.planReview, summary: [...toolCall.planReview.summary], sections: toolCall.planReview.sections.map((section) => ({ ...section })), handoffOptions: toolCall.planReview.handoffOptions.map((option) => ({ ...option })), decision: toolCall.planReview.decision ? { ...toolCall.planReview.decision } : undefined } : undefined,
     resourceRefs: toolCall.resourceRefs?.map((resource) => ({ ...resource })),
     approval: toolCall.approval ? { ...toolCall.approval } : undefined,
   };
@@ -279,6 +281,7 @@ export function upsertRuntimeToolCall(
             options: question.options.map((option) => ({ ...option })),
           }))
         : existingToolCall.userInputQuestions,
+      planReview: patch.planReview ?? existingToolCall.planReview,
       resourceRefs: patch.resourceRefs
         ? patch.resourceRefs.map((resource) => ({ ...resource }))
         : existingToolCall.resourceRefs?.map((resource) => ({ ...resource })),
@@ -295,6 +298,7 @@ export function upsertRuntimeToolCall(
         ...question,
         options: question.options.map((option) => ({ ...option })),
       })),
+      planReview: patch.planReview,
       argsPreview: patch.argsPreview,
       resultPreview: patch.resultPreview,
       resourceRefs: patch.resourceRefs?.map((resource) => ({ ...resource })),
@@ -315,6 +319,29 @@ export function upsertRuntimeToolCall(
     }
   }
   nextTrace.status = 'running';
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+
+export function supersedePreviousPlanReviews(
+  trace: ConversationWorkTrace | null | undefined,
+  currentToolCallId: string,
+): ConversationWorkTrace {
+  const nextTrace = cloneTrace(trace);
+  for (const block of nextTrace.blocks) {
+    for (const [index, toolCall] of block.toolCalls.entries()) {
+      if (toolCall.id === currentToolCallId || toolCall.toolName !== 'plan_artifact' || !toolCall.planReview) continue;
+      if (toolCall.planReview.status !== 'awaiting') continue;
+      block.toolCalls[index] = {
+        ...toolCall,
+        planReview: {
+          ...toolCall.planReview,
+          status: 'superseded',
+          decision: toolCall.planReview.decision ?? { kind: 'reject', feedback: 'Superseded by a newer plan revision.' },
+        },
+      };
+    }
+  }
   nextTrace.updatedAt = nowMs();
   return nextTrace;
 }
@@ -666,6 +693,14 @@ function getRuntimeToolBlockMeta(
       title: 'User input requested',
       stage: 'decision',
       kind: 'user_input',
+    };
+  }
+  if (normalizedToolName === 'plan_artifact') {
+    return {
+      id: 'runtime-plan-review',
+      title: 'Plan review requested',
+      stage: 'decision',
+      kind: 'plan_review',
     };
   }
   if (normalizedToolName === 'agent_handoff') {

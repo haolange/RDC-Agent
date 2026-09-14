@@ -31,6 +31,7 @@ import { resolveAgentWriteTarget } from '@shared/types/agentManifest';
 import { resolveHandoffTurnModelOverride } from '../sessions/profileHandoffModel';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
+import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import {
   createConversationMessage,
   isActiveRun,
@@ -522,6 +523,7 @@ export async function startProfileTurn(
     ) {
       agentToolApprovalRequestService.cancelTurn(pendingHandoff.sourceTurnId);
       agentUserInputRequestService.cancelTurn(pendingHandoff.sourceTurnId);
+      agentPlanReviewRequestService.cancelTurn(pendingHandoff.sourceTurnId);
       host.consumeCommittedHandoff(context.session.sessionId, latest, turnId);
     }
   } else if (workingSession && conversationAgentId) {

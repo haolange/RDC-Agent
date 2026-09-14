@@ -68,6 +68,10 @@ vi.mock('../agent-runtime/interactions/AgentUserInputRequestService', () => ({
   agentUserInputRequestService: { cancelTurn: cancelUserInput, answer: vi.fn() },
 }));
 
+vi.mock('../agent-runtime/interactions/AgentPlanReviewRequestService', () => ({
+  agentPlanReviewRequestService: { cancelTurn: vi.fn(), answer: vi.fn() },
+}));
+
 vi.mock('./ConversationTurnTerminal', () => ({
   persistConversationSnapshot: vi.fn(),
   assertTerminalContextOwnership: vi.fn(),

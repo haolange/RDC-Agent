@@ -39,7 +39,7 @@ export function persistAgentHandoff(handoff: AgentHandoffDefinition): AgentHando
     prompt: handoff.prompt,
   };
   if (handoff.send === true) next.send = true;
-  if (handoff.showContinueOn === true) next.showContinueOn = true;
+  if (handoff.showContinueOn === false) next.showContinueOn = false;
   const model = handoff.model?.trim();
   if (model) next.model = model;
   return next;

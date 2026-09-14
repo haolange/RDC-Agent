@@ -3,6 +3,7 @@ import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime'
 import { translateCoreToSharedAgentEvent } from '../agent-runtime/AgentEventBridge';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
+import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 
 const eventContext = {
   runId: 'run-cancel-test',
@@ -71,6 +72,39 @@ describe('cancel turn stability', () => {
       status: 'cancelled',
       kind: 'ask_user',
       toolCallId: 'tool-ask-user',
+    });
+  });
+
+  it('emits cancelled approval.answered when a pending plan review is cancelled', async () => {
+    const events: SharedAgentEvent[] = [];
+    const turnId = 'turn-plan-review-cancel';
+    const requestPromise = agentPlanReviewRequestService.request({
+      agentId: 'debugger',
+      sessionId: 'session-cancel-test',
+      turnId,
+      toolCallId: 'tool-plan',
+      planReview: {
+        planId: 'plan-1',
+        revision: 1,
+        uri: 'session://plans/plan.md',
+        hash: 'a'.repeat(64),
+        title: 'Plan',
+        summary: ['One'],
+        sections: [],
+        status: 'awaiting',
+        handoffOptions: [{ label: '交给 General 执行', agent: 'general' }],
+      },
+      context: eventContext,
+      onEvent: (event) => events.push(event),
+    });
+
+    agentPlanReviewRequestService.cancelTurn(turnId);
+
+    await expect(requestPromise).rejects.toThrow(/cancelled/i);
+    expect(events[1]?.payload).toMatchObject({
+      status: 'cancelled',
+      kind: 'plan_review',
+      toolCallId: 'tool-plan',
     });
   });
 

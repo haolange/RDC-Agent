@@ -41,6 +41,7 @@ export function useComposerStop(options: {
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
 
   const handlePrimaryStop = useCallback(async () => {
+    useComposerSessionContextStore.getState().clearHandoffSuggestion();
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
 

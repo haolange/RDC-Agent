@@ -1,0 +1,43 @@
+.composer-shell-plan-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.composer-plan-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.composer-plan-review__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.composer-plan-review__summary {
+  margin: 0;
+  padding-left: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--token-text-body);
+}
+
+.composer-plan-review__feedback {
+  min-height: calc(var(--control-height-md) * 2);
+  resize: vertical;
+}
+
+.composer-plan-review__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.composer-plan-review__error {
+  margin: 0;
+  color: var(--token-status-error);
+  font-size: var(--text-sm);
+}

@@ -43,7 +43,7 @@ export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<string, WorkProcessToolDi
   tool_search: { icon: 'toolSearch', groupKind: 'runtime', category: '工具发现', groupTitle: '工具发现', groupUnit: '查询', completeVerb: '已搜索工具', runningVerb: '正在搜索工具' },
   code_interpreter: { icon: 'interpreter', groupKind: 'command', category: '解释器', groupTitle: '解释器', groupUnit: '脚本', completeVerb: '已运行解释器', runningVerb: '正在运行解释器', approval: true, errorAccent: true },
   agent_handoff: { icon: 'handoff', groupKind: 'collaboration', category: '代理交接', groupTitle: '交接', groupUnit: '交接', completeVerb: '已准备交接', runningVerb: '正在准备交接' },
-  plan_artifact: { icon: 'planArtifact', groupKind: 'runtime', category: '计划产物', groupTitle: '产物', groupUnit: '产物', completeVerb: '已生成计划', runningVerb: '正在生成计划' },
+  plan_artifact: { icon: 'planArtifact', groupKind: 'runtime', category: '计划产物', groupTitle: '产物', groupUnit: '产物', completeVerb: '已提交计划', runningVerb: '正在提交计划' },
   output_register: { icon: 'outputPublish', groupKind: 'runtime', category: '输出发布', groupTitle: '输出', groupUnit: '文件', completeVerb: '已发布输出', runningVerb: '正在发布输出', mutation: true },
   memory_search: { icon: 'memorySearch', groupKind: 'memory', category: '记忆搜索', groupTitle: '记忆', groupUnit: '搜索', completeVerb: '已搜索记忆', runningVerb: '正在搜索记忆' },
   memory_read: { icon: 'memoryRead', groupKind: 'memory', category: '记忆读取', groupTitle: '记忆', groupUnit: '读取', completeVerb: '已读取记忆', runningVerb: '正在读取记忆' },

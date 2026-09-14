@@ -9,6 +9,7 @@ import type { ThinkingArtifact } from '@shared/types/reasoning';
 export interface ConversationLoopContinuationState {
   approval?: boolean;
   userInput?: boolean;
+  planReview?: boolean;
   subagent?: boolean;
   handoff?: boolean;
 }
@@ -24,7 +25,7 @@ export function resolveConversationLoopOutputPhase(
 ): ConversationLoopOutputPhase {
   const pending = input.hasPendingContinuation;
   const hasPendingContinuation = Boolean(
-    pending?.approval || pending?.userInput || pending?.subagent || pending?.handoff,
+    pending?.approval || pending?.userInput || pending?.planReview || pending?.subagent || pending?.handoff,
   );
 
   if (

@@ -184,7 +184,7 @@
               { type: 'tool', tool: { name: 'task_list', body: '3 tasks' } },
               { type: 'tool', tool: { name: 'task_stop', body: 'task-2' } },
               { type: 'tool', tool: { name: 'agent_handoff', body: 'Debugger → Analyzer' } },
-              { type: 'tool', tool: { name: 'plan_artifact', body: 'Plan artifact saved: artifacts/plan.md' } },
+              { type: 'tool', tool: { name: 'plan_artifact', verb: en ? 'Updated plan · Rejected' : '已更新计划 · 已拒绝', body: en ? 'Add the reproduction steps.' : '请补上复现条件。' } },
               { type: 'tool', tool: { name: 'output_register', body: 'outputs/report.md' } },
             ],
           }],
@@ -268,8 +268,8 @@
       },
       '08': {
         note: en
-          ? 'Plan = plan_artifact tool card; Tasks use one live snapshot card.'
-          : 'Plan = plan_artifact 工具卡；Tasks 用一张活的快照卡。',
+          ? 'Plan = plan review card plus a superseded/rejected shell row; Tasks use one live snapshot card.'
+          : 'Plan = 计划卡 + 已拒绝壳行；Tasks 用一张活的快照卡。',
         user: userPrompt('先出计划再执行。', 'Create a plan, then execute.'),
         wp: {
           status: 'complete',
@@ -282,15 +282,30 @@
               status: 'complete',
               open: false,
               duration: '4s',
-              preview: en ? 'Write plan artifact, then drive tasks from TaskRegistry.' : '写入 plan artifact，再用 TaskRegistry 驱动任务。',
+              preview: en ? 'Submit the live plan for review, then drive tasks from TaskRegistry.' : '用 plan_artifact 提交当前计划审阅，再用 TaskRegistry 驱动任务。',
             },
             prose: {
               html: en
-                ? '<p>Plan saved. Tasks below are one live snapshot card (Progress rail shares taskProjection).</p>'
-                : '<p>计划已保存。下方是一张活的任务快照卡（与 Progress 轨共用 taskProjection）。</p>',
+                ? '<p>Current plan is awaiting review. The previous revision is a rejected shell row. Tasks below are one live snapshot card (Progress rail shares taskProjection).</p>'
+                : '<p>当前计划待审阅。上一版已拒绝为壳行。下方是一张活的任务快照卡（与 Progress 轨共用 taskProjection）。</p>',
             },
             items: [
-              { type: 'tool', tool: { name: 'plan_artifact', body: 'Plan artifact saved: artifacts/plan.md' } },
+              {
+                type: 'planReview',
+                plan: {
+                  title: en ? 'Import then diagnose' : '导入后再诊断',
+                  status: 'awaiting',
+                  revision: 2,
+                  uri: 'session://plans/plan.md',
+                  summary: en
+                    ? ['Import the capture', 'Open it in the owner session']
+                    : ['导入 capture', '在归属 session 打开'],
+                  sections: [
+                    { heading: en ? 'Goal' : '目标与边界', body: en ? 'Find the first bad event.' : '定位 First Bad Event。' },
+                  ],
+                },
+              },
+              { type: 'tool', tool: { name: 'plan_artifact', verb: en ? 'Updated plan · Rejected' : '已更新计划 · 已拒绝', body: en ? 'Add the reproduction steps.' : '请补上复现条件。' } },
             ],
           }],
           extras: [

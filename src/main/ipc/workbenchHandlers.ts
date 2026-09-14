@@ -22,6 +22,7 @@ import { registerKnowledgeHandlers } from './knowledgeHandlers';
 import { registerCaptureDeviceHandlers } from './captureDeviceHandlers';
 import { registerCommandHandlers } from './commandHandlers';
 import { registerConversationHandlers } from './conversationHandlers';
+import { registerPlanHandlers } from './planHandlers';
 import { registerProjectSessionHandlers } from './projectSessionHandlers';
 import { registerRuntimeTerminalHandlers } from './runtimeTerminalHandlers';
 import { registerSettingsLlmHandlers } from './settingsLlmHandlers';
@@ -263,6 +264,7 @@ export function registerIPCHandlers(): void {
   registerShellHandlers();
   registerWebHandlers();
   registerConversationHandlers(context);
+  registerPlanHandlers(context);
   registerWorkflowHandlers(context);
   registerProjectSessionHandlers(context);
   registerRuntimeTerminalHandlers();

@@ -37,8 +37,7 @@ import {
   type AgentEventBridgeContext,
 } from '../../agent-runtime/AgentEventBridge';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
-import { agentUserInputRequestService } from '../../agent-runtime/interactions/AgentUserInputRequestService';
-import { agentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
+import { cancelTurnInteractionRequests } from './cancelTurnInteractionRequests';
 import { enforceTaskReturnBinding } from '../../agent-runtime/agent/TurnCompletionValidator';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import type {
@@ -827,8 +826,7 @@ export class AgentTurnRunner {
       if (abortListener && input.options?.signal) {
         input.options.signal.removeEventListener('abort', abortListener);
       }
-      agentUserInputRequestService.cancelTurn(input.turnId);
-      agentToolApprovalRequestService.cancelTurn(input.turnId);
+      cancelTurnInteractionRequests(turnHandle.turnId);
       input.terminalContext?.(activeSlot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus, turnHandle.pendingHandoff ?? undefined, turnHandle.completionDeclaration);
       this.deps.slots.flush(activeSlot);
       if (turnHandle.isAborted) {

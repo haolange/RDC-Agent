@@ -22,6 +22,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     cancelActiveTurn: 'conversation:cancelActiveTurn',
     answerUserInput: 'conversation:answerUserInput',
     answerToolApproval: 'conversation:answerToolApproval',
+    answerPlanReview: 'conversation:answerPlanReview',
     getHistory: 'conversation:getHistory',
     switchBranch: 'conversation:switchBranch',
     clearHistory: 'conversation:clearHistory',
@@ -54,6 +55,12 @@ export const RENDERER_INVOKE_CHANNEL = {
   },
   investigation: {
     read: 'investigation:read',
+  },
+  plan: {
+    read: 'plan:read',
+    issueApprovalToken: 'plan:issueApprovalToken',
+    saveToProject: 'plan:saveToProject',
+    export: 'plan:export',
   },
   knowledge: {
     overview: 'knowledge:overview',

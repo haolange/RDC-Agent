@@ -2,7 +2,6 @@ import { enforceMissionTurnCompletion } from '../../investigation/missionComplet
 import { validateInvestigationHandoff } from '../../investigation/investigationHandoffValidation';
 import { HANDOFF_CONTRACT_JSON_SCHEMA } from '@shared/types/handoffContract';
 import { validateHandoffArtifacts } from '../../sessions/handoffArtifacts';
-import { writeSessionPlanArtifact } from '../../sessions/sessionPlanArtifact';
 /**
  * RuntimeToolAssembly — resolveRuntimeTools / workbench / MCP catalog tools.
  */
@@ -16,7 +15,7 @@ import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
 import type { ToolDefinition } from '../../agent-runtime/core/types';
 import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/tools';
 import { HANDOFF_ERROR } from '@shared/types/profileHandoff';
-import { handoffController } from '../../agent-runtime/agent/HandoffController';
+import { assertMissionExecutePlanGate, handoffController } from '../../agent-runtime/agent/HandoffController';
 import { isHandoffDeclaredModelValid } from '../../sessions/profileHandoffModel';
 import { settingsService } from '../../settings/SettingsService';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
@@ -339,6 +338,24 @@ export class RuntimeToolAssembly {
         let contract;
         try {
           contract = validateHandoffArtifacts(resolvedSessionId, args.contract);
+          const planGate = assertMissionExecutePlanGate({
+            sourceAgentId: agentId,
+            target,
+            intent: contract.intent,
+            planHash: contract.intent === 'execute' ? contract.plan.hash : undefined,
+            planUri: contract.intent === 'execute' ? contract.plan.uri : undefined,
+            approved: turn?.approvedPlan ?? null,
+          });
+          if (!planGate.valid) {
+            return {
+              content: [{
+                type: 'text',
+                text: `${planGate.code ?? HANDOFF_ERROR.PLAN_NOT_APPROVED}: ${planGate.reason ?? 'Mission execute requires an approved frozen plan.'}`,
+              }],
+              isError: true,
+              details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false, code: planGate.code },
+            };
+          }
           validateInvestigationHandoff({ sessionId: resolvedSessionId, sourceAgentId: agentId, targetAgentId: target, contract, taskBinding: turn?.runtimePlan?.taskBinding });
         } catch (error) {
           return { content: [{ type: 'text', text: String(error) }], isError: true, details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false } };
@@ -489,46 +506,38 @@ export class RuntimeToolAssembly {
   }
 
   createPlanArtifactTool(sessionId?: string | null): AgentTool<
-    { title?: string; content?: string },
-    { sessionId: string | null; artifactPath?: string }
+    { title?: string; summary?: string[]; content?: string },
+    { sessionId: string | null }
   > {
     return {
       name: 'plan_artifact',
-      label: 'Write Plan Artifact',
-      description: 'Write a new versioned Markdown plan artifact and return its URI and hash. This cannot edit arbitrary workspace files.',
+      label: 'Submit Plan for Review',
+      description: 'Submit the current session plan for in-loop human review. Title, a 1-4 item summary, and Markdown content are required. The runtime writes session://plans/plan.md and pauses until the user approves a declared continue handoff or rejects with feedback.',
       parameters: {
         type: 'object',
-        required: ['content'],
+        required: ['title', 'summary', 'content'],
         properties: {
-          title: { type: 'string', description: 'Optional plan title.' },
-          content: { type: 'string', description: 'Plan content to persist for this session.' },
+          title: { type: 'string', description: 'Short plan title shown on the review card.' },
+          summary: {
+            type: 'array',
+            items: { type: 'string' },
+            minItems: 1,
+            maxItems: 4,
+            description: 'One to four concise summary lines. Do not put the full plan here.',
+          },
+          content: { type: 'string', description: 'Markdown plan body. Use ## headings for sections.' },
         },
       },
       permissionHint: 'session_mutation',
-      async execute(_toolCallId, args) {
-        if (!sessionId) {
-          return {
-            content: [{ type: 'text', text: 'No active session is available for a plan artifact.' }],
-            isError: true,
-            details: { sessionId: null },
-          };
-        }
-        const body = typeof args.content === 'string' ? args.content.trim() : '';
-        if (!body) {
-          return {
-            content: [{ type: 'text', text: 'Plan artifact content is required.' }],
-            isError: true,
-            details: { sessionId },
-          };
-        }
-        const title = typeof args.title === 'string' && args.title.trim()
-          ? args.title.trim()
-          : 'Agent Plan';
-        const artifact = writeSessionPlanArtifact(sessionId, `# ${title}\n\n${body}\n`);
-        const artifactPath = artifact.uri;
+      spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'comm', requiresApproval: false },
+      async execute() {
         return {
-          content: [{ type: 'text', text: `Plan artifact saved: ${artifactPath}\nsha256: ${artifact.hash}` }],
-          details: { sessionId, artifactPath, uri: artifact.uri, hash: artifact.hash },
+          content: [{
+            type: 'text',
+            text: 'plan_artifact must be executed by the conversation plan review bridge.',
+          }],
+          isError: true,
+          details: { sessionId: sessionId ?? null },
         };
       },
     };

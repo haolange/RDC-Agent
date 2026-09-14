@@ -192,8 +192,8 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
         </SettingsField>
         <SettingsField label={t('settings.agentHandoffShowContinueOn')} layout="row">
           <Checkbox
-            checked={handoff.showContinueOn === true}
-            onCheckedChange={(checked) => patch({ showContinueOn: checked || undefined })}
+            checked={handoff.showContinueOn !== false}
+            onCheckedChange={(checked) => patch({ showContinueOn: checked ? undefined : false })}
             label={t('settings.agentHandoffShowContinueOnHelp')}
           />
         </SettingsField>

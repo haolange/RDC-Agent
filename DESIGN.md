@@ -33,7 +33,7 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 1. **单一真相**：Session / Conversation / branch / journal 是会话历史权威；Agent slot 是执行配置与缓存，不是私有历史。
 2. **冻结执行**：`EffectiveRuntimePlan`（`schemaVersion: 3`，含 `planId` / fingerprint 与完整工具/策略面）在 `prepareTurn` 冻结；Prompt 与 Executor 共用；在途 turn 不读可变 Settings。
 3. **主进程权威**：权限、secret、MCP trust、Shell、RDX CLI、IPC 校验均在 `src/main`；preload / renderer / Browser Bridge 只暴露受控面。
-4. **Scope 固定**：用户资源 `~/.rdx`，项目资源 `<project-root>/.rdx`；无配置 workspace root、无旧目录 fallback、无静默迁移。
+4. **Scope 固定**：用户资源 `~/.rdx`，项目资源 `<project-root>/.rdx`（用户点保存的计划在 `plans/<sessionId>/`）；无配置 workspace root、无旧目录 fallback、无静默迁移。
 5. **Provider 事实分层**：Manifest 是**基线真值**（baseline truth），Discovery 是**候选验证**（candidate validation），用户覆盖（`models.json`）是**显式覆盖，自带 provenance**（explicit override with provenance），三者合并为 EffectiveCatalog。模型/协议/控件基线事实只在 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth、discovery 与 user-override。用户覆盖禁止触及 route.protocol、authSchemaId、adapterId、compatibilityGroup、carrier 等安全/延续性字段。
    `catalogRevision` 只冻结 Effective Catalog 的可执行/可选择语义；刷新仅更新 provenance 时间戳时 revision 必须稳定，route、control、availability、quota 等有效语义变化时才更新。
 6. **可取消与可回收**：Turn 经 `TurnCoordinator`（Session ownership：Active → Aborting → Orphaned → Settled；Orphaned 时 `beginTurn` fail-closed `TURN_ORPHANED`；`abortAndJoin` 等 stream terminal **与** producerCompletion）。子进程经 `ProcessSupervisor`；应用退出经 `ShutdownCoordinator`；迟到 event 按 generation 丢弃。无 durable session 的 turn/slot 使用 ephemeral scope id（禁止 `__anon__` / `__no_session__`）。Conversation Stop 相位语义：`preparing` 干净撤销；`committing`/`running` 单调落停。Renderer 对 monotonic-stopped turn/request 丢弃迟到 `draft|streaming` patch。ProcessSupervisor 超时未观察到 close 时标记 `unconfirmed_orphan` 并保留 registry，禁止伪造已退出。
@@ -84,7 +84,7 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 - **`read_image`**：`visionInputMode !== 'native'` 时 `VISION_INPUT_UNSUPPORTED` fail-closed，与附件 vision 输入一致。
 - **图像预览单通道**：工具图只经 session `image-previews` + `conversation:getToolImagePreview`（Zod + active-session gate）给 renderer；大 base64 不得进入 `resultPreview`。模型侧把 tool-result 图桥成紧随的 user image part，禁止静默丢图。用户附件缩略图走 `conversation:getAttachmentPreview`：staging 预览无 session；已提交附件必须带 `sessionId` 且过 active-session gate。
 - **用户附件管道**：Composer `+` 只附加图片/文件（path 或 bytes 经 `conversation:stageAttachments`）。`.rdc`、可执行文件与 **SVG** 硬拒（SVG 不进 vision / inline）。Staging 写 `{userData}/state/staging/attachments/`，进程启动清空，preparing 失败不落 session。prepare 冻结最终 session 逻辑路径与 inline 文本；run 只补 image 字节。物化分层：image → native vision；text/pdf → tokenizer 预算 inline；binary → 元数据路径。当前 session `attachments/` 仅对 `read_file`/`read_image`/`glob`/`grep` 自动只读授权。禁止 `session:attachments:list` / `import` IPC。
-- **session:// Artifact**：URI `session://<plans|investigation|tool-outputs>/<relative-path>` 只解析到 owning session 的 `<sessionPath>/session-artifacts/<category>/`。配额：单文件 2 MiB，artifact_read 返回窗 200 KiB / 2000 行，自动卸货阈值 32 KiB（序列化后），session 合计 96 MiB，tool-outputs 最多 256 文件；写入先对 incomingBytes（覆盖只计 delta）做 session 级 reservation，再 temp write / hash / atomic commit，失败回滚 reservation 并删除 temp；按磁盘 reconcile（丢弃未提交 reservation、清掉 `.tmp`）在启动 `initializeWorkspace`、session 打开/加载（`readSession` / `setCurrentSessionId`）以及 resolver 首次 read/write/list 时幂等执行；`artifact_read` 遇到卸货 envelope 时返回 payload 的 hash/size/mime 与 owner/source，不以 envelope 文件自身 hash 作为工具结果；MIME 白名单 text/plain、text/markdown、application/json、text/csv、text/yaml、image/png|jpeg|gif|webp；硬拒 SVG / 可执行 / `.rdc`。investigation/plans 本 Wave 只预留 category。不进入 attachments 自动授权，`read_file` 不放宽。
+- **session:// Artifact**：URI `session://<plans|investigation|tool-outputs>/<relative-path>` 只解析到 owning session 的 `<sessionPath>/session-artifacts/<category>/`。配额：单文件 2 MiB，artifact_read 返回窗 200 KiB / 2000 行，自动卸货阈值 32 KiB（序列化后），session 合计 96 MiB，tool-outputs 最多 256 文件；写入先对 incomingBytes（覆盖只计 delta）做 session 级 reservation，再 temp write / hash / atomic commit，失败回滚 reservation 并删除 temp；按磁盘 reconcile（丢弃未提交 reservation、清掉 `.tmp`）在启动 `initializeWorkspace`、session 打开/加载（`readSession` / `setCurrentSessionId`）以及 resolver 首次 read/write/list 时幂等执行；`artifact_read` 遇到卸货 envelope 时返回 payload 的 hash/size/mime 与 owner/source，不以 envelope 文件自身 hash 作为工具结果；MIME 白名单 text/plain、text/markdown、application/json、text/csv、text/yaml、image/png|jpeg|gif|webp；硬拒 SVG / 可执行 / `.rdc`。plans 活文件为 `session://plans/plan.md`（同意前覆盖写），同意后冻结为 `plan-<ISO>-<hash8>.md`；下一周期再写同一活文件。investigation 为调查记录。不进入 attachments 自动授权，`read_file` 不放宽。
 - **Tasks 快照卡**：一轮只保留一张活的任务卡。canonical order 与派生状态由 main 侧 `taskProjection` 单点投影，transcript 与 Right Rail Progress 同序、同态、同副标题；点击定位靠 `data-work-process-task-id`。
 - **Capture 所有权**：`ownerSessionId` 不匹配则 fail-closed；不得跨 session 继承已打开 capture。
 - **唯一 Turn Preparation**：`sendMessage` / `sendProfileMessage` / Subagent 经 `ProfileTurnPreparation`（或 conversation `prepareTurn`）冻结 `preparedRuntime`；`AgentTurnRunner` 无 preparedRuntime 抛 `TURN_NOT_PREPARED`，禁止 fallback plan。
@@ -263,7 +263,7 @@ T19 逐项裁决（删除 / 保留理由 / 调用方）：
 | 项 | 裁决 | 理由 / 调用方 | 测试/门禁 |
 | --- | --- | --- | --- |
 | `src/main/reports/ArtifactStore.ts` + `artifact_store.json` | **保留** | `output_register` / `SessionArtifactSource` 的 Outputs 索引，不是 Investigation。禁止混进 Artifacts 卡。 | `OutputRegistrationTool.test.ts`；`pnpm run check:right-rail` |
-| `writeSessionPlanArtifact` 钉死 `artifacts/plan.md` | **删除钉死** | `plan_artifact` 仍写 session artifacts，文件名改为 `plan-<ISO>.md`，禁止覆盖单一 `plan.md`。 | `sessionPlanArtifact.test.ts` |
+| `writeSessionPlanArtifact` 钉死 `artifacts/plan.md` | **改为计划门** | 同意前覆盖 `session://plans/plan.md`，同意后冻结 `plan-<ISO>-<hash8>.md`，下一周期再写同一活文件；禁止拒绝后新开对话。 | `sessionPlanArtifact.test.ts` |
 | `src/shared/types/harness.ts` | **收敛保留** | 只留 Outputs `ArtifactKind` / `ArtifactRecord`。**不改名**。删除未用的旧 Debugger harness 类型。Investigation `EvidenceRecord` 仍以 `renderdocInvestigation.ts` 为准。禁止恢复固定 stage。 | `pnpm run check:legacy-residue`（断言该路径仍存在且无旧 harness 类型） |
 | `RdxCliInvokerService` `tool_count` | **保留诊断、禁止 UI** | CLI 内部 invoker 诊断可用；Right Rail / 模型工具面不得展示 catalog summary。 | `pnpm run check:right-rail` |
 | stage / `WorkflowStage` / `recommendedSpecialists` | **已删** | 见裁决 I；不得双读 v2。 | `pnpm run check:investigation-system`；Run v3 合同见裁决 I |
@@ -302,7 +302,7 @@ Mission profiles runtime allowlist **仅允许**：
 - 用户询问：`ask_user`（askUser token）
 - 交接：`agent_handoff`（handoff token）
 - 任务进度：`task_create` / `task_update` / `task_get` / `task_list` / `task_stop`（`task` token 展开时 **必须剔除** `output_register`）
-- 制品：`plan_artifact`、`investigation_read` / `investigation_write` / `investigation_list`
+- 制品：`plan_artifact`（人机门，与 `ask_user` 同构停顿）、`investigation_read` / `investigation_write` / `investigation_list`
 - 知识（只读 + 显式 Candidate）：`knowledge_browse` / `knowledge_search` / `knowledge_read` / `knowledge_compile` / `knowledge_candidate_create`（后者仅显式用户意图；不自动持久写）
 - Memory 只读：`memory_search` / `memory_read`（禁止 `memory_write` / `memory_delete`）
 - Skill 发现：`tool_search` / `skills` / `skill_read`
@@ -383,7 +383,7 @@ main-owned `RightRailProjectionService` 为显式 `{ projectId, sessionId }` 组
 
 General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 策略采用 renderdoc-execution 的六块 Markdown 模板，按规模填写；Knowledge 相似性仅是检查线索。
 
-agent_handoff 要求非空摘要和严格 contract：route；execute（Plan URI/hash、requiredSkillIds、returnTo、deliveryRequirements）；return（executionHandoffId、产物 URI/hash）。returnTo 必须等于实际派发者。Plan 经 session artifact plans 类别版本化，历史文件不迁移或删除。接收 prepareTurn 校验引用、预加载必需 Skill、去重、冻结来源与权限交集；来源变化重新准备，缺失或权限冲突拒绝。通用 turn 仅调用 TurnCompletionValidator，组合层选择 Investigation 校验策略并冻结任务绑定。
+agent_handoff 要求非空摘要和严格 contract：route；execute（Plan URI/hash、requiredSkillIds、returnTo、deliveryRequirements）；return（executionHandoffId、产物 URI/hash）。returnTo 必须等于实际派发者。Mission execute 必须绑定本轮已批准冻结 Plan（`approvedHash` + 声明的 continue handoff target）；未经过计划门的 execute 直接 `HANDOFF_PLAN_NOT_APPROVED`。Plan 经 session artifact plans 类别版本化：同意前覆盖活文件，同意后冻结副本，历史文件不迁移或删除。接收 prepareTurn 校验引用、预加载必需 Skill、去重、冻结来源与权限交集；来源变化重新准备，缺失或权限冲突拒绝。通用 turn 仅调用 TurnCompletionValidator，组合层选择 Investigation 校验策略并冻结任务绑定。
 
 每个 root 一次初始路由、最多两轮 execute/return；Small Loop 不消耗新周期，重复 consume 不重复扣数。第二轮允许回评估，第三轮执行拒绝。额度耗尽但未完成时，Mission 通过 turn_complete 的 budget_paused disposition 与 evidenceRefs 绑定最后回交 Checkpoint URI/hash，正文说明 unresolvedFrontier，等待新用户指令；这只是 turn 结束，绝不提升领域报告状态。handoff-state 只读取当前 schema；未知或旧格式原字节保留并拒绝继续，须先离线备份、转换和验证，不在正常运行时迁移或建立兼容双轨。重启降级、取消、事件驱动续跑保持原契约。
 

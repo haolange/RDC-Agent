@@ -13,7 +13,6 @@ import { sessionCommand } from './builtins/session';
 import { toolsCommand } from './builtins/tools';
 import { mcpCommand } from './builtins/mcp';
 import { skillsCommand } from './builtins/skills';
-import { planCommand } from './builtins/plan';
 import { testCommand } from './builtins/test';
 import { exportCommand } from './builtins/export';
 import { statusCommand } from './builtins/status';
@@ -49,7 +48,6 @@ function registerBuiltins(registry: CommandRegistry): void {
     toolsCommand,
     mcpCommand,
     skillsCommand,
-    planCommand,
     testCommand,
     exportCommand,
     statusCommand,

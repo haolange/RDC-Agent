@@ -6,6 +6,7 @@ import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { isActiveWorkProcessStatus } from './workProcessActiveSignal';
 import { ToolRow } from './WorkProcessRowParts';
+import { PlanCard } from './PlanCard';
 
 export { ToolRow };
 
@@ -53,6 +54,15 @@ export const DiagnosticRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'dia
       ) : (
         <div className="work-process-diagnostic-message">{row.message}</div>
       )}
+    </div>
+  </li>
+);
+
+export const PlanReviewRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'planReview' }> }> = ({ row }) => (
+  <li className={`work-process-step is-appear status-${row.status} kind-plan-review`} data-testid="work-process-plan-review">
+    <WorkProcessRailIcon variant="step" status={row.status} />
+    <div className="work-process-step-content">
+      <PlanCard plan={row.plan} />
     </div>
   </li>
 );

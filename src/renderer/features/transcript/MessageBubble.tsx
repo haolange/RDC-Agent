@@ -9,6 +9,7 @@ import { UserMessageEditForm } from './UserMessageEditForm';
 import { useUserMessageRewrite } from './useUserMessageRewrite';
 import { MessageAttachments } from './MessageAttachments';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
+import { HandoffSuggestionRow } from './HandoffSuggestionRow';
 import { SystemMessage } from './SystemMessage';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
@@ -214,6 +215,9 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
             <div className="conversation-bubble conversation-bubble-assistant">
               {renderContentWithCursor(message.content, status)}
             </div>
+          ) : null}
+          {!isInProgress && message.handoffSuggestions && message.handoffSuggestions.length > 0 ? (
+            <HandoffSuggestionRow suggestions={message.handoffSuggestions} />
           ) : null}
           {showDiagnosticBlock && message.diagnostic ? (
             <div className="conversation-message-diagnostic" role="alert">

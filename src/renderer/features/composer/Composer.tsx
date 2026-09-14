@@ -12,8 +12,7 @@ import type { ComposerController } from './useComposer';
 import { PermissionModeSelector } from './PermissionModeSelector';
 import { EffortControl } from './EffortControl';
 import { ComposerModelOverrideMenu } from './ComposerModelOverrideMenu';
-import { ToolApprovalRequestPanel, usePendingToolApprovalRequest } from './ToolApprovalRequestPanel';
-import { UserInputRequestPanel, usePendingUserInputRequest } from './UserInputRequestPanel';
+import { useComposerPendingGate } from './useComposerPendingGate';
 import { SlashCommandPopover } from './SlashCommandPopover';
 import { useSlashCommand } from './useSlashCommand';
 import { ComposerMarkdownInput, type ComposerMarkdownMode } from './ComposerMarkdownInput';
@@ -33,6 +32,7 @@ import './Debugger.composer-panels.css';
 import './composer-chrome.css';
 import './composer-effort.css';
 import './composer-attachments.css';
+import './composer-plan-review.css';
 
 export interface ComposerProps {
   composer: ComposerController;
@@ -71,9 +71,6 @@ export const Composer: React.FC<ComposerProps> = ({
     () => buildComposerSessionScopeKey(currentProject?.projectId, currentSession?.sessionId),
     [currentProject?.projectId, currentSession?.sessionId],
   );
-  const pendingToolApproval = usePendingToolApprovalRequest();
-  const pendingUserInput = usePendingUserInputRequest();
-
   const slashCommand = useSlashCommand(
     composer.promptValue,
     composer.setPromptValueDirect,
@@ -134,27 +131,8 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   }, [composerMarkdown, isComposerBusy]);
 
-  if (pendingToolApproval) {
-    return (
-      <div
-        className="composer-shell composer-shell-tool-approval"
-        {...composeAccentStyle}
-      >
-        <ToolApprovalRequestPanel request={pendingToolApproval} />
-      </div>
-    );
-  }
-
-  if (pendingUserInput) {
-    return (
-      <div
-        className="composer-shell composer-shell-user-input"
-        {...composeAccentStyle}
-      >
-        <UserInputRequestPanel request={pendingUserInput} />
-      </div>
-    );
-  }
+  const pendingGate = useComposerPendingGate(composeAccentStyle);
+  if (pendingGate) return pendingGate;
 
   return (
     <ComposerMenuRegistryProvider>
