@@ -428,3 +428,7 @@ Android matching-runtime acceptance now passed: Android Studio SDK NDK 27.3.1375
 - 最新 Browser 表单逐字符输入 QA_DRAFT（尚无等号）以及 one two 后的空格均保留，随后恢复草稿，未保存诊断参数。
 - Capture：隔离配置继承 RDX disabled，配置现有 CLI 后安装校验识别 128 operations。默认 Tools runtime 根返回 context_limit_exceeded；该尝试创建了本轮 daemon/log metadata，关闭未得到原生确认，UI 保留 RDX_CLOSE_FAILED 和 ownership，不能算关闭成功。随后用官方 RDX_INTERMEDIATE_ROOT 创建独立 runtime，新会话 sess_d9accc00c70f 原位打开本地 RDC（未复制）。capture SHA-256 为 0a79926a92e7e659989befc2322dc93b65782252fc5be2de33496142735a4094；真实事件 147→140→137→147 均得到 Applied EID，最终 Close 返回 Not open。Present 回执为 Final Present does not identify exactly one swap-buffer resource，三个事件均无图像，故这里只通过事件选择/恢复/隔离关闭，图像预览没有通过。无 Android 设备，不尝试 WhiteHair。原项目 metadata SHA-256 前后一致 f367755908a593cad88bddcff675573c3b4a7b725601bcf5264609af76acdcc5。
 - T6 清理完成：Browser 尺寸恢复、QA 页面关闭，launcher 退出；QA 锁持有 PID 42288 已退出，canonical 桌面 instance.lock 不存在，桌面启动权已交还。隔离 RDX daemon 随应用退出，默认根本轮失败上下文通过官方 daemon stop 停止（PID 66924 已退出），仅删除该上下文的残留日志，其他上下文保留。清理了本轮 .local（QA project/userData/home、加密凭据副本、运行时、预算守卫、工作清单、专用测试 TEMP）及 coverage 中间报告；保留当前 out 构建与依赖。加密副本因 ACL 首次删除失败，提升权限删除后再次复查。未复制或删除原始 capture、真实会话与用户资源。清理回执不代表未完成的模型、图像或设备验收通过。
+
+### 2026-09-14 续接范围调整
+
+按用户最新决定，General 执行与 Mission 回评估，以及依赖此链路的真实模型建议行验收，交由后续专门大项验证；不再作为本次家中续接任务或阻塞。上述历史未完成事实保持，不改标为通过。本次续接仅保留原生导出对话框、本地与 Android Capture 验收，详见 docs/workflows/plan-handoff-acceptance-continuation.md。
