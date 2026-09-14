@@ -1,0 +1,13 @@
+schema_version: 1
+module_path: scripts/runtime_helpers
+title: 运行时辅助脚本集（构建/校验/测试环境）
+scope:
+    - scripts/builtin-profile-contracts.mjs
+    - scripts/pnpm-resolver.mjs
+    - scripts/provider-catalog-index.cjs
+    - scripts/register-ts-source.cjs
+    - scripts/renderer-contract.mjs
+    - scripts/vitest-global-setup.ts
+source_files: []
+depends_on: []
+related_to: []

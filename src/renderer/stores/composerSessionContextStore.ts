@@ -20,10 +20,18 @@ export interface LastSentPrompt {
   skillIds: string[];
 }
 
+export interface HandoffSuggestionRequest {
+  sessionId: string;
+  agentId: string;
+  prompt: string;
+  send: boolean;
+}
+
 interface ComposerSessionContextState {
   activeTurn: ActiveTurnContext | null;
   lastSent: LastSentPrompt | null;
   isPromptSending: boolean;
+  handoffSuggestionRequest: HandoffSuggestionRequest | null;
 
   beginTurn: (context: ActiveTurnContext) => void;
   setRealTurnId: (
@@ -34,6 +42,8 @@ interface ComposerSessionContextState {
   clearActiveTurnIfOwned: (ownership: ActiveTurnOwnership) => void;
   setLastSent: (lastSent: LastSentPrompt | null) => void;
   setIsPromptSending: (sending: boolean) => void;
+  queueHandoffSuggestion: (request: HandoffSuggestionRequest) => void;
+  clearHandoffSuggestion: () => void;
   resetForSessionSwitch: () => void;
 }
 
@@ -41,6 +51,7 @@ export const useComposerSessionContextStore = create<ComposerSessionContextState
   activeTurn: null,
   lastSent: null,
   isPromptSending: false,
+  handoffSuggestionRequest: null,
 
   beginTurn: (context) => set({ activeTurn: context }),
   setRealTurnId: (ownership, turnId, committedSessionId) => {
@@ -62,9 +73,16 @@ export const useComposerSessionContextStore = create<ComposerSessionContextState
   },
   setLastSent: (lastSent) => set({ lastSent }),
   setIsPromptSending: (isPromptSending) => set({ isPromptSending }),
+  queueHandoffSuggestion: (handoffSuggestionRequest) => {
+    const state = get();
+    if (state.handoffSuggestionRequest || state.activeTurn || state.isPromptSending) return;
+    set({ handoffSuggestionRequest });
+  },
+  clearHandoffSuggestion: () => set({ handoffSuggestionRequest: null }),
   resetForSessionSwitch: () => set({
     activeTurn: null,
     isPromptSending: false,
+    handoffSuggestionRequest: null,
   }),
 }));
 

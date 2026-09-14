@@ -785,7 +785,6 @@ PhaseGroupNode
 PhaseKind
 PLAN_ONLY_CONFLICT_SKILL_IDS
 PlanNode
-PlanStatus
 PlanStep
 PlatformApi
 POLICY_UNLIMITED_COMPACTION_PERCENT

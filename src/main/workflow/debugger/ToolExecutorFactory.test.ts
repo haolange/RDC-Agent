@@ -82,6 +82,10 @@ vi.mock('../../agent-runtime/interactions/AgentUserInputRequestService', () => (
   agentUserInputRequestService: {},
 }));
 
+vi.mock('../../agent-runtime/interactions/AgentPlanReviewRequestService', () => ({
+  agentPlanReviewRequestService: {},
+}));
+
 import { ToolExecutorFactory } from './ToolExecutorFactory';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
@@ -675,4 +679,52 @@ it('durably saves reserved cost before effects and rejects effects when durable 
  const fail = registerPolicyBudgetObserver(ledger, async () => { throw new Error('durable budget unavailable'); });
  await expect(executor.execute({ ...call, id: 'failed-save' })).rejects.toThrow('durable budget unavailable');
  expect(execute).toHaveBeenCalledOnce(); expect(ledger.toolCalls).toBe(2); fail();
+});
+
+describe('ToolExecutorFactory plan_artifact gate', () => {
+  const planTool = {
+    name: 'plan_artifact',
+    description: 'plan',
+    parameters: { type: 'object', properties: {} },
+    execute: async () => ({ content: [{ type: 'text' as const, text: 'stub' }] }),
+  };
+
+  function createFactory() {
+    return new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      getActiveTurn: () => null,
+      resolveRuntimeTools: () => ({
+        toolMap: new Map([['plan_artifact', planTool]]),
+        definitions: [],
+        deferredDefinitions: [],
+      }),
+      isAllowedForRuntime: () => true,
+      matchesToolAllowlist: () => true,
+    });
+  }
+
+  it('fails closed when the profile has no continue handoff', async () => {
+    const executor = createFactory().createToolExecutor('debugger', ['plan_artifact'], 'sess', {
+      sessionId: 'sess',
+      turnId: 'turn-1',
+      eventContext: { sessionId: 'sess', requestId: 'req-1' },
+      effectivePlan: {
+        toolAllowlist: ['plan_artifact'],
+        skillIntersection: ['plan_artifact'],
+        activatedDeferredTools: ['plan_artifact'],
+        profileHandoffs: [{ agent: 'general', label: 'Execute', prompt: 'go', showContinueOn: false }],
+        projectId: null,
+        projectRootPath: null,
+      },
+    } as never);
+    const result = await executor.execute({
+      type: 'toolCall',
+      id: 'tc-plan',
+      name: 'plan_artifact',
+      arguments: { title: 'Plan', summary: ['Goal'], content: '## Goal\nFind it.' },
+    });
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toMatch(/PLAN_REVIEW_NO_HANDOFF/);
+  });
 });

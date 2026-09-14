@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
-import { buildWorkProcessPresentation } from './workProcessPresentation';
+import type { ConversationPlanReview } from '@shared/types/planReview';
+import { buildWorkProcessPresentation, createToolRowForPresentation } from './workProcessPresentation';
 
 const now = 1_700_000_000_000;
 
@@ -1421,5 +1422,48 @@ describe('buildWorkProcessPresentation', () => {
         pathChip: 'out/report.md',
       }),
     );
+  });
+
+  it('renders awaiting plan_artifact as a planReview card and rejected as a shell row', () => {
+    const awaiting: ConversationPlanReview = {
+      planId: 'plan-1',
+      revision: 2,
+      uri: 'session://plans/plan.md',
+      hash: 'a'.repeat(64),
+      title: '导入后再诊断',
+      summary: ['导入 capture'],
+      sections: [{ heading: '目标与边界', body: '定位 First Bad Event。' }],
+      status: 'awaiting',
+      handoffOptions: [{ label: 'Execute with General', agent: 'general' }],
+    };
+    const card = createToolRowForPresentation({
+      id: 'plan-live',
+      toolName: 'plan_artifact',
+      status: 'running',
+      planReview: awaiting,
+      argsPreview: JSON.stringify({ title: awaiting.title }),
+      startedAt: now,
+    });
+    expect(card).toMatchObject({ type: 'planReview', plan: awaiting });
+
+    const shell = createToolRowForPresentation({
+      id: 'plan-rejected',
+      toolName: 'plan_artifact',
+      status: 'complete',
+      planReview: {
+        ...awaiting,
+        revision: 1,
+        status: 'rejected',
+        decision: { kind: 'reject', feedback: '请补上复现条件。' },
+      },
+      resultPreview: '请补上复现条件。',
+      startedAt: now,
+      completedAt: now + 10,
+    });
+    expect(shell).toMatchObject({
+      type: 'tool',
+      verb: '已更新计划 · 已拒绝',
+      bodyText: '请补上复现条件。',
+    });
   });
 });

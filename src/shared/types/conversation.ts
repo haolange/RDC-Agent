@@ -4,6 +4,10 @@ import type { AgentEvent } from './agentRuntime';
 import type { ConversationBranchState } from './conversationBranch';
 import type { ProviderOutputRef, ThinkingArtifact } from './reasoning';
 import type {
+  ConversationPlanReview,
+  PlanReviewHandoffSuggestion,
+} from './planReview';
+import type {
   PreparedTurnContextSummary,
   RunSummary,
   SessionAttachmentLayer,
@@ -29,6 +33,7 @@ export type ConversationWorkBlockKind =
   | 'llm_turn'
   | 'approval'
   | 'user_input'
+  | 'plan_review'
   | 'compaction'
   | 'subagent'
   | 'handoff'
@@ -142,6 +147,8 @@ export interface ConversationToolCall {
   providerOutputRef?: ProviderOutputRef;
   /** Canonical ask_user payload. Renderer state must never be reconstructed from argsPreview. */
   userInputQuestions?: ConversationAskUserQuestion[];
+  /** Canonical plan_artifact review payload. Renderer state must never be reconstructed from argsPreview. */
+  planReview?: ConversationPlanReview;
   argsPreview?: string;
   resultPreview?: string;
   /** Canonical, non-sensitive resources proven by this tool result. */
@@ -244,6 +251,8 @@ export interface ConversationMessage {
   variantIndex?: number;
   /** Frozen preflight summary persisted on both turn messages for restart-safe idempotency and trace audit. */
   preparedContext?: PreparedTurnContextSummary;
+  /** Turn-end continue actions from the frozen profile handoffs (`showContinueOn !== false`). */
+  handoffSuggestions?: PlanReviewHandoffSuggestion[];
 }
 
 export type AttachmentLayer = SessionAttachmentLayer;
@@ -431,6 +440,14 @@ export interface ConversationAnswerToolApprovalResult {
   success: boolean;
   error?: string;
 }
+
+export type {
+  ConversationAnswerPlanReviewRequest,
+  ConversationAnswerPlanReviewResult,
+  ConversationPlanReview,
+  PlanReviewDecision,
+  PlanReviewHandoffSuggestion,
+} from './planReview';
 
 export interface ConversationTurnResult {
   requestId: string;

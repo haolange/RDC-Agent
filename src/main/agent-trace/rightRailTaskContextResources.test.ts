@@ -19,6 +19,22 @@ const segment = (input: Partial<PromptSegment> & Pick<PromptSegment, 'id' | 'kin
 });
 
 describe('right rail task context resources', () => {
+  it('keeps live and frozen plan references in the transcript while retaining other session resources', () => {
+    const resources = collectSessionTaskContextResources({
+      messages: [message([{
+        id: 'plans', kind: 'llm_turn', title: 'Plan', status: 'complete', startedAt: 1,
+        toolCalls: [{ id: 'plan', toolName: 'plan_artifact', status: 'complete', startedAt: 1,
+          resourceRefs: [
+            { id: 'live', kind: 'file', label: 'plan.md', path: 'session://plans/plan.md' },
+            { id: 'frozen', kind: 'file', label: 'plan-frozen.md', path: 'session://plans/plan-frozen.md' },
+            { id: 'output', kind: 'file', label: 'result.md', path: 'session://tool-outputs/result.md' },
+          ],
+        }],
+      }])], promptSegments: [],
+    });
+    expect(resources.map((resource) => resource.id)).toEqual(['output']);
+  });
+
   it('uses only durable resources from successfully completed tool calls, including nested blocks', () => {
     const resources = collectSessionTaskContextResources({
       messages: [message([{

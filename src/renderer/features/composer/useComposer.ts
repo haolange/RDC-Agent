@@ -19,6 +19,8 @@ import { useSelectedContextProfile } from './useSelectedContextProfile';
 import { useComposerDomEffects } from './useComposerDomEffects';
 import { hydrateComposerAgentFromSession } from '../../stores/sessionAgentHydration';
 import { persistSessionAgentId } from './sessionAgentId';
+import { useQueuedHandoffSuggestion } from './useQueuedHandoffSuggestion';
+
 
 export function useComposer(options: {
   showNotice: (message: string) => void;
@@ -139,6 +141,10 @@ export function useComposer(options: {
   const primaryButtonDisabled = send.isComposerBusy
     ? currentRun?.status === 'stopping' && !hasActiveConversationTurn && !send.isPromptSending
     : (!hasMessageContent && !hasPendingAttachments);
+
+  useQueuedHandoffSuggestion({
+    sessionId: currentSession?.sessionId, promptValue, setPromptValue, sendPrompt: send.handlePromptSend, showNotice,
+  });
 
   useComposerDomEffects({
     promptInputRef,

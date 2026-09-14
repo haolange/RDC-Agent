@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: scripts/launchers_and_smoke_tests
+title: RDC-Agent 启动器与冒烟测试脚本
+scope:
+    - scripts/smoke-*.mjs
+    - scripts/open-agent-browser-qa.html
+    - scripts/run-rdc-launcher.*
+    - scripts/start-rdc-agent.*
+source_files: []
+depends_on: []
+related_to: []

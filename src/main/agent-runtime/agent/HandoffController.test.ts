@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HANDOFF_ERROR } from '@shared/types/profileHandoff';
-import { HandoffController } from './HandoffController';
+import { assertMissionExecutePlanGate, HandoffController } from './HandoffController';
 
 describe('HandoffController frozen turn authority', () => {
   it('uses frozen project profile handoffs and enabled ids without rereading mutable settings', () => {
@@ -87,5 +87,36 @@ describe('HandoffController frozen turn authority', () => {
       enabledProfileIds: ['plan', 'edit'],
       isDeclaredModelValid: () => false,
     })).toMatchObject({ valid: false, code: HANDOFF_ERROR.MODEL_INVALID });
+  });
+
+  it('requires an approved hash and target for Mission execute', () => {
+    const hash = 'a'.repeat(64);
+    expect(assertMissionExecutePlanGate({
+      sourceAgentId: 'debugger',
+      target: 'general',
+      intent: 'execute',
+      planHash: hash,
+      approved: null,
+    })).toMatchObject({ valid: false, code: HANDOFF_ERROR.PLAN_NOT_APPROVED });
+    expect(assertMissionExecutePlanGate({
+      sourceAgentId: 'debugger',
+      target: 'general',
+      intent: 'execute',
+      planHash: hash,
+      approved: { hash, target: 'analyzer', frozenUri: 'session://plans/plan-frozen.md' },
+    })).toMatchObject({ valid: false, code: HANDOFF_ERROR.PLAN_NOT_APPROVED });
+    expect(assertMissionExecutePlanGate({
+      sourceAgentId: 'debugger',
+      target: 'general',
+      intent: 'execute',
+      planHash: `sha256:${hash}`,
+      planUri: 'session://plans/plan-frozen.md',
+      approved: { hash, target: 'general', frozenUri: 'session://plans/plan-frozen.md' },
+    })).toMatchObject({ valid: true });
+    expect(assertMissionExecutePlanGate({
+      sourceAgentId: 'general',
+      target: 'debugger',
+      intent: 'return',
+    })).toMatchObject({ valid: true });
   });
 });

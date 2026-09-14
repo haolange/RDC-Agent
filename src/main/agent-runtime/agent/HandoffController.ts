@@ -7,6 +7,8 @@
 
 import { HANDOFF_CHAIN_LIMIT, HANDOFF_ERROR } from '@shared/types/profileHandoff';
 import type { FrozenHandoffDefinition } from '../EffectiveRuntimePlan';
+import { isMissionProfileId } from '@shared/constants/missionPlanOnly';
+import { normalizeArtifactHash } from '../../sessions/sessionPlanArtifact';
 
 export interface HandoffRequest {
   fromAgentId: string;
@@ -39,6 +41,28 @@ export interface HandoffResolveResult {
 
 function fail(code: string, reason: string): HandoffResolveResult {
   return { valid: false, code, reason };
+}
+
+export function assertMissionExecutePlanGate(input: {
+  sourceAgentId: string;
+  target: string;
+  intent: string;
+  planHash?: string;
+  planUri?: string;
+  approved?: { hash: string; target: string; frozenUri: string } | null;
+}): HandoffResolveResult {
+  if (!isMissionProfileId(input.sourceAgentId) || input.intent !== 'execute') {
+    return { valid: true };
+  }
+  const approved = input.approved;
+  const planHash = input.planHash ? normalizeArtifactHash(input.planHash) : '';
+  if (!approved || !planHash || normalizeArtifactHash(approved.hash) !== planHash || approved.target !== input.target || approved.frozenUri !== input.planUri) {
+    return fail(
+      HANDOFF_ERROR.PLAN_NOT_APPROVED,
+      'Mission execute requires an approved frozen plan bound to this handoff target.',
+    );
+  }
+  return { valid: true };
 }
 
 export class HandoffController {

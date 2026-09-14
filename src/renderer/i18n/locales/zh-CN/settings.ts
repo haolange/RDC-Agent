@@ -180,7 +180,7 @@ export const zhSettings = {
   'settings.agentHandoffSend': '自动发送',
   'settings.agentHandoffSendHelp': '立即运行目标智能体，而不是只把提示词填入输入框。',
   'settings.agentHandoffShowContinueOn': '显示为继续操作',
-  'settings.agentHandoffShowContinueOnHelp': '当前轮次结束时提供这个交接入口。',
+  'settings.agentHandoffShowContinueOnHelp': '回合结束后作为建议按钮显示（默认开）。',
   'settings.agentHandoffErrorLabelRequired': '名称不能为空。',
   'settings.agentHandoffErrorTargetRequired': '请选择目标智能体。',
   'settings.agentHandoffErrorTargetUnknown': '智能体「{id}」不存在。',

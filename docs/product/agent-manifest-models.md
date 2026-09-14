@@ -84,7 +84,7 @@ Removed fields (do not restore): `harness` / lean|standard thickness modes. Skil
 - `agent`
 - `prompt`
 - `send`
-- `showContinueOn`
+- `showContinueOn`（未声明视为 true；Settings 只持久化显式 `false`。为 true 时回合结束后渲染建议按钮，计划门通过也点同一组按钮）
 - `model`
 
 Composer and orchestrator switch lists are derived from `.agent.md` definitions where `enabled && userInvocable` is true.
@@ -118,7 +118,7 @@ Tasks 能力由 route 与冻结工具集决定，不是独立 profile：只读 r
 
 ## Plan 输出
 
-`plan.md` is a normal artifact, attachment, or trace output produced by an agent. It is not a workflow state machine, IPC channel, or renderer overlay. Approval and continuation UX should be modeled through generic handoffs and conversation/tool events.
+`planArtifact` token 只给三 Mission。`plan_artifact` 是人机门：提交 `title` + `summary[]` + Markdown `content`，主进程覆盖 `session://plans/plan.md` 并按 `##` 切 `sections[]`。无 `showContinueOn !== false` 的 handoff 则 fail-closed。批准冻结 `plan-<ISO>-<hash8>.md` 并只放行同 hash / 同 target 的 `agent_handoff` execute；拒绝意见回同一 tool result。项目副本仅用户点击写入 `<project>/.rdx/plans/<sessionId>/plan.md`。
 
 ## RDX Shell Actions
 

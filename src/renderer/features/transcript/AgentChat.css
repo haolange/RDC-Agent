@@ -1792,6 +1792,19 @@
   margin-top: var(--space-0-5);
 }
 
+.handoff-suggestion-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.handoff-suggestion-row__label {
+  margin: 0;
+  color: var(--token-text-body);
+  font-size: var(--text-xs);
+}
+
 .work-process.is-collapsed .work-process-header {
   margin-bottom: 0;
   color: var(--token-text-caption);

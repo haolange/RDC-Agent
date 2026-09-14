@@ -9,7 +9,6 @@ import type {
   TraceStatus,
 } from '@shared/types/agenticTrace';
 import type {
-  PlanStatus,
   RawAuditRef,
   TraceSessionResult,
 } from '@shared/types/trace';
@@ -64,19 +63,12 @@ export function findCanonicalFinalAnswer(
   }
   return finalAnswer;
 }
-const runStatusFromSummary = (run: RunSummary, planStatus?: PlanStatus): TraceStatus => {
-  if (planStatus === 'awaiting_approval' || run.status === 'awaiting_approval') return 'waiting_approval';
+const runStatusFromSummary = (run: RunSummary): TraceStatus => {
+  if (run.status === 'awaiting_approval') return 'waiting_approval';
   if (run.status === 'failed' || run.status === 'interrupted') return 'failed';
   if (run.status === 'cancelled') return 'cancelled';
   if (run.status === 'completed') return 'succeeded';
   return 'running';
-};
-
-const mapRunPlanStatus = (run: RunSummary): PlanStatus => {
-  if (run.status === 'failed' || run.status === 'interrupted') return 'failed';
-  if (run.status === 'completed') return 'executed';
-  if (run.status === 'awaiting_approval') return 'awaiting_approval';
-  return 'accepted';
 };
 
 interface HistoryTurn {
@@ -175,7 +167,6 @@ export class TraceService {
 
     for (const run of runs) {
       const runEvents = events.filter((e) => e.run_id === run.runId).sort((a, b) => a.ts_ms - b.ts_ms);
-      const planStatus = mapRunPlanStatus(run);
       const agentType = run.profileId ?? 'general';
       profileId = agentType;
       const profile = agentProfileRegistry.getForMode(agentType);
@@ -191,13 +182,13 @@ export class TraceService {
           runId,
           agentType,
           userRequest: String(userPrompt),
-          status: runStatusFromSummary(run, planStatus),
+          status: runStatusFromSummary(run),
           createdAt: toIso(run.startedAt),
           updatedAt: toIso(run.finishedAt ?? run.startedAt),
         };
         this.runStore.save(agentRun);
       } else {
-        agentRun.status = runStatusFromSummary(run, planStatus);
+        agentRun.status = runStatusFromSummary(run);
         agentRun.updatedAt = toIso(run.finishedAt ?? Date.now());
         this.runStore.save(agentRun);
       }

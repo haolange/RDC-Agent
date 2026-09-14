@@ -147,6 +147,27 @@ export const ConversationAnswerUserInputArgsSchema = z.tuple([
  * User's approve/reject answer for an in-turn tool approval prompt.
  * This is not a self-asserted IPC mutation bypass (unlike memory write `approved`).
  */
+export const ConversationAnswerPlanReviewArgsSchema = z.tuple([
+  z.object({
+    sessionId: z.union([ipcId(128, 'sessionId'), z.null()]).optional(),
+    turnId: ipcNonEmptyString(200, 'turnId'),
+    toolCallId: ipcNonEmptyString(200, 'toolCallId'),
+    decision: z.discriminatedUnion('kind', [
+      z.object({
+        kind: z.literal('approve'),
+        handoff: z.object({
+          label: ipcNonEmptyString(200, 'label'),
+          agent: ipcNonEmptyString(200, 'agent'),
+        }).strict(),
+      }).strict(),
+      z.object({
+        kind: z.literal('reject'),
+        feedback: ipcNonEmptyString(20_000, 'feedback'),
+      }).strict(),
+    ]),
+  }).strict(),
+]);
+
 export const ConversationAnswerToolApprovalArgsSchema = z.tuple([
   z.object({
     sessionId: z.union([ipcId(128, 'sessionId'), z.null()]).optional(),

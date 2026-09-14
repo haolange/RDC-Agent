@@ -151,7 +151,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 ## Profile Handoff
 
-`ProfileHandoffState` 是 session-owned durable 状态机（`prepared` → `committed` → `consumed`，或未完成点 `cancelled`），由 `HandoffStateStore` 写入 `<sessionPath>/handoff-state.json`。`AgentHandoffDefinition` 只是 manifest 路由声明，不是该记录。
+`ProfileHandoffState` 是 session-owned durable 状态机（`prepared` → `committed` → `consumed`，或未完成点 `cancelled`），由 `HandoffStateStore` 写入 `<sessionPath>/handoff-state.json`。`AgentHandoffDefinition` 只是 manifest 路由声明，不是该记录。计划门是另一条人机停顿：`plan_artifact` 写活计划并挂起，`approval.requested kind=plan_review`；拒绝意见回同一 tool result，批准写入 `TurnHandle.approvedPlan`（`approvedHash` + target + frozenUri）。回合成功终态把冻结 `profileHandoffs`（`showContinueOn !== false`）快照到 assistant `handoffSuggestions`。
 
 事务顺序：`before-handoff` → 内存草稿 prepare → 绑定 `turn.pendingHandoff` → `after-hook` → 持久化 `HandoffStateStore.prepare`。`before-handoff` denied 则不 draft、不 bind、不 persist。Hook / 持久化 / 绑定失败必须 cancel/rollback，不得遗留 active prepared，并清掉 `pendingHandoff`。
 
@@ -182,7 +182,7 @@ RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）
 
 General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 策略采用 renderdoc-execution 的六块 Markdown 模板，按规模填写；Knowledge 相似性仅是检查线索。
 
-agent_handoff 要求非空摘要和严格 contract：route；execute（Plan URI/hash、requiredSkillIds、returnTo、deliveryRequirements）；return（executionHandoffId、产物 URI/hash）。returnTo 必须等于实际派发者。Plan 经 session artifact plans 类别版本化，历史文件不迁移或删除。接收 prepareTurn 校验引用、预加载必需 Skill、去重、冻结来源与权限交集；来源变化重新准备，缺失或权限冲突拒绝。通用 turn 仅调用 TurnCompletionValidator，组合层选择 Investigation 校验策略并冻结任务绑定。
+agent_handoff 要求非空摘要和严格 contract：route；execute（Plan URI/hash、requiredSkillIds、returnTo、deliveryRequirements）；return（executionHandoffId、产物 URI/hash）。returnTo 必须等于实际派发者。Mission execute 必须绑定本轮已批准冻结 Plan：`plan.hash === approvedHash`、`plan.uri === frozenUri` 且 `agent === approvedTarget`，否则 `HANDOFF_PLAN_NOT_APPROVED`。Plan 经 session artifact plans 类别版本化：同意前覆盖 `session://plans/plan.md`，同意后冻结 `plan-<ISO>-<hash8>.md`，历史文件不迁移或删除。接收 prepareTurn 校验引用、预加载必需 Skill、去重、冻结来源与权限交集；来源变化重新准备，缺失或权限冲突拒绝。通用 turn 仅调用 TurnCompletionValidator，组合层选择 Investigation 校验策略并冻结任务绑定。
 
 每个 root 一次初始路由、最多两轮 execute/return；Small Loop 不消耗新周期，重复 consume 不重复扣数。第二轮允许回评估，第三轮执行拒绝。额度耗尽但未完成时，Mission 通过 turn_complete 的 budget_paused disposition 与 evidenceRefs 绑定最后回交 Checkpoint URI/hash，正文说明 unresolvedFrontier，等待新用户指令；这只是 turn 结束，绝不提升领域报告状态。handoff-state 只读取当前 schema；未知或旧格式原字节保留并拒绝继续，须先离线备份、转换和验证，不在正常运行时迁移或建立兼容双轨。重启降级、取消、事件驱动续跑保持原契约。
 
@@ -244,3 +244,5 @@ Task 的 completionRequirements 是 result.outputs 的精确键；验收语义�
 后台重试先选择已有 Task 的根预算，再绑定新执行；不先绑定新父轮预算后尝试换根。旧执行、消费与期限保留。自动压缩、角色恢复和 Provider 元数据刷新不重置这些状态。Composer 的推理选择按实际 Provider/模型路由恢复，同一路由下恢复 Agent 身份不应套用模型默认档位。
 
 Task 状态文件的提交保持同一候选文件与原子 rename。短暂 EPERM/EBUSY 在持有存储锁期间最多重试三次（10/20/40 ms）；不删除目标、不重复领域操作。持续失败删除未安装候选、保留权威旧文件并返回原错误，不能宣称结果已持久保存。
+
+计划批准先验证正文并冻结制品、持久化决策，再发布 TurnHandle 执行授权与 answered 事件；失败不发布批准，新审阅撤销旧在途授权。根/子计划审阅均不得同时生成普通工具审批；子请求回答与读取按持久 delegated owner 路由。

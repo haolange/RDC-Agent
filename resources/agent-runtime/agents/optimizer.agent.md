@@ -36,6 +36,7 @@ handoffs:
     agent: general
     prompt: Execute the approved Optimizer plan with requiredSkillIds `renderdoc-execution`, `optimization-experiment`, `rdx-cli-shell`, and `optimizer-rdx-tools`. Use the shared shell rules and the Optimizer operation manual only after they are preloaded for General. Qualify the baseline and noise floor, write Frame Breakdown and Cost/Limiter/Mechanism, then run a transactional Experiment with intervention plus rollback (A-B-A). Ablation is not a shipping optimization. After Claims, open an independent `$skeptic-review`. Preserve the stated correctness and quality constraints.
     send: true
+    showContinueOn: true
 metadata: {}
 ---
 

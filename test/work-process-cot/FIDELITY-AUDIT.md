@@ -19,7 +19,7 @@
 | web | search=域名 pills；fetch=title summary + destination chip |
 | 聚合 | ≥8 自然语言摘要；triangle caret |
 | Compact | `Earlier work summarized`，无计数 |
-| Plan | `plan_artifact` 工具卡；不 pin plan.md |
+| Plan | 计划卡 + 已拒绝壳行；不进 Right Rail |
 | Tasks snapshot | 一轮一张活卡；canonical order；completed 删除线；cancelled 态 |
 | ask_user | `{verb} · {count}`；`0/2`；caret；无 header icon；待答「等待回答」 |
 | Approval | 扁平 ApprovalRow「等待审批」+ 工具卡内 `.work-process-tool-approval` |
@@ -46,6 +46,6 @@
 - 跳到完成 → meta 含「持续」；thinking 折叠为「已思考 ·」
 - 场景 02 → 运行中仍「正在思考」展开扫光
 - 场景 05 → `mcp__*`「已调用 MCP」；`web_fetch` 有 title
-- 场景 08 → 一张活的 Tasks 快照卡，completed 有删除线
+- 场景 08 → 计划卡 + 已拒绝壳行；一张活的 Tasks 快照卡，completed 有删除线
 - 场景 09 → ask_user `等待用户 · 2` + `0/2`；扁平「等待审批」；工具卡内审批条
 - 场景 12 → thinking 展开可见渲染后的粗体 / 行内代码 / 标题

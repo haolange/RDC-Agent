@@ -123,12 +123,18 @@
     }
     if (phase >= 9) {
       base.sections[0].items.push({
-        type: 'tool',
-        tool: {
-          name: 'plan_artifact',
-          status: phase === 9 ? 'running' : 'complete',
-          body: 'Plan artifact saved: artifacts/plan.md',
-          path: 'artifacts/plan.md',
+        type: 'planReview',
+        plan: {
+          title: locale === 'en' ? 'Validate replay device path' : '校验 Replay Device 路径',
+          status: phase === 9 ? 'awaiting' : 'approved',
+          revision: 1,
+          uri: 'session://plans/plan.md',
+          summary: locale === 'en'
+            ? ['Confirm the replay device', 'Keep the current lease']
+            : ['确认 Replay Device', '保持当前 lease'],
+          sections: [
+            { heading: locale === 'en' ? 'Goal' : '目标与边界', body: locale === 'en' ? 'Validate the device path.' : '校验设备路径。' },
+          ],
         },
       });
       base.extras = [{

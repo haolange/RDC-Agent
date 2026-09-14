@@ -11,6 +11,7 @@ export type {
   EventSubscriptionApi,
   EvidenceApi,
   InvestigationApi,
+  PlanApi,
   KnowledgeApi,
   LlmApi,
   MemoryApi,
@@ -100,6 +101,8 @@ export type {
   MCPTransport,
 } from './mcp';
 export type {
+  ConversationAnswerPlanReviewRequest,
+  ConversationAnswerPlanReviewResult,
   ConversationAnswerUserInputRequest,
   ConversationAnswerUserInputResult,
   ConversationAskUserAnswer,
@@ -203,6 +206,24 @@ export type {
   SkillMetadata,
 } from './rdxRuntime';
 export { CANONICAL_HOOK_EVENTS } from './rdxRuntime';
+export type {
+  ConversationPlanReview,
+  PlanApprovalTokenRequest,
+  PlanExportRequest,
+  PlanExportResult,
+  PlanReadRequest,
+  PlanReadResult,
+  PlanReviewDecision,
+  PlanReviewHandoffOption,
+  PlanReviewHandoffSuggestion,
+  PlanReviewSection,
+  PlanReviewStateDocument,
+  PlanReviewStatus,
+  PlanSaveToProjectRequest,
+  PlanSaveToProjectResult,
+  ProjectPlanFrontmatter,
+} from './planReview';
+export { isHandoffContinueAction, PLAN_REVIEW_STATE_SCHEMA } from './planReview';
 export type {
   DelegationCapsule,
   DelegationCapsuleBudget,
@@ -389,7 +410,6 @@ export type {
 } from './workflow';
 export type {
   BranchNavigatorViewModel,
-  PlanStatus,
   ProgressTask,
   RequestBranch,
   RequestBranchGroup,

@@ -5,15 +5,6 @@ import type {
   InvestigationRecordType,
 } from './renderdocInvestigation';
 
-export type PlanStatus =
-  | 'draft'
-  | 'awaiting_approval'
-  | 'accepted'
-  | 'needs_revision'
-  | 'superseded'
-  | 'executed'
-  | 'failed';
-
 export interface RawAuditRef {
   id: string;
   label: string;

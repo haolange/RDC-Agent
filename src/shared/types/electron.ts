@@ -16,6 +16,8 @@ import type {
   ConversationAnswerUserInputResult,
   ConversationAnswerToolApprovalRequest,
   ConversationAnswerToolApprovalResult,
+  ConversationAnswerPlanReviewRequest,
+  ConversationAnswerPlanReviewResult,
   ConversationGetAttachmentPreviewRequest,
   ConversationGetAttachmentPreviewResult,
   ConversationMessage,
@@ -30,6 +32,15 @@ import type {
   ConversationTurnResult,
 } from './conversation';
 import type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from './device';
+import type {
+  PlanApprovalTokenRequest,
+  PlanExportRequest,
+  PlanExportResult,
+  PlanReadRequest,
+  PlanReadResult,
+  PlanSaveToProjectRequest,
+  PlanSaveToProjectResult,
+} from './planReview';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from './providerCapability';
 import type { ModelsOverride } from '../provider-catalog/modelsOverrideSchema';
 import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
@@ -177,6 +188,7 @@ export interface ElectronAPI {
     cancelActiveTurn: (request?: ConversationCancelActiveTurnRequest) => Promise<ConversationCancelActiveTurnResult>;
     answerUserInput: (request: ConversationAnswerUserInputRequest) => Promise<ConversationAnswerUserInputResult>;
     answerToolApproval: (request: ConversationAnswerToolApprovalRequest) => Promise<ConversationAnswerToolApprovalResult>;
+    answerPlanReview: (request: ConversationAnswerPlanReviewRequest) => Promise<ConversationAnswerPlanReviewResult>;
     getHistory: (sessionId: string) => Promise<{
       messages: ConversationMessage[];
       branchState?: import('./conversationBranch').ConversationBranchState | null;
@@ -256,6 +268,13 @@ export interface ElectronAPI {
 
   investigation: {
     read: (request: InvestigationReadRequest) => Promise<InvestigationReadIpcResult>;
+  };
+
+  plan: {
+    read: (request: PlanReadRequest) => Promise<PlanReadResult>;
+    issueApprovalToken: (request: PlanApprovalTokenRequest) => Promise<{ token?: string; targetPath?: string; cancelled?: boolean; error?: string }>;
+    saveToProject: (request: PlanSaveToProjectRequest) => Promise<PlanSaveToProjectResult>;
+    export: (request: PlanExportRequest) => Promise<PlanExportResult>;
   };
 
   knowledge: {

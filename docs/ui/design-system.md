@@ -149,7 +149,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 ## Transcript 卡壳
 
-审批卡、Work Process tool 卡、Asked 卡、Sub Agent 子行、Tasks 快照卡、图像缩略图与 Compact 摘要共用同一组变量（定义在 `design-system.css`）：`--transcript-card-radius` / `--transcript-card-padding` / `--transcript-card-border` / `--transcript-card-surface` / `--transcript-card-shadow` / `--transcript-card-icon-size`。禁止再为某一类卡另起一套 radius/padding/border/背景，也禁止 tool 卡图标硬编码 px。缩略图经 `conversation:getToolImagePreview` 取 `data:` URL，禁止把大图 base64 写进 `resultPreview`。
+审批卡、Work Process tool 卡、Asked 卡、计划卡、计划阅读面板、handoff 建议行、Sub Agent 子行、Tasks 快照卡、图像缩略图与 Compact 摘要共用同一组变量（定义在 `design-system.css`）：`--transcript-card-radius` / `--transcript-card-padding` / `--transcript-card-border` / `--transcript-card-surface` / `--transcript-card-shadow` / `--transcript-card-icon-size`。禁止再为某一类卡另起一套 radius/padding/border/背景，也禁止 tool 卡图标硬编码 px。缩略图经 `conversation:getToolImagePreview` 取 `data:` URL，禁止把大图 base64 写进 `resultPreview`。
 
 ## 模态尺寸
 
@@ -277,3 +277,5 @@ Composer Send / Stop 共用 Button 的 primary / danger 状态，尺寸固定 28
 用户入口再次点击直接关闭菜单；外部点击处理须排除入口自身，避免 mousedown 关闭后 click 重开。入口使用 aria-expanded / aria-controls，与弹层状态一致，保留 Escape 焦点返回。项目 Capture 的导入与刷新使用 SectionHeader actions 内两个 28px IconButton（加号 / 刷新），共用默认、hover、focus、disabled 状态和可访问名称，不保留独立文字按钮行。
 
 Composer 宽度分配：左组及图标 menu wrapper 不参与压缩；右组允许收缩，Model wrapper 与 pill 贯通 min-width:0 / width:100%。窄宽规则具有足够 specificity，不受后加载 Pill / Effort 基础样式覆盖。禁止 viewport 规则恢复右组 flex-shrink:0。<=720px 主内容轨道使用留白内全宽，不继续使用桌面 77% 上限；Model 只对实际溢出文本渐隐，保留完整 title。
+
+计划卡使用 transcript-card padding/border/radius 与实色 token-bg-raised，底部以该实色渐隐遮罩裁切长内容；复用公共 Button 焦点环，分节 summary 使用 token-border-focus。阅读面板使用 modal-backdrop 和 token-bg-overlay，不引入未定义的颜色或焦点别名。

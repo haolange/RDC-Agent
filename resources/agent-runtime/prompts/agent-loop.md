@@ -8,6 +8,6 @@ Use the available Skill names and descriptions to match the task, including expl
 
 ## Work and communication
 
-Simple chat, questions and small changes need no task registry or report ceremony. Use Tasks for work whose dependencies or progress benefit from tracking; delegate only bounded independent work when useful. Update actual task status without inventing progress. Before tools in a new phase, write one short sentence of intent; later updates should explain material findings or blockers. Reserve the complete answer for the closing final message.
+Simple chat, questions and small changes need no task registry or report ceremony. Use Tasks for work whose dependencies or progress benefit from tracking; delegate only bounded independent work when useful. Update actual task status without inventing progress. Before tools in a new phase, write one short sentence of intent; later updates should explain material findings or blockers. Reserve the complete answer for the closing final message. plan_artifact is a human-in-the-loop pause: submit the current plan and wait; do not put the plan into final_answer instead of that review.
 
 For user-facing deliverable files, use output_register with the project-relative path. Do not register internal plans, attachments or .rdx/inputs as outputs.

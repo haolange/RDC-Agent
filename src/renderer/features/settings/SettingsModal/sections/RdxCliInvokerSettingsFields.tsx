@@ -31,6 +31,8 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
   const [checking, setChecking] = useState(false);
   const [summary, setSummary] = useState<ToolRuntimeSummary | null>(null);
   const [message, setMessage] = useState('');
+  const [envText, setEnvText] = useState(() => envToText(rdxCliDraft.env));
+  const [argsText, setArgsText] = useState(() => rdxCliDraft.argsPrefix.join(' '));
   const validate = async () => {
     const revision = ++validationRevision.current;
     setChecking(true); setSummary(null); setMessage('');
@@ -85,10 +87,14 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
         </SettingsField>
         <SettingsField label={t('settings.rdxCliArgsPrefix')} layout="row" description={t('settings.rdxCliArgsPrefixHint')}>
           <Input
-            value={rdxCliDraft.argsPrefix.join(' ')}
+            value={argsText}
             placeholder="cli/run_cli.py"
             spellCheck={false}
-            onChange={(event) => patch({ argsPrefix: splitArgs(event.currentTarget.value) })}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setArgsText(value);
+              patch({ argsPrefix: splitArgs(value) });
+            }}
           />
         </SettingsField>
         <SettingsField label={t('settings.rdxCliWorkingDirectory')} layout="row">
@@ -113,10 +119,14 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
           <AutosizeTextarea
             maxHeight={180}
             className="input settings-rdx-cli-textarea"
-            value={envToText(rdxCliDraft.env)}
+            value={envText}
             placeholder="NAME=value"
             spellCheck={false}
-            onChange={(event) => patch({ env: textToEnv(event.currentTarget.value) })}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setEnvText(value);
+              patch({ env: textToEnv(value) });
+            }}
           />
         </SettingsField>
       </div>

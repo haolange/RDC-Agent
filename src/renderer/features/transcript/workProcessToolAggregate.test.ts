@@ -19,7 +19,7 @@ const tool = (id: string): Extract<WorkProcessRow, { type: 'tool' }> => ({
   rawLines: [],
 });
 
-const separator = (type: 'approval' | 'userInput' | 'diagnostic', id: string): WorkProcessRow => {
+const separator = (type: 'approval' | 'userInput' | 'planReview' | 'diagnostic', id: string): WorkProcessRow => {
   if (type === 'approval') {
     return {
       type,
@@ -43,6 +43,25 @@ const separator = (type: 'approval' | 'userInput' | 'diagnostic', id: string): W
       answeredCount: 0,
       incomplete: true,
       duration: '',
+    };
+  }
+  if (type === 'planReview') {
+    return {
+      type,
+      id,
+      status: 'running',
+      duration: '',
+      plan: {
+        planId: 'plan-1',
+        revision: 1,
+        uri: 'session://plans/plan.md',
+        hash: 'a'.repeat(64),
+        title: 'Plan',
+        summary: ['Goal'],
+        sections: [{ heading: 'Goal', body: 'Find it.' }],
+        status: 'awaiting',
+        handoffOptions: [{ label: 'Execute with General', agent: 'general' }],
+      },
     };
   }
   return {
@@ -69,7 +88,7 @@ describe('aggregateSectionSteps', () => {
     expect(aggregated[0]?.type === 'toolAggregate' ? aggregated[0].children : []).toHaveLength(8);
   });
 
-  it.each(['approval', 'userInput', 'diagnostic'] as const)('%s cuts a consecutive tool run', (type) => {
+  it.each(['approval', 'userInput', 'planReview', 'diagnostic'] as const)('%s cuts a consecutive tool run', (type) => {
     const rows = [
       ...Array.from({ length: 4 }, (_, index) => tool(`before-${index}`)),
       separator(type, `separator-${type}`),

@@ -1,4 +1,5 @@
 import { getElectronApi } from '../../platform/getElectronApi';
+import { useProjectStore } from '../../stores/projectStore';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { applySessionRecordToStore } from './sessionModelOverride';
 
@@ -17,6 +18,8 @@ export async function persistSessionAgentId(
     return { ok: false, error: result.error || 'AGENT_UNAVAILABLE' };
   }
   applySessionRecordToStore(result.session);
-  useLayoutStore.getState().setSelectedAgentId(result.session.agentId || agentId);
+  if (useProjectStore.getState().currentSession?.sessionId === sessionId) {
+    useLayoutStore.getState().setSelectedAgentId(result.session.agentId || agentId);
+  }
   return { ok: true };
 }

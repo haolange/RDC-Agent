@@ -17,10 +17,10 @@
   .rdx/
     project.yaml
     agents/ skills/ mcp/ hooks/ policies/ knowledge/ memory/
-    inputs/ artifacts/
+    inputs/ artifacts/ plans/
 ```
 
-应用拥有的 session / task / trace / UI / log / cache / secret 在 Electron OS data 下，不得写入 `~/.rdx` 或项目仓库。Project `.rdx/.gitignore` 排除 `inputs`、`artifacts`、`memory` 与 runtime state。
+应用拥有的 session / task / trace / UI / log / cache / secret 在 Electron OS data 下，不得写入 `~/.rdx` 或项目仓库。Project `.rdx/.gitignore` 排除 `inputs`、`artifacts`、`memory` 与 runtime state；`plans/` 不排除。
 
 优先级：`builtin < user < project`。整资源替换。Project disabled override 可故意遮蔽继承资源。Policy 只收紧。`.policy.yml` `limits.contextCompactionPercent` 默认 100（不设限）；用户级 Settings → Policy 顶部 Agent Runtime 压缩阈值为 50–90、步长 5，生效值为 `min(用户设置, policy)`。RDX CLI actions 与 secret 属本机边界，不能被 project 覆盖。
 
@@ -81,7 +81,7 @@ Account providers 是登录产品。Super Grok Account：xAI 公共 native-clien
 
 General 默认只预载 execution-orchestrator；renderdoc-investigation 按真实调查目标匹配，简单问答不路由。显式 Skill、profile 默认 Skill 和 execute 合同的 requiredSkillIds 合并去重；prepareTurn 校验可用性与工具权限交集，冻结来源，来源变化要求重新准备。skill_read 仍只读方法，不重算在途权限。
 
-RenderDoc Mission 的 execute 合同固定绑定共享执行方法、对应领域方法、`rdx-cli-shell` 和一本专业工具手册：Debugger 使用 `debugger-rdx-tools`，Analyzer 使用 `analyzer-rdx-tools`，Optimizer 使用 `optimizer-rdx-tools`。这四个 RDX 使用手册只对 General 可见；Mission 可以在合同中声明其 id，但不能读取或执行其工具。手册成员表是知识覆盖，不是权限表；未知操作、身份覆盖、路径越界或未满足前置条件仍在主进程执行前拒绝。
+Mission 必须先经 `plan_artifact` 计划门：用户点声明的 continue handoff 才冻结 Plan 并放行同 hash / 同 target 的 execute。RenderDoc Mission 的 execute 合同固定绑定共享执行方法、对应领域方法、`rdx-cli-shell` 和一本专业工具手册：Debugger 使用 `debugger-rdx-tools`，Analyzer 使用 `analyzer-rdx-tools`，Optimizer 使用 `optimizer-rdx-tools`。这四个 RDX 使用手册只对 General 可见；Mission 可以在合同中声明其 id，但不能读取或执行其工具。手册成员表是知识覆盖，不是权限表；未知操作、身份覆盖、路径越界或未满足前置条件仍在主进程执行前拒绝。
 
 专业参数参考由 `scripts/generate-rdx-tool-guides.mjs` 从相邻 RDX Tools 2.0 代码生成 catalog 读取，记录 catalog fingerprint。开发校验使用 `pnpm run check:rdx-tool-guides -- --catalog <RDC-Agent-Tools>/spec/tool_catalog.json`；生成内容不作为运行时 catalog，产品执行仍读取 prepareTurn 冻结的同一配置 CLI。
 

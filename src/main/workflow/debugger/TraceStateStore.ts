@@ -1,7 +1,6 @@
 ﻿import * as fs from 'fs';
 import * as path from 'path';
 import type {
-  PlanStatus,
   RequestBranch,
   RequestBranchGroup,
   UserRequest,
@@ -13,24 +12,12 @@ import { runScopedStore } from './RunScopedStore';
 
 const STORE_FILE = 'agentic-trace-state.json';
 
-export interface TracePlanRecord {
-  planId: string;
-  runId: string;
-  traceLaneId: string;
-  status: PlanStatus;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface TracePersistedState {
   schemaVersion: '1';
   sessionId: string;
   activeBranchId: string;
-  latestDisplayedPlanId?: string;
-  latestAcceptedPlanId?: string;
   userRequests: UserRequest[];
   branches: RequestBranchGroup[];
-  plans: TracePlanRecord[];
   updatedAt: string;
 }
 
@@ -40,7 +27,6 @@ const defaultState = (sessionId: string): TracePersistedState => ({
   activeBranchId: 'branch-main',
   userRequests: [],
   branches: [],
-  plans: [],
   updatedAt: nowIso(),
 });
 
@@ -52,14 +38,13 @@ export class TraceStateStore {
     }
 
     try {
-      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Partial<TracePersistedState>;
+      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Partial<TracePersistedState> & Record<string, unknown>;
       return {
         ...defaultState(sessionId),
-        ...parsed,
         sessionId,
+        activeBranchId: typeof parsed.activeBranchId === 'string' ? parsed.activeBranchId : 'branch-main',
         userRequests: parsed.userRequests ?? [],
         branches: parsed.branches ?? [],
-        plans: parsed.plans ?? [],
       };
     } catch (error) {
       console.error(`[TraceStateStore] Failed to read ${filePath}`, error);
@@ -82,7 +67,6 @@ export class TraceStateStore {
     sessionId: string;
     runId: string;
     prompt: string;
-    planId?: string;
     traceLaneId: string;
   }): TracePersistedState {
     const state = this.read(input.sessionId);
@@ -129,59 +113,12 @@ export class TraceStateStore {
       activeBranchId: branchId,
       userRequests: [...state.userRequests, request],
       branches: [...state.branches, group],
-      plans: input.planId
-        ? this.upsertPlan(state.plans, {
-            planId: input.planId,
-            runId: input.runId,
-            traceLaneId: input.traceLaneId,
-            status: 'awaiting_approval',
-            createdAt,
-            updatedAt: createdAt,
-          })
-        : state.plans,
-      latestDisplayedPlanId: input.planId ?? state.latestDisplayedPlanId,
-    });
-  }
-
-  markPlan(sessionId: string, planId: string, status: PlanStatus): TracePersistedState {
-    const state = this.read(sessionId);
-    const now = nowIso();
-    return this.write({
-      ...state,
-      latestDisplayedPlanId: status === 'awaiting_approval' ? planId : state.latestDisplayedPlanId,
-      latestAcceptedPlanId: status === 'accepted' ? planId : state.latestAcceptedPlanId,
-      plans: state.plans.map((plan) => plan.planId === planId ? { ...plan, status, updatedAt: now } : plan),
-    });
-  }
-
-  registerPlan(input: {
-    sessionId: string;
-    planId: string;
-    runId: string;
-    traceLaneId: string;
-    status: PlanStatus;
-  }): TracePersistedState {
-    const state = this.read(input.sessionId);
-    const now = nowIso();
-    return this.write({
-      ...state,
-      latestDisplayedPlanId: input.status === 'awaiting_approval' ? input.planId : state.latestDisplayedPlanId,
-      latestAcceptedPlanId: input.status === 'accepted' ? input.planId : state.latestAcceptedPlanId,
-      plans: this.upsertPlan(state.plans, {
-        planId: input.planId,
-        runId: input.runId,
-        traceLaneId: input.traceLaneId,
-        status: input.status,
-        createdAt: now,
-        updatedAt: now,
-      }),
     });
   }
 
   createRevision(input: {
     sessionId: string;
     runId: string;
-    previousPlanId: string;
     revisionText: string;
     revisionTraceLaneId: string;
   }): TracePersistedState {
@@ -243,18 +180,12 @@ export class TraceStateStore {
     return this.write({
       ...state,
       activeBranchId: branchId,
-      latestDisplayedPlanId: undefined,
       userRequests: rootRequest
         ? state.userRequests.map((request) => request.id === rootRequest.id ? nextRequest : request)
         : [...state.userRequests, nextRequest],
       branches: branchGroup
         ? state.branches.map((group) => group.id === branchGroup.id ? nextBranchGroup : group)
         : [...state.branches, nextBranchGroup],
-      plans: state.plans.map((plan) => (
-        plan.planId === input.previousPlanId
-          ? { ...plan, status: 'needs_revision', updatedAt: createdAt }
-          : plan
-      )),
     });
   }
 
@@ -277,20 +208,6 @@ export class TraceStateStore {
         })),
       })),
     });
-  }
-
-  private upsertPlan(plans: TracePlanRecord[], plan: TracePlanRecord): TracePlanRecord[] {
-    const index = plans.findIndex((entry) => entry.planId === plan.planId);
-    if (index < 0) {
-      return [...plans, plan];
-    }
-    const next = [...plans];
-    next[index] = {
-      ...next[index],
-      ...plan,
-      createdAt: next[index].createdAt,
-    };
-    return next;
   }
 
   private resolvePath(sessionId: string): string {

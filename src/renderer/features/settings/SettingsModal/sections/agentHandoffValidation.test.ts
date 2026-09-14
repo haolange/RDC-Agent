@@ -120,13 +120,13 @@ describe('findProjectedHandoffTargetConflicts', () => {
 });
 
 describe('persistAgentHandoff', () => {
-  it('omits send:false after the send checkbox is cleared', () => {
+  it('omits send:false and persists showContinueOn only when false', () => {
     const cleared = persistAgentHandoff({ ...valid, send: true, showContinueOn: true });
-    expect(cleared).toEqual({ ...valid, send: true, showContinueOn: true });
-    expect(persistAgentHandoff({ ...cleared, send: false, showContinueOn: false })).toEqual(valid);
-    expect(persistAgentHandoff({ ...cleared, send: undefined, model: '' })).toEqual({
+    expect(cleared).toEqual({ ...valid, send: true });
+    expect(persistAgentHandoff({ ...cleared, send: false, showContinueOn: false })).toEqual({
       ...valid,
-      showContinueOn: true,
+      showContinueOn: false,
     });
+    expect(persistAgentHandoff({ ...cleared, send: undefined, model: '' })).toEqual(valid);
   });
 });

@@ -7,6 +7,10 @@
 <title>RDC-Agent Design System</title>
 <link rel="stylesheet" href="../../src/renderer/styles/design-system.css">
 <link rel="stylesheet" href="../../src/renderer/ui/kit.css">
+<link rel="stylesheet" href="../../src/renderer/features/transcript/plan-card.css">
+<link rel="stylesheet" href="../../src/renderer/features/transcript/plan-review-panel.css">
+<link rel="stylesheet" href="../../src/renderer/features/composer/composer-plan-review.css">
+<link rel="stylesheet" href="../../src/renderer/patterns/HandoffActionRow/HandoffActionRow.css">
 <style>
 body {
   min-height: 100vh;
@@ -242,6 +246,49 @@ body {
           <div class="ui-toast-copy">
             <span class="ui-toast-title">Lease ready</span>
             <span class="ui-toast-message">The capture context is attached to this session.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ds-section">
+      <h2 class="ds-section-title">Plan review</h2>
+      <p class="ds-note">Runtime CSS: <code>plan-card.css</code> / <code>plan-review-panel.css</code> / <code>composer-plan-review.css</code> / <code>HandoffActionRow.css</code>. Semantic tokens only; <code>:hover</code> pairs with <code>:focus-visible</code>.</p>
+      <section class="plan-card is-awaiting" data-testid="plan-card">
+        <div class="plan-card__head">
+          <span>计划</span>
+          <span>待审阅</span>
+        </div>
+        <h3 class="plan-card__title"><button type="button" class="button button-ghost plan-card__open">导入后再诊断</button></h3>
+        <ul class="plan-card__summary">
+          <li>导入 capture</li>
+          <li>在归属 session 打开</li>
+        </ul>
+        <div class="plan-card__sections">
+          <details class="plan-card__section" open>
+            <summary class="plan-card__section-title">目标与边界</summary>
+            <p class="plan-card__section-body">定位 First Bad Event，保留未知边界。</p>
+          </details>
+        </div>
+        <div class="plan-card__foot">
+          <span>v2</span>
+          <span>session://plans/plan.md</span>
+        </div>
+        <span class="plan-card__fade" aria-hidden="true"></span>
+      </section>
+      <div class="composer-shell-plan-review" style="margin-top: var(--space-4); border: 1px solid var(--token-border-subtle); border-radius: var(--radius-md);">
+        <div class="composer-plan-review">
+          <h3 class="composer-plan-review__title">审阅当前计划</h3>
+          <ul class="composer-plan-review__summary">
+            <li>导入 capture</li>
+            <li>在归属 session 打开</li>
+          </ul>
+          <textarea class="composer-plan-review__feedback" placeholder="拒绝时填写意见"></textarea>
+          <div class="composer-plan-review__actions">
+            <button type="button" class="button button-secondary">拒绝</button>
+            <div class="handoff-action-row" role="group">
+              <button type="button" class="button button-primary handoff-action-row__button">Execute with General</button>
+            </div>
           </div>
         </div>
       </div>

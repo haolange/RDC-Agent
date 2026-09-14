@@ -374,7 +374,7 @@ export const enSettings = {
   'settings.agentHandoffSend': 'Send automatically',
   'settings.agentHandoffSendHelp': 'Run the target Agent immediately instead of only filling the composer.',
   'settings.agentHandoffShowContinueOn': 'Show as continue action',
-  'settings.agentHandoffShowContinueOnHelp': 'Offer this handoff when the current turn finishes.',
+  'settings.agentHandoffShowContinueOnHelp': 'Show as a suggestion button after the turn ends (on by default).',
   'settings.agentHandoffErrorLabelRequired': 'Label is required.',
   'settings.agentHandoffErrorTargetRequired': 'Select a target Agent.',
   'settings.agentHandoffErrorTargetUnknown': 'Agent "{id}" does not exist.',

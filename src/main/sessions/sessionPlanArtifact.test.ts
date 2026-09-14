@@ -4,16 +4,21 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { StorageIo } from './StorageIo';
 import { SessionArtifactResolver } from './SessionArtifactResolver';
-import { writeSessionPlanArtifact } from './sessionPlanArtifact';
+import {
+  LIVE_PLAN_URI,
+  PlanArtifactWriter,
+  composePlanMarkdown,
+  sectionsFromMarkdown,
+} from './sessionPlanArtifact';
 
-describe('writeSessionPlanArtifact', () => {
+describe('PlanArtifactWriter', () => {
   const roots: string[] = [];
 
   afterEach(async () => {
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
-  it('writes a versioned plan file and never pins artifacts/plan.md', async () => {
+  it('overwrites session://plans/plan.md and freezes an approved copy', async () => {
     const projectsRoot = await mkdtemp(path.join(os.tmpdir(), 'rdx-plan-artifact-'));
     roots.push(projectsRoot);
     const sessionPath = path.join(projectsRoot, 'sess');
@@ -29,14 +34,32 @@ describe('writeSessionPlanArtifact', () => {
     }), 'utf8');
 
     const resolver = new SessionArtifactResolver({ resolveSessionPath: () => sessionPath, io: new StorageIo() });
+    const writer = new PlanArtifactWriter(resolver);
+    const first = writer.writeLivePlan('sess', '# first\n\n## Goal\none\n');
+    const second = writer.writeLivePlan('sess', '# second\n\n## Goal\ntwo\n');
+    expect(first.uri).toBe(LIVE_PLAN_URI);
+    expect(second.uri).toBe(LIVE_PLAN_URI);
+    expect(first.hash).not.toBe(second.hash);
+    const frozen = writer.freezeApprovedPlan('sess', second.hash);
+    expect(frozen.uri).toMatch(/^session:\/\/plans\/plan-\d{4}-\d{2}-\d{2}T\d+Z-[a-f0-9]{8}\.md$/);
+    expect(frozen.hash).toBe(second.hash);
+    const live = writer.readMarkdown('sess', LIVE_PLAN_URI, second.hash);
+    expect(live.markdown).toContain('## Goal\ntwo');
+  });
+});
 
-    const first = writeSessionPlanArtifact('sess', '# first', resolver).uri;
-    const second = writeSessionPlanArtifact('sess', '# second', resolver).uri;
-    expect(path.basename(first)).toMatch(/^plan-\d{4}-\d{2}-\d{2}T\d+Z-[a-z0-9]+\.md$/);
-    expect(path.basename(second)).toMatch(/^plan-\d{4}-\d{2}-\d{2}T\d+Z-[a-z0-9]+\.md$/);
-    expect(path.basename(first)).not.toBe('plan.md');
-    expect(path.basename(second)).not.toBe('plan.md');
-    expect(first).not.toBe(second);
-    expect(first).not.toBe(path.join(sessionPath, 'artifacts', 'plan.md'));
+describe('plan markdown helpers', () => {
+  it('composes title, summary and content then splits ## sections', () => {
+    const markdown = composePlanMarkdown({
+      title: 'Frame drop',
+      summary: ['Check GPU', 'Compare EID'],
+      content: '## Goal\nFind the drop.\n## Inputs\nCapture A.',
+    });
+    expect(markdown).toContain('# Frame drop');
+    expect(markdown).toContain('- Check GPU');
+    expect(sectionsFromMarkdown(markdown)).toEqual([
+      { heading: 'Goal', body: 'Find the drop.' },
+      { heading: 'Inputs', body: 'Capture A.' },
+    ]);
   });
 });

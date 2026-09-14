@@ -115,6 +115,8 @@ export const collectSessionTaskContextResources = (input: {
     .filter((resource): resource is TaskContextResource => resource !== null);
   return dedupe([
     ...promptResources,
-    ...dedupeToolRefs(toolRefs).map((ref) => fromToolRef(ref, input.projectRoot)),
+    ...dedupeToolRefs(toolRefs)
+      .filter((ref) => !ref.path?.startsWith('session://plans/'))
+      .map((ref) => fromToolRef(ref, input.projectRoot)),
   ]);
 };

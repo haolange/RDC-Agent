@@ -8,6 +8,7 @@ import type {
   EvidenceApi,
   InvestigationApi,
   KnowledgeApi,
+  PlanApi,
   McpApi,
   ToolApi,
   WindowControlsApi,
@@ -60,6 +61,7 @@ export function createConversationApi(transport: RendererApiTransport): Conversa
     cancelActiveTurn: (request) => transport.invoke(INVOKE.conversation.cancelActiveTurn, request),
     answerUserInput: (request) => transport.invoke(INVOKE.conversation.answerUserInput, request),
     answerToolApproval: (request) => transport.invoke(INVOKE.conversation.answerToolApproval, request),
+    answerPlanReview: (request) => transport.invoke(INVOKE.conversation.answerPlanReview, request),
     getHistory: (sessionId) => transport.invoke(INVOKE.conversation.getHistory, sessionId),
     switchBranch: (request) => transport.invoke(INVOKE.conversation.switchBranch, request),
     clearHistory: (sessionId) => transport.invoke(INVOKE.conversation.clearHistory, sessionId),
@@ -100,6 +102,15 @@ export function createAgentApi(transport: RendererApiTransport): AgentApi {
 export function createInvestigationApi(transport: RendererApiTransport): InvestigationApi {
   return {
     read: (request) => transport.invoke(INVOKE.investigation.read, request),
+  };
+}
+
+export function createPlanApi(transport: RendererApiTransport): PlanApi {
+  return {
+    read: (request) => transport.invoke(INVOKE.plan.read, request),
+    issueApprovalToken: (request) => transport.invoke(INVOKE.plan.issueApprovalToken, request),
+    saveToProject: (request) => transport.invoke(INVOKE.plan.saveToProject, request),
+    export: (request) => transport.invoke(INVOKE.plan.export, request),
   };
 }
 

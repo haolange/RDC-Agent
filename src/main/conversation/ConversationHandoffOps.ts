@@ -17,6 +17,7 @@ import {
 } from '@shared/types/profileHandoff';
 import { generateEventId } from '@shared/utils/id';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
+import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import type { ResolvedConversationContext } from './ConversationRoutePreflight';
@@ -159,6 +160,7 @@ export class ConversationHandoffOps {
     this.consumedHandoffIds.add(latest.handoffId);
     agentToolApprovalRequestService.cancelTurn(handoff.sourceTurnId);
     agentUserInputRequestService.cancelTurn(handoff.sourceTurnId);
+    agentPlanReviewRequestService.cancelTurn(handoff.sourceTurnId);
     const consumed = storageAdapter.handoffs.consume(sessionId, latest.handoffId, continuationTurnId);
     storageAdapter.updateSession(sessionId, { agentId: consumed.toAgentId });
     emitConversationEvent(buildHandoffAgentEvent('handoff.consumed', sessionId, consumed));
@@ -233,6 +235,7 @@ export class ConversationHandoffOps {
     }
     agentToolApprovalRequestService.cancelTurn(committed.sourceTurnId);
     agentUserInputRequestService.cancelTurn(committed.sourceTurnId);
+    agentPlanReviewRequestService.cancelTurn(committed.sourceTurnId);
     const requestId = generateEventId('request');
     const turnControls = session.turnControls ?? { reasoningLevel: 'off', maxContextMode: false, fastModel: false };
     const autoSendInput: ConversationHandoffAutoSendInput = {
@@ -324,6 +327,7 @@ export class ConversationHandoffOps {
   private emitCancelledHandoff(sessionId: string, cancelled: ProfileHandoffState): void {
     agentToolApprovalRequestService.cancelTurn(cancelled.sourceTurnId);
     agentUserInputRequestService.cancelTurn(cancelled.sourceTurnId);
+    agentPlanReviewRequestService.cancelTurn(cancelled.sourceTurnId);
     emitConversationEvent(buildHandoffAgentEvent('handoff.cancelled', sessionId, cancelled));
   }
 

@@ -220,6 +220,13 @@ export class TurnHandle {
   eventSink: TurnEventSink | null = null;
   deferredActivation: TurnDeferredActivation | null = null;
   pendingHandoff: PendingHandoff | null = null;
+  /** Same-turn plan gate: Mission execute must match this hash and target. */
+  approvedPlan: {
+    hash: string;
+    target: string;
+    frozenUri: string;
+    planId: string;
+  } | null = null;
   agentSlotKey: string | null = null;
 
   private readonly producers = new Map<string, TurnProducer>();

@@ -16,6 +16,8 @@ import type { SessionAttachmentRecord } from '@shared/types/session';
 import { nowMs } from '@shared/utils/id';
 import { agentOrchestrator, type PreparedAgentTurnContext } from '../workflow/debugger/AgentOrchestrator';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
+import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
+import { isHandoffContinueAction, type PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -259,6 +261,7 @@ export async function completeProfileTurn(
 
   const commitStoppedMessage = () => {
     agentUserInputRequestService.cancelTurn(assistantMessage.turnId);
+    agentPlanReviewRequestService.cancelTurn(assistantMessage.turnId);
     agentToolApprovalRequestService.cancelTurn(assistantMessage.turnId);
     if (sessionId) host.cancelUnfinishedHandoff(sessionId, 'user_stop');
     commitTerminalAssistantMessage('message_completed', {
@@ -336,6 +339,7 @@ export async function completeProfileTurn(
   const pendingContinuation: ConversationLoopContinuationState = {
     approval: false,
     userInput: false,
+    planReview: false,
     subagent: false,
     handoff: false,
   };
@@ -351,6 +355,7 @@ export async function completeProfileTurn(
   const hasPendingContinuation = () => (
     pendingContinuation.approval
     || pendingContinuation.userInput
+    || pendingContinuation.planReview
     || pendingContinuation.subagent
     || pendingContinuation.handoff
   );
@@ -601,10 +606,21 @@ export async function completeProfileTurn(
         : '等待模型配置'
       : '回复已完成';
 
+  const handoffSuggestions: PlanReviewHandoffSuggestion[] | undefined = finalStatus === 'complete'
+    ? (input.preparedTurn.runtime.effectivePlan.profileHandoffs ?? [])
+      .filter((handoff) => isHandoffContinueAction(handoff) && handoff.label.trim() && handoff.agent.trim())
+      .map((handoff) => ({
+        label: handoff.label.trim(),
+        agent: handoff.agent.trim(),
+        prompt: handoff.prompt,
+        send: handoff.send === true,
+      }))
+    : undefined;
   commitTerminalAssistantMessage(finalStatus === 'error' ? 'message_errored' : 'message_completed', {
     status: finalStatus,
     content: assistantContent,
     diagnostic: llmDiagnostic,
+    ...(handoffSuggestions && handoffSuggestions.length > 0 ? { handoffSuggestions } : {}),
     ...withWorkTrace(finalizeTrace(
       traceWithEvidence,
       traceStatus,

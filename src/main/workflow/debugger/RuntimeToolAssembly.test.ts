@@ -116,6 +116,15 @@ function handoffContract(target: string): HandoffContract {
     ? { intent: 'execute', plan: ref, requiredSkillIds: ['renderdoc-execution'], returnTo: 'debugger', deliveryRequirements: 'checkpoint' }
     : { intent: 'return', executionHandoffId: 'executing', artifacts: [ref] };
 }
+
+function approveMissionExecute(handle: TurnHandle, target = 'general'): void {
+  handle.approvedPlan = {
+    hash: 'a'.repeat(64),
+    target,
+    frozenUri: 'session://plans/plan.md',
+    planId: 'plan-test',
+  };
+}
 function createAssembly(): RuntimeToolAssembly {
   return new RuntimeToolAssembly({
     mcp: {
@@ -232,15 +241,12 @@ describe('RuntimeToolAssembly', () => {
     expect(result.content[0]).toMatchObject({ type: 'text' });
   });
 
-  it('createPlanArtifactTool validates session and content', async () => {
+  it('createPlanArtifactTool is a fail-closed stub', async () => {
     const assembly = createAssembly();
-    const noSession = assembly.createPlanArtifactTool(null);
-    const missing = await noSession.execute('tc', { content: 'plan' });
-    expect(missing.isError).toBe(true);
-
-    const withSession = assembly.createPlanArtifactTool('sess-1');
-    const empty = await withSession.execute('tc', { content: '   ' });
-    expect(empty.isError).toBe(true);
+    const tool = assembly.createPlanArtifactTool('sess-1');
+    const result = await tool.execute('tc', { title: 'Plan', summary: ['One'], content: '## Goal\nDo work.' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('plan review bridge') });
   });
 
   it('createTaskRuntimeTools uses memory store for subagent sessions', () => {
@@ -293,6 +299,7 @@ describe('RuntimeToolAssembly', () => {
       profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
       enabledProfileIds: ['debugger', 'general'],
     } as never;
+    approveMissionExecute(handle);
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
     const result = await tool.execute('tc-handoff', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).not.toBe(true);
@@ -348,6 +355,7 @@ describe('RuntimeToolAssembly', () => {
       profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
       enabledProfileIds: ['debugger', 'general'],
     } as never;
+    approveMissionExecute(handle);
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
     const result = await tool.execute('tc-after-denied', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);
@@ -373,6 +381,7 @@ describe('RuntimeToolAssembly', () => {
       profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
       enabledProfileIds: ['debugger', 'general'],
     } as never;
+    approveMissionExecute(handle);
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
     const result = await tool.execute('tc-hook-throw', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);
@@ -396,6 +405,7 @@ describe('RuntimeToolAssembly', () => {
       profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
       enabledProfileIds: ['debugger', 'general'],
     } as never;
+    approveMissionExecute(handle);
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
     const result = await tool.execute('tc-persist-fail', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);
@@ -416,6 +426,7 @@ describe('RuntimeToolAssembly', () => {
       profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
       enabledProfileIds: ['debugger', 'general'],
     } as never;
+    approveMissionExecute(handle);
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
     const result = await tool.execute('tc-denied', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);
@@ -434,6 +445,7 @@ describe('RuntimeToolAssembly', () => {
       profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
       enabledProfileIds: ['debugger', 'general'],
     } as never;
+    approveMissionExecute(handle);
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
     const result = await tool.execute('tc-second', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);
@@ -453,6 +465,7 @@ describe('RuntimeToolAssembly', () => {
       profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
       enabledProfileIds: ['debugger', 'general'],
     } as never;
+    approveMissionExecute(handle);
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
     const result = await tool.execute('tc-depth', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);
@@ -476,6 +489,7 @@ describe('RuntimeToolAssembly', () => {
       }],
       enabledProfileIds: ['debugger', 'general'],
     } as never;
+    approveMissionExecute(handle);
     const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
     const result = await tool.execute('tc-model', { agent: 'general', contract: handoffContract('general'), prompt: 'continue', label: 'Go' });
     expect(result.isError).toBe(true);

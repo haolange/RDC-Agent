@@ -76,7 +76,7 @@ Profile 列表顺序与桌面一致：
 │ ● 正在规划调查                                                              │
 │   ✓ 读取 capture/runtime 上下文                                              │
 │   ✓ 查询 rdx replay help                                                    │
-│   ✓ 保存计划  debugger-plan.md                                              │
+│   ✓ 审阅计划  session://plans/plan.md                                       │
 │   ↳ Debugger → General                                                      │
 │                                                                             │
 │ GENERAL · EXECUTING                                                         │
@@ -191,7 +191,7 @@ Knowledge Scout 使用同一披露：
 
 ```text
 ↳ Debugger → General
-  plan: debugger-plan.md
+  plan: session://plans/plan-<ISO>-<hash8>.md
   armed: renderdoc-execution, debugger-causal-method, rdx-cli-shell, debugger-rdx-tools
 ```
 
