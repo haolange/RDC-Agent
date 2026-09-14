@@ -1,20 +1,20 @@
 # Plan/Handoff 剩余验收续接需求
 
-> 给家中 Windows / Android 环境的新 Agent：请执行本文，完成剩余三组真实验收及由失败直接引出的修复。证据截止 2026-09-14；不需要旧聊天或桌面需求文件。本文是本轮交接任务，不是新增产品权威。历史结果见 acceptance ledger，不能代替接手机器的实测。
+> 给家中 Windows / Android 环境的新 Agent：请执行本文，完成剩余两组真实验收及由失败直接引出的修复。证据截止 2026-09-14；不需要旧聊天或桌面需求文件。本文是本轮交接任务，不是新增产品权威。历史结果见 acceptance ledger，不能代替接手机器的实测。
 
 ## 1. 项目基本信息
 
 RDC-Agent 是 Electron / React / TypeScript 的通用 Agent workbench，支持 RenderDoc capture。原机器仓库为 `D:\Projects\Native\rdx\RDC-Agent`，远端为 https://github.com/haolange/RDC-Agent.git，分支 main；家中路径请发现实际 checkout，不硬编码原机器路径。依赖版本以 package.json、pnpm-lock.yaml 为准：Node >=22.13.0、pnpm 11.7.0。无线上部署任务。
 
-本轮目标是 Mission 规划→用户审阅→既有 handoff→General 执行→原 Mission 回评估。保持同意前覆盖活计划、同意后冻结、拒绝回同一 tool result、项目保存由用户显式触发。禁止另造 Plan Mode、第二条执行通道或兼容 shim。
+产品链路保持 Mission 规划→用户审阅→既有 handoff→General 执行→原 Mission 回评估。按用户 2026-09-14 最新决定，General 执行与 Mission 回评估及依赖该链路的真实模型建议行验收移交后续专门大项，不属于本次续接范围，也不作为本次阻塞。本次只完成原生导出对话框及本地/Android Capture 验收。保持同意前覆盖活计划、同意后冻结、拒绝回同一 tool result、项目保存由用户显式触发。禁止另造 Plan Mode、第二条执行通道或兼容 shim。
 
 ## 2. 当前项目进度
 
 | 模块 | 状态与证据 | 剩余验收 |
 | --- | --- | --- |
-| 审阅、owner、冻结与执行授权 | 确定性测试已验证；真实模型拒绝修订批准已验证 | 模型真实 execute 与回评估 |
+| 审阅、owner、冻结与执行授权 | 确定性测试已验证；真实模型拒绝修订批准已验证 | 后续专项，本次排除 |
 | 历史计划保存/导出 | 主进程集成测试已验证；Browser 项目保存已验证 | 原生保存对话框端到端 |
-| Composer/卡片/阅读面板 | Browser 窄屏、错误态、Esc 焦点、右栏隔离已验证 | 真实交接产出的建议行 |
+| Composer/卡片/阅读面板 | Browser 窄屏、错误态、Esc 焦点、右栏隔离已验证 | 真实交接产出的建议行归后续专项 |
 | Capture | 本地 EID 选择/恢复/关闭已验证 | 本地图像、Android 回放与呈现能力 |
 
 没有放弃上述需求。不要把确定性 fixture 等同模型效果，不把无图像、unsupported 或未连接设备标为通过。
@@ -54,7 +54,7 @@ RDX CLI 使用本机已有安装与完整 catalog，不能照搬原机器 execut
 
 plan:* 以 shared 类型和 Zod 为唯一当前接口，不恢复弱绑定形态。Electron 原生对话框只能由主进程选路；Browser bridge 不得为测试放宽 desktop-only、安全或 secret 边界。
 
-模型优先已配置 Cline Pass，其次 OpenCode Go，再次明确识别的 Arc Engine，使用 DeepSeek V4-Flash；不比较付费服务。上一轮恰好调用 8 次、每次最多1500输出 tokens，总上限12000；第9次在发送前阻止。该预算已用完，不得把换聊天当作预算重置，开始外部调用前集中向用户确认家中续测新增请求/输出额度；得到答复前继续离线、原生对话框与 Capture 工作。
+本次续接不安排真实模型调用，不需要申请模型预算。General 执行、Mission 回评估及依赖它们的模型效果由后续专项另行制定场景和预算；历史八次请求的结果保留在 acceptance ledger，不重复执行。
 
 ## 8. 构建、运行、测试与部署
 
@@ -72,26 +72,24 @@ plan:* 以 shared 类型和 Zod 为唯一当前接口，不恢复弱绑定形态
 
 | 优先级 | 事实/根因状态 | 收敛标准 |
 | --- | --- | --- |
-| P1 模型完整交接 | 模型批准后误用 background_query，被 ownership 拒绝；随后搜索到 agent_handoff 时预算耗尽。模型行为原因尚未确定 | 真实 General execute→原 Mission 评估，同 target/hash/URI；建议行可用 |
 | P1 Capture 图像 | 本地 capture 的 Present 未唯一识别 swap-buffer；147/140/137 均无图，原因未定位 | 合法图像与证据身份、内容 hash、回放恢复一致，或明确能力边界并纠正错误实现 |
 | P2 导出 UI | 内置浏览器无法操作原生保存对话框；不是已证代码缺陷 | 真实选择、取消、覆盖确认、文件内容和焦点回归 |
 | P1 Android | 原机器未连接设备；旧 ledger 其他轮成功不能代表本次 | 家中真实 helper/连接/回放/恢复/关闭与设备呈现回执 |
 
 ## 11. 下一步执行计划
 
-建立一份临时 Tasks，状态为待执行/执行中/待验证/通过/阻塞，沿下面三组推进，不重新全库审计。
+建立一份临时 Tasks，状态为待执行/执行中/待验证/通过/阻塞，沿下面两组推进，不重新全库审计。
 
-1. **真实模型完整交接**：新增预算确认后，在隔离会话执行一个简短连续场景：Mission 提交→空拒绝校验→有效拒绝→修订→批准→General execute→原 Mission 评估→建议行。限制无关搜索与任务工具，但不注入批准或手工伪造交接。观察真实 requiredSkillIds 预载、owner、hash/URI/target、同一 loop、tool result 和取消/重复点击；模型再次选错先定位 prompt/tool discovery/实际响应，不增加权限 fallback。每次请求前核对预算，重试续跑均计数。需要修复时只改直接原因及测试。
-2. **原生导出端到端**：用标准 Electron 或 Browser 配合用户操作原生对话框。验证读全文、复制、下载选目标、取消不写入；历史 A 在 B 产生且切 Agent 后仍保存 A 的身份和正文；固定项目路径正确。对换路径/计划、跨会话、重放、过期及写入失败沿用确定性测试。不要为 UI 自动化新增弱接口；若工具不能操作，让用户完成那一步并核验输出，其他测试继续。
-3. **本地与 Android Capture**：寻找本地 capture；原路径 `J:\DebugTest\rdx` 仅供定位。原本地 capture `眼睛泪腺白点.rdc` SHA256 为 0a79926a92e7e659989befc2322dc93b65782252fc5be2de33496142735a4094，约1.65GB，不重复复制。原147→140→137→147 Applied EID与Close Not open已证，但没有图像；定位有输出的真实事件与原生回执后检查 requested/applied/image EID 和内容hash。WhiteHair 用连接的 Android 设备，核对 Tools 原生 catalog、安装/服务版本、现有 helper复用、就绪、回放、无色输出事件、恢复、关闭及设备呈现。不要求先清空设备进程，不关闭用户 helper；已有服务不等于占用。Tools 仓库只有确认不可替代直接依赖缺陷才纳入，先读其 AGENTS。unsupported 精确记录，不能伪造绿色。不要一次性跑全部128工具。
+1. **原生导出端到端**：用标准 Electron 或 Browser 配合用户操作原生对话框。验证读全文、复制、下载选目标、取消不写入；历史 A 在 B 产生且切 Agent 后仍保存 A 的身份和正文；固定项目路径正确。对换路径/计划、跨会话、重放、过期及写入失败沿用确定性测试。不要为 UI 自动化新增弱接口；若工具不能操作，让用户完成那一步并核验输出，其他测试继续。
+2. **本地与 Android Capture**：寻找本地 capture；原路径 `J:\DebugTest\rdx` 仅供定位。原本地 capture `眼睛泪腺白点.rdc` SHA256 为 0a79926a92e7e659989befc2322dc93b65782252fc5be2de33496142735a4094，约1.65GB，不重复复制。原147→140→137→147 Applied EID与Close Not open已证，但没有图像；定位有输出的真实事件与原生回执后检查 requested/applied/image EID 和内容hash。WhiteHair 用连接的 Android 设备，核对 Tools 原生 catalog、安装/服务版本、现有 helper复用、就绪、回放、无色输出事件、恢复、关闭及设备呈现。不要求先清空设备进程，不关闭用户 helper；已有服务不等于占用。Tools 仓库只有确认不可替代直接依赖缺陷才纳入，先读其 AGENTS。unsupported 精确记录，不能伪造绿色。不要一次性跑全部128工具。
 
-三组完成后同步受影响契约/UI文档与既有 ledger（真实源码 SHA、日期、证据、失败边界分开）。清理本轮 QA home/TEMP/日志/截图/工作清单与自有进程；先核对路径、链接、Git状态、PID所有权，保留用户数据、当前依赖和必要证据；确认桌面启动权已交还。可逆修复按逐项diff回退，不整库restore。
+两组完成后同步受影响契约/UI文档与既有 ledger（真实源码 SHA、日期、证据、失败边界分开）。清理本轮 QA home/TEMP/日志/截图/工作清单与自有进程；先核对路径、链接、Git状态、PID所有权，保留用户数据、当前依赖和必要证据；确认桌面启动权已交还。可逆修复按逐项diff回退，不整库restore。
 
 ## 12. 新 AI 接手指令
 
 请立即核对 checkout，再按 AGENTS.md → DESIGN.md Architecture Principles/Authority Map → docs/contracts/{runtime-kernel,permissions,session-projection}.md → docs/ui/{design-system,workbench-and-transcript}.md → docs/architecture/{rdx-runtime,browser-qa-surface}.md → docs/product/acceptance-ledger.md 的顺序读取相关部分。以本文第11节为收敛范围执行到验证和清理完成。
 
-搜索/历史核对只委托 Luna 子 Agent，主 Agent 负责计划、实现与验证裁决。保持现有组件层级、公共Button和语义token，不留legacy/双路径。不因跨电脑路径或已清理旧QA会话重新打开整个产品设计。外部请求新预算、不可逆数据操作或安全边界冲突必须明确询问；其余可逆操作说明默认选择后继续。
+搜索/历史核对只委托 Luna 子 Agent，主 Agent 负责计划、实现与验证裁决。保持现有组件层级、公共Button和语义token，不留legacy/双路径。不因跨电脑路径或已清理旧QA会话重新打开整个产品设计。不可逆数据操作或安全边界冲突必须明确询问；其余可逆操作说明默认选择后继续。
 
 ## 13. 证据索引
 
@@ -99,12 +97,12 @@ plan:* 以 shared 类型和 Zod 为唯一当前接口，不恢复弱绑定形态
 
 ## 14. 不确定项与待确认问题
 
-家中 checkout/capture 路径、Android序列号与服务可用性、家中凭据可解密性需现场核实。新增模型预算必须用户确认。Present 无图像的根因、真实模型回评估效果、原生导出交互仍需实证，不提前归因于设备或产品代码。
+家中 checkout/capture 路径、Android序列号与服务可用性、家中凭据可解密性需现场核实。模型回评估由后续专项负责，本次不追踪。Present 无图像的根因、原生导出交互仍需实证，不提前归因于设备或产品代码。
 
 ## 15. 交接完成度自检
 
 - [x] 分支、基线、提交时机和家中路径发现方式明确。
-- [x] 已验证与剩余三组真实验收分别描述，文件/调用链/命令可定位。
+- [x] 已验证与剩余两组真实验收分别描述，文件/调用链/命令可定位。
 - [x] 不复制 secret、原始 capture 或旧测试副本；不依赖旧聊天。
-- [x] 预算、失败路径、禁止重复的规避方法与清理出口明确。
+- [x] 后续专项排除边界、失败路径、禁止重复的规避方法与清理出口明确。
 - [x] 这是可执行续接需求，未把未完成验收写成通过。
