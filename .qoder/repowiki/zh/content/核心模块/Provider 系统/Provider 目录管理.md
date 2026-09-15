@@ -9,7 +9,17 @@
 - [llm.ts](file://src/shared/constants/llm.ts)
 - [settings.ts](file://src/shared/types/settings.ts)
 - [provider-catalog-index.cjs](file://scripts/provider-catalog-index.cjs)
+- [deepseek.json](file://src/shared/provider-catalog/manifests/surfaces/deepseek.json)
+- [chatgpt-account.json](file://src/shared/provider-catalog/manifests/surfaces/chatgpt-account.json)
+- [LiveProviderCatalogParsers.ts](file://src/main/settings/LiveProviderCatalogParsers.ts)
 </cite>
+
+## 更新摘要
+**所做更改**
+- 更新了 DeepSeek 提供商清单，反映模型重命名和移除操作
+- 新增了 ChatGPT Account 提供商的 GPT-6 Astra 模型支持
+- 增强了 LiveProviderCatalogParsers 中的准入过滤机制
+- 更新了相关测试用例以反映新的模型标识符
 
 ## 目录
 1. [简介](#简介)
@@ -33,7 +43,7 @@
 - 完整的提供商注册流程示例（从清单到运行时可用）
 
 ## 项目结构
-Provider 目录由“编译期清单 + 运行期注册表 + 服务层”三层构成：
+Provider 目录由"编译期清单 + 运行期注册表 + 服务层"三层构成：
 - 编译期清单：通过脚本将 manifests 编译为紧凑的 index 与 surface 集合，供运行时加载
 - 运行期注册表：提供查询、缓存、转换能力，将清单项映射为统一的 ProviderEntry
 - 服务层：对外暴露稳定的 API，负责排序、聚合分类与协议定义
@@ -46,12 +56,12 @@ C --> D["ProviderCatalogService<br/>排序/聚合/对外API"]
 D --> E["调用方<br/>IPC/前端/其他模块"]
 ```
 
-图表来源
+**图表来源**
 - [provider-catalog-index.cjs:1-19](file://scripts/provider-catalog-index.cjs#L1-L19)
 - [ProviderCatalogRegistry.ts:1-140](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L1-L140)
 - [ProviderCatalogService.ts:57-70](file://src/main/settings/ProviderCatalogService.ts#L57-L70)
 
-章节来源
+**章节来源**
 - [provider-catalog-index.cjs:1-19](file://scripts/provider-catalog-index.cjs#L1-L19)
 - [ProviderCatalogRegistry.ts:1-140](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L1-L140)
 - [ProviderCatalogService.ts:57-70](file://src/main/settings/ProviderCatalogService.ts#L57-L70)
@@ -64,7 +74,7 @@ D --> E["调用方<br/>IPC/前端/其他模块"]
 - constants/llm：分类定义与协议定义常量，用于 UI 展示与排序
 - types/settings：统一的数据契约（如 LlmProviderEntry、LlmProviderCatalogResponse 等）
 
-章节来源
+**章节来源**
 - [ProviderCatalogService.ts:1-73](file://src/main/settings/ProviderCatalogService.ts#L1-L73)
 - [ProviderCatalogRegistry.ts:1-284](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L1-L284)
 - [compiler.ts:622-716](file://src/shared/provider-catalog/compiler.ts#L622-L716)
@@ -94,7 +104,7 @@ Service->>Service : 排序(compareProvider)
 Service-->>Caller : {categories, protocols, providers}
 ```
 
-图表来源
+**图表来源**
 - [ProviderCatalogService.ts:57-70](file://src/main/settings/ProviderCatalogService.ts#L57-L70)
 - [ProviderCatalogRegistry.ts:110-143](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L110-L143)
 - [ProviderCatalogRegistry.ts:210-266](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L210-L266)
@@ -121,10 +131,10 @@ Sort --> BuildResp["组装 {categories, protocols, providers}"]
 BuildResp --> End(["返回"])
 ```
 
-图表来源
+**图表来源**
 - [ProviderCatalogService.ts:11-69](file://src/main/settings/ProviderCatalogService.ts#L11-L69)
 
-章节来源
+**章节来源**
 - [ProviderCatalogService.ts:11-69](file://src/main/settings/ProviderCatalogService.ts#L11-L69)
 - [llm.ts:10-118](file://src/shared/constants/llm.ts#L10-L118)
 
@@ -160,11 +170,11 @@ class CompiledProviderCatalogIndex {
 ProviderCatalogRegistry --> CompiledProviderCatalogIndex : "读取索引"
 ```
 
-图表来源
+**图表来源**
 - [ProviderCatalogRegistry.ts:21-143](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L21-L143)
 - [ProviderCatalogRegistry.ts:149-266](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L149-L266)
 
-章节来源
+**章节来源**
 - [ProviderCatalogRegistry.ts:21-143](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L21-L143)
 - [ProviderCatalogRegistry.ts:149-266](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L149-L266)
 
@@ -188,13 +198,13 @@ Validate --> Hash["生成 catalogRevision(稳定哈希)"]
 Hash --> Output["输出 index + surfaces 映射"]
 ```
 
-图表来源
+**图表来源**
 - [compiler.ts:108-165](file://src/shared/provider-catalog/compiler.ts#L108-L165)
 - [compiler.ts:221-304](file://src/shared/provider-catalog/compiler.ts#L221-L304)
 - [compiler.ts:454-620](file://src/shared/provider-catalog/compiler.ts#L454-L620)
 - [compiler.ts:622-716](file://src/shared/provider-catalog/compiler.ts#L622-L716)
 
-章节来源
+**章节来源**
 - [compiler.ts:622-716](file://src/shared/provider-catalog/compiler.ts#L622-L716)
 
 ### 清单 Schema：catalogManifestSchema
@@ -207,7 +217,7 @@ Hash --> Output["输出 index + surfaces 映射"]
   - 确保清单数据的完整性与一致性
   - 为编译期校验与运行期转换提供强类型基础
 
-章节来源
+**章节来源**
 - [catalogManifestSchema.ts:23-111](file://src/shared/provider-catalog/catalogManifestSchema.ts#L23-L111)
 - [catalogManifestSchema.ts:137-235](file://src/shared/provider-catalog/catalogManifestSchema.ts#L137-L235)
 
@@ -218,7 +228,7 @@ Hash --> Output["输出 index + surfaces 映射"]
   - 为 UI 展示与排序提供权威来源
   - 限制协议白名单，防止非法协议接入
 
-章节来源
+**章节来源**
 - [llm.ts:10-118](file://src/shared/constants/llm.ts#L10-L118)
 
 ### 数据契约：types/settings
@@ -227,7 +237,151 @@ Hash --> Output["输出 index + surfaces 映射"]
 - LlmProviderConnectionSchema：连接字段与头部映射
 - LlmProviderCapability：能力开关（chat、tool-calling、structured-output 等）
 
-章节来源
+**章节来源**
+- [settings.ts:420-541](file://src/shared/types/settings.ts#L420-L541)
+- [settings.ts:116-144](file://src/shared/types/settings.ts#L116-L144)
+
+### 最新变更：DeepSeek 提供商重构
+
+**更新** DeepSeek 提供商清单进行了重大重构，移除了 `deepseek-v4-pro` 模型并将 `deepseek-v4-flash` 重命名为 `deepseek-flash`。
+
+#### DeepSeek 模型变更详情
+- **移除的模型**：`deepseek-v4-pro` 已从目录中完全移除
+- **重命名的模型**：`deepseek-v4-flash` → `deepseek-flash`
+- **保留的功能**：推理模式、工具调用、视觉输入等核心功能保持不变
+- **适配的协议**：OpenAIResponses、OpenAICompatibleChatCompletions、AnthropicMessages
+
+#### 准入过滤机制
+DeepSeek 提供商现在使用严格的准入过滤机制，只允许 `deepseek-flash` 模型通过：
+
+```json
+{
+  "admission": {
+    "allowPatterns": ["deepseek-flash"]
+  }
+}
+```
+
+**章节来源**
+- [deepseek.json:212-228](file://src/shared/provider-catalog/manifests/surfaces/deepseek.json#L212-L228)
+- [deepseek.json:229-369](file://src/shared/provider-catalog/manifests/surfaces/deepseek.json#L229-L369)
+
+### 最新变更：ChatGPT Account 提供商增强
+
+**更新** ChatGPT Account 提供商新增了 GPT-6 Astra 模型，支持双上下文层级配置。
+
+#### GPT-6 Astra 模型特性
+- **默认上下文层级**：272,000 tokens（Codex 服务限制）
+- **最大上下文层级**：872,000 tokens（Max 模式，需要额外授权）
+- **推理级别**：low、medium、high、xhigh、max
+- **快速模式**：可选，启用后设置 `service_tier: priority`
+- **工具调用**：支持
+- **视觉输入**：支持
+- **结构化输出**：支持
+
+#### 双上下文层级实现
+系统通过 `contextTiers` 数组实现双层级配置：
+
+```json
+"contextTiers": [
+  {
+    "id": "default",
+    "label": "Codex service limit",
+    "maxPromptTokens": 272000,
+    "activation": {"kind": "implicit"},
+    "entitlement": "granted"
+  },
+  {
+    "id": "max", 
+    "label": "Max mode",
+    "maxPromptTokens": 872000,
+    "activation": {"kind": "implicit"},
+    "entitlement": "unknown"
+  }
+]
+```
+
+**章节来源**
+- [chatgpt-account.json:127-250](file://src/shared/provider-catalog/manifests/surfaces/chatgpt-account.json#L127-L250)
+
+### 最新变更：LiveProviderCatalogParsers 改进
+
+**更新** LiveProviderCatalogParsers.ts 增强了准入过滤机制，改进了模型发现和验证逻辑。
+
+#### 改进的过滤机制
+- **更严格的身份验证**：`liveIdentity()` 函数现在使用 `isAdmittedDiscoveredModel()` 进行更严格的模型身份验证
+- **增强的错误处理**：改进了无效模型条目的处理和日志记录
+- **更好的兼容性**：支持更多格式的模型目录响应
+
+#### 支持的模型格式
+- OpenAI 兼容格式：`{ id, name, model }`
+- Anthropic 格式：标准模型列表
+- 自定义格式：支持多种供应商特定的模型目录格式
+
+**章节来源**
+- [LiveProviderCatalogParsers.ts:77-86](file://src/main/settings/LiveProviderCatalogParsers.ts#L77-L86)
+- [LiveProviderCatalogParsers.ts:302-313](file://src/main/settings/LiveProviderCatalogParsers.ts#L302-L313)
+
+### 清单编译与校验：compiler
+- 职责
+  - 解析 identities、profiles、surfaces，应用 profile 的 routeMechanics 与 contracts
+  - 严格校验 surface、model、route、binding、discovery 等
+  - 生成稳定哈希的 catalogRevision 与精简的 summaries
+- 关键点
+  - 合并合约：mergeProviderContracts 基于 profile 与 route 覆盖
+  - 绑定冲突检测：executionBindings 的 selector 与 actions 一致性检查
+  - 公开补丁校验：禁止在清单中嵌入敏感字段
+  - 路由适配器校验：adapterId 必须支持对应 protocol
+  - 发现策略校验：strategy 与 discoveryPolicyId 一致
+
+```mermaid
+flowchart TD
+Input["清单输入(identities/profiles/surfaces)"] --> Parse["解析与标准化"]
+Parse --> Validate["多规则校验(surface/model/route/binding/discovery)"]
+Validate --> Hash["生成 catalogRevision(稳定哈希)"]
+Hash --> Output["输出 index + surfaces 映射"]
+```
+
+**图表来源**
+- [compiler.ts:108-165](file://src/shared/provider-catalog/compiler.ts#L108-L165)
+- [compiler.ts:221-304](file://src/shared/provider-catalog/compiler.ts#L221-L304)
+- [compiler.ts:454-620](file://src/shared/provider-catalog/compiler.ts#L454-L620)
+- [compiler.ts:622-716](file://src/shared/provider-catalog/compiler.ts#L622-L716)
+
+**章节来源**
+- [compiler.ts:622-716](file://src/shared/provider-catalog/compiler.ts#L622-L716)
+
+### 清单 Schema：catalogManifestSchema
+- 定义
+  - ProviderSurfaceManifest：surface 的核心结构，包括 routes、discovery、connectionSchema、authModes、capabilities 等
+  - ConnectionSchema：连接字段、主密钥字段、凭证备选方案、头部映射、端点模板
+  - DiscoveryStrategy：json-catalog 或 custom-parser，含 admission 与 routeRules
+  - ModelManifest：模型元数据、上下文窗口、执行绑定、能力声明等
+- 作用
+  - 确保清单数据的完整性与一致性
+  - 为编译期校验与运行期转换提供强类型基础
+
+**章节来源**
+- [catalogManifestSchema.ts:23-111](file://src/shared/provider-catalog/catalogManifestSchema.ts#L23-L111)
+- [catalogManifestSchema.ts:137-235](file://src/shared/provider-catalog/catalogManifestSchema.ts#L137-L235)
+
+### 分类与协议定义：constants/llm
+- 分类定义：login-authorization、official-direct、cloud-platform、coding-token-plan、compatible-access、local
+- 协议定义：OpenAICompatibleChatCompletions、AnthropicMessages、GoogleGemini、AzureOpenAIChatCompletions 等
+- 用途
+  - 为 UI 展示与排序提供权威来源
+  - 限制协议白名单，防止非法协议接入
+
+**章节来源**
+- [llm.ts:10-118](file://src/shared/constants/llm.ts#L10-L118)
+
+### 数据契约：types/settings
+- LlmProviderEntry：运行时可配置的提供商条目，包含协议、认证模式、连接值、模型列表、能力等
+- LlmProviderCatalogEntry/LlmProviderCatalogResponse：目录查询响应结构
+- LlmProviderConnectionSchema：连接字段与头部映射
+- LlmProviderCapability：能力开关（chat、tool-calling、structured-output 等）
+
+**章节来源**
 - [settings.ts:420-541](file://src/shared/types/settings.ts#L420-L541)
 - [settings.ts:116-144](file://src/shared/types/settings.ts#L116-L144)
 
@@ -254,12 +408,12 @@ Reg --> Compiler["compiler.ts"]
 Script["provider-catalog-index.cjs"] --> Compiler
 ```
 
-图表来源
+**图表来源**
 - [ProviderCatalogService.ts:1-73](file://src/main/settings/ProviderCatalogService.ts#L1-L73)
 - [ProviderCatalogRegistry.ts:1-143](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L1-L143)
 - [provider-catalog-index.cjs:1-19](file://scripts/provider-catalog-index.cjs#L1-L19)
 
-章节来源
+**章节来源**
 - [ProviderCatalogService.ts:1-73](file://src/main/settings/ProviderCatalogService.ts#L1-L73)
 - [ProviderCatalogRegistry.ts:1-143](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L1-L143)
 - [provider-catalog-index.cjs:1-19](file://scripts/provider-catalog-index.cjs#L1-L19)
@@ -276,33 +430,35 @@ Script["provider-catalog-index.cjs"] --> Compiler
   - 生成精简 summaries，减少运行时内存占用
   - 稳定哈希 catalogRevision 便于缓存与变更检测
 
-[本节为通用性能讨论，不直接分析具体代码行]
-
 ## 故障排查指南
 - 常见错误
   - 索引无效：Bundled Provider Catalog index is invalid
   - 表面缺失：Bundled Provider surface ${id} is missing
   - 版本不匹配：Compiled Provider surface revision does not match the Catalog index
   - 未知内置提供商：Unknown builtin provider: ${id}
+  - 模型准入失败：模型未通过准入过滤检查
 - 定位建议
   - 检查编译脚本是否成功生成 index 与 surfaces
   - 确认 surface 的 schemaVersion 与 catalogRevision 一致
   - 查看清单校验错误（compiler 抛出），修复 surface/model/route/binding/discovery 问题
   - 验证 connectionSchema 字段与 headerMappings 引用是否存在
+  - 检查模型 ID 是否符合准入模式要求
 
-章节来源
+**章节来源**
 - [ProviderCatalogRegistry.ts:28-54](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L28-L54)
 - [ProviderCatalogRegistry.ts:119-138](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L119-L138)
 - [ProviderCatalogRegistry.ts:210-214](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L210-L214)
 - [compiler.ts:652-654](file://src/shared/provider-catalog/compiler.ts#L652-L654)
 
 ## 结论
-Provider 目录管理系统通过“编译期清单 + 运行期注册表 + 服务层”的分层设计，实现了：
+Provider 目录管理系统通过"编译期清单 + 运行期注册表 + 服务层"的分层设计，实现了：
 - 强类型的清单校验与稳定的目录版本控制
 - 灵活的提供商发现与认证模式支持
 - 清晰的分类与协议体系，便于 UI 展示与排序
 - 高效的懒加载与缓存机制，保障运行时性能
 - 完善的元数据与来源追溯，提升可维护性与可观测性
+
+最近的更新包括 DeepSeek 提供商的重构、ChatGPT Account 提供商的新功能以及 LiveProviderCatalogParsers 的增强，进一步提升了系统的稳定性和功能性。
 
 ## 附录：新增提供商注册流程示例
 以下流程展示如何将一个新的 LLM 服务提供商添加到系统中，使其在 ProviderCatalogService 中可见并可被配置使用。
@@ -347,13 +503,13 @@ User->>User : 配置连接值与密钥
 User->>User : 测试连接并启用提供商
 ```
 
-图表来源
+**图表来源**
 - [provider-catalog-index.cjs:1-19](file://scripts/provider-catalog-index.cjs#L1-L19)
 - [compiler.ts:622-716](file://src/shared/provider-catalog/compiler.ts#L622-L716)
 - [ProviderCatalogRegistry.ts:110-143](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L110-L143)
 - [ProviderCatalogService.ts:57-70](file://src/main/settings/ProviderCatalogService.ts#L57-L70)
 
-章节来源
+**章节来源**
 - [provider-catalog-index.cjs:1-19](file://scripts/provider-catalog-index.cjs#L1-L19)
 - [compiler.ts:622-716](file://src/shared/provider-catalog/compiler.ts#L622-L716)
 - [ProviderCatalogRegistry.ts:110-143](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L110-L143)

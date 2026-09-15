@@ -39,7 +39,6 @@ export const BUILTIN_AGENT_TOOL_IDS = [
   'background_cancel',
   'background_join',
   'ask_user',
-  'agent_handoff',
   'memory_search',
   'memory_read',
   'memory_write',
@@ -109,7 +108,6 @@ export const BUILTIN_AGENT_TOOL_TIERS: Record<BuiltinAgentToolId, BuiltinAgentTo
   background_cancel: 'core',
   background_join: 'core',
   ask_user: 'core',
-  agent_handoff: 'extended',
   memory_search: 'extended',
   memory_read: 'extended',
   memory_write: 'extended',
@@ -154,8 +152,6 @@ export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
   edit: ['edit_file'],
   askUser: ['ask_user'],
   'vscode/askQuestions': ['ask_user'],
-  agent: ['agent_handoff'],
-  handoff: ['agent_handoff'],
   task: ['task_create', 'task_update', 'task_get', 'task_list', 'task_stop', 'turn_complete', 'subagent_report', 'background_query', 'background_wait', 'background_result', 'background_message', 'background_cancel', 'background_join', 'output_register'],
   memory: ['memory_search', 'memory_read'],
   'memory-write': ['memory_write', 'memory_delete'],
@@ -183,6 +179,9 @@ export const REJECTED_TOOL_TOKENS: Record<string, string> = {
   todo: 'Use canonical token "task" instead of removed token "todo".',
   search_codebase: 'Tool "search_codebase" was removed; use glob/grep.',
   bash: 'Use canonical token "shell" instead of removed token "bash".',
+  handoff: 'Use declared continue buttons or token "subagent"; token "handoff" was removed.',
+  agent: 'Use token "subagent" for delegated agents; token "agent" was removed.',
+  agent_handoff: 'Use declared continue buttons; tool "agent_handoff" was removed.',
 };
 
 export interface ToolTokenDiagnostic {

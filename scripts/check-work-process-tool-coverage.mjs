@@ -148,10 +148,6 @@ const FIXTURES = {
   background_message: { argsPreview: JSON.stringify({ executionId: 'exec-1', body: 'data' }), resultPreview: toolEnvelope('queued', { executionId: 'exec-1' }) },
   background_cancel: { argsPreview: JSON.stringify({ executionId: 'exec-1' }), resultPreview: toolEnvelope('cancelled', { executionId: 'exec-1' }) },
   background_join: { argsPreview: JSON.stringify({ executionId: 'exec-1' }), resultPreview: toolEnvelope('joined', { executionId: 'exec-1' }) },
-  agent_handoff: {
-    argsPreview: JSON.stringify({ agent: 'edit', prompt: 'Implement fix' }),
-    resultPreview: toolEnvelope('Handoff ready', { agent: 'edit' }),
-  },
   subagent: {
     argsPreview: JSON.stringify({ profile: 'reviewer', prompt: 'Review this' }),
     resultPreview: toolEnvelope('Reviewed', { summary: 'Reviewed' }),

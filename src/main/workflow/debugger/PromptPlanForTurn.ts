@@ -1,5 +1,4 @@
-import { handoffPromptSegments } from '../../sessions/handoffPrompt';
-import { handoffRequiredSkillIds } from '../../sessions/handoffSkills';
+import { executionOfferRequiredSkillIds } from '../../sessions/handoffSkills';
 /**
  * PromptPlanForTurn — build PromptPlan for Debug sendMessage / profile turns.
  */
@@ -91,7 +90,7 @@ export class PromptPlanForTurn {
     const preloadSkillIds = mergeTurnPreloadSkillIds({
       profileSkills,
       messageText: input.messageText ?? '',
-      pendingSkillIds: [...(input.preloadSkillIds ?? []), ...handoffRequiredSkillIds(input.sessionId, input.agentId)],
+      pendingSkillIds: [...(input.preloadSkillIds ?? []), ...executionOfferRequiredSkillIds(input.sessionId, input.agentId)],
     });
     const preloadedSkills = [];
     for (const skillId of preloadSkillIds) {
@@ -120,7 +119,7 @@ export class PromptPlanForTurn {
       currentDate: promptClock.currentDate,
       timeZone: promptClock.timeZone,
       contextWindowTokens: input.contextWindowTokens,
-      extraSegments: [...(input.extraSegments ?? []), ...handoffPromptSegments(input.sessionId, input.agentId)],
+      extraSegments: input.extraSegments ?? [],
     });
   }
 }

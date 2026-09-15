@@ -38,6 +38,7 @@ import type {
   PlanExportResult,
   PlanReadRequest,
   PlanReadResult,
+  PlanReviewHandoffSuggestion,
   PlanSaveToProjectRequest,
   PlanSaveToProjectResult,
 } from './planReview';
@@ -477,6 +478,16 @@ export interface ElectronAPI {
     ) => Promise<{
       success: boolean;
       session?: SessionRecord;
+      error?: string;
+    }>;
+    applyDeclaredHandoff: (
+      id: string,
+      agent: string,
+      label: string,
+    ) => Promise<{
+      success: boolean;
+      session?: SessionRecord;
+      suggestion?: PlanReviewHandoffSuggestion;
       error?: string;
     }>;
 

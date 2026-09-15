@@ -42,6 +42,10 @@ export function persistAgentHandoff(handoff: AgentHandoffDefinition): AgentHando
   if (handoff.showContinueOn === false) next.showContinueOn = false;
   const model = handoff.model?.trim();
   if (model) next.model = model;
+  const requiredSkillIds = (handoff.requiredSkillIds ?? [])
+    .map((id) => id.trim())
+    .filter(Boolean);
+  if (requiredSkillIds.length > 0) next.requiredSkillIds = requiredSkillIds;
   return next;
 }
 

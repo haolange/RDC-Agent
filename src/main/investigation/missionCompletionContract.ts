@@ -1,6 +1,5 @@
 import { allowsBudgetPause } from './missionBudgetPause';
-import { storageAdapter } from '../sessions/StorageAdapter';
-import { enforceTaskReturnBinding, type TurnCompletionInput } from '../agent-runtime/agent/TurnCompletionValidator';
+import { type TurnCompletionInput } from '../agent-runtime/agent/TurnCompletionValidator';
 import { isMissionAgentId } from '@shared/types/agent';
 import {
   ANALYZER_EXPLANATION_LAYERS,
@@ -63,12 +62,6 @@ export function finalAnswerCitesReport(text: string, artifactId: string, content
 }
 
 export interface MissionCompletionInput extends TurnCompletionInput {
-  profileId: string;
-  turnId?: string;
-  sessionId?: string | null;
-  finalAnswerText: string;
-  pendingHandoff?: boolean;
-  pendingHandoffTarget?: string;
   service?: InvestigationArtifactService;
 }
 
@@ -80,22 +73,7 @@ export interface MissionCompletionReceipt {
 }
 
 export function enforceMissionTurnCompletion(input: MissionCompletionInput): MissionCompletionReceipt | void {
-  if (input.taskBinding) {
-    const binding = input.taskBinding;
-    const pending = input.sessionId ? storageAdapter.handoffs.getActive(input.sessionId) : null;
-    enforceTaskReturnBinding(input, pending);
-    if (binding.validationPolicy === 'renderdoc-investigation' && pending?.contract.intent === 'return') {
-      const service = input.service ?? investigationArtifactService;
-      const checkpoint = resolveMissionCheckpoint(service, input.sessionId!, binding.returnTo as InvestigationMission);
-      if (!checkpoint || Date.parse(checkpoint.manifest.createdAt) < binding.dispatchedAt || !pending.contract.artifacts.some(ref => ref.uri === checkpoint.contentUri && ref.hash.replace(/^sha256:/, '') === checkpoint.contentHash.replace(/^sha256:/, ''))) {
-        throw new MissionCompletionError('missing_checkpoint', 'Return must include the updated domain Checkpoint URI and hash.');
-      }
-    }
-  }
   if (!isMissionAgentId(input.profileId)) return;
-  if (input.pendingHandoff) return;
-  // Ending a conversational reply does not declare the investigation complete.
-  // Task return bindings above remain mandatory even for ordinary replies.
   if (!input.disposition) return;
   if (input.disposition === 'partial' || input.disposition === 'blocked' || input.disposition === 'cancelled') return;
   if (allowsBudgetPause(input, input.service ?? investigationArtifactService)) return;

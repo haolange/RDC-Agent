@@ -52,6 +52,9 @@ export function createSessionApi(transport: RendererApiTransport): SessionApi {
       transport.invoke(INVOKE.session.setModelOverride, id, modelOverride)
     ),
     setAgentId: (id, agentId) => transport.invoke(INVOKE.session.setAgentId, id, agentId),
+    applyDeclaredHandoff: (id, agent, label) => (
+      transport.invoke(INVOKE.session.applyDeclaredHandoff, id, agent, label)
+    ),
   };
 }
 

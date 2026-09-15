@@ -18,15 +18,10 @@ import { TurnHandle } from '../workflow/debugger/TurnCoordinator';
 import { settingsService } from '../settings/SettingsService';
 import { agentManifestService } from '../settings/AgentManifestService';
 import { sessionArtifactResolver } from '../sessions/SessionArtifactResolver';
-import { storageAdapter } from '../sessions/StorageAdapter';
-import { HandoffStateStore } from '../sessions/HandoffStateStore';
-import { StorageIo } from '../sessions/StorageIo';
 import { artifactizeToolResult } from '../agent-runtime/tools/ToolResultArtifactizer';
 import { artifactReadTool } from '../agent-runtime/tools/primitives/ArtifactReadTool';
 import { createInvestigationTools } from '../investigation/InvestigationTools';
 import { createInvestigationHarness, writeDraft, baselineWorld, hypothesisClaim, sampleChallenge, sampleCheckpoint, SESSION_ID } from '../investigation/investigationTestFixtures';
-import { resolveInvestigationTaskBinding } from '../investigation/investigationTaskBinding';
-import { enforceTaskReturnBinding } from '../agent-runtime/agent/TurnCompletionValidator';
 
 vi.mock('electron', () => ({ app: { getPath: () => process.env.TEMP, getAppPath: () => process.cwd() }, safeStorage: { isEncryptionAvailable: () => false } }));
 vi.mock('../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: async () => true }));
@@ -76,7 +71,7 @@ const TEST_REQUEST_PLAN = createTestRequestPlan({
 
 
 
-it('isolates Scout and Skeptic provider inputs, preserves evidence, follows Challenge and returns to original Mission', { timeout: 30000 }, async () => {
+it('isolates Scout and Skeptic provider inputs, preserves evidence, and lets Mission evaluate after the user returns', { timeout: 30000 }, async () => {
   const harness = createInvestigationHarness('rdc-exploration-provider-');
   const { resolver, service } = harness;
   const profiles = ['general', 'debugger'].map((id) => ({ id, enabled: true, instructions: `Identity ${id}`, skills: [], tools: [], agents: ['general'], handoffs: [], metadata: {}, models: [], mcpServers: [], filePath: `fixture/${id}.agent.md`, name: id, description: id } as unknown as AgentManifestDefinition));
@@ -84,8 +79,6 @@ it('isolates Scout and Skeptic provider inputs, preserves evidence, follows Chal
   vi.spyOn(agentManifestService, 'getEffectiveProfiles').mockReturnValue(profiles as never);
   vi.spyOn(sessionArtifactResolver, 'read').mockImplementation(resolver.read.bind(resolver));
   vi.spyOn(sessionArtifactResolver, 'write').mockImplementation(resolver.write.bind(resolver));
-  const handoffs = new HandoffStateStore({ io: new StorageIo(), sessions: { findSessionLocation: () => ({ sessionPath: harness.sessionPath }) } } as never);
-  for (const method of ['getActive', 'readDocument', 'computeNextChain', 'createPreparedDraft', 'abandonDraft', 'prepare', 'cancel'] as const) vi.spyOn(storageAdapter.handoffs, method).mockImplementation(handoffs[method].bind(handoffs) as never);
   const assembly = new RuntimeToolAssembly({ mcp: { getConnectedTools: () => [], getAgentTools: () => [] }, getActiveTurn: () => null, getMemoryStore: () => ({}), createSubagentTools: () => [], getMcpServerStatusSummary: () => [] } as never);
   const rawText = Array.from({ length: 200 }, (_, i) => `Source ${i}: hypothesis only, capture A, fixed camera; negative path valid only for driver X.
 `).join('');
@@ -140,18 +133,12 @@ it('isolates Scout and Skeptic provider inputs, preserves evidence, follows Chal
     } finally { handle.close(); }
   } });
   try {
-    const plan = resolver.write(SESSION_ID, 'session://plans/isolated-exploration.md', Buffer.from('Isolate retrieval, independently challenge, follow up, return to original Mission.'), { mimeType: 'text/markdown' });
-    const execute = handoffs.prepare(SESSION_ID, { sourceTurnId: 'mission-plan', sourceRequestId: 'mission-request', declaredModel: null, sourceAgentId: 'debugger', toAgentId: 'general', prompt: 'Execute bounded investigation', label: 'Execute', send: true, chainRoot: 'root', depth: 1, contract: { intent: 'execute', plan: { uri: plan.uri, hash: plan.hash }, returnTo: 'debugger', requiredSkillIds: ['renderdoc-execution'], deliveryRequirements: 'Return review and follow-up evidence' } });
-    handoffs.commit(SESSION_ID, 'mission-plan'); handoffs.consume(SESSION_ID, execute.handoffId, 'general-execution');
-    const binding = resolveInvestigationTaskBinding(SESSION_ID, 'general');
     const parentHandle = new TurnHandle({ sessionKey: SESSION_ID, turnId: 'general-execution', generation: 1 });
     parentHandle.eventSink = { sessionId: SESSION_ID, requestId: 'general-request' } as never;
-    parentHandle.runtimePlan = { profileDelegates: ['general'], profileHandoffs: [{ agent: 'debugger', label: 'Return', prompt: 'Return' }], enabledProfileIds: ['general', 'debugger'], taskBinding: binding } as never;
-    const tools = [artifactReadTool as unknown as AgentTool, ...runner.createSubagentTools('general', SESSION_ID, parentHandle), ...createInvestigationTools(SESSION_ID, { service }), assembly.createAgentHandoffTool('general', SESSION_ID, parentHandle)];
+    parentHandle.runtimePlan = { profileDelegates: ['general'], profileHandoffs: [], enabledProfileIds: ['general', 'debugger'] } as never;
+    const tools = [artifactReadTool as unknown as AgentTool, ...runner.createSubagentTools('general', SESSION_ID, parentHandle), ...createInvestigationTools(SESSION_ID, { service })];
     const privateNarrative = 'General private exploration history: '.repeat(80);
-    await runLoop('general', tools, [() => ({ name: 'subagent', args: { ...makeCapsule('knowledge-scout') } }), () => ({ name: 'subagent', args: { ...makeCapsule('skeptic-review') } }), () => ({ name: 'artifact_read', args: { uri: raw.uri, expectedHash: raw.hash } }), () => ({ name: 'investigation_write', args: { kind: 'checkpoint', mission: 'debugger', title: 'Follow-up conditions', summary: 'Driver Y follow-up remains unverified', record: { ...sampleCheckpoint({ currentWorldStateId: 'ws-baseline' }), unresolvedFrontier: 'Driver Y requires device; same camera condition retained.' } } }), () => { const checkpoint = service.list(SESSION_ID).find((item) => item.kind === 'checkpoint')!; return { name: 'agent_handoff', args: { agent: 'debugger', prompt: 'Independent review found a missing driver condition; return partial evidence for evaluation.', contract: { intent: 'return', executionHandoffId: execute.handoffId, artifacts: [{ uri: checkpoint.contentUri, hash: checkpoint.contentHash }] } } }; }], [{ role: 'user', content: privateNarrative, timestamp: Date.now() }]);
-    enforceTaskReturnBinding({ profileId: 'general', taskBinding: binding, pendingHandoff: true, pendingHandoffTarget: 'debugger', finalAnswerText: 'Partial return' }, handoffs.getActive(SESSION_ID));
-    const returned = handoffs.commit(SESSION_ID, 'general-execution')!; handoffs.consume(SESSION_ID, returned.handoffId, 'mission-evaluation');
+    await runLoop('general', tools, [() => ({ name: 'subagent', args: { ...makeCapsule('knowledge-scout') } }), () => ({ name: 'subagent', args: { ...makeCapsule('skeptic-review') } }), () => ({ name: 'artifact_read', args: { uri: raw.uri, expectedHash: raw.hash } }), () => ({ name: 'investigation_write', args: { kind: 'checkpoint', mission: 'debugger', title: 'Follow-up conditions', summary: 'Driver Y follow-up remains unverified', record: { ...sampleCheckpoint({ currentWorldStateId: 'ws-baseline' }), unresolvedFrontier: 'Driver Y requires device; same camera condition retained.' } } })], [{ role: 'user', content: privateNarrative, timestamp: Date.now() }]);
     await runLoop('mission-evaluation', [artifactReadTool as unknown as AgentTool], [() => ({ name: 'artifact_read', args: { uri: service.list(SESSION_ID).find((item) => item.kind === 'checkpoint')!.contentUri } })], [{ role: 'user', content: 'Evaluate the explicit returned evidence and unresolved scope.', timestamp: Date.now() }]);
     expect(childSessions).toHaveLength(2); expect(new Set(childSessions).size).toBe(2);
     for (const session of childSessions) {
@@ -187,7 +174,6 @@ it('isolates Scout and Skeptic provider inputs, preserves evidence, follows Chal
       expect(restored.text).toContain('Driver Y');
     }
     expect(service.list(SESSION_ID).some((item) => item.kind === 'challenge')).toBe(true);
-    expect(handoffs.readDocument(SESSION_ID)!.history!.filter((item) => item.contract.intent === 'return')[0]!.toAgentId).toBe('debugger');
     expect(resolver.read(SESSION_ID, raw.uri, { expectedHash: raw.hash }).text).toBe(rawText);
     parentHandle.close();
   } finally { vi.restoreAllMocks(); fs.rmSync(harness.sessionPath, { recursive: true, force: true }); }

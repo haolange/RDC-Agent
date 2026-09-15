@@ -197,6 +197,15 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
             label={t('settings.agentHandoffShowContinueOnHelp')}
           />
         </SettingsField>
+        <SettingsField label={t('settings.agentHandoffRequiredSkills')} layout="stack">
+          <AutosizeTextarea
+            value={(handoff.requiredSkillIds ?? []).join('\n')}
+            onChange={(event) => patch({
+              requiredSkillIds: event.target.value.split(/[\n,]/).map((id) => id.trim()).filter(Boolean),
+            })}
+            placeholder={t('settings.agentHandoffRequiredSkillsPlaceholder')}
+          />
+        </SettingsField>
       </div>
     </article>
   );

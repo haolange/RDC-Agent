@@ -88,7 +88,7 @@ Appearance 详细规则见 docs/ui/appearance-checklist.md；禁止恢复 transl
 
 关键边界不得回退：IPC parseIpcArgs + 单次 approvalToken；safeStorage fail-closed、无明文 secret IPC；sandbox:true + CSP 禁 inline；Hook/MCP trust 内容/路径/执行身份变更需 retrust；ProcessSupervisor 未观察 close/error 不移除；Turn generation 丢弃迟到事件；只投影 currentSession；RDX per-session lease 无全局镜像，离线 child 不得获得 RDX，unsafe 工具串行；Run 唯一 v3；Memory 活 pid 锁不回收；Knowledge 单一 main-owned 六 lane 五服务、无 Embedding、无自动 Candidate/Memory；Investigation provenance/hash/事务和认识论边界不放宽。
 
-prepareTurn 冻结 PromptPlan / EffectiveRuntimePlan 和本机 RDX binding。预载 skill allowed-tools 取交集，只收窄；skill_read 只读方法，不重算在途权限。普通任务留 General；Mission plan-only → `plan_artifact` 计划门（同意即冻结并只放行同 hash / 同 target 的 execute）→ General 执行 → 原 Mission 评估。RDX 共享 shell 手册与三本专业工具手册只提供知识，必须由 execute handoff 的 requiredSkillIds 真实预载，不能授权操作或替代冻结 catalog。Full access 不绕过 Mission/lease/hard deny。Handoff 单一持久状态机，root 最多两轮执行与回评估（初始 route 不计），事件驱动续跑，失败回滚、重启手动继续，取消规则不变。
+prepareTurn 冻结 PromptPlan / EffectiveRuntimePlan 和本机 RDX binding。预载 skill allowed-tools 取交集，只收窄；skill_read 只读方法，不重算在途权限。普通任务留 General；Mission plan-only → `plan_artifact` 计划门（同意即冻结）→ 用户点声明按钮切到 General → General 就地终答 → 用户自行切回 Mission 评估。RDX 共享 shell 手册与三本专业工具手册只提供知识，必须由会话 execution offer 上声明的 requiredSkillIds 真实预载，不能授权操作或替代冻结 catalog。Full access 不绕过 Mission/lease/hard deny。`handoffs` 只驱动建议行和计划门按钮；人点后主进程 `applyDeclaredHandoff` 写/确认 offer 并 persist `session.agentId`。不存在 `agent_handoff` 工具、durable `prepared → committed → consumed` 状态机或自动回 Mission。
 
 shell.command 与 shell.rdx 互斥；结构化 RDX 仅 owning General，经审批与冻结原生 CLI。实验关闭必须验证主进程签名回执 baseline/intervention/variant/rollback/restored。旧记录可读；权限拒绝、未执行或 capture hash 不变不是回滚证据。旧 verified 不代表当前版本。
 
@@ -117,7 +117,7 @@ Session rail 为 Progress / Artifacts / Outputs / Context / Capture，投影契�
 
 RDX 接口只维护当前操作契约；包发布号仅用于安装诊断，不设 major-version 权限门槛。接入必须校验真实 catalog 指纹、参数、能力和 JSON 格式，手册引用当前生成定义，不绑定 V1/V2。
 
-操作定义、参数约束、scope、effects 与证据类型来自配置 CLI 的完整 catalog；prepareTurn 冻结目录指纹、CLI 配置和 owning lease。应用固定生命周期通过原生调用边界生成 argv，不恢复自定义生命周期命令、catalogPath 或 JSON 模式配置。普通执行由主进程校验能力、身份、路径和前置条件；Skill 只提供知识，不能授权。专业手册参考通过生成器更新，Mission execute handoff 的 requiredSkillIds 必须在 General prepareTurn 实际加载。详见 docs/architecture/rdx-runtime.md。
+操作定义、参数约束、scope、effects 与证据类型来自配置 CLI 的完整 catalog；prepareTurn 冻结目录指纹、CLI 配置和 owning lease。应用固定生命周期通过原生调用边界生成 argv，不恢复自定义生命周期命令、catalogPath 或 JSON 模式配置。普通执行由主进程校验能力、身份、路径和前置条件；Skill 只提供知识，不能授权。专业手册参考通过生成器更新，Mission 声明续跑上的 requiredSkillIds 必须在 General prepareTurn 实际加载。详见 docs/architecture/rdx-runtime.md。
 
 专业 Agent 只需完整掌握职责内的工具集合；用途、参数、结果解释、示例和限制由明确成员清单与生成参考覆盖，不复制全部工具箱。共享 CLI/身份/输出/恢复知识只维护一份，专业手册引用；Mission → General → Mission 复用现有交接，不能仅用提示词中的 Skill 名称代替实际加载。
 

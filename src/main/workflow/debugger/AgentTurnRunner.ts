@@ -38,8 +38,6 @@ import {
 } from '../../agent-runtime/AgentEventBridge';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { cancelTurnInteractionRequests } from './cancelTurnInteractionRequests';
-import { enforceTaskReturnBinding } from '../../agent-runtime/agent/TurnCompletionValidator';
-import { storageAdapter } from '../../sessions/StorageAdapter';
 import type {
   AssistantMessage,
   AgentEvent as CoreAgentEvent,
@@ -79,7 +77,7 @@ import type {
   ToolExecutorRuntimeContext,
 } from './orchestratorTypes';
 import type { TurnCompletionValidator } from '../../agent-runtime/agent/TurnCompletionValidator';
-import { registerReceivingHandoffTurnOwner, settleJoinedTurnTaskExecutions, settleUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
+import { settleJoinedTurnTaskExecutions, settleUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 
 export function hasActualProviderUsage(message: AssistantMessage): boolean {
   return message.stopReason !== 'error';
@@ -406,7 +404,6 @@ export class AgentTurnRunner {
     let abortListener: (() => void) | null = null;
     let turnEnded = false;
     let setupCleanupComplete = false;
-    const releaseHandoffExecutionOwner = await registerReceivingHandoffTurnOwner(executionScopeId, turnHandle);
     try {
     slotKey = agentSlotKey(executionScopeId, input.agentId);
     const turnGeneration = turnHandle.generation;
@@ -770,20 +767,13 @@ export class AgentTurnRunner {
         throw new Error('TURN_COMPLETION_INVALID: cancelled requires an actual abort and joined execution.');
       }
       const completionInput = {
-        taskBinding: turnHandle.runtimePlan?.taskBinding,
         profileId: input.agentId,
         turnId: turnHandle.turnId,
         sessionId: executionScopeId,
         finalAnswerText: responseText,
         disposition: turnHandle.completionDeclaration?.disposition,
         evidenceRefs: turnHandle.completionDeclaration?.evidenceRefs,
-        pendingHandoff: Boolean(turnHandle.pendingHandoff),
-        pendingHandoffTarget: turnHandle.pendingHandoff?.toProfile,
       };
-      enforceTaskReturnBinding(
-        completionInput,
-        executionScopeId ? storageAdapter.handoffs.getActive(executionScopeId) : null,
-      );
       this.deps.validateCompletion(completionInput);
       return responseText;
     } catch (error) {
@@ -841,7 +831,6 @@ export class AgentTurnRunner {
       }
       await mcpLease?.release({ discardIfIdle: turnHandle.isOrphaned });
       turnCoordinator.endTurn(turnHandle);
-      releaseHandoffExecutionOwner?.();
       turnEnded = true;
       await dispatchRuntimeHooks('turn.after-end', {
         agentId: input.agentId,
@@ -879,7 +868,6 @@ export class AgentTurnRunner {
         await mcpLease?.release({ discardIfIdle: turnHandle.isOrphaned });
         if (!turnEnded) {
           turnCoordinator.endTurn(turnHandle);
-          releaseHandoffExecutionOwner?.();
           turnEnded = true;
           await dispatchRuntimeHooks('turn.after-end', {
             agentId: input.agentId,

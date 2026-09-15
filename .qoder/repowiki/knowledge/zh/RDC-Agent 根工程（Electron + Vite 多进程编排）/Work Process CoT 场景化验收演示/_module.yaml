@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: tests_and_coverage
-title: Work Process CoT 场景化验收演示
-scope:
-    - test/
-source_files: []
-depends_on: []
-related_to:
-    - path: scripts

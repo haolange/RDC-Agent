@@ -370,6 +370,8 @@ export const enSettings = {
   'settings.agentHandoffSendHelp': 'Run the target Agent immediately instead of only filling the composer.',
   'settings.agentHandoffShowContinueOn': 'Show as continue action',
   'settings.agentHandoffShowContinueOnHelp': 'Show as a suggestion button after the turn ends (on by default).',
+  'settings.agentHandoffRequiredSkills': 'Preload skills (optional)',
+  'settings.agentHandoffRequiredSkillsPlaceholder': 'One skill id per line; preloaded only after the user continues from an approved plan',
   'settings.agentHandoffErrorLabelRequired': 'Label is required.',
   'settings.agentHandoffErrorTargetRequired': 'Select a target Agent.',
   'settings.agentHandoffErrorTargetUnknown': 'Agent "{id}" does not exist.',

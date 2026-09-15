@@ -56,10 +56,15 @@ const readHandoffsStrict = (value: unknown): AgentHandoffDefinition[] | string =
     if (candidate.model !== undefined && (typeof candidate.model !== 'string' || !candidate.model.trim())) {
       return `handoffs[${index}].model must be a non-empty string when present.`;
     }
+    const requiredSkillIds = readStringArray(candidate.requiredSkillIds);
+    if (requiredSkillIds === null) {
+      return `handoffs[${index}].requiredSkillIds must be a string array when present.`;
+    }
     const handoff: AgentHandoffDefinition = { label, agent, prompt };
     if (typeof candidate.send === 'boolean') handoff.send = candidate.send;
     if (typeof candidate.showContinueOn === 'boolean') handoff.showContinueOn = candidate.showContinueOn;
     if (typeof candidate.model === 'string' && candidate.model.trim()) handoff.model = candidate.model.trim();
+    if (requiredSkillIds.length > 0) handoff.requiredSkillIds = requiredSkillIds;
     handoffs.push(handoff);
   }
   return handoffs;

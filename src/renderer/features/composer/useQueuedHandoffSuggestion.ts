@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { persistSessionAgentId } from './sessionAgentId';
+import { applyDeclaredHandoffOnClient } from './sessionAgentId';
 import { useComposerSessionContextStore, type HandoffSuggestionRequest } from '../../stores/composerSessionContextStore';
 import { useProjectStore } from '../../stores/projectStore';
 
@@ -11,6 +11,8 @@ export function useQueuedHandoffSuggestion(input: {
   showNotice: (message: string) => void;
 }): void {
   const request = useComposerSessionContextStore(state => state.handoffSuggestionRequest);
+  const activeTurn = useComposerSessionContextStore(state => state.activeTurn);
+  const isPromptSending = useComposerSessionContextStore(state => state.isPromptSending);
   const [ready, setReady] = useState<HandoffSuggestionRequest | null>(null);
   const callbacks = useRef(input);
   callbacks.current = input;
@@ -20,11 +22,12 @@ export function useQueuedHandoffSuggestion(input: {
     const current = () => mounted
       && useComposerSessionContextStore.getState().handoffSuggestionRequest === request
       && useProjectStore.getState().currentSession?.sessionId === request.sessionId;
-    void persistSessionAgentId(request.sessionId, request.agentId).then(result => {
+    void applyDeclaredHandoffOnClient(request.sessionId, request.agentId, request.label).then(result => {
       if (!current()) return;
       if (!result.ok) throw new Error(result.error || 'Agent switch failed.');
-      callbacks.current.setPromptValue(request.prompt);
-      if (request.send) setReady(request);
+      const prompt = result.suggestion?.prompt || request.prompt;
+      callbacks.current.setPromptValue(prompt);
+      if (request.send) setReady({ ...request, prompt });
       else useComposerSessionContextStore.getState().clearHandoffSuggestion();
     }).catch((error: unknown) => {
       if (!current()) return;
@@ -37,15 +40,20 @@ export function useQueuedHandoffSuggestion(input: {
   useEffect(() => {
     if (!ready) return;
     const store = useComposerSessionContextStore.getState();
-    if (store.handoffSuggestionRequest !== ready || ready.sessionId !== input.sessionId) { setReady(null); return; }
+    if (!store.handoffSuggestionRequest || store.handoffSuggestionRequest.sessionId !== ready.sessionId) {
+      setReady(null);
+      return;
+    }
+    if (ready.sessionId !== input.sessionId) { setReady(null); return; }
     if (input.promptValue !== ready.prompt) return;
+    if (activeTurn || isPromptSending) return;
     setReady(null);
     store.clearHandoffSuggestion();
-    if (store.activeTurn || store.isPromptSending || !ready.prompt.trim()) return;
+    if (!ready.prompt.trim()) return;
     void Promise.resolve(callbacks.current.sendPrompt()).catch((error: unknown) => {
       if (useProjectStore.getState().currentSession?.sessionId === ready.sessionId) {
         callbacks.current.showNotice(error instanceof Error ? error.message : String(error));
       }
     });
-  }, [ready, input.promptValue, input.sessionId]);
+  }, [ready, input.promptValue, input.sessionId, activeTurn, isPromptSending]);
 }

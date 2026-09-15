@@ -73,13 +73,6 @@ export type {
   TraceStatus,
   VisibleReasoningPacket,
 } from './agenticTrace';
-export type {
-  HandoffErrorCode,
-  HandoffStateDocument,
-  ProfileHandoffCancelReason,
-  ProfileHandoffLifecycle,
-  ProfileHandoffState,
-} from './profileHandoff';
 export type { AgentEvent, AgentEventPayload, AgentEventType } from './agentRuntime';
 export type {
   AgentRuntimeCatalog,
@@ -224,6 +217,12 @@ export type {
   ProjectPlanFrontmatter,
 } from './planReview';
 export { isHandoffContinueAction, PLAN_REVIEW_STATE_SCHEMA } from './planReview';
+export type {
+  CompletionArtifactRef,
+  ExecutionOffer,
+  ExecutionOfferPlanRef,
+} from './executionOffer';
+export { EXECUTION_OFFER_SCHEMA } from './executionOffer';
 export type {
   DelegationCapsule,
   DelegationCapsuleBudget,

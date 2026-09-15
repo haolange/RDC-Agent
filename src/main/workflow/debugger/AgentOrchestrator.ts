@@ -1,4 +1,3 @@
-import { resolveInvestigationTaskBinding } from '../../investigation/investigationTaskBinding';
 import { enforceMissionTurnCompletion } from '../../investigation/missionCompletionContract';
 /**
  * AgentOrchestrator — façade over turn preparation, tool assembly, executor,
@@ -123,7 +122,6 @@ export class AgentOrchestrator {
     });
 
     this.turnPrep = new TurnPreparationService({
-      resolveTaskBinding: resolveInvestigationTaskBinding,
       mcp: this.mcp,
       deferredActivation: this.deferredActivation,
       resolveRuntimeTools: (...args) => this.tools.resolveRuntimeTools(...args),

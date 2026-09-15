@@ -2,7 +2,7 @@
 
 > **文档地位**：本文件是受根目录 [`DESIGN.md`](../../DESIGN.md) 裁决的详细目标设计，**不是第二产品权威**。若与 `DESIGN.md` / `AGENTS.md` 冲突，以 `DESIGN.md` 为准并回改本文。
 >
-> **实现状态**：文中模块、schema、服务以目标态叙述。Knowledge 目标拓扑是五服务 + **六 lane** markdown-first + 五个 deferred 工具与 Knowledge Center 三列 UI（Embedding / Semantic lane 已由 U02 删除）。Wave 4 schema 已落地 `rdc.investigation.v1`、`InvestigationArtifactService` 与三个 deferred Investigation 工具；IPC `investigation:read` 已落地；4 个 builtin Hook 模板与 Session rail 五卡已落地。Wave 5：三条 Mission 方法面已接到 Skill / Hook / Capsule（Debugger `$debugger-causal-method`，Analyzer `$analyzer-architecture-method`，Optimizer `$optimization-experiment`；现 15 个垂直方法 Skill）。**T18 ColdData 真实验收已证**（见 `DESIGN.md` T18 已证组与 [`acceptance-ledger.md`](acceptance-ledger.md) `T18-colddata-*`）。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。durable handoff 状态机已落地。Run 当前为 v3。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。
+> **实现状态**：文中模块、schema、服务以目标态叙述。Knowledge 目标拓扑是五服务 + **六 lane** markdown-first + 五个 deferred 工具与 Knowledge Center 三列 UI（Embedding / Semantic lane 已由 U02 删除）。Wave 4 schema 已落地 `rdc.investigation.v1`、`InvestigationArtifactService` 与三个 deferred Investigation 工具；IPC `investigation:read` 已落地；4 个 builtin Hook 模板与 Session rail 五卡已落地。Wave 5：三条 Mission 方法面已接到 Skill / Hook / Capsule（Debugger `$debugger-causal-method`，Analyzer `$analyzer-architecture-method`，Optimizer `$optimization-experiment`；现 15 个垂直方法 Skill）。**T18 ColdData 真实验收已证**（见 `DESIGN.md` T18 已证组与 [`acceptance-ledger.md`](acceptance-ledger.md) `T18-colddata-*`）。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。声明续跑与 session execution offer 已落地。Run 当前为 v3。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。
 >
 > **读者**：实现后续 Wave 的 Codex / Agent。路径相对本仓库。中文为主，产品术语保留英文。
 
@@ -95,7 +95,7 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 - 生效优先级 **`builtin < user < project`**，整资源替换。运行时**不再写 user seed**。
 - user/project 只能覆盖这四个 id，或新增无关自定义 id。
 - `general` = Execution Orchestrator；`debugger` / `analyzer` / `optimizer` = Planning Orchestrator。
-- 空 `handoffs` 禁止；空 `agents` 仅表示可委托自身。
+- 空 `handoffs` 合法（General 无建议按钮）；空 `agents` 仅表示可委托自身。
 - 不新增 `mission` / `orchestratorType` / `investigationMode` 等 Profile 领域字段。
 - ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`。**不再有 custom manifest 运行通道**。
 - **迁移 v2（U01 落地）**：canonical hash 只排除顶层 `models` / `icon` / `accent` 与 `handoffs[*].model`；marker `schemaVersion:'2'`；v1 视为未完成；崩溃恢复 isolation manifest；shadow（忽略 model/icon/accent 后与 builtin 相同）purge；真正改过正文/工具的 builtin-id 副本 `retained-override`。官方未改 seed 永久清除，不留 `.migrated`。
@@ -114,9 +114,9 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 
 Embedding capability / Semantic lane **已删除**，见 `DESIGN.md` 裁决 C。**禁止恢复** Embedding capability / Semantic lane / `llm.embedding`。Discovery 对 embedding/embeddings modality 继续 fail-closed 剔除。真实 OpenAI embed **不再补跑**。
 
-### 3.4 Durable Handoff（已落地）
+### 3.4 Declared Continue 与 Execution Offer（已落地）
 
-`ProfileHandoffState` 经 `HandoffStateStore` 写入 `<sessionPath>/handoff-state.json`。现有 `AgentHandoffDefinition` 仍只是 manifest 路由声明，不是该状态机。Debugger Big Loop 走同一套机器（每 root 一次 route、最多两轮 execute/return，重启不自动执行）。事务顺序：内存草稿 prepare → 绑定 `turn.pendingHandoff` → after-hook → 持久化；Hook 拒绝/抛错或持久化失败必须 cancel/rollback，不得遗留 active prepared。`send:true` 由源 turn complete / turn-idle 事件驱动，同一 `handoffId` 一次 generation，有界 idle 观察，禁止 microtask 自递归。**源码与定向测试已落地。**产品级自动续跑 / pill 闭环仍须在有 session 的 Browser QA 中验收。
+`AgentHandoffDefinition` 只是 Copilot 式 UI 声明。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 校验声明、触发 `before-handoff` / `after-handoff`、写入 `<sessionPath>/execution-offer.json` 并 persist `session.agentId`。计划批准写入 offer（source / target / 冻结 plan.uri+hash / 声明 requiredSkillIds）。prepareTurn 仅当本回合 `agentId === targetAgentId` 且批准计划与 offer 同 hash 时预载 Skill。General 就地终答，不自动回 Mission。不存在 `agent_handoff` 工具或 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。`send: true` 只表示点完后预填并自动发送。
 
 ### 3.5 并发（目标态 / 迁移中）
 
@@ -139,7 +139,7 @@ Embedding capability / Semantic lane **已删除**，见 `DESIGN.md` 裁决 C。
 
 Coordinator **不是**新 Runtime，也不是 Profile 新字段。它是：
 
-`profile instructions + 预加载根 Skill + 按需 Skill + Hook + 通用 Task + 垂直 Artifact + durable Handoff`
+`profile instructions + 预加载根 Skill + 按需 Skill + Hook + 通用 Task + 垂直 Artifact + 声明续跑 / execution offer`
 
 的组合。Planning Orchestrator 负责理解目标、澄清、有限探测、编排与计划；General 负责 Task 分解、Shell / Sub-Agent、验证与报告。Knowledge Candidate 仅在用户显式意图下由 `knowledge_candidate_create` 创建，不是 General 的默认收尾步骤。
 
@@ -147,47 +147,26 @@ RDX 仍是外部 CLI：General 通过结构化 `shell.rdx` 调用 prepareTurn �
 
 ---
 
-## 5. Durable Handoff 状态机
+## 5. Execution Offer 与声明续跑
 
-### 5.1 记录字段
+### 5.1 Offer 字段
 
 | 字段 | 含义 |
 | --- | --- |
-| `handoffId` | 实例稳定 id |
-| `lifecycle` | `prepared` / `committed` / `consumed` / `cancelled` |
-| `sourceTurnId` | 发起 turn |
-| `sourceRequestId` | 发起 request |
-| `sourceAgentId` | 源 profile |
-| `toAgentId` | 目标 profile |
-| `chainRoot` | 用户 root 链 id |
-| `contract` | route / execute / return；Plan URI/hash、必需 Skill、真实返回对象、执行绑定与产物引用见 runtime-kernel |
-| `depth` | 相对 root 的深度；每用户 root 最多两轮执行与回评估，初始 route 不计，结构深度最多 5 |
-| `prompt` | 交接正文（含 plan / artifact refs，不含 secret） |
-| `label` | 人类可读标签 |
-| `declaredModel` | **字段必存在，值可为 `null`**。非空时为 canonical `providerId:modelId` |
-| timestamps | `preparedAt` / `committedAt` / `consumedAt` / `cancelledAt` |
-| `cancelReason` | Stop / Rewrite / branch / manual_switch / restart_degrade / invalid_model / depth_exceeded / superseded |
+| `sourceAgentId` | 批准或声明续跑时的源 profile |
+| `targetAgentId` | continue 目标（通常为 `general`） |
+| `plan.uri` / `plan.hash` | 刚批准冻结的计划 |
+| `requiredSkillIds` | 源 Mission 匹配那条 `handoffs` 声明，禁止从 prompt 正则抽取 |
 
-### 5.2 提交点
+新计划修订批准则覆盖；拒绝 / 取代则清除。同一 session 同时只保留一份 offer。
 
-| 状态 | 唯一合法进入条件 |
-| --- | --- |
-| `prepared` | `agent_handoff` 工具成功，且通过深度 / 同 session 单活跃 / model 预检 |
-| `committed` | **仅**源 turn complete |
-| `consumed` | **仅**目标消息 commit |
-| `cancelled` | 任意未完成点：Stop / Rewrite / branch / 手动切换 profile / 重启降级 / 非法 model / 超深度 |
+### 5.2 唯一切 Agent 路径
 
-`send:true` 只在 `committed` 后自动续跑。进程重启后未 `consumed` 的实例降级为手动继续，不自动续跑。审批不继承。同一 session 同时只允许一个活跃 handoff。空 `handoffs` 禁止；空 `agents` 仅自身。
+人点建议行或计划门 → `applyDeclaredHandoff`：校验选项属于当前（或刚批准的）profile 声明 → 写/确认 offer（若是批准后的 Execute）→ `before-handoff` / `after-handoff` → persist `session.agentId`。渲染层切换成功后预填；`send: true` 才自动发。失败提示并留草稿，迟到结果不得写进别的 session。手动改 Composer Agent pill 不写 offer、不预载调查 Skill。
 
 ### 5.3 模型优先级
 
-始终按下列顺序，handoff 目标 turn **继承**当前 session `modelOverride`（若存在且可执行）：
-
-1. session `modelOverride`（必须已通过 `isAgentToolExecutableModel`）
-2. handoff `declaredModel`（字段必在；值为 `null` 则跳过本档；非空必须再通过 `isAgentToolExecutableModel`。不在 EffectiveCatalog available 或 `pickerVisibility === 'internal'` 则 fail-closed）
-3. target profile route
-
-非法 model fail-closed，禁止静默回退。**审批不继承**（与模型优先级无关）。
+声明续跑目标 turn **继承**当前 session `modelOverride`（若存在且可执行），否则用 target profile route。非法 model fail-closed，禁止静默回退。**审批不继承**。空 `handoffs` 合法；空 `agents` 仅自身。`handoff` / `agent` / `agent_handoff` token 拒绝。
 
 ---
 
@@ -195,7 +174,7 @@ RDX 仍是外部 CLI：General 通过结构化 `shell.rdx` 调用 prepareTurn �
 
 - 只有 `AgentTool.spec.isConcurrencySafe === true` 才安全；**缺省 `false`**。
 - 只并发**连续**安全组；unsafe 调用独占，切开前后组。
-- 下列工具一律串行：`shell`、write、task mutation、RDX / Live Capture（含 `rdx_probe`）、MCP、ask、handoff、`output_register`。
+- 下列工具一律串行：`shell`、write、task mutation、RDX / Live Capture（含 `rdx_probe`）、MCP、ask、`output_register`。
 - `domainExtensions.rdx.requiresLease=true` 的 child 必须通过显式、受限、生命周期绑定的 delegated lease 取得 parent RDX context 并串行；child 完成/取消立即撤销。未请求 `domainExtensions.rdx` 的 child **在 allowlist 层**就不能拿到 `rdx_context` / `rdx_probe` / `shell` 中的 RDX 路径。禁止并发 RDX 双 owner。
 - `callIndex` 保持稳定顺序，UI / Trace / 结果回灌都按它排序。
 - dispatch 前原子扣减预算；扣减失败整组不开。
@@ -480,21 +459,21 @@ offline subagent 的 Capsule 不得携带 RDX lease；省略 `domainExtensions.r
 
 **Small Loop**（不重规划整个 Mission）：缺一条 Evidence、替代 Hypothesis、混淆变量、Scope 扩张、视觉回归未验、采样不足。流程：Execution → Candidate Claims → Skeptic → Challenge Set → 定向 Follow-up → 更新 Iteration Memory → Retry。Iteration Memory 只留 Accepted Facts、Active Claims、Rejected + Why、Blockers、Resolved Challenges、Delta、Evidence refs。
 
-**Big Loop** 触发：Bug Family 判错、结构假设崩、关键能力缺失、Verifier 反复指向同一结构缺口、用户目标变化、Context 将尽且 Plan 已偏离。流程：Execution State → Mission Checkpoint → Handoff 回 Planning Orchestrator → 再检索 → 新 plan 版本 → Handoff 回 Execution。消耗 durable handoff 深度预算。
+**Big Loop** 触发：Bug Family 判错、结构假设崩、关键能力缺失、Verifier 反复指向同一结构缺口、用户目标变化、Context 将尽且 Plan 已偏离。流程：General 把缺口写进终答 → 用户切回对应 Mission → 再检索 → 新 plan 版本 → 再批准 → 再点 Execute。runtime 不按身份 / depth / 正文开下一轮，也没有 cycle 预算。
 
-三条 Mission 纵切都把 Small Loop / Big Loop 写成各自 Coordinator、`$skeptic-review`、`$renderdoc-execution` 的可执行步骤，并由 `mission-plan-handoff-check` 校验 Big Loop 必须携带 `checkpointId`、链深度 ≤ 3。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。
+三条 Mission 纵切都把 Small Loop / Big Loop 写成各自 Coordinator、`$skeptic-review`、`$renderdoc-execution` 的可执行步骤，并由 `mission-plan-handoff-check` 校验 UI 续跑 payload（`toAgentId` + 非空 prompt）。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。
 
 ---
 
 ## 12. 三个 Mission 的流程与成功条件
 
-Analyzer 是认知基础，**不是**强制前置模式。Debugger / Optimizer 可按需消费 Analyzer Artifact；发现新 Bug / 性能问题通过 durable Handoff 或用户显式切换，不自动改 Mission。
+Analyzer 是认知基础，**不是**强制前置模式。Debugger / Optimizer 可按需消费 Analyzer Artifact；发现新 Bug / 性能问题通过用户显式切换 Mission，不自动改身份。
 
 ### 12.1 Debugger
 
 Planning：Triage & Taxonomy → Capture Report → Knowledge Retrieval → plan。Execution：First Bad Event → 竞争 Hypothesis → Evidence → Experiment → Skeptic。
 
-落地方式（Wave 5 前半）：接到已有 Profile / Skill / Hook / durable Handoff / `investigation_*` / `task_*`，不新建 Runtime。First Bad Event / Hypothesis Matrix / Counterfactual Artifact 的记录形状与步骤在 `$debugger-causal-method`（现有 `evidence` / `claim` / `claim_set` / `experiment` kind，无新 Registry 项）。`$debugger-coordinator` 负责规划与 Small / Big Loop；`$skeptic-review` 只写 `ChallengeRecord`；General 用 `task_create` 把 `requiredFollowUp` 变成补证 Task。
+落地方式（Wave 5 前半）：接到已有 Profile / Skill / Hook / 声明续跑 / `investigation_*` / `task_*`，不新建 Runtime。First Bad Event / Hypothesis Matrix / Counterfactual Artifact 的记录形状与步骤在 `$debugger-causal-method`（现有 `evidence` / `claim` / `claim_set` / `experiment` kind，无新 Registry 项）。`$debugger-coordinator` 负责规划与 Small / Big Loop；`$skeptic-review` 只写 `ChallengeRecord`；General 用 `task_create` 把 `requiredFollowUp` 变成补证 Task。
 
 | 结局 | 条件 |
 | --- | --- |
@@ -703,17 +682,17 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 - 194 个 RDX Agent Tool、RDX MCP、把 catalog 展开给模型。
 - 自动 Memory / Knowledge / Candidate / Promote；LLM 自治写 Knowledge。
 - 交互式旧 Profile 导出选择面。
-- 宣称现有 `AgentHandoffDefinition` 已足够。
+- 恢复 `agent_handoff`、`HandoffStateStore`、强制 return 或 dual-read 旧 `handoff-state.json`。
 - 恢复 Embedding capability / Semantic lane / `settings.llm.embedding`。
 - 把三卡或四卡 Right Rail 写成现行契约。
-- 把未实现的并发组写成已完成模块。Knowledge 五服务 / 垂直 schema / durable handoff / 三条 Mission 方法面（Skill/Hook/Capsule）/ Run v3 / `investigation:read` 已落地，不得再写成「尚未实现」。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06；均不得再写成尚未跑。不得把 T18 ColdData 已证写成尚未跑。不得把 Embedding 写成已落地现行能力。
+- 把未实现的并发组写成已完成模块。Knowledge 五服务 / 垂直 schema / 声明续跑与 execution offer / 三条 Mission 方法面（Skill/Hook/Capsule）/ Run v3 / `investigation:read` 已落地，不得再写成「尚未实现」。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06；均不得再写成尚未跑。不得把 T18 ColdData 已证写成尚未跑。不得把 Embedding 写成已落地现行能力。
 - 用空壳测试、skip/todo 或只加类名绕过已建立的 `check:knowledge-system` / `check:investigation-system` ratchet。
 
 ---
 
 ## 22. 与当前实现的差距（非实现清单）
 
-已落地：四个 builtin profile、Coordinator Skills、effective snapshot、Run schema **v3**（见裁决 I，不得双读）、IPC `investigation:read`、投影完整 `contentHash`、`rdc.investigation.v1` + `InvestigationArtifactService` + 三个 deferred Investigation 工具、15 个垂直方法 Skill、4 个 builtin Hook 模板、Session rail 五卡、durable handoff、三条 Mission 方法面（Skill / Hook / Capsule）、Knowledge 五服务 / 五个 deferred 工具 / Center 三列 UI、T18 ColdData user-space 持久化。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。
+已落地：四个 builtin profile、Coordinator Skills、effective snapshot、Run schema **v3**（见裁决 I，不得双读）、IPC `investigation:read`、投影完整 `contentHash`、`rdc.investigation.v1` + `InvestigationArtifactService` + 三个 deferred Investigation 工具、15 个垂直方法 Skill、4 个 builtin Hook 模板、Session rail 五卡、声明续跑与 execution offer、三条 Mission 方法面（Skill / Hook / Capsule）、Knowledge 五服务 / 五个 deferred 工具 / Center 三列 UI、T18 ColdData user-space 持久化。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。
 
 下游才改代码：
 
@@ -729,13 +708,13 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 
 ## 垂直指令与执行真实性收敛（2026-09-09）
 
-以 DESIGN.md 的同名裁决为准。General 直接处理普通代码调试、解释与性能修复；只把明确 RenderDoc/capture 调查转 Mission。标准闭环为 Mission 规划 → General 执行 → 原 Mission 评估与报告，General 的实际 handoff continuation turn 不得直接宣告 Mission 完成。深度不足或能力缺失保留 checkpoint 与未完成位置，取消/重启语义不变。
+以 DESIGN.md 的同名裁决为准。General 直接处理普通代码调试、解释与性能修复；只把明确 RenderDoc/capture 调查转 Mission。标准闭环为 Mission 规划 → 用户点声明按钮切到 General → General 就地终答 → 用户自行切回 Mission 评估与报告。General 任何回合不得宣告调查 `completed`。深度不足或能力缺失保留 checkpoint 与未完成位置，由用户决定是否切回。
 
-General 的 execution-orchestrator 只定义通用工作方法；三个 Mission coordinator 保存目标、计划产物、handoff 与方法路由；共享执行/Small Loop/Big Loop/capsule 只在 renderdoc-execution 维护。报告按需读对应 Mission 章节。先获取可安全读取的上下文，再问不可获取输入或必需决策；不重复已授权步骤。相似案例只在相关历史问题时检索，单次 lookup 不强制 Scout。canonical Skill 共 31 个：22 个 Mission / Knowledge / Coordinator 与 9 个 General，其中新增三本专业 RDX 工具手册；读取方法不重新武装本轮权限。
+General 的 execution-orchestrator 只定义通用工作方法；三个 Mission coordinator 保存目标、计划产物、声明续跑与方法路由；共享执行/Small Loop/Big Loop/capsule 只在 renderdoc-execution 维护。报告按需读对应 Mission 章节。先获取可安全读取的上下文，再问不可获取输入或必需决策；不重复已授权步骤。相似案例只在相关历史问题时检索，单次 lookup 不强制 Scout。canonical Skill 共 31 个：22 个 Mission / Knowledge / Coordinator 与 9 个 General，其中新增三本专业 RDX 工具手册；读取方法不重新武装本轮权限。
 
 ### 专业 RDX 手册与真实预载
 
-Debugger / Analyzer / Optimizer coordinator 在 execute handoff 的 `requiredSkillIds` 中分别绑定领域方法、`renderdoc-execution`、`rdx-cli-shell` 与本方向的 `*-rdx-tools`。`handoffRequiredSkillIds` 只接受同 session、committed、发给当前 General 的 execute 合同；PromptPlan preparation 随后加载并冻结这些 Skill，不能只依赖 handoff prompt 中的 `$skill` 文本。
+Debugger / Analyzer / Optimizer 在「Execute with General」声明的 `requiredSkillIds` 中分别绑定领域方法、`renderdoc-execution`、`rdx-cli-shell` 与本方向的 `*-rdx-tools`。prepareTurn 只在 execution offer 的 target 与冻结计划 hash 匹配时加载这些 Skill，不能只依赖按钮 prompt 中的 `$skill` 文本。
 
 `resources/agent-runtime/rdx-tool-guide-members.json` 明确三本手册的专业成员；它不是运行时 allowlist。`scripts/generate-rdx-tool-guides.mjs` 从 Tools 2.0 code-owned catalog 生成每项用途、参数约束、结果、影响、前置条件、失败限制和无身份 `shell.rdx` 示例，并校验成员、示例 schema 与 catalog fingerprint。共享 CLI 规则只在 `rdx-cli-shell` 维护一份；专业 SKILL 保持短流程入口，详细参考按需读取。
 
@@ -753,12 +732,12 @@ Experiment 可选 executionEvidence 五阶段引用的字段、签名、顺序�
 
 RDC 委派沿用通用 root/child-local 双层预算，不独立计费或恢复额度：同步与后台 Scout/Skeptic 恢复各自局部执行账本，根上限不被局部 Capsule 改写，根消费与 deadline 不因重新委派或回评估重置。已有 live root 不能静默换绑另一旧调查 root；此请求由 runtime 明确拒绝，模型需在授权范围内组织独立执行上下文。同 root 并发绑定由 runtime 保证只合并一次，不由指令手工扣账。
 
-Mission/General handoff 的 prepared/consumed/接收执行取消转交遵守通用合同。取消已发生时，接收者必须在新 Provider 请求或领域工具效果前承接 Stop；只有 producer 与进程退出确认后才能记任务 cancelled。取消不证明实验 rollback，不能替代领域回执。以上是实现合同；最终验证状态仍以 acceptance ledger 中的对应证据为准。
+声明续跑切 Agent 后的新回合是独立 turn，不继承未完成编排令牌。取消已发生时必须在新 Provider 请求或领域工具效果前承接 Stop；只有 producer 与进程退出确认后才能记任务 cancelled。取消不证明实验 rollback，不能替代领域回执。以上是实现合同；最终验证状态仍以 acceptance ledger 中的对应证据为准。
 
 
 ## 产品连续性收敛（2026-09-10）
 
-桌面完整设计书用于领域目标核对；本轮用户补充约束优先。Investigation 仍为垂直 Session Artifact，Context 复用 PromptPlan 与引用，Knowledge 六 lane、无 Embedding、无自动晋升，两轮 execute/return 与重启手动继续不变。已有 Harness 实现复用，不建立版本命名的平行引擎或存储。
+桌面完整设计书用于领域目标核对；本轮用户补充约束优先。Investigation 仍为垂直 Session Artifact，Context 复用 PromptPlan 与引用，Knowledge 六 lane、无 Embedding、无自动晋升。声明续跑由人点切 Agent，General 就地终答，回评估由用户切回 Mission。已有 Harness 实现复用，不建立版本命名的平行引擎或存储。
 
 澄清是目标形成：先读可获取材料，再用少量渐进问题确认区域、期望、参考与验收；允许不知道、非必需问题跳过及自由补充。回答进入实际工具结果、计划和 Task 修订，不能升级为工具观察、已验证原因或 mutation 授权。普通 General 和简单问题沿直接执行路径；重探索与独立审查按方法 Skill 委派。
 
@@ -766,7 +745,7 @@ Mission/General handoff 的 prepared/consumed/接收执行取消转交遵守通�
 
 本轮真实 Debugger 材料为眼睛泪腺白点 capture；没有参考图，事件 6152 仅为线索，IBL/specular/leakage 仅为竞争假设。必须保留正常高光，不能以整体压暗或局部未复现宣称修复。真实项目 Ground Truth 继续按已约定分期；受控 fixture、真实模型请求与原生 RDX 证据分别登记。Debugger 不替代 Analyzer/Optimizer 的旅程验收。实现及实测边界见 acceptance ledger。
 
-普通澄清、材料确认和下一步回复不自动宣告调查完成。领域扩展仅在显式 `turn_complete(completed)` 时校验完整报告；逻辑 Task 的必需执行与交付要求、绑定委派的返回合同仍独立强制。文本里的“完成”不构成运行时完成证据。
+普通澄清、材料确认和下一步回复不自动宣告调查完成。领域扩展仅在显式 `turn_complete(completed)` 时校验完整报告；逻辑 Task 的必需执行与交付要求仍独立强制。文本里的“完成”不构成运行时完成证据。
 
 
 材料交互保留原始文件、来源 hash、用户意图、归一化 ROI、文档位置、音视频时间范围和比较组/角色/条件。Composer 可选择区域并补充描述，transcript 原位打开原图与条件，比较按同组材料展开；这些是用户标注，不自动升级为工具观察。派生视图不得覆盖原图或把人工示意图标成 capture 证据。任务来源与用户后续修订分别进入 Journal 和委派，模型必须说明来源差异。

@@ -5,6 +5,7 @@ import { Button } from '../../ui/Button';
 import { HandoffActionRow } from '../../patterns/HandoffActionRow/HandoffActionRow';
 import { findPendingPlanReview, type PendingPlanReviewRequest } from './planReviewRequestModel';
 import { usePlanReviewSubmit } from './usePlanReviewSubmit';
+import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import './composer-plan-review.css';
 
 export const usePendingPlanReviewRequest = (): PendingPlanReviewRequest | null => {
@@ -27,6 +28,15 @@ export const PlanReviewRequestPanel: React.FC<{
     setError(null);
     try {
       await submit(request, decision);
+      if (decision.kind === 'approve' && request.sessionId) {
+        useComposerSessionContextStore.getState().queueHandoffSuggestion({
+          sessionId: request.sessionId,
+          agentId: decision.handoff.agent,
+          label: decision.handoff.label,
+          prompt: '',
+          send: true,
+        });
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {

@@ -213,13 +213,13 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 | **目标态** | 保持删除。禁止恢复 Embedding capability / Semantic lane / `settings.llm.embedding` / `EmbeddingCatalog` / `EmbeddingExecutionService`。Discovery 对 embedding/embeddings modality 继续 fail-closed 剔除。 |
 | **迁移门禁（U02 落地）** | `check:knowledge-system` 为六 lane + `forbidden.embedding-runtime` 零命中。Settings schema 7 一次性删除 embedding 选择；`>7` fail-closed。不得把「未跑真实 OpenAI embed」写成仍待验收的产品缺口。 |
 
-### D. Profile Handoff Durable State Machine
+### D. Declared Continue and Execution Offer
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | `AgentHandoffDefinition` 仍只是 manifest 路由声明。Durable 状态机已落地：`ProfileHandoffState`（`src/shared/types/profileHandoff.ts`）经 `HandoffStateStore` 写入 `<sessionPath>/handoff-state.json`。事务顺序为内存草稿 `prepare` → 绑定 `turn.pendingHandoff` → `after-hook` → 持久化 `HandoffStateStore.prepare`；任一失败 cancel/rollback，不遗留 active prepared。`send:true` 由源 turn complete / 会话 turn-idle 事件续跑，单次 generation token，有界 idle 观察，禁止 microtask 自递归。T18 ColdData 已证见下文已证组。产品级 Browser QA 全矩阵见 U05 / ledger。 |
-| **目标态** | 每个 handoff 实例是 session-owned durable 记录，状态为 `prepared` → `committed` → `consumed`，或任意未完成点进入 `cancelled`。必填字段：`handoffId` / `lifecycle` / `sourceTurnId` / `sourceRequestId` / `sourceAgentId` / `toAgentId` / `chainRoot` / `depth` / `contract` / `prompt` / `label` / `declaredModel` / timestamps / `cancelReason`。`declaredModel` **字段必存在，值可为 `null`**。`prepared` 仅工具成功；`committed` 仅源 turn complete；`consumed` 仅目标消息 commit。事务顺序必须是内存草稿 `prepare` → 绑定 `turn.pendingHandoff` → `after-hook` → 持久化 `HandoffStateStore.prepare`。`before-handoff` denied 则不 draft、不 bind、不 persist。Hook / 持久化 / 绑定失败必须显式 cancel/rollback，不得遗留 active prepared。`send:true` 必须公平、可取消、由源 turn complete / 会话无活跃 turn 的事件续跑，同一 `handoffId` 只有一次 generation token，有界 idle 观察，禁止 microtask 自递归。每个用户 root 最多两轮完整执行与回评估，初始 route 至多一次且不消耗周期；结构上限为五次交接。进程重启后未 consumed 的实例降级为手动继续，不自动续跑。Stop / Rewrite / branch / 手动切换 profile 取消未完成 handoff。审批不继承。同一 session 同时只允许一个活跃 handoff。非法 model fail-closed。模型优先级始终：**session `modelOverride` > 通过 `isAgentToolExecutableModel` 校验的 handoff `declaredModel` > target route**。空 `handoffs` 禁止；空 `agents` 仅自身。字段细则见详细目标设计。 |
-| **迁移门禁** | 实现必须新增 durable store（经 `StorageIo`），不得宣称「现有 `AgentHandoffDefinition` 已足够」。不得为旧无状态 handoff 增加永久双写。 |
+| **当前态** | `AgentHandoffDefinition` 只是 Copilot 式 UI 声明（label / agent / prompt / send / showContinueOn / requiredSkillIds）。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 触发 `agent.before-handoff` / `after-handoff`，写入 `<sessionPath>/execution-offer.json`，并 persist `session.agentId`。`send: true` 只表示点完后预填并自动发送。不存在 `agent_handoff` 工具，也不存在 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。 |
+| **目标态** | 与当前态相同。计划批准写入 offer（source / target / 冻结 plan.uri+hash / 声明 requiredSkillIds）。prepareTurn 仅当本回合 `agentId === targetAgentId` 且 session 批准计划与 offer 同 hash 时预载 Skill。General 就地终答，不自动回 Mission。用户用 Agent pill 或历史建议行切回 Mission。Pill 切换不写 offer、不预载调查 Skill。空 `handoffs` 合法（General 无按钮）。`handoff` / `agent` / `agent_handoff` token 拒绝，不静默映射到 `subagent`。 |
+| **迁移门禁** | 禁止恢复 `agent_handoff`、`HandoffStateStore`、强制 return 或 dual-read 旧 `handoff-state.json`。 |
 
 ### E. Investigation Vertical Schema
 
@@ -233,8 +233,8 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | `AgentTool.spec.isConcurrencySafe` 缺省 `false`。`ConcurrentToolScheduler` 只并发同轮连续安全组；unsafe 独占。`shell` / write / task mutation / RDX / MCP / ask / handoff / `output_register` 与 `domainExtensions.rdx.requiresLease=true` 的 subagent 串行。offline subagent（未请求 `domainExtensions.rdx`）可进并发组。dispatch 前 `reserveDispatchBudget` 原子扣减；失败整组不开。结果按 `callIndex` 回填；部分失败不连坐已发出调用；abort `allSettled` join。**delegated lease 已落地**：`grantDelegatedLease` / `revokeDelegatedLease`；`domainExtensions.rdx.requiresLease=true` child 在 turn 前取得 parent 上下文副本（`delegatedFrom`），同一 parent 同时只允许一条 live delegated lease，无 parent lease 则 fail-closed；child 完成 / 取消 / 抛错在 `finally` 立即撤销，parent lease 不变。未请求 `domainExtensions.rdx` child 在 allowlist 编译期剔除 `rdx_context` / `rdx_probe`（`shell` 可保留，但不继承 parent lease）。产品级 Browser QA 全矩阵见 U05 / ledger。 |
-| **目标态** | 并发缺省不安全：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。只并发**连续**安全组；unsafe 独占。`shell` / write / task mutation / RDX（含 `rdx_probe`） / MCP / ask / handoff / `output_register` 串行。`callIndex` 保持稳定顺序。dispatch 前原子扣减预算。abort 必须 `allSettled` join。部分失败不连坐同组其余已发出调用的结果记录，但不得继续开新组。offline subagent 不请求 `domainExtensions.rdx`。`domainExtensions.rdx.requiresLease=true` 的 child 必须通过显式、受限、生命周期绑定的 delegated lease 取得 parent RDX context 并串行；child 完成/取消立即撤销。未请求 `domainExtensions.rdx` 的 child **在 allowlist 层**就不能拿到 `rdx_context` / `rdx_probe` / `shell` 中的 RDX 路径（不是运行时再报错）。禁止并发 RDX 双 owner。 |
+| **当前态** | `AgentTool.spec.isConcurrencySafe` 缺省 `false`。`ConcurrentToolScheduler` 只并发同轮连续安全组；unsafe 独占。`shell` / write / task mutation / RDX / MCP / ask / `output_register` 与 `domainExtensions.rdx.requiresLease=true` 的 subagent 串行。offline subagent（未请求 `domainExtensions.rdx`）可进并发组。dispatch 前 `reserveDispatchBudget` 原子扣减；失败整组不开。结果按 `callIndex` 回填；部分失败不连坐已发出调用；abort `allSettled` join。**delegated lease 已落地**：`grantDelegatedLease` / `revokeDelegatedLease`；`domainExtensions.rdx.requiresLease=true` child 在 turn 前取得 parent 上下文副本（`delegatedFrom`），同一 parent 同时只允许一条 live delegated lease，无 parent lease 则 fail-closed；child 完成 / 取消 / 抛错在 `finally` 立即撤销，parent lease 不变。未请求 `domainExtensions.rdx` child 在 allowlist 编译期剔除 `rdx_context` / `rdx_probe`（`shell` 可保留，但不继承 parent lease）。产品级 Browser QA 全矩阵见 U05 / ledger。 |
+| **目标态** | 并发缺省不安全：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。只并发**连续**安全组；unsafe 独占。`shell` / write / task mutation / RDX（含 `rdx_probe`） / MCP / ask / `output_register` 串行。`callIndex` 保持稳定顺序。dispatch 前原子扣减预算。abort 必须 `allSettled` join。部分失败不连坐同组其余已发出调用的结果记录，但不得继续开新组。offline subagent 不请求 `domainExtensions.rdx`。`domainExtensions.rdx.requiresLease=true` 的 child 必须通过显式、受限、生命周期绑定的 delegated lease 取得 parent RDX context 并串行；child 完成/取消立即撤销。未请求 `domainExtensions.rdx` 的 child **在 allowlist 层**就不能拿到 `rdx_context` / `rdx_probe` / `shell` 中的 RDX 路径（不是运行时再报错）。禁止并发 RDX 双 owner。 |
 | **迁移门禁** | 实现前不得把并发执行写成已完成能力。RDX lease / shader replace / replay 不得进入并发组。 |
 
 ### G. Knowledge
@@ -300,7 +300,6 @@ Mission profiles runtime allowlist **仅允许**：
 
 - 信息只读：`read` / `search` / `web`（展开后的只读文件/搜索/网页工具，不含 write/edit）
 - 用户询问：`ask_user`（askUser token）
-- 交接：`agent_handoff`（handoff token）
 - 任务进度：`task_create` / `task_update` / `task_get` / `task_list` / `task_stop`（`task` token 展开时 **必须剔除** `output_register`）
 - 制品：`plan_artifact`（人机门，与 `ask_user` 同构停顿）、`investigation_read` / `investigation_write` / `investigation_list`
 - 知识（只读 + 显式 Candidate）：`knowledge_browse` / `knowledge_search` / `knowledge_read` / `knowledge_compile` / `knowledge_candidate_create`（后者仅显式用户意图；不自动持久写）
@@ -336,7 +335,7 @@ Enforcement 必须同时发生在：(1) profile allowlist 解析（token 展开�
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | 普通对话回复只结束消息，不自动完成 Investigation 或 Task；显式 `turn_complete(completed)` 的 Mission 完成门禁已落地（checkpoint + ready report + 完整章节 `conclusion` / `evidence` / `verification` / `limitations` / `status` / `links` + canonical `outputPhase=final_answer` 引用该 report）。Partial / Inconclusive / Blocked 不得伪装 completed。不能只靠 hook、模型文本或 `output_register`。普通 General 不受此合同约束；执行 Mission 计划的 consumed continuation 必须向原 Mission 交还证据，不能自行完成。T18 负路径 / Blocked 收口已证见下文已证组。U06 仅保留历史运行事实；Optimizer 真实实验结论已撤回，见 ledger 更正；产品级 Browser QA 全矩阵见 U05 / ledger。 |
+| **当前态** | 普通对话回复只结束消息，不自动完成 Investigation 或 Task；显式 `turn_complete(completed)` 的 Mission 完成门禁已落地（checkpoint + ready report + 完整章节 `conclusion` / `evidence` / `verification` / `limitations` / `status` / `links` + canonical `outputPhase=final_answer` 引用该 report）。Partial / Inconclusive / Blocked 不得伪装 completed。不能只靠 hook、模型文本或 `output_register`。普通 General 不受此合同约束，也不得宣告调查 `completed`。回评估由用户切回 Mission 后的新回合完成。T18 负路径 / Blocked 收口已证见下文已证组。U06 仅保留历史运行事实；Optimizer 真实实验结论已撤回，见 ledger 更正；产品级 Browser QA 全矩阵见 U05 / ledger。 |
 | **目标态** | Debugger / Analyzer / Optimizer 正常 `completed` 必须同时具备：可解引用 `MissionCheckpoint`；`kind=report` 且 `status=ready`（sourceRefs + contentHash 三条件）；完整章节 `conclusion` / `evidence` / `verification` / `limitations` / `status` / `links`；canonical `outputPhase=final_answer` 且正文引用该 report artifactId+hash。Partial / Inconclusive / Blocked 不得伪装 completed。不能只靠 hook、模型文本或 `output_register`。General 不受此合同约束。 |
 | **迁移门禁** | 实现必须把完成门禁放进 turn / Mission 收口，不得只加 hook 或提示词。 |
 
@@ -379,22 +378,22 @@ main-owned `RightRailProjectionService` 为显式 `{ projectId, sessionId }` 组
 | `T18-whitehair-open` | WhiteHair open | 硬件 BLOCKED | `sess_17b59bc0131c` `openProjectInput(input_whitehair)` → `LOCAL_REPLAY_UNSUPPORTED`（Adreno 650 `VK_EXT_fragment_density_map` vs RTX 5090）；SHA256 仍为 `03DF08D14E6D5819E5173209D9AC1218C2F740010104EC911A7873E97A258D42`；size `168591424`。正路径 Local replay 本机不可做，不空等。T15 Debugger 正路径闭环改由 U06 在 Android adb 设备上补跑，本行不得标 verified。 |
 
 
-## 通用 Harness 与结构化交接（2026-09-09）
+## 通用 Harness 与声明续跑（2026-09-15）
 
 General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 策略采用 renderdoc-execution 的六块 Markdown 模板，按规模填写；Knowledge 相似性仅是检查线索。
 
-agent_handoff 要求非空摘要和严格 contract：route；execute（Plan URI/hash、requiredSkillIds、returnTo、deliveryRequirements）；return（executionHandoffId、产物 URI/hash）。returnTo 必须等于实际派发者。Mission execute 必须绑定本轮已批准冻结 Plan（`approvedHash` + 声明的 continue handoff target）；未经过计划门的 execute 直接 `HANDOFF_PLAN_NOT_APPROVED`。Plan 经 session artifact plans 类别版本化：同意前覆盖活文件，同意后冻结副本，历史文件不迁移或删除。接收 prepareTurn 校验引用、预加载必需 Skill、去重、冻结来源与权限交集；来源变化重新准备，缺失或权限冲突拒绝。通用 turn 仅调用 TurnCompletionValidator，组合层选择 Investigation 校验策略并冻结任务绑定。
+`handoffs` 只驱动建议行和计划门按钮。人点后主进程 `applyDeclaredHandoff` 校验声明属于当前（或刚批准的）profile，写入/确认 session execution offer，触发 `before-handoff` / `after-handoff`，并 persist `session.agentId`。`send: true` 只表示点完后预填并自动发送。不存在 `agent_handoff` 工具、durable `prepared → committed → consumed` 状态机、强制 return 或自动回 Mission。
 
-每个 root 一次初始路由、最多两轮 execute/return；Small Loop 不消耗新周期，重复 consume 不重复扣数。第二轮允许回评估，第三轮执行拒绝。额度耗尽但未完成时，Mission 通过 turn_complete 的 budget_paused disposition 与 evidenceRefs 绑定最后回交 Checkpoint URI/hash，正文说明 unresolvedFrontier，等待新用户指令；这只是 turn 结束，绝不提升领域报告状态。handoff-state 只读取当前 schema；未知或旧格式原字节保留并拒绝继续，须先离线备份、转换和验证，不在正常运行时迁移或建立兼容双轨。重启降级、取消、事件驱动续跑保持原契约。
+Plan 经 session artifact plans 类别版本化：同意前覆盖活文件，同意后冻结副本，历史文件不迁移或删除。批准写入 offer（source / target / plan.uri+hash / 声明 requiredSkillIds）。prepareTurn 仅当本回合 `agentId === targetAgentId` 且批准计划与 offer 同 hash 时预载 Skill；权限仍走冻结 catalog 与交集。通用 turn 仅调用 TurnCompletionValidator。Big Loop 由 General 终答写缺口、用户切回 Mission、新计划、再批准、再点 Execute 组成；runtime 不按身份 / depth / 正文开下一轮。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse、不迁移。
 
 普通 Capsule 省略领域扩展且没有 RDX Lease prompt 段；仅 RDX 模块接受 domainExtensions.rdx.requiresLease=true 并注入租约上下文。缺省无 RDX，授权子代理串行且 finally 撤销；旧顶层字段拒绝，不保留双轨。
 
 
 ### Task 预算与取消所有权（2026-09-10）
 
-通用 harness 的逻辑 Task、执行实例与 root budget 统一持久化在 TaskStore。直接执行、同步/后台子执行及 handoff 共享根预算；Capsule 只收窄 child-local 账本，重试恢复原执行已消费量和原 root 关联。预算预留持久化先于工具效果，父回复结束及事件续跑不重置账本。并发首次绑定同一 root 只合并一次；已绑定 root A 的同一 live ledger 请求 root B 时显式拒绝，保持原账本与观察者归属，不建立多根合并或静默换绑路径。
+通用 harness 的逻辑 Task、执行实例与 root budget 统一持久化在 TaskStore。直接执行、同步/后台子执行共享根预算；Capsule 只收窄 child-local 账本，重试恢复原执行已消费量和原 root 关联。预算预留持久化先于工具效果，父回复结束不重置账本。并发首次绑定同一 root 只合并一次；已绑定 root A 的同一 live ledger 请求 root B 时显式拒绝，保持原账本与观察者归属，不建立多根合并或静默换绑路径。
 
-prepared → consumed → receiving turn 的取消所有权转交不能丢失已请求的 Stop。转交空隙保留 cancelling；接收者先承接取消意图并 abort/join，再允许后续执行边界。任务取消终态须在实际 producer 与所属进程退出后保存；同 turn 取消请求不 self-join。字段与调用合同以 [runtime-kernel](docs/contracts/runtime-kernel.md) 的 Task 执行章节为准，领域调查策略仍由实际加载的指令决定。
+任务取消终态须在实际 producer 与所属进程退出后保存；同 turn 取消请求不 self-join。声明续跑切 Agent 后的新回合是独立 turn，不继承未完成 handoff 取消令牌。字段与调用合同以 [runtime-kernel](docs/contracts/runtime-kernel.md) 的 Task 执行章节为准，领域调查策略仍由实际加载的指令决定。
 
 ## Session Capture 内嵌回放裁决（2026-09-13）
 

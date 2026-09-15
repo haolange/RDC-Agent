@@ -6,4 +6,4 @@ description: Route RenderDoc capture investigations of incorrect rendering, rend
 # RenderDoc Investigation
 
 仅当任务需要对 capture 进行证据驱动调查时使用本入口。错误渲染或根因定位交给 Debugger；渲染架构解释交给 Analyzer；GPU 成本与保真优化交给 Optimizer。术语解释、普通代码问题和无需调查的简单查询由 General 直接完成。
-使用 agent_handoff 的 route 意图提供用户目标、已有输入引用、事实与未知项、约束和授权摘要。每个用户 root 只允许一次初始路由，路由不消耗执行周期。不要在入口重复执行领域调查方法；由接收方规划并绑定 General 执行所需 Skill。
+在终答里写清应使用哪一只 Mission，由用户通过 UI 切换；不要调用已删除的交接工具，也不要假装已经切到了 Mission。不要在入口重复执行领域调查方法；由接收方规划，用户批准后再点 Execute with General。

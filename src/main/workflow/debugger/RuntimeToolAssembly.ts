@@ -1,7 +1,3 @@
-import { enforceMissionTurnCompletion } from '../../investigation/missionCompletionContract';
-import { validateInvestigationHandoff } from '../../investigation/investigationHandoffValidation';
-import { HANDOFF_CONTRACT_JSON_SCHEMA } from '@shared/types/handoffContract';
-import { validateHandoffArtifacts } from '../../sessions/handoffArtifacts';
 /**
  * RuntimeToolAssembly — resolveRuntimeTools / workbench / MCP catalog tools.
  */
@@ -14,15 +10,9 @@ import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
 import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
 import type { ToolDefinition } from '../../agent-runtime/core/types';
 import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/tools';
-import { HANDOFF_ERROR } from '@shared/types/profileHandoff';
-import { assertMissionExecutePlanGate, handoffController } from '../../agent-runtime/agent/HandoffController';
-import { isHandoffDeclaredModelValid } from '../../sessions/profileHandoffModel';
-import { settingsService } from '../../settings/SettingsService';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
-import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope, type TaskCompletionResult, type TaskExecutionRecord } from '../../agent-runtime/tasks';
+import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../../agent-runtime/tasks';
 import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
-import { storageAdapter } from '../../sessions/StorageAdapter';
-import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { createKnowledgeTools } from '../../knowledge/KnowledgeTools';
 import { createInvestigationTools } from '../../investigation/InvestigationTools';
@@ -38,8 +28,7 @@ import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
 import { createTaskRuntimeTools as assembleTaskRuntimeTools } from './TaskRuntimeTools';
-import { registerPreparedHandoffExecutionOwner } from './DirectTaskTurnLifecycle';
-import { bindTaskRootBudget } from './TaskRootBudget';
+import { enforceMissionTurnCompletion } from '../../investigation/missionCompletionContract';
 
 export interface RuntimeToolAssemblyDeps {
   mcp: McpConnectionCoordinator;
@@ -48,22 +37,6 @@ export interface RuntimeToolAssemblyDeps {
   createSubagentTools: (parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null) => AgentTool[];
   createBackgroundTools?: (parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null) => AgentTool[];
   getMcpServerStatusSummary: (projectRootPath?: string | null, query?: string) => MCPServerStatusSummary[];
-}
-
-function readHandoffTaskResult(value: unknown): TaskCompletionResult {
-  if (!value || typeof value !== 'object') throw new Error('HANDOFF_TASK_RESULT_REQUIRED: Task-owned return requires a structured taskResult.');
-  const record = value as Record<string, unknown>;
-  if (!['completed', 'partial', 'blocked', 'cancelled'].includes(String(record.disposition))
-    || typeof record.summary !== 'string' || !record.summary.trim()
-    || !record.outputs || typeof record.outputs !== 'object' || Array.isArray(record.outputs)) {
-    throw new Error('HANDOFF_TASK_RESULT_INVALID: disposition, summary, and outputs are required.');
-  }
-  const outputs: Record<string, string> = {};
-  for (const [key, output] of Object.entries(record.outputs as Record<string, unknown>)) {
-    if (typeof output !== 'string') throw new Error(`HANDOFF_TASK_RESULT_INVALID: output ${key} must be a string reference.`);
-    outputs[key] = output;
-  }
-  return { disposition: record.disposition as TaskCompletionResult['disposition'], summary: record.summary, outputs };
 }
 
 export class RuntimeToolAssembly {
@@ -255,256 +228,6 @@ export class RuntimeToolAssembly {
     };
   }
 
-  createAgentHandoffTool(
-    agentId: AgentRole,
-    sessionId?: string | null,
-    turnHandle?: TurnHandle | null,
-  ): AgentTool<
-    { agent?: string; label?: string; prompt?: string; contract?: unknown; taskId?: string; taskResult?: TaskCompletionResult },
-    { fromAgentId: AgentRole; toAgentId: string; label: string; prompt: string; valid: boolean; executionId?: string; generation?: number }
-  > {
-    const getActiveTurn = this.deps.getActiveTurn;
-    const capturedTurn = turnHandle ?? getActiveTurn(sessionId);
-    return {
-      name: 'agent_handoff',
-      label: 'Agent Handoff',
-      description: 'Request a handoff to another agent profile. The runtime validates the target against the current profile handoffs and prepares the receiving prompt. The actual profile switch is applied by the orchestrator after this turn.',
-      parameters: {
-        type: 'object',
-        required: ['agent', 'prompt', 'contract'],
-        properties: {
-          contract: HANDOFF_CONTRACT_JSON_SCHEMA,
-          agent: { type: 'string', description: 'Declared target agent profile id.' },
-          label: { type: 'string', description: 'Short handoff label. Defaults to the declared handoff label.' },
-          prompt: { type: 'string', description: 'Implementation or specialist prompt for the receiving agent. Required summary of the objective, evidence and current gaps.' },
-          taskId: { type: 'string', description: 'Optional logical Task owned by an execute handoff.' },
-          taskResult: { type: 'object', description: 'Structured result required when returning a Task-owned handoff.' },
-        },
-      },
-      permissionHint: 'readonly',
-      spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'comm', requiresApproval: false },
-      async execute(_toolCallId, args) {
-        const toProfile = typeof args.agent === 'string' ? args.agent.trim() : '';
-        const turn = capturedTurn ?? getActiveTurn(sessionId);
-        const resolvedSessionId = sessionId ?? turn?.eventSink?.sessionId ?? null;
-        const sourceRequestId = turn?.eventSink?.requestId?.trim() || '';
-        const sourceTurnId = turn?.turnId ?? '';
-        const store = storageAdapter.handoffs;
-        const nextChain = resolvedSessionId
-          ? store.computeNextChain(resolvedSessionId, agentId, sourceTurnId || undefined)
-          : { chainRoot: `handoff-root-${agentId}`, depth: 1 };
-        const resolved = handoffController.resolve(
-          agentId,
-          toProfile,
-          typeof args.prompt === 'string' ? args.prompt : undefined,
-          typeof args.label === 'string' ? args.label : undefined,
-          turn?.runtimePlan
-            ? {
-                sourceHandoffs: turn.runtimePlan.profileHandoffs,
-                enabledProfileIds: turn.runtimePlan.enabledProfileIds,
-                sessionId: resolvedSessionId ?? undefined,
-                hasActiveHandoff: resolvedSessionId ? Boolean(store.getActive(resolvedSessionId)) : false,
-                nextDepth: nextChain.depth,
-                chainRoot: nextChain.chainRoot,
-                isDeclaredModelValid: (canonical) => isHandoffDeclaredModelValid(canonical, settingsService.getAll()),
-              }
-            : undefined,
-        );
-        if (!resolved.valid || !resolved.request) {
-          return {
-            content: [{
-              type: 'text',
-              text: `${resolved.code ?? 'HANDOFF_REJECTED'}: ${resolved.reason ?? 'unknown reason'}`,
-            }],
-            isError: true,
-            details: {
-              fromAgentId: agentId,
-              toAgentId: toProfile,
-              label: '',
-              prompt: '',
-              valid: false,
-              code: resolved.code,
-            },
-          };
-        }
-        const { toProfile: target, label, prompt, send, declaredModel, chainRoot, depth } = resolved.request;
-        if (!resolvedSessionId || !sourceTurnId || !sourceRequestId) {
-          return {
-            content: [{ type: 'text', text: `${HANDOFF_ERROR.STATE_CONFLICT}: handoff requires a session-owned turn.` }],
-            isError: true,
-            details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false },
-          };
-        }
-        let contract;
-        try {
-          contract = validateHandoffArtifacts(resolvedSessionId, args.contract);
-          const planGate = assertMissionExecutePlanGate({
-            sourceAgentId: agentId,
-            target,
-            intent: contract.intent,
-            planHash: contract.intent === 'execute' ? contract.plan.hash : undefined,
-            planUri: contract.intent === 'execute' ? contract.plan.uri : undefined,
-            approved: turn?.approvedPlan ?? null,
-          });
-          if (!planGate.valid) {
-            return {
-              content: [{
-                type: 'text',
-                text: `${planGate.code ?? HANDOFF_ERROR.PLAN_NOT_APPROVED}: ${planGate.reason ?? 'Mission execute requires an approved frozen plan.'}`,
-              }],
-              isError: true,
-              details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false, code: planGate.code },
-            };
-          }
-          validateInvestigationHandoff({ sessionId: resolvedSessionId, sourceAgentId: agentId, targetAgentId: target, contract, taskBinding: turn?.runtimePlan?.taskBinding });
-        } catch (error) {
-          return { content: [{ type: 'text', text: String(error) }], isError: true, details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false } };
-        }
-        const projectRoot = turn?.runtimePlan?.projectRootPath ?? undefined;
-        const handoffAllowed = await dispatchRuntimeHooks('agent.before-handoff', {
-          agentId,
-          sessionId: resolvedSessionId,
-          projectRoot,
-          payload: {
-            fromAgentId: agentId,
-            toAgentId: target,
-            label,
-            prompt,
-            depth,
-            contract,
-          },
-        });
-        if (!handoffAllowed) {
-          return {
-            content: [{ type: 'text', text: 'HOOK_DENIED: agent.before-handoff' }],
-            isError: true,
-            details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false },
-          };
-        }
-        const taskId = typeof args.taskId === 'string' ? args.taskId.trim() : '';
-        const priorTaskBinding = contract.intent === 'return'
-          ? (typeof store.readDocument === 'function' ? (store.readDocument(resolvedSessionId)?.history ?? []) : []).find((entry) => entry.handoffId === contract.executionHandoffId)?.taskExecution
-          : undefined;
-        if (contract.intent === 'return' && taskId) {
-          return { content: [{ type: 'text', text: 'HANDOFF_TASK_INVALID: return uses the frozen execution binding; taskId must be omitted.' }], isError: true, details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false } };
-        }
-        let taskExecution: TaskExecutionRecord | undefined;
-        const taskRegistry = new TaskRegistry(createSessionTaskStore(resolvedSessionId));
-        if (contract.intent === 'execute' && taskId) {
-          const previousExecution = (await taskRegistry.listExecutions(taskId)).at(-1);
-          const rootBudgetId = turn?.policyBudget
-            ? await bindTaskRootBudget(taskRegistry, resolvedSessionId, turn.policyBudget, previousExecution?.rootBudgetId)
-            : undefined;
-          taskExecution = await taskRegistry.startExecution(taskId, {
-            mode: 'handoff',
-            rootBudgetId,
-            frozenPlanRef: `handoff:${sourceTurnId}`,
-            budget: turn?.policyBudget ? {
-              maxToolCalls: turn.policyBudget.maxToolCalls, toolCalls: turn.policyBudget.toolCalls,
-              maxSubagents: turn.policyBudget.maxSubagents, subagents: turn.policyBudget.subagents,
-              maxChildDepth: turn.policyBudget.maxChildDepth, childDepth: turn.subagentBudget.depth,
-              deadlineAt: turn.policyBudget.wallStartedAt + turn.policyBudget.maxWallTimeMs,
-            } : undefined,
-          });
-        }
-        const taskReturnResult = priorTaskBinding ? readHandoffTaskResult(args.taskResult) : undefined;
-        const prepareInput = {
-          contract,
-          sourceTurnId,
-          sourceRequestId,
-          sourceAgentId: agentId,
-          toAgentId: target,
-          prompt,
-          label,
-          declaredModel,
-          send,
-          chainRoot,
-          depth,
-          taskExecution: taskExecution ? {
-            taskId: taskExecution.taskId,
-            executionId: taskExecution.id,
-            generation: taskExecution.generation,
-            taskRevision: taskExecution.taskRevision,
-          } : priorTaskBinding,
-          taskResult: taskReturnResult,
-        };
-        let draftHandoffId: string | null = null;
-        try {
-          const draft = store.createPreparedDraft(resolvedSessionId, prepareInput);
-          draftHandoffId = draft.handoffId;
-          if (turn) {
-            turn.pendingHandoff = {
-              turnId: sourceTurnId,
-              fromAgentId: agentId,
-              toProfile: target as AgentRole,
-              prompt,
-              label,
-              sessionId: resolvedSessionId,
-            };
-          }
-          const afterAllowed = await dispatchRuntimeHooks('agent.after-handoff', {
-            agentId,
-            sessionId: resolvedSessionId,
-            projectRoot,
-            payload: { toAgentId: target, handoffId: draft.handoffId, label },
-          });
-          if (!afterAllowed) {
-            throw new Error('HOOK_DENIED: agent.after-handoff');
-          }
-          const prepared = store.prepare(resolvedSessionId, {
-            ...prepareInput,
-            handoffId: draft.handoffId,
-          });
-          if (taskExecution) {
-            registerPreparedHandoffExecutionOwner(resolvedSessionId, prepared.handoffId, taskExecution.id);
-          }
-          return {
-            content: [{
-              type: 'text',
-              text: `Handoff prepared from ${agentId} to ${target}: ${label}\n${prompt}`,
-            }],
-            details: {
-              fromAgentId: agentId,
-              toAgentId: target,
-              label,
-              prompt,
-              valid: true,
-              handoffId: prepared.handoffId,
-              send: prepared.send,
-              executionId: taskExecution?.id ?? priorTaskBinding?.executionId,
-              generation: taskExecution?.generation ?? priorTaskBinding?.generation,
-            },
-          };
-        } catch (error) {
-          if (turn) {
-            turn.pendingHandoff = null;
-          }
-          if (draftHandoffId) {
-            store.abandonDraft(resolvedSessionId, draftHandoffId);
-            const leaked = store.getActive(resolvedSessionId);
-            if (leaked?.handoffId === draftHandoffId) {
-              store.cancel(resolvedSessionId, 'superseded');
-            }
-          }
-          let settlementError: unknown;
-          if (taskExecution) {
-            try { await taskRegistry.settleExecution(taskExecution.id, {
-              expectedGeneration: taskExecution.generation,
-              status: 'failed',
-              result: { disposition: 'blocked', summary: `Handoff preparation failed: ${error instanceof Error ? error.message : String(error)}`, outputs: {} },
-            }); } catch (failure) { settlementError = failure; }
-          }
-          const message = `${error instanceof Error ? error.message : String(error)}${settlementError ? `; TASK_SETTLEMENT_FAILED: ${settlementError instanceof Error ? settlementError.message : String(settlementError)}` : ''}`;
-          return {
-            content: [{ type: 'text', text: message }],
-            isError: true,
-            details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false },
-          };
-        }
-      },
-    };
-  }
-
   createPlanArtifactTool(sessionId?: string | null): AgentTool<
     { title?: string; summary?: string[]; content?: string },
     { sessionId: string | null }
@@ -512,7 +235,7 @@ export class RuntimeToolAssembly {
     return {
       name: 'plan_artifact',
       label: 'Submit Plan for Review',
-      description: 'Submit the current session plan for in-loop human review. Title, a 1-4 item summary, and Markdown content are required. The runtime writes session://plans/plan.md and pauses until the user approves a declared continue handoff or rejects with feedback.',
+      description: 'Submit the current session plan for in-loop human review. Title, a 1-4 item summary, and Markdown content are required. The runtime writes session://plans/plan.md and pauses until the user approves or rejects. Approval freezes the plan; the user clicks a declared continue action to proceed.',
       parameters: {
         type: 'object',
         required: ['title', 'summary', 'content'],
@@ -788,7 +511,6 @@ export class RuntimeToolAssembly {
   createWorkbenchTools(agentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
     return [
       this.createAskUserTool(agentId),
-      this.createAgentHandoffTool(agentId, sessionId, turnHandle),
       this.createMemorySearchTool(sessionId),
       this.createMemoryReadTool(sessionId),
       this.createMemoryWriteTool(),

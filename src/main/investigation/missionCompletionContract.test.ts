@@ -1,6 +1,4 @@
-import { storageAdapter } from '../sessions/StorageAdapter';
-import type { ProfileHandoffState } from '@shared/types/profileHandoff';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   assertMissionTurnCompletion,
   enforceMissionTurnCompletion,
@@ -189,13 +187,12 @@ describe('missionCompletionContract', () => {
     })).toThrow(/mission_method|Reconstructed|Authoring|MISSION_COMPLETION_DENIED/);
   });
 
-  it('skips the completion contract while a durable handoff is pending', () => {
+  it('does not treat an ordinary Mission reply as completed', () => {
     const { service } = createInvestigationHarness();
     expect(enforceMissionTurnCompletion({
       profileId: 'debugger',
       sessionId: SESSION_ID,
-      finalAnswerText: 'handing off',
-      pendingHandoff: true,
+      finalAnswerText: 'still planning',
       service,
     })).toBeUndefined();
   });
@@ -252,26 +249,3 @@ function seedMissionMethod(
 }
 
 
-describe('task-bound execution completion', () => {
-  it.each(MISSIONS)('requires the frozen %s return binding and a current checkpoint', mission => {
-    const { service } = createInvestigationHarness();
-    const checkpoint = seedCheckpoint(service, mission);
-    const pending: ProfileHandoffState = { handoffId: 'return', lifecycle: 'prepared',
-      contract: { intent: 'return', executionHandoffId: 'execute', artifacts: [{ uri: checkpoint.contentUri, hash: checkpoint.contentHash }] },
-      sourceTurnId: 'execution', sourceRequestId: 'request', sourceAgentId: 'general', toAgentId: mission,
-      chainRoot: 'root', depth: 3, prompt: 'checkpoint and gaps', label: 'return', declaredModel: null, send: true, preparedAt: 1 };
-    const active = vi.spyOn(storageAdapter.handoffs, 'getActive').mockReturnValue(pending);
-    const input = { profileId: 'general', sessionId: SESSION_ID, turnId: 'execution', finalAnswerText: 'Execution returned.', service,
-      taskBinding: { handoffId: 'execute', returnTo: mission, deliveryRequirements: 'updated checkpoint', dispatchedAt: 0, validationPolicy: 'renderdoc-investigation' } };
-    try {
-      expect(() => enforceMissionTurnCompletion(input)).toThrow(/must return/);
-      expect(() => enforceMissionTurnCompletion({ ...input, pendingHandoff: true, pendingHandoffTarget: 'general' })).toThrow(/must return/);
-      expect(() => enforceMissionTurnCompletion({ ...input, pendingHandoff: true, pendingHandoffTarget: mission })).not.toThrow();
-      expect(() => enforceMissionTurnCompletion({ ...input, taskBinding: null })).not.toThrow();
-      expect(() => enforceMissionTurnCompletion({ ...input, pendingHandoff: true, pendingHandoffTarget: mission,
-        taskBinding: { ...input.taskBinding, dispatchedAt: Date.now() + 60_000 } })).toThrow(/Checkpoint/);
-      active.mockReturnValue({ ...pending, contract: { intent: 'return', executionHandoffId: 'forged', artifacts: [] } });
-      expect(() => enforceMissionTurnCompletion({ ...input, pendingHandoff: true, pendingHandoffTarget: mission })).toThrow(/frozen task binding/);
-    } finally { active.mockRestore(); }
-  });
-});

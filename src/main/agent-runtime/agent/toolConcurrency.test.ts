@@ -26,7 +26,6 @@ describe('toolConcurrency', () => {
       'rdx_context',
       'rdx_probe',
       'ask_user',
-      'agent_handoff',
       'output_register',
       'mcp__fs__read',
     ]) {

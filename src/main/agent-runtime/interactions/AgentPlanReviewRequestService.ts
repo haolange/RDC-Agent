@@ -6,6 +6,8 @@ import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEve
 import { planArtifactWriter, type PlanArtifactWriter } from '../../sessions/sessionPlanArtifact';
 import { planReviewStateStore, type PlanReviewStateStore } from '../../sessions/PlanReviewStateStore';
 import type { TurnHandle } from '../../workflow/debugger/TurnCoordinator';
+import { writeExecutionOfferFromApproval } from '../../conversation/applyDeclaredHandoff';
+import { storageAdapter } from '../../sessions/StorageAdapter';
 
 interface PendingPlanReviewRequest {
   delegatedOwner?: DelegatedInteractionOwner;
@@ -53,8 +55,9 @@ const keyFor = (turnId: string, toolCallId: string): string => `${turnId}::${too
 function formatApprovedResult(handoff: PlanReviewHandoffOption, frozenUri: string, hash: string): string {
   return [
     'approved',
-    `call agent_handoff → ${handoff.agent}`,
+    '已冻结，本回合结束，等待用户点声明按钮。',
     `label: ${handoff.label}`,
+    `target: ${handoff.agent}`,
     `plan.uri: ${frozenUri}`,
     `plan.hash: ${hash}`,
   ].join('\n');
@@ -190,6 +193,14 @@ export class AgentPlanReviewRequestService {
         planId: pending.planReview.planId,
       };
     }
+    const session = storageAdapter.readSession(sessionId);
+    writeExecutionOfferFromApproval({
+      sessionId,
+      sourceAgentId: pending.agentId,
+      projectRoot: session ? storageAdapter.getProjectById(session.projectId)?.rootPath ?? null : null,
+      handoff: input.decision.handoff,
+      plan: { uri: frozen.uri, hash: frozen.hash },
+    });
     const decision = { kind: 'approve' as const, handoff: input.decision.handoff };
     this.deletePending(pending);
     this.emit(pending, 'approval.answered', {

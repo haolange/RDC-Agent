@@ -181,6 +181,8 @@ export const zhSettings = {
   'settings.agentHandoffSendHelp': '立即运行目标智能体，而不是只把提示词填入输入框。',
   'settings.agentHandoffShowContinueOn': '显示为继续操作',
   'settings.agentHandoffShowContinueOnHelp': '回合结束后作为建议按钮显示（默认开）。',
+  'settings.agentHandoffRequiredSkills': '预载 Skill（可选）',
+  'settings.agentHandoffRequiredSkillsPlaceholder': '每行一个 skill id，仅在用户点此继续且计划已批准时预载',
   'settings.agentHandoffErrorLabelRequired': '名称不能为空。',
   'settings.agentHandoffErrorTargetRequired': '请选择目标智能体。',
   'settings.agentHandoffErrorTargetUnknown': '智能体「{id}」不存在。',

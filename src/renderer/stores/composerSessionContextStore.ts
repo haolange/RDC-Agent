@@ -23,6 +23,7 @@ export interface LastSentPrompt {
 export interface HandoffSuggestionRequest {
   sessionId: string;
   agentId: string;
+  label: string;
   prompt: string;
   send: boolean;
 }
@@ -74,8 +75,6 @@ export const useComposerSessionContextStore = create<ComposerSessionContextState
   setLastSent: (lastSent) => set({ lastSent }),
   setIsPromptSending: (isPromptSending) => set({ isPromptSending }),
   queueHandoffSuggestion: (handoffSuggestionRequest) => {
-    const state = get();
-    if (state.handoffSuggestionRequest || state.activeTurn || state.isPromptSending) return;
     set({ handoffSuggestionRequest });
   },
   clearHandoffSuggestion: () => set({ handoffSuggestionRequest: null }),

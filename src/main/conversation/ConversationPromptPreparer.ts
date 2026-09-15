@@ -1,5 +1,4 @@
-import { handoffPromptSegments } from '../sessions/handoffPrompt';
-import { handoffRequiredSkillIds } from '../sessions/handoffSkills';
+import { executionOfferRequiredSkillIds } from '../sessions/handoffSkills';
 import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
 import { promptPlanBuilder, resolvePromptClock } from '../agent-runtime/prompt';
 import { settingsService } from '../settings/SettingsService';
@@ -62,7 +61,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
   const preloadSkillIds = mergeTurnPreloadSkillIds({
     profileSkills: definition.skills,
     messageText: input.messageText,
-    pendingSkillIds: [...(input.preloadSkillIds ?? []), ...handoffRequiredSkillIds(input.context.session?.sessionId, input.agentId)],
+    pendingSkillIds: [...(input.preloadSkillIds ?? []), ...executionOfferRequiredSkillIds(input.context.session?.sessionId, input.agentId)],
   });
   const preloadedSkills = [];
   for (const skillId of preloadSkillIds) {
@@ -78,7 +77,6 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     profile: definition,
     scopedInstructions,
     preloadedSkills,
-    extraSegments: handoffPromptSegments(input.context.session?.sessionId, input.agentId),
     skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined, input.agentId),
     tools: allowedToolNames,
     workDir: projectRootPath ?? '',

@@ -6,7 +6,7 @@
 
 RDC-Agent 是 Electron / React / TypeScript 的通用 Agent workbench，支持 RenderDoc capture。原机器仓库为 `D:\Projects\Native\rdx\RDC-Agent`，远端为 https://github.com/haolange/RDC-Agent.git，分支 main；家中路径请发现实际 checkout，不硬编码原机器路径。依赖版本以 package.json、pnpm-lock.yaml 为准：Node >=22.13.0、pnpm 11.7.0。无线上部署任务。
 
-产品链路保持 Mission 规划→用户审阅→既有 handoff→General 执行→原 Mission 回评估。按用户 2026-09-14 最新决定，General 执行与 Mission 回评估及依赖该链路的真实模型建议行验收移交后续专门大项，不属于本次续接范围，也不作为本次阻塞。本次只完成原生导出对话框及本地/Android Capture 验收。保持同意前覆盖活计划、同意后冻结、拒绝回同一 tool result、项目保存由用户显式触发。禁止另造 Plan Mode、第二条执行通道或兼容 shim。
+产品链路保持 Mission 规划→用户审阅→人点声明按钮切到 General→General 就地终答→用户自行切回 Mission 评估。按用户 2026-09-15 决定，不存在 `agent_handoff` 工具或 durable 状态机。General 执行与 Mission 回评估及依赖该链路的真实模型建议行验收移交后续专门大项时，不得把旧交接合同写成现行权威。保持同意前覆盖活计划、同意后冻结、拒绝回同一 tool result、项目保存由用户显式触发。禁止另造 Plan Mode、第二条执行通道或兼容 shim。
 
 ## 2. 当前项目进度
 
@@ -24,17 +24,17 @@ RDC-Agent 是 Electron / React / TypeScript 的通用 Agent workbench，支持 R
 - `src/main/agent-runtime/interactions/AgentPlanReviewRequestService.ts`：生产审阅门；先持久化后发布批准。
 - `src/main/sessions/PlanReviewStateStore.ts`、`sessionPlanReference.ts`、`planFilePersistence.ts`：严格状态、持久历史身份、原子文件写入。
 - `src/main/ipc/planHandlers.ts`、`validation/planSchemas.ts`：全文读取、保存对话框、固定项目路径及一次性授权。
-- `src/main/agent-runtime/agent/HandoffController.ts`、`src/main/workflow/debugger/ToolExecutorFactory.ts`、`RuntimeToolAssembly.ts`：批准失效与执行 hash/target/URI 校验。
+- `src/main/conversation/applyDeclaredHandoff.ts`、`src/main/sessions/ExecutionOfferStore.ts`、`RuntimeToolAssembly.ts`：声明续跑、execution offer、Skill 预载。
 - `src/renderer/features/composer/useQueuedHandoffSuggestion.ts`：切换成功后的预填/发送事务。
 - `src/renderer/features/transcript/PlanCard.tsx`、`src/renderer/hooks/`：卡片与阅读操作；组件不得直调 IPC。
-- `src/main/testing/HandoffProviderFixture.test.ts`：三个 Mission 驱动生产审阅服务的确定性链路；不是产品 provider。
+- `src/main/sessions/ExecutionOfferStore.test.ts`、`src/main/conversation/applyDeclaredHandoff.test.ts`：确定性 offer / 声明续跑链路；不是产品 provider。
 - `src/shared/renderer-api/`、`src/shared/types/planReview.ts`：跨层 API/Browser capability。
 - `resources/agent-runtime/`：Mission/Skill/Prompt；`scripts/`：标准 launcher 和门禁；`test/work-process-cot/`：既有演示投影。
 - `out`、`node_modules` 为本机构建/依赖，不手改；`.qoder` 是独立知识文档，不是架构权威。
 
 ## 4. 核心逻辑说明
 
-plan_artifact 进入生产审阅服务。父会话展示 delegated 请求，回答和正文读取绑定实际 child owner。批准必须验证正文、冻结制品和持久决定成功后才发布内存授权；新周期撤销旧授权。execute 再查目标、hash、冻结 URI。历史保存从所选 tool call 的持久投影（含嵌套 work block）确定身份，不读最新状态替代旧版本。
+plan_artifact 进入生产审阅服务。父会话展示 delegated 请求，回答和正文读取绑定实际 child owner。批准必须验证正文、冻结制品和持久决定成功后才发布内存授权并写入 execution offer；新周期撤销旧授权。历史保存从所选 tool call 的持久投影（含嵌套 work block）确定身份，不读最新状态替代旧版本。
 
 取消、重启、重复回答和迟到事件不得恢复执行权。导出 token 绑定动作、会话/owner、计划身份及规范化路径；保存前重新校验。读失败不伪造全文；写失败保留原文件。建议行只在 Agent 切换成功且仍是当前会话时操作草稿，send:false 仅预填。
 

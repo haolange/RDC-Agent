@@ -594,16 +594,11 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               const result = event.payload.result as ToolCallResult | undefined;
               const isAskUserTool = normalizeToolName(String(event.payload.toolName)) === 'ask_user';
               const isPlanArtifactTool = normalizeToolName(String(event.payload.toolName)) === 'plan_artifact';
-              const isHandoffTool = normalizeToolName(String(event.payload.toolName)) === 'agent_handoff';
               if (isAskUserTool && result?.ok) {
                 pendingContinuation.userInput = false;
               }
               if (isPlanArtifactTool && result?.ok) {
                 pendingContinuation.planReview = false;
-              }
-              if (isHandoffTool && result?.ok) {
-                pendingContinuation.handoff = true;
-                markLoopCommentary();
               }
               const toolCallPatch: Partial<ConversationToolCall> & { id: string; toolName: string } = {
                 id: String(event.payload.toolCallId),

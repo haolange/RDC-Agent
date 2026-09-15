@@ -104,6 +104,13 @@ describe('DebuggerRuntimePolicy tool tokens', () => {
     expect(REJECTED_TOOL_TOKENS.search_codebase).toMatch(/removed/);
     expect(REJECTED_TOOL_TOKENS.bash).toMatch(/shell/);
   });
+
+  it('rejects handoff and agent tokens without mapping them to a live tool', () => {
+    const diagnostics = diagnoseManifestToolTokens(['handoff', 'agent', 'agent_handoff', 'subagent']);
+    expect(diagnostics.map((entry) => entry.token).sort()).toEqual(['agent', 'agent_handoff', 'handoff']);
+    expect(expandCanonicalToolToken('handoff')).toEqual(['handoff']);
+    expect(expandCanonicalToolToken('agent')).toEqual(['agent']);
+  });
 });
 
 describe('intersectSkillAllowedTools', () => {

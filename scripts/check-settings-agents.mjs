@@ -301,13 +301,19 @@ async function main() {
   assert(!composerSendFlow.includes('setSelectedAgentId'), 'Local send failures must not rewrite the selected Agent id.');
 
   assert(!existsSrc(path.join(repoRoot, 'src/renderer/features/transcript/useAgentHandoffActions.ts')), 'Dead renderer handoff actions must be deleted.');
-  const profileHandoff = readSrcFile(path.join(repoRoot, 'src/shared/types/profileHandoff.ts'), 'utf8');
-  assert(profileHandoff.includes('export interface ProfileHandoffState'), 'ProfileHandoffState must be the durable handoff record.');
+  assert(!fs.existsSync(path.join(repoRoot, 'src/shared/types/profileHandoff.ts')), 'Durable ProfileHandoffState must stay deleted.');
+  assert(!fs.existsSync(path.join(repoRoot, 'src/main/sessions/HandoffStateStore.ts')), 'HandoffStateStore must stay deleted.');
+  assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/agent/HandoffController.ts')), 'HandoffController must stay deleted.');
+  const executionOffer = readSrcFile(path.join(repoRoot, 'src/shared/types/executionOffer.ts'), 'utf8');
+  assert(executionOffer.includes('export interface ExecutionOffer'), 'ExecutionOffer must be the session continue-binding record.');
   const conversationService = readSrcFile(path.join(repoRoot, 'src/main/conversation/ConversationService.ts'), 'utf8');
   assert(!conversationService.includes('pendingHandoffs'), 'ConversationService must not keep an in-memory pendingHandoffs map.');
-  assert(conversationService.includes('scheduleHandoffAutoSend'), 'send:true continuation must go through the durable handoff store.');
+  assert(!conversationService.includes('scheduleHandoffAutoSend'), 'ConversationService must not auto-send declared continues.');
+  const applyDeclared = readSrcFile(path.join(repoRoot, 'src/main/conversation/applyDeclaredHandoff.ts'), 'utf8');
+  assert(applyDeclared.includes('dispatchRuntimeHooks(\'agent.before-handoff\''), 'Declared continue must fire agent.before-handoff.');
   const sessionApi = readSrcFile(path.join(repoRoot, 'src/shared/renderer-api/workbench.ts'), 'utf8');
   assert(sessionApi.includes('setAgentId'), 'Manual Agent switch must persist session.agentId through main.');
+  assert(sessionApi.includes('applyDeclaredHandoff'), 'Declared continue must persist session.agentId through main.');
 
   const useSettingsModal = readSrcFile(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/useSettingsModal.ts'), 'utf8');
   assert(!useSettingsModal.includes('AGENT_ROLES'), 'Settings route validation should derive agents from manifest drafts.');

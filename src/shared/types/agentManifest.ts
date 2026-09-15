@@ -9,6 +9,7 @@ export interface AgentHandoffDefinition {
   send?: boolean;
   showContinueOn?: boolean;
   model?: string;
+  requiredSkillIds?: string[];
 }
 
 export interface AgentManifestDefinition {

@@ -3,11 +3,11 @@ schema_version: 1
 locale: zh-CN
 branch: main
 nodes_managed: true
-exported_at: "2026-09-14T03:22:36Z"
+exported_at: "2026-09-15T06:37:06Z"
 modules:
     "":
-        dir_name: RDC-Agent 根工程（Electron + Vite 多进程编排）
-        title: RDC-Agent 根工程（Electron + Vite 多进程编排）
+        dir_name: RDC-Agent Electron 应用根工程
+        title: RDC-Agent Electron 应用根工程
         scope:
             - README.md
             - DESIGN.md
@@ -42,7 +42,8 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: resources
     resources:
         dir_name: RDC Agent 运行时静态资源（Agent_Skill_Prompt_Hook_图标）
         title: RDC Agent 运行时静态资源（Agent/Skill/Prompt/Hook/图标）
@@ -52,10 +53,13 @@ modules:
         children: []
         depends_on: []
         related_to:
-            - path: scripts
+            - path: docs
+            - path: scripts/fidelity_and_extraction
+            - path: scripts/runtime_helpers
+            - path: tests_and_coverage
     scripts:
-        dir_name: RDC-Agent 脚本与质量门禁集
-        title: RDC-Agent 脚本与质量门禁集
+        dir_name: RDC-Agent 脚本与质量门禁中心
+        title: RDC-Agent 脚本与质量门禁中心
         scope:
             - scripts/
         source_files: []
@@ -65,9 +69,7 @@ modules:
             - scripts/quality_checks
             - scripts/runtime_helpers
         depends_on: []
-        related_to:
-            - path: resources
-            - path: tests_and_coverage
+        related_to: []
     scripts/fidelity_and_extraction:
         dir_name: 保真度契约与 RDX 工具指南生成脚本
         title: 保真度契约与 RDX 工具指南生成脚本
@@ -77,7 +79,8 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: resources
     scripts/launchers_and_smoke_tests:
         dir_name: RDC-Agent 启动器与冒烟测试脚本
         title: RDC-Agent 启动器与冒烟测试脚本
@@ -99,7 +102,8 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: scripts/runtime_helpers
     scripts/runtime_helpers:
         dir_name: 运行时辅助脚本集（构建_校验_测试环境）
         title: 运行时辅助脚本集（构建/校验/测试环境）
@@ -113,14 +117,16 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: resources
+            - path: scripts/quality_checks
     tests_and_coverage:
-        dir_name: Work Process CoT 场景化验收演示
-        title: Work Process CoT 场景化验收演示
+        dir_name: Agent Work Process CoT 可视化验收套件
+        title: Agent Work Process CoT 可视化验收套件
         scope:
             - test/
         source_files: []
         children: []
         depends_on: []
         related_to:
-            - path: scripts
+            - path: resources

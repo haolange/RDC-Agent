@@ -29,17 +29,17 @@ const MISSION_NAMES = {
   optimizer: 'Optimizer',
 };
 
-const FORBIDDEN_TOOL_TOKENS = ['todo', 'bash', 'search_codebase'];
+const FORBIDDEN_TOOL_TOKENS = ['todo', 'bash', 'search_codebase', 'handoff', 'agent', 'agent_handoff'];
 const MISSION_FORBIDDEN_TOOLS = [
   'write', 'edit', 'git', 'file-manage',
   'shell', 'interpreter', 'code_interpreter', 'output', 'output_register',
 ];
 const GENERAL_REQUIRED_TOOLS = [
   'read', 'search', 'web', 'shell', 'write', 'edit', 'git', 'file-manage',
-  'handoff', 'task', 'output', 'subagent', 'tool_search', 'knowledge', 'investigation',
+  'task', 'output', 'subagent', 'tool_search', 'knowledge', 'investigation',
 ];
 const MISSION_REQUIRED_TOOLS = [
-  'read', 'search', 'web', 'askUser', 'handoff', 'task', 'planArtifact',
+  'read', 'search', 'web', 'askUser', 'task', 'planArtifact',
   'tool_search', 'knowledge', 'investigation', 'rdx_probe',
 ];
 
@@ -89,6 +89,10 @@ export function assertParsedHandoffs(handoffs, label) {
     if (handoff.model !== undefined) {
       assert(typeof handoff.model === 'string' && handoff.model.trim(), `${label} handoffs[${index}].model must be a non-empty string.`);
     }
+    if (handoff.requiredSkillIds !== undefined) {
+      assert(Array.isArray(handoff.requiredSkillIds), `${label} handoffs[${index}].requiredSkillIds must be an array.`);
+      assert(handoff.requiredSkillIds.every((id) => typeof id === 'string' && id.trim()), `${label} handoffs[${index}].requiredSkillIds must be non-empty strings.`);
+    }
   }
 }
 
@@ -108,7 +112,7 @@ export function assertParsedProfileContracts(id, definition) {
     assertIncludesAll(tools, GENERAL_REQUIRED_TOOLS, 'General tools');
     assert(skills.includes('execution-orchestrator'), 'General must arm execution-orchestrator');
     assertIncludesAll(agents, MISSION_AGENT_IDS, 'General agents');
-    assertIncludesAll(handoffs.map((entry) => entry.agent), MISSION_AGENT_IDS, 'General handoffs');
+    assert(handoffs.length === 0, 'General handoffs must be empty');
     return;
   }
 
@@ -117,7 +121,11 @@ export function assertParsedProfileContracts(id, definition) {
   assertIncludesNone(tools, MISSION_FORBIDDEN_TOOLS, `${id} tools`);
   assert(skills.includes(MISSION_SKILL[id]), `${id} must arm ${MISSION_SKILL[id]}`);
   assert(agents.includes('general'), `${id} agents must include general`);
-  assert(handoffs.some((entry) => entry.agent === 'general'), `${id} must hand off to general`);
+  const execute = handoffs.find((entry) => entry.agent === 'general' && entry.label === 'Execute with General');
+  assert(execute, `${id} must declare Execute with General`);
+  assert(execute.send === true, `${id} Execute with General must send`);
+  assert(execute.showContinueOn !== false, `${id} Execute with General must show continue`);
+  assert(Array.isArray(execute.requiredSkillIds) && execute.requiredSkillIds.length > 0, `${id} Execute with General must declare requiredSkillIds`);
 }
 
 export function assertManifestSourceContracts(id, source, filePath) {

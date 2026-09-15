@@ -33,8 +33,7 @@ import { EMPTY_CANONICAL_ASSISTANT_OUTPUT, requireCanonicalFinalAnswer } from '.
 import { hydrateFrozenUserContent } from './ConversationAttachmentMaterializer';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
 import type { TurnCompletionValidator } from '../agent-runtime/agent/TurnCompletionValidator';
-import { buildHandoffAgentEvent } from './profileHandoffEvents';
-import type { PendingHandoff, TurnCompletionDeclaration } from '../workflow/debugger/TurnCoordinator';
+import type { TurnCompletionDeclaration } from '../workflow/debugger/TurnCoordinator';
 import type {
   ActiveConversationTurn,
   AgentRoutePreflightOk,
@@ -84,44 +83,6 @@ export interface ConversationTurnRunnerHost {
     branchId: string,
   ): void;
   ephemeralTraceSessionId(turnId: string): string;
-  commitPreparedHandoff(sessionId: string, sourceTurnId: string): Promise<import('@shared/types/profileHandoff').ProfileHandoffState | null>;
-  cancelUnfinishedHandoff(sessionId: string, reason: import('@shared/types/profileHandoff').ProfileHandoffCancelReason): Promise<void>;
-  scheduleHandoffAutoSend(sessionId: string): void;
-}
-
-export async function settleSourceHandoffAfterTerminal(
-  host: ConversationTurnRunnerHost,
-  input: {
-    terminalCommitted: boolean;
-    assistantStatus: ConversationMessage['status'];
-    sessionId: string | null;
-    sourceTurnId: string;
-    pendingHandoff: PendingHandoff | null;
-  },
-): Promise<void> {
-  const { terminalCommitted, assistantStatus, sessionId, sourceTurnId, pendingHandoff } = input;
-  if (!sessionId) return;
-
-  if (!terminalCommitted || assistantStatus === 'error' || assistantStatus === 'stopped') {
-    await host.cancelUnfinishedHandoff(
-      sessionId,
-      assistantStatus === 'stopped' ? 'user_stop' : 'superseded',
-    );
-    return;
-  }
-  if (!pendingHandoff || pendingHandoff.turnId !== sourceTurnId || pendingHandoff.sessionId !== sessionId) {
-    return;
-  }
-
-  const committed = await host.commitPreparedHandoff(sessionId, sourceTurnId);
-  if (!committed) {
-    await host.cancelUnfinishedHandoff(sessionId, 'superseded');
-    return;
-  }
-  host.emitConversationEvent(buildHandoffAgentEvent('handoff.requested', sessionId, committed));
-  if (committed.send) {
-    host.scheduleHandoffAutoSend(sessionId);
-  }
 }
 
 export async function completeProfileTurn(
@@ -148,21 +109,6 @@ export async function completeProfileTurn(
 
   let streamScheduler: ConversationStreamPatchScheduler | null = null;
   let conversationPersistenceError: Error | null = null;
-  let sourceHandoffSettled = false;
-  const settleSourceHandoff = async (
-    terminalCommitted: boolean,
-    assistantStatus: ConversationMessage['status'],
-  ): Promise<void> => {
-    if (sourceHandoffSettled || !sessionId) return;
-    sourceHandoffSettled = true;
-    return settleSourceHandoffAfterTerminal(host, {
-      terminalCommitted,
-      assistantStatus,
-      sessionId,
-      sourceTurnId: assistantMessage.turnId,
-      pendingHandoff: terminalHandoff,
-    });
-  };
   let deferredTerminalEventType: ConversationStreamEvent['type'] | null = null;
   let lastTracePublishedAt = 0;
   const TRACE_PUBLISH_MIN_INTERVAL_MS = 160;
@@ -171,7 +117,6 @@ export async function completeProfileTurn(
     executionIdentity: ExecutionIdentity;
     status: 'complete' | 'stopped' | 'error';
   } | null } = { value: null };
-  let terminalHandoff: PendingHandoff | null = null;
   const terminalCompletion: { value: TurnCompletionDeclaration | null } = { value: null };
 
   const applyAssistantMessagePatch = (
@@ -264,7 +209,6 @@ export async function completeProfileTurn(
     agentUserInputRequestService.cancelTurn(assistantMessage.turnId);
     agentPlanReviewRequestService.cancelTurn(assistantMessage.turnId);
     agentToolApprovalRequestService.cancelTurn(assistantMessage.turnId);
-    if (sessionId) host.cancelUnfinishedHandoff(sessionId, 'user_stop');
     commitTerminalAssistantMessage('message_completed', {
       status: 'stopped',
       content: assistantMessage.content || '当前请求已停止。',
@@ -508,7 +452,6 @@ export async function completeProfileTurn(
               executionIdentity: result.executionIdentity,
               status: result.status,
             };
-            terminalHandoff = result.pendingHandoff ?? null;
             terminalCompletion.value = result.completionDeclaration ?? null;
           },
           onEvent: createAgentEventHandler({
@@ -525,15 +468,12 @@ export async function completeProfileTurn(
 
       requireCanonicalFinalAnswer(canonicalOutput);
       host.validateCompletion({
-        taskBinding: input.preparedTurn.runtime.effectivePlan.taskBinding,
         profileId: conversationAgentId,
         turnId: assistantMessage.turnId,
         sessionId,
         finalAnswerText: canonicalOutput.finalAnswerText,
         disposition: terminalCompletion.value?.disposition,
         evidenceRefs: terminalCompletion.value?.evidenceRefs,
-        pendingHandoff: Boolean(terminalHandoff),
-        pendingHandoffTarget: (terminalHandoff as PendingHandoff | null)?.toProfile,
       });
     } catch (error) {
       llmDiagnostic = createTurnFailedDiagnostic(routePreflight, error);
@@ -706,7 +646,6 @@ export async function completeProfileTurn(
           message: assistantMessage,
         } as ConversationStreamEvent);
         host.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
-        await settleSourceHandoff(true, assistantMessage.status);
       } catch (error) {
         console.error(`[ConversationService] Terminal transaction failed for ${assistantMessage.turnId}:`, error);
         assistantMessage = {
@@ -720,7 +659,6 @@ export async function completeProfileTurn(
           },
           updatedAt: nowMs(),
         };
-        await settleSourceHandoff(false, 'error');
         host.emitConversationEvent({
           type: 'message_errored',
           sessionId,
@@ -728,18 +666,6 @@ export async function completeProfileTurn(
           message: assistantMessage,
         });
         host.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
-      }
-    }
-    if (!sourceHandoffSettled && sessionId) {
-      const turnFailed = Boolean(conversationPersistenceError)
-        || abortController.signal.aborted
-        || assistantMessage.status === 'error'
-        || assistantMessage.status === 'stopped';
-      if (turnFailed) {
-        await settleSourceHandoff(
-          false,
-          assistantMessage.status === 'stopped' ? 'stopped' : 'error',
-        );
       }
     }
     host.clearActiveTurn(assistantMessage.turnId, abortController);

@@ -157,6 +157,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     select: 'session:select',
     setModelOverride: 'session:setModelOverride',
     setAgentId: 'session:setAgentId',
+    applyDeclaredHandoff: 'session:applyDeclaredHandoff',
   },
   run: {
     list: 'run:list',

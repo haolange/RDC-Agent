@@ -1,5 +1,4 @@
 import { DELEGATION_CAPSULE_JSON_SCHEMA } from '../types/delegationCapsule';
-import { HANDOFF_CONTRACT_JSON_SCHEMA } from '../types/handoffContract';
 export type AgentWorkbenchToolPermission =
   | 'readonly'
   | 'mutation'
@@ -377,15 +376,6 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     approvalRequired: false,
   },
   {
-    id: 'agent_handoff',
-    label: 'Agent Handoff',
-    permission: 'readonly',
-    inputSchema: { type: 'object', required: ['agent', 'prompt', 'contract'], properties: { agent: { type: 'string' }, label: { type: 'string' }, prompt: { type: 'string' }, contract: HANDOFF_CONTRACT_JSON_SCHEMA } },
-    resultSummary: 'Creates an implementation or specialist handoff summary.',
-    icon: 'route',
-    approvalRequired: false,
-  },
-  {
     id: 'subagent',
     label: 'Subagent',
     permission: 'readonly',
@@ -727,7 +717,7 @@ export const AGENT_WORKBENCH_COMMAND_CATALOG: AgentWorkbenchCommandDeclaration[]
     command: '/agents',
     label: 'Agents',
     description: 'List profiles and handoff options visible to the current profile.',
-    relatedTools: ['agent_handoff'],
+    relatedTools: ['skills'],
     permission: 'readonly',
   },
   {

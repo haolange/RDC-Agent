@@ -276,6 +276,6 @@ Composer Send / Stop 共用 Button 的 primary / danger 状态，尺寸固定 28
 
 用户入口再次点击直接关闭菜单；外部点击处理须排除入口自身，避免 mousedown 关闭后 click 重开。入口使用 aria-expanded / aria-controls，与弹层状态一致，保留 Escape 焦点返回。项目 Capture 的导入与刷新使用 SectionHeader actions 内两个 28px IconButton（加号 / 刷新），共用默认、hover、focus、disabled 状态和可访问名称，不保留独立文字按钮行。
 
-Composer 宽度分配：左组及图标 menu wrapper 不参与压缩；右组允许收缩，Model wrapper 与 pill 贯通 min-width:0 / width:100%。窄宽规则具有足够 specificity，不受后加载 Pill / Effort 基础样式覆盖。禁止 viewport 规则恢复右组 flex-shrink:0。<=720px 主内容轨道使用留白内全宽，不继续使用桌面 77% 上限；Model 只对实际溢出文本渐隐，保留完整 title。
+Composer 宽度分配：左组及图标 menu wrapper 不参与压缩；右组允许收缩。模型菜单随生效模型名 hug，用 `max-width` 封顶（默认 12rem），`min-width: 0` 可压；胶囊 `width: auto`，不预留固定槽、不贯通 `width: 100%`。窄容器只收紧 `max-width`（560px → 8rem，420px → 6rem），不用 `flex-basis` 预留槽。窄宽规则具有足够 specificity，不受后加载 Pill / Effort 基础样式覆盖。禁止 viewport 规则恢复右组 flex-shrink:0。<=720px 主内容轨道使用留白内全宽，不继续使用桌面 77% 上限；Model 只对实际溢出文本渐隐，完整名留在 `title`。
 
 计划卡使用 transcript-card padding/border/radius 与实色 token-bg-raised，底部以该实色渐隐遮罩裁切长内容；复用公共 Button 焦点环，分节 summary 使用 token-border-focus。阅读面板使用 modal-backdrop 和 token-bg-overlay，不引入未定义的颜色或焦点别名。
