@@ -1,6 +1,5 @@
 import type {
   ChromeThemesConfig,
-  ReduceMotionPreference,
   ThemeChromeConfig,
   ThemeChromeFonts,
   ThemePresetId,
@@ -12,8 +11,6 @@ import {
   getPresetChrome,
   isThemePresetId,
 } from './presets';
-
-const VALID_REDUCE_MOTION: ReduceMotionPreference[] = ['system', 'on', 'off'];
 
 function sanitizeFonts(candidate: unknown, fallback: ThemeChromeFonts): ThemeChromeFonts {
   if (!candidate || typeof candidate !== 'object') {
@@ -84,15 +81,6 @@ export function sanitizeChromeThemes(candidate: unknown, fallback?: ChromeThemes
     light: sanitizeThemeChrome(record.light, 'light', defaults.light),
     dark: sanitizeThemeChrome(record.dark, 'dark', defaults.dark),
   };
-}
-
-export function sanitizeReduceMotion(
-  candidate: unknown,
-  fallback: ReduceMotionPreference = 'system',
-): ReduceMotionPreference {
-  return typeof candidate === 'string' && VALID_REDUCE_MOTION.includes(candidate as ReduceMotionPreference)
-    ? (candidate as ReduceMotionPreference)
-    : fallback;
 }
 
 export function assertHexOrNull(value: unknown): string | null {

@@ -444,7 +444,6 @@
 }
 
 .is-trace-flash { animation: trace-flash 1.6s ease-out; }
-.is-trace-flash-static { outline: 1px solid var(--token-border-focus); }
 
 @keyframes trace-flash {
   0%, 100% { outline: 0 solid transparent; }
@@ -560,9 +559,4 @@
   .project-capture-input-row { grid-template-columns: var(--control-height-sm) minmax(0, 1fr) auto; }
   .right-rail-investigation-row { grid-template-columns: auto minmax(0, 1fr) auto; }
   .right-rail-investigation-row .button { min-width: var(--space-8); min-height: var(--space-8); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .is-trace-flash,
-  .right-rail-drawer-sheet { animation: none; }
 }

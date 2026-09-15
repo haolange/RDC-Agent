@@ -649,12 +649,6 @@
   animation: fadeInUp var(--transition-base) both;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-reduce-motion='system'] .work-process-step.is-appear {
-    animation: none;
-  }
-}
-
 .work-process-steps > .work-process-step:last-child {
   padding-bottom: 0;
 }
@@ -759,12 +753,6 @@
 @keyframes work-process-rail-pulse {
   0% { transform: scale(0.8); opacity: 0.7; }
   100% { transform: scale(1.6); opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html[data-reduce-motion='system'] .work-process-step-rail.status-running .work-process-rail-marker::after {
-    animation: none;
-  }
 }
 
 .work-process-step-content {
@@ -1829,13 +1817,6 @@
 @keyframes work-process-result-pulse {
   0%, 100% { opacity: 0.32; }
   50% { opacity: 0.72; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html[data-reduce-motion='system'] .work-process-thinking-state.status-streaming .work-process-thinking-summary::after,
-  html[data-reduce-motion='system'] .work-process-prose.is-streaming::after {
-    animation: none;
-  }
 }
 
 .work-process-section-list {

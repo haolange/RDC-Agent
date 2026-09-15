@@ -4,7 +4,6 @@ import {
   createIdleMaxTimeline,
   createReopenMaxTimeline,
   createMaxTimeline,
-  prefersReducedMotion,
   resolveMaxVisualFrame,
 } from './maxVisual';
 
@@ -23,13 +22,10 @@ export function buildIngressTimeline(input: {
   const fieldEpoch = phase === 'ingress-reopen' || current.phase === 'idle'
     ? now
     : current.fieldEpoch;
-  if (prefersReducedMotion() && phase !== 'ingress-drag') {
-    return createActiveMaxTimeline(nextRevision(), now, fieldEpoch);
-  }
   if (phase === 'ingress-reopen') {
     return createReopenMaxTimeline(nextRevision(), now);
   }
-  const frame = resolveMaxVisualFrame(current, now, prefersReducedMotion());
+  const frame = resolveMaxVisualFrame(current, now);
   return createMaxTimeline({
     phase,
     revision: nextRevision(),
@@ -48,8 +44,8 @@ export function buildEgressTimeline(input: {
 }): { timeline: MaxVisualTimeline; solidHandoffEligible: boolean } | 'reset' {
   const now = visualNow();
   const { current, nextRevision } = input;
-  const frame = resolveMaxVisualFrame(current, now, prefersReducedMotion());
-  if (frame.energy <= 0 || prefersReducedMotion()) {
+  const frame = resolveMaxVisualFrame(current, now);
+  if (frame.energy <= 0) {
     return 'reset';
   }
   return {

@@ -3,7 +3,6 @@ import type {
   AppSettings,
   AppTheme,
   FontScale,
-  ReduceMotionPreference,
   ThemeChromeConfig,
   ThemeVariant,
 } from '@shared/types/settings';
@@ -21,7 +20,6 @@ interface AppearanceSettingsProps {
   onFontScaleChange: (fontScale: FontScale) => void | Promise<void>;
   onComposerMarkdownChange: (enabled: boolean) => void | Promise<void>;
   onUsePointerCursorsChange: (enabled: boolean) => void | Promise<void>;
-  onReduceMotionChange: (value: ReduceMotionPreference) => void | Promise<void>;
   onChromeThemeChange: (variant: ThemeVariant, chrome: Partial<ThemeChromeConfig>) => void | Promise<void>;
   t: Translate;
 }
@@ -32,7 +30,6 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
   onFontScaleChange,
   onComposerMarkdownChange,
   onUsePointerCursorsChange,
-  onReduceMotionChange,
   onChromeThemeChange,
   t,
 }) => {
@@ -79,23 +76,6 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
               checked={settings.appearance.usePointerCursors}
               onCheckedChange={(enabled) => void onUsePointerCursorsChange(enabled)}
               aria-label={t('settings.usePointerCursors')}
-            />
-          </SettingsField>
-
-          <SettingsField
-            layout="row"
-            label={t('settings.appearanceReduceMotion')}
-            description={t('settings.appearanceReduceMotionHelp')}
-          >
-            <Tabs
-              variant="segmented"
-              label={t('settings.appearanceReduceMotion')}
-              value={settings.appearance.reduceMotion}
-              onChange={(value) => void onReduceMotionChange(value as ReduceMotionPreference)}
-              tabs={(['system', 'on', 'off'] as ReduceMotionPreference[]).map((value) => ({
-                id: value,
-                label: t(`settings.appearanceReduceMotion.${value}`),
-              }))}
             />
           </SettingsField>
 

@@ -55,15 +55,9 @@ assert(!activeSignalStyles.includes('--active-signal-base'), 'narrow sheen base 
 assert(!activeSignalStyles.includes('--active-signal-sheen'), 'narrow sheen highlight token must stay removed');
 assert(activeSignalStyles.includes('@keyframes active-signal-shimmer'), 'active signal shimmer keyframe is missing');
 assert(!activeSignalStyles.includes('active-signal-pulse'), 'legacy active-signal pulse must be removed');
-assert(activeSignalStyles.includes('@media (prefers-reduced-motion: reduce)'), 'active signal must honor reduced-motion preferences');
-assert(
-  activeSignalStyles.includes("html[data-reduce-motion='on'] .active-signal-text.is-active"),
-  'Settings reduceMotion=on must use the static Active Signal highlight fallback',
-);
-assert(
-  !/html\[data-reduce-motion='on'\][\s\S]{0,180}\.active-signal-text\.is-active[\s\S]{0,180}!important/.test(activeSignalStyles),
-  'Active Signal reduce-motion fallback must not use !important',
-);
+assert(!activeSignalStyles.includes('prefers-reduced-motion'), 'core motion must not depend on OS preferences');
+assert(!activeSignalStyles.includes('data-reduce-motion'), 'core motion must not have a settings override');
+assert(activeSignalStyles.includes('var(--active-signal-highlight) 46%'), 'active signal must keep the historical broad highlight');
 assert(activeSignalRenderSource.includes('ActiveSignalText active={active}') || activeSignalRenderSource.includes('ActiveSignalText active '), 'Work Process rows should use shared ActiveSignalText for active labels');
 assert(activeSignalRenderSource.includes('tone="interaction"'), 'ask_user interaction surfaces should use the interaction active signal tone');
 assert(!activeSignalRenderSource.includes("row.status === 'complete' &&"), 'complete rows must not be a trigger for active signal text');
@@ -948,7 +942,7 @@ const composerDir = path.join(CONTRACT_ROOT, 'src/renderer/features/composer');
 const appShellSource = [
   scriptRead('src/renderer/features/composer/composer-chrome.css', 'utf8'),
   ...fs.readdirSync(composerDir)
-    .filter((name) => /^composer-chrome-\d+\.css$/.test(name))
+    .filter((name) => /^composer-chrome-\d+\.css$/.test(name) || name === 'composer-motion.css')
     .sort()
     .map((name) => fs.readFileSync(path.join(composerDir, name), 'utf8')),
 ].join('\n');
@@ -1286,7 +1280,6 @@ assert(
   !/\.work-process-label\.status-running\s*\{[^}]*\bcolor:/.test(cssSource),
   'running Work Process label must not set color that overrides Active Signal shimmer',
 );
-assert(cssSource.includes('@media (prefers-reduced-motion: reduce)'), 'streaming motion should honor reduced motion');
 assert(cssSource.includes('.work-process-tool-approval'), 'tool approval styling should exist');
 assert(cssSource.includes('.work-process-disclosure:not([open]) > :not(summary)'), 'closed disclosure must not render expanded body content');
 assert(
@@ -1304,25 +1297,17 @@ assert(!cssSource.includes('.work-process-empty'), 'placeholder empty-state CSS 
 assert(!appShellSource.includes('composerEnergyFlow'), 'composer running border must not use the legacy uniform sweep keyframe');
 assert(appShellSource.includes('composerEnergyOrbit'), 'composer running border must use the energy orbit keyframe');
 assert(appShellSource.includes('.composer-shell.is-running::before'), 'composer running border must use the orbit stroke pseudo layer');
-assert(
-  /@keyframes composerEnergyOrbit[\s\S]{0,150}background-position:/.test(appShellSource),
-  'composer running orbit must move the light inside a fixed border mask',
-);
+assert(appShellSource.includes('@property --composer-energy-angle'), 'orbit must interpolate a registered angle');
+assert(appShellSource.includes('initial-value: -130deg') && appShellSource.includes('--composer-energy-angle: 230deg'), 'orbit must sweep one complete historical turn');
 const orbitStroke = appShellSource.match(/\.composer-shell\.is-running::before\s*\{[^}]+\}/)?.[0] ?? '';
-assert(!/\b(transform|filter):/.test(orbitStroke), 'composer orbit must not rotate the rectangular mask or filter the stroke');
-assert(orbitStroke.includes('pointer-events: none'), 'composer orbit must not intercept input');
-assert(activeSignalStyles.includes("html[data-reduce-motion='system'] .active-signal-text.is-active"), 'system motion fallback must not override Settings off');
-assert(appShellSource.includes("html[data-reduce-motion='system'] .composer-shell.is-running::before"), 'composer system motion fallback must not override Settings off');
-assert(!appShellSource.includes('@property --composer-energy-angle'), 'composer running orbit must not register --composer-energy-angle');
-assert(!appShellSource.includes('--composer-energy-angle'), 'composer running orbit must not interpolate --composer-energy-angle');
-assert(!appShellSource.includes('.composer-shell.is-running::after'), 'composer running border must not use a halo pseudo layer');
-assert(appShellSource.includes('.composer-shell.is-running:focus-within'), 'composer running border must preserve the focus ring layer');
-assert(appShellSource.includes('@media (prefers-reduced-motion: reduce)'), 'composer running status motion should honor reduced motion');
-assert(
-  /html\[data-reduce-motion='on'\][\s\S]{0,180}\.composer-shell\.is-running::before/.test(appShellSource)
-    || appShellSource.includes("html[data-reduce-motion='on'] .composer-shell.is-running::before"),
-  'Settings reduceMotion=on must freeze the composer orbit at a static bloom',
-);
+assert(orbitStroke.includes('conic-gradient(') && orbitStroke.includes('2.85s linear infinite'), 'orbit must use the historical angular sweep');
+assert(!/\btransform:/.test(orbitStroke), 'orbit must not rotate the rectangular mask');
+assert(orbitStroke.includes('drop-shadow('), 'orbit must retain its layered bloom');
+assert(orbitStroke.includes('pointer-events: none'), 'orbit must not intercept input');
+assert(!appShellSource.includes('--orbit-reach'), 'translated radial spotlight must be removed');
+assert(!appShellSource.includes('data-reduce-motion') && !appShellSource.includes('prefers-reduced-motion'), 'composer motion must remain active without preference overrides');
+assert(!appShellSource.includes('.composer-shell.is-running::after'), 'composer must use a single orbit layer');
+assert(appShellSource.includes('.composer-shell.is-running:focus-within'), 'composer must preserve its focus state');
 assert(appShellSource.includes('--composer-shell-radius: var(--radius-lg)'), 'composer shell radius must use the restrained radius-lg scale');
 
 assert(i18nSource.includes("'chat.workProcessTitle': 'Work process'"), 'English process title copy should be Work process');

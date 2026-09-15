@@ -2,7 +2,6 @@ import type {
   AppLanguage,
   AppTheme,
   FontScale,
-  ReduceMotionPreference,
   ThemeChromeConfig,
   ThemeVariant,
 } from '@shared/types/settings';
@@ -17,7 +16,6 @@ export function createAppSettingsAppearanceActions(get: AppearanceGet): Pick<
   | 'setFontScale'
   | 'setComposerMarkdown'
   | 'setUsePointerCursors'
-  | 'setReduceMotion'
   | 'setChromeTheme'
   | 'setContextBreakdownExpanded'
 > {
@@ -43,9 +41,6 @@ export function createAppSettingsAppearanceActions(get: AppearanceGet): Pick<
     },
     setUsePointerCursors: async (usePointerCursors: boolean) => {
       await save({ appearance: { usePointerCursors } });
-    },
-    setReduceMotion: async (reduceMotion: ReduceMotionPreference) => {
-      await save({ appearance: { reduceMotion } });
     },
     setChromeTheme: async (variant: ThemeVariant, chrome: Partial<ThemeChromeConfig>) => {
       await save(() => {

@@ -397,7 +397,6 @@ export type {
   ThemeChromeConfig,
   ThemeChromeFonts,
   ChromeThemesConfig,
-  ReduceMotionPreference,
   UiPreferences,
   AppTheme,
   AppLanguage,

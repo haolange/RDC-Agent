@@ -42,11 +42,11 @@
 - Rail marker 首行垂直居中：`margin-top: calc((var(--text-sm) * 1.65 - 6px) / 2)`；caption 行（`.first-line-caption`）用 `--text-xs * 1.45`。
 - 失败 summary → diagnostic 列表间距 `--space-2`（`.work-process-summary { margin: 0 0 var(--space-2) }`）。
 
-## Active Signal / reduceMotion
+## Active Signal 与 Composer 核心动效
 
 - 动画名 `active-signal-shimmer`；`.active-signal-text.is-active` 为 clipped-gradient 能量扫光（`1.6s linear`、`background-size: 200%`、`repeat-x`、36% wash 两端对齐，无关键帧停顿）。
-- Settings `on`，或 `system` 且 OS `prefers-reduced-motion: reduce` 时回退静态 `--active-signal-highlight`（移除透明 gradient）；`off` 不受系统减少动效覆盖。全局限制动画时长，静态样式负责保持文字可读。
-- Composer 真实 busy 状态下四边光带连续移动，固定圆角遮罩不旋转；停止后光层消失。用实际回合检查，不用临时 class 模拟验收。
+- App 与系统偏好均不减少或关闭动效；不存在静态替代分支。
+- Composer 真实 busy 状态下锥形渐变以 2.85s 角度匀速旋转，在四角自然伸缩，固定圆角遮罩不旋转；停止后光层消失。用实际回合检查，不用临时 class 模拟验收。
 - 门禁：`ActiveSignalText.test.ts` + `check:work-process` 扫描 `.work-process-label.status-running` 不得含 `color:`。
 
 ## Web 族

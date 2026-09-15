@@ -904,7 +904,6 @@ ReasoningSummary
 ReasoningVisibility
 ReasoningWireProfile
 ReasoningWireProfileSchema
-ReduceMotionPreference
 REJECTED_TOOL_TOKENS
 relativeLuminance
 RENDERER_EVENT_CHANNEL
@@ -995,7 +994,6 @@ RuntimeResourceCatalog
 SAFE_AGENT_PROFILE_ID_PATTERN
 sanitizeChromeThemes
 sanitizeCompactionThresholdPercent
-sanitizeReduceMotion
 sanitizeThemeChrome
 sanitizeToken
 sanitizeUiPreferences

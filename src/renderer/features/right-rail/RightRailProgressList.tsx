@@ -8,13 +8,12 @@ const focusWorkProcessTask = (taskId: string): void => {
   const escaped = window.CSS?.escape ? window.CSS.escape(taskId) : taskId;
   const target = document.querySelector<HTMLElement>(`[data-work-process-task-id="${escaped}"]`) ?? document.querySelector<HTMLElement>('[data-work-process-block-id="runtime-tasks"]');
   if (!target) return;
-  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-  target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
   target.focus({ preventScroll: true });
-  target.classList.remove('is-trace-flash', 'is-trace-flash-static');
+  target.classList.remove('is-trace-flash');
   void target.offsetWidth;
-  target.classList.add(reduced ? 'is-trace-flash-static' : 'is-trace-flash');
-  window.setTimeout(() => target.classList.remove('is-trace-flash', 'is-trace-flash-static'), reduced ? 800 : 1600);
+  target.classList.add('is-trace-flash');
+  window.setTimeout(() => target.classList.remove('is-trace-flash'), 1600);
 };
 
 export const RightRailProgressList: React.FC<{ tasks: ProgressTask[]; locateLabel: string; stopLabel: string }> = ({ tasks, locateLabel, stopLabel }) => {

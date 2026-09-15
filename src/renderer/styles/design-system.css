@@ -442,9 +442,7 @@
   background-image: linear-gradient(
     90deg,
     color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 0%,
-    color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 35%,
-    color-mix(in srgb, var(--token-text-heading) 75%, var(--active-signal-highlight)) 50%,
-    color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 65%,
+    var(--active-signal-highlight) 46%,
     color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 100%
   );
   background-size: 200% 100%;
@@ -454,24 +452,6 @@
   background-clip: text;
   color: transparent;
   animation: active-signal-shimmer 1.6s linear infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html[data-reduce-motion='system'] .active-signal-text.is-active {
-    animation: none;
-    background-image: none;
-    background-clip: border-box;
-    -webkit-background-clip: border-box;
-    color: var(--active-signal-highlight);
-  }
-}
-
-html[data-reduce-motion='on'] .active-signal-text.is-active {
-  animation: none;
-  background-image: none;
-  background-clip: border-box;
-  -webkit-background-clip: border-box;
-  color: var(--active-signal-highlight);
 }
 
 /* Stagger delays */

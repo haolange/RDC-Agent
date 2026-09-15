@@ -159,16 +159,6 @@
   transform: translate(-50%, 0) rotate(45deg);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .dropdown-select-menu {
-    background: var(--token-bg-shell);
-  }
-
-  .dropdown-select-menu-caret::before {
-    background: var(--token-bg-shell);
-  }
-}
-
 .dropdown-select-option,
 .dropdown-select-empty {
   min-height: 36px;

@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { assignDynStyle, clearDynStyle } from '../../lib/useDynStyle';
 import {
   clampMaxProgress,
@@ -6,7 +6,6 @@ import {
   type MaxFieldMode,
   type MaxVisualFrame,
   type MaxVisualTimeline,
-  prefersReducedMotion,
   resolveMaxClipX,
   resolveMaxFieldCell,
   resolveMaxVisualFrame,
@@ -132,14 +131,6 @@ export const EffortMaxField: React.FC<{
   const thumbRef = useRef(thumbRatio);
   const completeRef = useRef(onTimelineComplete);
   const paintRef = useRef<(timeMs: number) => MaxVisualFrame | null>(() => null);
-  const [motionRevision, setMotionRevision] = useState(0);
-
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const onMotionPreferenceChange = () => setMotionRevision((revision) => revision + 1);
-    media.addEventListener('change', onMotionPreferenceChange);
-    return () => media.removeEventListener('change', onMotionPreferenceChange);
-  }, []);
 
   const fieldActive = timeline.phase !== 'idle';
   timelineRef.current = timeline;
@@ -157,8 +148,7 @@ export const EffortMaxField: React.FC<{
     let colors = readFieldColors(layer);
     const paint = (timeMs: number) => {
       const activeTimeline = timelineRef.current;
-      const reduced = prefersReducedMotion();
-      const frame = resolveMaxVisualFrame(activeTimeline, timeMs, reduced);
+      const frame = resolveMaxVisualFrame(activeTimeline, timeMs);
       const width = Math.max(1, Math.floor(layer.clientWidth));
       const height = Math.max(1, Math.floor(layer.clientHeight));
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -171,7 +161,7 @@ export const EffortMaxField: React.FC<{
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
       const emitterRatio = clampMaxProgress(thumbRef.current);
-      const fieldTimeMs = reduced ? 0 : Math.max(0, timeMs - activeTimeline.fieldEpoch);
+      const fieldTimeMs = Math.max(0, timeMs - activeTimeline.fieldEpoch);
       paintField(
         ctx,
         width,
@@ -230,7 +220,7 @@ export const EffortMaxField: React.FC<{
     return () => {
       if (frameRequest) window.cancelAnimationFrame(frameRequest);
     };
-  }, [fieldActive, motionRevision, timeline.revision]);
+  }, [fieldActive, timeline.revision]);
 
   if (!fieldActive) return null;
   return (

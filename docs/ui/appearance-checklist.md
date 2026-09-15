@@ -61,7 +61,7 @@
 - Composer textarea 与 Markdown CodeMirror 两轨均可弹出完整可编辑菜单；无选区时剪切/复制灰；剪贴板空时两个粘贴灰。
 - Settings 输入框、transcript 正文/代码块、Runtime Log 抽屉走同一套菜单；只读面只有复制/全选。
 - 「粘贴并清理格式」去掉 zero-width / NBSP / 智能引号 / 全角标点，且与「粘贴」不是同义重复。
-- 390px 窄屏菜单完整位于 viewport 内并在边缘翻转；Arrow / Home / End / Enter / Escape 与焦点返回正确；`prefers-reduced-motion` 下无入场动画。
+- 390px 窄屏菜单完整位于 viewport 内并在边缘翻转；Arrow / Home / End / Enter / Escape 与焦点返回正确；入场动画保持正常播放。
 
 ## 验证命令
 

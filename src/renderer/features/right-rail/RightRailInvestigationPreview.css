@@ -157,10 +157,3 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .investigation-preview-overlay,
-  .investigation-preview-dialog {
-    transition: none;
-  }
-}

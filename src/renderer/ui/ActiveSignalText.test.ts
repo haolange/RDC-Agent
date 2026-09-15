@@ -36,8 +36,10 @@ describe('ActiveSignalText', () => {
     expect(css).toContain('@keyframes active-signal-shimmer');
     expect(css).not.toContain('active-signal-pulse');
     expect(activeBlock).not.toContain('::after');
-    expect(css).toContain("html[data-reduce-motion='on'] .active-signal-text.is-active");
-    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*html\[data-reduce-motion='system'\] \.active-signal-text\.is-active/);
+    expect(css).not.toContain("data-reduce-motion");
+    expect(css).not.toContain('prefers-reduced-motion');
+    expect(activeBlock).toContain('var(--active-signal-highlight) 46%');
+    expect(activeBlock).not.toContain('var(--token-text-heading) 75%');
   });
 
   it('does not let Work Process running labels override active shimmer color', () => {
