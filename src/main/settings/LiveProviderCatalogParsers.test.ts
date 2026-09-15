@@ -135,6 +135,17 @@ describe('live Provider Catalog parsers', () => {
     });
     expect(contribution.controls?.reasoning).toMatchObject({ kind: 'unknown', supportsOff: false });
   });
+  it('drops retired DeepSeek Flash/Pro ids from OpenCode Go live admission', () => {
+    const parsed = parseOpenCodeGoCatalog({ data: [
+      { id: 'deepseek-v4.1-flash' },
+      { id: 'deepseek-v4-flash' },
+      { id: 'deepseek-v4-pro' },
+      { id: 'deepseek-v4-flash-vision-exp' },
+      { id: 'glm-5.2' },
+    ] });
+    expect(parsed.models.map((model) => model.id)).toEqual(['deepseek-v4.1-flash', 'glm-5.2']);
+  });
+
   it('preserves OpenCode Go per-model protocols for dynamically admitted rows', () => {
     const parsed = parseOpenCodeGoCatalog(fixture('opencode-go.json'));
     expect(Object.fromEntries(parsed.contributions.map((model) => [model.modelId, model.route?.protocol]))).toEqual({

@@ -210,6 +210,7 @@ cost.total  = input + output + cacheRead + cacheWrite
 | `auth_expired` | 凭据过期/无效 | ✗ |
 | `auth_scope_denied` | 权限/scope 不足 | ✗ |
 | `model_source` | 模型不存在（404） | ✗ |
+| `request_rejected` | 工具/参数格式被拒绝（400 invalid-argument） | ✗ |
 | `rate_limit` | 速率限制（429） | ✓ |
 | `quota_exceeded` | 配额/余额耗尽 | ✗ |
 | `network` | 网络连接错误（5xx） | ✓ |

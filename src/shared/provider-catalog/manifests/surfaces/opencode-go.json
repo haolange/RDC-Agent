@@ -71,6 +71,9 @@
       "protocol": "OpenAICompatibleChatCompletions",
       "adapterId": "openai-compatible",
       "baseUrl": "https://opencode.ai/zen/go/v1",
+      "headers": {
+        "x-opencode-session": "rdc-agent"
+      },
       "default": true,
       "protocolOwner": "openai"
     },
@@ -79,6 +82,9 @@
       "protocol": "OpenAIResponses",
       "adapterId": "openai-responses",
       "baseUrl": "https://opencode.ai/zen/go/v1",
+      "headers": {
+        "x-opencode-session": "rdc-agent"
+      },
       "protocolOwner": "openai"
     },
     {
@@ -86,6 +92,9 @@
       "protocol": "AnthropicMessages",
       "adapterId": "anthropic-messages",
       "baseUrl": "https://opencode.ai/zen/go/v1",
+      "headers": {
+        "x-opencode-session": "rdc-agent"
+      },
       "protocolOwner": "anthropic"
     }
   ],
@@ -94,6 +103,13 @@
     "strategy": {
       "kind": "custom-parser",
       "parserId": "opencode-go-catalog"
+    },
+    "admission": {
+      "denyPatterns": [
+        "deepseek-v4-flash",
+        "deepseek-v4-flash-*",
+        "deepseek-v4-pro"
+      ]
     }
   },
   "models": [
@@ -809,76 +825,8 @@
       }
     },
     {
-      "modelId": "deepseek-v4-pro",
-      "label": "DeepSeek V4 Pro",
-      "aliases": [],
-      "availability": "unknown",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Default",
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "unknown",
-          "maxPromptTokens": 256000
-        }
-      ],
-      "defaultBudgetTokens": 256000,
-      "toolCalling": {
-        "state": "unknown"
-      },
-      "visionInput": {
-        "state": "unknown"
-      },
-      "structuredOutput": {
-        "state": "unknown"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "account-entitled",
-      "route": {
-        "protocol": "OpenAICompatibleChatCompletions",
-        "baseUrl": "https://opencode.ai/zen/go/v1",
-        "source": "catalog"
-      },
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "reasoning": {
-          "kind": "unknown",
-          "supportsOff": false,
-          "levels": [],
-          "defaultState": "provider-managed",
-          "defaultSelection": "on",
-          "wireProfile": {
-            "kind": "none"
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:opencode-go:0",
-      "liveProjection": {
-        "context": {
-          "observedTierId": "default",
-          "entitlementAuthority": "catalog-observation"
-        },
-        "capabilities": [
-          "toolCalling",
-          "visionInput",
-          "structuredOutput"
-        ]
-      }
-    },
-    {
-      "modelId": "deepseek-v4-flash",
-      "label": "DeepSeek V4 Flash",
+      "modelId": "deepseek-v4.1-flash",
+      "label": "DeepSeek V4.1 Flash",
       "aliases": [],
       "availability": "unknown",
       "contextTiers": [

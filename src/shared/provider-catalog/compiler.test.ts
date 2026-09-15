@@ -241,11 +241,15 @@ describe('Provider Catalog compiler', () => {
     const openCodeGo = catalog.surfaces.get('opencode-go')?.surface;
     expect(openCodeGo).toMatchObject({
       catalogOwnership: 'provider-managed',
-      discovery: { authority: 'authoritative-list' },
+      discovery: {
+        authority: 'authoritative-list',
+        admission: { denyPatterns: expect.arrayContaining(['deepseek-v4-flash', 'deepseek-v4-pro']) },
+      },
     });
+    expect(openCodeGo?.routes.every((route) => route.headers?.['x-opencode-session'] === 'rdc-agent')).toBe(true);
     expect(openCodeGo?.models.map((model) => model.modelId)).toEqual(expect.arrayContaining([
       'kimi-k3',
-      'deepseek-v4-pro',
+      'deepseek-v4.1-flash',
       'glm-5.2',
       'minimax-m3',
       'qwen3.7-max',
@@ -265,7 +269,7 @@ describe('Provider Catalog compiler', () => {
         reasoning: { kind: 'always-on', supportsOff: false, lockedSelection: 'max' },
       },
     });
-    expect(openCodeGo?.models.find((model) => model.modelId === 'deepseek-v4-pro')).toMatchObject({
+    expect(openCodeGo?.models.find((model) => model.modelId === 'deepseek-v4.1-flash')).toMatchObject({
       controls: {
         fast: { state: 'unsupported' },
         maxContext: { state: 'unsupported' },
@@ -362,6 +366,7 @@ describe('Provider Catalog compiler', () => {
     };
 
     verify('chatgpt-account', [
+      ['gpt-6-astra', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'low'],
       ['gpt-5.6-sol', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-terra', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-luna', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
@@ -453,12 +458,11 @@ describe('Provider Catalog compiler', () => {
     ]));
 
     verify('deepseek', [
-      ['deepseek-v4-flash', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['low', 'high', 'max'], 'high'],
-      ['deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
+      ['deepseek-flash', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['low', 'high', 'max'], 'high'],
     ]);
     const deepseek = catalog.surfaces.get('deepseek')?.surface;
     expect(deepseek?.discovery).toMatchObject({ authority: 'candidate-validation', strategy: { kind: 'json-catalog' } });
-    expect(deepseek?.models.map((model) => model.modelId)).toEqual(['deepseek-v4-flash', 'deepseek-v4-pro']);
+    expect(deepseek?.models.map((model) => model.modelId)).toEqual(['deepseek-flash']);
     expect(deepseek?.models.every((model) => model.aliases.length === 0)).toBe(true);
 
     verify('kimi-coding-plan', [
@@ -469,14 +473,9 @@ describe('Provider Catalog compiler', () => {
     ]);
 
     verify('volcengine-coding-plan', [
-      ['doubao-seed-2.0-lite', 131_072, 'unsupported', 'unsupported', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
       ['doubao-seed-2.1-turbo', 131_072, 'unsupported', 'unsupported', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
-      ['doubao-seed-2.0-pro', 131_072, 'unsupported', 'unsupported', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
-      ['doubao-seed-2.0-code', 131_072, 'unsupported', 'unsupported', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
       ['glm-5.3', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
       ['glm-5.2', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
-      ['deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
-      ['deepseek-v4-flash', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
       ['kimi-k2.7-code', 256_000, 'unsupported', 'selectable', 'always-on', false, [], 'on'],
       ['kimi-k2.7-code-highspeed', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on', 'internal'],
       ['minimax-m3', 204_800, 'unsupported', 'unsupported', 'unknown', false, [], 'on'],
@@ -484,21 +483,18 @@ describe('Provider Catalog compiler', () => {
 
     verify('cline-pass', [
       ['cline-pass/glm-5.3', 200_000, 'unsupported', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
+      ['cline-pass/glm-5.3-flash', 200_000, 'unsupported', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
       ['cline-pass/glm-5.2', 200_000, 'unsupported', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
       ['cline-pass/kimi-k3', 256_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'high', 'max'], 'high'],
       ['cline-pass/kimi-k2.7-code', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on'],
       ['cline-pass/kimi-k2.6', 256_000, 'unsupported', 'unsupported', 'toggle', true, [], 'on'],
-      ['cline-pass/deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
-      ['cline-pass/deepseek-v4-flash', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
+      ['cline-pass/deepseek-v4.1-flash', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
       ['cline-pass/qwen3.8-max', 1_000_000, 'fixed', 'unsupported', 'unknown', false, [], 'on'],
       ['cline-pass/qwen3.7-plus', 128_000, 'unsupported', 'unsupported', 'unknown', false, [], 'on'],
     ]);
     const volcengine = catalog.surfaces.get('volcengine-coding-plan')?.surface;
-    for (const modelId of ['doubao-seed-code', 'minimax-m2.5', 'kimi-k2.5', 'glm-5.1', 'glm-4.7']) {
-      expect(volcengine?.models.find((model) => model.modelId === modelId), modelId).toMatchObject({
-        availability: 'unavailable',
-        unavailableReason: expect.stringContaining('does not support the Coding Plan feature'),
-      });
+    for (const modelId of ['doubao-seed-2.0-code', 'doubao-seed-code', 'minimax-m2.5', 'kimi-k2.5', 'glm-5.1', 'glm-4.7', 'deepseek-v4-flash', 'deepseek-v4-pro']) {
+      expect(volcengine?.models.find((model) => model.modelId === modelId), modelId).toBeUndefined();
     }
     expect(volcengine?.models.find((model) => model.modelId === 'kimi-k2.7-code')).toMatchObject({
       availability: 'available',
@@ -512,7 +508,7 @@ describe('Provider Catalog compiler', () => {
     });
   });
 
-  it('compiles Opus 5 direct Fast and DeepSeek V4 protocol-specific controls without aliases', () => {
+  it('compiles Opus 5 direct Fast and DeepSeek V4.1 Flash protocol-specific controls without aliases', () => {
     const catalog = compileProviderCatalog(input());
     const opus5 = catalog.surfaces.get('anthropic')?.surface.models
       .find((model) => model.modelId === 'claude-opus-5');
@@ -536,16 +532,13 @@ describe('Provider Catalog compiler', () => {
     });
 
     const deepseek = catalog.surfaces.get('deepseek')?.surface;
-    const flash = deepseek?.models.find((model) => model.modelId === 'deepseek-v4-flash');
-    const pro = deepseek?.models.find((model) => model.modelId === 'deepseek-v4-pro');
+    const flash = deepseek?.models.find((model) => model.modelId === 'deepseek-flash');
     expect(flash?.route.protocol).toBe('OpenAIResponses');
+    expect(flash?.visionInput.state).toBe('supported');
     expect(flash?.routeOptions?.map((option) => option.route.protocol)).toEqual([
       'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'AnthropicMessages',
     ]);
-    expect(pro?.routeOptions?.map((option) => option.route.protocol)).toEqual([
-      'OpenAICompatibleChatCompletions', 'AnthropicMessages',
-    ]);
-    expect(pro?.routeOptions?.map((option) => option.route.protocol)).not.toContain('OpenAIResponses');
+    expect(deepseek?.models).toHaveLength(1);
     expect(deepseek?.models.every((model) => model.aliases.length === 0)).toBe(true);
     expect(deepseek?.routes.map((route) => ({
       protocol: route.protocol,

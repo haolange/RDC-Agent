@@ -396,7 +396,11 @@ export function parseOpenCodeGoCatalog(
     .flatMap((value) => {
       const observation = observationFromCatalogRow(value);
       return observation ? [observation] : [];
-    });
+    })
+    .filter((observation) => isAdmittedDiscoveredModel(
+      { id: observation.modelId },
+      surface.discovery.admission,
+    ));
   return asResult(projectLiveModelObservations(surface, observations));
 }
 function isClinePassCatalogRow(value: Record<string, unknown>, modelId: string): boolean {

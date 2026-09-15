@@ -135,6 +135,7 @@ export class ProviderConnectionService {
         undefined,
         discoveryAccountId,
       );
+      // Catalog reachability only. Do not treat this as a verified chat request.
       return {
         success: true,
         provider,

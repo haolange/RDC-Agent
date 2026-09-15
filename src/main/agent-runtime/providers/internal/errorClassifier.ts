@@ -155,6 +155,10 @@ function classifyByHttpStatus(
     return { code: 'context_overflow', retryable: false, httpStatus: status, message };
   }
 
+  if (status === 400 && isRequestRejected(lowerMessage)) {
+    return { code: 'request_rejected', retryable: false, httpStatus: status, message };
+  }
+
   // 404 — model not found
   if (status === 404) {
     return { code: 'model_source', retryable: false, httpStatus: status, message };
@@ -227,6 +231,18 @@ function classifyByMessagePattern(
     return { code: 'context_overflow', retryable: false, httpStatus, message };
   }
 
+  if (isRequestRejected(lowerMessage)) {
+    return { code: 'request_rejected', retryable: false, httpStatus, message };
+  }
+
+  if (
+    lowerMessage.includes('model_not_found')
+    || lowerMessage.includes('model not found')
+    || lowerMessage.includes('unknown model')
+  ) {
+    return { code: 'model_source', retryable: false, httpStatus, message };
+  }
+
   return null;
 }
 
@@ -235,6 +251,16 @@ function isScopeRelated(lowerMessage: string): boolean {
     lowerMessage.includes('scope') ||
     lowerMessage.includes('permission') ||
     lowerMessage.includes('access denied')
+  );
+}
+
+function isRequestRejected(lowerMessage: string): boolean {
+  return (
+    lowerMessage.includes('invalid-argument')
+    || lowerMessage.includes('tool parameter')
+    || lowerMessage.includes('root schema')
+    || lowerMessage.includes('unsupported parameter')
+    || lowerMessage.includes('invalid request')
   );
 }
 

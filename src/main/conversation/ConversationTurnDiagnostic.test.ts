@@ -178,6 +178,64 @@ describe('conversation turn failure classification', () => {
     );
   });
 
+  it('classifies Grok tool-schema invalid-argument as a request failure, not generic', () => {
+    const original = new ProviderHttpError(
+      'openai-responses',
+      400,
+      'invalid-argument',
+      '{"code":"invalid-argument","error":"shell: tool parameter root must be an object type (root schema is an anyOf/oneOf union with a non-object branch)"}',
+    );
+    const abort = new AgentRecoveryAbortError('[Recovery abort] unrecoverable error', {
+      cause: original,
+      category: 'unknown',
+      attempts: 1,
+      maxAttempts: 1,
+      lastStatus: 400,
+      bodySnippet: original.bodyText,
+    });
+    const diagnostic = createTurnFailedDiagnostic(
+      { agentId: 'general', providerId: 'grok-account', modelId: 'grok-4.6' },
+      abort,
+    );
+    expect(diagnostic.code).toBe('CONVERSATION_LLM_REQUEST_FAILED');
+    expect(diagnostic.userMessage).toContain('工具或参数格式');
+    expect(diagnostic.userMessage).not.toContain('额度或网络');
+    expect(diagnostic.technicalMessage).toContain('HTTP 400');
+    expect(diagnostic.technicalMessage).toContain('invalid-argument');
+  });
+
+  it('classifies a missing OpenCode session header as a request failure, not generic', () => {
+    const original = new ProviderHttpError(
+      'openai-compatible',
+      400,
+      'MissingSessionID',
+      '{"type":"error","error":{"type":"MissingSessionID","message":"Request is missing x-opencode-session"}}',
+    );
+    const diagnostic = createTurnFailedDiagnostic(
+      { agentId: 'general', providerId: 'opencode-go', modelId: 'deepseek-v4.1-flash' },
+      original,
+    );
+    expect(diagnostic.code).toBe('CONVERSATION_LLM_REQUEST_FAILED');
+    expect(diagnostic.userMessage).toContain('工具或参数格式');
+    expect(diagnostic.userMessage).not.toContain('额度或网络');
+    expect(diagnostic.technicalMessage).toContain('MissingSessionID');
+  });
+
+  it('classifies model-not-found as a model failure, not generic', () => {
+    const original = new ProviderHttpError(
+      'openai-responses',
+      404,
+      'model_not_found',
+      '{"error":{"code":"model_not_found","message":"The model grok-4.6 does not exist"}}',
+    );
+    const diagnostic = createTurnFailedDiagnostic(
+      { agentId: 'general', providerId: 'grok-account', modelId: 'grok-4.6' },
+      original,
+    );
+    expect(diagnostic.userMessage).toContain('没有此模型或模型已下线');
+    expect(diagnostic.userMessage).not.toContain('额度或网络');
+  });
+
   it('classifies ProviderWireFailureError abort with provider HTTP n/a technicalMessage', () => {
     const original = new ProviderWireFailureError(
       'openai-responses',

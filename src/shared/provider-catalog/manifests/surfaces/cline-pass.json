@@ -152,6 +152,79 @@
       }
     },
     {
+      "modelId": "cline-pass/glm-5.3-flash",
+      "label": "GLM-5.3 Flash",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 200000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 200000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.cline.bot/api/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "high",
+            "max"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:cline-pass:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
+      }
+    },
+    {
       "modelId": "cline-pass/glm-5.2",
       "label": "GLM-5.2",
       "aliases": [],
@@ -440,85 +513,8 @@
       }
     },
     {
-      "modelId": "cline-pass/deepseek-v4-pro",
-      "label": "DeepSeek V4 Pro",
-      "aliases": [],
-      "availability": "unknown",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 1000000,
-          "maxTotalTokens": 1000000,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "unknown"
-        }
-      ],
-      "defaultBudgetTokens": 256000,
-      "toolCalling": {
-        "state": "supported"
-      },
-      "visionInput": {
-        "state": "unknown"
-      },
-      "structuredOutput": {
-        "state": "unknown"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "account-entitled",
-      "route": {
-        "protocol": "OpenAICompatibleChatCompletions",
-        "baseUrl": "https://api.cline.bot/api/v1",
-        "source": "catalog"
-      },
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "fixed",
-          "fixedValue": true,
-          "entitlement": "unknown",
-          "tierId": "default",
-          "label": "Max mode"
-        },
-        "reasoning": {
-          "kind": "levels",
-          "supportsOff": false,
-          "levels": [
-            "high",
-            "max"
-          ],
-          "defaultSelection": "high",
-          "wireProfile": {
-            "kind": "none"
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:cline-pass:0",
-      "liveProjection": {
-        "context": {
-          "observedTierId": "default",
-          "entitlementAuthority": "catalog-observation"
-        },
-        "capabilities": [
-          "toolCalling",
-          "visionInput",
-          "structuredOutput"
-        ]
-      },
-      "fieldFactSourceIds": {
-        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
-      }
-    },
-    {
-      "modelId": "cline-pass/deepseek-v4-flash",
-      "label": "DeepSeek V4 Flash",
+      "modelId": "cline-pass/deepseek-v4.1-flash",
+      "label": "DeepSeek V4.1 Flash",
       "aliases": [],
       "availability": "unknown",
       "contextTiers": [

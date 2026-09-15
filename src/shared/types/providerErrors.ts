@@ -7,6 +7,7 @@ export type ProviderErrorCode =
   | 'auth_expired'
   | 'auth_scope_denied'
   | 'model_source'
+  | 'request_rejected'
   | 'rate_limit'
   | 'quota_exceeded'
   | 'network'

@@ -12,7 +12,7 @@ vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: { readSessionShel
 
 const output = process.env.RDC_AGENT_LIVE_COST_OUTPUT;
 const enabled = process.env.RDC_AGENT_LIVE_COST_REQUESTS === '2' && !!output && !!process.env.DEEPSEEK_API_KEY;
-const model = 'deepseek-v4-flash';
+const model = 'deepseek-flash';
 const userMessage = '请解释并给出这个 JavaScript 函数的最小修正，不需操作文件：function sumFirst(xs, n) { let sum = 0; for (let i = 0; i <= n; i++) sum += xs[i]; return sum; }。约定 n 是要相加的元素个数，0 <= n <= xs.length；请给出 n=0 和 n=xs.length 的两个边界例子。回答简短。';
 
 function source(file: string, version: 'before' | 'after'): string {

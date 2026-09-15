@@ -61,6 +61,7 @@ Fast 是同一模型的 request binding，不是 `*-fast` 别名或独立模型�
 
 | Name                  | Context Window | 1M Max      | Fast Mode                      | 推理等级                                         | 状态   |
 | --------------------- | --------------:| ----------- | ------------------------------ | -------------------------------------------- | ---- |
+| `gpt-6-astra`         | 272K 默认；Max 872K | 是（Codex Max mode，不是 API 1,050,000） | Codex `service_tier=priority`（Fast） | Low / Medium / High / Extra / Max（默认 Low） | 账号 `/models` 出现时可用；窗口与 Fast 取 Codex `models.json` + 本机 ChatGPT Account `/models`，不抄 API 数字 |
 | `gpt-5.6-sol`         | 256K           | 否           | API 参数：`service_tier=priority` | Low / Medium / High / Extra / Max（默认 Medium） | 可用   |
 | `gpt-5.6-terra`       | 256K           | 否           | API 参数：`service_tier=priority` | Low / Medium / High / Extra / Max（默认 Medium） | 可用   |
 | `gpt-5.6-luna`        | 256K           | 否           | API 参数：`service_tier=priority` | Low / Medium / High / Extra / Max（默认 Medium） | 可用   |
@@ -98,17 +99,17 @@ Fast 是同一模型的 request binding，不是 `*-fast` 别名或独立模型�
 | `grok-4.20-0309-reasoning`     | 1M             | 是      | 否         | Just On                        | 可用  |
 | `grok-4.20-multi-agent-0309`   | 1M             | 是      | 否         | Low / Medium / High / Extra    | 可用  |
 | `grok-4.3`                     | 500K           | 是（Max → 1M） | 否     | Non / Low / Medium / High      | 可用  |
+| `grok-4.6`                     | 500K           | 否      | 否         | Low / Medium / High / Extra（默认 High） | 可用  |
 | `grok-4.5`                     | 500K           | 否      | 否         | Low / Medium / High（默认 Medium） | 可用  |
 | `grok-build-0.1`               | 256K           | 否      | 否         | Just On                        | 可用  |
 
 ## DeepSeek
 
-| Name                | Context Window | 1M Max  | Fast Mode | 推理等级                                   | Route | 状态  |
-| ------------------- | --------------:| ------- | --------- | -------------------------------------- | ----- | --- |
-| `deepseek-v4-pro`   | 1M             | 是(只有1M) | 否         | Off / High / Max（默认 High） | Chat Completions / Anthropic | Preview；Responses 尚未开放 |
-| `deepseek-v4-flash` | 1M             | 是(只有1M) | 否         | Off / Low / High / Max（默认 High） | Responses（默认）/ Chat Completions / Anthropic | Public Beta |
+| Name             | Context Window | 1M Max  | Fast Mode | 推理等级                                   | Route | 状态  |
+| ---------------- | --------------:| ------- | --------- | -------------------------------------- | ----- | --- |
+| `deepseek-flash` | 1M             | 是(只有1M) | 否         | Off / Low / High / Max（默认 High） | Responses（默认）/ Chat Completions / Anthropic | DeepSeek-V4.1-Flash；原生视觉 |
 
-Flash 映射：`low/high/xhigh/max → low/high/high/max`；Pro 当前映射：`low/high/xhigh/max → high/high/max/max`。Thinking 开启时移除 `temperature`、`top_p`、`presence_penalty`、`frequency_penalty`。Chat/Anthropic 的工具续传必须回放 `reasoning_content`；Responses 回放 raw reasoning item 与 function-call continuation，不使用 `previous_response_id`。`deepseek-chat` / `deepseek-reasoner` 已于 2026-07-24 停用，不存在 alias 或兼容 shim。
+映射：`low/high/xhigh/max → low/high/high/max`。Thinking 开启时移除 `temperature`、`top_p`、`presence_penalty`、`frequency_penalty`。Chat/Anthropic 的工具续传必须回放 `reasoning_content`；Responses 回放 raw reasoning item 与 function-call continuation，不使用 `previous_response_id`。`deepseek-v4-flash` / `deepseek-v4-flash-vision-exp` / `deepseek-v4-pro` 已退役，不存在 alias 或兼容 shim。`deepseek-chat` / `deepseek-reasoner` 已于 2026-07-24 停用。
 
 ## Kimi Coding Plan
 
@@ -128,13 +129,14 @@ Kimi Coding Plan 的 Anthropic-compatible base URL 是 `https://api.kimi.com/cod
 | `doubao-seed-2.1-lite`     | 131K           | 否       | 否                                   | Off / Minimal / Low / Medium / High（默认 Medium） | 可用  |
 | `doubao-seed-2.1-pro`      | 131K           | 否       | 否                                   | Off / Minimal / Low / Medium / High（默认 Medium） | 可用  |
 | `doubao-seed-2.1-code`     | 131K           | 否       | 否                                   | Off / Minimal / Low / Medium / High（默认 Medium） | 可用  |
+| `doubao-seed-2.1-turbo`    | 131K           | 否       | 否                                   | Off / Minimal / Low / Medium / High（默认 Medium） | 可用  |
+| `glm-5.3`                  | 1M             | 是(只有1M) | 否                                   | Off / High / Max（默认 High）                      | 可用  |
 | `glm-5.2`                  | 1M             | 是(只有1M) | 否                                   | Off / High / Max（默认 High）                      | 可用  |
-| `deepseek-v4-pro`          | 1M             | 是(只有1M) | 否                                   | High / Max（默认 High）                            | 可用  |
-| `deepseek-v4-flash`        | 1M             | 是(只有1M) | 否                                   | High / Max（默认 High）                            | 可用  |
-| `kimi-k2.7-code`           | 256K           | 否       | 变体 model：`kimi-k2.7-code-highspeed` | 只有On                                           | 不可用 |
-| `kimi-k2.7-code-highspeed` | 256K           | 否       | 否                                   | 只有On                                           | 不可用 |
+| `kimi-k2.7-code`           | 256K           | 否       | 变体 model：`kimi-k2.7-code-highspeed` | 只有On                                           | 可用  |
+| `kimi-k2.7-code-highspeed` | 256K           | 否       | 否                                   | 只有On                                           | 内部 Fast 目标 |
+| `minimax-m3`               | 204.8K         | 否       | 否                                   | 不清楚                                            | 可用  |
 
-附加观测（本机 Volc Coding Plan 仍列出，旧表未覆盖）：`doubao-seed-code`、`minimax-m2.7`、`minimax-m2.5`、`kimi-k2.6`、`kimi-k2.5`、`glm-5.1`、`glm-4.7`。
+`doubao-seed-2.0-*`、`doubao-seed-code`、`deepseek-v4-pro`、`deepseek-v4-flash` 以及已确认不支持 Coding Plan 的 `minimax-m2.5` / `kimi-k2.5` / `glm-5.1` / `glm-4.7` 已从目录删除，不留 deprecated 占位。仍保留的附加现行项：`minimax-m2.7`、`kimi-k2.6`。
 
 ## ClinePass
 
@@ -143,24 +145,27 @@ Kimi Coding Plan 的 Anthropic-compatible base URL 是 `https://api.kimi.com/cod
 
 | Name                           | Context Window | 1M Max  | Fast Mode | 推理等级                      | 状态  |
 | ------------------------------ | --------------:| ------- | --------- | ------------------------- | --- |
+| `cline-pass/glm-5.3`           | 200K           | 否       | 否         | Off / High / Max（默认 High） | 可用  |
+| `cline-pass/glm-5.3-flash`     | 200K           | 否       | 否         | Off / High / Max（默认 High） | 可用  |
 | `cline-pass/glm-5.2`           | 200K           | 否       | 否         | Off / High / Max（默认 High） | 可用  |
 | `cline-pass/kimi-k3`           | 256K           | 否       | 否         | Low / High / Max          | 可用  |
 | `cline-pass/kimi-k2.7-code`    | 256K           | 否       | 否         | Just On                   | 可用  |
 | `cline-pass/kimi-k2.6`         | 256K           | 否       | 否         | Off / On                  | 可用  |
-| `cline-pass/deepseek-v4-pro`   | 1M             | 是(只有1M) | 否         | High / Max（默认 High）       | 可用  |
-| `cline-pass/deepseek-v4-flash` | 1M             | 是(只有1M) | 否         | High / Max（默认 High）       | 可用  |
+| `cline-pass/deepseek-v4.1-flash` | 1M             | 是(只有1M) | 否         | High / Max（默认 High）       | 可用  |
 | `cline-pass/mimo-v2.5`         | 128K           | 否       | 否         | 不清楚                       | 可用  |
 | `cline-pass/mimo-v2.5-pro`     | 128K           | 否       | 否         | 不清楚                       | 可用  |
 | `cline-pass/minimax-m3`        | 1M             | 是(只有1M) | 否         | 不清楚                       | 可用  |
+| `cline-pass/qwen3.8-max`       | 1M             | 是(只有1M) | 否         | 不清楚                       | 可用  |
 | `cline-pass/qwen3.7-max`       | 1M             | 是(只有1M) | 否         | 不清楚                       | 可用  |
 | `cline-pass/qwen3.7-plus`      | 128K           | 否       | 否         | 不清楚                       | 可用  |
 
 ## OpenCode Go
 
-> Live 来源：`GET https://opencode.ai/zen/go/v1/models`（2026-07-23）。  
+> Live 来源：`GET https://opencode.ai/zen/go/v1/models`（2026-07-23，本机 2026-09-15 复核）。  
 > 当前 live 行仅有 `id/object/created/owned_by`，无 context / effort / protocol 字段。  
 > 除已固化的 `kimi-k3` 外：`Fast`/`1M` unsupported；推理列标「不清楚」的保持 fail-closed（UI=Disabled）。  
-> 窗口列标「不清楚」的：不宣称已测死；manifest 可保留可发送的工作估计值，不得写成已验证事实。
+> 窗口列标「不清楚」的：不宣称已测死；manifest 可保留可发送的工作估计值，不得写成已验证事实。  
+> 退役 DeepSeek id（`deepseek-v4-flash` / `deepseek-v4-pro` / `deepseek-v4-flash-*`）admission 直接丢弃，不加 alias。聊天请求带 `x-opencode-session`。
 
 | Name                | Context Window | 1M Max      | Fast Mode | 推理等级                                               | 状态  |
 | ------------------- | --------------:| ----------- | --------- | -------------------------------------------------- | --- |
@@ -168,8 +173,7 @@ Kimi Coding Plan 的 Anthropic-compatible base URL 是 `https://api.kimi.com/cod
 | `kimi-k2.7-code`    | 不清楚            | 否           | 否         | 不清楚                                                | 可用  |
 | `kimi-k2.6`         | 不清楚            | 否           | 否         | 不清楚                                                | 可用  |
 | `kimi-k2.5`         | 不清楚            | 否           | 否         | 不清楚                                                | 可用  |
-| `deepseek-v4-pro`   | 不清楚            | 否           | 否         | 不清楚                                                | 可用  |
-| `deepseek-v4-flash` | 不清楚            | 否           | 否         | 不清楚                                                | 可用  |
+| `deepseek-v4.1-flash` | 不清楚            | 否           | 否         | 不清楚                                                | 可用  |
 | `glm-5.2`           | 不清楚            | 否           | 否         | 不清楚                                                | 可用  |
 | `glm-5.1`           | 不清楚            | 否           | 否         | 不清楚                                                | 可用  |
 | `glm-5`             | 不清楚            | 否           | 否         | 不清楚                                                | 可用  |
@@ -194,8 +198,8 @@ Kimi Coding Plan 的 Anthropic-compatible base URL 是 `https://api.kimi.com/cod
 
 - 本机仍保存 8 个 enabled Provider 配置；本次在最新 Browser/main process 上逐一执行 Provider Test。ChatGPT Account、DeepSeek、ClinePass、Kimi Coding Plan、OpenCode Go、Volcengine Coding Plan 通过；GitHub Copilot 与 Super Grok Account 的当前 OAuth 凭据未通过，UI 因而显示 `Unconfigured`，不得继续把缓存目录计作当前可用模型。
 - Kimi authoritative discovery 返回 4 个协议模型；产品选择器投影为 `kimi-for-coding`、`k3`、`k3-256k` 三个 primary 模型，`kimi-for-coding-highspeed` 仅作为 Fast execution target。旧伪身份 `k3[1m]` 已删除；`k3` 的 1M 是账户级 context tier，不是另一个 model id。
-- DeepSeek V4 Flash 已完成一条真实 Responses 请求，得到 canonical final `OK`、thinking 与 Last actual usage。其可见 reasoning 档固定为 Off / Low / High / Max；Pro 固定为 Off / High / Max。兼容输入 `xhigh` 只在 planner 内折叠映射，不得渲染成额外滑槽档位。
-- 本次 Provider Test 只证明凭据、目录和默认 route 可用，不等价于对每个目录模型完成独立请求。历史全模型 probe 结果不得冒充当前资格；模型级可用性必须由新的 model probe / execution evidence 单独续期。
+- DeepSeek 现行官方 id 是 `deepseek-flash`（V4.1 Flash）。`deepseek-v4-flash` / `deepseek-v4-pro` 已退役，目录不保留兼容名。兼容输入 `xhigh` 只在 planner 内折叠映射，不得渲染成额外滑槽档位。
+- 本次 Provider Test 只证明凭据、目录和默认 route 可用，不等价于聊天成功。`/models` verified 不能代替真实 chat/capability probe。历史全模型 probe 结果不得冒充当前资格；模型级可用性必须由新的 model probe / execution evidence 单独续期。
 - Direct Anthropic / Kimi Fast 仍未得到 `usage.speed=fast`，因此不标记当前账户 Fast entitled。1M 只验证真实 activation wire 与官方/manifest 数值，没有伪称完成百万 token 满窗压力测试。
 
 ## 校对备注
@@ -204,8 +208,8 @@ Kimi Coding Plan 的 Anthropic-compatible base URL 是 `https://api.kimi.com/cod
 2. ChatGPT `gpt-5.4-mini`：Fast 保持 unsupported（不跟其它 gpt-5.x 盲抄 `service_tier=priority`）。  
 3. Copilot `claude-opus-5` 只作为 `account-entitled` 候选；当前账户 discovery 缺席时不可选，且不继承 Anthropic Direct API Fast。`claude-opus-4.8` 不再绑定 Fast 开关；`claude-opus-4.8-fast` 为独立 primary 可选模型。
 4. Kimi Coding Plan：`kimi-for-coding` Always-on；账号缺 `highspeed` 时 Fast 可见但禁用；`k3` / `k3-256k` 只接受 Low/High/Max，目录缺席即不可选。
-5. Grok `grok-4.3`：常规 500K + Max→1M（注）；推理 Non/Low/Medium/High；`grok-4.20-reasoning` / `grok-build-0.1` = Just On；multi-agent = L/M/H/Extra。  
-6. DeepSeek Direct：固定 1M；Flash 可见 Off/Low/High/Max，Pro 可见 Off/High/Max，兼容 effort 输入走 model-specific 折叠映射。Flash 默认 Responses 且为 Public Beta，Pro 仍是 Preview 且禁止 Responses。Volc/ClinePass 是独立 surface，不得抄 Direct route 或 Off 能力。
+5. Grok `grok-4.3`：常规 500K + Max→1M（注）；推理 Non/Low/Medium/High；`grok-4.6` = L/M/H/Extra（默认 High）；`grok-4.20-reasoning` / `grok-build-0.1` = Just On；multi-agent = L/M/H/Extra。  
+6. DeepSeek Direct：只保留 `deepseek-flash`（V4.1 Flash），固定 1M，原生视觉，Responses 默认；可见 Off/Low/High/Max。退役 id 不加 alias。Volc/ClinePass/OpenCode 是独立 surface，使用各自平台 id，不得抄 Direct route。
 7. Volc：Doubao Fast=否；Kimi K2.7=只有On；附加观测行推理未写清 → fail-closed。  
 8. ClinePass：写清的档位已入结构控件；wire 待 probe；「不清楚」行保持 unknown。  
 9. OpenCode Go：仅 `kimi-k3` 窗口/推理已写清；其余「不清楚」不宣称已测；Composer 关档统一 `Disabled`/`禁用`。

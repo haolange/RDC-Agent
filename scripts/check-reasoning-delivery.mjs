@@ -111,7 +111,7 @@ assert(resolveAgentRouteCapability(kimi, 'kimi-for-coding', effectiveModel(kimi,
 const moonshotAnthropic = configuredProvider('moonshot', 'AnthropicMessages');
 assert(resolveAgentRouteCapability(moonshotAnthropic, 'kimi-k2.5', effectiveModel(moonshotAnthropic, 'kimi-k2.5')).reasoningContract.semantic === 'raw', 'Moonshot compatible Anthropic must be raw');
 const deepseekAnthropic = configuredProvider('deepseek', 'AnthropicMessages');
-assert(resolveAgentRouteCapability(deepseekAnthropic, 'deepseek-v4-pro', effectiveModel(deepseekAnthropic, 'deepseek-v4-pro')).reasoningContract.semantic === 'raw', 'DeepSeek Anthropic route must stay raw');
+assert(resolveAgentRouteCapability(deepseekAnthropic, 'deepseek-flash', effectiveModel(deepseekAnthropic, 'deepseek-flash')).reasoningContract.semantic === 'raw', 'DeepSeek Anthropic route must stay raw');
 
 const noReasoningProvider = configuredProvider('openai', 'OpenAICompatibleChatCompletions');
 assert(resolveProviderReasoningContract(noReasoningProvider, effectiveModel(noReasoningProvider, 'test-model', {

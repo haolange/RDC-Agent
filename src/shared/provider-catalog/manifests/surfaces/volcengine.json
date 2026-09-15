@@ -421,74 +421,6 @@
       "factSourceId": "rdc-agent:volcengine:0"
     },
     {
-      "modelId": "deepseek-v4-pro",
-      "label": "deepseek-v4-pro",
-      "aliases": [],
-      "availability": "available",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 1000000,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "granted"
-        }
-      ],
-      "defaultBudgetTokens": 256000,
-      "toolCalling": {
-        "state": "supported"
-      },
-      "visionInput": {
-        "state": "unsupported"
-      },
-      "structuredOutput": {
-        "state": "supported"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "maintained",
-      "route": {
-        "protocol": "OpenAICompatibleChatCompletions",
-        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
-        "source": "catalog"
-      },
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "fixed",
-          "fixedValue": true,
-          "tierId": "default",
-          "entitlement": "granted"
-        },
-        "reasoning": {
-          "kind": "levels",
-          "supportsOff": true,
-          "levels": [
-            "high",
-            "max"
-          ],
-          "defaultSelection": "high",
-          "wireProfile": {
-            "kind": "openai-compatible",
-            "on": "high",
-            "levels": {
-              "high": "high",
-              "max": "max"
-            },
-            "onMode": "enabled",
-            "offMode": "disabled"
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:volcengine:0"
-    },
-    {
       "modelId": "kimi-k2.5",
       "label": "kimi-k2.5",
       "aliases": [],
@@ -552,7 +484,6 @@
     "doubao-seed-2.1-pro",
     "doubao-seed-2.1-turbo",
     "glm-4.6",
-    "deepseek-v4-pro",
     "kimi-k2.5"
   ],
   "docsUrl": "https://www.volcengine.com/docs/82379/1928262"

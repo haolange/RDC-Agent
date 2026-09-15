@@ -26,7 +26,7 @@ const cases = [
   ['lm-studio', ['lmstudio-community/qwen3-coder']],
   ['nvidia-nim', ['deepseek-ai/deepseek-v4-pro']],
   ['github-models', ['openai/gpt-4.1']],
-  ['ollama-cloud', ['deepseek-v4-flash']],
+  ['ollama-cloud', ['deepseek-v4.1-flash']],
 ] as const;
 
 describe('data-only provider discovery fixtures', () => {
@@ -103,8 +103,7 @@ describe('data-only provider discovery fixtures', () => {
     if (!surface || discovery?.kind !== 'json-catalog') throw new Error('Missing DeepSeek discovery');
     const parsed = parseDeclarativeCatalog(discovery, {
       data: [
-        { id: 'deepseek-v4-flash' },
-        { id: 'deepseek-v4-pro' },
+        { id: 'deepseek-flash' },
       ],
     });
     const contributions = toDeclarativeCatalogContributions(parsed, {
@@ -129,10 +128,8 @@ describe('data-only provider discovery fixtures', () => {
         models: staleFallbackContributions,
       },
     });
-    expect(models.find((model) => model.modelId === 'deepseek-v4-flash')?.route.protocol)
+    expect(models.find((model) => model.modelId === 'deepseek-flash')?.route.protocol)
       .toBe('OpenAIResponses');
-    expect(models.find((model) => model.modelId === 'deepseek-v4-pro')?.route.protocol)
-      .toBe('OpenAICompatibleChatCompletions');
   });
 
   it('projects documented context and capability metadata without static inference', () => {

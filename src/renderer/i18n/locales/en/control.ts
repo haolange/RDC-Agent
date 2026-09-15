@@ -227,6 +227,7 @@ export const enControl = {
   "control.replay.intervention": "Modified",
   "control.replay.restored": "Restored",
   "control.replay.noOutput": "No image for this event",
+  "control.replay.finalPresentUnavailable": "Final Present is not uniquely identified",
   "control.replay.previous": "Previous event",
   "control.replay.next": "Next event",
   "control.replay.eventId": "Event ID",
