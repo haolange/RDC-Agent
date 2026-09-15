@@ -2,15 +2,18 @@ import { z } from 'zod';
 import {
   KNOWLEDGE_CARD_TYPES,
   KNOWLEDGE_CASE_CHAPTERS,
+  KNOWLEDGE_IMAGE_ROLES,
   KNOWLEDGE_LIFECYCLES,
   KNOWLEDGE_RELATION_KINDS,
   KNOWLEDGE_SCOPE_AXES,
   type KnowledgeCardRecord,
   type KnowledgeCaseChapters,
+  type KnowledgeImageRef,
   type KnowledgeLifecycle,
   type KnowledgeRelation,
   type KnowledgeScope,
 } from '@shared/types/knowledge';
+import { sanitizeKnowledgeImages } from './knowledgeImages';
 import { parse as parseYaml } from 'yaml';
 
 const optionalString = z.string().trim().min(1).optional();
@@ -41,6 +44,12 @@ export const KnowledgeRelationSchema = z.object({
   targetCardId: z.string().trim().min(1),
 }).strict();
 
+export const KnowledgeImageRefSchema = z.object({
+  relativePath: z.string().trim().min(1),
+  role: z.enum(KNOWLEDGE_IMAGE_ROLES),
+  alt: optionalString,
+}).strict();
+
 export const KnowledgeCaseChaptersSchema = z.object({
   claim: optionalString,
   scopeExclusions: optionalString,
@@ -69,6 +78,7 @@ export const KnowledgeCardRecordSchema = z.object({
   sourceStatus: optionalString,
   caseId: optionalString,
   chapters: KnowledgeCaseChaptersSchema.optional(),
+  images: z.array(KnowledgeImageRefSchema).default([]),
   sourceHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   sourceMtimeMs: z.number().int().nonnegative().optional(),
   sourceSize: z.number().int().nonnegative().optional(),
@@ -203,6 +213,12 @@ export function parseKnowledgeFrontmatter(source: string, options: {
   if (typeParsed.success) record.type = typeParsed.data;
   if (lifecycleParsed.success) record.lifecycle = lifecycleParsed.data;
   if (record.type === 'case') record.chapters = parseChapters(meta.chapters, body);
+  const images = sanitizeKnowledgeImages(
+    Array.isArray(meta.images) ? meta.images as KnowledgeImageRef[] : undefined,
+    relativePath,
+    record.caseId,
+  );
+  if (images.length > 0) record.images = images;
   return { meta, body, record };
 }
 
@@ -217,6 +233,7 @@ export function serializeKnowledgeCard(record: KnowledgeCardRecord): string {
     ...(record.sourceStatus ? { sourceStatus: record.sourceStatus } : {}),
     ...(record.caseId ? { caseId: record.caseId } : {}),
     ...(record.chapters ? { chapters: record.chapters } : {}),
+    ...(record.images?.length ? { images: record.images } : {}),
   };
   const yamlLines = [
     `cardId: ${JSON.stringify(frontmatter.cardId)}`,
@@ -232,6 +249,7 @@ export function serializeKnowledgeCard(record: KnowledgeCardRecord): string {
   if (record.sourceMtimeMs != null) yamlLines.push(`sourceMtimeMs: ${record.sourceMtimeMs}`);
   if (record.sourceSize != null) yamlLines.push(`sourceSize: ${record.sourceSize}`);
   if (record.chapters) yamlLines.push(`chapters: ${JSON.stringify(record.chapters)}`);
+  if (record.images?.length) yamlLines.push(`images: ${JSON.stringify(record.images)}`);
   return `---\n${yamlLines.join('\n')}\n---\n\n${record.body.trim()}\n`;
 }
 

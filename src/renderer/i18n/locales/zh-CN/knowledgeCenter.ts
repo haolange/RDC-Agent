@@ -183,4 +183,11 @@ export const zhKnowledgeCenter = {
   'knowledgeCenter.indexStatus': '当前状态',
   'knowledgeCenter.indexReady': '就绪',
   'knowledgeCenter.indexCopyRevision': '复制 Revision',
-  'knowledgeCenter.indexCopied': '已复制',} as const;
+  'knowledgeCenter.indexCopied': '已复制',
+  'knowledgeCenter.imageBefore': '修复前',
+  'knowledgeCenter.imageAfter': '修复后',
+  'knowledgeCenter.imageMissing': '对照图未入库',
+  'knowledgeCenter.imageRole.observed': '修复前',
+  'knowledgeCenter.imageRole.reference': '修复后',
+  'knowledgeCenter.imageRole.illustration': '附图',
+} as const;

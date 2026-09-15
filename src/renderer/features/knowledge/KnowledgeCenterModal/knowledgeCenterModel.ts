@@ -68,6 +68,7 @@ export function detailToRecord(card: {
   sourceStatus?: string;
   caseId?: string;
   chapters?: KnowledgeCardRecord['chapters'];
+  images?: KnowledgeCardRecord['images'];
 }): KnowledgeCardRecord {
   return {
     cardId: card.cardId,
@@ -84,5 +85,6 @@ export function detailToRecord(card: {
     ...(card.sourceStatus ? { sourceStatus: card.sourceStatus } : {}),
     ...(card.caseId ? { caseId: card.caseId } : {}),
     ...(card.chapters ? { chapters: card.chapters } : {}),
+    ...(card.images?.length ? { images: card.images } : {}),
   };
 }

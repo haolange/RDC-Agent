@@ -4,7 +4,8 @@ import type {
   KnowledgeReviewRecord,
   SessionKnowledgeCandidate,
 } from '@shared/types/knowledge';
-import { ingestColdData, ingestColdDataFromPath, type ColdDataIngestResult } from './coldDataIngest';
+import { ingestKnowledge, ingestKnowledgeFromPath, type KnowledgeImportResult } from './knowledgeIngest';
+import { putStagedKnowledgeImages } from './knowledgeImageStaging';
 import { KnowledgeCandidateRequiresIntentError } from './knowledgeErrors';
 import {
   createSessionScopedKnowledgeStore,
@@ -62,14 +63,14 @@ export class KnowledgeCandidateService {
   }
 
   /**
-   * ColdData enters session staging as Draft. This method never creates a Candidate.
+   * Imported knowledge enters session staging as Draft. This method never creates a Candidate.
    */
-  async ingestColdDataToStaging(source: string, options: {
+  async ingestToStaging(source: string, options: {
     sessionId: string;
     spaceId?: string;
     availableAssetNames?: Iterable<string>;
-  }): Promise<ColdDataIngestResult> {
-    const result = ingestColdData(source, {
+  }): Promise<KnowledgeImportResult> {
+    const result = ingestKnowledge(source, {
       spaceId: options.spaceId ?? `staging:${options.sessionId}`,
       sessionId: options.sessionId,
       existingCaseIds: await this.existingCaseIds(options.sessionId),
@@ -78,12 +79,12 @@ export class KnowledgeCandidateService {
     return this.persistDraftResult(options.sessionId, result);
   }
 
-  async ingestColdDataPathToStaging(filePath: string, options: {
+  async ingestPathToStaging(filePath: string, options: {
     sessionId: string;
     spaceId?: string;
     availableAssetNames?: Iterable<string>;
-  }): Promise<ColdDataIngestResult> {
-    const result = await ingestColdDataFromPath(filePath, {
+  }): Promise<KnowledgeImportResult> {
+    const result = await ingestKnowledgeFromPath(filePath, {
       spaceId: options.spaceId ?? `staging:${options.sessionId}`,
       sessionId: options.sessionId,
       existingCaseIds: await this.existingCaseIds(options.sessionId),
@@ -127,8 +128,8 @@ export class KnowledgeCandidateService {
 
   private async persistDraftResult(
     sessionId: string,
-    result: ColdDataIngestResult,
-  ): Promise<ColdDataIngestResult> {
+    result: KnowledgeImportResult & { stagedImages?: import('./knowledgeIngest').KnowledgeStagedImage[] },
+  ): Promise<KnowledgeImportResult> {
     if (result.status === 'draft' && result.record) {
       await this.store.putDraft(sessionId, {
         card: result.record,
@@ -136,8 +137,12 @@ export class KnowledgeCandidateService {
         ...(result.sourceMtimeMs != null ? { sourceMtimeMs: result.sourceMtimeMs } : {}),
         ...(result.sourceSize != null ? { sourceSize: result.sourceSize } : {}),
       });
+      if (result.stagedImages?.length) {
+        await putStagedKnowledgeImages(result.record.cardId, result.stagedImages);
+      }
     }
-    return result;
+    const { stagedImages: _staged, ...publicResult } = result;
+    return publicResult;
   }
 }
 

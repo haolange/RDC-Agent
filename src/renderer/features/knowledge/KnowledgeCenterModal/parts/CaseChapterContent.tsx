@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
-import { MessageMarkdown } from '../../../../patterns/Markdown/MessageMarkdown';
 import { Button } from '../../../../ui/Button';
 import { useI18n } from '../../../../i18n';
+import { KnowledgeMarkdown } from './KnowledgeMarkdown';
 
 type Value = null | boolean | number | string | Value[] | { [key: string]: Value };
 
@@ -71,7 +71,7 @@ function EvidenceItem({ value, chinese }: { value: Record<string, Value>; chines
   </article>;
 }
 
-export function CaseChapterContent({ content, chapter }: { content: string; chapter?: string }) {
+export function CaseChapterContent({ content, chapter, spaceId }: { content: string; chapter?: string; spaceId: string }) {
   const { language } = useI18n();
   const chinese = language === 'zh-CN';
   const value = parseChapterValue(content);
@@ -94,6 +94,6 @@ export function CaseChapterContent({ content, chapter }: { content: string; chap
       {Object.keys(attributes).length > 0 && <StructuredValue value={attributes} chinese={chinese} />}
     </div>;
   }
-  return value === undefined ? <MessageMarkdown content={content} />
+  return value === undefined ? <KnowledgeMarkdown content={content} spaceId={spaceId} />
     : <div className="knowledge-case-structured"><StructuredValue value={value} chinese={chinese} /></div>;
 }

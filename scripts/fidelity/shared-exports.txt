@@ -209,8 +209,6 @@ classifyAgentToolEligibility
 CLIResult
 CodeInterpreterSettings
 CodePreview
-ColdDataIngestResult
-ColdDataIngestStatus
 CommandApi
 CommandContext
 CommandDefinition
@@ -612,6 +610,10 @@ KnowledgeExportRequest
 KnowledgeExportResult
 KnowledgeExportScope
 KnowledgeHumanConfirmation
+KnowledgeImageRef
+KnowledgeImageRole
+KnowledgeImportResult
+KnowledgeImportStatus
 KnowledgeIndexOverview
 KnowledgeLaneHit
 KnowledgeLaneResult

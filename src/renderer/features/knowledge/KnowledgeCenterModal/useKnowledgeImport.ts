@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type {
-  ColdDataIngestResult,
+  KnowledgeImportResult,
   KnowledgeCandidatesResult,
   KnowledgeCardRecord,
   KnowledgeSpace,
@@ -25,7 +25,7 @@ export function useKnowledgeImport(options: {
   const [source, setSource] = useState('');
   const [filePath, setFilePath] = useState<string | null>(null);
   const [spaceId, setSpaceId] = useState(options.spaces[0]?.spaceId ?? 'user');
-  const [result, setResult] = useState<ColdDataIngestResult | null>(null);
+  const [result, setResult] = useState<KnowledgeImportResult | null>(null);
   const [inbox, setInbox] = useState<KnowledgeCandidatesResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +104,7 @@ export function useKnowledgeImport(options: {
     setBusy(true);
     setError(null);
     try {
-      const imported = await window.electronAPI.knowledge.coldDataImport({
+      const imported = await window.electronAPI.knowledge.import({
         sessionId: options.sessionId,
         spaceId,
         ...(filePath ? { filePath } : { source }),

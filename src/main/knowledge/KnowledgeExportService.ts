@@ -9,7 +9,7 @@ import {
   type KnowledgePackage,
   type KnowledgePackageCard,
 } from '@shared/types/knowledgeExport';
-import { containsAbsolutePath, hasKnowledgeSecret } from './coldDataIngest';
+import { containsAbsolutePath, hasKnowledgeSecret } from './knowledgeIngest';
 
 export interface KnowledgeExportDependencies {
   getCard(spaceId: string, relativePath: string): Promise<KnowledgeCardDetail | null>;
@@ -38,6 +38,7 @@ export function toPackageCard(card: KnowledgeCardDetail): KnowledgePackageCard {
     sourceStatus: card.sourceStatus,
     caseId: card.caseId,
     chapters: card.chapters,
+    images: card.images,
   });
 }
 

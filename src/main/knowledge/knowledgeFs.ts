@@ -196,6 +196,7 @@ export function toCardDetail(
     ...(parsed.record.sourceStatus ? { sourceStatus: parsed.record.sourceStatus } : {}),
     ...(parsed.record.caseId ? { caseId: parsed.record.caseId } : {}),
     ...(parsed.record.chapters ? { chapters: parsed.record.chapters } : {}),
+    ...(parsed.record.images?.length ? { images: parsed.record.images } : {}),
     ...(parsed.record.sourceHash ? { sourceHash: parsed.record.sourceHash } : {}),
     ...(parsed.record.sourceMtimeMs != null ? { sourceMtimeMs: parsed.record.sourceMtimeMs } : {}),
     ...(parsed.record.sourceSize != null ? { sourceSize: parsed.record.sourceSize } : {}),

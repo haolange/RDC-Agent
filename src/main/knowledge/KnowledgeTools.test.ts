@@ -89,7 +89,23 @@ describe('KnowledgeTools', () => {
     const { byName, query } = createTools();
     const result = await byName.knowledge_read.execute('c5', { spaceId: 'user', relativePath: 'facts/sample.md' });
     expect(query.getCard).toHaveBeenCalledWith('user', 'facts/sample.md');
-    expect(result.details).toMatchObject({ cardId: 'user:facts/sample.md' });
+    expect(result.details).toMatchObject({ cardId: 'user:facts/sample.md', images: [] });
+  });
+
+  it('lists knowledge-root image paths and roles from knowledge_read', async () => {
+    const { byName, query } = createTools();
+    vi.mocked(query.getCard).mockResolvedValueOnce({
+      ...card,
+      content: card.body,
+      images: [{ relativePath: 'cases/sample/observed.png', role: 'observed' }],
+    });
+    const result = await byName.knowledge_read.execute('c5b', { spaceId: 'user', relativePath: 'facts/sample.md' });
+    const text = String(result.content[0] && 'text' in result.content[0] ? result.content[0].text : '');
+    expect(text).toContain('cases/sample/observed.png');
+    expect(text).toContain('observed');
+    expect(result.details).toMatchObject({
+      images: [{ relativePath: 'cases/sample/observed.png', role: 'observed' }],
+    });
   });
 
   it('creates a session candidate only after explicit intent and never as verified/promoted', async () => {

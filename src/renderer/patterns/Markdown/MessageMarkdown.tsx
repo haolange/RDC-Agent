@@ -16,6 +16,7 @@ interface MessageMarkdownProps {
   content: string;
   /** Skip KaTeX / math / highlight while the source is still streaming. */
   deferHeavyPlugins?: boolean;
+  renderImage?: (props: { src?: string; alt?: string }) => React.ReactNode;
 }
 
 const STREAMING_REMARK_PLUGINS: NonNullable<Options['remarkPlugins']> = [remarkGfm];
@@ -33,13 +34,8 @@ function isLanguageClass(className: unknown): string | null {
   return match?.[1] ?? null;
 }
 
-const markdownComponents: Components = {
-  a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noreferrer noopener">
-      {children}
-    </a>
-  ),
-  img: ({ src, alt }) => (
+function defaultMarkdownImage({ src, alt }: { src?: string; alt?: string }) {
+  return (
     <img
       src={src}
       alt={alt ?? ''}
@@ -47,46 +43,57 @@ const markdownComponents: Components = {
       loading="lazy"
       referrerPolicy="no-referrer"
     />
-  ),
-  input: (props) => {
-    if (props.type === 'checkbox') {
-      return (
-        <input
-          type="checkbox"
-          className="markdown-task-checkbox"
-          checked={Boolean(props.checked)}
-          disabled
-          readOnly
-        />
+  );
+}
+
+function createMarkdownComponents(renderImage?: MessageMarkdownProps['renderImage']): Components {
+  return {
+    a: ({ href, children }) => (
+      <a href={href} target="_blank" rel="noreferrer noopener">
+        {children}
+      </a>
+    ),
+    img: ({ src, alt }) => (renderImage ? renderImage({ src, alt }) : defaultMarkdownImage({ src, alt })),
+    input: (props) => {
+      if (props.type === 'checkbox') {
+        return (
+          <input
+            type="checkbox"
+            className="markdown-task-checkbox"
+            checked={Boolean(props.checked)}
+            disabled
+            readOnly
+          />
+        );
+      }
+      return <input {...props} />;
+    },
+    pre: ({ children }) => {
+      const childArray = React.Children.toArray(children);
+      const codeElement = childArray.find(
+        (child): child is React.ReactElement<{ className?: string; children?: React.ReactNode }> =>
+          React.isValidElement(child) && child.type === 'code',
       );
-    }
-    return <input {...props} />;
-  },
-  pre: ({ children }) => {
-    const childArray = React.Children.toArray(children);
-    const codeElement = childArray.find(
-      (child): child is React.ReactElement<{ className?: string; children?: React.ReactNode }> =>
-        React.isValidElement(child) && child.type === 'code',
-    );
 
-    if (!codeElement) {
-      return <pre>{children}</pre>;
-    }
+      if (!codeElement) {
+        return <pre>{children}</pre>;
+      }
 
-    const language = isLanguageClass(codeElement.props.className) ?? '';
-    const code = flattenMarkdownText(codeElement.props.children).replace(/\n$/, '');
+      const language = isLanguageClass(codeElement.props.className) ?? '';
+      const code = flattenMarkdownText(codeElement.props.children).replace(/\n$/, '');
 
-    if (language === 'mermaid') {
-      return <MarkdownMermaid source={code} />;
-    }
+      if (language === 'mermaid') {
+        return <MarkdownMermaid source={code} />;
+      }
 
-    return (
-      <MarkdownCodeBlock language={language} code={code}>
-        <code className={codeElement.props.className}>{codeElement.props.children}</code>
-      </MarkdownCodeBlock>
-    );
-  },
-};
+      return (
+        <MarkdownCodeBlock language={language} code={code}>
+          <code className={codeElement.props.className}>{codeElement.props.children}</code>
+        </MarkdownCodeBlock>
+      );
+    },
+  };
+}
 
 /**
  * Shared Markdown renderer for assistant answers, Work Process commentary,
@@ -95,15 +102,20 @@ const markdownComponents: Components = {
  * Raw HTML stays disabled (react-markdown default). External links open in a
  * new window. Mermaid and KaTeX are opt-in via fenced / math syntax.
  */
-const MessageMarkdownInner: React.FC<MessageMarkdownProps> = ({ content, deferHeavyPlugins = false }) => {
+const MessageMarkdownInner: React.FC<MessageMarkdownProps> = ({
+  content,
+  deferHeavyPlugins = false,
+  renderImage,
+}) => {
   const normalized = useMemo(() => normalizeAssistantMarkdown(content), [content]);
+  const components = useMemo(() => createMarkdownComponents(renderImage), [renderImage]);
 
   return (
     <div className="markdown-body">
       <Markdown
         remarkPlugins={deferHeavyPlugins ? STREAMING_REMARK_PLUGINS : FULL_REMARK_PLUGINS}
         rehypePlugins={deferHeavyPlugins ? undefined : FULL_REHYPE_PLUGINS}
-        components={markdownComponents}
+        components={components}
       >
         {normalized}
       </Markdown>

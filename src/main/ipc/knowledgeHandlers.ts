@@ -1,6 +1,7 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron';
 import type { KnowledgeIndexOverview, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
-import { COLD_DATA_MAX_BYTES } from '../knowledge/coldDataIngest';
+import { KNOWLEDGE_IMPORT_MAX_BYTES } from '../knowledge/knowledgeIngest';
+import { readKnowledgeImagePreview } from '../knowledge/knowledgeImagePreview';
 import { knowledgeCandidateService } from '../knowledge/KnowledgeCandidateService';
 import { knowledgeCompileService } from '../knowledge/KnowledgeCompileService';
 import {
@@ -18,7 +19,8 @@ import {
   KnowledgeCandidateCreateArgsSchema,
   KnowledgeCandidatesArgsSchema,
   KnowledgeCardArgsSchema,
-  KnowledgeColdDataImportArgsSchema,
+  KnowledgeImportArgsSchema,
+  KnowledgeImageArgsSchema,
   KnowledgeCompileArgsSchema,
   KnowledgeIndexRebuildArgsSchema,
   KnowledgeIssueApprovalTokenArgsSchema,
@@ -273,22 +275,39 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
     }
   });
 
-  ipcMain.handle('knowledge:coldDataImport', async (_event, ...rawArgs: unknown[]) => {
-    const [input] = parseIpcArgs(KnowledgeColdDataImportArgsSchema, rawArgs, {
-      label: 'knowledge:coldDataImport',
-      maxBytes: COLD_DATA_MAX_BYTES + 8 * 1024,
+  ipcMain.handle('knowledge:import', async (_event, ...rawArgs: unknown[]) => {
+    const [input] = parseIpcArgs(KnowledgeImportArgsSchema, rawArgs, {
+      label: 'knowledge:import',
+      maxBytes: KNOWLEDGE_IMPORT_MAX_BYTES + 8 * 1024,
     });
     try {
       if (input.spaceId) assertKnownSpaces([input.spaceId]);
       if (input.filePath) {
-        return await knowledgeCandidateService.ingestColdDataPathToStaging(input.filePath, {
+        return await knowledgeCandidateService.ingestPathToStaging(input.filePath, {
           sessionId: input.sessionId,
           ...(input.spaceId ? { spaceId: input.spaceId } : {}),
         });
       }
-      return await knowledgeCandidateService.ingestColdDataToStaging(input.source ?? '', {
+      return await knowledgeCandidateService.ingestToStaging(input.source ?? '', {
         sessionId: input.sessionId,
         ...(input.spaceId ? { spaceId: input.spaceId } : {}),
+      });
+    } catch (error) {
+      rethrowKnowledgeError(error);
+    }
+  });
+
+  ipcMain.handle('knowledge:image', async (_event, ...rawArgs: unknown[]) => {
+    const [input] = parseIpcArgs(KnowledgeImageArgsSchema, rawArgs, {
+      label: 'knowledge:image',
+      maxBytes: 4 * 1024,
+    });
+    try {
+      assertKnownSpaces([input.spaceId]);
+      return await readKnowledgeImagePreview({
+        spaces: knowledgeQueryService.listSpaces(),
+        spaceId: input.spaceId,
+        relativePath: input.relativePath,
       });
     } catch (error) {
       rethrowKnowledgeError(error);

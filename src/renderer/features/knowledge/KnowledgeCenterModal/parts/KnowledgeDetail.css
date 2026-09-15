@@ -53,8 +53,58 @@
 .knowledge-evidence-toggle.button:focus-visible { color: var(--token-text-heading); }
 .knowledge-evidence-details { margin-top: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--token-border-muted); }
 .knowledge-case-raw { white-space: pre-wrap; overflow-wrap: anywhere; }
+.knowledge-card-images { display: grid; gap: var(--space-4); margin-bottom: var(--space-6); }
+.knowledge-card-images-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.knowledge-card-image {
+  margin: 0;
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-raised);
+}
+.knowledge-card-image-label {
+  margin: 0 0 var(--space-2);
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+}
+.knowledge-card-image-frame {
+  display: grid;
+  place-items: center;
+  min-height: calc(var(--space-8) * 6);
+  max-height: 40vh;
+  overflow: hidden;
+  background: var(--token-bg-muted);
+  border-radius: var(--radius-sm);
+}
+.knowledge-card-image-frame img {
+  display: block;
+  max-width: 100%;
+  max-height: 40vh;
+  object-fit: contain;
+}
+.knowledge-card-image-missing {
+  display: grid;
+  gap: var(--space-2);
+  place-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: calc(var(--space-8) * 6);
+  padding: var(--space-4);
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+.knowledge-card-image-missing code {
+  color: var(--token-text-body);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
 @media (max-width: 640px) {
   .knowledge-center-content .knowledge-center-body { padding: var(--space-4); }
-  .knowledge-case-fields, .knowledge-symptom-comparison { grid-template-columns: 1fr; }
+  .knowledge-case-fields, .knowledge-symptom-comparison, .knowledge-card-images-pair { grid-template-columns: 1fr; }
   .knowledge-detail-info .knowledge-center-meta { grid-template-columns: 1fr; }
 }

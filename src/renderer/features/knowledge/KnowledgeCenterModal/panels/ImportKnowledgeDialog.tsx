@@ -6,16 +6,16 @@ import { Tabs } from '../../../../ui/Tabs';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { Textarea } from '../../../../ui/Textarea';
 import { useI18n, type TranslationKey } from '../../../../i18n';
-import type { ColdDataIngestStatus, KnowledgeSpace } from '@shared/types/knowledge';
+import type { KnowledgeImportStatus, KnowledgeSpace } from '@shared/types/knowledge';
 import type { useKnowledgeImport } from '../useKnowledgeImport';
 
-const IMPORT_STATUS_KEYS: Record<ColdDataIngestStatus, TranslationKey> = {
+const IMPORT_STATUS_KEYS: Record<KnowledgeImportStatus, TranslationKey> = {
   draft: 'knowledgeCenter.importStatusDraft',
   quarantine: 'knowledgeCenter.importStatusQuarantine',
   conflict: 'knowledgeCenter.importStatusConflict',
 };
 
-const IMPORT_STATUS_HINT_KEYS: Record<ColdDataIngestStatus, TranslationKey> = {
+const IMPORT_STATUS_HINT_KEYS: Record<KnowledgeImportStatus, TranslationKey> = {
   draft: 'knowledgeCenter.importStatusDraftHint',
   quarantine: 'knowledgeCenter.importStatusQuarantineHint',
   conflict: 'knowledgeCenter.importStatusConflictHint',

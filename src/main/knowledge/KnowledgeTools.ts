@@ -201,7 +201,7 @@ function createKnowledgeReadTool(deps: KnowledgeToolDependencies): AgentTool {
   return {
     name: 'knowledge_read',
     label: 'Read Knowledge',
-    description: 'Read one Knowledge card by space and relative path.',
+    description: 'Read one Knowledge card by space and relative path. Lists knowledge-root relative image paths and roles; inspect pixels with read_image.',
     parameters: {
       type: 'object',
       required: ['spaceId', 'relativePath'],
@@ -225,9 +225,14 @@ function createKnowledgeReadTool(deps: KnowledgeToolDependencies): AgentTool {
       if (!spaceId || !relativePath) return errorResult('spaceId and relativePath are required.');
       const card = await deps.query.getCard(spaceId, relativePath);
       if (!card) return errorResult(`Knowledge card not found: ${spaceId}:${relativePath}`, { spaceId, relativePath });
+      const images = card.images ?? [];
+      const imageLines = images.map((image) => `- ${image.role}\t${image.relativePath}`);
+      const imageBlock = imageLines.length > 0
+        ? `images\t${images.length}\n${imageLines.join('\n')}\n\n`
+        : '';
       return textResult(
-        `# ${card.title}\n\n${card.content}`,
-        { spaceId, relativePath, cardId: card.cardId, title: card.title },
+        `# ${card.title}\n\n${imageBlock}${card.content}`,
+        { spaceId, relativePath, cardId: card.cardId, title: card.title, images },
       );
     },
   };

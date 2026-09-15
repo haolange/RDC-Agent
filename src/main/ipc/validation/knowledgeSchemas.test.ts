@@ -3,7 +3,8 @@ import { IpcValidationError, parseIpcArgs } from './IpcPayloadGuard';
 import {
   KnowledgeCandidateCreateArgsSchema,
   KnowledgeCardArgsSchema,
-  KnowledgeColdDataImportArgsSchema,
+  KnowledgeImageArgsSchema,
+  KnowledgeImportArgsSchema,
   KnowledgeCompileArgsSchema,
   KnowledgePromoteArgsSchema,
   KnowledgeQueryArgsSchema,
@@ -73,10 +74,17 @@ describe('knowledge IPC schemas', () => {
     }], { label: 'knowledge:candidateCreate' })).toThrow(IpcValidationError);
   });
 
-  it('rejects coldDataImport without source or filePath', () => {
-    expect(() => parseIpcArgs(KnowledgeColdDataImportArgsSchema, [{
+  it('rejects import without source or filePath', () => {
+    expect(() => parseIpcArgs(KnowledgeImportArgsSchema, [{
       sessionId: 'session_a',
-    }], { label: 'knowledge:coldDataImport' })).toThrow(IpcValidationError);
+    }], { label: 'knowledge:import' })).toThrow(IpcValidationError);
+  });
+
+  it('rejects knowledge image lookup with empty relativePath', () => {
+    expect(() => parseIpcArgs(KnowledgeImageArgsSchema, [{
+      spaceId: 'user',
+      relativePath: '',
+    }], { label: 'knowledge:image' })).toThrow(IpcValidationError);
   });
 
   it('rejects card lookup with empty relativePath', () => {

@@ -1,7 +1,7 @@
 {
   "id": "analyzer-architecture-sanitized",
   "captureRef": "captures/fixture-pass-graph.rdc",
-  "notes": "Deidentified Analyzer oracle. No host paths, original screenshots, or ColdData filenames.",
+  "notes": "Deidentified Analyzer oracle. No host paths, original screenshots, or knowledge-import filenames.",
   "oracle": {
     "legal": [
       {

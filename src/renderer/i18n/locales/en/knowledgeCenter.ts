@@ -183,4 +183,11 @@ export const enKnowledgeCenter = {
   'knowledgeCenter.indexStatus': 'Status',
   'knowledgeCenter.indexReady': 'Ready',
   'knowledgeCenter.indexCopyRevision': 'Copy revision',
-  'knowledgeCenter.indexCopied': 'Copied',} as const;
+  'knowledgeCenter.indexCopied': 'Copied',
+  'knowledgeCenter.imageBefore': 'Before fix',
+  'knowledgeCenter.imageAfter': 'After fix',
+  'knowledgeCenter.imageMissing': 'Comparison image not in the library',
+  'knowledgeCenter.imageRole.observed': 'Before fix',
+  'knowledgeCenter.imageRole.reference': 'After fix',
+  'knowledgeCenter.imageRole.illustration': 'Illustration',
+} as const;

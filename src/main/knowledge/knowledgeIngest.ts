@@ -1,18 +1,27 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
+import path from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import {
   KNOWLEDGE_CASE_CHAPTERS,
-  type ColdDataIngestResult,
   type KnowledgeCardRecord,
   type KnowledgeCaseChapters,
+  type KnowledgeImageRef,
+  type KnowledgeImportResult,
+  type KnowledgeImportStatus,
   type KnowledgeScope,
 } from '@shared/types/knowledge';
 import { KNOWLEDGE_PACKAGE_SCHEMA } from '@shared/types/knowledgeExport';
+import {
+  isKnowledgeImageFileName,
+  knowledgeImageDestination,
+  knowledgeImageRoleFromAsset,
+  sanitizeKnowledgeImages,
+} from './knowledgeImages';
 
-export type { ColdDataIngestResult, ColdDataIngestStatus } from '@shared/types/knowledge';
+export type { KnowledgeImportResult, KnowledgeImportStatus };
 
-export const COLD_DATA_MAX_BYTES = 2 * 1024 * 1024;
+export const KNOWLEDGE_IMPORT_MAX_BYTES = 2 * 1024 * 1024;
 
 const SECRET_RE = /\b(api[_-]?key|password|secret|credential|authorization|bearer\s+[a-z0-9._+\-/=]+)\b/i;
 const DRIVE_ABS_RE = /(?<![A-Za-z0-9/])[A-Za-z]:[/\\]/;
@@ -37,17 +46,17 @@ function leakedSensitiveReason(...texts: Array<string | undefined>): 'secret-det
   return null;
 }
 
-export interface ColdDataPathStat {
+export interface KnowledgeImportPathStat {
   mtimeMs: number;
   size: number;
 }
 
-export interface ColdDataPathIo {
-  stat(filePath: string): Promise<ColdDataPathStat>;
+export interface KnowledgeImportPathIo {
+  stat(filePath: string): Promise<KnowledgeImportPathStat>;
   readFile(filePath: string): Promise<Buffer>;
 }
 
-const defaultPathIo: ColdDataPathIo = {
+const defaultPathIo: KnowledgeImportPathIo = {
   stat: async (filePath) => {
     const stat = await fs.stat(filePath);
     return { mtimeMs: stat.mtimeMs, size: stat.size };
@@ -55,10 +64,16 @@ const defaultPathIo: ColdDataPathIo = {
   readFile: (filePath) => fs.readFile(filePath),
 };
 
-export interface ColdDataAssetRef {
+export interface KnowledgeImportAssetRef {
   file: string;
   role?: string;
-  sha256?: string;
+}
+
+export interface KnowledgeStagedImage {
+  relativePath: string;
+  role: KnowledgeImageRef['role'];
+  bytes: Buffer;
+  sha256: string;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -120,9 +135,19 @@ function replaceMappedNames(text: string, mapping: Map<string, string>): string 
   return next;
 }
 
-function stripLeftoverFilenames(text: string): string {
+function stripLeftoverFilenames(text: string, keep: Iterable<string> = []): string {
+  const tokens = [...keep].filter(Boolean).sort((left, right) => right.length - left.length);
+  const placeholders = new Map<string, string>();
+  let protectedText = text;
+  tokens.forEach((token, index) => {
+    const mark = `\u0000KEEP${index}\u0000`;
+    placeholders.set(mark, token);
+    protectedText = protectedText.split(token).join(mark);
+  });
   FILENAME_TOKEN_RE.lastIndex = 0;
-  return text.replace(FILENAME_TOKEN_RE, '').replace(/[ \t]{2,}/g, ' ');
+  let stripped = protectedText.replace(FILENAME_TOKEN_RE, '').replace(/[ \t]{2,}/g, ' ');
+  for (const [mark, token] of placeholders) stripped = stripped.split(mark).join(token);
+  return stripped;
 }
 
 const PROVENANCE_TOKEN_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
@@ -136,7 +161,7 @@ export function sanitizeProvenanceToken(value: string | undefined): string | und
 }
 
 function redactText(text: string, mapping: Map<string, string>): string {
-  return stripLeftoverFilenames(replaceMappedNames(text, mapping));
+  return stripLeftoverFilenames(replaceMappedNames(text, mapping), mapping.values());
 }
 
 function redactValue(value: unknown, mapping: Map<string, string>): unknown {
@@ -156,8 +181,8 @@ function redactValue(value: unknown, mapping: Map<string, string>): unknown {
   return value;
 }
 
-function collectAssets(raw: unknown): ColdDataAssetRef[] {
-  const assets: ColdDataAssetRef[] = [];
+function collectAssets(raw: unknown): KnowledgeImportAssetRef[] {
+  const assets: KnowledgeImportAssetRef[] = [];
   const visit = (value: unknown) => {
     if (!value) return;
     if (Array.isArray(value)) {
@@ -170,7 +195,6 @@ function collectAssets(raw: unknown): ColdDataAssetRef[] {
         assets.push({
           file: row.file,
           ...(typeof row.role === 'string' ? { role: row.role } : {}),
-          ...(typeof row.sha256 === 'string' ? { sha256: row.sha256 } : {}),
         });
         return;
       }
@@ -179,6 +203,26 @@ function collectAssets(raw: unknown): ColdDataAssetRef[] {
   };
   visit(raw);
   return assets;
+}
+
+function mapDeclaredAssets(assets: KnowledgeImportAssetRef[], caseId: string): {
+  mapping: Map<string, string>;
+  images: KnowledgeImageRef[];
+} {
+  const mapping = new Map<string, string>();
+  const images: KnowledgeImageRef[] = [];
+  const used = new Set<string>();
+  for (const asset of assets) {
+    if (isKnowledgeImageFileName(asset.file)) {
+      const role = knowledgeImageRoleFromAsset(asset.role);
+      const dest = knowledgeImageDestination(caseId, role, asset.file, used);
+      mapping.set(asset.file, dest);
+      images.push({ relativePath: dest, role });
+      continue;
+    }
+    mapping.set(asset.file, opaqueAssetId(asset.file));
+  }
+  return { mapping, images };
 }
 
 function chapterFrom(value: unknown): string | undefined {
@@ -230,13 +274,13 @@ function buildBody(title: string, chapters: KnowledgeCaseChapters): string {
 /**
  * Knowledge packages produced by export come back in as ordinary session
  * drafts. The package `lifecycle` is metadata only: nothing re-enters as
- * verified, and a duplicate cardId takes the same conflict path as ColdData.
+ * verified, and a duplicate cardId takes the same conflict path as case YAML.
  */
 export function ingestKnowledgePackage(doc: Record<string, unknown>, options: {
   spaceId?: string;
   existingCardIds?: Iterable<string>;
-}): ColdDataIngestResult {
-  const none: ColdDataIngestResult = {
+}): KnowledgeImportResult {
+  const none: KnowledgeImportResult = {
     status: 'quarantine',
     candidateCreated: false,
     lifecycle: null,
@@ -262,6 +306,11 @@ export function ingestKnowledgePackage(doc: Record<string, unknown>, options: {
     };
   }
 
+  const images = sanitizeKnowledgeImages(
+    Array.isArray(first.images) ? first.images as KnowledgeImageRef[] : undefined,
+    relativePath,
+    readString(first.caseId),
+  );
   const record: KnowledgeCardRecord = {
     cardId,
     spaceId,
@@ -276,6 +325,7 @@ export function ingestKnowledgePackage(doc: Record<string, unknown>, options: {
     ...(readString(first.sourceStatus) ? { sourceStatus: readString(first.sourceStatus) } : {}),
     ...(readString(first.caseId) ? { caseId: readString(first.caseId) } : {}),
     ...(first.chapters ? { chapters: asRecord(first.chapters) as KnowledgeCaseChapters } : {}),
+    ...(images.length > 0 ? { images } : {}),
   };
 
   return {
@@ -284,17 +334,17 @@ export function ingestKnowledgePackage(doc: Record<string, unknown>, options: {
     lifecycle: 'draft',
     verified: false,
     record,
-    missingAssets: [],
+    missingAssets: images.map((image) => image.relativePath),
   };
 }
 
-export function ingestColdData(source: string, options: {
+export function ingestKnowledge(source: string, options: {
   spaceId?: string;
   sessionId?: string;
   existingCaseIds?: Iterable<string>;
   availableAssetNames?: Iterable<string>;
-} = {}): ColdDataIngestResult {
-  const none: ColdDataIngestResult = {
+} = {}): KnowledgeImportResult {
+  const none: KnowledgeImportResult = {
     status: 'quarantine',
     candidateCreated: false,
     lifecycle: null,
@@ -351,25 +401,30 @@ export function ingestColdData(source: string, options: {
     return { ...none, reason: 'filename-leaked' };
   }
   const assets = collectAssets(doc.assets);
-  const assetIds = new Map(assets.map((asset) => [asset.file, opaqueAssetId(asset.file)]));
-  const available = new Set(options.availableAssetNames ?? assets.map((asset) => asset.file));
+  const { mapping, images } = mapDeclaredAssets(assets, sanitizedCaseId);
+  const available = new Set(options.availableAssetNames ?? []);
   const missingAssets = assets
     .filter((asset) => !available.has(asset.file))
-    .map((asset) => assetIds.get(asset.file) ?? opaqueAssetId(asset.file));
-  const redactedDoc = asRecord(redactValue(doc, assetIds));
+    .map((asset) => mapping.get(asset.file) ?? opaqueAssetId(asset.file));
+  const redactedDoc = asRecord(redactValue(doc, mapping));
   const scope = mapScope(asRecord(redactedDoc.environment));
-  const sanitizedTitle = redactText(title, assetIds);
+  const sanitizedTitle = redactText(title, mapping);
   const chapters = Object.fromEntries(
     Object.entries(buildChapters(redactedDoc, scope)).map(([key, value]) => [
       key,
-      typeof value === 'string' ? redactText(value, assetIds) : value,
+      typeof value === 'string' ? redactText(value, mapping) : value,
     ]),
   ) as KnowledgeCaseChapters;
   const spaceId = options.spaceId || 'staging';
   const relativePath = `cases/${sanitizedCaseId}.md`;
-  const body = redactText(buildBody(sanitizedTitle, chapters), assetIds);
-  const preview = redactText(sanitizedTitle, assetIds);
+  const body = redactText(buildBody(sanitizedTitle, chapters), mapping);
+  const preview = redactText(sanitizedTitle, mapping);
   const originals = assets.map((asset) => asset.file);
+  const sanitizedImages = sanitizeKnowledgeImages(images, relativePath, sanitizedCaseId);
+  const allowedPaths = new Set([
+    ...mapping.values(),
+    ...sanitizedImages.map((image) => image.relativePath),
+  ]);
   const published = [
     sanitizedTitle,
     preview,
@@ -378,8 +433,13 @@ export function ingestColdData(source: string, options: {
     sanitizedCaseId,
     ...Object.values(chapters),
     ...missingAssets,
+    ...sanitizedImages.map((image) => image.relativePath),
   ];
-  if (originals.some((name) => published.some((text) => typeof text === 'string' && text.includes(name)))) {
+  const leakedOriginal = originals.some((name) => published.some((text) => {
+    if (typeof text !== 'string' || !text.includes(name)) return false;
+    return ![...allowedPaths].some((allowed) => text === allowed || text.includes(allowed));
+  }));
+  if (leakedOriginal) {
     return { ...none, reason: 'filename-leaked' };
   }
   const record: KnowledgeCardRecord = {
@@ -396,6 +456,7 @@ export function ingestColdData(source: string, options: {
     caseId: sanitizedCaseId,
     chapters,
     preview,
+    ...(sanitizedImages.length > 0 ? { images: sanitizedImages } : {}),
   };
   const leaked = leakedSensitiveReason(sanitizedTitle, body, preview, ...Object.values(chapters));
   if (leaked) {
@@ -413,16 +474,15 @@ export function ingestColdData(source: string, options: {
   };
 }
 
-export function coldDataContentId(bytes: Buffer | string): string {
-  const digest = createHash('sha256').update(bytes).digest('hex');
-  return digest.slice(0, 8);
+export function knowledgeImportContentId(bytes: Buffer | string): string {
+  return createHash('sha256').update(bytes).digest('hex').slice(0, 8);
 }
 
-export function hashColdDataBytes(bytes: Buffer): string {
+export function hashKnowledgeImportBytes(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-function quarantine(reason: string): ColdDataIngestResult {
+function quarantine(reason: string): KnowledgeImportResult {
   return {
     status: 'quarantine',
     candidateCreated: false,
@@ -433,7 +493,7 @@ function quarantine(reason: string): ColdDataIngestResult {
   };
 }
 
-export async function ingestColdDataFromPath(
+export async function ingestKnowledgeFromPath(
   filePath: string,
   options: {
     spaceId?: string;
@@ -441,12 +501,12 @@ export async function ingestColdDataFromPath(
     existingCaseIds?: Iterable<string>;
     availableAssetNames?: Iterable<string>;
     maxBytes?: number;
-    io?: ColdDataPathIo;
+    io?: KnowledgeImportPathIo;
   } = {},
-): Promise<ColdDataIngestResult> {
+): Promise<KnowledgeImportResult & { stagedImages?: KnowledgeStagedImage[] }> {
   const io = options.io ?? defaultPathIo;
-  const maxBytes = options.maxBytes ?? COLD_DATA_MAX_BYTES;
-  let preStat: ColdDataPathStat;
+  const maxBytes = options.maxBytes ?? KNOWLEDGE_IMPORT_MAX_BYTES;
+  let preStat: KnowledgeImportPathStat;
   try {
     preStat = await io.stat(filePath);
   } catch {
@@ -464,8 +524,8 @@ export async function ingestColdDataFromPath(
   if (preBytes.length > maxBytes) {
     return quarantine('source-too-large');
   }
-  const preHash = hashColdDataBytes(preBytes);
-  let postStat: ColdDataPathStat;
+  const preHash = hashKnowledgeImportBytes(preBytes);
+  let postStat: KnowledgeImportPathStat;
   let postBytes: Buffer;
   try {
     postStat = await io.stat(filePath);
@@ -476,7 +536,7 @@ export async function ingestColdDataFromPath(
   if (postBytes.length > maxBytes) {
     return quarantine('source-too-large');
   }
-  const postHash = hashColdDataBytes(postBytes);
+  const postHash = hashKnowledgeImportBytes(postBytes);
   if (
     preHash !== postHash
     || Math.trunc(preStat.mtimeMs) !== Math.trunc(postStat.mtimeMs)
@@ -485,9 +545,59 @@ export async function ingestColdDataFromPath(
   ) {
     return quarantine('source-changed');
   }
-  const result = ingestColdData(preBytes.toString('utf8'), options);
+  let parsed: unknown;
+  try {
+    parsed = parseYaml(preBytes.toString('utf8'));
+  } catch {
+    parsed = {};
+  }
+  const declared = collectAssets(asRecord(parsed).assets).map((asset) => asset.file);
+  const available = new Set(options.availableAssetNames ?? []);
+  const siblingDir = path.dirname(filePath);
+  const stagedImages: KnowledgeStagedImage[] = [];
+  if (!options.availableAssetNames) {
+    for (const name of declared) {
+      try {
+        await io.stat(path.join(siblingDir, name));
+        available.add(name);
+      } catch {
+        // sibling absent
+      }
+    }
+  }
+  const result = ingestKnowledge(preBytes.toString('utf8'), {
+    ...options,
+    availableAssetNames: available,
+  });
   if (result.status !== 'draft' || !result.record) {
     return result;
+  }
+  if (result.record.images?.length) {
+    const destBySource = new Map<string, KnowledgeImageRef>();
+    const assets = collectAssets(asRecord(parsed).assets);
+    const used = new Set<string>();
+    for (const asset of assets) {
+      if (!isKnowledgeImageFileName(asset.file)) continue;
+      const role = knowledgeImageRoleFromAsset(asset.role);
+      const dest = knowledgeImageDestination(result.record.caseId ?? 'case', role, asset.file, used);
+      const image = result.record.images.find((entry) => entry.relativePath === dest);
+      if (image) destBySource.set(asset.file, image);
+    }
+    for (const [sourceName, image] of destBySource) {
+      if (!available.has(sourceName)) continue;
+      try {
+        const bytes = await io.readFile(path.join(siblingDir, sourceName));
+        if (bytes.length > maxBytes) continue;
+        stagedImages.push({
+          relativePath: image.relativePath,
+          role: image.role,
+          bytes,
+          sha256: hashKnowledgeImportBytes(bytes),
+        });
+      } catch {
+        // sibling unreadable
+      }
+    }
   }
   const sourceHash = preHash;
   const sourceMtimeMs = Math.trunc(preStat.mtimeMs);
@@ -500,5 +610,6 @@ export async function ingestColdDataFromPath(
     sourceHash,
     sourceMtimeMs,
     sourceSize,
+    ...(stagedImages.length > 0 ? { stagedImages } : {}),
   };
 }
