@@ -438,11 +438,13 @@
 }
 
 .active-signal-text.is-active {
-  display: inline;
+  display: inline-block;
   background-image: linear-gradient(
     90deg,
     color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 0%,
-    var(--active-signal-highlight) 46%,
+    color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 35%,
+    color-mix(in srgb, var(--token-text-heading) 75%, var(--active-signal-highlight)) 50%,
+    color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 65%,
     color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 100%
   );
   background-size: 200% 100%;
@@ -455,7 +457,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .active-signal-text.is-active {
+  html[data-reduce-motion='system'] .active-signal-text.is-active {
     animation: none;
     background-image: none;
     background-clip: border-box;

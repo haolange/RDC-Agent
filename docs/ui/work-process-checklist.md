@@ -8,6 +8,7 @@
 - loop thinking 运行态默认展开（summary/raw/unknown 与 final-answer/收束 thinking 同一生命周期）。
 - Active Signal「正在思考 / Thinking」。
 - `.work-process-label.status-running` **不得**设置 `color`（仅 `--active-signal-highlight`）；运行标签 shimmer 依赖 `color: transparent` + `background-clip: text`，任何后续规则覆盖 `color` 都会冻结为透明。
+- `.work-process-label` 与 collapsed / header hover 只能给 `:not(.is-active)` 设 `color`；`.active-signal-text.is-active` 用 `inline-block`。
 
 ## 完成态
 
@@ -44,7 +45,8 @@
 ## Active Signal / reduceMotion
 
 - 动画名 `active-signal-shimmer`；`.active-signal-text.is-active` 为 clipped-gradient 能量扫光（`1.6s linear`、`background-size: 200%`、`repeat-x`、36% wash 两端对齐，无关键帧停顿）。
-- Settings `html[data-reduce-motion='on']` 与 OS `prefers-reduced-motion: reduce` 均回退静态 `--active-signal-highlight`（移除透明 gradient）；全局 `animation-duration: 0` 仍生效，fallback 负责去掉冻结透明字。
+- Settings `on`，或 `system` 且 OS `prefers-reduced-motion: reduce` 时回退静态 `--active-signal-highlight`（移除透明 gradient）；`off` 不受系统减少动效覆盖。全局限制动画时长，静态样式负责保持文字可读。
+- Composer 真实 busy 状态下四边光带连续移动，固定圆角遮罩不旋转；停止后光层消失。用实际回合检查，不用临时 class 模拟验收。
 - 门禁：`ActiveSignalText.test.ts` + `check:work-process` 扫描 `.work-process-label.status-running` 不得含 `color:`。
 
 ## Web 族

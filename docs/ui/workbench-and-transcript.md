@@ -35,13 +35,13 @@ Commentary：markdown 散文，不进 thinking 槽。Tool / Asked / Sub Agent / 
 
 `error_recovery_*` 仅 Agent Activity / runtime log，不进 Work Process 叙事。Request Inspector 不出现在消息流或右侧默认 Session/Trace。入场动画由真实事件驱动，禁止假 stagger。
 
-Active Signal：`active-signal-shimmer` clipped-gradient 能量扫光（`1.6s linear`、`background-size: 200%`、`repeat-x`、36% wash 整格循环）；仅用于权威 running/pending/streaming 主短语。`.work-process-label.status-running` 只设 `--active-signal-highlight`，**禁止**再设 `color`（否则扫光字体会冻在透明）。减少动效：`prefers-reduced-motion: reduce` 与 Settings `html[data-reduce-motion='on']` 均回退静态 `--active-signal-highlight`（移除透明 gradient）；全局 animation-duration kill 仍生效，fallback 负责可见高亮字。
+Active Signal：`active-signal-shimmer` clipped-gradient 能量扫光（`1.6s linear`、`background-size: 200%`、`repeat-x`、36% wash 整格循环）；仅用于权威 running/pending/streaming 主短语。`.work-process-label.status-running` 只设 `--active-signal-highlight`，**禁止**再设 `color`（否则扫光被固定字色遮住）。减少动效：Settings `on`，或 `system` 且 `prefers-reduced-motion: reduce` 时回退静态 `--active-signal-highlight`（移除透明 gradient）；`off` 正常播放。全局时长限制与组件静态样式采用同一设置语义。
 
 ## Human-in-the-loop
 
 `ask_user`：batch `questions[]`；`ConversationToolCall.userInputQuestions` 为唯一跨层 payload；`argsPreview` 仅展示。Composer 区 wizard 答题；Work Process 记录紧凑 Q/A transcript。
 
-`plan_artifact` 与 `ask_user` 同构停顿。三层表面：Work Process 计划卡（`PlanCard`，无同意/拒绝按钮）、只读阅读面板（`PlanReviewPanel`）、Composer 待审门（`PlanReviewRequestPanel` + `HandoffActionRow`）。Composer 优先级 `pendingToolApproval > pendingPlanReview > pendingUserInput`。通过 = 点当前 Agent 声明的 continue handoff 按钮（文案 = `label`）；拒绝意见必填。superseded / rejected 降为工具壳行。计划不进 Right Rail。回合成功终态在 final answer 下渲染 `handoffSuggestions` 建议行，与计划门共用 `HandoffActionRow`。
+`plan_artifact` 与 `ask_user` 同构停顿。三层表面：Work Process 计划卡（`PlanCard`，无同意/拒绝按钮）、只读阅读面板（`PlanReviewPanel`）、Composer 待审门（`PlanReviewRequestPanel` + `HandoffActionRow`）。Composer 优先级 `pendingToolApproval > pendingPlanReview > pendingUserInput`。通过 = 点当前 Agent 声明的 continue handoff 按钮（文案 = `label`）；拒绝意见必填。superseded / rejected 降为工具壳行。计划不进 Right Rail。不得把计划写进 `final_answer` 冒充审阅门。Mission 回合成功终态仅在本回合 `plan_artifact` 的真实批准事件已投影到 workTrace 时才在 final answer 下快照 `handoffSuggestions`；该事件在冻结计划后发布。澄清/散文计划不挂 Execute。建议行与计划门共用 `HandoffActionRow`，但不代替批准冻结。
 
 ## Composer 控件
 

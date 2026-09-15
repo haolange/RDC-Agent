@@ -40,6 +40,7 @@ assert(activeSignalSource.includes('data-active-signal={active ? tone : undefine
 assert(activeSignalHelper.includes("status === 'running' || status === 'pending'"), 'active signal must be driven by running/pending Work Process status');
 assert(activeSignalHelper.includes("thinkingStatus === 'streaming'"), 'active signal must recognize streaming thinking lifecycle');
 assert(activeSignalStyles.includes('.active-signal-text.is-active'), 'active signal text CSS class is missing');
+assert(activeSignalStyles.includes('display: inline-block'), 'active signal must use inline-block so flex headers keep a wash box');
 assert(activeSignalStyles.includes('background-clip: text'), 'active signal must use clipped-gradient energy shimmer');
 assert(activeSignalStyles.includes('background-size: 200% 100%'), 'active signal must tile a 200% energy wash so the loop is one period');
 assert(activeSignalStyles.includes('background-repeat: repeat-x'), 'active signal must repeat-x so the loop seam can tile');
@@ -1218,8 +1219,12 @@ assert(
   'nested tool rows should use top-only space-2 padding (denser than loop entrance / turn boundary)',
 );
 assert(
-  cssSource.includes('.work-process.is-collapsed .work-process-label'),
-  'collapsed Work Process header should use quieter caption chrome',
+  cssSource.includes('.work-process.is-collapsed .work-process-label:not(.is-active)'),
+  'collapsed Work Process header must not override Active Signal color',
+);
+assert(
+  cssSource.includes('.work-process-label:not(.is-active)'),
+  'Work Process labels must not set color while Active Signal is live',
 );
 assert(
   /order:\s*1/.test(cssSource.match(/\.work-process-status-dot\s*\{[^}]+\}/)?.[0] ?? ''),
@@ -1297,11 +1302,27 @@ assert(!cssSource.includes('.work-process-step-rail.is-section .work-process-rai
 assert(!cssSource.includes('.work-process-steps-toggle'), 'legacy tool-step toggle CSS should be removed');
 assert(!cssSource.includes('.work-process-empty'), 'placeholder empty-state CSS should be removed');
 assert(!appShellSource.includes('composerEnergyFlow'), 'composer running border must not use the legacy uniform sweep keyframe');
-assert(!appShellSource.includes('composerEnergyOrbit'), 'composer running border must not use an energy orbit keyframe');
-assert(!appShellSource.includes('.composer-shell.is-running::before'), 'composer running border must not use an orbit/bloom pseudo layer');
+assert(appShellSource.includes('composerEnergyOrbit'), 'composer running border must use the energy orbit keyframe');
+assert(appShellSource.includes('.composer-shell.is-running::before'), 'composer running border must use the orbit stroke pseudo layer');
+assert(
+  /@keyframes composerEnergyOrbit[\s\S]{0,150}background-position:/.test(appShellSource),
+  'composer running orbit must move the light inside a fixed border mask',
+);
+const orbitStroke = appShellSource.match(/\.composer-shell\.is-running::before\s*\{[^}]+\}/)?.[0] ?? '';
+assert(!/\b(transform|filter):/.test(orbitStroke), 'composer orbit must not rotate the rectangular mask or filter the stroke');
+assert(orbitStroke.includes('pointer-events: none'), 'composer orbit must not intercept input');
+assert(activeSignalStyles.includes("html[data-reduce-motion='system'] .active-signal-text.is-active"), 'system motion fallback must not override Settings off');
+assert(appShellSource.includes("html[data-reduce-motion='system'] .composer-shell.is-running::before"), 'composer system motion fallback must not override Settings off');
+assert(!appShellSource.includes('@property --composer-energy-angle'), 'composer running orbit must not register --composer-energy-angle');
+assert(!appShellSource.includes('--composer-energy-angle'), 'composer running orbit must not interpolate --composer-energy-angle');
 assert(!appShellSource.includes('.composer-shell.is-running::after'), 'composer running border must not use a halo pseudo layer');
 assert(appShellSource.includes('.composer-shell.is-running:focus-within'), 'composer running border must preserve the focus ring layer');
 assert(appShellSource.includes('@media (prefers-reduced-motion: reduce)'), 'composer running status motion should honor reduced motion');
+assert(
+  /html\[data-reduce-motion='on'\][\s\S]{0,180}\.composer-shell\.is-running::before/.test(appShellSource)
+    || appShellSource.includes("html[data-reduce-motion='on'] .composer-shell.is-running::before"),
+  'Settings reduceMotion=on must freeze the composer orbit at a static bloom',
+);
 assert(appShellSource.includes('--composer-shell-radius: var(--radius-lg)'), 'composer shell radius must use the restrained radius-lg scale');
 
 assert(i18nSource.includes("'chat.workProcessTitle': 'Work process'"), 'English process title copy should be Work process');

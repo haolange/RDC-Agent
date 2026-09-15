@@ -88,7 +88,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 | 体系 | 数据 | 作用域 |
 |------|------|--------|
 | 全局 Appearance | `appearance.theme` + `chromeThemes.light\|dark` | Shell、Settings、transcript、全局 CTA/focus |
-| Compose Agent | `.agent.md` `accent` → `--composer-mode-accent` / `--composer-effort-*` | Composer 边框、send、Effort/Max 色相；禁止 energy orbit / 流光 |
+| Compose Agent | `.agent.md` `accent` → `--composer-mode-accent` / `--composer-effort-*` | Composer 边框、send、Effort/Max 色相；运行态 `is-running` 使用 token 化 energy orbit |
 
 - Light/Dark（含 system）影响两套体系的亮度调制。
 - 不提供 translucent sidebar。
@@ -125,7 +125,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 - Agent accent 必须可配置（`.agent.md` + Settings → Agents GUI）；`AGENT_SEED_ACCENTS` 仅用于 builtin seed 初值，不是运行时权威。
 - `--token-context-*` 色阶专用于 Context breakdown 弹窗的分段条与图例色点，不得挪作其它装饰或背景。
 - 不得引入非 design-system.css / ThemeChromeCompiler 定义的新颜色；需要新颜色时先在 `--token-*` 或 chrome 编译层添加并说明用途。
-- Composer 运行态禁止 energy orbit / 流光 / backdrop blur；agent accent 只体现在边框、send 与 Effort 色相。
+- Composer 运行态用 `--composer-mode-accent` 驱动 `composerEnergyOrbit` 四边绕光：`.composer-shell.is-running::before` 的圆角边框遮罩固定，径向光斑通过 `background-position` 沿四边移动；光层不截获指针。禁止旋转长方形遮罩、`@property` 角度插值、drop-shadow、`composerEnergyFlow`、`::after` halo 与 backdrop blur。Settings 减少动效为 `on`，或为 `system` 且系统要求减少动效时停转、保留静态一角光；`off` 正常播放。agent accent 同时体现在边框、send 与 Effort 色相。
 
 ## 新增组件规则
 
@@ -243,7 +243,7 @@ pnpm run typecheck
 | `:hover` 必配 `:focus-visible`；禁无替代 `outline: none` | 无自动门禁 | **B8** 扫描清零 |
 | 分子组件清单与交互态 / CSS 变量 variant / 禁内联 style | `src/renderer/ui` 已落地；luna 审查 | **B2** 已落地 |
 | 统一 `EmptyState` + 可选 visual | 组件已落地；Right Rail 五卡恢复 token 着色等距场景 | **B2** 组件；二次收敛恢复 visual |
-| Composer 禁 energy orbit / 流光 | `check:work-process` 禁止 orbit keyframe / `::before` bloom | **B6** 已落地 |
+| Composer 运行态 energy orbit | `check:work-process` 要求 `composerEnergyOrbit` + `::before` 固定遮罩内移动光斑；禁旋转遮罩 / `@property --composer-energy-angle` / `composerEnergyFlow` / `::after` halo | B6 删除已废止；真实 busy 状态下目视验收 |
 | DropdownSelect 禁 backdrop blur | `check:appearance` 要求实色 `--token-bg-shell`、禁止 blur | B1 已反转 |
 | Preview 引用运行时 CSS，删除 `designs/tokens/*` | Preview 已改；副本已删并入 `retired` | **B2** 已落地 |
 | i18n 拆分、硬编码入 i18n、sentence case | key 已拆到 `i18n/locales/{en,zh-CN}/`；硬编码与 sentence case 仍待扫 | **B3** 拆分；**B8** 文案 |

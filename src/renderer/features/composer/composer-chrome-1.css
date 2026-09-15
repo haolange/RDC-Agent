@@ -4,6 +4,7 @@
 .composer-shell {
   --composer-mode-accent: var(--token-accent-primary);
   --composer-shell-radius: var(--radius-lg);
+  --composer-energy-stroke: 2px;
   container-type: inline-size;
   container-name: composer;
   position: relative;

@@ -1,11 +1,19 @@
 @media (prefers-reduced-motion: reduce) {
-  .composer-agent-menu-item-running-dot {
+  html[data-reduce-motion='system'] .composer-agent-menu-item-running-dot {
     animation: none;
   }
 
-  .composer-agent-menu-item-tooltip {
+  html[data-reduce-motion='system'] .composer-agent-menu-item-tooltip {
     transition: none;
   }
+
+  html[data-reduce-motion='system'] .composer-shell.is-running::before {
+    animation: none;
+  }
+}
+
+html[data-reduce-motion='on'] .composer-shell.is-running::before {
+  animation: none;
 }
 
 /* Narrow composer: keep one row. Collapse chrome to icons; model label fades. */
