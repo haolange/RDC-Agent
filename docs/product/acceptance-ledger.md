@@ -450,3 +450,27 @@ Android matching-runtime acceptance now passed: Android Studio SDK NDK 27.3.1375
 源码 SHA-256：`src/renderer/styles/design-system.css` = `5A2F7A9188BDB7D65093EFD1115E8A3AEA6BFAFFED325E3ADE2A314056002D0C`；`composer-chrome-3.css` = `5178A96BABA2832DD6C544BB663735772AA788C3F0EC2B9C9F04DEDB621C6671`；`ConversationTurnTerminal.ts` = `7F528940BF14ADBDBF6EBB1D86E1E95873B5A7F74810A8FF994E18FC297F21BF`；`missionHandoffSuggestions.ts` = `055FC7F191C3B1E12E3DFCFE24B8DBE932FCA8F0298FEF45860D8F1652A7093A`。
 
 真实 UI 阻塞：本任务内置浏览器接入既有 canonical 服务返回 `net::ERR_BLOCKED_BY_CLIENT`，未能进入页面。既有 canonical browser 进程继续持有 instance.lock；未关闭、未手改 Settings/会话、未发起模型测试。已请求用户确认重启以加载新主进程构建并取得新一次性 /qa 入口，以及内置浏览器仍拦截时能否用 Chrome。批准前不替换既有服务；本条不宣称桌面启动权已交还，也不宣称用户目视验收通过。
+
+## 2026-09-15 核心动效历史还原
+
+基于 `3d501629` 的未提交工作区；Composer 基准为 `093caa82^`，Active Signal 基准为 `1b531894`。本节不改变此前 Mission 验收结果。
+
+- 历史视觉与现有组件收敛：核心运行态通过，完整矩阵仍有下述未覆盖项。单一 Composer 角度绕光、ActiveSignalText 宽渐变；保留当前布局及颜色覆盖修复。
+- 全应用减少动效控制删除：工程通过。UI、类型、持久化投影、DOM、CSS 与 Effort 静态分支一起删除；保留正常动效。
+- 工程验证：399 文件、2878 用例通过；既有 3 文件 / 3 用例跳过。覆盖率 statements 72.61%、branches 62.19%、functions 76.86%、lines 74.99%；coverage ratchet 通过。typecheck、lint 与 UI 专项检查通过；完整 check:gates 与 build 通过。Knowledge 原临时路径 EPERM，使用本轮工作区内专用 TEMP 后通过，未修改业务逻辑或断言。
+- 真实 Browser 局部验收：通过标准 start:agent-browser 的 disposable 用户目录与一次性 /qa 入口进入同源 /app。390px 视口无横向溢出，Composer 宽 354px；三行输入正常；错误终态没有 is-running / active signal，绕光 animation-name 为 none。此项不代表持续运行的视觉恢复通过。
+- 首次隔离动态验收的历史阻塞（后由真实账号解除）：本地模拟 Provider 的模型没有 source-backed toolCalling.supported，session:setModelOverride 返回 MODEL_TOOLS_UNVERIFIED；临时 OpenAI 账号模型路由固定在服务目录地址，不能经 models.json 的 provider baseUrl 转向本机模拟服务，假凭据回合以认证失败结束（2.2s）。未更改模型能力门禁或运行时业务逻辑。随后用户明确授权使用 ClinePass 或 OpenCode Go 的 DeepSeek V4，真实回合结果见下节。
+- 动画与源码审计：原 25 个 keyframes 名称全部保留；Composer 同名 orbit 从四边位置动画替换为历史角度动画。生产源码无减少动效控制、媒体查询或监听器；旧字段仅在删除验证测试中出现。
+- 本轮资源清理：通过。隔离 QA Electron、本机模拟服务与启动器已退出；本轮 motion-verification 测试/QA 根及首次 disposable 临时目录已删除；canonical instance.lock 不存在。桌面启动权已交还。保留当前 out 构建和 coverage 验证产物，不保留临时账号、会话或模拟服务。
+
+本轮源码 SHA-256：`src/renderer/features/composer/composer-motion.css` = `ad23b232c283bec5d64518b2c57a05e9beb9e5a513e725c4d9edaa070c777980`；`src/renderer/styles/design-system.css` = `ebf1d4679089dde661c060e28d40b1dbc50b1ecb2dc76b5239f9ea156f42c76d`。
+
+### 2026-09-15 真实账号续验
+
+用户授权后以 canonical start:agent-browser 和一次性 /qa 入口，使用既有 ClinePass / DeepSeek V4 Pro；仅创建本轮文字验收会话，没有读取凭据明文，没有打开 Capture，也未触发工具或交接。源码与上述 SHA-256 一致，启动器重新 build 通过。
+
+- 两圈 Composer 绕光：通过。General 暗色桌面真实 Working/Thinking 回合中，连续截图序列及角度采样覆盖 6.429 秒（1789447056284–1789447062713），角度从 −95.4065° 推进并两次回绕至负角度，末值 −2.71802°；周期 2.85 秒。连续帧可见短边收窄、长边展开，固定圆角轮廓，未见循环跳边或光环核心裁切。此为真实运行帧观察，不以单张静态截图代替。
+- Transcript：Working 与 Thinking 的 background-position 持续推进，文字 computed color 透明；折叠 Working 后仍扫光。正常完成的 22.7 秒回合变为 Work process / Thought for 18.1s；取消回合变为 Stopped / Thought for 23.9s；终态 is-running 和 active signal 数量均为 0。hover 覆盖沿用专项测试，未单独记录鼠标悬停采样。
+- 主题、尺寸与 Agent：暗色桌面 General 青色、亮色 390×844 General 青色与 Analyzer 紫色（accent #8d8bff）均呈现运行光环；窄屏 Composer 宽 354px，页面 scrollWidth=390，无横向溢出。多行输入可编辑并在固定输入区滚动，运行中仍可输入；完成后恢复正常发送，运行中附件/effort 禁用。
+- 未覆盖边界：当前 browser 控制接口不提供系统减少动效切换或媒体偏好模拟，因此 OS 开/关两态未实测，不标记全矩阵通过。DeepSeek V4 的 Max mode 为 Fixed，UI 正确禁用切换；Effort 可切换进入/持续/退出时间轴由本轮已通过单测证明，本次账号验收没有覆盖该交互。
+- 收尾：本轮临时会话经应用删除，界面返回 No sessions yet；恢复暗色主题与默认浏览器尺寸。QA 标签页、启动器和自有主进程均退出，canonical instance.lock 不存在；桌面启动权已交还。没有新增截图/录像文件、测试账号或临时目录。

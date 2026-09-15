@@ -36,7 +36,7 @@ assert(
 const defaults = createDefaultUiPreferences();
 assert(defaults.chromeThemes.light.presetId === 'rdc', 'Default light chrome is RDC');
 assert(defaults.chromeThemes.dark.presetId === 'rdc', 'Default dark chrome is RDC');
-assert(defaults.reduceMotion === 'system', 'Default reduceMotion is system');
+assert(!('reduceMotion' in defaults), 'Removed motion preference must not persist in defaults');
 assert(defaults.usePointerCursors === false, 'Pointer cursors remain opt-in');
 
 const sanitized = sanitizeUiPreferences({

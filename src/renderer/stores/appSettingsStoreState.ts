@@ -9,7 +9,6 @@ import type {
   ProviderDefinitionCommitSnapshot,
   ProviderDefinitionSaveResult,
   ProfileSettings,
-  ReduceMotionPreference,
   ResolvedTheme,
   ThemeChromeConfig,
   ThemeVariant,
@@ -39,7 +38,6 @@ export interface AppSettingsState {
   setFontScale: (fontScale: FontScale) => Promise<void>;
   setComposerMarkdown: (composerMarkdown: boolean) => Promise<void>;
   setUsePointerCursors: (usePointerCursors: boolean) => Promise<void>;
-  setReduceMotion: (reduceMotion: ReduceMotionPreference) => Promise<void>;
   setChromeTheme: (variant: ThemeVariant, chrome: Partial<ThemeChromeConfig>) => Promise<void>;
   setContextBreakdownExpanded: (contextBreakdownExpanded: boolean) => Promise<void>;
   updateProfile: (profile: Partial<ProfileSettings>) => Promise<void>;

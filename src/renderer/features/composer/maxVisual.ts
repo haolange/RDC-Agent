@@ -165,7 +165,6 @@ export function createActiveMaxTimeline(
 export function resolveMaxVisualFrame(
   timeline: MaxVisualTimeline,
   now: number,
-  reducedMotion = false,
 ): MaxVisualFrame {
   if (timeline.phase === 'idle') {
     return {
@@ -183,35 +182,29 @@ export function resolveMaxVisualFrame(
       progress: 1,
       energy: 1,
       stopsOpacity: 0,
-      running: !reducedMotion,
+      running: true,
       complete: false,
     };
   }
 
   const elapsedMs = now - timeline.startedAt;
-  const progress = reducedMotion
-    ? 1
-    : resolveMaxAnimationProgress(elapsedMs, timeline.durationMs);
+  const progress = resolveMaxAnimationProgress(elapsedMs, timeline.durationMs);
   if (timeline.phase === 'egress') {
     return {
       phase: timeline.phase,
       progress,
       energy: timeline.fromEnergy * (1 - progress),
       stopsOpacity: timeline.fromStopsOpacity + (1 - timeline.fromStopsOpacity) * progress,
-      running: !reducedMotion && progress < 1,
+      running: progress < 1,
       complete: progress >= 1,
     };
   }
 
   const remainingIngressMs = (1 - timeline.fromEnergy) * MAX_VISUAL_INGRESS_MS;
-  const energyProgress = reducedMotion
-    ? 1
-    : resolveMaxIngressEnergyProgress(elapsedMs, remainingIngressMs);
+  const energyProgress = resolveMaxIngressEnergyProgress(elapsedMs, remainingIngressMs);
   const energy = timeline.fromEnergy + (1 - timeline.fromEnergy) * energyProgress;
   const dragPreview = timeline.phase === 'ingress-drag';
-  const stopsProgress = reducedMotion
-    ? 1
-    : resolveMaxAnimationProgress(elapsedMs, MAX_VISUAL_EGRESS_MS);
+  const stopsProgress = resolveMaxAnimationProgress(elapsedMs, MAX_VISUAL_EGRESS_MS);
   return {
     phase: timeline.phase,
     progress,
@@ -219,7 +212,7 @@ export function resolveMaxVisualFrame(
     stopsOpacity: dragPreview
       ? timeline.fromStopsOpacity
       : timeline.fromStopsOpacity * (1 - stopsProgress),
-    running: !reducedMotion && (dragPreview || progress < 1),
+    running: dragPreview || progress < 1,
     complete: !dragPreview && progress >= 1,
   };
 }
@@ -361,9 +354,4 @@ export function resolveMaxClipX(
   const ratio = clampMaxProgress(emitterRatio);
   const half = Math.min(Math.max(thumbWidthPx, 0) / 2, safeWidth / 2);
   return half + ratio * (safeWidth - 2 * half);
-}
-
-export function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }

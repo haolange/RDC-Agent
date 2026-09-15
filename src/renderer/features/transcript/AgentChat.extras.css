@@ -52,7 +52,6 @@
   line-height: 1.6;
 }
 
-
 .work-process-subagent {
   list-style: none;
   padding: var(--space-2);
@@ -65,12 +64,6 @@
   animation: work-process-trace-flash 1.6s ease-out;
 }
 
-.is-trace-flash-static {
-  border-radius: var(--radius-md);
-  background: var(--token-interactive-focus);
-  box-shadow: 0 0 0 2px var(--token-border-focus);
-}
-
 @keyframes work-process-trace-flash {
   0% {
     background: var(--token-interactive-focus);
@@ -79,14 +72,6 @@
   100% {
     background: transparent;
     box-shadow: 0 0 0 0 transparent;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .is-trace-flash {
-    animation: none;
-    background: var(--token-interactive-focus);
-    box-shadow: 0 0 0 2px var(--token-border-focus);
   }
 }
 
@@ -181,7 +166,6 @@
 .work-process-child-diagnostic.status-error .work-process-child-message {
   color: var(--token-status-error);
 }
-
 
 .work-process-tool-thumbs {
   display: flex;

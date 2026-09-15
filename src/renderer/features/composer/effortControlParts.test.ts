@@ -363,7 +363,7 @@ describe('effortControlParts', () => {
     });
   });
 
-  it('resolves reduced motion to static endpoints without a running loop', () => {
+  it('keeps ingress gradual and the active field animating', () => {
     const ingress = createMaxTimeline({
       phase: 'ingress-committed',
       revision: 1,
@@ -372,16 +372,16 @@ describe('effortControlParts', () => {
       fromStopsOpacity: 1,
       fieldEpoch: 0,
     });
-    expect(resolveMaxVisualFrame(ingress, 0, true)).toMatchObject({
-      energy: 1,
-      stopsOpacity: 0,
-      running: false,
-      complete: true,
+    expect(resolveMaxVisualFrame(ingress, 0)).toMatchObject({
+      energy: 0,
+      stopsOpacity: 1,
+      running: true,
+      complete: false,
     });
-    expect(resolveMaxVisualFrame(createActiveMaxTimeline(2, 0), 10, true)).toMatchObject({
+    expect(resolveMaxVisualFrame(createActiveMaxTimeline(2, 0), 10)).toMatchObject({
       energy: 1,
       stopsOpacity: 0,
-      running: false,
+      running: true,
     });
   });
 

@@ -5,7 +5,7 @@ import type {
   UiPreferences,
 } from '../types/settings';
 import { createDefaultChromeThemes } from './presets';
-import { sanitizeChromeThemes, sanitizeReduceMotion } from './sanitize';
+import { sanitizeChromeThemes } from './sanitize';
 
 const VALID_THEMES: AppTheme[] = ['dark', 'light', 'system'];
 const VALID_LANGUAGES: AppLanguage[] = ['zh-CN', 'en'];
@@ -25,7 +25,6 @@ export function createDefaultUiPreferences(): UiPreferences {
     composerMarkdown: false,
     usePointerCursors: false,
     contextBreakdownExpanded: true,
-    reduceMotion: 'system',
     chromeThemes: createDefaultChromeThemes(),
   };
 }
@@ -52,7 +51,6 @@ export function sanitizeUiPreferences(
     contextBreakdownExpanded: typeof record.contextBreakdownExpanded === 'boolean'
       ? record.contextBreakdownExpanded
       : fallback.contextBreakdownExpanded,
-    reduceMotion: sanitizeReduceMotion(record.reduceMotion, fallback.reduceMotion),
     chromeThemes: sanitizeChromeThemes(chromeSource, fallback.chromeThemes),
   };
 }

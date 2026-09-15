@@ -56,9 +56,3 @@
   width: var(--transcript-card-icon-size);
   height: var(--transcript-card-icon-size);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .task-status-marker.is-in-progress {
-    animation: none;
-  }
-}

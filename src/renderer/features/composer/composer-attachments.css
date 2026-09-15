@@ -160,10 +160,3 @@
     height: var(--composer-attachment-card-size-narrow);
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .composer-attachment-card-remove,
-  .composer-skill-chip-remove {
-    transition: none;
-  }
-}

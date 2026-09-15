@@ -17,8 +17,6 @@ import {
   sortProvidersByLabel,
 } from './utils';
 
-
-
 const EMPTY_PROVIDER_CATALOG_SNAPSHOT: ProviderCatalogSnapshot = {
   categories: [],
   protocols: [],
@@ -38,7 +36,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const setFontScale = useAppSettingsStore((state) => state.setFontScale);
   const setComposerMarkdown = useAppSettingsStore((state) => state.setComposerMarkdown);
   const setUsePointerCursors = useAppSettingsStore((state) => state.setUsePointerCursors);
-  const setReduceMotion = useAppSettingsStore((state) => state.setReduceMotion);
   const setChromeTheme = useAppSettingsStore((state) => state.setChromeTheme);
   const updateProfile = useAppSettingsStore((state) => state.updateProfile);
   const patchSettings = useAppSettingsStore((state) => state.patchSettings);
@@ -188,7 +185,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     setFontScale,
     setComposerMarkdown,
     setUsePointerCursors,
-    setReduceMotion,
     setChromeTheme,
     ...actions,
     ...providerConnection,

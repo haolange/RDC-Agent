@@ -14,7 +14,7 @@ import type { useRdxRuntimeOverview } from './useRdxRuntimeOverview';
 type PageState = Pick<ReturnType<typeof useSettingsModal>,
   'activeSection' | 't' | 'accountDraft' | 'setAccountDraft' | 'handleAvatarSelect' |
   'handleAccountSave' | 'setLanguage' | 'globalInstructionsDraft' | 'setGlobalInstructionsDraft' | 'handleSavePersonalization' |
-  'setTheme' | 'setFontScale' | 'setComposerMarkdown' | 'setUsePointerCursors' | 'setReduceMotion' |
+  'setTheme' | 'setFontScale' | 'setComposerMarkdown' | 'setUsePointerCursors' |
   'setChromeTheme' | 'accountProviders' | 'providerCatalog' | 'providerCatalogCategories' | 'getResolvedProviderLabel' |
   'handleRefreshProviderModels' | 'handleDisconnectProvider' | 'openProviderConnection' | 'agentManifestDrafts' | 'setAgentManifestDrafts' |
   'handleSaveAgentManifests' | 'handleImportAgentManifest' | 'agentManifestSaveState' | 'agentManifestSaveMessage' | 'agentManifestSaveBlocked' |
@@ -46,7 +46,6 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
     setFontScale,
     setComposerMarkdown,
     setUsePointerCursors,
-    setReduceMotion,
     setChromeTheme,
     accountProviders,
     providerCatalog,
@@ -95,7 +94,6 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
         onFontScaleChange={setFontScale}
         onComposerMarkdownChange={setComposerMarkdown}
         onUsePointerCursorsChange={setUsePointerCursors}
-        onReduceMotionChange={setReduceMotion}
         onChromeThemeChange={setChromeTheme}
         t={t}
       />

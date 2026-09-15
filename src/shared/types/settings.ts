@@ -11,7 +11,6 @@ export type ResolvedTheme = 'dark' | 'light';
 export type ThemeVariant = ResolvedTheme;
 export type AppLanguage = 'zh-CN' | 'en';
 export type FontScale = 'small' | 'medium' | 'large';
-export type ReduceMotionPreference = 'system' | 'on' | 'off';
 export type ThemePresetId =
   | 'rdc'
   | 'absolutely'
@@ -279,7 +278,6 @@ export interface UiPreferences {
   /** UI memory: whether Context breakdown popover details are expanded. Driven by popover toggle only. */
   contextBreakdownExpanded: boolean;
   /** Reduce UI motion: match OS, force on, or force off. */
-  reduceMotion: ReduceMotionPreference;
   /** Independent Light / Dark chrome themes for Settings → Appearance. */
   chromeThemes: ChromeThemesConfig;
 }

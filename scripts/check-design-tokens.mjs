@@ -7,8 +7,7 @@
  *    (`--token-*`, `--text-*`, `--space-*`, `--radius-*`, `--control-*`, component vars)
  *    instead of primitive `--color-*` namespaces or literal values.
  *  - token definition file (design-system.css) may reference primitives.
- *    styles/global/* is not exempt; reduced-motion !important in base.css is
- *    the single documented exception.
+ *    styles/global/* is not exempt.
  *  - Right Rail empty visuals use semantic `--token-*` stop-color classes.
  *
  * Hits are locked by scripts/fidelity/design-tokens-baseline.json (B0 ratchet).
@@ -98,9 +97,6 @@ for (const filePath of files) {
       rule.pattern.lastIndex = 0;
       if (!rule.pattern.test(line)) continue;
       if (rule.id === 'primitive-color-var' && STOP_COLOR_EXEMPT.has(rel) && line.includes('stop-color')) continue;
-      if (rule.id === 'important' && rel === 'src/renderer/styles/global/base.css') {
-        continue;
-      }
       hits.push(`${rel}:${index + 1}: ${rule.id} — ${rule.message} :: ${line.trim()}`);
     }
   });

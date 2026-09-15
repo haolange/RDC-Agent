@@ -8,7 +8,6 @@ const titles: Record<string, string> = {
   'settings.personalization': 'Personalization',
   'settings.appearance': 'Appearance',
   'userMenu.fontScale': 'Font scale',
-  'settings.appearanceReduceMotion': 'Reduce motion',
   'settings.resourceDiagnosticsTitle': 'Resources & diagnostics',
   'settings.models': 'Models',
   'settings.agentManifestTitle': 'Agents',

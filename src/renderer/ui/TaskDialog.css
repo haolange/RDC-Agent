@@ -122,10 +122,3 @@
     flex: 1;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .task-dialog-overlay,
-  .task-dialog {
-    animation: none;
-  }
-}

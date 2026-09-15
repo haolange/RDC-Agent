@@ -63,10 +63,3 @@
   margin: var(--space-1) var(--space-2);
   background: var(--token-border-muted);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .app-context-menu,
-  .app-context-menu-item {
-    transition: none;
-  }
-}

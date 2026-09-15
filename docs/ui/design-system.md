@@ -14,7 +14,7 @@
 RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 VS Code / JetBrains / Linear 的密度与克制）。裁决见 [`DESIGN.md`](../../DESIGN.md) UI 节。
 
 - 层次由 1px 边框 + 实色表面建立；阴影只用于 popover 与 modal。
-- 不使用 backdrop blur、装饰性动效、插画或渐变背景。
+- 不使用 backdrop blur 或无状态含义的装饰性背景。Active Signal、Composer 绕光与 Effort 是核心状态视觉，保留完整动效。
 - 单一 accent 只承担 focus / selected / primary CTA；状态色只表达状态。
 - 信息密度优先于留白：同屏能多放一行真实信息，就不要用空白替代。
 
@@ -81,7 +81,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 - 状态类一律 `is-*`：`is-active` / `is-selected` / `is-running` / `is-disabled` / `is-error`，并配对应 `aria-*`。禁止裸 `.active` / `.current`。
 - 任何定义了 `:hover` 的可交互选择器必须同时定义 `:focus-visible`。
 - 焦点环统一 `--token-border-focus`；禁止 `outline: none` 而不提供等效焦点样式。
-- `prefers-reduced-motion` 在 `styles/global/base.css` 单点处理，组件不重复声明全局兜底。
+- 动效由真实交互与运行生命周期驱动；不提供减少动效设置，不读取系统减少动效偏好，不设置全局停播覆盖。
 
 ## 双体系（摘要）
 
@@ -125,7 +125,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 - Agent accent 必须可配置（`.agent.md` + Settings → Agents GUI）；`AGENT_SEED_ACCENTS` 仅用于 builtin seed 初值，不是运行时权威。
 - `--token-context-*` 色阶专用于 Context breakdown 弹窗的分段条与图例色点，不得挪作其它装饰或背景。
 - 不得引入非 design-system.css / ThemeChromeCompiler 定义的新颜色；需要新颜色时先在 `--token-*` 或 chrome 编译层添加并说明用途。
-- Composer 运行态用 `--composer-mode-accent` 驱动 `composerEnergyOrbit` 四边绕光：`.composer-shell.is-running::before` 的圆角边框遮罩固定，径向光斑通过 `background-position` 沿四边移动；光层不截获指针。禁止旋转长方形遮罩、`@property` 角度插值、drop-shadow、`composerEnergyFlow`、`::after` halo 与 backdrop blur。Settings 减少动效为 `on`，或为 `system` 且系统要求减少动效时停转、保留静态一角光；`off` 正常播放。agent accent 同时体现在边框、send 与 Effort 色相。
+- Composer 运行态用 `--composer-mode-accent` 驱动 `composerEnergyOrbit`：`composer-motion.css` 注册角度，从 −130° 到 230°，2.85s 一圈；固定圆角遮罩内的锥形渐变产生四角光带伸缩，2px 光环与分层 drop-shadow 保留历史辉光。光层不截获指针，不旋转矩形遮罩，不使用径向光斑沿四边平移。停止后光层消失，accent 同时用于边框、send 与 Effort。
 
 ## 新增组件规则
 
@@ -169,7 +169,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 ## 轻量选择控件
 
 - **多选**用 `CheckPill`（勾选 + 文字，`role="checkbox"`，`aria-checked`，`is-selected`），用于工具权限、知识筛选的类型 / 生命周期 / 检索通道。禁止为多选画大方框卡片。
-- **单选**用 `Tabs` 的 `variant="segmented"`（`role="tablist"` / `radiogroup`），用于主题模式、字号、减少动效、导入输入方式、导出范围与格式。
+- **单选**用 `Tabs` 的 `variant="segmented"`（`role="tablist"` / `radiogroup`），用于主题模式、字号、导入输入方式、导出范围与格式。
 - 动作按钮与选择控件不混同：普通执行 `ghost` / `secondary`，主要动作 `primary`，危险动作 `danger`。
 
 ## 颜色选择浮层
@@ -183,15 +183,15 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 - 背景 `--token-bg-overlay`，边框 `--token-border-card`，阴影 `--token-shadow-popover`，hover `--token-interactive-hover`，灰项 `--token-text-disabled`，分隔线 `--token-border-muted`，层级 `--z-popover`。
 - 可编辑区：撤销 / 重做 / 剪切 / 复制 / 粘贴 / 粘贴并清理格式 / 全选；只读区：复制 / 全选。快捷键按平台显示 `Ctrl` 或 `⌘`。
 - 定位走 `useDynStyle`（CSP `style-src-attr 'none'`）；靠近视口右/下边缘翻转；约 390px 必须完整在 viewport 内。
-- `role="menu"` + `role="menuitem"`；Arrow / Home / End / Enter / Escape；Escape 把焦点还给原元素；`prefers-reduced-motion` 下不播入场动画。
+- `role="menu"` + `role="menuitem"`；Arrow / Home / End / Enter / Escape；Escape 把焦点还给原元素；入场动画保持正常播放。
 - 侧栏 Session/Project 自有菜单用 `data-owns-context-menu` 排除。
 
 ## 窄屏 Workbench
 
 - `<=720px` 时桌面工作区最小宽度必须解除，主区与 Composer 以真实 viewport 收缩，不得用 `overflow: hidden` 掩盖被裁掉的桌面宽度。
 - Composer Footer 始终单行、控件高 `--control-height-sm`（含发送按钮）。缩窄时禁止折成两行；Agent / Permission / Effort 收成 28 图标，Model 保留名称但设最长宽度，溢出用线性渐隐而不是省略号。
-- Agent / Permission / Effort / Usage / Model 菜单在窄屏锚定到 Composer 上方并完整位于 viewport 内；同一时刻只开一个；running 与 selected 分列，约 8px 状态点使用 semantic status token，`prefers-reduced-motion: reduce` 时停止动画。
-- Browser 验收至少覆盖约 390px viewport、水平溢出、菜单 selected/running、键盘导航、Escape 焦点返回及 reduced-motion。
+- Agent / Permission / Effort / Usage / Model 菜单在窄屏锚定到 Composer 上方并完整位于 viewport 内；同一时刻只开一个；running 与 selected 分列，约 8px 状态点使用 semantic status token，运行点保持状态动画。
+- Browser 验收至少覆盖约 390px viewport、水平溢出、菜单 selected/running、键盘导航、Escape 焦点返回及持续播放。
 
 ## 组件清单（`src/renderer/ui`）
 
@@ -230,7 +230,7 @@ pnpm run check:appearance
 pnpm run typecheck
 ```
 
-`check:design-tokens` 豁免：token 定义层 `styles/design-system.css`；`styles/global/base.css` 的 reduced-motion `!important`；Right Rail `stop-color` 随 B7 空态收敛删除。新增豁免必须先改本文件再改脚本。
+`check:design-tokens` 豁免：token 定义层 `styles/design-system.css`；Right Rail `stop-color` 随 B7 空态收敛删除。新增豁免必须先改本文件再改脚本。
 
 ### 规则 → 门禁 / 债务批次
 
@@ -243,7 +243,7 @@ pnpm run typecheck
 | `:hover` 必配 `:focus-visible`；禁无替代 `outline: none` | 无自动门禁 | **B8** 扫描清零 |
 | 分子组件清单与交互态 / CSS 变量 variant / 禁内联 style | `src/renderer/ui` 已落地；luna 审查 | **B2** 已落地 |
 | 统一 `EmptyState` + 可选 visual | 组件已落地；Right Rail 五卡恢复 token 着色等距场景 | **B2** 组件；二次收敛恢复 visual |
-| Composer 运行态 energy orbit | `check:work-process` 要求 `composerEnergyOrbit` + `::before` 固定遮罩内移动光斑；禁旋转遮罩 / `@property --composer-energy-angle` / `composerEnergyFlow` / `::after` halo | B6 删除已废止；真实 busy 状态下目视验收 |
+| Composer 运行态 energy orbit | `check:work-process` 验证注册角度、锥形渐变、2.85s 周期、固定遮罩和分层辉光；无偏好停播覆盖 | 真实 busy 状态下验收四角伸缩与终态停止 |
 | DropdownSelect 禁 backdrop blur | `check:appearance` 要求实色 `--token-bg-shell`、禁止 blur | B1 已反转 |
 | Preview 引用运行时 CSS，删除 `designs/tokens/*` | Preview 已改；副本已删并入 `retired` | **B2** 已落地 |
 | i18n 拆分、硬编码入 i18n、sentence case | key 已拆到 `i18n/locales/{en,zh-CN}/`；硬编码与 sentence case 仍待扫 | **B3** 拆分；**B8** 文案 |

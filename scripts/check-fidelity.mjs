@@ -185,9 +185,8 @@ requireCssContract(
     && composerChromeCss.includes('.composer-agent-menu-item.is-selected')
     && cssBlock(composerChromeCss, '.composer-agent-menu-item-running-dot').includes('width: var(--space-2);')
     && cssBlock(composerChromeCss, '.composer-agent-menu-item-running-dot').includes('height: var(--space-2);')
-    && composerChromeCss.includes('@media (prefers-reduced-motion: reduce)')
-    && composerChromeCss.includes('.composer-agent-menu-item-running-dot {\n    animation: none;'),
-  'Agent menu must keep selected and session-scoped running states separate, accessible, compact, localized, and reduced-motion safe.',
+    && !composerChromeCss.includes('prefers-reduced-motion'),
+  'Agent menu must keep selected and session-scoped running states separate, accessible, compact, localized, and continuously animated.',
 );
 
 const contextMetricResponsiveStart = appShellCss.indexOf('@container (max-width: 33rem)');

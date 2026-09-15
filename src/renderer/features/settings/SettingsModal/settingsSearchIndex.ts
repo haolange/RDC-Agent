@@ -46,13 +46,6 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     target: 'font-scale',
   },
   {
-    id: 'reduce-motion',
-    section: 'appearance',
-    titleKey: 'settings.appearanceReduceMotion',
-    keywords: ['motion', 'animation', 'reduced', '动效', '减少动画'],
-    target: 'appearance',
-  },
-  {
     id: 'resource-diagnostics',
     section: 'general',
     titleKey: 'settings.resourceDiagnosticsTitle',
