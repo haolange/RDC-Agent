@@ -54,10 +54,16 @@ export function assertTerminalContextOwnership(
     const concreteBranch = branchState?.forks
       .flatMap((fork) => fork.branches)
       .find((branch) => branch.branchId === normalizedBranchId);
+    const anchor = history.find((message) => message.id === concreteBranch?.anchorUserMessageId);
+    // The anchor owns the fork's first turn. Later turns keep that branch ID,
+    // but have their own user message and turn IDs.
     if (
       !concreteBranch
-      || concreteBranch.anchorUserMessageId !== userMessageId
-      || concreteBranch.rootTurnId !== turnId
+      || !anchor
+      || anchor.role !== 'user'
+      || anchor.turnId !== concreteBranch.rootTurnId
+      || normalizeBranchId(anchor.branchId) !== normalizedBranchId
+      || user.createdAt < anchor.createdAt
     ) {
       throw new Error(`Conversation branch ownership changed before context journal append for turn ${turnId}.`);
     }

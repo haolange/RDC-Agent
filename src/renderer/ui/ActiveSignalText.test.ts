@@ -22,6 +22,7 @@ describe('ActiveSignalText', () => {
     const css = fs.readFileSync(cssPath, 'utf8');
     const activeBlock = css.match(/\.active-signal-text\.is-active\s*\{[\s\S]*?\}/)?.[0] ?? '';
 
+    expect(activeBlock).toContain('display: inline-block');
     expect(activeBlock).toContain('background-clip: text');
     expect(activeBlock).toContain('color: transparent');
     expect(activeBlock).toContain('background-size: 200% 100%');
@@ -36,6 +37,7 @@ describe('ActiveSignalText', () => {
     expect(css).not.toContain('active-signal-pulse');
     expect(activeBlock).not.toContain('::after');
     expect(css).toContain("html[data-reduce-motion='on'] .active-signal-text.is-active");
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*html\[data-reduce-motion='system'\] \.active-signal-text\.is-active/);
   });
 
   it('does not let Work Process running labels override active shimmer color', () => {
@@ -45,6 +47,9 @@ describe('ActiveSignalText', () => {
 
     expect(runningBlock).toContain('--active-signal-highlight');
     expect(runningBlock).not.toMatch(/\bcolor:/);
+    expect(css).toContain('.work-process-label:not(.is-active)');
+    expect(css).toContain('.work-process.is-collapsed .work-process-label:not(.is-active)');
+    expect(css).not.toMatch(/\.work-process\.is-collapsed \.work-process-label,/);
   });
 
   it('keeps inactive text static', () => {

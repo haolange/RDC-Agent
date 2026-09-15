@@ -11,7 +11,7 @@ Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verifie
 | Task | Criterion | Gate/Test | Browser evidence ref | Verdict | Commit SHA | Date |
 | --- | --- | --- | --- | --- | --- | --- |
 | PLAN-GATE-L1 | Mission `plan_artifact` 覆盖活计划、拒绝修订同一份、批准冻结并只放行同 hash / 同 target / 同冻结 URI 的 execute | `AgentPlanReviewRequestService` / `PlanReviewStateStore` / `PlanArtifactWriter` / `HandoffController` / `ToolExecutorFactory` / `HandoffProviderFixture` | — | planned | — | 2026-09-14 |
-| PLAN-GATE-UI | transcript 计划卡 + 只读面板 + Composer 待审门 + 回合结束 handoff 建议行；优先级 toolApproval > planReview > userInput | `planReviewRequestModel` / `workProcessPresentation` / `check:work-process-tool-coverage` / `check:design-tokens` | disposable `qa-1789374688563-6681812f93040d61`（已清理）；project `proj_85e9bdb7e163`；session `sess_459d84ad54cf`；同源 `/app`；卡 `plan-card is-awaiting`；面板 `role=dialog` + Esc 回卡；Composer `拒绝意见` 空则拒绝禁用；建议行 `Execute with General` 将 `agentId` 切到 `general`；`plan:saveToProject` 写入 `.rdx/plans/<sessionId>/plan.md` 且 `.gitignore` 不含 `plans/`；窄屏 390 侧栏收起后卡/门/面板仍可用。无 token | planned | — | 2026-09-14 |
+| PLAN-GATE-UI | transcript 计划卡 + 只读面板 + Composer 待审门；Mission 仅批准后才快照 handoff 建议行；优先级 toolApproval > planReview > userInput | `planReviewRequestModel` / `workProcessPresentation` / `missionHandoffSuggestions` / `check:work-process-tool-coverage` / `check:design-tokens` | disposable `qa-1789374688563-6681812f93040d61`（已清理）；project `proj_85e9bdb7e163`；session `sess_459d84ad54cf`；同源 `/app`；卡 `plan-card is-awaiting`；面板 `role=dialog` + Esc 回卡；Composer `拒绝意见` 空则拒绝禁用；无批准的 Mission 终答不得出现 `Execute with General`；批准后建议行将 `agentId` 切到 `general`；`plan:saveToProject` 写入 `.rdx/plans/<sessionId>/plan.md` 且 `.gitignore` 不含 `plans/`；窄屏 390 侧栏收起后卡/门/面板仍可用。无 token | planned | — | 2026-09-15 |
 | PLAN-GATE-QA | Browser QA：Mission → plan_artifact → 拒绝 → 修订 → 批准 → agent_handoff；卡 / 面板 / Composer 门 / 建议行 / 窄屏 390 / Esc | disposable `start:agent-browser`；`HandoffProviderFixture` 为确定性工程验证，不是活模型证据。Browser 无运行期 fixture provider，未用真实 userData 重跑模型选工具 | 同源 `/app` 投影 UI 已过（见 PLAN-GATE-UI）。`conversation:answerPlanReview` 在无活 pending 时 fail-closed：`No pending plan review request was found for this turn.` 前轮未重跑活链路；2026-09-14 本轮已真实完成审阅、拒绝修订和批准冻结，完整模型交接因 8 请求预算耗尽仍未通过，见文末本轮证据。无 token | planned | — | 2026-09-14 |
 | UI-composer-focus | 通过原生项目入口进入真实 Composer，复查鼠标／键盘聚焦白框、编辑／预览、附件与 Skill 操作 | Tabs 多实例 ID、禁用和键盘导航单测已过；真实 Composer 待验证 | — | planned | — | 2026-09-12 |
 | UI-knowledge-data | 补齐 K01/K04/K05/K06/K09/K10/K11 实际阅读、元数据、候选、冲突、导入结果、导出与写入确认 | 迟到详情请求回归已过；空态不替代有数据状态 | — | planned | — | 2026-09-12 |
@@ -88,7 +88,8 @@ Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verifie
 | UI-B3-structure | features 按产品面重组；i18n 拆分；IPC 出 TSX | `check:renderer-structure` hits=0 | 冒烟：Settings / Knowledge / Terminal | verified | e9d72b0d | 2026-09-08 |
 | UI-B4-settings | Settings 九节共用 kit；密度 32 | `check:settings-agents` Browser 1440/390 | disposable Settings 九导航 + 搜索高亮 | verified | 45a51b15 | 2026-09-08 |
 | UI-B5-knowledge | Knowledge 三列 kit；列宽 224 / minmax(280,0.8fr) / 1.2fr；960 切换 | `check:knowledge-system` | disposable 三列空态；case TOC 仍为章节锚点 | verified | b71efb41 | 2026-09-08 |
-| UI-B6-composer | 删除 energy orbit；壳 radius-lg；底栏 Pill 高 28 | `check:work-process` 禁 orbit；`check:appearance` | disposable 底栏互斥；无真实 provider 未验 Stop/Rewrite | verified | 093caa82 | 2026-09-08 |
+| UI-composer-orbit-restore | Composer `is-running` 四边绕光；废止 B6 禁令；固定圆角遮罩内移动光斑；禁旋转遮罩 / `@property` / `composerEnergyFlow` / `::after` halo | `check:work-process` + `check:design-tokens`；Settings off 不受 OS 减少动效覆盖 | 2026-09-15 前轮 transform/样式采样已被用户否决，不是可见效果验收。当前改为 background-position 沿四边移动；真实 canonical 持续回合与交互仍待验证，见下方本次复验记录 | planned | — | 2026-09-15 |
+| UI-B6-composer | 删除 energy orbit；壳 radius-lg；底栏 Pill 高 28 | `check:work-process` 禁 orbit；`check:appearance` | disposable 底栏互斥；无真实 provider 未验 Stop/Rewrite。现行设计已废止「禁 orbit」，见 UI-composer-orbit-restore | verified | 093caa82 | 2026-09-08 |
 | UI-B7-chrome | Right Rail 空态改 EmptyState；Sidebar/Device `is-selected`；Terminal 去掉 256px 字面量 | `check:right-rail` `check:design-tokens` STOP_COLOR_EXEMPT 空 | disposable 1440 五卡空态无插画；390 drawer overflowX=false | verified | 950fb311 | 2026-09-08 |
 | UI-B8-copy-a11y | Threads→Sessions；DeviceSelector/Slash/Rail/Agent 模板入 i18n；Settings 搜索焦点环；hover 配 focus-visible | `check:right-rail` i18n keys | disposable ZH 工作台/User menu/Settings/Knowledge；device aria-label「回放设备：本地回放」；无 FULL_ACCESS 故 EN 未持久化 | verified | 634892ff | 2026-09-08 |
 | UI-B9-finalize | fidelity 基线复核；docs 路径；全门禁 + build；交还桌面启动权后 push | `check:fidelity` `check:legacy-residue` `check:gates` `typecheck` `lint` `build` | disposable FULL_ACCESS=1；project `proj_5b660f23c308` session `sess_316a6244e3a4`；1440 五卡 EmptyState + Composer pill 高 28 + 九 Settings 节 + 搜索 compaction→策略 + 六 Knowledge lane 无 Semantic + 底栏互斥 + fail-closed unknown/internal/secret/desktop-only 403 且 `session:list` 200；390 `bodyMin=0` overflowX=false drawer=true；Appearance `settings:set` light 持久化后恢复 dark。截图 `%LOCALAPPDATA%/Temp/cursor/screenshots/b9-*.png`。无真实 turn 故 Memory/Tool 审批未跑。command palette 合成 Ctrl+K 未打开属自动化限制 | verified | 8836d929 | 2026-09-08 |
@@ -432,3 +433,20 @@ Android matching-runtime acceptance now passed: Android Studio SDK NDK 27.3.1375
 ### 2026-09-14 续接范围调整
 
 按用户最新决定，General 执行与 Mission 回评估，以及依赖此链路的真实模型建议行验收，交由后续专门大项验证；不再作为本次家中续接任务或阻塞。上述历史未完成事实保持，不改标为通过。本次续接仅保留原生导出对话框、本地与 Android Capture 验收，详见 docs/workflows/plan-handoff-acceptance-continuation.md。
+
+## 2026-09-15 动效与计划门接手复验
+
+适用源码：`main @ f20fc1c7` 加当前未提交修复；前轮用户已否决可见效果，旧 transform 采样不作验收。以下记录与前节独立，不承接前节的桌面启动权结论。
+
+- Active Signal 与 Work Process 动效：**待验证**。已修复 OS 减少动效覆盖 Settings off；同一 clipped-gradient 增加亮带对比；真实持续回合仍待目视。
+- Composer 绕光：**待验证**。同一 `::before` 固定圆角遮罩，background-position 光斑沿四边移动，移除旋转遮罩与滤镜，pointer-events none；真实 busy 状态仍待目视。
+- 分支续聊终态提交：**待验证**。锚点检查原来把分支首轮身份强加给后续回合；改为验证当前消息身份及分支锚点一致性。12 项单测覆盖续聊、首轮、后台分支、错误 turn/branch、删除分支、缺失/损坏锚点；canonical 现场续聊仍待复验。
+- Mission 三层计划门：**待验证**。复用 PlanCard / PlanReviewPanel / Composer PlanReviewRequestPanel；本回合真实 approved plan_artifact 才快照建议行，移除未接线的 approvedPlan 参数。待审/拒绝/取代不得生成建议行。新模型回合尚未验证。
+- 工程验证：**通过**。全量 coverage：398 文件通过、2874 测试通过、3 文件/3 测试沿用既有跳过；typecheck、lint、build、check:gates、coverage ratchet 均通过。
+- 测试缓存收尾：**通过**。已删除本次专用 motion-validation 缓存和中止测试的隔离 userData 根，确认路径不存在；保留当前 build 与 coverage 证据。
+
+覆盖率：statements 72.60%、branches 62.20%、functions 76.86%、lines 74.99%；来源 `coverage/coverage-summary.json`。初次全量验证因系统临时目录祖先 `realpath C:\Users\Vip` 返回 EPERM 中止，改用仓库内专用 TEMP/TMP 后全量与门禁通过；没有修改 Knowledge 实现、测试断言或覆盖率阈值。
+
+源码 SHA-256：`src/renderer/styles/design-system.css` = `5A2F7A9188BDB7D65093EFD1115E8A3AEA6BFAFFED325E3ADE2A314056002D0C`；`composer-chrome-3.css` = `5178A96BABA2832DD6C544BB663735772AA788C3F0EC2B9C9F04DEDB621C6671`；`ConversationTurnTerminal.ts` = `7F528940BF14ADBDBF6EBB1D86E1E95873B5A7F74810A8FF994E18FC297F21BF`；`missionHandoffSuggestions.ts` = `055FC7F191C3B1E12E3DFCFE24B8DBE932FCA8F0298FEF45860D8F1652A7093A`。
+
+真实 UI 阻塞：本任务内置浏览器接入既有 canonical 服务返回 `net::ERR_BLOCKED_BY_CLIENT`，未能进入页面。既有 canonical browser 进程继续持有 instance.lock；未关闭、未手改 Settings/会话、未发起模型测试。已请求用户确认重启以加载新主进程构建并取得新一次性 /qa 入口，以及内置浏览器仍拦截时能否用 Chrome。批准前不替换既有服务；本条不宣称桌面启动权已交还，也不宣称用户目视验收通过。

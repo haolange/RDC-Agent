@@ -18,6 +18,7 @@ import { agentOrchestrator, type PreparedAgentTurnContext } from '../workflow/de
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { isHandoffContinueAction, type PlanReviewHandoffSuggestion } from '@shared/types/planReview';
+import { shouldSnapshotHandoffSuggestions } from './missionHandoffSuggestions';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -606,16 +607,21 @@ export async function completeProfileTurn(
         : '等待模型配置'
       : '回复已完成';
 
-  const handoffSuggestions: PlanReviewHandoffSuggestion[] | undefined = finalStatus === 'complete'
-    ? (input.preparedTurn.runtime.effectivePlan.profileHandoffs ?? [])
-      .filter((handoff) => isHandoffContinueAction(handoff) && handoff.label.trim() && handoff.agent.trim())
-      .map((handoff) => ({
-        label: handoff.label.trim(),
-        agent: handoff.agent.trim(),
-        prompt: handoff.prompt,
-        send: handoff.send === true,
-      }))
-    : undefined;
+  const handoffSuggestions: PlanReviewHandoffSuggestion[] | undefined =
+    shouldSnapshotHandoffSuggestions({
+      agentId: conversationAgentId,
+      finalStatus,
+      workTrace: traceWithEvidence,
+    })
+      ? (input.preparedTurn.runtime.effectivePlan.profileHandoffs ?? [])
+        .filter((handoff) => isHandoffContinueAction(handoff) && handoff.label.trim() && handoff.agent.trim())
+        .map((handoff) => ({
+          label: handoff.label.trim(),
+          agent: handoff.agent.trim(),
+          prompt: handoff.prompt,
+          send: handoff.send === true,
+        }))
+      : undefined;
   commitTerminalAssistantMessage(finalStatus === 'error' ? 'message_errored' : 'message_completed', {
     status: finalStatus,
     content: assistantContent,

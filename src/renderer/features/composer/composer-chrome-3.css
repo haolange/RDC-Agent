@@ -164,11 +164,61 @@
 }
 
 .composer-shell.is-running {
-  border-color: var(--composer-mode-accent);
+  border-color: color-mix(in srgb, var(--composer-mode-accent) 44%, var(--token-border-strong));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.03),
+    0 0 0 1px color-mix(in srgb, var(--composer-mode-accent) 12%, transparent),
+    0 0 10px color-mix(in srgb, var(--composer-mode-accent) 16%, transparent);
 }
 
 .composer-shell.is-running:focus-within {
-  border-color: var(--composer-mode-accent);
+  border-color: color-mix(in srgb, var(--composer-mode-accent) 52%, var(--token-border-strong));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.03),
+    0 0 0 1px color-mix(in srgb, var(--composer-mode-accent) 18%, transparent),
+    0 0 14px color-mix(in srgb, var(--composer-mode-accent) 20%, transparent);
+}
+
+/* Keep the rounded border mask fixed while the light travels around it. */
+.composer-shell.is-running::before {
+  --orbit-reach: var(--space-16);
+  position: absolute;
+  inset: calc(-1 * var(--composer-energy-stroke));
+  padding: var(--composer-energy-stroke);
+  border-radius: calc(var(--composer-shell-radius) + var(--composer-energy-stroke));
+  pointer-events: none;
+  z-index: 1;
+  content: "";
+  background-image: radial-gradient(
+    circle,
+    var(--token-text-heading) 0%,
+    var(--composer-mode-accent) 24%,
+    color-mix(in srgb, var(--composer-mode-accent) 60%, transparent) 48%,
+    transparent 72%
+  );
+  background-size: calc(var(--orbit-reach) * 2) calc(var(--orbit-reach) * 2);
+  background-repeat: no-repeat;
+  background-position: calc(0% - var(--orbit-reach)) calc(0% - var(--orbit-reach));
+  animation: composerEnergyOrbit 2.85s linear infinite;
+  -webkit-mask: linear-gradient(rgb(255 255 255) 0 0) content-box, linear-gradient(rgb(255 255 255) 0 0);
+  mask: linear-gradient(rgb(255 255 255) 0 0) content-box, linear-gradient(rgb(255 255 255) 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+@keyframes composerEnergyOrbit {
+  0%, 100% {
+    background-position: calc(0% - var(--orbit-reach)) calc(0% - var(--orbit-reach));
+  }
+  40% {
+    background-position: calc(100% + var(--orbit-reach)) calc(0% - var(--orbit-reach));
+  }
+  50% {
+    background-position: calc(100% + var(--orbit-reach)) calc(100% + var(--orbit-reach));
+  }
+  90% {
+    background-position: calc(0% - var(--orbit-reach)) calc(100% + var(--orbit-reach));
+  }
 }
 
 /* Moved from app-shell during B3 colocation */

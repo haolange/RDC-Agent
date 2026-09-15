@@ -151,7 +151,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 ## Profile Handoff
 
-`ProfileHandoffState` 是 session-owned durable 状态机（`prepared` → `committed` → `consumed`，或未完成点 `cancelled`），由 `HandoffStateStore` 写入 `<sessionPath>/handoff-state.json`。`AgentHandoffDefinition` 只是 manifest 路由声明，不是该记录。计划门是另一条人机停顿：`plan_artifact` 写活计划并挂起，`approval.requested kind=plan_review`；拒绝意见回同一 tool result，批准写入 `TurnHandle.approvedPlan`（`approvedHash` + target + frozenUri）。回合成功终态把冻结 `profileHandoffs`（`showContinueOn !== false`）快照到 assistant `handoffSuggestions`。
+`ProfileHandoffState` 是 session-owned durable 状态机（`prepared` → `committed` → `consumed`，或未完成点 `cancelled`），由 `HandoffStateStore` 写入 `<sessionPath>/handoff-state.json`。`AgentHandoffDefinition` 只是 manifest 路由声明，不是该记录。计划门是另一条人机停顿：`plan_artifact` 写活计划并挂起，`approval.requested kind=plan_review`；拒绝意见回同一 tool result，批准写入 `TurnHandle.approvedPlan`（`approvedHash` + target + frozenUri）。回合成功终态把冻结 `profileHandoffs`（`showContinueOn !== false`）快照到 assistant `handoffSuggestions`。Mission 仅在本回合 workTrace 含真实已批准 `plan_artifact` 时才快照；批准事件在冻结完成后发布，普通终答不得挂 Execute 建议行。
 
 事务顺序：`before-handoff` → 内存草稿 prepare → 绑定 `turn.pendingHandoff` → `after-hook` → 持久化 `HandoffStateStore.prepare`。`before-handoff` denied 则不 draft、不 bind、不 persist。Hook / 持久化 / 绑定失败必须 cancel/rollback，不得遗留 active prepared，并清掉 `pendingHandoff`。
 
