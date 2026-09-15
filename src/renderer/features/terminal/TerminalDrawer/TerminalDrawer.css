@@ -381,6 +381,10 @@ body.terminal-resizing {
   font-family: var(--font-mono);
 }
 
+.runtime-terminal-entry-spacer {
+  flex-shrink: 0;
+}
+
 .runtime-terminal-empty {
   display: flex;
   align-items: center;

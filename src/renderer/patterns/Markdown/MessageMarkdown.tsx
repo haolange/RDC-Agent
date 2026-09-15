@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import Markdown from 'react-markdown';
-import type { Components } from 'react-markdown';
+import type { Components, Options } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeHighlight from 'rehype-highlight';
@@ -14,7 +14,16 @@ import 'katex/dist/katex.min.css';
 
 interface MessageMarkdownProps {
   content: string;
+  /** Skip KaTeX / math / highlight while the source is still streaming. */
+  deferHeavyPlugins?: boolean;
 }
+
+const STREAMING_REMARK_PLUGINS: NonNullable<Options['remarkPlugins']> = [remarkGfm];
+const FULL_REMARK_PLUGINS: NonNullable<Options['remarkPlugins']> = [remarkGfm, remarkMath];
+const FULL_REHYPE_PLUGINS: NonNullable<Options['rehypePlugins']> = [
+  rehypeKatex,
+  [rehypeHighlight, { detect: true, ignoreMissing: true }],
+];
 
 function isLanguageClass(className: unknown): string | null {
   if (typeof className !== 'string') {
@@ -86,17 +95,14 @@ const markdownComponents: Components = {
  * Raw HTML stays disabled (react-markdown default). External links open in a
  * new window. Mermaid and KaTeX are opt-in via fenced / math syntax.
  */
-const MessageMarkdownInner: React.FC<MessageMarkdownProps> = ({ content }) => {
+const MessageMarkdownInner: React.FC<MessageMarkdownProps> = ({ content, deferHeavyPlugins = false }) => {
   const normalized = useMemo(() => normalizeAssistantMarkdown(content), [content]);
 
   return (
     <div className="markdown-body">
       <Markdown
-        remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[
-          rehypeKatex,
-          [rehypeHighlight, { detect: true, ignoreMissing: true }],
-        ]}
+        remarkPlugins={deferHeavyPlugins ? STREAMING_REMARK_PLUGINS : FULL_REMARK_PLUGINS}
+        rehypePlugins={deferHeavyPlugins ? undefined : FULL_REHYPE_PLUGINS}
         components={markdownComponents}
       >
         {normalized}

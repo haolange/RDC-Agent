@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
-import type { WorkflowState } from '@shared/types/workflow';
 import type { ContextSnapshot, OpenedCaptureState, RunContextUsageSummary } from '@shared/types/session';
 import { useConversationStore } from './conversationStore';
 import { useWorkflowStore } from './workflowStore';
@@ -30,7 +29,6 @@ interface SessionProjectionStoreState {
   projectTrace: (sessionId: string, presentation: AgentRunPresentation) => void;
   projectContextSnapshot: (sessionId: string, snapshot: ContextSnapshot | null) => void;
   projectOpenedCapture: (sessionId: string, openedCapture: OpenedCaptureState | null) => void;
-  projectWorkflow: (sessionId: string, state: WorkflowState) => void;
   projectTimelineEntry: (sessionId: string, entry: AgentTimelineEntry) => void;
   activateSession: (sessionId: string) => boolean;
   evictSession: (sessionId: string) => void;
@@ -145,17 +143,6 @@ export const useSessionProjectionStore = create<SessionProjectionStoreState>((se
       bySessionId: updateSessionProjectionMap(state.bySessionId, sessionId, (projection) => ({
         ...projection,
         openedCapture,
-      })),
-    }));
-  },
-
-  projectWorkflow: (sessionId, workflowState) => {
-    if (!sessionId) return;
-    set((state) => ({
-      bySessionId: updateSessionProjectionMap(state.bySessionId, sessionId, (projection) => ({
-        ...projection,
-        workflowState,
-        reasoningSummaries: workflowState.reasoningSummaries ?? projection.reasoningSummaries,
       })),
     }));
   },

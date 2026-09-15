@@ -1,6 +1,6 @@
 import type { SessionScope, OpenedCapturePreview } from './session';
 export type CaptureReplayPhase = 'closed' | 'validating' | 'connecting' | 'transferring' | 'opening' | 'loading_image' | 'ready' | 'applying' | 'closing' | 'error';
-export interface CaptureReplayEvent { eventId: number; name: string }
+export interface CaptureReplayEvent { eventId: number }
 export interface CaptureReplayTarget { textureId: string; outputSlot: number | null }
 export interface CaptureReplayError { code: string; message: string; retry: 'open' | 'close' | 'image' | 'apply' | null }
 export interface CaptureReplayObservation {

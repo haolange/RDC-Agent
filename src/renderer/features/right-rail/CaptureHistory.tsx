@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CaptureReplayHistoryEntry, CaptureReplayState } from '@shared/types/captureReplay';
-import { listReplayHistory, readReplayImage, type CaptureScope } from './capturePanelActions';
+import { listReplayHistory, type CaptureScope } from './capturePanelActions';
+import { useCapturePreviewUrl } from './useCapturePreviewUrl';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { latestSuccessfulHistoryIndex, readCaptureHistory } from './readCaptureHistory';
@@ -17,8 +18,6 @@ function ScopedCaptureHistory({ scope, captureHash, state, active: visible }: Ca
   const entriesRef = useRef<CaptureReplayHistoryEntry[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [image, setImage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
@@ -36,17 +35,14 @@ function ScopedCaptureHistory({ scope, captureHash, state, active: visible }: Ca
   const following = selected === null;
   const live = Boolean(state?.contextId && state.phase !== 'closed');
   const liveObservation = following && live ? state?.agentObservation : null;
-  useEffect(() => {
-    let active = true;
-    setImage(null);
-    if (!entry?.imageSha256 || !captureHash) { setLoading(false); return; }
-    setLoading(true);
-    void readReplayImage({ ...scope, captureHash, imageHash: entry.imageSha256 })
-      .then((url) => { if (active) { setImage(url); setError(null); } })
-      .catch((reason) => { if (active) setError(String(reason)); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [scope, captureHash, entry?.imageSha256]);
+  const liveImagePath = liveObservation?.image.imagePath ?? null;
+  const historyHash = !liveObservation && entry?.imageSha256 && captureHash ? entry.imageSha256 : null;
+  const shownImage = useCapturePreviewUrl(scope, {
+    imagePath: liveImagePath,
+    captureHash: historyHash ? captureHash : null,
+    imageHash: historyHash,
+  });
+  const loading = Boolean((liveImagePath || historyHash) && !shownImage);
   useEffect(() => {
     if (!playing || !visible) return;
     const timer = setInterval(() => {
@@ -59,7 +55,6 @@ function ScopedCaptureHistory({ scope, captureHash, state, active: visible }: Ca
     return () => clearInterval(timer);
   }, [playing, entries.length, visible]);
   const select = (value: number) => { setSelected(value); setPlaying(false); };
-  const shownImage = liveObservation?.image.imageUrl ?? image;
   const shownEvent = liveObservation?.eventId ?? entry?.eventId;
   const shownSummary = liveObservation?.summary ?? entry?.summary;
   const shownToolCall = liveObservation?.toolCallId ?? entry?.toolCallId;

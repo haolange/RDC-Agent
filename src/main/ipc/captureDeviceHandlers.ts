@@ -28,9 +28,16 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
   const authorizeReplayScope = (scope: SessionScope) => {
     if (storageAdapter.readSession(scope.sessionId)?.projectId !== scope.projectId) throw new Error('REPLAY_SCOPE_DENIED');
   };
+  const lastReplayHint = new Map<string, { phase: string; contextId: string | null; imageEventId: number | null }>();
   rdxSessionService.subscribe(state => {
     context.broadcastToRenderer('capture:replayChanged', state);
-    traceProjectionRefreshService.schedule(state.sessionId);
+    const previous = lastReplayHint.get(state.sessionId);
+    lastReplayHint.set(state.sessionId, { phase: state.phase, contextId: state.contextId, imageEventId: state.imageEventId });
+    const terminal = state.phase === 'ready' || state.phase === 'error' || state.phase === 'closed';
+    const identityChanged = !previous || previous.contextId !== state.contextId || previous.imageEventId !== state.imageEventId;
+    if ((terminal && previous?.phase !== state.phase) || (identityChanged && previous)) {
+      traceProjectionRefreshService.schedule(state.sessionId);
+    }
   });
   ipcMain.handle('capture:getReplayState', (_event, ...rawArgs: unknown[]) => {
     const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, { label: 'capture:getReplayState', maxBytes: 1024 });
@@ -114,7 +121,11 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
         detail: openedCapture.preview?.source ?? openedCapture.previewError?.code ?? 'Preview unavailable',
         sessionId: request.sessionId,
         projectId: request.projectId,
-        raw: { openedCapture, contextSnapshot },
+        raw: {
+          inputId: openedCapture.inputId,
+          contextId: openedCapture.contextId,
+          captureHash: rdxSessionService.snapshotReplayForSession(scope).captureHash,
+        },
       });
       return { success: true, openedCapture, contextSnapshot };
     } catch (error) {

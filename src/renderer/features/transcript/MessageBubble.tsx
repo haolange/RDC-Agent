@@ -49,7 +49,7 @@ const renderContentWithCursor = (
   }
   return (
     <>
-      <MessageMarkdown content={content} />
+      <MessageMarkdown content={content} deferHeavyPlugins={showCursor} />
       {showCursor ? <StreamingCursor /> : null}
     </>
   );

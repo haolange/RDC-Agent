@@ -35,8 +35,14 @@ export interface ReplayManifest {
   entries: ReplayHistoryEntry[];
 }
 
+export interface EncodedReplayPng {
+  png: Buffer;
+  width: number;
+  height: number;
+}
+
 export interface ReplayPngCodec {
-  encode(bytes: Buffer): { png: Buffer; width: number; height: number };
+  encode(bytes: Buffer): EncodedReplayPng;
 }
 
 export interface ReplayHistoryOptions {

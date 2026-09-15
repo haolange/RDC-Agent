@@ -15,7 +15,7 @@ const OutputFileGlyph: React.FC = () => (
   </svg>
 );
 
-export const RightRailOutputList: React.FC<RightRailOutputListProps> = ({ current, previous }) => {
+export const RightRailOutputList: React.FC<RightRailOutputListProps> = React.memo(({ current, previous }) => {
   const { t } = useI18n();
   return (
     <div className="right-rail-artifact-list">
@@ -34,6 +34,6 @@ export const RightRailOutputList: React.FC<RightRailOutputListProps> = ({ curren
       })}
     </div>
   );
-};
+});
 
 export default RightRailOutputList;

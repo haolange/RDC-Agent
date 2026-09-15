@@ -5,8 +5,12 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeKatex from 'rehype-katex';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { normalizeAssistantMarkdown } from './normalizeAssistantMarkdown';
+import { MessageMarkdown } from './MessageMarkdown';
+
+vi.mock('./markdownHighlight', () => ({}));
+vi.mock('katex/dist/katex.min.css', () => ({}));
 
 function renderMarkdown(content: string, extras?: { highlight?: boolean; katex?: boolean }): string {
   const normalized = normalizeAssistantMarkdown(content);
@@ -48,5 +52,14 @@ describe('MessageMarkdown pipeline for GPT thinking titles', () => {
     });
     expect(html).toContain('<strong>Planning project purpose inspection</strong>');
     expect(html).not.toContain('**');
+  });
+
+  it('keeps GFM strong when heavy plugins are deferred for streaming', () => {
+    const html = renderToStaticMarkup(createElement(MessageMarkdown, {
+      content: '**Planning project purpose inspection**',
+      deferHeavyPlugins: true,
+    }));
+    expect(html).toContain('<strong>Planning project purpose inspection</strong>');
+    expect(html).not.toContain('**Planning project purpose inspection**');
   });
 });

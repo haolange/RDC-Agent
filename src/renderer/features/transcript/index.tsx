@@ -30,7 +30,7 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
     }
     container.scrollTo({
       top: container.scrollHeight,
-      behavior: 'smooth',
+      behavior: 'auto',
     });
   }, [
     messageCount,

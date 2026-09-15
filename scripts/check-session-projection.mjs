@@ -41,14 +41,16 @@ if (!bridge.includes('isActiveSessionEvent')) {
 for (const required of [
   'onTraceProjectionChanged',
   'handleConversationEvent',
-  'onWorkflowStateChanged',
   'projectConversationMessage',
   'projectTrace',
-  'projectWorkflow',
 ]) {
   if (!bridge.includes(required)) {
     fail(`useIpcEventBridge must reference ${required}`);
   }
+}
+
+if (bridge.includes('onWorkflowStateChanged') || bridge.includes('workflow:stateChanged')) {
+  fail('useIpcEventBridge must not subscribe to workflow:stateChanged');
 }
 
 if (!hygiene.includes('captureActiveSession') || !hygiene.includes('resetForSessionSwitch')) {
@@ -57,6 +59,9 @@ if (!hygiene.includes('captureActiveSession') || !hygiene.includes('resetForSess
 
 if (!projectionStore.includes('activateSession') || !projectionStore.includes('projectConversationMessage')) {
   fail('sessionProjectionStore must expose activate/project APIs');
+}
+if (!projectionStore.includes('workflowState') || !hygiene.includes('setWorkflowState')) {
+  fail('workflow state must remain restorable via capture/hydrate and session switch');
 }
 
 if (!composerContext.includes('restoreLastSentIfCurrentSession') || !composerContext.includes('sessionId')) {

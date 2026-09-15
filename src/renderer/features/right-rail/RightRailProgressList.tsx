@@ -16,7 +16,7 @@ const focusWorkProcessTask = (taskId: string): void => {
   window.setTimeout(() => target.classList.remove('is-trace-flash'), 1600);
 };
 
-export const RightRailProgressList: React.FC<{ tasks: ProgressTask[]; locateLabel: string; stopLabel: string }> = ({ tasks, locateLabel, stopLabel }) => {
+export const RightRailProgressList: React.FC<{ tasks: ProgressTask[]; locateLabel: string; stopLabel: string }> = React.memo(({ tasks, locateLabel, stopLabel }) => {
   const sessionId = tasks.find((task) => task.status === 'in_progress')?.sessionId;
   const { stopping, error, stop } = useSessionWorkStop(sessionId);
   return <>
@@ -31,4 +31,4 @@ export const RightRailProgressList: React.FC<{ tasks: ProgressTask[]; locateLabe
       </li>
     ))}</ol>
   </>;
-};
+});

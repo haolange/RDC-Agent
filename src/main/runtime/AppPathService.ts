@@ -240,6 +240,10 @@ export class AppPathService {
   getCapturePreviewPath(projectId: string, inputId: string): string {
     return path.join(this.getCapturePreviewDir(projectId), `${sanitizePathSegment(inputId || 'capture')}-latest.png`);
   }
+
+  getLiveReplayPreviewPath(sessionId: string): string {
+    return path.join(this.getAppStatePaths().capturePreviewsPath, 'live', `${sanitizePathSegment(sessionId || 'session')}.png`);
+  }
 }
 
 export const appPathService = new AppPathService();

@@ -9,6 +9,7 @@ import { RdxSessionRuntime, type RdxLifecycleOptions } from './RdxSessionRuntime
 import { getDelegatedChildSessionId, getRdxContextLease } from './RdxRuntimeContextRegistry';
 import { shellInvocationService } from '../tools/ShellInvocationService';
 import { beginRdxLifecycle, getRdxInteractionLock, runRdxOperation, subscribeRdxInteractionLock } from './RdxOperationCoordinator';
+import { replayLivePreviewStore } from '../captures/replay/ReplayLivePreviewStore';
 import { observeReplay, readReplayEvents } from './RdxReplayObservation';
 
 const keyOf = (scope: SessionScope) => JSON.stringify([scope.projectId, scope.sessionId]);
@@ -116,7 +117,9 @@ export class RdxSessionService {
           try {
             await runRdxOperation(owner.contextId, async () => {
               this.publish(binding, { events: await readReplayEvents(owner, binding.runtime.getCliSettings()) });
-              this.publish(binding, await observeReplay(owner, { final_output: true }, binding.runtime.getCliSettings()));
+              this.publish(binding, await observeReplay(owner, { final_output: true }, binding.runtime.getCliSettings(), {
+                sessionId: scope.sessionId, generation: binding.state.generation,
+              }));
             });
           } catch (error) { this.publish(binding, { error: { code: 'RDX_IMAGE_FAILED', message: String(error), retry: 'image' } }); }
         }
@@ -136,6 +139,7 @@ export class RdxSessionService {
     const closed = contextId ? await runRdxOperation(contextId, close) : await close();
     if (binding.deviceId && binding.deviceId !== retainedDeviceId && this.devices.get(binding.deviceId) === keyOf(scope)) this.devices.delete(binding.deviceId);
     binding.deviceId = null;
+    await replayLivePreviewStore.clear(scope.sessionId);
     return closed;
   }
   clearOpenedCaptureForSession(scope: SessionScope, options: RdxLifecycleOptions = {}): Promise<boolean> {
@@ -231,8 +235,7 @@ export class RdxSessionService {
         observation: state.observation, saved: false, saveError: null } : null;
     if (agentObservation) this.publish(this.binding(scope), { agentObservation });
     try {
-      const imageBytes = state.image?.imageUrl.startsWith('data:image/png;base64,')
-        ? Buffer.from(state.image.imageUrl.slice('data:image/png;base64,'.length), 'base64') : undefined;
+      const imageBytes = state.image ? await replayLivePreviewStore.read(scope.sessionId) : undefined;
       await replayHistoryStore.append({ projectRoot: project.rootPath, sessionId: scope.sessionId, captureSha256: state.captureHash }, {
         eventId: state.appliedEventId, operationId, summary, toolCallId,
         modificationState: state.observation?.modificationState, nativeRevision: state.observation?.nativeRevision,
@@ -259,7 +262,9 @@ export class RdxSessionService {
       if (args.event_id !== undefined && args.event_id !== binding.state.requestedEventId) return;
       this.publish(binding, { phase: 'applying', operationId, error: null });
       try {
-        const observed = await observeReplay(owner, args, frozenCli ?? binding.runtime.getCliSettings());
+        const observed = await observeReplay(owner, args, frozenCli ?? binding.runtime.getCliSettings(), {
+          sessionId: scope.sessionId, generation,
+        });
         if (generation === binding.state.generation) this.publish(binding, { ...observed, operationId, phase: 'ready' });
       }
       catch (error) { if (generation === binding.state.generation) this.publish(binding, { operationId, image: null, observation: null, imageEventId: null, appliedEventId: null, target: null, targets: [], isFinalOutput: false, phase: 'ready', error: { code: 'RDX_OBSERVE_FAILED', message: String(error), retry: 'image' } }); }

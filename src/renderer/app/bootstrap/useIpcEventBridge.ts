@@ -5,13 +5,11 @@ import type { ToolTraceEntry } from '@shared/types/tool';
 import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import type { ActionEvent } from '@shared/types/evidence';
-import type { WorkflowState } from '@shared/types/workflow';
 import type { RunSummary, ContextSnapshot, SessionScopedPayload } from '@shared/types/session';
 import type { TranslationKey } from '../../i18n';
 import {
   applyActionEventToMessage,
   applyToolTraceToMessage,
-  hydrateMessagesWithActionEvents,
   mapActionEventToTimelineEntry,
   mergeCapturesWithSnapshot,
 } from '../../services/conversationTimeline';
@@ -67,8 +65,6 @@ export function useIpcEventBridge(options: {
 
   const setSystemTheme = useAppSettingsStore((state) => state.setSystemTheme);
   const addActionEvent = useEvidenceStore((state) => state.addActionEvent);
-  const setWorkflowState = useWorkflowStore((state) => state.setWorkflowState);
-  const setReasoningSummaries = useConversationStore((state) => state.setReasoningSummaries);
   const activeSessionId = useProjectStore((state) => state.currentSession?.sessionId ?? null);
   const handoffNotice = useProjectStore((state) => state.currentSession?.handoffNotice);
   const shownHandoffNotices = useRef(new Set<string>());
@@ -325,57 +321,6 @@ export function useIpcEventBridge(options: {
       }
     });
 
-    const unsubscribeWorkflowStateChanged = electronAPI.events.onWorkflowStateChanged((rawState) => {
-      const state = rawState as WorkflowState;
-      if (!isActiveSessionEvent(state.sessionId)) {
-        projection().projectWorkflow(state.sessionId, state);
-        return;
-      }
-      setWorkflowState(state);
-      setReasoningSummaries(state.reasoningSummaries ?? []);
-      const currentProject = useProjectStore.getState().currentProject;
-      const currentSession = useProjectStore.getState().currentSession;
-
-      if (currentProject) {
-        electronAPI.session.list(currentProject.projectId)
-          .then((result) => useProjectStore.getState().setSessions(result.sessions ?? []))
-          .catch(() => undefined);
-      }
-
-      if (currentSession) {
-        electronAPI.run.list(currentSession.sessionId)
-          .then((result) => {
-            useSessionStore.getState().setRuns(result.runs ?? []);
-            const targetRunId = state.runId || useSessionStore.getState().currentRun?.runId;
-            const activeRun = result.runs?.find((run) => run.runId === targetRunId)
-              ?? result.runs?.[0]
-              ?? null;
-            if (activeRun) {
-              useSessionStore.getState().setCurrentRun(activeRun);
-              useCaptureStore.getState().setCaptures(activeRun.captures ?? []);
-            }
-          })
-          .catch(() => undefined);
-
-        electronAPI.evidence.getChain()
-          .then((result) => {
-            if (!isActiveSessionEvent(currentSession.sessionId)) return;
-            useEvidenceStore.getState().setActionEvents(result.events ?? []);
-            const timeline = (result.events ?? [])
-              .map((event) => mapActionEventToTimelineEntry(event as ActionEvent))
-              .filter((entry): entry is AgentTimelineEntry => entry !== null);
-            useConversationStore.getState().setTimeline(timeline);
-            useConversationStore.getState().setConversationMessages(
-              hydrateMessagesWithActionEvents(
-                useConversationStore.getState().conversationMessages,
-                (result.events ?? []) as ActionEvent[],
-              ),
-            );
-          })
-          .catch(() => undefined);
-      }
-    });
-
     const unsubscribeRunStatusChanged = electronAPI.events.onRunStatusChanged((rawPayload) => {
       const payload = rawPayload as {
         runId: string;
@@ -466,7 +411,6 @@ export function useIpcEventBridge(options: {
       unsubscribeAgentStatusChanged();
       unsubscribeCaptureStatusChanged();
       unsubscribeEvidenceEventAdded();
-      unsubscribeWorkflowStateChanged();
       unsubscribeRunStatusChanged();
       unsubscribeDeviceStatusChanged();
       unsubscribeProjectInputsChanged();
@@ -483,11 +427,9 @@ export function useIpcEventBridge(options: {
   }, [
     activeSessionId,
     addActionEvent,
-    setReasoningSummaries,
     setSettingsModalOpen,
     setSystemTheme,
     setWindowMaximized,
-    setWorkflowState,
     showNotice,
     syncCapturesFromSnapshot,
     t,

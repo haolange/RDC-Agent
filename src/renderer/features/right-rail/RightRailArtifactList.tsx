@@ -40,7 +40,7 @@ const rowClass = (row: InvestigationArtifactRow): string => {
   return `right-rail-investigation-row status-${status}${row.degraded ? ' is-degraded' : ''}`;
 };
 
-export const RightRailArtifactList: React.FC<{ artifacts: InvestigationArtifactsPanelViewModel }> = ({ artifacts }) => {
+export const RightRailArtifactList: React.FC<{ artifacts: InvestigationArtifactsPanelViewModel }> = React.memo(({ artifacts }) => {
   const { t, language } = useI18n();
   const sessionId = useProjectStore((state) => state.currentSession?.sessionId ?? '');
   const [previewRow, setPreviewRow] = useState<InvestigationArtifactRow | null>(null);
@@ -104,6 +104,6 @@ export const RightRailArtifactList: React.FC<{ artifacts: InvestigationArtifacts
       ) : null}
     </div>
   );
-};
+});
 
 export default RightRailArtifactList;

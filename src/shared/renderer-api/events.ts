@@ -13,9 +13,6 @@ import type { RendererApiTransport } from './transport';
 
 export function createEventSubscriptionApi(transport: RendererApiTransport): EventSubscriptionApi {
   return {
-    onWorkflowStateChanged: (callback) => (
-      transport.subscribe(EVENT.workflow.stateChanged, (state) => callback(state as Parameters<typeof callback>[0]))
-    ),
     onRunStatusChanged: (callback) => (
       transport.subscribe(EVENT.workflow.runStatusChanged, (data) => callback(data as Parameters<typeof callback>[0]))
     ),

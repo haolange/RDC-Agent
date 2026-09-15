@@ -163,7 +163,7 @@ const capturePanel = [
   read('src/renderer/features/right-rail/CaptureFrame.tsx'),
   read('src/renderer/features/right-rail/CaptureHistory.tsx'),
 ].join('\n');
-for (const required of ['RdxContextPanelViewModel', 'control.captureOpen', 'capture.openProjectInput', 'capture.clearOpenedState', 'capture.applyReplayEvent', 'capture.refreshFrame', 'capture.listReplayHistory', 'capture.readReplayImage', 'capture-replay-device-row', 'role="tablist"', 'aria-selected', 'CaptureFrame', 'CaptureHistory']) {
+for (const required of ['RdxContextPanelViewModel', 'control.captureOpen', 'capture.openProjectInput', 'capture.clearOpenedState', 'capture.applyReplayEvent', 'capture.refreshFrame', 'capture.listReplayHistory', 'capture.readReplayImage', 'capture.readLivePreview', 'capture-replay-device-row', 'role="tablist"', 'aria-selected', 'CaptureFrame', 'CaptureHistory']) {
   requireText(capturePanel, required, `CapturePanel must retain ${required}`);
 }
 for (const retired of ['openHumanPreview', 'closeHumanPreview', 'humanPreviewStatus']) forbidText(capturePanel, retired, `Capture must retire ${retired}`);
