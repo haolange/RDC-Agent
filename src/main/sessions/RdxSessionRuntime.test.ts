@@ -6,6 +6,8 @@ vi.mock('../settings/SettingsService', () => ({ settingsService: { getAll: () =>
 vi.mock('../captures/ReplayDeviceService', () => ({ replayDeviceService: {} }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('../tools/ShellInvocationService', () => ({ shellInvocationService: { hasUnconfirmedProcesses: () => false } }));
+import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
+import { freezeRdxTurnBinding } from '../tools/RdxTurnBindings';
 import { RdxSessionRuntime } from './RdxSessionRuntime';
 import { clearRdxContextLeases, getRdxContextLease, grantDelegatedLease, revokeDelegatedLease } from './RdxRuntimeContextRegistry';
 const request: OpenProjectInputRequest = { projectId: 'project', sessionId: 'session', inputId: 'same-file', filePath: '/capture.rdc',
@@ -21,6 +23,19 @@ beforeEach(() => { clearRdxContextLeases(); nativeStop.mockReset(); nativeStop.m
   return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: _command === 'daemon' ? 'rdx.daemon.stop' : operation, data }) };
 }); });
 describe('native owning runtime', () => {
+  it('loads the cached catalog and skips refresh when a frozen binding is supplied', async () => {
+    const loadCatalog = vi.mocked(rdxCliInvokerService.loadCatalog);
+    loadCatalog.mockClear();
+    await new RdxSessionRuntime().openProjectInput(request);
+    expect(loadCatalog).toHaveBeenCalledWith(expect.objectContaining({ command: 'rdx' }));
+    expect(loadCatalog.mock.calls.every((call) => call[1] !== true)).toBe(true);
+    loadCatalog.mockClear();
+    const binding = freezeRdxTurnBinding({
+      enabled: true, command: 'rdx', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30_000,
+    }, []);
+    await new RdxSessionRuntime().openProjectInput(request, { binding });
+    expect(loadCatalog).not.toHaveBeenCalled();
+  });
   it('allocates a unique context rather than using input identity', async () => {
     const runtime = new RdxSessionRuntime(); const opened = await runtime.openProjectInput(request);
     expect(opened.contextId).toMatch(/^rdc-/); expect(opened.contextId).not.toBe(request.inputId);

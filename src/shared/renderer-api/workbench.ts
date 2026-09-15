@@ -71,6 +71,7 @@ export function createCaptureApi(transport: RendererApiTransport): CaptureApi {
     getReplaySelection: (scope) => transport.invoke(INVOKE.capture.getReplaySelection, scope),
     listReplayHistory: (request) => transport.invoke(INVOKE.capture.listReplayHistory, request),
     readReplayImage: (request) => transport.invoke(INVOKE.capture.readReplayImage, request),
+    readLivePreview: (scope) => transport.invoke(INVOKE.capture.readLivePreview, scope),
     clearReplayHistory: (request) => transport.invoke(INVOKE.capture.clearReplayHistory, request),
     getReplayState: (scope) => transport.invoke(INVOKE.capture.getReplayState, scope),
     applyReplayEvent: (request) => transport.invoke(INVOKE.capture.applyReplayEvent, request),

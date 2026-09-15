@@ -3,7 +3,6 @@ import type { AgentMessage, AgentState } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
 import type { RunContextUsageSummary, RunSummary, SessionScope } from '@shared/types/session';
-import type { WorkflowState } from '@shared/types/workflow';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import { rendererEventHub } from '../../browserAppBridge/rendererEventHub';
 
@@ -22,10 +21,6 @@ export class WorkflowProjectionPublisher {
         window.webContents.send(channel, ...args);
       }
     }
-  }
-
-  publishWorkflowState(state: WorkflowState): void {
-    this.publish('workflow:stateChanged', state);
   }
 
   publishRunStatus(payload: RunStatusProjection): void {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CaptureReplayApplyRequest, CaptureReplayState } from '@shared/types/captureReplay';
 import { applyReplayEvent, type CaptureScope } from './capturePanelActions';
+import { useCapturePreviewUrl } from './useCapturePreviewUrl';
 import { createReplayApplyQueue } from './replayApplyQueue';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
@@ -32,6 +33,7 @@ export function CaptureFrame({ scope, state, disabled, receive }: {
     setRequested(id); setError(null); queue.enqueue({ ...scope, bindingGeneration: state.generation, eventId: id, ...(target ? { target } : {}) }, flush);
   };
   const image = state?.image;
+  const previewUrl = useCapturePreviewUrl(scope, { imagePath: image?.imagePath });
   const busyImage = state && ['validating', 'connecting', 'opening', 'loading_image', 'closing'].includes(state.phase);
   const feedback = requested !== null || state?.phase === 'applying' || (state?.requestedEventId !== null && state?.requestedEventId !== state?.appliedEventId)
     ? t('control.replay.requested', { requested: requested ?? state?.requestedEventId ?? '—', shown: state?.imageEventId ?? '—' })
@@ -45,7 +47,7 @@ export function CaptureFrame({ scope, state, disabled, receive }: {
         onChange={(textureId) => state?.appliedEventId && select(state.appliedEventId, true, { textureId })} />}
     </div>
     <div className="capture-replay-image" aria-busy={Boolean(busyImage)}>
-      {image?.imageUrl ? <img src={image.imageUrl} alt={`EID ${state?.imageEventId ?? '—'}`} /> : <span>{busyImage ? t(`control.replay.${state.phase}`) : t(state?.contextId ? 'control.replay.noOutput' : 'control.replay.noImage')}</span>}
+      {previewUrl ? <img src={previewUrl} alt={`EID ${state?.imageEventId ?? '—'}`} /> : <span>{busyImage ? t(`control.replay.${state.phase}`) : t(state?.contextId ? 'control.replay.noOutput' : 'control.replay.noImage')}</span>}
       {image && busyImage && <span className="capture-image-state">{t(`control.replay.${state.phase}`)}</span>}
     </div>
     <div className="capture-event-controls">

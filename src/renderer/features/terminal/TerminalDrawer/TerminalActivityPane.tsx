@@ -1,15 +1,27 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
+import { useDynStyle } from '../../../lib/useDynStyle';
 import {
   formatRaw,
   formatTimestamp,
   formatShortId,
 } from './terminalFormatters';
+import {
+  TERMINAL_ENTRY_ESTIMATE,
+  TERMINAL_WINDOW_OVERSCAN,
+  TERMINAL_WINDOW_THRESHOLD,
+  terminalActivityWindow,
+} from './terminalActivityWindow';
 import type { TerminalDrawerViewModel } from './useTerminalDrawer';
 
 interface TerminalActivityPaneProps {
   vm: TerminalDrawerViewModel;
 }
+
+const TerminalSpacer: React.FC<{ height: number }> = ({ height }) => {
+  const dynStyle = useDynStyle({ height: `${height}px` });
+  return <div aria-hidden="true" className="runtime-terminal-entry-spacer" {...dynStyle} />;
+};
 
 export const TerminalActivityPane: React.FC<TerminalActivityPaneProps> = ({ vm }) => {
   const {
@@ -23,6 +35,50 @@ export const TerminalActivityPane: React.FC<TerminalActivityPaneProps> = ({ vm }
     toggleEntryExpanded,
     handleCopyEntry,
   } = vm;
+  const [range, setRange] = useState({ start: 0, end: Math.min(filteredEntries.length, 24) });
+
+  const updateRange = useCallback(() => {
+    const body = activityBodyRef.current;
+    if (!body || filteredEntries.length <= TERMINAL_WINDOW_THRESHOLD) {
+      setRange({ start: 0, end: filteredEntries.length });
+      return;
+    }
+    const next = terminalActivityWindow(
+      filteredEntries.length,
+      body.scrollTop,
+      body.clientHeight,
+      TERMINAL_ENTRY_ESTIMATE,
+      TERMINAL_WINDOW_OVERSCAN,
+    );
+    setRange((prev) => (prev.start === next.start && prev.end === next.end ? prev : next));
+  }, [activityBodyRef, filteredEntries.length]);
+
+  useEffect(() => {
+    const body = activityBodyRef.current;
+    if (!body) {
+      updateRange();
+      return;
+    }
+    body.addEventListener('scroll', updateRange, { passive: true });
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => updateRange()) : null;
+    ro?.observe(body);
+    updateRange();
+    return () => {
+      body.removeEventListener('scroll', updateRange);
+      ro?.disconnect();
+    };
+  }, [activityBodyRef, updateRange]);
+
+  useEffect(() => {
+    updateRange();
+  }, [filteredEntries.length, updateRange]);
+
+  const windowed = filteredEntries.length > TERMINAL_WINDOW_THRESHOLD;
+  const visible = windowed ? filteredEntries.slice(range.start, range.end) : filteredEntries;
+  const leading = windowed ? range.start * TERMINAL_ENTRY_ESTIMATE : 0;
+  const trailing = windowed
+    ? Math.max(0, (filteredEntries.length - range.end) * TERMINAL_ENTRY_ESTIMATE)
+    : 0;
 
   return (
     <div
@@ -35,16 +91,20 @@ export const TerminalActivityPane: React.FC<TerminalActivityPaneProps> = ({ vm }
         ) : filteredEntries.length === 0 ? (
           <div className="runtime-terminal-empty">{emptyCopy}</div>
         ) : (
-          filteredEntries.map((entry) => (
-            <TerminalLogEntry
-              key={entry.id}
-              entry={entry}
-              isExpanded={density === 'expanded' || expandedEntryIds.includes(entry.id)}
-              onToggle={() => toggleEntryExpanded(entry.id)}
-              onCopy={() => handleCopyEntry(entry)}
-              copyLabel={t('terminal.copyContext')}
-            />
-          ))
+          <>
+            {leading > 0 ? <TerminalSpacer height={leading} /> : null}
+            {visible.map((entry) => (
+              <TerminalLogEntry
+                key={entry.id}
+                entry={entry}
+                isExpanded={density === 'expanded' || expandedEntryIds.includes(entry.id)}
+                onToggle={() => toggleEntryExpanded(entry.id)}
+                onCopy={() => handleCopyEntry(entry)}
+                copyLabel={t('terminal.copyContext')}
+              />
+            ))}
+            {trailing > 0 ? <TerminalSpacer height={trailing} /> : null}
+          </>
         )}
       </div>
     </div>

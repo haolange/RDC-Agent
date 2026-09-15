@@ -77,7 +77,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
         await clearReplayHistory({ ...scope, captureHash });
         setConfirmClear(false); setMore(false); setHistoryEpoch((value) => value + 1);
       }
-      await refreshProjection();
+      if (operation === 'refresh') await refreshProjection();
     } catch (reason) { setError({ message: reason instanceof Error ? reason.message : String(reason), action: operation }); }
     finally { setAction(null); }
   };

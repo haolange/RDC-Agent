@@ -145,6 +145,7 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'capture:getReplaySelection': 'read',
   'capture:listReplayHistory': 'read',
   'capture:readReplayImage': 'read',
+  'capture:readLivePreview': 'read',
   'capture:clearReplayHistory': 'high-impact',
   'capture:getReplayState': 'read',
   'capture:applyReplayEvent': 'mutation',

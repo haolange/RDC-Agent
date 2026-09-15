@@ -72,7 +72,7 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
               <span className="work-process-row-caret" aria-hidden="true" />
             </summary>
             <div className="work-process-thinking-preview">
-              <MessageMarkdown content={row.thinkingPreview} />
+              <MessageMarkdown content={row.thinkingPreview} deferHeavyPlugins={thinkingActive} />
             </div>
           </details>
         ) : row.thinkingLabel ? (
@@ -83,7 +83,7 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
         ) : null}
         {hasProse ? (
           <div className={`work-process-prose${row.proseStreaming ? ' is-streaming' : ''}`}>
-            <MessageMarkdown content={row.proseText} />
+            <MessageMarkdown content={row.proseText} deferHeavyPlugins={row.proseStreaming} />
           </div>
         ) : null}
         {showSteps ? (

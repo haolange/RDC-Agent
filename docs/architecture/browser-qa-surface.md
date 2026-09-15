@@ -50,4 +50,4 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
 
 ## Capture Replay QA
 
-capture:getReplayState/getReplaySelection/listReplayHistory/readReplayImage 为只读面；applyReplayEvent/refreshFrame 为 mutation；clearReplayHistory 为 high-impact，复用共享 channel capability 表。状态事件为 capture:replayChanged，包含完整 scope/generation/revision。QA 应覆盖跨 session 迟到结果、运行锁、非空回放与 RDC 归零原空态。真实 Android 显示验收必须来自设备屏幕与原生回执，不以 Browser 图片或 local export 代替。
+capture:getReplayState/getReplaySelection/listReplayHistory/readReplayImage/readLivePreview 为只读面；applyReplayEvent/refreshFrame 为 mutation；clearReplayHistory 为 high-impact，复用共享 channel capability 表。状态事件为 capture:replayChanged，包含完整 scope/generation/revision，不含像素。QA 应覆盖跨 session 迟到结果、运行锁、非空回放与 RDC 归零原空态。真实 Android 显示验收必须来自设备屏幕与原生回执，不以 Browser 图片或 local export 代替。

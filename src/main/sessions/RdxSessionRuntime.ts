@@ -82,11 +82,16 @@ export class RdxSessionRuntime {
   async openProjectInput(request: OpenProjectInputRequest, options: RdxLifecycleOptions = {}): Promise<OpenedCaptureState> {
     options.signal?.throwIfAborted();
     const cli = structuredClone(options.binding?.cli ?? settingsService.getAll().tooling.rdxCli);
-    const catalog = await rdxCliInvokerService.loadCatalog(cli, true);
+    let lifecycleBinding = options.binding;
+    if (!lifecycleBinding) {
+      const catalog = await rdxCliInvokerService.loadCatalog(cli);
+      options.signal?.throwIfAborted();
+      lifecycleBinding = freezeRdxTurnBinding(cli, catalog.tools);
+    }
     options.signal?.throwIfAborted();
     const allocatedContextId = `rdc-${randomUUID()}`;
     await this.closeOrReplaceOpenedCapture(options);
-    this.lifecycleBinding = options.binding ?? freezeRdxTurnBinding(cli, catalog.tools);
+    this.lifecycleBinding = lifecycleBinding;
     options = { ...options, binding: this.lifecycleBinding };
     this.contextId = allocatedContextId;
     this.ownerScope = request.sessionId ? { projectId: request.projectId, sessionId: request.sessionId } : null;

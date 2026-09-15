@@ -77,7 +77,7 @@ export function useAppBootstrap(options: {
         console.error('Failed to initialize app shell:', error);
         setConnectionStatus('degraded');
       } finally {
-        window.setTimeout(() => setIsLoading(false), 320);
+        setIsLoading(false);
       }
     };
 
@@ -116,20 +116,45 @@ export function useAppBootstrap(options: {
 
     let cancelled = false;
     void (async () => {
+      const conversation = useConversationStore.getState();
+      const historyAlreadyBound = conversation.allConversationMessages.some(
+        (message) => message.sessionId === currentSession.sessionId,
+      );
+      const traceAlreadyBound = useWorkflowStore.getState().tracePresentation?.sessionId === currentSession.sessionId;
+      const restoreWillRun = !(navigator.webdriver && runtimeTestMode);
+      const skipEvidenceIpc = restoreWillRun && historyAlreadyBound;
       const [historyResult, evidenceResult, traceResult] = await Promise.all([
-        electronAPI.conversation.getHistory(currentSession.sessionId).catch(() => ({ messages: [], branchState: null })),
-        electronAPI.evidence.getChain().catch(() => ({ events: [] as ActionEvent[] })),
-        electronAPI.trace.getProjection(currentSession.sessionId).catch(() => ({ success: false, presentation: null })),
+        historyAlreadyBound
+          ? Promise.resolve(null)
+          : electronAPI.conversation.getHistory(currentSession.sessionId).catch(() => ({ messages: [], branchState: null })),
+        skipEvidenceIpc
+          ? Promise.resolve({ events: [] as ActionEvent[] })
+          : electronAPI.evidence.getChain().catch(() => ({ events: [] as ActionEvent[] })),
+        traceAlreadyBound
+          ? Promise.resolve(null)
+          : electronAPI.trace.getProjection(currentSession.sessionId).catch(() => ({ success: false, presentation: null })),
       ]);
       if (cancelled) return;
-      setConversationSnapshot(
-        hydrateMessagesWithActionEvents(
-          historyResult.messages ?? [],
-          (evidenceResult.events ?? []) as ActionEvent[],
-        ),
-        historyResult.branchState ?? null,
-      );
-      setTracePresentation(traceResult.presentation ?? null);
+      if (historyResult) {
+        setConversationSnapshot(
+          hydrateMessagesWithActionEvents(
+            historyResult.messages ?? [],
+            (evidenceResult.events ?? []) as ActionEvent[],
+          ),
+          historyResult.branchState ?? null,
+        );
+      } else if (!restoreWillRun) {
+        setConversationSnapshot(
+          hydrateMessagesWithActionEvents(
+            useConversationStore.getState().allConversationMessages,
+            (evidenceResult.events ?? []) as ActionEvent[],
+          ),
+          useConversationStore.getState().branchState,
+        );
+      }
+      if (traceResult) {
+        setTracePresentation(traceResult.presentation ?? null);
+      }
     })();
     return () => { cancelled = true; };
   }, [currentSession?.sessionId, runtimeTestMode, setConversationSnapshot, setTracePresentation]);
@@ -269,12 +294,14 @@ function useSessionRestoreBootstrap(runtimeTestMode: boolean | null): void {
       })
       .catch(() => undefined);
 
-    void electronAPI.trace.getProjection(currentSession.sessionId)
-      .then((result) => {
-        useWorkflowStore.getState().setTracePresentation(result.presentation ?? null);
-      })
-      .catch(() => {
-        useWorkflowStore.getState().setTracePresentation(null);
-      });
+    if (useWorkflowStore.getState().tracePresentation?.sessionId !== currentSession.sessionId) {
+      void electronAPI.trace.getProjection(currentSession.sessionId)
+        .then((result) => {
+          useWorkflowStore.getState().setTracePresentation(result.presentation ?? null);
+        })
+        .catch(() => {
+          useWorkflowStore.getState().setTracePresentation(null);
+        });
+    }
   }, [currentSession, runtimeTestMode]);
 }

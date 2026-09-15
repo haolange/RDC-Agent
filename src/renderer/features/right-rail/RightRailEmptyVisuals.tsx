@@ -202,10 +202,11 @@ const CaptureVisual: React.FC = () => {
   );
 };
 
-export const RightRailEmptyVisual: React.FC<{ kind: RightRailEmptyKind }> = ({ kind }) => {
+export const RightRailEmptyVisual: React.FC<{ kind: RightRailEmptyKind }> = React.memo(({ kind }) => {
   if (kind === 'progress') return <ProgressVisual />;
   if (kind === 'artifacts') return <ArtifactsVisual />;
   if (kind === 'outputs') return <OutputsVisual />;
   if (kind === 'context') return <ContextVisual />;
   return <CaptureVisual />;
-};
+});
+RightRailEmptyVisual.displayName = 'RightRailEmptyVisual';

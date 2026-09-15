@@ -37,6 +37,7 @@ export interface LoadProjectsOptions {
   autoSelectSession?: boolean;
   rightRailTarget?: RightRailTarget;
   requestId?: number;
+  onProjectsListed?: () => void;
 }
 
 export interface SelectSessionOptions {

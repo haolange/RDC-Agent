@@ -2,6 +2,7 @@ import { rdxSessionService } from '../sessions';
 import { ipcMain } from 'electron';
 import { z } from 'zod';
 import { replayHistoryStore } from '../captures/replay/ReplayHistoryStore';
+import { replayLivePreviewStore } from '../captures/replay/ReplayLivePreviewStore';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { SessionScopeSchema, SessionScopeArgsSchema } from './validation/captureDeviceSchemas';
@@ -25,8 +26,12 @@ export function registerCaptureReplayHistoryHandlers(): void {
   });
   ipcMain.handle('capture:readReplayImage', async (_event, ...args: unknown[]) => {
     const [request] = parseIpcArgs(z.tuple([history.extend({ imageHash: hash }).strict()]), args, { label: 'capture:readReplayImage', maxBytes: 2048 });
-    const bytes = await replayHistoryStore.readImage({ projectRoot: authorize(request), sessionId: request.sessionId, captureSha256: request.captureHash }, request.imageHash);
-    return `data:image/png;base64,${bytes.toString('base64')}`;
+    return replayHistoryStore.readImage({ projectRoot: authorize(request), sessionId: request.sessionId, captureSha256: request.captureHash }, request.imageHash);
+  });
+  ipcMain.handle('capture:readLivePreview', async (_event, ...args: unknown[]) => {
+    const [scope] = parseIpcArgs(SessionScopeArgsSchema, args, { label: 'capture:readLivePreview', maxBytes: 1024 });
+    authorize(scope);
+    return replayLivePreviewStore.read(scope.sessionId);
   });
   ipcMain.handle('capture:clearReplayHistory', (_event, ...args: unknown[]) => {
     const [request] = parseIpcArgs(z.tuple([history]), args, { label: 'capture:clearReplayHistory', maxBytes: 2048 });

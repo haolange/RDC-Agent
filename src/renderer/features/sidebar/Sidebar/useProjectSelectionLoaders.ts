@@ -130,7 +130,9 @@ export function useProjectSelectionLoaders({
     didRunInitialLoadRef.current = true;
 
     void (async () => {
-      await loadProjects();
+      await loadProjects(undefined, undefined, {
+        onProjectsListed: () => setIsLoading(false),
+      });
       setIsLoading(false);
     })();
   }, [loadProjects]);

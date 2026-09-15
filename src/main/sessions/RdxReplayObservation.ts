@@ -2,12 +2,18 @@ import type { RdxCliInvokerSettings } from '@shared/types/settings';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { nativeImage } from 'electron';
 import type { CaptureReplayState } from '@shared/types/captureReplay';
 import type { RdxRuntimeContext } from '@shared/types/session';
+import { replayPngCodec } from '../captures/replay/replayPngCodec';
+import { replayLivePreviewStore } from '../captures/replay/ReplayLivePreviewStore';
 import { settingsService } from '../settings/SettingsService';
 import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import { parseRdxNativeResult } from '../tools/RdxNativeProtocol';
+
+export interface ReplayLiveWriteTarget {
+  sessionId: string;
+  generation: number;
+}
 
 async function call(owner: RdxRuntimeContext, operation: string, args: Record<string, unknown>, frozenCli?: RdxCliInvokerSettings) {
   const settings = structuredClone(frozenCli ?? settingsService.getAll().tooling.rdxCli);
@@ -18,15 +24,22 @@ async function call(owner: RdxRuntimeContext, operation: string, args: Record<st
   if (result.result_kind !== operation || result.data.session_id !== owner.replaySessionId) throw new Error('RDX_OBSERVATION_IDENTITY_MISMATCH');
   return result.data;
 }
+
 export async function readReplayEvents(owner: RdxRuntimeContext, frozenCli?: RdxCliInvokerSettings): Promise<CaptureReplayState['events']> {
   const data = await call(owner, 'rd.session.get_replay_events', {}, frozenCli);
   if (data.complete !== true || !Array.isArray(data.events)) throw new Error('RDX_EVENTS_INCOMPLETE');
   return data.events.map((entry: { event_id: number; name: string }) => {
     if (!Number.isInteger(entry.event_id) || typeof entry.name !== 'string') throw new Error('RDX_EVENTS_INVALID');
-    return { eventId: entry.event_id, name: entry.name };
+    return { eventId: entry.event_id };
   });
 }
-export async function observeReplay(owner: RdxRuntimeContext, args: Record<string, unknown>, frozenCli?: RdxCliInvokerSettings): Promise<Partial<CaptureReplayState>> {
+
+export async function observeReplay(
+  owner: RdxRuntimeContext,
+  args: Record<string, unknown>,
+  frozenCli?: RdxCliInvokerSettings,
+  live?: ReplayLiveWriteTarget,
+): Promise<Partial<CaptureReplayState>> {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-replay-'));
   try {
     const imagePath = path.join(directory, 'frame.png');
@@ -69,12 +82,10 @@ export async function observeReplay(owner: RdxRuntimeContext, args: Record<strin
     if (data.image_path) {
       if (!Number.isSafeInteger(data.image_event_id) || data.image_event_id !== eventId) throw new Error('RDX_IMAGE_EVENT_MISMATCH');
       if (typeof data.image_path !== 'string' || path.resolve(data.image_path) !== imagePath) throw new Error('RDX_IMAGE_PATH_MISMATCH');
-      let image = nativeImage.createFromPath(imagePath);
-      if (image.isEmpty()) throw new Error('RDX_IMAGE_UNREADABLE');
-      const size = image.getSize();
-      if (Math.max(size.width, size.height) > 960) image = image.resize(size.width >= size.height ? { width: 960 } : { height: 960 });
-      const scaled = image.getSize();
-      result.image = { imagePath: '', imageUrl: image.toDataURL(), ...scaled, source: 'framebuffer_screenshot', updatedAt: Date.now() };
+      if (!live) throw new Error('RDX_LIVE_TARGET_REQUIRED');
+      let bytes: Buffer;
+      try { bytes = await fs.readFile(imagePath); } catch { throw new Error('RDX_IMAGE_UNREADABLE'); }
+      result.image = await replayLivePreviewStore.write(live.sessionId, live.generation, eventId, replayPngCodec.encode(bytes));
       result.imageEventId = data.image_event_id as number;
     } else {
       const error = data.image_error as { code?: unknown; message?: unknown } | null | undefined;

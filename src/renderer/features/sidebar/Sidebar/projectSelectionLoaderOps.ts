@@ -224,6 +224,7 @@ export async function loadProjectsOp(
   ctx.setProjects(nextProjects);
   const visibleProjectIds = new Set(nextProjects.map((project) => project.projectId));
   ctx.pruneTreeForProjects(visibleProjectIds);
+  options.onProjectsListed?.();
 
   const targetProject = nextProjects.find((project) => project.projectId === preferredProjectId)
     || nextProjects[0]

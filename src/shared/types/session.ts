@@ -388,7 +388,6 @@ export interface ContextSnapshot {
 
 export interface OpenedCapturePreview {
   imagePath: string;
-  imageUrl: string;
   width: number;
   height: number;
   source: 'framebuffer_screenshot' | 'capture_thumbnail';

@@ -1,10 +1,13 @@
 import { clearRdxContextLeases, setRdxRuntimeContextForSession, quarantineRdxContext } from './RdxRuntimeContextRegistry';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OpenProjectInputRequest } from '@shared/types/session';
-const mocks = vi.hoisted(() => ({ close: vi.fn(), observe: vi.fn(), events: vi.fn(), append: vi.fn(), hash: vi.fn(), saveSelection: vi.fn() }));
+const mocks = vi.hoisted(() => ({ close: vi.fn(), observe: vi.fn(), events: vi.fn(), append: vi.fn(), hash: vi.fn(), saveSelection: vi.fn(), liveRead: vi.fn(), liveClear: vi.fn() }));
 vi.mock('../captures/replay/captureContentHash', () => ({ hashCaptureFile: mocks.hash }));
 vi.mock('./StorageAdapter', () => ({ storageAdapter: { getProjectById: () => ({ rootPath: '/project' }) } }));
 vi.mock('../captures/replay/ReplayHistoryStore', () => ({ replayHistoryStore: { saveSelection: mocks.saveSelection, append: mocks.append } }));
+vi.mock('../captures/replay/ReplayLivePreviewStore', () => ({
+  replayLivePreviewStore: { read: mocks.liveRead, clear: mocks.liveClear, write: vi.fn() },
+}));
 vi.mock('../tools/ShellInvocationService', () => ({ shellInvocationService: { hasUnconfirmedProcesses: () => false } }));
 vi.mock('./RdxReplayObservation', () => ({ observeReplay: mocks.observe, readReplayEvents: mocks.events }));
 vi.mock('./RdxSessionRuntime', () => ({ RdxSessionRuntime: class {
@@ -27,8 +30,9 @@ const request = (sessionId = 's1', remote = false): OpenProjectInputRequest => (
   inputId: 'capture', filePath: '/project/capture.rdc', replayDevice: { id: remote ? 'android' : 'local',
     type: remote ? 'android' : 'local', label: 'device', status: 'online', transport: 'local' } });
 beforeEach(() => { clearRdxContextLeases(); vi.clearAllMocks(); mocks.hash.mockReset(); mocks.hash.mockResolvedValue({ sha256: 'a'.repeat(64) }); mocks.close.mockResolvedValue(undefined);
-  mocks.events.mockResolvedValue([{ eventId: 1, name: 'draw' }, { eventId: 9, name: 'present' }]);
+  mocks.events.mockResolvedValue([{ eventId: 1 }, { eventId: 9 }]);
   mocks.observe.mockResolvedValue({ appliedEventId: 9, imageEventId: 9, error: null });
+  mocks.liveRead.mockResolvedValue(Buffer.from('png'));
   setRdxInteractionLock('s1', 'test', false);
 });
 describe('per-session capture lifecycle', () => {
@@ -50,7 +54,7 @@ describe('per-session capture lifecycle', () => {
     const service = new RdxSessionService(); const phases: string[] = []; service.subscribe(state => phases.push(state.phase));
     await service.openProjectInput(request());
     expect(phases).toContain('validating'); expect(phases).toContain('loading_image');
-    expect(mocks.observe).toHaveBeenCalledWith(expect.anything(), { final_output: true }, undefined);
+    expect(mocks.observe).toHaveBeenCalledWith(expect.anything(), { final_output: true }, undefined, expect.objectContaining({ sessionId: 's1' }));
     expect(service.snapshotReplayForSession(scope).phase).toBe('ready');
   });
   it('retains opened context when image loading fails', async () => {
@@ -178,7 +182,7 @@ it('does not attribute the preceding EID to a failed Agent observation', async (
 });
 it('keeps paired Agent pixels and metadata isolated from manual apply and reports unsaved output', async () => {
   const service = new RdxSessionService(); await service.openProjectInput(request());
-  const image = { imagePath: '', imageUrl: 'data:image/png;base64,eA==', width: 1, height: 1, source: 'framebuffer_screenshot', updatedAt: 1 };
+  const image = { imagePath: 'live:1:9', width: 1, height: 1, source: 'framebuffer_screenshot', updatedAt: 1 };
   const observation = { nativeRevision: 7, modificationState: 'intervention', displayParameters: { mip: 0, slice: 0, sample: 0, rangeMin: 0, rangeMax: 1 } };
   mocks.observe.mockResolvedValueOnce({ appliedEventId: 9, imageEventId: 9, image, observation });
   mocks.append.mockRejectedValueOnce(new Error('REPLAY_QUOTA_EXCEEDED'));
@@ -187,7 +191,7 @@ it('keeps paired Agent pixels and metadata isolated from manual apply and report
   expect(paired).toMatchObject({ eventId: 9, image, observation, saved: false, saveError: expect.stringContaining('QUOTA') });
   expect(mocks.append).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ nativeRevision: 7,
     modificationState: 'intervention', displayParameters: observation.displayParameters }), expect.any(Buffer));
-  mocks.observe.mockResolvedValueOnce({ appliedEventId: 1, imageEventId: 1, image: { ...image, imageUrl: 'data:image/png;base64,eQ==' } });
+  mocks.observe.mockResolvedValueOnce({ appliedEventId: 1, imageEventId: 1, image: { ...image, imagePath: 'live:1:1' } });
   await service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 1 });
   expect(service.snapshotReplayForSession(scope).agentObservation).toEqual(paired);
   mocks.observe.mockRejectedValueOnce(new Error('observation failed'));

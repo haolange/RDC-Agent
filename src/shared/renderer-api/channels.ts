@@ -174,6 +174,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     getReplaySelection: 'capture:getReplaySelection',
     listReplayHistory: 'capture:listReplayHistory',
     readReplayImage: 'capture:readReplayImage',
+    readLivePreview: 'capture:readLivePreview',
     clearReplayHistory: 'capture:clearReplayHistory',
     getReplayState: 'capture:getReplayState',
     applyReplayEvent: 'capture:applyReplayEvent',
@@ -203,7 +204,6 @@ export const RENDERER_EVENT_CHANNEL = {
     event: 'conversation:event',
   },
   workflow: {
-    stateChanged: 'workflow:stateChanged',
     runStatusChanged: 'workflow:runStatusChanged',
     runUsageChanged: 'workflow:runUsageChanged',
     blocked: 'workflow:blocked',
