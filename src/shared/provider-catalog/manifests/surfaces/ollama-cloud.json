@@ -81,7 +81,10 @@
       },
       "admission": {
         "denyPatterns": [
-          "*embed*"
+          "*embed*",
+          "deepseek-v4-flash",
+          "deepseek-v4-flash-*",
+          "deepseek-v4-pro"
         ]
       }
     }
@@ -89,7 +92,7 @@
   "models": [],
   "protocolOverrides": [],
   "recommendedModels": [
-    "deepseek-v4-flash",
+    "deepseek-v4.1-flash",
     "minimax-m3",
     "qwen3.5:397b"
   ],

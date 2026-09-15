@@ -71,6 +71,16 @@
       "surface": "chatgpt-account",
       "accountScope": "observed-account",
       "surfaceBuild": "chatgpt-account /models: gpt-5.4 default=272000 max=1000000; gpt-5.5/gpt-5.4-mini default=272000; gpt-5.6 default=272000"
+    },
+    {
+      "id": "rdc-agent:chatgpt-account:gpt-6-astra-20260915",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "codex-models.json@main + chatgpt-account /models 272000/872000",
+      "observedAt": "2026-09-15",
+      "refreshedAt": "2026-09-15T13:00:00+08:00",
+      "surface": "chatgpt-account",
+      "accountScope": "observed-account",
+      "surfaceBuild": "Codex models.json gpt-6-astra context_window=272000 max_context_window=872000; live /models same windows; Fast=priority service tier; reasoning default low. API 1050000 is not used."
     }
   ],
   "defaultFactSourceId": "rdc-agent:chatgpt-account:0",
@@ -115,6 +125,129 @@
     }
   },
   "models": [
+    {
+      "modelId": "gpt-6-astra",
+      "label": "GPT-6 Astra",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Codex service limit",
+          "maxPromptTokens": 272000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
+          "maxPromptTokens": 872000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 272000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://chatgpt.com/backend-api/codex",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "label": "Fast"
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "max",
+          "entitlement": "unknown"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "low",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "low",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "executionBindings": [
+        {
+          "id": "route:chatgpt-codex-parameter-policy",
+          "when": {},
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null
+              }
+            }
+          ],
+          "entitlement": "granted"
+        },
+        {
+          "id": "fast:activation",
+          "when": {
+            "fast": true
+          },
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null,
+                "service_tier": "priority"
+              }
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ],
+      "factSourceId": "rdc-agent:chatgpt-account:gpt-6-astra-20260915",
+      "fieldFactSourceIds": {
+        "contextTiers": "rdc-agent:chatgpt-account:gpt-6-astra-20260915",
+        "controls": "rdc-agent:chatgpt-account:gpt-6-astra-20260915"
+      }
+    },
     {
       "modelId": "gpt-5.6-sol",
       "label": "GPT-5.6 Sol",
@@ -898,6 +1031,7 @@
   ],
   "protocolOverrides": [],
   "recommendedModels": [
+    "gpt-6-astra",
     "gpt-5.6-sol",
     "gpt-5.6-terra",
     "gpt-5.6-luna",

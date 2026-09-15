@@ -186,6 +186,21 @@ describe('classifyProviderError', () => {
       expect(result.retryable).toBe(false);
     });
 
+    it('classifies Grok invalid-argument tool schema as request_rejected', () => {
+      const result = classifyProviderError(
+        new Error('shell: tool parameter root must be an object type (root schema is an anyOf/oneOf union)'),
+        400,
+      );
+      expect(result.code).toBe('request_rejected');
+      expect(result.retryable).toBe(false);
+    });
+
+    it('classifies model not found by message as model_source', () => {
+      const result = classifyProviderError(new Error('model_not_found: grok-4.6'));
+      expect(result.code).toBe('model_source');
+      expect(result.retryable).toBe(false);
+    });
+
     it('classifies "provider not found" as provider_unknown', () => {
       const result = classifyProviderError(new Error('provider not found: my-custom-llm'));
       expect(result.code).toBe('provider_unknown');

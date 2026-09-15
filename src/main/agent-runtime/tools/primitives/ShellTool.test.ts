@@ -170,6 +170,28 @@ describe('ShellTool', () => {
     expect(shellTool.name).toBe('shell');
   });
 
+  it('keeps the tool parameter root as a plain object without oneOf/anyOf', () => {
+    const parameters = shellTool.parameters as Record<string, unknown>;
+    expect(parameters.type).toBe('object');
+    expect(parameters).not.toHaveProperty('oneOf');
+    expect(parameters).not.toHaveProperty('anyOf');
+  });
+
+  it('rejects mixed or empty command/rdx at execute time', async () => {
+    await expect(shellTool.execute('s-empty', {}, undefined, undefined, {
+      workspaceRoot: process.cwd(),
+      projectRootPath: process.cwd(),
+      projectId: null,
+      sessionId: null,
+    })).rejects.toThrow('exactly one of command or rdx');
+    await expect(shellTool.execute('s-mixed', { command: 'echo', rdx: { operation: 'rd.core.init', args: {} } }, undefined, undefined, {
+      workspaceRoot: process.cwd(),
+      projectRootPath: process.cwd(),
+      projectId: null,
+      sessionId: null,
+    })).rejects.toThrow('exactly one of command or rdx');
+  });
+
   it('injects the resolved interpreter and host OS into the dynamic description', () => {
     expect(shellTool.description).toMatch(/Host OS:/);
     expect(shellTool.description).toMatch(/PowerShell|bash|sh|zsh|pwsh/i);

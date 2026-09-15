@@ -227,6 +227,7 @@ export const zhControl = {
   "control.replay.intervention": "已修改",
   "control.replay.restored": "已恢复",
   "control.replay.noOutput": "当前事件没有可用画面",
+  "control.replay.finalPresentUnavailable": "无法唯一识别最终 Present",
   "control.replay.previous": "上一个事件",
   "control.replay.next": "下一个事件",
   "control.replay.eventId": "事件 ID",

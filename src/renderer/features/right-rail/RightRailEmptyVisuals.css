@@ -1,13 +1,21 @@
 .right-rail-empty-visual {
   display: block;
-  width: auto;
+  width: 100%;
   max-width: 100%;
-  height: calc(var(--control-height-sm) * 4);
+  height: auto;
+  aspect-ratio: 200 / 112;
+  max-height: min(40cqw, calc(var(--control-height-sm) * 6));
   --rr-eg-shadow-color: var(--token-text-heading);
   --rr-eg-shadow-op: 0.22;
   --rr-eg-shade-op: 0.12;
   --rr-eg-sheen-op: 0.18;
   --rr-eg-edge-op: 0.36;
+}
+
+@container right-rail (max-width: 20rem) {
+  .right-rail-empty-visual {
+    max-height: min(32cqw, calc(var(--control-height-sm) * 4));
+  }
 }
 
 :root[data-resolved-theme='light'] .right-rail-empty-visual {

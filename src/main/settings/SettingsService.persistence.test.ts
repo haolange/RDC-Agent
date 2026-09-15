@@ -72,8 +72,8 @@ describe('SettingsService provider persistence', () => {
       status: 'verified' as const,
       models: [
         {
-          id: 'deepseek-v4-flash',
-          label: 'DeepSeek V4 Flash',
+          id: 'deepseek-flash',
+          label: 'DeepSeek V4.1 Flash',
           enabled: true,
         },
       ],
@@ -307,14 +307,14 @@ describe('SettingsService provider persistence', () => {
       .toMatchObject({ refreshToken: 'refresh-new' });
   });
 
-  it('keeps maintained Volc Coding Plan rows and their explicit catalog denials when candidate validation returns a subset', async () => {
+  it('keeps current Volc Coding Plan rows and drops retired candidate ids when validation returns a subset', async () => {
     const { SettingsService } = await import('./SettingsService');
     const { getProviderModelSummaries } = await import('../provider-catalog/ProviderCatalogRegistry');
     const service = new SettingsService();
     service.initialize();
 
     service.saveProviderConnection('volcengine-coding-plan', 'test-key', [
-      { id: 'doubao-seed-2.0-code', label: 'Doubao Seed 2.0 Code', enabled: true, availability: 'available' },
+      { id: 'doubao-seed-2.1-turbo', label: 'Doubao Seed 2.1 Turbo', enabled: true, availability: 'available' },
       { id: 'glm-4.7', label: 'GLM 4.7', enabled: true, availability: 'available' },
       { id: 'kimi-k2.7-code', label: 'Kimi K2.7 Code', enabled: true, availability: 'available' },
     ]);
@@ -324,11 +324,8 @@ describe('SettingsService provider persistence', () => {
       .find((provider) => provider.id === 'volcengine-coding-plan')?.models ?? [];
     expect(models.map((model) => model.id))
       .toEqual(getProviderModelSummaries('volcengine-coding-plan').map((model) => model.id));
-    expect(models.find((model) => model.id === 'doubao-seed-2.0-code')?.availability).toBe('available');
-    expect(models.find((model) => model.id === 'glm-4.7')).toMatchObject({
-      availability: 'unavailable',
-      availabilityReason: expect.stringContaining('does not support the Coding Plan feature'),
-    });
+    expect(models.find((model) => model.id === 'doubao-seed-2.1-turbo')?.availability).toBe('available');
+    expect(models.find((model) => model.id === 'glm-4.7')).toBeUndefined();
     expect(models.find((model) => model.id === 'kimi-k2.7-code')).toMatchObject({
       availability: 'available',
     });

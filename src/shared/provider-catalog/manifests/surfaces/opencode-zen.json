@@ -110,7 +110,11 @@
           "text",
           "image"
         ],
-        "denyPatterns": []
+        "denyPatterns": [
+          "deepseek-v4-flash",
+          "deepseek-v4-flash-*",
+          "deepseek-v4-pro"
+        ]
       },
       "routeRules": [
         {
@@ -984,69 +988,8 @@
       "factSourceId": "rdc-agent:opencode-zen:0"
     },
     {
-      "modelId": "deepseek-v4-pro",
-      "label": "DeepSeek V4 Pro",
-      "aliases": [],
-      "availability": "available",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 1000000,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "unknown"
-        }
-      ],
-      "defaultBudgetTokens": 256000,
-      "toolCalling": {
-        "state": "supported"
-      },
-      "visionInput": {
-        "state": "unknown"
-      },
-      "structuredOutput": {
-        "state": "unknown"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "maintained",
-      "route": {
-        "protocol": "OpenAICompatibleChatCompletions",
-        "baseUrl": "https://opencode.ai/zen/v1",
-        "source": "model"
-      },
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "fixed",
-          "fixedValue": true,
-          "tierId": "default",
-          "entitlement": "unknown"
-        },
-        "reasoning": {
-          "kind": "toggle",
-          "supportsOff": true,
-          "levels": [],
-          "defaultSelection": "on",
-          "wireProfile": {
-            "kind": "anthropic",
-            "on": "high",
-            "onMode": "adaptive",
-            "offMode": "disabled"
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:opencode-zen:0"
-    },
-    {
-      "modelId": "deepseek-v4-flash",
-      "label": "DeepSeek V4 Flash",
+      "modelId": "deepseek-v4.1-flash",
+      "label": "DeepSeek V4.1 Flash",
       "aliases": [],
       "availability": "available",
       "contextTiers": [

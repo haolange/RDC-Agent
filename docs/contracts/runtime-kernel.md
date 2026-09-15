@@ -72,7 +72,7 @@ Scoped Runtime Resolution
 ```typescript
 type ProviderErrorCode =
   | 'provider_unknown' | 'auth_unconfigured' | 'auth_expired'
-  | 'auth_scope_denied' | 'model_source' | 'rate_limit'
+  | 'auth_scope_denied' | 'model_source' | 'request_rejected' | 'rate_limit'
   | 'quota_exceeded' | 'network' | 'timeout'
   | 'context_overflow' | 'stream_protocol' | 'aborted' | 'unknown';
 

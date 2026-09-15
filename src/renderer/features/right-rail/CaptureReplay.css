@@ -4,9 +4,72 @@
 .capture-history-toolbar,
 .capture-image-toolbar,
 .capture-replay-pending { display: flex; align-items: center; justify-content: space-between; min-width: 0; gap: var(--space-2); }
-.capture-replay-status { color: var(--token-text-caption); font-size: var(--text-xs); }
-.capture-replay-status.is-error,
-.capture-replay-feedback.is-error { color: var(--token-status-error); }
+.capture-replay-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-5);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--token-bg-panel) 62%, transparent);
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+}
+.capture-replay-status.is-success {
+  border-color: color-mix(in srgb, var(--token-status-success) 22%, transparent);
+  background: color-mix(in srgb, var(--token-status-success) 8%, transparent);
+  color: var(--token-status-success);
+}
+.capture-replay-status.is-warning {
+  border-color: color-mix(in srgb, var(--token-status-warning) 26%, transparent);
+  background: color-mix(in srgb, var(--token-status-warning) 8%, transparent);
+  color: var(--token-status-warning);
+}
+.capture-replay-status.is-error {
+  border-color: color-mix(in srgb, var(--token-status-error) 26%, transparent);
+  background: color-mix(in srgb, var(--token-status-error) 8%, transparent);
+  color: var(--token-status-error);
+}
+.capture-replay-status.is-info {
+  border-color: color-mix(in srgb, var(--token-status-info) 26%, transparent);
+  background: color-mix(in srgb, var(--token-status-info) 8%, transparent);
+  color: var(--token-status-info);
+}
+.capture-replay-callouts { display: flex; flex-direction: column; gap: var(--space-2); }
+.capture-replay-callout {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-sm);
+  background: var(--token-bg-panel);
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+.capture-replay-callout.is-warning {
+  border-color: color-mix(in srgb, var(--token-status-warning) 26%, transparent);
+  background: color-mix(in srgb, var(--token-status-warning) 8%, transparent);
+  color: var(--token-status-warning);
+}
+.capture-replay-callout.is-error {
+  border-color: color-mix(in srgb, var(--token-status-error) 26%, transparent);
+  background: color-mix(in srgb, var(--token-status-error) 8%, transparent);
+  color: var(--token-status-error);
+}
+.capture-replay-callout.is-info {
+  border-color: color-mix(in srgb, var(--token-status-info) 22%, transparent);
+  background: color-mix(in srgb, var(--token-status-info) 8%, transparent);
+  color: var(--token-text-body);
+}
+.capture-replay-callout-copy { display: flex; flex-direction: column; min-width: 0; gap: var(--space-1); }
+.capture-replay-callout-copy strong { font-size: var(--text-sm); font-weight: var(--font-medium); }
+.capture-replay-callout-copy small { color: var(--token-text-caption); font-size: var(--text-xs); overflow-wrap: anywhere; }
 .capture-replay-menu { display: flex; flex-wrap: wrap; gap: var(--space-1); padding: var(--space-2); border: 1px solid var(--token-border-subtle); border-radius: var(--radius-sm); }
 .capture-replay-file-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
 .capture-replay-device-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-1); }

@@ -10,6 +10,15 @@ import { DropdownSelect } from '../../ui/DropdownSelect';
 import { useI18n } from '../../i18n';
 import { CaptureFrame } from './CaptureFrame';
 import { CaptureHistory } from './CaptureHistory';
+import {
+  CaptureReplayCallouts,
+  CaptureReplayStatusChip,
+  FACT_LABELS,
+  captureStatusLabelKey,
+  collectCaptureCallouts,
+  isCapturePartialReady,
+  resolveCaptureStatusTone,
+} from './CaptureReplayStatus';
 import { useCaptureReplay } from './useCaptureReplay';
 import { clearOpenedCapture, clearReplayHistory, getTraceProjection, openProjectCaptureInput, refreshProjectCaptureInputs, refreshReplayDevices, refreshReplayFrame, type CaptureScope } from './capturePanelActions';
 import './CaptureReplay.css';
@@ -39,7 +48,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   const locked = Boolean(state?.interactionLock);
   const disabled = locked || phaseBusy || action !== null || !state;
   const captureHash = state?.captureHash ?? selection?.captureSha256 ?? null;
-  const partial = state?.phase === 'ready' && Boolean(state.error || state.warning || ['unsupported', 'error', 'pending'].includes(state.devicePresentation.status));
+  const partial = isCapturePartialReady(state);
   const refreshProjection = useCallback(async () => {
     await reload();
     const result = await getTraceProjection(scope.sessionId);
@@ -72,13 +81,25 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     } catch (reason) { setError({ message: reason instanceof Error ? reason.message : String(reason), action: operation }); }
     finally { setAction(null); }
   };
-  const imageErrorKeys: Record<string, Parameters<typeof t>[0]> = { no_color_output: 'control.replay.noOutput', missing_target: 'control.replay.missingTarget', export_failure: 'control.replay.exportFailed' };
-  const diagnostic = error?.message ?? connectionError ?? (state?.error ? imageErrorKeys[state.error.code] ? t(imageErrorKeys[state.error.code]) : state.error.message : null);
-  const retry: Action = error?.action ?? (state?.error?.retry === 'close' ? 'close' : state?.error?.retry === 'open' ? 'open' : 'image');
+  const statusTone = resolveCaptureStatusTone({ phase: state?.phase, pending, partial });
+  const callouts = collectCaptureCallouts({
+    locked,
+    lockedLabel: t('control.replay.locked'),
+    warning: state?.warning ?? null,
+    finalPresentTitle: t('control.replay.finalPresentUnavailable'),
+    actionError: error,
+    connectionError,
+    stateError: state?.error ?? null,
+    factLabels: {
+      no_color_output: t(FACT_LABELS.no_color_output),
+      missing_target: t(FACT_LABELS.missing_target),
+      export_failure: t(FACT_LABELS.export_failure),
+    },
+  });
   return <div className="capture-replay-panel" aria-label={t('control.rightRail.capture.controls')}>
     <div className="capture-replay-status-row">
       <h2 className="right-rail-section-heading">{t('control.rightRail.capture.title')}</h2>
-      <span role="status" className={`capture-replay-status${state?.error ? ' is-error' : ''}`}>{pending ? t('control.replay.pending') : partial ? t('control.replay.partial') : t(`control.replay.${state?.phase ?? 'closed'}`)}</span>
+      <CaptureReplayStatusChip label={t(captureStatusLabelKey({ pending, partial, phase: state?.phase }))} tone={statusTone} />
       <Button variant="ghost" size="sm" aria-label={t('control.replay.more')} aria-expanded={more} onClick={() => setMore(!more)}>⋯</Button>
     </div>
     {more && <div className="capture-replay-menu">
@@ -102,8 +123,12 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
       <Button variant={open ? 'secondary' : 'primary'} size="sm" disabled={disabled || !selectedInput} onClick={() => void run(pending || !open ? 'open' : 'close')}>{t(pending ? 'control.replay.switch' : open ? 'control.replay.close' : 'control.captureOpen')}</Button>
     </div>
     {pending && <div className="capture-replay-pending"><small>{capture.availableCaptures.find((input) => input.inputId === actualInputId)?.fileName} · {devices.find((device) => device.id === actualDeviceId)?.label}</small><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDraft(null)}>{t('control.replay.cancel')}</Button></div>}
-    {locked && <div className="capture-replay-feedback" role="status" title={state?.interactionLock ?? undefined}>{t('control.replay.locked')}</div>}
-    {state?.warning && <div className="capture-replay-feedback" role="status">{state.warning.message}</div>}
+    <CaptureReplayCallouts
+      callouts={callouts}
+      disabled={disabled}
+      retryLabels={{ open: t('control.replay.retryOpen'), close: t('control.replay.retryClose'), image: t('control.replay.retryImage') }}
+      onRetry={(operation) => void run(operation)}
+    />
     <div className="capture-replay-tabs" role="tablist" aria-label={t('control.rightRail.capture.title')}>
       {(['frame', 'history'] as const).map((id) => <Button key={id} variant="ghost" size="sm" role="tab" id={`capture-${id}-tab`} aria-controls={`capture-${id}-panel`} aria-selected={tab === id}
         tabIndex={tab === id ? 0 : -1} className={tab === id ? 'is-selected' : ''} onClick={() => setTab(id)} onKeyDown={(event) => {
@@ -112,7 +137,6 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     </div>
     <div hidden={tab !== 'frame'}><CaptureFrame scope={scope} state={state} disabled={disabled || !open || pending || tab !== 'frame' || state?.error?.retry === 'close'} receive={receive} /></div>
     <div hidden={tab !== 'history'}><CaptureHistory key={`${captureHash ?? 'none'}:${historyEpoch}`} scope={scope} captureHash={captureHash} state={state} active={tab === 'history'} /></div>
-    {diagnostic && <div className="capture-replay-feedback is-error" role="alert"><span>{diagnostic}</span>{(error || state?.error?.retry) && <Button variant="ghost" size="sm" disabled={disabled} onClick={() => void run(retry)}>{t(retry === 'close' ? 'control.replay.retryClose' : retry === 'open' ? 'control.replay.retryOpen' : 'control.replay.retryImage')}</Button>}</div>}
   </div>;
 }
 

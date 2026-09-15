@@ -115,7 +115,7 @@ export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operati
       },
     },
     additionalProperties: false,
-    oneOf: [{ required: ['command'], not: { required: ['rdx'] } }, { required: ['rdx'], not: { required: ['command'] } }],
+    description: 'Provide exactly one of command or rdx. Runtime rejects mixed or empty input.',
   },
   spec: {
     isReadOnly: false,

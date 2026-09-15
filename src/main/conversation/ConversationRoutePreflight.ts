@@ -610,7 +610,7 @@ function isStreamProtocolTurnFailure(error: unknown): boolean {
   return error instanceof AgentRecoveryAbortError && error.category === 'stream_protocol';
 }
 
-type LlmFailureClass = 'auth' | 'quota' | 'overloaded' | 'server' | 'empty_stream' | 'network' | 'generic';
+type LlmFailureClass = 'auth' | 'quota' | 'overloaded' | 'server' | 'empty_stream' | 'network' | 'request' | 'model' | 'generic';
 
 interface LlmRequestFailure {
   kind: LlmFailureClass;
@@ -729,7 +729,41 @@ function llmFailureKind(
   if (category === 'network_error') {
     return 'network';
   }
+  if (isModelUnavailableFailure(status, error)) {
+    return 'model';
+  }
+  if (isRequestSchemaFailure(status, error)) {
+    return 'request';
+  }
   return 'generic';
+}
+
+function failureText(error: unknown): string {
+  const abort = error instanceof AgentRecoveryAbortError ? error : undefined;
+  return `${error instanceof Error ? `${error.message} ${error.name}` : String(error)} ${causeSnippet(error)} ${abort?.bodySnippet ?? ''}`.toLowerCase();
+}
+
+function isRequestSchemaFailure(status: number | undefined, error: unknown): boolean {
+  const raw = failureText(error);
+  return raw.includes('invalid-argument')
+    || raw.includes('tool parameter')
+    || raw.includes('root schema')
+    || raw.includes('oneof')
+    || raw.includes('anyof')
+    || raw.includes('missingsessionid')
+    || raw.includes('x-opencode-session')
+    || raw.includes('input must be a list')
+    || raw.includes('stream must be set')
+    || (status === 400 && (raw.includes('invalid request') || raw.includes('unsupported parameter')));
+}
+
+function isModelUnavailableFailure(status: number | undefined, error: unknown): boolean {
+  const raw = failureText(error);
+  return status === 404
+    || raw.includes('model_not_found')
+    || raw.includes('model not found')
+    || raw.includes('unknown model')
+    || raw.includes('does not have access to model');
 }
 
 function extractStatusFromMessage(error: unknown): number | undefined {
@@ -762,6 +796,10 @@ function llmRequestFailureUserMessage(
       return `${label} 当前使用 ${route} 时，服务商没有返回助手正文或结构化工具调用。请稍后重试；若持续出现，请检查该模型或更换模型。`;
     case 'network':
       return `${label} 当前使用 ${route} 时网络连接失败。请检查网络、代理或服务商可达性后重试。`;
+    case 'request':
+      return `${label} 当前使用 ${route} 时，服务商拒绝了本次请求的工具或参数格式。请更换模型或稍后重试；若持续出现，该路由的工具 schema 需要修正。`;
+    case 'model':
+      return `${label} 当前使用 ${route} 时，该账号没有此模型或模型已下线。请在设置中更换可用模型后重试。`;
     default:
       return `模型请求失败：${label} 当前使用 ${route}，但服务商请求没有成功。请检查该账号、模型权限、额度或网络状态后重试。`;
   }
