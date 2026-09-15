@@ -86,7 +86,7 @@ Settings 保留 executable、argsPrefix、cwd、env 和 timeout，并呈现连�
 
 实验验收解释受支持的测量、干预和回滚结果，测量必须包含真实有限数值或可验证图像；不接受空值、伪造零值或成功文案。baseline → intervention → variant → rollback → restored 必须属于同一实验、context 和 lease，顺序有效；测量方法、参数与采样条件一致；回滚对应真实 replacement 并确认已恢复。历史记录不自动取得当前执行证明。签名证明执行和结果，不自动证明因果、质量、噪声或优化收益。
 
-专业手册与共享执行 Skill 经现有 Mission execute handoff 的 requiredSkillIds 传递，并在 General prepareTurn 真正加载。手册是操作知识，主进程执行规则是权限权威。生成参考及示例校验见 `pnpm run check:rdx-tool-guides`。
+专业手册与共享执行 Skill 经 Mission 声明续跑上的 requiredSkillIds 写入 session execution offer，并在 General prepareTurn 真正加载。手册是操作知识，主进程执行规则是权限权威。生成参考及示例校验见 `pnpm run check:rdx-tool-guides`。
 
 ## 内嵌回放、观察与 Session ownership
 

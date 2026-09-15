@@ -42,8 +42,9 @@
 
 .composer-model-menu {
   position: relative;
-  flex: 0 1 12rem;
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 12rem;
 }
 
 .composer-agent-menu,
@@ -59,7 +60,8 @@
   height: var(--control-height-sm);
   min-height: var(--control-height-sm);
   min-width: 0;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   padding: 0 var(--space-3);
   border-radius: var(--control-radius);
   border: 1px solid var(--token-border-default);

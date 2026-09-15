@@ -23,7 +23,6 @@ const ALWAYS_SERIAL_TOOL_NAMES = new Set([
   'rdx_probe',
   'ask_user',
   'plan_artifact',
-  'agent_handoff',
   'output_register',
   'investigation_write',
 ]);

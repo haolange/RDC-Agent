@@ -55,6 +55,12 @@ export const SessionSetAgentIdArgsSchema = z.tuple([
   ipcNonEmptyString(128, 'agentId'),
 ]);
 
+export const SessionApplyDeclaredHandoffArgsSchema = z.tuple([
+  ipcId(128, 'sessionId'),
+  ipcNonEmptyString(128, 'agent'),
+  ipcNonEmptyString(200, 'label'),
+]);
+
 
 export const RunListArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),

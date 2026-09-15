@@ -43,6 +43,7 @@ describe('HookEngine trust fingerprint', () => {
     const dispatchSources = [
       'src/main/hooks/sessionLifecycle.ts',
       'src/main/hooks/runtimeHookDispatch.ts',
+      'src/main/conversation/applyDeclaredHandoff.ts',
       'src/main/workflow/debugger/AgentTurnRunner.ts',
       'src/main/workflow/debugger/ToolExecutorFactory.ts',
       'src/main/workflow/debugger/RuntimeToolAssembly.ts',

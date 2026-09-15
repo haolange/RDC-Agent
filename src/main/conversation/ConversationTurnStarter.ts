@@ -5,7 +5,6 @@ import type {
   ConversationTurnResult,
 } from '@shared/types/conversation';
 import type { SessionAttachmentRecord } from '@shared/types/session';
-import { isConsumableHandoff, type ProfileHandoffState } from '@shared/types/profileHandoff';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
@@ -28,10 +27,6 @@ import type {
   ResolvedConversationContext,
 } from './ConversationRoutePreflight';
 import { resolveAgentWriteTarget } from '@shared/types/agentManifest';
-import { resolveHandoffTurnModelOverride } from '../sessions/profileHandoffModel';
-import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
-import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
-import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import {
   createConversationMessage,
   isActiveRun,
@@ -62,8 +57,6 @@ export interface ConversationTurnStarterHost {
   persistConversationSnapshot(sessionId: string | null | undefined, message: ConversationMessage): Error | null;
   publishConversationTrace(traceSessionId: string, messages: ConversationMessage[], persistedSessionId?: string | null): void;
   ephemeralTraceSessionId(turnId: string): string;
-  getCommittedHandoff(sessionId: string): ProfileHandoffState | null;
-  consumeCommittedHandoff(sessionId: string, handoff: ProfileHandoffState, continuationTurnId?: string): void;
 }
 
 export async function startProfileTurn(
@@ -87,17 +80,8 @@ export async function startProfileTurn(
   const pendingProjectRootPath = context.projectId
     ? storageAdapter.getProjectById(context.projectId)?.rootPath ?? null
     : null;
-  const pendingHandoff = context.session
-    ? host.getCommittedHandoff(context.session.sessionId)
-    : null;
-  const effectiveMessage = pendingHandoff
-    ? (rawMessage.trim()
-      ? `${pendingHandoff.prompt}\n\n---\nUser message: ${rawMessage}`
-      : pendingHandoff.prompt)
-    : rawMessage;
-  const conversationAgentId = pendingHandoff
-    ? resolveConversationAgentId(pendingHandoff.toAgentId, null, pendingProjectRootPath)
-    : resolveConversationAgentId(requestedAgentId, requestedProfileId, pendingProjectRootPath);
+  const effectiveMessage = rawMessage;
+  const conversationAgentId = resolveConversationAgentId(requestedAgentId, requestedProfileId, pendingProjectRootPath);
   const turnId = generateEventId('turn');
   const throwIfPreparationCancelled = () => {
     if (preparationController.signal.aborted) {
@@ -107,8 +91,7 @@ export async function startProfileTurn(
 
   throwIfPreparationCancelled();
   if (
-    !pendingHandoff
-    && configurationCommit?.agentId
+    configurationCommit?.agentId
     && configurationCommit.agentId !== conversationAgentId
   ) {
     throw new Error('AGENT_COMMIT_NOT_FOUND: the committed Agent does not match the selected route.');
@@ -119,7 +102,7 @@ export async function startProfileTurn(
       `CONVERSATION_AGENT_UNAVAILABLE: requested profile \`${conversationAgentId}\` is not enabled.`,
     );
   }
-  if (!pendingHandoff && configurationCommit?.agentCommitHash) {
+  if (configurationCommit?.agentCommitHash) {
     const writeTarget = resolveAgentWriteTarget(effectiveSnapshot, context.projectId);
     const latestCommit = await settingsService.getAgentDefinitionCommit({
       agentId: conversationAgentId,
@@ -131,16 +114,10 @@ export async function startProfileTurn(
   }
   throwIfPreparationCancelled();
 
-  const modelOverride = pendingHandoff
-    ? resolveHandoffTurnModelOverride({
-        sessionOverride: context.session?.modelOverride ?? null,
-        declaredModel: pendingHandoff.declaredModel,
-        settings: settingsService.getAll(),
-      })
-    : context.session?.modelOverride
-      ?? (configurationCommit?.providerId && configurationCommit.modelId
-        ? { providerId: configurationCommit.providerId, modelId: configurationCommit.modelId }
-        : null);
+  const modelOverride = context.session?.modelOverride
+    ?? (configurationCommit?.providerId && configurationCommit.modelId
+      ? { providerId: configurationCommit.providerId, modelId: configurationCommit.modelId }
+      : null);
   const configuredRoute = effectiveSnapshot?.compiledRoute;
   const surfaceProviderId = modelOverride?.providerId ?? configuredRoute?.providerId;
   if (surfaceProviderId) {
@@ -513,20 +490,7 @@ export async function startProfileTurn(
     throw new Error(`TURN_COMMIT_FAILED: ${redactTechnicalMessage(error)}`);
   }
   const cancelAfterCommit = host.getPreparingRequestByRequestId(requestId)?.cancelAfterCommit === true;
-  const preparationAborted = preparationController.signal.aborted;
-  if (pendingHandoff && context.session) {
-    const latest = host.getCommittedHandoff(context.session.sessionId);
-    if (
-      !cancelAfterCommit
-      && !preparationAborted
-      && isConsumableHandoff(pendingHandoff, latest)
-    ) {
-      agentToolApprovalRequestService.cancelTurn(pendingHandoff.sourceTurnId);
-      agentUserInputRequestService.cancelTurn(pendingHandoff.sourceTurnId);
-      agentPlanReviewRequestService.cancelTurn(pendingHandoff.sourceTurnId);
-      host.consumeCommittedHandoff(context.session.sessionId, latest, turnId);
-    }
-  } else if (workingSession && conversationAgentId) {
+  if (workingSession && conversationAgentId) {
     storageAdapter.updateSession(workingSession.sessionId, { agentId: conversationAgentId });
     workingSession = storageAdapter.readSession(workingSession.sessionId) ?? workingSession;
   }

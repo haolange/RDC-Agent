@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: scripts/quality_checks
-title: 代码质量与架构门禁脚本集
-scope:
-    - scripts/check-*.mjs
-    - scripts/system-debt-ratchet.mjs
-source_files: []
-depends_on: []
-related_to: []

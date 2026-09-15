@@ -35,7 +35,7 @@ function plan(version: 'before' | 'after', id: string, extra: string[] = []) {
     profile: profile.definition,
     scopedInstructions: { sources: [], totalBytes: 0, diagnostics: [] },
     preloadedSkills: preloaded,
-    skillCatalog: catalog, tools: ['read_file', 'search', 'shell', 'agent_handoff', 'plan_artifact', 'skill_read', 'artifact_read'], workDir: 'C:/qa/inline-code',
+    skillCatalog: catalog, tools: ['read_file', 'search', 'shell', 'plan_artifact', 'skill_read', 'artifact_read'], workDir: 'C:/qa/inline-code',
     routeCapability: { providerId: 'deepseek', modelId: model, toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'none',
       reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content',
         artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'comparison', continuation: 'exact-execution' },

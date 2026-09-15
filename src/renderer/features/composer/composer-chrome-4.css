@@ -32,7 +32,6 @@
   }
 
   .composer-footer-bar .composer-model-menu {
-    flex-basis: 8rem;
     max-width: 8rem;
   }
 
@@ -43,7 +42,6 @@
 
 @container composer (max-width: 420px) {
   .composer-footer-bar .composer-model-menu {
-    flex-basis: 6rem;
     max-width: 6rem;
   }
 }

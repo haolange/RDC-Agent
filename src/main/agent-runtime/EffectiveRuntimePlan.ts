@@ -1,4 +1,3 @@
-import type { TaskCompletionBinding } from './agent/TurnCompletionValidator';
 import { createHash, randomBytes } from 'crypto';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
@@ -21,12 +20,12 @@ export interface FrozenHandoffDefinition {
   send?: boolean;
   showContinueOn?: boolean;
   model?: string;
+  requiredSkillIds?: readonly string[];
 }
 
 export const EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION = 3 as const;
 
 export interface EffectiveRuntimePlan {
-  taskBinding: Readonly<TaskCompletionBinding> | null;
   schemaVersion: typeof EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION;
   planId: string;
   fingerprint: string;
@@ -83,7 +82,6 @@ export interface EffectiveRuntimePlan {
 }
 
 export interface BuildEffectiveRuntimePlanInput {
-  taskBinding?: TaskCompletionBinding | null;
   rdxBindingFingerprint?: string;
   agentId: string;
   projectRootPath: string | null;
@@ -182,6 +180,9 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     ...(handoff.send !== undefined ? { send: handoff.send } : {}),
     ...(handoff.showContinueOn !== undefined ? { showContinueOn: handoff.showContinueOn } : {}),
     ...(handoff.model !== undefined ? { model: handoff.model } : {}),
+    ...(handoff.requiredSkillIds && handoff.requiredSkillIds.length > 0
+      ? { requiredSkillIds: Object.freeze([...handoff.requiredSkillIds]) }
+      : {}),
   })));
   const enabledProfileIds = freezeStringList(input.enabledProfileIds);
   const profileDelegates = freezeStringList(input.profileDelegates ?? input.profile?.agents ?? []);
@@ -218,9 +219,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     input.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
     policy.contextCompactionPercent,
   );
-  const taskBinding = input.taskBinding ? Object.freeze({ ...input.taskBinding }) : null;
   const fingerprint = stableHash([
-    taskBinding,
     EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION,
     input.agentId,
     input.projectRootPath,
@@ -249,7 +248,6 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     delegationCapsule,
   ]);
   return {
-    taskBinding,
     schemaVersion: EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION,
     planId: `plan_${randomBytes(8).toString('hex')}`,
     fingerprint,

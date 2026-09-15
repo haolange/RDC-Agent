@@ -8,6 +8,7 @@ export interface SeedSemanticHandoff {
   send?: boolean;
   showContinueOn?: boolean;
   model?: string;
+  requiredSkillIds?: string[];
 }
 
 /** Parse-after semantic payload used to recognize official historical user seeds. */
@@ -71,6 +72,8 @@ const readHandoffs = (value: unknown): SeedSemanticHandoff[] => {
     if (typeof candidate.send === 'boolean') handoff.send = candidate.send;
     if (typeof candidate.showContinueOn === 'boolean') handoff.showContinueOn = candidate.showContinueOn;
     if (typeof candidate.model === 'string' && candidate.model.trim()) handoff.model = candidate.model.trim();
+    const requiredSkillIds = readStringArray(candidate.requiredSkillIds);
+    if (requiredSkillIds.length > 0) handoff.requiredSkillIds = requiredSkillIds;
     return handoff;
   });
 };
@@ -165,6 +168,9 @@ export function hashCanonicalAgentSemantics(manifest: SeedSemanticManifest): str
       prompt: handoff.prompt,
       ...(typeof handoff.send === 'boolean' ? { send: handoff.send } : {}),
       ...(typeof handoff.showContinueOn === 'boolean' ? { showContinueOn: handoff.showContinueOn } : {}),
+      ...(handoff.requiredSkillIds && handoff.requiredSkillIds.length > 0
+        ? { requiredSkillIds: handoff.requiredSkillIds }
+        : {}),
     })),
     metadata: manifest.metadata,
     instructions: manifest.instructions,

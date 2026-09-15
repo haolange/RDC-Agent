@@ -26,11 +26,13 @@ import {
   SessionIdOnlyArgsSchema,
   SessionListArgsSchema,
   SessionRenameArgsSchema,
+  SessionApplyDeclaredHandoffArgsSchema,
   SessionSetAgentIdArgsSchema,
   SessionSetModelOverrideArgsSchema,
 } from './validation/projectSessionSchemas';
 import { createSessionWithHooks, removeSessionWithHooks } from '../hooks/sessionLifecycle';
 import { conversationService } from '../conversation/ConversationService';
+import { applyDeclaredHandoff } from '../conversation/applyDeclaredHandoff';
 import { projectSessionForClient } from '../sessions/projectSessionHandoff';
 import { resolveEnabledAgentDefinition } from '../conversation/ConversationRoutePreflight';
 import { classifyAgentToolEligibility, describeAgentToolIneligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
@@ -266,7 +268,6 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         return { success: false, error: `Session not found: ${id}` };
       }
 
-      conversationService.cancelUnfinishedHandoff(id, 'session_close');
       const stopped = await conversationService.cancelActiveTurn({ sessionId: id });
       if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${id}.`);
 
@@ -388,9 +389,20 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       if (!definition) {
         return { success: false, error: `CONVERSATION_AGENT_UNAVAILABLE: requested profile \`${agentId}\` is not enabled.` };
       }
-      conversationService.cancelUnfinishedHandoff(id, 'manual_switch');
       const updated = storageAdapter.updateSession(id, { agentId });
       return { success: true, session: updated };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('session:applyDeclaredHandoff', async (_event, ...rawArgs: unknown[]) => {
+    try {
+      const [id, agent, label] = parseIpcArgs(SessionApplyDeclaredHandoffArgsSchema, rawArgs, {
+        label: 'session:applyDeclaredHandoff',
+        maxBytes: 4 * 1024,
+      });
+      return applyDeclaredHandoff({ sessionId: id, agent, label });
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }

@@ -1,4 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../sessions/StorageAdapter', () => ({
+  storageAdapter: {
+    readSession: () => ({ sessionId: 'sess', projectId: 'proj' }),
+    getProjectById: () => ({ rootPath: null }),
+    executionOffers: { write: vi.fn(), read: vi.fn(), clear: vi.fn() },
+  },
+}));
+vi.mock('../../conversation/ConversationRoutePreflight', () => ({
+  resolveEnabledAgentDefinition: () => ({
+    handoffs: [{
+      agent: 'general',
+      label: '交给 General 执行',
+      prompt: 'Execute the frozen plan.',
+      send: true,
+      requiredSkillIds: ['renderdoc-execution'],
+    }],
+  }),
+}));
+
 import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 import type { ConversationPlanReview } from '@shared/types/planReview';
 import { AgentPlanReviewRequestService } from './AgentPlanReviewRequestService';
@@ -76,7 +96,7 @@ describe('AgentPlanReviewRequestService', () => {
       toolCallId: 'call-2',
       decision: { kind: 'approve', handoff: { label: '交给 General 执行', agent: 'general' } },
     })).toEqual({ success: true });
-    await expect(pending).resolves.toContain('call agent_handoff → general');
+    await expect(pending).resolves.toContain('已冻结，本回合结束，等待用户点声明按钮。');
     expect(turnHandle.approvedPlan).toEqual({
       hash: 'b'.repeat(64),
       target: 'general',

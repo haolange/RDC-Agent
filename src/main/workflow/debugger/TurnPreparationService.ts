@@ -1,8 +1,7 @@
 import { rdxCliInvokerService } from '../../tools/RdxCliInvokerService';
 import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
-import { assertHandoffSkillCompatibility } from '../../sessions/handoffSkillCompatibility';
-import type { TaskCompletionBinding } from '../../agent-runtime/agent/TurnCompletionValidator';
-import { handoffRequiredSkillIds } from '../../sessions/handoffSkills';
+import { assertExecutionOfferSkillCompatibility } from '../../sessions/handoffSkillCompatibility';
+import { executionOfferRequiredSkillIds } from '../../sessions/handoffSkills';
 /**
  * TurnPreparationService — prepareTurnContext (compaction / cache / effectivePlan freeze).
  */
@@ -92,7 +91,6 @@ function resolveSkillIntersection(
 }
 
 export interface TurnPreparationServiceDeps {
-  resolveTaskBinding: (sessionId: string | null, agentId: string) => TaskCompletionBinding | null;
   mcp: McpConnectionCoordinator;
   deferredActivation: DeferredToolActivationTracker;
   resolveRuntimeTools: (
@@ -177,7 +175,7 @@ export class TurnPreparationService {
       turnSettings.agentRuntime.context.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
       compiledPolicy.contextCompactionPercent,
     );
-    const profile = { ...input.effectiveProfile, skills: [...new Set([...input.effectiveProfile.skills, ...input.promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)), ...handoffRequiredSkillIds(input.sessionId, input.agentId)])] };
+    const profile = { ...input.effectiveProfile, skills: [...new Set([...input.effectiveProfile.skills, ...input.promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)), ...executionOfferRequiredSkillIds(input.sessionId, input.agentId)])] };
     const profileSkills = profile.skills;
     const skillIntersection = resolveSkillIntersection(
       profileSkills,
@@ -186,8 +184,13 @@ export class TurnPreparationService {
       input.agentId,
       input.promptPlan,
     );
-    const taskBinding = this.deps.resolveTaskBinding(input.sessionId, input.agentId);
-    assertHandoffSkillCompatibility({ binding: taskBinding, agentId: input.agentId, tools: input.toolAllowlist, intersection: skillIntersection, deniedTools: compiledPolicy.deniedTools });
+    assertExecutionOfferSkillCompatibility({
+      sessionId: input.sessionId,
+      agentId: input.agentId,
+      tools: input.toolAllowlist,
+      intersection: skillIntersection,
+      deniedTools: compiledPolicy.deniedTools,
+    });
     const preparedToolAllowlist = skillIntersection ?? input.toolAllowlist;
     const acquiredMcp = await this.deps.mcp.acquireConnections(
       input.agentId,
@@ -322,7 +325,6 @@ export class TurnPreparationService {
         : null,
     });
     const effectivePlan = buildEffectiveRuntimePlan({
-      taskBinding,
       rdxBindingFingerprint: rdxBindingFingerprint(rdxBinding),
       agentId: input.agentId,
       projectRootPath: input.projectRootPath,

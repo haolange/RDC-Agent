@@ -23,9 +23,8 @@ if (/\bembedding(s)?\b/i.test(toAgentId)) {
   fail('mission-plan-handoff-check: Embedding models must not enter Agent/handoff picker');
 }
 
-// Execution-cycle accounting is owned by HandoffStateStore, never duplicated in hooks.
-
-// Handoff artifacts and domain contents are validated by main before this hook.
-// Identity and chain depth do not imply a workflow or a checkpoint.
+// Continue actions are human-clicked UI payloads. Main validates the declared
+// target and writes the session execution offer; this hook only checks the
+// continue payload. No second cycle budget lives here.
 
 pass('mission-plan-handoff-check: ok');

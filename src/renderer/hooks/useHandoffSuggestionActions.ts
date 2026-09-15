@@ -10,6 +10,7 @@ export function useHandoffSuggestionActions() {
     useComposerSessionContextStore.getState().queueHandoffSuggestion({
       sessionId,
       agentId: suggestion.agent,
+      label: suggestion.label,
       prompt: suggestion.prompt,
       send: suggestion.send,
     });

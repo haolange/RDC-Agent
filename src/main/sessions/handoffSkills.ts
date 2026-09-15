@@ -1,11 +1,19 @@
+import { planReviewStateStore } from './PlanReviewStateStore';
 import { storageAdapter } from './StorageAdapter';
-import { validateHandoffArtifacts } from './handoffArtifacts';
+import { executionOfferMatches } from './ExecutionOfferStore';
 
-/** Only a committed handoff to this recipient can preload task-bound methods. */
-export function handoffRequiredSkillIds(sessionId: string | null | undefined, agentId: string): string[] {
+/** Preload only the skills frozen on the session execution offer for this recipient. */
+export function executionOfferRequiredSkillIds(sessionId: string | null | undefined, agentId: string): string[] {
   if (!sessionId) return [];
-  const handoff = storageAdapter.handoffs.getActive(sessionId);
-  if (!handoff || handoff.lifecycle !== 'committed' || handoff.toAgentId !== agentId) return [];
-  const contract = validateHandoffArtifacts(sessionId, handoff.contract);
-  return contract.intent === 'execute' ? [...new Set(contract.requiredSkillIds)] : [];
+  const offer = storageAdapter.executionOffers.read(sessionId);
+  const approved = planReviewStateStore.read(sessionId);
+  if (!approved || approved.status !== 'approved') return [];
+  if (!executionOfferMatches(offer, {
+    agentId,
+    planHash: approved.approvedHash,
+    planUri: approved.frozenUri,
+  })) {
+    return [];
+  }
+  return [...new Set(offer.requiredSkillIds)];
 }

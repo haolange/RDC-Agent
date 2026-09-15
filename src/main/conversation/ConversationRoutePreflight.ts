@@ -180,7 +180,7 @@ export function isActiveRun(run: RunSummary | null | undefined): run is RunSumma
 
 export const isLoopTool = (toolName: string): boolean => {
   const normalized = normalizeToolName(toolName);
-  return normalized !== 'ask_user' && normalized !== 'plan_artifact' && normalized !== 'agent_handoff';
+  return normalized !== 'ask_user' && normalized !== 'plan_artifact';
 };
 
 export function summarizeRuntimePayload(payload: AgentEvent['payload']): string {

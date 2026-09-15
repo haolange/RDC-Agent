@@ -62,6 +62,7 @@ export class PlanReviewStateStore {
       updatedAt: nowMs(),
     };
     this.write(sessionId, next);
+    storageAdapter.executionOffers.clear(sessionId);
     return { planId: next.planId, revision: next.revision, newCycle };
   }
 
@@ -83,6 +84,9 @@ export class PlanReviewStateStore {
       updatedAt: nowMs(),
     };
     this.write(sessionId, next);
+    if (status === 'rejected') {
+      storageAdapter.executionOffers.clear(sessionId);
+    }
     return next;
   }
 

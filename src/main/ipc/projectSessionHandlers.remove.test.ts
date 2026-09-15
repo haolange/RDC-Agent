@@ -5,7 +5,6 @@ const { handlers, syncSessionSlots, abortBackgroundSession, storage, conversatio
   syncSessionSlots: vi.fn(),
   abortBackgroundSession: vi.fn(async () => undefined),
   conversation: {
-    cancelUnfinishedHandoff: vi.fn(),
     cancelActiveTurn: vi.fn(async () => ({ success: true })),
   },
   storage: {
@@ -18,7 +17,7 @@ const { handlers, syncSessionSlots, abortBackgroundSession, storage, conversatio
     setCurrentSessionId: vi.fn(async () => undefined),
     setCurrentProjectId: vi.fn(),
     getLatestRun: vi.fn(() => null),
-    handoffs: { readDocument: vi.fn(() => null), getActive: vi.fn((): { handoffId: string; lifecycle: string; toAgentId: string } | null => null) },
+    executionOffers: { read: vi.fn(() => null), write: vi.fn(), clear: vi.fn(), discardRemovedHandoffState: vi.fn() },
   },
 }));
 
@@ -94,8 +93,6 @@ describe('session:remove slot sync', () => {
     storage.listRuns.mockReturnValue([]);
     storage.listSessions.mockReturnValue([]);
     storage.getProjectById.mockReturnValue({ projectId: 'proj_1', rootPath: 'D:/proj_1' });
-    storage.handoffs.getActive.mockReset();
-    storage.handoffs.getActive.mockReturnValue(null);
   });
 
   it('does not remove a project when background abort-and-join fails', async () => {
@@ -143,13 +140,12 @@ describe('session:remove slot sync', () => {
     // which the hoisted storage stub omitted. attachmentStagingService is also
     // imported by the handler and is mocked so this test does not load AppPathService/HookEngine.
     expect(result, `session:remove payload=${JSON.stringify(result)}`).toMatchObject({ success: true });
-    expect(conversation.cancelUnfinishedHandoff).toHaveBeenCalledWith('sess_1', 'session_close');
     expect(conversation.cancelActiveTurn).toHaveBeenCalledWith({ sessionId: 'sess_1' });
     expect(storage.removeSession).toHaveBeenCalledWith('sess_1');
     expect(syncSessionSlots).toHaveBeenCalledWith('sess_1');
   });
 
-  it('projects toAgentId on session:select while a committed handoff is unconsumed', async () => {
+  it('returns the persisted session agentId on session:select', async () => {
     storage.readSession.mockReturnValue({
       sessionId: 'sess_1',
       projectId: 'proj_1',
@@ -158,12 +154,7 @@ describe('session:remove slot sync', () => {
       sessionPath: 'D:/sess_1',
       createdAt: 1,
       updatedAt: 1,
-      agentId: 'plan',
-    });
-    storage.handoffs.getActive.mockReturnValue({
-      handoffId: 'handoff-1',
-      lifecycle: 'committed',
-      toAgentId: 'edit',
+      agentId: 'general',
     });
     registerProjectSessionHandlers({
       state: { currentSessionId: null, currentProjectId: 'proj_1', currentRunId: null },
@@ -179,7 +170,7 @@ describe('session:remove slot sync', () => {
     const result = await handler!({}, 'sess_1');
     expect(result).toMatchObject({
       success: true,
-      session: expect.objectContaining({ sessionId: 'sess_1', agentId: 'edit' }),
+      session: expect.objectContaining({ sessionId: 'sess_1', agentId: 'general' }),
     });
   });
 

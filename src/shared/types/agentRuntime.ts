@@ -209,10 +209,8 @@ export interface AgentSubagentChildPayload extends AgentEventBasePayload {
 }
 
 /**
- * Handoff 事件 payload。
- *
- * agent_handoff 工具触发 session 级控制权转移时发出，
- * ConversationService 据此切换活跃 profile 并注入 prompt。
+ * Historical handoff event payload retained for old transcripts.
+ * Live continue actions persist session.agentId through applyDeclaredHandoff.
  */
 export interface AgentHandoffRequestedPayload extends AgentEventBasePayload {
   /** 源 profile。 */

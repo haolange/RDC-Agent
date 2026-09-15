@@ -19,10 +19,6 @@ import type {
   ConversationSwitchBranchRequest,
   ConversationSwitchBranchResult,
 } from '@shared/types/conversationBranch';
-import type {
-  ProfileHandoffCancelReason,
-  ProfileHandoffState,
-} from '@shared/types/profileHandoff';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { SessionRecord } from '@shared/types/session';
 import { generateEventId } from '@shared/utils/id';
@@ -52,7 +48,6 @@ import type {
 import { canonicalJson } from './ConversationRoutePreflight';
 import { prepareConversationPrompt as buildConversationPrompt, type PrepareConversationPromptInput } from './ConversationPromptPreparer';
 import { hashAttachmentContents } from './ConversationAttachmentHashing';
-import { ConversationHandoffOps } from './ConversationHandoffOps';
 import { ConversationBackgroundContinuation, type BackgroundContinuationEvent } from './ConversationBackgroundContinuation';
 import { startProfileTurn as runStartProfileTurn } from './ConversationTurnStarter';
 import { completeProfileTurn as runCompleteProfileTurn, type CompleteProfileTurnInput, type ConversationTurnRunnerHost } from './ConversationTurnRunner';
@@ -90,15 +85,6 @@ export class ConversationService {
   private readonly sendRequestFingerprints = new Map<string, string>();
   private readonly activeSendScopes = new Map<string, string>();
   private readonly backgroundContinuations = new ConversationBackgroundContinuation((event) => this.runBackgroundContinuation(event));
-  private readonly handoffs = new ConversationHandoffOps({
-    hasActiveTurnForSession: (sessionId) => Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === sessionId),
-    runIdempotentTurn: (input, operation) => this.runIdempotentTurn(input, operation),
-    resolveContext: (input) => this.resolveContext(input),
-    startAutoSendProfileTurn: (input) => this.startProfileTurn(
-      input.context, input.agentId, input.agentId, '', [], [], undefined,
-      input.turnControls, input.requestId, input.controller, undefined, input.requestFingerprint,
-    ),
-  });
   constructor() {
     agentOrchestrator.backgroundSubagents.onEvent = (event) => {
       if (event.type === 'settled' || event.type === 'message') {
@@ -190,9 +176,6 @@ export class ConversationService {
     const preparing = preparingEntry?.[1];
     const preparingRequestId = preparing?.requestId;
     if (preparing && preparingRequestId) {
-      const owningSessionId = request.sessionId
-        ?? (preparing.scopeKey.startsWith('session:') ? preparing.scopeKey.slice('session:'.length) : null);
-      if (owningSessionId) this.cancelUnfinishedHandoff(owningSessionId, 'user_stop');
       preparing.controller.abort();
       if (preparing.phase === 'committing') preparing.cancelAfterCommit = true;
       return {
@@ -208,7 +191,6 @@ export class ConversationService {
       .sort((left, right) => right.startedAt - left.startedAt);
     const target = candidates[0];
     if (!target) {
-      if (request.sessionId) await this.cancelUnfinishedHandoff(request.sessionId, 'user_stop');
       if (request.sessionId) {
         this.backgroundContinuations.suppress(request.sessionId);
         await agentOrchestrator.backgroundSubagents.abortSession(request.sessionId);
@@ -217,7 +199,6 @@ export class ConversationService {
       return { success: false, error: 'No active conversation turn.' };
     }
 
-    await this.cancelUnfinishedHandoff(target.sessionId, 'user_stop');
     if (target.sessionId) this.backgroundContinuations.suppress(target.sessionId);
     target.stop();
     await target.stopped;
@@ -247,7 +228,6 @@ export class ConversationService {
     }
   }
   private notifySessionTurnIdle(sessionId: string): void {
-    this.handoffs.notifySessionTurnIdle(sessionId);
     this.backgroundContinuations.notifyIdle(sessionId);
   }
   private async runBackgroundContinuation(pending: BackgroundContinuationEvent): Promise<void> {
@@ -614,7 +594,6 @@ export class ConversationService {
     const turnsToStop = Array.from(this.activeTurns.values()).filter((activeTurn) => (
       activeTurn.sessionId === sessionId && downstreamTurnIds.has(activeTurn.turnId)
     ));
-    this.cancelUnfinishedHandoff(sessionId, 'rewrite');
     for (const activeTurn of turnsToStop) {
       activeTurn.stop();
     }
@@ -700,7 +679,6 @@ export class ConversationService {
   }
 
   async switchConversationBranch(input: ConversationSwitchBranchRequest): Promise<ConversationSwitchBranchResult> {
-    this.cancelUnfinishedHandoff(input.sessionId, 'branch');
     const activeTurns = Array.from(this.activeTurns.values()).filter((turn) => turn.sessionId === input.sessionId);
     for (const turn of activeTurns) turn.stop();
     if (activeTurns.length > 0) {
@@ -797,12 +775,6 @@ export class ConversationService {
         persistedSessionId?: string | null,
       ) => publishConversationTrace(traceSessionId, messages, persistedSessionId, publishTraceProjection),
       ephemeralTraceSessionId,
-      getCommittedHandoff: (sessionId: string) => this.handoffs.getCommittedHandoff(sessionId),
-      consumeCommittedHandoff: (
-        sessionId: string,
-        handoff: ProfileHandoffState,
-        continuationTurnId?: string,
-      ) => this.consumeCommittedHandoff(sessionId, handoff, continuationTurnId),
     };
   }
 
@@ -820,30 +792,7 @@ export class ConversationService {
       clearActiveTurn: (turnId: string, controller: AbortController) => this.clearActiveTurn(turnId, controller),
       assertTerminalContextOwnership,
       ephemeralTraceSessionId,
-      commitPreparedHandoff: (sessionId: string, sourceTurnId: string) => this.commitPreparedHandoff(sessionId, sourceTurnId),
-      cancelUnfinishedHandoff: (sessionId: string, reason: ProfileHandoffCancelReason) => this.cancelUnfinishedHandoff(sessionId, reason),
-      scheduleHandoffAutoSend: (sessionId: string) => this.scheduleHandoffAutoSend(sessionId),
     };
-  }
-
-  cancelUnfinishedHandoff(sessionId: string | null | undefined, reason: ProfileHandoffCancelReason): Promise<void> {
-    return this.handoffs.cancelUnfinishedHandoff(sessionId, reason);
-  }
-
-  notifyHydratedHandoff(sessionId: string, result: ProfileHandoffState | null): void {
-    this.handoffs.notifyHydratedHandoff(sessionId, result);
-  }
-
-  private commitPreparedHandoff(sessionId: string, sourceTurnId: string): Promise<ProfileHandoffState | null> {
-    return this.handoffs.commitPreparedHandoff(sessionId, sourceTurnId);
-  }
-
-  private consumeCommittedHandoff(sessionId: string, handoff: ProfileHandoffState, continuationTurnId?: string): void {
-    this.handoffs.consumeCommittedHandoff(sessionId, handoff, continuationTurnId);
-  }
-
-  private scheduleHandoffAutoSend(sessionId: string): void {
-    this.handoffs.scheduleHandoffAutoSend(sessionId);
   }
 
   private async startProfileTurn(
@@ -885,9 +834,3 @@ export class ConversationService {
 }
 
 export const conversationService = new ConversationService();
-
-if (typeof storageAdapter.setHandoffHydrateListener === 'function') {
-  storageAdapter.setHandoffHydrateListener((sessionId, result) => {
-    conversationService.notifyHydratedHandoff(sessionId, result);
-  });
-}

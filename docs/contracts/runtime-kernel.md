@@ -149,13 +149,13 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 唯一引擎是 `HookEngine`。分发根：`resources/agent-runtime/hooks`（builtin）< `~/.rdx/hooks` < `<project>/.rdx/hooks`，与 `ScopedResourceResolver` 同序。Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity；任一变化 → `needsRetrust`。builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。接线事件（12 canonical）：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。禁止第二套 `AgentHooks`。
 
-## Profile Handoff
+## Declared Continue and Execution Offer
 
-`ProfileHandoffState` 是 session-owned durable 状态机（`prepared` → `committed` → `consumed`，或未完成点 `cancelled`），由 `HandoffStateStore` 写入 `<sessionPath>/handoff-state.json`。`AgentHandoffDefinition` 只是 manifest 路由声明，不是该记录。计划门是另一条人机停顿：`plan_artifact` 写活计划并挂起，`approval.requested kind=plan_review`；拒绝意见回同一 tool result，批准写入 `TurnHandle.approvedPlan`（`approvedHash` + target + frozenUri）。回合成功终态把冻结 `profileHandoffs`（`showContinueOn !== false`）快照到 assistant `handoffSuggestions`。Mission 仅在本回合 workTrace 含真实已批准 `plan_artifact` 时才快照；批准事件在冻结完成后发布，普通终答不得挂 Execute 建议行。
+`AgentHandoffDefinition` 只是 Copilot 式 UI 声明（label / agent / prompt / send / showContinueOn / requiredSkillIds）。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 校验选项属于当前（或刚批准的）profile，触发 `agent.before-handoff` / `agent.after-handoff`，写入 `<sessionPath>/execution-offer.json`，并 persist `session.agentId`。不存在 `agent_handoff` 工具，也不存在 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse、不迁移。
 
-事务顺序：`before-handoff` → 内存草稿 prepare → 绑定 `turn.pendingHandoff` → `after-hook` → 持久化 `HandoffStateStore.prepare`。`before-handoff` denied 则不 draft、不 bind、不 persist。Hook / 持久化 / 绑定失败必须 cancel/rollback，不得遗留 active prepared，并清掉 `pendingHandoff`。
+计划门是另一条人机停顿：`plan_artifact` 写活计划并挂起，`approval.requested kind=plan_review`；拒绝意见回同一 tool result，批准写入 `TurnHandle.approvedPlan`（`approvedHash` + target + frozenUri）并覆盖 execution offer。回合成功终态把冻结 `profileHandoffs`（`showContinueOn !== false`）快照到 assistant `handoffSuggestions`。Mission 仅在本回合 workTrace 含真实已批准 `plan_artifact` 时才快照 Execute；General 无声明即无按钮。
 
-`send:true` 续跑由源 turn complete / 会话 turn-idle 事件触发一次；同一 `handoffId` 只有一次 generation token，迟到/重复事件丢弃。仅对「源 turn 仍占槽」做有界 idle 观察（`HANDOFF_AUTO_SEND_MAX_IDLE_OBSERVATIONS`），超过则 `cancel(superseded)`。Stop / cancel / preflight / `invalid_model` 永不重试。禁止 `queueMicrotask` 自递归续跑。重启 hydrate 将本进程未 live 的 durable prepared/committed 降为 `restart_degrade`，永不 auto-send。
+`send: true` 只表示点完后预填并自动发送。失败提示并留草稿，迟到结果不得写进别的 session。手动改 Composer Agent pill 不写 offer、不预载调查 Skill。prepareTurn 仅当本回合 `agentId === targetAgentId` 且 session 批准计划与 offer 同 hash 时，把声明 `requiredSkillIds` 并入 PromptPlan preload。`handoff` / `agent` / `agent_handoff` token 拒绝。
 
 ## RDX / Capture
 
@@ -178,20 +178,18 @@ RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）
 - 门禁：`pnpm run check:orchestrator-facade`（挂于 `check:architecture`）
 
 
-## 通用 Harness 与结构化交接（2026-09-09）
+## 通用 Harness 与声明续跑（2026-09-15）
 
 General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 策略采用 renderdoc-execution 的六块 Markdown 模板，按规模填写；Knowledge 相似性仅是检查线索。
 
-agent_handoff 要求非空摘要和严格 contract：route；execute（Plan URI/hash、requiredSkillIds、returnTo、deliveryRequirements）；return（executionHandoffId、产物 URI/hash）。returnTo 必须等于实际派发者。Mission execute 必须绑定本轮已批准冻结 Plan：`plan.hash === approvedHash`、`plan.uri === frozenUri` 且 `agent === approvedTarget`，否则 `HANDOFF_PLAN_NOT_APPROVED`。Plan 经 session artifact plans 类别版本化：同意前覆盖 `session://plans/plan.md`，同意后冻结 `plan-<ISO>-<hash8>.md`，历史文件不迁移或删除。接收 prepareTurn 校验引用、预加载必需 Skill、去重、冻结来源与权限交集；来源变化重新准备，缺失或权限冲突拒绝。通用 turn 仅调用 TurnCompletionValidator，组合层选择 Investigation 校验策略并冻结任务绑定。
-
-每个 root 一次初始路由、最多两轮 execute/return；Small Loop 不消耗新周期，重复 consume 不重复扣数。第二轮允许回评估，第三轮执行拒绝。额度耗尽但未完成时，Mission 通过 turn_complete 的 budget_paused disposition 与 evidenceRefs 绑定最后回交 Checkpoint URI/hash，正文说明 unresolvedFrontier，等待新用户指令；这只是 turn 结束，绝不提升领域报告状态。handoff-state 只读取当前 schema；未知或旧格式原字节保留并拒绝继续，须先离线备份、转换和验证，不在正常运行时迁移或建立兼容双轨。重启降级、取消、事件驱动续跑保持原契约。
+Plan 经 session artifact plans 类别版本化：同意前覆盖 `session://plans/plan.md`，同意后冻结 `plan-<ISO>-<hash8>.md`，历史文件不迁移或删除。批准写入 execution offer；prepareTurn 仅当 hash 与 target 匹配时预载声明 Skill。通用 turn 仅调用 TurnCompletionValidator。Big Loop 由 General 终答写缺口、用户切回 Mission、新计划、再批准、再点 Execute 组成；runtime 不按身份 / depth / 正文开下一轮。 Mission 额度耗尽但未完成时可通过 `budget_paused` 结束 turn，绝不提升领域报告状态。
 
 普通 Capsule 省略领域扩展且没有 RDX Lease prompt 段；仅 RDX 模块接受 domainExtensions.rdx.requiresLease=true 并注入租约上下文。缺省无 RDX；同一 live context 的租约独占覆盖完整子执行区间，其他安全工作仍可并行；finally 撤销须携带停止证明，否则隔离父资源；旧顶层字段拒绝，不保留双轨。
 
 
 ### Harness / 领域与上下文边界（2026-09-09 收敛）
 
-通用完成检查按冻结 execution binding 校验回到实际派发者及 executionHandoffId，不按 Mission/General 身份或 depth 推断 Big Loop。handoff Hook 只接收显式 contract；Checkpoint 与实验回执内容校验在领域服务。completed 才断言领域完成；partial/blocked/cancelled 不提升报告，绑定执行仍须合法回交或走取消生命周期。自然语言前缀不控制终态。
+通用完成检查不按 Mission/General 身份或 depth 推断 Big Loop。handoff Hook 只在人点声明续跑时触发。Checkpoint 与实验回执内容校验在领域服务。completed 才断言领域完成，且仅 Mission 可宣告；partial/blocked/cancelled 不提升报告。自然语言前缀不控制终态。
 
 子执行 artifact_read 只读取显式授予且 hash 冻结的同一所属 Session 引用，嵌套委派取子集。子执行调查输出保存到原调查，输入引用的读权限不授予覆盖权限；只能更新本子执行新建的输出。退出撤销临时访问权，已保存产物继续归原 Session 所有。
 

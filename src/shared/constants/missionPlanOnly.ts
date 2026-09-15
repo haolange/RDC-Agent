@@ -14,7 +14,6 @@ export const MISSION_PLAN_ONLY_TOOL_IDS = [
   'web_fetch',
   'web_search',
   'ask_user',
-  'agent_handoff',
   'task_create',
   'task_update',
   'task_get',

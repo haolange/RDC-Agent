@@ -3,7 +3,6 @@ import { createTaskTools, TaskRegistry, MemoryTaskStore, createSessionTaskStore,
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import type { TurnHandle } from './TurnCoordinator';
-import { getConsumedHandoffTaskBinding } from './DirectTaskTurnLifecycle';
 import { notifyBackgroundExecutionMessage } from './BackgroundSubagentService';
 import { sessionArtifactResolver } from '../../sessions/SessionArtifactResolver';
 import { bindTaskRootBudget } from './TaskRootBudget';
@@ -50,14 +49,7 @@ export function createTaskRuntimeTools(input: {
   const recovery = registry.reconcileInterruptedExecutions();
   const tools = createTaskTools(registry, {
     scopeRootTaskId: delegatedScope?.rootTaskId,
-    requestCurrentTurnStop: (taskId) => {
-      const turn = input.turnHandle ?? input.getActiveTurn(resolvedSessionId);
-      if (!resolvedSessionId || !turn) return false;
-      const binding = getConsumedHandoffTaskBinding(resolvedSessionId, turn.turnId);
-      if (binding?.taskId !== taskId) return false;
-      void turn.abortAndJoin({ reason: 'user_stop' });
-      return true;
-    },
+    requestCurrentTurnStop: () => false,
     startOptions: async () => {
       const turn = input.turnHandle ?? input.getActiveTurn(resolvedSessionId);
       const scopedExecutions = await registry.listExecutions();
