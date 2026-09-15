@@ -85,6 +85,16 @@ export interface KnowledgeRelation {
   targetCardId: string;
 }
 
+export const KNOWLEDGE_IMAGE_ROLES = ['observed', 'reference', 'illustration'] as const;
+export type KnowledgeImageRole = (typeof KNOWLEDGE_IMAGE_ROLES)[number];
+
+/** Image living under the owning knowledge space root. Never an absolute path. */
+export interface KnowledgeImageRef {
+  relativePath: string;
+  role: KnowledgeImageRole;
+  alt?: string;
+}
+
 export interface KnowledgeCaseChapters {
   claim?: string;
   scopeExclusions?: string;
@@ -114,7 +124,8 @@ export interface KnowledgeCardRecord {
   sourceStatus?: string;
   caseId?: string;
   chapters?: KnowledgeCaseChapters;
-  /** ColdData path ingest provenance. Never an absolute path or original filename. */
+  images?: KnowledgeImageRef[];
+  /** Import path provenance. Never an absolute path or original filename. */
   sourceHash?: string;
   sourceMtimeMs?: number;
   sourceSize?: number;
@@ -149,6 +160,7 @@ export interface KnowledgeCardDetail extends KnowledgeCardSummary {
   sourceStatus?: string;
   caseId?: string;
   chapters?: KnowledgeCaseChapters;
+  images?: KnowledgeImageRef[];
   /** Ingest provenance projected from the card record; absent for hand-written cards. */
   sourceHash?: string;
   sourceMtimeMs?: number;
@@ -261,10 +273,10 @@ export interface KnowledgeCandidatesResult {
   drafts: KnowledgeCardRecord[];
 }
 
-export type ColdDataIngestStatus = 'draft' | 'quarantine' | 'conflict';
+export type KnowledgeImportStatus = 'draft' | 'quarantine' | 'conflict';
 
-export interface ColdDataIngestResult {
-  status: ColdDataIngestStatus;
+export interface KnowledgeImportResult {
+  status: KnowledgeImportStatus;
   candidateCreated: false;
   lifecycle: 'draft' | null;
   sourceStatus?: string;

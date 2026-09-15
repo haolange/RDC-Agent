@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { KNOWLEDGE_CASE_CHAPTERS } from '@shared/types/knowledge';
-import { MessageMarkdown } from '../../../../patterns/Markdown/MessageMarkdown';
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { EmptyState } from '../../../../ui/EmptyState';
@@ -10,6 +9,8 @@ import { useI18n } from '../../../../i18n';
 import { CHAPTER_LABEL_KEYS, formatKnowledgeTime } from '../knowledgeCenterLabels';
 import { detailToRecord } from '../knowledgeCenterModel';
 import { CaseChapterContent } from '../parts/CaseChapterContent';
+import { KnowledgeCardImages } from '../parts/KnowledgeCardImages';
+import { KnowledgeMarkdown } from '../parts/KnowledgeMarkdown';
 import '../parts/KnowledgeDetail.css';
 import { CardBadges } from '../parts/CardBadges';
 import { CardMetaGrid } from '../parts/CardMetaGrid';
@@ -128,16 +129,17 @@ export function DetailColumn({ state, write, onCreateCandidate }: DetailColumnPr
               </nav>
             )}
             <div className="knowledge-center-markdown">
+              {card.images?.length ? <KnowledgeCardImages spaceId={card.spaceId} images={card.images} /> : null}
               {card.type === 'case' && card.chapters
                 ? KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => card.chapters?.[chapter]?.trim()).map((chapter) => (
                   <section className="knowledge-case-section" key={chapter} id={`knowledge-chapter-${chapter}`}>
                     <h3>{t(CHAPTER_LABEL_KEYS[chapter])}</h3>
                     {card.chapters?.[chapter]
-                      ? <CaseChapterContent chapter={chapter} content={card.chapters[chapter] ?? ''} />
+                      ? <CaseChapterContent spaceId={card.spaceId} chapter={chapter} content={card.chapters[chapter] ?? ''} />
                       : <p className="knowledge-center-missing">{t('knowledgeCenter.chaptersMissing')}</p>}
                   </section>
                 ))
-                : <MessageMarkdown content={card.content} />}
+                : <KnowledgeMarkdown content={card.content} spaceId={card.spaceId} />}
             </div>
           </article>
         )}

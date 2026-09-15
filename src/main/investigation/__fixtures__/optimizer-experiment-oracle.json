@@ -1,7 +1,7 @@
 {
   "id": "optimizer-aba-sanitized",
   "captureRef": "captures/fixture-timing.rdc",
-  "notes": "Deidentified Optimizer oracle. No host paths, original screenshots, or ColdData filenames. Local ColdData replay is a Wave 6 / manual step.",
+  "notes": "Deidentified Optimizer oracle. No host paths, original screenshots, or knowledge-import filenames. Local knowledge-import replay is a Wave 6 / manual step.",
   "oracle": {
     "closeLegal": {
       "interventionType": "shader_replace",

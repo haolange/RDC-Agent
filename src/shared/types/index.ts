@@ -245,8 +245,10 @@ export type {
   StructuredHandoffResourceRef,
 } from './semanticContext';
 export type {
-  ColdDataIngestResult,
-  ColdDataIngestStatus,
+  KnowledgeImageRef,
+  KnowledgeImageRole,
+  KnowledgeImportResult,
+  KnowledgeImportStatus,
   KnowledgeCandidatesResult,
   KnowledgeCardDetail,
   KnowledgeCardRecord,

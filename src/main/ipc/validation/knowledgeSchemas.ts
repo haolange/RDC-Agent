@@ -60,7 +60,7 @@ export const KnowledgeCandidateCreateArgsSchema = z.tuple([
   }).strict(),
 ]);
 
-export const KnowledgeColdDataImportArgsSchema = z.tuple([
+export const KnowledgeImportArgsSchema = z.tuple([
   z.object({
     sessionId: ipcId(128, 'sessionId'),
     spaceId: KnowledgeSpaceIdSchema.optional(),
@@ -70,6 +70,13 @@ export const KnowledgeColdDataImportArgsSchema = z.tuple([
     (value) => Boolean(value.source?.trim() || value.filePath?.trim()),
     { message: 'source or filePath is required' },
   ),
+]);
+
+export const KnowledgeImageArgsSchema = z.tuple([
+  z.object({
+    spaceId: KnowledgeSpaceIdSchema,
+    relativePath: ipcNonEmptyString(1024, 'relativePath'),
+  }).strict(),
 ]);
 
 export const KnowledgeIssueApprovalTokenArgsSchema = z.tuple([

@@ -11,6 +11,9 @@ import {
   KnowledgeWriteIntegrityError,
 } from './knowledgeErrors';
 import { assertSafeKnowledgeWriteTarget, writeKnowledgeCardAtomic } from './knowledgeFs';
+import { clearStagedKnowledgeImages, putStagedKnowledgeImages, takeStagedKnowledgeImages } from './knowledgeImageStaging';
+import { isKnowledgeImagePathAllowed } from './knowledgeImages';
+import type { KnowledgeStagedImage } from './knowledgeIngest';
 import { knowledgeIndexService, KnowledgeIndexService } from './KnowledgeIndexService';
 import { knowledgeQueryService } from './KnowledgeQueryService';
 
@@ -21,6 +24,7 @@ export interface KnowledgeWriteInput {
   confirmation: KnowledgeHumanConfirmation;
   approvalToken?: string;
   approvalAlreadyConsumed?: boolean;
+  stagedImages?: KnowledgeStagedImage[];
 }
 
 export interface KnowledgePromoteInput {
@@ -103,8 +107,27 @@ export class KnowledgeWriteService {
     } else {
       await writeKnowledgeCardAtomic(absolute, serialized);
     }
+    await this.writeStagedImages(space.rootPath, record, input.stagedImages);
     await this.overrides.index?.rebuild();
     return record;
+  }
+
+  private async writeStagedImages(
+    rootPath: string,
+    record: KnowledgeCardRecord,
+    incoming?: KnowledgeStagedImage[],
+  ): Promise<void> {
+    const declared = record.images ?? [];
+    if (declared.length === 0) return;
+    if (incoming?.length) await putStagedKnowledgeImages(record.cardId, incoming);
+    const staged = await takeStagedKnowledgeImages(record.cardId, declared.map((image) => image.relativePath));
+    for (const image of staged) {
+      if (!isKnowledgeImagePathAllowed(record.relativePath, image.relativePath, record.caseId)) continue;
+      const dest = await assertSafeKnowledgeWriteTarget(rootPath, image.relativePath);
+      await fs.mkdir(path.dirname(dest), { recursive: true });
+      await fs.writeFile(dest, image.bytes);
+    }
+    await clearStagedKnowledgeImages(record.cardId);
   }
 
   async promote(input: KnowledgePromoteInput): Promise<KnowledgeCardRecord> {

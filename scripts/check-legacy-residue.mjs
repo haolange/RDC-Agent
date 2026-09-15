@@ -39,6 +39,9 @@ const FORBIDDEN = {
   legacyGlobalMirror: token('legacy', 'GlobalMirror'),
   getRdxRuntimeContext: token('getRdx', 'RuntimeContext'),
   legacyFallback: token('legacy', ' fallback'),
+  coldDataPascal: token('Cold', 'Data'),
+  coldDataCamel: token('cold', 'Data'),
+  coldDataKebab: token('cold', '-data'),
 };
 
 const HARNESS_REL = 'src/shared/types/harness.ts';
@@ -260,6 +263,9 @@ const rules = [
   { id: 'legacyGlobalMirror', hits: collectPatternHits(FORBIDDEN.legacyGlobalMirror) },
   { id: 'getRdxRuntimeContext', hits: collectPatternHits(FORBIDDEN.getRdxRuntimeContext) },
   { id: 'legacy-fallback-wording', hits: collectPatternHits(FORBIDDEN.legacyFallback) },
+  { id: 'ColdData', hits: collectPatternHits(FORBIDDEN.coldDataPascal) },
+  { id: 'coldData', hits: collectPatternHits(FORBIDDEN.coldDataCamel) },
+  { id: 'cold-data', hits: collectPatternHits(FORBIDDEN.coldDataKebab) },
 ];
 
 for (const rule of rules) {

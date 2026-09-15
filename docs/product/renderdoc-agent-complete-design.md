@@ -2,7 +2,7 @@
 
 > **文档地位**：本文件是受根目录 [`DESIGN.md`](../../DESIGN.md) 裁决的详细目标设计，**不是第二产品权威**。若与 `DESIGN.md` / `AGENTS.md` 冲突，以 `DESIGN.md` 为准并回改本文。
 >
-> **实现状态**：文中模块、schema、服务以目标态叙述。Knowledge 目标拓扑是五服务 + **六 lane** markdown-first + 五个 deferred 工具与 Knowledge Center 三列 UI（Embedding / Semantic lane 已由 U02 删除）。Wave 4 schema 已落地 `rdc.investigation.v1`、`InvestigationArtifactService` 与三个 deferred Investigation 工具；IPC `investigation:read` 已落地；4 个 builtin Hook 模板与 Session rail 五卡已落地。Wave 5：三条 Mission 方法面已接到 Skill / Hook / Capsule（Debugger `$debugger-causal-method`，Analyzer `$analyzer-architecture-method`，Optimizer `$optimization-experiment`；现 15 个垂直方法 Skill）。**T18 ColdData 真实验收已证**（见 `DESIGN.md` T18 已证组与 [`acceptance-ledger.md`](acceptance-ledger.md) `T18-colddata-*`）。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。声明续跑与 session execution offer 已落地。Run 当前为 v3。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。
+> **实现状态**：文中模块、schema、服务以目标态叙述。Knowledge 目标拓扑是五服务 + **六 lane** markdown-first + 五个 deferred 工具与 Knowledge Center 三列 UI（Embedding / Semantic lane 已由 U02 删除）。Wave 4 schema 已落地 `rdc.investigation.v1`、`InvestigationArtifactService` 与三个 deferred Investigation 工具；IPC `investigation:read` 已落地；4 个 builtin Hook 模板与 Session rail 五卡已落地。Wave 5：三条 Mission 方法面已接到 Skill / Hook / Capsule（Debugger `$debugger-causal-method`，Analyzer `$analyzer-architecture-method`，Optimizer `$optimization-experiment`；现 15 个垂直方法 Skill）。**T18 知识导入 真实验收已证**（见 `DESIGN.md` T18 已证组与 [`acceptance-ledger.md`](acceptance-ledger.md) `T18-colddata-*`）。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。声明续跑与 session execution offer 已落地。Run 当前为 v3。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。
 >
 > **读者**：实现后续 Wave 的 Codex / Agent。路径相对本仓库。中文为主，产品术语保留英文。
 
@@ -14,7 +14,7 @@
 - **目标态**：后续 Wave 必须收敛到的单一路径。
 - **迁移中**：目标模块已裁决、尚未实现；实现时直接收敛，不保留 legacy 双轨。
 - 本文重组桌面《RenderDoc Agent 完整设计书》的领域契约，并叠加仓库化裁决。桌面书不是权威。
-- 本机 `ColdData` 原料与原始导出截图**不进入本仓库**；CI 只用脱敏 fixture（文件名如 `symptom-compare-<shortHash>.png`）。
+- 本机 `知识导入` 原料与原始导出截图**不进入本仓库**；CI 只用脱敏 fixture（文件名如 `symptom-compare-<shortHash>.png`）。
 
 ### 2026-09-09 Harness 边界收敛
 
@@ -124,7 +124,7 @@ Embedding capability / Semantic lane **已删除**，见 `DESIGN.md` 裁决 C。
 
 ### 3.6 Knowledge 与 Investigation 门禁
 
-门禁脚本：`pnpm run check:knowledge-system`、`pnpm run check:investigation-system`。**ratchet 已建立**；Investigation schema / Service / contract suite / 五卡已清零。三条 Mission 方法面已接到 Skill / Hook / Capsule。禁止用空壳测试、skip/todo 或只加类名绕过。债务 allowlist 已空（hits=0）。Investigation 目标态：record/manifest/index/supersede/stale-propagation 同一事务；renderer 唯一读取通道 `investigation:read({ sessionId, artifactId, expectedHash })`；Mission 正常 `completed` 须可解引用 `MissionCheckpoint` + `kind=report`/`status=ready` + 完整章节 + `outputPhase=final_answer` 引用该 report（见 `DESIGN.md` 裁决 E / L）。**当前态**：事务已落地（journal / temp-set / commit marker / atomic replace）；完成合同已落地（turn 收口：checkpoint + ready report + 完整章节 + `final_answer` 引用）；IPC `investigation:read({ sessionId, artifactId, expectedHash })` **已落地**；投影携带完整 `contentHash`（renderer 只缩显）。T18 ColdData 已证见 `DESIGN.md` T18 已证组。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。
+门禁脚本：`pnpm run check:knowledge-system`、`pnpm run check:investigation-system`。**ratchet 已建立**；Investigation schema / Service / contract suite / 五卡已清零。三条 Mission 方法面已接到 Skill / Hook / Capsule。禁止用空壳测试、skip/todo 或只加类名绕过。债务 allowlist 已空（hits=0）。Investigation 目标态：record/manifest/index/supersede/stale-propagation 同一事务；renderer 唯一读取通道 `investigation:read({ sessionId, artifactId, expectedHash })`；Mission 正常 `completed` 须可解引用 `MissionCheckpoint` + `kind=report`/`status=ready` + 完整章节 + `outputPhase=final_answer` 引用该 report（见 `DESIGN.md` 裁决 E / L）。**当前态**：事务已落地（journal / temp-set / commit marker / atomic replace）；完成合同已落地（turn 收口：checkpoint + ready report + 完整章节 + `final_answer` 引用）；IPC `investigation:read({ sessionId, artifactId, expectedHash })` **已落地**；投影携带完整 `contentHash`（renderer 只缩显）。T18 知识导入 已证见 `DESIGN.md` T18 已证组。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。
 
 ### 3.7 Mission Plan-Only 与 Run Schema
 
@@ -388,7 +388,7 @@ Right Rail **目标** Artifacts 卡只投影 main-owned 本清单及其记录，
 | `S-KNOW-02` | 冲突不可静默覆盖；必须保留 `contradicts` 或显式 `supersedes` 原因 |
 | `S-RDC-01` | mutate 必有 Experiment + exclusive World State + rollback / restored 验证；否则 World State `polluted`，相关 Evidence `stale` |
 
-`check:investigation-system` ratchet 已建立；schema + `InvestigationArtifactService` + 三个 deferred 工具 + `investigationSystemContract.test.ts` 已落地并硬执行。应覆盖字段完整性（含 `claimId` / `experimentId` / `challengeId` / `artifactId`）、`ready` 三条件、偏序不可升级、精确 `S-CAUSAL-01`、引用可解、非侵入、Skeptic `ChallengeRecord` 形状、Checkpoint 所列 id 可解引用、Analyzer `claimKind` 越层失败、Optimizer 无 rollback 的 mutate 不得关闭。15 Skill / 4 Hook 与 Session rail 五卡已落地。三条 Mission 方法面已接到 Skill / Hook / Capsule。禁止 skip/todo/无断言空壳。T18 ColdData 已证见 `DESIGN.md` T18 已证组。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。
+`check:investigation-system` ratchet 已建立；schema + `InvestigationArtifactService` + 三个 deferred 工具 + `investigationSystemContract.test.ts` 已落地并硬执行。应覆盖字段完整性（含 `claimId` / `experimentId` / `challengeId` / `artifactId`）、`ready` 三条件、偏序不可升级、精确 `S-CAUSAL-01`、引用可解、非侵入、Skeptic `ChallengeRecord` 形状、Checkpoint 所列 id 可解引用、Analyzer `claimKind` 越层失败、Optimizer 无 rollback 的 mutate 不得关闭。15 Skill / 4 Hook 与 Session rail 五卡已落地。三条 Mission 方法面已接到 Skill / Hook / Capsule。禁止 skip/todo/无断言空壳。T18 知识导入 已证见 `DESIGN.md` T18 已证组。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。
 
 ---
 
@@ -487,7 +487,7 @@ Planning：Triage & Taxonomy → Capture Report → Knowledge Retrieval → plan
 
 阶段：Observed Model → Resource Versioning → Pass Reconstruction → Shader Reconstruction → Traceability → Cross-Capture → Architecture Synthesis → Skeptic。
 
-落地方式（Wave 5）：接到已有 Profile / Skill / Hook / durable Handoff / `investigation_*` / `task_*`，不新建 Runtime。Architecture Model 版本比较 Artifact 与 Observed / Reconstructed / Authoring 分层写在 `$analyzer-architecture-method`（现有 `claim` / `claim_set` kind，无新 Registry 项）。`claimKind` 越层在写入时失败。`$analyzer-coordinator` 负责规划与 Small / Big Loop。仓库只用脱敏 fixture（`src/main/investigation/__fixtures__`）。T18 ColdData 已证见 `DESIGN.md` T18 已证组；Analyzer 正常 `completed` 见 U06。
+落地方式（Wave 5）：接到已有 Profile / Skill / Hook / durable Handoff / `investigation_*` / `task_*`，不新建 Runtime。Architecture Model 版本比较 Artifact 与 Observed / Reconstructed / Authoring 分层写在 `$analyzer-architecture-method`（现有 `claim` / `claim_set` kind，无新 Registry 项）。`claimKind` 越层在写入时失败。`$analyzer-coordinator` 负责规划与 Small / Big Loop。仓库只用脱敏 fixture（`src/main/investigation/__fixtures__`）。T18 知识导入 已证见 `DESIGN.md` T18 已证组；Analyzer 正常 `completed` 见 U06。
 
 最低完整：主要 Pass 可用、Resource 依赖清晰、高频 Shader/Material 有 Fingerprint、用户目标 Trace 可答、Observed / Derived / Inferred 分离、Unknown Frontier 明确、Skeptic 无结构性 blocker。不得把未观察的引擎语义写成 `observed_fact`。
 
@@ -495,7 +495,7 @@ Planning：Triage & Taxonomy → Capture Report → Knowledge Retrieval → plan
 
 三层性能概念：Objective Budget、Hardware Constraint、Efficiency Indicator。Capability Ceiling O0–O6。三类动作 C / R / E。Shader Lab 分 Diagnostic Ablation、Semantics-Preserving、Quality Trade-off；Ablation 不得当正式优化。
 
-落地方式（Wave 5）：接到已有 Profile / Skill / Hook / `investigation_*`，不新建 Runtime。Baseline Qualification + Noise Floor → Frame Breakdown → Cost/Limiter/Mechanism → 事务性 Experiment → Replay Benchmark（A-B-A）→ Visual/Numerical Regression 写在 `$optimizer-coordinator` 与 `$optimization-experiment`。Experiment 必须 intervention + rollback；`type == none` 不能当 counterfactual；无 rollback 的 mutate 不得关闭。最终回答结构由 `$report-composition` + `report-contract` hook 卡住。仓库只用脱敏 fixture。T18 ColdData 已证见 `DESIGN.md` T18 已证组；Optimizer 正常 `completed` 见 U06。
+落地方式（Wave 5）：接到已有 Profile / Skill / Hook / `investigation_*`，不新建 Runtime。Baseline Qualification + Noise Floor → Frame Breakdown → Cost/Limiter/Mechanism → 事务性 Experiment → Replay Benchmark（A-B-A）→ Visual/Numerical Regression 写在 `$optimizer-coordinator` 与 `$optimization-experiment`。Experiment 必须 intervention + rollback；`type == none` 不能当 counterfactual；无 rollback 的 mutate 不得关闭。最终回答结构由 `$report-composition` + `report-contract` hook 卡住。仓库只用脱敏 fixture。T18 知识导入 已证见 `DESIGN.md` T18 已证组；Optimizer 正常 `completed` 见 U06。
 
 | 结局 | 条件 |
 | --- | --- |
@@ -507,7 +507,7 @@ Planning：Triage & Taxonomy → Capture Report → Knowledge Retrieval → plan
 
 ## 13. Knowledge Engine
 
-五个主进程服务已落地：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`。目标拓扑 **六 lane**（markdown-first）：Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version。**禁止** Semantic lane / Embedding capability（U02 已删除第七轴）。五个 deferred 工具与 `$knowledge-scout` / `$knowledge-candidate` 已落地。Knowledge Center 三列 UI（Spaces / List / Detail）、Candidate Inbox 与 ColdData Import 已落地；browse-only IPC 已删除。Candidate/Draft/review 已落到 session durable store（`<sessionPath>/knowledge-state.json`，跨进程锁 + revision）；ColdData bounded path ingest 记录并复核源 hash/mtime/size，只进 session Draft；human-confirm 写入经 realpath + 原子替换。**T18 ColdData user-space 持久化已证**（见 `DESIGN.md` T18 已证组）。产品级 Browser QA 全矩阵见 U05。
+五个主进程服务已落地：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`。目标拓扑 **六 lane**（markdown-first）：Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version。**禁止** Semantic lane / Embedding capability（U02 已删除第七轴）。五个 deferred 工具与 `$knowledge-scout` / `$knowledge-candidate` 已落地。Knowledge Center 三列 UI（Spaces / List / Detail）、Candidate Inbox 与 知识导入 Import 已落地；browse-only IPC 已删除。Candidate/Draft/review 已落到 session durable store（`<sessionPath>/knowledge-state.json`，跨进程锁 + revision）；知识导入 bounded path ingest 记录并复核源 hash/mtime/size，只进 session Draft；human-confirm 写入经 realpath + 原子替换。**T18 知识导入 user-space 持久化已证**（见 `DESIGN.md` T18 已证组）。产品级 Browser QA 全矩阵见 U05。
 
 三个逻辑平面：Evidence（不可变事实，不是 Knowledge）→ Knowledge（结构化、带 Scope 与验证）→ Compiled Context（即时 Pack）。Card 是 Projection，不是存储本体。
 
@@ -521,7 +521,7 @@ Fact / Constraint / Pattern / Procedure / Case / Model。Scope 是多轴空间�
 
 `Draft → Candidate → Verified → Promoted → Deprecated / Superseded`。
 
-- ColdData Historical Debug Case 摄入为 session staging / **Draft**，**绝不默认或自动进入 Candidate**。
+- 知识导入 Historical Debug Case 摄入为 session staging / **Draft**，**绝不默认或自动进入 Candidate**。
 - 源 YAML `meta.status: fixed` **不等于** `Verified`（`fixed ≠ verified`）。
 - Session Candidate 仅当用户显式点击 / 命令，或 Agent 在本轮得到明确用户意图后显式调用 `knowledge_candidate_create` 才创建。
 - 持久写入与 Promote 仅 human review；`FullAccess` 不可绕过。
@@ -536,7 +536,7 @@ Fact / Constraint / Pattern / Procedure / Case / Model。Scope 是多轴空间�
 
 ---
 
-## 14. ColdData Normalization
+## 14. 历史案例导入归一化
 
 原料角色：**Historical Debug Case**，服务冷启动与**可选** Candidate 原料，不是已验证 Knowledge，也不是自动 Candidate。
 
@@ -568,7 +568,7 @@ Fact / Constraint / Pattern / Procedure / Case / Model。Scope 是多轴空间�
 | `generalization.*` | Derived；推荐 SOP 只是候选 Procedure 引用 |
 | `notes.derived_feature` | Derived；SPIR-V id / HLSL 锚点 |
 
-YAML 破损 → `quarantine`，不解析半份。缺附件 → `Draft`，不得创建 Candidate。重复 `case_id` → 出示 diff，**不覆盖**。staging 只存在于当前 session；canonical 仍只写 user / project Knowledge。摄入本身**不**调用 `knowledge_candidate_create`。本机原始 ColdData **不进仓库**；CI 使用脱敏 fixture（占位文件名如 `symptom-compare-<shortHash>.png`、去绝对路径、去 secret、必要时替换 HLSL）。
+YAML 破损 → `quarantine`，不解析半份。缺附件 → `Draft`，不得创建 Candidate。重复 `case_id` → 出示 diff，**不覆盖**。staging 只存在于当前 session；canonical 仍只写 user / project Knowledge。摄入本身**不**调用 `knowledge_candidate_create`。本机原始导入案例 **不进仓库**；CI 使用脱敏 fixture（占位文件名如 `symptom-compare-<shortHash>.png`、去绝对路径、去 secret、必要时替换 HLSL）。
 
 ### 14.3 Canonical Case Card 最低章节
 
@@ -627,7 +627,7 @@ Executive Visual Report 按需，不强制每个小任务。可信度标识必�
 | Knowledge | Retrieval P/R、Scope 匹配、陈旧检测、冲突保留、Promotion 精度、Negative 复用 |
 | Context | Token / 成功任务、关键遗漏、陈旧 / 重复 Context、Rehydration、Small / Big Loop |
 
-Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdData fixture）、Real Project Capture、Adversarial。禁止只用固定案例过拟合。
+Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 知识导入 fixture）、Real Project Capture、Adversarial。禁止只用固定案例过拟合。
 
 ---
 
@@ -668,7 +668,7 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 - **Analyzer**：无 Debug Tag 也能给出主要 Pass Graph；Producer / Consumer 可追溯；高频 Shader 可聚类；Observed / Inferred 分离；可增量 Architecture Model。
 - **Optimizer**：Frame Breakdown；解释 Mechanism；至少一个 Replay Experiment；统计高于噪声；检查视觉差异；写明验证上限与 Runtime 风险。
 - **Context**：Sub-Agent 只得 Task-relevant Capsule；原始 Artifact 可恢复；Small Loop 不重放完整历史；Big Loop 经 Checkpoint 恢复；patch 后旧 Evidence 不误用。
-- **Knowledge**：六 Type、多轴 Scope、人类可审可写、冲突不静默覆盖、Promotion 有规则、Negative 可检索、每条可追溯；ColdData 摄入为 Draft/staging 且 `fixed ≠ verified`；Candidate 仅显式创建。
+- **Knowledge**：六 Type、多轴 Scope、人类可审可写、冲突不静默覆盖、Promotion 有规则、Negative 可检索、每条可追溯；知识导入 摄入为 Draft/staging 且 `fixed ≠ verified`；Candidate 仅显式创建。
 - **平台非侵入**：无 InvestigationGraph、无第二 TaskStore、无 194 RDX tools / RDX MCP、无自动 Memory / Knowledge / Promote、禁止恢复 Embedding capability / Semantic lane。
 
 通用 Runtime 回归仍必须成立：无 RenderDoc Context 时 `general` 保持完整通用能力；Custom Profile 仍可创建；Permission 与 Profile / Handoff 互不替代。
@@ -685,14 +685,14 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 - 恢复 `agent_handoff`、`HandoffStateStore`、强制 return 或 dual-read 旧 `handoff-state.json`。
 - 恢复 Embedding capability / Semantic lane / `settings.llm.embedding`。
 - 把三卡或四卡 Right Rail 写成现行契约。
-- 把未实现的并发组写成已完成模块。Knowledge 五服务 / 垂直 schema / 声明续跑与 execution offer / 三条 Mission 方法面（Skill/Hook/Capsule）/ Run v3 / `investigation:read` 已落地，不得再写成「尚未实现」。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06；均不得再写成尚未跑。不得把 T18 ColdData 已证写成尚未跑。不得把 Embedding 写成已落地现行能力。
+- 把未实现的并发组写成已完成模块。Knowledge 五服务 / 垂直 schema / 声明续跑与 execution offer / 三条 Mission 方法面（Skill/Hook/Capsule）/ Run v3 / `investigation:read` 已落地，不得再写成「尚未实现」。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06；均不得再写成尚未跑。不得把 T18 知识导入 已证写成尚未跑。不得把 Embedding 写成已落地现行能力。
 - 用空壳测试、skip/todo 或只加类名绕过已建立的 `check:knowledge-system` / `check:investigation-system` ratchet。
 
 ---
 
 ## 22. 与当前实现的差距（非实现清单）
 
-已落地：四个 builtin profile、Coordinator Skills、effective snapshot、Run schema **v3**（见裁决 I，不得双读）、IPC `investigation:read`、投影完整 `contentHash`、`rdc.investigation.v1` + `InvestigationArtifactService` + 三个 deferred Investigation 工具、15 个垂直方法 Skill、4 个 builtin Hook 模板、Session rail 五卡、声明续跑与 execution offer、三条 Mission 方法面（Skill / Hook / Capsule）、Knowledge 五服务 / 五个 deferred 工具 / Center 三列 UI、T18 ColdData user-space 持久化。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。
+已落地：四个 builtin profile、Coordinator Skills、effective snapshot、Run schema **v3**（见裁决 I，不得双读）、IPC `investigation:read`、投影完整 `contentHash`、`rdc.investigation.v1` + `InvestigationArtifactService` + 三个 deferred Investigation 工具、15 个垂直方法 Skill、4 个 builtin Hook 模板、Session rail 五卡、声明续跑与 execution offer、三条 Mission 方法面（Skill / Hook / Capsule）、Knowledge 五服务 / 五个 deferred 工具 / Center 三列 UI、T18 知识导入 user-space 持久化。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。
 
 下游才改代码：
 

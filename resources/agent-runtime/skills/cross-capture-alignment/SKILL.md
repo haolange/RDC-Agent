@@ -14,4 +14,4 @@ Use this skill when two or more captures must be compared.
 5. For Analyzer, this is Traceability: answer the user's target path across events / resources / passes. Aligned facts stay on their original layers. Do not invent a shared World State.
 6. For Optimizer, compare only after Baseline Qualification. Timing deltas below the noise floor are not gains.
 
-Do not collapse "this Adreno" into "all Adreno". Do not treat a historical ColdData `fixed` status as verified. Do not invent a shared World State across captures.
+Do not collapse "this Adreno" into "all Adreno". Do not treat a historical imported-case `fixed` status as verified. Do not invent a shared World State across captures.

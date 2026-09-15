@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import type { KnowledgeCardDetail } from '@shared/types/knowledge';
 import { KNOWLEDGE_PACKAGE_SCHEMA } from '@shared/types/knowledgeExport';
-import { ingestColdData } from './coldDataIngest';
+import { ingestKnowledge } from './knowledgeIngest';
 import { KnowledgeExportService, isExportable, toPackageCard } from './KnowledgeExportService';
 
 function detail(overrides: Partial<KnowledgeCardDetail> = {}): KnowledgeCardDetail {
@@ -73,7 +73,7 @@ describe('KnowledgeExportService', () => {
     expect(parsed.schema).toBe(KNOWLEDGE_PACKAGE_SCHEMA);
     expect(parsed.cards[0].title).toBe('Material sampling triage');
 
-    const reimported = ingestColdData(contents, { spaceId: 'user' });
+    const reimported = ingestKnowledge(contents, { spaceId: 'user' });
     expect(reimported.status).toBe('draft');
     // A package can claim any lifecycle; re-import always lands unverified.
     expect(reimported.verified).toBe(false);
@@ -94,7 +94,7 @@ describe('KnowledgeExportService', () => {
     });
     const contents = written.get('C:/exports/knowledge.yaml') ?? '';
 
-    const conflict = ingestColdData(contents, {
+    const conflict = ingestKnowledge(contents, {
       spaceId: 'user',
       existingCaseIds: ['user:cases/aird-1.md'],
     });

@@ -30,6 +30,7 @@ export interface KnowledgePackageCard {
   sourceStatus?: string;
   caseId?: string;
   chapters?: KnowledgeCardRecord['chapters'];
+  images?: KnowledgeCardRecord['images'];
 }
 
 export interface KnowledgePackage {

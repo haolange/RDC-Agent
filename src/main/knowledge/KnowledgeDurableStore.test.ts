@@ -18,7 +18,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { KnowledgeCardRecord } from '@shared/types/knowledge';
 import { acquireDirectoryFileLock, releaseDirectoryFileLock } from '../sessions/directoryFileLock';
 import { parseKnowledgeFrontmatter, sourceStatusImpliesVerified } from './knowledgeCardSchema';
-import { COLD_DATA_MAX_BYTES, ingestColdDataFromPath, sanitizeProvenanceToken } from './coldDataIngest';
+import { KNOWLEDGE_IMPORT_MAX_BYTES, ingestKnowledgeFromPath, sanitizeProvenanceToken } from './knowledgeIngest';
 import {
   KnowledgeApprovalTokenInvalidError,
   KnowledgeHumanConfirmationRequiredError,
@@ -79,7 +79,7 @@ describe('Knowledge durable store', () => {
       now: () => new Date('2026-09-01T00:00:00.000Z'),
       createId: () => 'stable',
     });
-    await first.ingestColdDataToStaging([
+    await first.ingestToStaging([
       'case_id: restart-case',
       'title: Restart case',
       'meta:',
@@ -247,7 +247,7 @@ const card = JSON.parse(process.env.KNOW_CARD);
   });
 });
 
-describe('ColdData path ingest', () => {
+describe('knowledge path ingest', () => {
   it('records source hash/mtime/size and quarantines a mid-read change', async () => {
     const root = tempRoot('rdc-know-path-');
     const filePath = path.join(root, 'case.yaml');
@@ -261,7 +261,7 @@ describe('ColdData path ingest', () => {
     writeFileSync(filePath, yaml, 'utf8');
     const before = sourceFingerprint(filePath);
     const candidates = createDisposableCandidateService(root);
-    const result = await candidates.ingestColdDataPathToStaging(filePath, { sessionId: 'sess-path' });
+    const result = await candidates.ingestPathToStaging(filePath, { sessionId: 'sess-path' });
     expect(result.status).toBe('draft');
     expect(result.candidateCreated).toBe(false);
     expect(result.sourceHash).toBe(before.hash);
@@ -275,7 +275,7 @@ describe('ColdData path ingest', () => {
 
     const changed = Buffer.from(`${yaml}\nextra: 1\n`);
     let reads = 0;
-    const quarantined = await ingestColdDataFromPath(filePath, {
+    const quarantined = await ingestKnowledgeFromPath(filePath, {
       sessionId: 'sess-path',
       io: {
         stat: async () => {
@@ -294,7 +294,7 @@ describe('ColdData path ingest', () => {
     expect(quarantined.candidateCreated).toBe(false);
   });
 
-  it('ingests synthetic Chinese-path ColdData fixtures into disposable Drafts only', async () => {
+  it('ingests synthetic Chinese-path import fixtures into disposable Drafts only', async () => {
     const root = tempRoot('rdc-know-fixtures-');
     const cases = [1, 2].map((index) => {
       const filePath = path.join(root, '案例' + index + '.txt');
@@ -313,7 +313,7 @@ describe('ColdData path ingest', () => {
     const before = cases.map((filePath) => ({ filePath, ...sourceFingerprint(filePath) }));
     const candidates = createDisposableCandidateService(root);
     for (const [index, filePath] of cases.entries()) {
-      const result = await candidates.ingestColdDataPathToStaging(filePath, {
+      const result = await candidates.ingestPathToStaging(filePath, {
         sessionId: `sess-real-${index + 1}`,
       });
       expect(result.status).toBe('draft');
@@ -334,9 +334,9 @@ describe('ColdData path ingest', () => {
       });
       expect(published).not.toContain('企业微信');
       expect(published).not.toContain('HairBlack');
-      expect(published).not.toMatch(/\.png/i);
       expect(published).not.toMatch(/\.txt/i);
-      expect(result.missingAssets.every((id) => /^asset-[a-f0-9]{8}$/.test(id) || id.length === 0)).toBe(true);
+      expect(result.missingAssets.some((id) => id.endsWith('.png'))).toBe(true);
+      expect(result.missingAssets.some((id) => /^asset-[a-f0-9]{8}$/.test(id))).toBe(true);
     }
     for (const snapshot of before) {
       const after = sourceFingerprint(snapshot.filePath);
@@ -352,7 +352,7 @@ describe('ColdData path ingest', () => {
     const leaks = ['C:/capture.rdc', 'C:\\capture.rdc', '/var/capture.rdc', '/Users/x/a.rdc'];
     for (const [index, leak] of leaks.entries()) {
       const sessionId = `sess-abs-${index}`;
-      const result = await candidates.ingestColdDataToStaging([
+      const result = await candidates.ingestToStaging([
         `case_id: abs-case-${index}`,
         'title: Abs',
         `symptoms: see ${leak}`,
@@ -362,7 +362,7 @@ describe('ColdData path ingest', () => {
       expect(result.record, leak).toBeUndefined();
       expect(await candidates.listStagedDrafts(sessionId)).toHaveLength(0);
     }
-    const secret = await candidates.ingestColdDataToStaging([
+    const secret = await candidates.ingestToStaging([
       'case_id: secret-case',
       'title: Secret',
       'symptoms: api_key leaked',
@@ -374,8 +374,8 @@ describe('ColdData path ingest', () => {
   });
 
   it('quarantines a file that grows past 2MB after the pre-stat', async () => {
-    const oversized = Buffer.alloc(COLD_DATA_MAX_BYTES + 1, 0x61);
-    const result = await ingestColdDataFromPath('grown.yaml', {
+    const oversized = Buffer.alloc(KNOWLEDGE_IMPORT_MAX_BYTES + 1, 0x61);
+    const result = await ingestKnowledgeFromPath('grown.yaml', {
       io: {
         stat: async () => ({ mtimeMs: 1, size: 16 }),
         readFile: async () => oversized,
@@ -515,7 +515,7 @@ describe('Knowledge write gates', () => {
     const root = tempRoot('rdc-know-fixed-');
     const write = writeService(root);
     const candidates = createDisposableCandidateService(root);
-    const result = await candidates.ingestColdDataToStaging([
+    const result = await candidates.ingestToStaging([
       'case_id: fixed-case',
       'title: Fixed case',
       'meta:',
@@ -570,7 +570,7 @@ describe('Knowledge write gates', () => {
     expect(rebuilt.cards[0]?.contentHash).not.toBe(first.cards[0]?.contentHash);
   });
 
-  it('serializes ColdData source fingerprints into canonical card frontmatter', () => {
+  it('serializes import source fingerprints into canonical card frontmatter', () => {
     const card: KnowledgeCardRecord = {
       ...factCard(),
       sourceHash: 'ab'.repeat(32),

@@ -89,7 +89,7 @@ import type {
 } from './trace';
 import type { HookEvent, RdxRuntimeOverview, RequestEnvelopeSnapshot, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from './rdxRuntime';
 import type {
-  ColdDataIngestResult,
+  KnowledgeImportResult,
   KnowledgeCandidatesResult,
   KnowledgeCardDetail,
   KnowledgeCardRecord,
@@ -290,12 +290,16 @@ export interface ElectronAPI {
       card: KnowledgeCardRecord;
       explicitUserIntent: true;
     }) => Promise<SessionKnowledgeCandidate>;
-    coldDataImport: (request: {
+    import: (request: {
       sessionId: string;
       spaceId?: string;
       source?: string;
       filePath?: string;
-    }) => Promise<ColdDataIngestResult>;
+    }) => Promise<KnowledgeImportResult>;
+    image: (request: {
+      spaceId: string;
+      relativePath: string;
+    }) => Promise<{ dataUrl: string | null; error?: string }>;
     issueApprovalToken: (request: {
       action: 'knowledge.write' | 'knowledge.promote';
       spaceId: string;

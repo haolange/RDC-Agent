@@ -44,7 +44,7 @@ const FORBIDDEN_WRITE = [
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const fixturePath = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
-  '../knowledge/__fixtures__/colddata/hair-adreno-sanitized.yaml',
+  '../knowledge/__fixtures__/knowledge-import/hair-adreno-sanitized.yaml',
 );
 
 function readRepo(relative: string): string {
@@ -144,11 +144,11 @@ describe('knowledge system contract', () => {
     expect(await candidates.listCandidates('session-1')).toHaveLength(0);
   });
 
-  it('knowledge.contract.colddata.sanitized-import', async () => {
+  it('knowledge.contract.import.sanitized-import', async () => {
     expect.hasAssertions();
     const yaml = readFileSync(fixturePath, 'utf8');
     const candidates = createDisposableCandidateService(temporaryDirectory('rdc-know-cold-'));
-    const result = await candidates.ingestColdDataToStaging(yaml, {
+    const result = await candidates.ingestToStaging(yaml, {
       sessionId: 'session-cold',
       availableAssetNames: ['symptom-compare-a1b2c3d4.png'],
     });
@@ -187,7 +187,7 @@ describe('knowledge system contract', () => {
       explicitUserIntent: true,
     });
     const yaml = readFileSync(fixturePath, 'utf8');
-    await first.ingestColdDataToStaging(yaml, { sessionId });
+    await first.ingestToStaging(yaml, { sessionId });
     const second = createDisposableCandidateService(root);
     expect(await second.listCandidates(sessionId)).toHaveLength(1);
     expect(await second.listStagedDrafts(sessionId)).toHaveLength(1);
@@ -207,19 +207,21 @@ describe('knowledge system contract', () => {
       'knowledge_search',
       'knowledge_read',
       'knowledge_compile',
+      'read_image',
     ]);
     expect(candidateTools).toEqual(['knowledge_candidate_create']);
     expect(readRepo('resources/agent-runtime/skills/knowledge-scout/SKILL.md')).not.toMatch(/knowledge_write|knowledge_promote/);
     expect(readRepo('resources/agent-runtime/skills/knowledge-candidate/SKILL.md')).not.toMatch(/knowledge_write|knowledge_promote/);
     expect(readRepo('src/main/agent-runtime/capabilities/SkillCatalogBudget.ts')).toMatch(/短索引/);
 
-    const runtime = [...FIVE_DEFERRED, 'skills', 'skill_read', 'ask_user', 'tool_search', 'read_file'];
+    const runtime = [...FIVE_DEFERRED, 'skills', 'skill_read', 'ask_user', 'tool_search', 'read_file', 'read_image'];
     const scoutNarrow = intersectSkillAllowedTools(runtime, scoutTools);
     expect(scoutNarrow).toEqual(expect.arrayContaining([
       'knowledge_browse',
       'knowledge_search',
       'knowledge_read',
       'knowledge_compile',
+      'read_image',
     ]));
     expect(scoutNarrow).toEqual(expect.arrayContaining(['skills', 'skill_read', 'ask_user', 'tool_search']));
     expect(scoutNarrow).not.toContain('knowledge_candidate_create');
