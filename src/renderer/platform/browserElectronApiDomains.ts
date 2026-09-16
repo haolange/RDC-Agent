@@ -1,5 +1,5 @@
 export const BROWSER_ELECTRON_API_DOMAINS = {
-  shell: ['platform', 'appMeta', 'appShell', 'windowControls', 'selectFiles', 'selectRdcFiles', 'selectDirectory'],
+  shell: ['platform', 'appMeta', 'appShell', 'windowControls', 'selectFiles', 'selectRdcFiles', 'selectKnowledgeImport', 'selectDirectory'],
   conversation: ['conversation'],
   workflow: ['workflow'],
   projectSession: ['project', 'session', 'run'],

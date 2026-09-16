@@ -1,9 +1,3 @@
-.settings-section {
-  border: 1px solid var(--token-border-card);
-  border-radius: var(--radius-lg);
-  background: var(--token-bg-raised);
-}
-
 .settings-section-header {
   display: flex;
   align-items: flex-start;
@@ -25,26 +19,28 @@
   gap: var(--space-3);
   flex-wrap: wrap;
   justify-content: space-between;
-  padding: var(--space-3) var(--space-3);
+  padding: var(--space-3);
   border: 1px solid var(--token-border-card);
   border-radius: var(--radius-md);
   background: var(--token-bg-panel);
 }
 
-.settings-center :is(input, textarea, select) { max-width: 100%; }
+.settings-center :is(input, textarea, select) {
+  max-width: 100%;
+}
 
-.settings-center :is(code, .settings-help-text, .settings-section-subtitle) { overflow-wrap: anywhere; }
+.settings-center :is(code, .settings-help-text, .settings-section-subtitle) {
+  overflow-wrap: anywhere;
+}
 
-@media (max-width: 960px) {
-
-  .settings-choice-group {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    justify-self: stretch;
+@container settings-panel (max-width: 60rem) {
+  .settings-secret-status {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
-@media (max-width: 48rem) {
+@container settings-panel (max-width: 48rem) {
   .settings-actions-split {
     align-items: stretch;
     flex-direction: column;

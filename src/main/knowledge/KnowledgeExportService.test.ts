@@ -1,9 +1,39 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import type { KnowledgeCardDetail } from '@shared/types/knowledge';
 import { KNOWLEDGE_PACKAGE_SCHEMA } from '@shared/types/knowledgeExport';
-import { ingestKnowledge } from './knowledgeIngest';
+import { ingestKnowledge, ingestKnowledgeFromPath } from './knowledgeIngest';
 import { KnowledgeExportService, isExportable, toPackageCard } from './KnowledgeExportService';
+import {
+  KNOWLEDGE_PACKAGE_MANIFEST,
+  unzipKnowledgeFiles,
+  utf8FromZip,
+} from './knowledgeZip';
+
+const PNG_1X1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+const roots: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
+
+function tempRoot(prefix: string): string {
+  const root = mkdtempSync(path.join(os.tmpdir(), prefix));
+  roots.push(root);
+  return root;
+}
+
+function absoluteTarget(name: string): string {
+  return path.join(tempRoot('rdc-know-export-'), name);
+}
 
 function detail(overrides: Partial<KnowledgeCardDetail> = {}): KnowledgeCardDetail {
   return {
@@ -24,8 +54,11 @@ function detail(overrides: Partial<KnowledgeCardDetail> = {}): KnowledgeCardDeta
   };
 }
 
-function createService(cards: KnowledgeCardDetail[]) {
-  const written = new Map<string, string>();
+function createService(
+  cards: KnowledgeCardDetail[],
+  images: Map<string, Uint8Array> = new Map(),
+) {
+  const written = new Map<string, Uint8Array>();
   const service = new KnowledgeExportService({
     getCard: async (spaceId, relativePath) => (
       cards.find((card) => card.spaceId === spaceId && card.relativePath === relativePath) ?? null
@@ -33,11 +66,20 @@ function createService(cards: KnowledgeCardDetail[]) {
     listCards: async (spaceId) => cards
       .filter((card) => card.spaceId === spaceId)
       .map((card) => ({ spaceId: card.spaceId, relativePath: card.relativePath })),
-    writeFile: async (targetPath, contents) => {
+    readImage: async (_spaceId, relativePath) => images.get(relativePath) ?? null,
+    writeBytes: async (targetPath, contents) => {
       written.set(targetPath, contents);
     },
   });
   return { service, written };
+}
+
+function packageFiles(bytes: Uint8Array): Map<string, Uint8Array> {
+  return unzipKnowledgeFiles(bytes);
+}
+
+function packageYaml(bytes: Uint8Array): string {
+  return utf8FromZip(packageFiles(bytes).get(KNOWLEDGE_PACKAGE_MANIFEST)!);
 }
 
 describe('KnowledgeExportService', () => {
@@ -56,49 +98,83 @@ describe('KnowledgeExportService', () => {
     expect(isExportable(detail({ body: 'See C:\\Users\\me\\capture.rdc' }))).toBe(false);
   });
 
-  it('writes a package whose cards survive a round trip back through import', async () => {
-    const { service, written } = createService([detail()]);
+  it('writes a zip whose yaml and images survive a round trip back through import', async () => {
+    const imagePath = 'cases/aird-1/observed.png';
+    const targetPath = absoluteTarget('knowledge.zip');
+    const { service, written } = createService(
+      [detail({ images: [{ relativePath: imagePath, role: 'observed' }] })],
+      new Map([[imagePath, PNG_1X1]]),
+    );
     const result = await service.export({
       format: 'package',
       scope: 'space',
       spaceId: 'user',
-      targetPath: 'C:/exports/knowledge.yaml',
+      targetPath,
     });
 
     expect(result.cardCount).toBe(1);
     expect(result.excludedCount).toBe(0);
 
-    const contents = written.get('C:/exports/knowledge.yaml') ?? '';
-    const parsed = parseYaml(contents) as { schema: string; cards: Array<{ title: string }> };
+    const zip = written.get(targetPath);
+    expect(zip).toBeDefined();
+    const files = packageFiles(zip!);
+    expect(files.has(KNOWLEDGE_PACKAGE_MANIFEST)).toBe(true);
+    expect(Buffer.from(files.get(imagePath)!).equals(PNG_1X1)).toBe(true);
+
+    const parsed = parseYaml(packageYaml(zip!)) as {
+      schema: string;
+      cards: Array<{ title: string; images?: Array<{ relativePath: string }> }>;
+    };
     expect(parsed.schema).toBe(KNOWLEDGE_PACKAGE_SCHEMA);
     expect(parsed.cards[0].title).toBe('Material sampling triage');
+    expect(parsed.cards[0].images).toEqual([{ relativePath: imagePath, role: 'observed' }]);
 
-    const reimported = ingestKnowledge(contents, { spaceId: 'user' });
-    expect(reimported.status).toBe('draft');
-    // A package can claim any lifecycle; re-import always lands unverified.
+    writeFileSync(targetPath, zip!);
+    const reimported = await ingestKnowledgeFromPath(targetPath, { spaceId: 'user' });
+    expect(reimported.items).toHaveLength(1);
+    expect(reimported.items[0]?.status).toBe('draft');
     expect(reimported.verified).toBe(false);
     expect(reimported.candidateCreated).toBe(false);
-    expect(reimported.record?.lifecycle).toBe('draft');
-    expect(reimported.record?.title).toBe('Material sampling triage');
-    expect(reimported.record?.body).toBe('# Material sampling triage\n\nBody.');
-    expect(reimported.record?.relativePath).toBe('cases/aird-1.md');
+    expect(reimported.items[0]?.record?.lifecycle).toBe('draft');
+    expect(reimported.items[0]?.record?.title).toBe('Material sampling triage');
+    expect(reimported.items[0]?.record?.body).toBe('# Material sampling triage\n\nBody.');
+    expect(reimported.items[0]?.record?.relativePath).toBe('cases/aird-1.md');
+    expect(reimported.items[0]?.missingAssets).toEqual([]);
+    expect(reimported.stagedImagesByCardId?.get('user:cases/aird-1.md')?.[0]?.relativePath).toBe(imagePath);
+  });
+
+  it('omits missing images from the exported yaml instead of declaring them', async () => {
+    const targetPath = absoluteTarget('knowledge.zip');
+    const { service, written } = createService([
+      detail({ images: [{ relativePath: 'cases/aird-1/observed.png', role: 'observed' }] }),
+    ]);
+    await service.export({
+      format: 'package',
+      scope: 'space',
+      spaceId: 'user',
+      targetPath,
+    });
+    const parsed = parseYaml(packageYaml(written.get(targetPath)!)) as {
+      cards: Array<{ images?: unknown }>;
+    };
+    expect(parsed.cards[0]?.images).toBeUndefined();
+    expect(packageFiles(written.get(targetPath)!).has('cases/aird-1/observed.png')).toBe(false);
   });
 
   it('reports a duplicate cardId through the existing conflict path', async () => {
+    const targetPath = absoluteTarget('knowledge.zip');
     const { service, written } = createService([detail()]);
     await service.export({
       format: 'package',
       scope: 'space',
       spaceId: 'user',
-      targetPath: 'C:/exports/knowledge.yaml',
+      targetPath,
     });
-    const contents = written.get('C:/exports/knowledge.yaml') ?? '';
-
-    const conflict = ingestKnowledge(contents, {
+    const conflict = ingestKnowledge(packageYaml(written.get(targetPath)!), {
       spaceId: 'user',
       existingCaseIds: ['user:cases/aird-1.md'],
     });
-    expect(conflict.status).toBe('conflict');
+    expect(conflict.items[0]?.status).toBe('conflict');
     expect(conflict.verified).toBe(false);
   });
 
@@ -111,23 +187,27 @@ describe('KnowledgeExportService', () => {
       format: 'package',
       scope: 'space',
       spaceId: 'user',
-      targetPath: 'C:/exports/knowledge.yaml',
+      targetPath: absoluteTarget('knowledge.zip'),
     });
     expect(result.cardCount).toBe(1);
     expect(result.excludedCount).toBe(1);
   });
 
-  it('writes readable markdown that is not a package', async () => {
+  it('writes readable markdown that is not a package and cannot be re-imported', async () => {
+    const targetPath = absoluteTarget('knowledge.md');
     const { service, written } = createService([detail()]);
     await service.export({
       format: 'markdown',
       scope: 'selected',
       cardRefs: [{ spaceId: 'user', relativePath: 'cases/aird-1.md' }],
-      targetPath: 'C:/exports/knowledge.md',
+      targetPath,
     });
-    const contents = written.get('C:/exports/knowledge.md') ?? '';
+    const contents = new TextDecoder().decode(written.get(targetPath));
     expect(contents).toContain('# Material sampling triage');
     expect(contents).not.toContain(KNOWLEDGE_PACKAGE_SCHEMA);
+    const reimported = ingestKnowledge(contents, { spaceId: 'user' });
+    expect(reimported.items[0]?.status).toBe('quarantine');
+    expect(reimported.items[0]?.reason).toBe('yaml-broken');
   });
 
   it('fails closed on a relative target path and on an empty selection', async () => {
@@ -136,14 +216,14 @@ describe('KnowledgeExportService', () => {
       format: 'package',
       scope: 'selected',
       cardRefs: [{ spaceId: 'user', relativePath: 'cases/aird-1.md' }],
-      targetPath: 'relative/knowledge.yaml',
+      targetPath: 'relative/knowledge.zip',
     })).rejects.toThrow('KNOWLEDGE_EXPORT_TARGET_INVALID');
 
     await expect(service.export({
       format: 'package',
       scope: 'selected',
       cardRefs: [],
-      targetPath: 'C:/exports/knowledge.yaml',
+      targetPath: absoluteTarget('knowledge.zip'),
     })).rejects.toThrow('KNOWLEDGE_EXPORT_EMPTY_SELECTION');
   });
 });

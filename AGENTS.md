@@ -46,7 +46,7 @@ Appearance 详细规则见 docs/ui/appearance-checklist.md；禁止恢复 transl
 
 **权威文件**：[`docs/ui/design-system.md`](docs/ui/design-system.md)（视觉定位 / Token / 刻度 / 组件规则 / 视觉参考）。本节仅保留高层原则。
 
-- **视觉定位**：restrained、高密度、实色分层的精密工具风。不使用 backdrop blur、装饰性特效或插画；单一 accent 只用于 focus / selected / primary CTA。
+- **视觉定位**：restrained、高密度、实色分层的精密工具风。不使用装饰性特效或插画；backdrop blur 只允许模态遮罩 `--modal-backdrop-filter`，Dropdown / chrome 仍为实色；单一 accent 只用于 focus / selected / primary CTA。
 - **必须**引用语义 token（`--token-*`），禁止直接用 primitive token；字号用 `var(--text-*)`，间距用 `var(--space-*)`，圆角用 `var(--radius-*)`，控件高度用 `var(--control-height-*)`。门禁：`pnpm run check:design-tokens`。
 - 全局唯一按钮系统：`.button` + variant 修饰类；React 层用 `<Button>`。
 - 颜色双体系：全局 chrome vs Composer agent accent；详见 [`docs/ui/design-system.md`](docs/ui/design-system.md) 与 [`docs/ui/appearance-checklist.md`](docs/ui/appearance-checklist.md)。

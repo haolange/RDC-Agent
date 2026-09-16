@@ -903,6 +903,8 @@
   --modal-radius:              var(--radius-lg);
   --modal-shadow:              var(--token-shadow-popover);
   --modal-backdrop:            color-mix(in srgb, var(--token-bg-app) 40%, transparent);
+  --modal-backdrop-filter:     blur(16px);
+  --modal-workbench-inset:     var(--space-4);
 
   /* ── Component: Badge ── */
   --badge-height:              20px;
@@ -915,4 +917,10 @@
   --layout-sidebar-right:      312px;
   --layout-header:             52px;
   --layout-composer-max:       760px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --modal-workbench-inset: var(--space-0);
+  }
 }

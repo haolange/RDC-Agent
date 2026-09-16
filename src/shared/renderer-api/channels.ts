@@ -9,6 +9,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     resolveFavicon: 'web:resolveFavicon',
     selectFiles: 'dialog:selectFiles',
     selectRdcFiles: 'dialog:selectRdcFiles',
+    selectKnowledgeImport: 'dialog:selectKnowledgeImport',
     selectDirectory: 'dialog:selectDirectory',
     saveFile: 'dialog:saveFile',
     minimizeWindow: 'window:minimize',

@@ -262,12 +262,12 @@ describe('knowledge path ingest', () => {
     const before = sourceFingerprint(filePath);
     const candidates = createDisposableCandidateService(root);
     const result = await candidates.ingestPathToStaging(filePath, { sessionId: 'sess-path' });
-    expect(result.status).toBe('draft');
+    expect(result.items[0]?.status).toBe('draft');
     expect(result.candidateCreated).toBe(false);
     expect(result.sourceHash).toBe(before.hash);
     expect(result.sourceMtimeMs).toBe(before.mtimeMs);
     expect(result.sourceSize).toBe(before.size);
-    expect(result.record?.sourceHash).toBe(before.hash);
+    expect(result.items[0]?.record?.sourceHash).toBe(before.hash);
     const drafts = await candidates.listStagedDrafts('sess-path');
     expect(drafts[0]?.sourceHash).toBe(before.hash);
     expect(drafts[0]?.sourceMtimeMs).toBe(before.mtimeMs);
@@ -289,8 +289,8 @@ describe('knowledge path ingest', () => {
         },
       },
     });
-    expect(quarantined.status).toBe('quarantine');
-    expect(quarantined.reason).toBe('source-changed');
+    expect(quarantined.items[0]?.status).toBe('quarantine');
+    expect(quarantined.items[0]?.reason).toBe('source-changed');
     expect(quarantined.candidateCreated).toBe(false);
   });
 
@@ -316,27 +316,27 @@ describe('knowledge path ingest', () => {
       const result = await candidates.ingestPathToStaging(filePath, {
         sessionId: `sess-real-${index + 1}`,
       });
-      expect(result.status).toBe('draft');
+      expect(result.items[0]?.status).toBe('draft');
       expect(result.candidateCreated).toBe(false);
       expect(result.verified).toBe(false);
-      expect(result.lifecycle).toBe('draft');
-      expect(result.record?.lifecycle).toBe('draft');
-      expect(result.record?.sourceHash).toBe(before[index]?.hash);
+      expect(result.items[0]?.lifecycle).toBe('draft');
+      expect(result.items[0]?.record?.lifecycle).toBe('draft');
+      expect(result.items[0]?.record?.sourceHash).toBe(before[index]?.hash);
       expect(await candidates.listCandidates(`sess-real-${index + 1}`)).toHaveLength(0);
       const drafts = await candidates.listStagedDrafts(`sess-real-${index + 1}`);
       expect(drafts).toHaveLength(1);
       const published = JSON.stringify({
-        body: result.record?.body,
-        chapters: result.record?.chapters,
-        preview: result.record?.preview,
-        missingAssets: result.missingAssets,
+        body: result.items[0]?.record?.body,
+        chapters: result.items[0]?.record?.chapters,
+        preview: result.items[0]?.record?.preview,
+        missingAssets: result.items[0]?.missingAssets,
         draft: drafts[0],
       });
       expect(published).not.toContain('企业微信');
       expect(published).not.toContain('HairBlack');
       expect(published).not.toMatch(/\.txt/i);
-      expect(result.missingAssets.some((id) => id.endsWith('.png'))).toBe(true);
-      expect(result.missingAssets.some((id) => /^asset-[a-f0-9]{8}$/.test(id))).toBe(true);
+      expect(result.items[0]?.missingAssets.some((id) => id.endsWith('.png'))).toBe(true);
+      expect(result.items[0]?.missingAssets.some((id) => /^asset-[a-f0-9]{8}$/.test(id))).toBe(true);
     }
     for (const snapshot of before) {
       const after = sourceFingerprint(snapshot.filePath);
@@ -357,9 +357,9 @@ describe('knowledge path ingest', () => {
         'title: Abs',
         `symptoms: see ${leak}`,
       ].join('\n'), { sessionId });
-      expect(result.status, leak).toBe('quarantine');
-      expect(result.reason, leak).toBe('absolute-path');
-      expect(result.record, leak).toBeUndefined();
+      expect(result.items[0]?.status, leak).toBe('quarantine');
+      expect(result.items[0]?.reason, leak).toBe('absolute-path');
+      expect(result.items[0]?.record, leak).toBeUndefined();
       expect(await candidates.listStagedDrafts(sessionId)).toHaveLength(0);
     }
     const secret = await candidates.ingestToStaging([
@@ -367,8 +367,8 @@ describe('knowledge path ingest', () => {
       'title: Secret',
       'symptoms: api_key leaked',
     ].join('\n'), { sessionId: 'sess-q' });
-    expect(secret.status).toBe('quarantine');
-    expect(secret.reason).toBe('secret-detected');
+    expect(secret.items[0]?.status).toBe('quarantine');
+    expect(secret.items[0]?.reason).toBe('secret-detected');
     expect(await candidates.listStagedDrafts('sess-q')).toHaveLength(0);
     expect(await candidates.listCandidates('sess-q')).toHaveLength(0);
   });
@@ -381,9 +381,9 @@ describe('knowledge path ingest', () => {
         readFile: async () => oversized,
       },
     });
-    expect(result.status).toBe('quarantine');
-    expect(result.reason).toBe('source-too-large');
-    expect(result.record).toBeUndefined();
+    expect(result.items[0]?.status).toBe('quarantine');
+    expect(result.items[0]?.reason).toBe('source-too-large');
+    expect(result.items[0]?.record).toBeUndefined();
   });
 });
 
@@ -522,9 +522,9 @@ describe('Knowledge write gates', () => {
       '  status: fixed',
       'symptoms: darker',
     ].join('\n'), { sessionId: 'sess-fixed' });
-    expect(result.sourceStatus).toBe('fixed');
+    expect(result.items[0]?.sourceStatus).toBe('fixed');
     expect(result.verified).toBe(false);
-    expect(result.record?.lifecycle).toBe('draft');
+    expect(result.items[0]?.record?.lifecycle).toBe('draft');
     expect(await candidates.listCandidates('sess-fixed')).toHaveLength(0);
     await expect(write.write({
       spaceId: 'user',

@@ -9,7 +9,7 @@ import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { knowledgeErrorMessage } from './knowledgeCenterModel';
 
 const EXTENSION: Record<KnowledgeExportFormat, string> = {
-  package: 'yaml',
+  package: 'zip',
   markdown: 'md',
 };
 

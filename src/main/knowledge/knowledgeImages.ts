@@ -6,6 +6,8 @@ import {
 } from '@shared/types/knowledge';
 import { toPosixRelative } from './knowledgeFs';
 
+export const KNOWLEDGE_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
 export const KNOWLEDGE_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
 
 export const KNOWLEDGE_IMAGE_MIME_BY_EXT: Record<string, string> = {

@@ -10,8 +10,7 @@
 }
 
 .settings-page-policy .settings-policy-threshold.is-row {
-  grid-template-columns: minmax(0, 24rem) minmax(6rem, 10rem);
-  justify-content: start;
+  justify-content: space-between;
 }
 
 .settings-resource-dialog .settings-runtime-editor[data-resource-kind='policy'] textarea {

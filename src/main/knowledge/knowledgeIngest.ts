@@ -7,6 +7,7 @@ import {
   type KnowledgeCardRecord,
   type KnowledgeCaseChapters,
   type KnowledgeImageRef,
+  type KnowledgeImportItem,
   type KnowledgeImportResult,
   type KnowledgeImportStatus,
   type KnowledgeScope,
@@ -17,9 +18,43 @@ import {
   knowledgeImageDestination,
   knowledgeImageRoleFromAsset,
   sanitizeKnowledgeImages,
+  KNOWLEDGE_IMAGE_MAX_BYTES,
 } from './knowledgeImages';
+import {
+  isZipBuffer,
+  pickKnowledgeYamlEntry,
+  unzipKnowledgeFiles,
+  utf8FromZip,
+  KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED,
+} from './knowledgeZip';
 
-export type { KnowledgeImportResult, KnowledgeImportStatus };
+export type { KnowledgeImportItem, KnowledgeImportResult, KnowledgeImportStatus };
+
+function quarantineItem(reason: string): KnowledgeImportItem {
+  return {
+    status: 'quarantine',
+    lifecycle: null,
+    missingAssets: [],
+    reason,
+  };
+}
+
+function quarantineResult(reason: string): KnowledgeImportResult {
+  return {
+    candidateCreated: false,
+    verified: false,
+    items: [quarantineItem(reason)],
+  };
+}
+
+function fromItems(items: KnowledgeImportItem[], extra: Partial<KnowledgeImportResult> = {}): KnowledgeImportResult {
+  return {
+    candidateCreated: false,
+    verified: false,
+    items,
+    ...extra,
+  };
+}
 
 export const KNOWLEDGE_IMPORT_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -74,6 +109,10 @@ export interface KnowledgeStagedImage {
   role: KnowledgeImageRef['role'];
   bytes: Buffer;
   sha256: string;
+}
+
+export interface KnowledgeImportPathResult extends KnowledgeImportResult {
+  stagedImagesByCardId?: Map<string, KnowledgeStagedImage[]>;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -279,126 +318,134 @@ function buildBody(title: string, chapters: KnowledgeCaseChapters): string {
 export function ingestKnowledgePackage(doc: Record<string, unknown>, options: {
   spaceId?: string;
   existingCardIds?: Iterable<string>;
+  existingCaseIds?: Iterable<string>;
+  availableImagePaths?: Iterable<string>;
 }): KnowledgeImportResult {
-  const none: KnowledgeImportResult = {
-    status: 'quarantine',
-    candidateCreated: false,
-    lifecycle: null,
-    verified: false,
-    missingAssets: [],
-  };
   const cards = Array.isArray(doc.cards) ? doc.cards : [];
-  const first = asRecord(cards[0]);
-  const title = readString(first.title);
-  const relativePath = readString(first.relativePath);
-  if (!title || !relativePath) return { ...none, reason: 'yaml-broken' };
+  if (cards.length === 0) return quarantineResult('yaml-broken');
 
   const spaceId = options.spaceId || 'staging';
-  const cardId = `${spaceId}:${relativePath}`;
-  if (options.existingCardIds && new Set(options.existingCardIds).has(cardId)) {
-    return {
-      status: 'conflict',
-      candidateCreated: false,
+  const existing = new Set([
+    ...options.existingCardIds ?? [],
+    ...options.existingCaseIds ?? [],
+  ]);
+  const availableImages = options.availableImagePaths ? new Set(options.availableImagePaths) : null;
+  const items: KnowledgeImportItem[] = [];
+
+  for (const raw of cards) {
+    const card = asRecord(raw);
+    const title = readString(card.title);
+    const relativePath = readString(card.relativePath);
+    if (!title || !relativePath) {
+      items.push(quarantineItem('yaml-broken'));
+      continue;
+    }
+    const caseId = readString(card.caseId);
+    const cardId = `${spaceId}:${relativePath}`;
+    if (existing.has(cardId) || (caseId && existing.has(caseId))) {
+      items.push({
+        status: 'conflict',
+        lifecycle: 'draft',
+        missingAssets: [],
+        reason: 'duplicate-case-id',
+        ...(caseId ? { existingCaseId: caseId } : {}),
+      });
+      continue;
+    }
+    const images = sanitizeKnowledgeImages(
+      Array.isArray(card.images) ? card.images as KnowledgeImageRef[] : undefined,
+      relativePath,
+      caseId,
+    );
+    const missingAssets = availableImages
+      ? images.filter((image) => !availableImages.has(image.relativePath)).map((image) => image.relativePath)
+      : images.map((image) => image.relativePath);
+    const record: KnowledgeCardRecord = {
+      cardId,
+      spaceId,
+      relativePath,
+      type: (readString(card.type) as KnowledgeCardRecord['type']) ?? 'fact',
       lifecycle: 'draft',
-      verified: false,
-      missingAssets: [],
-      reason: 'duplicate-case-id',
+      title,
+      scope: asRecord(card.scope) as KnowledgeScope,
+      relations: [],
+      body: readString(card.body) ?? '',
+      preview: title,
+      ...(readString(card.sourceStatus) ? { sourceStatus: readString(card.sourceStatus) } : {}),
+      ...(caseId ? { caseId } : {}),
+      ...(card.chapters ? { chapters: asRecord(card.chapters) as KnowledgeCaseChapters } : {}),
+      ...(images.length > 0 ? { images } : {}),
     };
+    items.push({
+      status: 'draft',
+      lifecycle: 'draft',
+      record,
+      missingAssets,
+      ...(readString(card.sourceStatus) ? { sourceStatus: readString(card.sourceStatus) } : {}),
+      ...(missingAssets.length > 0 ? { reason: 'missing-assets' } : {}),
+    });
+    existing.add(cardId);
   }
 
-  const images = sanitizeKnowledgeImages(
-    Array.isArray(first.images) ? first.images as KnowledgeImageRef[] : undefined,
-    relativePath,
-    readString(first.caseId),
-  );
-  const record: KnowledgeCardRecord = {
-    cardId,
-    spaceId,
-    relativePath,
-    type: (readString(first.type) as KnowledgeCardRecord['type']) ?? 'fact',
-    lifecycle: 'draft',
-    title,
-    scope: asRecord(first.scope) as KnowledgeScope,
-    relations: [],
-    body: readString(first.body) ?? '',
-    preview: title,
-    ...(readString(first.sourceStatus) ? { sourceStatus: readString(first.sourceStatus) } : {}),
-    ...(readString(first.caseId) ? { caseId: readString(first.caseId) } : {}),
-    ...(first.chapters ? { chapters: asRecord(first.chapters) as KnowledgeCaseChapters } : {}),
-    ...(images.length > 0 ? { images } : {}),
-  };
-
-  return {
-    status: 'draft',
-    candidateCreated: false,
-    lifecycle: 'draft',
-    verified: false,
-    record,
-    missingAssets: images.map((image) => image.relativePath),
-  };
+  return fromItems(items);
 }
 
 export function ingestKnowledge(source: string, options: {
   spaceId?: string;
   sessionId?: string;
   existingCaseIds?: Iterable<string>;
+  existingCardIds?: Iterable<string>;
   availableAssetNames?: Iterable<string>;
+  availableImagePaths?: Iterable<string>;
 } = {}): KnowledgeImportResult {
-  const none: KnowledgeImportResult = {
-    status: 'quarantine',
-    candidateCreated: false,
-    lifecycle: null,
-    verified: false,
-    missingAssets: [],
-  };
   if (SECRET_RE.test(source)) {
-    return { ...none, reason: 'secret-detected' };
+    return quarantineResult('secret-detected');
   }
   if (containsAbsolutePath(source)) {
-    return { ...none, reason: 'absolute-path' };
+    return quarantineResult('absolute-path');
   }
   let parsed: unknown;
   try {
     parsed = parseYaml(source);
   } catch {
-    return { ...none, reason: 'yaml-broken' };
+    return quarantineResult('yaml-broken');
   }
   const doc = asRecord(parsed);
   if (Object.keys(doc).length === 0) {
-    return { ...none, reason: 'yaml-broken' };
+    return quarantineResult('yaml-broken');
   }
   if (readString(doc.schema) === KNOWLEDGE_PACKAGE_SCHEMA) {
     return ingestKnowledgePackage(doc, {
       ...(options.spaceId ? { spaceId: options.spaceId } : {}),
-      ...(options.existingCaseIds ? { existingCardIds: options.existingCaseIds } : {}),
+      ...(options.existingCardIds ? { existingCardIds: options.existingCardIds } : {}),
+      ...(options.existingCaseIds ? { existingCaseIds: options.existingCaseIds } : {}),
+      ...(options.availableImagePaths ? { availableImagePaths: options.availableImagePaths } : {}),
     });
   }
   const caseId = readString(doc.case_id) || readString(doc.caseId);
   const title = readString(doc.title);
   if (!caseId || !title) {
-    return { ...none, reason: 'yaml-broken' };
+    return quarantineResult('yaml-broken');
   }
   if (options.existingCaseIds && new Set(options.existingCaseIds).has(caseId)) {
-    return {
+    return fromItems([{
       status: 'conflict',
-      candidateCreated: false,
       lifecycle: 'draft',
-      verified: false,
       existingCaseId: caseId,
       missingAssets: [],
       reason: 'duplicate-case-id',
-    };
+    }]);
   }
   for (const text of collectStrings(doc)) {
     if (SECRET_RE.test(text) || containsAbsolutePath(text)) {
-      return { ...none, reason: SECRET_RE.test(text) ? 'secret-detected' : 'absolute-path' };
+      return quarantineResult(SECRET_RE.test(text) ? 'secret-detected' : 'absolute-path');
     }
   }
   const meta = asRecord(doc.meta);
   const sourceStatus = sanitizeProvenanceToken(readString(meta.status));
   const sanitizedCaseId = sanitizeProvenanceToken(caseId);
   if (!sanitizedCaseId) {
-    return { ...none, reason: 'filename-leaked' };
+    return quarantineResult('filename-leaked');
   }
   const assets = collectAssets(doc.assets);
   const { mapping, images } = mapDeclaredAssets(assets, sanitizedCaseId);
@@ -440,7 +487,7 @@ export function ingestKnowledge(source: string, options: {
     return ![...allowedPaths].some((allowed) => text === allowed || text.includes(allowed));
   }));
   if (leakedOriginal) {
-    return { ...none, reason: 'filename-leaked' };
+    return quarantineResult('filename-leaked');
   }
   const record: KnowledgeCardRecord = {
     cardId: `${spaceId}:${relativePath}`,
@@ -460,18 +507,16 @@ export function ingestKnowledge(source: string, options: {
   };
   const leaked = leakedSensitiveReason(sanitizedTitle, body, preview, ...Object.values(chapters));
   if (leaked) {
-    return { ...none, reason: leaked };
+    return quarantineResult(leaked);
   }
-  return {
+  return fromItems([{
     status: 'draft',
-    candidateCreated: false,
     lifecycle: 'draft',
     sourceStatus,
-    verified: false,
     record,
     missingAssets,
-    reason: missingAssets.length > 0 ? 'missing-assets' : undefined,
-  };
+    ...(missingAssets.length > 0 ? { reason: 'missing-assets' } : {}),
+  }]);
 }
 
 export function knowledgeImportContentId(bytes: Buffer | string): string {
@@ -483,14 +528,73 @@ export function hashKnowledgeImportBytes(bytes: Buffer): string {
 }
 
 function quarantine(reason: string): KnowledgeImportResult {
-  return {
-    status: 'quarantine',
-    candidateCreated: false,
-    lifecycle: null,
-    verified: false,
-    missingAssets: [],
-    reason,
-  };
+  return quarantineResult(reason);
+}
+
+function siblingImageNames(yamlEntry: string, files: Iterable<string>): string[] {
+  const slash = yamlEntry.lastIndexOf('/');
+  const dir = slash >= 0 ? yamlEntry.slice(0, slash + 1) : '';
+  const names: string[] = [];
+  for (const name of files) {
+    if (!name.startsWith(dir)) continue;
+    const rest = name.slice(dir.length);
+    if (!rest.includes('/') && isKnowledgeImageFileName(rest)) names.push(rest);
+  }
+  return names;
+}
+
+function stageImagesFromMap(
+  items: KnowledgeImportItem[],
+  files: Map<string, Uint8Array>,
+  yamlEntry: string,
+  parsed: Record<string, unknown>,
+): Map<string, KnowledgeStagedImage[]> {
+  const staged = new Map<string, KnowledgeStagedImage[]>();
+  const slash = yamlEntry.lastIndexOf('/');
+  const dir = slash >= 0 ? yamlEntry.slice(0, slash + 1) : '';
+  for (const item of items) {
+    if (item.status !== 'draft' || !item.record?.images?.length) continue;
+    const destBySource = new Map<string, KnowledgeImageRef>();
+    const used = new Set<string>();
+    for (const asset of collectAssets(parsed.assets)) {
+      if (!isKnowledgeImageFileName(asset.file)) continue;
+      const dest = knowledgeImageDestination(item.record.caseId ?? 'case', knowledgeImageRoleFromAsset(asset.role), asset.file, used);
+      const image = item.record.images.find((entry) => entry.relativePath === dest);
+      if (image) destBySource.set(asset.file, image);
+    }
+    const collected: KnowledgeStagedImage[] = [];
+    for (const image of item.record.images) {
+      const sourceName = [...destBySource.entries()].find(([, dest]) => dest.relativePath === image.relativePath)?.[0];
+      const data = files.get(image.relativePath)
+        ?? (sourceName ? files.get(`${dir}${sourceName}`) : undefined);
+      if (!data || data.byteLength > KNOWLEDGE_IMAGE_MAX_BYTES) continue;
+      const bytes = Buffer.from(data);
+      collected.push({
+        relativePath: image.relativePath,
+        role: image.role,
+        bytes,
+        sha256: hashKnowledgeImportBytes(bytes),
+      });
+    }
+    if (collected.length > 0) staged.set(item.record.cardId, collected);
+  }
+  return staged;
+}
+
+function attachSourceProvenance(
+  result: KnowledgeImportResult,
+  sourceHash: string,
+  sourceMtimeMs: number,
+  sourceSize: number,
+): KnowledgeImportResult {
+  for (const item of result.items) {
+    if (item.record) {
+      item.record.sourceHash = sourceHash;
+      item.record.sourceMtimeMs = sourceMtimeMs;
+      item.record.sourceSize = sourceSize;
+    }
+  }
+  return { ...result, sourceHash, sourceMtimeMs, sourceSize };
 }
 
 export async function ingestKnowledgeFromPath(
@@ -499,13 +603,16 @@ export async function ingestKnowledgeFromPath(
     spaceId?: string;
     sessionId?: string;
     existingCaseIds?: Iterable<string>;
+    existingCardIds?: Iterable<string>;
     availableAssetNames?: Iterable<string>;
+    availableImagePaths?: Iterable<string>;
     maxBytes?: number;
     io?: KnowledgeImportPathIo;
   } = {},
-): Promise<KnowledgeImportResult & { stagedImages?: KnowledgeStagedImage[] }> {
+): Promise<KnowledgeImportPathResult> {
   const io = options.io ?? defaultPathIo;
-  const maxBytes = options.maxBytes ?? KNOWLEDGE_IMPORT_MAX_BYTES;
+  const looksZip = filePath.toLowerCase().endsWith('.zip');
+  const maxBytes = options.maxBytes ?? (looksZip ? KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED : KNOWLEDGE_IMPORT_MAX_BYTES);
   let preStat: KnowledgeImportPathStat;
   try {
     preStat = await io.stat(filePath);
@@ -545,18 +652,58 @@ export async function ingestKnowledgeFromPath(
   ) {
     return quarantine('source-changed');
   }
+
+  const sourceHash = preHash;
+  const sourceMtimeMs = Math.trunc(preStat.mtimeMs);
+  const sourceSize = preStat.size;
+
+  if (looksZip || isZipBuffer(preBytes)) {
+    let files: Map<string, Uint8Array>;
+    try {
+      files = unzipKnowledgeFiles(preBytes);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'KNOWLEDGE_ZIP_PATH_INVALID') return quarantine('zip-path-invalid');
+      if (code === 'KNOWLEDGE_ZIP_TOO_LARGE') return quarantine('source-too-large');
+      return quarantine('zip-invalid');
+    }
+    const yamlEntry = pickKnowledgeYamlEntry(files.keys());
+    if (!yamlEntry) return quarantine('yaml-broken');
+    const yamlBytes = files.get(yamlEntry);
+    if (!yamlBytes) return quarantine('yaml-broken');
+    const yamlText = utf8FromZip(yamlBytes);
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = asRecord(parseYaml(yamlText));
+    } catch {
+      parsed = {};
+    }
+    const availableAssetNames = options.availableAssetNames ?? siblingImageNames(yamlEntry, files.keys());
+    const availableImagePaths = options.availableImagePaths ?? [...files.keys()].filter((name) => isKnowledgeImageFileName(name));
+    const result = ingestKnowledge(yamlText, {
+      ...options,
+      availableAssetNames,
+      availableImagePaths,
+    });
+    const stagedImagesByCardId = stageImagesFromMap(result.items, files, yamlEntry, parsed);
+    return {
+      ...attachSourceProvenance(result, sourceHash, sourceMtimeMs, sourceSize),
+      ...(stagedImagesByCardId.size > 0 ? { stagedImagesByCardId } : {}),
+    };
+  }
+
   let parsed: unknown;
   try {
     parsed = parseYaml(preBytes.toString('utf8'));
   } catch {
     parsed = {};
   }
-  const declared = collectAssets(asRecord(parsed).assets).map((asset) => asset.file);
-  const available = new Set(options.availableAssetNames ?? []);
+  const doc = asRecord(parsed);
   const siblingDir = path.dirname(filePath);
-  const stagedImages: KnowledgeStagedImage[] = [];
+  const available = new Set(options.availableAssetNames ?? []);
+  const availableImages = new Set(options.availableImagePaths ?? []);
   if (!options.availableAssetNames) {
-    for (const name of declared) {
+    for (const name of collectAssets(doc.assets).map((asset) => asset.file)) {
       try {
         await io.stat(path.join(siblingDir, name));
         available.add(name);
@@ -565,51 +712,64 @@ export async function ingestKnowledgeFromPath(
       }
     }
   }
+  if (!options.availableImagePaths && readString(doc.schema) === KNOWLEDGE_PACKAGE_SCHEMA) {
+    for (const raw of Array.isArray(doc.cards) ? doc.cards : []) {
+      const images = sanitizeKnowledgeImages(
+        Array.isArray(asRecord(raw).images) ? asRecord(raw).images as KnowledgeImageRef[] : undefined,
+        readString(asRecord(raw).relativePath) ?? '',
+        readString(asRecord(raw).caseId),
+      );
+      for (const image of images) {
+        try {
+          await io.stat(path.join(siblingDir, ...image.relativePath.split('/')));
+          availableImages.add(image.relativePath);
+        } catch {
+          // image absent at package root
+        }
+      }
+    }
+  }
   const result = ingestKnowledge(preBytes.toString('utf8'), {
     ...options,
     availableAssetNames: available,
+    ...(availableImages.size > 0 ? { availableImagePaths: availableImages } : {}),
   });
-  if (result.status !== 'draft' || !result.record) {
-    return result;
-  }
-  if (result.record.images?.length) {
+  const files = new Map<string, Uint8Array>();
+  for (const item of result.items) {
+    if (item.status !== 'draft' || !item.record?.images) continue;
     const destBySource = new Map<string, KnowledgeImageRef>();
-    const assets = collectAssets(asRecord(parsed).assets);
     const used = new Set<string>();
-    for (const asset of assets) {
+    for (const asset of collectAssets(doc.assets)) {
       if (!isKnowledgeImageFileName(asset.file)) continue;
-      const role = knowledgeImageRoleFromAsset(asset.role);
-      const dest = knowledgeImageDestination(result.record.caseId ?? 'case', role, asset.file, used);
-      const image = result.record.images.find((entry) => entry.relativePath === dest);
+      const dest = knowledgeImageDestination(item.record.caseId ?? 'case', knowledgeImageRoleFromAsset(asset.role), asset.file, used);
+      const image = item.record.images.find((entry) => entry.relativePath === dest);
       if (image) destBySource.set(asset.file, image);
     }
     for (const [sourceName, image] of destBySource) {
       if (!available.has(sourceName)) continue;
       try {
         const bytes = await io.readFile(path.join(siblingDir, sourceName));
-        if (bytes.length > maxBytes) continue;
-        stagedImages.push({
-          relativePath: image.relativePath,
-          role: image.role,
-          bytes,
-          sha256: hashKnowledgeImportBytes(bytes),
-        });
+        if (bytes.length > KNOWLEDGE_IMAGE_MAX_BYTES) continue;
+        files.set(sourceName, bytes);
+        files.set(image.relativePath, bytes);
       } catch {
         // sibling unreadable
       }
     }
+    for (const image of item.record.images) {
+      if (files.has(image.relativePath)) continue;
+      try {
+        const bytes = await io.readFile(path.join(siblingDir, ...image.relativePath.split('/')));
+        if (bytes.length > KNOWLEDGE_IMAGE_MAX_BYTES) continue;
+        files.set(image.relativePath, bytes);
+      } catch {
+        // package-relative image absent
+      }
+    }
   }
-  const sourceHash = preHash;
-  const sourceMtimeMs = Math.trunc(preStat.mtimeMs);
-  const sourceSize = preStat.size;
-  result.record.sourceHash = sourceHash;
-  result.record.sourceMtimeMs = sourceMtimeMs;
-  result.record.sourceSize = sourceSize;
+  const stagedImagesByCardId = stageImagesFromMap(result.items, files, path.basename(filePath), doc);
   return {
-    ...result,
-    sourceHash,
-    sourceMtimeMs,
-    sourceSize,
-    ...(stagedImages.length > 0 ? { stagedImages } : {}),
+    ...attachSourceProvenance(result, sourceHash, sourceMtimeMs, sourceSize),
+    ...(stagedImagesByCardId.size > 0 ? { stagedImagesByCardId } : {}),
   };
 }

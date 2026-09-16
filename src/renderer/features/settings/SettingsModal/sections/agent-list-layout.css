@@ -72,16 +72,13 @@
   flex: 0 0 auto;
 }
 
-@media (max-width: 960px) {
-
+@container settings-panel (max-width: 60rem) {
   .settings-page-agents .settings-manifest-list-column {
     height: auto;
     max-height: 15rem;
+    min-height: 0;
     flex-shrink: 0;
   }
-}
-
-@media (max-width: 960px) {
 
   .settings-page-agents .settings-manifest-list {
     overflow-y: auto;
@@ -89,15 +86,7 @@
   }
 }
 
-@media (max-width: 68rem) {
-
-  .settings-page-agents .settings-manifest-list-column {
-    height: auto;
-    min-height: 0;
-  }
-}
-
-@media (max-width: 48rem) {
+@container settings-panel (max-width: 48rem) {
   .settings-page-agents .settings-manifest-list-column {
     width: 100%;
     max-width: 100%;

@@ -14,7 +14,7 @@
 RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 VS Code / JetBrains / Linear 的密度与克制）。裁决见 [`DESIGN.md`](../../DESIGN.md) UI 节。
 
 - 层次由 1px 边框 + 实色表面建立；阴影只用于 popover 与 modal。
-- 不使用 backdrop blur 或无状态含义的装饰性背景。Active Signal、Composer 绕光与 Effort 是核心状态视觉，保留完整动效。
+- 不使用无状态含义的装饰性背景。backdrop blur 只允许模态全屏遮罩（`--modal-backdrop` + `--modal-backdrop-filter`）；Dropdown / popover / chrome 仍为实色。Active Signal、Composer 绕光与 Effort 是核心状态视觉，保留完整动效。
 - 单一 accent 只承担 focus / selected / primary CTA；状态色只表达状态。
 - 信息密度优先于留白：同屏能多放一行真实信息，就不要用空白替代。
 
@@ -153,7 +153,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 ## 模态尺寸
 
-知识中心与 Settings 用视窗比例驱动：约 `min(92vw, 1920px) × min(90vh, 1240px)`，带最小尺寸下限；960 堆叠，640 全屏。禁止再写互相覆盖的多段 media query。`--settings-content-max` 随大屏上调，避免内容挤在中间一条。
+知识中心与 Settings 居中，外壳在 `88vw × 86vh`（硬顶 `120rem × 70rem`）内接最大 16:10，不写死 `aspect-ratio`；带 `min(45rem/40rem, 视窗 − 2×inset)` 下限。backdrop `padding: var(--modal-workbench-inset)`（`--space-4`，`≤640px` 为 0），底为 `--modal-backdrop`（`--token-bg-app` 40% 压暗）加 `--modal-backdrop-filter`（`blur(16px)`）；组件 CSS 只写 `var(--modal-backdrop-filter)`，禁止字面量 `blur()`。960 堆叠导航，640 全屏去圆角。禁止再写互相覆盖的多段 media query。设置内容列与面板同宽，只靠 panel padding 留白，不再用居中 `--settings-content-max`。内部表单分栏按 `.settings-center-panel` 容器宽度查询，不按视口猜测。
 
 知识中心与 Settings 的内容使用实色分层、紧凑工具栏与清晰标题，避免嵌套装饰框和重复说明。Knowledge 保持空间 / 列表 / 详情三列（列宽 `224 / minmax(280, 0.8fr) / 1.2fr`），左栏仅放视图与空间导航；类型、生命周期与六条检索通道收进列表的筛选入口，以文字按钮表达多选；索引维护与卡片元数据默认折叠；960px 以下用空间 / 列表 / 详情切换且始终提供关闭入口。Settings 保持八项导航（常规 / 外观 / Provider / Agents / Skills / Tools / Hooks / Policy）与均分 User / Project 作用域；本机资源根与逐项资源路径只读，经常规页的「资源与诊断」任务子弹窗查看，不作为一级导航。640px 以下导航单行横向滚动，内容全屏。宽屏下 Light / Dark 编辑器并排，小屏堆叠。资源空态共用 `EmptyState`，不添加装饰性文案；路径、模型名与元数据允许换行。说明文案仅保留操作条件、作用域和必要风险，内部实现细节留在文档。
 

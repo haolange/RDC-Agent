@@ -99,20 +99,17 @@
   line-height: var(--leading-normal);
 }
 
-@media (max-width: 760px) {
-
-  .settings-mcp-table { min-width: 36rem; }
-}
-
-@media (max-width: 760px) {
+@media (max-width: 48rem) {
+  .settings-mcp-table {
+    min-width: 36rem;
+  }
 
   .settings-mcp-dialog .settings-field:not(.settings-runtime-form-check) {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
   }
-}
 
-@media (max-width: 760px) {
-
-  .settings-mcp-dialog .settings-field-copy { padding-top: 0; }
+  .settings-mcp-dialog .settings-field-copy {
+    padding-top: 0;
+  }
 }

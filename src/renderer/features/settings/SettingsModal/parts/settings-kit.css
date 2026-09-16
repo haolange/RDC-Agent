@@ -38,6 +38,13 @@
   gap: var(--space-4);
 }
 
+@container settings-panel (max-width: 36rem) {
+  .settings-field.is-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .settings-field-copy {
   min-width: 0;
   display: flex;
@@ -147,7 +154,7 @@
   white-space: pre-line;
 }
 
-@media (max-width: 960px) {
+@container settings-panel (max-width: 60rem) {
   .settings-resource-split {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -182,6 +189,56 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+}
+
+.settings-choice-group .user-menu-pill {
+  width: auto;
+  min-width: 4.5rem;
+  flex: 0 0 auto;
+  justify-content: center;
+}
+
+.settings-empty {
+  font-size: var(--text-sm);
+  color: var(--token-text-caption);
+  padding: var(--space-3);
+}
+
+.settings-empty-dashed {
+  border: 1px dashed var(--token-border-muted);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.settings-select-menu {
+  z-index: calc(var(--z-modal) + 24);
+}
+
+.settings-link {
+  width: fit-content;
+  color: var(--token-accent-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.settings-required-field {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+}
+
+.settings-actions-split {
+  justify-content: space-between;
+}
+
+.settings-actions-split > .button:last-child {
+  margin-inline-start: auto;
+}
+
+.settings-save-status {
+  min-height: var(--space-5);
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
 }
 
 /* Scope stays a compact User | Project control; it never spans the page. */
@@ -227,10 +284,6 @@
 .settings-center-search.ui-search-field {
   width: 100%;
   min-height: var(--control-height-md);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
 }
 
 .settings-center-search.ui-search-field .ui-input {

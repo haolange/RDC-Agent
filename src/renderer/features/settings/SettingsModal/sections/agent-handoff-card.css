@@ -151,3 +151,13 @@
   display: flex;
   justify-content: flex-start;
 }
+
+@container settings-panel (max-width: 48rem) {
+  .settings-handoff-card-body .settings-field.is-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-handoff-card-body .settings-field.is-row .settings-field-label {
+    padding-top: 0;
+  }
+}

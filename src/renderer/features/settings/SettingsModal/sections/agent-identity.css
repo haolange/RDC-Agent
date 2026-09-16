@@ -99,7 +99,8 @@
 }
 
 .settings-agent-name-input {
-  max-width: 24rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .settings-agent-look-row {
@@ -108,37 +109,23 @@
   gap: var(--space-3);
 }
 
-@media (max-width: 960px) {
-  .settings-agent-flags {
+@container settings-panel (max-width: 60rem) {
+  .settings-agent-flags,
+  .settings-page-agents .settings-agent-flags {
+    width: 100%;
     grid-template-columns: minmax(0, 1fr);
   }
-}
-
-@media (max-width: 960px) {
 
   .settings-agent-identity-grid .settings-field.is-row {
     grid-template-columns: minmax(0, 1fr);
   }
-}
-
-@media (max-width: 960px) {
 
   .settings-agent-identity-grid .settings-field-control {
-  width: 100%;
-  min-width: 0;
-}
-}
-
-@media (max-width: 960px) {
-
-.settings-agent-identity-grid .settings-field.is-row .settings-field-label {
-    padding-top: 0;
-  }
-}
-
-@media (max-width: 68rem) {
-
-  .settings-page-agents .settings-agent-flags {
     width: 100%;
+    min-width: 0;
+  }
+
+  .settings-agent-identity-grid .settings-field.is-row .settings-field-label {
+    padding-top: 0;
   }
 }

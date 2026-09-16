@@ -11,7 +11,6 @@ interface PersonalizationSettingsProps {
   globalInstructionsDraft: string;
   onGlobalInstructionsDraftChange: (value: string) => void;
   onSavePersonalization: () => void | Promise<void>;
-  embedded?: boolean;
   t: Translate;
 }
 
@@ -26,7 +25,6 @@ export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = (
   globalInstructionsDraft,
   onGlobalInstructionsDraftChange,
   onSavePersonalization,
-  embedded = false,
   t,
 }) => {
   const [status, setStatus] = useState<SaveStatus>('idle');
@@ -43,7 +41,7 @@ export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = (
 
   const textareaId = 'settings-global-instructions';
 
-  const block = (
+  return (
     <SettingsSection
       className="settings-personalization-block"
       title={t('settings.personalizationTitle')}
@@ -76,15 +74,5 @@ export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = (
         </Button>
       </div>
     </SettingsSection>
-  );
-
-  if (embedded) {
-    return block;
-  }
-
-  return (
-    <section className="settings-page settings-page-personalization">
-      {block}
-    </section>
   );
 };

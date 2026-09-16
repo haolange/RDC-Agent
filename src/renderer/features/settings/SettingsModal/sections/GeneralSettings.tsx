@@ -54,7 +54,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
           className="settings-language-section"
           data-settings-search="language"
         >
-          <SettingsField label={t('userMenu.language')} search="language">
+          <SettingsField layout="row" label={t('userMenu.language')} search="language">
             <div className="settings-choice-group" role="group" aria-label={t('userMenu.language')}>
               <Pill
                 selected={settings.appearance.language === 'zh-CN'}
@@ -72,7 +72,6 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
           </SettingsField>
         </SettingsSection>
         <PersonalizationSettings
-          embedded
           globalInstructionsDraft={globalInstructionsDraft}
           onGlobalInstructionsDraftChange={onGlobalInstructionsDraftChange}
           onSavePersonalization={onSavePersonalization}
