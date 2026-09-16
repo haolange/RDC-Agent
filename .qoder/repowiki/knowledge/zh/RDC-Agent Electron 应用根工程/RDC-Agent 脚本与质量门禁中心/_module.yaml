@@ -1,8 +1,0 @@
-schema_version: 1
-module_path: scripts
-title: RDC-Agent 脚本与质量门禁中心
-scope:
-    - scripts/
-source_files: []
-depends_on: []
-related_to: []
