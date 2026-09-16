@@ -80,6 +80,7 @@ export function EffortModeIconButton(props: EffortModeIconButtonProps) {
   const accessibleName = props.statusLabel
     ? `${props.label} · ${props.statusLabel}`
     : props.label;
+  const tipText = props.statusLabel ?? props.label;
   return (
     <button
       type="button"
@@ -98,7 +99,7 @@ export function EffortModeIconButton(props: EffortModeIconButtonProps) {
     >
       {props.children}
       <span className="composer-model-effort-mode-tip" role="tooltip">
-        {accessibleName}
+        {tipText}
       </span>
     </button>
   );

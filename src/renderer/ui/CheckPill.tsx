@@ -1,5 +1,6 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../lib/cn';
+import { Icon } from './Icon';
 import './CheckPill.css';
 
 export interface CheckPillProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onChange'> {
@@ -12,7 +13,7 @@ export interface CheckPillProps extends Omit<ButtonHTMLAttributes<HTMLButtonElem
 
 /**
  * Lightweight multi-select control: a check mark plus text, never a large
- * checkbox card. Used for tool permissions and knowledge filters.
+ * checkbox card. The box shares `--checkbox-*` with `Checkbox`; Switch keeps accent fill.
  */
 export const CheckPill = forwardRef<HTMLButtonElement, CheckPillProps>(function CheckPill(
   { checked, onCheckedChange, hint, className, disabled, type = 'button', children, ...rest },
@@ -30,9 +31,7 @@ export const CheckPill = forwardRef<HTMLButtonElement, CheckPillProps>(function 
       {...rest}
     >
       <span className="ui-check-pill-box" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-          <path d="M5 12.5 9.5 17 19 7" />
-        </svg>
+        {checked ? <Icon name="check" size={12} /> : null}
       </span>
       <span className="ui-check-pill-text">
         <span className="ui-check-pill-label">{children}</span>

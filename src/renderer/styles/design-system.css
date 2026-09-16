@@ -882,14 +882,13 @@
   --input-text:                var(--token-text-heading);
   --input-placeholder:         var(--token-text-placeholder);
 
-  /* ── Component: Checkbox ──
-   *  Defaults are the accent-filled box. Surfaces that must stay grayscale
-   *  (e.g. always-on filter lists) override these on the `.ui-checkbox` element. */
+  /* ── Component: Checkbox / CheckPill box ──
+   *  Multi-select stays an outline box + ink tick. Accent fill is Switch-only. */
   --checkbox-bg:               var(--token-bg-panel);
   --checkbox-border:           var(--token-border-default);
-  --checkbox-checked-bg:       var(--token-accent-primary);
-  --checkbox-checked-border:   var(--token-accent-primary);
-  --checkbox-check-color:      var(--token-text-inverse);
+  --checkbox-checked-bg:       transparent;
+  --checkbox-checked-border:   var(--token-border-strong);
+  --checkbox-check-color:      var(--token-text-heading);
 
   /* ── Component: Card ── */
   --card-bg:                   var(--token-bg-panel);

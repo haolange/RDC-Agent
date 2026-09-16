@@ -105,6 +105,29 @@ assert(
   'Composer ring must stay on while a footer menu is expanded, not only :focus-within',
 );
 
+const checkboxTokenSource = scriptRead('src/renderer/styles/design-system.css');
+const checkPillCss = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/CheckPill.css'), 'utf8');
+const knowledgeSidebarCss = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/features/knowledge/KnowledgeCenterModal/knowledge-center-sidebar.css'),
+  'utf8',
+);
+assert(
+  checkboxTokenSource.includes('--checkbox-checked-bg:       transparent;')
+    && checkboxTokenSource.includes('--checkbox-check-color:      var(--token-text-heading);')
+    && !checkboxTokenSource.includes('--checkbox-checked-bg:       var(--token-accent-primary);'),
+  'Checkbox tokens must stay outline + ink, not accent fill',
+);
+assert(
+  checkPillCss.includes('border-color: var(--checkbox-checked-border);')
+    && checkPillCss.includes('background: var(--checkbox-checked-bg);')
+    && !checkPillCss.includes('var(--token-accent-primary)'),
+  'CheckPill box must share checkbox tokens and must not paint accent fill',
+);
+assert(
+  !knowledgeSidebarCss.includes('--checkbox-checked-bg'),
+  'Knowledge space rows must not restyle the checkbox checked box',
+);
+
 const effortPopupSource = scriptRead('src/renderer/features/composer/ComposerModelEffortPanel.tsx');
 const effortControlSource = scriptRead('src/renderer/features/composer/useComposerEffortControl.ts');
 const effortMaxFieldSource = scriptRead('src/renderer/features/composer/EffortMaxField.tsx');
@@ -121,6 +144,17 @@ assert(
     && debuggerCssSource.includes('max-height: min(32rem, calc(100vh - var(--space-16)))')
     && debuggerCssSource.includes('width: min(calc(var(--space-10) * 8), calc(100vw - var(--space-6)))'),
   'Model picker may grow to 32rem tall but must stay 320px wide',
+);
+assert(
+  debuggerCssSource.includes('.composer-model-effort-mode-tip')
+    && debuggerCssSource.includes('bottom: calc(100% + var(--space-6))')
+    && debuggerCssSource.includes('border-radius: var(--radius-full)')
+    && debuggerCssSource.includes('background: var(--token-bg-raised);')
+    && debuggerCssSource.includes('box-shadow: var(--token-shadow-raised)')
+    && !debuggerCssSource.includes('.composer-model-effort-mode-tip {\n  position: absolute;\n  top: calc(100%')
+    && !debuggerCssSource.includes(".composer-model-effort-mode[data-mode='fast'] .composer-model-effort-mode-tip")
+    && !debuggerCssSource.includes(".composer-model-effort-mode[data-mode='max-context'] .composer-model-effort-mode-tip"),
+  'Fast/Max tips must be raised pills centered on the icons, not pinned cards growing into the panel',
 );
 assert(
   fs.readFileSync(path.join(repoRoot, 'src/renderer/features/composer/composer-chrome-2.css'), 'utf8')

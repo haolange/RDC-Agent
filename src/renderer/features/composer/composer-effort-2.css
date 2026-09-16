@@ -5,8 +5,7 @@
   z-index: var(--z-dropdown);
   width: min(20rem, calc(100vw - var(--space-4)));
   max-height: min(24rem, calc(100vh - var(--space-8)));
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: visible;
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
@@ -137,30 +136,23 @@
 
 .composer-model-effort-mode-tip {
   position: absolute;
-  top: calc(100% + var(--space-2));
+  left: 50%;
+  bottom: calc(100% + var(--space-6));
   z-index: var(--z-tooltip);
   width: max-content;
-  max-width: min(12rem, 42vw);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-overlay);
-  box-shadow: var(--token-shadow-popover);
-  color: var(--token-text-body);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-full);
+  background: var(--token-bg-raised);
+  box-shadow: var(--token-shadow-raised);
+  color: var(--token-text-heading);
   font-size: var(--text-xs);
-  line-height: 1.45;
+  line-height: var(--leading-normal);
   opacity: 0;
   pointer-events: none;
+  transform: translateX(-50%);
   visibility: hidden;
-  white-space: normal;
-}
-
-.composer-model-effort-mode[data-mode='fast'] .composer-model-effort-mode-tip {
-  left: 0;
-}
-
-.composer-model-effort-mode[data-mode='max-context'] .composer-model-effort-mode-tip {
-  right: 0;
+  white-space: nowrap;
 }
 
 .composer-model-effort-mode:hover .composer-model-effort-mode-tip,

@@ -143,9 +143,26 @@ describe('effortControlParts', () => {
     }));
 
     expect(markup).toContain('composer-model-effort-mode-tip');
-    expect(markup).toContain('Disabled');
+    expect(markup).toContain('>Disabled<');
     expect(markup).toContain('aria-label="Max mode · Disabled"');
+    expect(markup).not.toContain('>Max mode · Disabled<');
     expect(markup).toContain('disabled=""');
+  });
+
+  it('shows the mode label in the tip when no status constraint is present', () => {
+    const markup = renderToStaticMarkup(React.createElement(EffortModeIconButton, {
+      mode: 'fast',
+      'data-testid': 'composer-model-effort-fast-mode',
+      label: 'Fast mode',
+      available: true,
+      active: false,
+      onToggle: () => undefined,
+      children: 'F',
+    }));
+
+    expect(markup).toContain('>Fast mode<');
+    expect(markup).toContain('aria-label="Fast mode"');
+    expect(markup).not.toContain('disabled=""');
   });
 
   it('renders fixed Max mode as active and disabled instead of flashing off', () => {
