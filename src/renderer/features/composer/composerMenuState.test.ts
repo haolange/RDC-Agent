@@ -9,8 +9,8 @@ describe('reduceComposerMenu', () => {
 
   it('toggles the active menu closed and a different menu open', () => {
     expect(reduceComposerMenu('agent', { type: 'toggle', id: 'agent' })).toBeNull();
-    expect(reduceComposerMenu('agent', { type: 'toggle', id: 'effort' })).toBe('effort');
-    expect(reduceComposerMenu('effort', { type: 'open', id: 'model' })).toBe('model');
+    expect(reduceComposerMenu('agent', { type: 'toggle', id: 'modelEffort' })).toBe('modelEffort');
+    expect(reduceComposerMenu('modelEffort', { type: 'open', id: 'usage' })).toBe('usage');
   });
 
   it('closes only the matching menu', () => {

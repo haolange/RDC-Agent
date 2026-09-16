@@ -23,11 +23,6 @@ composer-attach-file-input
 composer-attachment-card
 composer-attachments
 composer-drop-overlay
-composer-effort-capability-state
-composer-effort-fast-row
-composer-effort-max-context-row
-composer-effort-pill
-composer-effort-popup
 composer-effort-slider
 composer-footer-bar
 composer-markdown-input
@@ -35,8 +30,12 @@ composer-markdown-preview
 composer-markdown-toolbar
 composer-mode-pill
 composer-model-agent-default
+composer-model-effort-fast-mode
+composer-model-effort-max-mode
 composer-model-item-${option.providerId}-${option.modelId}
-composer-model-pill
+composer-model-effort-open-picker
+composer-model-effort-pill
+composer-model-effort-popup
 composer-model-popup
 composer-model-search
 composer-permission-pill

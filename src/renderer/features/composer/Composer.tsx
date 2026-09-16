@@ -10,8 +10,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import type { ComposerController } from './useComposer';
 import { PermissionModeSelector } from './PermissionModeSelector';
-import { EffortControl } from './EffortControl';
-import { ComposerModelOverrideMenu } from './ComposerModelOverrideMenu';
+import { ComposerModelEffortControl } from './ComposerModelEffortControl';
 import { useComposerPendingGate } from './useComposerPendingGate';
 import { SlashCommandPopover } from './SlashCommandPopover';
 import { useSlashCommand } from './useSlashCommand';
@@ -232,11 +231,7 @@ export const Composer: React.FC<ComposerProps> = ({
           <PermissionModeSelector />
         </div>
         <div className="composer-toolbar-group composer-toolbar-group-right">
-          <ComposerModelOverrideMenu
-            agentId={selectedAgentId}
-            currentSession={currentSession}
-          />
-          <EffortControl
+          <ComposerModelEffortControl
             agentId={selectedAgentId}
             currentSession={currentSession}
             disabled={isComposerBusy}

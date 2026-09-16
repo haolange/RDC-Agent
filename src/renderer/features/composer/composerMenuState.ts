@@ -1,4 +1,4 @@
-export const COMPOSER_MENU_IDS = ['agent', 'permission', 'model', 'effort', 'usage'] as const;
+export const COMPOSER_MENU_IDS = ['agent', 'permission', 'modelEffort', 'usage'] as const;
 
 export type ComposerMenuId = (typeof COMPOSER_MENU_IDS)[number];
 
