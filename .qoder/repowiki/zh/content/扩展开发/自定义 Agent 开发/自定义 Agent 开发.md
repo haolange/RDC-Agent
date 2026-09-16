@@ -14,7 +14,19 @@
 - [debugger.agent.md](file://resources/agent-runtime/agents/debugger.agent.md)
 - [ProviderCapabilityProbeService.ts](file://src/main/settings/ProviderCapabilityProbeService.ts)
 - [check-tool-system.mjs](file://scripts/check-tool-system.mjs)
+- [applyDeclaredHandoff.ts](file://src/main/conversation/applyDeclaredHandoff.ts)
+- [executionOffer.ts](file://src/shared/types/executionOffer.ts)
+- [agentManifest.ts](file://src/shared/types/agentManifest.ts)
+- [DESIGN.md](file://DESIGN.md)
 </cite>
+
+## 更新摘要
+**所做更改**
+- 更新了交接（handoffs）机制的说明，反映从复杂状态机到简单声明式续跑模型的转变
+- 移除了关于自动执行流程的状态机集成描述
+- 强调了交接现在仅驱动 UI 建议而非自动执行流
+- 更新了交接配置和执行的详细说明
+- 修正了相关示例和最佳实践
 
 ## 目录
 1. [简介](#简介)
@@ -29,7 +41,9 @@
 10. [附录：从零到一开发示例](#附录从零到一开发示例)
 
 ## 简介
-本指南面向希望在 RDC-Agent 中创建“自定义 Agent”的开发者，覆盖从清单定义、能力声明、技能绑定、提示词配置，到生命周期管理、任务编排、子 Agent 协调、权限控制、错误处理、性能优化、注册发现执行监控的全流程。RDC-Agent 以 `.agent.md` 作为 Agent 行为配置的唯一产品入口，通过内置 profile（general/debugger/analyzer/optimizer）与用户/项目级覆盖实现可组合的 Agent 生态；运行时由 Agent 内核驱动 LLM 调用、工具执行、事件流与追踪投影，并通过 Settings/Provider Catalog 完成模型路由与能力探测。
+本指南面向希望在 RDC-Agent 中创建"自定义 Agent"的开发者，覆盖从清单定义、能力声明、技能绑定、提示词配置，到生命周期管理、任务编排、子 Agent 协调、权限控制、错误处理、性能优化、注册发现执行监控的全流程。RDC-Agent 以 `.agent.md` 作为 Agent 行为配置的唯一产品入口，通过内置 profile（general/debugger/analyzer/optimizer）与用户/项目级覆盖实现可组合的 Agent 生态；运行时由 Agent 内核驱动 LLM 调用、工具执行、事件流与追踪投影，并通过 Settings/Provider Catalog 完成模型路由与能力探测。
+
+**重要更新**：交接（handoffs）机制已简化为声明式续跑模型，移除了复杂的 state machine 集成。现在交接仅驱动 UI 建议按钮，不再自动执行业务流程。
 
 ## 项目结构
 RDC-Agent 采用 Electron 多进程分层：主进程承载 Agent 运行时、工作流编排、设置与服务桥接；渲染层负责交互与可视化；共享层提供类型与常量；资源层包含内置 Agent/Skill/Prompt/Hook 等。Agent 清单按作用域解析并合并，形成最终生效的配置快照。
@@ -41,25 +55,32 @@ A["Agent 运行时<br/>src/main/agent-runtime/*"]
 B["工作流编排<br/>src/main/workflow/debugger/*"]
 C["设置与目录<br/>src/main/settings/*"]
 D["IPC 处理器<br/>src/main/ipc/*"]
+E["交接处理<br/>src/main/conversation/applyDeclaredHandoff.ts"]
 end
 subgraph "渲染进程"
-E["界面与状态投影<br/>src/renderer/*"]
+F["界面与状态投影<br/>src/renderer/*"]
+G["交接编辑器<br/>Settings Modal Handoff Editor"]
 end
 subgraph "资源"
-F["Agent 清单<br/>resources/agent-runtime/agents/*.agent.md"]
-G["技能与提示词<br/>resources/agent-runtime/skills/*, prompts/*"]
+H["Agent 清单<br/>resources/agent-runtime/agents/*.agent.md"]
+I["技能与提示词<br/>resources/agent-runtime/skills/*, prompts/*"]
+J["执行报价<br/>execution-offer.json"]
 end
-E --> D
+F --> D
 D --> B
 B --> A
 A --> C
-A --> F
-A --> G
+A --> E
+E --> J
+A --> H
+A --> I
+G --> F
 ```
 
 图表来源
 - [overview.md:10-25](file://docs/architecture/overview.md#L10-L25)
 - [agent-manifest-models.md:5-15](file://docs/product/agent-manifest-models.md#L5-L15)
+- [applyDeclaredHandoff.ts:38-94](file://src/main/conversation/applyDeclaredHandoff.ts#L38-L94)
 
 章节来源
 - [README.md:38-46](file://README.md#L38-L46)
@@ -72,6 +93,7 @@ A --> G
 - 清单与模型：`.agent.md` 描述 Agent 身份、能力、工具、子 Agent、技能与交接；Settings/Provider Catalog 决定可用模型与路由。
 - 技能系统：将领域方法（如调试/分析/优化）以 Skill 形式装配到 Agent，支持计划专用冲突隔离。
 - 追踪协议：Agentic Trace 记录运行事件、右侧面板投影与任务进度，支撑可审计的工作过程。
+- **交接系统**：简化的声明式续跑模型，通过 UI 建议按钮驱动 Agent 切换，不再使用复杂状态机。
 
 章节来源
 - [Agent.ts:1-15](file://src/main/agent-runtime/agent/Agent.ts#L1-L15)
@@ -79,9 +101,10 @@ A --> G
 - [agent-manifest-models.md:17-79](file://docs/product/agent-manifest-models.md#L17-L79)
 - [canonicalSkills.ts:1-45](file://src/shared/constants/canonicalSkills.ts#L1-L45)
 - [agentic-trace-protocol.md:1-24](file://docs/architecture/agentic-trace-protocol.md#L1-L24)
+- [agentManifest.ts:5-13](file://src/shared/types/agentManifest.ts#L5-L13)
 
 ## 架构总览
-RDC-Agent 的主数据流从渲染器 UI 经 Preload/IPC 进入工作流编排，再由 Agent 运行时驱动 Provider 与外部能力（如 RDX CLI），并将运行轨迹投影回 UI。
+RDC-Agent 的主数据流从渲染器 UI 经 Preload/IPC 进入工作流编排，再由 Agent 运行时驱动 Provider 与外部能力（如 RDX CLI），并将运行轨迹投影回 UI。**交接流程已简化**：用户点击交接建议按钮后，主进程验证声明并写入执行报价，然后持久化会话的 agentId，触发钩子但不自动执行业务流程。
 
 ```mermaid
 sequenceDiagram
@@ -90,6 +113,7 @@ participant P as "Preload API"
 participant I as "IPC 处理器"
 participant W as "工作流编排"
 participant R as "Agent 运行时"
+participant H as "交接处理"
 participant S as "设置/目录"
 participant X as "外部能力(RDX CLI)"
 participant T as "追踪投影"
@@ -100,12 +124,17 @@ W->>R : 启动 Agent 循环
 R->>S : 读取清单/模型/策略
 R->>X : 执行受控工具/Shell
 R-->>T : 推送事件/投影
-T-->>U : 更新右侧面板/转录
+U->>H : 点击交接建议按钮
+H->>H : 验证交接声明
+H->>S : 写入 execution-offer.json
+H->>S : 持久化 session.agentId
+H->>R : 触发 before-handoff/after-handoff 钩子
 ```
 
 图表来源
 - [overview.md:10-25](file://docs/architecture/overview.md#L10-L25)
 - [agentic-trace-protocol.md:26-49](file://docs/architecture/agentic-trace-protocol.md#L26-L49)
+- [applyDeclaredHandoff.ts:38-94](file://src/main/conversation/applyDeclaredHandoff.ts#L38-L94)
 
 ## 详细组件分析
 
@@ -114,6 +143,11 @@ T-->>U : 更新右侧面板/转录
 - 关键字段：name/description/argument-hint/target/model/icon/accent/enabled/user-invocable/disable-model-invocation/tools/agents/skills/mcp-servers/handoffs。
 - 工具令牌：使用规范 token（read/search/web/shell/task/memory/subagent/tool_search/rdxContext 等），废弃令牌会被拒绝。
 - 计划输出：plan.md 是普通产物，不是工作流状态机或 IPC 通道。
+
+**交接配置更新**：
+- `AgentHandoffDefinition` 现在是简单的 Copilot 式 UI 声明，包含 label、agent、prompt、send、showContinueOn、model、requiredSkillIds 字段
+- 不再存在 `agent_handoff` 工具或 durable 状态机
+- `send: true` 仅表示点击后预填并自动发送，不改变交接的本质
 
 实践要点
 - 在 resources/agent-runtime/agents 下新增或覆盖 .agent.md，确保 tools 列表仅包含允许的能力。
@@ -125,9 +159,10 @@ T-->>U : 更新右侧面板/转录
 - [agent-manifest-models.md:17-79](file://docs/product/agent-manifest-models.md#L17-L79)
 - [agent-manifest-models.md:92-118](file://docs/product/agent-manifest-models.md#L92-L118)
 - [canonicalSkills.ts:51-94](file://src/shared/constants/canonicalSkills.ts#L51-L94)
+- [agentManifest.ts:5-13](file://src/shared/types/agentManifest.ts#L5-L13)
 
 ### 技能绑定与方法装配
-- 技能分为通用与“任务/知识/协调器”两类；某些技能因与计划专用冲突而仅限 General。
+- 技能分为通用与"任务/知识/协调器"两类；某些技能因与计划专用冲突而仅限 General。
 - 通过 SKILL_ARMED_BY_PROFILE 将特定 Profile 与协调器技能绑定。
 - 技能可见性受 Profile 限制，防止 Mission-only Agent 误用执行型技能。
 
@@ -215,6 +250,42 @@ Service-->>Parent : 事件投影(approval.requested/progress)
 - [check-tool-system.mjs:235-272](file://scripts/check-tool-system.mjs#L235-L272)
 - [agentic-trace-protocol.md:26-49](file://docs/architecture/agentic-trace-protocol.md#L26-L49)
 
+### 交接机制详解（已简化）
+**重大变更**：交接机制已从复杂的状态机模式简化为声明式续跑模型。
+
+**新的交接流程**：
+1. **声明配置**：在 Agent 清单中声明 `handoffs` 数组，每个交接项包含 label、agent、prompt、可选的 send、showContinueOn、model、requiredSkillIds
+2. **UI 建议**：交接仅显示为建议按钮，不自动执行业务流程
+3. **用户触发**：用户点击建议按钮后，主进程调用 `applyDeclaredHandoff`
+4. **验证与执行**：验证交接声明属于当前或刚批准的 profile，写入 execution-offer.json，持久化 session.agentId，触发 before-handoff/after-handoff 钩子
+5. **技能预载**：仅在计划批准后且目标 Agent 匹配时预载 requiredSkillIds
+
+**关键特性**：
+- 不存在 `agent_handoff` 工具或 durable 状态机
+- `send: true` 仅表示点击后预填并自动发送
+- 空 `handoffs` 合法（General 无按钮）
+- 禁止 `handoff` / `agent` / `agent_handoff` token，不静默映射到 `subagent`
+
+```mermaid
+flowchart TD
+UserClick["用户点击交接建议"] --> Validate["验证交接声明"]
+Validate --> WriteOffer["写入 execution-offer.json"]
+WriteOffer --> PersistSession["持久化 session.agentId"]
+PersistSession --> TriggerHooks["触发 before-handoff/after-handoff 钩子"]
+TriggerHooks --> Complete["完成交接"]
+```
+
+图表来源
+- [applyDeclaredHandoff.ts:38-94](file://src/main/conversation/applyDeclaredHandoff.ts#L38-L94)
+- [executionOffer.ts:8-17](file://src/shared/types/executionOffer.ts#L8-L17)
+- [agentManifest.ts:5-13](file://src/shared/types/agentManifest.ts#L5-L13)
+
+章节来源
+- [applyDeclaredHandoff.ts:38-94](file://src/main/conversation/applyDeclaredHandoff.ts#L38-L94)
+- [executionOffer.ts:8-17](file://src/shared/types/executionOffer.ts#L8-L17)
+- [agentManifest.ts:5-13](file://src/shared/types/agentManifest.ts#L5-L13)
+- [DESIGN.md:220-222](file://DESIGN.md#L220-L222)
+
 ### 权限控制与能力探测
 - 默认权限模式与读写根、命令前缀白/黑名单在设置中配置。
 - Provider 能力探测服务对失败进行分类（配额耗尽、认证失败、路由不可用等），并结合 manifest 声明的授权拒绝匹配器做 fail-closed 决策。
@@ -255,6 +326,7 @@ Route --> |是| Success["成功并记录证据"]
 - Agent 内核依赖 ProviderStrategy、ToolExecutor、EventStream、ErrorRecovery、ConcurrentToolScheduler。
 - 工作流编排依赖 AgentOrchestrator、TurnPreparationService、RuntimeToolAssembly、ToolExecutorFactory、DebuggerRuntimePolicy。
 - 清单与技能系统通过 canonicalSkills 与 agent manifests 耦合，确保 Mission-only 与执行型职责分离。
+- **交接系统**：依赖 ExecutionOfferStore、PlanReviewStateStore、StorageAdapter，与 Agent 内核解耦。
 
 ```mermaid
 graph LR
@@ -265,6 +337,9 @@ E["工作流编排"] --> A
 E --> F["RuntimeToolAssembly"]
 G["清单/技能系统"] --> A
 G --> E
+H["交接系统"] --> I["ExecutionOfferStore"]
+H --> J["PlanReviewStateStore"]
+H --> K["StorageAdapter"]
 ```
 
 图表来源
@@ -272,6 +347,7 @@ G --> E
 - [AgentLoop.ts:16-43](file://src/main/agent-runtime/agent/AgentLoop.ts#L16-L43)
 - [check-tool-system.mjs:235-272](file://scripts/check-tool-system.mjs#L235-L272)
 - [canonicalSkills.ts:1-45](file://src/shared/constants/canonicalSkills.ts#L1-L45)
+- [applyDeclaredHandoff.ts:38-94](file://src/main/conversation/applyDeclaredHandoff.ts#L38-L94)
 
 章节来源
 - [Agent.ts:16-40](file://src/main/agent-runtime/agent/Agent.ts#L16-L40)
@@ -285,6 +361,7 @@ G --> E
 - 工具并发：按 isConcurrencySafe 分组并发执行，提升吞吐同时保证安全性。
 - 进度保护：检测重复工具轮次，注入指导或终止，防止死循环。
 - Provider 能力探测：配额耗尽时延迟重试并记录观测，减少无效请求。
+- **交接性能**：简化的交接机制减少了状态管理的开销，提高了响应速度。
 
 章节来源
 - [AgentLoop.ts:400-534](file://src/main/agent-runtime/agent/AgentLoop.ts#L400-L534)
@@ -298,6 +375,10 @@ G --> E
 - 输出截断：stopReason=length 触发恢复策略（压缩/续写/切换模型/中止）。
 - 工具未配置：未提供 ToolExecutor 时所有工具调用返回错误，需装配执行器。
 - Provider 失败：根据分类（认证失败/路由不可用/配额耗尽）采取相应措施。
+- **交接问题**：
+  - 交接声明未找到：检查当前 Agent 的 handoffs 配置是否正确
+  - 目标 Agent 不可用：确认目标 Agent 已启用且存在
+  - 技能预载失败：检查 requiredSkillIds 是否与目标 Agent 兼容
 
 章节来源
 - [AgentLoop.ts:271-330](file://src/main/agent-runtime/agent/AgentLoop.ts#L271-L330)
@@ -306,7 +387,7 @@ G --> E
 - [ProviderCapabilityProbeService.ts:41-58](file://src/main/settings/ProviderCapabilityProbeService.ts#L41-L58)
 
 ## 结论
-RDC-Agent 提供了完整的自定义 Agent 开发生态：以 `.agent.md` 为中心的能力声明与技能绑定，配合显式状态机的 Agent 内核与工作流编排，实现可审计、可恢复、可扩展的 Agent 执行环境。通过权限控制、能力探测与追踪协议，开发者可以构建从简单分析到复杂调试工作流的多样化 Agent，并在生产环境中获得稳定与可观测的运行体验。
+RDC-Agent 提供了完整的自定义 Agent 开发生态：以 `.agent.md` 为中心的能力声明与技能绑定，配合显式状态机的 Agent 内核与工作流编排，实现可审计、可恢复、可扩展的 Agent 执行环境。**交接机制的简化**使 Agent 间的协作更加直观和可控，通过 UI 建议按钮驱动切换而非自动执行，提供了更好的用户体验和控制权。通过权限控制、能力探测与追踪协议，开发者可以构建从简单分析到复杂调试工作流的多样化 Agent，并在生产环境中获得稳定与可观测的运行体验。
 
 ## 附录：从零到一开发示例
 
@@ -317,32 +398,48 @@ RDC-Agent 提供了完整的自定义 Agent 开发生态：以 `.agent.md` 为�
 - 新建清单：在 `<project-root>/.rdx/agents/` 下创建 `my-analyzer.agent.md`，ID 为文件名 stem。
 - 声明能力：tools 包含 read/search/knowledge/tool_search 等只读能力；禁用 shell/write/edit。
 - 绑定技能：skills 加入 analyzer-coordinator 或相关分析方法。
-- 配置交接：handoffs 指向 debugger/optimizer，以便后续深入。
+- **配置交接**：添加 handoffs 指向 debugger/optimizer，设置 label、prompt、可选的 send 和 showContinueOn。
 - 提示词：在 Markdown 正文中明确分析范围、证据要求与输出格式。
 - 验证：运行 check:tool-system 与 settings-agents 校验工具令牌与清单一致性。
 
 参考
 - 清单字段与工具令牌规范
 - 技能可见性与计划专用冲突规则
+- **交接配置的最佳实践**
 
 章节来源
 - [agent-manifest-models.md:17-79](file://docs/product/agent-manifest-models.md#L17-L79)
 - [canonicalSkills.ts:51-94](file://src/shared/constants/canonicalSkills.ts#L51-L94)
+- [agentManifest.ts:5-13](file://src/shared/types/agentManifest.ts#L5-L13)
 
 ### 示例二：复杂的调试工作流编排
 目标：构建一个 Debugger 主导的调试工作流，最小化根因不确定性，产出可验证计划并由 General 执行。
 
 步骤
 - 使用内置 Debugger profile：其 tools 限定为计划专用能力（不含 shell/write），并绑定 debugger-coordinator。
-- 设计交接：handoff 到 general 执行已批准计划，并要求写入 investigation 记录与质疑审查。
+- **设计交接**：添加 handoff 到 general，设置合适的 label（如"Execute with General"）、prompt 和 requiredSkillIds。
 - 任务编排：通过 TurnPreparationService 分区延迟工具，确保 MCP/builtin 工具按需装配。
 - 子 Agent 协调：使用 subagent 启动后台任务，限制预算与工件访问，必要时请求审批。
 - 监控与追踪：通过 Agentic Trace 观察任务进度与子 Agent 状态，导出运行记录。
+
+**交接配置示例**：
+```yaml
+handoffs:
+  - label: "Execute with General"
+    agent: "general"
+    prompt: "Execute the approved debugging plan."
+    requiredSkillIds:
+      - "renderdoc-execution"
+      - "investigation-tools"
+      - "artifact-provenance"
+      - "cross-capture-alignment"
+```
 
 参考
 - Debugger 清单与约束
 - 工作流编排与工具装配
 - 子 Agent 审批与工件作用域
+- **交接配置的最佳实践**
 
 章节来源
 - [debugger.agent.md:1-45](file://resources/agent-runtime/agents/debugger.agent.md#L1-L45)
@@ -357,14 +454,41 @@ RDC-Agent 提供了完整的自定义 Agent 开发生态：以 `.agent.md` 为�
 - 绑定执行协调器：skills 包含 execution-orchestrator。
 - 配置权限：在设置中配置 readableRoots/writableRoots/allowedCommandPrefixes/deniedCommandPrefixes。
 - 编排子任务：通过 task 与 subagent 拆分复杂工作，设置预算与停止条件。
+- **交接配置**：由于 General 通常作为执行终点，一般不需要配置 outgoing handoffs。
 - 监控：结合右侧面板 Progress 与 Trace 查看任务进度与子 Agent 状态。
 
 参考
 - General 清单与技能
 - 权限配置默认值
 - 任务与子 Agent 协调
+- **交接机制的使用场景**
 
 章节来源
 - [general.agent.md:1-60](file://resources/agent-runtime/agents/general.agent.md#L1-L60)
 - [defaultAppSettings.ts:71-84](file://src/renderer/stores/defaultAppSettings.ts#L71-L84)
 - [agentic-trace-protocol.md:26-49](file://docs/architecture/agentic-trace-protocol.md#L26-L49)
+
+### 示例四：交接配置最佳实践
+目标：正确配置和使用交接功能，提供流畅的用户体验。
+
+**交接配置原则**：
+1. **明确的标签**：使用清晰的 label 描述交接目的
+2. **具体的提示词**：prompt 应该明确指示目标 Agent 要做什么
+3. **合理的技能预载**：只在必要时使用 requiredSkillIds
+4. **适当的自动发送**：谨慎使用 send: true，避免意外执行
+5. **用户控制权**：默认 showContinueOn: true，让用户选择何时继续
+
+**常见交接模式**：
+- **分析→调试**：Analyzer 发现问题后切换到 Debugger 深入调查
+- **调试→执行**：Debugger 制定计划后切换到 General 执行
+- **多阶段工作流**：多个专业 Agent 之间的有序交接
+
+**故障排除**：
+- 交接按钮不显示：检查 handoffs 配置和目标 Agent 是否启用
+- 交接失败：验证交接声明是否存在于当前 Agent
+- 技能预载失败：检查 requiredSkillIds 是否与目标 Agent 兼容
+
+章节来源
+- [agentManifest.ts:5-13](file://src/shared/types/agentManifest.ts#L5-L13)
+- [applyDeclaredHandoff.ts:38-94](file://src/main/conversation/applyDeclaredHandoff.ts#L38-L94)
+- [DESIGN.md:220-222](file://DESIGN.md#L220-L222)
