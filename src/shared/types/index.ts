@@ -247,6 +247,7 @@ export type {
 export type {
   KnowledgeImageRef,
   KnowledgeImageRole,
+  KnowledgeImportItem,
   KnowledgeImportResult,
   KnowledgeImportStatus,
   KnowledgeCandidatesResult,

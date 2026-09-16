@@ -121,11 +121,11 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 
 ### UI
 
-**视觉定位（裁决）**：RDC-Agent 是 restrained、高密度、实色分层的精密工具，参照 VS Code / JetBrains / Linear 的信息密度与克制程度。每一处视觉选择都服务于聚焦与快速研判：不使用 backdrop blur、装饰性动效或插画；层次由 1px 边框与实色表面建立，阴影只用于 popover 与 modal；单一 accent 只承担 focus / selected / primary CTA。该定位是 `docs/ui/design-system.md` 全部刻度的上位依据，冲突时以本段为准。
+**视觉定位（裁决）**：RDC-Agent 是 restrained、高密度、实色分层的精密工具，参照 VS Code / JetBrains / Linear 的信息密度与克制程度。每一处视觉选择都服务于聚焦与快速研判：不使用装饰性动效或插画；层次由 1px 边框与实色表面建立，阴影只用于 popover 与 modal。backdrop blur 只允许用在模态全屏遮罩（`--modal-backdrop` + `--modal-backdrop-filter`），把注意力压到弹层上；Dropdown / popover / chrome 仍为实色，禁止装饰性毛玻璃。单一 accent 只承担 focus / selected / primary CTA。该定位是 `docs/ui/design-system.md` 全部刻度的上位依据，冲突时以本段为准。
 
 **渲染层分层（裁决）**：`ui`（无业务原子/分子组件）→ `patterns`（跨 feature 复合，可读 store，不写 store、不直调 IPC）→ `features`（产品面，禁止横向 import 其它 feature）→ `app` / `shell`（编排与窗口 chrome）。`stores` / `services` / `hooks` / `lib` / `platform` 为被依赖层，不得反向 import `features` / `ui` / `patterns` / `app` / `shell`。组件（`.tsx`）不得直调 `window.electronAPI`。门禁：`pnpm run check:renderer-structure` + ESLint `no-restricted-imports`。
 
-**Token 合规（裁决）**：组件 CSS 只允许语义 token 与刻度变量；primitive `--color-*`、hex 字面量、px 字号 / 间距 / 圆角、`!important`、`backdrop-filter` 一律禁止，豁免仅限 token 定义层与全局 chrome 层。门禁：`pnpm run check:design-tokens`。受门禁锁定的 renderer 文件路径集中登记在 [`scripts/fidelity/renderer-contract.json`](scripts/fidelity/renderer-contract.json)。
+**Token 合规（裁决）**：组件 CSS 只允许语义 token 与刻度变量；primitive `--color-*`、hex 字面量、px 字号 / 间距 / 圆角、`!important` 一律禁止。`backdrop-filter` 禁止字面量 `blur(...)`；模态遮罩只能写 `var(--modal-backdrop-filter)`。豁免仅限 token 定义层与全局 chrome 层。门禁：`pnpm run check:design-tokens`。受门禁锁定的 renderer 文件路径集中登记在 [`scripts/fidelity/renderer-contract.json`](scripts/fidelity/renderer-contract.json)。
 
 **渲染层目录（裁决 / 目标态）**：
 

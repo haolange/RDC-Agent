@@ -3,9 +3,12 @@ import { rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { zipSync } from 'fflate';
+import { KNOWLEDGE_PACKAGE_SCHEMA } from '@shared/types/knowledgeExport';
 import { createDisposableCandidateService } from './KnowledgeCandidateService';
 import { KnowledgeWriteService } from './KnowledgeWriteService';
-import { ingestKnowledgeFromPath } from './knowledgeIngest';
+import { ingestKnowledge, ingestKnowledgeFromPath } from './knowledgeIngest';
+import { KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED, utf8ToZip, zipKnowledgeFiles } from './knowledgeZip';
 
 const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -50,19 +53,19 @@ describe('knowledge import images', () => {
       sessionId: 'sess-img',
       spaceId: 'user',
     });
-    expect(result.status).toBe('draft');
-    expect(result.record?.images).toEqual([
+    expect(result.items[0]?.status).toBe('draft');
+    expect(result.items[0]?.record?.images).toEqual([
       { relativePath: 'cases/img-case/observed.png', role: 'observed' },
       { relativePath: 'cases/img-case/reference.png', role: 'reference' },
     ]);
-    expect(result.missingAssets).toEqual([]);
+    expect(result.items[0]?.missingAssets).toEqual([]);
     const write = new KnowledgeWriteService({
       listSpaces: () => [{ spaceId: 'user', kind: 'user', label: 'User', rootPath: spaceRoot }],
       now: () => new Date('2026-09-01T00:00:00.000Z'),
     });
     await write.write({
       spaceId: 'user',
-      card: result.record!,
+      card: result.items[0]!.record!,
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: true },
       approvalAlreadyConsumed: true,
@@ -80,15 +83,95 @@ describe('knowledge import images', () => {
       spaceId: 'user',
       sessionId: 'sess-missing',
     });
-    expect(result.status).toBe('draft');
-    expect(result.record?.images).toEqual([
+    expect(result.items[0]?.status).toBe('draft');
+    expect(result.items[0]?.record?.images).toEqual([
       { relativePath: 'cases/missing-case/observed.png', role: 'observed' },
       { relativePath: 'cases/missing-case/reference.png', role: 'reference' },
     ]);
-    expect(result.missingAssets).toEqual([
+    expect(result.items[0]?.missingAssets).toEqual([
       'cases/missing-case/observed.png',
       'cases/missing-case/reference.png',
     ]);
-    expect(result.stagedImages).toBeUndefined();
+    expect(result.stagedImagesByCardId).toBeUndefined();
+  });
+
+  it('marks declared package images missing when only YAML is pasted', () => {
+    const pasted = [
+      `schema: ${KNOWLEDGE_PACKAGE_SCHEMA}`,
+      'exportedAt: 2026-09-01T00:00:00.000Z',
+      'cards:',
+      '  - cardId: user:cases/paste-1.md',
+      '    relativePath: cases/paste-1.md',
+      '    type: case',
+      '    lifecycle: verified',
+      '    title: Pasted card',
+      '    body: Body',
+      '    images:',
+      '      - { relativePath: cases/paste-1/observed.png, role: observed }',
+    ].join('\n');
+    const result = ingestKnowledge(pasted, { spaceId: 'user' });
+    expect(result.items[0]?.status).toBe('draft');
+    expect(result.items[0]?.missingAssets).toEqual(['cases/paste-1/observed.png']);
+    expect(result.items[0]?.reason).toBe('missing-assets');
+  });
+
+  it('ingests every card from a multi-card package zip', async () => {
+    const sourceRoot = tempRoot('rdc-know-img-multi-');
+    const zipPath = path.join(sourceRoot, 'pack.zip');
+    const yaml = [
+      `schema: ${KNOWLEDGE_PACKAGE_SCHEMA}`,
+      'exportedAt: 2026-09-01T00:00:00.000Z',
+      'cards:',
+      '  - cardId: user:cases/a.md',
+      '    relativePath: cases/a.md',
+      '    type: case',
+      '    lifecycle: verified',
+      '    title: Card A',
+      '    body: Body A',
+      '    images:',
+      '      - { relativePath: cases/a/observed.png, role: observed }',
+      '  - cardId: user:cases/b.md',
+      '    relativePath: cases/b.md',
+      '    type: case',
+      '    lifecycle: verified',
+      '    title: Card B',
+      '    body: Body B',
+    ].join('\n');
+    writeFileSync(zipPath, zipKnowledgeFiles([
+      { name: 'knowledge.yaml', data: utf8ToZip(yaml) },
+      { name: 'cases/a/observed.png', data: PNG_1X1 },
+    ]));
+    const candidates = createDisposableCandidateService(tempRoot('rdc-know-img-multi-sess-'));
+    const result = await candidates.ingestPathToStaging(zipPath, {
+      sessionId: 'sess-multi',
+      spaceId: 'user',
+    });
+    expect(result.items).toHaveLength(2);
+    expect(result.items.map((item) => item.record?.title)).toEqual(['Card A', 'Card B']);
+    expect(result.items[0]?.missingAssets).toEqual([]);
+    expect(result.items[1]?.missingAssets).toEqual([]);
+    expect(await candidates.listStagedDrafts('sess-multi')).toHaveLength(2);
+  });
+
+  it('quarantines zip-slip entries and oversized zip payloads', async () => {
+    const sourceRoot = tempRoot('rdc-know-img-zip-');
+    const slipPath = path.join(sourceRoot, 'slip.zip');
+    writeFileSync(slipPath, zipSync({
+      '../escape.png': PNG_1X1,
+      'knowledge.yaml': utf8ToZip(`schema: ${KNOWLEDGE_PACKAGE_SCHEMA}\ncards: []\n`),
+    }));
+    const slipped = await ingestKnowledgeFromPath(slipPath, { spaceId: 'user' });
+    expect(slipped.items[0]?.status).toBe('quarantine');
+    expect(slipped.items[0]?.reason).toBe('zip-path-invalid');
+
+    const oversized = Buffer.alloc(KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED + 1, 0x61);
+    const huge = await ingestKnowledgeFromPath('huge.zip', {
+      io: {
+        stat: async () => ({ mtimeMs: 1, size: oversized.length }),
+        readFile: async () => oversized,
+      },
+    });
+    expect(huge.items[0]?.status).toBe('quarantine');
+    expect(huge.items[0]?.reason).toBe('source-too-large');
   });
 });

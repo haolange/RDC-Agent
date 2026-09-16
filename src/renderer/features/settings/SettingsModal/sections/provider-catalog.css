@@ -85,7 +85,8 @@
   padding: 0 var(--space-4) var(--space-4);
 }
 
-@media (max-width: 640px) {
-
-  .settings-provider-grid { grid-template-columns: minmax(0, 1fr); }
+@container settings-panel (max-width: 36rem) {
+  .settings-provider-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

@@ -152,12 +152,12 @@ describe('knowledge system contract', () => {
       sessionId: 'session-cold',
       availableAssetNames: ['symptom-compare-a1b2c3d4.png'],
     });
-    expect(result.status).toBe('draft');
+    expect(result.items[0]?.status).toBe('draft');
     expect(result.candidateCreated).toBe(false);
-    expect(result.lifecycle).toBe('draft');
+    expect(result.items[0]?.lifecycle).toBe('draft');
     expect(result.verified).toBe(false);
-    expect(result.sourceStatus).toBe('fixed');
-    expect(result.record?.lifecycle).toBe('draft');
+    expect(result.items[0]?.sourceStatus).toBe('fixed');
+    expect(result.items[0]?.record?.lifecycle).toBe('draft');
     expect(yaml).not.toMatch(/[A-Za-z]:\\/);
     expect(await candidates.listCandidates('session-cold')).toHaveLength(0);
     expect(await candidates.listStagedDrafts('session-cold')).toHaveLength(1);

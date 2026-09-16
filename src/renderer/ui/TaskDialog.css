@@ -7,6 +7,8 @@
   justify-content: center;
   padding: var(--space-6);
   background: var(--modal-backdrop);
+  backdrop-filter: var(--modal-backdrop-filter);
+  -webkit-backdrop-filter: var(--modal-backdrop-filter);
   animation: task-dialog-backdrop-in 120ms ease-out;
 }
 

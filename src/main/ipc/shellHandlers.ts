@@ -76,6 +76,18 @@ export function registerShellHandlers(): void {
     return result.canceled ? null : result.filePaths;
   });
 
+  ipcMain.handle('dialog:selectKnowledgeImport', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectKnowledgeImport', maxBytes: 1024 });
+    const result = await dialog.showOpenDialog({
+      filters: [
+        { name: 'Knowledge package', extensions: ['zip'] },
+        { name: 'Case YAML', extensions: ['yaml', 'yml'] },
+      ],
+      properties: ['openFile'],
+    });
+    return result.canceled ? null : result.filePaths[0] ?? null;
+  });
+
   ipcMain.handle('dialog:selectFiles', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectFiles', maxBytes: 1024 });
     const result = await dialog.showOpenDialog({

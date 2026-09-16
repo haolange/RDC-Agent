@@ -159,13 +159,10 @@
   color: var(--token-accent-primary);
 }
 
-@media (max-width: 760px) {
+@media (max-width: 48rem) {
   .settings-model-cascade-menu {
     max-height: min(36rem, 78vh);
   }
-}
-
-@media (max-width: 640px) {
 
   .settings-model-option {
     padding-inline: var(--space-2);

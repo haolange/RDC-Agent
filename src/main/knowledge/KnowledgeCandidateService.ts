@@ -69,12 +69,15 @@ export class KnowledgeCandidateService {
     sessionId: string;
     spaceId?: string;
     availableAssetNames?: Iterable<string>;
+    availableImagePaths?: Iterable<string>;
   }): Promise<KnowledgeImportResult> {
+    const existing = await this.existingImportIds(options.sessionId);
     const result = ingestKnowledge(source, {
       spaceId: options.spaceId ?? `staging:${options.sessionId}`,
       sessionId: options.sessionId,
-      existingCaseIds: await this.existingCaseIds(options.sessionId),
+      ...existing,
       availableAssetNames: options.availableAssetNames,
+      availableImagePaths: options.availableImagePaths,
     });
     return this.persistDraftResult(options.sessionId, result);
   }
@@ -83,12 +86,15 @@ export class KnowledgeCandidateService {
     sessionId: string;
     spaceId?: string;
     availableAssetNames?: Iterable<string>;
+    availableImagePaths?: Iterable<string>;
   }): Promise<KnowledgeImportResult> {
+    const existing = await this.existingImportIds(options.sessionId);
     const result = await ingestKnowledgeFromPath(filePath, {
       spaceId: options.spaceId ?? `staging:${options.sessionId}`,
       sessionId: options.sessionId,
-      existingCaseIds: await this.existingCaseIds(options.sessionId),
+      ...existing,
       availableAssetNames: options.availableAssetNames,
+      availableImagePaths: options.availableImagePaths,
     });
     return this.persistDraftResult(options.sessionId, result);
   }
@@ -120,28 +126,35 @@ export class KnowledgeCandidateService {
     return (await this.store.listReviews(sessionId)).map((entry) => entry.review);
   }
 
-  private async existingCaseIds(sessionId: string): Promise<string[]> {
-    return (await this.listStagedDrafts(sessionId))
-      .map((entry) => entry.caseId)
-      .filter((value): value is string => Boolean(value));
+  private async existingImportIds(sessionId: string): Promise<{
+    existingCaseIds: string[];
+    existingCardIds: string[];
+  }> {
+    const drafts = await this.listStagedDrafts(sessionId);
+    return {
+      existingCaseIds: drafts.map((entry) => entry.caseId).filter((value): value is string => Boolean(value)),
+      existingCardIds: drafts.map((entry) => entry.cardId),
+    };
   }
 
   private async persistDraftResult(
     sessionId: string,
-    result: KnowledgeImportResult & { stagedImages?: import('./knowledgeIngest').KnowledgeStagedImage[] },
+    result: import('./knowledgeIngest').KnowledgeImportPathResult,
   ): Promise<KnowledgeImportResult> {
-    if (result.status === 'draft' && result.record) {
+    for (const item of result.items) {
+      if (item.status !== 'draft' || !item.record) continue;
       await this.store.putDraft(sessionId, {
-        card: result.record,
+        card: item.record,
         ...(result.sourceHash ? { sourceHash: result.sourceHash } : {}),
         ...(result.sourceMtimeMs != null ? { sourceMtimeMs: result.sourceMtimeMs } : {}),
         ...(result.sourceSize != null ? { sourceSize: result.sourceSize } : {}),
       });
-      if (result.stagedImages?.length) {
-        await putStagedKnowledgeImages(result.record.cardId, result.stagedImages);
+      const staged = result.stagedImagesByCardId?.get(item.record.cardId);
+      if (staged?.length) {
+        await putStagedKnowledgeImages(item.record.cardId, staged);
       }
     }
-    const { stagedImages: _staged, ...publicResult } = result;
+    const { stagedImagesByCardId: _staged, ...publicResult } = result;
     return publicResult;
   }
 }

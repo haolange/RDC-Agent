@@ -89,14 +89,9 @@
   margin-top: 0;
 }
 
-@media (max-width: 960px) {
-  .settings-capability-picker {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 560px) {
+@container settings-panel (max-width: 48rem) {
+  .settings-capability-picker,
   .settings-capability-custom {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

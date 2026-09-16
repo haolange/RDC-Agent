@@ -83,9 +83,8 @@ export function useKnowledgeImport(options: {
     setBusy(true);
     setError(null);
     try {
-      const paths = await window.electronAPI.selectFiles();
+      const next = await window.electronAPI.selectKnowledgeImport();
       if (!request.isCurrent(seq)) return;
-      const next = paths?.[0] ?? null;
       setFilePath(next);
       if (next) setSource('');
     } catch (err) {

@@ -224,6 +224,7 @@ export interface ElectronAPI {
 
   selectFiles: () => Promise<string[] | null>;
   selectRdcFiles: () => Promise<string[] | null>;
+  selectKnowledgeImport: () => Promise<string | null>;
   selectDirectory: () => Promise<string | null>;
   saveFile: (request: { defaultFileName: string; extension: string }) => Promise<string | null>;
 

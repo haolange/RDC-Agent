@@ -60,21 +60,10 @@
 }
 
 @media (max-width: 960px) {
-
-  .settings-modal-header {
-    min-height: calc(var(--space-8) + var(--space-2));
-  }
-}
-
-@media (max-width: 960px) {
-
   .settings-modal-header {
     min-height: 0;
     padding: var(--space-3) var(--space-4);
   }
-}
-
-@media (max-width: 960px) {
 
   .settings-modal-title {
     font-size: var(--text-lg);

@@ -15,9 +15,17 @@
 
 .settings-manifest-actions {
   display: flex;
+  width: 100%;
   align-items: center;
-  gap: var(--space-3);
+  justify-content: flex-end;
   flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.settings-manifest-actions .button {
+  min-height: var(--btn-height-md);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
 }
 
 .settings-manifest-layout {
@@ -34,23 +42,17 @@
   gap: var(--space-4);
 }
 
-.settings-page-agents > .settings-manifest-page {
-  flex: 1 1 auto;
-  height: 100%;
+.settings-page-agents > .settings-manifest-page,
+.settings-page-agents,
+.settings-page-agents .settings-manifest-page {
+  display: flex;
   min-height: 0;
 }
 
-.settings-manifest-actions .button {
-  min-height: var(--btn-height-md);
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-md);
-}
-
-.settings-manifest-actions {
-  display: flex;
-  width: 100%;
-  justify-content: flex-end;
-  gap: var(--space-2);
+.settings-page-agents .settings-manifest-page {
+  flex: 1 1 auto;
+  flex-direction: column;
+  height: 100%;
 }
 
 .settings-page-agents .settings-manifest-layout {
@@ -62,93 +64,44 @@
   overflow: hidden;
 }
 
-.settings-page-agents,
-.settings-page-agents .settings-manifest-page {
-  display: flex;
-  min-height: 0;
-}
-
-.settings-page-agents .settings-manifest-page {
-  flex: 1 1 auto;
-  flex-direction: column;
-}
-
 .settings-manifest-page-toolbar {
   align-items: center;
   flex: 0 0 auto;
 }
 
-@media (max-width: 960px) {
+@container settings-panel (max-width: 60rem) {
   .settings-manifest-toolbar {
     flex-direction: column;
   }
-}
-
-@media (max-width: 960px) {
 
   .settings-manifest-layout,
-.settings-manifest-form-grid {
-    grid-template-columns: 1fr;
+  .settings-manifest-form-grid,
+  .settings-page-agents .settings-manifest-layout {
+    grid-template-columns: minmax(0, 1fr);
   }
-}
 
-@media (max-width: 960px) {
-
-  .settings-manifest-layout,
-.settings-manifest-form-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 64rem) {
-  .settings-manifest-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 68rem) {
-  .settings-manifest-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 68rem) {
   .settings-page-agents .settings-manifest-page {
     display: block;
     flex: 0 0 auto;
   }
-}
-
-@media (max-width: 68rem) {
 
   .settings-page-agents .settings-manifest-layout {
     height: auto;
     min-height: 0;
     overflow: visible;
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 
-@media (max-width: 48rem) {
+@container settings-panel (max-width: 48rem) {
   .settings-page-agents .settings-manifest-page,
-.settings-page-agents .settings-manifest-layout {
+  .settings-page-agents .settings-manifest-layout {
     width: 100%;
     max-width: 100%;
     min-width: 0;
   }
-}
-
-@media (max-width: 48rem) {
-
-  .settings-page-agents .settings-manifest-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 48rem) {
 
   .settings-page-agents .settings-manifest-actions,
-.settings-page-agents .settings-manifest-actions .button {
+  .settings-page-agents .settings-manifest-actions .button {
     width: 100%;
   }
 }

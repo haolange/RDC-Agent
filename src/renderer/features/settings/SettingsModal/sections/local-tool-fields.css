@@ -107,20 +107,11 @@
   grid-column: 1 / -1;
 }
 
-@media (max-width: 960px) {
-  .settings-interpreter-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 960px) {
-
+@container settings-panel (max-width: 60rem) {
+  .settings-interpreter-grid,
   .settings-local-tool-grid .settings-field.is-row {
     grid-template-columns: minmax(0, 1fr);
   }
-}
-
-@media (max-width: 960px) {
 
   .settings-local-tool-grid .settings-field.is-row .settings-field-label {
     padding-top: 0;

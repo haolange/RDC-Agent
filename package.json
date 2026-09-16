@@ -90,6 +90,7 @@
     "ai": "6.0.226",
     "aws4fetch": "1.0.20",
     "electron-store": "^8.1.0",
+    "fflate": "^0.8.3",
     "gitlab-ai-provider": "6.11.1",
     "highlight.js": "^11.11.1",
     "katex": "^0.17.0",

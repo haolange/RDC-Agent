@@ -18,6 +18,7 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'web:resolveFavicon': 'desktop-only',
   'dialog:selectFiles': 'mutation',
   'dialog:selectRdcFiles': 'mutation',
+  'dialog:selectKnowledgeImport': 'mutation',
   'dialog:selectDirectory': 'mutation',
   'dialog:saveFile': 'mutation',
   'window:minimize': 'desktop-only',

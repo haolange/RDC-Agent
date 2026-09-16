@@ -1,6 +1,6 @@
 # Knowledge Center
 
-知识中心是 Workbench 左侧边栏底部、用户条上方的常驻入口，打开视窗比例驱动的实色分层模态（`min(92vw, 1920px) × min(90vh, 1240px)`；`≤960px` 时三列切换，`≤640px` 全屏）。它只消费已落地的五服务：`Query` / `Index` / `Compile` / `Candidate` / `Write`，不另开 browse 双轨或派生存储。
+知识中心是 Workbench 左侧边栏底部、用户条上方的常驻入口，打开居中实色分层模态（在 `88vw × 86vh`、硬顶 `120rem × 70rem` 内接最大 16:10，backdrop `--modal-workbench-inset`；`≤960px` 时三列切换，`≤640px` 全屏）。它只消费已落地的五服务：`Query` / `Index` / `Compile` / `Candidate` / `Write`，不另开 browse 双轨或派生存储。
 
 ## 信息架构
 
@@ -21,8 +21,8 @@
 
 - 持久写入只能经 `KnowledgeWriteService.write/promote`，且 `confirmation.explicitHumanConfirmation === true`；`FullAccess` 不得绕过。
 - Candidate 只能经 `createCandidate({ explicitUserIntent: true })`，必须由用户点击触发。
-- 导入只走 `ingestToStaging`（Draft / quarantine / conflict），**不得**导入即 Candidate，也不得批量提升。用户文案统一「导入知识 / 导出知识」，标识统一为知识导入。卡片可声明 `images[]`；知识根内真实存在的 png/jpeg/gif/webp 才能出图，缺失则标「对照图未入库」。
-- 导出经 `KnowledgeExportService`，格式二选一：**知识包**（`rdc.knowledge-package/1`，单文件 YAML，可再导入）与 **Markdown**（阅读用途，不可再导入）。范围为当前选中卡片 / 当前筛选结果 / 指定空间，数量实时计算。导出包剔除 `sourceHash` / `sourceMtimeMs` / `sourceSize` 与任何绝对路径，复用导入同一套 secret 扫描；绝不导出凭据、provider 配置或会话数据。导出包的 `lifecycle` 只是元数据，再导入一律落 session Draft（`verified: false`），重复 `cardId` 走既有 conflict 路径。保存位置由系统保存对话框选定，取消不产生半成品。
+- 导入只走 `ingestToStaging`（Draft / quarantine / conflict），**不得**导入即 Candidate，也不得批量提升。用户文案统一「导入知识 / 导出知识」，标识统一为知识导入。选文件只走 `dialog:selectKnowledgeImport`（zip / yaml / yml），禁止 All Files、禁止单独选 png。知识包 zip 的包根是解压根；本机案例 YAML 的包根是该文件所在目录。卡片可声明 `images[]`，图一律按「包根 + 声明相对路径」入库；缺失则标「对照图未入库」。粘贴 YAML 不含对照图。导入结果是 `items[]`（每项自带 status / record / missingAssets / reason）。
+- 导出经 `KnowledgeExportService`，格式二选一：**知识包**（标准 zip 载体，内含 `knowledge.yaml` 的 `rdc.knowledge-package/1` 与声明对照图，可再导入）与 **Markdown**（阅读用途，不可再导入，不夹图）。范围为当前选中卡片 / 当前筛选结果 / 指定空间，数量实时计算。导出包剔除 `sourceHash` / `sourceMtimeMs` / `sourceSize` 与任何绝对路径，复用导入同一套 secret 扫描；磁盘上不存在的图不写入 yaml 的 `images[]`；绝不导出凭据、provider 配置或会话数据。导出包的 `lifecycle` 只是元数据，再导入一律落 session Draft（`verified: false`），重复 `cardId` 走既有 conflict 路径。保存位置由系统保存对话框选定（知识包扩展名为 zip），取消不产生半成品。
 - 禁止声称语义检索。Semantic lane 开关与 Settings > Models Embedding 重建入口已删除。
 - Center 的 Rebuild Index 只重建 `KnowledgeIndexService` 结构索引。
 - `change reason` 与 `rollback basis` 只做确认门禁，不落盘。
@@ -38,6 +38,6 @@
 | Renderer API | `src/shared/renderer-api/core.ts`（Desktop / Browser 共用） |
 | 类型 | `src/shared/types/knowledge.ts`、`src/shared/types/knowledgeExport.ts` |
 
-IPC 通道：`knowledge:overview` / `query` / `card` / `compile` / `index:rebuild` / `candidates` / `candidateCreate` / `import` / `image` / `issueApprovalToken` / `write` / `promote` / `export`。写/提升必须消费 Main 签发的 `approvalToken`，并带 `explicitHumanConfirmation`；`knowledge:export` 为 `high-impact`，目标路径由 `dialog:saveFile` 的系统保存对话框返回，renderer 不得自行拼绝对路径。已删除 browse-only 的 `knowledge:listSpaces` / `listCards` / `getCard`。
+IPC 通道：`knowledge:overview` / `query` / `card` / `compile` / `index:rebuild` / `candidates` / `candidateCreate` / `import` / `image` / `issueApprovalToken` / `write` / `promote` / `export`。写/提升必须消费 Main 签发的 `approvalToken`，并带 `explicitHumanConfirmation`；`knowledge:export` 为 `high-impact`，目标路径由 `dialog:saveFile` 的系统保存对话框返回（知识包扩展名 zip），renderer 不得自行拼绝对路径。知识导入选文件走 `dialog:selectKnowledgeImport`（zip / yaml / yml），不走 `dialog:selectFiles`。已删除 browse-only 的 `knowledge:listSpaces` / `listCards` / `getCard`。
 
 权威产品边界见根目录 `DESIGN.md`「Knowledge」。

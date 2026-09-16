@@ -77,14 +77,9 @@
   gap: var(--space-4);
 }
 
-@media (max-width: 960px) {
-  .settings-agent-route-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 68rem) {
+@container settings-panel (max-width: 60rem) {
+  .settings-agent-route-grid,
   .settings-model-route-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

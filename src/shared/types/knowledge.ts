@@ -275,16 +275,20 @@ export interface KnowledgeCandidatesResult {
 
 export type KnowledgeImportStatus = 'draft' | 'quarantine' | 'conflict';
 
-export interface KnowledgeImportResult {
+export interface KnowledgeImportItem {
   status: KnowledgeImportStatus;
-  candidateCreated: false;
   lifecycle: 'draft' | null;
   sourceStatus?: string;
-  verified: false;
   record?: KnowledgeCardRecord;
   missingAssets: string[];
   reason?: string;
   existingCaseId?: string;
+}
+
+export interface KnowledgeImportResult {
+  candidateCreated: false;
+  verified: false;
+  items: KnowledgeImportItem[];
   sourceHash?: string;
   sourceMtimeMs?: number;
   sourceSize?: number;

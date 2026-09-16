@@ -1,8 +1,9 @@
 import type { KnowledgeCardRecord } from './knowledge';
 
 /**
- * Single-file YAML knowledge package. It is the only export format that can be
- * imported again; Markdown export is for reading and is not re-importable.
+ * YAML knowledge package carried inside a zip together with declared images.
+ * It is the only export format that can be imported again. Markdown export is
+ * for reading and is not re-importable.
  */
 export const KNOWLEDGE_PACKAGE_SCHEMA = 'rdc.knowledge-package/1';
 

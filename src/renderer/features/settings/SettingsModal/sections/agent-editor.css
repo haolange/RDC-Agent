@@ -93,51 +93,24 @@
   overflow: auto;
 }
 
-@media (max-width: 960px) {
-  .settings-manifest-editor-head {
-    flex-direction: column;
-  }
-}
-
-@media (max-width: 960px) {
-
-  .settings-manifest-editor {
-    overflow: visible;
-  }
-}
-
-@media (max-width: 68rem) {
-
+@container settings-panel (max-width: 60rem) {
+  .settings-manifest-editor,
   .settings-page-agents .settings-manifest-editor {
     height: auto;
     min-height: 0;
-  }
-}
-
-@media (max-width: 68rem) {
-
-  .settings-page-agents .settings-manifest-editor {
     overflow: visible;
   }
-}
 
-@media (max-width: 68rem) {
-
+  .settings-manifest-editor-head,
   .settings-page-agents .settings-manifest-editor-head {
     flex-direction: column;
   }
-}
-
-@media (max-width: 68rem) {
 
   .settings-page-agents .settings-manifest-editor-actions {
     width: 100%;
     flex-wrap: wrap;
     justify-content: flex-start;
   }
-}
-
-@media (max-width: 68rem) {
 
   .settings-manifest-editor-body {
     flex: 0 0 auto;
@@ -146,7 +119,7 @@
   }
 }
 
-@media (max-width: 48rem) {
+@container settings-panel (max-width: 48rem) {
   .settings-page-agents .settings-manifest-editor {
     width: 100%;
     max-width: 100%;

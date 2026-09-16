@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
-import type { KnowledgeCardDetail } from '@shared/types/knowledge';
+import type { KnowledgeCardDetail, KnowledgeImageRef, KnowledgeSpace } from '@shared/types/knowledge';
 import {
   KNOWLEDGE_PACKAGE_SCHEMA,
   type KnowledgeExportRequest,
@@ -9,12 +9,20 @@ import {
   type KnowledgePackage,
   type KnowledgePackageCard,
 } from '@shared/types/knowledgeExport';
+import { resolveWithinRoot } from './knowledgeFs';
 import { containsAbsolutePath, hasKnowledgeSecret } from './knowledgeIngest';
+import { isSafeKnowledgeImageRelative, KNOWLEDGE_IMAGE_MAX_BYTES } from './knowledgeImages';
+import {
+  KNOWLEDGE_PACKAGE_MANIFEST,
+  utf8ToZip,
+  zipKnowledgeFiles,
+} from './knowledgeZip';
 
 export interface KnowledgeExportDependencies {
   getCard(spaceId: string, relativePath: string): Promise<KnowledgeCardDetail | null>;
   listCards(spaceId: string): Promise<Array<{ spaceId: string; relativePath: string }>>;
-  writeFile(targetPath: string, contents: string): Promise<void>;
+  readImage(spaceId: string, relativePath: string): Promise<Uint8Array | null>;
+  writeBytes(targetPath: string, contents: Uint8Array): Promise<void>;
 }
 
 function omitUndefined<T extends object>(value: T): T {
@@ -25,7 +33,7 @@ function omitUndefined<T extends object>(value: T): T {
  * Package cards carry authoring content only. Machine-local provenance never
  * leaves this machine, so a package cannot imply the target already verified it.
  */
-export function toPackageCard(card: KnowledgeCardDetail): KnowledgePackageCard {
+export function toPackageCard(card: KnowledgeCardDetail, images?: KnowledgeImageRef[]): KnowledgePackageCard {
   return omitUndefined({
     cardId: card.cardId,
     relativePath: card.relativePath,
@@ -38,7 +46,7 @@ export function toPackageCard(card: KnowledgeCardDetail): KnowledgePackageCard {
     sourceStatus: card.sourceStatus,
     caseId: card.caseId,
     chapters: card.chapters,
-    images: card.images,
+    images,
   });
 }
 
@@ -89,6 +97,7 @@ export class KnowledgeExportService {
     }
     const refs = await this.resolveRefs(request);
     const cards: KnowledgePackageCard[] = [];
+    const imageFiles = new Map<string, Uint8Array>();
     let excludedCount = 0;
     for (const ref of refs) {
       const card = await this.deps.getCard(ref.spaceId, ref.relativePath);
@@ -97,18 +106,29 @@ export class KnowledgeExportService {
         excludedCount += 1;
         continue;
       }
-      cards.push(toPackageCard(card));
+      const present: KnowledgeImageRef[] = [];
+      for (const image of card.images ?? []) {
+        if (!isSafeKnowledgeImageRelative(image.relativePath)) continue;
+        const bytes = await this.deps.readImage(card.spaceId, image.relativePath);
+        if (!bytes || bytes.byteLength === 0 || bytes.byteLength > KNOWLEDGE_IMAGE_MAX_BYTES) continue;
+        present.push(image);
+        if (!imageFiles.has(image.relativePath)) imageFiles.set(image.relativePath, bytes);
+      }
+      cards.push(toPackageCard(card, present.length > 0 ? present : undefined));
     }
     if (cards.length === 0) throw new Error('KNOWLEDGE_EXPORT_EMPTY_RESULT');
 
-    const contents = request.format === 'package'
-      ? serializePackage(cards, new Date().toISOString())
-      : serializeMarkdown(cards);
-    await this.deps.writeFile(request.targetPath, contents);
+    const payload = request.format === 'package'
+      ? zipKnowledgeFiles([
+        { name: KNOWLEDGE_PACKAGE_MANIFEST, data: utf8ToZip(serializePackage(cards, new Date().toISOString())) },
+        ...[...imageFiles.entries()].map(([name, data]) => ({ name, data })),
+      ])
+      : new TextEncoder().encode(serializeMarkdown(cards));
+    await this.deps.writeBytes(request.targetPath, payload);
     return {
       cardCount: cards.length,
       excludedCount,
-      bytes: Buffer.byteLength(contents, 'utf8'),
+      bytes: payload.byteLength,
       targetPath: request.targetPath,
     };
   }
@@ -117,15 +137,25 @@ export class KnowledgeExportService {
 export function createDefaultExportDependencies(services: {
   getCard(spaceId: string, relativePath: string): Promise<KnowledgeCardDetail | null>;
   listCards(spaceId: string): Promise<Array<{ relativePath: string }>>;
+  listSpaces(): KnowledgeSpace[];
 }): KnowledgeExportDependencies {
   return {
     getCard: services.getCard,
     listCards: async (spaceId) => (await services.listCards(spaceId))
       .map((card) => ({ spaceId, relativePath: card.relativePath })),
-    // Temp file plus rename so a cancelled or failed write leaves no half file.
-    writeFile: async (targetPath, contents) => {
+    readImage: async (spaceId, relativePath) => {
+      const space = services.listSpaces().find((entry) => entry.spaceId === spaceId);
+      if (!space) return null;
+      try {
+        const absolute = await resolveWithinRoot(space.rootPath, relativePath);
+        return await fs.readFile(absolute);
+      } catch {
+        return null;
+      }
+    },
+    writeBytes: async (targetPath, contents) => {
       const temp = `${targetPath}.tmp`;
-      await fs.writeFile(temp, contents, 'utf8');
+      await fs.writeFile(temp, contents);
       await fs.rename(temp, targetPath);
     },
   };

@@ -5,31 +5,33 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-4);
+  padding: var(--modal-workbench-inset);
   background: var(--modal-backdrop);
+  backdrop-filter: var(--modal-backdrop-filter);
+  -webkit-backdrop-filter: var(--modal-backdrop-filter);
 }
 
 .settings-center {
   --settings-sidebar-width: 240px;
+  --settings-card-bg: var(--token-bg-raised);
+  --settings-card-bg-hover: var(--token-interactive-hover);
+  --settings-subtle-bg: var(--token-bg-shell);
+  container-type: inline-size;
+  container-name: settings-shell;
   position: relative;
   z-index: var(--z-modal);
-  width: min(92vw, 1920px);
-  height: min(90vh, 1240px);
-  min-width: min(45rem, calc(100vw - var(--space-8)));
-  min-height: min(30rem, calc(100vh - var(--space-8)));
+  width: min(88vw, 120rem, calc(min(86vh, 70rem) * 16 / 10));
+  height: min(86vh, 70rem, calc(min(88vw, 120rem) * 10 / 16));
+  min-width: min(45rem, calc(100vw - 2 * var(--modal-workbench-inset)));
+  min-height: min(30rem, calc(100vh - 2 * var(--modal-workbench-inset)));
   display: grid;
   grid-template-columns: var(--settings-sidebar-width) minmax(0, 1fr);
-  border: 1px solid var(--token-border-card);
+  border: 1px solid var(--modal-border);
   border-radius: var(--modal-radius);
   background: var(--modal-bg);
   box-shadow: var(--shadow-xl);
   overflow: hidden;
   animation: fadeInScale var(--transition-base) var(--ease-decelerate);
-  --settings-content-max: 1480px;
-  --settings-card-bg: var(--token-bg-raised);
-  --settings-card-bg-hover: var(--token-interactive-hover);
-  --settings-subtle-bg: var(--token-bg-shell);
-  border-color: var(--modal-border);
 }
 
 .settings-center-sidebar {
@@ -37,9 +39,8 @@
   flex-direction: column;
   gap: var(--space-4);
   padding: var(--space-5) var(--space-4);
-  border-right: 1px solid var(--token-border-card);
+  border-right: 1px solid var(--token-border-muted);
   background: var(--token-bg-shell);
-  border-right-color: var(--token-border-muted);
   overflow-y: auto;
 }
 
@@ -70,7 +71,10 @@
 }
 
 .settings-center-panel {
+  container-type: inline-size;
+  container-name: settings-panel;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
@@ -79,23 +83,12 @@
 }
 
 .settings-page {
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-}
-
-@media (max-width: 880px) {
-  .settings-handoff-card-body .settings-field.is-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 880px) {
-
-  .settings-handoff-card-body .settings-field.is-row .settings-field-label {
-    padding-top: 0;
-  }
 }
 
 @media (max-width: 1280px) {
@@ -105,69 +98,29 @@
 }
 
 @media (max-width: 960px) {
-  .settings-modal-backdrop {
-    padding: var(--space-5);
-  }
-}
-
-@media (max-width: 960px) {
-
   .settings-center {
-    width: min(94vw, calc(100vw - var(--space-4)));
-    height: min(90vh, calc(100vh - var(--space-4)));
-    min-width: 0;
-    min-height: 0;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
   }
-}
-
-@media (max-width: 960px) {
 
   .settings-center-sidebar {
-    min-width: 0;
     width: 100%;
     max-width: 100%;
+    min-width: 0;
     box-sizing: border-box;
+    gap: var(--space-3);
+    padding: var(--space-4);
     border-right: 0;
     border-bottom: 1px solid var(--token-border-card);
   }
-}
-
-@media (max-width: 960px) {
 
   .settings-center-content,
-.settings-center-panel {
-    min-width: 0;
+  .settings-center-panel {
     width: 100%;
     max-width: 100%;
+    min-width: 0;
     box-sizing: border-box;
   }
-}
-
-@media (max-width: 960px) {
-
-  .settings-secret-status {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-
-@media (max-width: 960px) {
-  .settings-modal-backdrop {
-    padding: var(--space-2);
-  }
-}
-
-@media (max-width: 960px) {
-
-  .settings-center-sidebar {
-    gap: var(--space-3);
-    padding: var(--space-4);
-  }
-}
-
-@media (max-width: 960px) {
 
   .settings-center-panel {
     padding: var(--space-4);
@@ -175,21 +128,13 @@
 }
 
 @media (max-width: 640px) {
-  .settings-modal-backdrop { padding: 0; }
-}
-
-@media (max-width: 640px) {
-
   .settings-center {
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
     min-width: 0;
     min-height: 0;
     border-radius: 0;
   }
-}
-
-@media (max-width: 640px) {
 
   .settings-center-brand {
     padding-bottom: var(--space-2);

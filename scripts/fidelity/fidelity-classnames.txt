@@ -990,7 +990,6 @@ settings-page-appearance
 settings-page-general
 settings-page-hooks
 settings-page-models
-settings-page-personalization
 settings-page-policy
 settings-page-skills
 settings-page-tools

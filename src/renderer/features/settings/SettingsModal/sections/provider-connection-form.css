@@ -139,8 +139,7 @@
   background: var(--modal-bg);
 }
 
-@media (max-width: 960px) {
-
+@container settings-panel (max-width: 60rem) {
   .settings-model-section-header {
     align-items: flex-start;
     flex-direction: column;
@@ -148,39 +147,19 @@
 }
 
 @media (max-width: 640px) {
-
   .settings-provider-connect-actions {
     grid-template-columns: 1fr;
     justify-content: stretch;
   }
-}
-
-@media (max-width: 640px) {
 
   .settings-provider-connect-actions .button {
     width: 100%;
   }
-}
 
-@media (max-width: 640px) {
-
-  .settings-provider-connect-dialog {
-    width: calc(100vw - var(--space-4));
-    max-height: calc(100vh - var(--space-4));
-  }
-}
-
-@media (max-width: 560px) {
-  .settings-provider-connect-actions {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 560px) {
-
+  .settings-provider-connect-dialog,
   .settings-provider-connect-dialog[data-model-list-size='short'],
-.settings-provider-connect-dialog[data-model-list-size='medium'],
-.settings-provider-connect-dialog[data-model-list-size='long'] {
+  .settings-provider-connect-dialog[data-model-list-size='medium'],
+  .settings-provider-connect-dialog[data-model-list-size='long'] {
     width: calc(100vw - var(--space-4));
     max-height: calc(100vh - var(--space-4));
   }

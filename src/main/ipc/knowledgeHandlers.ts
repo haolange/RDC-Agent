@@ -34,6 +34,7 @@ import {
 const knowledgeExportService = new KnowledgeExportService(createDefaultExportDependencies({
   getCard: (spaceId, relativePath) => knowledgeQueryService.getCard(spaceId, relativePath),
   listCards: (spaceId) => knowledgeQueryService.listCards(spaceId),
+  listSpaces: () => knowledgeQueryService.listSpaces(),
 }));
 
 function assertKnownSpaces(spaceIds: string[] | undefined): void {

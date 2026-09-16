@@ -9,6 +9,8 @@
  *  - token definition file (design-system.css) may reference primitives.
  *    styles/global/* is not exempt.
  *  - Right Rail empty visuals use semantic `--token-*` stop-color classes.
+ *  - component CSS may only set backdrop-filter to var(--modal-backdrop-filter);
+ *    literal blur() stays in the token definition file.
  *
  * Hits are locked by scripts/fidelity/design-tokens-baseline.json (B0 ratchet).
  * Debt may only decrease; a decrease must update the baseline in the same change.
@@ -77,12 +79,9 @@ const RULES = [
     pattern: /!important/,
     message: '!important is forbidden in component CSS',
   },
-  {
-    id: 'backdrop-blur',
-    pattern: /backdrop-filter:\s*blur|-webkit-backdrop-filter:\s*blur/,
-    message: 'backdrop blur is forbidden (restrained chrome uses solid surfaces)',
-  },
 ];
+
+const BACKDROP_FILTER_DECL = /(?:-webkit-)?backdrop-filter:\s*([^;]+)/g;
 
 const files = walk(path.join(root, 'src/renderer'));
 const hits = [];
@@ -98,6 +97,13 @@ for (const filePath of files) {
       if (!rule.pattern.test(line)) continue;
       if (rule.id === 'primitive-color-var' && STOP_COLOR_EXEMPT.has(rel) && line.includes('stop-color')) continue;
       hits.push(`${rel}:${index + 1}: ${rule.id} — ${rule.message} :: ${line.trim()}`);
+    }
+    BACKDROP_FILTER_DECL.lastIndex = 0;
+    let backdropMatch;
+    while ((backdropMatch = BACKDROP_FILTER_DECL.exec(line))) {
+      const value = backdropMatch[1].trim();
+      if (value === 'var(--modal-backdrop-filter)') continue;
+      hits.push(`${rel}:${index + 1}: backdrop-blur — backdrop-filter must be var(--modal-backdrop-filter) :: ${line.trim()}`);
     }
   });
 }
