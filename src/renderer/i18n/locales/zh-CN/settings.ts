@@ -390,6 +390,8 @@ export const zhSettings = {
   'settings.rdxVerifying': '验证中…',
   'settings.rdxVerified': '可用',
   'settings.rdxOperations': '个操作',
+  'settings.rdxCliIntermediateRoot': 'Runtime 根',
+  'settings.rdxCliEnvHint': '每行填写一项 NAME=value。未写 RDX_INTERMEDIATE_ROOT 时，桌面使用用户资源根下的 rdx-intermediate。',
   'settings.rdxVerifyHint': '检查已保存的 CLI 版本与能力。',
   'settings.rdxSaveBeforeVerify': '请先保存安装配置，再进行验证。',
   'settings.rdxCliInvoker': '本地 RenderDoc 工具链',

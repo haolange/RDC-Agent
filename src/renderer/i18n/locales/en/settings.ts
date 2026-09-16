@@ -210,6 +210,8 @@ export const enSettings = {
   'settings.rdxVerifying': 'Verifying…',
   'settings.rdxVerified': 'Available',
   'settings.rdxOperations': 'operations',
+  'settings.rdxCliIntermediateRoot': 'Runtime root',
+  'settings.rdxCliEnvHint': 'One NAME=value per line. When RDX_INTERMEDIATE_ROOT is unset, the desktop uses rdx-intermediate under the user resource root.',
   'settings.rdxVerifyHint': 'Checks the saved CLI version and capabilities.',
   'settings.rdxSaveBeforeVerify': 'Save these installation settings before verifying.',
   'settings.rdxCliInvoker': 'Local RenderDoc Toolchain',

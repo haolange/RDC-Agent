@@ -108,6 +108,7 @@ export interface ToolRuntimeMetadata {
   source: ToolRuntimeSource;
   command: string;
   workingDirectory: string;
+  intermediateRoot: string;
   version: string | null;
   catalog: {
     path: string;

@@ -16,6 +16,7 @@ import type { RdxCliInvokerSettings } from '@shared/types/settings';
 import { settingsService } from '../settings/SettingsService';
 import { shellInvocationService, type ShellInvocationService } from './ShellInvocationService';
 import { resolveRdxBatchInvocation } from './resolveRdxBatchInvocation';
+import { RDX_INTERMEDIATE_ROOT_ENV, withRdxHostRuntimeEnv } from './withRdxHostRuntimeEnv';
 
 export class RdxCliInvokerService {
   private catalogs = new Map<string, Promise<ToolCatalog>>();
@@ -30,10 +31,12 @@ export class RdxCliInvokerService {
   }
 
   private createRuntimeMetadata(settings = this.getSettings(), catalog?: Partial<ToolCatalog>): ToolRuntimeMetadata {
+    const resolved = withRdxHostRuntimeEnv(settings);
     return {
       source: settings.enabled && settings.command.trim() ? 'configured' : 'unconfigured',
       command: settings.command.trim(),
       workingDirectory: settings.workingDirectory.trim(),
+      intermediateRoot: resolved.env[RDX_INTERMEDIATE_ROOT_ENV] ?? '',
       version: this.versions.get(canonicalJson(settings)) ?? null,
       catalog: {
         path: '',
@@ -154,7 +157,11 @@ export class RdxCliInvokerService {
     } = {},
   ): Promise<CLIResult> {
     const startTime = nowMs();
-    const settings = options.settings ?? this.getSettings();
+    const incoming = options.settings ?? this.getSettings();
+    const settings = withRdxHostRuntimeEnv({
+      ...incoming,
+      env: { ...incoming.env, ...options.env },
+    });
     const unavailableReason = this.getAvailabilityFailure(settings);
     if (unavailableReason) {
       return {
@@ -174,10 +181,7 @@ export class RdxCliInvokerService {
       command: invocation.command,
       args: invocation.args,
       cwd: options.cwd || settings.workingDirectory || undefined,
-      env: {
-        ...settings.env,
-        ...options.env,
-      },
+      env: settings.env,
       timeoutMs: options.timeout ?? settings.timeoutMs,
       outputBufferBytes: 8 * 1024 * 1024,
       runId: options.runId,
