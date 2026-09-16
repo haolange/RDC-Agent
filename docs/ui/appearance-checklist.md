@@ -9,6 +9,7 @@
 - Light/Dark 编辑卡跟随 App chrome。
 - 圆角色板+hex。
 - 可读预设下拉（统一 pill Aa+名称触发体、菜单右缘贴合并向左延伸、caret 衔接 tip、实色 overlay 菜单、每项 Aa+勾选、足够宽度）。
+- 多选 `Checkbox` / `CheckPill` 共用空心方框 + 字色勾；`Switch` 才是 accent 胶囊。
 - Import/Copy `rdx-theme-v1:`。
 - Preferences。
 
@@ -32,7 +33,7 @@
 - canonical wire `xhigh` 统一显示 `Extra` 且产品最高档为 `Max`。
 - 上下文开关只叫 `Max mode / Max 模式`（reasoning 的 `Max` 不变）。
 - 固定 Max mode 开启且不可关闭。
-- Max mode 与 Fast mode 在思考面板里始终占位：不支持时灰色关闭，固定支持时灰色开启，只有 selectable 状态可交互。收起的合并胶囊只在对应模式开启时显示前置图标。
+- Max mode 与 Fast mode 在思考面板里始终占位：不支持时灰色关闭，固定支持时灰色开启，只有 selectable 状态可交互。收起的合并胶囊只在对应模式开启时显示前置图标。hover / `:focus-visible` 的 Fast/Max tip 是对准图标的实色圆胶囊（`--token-bg-raised`），完全浮在弹层上方；有约束状态只显示状态，不朝下叠进身份行。
 - 快速 A→B→C 只保留最新 revision。
 - 在途 turn 保持创建时冻结的 `RequestPlan`。
 - 切换和输入不触发 Context preview IPC。

@@ -34,25 +34,23 @@
   flex: none;
   width: var(--space-4);
   height: var(--space-4);
-  border: 1px solid var(--token-border-strong);
+  border: 1px solid var(--checkbox-border);
   border-radius: var(--radius-sm);
-  background: var(--token-bg-panel);
-  color: transparent;
+  background: var(--checkbox-bg);
+  color: var(--checkbox-check-color);
   transition:
     background var(--transition-fast),
     border-color var(--transition-fast),
     color var(--transition-fast);
 }
 
-.ui-check-pill-box svg {
-  width: var(--space-3);
-  height: var(--space-3);
+.ui-check-pill:hover:not(:disabled) .ui-check-pill-box {
+  border-color: var(--token-border-strong);
 }
 
 .ui-check-pill.is-selected .ui-check-pill-box {
-  border-color: var(--token-accent-primary);
-  background: var(--token-accent-primary);
-  color: var(--token-text-inverse);
+  border-color: var(--checkbox-checked-border);
+  background: var(--checkbox-checked-bg);
 }
 
 .ui-check-pill.is-selected {

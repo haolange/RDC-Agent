@@ -62,9 +62,6 @@
 /* ── Space filters: multi select, on by default, must stay quiet ── */
 
 .knowledge-center-space-row.ui-checkbox {
-  --checkbox-checked-bg: transparent;
-  --checkbox-checked-border: var(--token-border-strong);
-  --checkbox-check-color: var(--token-text-heading);
   display: flex;
   width: 100%;
   gap: var(--space-3);

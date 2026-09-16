@@ -3,6 +3,7 @@ import { CANONICAL_HOOK_EVENTS, type ScopedResourceKind } from '@shared/types/rd
 import { MCP_TRANSPORTS } from '@shared/types/mcp';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
+import { Checkbox } from '../../../../ui/Checkbox';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { Input } from '../../../../ui/Input';
@@ -141,10 +142,13 @@ export const ScopedResourceEditor: React.FC<{
             <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldArgsJson')}>
               <AutosizeTextarea maxHeight={160} className="input" value={form.argsText} disabled={busy} onChange={(event) => onChange({ argsText: event.target.value })} />
             </SettingsField>
-            <label className="settings-field settings-runtime-form-check">
-              <input type="checkbox" checked={form.enabled} disabled={busy} onChange={(event) => onChange({ enabled: event.target.checked })} />
-              <span>{t('settings.resourceFieldEnabledDefault')}</span>
-            </label>
+            <Checkbox
+              className="settings-field settings-runtime-form-check"
+              checked={form.enabled}
+              disabled={busy}
+              onCheckedChange={(enabled) => onChange({ enabled })}
+              label={t('settings.resourceFieldEnabledDefault')}
+            />
           </>
         )}
 
@@ -185,10 +189,13 @@ export const ScopedResourceEditor: React.FC<{
                 ))}
               </div>
             </SettingsField>
-            <label className="settings-field settings-runtime-form-check">
-              <input type="checkbox" checked={form.enabled} disabled={busy} onChange={(event) => onChange({ enabled: event.target.checked })} />
-              <span>{t('settings.resourceFieldEnabled')}</span>
-            </label>
+            <Checkbox
+              className="settings-field settings-runtime-form-check"
+              checked={form.enabled}
+              disabled={busy}
+              onCheckedChange={(enabled) => onChange({ enabled })}
+              label={t('settings.resourceFieldEnabled')}
+            />
           </>
         )}
       </div>
