@@ -31,6 +31,8 @@ describe('AppPathService', () => {
     const first = service.initializeRuntime();
     const firstCallCount = mkdirSpy.mock.calls.length;
     expect(firstCallCount).toBeGreaterThan(0);
+    expect(first.rdxIntermediateRoot).toBe(path.join(first.userRdxRoot, 'rdx-intermediate'));
+    expect(mkdirSpy.mock.calls.some((call) => String(call[0]).endsWith('rdx-intermediate'))).toBe(false);
 
     const second = service.initializeRuntime();
     expect(second).toBe(first);

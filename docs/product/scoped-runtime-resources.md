@@ -11,6 +11,7 @@
   config.json
   RDX.md
   agents/  skills/  mcp/  hooks/  policies/  knowledge/  memory/
+  rdx-intermediate/
 
 <project-root>/
   RDX.md

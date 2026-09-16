@@ -15,6 +15,7 @@ export interface UserRdxPaths {
   policiesPath: string;
   knowledgePath: string;
   memoryPath: string;
+  rdxIntermediateRoot: string;
 }
 
 export interface ProjectRdxPaths {
@@ -117,6 +118,7 @@ export class AppPathService {
       policiesPath: path.join(userRdxRoot, 'policies'),
       knowledgePath: path.join(userRdxRoot, 'knowledge'),
       memoryPath: path.join(userRdxRoot, 'memory'),
+      rdxIntermediateRoot: path.join(userRdxRoot, 'rdx-intermediate'),
     };
   }
 

@@ -26,6 +26,7 @@ describe('RdxCliInvokerService.getRuntimeSummary', () => {
       runtime: expect.objectContaining({
         source: 'unconfigured',
         command: '',
+        intermediateRoot: expect.stringMatching(/rdx-intermediate$/u),
       }),
       cli: expect.objectContaining({
         available: false,
@@ -116,4 +117,11 @@ it.each(['1.0.0', '2.0.0', 'local-build'])('validates capabilities independently
   const service = new RdxCliInvokerService();
   vi.spyOn(service, 'executeCLI').mockResolvedValueOnce(reply('rdx.version', { tool_version: identity, schema_version: '3.0.0' })).mockResolvedValueOnce(catalogReply());
   expect((await service.loadCatalog(cli)).tool_count).toBe(applicationOperations.length);
+});
+
+it('injects the host intermediate root into every CLI spawn env', async () => {
+  const invoke = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', duration_ms: 1 });
+  const service = new RdxCliInvokerService({ invoke } as never);
+  await service.executeCLI('version', ['--json'], { settings: cli });
+  expect(invoke.mock.calls[0][0].env.RDX_INTERMEDIATE_ROOT).toMatch(/rdx-intermediate$/u);
 });

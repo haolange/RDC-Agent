@@ -1,4 +1,5 @@
 import { rdxCliInvokerService } from '../../tools/RdxCliInvokerService';
+import { withRdxHostRuntimeEnv } from '../../tools/withRdxHostRuntimeEnv';
 import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
 import { assertExecutionOfferSkillCompatibility } from '../../sessions/handoffSkillCompatibility';
 import { executionOfferRequiredSkillIds } from '../../sessions/handoffSkills';
@@ -165,7 +166,7 @@ export class TurnPreparationService {
     // Compile the immutable policy before acquiring any external MCP lease.
     // Invalid policy must not spawn processes or establish network connections.
     const turnSettings = settingsService.getAll();
-    const cliSettings = structuredClone(turnSettings.tooling.rdxCli);
+    const cliSettings = withRdxHostRuntimeEnv(structuredClone(turnSettings.tooling.rdxCli));
     const leaseIdentity = assertRdxContextLeaseOwnership({ sessionId: input.sessionId, projectId: input.projectId });
     const catalog = leaseIdentity ? await rdxCliInvokerService.loadCatalog(cliSettings, true) : null;
     throwIfCancelled();

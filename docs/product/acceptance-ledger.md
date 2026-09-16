@@ -484,3 +484,15 @@ Android matching-runtime acceptance now passed: Android Studio SDK NDK 27.3.1375
 - 主题、尺寸与 Agent：暗色桌面 General 青色、亮色 390×844 General 青色与 Analyzer 紫色（accent #8d8bff）均呈现运行光环；窄屏 Composer 宽 354px，页面 scrollWidth=390，无横向溢出。多行输入可编辑并在固定输入区滚动，运行中仍可输入；完成后恢复正常发送，运行中附件/effort 禁用。
 - 未覆盖边界：当前 browser 控制接口不提供系统减少动效切换或媒体偏好模拟，因此 OS 开/关两态未实测，不标记全矩阵通过。DeepSeek V4 的 Max mode 为 Fixed，UI 正确禁用切换；Effort 可切换进入/持续/退出时间轴由本轮已通过单测证明，本次账号验收没有覆盖该交互。
 - 收尾：本轮临时会话经应用删除，界面返回 No sessions yet；恢复暗色主题与默认浏览器尺寸。QA 标签页、启动器和自有主进程均退出，canonical instance.lock 不存在；桌面启动权已交还。没有新增截图/录像文件、测试账号或临时目录。
+
+## 2026-09-16 RDX 活占用与桌面自有 runtime 根
+
+适用源码：`main @ fca93bd0` 加当前未提交实现。不把 CLI 安装目录或 Tools 源码路径写入仓库。本节只记录本轮实际核对，不改标既有 T18/U06 Capture 结论。
+
+- 一次性残片：计划清单中的死户口 / 死 daemon 文件已不存在；用户根下旧泄漏标记已不存在。`WhiteHair.rdc`（168591424 字节）与 `眼睛泪腺白点.rdc`（1647684424 字节）源文件仍在项目 inputs。未整目录删除 Tools `intermediate/`，未扫 QA userData。
+- Tools：`max_contexts` 改为活占用（daemon/worker/`owner_pid` 仍在跑，或本进程内存里有活 replay/preview）。空/死 `runtime_state_*.json` 不再占容量。`tests/test_context_occupancy.py` 3 项通过。
+- 本库：Settings `command` / `workingDirectory` / `env` 仍是唯一 CLI 入口。未写 `RDX_INTERMEDIATE_ROOT` 时，`withRdxHostRuntimeEnv` 在 `executeCLI`、`openProjectInput` 与 `prepareTurn` 冻结前注入 `~/.rdx/rdx-intermediate`。`initializeRuntime` 不预建该目录。Settings 校验成功文案带有效 Runtime 根；未新增表单字段。
+- 工程：`withRdxHostRuntimeEnv` / `RdxCliInvokerService` / `RdxTurnBindings` / `RdxSessionRuntime` / `rdxInstallation` / `AppPathService` 共 6 文件 36 项通过；`AgentOrchestrator.preparedTurn` 5 项通过。`typecheck`、受影响 eslint、`check:legacy-residue` 通过。未跑完整 coverage / Browser QA / 发布 pack。
+- 真实打开：使用当前 Settings 已配置 CLI（`env` 为空），注入用户根 `rdx-intermediate`。`rd.capture.open_file` 打开 `WhiteHair.rdc` 成功：`context_id=rdc-ee053f69-b68d-45a5-af73-e488a1553d41`，`capture_file_id=capf_f73fcaf44151`，`driver=Vulkan`，未出现 `context_limit_exceeded`。中间态只出现在用户根 `rdx-intermediate/runtime/...`，Tools 默认 `intermediate/runtime` 无此 lease。`rd.capture.open_replay` 失败，`renderdoc_error`：`Current replaying hardware unsupported`。这与既有本机 WhiteHair GPU 限制同类，**不标本地回放通过**。
+- 关闭：仅对该 lease `rd.session.clear_context` 与 `daemon stop` 均确认成功。确认 daemon 已停后，删除该 id 关闭后留下的空 state / snapshot / log / lock；该 id 文件数为 0。未清理其他 context。
+- 本轮未启动桌面或 Browser QA；canonical `instance.lock` 不存在。

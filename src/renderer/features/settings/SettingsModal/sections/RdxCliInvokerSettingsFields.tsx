@@ -72,7 +72,7 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
         </Button>
         <p className="settings-help-text" role="status" aria-live="polite">
           {message || (summary ? (summary.cli.available
-            ? `${t('settings.rdxVerified')}: ${summary.runtime.version} · ${summary.runtime.catalog.toolCount} ${t('settings.rdxOperations')}`
+            ? `${t('settings.rdxVerified')}: ${summary.runtime.version} · ${summary.runtime.catalog.toolCount} ${t('settings.rdxOperations')} · ${t('settings.rdxCliIntermediateRoot')}: ${summary.runtime.intermediateRoot}`
             : summary.cli.unavailableReason) : t('settings.rdxVerifyHint'))}
         </p>
       </div>
@@ -115,7 +115,7 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
             onChange={(event) => patch({ timeoutMs: Number(event.currentTarget.value) })}
           />
         </SettingsField>
-        <SettingsField label={t('settings.rdxCliEnv')} layout="row" description={t('settings.envLineHint')}>
+        <SettingsField label={t('settings.rdxCliEnv')} layout="row" description={t('settings.rdxCliEnvHint')}>
           <AutosizeTextarea
             maxHeight={180}
             className="input settings-rdx-cli-textarea"

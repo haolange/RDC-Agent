@@ -2,6 +2,7 @@ import { settingsService } from '../settings/SettingsService';
 import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import { parseRdxNativeResult } from '../tools/RdxNativeProtocol';
 import { freezeRdxTurnBinding } from '../tools/RdxTurnBindings';
+import { withRdxHostRuntimeEnv } from '../tools/withRdxHostRuntimeEnv';
 import { shellInvocationService } from '../tools/ShellInvocationService';
 /**
  * RdxSessionService - RDX runtime context state and fixed native CLI lifecycle.
@@ -81,7 +82,7 @@ export class RdxSessionRuntime {
 
   async openProjectInput(request: OpenProjectInputRequest, options: RdxLifecycleOptions = {}): Promise<OpenedCaptureState> {
     options.signal?.throwIfAborted();
-    const cli = structuredClone(options.binding?.cli ?? settingsService.getAll().tooling.rdxCli);
+    const cli = withRdxHostRuntimeEnv(structuredClone(options.binding?.cli ?? settingsService.getAll().tooling.rdxCli));
     let lifecycleBinding = options.binding;
     if (!lifecycleBinding) {
       const catalog = await rdxCliInvokerService.loadCatalog(cli);

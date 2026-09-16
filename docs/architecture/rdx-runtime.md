@@ -4,11 +4,12 @@ RDX Runtime 是 RDC-Agent 的资源解析、Prompt 构建与运行期可观测�
 
 ## Scope 与存储边界
 
-- User Scope 固定为 `~/.rdx`。
+- User Scope 固定为 `~/.rdx`（`RDC_AGENT_HOME` 可覆盖该根）。
 - Project Scope 固定为 `<project-root>/.rdx`。
 - 应用内部状态位于 `${userData}/state`，Secret、日志和缓存位于 OS `userData` 下。
 - Project `inputs/`、`artifacts/`、`memory/` 与 runtime state 默认不进入 Git。
 - RDX CLI 安装位置、参数前缀、工作目录、环境与超时是 User/Device 配置，Project 资源不能覆盖本机执行入口。
+- 桌面调用原生 CLI 时，若 Settings `env` 未写 `RDX_INTERMEDIATE_ROOT`，主进程注入用户资源根下的 `rdx-intermediate`。Settings 已写则原样使用。CLI 可执行文件仍只来自 Settings，不探测安装包或源码树，不把 Tools 默认 `intermediate` 当作产品 fallback。日常只 `clear` 本会话 lease；限额以 Tools 的活占用为准。
 
 `ScopedResourceResolver` 对 Agent、Skill、MCP、Hook 使用 `builtin < user < project` 的 whole-resource override，同 ID 的 Project disabled resource 可以隐藏继承项。Policy 只允许收紧；放宽、无效或不可比较的配置 fail-closed。
 
@@ -76,7 +77,7 @@ Memory 与 Knowledge 使用独立 scoped preload domain（`memory` / `knowledge`
 
 `RdxCliInvokerService` 和 session service 是软件固定对接边界。安装验证读取同一 CLI 的版本与完整 catalog，校验 canonical envelope、catalog schema、内容指纹和软件必需操作的参数契约。生命周期代码生成确定 argv，覆盖本地/远端打开、连接、context 查询、清理关闭、daemon 状态、完整事件索引与原子观察。目录不从独立文件配置读取，机器调用统一 canonical JSON；不匹配时明确升级，不回退旧命令。
 
-Settings 保留 executable、argsPrefix、cwd、env 和 timeout，并呈现连接验证与实际版本/能力状态。四个生命周期命令模板、模板变量、catalogPath 和 JSON 模式配置已移除。版本兼容根据软件所需接口判定，不把当前工具总数作为运行条件。
+Settings 保留 executable、argsPrefix、cwd、env 和 timeout，并呈现连接验证、实际版本/能力状态与有效 runtime 根。四个生命周期命令模板、模板变量、catalogPath 和 JSON 模式配置已移除。版本兼容根据软件所需接口判定，不把当前工具总数作为运行条件。
 
 `prepareTurn` 冻结 CLI 配置、完整操作定义及其指纹、owning session/context/replay lease 身份。在途 Settings 变化不影响该轮。General 使用已有 shell 的结构化 RDX 模式，普通 command 与 rdx 互斥；轻量发现只返回匹配操作或单个操作说明，不把完整 catalog 展开进每次模型请求。
 
