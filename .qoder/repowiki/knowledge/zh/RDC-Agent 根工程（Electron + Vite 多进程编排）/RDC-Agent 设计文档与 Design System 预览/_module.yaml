@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: docs
-title: RDC-Agent 设计文档与设计系统预览
+title: RDC-Agent 设计文档与 Design System 预览
 scope:
     - docs/
     - designs/
