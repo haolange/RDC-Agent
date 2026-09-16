@@ -12,17 +12,12 @@
   .composer-footer-bar .composer-agent-pill-label,
   .composer-footer-bar .composer-agent-pill-caret,
   .composer-footer-bar .composer-permission-pill-label,
-  .composer-footer-bar .composer-permission-pill-caret,
-  .composer-footer-bar .composer-effort-pill-label,
-  .composer-footer-bar .composer-effort-pill-caret,
-  .composer-footer-bar .composer-effort-pill-modes,
-  .composer-footer-bar .composer-model-pill-caret {
+  .composer-footer-bar .composer-permission-pill-caret {
     display: none;
   }
 
   .composer-footer-bar .composer-agent-pill,
-  .composer-footer-bar .composer-permission-pill,
-  .composer-footer-bar .composer-effort-pill {
+  .composer-footer-bar .composer-permission-pill {
     width: var(--control-height-sm);
     min-width: var(--control-height-sm);
     max-width: var(--control-height-sm);
@@ -31,17 +26,21 @@
     gap: 0;
   }
 
-  .composer-footer-bar .composer-model-menu {
+  .composer-footer-bar .composer-model-effort-menu {
     max-width: 8rem;
   }
 
-  .composer-footer-bar .composer-model-pill {
+  .composer-footer-bar .composer-model-effort-pill {
     padding-inline: var(--space-2);
+  }
+
+  .composer-footer-bar .composer-model-effort-pill-caret {
+    display: none;
   }
 }
 
 @container composer (max-width: 420px) {
-  .composer-footer-bar .composer-model-menu {
+  .composer-footer-bar .composer-model-effort-menu {
     max-width: 6rem;
   }
 }

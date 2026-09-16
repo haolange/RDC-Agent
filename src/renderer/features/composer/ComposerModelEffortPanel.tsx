@@ -2,17 +2,13 @@ import React from 'react';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
 import type { TranslationKey } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
-import {
-  EFFORT_LABEL_KEYS,
-  EffortFastModeSwitchRow,
-  EffortMaxContextSwitchRow,
-  getStopPosition,
-} from './effortControlParts';
+import { Button } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
+import { EFFORT_LABEL_KEYS, EffortModeIconButton, getStopPosition } from './effortControlParts';
 import { EFFORT_THUMB_WIDTH_PX, thumbInsetPercent } from './effortSliderGeometry';
 import type { MaxVisualTimeline } from './maxVisual';
 import type { ExitingMaxPhase } from './useMaxVisualController';
 import { EffortMaxField } from './EffortMaxField';
-import { Button } from '../../ui/Button';
 
 const EffortSliderStop: React.FC<{
   level: ReasoningSelection;
@@ -29,11 +25,12 @@ const EffortSliderStop: React.FC<{
   );
 };
 
-export const EffortControlPopup: React.FC<{
+export const ComposerModelEffortPanel: React.FC<{
   popupRef: React.RefObject<HTMLDivElement>;
   popupShiftPx: number;
   trackRef: React.RefObject<HTMLDivElement>;
-  capabilityStateLabel?: string;
+  modelLabel: string;
+  onOpenModels: () => void;
   capabilityStateDetail?: string;
   capabilityRefreshing: boolean;
   capabilityRetryLabel: string;
@@ -71,7 +68,8 @@ export const EffortControlPopup: React.FC<{
   popupRef,
   popupShiftPx,
   trackRef,
-  capabilityStateLabel,
+  modelLabel,
+  onOpenModels,
   capabilityStateDetail,
   capabilityRefreshing,
   capabilityRetryLabel,
@@ -111,30 +109,68 @@ export const EffortControlPopup: React.FC<{
   });
   const thumbDynStyle = useDynStyle({ left: `${thumbPercent}%` });
   const tooltipDynStyle = useDynStyle({ left: `${tooltipLeftPercent}%` });
+  const reasoningLabel = hasAdjustableReasoning
+    ? t(EFFORT_LABEL_KEYS[displayLevel])
+    : t('composer.effort.levelOff');
 
   return (
-  <div
-    ref={popupRef}
-    className="composer-effort-popup"
-    data-testid="composer-effort-popup"
-    role="dialog"
-    aria-label={t('composer.effort.popupTitle')}
-    {...popupDynStyle}
-  >
-    {capabilityStateLabel ? (
-      <div className="composer-effort-capability-state" data-testid="composer-effort-capability-state" role="status">
-        <div className="composer-effort-capability-state-copy">
-          <span>{t('composer.effort.reasoning')}</span>
-          <strong>{capabilityStateLabel}</strong>
-          {capabilityStateDetail ? <small>{capabilityStateDetail}</small> : null}
+    <div
+      ref={popupRef}
+      className="composer-model-effort-popup"
+      data-testid="composer-model-effort-popup"
+      role="dialog"
+      aria-label={t('composer.effort.popupTitle')}
+      {...popupDynStyle}
+    >
+      <div className="composer-model-effort-panel-head">
+        <EffortModeIconButton
+          mode="fast"
+          data-testid="composer-model-effort-fast-mode"
+          label={t('composer.effort.fastModel')}
+          statusLabel={fastModelStatusLabel}
+          available={fastModelAvailable}
+          active={fastModel}
+          onToggle={onToggleFastModel}
+        >
+          <Icon name="lightning" size={16} />
+        </EffortModeIconButton>
+        <div className="composer-model-effort-identity">
+          <span className="composer-model-effort-level">{reasoningLabel}</span>
+          <button
+            type="button"
+            className="composer-model-effort-model"
+            data-testid="composer-model-effort-open-picker"
+            aria-label={t('composer.model.openPicker')}
+            title={modelLabel}
+            onClick={onOpenModels}
+          >
+            <span>{modelLabel}</span>
+            <Icon name="chevron-right" size={12} />
+          </button>
+          {capabilityStateDetail ? (
+            <Button variant="ghost" size="sm" onClick={onRetryCapability}>
+              {capabilityRetryLabel}
+            </Button>
+          ) : null}
+          {capabilityRefreshing ? (
+            <span className="composer-model-effort-refreshing" role="status">
+              {t('composer.effort.capabilityRefreshing')}
+            </span>
+          ) : null}
         </div>
-        {capabilityStateDetail ? (
-          <Button variant="ghost" size="sm" onClick={onRetryCapability}>
-            {capabilityRetryLabel}
-          </Button>
-        ) : null}
+        <EffortModeIconButton
+          mode="max-context"
+          data-testid="composer-model-effort-max-mode"
+          label={t('composer.effort.maxContext')}
+          statusLabel={maxContextStatusLabel}
+          available={maxContextAvailable}
+          active={maxContextMode}
+          onToggle={onToggleMaxContext}
+        >
+          <Icon name="max-mode" size={16} />
+        </EffortModeIconButton>
       </div>
-    ) : (
+
       <div className={`composer-effort-slider-section ${hasAdjustableReasoning ? '' : 'is-disabled'}`}>
         <div
           ref={trackRef}
@@ -186,9 +222,7 @@ export const EffortControlPopup: React.FC<{
             aria-valuemin={0}
             aria-valuemax={displayLevels.length - 1}
             aria-valuenow={displayIndex}
-            aria-valuetext={hasAdjustableReasoning
-              ? t(EFFORT_LABEL_KEYS[displayLevel])
-              : t('composer.effort.levelOff')}
+            aria-valuetext={reasoningLabel}
             aria-disabled={!hasAdjustableReasoning}
             onKeyDown={onThumbKeyDown}
           />
@@ -205,31 +239,6 @@ export const EffortControlPopup: React.FC<{
           <span>{t('composer.effort.smarter')}</span>
         </div>
       </div>
-    )}
-
-    {capabilityRefreshing ? (
-      <div className="composer-effort-refreshing" role="status">
-        {t('composer.effort.capabilityRefreshing')}
-      </div>
-    ) : null}
-
-    <div className="composer-effort-popup-divider" aria-hidden="true" />
-
-    <EffortMaxContextSwitchRow
-      label={t('composer.effort.maxContext')}
-      statusLabel={maxContextStatusLabel}
-      available={maxContextAvailable}
-      active={maxContextMode}
-      onToggle={onToggleMaxContext}
-    />
-
-    <EffortFastModeSwitchRow
-      label={t('composer.effort.fastModel')}
-      statusLabel={fastModelStatusLabel}
-      available={fastModelAvailable}
-      active={fastModel}
-      onToggle={onToggleFastModel}
-    />
-  </div>
+    </div>
   );
 };

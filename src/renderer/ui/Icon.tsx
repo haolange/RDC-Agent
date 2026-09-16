@@ -47,7 +47,8 @@ export type IconName =
   | 'arrow-down'
   | 'link'
   | 'user'
-  | 'lightning';
+  | 'lightning'
+  | 'max-mode';
 
 type IconPart =
   | { d: string }
@@ -127,6 +128,10 @@ const ICONS: Record<IconName, readonly IconPart[]> = {
   link: [{ d: 'M10 14 14 10' }, { d: 'M8.5 15.5 7 17a3.5 3.5 0 0 1-5-5l3-3a3.5 3.5 0 0 1 5 0' }, { d: 'M15.5 8.5 17 7a3.5 3.5 0 0 1 5 5l-3 3a3.5 3.5 0 0 1-5 0' }],
   user: [{ c: [12, 8, 3.5] }, { d: 'M5 20a7 7 0 0 1 14 0' }],
   lightning: [{ d: 'M13 2 5 14h6l-1 8 8-12h-6l1-8Z' }],
+  'max-mode': [
+    { r: [4, 3.5, 12.5, 10, 2] },
+    { r: [7.5, 10.5, 12.5, 10, 2] },
+  ],
 };
 
 export interface IconProps {

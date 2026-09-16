@@ -24,7 +24,8 @@
   transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
-.composer-shell:focus-within {
+.composer-shell:focus-within,
+.composer-shell:has([aria-expanded="true"]) {
   border-color: var(--composer-mode-accent);
 }
 

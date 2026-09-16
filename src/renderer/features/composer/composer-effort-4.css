@@ -1,12 +1,3 @@
-.composer-effort-toggle.is-active::after {
-  transform: translateX(var(--space-4));
-  background: var(--token-bg-panel);
-}
-
-.composer-effort-toggle:disabled {
-  cursor: not-allowed;
-}
-
 .composer-user-input-options {
   display: flex;
   flex-direction: column;

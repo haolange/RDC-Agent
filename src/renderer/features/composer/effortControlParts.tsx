@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { cn } from '../../lib/cn';
 import type {
   ReasoningControl,
@@ -36,191 +37,70 @@ export const EFFORT_LABEL_KEYS = {
   max: 'composer.effort.levelMax',
 } as const;
 
-export type EffortPillMode = 'max-context' | 'fast';
-
-export interface EffortPillModeBadge {
-  mode: EffortPillMode;
-  label: string;
+export interface ModelEffortCapsulePresentation {
+  modelLabel: string;
+  reasoningLabel: string;
+  showFast: boolean;
+  showMax: boolean;
   title: string;
 }
 
-export interface EffortPillPresentation {
-  label: string;
-  title: string;
-  badges: EffortPillModeBadge[];
-}
-
-export type ReasoningIconVariant = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-
-export function resolveReasoningIconVariant(level: ReasoningSelection): ReasoningIconVariant {
-  if (level === 'on') {
-    return 'medium';
-  }
-  return level;
-}
-
-export function buildEffortPillPresentation(input: {
+export function buildModelEffortCapsulePresentation(input: {
+  modelLabel: string;
   reasoningLabel: string;
   maxContextMode: boolean;
   maxContextLabel: string;
-  maxContextBadgeLabel: string;
   fastModel: boolean;
   fastModelLabel: string;
-  fastModelBadgeLabel: string;
-}): EffortPillPresentation {
-  const badges: EffortPillModeBadge[] = [];
-  if (input.maxContextMode) {
-    badges.push({
-      mode: 'max-context',
-      label: input.maxContextBadgeLabel,
-      title: input.maxContextLabel,
-    });
-  }
-  if (input.fastModel) {
-    badges.push({
-      mode: 'fast',
-      label: input.fastModelBadgeLabel,
-      title: input.fastModelLabel,
-    });
-  }
+}): ModelEffortCapsulePresentation {
+  const parts = [input.modelLabel, input.reasoningLabel];
+  if (input.fastModel) parts.push(input.fastModelLabel);
+  if (input.maxContextMode) parts.push(input.maxContextLabel);
   return {
-    label: input.reasoningLabel,
-    title: [input.reasoningLabel, ...badges.map((badge) => badge.title)].join(' | '),
-    badges,
+    modelLabel: input.modelLabel,
+    reasoningLabel: input.reasoningLabel,
+    showFast: input.fastModel,
+    showMax: input.maxContextMode,
+    title: parts.join(' · '),
   };
 }
 
-interface EffortModeSwitchRowProps {
+interface EffortModeIconButtonProps {
+  mode: 'fast' | 'max-context';
+  'data-testid': 'composer-model-effort-fast-mode' | 'composer-model-effort-max-mode';
   label: string;
   statusLabel?: string;
   available: boolean;
   active: boolean;
   onToggle: () => void;
+  children: ReactNode;
 }
 
-function EffortModeSwitchRowBody(props: EffortModeSwitchRowProps) {
+export function EffortModeIconButton(props: EffortModeIconButtonProps) {
+  const accessibleName = props.statusLabel
+    ? `${props.label} · ${props.statusLabel}`
+    : props.label;
   return (
-    <>
-      <div className="composer-effort-toggle-copy">
-        <span className="composer-effort-toggle-label">{props.label}</span>
-        {props.statusLabel ? (
-          <span className="composer-effort-toggle-status">{props.statusLabel}</span>
-        ) : null}
-      </div>
-      <button
-        type="button"
-        role="switch"
-        className={cn('composer-effort-toggle', props.active && 'is-active')}
-        aria-checked={props.active}
-        aria-label={props.statusLabel ? `${props.label} · ${props.statusLabel}` : props.label}
-        disabled={!props.available}
-        onClick={props.onToggle}
-      />
-    </>
-  );
-}
-
-export function EffortMaxContextSwitchRow(props: EffortModeSwitchRowProps) {
-  return (
-    <div
-      className={`composer-effort-toggle-row ${props.available ? '' : 'is-disabled'}`}
-      data-testid="composer-effort-max-context-row"
-    >
-      <EffortModeSwitchRowBody {...props} />
-    </div>
-  );
-}
-
-export function EffortFastModeSwitchRow(props: EffortModeSwitchRowProps) {
-  return (
-    <div
-      className={`composer-effort-toggle-row ${props.available ? '' : 'is-disabled'}`}
-      data-testid="composer-effort-fast-row"
-    >
-      <EffortModeSwitchRowBody {...props} />
-    </div>
-  );
-}
-
-/**
- * Reasoning icons share optical center (12,12) in a 24 viewBox.
- * Density grows with level; stroke stays integer 2 for crisp 16px @ 1.5dpr.
- */
-export function ReasoningLevelIcon({ level }: { level: ReasoningSelection }) {
-  const variant = resolveReasoningIconVariant(level);
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      data-reasoning-icon={variant}
-    >
-      {variant === 'off' ? (
-        <>
-          <circle cx="12" cy="12" r="3" opacity="0.55" />
-          <circle cx="12" cy="12" r="8" opacity="0.4" />
-        </>
-      ) : (
-        <circle cx="12" cy="12" r="3" />
+    <button
+      type="button"
+      role="switch"
+      className={cn(
+        'composer-model-effort-mode',
+        props.active && 'is-active',
+        !props.available && 'is-disabled',
       )}
-
-      {variant === 'minimal' ? (
-        <path d="M12 5v3M12 16v3" />
-      ) : null}
-
-      {variant === 'low' ? (
-        <>
-          <circle cx="12" cy="5" r="2" />
-          <path d="M12 7v2" />
-        </>
-      ) : null}
-
-      {variant === 'medium' ? (
-        <>
-          <circle cx="6" cy="8" r="2" />
-          <circle cx="18" cy="8" r="2" />
-          <path d="M8 9 10 11M16 9 14 11" />
-        </>
-      ) : null}
-
-      {variant === 'high' ? (
-        <>
-          <circle cx="6" cy="7" r="2" />
-          <circle cx="18" cy="7" r="2" />
-          <circle cx="7" cy="17" r="2" />
-          <circle cx="17" cy="17" r="2" />
-          <path d="M8 9 10 11M16 9 14 11M9 15 10 14M15 15 14 14" />
-        </>
-      ) : null}
-
-      {variant === 'xhigh' ? (
-        <>
-          <path d="M7 5a8 8 0 0 1 10 0" />
-          <circle cx="6" cy="8" r="2" />
-          <circle cx="18" cy="8" r="2" />
-          <circle cx="7" cy="17" r="2" />
-          <circle cx="17" cy="17" r="2" />
-          <path d="M8 9 10 11M16 9 14 11M9 15 10 14M15 15 14 14" />
-        </>
-      ) : null}
-
-      {variant === 'max' ? (
-        <>
-          <circle cx="12" cy="12" r="8" />
-          <circle cx="6" cy="7" r="2" />
-          <circle cx="18" cy="7" r="2" />
-          <circle cx="7" cy="17" r="2" />
-          <circle cx="17" cy="17" r="2" />
-          <path d="M8 9 10 11M16 9 14 11M9 15 10 14M15 15 14 14" />
-        </>
-      ) : null}
-    </svg>
+      data-mode={props.mode}
+      data-testid={props['data-testid']}
+      aria-checked={props.active}
+      aria-label={accessibleName}
+      disabled={!props.available}
+      onClick={props.onToggle}
+    >
+      {props.children}
+      <span className="composer-model-effort-mode-tip" role="tooltip">
+        {accessibleName}
+      </span>
+    </button>
   );
 }
 

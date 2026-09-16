@@ -120,8 +120,8 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 - 强调色（`--color-accent-*`）只用于：焦点环、激活状态、主要 CTA（非 Composer）。不得用于正文、装饰或多处背景。全局 accent 来自 Appearance chrome 编译，不接管 Composer。
 - 状态色（success / warning / error / info）只用于语义状态，不得挪作装饰。
-- **双体系**：全局 chrome（`chromeThemes.light|dark` → `ThemeChromeCompiler`）驱动 shell/Settings/transcript；Composer 第二套由当前 agent 的 `.agent.md` `accent` 派生 `--composer-mode-accent` 与 `--composer-effort-*`（边框、send、Effort/Max 滑条、Max 字色、Max mode / Fast 开关开态、`2x`/`Fast` pill）。禁止这些 compose 控件再读 `--token-border-focus` 或裸 `--token-effort-*` 作为唯一色源。Light/Dark 只调制 compose 派生色的亮度，不替换色相来源。`--token-effort-*` 仅为 compose 变量缺省回退，禁止挪作其它装饰或背景。
-- Effort 弹层的 Max mode / Fast mode 是稳定能力槽位，不随模型消失：unsupported 显示灰色关闭，fixed 显示灰色开启，selectable 才允许切换。
+- **双体系**：全局 chrome（`chromeThemes.light|dark` → `ThemeChromeCompiler`）驱动 shell/Settings/transcript；Composer 第二套由当前 agent 的 `.agent.md` `accent` 派生 `--composer-mode-accent` 与 `--composer-effort-*`（边框、send、Effort/Max 滑条、Max 字色、Max mode / Fast 角标开态）。禁止这些 compose 控件再读 `--token-border-focus` 或裸 `--token-effort-*` 作为唯一色源。Light/Dark 只调制 compose 派生色的亮度，不替换色相来源。`--token-effort-*` 仅为 compose 变量缺省回退，禁止挪作其它装饰或背景。
+- Effort 弹层的 Max mode / Fast mode 是稳定能力槽位，不随模型消失：面板里始终占位；unsupported 显示灰色关闭，fixed 显示灰色开启，selectable 才允许切换。收起胶囊只在对应模式开启时前置图标。
 - Agent accent 必须可配置（`.agent.md` + Settings → Agents GUI）；`AGENT_SEED_ACCENTS` 仅用于 builtin seed 初值，不是运行时权威。
 - `--token-context-*` 色阶专用于 Context breakdown 弹窗的分段条与图例色点，不得挪作其它装饰或背景。
 - 不得引入非 design-system.css / ThemeChromeCompiler 定义的新颜色；需要新颜色时先在 `--token-*` 或 chrome 编译层添加并说明用途。
@@ -189,8 +189,8 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 ## 窄屏 Workbench
 
 - `<=720px` 时桌面工作区最小宽度必须解除，主区与 Composer 以真实 viewport 收缩，不得用 `overflow: hidden` 掩盖被裁掉的桌面宽度。
-- Composer Footer 始终单行、控件高 `--control-height-sm`（含发送按钮）。缩窄时禁止折成两行；Agent / Permission / Effort 收成 28 图标，Model 保留名称但设最长宽度，溢出用线性渐隐而不是省略号。
-- Agent / Permission / Effort / Usage / Model 菜单在窄屏锚定到 Composer 上方并完整位于 viewport 内；同一时刻只开一个；running 与 selected 分列，约 8px 状态点使用 semantic status token，运行点保持状态动画。
+- Composer Footer 始终单行、控件高 `--control-height-sm`（含发送按钮）。缩窄时禁止折成两行；Agent / Permission 收成 28 图标，合并的 model-effort 胶囊保留模型名 + 思考等级但设最长宽度，只有模型名溢出才用线性渐隐而不是省略号。
+- Agent / Permission / model-effort / Usage 菜单在窄屏锚定到 Composer 上方并完整位于 viewport 内；同一时刻只开一个；running 与 selected 分列，约 8px 状态点使用 semantic status token，运行点保持状态动画。
 - Browser 验收至少覆盖约 390px viewport、水平溢出、菜单 selected/running、键盘导航、Escape 焦点返回及持续播放。
 
 ## 组件清单（`src/renderer/ui`）
@@ -276,6 +276,6 @@ Composer Send / Stop 共用 Button 的 primary / danger 状态，尺寸固定 28
 
 用户入口再次点击直接关闭菜单；外部点击处理须排除入口自身，避免 mousedown 关闭后 click 重开。入口使用 aria-expanded / aria-controls，与弹层状态一致，保留 Escape 焦点返回。项目 Capture 的导入与刷新使用 SectionHeader actions 内两个 28px IconButton（加号 / 刷新），共用默认、hover、focus、disabled 状态和可访问名称，不保留独立文字按钮行。
 
-Composer 宽度分配：左组及图标 menu wrapper 不参与压缩；右组允许收缩。模型菜单随生效模型名 hug，用 `max-width` 封顶（默认 12rem），`min-width: 0` 可压；胶囊 `width: auto`，不预留固定槽、不贯通 `width: 100%`。窄容器只收紧 `max-width`（560px → 8rem，420px → 6rem），不用 `flex-basis` 预留槽。窄宽规则具有足够 specificity，不受后加载 Pill / Effort 基础样式覆盖。禁止 viewport 规则恢复右组 flex-shrink:0。<=720px 主内容轨道使用留白内全宽，不继续使用桌面 77% 上限；Model 只对实际溢出文本渐隐，完整名留在 `title`。
+Composer 宽度分配：左组及图标 menu wrapper 不参与压缩；右组允许收缩。model-effort 菜单独随生效模型名 + 思考等级 hug，用 `max-width` 封顶（默认 12rem），`min-width: 0` 可压；胶囊 `width: auto`，不预留固定槽、不贯通 `width: 100%`。窄容器只收紧 `max-width`（560px → 8rem，420px → 6rem），不用 `flex-basis` 预留槽。窄宽规则具有足够 specificity，不受后加载 Pill / Effort 基础样式覆盖。禁止 viewport 规则恢复右组 flex-shrink:0。<=720px 主内容轨道使用留白内全宽，不继续使用桌面 77% 上限；模型名只对实际溢出文本渐隐，完整名留在 `title`。
 
 计划卡使用 transcript-card padding/border/radius 与实色 token-bg-raised，底部以该实色渐隐遮罩裁切长内容；复用公共 Button 焦点环，分节 summary 使用 token-border-focus。阅读面板使用 modal-backdrop 和 token-bg-overlay，不引入未定义的颜色或焦点别名。

@@ -32,7 +32,7 @@
 - canonical wire `xhigh` 统一显示 `Extra` 且产品最高档为 `Max`。
 - 上下文开关只叫 `Max mode / Max 模式`（reasoning 的 `Max` 不变）。
 - 固定 Max mode 开启且不可关闭。
-- Max mode 与 Fast mode 始终显示：不支持时灰色关闭，固定支持时灰色开启，只有 selectable 状态可交互。
+- Max mode 与 Fast mode 在思考面板里始终占位：不支持时灰色关闭，固定支持时灰色开启，只有 selectable 状态可交互。收起的合并胶囊只在对应模式开启时显示前置图标。
 - 快速 A→B→C 只保留最新 revision。
 - 在途 turn 保持创建时冻结的 `RequestPlan`。
 - 切换和输入不触发 Context preview IPC。
@@ -43,7 +43,7 @@
 - Actual / Last actual 在弹层宽度大于 `33rem` 时保持等宽三列独立圆角卡片 Tokens | Cache | Reasoning（Cache：省 tokens、最近一轮%、累计%、命中/未命中；缺遥测显示 `—`，禁止假 0 / 假 0%；Cache 卡内 stats 可折成 2×2）；卡片间距用 `--space-3`，禁止分隔线连体与 `clamp` 归零 gap；只有真实窄屏才纵向单列堆叠。
 - 缩窗只在发送 preflight 内派生压缩视图而不提前改写历史。
 
-- Composer 底栏 Model override 与 Agent / Permission / Effort / Usage 互斥；390px 不越界。
+- Composer 底栏 model-effort 与 Agent / Permission / Usage 互斥；390px 不越界。
 - Settings 左侧导航可搜索并跳转高亮；八项顺序为 常规 → 外观 → Provider → Agents → Skills → Tools → Hooks → Policy，没有 Workspace 一级项。
 - 常规页底部「资源与诊断」打开任务子弹窗，内含只读用户根 / 项目根与九条资源路径的复制 / 打开；根路径不可编辑，不提供迁移。
 - Provider 总览卡片在同一视口下等宽等高；测试连接前 / 中 / 后卡片几何与按钮基线不变；未配置为中性色，只有真实失败才用 error；长错误折成摘要 + 展开。
@@ -52,7 +52,7 @@
 
 - First visible Effort popup frame must use measured inset geometry; measurement correction must not transition left or transform, while normal snap and Max lifecycle timing remain unchanged.
 
-- 白方块全程落在 track 内（inset 几何，无端点 transform 突变）。
+- 圆形滑块全程落在 track 内（inset 几何，无端点 transform 突变）。
 - 弹层拖拽无横向滚动条与布局跳动。
 - 松手仍 snap 到最近档位并短动画回位。
 

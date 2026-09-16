@@ -94,8 +94,19 @@ assert(
 );
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const effortPopupSource = scriptRead('src/renderer/features/composer/EffortControlPopup.tsx');
-const effortControlSource = scriptRead('src/renderer/features/composer/EffortControl.tsx');
+const composerChromeSource = [
+  fs.readFileSync(path.join(repoRoot, 'src/renderer/features/composer/composer-chrome-1.css'), 'utf8'),
+  fs.readFileSync(path.join(repoRoot, 'src/renderer/features/composer/composer-chrome-3.css'), 'utf8'),
+].join('\n');
+assert(
+  composerChromeSource.includes('.composer-shell:focus-within')
+    && composerChromeSource.includes('.composer-shell:has([aria-expanded="true"])')
+    && composerChromeSource.includes('.composer-shell.is-running:has([aria-expanded="true"])'),
+  'Composer ring must stay on while a footer menu is expanded, not only :focus-within',
+);
+
+const effortPopupSource = scriptRead('src/renderer/features/composer/ComposerModelEffortPanel.tsx');
+const effortControlSource = scriptRead('src/renderer/features/composer/useComposerEffortControl.ts');
 const effortMaxFieldSource = scriptRead('src/renderer/features/composer/EffortMaxField.tsx');
 const effortLayoutSource = scriptRead('src/renderer/features/composer/useEffortPopupLayout.ts');
 const debuggerCssSource = [
@@ -105,6 +116,17 @@ const debuggerCssSource = [
     .sort()
     .map((name) => fs.readFileSync(path.join(repoRoot, 'src/renderer/features/composer', name), 'utf8')),
 ].join('\n');
+assert(
+  debuggerCssSource.includes('.composer-model-effort-popup.is-picker')
+    && debuggerCssSource.includes('max-height: min(32rem, calc(100vh - var(--space-16)))')
+    && debuggerCssSource.includes('width: min(calc(var(--space-10) * 8), calc(100vw - var(--space-6)))'),
+  'Model picker may grow to 32rem tall but must stay 320px wide',
+);
+assert(
+  fs.readFileSync(path.join(repoRoot, 'src/renderer/features/composer/composer-chrome-2.css'), 'utf8')
+    .includes('padding: var(--space-1) var(--space-1) var(--space-2) 0;'),
+  'Model list must keep bottom padding so the last row is not clipped by the popup radius',
+);
 assert(
   !effortPopupSource.includes("'--composer-effort-stops-opacity'"),
   'Effort popup must not compete with the Max animation for stop opacity ownership',

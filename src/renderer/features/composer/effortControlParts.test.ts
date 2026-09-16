@@ -3,13 +3,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import {
   buildDisplaySelections,
-  buildEffortPillPresentation,
+  buildModelEffortCapsulePresentation,
   clampSliderRatio,
-  EffortMaxContextSwitchRow,
+  EffortModeIconButton,
   findAdjacentSupportedLevel,
   getStopPosition,
-  ReasoningLevelIcon,
-  resolveReasoningIconVariant,
   resolveNearestSnapLevel,
 } from './effortControlParts';
 import {
@@ -100,76 +98,71 @@ describe('effortControlParts', () => {
     })).toEqual(['on']);
   });
 
-  it('maps every reasoning selection to a stable pill icon variant', () => {
-    expect(resolveReasoningIconVariant('off')).toBe('off');
-    expect(resolveReasoningIconVariant('minimal')).toBe('minimal');
-    expect(resolveReasoningIconVariant('low')).toBe('low');
-    expect(resolveReasoningIconVariant('medium')).toBe('medium');
-    expect(resolveReasoningIconVariant('on')).toBe('medium');
-    expect(resolveReasoningIconVariant('high')).toBe('high');
-    expect(resolveReasoningIconVariant('xhigh')).toBe('xhigh');
-    expect(resolveReasoningIconVariant('max')).toBe('max');
-  });
-
-  it('renders reasoning icons on a crisp 16px integer grid', () => {
-    for (const level of ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const) {
-      const markup = renderToStaticMarkup(React.createElement(ReasoningLevelIcon, { level }));
-      expect(markup).toContain('width="16"');
-      expect(markup).toContain('height="16"');
-      expect(markup).toContain('stroke-width="2"');
-      expect(markup).toContain(`data-reasoning-icon="${level}"`);
-    }
-    expect(renderToStaticMarkup(React.createElement(ReasoningLevelIcon, { level: 'on' })))
-      .toContain('data-reasoning-icon="medium"');
-  });
-
-  it('keeps reasoning, Max mode, and Fast mode as separate pill states', () => {
-    const presentation = buildEffortPillPresentation({
+  it('shows Fast and Max icons on the capsule only when those modes are on', () => {
+    const presentation = buildModelEffortCapsulePresentation({
+      modelLabel: 'GPT-5.6 Sol',
       reasoningLabel: 'Max',
       maxContextMode: true,
       maxContextLabel: 'Max mode',
-      maxContextBadgeLabel: 'Max mode',
       fastModel: true,
       fastModelLabel: 'Fast mode',
-      fastModelBadgeLabel: '2x',
     });
 
-    expect(presentation.label).toBe('Max');
-    expect(presentation.title).toBe('Max | Max mode | Fast mode');
-    expect(presentation.badges).toEqual([
-      { mode: 'max-context', label: 'Max mode', title: 'Max mode' },
-      { mode: 'fast', label: '2x', title: 'Fast mode' },
-    ]);
-    expect(presentation.label).not.toContain('Max mode');
+    expect(presentation.modelLabel).toBe('GPT-5.6 Sol');
+    expect(presentation.reasoningLabel).toBe('Max');
+    expect(presentation.showFast).toBe(true);
+    expect(presentation.showMax).toBe(true);
+    expect(presentation.title).toBe('GPT-5.6 Sol · Max · Fast mode · Max mode');
   });
 
-  it('projects unavailable Max mode entitlement as Disabled in the switch accessible name', () => {
-    const markup = renderToStaticMarkup(React.createElement(EffortMaxContextSwitchRow, {
+  it('hides capsule Fast and Max icons when those modes are off', () => {
+    const presentation = buildModelEffortCapsulePresentation({
+      modelLabel: 'GPT-5.6 Sol',
+      reasoningLabel: 'Medium',
+      maxContextMode: false,
+      maxContextLabel: 'Max mode',
+      fastModel: false,
+      fastModelLabel: 'Fast mode',
+    });
+
+    expect(presentation.showFast).toBe(false);
+    expect(presentation.showMax).toBe(false);
+    expect(presentation.title).toBe('GPT-5.6 Sol · Medium');
+  });
+
+  it('projects unavailable Max mode entitlement as Disabled in the icon accessible name', () => {
+    const markup = renderToStaticMarkup(React.createElement(EffortModeIconButton, {
+      mode: 'max-context',
+      'data-testid': 'composer-model-effort-max-mode',
       label: 'Max mode',
       statusLabel: 'Disabled',
       available: false,
       active: false,
       onToggle: () => undefined,
+      children: 'M',
     }));
 
-    expect(markup).toContain('composer-effort-toggle-status');
+    expect(markup).toContain('composer-model-effort-mode-tip');
     expect(markup).toContain('Disabled');
     expect(markup).toContain('aria-label="Max mode · Disabled"');
     expect(markup).toContain('disabled=""');
   });
 
   it('renders fixed Max mode as active and disabled instead of flashing off', () => {
-    const markup = renderToStaticMarkup(React.createElement(EffortMaxContextSwitchRow, {
+    const markup = renderToStaticMarkup(React.createElement(EffortModeIconButton, {
+      mode: 'max-context',
+      'data-testid': 'composer-model-effort-max-mode',
       label: 'Max mode',
       statusLabel: 'Fixed',
       available: false,
       active: true,
       onToggle: () => undefined,
+      children: 'M',
     }));
 
     expect(markup).toContain('aria-checked="true"');
     expect(markup).toContain('disabled=""');
-    expect(markup).toContain('composer-effort-toggle');
+    expect(markup).toContain('composer-model-effort-mode');
     expect(markup).toContain('is-active');
     expect(markup).toContain('Fixed');
   });
