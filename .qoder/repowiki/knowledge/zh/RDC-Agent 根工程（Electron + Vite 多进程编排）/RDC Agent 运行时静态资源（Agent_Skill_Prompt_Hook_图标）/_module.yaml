@@ -7,5 +7,3 @@ source_files: []
 depends_on: []
 related_to:
     - path: scripts/fidelity_and_extraction
-    - path: scripts/launchers_and_smoke_tests
-    - path: scripts/runtime_helpers
