@@ -9,5 +9,5 @@ scope:
 source_files: []
 depends_on: []
 related_to:
-    - path: resources
     - path: scripts/runtime_helpers
+    - path: tests_and_coverage

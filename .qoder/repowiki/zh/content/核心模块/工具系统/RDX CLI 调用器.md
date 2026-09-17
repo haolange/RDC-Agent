@@ -13,6 +13,14 @@
 - [RdxCliInvokerService.test.ts](file://src/main/tools/RdxCliInvokerService.test.ts)
 </cite>
 
+## 更新摘要
+**所做更改**
+- 更新了参数构建与规范化部分，详细说明自动注入 `--owner-pid` 标志的功能
+- 增强了上下文传递机制的说明，包括所有者进程标识符的自动管理
+- 更新了架构图和流程图以反映新的所有者上下文增强功能
+- 添加了关于进程所有权和上下文隔离的新章节
+- 更新了故障排查指南以包含新的所有者进程相关错误
+
 ## 目录
 1. [简介](#简介)
 2. [项目结构](#项目结构)
@@ -28,8 +36,10 @@
 ## 简介
 本文件面向需要集成或扩展 RDX CLI 能力的开发者，系统性说明 RdxCliInvokerService 的设计与实现。内容覆盖 CLI 命令执行、参数构建与规范化、结果解析与错误处理、工具目录加载、运行时元数据管理、可用性检查与配置验证、命令行参数规范化、上下文传递、超时控制与进程管理等关键特性，并提供完整的 API 参考与最佳实践建议。
 
+**最新更新**：RdxCliInvokerService 现在在检测到上下文 ID 时自动注入 `--owner-pid` 标志，通过当前进程标识符增强所有者上下文，确保 RDX CLI 命令能够正确识别和管理进程所有权关系。
+
 ## 项目结构
-围绕 RDX CLI 调用器的核心代码主要位于 src/main/tools 目录，配合共享类型定义与设置类型，形成“服务层 + 协议层 + 进程管理层”的分层结构：
+围绕 RDX CLI 调用器的核心代码主要位于 src/main/tools 目录，配合共享类型定义与设置类型，形成"服务层 + 协议层 + 进程管理层"的分层结构：
 - 服务层：RdxCliInvokerService 提供高层工具调用能力（call、executeCLI、loadCatalog、getRuntimeSummary 等）。
 - 协议层：RdxNativeProtocol 负责校验并解析 RDX CLI 的 JSON 信封格式。
 - 进程管理层：ShellInvocationService 封装子进程生命周期、超时、中止、孤儿进程处理等。
@@ -46,6 +56,7 @@ A --> E["SettingsService<br/>读取 RdxCliInvokerSettings"]
 B --> F["ProcessSupervisor<br/>进程调度/隔离/超时"]
 A --> G["RdxExecutionReceipts<br/>执行回执签名/校验"]
 A --> H["RdxTurnBindings<br/>运行期绑定/指纹"]
+A --> I["自动注入 --owner-pid<br/>增强所有者上下文"]
 ```
 
 **图表来源**
@@ -62,7 +73,7 @@ A --> H["RdxTurnBindings<br/>运行期绑定/指纹"]
 - [settings.ts:1-200](file://src/shared/types/settings.ts#L1-L200)
 
 ## 核心组件
-- RdxCliInvokerService：对外暴露 call、executeCLI、loadCatalog、getRuntimeSummary、isAvailable、abortRun、terminateAll 等方法；内部完成参数构建、上下文注入、超时控制、结果解析与追踪事件发射。
+- RdxCliInvokerService：对外暴露 call、executeCLI、loadCatalog、getRuntimeSummary、isAvailable、abortRun、terminateAll 等方法；内部完成参数构建、上下文注入、超时控制、结果解析与追踪事件发射。**新增**：自动检测并注入 `--owner-pid` 标志以增强所有者上下文。
 - ShellInvocationService：统一子进程启动、等待、超时、中止、孤儿进程检测与清理；返回标准化的 CLIResult。
 - resolveRdxBatchInvocation：在 Windows 平台上将 rdx.bat 调用转换为 powershell.exe -File rdx_bat_launcher.ps1 的形式，并透传非交互标志。
 - RdxNativeProtocol：严格校验 RDX CLI 的 JSON 输出信封（ok、result_kind、data、context_id），并在不匹配时抛出协议错误。
@@ -91,6 +102,7 @@ participant Protocol as "RdxNativeProtocol"
 Caller->>Service : call({ toolName, args, contextId, runId, abortSignal })
 Service->>Service : 构建有效参数与 --args-json
 Service->>Service : 注入 --daemon-context如存在
+Service->>Service : 自动注入 --owner-pid (当有contextId时)
 Service->>Resolver : 解析实际命令与参数Windows 批处理适配
 Resolver-->>Service : { command, args }
 Service->>Shell : invoke({ command, args, cwd, env, timeoutMs, runId, contextId, abortSignal })
@@ -115,8 +127,8 @@ Service-->>Caller : ToolCallResultok/data/artifacts/error/duration_ms/trace_id
   - 可用性检查：基于设置项判断是否启用、命令是否存在、工作目录是否可用。
   - 工具目录加载：从 catalogPath 加载工具清单，缓存并按路径变更刷新；未配置时返回空目录。
   - 运行时摘要：统计命名空间工具数量，报告 CLI 可用性与不可用原因。
-  - 参数构建与规范化：将 --context-id 标准化为 --daemon-context；分离全局参数与命令参数；拼接 settings.argsPrefix。
-  - 上下文传递：自动注入 context_id、runtime_owner、owner_lease_id 到 --args-json；必要时追加 --daemon-context。
+  - 参数构建与规范化：将 --context-id 标准化为 --daemon-context；分离全局参数与命令参数；拼接 settings.argsPrefix。**新增**：自动检测并注入 `--owner-pid` 标志。
+  - 上下文传递：自动注入 context_id、runtime_owner、owner_lease_id 到 --args-json；必要时追加 --daemon-context。**新增**：当使用上下文 ID 时自动注入 `--owner-pid process.pid` 以增强所有者上下文。
   - 超时与中止：继承设置中的 timeoutMs，支持外部 AbortSignal 中断。
   - 结果解析：先进行协议校验，再解析 stdout JSON，映射为 ToolCallResult；失败路径包含 CLI_ERROR、EXECUTION_ERROR 等。
   - 追踪事件：每次调用都会生成 ToolTraceEntry 并通过监听器广播。
@@ -132,8 +144,11 @@ AddJson --> ContextFlag{"是否有 contextId?"}
 SkipJson --> ContextFlag
 ContextFlag --> |是| AddCtx["追加 --daemon-context"]
 ContextFlag --> |否| NoCtx["不追加"]
-AddCtx --> Exec["executeCLI('call', 参数)"]
-NoCtx --> Exec
+AddCtx --> OwnerPid{"是否需要 owner-pid?"}
+NoCtx --> Exec["executeCLI('call', 参数)"]
+OwnerPid --> |是| AddOwnerPid["追加 --owner-pid process.pid"]
+OwnerPid --> |否| Exec
+AddOwnerPid --> Exec
 Exec --> Parse["parseRdxNativeResult(CLIResult)"]
 Parse --> Stdout{"stdout 是否为空?"}
 Stdout --> |否| MapResult["解析 JSON -> ToolCallResult"]
@@ -149,6 +164,32 @@ Emit --> End(["返回 ToolCallResult"])
 
 **章节来源**
 - [RdxCliInvokerService.ts:42-367](file://src/main/tools/RdxCliInvokerService.ts#L42-L367)
+
+### 所有者上下文增强机制
+**新增功能**：RdxCliInvokerService 现在实现了智能的所有者上下文增强机制，当检测到上下文 ID 时自动注入 `--owner-pid` 标志。
+
+- 自动检测逻辑：在 `buildCommandArgs` 方法中检测是否存在 `--daemon-context` 或 `--owner-pid` 参数
+- 进程标识符注入：当存在上下文 ID 且未显式指定 `--owner-pid` 时，自动注入当前进程 PID (`process.pid`)
+- 参数优先级：显式指定的 `--owner-pid` 参数优先于自动注入的值
+- 上下文隔离：确保每个上下文都有正确的进程所有权标识，防止跨上下文干扰
+
+```mermaid
+flowchart TD
+CheckContext{"检查 contextId"} --> |存在| CheckOwnerPid{"检查是否已有 --owner-pid"}
+CheckContext --> |不存在| SkipInjection["跳过注入"]
+CheckOwnerPid --> |已存在| UseExisting["使用现有值"]
+CheckOwnerPid --> |不存在| InjectPid["注入 process.pid"]
+InjectPid --> AddToArgs["添加到全局参数"]
+UseExisting --> AddToArgs
+AddToArgs --> ExecuteCLI["执行 CLI 命令"]
+SkipInjection --> ExecuteCLI
+```
+
+**图表来源**
+- [RdxCliInvokerService.ts:121-155](file://src/main/tools/RdxCliInvokerService.ts#L121-L155)
+
+**章节来源**
+- [RdxCliInvokerService.ts:121-155](file://src/main/tools/RdxCliInvokerService.ts#L121-L155)
 
 ### ShellInvocationService：子进程生命周期管理
 - 功能要点
@@ -238,6 +279,7 @@ Svc --> Set["SettingsService"]
 Shl --> PS["ProcessSupervisor"]
 Svc --> Rec["RdxExecutionReceipts"]
 Svc --> Bind["RdxTurnBindings"]
+Svc --> Owner["所有者上下文增强"]
 ```
 
 **图表来源**
@@ -259,6 +301,7 @@ Svc --> Bind["RdxTurnBindings"]
 - 结果校验：协议层严格校验 JSON 信封，减少下游误判。
 - 可观测性：每次调用均产生 ToolTraceEntry，便于追踪与审计。
 - 并发与取消：支持 AbortSignal 中断；上层可结合并发策略限制工具调用。
+- **新增**：所有者上下文增强提高了进程所有权管理的准确性，减少了跨上下文干扰的风险。
 
 [本节为通用指导，不直接分析具体文件]
 
@@ -269,11 +312,13 @@ Svc --> Bind["RdxTurnBindings"]
   - 协议错误：parseRdxNativeResult 抛出 RDX_CLI_PROTOCOL/RDX_CONTEXT_MISMATCH，需检查 RDX CLI 输出是否符合信封规范。
   - 超时：ShellInvocationService 返回 exitCode=124，stderr 包含超时信息。
   - 孤儿进程：processExitReason='unconfirmed_orphan'，需关注进程终止确认逻辑。
+  - **新增**：所有者上下文问题：如果 RDX CLI 无法正确识别进程所有权，检查是否正确注入了 `--owner-pid` 标志。
 - 调试建议
   - 开启 trace 监听：onInvocationTrace 收集每次调用的入参与结果。
   - 检查 Settings：确认 enabled、command、workingDirectory、env、timeoutMs、catalogPath 等字段。
   - 验证 Windows 批处理：确认 rdx_bat_launcher.ps1 存在并可执行。
   - 查看子进程日志：CLIResult.stderr/stdout 保留完整输出。
+  - **新增**：验证所有者上下文：检查调用参数中是否包含正确的 `--owner-pid` 标志，特别是在使用上下文 ID 时。
 
 **章节来源**
 - [RdxCliInvokerService.ts:70-86](file://src/main/tools/RdxCliInvokerService.ts#L70-L86)
@@ -282,7 +327,7 @@ Svc --> Bind["RdxTurnBindings"]
 - [ShellInvocationService.ts:67-97](file://src/main/tools/ShellInvocationService.ts#L67-L97)
 
 ## 结论
-RdxCliInvokerService 提供了稳定、可观测、可配置的 RDX CLI 调用能力，通过严格的协议校验、完善的进程管理与清晰的错误分类，使上层工具系统能够可靠地集成外部 RDX 工具。结合 RdxExecutionReceipts 与 RdxTurnBindings，可在保障安全与完整性的前提下，实现端到端的执行审计与上下文绑定。
+RdxCliInvokerService 提供了稳定、可观测、可配置的 RDX CLI 调用能力，通过严格的协议校验、完善的进程管理与清晰的错误分类，使上层工具系统能够可靠地集成外部 RDX 工具。**新增的所有者上下文增强功能**进一步提升了进程所有权管理的准确性，确保在多上下文环境中正确识别和管理进程关系。结合 RdxExecutionReceipts 与 RdxTurnBindings，可在保障安全与完整性的前提下，实现端到端的执行审计与上下文绑定。
 
 [本节为总结性内容，不直接分析具体文件]
 
@@ -354,6 +399,8 @@ RdxCliInvokerService 提供了稳定、可观测、可配置的 RDX CLI 调用�
   - [RdxCliInvokerService.ts:248-355](file://src/main/tools/RdxCliInvokerService.ts#L248-L355)
 - 构建并规范化命令行参数：
   - [RdxCliInvokerService.ts:143-176](file://src/main/tools/RdxCliInvokerService.ts#L143-L176)
+- **新增**：自动注入所有者进程标识符：
+  - [RdxCliInvokerService.ts:121-155](file://src/main/tools/RdxCliInvokerService.ts#L121-L155)
 - 解析 RDX CLI 协议信封：
   - [RdxNativeProtocol.ts:12-34](file://src/main/tools/RdxNativeProtocol.ts#L12-L34)
 - 子进程超时与异常处理：
@@ -380,13 +427,16 @@ RdxCliInvokerService 提供了稳定、可观测、可配置的 RDX CLI 调用�
 - 在 Windows 环境下确保 rdx_bat_launcher.ps1 存在且可执行。
 - 使用 RdxExecutionReceipts 保存关键操作的执行回执，保障可追溯性。
 - 使用 RdxTurnBindings 将 CLI 配置与动作绑定到运行上下文，避免敏感信息外泄。
+- **新增**：利用自动注入的 `--owner-pid` 功能，无需手动管理进程所有权标识，系统会在检测到上下文 ID 时自动处理。
 
 [本节为通用指导，不直接分析具体文件]
 
 ### 测试与断言参考
 - 行为验证：getRuntimeSummary 不包含不推荐字段；上下文作用域的参数与上下文 ID 正确传递。
+- **新增**：所有者上下文增强测试：验证 `--owner-pid` 标志在上下文 ID 存在时自动注入。
 - 参考用例：
   - [RdxCliInvokerService.test.ts:24-47](file://src/main/tools/RdxCliInvokerService.test.ts#L24-L47)
+  - [RdxCliInvokerService.test.ts:129-135](file://src/main/tools/RdxCliInvokerService.test.ts#L129-L135)
 
 **章节来源**
-- [RdxCliInvokerService.test.ts:1-48](file://src/main/tools/RdxCliInvokerService.test.ts#L1-L48)
+- [RdxCliInvokerService.test.ts:1-136](file://src/main/tools/RdxCliInvokerService.test.ts#L1-L136)

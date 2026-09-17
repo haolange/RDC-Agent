@@ -11,6 +11,4 @@ scope:
 source_files: []
 depends_on: []
 related_to:
-    - path: resources
     - path: scripts/launchers_and_smoke_tests
-    - path: scripts/quality_checks

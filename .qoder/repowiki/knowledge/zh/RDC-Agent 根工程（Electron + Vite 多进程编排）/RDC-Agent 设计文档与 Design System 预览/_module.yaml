@@ -6,4 +6,5 @@ scope:
     - designs/
 source_files: []
 depends_on: []
-related_to: []
+related_to:
+    - path: scripts/fidelity_and_extraction

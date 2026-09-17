@@ -6,6 +6,4 @@ scope:
     - scripts/system-debt-ratchet.mjs
 source_files: []
 depends_on: []
-related_to:
-    - path: scripts/fidelity_and_extraction
-    - path: scripts/runtime_helpers
+related_to: []
