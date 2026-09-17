@@ -31,7 +31,6 @@ export type ProcessOwner =
   | 'replay'
   | 'agent-shell'
   | 'background'
-  | 'daemon'
   | 'other';
 
 export interface SupervisedSpawnOptions {

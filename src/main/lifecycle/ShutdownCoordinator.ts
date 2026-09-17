@@ -7,6 +7,7 @@ export type ShutdownPhase =
   | 'stop_accepting_turns'
   | 'abort_all'
   | 'join_producers'
+  | 'release_owned_runtimes'
   | 'terminate_processes'
   | 'flush_storage'
   | 'exited';
@@ -15,6 +16,7 @@ export type ShutdownDisposablePhase =
   | 'stop_accepting_turns'
   | 'abort_all'
   | 'join_producers'
+  | 'release_owned_runtimes'
   | 'terminate_processes'
   | 'flush_storage';
 
@@ -24,10 +26,11 @@ export interface ShutdownDisposable {
   dispose: () => void | Promise<void>;
 }
 
-const PHASE_ORDER: ShutdownDisposablePhase[] = [
+export const SHUTDOWN_PHASE_ORDER: ShutdownDisposablePhase[] = [
   'stop_accepting_turns',
   'abort_all',
   'join_producers',
+  'release_owned_runtimes',
   'terminate_processes',
   'flush_storage',
 ];
@@ -74,7 +77,7 @@ export class ShutdownCoordinator {
     }
 
     try {
-      for (const phase of PHASE_ORDER) {
+      for (const phase of SHUTDOWN_PHASE_ORDER) {
         this.phase = phase;
         const remaining = deadline - Date.now();
         if (remaining <= 0) break;

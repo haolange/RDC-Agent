@@ -26,7 +26,7 @@ Work Process 的工具摘要只由 runtime tool result 计算 `succeeded / faile
 | `AgentOrchestrator` | façade（少于 800 行）；`ProfileTurnPreparation` 为 sendMessage/sendProfileMessage/subagent 唯一 prepare 入口；无 `preparedRuntime` → `TURN_NOT_PREPARED` |
 | `TurnCoordinator` / `TurnHandle` | Session ownership Active→Aborting→Orphaned→Settled；Orphaned 时 `beginTurn` → `TURN_ORPHANED`；`abortAndJoin` 等 stream + producerCompletion；late producer join |
 | `ProcessSupervisor` | spawn/joinAll；POSIX pgid；Windows `taskkill /T`；close-observed registry；timeout yields `unconfirmed_orphan` |
-| `ShutdownCoordinator` | `running → … → exited`；before-quit 限时 `shutdownAll` |
+| `ShutdownCoordinator` | `running → … → release_owned_runtimes → terminate_processes → … → exited`；before-quit 限时 `shutdownAll`；RDX clear+stop 不得与 `joinAll` 并行 |
 | `AgentSlotRegistry` / `McpConnectionCoordinator` / `DeferredToolActivationTracker` / `TurnHandle.pendingHandoff` | Per-session/per-project ownership；AgentState 键 `scope::agentId`；MCP pool `realpath+projectId+descriptorHash`；orphan pool quarantine；transport 仅 stdio/streamable-http（sse fail-closed） |
 | `RdxRuntimeContextRegistry` | 仅 per-session RDX context lease；无 global mirror |
 | `LoopRuntimeState` | Agent 工具面 COW；每轮读 `runtime.current` |

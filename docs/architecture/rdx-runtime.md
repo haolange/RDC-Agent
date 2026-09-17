@@ -9,7 +9,7 @@ RDX Runtime 是 RDC-Agent 的资源解析、Prompt 构建与运行期可观测�
 - 应用内部状态位于 `${userData}/state`，Secret、日志和缓存位于 OS `userData` 下。
 - Project `inputs/`、`artifacts/`、`memory/` 与 runtime state 默认不进入 Git。
 - RDX CLI 安装位置、参数前缀、工作目录、环境与超时是 User/Device 配置，Project 资源不能覆盖本机执行入口。
-- 桌面调用原生 CLI 时，若 Settings `env` 未写 `RDX_INTERMEDIATE_ROOT`，主进程注入用户资源根下的 `rdx-intermediate`。Settings 已写则原样使用。CLI 可执行文件仍只来自 Settings，不探测安装包或源码树，不把 Tools 默认 `intermediate` 当作产品 fallback。日常只 `clear` 本会话 lease；限额以 Tools 的活占用为准。
+- 桌面调用原生 CLI 时，若 Settings `env` 未写 `RDX_INTERMEDIATE_ROOT`，主进程注入用户资源根下的 `rdx-intermediate`。Settings 已写则原样使用。CLI 可执行文件仍只来自 Settings，不探测安装包或源码树，不把 Tools 默认 `intermediate` 当作产品 fallback。关闭本会话 lease 必须先 `rd.session.clear_context` / `context clear`，再对该 `rdc-<uuid>` 执行 `daemon stop`；clear 不代替 stop。限额以 Tools 的活占用为准。启动与退出只收割 App 中间根下已确认归属的 `rdc-*`，不扫安装目录 `intermediate`，不碰 `default` 或其他 context。
 
 `ScopedResourceResolver` 对 Agent、Skill、MCP、Hook 使用 `builtin < user < project` 的 whole-resource override，同 ID 的 Project disabled resource 可以隐藏继承项。Policy 只允许收紧；放宽、无效或不可比较的配置 fail-closed。
 
@@ -91,7 +91,7 @@ Settings 保留 executable、argsPrefix、cwd、env 和 timeout，并呈现连�
 
 ## 内嵌回放、观察与 Session ownership
 
-应用生命周期的唯一入口为 session-scoped `RdxSessionService`，每个 binding 持有 `RdxSessionRuntime`。Open 对原文件计算完整 SHA-256，main 分配 UUID daemon context，并通过固定原生 argv 传递。只接受匹配的 native identity，关闭失败保留原 owning context。Android 设备预留先于连接，另一 session 不能抢占。
+应用生命周期的唯一入口为 session-scoped `RdxSessionService`，每个 binding 持有 `RdxSessionRuntime`。Open 对原文件计算完整 SHA-256，main 分配 UUID daemon context，先 `daemon start --owner-pid <App pid>` 再通过固定原生 argv 传递。只接受匹配的 native identity，关闭失败保留原 owning context。Android 设备预留先于连接，另一 session 不能抢占。`ShutdownCoordinator` 在 `release_owned_runtimes` 完成 clear+stop 与归属收割后，才进入 `terminate_processes` 的 `ProcessSupervisor.joinAll`。归属记录落在 `userData/state/owned-rdx-daemons.json`，不是全局 lease 镜像。
 
 `rd.session.get_replay_events` 返回完整事件列表；`rd.session.observe` 在原生串行区内应用事件、解析目标并导出画面。默认 final_output 只使用 Present 资源证据，无法识别时不冒充最终输出。Remote 当前能力为 unsupported，Local 图片路径并不能证明设备屏幕显示。
 
@@ -109,7 +109,7 @@ RDX 接口只维护当前操作契约；包发布号仅用于安装诊断，不�
 
 设备选择只更新选择目标；Capture 打开时才由 RdxSessionRuntime 分配 owning context、冻结 CLI 并预留设备，然后调用同一原生连接。无 context 的 device:activate IPC 已删除。Tools 根据实际状态复用已有 helper 或启动自有 helper，应用不另行启停。设备连接状态只在 connect 与 Ping 都成功后建立；startedActivity 才表示本次启动，包名存在不表示 APK 已验证。失败保留真实错误，可重新打开 Capture 重试。关闭、取消与退出均遵循自有资源清理，借用 helper 必须保留。
 
-远端 replay 必须复用 owning runtime 已持有的 native connection，避免第二条连接触发真实 busy。关闭先经 clear_context 确认所属会话和转发释放，再清除身份；清理失败保留恢复信息。CLI canonical 错误中的原始代码与消息应保留到应用恢复提示。
+远端 replay 必须复用 owning runtime 已持有的 native connection，避免第二条连接触发真实 busy。关闭先经 clear_context 确认所属会话和转发释放，再 `daemon stop` 并确认该 context 的 daemon/worker 退出；清理失败保留恢复信息，不得把 clear 成功或缺失 state 文件当成进程已死。CLI canonical 错误中的原始代码与消息应保留到应用恢复提示。
 
 
 ### Capture queries and temporary replay evidence

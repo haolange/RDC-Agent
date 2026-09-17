@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 import { registerIPCHandlers, setMainWindow, initializeIpcState, stopAllActiveRuns } from './ipc/handlers';
 import { storageAdapter } from './sessions/StorageAdapter';
 import { rdxSessionService } from './sessions';
+import { harvestOwnedRdxDaemons } from './sessions/OwnedRdxDaemonRegistry';
 import { settingsService } from './settings/SettingsService';
 import { rdxCliInvokerService } from './tools/RdxCliInvokerService';
 import { replayDeviceService } from './captures/ReplayDeviceService';
@@ -38,7 +39,7 @@ import { acquireUserDataInstanceLock } from './runtime/userDataInstanceLock';
 // Re-export for callers that historically imported from main entry.
 export { rdxSessionService } from './sessions';
 
-const SHUTDOWN_TIMEOUT_MS = 8_000;
+const SHUTDOWN_TIMEOUT_MS = 45_000;
 let shutdownStarted = false;
 
 function registerShutdownDisposables(): void {
@@ -66,6 +67,13 @@ function registerShutdownDisposables(): void {
     },
   });
   shutdownCoordinator.register({
+    id: 'rdx.close-runtime',
+    phase: 'release_owned_runtimes',
+    dispose: async () => {
+      await rdxSessionService.closeAll();
+    },
+  });
+  shutdownCoordinator.register({
     id: 'process-supervisor.join-all',
     phase: 'terminate_processes',
     dispose: async () => {
@@ -77,13 +85,6 @@ function registerShutdownDisposables(): void {
     phase: 'terminate_processes',
     dispose: async () => {
       await agentOrchestrator.disconnectAllMcpServers();
-    },
-  });
-  shutdownCoordinator.register({
-    id: 'rdx.close-runtime',
-    phase: 'terminate_processes',
-    dispose: async () => {
-      await rdxSessionService.closeAll();
     },
   });
   shutdownCoordinator.register({
@@ -632,7 +633,6 @@ app.on('window-all-closed', () => {
   if (isHeadlessMode) {
     return;
   }
-  replayDeviceService.dispose();
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -688,6 +688,26 @@ async function initializeServices(): Promise<void> {
     
     await rdxCliInvokerService.getRuntimeSummary();
     console.log('[Main] RDX CLI invoker initialized');
+    const leftover = await harvestOwnedRdxDaemons();
+    if (leftover.failed.length) {
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'context',
+        severity: 'error',
+        title: 'RDX leftover daemon harvest failed',
+        summary: leftover.failed.map((item) => `${item.contextId}: ${item.error}`).join('; '),
+        raw: leftover,
+      });
+    } else if (leftover.released.length) {
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'context',
+        severity: 'info',
+        title: 'RDX leftover daemons released',
+        summary: leftover.released.join(', '),
+        raw: leftover,
+      });
+    }
     runtimeLogService.log({
       scope: 'app',
       namespace: 'system',
