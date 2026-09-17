@@ -47,6 +47,36 @@ function quarantineResult(reason: string): KnowledgeImportResult {
   };
 }
 
+function identityConflictItem(input: {
+  title: string;
+  spaceId: string;
+  relativePath: string;
+  cardId: string;
+  caseId?: string;
+}): KnowledgeImportItem {
+  return {
+    status: 'conflict',
+    lifecycle: 'draft',
+    missingAssets: [],
+    reason: 'duplicate-case-id',
+    existingCardId: input.cardId,
+    ...(input.caseId ? { existingCaseId: input.caseId } : {}),
+    record: {
+      cardId: input.cardId,
+      spaceId: input.spaceId,
+      relativePath: input.relativePath,
+      type: 'case',
+      lifecycle: 'draft',
+      title: input.title,
+      scope: {},
+      relations: [],
+      body: '',
+      preview: input.title,
+      ...(input.caseId ? { caseId: input.caseId } : {}),
+    },
+  };
+}
+
 function fromItems(items: KnowledgeImportItem[], extra: Partial<KnowledgeImportResult> = {}): KnowledgeImportResult {
   return {
     candidateCreated: false,
@@ -311,8 +341,8 @@ function buildBody(title: string, chapters: KnowledgeCaseChapters): string {
 }
 
 /**
- * Knowledge packages produced by export come back in as ordinary session
- * drafts. The package `lifecycle` is metadata only: nothing re-enters as
+ * Knowledge packages produced by export come back as draft cards for the
+ * target space. The package `lifecycle` is metadata only: nothing re-enters as
  * verified, and a duplicate cardId takes the same conflict path as case YAML.
  */
 export function ingestKnowledgePackage(doc: Record<string, unknown>, options: {
@@ -343,13 +373,13 @@ export function ingestKnowledgePackage(doc: Record<string, unknown>, options: {
     const caseId = readString(card.caseId);
     const cardId = `${spaceId}:${relativePath}`;
     if (existing.has(cardId) || (caseId && existing.has(caseId))) {
-      items.push({
-        status: 'conflict',
-        lifecycle: 'draft',
-        missingAssets: [],
-        reason: 'duplicate-case-id',
-        ...(caseId ? { existingCaseId: caseId } : {}),
-      });
+      items.push(identityConflictItem({
+        title,
+        spaceId,
+        relativePath,
+        cardId,
+        ...(caseId ? { caseId } : {}),
+      }));
       continue;
     }
     const images = sanitizeKnowledgeImages(
@@ -428,13 +458,15 @@ export function ingestKnowledge(source: string, options: {
     return quarantineResult('yaml-broken');
   }
   if (options.existingCaseIds && new Set(options.existingCaseIds).has(caseId)) {
-    return fromItems([{
-      status: 'conflict',
-      lifecycle: 'draft',
-      existingCaseId: caseId,
-      missingAssets: [],
-      reason: 'duplicate-case-id',
-    }]);
+    const spaceId = options.spaceId || 'staging';
+    const relativePath = `cases/${caseId}.md`;
+    return fromItems([identityConflictItem({
+      title,
+      spaceId,
+      relativePath,
+      cardId: `${spaceId}:${relativePath}`,
+      caseId,
+    })]);
   }
   for (const text of collectStrings(doc)) {
     if (SECRET_RE.test(text) || containsAbsolutePath(text)) {

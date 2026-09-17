@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import type {
-  KnowledgeCardRecord,
   KnowledgeReviewRecord,
   SessionKnowledgeCandidate,
 } from '@shared/types/knowledge';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { StorageIo } from '../sessions/StorageIo';
+import { assertNoUnsupportedSchemaVersion } from '../sessions/storageSchema';
 import { withDirectoryFileLock } from '../sessions/directoryFileLock';
 import { KnowledgeRevisionConflictError } from './knowledgeErrors';
 import {
@@ -14,7 +14,9 @@ import {
   KNOWLEDGE_STATE_FILE,
   KNOWLEDGE_STATE_LOCK_FILE,
   KNOWLEDGE_STATE_LOCK_TIMEOUT,
-  KNOWLEDGE_STATE_MIGRATIONS,
+  KNOWLEDGE_STATE_SCHEMA_VERSION,
+  parseKnowledgeStatePayload,
+  serializeKnowledgeStateDocument,
   type KnowledgeDurableCandidate,
   type KnowledgeDurableDraft,
   type KnowledgeDurableReview,
@@ -25,14 +27,6 @@ export interface KnowledgeDurableStoreDependencies {
   resolveStatePath(sessionId: string): string;
   storage?: StorageIo;
   lockMaxAttempts?: number;
-}
-
-export interface KnowledgePutDraftInput {
-  card: KnowledgeCardRecord;
-  expectedRevision?: number;
-  sourceHash?: string;
-  sourceMtimeMs?: number;
-  sourceSize?: number;
 }
 
 export interface KnowledgePutCandidateInput {
@@ -74,34 +68,16 @@ export class KnowledgeDurableStore {
     return (this.overrides.resolveStatePath ?? defaultSessionStatePath)(sessionId);
   }
 
-  async listDrafts(sessionId: string): Promise<KnowledgeDurableDraft[]> {
-    return [...(await this.readDocument(sessionId)).drafts];
-  }
-
   async listCandidates(sessionId: string): Promise<KnowledgeDurableCandidate[]> {
-    return [...(await this.readDocument(sessionId)).candidates];
+    return [...(await this.load(sessionId)).document.candidates];
   }
 
   async listReviews(sessionId: string): Promise<KnowledgeDurableReview[]> {
-    return [...(await this.readDocument(sessionId)).reviews];
+    return [...(await this.load(sessionId)).document.reviews];
   }
 
-  async putDraft(sessionId: string, input: KnowledgePutDraftInput): Promise<KnowledgeDurableDraft> {
-    return this.mutate(sessionId, (document) => {
-      const contentHash = hashKnowledgeContent(input.card);
-      const index = document.drafts.findIndex((entry) => entry.card.cardId === input.card.cardId);
-      const next = upsertRecord(document.drafts[index], input.expectedRevision, contentHash, (revision) => ({
-        revision,
-        contentHash,
-        card: input.card,
-        ...(input.sourceHash ? { sourceHash: input.sourceHash } : {}),
-        ...(input.sourceMtimeMs != null ? { sourceMtimeMs: input.sourceMtimeMs } : {}),
-        ...(input.sourceSize != null ? { sourceSize: input.sourceSize } : {}),
-      }), `draft ${input.card.cardId}`);
-      if (index >= 0) document.drafts[index] = next;
-      else document.drafts.push(next);
-      return next;
-    });
+  async listLeftoverDrafts(sessionId: string): Promise<KnowledgeDurableDraft[]> {
+    return [...(await this.load(sessionId)).leftoverDrafts];
   }
 
   async putCandidate(sessionId: string, input: KnowledgePutCandidateInput): Promise<KnowledgeDurableCandidate> {
@@ -144,6 +120,13 @@ export class KnowledgeDurableStore {
     });
   }
 
+  async replaceLeftoverDrafts(sessionId: string, leftoverDrafts: readonly KnowledgeDurableDraft[]): Promise<void> {
+    await this.withSessionLock(sessionId, async () => {
+      const loaded = this.loadUnlocked(sessionId);
+      this.writeUnlocked(sessionId, loaded.document, leftoverDrafts);
+    });
+  }
+
   async withSessionLock<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
     const statePath = this.resolveStatePath(sessionId);
     return withDirectoryFileLock(path.dirname(statePath), {
@@ -153,31 +136,57 @@ export class KnowledgeDurableStore {
     }, operation);
   }
 
-  private async readDocument(sessionId: string): Promise<KnowledgeStateDocument> {
+  private async load(sessionId: string): Promise<{
+    document: KnowledgeStateDocument;
+    leftoverDrafts: KnowledgeDurableDraft[];
+  }> {
     try {
-      const statePath = this.resolveStatePath(sessionId);
-      return this.storage.readJson(statePath, KNOWLEDGE_STATE_MIGRATIONS)
-        ?? emptyKnowledgeStateDocument();
+      return this.loadUnlocked(sessionId);
     } catch (error) {
       if (error instanceof Error && error.message.startsWith('KNOWLEDGE_SESSION_UNKNOWN')) {
-        return emptyKnowledgeStateDocument();
+        return { document: emptyKnowledgeStateDocument(), leftoverDrafts: [] };
       }
       throw error;
     }
   }
 
-  private async mutate<T>(sessionId: string, mutate: (document: KnowledgeStateDocument) => T): Promise<T> {
+  private loadUnlocked(sessionId: string): {
+    document: KnowledgeStateDocument;
+    leftoverDrafts: KnowledgeDurableDraft[];
+  } {
+    const statePath = this.resolveStatePath(sessionId);
+    const raw = this.storage.readJson<unknown>(statePath);
+    if (raw == null) {
+      return { document: emptyKnowledgeStateDocument(), leftoverDrafts: [] };
+    }
+    assertNoUnsupportedSchemaVersion(raw, KNOWLEDGE_STATE_SCHEMA_VERSION, statePath);
+    return parseKnowledgeStatePayload(raw);
+  }
+
+  private writeUnlocked(
+    sessionId: string,
+    document: KnowledgeStateDocument,
+    leftoverDrafts: readonly KnowledgeDurableDraft[],
+  ): void {
+    const statePath = this.resolveStatePath(sessionId);
+    this.storage.ensureDir(path.dirname(statePath));
+    this.storage.writeUtf8AtomicFsync(statePath, serializeKnowledgeStateDocument(document, leftoverDrafts));
+    const written = this.storage.readJson<unknown>(statePath);
+    if (!written) {
+      throw new Error('KNOWLEDGE_WRITE_INTEGRITY: durable knowledge-state.json vanished after atomic replace.');
+    }
+    assertNoUnsupportedSchemaVersion(written, KNOWLEDGE_STATE_SCHEMA_VERSION, statePath);
+    parseKnowledgeStatePayload(written);
+  }
+
+  private async mutate<T>(
+    sessionId: string,
+    mutate: (document: KnowledgeStateDocument) => T,
+  ): Promise<T> {
     return this.withSessionLock(sessionId, async () => {
-      const statePath = this.resolveStatePath(sessionId);
-      const document = this.storage.readJson(statePath, KNOWLEDGE_STATE_MIGRATIONS)
-        ?? emptyKnowledgeStateDocument();
-      const result = mutate(document);
-      this.storage.ensureDir(path.dirname(statePath));
-      this.storage.writeUtf8AtomicFsync(statePath, `${JSON.stringify(document, null, 2)}\n`);
-      const written = this.storage.readJson(statePath, KNOWLEDGE_STATE_MIGRATIONS);
-      if (!written) {
-        throw new Error('KNOWLEDGE_WRITE_INTEGRITY: durable knowledge-state.json vanished after atomic replace.');
-      }
+      const loaded = this.loadUnlocked(sessionId);
+      const result = mutate(loaded.document);
+      this.writeUnlocked(sessionId, loaded.document, loaded.leftoverDrafts);
       return result;
     });
   }

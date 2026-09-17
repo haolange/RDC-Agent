@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   KnowledgeImportResult,
   KnowledgeCandidatesResult,
@@ -7,6 +7,7 @@ import type {
 } from '@shared/types/knowledge';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { knowledgeErrorMessage } from './knowledgeCenterModel';
+import { beginSynchronousFlight } from './knowledgeImportExportModel';
 import { useI18n } from '../../../i18n';
 
 export type KnowledgeImportMode = 'file' | 'paste';
@@ -15,11 +16,12 @@ export function useKnowledgeImport(options: {
   open: boolean;
   sessionId: string | null;
   spaces: KnowledgeSpace[];
-  onCreated: () => Promise<void>;
+  onImported: (result: KnowledgeImportResult) => Promise<void>;
 }) {
   const { t } = useI18n();
   const request = useKnowledgeRequestScope(options.open, options.sessionId ?? '');
   const inboxRequest = useKnowledgeRequestScope(options.open, options.sessionId ?? '');
+  const inFlight = useRef(false);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<KnowledgeImportMode>('file');
   const [source, setSource] = useState('');
@@ -51,6 +53,7 @@ export function useKnowledgeImport(options: {
 
   const close = useCallback(() => {
     request.next();
+    inFlight.current = false;
     setBusy(false);
     setOpen(false);
     setMode('file');
@@ -79,6 +82,7 @@ export function useKnowledgeImport(options: {
   }, []);
 
   const selectFile = useCallback(async () => {
+    if (inFlight.current) return;
     const seq = request.next();
     setBusy(true);
     setError(null);
@@ -95,27 +99,29 @@ export function useKnowledgeImport(options: {
   }, [request]);
 
   const importSource = useCallback(async () => {
-    if (!options.sessionId) {
-      setError(t('knowledgeCenter.sessionRequired'));
+    if (!spaceId) {
+      setError(t('knowledgeCenter.emptyNoSpaces'));
       return;
     }
+    if (!beginSynchronousFlight(inFlight)) return;
     const seq = request.next();
     setBusy(true);
     setError(null);
     try {
       const imported = await window.electronAPI.knowledge.import({
-        sessionId: options.sessionId,
         spaceId,
+        ...(options.sessionId ? { sessionId: options.sessionId } : {}),
         ...(filePath ? { filePath } : { source }),
       });
       if (!request.isCurrent(seq)) return;
       setResult(imported);
       await refreshInbox();
       if (!request.isCurrent(seq)) return;
-      await options.onCreated();
+      await options.onImported(imported);
     } catch (err) {
       if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
     } finally {
+      inFlight.current = false;
       if (request.isCurrent(seq)) setBusy(false);
     }
   }, [filePath, options, refreshInbox, request, source, spaceId, t]);
@@ -125,6 +131,7 @@ export function useKnowledgeImport(options: {
       setError(t('knowledgeCenter.sessionRequired'));
       return;
     }
+    if (!beginSynchronousFlight(inFlight)) return;
     const seq = request.next();
     setBusy(true);
     setError(null);
@@ -135,15 +142,15 @@ export function useKnowledgeImport(options: {
         explicitUserIntent: true,
       });
       if (!request.isCurrent(seq)) return;
-      await options.onCreated();
       await refreshInbox();
       if (request.isCurrent(seq)) close();
     } catch (err) {
       if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
     } finally {
+      inFlight.current = false;
       if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [close, options, refreshInbox, request, t]);
+  }, [close, options.sessionId, refreshInbox, request, t]);
 
   return {
     hasSession: Boolean(options.sessionId),

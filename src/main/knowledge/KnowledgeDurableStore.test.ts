@@ -15,7 +15,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { KnowledgeCardRecord } from '@shared/types/knowledge';
+import type { KnowledgeCardRecord, SessionKnowledgeCandidate } from '@shared/types/knowledge';
 import { acquireDirectoryFileLock, releaseDirectoryFileLock } from '../sessions/directoryFileLock';
 import { parseKnowledgeFrontmatter, sourceStatusImpliesVerified } from './knowledgeCardSchema';
 import { KNOWLEDGE_IMPORT_MAX_BYTES, ingestKnowledgeFromPath, sanitizeProvenanceToken } from './knowledgeIngest';
@@ -31,6 +31,7 @@ import {
   KnowledgeDurableStore,
 } from './KnowledgeDurableStore';
 import { createDisposableCandidateService } from './KnowledgeCandidateService';
+import { createDisposableImportService } from './KnowledgeImportService';
 import { KnowledgeIndexService } from './KnowledgeIndexService';
 import { KnowledgeWriteService } from './KnowledgeWriteService';
 import { KNOWLEDGE_STATE_LOCK_FILE, KNOWLEDGE_STATE_LOCK_TIMEOUT } from './knowledgeStateSchema';
@@ -47,6 +48,16 @@ function tempRoot(prefix: string): string {
   const root = mkdtempSync(path.join(os.tmpdir(), prefix));
   roots.push(root);
   return root;
+}
+
+function candidateOf(card: KnowledgeCardRecord, sessionId = 'sess-b'): SessionKnowledgeCandidate {
+  return {
+    candidateId: `cand_${card.cardId}`,
+    sessionId,
+    card: { ...card, lifecycle: 'candidate' },
+    createdAt: '2026-09-01T00:00:00.000Z',
+    source: 'explicit-user-intent',
+  };
 }
 
 function factCard(id = 'user:facts/sample.md'): KnowledgeCardRecord {
@@ -79,13 +90,6 @@ describe('Knowledge durable store', () => {
       now: () => new Date('2026-09-01T00:00:00.000Z'),
       createId: () => 'stable',
     });
-    await first.ingestToStaging([
-      'case_id: restart-case',
-      'title: Restart case',
-      'meta:',
-      '  status: fixed',
-      'symptoms: darker hair',
-    ].join('\n'), { sessionId: 'sess-a' });
     await first.createCandidate({
       sessionId: 'sess-a',
       card: factCard(),
@@ -94,10 +98,8 @@ describe('Knowledge durable store', () => {
     await first.queueReview({ sessionId: 'sess-a', kind: 'write', cardId: 'user:facts/sample.md' });
 
     const restarted = createDisposableCandidateService(root);
-    expect(await restarted.listStagedDrafts('sess-a')).toHaveLength(1);
     expect(await restarted.listCandidates('sess-a')).toHaveLength(1);
     expect(await restarted.listReviews('sess-a')).toHaveLength(1);
-    expect((await restarted.listStagedDrafts('sess-a'))[0]?.lifecycle).toBe('draft');
     expect((await restarted.listCandidates('sess-a'))[0]?.card.lifecycle).toBe('candidate');
   });
 
@@ -117,44 +119,44 @@ describe('Knowledge durable store', () => {
       resolveStatePath: (sessionId) => path.join(root, sessionId, 'knowledge-state.json'),
       lockMaxAttempts: 3,
     });
-    await expect(store.putDraft('sess-lock', { card: factCard() })).rejects.toThrow(/KNOWLEDGE_STATE_LOCK_TIMEOUT/);
+    await expect(store.putCandidate('sess-lock', { candidate: candidateOf(factCard(), 'sess-lock') })).rejects.toThrow(/KNOWLEDGE_STATE_LOCK_TIMEOUT/);
     await releaseDirectoryFileLock(held.lockPath);
   });
 
   it('refuses a stale revision instead of overwriting', async () => {
     const store = createSessionScopedKnowledgeStore(tempRoot('rdc-know-rev-'));
-    const created = await store.putDraft('sess-b', { card: factCard() });
+    const created = await store.putCandidate('sess-b', { candidate: candidateOf(factCard()) });
     expect(created.revision).toBe(1);
-    await expect(store.putDraft('sess-b', {
-      card: { ...factCard(), body: 'changed' },
+    await expect(store.putCandidate('sess-b', {
+      candidate: candidateOf({ ...factCard(), body: 'changed' }),
     })).rejects.toBeInstanceOf(KnowledgeRevisionConflictError);
-    await expect(store.putDraft('sess-b', {
-      card: { ...factCard(), body: 'changed' },
+    await expect(store.putCandidate('sess-b', {
+      candidate: candidateOf({ ...factCard(), body: 'changed' }),
       expectedRevision: 0,
     })).rejects.toBeInstanceOf(KnowledgeRevisionConflictError);
-    const updated = await store.putDraft('sess-b', {
-      card: { ...factCard(), body: 'changed' },
+    const updated = await store.putCandidate('sess-b', {
+      candidate: candidateOf({ ...factCard(), body: 'changed' }),
       expectedRevision: 1,
     });
     expect(updated.revision).toBe(2);
-    const listed = await store.listDrafts('sess-b');
+    const listed = await store.listCandidates('sess-b');
     expect(listed).toHaveLength(1);
-    expect(listed[0]?.card.body).toBe('changed');
+    expect(listed[0]?.candidate.card.body).toBe('changed');
   });
 
   it('keeps two independently accommodatable concurrent writes', async () => {
     const root = tempRoot('rdc-know-conc-');
     const store = createSessionScopedKnowledgeStore(root);
     const [left, right] = await Promise.all([
-      store.putDraft('sess-c', { card: factCard('user:facts/one.md') }),
-      store.putDraft('sess-c', { card: factCard('user:facts/two.md') }),
+      store.putCandidate('sess-c', { candidate: candidateOf(factCard('user:facts/one.md'), 'sess-c') }),
+      store.putCandidate('sess-c', { candidate: candidateOf(factCard('user:facts/two.md'), 'sess-c') }),
     ]);
-    expect(left.card.cardId).toBe('user:facts/one.md');
-    expect(right.card.cardId).toBe('user:facts/two.md');
+    expect(left.candidate.card.cardId).toBe('user:facts/one.md');
+    expect(right.candidate.card.cardId).toBe('user:facts/two.md');
     const listed = await new KnowledgeDurableStore({
       resolveStatePath: (sessionId) => path.join(root, sessionId, 'knowledge-state.json'),
-    }).listDrafts('sess-c');
-    expect(listed.map((entry) => entry.card.cardId).sort()).toEqual([
+    }).listCandidates('sess-c');
+    expect(listed.map((entry) => entry.candidate.card.cardId).sort()).toEqual([
       'user:facts/one.md',
       'user:facts/two.md',
     ]);
@@ -176,8 +178,16 @@ const card = JSON.parse(process.env.KNOW_CARD);
   const store = new KnowledgeDurableStore({
     resolveStatePath: (id) => require('node:path').join(root, id, 'knowledge-state.json'),
   });
-  const saved = await store.putDraft(sessionId, { card });
-  process.stdout.write(JSON.stringify({ cardId: saved.card.cardId, revision: saved.revision }));
+  const saved = await store.putCandidate(sessionId, {
+    candidate: {
+      candidateId: card.cardId,
+      sessionId,
+      card: { ...card, lifecycle: 'candidate' },
+      createdAt: '2026-09-01T00:00:00.000Z',
+      source: 'explicit-user-intent',
+    },
+  });
+  process.stdout.write(JSON.stringify({ cardId: saved.candidate.card.cardId, revision: saved.revision }));
 })().catch((error) => {
   console.error(error);
   process.exit(1);
@@ -207,7 +217,7 @@ const card = JSON.parse(process.env.KNOW_CARD);
     expect(first.code, first.stderr).toBe(0);
     expect(second.code, second.stderr).toBe(0);
     const store = createSessionScopedKnowledgeStore(root);
-    const listed = (await store.listDrafts('sess-x')).map((entry) => entry.card.cardId).sort();
+    const listed = (await store.listCandidates('sess-x')).map((entry) => entry.candidate.card.cardId).sort();
     expect(listed).toEqual(['user:facts/proc-a.md', 'user:facts/proc-b.md']);
   }, 20_000);
 
@@ -222,7 +232,7 @@ const card = JSON.parse(process.env.KNOW_CARD);
       reviews: [],
     }), 'utf8');
     const store = createSessionScopedKnowledgeStore(root);
-    await expect(store.listDrafts('sess-schema')).rejects.toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+    await expect(store.listCandidates('sess-schema')).rejects.toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
   });
 
   it('fail-closes an unknown higher knowledge-index schemaVersion', async () => {
@@ -260,18 +270,16 @@ describe('knowledge path ingest', () => {
     ].join('\n');
     writeFileSync(filePath, yaml, 'utf8');
     const before = sourceFingerprint(filePath);
-    const candidates = createDisposableCandidateService(root);
-    const result = await candidates.ingestPathToStaging(filePath, { sessionId: 'sess-path' });
+    const spaceRoot = tempRoot('rdc-know-path-space-');
+    const importer = createDisposableImportService({ spaceRoot });
+    const result = await importer.importToSpace({ spaceId: 'user', filePath });
     expect(result.items[0]?.status).toBe('draft');
     expect(result.candidateCreated).toBe(false);
     expect(result.sourceHash).toBe(before.hash);
     expect(result.sourceMtimeMs).toBe(before.mtimeMs);
     expect(result.sourceSize).toBe(before.size);
     expect(result.items[0]?.record?.sourceHash).toBe(before.hash);
-    const drafts = await candidates.listStagedDrafts('sess-path');
-    expect(drafts[0]?.sourceHash).toBe(before.hash);
-    expect(drafts[0]?.sourceMtimeMs).toBe(before.mtimeMs);
-    expect(drafts[0]?.sourceSize).toBe(before.size);
+    expect(existsSync(path.join(spaceRoot, 'cases', 'path-case.md'))).toBe(true);
 
     const changed = Buffer.from(`${yaml}\nextra: 1\n`);
     let reads = 0;
@@ -294,7 +302,7 @@ describe('knowledge path ingest', () => {
     expect(quarantined.candidateCreated).toBe(false);
   });
 
-  it('ingests synthetic Chinese-path import fixtures into disposable Drafts only', async () => {
+  it('ingests synthetic Chinese-path import fixtures into space drafts only', async () => {
     const root = tempRoot('rdc-know-fixtures-');
     const cases = [1, 2].map((index) => {
       const filePath = path.join(root, '案例' + index + '.txt');
@@ -311,11 +319,11 @@ describe('knowledge path ingest', () => {
       return filePath;
     });
     const before = cases.map((filePath) => ({ filePath, ...sourceFingerprint(filePath) }));
+    const spaceRoot = tempRoot('rdc-know-fixtures-space-');
+    const importer = createDisposableImportService({ spaceRoot });
     const candidates = createDisposableCandidateService(root);
     for (const [index, filePath] of cases.entries()) {
-      const result = await candidates.ingestPathToStaging(filePath, {
-        sessionId: `sess-real-${index + 1}`,
-      });
+      const result = await importer.importToSpace({ spaceId: 'user', filePath });
       expect(result.items[0]?.status).toBe('draft');
       expect(result.candidateCreated).toBe(false);
       expect(result.verified).toBe(false);
@@ -323,14 +331,12 @@ describe('knowledge path ingest', () => {
       expect(result.items[0]?.record?.lifecycle).toBe('draft');
       expect(result.items[0]?.record?.sourceHash).toBe(before[index]?.hash);
       expect(await candidates.listCandidates(`sess-real-${index + 1}`)).toHaveLength(0);
-      const drafts = await candidates.listStagedDrafts(`sess-real-${index + 1}`);
-      expect(drafts).toHaveLength(1);
+      expect(existsSync(path.join(spaceRoot, result.items[0]!.record!.relativePath))).toBe(true);
       const published = JSON.stringify({
         body: result.items[0]?.record?.body,
         chapters: result.items[0]?.record?.chapters,
         preview: result.items[0]?.record?.preview,
         missingAssets: result.items[0]?.missingAssets,
-        draft: drafts[0],
       });
       expect(published).not.toContain('企业微信');
       expect(published).not.toContain('HairBlack');
@@ -347,30 +353,34 @@ describe('knowledge path ingest', () => {
   });
 
   it('quarantines absolute paths and secrets without creating a Draft', async () => {
-    const root = tempRoot('rdc-know-q-');
-    const candidates = createDisposableCandidateService(root);
+    const spaceRoot = tempRoot('rdc-know-q-space-');
+    const importer = createDisposableImportService({ spaceRoot });
     const leaks = ['C:/capture.rdc', 'C:\\capture.rdc', '/var/capture.rdc', '/Users/x/a.rdc'];
     for (const [index, leak] of leaks.entries()) {
-      const sessionId = `sess-abs-${index}`;
-      const result = await candidates.ingestToStaging([
-        `case_id: abs-case-${index}`,
-        'title: Abs',
-        `symptoms: see ${leak}`,
-      ].join('\n'), { sessionId });
+      const result = await importer.importToSpace({
+        spaceId: 'user',
+        source: [
+          `case_id: abs-case-${index}`,
+          'title: Abs',
+          `symptoms: see ${leak}`,
+        ].join('\n'),
+      });
       expect(result.items[0]?.status, leak).toBe('quarantine');
       expect(result.items[0]?.reason, leak).toBe('absolute-path');
       expect(result.items[0]?.record, leak).toBeUndefined();
-      expect(await candidates.listStagedDrafts(sessionId)).toHaveLength(0);
+      expect(readdirSync(spaceRoot).length).toBe(0);
     }
-    const secret = await candidates.ingestToStaging([
-      'case_id: secret-case',
-      'title: Secret',
-      'symptoms: api_key leaked',
-    ].join('\n'), { sessionId: 'sess-q' });
+    const secret = await importer.importToSpace({
+      spaceId: 'user',
+      source: [
+        'case_id: secret-case',
+        'title: Secret',
+        'symptoms: api_key leaked',
+      ].join('\n'),
+    });
     expect(secret.items[0]?.status).toBe('quarantine');
     expect(secret.items[0]?.reason).toBe('secret-detected');
-    expect(await candidates.listStagedDrafts('sess-q')).toHaveLength(0);
-    expect(await candidates.listCandidates('sess-q')).toHaveLength(0);
+    expect(readdirSync(spaceRoot).length).toBe(0);
   });
 
   it('quarantines a file that grows past 2MB after the pre-stat', async () => {
@@ -514,18 +524,20 @@ describe('Knowledge write gates', () => {
     expect(sourceStatusImpliesVerified('fixed')).toBe(false);
     const root = tempRoot('rdc-know-fixed-');
     const write = writeService(root);
-    const candidates = createDisposableCandidateService(root);
-    const result = await candidates.ingestToStaging([
-      'case_id: fixed-case',
-      'title: Fixed case',
-      'meta:',
-      '  status: fixed',
-      'symptoms: darker',
-    ].join('\n'), { sessionId: 'sess-fixed' });
+    const importer = createDisposableImportService({ spaceRoot: root });
+    const result = await importer.importToSpace({
+      spaceId: 'user',
+      source: [
+        'case_id: fixed-case',
+        'title: Fixed case',
+        'meta:',
+        '  status: fixed',
+        'symptoms: darker',
+      ].join('\n'),
+    });
     expect(result.items[0]?.sourceStatus).toBe('fixed');
     expect(result.verified).toBe(false);
     expect(result.items[0]?.record?.lifecycle).toBe('draft');
-    expect(await candidates.listCandidates('sess-fixed')).toHaveLength(0);
     await expect(write.write({
       spaceId: 'user',
       card: { ...factCard(), lifecycle: 'verified', sourceStatus: 'fixed' },

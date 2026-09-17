@@ -59,3 +59,13 @@ export class KnowledgeApprovalTokenInvalidError extends Error {
     this.name = 'KnowledgeApprovalTokenInvalidError';
   }
 }
+
+export class KnowledgeDraftMigrationConflictError extends Error {
+  readonly code = 'KNOWLEDGE_DRAFT_MIGRATION_CONFLICT';
+  readonly cardIds: string[];
+  constructor(cardIds: string[]) {
+    super(`KNOWLEDGE_DRAFT_MIGRATION_CONFLICT: ${cardIds.join(',')}`);
+    this.name = 'KnowledgeDraftMigrationConflictError';
+    this.cardIds = cardIds;
+  }
+}

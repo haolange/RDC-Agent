@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KnowledgeLaneHit, KnowledgePack } from '@shared/types/knowledge';
-import { assignKnowledgeCenterList } from './knowledgeCenterQuery';
+import { assignKnowledgeCenterList, includeSelectedSpaceId } from './knowledgeCenterQuery';
 
 function hit(cardId: string, score: number): KnowledgeLaneHit {
   return {
@@ -38,5 +38,10 @@ describe('assignKnowledgeCenterList', () => {
 
   it('uses compiled hits only in Conflicts', () => {
     expect(assignKnowledgeCenterList('conflicts', queryHits, compiled).hits).toEqual(compiled.hits);
+  });
+
+  it('adds the imported space to the current selection', () => {
+    expect(includeSelectedSpaceId(['project:a'], 'user')).toEqual(['project:a', 'user']);
+    expect(includeSelectedSpaceId(['user'], 'user')).toEqual(['user']);
   });
 });

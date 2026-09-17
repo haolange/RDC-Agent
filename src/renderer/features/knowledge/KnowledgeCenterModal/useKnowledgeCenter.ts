@@ -9,7 +9,7 @@ import {
   createRequestSeq, knowledgeErrorMessage, knowledgeQueryKey, toggleSetValue,
   type KnowledgeNarrowPane, type KnowledgeViewMode,
 } from './knowledgeCenterModel';
-import { buildKnowledgeCenterQueryRequest, nextSelectedSpaceIds, runKnowledgeCenterQuery, SEARCH_DEBOUNCE_MS } from './knowledgeCenterQuery';
+import { buildKnowledgeCenterQueryRequest, includeSelectedSpaceId, nextSelectedSpaceIds, runKnowledgeCenterQuery, SEARCH_DEBOUNCE_MS } from './knowledgeCenterQuery';
 import { useKnowledgeSelection } from './useKnowledgeSelection';
 import { useKnowledgeFilters } from './useKnowledgeFilters';
 
@@ -160,12 +160,49 @@ export function useKnowledgeCenter(open: boolean) {
     clearConflict();
     setViewMode(next);
   }, [clearCardSelection, clearConflict]);
+
+  const revealImportedCard = useCallback(async (card: {
+    spaceId: string;
+    relativePath: string;
+    cardId: string;
+  }) => {
+    clearConflict();
+    setViewMode('cards');
+    const revealRequest = {
+      ...queryRequest,
+      spaceIds: includeSelectedSpaceId(queryRequest.spaceIds ?? [], card.spaceId),
+    };
+    await refreshOverview();
+    setSelectedSpaceIds((current) => includeSelectedSpaceId(current, card.spaceId));
+    const seq = querySeq.current.next();
+    setLoadingQuery(true);
+    try {
+      const next = await runKnowledgeCenterQuery({
+        viewMode: 'cards',
+        queryRequest: revealRequest,
+        query: (request) => window.electronAPI.knowledge.query(request),
+        compile: (request) => window.electronAPI.knowledge.compile(request),
+        isCurrent: () => querySeq.current.isCurrent(seq),
+      });
+      if (!next || !querySeq.current.isCurrent(seq)) return;
+      setHits(next.hits);
+      setPack(next.pack);
+      setPackQueryKey(knowledgeQueryKey(revealRequest));
+      await selectCard(card.spaceId, card.relativePath, card.cardId);
+      if (narrow) setNarrowPane('detail');
+    } catch (err) {
+      if (querySeq.current.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+    } finally {
+      if (querySeq.current.isCurrent(seq)) setLoadingQuery(false);
+    }
+  }, [clearConflict, narrow, queryRequest, refreshOverview, selectCard]);
+
   return {
     sessionId, viewMode, setViewMode: changeViewMode, narrow, narrowPane, setNarrowPane, spaces, index,
     selectedSpaceIds, types, lifecycles, lanes, allLanes: KNOWLEDGE_RETRIEVAL_LANES,
     searchQuery, setSearchQuery, hits, pack, packQueryKey, selectedCardId, selectedCard, loadingOverview,
     loadingQuery, loadingDetail, rebuilding, error, setError, toggleSpace, toggleType,
     toggleLifecycle, toggleLane, selectCard, selectRecord, rebuildIndex, refreshOverview, refreshQuery, queryRequest,
-    selectedConflict, conflictCards, selectConflict, openRelatedCard,
+    selectedConflict, conflictCards, selectConflict, openRelatedCard, revealImportedCard,
   };
 }

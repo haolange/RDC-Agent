@@ -13,6 +13,7 @@ import { AGENT_WORKBENCH_TOOL_CATALOG } from '@shared/constants/agentWorkbenchCa
 import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
 import { createKnowledgeTools } from '../knowledge/KnowledgeTools';
 import { createDisposableCandidateService } from '../knowledge/KnowledgeCandidateService';
+import { createDisposableImportService } from '../knowledge/KnowledgeImportService';
 import { sourceStatusImpliesVerified } from '../knowledge/knowledgeCardSchema';
 import { KNOWLEDGE_STATE_FILE } from '../knowledge/knowledgeStateSchema';
 import { KnowledgeWriteService } from '../knowledge/KnowledgeWriteService';
@@ -147,9 +148,11 @@ describe('knowledge system contract', () => {
   it('knowledge.contract.import.sanitized-import', async () => {
     expect.hasAssertions();
     const yaml = readFileSync(fixturePath, 'utf8');
-    const candidates = createDisposableCandidateService(temporaryDirectory('rdc-know-cold-'));
-    const result = await candidates.ingestToStaging(yaml, {
-      sessionId: 'session-cold',
+    const spaceRoot = temporaryDirectory('rdc-know-cold-');
+    const importer = createDisposableImportService({ spaceRoot });
+    const result = await importer.importToSpace({
+      spaceId: 'user',
+      source: yaml,
       availableAssetNames: ['symptom-compare-a1b2c3d4.png'],
     });
     expect(result.items[0]?.status).toBe('draft');
@@ -159,8 +162,7 @@ describe('knowledge system contract', () => {
     expect(result.items[0]?.sourceStatus).toBe('fixed');
     expect(result.items[0]?.record?.lifecycle).toBe('draft');
     expect(yaml).not.toMatch(/[A-Za-z]:\\/);
-    expect(await candidates.listCandidates('session-cold')).toHaveLength(0);
-    expect(await candidates.listStagedDrafts('session-cold')).toHaveLength(1);
+    expect(existsSync(path.join(spaceRoot, result.items[0]!.record!.relativePath))).toBe(true);
   });
 
   it('knowledge.contract.durable.store-single-source', async () => {
@@ -187,12 +189,13 @@ describe('knowledge system contract', () => {
       explicitUserIntent: true,
     });
     const yaml = readFileSync(fixturePath, 'utf8');
-    await first.ingestToStaging(yaml, { sessionId });
+    const spaceRoot = temporaryDirectory('rdc-know-durable-space-');
+    await createDisposableImportService({ spaceRoot }).importToSpace({ spaceId: 'user', source: yaml });
     const second = createDisposableCandidateService(root);
     expect(await second.listCandidates(sessionId)).toHaveLength(1);
-    expect(await second.listStagedDrafts(sessionId)).toHaveLength(1);
     expect(await second.listCandidates(sessionId)).toEqual(await first.listCandidates(sessionId));
     expect(existsSync(path.join(root, sessionId, KNOWLEDGE_STATE_FILE))).toBe(true);
+    expect(existsSync(path.join(spaceRoot, 'cases'))).toBe(true);
   });
 
   it('knowledge.contract.tools.skill-intersection-caller', async () => {

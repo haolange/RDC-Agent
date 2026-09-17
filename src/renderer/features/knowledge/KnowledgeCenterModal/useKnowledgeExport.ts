@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KnowledgeLaneHit, KnowledgeSpace } from '@shared/types/knowledge';
 import type {
   KnowledgeExportFormat,
@@ -7,6 +7,7 @@ import type {
 } from '@shared/types/knowledgeExport';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { knowledgeErrorMessage } from './knowledgeCenterModel';
+import { beginSynchronousFlight, knowledgeExportScopeCounts } from './knowledgeImportExportModel';
 
 const EXTENSION: Record<KnowledgeExportFormat, string> = {
   package: 'zip',
@@ -20,26 +21,39 @@ export function useKnowledgeExport(options: {
   selected: { spaceId: string; relativePath: string } | null;
 }) {
   const request = useKnowledgeRequestScope(options.active);
+  const inFlight = useRef(false);
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState<KnowledgeExportScope>('filtered');
   const [format, setFormat] = useState<KnowledgeExportFormat>('package');
   const [spaceId, setSpaceId] = useState(options.spaces[0]?.spaceId ?? 'user');
+  const [spaceCount, setSpaceCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<KnowledgeExportResult | null>(null);
 
-  /** Counts are derived from live state so the dialog never shows a stale number. */
-  const counts = useMemo(() => ({
-    selected: options.selected ? 1 : 0,
-    filtered: options.hits.length,
-    space: options.hits.filter((hit) => hit.spaceId === spaceId).length,
-  }), [options.hits, options.selected, spaceId]);
+  useEffect(() => {
+    if (!open) return;
+    const seq = request.next();
+    void window.electronAPI.knowledge.query({ spaceIds: [spaceId] }).then((listed) => {
+      if (request.isCurrent(seq)) setSpaceCount(listed.hits.length);
+    }).catch((err) => {
+      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+    });
+  }, [open, request, spaceId]);
 
-  const canExport = options.hits.length > 0 || Boolean(options.selected);
+  /** Space count comes from listCards/query of that spaceId, not the filtered Cards hits. */
+  const counts = useMemo(() => knowledgeExportScopeCounts({
+    selected: options.selected,
+    hits: options.hits,
+    spaceCount,
+  }), [options.hits, options.selected, spaceCount]);
+
+  const canExport = options.hits.length > 0 || Boolean(options.selected) || spaceCount > 0;
   const pendingCount = counts[scope];
 
   const close = useCallback(() => {
     request.next();
+    inFlight.current = false;
     setBusy(false);
     setOpen(false);
     setError(null);
@@ -57,6 +71,7 @@ export function useKnowledgeExport(options: {
   }, [options.selected, options.spaces]);
 
   const run = useCallback(async () => {
+    if (!beginSynchronousFlight(inFlight)) return;
     const seq = request.next();
     setError(null);
     setBusy(true);
@@ -80,6 +95,7 @@ export function useKnowledgeExport(options: {
     } catch (err) {
       if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
     } finally {
+      inFlight.current = false;
       if (request.isCurrent(seq)) setBusy(false);
     }
   }, [format, options.hits, options.selected, request, scope, spaceId]);

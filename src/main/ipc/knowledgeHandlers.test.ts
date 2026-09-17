@@ -54,7 +54,13 @@ vi.mock('../knowledge/KnowledgeWriteService', () => ({
 vi.mock('../knowledge/KnowledgeCandidateService', () => ({
   knowledgeCandidateService: {
     listCandidates: () => [],
-    listStagedDrafts: () => [],
+  },
+}));
+
+vi.mock('../knowledge/KnowledgeImportService', () => ({
+  knowledgeImportService: {
+    importToSpace: vi.fn(async () => ({ candidateCreated: false, verified: false, items: [] })),
+    migrateSessionDrafts: vi.fn(async () => undefined),
   },
 }));
 
@@ -70,6 +76,7 @@ vi.mock('../runtime/RuntimeLogService', () => ({
   runtimeLogService: { log: vi.fn() },
 }));
 
+import { knowledgeImportService } from '../knowledge/KnowledgeImportService';
 import { registerKnowledgeHandlers } from './knowledgeHandlers';
 
 const sampleCard = {
@@ -89,6 +96,8 @@ describe('knowledge mutation approval boundaries', () => {
     handlers.clear();
     writeMocks.write.mockClear();
     writeMocks.promote.mockClear();
+    vi.mocked(knowledgeImportService.importToSpace).mockClear();
+    vi.mocked(knowledgeImportService.migrateSessionDrafts).mockClear();
     delete process.env.RDC_AGENT_TEST_MODE;
     delete process.env.RDC_AGENT_BROWSER_QA;
     delete process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS;
@@ -166,6 +175,31 @@ describe('knowledge mutation approval boundaries', () => {
       confirmation: { explicitHumanConfirmation: true },
       approvalToken: issued.token,
     })).rejects.toMatchObject({ message: 'KNOWLEDGE_APPROVAL_TOKEN_INVALID' });
+    expect(writeMocks.write).not.toHaveBeenCalled();
+  });
+
+  it('imports into the chosen space without a second write dialog', async () => {
+    const imported = {
+      candidateCreated: false as const,
+      verified: false as const,
+      items: [{
+        status: 'draft' as const,
+        lifecycle: 'draft' as const,
+        missingAssets: [],
+        record: { ...sampleCard, spaceId: 'user', cardId: 'user:facts/same.md' },
+      }],
+    };
+    vi.mocked(knowledgeImportService.importToSpace).mockResolvedValueOnce(imported);
+    const result = await handlers.get('knowledge:import')!({}, {
+      spaceId: 'user',
+      source: 'case_id: same\ntitle: Same\nsymptoms: darker',
+    });
+    expect(result).toEqual(imported);
+    expect(knowledgeImportService.migrateSessionDrafts).not.toHaveBeenCalled();
+    expect(knowledgeImportService.importToSpace).toHaveBeenCalledWith({
+      spaceId: 'user',
+      source: 'case_id: same\ntitle: Same\nsymptoms: darker',
+    });
     expect(writeMocks.write).not.toHaveBeenCalled();
   });
 });

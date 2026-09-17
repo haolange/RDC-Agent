@@ -25,7 +25,7 @@
 }
 
 /* Scoped to the left rail: the middle column reuses `.knowledge-center-section-title`
- * for its Candidates / Drafts separators and must keep its own scale. */
+ * for its Candidates separator and must keep its own scale. */
 .knowledge-center-spaces .knowledge-center-section-title {
   margin-block-start: var(--space-2);
   padding-inline-start: calc(var(--space-3) + var(--space-4) + var(--space-3));
