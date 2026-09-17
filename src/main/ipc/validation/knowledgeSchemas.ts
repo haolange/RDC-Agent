@@ -62,8 +62,8 @@ export const KnowledgeCandidateCreateArgsSchema = z.tuple([
 
 export const KnowledgeImportArgsSchema = z.tuple([
   z.object({
-    sessionId: ipcId(128, 'sessionId'),
-    spaceId: KnowledgeSpaceIdSchema.optional(),
+    spaceId: KnowledgeSpaceIdSchema,
+    sessionId: ipcId(128, 'sessionId').optional(),
     source: ipcString(512 * 1024, 'source').optional(),
     filePath: ipcNonEmptyString(4096, 'filePath').optional(),
   }).strict().refine(

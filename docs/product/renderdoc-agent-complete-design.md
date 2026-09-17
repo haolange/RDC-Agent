@@ -507,7 +507,7 @@ Planning：Triage & Taxonomy → Capture Report → Knowledge Retrieval → plan
 
 ## 13. Knowledge Engine
 
-五个主进程服务已落地：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`。目标拓扑 **六 lane**（markdown-first）：Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version。**禁止** Semantic lane / Embedding capability（U02 已删除第七轴）。五个 deferred 工具与 `$knowledge-scout` / `$knowledge-candidate` 已落地。Knowledge Center 三列 UI（Spaces / List / Detail）、Candidate Inbox 与 知识导入 Import 已落地；browse-only IPC 已删除。Candidate/Draft/review 已落到 session durable store（`<sessionPath>/knowledge-state.json`，跨进程锁 + revision）；知识导入 bounded path ingest 记录并复核源 hash/mtime/size，只进 session Draft；human-confirm 写入经 realpath + 原子替换。**T18 知识导入 user-space 持久化已证**（见 `DESIGN.md` T18 已证组）。产品级 Browser QA 全矩阵见 U05。
+五个主进程服务已落地：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`。目标拓扑 **六 lane**（markdown-first）：Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version。**禁止** Semantic lane / Embedding capability（U02 已删除第七轴）。五个 deferred 工具与 `$knowledge-scout` / `$knowledge-candidate` 已落地。Knowledge Center 三列 UI（Spaces / List / Detail）、Candidate Inbox 与 知识导入 Import 已落地；browse-only IPC 已删除。Candidate/review 已落到 session durable store（`<sessionPath>/knowledge-state.json`，跨进程锁 + revision）；知识导入 bounded path ingest 记录并复核源 hash/mtime/size，经 WriteService 写入所选 user/project 空间 draft，Cards 可读；human-confirm 写入经 realpath + 原子替换。**T18 旧桌面证据**见 `DESIGN.md` T18 已证组与 ledger；现行导入不再写 session inbox。产品级 Browser QA 全矩阵见 U05。
 
 三个逻辑平面：Evidence（不可变事实，不是 Knowledge）→ Knowledge（结构化、带 Scope 与验证）→ Compiled Context（即时 Pack）。Card 是 Projection，不是存储本体。
 
@@ -521,7 +521,7 @@ Fact / Constraint / Pattern / Procedure / Case / Model。Scope 是多轴空间�
 
 `Draft → Candidate → Verified → Promoted → Deprecated / Superseded`。
 
-- 知识导入 Historical Debug Case 摄入为 session staging / **Draft**，**绝不默认或自动进入 Candidate**。
+- 知识导入 Historical Debug Case 写入所选 user/project 空间 **Draft**，**绝不默认或自动进入 Candidate**。会话不是知识库。
 - 源 YAML `meta.status: fixed` **不等于** `Verified`（`fixed ≠ verified`）。
 - Session Candidate 仅当用户显式点击 / 命令，或 Agent 在本轮得到明确用户意图后显式调用 `knowledge_candidate_create` 才创建。
 - 持久写入与 Promote 仅 human review；`FullAccess` 不可绕过。

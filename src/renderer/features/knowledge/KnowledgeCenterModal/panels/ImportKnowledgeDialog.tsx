@@ -6,7 +6,7 @@ import { Tabs } from '../../../../ui/Tabs';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { Textarea } from '../../../../ui/Textarea';
 import { useI18n, type TranslationKey } from '../../../../i18n';
-import type { KnowledgeImportStatus, KnowledgeSpace } from '@shared/types/knowledge';
+import type { KnowledgeImportItem, KnowledgeImportStatus, KnowledgeSpace } from '@shared/types/knowledge';
 import type { useKnowledgeImport } from '../useKnowledgeImport';
 
 const IMPORT_STATUS_KEYS: Record<KnowledgeImportStatus, TranslationKey> = {
@@ -15,11 +15,12 @@ const IMPORT_STATUS_KEYS: Record<KnowledgeImportStatus, TranslationKey> = {
   conflict: 'knowledgeCenter.importStatusConflict',
 };
 
-const IMPORT_STATUS_HINT_KEYS: Record<KnowledgeImportStatus, TranslationKey> = {
-  draft: 'knowledgeCenter.importStatusDraftHint',
-  quarantine: 'knowledgeCenter.importStatusQuarantineHint',
-  conflict: 'knowledgeCenter.importStatusConflictHint',
-};
+function itemHintKey(item: KnowledgeImportItem): TranslationKey {
+  if (item.reason === 'already-present') return 'knowledgeCenter.importStatusAlreadyPresentHint';
+  if (item.status === 'draft') return 'knowledgeCenter.importStatusDraftHint';
+  if (item.status === 'quarantine') return 'knowledgeCenter.importStatusQuarantineHint';
+  return 'knowledgeCenter.importStatusConflictHint';
+}
 
 const fileNameOf = (filePath: string): string => filePath.split(/[\\/]/).pop() ?? filePath;
 
@@ -30,16 +31,17 @@ interface ImportKnowledgeDialogProps {
 
 /**
  * File, paste and result are states of one dialog. It layers over the three
- * columns without replacing the reading area, and never claims a draft is stored.
+ * columns without replacing the reading area.
  */
 export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialogProps) {
   const { t } = useI18n();
   const result = importer.result;
-  const canImport = importer.hasSession && !importer.busy && Boolean(importer.filePath || importer.source.trim());
+  const canImport = !importer.busy && Boolean(importer.filePath || importer.source.trim());
   const resultItems = result?.items ?? [];
   const uniformStatus = resultItems.length > 0 && resultItems.every((item) => item.status === resultItems[0]?.status)
     ? resultItems[0].status
     : null;
+  const uniformAlreadyPresent = resultItems.length > 0 && resultItems.every((item) => item.reason === 'already-present');
 
   const footer = result ? (
     <>
@@ -83,53 +85,59 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
             </h3>
             <div className="knowledge-import-result-status">
               {uniformStatus ? (
-                <span className="knowledge-center-badge" data-status={uniformStatus}>
-                  {t(IMPORT_STATUS_KEYS[uniformStatus])}
+                <span className="knowledge-center-badge" data-status={uniformAlreadyPresent ? 'draft' : uniformStatus}>
+                  {uniformAlreadyPresent
+                    ? t('knowledgeCenter.importStatusAlreadyPresent')
+                    : t(IMPORT_STATUS_KEYS[uniformStatus])}
                 </span>
               ) : null}
-              <span>{t('knowledgeCenter.importNotVerified')}</span>
             </div>
           </div>
           {uniformStatus ? (
-            <p className="knowledge-import-hint" data-testid="knowledge-center-import-status-hint">{t(IMPORT_STATUS_HINT_KEYS[uniformStatus])}</p>
+            <p className="knowledge-import-hint" data-testid="knowledge-center-import-status-hint">
+              {t(uniformAlreadyPresent
+                ? 'knowledgeCenter.importStatusAlreadyPresentHint'
+                : itemHintKey(resultItems[0]!))}
+            </p>
           ) : null}
 
-          {resultItems.map((item, index) => (
-            <div key={item.record?.cardId ?? `${item.status}-${index}`} className="knowledge-import-result-card">
-              <strong>{item.record?.title ?? item.reason ?? item.status}</strong>
-              {item.record?.relativePath ? <p>{item.record.relativePath}</p> : null}
-              <span className="knowledge-center-badge" data-status={item.status}>{t(IMPORT_STATUS_KEYS[item.status])}</span>
-              {item.missingAssets.length > 0 ? (
-                <p className="knowledge-import-hint">{t('knowledgeCenter.importMissingImages', { count: item.missingAssets.length })}</p>
-              ) : null}
-              {item.reason ? <InlineError>{item.reason}</InlineError> : null}
-              {item.status === 'draft' && item.record ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={importer.busy || !importer.hasSession}
-                  data-testid="knowledge-center-import-create-candidate"
-                  onClick={() => void importer.createCandidate(item.record!)}
-                >
-                  {t('knowledgeCenter.importCreateCandidate')}
-                </Button>
-              ) : null}
-            </div>
-          ))}
-
-          <details className="knowledge-import-result-details" open>
-            <summary>{t('knowledgeCenter.importResultDetails')}</summary>
-            <dl className="knowledge-import-result-grid">
-              <div>
-                <dt>{t('knowledgeCenter.importCandidateState')}</dt>
-                <dd>{t('knowledgeCenter.draftNotCandidate')}</dd>
+          {resultItems.map((item, index) => {
+            const title = item.record?.title ?? item.reason ?? item.status;
+            const caseId = item.record?.caseId ?? item.existingCaseId;
+            const existingCardId = item.existingCardId ?? item.record?.cardId;
+            return (
+              <div key={item.record?.cardId ?? `${item.status}-${index}`} className="knowledge-import-result-card">
+                <strong>{title}</strong>
+                {caseId ? <p>{t('knowledgeCenter.metaCaseId')}: {caseId}</p> : null}
+                {item.record?.relativePath ? <p>{item.record.relativePath}</p> : null}
+                <span className="knowledge-center-badge" data-status={item.status}>
+                  {item.reason === 'already-present'
+                    ? t('knowledgeCenter.importStatusAlreadyPresent')
+                    : t(IMPORT_STATUS_KEYS[item.status])}
+                </span>
+                {item.status === 'conflict' && existingCardId ? (
+                  <p className="knowledge-import-hint">{t('knowledgeCenter.importExistingCard', { id: existingCardId })}</p>
+                ) : null}
+                {item.missingAssets.length > 0 ? (
+                  <p className="knowledge-import-hint">{t('knowledgeCenter.importMissingImages', { count: item.missingAssets.length })}</p>
+                ) : null}
+                {item.reason && item.reason !== 'already-present' && item.reason !== 'duplicate-case-id' && item.reason !== 'missing-assets' ? (
+                  <InlineError>{item.reason}</InlineError>
+                ) : null}
+                {item.status === 'draft' && item.record && importer.hasSession ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={importer.busy}
+                    data-testid="knowledge-center-import-create-candidate"
+                    onClick={() => void importer.createCandidate(item.record!)}
+                  >
+                    {t('knowledgeCenter.importCreateCandidate')}
+                  </Button>
+                ) : null}
               </div>
-              <div>
-                <dt>{t('knowledgeCenter.importVerificationState')}</dt>
-                <dd>{t('knowledgeCenter.importNotVerified')}</dd>
-              </div>
-            </dl>
-          </details>
+            );
+          })}
           {importer.error && <InlineError>{importer.error}</InlineError>}
         </>
       ) : (
@@ -189,7 +197,6 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
             </label>
           )}
 
-          {!importer.hasSession ? <InlineError>{t('knowledgeCenter.sessionRequired')}</InlineError> : null}
           <p className="knowledge-import-hint">{importer.mode === 'paste' ? t('knowledgeCenter.importPasteHint') : t('knowledgeCenter.importFormatHint')}</p>
           {(importer.filePath || importer.source.trim()) && !importer.error ? (
             <p className="knowledge-import-pending" role="status" data-testid="knowledge-center-import-pending">

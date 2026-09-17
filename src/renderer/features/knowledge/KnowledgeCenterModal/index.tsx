@@ -18,6 +18,7 @@ import { useKnowledgeImport } from './useKnowledgeImport';
 import { useKnowledgeExport } from './useKnowledgeExport';
 import { useKnowledgeWriteConfirm } from './useKnowledgeWriteConfirm';
 import { detailToRecord } from './knowledgeCenterModel';
+import { firstImportedSpaceCard } from './knowledgeImportExportModel';
 import './KnowledgeCenterModal.css';
 
 interface KnowledgeCenterModalProps {
@@ -32,7 +33,12 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
     open,
     sessionId: state.sessionId,
     spaces: state.spaces,
-    onCreated: async () => {
+    onImported: async (imported) => {
+      const first = firstImportedSpaceCard(imported);
+      if (first) {
+        await state.revealImportedCard(first);
+        return;
+      }
       await state.refreshOverview();
       await state.refreshQuery();
     },

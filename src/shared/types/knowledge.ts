@@ -270,7 +270,6 @@ export interface SessionKnowledgeCandidate {
 
 export interface KnowledgeCandidatesResult {
   candidates: SessionKnowledgeCandidate[];
-  drafts: KnowledgeCardRecord[];
 }
 
 export type KnowledgeImportStatus = 'draft' | 'quarantine' | 'conflict';
@@ -283,6 +282,7 @@ export interface KnowledgeImportItem {
   missingAssets: string[];
   reason?: string;
   existingCaseId?: string;
+  existingCardId?: string;
 }
 
 export interface KnowledgeImportResult {

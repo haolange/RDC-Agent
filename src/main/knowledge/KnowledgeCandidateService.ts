@@ -4,8 +4,6 @@ import type {
   KnowledgeReviewRecord,
   SessionKnowledgeCandidate,
 } from '@shared/types/knowledge';
-import { ingestKnowledge, ingestKnowledgeFromPath, type KnowledgeImportResult } from './knowledgeIngest';
-import { putStagedKnowledgeImages } from './knowledgeImageStaging';
 import { KnowledgeCandidateRequiresIntentError } from './knowledgeErrors';
 import {
   createSessionScopedKnowledgeStore,
@@ -62,53 +60,6 @@ export class KnowledgeCandidateService {
     return (await this.store.listCandidates(sessionId)).map((entry) => entry.candidate);
   }
 
-  /**
-   * Imported knowledge enters session staging as Draft. This method never creates a Candidate.
-   */
-  async ingestToStaging(source: string, options: {
-    sessionId: string;
-    spaceId?: string;
-    availableAssetNames?: Iterable<string>;
-    availableImagePaths?: Iterable<string>;
-  }): Promise<KnowledgeImportResult> {
-    const existing = await this.existingImportIds(options.sessionId);
-    const result = ingestKnowledge(source, {
-      spaceId: options.spaceId ?? `staging:${options.sessionId}`,
-      sessionId: options.sessionId,
-      ...existing,
-      availableAssetNames: options.availableAssetNames,
-      availableImagePaths: options.availableImagePaths,
-    });
-    return this.persistDraftResult(options.sessionId, result);
-  }
-
-  async ingestPathToStaging(filePath: string, options: {
-    sessionId: string;
-    spaceId?: string;
-    availableAssetNames?: Iterable<string>;
-    availableImagePaths?: Iterable<string>;
-  }): Promise<KnowledgeImportResult> {
-    const existing = await this.existingImportIds(options.sessionId);
-    const result = await ingestKnowledgeFromPath(filePath, {
-      spaceId: options.spaceId ?? `staging:${options.sessionId}`,
-      sessionId: options.sessionId,
-      ...existing,
-      availableAssetNames: options.availableAssetNames,
-      availableImagePaths: options.availableImagePaths,
-    });
-    return this.persistDraftResult(options.sessionId, result);
-  }
-
-  async listStagedDrafts(sessionId: string): Promise<KnowledgeCardRecord[]> {
-    return (await this.store.listDrafts(sessionId)).map((entry) => {
-      const card = { ...entry.card };
-      if (entry.sourceHash) card.sourceHash = entry.sourceHash;
-      if (entry.sourceMtimeMs != null) card.sourceMtimeMs = entry.sourceMtimeMs;
-      if (entry.sourceSize != null) card.sourceSize = entry.sourceSize;
-      return card;
-    });
-  }
-
   async queueReview(input: KnowledgeReviewQueueInput): Promise<KnowledgeReviewRecord> {
     const stored = await this.store.putReview(input.sessionId, {
       review: {
@@ -124,38 +75,6 @@ export class KnowledgeCandidateService {
 
   async listReviews(sessionId: string): Promise<KnowledgeReviewRecord[]> {
     return (await this.store.listReviews(sessionId)).map((entry) => entry.review);
-  }
-
-  private async existingImportIds(sessionId: string): Promise<{
-    existingCaseIds: string[];
-    existingCardIds: string[];
-  }> {
-    const drafts = await this.listStagedDrafts(sessionId);
-    return {
-      existingCaseIds: drafts.map((entry) => entry.caseId).filter((value): value is string => Boolean(value)),
-      existingCardIds: drafts.map((entry) => entry.cardId),
-    };
-  }
-
-  private async persistDraftResult(
-    sessionId: string,
-    result: import('./knowledgeIngest').KnowledgeImportPathResult,
-  ): Promise<KnowledgeImportResult> {
-    for (const item of result.items) {
-      if (item.status !== 'draft' || !item.record) continue;
-      await this.store.putDraft(sessionId, {
-        card: item.record,
-        ...(result.sourceHash ? { sourceHash: result.sourceHash } : {}),
-        ...(result.sourceMtimeMs != null ? { sourceMtimeMs: result.sourceMtimeMs } : {}),
-        ...(result.sourceSize != null ? { sourceSize: result.sourceSize } : {}),
-      });
-      const staged = result.stagedImagesByCardId?.get(item.record.cardId);
-      if (staged?.length) {
-        await putStagedKnowledgeImages(item.record.cardId, staged);
-      }
-    }
-    const { stagedImagesByCardId: _staged, ...publicResult } = result;
-    return publicResult;
   }
 }
 

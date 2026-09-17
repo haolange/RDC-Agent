@@ -76,8 +76,24 @@ describe('knowledge IPC schemas', () => {
 
   it('rejects import without source or filePath', () => {
     expect(() => parseIpcArgs(KnowledgeImportArgsSchema, [{
+      spaceId: 'user',
       sessionId: 'session_a',
     }], { label: 'knowledge:import' })).toThrow(IpcValidationError);
+  });
+
+  it('rejects import without a target spaceId', () => {
+    expect(() => parseIpcArgs(KnowledgeImportArgsSchema, [{
+      source: 'case_id: a\ntitle: A\nsymptoms: darker',
+    }], { label: 'knowledge:import' })).toThrow(IpcValidationError);
+  });
+
+  it('accepts import with spaceId and source and no sessionId', () => {
+    const [request] = parseIpcArgs(KnowledgeImportArgsSchema, [{
+      spaceId: 'user',
+      source: 'case_id: a\ntitle: A\nsymptoms: darker',
+    }], { label: 'knowledge:import', maxBytes: 16 * 1024 });
+    expect(request.spaceId).toBe('user');
+    expect(request.sessionId).toBeUndefined();
   });
 
   it('rejects knowledge image lookup with empty relativePath', () => {

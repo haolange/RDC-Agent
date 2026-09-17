@@ -292,8 +292,8 @@ export interface ElectronAPI {
       explicitUserIntent: true;
     }) => Promise<SessionKnowledgeCandidate>;
     import: (request: {
-      sessionId: string;
-      spaceId?: string;
+      spaceId: string;
+      sessionId?: string;
       source?: string;
       filePath?: string;
     }) => Promise<KnowledgeImportResult>;

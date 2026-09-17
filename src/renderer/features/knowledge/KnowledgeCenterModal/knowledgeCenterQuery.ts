@@ -42,6 +42,10 @@ export function nextSelectedSpaceIds(current: string[], spaces: KnowledgeSpace[]
     : current.filter((id) => spaces.some((space) => space.spaceId === id));
 }
 
+export function includeSelectedSpaceId(current: string[], spaceId: string): string[] {
+  return current.includes(spaceId) ? current : [...current, spaceId];
+}
+
 export async function runKnowledgeCenterQuery(input: {
   viewMode: KnowledgeViewMode;
   queryRequest: KnowledgeQueryRequest;

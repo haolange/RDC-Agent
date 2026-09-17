@@ -5,8 +5,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { zipSync } from 'fflate';
 import { KNOWLEDGE_PACKAGE_SCHEMA } from '@shared/types/knowledgeExport';
-import { createDisposableCandidateService } from './KnowledgeCandidateService';
-import { KnowledgeWriteService } from './KnowledgeWriteService';
+import { createDisposableImportService } from './KnowledgeImportService';
 import { ingestKnowledge, ingestKnowledgeFromPath } from './knowledgeIngest';
 import { KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED, utf8ToZip, zipKnowledgeFiles } from './knowledgeZip';
 
@@ -48,10 +47,10 @@ describe('knowledge import images', () => {
     writeFileSync(path.join(sourceRoot, 'case.yaml'), caseYaml('img-case'), 'utf8');
     writeFileSync(path.join(sourceRoot, 'observed.png'), PNG_1X1);
     writeFileSync(path.join(sourceRoot, 'reference.png'), PNG_1X1);
-    const candidates = createDisposableCandidateService(tempRoot('rdc-know-img-sess-'));
-    const result = await candidates.ingestPathToStaging(path.join(sourceRoot, 'case.yaml'), {
-      sessionId: 'sess-img',
+    const importer = createDisposableImportService({ spaceRoot });
+    const result = await importer.importToSpace({
       spaceId: 'user',
+      filePath: path.join(sourceRoot, 'case.yaml'),
     });
     expect(result.items[0]?.status).toBe('draft');
     expect(result.items[0]?.record?.images).toEqual([
@@ -59,17 +58,6 @@ describe('knowledge import images', () => {
       { relativePath: 'cases/img-case/reference.png', role: 'reference' },
     ]);
     expect(result.items[0]?.missingAssets).toEqual([]);
-    const write = new KnowledgeWriteService({
-      listSpaces: () => [{ spaceId: 'user', kind: 'user', label: 'User', rootPath: spaceRoot }],
-      now: () => new Date('2026-09-01T00:00:00.000Z'),
-    });
-    await write.write({
-      spaceId: 'user',
-      card: result.items[0]!.record!,
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-      approvalAlreadyConsumed: true,
-    });
     expect(existsSync(path.join(spaceRoot, 'cases', 'img-case.md'))).toBe(true);
     expect(existsSync(path.join(spaceRoot, 'cases', 'img-case', 'observed.png'))).toBe(true);
     expect(existsSync(path.join(spaceRoot, 'cases', 'img-case', 'reference.png'))).toBe(true);
@@ -141,16 +129,15 @@ describe('knowledge import images', () => {
       { name: 'knowledge.yaml', data: utf8ToZip(yaml) },
       { name: 'cases/a/observed.png', data: PNG_1X1 },
     ]));
-    const candidates = createDisposableCandidateService(tempRoot('rdc-know-img-multi-sess-'));
-    const result = await candidates.ingestPathToStaging(zipPath, {
-      sessionId: 'sess-multi',
-      spaceId: 'user',
-    });
+    const spaceRoot = tempRoot('rdc-know-img-multi-space-');
+    const importer = createDisposableImportService({ spaceRoot });
+    const result = await importer.importToSpace({ spaceId: 'user', filePath: zipPath });
     expect(result.items).toHaveLength(2);
     expect(result.items.map((item) => item.record?.title)).toEqual(['Card A', 'Card B']);
     expect(result.items[0]?.missingAssets).toEqual([]);
     expect(result.items[1]?.missingAssets).toEqual([]);
-    expect(await candidates.listStagedDrafts('sess-multi')).toHaveLength(2);
+    expect(existsSync(path.join(spaceRoot, 'cases', 'a.md'))).toBe(true);
+    expect(existsSync(path.join(spaceRoot, 'cases', 'b.md'))).toBe(true);
   });
 
   it('quarantines zip-slip entries and oversized zip payloads', async () => {

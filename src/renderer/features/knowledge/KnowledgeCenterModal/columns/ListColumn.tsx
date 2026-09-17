@@ -30,7 +30,7 @@ function emptyReason(
   if (state.viewMode === 'cards' && state.hits.length === 0 && state.searchQuery.trim()) {
     return 'knowledgeCenter.emptyNoHits';
   }
-  if (state.viewMode === 'candidates' && !(inbox?.candidates.length || inbox?.drafts.length)) {
+  if (state.viewMode === 'candidates' && !(inbox?.candidates.length)) {
     return 'knowledgeCenter.emptyNoViewData';
   }
   if (state.viewMode === 'conflicts' && !(state.pack?.conflicts.length)) {
@@ -60,7 +60,7 @@ function HitButton({ hit: card, active, onSelect }: { hit: KnowledgeLaneHit; act
   );
 }
 
-/** Candidates / drafts row: title, origin, time, pending-review badge. */
+/** Candidate row: title, origin, time, pending-review badge. */
 function RecordRow({
   record,
   active,
@@ -100,7 +100,7 @@ export function ListColumn({ state, inbox, onImport }: ListColumnProps) {
   const loading = state.loadingQuery || state.loadingOverview;
   // The import action belongs next to the empty list, not only in the sidebar.
   const offerImport = reason === 'knowledgeCenter.emptyNoCards' || reason === 'knowledgeCenter.emptyNoSpaces';
-  const candidateCount = (inbox?.candidates.length ?? 0) + (inbox?.drafts.length ?? 0);
+  const candidateCount = inbox?.candidates.length ?? 0;
   const conflictCount = state.pack?.conflicts.length ?? 0;
   const hitById = new Map(state.pack?.hits.map((hit) => [hit.cardId, hit] as const) ?? []);
 
@@ -165,18 +165,6 @@ export function ListColumn({ state, inbox, onImport }: ListColumnProps) {
                 active={state.selectedCardId === entry.card.cardId && state.selectedCard?.lifecycle === entry.card.lifecycle}
                 pendingLabel={t('knowledgeCenter.pendingReview')}
                 onSelect={() => state.selectRecord(entry.card)}
-              />
-            ))}
-            {inbox.drafts.length > 0 ? (
-              <div className="knowledge-center-section-title">{t('knowledgeCenter.draftsSection')}</div>
-            ) : null}
-            {inbox.drafts.map((draft) => (
-              <RecordRow
-                key={draft.cardId}
-                record={draft}
-                active={state.selectedCardId === draft.cardId && state.selectedCard?.lifecycle === draft.lifecycle}
-                pendingLabel={t('knowledgeCenter.draftNotCandidate')}
-                onSelect={() => state.selectRecord(draft)}
               />
             ))}
           </>

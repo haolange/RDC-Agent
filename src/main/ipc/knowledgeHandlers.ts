@@ -3,6 +3,8 @@ import type { KnowledgeIndexOverview, KnowledgeQueryRequest, KnowledgeSpace } fr
 import { KNOWLEDGE_IMPORT_MAX_BYTES } from '../knowledge/knowledgeIngest';
 import { readKnowledgeImagePreview } from '../knowledge/knowledgeImagePreview';
 import { knowledgeCandidateService } from '../knowledge/KnowledgeCandidateService';
+import { knowledgeImportService } from '../knowledge/KnowledgeImportService';
+import { KnowledgeDraftMigrationConflictError } from '../knowledge/knowledgeErrors';
 import { knowledgeCompileService } from '../knowledge/KnowledgeCompileService';
 import {
   createDefaultExportDependencies,
@@ -253,9 +255,23 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
       label: 'knowledge:candidates',
       maxBytes: 4 * 1024,
     });
+    try {
+      await knowledgeImportService.migrateSessionDrafts(sessionId);
+    } catch (error) {
+      if (!(error instanceof KnowledgeDraftMigrationConflictError)) {
+        rethrowKnowledgeError(error);
+      }
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'context',
+        severity: 'warning',
+        title: 'Knowledge session draft migration conflict',
+        summary: 'Unreviewed session drafts were not written because the target space already has a different card at the same identity.',
+        raw: { sessionId, cardIds: error.cardIds },
+      });
+    }
     return {
       candidates: await knowledgeCandidateService.listCandidates(sessionId),
-      drafts: await knowledgeCandidateService.listStagedDrafts(sessionId),
     };
   });
 
@@ -282,16 +298,31 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
       maxBytes: KNOWLEDGE_IMPORT_MAX_BYTES + 8 * 1024,
     });
     try {
-      if (input.spaceId) assertKnownSpaces([input.spaceId]);
-      if (input.filePath) {
-        return await knowledgeCandidateService.ingestPathToStaging(input.filePath, {
-          sessionId: input.sessionId,
-          ...(input.spaceId ? { spaceId: input.spaceId } : {}),
-        });
+      assertKnownSpaces([input.spaceId]);
+      const space = knowledgeQueryService.listSpaces().find((entry) => entry.spaceId === input.spaceId);
+      const token = ipcApprovalTokenService.issue({
+        action: 'knowledge.write',
+        ...knowledgeSpaceTokenBinding(space, 'import'),
+      });
+      consumeKnowledgeToken(token, 'knowledge.write', input.spaceId, 'import');
+      if (input.sessionId) {
+        try {
+          await knowledgeImportService.migrateSessionDrafts(input.sessionId);
+        } catch (error) {
+          if (!(error instanceof KnowledgeDraftMigrationConflictError)) throw error;
+          runtimeLogService.log({
+            scope: 'app',
+            namespace: 'context',
+            severity: 'warning',
+            title: 'Knowledge session draft migration conflict',
+            summary: 'Unreviewed session drafts were not written because the target space already has a different card at the same identity.',
+            raw: { sessionId: input.sessionId, cardIds: error.cardIds },
+          });
+        }
       }
-      return await knowledgeCandidateService.ingestToStaging(input.source ?? '', {
-        sessionId: input.sessionId,
-        ...(input.spaceId ? { spaceId: input.spaceId } : {}),
+      return await knowledgeImportService.importToSpace({
+        spaceId: input.spaceId,
+        ...(input.filePath ? { filePath: input.filePath } : { source: input.source ?? '' }),
       });
     } catch (error) {
       rethrowKnowledgeError(error);
