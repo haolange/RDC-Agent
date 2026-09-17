@@ -118,21 +118,32 @@ export class RdxCliInvokerService {
     }
   }
 
-  private buildCommandArgs(settings: RdxCliInvokerSettings, command: string, args: string[]): string[] {
+  private buildCommandArgs(
+    settings: RdxCliInvokerSettings,
+    command: string,
+    args: string[],
+    options: { contextId?: string } = {},
+  ): string[] {
     const globalArgs: string[] = [];
     const commandArgs: string[] = [];
+    let hasOwnerPid = false;
 
     for (let index = 0; index < args.length; index += 1) {
       const current = args[index];
-      if (current === '--daemon-context') {
+      if (current === '--daemon-context' || current === '--owner-pid') {
         const value = args[index + 1];
         if (value) {
           globalArgs.push(current, value);
+          if (current === '--owner-pid') hasOwnerPid = true;
           index += 1;
           continue;
         }
       }
       commandArgs.push(current);
+    }
+
+    if (options.contextId && !hasOwnerPid) {
+      globalArgs.push('--owner-pid', String(process.pid));
     }
 
     return [
@@ -174,7 +185,7 @@ export class RdxCliInvokerService {
 
     const invocation = resolveRdxBatchInvocation(
       settings.command,
-      this.buildCommandArgs(settings, command, args),
+      this.buildCommandArgs(settings, command, args, { contextId: options.contextId }),
     );
 
     return this.shell.invoke({

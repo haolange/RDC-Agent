@@ -6,6 +6,8 @@ vi.mock('../settings/SettingsService', () => ({ settingsService: { getAll: () =>
 vi.mock('../captures/ReplayDeviceService', () => ({ replayDeviceService: {} }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('../tools/ShellInvocationService', () => ({ shellInvocationService: { hasUnconfirmedProcesses: () => false } }));
+const ownership = vi.hoisted(() => ({ remember: vi.fn(), forget: vi.fn() }));
+vi.mock('./OwnedRdxDaemonRegistry', () => ({ rememberOwnedRdxDaemon: ownership.remember, forgetOwnedRdxDaemon: ownership.forget }));
 import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import { freezeRdxTurnBinding } from '../tools/RdxTurnBindings';
 import { RdxSessionRuntime } from './RdxSessionRuntime';
@@ -13,9 +15,14 @@ import { clearRdxContextLeases, getRdxContextLease, grantDelegatedLease, revokeD
 const request: OpenProjectInputRequest = { projectId: 'project', sessionId: 'session', inputId: 'same-file', filePath: '/capture.rdc',
   replayDevice: { id: 'local', type: 'local', label: 'Local', transport: 'local', status: 'online' } };
 const scope = { projectId: 'project', sessionId: 'session' };
-beforeEach(() => { clearRdxContextLeases(); nativeStop.mockReset(); nativeStop.mockImplementation(async (_command: string, args: string[]) => {
+beforeEach(() => { clearRdxContextLeases(); ownership.remember.mockReset(); ownership.forget.mockReset(); nativeStop.mockReset(); nativeStop.mockImplementation(async (_command: string, args: string[]) => {
   const operation = args[0];
   const context = args[args.lastIndexOf('--daemon-context') + 1] ?? 'default';
+  if (_command === 'daemon' && operation === 'start') {
+    return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rdx.daemon.start', data: {
+      context_id: context, owner_pid: process.pid, state: { context_id: context, owner_pid: process.pid, pid: 4242, worker: { pid: 0 } },
+    } }) };
+  }
   const data = _command === 'daemon' ? { context_id: context, stopped: true }
     : operation === 'rd.capture.open_file' ? { context_id: context, capture_file_id: 'file' }
     : operation === 'rd.capture.open_replay' ? { context_id: context, session_id: 'replay', capture_file_id: 'file' }
@@ -36,13 +43,38 @@ describe('native owning runtime', () => {
     await new RdxSessionRuntime().openProjectInput(request, { binding });
     expect(loadCatalog).not.toHaveBeenCalled();
   });
+  it('fails closed when daemon start does not bind the application owner', async () => {
+    nativeStop.mockImplementation(async (_command: string, args: string[]) => {
+      const context = args[args.lastIndexOf('--daemon-context') + 1] ?? 'default';
+      if (_command === 'daemon' && args[0] === 'start') {
+        return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rdx.daemon.start', data: {
+          context_id: context, owner_pid: 1, state: { context_id: context, owner_pid: 1, pid: 4242 },
+        } }) };
+      }
+      return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: args[0], data: { context_id: context } }) };
+    });
+    await expect(new RdxSessionRuntime().openProjectInput(request)).rejects.toThrow('owner_pid');
+    expect(ownership.remember).not.toHaveBeenCalled();
+    expect(getRdxContextLease('session')).toBeNull();
+  });
   it('allocates a unique context rather than using input identity', async () => {
     const runtime = new RdxSessionRuntime(); const opened = await runtime.openProjectInput(request);
     expect(opened.contextId).toMatch(/^rdc-/); expect(opened.contextId).not.toBe(request.inputId);
     expect(getRdxContextLease('session')?.contextId).toBe(opened.contextId);
+    expect(nativeStop).toHaveBeenCalledWith('daemon', ['start', '--daemon-context', opened.contextId], expect.objectContaining({ contextId: opened.contextId }));
+    expect(ownership.remember).toHaveBeenCalledWith(expect.objectContaining({ contextId: opened.contextId, ownerPid: process.pid }));
   });
   it('retains partial-open context until explicit confirmed close', async () => {
-    nativeStop.mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'open outcome uncertain' });
+    nativeStop.mockImplementation(async (_command: string, args: string[]) => {
+      const context = args[args.lastIndexOf('--daemon-context') + 1] ?? 'default';
+      if (_command === 'daemon' && args[0] === 'start') {
+        return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rdx.daemon.start', data: {
+          context_id: context, owner_pid: process.pid, state: { context_id: context, owner_pid: process.pid, pid: 4242 },
+        } }) };
+      }
+      if (args[0] === 'rd.capture.open_file') return { exitCode: 1, stdout: '', stderr: 'open outcome uncertain' };
+      return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: _command === 'daemon' ? 'rdx.daemon.stop' : args[0], data: { context_id: context, stopped: true } }) };
+    });
     const runtime = new RdxSessionRuntime(); await expect(runtime.openProjectInput(request)).rejects.toThrow('CLI_FAILED');
     const contextId = runtime.getContextId(); expect(contextId).toMatch(/^rdc-/);
     nativeStop.mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'close failed' });
@@ -51,7 +83,15 @@ describe('native owning runtime', () => {
     await runtime.clearOpenedCaptureForSession(scope); expect(runtime.getContextId()).toBeNull();
   });
   it('rejects a native operation returning a foreign context', async () => {
-    nativeStop.mockResolvedValueOnce({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rd.capture.open_file', data: { context_id: 'foreign', session_id: 'replay', capture_file_id: 'file' } }) });
+    nativeStop.mockImplementation(async (_command: string, args: string[]) => {
+      const context = args[args.lastIndexOf('--daemon-context') + 1] ?? 'default';
+      if (_command === 'daemon' && args[0] === 'start') {
+        return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rdx.daemon.start', data: {
+          context_id: context, owner_pid: process.pid, state: { context_id: context, owner_pid: process.pid, pid: 4242 },
+        } }) };
+      }
+      return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rd.capture.open_file', data: { context_id: 'foreign', session_id: 'replay', capture_file_id: 'file' } }) };
+    });
     const runtime = new RdxSessionRuntime(); await expect(runtime.openProjectInput(request)).rejects.toThrow('CONTEXT_MISMATCH');
     expect(getRdxContextLease('session')).toBeNull();
     expect(runtime.getContextId()).not.toBe('foreign');
@@ -80,6 +120,7 @@ it('retains ownership when daemon stop fails after replay clear', async () => {
   await runtime.clearOpenedCaptureForSession(scope);
   expect(runtime.getContextId()).toBeNull();
   expect(nativeStop).toHaveBeenCalledWith('daemon', ['stop', '--daemon-context', id], expect.objectContaining({ contextId: id }));
+  expect(ownership.forget).toHaveBeenCalledWith(id);
 });
 
 it('rejects wrong-context clear without stopping any daemon', async () => {
@@ -101,7 +142,13 @@ it('rejects unconfirmed daemon stop and preserves owning lease', async () => {
 });
 it('does not commit a native open completed after cancellation', async () => {
   const controller = new AbortController();
-  nativeStop.mockImplementationOnce(async (_command: string, args: string[]) => {
+  nativeStop.mockImplementation(async (_command: string, args: string[]) => {
+    const context = args[args.lastIndexOf('--daemon-context') + 1] ?? 'default';
+    if (_command === 'daemon' && args[0] === 'start') {
+      return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rdx.daemon.start', data: {
+        context_id: context, owner_pid: process.pid, state: { context_id: context, owner_pid: process.pid, pid: 4242 },
+      } }) };
+    }
     controller.abort();
     return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rd.capture.open_file', data: { context_id: args.at(-1), capture_file_id: 'file' } }) };
   });

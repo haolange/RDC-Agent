@@ -9,6 +9,7 @@ import { RdxSessionRuntime, type RdxLifecycleOptions } from './RdxSessionRuntime
 import { getDelegatedChildSessionId, getRdxContextLease } from './RdxRuntimeContextRegistry';
 import { shellInvocationService } from '../tools/ShellInvocationService';
 import { beginRdxLifecycle, getRdxInteractionLock, runRdxOperation, subscribeRdxInteractionLock } from './RdxOperationCoordinator';
+import { harvestOwnedRdxDaemons } from './OwnedRdxDaemonRegistry';
 import { replayLivePreviewStore } from '../captures/replay/ReplayLivePreviewStore';
 import { observeReplay, readReplayEvents } from './RdxReplayObservation';
 
@@ -201,8 +202,11 @@ export class RdxSessionService {
   }
   async closeAll(): Promise<void> {
     const results = await Promise.allSettled([...this.bindings.values()].map(binding => this.clearOpenedCaptureForSession(binding.state)));
+    const harvest = await harvestOwnedRdxDaemons();
     const failures = results.filter(result => result.status === 'rejected');
-    if (failures.length) throw new Error(`RDX_CLOSE_FAILED: ${failures.length} session resources remain owned.`);
+    if (failures.length || harvest.failed.length) {
+      throw new Error(`RDX_CLOSE_FAILED: ${failures.length + harvest.failed.length} session resources remain owned.`);
+    }
   }
   async switchActiveCapture(scope: CaptureReplayBindingRequest, captureId: string): Promise<void> {
     await this.serial(scope, async () => {

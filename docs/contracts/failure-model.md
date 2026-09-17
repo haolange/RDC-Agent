@@ -65,7 +65,7 @@
 | Provider stream buffer 超限 | Integrity | 8MiB fail-closed 截断会话步 |
 | 用户 Stop / abortAndJoin | Availability | join producers；丢弃迟到 event |
 | ProcessSupervisor timeout/abort | Availability | terminate process tree; settle only after observed close/error; retain `unconfirmed_orphan` in registry for diagnostics |
-| ShutdownCoordinator 限时 shutdown | Availability | 尽量排空后退出 |
+| ShutdownCoordinator 限时 shutdown | Availability | 尽量排空后退出；`release_owned_runtimes` 失败必须记错误并保留归属记录，不得假装 daemon 已停 |
 | Provider 网络/配额类错误 | Availability | 按 ErrorRecovery 契约；不发明 entitlement；429 与明确 `quota_exceeded` 的 402 只记录短期 quota |
 | Provider 空流 / wire 失败 / 恢复 abort | Availability | 见下文「provider 失败诊断保真」；空流不得合成 HTTP 502；最终 Work Process 只展示一条诊断 |
 | Headless instance.lock 冲突 | Security + Availability | 冲突 fail-closed 避免串 userData |

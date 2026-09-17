@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ShutdownCoordinator } from './ShutdownCoordinator';
+import { ShutdownCoordinator, SHUTDOWN_PHASE_ORDER } from './ShutdownCoordinator';
 
 describe('ShutdownCoordinator', () => {
+  it('releases owned runtimes before joining supervised processes', () => {
+    expect(SHUTDOWN_PHASE_ORDER.indexOf('release_owned_runtimes')).toBeLessThan(
+      SHUTDOWN_PHASE_ORDER.indexOf('terminate_processes'),
+    );
+  });
+
   it('runs disposables through the shutdown state machine once', async () => {
     const coordinator = new ShutdownCoordinator();
     const phases: string[] = [];
@@ -28,6 +34,13 @@ describe('ShutdownCoordinator', () => {
       },
     });
     coordinator.register({
+      id: 'release',
+      phase: 'release_owned_runtimes',
+      dispose: async () => {
+        phases.push('release_owned_runtimes');
+      },
+    });
+    coordinator.register({
       id: 'terminate',
       phase: 'terminate_processes',
       dispose: () => {
@@ -51,6 +64,7 @@ describe('ShutdownCoordinator', () => {
       'stop_accepting_turns',
       'abort_all',
       'join_producers',
+      'release_owned_runtimes',
       'terminate_processes',
       'flush_storage',
     ]);

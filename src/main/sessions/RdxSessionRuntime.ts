@@ -26,6 +26,8 @@ import type {
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type { RdxTurnBinding } from '../tools/RdxTurnBindings';
 import { setRdxRuntimeContextForSession, getDelegatedChildSessionId } from './RdxRuntimeContextRegistry';
+import { forgetOwnedRdxDaemon, rememberOwnedRdxDaemon } from './OwnedRdxDaemonRegistry';
+import { hostRdxIntermediateRoot, RDX_INTERMEDIATE_ROOT_ENV } from '../tools/withRdxHostRuntimeEnv';
 
 interface PreviewLoadResult {
   preview: OpenedCapturePreview | null;
@@ -94,6 +96,7 @@ export class RdxSessionRuntime {
     await this.closeOrReplaceOpenedCapture(options);
     this.lifecycleBinding = lifecycleBinding;
     options = { ...options, binding: this.lifecycleBinding };
+    await this.ensureOwnedDaemon(allocatedContextId, lifecycleBinding, options.signal);
     this.contextId = allocatedContextId;
     this.ownerScope = request.sessionId ? { projectId: request.projectId, sessionId: request.sessionId } : null;
     let replayDevice = request.replayDevice;
@@ -461,7 +464,32 @@ export class RdxSessionRuntime {
       }), this.contextId, 'rdx.daemon.stop');
       options.signal?.throwIfAborted();
       if (response.data.stopped !== true) throw new Error('RDX_CLOSE_FAILED: daemon shutdown was not confirmed.');
+      forgetOwnedRdxDaemon(this.contextId);
     }
+  }
+
+  private async ensureOwnedDaemon(contextId: string, binding: RdxTurnBinding, signal?: AbortSignal): Promise<void> {
+    const cli = binding.cli;
+    if (!cli.enabled || !cli.command) throw new Error('RDX_CLOSE_FAILED: owning CLI is unavailable for daemon start.');
+    signal?.throwIfAborted();
+    const payload = parseRdxNativeResult(await rdxCliInvokerService.executeCLI('daemon', ['start', '--daemon-context', contextId], {
+      contextId, abortSignal: signal,
+      settings: { ...cli, argsPrefix: [...cli.argsPrefix.filter((arg) => arg !== '--json'), '--json'] },
+    }), contextId, 'rdx.daemon.start');
+    const state = payload.data.state && typeof payload.data.state === 'object' && !Array.isArray(payload.data.state)
+      ? payload.data.state as Record<string, unknown>
+      : {};
+    const ownerPid = Number(payload.data.owner_pid ?? state.owner_pid ?? 0);
+    if (ownerPid !== process.pid) throw new Error('RDX_CLOSE_FAILED: daemon start did not bind the application owner_pid.');
+    rememberOwnedRdxDaemon({
+      contextId,
+      command: cli.command,
+      intermediateRoot: cli.env[RDX_INTERMEDIATE_ROOT_ENV] || hostRdxIntermediateRoot(),
+      ownerPid,
+      daemonPid: Number(state.pid ?? 0),
+      workerPid: Number((state.worker && typeof state.worker === 'object' ? (state.worker as { pid?: unknown }).pid : 0) ?? 0),
+      startedAt: Date.now(),
+    });
   }
 
   private resetRuntimeState(previousCapture: OpenedCaptureState | null): void {

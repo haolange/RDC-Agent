@@ -9,6 +9,7 @@ vi.mock('../captures/replay/ReplayLivePreviewStore', () => ({
   replayLivePreviewStore: { read: mocks.liveRead, clear: mocks.liveClear, write: vi.fn() },
 }));
 vi.mock('../tools/ShellInvocationService', () => ({ shellInvocationService: { hasUnconfirmedProcesses: () => false } }));
+vi.mock('./OwnedRdxDaemonRegistry', () => ({ harvestOwnedRdxDaemons: vi.fn(async () => ({ released: [], failed: [] })) }));
 vi.mock('./RdxReplayObservation', () => ({ observeReplay: mocks.observe, readReplayEvents: mocks.events }));
 vi.mock('./RdxSessionRuntime', () => ({ RdxSessionRuntime: class {
   opened: Record<string, unknown> | null = null;
@@ -23,6 +24,7 @@ vi.mock('./RdxSessionRuntime', () => ({ RdxSessionRuntime: class {
   snapshotContextForSession() { return this.opened; }
   async clearOpenedCaptureForSession() { if (!this.opened) return false; await mocks.close(); this.opened = null; return true; }
 } }));
+import { harvestOwnedRdxDaemons } from './OwnedRdxDaemonRegistry';
 import { RdxSessionService } from './RdxSessionService';
 import { setRdxInteractionLock, runRdxOperation } from './RdxOperationCoordinator';
 const scope = { projectId: 'p', sessionId: 's1' };
@@ -171,6 +173,23 @@ it('does not start native open after Agent preparation arrives during hashing', 
   release({ sha256: 'a'.repeat(64) }); await rejected;
   expect(service.snapshotOpenedCaptureForSession(scope)).toBeNull();
 });
+it('harvests leftover owned daemons after closeAll', async () => {
+  const service = new RdxSessionService();
+  await service.openProjectInput(request());
+  await service.closeAll();
+  expect(mocks.close).toHaveBeenCalled();
+  expect(harvestOwnedRdxDaemons).toHaveBeenCalledTimes(1);
+});
+
+it('fails closeAll when leftover harvest cannot confirm release', async () => {
+  vi.mocked(harvestOwnedRdxDaemons).mockResolvedValueOnce({
+    released: [],
+    failed: [{ contextId: 'rdc-left', error: 'daemon still owned' }],
+  });
+  const service = new RdxSessionService();
+  await expect(service.closeAll()).rejects.toThrow('CLOSE_FAILED');
+});
+
 it('does not attribute the preceding EID to a failed Agent observation', async () => {
   const service = new RdxSessionService(); await service.openProjectInput(request());
   mocks.observe.mockRejectedValueOnce(new Error('native image outcome unknown'));

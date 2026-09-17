@@ -10,6 +10,7 @@ Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verifie
 
 | Task | Criterion | Gate/Test | Browser evidence ref | Verdict | Commit SHA | Date |
 | --- | --- | --- | --- | --- | --- | --- |
+| RDX-daemon-lifecycle | 正常关闭先 `release_owned_runtimes`（clear+stop+收割）再 `joinAll`；open 先 `daemon start --owner-pid`；只收割 App 中间根 `rdc-*`；clear ≠ stop；宿主死亡忽略卡住 request count | `OwnedRdxDaemonRegistry` / `ShutdownCoordinator` / `RdxSessionRuntime` / `RdxSessionService` / `RdxCliInvokerService`；Tools `test_daemon_client` / `test_runtime_worker` | 仓库已无 `RdxNativeLifecycle.test.ts`，不再恢复该文件名。历史打开/preview/close 证据仍有效，不代替本轮进程回执。无 token | planned | — | 2026-09-17 |
 | UI-modal-backdrop-frost | `--modal-backdrop` 为 app 底 40% 压暗 + `--modal-backdrop-filter` `blur(16px)`；组件 CSS 只写 token；DESIGN 仅允许模态遮罩毛玻璃，Dropdown 仍实色 | `check:design-tokens`；`check:appearance`；disposable `start:agent-browser` | disposable `qa-1789586863139-829631c2dff7131b`（已清理）；未建 project/session；同源 `/app`。知识中心 backdrop token `color-mix(... 40%, transparent)`，computed bg alpha 0.4，`backdropFilter=blur(16px)`，`--modal-backdrop-filter=blur(16px)`。无 token | planned | — | 2026-09-17 |
 | UI-modal-backdrop-dim | `--modal-backdrop` 为 app 底 65% 实色压暗，无 `backdrop-filter`；不改 DESIGN 毛玻璃禁令 | `check:design-tokens`；disposable `start:agent-browser` | disposable `qa-1789586515980-e1998f3c8d242243`（已清理）；未建 project/session；同源 `/app`。知识中心 backdrop token `color-mix(... 65%, transparent)`，computed alpha 0.65，`backdropFilter=none`。无 token | planned | — | 2026-09-17 |
 | UI-modal-1610-inscribe | Settings / 知识中心在 `88vw×86vh`（硬顶 120rem×70rem）内接最大 16:10，不写死 aspect-ratio；640 全屏去圆角 | `tsc`；`check:design-tokens`；`check:fidelity`；disposable `start:agent-browser` | disposable `qa-1789585664599-ecc88928104d7b68`（已清理）；未建 project/session；同源 `/app`。1920×1080：两壳 1486.1×928.8，ratio 1.6。2227×1253：两壳 1725×1078，ratio 1.6。640×800：知识中心 640×800 原点、radius 0。无 token | planned | — | 2026-09-17 |
@@ -138,7 +139,7 @@ Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verifie
 
 真实请求成本验证（用户限定最多两次，无重试）：生产 PromptPlanBuilder，General 同一段合成代码问题、相同 DeepSeek V4 Flash 参数，before/after 各一次，均正确修复 i<n 边界，无提问、无 handoff。before input/output/total = 1644/137/1781；after = 1200/210/1410；cache hit 均为 0。输入下降 27.0%，总 token 下降 20.8%。这是受预算约束的单轮文本对照，不是五场景多轮 Mission 成本结论；工具轮数未测。请求预算文件 used=2，禁止默认测试触发外部调用。完整 PromptPlan 字符数：General 7184→4949、Debugger 10449→5404、Analyzer 10725→5495、Optimizer 10514→5436；制品在本机临时 rdc-convergence-bench-c3f1cbdb20/instruction-cost。
 
-应用生命周期实测：RdxNativeLifecycle.test.ts 使用真实 production SessionService → configured action → ShellInvocationService / invoker，副本 capture open、registry/context query、preview status/off、context clear/lease 清除通过；finally 停止独立 daemon，源与副本 hash 不变。preview off 必须收到所属 context 且 preview.enabled=false 才显示关闭；openPreview 空成功载荷不再被补成 open。Android prepared remote 只消费一次，成功或失败后重试都须重新连接，已有单测；真实 adb devices -l 列表为空，Android 正路径仍受硬件阻塞。
+应用生命周期实测：当时的 opt-in 原生文件现已不在仓库，不再恢复 `RdxNativeLifecycle.test.ts` 这个名字。当时使用真实 production SessionService → configured action → ShellInvocationService / invoker，副本 capture open、registry/context query、preview status/off、context clear/lease 清除通过；finally 停止独立 daemon，源与副本 hash 不变。当前同等工程覆盖改为 `OwnedRdxDaemonRegistry` / `ShutdownCoordinator` / `RdxSessionRuntime` 的 clear≠stop 与归属收割测试。preview off 必须收到所属 context 且 preview.enabled=false 才显示关闭；openPreview 空成功载荷不再被补成 open。Android prepared remote 只消费一次，成功或失败后重试都须重新连接，已有单测；真实 adb devices -l 列表为空，Android 正路径仍受硬件阻塞。
 
 GUI 验收仍待外部条件：浏览器自动化与独立桌面自动化内核均在启动时返回 Windows CreateProcessWithLogonW 1385，无法点击或截图；HTTP smoke 不替代 GUI。实际 render-target A-B-A 结果不替代 screenshot 显示链验证，也不替代真实 provider 多轮 Mission roundtrip / OS safeStorage 的完整产品验收。
 
@@ -155,7 +156,7 @@ GUI 验收仍待外部条件：浏览器自动化与独立桌面自动化内核�
 
 - pnpm 11.7.0 typecheck、lint、check:gates、build。完整 tests 为 337 files passed / 4 skipped，2482 tests passed / 4 skipped；coverage ratchet lines 73.50%、functions 75.77%、branches 60.96%、statements 71.21%。Windows 沙箱阻止 Knowledge 安全测试 realpath 访问祖先目录，完整门禁在宿主环境执行，未修改产品路径检查。
 - HandoffProviderFixture 使用确定性 ProviderStrategy + 真实 AgentLoop、RuntimeToolAssembly、HandoffStateStore、SessionArtifactResolver、InvestigationArtifactService；三类代表 Plan、直接 Mission/General 路由、Small Loop、一次 Big Loop、第二次回评估、第三轮拒绝、错误返回、重复 consume、取消和重启降级通过。另有缺失/损坏/hash/跨 session 引用、必需 Skill 去重/缺失/权限冲突及 v1 原字节迁移单测。它不是实际模型规划质量验收。
-- 真实原生 CLI 两项通过：RdxNativeExecution 验证实际 render-target texture 的 A-B-A 与主进程签名回执，RdxNativeLifecycle 验证应用 action 打开、所属 context、preview off 和关闭租约。原生 runtime state 在独立临时 tools root；现有共享 CLI context 达到数量上限时不删除用户 context。源 capture 与副本 hash 保持不变。制品为本机临时 rdc-native-receipts-ifHtEo / rdc-native-lifecycle-pHnpni；测试签名 key 不等于 OS safeStorage 的产品验收。
+- 真实原生 CLI 两项通过：RdxNativeExecution 验证实际 render-target texture 的 A-B-A 与主进程签名回执；当时的应用生命周期专项现已不在仓库，不再按 `RdxNativeLifecycle.test.ts` 复跑，历史结果仍是当时打开、所属 context、preview off 和关闭租约的证据。原生 runtime state 在独立临时 tools root；现有共享 CLI context 达到数量上限时不删除用户 context。源 capture 与副本 hash 保持不变。制品为本机临时 rdc-native-receipts-ifHtEo / rdc-native-lifecycle-pHnpni；测试签名 key 不等于 OS safeStorage 的产品验收。
 - GUI 宿主恢复：策略备份 rdc-gui-rights-20260909-163648/before.inf，仅为 CodexSandboxUsers 增补 SeInteractiveLogonRight，其他登录策略及 elevated 沙箱不变；普通执行与 CUA 宿主均启动成功。
 - disposable Browser QA 实际访问一次性 /qa 后的同源 /app，点击 Settings / General 指令、Skills 设置、Plan 展开、失败详情，键盘 Enter 收起，检查 disabled / selected / focus；820px 窄屏 document.scrollWidth=clientWidth=820。Composer 本地 /skills renderdoc-investigation 显示待发送预载，未发送模型请求；旧 v1 fixture 在真实 session select 后显示迁移提示并生成 v2 与归档。会话/Plan/Checkpoint 为生产存储服务写入的明确 GUI fixture，错误行是显示样本，不冒充真实模型轨迹。截图 qa-general.png、qa-plan-wide.png、qa-plan-narrow.png、qa-skill-entry.png、qa-handoff-migration.png 保存在本轮仓库外可视化产物目录。
 - Browser QA launcher 66464/Electron 48132 及子进程已停止；桌面 scripts/start-rdc-agent.cmd 另以临时用户目录实启。沙箱桌面 GPU 启动失败，宿主环境同入口加载 file renderer 成功、无占锁失败；launcher 59152/Electron 3816 及子进程已停止。canonical instance.lock 不存在，临时锁 owner 已死；桌面启动权已交还。
@@ -251,7 +252,7 @@ GUI 验收仍待外部条件：浏览器自动化与独立桌面自动化内核�
 - 2026-09-10 01:02–01:04 新增受控证据：ExplorationReviewProviderFixture 实际 AgentLoop / SubagentRunner / PromptPlan / 领域工具 / handoff 捕获父子 Provider 输入，Scout 与 Skeptic 独立会话，原始来源未整体回灌；Challenge 后 General 读取原证据核查条件并回原 Mission，缺少 driver Y 实测诚实保持 partial。图像经过 artifact_read、结果外置路径后仍以 image block 到达子 Provider 输入。此为受控 Provider fixture，不是真实模型科学判断或新 driver 实验。
 - 同期 ArtifactReadTool + ToolResultArtifactizer 2 文件 9 测试通过：根 Session 托管子执行大结果、精确 hash/read grant、分页重建完整错误尾部、视觉内容不被重复外置。ToolResourceArbiter 1 文件 10 测试通过：跨项目 unsafe effects 保守串行、无关只读并行；未确认退出同时保留局部与全局 unsafe 资源，真实退出解锁。最后全库验证仍由最终 diff 收口。
 
-- 2026-09-10 01:17:14 主执行者重新验证最终资源仲裁路径：RdxNativeLifecycle + RdxNativeExecution **2 文件 2 测试通过**，28.68s；证据 TEMP/rdc-native-lifecycle-Qir217 与 TEMP/rdc-native-receipts-y1oZ6I/validation.json。限定 python/rdx 且 command 含本轮 rdc-native- 的进程检查为空。这是该次本机原生路径证据，不能升级为真实模型、Remote/Android 或尚在修复的后台集成验收。
+- 2026-09-10 01:17:14 主执行者重新验证最终资源仲裁路径：当时的应用生命周期专项 + RdxNativeExecution **2 文件 2 测试通过**，28.68s；证据 TEMP/rdc-native-lifecycle-Qir217 与 TEMP/rdc-native-receipts-y1oZ6I/validation.json。该生命周期文件名已不在仓库。限定 python/rdx 且 command 含本轮 rdc-native- 的进程检查为空。这是该次本机原生路径证据，不能升级为真实模型、Remote/Android 或尚在修复的后台集成验收。
 
 ## 2026-09-10 Harness 最终收口（未提交工作区）
 
@@ -273,7 +274,7 @@ GUI 验收仍待外部条件：浏览器自动化与独立桌面自动化内核�
 - 完整 `vitest run --coverage --maxWorkers=2`：**361 文件通过 / 4 文件按既有开关跳过，2619 测试通过 / 4 跳过**；2026-09-10 12:59:04 开始，163.25 秒，exit 0。覆盖率 statements 72.00%、branches 62.00%、functions 76.53%、lines 74.31%；coverage ratchet exit 0。跳过项为三项显式原生测试与双请求成本比较；前三项已另跑，未虚构新的成本比较。
 - 最终 typecheck、lint、build 通过；最终 check:gates 与 whitespace 核对由本节追加记录给出。未删测试、未放宽阈值，Knowledge realpath 检查通过主机身份运行，未绕过权限逻辑。日志为本机 TEMP 下 `rdc-harness-final-{coverage-3,ratchet-3,typecheck-6,lint-6,build-3}.log`。
 - 受控模型集成：ExplorationReviewProviderFixture 使用生产 AgentLoop / SubagentRunner / PromptPlan / handoff，Scout 独立探索、Skeptic 独立上下文形成 Challenge、General 按引用补证、回原 Mission 评估；未测 driver Y 保留 partial。该测试证明执行和输入契约，不冒充真实模型科学结论。
-- 原生专项最终资源路径：01:17:14 的 RdxNativeLifecycle/RdxNativeExecution 2 文件 2 测试、28.68 秒；A/restored hash `52e503065984534330ee321dbca53e164f87ee4d646b5826fc2041bbd28d13c3`，B `e1d873b5e3bdef3d6bfa784b83fe6b5c83e892e275daee8401ae66ca6f7e1357`。本轮后续修复不修改这些原生/资源源码。证据 TEMP/rdc-native-receipts-y1oZ6I/validation.json 与 TEMP/rdc-native-lifecycle-Qir217。
+- 原生专项最终资源路径：01:17:14 的应用生命周期专项/RdxNativeExecution 2 文件 2 测试、28.68 秒；A/restored hash `52e503065984534330ee321dbca53e164f87ee4d646b5826fc2041bbd28d13c3`，B `e1d873b5e3bdef3d6bfa784b83fe6b5c83e892e275daee8401ae66ca6f7e1357`。该生命周期测试文件名已不在仓库。本轮后续修复不修改这些原生/资源源码。证据 TEMP/rdc-native-receipts-y1oZ6I/validation.json 与 TEMP/rdc-native-lifecycle-Qir217。
 
 ### 真实 Browser / OAuth 行为证据
 
@@ -511,3 +512,14 @@ Android matching-runtime acceptance now passed: Android Studio SDK NDK 27.3.1375
 - 工程：`KnowledgeExportService` / `knowledgeZip` / `knowledgeIngest.images` / `KnowledgeDurableStore` / `knowledgeSystemContract` / `knowledgeSchemas` 及相关 Knowledge Center 测试通过；`typecheck`、受影响 eslint、`check:knowledge-system`、`check:shared-exports`、`check:fidelity`、`check:browser-capability`、`check:design-tokens`、`check:legacy-residue`、`check:contracts` 通过。
 - 带图往返：用本机用户知识卡 `~/.rdx/knowledge/cases/AIRD-20260207-0001.md`（`observed.png` 599070 字节、`reference.png` 590171 字节）经 `KnowledgeExportService` 写出临时 zip，再 `ingestKnowledgeFromPath`。一条 draft，`missingAssets` 为空，两张图进入 staging。未写入用户知识根，临时目录已删。
 - 本轮未启动桌面或 Browser QA；canonical `instance.lock` 不存在。原生保存/打开对话框未点，不把 Center 点击链标为通过。
+
+## 2026-09-17 RDX daemon/worker 生命周期收口
+
+适用源码：当前未提交工作区。表行 `RDX-daemon-lifecycle` 保持 planned：未提交、未跑完整 coverage / Browser QA / 桌面开关机，不写 verified SHA。仓库已无 `RdxNativeLifecycle.test.ts`，不再恢复该文件名。
+
+- 工程：`OwnedRdxDaemonRegistry` / `RdxSessionRuntime` / `RdxSessionService` / `RdxCliInvokerService` / `ShutdownCoordinator` / `ProcessSupervisor` / `executeRdxShell` / cancellation 与 fault-injection 共 9 文件 114 项通过。受影响 eslint 通过。本轮文件无新增 tsc 诊断；全库 `tsc --noEmit` 仍有既有 `fflate` 缺失，与本轮无关。未跑完整 coverage / check:gates / build。
+- Tools：`test_daemon_client.py` 17 项通过（含 clear≠stop、`--owner-pid`、claim_owner、stop 只收本 context worker、宿主死亡后进程退出）。`test_runtime_worker.py` 的 `RDX_DAEMON_PID` 注入通过；另外两项依赖 `rdx.server` 的既有用例在 Python 3.12 上因 `ctypes.wintypes.HCURSOR` 收集失败，未改断言。本轮临时 pytest venv 已删。
+- 隔离实机（Tools 3.14、独立 `RDX_INTERMEDIATE_ROOT`，未开桌面 / QA）：两个 `rdc-*` 先 `daemon start --owner-pid`；`context clear` 后目标 daemon 仍在；`daemon stop` 只停目标，另一 context 仍在。已死 owner + 1s lease 后 daemon 进程退出。worker 父 PID 监视线程在父死后退出。临时中间根已删，本轮 `rdc-aaaaaaaa-*` 进程为空。
+- 实机修了 Windows 收口缺口：watch 已判定 owner 丢失，但 `Listener.accept()` 不因 `close()` 醒来，进程会继续活着。现在 `serve_forever` 已启动的 daemon 在 `_stop()` 后 `os._exit(0)`。
+- 未自动杀安装目录独立 CLI。本机仍有 `rdx-tools` `python.exe` PID 19760：`daemon-context default`、无 `--owner-pid`，状态不在 App `~/.rdx/rdx-intermediate`，也不在安装目录 `intermediate/runtime/rdx_cli` 的可见 `daemon_state*.json`。按计划只作手工诊断，不杀 `default` / 其他用户 helper。
+- 本轮未启动 QA / 桌面 launcher；canonical `instance.lock` 不存在。桌面启动权已交还。

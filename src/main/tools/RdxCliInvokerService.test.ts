@@ -125,3 +125,11 @@ it('injects the host intermediate root into every CLI spawn env', async () => {
   await service.executeCLI('version', ['--json'], { settings: cli });
   expect(invoke.mock.calls[0][0].env.RDX_INTERMEDIATE_ROOT).toMatch(/rdx-intermediate$/u);
 });
+
+it('lifts owner-pid for context-scoped CLI invocations', async () => {
+  const invoke = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', duration_ms: 1 });
+  const service = new RdxCliInvokerService({ invoke } as never);
+  await service.executeCLI('call', ['rd.capture.open_file', '--daemon-context', 'rdc-owned'], { settings: cli, contextId: 'rdc-owned' });
+  expect(invoke.mock.calls[0][0].args.slice(0, 4)).toEqual(['--daemon-context', 'rdc-owned', '--owner-pid', String(process.pid)]);
+  expect(invoke.mock.calls[0][0].args).toContain('call');
+});
