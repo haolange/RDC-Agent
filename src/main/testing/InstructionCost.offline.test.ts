@@ -66,7 +66,9 @@ describe('offline complete PromptPlan comparison', () => {
         expect(after.segments.some(segment => segment.kind === 'tool-capability')).toBe(true);
         if (test.id === 'general' && !test.extra.length) {
           const resident = after.segments.filter(segment => ['core-contract', 'agent-profile', 'preloaded-skill'].includes(segment.kind)).map(segment => segment.content).join('\n');
-          expect(resident).not.toMatch(/RDX|Mission|RenderDoc|Checkpoint/);
+          expect(resident).not.toMatch(/RDX|RenderDoc|Checkpoint/);
+          expect(resident).toContain('When this turn is executing an approved Mission plan');
+          expect(resident).toContain('General finishes in place');
         }
         return { ...test, beforeChars: before.systemPrompt.length, afterChars: after.systemPrompt.length, deltaChars: after.systemPrompt.length - before.systemPrompt.length,
           beforeEstimatedTokens: before.totalTokenEstimate, afterEstimatedTokens: after.totalTokenEstimate, segments: after.segments.map(segment => ({ id: segment.id, chars: segment.content.length })) };

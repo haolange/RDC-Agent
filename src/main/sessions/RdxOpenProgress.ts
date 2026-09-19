@@ -13,7 +13,7 @@ export async function withRdxOpenProgress<T>(contextId: string, cli: RdxCliInvok
     while (!finished) {
       try {
         const result = parseRdxNativeResult(await rdxCliInvokerService.executeCLI('daemon', ['status', '--daemon-context', contextId], {
-          contextId, timeout: 5000, settings: { ...cli, argsPrefix: [...cli.argsPrefix.filter(arg => arg !== '--json'), '--json'] },
+          contextId, timeout: 5000, settings: cli,
         }));
         const state = result.data.state as Record<string, unknown> | undefined;
         const active = state?.active_operation as Record<string, unknown> | undefined;

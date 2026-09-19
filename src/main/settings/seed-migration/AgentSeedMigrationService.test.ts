@@ -100,7 +100,10 @@ describe('seed semantic hash', () => {
   });
 
   it('hashCanonicalAgentSemantics ignores only model/icon/accent and handoff.model', () => {
-    const builtin = extractSeedSemanticManifest(readBuiltinRaw('general'), 'general');
+    const builtin = { ...extractSeedSemanticManifest(readBuiltinRaw('general'), 'general'), handoffs: [
+      { agent: 'general', label: 'Continue', prompt: 'Continue work', send: true },
+      { agent: 'analyzer', label: 'Evaluate', prompt: 'Evaluate evidence', send: true },
+    ] };
     const baseline = hashCanonicalAgentSemantics(builtin);
     expect(hashCanonicalAgentSemantics({ ...builtin, models: ['openrouter/x'] })).toBe(baseline);
     expect(hashCanonicalAgentSemantics({ ...builtin, icon: 'spark' })).toBe(baseline);

@@ -87,9 +87,7 @@ export function createRdxProbeTool(
         }
         const args = [...compiled.args];
         if (lease && compiled.needsContext) args.push('--daemon-context', lease.contextId);
-        // --json is global in the native parser, never an application session argument.
-        const frozenSettings = { ...settings, argsPrefix: [...settings.argsPrefix, '--json'] };
-        const cli = await executeCli(compiled.command, args, { abortSignal: signal, settings: frozenSettings, contextId: lease?.contextId });
+        const cli = await executeCli(compiled.command, args, { abortSignal: signal, settings, contextId: lease?.contextId });
         signal?.throwIfAborted();
         const expectedContext = compiled.command === 'context' ? lease?.contextId : undefined;
         const payload = parseRdxNativeResult(cli, expectedContext);

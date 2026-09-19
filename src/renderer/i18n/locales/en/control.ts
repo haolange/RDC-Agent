@@ -235,7 +235,7 @@ export const enControl = {
   "control.replay.applied": "Applied EID {eid}",
   "control.replay.requested": "Applying EID {requested} · Showing EID {shown}",
   "control.replay.synced": "Device display synchronized",
-  "control.replay.remoteUnsupported": "Device display sync unavailable",
+  "control.replay.remoteUnavailable": "Device display sync unavailable",
   "control.replay.locked": "Agent is controlling replay",
   "control.replay.retryImage": "Retry image",
   "control.replay.retryClose": "Retry close",

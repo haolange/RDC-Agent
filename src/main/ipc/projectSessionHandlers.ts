@@ -287,6 +287,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       await removeSessionWithHooks(id);
       attachmentStagingService.releaseBySessionId(id);
       agentOrchestrator.syncSessionSlots(id);
+      agentOrchestrator.releaseSessionToolState(id);
       const remainingSessions = storageAdapter.listSessions(session.projectId);
       const nextSession = remainingSessions[0]
         ? projectSessionForClient(remainingSessions[0])

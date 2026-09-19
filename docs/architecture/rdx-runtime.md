@@ -93,7 +93,7 @@ Settings 保留 executable、argsPrefix、cwd、env 和 timeout，并呈现连�
 
 应用生命周期的唯一入口为 session-scoped `RdxSessionService`，每个 binding 持有 `RdxSessionRuntime`。Open 对原文件计算完整 SHA-256，main 分配 UUID daemon context，先 `daemon start --owner-pid <App pid>` 再通过固定原生 argv 传递。只接受匹配的 native identity，关闭失败保留原 owning context。Android 设备预留先于连接，另一 session 不能抢占。`ShutdownCoordinator` 在 `release_owned_runtimes` 完成 clear+stop 与归属收割后，才进入 `terminate_processes` 的 `ProcessSupervisor.joinAll`。归属记录落在 `userData/state/owned-rdx-daemons.json`，不是全局 lease 镜像。
 
-`rd.session.get_replay_events` 返回完整事件列表；`rd.session.observe` 在原生串行区内应用事件、解析目标并导出画面。默认 final_output 只使用 Present 资源证据，无法识别时不冒充最终输出。Remote 当前能力为 unsupported，Local 图片路径并不能证明设备屏幕显示。
+`rd.session.get_replay_events` 返回完整事件列表；`rd.session.observe` 在原生串行区内应用事件、解析目标并导出画面。默认 final_output 只使用 Present 资源证据，无法识别时不冒充最终输出。Remote 屏幕呈现使用同一远程连接的原生确认，按事件、纹理和新鲜序号报告 presented；缺少能力为 unsupported，窗口或呈现失败为 unavailable。Local 图片路径不能证明设备屏幕显示。
 
 `executeRdxShell` 与人工操作共享 context 队列；native 返回及签名回执完成后才观察并记录足迹，使用该 turn 的冻结 CLI。测量操作是自包含的 awaited 调用，观察不会插入 sampling 内部；是否刷新由操作影响决定，不按工具名称特判。多条命令构成的 experiment 是证据生命周期，不是持续采样事务：命令之间的观察会执行 replay/export，不承诺整个 experiment 零扰动。
 
@@ -119,3 +119,17 @@ Frozen turn identity includes the owning capture and replay identities. Capture-
 Frame-timing evidence validates the complete single-queue GPU replay method, seconds, range, samples/warmup, capture and actual replacement set. These checks supplement main-process signed receipts and the existing five-phase experiment validation; catalog claims cannot replace execution proof. Specialist references are generated from the same frozen CLI definitions.
 
 Android 回放使用匹配的 Tools/native 服务。服务端在等待用户下一条操作时保持连接，只有开始接收包后才应用接收超时；应用不通过后台抢占或重启用户 helper 来维持会话。Android 文件传输由同一 CLI 以 ADB 和 SHA256 校验完成，已验证设备副本可复用；连接只拥有本次新建的副本。Capture 的图像导出成功与设备实际呈现分别投影，无设备确认时仍显示同步不可用。
+
+## 同安装 Python 绑定与 Tool batch
+
+共用 assertRdxCliBinding 校验 Settings 保存、安装验证与实际调用；command 固定为同安装捆绑 Python 绝对路径，唯一 argsPrefix 为 cli/run_cli.py。prepareTurn 经 catalog 验证冻结该配对。RDX_TOOLS_ROOT 不得重定向，PYTHONHOME/PYTHONPATH 不接受外部导入路径。文件 realpath 不得逃出安装。bat/旧 PowerShell 转发器返回 RDX_BAT_REJECTED，不再改写启动命令。
+
+旧非法设置读取后仍展示，通用工作台可启动；保存和 RDX 执行 fail-closed。失效验证清除缓存；除版本与完整 catalog 安装诊断外，调用前必须有验证成功的同安装 catalog。shell.rdx 一次一操作，发现仅读冻结定义。
+
+Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 校验与 daemon 请求，顺序、首错停止，无新 catalog 操作、服务或 IPC。Agent 不接入 batch，继续使用单 owning lease 与独立签名回执。
+
+## 回放隔离与恢复投影
+
+原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化。失败没有取得可信恢复证明时仍 fail-closed；恢复通过应用生命周期重新建立 owning capture/replay/context 身份。
+
+Android 的 remote_display 由同一远程连接的原生呈现确认驱动，核对当前事件、目标纹理及新鲜序号；后台窗口、原生失败或缺失能力不得显示 presented。无颜色输出清除手机旧画面并表达无输出，应用 PNG 与手机屏幕状态分别判断。

@@ -179,9 +179,11 @@ export class AgentOrchestrator {
 
   private releaseTransientAgentState(scopeId: string): void {
     if (!isTransientExecutionScope(scopeId)) return;
+    this.toolExecutors.releaseSession(scopeId);
     this.slots.purgeAgentStatesForScope(scopeId);
   }
 
+  releaseSessionToolState = (sessionId: string): void => this.toolExecutors.releaseSession(sessionId);
   private getOrCreateAgentConfig(agentId: AgentRole): AgentConfig {
     return this.slots.getOrCreateAgentConfig(agentId);
   }

@@ -19,6 +19,7 @@ Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consu
 - 事件流采用携带 cookie 的同源 `POST /events` fetch，保留 SSE 帧格式；不依赖原生 EventSource GET 的 Origin 行为。断流只重接同一事件流，不轮询应用状态；401/403 停止重连，最后订阅移除后 abort，迟到帧不得派发。
 - Cookie 认证的 `/invoke`、`/events`、`/api/*` 必须带精确 Origin。`browser-dev` 同源反代 Vite 时不得把 cookie / authorization / `x-rdc-*` 转给上游。
 - Secret 只可提交给主进程；renderer 只读取 `{ hasSecret, maskedPreview? }`，不得获得明文。
+- 两个 Capture 图像读取 channel 在 Browser JSON transport 中严格解析 Node Buffer 的 `{ type: 'Buffer', data: byte[] }`，还原为 `Uint8Array`；非法字节拒绝。Desktop 仍使用原有字节返回类型，组件不感知 transport 差异。
 
 ## 产品能力矩阵
 

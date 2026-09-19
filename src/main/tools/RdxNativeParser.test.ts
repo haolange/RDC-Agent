@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { compileRdxProbe, type RdxProbeInput } from '@shared/constants/rdxProbe';
 import { RdxCliInvokerService } from './RdxCliInvokerService';
 import { ShellInvocationService } from './ShellInvocationService';
@@ -13,11 +13,12 @@ describe.skipIf(!root || !python)('external native parser contract (explicit ins
     const calls: string[][] = [];
     class ParserCapture extends ShellInvocationService {
       override async invoke(request: Parameters<ShellInvocationService['invoke']>[0]) {
-        calls.push(request.args ?? []);
+        calls.push((request.args ?? []).slice(1));
         return { exitCode: 0, stdout: '{}', stderr: '', duration_ms: 0 };
       }
     }
     const invoker = new RdxCliInvokerService(new ParserCapture());
+    vi.spyOn(invoker, 'loadCatalog').mockResolvedValue({} as never);
     const inputs: RdxProbeInput[] = [
       { action: 'version' }, { action: 'doctor' }, { action: 'enumerate' }, { action: 'preview_status' },
       { action: 'lease_open' }, { action: 'lease_close' },
@@ -30,7 +31,7 @@ describe.skipIf(!root || !python)('external native parser contract (explicit ins
     for (const input of inputs) {
       const command = compileRdxProbe(input);
       await invoker.executeCLI(command.command, [...command.args, ...(command.needsContext ? ['--daemon-context', 'qa-parser-context'] : [])],
-        { settings: { ...DEFAULT_RDX_CLI_INVOKER, enabled: true, command: python!, argsPrefix: ['--json'] } });
+        { settings: { ...DEFAULT_RDX_CLI_INVOKER, enabled: true, command: python!, argsPrefix: [path.resolve(root!, 'cli/run_cli.py')] } });
     }
     const code = [
       'import sys,json,contextlib,io',

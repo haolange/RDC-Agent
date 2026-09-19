@@ -47,7 +47,7 @@ async function callNative(
   signal?.throwIfAborted();
   const result = await rdxCliInvokerService.executeCLI('call', [
     operation, '--args-json', JSON.stringify(args), '--daemon-context', contextId,
-  ], { contextId, abortSignal: signal, settings: { ...binding.cli, argsPrefix: [...binding.cli.argsPrefix, '--json'] } });
+  ], { contextId, abortSignal: signal, settings: binding.cli });
   try {
     signal?.throwIfAborted();
     const payload = parseRdxNativeResult(result, contextId, operation);
@@ -460,7 +460,7 @@ export class RdxSessionRuntime {
       if (!cli?.enabled || !cli.command) throw new Error('RDX_CLOSE_FAILED: owning CLI is unavailable for daemon shutdown.');
       const response = parseRdxNativeResult(await rdxCliInvokerService.executeCLI('daemon', ['stop', '--daemon-context', this.contextId], {
         contextId: this.contextId, abortSignal: options.signal,
-        settings: { ...cli, argsPrefix: [...cli.argsPrefix.filter(arg => arg !== '--json'), '--json'] },
+        settings: cli,
       }), this.contextId, 'rdx.daemon.stop');
       options.signal?.throwIfAborted();
       if (response.data.stopped !== true) throw new Error('RDX_CLOSE_FAILED: daemon shutdown was not confirmed.');
@@ -474,7 +474,7 @@ export class RdxSessionRuntime {
     signal?.throwIfAborted();
     const payload = parseRdxNativeResult(await rdxCliInvokerService.executeCLI('daemon', ['start', '--daemon-context', contextId], {
       contextId, abortSignal: signal,
-      settings: { ...cli, argsPrefix: [...cli.argsPrefix.filter((arg) => arg !== '--json'), '--json'] },
+      settings: cli,
     }), contextId, 'rdx.daemon.start');
     const state = payload.data.state && typeof payload.data.state === 'object' && !Array.isArray(payload.data.state)
       ? payload.data.state as Record<string, unknown>

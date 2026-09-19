@@ -28,7 +28,7 @@ export function isCapturePartialReady(state: CaptureReplayState | null): boolean
   return state?.phase === 'ready' && Boolean(
     state.error
     || state.warning
-    || ['unsupported', 'error', 'pending'].includes(state.devicePresentation.status),
+    || ['unsupported', 'unavailable'].includes(state.devicePresentation.status),
   );
 }
 

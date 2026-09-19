@@ -1,4 +1,5 @@
 import path from 'path';
+import { assertRdxCliBinding } from '@shared/utils/rdxCliBinding';
 import {
   DEFAULT_CONTEXT_COMPACTION_PERCENT,
 } from '@shared/types/modelCapability';
@@ -68,13 +69,14 @@ export function sanitizeStringRecord(value: unknown): Record<string, string> {
 export function sanitizeRdxCliInvokerSettings(
   value: unknown,
   fallback: RdxCliInvokerSettings = DEFAULT_RDX_CLI_INVOKER,
+  validate = false,
 ): RdxCliInvokerSettings {
   const candidate = value && typeof value === 'object' ? value as Partial<RdxCliInvokerSettings> : {};
   const timeoutMs = typeof candidate.timeoutMs === 'number' && Number.isFinite(candidate.timeoutMs)
     ? clamp(Math.trunc(candidate.timeoutMs), 1000, 600000)
     : fallback.timeoutMs;
 
-  return {
+  const settings: RdxCliInvokerSettings = {
     enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : fallback.enabled,
     command: typeof candidate.command === 'string' ? candidate.command.trim() : fallback.command,
     argsPrefix: sanitizeStringArray(candidate.argsPrefix ?? fallback.argsPrefix),
@@ -82,6 +84,8 @@ export function sanitizeRdxCliInvokerSettings(
     env: sanitizeStringRecord(candidate.env ?? fallback.env),
     timeoutMs,
   };
+  if (validate && (settings.enabled || settings.command || settings.argsPrefix.length)) assertRdxCliBinding(settings);
+  return settings;
 }
 
 export function sanitizeCodeInterpreterSettings(

@@ -159,7 +159,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 ## RDX / Capture
 
-无内置 RDX toolchain。**General** 与 UI 的 Open capture / remote / preview / close 以及 Live RDC mutate 走 Settings shell action / `shell` → `ShellInvocationService`，且必须持有 exclusive lease。**Mission planner** 禁止 `shell` 与 `code_interpreter`；只通过受控只读 `rdx_probe` + `rdx_context` 访问 RDX（见 `DESIGN.md` 裁决 J）。`rdx_probe` 唯一执行路径是 Settings `tooling.rdxCli` 已配置的只读 shell action；仓库不得硬编码 CLI 路径。已打开 `.rdc` 由 `ownerSessionId` 拥有；不匹配 fail-closed。Local + Android-origin capture 不得静默 fallback remote。
+无内置 RDX toolchain。Settings `tooling.rdxCli` 必须配对同安装捆绑 Python 与 `cli/run_cli.py`。General 的 `shell.rdx`、主进程固定 open/remote/close 生命周期及 Live RDC mutate 经原生调用边界直接执行冻结 Python argv，并校验 exclusive lease；`shell.command` 不得调用 RDX，UI 不恢复旧 shell action 或 human-preview 入口。Mission planner 禁止 `shell` 与 `code_interpreter`，只通过受控只读 `rdx_probe` + `rdx_context` 访问 RDX（见 `DESIGN.md` 裁决 J）；probe 同样使用已验证绑定。仓库不硬编码本机安装路径。已打开 `.rdc` 由 `ownerSessionId` 拥有，不匹配 fail-closed；Local + Android-origin capture 不得静默 fallback remote。
 
 RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）。禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext` 全局 API；工具路径经 `assertRdxContextLeaseOwnership`，不得回退 parent。parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease；child 结束经实际停止确认后 `revokeDelegatedLease`；未确认时父资源保持隔离。未请求 `domainExtensions.rdx` 的 child 在 allowlist 编译期不得看到 `rdx_context` / `rdx_probe`。
 
@@ -244,3 +244,9 @@ Task 的 completionRequirements 是 result.outputs 的精确键；验收语义�
 Task 状态文件的提交保持同一候选文件与原子 rename。短暂 EPERM/EBUSY 在持有存储锁期间最多重试三次（10/20/40 ms）；不删除目标、不重复领域操作。持续失败删除未安装候选、保留权威旧文件并返回原错误，不能宣称结果已持久保存。
 
 计划批准先验证正文并冻结制品、持久化决策，再发布 TurnHandle 执行授权与 answered 事件；失败不发布批准，新审阅撤销旧在途授权。根/子计划审阅均不得同时生成普通工具审批；子请求回答与读取按持久 delegated owner 路由。
+
+## 专用工具路由与读取前置
+
+文件路由表独立于灾难 shellHardDeny 表，均在权限模式和自定义允许前缀之前求值；Full access 不能绕过。有效工具集合有对应工具时，shell.command 文件读写/搜索返回 SHELL_FILE_TOOL_BYPASS，命令行 RDX 返回 RDX_VIA_COMMAND_DENIED。edit_file 和覆盖已有文件的 write_file 必须先在同一 session 成功 read_file 同一 realpath，否则 READ_BEFORE_EDIT_REQUIRED。已读状态跨 turn、仅内存持有，重启须重读；子 session 不继承。新建文件免先读。
+
+Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDX_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。

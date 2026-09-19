@@ -7,6 +7,7 @@
  */
 
 import * as fs from 'fs/promises';
+import { requireSuccessfulFileRead } from './fileReadAccess';
 import * as path from 'path';
 import type { AgentTool } from '../../agent/AgentTool';
 import { isPathExisting, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from './_shared';
@@ -28,7 +29,7 @@ export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
   name: 'write_file',
   label: '写入文件',
   description:
-    'Write content to a text file inside the workspace. Creates the file (and parent directories) if needed; overwrites if it exists.',
+    'Write content to a text file inside the workspace. Creates the file (and parent directories) if needed. Overwriting an existing file requires a successful read_file of the same realpath in this session; otherwise READ_BEFORE_EDIT_REQUIRED.',
   parameters: {
     type: 'object',
     properties: {
@@ -71,6 +72,7 @@ export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
     }
 
     const existed = isPathExisting(absolute);
+    if (existed) requireSuccessfulFileRead(absolute, context);
     await fs.mkdir(dir, { recursive: true });
     if (signal?.aborted) {
       throw new Error('Aborted');

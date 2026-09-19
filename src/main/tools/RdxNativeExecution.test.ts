@@ -1,6 +1,6 @@
 import { isolatedRdxTools } from '../testing/isolatedRdxTools';
 import { createHash, randomUUID } from 'node:crypto';
-import { copyFileSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync, lstatSync, unlinkSync, rmSync, existsSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { InvestigationContentRef, ExperimentRecord } from '@shared/types/renderdocInvestigation';
@@ -30,13 +30,6 @@ const hash = (file: string) => createHash('sha256').update(readFileSync(file)).d
 
 function cleanupNativeTestDirectory(directory: string, testRoot: string): void {
 if (path.dirname(path.resolve(directory)) !== testRoot) throw new Error('Refusing cleanup outside the owned test root');
-for (const name of ['rdx', 'binaries', 'cli', 'policy', 'spec']) {
-  const link = path.join(directory, 'tools', name);
-  if (existsSync(link)) {
-    if (!lstatSync(link).isSymbolicLink()) throw new Error('Expected an owned runtime junction');
-    unlinkSync(link);
-  }
-}
 rmSync(directory, { recursive: true, force: true });
 }
 
@@ -52,7 +45,7 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
     const contextId = 'qa-receipt-' + randomUUID().slice(0, 12);
     const sessionId = 'qa-session-' + randomUUID();
     const settings = { ...DEFAULT_RDX_CLI_INVOKER, enabled: true, command: python!,
-      argsPrefix: ['-m', 'rdx.cli', '--json'], env: nativeEnv, timeoutMs: 60_000 };
+      argsPrefix: [path.resolve(path.dirname(python!), '../../../../cli/run_cli.py')], env: nativeEnv, timeoutMs: 60_000 };
     const resolver = new SessionArtifactResolver({ resolveSessionPath: (id) => id === sessionId ? directory : null });
     const receipts = new RdxExecutionReceipts(resolver, () => 'isolated-integration-signing-key');
     state.receipts = receipts;
@@ -105,6 +98,14 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
       expect(restoredHash).toBe(baselineHash);
       writeFileSync(path.join(directory, 'validation.json'), JSON.stringify({ contextId, sessionId, evidence,
         baselineHash, variantHash, restoredHash, sourceHash: before }, null, 2));
+      if (process.env.RDX_NATIVE_EXECUTION_OUTPUT) {
+        const output = path.resolve(process.env.RDX_NATIVE_EXECUTION_OUTPUT);
+        mkdirSync(output, { recursive: true });
+        for (const name of ['validation.json', 'baseline.png', 'variant.png', 'restored.png']) {
+          copyFileSync(path.join(directory, name), path.join(output, name));
+        }
+        cpSync(path.join(directory, 'session-artifacts', 'tool-outputs'), path.join(output, 'tool-outputs'), { recursive: true });
+      }
       console.info('Native signed execution verified:', directory);
     } finally {
       try {
@@ -116,6 +117,7 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
           }
         }
       } finally {
+        await native('context', ['clear']);
         await native('daemon', ['stop']);
         setRdxRuntimeContextForSession(sessionId, null);
         state.receipts = null;

@@ -393,8 +393,9 @@ function createMainWindow(): void {
     mainWindow = null;
   });
 
-  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
-    console.log('[RendererConsole]', { level, message, line, sourceId });
+  mainWindow.webContents.on('console-message', (details) => {
+    console.log('[RendererConsole]', { level: details.level, message: details.message,
+      line: details.lineNumber, sourceId: details.sourceId });
   });
 
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {

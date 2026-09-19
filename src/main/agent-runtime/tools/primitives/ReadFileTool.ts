@@ -6,6 +6,7 @@
  */
 
 import * as fs from 'fs';
+import { recordSuccessfulFileRead } from './fileReadAccess';
 import * as readline from 'readline';
 import type { AgentTool } from '../../agent/AgentTool';
 import { assertTextReadable, safeResolvePath, truncateOutput } from './_shared';
@@ -34,7 +35,7 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails> = {
   name: 'read_file',
   label: '读取文件',
   description:
-    'Read the contents of a text file in the workspace. Supports line offset (1-based) and limit. Default limit is 2000 lines. Binary files and RenderDoc .rdc captures are rejected.',
+    'Read the contents of a text file in the workspace. A successful uncancelled read permits later edit_file or overwrite of this realpath in the same session. Supports line offset (1-based) and limit. Default limit is 2000 lines. Binary files and RenderDoc .rdc captures are rejected.',
   parameters: {
     type: 'object',
     properties: {
@@ -86,6 +87,7 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails> = {
       || !hitEof
       || lines.length < Math.min(limit, Math.max(0, totalLines - startIdx));
 
+    recordSuccessfulFileRead(absolute, context);
     return {
       content: [{ type: 'text', text }],
       details: {

@@ -56,3 +56,9 @@ effects 描述可能的 replay position、artifact write、shader debug/replace 
 texture/buffer 的 `state=capture_initial` 只读取捕获实际保存且可重建的帧前内容。不能同时传 `event_id`；缺少初始化来源时停止，不用当前内容替代。小型结果选 `as_base64=true` 并遵守字节预算，大结果用范围或明确输出请求。
 
 `replay_position_temporary` 表示内部可能移动回放位置。主进程在同一串行 lease 内核对调用前后 context、事件及结果恢复证明；这种查询不会被当作最终可见状态变更。恢复失败或证明不一致会隔离调用，不能继续签发成功回执。
+
+## 安装绑定与批量边界
+
+Settings 中 command 必须是本安装 binaries/windows/x64/python/python.exe 的绝对路径，argsPrefix 只含同安装 cli/run_cli.py。bat、PowerShell、薄 cmd/exe、跨安装组合和环境重定向会被拒绝；旧值保持可见，由用户修正。安装验证失败不得执行。RDX_BAT_REJECTED 与 RDX_VIA_COMMAND_DENIED 是拒绝，不是建议改写 argv。
+
+人类 PATH 使用薄 bin/rdx.cmd；双击安装使用 install.cmd。Tool CLI 的只读 batch 是人类/外部客户端功能。Agent 没有 batch 工具，每个 shell.rdx 操作独立调用冻结的 Python argv；discovery 仅读冻结 catalog，不启动 CLI。不要用 shell.command 调用 rdx 或 Python 入口绕过宿主。

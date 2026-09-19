@@ -18,7 +18,7 @@ interface Binding { runtime: RdxSessionRuntime; state: CaptureReplayState; devic
 const empty = (scope: SessionScope): CaptureReplayState => ({ ...scope, generation: 0, revision: 0, operationId: null,
   phase: 'closed', replayDeviceId: null, inputId: null, captureHash: null, contextId: null,
   requestedEventId: null, appliedEventId: null, imageEventId: null, events: [], targets: [], target: null,
-  isFinalOutput: false, image: null, observation: null, agentObservation: null, devicePresentation: { status: 'not_applicable' }, warning: null, interactionLock: null, error: null });
+  isFinalOutput: false, image: null, observation: null, agentObservation: null, devicePresentation: { status: 'not_applicable', eventId: null, textureId: null, sequence: null, reason: null }, warning: null, interactionLock: null, error: null });
 
 /** Per-session application ownership. Device reservations survive uncertain native close. */
 export class RdxSessionService {
@@ -67,6 +67,16 @@ export class RdxSessionService {
     if (!['ready', 'applying'].includes(binding.state.phase)) throw new Error('RDX_REPLAY_BUSY');
   }
   private publish(binding: Binding, patch: Partial<CaptureReplayState>): void {
+    if (['ready', 'applying'].includes(patch.phase ?? binding.state.phase)
+      && getRdxContextLease(binding.state.sessionId)?.quarantineReason) {
+      patch = { ...patch, phase: 'error', devicePresentation: undefined,
+        error: { code: 'RDX_CONTEXT_QUARANTINED', message: 'Replay outcome is uncertain; close and reopen the capture.', retry: 'close' } };
+    }
+    if (!patch.devicePresentation && (patch.error || (patch.phase && patch.phase !== 'ready'))) {
+      patch.devicePresentation = binding.deviceId
+        ? { status: 'unavailable', eventId: null, textureId: null, sequence: null, reason: patch.error?.code ?? 'observation_pending' }
+        : { status: 'not_applicable', eventId: null, textureId: null, sequence: null, reason: null };
+    }
     binding.state = { ...binding.state, ...patch, revision: binding.state.revision + 1, interactionLock: this.lock(binding) };
     for (const listener of this.listeners) listener(structuredClone(binding.state));
   }

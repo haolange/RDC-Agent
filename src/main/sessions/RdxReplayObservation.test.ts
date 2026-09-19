@@ -20,7 +20,7 @@ function reply(patch: Record<string, unknown> = {}) {
       context_id: 'context', session_id: 'replay', event_id: 9, image_event_id: 9, image_path: exportedPath,
       revision: 3, modification_state: 'baseline', display_parameters: { mip: 0, slice: 0, sample: 0, range_min: 0, range_max: 1 },
       target: { texture_id: 'ResourceId::1', output_slot: null }, targets: [], is_final_output: true,
-      remote_display: { status: 'not_applicable' }, ...patch,
+      remote_display: { status: 'not_applicable', event_id: 9, texture_id: null, sequence: null, reason: null }, ...patch,
     } }) };
   });
 }
@@ -39,6 +39,21 @@ it.each(['baseline', 'intervention', 'restored'])('projects native %s facts and 
 it('rejects invented or missing observation metadata', async () => {
   reply({ modification_state: 'probably_restored' });
   await expect(observeReplay(owner, {}, undefined, live)).rejects.toThrow('METADATA_INVALID');
+});
+it('projects only native presentation confirmed for the same event and texture', async () => {
+  reply({ remote_display: { status: 'presented', event_id: 9, texture_id: 'ResourceId::1', sequence: 2, reason: null } });
+  const result = await observeReplay({ ...owner, backend: 'remote' }, {}, undefined, live);
+  expect(result.devicePresentation).toEqual({ status: 'presented', eventId: 9, textureId: 'ResourceId::1', sequence: 2, reason: null });
+});
+it.each([
+  { status: 'presented', event_id: 8, texture_id: 'ResourceId::1', sequence: 2, reason: null },
+  { status: 'presented', event_id: 9, texture_id: 'ResourceId::2', sequence: 2, reason: null },
+  { status: 'presented', event_id: 9, texture_id: 'ResourceId::1', sequence: null, reason: null },
+  { status: 'displayed', event_id: 9, texture_id: 'ResourceId::1', sequence: 2, reason: null },
+  { status: 'unavailable', event_id: 9, texture_id: null, sequence: null, reason: null },
+])('rejects a malformed, stale or mismatched presentation receipt %j', async remote => {
+  reply({ remote_display: remote });
+  await expect(observeReplay({ ...owner, backend: 'remote' }, {}, undefined, live)).rejects.toThrow('RDX_DISPLAY_RECEIPT');
 });
 it.each(['no_color_output', 'missing_target', 'export_failure'])('preserves %s and only retries image export failures', async code => {
   reply({ image_path: null, image_event_id: null, image_error: { code, message: code } });

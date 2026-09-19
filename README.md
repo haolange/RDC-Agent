@@ -87,3 +87,6 @@ Windows 可直接运行 `scripts/start-rdc-agent.cmd`；macOS/Linux 使用 `sh s
 - [docs/README.md](./docs/README.md)：正式文档索引。
 - [docs/architecture/agent-runtime-kernel.md](./docs/architecture/agent-runtime-kernel.md)：RDX Runtime 与 Agent Kernel。
 - [docs/ui/design-system.md](./docs/ui/design-system.md)：设计系统与 UI 约束。
+
+
+RDX 安装配置须将捆绑 Python 的绝对路径与同安装 cli/run_cli.py 配对；人类终端使用薄 bin/rdx.cmd，双击安装使用 install.cmd。旧 bat/PowerShell 配置保持可见但拒绝执行，须在 Settings 手动修正。文件修改工具要求同会话先成功 read_file；应用重启后重新读取。详见 [RDX 运行时](docs/architecture/rdx-runtime.md) 与 [权限契约](docs/contracts/permissions.md)。

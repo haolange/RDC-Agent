@@ -1,8 +1,10 @@
 import { getElectronApi } from './getElectronApi';
+import { assertRdxCliBinding } from '@shared/utils/rdxCliBinding';
 import type { RdxCliInvokerSettings } from '@shared/types/settings';
 import type { ToolRuntimeSummary } from '@shared/types/tool';
 
 export async function validateRdxInstallation(draft: RdxCliInvokerSettings): Promise<ToolRuntimeSummary | null> {
+  assertRdxCliBinding(draft);
   const api = getElectronApi();
   if (!api) throw new Error('Application bridge is unavailable.');
   const saved = (await api.settings.get()).tooling.rdxCli;
