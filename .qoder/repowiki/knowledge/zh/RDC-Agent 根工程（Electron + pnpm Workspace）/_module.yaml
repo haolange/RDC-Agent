@@ -1,0 +1,23 @@
+schema_version: 1
+module_path: ""
+title: RDC-Agent 根工程（Electron + pnpm Workspace）
+scope:
+    - README.md
+    - DESIGN.md
+    - .gitignore
+    - .eslintrc.cjs
+    - package.json
+    - pnpm-workspace.yaml
+    - tsconfig.json
+    - electron.vite.config.ts
+    - vite.renderer.config.ts
+    - vitest.config.ts
+    - electron-builder.json
+    - .cursorignore
+    - .gitattributes
+    - AGENTS.md
+    - LICENSE
+    - pnpm-lock.yaml
+source_files: []
+depends_on: []
+related_to: []

@@ -3,6 +3,7 @@
 <cite>
 **本文引用的文件**
 - [RdxCliInvokerService.ts](file://src/main/tools/RdxCliInvokerService.ts)
+- [rdxCliBinding.ts](file://src/shared/utils/rdxCliBinding.ts)
 - [ShellInvocationService.ts](file://src/main/tools/ShellInvocationService.ts)
 - [resolveRdxBatchInvocation.ts](file://src/main/tools/resolveRdxBatchInvocation.ts)
 - [RdxNativeProtocol.ts](file://src/main/tools/RdxNativeProtocol.ts)
@@ -15,11 +16,11 @@
 
 ## 更新摘要
 **所做更改**
-- 更新了参数构建与规范化部分，详细说明自动注入 `--owner-pid` 标志的功能
-- 增强了上下文传递机制的说明，包括所有者进程标识符的自动管理
-- 更新了架构图和流程图以反映新的所有者上下文增强功能
-- 添加了关于进程所有权和上下文隔离的新章节
-- 更新了故障排查指南以包含新的所有者进程相关错误
+- 增强了安全绑定验证机制，新增结构验证确保只允许使用捆绑的Python解释器和CLI入口点
+- 添加了详细的安全约束说明，包括禁止bat/PowerShell包装器和环境变量重定向
+- 更新了故障排查指南以包含新的安全验证错误
+- 增强了架构图和流程图以反映新的安全验证流程
+- 添加了关于安全绑定验证的详细章节
 
 ## 目录
 1. [简介](#简介)
@@ -36,13 +37,14 @@
 ## 简介
 本文件面向需要集成或扩展 RDX CLI 能力的开发者，系统性说明 RdxCliInvokerService 的设计与实现。内容覆盖 CLI 命令执行、参数构建与规范化、结果解析与错误处理、工具目录加载、运行时元数据管理、可用性检查与配置验证、命令行参数规范化、上下文传递、超时控制与进程管理等关键特性，并提供完整的 API 参考与最佳实践建议。
 
-**最新更新**：RdxCliInvokerService 现在在检测到上下文 ID 时自动注入 `--owner-pid` 标志，通过当前进程标识符增强所有者上下文，确保 RDX CLI 命令能够正确识别和管理进程所有权关系。
+**最新更新**：RdxCliInvokerService 现在实现了增强的安全绑定验证机制，通过严格的结构性验证确保只允许使用捆绑的Python解释器和CLI入口点，防止通过环境变量重定向或bat/PowerShell包装器进行安全绕过。同时自动注入 `--owner-pid` 标志增强所有者上下文。
 
 ## 项目结构
-围绕 RDX CLI 调用器的核心代码主要位于 src/main/tools 目录，配合共享类型定义与设置类型，形成"服务层 + 协议层 + 进程管理层"的分层结构：
+围绕 RDX CLI 调用器的核心代码主要位于 src/main/tools 目录，配合共享类型定义与设置类型，形成"服务层 + 协议层 + 进程管理层 + 安全验证层"的分层结构：
 - 服务层：RdxCliInvokerService 提供高层工具调用能力（call、executeCLI、loadCatalog、getRuntimeSummary 等）。
 - 协议层：RdxNativeProtocol 负责校验并解析 RDX CLI 的 JSON 信封格式。
 - 进程管理层：ShellInvocationService 封装子进程生命周期、超时、中止、孤儿进程处理等。
+- 安全验证层：assertRdxCliBinding 提供严格的结构验证，确保绑定安全性。
 - 平台适配：resolveRdxBatchInvocation 在 Windows 上通过 PowerShell 启动 rdx.bat。
 - 类型与配置：shared/types/tool.ts 与 shared/types/settings.ts 定义工具、结果、摘要与调用器配置。
 - 审计与绑定：RdxExecutionReceipts 用于生成签名化的执行回执；RdxTurnBindings 用于将 CLI 配置与动作绑定到单次运行上下文。
@@ -53,14 +55,19 @@ A["RdxCliInvokerService<br/>工具调用入口"] --> B["ShellInvocationService<b
 A --> C["resolveRdxBatchInvocation<br/>Windows 批处理适配"]
 A --> D["RdxNativeProtocol<br/>JSON 信封校验"]
 A --> E["SettingsService<br/>读取 RdxCliInvokerSettings"]
-B --> F["ProcessSupervisor<br/>进程调度/隔离/超时"]
-A --> G["RdxExecutionReceipts<br/>执行回执签名/校验"]
-A --> H["RdxTurnBindings<br/>运行期绑定/指纹"]
-A --> I["自动注入 --owner-pid<br/>增强所有者上下文"]
+A --> F["assertRdxCliBinding<br/>安全绑定验证"]
+B --> G["ProcessSupervisor<br/>进程调度/隔离/超时"]
+A --> H["RdxExecutionReceipts<br/>执行回执签名/校验"]
+A --> I["RdxTurnBindings<br/>运行期绑定/指纹"]
+A --> J["自动注入 --owner-pid<br/>增强所有者上下文"]
+F --> K["禁止bat/PowerShell包装器"]
+F --> L["验证捆绑Python路径"]
+F --> M["阻止环境变量重定向"]
 ```
 
 **图表来源**
 - [RdxCliInvokerService.ts:42-367](file://src/main/tools/RdxCliInvokerService.ts#L42-L367)
+- [rdxCliBinding.ts:17-42](file://src/shared/utils/rdxCliBinding.ts#L17-L42)
 - [ShellInvocationService.ts:29-127](file://src/main/tools/ShellInvocationService.ts#L29-L127)
 - [resolveRdxBatchInvocation.ts:4-21](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L21)
 - [RdxNativeProtocol.ts:1-35](file://src/main/tools/RdxNativeProtocol.ts#L1-L35)
@@ -69,19 +76,22 @@ A --> I["自动注入 --owner-pid<br/>增强所有者上下文"]
 
 **章节来源**
 - [RdxCliInvokerService.ts:1-367](file://src/main/tools/RdxCliInvokerService.ts#L1-L367)
+- [rdxCliBinding.ts:1-43](file://src/shared/utils/rdxCliBinding.ts#L1-L43)
 - [tool.ts:52-142](file://src/shared/types/tool.ts#L52-L142)
-- [settings.ts:1-200](file://src/shared/types/settings.ts#L1-L200)
+- [settings.ts:290-297](file://src/shared/types/settings.ts#L290-L297)
 
 ## 核心组件
-- RdxCliInvokerService：对外暴露 call、executeCLI、loadCatalog、getRuntimeSummary、isAvailable、abortRun、terminateAll 等方法；内部完成参数构建、上下文注入、超时控制、结果解析与追踪事件发射。**新增**：自动检测并注入 `--owner-pid` 标志以增强所有者上下文。
+- RdxCliInvokerService：对外暴露 call、executeCLI、loadCatalog、getRuntimeSummary、isAvailable、abortRun、terminateAll 等方法；内部完成参数构建、上下文注入、超时控制、结果解析与追踪事件发射。**新增**：自动检测并注入 `--owner-pid` 标志以增强所有者上下文，并通过 assertRdxCliBinding 进行安全绑定验证。
 - ShellInvocationService：统一子进程启动、等待、超时、中止、孤儿进程检测与清理；返回标准化的 CLIResult。
 - resolveRdxBatchInvocation：在 Windows 平台上将 rdx.bat 调用转换为 powershell.exe -File rdx_bat_launcher.ps1 的形式，并透传非交互标志。
 - RdxNativeProtocol：严格校验 RDX CLI 的 JSON 输出信封（ok、result_kind、data、context_id），并在不匹配时抛出协议错误。
 - RdxExecutionReceipts：为成功执行的 RDX 操作生成带签名的执行回执，支持读写与完整性校验。
 - RdxTurnBindings：将 CLI 配置、动作配置与租约身份冻结并绑定到当前运行计划，避免敏感信息序列化泄露。
+- **新增**：assertRdxCliBinding：提供严格的结构验证，确保只允许使用捆绑的Python解释器和CLI入口点，防止安全绕过。
 
 **章节来源**
 - [RdxCliInvokerService.ts:42-367](file://src/main/tools/RdxCliInvokerService.ts#L42-L367)
+- [rdxCliBinding.ts:17-42](file://src/shared/utils/rdxCliBinding.ts#L17-L42)
 - [ShellInvocationService.ts:29-127](file://src/main/tools/ShellInvocationService.ts#L29-L127)
 - [resolveRdxBatchInvocation.ts:4-21](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L21)
 - [RdxNativeProtocol.ts:1-35](file://src/main/tools/RdxNativeProtocol.ts#L1-L35)
@@ -95,11 +105,14 @@ RdxCliInvokerService 作为工具系统对外的统一入口，屏蔽了底层�
 sequenceDiagram
 participant Caller as "调用方"
 participant Service as "RdxCliInvokerService"
+participant Validator as "assertRdxCliBinding"
 participant Resolver as "resolveRdxBatchInvocation"
 participant Shell as "ShellInvocationService"
 participant Proc as "ProcessSupervisor"
 participant Protocol as "RdxNativeProtocol"
 Caller->>Service : call({ toolName, args, contextId, runId, abortSignal })
+Service->>Validator : 验证安全绑定
+Validator-->>Service : 验证通过/抛出错误
 Service->>Service : 构建有效参数与 --args-json
 Service->>Service : 注入 --daemon-context如存在
 Service->>Service : 自动注入 --owner-pid (当有contextId时)
@@ -116,6 +129,7 @@ Service-->>Caller : ToolCallResultok/data/artifacts/error/duration_ms/trace_id
 
 **图表来源**
 - [RdxCliInvokerService.ts:248-355](file://src/main/tools/RdxCliInvokerService.ts#L248-L355)
+- [rdxCliBinding.ts:17-42](file://src/shared/utils/rdxCliBinding.ts#L17-L42)
 - [resolveRdxBatchInvocation.ts:4-21](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L21)
 - [ShellInvocationService.ts:32-105](file://src/main/tools/ShellInvocationService.ts#L32-L105)
 - [RdxNativeProtocol.ts:12-34](file://src/main/tools/RdxNativeProtocol.ts#L12-L34)
@@ -124,7 +138,7 @@ Service-->>Caller : ToolCallResultok/data/artifacts/error/duration_ms/trace_id
 
 ### RdxCliInvokerService：工具调用与编排
 - 功能要点
-  - 可用性检查：基于设置项判断是否启用、命令是否存在、工作目录是否可用。
+  - 可用性检查：基于设置项判断是否启用、命令是否存在、工作目录是否可用。**新增**：通过 assertRdxCliBinding 进行安全绑定验证。
   - 工具目录加载：从 catalogPath 加载工具清单，缓存并按路径变更刷新；未配置时返回空目录。
   - 运行时摘要：统计命名空间工具数量，报告 CLI 可用性与不可用原因。
   - 参数构建与规范化：将 --context-id 标准化为 --daemon-context；分离全局参数与命令参数；拼接 settings.argsPrefix。**新增**：自动检测并注入 `--owner-pid` 标志。
@@ -136,7 +150,9 @@ Service-->>Caller : ToolCallResultok/data/artifacts/error/duration_ms/trace_id
 
 ```mermaid
 flowchart TD
-Start(["进入 call()"]) --> BuildArgs["构建有效参数<br/>合并 context/runtime_owner/lease_id"]
+Start(["进入 call()"]) --> Validate["assertRdxCliBinding<br/>安全绑定验证"]
+Validate --> |通过| BuildArgs["构建有效参数<br/>合并 context/runtime_owner/lease_id"]
+Validate --> |失败| ErrorReturn["返回 RDX_BINDING_INVALID"]
 BuildArgs --> JsonArg{"是否有参数?"}
 JsonArg --> |是| AddJson["追加 --args-json"]
 JsonArg --> |否| SkipJson["跳过 --args-json"]
@@ -161,9 +177,41 @@ Emit --> End(["返回 ToolCallResult"])
 **图表来源**
 - [RdxCliInvokerService.ts:143-176](file://src/main/tools/RdxCliInvokerService.ts#L143-L176)
 - [RdxCliInvokerService.ts:248-355](file://src/main/tools/RdxCliInvokerService.ts#L248-L355)
+- [rdxCliBinding.ts:17-42](file://src/shared/utils/rdxCliBinding.ts#L17-L42)
 
 **章节来源**
 - [RdxCliInvokerService.ts:42-367](file://src/main/tools/RdxCliInvokerService.ts#L42-L367)
+
+### 安全绑定验证机制
+**新增功能**：RdxCliInvokerService 现在实现了严格的安全绑定验证机制，通过 assertRdxCliBinding 函数确保只允许使用捆绑的Python解释器和CLI入口点。
+
+- 禁止bat/PowerShell包装器：拒绝任何 .bat 文件或 rdx_bat_launcher.ps1 作为命令或参数前缀
+- 验证捆绑Python路径：要求命令必须是绝对路径且指向 binaries/windows/x64/python/python.exe
+- 验证CLI入口点：要求 argsPrefix[0] 必须是同一安装目录下的 cli/run_cli.py
+- 阻止环境变量重定向：禁止设置 PYTHONHOME、PYTHONPATH 或 RDX_TOOLS_ROOT 环境变量来重定向Python或工具安装
+- 路径规范化：在Windows平台上正确处理路径分隔符和相对路径
+
+```mermaid
+flowchart TD
+CheckCommand{"检查命令"} --> BatReject{"是否包含.bat或rdx_bat_launcher.ps1?"}
+BatReject --> |是| RejectBat["抛出 RDX_BAT_REJECTED"]
+BatReject --> |否| CheckPython{"验证Python路径"}
+CheckPython --> PythonValid{"是否是捆绑python.exe?"}
+PythonValid --> |否| RejectPython["抛出 RDX_BINDING_INVALID"]
+PythonValid --> |是| CheckEntry{"验证CLI入口点"}
+CheckEntry --> EntryValid{"是否是同一安装的cli/run_cli.py?"}
+EntryValid --> |否| RejectEntry["抛出 RDX_BINDING_INVALID"]
+EntryValid --> |是| CheckEnv{"检查环境变量"}
+CheckEnv --> EnvValid{"是否重定向Python或Tools?"}
+EnvValid --> |是| RejectEnv["抛出 RDX_BINDING_INVALID"]
+EnvValid --> |否| Pass["验证通过"]
+```
+
+**图表来源**
+- [rdxCliBinding.ts:17-42](file://src/shared/utils/rdxCliBinding.ts#L17-L42)
+
+**章节来源**
+- [rdxCliBinding.ts:1-43](file://src/shared/utils/rdxCliBinding.ts#L1-L43)
 
 ### 所有者上下文增强机制
 **新增功能**：RdxCliInvokerService 现在实现了智能的所有者上下文增强机制，当检测到上下文 ID 时自动注入 `--owner-pid` 标志。
@@ -269,6 +317,7 @@ ShellInvocationService --> CLIResult : "返回"
 - 进程隔离：通过 ShellInvocationService 与 ProcessSupervisor 解耦具体进程管理。
 - 平台兼容：resolveRdxBatchInvocation 屏蔽 Windows 批处理的差异。
 - 类型安全：ToolCallRequest/ToolCallResult/CLIResult/ToolCatalog 等类型集中定义，保证上下游一致性。
+- **新增**：安全验证：assertRdxCliBinding 提供独立的安全验证层，确保绑定安全性。
 
 ```mermaid
 graph LR
@@ -276,14 +325,17 @@ Svc["RdxCliInvokerService"] --> Shl["ShellInvocationService"]
 Svc --> Res["resolveRdxBatchInvocation"]
 Svc --> Pro["RdxNativeProtocol"]
 Svc --> Set["SettingsService"]
+Svc --> Val["assertRdxCliBinding"]
 Shl --> PS["ProcessSupervisor"]
 Svc --> Rec["RdxExecutionReceipts"]
 Svc --> Bind["RdxTurnBindings"]
 Svc --> Owner["所有者上下文增强"]
+Val --> Security["安全绑定验证"]
 ```
 
 **图表来源**
 - [RdxCliInvokerService.ts:1-367](file://src/main/tools/RdxCliInvokerService.ts#L1-L367)
+- [rdxCliBinding.ts:1-43](file://src/shared/utils/rdxCliBinding.ts#L1-L43)
 - [ShellInvocationService.ts:1-127](file://src/main/tools/ShellInvocationService.ts#L1-L127)
 - [resolveRdxBatchInvocation.ts:1-21](file://src/main/tools/resolveRdxBatchInvocation.ts#L1-L21)
 - [RdxNativeProtocol.ts:1-35](file://src/main/tools/RdxNativeProtocol.ts#L1-L35)
@@ -302,8 +354,7 @@ Svc --> Owner["所有者上下文增强"]
 - 可观测性：每次调用均产生 ToolTraceEntry，便于追踪与审计。
 - 并发与取消：支持 AbortSignal 中断；上层可结合并发策略限制工具调用。
 - **新增**：所有者上下文增强提高了进程所有权管理的准确性，减少了跨上下文干扰的风险。
-
-[本节为通用指导，不直接分析具体文件]
+- **新增**：安全绑定验证在早期阶段阻止潜在的安全攻击，提高整体系统安全性。
 
 ## 故障排查指南
 - 常见错误与定位
@@ -313,23 +364,24 @@ Svc --> Owner["所有者上下文增强"]
   - 超时：ShellInvocationService 返回 exitCode=124，stderr 包含超时信息。
   - 孤儿进程：processExitReason='unconfirmed_orphan'，需关注进程终止确认逻辑。
   - **新增**：所有者上下文问题：如果 RDX CLI 无法正确识别进程所有权，检查是否正确注入了 `--owner-pid` 标志。
+  - **新增**：安全绑定验证失败：如果出现 RDX_BAT_REJECTED 或 RDX_BINDING_INVALID 错误，检查配置是否符合安全要求。
 - 调试建议
   - 开启 trace 监听：onInvocationTrace 收集每次调用的入参与结果。
   - 检查 Settings：确认 enabled、command、workingDirectory、env、timeoutMs、catalogPath 等字段。
   - 验证 Windows 批处理：确认 rdx_bat_launcher.ps1 存在并可执行。
   - 查看子进程日志：CLIResult.stderr/stdout 保留完整输出。
   - **新增**：验证所有者上下文：检查调用参数中是否包含正确的 `--owner-pid` 标志，特别是在使用上下文 ID 时。
+  - **新增**：验证安全绑定：确保 command 指向捆绑的 python.exe，argsPrefix[0] 指向同一安装的 cli/run_cli.py，且没有设置危险的环境变量。
 
 **章节来源**
 - [RdxCliInvokerService.ts:70-86](file://src/main/tools/RdxCliInvokerService.ts#L70-L86)
 - [RdxCliInvokerService.ts:178-221](file://src/main/tools/RdxCliInvokerService.ts#L178-L221)
+- [rdxCliBinding.ts:17-42](file://src/shared/utils/rdxCliBinding.ts#L17-L42)
 - [RdxNativeProtocol.ts:12-34](file://src/main/tools/RdxNativeProtocol.ts#L12-L34)
 - [ShellInvocationService.ts:67-97](file://src/main/tools/ShellInvocationService.ts#L67-L97)
 
 ## 结论
-RdxCliInvokerService 提供了稳定、可观测、可配置的 RDX CLI 调用能力，通过严格的协议校验、完善的进程管理与清晰的错误分类，使上层工具系统能够可靠地集成外部 RDX 工具。**新增的所有者上下文增强功能**进一步提升了进程所有权管理的准确性，确保在多上下文环境中正确识别和管理进程关系。结合 RdxExecutionReceipts 与 RdxTurnBindings，可在保障安全与完整性的前提下，实现端到端的执行审计与上下文绑定。
-
-[本节为总结性内容，不直接分析具体文件]
+RdxCliInvokerService 提供了稳定、可观测、可配置的 RDX CLI 调用能力，通过严格的协议校验、完善的进程管理与清晰的错误分类，使上层工具系统能够可靠地集成外部 RDX 工具。**新增的安全绑定验证机制**进一步提升了系统的安全性，确保只允许使用捆绑的Python解释器和CLI入口点，防止通过环境变量重定向或bat/PowerShell包装器进行安全绕过。**新增的所有者上下文增强功能**进一步提升了进程所有权管理的准确性，确保在多上下文环境中正确识别和管理进程关系。结合 RdxExecutionReceipts 与 RdxTurnBindings，可在保障安全与完整性的前提下，实现端到端的执行审计与上下文绑定。
 
 ## 附录：API 参考
 
@@ -375,8 +427,12 @@ RdxCliInvokerService 提供了稳定、可观测、可配置的 RDX CLI 调用�
   - bindRdxTurn(plan, binding): void
   - getRdxTurnBinding(plan): RdxTurnBinding | undefined
 
+- **新增**：assertRdxCliBinding
+  - assertRdxCliBinding(settings: RdxCliInvokerSettings): void
+
 **章节来源**
 - [RdxCliInvokerService.ts:42-367](file://src/main/tools/RdxCliInvokerService.ts#L42-L367)
+- [rdxCliBinding.ts:17-42](file://src/shared/utils/rdxCliBinding.ts#L17-L42)
 - [ShellInvocationService.ts:29-127](file://src/main/tools/ShellInvocationService.ts#L29-L127)
 - [resolveRdxBatchInvocation.ts:4-21](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L21)
 - [RdxNativeProtocol.ts:1-35](file://src/main/tools/RdxNativeProtocol.ts#L1-L35)
@@ -392,7 +448,7 @@ RdxCliInvokerService 提供了稳定、可观测、可配置的 RDX CLI 调用�
 
 **章节来源**
 - [tool.ts:52-142](file://src/shared/types/tool.ts#L52-L142)
-- [settings.ts:1-200](file://src/shared/types/settings.ts#L1-L200)
+- [settings.ts:290-297](file://src/shared/types/settings.ts#L290-L297)
 
 ### 使用示例（路径引用）
 - 调用外部 RDX CLI 工具并处理 JSON 输出：
@@ -401,6 +457,8 @@ RdxCliInvokerService 提供了稳定、可观测、可配置的 RDX CLI 调用�
   - [RdxCliInvokerService.ts:143-176](file://src/main/tools/RdxCliInvokerService.ts#L143-L176)
 - **新增**：自动注入所有者进程标识符：
   - [RdxCliInvokerService.ts:121-155](file://src/main/tools/RdxCliInvokerService.ts#L121-L155)
+- **新增**：安全绑定验证：
+  - [rdxCliBinding.ts:17-42](file://src/shared/utils/rdxCliBinding.ts#L17-L42)
 - 解析 RDX CLI 协议信封：
   - [RdxNativeProtocol.ts:12-34](file://src/main/tools/RdxNativeProtocol.ts#L12-L34)
 - 子进程超时与异常处理：
@@ -414,6 +472,7 @@ RdxCliInvokerService 提供了稳定、可观测、可配置的 RDX CLI 调用�
 
 **章节来源**
 - [RdxCliInvokerService.ts:143-355](file://src/main/tools/RdxCliInvokerService.ts#L143-L355)
+- [rdxCliBinding.ts:17-42](file://src/shared/utils/rdxCliBinding.ts#L17-L42)
 - [RdxNativeProtocol.ts:12-34](file://src/main/tools/RdxNativeProtocol.ts#L12-L34)
 - [ShellInvocationService.ts:67-97](file://src/main/tools/ShellInvocationService.ts#L67-L97)
 - [resolveRdxBatchInvocation.ts:4-21](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L21)
@@ -428,15 +487,16 @@ RdxCliInvokerService 提供了稳定、可观测、可配置的 RDX CLI 调用�
 - 使用 RdxExecutionReceipts 保存关键操作的执行回执，保障可追溯性。
 - 使用 RdxTurnBindings 将 CLI 配置与动作绑定到运行上下文，避免敏感信息外泄。
 - **新增**：利用自动注入的 `--owner-pid` 功能，无需手动管理进程所有权标识，系统会在检测到上下文 ID 时自动处理。
-
-[本节为通用指导，不直接分析具体文件]
+- **新增**：确保配置符合安全绑定要求：使用捆绑的 python.exe 和 cli/run_cli.py，避免设置危险的环境变量。
 
 ### 测试与断言参考
 - 行为验证：getRuntimeSummary 不包含不推荐字段；上下文作用域的参数与上下文 ID 正确传递。
 - **新增**：所有者上下文增强测试：验证 `--owner-pid` 标志在上下文 ID 存在时自动注入。
+- **新增**：安全绑定验证测试：验证 bat/PowerShell 包装器被拒绝，环境变量重定向被阻止。
 - 参考用例：
   - [RdxCliInvokerService.test.ts:24-47](file://src/main/tools/RdxCliInvokerService.test.ts#L24-L47)
   - [RdxCliInvokerService.test.ts:129-135](file://src/main/tools/RdxCliInvokerService.test.ts#L129-L135)
+  - [RdxCliInvokerService.test.ts:140-158](file://src/main/tools/RdxCliInvokerService.test.ts#L140-L158)
 
 **章节来源**
-- [RdxCliInvokerService.test.ts:1-136](file://src/main/tools/RdxCliInvokerService.test.ts#L1-L136)
+- [RdxCliInvokerService.test.ts:1-170](file://src/main/tools/RdxCliInvokerService.test.ts#L1-L170)

@@ -1,0 +1,14 @@
+schema_version: 1
+module_path: scripts/runtime_helpers
+title: 构建期与运行期基础设施脚本集
+scope:
+    - scripts/builtin-profile-contracts.mjs
+    - scripts/pnpm-resolver.mjs
+    - scripts/provider-catalog-index.cjs
+    - scripts/register-ts-source.cjs
+    - scripts/renderer-contract.mjs
+    - scripts/vitest-global-setup.ts
+source_files: []
+depends_on: []
+related_to:
+    - path: resources
