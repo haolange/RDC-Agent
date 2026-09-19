@@ -70,6 +70,7 @@ const allowedRootFiles = new Set([
   'AGENTS.md',
   'DESIGN.md',
   'README.md',
+  'README.en.md',
   'LICENSE',
   'package.json',
   'pnpm-lock.yaml',
