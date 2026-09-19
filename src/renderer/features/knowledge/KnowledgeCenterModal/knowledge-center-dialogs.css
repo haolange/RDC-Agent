@@ -168,29 +168,6 @@
   overflow-wrap: anywhere;
 }
 
-.knowledge-import-result-details summary {
-  color: var(--token-text-caption);
-  font-size: var(--text-xs);
-  cursor: pointer;
-}
-
-.knowledge-import-result-grid {
-  display: flex;
-  gap: var(--space-6);
-  margin: var(--space-2) 0 0;
-  font-size: var(--text-xs);
-}
-
-.knowledge-import-result-grid dt {
-  color: var(--token-text-caption);
-}
-
-.knowledge-import-result-grid dd {
-  margin: var(--space-0-5) 0 0;
-  color: var(--token-text-heading);
-  font-variant-numeric: tabular-nums;
-}
-
 /* Export */
 .knowledge-export-group {
   display: flex;

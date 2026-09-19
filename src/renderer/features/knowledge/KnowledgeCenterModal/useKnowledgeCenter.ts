@@ -7,10 +7,11 @@ import {
 import { useProjectStore } from '../../../stores/projectStore';
 import {
   createRequestSeq, knowledgeErrorMessage, knowledgeQueryKey, toggleSetValue,
-  type KnowledgeNarrowPane, type KnowledgeViewMode,
+  type KnowledgeViewMode,
 } from './knowledgeCenterModel';
 import { buildKnowledgeCenterQueryRequest, includeSelectedSpaceId, nextSelectedSpaceIds, runKnowledgeCenterQuery, SEARCH_DEBOUNCE_MS } from './knowledgeCenterQuery';
 import { useKnowledgeSelection } from './useKnowledgeSelection';
+import { useKnowledgeViewport } from './useKnowledgeViewport';
 import { useKnowledgeFilters } from './useKnowledgeFilters';
 
 export function useKnowledgeCenter(open: boolean) {
@@ -19,8 +20,7 @@ export function useKnowledgeCenter(open: boolean) {
   const overviewSeq = useRef(createRequestSeq());
   const rebuildSeq = useRef(createRequestSeq());
   const [viewMode, setViewMode] = useState<KnowledgeViewMode>('cards');
-  const [narrow, setNarrow] = useState(false);
-  const [narrowPane, setNarrowPane] = useState<KnowledgeNarrowPane>('spaces');
+  const { narrow, narrowPane, setNarrowPane } = useKnowledgeViewport();
   const [spaces, setSpaces] = useState<KnowledgeSpace[]>([]);
   const [index, setIndex] = useState<KnowledgeIndexOverview | null>(null);
   const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([]);
@@ -34,14 +34,6 @@ export function useKnowledgeCenter(open: boolean) {
   const [loadingQuery, setLoadingQuery] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 960px)');
-    const sync = () => setNarrow(media.matches);
-    sync();
-    media.addEventListener('change', sync);
-    return () => media.removeEventListener('change', sync);
-  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchQuery), SEARCH_DEBOUNCE_MS);
@@ -95,7 +87,7 @@ export function useKnowledgeCenter(open: boolean) {
     }
   }, [queryRequest, viewMode]);
 
-  const showDetail = useCallback(() => { if (narrow) setNarrowPane('detail'); }, [narrow]);
+  const showDetail = useCallback(() => { if (narrow) setNarrowPane('detail'); }, [narrow, setNarrowPane]);
   const { selectedCardId, selectedCard, loadingDetail, clearCardSelection,
     selectedConflict, conflictCards, selectConflict, clearConflict, selectCard, selectRecord } =
     useKnowledgeSelection({ open, queryKey: knowledgeQueryKey(queryRequest), hits, pack,
@@ -145,7 +137,7 @@ export function useKnowledgeCenter(open: boolean) {
     const rebuild = rebuildSeq.current;
     void refreshOverview();
     return () => { overview.next(); rebuild.next(); };
-  }, [clearCardSelection, clearConflict, open, refreshOverview]);
+  }, [clearCardSelection, clearConflict, open, refreshOverview, setNarrowPane]);
 
   useEffect(() => {
     if (!open) return;
@@ -161,11 +153,7 @@ export function useKnowledgeCenter(open: boolean) {
     setViewMode(next);
   }, [clearCardSelection, clearConflict]);
 
-  const revealImportedCard = useCallback(async (card: {
-    spaceId: string;
-    relativePath: string;
-    cardId: string;
-  }) => {
+  const revealImportedCard = useCallback(async (card: Pick<KnowledgeCardDetail, 'spaceId' | 'relativePath' | 'cardId'>) => {
     clearConflict();
     setViewMode('cards');
     const revealRequest = {
@@ -195,7 +183,7 @@ export function useKnowledgeCenter(open: boolean) {
     } finally {
       if (querySeq.current.isCurrent(seq)) setLoadingQuery(false);
     }
-  }, [clearConflict, narrow, queryRequest, refreshOverview, selectCard]);
+  }, [clearConflict, narrow, queryRequest, refreshOverview, selectCard, setNarrowPane]);
 
   return {
     sessionId, viewMode, setViewMode: changeViewMode, narrow, narrowPane, setNarrowPane, spaces, index,

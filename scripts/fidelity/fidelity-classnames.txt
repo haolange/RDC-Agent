@@ -548,8 +548,6 @@ knowledge-import-mode
 knowledge-import-pending
 knowledge-import-result-card
 knowledge-import-result-count
-knowledge-import-result-details
-knowledge-import-result-grid
 knowledge-import-result-head
 knowledge-import-result-status
 knowledge-symptom
