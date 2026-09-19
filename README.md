@@ -1,92 +1,252 @@
+<div align="center">
+
+<img src="docs/media/rdc-agent-hero.png" alt="RDC-Agent GPU debugging workbench" width="100%" />
+
 # RDC-Agent
 
-`RDC-Agent` 是面向 RenderDoc `.rdc` capture 的 Electron 桌面应用。它把通用 Agent 协作入口与可审计的图形调试流程放在同一工作台中，并通过用户配置的外部 RDX CLI 执行本机 RenderDoc 能力。
+### 把一帧 GPU 问题，变成一条可追溯的答案链
 
-## 当前能力
+RenderDoc `.rdc` capture × AI Agent workbench × RDX 原生诊断
 
-- 管理本地 Project，并使用 `<project-root>/.rdx/inputs/` 作为 `.rdc` 输入目录。
-- 在工作台内浏览、导入、打开和切换 capture；失败时 fail-closed 并展示 RDX/RenderDoc 诊断。
-- 使用固定的 `~/.rdx` User Scope 与 `<project-root>/.rdx` Project Scope 管理 Agent、Skill、MCP、Hook、Policy、Knowledge 与显式 Memory。
-- 配置真实 Provider、Model 与 Agent Route，通过统一的 `PromptPlan -> RequestEnvelope -> Provider Adapter` 管线执行 LLM 调用。
-- 在 Work Process 中展示真实运行过程与 provider reasoning 语义；脱敏请求快照仅落盘并由 IPC 提供，供日后专用 Debug View 使用，不嵌入消息流，也不作为 Settings 导航入口。
-- 通过 Settings 中的 RDX CLI 与 shell actions 接入系统安装或用户配置的外部工具链。
+[中文](#中文) · [English](#english) · [设计与架构](./DESIGN.md) · [问题反馈](https://github.com/haolange/RDC-Agent/issues)
 
-## Canonical Runtime
+</div>
 
-用户资源固定在 `~/.rdx`：
+<details open>
+<summary><strong>中文</strong></summary>
+
+## 不是“会聊天的工具”，而是能把图形问题推进下去的工作台
+
+RDC-Agent 是一个面向 Windows 的 Electron 桌面应用：把日常 Agent 协作、RenderDoc capture 调查和 RDX 原生操作放进同一个可审计的工作区。
+
+你可以从一句“这一帧为什么不对？”开始，逐步完成：
+
+1. 打开项目与 `.rdc` capture，固定当前 capture / replay / context 身份；
+2. 让 Agent 读取代码、运行命令、检查 RDX 上下文，并把过程投影成可读的 Work Process；
+3. 按需进入 Debugger、Analyzer 或 Optimizer 方法面；
+4. 将观察、证据、结论和下一步动作留在同一个 session，而不是散落在终端、截图和聊天记录里。
+
+## RDC-Agent 不等于 LLM + Skill + Tool
+
+当前可见的 RenderDoc Agent 集成，常见形态仍是：把 Replay API 包成 MCP 工具，补一层 Skill，再让 LLM 自己选择 tool call。这解决了“模型能不能调用 RenderDoc”的问题，却没有自动解决“调查是否稳定、证据是否充分、结论是否可信”。
+
+RDC-Agent 的最小产品单元不是一次 tool call，而是一条有状态、有任务、有上下文、有证据约束的调查闭环：
 
 ```text
-~/.rdx/
-  config.json
-  RDX.md
-  agents/ skills/ mcp/ hooks/ policies/ knowledge/ memory/
+Problem
+  ↓
+Hypothesis
+  ↓
+Inspection
+  ↓
+Experiment
+  ↓
+Evidence
+  ↓
+Conclusion
 ```
 
-项目资源固定在 `<project-root>/.rdx`：
+这条链由四个系统共同托住：
 
-```text
-<project-root>/
-  RDX.md
-  .rdx/
-    project.yaml
-    agents/ skills/ mcp/ hooks/ policies/ knowledge/ memory/
-    inputs/ artifacts/
-```
+- **Tasks system** 管的是下一步要验证什么、哪些补证仍未完成、什么条件才能收口；它不是把调查阶段写死成一张流程图。
+- **Context in app** 把当前 session 的 capture / replay / context、任务、Artifacts、Outputs、Context 和 Capture 投影到同一工作区，减少“模型记得但系统没有”的漂移。
+- **Investigation schema** 把 World State、Evidence、Claim、Experiment、Challenge、Checkpoint 和 Report 变成可引用的 session artifacts；观察、推断、派生结论和未知状态不能随意升格。
+- **Knowledge Engine** 以 markdown-first 的六条 retrieval lane 连接 Identity / Path、Scope / Metadata、Lexical、Structural、Relation / Graph、Temporal / Version，让经验与历史案例可以被检索，但不会用一个不可解释的 embedding 分数替代证据。
 
-应用状态、Secret、日志和缓存保存在 OS `userData` 目录，不进入 User/Project Scope。项目 `.rdx/.gitignore` 默认忽略 `inputs/`、`artifacts/`、`memory/` 与 runtime state。
+所以，RDC-Agent 追求的不是“再多几个 GPU 工具”，而是让 Agent 在调查过程中知道：当前对象是谁、已知事实是什么、竞争假设是什么、下一步实验如何回滚、哪条结论仍然只是推断。
 
-## 仓库结构
+这也解释了几个有意的产品边界：MCP 不是 RDC-Agent 的运行时权威；RDX 的可编程 CLI / JSON contract 才是 Agent、脚本、测试和人共同使用的操作面。remote / Android 回放属于显式的 runtime capability，不会因为本地 PNG 成功就静默假装远端成功；工具集合按 catalog 发现、描述和裁剪，而不是把一张无法治理的全量工具表塞给模型。工具少而事实完整、身份明确、失败诚实，比按钮数量更重要。
 
-- `src/main`：Electron 主进程、IPC、工作流编排、Provider 与外部能力接入。
-- `src/preload`：向 renderer 暴露受控 API。
-- `src/renderer`：界面、交互和状态投影。
-- `src/shared`：跨层类型、常量与契约。
-- `resources`：随应用分发的 Core Prompt 与 builtin Agent/Skill 资源。
-- `docs`：稳定产品、架构、工作流和 UI 文档。
-- `scripts`：可复用开发、验证和启动脚本。
+## 一份调查，服务不同岗位的两种阅读面
 
-## 开发与验证
+最终结果不应只是一段聊天终答。RDC-Agent 的调查结果可以沿同一份事实源生成两种阅读面：
 
-需要 Node.js `>=22.13.0`（同时满足 Electron 42 与 pnpm 11.7 runtime contract）。仓库统一使用 pnpm `11.7.0`；源码启动器会按 `pnpm-lock.yaml` 条件式同步依赖。pnpm store 固定在每用户的 `~/.cache/rdc-agent/pnpm-store`，不会写入项目所在磁盘的根目录。
+- **Developer Report（Markdown）**：面向图形程序员、TA、引擎和性能工程师，包含目标、输入、环境、计划、任务时间线、Evidence、Claims、Experiments、Challenges、Limitations 和 Artifact Index。
+- **Executive Visual Report（generative UI / canvas）**：面向 QA、Artist、策划和需要快速理解影响面的协作者，用图文、Before / After / Diff、区域标注和可信度标记讲清“发生了什么、影响谁、建议做什么”。
 
-```bash
+视觉报告只是事实的阅读投影，不是第二个结论引擎：每个关键判断仍需回指可解引用的 Claim、Evidence 和 verification 状态。这样同一份调查既能让专业人员深挖，也能让非图形岗位快速理解，而不会为了“好看”牺牲可信度。
+
+![RDC-Agent workbench preview](docs/media/rdc-agent-workbench-preview.png)
+
+> 上图是公开展示版工作台预览：布局来自真实内置 Browser QA 的 `/app` 工作台，项目名、capture 名称、历史对话和模型信息已替换为中性占位内容。它展示产品结构，不把演示文字冒充成运行结果。
+
+## 三个入口，覆盖一次图形调查的主要节奏
+
+| 入口 | 你会得到什么 |
+| --- | --- |
+| **Debugger** | 从异常现象回到事件、资源、Pipeline 和 Shader，先定位“哪里不对”。 |
+| **Analyzer** | 串联跨 capture、跨事件和跨证据的线索，形成可以复查的调查材料。 |
+| **Optimizer** | 在真实干预、可回滚的前提下比较代价与收益，排出优化顺序。 |
+
+这三者不是三个孤立的聊天人格：它们共享同一个 Agent loop、项目资源边界、权限模型和 session 证据链。普通工程协作仍然由 General 处理；RenderDoc 专项工作按需交接到对应方法面。
+
+## 事实上的能力边界
+
+- **Capture 工作流**：管理项目内 `.rdc` 输入，打开、切换和诊断 capture；RDX / RenderDoc 能力来自用户配置的外部 RDX CLI。
+- **Agent 工作流**：支持阅读、规划、编辑、搜索、Shell、工具调用、handoff、memory 和 subagent 编排；执行权限由主进程和冻结的运行计划控制。
+- **可审计资源**：用户资源位于 `~/.rdx`，项目资源位于 `<project-root>/.rdx`；Agent、Skill、MCP、Hook、Policy、Knowledge 和显式 Memory 有清晰的 scope。
+- **真实运行过程**：Work Process 展示实际执行过程和 provider reasoning 语义；不伪造隐藏思维链，也不把模型自报当成证据。
+- **设备与回放**：本地回放与 Android 设备路径由 RDX / RenderDoc 环境决定；“已连接”不等于每一种 capture 都能在每一台 GPU 上成功 replay。
+
+当前发布面是 **Windows-only**。RDC-Agent 不捆绑你的 `.rdc` 文件、Provider 密钥或 RenderDoc 安装；你需要自行配置 RDX CLI、Provider / Model，以及对应的设备环境。
+
+## 为什么它适合严肃的图形调试
+
+- **上下文不漂移**：capture、replay、context 和 session 身份在 turn 开始时冻结，避免调查中途悄悄换对象。
+- **权限不靠提示词**：Skill 提供方法知识，不能自行扩大工具权限；Shell、RDX、IPC 和 Secret 边界由主进程控制。
+- **失败可解释**：安全拒绝、完整性降级和可恢复错误分开表达，失败不会被空结果或固定成功值掩盖。
+- **结果可复查**：调查材料、capture 证据和运行记录都有明确的来源与边界，便于复盘和交接。
+
+## 5 分钟开始
+
+环境要求：Windows、Node.js `>=22.13.0`、pnpm `11.7.0`，以及已安装并可由 Settings 配置的 RDX CLI。
+
+```powershell
+pnpm install
 pnpm run dev
 ```
 
-真实浏览器会话：
+真实 Browser QA（用于开发和界面验收）：
 
-```bash
+```powershell
 pnpm run start:agent-browser
 ```
 
-主验证命令：
+常用工程验证：
 
-```bash
+```powershell
 pnpm run typecheck
 pnpm test
-pnpm run check:architecture
-pnpm run check:fidelity
-pnpm run check:shared-exports
-pnpm run check:provider-system
-pnpm run check:settings-agents
-pnpm run check:reasoning-delivery
-pnpm run check:work-process
-pnpm run check:work-process-tool-coverage
-pnpm run check:repository-hygiene
+pnpm run check:gates
 pnpm run build
 ```
 
-Windows 可直接运行 `scripts/start-rdc-agent.cmd`；macOS/Linux 使用 `sh scripts/start-rdc-agent.sh`。二者经 `run-rdc-launcher` 进入同一个 `launch-rdc-agent.mjs`。开发热更、浏览器真实会话等模式用 `pnpm run start:human:dev` / `pnpm run start:agent-browser`（或 `scripts/run-rdc-launcher.* --mode ...`）。追加 `--prepare-only` 可完成条件式依赖同步、Electron 运行时检查和构建；`--force-prepare` 用于强制恢复依赖与构建。非标准 Node 安装可通过绝对路径环境变量 `RDC_AGENT_NODE` 指定。
+然后在应用中：
 
-这些入口只服务于源码开发。`pnpm run pack` / `pnpm run dist` 生成的发布包包含应用运行依赖，但不包含 pnpm、lockfile、源码 launcher 或开发缓存；最终用户直接运行 exe、app、AppImage 或安装包。
+1. 添加一个 Project；
+2. 将 `.rdc` 放入 `<project-root>/.rdx/inputs/`，或从 Capture 面板导入；
+3. 配置 RDX CLI 与 Provider / Model；
+4. 从 General 开始描述目标，需要图形调查时再进入 Debugger、Analyzer 或 Optimizer。
+
+## 公开仓库说明
+
+这是一个仍在快速收敛中的工程项目。README 展示已经落地的产品边界与真实验证过的工作流；完整平台、Provider、GPU、Android 和发布验收矩阵请查看 [Acceptance Ledger](./docs/product/acceptance-ledger.md)。不具备对应环境的验证，不会在这里被包装成“全平台保证”。
+
+欢迎提交 issue、改进文档或针对具体 capture 的可复现问题。请不要在 issue 中上传私有 `.rdc`、Provider 密钥、用户数据或包含敏感路径的日志。
 
 ## 文档入口
 
-- [DESIGN.md](./DESIGN.md)：产品与工程架构 SSOT。
-- [AGENTS.md](./AGENTS.md)：仓库修改与验证规范。
-- [docs/README.md](./docs/README.md)：正式文档索引。
-- [docs/architecture/agent-runtime-kernel.md](./docs/architecture/agent-runtime-kernel.md)：RDX Runtime 与 Agent Kernel。
-- [docs/ui/design-system.md](./docs/ui/design-system.md)：设计系统与 UI 约束。
+- [产品与架构裁决](./DESIGN.md)
+- [运行时与权限契约](./docs/contracts/runtime-kernel.md)
+- [RDX 运行时](./docs/architecture/rdx-runtime.md)
+- [Workbench / Transcript / Composer](./docs/ui/workbench-and-transcript.md)
+- [UI Design System](./docs/ui/design-system.md)
+- [验收记录](./docs/product/acceptance-ledger.md)
 
+</details>
 
-RDX 安装配置须将捆绑 Python 的绝对路径与同安装 cli/run_cli.py 配对；人类终端使用薄 bin/rdx.cmd，双击安装使用 install.cmd。旧 bat/PowerShell 配置保持可见但拒绝执行，须在 Settings 手动修正。文件修改工具要求同会话先成功 read_file；应用重启后重新读取。详见 [RDX 运行时](docs/architecture/rdx-runtime.md) 与 [权限契约](docs/contracts/permissions.md)。
+<details>
+<summary><strong>English</strong></summary>
+
+## A workbench that moves GPU questions forward
+
+RDC-Agent is a Windows desktop application that brings everyday agent collaboration, RenderDoc capture investigation, and native RDX operations into one auditable workspace.
+
+Start with “Why is this frame wrong?” and work through a stable chain:
+
+1. Open a project and its `.rdc` captures while keeping capture, replay, and context identity explicit.
+2. Let the agent inspect code, run commands, check RDX context, and expose the real execution process through Work Process.
+3. Enter Debugger, Analyzer, or Optimizer methods when the problem calls for graphics-specific reasoning.
+4. Keep observations, evidence, conclusions, and next actions in the same session instead of scattering them across terminals, screenshots, and chat logs.
+
+## RDC-Agent is not just LLM + Skill + Tool
+
+Many visible RenderDoc agent integrations still stop at a familiar shape: wrap Replay API operations as MCP tools, add a Skill, and let the LLM choose tool calls. That answers “can the model call RenderDoc?” It does not, by itself, answer “is the investigation stable, sufficiently evidenced, and trustworthy?”
+
+RDC-Agent treats the investigation loop—not an individual tool call—as the product primitive:
+
+```text
+Problem
+  ↓
+Hypothesis
+  ↓
+Inspection
+  ↓
+Experiment
+  ↓
+Evidence
+  ↓
+Conclusion
+```
+
+Four systems keep that loop grounded:
+
+- **Tasks system** tracks what must be verified next, which evidence gaps remain, and what is required before an investigation can close.
+- **Context in app** keeps the current capture / replay / context, tasks, Artifacts, Outputs, Context, and Capture visible in one session instead of relying on model memory alone.
+- **Investigation schema** stores World State, Evidence, Claim, Experiment, Challenge, Checkpoint, and Report as referenceable session artifacts with explicit epistemic and verification boundaries.
+- **Knowledge Engine** connects six markdown-first retrieval lanes—Identity / Path, Scope / Metadata, Lexical, Structural, Relation / Graph, and Temporal / Version—without replacing evidence with an opaque embedding score.
+
+The goal is not simply to expose more GPU buttons. It is to make the agent know which object is under investigation, what is observed, which hypotheses compete, how an experiment can be rolled back, and which conclusions are still only inferences.
+
+That is also why several boundaries are intentional: MCP is not RDC-Agent's runtime authority; the programmable RDX CLI / JSON contract is the operation surface shared by agents, scripts, tests, and people. Remote / Android replay is an explicit runtime capability—local PNG success must not silently become a claim of remote success. Tools are discovered, described, and scoped from a catalog instead of dumping an ungoverned full table into every model turn. Fewer tools with complete facts, explicit identity, and honest failure are more valuable than a larger button count.
+
+## One investigation, two reading surfaces
+
+The result should not be only a chat answer. The same source-backed investigation can be projected into two reading surfaces:
+
+- **Developer Report (Markdown)** for graphics programmers, TAs, engine and performance engineers: goal, inputs, environment, plan, task timeline, evidence, claims, experiments, challenges, limitations, and artifact index.
+- **Executive Visual Report (generative UI / canvas)** for QA, artists, designers, producers, and other collaborators: explain what happened, who is affected, and what to do next through diagrams, Before / After / Diff views, region annotations, and credibility markers.
+
+The visual report is a presentation layer, not a second conclusion engine. Important statements still point back to referenceable Claims, Evidence, and verification state, so readability never outruns trustworthiness.
+
+## Three focused ways to investigate
+
+- **Debugger** traces a visual symptom back to events, resources, pipeline state, and shaders.
+- **Analyzer** connects clues across captures, events, and evidence into material that can be reviewed later.
+- **Optimizer** compares cost and benefit through real, reversible interventions.
+
+These are not three isolated chat personas. They share the same agent loop, project resource boundaries, permission model, and session evidence chain. General handles ordinary engineering work; RenderDoc investigations are handed off to the appropriate method surface when needed.
+
+## What is real, and where the boundary is
+
+- Capture management, diagnostics, and RDX / RenderDoc operations are driven by the external RDX CLI configured on the host.
+- Agent work includes reading, planning, editing, searching, shell commands, tool calls, handoffs, memory, and subagent orchestration.
+- User resources live under `~/.rdx`; project resources live under `<project-root>/.rdx`.
+- Work Process reflects actual execution and provider reasoning semantics. It does not fabricate hidden chain-of-thought or treat model self-report as evidence.
+- Local replay and Android presentation depend on the installed RDX / RenderDoc environment and the target GPU. A connected device is not a promise that every capture replays everywhere.
+
+The release surface is **Windows-only**. RDC-Agent does not bundle your captures, provider keys, or RenderDoc installation. Configure the RDX CLI, provider / model, and device environment yourself.
+
+## Start developing
+
+Requirements: Windows, Node.js `>=22.13.0`, pnpm `11.7.0`, and an RDX CLI that can be configured from Settings.
+
+```powershell
+pnpm install
+pnpm run dev
+```
+
+For the real in-app Browser QA surface:
+
+```powershell
+pnpm run start:agent-browser
+```
+
+Useful verification commands:
+
+```powershell
+pnpm run typecheck
+pnpm test
+pnpm run check:gates
+pnpm run build
+```
+
+Read the [design and architecture guide](./DESIGN.md) for the product boundary, the [RDX runtime contract](./docs/architecture/rdx-runtime.md) for native operations, and the [acceptance ledger](./docs/product/acceptance-ledger.md) for evidence and unverified boundaries.
+
+This repository is evolving quickly. Please report reproducible problems with the smallest safe reproduction you can share. Never upload private `.rdc` captures, provider keys, user data, or logs containing sensitive paths.
+
+</details>
+
+## License
+
+See [LICENSE](./LICENSE).
