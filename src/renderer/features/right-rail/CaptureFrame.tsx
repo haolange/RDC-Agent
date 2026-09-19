@@ -64,7 +64,7 @@ export function CaptureFrame({ scope, state, disabled, receive }: {
       onPointerUp={(event) => events[Number(event.currentTarget.value)] && select(events[Number(event.currentTarget.value)].eventId, true)}
       onKeyUp={(event) => events[Number(event.currentTarget.value)] && select(events[Number(event.currentTarget.value)].eventId, true)} />
     <div className="capture-replay-feedback" role="status">{error ?? feedback}</div>
-    {state?.devicePresentation.status === 'displayed' && <small>{t('control.replay.synced')}</small>}
-    {state?.devicePresentation.status === 'unsupported' && <small title={state.devicePresentation.reason}>{t('control.replay.remoteUnsupported')}</small>}
+    {state?.devicePresentation.status === 'presented' && <small>{t('control.replay.synced')}</small>}
+    {state && ['unsupported', 'unavailable'].includes(state.devicePresentation.status) && <small title={state.devicePresentation.reason ?? undefined}>{t('control.replay.remoteUnavailable')}</small>}
   </div>;
 }

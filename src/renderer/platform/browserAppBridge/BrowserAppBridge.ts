@@ -52,6 +52,14 @@ class BrowserAppBridgeClient implements RendererApiTransport {
     if (!response.ok || !payload.success) {
       throw new Error(payload.error || `Bridge invoke failed for ${channel}`);
     }
+    if (channel === 'capture:readLivePreview' || channel === 'capture:readReplayImage') {
+      const bytes = payload.result as { type?: unknown; data?: unknown } | null;
+      if (bytes?.type !== 'Buffer' || !Array.isArray(bytes.data)
+        || !bytes.data.every(value => Number.isInteger(value) && value >= 0 && value <= 255)) {
+        throw new Error('BRIDGE_INVALID_IMAGE_BYTES');
+      }
+      return Uint8Array.from(bytes.data) as TResult;
+    }
     return payload.result as TResult;
   }
 

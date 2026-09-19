@@ -38,7 +38,7 @@ vi.mock('./projectInputLifecycleHandlers', () => ({ registerProjectInputLifecycl
 vi.mock('../sessions', () => ({ rdxSessionService: { clearOpenedCaptureForSession: vi.fn(async () => true) } }));
 
 vi.mock('../workflow/debugger/AgentOrchestrator', () => ({
-  agentOrchestrator: { syncSessionSlots, backgroundSubagents: { abortSession: abortBackgroundSession } },
+  agentOrchestrator: { syncSessionSlots, releaseSessionToolState: vi.fn(), backgroundSubagents: { abortSession: abortBackgroundSession } },
 }));
 
 vi.mock('../conversation/ConversationService', () => ({

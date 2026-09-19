@@ -1283,7 +1283,7 @@ assert(
 assert(cssSource.includes('.work-process-tool-approval'), 'tool approval styling should exist');
 assert(cssSource.includes('.work-process-disclosure:not([open]) > :not(summary)'), 'closed disclosure must not render expanded body content');
 assert(
-  componentSource.includes('<MessageMarkdown content={row.thinkingPreview} />'),
+  componentSource.includes('<MessageMarkdown content={row.thinkingPreview} deferHeavyPlugins={thinkingActive} />'),
   'thinking preview must render through MessageMarkdown',
 );
 assert(

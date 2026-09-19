@@ -235,7 +235,7 @@ export const zhControl = {
   "control.replay.applied": "已应用 EID {eid}",
   "control.replay.requested": "正在应用 EID {requested} · 当前显示 EID {shown}",
   "control.replay.synced": "设备画面已同步",
-  "control.replay.remoteUnsupported": "设备画面同步不可用",
+  "control.replay.remoteUnavailable": "设备画面同步不可用",
   "control.replay.locked": "Agent 正在操作回放",
   "control.replay.retryImage": "重试画面",
   "control.replay.retryClose": "重试关闭",

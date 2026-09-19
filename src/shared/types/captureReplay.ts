@@ -21,7 +21,7 @@ export interface CaptureReplayState extends SessionScope {
   isFinalOutput: boolean; image: OpenedCapturePreview | null;
   observation: CaptureReplayObservation | null;
   agentObservation: CaptureAgentObservation | null;
-  devicePresentation: { status: 'not_applicable' | 'unsupported' | 'pending' | 'displayed' | 'error'; reason?: string };
+  devicePresentation: { status: 'not_applicable' | 'unsupported' | 'unavailable' | 'presented'; eventId: number | null; textureId: string | null; sequence: number | null; reason: string | null };
   warning: { code: string; message: string } | null;
   interactionLock: string | null; error: CaptureReplayError | null;
 }

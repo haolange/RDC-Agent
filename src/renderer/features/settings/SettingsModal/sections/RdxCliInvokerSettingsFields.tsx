@@ -8,7 +8,7 @@ import { Input } from '../../../../ui/Input';
 import { Switch } from '../../../../ui/Switch';
 import { AutosizeTextarea } from '../AutosizeTextarea';
 import { SettingsField } from '../parts';
-import { envToText, splitArgs, textToEnv } from './toolEnvText';
+import { envToText, textToEnv } from './toolEnvText';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -80,7 +80,7 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
         <SettingsField label={t('settings.rdxCliCommand')} layout="row">
           <Input
             value={rdxCliDraft.command}
-            placeholder="C:\\Tools\\rdx\\rdx.bat"
+            placeholder="C:\\Tools\\rdx\\binaries\\windows\\x64\\python\\python.exe"
             spellCheck={false}
             onChange={(event) => patch({ command: event.currentTarget.value })}
           />
@@ -93,7 +93,7 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
             onChange={(event) => {
               const value = event.currentTarget.value;
               setArgsText(value);
-              patch({ argsPrefix: splitArgs(value) });
+              patch({ argsPrefix: [value.trim().replace(/^"|"$/g, "")].filter(Boolean) });
             }}
           />
         </SettingsField>

@@ -728,3 +728,35 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
     expect(JSON.stringify(result.content)).toMatch(/PLAN_REVIEW_NO_HANDOFF/);
   });
 });
+
+it('keeps private file-read state across turns and agent switches, isolates and releases scopes', async () => {
+  const seen: Set<string>[] = [];
+  const tool = { name: 'read_file', description: 'read', parameters: { type: 'object', properties: {} },
+    execute: async (_id: string, _args: unknown, _signal: unknown, _update: unknown, context?: import('../../agent-runtime/agent/AgentTool').ToolExecutionContext) => {
+      seen.push(context!.successfulFileReads!);
+      return { content: [{ type: 'text' as const, text: 'ok' }] };
+    } };
+  const make = () => new ToolExecutorFactory({
+    slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+    deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+    getActiveTurn: () => null,
+    resolveRuntimeTools: () => ({ toolMap: new Map([['read_file', tool]]), definitions: [], deferredDefinitions: [] }),
+    isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+  });
+  const factory = make();
+  const run = async (session: string, agent = 'general', owner = factory) => {
+    const executor = owner.createToolExecutor(agent, ['read_file'], session);
+    const result = await executor.execute({ type: 'toolCall', id: 'read-' + seen.length, name: 'read_file', arguments: {} });
+    expect(result.isError).not.toBe(true);
+    return seen.at(-1)!;
+  };
+  const first = await run('a'); first.add('realpath');
+  expect(await run('a', 'analyzer')).toBe(first);
+  expect((await run('b')).has('realpath')).toBe(false);
+  const child = await run('a::subagent::child'); child.add('child-path');
+  expect(child).not.toBe(first);
+  factory.releaseSession('a');
+  expect((await run('a')).size).toBe(0);
+  expect((await run('a::subagent::child')).size).toBe(0);
+  expect((await run('a', 'general', make())).size).toBe(0);
+});

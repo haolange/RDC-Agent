@@ -91,6 +91,9 @@ export class PromptPlanBuilder {
       push({ id: `core:${fileName}`, kind: 'core-contract', scope: 'builtin', sourcePath, sourceHash: hashScopedResource(content), content });
     }
 
+    const fileRouting = 'Use read_file / grep / glob / edit_file / write_file for file I/O. Before editing or overwriting an existing file, successfully read_file the same realpath in this session; after restart read again. shell.command file-tool bypass is denied; use dedicated structured execution for host-owned capabilities.';
+    push({ id: 'core:file-tool-routing', kind: 'core-contract', scope: 'builtin', sourcePath: 'runtime:file-tool-routing', sourceHash: hashScopedResource(fileRouting), content: fileRouting });
+
     const profileContent = [
       `# Effective Agent Profile`,
       `Name: ${input.profile.name}`,

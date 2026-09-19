@@ -1,4 +1,5 @@
 import * as os from 'os';
+import { matchShellFileToolBypass } from './shellFileToolBypass';
 import * as path from 'path';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
 import type { CompiledPolicy } from '@shared/types/rdxRuntime';
@@ -37,6 +38,8 @@ export interface AgentPermissionDecision {
 }
 
 export interface AgentPermissionDecisionInput {
+  /** Actual tools available to this executor after frozen skill intersection. */
+  effectiveToolNames?: readonly string[];
   tool: AgentTool;
   toolCall: ToolCall;
   /** Mission plan-only hard deny uses this; Full access cannot bypass. */
@@ -70,19 +73,15 @@ const NETWORK_TOOL_NAMES = new Set(['web_fetch', 'web_search']);
 const WINDOWS_ROUTINE_COMMAND_PREFIXES = [
   'dir',
   'ls',
-  'type',
   'get-childitem',
-  'get-content',
   'get-location',
   'pwd',
   'echo',
   'write-output',
-  'select-string',
   'git status',
   'git diff',
   'git show',
   'git log',
-  'rg',
   'node scripts/check-',
   'pnpm run check:',
   'pnpm run typecheck',
@@ -90,19 +89,14 @@ const WINDOWS_ROUTINE_COMMAND_PREFIXES = [
 
 const POSIX_ROUTINE_COMMAND_PREFIXES = [
   'ls',
-  'cat',
   'pwd',
-  'head',
-  'tail',
   'echo',
-  'find',
   'which',
   'where',
   'git status',
   'git diff',
   'git show',
   'git log',
-  'rg',
   'node scripts/check-',
   'pnpm run check:',
   'pnpm run typecheck',
@@ -361,6 +355,8 @@ export class AgentPermissionPolicyService {
       if (hardDeny) {
         return denied(`Shell command hard-denied (matched "${hardDeny}").`, 'high');
       }
+      const bypass = matchShellFileToolBypass(command, resolveShellKind(), input.effectiveToolNames ?? []);
+      if (bypass) return denied(bypass);
     }
 
     const baseline = this.evaluateBaseline(input, permissions, mode, toolName, workspaceRoot);

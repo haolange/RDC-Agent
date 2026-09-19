@@ -4,10 +4,10 @@ import { DEFAULT_RDX_CLI_INVOKER } from '../settings/settingsDefaults';
 import { freezeRdxTurnBinding } from './RdxTurnBindings';
 import type { RdxOperationDefinition } from '@shared/types/tool';
 import { executeRdxShell, RdxShellInputSchema } from './executeRdxShell';
-const mock = vi.hoisted(() => ({ execute: vi.fn(), lease: vi.fn(), prepare: vi.fn(), write: vi.fn(), quarantine: vi.fn(), observe: vi.fn() }));
+const mock = vi.hoisted(() => ({ execute: vi.fn(), lease: vi.fn(), retainedLease: vi.fn(), prepare: vi.fn(), write: vi.fn(), quarantine: vi.fn(), observe: vi.fn() }));
 vi.mock('../sessions', () => ({ rdxSessionService: { observeAgentOperation: mock.observe } }));
 vi.mock('./RdxCliInvokerService', () => ({ rdxCliInvokerService: { executeCLI: mock.execute } }));
-vi.mock('../sessions/RdxRuntimeContextRegistry', () => ({ assertRdxContextLeaseOwnership: mock.lease, quarantineRdxContext: mock.quarantine }));
+vi.mock('../sessions/RdxRuntimeContextRegistry', () => ({ assertRdxContextLeaseOwnership: mock.lease, getRdxContextLease: mock.retainedLease, quarantineRdxContext: mock.quarantine }));
 vi.mock('./RdxExecutionReceipts', async (importOriginal) => {
   const original = await importOriginal<typeof import('./RdxExecutionReceipts')>();
   return { ...original, rdxExecutionReceipts: { prepare: mock.prepare, write: mock.write } };
@@ -26,10 +26,20 @@ const input = { operation: 'rd.perf.get_event_durations', args: {}, experimentId
 beforeEach(() => {
   vi.clearAllMocks();
   mock.lease.mockReturnValue(lease);
+  mock.retainedLease.mockReturnValue(null);
   mock.execute.mockResolvedValue({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: input.operation, data: { event_durations: [{ event_id: 11, duration_us: 2 }] } }) });
   mock.write.mockReturnValue({ uri: 'session://tool-outputs/receipt.json', expectedHash: 'sha256:abc' });
 });
 describe('structured RDX shell', () => {
+  it('denies a fresh turn on a quarantined lease with explicit lifecycle recovery', async () => {
+    mock.lease.mockReturnValue(null);
+    mock.retainedLease.mockReturnValue({ ...lease, quarantineReason: 'native outcome uncertain' });
+    const fresh = { ...context, turnId: 'next-turn',
+      rdxBinding: freezeRdxTurnBinding(context.rdxBinding!.cli, [definition], null) };
+    await expect(executeRdxShell(input, 'call', undefined, fresh)).rejects.toThrow(/RDX_CONTEXT_QUARANTINED:.*close and reopen/);
+    expect(mock.execute).not.toHaveBeenCalled();
+    expect(mock.write).not.toHaveBeenCalled();
+  });
   it('injects only native replay identity and frozen binding, then issues a main receipt', async () => {
     await executeRdxShell(input, 'call', undefined, context);
     expect(mock.execute).toHaveBeenCalledWith('call', [

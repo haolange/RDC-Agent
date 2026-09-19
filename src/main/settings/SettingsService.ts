@@ -346,7 +346,7 @@ export class SettingsService {
         rdxCli: sanitizeRdxCliInvokerSettings({
           ...(currentPersisted.tooling?.rdxCli ?? DEFAULT_RDX_CLI_INVOKER),
           ...(patch.tooling?.rdxCli ?? {}),
-        }),
+        }, DEFAULT_RDX_CLI_INVOKER, patch.tooling?.rdxCli !== undefined),
         codeInterpreter: sanitizeCodeInterpreterSettings({
           ...(currentPersisted.tooling?.codeInterpreter ?? DEFAULT_CODE_INTERPRETER),
           ...(patch.tooling?.codeInterpreter ?? {}),

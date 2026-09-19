@@ -73,7 +73,7 @@ describe('native RDX probe', () => {
     expect(executeCli.mock.calls.map(([command, args]) => [command, args])).toEqual([
       ['doctor', []], ['version', ['--json']], ['tools', ['list']],
     ]);
-    expect(executeCli.mock.calls[0]?.[2]?.settings?.argsPrefix).toEqual(['--json']);
+    expect(executeCli.mock.calls[0]?.[2]?.settings?.argsPrefix).toEqual([]);
     expect(compileRdxProbe({ action: 'preview_status' }).args).toEqual(['preview', 'status']);
   });
   it.each([

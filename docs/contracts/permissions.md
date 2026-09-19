@@ -78,7 +78,7 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 ## Shell 分析
 
 - Agent 命令工具 id 是 `shell`；解释器由 `ShellResolver` 解析（Settings 本机覆盖 → pwsh 7 → Windows PowerShell 5.1；POSIX `$SHELL`∈zsh/bash/sh/dash → zsh → bash → sh）。fish/csh/nu 等 fail-closed。全失败 `SHELL_UNAVAILABLE`。
-- 硬拒绝是**唯一**灾难 enforcement 表（`shellHardDeny`）。PowerShell 先统一 splitter（含 `&`）、折叠反引号、静态别名展开与最短唯一参数 bind，再匹配 `Remove-Item -Recurse -Force` 根路径（含 `$env:SystemDrive` / `\\?\C:\` / UNC 根 / hive 根）、`iwr|iex`（右端含 `bash`/`sh`/`pwsh`/`cmd`）、`-EncodedCommand`、嵌套 `powershell -Command` / `&` 调用运算符、launcher `-ExecutionPolicy Bypass`。cmd 覆盖 `rd /s /q`、`del /s /q`、`diskpart`、`shutdown /s`、`format`。POSIX 覆盖 `rm -rf /`、`dd if=`、`mkfs*`、`> /dev/sd|hd|nvme|xvd`、fork bomb、`chmod 777`；`sudo` 只在与这些灾难组合叠加时硬拒。allow 与 deny 都用词边界匹配。
+- 灾难命令由 `shellHardDeny` 单独维护；文件/RDX 路由硬拒绝是独立规则，两者都先于权限模式求值。PowerShell 先统一 splitter（含 `&`）、折叠反引号、静态别名展开与最短唯一参数 bind，再匹配 `Remove-Item -Recurse -Force` 根路径（含 `$env:SystemDrive` / `\\?\C:\` / UNC 根 / hive 根）、`iwr|iex`（右端含 `bash`/`sh`/`pwsh`/`cmd`）、`-EncodedCommand`、嵌套 `powershell -Command` / `&` 调用运算符、launcher `-ExecutionPolicy Bypass`。cmd 覆盖 `rd /s /q`、`del /s /q`、`diskpart`、`shutdown /s`、`format`。POSIX 覆盖 `rm -rf /`、`dd if=`、`mkfs*`、`> /dev/sd|hd|nvme|xvd`、fork bomb、`chmod 777`；`sudo` 只在与这些灾难组合叠加时硬拒。allow 与 deny 都用词边界匹配。
 - RDX / 通用 shell 经 `ShellInvocationService`；exitCode：`code ?? (signal ? 128+n : 1)`。
 - `ShellCommandRiskAnalyzer`：结构分析 + denied 词边界与路径前缀；最高分档为 `high`，只做审批路由，没有 `critical` 档位。
 - **风险分类器不是安全边界**；真正边界是 PermissionPolicy + `shellHardDeny` + sandbox/OS。
@@ -120,3 +120,9 @@ Skill 权限只在 prepareTurn 对预载集合取交集；skill_read 只读方�
 ## 计划文件操作
 
 plan:* 以当前查看 session + planId/revision/URI/hash 定位持久历史 tool call，由主进程解析创建 Agent 和实际 owning session；不以当前 session 配置补历史身份。导出路径由主进程原生保存对话框选定，保存到项目的路径由主进程固定计算。单次 approvalToken 绑定 action、viewer/owner、计划身份、URI/hash 和规范化目标，确认后复验；不接受 renderer 更换目标，不沿链接写入。取消不签发 token，写盘原子提交并验证，失败保留原文件。
+
+## 专用工具路由与读取前置
+
+文件路由表独立于灾难 shellHardDeny 表，均在权限模式和自定义允许前缀之前求值；Full access 不能绕过。有效工具集合有对应工具时，shell.command 文件读写/搜索返回 SHELL_FILE_TOOL_BYPASS，命令行 RDX 返回 RDX_VIA_COMMAND_DENIED。edit_file 和覆盖已有文件的 write_file 必须先在同一 session 成功 read_file 同一 realpath，否则 READ_BEFORE_EDIT_REQUIRED。已读状态跨 turn、仅内存持有，重启须重读；子 session 不继承。新建文件免先读。
+
+Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDX_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。

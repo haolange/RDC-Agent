@@ -1,4 +1,5 @@
 import { parseRdxNativeResult } from './RdxNativeProtocol';
+import { assertRdxCliBinding } from '@shared/utils/rdxCliBinding';
 import { canonicalJson, deepFreeze, validateDefinitions, validateApplicationOperations } from './RdxOperationCatalog';
 import fs from 'fs';
 import path from 'path';
@@ -56,8 +57,16 @@ export class RdxCliInvokerService {
       return 'RDX CLI command is not configured.';
     }
     const command = settings.command.trim();
+    try { assertRdxCliBinding(settings); } catch (error) { return (error as Error).message; }
     if ((path.isAbsolute(command) || command.includes(path.sep) || command.includes('/')) && !fs.existsSync(command)) {
       return `RDX CLI command not found: ${command}`;
+    }
+    const root = path.resolve(path.dirname(command), '..', '..', '..', '..');
+    const entry = path.resolve(settings.workingDirectory || root, settings.argsPrefix[0]);
+    if (!fs.existsSync(entry)) return `RDX_BINDING_INVALID: CLI entry not found: ${entry}`;
+    if (fs.realpathSync(command).toLowerCase() !== path.join(fs.realpathSync(root), 'binaries', 'windows', 'x64', 'python', 'python.exe').toLowerCase()
+      || fs.realpathSync(entry).toLowerCase() !== path.join(fs.realpathSync(root), 'cli', 'run_cli.py').toLowerCase()) {
+      return 'RDX_BINDING_INVALID: Python and CLI must resolve inside the same installation.';
     }
     return undefined;
   }
@@ -75,7 +84,10 @@ export class RdxCliInvokerService {
     const frozen = deepFreeze(structuredClone(settings));
     const key = canonicalJson(frozen);
     const unavailable = this.getAvailabilityFailure(frozen);
-    if (unavailable) throw new Error(unavailable);
+    if (unavailable) {
+      this.catalogs.delete(key); this.validatedCatalogs.delete(key); this.versions.delete(key);
+      throw new Error(unavailable);
+    }
     if (refresh) { this.catalogs.delete(key); this.validatedCatalogs.delete(key); this.versions.delete(key); }
     const cached = this.catalogs.get(key);
     if (cached) return cached;
@@ -146,8 +158,10 @@ export class RdxCliInvokerService {
       globalArgs.push('--owner-pid', String(process.pid));
     }
 
+    const root = path.resolve(path.dirname(settings.command), '..', '..', '..', '..');
     return [
-      ...settings.argsPrefix,
+      path.resolve(settings.workingDirectory || root, settings.argsPrefix[0]),
+      '--json',
       ...globalArgs,
       command,
       ...commandArgs,
@@ -175,12 +189,20 @@ export class RdxCliInvokerService {
     });
     const unavailableReason = this.getAvailabilityFailure(settings);
     if (unavailableReason) {
+      const key = canonicalJson(incoming);
+      this.catalogs.delete(key); this.validatedCatalogs.delete(key); this.versions.delete(key);
       return {
         exitCode: 2,
         stdout: '',
         stderr: unavailableReason,
         duration_ms: nowMs() - startTime,
       };
+    }
+
+    if (command !== 'version' && !(command === 'tools' && args[0] === 'list')) {
+      try { await this.loadCatalog(incoming); } catch (error) {
+        return { exitCode: 2, stdout: '', stderr: (error as Error).message, duration_ms: nowMs() - startTime };
+      }
     }
 
     const invocation = resolveRdxBatchInvocation(
@@ -192,7 +214,7 @@ export class RdxCliInvokerService {
       command: invocation.command,
       args: invocation.args,
       cwd: options.cwd || settings.workingDirectory || undefined,
-      env: settings.env,
+      env: { ...settings.env, PYTHONHOME: '', PYTHONPATH: '', RDX_TOOLS_ROOT: path.resolve(path.dirname(settings.command), '..', '..', '..', '..') },
       timeoutMs: options.timeout ?? settings.timeoutMs,
       outputBufferBytes: 8 * 1024 * 1024,
       runId: options.runId,

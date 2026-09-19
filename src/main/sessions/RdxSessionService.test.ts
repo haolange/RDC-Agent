@@ -133,6 +133,24 @@ it('quarantine blocks manual event/refresh but leaves confirmed close available 
   expect(await service.clearOpenedCaptureForSession(scope)).toBe(true);
 });
 
+it('publishes quarantine on Agent lock release instead of leaving a ready remote capture', async () => {
+  mocks.observe.mockResolvedValueOnce({ appliedEventId: 9, imageEventId: 9, error: null,
+    devicePresentation: { status: 'presented', eventId: 9, textureId: 'texture', sequence: 1, reason: null } });
+  const service = new RdxSessionService(); await service.openProjectInput(request('s1', true));
+  const lease = setRdxRuntimeContextForSession('s1', { contextId: 'context-s1', runtimeOwner: 'app', ownerLeaseId: 'owner', replaySessionId: 'native-s1', backend: 'remote', updatedAt: Date.now() }, { projectId: 'p' })!;
+  const listener = vi.fn(); service.subscribe(listener);
+  setRdxInteractionLock('s1', 'test', true);
+  quarantineRdxContext('s1', lease.version, 'native failure');
+  setRdxInteractionLock('s1', 'test', false);
+  expect(listener.mock.lastCall?.[0]).toMatchObject({ phase: 'error', interactionLock: null,
+    error: { code: 'RDX_CONTEXT_QUARANTINED', retry: 'close' },
+    devicePresentation: { status: 'unavailable', sequence: null } });
+  expect(service.snapshotReplayForSession(scope).phase).toBe('error');
+  expect(service.snapshotOpenedCaptureForSession(scope)).not.toBeNull();
+  expect(await service.clearOpenedCaptureForSession(scope)).toBe(true);
+  expect(service.snapshotReplayForSession(scope).phase).toBe('closed');
+});
+
 it('retains Android reservation across same-device replacement while selection persistence waits', async () => {
   const service = new RdxSessionService(); await service.openProjectInput(request('s1', true));
   let release!: () => void;

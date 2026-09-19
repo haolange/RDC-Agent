@@ -7,6 +7,7 @@
  */
 
 import * as fs from 'fs/promises';
+import { requireSuccessfulFileRead } from './fileReadAccess';
 import type { AgentTool } from '../../agent/AgentTool';
 import { assertTextReadable, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from './_shared';
 import { TEXT_FILE_MAX_BYTES } from './toolLimits';
@@ -30,7 +31,7 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
   name: 'edit_file',
   label: '编辑文件',
   description:
-    'Edit a text file by replacing old_text with new_text. The old_text must match exactly and appear exactly once in the file. Binary files are rejected.',
+    'Requires a successful read_file of the same realpath in this session (READ_BEFORE_EDIT_REQUIRED). Edit a text file by replacing old_text with new_text. The old_text must match exactly and appear exactly once in the file. Binary files are rejected.',
   parameters: {
     type: 'object',
     properties: {
@@ -67,6 +68,7 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
     const workspaceRoot = requireMutationWorkspaceRoot(context);
     const absolute = safeResolvePath(params.path, workspaceRoot, context);
     assertTextReadable(absolute, { maxBytes: TEXT_FILE_MAX_BYTES });
+    requireSuccessfulFileRead(absolute, context);
 
     const original = await fs.readFile(absolute, 'utf8');
     if (signal?.aborted) {

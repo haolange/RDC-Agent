@@ -157,7 +157,7 @@ async function stopOwnedDaemon(
     await execute(cliCommand, args, {
       contextId: record.contextId,
       abortSignal: options.signal,
-      settings: { ...settings, argsPrefix: [...settings.argsPrefix.filter((arg) => arg !== '--json'), '--json'] },
+      settings: settings,
     }),
     record.contextId,
     kind,

@@ -17,7 +17,6 @@ export interface ReplayLiveWriteTarget {
 
 async function call(owner: RdxRuntimeContext, operation: string, args: Record<string, unknown>, frozenCli?: RdxCliInvokerSettings) {
   const settings = structuredClone(frozenCli ?? settingsService.getAll().tooling.rdxCli);
-  settings.argsPrefix = [...settings.argsPrefix.filter(arg => arg !== '--json'), '--json'];
   const result = parseRdxNativeResult(await rdxCliInvokerService.executeCLI('call', [operation, '--args-json',
     JSON.stringify(args), '--daemon-context', owner.contextId,
   ], { contextId: owner.contextId, settings }), owner.contextId);
@@ -63,8 +62,16 @@ export async function observeReplay(
     if (!Array.isArray(data.targets)) throw new Error('RDX_OBSERVATION_TARGET_INVALID');
     const targets = data.targets.map(targetSchema);
     const remote = data.remote_display as Record<string, unknown> | undefined;
-    if (!remote || !['not_applicable', 'unsupported', 'pending', 'displayed', 'error'].includes(String(remote.status))
-      || (remote.reason !== undefined && typeof remote.reason !== 'string')) throw new Error('RDX_DISPLAY_RECEIPT_INVALID');
+    if (!remote || !['not_applicable', 'unsupported', 'unavailable', 'presented'].includes(String(remote.status))
+      || remote.event_id !== eventId
+      || !(remote.texture_id === null || typeof remote.texture_id === 'string')
+      || !(remote.sequence === null || (Number.isSafeInteger(remote.sequence) && Number(remote.sequence) > 0))
+      || !(remote.reason === null || typeof remote.reason === 'string')) throw new Error('RDX_DISPLAY_RECEIPT_INVALID');
+    if (remote.status === 'presented' && (owner.backend !== 'remote' || !target
+      || remote.texture_id !== target.textureId || remote.sequence === null || remote.reason !== null)) {
+      throw new Error('RDX_DISPLAY_RECEIPT_IDENTITY_MISMATCH');
+    }
+    if (['unsupported', 'unavailable'].includes(String(remote.status)) && !remote.reason) throw new Error('RDX_DISPLAY_RECEIPT_INVALID');
     const finalError = data.final_output_error as { code?: unknown; message?: unknown } | null;
     const result: Partial<CaptureReplayState> = {
       appliedEventId: eventId, imageEventId: null, image: null,
@@ -75,7 +82,9 @@ export async function observeReplay(
       target,
       targets,
       isFinalOutput: data.is_final_output === true,
-      devicePresentation: remote as CaptureReplayState['devicePresentation'],
+      devicePresentation: { status: remote.status as CaptureReplayState['devicePresentation']['status'],
+        eventId, textureId: remote.texture_id as string | null, sequence: remote.sequence as number | null,
+        reason: remote.reason as string | null },
       warning: finalError && typeof finalError.code === 'string' && typeof finalError.message === 'string' ? { code: finalError.code, message: finalError.message } : null,
       error: null,
     };

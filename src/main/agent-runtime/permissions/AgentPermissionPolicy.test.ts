@@ -599,7 +599,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
       return { type: 'toolCall', id: 'tc-kn', name, arguments: { path: target, pattern: 'x' } };
     }
     if (name === 'shell') {
-      return { type: 'toolCall', id: 'tc-kn', name, arguments: { command: `type ${target}` } };
+      return { type: 'toolCall', id: 'tc-kn', name, arguments: { command: `node ${target}` } };
     }
     if (name === 'code_interpreter') {
       return { type: 'toolCall', id: 'tc-kn', name, arguments: { cwd: target } };
@@ -703,5 +703,20 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
     expect(decision.action).toBe('allow');
     expect(decision.temporaryPathRoots).toEqual(['*']);
     expect(decision.temporaryPathRoots).not.toContain(knowledgeRoot);
+  });
+});
+
+
+describe('file routing across permission modes', () => {
+  it.each(['default', 'auto-review', 'full-access', 'custom'] as const)('%s cannot allow file or RDX bypass', mode => {
+    for (const command of ['rg pattern', 'Get-Content file', 'type file', 'rdx version']) {
+      const decision = new AgentPermissionPolicyService().evaluate({
+        tool: shellTool, toolCall: { type: 'toolCall', id: 'route', name: 'shell', arguments: { command } },
+        agentId: 'general', effectiveToolNames: ['read_file', 'grep'],
+        permissionSettings: { mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [command], deniedCommandPrefixes: [] },
+      });
+      expect(decision.action).toBe('deny');
+      expect(decision.reason).toContain(command.startsWith('rdx') ? 'RDX_VIA_COMMAND_DENIED' : 'SHELL_FILE_TOOL_BYPASS');
+    }
   });
 });

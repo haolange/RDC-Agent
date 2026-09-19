@@ -69,6 +69,21 @@ export interface ToolExecutorFactoryDeps {
 }
 
 export class ToolExecutorFactory {
+  private readonly successfulFileReads = new Map<string, Set<string>>();
+
+  releaseSession(sessionId: string): void {
+    this.successfulFileReads.delete(sessionId);
+    for (const key of this.successfulFileReads.keys()) {
+      if (key.startsWith(`${sessionId}::subagent::`)) this.successfulFileReads.delete(key);
+    }
+  }
+
+  private sessionFileReads(sessionId: string | null | undefined): Set<string> {
+    if (!sessionId) return new Set();
+    let reads = this.successfulFileReads.get(sessionId);
+    if (!reads) { reads = new Set(); this.successfulFileReads.set(sessionId, reads); }
+    return reads;
+  }
   constructor(private readonly deps: ToolExecutorFactoryDeps) {}
 
   activateDeferredTools(toolNames: string[], sessionId?: string | null): void {
@@ -231,17 +246,18 @@ export class ToolExecutorFactory {
         if (normalizedName === 'plan_artifact') {
           return this.executePlanArtifactTool(validatedToolCall, agentId, runtimeContext, signal);
         }
-        const sessionId = runtimeContext?.sessionId ?? null;
+        const executorSessionId = runtimeContext?.sessionId ?? sessionId ?? null;
         let sessionAttachmentsRoot: string | null = null;
-        if (sessionId) {
+        if (executorSessionId) {
           try {
-            sessionAttachmentsRoot = storageAdapter.getSessionAttachmentsDir(sessionId);
+            sessionAttachmentsRoot = storageAdapter.getSessionAttachmentsDir(executorSessionId);
           } catch {
             sessionAttachmentsRoot = null;
           }
         }
         const knowledgeReadRoots = plan?.knowledgeReadRoots ?? [];
         const permissionDecision = agentPermissionPolicyService.evaluate({
+          effectiveToolNames: [...tools.keys()].filter(name => !activeSkillAllowlist || activeSkillAllowlist.has(name)),
           tool,
           toolCall: validatedToolCall,
           agentId,
@@ -305,6 +321,7 @@ export class ToolExecutorFactory {
             return denyTool('A blocking lifecycle hook denied this tool call.');
           }
           const toolContext: ToolExecutionContext = {
+            successfulFileReads: this.sessionFileReads(runtimeContext?.sessionId ?? sessionId),
             rdxBinding: plan ? getRdxTurnBinding(plan) : undefined,
             agentId,
             turnId: runtimeContext?.turnId,

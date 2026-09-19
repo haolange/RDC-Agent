@@ -4,7 +4,7 @@ import { validateExecutionEvidence, verifyRollbackIdentity } from './RdxValidate
 import { runRdxOperation } from '../sessions/RdxOperationCoordinator';
 import { z } from 'zod';
 import type { AgentToolResult, ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
-import { assertRdxContextLeaseOwnership, quarantineRdxContext } from '../sessions/RdxRuntimeContextRegistry';
+import { assertRdxContextLeaseOwnership, getRdxContextLease, quarantineRdxContext } from '../sessions/RdxRuntimeContextRegistry';
 import { rdxCliInvokerService } from './RdxCliInvokerService';
 import { parseRdxNativeResult } from './RdxNativeProtocol';
 import { rdxDigest, rdxExecutionReceipts } from './RdxExecutionReceipts';
@@ -29,6 +29,10 @@ export async function executeRdxShell(
     throw new Error('RDX_EXECUTION_DENIED: only the owning General turn may execute native operations.');
   }
   const lease = assertRdxContextLeaseOwnership({ sessionId: context.sessionId, projectId: context.projectId });
+  const retainedLease = !lease ? getRdxContextLease(context.sessionId) : null;
+  if (retainedLease?.ownerProjectId === context.projectId && retainedLease.quarantineReason) {
+    throw new Error('RDX_CONTEXT_QUARANTINED: replay outcome is uncertain; close and reopen the capture before execution.');
+  }
   const cli = context.rdxBinding?.cli;
   const identity = context.rdxBinding?.identity;
   if (!lease || !identity || identity.version !== lease.version || identity.contextId !== lease.contextId || identity.ownerSessionId !== context.sessionId) {
@@ -75,7 +79,7 @@ export async function executeRdxShell(
     const readReplayEvent = async (): Promise<number> => {
       const response = await rdxCliInvokerService.executeCLI('call', [
         'rd.session.get_context', '--args-json', '{}', '--daemon-context', lease.contextId,
-      ], { abortSignal: signal, contextId: lease.contextId, settings: { ...cli, argsPrefix: [...cli.argsPrefix, '--json'] } });
+      ], { abortSignal: signal, contextId: lease.contextId, settings: cli });
       const snapshot = parseRdxNativeResult(response, undefined, 'rd.session.get_context');
       const runtime = snapshot.data.runtime as Record<string, unknown> | undefined;
       if (snapshot.data.context_id !== lease.contextId || snapshot.data.current_session_id !== replaySessionId
@@ -87,7 +91,7 @@ export async function executeRdxShell(
     const originalEvent = definition.effects.includes('replay_position_temporary') ? await readReplayEvent() : undefined;
     const result = await rdxCliInvokerService.executeCLI('call', [
       input.operation, '--args-json', JSON.stringify(args), '--daemon-context', lease.contextId,
-    ], { abortSignal: signal, contextId: lease.contextId, settings: { ...cli, argsPrefix: [...cli.argsPrefix, '--json'] } });
+    ], { abortSignal: signal, contextId: lease.contextId, settings: cli });
     signal?.throwIfAborted();
     const payload = parseRdxNativeResult(result, undefined, input.operation);
     if (payload.result_kind !== input.operation
