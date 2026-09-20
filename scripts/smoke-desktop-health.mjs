@@ -12,7 +12,8 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -116,50 +117,57 @@ async function main() {
   }
   ok(`Starting ${executable} for ${HOLD_MS}ms`);
 
-  const child = spawn(executable, [], {
-    cwd: unpacked,
-    env: {
-      ...process.env,
-      ELECTRON_DISABLE_SECURITY_WARNINGS: '1',
-      RDC_AGENT_SMOKE_DESKTOP: '1',
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-
-  let spawned = false;
-  child.once('spawn', () => {
-    spawned = true;
-    ok(`pid=${child.pid}`);
-  });
-  child.stdout?.on('data', (chunk) => process.stdout.write(chunk));
-  child.stderr?.on('data', (chunk) => process.stderr.write(chunk));
-
-  const earlyExit = new Promise((resolve) => {
-    child.once('error', (error) => resolve({ type: 'error', error }));
-    child.once('exit', (code, signal) => resolve({ type: 'exit', code, signal }));
-  });
-
-  const held = await Promise.race([
-    earlyExit,
-    new Promise((resolve) => setTimeout(() => resolve({ type: 'hold' }), HOLD_MS)),
-  ]);
-
-  if (held.type === 'error') {
-    fail(`Electron failed to start: ${held.error instanceof Error ? held.error.message : String(held.error)}`);
-    return;
+  const root = mkdtempSync(path.join(tmpdir(), 'rdc-agent-desktop-smoke-'));
+  let child;
+  let output = '';
+  try {
+    child = spawn(executable, [], {
+      cwd: unpacked,
+      env: {
+        ...process.env,
+        RDC_AGENT_HOME: path.join(root, '.rdc-agent'),
+        RDC_AGENT_USER_DATA: path.join(root, 'app-data'),
+        RDC_AGENT_HEADLESS: '0',
+        RDC_AGENT_BROWSER_QA: '0',
+        RDC_AGENT_TEST_MODE: '0',
+        NODE_ENV: 'production',
+      },
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const collect = (chunk) => {
+      output += chunk.toString();
+      if (output.length > 256_000) output = output.slice(-256_000);
+      process.stdout.write(chunk);
+    };
+    child.stdout?.on('data', collect);
+    child.stderr?.on('data', collect);
+    let timer;
+    const outcome = await Promise.race([
+      new Promise(resolve => {
+        child.once('error', error => resolve({ type: 'error', error }));
+        child.once('exit', (code, signal) => resolve({ type: 'exit', code, signal }));
+      }),
+      new Promise(resolve => { timer = setTimeout(() => resolve({ type: 'hold' }), HOLD_MS); }),
+    ]);
+    clearTimeout(timer);
+    if (outcome.type !== 'hold') {
+      fail(outcome.type === 'error'
+        ? `Electron failed to start: ${String(outcome.error)}`
+        : `Electron exited before readiness (code=${outcome.code}, signal=${outcome.signal})`);
+      return;
+    }
+    // A missing packaged dependency may leave a live process showing an error
+    // dialog. Process survival alone cannot establish successful startup.
+    if (!output.includes('[Main] ReplayDeviceService initialized')) {
+      fail('Packaged main process did not finish service initialization.');
+      return;
+    }
+    ok('PASS (packaged services initialized; visual rendering is a separate check)');
+  } finally {
+    await stopChild(child);
+    rmSync(root, { recursive: true, force: true });
   }
-  if (held.type === 'exit' && !spawned) {
-    fail(`Electron exited before spawn settled (code=${held.code}, signal=${held.signal})`);
-    return;
-  }
-  if (held.type === 'exit' && held.code !== 0 && held.code != null) {
-    // Instant crash is a hard fail; a clean early exit is unusual but treat non-zero as fail.
-    fail(`Electron exited early with code=${held.code} signal=${held.signal}`);
-    return;
-  }
-
-  await stopChild(child);
-  ok('PASS (started and terminated)');
 }
 
 await main();

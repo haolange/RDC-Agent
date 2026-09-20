@@ -45,7 +45,7 @@
 - 协议层：RdcNativeProtocol 负责校验并解析 rdc-tool CLI 的 JSON 信封格式。
 - 进程管理层：ShellInvocationService 封装子进程生命周期、超时、中止、孤儿进程处理等。
 - 安全验证层：assertRdcCliBinding 提供严格的结构验证，确保绑定安全性。
-- 平台适配：resolveRdcBatchInvocation 在 Windows 上通过 PowerShell 启动 rdc.bat。
+- 平台适配：resolveRdcBatchInvocation 在 Windows 上拒绝 legacy rdx.bat，不通过 PowerShell 启动。
 - 类型与配置：shared/types/tool.ts 与 shared/types/settings.ts 定义工具、结果、摘要与调用器配置。
 - 审计与绑定：RdcExecutionReceipts 用于生成签名化的执行回执；RdcTurnBindings 用于将 CLI 配置与动作绑定到单次运行上下文。
 
@@ -83,7 +83,7 @@ F --> M["阻止环境变量重定向"]
 ## 核心组件
 - RdcCliInvokerService：对外暴露 call、executeCLI、loadCatalog、getRuntimeSummary、isAvailable、abortRun、terminateAll 等方法；内部完成参数构建、上下文注入、超时控制、结果解析与追踪事件发射。**新增**：自动检测并注入 `--owner-pid` 标志以增强所有者上下文，并通过 assertRdcCliBinding 进行安全绑定验证。
 - ShellInvocationService：统一子进程启动、等待、超时、中止、孤儿进程检测与清理；返回标准化的 CLIResult。
-- resolveRdcBatchInvocation：在 Windows 平台上将 rdc.bat 调用转换为 powershell.exe -File rdc_bat_launcher.ps1 的形式，并透传非交互标志。
+- resolveRdcBatchInvocation：在 Windows 平台上拒绝 legacy rdx.bat 与 legacy rdx_bat_launcher.ps1，不再改写启动命令。
 - RdcNativeProtocol：严格校验 rdc-tool CLI 的 JSON 输出信封（ok、result_kind、data、context_id），并在不匹配时抛出协议错误。
 - RdcExecutionReceipts：为成功执行的 RDC 操作生成带签名的执行回执，支持读写与完整性校验。
 - RdcTurnBindings：将 CLI 配置、动作配置与租约身份冻结并绑定到当前运行计划，避免敏感信息序列化泄露。
@@ -185,7 +185,7 @@ Emit --> End(["返回 ToolCallResult"])
 ### 安全绑定验证机制
 **新增功能**：RdcCliInvokerService 现在实现了严格的安全绑定验证机制，通过 assertRdcCliBinding 函数确保只允许使用捆绑的Python解释器和CLI入口点。
 
-- 禁止bat/PowerShell包装器：拒绝任何 .bat 文件或 rdc_bat_launcher.ps1 作为命令或参数前缀
+- 禁止bat/PowerShell包装器：拒绝任何 .bat 文件或 legacy rdx_bat_launcher.ps1 作为命令或参数前缀
 - 验证捆绑Python路径：要求命令必须是绝对路径且指向 binaries/windows/x64/python/python.exe
 - 验证CLI入口点：要求 argsPrefix[0] 必须是同一安装目录下的 cli/run_cli.py
 - 阻止环境变量重定向：禁止设置 PYTHONHOME、PYTHONPATH 或 RDC_TOOL_ROOT 环境变量来重定向Python或工具安装
@@ -193,7 +193,7 @@ Emit --> End(["返回 ToolCallResult"])
 
 ```mermaid
 flowchart TD
-CheckCommand{"检查命令"} --> BatReject{"是否包含.bat或rdc_bat_launcher.ps1?"}
+CheckCommand{"检查命令"} --> BatReject{"是否包含.bat或legacy rdx_bat_launcher.ps1?"}
 BatReject --> |是| RejectBat["抛出 RDC_TOOL_BAT_REJECTED"]
 BatReject --> |否| CheckPython{"验证Python路径"}
 CheckPython --> PythonValid{"是否是捆绑python.exe?"}
@@ -278,8 +278,8 @@ ShellInvocationService --> CLIResult : "返回"
 
 ### resolveRdcBatchInvocation：Windows 批处理桥接
 - 功能要点
-  - 仅在 Windows 且命令为 rdc.bat 时生效。
-  - 若存在 scripts/rdc_bat_launcher.ps1，则通过 powershell.exe -File 启动，并透传 -NonInteractive（当传入 --non-interactive）。
+  - 仅用于记录旧入口 legacy rdx.bat 的拒绝规则；当前入口为同安装的 bundled python.exe + 唯一 cli/run_cli.py argsPrefix；不直接绑定 rdc-tool、cmd 或 bat。
+  - 旧 PowerShell launcher 仅作为拒绝对象，不再启动，并透传 -NonInteractive（当传入 --non-interactive）。
   - 其他情况直接透传原始命令与参数。
 
 **章节来源**
@@ -368,7 +368,7 @@ Val --> Security["安全绑定验证"]
 - 调试建议
   - 开启 trace 监听：onInvocationTrace 收集每次调用的入参与结果。
   - 检查 Settings：确认 enabled、command、workingDirectory、env、timeoutMs、catalogPath 等字段。
-  - 验证 Windows 批处理：确认 rdc_bat_launcher.ps1 存在并可执行。
+  - 验证 Windows 批处理：确认旧 launcher 被拒绝，当前入口使用同安装的 bundled python.exe + 唯一 cli/run_cli.py argsPrefix；不直接绑定 rdc-tool、cmd 或 bat。
   - 查看子进程日志：CLIResult.stderr/stdout 保留完整输出。
   - **新增**：验证所有者上下文：检查调用参数中是否包含正确的 `--owner-pid` 标志，特别是在使用上下文 ID 时。
   - **新增**：验证安全绑定：确保 command 指向捆绑的 python.exe，argsPrefix[0] 指向同一安装的 cli/run_cli.py，且没有设置危险的环境变量。
@@ -483,7 +483,7 @@ RdcCliInvokerService 提供了稳定、可观测、可配置的 rdc-tool CLI 调
 - 始终通过 call() 发起工具调用，避免绕过参数构建与上下文注入。
 - 合理设置 timeoutMs，并结合 AbortSignal 实现任务级取消。
 - 使用 onInvocationTrace 订阅调用轨迹，便于审计与问题定位。
-- 在 Windows 环境下确保 rdc_bat_launcher.ps1 存在且可执行。
+- Windows 下旧 launcher 仅作为拒绝对象；当前入口使用 Settings 仅配置同安装的 bundled python.exe，且 argsPrefix[0] 必须是同一安装的 cli/run_cli.py；不直接绑定 rdc-tool、cmd 或 bat。
 - 使用 RdcExecutionReceipts 保存关键操作的执行回执，保障可追溯性。
 - 使用 RdcTurnBindings 将 CLI 配置与动作绑定到运行上下文，避免敏感信息外泄。
 - **新增**：利用自动注入的 `--owner-pid` 功能，无需手动管理进程所有权标识，系统会在检测到上下文 ID 时自动处理。

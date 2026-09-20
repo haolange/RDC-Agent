@@ -193,7 +193,7 @@ end
 - [src/main/commands/builtins/skills.ts:1-62](file://src/main/commands/builtins/skills.ts#L1-L62)
 
 ### 示例 Skill：分析器架构方法
-- 目标：在现有 rdc.investigation.v1 工件上写入 Analyzer Architecture Model，不跨越 Observed/Reconstructed/Authoring 层。
+- 目标：在现有 rdc_tool.investigation.v1 工件上写入 Analyzer Architecture Model，不跨越 Observed/Reconstructed/Authoring 层。
 - 约束：严格限定 claimKind 与层级；要求增量版本化与 provenance 标记；禁止写入 Knowledge 或 memory_write。
 - 参考：SKILL.md 中的分层表与步骤说明。
 

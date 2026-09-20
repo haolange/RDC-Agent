@@ -156,7 +156,7 @@ Final --> End(["回合结束"])
 - 执行编排（execution-orchestrator）：通用任务的编排与验证原则，强调最小修改、影响验证与明确边界。
 - 调试（debug）：只读诊断，读取实现、日志与失败证据，区分原因与假设，提出最小修复与验证方案；不承诺执行复现或修改。
 - 优化协调器（optimizer-coordinator）：规划与评估优化调查，使用受控 rdc_context/rdc_probe 获取事实，执行交给 General；遵循共享 Plan 模板与交接合同，输出 Checkpoint 与结构化报告。
-- 分析架构方法（analyzer-architecture-method）：在 Analyzer 执行期间写入 rdc.investigation.v1 工件，遵守 Observed/Reconstructed/Authoring 三层约束，增量版本化并标记 ready。
+- 分析架构方法（analyzer-architecture-method）：在 Analyzer 执行期间写入 rdc_tool.investigation.v1 工件，遵守 Observed/Reconstructed/Authoring 三层约束，增量版本化并标记 ready。
 
 章节来源
 - [SKILL.md（执行编排）:1-10](file://resources/agent-runtime/skills/execution-orchestrator/SKILL.md#L1-L10)
