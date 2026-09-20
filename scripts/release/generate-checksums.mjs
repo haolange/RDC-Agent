@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const releaseDir = path.join(repoRoot, 'release');
 const outputName = 'SHA256SUMS.txt';
+const hasDistribution = existsSync(releaseDir)
+  && readdirSync(releaseDir).some(name => /\.(exe|zip|dmg|AppImage|deb|rpm|msi|pkg)$/i.test(name));
 
 function hashFile(absolute, relative) {
   const digest = createHash('sha256').update(readFileSync(absolute)).digest('hex');
@@ -23,7 +25,7 @@ function listArtifactFiles(dir, prefix = '') {
   if (!existsSync(dir)) return [];
   const entries = [];
   for (const name of readdirSync(dir).sort()) {
-    if (name === outputName || name.endsWith('.sha256') || name === 'sbom.cdx.json') continue;
+    if (name === outputName || name.endsWith('.sha256') || name === 'sbom.cdx.json' || name === 'builder-debug.yml') continue;
     const absolute = path.join(dir, name);
     const relative = prefix ? `${prefix}/${name}` : name;
     const stats = statSync(absolute);
@@ -35,6 +37,7 @@ function listArtifactFiles(dir, prefix = '') {
         || name === 'win-unpacked'
         || name === 'linux-unpacked'
       ) {
+        if (hasDistribution) continue; // Public checksum list must not reference local-only unpacked files.
         // --dir packs: hash the primary executable inside unpacked trees.
         const candidates = [
           path.join(absolute, 'RdcAgent.exe'),

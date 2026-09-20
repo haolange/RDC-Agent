@@ -96,6 +96,14 @@ Conclusion
 
 ## 5 分钟开始
 
+发行包用户：安装 `*-setup.exe`，或完整解压 Windows zip 后运行 `RdcAgent.exe`（保留同目录资源）。不需要 Node.js/pnpm。首次上手指南也可从标题栏问号重开；自行配置 Provider/Model 和项目即可使用 General。
+
+当前 **0.6.0-rc.1 是未签名预发布版**：Windows 可能提示未知发布者，受管理电脑可能阻止运行。仅从本仓库 [Releases](https://github.com/haolange/RDC-Agent/releases) 下载并核对 SHA-256；不要关闭安全防护。稳定正式版仍保留签名要求。
+
+RDC 调查另从 [RDC-Tool Releases](https://github.com/haolange/RDC-Tool/releases) 下载自包含 zip，解压后在 Settings → Tools 检测安装或选择 `rdc-tool` 根目录，再验证并应用；不需要另装 Python。默认安装目录为 `%LOCALAPPDATA%/Programs/rdc-tool`。通用 Code Interpreter 是单独的可选配置。
+
+以下命令只供源码开发：
+
 环境要求：Windows、Node.js `>=22.13.0`、pnpm `11.7.0`，以及已安装并可由 Settings 配置的 RDC-Tool CLI。
 
 ```powershell
@@ -152,4 +160,4 @@ RDC-Agent **0.6.x** pairs with RDC-Tool **1.0.0** and the current RenderDoc **1.
 
 ## Reporting safely
 
-Do not upload private captures, provider keys or full logs containing local absolute paths. Redact logs and use the installation or bug-report template. RDC-Agent remains private during this maintenance release.
+Do not upload private captures, provider keys or full logs containing local absolute paths. Redact logs and use the installation or bug-report template.

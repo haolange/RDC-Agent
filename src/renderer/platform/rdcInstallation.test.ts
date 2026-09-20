@@ -1,12 +1,16 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { validateRdcInstallation } from './rdcInstallation';
-const cli = { enabled: true, command: 'C:/Tools/binaries/windows/x64/python/python.exe', argsPrefix: ['C:/Tools/cli/run_cli.py'], workingDirectory: '', env: {}, timeoutMs: 30000 };
+import { validateRdcInstallation, selectRdcInstallation } from './rdcInstallation';
+const cli = { root: 'C:/Tools space/工具', env: {}, timeoutMs: 30000 };
 const summary = { cli: { available: true }, runtime: { version: 'installed-build' } };
 const getSummary = vi.fn(async () => summary);
-beforeEach(() => { getSummary.mockClear(); vi.stubGlobal('window', { electronAPI: { settings: { get: async () => ({ tooling: { rdcCli: cli } }) }, tool: { getRuntimeSummary: getSummary } } }); });
-it('validates the saved installation through the main process', async () => {
-  expect(await validateRdcInstallation(cli)).toBe(summary); expect(getSummary).toHaveBeenCalledTimes(1);
+beforeEach(() => { getSummary.mockReset(); getSummary.mockResolvedValue(summary); vi.stubGlobal('window', { electronAPI: { selectDirectory: async () => null, tool: { verifyInstallation: getSummary } } }); });
+it('validates the unsaved candidate through main without persisting settings', async () => {
+  expect(await validateRdcInstallation(cli)).toBe(summary); expect(getSummary).toHaveBeenCalledWith(cli);
 });
-it('does not label an unsaved executable as verified', async () => {
-  expect(await validateRdcInstallation({ ...cli, command: 'C:/Other/binaries/windows/x64/python/python.exe', argsPrefix: ['C:/Other/cli/run_cli.py'] })).toBeNull(); expect(getSummary).not.toHaveBeenCalled();
+it('propagates validation failure without returning success', async () => {
+  getSummary.mockRejectedValueOnce(new Error('bad catalog'));
+  await expect(validateRdcInstallation(cli)).rejects.toThrow('bad catalog');
+});
+it('keeps cancellation empty without verification', async () => {
+  expect(await selectRdcInstallation()).toBeNull(); expect(getSummary).not.toHaveBeenCalled();
 });

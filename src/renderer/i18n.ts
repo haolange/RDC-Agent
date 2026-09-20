@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+import { enOnboarding } from './i18n/locales/en/onboarding';
+import { zhOnboarding } from './i18n/locales/zh-CN/onboarding';
 import type { AppLanguage } from '@shared/types/settings';
 import { useAppSettingsStore } from './stores/appSettingsStore';
 import { enApp } from './i18n/locales/en/app';
@@ -43,6 +45,7 @@ import { zhTheme } from './i18n/locales/zh-CN/theme';
 import { zhUserMenu } from './i18n/locales/zh-CN/userMenu';
 
 const englishTranslations = {
+  ...enOnboarding,
   ...enApp,
   ...enChat,
   ...enComposer,
@@ -68,6 +71,7 @@ const englishTranslations = {
 export type TranslationKey = keyof typeof englishTranslations;
 
 const zhCnOverrides: Partial<Record<TranslationKey, string>> = {
+  ...zhOnboarding,
   ...zhApp,
   ...zhChat,
   ...zhComposer,

@@ -85,7 +85,15 @@ These are not three isolated chat personas. They share the same agent loop, proj
 
 The release surface is **Windows-only**. RDC-Agent does not bundle your captures, provider keys, or RenderDoc installation. Configure the RDC-Tool CLI, provider / model, and device environment yourself.
 
-## Start developing
+## Download and first use
+
+Windows releases provide an NSIS installer (`*-setup.exe`) and a portable zip. Extract the whole zip before running `RdcAgent.exe`; Node.js and pnpm are only needed for source development. The **0.6.0-rc.1 prerelease is unsigned**: Windows may warn about an unknown publisher or block execution under managed security policies. Download only from this repository's [Releases](https://github.com/haolange/RDC-Agent/releases) and verify SHA-256; do not disable security protections. Stable releases still require signing.
+
+The four-step guide appears on first launch and can be reopened from the titlebar question mark. Configure your own provider/API key and model in Settings, then create a Project and import a capture. Official Agents, Skills and Hooks are bundled under `resources/agent-runtime` and are not copied into user space.
+
+Download the independent [RDC-Tool release](https://github.com/haolange/RDC-Tool/releases), extract it, then use Settings → Tools → Detect installation / Select folder → Verify and apply. Select the `rdc-tool` root containing its bundled Python and CLI, not the Python executable. Detection checks the configured location and `%LOCALAPPDATA%/Programs/rdc-tool`; installing into PATH is optional. General use can start without RDC. Code Interpreter remains a separate environment.
+
+## Source development
 
 Requirements: Windows, Node.js `>=22.13.0`, pnpm `11.7.0`, and an RDC-Tool CLI that can be configured from Settings.
 
@@ -125,4 +133,4 @@ RDC-Agent **0.6.x** pairs with RDC-Tool **1.0.0** and the current RenderDoc **1.
 
 ## Reporting safely
 
-Do not upload private captures, provider keys or full logs containing local absolute paths. Redact logs and use the installation or bug-report template. RDC-Agent remains private during this maintenance release.
+Do not upload private captures, provider keys or full logs containing local absolute paths. Redact logs and use the installation or bug-report template.

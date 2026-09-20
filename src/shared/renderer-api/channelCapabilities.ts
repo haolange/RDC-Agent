@@ -10,6 +10,8 @@ export type BridgeChannelCapability = 'read' | 'mutation' | 'high-impact' | 'des
 
 export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapability> = {
   'app:getMeta': 'read',
+  'app:hasSeenGettingStarted': 'read',
+  'app:acknowledgeGettingStarted': 'mutation',
   'app:selectAvatar': 'desktop-only',
   'app:getAvatarDataUrl': 'desktop-only',
   'app:openPath': 'mutation',
@@ -89,6 +91,9 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'command:execute': 'high-impact',
   'tool:getCatalog': 'read',
   'tool:getRuntimeSummary': 'read',
+  'tool:detectInstallations': 'read',
+  'tool:resolveInstallation': 'read',
+  'tool:verifyInstallation': 'high-impact',
   'mcp:getStatusSummary': 'read',
   'evidence:getChain': 'read',
   'evidence:getEvents': 'read',

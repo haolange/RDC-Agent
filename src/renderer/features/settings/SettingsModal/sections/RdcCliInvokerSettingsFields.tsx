@@ -1,135 +1,61 @@
-import React, { useState, useRef, type Dispatch, type SetStateAction } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
-import type { ToolRuntimeSummary } from '@shared/types/tool';
-import { validateRdcInstallation } from '../../../../platform/rdcInstallation';
 import { Button } from '../../../../ui/Button';
 import { Input } from '../../../../ui/Input';
 import { Switch } from '../../../../ui/Switch';
 import { AutosizeTextarea } from '../AutosizeTextarea';
 import { SettingsField } from '../parts';
 import { envToText, textToEnv } from './toolEnvText';
+import { useRdcInstallation } from './useRdcInstallation';
 
-type Translate = ReturnType<typeof useI18n>['t'];
-
-interface RdcCliInvokerSettingsFieldsProps {
+interface Props {
   rdcCliDraft: RdcCliInvokerSettings;
   onRdcCliDraftChange: Dispatch<SetStateAction<RdcCliInvokerSettings>>;
-  t: Translate;
+  t: ReturnType<typeof useI18n>['t'];
 }
 
-/**
- * Local RDC-Tool toolchain (machine-local). Every field is visible when the
- * disclosure is open; the enable switch sits in the section head.
- */
-export const RdcCliInvokerSettingsFields: React.FC<RdcCliInvokerSettingsFieldsProps> = ({
-  rdcCliDraft,
-  onRdcCliDraftChange,
-  t,
-}) => {
-  const validationRevision = useRef(0);
-  const [checking, setChecking] = useState(false);
-  const [summary, setSummary] = useState<ToolRuntimeSummary | null>(null);
-  const [message, setMessage] = useState('');
-  const [envText, setEnvText] = useState(() => envToText(rdcCliDraft.env));
-  const [argsText, setArgsText] = useState(() => rdcCliDraft.argsPrefix.join(' '));
-  const validate = async () => {
-    const revision = ++validationRevision.current;
-    setChecking(true); setSummary(null); setMessage('');
-    try {
-      const result = await validateRdcInstallation(rdcCliDraft);
-      if (revision !== validationRevision.current) return;
-      if (result) setSummary(result); else setMessage(t('settings.rdcSaveBeforeVerify'));
-    } catch (error) { if (revision === validationRevision.current) setMessage(error instanceof Error ? error.message : String(error)); }
-    finally { setChecking(false); }
-  };
-  const patch = (next: Partial<RdcCliInvokerSettings>) => {
-    validationRevision.current += 1;
-    setSummary(null); setMessage('');
-    onRdcCliDraftChange((current) => ({ ...current, ...next }));
-  };
-
-  return (
-    <section className="settings-local-tool-form settings-renderdoc-toolchain" data-testid="settings-rdc-toolchain">
-      <header className="settings-local-tool-form-head">
-        <div>
-          <p className="settings-help-text">{t('settings.localRenderDocToolchainHint')}</p>
-        </div>
-        <label className="settings-switch-row">
-          <span>{rdcCliDraft.enabled ? t('settings.enabled') : t('settings.disabled')}</span>
-          <Switch
-            checked={rdcCliDraft.enabled}
-            onCheckedChange={(enabled) => patch({ enabled })}
-            aria-label={t('settings.rdcCliEnabled')}
-            data-testid="settings-rdc-enabled"
-          />
-        </label>
-      </header>
-
-      <div className="settings-local-tool-form-head">
-        <Button size="sm" disabled={checking || !rdcCliDraft.enabled || !rdcCliDraft.command.trim()} onClick={() => void validate()}>
-          {checking ? t('settings.rdcVerifying') : t('settings.rdcVerify')}
-        </Button>
-        <p className="settings-help-text" role="status" aria-live="polite">
-          {message || (summary ? (summary.cli.available
-            ? `${t('settings.rdcVerified')}: ${summary.runtime.version} · ${summary.runtime.catalog.toolCount} ${t('settings.rdcOperations')} · ${t('settings.rdcCliIntermediateRoot')}: ${summary.runtime.intermediateRoot}`
-            : summary.cli.unavailableReason) : t('settings.rdcVerifyHint'))}
-        </p>
-      </div>
-      <div className="settings-local-tool-grid">
-        <SettingsField label={t('settings.rdcCliCommand')} layout="row">
-          <Input
-            value={rdcCliDraft.command}
-            placeholder="C:\\Tools\\rdc\\binaries\\windows\\x64\\python\\python.exe"
-            spellCheck={false}
-            onChange={(event) => patch({ command: event.currentTarget.value })}
-          />
-        </SettingsField>
-        <SettingsField label={t('settings.rdcCliArgsPrefix')} layout="row" description={t('settings.rdcCliArgsPrefixHint')}>
-          <Input
-            value={argsText}
-            placeholder="cli/run_cli.py"
-            spellCheck={false}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              setArgsText(value);
-              patch({ argsPrefix: [value.trim().replace(/^"|"$/g, "")].filter(Boolean) });
-            }}
-          />
-        </SettingsField>
-        <SettingsField label={t('settings.rdcCliWorkingDirectory')} layout="row">
-          <Input
-            value={rdcCliDraft.workingDirectory}
-            placeholder="C:\\Tools\\rdc"
-            spellCheck={false}
-            onChange={(event) => patch({ workingDirectory: event.currentTarget.value })}
-          />
-        </SettingsField>
-        <SettingsField label={t('settings.rdcCliTimeoutMs')} layout="row">
-          <Input
-            type="number"
-            min={1000}
-            max={600000}
-            step={1000}
-            value={rdcCliDraft.timeoutMs}
-            onChange={(event) => patch({ timeoutMs: Number(event.currentTarget.value) })}
-          />
-        </SettingsField>
-        <SettingsField label={t('settings.rdcCliEnv')} layout="row" description={t('settings.rdcCliEnvHint')}>
-          <AutosizeTextarea
-            maxHeight={180}
-            className="input settings-rdc-cli-textarea"
-            value={envText}
-            placeholder="NAME=value"
-            spellCheck={false}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              setEnvText(value);
-              patch({ env: textToEnv(value) });
-            }}
-          />
-        </SettingsField>
-      </div>
-    </section>
-  );
-};
+export function RdcCliInvokerSettingsFields({ rdcCliDraft: draft, onRdcCliDraftChange: change, t }: Props) {
+  const installation = useRdcInstallation(draft, change);
+  const [envText, setEnvText] = useState(() => envToText(draft.env));
+  const patch = (value: Partial<RdcCliInvokerSettings>) => { installation.invalidate(); change({ ...draft, ...value }); };
+  return <section className="settings-local-tool-form settings-renderdoc-toolchain" data-testid="settings-rdc-toolchain">
+    <p className="settings-help-text">{t('settings.rdcFolderHint')}</p>
+    <SettingsField label={t('settings.rdcFolder')} layout="row">
+      <Input readOnly value={installation.root || draft.command} placeholder={t('settings.rdcNotSelected')} />
+    </SettingsField>
+    <div className="settings-actions">
+      <Button size="sm" disabled={installation.busy} onClick={() => void installation.detect()}>{t('settings.rdcDetect')}</Button>
+      <Button size="sm" disabled={installation.busy} onClick={() => void installation.select()}>{t('settings.rdcSelect')}</Button>
+      <Button size="sm" variant="primary" disabled={installation.busy || !installation.root} onClick={() => void installation.apply()}>
+        {t(installation.busy ? 'settings.rdcVerifying' : 'settings.rdcApply')}
+      </Button>
+    </div>
+    {installation.candidates.map((candidate) => <div key={candidate.root}>
+      <Button size="sm" disabled={installation.busy || !!candidate.problem} onClick={() => void installation.choose(candidate.root)}>{candidate.root}</Button>
+      {candidate.problem && <p className="settings-help-text">{candidate.problem}</p>}
+    </div>)}
+    <p className="settings-help-text" role="status" aria-live="polite">
+      {installation.error || (installation.summary
+        ? `${t('settings.rdcApplied')}: ${installation.summary.runtime.version} · ${installation.summary.runtime.catalog.toolCount} ${t('settings.rdcOperations')}`
+        : installation.detected && !installation.candidates.length ? t('settings.rdcNotFound') : t('settings.rdcVerifyHint'))}
+    </p>
+    <details>
+      <summary>{t('settings.rdcAdvanced')}</summary>
+      <label className="settings-switch-row">
+        <span>{t('settings.rdcCliEnabled')}</span>
+        <Switch checked={draft.enabled} disabled={installation.busy} onCheckedChange={(enabled) => patch({ enabled })}
+          aria-label={t('settings.rdcCliEnabled')} data-testid="settings-rdc-enabled" />
+      </label>
+      <SettingsField label={t('settings.rdcCliTimeoutMs')} layout="row">
+        <Input type="number" min={1000} max={600000} step={1000} disabled={installation.busy} value={draft.timeoutMs}
+          onChange={(event) => patch({ timeoutMs: Number(event.currentTarget.value) })} />
+      </SettingsField>
+      <SettingsField label={t('settings.rdcCliEnv')} layout="row" description={t('settings.rdcCliEnvHint')}>
+        <AutosizeTextarea maxHeight={180} className="input settings-rdc-cli-textarea" disabled={installation.busy}
+          value={envText} placeholder="NAME=value" spellCheck={false}
+          onChange={(event) => { setEnvText(event.currentTarget.value); patch({ env: textToEnv(event.currentTarget.value) }); }} />
+      </SettingsField>
+    </details>
+  </section>;
+}

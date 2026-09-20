@@ -22,13 +22,13 @@ flowchart LR
   Trace --> Renderer
 ```
 
-The RDC-Tool CLI command is not hardcoded or bundled. System-installed CLI commands, action arguments, working directory, environment variables, timeout, and catalog path are Settings data.
+RDC-Tool is independently distributed. Settings accepts its root directory; main derives bundled Python, the sole CLI entry argument and working directory. Environment and timeout remain local settings. The configured CLI supplies the complete catalog; there is no catalog-path setting or lifecycle command template.
 
 ## Public Boundaries
 
 - Renderer/preload can read catalog and runtime status through IPC.
 - Renderer/preload do not expose arbitrary tool execution.
-- RDC vertical entries call configured shell actions through `ShellInvocationService`; agents use allowed shell access and read stable runtime context through `rdcContext`.
+- RDC lifecycle entries use the fixed native boundary and owning session lease. General executes structured `shell.rdc` against the prepared catalog; Mission profiles plan and assess with controlled probes.
 - Agentic Trace exposes projection APIs under `trace:*`.
 - Debugger workflow actions remain under `workflow:*`.
 

@@ -24,6 +24,8 @@ export function createAppMetaApi(transport: RendererApiTransport): AppMetaApi {
 
 export function createAppShellApi(transport: RendererApiTransport): AppShellApi {
   return {
+    hasSeenGettingStarted: () => transport.invoke(INVOKE.shell.hasSeenGettingStarted),
+    acknowledgeGettingStarted: () => transport.invoke(INVOKE.shell.acknowledgeGettingStarted),
     selectAvatar: () => transport.invoke(INVOKE.shell.selectAvatar),
     getAvatarDataUrl: (avatarPath) => transport.invoke(INVOKE.shell.getAvatarDataUrl, avatarPath),
     openPath: (targetPath) => transport.invoke(INVOKE.shell.openPath, targetPath),
@@ -144,6 +146,9 @@ export function createToolApi(transport: RendererApiTransport): ToolApi {
   return {
     getCatalog: () => transport.invoke(INVOKE.tools.getCatalog),
     getRuntimeSummary: () => transport.invoke(INVOKE.tools.getRuntimeSummary),
+    detectInstallations: () => transport.invoke(INVOKE.tools.detectInstallations),
+    resolveInstallation: (request) => transport.invoke(INVOKE.tools.resolveInstallation, request),
+    verifyInstallation: (request) => transport.invoke(INVOKE.tools.verifyInstallation, request),
   };
 }
 

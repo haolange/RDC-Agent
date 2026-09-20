@@ -4,6 +4,7 @@ import './Icon.css';
 export type IconSize = 12 | 14 | 16 | 18 | 20 | 24;
 
 export type IconName =
+  | 'help'
   | 'close'
   | 'search'
   | 'check'
@@ -56,6 +57,7 @@ type IconPart =
   | { r: readonly [number, number, number, number, number?] };
 
 const ICONS: Record<IconName, readonly IconPart[]> = {
+  help: [{ c: [12, 12, 9] }, { d: 'M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4M12 16.5h.01' }],
   close: [{ d: 'M6 6l12 12M18 6 6 18' }],
   search: [{ d: 'M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Zm6.5-1 4 4' }],
   check: [{ d: 'M5 12.5 9.5 17 19 7' }],

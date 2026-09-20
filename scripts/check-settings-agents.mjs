@@ -254,11 +254,13 @@ async function main() {
   const renderDocToolchain = readSrcFile(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RdcCliInvokerSettingsFields.tsx'), 'utf8',
   );
-  assert(renderDocToolchain.includes('settings.localRenderDocToolchain'), 'Skills & Tools should expose the local RenderDoc toolchain.');
-  assert(renderDocToolchain.includes('validateRdcInstallation') && renderDocToolchain.includes('summary.runtime.version')
+  const installationFlow = readSrcFile(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/useRdcInstallation.ts'), 'utf8');
+  assert(renderDocToolchain.includes('settings.rdcFolder') && renderDocToolchain.includes('settings.rdcApply'), 'Skills & Tools should expose installation selection and explicit apply.');
+  assert(installationFlow.includes('validateRdcInstallation') && renderDocToolchain.includes('summary.runtime.version')
     && renderDocToolchain.includes('summary.runtime.catalog.toolCount'), 'Installation validation must show actual version and discovered capability count.');
-  assert(renderDocToolchain.includes('summary.cli.unavailableReason') && renderDocToolchain.includes('settings.rdcSaveBeforeVerify'),
-    'Installation validation must preserve explicit failure and unsaved-configuration states.');
+  assert(renderDocToolchain.includes('installation.error') && installationFlow.includes('if (!current()) return;')
+    && installationFlow.indexOf('await validateRdcInstallation') < installationFlow.indexOf('await useAppSettingsStore.getState().patchSettings'),
+    'Installation validation must report failure, discard stale results and validate the draft before persistence.');
   assert(!toolsSettings.includes('RdcActionsFields') && !renderDocToolchain.includes('catalogPath')
     && !renderDocToolchain.includes('jsonMode'), 'Settings must not restore lifecycle command templates or separate catalog/JSON modes.');
 

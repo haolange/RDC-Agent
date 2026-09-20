@@ -1,6 +1,6 @@
 {
   "name": "rdc-agent",
-  "version": "0.6.0",
+  "version": "0.6.0-rc.1",
   "description": "RDC-Agent — Electron desktop app for RenderDoc .rdc capture analysis with agentic Debugger/Ask workflows",
   "author": "RDC-Agent Contributors",
   "repository": {
@@ -64,6 +64,7 @@
     "check:release-config": "node scripts/check-release-config.mjs",
     "release:checksums": "node scripts/release/generate-checksums.mjs",
     "release:sbom": "node scripts/release/generate-sbom.mjs",
+    "check:release-package": "node scripts/release/verify-package.mjs",
     "check:gates": "node scripts/check-repository-hygiene.mjs && node scripts/check-architecture.mjs && node scripts/check-orchestrator-facade.mjs && node scripts/check-fidelity.mjs && node scripts/check-shared-exports.mjs && node scripts/check-work-process-presentation.mjs && node scripts/check-work-process-tool-coverage.mjs && node scripts/check-conversation-branch.mjs && node scripts/check-reasoning-delivery.mjs && node scripts/check-agent-runtime.mjs && node scripts/check-tool-system.mjs && node scripts/check-browser-capability.mjs && node scripts/check-appearance.mjs && node scripts/check-session-projection.mjs && node scripts/check-right-rail.mjs && node scripts/check-knowledge-system.mjs && node scripts/check-investigation-system.mjs && node scripts/check-legacy-residue.mjs && node scripts/check-acceptance-ledger.mjs && node scripts/check-settings-agents.mjs && node scripts/check-provider-system.mjs && node scripts/check-release-config.mjs && node scripts/check-design-tokens.mjs && node scripts/check-renderer-structure.mjs && node scripts/check-identity.mjs",
     "start:human": "node scripts/launch-rdc-agent.mjs --mode desktop",
     "start:human:dev": "node scripts/launch-rdc-agent.mjs --mode desktop-dev",

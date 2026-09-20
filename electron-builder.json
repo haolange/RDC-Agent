@@ -30,13 +30,18 @@
       {
         "target": "nsis",
         "arch": ["x64"]
+      },
+      {
+        "target": "zip",
+        "arch": ["x64"]
       }
     ],
     "icon": "resources/icons/icon.ico",
-    "artifactName": "${productName}-${version}-${arch}-setup.${ext}",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
     "signAndEditExecutable": true
   },
   "nsis": {
+    "artifactName": "${productName}-${version}-${arch}-setup.${ext}",
     "oneClick": false,
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,

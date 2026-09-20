@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { GettingStartedDialog } from '../features/onboarding/GettingStartedDialog';
+import { useGettingStarted } from '../hooks/useGettingStarted';
 import { DebuggerPage } from '../features/transcript/DebuggerPage';
 import { UserMenu } from '../shell/UserMenu';
 import { TitleBar } from '../shell/TitleBar';
@@ -64,6 +66,7 @@ const App: React.FC = () => {
   const showNotice = useCallback((message: string) => {
     setShellNotice(message);
   }, []);
+  const gettingStarted = useGettingStarted(!isLoading, showNotice);
 
   const applyAppearancePreference = useCallback((mutation: () => Promise<void>) => {
     void mutation().catch((error: unknown) => {
@@ -150,6 +153,8 @@ const App: React.FC = () => {
     <AppProviders>
       <AppShell
         titleBar={<TitleBar
+          onGettingStarted={gettingStarted.show}
+          gettingStartedLabel={t('onboarding.title')}
           effectiveLeftCollapsed={layout.effectiveLeftCollapsed}
           effectiveRightCollapsed={layout.effectiveRightCollapsed}
           isRightRailVisible={layout.isRightRailVisible}
@@ -222,6 +227,7 @@ const App: React.FC = () => {
           onFontScaleChange={(fontScale) => applyAppearancePreference(() => setFontScale(fontScale))}
         />
 
+        {gettingStarted.open && <GettingStartedDialog onClose={gettingStarted.close} />}
         <SettingsModal
           open={settingsModalOpen}
           settings={settings}

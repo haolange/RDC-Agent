@@ -1,6 +1,6 @@
 # RDC/RDC Debugger Profile Overview
 
-Debugger is the RDC/RDC-oriented executable profile inside the general RDC-Agent workbench. It is not the only execution path: Edit, Analyzer, and Optimizer are also profiles with their own instructions, tools, approval policy, and handoffs.
+Debugger is a planning profile alongside Analyzer and Optimizer. General owns execution; declared handoffs and a human-approved plan connect the profiles.
 
 ## User Flow
 
@@ -14,15 +14,13 @@ Debugger is the RDC/RDC-oriented executable profile inside the general RDC-Agent
 
 ## Product Boundaries
 
-- Ask is read-only guidance and clarification.
-- Plan researches, asks questions, and creates plan/handoff artifacts without direct implementation.
-- Edit handles ordinary implementation work under approval policy.
-- Debugger, Analyzer, and Optimizer are executable profiles; they are selected or invoked by profile visibility, handoffs, and tool policy rather than hardcoded mode branches.
+- General handles ordinary work and approved execution.
+- Debugger, Analyzer and Optimizer plan and evaluate investigations. Their execution handoff requires an approved plan and explicit user action.
 - Prompt text that mentions a path does not open a capture; only application state can provide an opened capture context.
 
 ## Tooling Boundary
 
-Debugger execution uses configured shell access and stable `RdcRuntimeContext`. RDC-Tool CLI commands, action recipes, and catalog path are Settings data, not built-in application constants.
+Settings selects an independent RDC-Tool installation. Main validates its bundled Python/CLI pair and complete catalog. Each execution turn freezes the binding and owning lease; operation recipes live in Skills, not configurable lifecycle command templates.
 
 Renderer UI displays state, approvals, trace, evidence, and artifacts. It does not execute arbitrary RDC tools.
 
