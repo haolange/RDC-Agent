@@ -37,7 +37,7 @@ export class ShellInvocationService {
       return {
         exitCode: 2,
         stdout: '',
-        stderr: 'RDX CLI command is not configured.',
+        stderr: 'RDC-Tool CLI command is not configured.',
         duration_ms: nowMs() - startTime,
       };
     }

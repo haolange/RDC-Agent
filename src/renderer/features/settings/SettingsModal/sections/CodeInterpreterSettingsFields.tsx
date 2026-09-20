@@ -59,7 +59,7 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
             }}
           />
         </SettingsField>
-        <SettingsField label={t('settings.codeInterpreterArgs')} description={t('settings.rdxCliArgsPrefixHint')}>
+        <SettingsField label={t('settings.codeInterpreterArgs')} description={t('settings.rdcCliArgsPrefixHint')}>
           <Input
             type="text"
             value={argsText}

@@ -8,7 +8,7 @@ import { runExecutionService } from '../workflow/debugger/RunExecutionService';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
-import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
+import { rdcCliInvokerService } from '../tools/RdcCliInvokerService';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
@@ -40,7 +40,7 @@ import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry
 import { resolveEffectiveModel } from '../settings/EffectiveModelResolver';
 import { settingsService } from '../settings/SettingsService';
 import { registerProjectInputLifecycleHandlers } from './projectInputLifecycleHandlers';
-import { rdxSessionService } from '../sessions';
+import { rdcSessionService } from '../sessions';
 
 const STALE_RECOVERABLE_RUN_STATUSES: Array<RunSummary['status']> = [
   'planning',
@@ -135,7 +135,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       await Promise.all(storageAdapter.listSessions(projectId).map(async (session) => {
         const stopped = await conversationService.cancelActiveTurn({ sessionId: session.sessionId });
         if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${session.sessionId}.`);
-        await rdxSessionService.clearOpenedCaptureForSession({ projectId, sessionId: session.sessionId });
+        await rdcSessionService.clearOpenedCaptureForSession({ projectId, sessionId: session.sessionId });
       }));
       storageAdapter.removeProject(projectId);
       if (state.currentProjectId === projectId) {
@@ -275,7 +275,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       const activeRun = runs.find((run) => ['queued', 'running', 'stopping'].includes(run.status));
       if (activeRun) {
         runExecutionService.stopRun(activeRun.runId);
-        rdxCliInvokerService.abortRun(activeRun.runId);
+        rdcCliInvokerService.abortRun(activeRun.runId);
         await context.setRunLifecycleState(id, activeRun.runId, {
           status: 'cancelled',
           stopReason: 'Session removed',

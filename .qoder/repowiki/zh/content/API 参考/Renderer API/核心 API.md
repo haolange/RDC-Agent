@@ -66,7 +66,7 @@ PT --> H
 - [channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
 
 ## 核心组件
-- createRendererApi：组装并返回 ElectronAPI 实例，聚合平台信息与各子域 API（appMeta、appShell、web、conversation、workflow、agent、memory、investigation、knowledge、rdxRuntime、tool、mcp、evidence、llm、settings、project、device、session、run、runtimeLog、capture、context、events、windowControls），并提供 on/off 事件订阅。
+- createRendererApi：组装并返回 ElectronAPI 实例，聚合平台信息与各子域 API（appMeta、appShell、web、conversation、workflow、agent、memory、investigation、knowledge、rdcRuntime、tool、mcp、evidence、llm、settings、project、device、session、run、runtimeLog、capture、context、events、windowControls），并提供 on/off 事件订阅。
 - RendererApiTransport：定义 invoke/subscribe/addListener/removeListener/removeAllListeners 等传输抽象，屏蔽底层 IPC 细节。
 - createIpcRendererTransport：基于 Electron ipcRenderer 的具体实现，负责消息转发、监听器管理与生命周期。
 - channels：集中声明所有可被调用的 invoke channel 与 event channel，提供类型化枚举与校验工具。
@@ -174,7 +174,7 @@ RendererApiTransport <|.. IpcRendererTransport : "实现"
 ### 子域 API 映射：core / workbench / settings
 - core：覆盖 appMeta、appShell、web、dialog、windowControls、conversation、workflow、agent、investigation、knowledge、command、tool、mcp、evidence 等。
 - workbench：覆盖 project、device、session、run、runtimeLog、capture、context、trace。
-- settings：覆盖 memory、rdxRuntime、llm、settings。
+- settings：覆盖 memory、rdcRuntime、llm、settings。
 - 所有方法均通过 transport.invoke 调用对应 channel，保持单一职责与高内聚。
 
 章节来源

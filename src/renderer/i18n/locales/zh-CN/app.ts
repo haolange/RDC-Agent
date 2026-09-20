@@ -7,7 +7,7 @@ export const zhApp = {
   'app.notice.filesReceived': '已接收 {count} 个文件，请在 Debugger 页面确认。',
   'app.notice.newWorkspace': '已创建新的调试工作区。',
   'app.loading': '加载中',
-  'app.loadingShell': '正在加载 RDC Agent 工作台…',
+  'app.loadingShell': '正在加载 RDC-Agent 工作台…',
   'app.leftSidebarExpand': '展开左侧边栏',
   'app.leftSidebarCollapse': '收起左侧边栏',
   'app.rightPanelExpand': '展开右侧面板',

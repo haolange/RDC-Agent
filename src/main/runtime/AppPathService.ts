@@ -4,8 +4,8 @@ import path from 'path';
 import { app } from 'electron';
 import { resolveCanonicalUserDataPath } from './userDataPath';
 
-export interface UserRdxPaths {
-  userRdxRoot: string;
+export interface UserRdcPaths {
+  userRdcRoot: string;
   configPath: string;
   instructionsPath: string;
   agentsPath: string;
@@ -15,12 +15,12 @@ export interface UserRdxPaths {
   policiesPath: string;
   knowledgePath: string;
   memoryPath: string;
-  rdxIntermediateRoot: string;
+  rdcIntermediateRoot: string;
 }
 
-export interface ProjectRdxPaths {
+export interface ProjectRdcPaths {
   projectRoot: string;
-  projectRdxRoot: string;
+  projectRdcRoot: string;
   projectMetadataPath: string;
   gitignorePath: string;
   agentsPath: string;
@@ -55,7 +55,7 @@ export interface AppStatePaths {
  * Canonical aggregate used by main-process services that need both User Scope
  * resources and application-internal state paths.
  */
-export interface RuntimePaths extends UserRdxPaths, AppStatePaths {
+export interface RuntimePaths extends UserRdcPaths, AppStatePaths {
   settingsPath: string;
 }
 
@@ -75,8 +75,8 @@ export class AppPathService {
     return resolveCanonicalUserDataPath(process.env.RDC_AGENT_USER_DATA, appDataRoot);
   }
 
-  getUserRdxRoot(): string {
-    return normalizePath(process.env.RDC_AGENT_HOME?.trim() || path.join(os.homedir(), '.rdx'));
+  getUserRdcRoot(): string {
+    return normalizePath(process.env.RDC_AGENT_HOME?.trim() || path.join(os.homedir(), '.rdc-agent'));
   }
 
   /**
@@ -105,20 +105,20 @@ export class AppPathService {
     return path.join(this.getBuiltinAgentRuntimeRoot(), 'hooks');
   }
 
-  getUserRdxPaths(): UserRdxPaths {
-    const userRdxRoot = this.getUserRdxRoot();
+  getUserRdcPaths(): UserRdcPaths {
+    const userRdcRoot = this.getUserRdcRoot();
     return {
-      userRdxRoot,
-      configPath: path.join(userRdxRoot, CONFIG_FILE_NAME),
-      instructionsPath: path.join(userRdxRoot, 'RDX.md'),
-      agentsPath: path.join(userRdxRoot, 'agents'),
-      skillsPath: path.join(userRdxRoot, 'skills'),
-      mcpPath: path.join(userRdxRoot, 'mcp'),
-      hooksPath: path.join(userRdxRoot, 'hooks'),
-      policiesPath: path.join(userRdxRoot, 'policies'),
-      knowledgePath: path.join(userRdxRoot, 'knowledge'),
-      memoryPath: path.join(userRdxRoot, 'memory'),
-      rdxIntermediateRoot: path.join(userRdxRoot, 'rdx-intermediate'),
+      userRdcRoot,
+      configPath: path.join(userRdcRoot, CONFIG_FILE_NAME),
+      instructionsPath: path.join(userRdcRoot, 'RDC.md'),
+      agentsPath: path.join(userRdcRoot, 'agents'),
+      skillsPath: path.join(userRdcRoot, 'skills'),
+      mcpPath: path.join(userRdcRoot, 'mcp'),
+      hooksPath: path.join(userRdcRoot, 'hooks'),
+      policiesPath: path.join(userRdcRoot, 'policies'),
+      knowledgePath: path.join(userRdcRoot, 'knowledge'),
+      memoryPath: path.join(userRdcRoot, 'memory'),
+      rdcIntermediateRoot: path.join(userRdcRoot, 'rdc-tool-intermediate'),
     };
   }
 
@@ -142,36 +142,36 @@ export class AppPathService {
     };
   }
 
-  getProjectRdxPaths(projectRoot: string): ProjectRdxPaths {
+  getProjectRdcPaths(projectRoot: string): ProjectRdcPaths {
     const resolvedProjectRoot = normalizePath(projectRoot);
-    const projectRdxRoot = path.join(resolvedProjectRoot, '.rdx');
+    const projectRdcRoot = path.join(resolvedProjectRoot, '.rdc-agent');
     return {
       projectRoot: resolvedProjectRoot,
-      projectRdxRoot,
-      projectMetadataPath: path.join(projectRdxRoot, 'project.yaml'),
-      gitignorePath: path.join(projectRdxRoot, '.gitignore'),
-      agentsPath: path.join(projectRdxRoot, 'agents'),
-      skillsPath: path.join(projectRdxRoot, 'skills'),
-      mcpPath: path.join(projectRdxRoot, 'mcp'),
-      hooksPath: path.join(projectRdxRoot, 'hooks'),
-      policiesPath: path.join(projectRdxRoot, 'policies'),
-      knowledgePath: path.join(projectRdxRoot, 'knowledge'),
-      memoryPath: path.join(projectRdxRoot, 'memory'),
-      plansPath: path.join(projectRdxRoot, 'plans'),
-      inputsPath: path.join(projectRdxRoot, 'inputs'),
-      artifactsPath: path.join(projectRdxRoot, 'artifacts'),
-      replayPath: path.join(projectRdxRoot, 'replay'),
+      projectRdcRoot,
+      projectMetadataPath: path.join(projectRdcRoot, 'project.yaml'),
+      gitignorePath: path.join(projectRdcRoot, '.gitignore'),
+      agentsPath: path.join(projectRdcRoot, 'agents'),
+      skillsPath: path.join(projectRdcRoot, 'skills'),
+      mcpPath: path.join(projectRdcRoot, 'mcp'),
+      hooksPath: path.join(projectRdcRoot, 'hooks'),
+      policiesPath: path.join(projectRdcRoot, 'policies'),
+      knowledgePath: path.join(projectRdcRoot, 'knowledge'),
+      memoryPath: path.join(projectRdcRoot, 'memory'),
+      plansPath: path.join(projectRdcRoot, 'plans'),
+      inputsPath: path.join(projectRdcRoot, 'inputs'),
+      artifactsPath: path.join(projectRdcRoot, 'artifacts'),
+      replayPath: path.join(projectRdcRoot, 'replay'),
     };
   }
 
   initializeRuntime(): RuntimePaths {
     const paths = this.getRuntimePaths();
-    const memoKey = `${paths.userRdxRoot}\u0000${paths.appStateRoot}`;
+    const memoKey = `${paths.userRdcRoot}\u0000${paths.appStateRoot}`;
     if (this.runtimeInitMemo?.key === memoKey) {
       return this.runtimeInitMemo.paths;
     }
     const directories = [
-      paths.userRdxRoot,
+      paths.userRdcRoot,
       paths.agentsPath,
       paths.skillsPath,
       paths.mcpPath,
@@ -196,10 +196,10 @@ export class AppPathService {
     return paths;
   }
 
-  initializeProjectRdx(projectRoot: string): ProjectRdxPaths {
-    const paths = this.getProjectRdxPaths(projectRoot);
+  initializeProjectRdc(projectRoot: string): ProjectRdcPaths {
+    const paths = this.getProjectRdcPaths(projectRoot);
     [
-      paths.projectRdxRoot,
+      paths.projectRdcRoot,
       paths.agentsPath,
       paths.skillsPath,
       paths.mcpPath,
@@ -226,7 +226,7 @@ export class AppPathService {
   }
 
   getRuntimePaths(): RuntimePaths {
-    const user = this.getUserRdxPaths();
+    const user = this.getUserRdcPaths();
     const state = this.getAppStatePaths();
     return {
       ...user,

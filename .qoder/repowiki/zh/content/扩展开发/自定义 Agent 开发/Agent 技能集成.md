@@ -115,7 +115,7 @@ RT-->>U : 工作过程投影与最终答案
 ### 技能注册机制
 - 内置清单：canonicalSkills.ts 维护所有内置技能 ID、按角色武装的技能、计划模式冲突技能与可见性规则。
 - 作用域：技能可从 builtin、user、project 三个作用域装载，优先级与合并策略由运行时服务处理。
-- 可见性与冲突：Mission 角色（debugger/analyzer/optimizer）不可发现或加载 plan-only-conflict 技能（例如 rdx-cli-shell），以避免与“仅计划”模式冲突。
+- 可见性与冲突：Mission 角色（debugger/analyzer/optimizer）不可发现或加载 plan-only-conflict 技能（例如 rdc-tool-shell），以避免与“仅计划”模式冲突。
 - 角色武装：不同 Agent 角色会预装特定协调类技能（如 optimizer-coordinator）。
 
 章节来源
@@ -155,7 +155,7 @@ Final --> End(["回合结束"])
 ### 内置技能库使用方法
 - 执行编排（execution-orchestrator）：通用任务的编排与验证原则，强调最小修改、影响验证与明确边界。
 - 调试（debug）：只读诊断，读取实现、日志与失败证据，区分原因与假设，提出最小修复与验证方案；不承诺执行复现或修改。
-- 优化协调器（optimizer-coordinator）：规划与评估优化调查，使用受控 rdx_context/rdx_probe 获取事实，执行交给 General；遵循共享 Plan 模板与交接合同，输出 Checkpoint 与结构化报告。
+- 优化协调器（optimizer-coordinator）：规划与评估优化调查，使用受控 rdc_context/rdc_probe 获取事实，执行交给 General；遵循共享 Plan 模板与交接合同，输出 Checkpoint 与结构化报告。
 - 分析架构方法（analyzer-architecture-method）：在 Analyzer 执行期间写入 rdc.investigation.v1 工件，遵守 Observed/Reconstructed/Authoring 三层约束，增量版本化并标记 ready。
 
 章节来源
@@ -170,8 +170,8 @@ Final --> End(["回合结束"])
 - 目标
   - 在给定 capture 上提取关键指标（draw calls、overdraw、shader 编译次数），与基线对比，输出差异与建议。
 - 步骤
-  - 使用 rdx_context 获取当前会话租约状态与上下文。
-  - 使用 rdx_probe 读取只限的事实（如 pass 拓扑、shader IR 指纹）。
+  - 使用 rdc_context 获取当前会话租约状态与上下文。
+  - 使用 rdc_probe 读取只限的事实（如 pass 拓扑、shader IR 指纹）。
   - 使用 read_file/grep 读取本地基线与历史产物。
   - 使用 web_search 检索相关优化策略与已知问题。
   - 输出结构化报告，包含指标、差异、建议与不确定性说明。
@@ -207,7 +207,7 @@ Final --> End(["回合结束"])
   - LoopProgressGuard 检测连续无进展，第三次相同指纹抛出 AGENT_NO_PROGRESS。
 - 工具与策略
   - 工具能力来自有效清单 ∩ 活跃技能 ∩ 策略 ∩ 运行时前置条件；空工具集 fail-closed。
-  - Mission 角色禁止 shell/code_interpreter；RDX 访问通过 rdx_probe/rdx_context 与 ShellInvocationService 受限通道。
+  - Mission 角色禁止 shell/code_interpreter；RDC 访问通过 rdc_probe/rdc_context 与 ShellInvocationService 受限通道。
 - 工作过程与摘要
   - 工具执行事件标准化为 tool.started/tool.completed；工作过程摘要基于真实工具结果统计，模型自述不能覆盖 runtime 证据。
 
@@ -275,7 +275,7 @@ RDC-Agent 的技能系统以“清单 + 装载 + 装配 + 执行 + 呈现”为�
 - 关键工具
   - skill_read：读取已配置技能的完整指令。
   - tool_search：发现并激活延迟工具。
-  - rdx_context/rdx_probe：受限读取 RDX/RDC 上下文与事实。
+  - rdc_context/rdc_probe：受限读取 RDC/RDC 上下文与事实。
 
 章节来源
 - [general.agent.md:1-60](file://resources/agent-runtime/agents/general.agent.md#L1-L60)

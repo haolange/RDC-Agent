@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'crypto';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { PromptPlan, CompiledPolicy, ResourceProvenance } from '@shared/types/rdxRuntime';
+import type { PromptPlan, CompiledPolicy, ResourceProvenance } from '@shared/types/rdcRuntime';
 import type { AgentPermissionSettings } from '@shared/types/settings';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
@@ -10,7 +10,7 @@ import type { ToolDefinition } from './core/types';
 import { compileEffectivePolicy, emptyCompiledPolicy } from './permissions/PolicyCompiler';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import { freezeDelegationCapsule } from '@shared/types/delegationCapsule';
-import { isRdxLeaseToolName, stripRdxLeaseToolsFromAllowlist } from '@shared/constants/rdxLeaseTools';
+import { isRdcLeaseToolName, stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
 import { filterMissionPlanOnlyAllowlist, isMissionProfileId } from '@shared/constants/missionPlanOnly';
 
 export interface FrozenHandoffDefinition {
@@ -70,19 +70,19 @@ export interface EffectiveRuntimePlan {
   promptPlanFingerprint: string;
   attachmentManifestFingerprint: string | null;
   /**
-   * Offline child plans strip RDX lease tools at compile time.
+   * Offline child plans strip RDC lease tools at compile time.
    * Executor / tool_search must keep denying those ids even if a wildcard remains.
    */
-  excludeRdxLeaseTools: boolean;
+  excludeRdcLeaseTools: boolean;
   /** Frozen Delegation Capsule when this plan was prepared for a subagent child. */
   delegationCapsule: DelegationCapsule | null;
   /** Frozen at plan build; Prompt 与 Executor 共用。 */
-  rdxBindingFingerprint?: string;
+  rdcBindingFingerprint?: string;
   createdAt: number;
 }
 
 export interface BuildEffectiveRuntimePlanInput {
-  rdxBindingFingerprint?: string;
+  rdcBindingFingerprint?: string;
   agentId: string;
   projectRootPath: string | null;
   projectId?: string | null;
@@ -113,8 +113,8 @@ export interface BuildEffectiveRuntimePlanInput {
   /** User-level compaction percent before policy min-merge. */
   compactionThresholdPercent?: number;
   attachmentManifestFingerprint?: string | null;
-  /** When true, strip rdx_context / rdx_probe from frozen allowlists. */
-  excludeRdxLeaseTools?: boolean;
+  /** When true, strip rdc_context / rdc_probe from frozen allowlists. */
+  excludeRdcLeaseTools?: boolean;
   /** Structured clone stored on the child plan after capsule freeze. */
   delegationCapsule?: DelegationCapsule | null;
 }
@@ -186,24 +186,24 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
   })));
   const enabledProfileIds = freezeStringList(input.enabledProfileIds);
   const profileDelegates = freezeStringList(input.profileDelegates ?? input.profile?.agents ?? []);
-  const excludeRdxLeaseTools = input.excludeRdxLeaseTools === true;
+  const excludeRdcLeaseTools = input.excludeRdcLeaseTools === true;
   const applyMissionFilter = (values: readonly string[]): readonly string[] => (
     isMissionProfileId(input.agentId) ? filterMissionPlanOnlyAllowlist(values) : [...values]
   );
-  const rawAllowlist = excludeRdxLeaseTools
-    ? stripRdxLeaseToolsFromAllowlist(input.toolAllowlist)
+  const rawAllowlist = excludeRdcLeaseTools
+    ? stripRdcLeaseToolsFromAllowlist(input.toolAllowlist)
     : input.toolAllowlist;
   const toolAllowlist = freezeStringList(applyMissionFilter(rawAllowlist));
   const skillIntersection = input.skillIntersection === undefined || input.skillIntersection === null
     ? null
     : freezeStringList(applyMissionFilter(
-      excludeRdxLeaseTools
-        ? stripRdxLeaseToolsFromAllowlist(input.skillIntersection)
+      excludeRdcLeaseTools
+        ? stripRdcLeaseToolsFromAllowlist(input.skillIntersection)
         : input.skillIntersection,
     ));
   const visibleToolNames = freezeStringList(applyMissionFilter(
-    excludeRdxLeaseTools
-      ? stripRdxLeaseToolsFromAllowlist(input.visibleToolNames ?? [])
+    excludeRdcLeaseTools
+      ? stripRdcLeaseToolsFromAllowlist(input.visibleToolNames ?? [])
       : input.visibleToolNames ?? [],
   ));
   const delegationCapsule = input.delegationCapsule
@@ -243,8 +243,8 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     requestPlanFingerprint,
     promptPlanFingerprint,
     attachmentManifestFingerprint,
-    input.rdxBindingFingerprint ?? null,
-    excludeRdxLeaseTools,
+    input.rdcBindingFingerprint ?? null,
+    excludeRdcLeaseTools,
     delegationCapsule,
   ]);
   return {
@@ -274,9 +274,9 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     requestPlanFingerprint,
     promptPlanFingerprint,
     attachmentManifestFingerprint,
-    excludeRdxLeaseTools,
+    excludeRdcLeaseTools,
     delegationCapsule,
-    rdxBindingFingerprint: input.rdxBindingFingerprint,
+    rdcBindingFingerprint: input.rdcBindingFingerprint,
     createdAt: Date.now(),
   };
 }
@@ -289,7 +289,7 @@ export function activeToolNamesForPlan(
   return definitions
     .map((definition) => definition.name)
     .filter((name) => {
-      if (plan.excludeRdxLeaseTools && isRdxLeaseToolName(name)) {
+      if (plan.excludeRdcLeaseTools && isRdcLeaseToolName(name)) {
         return false;
       }
       return allow.size === 0 || allow.has(name.trim().toLowerCase());

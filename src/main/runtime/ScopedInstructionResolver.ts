@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import type { ScopedInstructionResolution, ScopedInstructionSource } from '@shared/types/rdxRuntime';
+import type { ScopedInstructionResolution, ScopedInstructionSource } from '@shared/types/rdcRuntime';
 import { hashScopedResource } from './ScopedResourceResolver';
 
 const DEFAULT_INSTRUCTION_BUDGET = 64 * 1024;
@@ -32,7 +32,7 @@ export class ScopedInstructionResolver {
     }
 
     const projectInstructionPaths = new Set<string>();
-    const rootInstruction = path.join(projectRoot, 'RDX.md');
+    const rootInstruction = path.join(projectRoot, 'RDC.md');
     if (fs.existsSync(rootInstruction)) projectInstructionPaths.add(rootInstruction);
 
     for (const activePath of input.activePaths) {
@@ -54,7 +54,7 @@ export class ScopedInstructionResolver {
       let current = projectRoot;
       for (const part of parts) {
         current = path.join(current, part);
-        const instructionPath = path.join(current, 'RDX.md');
+        const instructionPath = path.join(current, 'RDC.md');
         if (fs.existsSync(instructionPath)) projectInstructionPaths.add(instructionPath);
       }
     }
@@ -74,7 +74,7 @@ export class ScopedInstructionResolver {
         diagnostics.push({
           code: 'instructions.source.symlink-escape',
           severity: 'error',
-          message: `RDX.md resolves outside the project: ${candidate.sourcePath}`,
+          message: `RDC.md resolves outside the project: ${candidate.sourcePath}`,
           sourcePath: candidate.sourcePath,
         });
         return;
@@ -93,7 +93,7 @@ export class ScopedInstructionResolver {
       }
       totalBytes += byteLength;
       sources.push({
-        id: `${candidate.scope}:${path.relative(candidate.scope === 'project' ? projectRoot : path.dirname(candidate.sourcePath), candidate.sourcePath) || 'RDX.md'}`,
+        id: `${candidate.scope}:${path.relative(candidate.scope === 'project' ? projectRoot : path.dirname(candidate.sourcePath), candidate.sourcePath) || 'RDC.md'}`,
         scope: candidate.scope,
         sourcePath: candidate.sourcePath,
         sourceHash: hashScopedResource(content),

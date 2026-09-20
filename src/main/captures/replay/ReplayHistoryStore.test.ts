@@ -37,9 +37,9 @@ describe('ReplayHistoryStore', () => {
     expect(page.nextSequence).toBe(2);
     expect((await reloaded.list(scope, { afterSequence: 2 })).entries[0].eventId).toBe(2);
     expect(await reloaded.readImage(scope, page.entries[0].imageSha256!)).toEqual(image);
-    const files = await fs.readdir(path.join(scope.projectRoot, '.rdx', 'replay', scope.sessionId, hash));
+    const files = await fs.readdir(path.join(scope.projectRoot, '.rdc-agent', 'replay', scope.sessionId, hash));
     expect(files.filter((file) => file.endsWith('.png'))).toHaveLength(1);
-    await expect(fs.stat(path.join(scope.projectRoot, '.rdx', 'replay.lock'))).rejects.toHaveProperty('code', 'ENOENT');
+    await expect(fs.stat(path.join(scope.projectRoot, '.rdc-agent', 'replay.lock'))).rejects.toHaveProperty('code', 'ENOENT');
   });
 
   it('serializes writes across store instances and isolates the same capture across sessions', async () => {
@@ -63,7 +63,7 @@ describe('ReplayHistoryStore', () => {
     const scope = await setup();
     const store = new ReplayHistoryStore({ codec, projectQuotaBytes: 1 });
     await expect(store.append(scope, fact, image)).rejects.toThrow('REPLAY_QUOTA_EXCEEDED');
-    await expect(fs.stat(path.join(scope.projectRoot, '.rdx', 'replay'))).rejects.toHaveProperty('code', 'ENOENT');
+    await expect(fs.stat(path.join(scope.projectRoot, '.rdc-agent', 'replay'))).rejects.toHaveProperty('code', 'ENOENT');
   });
 
   it('stores selection without opening anything and safely overwrites it', async () => {
@@ -89,20 +89,20 @@ describe('ReplayHistoryStore', () => {
     const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-replay-protected-'));
     roots.push(outside);
     await fs.writeFile(path.join(outside, 'keep.txt'), 'protected');
-    await fs.mkdir(path.join(scope.projectRoot, '.rdx'));
-    await fs.symlink(outside, path.join(scope.projectRoot, '.rdx', 'replay'), process.platform === 'win32' ? 'junction' : 'dir');
+    await fs.mkdir(path.join(scope.projectRoot, '.rdc-agent'));
+    await fs.symlink(outside, path.join(scope.projectRoot, '.rdc-agent', 'replay'), process.platform === 'win32' ? 'junction' : 'dir');
     const store = new ReplayHistoryStore({ codec });
     await expect(store.append(scope, fact)).rejects.toThrow('REPLAY_UNSAFE_LINK');
     await expect(store.clearSession(scope.projectRoot, scope.sessionId)).rejects.toThrow('REPLAY_UNSAFE_LINK');
     expect(await fs.readFile(path.join(outside, 'keep.txt'), 'utf8')).toBe('protected');
-    await fs.unlink(path.join(scope.projectRoot, '.rdx', 'replay'));
+    await fs.unlink(path.join(scope.projectRoot, '.rdc-agent', 'replay'));
   });
 
   it('recovers only uncommitted owned files, while preserving original files and corrupt evidence', async () => {
     const scope = await setup();
     const store = new ReplayHistoryStore({ codec });
     const saved = await store.append(scope, fact, image);
-    const captureRoot = path.join(scope.projectRoot, '.rdx', 'replay', scope.sessionId, hash);
+    const captureRoot = path.join(scope.projectRoot, '.rdc-agent', 'replay', scope.sessionId, hash);
     await fs.writeFile(path.join(captureRoot, '.pending-123-abc'), 'partial');
     await fs.writeFile(path.join(captureRoot, `${'b'.repeat(64)}.png`), image);
     await fs.writeFile(path.join(captureRoot, 'unknown.txt'), 'keep');
@@ -118,7 +118,7 @@ describe('ReplayHistoryStore', () => {
     const scope = await setup();
     const store = new ReplayHistoryStore({ codec });
     const saved = await store.append(scope, fact, image);
-    await fs.writeFile(path.join(scope.projectRoot, '.rdx', 'replay', scope.sessionId, hash, `${saved.imageSha256}.png`), 'corrupted');
+    await fs.writeFile(path.join(scope.projectRoot, '.rdc-agent', 'replay', scope.sessionId, hash, `${saved.imageSha256}.png`), 'corrupted');
     await expect(store.readImage(scope, saved.imageSha256!)).rejects.toThrow('REPLAY_IMAGE_CORRUPT');
     await expect(store.append(scope, fact, image)).rejects.toThrow('REPLAY_IMAGE_CORRUPT');
   });
@@ -139,8 +139,8 @@ describe('ReplayHistoryStore', () => {
 
   it('never steals a live process lock', async () => {
     const scope = await setup();
-    await fs.mkdir(path.join(scope.projectRoot, '.rdx'));
-    const lock = path.join(scope.projectRoot, '.rdx', 'replay.lock');
+    await fs.mkdir(path.join(scope.projectRoot, '.rdc-agent'));
+    const lock = path.join(scope.projectRoot, '.rdc-agent', 'replay.lock');
     await fs.writeFile(lock, JSON.stringify({ pid: process.pid, token: 'another-owner' }));
     await expect(new ReplayHistoryStore({ codec }).append(scope, fact)).rejects.toThrow('REPLAY_STORE_BUSY');
     expect(JSON.parse(await fs.readFile(lock, 'utf8')).token).toBe('another-owner');
@@ -155,13 +155,13 @@ describe('ReplayHistoryStore', () => {
     });
     const store = new ReplayHistoryStore({ codec });
     await expect(store.append(scope, fact)).rejects.toThrow('INJECTED_DISK_FAILURE');
-    await expect(fs.stat(path.join(scope.projectRoot, '.rdx', 'replay.lock'))).rejects.toHaveProperty('code', 'ENOENT');
+    await expect(fs.stat(path.join(scope.projectRoot, '.rdc-agent', 'replay.lock'))).rejects.toHaveProperty('code', 'ENOENT');
     spy.mockRestore();
     expect((await store.append(scope, fact)).saved).toBe(true);
   });
   it('does not delete another token that replaced a failed lock owner', async () => {
     const scope = await setup();
-    const target = path.join(scope.projectRoot, '.rdx', 'replay.lock');
+    const target = path.join(scope.projectRoot, '.rdc-agent', 'replay.lock');
     const originalOpen = fs.open.bind(fs);
     vi.spyOn(fs, 'open').mockImplementation(async (...args: Parameters<typeof fs.open>) => {
       const handle = await originalOpen(...args);
@@ -179,7 +179,7 @@ describe('ReplayHistoryStore', () => {
     const store = new ReplayHistoryStore({ codec });
     await store.saveSelection(scope.projectRoot, scope.sessionId, { inputId: 'capture', captureSha256: hash });
     await store.append(scope, fact, image);
-    const sessionRoot = path.join(scope.projectRoot, '.rdx', 'replay', scope.sessionId);
+    const sessionRoot = path.join(scope.projectRoot, '.rdc-agent', 'replay', scope.sessionId);
     await fs.writeFile(path.join(sessionRoot, '.pending-123-abcd'), 'unfinished selection');
     await store.recover(scope.projectRoot);
     await expect(fs.stat(path.join(sessionRoot, '.pending-123-abcd'))).rejects.toHaveProperty('code', 'ENOENT');
@@ -191,7 +191,7 @@ describe('ReplayHistoryStore', () => {
     const store = new ReplayHistoryStore({ codec });
     await store.saveSelection(scope.projectRoot, scope.sessionId, { inputId: 'capture', captureSha256: hash });
     await store.reconcileCaptureReferences(scope.projectRoot, new Set());
-    await expect(fs.stat(path.join(scope.projectRoot, '.rdx', 'replay'))).rejects.toHaveProperty('code', 'ENOENT');
+    await expect(fs.stat(path.join(scope.projectRoot, '.rdc-agent', 'replay'))).rejects.toHaveProperty('code', 'ENOENT');
   });
   it('rebinds a closed session selection by content when its original input was moved or removed', async () => {
     const scope = await setup();

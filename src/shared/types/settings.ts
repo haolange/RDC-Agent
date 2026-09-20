@@ -287,7 +287,7 @@ export interface ProfileSettings {
   avatarPath?: string;
 }
 
-export interface RdxCliInvokerSettings {
+export interface RdcCliInvokerSettings {
   enabled: boolean;
   command: string;
   argsPrefix: string[];
@@ -328,7 +328,7 @@ export type ResolvedShellSnapshot =
     };
 
 export interface ToolingSettings {
-  rdxCli: RdxCliInvokerSettings;
+  rdcCli: RdcCliInvokerSettings;
   codeInterpreter: CodeInterpreterSettings;
   shell: AgentShellSettings;
 }
@@ -357,7 +357,7 @@ export interface AgentRuntimeSettings {
 }
 
 export interface AppRuntimePaths {
-  userRdxRoot: string;
+  userRdcRoot: string;
   settingsPath: string;
   instructionsPath: string;
   agentsPath: string;
@@ -562,7 +562,7 @@ export type AppSettingsPatch = Partial<{
   }>;
   profile: Partial<ProfileSettings>;
   tooling: Partial<{
-    rdxCli: Partial<RdxCliInvokerSettings>;
+    rdcCli: Partial<RdcCliInvokerSettings>;
     codeInterpreter: Partial<CodeInterpreterSettings>;
     shell: Partial<AgentShellSettings>;
   }>;

@@ -5,7 +5,7 @@
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { ContextUsageBreakdownEntry } from '@shared/types/session';
-import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdxRuntime';
+import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdcRuntime';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
@@ -102,7 +102,7 @@ export interface AgentTurnRunnerDeps {
     projectId?: string | null,
     projectRootPath?: string | null,
     mcpPoolKey?: string | null,
-    options?: { excludeRdxLeaseTools?: boolean },
+    options?: { excludeRdcLeaseTools?: boolean },
   ) => ResolvedRuntimeTools;
   createToolSignature: (tools: ToolDefinition[]) => string;
   createToolExecutor: (
@@ -428,7 +428,7 @@ export class AgentTurnRunner {
       input.projectId,
       input.projectRootPath,
       mcpLease?.poolKey ?? null,
-      { excludeRdxLeaseTools: preparedRuntime.effectivePlan.excludeRdxLeaseTools === true },
+      { excludeRdcLeaseTools: preparedRuntime.effectivePlan.excludeRdcLeaseTools === true },
     );
     // Preparation freezes the schemas sent to the provider before a staged
     // conversation session has a durable run. Rebuild tool instances here so

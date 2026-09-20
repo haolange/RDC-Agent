@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { ConversationMessage, ConversationToolResourceRef, ConversationWorkBlock } from '@shared/types/conversation';
-import type { PromptSegment } from '@shared/types/rdxRuntime';
+import type { PromptSegment } from '@shared/types/rdcRuntime';
 import type { TaskContextResource } from '@shared/types/trace';
 
 const collectToolRefs = (

@@ -13,9 +13,9 @@
 
 - `overview.md`：Electron / React / Debugger 主链架构总览。
 - `module-map.md`：能力域到源码、共享类型、IPC/preload、UI 与测试入口的地图。
-- `data-flow.md`：Project、Session、Capture、Agent、Trace 与 RDX shell action 的端到端数据流。
+- `data-flow.md`：Project、Session、Capture、Agent、Trace 与 RDC shell action 的端到端数据流。
 - `agent-runtime-kernel.md`：实现向 kernel 说明（契约以 contracts/runtime-kernel 为准）。
-- `rdx-runtime.md`：Scope、资源覆盖、Instructions、Skills、Hooks、Memory（产品规格见 product/scoped-runtime-resources）。
+- `rdc-runtime.md`：Scope、资源覆盖、Instructions、Skills、Hooks、Memory（产品规格见 product/scoped-runtime-resources）。
 - `agentic-trace-protocol.md`：Trace、Progress 与 right-panel projection。
 - `provider-architecture.md`：Catalog / EffectiveModel / RequestPlan / credential lease。
 - `browser-qa-surface.md`：Browser（debug-only）与 Desktop 的单轨 API、transport、安全及状态 parity。

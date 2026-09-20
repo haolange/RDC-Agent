@@ -1,5 +1,5 @@
 import { generateEventId } from '@shared/utils/id';
-import type { PromptPlan, RequestEnvelopeSnapshot } from '@shared/types/rdxRuntime';
+import type { PromptPlan, RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import { redactSecretsDeep } from '../../runtime/secretRedaction';
 

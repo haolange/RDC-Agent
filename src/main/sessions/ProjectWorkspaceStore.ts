@@ -363,7 +363,7 @@ export class ProjectWorkspaceStore {
     const normalizedProject = this.normalizeProjectRecord(project);
     this.host.io.ensureDir(this.getProjectDataPath(normalizedProject));
     this.host.io.writeJsonAtomic(path.join(this.getProjectDataPath(normalizedProject), 'project.json'), normalizedProject);
-    const projectPaths = appPathService.initializeProjectRdx(normalizedProject.rootPath);
+    const projectPaths = appPathService.initializeProjectRdc(normalizedProject.rootPath);
     writeYaml(projectPaths.projectMetadataPath, {
       schema_version: '1',
       name: normalizedProject.name,
@@ -447,9 +447,9 @@ export class ProjectWorkspaceStore {
     knowledgePath: string;
     inputsPath: string;
   } {
-    const projectPaths = appPathService.initializeProjectRdx(rootPath);
+    const projectPaths = appPathService.initializeProjectRdc(rootPath);
     return {
-      resourcePath: projectPaths.projectRdxRoot,
+      resourcePath: projectPaths.projectRdcRoot,
       knowledgePath: projectPaths.knowledgePath,
       inputsPath: projectPaths.inputsPath,
     };
@@ -466,8 +466,8 @@ export class ProjectWorkspaceStore {
       rootPath = resolvedRoot;
     }
     // Normalizing registry metadata must not recreate an offline or externally removed project.
-    const projectPaths = appPathService.getProjectRdxPaths(rootPath);
-    const resourcePath = projectPaths.projectRdxRoot;
+    const projectPaths = appPathService.getProjectRdcPaths(rootPath);
+    const resourcePath = projectPaths.projectRdcRoot;
     const { knowledgePath, inputsPath } = projectPaths;
     return {
       ...project,

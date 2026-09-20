@@ -88,7 +88,7 @@
   overflow-wrap: anywhere;
 }
 
-.settings-rdx-cli-textarea {
+.settings-rdc-cli-textarea {
   min-height: calc(var(--control-height-md) * 2);
   resize: vertical;
 }

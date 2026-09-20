@@ -40,7 +40,7 @@ const GENERAL_REQUIRED_TOOLS = [
 ];
 const MISSION_REQUIRED_TOOLS = [
   'read', 'search', 'web', 'askUser', 'task', 'planArtifact',
-  'tool_search', 'knowledge', 'investigation', 'rdx_probe',
+  'tool_search', 'knowledge', 'investigation', 'rdc_probe',
 ];
 
 function assert(condition, message) {

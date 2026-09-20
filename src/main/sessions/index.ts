@@ -1,11 +1,11 @@
 /**
  * Session-layer service exports.
- * Instantiating rdxSessionService here breaks the ConversationService ↔ index.ts cycle.
+ * Instantiating rdcSessionService here breaks the ConversationService ↔ index.ts cycle.
  */
 
-import { RdxSessionService } from './RdxSessionService';
+import { RdcSessionService } from './RdcSessionService';
 
-export { RdxSessionService } from './RdxSessionService';
+export { RdcSessionService } from './RdcSessionService';
 export { storageAdapter } from './StorageAdapter';
 
-export const rdxSessionService = new RdxSessionService();
+export const rdcSessionService = new RdcSessionService();

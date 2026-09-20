@@ -10,7 +10,7 @@ import type {
 } from '@shared/types/modelCapability';
 import type { EffectiveModel, ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
 import type { PreparedTurnContextSummary } from '@shared/types/session';
-import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdxRuntime';
+import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdcRuntime';
 import type { CompiledPromptCache } from '@shared/types/semanticContext';
 import type { EffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
 import type { PendingHandoff, PolicyBudgetState, SubagentBudgetState } from './TurnCoordinator';
@@ -78,11 +78,11 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
   projectId?: string | null;
   promptPlan?: PromptPlan;
   /** Volatile Delegation Capsule segments appended to the child PromptPlan. */
-  extraPromptSegments?: import('@shared/types/rdxRuntime').PromptSegment[];
+  extraPromptSegments?: import('@shared/types/rdcRuntime').PromptSegment[];
   /** Frozen capsule stored on the child EffectiveRuntimePlan. */
   frozenDelegationCapsule?: import('@shared/types/delegationCapsule').DelegationCapsule;
-  /** Offline children strip rdx_context / rdx_probe at allowlist compile time. */
-  excludeRdxLeaseTools?: boolean;
+  /** Offline children strip rdc_context / rdc_probe at allowlist compile time. */
+  excludeRdcLeaseTools?: boolean;
   /** Exact profile snapshot used to build this child turn. */
   effectiveProfile?: EffectiveAgentProfile | null;
   /** Enabled profile ids from the same resolution snapshot. */

@@ -184,14 +184,14 @@ export interface TaskContextPanelViewModel {
   resources: TaskContextResource[];
 }
 
-export interface RdxContextCaptureInput {
+export interface RdcContextCaptureInput {
   inputId: string;
   fileName: string;
   filePath: string;
   sizeBytes: number;
 }
 
-export interface RdxContextCaptureViewModel {
+export interface RdcContextCaptureViewModel {
   inputId: string;
   captureId?: string;
   captureFileId?: string;
@@ -205,7 +205,7 @@ export interface RdxContextCaptureViewModel {
   previewAvailable: boolean;
 }
 
-export interface RdxContextRuntimeViewModel {
+export interface RdcContextRuntimeViewModel {
   contextId?: string;
   replaySessionId?: string;
   runtimeOwner?: string;
@@ -214,7 +214,7 @@ export interface RdxContextRuntimeViewModel {
   remoteStatus?: 'connected' | 'online' | 'disconnected' | 'error';
 }
 
-export interface RdxContextDiagnostic {
+export interface RdcContextDiagnostic {
   id: string;
   code?: string;
   summary: string;
@@ -223,16 +223,16 @@ export interface RdxContextDiagnostic {
   action: 'retry' | 'change_device' | 'copy' | 'settings' | 'none';
 }
 
-export interface RdxContextPanelViewModel {
-  capture: RdxContextCaptureViewModel | null;
-  availableCaptures: RdxContextCaptureInput[];
-  runtime: RdxContextRuntimeViewModel;
-  diagnostics: RdxContextDiagnostic[];
+export interface RdcContextPanelViewModel {
+  capture: RdcContextCaptureViewModel | null;
+  availableCaptures: RdcContextCaptureInput[];
+  runtime: RdcContextRuntimeViewModel;
+  diagnostics: RdcContextDiagnostic[];
 }
 
 export interface ContextPanelViewModel {
   task: TaskContextPanelViewModel;
-  rdx: RdxContextPanelViewModel;
+  rdc: RdcContextPanelViewModel;
 }
 
 export interface RightPanelViewModel {

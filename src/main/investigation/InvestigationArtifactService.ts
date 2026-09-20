@@ -1,4 +1,4 @@
-import { RdxExecutionReceipts } from '../tools/RdxExecutionReceipts';
+import { RdcExecutionReceipts } from '../tools/RdcExecutionReceipts';
 import { assertExecutionEvidence } from './investigationExecutionEvidence';
 import * as path from 'path';
 import { generateEventId } from '@shared/utils/id';
@@ -97,7 +97,7 @@ export type {
 } from './investigationArtifactWrite';
 
 export class InvestigationArtifactService {
-  private readonly receiptStore: RdxExecutionReceipts;
+  private readonly receiptStore: RdcExecutionReceipts;
   private readonly resolver: SessionArtifactResolver;
   private readonly now: () => Date;
   private readonly onPersistBoundary?: InvestigationArtifactServiceDeps['onPersistBoundary'];
@@ -106,7 +106,7 @@ export class InvestigationArtifactService {
 
   constructor(deps: InvestigationArtifactServiceDeps = {}) {
     this.resolver = deps.resolver ?? sessionArtifactResolver;
-    this.receiptStore = deps.receiptStore ?? new RdxExecutionReceipts(this.resolver);
+    this.receiptStore = deps.receiptStore ?? new RdcExecutionReceipts(this.resolver);
     this.now = deps.now ?? (() => new Date());
     this.onPersistBoundary = deps.onPersistBoundary;
     this.lockMaxAttempts = deps.lockMaxAttempts;

@@ -5,7 +5,7 @@ description: Consume a frozen RenderDoc investigation plan, execute within its s
 
 # RenderDoc Execution
 
-General 消费本次会话 execution offer 冻结的 Plan URI/hash 与 requiredSkillIds。按冻结计划读取原 Plan 和 Checkpoint，完成计划边界内的检查；不得静默改写战略目标或覆盖旧 Plan。需要战略改变时保存 Checkpoint，在终答写清缺口，由用户切回原 Mission 评估或开新计划。CLI 用法见 `$rdx-cli-shell`，专业操作成员与参数见本次预载的 `debugger-rdx-tools` / `analyzer-rdx-tools` / `optimizer-rdx-tools` 之一，领域记录见本次必需方法，不另造执行引擎。
+General 消费本次会话 execution offer 冻结的 Plan URI/hash 与 requiredSkillIds。按冻结计划读取原 Plan 和 Checkpoint，完成计划边界内的检查；不得静默改写战略目标或覆盖旧 Plan。需要战略改变时保存 Checkpoint，在终答写清缺口，由用户切回原 Mission 评估或开新计划。CLI 用法见 `$rdc-tool-shell`，专业操作成员与参数见本次预载的 `debugger-rdc-tools` / `analyzer-rdc-tools` / `optimizer-rdc-tools` 之一，领域记录见本次必需方法，不另造执行引擎。
 
 ## 共享 Plan 模板
 
@@ -27,14 +27,14 @@ General 就地终答，不自动切回 Mission，也不要求 return 合同。�
 ## 执行与证据
 
 按规模使用 task_create / task_update，在计划边界内调整 Tasks；开放 Challenge 的后续检查引用 challengeId 和 requiredFollowUp，更新或 supersede 原 claim_set，不把领域字段写进 TaskRecord。通过 investigation_* 写 Evidence／Claim／Experiment／Challenge／Checkpoint，按 provenance 门禁标记 ready。
-因果介入与优化实验必须有真实执行及恢复；shell.rdx 的 experimentId 绑定 baseline→intervention→variant→rollback→restored 签名回执（Experiment.executionEvidence）。权限拒绝、未执行、布尔声明或原 capture hash 不变均不是回滚证据。General 任何回合不得宣告调查 completed；调查完成只能由用户切回后的 Mission 声明。
-普通 subagent 子代理不请求领域扩展；需要 RDX 时显式申请可选扩展并遵守串行租约和及时回收。用户未要求时不写持久 Memory／Knowledge。
+因果介入与优化实验必须有真实执行及恢复；shell.rdc 的 experimentId 绑定 baseline→intervention→variant→rollback→restored 签名回执（Experiment.executionEvidence）。权限拒绝、未执行、布尔声明或原 capture hash 不变均不是回滚证据。General 任何回合不得宣告调查 completed；调查完成只能由用户切回后的 Mission 声明。
+普通 subagent 子代理不请求领域扩展；需要 RDC 时显式申请可选扩展并遵守串行租约和及时回收。用户未要求时不写持久 Memory／Knowledge。
 
 
 ## 隔离探索与独立审查
 
 单次 lookup、必要抽查及低成本操作由 General 直接完成。重 Knowledge 检索、多来源综合及长分析分支，通过 subagent 派发 General 子上下文，Capsule.requiredSkillIds 明确包含 knowledge-scout；不先读取全部历史再另调模型生成 Capsule。
-生成主张后，另开 General 子上下文并预载 skeptic-review。只给主张、证据、反证、实验条件和适用范围的引用，不复制生成者长叙事，不请求 RDX。General 自己读取 skeptic-review 不等于独立审查。子代理自主检查并提出 Challenge；General 整合证据、为相关 Challenge 创建依赖明确的补证 Task，战略改变写进终答，等用户切回原 Mission。原 Mission 最终评估，不新增裁决身份。
+生成主张后，另开 General 子上下文并预载 skeptic-review。只给主张、证据、反证、实验条件和适用范围的引用，不复制生成者长叙事，不请求 RDC。General 自己读取 skeptic-review 不等于独立审查。子代理自主检查并提出 Challenge；General 整合证据、为相关 Challenge 创建依赖明确的补证 Task，战略改变写进终答，等用户切回原 Mission。原 Mission 最终评估，不新增裁决身份。
 每次委派给出目标、scope、已确认事实及来源资格、竞争假设、Challenge 引用、否定路径的适用与重验条件、停止条件、预算和输出要求。任务完成要求覆盖 Plan 交付要求；未创建的必要工作不能靠 runtime 猜测补齐。Small Loop 保留有效状态和相关增量，Iteration Memory 属于本调查产物，不自动晋升持久 Memory/Knowledge。
 
 ## 材料与交付

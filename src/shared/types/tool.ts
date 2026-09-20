@@ -76,7 +76,7 @@ export interface ToolArtifact {
   metadata: Record<string, unknown>;
 }
 
-export interface RdxOperationDefinition extends Record<string, unknown> {
+export interface RdcOperationDefinition extends Record<string, unknown> {
   name: string;
   namespace: string;
   description: string;
@@ -93,7 +93,7 @@ export interface ToolCatalog {
   source_path?: string;
   tool_count?: number;
   generated_at?: string;
-  tools: RdxOperationDefinition[];
+  tools: RdcOperationDefinition[];
   fingerprint: string;
   namespaces: Record<ToolNamespace, {
     description: string;

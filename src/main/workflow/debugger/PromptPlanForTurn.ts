@@ -11,7 +11,7 @@ import {
   AGENT_DISPLAY_NAMES,
 } from '@shared/constants/agents';
 import type { EffectiveModel } from '@shared/types/providerCapability';
-import type { PromptPlan } from '@shared/types/rdxRuntime';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
 import type { EffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
 import { promptPlanBuilder, resolvePromptClock } from '../../agent-runtime/prompt';
@@ -46,7 +46,7 @@ export class PromptPlanForTurn {
     systemPrompt?: string;
     messageText?: string;
     preloadSkillIds?: string[];
-    extraSegments?: import('@shared/types/rdxRuntime').PromptSegment[];
+    extraSegments?: import('@shared/types/rdcRuntime').PromptSegment[];
     /** Exact effective profile snapshot resolved by the caller. */
     effectiveProfile?: AgentManifestDefinition | null;
     /**
@@ -82,7 +82,7 @@ export class PromptPlanForTurn {
     const activePaths = [projectRootPath].filter((value): value is string => Boolean(value));
     const scopedInstructions = projectRootPath
       ? scopedInstructionResolver.resolveForPaths({
-          userInstructionsPath: appPathService.getUserRdxPaths().instructionsPath,
+          userInstructionsPath: appPathService.getUserRdcPaths().instructionsPath,
           projectRoot: projectRootPath,
           activePaths,
         })

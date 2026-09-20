@@ -12,13 +12,13 @@ vi.mock('electron', () => ({
   },
 }));
 
-vi.mock('../../sessions/RdxRuntimeContextRegistry', () => ({
-  assertRdxContextLeaseOwnership: vi.fn(() => null),
-  getRdxContextLease: vi.fn(() => null),
-  setRdxRuntimeContextForSession: vi.fn(() => null),
+vi.mock('../../sessions/RdcRuntimeContextRegistry', () => ({
+  assertRdcContextLeaseOwnership: vi.fn(() => null),
+  getRdcContextLease: vi.fn(() => null),
+  setRdcRuntimeContextForSession: vi.fn(() => null),
 }));
 
-import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
+import { assertRdcContextLeaseOwnership } from '../../sessions/RdcRuntimeContextRegistry';
 import { resolveAgentToolAllowlistFromDefinition } from './DebuggerRuntimePolicy';
 import { RuntimeToolAssembly } from './RuntimeToolAssembly';
 import { toolValidator } from '../../agent-runtime/core/ToolValidator';
@@ -111,20 +111,20 @@ describe('RuntimeToolAssembly', () => {
     expect(result.details?.questions).toEqual([]);
   });
 
-  it('createRdxContextTool reports missing lease', async () => {
+  it('createRdcContextTool reports missing lease', async () => {
     const assembly = createAssembly();
-    const tool = assembly.createRdxContextTool('sess-1', 'proj-1');
+    const tool = assembly.createRdcContextTool('sess-1', 'proj-1');
     const result = await tool.execute('tc-1', {});
     expect(result.details).toEqual({ available: false });
-    expect(assertRdxContextLeaseOwnership).toHaveBeenCalled();
+    expect(assertRdcContextLeaseOwnership).toHaveBeenCalled();
   });
 
-  it('createRdxContextTool returns runtime context when lease exists', async () => {
-    vi.mocked(assertRdxContextLeaseOwnership).mockReturnValueOnce({
+  it('createRdcContextTool returns runtime context when lease exists', async () => {
+    vi.mocked(assertRdcContextLeaseOwnership).mockReturnValueOnce({
       runtimeContext: { capture: 'demo.rdc' },
     } as never);
     const assembly = createAssembly();
-    const tool = assembly.createRdxContextTool('sess-1', 'proj-1');
+    const tool = assembly.createRdcContextTool('sess-1', 'proj-1');
     const result = await tool.execute('tc-1', {});
     expect(result.details).toEqual({ available: true });
     expect(result.content[0]).toMatchObject({ type: 'text' });

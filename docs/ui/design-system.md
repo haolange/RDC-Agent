@@ -6,7 +6,7 @@
 2. [`workbench-and-transcript.md`](workbench-and-transcript.md) — Workbench / Composer Effort / transcript 产品规格
 3. [`AGENTS.md`](../../AGENTS.md) — token / 按钮 / Appearance 执行纪律
 4. [`src/renderer/styles/design-system.css`](../../src/renderer/styles/design-system.css) — primitive + semantic token 定义
-5. [`src/shared/theme/`](../../src/shared/theme/) — preset catalog、`ThemeChromeCompiler`、`rdx-theme-v1`、compose accent 派生
+5. [`src/shared/theme/`](../../src/shared/theme/) — preset catalog、`ThemeChromeCompiler`、`rdc-theme-v1`、compose accent 派生
 6. [`designs/rdc-agent-design-system/Design System Preview.html`](../../designs/rdc-agent-design-system/Design%20System%20Preview.html) — 可交互预览
 
 ## 视觉定位
@@ -92,7 +92,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 - Light/Dark（含 system）影响两套体系的亮度调制。
 - 不提供 translucent sidebar。
-- 主题分享格式：`rdx-theme-v1:`（拒绝 `codex-theme-v1:`）。
+- 主题分享格式：`rdc-theme-v1:`（拒绝 `codex-theme-v1:`）。
 - 预设：RDC（默认）+ Absolutely / Ayu / Catppuccin / Dracula / Everforest / GitHub / Gruvbox / Linear。
 
 ## CSS 入口

@@ -868,7 +868,7 @@ const fileGutterPresentation = buildWorkProcessPresentation({
           id: 'tool-read-gutter',
           toolName: 'read_file',
           status: 'complete',
-          argsPreview: JSON.stringify({ path: '.rdx/project.yaml' }),
+          argsPreview: JSON.stringify({ path: '.rdc-agent/project.yaml' }),
           resultPreview: JSON.stringify({
             ok: true,
             data: {
@@ -886,7 +886,7 @@ const fileGutterPresentation = buildWorkProcessPresentation({
 });
 const fileGutterRow = flattenRows(fileGutterPresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'read_file');
 assert(fileGutterRow?.previewKind === 'file', 'read_file should project file preview kind');
-assert(fileGutterRow?.pathChip === '.rdx/project.yaml', 'read_file should expose pathChip');
+assert(fileGutterRow?.pathChip === '.rdc-agent/project.yaml', 'read_file should expose pathChip');
 assert(!fileGutterRow.previewLines.join('\n').includes('→'), 'file preview must strip Unicode line-number gutters');
 assert(fileGutterRow.previewLines.some((line) => line.includes('schema_version')), 'file preview should keep content after gutter strip');
 
@@ -1162,8 +1162,8 @@ assert(
   'Settings nav must list Policy and must not list Diagnostics',
 );
 assert(
-  !traceRightPanelSource.includes('RdxRuntimeContextPanel'),
-  'Right rail must consume the unified RDX Context projection.',
+  !traceRightPanelSource.includes('RdcRuntimeContextPanel'),
+  'Right rail must consume the unified RDC Context projection.',
 );
 
 assert(!componentSource.includes('work-process-tool-target is-toggle'), 'tool target dual-toggle disclosure must be removed');

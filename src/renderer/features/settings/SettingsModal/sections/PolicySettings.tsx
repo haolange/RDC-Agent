@@ -1,5 +1,5 @@
 import React from 'react';
-import type { RdxRuntimeOverview } from '@shared/types/rdxRuntime';
+import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 import {
   CONTEXT_COMPACTION_PERCENT_MAX,
   CONTEXT_COMPACTION_PERCENT_MIN,
@@ -25,10 +25,10 @@ const COMPACTION_PERCENT_OPTIONS: number[] = (() => {
 })();
 
 export const PolicySettings: React.FC<{
-  overview: RdxRuntimeOverview | null;
+  overview: RdcRuntimeOverview | null;
   scope: 'user' | 'project';
   onScopeChange: (scope: 'user' | 'project') => void;
-  onChanged: (overview: RdxRuntimeOverview) => void;
+  onChanged: (overview: RdcRuntimeOverview) => void;
 }> = ({ overview, scope, onScopeChange, onChanged }) => {
   const { t } = useI18n();
   const percent = useAppSettingsStore(

@@ -228,7 +228,7 @@ Effective Catalog 的模型事实来自三层合并（优先级递增）：
 
 1. **Manifest 基线**（`src/shared/provider-catalog/manifests`）：编译期确定的结构能力、协议、route、controls、bindings。
 2. **Discovery 投影**（live catalog）：账号级 live discovery 贡献的可用性、上下文窗口、reasoning metadata；只能收窄或补充，不能覆盖 manifest 结构能力。
-3. **用户覆盖**（`~/.rdx/models.json`，由 `ModelsOverrideService` 管理）：最高合并优先级，自带 provenance；可覆盖定价、上下文窗口、显示名等非安全字段。**禁止**触及 `route.protocol`、`authSchemaId`、`adapterId`、`compatibilityGroup`、`carrier` 等安全/延续性字段。
+3. **用户覆盖**（`~/.rdc-agent/models.json`，由 `ModelsOverrideService` 管理）：最高合并优先级，自带 provenance；可覆盖定价、上下文窗口、显示名等非安全字段。**禁止**触及 `route.protocol`、`authSchemaId`、`adapterId`、`compatibilityGroup`、`carrier` 等安全/延续性字段。
 
 合并冲突记录 provenance，不静默覆盖。`EffectiveModelResolver` 在 `userOverrideContribution()` 中执行合并。
 

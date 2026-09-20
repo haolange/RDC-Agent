@@ -1,6 +1,6 @@
-# RDC/RDX Debugger Profile Overview
+# RDC/RDC Debugger Profile Overview
 
-Debugger is the RDC/RDX-oriented executable profile inside the general RDC-Agent workbench. It is not the only execution path: Edit, Analyzer, and Optimizer are also profiles with their own instructions, tools, approval policy, and handoffs.
+Debugger is the RDC/RDC-oriented executable profile inside the general RDC-Agent workbench. It is not the only execution path: Edit, Analyzer, and Optimizer are also profiles with their own instructions, tools, approval policy, and handoffs.
 
 ## User Flow
 
@@ -9,7 +9,7 @@ Debugger is the RDC/RDX-oriented executable profile inside the general RDC-Agent
 3. Select the Debugger profile when the task needs RenderDoc/RDC context.
 4. Provide the debugging goal.
 5. Review Work Process events, tool calls, approvals, diagnostics, and any handoff.
-6. Let approved app entries execute through configured RDX shell actions / system CLI.
+6. Let approved app entries execute through configured RDC shell actions / system CLI.
 7. Review trace, evidence, artifacts, and report output.
 
 ## Product Boundaries
@@ -22,9 +22,9 @@ Debugger is the RDC/RDX-oriented executable profile inside the general RDC-Agent
 
 ## Tooling Boundary
 
-Debugger execution uses configured shell access and stable `RdxRuntimeContext`. RDX CLI commands, action recipes, and catalog path are Settings data, not built-in application constants.
+Debugger execution uses configured shell access and stable `RdcRuntimeContext`. RDC-Tool CLI commands, action recipes, and catalog path are Settings data, not built-in application constants.
 
-Renderer UI displays state, approvals, trace, evidence, and artifacts. It does not execute arbitrary RDX tools.
+Renderer UI displays state, approvals, trace, evidence, and artifacts. It does not execute arbitrary RDC tools.
 
 ## Validation
 

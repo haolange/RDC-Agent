@@ -4,7 +4,7 @@ import { requestEnvelopeBuilder, requestSnapshotStore } from '../agent-runtime/p
 import { promptCacheCompiler } from '../agent-runtime/prompt/PromptCacheCompiler';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { LlmModelCapabilityProbeRequest, LlmProviderEntry } from '@shared/types/settings';
-import type { PromptPlan } from '@shared/types/rdxRuntime';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { generateEventId } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
 import { hashScopedResource } from '../runtime/ScopedResourceResolver';

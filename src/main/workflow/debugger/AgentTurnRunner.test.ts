@@ -38,7 +38,7 @@ import type { McpConnectionCoordinator, McpConnectionLease } from './McpConnecti
 import type { PreparedAgentRuntime } from './orchestratorTypes';
 import type { EffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { PromptPlan } from '@shared/types/rdxRuntime';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { turnCoordinator } from './TurnCoordinator';
 
 function createRunner(): AgentTurnRunner {

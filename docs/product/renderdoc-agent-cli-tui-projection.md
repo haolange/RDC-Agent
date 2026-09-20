@@ -2,7 +2,7 @@
 
 > 本文是 `renderdoc-agent-complete-design.md` 的 CLI/TUI 投影附录（draft）。
 > 它不定义第二套 Agent 架构，也不是当前产品权威；权威边界以根目录 `DESIGN.md` 为准。
-> 所有 Profile、Skill、Hook、Permission、Task、Sub-Agent、Handoff、RDX、Artifact 和 Knowledge 事实均来自与 Electron Workbench 相同的主进程与共享合同。
+> 所有 Profile、Skill、Hook、Permission、Task、Sub-Agent、Handoff、RDC、Artifact 和 Knowledge 事实均来自与 Electron Workbench 相同的主进程与共享合同。
 
 ## 1. 目标
 
@@ -12,12 +12,12 @@
 - Debugger / Analyzer / Optimizer Planning Orchestrator；
 - Mission -> General Handoff；
 - Task、Sub-Agent、Tool、Artifact 与错误投影；
-- 外部 RDX CLI Shell 调用；
+- 外部 RDC-Tool CLI Shell 调用；
 - deferred Knowledge Browse/Search/Read/Compile/Candidate Tool、Knowledge Scout 与 Candidate Human Review；
 - Default / Auto / FullAccess / Custom；
 - 同一 Session 的继续、取消、压缩与恢复。
 
-不为 TUI 新建第二套 Profile 注册表、Coordinator 状态机、RDX adapter、Task Store、Knowledge Index 或事件协议。
+不为 TUI 新建第二套 Profile 注册表、Coordinator 状态机、RDC adapter、Task Store、Knowledge Index 或事件协议。
 
 ## 2. 共同事实源
 
@@ -31,7 +31,7 @@
 | Task | TaskCreate/Update/Get/List/Stop |
 | Sub-Agent | 单进程独立 Context |
 | Handoff | `agent_handoff` 与 Handoff 事件 |
-| RDX | 外部 CLI + ShellInvocationService |
+| RDC | 外部 CLI + ShellInvocationService |
 | Work Process | 同一 Agent/Conversation/Trace 事件 |
 | Artifact | 同一 Session Artifact Store |
 | Knowledge | 同一 Query/Index/Compile/Candidate/Write Service、stable refs 与 index revision |
@@ -66,7 +66,7 @@ Profile 列表顺序与桌面一致：
 建议采用三段式终端布局：
 
 ```text
-┌ RDC-Agent ─ Project: Demo ─ Session: capture-01 ─ RDX: ready ───────────────┐
+┌ RDC-Agent ─ Project: Demo ─ Session: capture-01 ─ RDC: ready ───────────────┐
 │ Debugger · Default · Model Name · Context 18%                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ USER                                                                        │
@@ -75,13 +75,13 @@ Profile 列表顺序与桌面一致：
 │ WORKING                                                                     │
 │ ● 正在规划调查                                                              │
 │   ✓ 读取 capture/runtime 上下文                                              │
-│   ✓ 查询 rdx replay help                                                    │
+│   ✓ 查询 rdc replay help                                                    │
 │   ✓ 审阅计划  session://plans/plan.md                                       │
 │   ↳ Debugger → General                                                      │
 │                                                                             │
 │ GENERAL · EXECUTING                                                         │
 │   ◐ 定位首个异常事件                                                        │
-│   $ rdx ...                                                                 │
+│   $ rdc ...                                                                 │
 │   artifact  evidence/first-bad-event.json                                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ > 输入消息…                                                                 │
@@ -138,7 +138,7 @@ Tasks  2/4
 
 ```text
 command
-  rdx ...
+  rdc ...
 stdout
   ...
 stderr
@@ -150,10 +150,10 @@ exit
 连续同族调用达到聚合阈值时：
 
 ```text
-✓ Shell · 12 次 RDX 查询 · 2 artifacts · 18.4s
+✓ Shell · 12 次 RDC 查询 · 2 artifacts · 18.4s
 ```
 
-TUI 不增加 194 种 RDX Tool 行。它们都是 Shell。
+TUI 不增加 194 种 RDC Tool 行。它们都是 Shell。
 
 Knowledge Tool 仍使用统一 Tool 行，但提供 outcome-first family projection：
 
@@ -192,7 +192,7 @@ Knowledge Scout 使用同一披露：
 ```text
 ↳ Debugger → General
   plan: session://plans/plan-<ISO>-<hash8>.md
-  armed: renderdoc-execution, debugger-causal-method, rdx-cli-shell, debugger-rdx-tools
+  armed: renderdoc-execution, debugger-causal-method, rdc-tool-shell, debugger-rdc-tools
 ```
 
 发生 Handoff 后：
@@ -226,21 +226,21 @@ Knowledge Scout 使用同一披露：
 | `/tasks` | 当前 Task |
 | `/artifacts` | 当前 Session Artifact |
 | `/knowledge` | Knowledge Browse/Search/Read/Compile/Status/Authoring/Candidate Review 入口 |
-| `/status` | Project/Session/RDX/Provider 摘要 |
+| `/status` | Project/Session/RDC/Provider 摘要 |
 | `Ctrl+C` | 第一次停止当前 turn，空闲时按既有退出规则 |
 
 Profile picker 与 Permission picker 必须是两个独立控件。
 
-## 7. RDX CLI
+## 7. RDC-Tool CLI
 
 ### 7.1 Agent 调用
 
-General 使用结构化 `shell.rdx`。定向发现读取 prepareTurn 冻结的同一份定义，不启动 CLI；执行只提交 operation 与业务参数，身份由主进程注入：
+General 使用结构化 `shell.rdc`。定向发现读取 prepareTurn 冻结的同一份定义，不启动 CLI；执行只提交 operation 与业务参数，身份由主进程注入：
 
 ```json
-{"rdx":{"discovery":{"kind":"search","query":"texture pixel","limit":8}}}
-{"rdx":{"discovery":{"kind":"describe","operation":"rd.texture.get_pixel_history"}}}
-{"rdx":{"operation":"rd.texture.get_pixel_history","args":{"event_id":11,"x":0,"y":0,"target":{"rt_index":0}}}}
+{"rdc":{"discovery":{"kind":"search","query":"texture pixel","limit":8}}}
+{"rdc":{"discovery":{"kind":"describe","operation":"rd.texture.get_pixel_history"}}}
+{"rdc":{"operation":"rd.texture.get_pixel_history","args":{"event_id":11,"x":0,"y":0,"target":{"rt_index":0}}}}
 ```
 
 `discovery` 与 `operation` 互斥；Agent 不能提交 session、context 或 lease 身份。
@@ -248,14 +248,14 @@ General 使用结构化 `shell.rdx`。定向发现读取 prepareTurn 冻结的�
 不得：
 
 - 将 Catalog 展开进 Provider tools；
-- 建立 `rdx:<tool>` TUI command；
+- 建立 `rdc:<tool>` TUI command；
 - 为每个命令创建 slash command；
 - 通过 TUI renderer 绕过 ShellInvocationService；
-- 使用仓库内 RDX 副本或 MCP fallback。
+- 使用仓库内 RDC 副本或 MCP fallback。
 
 ### 7.2 人类终端
 
-如果 TUI 支持用户直接打开 Shell，直接输入的 `rdx` 与 Agent `shell` 应共享：
+如果 TUI 支持用户直接打开 Shell，直接输入的 `rdc-tool` 与 Agent `shell` 应共享：
 
 - Settings command；
 - cwd；
@@ -265,7 +265,7 @@ General 使用结构化 `shell.rdx`。定向发现读取 prepareTurn 冻结的�
 - Trace；
 - Secret 边界。
 
-人类 Shell 和 Agent Shell 的权限来源可以不同，但不能走两套 RDX 安装发现逻辑。
+人类 Shell 和 Agent Shell 的权限来源可以不同，但不能走两套 RDC 安装发现逻辑。
 
 ### 7.3 长输出
 
@@ -393,17 +393,17 @@ Rollback basis: v2 / hash 91a...
 TUI 可以提供文本编辑或跳转到文件，但必须遵守相同 scoped resource：
 
 ```text
-~/.rdx/agents
-~/.rdx/skills
-~/.rdx/hooks
-~/.rdx/policies
-~/.rdx/knowledge
-~/.rdx/memory
+~/.rdc-agent/agents
+~/.rdc-agent/skills
+~/.rdc-agent/hooks
+~/.rdc-agent/policies
+~/.rdc-agent/knowledge
+~/.rdc-agent/memory
 
-<project-root>/.rdx/...
+<project-root>/.rdc-agent/...
 ```
 
-Project Hook 的 trust/revoke/test 仍基于内容 hash。Project Scope 不能覆盖本机 RDX secret/action。
+Project Hook 的 trust/revoke/test 仍基于内容 hash。Project Scope 不能覆盖本机 RDC secret/action。
 
 TUI 不增加可配置 workspace root，不恢复旧目录 fallback。
 
@@ -416,7 +416,7 @@ PROVIDER   request failed
 POLICY     shell denied
 HOOK       mission-plan-handoff-check blocked
 SHELL      exit 2
-RDX        context stale
+RDC        context stale
 ARTIFACT   hash mismatch
 KNOWLEDGE  target conflict
 ```
@@ -424,7 +424,7 @@ KNOWLEDGE  target conflict
 Stop：
 
 - 中止当前 Provider turn；
-- 中止正在运行的 Shell/RDX；
+- 中止正在运行的 Shell/RDC；
 - 更新运行中 Task；
 - 保留已完成 Trace/Artifact；
 - 不把停止合成为成功 Final。
@@ -436,7 +436,7 @@ Resume：
 - Task 和 Artifact 从持久状态恢复；
 - Sub-Agent 内存 Task 不伪装成已持久化；
 - Knowledge Pack/Candidate 重新验证 source hashes 与 index revision，过期显示 stale，不自动注入；
-- RDX Context 必须重新验证，不能假设 daemon 状态仍有效。
+- RDC Context 必须重新验证，不能假设 daemon 状态仍有效。
 
 ## 11. Token 与上下文
 
@@ -447,7 +447,7 @@ Resume：
 - `knowledge_*` schema 全部 deferred；打开 `/knowledge` UI 不激活 Provider Tool。
 - Browse/Search 只返回 bounded summaries 和 stable refs；Read/Compile 受同一 Knowledge Budget Policy 约束。
 - 重检索由 Knowledge Scout 独立 Context 消费，父级只接收不超过合同预算的 Brief/Pack refs。
-- RDX help 定向读取。
+- RDC help 定向读取。
 - 长 Raw 输出和完整 Knowledge Pack 转 Artifact。
 - 仅自动压缩，复用 Structured Context/Handoff 与受控原始来源；不提供手动命令入口。
 - 不把 TUI 屏幕文本、Search 列表或 Candidate Review 反向复制为新的 Prompt Source。
@@ -513,8 +513,8 @@ TUI 不根据文本关键词猜测事件类型。
 10. Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version 六 lane 状态、match reason、stale 和分页/截断。无语义检索轴。
 11. Candidate Create 只写 Session Artifact。
 12. Candidate 明确 Promote/Reject，FullAccess 不绕过，未回答不自动选择。
-13. Session Resume 后 Pack/Candidate freshness 和 RDX Context 重新校验。
-14. RDX 定向 help、成功、失败、取消。
+13. Session Resume 后 Pack/Candidate freshness 和 RDC Context 重新校验。
+14. RDC 定向 help、成功、失败、取消。
 15. 长输出 Artifact。
 16. 80/120/160 列宽。
 17. truecolor/256/no-color。
@@ -523,7 +523,7 @@ TUI 不根据文本关键词猜测事件类型。
 20. New/Edit/Specialize/Import/Merge/Deprecate 共用 Session Draft、Diff/Conflict/Version/Change Reason/Rollback 确认；取消和失败不改 canonical Markdown/index revision。
 21. Rebuild 只更新派生索引，成功原子发布 revision，失败保留 last-known-good 并显示 stale/failed。
 22. 80/120/160 列下 Authoring View 的 Form/Preview/Confirm 路径均可达，无横向信息丢失。
-23. no TodoWrite、no MCP RDX、no 194 tool schemas、no fixed stage、no TUI Knowledge index、no autonomous Promote。
+23. no TodoWrite、no MCP RDC、no 194 tool schemas、no fixed stage、no TUI Knowledge index、no autonomous Promote。
 
 ## 15. 实现约束
 

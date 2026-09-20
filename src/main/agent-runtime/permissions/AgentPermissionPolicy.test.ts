@@ -11,7 +11,7 @@ import { compilePolicyFromRestrictive } from './PolicyCompiler';
 
 const { mockSettings } = vi.hoisted(() => ({
   mockSettings: {
-    paths: { userRdxRoot: 'D:\\AppWorkspace' },
+    paths: { userRdcRoot: 'D:\\AppWorkspace' },
     agentRuntime: {
       permissions: {
         mode: 'full-access' as AgentPermissionMode,
@@ -548,10 +548,10 @@ describe('AgentPermissionPolicyService shell risk classifier', () => {
 
 describe('AgentPermissionPolicyService knowledge read roots', () => {
   const service = new AgentPermissionPolicyService();
-  const userRdx = path.join(fixtureRoot, 'user-rdx');
-  const knowledgeRoot = path.join(userRdx, 'knowledge');
-  const memoryRoot = path.join(userRdx, 'memory');
-  const agentsRoot = path.join(userRdx, 'agents');
+  const userRdc = path.join(fixtureRoot, 'user-rdc');
+  const knowledgeRoot = path.join(userRdc, 'knowledge');
+  const memoryRoot = path.join(userRdc, 'memory');
+  const agentsRoot = path.join(userRdc, 'agents');
   const knowledgeFile = path.join(knowledgeRoot, 'cards', 'note.md');
 
   const writeFileTool: AgentTool = {
@@ -631,7 +631,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
     },
   );
 
-  it('denies sibling ~/.rdx/memory and ~/.rdx/agents reads', () => {
+  it('denies sibling ~/.rdc-agent/memory and ~/.rdc-agent/agents reads', () => {
     for (const sibling of [path.join(memoryRoot, 'x.md'), path.join(agentsRoot, 'ask.md')]) {
       const decision = service.evaluate({
         tool: readFileTool,
@@ -658,7 +658,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
   });
 
   it('does not auto-allow read_file through a knowledge-root junction into memory/agents', async () => {
-    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-policy-junc-'));
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-policy-junc-'));
     const knowledge = path.join(tmp, 'knowledge');
     const memory = path.join(tmp, 'memory');
     const agents = path.join(tmp, 'agents');
@@ -708,15 +708,15 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
 
 
 describe('file routing across permission modes', () => {
-  it.each(['default', 'auto-review', 'full-access', 'custom'] as const)('%s cannot allow file or RDX bypass', mode => {
-    for (const command of ['rg pattern', 'Get-Content file', 'type file', 'rdx version']) {
+  it.each(['default', 'auto-review', 'full-access', 'custom'] as const)('%s cannot allow file or RDC bypass', mode => {
+    for (const command of ['rg pattern', 'Get-Content file', 'type file', 'rdc-tool version']) {
       const decision = new AgentPermissionPolicyService().evaluate({
         tool: shellTool, toolCall: { type: 'toolCall', id: 'route', name: 'shell', arguments: { command } },
         agentId: 'general', effectiveToolNames: ['read_file', 'grep'],
         permissionSettings: { mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [command], deniedCommandPrefixes: [] },
       });
       expect(decision.action).toBe('deny');
-      expect(decision.reason).toContain(command.startsWith('rdx') ? 'RDX_VIA_COMMAND_DENIED' : 'SHELL_FILE_TOOL_BYPASS');
+      expect(decision.reason).toContain(command.startsWith('rdc') ? 'RDC_VIA_COMMAND_DENIED' : 'SHELL_FILE_TOOL_BYPASS');
     }
   });
 });

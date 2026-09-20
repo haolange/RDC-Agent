@@ -1,0 +1,36 @@
+name: Installation problem
+description: Report an RDC-Agent installation problem
+body:
+  - type: markdown
+    attributes:
+      value: Do not upload private captures, provider keys, or unredacted logs containing local absolute paths.
+  - type: input
+    id: os
+    attributes:
+      label: Windows version and architecture
+    validations:
+      required: true
+  - type: input
+    id: tool
+    attributes:
+      label: RDC-Tool version
+    validations:
+      required: true
+  - type: input
+    id: renderdoc
+    attributes:
+      label: RenderDoc runtime baseline
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Failed command or UI action (redact paths and secrets)
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true

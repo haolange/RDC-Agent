@@ -62,7 +62,7 @@ vi.mock('../../settings/AgentManifestService', () => ({
 
 vi.mock('../../settings/AgentRuntimeConfigService', () => ({
   agentRuntimeConfigService: {
-    loadSkill: (id: string) => (['inspect', 'renderdoc-execution', 'debugger-causal-method', 'rdx-cli-shell', 'debugger-rdx-tools', 'analyzer-rdx-tools', 'optimizer-rdx-tools', 'analyzer-architecture-method', 'optimization-experiment'].includes(id)
+    loadSkill: (id: string) => (['inspect', 'renderdoc-execution', 'debugger-causal-method', 'rdc-tool-shell', 'debugger-rdc-tools', 'analyzer-rdc-tools', 'optimizer-rdc-tools', 'analyzer-architecture-method', 'optimization-experiment'].includes(id)
       ? { id, name: id, description: 'd', instructions: id === 'inspect' ? 'Inspect' : fs.readFileSync(path.join(process.cwd(), 'resources/agent-runtime/skills', id, 'SKILL.md'), 'utf8'), allowedTools: id === 'inspect' ? ['read_file'] : [] }
       : null),
     listSkillMetadata: () => [],
@@ -77,7 +77,7 @@ vi.mock('../../runtime/ScopedInstructionResolver', () => ({
 
 vi.mock('../../runtime/AppPathService', () => ({
   appPathService: {
-    getUserRdxPaths: () => ({
+    getUserRdcPaths: () => ({
       instructionsPath: 'D:/user/instructions',
       hooksPath: 'D:/user/hooks',
     }),
@@ -274,7 +274,7 @@ describe('PromptPlanForTurn', () => {
   });
 
   it.each([{ mission: 'debugger', method: 'debugger-causal-method' }, { mission: 'analyzer', method: 'analyzer-architecture-method' }, { mission: 'optimizer', method: 'optimization-experiment' }])('materializes actual builtin $mission manuals as preloaded skill content', ({ mission, method }) => {
-    const requiredSkillIds = ['renderdoc-execution', method, 'rdx-cli-shell', `${mission}-rdx-tools`];
+    const requiredSkillIds = ['renderdoc-execution', method, 'rdc-tool-shell', `${mission}-rdc-tools`];
     const plan = service.buildPromptPlanForAgentTurn({
       agentId: 'ask',
       projectRootPath: null,

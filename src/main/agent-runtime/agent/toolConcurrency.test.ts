@@ -15,7 +15,7 @@ describe('toolConcurrency', () => {
     })).toBe(true);
   });
 
-  it('forces shell, write, RDX, MCP, ask, handoff, output, and task mutation serial', () => {
+  it('forces shell, write, RDC, MCP, ask, handoff, output, and task mutation serial', () => {
     for (const name of [
       'shell',
       'write_file',
@@ -23,8 +23,8 @@ describe('toolConcurrency', () => {
       'task_create',
       'task_update',
       'task_stop',
-      'rdx_context',
-      'rdx_probe',
+      'rdc_context',
+      'rdc_probe',
       'ask_user',
       'output_register',
       'mcp__fs__read',
@@ -41,7 +41,7 @@ describe('toolConcurrency', () => {
     expect(isToolCallConcurrencySafe({ name: 'subagent', args: { task: 'x' } })).toBe(false);
     const spec = { orchestration: true, isReadOnly: false, isConcurrencySafe: true, isDestructive: false, category: 'task' as const, requiresApproval: false };
     expect(isToolCallConcurrencySafe({ name: 'subagent', spec, args: { task: 'x' } })).toBe(true);
-    expect(isToolCallConcurrencySafe({ name: 'subagent', spec, args: { domainExtensions: { rdx: { requiresLease: true } } } })).toBe(true);
+    expect(isToolCallConcurrencySafe({ name: 'subagent', spec, args: { domainExtensions: { rdc: { requiresLease: true } } } })).toBe(true);
     expect(countSubagentCalls([{ name: 'subagent' }, { name: 'background_wait' }])).toBe(1);
   });
 

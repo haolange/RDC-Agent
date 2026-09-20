@@ -54,7 +54,7 @@ function requireCurrentSession(context: WorkbenchIpcContext, sessionId: string):
 function projectTarget(sessionId: string): string {
   const location = storageAdapter.sessions.findSessionLocation(sessionId);
   if (!location) throw new Error('PLAN_SESSION_NOT_FOUND');
-  return path.join(appPathService.getProjectRdxPaths(location.project.rootPath).plansPath, sessionId, 'plan.md');
+  return path.join(appPathService.getProjectRdcPaths(location.project.rootPath).plansPath, sessionId, 'plan.md');
 }
 
 function binding(request: PlanReadRequest, owner: string, target: string): string {

@@ -26,7 +26,7 @@
 - 如使用多 Agent，分配明确、互不重复的交付与验证边界；停止交叉探索、重复检查、空等和频繁切换。是否新增 Agent 遵循当前授权，不把某轮安排固定成永久禁令。
 - 用具体行为解释问题和进度：谁在做什么、还差什么、完成条件、实际阻塞和下一步。不要只报 Task 编号、术语或重复历史过程；更新任务状态，而非只追加日志。
 
-- RDX 查询、测量和缩略图沿用冻结的 capture/replay/context 身份。临时回放位置必须恢复并由主进程核验，恢复失败隔离 lease；能力声明不能替代身份检查、实际结果验证和签名回执。归属 daemon 必须先释放 context 再 `daemon stop`，并以进程回执为准；不得把 context clear 当成 daemon/worker 已退出。
+- RDC 查询、测量和缩略图沿用冻结的 capture/replay/context 身份。临时回放位置必须恢复并由主进程核验，恢复失败隔离 lease；能力声明不能替代身份检查、实际结果验证和签名回执。归属 daemon 必须先释放 context 再 `daemon stop`，并以进程回执为准；不得把 context clear 当成 daemon/worker 已退出。
 
 ## 代码与文档边界
 
@@ -62,7 +62,7 @@ Appearance 详细规则见 docs/ui/appearance-checklist.md；禁止恢复 transl
 - 依赖唯一 pnpm@11.7.0，保留 pnpm-lock.yaml；pnpm-workspace.yaml 固定 store。禁止 npm/Yarn fallback、根盘 store、第二 launcher。node_modules/out/release/下载缓存/prepare state 仅本机；发布包不得带包管理器、lockfile、源码 launcher 或开发缓存。
 - resources 放分发资源，scripts 放可复用脚本；禁止恢复独立 cli/、Playwright e2e/、docs/handover/。designs 只保留 rdc-agent-design-system。
 - 目录与文件按稳定职责命名，不以 v1/v2、new/old、final/final2 等迭代标签建立长期并行路径；协议或存储版本只在确有语义需要的边界表达。已有带版本名且仍被引用的实现，须先核对调用与契约再收敛，禁止凭名字直接删除。不提交乱码，先核实原始字节。
-- 用户资源根固定 ~/.rdx、项目 <project-root>/.rdx；不加可配置根、旧目录 fallback、双写或静默迁移。Project Scope 覆盖 agents/skills/MCP/hooks/policies/knowledge/memory；`plans/<sessionId>/` 只在用户点击「保存到项目」时写入。CLI executable、参数前缀、工作目录、环境、超时和 secret 为本机边界，project 不得覆盖。
+- 用户资源根固定 ~/.rdc-agent、项目 <project-root>/.rdc-agent；不加可配置根、旧目录 fallback、双写或静默迁移。Project Scope 覆盖 agents/skills/MCP/hooks/policies/knowledge/memory；`plans/<sessionId>/` 只在用户点击「保存到项目」时写入。CLI executable、参数前缀、工作目录、环境、超时和 secret 为本机边界，project 不得覆盖。
 - Prompt 调用经 PromptPlan；产品字段、投影与详细状态约束按下方主题路由读取。
 
 ### 本地整洁与清理原则
@@ -83,14 +83,14 @@ Appearance 详细规则见 docs/ui/appearance-checklist.md；禁止恢复 transl
 模块字段、历史阶段和完整验收矩阵在主题文档维护，根文件不重复：
 - 运行时/安全：DESIGN.md、docs/contracts/runtime-kernel.md、permissions.md、failure-model.md、docs/architecture/agent-runtime-kernel.md。
 - Agent/Skill/Hook/Memory：docs/product/scoped-runtime-resources.md；RenderDoc 调查与 handoff：docs/product/renderdoc-agent-complete-design.md。
-- RDX 原生协议：docs/architecture/rdx-runtime.md；Browser bridge：docs/architecture/browser-qa-surface.md。
+- RDC 原生协议：docs/architecture/rdc-runtime.md；Browser bridge：docs/architecture/browser-qa-surface.md。
 - UI/Composer/Settings：docs/ui/workbench-and-transcript.md、design-system.md、appearance-checklist.md；session gate：docs/contracts/session-projection.md。
 
-关键边界不得回退：IPC parseIpcArgs + 单次 approvalToken；safeStorage fail-closed、无明文 secret IPC；sandbox:true + CSP 禁 inline；Hook/MCP trust 内容/路径/执行身份变更需 retrust；ProcessSupervisor 未观察 close/error 不移除；Turn generation 丢弃迟到事件；只投影 currentSession；RDX per-session lease 无全局镜像，离线 child 不得获得 RDX，unsafe 工具串行；Run 唯一 v3；Memory 活 pid 锁不回收；Knowledge 单一 main-owned 六 lane 五服务、无 Embedding、无自动 Candidate/Memory；Investigation provenance/hash/事务和认识论边界不放宽。
+关键边界不得回退：IPC parseIpcArgs + 单次 approvalToken；safeStorage fail-closed、无明文 secret IPC；sandbox:true + CSP 禁 inline；Hook/MCP trust 内容/路径/执行身份变更需 retrust；ProcessSupervisor 未观察 close/error 不移除；Turn generation 丢弃迟到事件；只投影 currentSession；RDC per-session lease 无全局镜像，离线 child 不得获得 RDC，unsafe 工具串行；Run 唯一 v3；Memory 活 pid 锁不回收；Knowledge 单一 main-owned 六 lane 五服务、无 Embedding、无自动 Candidate/Memory；Investigation provenance/hash/事务和认识论边界不放宽。
 
-prepareTurn 冻结 PromptPlan / EffectiveRuntimePlan 和本机 RDX binding。预载 skill allowed-tools 取交集，只收窄；skill_read 只读方法，不重算在途权限。普通任务留 General；Mission plan-only → `plan_artifact` 计划门（同意即冻结）→ 用户点声明按钮切到 General → General 就地终答 → 用户自行切回 Mission 评估。RDX 共享 shell 手册与三本专业工具手册只提供知识，必须由会话 execution offer 上声明的 requiredSkillIds 真实预载，不能授权操作或替代冻结 catalog。Full access 不绕过 Mission/lease/hard deny。`handoffs` 只驱动建议行和计划门按钮；人点后主进程 `applyDeclaredHandoff` 写/确认 offer 并 persist `session.agentId`。不存在 `agent_handoff` 工具、durable `prepared → committed → consumed` 状态机或自动回 Mission。
+prepareTurn 冻结 PromptPlan / EffectiveRuntimePlan 和本机 RDC binding。预载 skill allowed-tools 取交集，只收窄；skill_read 只读方法，不重算在途权限。普通任务留 General；Mission plan-only → `plan_artifact` 计划门（同意即冻结）→ 用户点声明按钮切到 General → General 就地终答 → 用户自行切回 Mission 评估。RDC 共享 shell 手册与三本专业工具手册只提供知识，必须由会话 execution offer 上声明的 requiredSkillIds 真实预载，不能授权操作或替代冻结 catalog。Full access 不绕过 Mission/lease/hard deny。`handoffs` 只驱动建议行和计划门按钮；人点后主进程 `applyDeclaredHandoff` 写/确认 offer 并 persist `session.agentId`。不存在 `agent_handoff` 工具、durable `prepared → committed → consumed` 状态机或自动回 Mission。
 
-shell.command 与 shell.rdx 互斥；结构化 RDX 仅 owning General，经审批与冻结原生 CLI。实验关闭必须验证主进程签名回执 baseline/intervention/variant/rollback/restored。旧记录可读；权限拒绝、未执行或 capture hash 不变不是回滚证据。旧 verified 不代表当前版本。
+shell.command 与 shell.rdc-agent 互斥；结构化 RDC 仅 owning General，经审批与冻结原生 CLI。实验关闭必须验证主进程签名回执 baseline/intervention/variant/rollback/restored。旧记录可读；权限拒绝、未执行或 capture hash 不变不是回滚证据。旧 verified 不代表当前版本。
 
 ## 验证范围与 Browser QA
 
@@ -101,7 +101,7 @@ shell.command 与 shell.rdx 互斥；结构化 RDX 仅 owning General，经审�
 
 局部改动运行受影响单测、typecheck、lint 和专项 check；跨层集成补完整 tests/coverage ratchet、check:gates、build；发布配置改动才 pack 并检查产物清洁。resource/instruction/prompt/skill/hook/memory 分别执行 check:scoped-resources、check:project-instructions、check:prompt-plan-snapshot、check:skills、check:hooks、check:memory-policy。安全/并发/取消/存储/provider wire 补 check:contracts。模型/tool/Knowledge/Investigation 改动补对应 check:*。AgentOrchestrator façade 必须 <800 行。
 
-main/preload/IPC/workspace/RDX 变更补真实启动或 Browser QA；UI 局部测受影响入口、交互、窄屏/键盘/焦点/disabled/selected/running，集成测跨层链，发布才完整产品矩阵。不得用 Playwright/Electron E2E 作门禁，不造 renderer demo。无设备的 Remote/Android 如实记录阻塞，不以本地成功代替。
+main/preload/IPC/workspace/RDC 变更补真实启动或 Browser QA；UI 局部测受影响入口、交互、窄屏/键盘/焦点/disabled/selected/running，集成测跨层链，发布才完整产品矩阵。不得用 Playwright/Electron E2E 作门禁，不造 renderer demo。无设备的 Remote/Android 如实记录阻塞，不以本地成功代替。
 
 Browser QA 默认 disposable start:agent-browser，使用完整 one-time /qa?qaBootstrap=... 进入同源 /app，不直开 Vite，不接受 URL token。仅显式要求真实账号/canonical/T15–T18 才用真实 userData。debug-only bridge 共用 ElectronAPI factory/manifest/handler，未知/内部/明文 secret/desktop-only fail-closed；high-impact 需 QA full access。性能按原生 Event Timing p95/Long Task，不按工具往返或 RAF。
 
@@ -113,11 +113,11 @@ Browser QA 默认 disposable start:agent-browser，使用完整 one-time /qa?qaB
 
 Session rail 为 Progress / Artifacts / Outputs / Context / Capture，投影契约见 `docs/contracts/session-projection.md`。
 
-## RDX 操作契约
+## RDC 操作契约
 
-RDX 接口只维护当前操作契约；包发布号仅用于安装诊断，不设 major-version 权限门槛。接入必须校验真实 catalog 指纹、参数、能力和 JSON 格式，手册引用当前生成定义，不绑定 V1/V2。
+RDC 接口只维护当前操作契约；包发布号仅用于安装诊断，不设 major-version 权限门槛。接入必须校验真实 catalog 指纹、参数、能力和 JSON 格式，手册引用当前生成定义，不绑定 V1/V2。
 
-操作定义、参数约束、scope、effects 与证据类型来自配置 CLI 的完整 catalog；prepareTurn 冻结目录指纹、CLI 配置和 owning lease。应用固定生命周期通过原生调用边界生成 argv，不恢复自定义生命周期命令、catalogPath 或 JSON 模式配置。普通执行由主进程校验能力、身份、路径和前置条件；Skill 只提供知识，不能授权。专业手册参考通过生成器更新，Mission 声明续跑上的 requiredSkillIds 必须在 General prepareTurn 实际加载。详见 docs/architecture/rdx-runtime.md。
+操作定义、参数约束、scope、effects 与证据类型来自配置 CLI 的完整 catalog；prepareTurn 冻结目录指纹、CLI 配置和 owning lease。应用固定生命周期通过原生调用边界生成 argv，不恢复自定义生命周期命令、catalogPath 或 JSON 模式配置。普通执行由主进程校验能力、身份、路径和前置条件；Skill 只提供知识，不能授权。专业手册参考通过生成器更新，Mission 声明续跑上的 requiredSkillIds 必须在 General prepareTurn 实际加载。详见 docs/architecture/rdc-runtime.md。
 
 专业 Agent 只需完整掌握职责内的工具集合；用途、参数、结果解释、示例和限制由明确成员清单与生成参考覆盖，不复制全部工具箱。共享 CLI/身份/输出/恢复知识只维护一份，专业手册引用；Mission → General → Mission 复用现有交接，不能仅用提示词中的 Skill 名称代替实际加载。
 
@@ -125,6 +125,6 @@ RDX 接口只维护当前操作契约；包发布号仅用于安装诊断，不�
 
 ## Capture replay 改动门禁
 
-项目 RDC 为空的原空态必须保持。修改 Capture 时同时核对 per-session runtime、context 串行执行、Agent 生命周期锁、requested/applied/image EID 和内容 hash。内嵌回放不得恢复应用 human-preview 窗口或旧 Settings action；不要删除 Tools 独立 CLI 的有效窗口能力。足迹与用户 capture/正式证据分开管理。Android 设备呈现必须有真实回执，`unsupported` 不能标绿。除既有专项门禁，运行 `RdxSessionRuntime`、`RdxSessionService`、`executeRdxShell`、ReplayHistoryStore 的受影响测试。
+项目 RDC 为空的原空态必须保持。修改 Capture 时同时核对 per-session runtime、context 串行执行、Agent 生命周期锁、requested/applied/image EID 和内容 hash。内嵌回放不得恢复应用 human-preview 窗口或旧 Settings action；不要删除 Tools 独立 CLI 的有效窗口能力。足迹与用户 capture/正式证据分开管理。Android 设备呈现必须有真实回执，`unsupported` 不能标绿。除既有专项门禁，运行 `RdcSessionRuntime`、`RdcSessionService`、`executeRdcShell`、ReplayHistoryStore 的受影响测试。
 
 软件应处理用户正常环境，不要求连接前清空设备进程。Android helper 的启动、已有服务连接、就绪检查和自有资源清理由 Tools 统一实现，Agent 复用并展示准确状态与恢复入口，不另写一套设备进程逻辑。进程存在不等于服务被占用；复用用户 helper 不代表取得关闭、重装或修改配置的权限。

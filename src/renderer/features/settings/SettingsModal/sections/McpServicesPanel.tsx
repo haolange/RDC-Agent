@@ -1,6 +1,6 @@
 import React from 'react';
 import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
-import type { RdxRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdxRuntime';
+import type { RdcRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdcRuntime';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { Badge, type BadgeTone } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
@@ -51,10 +51,10 @@ function ConnectionBadge({ server }: { server: MCPServerStatusSummary | undefine
  * Connection failure and trust are independent facts and stay in separate badges.
  */
 export const McpServicesPanel: React.FC<{
-  overview: RdxRuntimeOverview | null;
+  overview: RdcRuntimeOverview | null;
   scope: 'user' | 'project';
   onScopeChange: (scope: 'user' | 'project') => void;
-  onChanged: (overview: RdxRuntimeOverview) => void;
+  onChanged: (overview: RdcRuntimeOverview) => void;
 }> = ({ overview, scope, onScopeChange, onChanged }) => {
   const { t } = useI18n();
   const status = useMcpStatus();

@@ -9,7 +9,7 @@ import { HooksSettings } from './sections/HooksSettings';
 import { PolicySettings } from './sections/PolicySettings';
 import type { AppSettings } from '@shared/types/settings';
 import type { useSettingsModal } from './useSettingsModal';
-import type { useRdxRuntimeOverview } from './useRdxRuntimeOverview';
+import type { useRdcRuntimeOverview } from './useRdcRuntimeOverview';
 
 type PageState = Pick<ReturnType<typeof useSettingsModal>,
   'activeSection' | 't' | 'accountDraft' | 'setAccountDraft' | 'handleAvatarSelect' |
@@ -18,12 +18,12 @@ type PageState = Pick<ReturnType<typeof useSettingsModal>,
   'setChromeTheme' | 'accountProviders' | 'providerCatalog' | 'providerCatalogCategories' | 'getResolvedProviderLabel' |
   'handleRefreshProviderModels' | 'handleDisconnectProvider' | 'openProviderConnection' | 'agentManifestDrafts' | 'setAgentManifestDrafts' |
   'handleSaveAgentManifests' | 'handleImportAgentManifest' | 'agentManifestSaveState' | 'agentManifestSaveMessage' | 'agentManifestSaveBlocked' |
-  'rdxCliDraft' | 'codeInterpreterDraft' | 'shellDraft' | 'setRdxCliDraft' |
+  'rdcCliDraft' | 'codeInterpreterDraft' | 'shellDraft' | 'setRdcCliDraft' |
   'setCodeInterpreterDraft' | 'setShellDraft' | 'handleSaveToolsConfig' | 'dirty'>;
 interface SettingsPageContentProps {
   modal: PageState;
   settings: AppSettings;
-  runtime: Pick<ReturnType<typeof useRdxRuntimeOverview>, 'overview' | 'setOverview'>;
+  runtime: Pick<ReturnType<typeof useRdcRuntimeOverview>, 'overview' | 'setOverview'>;
   resourceScope: 'user' | 'project';
   setResourceScope: (scope: 'user' | 'project') => void;
   onOpenResourceDiagnostics: () => void;
@@ -61,10 +61,10 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
     agentManifestSaveState,
     agentManifestSaveMessage,
     agentManifestSaveBlocked,
-    rdxCliDraft,
+    rdcCliDraft,
     codeInterpreterDraft,
     shellDraft,
-    setRdxCliDraft,
+    setRdcCliDraft,
     setCodeInterpreterDraft,
     setShellDraft,
     handleSaveToolsConfig,
@@ -144,10 +144,10 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
       </header>
       <McpServicesPanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} onChanged={runtime.setOverview} />
       <ToolsSettings
-        rdxCliDraft={rdxCliDraft}
+        rdcCliDraft={rdcCliDraft}
         codeInterpreterDraft={codeInterpreterDraft}
         shellDraft={shellDraft}
-        onRdxCliDraftChange={setRdxCliDraft}
+        onRdcCliDraftChange={setRdcCliDraft}
         onCodeInterpreterDraftChange={setCodeInterpreterDraft}
         onShellDraftChange={setShellDraft}
         onSaveToolsConfig={handleSaveToolsConfig}

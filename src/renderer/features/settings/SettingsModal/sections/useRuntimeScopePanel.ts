@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { RdxRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdxRuntime';
+import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
 import { useI18n } from '../../../../i18n';
 import { emptyForm, formFromContent, type ResourceFormState } from './scopedResourceForm';
 import { uniqueResourceId } from './uniqueResourceId';
@@ -9,11 +9,11 @@ import { importScopedResourceFromPicker, saveScopedResource, templateResourceId 
 export { normalizeResourceId, templateResourceId } from './runtimeScopeMutations';
 
 export interface RuntimeScopePanelOptions {
-  overview: RdxRuntimeOverview | null;
+  overview: RdcRuntimeOverview | null;
   scope: 'user' | 'project';
   kind: ScopedResourceKind;
   kinds: ScopedResourceKind[];
-  onChanged?: (overview: RdxRuntimeOverview) => void;
+  onChanged?: (overview: RdcRuntimeOverview) => void;
 }
 
 export function useRuntimeScopePanel({

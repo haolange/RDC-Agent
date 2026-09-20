@@ -69,8 +69,8 @@ describe('concurrencyContract: temporary path roots', () => {
   });
 
   it('does not leak temporary roots across concurrent contexts', async () => {
-    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-conc-ws-'));
-    const external = await mkdtemp(path.join(os.tmpdir(), 'rdx-conc-ext-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdc-conc-ws-'));
+    const external = await mkdtemp(path.join(os.tmpdir(), 'rdc-conc-ext-'));
     roots.push(workspace, external);
     const externalFile = path.join(external, 'notes.txt');
     await writeFile(externalFile, 'ok', 'utf8');

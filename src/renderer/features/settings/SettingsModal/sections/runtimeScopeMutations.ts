@@ -1,4 +1,4 @@
-import type { RdxRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdxRuntime';
+import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
 import { selectFiles } from '../../../../hooks/appShellBridge';
 import { contentFromForm, type ResourceFormState } from './scopedResourceForm';
 import { importScopedResource, upsertScopedResource, validateScopedResource } from './runtimeScopeActions';
@@ -9,7 +9,7 @@ export const normalizeResourceId = (value: string): string =>
   value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || value;
 
 export type SaveScopedResourceOutcome =
-  | { ok: true; overview: RdxRuntimeOverview; id: string }
+  | { ok: true; overview: RdcRuntimeOverview; id: string }
   | { ok: false; messageKey: 'resourceArgsInvalid' | 'resourceIdExists'; message?: string }
   | { ok: false; messageKey: null; message: string };
 
@@ -65,7 +65,7 @@ export async function importScopedResourceFromPicker(input: {
   kind: ScopedResourceKind;
   scope: 'user' | 'project';
   projectRoot?: string;
-}): Promise<{ overview: RdxRuntimeOverview; imported: ScopedResourceDocument | null } | null> {
+}): Promise<{ overview: RdcRuntimeOverview; imported: ScopedResourceDocument | null } | null> {
   const paths = await selectFiles();
   const filePath = paths?.[0];
   if (!filePath) return null;

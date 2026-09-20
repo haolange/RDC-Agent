@@ -33,7 +33,7 @@
     // Bare `mcp` tool vs `mcp__*` — product catalog differs.
     mcp: { zh: { running: '正在查询 MCP', complete: '已查询 MCP' }, en: { running: 'Querying MCP', complete: 'Queried MCP' } },
     mcp_call: { zh: { running: '正在调用 MCP', complete: '已调用 MCP' }, en: { running: 'Calling MCP', complete: 'Called MCP' } },
-    rdx_context: { zh: { running: '正在读取 RDX 上下文', complete: '已读取 RDX 上下文' }, en: { running: 'Reading RDX context', complete: 'Read RDX context' } },
+    rdc_context: { zh: { running: '正在读取 RDC 上下文', complete: '已读取 RDC 上下文' }, en: { running: 'Reading RDC context', complete: 'Read RDC context' } },
     subagent: { zh: { running: '正在调用子代理', complete: '已调用子代理' }, en: { running: 'Calling subagent', complete: 'Called subagent' } },
     task_create: { zh: { running: '正在创建任务', complete: '已创建任务' }, en: { running: 'Creating task', complete: 'Created task' } },
     task_update: { zh: { running: '正在更新任务', complete: '已更新任务' }, en: { running: 'Updating task', complete: 'Updated task' } },

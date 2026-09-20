@@ -129,9 +129,9 @@ describe('system debt ratchet CLI', () => {
     expect(result.stdout).toContain('profile-ceiling: ok');
     expect(result.stdout).toContain('hard-taskstore-rename: ok');
     expect(result.stdout).toContain('hard-taskstore-type-ref: ok');
-    expect(result.stdout).toContain('hard-rdx-settings-mcp: ok');
-    expect(result.stdout).toContain('hard-rdx-plain-name: ok');
-    expect(result.stdout).toContain('hard-rdx-agent-tool: ok');
+    expect(result.stdout).toContain('hard-rdc-settings-mcp: ok');
+    expect(result.stdout).toContain('hard-rdc-plain-name: ok');
+    expect(result.stdout).toContain('hard-rdc-agent-tool: ok');
     expect(result.stdout).toContain('hard-knowledge-write-token: ok');
     expect(result.stdout).toContain('hard-knowledge-write-canonical-lifecycle: ok');
     expect(result.stdout).toContain('hard-knowledge-write-canonical-tool: ok');
@@ -340,7 +340,7 @@ describe('system debt ratchet CLI', () => {
     expect(JSON.parse(token.stdout).ids).toEqual([]);
   });
 
-  it('hard-forbids renamed TaskStore, settings RDX MCP, and rd.* AgentTool but not plain objects', () => {
+  it('hard-forbids renamed TaskStore, settings RDC MCP, and rd.* AgentTool but not plain objects', () => {
     const dir = tempDir();
     mkdirSync(path.join(dir, 'src', 'main', 'alt'), { recursive: true });
     writeFileSync(path.join(dir, 'src', 'main', 'alt', 'HiddenStore.ts'), 'import type { TaskStore } from "../agent-runtime/tasks/TaskStore";\nexport class HiddenStore implements TaskStore {}\n', 'utf8');
@@ -350,10 +350,10 @@ describe('system debt ratchet CLI', () => {
 
     const mcpDir = tempDir();
     mkdirSync(path.join(mcpDir, 'src', 'renderer', 'features', 'settings'), { recursive: true });
-    writeFileSync(path.join(mcpDir, 'src', 'renderer', 'features', 'settings', 'HiddenRdxMcp.ts'), "export const mcpServers = [{ name: 'rdx', command: 'rdx-mcp' }];\n", 'utf8');
+    writeFileSync(path.join(mcpDir, 'src', 'renderer', 'features', 'settings', 'HiddenRdcMcp.ts'), "export const mcpServers = [{ name: 'rdc', command: 'rdc-mcp' }];\n", 'utf8');
     const settingsMcp = spawnNode(ratchetCli, ['--hard-forbid-only', '--repo-root', mcpDir]);
     expect(settingsMcp.status).not.toBe(0);
-    expect(`${settingsMcp.stderr}${settingsMcp.stdout}`).toMatch(/hard\.rdx-mcp-or-rd-tools/);
+    expect(`${settingsMcp.stderr}${settingsMcp.stdout}`).toMatch(/hard\.rdc-mcp-or-rd-tools/);
 
     const plainDir = tempDir();
     mkdirSync(path.join(plainDir, 'src', 'main'), { recursive: true });
@@ -366,7 +366,7 @@ describe('system debt ratchet CLI', () => {
     writeFileSync(path.join(toolDir, 'src', 'shared', 'constants', 'agentToolTokens.ts'), "export const BUILTIN_AGENT_TOOL_IDS = ['rd.foo'];\n", 'utf8');
     const builtin = spawnNode(ratchetCli, ['--hard-forbid-only', '--repo-root', toolDir]);
     expect(builtin.status).not.toBe(0);
-    expect(`${builtin.stderr}${builtin.stdout}`).toMatch(/hard\.rdx-mcp-or-rd-tools/);
+    expect(`${builtin.stderr}${builtin.stdout}`).toMatch(/hard\.rdc-mcp-or-rd-tools/);
   });
 
   it('still hard-fails autonomous writes inside KnowledgeWriteService.ts', () => {

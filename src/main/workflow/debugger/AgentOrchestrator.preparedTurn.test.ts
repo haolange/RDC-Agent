@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EffectiveModel } from '@shared/types/providerCapability';
-import type { EffectiveAgentProfile } from '@shared/types/rdxRuntime';
+import type { EffectiveAgentProfile } from '@shared/types/rdcRuntime';
 import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { pathIdentityKey } from '../../agent-runtime/knowledgeReadRoots';
@@ -21,17 +21,17 @@ vi.mock('../../runtime/AppPathService', async (importOriginal) => {
     ...actual,
     appPathService: new Proxy(actual.appPathService, {
       get(target, prop, receiver) {
-        if (prop === 'getUserRdxPaths') {
+        if (prop === 'getUserRdcPaths') {
           return () => {
-            const paths = target.getUserRdxPaths();
+            const paths = target.getUserRdcPaths();
             return knowledgeFixture.userKnowledgePath
               ? { ...paths, knowledgePath: knowledgeFixture.userKnowledgePath }
               : paths;
           };
         }
-        if (prop === 'getProjectRdxPaths') {
+        if (prop === 'getProjectRdcPaths') {
           return (projectRoot: string) => {
-            const paths = target.getProjectRdxPaths(projectRoot);
+            const paths = target.getProjectRdcPaths(projectRoot);
             return knowledgeFixture.projectKnowledgePath
               ? { ...paths, knowledgePath: knowledgeFixture.projectKnowledgePath }
               : paths;
@@ -233,11 +233,11 @@ describe('AgentOrchestrator prepared turn context', () => {
   });
 
   it('freezes existing user and project knowledge directories onto the plan', async () => {
-    const user = await mkdtemp(path.join(os.tmpdir(), 'rdx-prep-user-'));
-    const project = await mkdtemp(path.join(os.tmpdir(), 'rdx-prep-proj-'));
+    const user = await mkdtemp(path.join(os.tmpdir(), 'rdc-prep-user-'));
+    const project = await mkdtemp(path.join(os.tmpdir(), 'rdc-prep-proj-'));
     tempRoots.push(user, project);
     const userKnowledge = path.join(user, 'knowledge');
-    const projectKnowledge = path.join(project, '.rdx', 'knowledge');
+    const projectKnowledge = path.join(project, '.rdc-agent', 'knowledge');
     await mkdir(userKnowledge, { recursive: true });
     await mkdir(projectKnowledge, { recursive: true });
     knowledgeFixture.userKnowledgePath = userKnowledge;
@@ -259,7 +259,7 @@ describe('AgentOrchestrator prepared turn context', () => {
   });
 
   it('excludes a symlink/junction knowledge root and records a diagnostic', async () => {
-    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rdx-prep-link-'));
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rdc-prep-link-'));
     tempRoots.push(tmp);
     const real = path.join(tmp, 'real-knowledge');
     const link = path.join(tmp, 'knowledge');

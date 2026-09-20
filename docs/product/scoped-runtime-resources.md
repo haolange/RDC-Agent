@@ -4,36 +4,36 @@
 
 ## Scope 与存储
 
-用户资源根：`~/.rdx`。项目资源根：`<project-root>/.rdx`。无配置 workspace root、无旧目录 fallback、无静默迁移。
+用户资源根：`~/.rdc-agent`。项目资源根：`<project-root>/.rdc-agent`。无配置 workspace root、无旧目录 fallback、无静默迁移。
 
 ```text
-~/.rdx/
+~/.rdc-agent/
   config.json
-  RDX.md
+  RDC.md
   agents/  skills/  mcp/  hooks/  policies/  knowledge/  memory/
-  rdx-intermediate/
+  rdc-tool-intermediate/
 
 <project-root>/
-  RDX.md
-  .rdx/
+  RDC.md
+  .rdc-agent/
     project.yaml
     agents/ skills/ mcp/ hooks/ policies/ knowledge/ memory/
     inputs/ artifacts/ plans/
 ```
 
-应用拥有的 session / task / trace / UI / log / cache / secret 在 Electron OS data 下，不得写入 `~/.rdx` 或项目仓库。Project `.rdx/.gitignore` 排除 `inputs`、`artifacts`、`memory` 与 runtime state；`plans/` 不排除。
+应用拥有的 session / task / trace / UI / log / cache / secret 在 Electron OS data 下，不得写入 `~/.rdc-agent` 或项目仓库。Project `.rdc-agent/.gitignore` 排除 `inputs`、`artifacts`、`memory` 与 runtime state；`plans/` 不排除。
 
-优先级：`builtin < user < project`。整资源替换。Project disabled override 可故意遮蔽继承资源。Policy 只收紧。`.policy.yml` `limits.contextCompactionPercent` 默认 100（不设限）；用户级 Settings → Policy 顶部 Agent Runtime 压缩阈值为 50–90、步长 5，生效值为 `min(用户设置, policy)`。RDX CLI actions 与 secret 属本机边界，不能被 project 覆盖。
+优先级：`builtin < user < project`。整资源替换。Project disabled override 可故意遮蔽继承资源。Policy 只收紧。`.policy.yml` `limits.contextCompactionPercent` 默认 100（不设限）；用户级 Settings → Policy 顶部 Agent Runtime 压缩阈值为 50–90、步长 5，生效值为 `min(用户设置, policy)`。RDC-Tool CLI actions 与 secret 属本机边界，不能被 project 覆盖。
 
-Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导航：User | Project 作用域行 + Import/New + 详情编辑器。禁止装饰性 “RDX Runtime” kicker；禁止 Settings Diagnostics 导航。
+Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导航：User | Project 作用域行 + Import/New + 详情编辑器。禁止装饰性 “RDC Runtime” kicker；禁止 Settings Diagnostics 导航。
 
 ## Profiles
 
-四个 builtin：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件在 `resources/agent-runtime/agents`，再与 `~/.rdx/agents` 和 `<project-root>/.rdx/agents` 合成 effective snapshot。user/project 只能覆盖这四个 id，或新增无关自定义 id。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`；**无运行通道**（U01 落地 v2 迁移：shadow purge，真正改过正文/工具的 builtin-id 副本 `retained-override`）。迁移 marker 为 v2（U01 已落地）。Mission planner 工具面见裁决 J（plan-only + `rdx_probe`）。
+四个 builtin：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件在 `resources/agent-runtime/agents`，再与 `~/.rdc-agent/agents` 和 `<project-root>/.rdc-agent/agents` 合成 effective snapshot。user/project 只能覆盖这四个 id，或新增无关自定义 id。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`；**无运行通道**（U01 落地 v2 迁移：shadow purge，真正改过正文/工具的 builtin-id 副本 `retained-override`）。迁移 marker 为 v2（U01 已落地）。Mission planner 工具面见裁决 J（plan-only + `rdc_probe`）。
 
 ## Project Instructions
 
-解析顺序：`~/.rdx/RDX.md` → 项目根 `RDX.md` → 根到活跃目标目录链上的每个 `RDX.md`。拒绝 traversal/symlink escape；有预算与 provenance；不静默截断；不自动导入 `AGENTS.md`/`CLAUDE.md`。指令是模型上下文，不扩展文件系统或权限权威。
+解析顺序：`~/.rdc-agent/RDC.md` → 项目根 `RDC.md` → 根到活跃目标目录链上的每个 `RDC.md`。拒绝 traversal/symlink escape；有预算与 provenance；不静默截断；不自动导入 `AGENTS.md`/`CLAUDE.md`。指令是模型上下文，不扩展文件系统或权限权威。
 
 ## Skills
 
@@ -82,8 +82,8 @@ Account providers 是登录产品。Super Grok Account：xAI 公共 native-clien
 
 General 默认只预载 execution-orchestrator；renderdoc-investigation 按真实调查目标匹配，简单问答不路由。显式 Skill、profile 默认 Skill 和 execute 合同的 requiredSkillIds 合并去重；prepareTurn 校验可用性与工具权限交集，冻结来源，来源变化要求重新准备。skill_read 仍只读方法，不重算在途权限。
 
-Mission 必须先经 `plan_artifact` 计划门：用户点声明的 continue handoff 才冻结 Plan 并放行同 hash / 同 target 的 execute。RenderDoc Mission 的 execute 合同固定绑定共享执行方法、对应领域方法、`rdx-cli-shell` 和一本专业工具手册：Debugger 使用 `debugger-rdx-tools`，Analyzer 使用 `analyzer-rdx-tools`，Optimizer 使用 `optimizer-rdx-tools`。这四个 RDX 使用手册只对 General 可见；Mission 可以在合同中声明其 id，但不能读取或执行其工具。手册成员表是知识覆盖，不是权限表；未知操作、身份覆盖、路径越界或未满足前置条件仍在主进程执行前拒绝。
+Mission 必须先经 `plan_artifact` 计划门：用户点声明的 continue handoff 才冻结 Plan 并放行同 hash / 同 target 的 execute。RenderDoc Mission 的 execute 合同固定绑定共享执行方法、对应领域方法、`rdc-tool-shell` 和一本专业工具手册：Debugger 使用 `debugger-rdc-tools`，Analyzer 使用 `analyzer-rdc-tools`，Optimizer 使用 `optimizer-rdc-tools`。这四个 RDC 使用手册只对 General 可见；Mission 可以在合同中声明其 id，但不能读取或执行其工具。手册成员表是知识覆盖，不是权限表；未知操作、身份覆盖、路径越界或未满足前置条件仍在主进程执行前拒绝。
 
-专业参数参考由 `scripts/generate-rdx-tool-guides.mjs` 从相邻 RDX Tools 2.0 代码生成 catalog 读取，记录 catalog fingerprint。开发校验使用 `pnpm run check:rdx-tool-guides -- --catalog <RDC-Agent-Tools>/spec/tool_catalog.json`；生成内容不作为运行时 catalog，产品执行仍读取 prepareTurn 冻结的同一配置 CLI。
+专业参数参考由 `scripts/generate-rdc-tool-guides.mjs` 从相邻 RDC-Tool 1.0.0 代码生成 catalog 读取，记录 catalog fingerprint。开发校验使用 `pnpm run check:rdc-tool-guides -- --catalog <RDC-Tool>/spec/tool_catalog.json`；生成内容不作为运行时 catalog，产品执行仍读取 prepareTurn 冻结的同一配置 CLI。
 
 Plan / handoff v2 / 两轮预算 / 领域完成校验的权威约定见 [runtime-kernel.md](../contracts/runtime-kernel.md#通用-harness-与结构化交接2026-09-09)。

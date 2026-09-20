@@ -12,7 +12,7 @@ export type { ReplayHistoryEntry, ReplayHistoryScope, ReplayObservation, ReplayS
 export class ReplayHistoryStore {
   constructor(private readonly options: ReplayHistoryOptions = {}) {}
 
-  private root(projectRoot: string): string { return appPathService.getProjectRdxPaths(projectRoot).replayPath; }
+  private root(projectRoot: string): string { return appPathService.getProjectRdcPaths(projectRoot).replayPath; }
   private session(projectRoot: string, sessionId: string): string {
     assertSession(sessionId);
     return path.join(this.root(projectRoot), sessionId);

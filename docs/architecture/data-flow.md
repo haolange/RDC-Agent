@@ -1,6 +1,6 @@
 # Data Flow
 
-本文描述当前 project state、agent turn、Agentic Trace projection 和 RDX shell action 的跨层流向。
+本文描述当前 project state、agent turn、Agentic Trace projection 和 RDC shell action 的跨层流向。
 
 ## Agent Turn
 
@@ -30,16 +30,16 @@ sequenceDiagram
 
 `.agent.md` is the source for instructions, model, tools, agent handoffs, skills, MCP servers, and invocability. `plan_artifact` is a human-in-the-loop pause with a live session plan and a frozen approved copy; it is not a Right Rail output.
 
-## RDX Shell Actions
+## RDC Shell Actions
 
 ```mermaid
 sequenceDiagram
   participant UI as Renderer
   participant IPC as Main IPC
-  participant Session as RdxSessionService
-  participant Runtime as RdxSessionRuntime
+  participant Session as RdcSessionService
+  participant Runtime as RdcSessionRuntime
   participant Shell as ShellInvocationService
-  participant CLI as System-installed RDX CLI
+  participant CLI as System-installed RDC-Tool CLI
 
   UI->>IPC: capture:openProjectInput / capture:refreshFrame
   IPC->>Session: openProjectInput or preview
@@ -53,11 +53,11 @@ sequenceDiagram
   CLI-->>Shell: stdout / stderr / exit code
   Shell-->>Runtime: ShellInvocationResult
   Runtime-->>Session: parsed JSON or fail-closed diagnostic
-  Session-->>IPC: stable RdxRuntimeContext
+  Session-->>IPC: stable RdcRuntimeContext
   IPC-->>UI: context:changed and opened capture state
 ```
 
-RDX installation details remain under `settings.tooling.rdxCli`. The main session boundary constructs the fixed native operation names and arguments, and freezes CLI settings for each turn; renderer and preload never construct lifecycle commands.
+RDC installation details remain under `settings.tooling.rdcCli`. The main session boundary constructs the fixed native operation names and arguments, and freezes CLI settings for each turn; renderer and preload never construct lifecycle commands.
 
 Local Open invokes `rd.capture.open_file` followed by `rd.capture.open_replay`. Remote Open first invokes `rd.remote.connect`, then passes its returned `remote_id` to the replay operation. Failures expose structured diagnostics (`message`, optional `classification` / `fix_hint`) rather than truncated CLI stderr alone.
 

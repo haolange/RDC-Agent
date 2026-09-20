@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
-import type { PromptSegment } from '@shared/types/rdxRuntime';
+import type { PromptSegment } from '@shared/types/rdcRuntime';
 import { collectSessionTaskContextResources } from './rightRailTaskContextResources';
 
 const message = (blocks: ConversationWorkBlock[]): ConversationMessage => ({
@@ -64,7 +64,7 @@ describe('right rail task context resources', () => {
     const resources = collectSessionTaskContextResources({
       messages: [],
       promptSegments: [
-        segment({ id: 'skill:browser', kind: 'preloaded-skill', sourcePath: 'D:/project/.rdx/skills/browser/SKILL.md' }),
+        segment({ id: 'skill:browser', kind: 'preloaded-skill', sourcePath: 'D:/project/.rdc-agent/skills/browser/SKILL.md' }),
         segment({ id: 'instruction:project', kind: 'scoped-instruction', sourcePath: 'D:/project/AGENTS.md' }),
         segment({ id: 'profile:ask', kind: 'agent-profile', sourcePath: 'D:/agents/ask.agent.md' }),
         segment({ id: 'catalog', kind: 'skill-catalog', sourcePath: 'runtime://skills/catalog' }),

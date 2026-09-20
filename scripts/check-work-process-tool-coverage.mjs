@@ -213,11 +213,11 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ query: 'fs' }),
     resultPreview: toolEnvelope('filesystem', { servers: ['filesystem'] }),
   },
-  rdx_context: {
+  rdc_context: {
     argsPreview: '{}',
     resultPreview: toolEnvelope('capture: demo.rdc', { capturePath: 'demo.rdc' }),
   },
-  rdx_probe: {
+  rdc_probe: {
     argsPreview: JSON.stringify({ action: 'doctor' }),
     resultPreview: toolEnvelope('{"action":"doctor","exitCode":0}', {
       action: 'doctor',

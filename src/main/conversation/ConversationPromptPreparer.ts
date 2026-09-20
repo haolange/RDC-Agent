@@ -53,7 +53,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
   ].filter((value): value is string => Boolean(value));
   const scopedInstructions = projectRootPath
     ? scopedInstructionResolver.resolveForPaths({
-        userInstructionsPath: appPathService.getUserRdxPaths().instructionsPath,
+        userInstructionsPath: appPathService.getUserRdcPaths().instructionsPath,
         projectRoot: projectRootPath,
         activePaths,
       })

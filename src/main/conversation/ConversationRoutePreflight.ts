@@ -8,7 +8,7 @@ import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import type { AgentRole } from '@shared/types/agent';
 import { isTopLevelAgentId } from '@shared/types/agent';
 import type { AgentRouteCapability, AgentEvent } from '@shared/types/agentRuntime';
-import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdxRuntime';
+import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdcRuntime';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type {
   OpenedCaptureState,

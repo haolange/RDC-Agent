@@ -220,7 +220,7 @@ const renderIconPath = (icon: WorkProcessIconKey): ReactElement => {
       return <path d="M9 7V3m6 4V3M7 7h10v4a5 5 0 0 1-10 0V7Zm5 9v5" />;
     case 'monitor':
       return <path d="M4 5h16v10H4V5Zm5 15h6m-3-5v5" />;
-    case 'rdxProbe':
+    case 'rdcProbe':
       return (
         <>
           <path d="M4 5h16v10H4V5Zm5 15h6m-3-5v5" />

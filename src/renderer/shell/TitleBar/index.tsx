@@ -53,7 +53,7 @@ export function TitleBar({
           <div className="app-logo">
             <div className="app-logo-icon">RD</div>
             <div className="app-logo-copy">
-              <span className="app-logo-text">RDC Agent</span>
+              <span className="app-logo-text">RDC-Agent</span>
             </div>
           </div>
         )}

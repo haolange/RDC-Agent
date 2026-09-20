@@ -20,7 +20,7 @@ const DEBUGGER_LOOP_SKILLS = [
   'pixel-forensics',
   'report-composition',
   'capture-preflight',
-  'rdx-cli-shell',
+  'rdc-tool-shell',
   'artifact-provenance',
   'pass-graph-analysis',
   'shader-ir-analysis',
@@ -80,15 +80,15 @@ describe('DebuggerRuntimePolicy tool tokens', () => {
       'interpreter',
       'task',
       'output',
-      'rdxContext',
-      'rdx_probe',
+      'rdcContext',
+      'rdc_probe',
     ]);
     expect(expanded).toEqual(expect.arrayContaining([
       'read_file',
       'task_create',
       'task_stop',
-      'rdx_context',
-      'rdx_probe',
+      'rdc_context',
+      'rdc_probe',
     ]));
     expect(expanded).not.toContain('shell');
     expect(expanded).not.toContain('code_interpreter');
@@ -184,8 +184,8 @@ describe('combineActiveSkillAllowlists', () => {
       'investigation_write',
       'investigation_list',
       'artifact_read',
-      'rdx_context',
-      'rdx_probe',
+      'rdc_context',
+      'rdc_probe',
       'read_file',
       'read_image',
       'ask_user',
@@ -203,7 +203,7 @@ describe('combineActiveSkillAllowlists', () => {
     expect(runtime).not.toContain('shell');
     const review = combineActiveSkillAllowlists(runtime, [readSkillAllowedTools('skeptic-review')]);
     expect(review).toContain('artifact_read');
-    expect(review).not.toContain('rdx_probe');
+    expect(review).not.toContain('rdc_probe');
     expect(review).not.toContain('subagent');
   });
 });

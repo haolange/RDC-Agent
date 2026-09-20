@@ -13,7 +13,7 @@ afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recur
 
 describe('FileTaskStore', () => {
   it('retries a transient atomic rename without replacing or duplicating Task state', async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-store-')); roots.push(dir);
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-store-')); roots.push(dir);
     const registry = new TaskRegistry(dir); await registry.createTask('Existing');
     const target = path.join(dir, 'task-state.json'); const original = await readFile(target, 'utf8');
     const rename = (await vi.importActual<typeof import('fs/promises')>('fs/promises')).rename; let locked = false;
@@ -27,7 +27,7 @@ describe('FileTaskStore', () => {
   });
 
   it('preserves the authoritative state and removes the candidate after persistent rename denial', async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-store-')); roots.push(dir);
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-store-')); roots.push(dir);
     const registry = new TaskRegistry(dir); await registry.createTask('Existing');
     const target = path.join(dir, 'task-state.json'); const original = await readFile(target, 'utf8');
     const spy = vi.spyOn(fsPromises, 'rename').mockClear().mockRejectedValue(Object.assign(new Error('denied'), { code: 'EPERM' }));
@@ -38,7 +38,7 @@ describe('FileTaskStore', () => {
   });
 
   it('never silently converts or overwrites an existing noncurrent store', async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-store-'));
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-store-'));
     roots.push(dir);
     const original = '{"id":"task_old","subject":"Old","status":"completed"}';
     await writeFile(path.join(dir, 'task_old.json'), original);
@@ -52,7 +52,7 @@ describe('FileTaskStore', () => {
   });
 
   it('rejects malformed canonical records and dangling execution references', async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-store-'));
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-store-'));
     roots.push(dir);
     await writeFile(path.join(dir, 'task-state.json'), JSON.stringify({
       schemaVersion: 2,
@@ -72,7 +72,7 @@ describe('FileTaskStore', () => {
       (state) => { const messages = Object.values(state.messages)[0] as any[]; messages[0].kind = 'noise'; },
     ];
     for (const corrupt of corruptions) {
-      const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-store-'));
+      const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-store-'));
       roots.push(dir);
       const registry = new TaskRegistry(dir);
       const first = await registry.createTask('First');

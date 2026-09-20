@@ -21,7 +21,7 @@ describe('PlanReviewStateStore', () => {
   }
 
   it('starts revision 1 and increments until approved starts a new cycle', async () => {
-    roots.push(await mkdtemp(path.join(os.tmpdir(), 'rdx-plan-state-')));
+    roots.push(await mkdtemp(path.join(os.tmpdir(), 'rdc-plan-state-')));
     await mkdir(roots[0]!, { recursive: true });
     const store = createStore();
     const first = store.beginRevision('sess');
@@ -40,7 +40,7 @@ describe('PlanReviewStateStore', () => {
     expect(nextCycle.revision).toBe(1);
   });
   it('rejects invalid documents and preserves unsupported versions', async () => {
-    roots.push(await mkdtemp(path.join(os.tmpdir(), 'rdx-plan-state-')));
+    roots.push(await mkdtemp(path.join(os.tmpdir(), 'rdc-plan-state-')));
     const store = createStore();
     const file = store.getStatePath('sess')!;
     for (const patch of [{ revision: -2 }, { status: 'nonsense' }, { approvedHandoff: 42 }, { updatedAt: undefined }]) {

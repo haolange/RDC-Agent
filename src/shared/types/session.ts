@@ -74,13 +74,13 @@ export interface SessionRecord {
   agentId?: string;
 }
 
-/** Explicit project/session ownership for stateful RDX operations and events. */
+/** Explicit project/session ownership for stateful RDC operations and events. */
 export interface SessionScope {
   projectId: string;
   sessionId: string;
 }
 
-/** Every mutable RDX event carries its owning session; unowned state is never projected. */
+/** Every mutable RDC event carries its owning session; unowned state is never projected. */
 export interface SessionScopedPayload<T> extends SessionScope {
   payload: T;
 }
@@ -356,7 +356,7 @@ export interface PreparedTurnContextSummary {
 
 
 
-export interface RdxRuntimeContext {
+export interface RdcRuntimeContext {
   contextId: string;
   runtimeOwner: string;
   ownerLeaseId: string;
@@ -383,7 +383,7 @@ export interface ContextSnapshot {
   captureDescriptors: CaptureDescriptor[];
   activeCapture: string;
   deviceLabel: string;
-  runtimeContext?: RdxRuntimeContext | null;
+  runtimeContext?: RdcRuntimeContext | null;
 }
 
 export interface OpenedCapturePreview {
@@ -441,7 +441,7 @@ export interface OpenedCaptureState {
   preview?: OpenedCapturePreview | null;
   previewError?: OpenedCapturePreviewError | null;
   previewAttempts?: OpenedCapturePreviewAttempt[];
-  runtimeContext?: RdxRuntimeContext | null;
+  runtimeContext?: RdcRuntimeContext | null;
 }
 
 export interface OpenProjectInputRequest {

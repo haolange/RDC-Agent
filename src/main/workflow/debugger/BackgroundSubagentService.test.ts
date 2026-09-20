@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { TaskRegistry } from '../../agent-runtime/tasks';
 import { BackgroundSubagentService } from './BackgroundSubagentService';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
-import type { RequestEnvelopeSnapshot } from '@shared/types/rdxRuntime';
+import type { RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 import { flushPolicyBudgetObservers } from './DelegationBudget';
 
 const roots: string[] = [];

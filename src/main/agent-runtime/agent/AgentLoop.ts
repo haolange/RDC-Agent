@@ -86,10 +86,10 @@ export interface AgentLoopConfig {
     model: Model;
     context: Context;
     streamOptions: StreamOptions;
-    mailboxDeliveries?: import('@shared/types/rdxRuntime').RequestEnvelopeSnapshot['mailboxDeliveries'];
+    mailboxDeliveries?: import('@shared/types/rdcRuntime').RequestEnvelopeSnapshot['mailboxDeliveries'];
   }) => Promise<string | undefined> | string | undefined;
   onResponse?: (requestId: string | undefined, message: AssistantMessage) => Promise<void> | void;
-  beforeRequestMessages?: () => Promise<{ messages: Message[]; mailboxDeliveries?: import('@shared/types/rdxRuntime').RequestEnvelopeSnapshot['mailboxDeliveries']; commit?: () => Promise<void> }>;
+  beforeRequestMessages?: () => Promise<{ messages: Message[]; mailboxDeliveries?: import('@shared/types/rdcRuntime').RequestEnvelopeSnapshot['mailboxDeliveries']; commit?: () => Promise<void> }>;
 }
 
 /** Agent 上下文（messages 可在 loop 内增长；tools 经 runtime revision COW）。 */

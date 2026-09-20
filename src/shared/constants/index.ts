@@ -20,10 +20,10 @@ export type {
   ToolTokenDiagnostic,
 } from './agentToolTokens';
 export {
-  RDX_LEASE_TOOL_IDS,
-  isRdxLeaseToolName,
-  stripRdxLeaseToolsFromAllowlist,
-} from './rdxLeaseTools';
+  RDC_LEASE_TOOL_IDS,
+  isRdcLeaseToolName,
+  stripRdcLeaseToolsFromAllowlist,
+} from './rdcLeaseTools';
 export {
   CANONICAL_SKILL_IDS,
   FORBIDDEN_SKILL_NAMES,
@@ -51,11 +51,11 @@ export {
   isMissionProfileId,
 } from './missionPlanOnly';
 export {
-  RDX_PROBE_ACTIONS,
-  RDX_PROBE_READONLY_CLI_ACTIONS,
-  RdxProbeInputSchema,
-  compileRdxProbe,
-} from './rdxProbe';
+  RDC_PROBE_ACTIONS,
+  RDC_PROBE_READONLY_CLI_ACTIONS,
+  RdcProbeInputSchema,
+  compileRdcProbe,
+} from './rdcProbe';
 export {
   AGENT_SEED_ACCENTS,
   AGENT_DESCRIPTIONS,

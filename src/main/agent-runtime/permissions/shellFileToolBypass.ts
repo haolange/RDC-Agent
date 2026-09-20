@@ -54,11 +54,11 @@ export function matchShellFileToolBypass(
       if (head && (!head.quoted || invokeQuoted || !powershell)) {
         const name = head.value.split(/[/\\]/).pop()!.replace(/\.(exe|cmd|bat)$/i, '').toLowerCase();
         const args = segment.slice(first + 1).map(token => token.value);
-        if (name === 'rdx' || ((name === 'py' || /^python(?:\d+(?:\.\d+)*)?$/.test(name))
+        if ((name === 'rdc-tool' || name.startsWith('rdx')) || ((name === 'py' || /^python(?:\d+(?:\.\d+)*)?$/.test(name))
           && (args.some(arg => /(?:^|[/\\])run_cli\.py$/i.test(arg))
-            || args.some((arg, index) => arg === '-m' && args[index + 1] === 'rdx.cli')))
-          || (['pwsh', 'powershell'].includes(name) && args.some(arg => /(?:^|[/\\])rdx_bat_launcher\.ps1$/i.test(arg)))) {
-          return 'RDX_VIA_COMMAND_DENIED: use shell.rdx with the frozen installation and owning lease.';
+            || args.some((arg, index) => arg === '-m' && args[index + 1] === 'rdc_tool.cli')))
+          || (['pwsh', 'powershell'].includes(name) && args.some(arg => /(?:^|[/\\])rdc_bat_launcher\.ps1$/i.test(arg)))) {
+          return 'RDC_VIA_COMMAND_DENIED: use shell.rdc with the frozen installation and owning lease.';
         }
         const target = FILE_COMMANDS[name];
         if (target && effectiveToolNames.includes(target)) return `SHELL_FILE_TOOL_BYPASS: use ${target} instead of ${name}.`;

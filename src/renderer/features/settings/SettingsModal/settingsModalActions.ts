@@ -190,12 +190,12 @@ export function createSettingsModalActions({
   const handleSaveToolsConfig = async () => {
     const nextSettings = await patchSettings({
       tooling: {
-        rdxCli: modalState.rdxCliDraft,
+        rdcCli: modalState.rdcCliDraft,
         codeInterpreter: modalState.codeInterpreterDraft,
         shell: modalState.shellDraft,
       },
     });
-    modalState.setRdxCliDraft(nextSettings.tooling.rdxCli);
+    modalState.setRdcCliDraft(nextSettings.tooling.rdcCli);
     modalState.setCodeInterpreterDraft(nextSettings.tooling.codeInterpreter);
     modalState.setShellDraft(nextSettings.tooling.shell);
   };

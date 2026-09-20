@@ -16,10 +16,10 @@ describe('dedicated file routing', () => {
     'Select-String x', 'Set-Content f x', 'sed x f', 'find .', 'g`c f'])('rejects %s', command => {
     expect(matchShellFileToolBypass(command, 'pwsh', tools)).toContain('SHELL_FILE_TOOL_BYPASS');
   });
-  it.each(['rdx call rd.x', '& "C:\\Tools\\rdx.cmd" version', 'cmd /c rdx.exe version',
-    'python "C:\\Tools\\cli\\run_cli.py" version', 'py cli/run_cli.py version', 'python -m rdx.cli version',
-    'powershell -File C:\\Tools\\scripts\\rdx_bat_launcher.ps1 version'])('rejects native command bypass %s', command => {
-    expect(matchShellFileToolBypass(command, 'pwsh', [])).toContain('RDX_VIA_COMMAND_DENIED');
+  it.each(['rdc-tool call rd.x', '& "C:\\Tools\\rdc-tool.cmd" version', 'cmd /c rdc-tool.exe version',
+    'python "C:\\Tools\\cli\\run_cli.py" version', 'py cli/run_cli.py version', 'python -m rdc_tool.cli version',
+    'powershell -File C:\\Tools\\scripts\\rdc_bat_launcher.ps1 version'])('rejects native command bypass %s', command => {
+    expect(matchShellFileToolBypass(command, 'pwsh', [])).toContain('RDC_VIA_COMMAND_DENIED');
   });
   it.each(['echo "rg x; cat f"', 'git log --grep=hello', 'git show file', 'dir',
     'pnpm run check:contracts', 'echo hi > file', 'node scripts/check-tools.mjs'])('preserves %s', command => {

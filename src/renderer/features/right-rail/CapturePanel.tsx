@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { RdxContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
+import type { RdcContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
 import { copyAppText } from '../../hooks/appShellBridge';
 import { useDeviceStore } from '../../stores/deviceStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -26,7 +26,7 @@ import './CaptureReplay.css';
 type Action = 'open' | 'close' | 'refresh' | 'image' | 'clearHistory';
 const sizeLabel = (size: number) => size >= 1024 ** 3 ? `${(size / 1024 ** 3).toFixed(1)} GB` : `${(size / 1024 ** 2).toFixed(1)} MB`;
 
-function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: RdxContextPanelViewModel }) {
+function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: RdcContextPanelViewModel }) {
   const { t } = useI18n();
   const { state, selection, error: connectionError, reload, receive } = useCaptureReplay(scope);
   const devices = useDeviceStore((value) => value.devices);
@@ -140,7 +140,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   </div>;
 }
 
-export function CapturePanel({ task, capture }: { task: TaskContextPanelViewModel; capture: RdxContextPanelViewModel }) {
+export function CapturePanel({ task, capture }: { task: TaskContextPanelViewModel; capture: RdcContextPanelViewModel }) {
   const { t } = useI18n();
   const scope = useMemo(() => task.projectId && task.sessionId ? { projectId: task.projectId, sessionId: task.sessionId } : null, [task.projectId, task.sessionId]);
   return scope ? <ScopedCapturePanel key={`${scope.projectId}:${scope.sessionId}`} scope={scope} capture={capture} /> : <span>{t('control.replay.noSession')}</span>;

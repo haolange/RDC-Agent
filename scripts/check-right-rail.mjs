@@ -150,7 +150,7 @@ const context = read('src/renderer/features/right-rail/RightRailContext.tsx');
 for (const requiredArea of ['TaskContextPanelViewModel', 'TaskContextResource', "t('control.rightRail.context.resources')", "t('control.rightRail.outputs.open')"]) {
   requireText(context, requiredArea, `RightRailContext must retain ${requiredArea}`);
 }
-for (const forbidden of ['context?: ContextPanelViewModel', 'Rdx', 'Capture', 'Preview', 'Refresh', 'Copy', 'Clear', '<details', 'Session details', 'Replay options', 'Runtime details', 'Context ID', 'Replay session', 'Capture file', 'Remote ID', 'cliSummary', '<Fact label="CLI"', 'toolCount', 'namespace inventory']) {
+for (const forbidden of ['context?: ContextPanelViewModel', 'Rdc', 'Capture', 'Preview', 'Refresh', 'Copy', 'Clear', '<details', 'Session details', 'Replay options', 'Runtime details', 'Context ID', 'Replay session', 'Capture file', 'Remote ID', 'cliSummary', '<Fact label="CLI"', 'toolCount', 'namespace inventory']) {
   forbidText(context, forbidden, `RightRailContext must not retain ${forbidden}`);
 }
 
@@ -163,7 +163,7 @@ const capturePanel = [
   read('src/renderer/features/right-rail/CaptureFrame.tsx'),
   read('src/renderer/features/right-rail/CaptureHistory.tsx'),
 ].join('\n');
-for (const required of ['RdxContextPanelViewModel', 'control.captureOpen', 'capture.openProjectInput', 'capture.clearOpenedState', 'capture.applyReplayEvent', 'capture.refreshFrame', 'capture.listReplayHistory', 'capture.readReplayImage', 'capture.readLivePreview', 'capture-replay-device-row', 'role="tablist"', 'aria-selected', 'CaptureFrame', 'CaptureHistory']) {
+for (const required of ['RdcContextPanelViewModel', 'control.captureOpen', 'capture.openProjectInput', 'capture.clearOpenedState', 'capture.applyReplayEvent', 'capture.refreshFrame', 'capture.listReplayHistory', 'capture.readReplayImage', 'capture.readLivePreview', 'capture-replay-device-row', 'role="tablist"', 'aria-selected', 'CaptureFrame', 'CaptureHistory']) {
   requireText(capturePanel, required, `CapturePanel must retain ${required}`);
 }
 for (const retired of ['openHumanPreview', 'closeHumanPreview', 'humanPreviewStatus']) forbidText(capturePanel, retired, `Capture must retire ${retired}`);
@@ -182,7 +182,7 @@ const rightRailCss = [
 for (const required of ['.right-rail-empty-state', '.ui-empty-state-title', '.right-rail-empty-visual', 'grid-template-rows:', 'flex: 0 0 auto', 'font-size: var(--text-sm)', 'font-size: var(--text-xs)', '.right-rail-capture-panel', '.capture-replay-device-row', '.project-capture-import-section', '.project-capture-input-list', '.right-rail-investigation-list', '.right-rail-investigation-row']) {
   requireText(rightRailCss, required, `Right rail CSS must retain ${required}`);
 }
-for (const forbidden of ['.control-panel', '.cp-section', '.capture-library', '.panel-action-btn', 'trace-plan-preview', 'is-plan', '.right-rail-details', '.right-rail-context-area-heading', '.right-rail-rdx-context', '.right-rail-section:not(.is-empty)', '.right-rail-section.is-empty', '.right-rail-capture-summary']) {
+for (const forbidden of ['.control-panel', '.cp-section', '.capture-library', '.panel-action-btn', 'trace-plan-preview', 'is-plan', '.right-rail-details', '.right-rail-context-area-heading', '.right-rail-rdc-context', '.right-rail-section:not(.is-empty)', '.right-rail-section.is-empty', '.right-rail-capture-summary']) {
   forbidText(rightRailCss, forbidden, `RightRail.css must not retain ${forbidden}`);
 }
 
@@ -206,7 +206,7 @@ requireText(workbenchLayout, 'useNarrowViewport(RIGHT_RAIL_DRAWER_BREAKPOINT)', 
 const traceTypes = read('src/shared/types/trace.ts');
 for (const requiredContract of [
   'task: TaskContextPanelViewModel;',
-  'rdx: RdxContextPanelViewModel;',
+  'rdc: RdcContextPanelViewModel;',
   "export type TraceArtifactSource = 'report' | 'evidence' | 'image' | 'document' | 'data' | 'other';",
   'contextId?: string;',
   'replaySessionId?: string;',
@@ -262,7 +262,7 @@ for (const forbidden of ['session_plan', 'run_report', 'action_output', 'reportP
 }
 
 const outputRegistrationTool = read('src/main/reports/OutputRegistrationTool.ts');
-for (const required of ['createOutputRegistrationTool', "name: 'output_register'", "'.rdx', 'inputs'", 'runScopedStore.getRunRoot', 'artifactStore.register']) {
+for (const required of ['createOutputRegistrationTool', "name: 'output_register'", "'.rdc-agent', 'inputs'", 'runScopedStore.getRunRoot', 'artifactStore.register']) {
   requireText(outputRegistrationTool, required, `OutputRegistrationTool must retain ${required}`);
 }
 for (const forbidden of ['readdirSync', 'globSync', 'payload paths']) {
@@ -296,7 +296,7 @@ for (const [source, requiredTextValue, label] of [
   [docs.traceProtocol, '## Outputs lane', 'trace output projection contract'],
   [docs.traceProtocol, '## Context and Capture lanes', 'trace context projection contract'],
   [docs.sessionProjectionContract, '## Right Rail scoped payloads', 'session projection scope contract'],
-  [docs.specDrivenDevelopment, '## Right Rail projection', 'RDX right rail contract'],
+  [docs.specDrivenDevelopment, '## Right Rail projection', 'RDC right rail contract'],
   [docs.agents, '## Right Rail single-track gate', 'AGENTS right rail gate'],
 ]) {
   requireText(source, requiredTextValue, `missing ${label}`);
@@ -309,7 +309,7 @@ for (const forbiddenDocText of [
   '`plan.md` fixed',
   'CLI summary, and deduplicated diagnostics',
   "source: 'session_plan'",
-  'Context has only Task Context and RDX Context',
+  'Context has only Task Context and RDC Context',
   'exactly three top-level sections: `Progress / Artifacts / Context`',
   '目标三卡',
   '当前四卡',

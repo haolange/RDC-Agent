@@ -128,10 +128,10 @@ Note over M,P : 必要时通过 broadcastToRenderer 推送事件
 - workbenchHandlers.ts 是 IPC 组合根：
   - 初始化 IPC 状态：恢复当前 session/project/run，恢复中断运行，检测可恢复会话。
   - 安装 invoke 注册表：在首次注册时拦截 ipcMain.handle，建立本地 Map 记录所有已注册通道。
-  - 按域批量注册处理器：conversation、workflow、project、session、device、shell、web、toolEvidence、trace、rdxRuntime 等。
+  - 按域批量注册处理器：conversation、workflow、project、session、device、shell、web、toolEvidence、trace、rdcRuntime 等。
   - 启动后断言：assertRendererIpcParity 检查渲染器声明的所有通道是否都在主进程有实现，缺失则抛错。
   - 主题桥接：监听 nativeTheme 更新并向渲染器广播 app:themeChanged。
-  - 工具执行追踪：订阅 rdxCliInvokerService 的执行完成事件，写入日志与证据，并广播 tool:executionComplete。
+  - 工具执行追踪：订阅 rdcCliInvokerService 的执行完成事件，写入日志与证据，并广播 tool:executionComplete。
 
 ```mermaid
 flowchart TD

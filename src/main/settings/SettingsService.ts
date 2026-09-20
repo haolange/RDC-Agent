@@ -54,7 +54,7 @@ import {
   DEFAULT_LAYOUT,
   DEFAULT_PROFILE,
   DEFAULT_CODE_INTERPRETER,
-  DEFAULT_RDX_CLI_INVOKER,
+  DEFAULT_RDC_CLI_INVOKER,
   DEFAULT_SHELL_TOOLING,
   LEFT_DEFAULTS,
   RIGHT_DEFAULTS,
@@ -67,7 +67,7 @@ import {
   sanitizeAgentRuntimeContextSettings,
   sanitizeAgentShellSettings,
   sanitizeCodeInterpreterSettings,
-  sanitizeRdxCliInvokerSettings,
+  sanitizeRdcCliInvokerSettings,
   sanitizeSidebar,
   sanitizeTerminal,
   sanitizeWindow,
@@ -104,7 +104,7 @@ export class SettingsService {
 
     const rawPersisted = readJsonFile<PersistedSettingsPayload>(runtimePaths.settingsPath);
     assertPersistedSettingsSchemaVersion(rawPersisted, runtimePaths.settingsPath);
-    const rebuildResult = rebuildPersistedSettings(rawPersisted, runtimePaths.userRdxRoot);
+    const rebuildResult = rebuildPersistedSettings(rawPersisted, runtimePaths.userRdcRoot);
     this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
 
     this.initialized = true;
@@ -124,7 +124,7 @@ export class SettingsService {
   ): void {
     writeSettings(result.settings);
     shellResolver.clearCache();
-    deleteSecretsAfterCommit(result.secretRefsToDelete, paths.userRdxRoot);
+    deleteSecretsAfterCommit(result.secretRefsToDelete, paths.userRdcRoot);
   }
 
   getAll(runtimePaths?: Partial<AppRuntimePaths>): AppSettings {
@@ -136,7 +136,7 @@ export class SettingsService {
     return toRuntimeSettings(persisted, runtimePaths);
   }
 
-  getProviderSecret(providerId: string, workspaceRoot = appPathService.getUserRdxRoot()): string {
+  getProviderSecret(providerId: string, workspaceRoot = appPathService.getUserRdcRoot()): string {
     this.ensureInitialized();
 
     const persisted = normalizePersistedSettings(
@@ -154,7 +154,7 @@ export class SettingsService {
 
   hasProviderSecret(
     providerId: string,
-    workspaceRoot = appPathService.getUserRdxRoot(),
+    workspaceRoot = appPathService.getUserRdcRoot(),
   ): { hasSecret: boolean; maskedPreview?: string } {
     const plaintext = this.getProviderSecret(providerId, workspaceRoot);
     if (!plaintext) {
@@ -166,7 +166,7 @@ export class SettingsService {
 
   getProviderConnectionValues(
     providerId: string,
-    workspaceRoot = appPathService.getUserRdxRoot(),
+    workspaceRoot = appPathService.getUserRdcRoot(),
   ): Record<string, string> {
     this.ensureInitialized();
     const persisted = normalizePersistedSettings(
@@ -194,7 +194,7 @@ export class SettingsService {
     return values;
   }
 
-  getProviderOAuthSecret(providerId: string, workspaceRoot = appPathService.getUserRdxRoot()): string {
+  getProviderOAuthSecret(providerId: string, workspaceRoot = appPathService.getUserRdcRoot()): string {
     this.ensureInitialized();
     const provider = this.getAll().llm.providers.find((entry) => entry.id === providerId);
     return secretStorageService.getSecret(
@@ -252,7 +252,7 @@ export class SettingsService {
 
     const currentPersisted = normalizePersistedSettings(
       readJsonFile<PersistedSettingsPayload>(nextPaths.settingsPath) ?? createDefaultPersistedSettings(),
-      nextPaths.userRdxRoot,
+      nextPaths.userRdcRoot,
       { credentialView: 'storage-metadata' },
     );
 
@@ -268,7 +268,7 @@ export class SettingsService {
         || getProviderAccountSecretRef(provider.id, authAccountIds['api-key'], 'api-key');
       const apiKey = provider.apiKey?.trim() ?? '';
       if (provider.authMode === 'api-key' && apiKey) {
-        const previousSecret = getResolvedProviderSecret(provider.id, secretRef, nextPaths.userRdxRoot);
+        const previousSecret = getResolvedProviderSecret(provider.id, secretRef, nextPaths.userRdcRoot);
         if (!authAccountIds['api-key'] || previousSecret !== apiKey) {
           const previousRef = secretRef;
           authAccountIds['api-key'] = createLocalAccountId();
@@ -277,7 +277,7 @@ export class SettingsService {
             secretRefsToDelete.add(previousRef);
           }
         }
-        secretStorageService.setSecret(secretRef, apiKey, nextPaths.userRdxRoot);
+        secretStorageService.setSecret(secretRef, apiKey, nextPaths.userRdcRoot);
       } else if (provider.authMode === 'api-key' && provider.hasStoredSecretByAuthMode?.['api-key'] !== true && !provider.hasStoredSecret) {
         if (secretRef) secretRefsToDelete.add(secretRef);
         delete authAccountIds['api-key'];
@@ -287,9 +287,9 @@ export class SettingsService {
         activeAccountId: authAccountIds[provider.authMode],
         authAccountIds,
         secretRef,
-      }, nextPaths.userRdxRoot, { credentialView: providerCredentialView });
+      }, nextPaths.userRdcRoot, { credentialView: providerCredentialView });
     }).filter((provider): provider is LlmProviderEntry => provider !== null);
-    const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.userRdxRoot, {
+    const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.userRdcRoot, {
       credentialView: providerCredentialView,
     });
     if (typeof patch.agents?.globalInstructions === 'string') {
@@ -343,10 +343,10 @@ export class SettingsService {
           : currentPersisted.profile?.avatarPath || DEFAULT_PROFILE.avatarPath,
       },
       tooling: {
-        rdxCli: sanitizeRdxCliInvokerSettings({
-          ...(currentPersisted.tooling?.rdxCli ?? DEFAULT_RDX_CLI_INVOKER),
-          ...(patch.tooling?.rdxCli ?? {}),
-        }, DEFAULT_RDX_CLI_INVOKER, patch.tooling?.rdxCli !== undefined),
+        rdcCli: sanitizeRdcCliInvokerSettings({
+          ...(currentPersisted.tooling?.rdcCli ?? DEFAULT_RDC_CLI_INVOKER),
+          ...(patch.tooling?.rdcCli ?? {}),
+        }, DEFAULT_RDC_CLI_INVOKER, patch.tooling?.rdcCli !== undefined),
         codeInterpreter: sanitizeCodeInterpreterSettings({
           ...(currentPersisted.tooling?.codeInterpreter ?? DEFAULT_CODE_INTERPRETER),
           ...(patch.tooling?.codeInterpreter ?? {}),
@@ -369,7 +369,7 @@ export class SettingsService {
     };
 
     writeSettings(nextPersisted);
-    deleteSecretsAfterCommit(secretRefsToDelete, nextPaths.userRdxRoot);
+    deleteSecretsAfterCommit(secretRefsToDelete, nextPaths.userRdcRoot);
     return this.getAll({
       ...nextPaths,
       ...(runtimePaths ?? {}),
@@ -455,7 +455,7 @@ export class SettingsService {
       .filter((provider) => provider.enabled && provider.isConfigured && provider.status === 'verified')
       .map((provider) => {
         const accountCredential = provider.authMode === 'account'
-          ? resolveAccountRuntimeCredential(provider, settings.paths.userRdxRoot)
+          ? resolveAccountRuntimeCredential(provider, settings.paths.userRdcRoot)
           : { apiKey: '', baseUrl: undefined };
         return {
           id: provider.id,
@@ -463,7 +463,7 @@ export class SettingsService {
           label: provider.label,
           enabled: provider.enabled,
           apiKey: provider.authMode === 'api-key'
-            ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.paths.userRdxRoot)
+            ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.paths.userRdcRoot)
             : provider.authMode === 'account'
               ? accountCredential.apiKey
               : '',

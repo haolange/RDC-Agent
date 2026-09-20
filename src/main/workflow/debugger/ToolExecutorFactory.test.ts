@@ -49,7 +49,7 @@ vi.mock('../../hooks/HookEngine', () => ({
 
 vi.mock('../../runtime/AppPathService', () => ({
   appPathService: {
-    getUserRdxPaths: () => ({
+    getUserRdcPaths: () => ({
       hooksPath: 'D:/hooks',
       instructionsPath: 'D:/instructions',
     }),
@@ -464,7 +464,7 @@ describe('ToolExecutorFactory', () => {
       type: 'toolCall',
       id: 'live',
       name: 'subagent',
-      arguments: { domainExtensions: { rdx: { requiresLease: true } } },
+      arguments: { domainExtensions: { rdc: { requiresLease: true } } },
     })).toBe(false);
     expect(executor.reserveDispatchBudget?.([
       { type: 'toolCall', id: 'g1', name: 'read_file', arguments: {} },
@@ -507,7 +507,7 @@ describe('ToolExecutorFactory', () => {
   });
 
   it('injects knowledgeReadRoots only for the four read-only file tools', async () => {
-    const knowledgeRoot = 'D:/Users/me/.rdx/knowledge';
+    const knowledgeRoot = 'D:/Users/me/.rdc-agent/knowledge';
     const seen = new Map<string, readonly string[] | undefined>();
     const makeTool = (name: string) => ({
       name,
@@ -580,10 +580,10 @@ describe('ToolExecutorFactory', () => {
     const path = await import('node:path');
     const { readFileTool } = await import('../../agent-runtime/tools/primitives/ReadFileTool');
     const { writeFileTool } = await import('../../agent-runtime/tools/primitives/WriteFileTool');
-    const userRdx = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-exec-'));
-    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-exec-ws-'));
-    const knowledge = path.join(userRdx, 'knowledge');
-    const memory = path.join(userRdx, 'memory');
+    const userRdc = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-exec-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-exec-ws-'));
+    const knowledge = path.join(userRdc, 'knowledge');
+    const memory = path.join(userRdc, 'memory');
     await mkdir(knowledge, { recursive: true });
     await mkdir(memory, { recursive: true });
     await writeFile(path.join(memory, 'secret.md'), 'leak', 'utf8');
@@ -647,7 +647,7 @@ describe('ToolExecutorFactory', () => {
       expect(writeResult.isError).toBe(true);
       expect(JSON.stringify(writeResult)).toMatch(/超出 workspace/);
     } finally {
-      await Promise.all([rm(userRdx, { recursive: true, force: true }), rm(workspace, { recursive: true, force: true })]);
+      await Promise.all([rm(userRdc, { recursive: true, force: true }), rm(workspace, { recursive: true, force: true })]);
     }
   });
 });

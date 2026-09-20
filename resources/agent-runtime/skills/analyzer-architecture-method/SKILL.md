@@ -30,13 +30,13 @@ Shape: one `ClaimSet` (`kind: claim_set`) titled Architecture Model.
 
 ## Bounds
 
-Do not persist Knowledge. Do not call `memory_write`. Do not write these fields into Tasks, Profiles, or Messages. RDX runs only through the Settings-configured CLI.
+Do not persist Knowledge. Do not call `memory_write`. Do not write these fields into Tasks, Profiles, or Messages. RDC runs only through the Settings-configured CLI.
 
 ## 双 capture：由应用管理身份
 
 1. 用户通过应用 Capture 入口顺序打开 A、B；每份 capture 使用各自 owning Agent session。应用管理 open/close 和 lease。General 不调用 open_replay，不覆盖 session/context/lease 身份。
-2. 在 A 的 owning session，General 经已预载的共享 Skill 和 Analyzer 手册，用 shell.rdx 读取完整事件索引、action details、父链、pipeline shader hash/debug_name 和附件。把原始事实保存为带 capture hash、session、event、operation、证据引用的产物。
-3. 在 B 的 owning session 重复读取并保存独立身份事实。比较时读取两份已保存产物，不跨 session 借用 live lease；不在一个 shell.rdx 中伪造另一份 session_id。
+2. 在 A 的 owning session，General 经已预载的共享 Skill 和 Analyzer 手册，用 shell.rdc 读取完整事件索引、action details、父链、pipeline shader hash/debug_name 和附件。把原始事实保存为带 capture hash、session、event、operation、证据引用的产物。
+3. 在 B 的 owning session 重复读取并保存独立身份事实。比较时读取两份已保存产物，不跨 session 借用 live lease；不在一个 shell.rdc 中伪造另一份 session_id。
 4. 再用 $cross-capture-alignment 对齐已有事实。marker_path 缺失保留 null；重复 marker 不唯一。shader 内容 SHA-256 与非自动 debug_name 也可能缺失，不用跨文件 ResourceId 充当稳定键。无 marker 时只能提出由拓扑、附件、事件邻域支持的启发式，并保留反证和歧义。
 
 usage 的 is_read/is_write 可以为 null；binding-only 无法从 usage 确认。按真实事件和 color/depth attachment 在知识层组织资源版本和依赖假设，不能从空 usage 宣称“未使用”。回归对照先声明预期事实，保留原始结果、身份与 unsupported，再报告观察和推断。证据包仅是这些已有产物的组织方式，不创建宏或新的调查类型。

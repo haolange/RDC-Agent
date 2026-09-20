@@ -163,7 +163,7 @@ AO->>AO : 释放 MCP 租约/凭证句柄/临时状态
 - 职责：用于 Profile Turn（如子 Agent、后台任务、手递手场景），支持传入已准备的 Turn 上下文、冻结的请求计划、额外提示片段等。
 - 关键特性：
   - 支持 routeAgentId 与 modelOverride，灵活选择路由与模型
-  - 支持 excludeRdxLeaseTools 过滤特定工具
+  - 支持 excludeRdcLeaseTools 过滤特定工具
   - 支持 frozenDelegationCapsule.reasoningLevel 约束推理级别
   - 支持 onTerminalContext 回调，提供终端上下文统计与完成声明
   - 自动记录日志并更新状态
@@ -372,7 +372,7 @@ AgentOrchestrator 作为编排系统的主入口，提供了清晰、稳定、�
   - 参数：
     - agentId：目标 Agent 角色
     - content：输入文本
-    - options：preparedTurn、requestPlan、modelOverride、excludeRdxLeaseTools、frozenDelegationCapsule、onTerminalContext 等
+    - options：preparedTurn、requestPlan、modelOverride、excludeRdcLeaseTools、frozenDelegationCapsule、onTerminalContext 等
   - 返回：最终响应文本
 - prepareTurnContext(input)
   - 功能：准备 Turn 上下文，返回 PreparedAgentTurnContext

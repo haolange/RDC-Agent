@@ -1,5 +1,5 @@
 import React from 'react';
-import type { RdxRuntimeOverview } from '@shared/types/rdxRuntime';
+import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 import type { TranslationKey, useI18n } from '../../../../i18n';
 import { copyAppText, openAppPath } from '../../../../hooks/appShellBridge';
 import { Button } from '../../../../ui/Button';
@@ -24,7 +24,7 @@ const PATH_LABEL_KEYS: Record<string, TranslationKey> = {
   artifactsPath: 'settings.artifactsPath',
 };
 
-const ROOT_KEYS = new Set(['projectRoot', 'userRdxRoot', 'projectRdxRoot']);
+const ROOT_KEYS = new Set(['projectRoot', 'userRdcRoot', 'projectRdcRoot']);
 
 const pathLabel = (t: Translate, key: string): string => {
   const labelKey = PATH_LABEL_KEYS[key];
@@ -33,7 +33,7 @@ const pathLabel = (t: Translate, key: string): string => {
 
 interface ResourceDiagnosticsDialogProps {
   open: boolean;
-  overview: RdxRuntimeOverview | null;
+  overview: RdcRuntimeOverview | null;
   loading: boolean;
   error: string;
   onClose: () => void;
@@ -108,7 +108,7 @@ export const ResourceDiagnosticsDialog: React.FC<ResourceDiagnosticsDialogProps>
     >
       <div className="settings-path-roots">
         {rootRow(t('settings.workspaceRuntimeRoot'), overview?.userRoot)}
-        {rootRow(t('settings.workspaceProjectScope'), overview?.projectPaths?.projectRdxRoot)}
+        {rootRow(t('settings.workspaceProjectScope'), overview?.projectPaths?.projectRdcRoot)}
       </div>
       {error ? <InlineError>{error}</InlineError> : null}
       {pathRows(t('settings.workspaceUserScope'), overview?.userPaths)}

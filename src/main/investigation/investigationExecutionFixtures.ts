@@ -1,8 +1,8 @@
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
-import { RdxExecutionReceipts, rdxDigest, type RdxExecutionReceipt } from '../tools/RdxExecutionReceipts';
+import { RdcExecutionReceipts, rdcDigest, type RdcExecutionReceipt } from '../tools/RdcExecutionReceipts';
 
 /** Signed fixture results model a successful native A-B-A; never a production evidence source. */
-export function executionReceiptFixtures(sessionId: string, experimentId: string): RdxExecutionReceipt[] {
+export function executionReceiptFixtures(sessionId: string, experimentId: string): RdcExecutionReceipt[] {
   return ['baseline', 'intervention', 'variant', 'rollback', 'restored'].map((phase, index) => {
     const operation = phase === 'intervention' ? 'rd.shader.edit_and_replace'
       : phase === 'rollback' ? 'rd.shader.revert_replacement' : 'rd.perf.get_event_durations';
@@ -15,13 +15,13 @@ export function executionReceiptFixtures(sessionId: string, experimentId: string
       evidence: phase === 'intervention' ? { kind: 'intervention', replacementId: 'replacement-fixture' }
         : phase === 'rollback' ? { kind: 'rollback', replacementId: 'replacement-fixture' }
           : { kind: 'measurement', method: 'event_durations', conditionsFingerprint: 'b'.repeat(64), values: [2] },
-      operation, args, argsFingerprint: rdxDigest(args), result, resultHash: rdxDigest(result),
+      operation, args, argsFingerprint: rdcDigest(args), result, resultHash: rdcDigest(result),
       startedAt: index * 10, completedAt: index * 10 + 1, exitCode: 0 };
   });
 }
 export function seedExecutionEvidence(
-  store: RdxExecutionReceipts, sessionId: string, experimentId: string,
-  transform?: (records: RdxExecutionReceipt[]) => void,
+  store: RdcExecutionReceipts, sessionId: string, experimentId: string,
+  transform?: (records: RdcExecutionReceipt[]) => void,
 ): NonNullable<ExperimentRecord['executionEvidence']> {
   const records = executionReceiptFixtures(sessionId, experimentId);
   transform?.(records);

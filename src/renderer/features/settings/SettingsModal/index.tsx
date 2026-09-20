@@ -7,7 +7,7 @@ import { useSettingsModal } from './useSettingsModal';
 import { ResourceDiagnosticsDialog } from './sections/ResourceDiagnosticsDialog';
 import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
 import { SettingsCenterNav } from './SettingsCenterNav';
-import { useRdxRuntimeOverview } from './useRdxRuntimeOverview';
+import { useRdcRuntimeOverview } from './useRdcRuntimeOverview';
 import { Icon } from '../../../ui/Icon';
 import { IconButton } from '../../../ui/IconButton';
 import { UnsavedChangesDialog } from '../../../ui/UnsavedChangesDialog';
@@ -25,7 +25,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const modal = useSettingsModal(open, settings);
   const dialogRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const runtime = useRdxRuntimeOverview(open);
+  const runtime = useRdcRuntimeOverview(open);
   const [resourceScope, setResourceScope] = useState<'user' | 'project'>('user');
   const [resourceDiagnosticsOpen, setResourceDiagnosticsOpen] = useState(false);
   const {
@@ -94,7 +94,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
             <div className="settings-center-brand">
               <div className="settings-center-brand-icon">RD</div>
               <div className="settings-center-brand-copy">
-                <div className="settings-center-brand-title">RDC Agent</div>
+                <div className="settings-center-brand-title">RDC-Agent</div>
                 <div className="settings-center-brand-subtitle">{t('settings.title')}</div>
               </div>
             </div>

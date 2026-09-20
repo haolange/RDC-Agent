@@ -36,7 +36,7 @@ function context(root: string, vision: 'native' | 'disabled' = 'native'): ToolEx
 
 describe('ReadImageTool', () => {
   it('fails closed on non-vision routes', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-read-image-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-image-'));
     roots.push(root);
     await writeFile(path.join(root, 'frame.png'), PNG_1X1);
 
@@ -45,7 +45,7 @@ describe('ReadImageTool', () => {
   });
 
   it('returns a text block plus image block on vision routes', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-read-image-ok-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-image-ok-'));
     roots.push(root);
     await writeFile(path.join(root, 'frame.png'), PNG_1X1);
 
@@ -59,7 +59,7 @@ describe('ReadImageTool', () => {
   });
 
   it('rejects paths outside the workspace', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-read-image-escape-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-image-escape-'));
     roots.push(root);
 
     await expect(readImageTool.execute('img-2', { path: '../outside.png' }, undefined, undefined, context(root)))

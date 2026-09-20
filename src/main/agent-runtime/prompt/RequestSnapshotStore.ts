@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import type { RequestEnvelopeSnapshot } from '@shared/types/rdxRuntime';
+import type { RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 import { appPathService } from '../../runtime/AppPathService';
 
 const safeSegment = (value: string): string => value.replace(/[^a-zA-Z0-9._-]/g, '-');

@@ -79,7 +79,7 @@ function ScopedCaptureHistory({ scope, captureHash, state, active: visible }: Ca
         aria-label={t('control.replay.historySlider')} aria-valuetext={`${index + 1} / ${entries.length}`} onChange={(event) => select(Number(event.target.value))} />
     </div>
     {(entry || liveObservation) && <div className="capture-history-detail"><span title={shownSummary}>{shownSummary}</span><small>EID {shownEvent ?? '—'} · {modification ? t(`control.replay.${modification}` as Parameters<typeof t>[0]) : t('control.replay.saved')}</small>
-      {shownToolCall && <Button size="sm" variant="ghost" onClick={() => window.dispatchEvent(new CustomEvent('rdx:locate-tool-call', { detail: { ...scope, toolCallId: shownToolCall } }))}>{t('control.replay.message')}</Button>}
+      {shownToolCall && <Button size="sm" variant="ghost" onClick={() => window.dispatchEvent(new CustomEvent('rdc:locate-tool-call', { detail: { ...scope, toolCallId: shownToolCall } }))}>{t('control.replay.message')}</Button>}
     </div>}
     {(liveObservation?.saveError || error || entry?.failure) && <div className="capture-replay-feedback is-error" role="status">{liveObservation?.saveError || error || entry?.failure}</div>}
   </div>;

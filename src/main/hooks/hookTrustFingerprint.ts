@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import type { HookDefinition, ResourceScope } from '@shared/types/rdxRuntime';
+import type { HookDefinition, ResourceScope } from '@shared/types/rdcRuntime';
 import { hashScopedResource } from '../runtime/ScopedResourceResolver';
 import { isNodeCommand, resolveHookArg, resolveHookCommand, resolveHookCwd } from './hookResolve';
 

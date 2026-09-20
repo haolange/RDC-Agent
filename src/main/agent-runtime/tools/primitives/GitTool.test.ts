@@ -29,7 +29,7 @@ describe('GitTool', () => {
   });
 
   it('runs git_status in a temporary repository', { timeout: 30_000 }, async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-git-tool-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-git-tool-'));
     roots.push(root);
     await execFileAsync('git', ['init'], { cwd: root, windowsHide: true });
     await execFileAsync('git', ['config', 'user.email', 'test@example.com'], { cwd: root, windowsHide: true });

@@ -80,7 +80,7 @@ E --> D
   - 维护 PolicyBudgetState 与 SubagentBudgetState，提供预留与消费
 - SubagentRunner
   - 解析委派胶囊、校验目标 profile、派生子代理预算
-  - 注入 RDX 能力租约、工件访问授权、任务范围约束
+  - 注入 RDC 能力租约、工件访问授权、任务范围约束
   - 通过 sendProfileMessage 发起子代理回合，透传事件与增量文本
   - 支持 wait/background 两种模式；background 交由 BackgroundSubagentService
 - AgentTurnRunner
@@ -224,7 +224,7 @@ TurnCoordinator --> TurnHandle : "创建/管理"
 ### SubagentRunner：子任务执行模型
 - 委派与授权
   - 解析 DelegationCapsule，校验目标 profile 与委派列表
-  - 授予工件访问权限、RDX 能力租约、任务范围约束
+  - 授予工件访问权限、RDC 能力租约、任务范围约束
 - 预算与并发
   - 派生子代理预算（继承父策略），检查 depth/children/toolCalls/wallTime
   - 预留子代理槽位，必要时刷新观察者并消费预留

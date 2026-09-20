@@ -11,7 +11,7 @@ const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => fs.rm(root, { recursive: true, force: true }))); });
 async function setup() {
   const rootPath = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-input-scan-')); roots.push(rootPath);
-  const inputsPath = path.join(rootPath, '.rdx', 'inputs'); await fs.mkdir(inputsPath, { recursive: true });
+  const inputsPath = path.join(rootPath, '.rdc-agent', 'inputs'); await fs.mkdir(inputsPath, { recursive: true });
   const project: ProjectRecord = { projectId: 'project', name: 'project', rootPath, inputsPath, resourcePath: path.dirname(inputsPath),
     knowledgePath: '', slug: 'project', inputsUpdatedAt: 1, createdAt: 1, updatedAt: 1, inputs: [] };
   const store = new ProjectWorkspaceStore({} as StorageHost);

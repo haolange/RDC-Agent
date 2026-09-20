@@ -18,7 +18,7 @@ import {
   createWorkflowApi,
 } from './core';
 import { createEventSubscriptionApi } from './events';
-import { createLlmApi, createMemoryApi, createRdxRuntimeApi, createSettingsApi } from './settings';
+import { createLlmApi, createMemoryApi, createRdcRuntimeApi, createSettingsApi } from './settings';
 import type { RendererApiTransport } from './transport';
 import {
   createCaptureApi,
@@ -55,7 +55,7 @@ export function createRendererApi(platform: NodeJS.Platform, transport: Renderer
     investigation: createInvestigationApi(transport),
     plan: createPlanApi(transport),
     knowledge: createKnowledgeApi(transport),
-    rdxRuntime: createRdxRuntimeApi(transport),
+    rdcRuntime: createRdcRuntimeApi(transport),
     tool: createToolApi(transport),
     mcp: createMcpApi(transport),
     evidence: createEvidenceApi(transport),

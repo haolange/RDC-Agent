@@ -8,9 +8,9 @@
 - [TurnCoordinator.ts](file://src/main/workflow/debugger/TurnCoordinator.ts)
 - [subagentModelArg.ts](file://src/main/workflow/debugger/subagentModelArg.ts)
 - [DelegationCapsuleCompiler.ts](file://src/main/agent-runtime/prompt/DelegationCapsuleCompiler.ts)
-- [RdxDelegation.ts](file://src/main/sessions/RdxDelegation.ts)
+- [RdcDelegation.ts](file://src/main/sessions/RdcDelegation.ts)
 - [DelegatedArtifactAccess.ts](file://src/main/sessions/DelegatedArtifactAccess.ts)
-- [RdxRuntimeContextRegistry.ts](file://src/main/sessions/RdxRuntimeContextRegistry.ts)
+- [RdcRuntimeContextRegistry.ts](file://src/main/sessions/RdcRuntimeContextRegistry.ts)
 - [ProcessSupervisor.ts](file://src/main/runtime/ProcessSupervisor.ts)
 - [ShellInvocationService.ts](file://src/main/tools/ShellInvocationService.ts)
 - [TaskContracts.ts](file://src/main/agent-runtime/tasks/TaskContracts.ts)
@@ -37,7 +37,7 @@
 围绕子Agent协调的关键代码主要分布在以下模块：
 - 工作流调试器层：负责子Agent生命周期编排、预算与并发控制、事件转发与结果持久化
 - 代理运行时任务层：定义任务契约、执行记录、预算状态与任务作用域
-- 会话与权限层：提供RDX能力租约、工件访问授权、进程监督等基础设施
+- 会话与权限层：提供RDC能力租约、工件访问授权、进程监督等基础设施
 - 共享类型层：定义委托胶囊（Delegation Capsule）结构与校验规则
 
 ```mermaid
@@ -45,7 +45,7 @@ graph TB
 A["父Agent工具调用<br/>createSubagentTools"] --> B["SubagentRunner.runSubagent"]
 B --> C["预算与并发检查<br/>TurnCoordinator / DelegationBudget"]
 B --> D["委托胶囊编译与注入<br/>DelegationCapsuleCompiler"]
-B --> E["会话与权限<br/>RdxDelegation / RdxRuntimeContextRegistry"]
+B --> E["会话与权限<br/>RdcDelegation / RdcRuntimeContextRegistry"]
 B --> F["目标Agent消息发送<br/>sendProfileMessage"]
 F --> G["子Agent运行"]
 G --> H["事件转发与监控<br/>parentOnEvent"]
@@ -67,7 +67,7 @@ B --> K["进程清理与租约回收<br/>ProcessSupervisor / ShellInvocationServ
 - TurnCoordinator / DelegationBudget：提供预留槽位、深度限制、最大子Agent数、墙钟时间等策略预算控制。
 - DelegatedTaskScopes：维护父子任务的作用域绑定，确保嵌套委派的目标任务属于拥有者任务的子树。
 - delegationCapsule 与编译器：定义并校验委托胶囊，将结构化目标、约束、工件引用、技能需求等编译为子Agent可执行的提示片段。
-- RdxDelegation / RdxRuntimeContextRegistry：基于领域扩展声明的能力租约与上下文租约，控制RDX相关工具的可用性与隔离性。
+- RdcDelegation / RdcRuntimeContextRegistry：基于领域扩展声明的能力租约与上下文租约，控制RDC相关工具的可用性与隔离性。
 - ProcessSupervisor / ShellInvocationService：保障子进程生命周期管理与未确认进程清理。
 - TaskContracts：定义任务与执行记录的契约，包括状态机、预算字段、完成结果结构等。
 
@@ -95,7 +95,7 @@ Runner->>Budget : 校验深度/子Agent数/墙钟时间/预留槽位
 Budget-->>Runner : 允许或拒绝
 Runner->>Capsule : 解析/冻结/编译
 Capsule-->>Runner : 编译后的提示片段
-Runner->>Session : 授予工件访问/申请RDX租约
+Runner->>Session : 授予工件访问/申请RDC租约
 Session-->>Runner : 授权结果
 Runner->>Target : sendProfileMessage(携带会话ID/信号/预算)
 Target-->>Runner : 事件流(delta/tool.started/completed)
@@ -126,7 +126,7 @@ Runner-->>Parent : 返回标准化结果
   - 根据执行是否被中止决定状态为 cancelled 或 failed；否则为 complete。
   - 将结果标准化并持久化为任务执行结果，必要时回写预算快照。
 - 资源清理
-  - 清理定时器、加入子进程、撤销RDX租约、释放工件访问、注销生产者、移除监听器等。
+  - 清理定时器、加入子进程、撤销RDC租约、释放工件访问、注销生产者、移除监听器等。
 
 ```mermaid
 flowchart TD
@@ -134,7 +134,7 @@ Start(["进入 runSubagent"]) --> Resolve["解析目标配置与模型覆盖"]
 Resolve --> BudgetCheck{"预算/并发/深度/墙钟时间 允许?"}
 BudgetCheck -- 否 --> Fail["返回失败结果"]
 BudgetCheck -- 是 --> Setup["创建子会话/AbortController/超时计时器"]
-Setup --> Grant["授予工件访问/申请RDX租约"]
+Setup --> Grant["授予工件访问/申请RDC租约"]
 Grant --> Send["发送消息到目标Agent"]
 Send --> Stream{"事件流"}
 Stream --> |assistant.delta/tool.*| Forward["转发至父端"]
@@ -199,8 +199,8 @@ Cleanup --> End(["返回结果"])
 ### 数据共享机制与权限继承
 - 工件访问授权
   - 通过 grantDelegatedArtifactAccess 将父会话中的工件URI授权给子会话，限制仅可访问明确列出的输入工件、挑战引用与已接受事实的来源。
-- RDX能力租约
-  - 若委托胶囊声明需要RDX能力，则通过 grantDelegatedLease 授予子会话临时租约，并在完成后撤销。
+- RDC能力租约
+  - 若委托胶囊声明需要RDC能力，则通过 grantDelegatedLease 授予子会话临时租约，并在完成后撤销。
 - 任务作用域继承
   - 通过 registerDelegatedTaskScope 将子会话绑定到父任务作用域，确保嵌套委派的目标任务必须属于拥有者任务的子树。
 
@@ -210,7 +210,7 @@ Cleanup --> End(["返回结果"])
 
 ### 错误传播、超时与取消
 - 错误传播
-  - 解析委托胶囊失败、目标配置不可用、策略限制超限、工件访问拒绝、RDX租约拒绝等均会立即返回失败结果或抛出异常。
+  - 解析委托胶囊失败、目标配置不可用、策略限制超限、工件访问拒绝、RDC租约拒绝等均会立即返回失败结果或抛出异常。
   - 工具调用失败或拒绝会被转换为子Agent事件，供父端展示与决策。
 - 超时处理
   - 基于策略预算的墙钟时间设置超时定时器，超时时中止子执行并标记为 cancelled。
@@ -265,7 +265,7 @@ TaskRecord ||--o{ TaskExecutionRecord : "包含多个执行"
 ## 依赖关系分析
 - SubagentRunner 依赖
   - 预算与并发：TurnCoordinator、DelegationBudget、TaskRootBudget
-  - 会话与权限：RdxDelegation、RdxRuntimeContextRegistry、DelegatedArtifactAccess
+  - 会话与权限：RdcDelegation、RdcRuntimeContextRegistry、DelegatedArtifactAccess
   - 进程与工具：ProcessSupervisor、ShellInvocationService
   - 提示与模型：DelegationCapsuleCompiler、subagentModelArg
   - 任务系统：TaskRegistry、TaskContracts、DelegatedTaskScopes
@@ -280,7 +280,7 @@ graph LR
 Runner["SubagentRunner"] --> Coord["TurnCoordinator"]
 Runner --> Budget["DelegationBudget"]
 Runner --> Capsule["DelegationCapsuleCompiler"]
-Runner --> Session["RdxRuntimeContextRegistry"]
+Runner --> Session["RdcRuntimeContextRegistry"]
 Runner --> Proc["ProcessSupervisor"]
 Runner --> Tools["ShellInvocationService"]
 Runner --> Tasks["TaskRegistry / TaskContracts"]
@@ -313,7 +313,7 @@ Runner --> Result["SubagentResultEnvelope"]
 - 常见问题
   - 策略限制超限：检查 maxChildDepth、maxWallTimeMs、maxSubagents 与预留槽位。
   - 工件访问拒绝：确认父会话是否存在且已授权相应工件URI。
-  - RDX租约拒绝：确保父会话与父轮次ID存在，且子会话请求了必要的领域扩展。
+  - RDC租约拒绝：确保父会话与父轮次ID存在，且子会话请求了必要的领域扩展。
   - 任务作用域违规：嵌套委派的目标任务必须是拥有者任务的子任务。
 - 定位步骤
   - 查看子Agent事件流（delta/tool.*）定位卡点。

@@ -87,7 +87,7 @@ import type {
   TraceBranchSwitchResult,
   TraceSessionResult,
 } from './trace';
-import type { HookEvent, RdxRuntimeOverview, RequestEnvelopeSnapshot, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from './rdxRuntime';
+import type { HookEvent, RdcRuntimeOverview, RequestEnvelopeSnapshot, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from './rdcRuntime';
 import type {
   KnowledgeImportResult,
   KnowledgeCandidatesResult,
@@ -324,17 +324,17 @@ export interface ElectronAPI {
     export: (request: KnowledgeExportRequest) => Promise<KnowledgeExportResult>;
   };
 
-  rdxRuntime: {
-    getOverview: (projectRoot?: string) => Promise<RdxRuntimeOverview>;
+  rdcRuntime: {
+    getOverview: (projectRoot?: string) => Promise<RdcRuntimeOverview>;
     validateResource: (request: ScopedResourceWriteRequest) => Promise<{ valid: boolean; diagnostics: string[] }>;
-    upsertResource: (request: ScopedResourceWriteRequest) => Promise<RdxRuntimeOverview>;
-    importResource: (request: ScopedResourceImportRequest) => Promise<{ overview: RdxRuntimeOverview; id: string }>;
-    deleteResource: (kind: ScopedResourceKind, scope: 'user' | 'project', id: string, projectRoot?: string) => Promise<RdxRuntimeOverview>;
+    upsertResource: (request: ScopedResourceWriteRequest) => Promise<RdcRuntimeOverview>;
+    importResource: (request: ScopedResourceImportRequest) => Promise<{ overview: RdcRuntimeOverview; id: string }>;
+    deleteResource: (kind: ScopedResourceKind, scope: 'user' | 'project', id: string, projectRoot?: string) => Promise<RdcRuntimeOverview>;
     revealResource: (sourcePath: string) => Promise<{ success: boolean; error?: string }>;
-    trustHook: (projectRoot: string | undefined | null, hookId: string) => Promise<RdxRuntimeOverview>;
-    revokeHook: (projectRoot: string | undefined | null, hookId: string) => Promise<RdxRuntimeOverview>;
-    trustMcp: (projectRoot: string, descriptorId: string) => Promise<RdxRuntimeOverview>;
-    revokeMcp: (projectRoot: string, descriptorId: string) => Promise<RdxRuntimeOverview>;
+    trustHook: (projectRoot: string | undefined | null, hookId: string) => Promise<RdcRuntimeOverview>;
+    revokeHook: (projectRoot: string | undefined | null, hookId: string) => Promise<RdcRuntimeOverview>;
+    trustMcp: (projectRoot: string, descriptorId: string) => Promise<RdcRuntimeOverview>;
+    revokeMcp: (projectRoot: string, descriptorId: string) => Promise<RdcRuntimeOverview>;
     testHook: (event: HookEvent, projectRoot?: string, hookId?: string) => Promise<unknown>;
     listRequestSnapshots: (sessionId: string, turnId?: string) => Promise<RequestEnvelopeSnapshot[]>;
     getRequestSnapshot: (sessionId: string, turnId: string, snapshotId: string) => Promise<RequestEnvelopeSnapshot | null>;

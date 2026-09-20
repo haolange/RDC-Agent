@@ -17,9 +17,9 @@ import {
 const storeFor = (scope: 'user' | 'project', projectRoot?: string): MemoryStore => {
   if (scope === 'project') {
     if (!projectRoot) throw new Error('Project scope memory requires a project root.');
-    return new MemoryStore(appPathService.getProjectRdxPaths(projectRoot).memoryPath);
+    return new MemoryStore(appPathService.getProjectRdcPaths(projectRoot).memoryPath);
   }
-  return new MemoryStore(appPathService.getUserRdxPaths().memoryPath);
+  return new MemoryStore(appPathService.getUserRdcPaths().memoryPath);
 };
 
 async function confirmMemoryMutation(action: 'memory.write' | 'memory.delete', scope: 'user' | 'project', name?: string): Promise<boolean> {

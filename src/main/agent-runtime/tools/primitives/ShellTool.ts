@@ -1,4 +1,4 @@
-import { executeRdxShell, type RdxShellInput } from '../../../tools/executeRdxShell';
+import { executeRdcShell, type RdcShellInput } from '../../../tools/executeRdcShell';
 /**
  * ShellTool — spawn a fresh interpreter for each call and persist only cwd.
  */
@@ -27,7 +27,7 @@ import {
 
 interface ShellParams {
   command?: string;
-  rdx?: RdxShellInput;
+  rdc?: RdcShellInput;
   timeout?: number;
 }
 
@@ -99,12 +99,12 @@ export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operati
         type: 'string',
         description: 'The shell command to execute in the current session working directory',
       },
-      rdx: {
+      rdc: {
         type: 'object', additionalProperties: false,
         oneOf: [{ type: 'object', required: ['operation', 'args'], properties: { operation: {}, args: {}, experimentId: {} }, additionalProperties: false }, { type: 'object', required: ['discovery'], properties: { discovery: {} }, additionalProperties: false }],
         properties: {
           discovery: { type: 'object', additionalProperties: false, properties: { kind: { enum: ['search', 'describe'] }, query: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 20 }, operation: { type: 'string' } }, required: ['kind'], oneOf: [{ type: 'object', properties: { kind: { const: 'search' }, query: {}, limit: {} }, required: ['query'], additionalProperties: false }, { type: 'object', properties: { kind: { const: 'describe' }, operation: {} }, required: ['operation'], additionalProperties: false }] },
-          operation: { type: 'string', description: 'Discovered RDX operation allowed by its frozen capability contract. General only.' },
+          operation: { type: 'string', description: 'Discovered RDC operation allowed by its frozen capability contract. General only.' },
           args: { type: 'object', description: 'Native operation arguments; replay/context identity is injected by main.' },
           experimentId: { type: 'string', description: 'Bind a signed execution receipt to this experiment. Required for investigation closure.' },
         },
@@ -115,7 +115,7 @@ export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operati
       },
     },
     additionalProperties: false,
-    description: 'Provide exactly one of command or rdx. Runtime rejects mixed or empty input.',
+    description: 'Provide exactly one of command or rdc. Runtime rejects mixed or empty input.',
   },
   spec: {
     isReadOnly: false,
@@ -128,8 +128,8 @@ export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operati
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, onUpdate, context) {
-    if ((typeof params.command === 'string') === Boolean(params.rdx)) throw new Error('SHELL_INPUT: provide exactly one of command or rdx.');
-    if (params.rdx) return withSessionShellLock(context?.sessionId ?? null, () => executeRdxShell(params.rdx!, _toolCallId, signal, context));
+    if ((typeof params.command === 'string') === Boolean(params.rdc)) throw new Error('SHELL_INPUT: provide exactly one of command or rdc.');
+    if (params.rdc) return withSessionShellLock(context?.sessionId ?? null, () => executeRdcShell(params.rdc!, _toolCallId, signal, context));
     return withSessionShellLock(context?.sessionId ?? null, () => executeShellCommand(
       params,
       signal,

@@ -26,7 +26,7 @@ const isInside = (rootPath: string, candidatePath: string): boolean => {
 };
 
 const isProjectInput = (projectRootPath: string, sourcePath: string): boolean => {
-  const inputsRoot = path.resolve(projectRootPath, '.rdx', 'inputs');
+  const inputsRoot = path.resolve(projectRootPath, '.rdc-agent', 'inputs');
   return sourcePath === inputsRoot || isInside(inputsRoot, sourcePath);
 };
 

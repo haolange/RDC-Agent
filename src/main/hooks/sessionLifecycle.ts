@@ -1,6 +1,6 @@
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { dispatchRuntimeHooks } from './runtimeHookDispatch';
-import { rdxSessionService } from '../sessions';
+import { rdcSessionService } from '../sessions';
 import { replayHistoryStore } from '../captures/replay/ReplayHistoryStore';
 
 export async function createSessionWithHooks(
@@ -25,7 +25,7 @@ export async function createSessionWithHooks(
 export async function removeSessionWithHooks(sessionId: string): Promise<void> {
   const session = storageAdapter.readSession(sessionId);
   const project = session ? storageAdapter.getProjectById(session.projectId) : null;
-  if (session) await rdxSessionService.clearOpenedCaptureForSession({ projectId: session.projectId, sessionId });
+  if (session) await rdcSessionService.clearOpenedCaptureForSession({ projectId: session.projectId, sessionId });
   if (project) await replayHistoryStore.clearSession(project.rootPath, sessionId);
   storageAdapter.removeSession(sessionId);
   if (!session) return;

@@ -12,7 +12,7 @@ import { policyBudgetChain } from './DelegationBudget';
 import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
 import type { ToolDefinition } from '../../agent-runtime/core/types';
-import type { CompiledPolicy } from '@shared/types/rdxRuntime';
+import type { CompiledPolicy } from '@shared/types/rdcRuntime';
 import type { EffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
 
 export type AbortReason =

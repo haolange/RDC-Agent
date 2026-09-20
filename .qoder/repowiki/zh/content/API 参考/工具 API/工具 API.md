@@ -11,7 +11,7 @@
 - [src/main/agent-runtime/tools/primitives/WebTools.ts](file://src/main/agent-runtime/tools/primitives/WebTools.ts)
 - [src/main/agent-runtime/tools/primitives/toolLimits.ts](file://src/main/agent-runtime/tools/primitives/toolLimits.ts)
 - [src/main/agent-runtime/agent/AgentTool.ts](file://src/main/agent-runtime/agent/AgentTool.ts)
-- [src/main/tools/executeRdxShell.ts](file://src/main/tools/executeRdxShell.ts)
+- [src/main/tools/executeRdcShell.ts](file://src/main/tools/executeRdcShell.ts)
 - [src/main/runtime/ProcessSupervisor.ts](file://src/main/runtime/ProcessSupervisor.ts)
 - [src/main/runtime/ShellResolver.ts](file://src/main/runtime/ShellResolver.ts)
 - [src/main/runtime/resolveConfiguredShell.ts](file://src/main/runtime/resolveConfiguredShell.ts)
@@ -147,29 +147,29 @@ ToolPool --> AgentTool : "管理实例"
 - [src/main/agent-runtime/tools/primitives/index.ts:1-60](file://src/main/agent-runtime/tools/primitives/index.ts#L1-L60)
 
 ### Shell 工具（命令执行）
-- 功能：在会话工作目录下执行 shell 命令或原生 rdx 操作，支持超时、输出截断、进程隔离、会话级 cwd 持久化
-- 输入：command 或 rdx（二选一），可选 timeout
+- 功能：在会话工作目录下执行 shell 命令或原生 rdc 操作，支持超时、输出截断、进程隔离、会话级 cwd 持久化
+- 输入：command 或 rdc（二选一），可选 timeout
 - 权限与规格：非只读、非并发安全、具破坏性、需要审批、副作用为 process
 - 执行流程：解析 shell、构建非交互参数、通过 ProcessSupervisor 启动子进程、流式收集输出、解析 trailer 更新 cwd、合并退出码与诊断信息
 - 安全：强制输出上限、最大超时、工作目录必须在项目根内、孤儿进程与 spawn 失败处理
 
 ```mermaid
 flowchart TD
-Start(["进入 execute"]) --> CheckInput{"command 或 rdx?"}
-CheckInput --> |rdx| ExecRdx["executeRdxShell(...)"]
+Start(["进入 execute"]) --> CheckInput{"command 或 rdc?"}
+CheckInput --> |rdc| ExecRdc["executeRdcShell(...)"]
 CheckInput --> |command| ResolveShell["解析配置 shell<br/>构建非交互参数"]
 ResolveShell --> Spawn["ProcessSupervisor.spawn(...)"]
 Spawn --> Stream["流式读取 stdout/stderr<br/>应用输出上限"]
 Stream --> Trailer["解析 trailer 更新 cwd"]
 Trailer --> ExitCode{"合并退出码/诊断"}
 ExitCode --> Result["返回标准化结果"]
-ExecRdx --> Result
+ExecRdc --> Result
 ```
 
 图表来源
 - [src/main/agent-runtime/tools/primitives/ShellTool.ts:83-137](file://src/main/agent-runtime/tools/primitives/ShellTool.ts#L83-L137)
 - [src/main/agent-runtime/tools/primitives/ShellTool.ts:140-270](file://src/main/agent-runtime/tools/primitives/ShellTool.ts#L140-L270)
-- [src/main/tools/executeRdxShell.ts](file://src/main/tools/executeRdxShell.ts)
+- [src/main/tools/executeRdcShell.ts](file://src/main/tools/executeRdcShell.ts)
 - [src/main/runtime/ProcessSupervisor.ts](file://src/main/runtime/ProcessSupervisor.ts)
 - [src/main/runtime/ShellResolver.ts](file://src/main/runtime/ShellResolver.ts)
 - [src/main/runtime/resolveConfiguredShell.ts](file://src/main/runtime/resolveConfiguredShell.ts)
@@ -272,7 +272,7 @@ ALL["所有工具"] --> LIM["toolLimits.ts"]
 
 ## 故障排查指南
 - Shell 执行失败
-  - 检查 command/rdx 是否二选一且格式正确
+  - 检查 command/rdc-tool 是否二选一且格式正确
   - 关注 reason（timeout/abort/unconfirmed_orphan/spawn_failed）与 exitCode
   - 确认工作目录未越界项目根，trailer 缺失会阻止 cwd 更新
 - 网络请求失败
@@ -294,7 +294,7 @@ ALL["所有工具"] --> LIM["toolLimits.ts"]
 ## 附录
 
 ### 内置工具一览与用途
-- 命令执行：shell（终端命令、原生 rdx 操作）
+- 命令执行：shell（终端命令、原生 rdc 操作）
 - 文件操作：read/write/edit/delete/move/copy、glob/grep、artifact/read image
 - 版本控制：git(status/diff/log/add/unstage/commit)
 - 网络：web_fetch、web_search

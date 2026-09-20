@@ -1,10 +1,10 @@
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
-import { RdxExecutionReceipts, rdxExecutionReceipts } from '../tools/RdxExecutionReceipts';
+import { RdcExecutionReceipts, rdcExecutionReceipts } from '../tools/RdcExecutionReceipts';
 import { InvestigationError } from './investigationErrors';
 
 /** Historical reads do not call this gate. Every new close/report completion does. */
 export function assertExecutionEvidence(
-  sessionId: string, experiment: ExperimentRecord, receipts: RdxExecutionReceipts = rdxExecutionReceipts,
+  sessionId: string, experiment: ExperimentRecord, receipts: RdcExecutionReceipts = rdcExecutionReceipts,
 ): void {
   if (experiment.status !== 'recorded' && experiment.status !== 'rolled_back') return;
   try {
@@ -39,7 +39,7 @@ export function assertExecutionEvidence(
     }
   } catch (error) {
     throw new InvestigationError('INVESTIGATION_INVARIANT_VIOLATION',
-      'RDX_EXECUTION_EVIDENCE_REQUIRED: ' + (error instanceof Error ? error.message : String(error)),
+      'RDC_EXECUTION_EVIDENCE_REQUIRED: ' + (error instanceof Error ? error.message : String(error)),
       { invariantId: 'S-RDC-01', details: { experimentId: experiment.experimentId } });
   }
 }

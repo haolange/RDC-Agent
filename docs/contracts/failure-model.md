@@ -32,7 +32,7 @@
 | IPC Zod 非法 payload / approvalToken 重放 | Security | **全量** handler `parseIpcArgs`；单次消费 token |
 | Sandbox / permission deny-by-default | Security | Electron 面 |
 | CSP 绕过（`style-src`/`script-src` unsafe-inline、style attr） | Security | 生产无 unsafe-inline；`style-src-attr 'none'`；动态样式走 `useDynStyle` |
-| RDX context 无 session / lease 所有权不匹配 | Security | 仅 per-session lease；禁止 global mirror |
+| RDC context 无 session / lease 所有权不匹配 | Security | 仅 per-session lease；禁止 global mirror |
 | 在途 turn 读可变 Settings / 未冻结 plan | Integrity | `EffectiveRuntimePlan` schemaVersion 3 完整冻结 |
 | SSRF / private DNS（`web_fetch`/`web_search`） | Security | 每跳校验 + pin |
 | Attachment SVG 脚本 / 超限媒体 | Security | `ATTACHMENT_MEDIA_UNSUPPORTED` |

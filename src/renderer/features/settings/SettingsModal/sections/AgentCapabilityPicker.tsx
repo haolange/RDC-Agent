@@ -29,13 +29,13 @@ const BUILTIN_TOOL_OPTIONS = [
   'skill',
   'mcp',
   'tool_search',
-  'rdxContext',
+  'rdcContext',
   'subagent',
 ];
 
 /** Display-only grouping of builtin tool ids; the ids themselves are the real tool tokens. */
 const TOOL_SUBGROUPS: Array<{ id: 'read' | 'execute' | 'collaborate'; tools: readonly string[] }> = [
-  { id: 'read', tools: ['read', 'search', 'web', 'git', 'rdxContext', 'tool_search', 'memory', 'skill', 'mcp', 'planArtifact'] },
+  { id: 'read', tools: ['read', 'search', 'web', 'git', 'rdcContext', 'tool_search', 'memory', 'skill', 'mcp', 'planArtifact'] },
   { id: 'execute', tools: ['shell', 'interpreter', 'write', 'edit', 'file-manage', 'memory-write'] },
   { id: 'collaborate', tools: ['agent', 'subagent', 'handoff', 'task', 'askUser'] },
 ];

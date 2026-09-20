@@ -10,7 +10,7 @@ const roots: string[]=[];
 afterEach(()=>{vi.restoreAllMocks();for(const root of roots.splice(0))fs.rmSync(root,{recursive:true,force:true});});
 it('preserves an explicit builtin General model-only user override through save and fresh service reload', async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'rdc-agent-model-cow-'));roots.push(root);
- const paths={agentsPath:path.join(root,'agents'),instructionsPath:path.join(root,'RDX.md')};
+ const paths={agentsPath:path.join(root,'agents'),instructionsPath:path.join(root,'RDC.md')};
  const service=new AgentManifestService();
  const builtin=service.resolveEffectiveSnapshot(paths).profiles.find(profile=>profile.id==='general')!;
  expect(builtin.builtin).toBe(true);
@@ -28,7 +28,7 @@ it('preserves an explicit builtin General model-only user override through save 
 
 it('rejects marker persistence failure and preserves the previously committed user model bytes', async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'rdc-agent-model-failure-'));roots.push(root);
- const paths={agentsPath:path.join(root,'agents'),instructionsPath:path.join(root,'RDX.md')};
+ const paths={agentsPath:path.join(root,'agents'),instructionsPath:path.join(root,'RDC.md')};
  const service=new AgentManifestService();
  const builtin=service.resolveEffectiveSnapshot(paths).profiles.find(profile=>profile.id==='general')!;
  const initial=await service.saveDefinition(paths,{...builtin,models:['openai-codex:gpt-5.6-luna']},{scope:'user'});

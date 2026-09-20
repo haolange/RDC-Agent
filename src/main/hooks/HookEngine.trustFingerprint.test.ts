@@ -3,13 +3,13 @@ import os from 'os';
 import path from 'path';
 import YAML from 'yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CANONICAL_HOOK_EVENTS } from '@shared/types/rdxRuntime';
+import { CANONICAL_HOOK_EVENTS } from '@shared/types/rdcRuntime';
 import { HookEngine } from './HookEngine';
 import { CURRENT_HOOK_TRUST_SCHEMA_VERSION } from './hookTrustStore';
 
 const roots: string[] = [];
 const makeRoot = () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-hook-fp-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-hook-fp-'));
   roots.push(root);
   return root;
 };
@@ -110,7 +110,7 @@ describe('HookEngine trust fingerprint', () => {
   it('keeps trust across restart and revokes explicit trust', () => {
     const root = makeRoot();
     const project = path.join(root, 'project');
-    const hooks = path.join(project, '.rdx', 'hooks');
+    const hooks = path.join(project, '.rdc-agent', 'hooks');
     writeHook(hooks, 'check', { event: 'tool.after-call', ...nodeInline('process.exit(0)') });
     const trustPath = path.join(root, 'trust.json');
     const first = new HookEngine(trustPath);
@@ -127,7 +127,7 @@ describe('HookEngine trust fingerprint', () => {
   it('does not accept an old YAML-only sourceHash even when it matches the parsed definition', () => {
     const root = makeRoot();
     const project = path.join(root, 'project');
-    const hooks = path.join(project, '.rdx', 'hooks');
+    const hooks = path.join(project, '.rdc-agent', 'hooks');
     writeHook(hooks, 'check', { event: 'permission.denied', ...nodeInline('process.exit(0)') });
     const trustPath = path.join(root, 'trust.json');
     const engine = new HookEngine(trustPath);
@@ -150,7 +150,7 @@ describe('HookEngine trust fingerprint', () => {
   it('requires retrust when referenced script bytes change', () => {
     const root = makeRoot();
     const project = path.join(root, 'project');
-    const hooks = path.join(project, '.rdx', 'hooks');
+    const hooks = path.join(project, '.rdc-agent', 'hooks');
     fs.mkdirSync(hooks, { recursive: true });
     const script = path.join(hooks, 'run.mjs');
     fs.writeFileSync(script, 'process.exit(0)\n');
@@ -176,7 +176,7 @@ describe('HookEngine trust fingerprint', () => {
   it('requires retrust when an extensionless relative script changes', () => {
     const root = makeRoot();
     const project = path.join(root, 'project');
-    const hooks = path.join(project, '.rdx', 'hooks');
+    const hooks = path.join(project, '.rdc-agent', 'hooks');
     fs.mkdirSync(hooks, { recursive: true });
     const script = path.join(hooks, 'run');
     fs.writeFileSync(script, 'process.exit(0)\n');
@@ -202,8 +202,8 @@ describe('HookEngine trust fingerprint', () => {
     const root = makeRoot();
     const projectA = path.join(root, 'project-a');
     const projectB = path.join(root, 'project-b');
-    const hooksA = path.join(projectA, '.rdx', 'hooks');
-    const hooksB = path.join(projectB, '.rdx', 'hooks');
+    const hooksA = path.join(projectA, '.rdc-agent', 'hooks');
+    const hooksB = path.join(projectB, '.rdc-agent', 'hooks');
     const userHooks = path.join(root, 'user');
     writeHook(hooksA, 'check', { event: 'tool.after-call', ...nodeInline('process.exit(0)') });
     writeHook(hooksB, 'check', { event: 'tool.after-call', ...nodeInline('process.exit(0)') });
@@ -226,12 +226,12 @@ describe('HookEngine trust fingerprint', () => {
   it('requires retrust when the same basename resolves to a different PATH executable', () => {
     const root = makeRoot();
     const project = path.join(root, 'project');
-    const hooks = path.join(project, '.rdx', 'hooks');
+    const hooks = path.join(project, '.rdc-agent', 'hooks');
     const dirA = path.join(root, 'bin-a');
     const dirB = path.join(root, 'bin-b');
     fs.mkdirSync(dirA, { recursive: true });
     fs.mkdirSync(dirB, { recursive: true });
-    const toolName = process.platform === 'win32' ? 'rdx-hook-probe.cmd' : 'rdx-hook-probe';
+    const toolName = process.platform === 'win32' ? 'rdc-hook-probe.cmd' : 'rdc-hook-probe';
     fs.writeFileSync(path.join(dirA, toolName), process.platform === 'win32' ? '@echo a\r\n' : '#!/bin/sh\necho a\n');
     fs.writeFileSync(path.join(dirB, toolName), process.platform === 'win32' ? '@echo b\r\n' : '#!/bin/sh\necho b\n');
     if (process.platform !== 'win32') {
@@ -266,7 +266,7 @@ describe('HookEngine trust fingerprint', () => {
   it('requires retrust when symlink realpath changes with identical bytes', () => {
     const root = makeRoot();
     const project = path.join(root, 'project');
-    const hooks = path.join(project, '.rdx', 'hooks');
+    const hooks = path.join(project, '.rdc-agent', 'hooks');
     const targetA = path.join(root, 'target-a');
     const targetB = path.join(root, 'target-b');
     const linkDir = path.join(hooks, 'scripts');
@@ -301,7 +301,7 @@ describe('HookEngine trust fingerprint', () => {
   it('requires retrust when command resolution changes', () => {
     const root = makeRoot();
     const project = path.join(root, 'project');
-    const hooks = path.join(project, '.rdx', 'hooks');
+    const hooks = path.join(project, '.rdc-agent', 'hooks');
     const toolA = path.join(root, process.platform === 'win32' ? 'tool-a.cmd' : 'tool-a');
     const toolB = path.join(root, process.platform === 'win32' ? 'tool-b.cmd' : 'tool-b');
     fs.writeFileSync(toolA, process.platform === 'win32' ? '@echo a\r\n' : '#!/bin/sh\necho a\n');

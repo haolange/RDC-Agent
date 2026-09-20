@@ -6,7 +6,7 @@
 
 ### Turn one GPU frame problem into a traceable chain of answers
 
-RenderDoc `.rdc` capture × AI Agent workbench × native RDX diagnostics
+RenderDoc `.rdc` capture × AI Agent workbench × native RDC diagnostics
 
 [中文](./README.md) · [Design & architecture](./DESIGN.md) · [Issues](https://github.com/haolange/RDC-Agent/issues)
 
@@ -14,12 +14,12 @@ RenderDoc `.rdc` capture × AI Agent workbench × native RDX diagnostics
 
 ## A workbench that moves GPU questions forward
 
-RDC-Agent is a Windows desktop application that brings everyday agent collaboration, RenderDoc capture investigation, and native RDX operations into one auditable workspace.
+RDC-Agent is a Windows desktop application that brings everyday agent collaboration, RenderDoc capture investigation, and native RDC operations into one auditable workspace.
 
 Start with “Why is this frame wrong?” and work through a stable chain:
 
 1. Open a project and its `.rdc` captures while keeping capture, replay, and context identity explicit.
-2. Let the agent inspect code, run commands, check RDX context, and expose the real execution process through Work Process.
+2. Let the agent inspect code, run commands, check RDC context, and expose the real execution process through Work Process.
 3. Enter Debugger, Analyzer, or Optimizer methods when the problem calls for graphics-specific reasoning.
 4. Keep observations, evidence, conclusions, and next actions in the same session instead of scattering them across terminals, screenshots, and chat logs.
 
@@ -52,7 +52,7 @@ Four systems keep that loop grounded:
 
 The goal is not simply to expose more GPU buttons. It is to make the agent know which object is under investigation, what is observed, which hypotheses compete, how an experiment can be rolled back, and which conclusions are still only inferences.
 
-That is also why several boundaries are intentional: MCP is not RDC-Agent's runtime authority; the programmable RDX CLI / JSON contract is the operation surface shared by agents, scripts, tests, and people. Remote / Android replay is an explicit runtime capability—local PNG success must not silently become a claim of remote success. Tools are discovered, described, and scoped from a catalog instead of dumping an ungoverned full table into every model turn. Fewer tools with complete facts, explicit identity, and honest failure are more valuable than a larger button count.
+That is also why several boundaries are intentional: MCP is not RDC-Agent's runtime authority; the programmable RDC-Tool CLI / JSON contract is the operation surface shared by agents, scripts, tests, and people. Remote / Android replay is an explicit runtime capability—local PNG success must not silently become a claim of remote success. Tools are discovered, described, and scoped from a catalog instead of dumping an ungoverned full table into every model turn. Fewer tools with complete facts, explicit identity, and honest failure are more valuable than a larger button count.
 
 ## One investigation, two reading surfaces
 
@@ -77,17 +77,17 @@ These are not three isolated chat personas. They share the same agent loop, proj
 
 ## What is real, and where the boundary is
 
-- Capture management, diagnostics, and RDX / RenderDoc operations are driven by the external RDX CLI configured on the host.
+- Capture management, diagnostics, and RDC / RenderDoc operations are driven by the external RDC-Tool CLI configured on the host.
 - Agent work includes reading, planning, editing, searching, shell commands, tool calls, handoffs, memory, and subagent orchestration.
-- User resources live under `~/.rdx`; project resources live under `<project-root>/.rdx`.
+- User resources live under `~/.rdc-agent`; project resources live under `<project-root>/.rdc-agent`.
 - Work Process reflects actual execution and provider reasoning semantics. It does not fabricate hidden chain-of-thought or treat model self-report as evidence.
-- Local replay and Android presentation depend on the installed RDX / RenderDoc environment and the target GPU. A connected device is not a promise that every capture replays everywhere.
+- Local replay and Android presentation depend on the installed RDC / RenderDoc environment and the target GPU. A connected device is not a promise that every capture replays everywhere.
 
-The release surface is **Windows-only**. RDC-Agent does not bundle your captures, provider keys, or RenderDoc installation. Configure the RDX CLI, provider / model, and device environment yourself.
+The release surface is **Windows-only**. RDC-Agent does not bundle your captures, provider keys, or RenderDoc installation. Configure the RDC-Tool CLI, provider / model, and device environment yourself.
 
 ## Start developing
 
-Requirements: Windows, Node.js `>=22.13.0`, pnpm `11.7.0`, and an RDX CLI that can be configured from Settings.
+Requirements: Windows, Node.js `>=22.13.0`, pnpm `11.7.0`, and an RDC-Tool CLI that can be configured from Settings.
 
 ```powershell
 pnpm install
@@ -109,10 +109,20 @@ pnpm run check:gates
 pnpm run build
 ```
 
-Read the [design and architecture guide](./DESIGN.md) for the product boundary, the [RDX runtime contract](./docs/architecture/rdx-runtime.md) for native operations, and the [acceptance ledger](./docs/product/acceptance-ledger.md) for evidence and unverified boundaries.
+Read the [design and architecture guide](./DESIGN.md) for the product boundary, the [RDC runtime contract](./docs/architecture/rdc-runtime.md) for native operations, and the [acceptance ledger](./docs/product/acceptance-ledger.md) for evidence and unverified boundaries.
 
 This repository is evolving quickly. Please report reproducible problems with the smallest safe reproduction you can share. Never upload private `.rdc` captures, provider keys, user data, or logs containing sensitive paths.
 
 ## License
 
 See [LICENSE](./LICENSE).
+
+## RenderDoc runtime baseline
+
+The current assembled and verified baseline is **RenderDoc 1.45**. RDC-Tool does not track every upstream minor release: a newer runtime becomes the baseline only after matching runtime packaging, catalog checks, tests and release gates pass. RenderDoc 1.44 and earlier official GUI releases are not separate assembly targets. Use the replay path matching this bundled runtime. Capture-format compatibility follows upstream RenderDoc.
+
+RDC-Agent **0.6.x** pairs with RDC-Tool **1.0.0** and the current RenderDoc **1.45** runtime. Catalog definitions and fingerprints, not package version numbers, authorize operations. Local PNG export does not prove Android device presentation.
+
+## Reporting safely
+
+Do not upload private captures, provider keys or full logs containing local absolute paths. Redact logs and use the installation or bug-report template. RDC-Agent remains private during this maintenance release.

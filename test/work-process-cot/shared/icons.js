@@ -74,7 +74,7 @@
     skills: 'skillsList',
     skill_read: 'skillRead',
     mcp: 'plug',
-    rdx_context: 'monitor',
+    rdc_context: 'monitor',
     subagent: 'brain',
     task_create: 'taskCreate',
     task_update: 'taskUpdate',

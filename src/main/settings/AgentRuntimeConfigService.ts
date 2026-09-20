@@ -6,7 +6,7 @@ import type {
   AgentRuntimeSkillDescriptor,
 } from '@shared/types/agentRuntime';
 import { MCP_TRANSPORTS as MCP_TRANSPORT_LIST, type MCPTransport } from '@shared/types/mcp';
-import type { ScopedResourceCandidate, SkillLoadResult, SkillMetadata } from '@shared/types/rdxRuntime';
+import type { ScopedResourceCandidate, SkillLoadResult, SkillMetadata } from '@shared/types/rdcRuntime';
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
 import {
@@ -94,7 +94,7 @@ export class AgentRuntimeConfigService {
 
   private resolveSkills(projectRoot?: string, viewerAgentId?: string): SkillLoadResult[] {
     this.ensureScaffold();
-    const user = appPathService.getUserRdxPaths();
+    const user = appPathService.getUserRdcPaths();
     const candidates: Array<ScopedResourceCandidate<SkillLoadResult>> = [];
     const addDirectory = (root: string, scope: 'builtin' | 'user' | 'project') => {
       if (!fs.existsSync(root)) return;
@@ -105,7 +105,7 @@ export class AgentRuntimeConfigService {
     };
     addDirectory(path.join(this.templateRoot(), 'skills'), 'builtin');
     addDirectory(user.skillsPath, 'user');
-    if (projectRoot) addDirectory(appPathService.getProjectRdxPaths(projectRoot).skillsPath, 'project');
+    if (projectRoot) addDirectory(appPathService.getProjectRdcPaths(projectRoot).skillsPath, 'project');
     const resolved = scopedResourceResolver.resolve(candidates).resources.filter((resource) => resource.enabled).map((resource) => ({
       ...resource.value,
       scope: resource.provenance.scope,
@@ -153,9 +153,9 @@ export class AgentRuntimeConfigService {
       });
     };
 
-    loadDirectory(appPathService.getUserRdxPaths().mcpPath, 'user', userDescriptors);
+    loadDirectory(appPathService.getUserRdcPaths().mcpPath, 'user', userDescriptors);
     if (projectRoot) {
-      loadDirectory(appPathService.getProjectRdxPaths(projectRoot).mcpPath, 'project', projectDescriptors);
+      loadDirectory(appPathService.getProjectRdcPaths(projectRoot).mcpPath, 'project', projectDescriptors);
     }
 
     const ids = new Set([...userDescriptors.keys(), ...projectDescriptors.keys()]);

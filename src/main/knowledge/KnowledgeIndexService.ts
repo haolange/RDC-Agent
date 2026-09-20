@@ -31,7 +31,7 @@ const defaultDependencies = (): KnowledgeIndexDependencies => {
         spaceId: 'user',
         kind: 'user',
         label: 'User',
-        rootPath: appPathService.getUserRdxPaths().knowledgePath,
+        rootPath: appPathService.getUserRdcPaths().knowledgePath,
       }];
       for (const project of storageAdapter.listProjects()) {
         spaces.push({

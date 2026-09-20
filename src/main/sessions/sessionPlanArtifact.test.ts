@@ -19,7 +19,7 @@ describe('PlanArtifactWriter', () => {
   });
 
   it('overwrites session://plans/plan.md and freezes an approved copy', async () => {
-    const projectsRoot = await mkdtemp(path.join(os.tmpdir(), 'rdx-plan-artifact-'));
+    const projectsRoot = await mkdtemp(path.join(os.tmpdir(), 'rdc-plan-artifact-'));
     roots.push(projectsRoot);
     const sessionPath = path.join(projectsRoot, 'sess');
     await mkdir(sessionPath, { recursive: true });

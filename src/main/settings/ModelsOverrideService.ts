@@ -28,7 +28,7 @@ export class ModelsOverrideService extends EventEmitter {
   private cache: ModelsOverride | null = null;
 
   private getFilePath(): string {
-    return path.join(appPathService.getUserRdxRoot(), MODELS_OVERRIDE_FILE);
+    return path.join(appPathService.getUserRdcRoot(), MODELS_OVERRIDE_FILE);
   }
 
   private quarantineCorruptFile(filePath: string, cause: unknown): never {

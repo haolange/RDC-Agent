@@ -11,7 +11,7 @@ import type {
 } from '@shared/types/agentManifest';
 import type { AppRuntimePaths, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
-import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdxRuntime';
+import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
 import { AGENT_ROLES } from '@shared/constants/agents';
 import { canonicalAgentModelId, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
@@ -214,7 +214,7 @@ export class AgentManifestService {
     }
 
     if (projectRoot) {
-      const projectAgentsPath = appPathService.getProjectRdxPaths(projectRoot).agentsPath;
+      const projectAgentsPath = appPathService.getProjectRdcPaths(projectRoot).agentsPath;
       for (const loaded of loadManifestCandidates(projectAgentsPath, 'project', false)) {
         const reserved = reservedHistoricalIdsForCandidate(loaded.candidate);
         if (reserved.length > 0) {
@@ -373,7 +373,7 @@ export class AgentManifestService {
     if (!projectRoot?.trim()) {
       throw new Error('AGENT_MANIFEST_PROJECT_ROOT_REQUIRED: project-scoped save needs a project root.');
     }
-    return appPathService.getProjectRdxPaths(projectRoot).agentsPath;
+    return appPathService.getProjectRdcPaths(projectRoot).agentsPath;
   }
 
   async readCommitHash(filePath: string): Promise<string> {

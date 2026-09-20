@@ -125,8 +125,8 @@ export const VirtualMessageList: React.FC<Props> = ({
         if (target) { target.tabIndex = -1; target.focus({ preventScroll: true }); }
       });
     };
-    window.addEventListener('rdx:locate-tool-call', locate);
-    return () => { window.removeEventListener('rdx:locate-tool-call', locate); if (frame !== undefined) cancelAnimationFrame(frame); };
+    window.addEventListener('rdc:locate-tool-call', locate);
+    return () => { window.removeEventListener('rdc:locate-tool-call', locate); if (frame !== undefined) cancelAnimationFrame(frame); };
   }, [messages, estimateHeight, overscan]);
 
   const totalHeight = messages.length * estimateHeight;

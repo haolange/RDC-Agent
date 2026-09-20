@@ -4,7 +4,7 @@
 
 ## 1. 项目基本信息
 
-RDC-Agent 是 Electron / React / TypeScript 的通用 Agent workbench，支持 RenderDoc capture。原机器仓库为 `D:\Projects\Native\rdx\RDC-Agent`，远端为 https://github.com/haolange/RDC-Agent.git，分支 main；家中路径请发现实际 checkout，不硬编码原机器路径。依赖版本以 package.json、pnpm-lock.yaml 为准：Node >=22.13.0、pnpm 11.7.0。无线上部署任务。
+RDC-Agent 是 Electron / React / TypeScript 的通用 Agent workbench，支持 RenderDoc capture。原机器仓库为 `D:\Projects\Native\rdc\RDC-Agent`，远端为 https://github.com/haolange/RDC-Agent.git，分支 main；家中路径请发现实际 checkout，不硬编码原机器路径。依赖版本以 package.json、pnpm-lock.yaml 为准：Node >=22.13.0、pnpm 11.7.0。无线上部署任务。
 
 产品链路保持 Mission 规划→用户审阅→人点声明按钮切到 General→General 就地终答→用户自行切回 Mission 评估。按用户 2026-09-15 决定，不存在 `agent_handoff` 工具或 durable 状态机。General 执行与 Mission 回评估及依赖该链路的真实模型建议行验收移交后续专门大项时，不得把旧交接合同写成现行权威。保持同意前覆盖活计划、同意后冻结、拒绝回同一 tool result、项目保存由用户显式触发。禁止另造 Plan Mode、第二条执行通道或兼容 shim。
 
@@ -44,7 +44,7 @@ plan_artifact 进入生产审阅服务。父会话展示 delegated 请求，回�
 
 只从家中机器的现有资源复制必要配置、用户资源和加密凭据，排除历史会话、缓存、大型 capture；凭据值一律不输出。原机器曾需一并复制 Chromium Local State 才能解密隔离副本，但这不保证跨电脑 safeStorage 可解密：优先家中本机凭据；失败明确记录并让用户在正式界面完成登录，不自动切真实 userData 或解密成明文。
 
-RDX CLI 使用本机已有安装与完整 catalog，不能照搬原机器 executable。必要时在隔离设置里用官方 `RDX_INTERMEDIATE_ROOT` 指向本轮独立 runtime，避免既有上下文限额；不得删除其他上下文。
+RDC-Tool CLI 使用本机已有安装与完整 catalog，不能照搬原机器 executable。必要时在隔离设置里用官方 `RDC_TOOL_INTERMEDIATE_ROOT` 指向本轮独立 runtime，避免既有上下文限额；不得删除其他上下文。
 
 ## 6. 数据库与数据模型
 
@@ -81,13 +81,13 @@ plan:* 以 shared 类型和 Zod 为唯一当前接口，不恢复弱绑定形态
 建立一份临时 Tasks，状态为待执行/执行中/待验证/通过/阻塞，沿下面两组推进，不重新全库审计。
 
 1. **原生导出端到端**：用标准 Electron 或 Browser 配合用户操作原生对话框。验证读全文、复制、下载选目标、取消不写入；历史 A 在 B 产生且切 Agent 后仍保存 A 的身份和正文；固定项目路径正确。对换路径/计划、跨会话、重放、过期及写入失败沿用确定性测试。不要为 UI 自动化新增弱接口；若工具不能操作，让用户完成那一步并核验输出，其他测试继续。
-2. **本地与 Android Capture**：寻找本地 capture；原路径 `J:\DebugTest\rdx` 仅供定位。原本地 capture `眼睛泪腺白点.rdc` SHA256 为 0a79926a92e7e659989befc2322dc93b65782252fc5be2de33496142735a4094，约1.65GB，不重复复制。原147→140→137→147 Applied EID与Close Not open已证，但没有图像；定位有输出的真实事件与原生回执后检查 requested/applied/image EID 和内容hash。WhiteHair 用连接的 Android 设备，核对 Tools 原生 catalog、安装/服务版本、现有 helper复用、就绪、回放、无色输出事件、恢复、关闭及设备呈现。不要求先清空设备进程，不关闭用户 helper；已有服务不等于占用。Tools 仓库只有确认不可替代直接依赖缺陷才纳入，先读其 AGENTS。unsupported 精确记录，不能伪造绿色。不要一次性跑全部128工具。
+2. **本地与 Android Capture**：寻找本地 capture；原路径 `J:\DebugTest\rdc` 仅供定位。原本地 capture `眼睛泪腺白点.rdc` SHA256 为 0a79926a92e7e659989befc2322dc93b65782252fc5be2de33496142735a4094，约1.65GB，不重复复制。原147→140→137→147 Applied EID与Close Not open已证，但没有图像；定位有输出的真实事件与原生回执后检查 requested/applied/image EID 和内容hash。WhiteHair 用连接的 Android 设备，核对 Tools 原生 catalog、安装/服务版本、现有 helper复用、就绪、回放、无色输出事件、恢复、关闭及设备呈现。不要求先清空设备进程，不关闭用户 helper；已有服务不等于占用。Tools 仓库只有确认不可替代直接依赖缺陷才纳入，先读其 AGENTS。unsupported 精确记录，不能伪造绿色。不要一次性跑全部128工具。
 
 两组完成后同步受影响契约/UI文档与既有 ledger（真实源码 SHA、日期、证据、失败边界分开）。清理本轮 QA home/TEMP/日志/截图/工作清单与自有进程；先核对路径、链接、Git状态、PID所有权，保留用户数据、当前依赖和必要证据；确认桌面启动权已交还。可逆修复按逐项diff回退，不整库restore。
 
 ## 12. 新 AI 接手指令
 
-请立即核对 checkout，再按 AGENTS.md → DESIGN.md Architecture Principles/Authority Map → docs/contracts/{runtime-kernel,permissions,session-projection}.md → docs/ui/{design-system,workbench-and-transcript}.md → docs/architecture/{rdx-runtime,browser-qa-surface}.md → docs/product/acceptance-ledger.md 的顺序读取相关部分。以本文第11节为收敛范围执行到验证和清理完成。
+请立即核对 checkout，再按 AGENTS.md → DESIGN.md Architecture Principles/Authority Map → docs/contracts/{runtime-kernel,permissions,session-projection}.md → docs/ui/{design-system,workbench-and-transcript}.md → docs/architecture/{rdc-runtime,browser-qa-surface}.md → docs/product/acceptance-ledger.md 的顺序读取相关部分。以本文第11节为收敛范围执行到验证和清理完成。
 
 搜索/历史核对只委托 Luna 子 Agent，主 Agent 负责计划、实现与验证裁决。保持现有组件层级、公共Button和语义token，不留legacy/双路径。不因跨电脑路径或已清理旧QA会话重新打开整个产品设计。不可逆数据操作或安全边界冲突必须明确询问；其余可逆操作说明默认选择后继续。
 

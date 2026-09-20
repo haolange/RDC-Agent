@@ -1,12 +1,12 @@
 import { flushPolicyBudgetObservers } from './DelegationBudget';
 import { withProcessExecutionOwner } from '../../runtime/ResourceExecutionLifetime';
-import { getRdxTurnBinding } from '../../tools/RdxTurnBindings';
+import { getRdcTurnBinding } from '../../tools/RdcTurnBindings';
 /**
  * ToolExecutorFactory — createToolExecutor and tool-call mediation helpers.
  */
 
 import type { AgentRole } from '@shared/types/agent';
-import type { HookEvent } from '@shared/types/rdxRuntime';
+import type { HookEvent } from '@shared/types/rdcRuntime';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import type { AgentToolResult, ToolExecutionContext } from '../../agent-runtime/agent/AgentTool';
 import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
@@ -35,7 +35,7 @@ import {
   isDeferredToolName,
 } from './deferredTools';
 import { normalizeToolName } from './DebuggerRuntimePolicy';
-import { isRdxLeaseToolName } from '@shared/constants/rdxLeaseTools';
+import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import { reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
@@ -57,13 +57,13 @@ export interface ToolExecutorFactoryDeps {
     projectId?: string | null,
     projectRootPath?: string | null,
     mcpPoolKey?: string | null,
-    options?: { excludeRdxLeaseTools?: boolean },
+    options?: { excludeRdcLeaseTools?: boolean },
   ) => ResolvedRuntimeTools;
   isAllowedForRuntime: (
     agentId: AgentRole,
     toolName: string,
     frozenToolAllowlist?: readonly string[],
-    excludeRdxLeaseTools?: boolean,
+    excludeRdcLeaseTools?: boolean,
   ) => boolean;
   matchesToolAllowlist: (toolName: string, toolAllowlist: string[]) => boolean;
 }
@@ -127,7 +127,7 @@ export class ToolExecutorFactory {
       runtimeContext?.projectId ?? plan?.projectId,
       runtimeContext?.projectRootPath ?? plan?.projectRootPath,
       runtimeContext?.mcpPoolKey ?? null,
-      { excludeRdxLeaseTools: plan?.excludeRdxLeaseTools === true },
+      { excludeRdcLeaseTools: plan?.excludeRdcLeaseTools === true },
     ).toolMap;
     // Skill allowed-tools 收窄集（DESIGN Skills 条款：只收窄、不扩展）。
     // 多 skill：allowedTools = ∩(skill_i) ∩ runtimeAllowlist（空声明不参与）。
@@ -170,12 +170,12 @@ export class ToolExecutorFactory {
         );
         const normalizedName = normalizeToolName(toolCall.name);
         if (
-          (plan?.excludeRdxLeaseTools && isRdxLeaseToolName(toolCall.name))
+          (plan?.excludeRdcLeaseTools && isRdcLeaseToolName(toolCall.name))
           || !this.deps.isAllowedForRuntime(
             agentId,
             toolCall.name,
             effectiveToolAllowlist,
-            plan?.excludeRdxLeaseTools === true,
+            plan?.excludeRdcLeaseTools === true,
           )
           || !tools.has(normalizedName)
         ) {
@@ -322,10 +322,10 @@ export class ToolExecutorFactory {
           }
           const toolContext: ToolExecutionContext = {
             successfulFileReads: this.sessionFileReads(runtimeContext?.sessionId ?? sessionId),
-            rdxBinding: plan ? getRdxTurnBinding(plan) : undefined,
+            rdcBinding: plan ? getRdcTurnBinding(plan) : undefined,
             agentId,
             turnId: runtimeContext?.turnId,
-            excludeRdxLeaseTools: plan?.excludeRdxLeaseTools,
+            excludeRdcLeaseTools: plan?.excludeRdcLeaseTools,
             workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
             projectRootPath,
             projectId: runtimeContext?.projectId ?? plan?.projectId ?? null,
@@ -409,7 +409,7 @@ export class ToolExecutorFactory {
     payload: Record<string, unknown>,
   ): Promise<boolean> {
     const projectRoot = runtimeContext?.projectRootPath ?? undefined;
-    hookEngine.load(appPathService.getUserRdxPaths().hooksPath, projectRoot ?? undefined);
+    hookEngine.load(appPathService.getUserRdcPaths().hooksPath, projectRoot ?? undefined);
     const results = await toolResourceArbiter.runExclusive(
       toolResourceKey(projectRoot, runtimeContext?.sessionId ?? 'ephemeral'),
       undefined,

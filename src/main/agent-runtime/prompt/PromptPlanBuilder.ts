@@ -13,7 +13,7 @@ import type {
   ScopedInstructionResolution,
   SkillLoadResult,
   SkillMetadata,
-} from '@shared/types/rdxRuntime';
+} from '@shared/types/rdcRuntime';
 import { charsToTokens } from '@shared/utils/tokens';
 import { generateEventId } from '@shared/utils/id';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';

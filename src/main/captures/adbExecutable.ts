@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export function adbUnavailableMessage(): string {
-  return 'adb executable not found. Configure RDX_ANDROID_ADB_PATH or install Android platform-tools.';
+  return 'adb executable not found. Configure RDC_ANDROID_ADB_PATH or install Android platform-tools.';
 }
 
 export function candidateAdbPaths(): string[] {
@@ -14,7 +14,7 @@ export function candidateAdbPaths(): string[] {
     }
   };
 
-  push(process.env.RDX_ANDROID_ADB_PATH);
+  push(process.env.RDC_ANDROID_ADB_PATH);
   push(process.env.ADB);
 
   for (const envName of ['ANDROID_SDK_ROOT', 'ANDROID_HOME']) {

@@ -1,4 +1,4 @@
-import type { RdxTurnBinding } from '../../tools/RdxTurnBindings';
+import type { RdcTurnBinding } from '../../tools/RdcTurnBindings';
 import type {
   ImageContent,
   JsonSchema,
@@ -20,10 +20,10 @@ export interface ToolExecutionContext {
   /** Session-owned volatile state; never persisted or shared with child sessions. */
   successfulFileReads?: Set<string>;
   /** Main-owned, private execution binding; never serialized to the model. */
-  rdxBinding?: RdxTurnBinding;
+  rdcBinding?: RdcTurnBinding;
   agentId?: string;
   turnId?: string;
-  excludeRdxLeaseTools?: boolean;
+  excludeRdcLeaseTools?: boolean;
   workspaceRoot: string;
   projectRootPath: string | null;
   projectId: string | null;

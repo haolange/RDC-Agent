@@ -165,7 +165,7 @@ PT-->>R : resolve/reject
 ### 通道清单与类型
 - 职责：集中定义所有 invoke 与 event 通道名，导出类型与判定函数，确保两端类型一致。
 - 关键点：
-  - 按领域分组（shell、conversation、workflow、agent、memory、investigation、knowledge、rdxRuntime、command、tools、llm、settings、project、device、session、run、runtime、capture、context、trace）。
+  - 按领域分组（shell、conversation、workflow、agent、memory、investigation、knowledge、rdcRuntime、command、tools、llm、settings、project、device、session、run、runtime、capture、context、trace）。
   - 提供 isRendererInvokeChannel/isRendererEventChannel 用于运行时类型守卫。
   - 导出 RENDERER_INVOKE_CHANNELS/RENDERER_EVENT_CHANNELS 用于一致性检查。
 
@@ -206,7 +206,7 @@ PT-->>R : resolve/reject
 - 行为要点：
   - 删除前显示确认对话框，列出关联会话和影响范围
   - 使用 ipcApprovalTokenService 进行权限验证
-  - 文件监控自动检测 .rdx/inputs 目录变化并刷新
+  - 文件监控自动检测 .rdc-agent/inputs 目录变化并刷新
   - 错误处理和日志记录完善
 
 **新增** 这是全新的项目输入管理功能，提供了安全的抓帧删除流程。
@@ -367,7 +367,7 @@ RDC-Agent 的 IPC 体系通过共享通道清单、严格的参数校验与清�
 - Capture/Device：context:get、context:openHumanPreview、context:closeHumanPreview、capture:list、capture:openProjectInput、capture:getOpenedState、capture:clearOpenedState、capture:select、capture:getReplaySelection、capture:listReplayHistory、capture:readReplayImage、capture:clearReplayHistory、capture:getReplayState、capture:applyReplayEvent、capture:refreshFrame、device:list、device:refresh、device:activate、device:watch:start、device:watch:renew、device:watch:stop
 - Project Input Lifecycle：project:inputs:prepareRemove、project:inputs:remove
 - Agent：agent:sendMessage、agent:getState、agent:getAllStates、agent:configure
-- 其他：workflow、memory、investigation、knowledge、rdxRuntime、command、tools、llm、settings、project、session、run、runtime、trace（详见 shared/renderer-api/channels.ts）
+- 其他：workflow、memory、investigation、knowledge、rdcRuntime、command、tools、llm、settings、project、session、run、runtime、trace（详见 shared/renderer-api/channels.ts）
 
 **更新** 新增项目输入生命周期通道和捕获回放历史通道。
 

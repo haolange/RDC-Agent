@@ -2,7 +2,7 @@ import * as os from 'os';
 import { matchShellFileToolBypass } from './shellFileToolBypass';
 import * as path from 'path';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
-import type { CompiledPolicy } from '@shared/types/rdxRuntime';
+import type { CompiledPolicy } from '@shared/types/rdcRuntime';
 import type { AgentTool } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
 import { settingsService } from '../../settings/SettingsService';
@@ -329,7 +329,7 @@ export class AgentPermissionPolicyService {
     const toolName = normalizeToolName(input.toolCall.name);
     const workspaceRoot = path.resolve(
       input.projectRootPath
-      || settings?.paths.userRdxRoot
+      || settings?.paths.userRdcRoot
       || process.cwd(),
     );
 
@@ -344,8 +344,8 @@ export class AgentPermissionPolicyService {
       return denied(`Policy deniedTools blocked tool "${input.toolCall.name}".`, 'high');
     }
 
-    if (toolName === 'shell' && input.toolCall.arguments.rdx && input.agentId !== 'general') {
-      return denied('RDX_EXECUTION_DENIED: General only.', 'high');
+    if (toolName === 'shell' && input.toolCall.arguments.rdc && input.agentId !== 'general') {
+      return denied('RDC_EXECUTION_DENIED: General only.', 'high');
     }
 
     // Catastrophic shell patterns are hard-denied in every mode, including full-access.
@@ -427,7 +427,7 @@ export class AgentPermissionPolicyService {
 
     if (toolName === 'shell') {
       const command = extractStringArg(input.toolCall, 'command');
-      if (input.toolCall.arguments.rdx) return request(mode, 'Native RDX operation requires review: ' + JSON.stringify(input.toolCall.arguments.rdx), 'high');
+      if (input.toolCall.arguments.rdc) return request(mode, 'Native RDC operation requires review: ' + JSON.stringify(input.toolCall.arguments.rdc), 'high');
       if (!command) return denied('Shell command is empty.', 'medium');
       if (isCommandAllowedByRule(command, permissions)) {
         return { action: 'allow', risk: 'low', temporaryPathRoots: [] };
