@@ -1,5 +1,7 @@
 # Acceptance Ledger
 
+2026-09-20 RELEASE-PUBLISHED：Agent `v0.6.0-rc.1`（构建提交392c71f16a327d71084196b9e343b6ee9f739bf4）已作为明确未签名的GitHub预发布公开；Tools `v1.0.1`（04295e47cd87727f109f863980aa5b2cfbef2647）正式发布，v1.0.0未覆盖。9个服务器端资产digest逐项等于本地SHA256；Agent zip内asar等于已验unpacked，52 builtin与四张教程PNG字节一致，NSIS NotSigned符合本次授权。发行门禁5个正负例、安装/引导相关16项、typecheck/lint/check:gates通过；Tools 37测试+2subtests、实际zip/doctor/catalog和文档/identity通过。Tools CI已绿，Agent CI在发布回执时仍运行；历史真实链路沿用，不新增声称NSIS交互安装/独立干净机/LLM矩阵通过。地址、散列、CI链接及清理见docs/workflows/first-use-and-release-readiness.md P1–P3。本回执提交不移动发行tag。
+
 2026-09-20 ONBOARDING-VISUAL：在728fc2fa基线的未提交工作区完成四步图文教程；不将基线SHA冒充已提交实现。typecheck、受影响ESLint、design-token/renderer-structure、GettingStartedState（1项）及最终build通过，四张本地PNG进入renderer资产。真实disposable Browser QA验证中文深色、英文浅色，1280×720与390×844；四页图文、上下步/索引/完成/关闭/重开首步、Tab/Shift+Tab闭环、Escape焦点返回通过。390px正文无横向溢出，滚动可达完成提示与下载链接；首末页页脚位置一致。示例标识与HTML双语标注明确，无配置或模型请求。两个自有QA实例已停止、隔离数据清理、viewport恢复、标签页关闭，canonical lock不存在，桌面启动权已交还。本轮未操作原生CU、未重打release，旧候选不包含此图文改版。实现与生成来源见docs/ui/workbench-and-transcript.md，任务V1–V3见docs/workflows/first-use-and-release-readiness.md。
 
 2026-09-20 FIRST-USE-RELEASE退出补验：现有打包`release/win-unpacked/RdcAgent.exe`在隔离profile/home启动，原生窗口与上手指南目视正常；Alt+F4后主进程及该exe子进程退出，canonical instance.lock释放，未强制结束。临时配置删除并复查，桌面启动权已交还。此回执补齐下表该行历史未验的原生容器/正常退出项；计划T1–T6通过。代码仍未提交，表行保留planned而不将基线SHA冒充已提交实现；签名、独立干净机与发布不在本轮完成声明中。
