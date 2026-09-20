@@ -6,7 +6,7 @@
 
 RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDC 与 RenderDoc `.rdc`。它应能作为日常 agent 工作台完成阅读、规划、编辑、搜索、工具调用、handoff、memory 与 subagent 编排，同时保留 capture 打开、replay 上下文、RDC 原生操作、诊断与 RenderDoc 调查等垂直能力。
 
-**发布面是 Windows-only。** `electron-builder.json` 只保留 `win`；mac/linux 安装包与公证不在产品范围内。POSIX launcher wrapper（`.sh`）仅供 Ubuntu CI 的 node 面准备，不是发布目标。Windows release 通道（`RDC_AGENT_RELEASE_CHANNEL=release` 或 git tag）必须提供 `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD`（或 `CSC_*` 别名）；本地 `pnpm run pack` 保持不签名。SBOM 由完整 `pnpm-lock.yaml` 传递依赖图生成 CycloneDX，并记录 git SHA 与 lockfile digest。
+**发布面是 Windows-only。** `electron-builder.json` 只保留 `win`；mac/linux 安装包与公证不在产品范围内。POSIX launcher wrapper（`.sh`）仅供 Ubuntu CI 的 node 面准备，不是发布目标。Windows release 通道（`RDC_AGENT_RELEASE_CHANNEL=release` 或 git tag）必须提供 `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD`（或 `CSC_*` 别名）；唯一例外是显式 `RDC_AGENT_RELEASE_CHANNEL=prerelease`、package 带预发布后缀且 tag（如有）与该版本完全一致，只能发布为明确披露未签名的 GitHub prerelease。稳定正式版签名门禁不放宽；本地 `pnpm run pack` 保持不签名。SBOM 由完整 `pnpm-lock.yaml` 传递依赖图生成 CycloneDX，并记录 git SHA 与 lockfile digest。
 
 **不做** image/video 生成 runtime、media provider 目录面或 `MediaRuntimeService` 类骨架；discovery 对非 agent modality（含 image/video output）保持 fail-closed 剔除。用户附件 vision-input（读图）仍属 agent chat 能力，与生成 media 无关。
 
@@ -17,6 +17,12 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDC 与 RenderDo
 Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完成。`LoopProgressGuard` 对工具名、规范化参数、结果语义与 runtime revision 生成稳定指纹；连续第二轮无进展只注入一次不落盘纠偏指令，第三轮仍相同以 `AGENT_NO_PROGRESS` 终止。仍需 continuation 却达到 `maxTurns` 时以 `AGENT_MAX_TURNS_EXCEEDED` 终止。两者分别投影 `CONVERSATION_AGENT_LOOP_STALLED` / `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`，不得归类成 Provider 请求失败。
 
 ## Architecture Principles
+
+### 首次使用与本机安装
+
+上手指南是四步图文操作教程，首次 bootstrap 后展示，标题栏问号可重开。每页解释操作入口、动作与完成预期；本地教学图与 HTML 双语标注分离，始终标明示意而非当前配置。桌面左文右图、窄屏上图下文，沿用 TaskDialog 与固定底部导航。关闭/完成只确认已阅读，标记写 Electron 应用状态目录；不表示配置成功，不创建 Project、不保存 Provider、不执行模型请求。Builtin 继续直接读取随应用打包的文件，不写 user seed。
+
+Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。主进程从根目录派生同安装捆绑 Python 与 CLI，验证 catalog 后由现有 Settings 边界保存。检测只读已配置位置和 Tools 默认 `%LOCALAPPDATA%/Programs/rdc-tool`；用户确认前不执行候选。根目录不是第二份持久配置。失败保留原配置；未配置 RDC 不阻塞 General。发行候选同时提供 Windows zip 与 NSIS，正式签名门禁不变。
 
 ### 垂直能力收敛（2026-09-09）
 

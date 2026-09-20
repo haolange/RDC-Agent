@@ -1,5 +1,9 @@
 # Acceptance Ledger
 
+2026-09-20 ONBOARDING-VISUAL：在728fc2fa基线的未提交工作区完成四步图文教程；不将基线SHA冒充已提交实现。typecheck、受影响ESLint、design-token/renderer-structure、GettingStartedState（1项）及最终build通过，四张本地PNG进入renderer资产。真实disposable Browser QA验证中文深色、英文浅色，1280×720与390×844；四页图文、上下步/索引/完成/关闭/重开首步、Tab/Shift+Tab闭环、Escape焦点返回通过。390px正文无横向溢出，滚动可达完成提示与下载链接；首末页页脚位置一致。示例标识与HTML双语标注明确，无配置或模型请求。两个自有QA实例已停止、隔离数据清理、viewport恢复、标签页关闭，canonical lock不存在，桌面启动权已交还。本轮未操作原生CU、未重打release，旧候选不包含此图文改版。实现与生成来源见docs/ui/workbench-and-transcript.md，任务V1–V3见docs/workflows/first-use-and-release-readiness.md。
+
+2026-09-20 FIRST-USE-RELEASE退出补验：现有打包`release/win-unpacked/RdcAgent.exe`在隔离profile/home启动，原生窗口与上手指南目视正常；Alt+F4后主进程及该exe子进程退出，canonical instance.lock释放，未强制结束。临时配置删除并复查，桌面启动权已交还。此回执补齐下表该行历史未验的原生容器/正常退出项；计划T1–T6通过。代码仍未提交，表行保留planned而不将基线SHA冒充已提交实现；签名、独立干净机与发布不在本轮完成声明中。
+
 Verifier 结论落盘。本文件是二次收敛（U00–U07）与 T18 现场取证的验收台账，不是第二产品权威；产品裁决以根目录 [`DESIGN.md`](../../DESIGN.md) 为准。
 
 **Browser 证据路径在仓库外** `%LOCALAPPDATA%/rdc-agent-qa/<sha>/`。条目若引用 Browser 证据，只记相对该目录的路径、build SHA、QA `projectId` / `sessionId`、viewport、theme/motion、DOM selector、IPC channel + 结果码。**禁止**写入 token / cookie / secret / qaBootstrap。
@@ -14,6 +18,7 @@ Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verifie
 
 | Task | Criterion | Gate/Test | Browser evidence ref | Verdict | Commit SHA | Date |
 | --- | --- | --- | --- | --- | --- | --- |
+| FIRST-USE-RELEASE | 上手说明、本机目录绑定及本地候选；本行SHA仅为未提交工作区基线 | 2957 tests通过/4既有跳过；coverage/typecheck/lint/gates/build；52 builtin字节与包内Hook通过；Tools清理修复34项不同受影响测试通过，真实成功/异常/取消释放与更新zip门禁通过 | 2026-09-20中文深色/英文浅色390px；project proj_6646965201c4/session sess_56928f2a5437；真实选择目录、1.0.1/128操作、失败保留配置；Vulkan EID21打开关闭。用户确认界面目视走Browser，沿用已通过证据；打包exe服务初始化通过，原生容器及正常退出仍未验。候选hash与清理回执见docs/workflows/first-use-and-release-readiness.md；整体不标verified | planned | 728fc2fa9ea1ccc50023e5ef61376d083c86b27b | 2026-09-20 |
 | RDC-host-binding | 同安装捆绑 Python + sole run_cli.py 前缀；非法配置可见但拒绝；统一原生 argv；下列 SHA 是未提交工作区的基线，实际源码以本轮 source-manifest.json 为准 | Settings/binding/invoker/冻结身份测试；真实 RdxNativeRead/Parser 两项；typecheck/lint/build | `runtime-host/browser-qa.json`；project `proj_b2a8fe4f777b`，session `sess_41c4e1cff123`；Settings 保存 bat 返回 RDX_BAT_REJECTED；合法保存及验证128操作；两次 shell.rdx 独立 Python argv，发现无进程 | verified | 2dd81bc99e61f0bb1ab07c46ee9b4a9a32df48bf | 2026-09-19 |
 | RDC-host-file-policy | 文件路由先于四种模式/自定义前缀；同 session 跨 turn 的成功 realpath 读取，重启/子会话隔离；新建免先读，覆盖必须先读；保留 symlink 拒绝 | 真实工具写入与失败/取消读取、路径别名、子会话释放断言；SHELL_FILE_TOOL_BYPASS / RDX_VIA_COMMAND_DENIED / READ_BEFORE_EDIT_REQUIRED 均有执行断言；完整 tests/coverage ratchet、contracts、prompt/scoped resources/skills | 同一未提交源码回执；无新增 IPC、SessionRecord 字段或持久已读账本 | verified | 2dd81bc99e61f0bb1ab07c46ee9b4a9a32df48bf | 2026-09-19 |
 | RDC-host-replay-qa | 两 capture 事实、真实 batch、Capture 开关及当前帧；法线/UV unsupported，marker/debug name 缺失为 null；未声明模型质量或 Android 屏幕验收 | Tools384项及source release gate；Agent2936项全量与4项条件性跳过；真实read/parser另行通过；canonical catalog/三手册一致 | `runtime-host/browser-qa.json`；1813×1145、390×844，dark；`img[alt="EID 11"]` 解码603×653；`#capture-frame-tab`键盘focus/selected；close后图像消失和控件disabled；两图像IPC Buffer JSON严格解码修复 | verified | 2dd81bc99e61f0bb1ab07c46ee9b4a9a32df48bf | 2026-09-19 |

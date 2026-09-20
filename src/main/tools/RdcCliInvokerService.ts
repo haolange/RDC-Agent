@@ -113,8 +113,8 @@ export class RdcCliInvokerService {
     try { return await loading; } catch (error) { this.catalogs.delete(key); this.validatedCatalogs.delete(key); this.versions.delete(key); throw error; }
   }
 
-  async getRuntimeSummary(refresh = false): Promise<ToolRuntimeSummary> {
-    const settings = structuredClone(this.getSettings());
+  async getRuntimeSummary(refresh = false, draft: RdcCliInvokerSettings = this.getSettings()): Promise<ToolRuntimeSummary> {
+    const settings = structuredClone(draft);
     if (refresh) {
       const key = canonicalJson(settings);
       this.catalogs.delete(key); this.validatedCatalogs.delete(key); this.versions.delete(key);

@@ -1,6 +1,8 @@
 export const RENDERER_INVOKE_CHANNEL = {
   shell: {
     getAppMeta: 'app:getMeta',
+    hasSeenGettingStarted: 'app:hasSeenGettingStarted',
+    acknowledgeGettingStarted: 'app:acknowledgeGettingStarted',
     selectAvatar: 'app:selectAvatar',
     getAvatarDataUrl: 'app:getAvatarDataUrl',
     openPath: 'app:openPath',
@@ -100,6 +102,9 @@ export const RENDERER_INVOKE_CHANNEL = {
   tools: {
     getCatalog: 'tool:getCatalog',
     getRuntimeSummary: 'tool:getRuntimeSummary',
+    detectInstallations: 'tool:detectInstallations',
+    resolveInstallation: 'tool:resolveInstallation',
+    verifyInstallation: 'tool:verifyInstallation',
     getMcpStatusSummary: 'mcp:getStatusSummary',
     getEvidenceChain: 'evidence:getChain',
     getEvidenceEvents: 'evidence:getEvents',

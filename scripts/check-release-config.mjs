@@ -9,7 +9,7 @@
  *   Windows release channel: WIN_CSC_LINK + WIN_CSC_KEY_PASSWORD
  *     (CSC_LINK / CSC_KEY_PASSWORD also accepted).
  *   Local `pnpm run pack` stays unsigned.
- *   Required when RDC_AGENT_RELEASE_CHANNEL=release or GITHUB_REF is a tag.
+ *   Required for release or tag builds, except explicit version-matched prereleases.
  * Product is Windows-only; mac/linux electron-builder targets are forbidden.
  */
 
@@ -63,6 +63,12 @@ const secretPatterns = [
   /sk-[a-zA-Z0-9]{10,}/,
   /-----BEGIN CERTIFICATE-----/,
 ];
+
+const windowsTargets = (builder.win?.target ?? []).map(target => typeof target === 'string' ? target : target.target);
+if (!windowsTargets.includes('zip') || !windowsTargets.includes('nsis')) fail('Windows distribution must include zip and nsis.');
+if (builder.win?.artifactName?.includes('-setup') || !builder.nsis?.artifactName?.includes('-setup')) {
+  fail('Only the NSIS installer artifact name may contain -setup.');
+}
 for (const pattern of secretPatterns) {
   if (pattern.test(builderText)) {
     fail(`electron-builder.json must not embed always-on secrets (${pattern}).`);
@@ -86,8 +92,16 @@ if (builder.mac?.notarize === true) {
   fail('mac.notarize is forbidden; product is Windows-only.');
 }
 
-const requireWinSign = process.env.RDC_AGENT_RELEASE_CHANNEL === 'release'
-  || Boolean(process.env.GITHUB_REF && process.env.GITHUB_REF.startsWith('refs/tags/'));
+const packageJson = JSON.parse(read('package.json'));
+const channel = process.env.RDC_AGENT_RELEASE_CHANNEL;
+const tagRef = process.env.GITHUB_REF?.startsWith('refs/tags/') ? process.env.GITHUB_REF : undefined;
+const prereleaseVersion = /^\d+\.\d+\.\d+-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*$/.test(packageJson.version);
+const unsignedPrerelease = channel === 'prerelease' && prereleaseVersion
+  && (!tagRef || tagRef === `refs/tags/v${packageJson.version}`);
+if (channel === 'prerelease' && !unsignedPrerelease) {
+  fail('Unsigned prerelease requires a prerelease package version and an exactly matching tag (when set).');
+}
+const requireWinSign = channel === 'release' || Boolean(tagRef && !unsignedPrerelease);
 if (requireWinSign) {
   const link = process.env.WIN_CSC_LINK || process.env.CSC_LINK;
   const password = process.env.WIN_CSC_KEY_PASSWORD || process.env.CSC_KEY_PASSWORD;
@@ -98,12 +112,15 @@ if (requireWinSign) {
     fail('Release channel requires WIN_CSC_KEY_PASSWORD (or CSC_KEY_PASSWORD).');
   }
 } else {
-  console.log('[release-config] local/CI pack may stay unsigned (RDC_AGENT_RELEASE_CHANNEL is not release).');
+  console.log(unsignedPrerelease
+    ? '[release-config] Explicit prerelease may stay unsigned; publish as a disclosed GitHub prerelease only.'
+    : '[release-config] local/CI pack may stay unsigned (RDC_AGENT_RELEASE_CHANNEL is not release).');
 }
 
 const requiredScripts = [
   'scripts/release/generate-checksums.mjs',
   'scripts/release/generate-sbom.mjs',
+  'scripts/release/verify-package.mjs',
   'scripts/check-release-config.mjs',
 ];
 for (const relativePath of requiredScripts) {
@@ -112,11 +129,11 @@ for (const relativePath of requiredScripts) {
   }
 }
 
-const packageJson = JSON.parse(read('package.json'));
 for (const [name, command] of [
   ['check:release-config', 'node scripts/check-release-config.mjs'],
   ['release:checksums', 'node scripts/release/generate-checksums.mjs'],
   ['release:sbom', 'node scripts/release/generate-sbom.mjs'],
+  ['check:release-package', 'node scripts/release/verify-package.mjs'],
 ]) {
   if (packageJson.scripts?.[name] !== command) {
     fail(`package.json scripts.${name} must be \`${command}\`.`);

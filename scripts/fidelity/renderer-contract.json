@@ -122,6 +122,7 @@
     "settings.scopedResourceForm": "src/renderer/features/settings/SettingsModal/sections/scopedResourceForm.ts",
     "settings.toolsSettings": "src/renderer/features/settings/SettingsModal/sections/ToolsSettings.tsx",
     "settings.rdcCliInvokerSettingsFields": "src/renderer/features/settings/SettingsModal/sections/RdcCliInvokerSettingsFields.tsx",
+    "settings.rdcInstallationFlow": "src/renderer/features/settings/SettingsModal/sections/useRdcInstallation.ts",
     "settings.mcpServicesPanel": "src/renderer/features/settings/SettingsModal/sections/McpServicesPanel.tsx",
     "settings.policySettings": "src/renderer/features/settings/SettingsModal/sections/PolicySettings.tsx",
     "settings.generalSettings": "src/renderer/features/settings/SettingsModal/sections/GeneralSettings.tsx",

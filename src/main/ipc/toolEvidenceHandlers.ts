@@ -6,9 +6,27 @@ import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import { EvidenceGetEventsArgsSchema } from './validation/toolEvidenceSchemas';
+import { RdcInstallationArgsSchema } from './validation/rdcInstallationSchemas';
+import { detectRdcInstallations, resolveRdcInstallation } from '../tools/RdcInstallationService';
+import { settingsService } from '../settings/SettingsService';
 
 export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;
+  ipcMain.handle('tool:detectInstallations', (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'tool:detectInstallations', maxBytes: 1024 });
+    return detectRdcInstallations(settingsService.getAll().tooling.rdcCli);
+  });
+  ipcMain.handle('tool:resolveInstallation', (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(RdcInstallationArgsSchema, rawArgs, { label: 'tool:resolveInstallation', maxBytes: 65536 });
+    return resolveRdcInstallation(request);
+  });
+  ipcMain.handle('tool:verifyInstallation', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(RdcInstallationArgsSchema, rawArgs, { label: 'tool:verifyInstallation', maxBytes: 65536 });
+    const settings = resolveRdcInstallation(request);
+    const summary = await rdcCliInvokerService.getRuntimeSummary(true, settings);
+    if (!summary.cli.available) throw new Error(summary.cli.unavailableReason);
+    return { settings, summary };
+  });
 
   ipcMain.handle('tool:getCatalog', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'tool:getCatalog', maxBytes: 1024 });

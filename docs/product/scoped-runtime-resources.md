@@ -29,6 +29,8 @@ Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导
 
 ## Profiles
 
+首次上手说明不会复制官方资源或创建指令文件。已阅读标记属于 Electron 应用状态；用户/项目资源仅承载各自自定义内容。官方 Agent 文件直接位于 `resources/agent-runtime/agents/*.agent.md`。
+
 四个 builtin：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件在 `resources/agent-runtime/agents`，再与 `~/.rdc-agent/agents` 和 `<project-root>/.rdc-agent/agents` 合成 effective snapshot。user/project 只能覆盖这四个 id，或新增无关自定义 id。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`；**无运行通道**（U01 落地 v2 迁移：shadow purge，真正改过正文/工具的 builtin-id 副本 `retained-override`）。迁移 marker 为 v2（U01 已落地）。Mission planner 工具面见裁决 J（plan-only + `rdc_probe`）。
 
 ## Project Instructions

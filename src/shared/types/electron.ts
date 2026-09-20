@@ -162,6 +162,8 @@ export interface ElectronAPI {
   };
 
   appShell: {
+    hasSeenGettingStarted: () => Promise<boolean>;
+    acknowledgeGettingStarted: () => Promise<void>;
     selectAvatar: () => Promise<string | null>;
     getAvatarDataUrl: (avatarPath: string) => Promise<string | null>;
     openPath: (targetPath: string) => Promise<{
@@ -349,6 +351,9 @@ export interface ElectronAPI {
   };
 
   tool: {
+    detectInstallations: () => Promise<import('./rdcInstallation').RdcInstallationCandidate[]>;
+    resolveInstallation: (request: import('./rdcInstallation').RdcInstallationRequest) => Promise<import('./settings').RdcCliInvokerSettings>;
+    verifyInstallation: (request: import('./rdcInstallation').RdcInstallationRequest) => Promise<{ settings: import('./settings').RdcCliInvokerSettings; summary: ToolRuntimeSummary }>;
     getCatalog: () => Promise<ToolCatalog>;
     getRuntimeSummary: () => Promise<ToolRuntimeSummary>;
   };
