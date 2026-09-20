@@ -8,9 +8,11 @@
 |---|---|---|
 | P1 发行整理 | 通过 | Agent 0.6.0-rc.1与双语未签名说明；Tools 1.0.1发布说明；显式预发布门禁，正式签名要求保留，5项门禁正负例通过 |
 | P2 产物与验证 | 通过 | Agent typecheck/受影响lint/16项聚焦测试与check:gates通过；最终0.6.0-rc.1 NSIS/zip构建，52 builtin+4教程PNG字节一致，NSIS确认NotSigned；Tools 37测试+2subtests、文档/identity及实际zip验证通过 |
-| P3 上传与收口 | 执行中 | Tools 04295e4已提交并非强制推送，v1.0.1草稿资产上传；Agent等待提交与上传；发布前核对远端SHA/资产digest，CI报告当时状态 |
+| P3 上传与收口 | 通过 | Agent 392c71f1 / v0.6.0-rc.1与Tools 04295e4 / v1.0.1已非强制推送并发布；GitHub全部9资产digest与本地一致，Agent明确prerelease，Tools正式版；临时目录清理、无自有进程或canonical lock |
 
 最终Agent产物：NSIS SHA256 `99973c09f4d223a26e7456b2392560f1adc8a28ee5000647ea0fcb64ac98a147`，zip SHA256 `5af6785a2068f645b0cc36a97a4acd9f5c79d7aee310e3f642e4a304a40f64f6`；旧0.6.0本地候选已由本次rc.1替换并删除。Tools正式包SHA256 `e5cd8df1237ad95ecaf64afd911107c5298d08898492924edefb32efdf958357`，不再使用早期candidate散列。包验证在Windows修正asar读取的路径分隔后通过，属于验证脚本修正，不是包内资源缺失。
+
+发布地址：[Agent预发布](https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.1)、[Tools正式版](https://github.com/haolange/RDC-Tool/releases/tag/v1.0.1)。2026-09-20 19:40（UTC+8）快照：Tools [CI 35508297088](https://github.com/haolange/RDC-Tool/actions/runs/35508297088) success；Agent [CI 35508421797](https://github.com/haolange/RDC-Agent/actions/runs/35508421797) in_progress。云端CI异步，不把该快照写成Agent全绿。发行tag保留在实际构建提交；本回执后续提交仅更新文档，不移动tag或替换资产。SBOM记录Agent构建提交392c71f1。最终本地保留Agent release/与Tools dist/publish/；pytest临时依赖与测试根（先移除内部符号链接）、被替代candidate、打包暂存均已清理，桌面启动权已交还。
 
 ## 图文教程改版任务（本轮）
 
