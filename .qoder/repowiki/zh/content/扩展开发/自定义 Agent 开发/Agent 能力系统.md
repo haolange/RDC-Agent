@@ -39,7 +39,7 @@
 - 产品层：Agent Manifest 定义 agent 身份、可用工具令牌、可移交目标、技能与 MCP 服务器等
 - 运行时能力层：基于 Provider/Model/Route 的能力契约，解析出结构化/文本工具调用模式、推理可见性、流式支持等
 - 工具层：工具注册、搜索、结果摘要与产物化；任务工具通过工厂函数统一暴露
-- 权限与安全层：策略模式、沙箱、IPC、Shell、Secret、MCP 信任、RDC Context Lease 等安全边界
+- 权限与安全层：策略模式、沙箱、IPC、Shell、Secret、MCP 信任、RDX Context Lease 等安全边界
 
 ```mermaid
 graph TB
@@ -67,7 +67,7 @@ D --> F["执行入口与证据<br/>ShellInvocationService / 回执签名"]
 ## 核心组件
 - Agent Manifest（.agent.md）
   - 以 YAML frontmatter + Markdown 指令描述 agent 的身份、模型、图标、颜色、启用状态、用户可调用性、工具令牌集合、子代理、技能、MCP 服务器与移交配置
-  - 工具令牌为规范化的能力标识，如 read/search/web/shell/write/edit/git/askUser/agent/handoff/task/memory/planArtifact/skills/mcp/subagent/tool_search/rdcContext 等
+  - 工具令牌为规范化的能力标识，如 read/search/web/shell/write/edit/git/askUser/agent/handoff/task/memory/planArtifact/skills/mcp/subagent/tool_search/rdxContext 等
   - 不同内置 profile（general/debugger/analyzer/optimizer）提供不同的默认工具集与行为约定
 - 路由能力解析器（RouteCapabilityResolver）
   - 依据 Provider 是否启用且已配置、Model 可用性、Route 协议与契约，决定工具调用模式（native-structured/text-only/disabled）、推理可见性与交付方式、流式支持与结构化输出模式
@@ -78,7 +78,7 @@ D --> F["执行入口与证据<br/>ShellInvocationService / 回执签名"]
 - 技能目录预算（SkillCatalogBudget）
   - 在上下文窗口受限的情况下，按预算裁剪技能目录段，确保提示词不超限
 - 权限与安全边界（permissions）
-  - 明确 Permission Mode、Electron Sandbox、IPC 校验、Shell 硬拒绝规则、Secret 隔离、MCP 信任、RDC Context Lease 等关键安全面
+  - 明确 Permission Mode、Electron Sandbox、IPC 校验、Shell 硬拒绝规则、Secret 隔离、MCP 信任、RDX Context Lease 等关键安全面
   - 规定读写根、临时路径许可、Knowledge 读根、审批下界与预算冻结等策略
 
 **章节来源**
@@ -271,8 +271,8 @@ A["analyzer.agent.md"]
 O["optimizer.agent.md"]
 end
 subgraph "自定义"
-U["~/.rdc-agent/agents/*.agent.md"]
-P["<project>/.rdc-agent/agents/*.agent.md"]
+U["~/.rdx/agents/*.agent.md"]
+P["<project>/.rdx/agents/*.agent.md"]
 end
 U --> |覆盖/新增| G
 P --> |覆盖/新增| D
@@ -322,7 +322,7 @@ E --> F
   - Manifest 驱动工具令牌与技能/MCP 配置，进入能力解析与权限策略
   - 能力解析器依赖 Provider/Model/Route 契约，决定工具调用模式与推理可见性
   - 工具子系统通过 ToolPool 统一管理工具实例，供上层编排调用
-  - 权限与安全边界贯穿文件、网络、Shell、Secret、MCP、RDC Context Lease 等所有执行面
+  - 权限与安全边界贯穿文件、网络、Shell、Secret、MCP、RDX Context Lease 等所有执行面
 - 外部依赖
   - Provider 协议与错误分类
   - Electron Sandbox、IPC Schema（Zod）、Browser Bridge 通道能力矩阵

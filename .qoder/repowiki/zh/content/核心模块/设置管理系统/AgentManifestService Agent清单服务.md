@@ -290,8 +290,8 @@ AgentManifestService 提供了完整的 Agent 清单生命周期管理能力：�
 
 ### 清单位置与作用域
 - 内置：resources/agent-runtime/agents/*.agent.md
-- 用户：~/.rdc-agent/agents/*.agent.md
-- 项目：<project-root>/.rdc-agent/agents/*.agent.md
+- 用户：~/.rdx/agents/*.agent.md
+- 项目：<project-root>/.rdx/agents/*.agent.md
 - 优先级：builtin < user < project，整资源覆盖。
 
 章节来源

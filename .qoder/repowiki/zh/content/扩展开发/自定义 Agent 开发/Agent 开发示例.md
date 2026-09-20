@@ -36,7 +36,7 @@
 本文件面向希望在 RDC-Agent 中从零到一构建 Agent 的开发者，提供从简单到复杂的完整示例集合。内容覆盖基础分析 Agent、复杂调试工作流、多步骤任务编排等，并给出设计思路、实现细节、扩展方法、测试用例、调试技巧与性能优化建议。所有示例均基于仓库内已实现的 Agent Runtime、Workflow 编排、Skill 体系与工具系统，确保可直接复用与演进。
 
 ## 项目结构
-RDC-Agent 是面向 RenderDoc .rdc 捕获分析的 Electron 桌面应用，将通用 Agent 协作入口与可审计的图形调试流程整合在同一工作台，并通过外部 rdc-tool CLI 执行本机 RenderDoc 能力。资源与配置采用用户级 ~/.rdc-agent 与项目级 <project-root>/.rdc-agent 双作用域管理；主进程负责 IPC、工作流编排、Provider 与外部能力接入；渲染层负责交互与状态投影；共享层定义跨层类型与契约。
+RDC-Agent 是面向 RenderDoc .rdc 捕获分析的 Electron 桌面应用，将通用 Agent 协作入口与可审计的图形调试流程整合在同一工作台，并通过外部 RDX CLI 执行本机 RenderDoc 能力。资源与配置采用用户级 ~/.rdx 与项目级 <project-root>/.rdx 双作用域管理；主进程负责 IPC、工作流编排、Provider 与外部能力接入；渲染层负责交互与状态投影；共享层定义跨层类型与契约。
 
 ```mermaid
 graph TB
@@ -50,7 +50,7 @@ subgraph "渲染进程"
 E["界面与交互"]
 end
 subgraph "外部能力"
-F["rdc-tool CLI / RenderDoc"]
+F["RDX CLI / RenderDoc"]
 end
 E --> B
 B --> A
@@ -83,7 +83,7 @@ B --> F
 - [AgentRuntimeConfigService.ts:32-59](file://src/main/settings/AgentRuntimeConfigService.ts#L32-L59)
 
 ## 架构总览
-下图展示从用户输入到工具执行、再到结果投影与持久化的端到端流程，涵盖 Agent Loop、Work Process 编排、工具子系统与外部 RDC 能力。
+下图展示从用户输入到工具执行、再到结果投影与持久化的端到端流程，涵盖 Agent Loop、Work Process 编排、工具子系统与外部 RDX 能力。
 
 ```mermaid
 sequenceDiagram
@@ -93,7 +93,7 @@ participant T as "轮次协调器<br/>TurnCoordinator"
 participant L as "Agent 循环<br/>AgentLoop"
 participant X as "工具执行器<br/>ToolExecutor"
 participant S as "技能/工具<br/>Skills/Tools"
-participant R as "外部能力<br/>rdc-tool CLI/RenderDoc"
+participant R as "外部能力<br/>RDX CLI/RenderDoc"
 U->>W : 提交任务/问题
 W->>T : 准备本轮上下文与计划
 T->>L : 进入 next_turn
@@ -101,7 +101,7 @@ L->>L : 转换上下文/压缩
 L->>L : 调用 Provider 生成消息
 L->>X : 执行工具调用(可能分组并发)
 X->>S : 调用具体工具/技能
-S->>R : 必要时调用 RDC/RenderDoc
+S->>R : 必要时调用 RDX/RenderDoc
 R-->>S : 返回结果/证据
 S-->>X : 结构化结果
 X-->>L : ToolResultMessage
@@ -124,12 +124,12 @@ W-->>U : 输出/报告/工件
 - 角色与能力
   - Analyzer 为“规划编排者”，限制为 plan-only，不直接执行 shell/代码解释器/写操作；通过 handoff 将执行交给 General。
   - 启用 analyzer-coordinator 技能，按需读取方法类技能（如 pass-graph-analysis、shader-ir-analysis）。
-  - 工具集包含 read/search/web/askUser/handoff/task/planArtifact/memory/rdcContext/rdc_probe/subagent/tool_search/skill/knowledge/investigation。
+  - 工具集包含 read/search/web/askUser/handoff/task/planArtifact/memory/rdxContext/rdx_probe/subagent/tool_search/skill/knowledge/investigation。
 - 关键流程
   - 读取相关方法技能 → 编写版本化计划与检查点 → handoff 给 General → 评估签名执行证据与独立质疑 → 通过 investigation_* 发布任务报告并在 final_answer 引用 artifactId 与 contentHash。
 - 扩展方法
   - 新增分析方法：在 skills 下添加新 SKILL.md，并在 Analyzer 的 tools/skills 中声明引用。
-  - 增强证据采集：结合 rdcContext/rdc_probe 限定范围，避免越权访问。
+  - 增强证据采集：结合 rdxContext/rdx_probe 限定范围，避免越权访问。
   - 引入外部 MCP：在 agents 配置中添加 mcp-servers，配合 tool_search 动态发现。
 
 ```mermaid
@@ -159,7 +159,7 @@ Report --> End(["结束"])
 
 - 角色与能力
   - Debugger 同样为“规划编排者”，遵循 $debugger-coordinator，专注计划与评估；执行交由 General。
-  - 工具集与 Analyzer 类似，强调 investigation 与 rdc probe 能力。
+  - 工具集与 Analyzer 类似，强调 investigation 与 rdx probe 能力。
 - 关键流程
   - 读取方法技能 → 版本化计划与检查点 → handoff 给 General → 评估签名证据与独立质疑 → 发布调查工件。
 - 工作流编排要点

@@ -34,14 +34,14 @@
 - 版本管理、兼容性检查与部署策略
 
 ## 项目结构
-RDC-Agent 将内置资源放在 resources 目录，用户与项目级资源位于 ~/.rdc-agent 与 <project-root>/.rdc-agent。Skill 以目录为单位组织，每个 Skill 目录包含一个 SKILL.md 作为入口，并可附带 references、scripts、assets 等子目录。
+RDC-Agent 将内置资源放在 resources 目录，用户与项目级资源位于 ~/.rdx 与 <project-root>/.rdx。Skill 以目录为单位组织，每个 Skill 目录包含一个 SKILL.md 作为入口，并可附带 references、scripts、assets 等子目录。
 
 ```mermaid
 graph TB
 A["应用启动"] --> B["AgentRuntimeConfigService<br/>解析并合并技能清单"]
 B --> C["builtin 目录<br/>resources/agent-runtime/skills"]
-B --> D["user 目录<br/>~/.rdc-agent/skills"]
-B --> E["project 目录<br/><project-root>/.rdc-agent/skills"]
+B --> D["user 目录<br/>~/.rdx/skills"]
+B --> E["project 目录<br/><project-root>/.rdx/skills"]
 C --> F["解析 SKILL.md<br/>生成 SkillLoadResult"]
 D --> F
 E --> F
@@ -193,7 +193,7 @@ end
 - [src/main/commands/builtins/skills.ts:1-62](file://src/main/commands/builtins/skills.ts#L1-L62)
 
 ### 示例 Skill：分析器架构方法
-- 目标：在现有 rdc_tool.investigation.v1 工件上写入 Analyzer Architecture Model，不跨越 Observed/Reconstructed/Authoring 层。
+- 目标：在现有 rdc.investigation.v1 工件上写入 Analyzer Architecture Model，不跨越 Observed/Reconstructed/Authoring 层。
 - 约束：严格限定 claimKind 与层级；要求增量版本化与 provenance 标记；禁止写入 Knowledge 或 memory_write。
 - 参考：SKILL.md 中的分层表与步骤说明。
 

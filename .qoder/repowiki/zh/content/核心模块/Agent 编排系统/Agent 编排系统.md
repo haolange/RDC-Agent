@@ -10,9 +10,9 @@
 - [DelegationBudget.ts](file://src/main/workflow/debugger/DelegationBudget.ts)
 - [TaskRootBudget.ts](file://src/main/workflow/debugger/TaskRootBudget.ts)
 - [SubagentResultEnvelope.ts](file://src/main/workflow/debugger/SubagentResultEnvelope.ts)
-- [RdcRuntimeContextRegistry.ts](file://src/main/sessions/RdcRuntimeContextRegistry.ts)
+- [RdxRuntimeContextRegistry.ts](file://src/main/sessions/RdxRuntimeContextRegistry.ts)
 - [DelegatedArtifactAccess.ts](file://src/main/sessions/DelegatedArtifactAccess.ts)
-- [RdcDelegation.ts](file://src/main/sessions/RdcDelegation.ts)
+- [RdxDelegation.ts](file://src/main/sessions/RdxDelegation.ts)
 - [ConversationBackgroundContinuation.ts](file://src/main/conversation/ConversationBackgroundContinuation.ts)
 - [WorkflowProjectionPublisher.ts](file://src/main/workflow/debugger/WorkflowProjectionPublisher.ts)
 - [AgentToolApprovalRequestService.ts](file://src/main/agent-runtime/permissions/AgentToolApprovalRequestService.ts)
@@ -76,7 +76,7 @@ C --> H["AgentSlotRegistry"]
 C --> I["ToolExecutorFactory"]
 D --> J["BackgroundSubagentService"]
 D --> K["DelegationBudget / TaskRootBudget"]
-D --> L["RdcRuntimeContextRegistry / DelegatedArtifactAccess"]
+D --> L["RdxRuntimeContextRegistry / DelegatedArtifactAccess"]
 A --> M["WorkflowProjectionPublisher"]
 ```
 
@@ -256,7 +256,7 @@ TurnHandle --> SubagentBudgetState : "持有"
   - 校验父预算与策略预算，必要时预留子 Agent 配额。
 - 隔离与会话：
   - 为子 Agent 分配独立 sessionId（包含 ::subagent:: 标记）或临时作用域。
-  - 授予委派制品访问与可选 RDC 租约，注册任务作用域。
+  - 授予委派制品访问与可选 RDX 租约，注册任务作用域。
 - 执行与事件：
   - 设置超时定时器与父信号传播，注册 producer 以便中止时加入。
   - 调用 sendProfileMessage 执行子 Agent，透传 onEvent 事件（delta、tool.started/completed/denied）。
@@ -291,9 +291,9 @@ SR-->>Parent : {text,status,completionDeclaration}
 章节来源
 - [SubagentRunner.ts:80-429](file://src/main/workflow/debugger/SubagentRunner.ts#L80-L429)
 - [SubagentRunner.ts:431-678](file://src/main/workflow/debugger/SubagentRunner.ts#L431-L678)
-- [RdcRuntimeContextRegistry.ts](file://src/main/sessions/RdcRuntimeContextRegistry.ts)
+- [RdxRuntimeContextRegistry.ts](file://src/main/sessions/RdxRuntimeContextRegistry.ts)
 - [DelegatedArtifactAccess.ts](file://src/main/sessions/DelegatedArtifactAccess.ts)
-- [RdcDelegation.ts](file://src/main/sessions/RdcDelegation.ts)
+- [RdxDelegation.ts](file://src/main/sessions/RdxDelegation.ts)
 
 ### AgentTurnRunner：轮次运行器
 - 槽位管理：
@@ -467,7 +467,7 @@ O --> W["WorkflowProjectionPublisher"]
 - 上下文与压缩：
   - contextWindowTokens、compactionThresholdPercent 影响提示词与历史压缩。
 - 工具与权限：
-  - toolAllowlist 由 profile.tools 解析；MCP 工具默认延迟激活；RDC 能力需租约。
+  - toolAllowlist 由 profile.tools 解析；MCP 工具默认延迟激活；RDX 能力需租约。
 
 章节来源
 - [TurnCoordinator.ts:65-106](file://src/main/workflow/debugger/TurnCoordinator.ts#L65-L106)

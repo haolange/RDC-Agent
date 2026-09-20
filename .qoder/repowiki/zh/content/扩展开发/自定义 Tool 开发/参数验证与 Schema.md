@@ -307,7 +307,7 @@ HC["handoffContract.ts"] --> CAT
   - 示例：读取文件、搜索、Shell 等工具的 inputSchema
   - 参考：[agentWorkbenchCatalog.ts:27-200](file://src/shared/constants/agentWorkbenchCatalog.ts#L27-L200)
 - 枚举与受限选项
-  - 示例：RDC Probe action 的枚举值
+  - 示例：RDX Probe action 的枚举值
   - 参考：[agentWorkbenchCatalog.ts:516-542](file://src/shared/constants/agentWorkbenchCatalog.ts#L516-L542)
 - 复杂对象与嵌套数组
   - 示例：委托胶囊的 acceptedFacts、negativePaths、budget

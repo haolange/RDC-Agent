@@ -128,7 +128,7 @@ end
   - 计算子策略预算，限制最大深度、子 Agent 数量与墙钟时间。
 - 会话与资源隔离
   - 为子 Agent 生成独立 sessionId（或临时作用域），避免污染父线程持久化。
-  - 基于委派胶囊授予受限的产物读取权限；如需 RDC 能力则申请租约。
+  - 基于委派胶囊授予受限的产物读取权限；如需 RDX 能力则申请租约。
 - 启动与监控
   - 向父级 emit subagent.started；在 turn_complete 时收集完成声明。
   - 将子 Agent 的工具调用事件转换为 subagent.delta 上报，统计唯一 toolCallId 以避免重复计数。
@@ -219,7 +219,7 @@ Service-->>Owner : 事件settled + 可查询结果
   - 委派胶囊 inputArtifactRefs/challengeRefs/acceptedFacts.sourceRefs 作为只读产物引用，按会话粒度授权。
   - 后台结果以 session://tool-outputs/* 形式持久化，并通过 grantDelegatedOutput 授予父会话精确读取。
 - 权限继承
-  - 子会话继承父会话的委派任务范围与产物访问白名单；若需要 RDC 能力，必须显式申请租约并在完成后释放。
+  - 子会话继承父会话的委派任务范围与产物访问白名单；若需要 RDX 能力，必须显式申请租约并在完成后释放。
 
 章节来源
 - [SubagentRunner.ts:179-382](file://src/main/workflow/debugger/SubagentRunner.ts#L179-L382)
@@ -243,7 +243,7 @@ Service-->>Owner : 事件settled + 可查询结果
 
 ## 依赖关系分析
 - SubagentRunner 依赖：
-  - TurnCoordinator（预算、TurnHandle）、DelegationBudget（预算派生/观察）、RdcRuntimeContextRegistry（租约）、TaskRegistry（任务/执行）、DelegationCapsuleCompiler（提示编译）、ProcessSupervisor（进程协调）。
+  - TurnCoordinator（预算、TurnHandle）、DelegationBudget（预算派生/观察）、RdxRuntimeContextRegistry（租约）、TaskRegistry（任务/执行）、DelegationCapsuleCompiler（提示编译）、ProcessSupervisor（进程协调）。
 - BackgroundSubagentService 依赖：
   - TaskRegistry（任务/执行/消息）、requestSnapshotStore（请求快照/邮箱交付）、DelegationBudget（预算链/观察）、SubagentResultEnvelope（结果归一化/持久化）、TaskRootBudget（根预算绑定）。
 - 耦合与内聚

@@ -3,11 +3,11 @@ schema_version: 1
 locale: zh-CN
 branch: main
 nodes_managed: true
-exported_at: "2026-09-19T15:20:56Z"
+exported_at: "2026-09-20T08:51:30Z"
 modules:
     "":
-        dir_name: RDC-Agent 根工程（Electron + pnpm Workspace）
-        title: RDC-Agent 根工程（Electron + pnpm Workspace）
+        dir_name: RDC-Agent 根工程（Electron + Vite 多进程编排）
+        title: RDC-Agent 根工程（Electron + Vite 多进程编排）
         scope:
             - README.md
             - DESIGN.md
@@ -34,8 +34,8 @@ modules:
         depends_on: []
         related_to: []
     docs:
-        dir_name: RDC-Agent 设计文档与设计系统预览
-        title: RDC-Agent 设计文档与设计系统预览
+        dir_name: RDC-Agent 设计文档与 Design System 预览
+        title: RDC-Agent 设计文档与 Design System 预览
         scope:
             - docs/
             - designs/
@@ -69,11 +69,11 @@ modules:
         depends_on: []
         related_to: []
     scripts/fidelity_and_extraction:
-        dir_name: 保真度契约与 RDC 工具指南生成脚本
-        title: 保真度契约与 RDC 工具指南生成脚本
+        dir_name: 保真度契约与 RDX 工具指南生成脚本
+        title: 保真度契约与 RDX 工具指南生成脚本
         scope:
             - scripts/extract-*.mjs
-            - scripts/generate-rdc-tool-guides.mjs
+            - scripts/generate-rdx-tool-guides.mjs
         source_files: []
         children: []
         depends_on: []

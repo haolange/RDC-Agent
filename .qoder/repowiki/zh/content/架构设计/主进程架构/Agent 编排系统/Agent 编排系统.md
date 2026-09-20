@@ -206,13 +206,13 @@ TurnHandle --> SubagentBudgetState : "持有"
 ### SubagentRunner：子任务执行机制
 职责与要点
 - 子 Agent 启动：校验目标 profile、预算、模型覆盖；创建独立子会话 ID 以隔离上下文。
-- 资源隔离：授予受限工件访问、可选 RDC 租约、任务作用域绑定；父信号传播至子中止控制器。
+- 资源隔离：授予受限工件访问、可选 RDX 租约、任务作用域绑定；父信号传播至子中止控制器。
 - 事件透传：将子 Agent 的工具执行、增量文本等事件转发到父 trace，并统计工具调用。
 - 结果聚合：标准化结果、持久化、回写执行预算、设置执行状态。
 
 并行与隔离
 - 并发：runSubagent 可被多次调用，由上层调度器控制并发；每个子 Agent 拥有独立 AbortController 与预算快照。
-- 隔离：子会话 ID 拼接“::subagent::”段；工件访问与任务作用域按需授权；RDC 能力需显式租约。
+- 隔离：子会话 ID 拼接“::subagent::”段；工件访问与任务作用域按需授权；RDX 能力需显式租约。
 
 ```mermaid
 sequenceDiagram
@@ -303,7 +303,7 @@ TC --> AO
 - 代理配置不可用：确认 agent profile 已启用且可解析；检查项目根路径下的生效配置。
 - 提示计划不可用：检查上下文窗口、压缩阈值与技能预加载；确认 promptPlan 构建成功。
 - 预算超限：查看 policyBudget/subagentBudget 的限制项（最大工具调用、子 Agent 数、深度、墙钟时间）。
-- 子 Agent 失败或取消：检查子会话 ID、工件访问授权、RDC 租约、任务作用域绑定；关注事件中的 tool.started/completed/denied。
+- 子 Agent 失败或取消：检查子会话 ID、工件访问授权、RDX 租约、任务作用域绑定；关注事件中的 tool.started/completed/denied。
 - 会话终止失败：检查终端上下文提交、持久化异常、handoff 结算；关注 finally 中的错误日志。
 
 章节来源

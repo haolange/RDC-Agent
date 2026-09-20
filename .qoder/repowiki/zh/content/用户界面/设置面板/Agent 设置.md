@@ -371,7 +371,7 @@ RDC-Agent 的 Agent 设置以 .agent.md 为核心，通过 Settings 界面提供
 - 手递字段
   - label、agent、prompt、send、showContinueOn、model（可选覆盖）。
 - 工具令牌
-  - 常用令牌包括 read、search、web、shell、write、edit、git、askUser、agent、handoff、task、memory、planArtifact、skills、mcp、subagent、tool_search、rdcContext。
+  - 常用令牌包括 read、search、web、shell、write、edit、git、askUser、agent、handoff、task、memory、planArtifact、skills、mcp、subagent、tool_search、rdxContext。
 - 典型场景
   - 调试器向分析器移交证据：设置 handoffs 中目标为 analyzer，提示词引导分析，可选择 send 自动发送。
   - 通用执行器启用 shell 与写能力：在 tools 中添加 shell、write、edit，并确保路由允许写操作。

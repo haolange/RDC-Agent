@@ -159,7 +159,7 @@ CleanupSecrets --> Return["返回最新 AppSettings"]
 ### 设置验证与清洗
 - 窗口尺寸：clamp 到最小/最大范围，保证可交互性
 - 终端高度：限制在合理区间
-- 工具链：RdcCliInvoker、RdcActions、CodeInterpreter、Shell 均做类型与范围校验
+- 工具链：RdxCliInvoker、RdxActions、CodeInterpreter、Shell 均做类型与范围校验
 - 代理运行时权限：mode 枚举校验、路径白名单去重与展开、命令前缀数组清洗
 - UI 偏好：合并与清洗，避免污染主题
 

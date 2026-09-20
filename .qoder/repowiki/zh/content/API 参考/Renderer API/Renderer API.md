@@ -32,7 +32,7 @@
 本文件为 Renderer API 的完整参考文档，面向需要在渲染进程（浏览器端）集成 RDC-Agent 能力的开发者。文档覆盖向渲染器暴露的所有公共接口，包括：
 - 核心 API：应用元信息、对话框、窗口控制、Web 能力等
 - 工作区 API：项目、设备、会话、运行、捕获、上下文、追踪日志等
-- 设置与运行时 API：记忆、LLM 提供商、设置、RDC 运行时资源等
+- 设置与运行时 API：记忆、LLM 提供商、设置、RDX 运行时资源等
 - 事件订阅：工作流状态、设备/捕获/上下文变更、运行时日志、主题变化等
 
 每个方法均说明用途、参数类型、返回值、异步处理与错误处理要点，并提供使用示例、最佳实践与兼容性说明，以及客户端集成指南和常见问题解决方案。
@@ -168,9 +168,9 @@ API-->>UI : 返回 TResult / 抛错
 - [src/shared/renderer-api/workbench.ts:14-91](file://src/shared/renderer-api/workbench.ts#L14-L91)
 - [src/shared/renderer-api/channels.ts:123-175](file://src/shared/renderer-api/channels.ts#L123-L175)
 
-### 设置与运行时 API（记忆、LLM、设置、RDC 运行时）
+### 设置与运行时 API（记忆、LLM、设置、RDX 运行时）
 - memory：颁发批准令牌、列举/读写/删除
-- rdcRuntime：概览、资源验证/增删改查、导入、揭示、信任/撤销 Hook/MCP、测试 Hook、请求快照
+- rdxRuntime：概览、资源验证/增删改查、导入、揭示、信任/撤销 Hook/MCP、测试 Hook、请求快照
 - llm：测试草稿/能力、连接/断开、账号登录流程、刷新模型、登出
 - settings：获取设置/目录/有效模型/目录、检查密钥、导入 Agent 清单、保存定义、查询提交、模型覆盖、解析 Shell、批量设置
 
@@ -363,19 +363,19 @@ Renderer API 通过清晰的通道定义、传输抽象与能力矩阵，提供�
 - memory.write(request): Promise<void>
 - memory.delete(scope, name, approvalToken, projectRoot): Promise<void>
 
-- rdcRuntime.getOverview(projectRoot?): Promise<RdcRuntimeOverview>
-- rdcRuntime.validateResource(request): Promise<ValidationResult>
-- rdcRuntime.upsertResource(request): Promise<ResourceHandle>
-- rdcRuntime.importResource(request): Promise<ResourceHandle>
-- rdcRuntime.deleteResource(kind, scope, id, projectRoot): Promise<void>
-- rdcRuntime.revealResource(sourcePath): Promise<void>
-- rdcRuntime.trustHook(projectRoot, hookId): Promise<void>
-- rdcRuntime.revokeHook(projectRoot, hookId): Promise<void>
-- rdcRuntime.trustMcp(projectRoot, descriptorId): Promise<void>
-- rdcRuntime.revokeMcp(projectRoot, descriptorId): Promise<void>
-- rdcRuntime.testHook(event, projectRoot, hookId): Promise<TestResult>
-- rdcRuntime.listRequestSnapshots(sessionId, turnId): Promise<SnapshotList>
-- rdcRuntime.getRequestSnapshot(sessionId, turnId, snapshotId): Promise<RequestSnapshot>
+- rdxRuntime.getOverview(projectRoot?): Promise<RdxRuntimeOverview>
+- rdxRuntime.validateResource(request): Promise<ValidationResult>
+- rdxRuntime.upsertResource(request): Promise<ResourceHandle>
+- rdxRuntime.importResource(request): Promise<ResourceHandle>
+- rdxRuntime.deleteResource(kind, scope, id, projectRoot): Promise<void>
+- rdxRuntime.revealResource(sourcePath): Promise<void>
+- rdxRuntime.trustHook(projectRoot, hookId): Promise<void>
+- rdxRuntime.revokeHook(projectRoot, hookId): Promise<void>
+- rdxRuntime.trustMcp(projectRoot, descriptorId): Promise<void>
+- rdxRuntime.revokeMcp(projectRoot, descriptorId): Promise<void>
+- rdxRuntime.testHook(event, projectRoot, hookId): Promise<TestResult>
+- rdxRuntime.listRequestSnapshots(sessionId, turnId): Promise<SnapshotList>
+- rdxRuntime.getRequestSnapshot(sessionId, turnId, snapshotId): Promise<RequestSnapshot>
 
 - llm.testProviderDraft(request): Promise<TestResult>
 - llm.testModelCapability(request): Promise<ModelCapability>

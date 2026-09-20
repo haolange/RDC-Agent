@@ -4,8 +4,8 @@
 **本文引用的文件**
 - [ShellInvocationService.ts](file://src/main/tools/ShellInvocationService.ts)
 - [ProcessSupervisor.ts](file://src/main/runtime/ProcessSupervisor.ts)
-- [RdcShellActionService.ts](file://src/main/tools/RdcShellActionService.ts)
-- [resolveRdcBatchInvocation.ts](file://src/main/tools/resolveRdcBatchInvocation.ts)
+- [RdxShellActionService.ts](file://src/main/tools/RdxShellActionService.ts)
+- [resolveRdxBatchInvocation.ts](file://src/main/tools/resolveRdxBatchInvocation.ts)
 - [ResourceExecutionLifetime.ts](file://src/main/runtime/ResourceExecutionLifetime.ts)
 - [secretRedaction.ts](file://src/main/runtime/secretRedaction.ts)
 </cite>
@@ -27,7 +27,7 @@
 
 ## 项目结构
 围绕 Shell 执行的关键代码主要分布在以下模块：
-- 工具层：ShellInvocationService（统一入口）、RdcShellActionService（RDC 动作编排）、resolveRdcBatchInvocation（Windows legacy rdx.bat 拒绝诊断）
+- 工具层：ShellInvocationService（统一入口）、RdxShellActionService（RDX 动作编排）、resolveRdxBatchInvocation（Windows rdx.bat 启动桥接）
 - 运行时层：ProcessSupervisor（进程注册表、树杀、环形缓冲、超时/中止/孤儿检测）、ResourceExecutionLifetime（资源生命周期与执行上下文归属）
 - 安全层：secretRedaction（日志与输出中的敏感信息脱敏）
 
@@ -36,8 +36,8 @@ graph TB
 A["调用方<br/>工具/动作"] --> B["ShellInvocationService<br/>invoke()"]
 B --> C["ProcessSupervisor<br/>spawn()/join()/abort()"]
 C --> D["子进程<br/>stdout/stderr 环形缓冲"]
-B --> E["RdcShellActionService<br/>变量替换/参数拼装"]
-E --> F["resolveRdcBatchInvocation<br/>Windows legacy rdx.bat 拒绝诊断"]
+B --> E["RdxShellActionService<br/>变量替换/参数拼装"]
+E --> F["resolveRdxBatchInvocation<br/>Windows rdx.bat 桥接"]
 C --> G["ResourceExecutionLifetime<br/>执行会话归属/资源保留"]
 B --> H["secretRedaction<br/>日志/输出脱敏"]
 ```
@@ -45,32 +45,32 @@ B --> H["secretRedaction<br/>日志/输出脱敏"]
 图示来源
 - [ShellInvocationService.ts:29-126](file://src/main/tools/ShellInvocationService.ts#L29-L126)
 - [ProcessSupervisor.ts:140-425](file://src/main/runtime/ProcessSupervisor.ts#L140-L425)
-- [RdcShellActionService.ts:154-278](file://src/main/tools/RdcShellActionService.ts#L154-L278)
-- [resolveRdcBatchInvocation.ts:4-21](file://src/main/tools/resolveRdcBatchInvocation.ts#L4-L21)
+- [RdxShellActionService.ts:154-278](file://src/main/tools/RdxShellActionService.ts#L154-L278)
+- [resolveRdxBatchInvocation.ts:4-21](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L21)
 - [ResourceExecutionLifetime.ts:1-21](file://src/main/runtime/ResourceExecutionLifetime.ts#L1-L21)
 - [secretRedaction.ts:1-103](file://src/main/runtime/secretRedaction.ts#L1-L103)
 
 章节来源
 - [ShellInvocationService.ts:29-126](file://src/main/tools/ShellInvocationService.ts#L29-L126)
 - [ProcessSupervisor.ts:140-425](file://src/main/runtime/ProcessSupervisor.ts#L140-L425)
-- [RdcShellActionService.ts:154-278](file://src/main/tools/RdcShellActionService.ts#L154-L278)
-- [resolveRdcBatchInvocation.ts:4-21](file://src/main/tools/resolveRdcBatchInvocation.ts#L4-L21)
+- [RdxShellActionService.ts:154-278](file://src/main/tools/RdxShellActionService.ts#L154-L278)
+- [resolveRdxBatchInvocation.ts:4-21](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L21)
 - [ResourceExecutionLifetime.ts:1-21](file://src/main/runtime/ResourceExecutionLifetime.ts#L1-L21)
 - [secretRedaction.ts:1-103](file://src/main/runtime/secretRedaction.ts#L1-L103)
 
 ## 核心组件
 - ShellInvocationService：对外暴露 invoke(request)，负责命令校验、shell 选择、环境变量合并、工作目录设置、超时与中止信号透传、结果归一化、活跃进程跟踪与清理。
 - ProcessSupervisor：统一的子进程注册与生命周期管理，提供 spawn/join/abort、树级终止、超时强制终止、孤儿进程检测、环形缓冲输出、执行会话归属与资源保留。
-- RdcShellActionService：读取配置、变量替换、参数与环境拼装，委托 ShellInvocationService 执行，并对 stdout JSON 进行解析与诊断格式化。
-- resolveRdcBatchInvocation：在 Windows 上拒绝 legacy rdx.bat，不进行 PowerShell 桥接。
+- RdxShellActionService：读取配置、变量替换、参数与环境拼装，委托 ShellInvocationService 执行，并对 stdout JSON 进行解析与诊断格式化。
+- resolveRdxBatchInvocation：在 Windows 上对 rdx.bat 调用进行 PowerShell 桥接，确保非交互模式与执行策略。
 - ResourceExecutionLifetime：通过 AsyncLocalStorage 维护执行上下文与资源保留，保证未确认退出的进程资源不被提前释放。
 - secretRedaction：递归脱敏日志与输出中的密钥、令牌、大对象等敏感内容。
 
 章节来源
 - [ShellInvocationService.ts:29-126](file://src/main/tools/ShellInvocationService.ts#L29-L126)
 - [ProcessSupervisor.ts:140-425](file://src/main/runtime/ProcessSupervisor.ts#L140-L425)
-- [RdcShellActionService.ts:154-278](file://src/main/tools/RdcShellActionService.ts#L154-L278)
-- [resolveRdcBatchInvocation.ts:4-21](file://src/main/tools/resolveRdcBatchInvocation.ts#L4-L21)
+- [RdxShellActionService.ts:154-278](file://src/main/tools/RdxShellActionService.ts#L154-L278)
+- [resolveRdxBatchInvocation.ts:4-21](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L21)
 - [ResourceExecutionLifetime.ts:1-21](file://src/main/runtime/ResourceExecutionLifetime.ts#L1-L21)
 - [secretRedaction.ts:1-103](file://src/main/runtime/secretRedaction.ts#L1-L103)
 
@@ -182,48 +182,48 @@ SupervisedProcess --> RingBuffer : "stdout/stderr"
 - [ProcessSupervisor.ts:119-138](file://src/main/runtime/ProcessSupervisor.ts#L119-L138)
 - [ProcessSupervisor.ts:140-425](file://src/main/runtime/ProcessSupervisor.ts#L140-L425)
 
-### RdcShellActionService：动作编排与结果解析
+### RdxShellActionService：动作编排与结果解析
 - 配置读取：从 settingsService 获取 action 配置，未配置时返回结构化错误与修复提示。
 - 变量替换：workspaceRoot、logsPath、projectsPath、knowledgePath 等内置变量，支持 {{key}} 模板替换。
 - 参数与环境：对 command、args、env、workingDirectory 进行变量替换；合并 options.env。
-- 批量调用：resolveRdcBatchInvocation 拒绝 Windows legacy rdx.bat，不进行 PowerShell 桥接。
+- 批量调用：resolveRdxBatchInvocation 处理 Windows rdx.bat 的 PowerShell 桥接。
 - 结果解析：要求 stdout 为规范 JSON envelope，解析 data、ok、error/diagnostic；失败时生成诊断信息。
 - 日志记录：记录 action 执行摘要、命令、参数、退出码、输出与诊断。
 
 ```mermaid
 sequenceDiagram
 participant Caller as "调用方"
-participant Action as "RdcShellActionService"
-participant Resolve as "resolveRdcBatchInvocation"
+participant Action as "RdxShellActionService"
+participant Resolve as "resolveRdxBatchInvocation"
 participant Svc as "ShellInvocationService"
 Caller->>Action : runAction(actionId, variables, options)
 Action->>Action : 读取配置/变量替换(command,args,env,workdir)
-Action->>Resolve : 解析批量调用(Windows legacy rdx.bat)
+Action->>Resolve : 解析批量调用(Windows rdx.bat)
 Resolve-->>Action : {command,args}
 Action->>Svc : invoke({command,args,cwd,env,timeoutMs,contextId,abortSignal})
 Svc-->>Action : CLIResult
 Action->>Action : 解析JSON envelope/构造diagnostic
-Action-->>Caller : RdcShellActionResult{ok,data,error,diagnostic,...}
+Action-->>Caller : RdxShellActionResult{ok,data,error,diagnostic,...}
 ```
 
 图示来源
-- [RdcShellActionService.ts:154-278](file://src/main/tools/RdcShellActionService.ts#L154-L278)
-- [resolveRdcBatchInvocation.ts:4-21](file://src/main/tools/resolveRdcBatchInvocation.ts#L4-L21)
+- [RdxShellActionService.ts:154-278](file://src/main/tools/RdxShellActionService.ts#L154-L278)
+- [resolveRdxBatchInvocation.ts:4-21](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L21)
 - [ShellInvocationService.ts:32-105](file://src/main/tools/ShellInvocationService.ts#L32-L105)
 
 章节来源
-- [RdcShellActionService.ts:8-152](file://src/main/tools/RdcShellActionService.ts#L8-L152)
-- [RdcShellActionService.ts:154-278](file://src/main/tools/RdcShellActionService.ts#L154-L278)
-- [resolveRdcBatchInvocation.ts:4-21](file://src/main/tools/resolveRdcBatchInvocation.ts#L4-L21)
+- [RdxShellActionService.ts:8-152](file://src/main/tools/RdxShellActionService.ts#L8-L152)
+- [RdxShellActionService.ts:154-278](file://src/main/tools/RdxShellActionService.ts#L154-L278)
+- [resolveRdxBatchInvocation.ts:4-21](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L21)
 
 ### 环境变量注入与工作目录设置
 - 环境变量：默认继承 process.env，叠加请求 env，并固定 PYTHONIOENCODING=utf-8，确保 Python 子程序输出编码一致。
-- 工作目录：支持通过 request.cwd 指定；RdcShellActionService 支持 workingDirectory 变量替换。
+- 工作目录：支持通过 request.cwd 指定；RdxShellActionService 支持 workingDirectory 变量替换。
 - 安全建议：避免向子进程传递不必要的敏感环境变量；如需传递，应在上游进行最小化白名单过滤与脱敏。
 
 章节来源
 - [ShellInvocationService.ts:44-57](file://src/main/tools/ShellInvocationService.ts#L44-L57)
-- [RdcShellActionService.ts:187-213](file://src/main/tools/RdcShellActionService.ts#L187-L213)
+- [RdxShellActionService.ts:187-213](file://src/main/tools/RdxShellActionService.ts#L187-L213)
 
 ### 超时处理与进程终止
 - 超时：ProcessSupervisor 在 spawn 时设置 timeoutMs；到达时限触发 abort('timeout')，并尝试优雅终止，随后强制 SIGKILL。
@@ -250,25 +250,25 @@ Action-->>Caller : RdcShellActionResult{ok,data,error,diagnostic,...}
 
 ### 错误恢复与诊断
 - 标准化退出码：resolveExitCode 将 signal 转换为 128+signalNumber，缺失时回退到 1。
-- 结构化诊断：RdcShellActionService 将错误解析为 diagnostic（message/classification/fixHint/failedStep/renderdocStatus），便于前端展示与定位。
+- 结构化诊断：RdxShellActionService 将错误解析为 diagnostic（message/classification/fixHint/failedStep/renderdocStatus），便于前端展示与定位。
 - 孤儿恢复：unconfirmed_orphan 场景下，资源保留直至 child.close 被观测到，避免资源泄漏与重复使用。
 
 章节来源
 - [ShellInvocationService.ts:18-27](file://src/main/tools/ShellInvocationService.ts#L18-L27)
-- [RdcShellActionService.ts:109-152](file://src/main/tools/RdcShellActionService.ts#L109-L152)
+- [RdxShellActionService.ts:109-152](file://src/main/tools/RdxShellActionService.ts#L109-L152)
 - [ProcessSupervisor.ts:312-343](file://src/main/runtime/ProcessSupervisor.ts#L312-L343)
 
 ## 依赖关系分析
 - ShellInvocationService 依赖 ProcessSupervisor 完成进程生命周期管理。
-- RdcShellActionService 依赖 SettingsService、AppPathService、ShellInvocationService 与 resolveRdcBatchInvocation。
+- RdxShellActionService 依赖 SettingsService、AppPathService、ShellInvocationService 与 resolveRdxBatchInvocation。
 - ProcessSupervisor 依赖 ResourceExecutionLifetime 进行执行上下文与资源保留。
 - secretRedaction 在日志与输出路径中被复用，确保敏感信息不泄露。
 
 ```mermaid
 graph LR
 Svc["ShellInvocationService"] --> PS["ProcessSupervisor"]
-Act["RdcShellActionService"] --> Svc
-Act --> Res["resolveRdcBatchInvocation"]
+Act["RdxShellActionService"] --> Svc
+Act --> Res["resolveRdxBatchInvocation"]
 PS --> RL["ResourceExecutionLifetime"]
 Svc --> Redact["secretRedaction"]
 ```
@@ -276,16 +276,16 @@ Svc --> Redact["secretRedaction"]
 图示来源
 - [ShellInvocationService.ts:29-126](file://src/main/tools/ShellInvocationService.ts#L29-L126)
 - [ProcessSupervisor.ts:140-425](file://src/main/runtime/ProcessSupervisor.ts#L140-L425)
-- [RdcShellActionService.ts:154-278](file://src/main/tools/RdcShellActionService.ts#L154-L278)
-- [resolveRdcBatchInvocation.ts:4-21](file://src/main/tools/resolveRdcBatchInvocation.ts#L4-L21)
+- [RdxShellActionService.ts:154-278](file://src/main/tools/RdxShellActionService.ts#L154-L278)
+- [resolveRdxBatchInvocation.ts:4-21](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L21)
 - [ResourceExecutionLifetime.ts:1-21](file://src/main/runtime/ResourceExecutionLifetime.ts#L1-L21)
 - [secretRedaction.ts:1-103](file://src/main/runtime/secretRedaction.ts#L1-L103)
 
 章节来源
 - [ShellInvocationService.ts:29-126](file://src/main/tools/ShellInvocationService.ts#L29-L126)
 - [ProcessSupervisor.ts:140-425](file://src/main/runtime/ProcessSupervisor.ts#L140-L425)
-- [RdcShellActionService.ts:154-278](file://src/main/tools/RdcShellActionService.ts#L154-L278)
-- [resolveRdcBatchInvocation.ts:4-21](file://src/main/tools/resolveRdcBatchInvocation.ts#L4-L21)
+- [RdxShellActionService.ts:154-278](file://src/main/tools/RdxShellActionService.ts#L154-L278)
+- [resolveRdxBatchInvocation.ts:4-21](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L21)
 - [ResourceExecutionLifetime.ts:1-21](file://src/main/runtime/ResourceExecutionLifetime.ts#L1-L21)
 - [secretRedaction.ts:1-103](file://src/main/runtime/secretRedaction.ts#L1-L103)
 
@@ -311,7 +311,7 @@ Svc --> Redact["secretRedaction"]
 - [secretRedaction.ts:22-103](file://src/main/runtime/secretRedaction.ts#L22-L103)
 
 ## 结论
-Shell 执行服务通过 ShellInvocationService 与 ProcessSupervisor 的组合，提供了跨平台的命令执行、进程生命周期管理、超时与中止、孤儿检测与资源保护能力。RdcShellActionService 在此基础上实现了动作编排与结构化诊断。配合 secretRedaction 与资源限制，可在安全可控的环境中执行外部命令。建议在配置与调用侧遵循最小权限原则，严格限制环境变量与工作目录，并合理设置超时与缓冲大小。
+Shell 执行服务通过 ShellInvocationService 与 ProcessSupervisor 的组合，提供了跨平台的命令执行、进程生命周期管理、超时与中止、孤儿检测与资源保护能力。RdxShellActionService 在此基础上实现了动作编排与结构化诊断。配合 secretRedaction 与资源限制，可在安全可控的环境中执行外部命令。建议在配置与调用侧遵循最小权限原则，严格限制环境变量与工作目录，并合理设置超时与缓冲大小。
 
 [本节为总结性内容，不直接分析具体文件]
 
