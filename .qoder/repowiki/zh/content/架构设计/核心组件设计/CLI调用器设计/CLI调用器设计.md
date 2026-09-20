@@ -17,11 +17,12 @@
 
 ## 更新摘要
 **所做更改**
-- 更新了操作目录验证和能力检查机制
-- 移除了RdcShellActionService的引用和相关功能
-- 增强了执行收据和签名证据支持系统
-- 更新了安全策略和权限控制机制
-- 改进了文件系统路径验证和沙箱机制
+- 完成 RDX 到 RDC 品牌重命名，所有组件和服务名称已更新为 RDC 标识
+- 新增安全绑定验证机制 assertRdcCliBinding，确保 CLI 工具的安全绑定
+- 增强所有者上下文支持，通过 --owner-pid 注入实现进程所有权追踪
+- 更新原生协议处理以适配 RDC 原生协议规范
+- 改进操作目录验证和能力检查机制
+- 强化执行收据和签名证据支持系统
 
 ## 目录
 1. [简介](#简介)
@@ -53,7 +54,7 @@
 - 工具编排与协议层：RdcCliInvokerService、RdcNativeProtocol、RdcProbeLifecycle、RdcTurnBindings
 - 进程执行层：ShellInvocationService、ProcessSupervisor
 - 安全策略层：RdcOperationPolicy、RdcValidatedEvidence、RdcExecutionReceipts
-- 平台适配：resolveRdcBatchInvocation（Windows legacy rdx.bat 拒绝诊断）
+- 平台适配：resolveRdcBatchInvocation（Windows rdx.bat 启动桥接）
 - 上层入口：executeRdcShell（将 Agent 工具调用映射为原生 rdc 操作）
 
 ```mermaid
@@ -90,7 +91,7 @@ K --> I
 ```
 
 **图表来源**
-- [RdcCliInvokerService.ts:20-333](file://src/main/tools/RdcCliInvokerService.ts#L20-L333)
+- [RdcCliInvokerService.ts:22-370](file://src/main/tools/RdcCliInvokerService.ts#L22-L370)
 - [ShellInvocationService.ts:30-129](file://src/main/tools/ShellInvocationService.ts#L30-L129)
 - [RdcNativeProtocol.ts:3-43](file://src/main/tools/RdcNativeProtocol.ts#L3-L43)
 - [RdcProbeLifecycle.ts:7-42](file://src/main/tools/RdcProbeLifecycle.ts#L7-L42)
@@ -105,12 +106,12 @@ K --> I
 - **RdcOperationPolicy**：提供操作授权和参数验证，包括文件系统路径验证、虚拟路径检查、编译器标志白名单等安全约束。
 - **RdcValidatedEvidence**：验证执行证据，支持测量、干预和回滚三种证据类型，确保实验场景的可信性。
 - **RdcExecutionReceipts**：生成和验证签名的执行收据，提供完整的审计追踪能力。
-- **resolveRdcBatchInvocation**：在 Windows 上检测 legacy rdx.bat 并返回拒绝诊断，不调用 PowerShell 脚本。
+- **resolveRdcBatchInvocation**：在 Windows 上把 rdx.bat 调用桥接到 PowerShell 脚本，附加非交互等标志。
 - **ProcessSupervisor**：统一的子进程注册表，支持进程组隔离、SIGTERM/SIGKILL 优雅终止、超时强制终止、孤儿进程标记、环形缓冲区限流。
 - **executeRdcShell**：Agent 工具到原生 rdc 操作的入口，校验绑定与租约、串行执行、写入签名回执（实验场景）。
 
 **章节来源**
-- [RdcCliInvokerService.ts:20-333](file://src/main/tools/RdcCliInvokerService.ts#L20-L333)
+- [RdcCliInvokerService.ts:22-370](file://src/main/tools/RdcCliInvokerService.ts#L22-L370)
 - [ShellInvocationService.ts:30-129](file://src/main/tools/ShellInvocationService.ts#L30-L129)
 - [RdcNativeProtocol.ts:3-43](file://src/main/tools/RdcNativeProtocol.ts#L3-L43)
 - [RdcProbeLifecycle.ts:7-42](file://src/main/tools/RdcProbeLifecycle.ts#L7-L42)
@@ -124,7 +125,7 @@ K --> I
 ## 架构总览
 整体调用链路如下：
 - Agent 通过 executeRdcShell 发起原生 rdc 操作，校验绑定与租约后，交由 RdcCliInvokerService 构建参数并执行。
-- 参数构建阶段会合并全局 argsPrefix、daemon-context、--args-json 等；Windows 下 resolveRdcBatchInvocation 仅拒绝旧 launcher，不再转为 powershell 调用。
+- 参数构建阶段会合并全局 argsPrefix、daemon-context、--args-json 等；Windows 下可能经 resolveRdcBatchInvocation 转为 powershell 调用 rdx_bat_launcher.ps1。
 - ShellInvocationService 使用 ProcessSupervisor.spawn 启动子进程，设置工作目录、环境变量、超时、隔离进程组等。
 - 子进程完成后，RdcNativeProtocol 校验信封格式与上下文一致性；RdcCliInvokerService 将其转换为 ToolCallResult，并触发 trace。
 - 对于实验场景，RdcExecutionReceipts 生成签名的执行收据，RdcValidatedEvidence 验证证据的有效性。
@@ -167,7 +168,7 @@ Exec-->>Agent : 结果或回执
 **图表来源**
 - [executeRdcShell.ts:23-129](file://src/main/tools/executeRdcShell.ts#L23-L129)
 - [RdcOperationPolicy.ts:49-104](file://src/main/tools/RdcOperationPolicy.ts#L49-L104)
-- [RdcCliInvokerService.ts:214-321](file://src/main/tools/RdcCliInvokerService.ts#L214-L321)
+- [RdcCliInvokerService.ts:251-358](file://src/main/tools/RdcCliInvokerService.ts#L251-L358)
 - [RdcValidatedEvidence.ts:21-86](file://src/main/tools/RdcValidatedEvidence.ts#L21-L86)
 - [RdcExecutionReceipts.ts:48-56](file://src/main/tools/RdcExecutionReceipts.ts#L48-L56)
 
@@ -180,6 +181,7 @@ Exec-->>Agent : 结果或回执
   - 标准化 --context-id 为 --daemon-context
   - 分离全局参数与命令参数，插入 argsPrefix 与 daemon-context
   - 将请求参数序列化为 --args-json
+  - 自动注入 --owner-pid 用于进程所有权追踪
 - 执行与结果解析：
   - 调用 ShellInvocationService.invoke
   - 使用 RdcNativeProtocol.parseRdcNativeResult 校验信封
@@ -196,7 +198,7 @@ Exec-->>Agent : 结果或回执
 flowchart TD
 Start(["开始"]) --> CheckCfg["检查配置与可用性"]
 CheckCfg --> |不可用| ReturnErr["返回不可用错误"]
-CheckCfg --> |可用| BuildArgs["构建命令参数<br/>argsPrefix + daemon-context + --args-json"]
+CheckCfg --> |可用| BuildArgs["构建命令参数<br/>argsPrefix + daemon-context + --args-json + --owner-pid"]
 BuildArgs --> Invoke["ShellInvocationService.invoke"]
 Invoke --> Parse["RdcNativeProtocol.parseRdcNativeResult"]
 Parse --> Ok{"ok?"}
@@ -208,13 +210,15 @@ ReturnErr --> End
 ```
 
 **图表来源**
-- [RdcCliInvokerService.ts:48-187](file://src/main/tools/RdcCliInvokerService.ts#L48-L187)
-- [RdcCliInvokerService.ts:214-321](file://src/main/tools/RdcCliInvokerService.ts#L214-L321)
+- [RdcCliInvokerService.ts:52-72](file://src/main/tools/RdcCliInvokerService.ts#L52-L72)
+- [RdcCliInvokerService.ts:133-169](file://src/main/tools/RdcCliInvokerService.ts#L133-L169)
+- [RdcCliInvokerService.ts:251-358](file://src/main/tools/RdcCliInvokerService.ts#L251-L358)
 - [RdcNativeProtocol.ts:12-43](file://src/main/tools/RdcNativeProtocol.ts#L12-L43)
 
 **章节来源**
-- [RdcCliInvokerService.ts:48-187](file://src/main/tools/RdcCliInvokerService.ts#L48-L187)
-- [RdcCliInvokerService.ts:214-321](file://src/main/tools/RdcCliInvokerService.ts#L214-L321)
+- [RdcCliInvokerService.ts:52-72](file://src/main/tools/RdcCliInvokerService.ts#L52-L72)
+- [RdcCliInvokerService.ts:133-169](file://src/main/tools/RdcCliInvokerService.ts#L133-L169)
+- [RdcCliInvokerService.ts:251-358](file://src/main/tools/RdcCliInvokerService.ts#L251-L358)
 
 ### ShellInvocationService：shell 执行引擎
 - 进程创建：
@@ -346,7 +350,7 @@ ShellInvocationService --> ProcessSupervisor : "spawn/join"
 - [RdcExecutionReceipts.ts:42-76](file://src/main/tools/RdcExecutionReceipts.ts#L42-L76)
 
 ### resolveRdcBatchInvocation：Windows 批处理桥接
-- 当命令为 legacy rdx.bat 且在 Windows 平台时，返回拒绝诊断；不再切换到 powershell.exe 或调用 legacy rdx_bat_launcher.ps1
+- 当命令为 rdx.bat 且在 Windows 平台时，自动切换到 powershell.exe 并调用 scripts/rdx_bat_launcher.ps1
 - 支持 --non-interactive 时追加 -NonInteractive
 - 其他情况原样返回 command/args
 
@@ -406,7 +410,7 @@ F --> K["RdcExecutionReceipts"]
 ```
 
 **图表来源**
-- [RdcCliInvokerService.ts:20-333](file://src/main/tools/RdcCliInvokerService.ts#L20-L333)
+- [RdcCliInvokerService.ts:22-370](file://src/main/tools/RdcCliInvokerService.ts#L22-L370)
 - [ShellInvocationService.ts:30-129](file://src/main/tools/ShellInvocationService.ts#L30-L129)
 - [ProcessSupervisor.ts:167-425](file://src/main/runtime/ProcessSupervisor.ts#L167-L425)
 - [RdcNativeProtocol.ts:3-43](file://src/main/tools/RdcNativeProtocol.ts#L3-L43)
@@ -449,7 +453,7 @@ F --> K["RdcExecutionReceipts"]
   - 对实验场景，依据回执验证执行与回滚
 
 **章节来源**
-- [RdcCliInvokerService.ts:48-64](file://src/main/tools/RdcCliInvokerService.ts#L48-L64)
+- [RdcCliInvokerService.ts:52-72](file://src/main/tools/RdcCliInvokerService.ts#L52-L72)
 - [RdcNativeProtocol.ts:12-43](file://src/main/tools/RdcNativeProtocol.ts#L12-L43)
 - [ShellInvocationService.ts:69-99](file://src/main/tools/ShellInvocationService.ts#L69-L99)
 - [ProcessSupervisor.ts:270-343](file://src/main/runtime/ProcessSupervisor.ts#L270-L343)
@@ -512,6 +516,6 @@ E-->>U : 结果或回执
 **图表来源**
 - [executeRdcShell.ts:23-129](file://src/main/tools/executeRdcShell.ts#L23-L129)
 - [RdcOperationPolicy.ts:49-104](file://src/main/tools/RdcOperationPolicy.ts#L49-L104)
-- [RdcCliInvokerService.ts:214-321](file://src/main/tools/RdcCliInvokerService.ts#L214-L321)
+- [RdcCliInvokerService.ts:251-358](file://src/main/tools/RdcCliInvokerService.ts#L251-L358)
 - [RdcValidatedEvidence.ts:21-86](file://src/main/tools/RdcValidatedEvidence.ts#L21-L86)
 - [RdcExecutionReceipts.ts:48-56](file://src/main/tools/RdcExecutionReceipts.ts#L48-L56)

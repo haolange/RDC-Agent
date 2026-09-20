@@ -104,7 +104,7 @@ G --> F
 - [agentManifest.ts:5-13](file://src/shared/types/agentManifest.ts#L5-L13)
 
 ## 架构总览
-RDC-Agent 的主数据流从渲染器 UI 经 Preload/IPC 进入工作流编排，再由 Agent 运行时驱动 Provider 与外部能力（如 rdc-tool CLI），并将运行轨迹投影回 UI。**交接流程已简化**：用户点击交接建议按钮后，主进程验证声明并写入执行报价，然后持久化会话的 agentId，触发钩子但不自动执行业务流程。
+RDC-Agent 的主数据流从渲染器 UI 经 Preload/IPC 进入工作流编排，再由 Agent 运行时驱动 Provider 与外部能力（如 RDX CLI），并将运行轨迹投影回 UI。**交接流程已简化**：用户点击交接建议按钮后，主进程验证声明并写入执行报价，然后持久化会话的 agentId，触发钩子但不自动执行业务流程。
 
 ```mermaid
 sequenceDiagram
@@ -115,7 +115,7 @@ participant W as "工作流编排"
 participant R as "Agent 运行时"
 participant H as "交接处理"
 participant S as "设置/目录"
-participant X as "外部能力(rdc-tool CLI)"
+participant X as "外部能力(RDX CLI)"
 participant T as "追踪投影"
 U->>P : 发起对话/任务
 P->>I : IPC 调用
@@ -141,7 +141,7 @@ H->>R : 触发 before-handoff/after-handoff 钩子
 ### 自定义 Agent 清单与能力声明
 - 清单位置与作用域：builtin < user < project，整资源替换；Agent ID 来自文件名 stem。
 - 关键字段：name/description/argument-hint/target/model/icon/accent/enabled/user-invocable/disable-model-invocation/tools/agents/skills/mcp-servers/handoffs。
-- 工具令牌：使用规范 token（read/search/web/shell/task/memory/subagent/tool_search/rdcContext 等），废弃令牌会被拒绝。
+- 工具令牌：使用规范 token（read/search/web/shell/task/memory/subagent/tool_search/rdxContext 等），废弃令牌会被拒绝。
 - 计划输出：plan.md 是普通产物，不是工作流状态机或 IPC 通道。
 
 **交接配置更新**：
@@ -168,7 +168,7 @@ H->>R : 触发 before-handoff/after-handoff 钩子
 
 实践要点
 - 为 Debugger/Analyzer/Optimizer 绑定对应协调器技能，General 绑定 execution-orchestrator。
-- 避免在 Mission-only Agent 中引入 rdc-tool-shell 等冲突技能。
+- 避免在 Mission-only Agent 中引入 rdx-cli-shell 等冲突技能。
 
 章节来源
 - [canonicalSkills.ts:1-45](file://src/shared/constants/canonicalSkills.ts#L1-L45)
@@ -395,7 +395,7 @@ RDC-Agent 提供了完整的自定义 Agent 开发生态：以 `.agent.md` 为�
 目标：创建一个专注于代码/渲染分析的 Agent，具备只读工具与知识检索能力，并能将结果以 plan.md 形式输出。
 
 步骤
-- 新建清单：在 `<project-root>/.rdc-agent/agents/` 下创建 `my-analyzer.agent.md`，ID 为文件名 stem。
+- 新建清单：在 `<project-root>/.rdx/agents/` 下创建 `my-analyzer.agent.md`，ID 为文件名 stem。
 - 声明能力：tools 包含 read/search/knowledge/tool_search 等只读能力；禁用 shell/write/edit。
 - 绑定技能：skills 加入 analyzer-coordinator 或相关分析方法。
 - **配置交接**：添加 handoffs 指向 debugger/optimizer，设置 label、prompt、可选的 send 和 showContinueOn。
@@ -450,7 +450,7 @@ handoffs:
 目标：让 General 作为执行编排者，协调文件读写、Shell、解释器与外部工具，完成端到端任务。
 
 步骤
-- 启用 General profile：tools 包含 read/search/web/shell/interpreter/write/edit/git/file-manage/askUser/handoff/task/output/memory/skill/mcp/subagent/rdcContext/tool_search/knowledge/investigation。
+- 启用 General profile：tools 包含 read/search/web/shell/interpreter/write/edit/git/file-manage/askUser/handoff/task/output/memory/skill/mcp/subagent/rdxContext/tool_search/knowledge/investigation。
 - 绑定执行协调器：skills 包含 execution-orchestrator。
 - 配置权限：在设置中配置 readableRoots/writableRoots/allowedCommandPrefixes/deniedCommandPrefixes。
 - 编排子任务：通过 task 与 subagent 拆分复杂工作，设置预算与停止条件。

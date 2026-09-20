@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: ""
-title: RDC-Agent 根工程（Electron + pnpm Workspace）
+title: RDC-Agent 根工程（Electron + Vite 多进程编排）
 scope:
     - README.md
     - DESIGN.md

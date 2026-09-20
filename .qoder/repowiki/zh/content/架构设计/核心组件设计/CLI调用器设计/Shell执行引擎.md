@@ -5,8 +5,8 @@
 - [ShellInvocationService.ts](file://src/main/tools/ShellInvocationService.ts)
 - [ProcessSupervisor.ts](file://src/main/runtime/ProcessSupervisor.ts)
 - [ResourceExecutionLifetime.ts](file://src/main/runtime/ResourceExecutionLifetime.ts)
-- [RdcCliInvokerService.ts](file://src/main/tools/RdcCliInvokerService.ts)
-- [executeRdcShell.ts](file://src/main/tools/executeRdcShell.ts)
+- [RdxCliInvokerService.ts](file://src/main/tools/RdxCliInvokerService.ts)
+- [executeRdxShell.ts](file://src/main/tools/executeRdxShell.ts)
 - [ShellResolver.ts](file://src/main/runtime/ShellResolver.ts)
 - [shellHandlers.ts](file://src/main/ipc/shellHandlers.ts)
 </cite>
@@ -27,36 +27,36 @@
 
 ## 项目结构
 Shell执行相关能力分布在以下模块：
-- 工具层：ShellInvocationService（统一Shell调用）、RdcCliInvokerService（rdc-tool CLI封装）、executeRdcShell（受控的RDC原生操作入口）
+- 工具层：ShellInvocationService（统一Shell调用）、RdxCliInvokerService（RDX CLI封装）、executeRdxShell（受控的RDX原生操作入口）
 - 运行时：ProcessSupervisor（子进程注册、树杀、超时、孤儿检测）、ResourceExecutionLifetime（资源生命周期绑定）
 - 解析器：ShellResolver（跨平台Shell探测与参数构造）
 - IPC：shellHandlers（Electron主进程IPC，提供对话框、窗口、剪贴板等系统能力）
 
 ```mermaid
 graph TB
-A["调用方<br/>Agent/Tool"] --> B["RdcCliInvokerService"]
+A["调用方<br/>Agent/Tool"] --> B["RdxCliInvokerService"]
 B --> C["ShellInvocationService"]
 C --> D["ProcessSupervisor"]
 D --> E["child_process.spawn"]
 D --> F["RingBuffer(stdout/stderr)"]
 C --> G["ShellResolver(可选)"]
-A --> H["executeRdcShell(受控入口)"]
+A --> H["executeRdxShell(受控入口)"]
 I["IPC: shellHandlers"] -.->|系统能力| A
 ```
 
 图表来源
 - [ShellInvocationService.ts:29-105](file://src/main/tools/ShellInvocationService.ts#L29-L105)
 - [ProcessSupervisor.ts:167-394](file://src/main/runtime/ProcessSupervisor.ts#L167-L394)
-- [RdcCliInvokerService.ts:178-221](file://src/main/tools/RdcCliInvokerService.ts#L178-L221)
-- [executeRdcShell.ts:16-69](file://src/main/tools/executeRdcShell.ts#L16-L69)
+- [RdxCliInvokerService.ts:178-221](file://src/main/tools/RdxCliInvokerService.ts#L178-L221)
+- [executeRdxShell.ts:16-69](file://src/main/tools/executeRdxShell.ts#L16-L69)
 - [ShellResolver.ts:84-113](file://src/main/runtime/ShellResolver.ts#L84-L113)
 - [shellHandlers.ts:69-207](file://src/main/ipc/shellHandlers.ts#L69-L207)
 
 章节来源
 - [ShellInvocationService.ts:29-105](file://src/main/tools/ShellInvocationService.ts#L29-L105)
 - [ProcessSupervisor.ts:167-394](file://src/main/runtime/ProcessSupervisor.ts#L167-L394)
-- [RdcCliInvokerService.ts:178-221](file://src/main/tools/RdcCliInvokerService.ts#L178-L221)
-- [executeRdcShell.ts:16-69](file://src/main/tools/executeRdcShell.ts#L16-L69)
+- [RdxCliInvokerService.ts:178-221](file://src/main/tools/RdxCliInvokerService.ts#L178-L221)
+- [executeRdxShell.ts:16-69](file://src/main/tools/executeRdxShell.ts#L16-L69)
 - [ShellResolver.ts:84-113](file://src/main/runtime/ShellResolver.ts#L84-L113)
 - [shellHandlers.ts:69-207](file://src/main/ipc/shellHandlers.ts#L69-L207)
 
@@ -64,8 +64,8 @@ I["IPC: shellHandlers"] -.->|系统能力| A
 - ShellInvocationService：对外暴露invoke方法，负责命令校验、环境注入、子进程派生、结果归一化、活跃进程跟踪与清理。
 - ProcessSupervisor：统一的子进程注册中心，提供spawn/join/abort/joinAll、超时、信号、孤儿检测、环形缓冲区、进程组隔离。
 - ResourceExecutionLifetime：通过AsyncLocalStorage将资源释放与进程退出绑定，避免过早回收。
-- RdcCliInvokerService：对rdc-tool CLI的封装，包含可用性检查、参数构建、调用与结果解析、追踪上报。
-- executeRdcShell：受控的RDC原生操作入口，进行上下文租约校验、身份一致性校验、参数白名单过滤、执行回执写入。
+- RdxCliInvokerService：对RDX CLI的封装，包含可用性检查、参数构建、调用与结果解析、追踪上报。
+- executeRdxShell：受控的RDX原生操作入口，进行上下文租约校验、身份一致性校验、参数白名单过滤、执行回执写入。
 - ShellResolver：跨平台Shell探测与版本识别，生成非交互式执行参数。
 - shellHandlers：Electron主进程IPC，提供安全的系统交互能力（对话框、窗口、剪贴板、路径打开）。
 
@@ -73,35 +73,35 @@ I["IPC: shellHandlers"] -.->|系统能力| A
 - [ShellInvocationService.ts:29-127](file://src/main/tools/ShellInvocationService.ts#L29-L127)
 - [ProcessSupervisor.ts:18-72](file://src/main/runtime/ProcessSupervisor.ts#L18-L72)
 - [ResourceExecutionLifetime.ts:1-21](file://src/main/runtime/ResourceExecutionLifetime.ts#L1-L21)
-- [RdcCliInvokerService.ts:42-221](file://src/main/tools/RdcCliInvokerService.ts#L42-L221)
-- [executeRdcShell.ts:9-69](file://src/main/tools/executeRdcShell.ts#L9-L69)
+- [RdxCliInvokerService.ts:42-221](file://src/main/tools/RdxCliInvokerService.ts#L42-L221)
+- [executeRdxShell.ts:9-69](file://src/main/tools/executeRdxShell.ts#L9-L69)
 - [ShellResolver.ts:14-113](file://src/main/runtime/ShellResolver.ts#L14-L113)
 - [shellHandlers.ts:69-207](file://src/main/ipc/shellHandlers.ts#L69-L207)
 
 ## 架构总览
-Shell执行引擎采用分层设计：上层工具/代理通过RdcCliInvokerService或executeRdcShell发起调用；中间层ShellInvocationService统一封装命令与环境；底层ProcessSupervisor负责进程生命周期、I/O缓冲、超时与信号；ShellResolver提供跨平台Shell探测；IPC层提供受限的系统能力。
+Shell执行引擎采用分层设计：上层工具/代理通过RdxCliInvokerService或executeRdxShell发起调用；中间层ShellInvocationService统一封装命令与环境；底层ProcessSupervisor负责进程生命周期、I/O缓冲、超时与信号；ShellResolver提供跨平台Shell探测；IPC层提供受限的系统能力。
 
 ```mermaid
 sequenceDiagram
 participant Caller as "调用方"
-participant RdcCli as "RdcCliInvokerService"
+participant RdxCli as "RdxCliInvokerService"
 participant ShellSvc as "ShellInvocationService"
 participant Sup as "ProcessSupervisor"
 participant OS as "操作系统"
-Caller->>RdcCli : executeCLI(command, args, options)
-RdcCli->>RdcCli : 校验可用性与参数
-RdcCli->>ShellSvc : invoke({command,args,cwd,env,timeoutMs,...})
+Caller->>RdxCli : executeCLI(command, args, options)
+RdxCli->>RdxCli : 校验可用性与参数
+RdxCli->>ShellSvc : invoke({command,args,cwd,env,timeoutMs,...})
 ShellSvc->>Sup : spawn(owner="shell", command, args, opts)
 Sup->>OS : child_process.spawn(...)
 OS-->>Sup : stdout/stderr流
 Sup->>Sup : 环形缓冲+超时/信号监听
 Sup-->>ShellSvc : join(timeout)返回退出信息
-ShellSvc-->>RdcCli : CLIResult(exitCode,stdout,stderr,duration_ms)
-RdcCli-->>Caller : ToolCallResult/CLIResult
+ShellSvc-->>RdxCli : CLIResult(exitCode,stdout,stderr,duration_ms)
+RdxCli-->>Caller : ToolCallResult/CLIResult
 ```
 
 图表来源
-- [RdcCliInvokerService.ts:178-221](file://src/main/tools/RdcCliInvokerService.ts#L178-L221)
+- [RdxCliInvokerService.ts:178-221](file://src/main/tools/RdxCliInvokerService.ts#L178-L221)
 - [ShellInvocationService.ts:32-105](file://src/main/tools/ShellInvocationService.ts#L32-L105)
 - [ProcessSupervisor.ts:167-394](file://src/main/runtime/ProcessSupervisor.ts#L167-L394)
 
@@ -190,26 +190,26 @@ ProcessSupervisor --> SupervisedProcess : "创建/管理"
 - [ProcessSupervisor.ts:167-394](file://src/main/runtime/ProcessSupervisor.ts#L167-L394)
 - [ResourceExecutionLifetime.ts:1-21](file://src/main/runtime/ResourceExecutionLifetime.ts#L1-L21)
 
-### RdcCliInvokerService：rdc-tool CLI封装与可用性校验
+### RdxCliInvokerService：RDX CLI封装与可用性校验
 - 可用性检查：disabled或未配置command、命令路径不存在时返回不可用原因。
 - 参数构建：标准化--context-id为--daemon-context，分离全局参数与命令参数，拼接settings.argsPrefix。
-- 执行流程：调用resolveRdcBatchInvocation解析批处理命令，再通过ShellInvocationService.invoke执行，透传cwd/env/timeout/runId/contextId/abortSignal。
+- 执行流程：调用resolveRdxBatchInvocation解析批处理命令，再通过ShellInvocationService.invoke执行，透传cwd/env/timeout/runId/contextId/abortSignal。
 - 结果解析：将CLIResult转换为ToolCallResult，包含ok/data/artifacts/duration_ms/trace_id，失败时附带stderr/exitCode等细节。
 - 追踪上报：onInvocationTrace可订阅每次调用的trace。
 
 章节来源
-- [RdcCliInvokerService.ts:42-221](file://src/main/tools/RdcCliInvokerService.ts#L42-L221)
-- [RdcCliInvokerService.ts:248-363](file://src/main/tools/RdcCliInvokerService.ts#L248-L363)
+- [RdxCliInvokerService.ts:42-221](file://src/main/tools/RdxCliInvokerService.ts#L42-L221)
+- [RdxCliInvokerService.ts:248-363](file://src/main/tools/RdxCliInvokerService.ts#L248-L363)
 
-### executeRdcShell：受控的RDC原生操作入口（安全沙箱）
+### executeRdxShell：受控的RDX原生操作入口（安全沙箱）
 - 输入校验：严格schema限定operation格式、args类型、experimentId长度。
 - 权限与租约：仅允许general agent的turn执行，校验lease所有权、identity版本与上下文ID一致，禁止覆盖敏感字段（session_id、context_id、daemon_context、owner_session_id）。
 - 执行约束：要求存在frozen binding且拥有replay session，否则拒绝。
-- 执行与回执：调用rdcCliInvokerService.executeCLI，解析native结果，必要时写入执行回执（含参数指纹、结果哈希、时间戳等）。
+- 执行与回执：调用rdxCliInvokerService.executeCLI，解析native结果，必要时写入执行回执（含参数指纹、结果哈希、时间戳等）。
 - 异常恢复：异常时将上下文置为quarantine状态，阻止后续不安全执行。
 
 章节来源
-- [executeRdcShell.ts:9-69](file://src/main/tools/executeRdcShell.ts#L9-L69)
+- [executeRdxShell.ts:9-69](file://src/main/tools/executeRdxShell.ts#L9-L69)
 
 ### ShellResolver：跨平台Shell探测与参数构造
 - 自动候选：Windows优先pwsh，其次powershell，再bash/sh；POSIX优先$SHELL（限定zsh/bash/sh/dash），再fallback常见路径。
@@ -234,30 +234,30 @@ ProcessSupervisor --> SupervisedProcess : "创建/管理"
 
 ## 依赖关系分析
 - ShellInvocationService依赖ProcessSupervisor进行进程管理，依赖os/path用于平台判断与退出码转换。
-- RdcCliInvokerService依赖ShellInvocationService与SettingsService，间接依赖shellHandlers提供的系统能力（通过上层工具调用）。
-- executeRdcShell依赖RdcCliInvokerService与上下文租约服务，形成强约束的安全入口。
+- RdxCliInvokerService依赖ShellInvocationService与SettingsService，间接依赖shellHandlers提供的系统能力（通过上层工具调用）。
+- executeRdxShell依赖RdxCliInvokerService与上下文租约服务，形成强约束的安全入口。
 - ProcessSupervisor依赖child_process与Node信号机制，结合ResourceExecutionLifetime保证资源释放。
 
 ```mermaid
 graph LR
-Exec["executeRdcShell"] --> RdcCli["RdcCliInvokerService"]
-RdcCli --> ShellSvc["ShellInvocationService"]
+Exec["executeRdxShell"] --> RdxCli["RdxCliInvokerService"]
+RdxCli --> ShellSvc["ShellInvocationService"]
 ShellSvc --> Sup["ProcessSupervisor"]
 Sup --> OS["child_process"]
 ShellSvc --> OS
-RdcCli --> Settings["SettingsService"]
+RdxCli --> Settings["SettingsService"]
 Exec --> Lease["上下文租约/身份校验"]
 ```
 
 图表来源
-- [executeRdcShell.ts:16-69](file://src/main/tools/executeRdcShell.ts#L16-L69)
-- [RdcCliInvokerService.ts:178-221](file://src/main/tools/RdcCliInvokerService.ts#L178-L221)
+- [executeRdxShell.ts:16-69](file://src/main/tools/executeRdxShell.ts#L16-L69)
+- [RdxCliInvokerService.ts:178-221](file://src/main/tools/RdxCliInvokerService.ts#L178-L221)
 - [ShellInvocationService.ts:32-105](file://src/main/tools/ShellInvocationService.ts#L32-L105)
 - [ProcessSupervisor.ts:167-394](file://src/main/runtime/ProcessSupervisor.ts#L167-L394)
 
 章节来源
-- [executeRdcShell.ts:16-69](file://src/main/tools/executeRdcShell.ts#L16-L69)
-- [RdcCliInvokerService.ts:178-221](file://src/main/tools/RdcCliInvokerService.ts#L178-L221)
+- [executeRdxShell.ts:16-69](file://src/main/tools/executeRdxShell.ts#L16-L69)
+- [RdxCliInvokerService.ts:178-221](file://src/main/tools/RdxCliInvokerService.ts#L178-L221)
 - [ShellInvocationService.ts:32-105](file://src/main/tools/ShellInvocationService.ts#L32-L105)
 - [ProcessSupervisor.ts:167-394](file://src/main/runtime/ProcessSupervisor.ts#L167-L394)
 
@@ -268,13 +268,13 @@ Exec --> Lease["上下文租约/身份校验"]
   - 长任务：使用AbortSignal配合上游取消，减少无效等待。
 - 进程组隔离：POSIX下启用进程组隔离，便于快速终止整个子进程树，降低僵尸进程风险。
 - 并发控制：
-  - 当前实现无内置进程池，建议在调用侧（如RdcCliInvokerService或上层调度）增加并发上限与队列，避免过多子进程竞争CPU/IO。
+  - 当前实现无内置进程池，建议在调用侧（如RdxCliInvokerService或上层调度）增加并发上限与队列，避免过多子进程竞争CPU/IO。
   - 可使用runId分组批量中止，便于按任务粒度控制并发。
 - 路径与工作目录：
   - 尽量设置cwd为最小必要目录，减少文件系统扫描开销。
   - 避免在高频路径上进行大量stat/exists检查。
 - 日志与追踪：
-  - 利用RdcCliInvokerService.onInvocationTrace收集调用耗时与错误，定位瓶颈。
+  - 利用RdxCliInvokerService.onInvocationTrace收集调用耗时与错误，定位瓶颈。
   - 结合RuntimeLogService记录关键步骤，辅助排障。
 
 [本节为通用指导，不直接分析具体文件]
@@ -282,8 +282,8 @@ Exec --> Lease["上下文租约/身份校验"]
 ## 故障排除指南
 - 命令未配置或不可用：
   - 现象：exitCode=2，stderr提示未配置或命令不存在。
-  - 排查：检查Settings中tooling.rdc-agentCli.enabled与command；确认命令路径存在且可执行。
-  - 参考：[RdcCliInvokerService.ts:49-86](file://src/main/tools/RdcCliInvokerService.ts#L49-L86)
+  - 排查：检查Settings中tooling.rdxCli.enabled与command；确认命令路径存在且可执行。
+  - 参考：[RdxCliInvokerService.ts:49-86](file://src/main/tools/RdxCliInvokerService.ts#L49-L86)
 - 子进程启动失败：
   - 现象：reason=spawn_failed，exitCode=2，stderr包含错误消息。
   - 排查：检查命令与参数、环境变量、工作目录是否存在；确认权限与路径合法性。
@@ -297,20 +297,20 @@ Exec --> Lease["上下文租约/身份校验"]
   - 排查：检查系统信号处理；POSIX下确认进程组隔离；Windows下确认taskkill生效。
   - 参考：[ProcessSupervisor.ts:312-335](file://src/main/runtime/ProcessSupervisor.ts#L312-L335)
 - 权限与租约不一致：
-  - 现象：executeRdcShell抛出RDC_TOOL_EXECUTION_DENIED或协议不匹配。
+  - 现象：executeRdxShell抛出RDX_EXECUTION_DENIED或协议不匹配。
   - 排查：确保General turn拥有replay session且binding未变化；禁止覆盖敏感参数。
-  - 参考：[executeRdcShell.ts:21-38](file://src/main/tools/executeRdcShell.ts#L21-L38)
+  - 参考：[executeRdxShell.ts:21-38](file://src/main/tools/executeRdxShell.ts#L21-L38)
 - Shell不可用：
   - 现象：ShellUnavailableError或无法解析Shell。
   - 排查：安装支持的Shell（zsh/bash/sh/pwsh），避免WindowsApps别名；检查$SHELL与PATH。
   - 参考：[ShellResolver.ts:124-179](file://src/main/runtime/ShellResolver.ts#L124-L179)
 
 章节来源
-- [RdcCliInvokerService.ts:49-86](file://src/main/tools/RdcCliInvokerService.ts#L49-L86)
+- [RdxCliInvokerService.ts:49-86](file://src/main/tools/RdxCliInvokerService.ts#L49-L86)
 - [ShellInvocationService.ts:67-82](file://src/main/tools/ShellInvocationService.ts#L67-L82)
 - [ProcessSupervisor.ts:312-335](file://src/main/runtime/ProcessSupervisor.ts#L312-L335)
-- [executeRdcShell.ts:21-38](file://src/main/tools/executeRdcShell.ts#L21-L38)
+- [executeRdxShell.ts:21-38](file://src/main/tools/executeRdxShell.ts#L21-L38)
 - [ShellResolver.ts:124-179](file://src/main/runtime/ShellResolver.ts#L124-L179)
 
 ## 结论
-Shell执行引擎通过ShellInvocationService与ProcessSupervisor实现了统一的子进程管理，具备完善的超时、信号、孤儿检测与内存缓冲机制；RdcCliInvokerService与executeRdcShell提供了安全可控的CLI与原生操作入口；ShellResolver保障跨平台兼容性；IPC层提供受限的系统能力。建议在生产环境中结合并发控制、路径限制与资源监控进一步提升稳定性与性能。
+Shell执行引擎通过ShellInvocationService与ProcessSupervisor实现了统一的子进程管理，具备完善的超时、信号、孤儿检测与内存缓冲机制；RdxCliInvokerService与executeRdxShell提供了安全可控的CLI与原生操作入口；ShellResolver保障跨平台兼容性；IPC层提供受限的系统能力。建议在生产环境中结合并发控制、路径限制与资源监控进一步提升稳定性与性能。
