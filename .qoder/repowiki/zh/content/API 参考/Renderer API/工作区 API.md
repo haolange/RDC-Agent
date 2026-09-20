@@ -368,7 +368,7 @@ IPC-->>UI : 设置工作流 store
 - read_file
   - 参数：path: string, offset?: number, limit?: number
   - 返回：{ content: [{ type: 'text', text }], details: { path, totalLines, offset, limit, truncated } }
-  - 行为：文本文件分段读取，二进制/.rdc/超大文件拒绝；支持中止信号。
+  - 行为：文本文件分段读取，二进制/.rdc_tool/超大文件拒绝；支持中止信号。
   - 异步：是
 - write_file
   - 参数：path: string, content: string

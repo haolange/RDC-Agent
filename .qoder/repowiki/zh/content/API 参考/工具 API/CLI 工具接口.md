@@ -31,7 +31,7 @@
 ```mermaid
 graph TB
 A["RdcCliInvokerService<br/>CLI 调用编排"] --> B["ShellInvocationService<br/>进程执行/超时/中止"]
-A --> C["resolveRdcBatchInvocation<br/>Windows rdc.bat 启动器"]
+A --> C["resolveRdcBatchInvocation<br/>Windows legacy rdx.bat 拒绝诊断"]
 A --> D["RdcNativeProtocol<br/>原生协议校验"]
 A --> E["SettingsService<br/>读取 RdcCliInvokerSettings"]
 A --> F["文件系统<br/>工具目录 catalog 加载"]
@@ -53,7 +53,7 @@ B --> G["ProcessSupervisor<br/>底层进程生命周期"]
 ## 核心组件
 - RdcCliInvokerService：对外暴露的工具调用入口，负责参数拼装、命令执行、结果解析、追踪事件与运行摘要。
 - ShellInvocationService：封装子进程创建、超时、中止、孤儿进程隔离与退出码归一化。
-- resolveRdcBatchInvocation：在 Windows 上把 rdc.bat 转换为 PowerShell 启动器调用。
+- resolveRdcBatchInvocation：在 Windows 上拒绝 legacy rdx.bat，不再转换为 PowerShell 启动器调用。
 - RdcNativeProtocol：对 rdc-tool CLI 返回的原生 JSON 信封进行严格校验。
 - Settings 与 UI 文案：提供启用开关、命令路径、默认参数、工作目录、环境变量、超时、工具目录等配置项。
 
@@ -171,7 +171,7 @@ ShellInvocationService --> ProcessSupervisor : "创建/等待/中止进程"
 - [src/main/tools/RdcNativeProtocol.ts:1-35](file://src/main/tools/RdcNativeProtocol.ts#L1-L35)
 
 ### resolveRdcBatchInvocation 平台适配
-- 仅在 Windows 且命令为 rdc.bat 时，替换为 powershell.exe 调用内置脚本 rdc_bat_launcher.ps1，并追加 -NonInteractive（当传入 --non-interactive）。
+- 检测到 legacy rdx.bat 时返回拒绝诊断；当前入口使用 Settings 仅配置同安装的 bundled python.exe，且 argsPrefix[0] 必须是同一安装的 cli/run_cli.py；不直接绑定 rdc-tool、cmd 或 bat。
 - 其他平台或命令直接透传。
 
 章节来源
@@ -209,7 +209,7 @@ SS --> PS["ProcessSupervisor"]
 - 目录加载缓存：loadCatalog 会缓存已加载的 catalog，避免重复 IO。
 - 进程隔离与超时：通过超时与进程组隔离降低长时间任务对主进程的影响。
 - 参数最小化：仅当存在有效参数时才附加 --args-json，减少命令行长度。
-- 批量启动优化：Windows 上使用 PowerShell 启动器减少环境初始化开销。
+- 批量启动优化：Windows 上使用 Settings 配置的 rdc-tool，旧 PowerShell 启动器不再改写。
 
 [本节为通用指导，无需特定文件引用]
 
@@ -303,7 +303,7 @@ RdcCliInvokerService 提供了稳定、可观测、可配置的 rdc-tool CLI 调
 - 参数约定
   - 使用 --args-json 传递结构化参数；如需指定 daemon 上下文，使用 --daemon-context。
 - Windows 兼容
-  - 若使用 rdc.bat，系统会自动切换至 PowerShell 启动器；必要时添加 --non-interactive 以禁用交互。
+  - 检测到 legacy rdx.bat 时返回拒绝诊断；当前入口使用 Settings 仅配置同安装的 bundled python.exe，且 argsPrefix[0] 必须是同一安装的 cli/run_cli.py；不直接绑定 rdc-tool、cmd 或 bat。
 
 章节来源
 - [src/main/tools/RdcNativeProtocol.ts:12-34](file://src/main/tools/RdcNativeProtocol.ts#L12-L34)

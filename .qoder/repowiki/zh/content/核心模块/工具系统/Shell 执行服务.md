@@ -27,7 +27,7 @@
 
 ## 项目结构
 围绕 Shell 执行的关键代码主要分布在以下模块：
-- 工具层：ShellInvocationService（统一入口）、RdcShellActionService（RDC 动作编排）、resolveRdcBatchInvocation（Windows rdc.bat 启动桥接）
+- 工具层：ShellInvocationService（统一入口）、RdcShellActionService（RDC 动作编排）、resolveRdcBatchInvocation（Windows legacy rdx.bat 拒绝诊断）
 - 运行时层：ProcessSupervisor（进程注册表、树杀、环形缓冲、超时/中止/孤儿检测）、ResourceExecutionLifetime（资源生命周期与执行上下文归属）
 - 安全层：secretRedaction（日志与输出中的敏感信息脱敏）
 
@@ -37,7 +37,7 @@ A["调用方<br/>工具/动作"] --> B["ShellInvocationService<br/>invoke()"]
 B --> C["ProcessSupervisor<br/>spawn()/join()/abort()"]
 C --> D["子进程<br/>stdout/stderr 环形缓冲"]
 B --> E["RdcShellActionService<br/>变量替换/参数拼装"]
-E --> F["resolveRdcBatchInvocation<br/>Windows rdc.bat 桥接"]
+E --> F["resolveRdcBatchInvocation<br/>Windows legacy rdx.bat 拒绝诊断"]
 C --> G["ResourceExecutionLifetime<br/>执行会话归属/资源保留"]
 B --> H["secretRedaction<br/>日志/输出脱敏"]
 ```
@@ -62,7 +62,7 @@ B --> H["secretRedaction<br/>日志/输出脱敏"]
 - ShellInvocationService：对外暴露 invoke(request)，负责命令校验、shell 选择、环境变量合并、工作目录设置、超时与中止信号透传、结果归一化、活跃进程跟踪与清理。
 - ProcessSupervisor：统一的子进程注册与生命周期管理，提供 spawn/join/abort、树级终止、超时强制终止、孤儿进程检测、环形缓冲输出、执行会话归属与资源保留。
 - RdcShellActionService：读取配置、变量替换、参数与环境拼装，委托 ShellInvocationService 执行，并对 stdout JSON 进行解析与诊断格式化。
-- resolveRdcBatchInvocation：在 Windows 上对 rdc.bat 调用进行 PowerShell 桥接，确保非交互模式与执行策略。
+- resolveRdcBatchInvocation：在 Windows 上拒绝 legacy rdx.bat，不进行 PowerShell 桥接。
 - ResourceExecutionLifetime：通过 AsyncLocalStorage 维护执行上下文与资源保留，保证未确认退出的进程资源不被提前释放。
 - secretRedaction：递归脱敏日志与输出中的密钥、令牌、大对象等敏感内容。
 
@@ -186,7 +186,7 @@ SupervisedProcess --> RingBuffer : "stdout/stderr"
 - 配置读取：从 settingsService 获取 action 配置，未配置时返回结构化错误与修复提示。
 - 变量替换：workspaceRoot、logsPath、projectsPath、knowledgePath 等内置变量，支持 {{key}} 模板替换。
 - 参数与环境：对 command、args、env、workingDirectory 进行变量替换；合并 options.env。
-- 批量调用：resolveRdcBatchInvocation 处理 Windows rdc.bat 的 PowerShell 桥接。
+- 批量调用：resolveRdcBatchInvocation 拒绝 Windows legacy rdx.bat，不进行 PowerShell 桥接。
 - 结果解析：要求 stdout 为规范 JSON envelope，解析 data、ok、error/diagnostic；失败时生成诊断信息。
 - 日志记录：记录 action 执行摘要、命令、参数、退出码、输出与诊断。
 
@@ -198,7 +198,7 @@ participant Resolve as "resolveRdcBatchInvocation"
 participant Svc as "ShellInvocationService"
 Caller->>Action : runAction(actionId, variables, options)
 Action->>Action : 读取配置/变量替换(command,args,env,workdir)
-Action->>Resolve : 解析批量调用(Windows rdc.bat)
+Action->>Resolve : 解析批量调用(Windows legacy rdx.bat)
 Resolve-->>Action : {command,args}
 Action->>Svc : invoke({command,args,cwd,env,timeoutMs,contextId,abortSignal})
 Svc-->>Action : CLIResult

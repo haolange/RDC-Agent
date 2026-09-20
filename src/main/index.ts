@@ -348,7 +348,7 @@ function createMainWindow(): void {
       : {}),
     minWidth: APP_MIN_WINDOW_WIDTH,
     minHeight: APP_MIN_WINDOW_HEIGHT,
-    title: 'RdcAgent - RenderDoc Debug Agent',
+    title: 'RDC-Agent',
     show: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),

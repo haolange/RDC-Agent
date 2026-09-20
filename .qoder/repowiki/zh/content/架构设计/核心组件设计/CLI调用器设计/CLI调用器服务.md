@@ -40,7 +40,7 @@
 ## 项目结构
 RdcCliInvokerService 位于主进程工具层，负责将上层工具调用请求转换为对本地 rdc-tool CLI 的进程调用，并对结果进行标准化与追踪。其关键协作方包括：
 - ShellInvocationService：封装子进程生命周期、超时、隔离与退出码归一化。
-- resolveRdcBatchInvocation：在 Windows 平台下将 rdc.bat 调用替换为 PowerShell 启动脚本，以支持非交互模式等场景。
+- resolveRdcBatchInvocation：在 Windows 平台下检测 legacy rdx.bat 并返回拒绝诊断，不替换为 PowerShell 启动脚本。
 - withRdcHostRuntimeEnv：**新增** 桌面运行时环境注入器，自动设置 RDC_TOOL_INTERMEDIATE_ROOT 环境变量以实现运行时隔离。
 - AppPathService：提供用户级 RDC 路径解析，包括 rdcIntermediateRoot 等隔离路径。
 - RdcNativeProtocol：校验并解析 rdc-tool CLI 返回的 JSON 信封，确保协议一致性。
@@ -73,7 +73,7 @@ E --> I["操作系统进程<br/>rdc-tool CLI<br/>带隔离运行时环境"]
 - ShellInvocationService：统一进程调度、超时控制、环境注入、孤儿进程检测与终止。
 - withRdcHostRuntimeEnv：**新增** 桌面运行时环境注入器，自动设置 RDC_TOOL_INTERMEDIATE_ROOT 环境变量到用户级隔离路径。
 - AppPathService：提供用户级 RDC 路径解析，包括 rdcIntermediateRoot 等隔离路径。
-- resolveRdcBatchInvocation：Windows 平台下的批处理桥接，确保 rdc.bat 通过 PowerShell 以非交互方式运行。
+- resolveRdcBatchInvocation：Windows 平台下的旧批处理拒绝规则，legacy rdx.bat 不通过 PowerShell 运行。
 - RdcNativeProtocol：强制要求 rdc-tool CLI 返回标准 JSON 信封 {ok, result_kind, data}，并在上下文不匹配时抛出异常。
 
 **章节来源**
@@ -181,7 +181,7 @@ S-->>U : ToolCallResult(含trace_id,duration_ms)
 - 行为
   - **新增** 调用 withRdcHostRuntimeEnv 注入 RDC_TOOL_INTERMEDIATE_ROOT 环境变量。
   - 可用性检查失败则立即返回 exitCode=2 的诊断结果。
-  - 通过 resolveRdcBatchInvocation 适配 Windows 平台的 rdc.bat 调用。
+  - 通过 resolveRdcBatchInvocation 拒绝 Windows 平台的 legacy rdx.bat 调用。
   - 合并工作目录：优先 options.cwd，其次 settings.workingDirectory。
   - 合并环境变量：先 settings.env，再覆盖 options.env。
   - 超时：优先 options.timeout，其次 settings.timeoutMs。
@@ -242,7 +242,7 @@ S-->>U : ToolCallResult(含trace_id,duration_ms)
 
 ## 依赖关系分析
 - 低耦合：RdcCliInvokerService 仅依赖抽象化的 ShellInvocationService 与 SettingsService，便于测试与替换。
-- 平台适配：resolveRdcBatchInvocation 仅在 Windows 且命令为 rdc.bat 时生效，其他平台无额外开销。
+- 平台适配：resolveRdcBatchInvocation 在 Windows 上仅拒绝 legacy rdx.bat，其他平台无额外开销。
 - 协议约束：RdcNativeProtocol 强制契约，确保上层无需关心 rdc-tool CLI 的具体输出格式。
 - **新增依赖**：withRdcHostRuntimeEnv 提供桌面运行时环境注入，依赖 AppPathService 解析用户级路径。
 
@@ -308,7 +308,7 @@ RdcCliInvokerService --> resolveRdcBatchInvocation : "平台适配"
 - 协议错误：确保 rdc-tool CLI 返回标准 JSON 信封；查看 stderr 与 stdout 定位问题。
 - 上下文不匹配：当期望 contextId 与实际响应不一致时会抛出异常，需检查 daemon 上下文绑定。
 - 孤儿进程：出现 unconfirmed_orphan 时，检查系统资源清理与进程组隔离策略。
-- **新增**：运行时路径问题 - 检查 RDC_TOOL_INTERMEDIATE_ROOT 环境变量是否正确设置到用户级隔离路径；确认 ~./rdc/rdc-intermediate 目录存在且有适当权限。
+- **新增**：运行时路径问题 - 检查 RDC_TOOL_INTERMEDIATE_ROOT 环境变量是否正确设置到用户级隔离路径；确认 ~./rdc_tool/rdc-intermediate 目录存在且有适当权限。
 
 **章节来源**
 - [RdcCliInvokerService.ts:51-67](file://src/main/tools/RdcCliInvokerService.ts#L51-L67)
@@ -358,4 +358,4 @@ RdcCliInvokerService 提供了稳定、可观测、可配置的 rdc-tool CLI 调
 - 使用 catalogPath 管理工具清单，便于版本与权限治理。
 - 利用 onInvocationTrace 收集执行轨迹，配合日志系统进行排障。
 - **新增**：信任默认的运行时环境注入机制，仅在特殊需求时显式覆盖 RDC_TOOL_INTERMEDIATE_ROOT。
-- **新增**：在多用户环境中，确保每个用户都有独立的 ~./rdc/rdc-intermediate 目录权限。
+- **新增**：在多用户环境中，确保每个用户都有独立的 ~./rdc_tool/rdc-intermediate 目录权限。
