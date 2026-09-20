@@ -36,7 +36,7 @@ afterEach(async () => {
 
 describe('shellTrailer', () => {
   it('strips a GUID trailer and reads cwd, provider, and exit', () => {
-    const marker = 'RDX_SHELL_TESTMARKER';
+    const marker = 'RDC_SHELL_TESTMARKER';
     const parsed = parseShellTrailer(
       `hello\n${marker}\ncwd=D:\\\\proj\nprovider=FileSystem\nexit=7\n`,
       marker,
@@ -56,13 +56,13 @@ describe('shellTrailer', () => {
   });
 
   it('normalizes CRLF even when the trailer marker is missing', () => {
-    const parsed = parseShellTrailer('hello\r\nworld\r\n', 'RDX_SHELL_ABSENT');
+    const parsed = parseShellTrailer('hello\r\nworld\r\n', 'RDC_SHELL_ABSENT');
     expect(parsed.trailer).toBeNull();
     expect(parsed.body).toBe('hello\nworld\n');
   });
 
   it('registers a POSIX EXIT trap, begin marker, and explicit cd', () => {
-    const wrapped = wrapPosixCommand('/tmp/rdc-agent-shell-x/command.sh', 'RDX_SHELL_POSIX', '/tmp/proj');
+    const wrapped = wrapPosixCommand('/tmp/rdc-agent-shell-x/command.sh', 'RDC_SHELL_POSIX', '/tmp/proj');
     expect(wrapped).toContain("trap '__exit=$?; __emit' EXIT");
     expect(wrapped).toContain('pwd -P');
     expect(wrapped).toContain("printf '%s\\n' \"$__begin\"");
@@ -73,7 +73,7 @@ describe('shellTrailer', () => {
   });
 
   it('strips login-profile banner before the begin marker', () => {
-    const marker = 'RDX_SHELL_POSIX';
+    const marker = 'RDC_SHELL_POSIX';
     const parsed = parseShellTrailer(
       `Welcome to zsh\n${marker}_BEGIN\nhello\n${marker}\ncwd=/tmp/proj\nprovider=FileSystem\nexit=0\n`,
       marker,
@@ -90,15 +90,15 @@ describe('shellTrailer', () => {
 
   it('treats a non-FileSystem provider as unusable persisted cwd', () => {
     const parsed = parseShellTrailer(
-      `ok\nRDX_SHELL_X\ncwd=HKLM:\\SOFTWARE\nprovider=Registry\nexit=0\n`,
-      'RDX_SHELL_X',
+      `ok\nRDC_SHELL_X\ncwd=HKLM:\\SOFTWARE\nprovider=Registry\nexit=0\n`,
+      'RDC_SHELL_X',
     );
     expect(parsed.trailer?.provider).toBe('Registry');
     expect(parsed.trailer?.provider).not.toBe('FileSystem');
   });
 
   it('writes UTF-8 through an independent StreamWriter and keeps 5.1 OEM decode', () => {
-    const wrapped = wrapPowerShellCommand('Write-Output 中文', 'RDX_SHELL_UTF8');
+    const wrapped = wrapPowerShellCommand('Write-Output 中文', 'RDC_SHELL_UTF8');
     expect(wrapped).toContain('New-Object System.Text.UTF8Encoding $false');
     expect(wrapped).not.toContain('[Console]::OutputEncoding =');
     expect(wrapped).toContain('$PSNativeCommandUseErrorActionPreference = $false');
@@ -112,7 +112,7 @@ describe('shellTrailer', () => {
 
 describe('ShellTool', () => {
   it('runs a cross-platform echo and reports trailer exit 0', { timeout: 30_000 }, async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-shell-tool-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-shell-tool-'));
     roots.push(root);
     const context: ToolExecutionContext = {
       workspaceRoot: root,
@@ -121,8 +121,8 @@ describe('ShellTool', () => {
       sessionId: null,
     };
     const command = process.platform === 'win32'
-      ? 'Write-Output hello-rdx'
-      : 'printf %s hello-rdx';
+      ? 'Write-Output hello-rdc'
+      : 'printf %s hello-rdc';
     const result = await shellTool.execute(
       's1',
       { command, timeout: 20_000 },
@@ -131,8 +131,8 @@ describe('ShellTool', () => {
       context,
     );
     const text = result.content[0]?.type === 'text' ? result.content[0].text : '';
-    expect(text).toContain('hello-rdx');
-    expect(text).not.toContain('RDX_SHELL_');
+    expect(text).toContain('hello-rdc');
+    expect(text).not.toContain('RDC_SHELL_');
     expect(result.isError).not.toBe(true);
     expect(result.details).toMatchObject({
       exitCode: 0,
@@ -142,7 +142,7 @@ describe('ShellTool', () => {
   });
 
   it('keeps a FileSystem trailer for Get-Location / pwd', { timeout: 30_000 }, async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-shell-cwd-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-shell-cwd-'));
     roots.push(root);
     const context: ToolExecutionContext = {
       workspaceRoot: root,
@@ -177,19 +177,19 @@ describe('ShellTool', () => {
     expect(parameters).not.toHaveProperty('anyOf');
   });
 
-  it('rejects mixed or empty command/rdx at execute time', async () => {
+  it('rejects mixed or empty command/rdc at execute time', async () => {
     await expect(shellTool.execute('s-empty', {}, undefined, undefined, {
       workspaceRoot: process.cwd(),
       projectRootPath: process.cwd(),
       projectId: null,
       sessionId: null,
-    })).rejects.toThrow('exactly one of command or rdx');
-    await expect(shellTool.execute('s-mixed', { command: 'echo', rdx: { operation: 'rd.core.init', args: {} } }, undefined, undefined, {
+    })).rejects.toThrow('exactly one of command or rdc');
+    await expect(shellTool.execute('s-mixed', { command: 'echo', rdc: { operation: 'rd.core.init', args: {} } }, undefined, undefined, {
       workspaceRoot: process.cwd(),
       projectRootPath: process.cwd(),
       projectId: null,
       sessionId: null,
-    })).rejects.toThrow('exactly one of command or rdx');
+    })).rejects.toThrow('exactly one of command or rdc');
   });
 
   it('injects the resolved interpreter and host OS into the dynamic description', () => {
@@ -199,7 +199,7 @@ describe('ShellTool', () => {
   });
 
   it('persists cwd across calls for the same session and heals an escaped state', { timeout: 30_000 }, async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-shell-persist-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-shell-persist-'));
     roots.push(root);
     const nested = path.join(root, 'nested');
     await mkdir(nested);
@@ -220,7 +220,7 @@ describe('ShellTool', () => {
   });
 
   it('reports a non-zero exit when the user command exits 3', { timeout: 30_000 }, async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-shell-exit-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-shell-exit-'));
     roots.push(root);
     const context: ToolExecutionContext = {
       workspaceRoot: root,
@@ -241,7 +241,7 @@ describe('ShellTool', () => {
 
   it('decodes Windows native OEM stdout without U+FFFD', { timeout: 30_000 }, async () => {
     if (process.platform !== 'win32') return;
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-shell-oem-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-shell-oem-'));
     roots.push(root);
     const context: ToolExecutionContext = {
       workspaceRoot: root,
@@ -263,7 +263,7 @@ describe('ShellTool', () => {
   });
   it('preserves PowerShell Unicode and caller-selected UTF-8 native output', { timeout: 30_000 }, async () => {
     if (process.platform !== 'win32') return;
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-shell-utf8-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-shell-utf8-'));
     roots.push(root);
     const result = await shellTool.execute('s-utf8', {
       command: "Write-Output '中文样本'; [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); node -e \"process.stdout.write(String.fromCharCode(20013,25991))\"",

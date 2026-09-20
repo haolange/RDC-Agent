@@ -24,7 +24,7 @@ export const enSidebar = {
   'sidebar.removeSessionTitle': 'Delete session?',
   'sidebar.removeSessionConfirm': 'Delete “{title}”? Messages, work trace, request snapshots, derived context, and session artifacts will be removed from this device. This cannot be undone.',
   'sidebar.removeProjectTitle': 'Remove project?',
-  'sidebar.removeProjectConfirm': 'Remove “{name}” from RDC Agent? Local sessions and derived workspace data for this project will be deleted. The source project folder is not changed.',
+  'sidebar.removeProjectConfirm': 'Remove “{name}” from RDC-Agent? Local sessions and derived workspace data for this project will be deleted. The source project folder is not changed.',
   'sidebar.selectProjectFailed': 'Failed to select project.',
   'sidebar.selectSessionFailed': 'Failed to select session.',
   'sidebar.renameSession': 'Rename Session',

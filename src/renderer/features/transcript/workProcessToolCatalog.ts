@@ -52,8 +52,8 @@ export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<string, WorkProcessToolDi
   skills: { icon: 'skillsList', groupKind: 'runtime', category: '技能目录', groupTitle: '技能', groupUnit: '查询', completeVerb: '已列出技能', runningVerb: '正在列出技能' },
   skill_read: { icon: 'skillRead', groupKind: 'runtime', category: '技能加载', groupTitle: '技能', groupUnit: '读取', completeVerb: '已加载技能', runningVerb: '正在加载技能' },
   mcp: { icon: 'plug', groupKind: 'mcp', category: 'MCP', groupTitle: 'MCP', groupUnit: '调用', completeVerb: '已查询 MCP', runningVerb: '正在查询 MCP' },
-  rdx_context: { icon: 'monitor', groupKind: 'runtime', category: 'RDX', groupTitle: 'RDX 上下文', groupUnit: '读取', completeVerb: '已读取 RDX 上下文', runningVerb: '正在读取 RDX 上下文' },
-  rdx_probe: { icon: 'rdxProbe', groupKind: 'runtime', category: 'RDX', groupTitle: 'RDX 探测', groupUnit: '探测', completeVerb: '已探测 RDX', runningVerb: '正在探测 RDX' },
+  rdc_context: { icon: 'monitor', groupKind: 'runtime', category: 'RDC', groupTitle: 'RDC 上下文', groupUnit: '读取', completeVerb: '已读取 RDC 上下文', runningVerb: '正在读取 RDC 上下文' },
+  rdc_probe: { icon: 'rdcProbe', groupKind: 'runtime', category: 'RDC', groupTitle: 'RDC 探测', groupUnit: '探测', completeVerb: '已探测 RDC', runningVerb: '正在探测 RDC' },
   subagent: { icon: 'brain', groupKind: 'collaboration', category: '子代理', groupTitle: '子代理', groupUnit: '子任务', completeVerb: '已调用子代理', runningVerb: '正在调用子代理' },
   subagent_report: { icon: 'subagentReport', groupKind: 'collaboration', category: '子代理报告', groupTitle: '子代理', groupUnit: '报告', completeVerb: '已报告进展', runningVerb: '正在报告进展' },
   task_create: { icon: 'taskCreate', groupKind: 'task', category: '任务创建', groupTitle: '任务', groupUnit: '创建', completeVerb: '已创建任务', runningVerb: '正在创建任务', mutation: true },
@@ -164,8 +164,8 @@ export const getToolFamily = (toolName: string): WorkProcessToolFamily => {
     normalized === 'tool_search'
     || normalized === 'plan_artifact'
     || normalized === 'output_register'
-    || normalized === 'rdx_context'
-    || normalized === 'rdx_probe'
+    || normalized === 'rdc_context'
+    || normalized === 'rdc_probe'
     || normalized === 'agent_handoff'
     || normalized.startsWith('knowledge_')
     || normalized.startsWith('investigation_')

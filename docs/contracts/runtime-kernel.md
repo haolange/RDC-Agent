@@ -26,9 +26,9 @@ Work Process 的工具摘要只由 runtime tool result 计算 `succeeded / faile
 | `AgentOrchestrator` | façade（少于 800 行）；`ProfileTurnPreparation` 为 sendMessage/sendProfileMessage/subagent 唯一 prepare 入口；无 `preparedRuntime` → `TURN_NOT_PREPARED` |
 | `TurnCoordinator` / `TurnHandle` | Session ownership Active→Aborting→Orphaned→Settled；Orphaned 时 `beginTurn` → `TURN_ORPHANED`；`abortAndJoin` 等 stream + producerCompletion；late producer join |
 | `ProcessSupervisor` | spawn/joinAll；POSIX pgid；Windows `taskkill /T`；close-observed registry；timeout yields `unconfirmed_orphan` |
-| `ShutdownCoordinator` | `running → … → release_owned_runtimes → terminate_processes → … → exited`；before-quit 限时 `shutdownAll`；RDX clear+stop 不得与 `joinAll` 并行 |
+| `ShutdownCoordinator` | `running → … → release_owned_runtimes → terminate_processes → … → exited`；before-quit 限时 `shutdownAll`；RDC clear+stop 不得与 `joinAll` 并行 |
 | `AgentSlotRegistry` / `McpConnectionCoordinator` / `DeferredToolActivationTracker` / `TurnHandle.pendingHandoff` | Per-session/per-project ownership；AgentState 键 `scope::agentId`；MCP pool `realpath+projectId+descriptorHash`；orphan pool quarantine；transport 仅 stdio/streamable-http（sse fail-closed） |
-| `RdxRuntimeContextRegistry` | 仅 per-session RDX context lease；无 global mirror |
+| `RdcRuntimeContextRegistry` | 仅 per-session RDC context lease；无 global mirror |
 | `LoopRuntimeState` | Agent 工具面 COW；每轮读 `runtime.current` |
 | `LoopProgressGuard` | 检测相同工具轮次无进展；第二轮纠偏、第三轮 typed termination；runtime revision 变化即复位 |
 
@@ -113,7 +113,7 @@ Agent loop 终止与 Provider 失败互斥：`AGENT_NO_PROGRESS` → `CONVERSATI
 
 ## Tools 与 Permission（执行侧）
 
-Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（49 ids，含 `shell` / `read_image` / `code_interpreter` / `artifact_read` / `rdx_probe`、五个 deferred `knowledge_*` 与三个 deferred `investigation_*`）。Manifest token 经 `CANONICAL_TOOL_TOKEN_EXPANSIONS` 展开（`read` 含 `read_file`+`read_image`+`artifact_read`，`knowledge` 含五个 Knowledge 工具，`investigation` 含三个 Investigation 工具，`interpreter`/`image`/`shell` 为专用 token）；`REJECTED_TOOL_TOKENS` 拒绝无静默 fallback（含旧 token `bash`）。
+Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（49 ids，含 `shell` / `read_image` / `code_interpreter` / `artifact_read` / `rdc_probe`、五个 deferred `knowledge_*` 与三个 deferred `investigation_*`）。Manifest token 经 `CANONICAL_TOOL_TOKEN_EXPANSIONS` 展开（`read` 含 `read_file`+`read_image`+`artifact_read`，`knowledge` 含五个 Knowledge 工具，`investigation` 含三个 Investigation 工具，`interpreter`/`image`/`shell` 为专用 token）；`REJECTED_TOOL_TOKENS` 拒绝无静默 fallback（含旧 token `bash`）。
 
 `read_image` 在 `visionInputMode !== 'native'` 时 `VISION_INPUT_UNSUPPORTED`。tool-result 图像由 `ContextManager.convertToLlm` 剥出并桥成紧随的 user image part；UI 缩略图只走 session `image-previews` + `conversation:getToolImagePreview`，禁止把大 base64 写入 `resultPreview`。`code_interpreter` 执行 Settings 配置的外部解释器，未启用 fail-closed。
 
@@ -125,7 +125,7 @@ Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only
 
 执行前：`toolValidator.validate`；失败 → `TOOL_SCHEMA_VIOLATION`。`CompiledPolicy.deniedTools` 进入 Permission + Executor。非法 policy → fail-closed。
 
-同轮工具并发：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。`ConcurrentToolScheduler` 只并发**连续**安全组；`shell` / write / task mutation / RDX（含 `rdx_probe`） / MCP / ask / handoff / `output_register` 与需要 RDX lease 的 `subagent` 一律串行。offline `subagent` 不请求 `domainExtensions.rdx`，且 **在 allowlist 层**就不能拿到 `rdx_context` / `rdx_probe` / `shell` 中的 RDX 路径。`domainExtensions.rdx.requiresLease=true` 的 child 必须经显式、受限、生命周期绑定的 delegated lease 取得 parent 上下文并串行。禁止并发 RDX 双 owner。`callIndex` 稳定回填。`reserveDispatchBudget` 在 dispatch 前原子扣减 `maxToolCalls` / `maxSubagents` / wall clock；失败整组不开。组内部分失败不连坐已发出调用，但不得继续开新组。abort 必须 `Promise.allSettled` join。
+同轮工具并发：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。`ConcurrentToolScheduler` 只并发**连续**安全组；`shell` / write / task mutation / RDC（含 `rdc_probe`） / MCP / ask / handoff / `output_register` 与需要 RDC lease 的 `subagent` 一律串行。offline `subagent` 不请求 `domainExtensions.rdc`，且 **在 allowlist 层**就不能拿到 `rdc_context` / `rdc_probe` / `shell` 中的 RDC 路径。`domainExtensions.rdc.requiresLease=true` 的 child 必须经显式、受限、生命周期绑定的 delegated lease 取得 parent 上下文并串行。禁止并发 RDC 双 owner。`callIndex` 稳定回填。`reserveDispatchBudget` 在 dispatch 前原子扣减 `maxToolCalls` / `maxSubagents` / wall clock；失败整组不开。组内部分失败不连坐已发出调用，但不得继续开新组。abort 必须 `Promise.allSettled` join。
 
 `subagent` 只接受有界 Delegation Capsule：goal/task/scope、带 sourceRefs/qualification 的 acceptedFacts、hypotheses、challengeRefs、带理由/适用/重验条件的 negativePaths、inputArtifactRefs、outputRequirements、stopConditions、requiredSkillIds 和 budget；可选 domainExtensions 仅申请能力。缺字段、超限或非法引用 fail-closed。compiler 只向 system PromptPlan 加入 runtime 编写的解释规则，完整 Capsule 数据进入隔离子执行的 user 输入，不复制父历史。必需 Skill 在 prepareTurn 预载并冻结。
 
@@ -147,7 +147,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 ## Hooks
 
-唯一引擎是 `HookEngine`。分发根：`resources/agent-runtime/hooks`（builtin）< `~/.rdx/hooks` < `<project>/.rdx/hooks`，与 `ScopedResourceResolver` 同序。Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity；任一变化 → `needsRetrust`。builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。接线事件（12 canonical）：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。禁止第二套 `AgentHooks`。
+唯一引擎是 `HookEngine`。分发根：`resources/agent-runtime/hooks`（builtin）< `~/.rdc-agent/hooks` < `<project>/.rdc-agent/hooks`，与 `ScopedResourceResolver` 同序。Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity；任一变化 → `needsRetrust`。builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。接线事件（12 canonical）：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。禁止第二套 `AgentHooks`。
 
 ## Declared Continue and Execution Offer
 
@@ -157,11 +157,11 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 `send: true` 只表示点完后预填并自动发送。失败提示并留草稿，迟到结果不得写进别的 session。手动改 Composer Agent pill 不写 offer、不预载调查 Skill。prepareTurn 仅当本回合 `agentId === targetAgentId` 且 session 批准计划与 offer 同 hash 时，把声明 `requiredSkillIds` 并入 PromptPlan preload。`handoff` / `agent` / `agent_handoff` token 拒绝。
 
-## RDX / Capture
+## RDC / Capture
 
-无内置 RDX toolchain。Settings `tooling.rdxCli` 必须配对同安装捆绑 Python 与 `cli/run_cli.py`。General 的 `shell.rdx`、主进程固定 open/remote/close 生命周期及 Live RDC mutate 经原生调用边界直接执行冻结 Python argv，并校验 exclusive lease；`shell.command` 不得调用 RDX，UI 不恢复旧 shell action 或 human-preview 入口。Mission planner 禁止 `shell` 与 `code_interpreter`，只通过受控只读 `rdx_probe` + `rdx_context` 访问 RDX（见 `DESIGN.md` 裁决 J）；probe 同样使用已验证绑定。仓库不硬编码本机安装路径。已打开 `.rdc` 由 `ownerSessionId` 拥有，不匹配 fail-closed；Local + Android-origin capture 不得静默 fallback remote。
+无内置 RDC toolchain。Settings `tooling.rdcCli` 必须配对同安装捆绑 Python 与 `cli/run_cli.py`。General 的 `shell.rdc`、主进程固定 open/remote/close 生命周期及 Live RDC mutate 经原生调用边界直接执行冻结 Python argv，并校验 exclusive lease；`shell.command` 不得调用 RDC，UI 不恢复旧 shell action 或 human-preview 入口。Mission planner 禁止 `shell` 与 `code_interpreter`，只通过受控只读 `rdc_probe` + `rdc_context` 访问 RDC（见 `DESIGN.md` 裁决 J）；probe 同样使用已验证绑定。仓库不硬编码本机安装路径。已打开 `.rdc` 由 `ownerSessionId` 拥有，不匹配 fail-closed；Local + Android-origin capture 不得静默 fallback remote。
 
-RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）。禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext` 全局 API；工具路径经 `assertRdxContextLeaseOwnership`，不得回退 parent。parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease；child 结束经实际停止确认后 `revokeDelegatedLease`；未确认时父资源保持隔离。未请求 `domainExtensions.rdx` 的 child 在 allowlist 编译期不得看到 `rdx_context` / `rdx_probe`。
+RDC runtime context 仅绑定 per-session lease（`RdcRuntimeContextRegistry`）。禁止恢复 `legacyGlobalMirror` / `getRdcRuntimeContext` 全局 API；工具路径经 `assertRdcContextLeaseOwnership`，不得回退 parent。parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease；child 结束经实际停止确认后 `revokeDelegatedLease`；未确认时父资源保持隔离。未请求 `domainExtensions.rdc` 的 child 在 allowlist 编译期不得看到 `rdc_context` / `rdc_probe`。
 
 ## Model Capability（摘要）
 
@@ -171,7 +171,7 @@ RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）
 
 - `src/main/workflow/debugger/` — Orchestrator façade、TurnCoordinator、DeferredTools
 - `src/main/agent-runtime/EffectiveRuntimePlan.ts` — schemaVersion 3 冻结 plan
-- `src/main/sessions/RdxRuntimeContextRegistry.ts` — per-session RDX lease
+- `src/main/sessions/RdcRuntimeContextRegistry.ts` — per-session RDC lease
 - `src/main/runtime/ProcessSupervisor.ts`、`src/main/lifecycle/ShutdownCoordinator.ts`
 - `src/main/agent-runtime/` — prompt、providers、permissions、tools
 - `src/main/conversation/` — Conversation、journal、Work Process 策略
@@ -184,7 +184,7 @@ General 为默认通用工作身份。核心正文只负责可信上下文、授
 
 Plan 经 session artifact plans 类别版本化：同意前覆盖 `session://plans/plan.md`，同意后冻结 `plan-<ISO>-<hash8>.md`，历史文件不迁移或删除。批准写入 execution offer；prepareTurn 仅当 hash 与 target 匹配时预载声明 Skill。通用 turn 仅调用 TurnCompletionValidator。Big Loop 由 General 终答写缺口、用户切回 Mission、新计划、再批准、再点 Execute 组成；runtime 不按身份 / depth / 正文开下一轮。 Mission 额度耗尽但未完成时可通过 `budget_paused` 结束 turn，绝不提升领域报告状态。
 
-普通 Capsule 省略领域扩展且没有 RDX Lease prompt 段；仅 RDX 模块接受 domainExtensions.rdx.requiresLease=true 并注入租约上下文。缺省无 RDX；同一 live context 的租约独占覆盖完整子执行区间，其他安全工作仍可并行；finally 撤销须携带停止证明，否则隔离父资源；旧顶层字段拒绝，不保留双轨。
+普通 Capsule 省略领域扩展且没有 RDC Lease prompt 段；仅 RDC 模块接受 domainExtensions.rdc.requiresLease=true 并注入租约上下文。缺省无 RDC；同一 live context 的租约独占覆盖完整子执行区间，其他安全工作仍可并行；finally 撤销须携带停止证明，否则隔离父资源；旧顶层字段拒绝，不保留双轨。
 
 
 ### Harness / 领域与上下文边界（2026-09-09 收敛）
@@ -195,7 +195,7 @@ Plan 经 session artifact plans 类别版本化：同意前覆盖 `session://pla
 
 Compact 使用原始 Journal、Task/执行记录及应用层组装的领域记录，不由通用 compactor 猜测调查步骤。压缩前保存可按行读取的分块 JSON 权威 Checkpoint，模型只看到有界权威记录与原始文本；不逐条截去长消息尾部。保存失败、hash 复核失败或原始输入超过安全界限时保留原 view，禁止静默丢失。原始图像/测量产物按 URI/hash 保留，摘要须保留来源资格、适用条件和反证的重验条件。
 
-RDX delegated lease 暂停父控制权，父级 rebind/clear/close 必须先 join；原生结果不确定时隔离匹配版本，迟到失败不得隔离新版本。CLI 进程未观察 close 继续跟踪，相关 context 恢复受阻；观察实际 close 后可进入原有 capture close/open 验证并重新 prepareTurn。重开只恢复绑定，不证明实验 rollback。
+RDC delegated lease 暂停父控制权，父级 rebind/clear/close 必须先 join；原生结果不确定时隔离匹配版本，迟到失败不得隔离新版本。CLI 进程未观察 close 继续跟踪，相关 context 恢复受阻；观察实际 close 后可进入原有 capture close/open 验证并重新 prepareTurn。重开只恢复绑定，不证明实验 rollback。
 
 
 ### Task 执行、消息与资源生命周期
@@ -247,6 +247,6 @@ Task 状态文件的提交保持同一候选文件与原子 rename。短暂 EPER
 
 ## 专用工具路由与读取前置
 
-文件路由表独立于灾难 shellHardDeny 表，均在权限模式和自定义允许前缀之前求值；Full access 不能绕过。有效工具集合有对应工具时，shell.command 文件读写/搜索返回 SHELL_FILE_TOOL_BYPASS，命令行 RDX 返回 RDX_VIA_COMMAND_DENIED。edit_file 和覆盖已有文件的 write_file 必须先在同一 session 成功 read_file 同一 realpath，否则 READ_BEFORE_EDIT_REQUIRED。已读状态跨 turn、仅内存持有，重启须重读；子 session 不继承。新建文件免先读。
+文件路由表独立于灾难 shellHardDeny 表，均在权限模式和自定义允许前缀之前求值；Full access 不能绕过。有效工具集合有对应工具时，shell.command 文件读写/搜索返回 SHELL_FILE_TOOL_BYPASS，命令行 RDC 返回 RDC_VIA_COMMAND_DENIED。edit_file 和覆盖已有文件的 write_file 必须先在同一 session 成功 read_file 同一 realpath，否则 READ_BEFORE_EDIT_REQUIRED。已读状态跨 turn、仅内存持有，重启须重读；子 session 不继承。新建文件免先读。
 
-Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDX_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。
+Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDC_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。

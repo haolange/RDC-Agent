@@ -3,7 +3,7 @@ import { ipcMain } from 'electron';
 import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
 import type { OpenProjectInputRequest, SessionScope, SessionScopedPayload } from '@shared/types/session';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
-import { rdxSessionService } from '../sessions';
+import { rdcSessionService } from '../sessions';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
@@ -29,7 +29,7 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
     if (storageAdapter.readSession(scope.sessionId)?.projectId !== scope.projectId) throw new Error('REPLAY_SCOPE_DENIED');
   };
   const lastReplayHint = new Map<string, { phase: string; contextId: string | null; imageEventId: number | null }>();
-  rdxSessionService.subscribe(state => {
+  rdcSessionService.subscribe(state => {
     context.broadcastToRenderer('capture:replayChanged', state);
     const previous = lastReplayHint.get(state.sessionId);
     lastReplayHint.set(state.sessionId, { phase: state.phase, contextId: state.contextId, imageEventId: state.imageEventId });
@@ -42,34 +42,34 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
   ipcMain.handle('capture:getReplayState', (_event, ...rawArgs: unknown[]) => {
     const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, { label: 'capture:getReplayState', maxBytes: 1024 });
     authorizeReplayScope(scope);
-    return rdxSessionService.snapshotReplayForSession(scope);
+    return rdcSessionService.snapshotReplayForSession(scope);
   });
   ipcMain.handle('capture:refreshFrame', (_event, ...rawArgs: unknown[]) => {
     const [scope] = parseIpcArgs(CaptureReplayBindingArgsSchema, rawArgs, { label: 'capture:refreshFrame', maxBytes: 1024 });
     authorizeReplayScope(scope);
-    return rdxSessionService.refreshFrameForSession(scope);
+    return rdcSessionService.refreshFrameForSession(scope);
   });
   ipcMain.handle('capture:applyReplayEvent', (_event, ...rawArgs: unknown[]) => {
     const [request] = parseIpcArgs(CaptureReplayApplyArgsSchema, rawArgs, { label: 'capture:applyReplayEvent', maxBytes: 4096 });
     authorizeReplayScope(request);
-    return rdxSessionService.applyEventForSession(request);
+    return rdcSessionService.applyEventForSession(request);
   });
-  const broadcastContext = (scope: SessionScope, payload: ReturnType<typeof rdxSessionService.snapshotContextForSession>) => {
+  const broadcastContext = (scope: SessionScope, payload: ReturnType<typeof rdcSessionService.snapshotContextForSession>) => {
     context.broadcastToRenderer('context:changed', envelope(scope, payload));
     traceProjectionRefreshService.schedule(scope.sessionId);
   };
-  const broadcastOpenedCapture = (scope: SessionScope, payload: ReturnType<typeof rdxSessionService.snapshotOpenedCaptureForSession>) => {
+  const broadcastOpenedCapture = (scope: SessionScope, payload: ReturnType<typeof rdcSessionService.snapshotOpenedCaptureForSession>) => {
     context.broadcastToRenderer('capture:openedStateChanged', envelope(scope, payload));
   };
 
   ipcMain.handle('context:get', async (_event, ...rawArgs: unknown[]) => {
     const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, { label: 'context:get', maxBytes: 1024 });
-    return rdxSessionService.snapshotContextForSession(scope);
+    return rdcSessionService.snapshotContextForSession(scope);
   });
 
   ipcMain.handle('capture:list', async (_event, ...rawArgs: unknown[]) => {
     const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, { label: 'capture:list', maxBytes: 1024 });
-    return { captures: rdxSessionService.snapshotContextForSession(scope)?.captureDescriptors ?? [] };
+    return { captures: rdcSessionService.snapshotContextForSession(scope)?.captureDescriptors ?? [] };
   });
 
   ipcMain.handle('capture:openProjectInput', async (_event, ...rawArgs: unknown[]) => {
@@ -101,7 +101,7 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
         projectId: request.projectId,
         raw: { inputId: request.inputId, replayDeviceId: request.replayDeviceId },
       });
-      const openedCapture = await rdxSessionService.openProjectInput({
+      const openedCapture = await rdcSessionService.openProjectInput({
         projectId: request.projectId,
         sessionId: request.sessionId,
         inputId: input.inputId,
@@ -109,7 +109,7 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
         replayDevice,
       }, { expectedGeneration: request.bindingGeneration });
       const scope: SessionScope = { projectId: request.projectId, sessionId: request.sessionId };
-      const contextSnapshot = rdxSessionService.snapshotContextForSession(scope);
+      const contextSnapshot = rdcSessionService.snapshotContextForSession(scope);
       broadcastOpenedCapture(scope, openedCapture);
       broadcastContext(scope, contextSnapshot);
       runtimeLogService.log({
@@ -124,15 +124,15 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
         raw: {
           inputId: openedCapture.inputId,
           contextId: openedCapture.contextId,
-          captureHash: rdxSessionService.snapshotReplayForSession(scope).captureHash,
+          captureHash: rdcSessionService.snapshotReplayForSession(scope).captureHash,
         },
       });
       return { success: true, openedCapture, contextSnapshot };
     } catch (error) {
       const scope = request ? { projectId: request.projectId, sessionId: request.sessionId } : null;
       if (scope) {
-        broadcastOpenedCapture(scope, rdxSessionService.snapshotOpenedCaptureForSession(scope));
-        broadcastContext(scope, rdxSessionService.snapshotContextForSession(scope));
+        broadcastOpenedCapture(scope, rdcSessionService.snapshotOpenedCaptureForSession(scope));
+        broadcastContext(scope, rdcSessionService.snapshotContextForSession(scope));
       }
       runtimeLogService.log({
         scope: 'session',
@@ -150,13 +150,13 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
 
   ipcMain.handle('capture:getOpenedState', async (_event, ...rawArgs: unknown[]) => {
     const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, { label: 'capture:getOpenedState', maxBytes: 1024 });
-    return rdxSessionService.snapshotOpenedCaptureForSession(scope);
+    return rdcSessionService.snapshotOpenedCaptureForSession(scope);
   });
 
   ipcMain.handle('capture:clearOpenedState', async (_event, ...rawArgs: unknown[]) => {
     const [scope] = parseIpcArgs(CaptureReplayBindingArgsSchema, rawArgs, { label: 'capture:clearOpenedState', maxBytes: 1024 });
-    const cleared = await rdxSessionService.clearOpenedCaptureForSession(scope, { expectedGeneration: scope.bindingGeneration });
-    if (!cleared) return { success: false, error: 'No RDX context is owned by this session.' };
+    const cleared = await rdcSessionService.clearOpenedCaptureForSession(scope, { expectedGeneration: scope.bindingGeneration });
+    if (!cleared) return { success: false, error: 'No RDC context is owned by this session.' };
     broadcastOpenedCapture(scope, null);
     broadcastContext(scope, null);
     runtimeLogService.log({
@@ -164,7 +164,7 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
       namespace: 'capture',
       severity: 'info',
       title: 'Opened capture cleared',
-      summary: 'The session-owned RDX context was cleared.',
+      summary: 'The session-owned RDC context was cleared.',
       sessionId: scope.sessionId,
       projectId: scope.projectId,
     });
@@ -175,13 +175,13 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
     try {
       const [request] = parseIpcArgs(CaptureSelectArgsSchema, rawArgs, { label: 'capture:select', maxBytes: 4 * 1024 });
       const scope: SessionScope = { projectId: request.projectId, sessionId: request.sessionId };
-      const snapshot = rdxSessionService.snapshotContextForSession(scope);
+      const snapshot = rdcSessionService.snapshotContextForSession(scope);
       if (!snapshot?.captureDescriptors.some((capture) => capture.id === request.captureId)) {
         return { success: false, error: 'Capture is not owned by this session.' };
       }
-      await rdxSessionService.switchActiveCapture(request, request.captureId);
+      await rdcSessionService.switchActiveCapture(request, request.captureId);
       context.broadcastToRenderer('capture:statusChanged', envelope(scope, { captureId: request.captureId, status: 'selected' }));
-      broadcastContext(scope, rdxSessionService.snapshotContextForSession(scope));
+      broadcastContext(scope, rdcSessionService.snapshotContextForSession(scope));
       return { success: true };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };

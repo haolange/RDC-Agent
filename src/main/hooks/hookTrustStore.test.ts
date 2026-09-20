@@ -10,7 +10,7 @@ import {
 
 const roots: string[] = [];
 const makeRoot = () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-hook-trust-store-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-hook-trust-store-'));
   roots.push(root);
   return root;
 };

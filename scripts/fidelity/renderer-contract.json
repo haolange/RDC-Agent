@@ -121,7 +121,7 @@
     "settings.runtimeScopeActions": "src/renderer/features/settings/SettingsModal/sections/runtimeScopeActions.ts",
     "settings.scopedResourceForm": "src/renderer/features/settings/SettingsModal/sections/scopedResourceForm.ts",
     "settings.toolsSettings": "src/renderer/features/settings/SettingsModal/sections/ToolsSettings.tsx",
-    "settings.rdxCliInvokerSettingsFields": "src/renderer/features/settings/SettingsModal/sections/RdxCliInvokerSettingsFields.tsx",
+    "settings.rdcCliInvokerSettingsFields": "src/renderer/features/settings/SettingsModal/sections/RdcCliInvokerSettingsFields.tsx",
     "settings.mcpServicesPanel": "src/renderer/features/settings/SettingsModal/sections/McpServicesPanel.tsx",
     "settings.policySettings": "src/renderer/features/settings/SettingsModal/sections/PolicySettings.tsx",
     "settings.generalSettings": "src/renderer/features/settings/SettingsModal/sections/GeneralSettings.tsx",
@@ -161,7 +161,7 @@
     "captureReplayFrame": "src/renderer/features/right-rail/CaptureFrame.tsx",
     "captureReplayHistory": "src/renderer/features/right-rail/CaptureHistory.tsx",
     "captureReplayCss": "src/renderer/features/right-rail/CaptureReplay.css",
-    "rdxSessionService": "src/main/sessions/RdxSessionService.ts"
+    "rdcSessionService": "src/main/sessions/RdcSessionService.ts"
   },
   "retired": [
     "src/renderer/styles/themes/oklch-themes.css",
@@ -205,7 +205,7 @@
     "src/renderer/features/right-rail/ControlPanel.css",
     "src/renderer/features/right-rail/MemoryPanel.tsx",
     "src/renderer/features/right-rail/PlanArtifactPreview.tsx",
-    "src/renderer/features/right-rail/RdxRuntimeContextPanel.tsx",
+    "src/renderer/features/right-rail/RdcRuntimeContextPanel.tsx",
     "src/renderer/features/right-rail/SessionCapabilitiesPanel.tsx",
     "src/renderer/features/right-rail/SessionControlPanel.tsx",
     "src/renderer/features/right-rail/SessionProgressPanel.tsx",

@@ -15,32 +15,32 @@ export function createMemoryApi(transport: RendererApiTransport): MemoryApi {
   };
 }
 
-export function createRdxRuntimeApi(transport: RendererApiTransport): ElectronAPI['rdxRuntime'] {
+export function createRdcRuntimeApi(transport: RendererApiTransport): ElectronAPI['rdcRuntime'] {
   return {
-    getOverview: (projectRoot) => transport.invoke(INVOKE.rdxRuntime.getOverview, ...(projectRoot === undefined ? [] : [projectRoot])),
-    validateResource: (request) => transport.invoke(INVOKE.rdxRuntime.validateResource, request),
-    upsertResource: (request) => transport.invoke(INVOKE.rdxRuntime.upsertResource, request),
-    importResource: (request) => transport.invoke(INVOKE.rdxRuntime.importResource, request),
+    getOverview: (projectRoot) => transport.invoke(INVOKE.rdcRuntime.getOverview, ...(projectRoot === undefined ? [] : [projectRoot])),
+    validateResource: (request) => transport.invoke(INVOKE.rdcRuntime.validateResource, request),
+    upsertResource: (request) => transport.invoke(INVOKE.rdcRuntime.upsertResource, request),
+    importResource: (request) => transport.invoke(INVOKE.rdcRuntime.importResource, request),
     deleteResource: (kind, scope, id, projectRoot) => (
-      transport.invoke(INVOKE.rdxRuntime.deleteResource, kind, scope, id, ...(projectRoot === undefined ? [] : [projectRoot]))
+      transport.invoke(INVOKE.rdcRuntime.deleteResource, kind, scope, id, ...(projectRoot === undefined ? [] : [projectRoot]))
     ),
-    revealResource: (sourcePath) => transport.invoke(INVOKE.rdxRuntime.revealResource, sourcePath),
-    trustHook: (projectRoot, hookId) => transport.invoke(INVOKE.rdxRuntime.trustHook, projectRoot, hookId),
-    revokeHook: (projectRoot, hookId) => transport.invoke(INVOKE.rdxRuntime.revokeHook, projectRoot, hookId),
+    revealResource: (sourcePath) => transport.invoke(INVOKE.rdcRuntime.revealResource, sourcePath),
+    trustHook: (projectRoot, hookId) => transport.invoke(INVOKE.rdcRuntime.trustHook, projectRoot, hookId),
+    revokeHook: (projectRoot, hookId) => transport.invoke(INVOKE.rdcRuntime.revokeHook, projectRoot, hookId),
     trustMcp: (projectRoot, descriptorId) => (
-      transport.invoke(INVOKE.rdxRuntime.trustMcp, projectRoot, descriptorId)
+      transport.invoke(INVOKE.rdcRuntime.trustMcp, projectRoot, descriptorId)
     ),
     revokeMcp: (projectRoot, descriptorId) => (
-      transport.invoke(INVOKE.rdxRuntime.revokeMcp, projectRoot, descriptorId)
+      transport.invoke(INVOKE.rdcRuntime.revokeMcp, projectRoot, descriptorId)
     ),
     testHook: (event, projectRoot, hookId) => (
-      transport.invoke(INVOKE.rdxRuntime.testHook, event, projectRoot, hookId)
+      transport.invoke(INVOKE.rdcRuntime.testHook, event, projectRoot, hookId)
     ),
     listRequestSnapshots: (sessionId, turnId) => (
-      transport.invoke(INVOKE.rdxRuntime.listRequestSnapshots, sessionId, turnId)
+      transport.invoke(INVOKE.rdcRuntime.listRequestSnapshots, sessionId, turnId)
     ),
     getRequestSnapshot: (sessionId, turnId, snapshotId) => (
-      transport.invoke(INVOKE.rdxRuntime.getRequestSnapshot, sessionId, turnId, snapshotId)
+      transport.invoke(INVOKE.rdcRuntime.getRequestSnapshot, sessionId, turnId, snapshotId)
     ),
   };
 }

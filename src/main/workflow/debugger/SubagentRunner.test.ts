@@ -12,7 +12,7 @@ vi.mock('../../settings/SettingsService', () => ({
   settingsService: {
     getAll: () => ({
       agents: { definitions: [] },
-      paths: { userRdxRoot: 'C:/tmp/rdc-agent-test', projectRdxRoot: 'C:/tmp/rdc-agent-test/projects' },
+      paths: { userRdcRoot: 'C:/tmp/rdc-agent-test', projectRdcRoot: 'C:/tmp/rdc-agent-test/projects' },
       llm: { providers: [], agentRoutes: [] },
     }),
   },
@@ -48,12 +48,12 @@ import { SubagentRunner } from './SubagentRunner';
 import { createSubagentBudgetState, createPolicyBudgetState, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import {
-  assertRdxContextLeaseOwnership,
-  clearRdxContextLeases,
-  getRdxContextLease,
-  setRdxRuntimeContextForSession,
-} from '../../sessions/RdxRuntimeContextRegistry';
-import type { RdxRuntimeContext } from '@shared/types/session';
+  assertRdcContextLeaseOwnership,
+  clearRdcContextLeases,
+  getRdcContextLease,
+  setRdcRuntimeContextForSession,
+} from '../../sessions/RdcRuntimeContextRegistry';
+import type { RdcRuntimeContext } from '@shared/types/session';
 
 function testCapsule(overrides: Partial<DelegationCapsule> = {}): DelegationCapsule {
   return {
@@ -379,32 +379,32 @@ describe('SubagentRunner', () => {
         extraPromptSegments: expect.arrayContaining([
           expect.objectContaining({ kind: 'delegation-capsule', id: 'delegation:contract' }),
         ]),
-        excludeRdxLeaseTools: true,
+        excludeRdcLeaseTools: true,
         frozenDelegationCapsule: expect.objectContaining({}),
       }),
     );
   });
 
   it('grants a delegated lease before the child turn and revokes it after', async () => {
-    clearRdxContextLeases();
-    setRdxRuntimeContextForSession('parent', {
+    clearRdcContextLeases();
+    setRdcRuntimeContextForSession('parent', {
       contextId: 'ctx-live',
       runtimeOwner: 'local',
       ownerLeaseId: 'lease:live',
       backend: 'local',
       updatedAt: Date.now(),
       captureId: 'cap-live',
-    } satisfies RdxRuntimeContext, { projectId: 'proj-1' });
+    } satisfies RdcRuntimeContext, { projectId: 'proj-1' });
     let childSessionId = '';
     const runner = new SubagentRunner({
       sendProfileMessage: async (_agentId, _content, options) => {
         childSessionId = options?.sessionId ?? '';
-        expect(assertRdxContextLeaseOwnership({
+        expect(assertRdcContextLeaseOwnership({
           sessionId: childSessionId,
           projectId: 'proj-1',
         })?.contextId).toBe('ctx-live');
-        expect(options?.excludeRdxLeaseTools).toBe(false);
-        return 'used rdx';
+        expect(options?.excludeRdcLeaseTools).toBe(false);
+        return 'used rdc';
       },
       systemPromptForAgent: () => 'fallback',
       getActiveTurn: () => null,
@@ -422,32 +422,32 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      capsule: testCapsule({ domainExtensions: { rdx: { requiresLease: true } } }),
+      capsule: testCapsule({ domainExtensions: { rdc: { requiresLease: true } } }),
       parentSessionId: 'parent',
       projectId: 'proj-1',
       parentTurn,
     });
     expect(result.status).toBe('complete');
     expect(childSessionId).toContain('::subagent::');
-    expect(getRdxContextLease(childSessionId)).toBeNull();
-    expect(getRdxContextLease('parent')?.contextId).toBe('ctx-live');
-    clearRdxContextLeases();
+    expect(getRdcContextLease(childSessionId)).toBeNull();
+    expect(getRdcContextLease('parent')?.contextId).toBe('ctx-live');
+    clearRdcContextLeases();
   });
 
   it('revokes the delegated lease when the child throws', async () => {
-    clearRdxContextLeases();
-    setRdxRuntimeContextForSession('parent', {
+    clearRdcContextLeases();
+    setRdcRuntimeContextForSession('parent', {
       contextId: 'ctx-live',
       runtimeOwner: 'local',
       ownerLeaseId: 'lease:live',
       backend: 'local',
       updatedAt: Date.now(),
-    } satisfies RdxRuntimeContext, { projectId: 'proj-1' });
+    } satisfies RdcRuntimeContext, { projectId: 'proj-1' });
     let childSessionId = '';
     const runner = new SubagentRunner({
       sendProfileMessage: async (_agentId, _content, options) => {
         childSessionId = options?.sessionId ?? '';
-        expect(getRdxContextLease(childSessionId)?.delegatedFrom).toBe('parent');
+        expect(getRdcContextLease(childSessionId)?.delegatedFrom).toBe('parent');
         throw new Error('child boom');
       },
       systemPromptForAgent: () => 'fallback',
@@ -457,7 +457,7 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      capsule: testCapsule({ domainExtensions: { rdx: { requiresLease: true } } }),
+      capsule: testCapsule({ domainExtensions: { rdc: { requiresLease: true } } }),
       parentSessionId: 'parent',
       projectId: 'proj-1',
       parentTurn: {
@@ -471,13 +471,13 @@ describe('SubagentRunner', () => {
     });
     expect(result.status).toBe('failed');
     expect(result.text).toBe('child boom');
-    expect(getRdxContextLease(childSessionId)).toBeNull();
-    expect(getRdxContextLease('parent')?.contextId).toBe('ctx-live');
-    clearRdxContextLeases();
+    expect(getRdcContextLease(childSessionId)).toBeNull();
+    expect(getRdcContextLease('parent')?.contextId).toBe('ctx-live');
+    clearRdcContextLeases();
   });
 
-  it('fail-closes a lease-holding child when the parent has no RDX lease', async () => {
-    clearRdxContextLeases();
+  it('fail-closes a lease-holding child when the parent has no RDC lease', async () => {
+    clearRdcContextLeases();
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
     const runner = new SubagentRunner({
       sendProfileMessage,
@@ -488,7 +488,7 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      capsule: testCapsule({ domainExtensions: { rdx: { requiresLease: true } } }),
+      capsule: testCapsule({ domainExtensions: { rdc: { requiresLease: true } } }),
       parentSessionId: 'parent',
       projectId: 'proj-1',
       parentTurn: {
@@ -501,7 +501,7 @@ describe('SubagentRunner', () => {
       } as unknown as TurnHandle,
     });
     expect(result.status).toBe('failed');
-    expect(result.text).toMatch(/RDX_LEASE_DELEGATE_DENIED/);
+    expect(result.text).toMatch(/RDC_LEASE_DELEGATE_DENIED/);
     expect(sendProfileMessage).not.toHaveBeenCalled();
   });
 });

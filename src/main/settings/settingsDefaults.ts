@@ -5,7 +5,7 @@ import type {
   AgentRuntimeSettings,
   LayoutPreferences,
   ProfileSettings,
-  RdxCliInvokerSettings,
+  RdcCliInvokerSettings,
   AgentShellSettings,
   CodeInterpreterSettings,
   ToolingSettings,
@@ -40,7 +40,7 @@ export interface PersistedSettingsPayload {
     providers?: PersistedLlmProviderEntry[];
   };
   tooling?: {
-    rdxCli?: Partial<RdxCliInvokerSettings>;
+    rdcCli?: Partial<RdcCliInvokerSettings>;
     codeInterpreter?: Partial<CodeInterpreterSettings>;
     shell?: Partial<AgentShellSettings>;
   };
@@ -67,7 +67,7 @@ export const RIGHT_DEFAULTS = {
 export const VALID_PERMISSION_MODES: AgentPermissionMode[] = ['default', 'auto-review', 'full-access', 'custom'];
 
 export const EMPTY_PATHS: AppRuntimePaths = {
-  userRdxRoot: '',
+  userRdcRoot: '',
   settingsPath: '',
   instructionsPath: '',
   agentsPath: '',
@@ -112,7 +112,7 @@ export const DEFAULT_PROFILE: ProfileSettings = {
   avatarPath: '',
 };
 
-export const DEFAULT_RDX_CLI_INVOKER: RdxCliInvokerSettings = {
+export const DEFAULT_RDC_CLI_INVOKER: RdcCliInvokerSettings = {
   enabled: false,
   command: '',
   argsPrefix: [],
@@ -135,7 +135,7 @@ export const DEFAULT_SHELL_TOOLING: AgentShellSettings = {
 };
 
 export const DEFAULT_TOOLING: ToolingSettings = {
-  rdxCli: DEFAULT_RDX_CLI_INVOKER,
+  rdcCli: DEFAULT_RDC_CLI_INVOKER,
   codeInterpreter: DEFAULT_CODE_INTERPRETER,
   shell: DEFAULT_SHELL_TOOLING,
 };

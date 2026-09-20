@@ -2,23 +2,23 @@
 
 <cite>
 **本文引用的文件**
-- [RdxCliInvokerService.ts](file://src/main/tools/RdxCliInvokerService.ts)
+- [RdcCliInvokerService.ts](file://src/main/tools/RdcCliInvokerService.ts)
 - [ShellInvocationService.ts](file://src/main/tools/ShellInvocationService.ts)
-- [RdxNativeProtocol.ts](file://src/main/tools/RdxNativeProtocol.ts)
-- [RdxProbeLifecycle.ts](file://src/main/tools/RdxProbeLifecycle.ts)
-- [executeRdxShell.ts](file://src/main/tools/executeRdxShell.ts)
-- [RdxTurnBindings.ts](file://src/main/tools/RdxTurnBindings.ts)
-- [RdxOperationPolicy.ts](file://src/main/tools/RdxOperationPolicy.ts)
-- [RdxValidatedEvidence.ts](file://src/main/tools/RdxValidatedEvidence.ts)
-- [RdxExecutionReceipts.ts](file://src/main/tools/RdxExecutionReceipts.ts)
+- [RdcNativeProtocol.ts](file://src/main/tools/RdcNativeProtocol.ts)
+- [RdcProbeLifecycle.ts](file://src/main/tools/RdcProbeLifecycle.ts)
+- [executeRdcShell.ts](file://src/main/tools/executeRdcShell.ts)
+- [RdcTurnBindings.ts](file://src/main/tools/RdcTurnBindings.ts)
+- [RdcOperationPolicy.ts](file://src/main/tools/RdcOperationPolicy.ts)
+- [RdcValidatedEvidence.ts](file://src/main/tools/RdcValidatedEvidence.ts)
+- [RdcExecutionReceipts.ts](file://src/main/tools/RdcExecutionReceipts.ts)
 - [ProcessSupervisor.ts](file://src/main/runtime/ProcessSupervisor.ts)
-- [resolveRdxBatchInvocation.ts](file://src/main/tools/resolveRdxBatchInvocation.ts)
+- [resolveRdcBatchInvocation.ts](file://src/main/tools/resolveRdcBatchInvocation.ts)
 </cite>
 
 ## 更新摘要
 **所做更改**
 - 更新了操作目录验证和能力检查机制
-- 移除了RdxShellActionService的引用和相关功能
+- 移除了RdcShellActionService的引用和相关功能
 - 增强了执行收据和签名证据支持系统
 - 更新了安全策略和权限控制机制
 - 改进了文件系统路径验证和沙箱机制
@@ -37,10 +37,10 @@
 
 ## 简介
 本文件面向"CLI调用器"的设计与实现，聚焦以下目标：
-- 解析 RdxCliInvokerService 的外部工具集成机制（配置、参数构建、执行、结果解析）
+- 解析 RdcCliInvokerService 的外部工具集成机制（配置、参数构建、执行、结果解析）
 - 解析 ShellInvocationService 的 shell 执行引擎（进程生命周期、超时、隔离、异常处理）
-- 明确 RdxNativeProtocol 的原生协议定义与校验
-- 说明 RdxProbeLifecycle 的生命周期管理（打开/关闭捕获上下文）
+- 明确 RdcNativeProtocol 的原生协议定义与校验
+- 说明 RdcProbeLifecycle 的生命周期管理（打开/关闭捕获上下文）
 - 解释进程间通信、命令参数构建、结果解析处理
 - 描述安全沙箱机制、权限控制、资源限制实现
 - 包含超时处理、错误重试、日志收集功能
@@ -50,33 +50,33 @@
 
 ## 项目结构
 围绕 CLI 调用器的关键代码位于 src/main/tools 与 src/main/runtime：
-- 工具编排与协议层：RdxCliInvokerService、RdxNativeProtocol、RdxProbeLifecycle、RdxTurnBindings
+- 工具编排与协议层：RdcCliInvokerService、RdcNativeProtocol、RdcProbeLifecycle、RdcTurnBindings
 - 进程执行层：ShellInvocationService、ProcessSupervisor
-- 安全策略层：RdxOperationPolicy、RdxValidatedEvidence、RdxExecutionReceipts
-- 平台适配：resolveRdxBatchInvocation（Windows rdx.bat 启动桥接）
-- 上层入口：executeRdxShell（将 Agent 工具调用映射为原生 rdx 操作）
+- 安全策略层：RdcOperationPolicy、RdcValidatedEvidence、RdcExecutionReceipts
+- 平台适配：resolveRdcBatchInvocation（Windows rdc.bat 启动桥接）
+- 上层入口：executeRdcShell（将 Agent 工具调用映射为原生 rdc 操作）
 
 ```mermaid
 graph TB
 subgraph "工具编排"
-A["RdxCliInvokerService"]
-B["RdxNativeProtocol"]
-C["RdxProbeLifecycle"]
-D["RdxTurnBindings"]
+A["RdcCliInvokerService"]
+B["RdcNativeProtocol"]
+C["RdcProbeLifecycle"]
+D["RdcTurnBindings"]
 end
 subgraph "进程执行"
 E["ShellInvocationService"]
 F["ProcessSupervisor"]
 end
 subgraph "安全策略"
-G["RdxOperationPolicy"]
-H["RdxValidatedEvidence"]
-I["RdxExecutionReceipts"]
+G["RdcOperationPolicy"]
+H["RdcValidatedEvidence"]
+I["RdcExecutionReceipts"]
 end
 subgraph "平台适配"
-J["resolveRdxBatchInvocation"]
+J["resolveRdcBatchInvocation"]
 end
-K["executeRdxShell"]
+K["executeRdcShell"]
 A --> E
 A --> B
 A --> J
@@ -90,63 +90,63 @@ K --> I
 ```
 
 **图表来源**
-- [RdxCliInvokerService.ts:20-333](file://src/main/tools/RdxCliInvokerService.ts#L20-L333)
+- [RdcCliInvokerService.ts:20-333](file://src/main/tools/RdcCliInvokerService.ts#L20-L333)
 - [ShellInvocationService.ts:30-129](file://src/main/tools/ShellInvocationService.ts#L30-L129)
-- [RdxNativeProtocol.ts:3-43](file://src/main/tools/RdxNativeProtocol.ts#L3-L43)
-- [RdxProbeLifecycle.ts:7-42](file://src/main/tools/RdxProbeLifecycle.ts#L7-L42)
-- [RdxOperationPolicy.ts:49-104](file://src/main/tools/RdxOperationPolicy.ts#L49-L104)
-- [executeRdxShell.ts:23-129](file://src/main/tools/executeRdxShell.ts#L23-L129)
+- [RdcNativeProtocol.ts:3-43](file://src/main/tools/RdcNativeProtocol.ts#L3-L43)
+- [RdcProbeLifecycle.ts:7-42](file://src/main/tools/RdcProbeLifecycle.ts#L7-L42)
+- [RdcOperationPolicy.ts:49-104](file://src/main/tools/RdcOperationPolicy.ts#L49-L104)
+- [executeRdcShell.ts:23-129](file://src/main/tools/executeRdcShell.ts#L23-L129)
 
 ## 核心组件
-- **RdxCliInvokerService**：负责读取设置、加载工具目录、构建命令行参数、调用 ShellInvocationService、解析原生协议并产出统一 ToolCallResult。支持 trace 监听、取消信号、超时、工作目录与环境变量注入。
+- **RdcCliInvokerService**：负责读取设置、加载工具目录、构建命令行参数、调用 ShellInvocationService、解析原生协议并产出统一 ToolCallResult。支持 trace 监听、取消信号、超时、工作目录与环境变量注入。
 - **ShellInvocationService**：封装子进程执行，基于 ProcessSupervisor 管理进程树、超时、孤儿进程检测、退出码归一化、stdout/stderr 环形缓冲。
-- **RdxNativeProtocol**：定义并校验原生 rdx 输出信封（ok、result_kind、data），确保上下文一致性，拒绝二进制 stdout。
-- **RdxProbeLifecycle**：复用产品捕获生命周期，严格校验 capture 注册、会话所有权、设备选择与上下文分配，避免任意 context id 租约。
-- **RdxOperationPolicy**：提供操作授权和参数验证，包括文件系统路径验证、虚拟路径检查、编译器标志白名单等安全约束。
-- **RdxValidatedEvidence**：验证执行证据，支持测量、干预和回滚三种证据类型，确保实验场景的可信性。
-- **RdxExecutionReceipts**：生成和验证签名的执行收据，提供完整的审计追踪能力。
-- **resolveRdxBatchInvocation**：在 Windows 上把 rdx.bat 调用桥接到 PowerShell 脚本，附加非交互等标志。
+- **RdcNativeProtocol**：定义并校验原生 rdc 输出信封（ok、result_kind、data），确保上下文一致性，拒绝二进制 stdout。
+- **RdcProbeLifecycle**：复用产品捕获生命周期，严格校验 capture 注册、会话所有权、设备选择与上下文分配，避免任意 context id 租约。
+- **RdcOperationPolicy**：提供操作授权和参数验证，包括文件系统路径验证、虚拟路径检查、编译器标志白名单等安全约束。
+- **RdcValidatedEvidence**：验证执行证据，支持测量、干预和回滚三种证据类型，确保实验场景的可信性。
+- **RdcExecutionReceipts**：生成和验证签名的执行收据，提供完整的审计追踪能力。
+- **resolveRdcBatchInvocation**：在 Windows 上把 rdc.bat 调用桥接到 PowerShell 脚本，附加非交互等标志。
 - **ProcessSupervisor**：统一的子进程注册表，支持进程组隔离、SIGTERM/SIGKILL 优雅终止、超时强制终止、孤儿进程标记、环形缓冲区限流。
-- **executeRdxShell**：Agent 工具到原生 rdx 操作的入口，校验绑定与租约、串行执行、写入签名回执（实验场景）。
+- **executeRdcShell**：Agent 工具到原生 rdc 操作的入口，校验绑定与租约、串行执行、写入签名回执（实验场景）。
 
 **章节来源**
-- [RdxCliInvokerService.ts:20-333](file://src/main/tools/RdxCliInvokerService.ts#L20-L333)
+- [RdcCliInvokerService.ts:20-333](file://src/main/tools/RdcCliInvokerService.ts#L20-L333)
 - [ShellInvocationService.ts:30-129](file://src/main/tools/ShellInvocationService.ts#L30-L129)
-- [RdxNativeProtocol.ts:3-43](file://src/main/tools/RdxNativeProtocol.ts#L3-L43)
-- [RdxProbeLifecycle.ts:7-42](file://src/main/tools/RdxProbeLifecycle.ts#L7-L42)
-- [RdxOperationPolicy.ts:49-104](file://src/main/tools/RdxOperationPolicy.ts#L49-L104)
-- [RdxValidatedEvidence.ts:21-86](file://src/main/tools/RdxValidatedEvidence.ts#L21-L86)
-- [RdxExecutionReceipts.ts:42-76](file://src/main/tools/RdxExecutionReceipts.ts#L42-L76)
-- [resolveRdxBatchInvocation.ts:4-20](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L20)
+- [RdcNativeProtocol.ts:3-43](file://src/main/tools/RdcNativeProtocol.ts#L3-L43)
+- [RdcProbeLifecycle.ts:7-42](file://src/main/tools/RdcProbeLifecycle.ts#L7-L42)
+- [RdcOperationPolicy.ts:49-104](file://src/main/tools/RdcOperationPolicy.ts#L49-L104)
+- [RdcValidatedEvidence.ts:21-86](file://src/main/tools/RdcValidatedEvidence.ts#L21-L86)
+- [RdcExecutionReceipts.ts:42-76](file://src/main/tools/RdcExecutionReceipts.ts#L42-L76)
+- [resolveRdcBatchInvocation.ts:4-20](file://src/main/tools/resolveRdcBatchInvocation.ts#L4-L20)
 - [ProcessSupervisor.ts:167-425](file://src/main/runtime/ProcessSupervisor.ts#L167-L425)
-- [executeRdxShell.ts:23-129](file://src/main/tools/executeRdxShell.ts#L23-L129)
+- [executeRdcShell.ts:23-129](file://src/main/tools/executeRdcShell.ts#L23-L129)
 
 ## 架构总览
 整体调用链路如下：
-- Agent 通过 executeRdxShell 发起原生 rdx 操作，校验绑定与租约后，交由 RdxCliInvokerService 构建参数并执行。
-- 参数构建阶段会合并全局 argsPrefix、daemon-context、--args-json 等；Windows 下可能经 resolveRdxBatchInvocation 转为 powershell 调用 rdx_bat_launcher.ps1。
+- Agent 通过 executeRdcShell 发起原生 rdc 操作，校验绑定与租约后，交由 RdcCliInvokerService 构建参数并执行。
+- 参数构建阶段会合并全局 argsPrefix、daemon-context、--args-json 等；Windows 下可能经 resolveRdcBatchInvocation 转为 powershell 调用 rdc_bat_launcher.ps1。
 - ShellInvocationService 使用 ProcessSupervisor.spawn 启动子进程，设置工作目录、环境变量、超时、隔离进程组等。
-- 子进程完成后，RdxNativeProtocol 校验信封格式与上下文一致性；RdxCliInvokerService 将其转换为 ToolCallResult，并触发 trace。
-- 对于实验场景，RdxExecutionReceipts 生成签名的执行收据，RdxValidatedEvidence 验证证据的有效性。
+- 子进程完成后，RdcNativeProtocol 校验信封格式与上下文一致性；RdcCliInvokerService 将其转换为 ToolCallResult，并触发 trace。
+- 对于实验场景，RdcExecutionReceipts 生成签名的执行收据，RdcValidatedEvidence 验证证据的有效性。
 
-**更新** 现在在执行前通过 RdxOperationPolicy 进行严格的目录验证和能力检查，确保只有授权的操作才能执行。
+**更新** 现在在执行前通过 RdcOperationPolicy 进行严格的目录验证和能力检查，确保只有授权的操作才能执行。
 
 ```mermaid
 sequenceDiagram
 participant Agent as "Agent/上层调用方"
-participant Exec as "executeRdxShell"
-participant Policy as "RdxOperationPolicy"
-participant Invoker as "RdxCliInvokerService"
-participant Resolver as "resolveRdxBatchInvocation"
+participant Exec as "executeRdcShell"
+participant Policy as "RdcOperationPolicy"
+participant Invoker as "RdcCliInvokerService"
+participant Resolver as "resolveRdcBatchInvocation"
 participant Shell as "ShellInvocationService"
 participant Proc as "ProcessSupervisor"
-participant Native as "rdx 子进程"
-participant Proto as "RdxNativeProtocol"
-participant Evidence as "RdxValidatedEvidence"
-participant Receipt as "RdxExecutionReceipts"
+participant Native as "rdc 子进程"
+participant Proto as "RdcNativeProtocol"
+participant Evidence as "RdcValidatedEvidence"
+participant Receipt as "RdcExecutionReceipts"
 Agent->>Exec : 传入 operation/args/experimentId
 Exec->>Exec : 校验绑定/租约/上下文
-Exec->>Policy : authorizeRdxOperation(operation, args)
+Exec->>Policy : authorizeRdcOperation(operation, args)
 Policy-->>Exec : 验证后的args
 Exec->>Invoker : call(toolName="call", args=...)
 Invoker->>Resolver : 构建最终 command/args
@@ -155,7 +155,7 @@ Shell->>Proc : spawn(owner="shell", ...)
 Proc->>Native : 启动子进程
 Native-->>Shell : stdout/stderr/exitCode/signal
 Shell-->>Invoker : CLIResult
-Invoker->>Proto : parseRdxNativeResult(CLIResult)
+Invoker->>Proto : parseRdcNativeResult(CLIResult)
 Proto-->>Invoker : 信封对象
 Exec->>Evidence : validateExecutionEvidence(definition, args, result)
 Evidence-->>Exec : 验证后的证据
@@ -165,16 +165,16 @@ Exec-->>Agent : 结果或回执
 ```
 
 **图表来源**
-- [executeRdxShell.ts:23-129](file://src/main/tools/executeRdxShell.ts#L23-L129)
-- [RdxOperationPolicy.ts:49-104](file://src/main/tools/RdxOperationPolicy.ts#L49-L104)
-- [RdxCliInvokerService.ts:214-321](file://src/main/tools/RdxCliInvokerService.ts#L214-L321)
-- [RdxValidatedEvidence.ts:21-86](file://src/main/tools/RdxValidatedEvidence.ts#L21-L86)
-- [RdxExecutionReceipts.ts:48-56](file://src/main/tools/RdxExecutionReceipts.ts#L48-L56)
+- [executeRdcShell.ts:23-129](file://src/main/tools/executeRdcShell.ts#L23-L129)
+- [RdcOperationPolicy.ts:49-104](file://src/main/tools/RdcOperationPolicy.ts#L49-L104)
+- [RdcCliInvokerService.ts:214-321](file://src/main/tools/RdcCliInvokerService.ts#L214-L321)
+- [RdcValidatedEvidence.ts:21-86](file://src/main/tools/RdcValidatedEvidence.ts#L21-L86)
+- [RdcExecutionReceipts.ts:48-56](file://src/main/tools/RdcExecutionReceipts.ts#L48-L56)
 
 ## 详细组件分析
 
-### RdxCliInvokerService：外部工具集成与调用
-- 配置与可用性检查：从 Settings 读取 rdxCli 配置（enabled/command/cwd/env/timeoutMs/catalogPath/argsPrefix），未配置则直接返回不可用结果。
+### RdcCliInvokerService：外部工具集成与调用
+- 配置与可用性检查：从 Settings 读取 rdcCli 配置（enabled/command/cwd/env/timeoutMs/catalogPath/argsPrefix），未配置则直接返回不可用结果。
 - 工具目录加载：可选加载 catalog.json，统计命名空间与工具数量，用于运行时摘要。
 - 参数构建：
   - 标准化 --context-id 为 --daemon-context
@@ -182,7 +182,7 @@ Exec-->>Agent : 结果或回执
   - 将请求参数序列化为 --args-json
 - 执行与结果解析：
   - 调用 ShellInvocationService.invoke
-  - 使用 RdxNativeProtocol.parseRdxNativeResult 校验信封
+  - 使用 RdcNativeProtocol.parseRdcNativeResult 校验信封
   - 将 ok:false 的错误对象规范化为 ToolCallResult.error
   - 成功时提取 data/artifacts
 - Trace 与取消：
@@ -198,7 +198,7 @@ Start(["开始"]) --> CheckCfg["检查配置与可用性"]
 CheckCfg --> |不可用| ReturnErr["返回不可用错误"]
 CheckCfg --> |可用| BuildArgs["构建命令参数<br/>argsPrefix + daemon-context + --args-json"]
 BuildArgs --> Invoke["ShellInvocationService.invoke"]
-Invoke --> Parse["RdxNativeProtocol.parseRdxNativeResult"]
+Invoke --> Parse["RdcNativeProtocol.parseRdcNativeResult"]
 Parse --> Ok{"ok?"}
 Ok --> |是| EmitTrace["生成 trace_id 并发送追踪"]
 Ok --> |否| ErrFmt["规范化错误对象"]
@@ -208,13 +208,13 @@ ReturnErr --> End
 ```
 
 **图表来源**
-- [RdxCliInvokerService.ts:48-187](file://src/main/tools/RdxCliInvokerService.ts#L48-L187)
-- [RdxCliInvokerService.ts:214-321](file://src/main/tools/RdxCliInvokerService.ts#L214-L321)
-- [RdxNativeProtocol.ts:12-43](file://src/main/tools/RdxNativeProtocol.ts#L12-L43)
+- [RdcCliInvokerService.ts:48-187](file://src/main/tools/RdcCliInvokerService.ts#L48-L187)
+- [RdcCliInvokerService.ts:214-321](file://src/main/tools/RdcCliInvokerService.ts#L214-L321)
+- [RdcNativeProtocol.ts:12-43](file://src/main/tools/RdcNativeProtocol.ts#L12-L43)
 
 **章节来源**
-- [RdxCliInvokerService.ts:48-187](file://src/main/tools/RdxCliInvokerService.ts#L48-L187)
-- [RdxCliInvokerService.ts:214-321](file://src/main/tools/RdxCliInvokerService.ts#L214-L321)
+- [RdcCliInvokerService.ts:48-187](file://src/main/tools/RdcCliInvokerService.ts#L48-L187)
+- [RdcCliInvokerService.ts:214-321](file://src/main/tools/RdcCliInvokerService.ts#L214-L321)
 
 ### ShellInvocationService：shell 执行引擎
 - 进程创建：
@@ -255,7 +255,7 @@ ShellInvocationService --> ProcessSupervisor : "spawn/join"
 - [ShellInvocationService.ts:30-129](file://src/main/tools/ShellInvocationService.ts#L30-L129)
 - [ProcessSupervisor.ts:167-425](file://src/main/runtime/ProcessSupervisor.ts#L167-L425)
 
-### RdxNativeProtocol：原生协议定义与校验
+### RdcNativeProtocol：原生协议定义与校验
 - 信封字段：
   - ok: true 表示成功
   - result_kind: 字符串，标识结果类型
@@ -269,26 +269,26 @@ ShellInvocationService --> ProcessSupervisor : "spawn/join"
   - 禁止暴露二进制 stdout
 
 **章节来源**
-- [RdxNativeProtocol.ts:3-43](file://src/main/tools/RdxNativeProtocol.ts#L3-L43)
+- [RdcNativeProtocol.ts:3-43](file://src/main/tools/RdcNativeProtocol.ts#L3-L43)
 
-### RdxProbeLifecycle：捕获上下文生命周期
+### RdcProbeLifecycle：捕获上下文生命周期
 - openProbeLease：
   - 校验 projectId 与 capturePath 已注册
   - 校验当前会话拥有捕获上下文，且未被其他会话占用
   - 校验 replay device 已选择
-  - 通过 rdxSessionService.openProjectInput 打开输入并绑定 turn
+  - 通过 rdcSessionService.openProjectInput 打开输入并绑定 turn
 - closeProbeLease：
   - 校验 project 存在且无委托冲突
-  - 通过 rdxSessionService.clearOpenedCaptureForSession 关闭捕获
+  - 通过 rdcSessionService.clearOpenedCaptureForSession 关闭捕获
 - 安全约束：
   - 不随意签发任意 context id 的租约
   - 仅允许对已注册的 capture 进行操作
   - 防止委托租约关闭父捕获
 
 **章节来源**
-- [RdxProbeLifecycle.ts:7-42](file://src/main/tools/RdxProbeLifecycle.ts#L7-L42)
+- [RdcProbeLifecycle.ts:7-42](file://src/main/tools/RdcProbeLifecycle.ts#L7-L42)
 
-### RdxOperationPolicy：操作授权与目录验证
+### RdcOperationPolicy：操作授权与目录验证
 **新增** 提供全面的操作授权和文件系统验证机制：
 - 操作能力检查：验证操作的作用域（global、context、replay、capture）和效果类型
 - 文件系统路径验证：
@@ -307,9 +307,9 @@ ShellInvocationService --> ProcessSupervisor : "spawn/join"
   - 防止恶意源代码注入
 
 **章节来源**
-- [RdxOperationPolicy.ts:49-104](file://src/main/tools/RdxOperationPolicy.ts#L49-L104)
+- [RdcOperationPolicy.ts:49-104](file://src/main/tools/RdcOperationPolicy.ts#L49-L104)
 
-### RdxValidatedEvidence：执行证据验证
+### RdcValidatedEvidence：执行证据验证
 **新增** 提供可信的执行证据验证：
 - 证据类型支持：
   - measurement：性能测量（事件持续时间、计数器、图像、帧时序）
@@ -325,9 +325,9 @@ ShellInvocationService --> ProcessSupervisor : "spawn/join"
   - 确保时间戳的顺序正确性
 
 **章节来源**
-- [RdxValidatedEvidence.ts:21-86](file://src/main/tools/RdxValidatedEvidence.ts#L21-L86)
+- [RdcValidatedEvidence.ts:21-86](file://src/main/tools/RdcValidatedEvidence.ts#L21-L86)
 
-### RdxExecutionReceipts：签名执行收据
+### RdcExecutionReceipts：签名执行收据
 **新增** 提供完整的审计追踪能力：
 - 收据结构：
   - 包含会话、项目、轮次、工具调用等元数据
@@ -343,29 +343,29 @@ ShellInvocationService --> ProcessSupervisor : "spawn/join"
   - 确保实验场景的证据链完整性
 
 **章节来源**
-- [RdxExecutionReceipts.ts:42-76](file://src/main/tools/RdxExecutionReceipts.ts#L42-L76)
+- [RdcExecutionReceipts.ts:42-76](file://src/main/tools/RdcExecutionReceipts.ts#L42-L76)
 
-### resolveRdxBatchInvocation：Windows 批处理桥接
-- 当命令为 rdx.bat 且在 Windows 平台时，自动切换到 powershell.exe 并调用 scripts/rdx_bat_launcher.ps1
+### resolveRdcBatchInvocation：Windows 批处理桥接
+- 当命令为 rdc.bat 且在 Windows 平台时，自动切换到 powershell.exe 并调用 scripts/rdc_bat_launcher.ps1
 - 支持 --non-interactive 时追加 -NonInteractive
 - 其他情况原样返回 command/args
 
 **章节来源**
-- [resolveRdxBatchInvocation.ts:4-20](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L20)
+- [resolveRdcBatchInvocation.ts:4-20](file://src/main/tools/resolveRdcBatchInvocation.ts#L4-L20)
 
-### executeRdxShell：Agent 到原生 rdx 的入口
+### executeRdcShell：Agent 到原生 rdc 的入口
 **更新** 现在集成了增强的安全验证和执行收据支持：
 - 校验：
   - 仅 General agent 可执行
   - 绑定与租约版本一致，且拥有 replay session
   - 拒绝 default context 与未配置 CLI
 - 授权验证：
-  - 通过 RdxOperationPolicy.authorizeRdxOperation 进行参数验证
+  - 通过 RdcOperationPolicy.authorizeRdcOperation 进行参数验证
   - 检查操作能力和文件系统访问权限
   - 验证虚拟路径和编译器标志
 - 执行与证据：
   - 串行执行（通过 withSessionShellLock）
-  - 构造 operation/args，调用 RdxCliInvokerService.executeCLI
+  - 构造 operation/args，调用 RdcCliInvokerService.executeCLI
   - 验证执行结果的一致性
 - 收据生成：
   - 若携带 experimentId，验证执行证据
@@ -375,17 +375,17 @@ ShellInvocationService --> ProcessSupervisor : "spawn/join"
   - 捕获异常并 quarantine 上下文，提示恢复
 
 **章节来源**
-- [executeRdxShell.ts:23-129](file://src/main/tools/executeRdxShell.ts#L23-L129)
+- [executeRdcShell.ts:23-129](file://src/main/tools/executeRdcShell.ts#L23-L129)
 
 ## 依赖关系分析
 - 松耦合：
-  - RdxCliInvokerService 依赖 ShellInvocationService 抽象进程执行，便于替换实现
+  - RdcCliInvokerService 依赖 ShellInvocationService 抽象进程执行，便于替换实现
   - ShellInvocationService 依赖 ProcessSupervisor 统一管理进程生命周期
-  - RdxNativeProtocol 独立于执行层，只关注协议校验
+  - RdcNativeProtocol 独立于执行层，只关注协议校验
 - 强内聚：
-  - RdxProbeLifecycle 与 sessions/captures 服务紧密协作，保证捕获上下文一致性
-  - RdxOperationPolicy 集中处理操作授权和参数验证
-  - RdxValidatedEvidence 和 RdxExecutionReceipts 共同提供可信的执行证据
+  - RdcProbeLifecycle 与 sessions/captures 服务紧密协作，保证捕获上下文一致性
+  - RdcOperationPolicy 集中处理操作授权和参数验证
+  - RdcValidatedEvidence 和 RdcExecutionReceipts 共同提供可信的执行证据
 - 外部依赖：
   - Node child_process（通过 ProcessSupervisor）
   - 文件系统（catalog 加载、capture 路径校验）
@@ -393,30 +393,30 @@ ShellInvocationService --> ProcessSupervisor : "spawn/join"
 
 ```mermaid
 graph LR
-A["RdxCliInvokerService"] --> B["ShellInvocationService"]
+A["RdcCliInvokerService"] --> B["ShellInvocationService"]
 B --> C["ProcessSupervisor"]
-A --> D["RdxNativeProtocol"]
-A --> E["resolveRdxBatchInvocation"]
-F["executeRdxShell"] --> A
-F --> G["RdxProbeLifecycle"]
-F --> H["RdxTurnBindings"]
-F --> I["RdxOperationPolicy"]
-F --> J["RdxValidatedEvidence"]
-F --> K["RdxExecutionReceipts"]
+A --> D["RdcNativeProtocol"]
+A --> E["resolveRdcBatchInvocation"]
+F["executeRdcShell"] --> A
+F --> G["RdcProbeLifecycle"]
+F --> H["RdcTurnBindings"]
+F --> I["RdcOperationPolicy"]
+F --> J["RdcValidatedEvidence"]
+F --> K["RdcExecutionReceipts"]
 ```
 
 **图表来源**
-- [RdxCliInvokerService.ts:20-333](file://src/main/tools/RdxCliInvokerService.ts#L20-L333)
+- [RdcCliInvokerService.ts:20-333](file://src/main/tools/RdcCliInvokerService.ts#L20-L333)
 - [ShellInvocationService.ts:30-129](file://src/main/tools/ShellInvocationService.ts#L30-L129)
 - [ProcessSupervisor.ts:167-425](file://src/main/runtime/ProcessSupervisor.ts#L167-L425)
-- [RdxNativeProtocol.ts:3-43](file://src/main/tools/RdxNativeProtocol.ts#L3-L43)
-- [resolveRdxBatchInvocation.ts:4-20](file://src/main/tools/resolveRdxBatchInvocation.ts#L4-L20)
-- [executeRdxShell.ts:23-129](file://src/main/tools/executeRdxShell.ts#L23-L129)
-- [RdxProbeLifecycle.ts:7-42](file://src/main/tools/RdxProbeLifecycle.ts#L7-L42)
-- [RdxTurnBindings.ts:1-38](file://src/main/tools/RdxTurnBindings.ts#L1-L38)
-- [RdxOperationPolicy.ts:49-104](file://src/main/tools/RdxOperationPolicy.ts#L49-L104)
-- [RdxValidatedEvidence.ts:21-86](file://src/main/tools/RdxValidatedEvidence.ts#L21-L86)
-- [RdxExecutionReceipts.ts:42-76](file://src/main/tools/RdxExecutionReceipts.ts#L42-L76)
+- [RdcNativeProtocol.ts:3-43](file://src/main/tools/RdcNativeProtocol.ts#L3-L43)
+- [resolveRdcBatchInvocation.ts:4-20](file://src/main/tools/resolveRdcBatchInvocation.ts#L4-L20)
+- [executeRdcShell.ts:23-129](file://src/main/tools/executeRdcShell.ts#L23-L129)
+- [RdcProbeLifecycle.ts:7-42](file://src/main/tools/RdcProbeLifecycle.ts#L7-L42)
+- [RdcTurnBindings.ts:1-38](file://src/main/tools/RdcTurnBindings.ts#L1-L38)
+- [RdcOperationPolicy.ts:49-104](file://src/main/tools/RdcOperationPolicy.ts#L49-L104)
+- [RdcValidatedEvidence.ts:21-86](file://src/main/tools/RdcValidatedEvidence.ts#L21-L86)
+- [RdcExecutionReceipts.ts:42-76](file://src/main/tools/RdcExecutionReceipts.ts#L42-L76)
 
 ## 性能与资源限制
 - 进程组隔离：非 Windows 平台使用 detached 进程组，便于按组终止，减少僵尸进程风险
@@ -434,42 +434,42 @@ F --> K["RdxExecutionReceipts"]
 
 ## 故障排查指南
 - 常见错误与定位：
-  - 配置缺失：RdxCliInvokerService.getAvailabilityFailure 返回不可用原因，检查 enabled/command/cwd/env
-  - 协议不匹配：RdxNativeProtocol 抛错，检查 stdout 是否为合法 JSON 信封，是否包含 result_kind/data
+  - 配置缺失：RdcCliInvokerService.getAvailabilityFailure 返回不可用原因，检查 enabled/command/cwd/env
+  - 协议不匹配：RdcNativeProtocol 抛错，检查 stdout 是否为合法 JSON 信封，是否包含 result_kind/data
   - 上下文不一致：expectedContext 与响应 context_id 不匹配，检查 --daemon-context 是否正确注入
   - 超时：ShellInvocationService 返回 reason=timeout，检查 timeoutMs 与子进程行为
   - 孤儿进程：reason=unconfirmed_orphan，检查进程组隔离与 kill 逻辑
-  - 操作被拒绝：RdxOperationPolicy 验证失败，检查操作能力和文件系统权限
-  - 证据无效：RdxValidatedEvidence 验证失败，检查实验证据的完整性和一致性
+  - 操作被拒绝：RdcOperationPolicy 验证失败，检查操作能力和文件系统权限
+  - 证据无效：RdcValidatedEvidence 验证失败，检查实验证据的完整性和一致性
 - 日志与追踪：
-  - 使用 RdxCliInvokerService.onInvocationTrace 收集调用轨迹
-  - RdxExecutionReceipts 提供完整的审计追踪
+  - 使用 RdcCliInvokerService.onInvocationTrace 收集调用轨迹
+  - RdcExecutionReceipts 提供完整的审计追踪
 - 恢复策略：
-  - 使用 RdxProbeLifecycle 重新打开/关闭捕获上下文
+  - 使用 RdcProbeLifecycle 重新打开/关闭捕获上下文
   - 对实验场景，依据回执验证执行与回滚
 
 **章节来源**
-- [RdxCliInvokerService.ts:48-64](file://src/main/tools/RdxCliInvokerService.ts#L48-L64)
-- [RdxNativeProtocol.ts:12-43](file://src/main/tools/RdxNativeProtocol.ts#L12-L43)
+- [RdcCliInvokerService.ts:48-64](file://src/main/tools/RdcCliInvokerService.ts#L48-L64)
+- [RdcNativeProtocol.ts:12-43](file://src/main/tools/RdcNativeProtocol.ts#L12-L43)
 - [ShellInvocationService.ts:69-99](file://src/main/tools/ShellInvocationService.ts#L69-L99)
 - [ProcessSupervisor.ts:270-343](file://src/main/runtime/ProcessSupervisor.ts#L270-L343)
-- [RdxOperationPolicy.ts:49-104](file://src/main/tools/RdxOperationPolicy.ts#L49-L104)
-- [RdxValidatedEvidence.ts:21-86](file://src/main/tools/RdxValidatedEvidence.ts#L21-L86)
+- [RdcOperationPolicy.ts:49-104](file://src/main/tools/RdcOperationPolicy.ts#L49-L104)
+- [RdcValidatedEvidence.ts:21-86](file://src/main/tools/RdcValidatedEvidence.ts#L21-L86)
 
 ## 结论
 本设计通过分层解耦实现了安全的 CLI 调用器：
-- 工具编排层（RdxCliInvokerService）专注参数构建、协议校验与结果标准化
+- 工具编排层（RdcCliInvokerService）专注参数构建、协议校验与结果标准化
 - 执行层（ShellInvocationService/ProcessSupervisor）提供健壮的进程管理与资源控制
-- 协议层（RdxNativeProtocol）确保跨进程通信的一致性与安全性
-- 生命周期（RdxProbeLifecycle）保障捕获上下文的可信与可控
-- 安全策略层（RdxOperationPolicy/RdxValidatedEvidence/RdxExecutionReceipts）提供全面的安全验证和审计追踪
-- 入口（executeRdxShell）将 Agent 意图安全地映射到原生 rdx 操作，并支持实验回执
+- 协议层（RdcNativeProtocol）确保跨进程通信的一致性与安全性
+- 生命周期（RdcProbeLifecycle）保障捕获上下文的可信与可控
+- 安全策略层（RdcOperationPolicy/RdcValidatedEvidence/RdcExecutionReceipts）提供全面的安全验证和审计追踪
+- 入口（executeRdcShell）将 Agent 意图安全地映射到原生 rdc 操作，并支持实验回执
 
 **更新** 新的架构集成了增强的操作目录验证、能力检查和执行收据签名支持，提供了更强大的安全防护和审计能力，适合在生产环境中稳定运行。
 
 ## 附录：协议规范与调用流程
 
-### 原生协议规范（RdxNativeEnvelope）
+### 原生协议规范（RdcNativeEnvelope）
 - 必需字段：
   - ok: true
   - result_kind: string
@@ -483,20 +483,20 @@ F --> K["RdxExecutionReceipts"]
   - 若指定 expectedContext，需与响应 context_id 一致
 
 **章节来源**
-- [RdxNativeProtocol.ts:3-43](file://src/main/tools/RdxNativeProtocol.ts#L3-L43)
+- [RdcNativeProtocol.ts:3-43](file://src/main/tools/RdcNativeProtocol.ts#L3-L43)
 
 ### 调用流程图（端到端）
 ```mermaid
 sequenceDiagram
 participant U as "调用方"
-participant E as "executeRdxShell"
-participant P as "RdxOperationPolicy"
-participant I as "RdxCliInvokerService"
+participant E as "executeRdcShell"
+participant P as "RdcOperationPolicy"
+participant I as "RdcCliInvokerService"
 participant S as "ShellInvocationService"
-participant V as "RdxValidatedEvidence"
-participant R as "RdxExecutionReceipts"
+participant V as "RdcValidatedEvidence"
+participant R as "RdcExecutionReceipts"
 U->>E : 传入 operation/args/experimentId
-E->>P : authorizeRdxOperation(operation, args)
+E->>P : authorizeRdcOperation(operation, args)
 P-->>E : 验证后的args
 E->>I : call("call", args)
 I->>S : invoke(command,args,cwd,env,timeout,abortSignal)
@@ -510,8 +510,8 @@ E-->>U : 结果或回执
 ```
 
 **图表来源**
-- [executeRdxShell.ts:23-129](file://src/main/tools/executeRdxShell.ts#L23-L129)
-- [RdxOperationPolicy.ts:49-104](file://src/main/tools/RdxOperationPolicy.ts#L49-L104)
-- [RdxCliInvokerService.ts:214-321](file://src/main/tools/RdxCliInvokerService.ts#L214-L321)
-- [RdxValidatedEvidence.ts:21-86](file://src/main/tools/RdxValidatedEvidence.ts#L21-L86)
-- [RdxExecutionReceipts.ts:48-56](file://src/main/tools/RdxExecutionReceipts.ts#L48-L56)
+- [executeRdcShell.ts:23-129](file://src/main/tools/executeRdcShell.ts#L23-L129)
+- [RdcOperationPolicy.ts:49-104](file://src/main/tools/RdcOperationPolicy.ts#L49-L104)
+- [RdcCliInvokerService.ts:214-321](file://src/main/tools/RdcCliInvokerService.ts#L214-L321)
+- [RdcValidatedEvidence.ts:21-86](file://src/main/tools/RdcValidatedEvidence.ts#L21-L86)
+- [RdcExecutionReceipts.ts:48-56](file://src/main/tools/RdcExecutionReceipts.ts#L48-L56)

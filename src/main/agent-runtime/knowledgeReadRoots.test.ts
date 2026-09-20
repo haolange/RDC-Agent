@@ -33,10 +33,10 @@ describe('isKnowledgeReadFileTool', () => {
 
 describe('resolveKnowledgeReadRoots', () => {
   it('freezes existing user and project knowledge directories in canonical order', async () => {
-    const user = await makeDir('rdx-kn-user-');
-    const project = await makeDir('rdx-kn-proj-');
+    const user = await makeDir('rdc-kn-user-');
+    const project = await makeDir('rdc-kn-proj-');
     const userKnowledge = path.join(user, 'knowledge');
-    const projectKnowledge = path.join(project, '.rdx', 'knowledge');
+    const projectKnowledge = path.join(project, '.rdc-agent', 'knowledge');
     await mkdir(userKnowledge, { recursive: true });
     await mkdir(projectKnowledge, { recursive: true });
 
@@ -51,7 +51,7 @@ describe('resolveKnowledgeReadRoots', () => {
   });
 
   it('omits missing and non-directory candidates without a symlink diagnostic', async () => {
-    const tmp = await makeDir('rdx-kn-miss-');
+    const tmp = await makeDir('rdc-kn-miss-');
     const missing = path.join(tmp, 'knowledge');
     const file = path.join(tmp, 'not-a-dir');
     await writeFile(file, 'x', 'utf8');
@@ -65,7 +65,7 @@ describe('resolveKnowledgeReadRoots', () => {
   });
 
   it('excludes a knowledge root that is itself a symlink/junction and records a diagnostic', async () => {
-    const tmp = await makeDir('rdx-kn-link-');
+    const tmp = await makeDir('rdc-kn-link-');
     const real = path.join(tmp, 'real-knowledge');
     const link = path.join(tmp, 'knowledge');
     await mkdir(real, { recursive: true });
@@ -90,12 +90,12 @@ describe('resolveKnowledgeReadRoots', () => {
   });
 
   it('treats project-root case aliases as the same knowledge root', async () => {
-    const project = await makeDir('rdx-kn-alias-');
-    const knowledge = path.join(project, '.rdx', 'knowledge');
+    const project = await makeDir('rdc-kn-alias-');
+    const knowledge = path.join(project, '.rdc-agent', 'knowledge');
     await mkdir(knowledge, { recursive: true });
     const mixedCase = path.join(
       project.replace(/[a-z]/g, (ch) => ch.toUpperCase()),
-      '.rdx',
+      '.rdc-agent',
       'knowledge',
     );
 

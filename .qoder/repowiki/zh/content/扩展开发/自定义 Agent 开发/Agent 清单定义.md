@@ -48,8 +48,8 @@
 ## 项目结构
 Agent 清单以 Markdown + YAML frontmatter 形式存在，位于以下位置并按优先级合并：
 - 内置（builtin）：resources/agent-runtime/agents/*.agent.md
-- 用户（user）：~/.rdx/agents/*.agent.md
-- 项目（project）：<project-root>/.rdx/agents/*.agent.md
+- 用户（user）：~/.rdc-agent/agents/*.agent.md
+- 项目（project）：<project-root>/.rdc-agent/agents/*.agent.md
 
 四个内置角色：general / debugger / analyzer / optimizer。用户或项目级可覆盖这四个 id，或新增无关自定义 id。Agent ID 来自文件名 stem，不再从 frontmatter 读取 id。
 
@@ -57,8 +57,8 @@ Agent 清单以 Markdown + YAML frontmatter 形式存在，位于以下位置并
 graph TB
 subgraph "清单来源"
 B["内置清单<br/>resources/agent-runtime/agents"]
-U["用户清单<br/>~/.rdx/agents"]
-P["项目清单<br/>.<project>/.rdx/agents"]
+U["用户清单<br/>~/.rdc-agent/agents"]
+P["项目清单<br/>.<project>/.rdc-agent/agents"]
 end
 subgraph "解析与服务"
 S["AgentManifestService<br/>加载/合并/路由"]
@@ -157,7 +157,7 @@ Runtime-->>User : 执行计划/工具调用/报告
 - [src/shared/constants/agentToolTokens.ts:143-221](file://src/shared/constants/agentToolTokens.ts#L143-L221)
 
 ### 能力声明与工具令牌
-- 清单使用"能力名"而非直接写工具 id，例如 read、search、web、shell、write、edit、git、askUser、handoff、task、memory、planArtifact、skill、mcp、subagent、rdxContext、tool_search、knowledge、investigation。
+- 清单使用"能力名"而非直接写工具 id，例如 read、search、web、shell、write、edit、git、askUser、handoff、task、memory、planArtifact、skill、mcp、subagent、rdcContext、tool_search、knowledge、investigation。
 - 能力名在解析阶段被展开为具体工具 id 集合；已移除令牌（如 todo、search_codebase、bash）将被拒绝并提示替代方案。
 - 工具分层：core（常驻注入 schema）、extended（延迟发现/按需激活），影响工具可用性与工作区展示。
 
@@ -167,7 +167,7 @@ Runtime-->>User : 执行计划/工具调用/报告
 
 ### 权限与执行策略
 - Mission 类 Agent（debugger/analyzer/optimizer）默认"仅规划"，不直接执行 shell/代码解释器/写入等操作；它们通过 handoff 将执行交给 General。
-- General 作为执行编排者，可在策略允许时使用 shell/write/edit/rdxContext 等能力。
+- General 作为执行编排者，可在策略允许时使用 shell/write/edit/rdcContext 等能力。
 - 工具能力与模型可用性由 Provider Catalog 与 EffectiveCatalog 共同决定；若模型不具备原生工具调用能力或缺少预算，则不可选为 Agent 可执行模型。
 
 **章节来源**

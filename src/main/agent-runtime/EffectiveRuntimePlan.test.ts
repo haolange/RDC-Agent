@@ -207,18 +207,18 @@ describe('EffectiveRuntimePlan', () => {
     const empty = buildEffectiveRuntimePlan(shared);
     const withRoots = buildEffectiveRuntimePlan({
       ...shared,
-      knowledgeReadRoots: ['D:/Users/me/.rdx/knowledge', 'D:/Project/.rdx/knowledge'],
+      knowledgeReadRoots: ['D:/Users/me/.rdc-agent/knowledge', 'D:/Project/.rdc-agent/knowledge'],
     });
     const again = buildEffectiveRuntimePlan({
       ...shared,
-      knowledgeReadRoots: ['D:/Users/me/.rdx/knowledge', 'D:/Project/.rdx/knowledge'],
+      knowledgeReadRoots: ['D:/Users/me/.rdc-agent/knowledge', 'D:/Project/.rdc-agent/knowledge'],
     });
 
     expect(empty.schemaVersion).toBe(3);
     expect(empty.knowledgeReadRoots).toEqual([]);
     expect(withRoots.knowledgeReadRoots).toEqual([
-      'D:/Users/me/.rdx/knowledge',
-      'D:/Project/.rdx/knowledge',
+      'D:/Users/me/.rdc-agent/knowledge',
+      'D:/Project/.rdc-agent/knowledge',
     ]);
     expect(withRoots.permissionSettings.readableRoots).toEqual([]);
     expect(withRoots.fingerprint).not.toBe(empty.fingerprint);
@@ -310,48 +310,48 @@ describe('EffectiveRuntimePlan', () => {
       agentId: 'debugger',
       projectRootPath: 'D:/Project',
       profile: { skills: [] },
-      toolAllowlist: ['read_file', 'shell', 'code_interpreter', 'output_register', 'rdx_probe', 'task_create'],
+      toolAllowlist: ['read_file', 'shell', 'code_interpreter', 'output_register', 'rdc_probe', 'task_create'],
       permissionSettings: basePermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'mission' } },
       promptPlan: { systemPrompt: 'system' },
       policy,
-      skillIntersection: ['read_file', 'shell', 'rdx_probe'],
-      visibleToolNames: ['read_file', 'shell', 'output_register', 'rdx_probe'],
+      skillIntersection: ['read_file', 'shell', 'rdc_probe'],
+      visibleToolNames: ['read_file', 'shell', 'output_register', 'rdc_probe'],
       activatedDeferredTools: [],
       mcpDescriptorHash: null,
     });
-    expect(plan.toolAllowlist).toEqual(['read_file', 'rdx_probe', 'task_create']);
-    expect(plan.skillIntersection).toEqual(['read_file', 'rdx_probe']);
-    expect(plan.visibleToolNames).toEqual(['read_file', 'rdx_probe']);
+    expect(plan.toolAllowlist).toEqual(['read_file', 'rdc_probe', 'task_create']);
+    expect(plan.skillIntersection).toEqual(['read_file', 'rdc_probe']);
+    expect(plan.visibleToolNames).toEqual(['read_file', 'rdc_probe']);
     expect(plan.toolAllowlist).not.toContain('shell');
     expect(plan.toolAllowlist).not.toContain('output_register');
   });
 
-  it('strips RDX lease tools from an offline child plan', () => {
+  it('strips RDC lease tools from an offline child plan', () => {
     const policy = compilePolicyFromRestrictive({ deniedTools: [], limits: { maxTurns: 3 } });
     const plan = buildEffectiveRuntimePlan({
       agentId: 'general',
       projectRootPath: 'D:/Project',
       profile: { skills: [] },
-      toolAllowlist: ['read_file', 'rdx_context', 'rdx_probe', 'rdx', 'shell'],
+      toolAllowlist: ['read_file', 'rdc_context', 'rdc_probe', 'rdc', 'shell'],
       permissionSettings: basePermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'offline' } },
       promptPlan: { systemPrompt: 'system' },
       policy,
-      skillIntersection: ['read_file', 'rdx_context'],
-      visibleToolNames: ['read_file', 'rdx_context', 'shell'],
+      skillIntersection: ['read_file', 'rdc_context'],
+      visibleToolNames: ['read_file', 'rdc_context', 'shell'],
       activatedDeferredTools: [],
       mcpDescriptorHash: null,
-      excludeRdxLeaseTools: true,
+      excludeRdcLeaseTools: true,
     });
-    expect(plan.excludeRdxLeaseTools).toBe(true);
+    expect(plan.excludeRdcLeaseTools).toBe(true);
     expect(plan.toolAllowlist).toEqual(['read_file', 'shell']);
     expect(plan.skillIntersection).toEqual(['read_file']);
     expect(plan.visibleToolNames).toEqual(['read_file', 'shell']);
     expect(activeToolNamesForPlan([
-      { name: 'rdx_context', description: '', parameters: { type: 'object', properties: {} } },
+      { name: 'rdc_context', description: '', parameters: { type: 'object', properties: {} } },
       { name: 'shell', description: '', parameters: { type: 'object', properties: {} } },
     ], plan)).toEqual(['shell']);
   });

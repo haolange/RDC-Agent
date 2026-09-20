@@ -24,7 +24,7 @@ source_files:
 RDC-Agent 的配置系统由三部分组成：
 - **应用设置（AppSettings）**：通过 `src/main/settings/SettingsService.ts` 以 JSON 文件形式持久化到用户目录，负责 UI 外观、窗口布局、工具链、Agent 运行时权限、LLM Provider 元数据等。
 - **密钥存储**：通过 `src/main/settings/SecretStorageService.ts` 使用 Electron `safeStorage` 加密后写入 `secrets/provider-secrets.json`，仅保存引用（secretRef），明文不出现在 settings 文件中。
-- **运行时路径与资源目录**：通过 `src/main/runtime/AppPathService.ts` 统一计算 user/project/appState 三类路径，并自动创建目录；同时扫描 `resources/agent-runtime/skills`、`userRdxRoot/skills`、`projectRdxRoot/skills` 以及 MCP `.mcp.json` 描述符，形成可叠加的资源目录。
+- **运行时路径与资源目录**：通过 `src/main/runtime/AppPathService.ts` 统一计算 user/project/appState 三类路径，并自动创建目录；同时扫描 `resources/agent-runtime/skills`、`userRdcRoot/skills`、`projectRdcRoot/skills` 以及 MCP `.mcp.json` 描述符，形成可叠加的资源目录。
 
 没有发现 `.env`、`.yaml`、`.toml`、`application.properties` 等外部配置文件加载逻辑；所有“配置”最终都收敛为 JSON 持久化 + 文件系统目录约定。
 
@@ -36,7 +36,7 @@ RDC-Agent 的配置系统由三部分组成：
 | `src/main/settings/settingsDefaults.ts` | 定义 `SETTINGS_SCHEMA_VERSION = 7`、`PersistedSettingsPayload` 结构、`DEFAULT_*` 默认值（appearance/layout/profile/tooling/agentRuntime）。 |
 | `src/main/settings/settingsServiceHelpers.ts` | 读写 JSON 的 `readJsonFile/readJsonFileAsync/writeSettings/writeSettingsAsync`、schema version 校验 `assertPersistedSettingsSchemaVersion`、迁移 `rebuildPersistedSettings`、归一化 `normalizePersistedSettings/toRuntimeSettings`。 |
 | `src/main/settings/SecretStorageService.ts` | 基于 Electron `safeStorage` 的密钥存取，文件 `secrets/provider-secrets.json`，支持 `createProviderSecretRef/createProviderOAuthSecretRef/createProviderAccountSecretRef/createProviderConnectionSecretRef` 等命名规范。 |
-| `src/main/runtime/AppPathService.ts` | 计算 `userRdxRoot`（受 `RDC_AGENT_HOME` 覆盖）、`appData`（受 `RDC_AGENT_USER_DATA` 覆盖）、内置 agent-runtime 根、项目 `.rdx` 目录，并在 `initializeRuntime` 中递归创建所有目录。 |
+| `src/main/runtime/AppPathService.ts` | 计算 `userRdcRoot`（受 `RDC_AGENT_HOME` 覆盖）、`appData`（受 `RDC_AGENT_USER_DATA` 覆盖）、内置 agent-runtime 根、项目 `.rdc-agent` 目录，并在 `initializeRuntime` 中递归创建所有目录。 |
 | `src/main/settings/ExecutionProfileService.ts` | 根据当前 `AppSettings` 和 Agent 定义生成 `EffectiveAgentRuntimeConfig`，并产出诊断信息。 |
 | `src/main/settings/AgentRuntimeConfigService.ts` | 扫描 skills（`SKILL.md` + YAML front matter）与 MCP 描述符（`.mcp.json`），按 builtin/user/project 三层合并，并通过 `scopedResourceResolver` 去重。 |
 | `src/main/settings/settingsSanitize.ts` / `settingsProviderSanitize.ts` | 对 layout/window/sidebar/terminal/tooling/agentRuntime/provider 等字段做白名单式清洗。 |
@@ -45,7 +45,7 @@ RDC-Agent 的配置系统由三部分组成：
 ## 3. 架构与约定
 
 ### 3.1 持久化格式与版本演进
-- 设置文件路径 = `userRdxRoot/config.json`（即 `AppPathService.getRuntimePaths().settingsPath`）。
+- 设置文件路径 = `userRdcRoot/config.json`（即 `AppPathService.getRuntimePaths().settingsPath`）。
 - 每次写盘使用 **原子替换**：先写 `${settingsPath}.${process.pid}.tmp`，再 `renameSync` 到目标，失败时清理临时文件。
 - 每个 persisted 对象带 `schemaVersion`，读取时调用 `assertPersistedSettingsSchemaVersion`，若磁盘版本 > 当前 `SETTINGS_SCHEMA_VERSION` 则抛出 `StorageSchemaError`。
 - 升级路径集中在 `rebuildPersistedSettings`：例如 schema 6 重置 `appearance.chromeThemes`，schema 7 移除 `llm.embedding` 字段，删除 fixture provider 并清理对应 secret。
@@ -61,13 +61,13 @@ RDC-Agent 的配置系统由三部分组成：
 - 当 API Key 变更或 authAccountIds 变化时，`SettingsService.setAll` 会生成新的 `localAccountId`，并将旧 secretRef 加入 `secretRefsToDelete`，提交后由 `deleteSecretsAfterCommit` 清理。
 
 ### 3.4 路径与环境变量
-- `RDC_AGENT_HOME` 覆盖用户根目录（默认 `~/.rdx`）。
+- `RDC_AGENT_HOME` 覆盖用户根目录（默认 `~/.rdc-agent`）。
 - `RDC_AGENT_USER_DATA` 覆盖 Electron `app.getPath('appData')` 的 canonical 路径（Windows 默认 `AppData/Roaming`，Linux 默认 `~/.config`）。
 - `AppPathService.initializeRuntime` 会确保以下目录存在：`agents/skills/mcp/hooks/policies/knowledge/memory`、`state/{projects,sessions,tasks,traces,llm-calls,profile,staging/attachments}`、`logs`、`secrets`、`capture-previews`。
-- 项目级 `.rdx` 目录包含 `project.yaml`、`.gitignore`（默认忽略 `inputs/artifacts/memory/runtime/replay/replay.lock`），打开项目时会补写缺失的 gitignore 条目。
+- 项目级 `.rdc-agent` 目录包含 `project.yaml`、`.gitignore`（默认忽略 `inputs/artifacts/memory/runtime/replay/replay.lock`），打开项目时会补写缺失的 gitignore 条目。
 
 ### 3.5 资源目录叠加（skills/MCP）
-- Skills 从三个来源扫描并按 scope 排序：`builtin`（`resources/agent-runtime/skills`）→ `user`（`userRdxRoot/skills`）→ `project`（`projectRdxRoot/skills`），同名 id 由 `scopedResourceResolver` 决定 effective 值。
+- Skills 从三个来源扫描并按 scope 排序：`builtin`（`resources/agent-runtime/skills`）→ `user`（`userRdcRoot/skills`）→ `project`（`projectRdcRoot/skills`），同名 id 由 `scopedResourceResolver` 决定 effective 值。
 - Skill 定义格式：目录名作为 id，`SKILL.md` 首行 YAML front matter 含 `name`/`description`/`allowed-tools`，正文为 instructions；可选 `references/`、`scripts/`、`assets/` 子目录。
 - MCP 服务器通过 `<dir>/*.mcp.json` 声明，transport 必须在 `@shared/types/mcp.MCP_TRANSPORT_LIST` 中；project 级 MCP 需要 `McpTrustService` 信任后才能启用。
 
@@ -85,7 +85,7 @@ RDC-Agent 的配置系统由三部分组成：
 - **路径不可信输入需规范化**：`AppPathService` 对所有路径调用 `path.resolve`，并对 capture preview 的 projectId/inputId 做 `sanitizePathSegment` 过滤非法字符。
 - **Agent 运行时权限模式限定**：`VALID_PERMISSION_MODES = ['default','auto-review','full-access','custom']`，超出范围会被 sanitize 丢弃。
 - **Shell 可执行变更需刷新缓存**：`mergeAgentShellSettings` 在 `executable` 变化时调用 `shellResolver.clearCache()`。
-- **项目 `.rdx` 目录初始化时强制追加 `replay/` 与 `replay.lock` 到 `.gitignore`**，保证录制产物不被误提交。
+- **项目 `.rdc-agent` 目录初始化时强制追加 `replay/` 与 `replay.lock` 到 `.gitignore`**，保证录制产物不被误提交。
 
 ## 5. 与其他子系统交互
 

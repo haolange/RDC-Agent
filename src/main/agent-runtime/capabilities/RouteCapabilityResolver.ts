@@ -1,6 +1,6 @@
 import type { AgentRouteCapability, ReasoningDelivery, ReasoningVisibility, ToolCallingMode } from '@shared/types/agentRuntime';
 import type { ConversationDiagnosticSeverity } from '@shared/types/conversation';
-import type { ProviderReasoningContract } from '@shared/types/rdxRuntime';
+import type { ProviderReasoningContract } from '@shared/types/rdcRuntime';
 import type { LlmProviderEntry, LlmProviderId, LlmProviderProtocol } from '@shared/types/settings';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import { createFailClosedProviderContracts, createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';

@@ -42,10 +42,10 @@ describe('OutputRegistrationTool', () => {
   });
 
   it('rejects inputs and paths outside the active project', async () => {
-    fs.mkdirSync(path.join(root, '.rdx', 'inputs'), { recursive: true });
-    fs.writeFileSync(path.join(root, '.rdx', 'inputs', 'capture.rdc'), 'capture');
+    fs.mkdirSync(path.join(root, '.rdc-agent', 'inputs'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.rdc-agent', 'inputs', 'capture.rdc'), 'capture');
 
-    await expect(tool().execute('input', { path: '.rdx/inputs/capture.rdc' })).resolves.toMatchObject({ isError: true });
+    await expect(tool().execute('input', { path: '.rdc-agent/inputs/capture.rdc' })).resolves.toMatchObject({ isError: true });
     await expect(tool().execute('escape', { path: '../outside.md' })).resolves.toMatchObject({ isError: true });
     expect(mocks.register).not.toHaveBeenCalled();
   });

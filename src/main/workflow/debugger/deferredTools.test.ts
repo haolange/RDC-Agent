@@ -35,7 +35,7 @@ describe('isDeferredToolName', () => {
     expect(isDeferredToolName('tool_search')).toBe(false);
     expect(isDeferredToolName('skills')).toBe(false);
     expect(isDeferredToolName('skill_read')).toBe(false);
-    expect(isDeferredToolName('rdx_context')).toBe(false);
+    expect(isDeferredToolName('rdc_context')).toBe(false);
     expect(isDeferredToolName('custom_unknown_tool')).toBe(false);
   });
 });

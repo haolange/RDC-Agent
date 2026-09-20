@@ -12,8 +12,8 @@
       ? '<p>I will inspect the capture pipeline, draft a short plan, then summarize findings.</p>'
       : '<p>我会先检查 capture 管线，生成简短计划，再汇总结论。</p>';
     const thinkingPreview = locale === 'en'
-      ? 'Need file layout first, then confirm RDX context ownership before editing.'
-      : '先确认文件布局，再核对 RDX 上下文归属，然后才能安全修改。';
+      ? 'Need file layout first, then confirm RDC context ownership before editing.'
+      : '先确认文件布局，再核对 RDC 上下文归属，然后才能安全修改。';
     const finalHtml = locale === 'en'
       ? '<p>Capture ownership is healthy. Plan saved; next step is replay validation.</p><ul><li>Context lease OK</li><li>No stray CLI inventory</li></ul>'
       : '<p>Capture 归属正常。计划已保存；下一步做 replay 校验。</p><ul><li>上下文租约正常</li><li>无 CLI catalog 泄露</li></ul>';
@@ -52,10 +52,10 @@
         tool: {
           name: 'read_file',
           status: phase === 3 ? 'running' : 'complete',
-          path: 'src/main/sessions/RdxRuntimeContextRegistry.ts',
+          path: 'src/main/sessions/RdcRuntimeContextRegistry.ts',
           expandable: true,
-          preview: 'export class RdxRuntimeContextRegistry { ... }',
-          raw: '{"path":"src/main/sessions/RdxRuntimeContextRegistry.ts"}',
+          preview: 'export class RdcRuntimeContextRegistry { ... }',
+          raw: '{"path":"src/main/sessions/RdcRuntimeContextRegistry.ts"}',
         },
       });
     }
@@ -67,7 +67,7 @@
           status: 'complete',
           summary: locale === 'en' ? '12 matches · 3 files' : '12 处匹配 · 3 个文件',
           samples: [
-            'src/main/sessions/RdxRuntimeContextRegistry.ts:41',
+            'src/main/sessions/RdcRuntimeContextRegistry.ts:41',
             'src/main/workflow/debugger/AgentOrchestrator.ts:188',
           ],
         },

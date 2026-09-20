@@ -11,10 +11,10 @@ export const GENERAL_SKILL_IDS = [
   'simplify',
   'remember',
   'rdc-context',
-  'rdx-cli-shell',
-  'debugger-rdx-tools',
-  'analyzer-rdx-tools',
-  'optimizer-rdx-tools',
+  'rdc-tool-shell',
+  'debugger-rdc-tools',
+  'analyzer-rdc-tools',
+  'optimizer-rdc-tools',
 ] as const;
 
 export const MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS = [
@@ -53,10 +53,10 @@ export type CanonicalSkillLane = 'general' | 'mission-knowledge-coordinator';
 
 /** Skills whose tool surface conflicts with Mission plan-only and must stay on General. */
 export const PLAN_ONLY_CONFLICT_SKILL_IDS = [
-  'rdx-cli-shell',
-  'debugger-rdx-tools',
-  'analyzer-rdx-tools',
-  'optimizer-rdx-tools',
+  'rdc-tool-shell',
+  'debugger-rdc-tools',
+  'analyzer-rdc-tools',
+  'optimizer-rdc-tools',
 ] as const;
 
 export const SKILL_ARMED_BY_PROFILE: Record<string, readonly string[]> = {
@@ -95,7 +95,7 @@ export function isPlanOnlyConflictSkill(id: string): boolean {
   return (PLAN_ONLY_CONFLICT_SKILL_IDS as readonly string[]).includes(id);
 }
 
-/** Mission profiles cannot discover or load plan-only-conflict skills such as rdx-cli-shell. */
+/** Mission profiles cannot discover or load plan-only-conflict skills such as rdc-tool-shell. */
 export function isSkillVisibleToProfile(profileId: string, skillId: string): boolean {
   if (!isMissionAgentId(profileId)) return true;
   return !isPlanOnlyConflictSkill(skillId);

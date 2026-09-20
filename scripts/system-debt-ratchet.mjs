@@ -539,17 +539,17 @@ export function hasLifecycleKnowledgeWrite(source) {
   });
 }
 
-function isLegitimateRdxCliSurface(posixPath) {
-  return /RdxCliInvokerSettings|RdxShellAction/.test(posixPath);
+function isLegitimateRdcCliSurface(posixPath) {
+  return /RdcCliInvokerSettings|RdcShellAction/.test(posixPath);
 }
 
-export function hasRdxMcpRegistration(source) {
+export function hasRdcMcpRegistration(source) {
   return (
-    /mcpServers?\s*[:=][\s\S]{0,500}(?:name|id|command|descriptorId)\s*:\s*['"][^'"]*rdx/i.test(source)
-    || /(?:name|id|descriptorId)\s*:\s*['"]rdx(?:-mcp)?['"][\s\S]{0,240}(?:command|transport|mcpServers?|url)/i.test(source)
-    || /AgentRuntimeMcpDescriptor[\s\S]{0,240}['"]rdx/i.test(source)
-    || /createMcpServer\([^)]*rdx/i.test(source)
-    || /mcp__rdx__/i.test(source)
+    /mcpServers?\s*[:=][\s\S]{0,500}(?:name|id|command|descriptorId)\s*:\s*['"][^'"]*rdc/i.test(source)
+    || /(?:name|id|descriptorId)\s*:\s*['"]rdc(?:-mcp)?['"][\s\S]{0,240}(?:command|transport|mcpServers?|url)/i.test(source)
+    || /AgentRuntimeMcpDescriptor[\s\S]{0,240}['"]rdc/i.test(source)
+    || /createMcpServer\([^)]*rdc/i.test(source)
+    || /mcp__rdc__/i.test(source)
   );
 }
 
@@ -598,13 +598,13 @@ export function collectHardForbidViolations(repoRoot) {
       });
     }
 
-    const cliSurface = isLegitimateRdxCliSurface(posixPath);
-    if (hasRdxMcpRegistration(source) || (!cliSurface && hasRdAgentToolRegistration(source, posixPath))) {
+    const cliSurface = isLegitimateRdcCliSurface(posixPath);
+    if (hasRdcMcpRegistration(source) || (!cliSurface && hasRdAgentToolRegistration(source, posixPath))) {
       violations.push({
-        id: 'hard.rdx-mcp-or-rd-tools',
+        id: 'hard.rdc-mcp-or-rd-tools',
         file: posixPath,
-        pattern: 'RDX MCP registration or rd.* AgentTool/catalog registration',
-        note: 'RDX MCP or rd.* Agent tool schema registration is forbidden',
+        pattern: 'RDC MCP registration or rd.* AgentTool/catalog registration',
+        note: 'RDC MCP or rd.* Agent tool schema registration is forbidden',
       });
     }
 
@@ -1415,33 +1415,33 @@ const taskStore = null;
     }
   }));
 
-  cases.push(runFixtureCase('hard-rdx-settings-mcp', (dir) => {
+  cases.push(runFixtureCase('hard-rdc-settings-mcp', (dir) => {
     mkdirSync(path.join(dir, 'src', 'renderer', 'features', 'settings'), { recursive: true });
-    writeFileSync(path.join(dir, 'src', 'renderer', 'features', 'settings', 'HiddenRdxMcp.ts'), `
-export const mcpServers = [{ name: 'rdx', command: 'rdx-mcp', transport: 'stdio' }];
+    writeFileSync(path.join(dir, 'src', 'renderer', 'features', 'settings', 'HiddenRdcMcp.ts'), `
+export const mcpServers = [{ name: 'rdc', command: 'rdc-mcp', transport: 'stdio' }];
 `, 'utf8');
     const violations = collectHardForbidViolations(dir);
-    if (!violations.some((item) => item.id === 'hard.rdx-mcp-or-rd-tools')) {
-      throw new Error('RDX MCP hidden in settings must fail');
+    if (!violations.some((item) => item.id === 'hard.rdc-mcp-or-rd-tools')) {
+      throw new Error('RDC MCP hidden in settings must fail');
     }
   }));
 
-  cases.push(runFixtureCase('hard-rdx-plain-name', (dir) => {
+  cases.push(runFixtureCase('hard-rdc-plain-name', (dir) => {
     mkdirSync(path.join(dir, 'src', 'main'), { recursive: true });
     writeFileSync(path.join(dir, 'src', 'main', 'plain.ts'), `export const example = { name: 'rd.foo', label: 'not a tool' };\n`, 'utf8');
     const violations = collectHardForbidViolations(dir);
-    if (violations.some((item) => item.id === 'hard.rdx-mcp-or-rd-tools')) {
+    if (violations.some((item) => item.id === 'hard.rdc-mcp-or-rd-tools')) {
       throw new Error('ordinary name rd.foo must not fail');
     }
   }));
 
-  cases.push(runFixtureCase('hard-rdx-agent-tool', (dir) => {
+  cases.push(runFixtureCase('hard-rdc-agent-tool', (dir) => {
     mkdirSync(path.join(dir, 'src', 'shared', 'constants'), { recursive: true });
     writeFileSync(path.join(dir, 'src', 'shared', 'constants', 'agentToolTokens.ts'), `
 export const BUILTIN_AGENT_TOOL_IDS = ['read_file', 'rd.foo'];
 `, 'utf8');
     const violations = collectHardForbidViolations(dir);
-    if (!violations.some((item) => item.id === 'hard.rdx-mcp-or-rd-tools')) {
+    if (!violations.some((item) => item.id === 'hard.rdc-mcp-or-rd-tools')) {
       throw new Error('builtin AgentTool rd.foo must fail');
     }
   }));

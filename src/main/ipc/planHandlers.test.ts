@@ -16,7 +16,7 @@ vi.mock('electron', () => ({ ipcMain: { handle: (id: string, fn: (...args: unkno
   BrowserWindow: { getFocusedWindow: () => ({}) }, dialog: { showSaveDialog: mocks.saveDialog, showMessageBox: mocks.confirm } }));
 vi.mock('../sessions/sessionPlanReference', () => ({ readReferencedPlan: mocks.read }));
 vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: { sessions: { findSessionLocation: mocks.location }, get io() { return new StorageIo(); } } }));
-vi.mock('../runtime/AppPathService', () => ({ appPathService: { getProjectRdxPaths: mocks.paths } }));
+vi.mock('../runtime/AppPathService', () => ({ appPathService: { getProjectRdcPaths: mocks.paths } }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 
 const request = { sessionId: 's', planId: 'old-plan', revision: 2, uri: 'session://plans/plan-frozen.md', expectedHash: 'a'.repeat(64) };
@@ -25,10 +25,10 @@ let root: string;
 const invoke = (channel: string, args: unknown) => mocks.handlers.get(channel)!(null, args);
 beforeEach(() => {
   vi.clearAllMocks();
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-plan-ipc-'));
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-plan-ipc-'));
   context.state.currentSessionId = 's';
   mocks.location.mockReturnValue({ project: { rootPath: root } });
-  mocks.paths.mockReturnValue({ plansPath: path.join(root, '.rdx', 'plans') });
+  mocks.paths.mockReturnValue({ plansPath: path.join(root, '.rdc-agent', 'plans') });
   mocks.read.mockReturnValue({ markdown: '# Old body\n', hash: request.expectedHash, uri: request.uri,
     ownerSessionId: 's', agentId: 'debugger', plan: { planId: request.planId, revision: 2, title: 'Old plan' } });
   mocks.saveDialog.mockResolvedValue({ canceled: false, filePath: path.join(root, 'export.md') });

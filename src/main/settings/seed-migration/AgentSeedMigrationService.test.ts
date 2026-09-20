@@ -146,7 +146,7 @@ describe('seed semantic hash', () => {
 
 describe('AgentSeedMigrationService v2', () => {
   it('purges historical ask/plan/edit even when the user rewrote the body', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-hist-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-hist-'));
     roots.push(root);
     const s9Ask = OFFICIAL_SEED_GENERATIONS.find((entry) => entry.id === 's9')!.manifests.find((entry) => entry.id === 'ask')!;
     await writeFile(path.join(root, 'ask.agent.md'), serializeAgentMarkdown({
@@ -180,7 +180,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('purges S0 specialist ids as purged-historical', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-s0-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-s0-'));
     roots.push(root);
     const s0 = OFFICIAL_SEED_GENERATIONS.find((entry) => entry.id === 's0')!.manifests
       .find((entry) => entry.id === 'triage_agent')!;
@@ -195,7 +195,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('purges builtin shadows that match current canonical hash', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-shadow-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-shadow-'));
     roots.push(root);
     await writeFile(path.join(root, 'general.agent.md'), readBuiltinRaw('general'), 'utf8');
     const result = new AgentSeedMigrationService().migrateUserAgents(root);
@@ -204,7 +204,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('purges builtin copies that only differ in model/icon/accent/handoff.model', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-cosmetic-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-cosmetic-'));
     roots.push(root);
     let raw = readBuiltinRaw('general');
     raw = raw.replace('model: []', 'model:\n  - openrouter/x');
@@ -221,7 +221,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('retains a builtin-id copy that differs in tools or instructions', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-override-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-override-'));
     roots.push(root);
     const raw = `${readBuiltinRaw('debugger').trimEnd()}\n\nUser changed instructions.\n`;
     await writeFile(path.join(root, 'debugger.agent.md'), raw, 'utf8');
@@ -231,7 +231,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('retains unrelated custom ids', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-custom-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-custom-'));
     roots.push(root);
     const s9Ask = OFFICIAL_SEED_GENERATIONS.find((entry) => entry.id === 's9')!.manifests.find((entry) => entry.id === 'ask')!;
     await writeFile(path.join(root, 'my-custom.agent.md'), serializeAgentMarkdown({
@@ -247,7 +247,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('keeps filename/frontmatter mismatches as invalid-id', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-mismatch-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-mismatch-'));
     roots.push(root);
     const s0Ask = OFFICIAL_SEED_GENERATIONS.find((entry) => entry.id === 's0')!.manifests
       .find((entry) => entry.id === 'ask_agent')!;
@@ -261,7 +261,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('treats a v1 marker as incomplete and rewrites it to v2', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-v1-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-v1-'));
     roots.push(root);
     await writeFile(path.join(root, '.seed-migration.json'), JSON.stringify({
       schemaVersion: '1',
@@ -284,7 +284,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('fail-closes a handwritten schemaVersion 3 marker and does not touch files', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-v3-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-v3-'));
     roots.push(root);
     const markerPath = path.join(root, '.seed-migration.json');
     await writeFile(markerPath, JSON.stringify({
@@ -306,7 +306,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('does not remove leftover .migrated when schemaVersion is 3', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-v3-migrated-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-v3-migrated-'));
     roots.push(root);
     const markerPath = path.join(root, '.seed-migration.json');
     const migratedArchive = path.join(root, '.migrated', 's9', 'ask.agent.md');
@@ -334,7 +334,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('no-ops when a v2 marker exists and the directory hash is unchanged', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-noop-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-noop-'));
     roots.push(root);
     await writeFile(path.join(root, 'my-custom.agent.md'), '---\nname: Custom\n---\nkeep\n', 'utf8');
     const first = new AgentSeedMigrationService().migrateUserAgents(root);
@@ -346,7 +346,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('re-evaluates new shadows but never deletes previously retained-override files', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-reeval-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-reeval-'));
     roots.push(root);
     await writeFile(
       path.join(root, 'debugger.agent.md'),
@@ -367,7 +367,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('restores isolated files when builtin verification fails', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-verify-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-verify-'));
     roots.push(root);
     const missingBuiltins = path.join(root, 'missing-builtins');
     await mkdir(missingBuiltins, { recursive: true });
@@ -383,7 +383,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('fail-closes a corrupt isolation manifest without dropping unrelated files', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-isol-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-isol-'));
     roots.push(root);
     await writeFile(path.join(root, 'my-custom.agent.md'), '---\nname: Custom\n---\nkeep custom\n', 'utf8');
     await mkdir(path.join(root, SEED_PURGE_ISOLATION_DIR_NAME), { recursive: true });
@@ -405,7 +405,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('does not delete a source file when a live lock is held', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-lock-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-lock-'));
     roots.push(root);
     const sourcePath = path.join(root, 'ask.agent.md');
     await writeFile(sourcePath, serializeOfficialSeedFixture(
@@ -422,7 +422,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('removes a leftover .migrated directory after a successful purge', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-leftover-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-leftover-'));
     roots.push(root);
     await mkdir(path.join(root, '.migrated', 's9'), { recursive: true });
     await writeFile(path.join(root, '.migrated', 's9', 'ask.agent.md'), 'stale archive\n', 'utf8');
@@ -436,7 +436,7 @@ describe('AgentSeedMigrationService v2', () => {
   });
 
   it('restores the exact prior user file when explicit override ownership cannot be committed', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-explicit-rollback-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-seed-explicit-rollback-'));
     roots.push(root);
     const fileName = 'custom.agent.md';
     const filePath = path.join(root, fileName);

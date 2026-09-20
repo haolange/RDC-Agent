@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 function makeSession(name = 'session-a'): { sessionId: string; sessionPath: string } {
-  const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), `rdx-artifact-${name}-`));
+  const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), `rdc-artifact-${name}-`));
   roots.push(sessionPath);
   fs.writeFileSync(path.join(sessionPath, 'session.json'), '{}', 'utf8');
   return { sessionId: name, sessionPath };

@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { HookDefinition } from '@shared/types/rdxRuntime';
+import type { HookDefinition } from '@shared/types/rdcRuntime';
 import {
   computeHookTrustFingerprint,
   resolveExecutableIdentity,
@@ -10,7 +10,7 @@ import {
 
 const roots: string[] = [];
 const makeRoot = () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-hook-fp-unit-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-hook-fp-unit-'));
   roots.push(root);
   return root;
 };

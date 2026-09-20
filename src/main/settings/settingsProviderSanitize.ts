@@ -473,7 +473,7 @@ export function isConnectionSchemaSatisfied(
 
 export function sanitizeUserProvider(
   provider: PersistedLlmProviderEntry,
-  workspaceRoot = appPathService.getUserRdxRoot(),
+  workspaceRoot = appPathService.getUserRdcRoot(),
   options: ProviderSanitizeOptions = {},
 ): LlmProviderEntry | null {
   const incomingId = typeof provider.id === 'string' ? provider.id.trim() : '';

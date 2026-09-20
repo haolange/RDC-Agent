@@ -36,8 +36,8 @@ describe('PolicyCompiler', () => {
     }).contextCompactionPercent).toBe(70);
 
     const previousHome = process.env.RDC_AGENT_HOME;
-    const userRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-policy-user-'));
-    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-policy-project-'));
+    const userRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-user-'));
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-project-'));
     try {
       process.env.RDC_AGENT_HOME = userRoot;
       fs.mkdirSync(path.join(userRoot, 'policies'), { recursive: true });
@@ -46,16 +46,16 @@ describe('PolicyCompiler', () => {
         'limits:\n  contextCompactionPercent: 80\n',
         'utf8',
       );
-      fs.mkdirSync(path.join(projectRoot, '.rdx', 'policies'), { recursive: true });
+      fs.mkdirSync(path.join(projectRoot, '.rdc-agent', 'policies'), { recursive: true });
       fs.writeFileSync(
-        path.join(projectRoot, '.rdx', 'policies', 'project.policy.yml'),
+        path.join(projectRoot, '.rdc-agent', 'policies', 'project.policy.yml'),
         'limits:\n  contextCompactionPercent: 70\n',
         'utf8',
       );
       expect(compileEffectivePolicy(projectRoot).contextCompactionPercent).toBe(70);
 
       fs.writeFileSync(
-        path.join(projectRoot, '.rdx', 'policies', 'project.policy.yml'),
+        path.join(projectRoot, '.rdc-agent', 'policies', 'project.policy.yml'),
         'limits:\n  contextCompactionPercent: 90\n',
         'utf8',
       );
@@ -71,7 +71,7 @@ describe('PolicyCompiler', () => {
 
   it('filters disabled policies before restrictive merge', () => {
     const previousHome = process.env.RDC_AGENT_HOME;
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-policy-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-'));
     try {
       process.env.RDC_AGENT_HOME = root;
       const policies = path.join(root, 'policies');

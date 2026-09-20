@@ -100,6 +100,6 @@ const replay = read('src/renderer/features/right-rail/useCaptureReplay.ts');
 for (const required of ['next.projectId === scope.projectId', 'next.sessionId === scope.sessionId', 'next.generation', 'next.revision']) {
   if (!replay.includes(required)) fail(`Capture replay must gate scope and revisions: ${required}`);
 }
-const runtime = read('src/main/sessions/RdxSessionService.ts');
-if (!runtime.includes('keyOf(scope)') || !runtime.includes('runRdxOperation')) fail('Capture runtime must retain scoped ownership and native serialization');
+const runtime = read('src/main/sessions/RdcSessionService.ts');
+if (!runtime.includes('keyOf(scope)') || !runtime.includes('runRdcOperation')) fail('Capture runtime must retain scoped ownership and native serialization');
 console.log('[session-projection] ok');

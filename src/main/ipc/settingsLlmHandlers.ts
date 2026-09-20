@@ -190,7 +190,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'settings:get', maxBytes: 1024 });
     const paths = appPathService.getRuntimePaths();
     return withEffectiveAgentModelOptions(settingsService.getAll({
-      userRdxRoot: paths.userRdxRoot,
+      userRdcRoot: paths.userRdcRoot,
       settingsPath: paths.settingsPath,
       instructionsPath: paths.instructionsPath,
       agentsPath: paths.agentsPath,
@@ -256,7 +256,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       maxBytes: 4 * 1024,
     });
     const paths = appPathService.getRuntimePaths();
-    return settingsService.hasProviderSecret(providerId, paths.userRdxRoot);
+    return settingsService.hasProviderSecret(providerId, paths.userRdcRoot);
   });
 
   ipcMain.handle('settings:importAgentManifest', async (_event, ...rawArgs: unknown[]) => {

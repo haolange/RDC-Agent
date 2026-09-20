@@ -1,0 +1,16 @@
+import { getElectronApi } from './getElectronApi';
+import { assertRdcCliBinding } from '@shared/utils/rdcCliBinding';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
+import type { ToolRuntimeSummary } from '@shared/types/tool';
+
+export async function validateRdcInstallation(draft: RdcCliInvokerSettings): Promise<ToolRuntimeSummary | null> {
+  assertRdcCliBinding(draft);
+  const api = getElectronApi();
+  if (!api) throw new Error('Application bridge is unavailable.');
+  const saved = (await api.settings.get()).tooling.rdcCli;
+  if (saved.enabled !== draft.enabled || saved.command !== draft.command
+    || saved.workingDirectory !== draft.workingDirectory || saved.timeoutMs !== draft.timeoutMs
+    || JSON.stringify(saved.argsPrefix) !== JSON.stringify(draft.argsPrefix)
+    || Object.keys({ ...saved.env, ...draft.env }).some(key => saved.env[key] !== draft.env[key])) return null;
+  return api.tool.getRuntimeSummary();
+}

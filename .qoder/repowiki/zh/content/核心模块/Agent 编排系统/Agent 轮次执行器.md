@@ -10,7 +10,7 @@
 - [AgentSlotRegistry.ts](file://src/main/workflow/debugger/AgentSlotRegistry.ts)
 - [DeferredToolActivationTracker.ts](file://src/main/workflow/debugger/DeferredToolActivationTracker.ts)
 - [DirectTaskTurnLifecycle.ts](file://src/main/workflow/debugger/DirectTaskTurnLifecycle.ts)
-- [RdxRuntimeService.ts](file://src/main/runtime/RdxRuntimeService.ts)
+- [RdcRuntimeService.ts](file://src/main/runtime/RdcRuntimeService.ts)
 - [StorageAdapter.ts](file://src/main/sessions/StorageAdapter.ts)
 - [HookEngine.ts](file://src/main/hooks/HookEngine.ts)
 - [AgentEventBridge.ts](file://src/main/agent-runtime/AgentEventBridge.ts)
@@ -26,7 +26,7 @@
 - [AgentToolApprovalRequestService.ts](file://src/main/agent-runtime/permissions/AgentToolApprovalRequestService.ts)
 - [AgentUserInputRequestService.ts](file://src/main/agent-runtime/interactions/AgentUserInputRequestService.ts)
 - [ResourceExecutionLifetime.ts](file://src/main/runtime/ResourceExecutionLifetime.ts)
-- [RdxTurnBindings.ts](file://src/main/tools/RdxTurnBindings.ts)
+- [RdcTurnBindings.ts](file://src/main/tools/RdcTurnBindings.ts)
 </cite>
 
 ## 目录
@@ -55,7 +55,7 @@
 - 对话层：ConversationTurnRunner 负责用户消息到助手回复的端到端编排，包含流式补丁调度、持久化、工作追踪、手递手（handoff）结算。
 - 工作流调试层：AgentTurnRunner 负责创建/复用 Agent 槽位、构建请求、订阅事件、统计用量、协调 Turn 生命周期。
 - 工具执行层：ToolExecutorFactory 负责工具解析、权限校验、参数校验、钩子触发、资源仲裁、异步执行与结果归一化。
-- 支撑服务：TurnCoordinator、AgentSlotRegistry、DeferredToolActivationTracker、HookEngine、StorageAdapter、RdxRuntimeService 等。
+- 支撑服务：TurnCoordinator、AgentSlotRegistry、DeferredToolActivationTracker、HookEngine、StorageAdapter、RdcRuntimeService 等。
 
 ```mermaid
 graph TB
@@ -207,7 +207,7 @@ AgentTurnRunner --> TurnCoordinator : "轮次协调"
 - [AgentTurnRunner.ts:119-899](file://src/main/workflow/debugger/AgentTurnRunner.ts#L119-L899)
 
 ### ToolExecutorFactory：工具装配与执行
-- 动态工具加载：resolveRuntimeTools 根据 agentId、toolAllowlist、sessionId、projectId、projectRootPath、mcpPoolKey 等解析工具映射；支持 excludeRdxLeaseTools。
+- 动态工具加载：resolveRuntimeTools 根据 agentId、toolAllowlist、sessionId、projectId、projectRootPath、mcpPoolKey 等解析工具映射；支持 excludeRdcLeaseTools。
 - 权限与策略：先按 skillIntersection 收窄，再按 compiledPolicy 拒绝 deniedTools；随后由 AgentPermissionPolicy 评估 action（allow/deny/ask_user/auto_review）。
 - 参数校验：使用 ToolValidator 对 arguments 进行 schema 校验，失败返回 TOOL_SCHEMA_VIOLATION。
 - 沙箱与资源仲裁：withProcessExecutionOwner + withTemporaryPathAccess 限定临时路径访问；toolResourceArbiter 根据工具并发安全性选择共享或独占执行。
@@ -260,7 +260,7 @@ Artifact --> Return(["返回ToolResultMessage"])
 章节来源
 - [ToolExecutorFactory.ts:141-374](file://src/main/workflow/debugger/ToolExecutorFactory.ts#L141-L374)
 - [ResourceExecutionLifetime.ts](file://src/main/runtime/ResourceExecutionLifetime.ts)
-- [RdxTurnBindings.ts](file://src/main/tools/RdxTurnBindings.ts)
+- [RdcTurnBindings.ts](file://src/main/tools/RdcTurnBindings.ts)
 
 ### 错误处理、重试与超时控制
 - 错误分类与恢复：ErrorRecovery 提供重试、压缩、继续、中止策略；对 provider 明确拒绝结构化工具调用的情况记录能力证据。
@@ -285,7 +285,7 @@ Artifact --> Return(["返回ToolResultMessage"])
   - 提供者：ConfiguredRuntimeProvider 负责实际 LLM 调用。
   - 存储：StorageAdapter 负责会话、附件、终端提交。
   - 钩子系统：HookEngine 提供生命周期钩子。
-  - 运行时：RdxRuntimeService 提供运行时能力（如 MCP 连接、凭据等）。
+  - 运行时：RdcRuntimeService 提供运行时能力（如 MCP 连接、凭据等）。
 
 ```mermaid
 graph LR

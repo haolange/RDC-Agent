@@ -28,7 +28,7 @@ tools:
   - skill
   - mcp
   - subagent
-  - rdxContext
+  - rdcContext
   - tool_search
   - knowledge
   - investigation

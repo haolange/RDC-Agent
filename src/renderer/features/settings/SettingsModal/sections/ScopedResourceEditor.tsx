@@ -1,5 +1,5 @@
 import React from 'react';
-import { CANONICAL_HOOK_EVENTS, type ScopedResourceKind } from '@shared/types/rdxRuntime';
+import { CANONICAL_HOOK_EVENTS, type ScopedResourceKind } from '@shared/types/rdcRuntime';
 import { MCP_TRANSPORTS } from '@shared/types/mcp';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';

@@ -62,9 +62,9 @@ function assertEffectiveSaveShape(definition: unknown): asserts definition is {
 
 describe('AgentManifestService save/delete effective commit', () => {
   it('returns compiledRoute and provenance.sourceHash and accepts that hash on the next save', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-agent-save-meta-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-save-meta-'));
     roots.push(root);
-    const paths = { agentsPath: path.join(root, 'agents'), instructionsPath: path.join(root, 'RDX.md') };
+    const paths = { agentsPath: path.join(root, 'agents'), instructionsPath: path.join(root, 'RDC.md') };
     const first = await agentManifestService.saveDefinition(
       paths,
       customDraft('custom-writer', 'openai:gpt-test'),
@@ -91,12 +91,12 @@ describe('AgentManifestService save/delete effective commit', () => {
   });
 
   it('restores builtin general after deleting a project override', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-agent-delete-restore-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-delete-restore-'));
     roots.push(root);
     const projectRoot = path.join(root, 'project');
-    const projectAgents = path.join(projectRoot, '.rdx', 'agents');
+    const projectAgents = path.join(projectRoot, '.rdc-agent', 'agents');
     await mkdir(projectAgents, { recursive: true });
-    const paths = { agentsPath: path.join(root, 'user-agents'), instructionsPath: path.join(root, 'RDX.md') };
+    const paths = { agentsPath: path.join(root, 'user-agents'), instructionsPath: path.join(root, 'RDC.md') };
     await agentManifestService.saveDefinition(
       paths,
       customDraft('general', 'openai:project-general'),
@@ -120,9 +120,9 @@ describe('AgentManifestService save/delete effective commit', () => {
   });
 
   it('returns definition null only when the id is gone from every scope', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-agent-delete-gone-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-delete-gone-'));
     roots.push(root);
-    const paths = { agentsPath: path.join(root, 'agents'), instructionsPath: path.join(root, 'RDX.md') };
+    const paths = { agentsPath: path.join(root, 'agents'), instructionsPath: path.join(root, 'RDC.md') };
     await agentManifestService.saveDefinition(paths, customDraft('only-mine', 'openai:a'), { scope: 'user' });
     const deleted = await agentManifestService.saveDefinition(
       paths,

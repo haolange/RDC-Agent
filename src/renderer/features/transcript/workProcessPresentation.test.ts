@@ -1050,7 +1050,7 @@ describe('buildWorkProcessPresentation', () => {
               id: 'tool-read',
               toolName: 'read_file',
               status: 'complete',
-              argsPreview: JSON.stringify({ path: '.rdx/project.yaml' }),
+              argsPreview: JSON.stringify({ path: '.rdc-agent/project.yaml' }),
               resultPreview: JSON.stringify({
                 ok: true,
                 data: { content: [{ type: 'text', text: '1→schema_version: "1"\n2→name: "rdc"' }] },
@@ -1072,7 +1072,7 @@ describe('buildWorkProcessPresentation', () => {
       type: 'tool',
       family: 'file',
       previewKind: 'file',
-      pathChip: '.rdx/project.yaml',
+      pathChip: '.rdc-agent/project.yaml',
     });
     if (!readRow || readRow.type !== 'tool') throw new Error('expected read tool row');
     expect(readRow.previewLines.join('\n')).toContain('schema_version');

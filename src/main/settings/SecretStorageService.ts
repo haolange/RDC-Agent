@@ -70,7 +70,7 @@ function fsyncPath(targetPath: string): void {
 }
 
 export class SecretStorageService {
-  private getSecretFilePath(_workspaceRoot = appPathService.getUserRdxRoot()): string {
+  private getSecretFilePath(_workspaceRoot = appPathService.getUserRdcRoot()): string {
     return path.join(appPathService.getRuntimePaths().secretsPath, SECRET_FILE_NAME);
   }
 

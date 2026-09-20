@@ -27,7 +27,7 @@ function resolverFor(sessionPath: string): SessionArtifactResolver {
 
 describe('ToolResultArtifactizer', () => {
   it('leaves results at or below the 32 KiB threshold in place', () => {
-    const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-art-below-'));
+    const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-art-below-'));
     roots.push(sessionPath);
     const small = {
       content: [{ type: 'text' as const, text: 'hello' }],
@@ -46,7 +46,7 @@ describe('ToolResultArtifactizer', () => {
   });
 
   it('offloads oversized successful results to session://tool-outputs', () => {
-    const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-art-over-'));
+    const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-art-over-'));
     roots.push(sessionPath);
     fs.writeFileSync(path.join(sessionPath, 'session.json'), '{}');
     const huge = 'x'.repeat(TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES + 64);
@@ -118,7 +118,7 @@ describe('ToolResultArtifactizer', () => {
     expect(JSON.stringify(denied)).not.toContain(huge.slice(0, 80));
   });
   it('stores large child error output under root, grants exact readback and preserves critical tail', () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-child-offload-')); roots.push(root);
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-child-offload-')); roots.push(root);
     fs.writeFileSync(path.join(root, 'session.json'), '{}');
     const resolver = resolverFor(root);
     const release = grantDelegatedArtifactAccess('child-one', 'sess-1', [], resolver);

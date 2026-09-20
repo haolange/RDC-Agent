@@ -102,7 +102,7 @@ export class SettingsProviderOps {
     const paths = appPathService.initializeRuntime();
     const currentPersisted = normalizePersistedSettings(
       readJsonFile<PersistedSettingsPayload>(paths.settingsPath) ?? createDefaultPersistedSettings(),
-      paths.userRdxRoot,
+      paths.userRdcRoot,
       { credentialView: 'storage-metadata' },
     );
   const currentProviders = currentPersisted.llm?.providers ?? [];
@@ -118,11 +118,11 @@ export class SettingsProviderOps {
     activeAccountId: current.activeAccountId,
     hasStoredSecretByAuthMode: current.hasStoredSecretByAuthMode,
     hasStoredConnectionSecrets: current.hasStoredConnectionSecrets,
-  }, paths.userRdxRoot, { credentialView: 'storage-metadata' });
+  }, paths.userRdcRoot, { credentialView: 'storage-metadata' });
   if (!sanitized) throw new Error(`Provider ${provider.id} could not be sanitized.`);
   const nextProviders = normalizeUserProviders(
     currentProviders.map((entry) => entry.id === provider.id ? sanitized : entry),
-    paths.userRdxRoot,
+    paths.userRdcRoot,
     { credentialView: 'storage-metadata' },
   );
   await writeSettingsAsync({
@@ -232,7 +232,7 @@ export class SettingsProviderOps {
     : (defaultBaseUrl || provider.baseUrl);
   const schema = provider.connectionSchema;
   const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(schema) ?? 'apiKey';
-  const existingHydratedValues = this.host.getProviderConnectionValues(provider.id, current.paths.userRdxRoot);
+  const existingHydratedValues = this.host.getProviderConnectionValues(provider.id, current.paths.userRdcRoot);
   const draftHas = (fieldId: string): boolean => (
     Object.prototype.hasOwnProperty.call(connectionValuesDraft ?? {}, fieldId)
   );
@@ -304,8 +304,8 @@ export class SettingsProviderOps {
         nextSecretRefs[field.id] = targetRef;
       }
       retainedSecretRefs.add(targetRef);
-      if (credentialChanged || !secretStorageService.hasSecretRecord(targetRef, current.paths.userRdxRoot)) {
-        secretStorageService.setSecret(targetRef, plannedSecrets[field.id], current.paths.userRdxRoot);
+      if (credentialChanged || !secretStorageService.hasSecretRecord(targetRef, current.paths.userRdcRoot)) {
+        secretStorageService.setSecret(targetRef, plannedSecrets[field.id], current.paths.userRdcRoot);
         stagedSecretRefs.add(targetRef);
       }
     }
@@ -353,13 +353,13 @@ export class SettingsProviderOps {
     });
     deleteSecretsAfterCommit(
       [...previousSecretRefs].filter((secretRef) => !retainedSecretRefs.has(secretRef)),
-      current.paths.userRdxRoot,
+      current.paths.userRdcRoot,
     );
     return nextSettings;
   } catch (error) {
     deleteSecretsAfterCommit(
       [...stagedSecretRefs].filter((secretRef) => !previousSecretRefs.has(secretRef)),
-      current.paths.userRdxRoot,
+      current.paths.userRdcRoot,
     );
     throw error;
   }
@@ -391,7 +391,7 @@ export class SettingsProviderOps {
   const previousSecretRef = provider.authAccountIds?.account && provider.authAccountIds.account !== activeAccountId
     ? getProviderAccountSecretRef(provider.id, provider.authAccountIds.account, 'oauth')
     : undefined;
-  secretStorageService.setSecret(nextSecretRef, secretPayload, current.paths.userRdxRoot);
+  secretStorageService.setSecret(nextSecretRef, secretPayload, current.paths.userRdcRoot);
 
   const timestamp = nowIso();
   const nextProvider: LlmProviderEntry = {
@@ -421,7 +421,7 @@ export class SettingsProviderOps {
       providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
     },
   });
-  deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], current.paths.userRdxRoot);
+  deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], current.paths.userRdcRoot);
   return nextSettings;
   }
 
@@ -442,7 +442,7 @@ export class SettingsProviderOps {
   const previousSecretRef = provider.authAccountIds?.account && provider.authAccountIds.account !== activeAccountId
     ? getProviderAccountSecretRef(provider.id, provider.authAccountIds.account, 'oauth')
     : undefined;
-  secretStorageService.setSecret(nextSecretRef, secretPayload, current.paths.userRdxRoot);
+  secretStorageService.setSecret(nextSecretRef, secretPayload, current.paths.userRdcRoot);
   const nextProvider: LlmProviderEntry = {
     ...provider,
     authMode: 'account',
@@ -461,7 +461,7 @@ export class SettingsProviderOps {
       providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
     },
   });
-  deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], current.paths.userRdxRoot);
+  deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], current.paths.userRdcRoot);
   return nextSettings;
   }
 
@@ -509,7 +509,7 @@ export class SettingsProviderOps {
           : entry),
       },
     });
-    deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], current.paths.userRdxRoot);
+    deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], current.paths.userRdcRoot);
     return nextSettings;
   }
 
@@ -540,7 +540,7 @@ export class SettingsProviderOps {
       providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
     },
   });
-  deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], current.paths.userRdxRoot);
+  deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], current.paths.userRdcRoot);
   return nextSettings;
   }
 }

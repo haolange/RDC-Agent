@@ -24,7 +24,7 @@ export const zhSidebar = {
   'sidebar.removeSessionTitle': '删除会话？',
   'sidebar.removeSessionConfirm': '删除“{title}”？消息、工作过程、请求快照、派生上下文和会话产物都会从本机移除，且无法撤销。',
   'sidebar.removeProjectTitle': '移除项目？',
-  'sidebar.removeProjectConfirm': '从 RDC Agent 移除“{name}”？该项目在本机的会话与派生工作区数据将被删除，但不会改动源项目目录。',
+  'sidebar.removeProjectConfirm': '从 RDC-Agent 移除“{name}”？该项目在本机的会话与派生工作区数据将被删除，但不会改动源项目目录。',
   'sidebar.selectProjectFailed': '选择项目失败。',
   'sidebar.selectSessionFailed': '选择会话失败。',
   'sidebar.renameSession': '重命名会话',

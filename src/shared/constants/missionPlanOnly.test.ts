@@ -14,18 +14,18 @@ describe('mission plan-only allowlist', () => {
       'shell',
       'interpreter',
       'output',
-      'rdx_probe',
+      'rdc_probe',
     ]);
-    expect(expanded).toEqual(expect.arrayContaining(['read_file', 'task_create', 'task_stop', 'turn_complete', 'background_join', 'background_cancel', 'rdx_probe']));
+    expect(expanded).toEqual(expect.arrayContaining(['read_file', 'task_create', 'task_stop', 'turn_complete', 'background_join', 'background_cancel', 'rdc_probe']));
     expect(expanded).not.toContain('shell');
     expect(expanded).not.toContain('code_interpreter');
     expect(expanded).not.toContain('output_register');
   });
 
   it('filters a frozen allowlist down to plan-only ids', () => {
-    expect(filterMissionPlanOnlyAllowlist(['read_file', 'shell', 'output_register', 'rdx_probe'])).toEqual([
+    expect(filterMissionPlanOnlyAllowlist(['read_file', 'shell', 'output_register', 'rdc_probe'])).toEqual([
       'read_file',
-      'rdx_probe',
+      'rdc_probe',
     ]);
     expect(isMissionForbiddenToolId('mcp__fs__write')).toBe(true);
   });

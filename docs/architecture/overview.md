@@ -16,19 +16,19 @@ flowchart LR
   IPC --> Runtime["Agent / session services"]
   Runtime --> Trace["Agentic Trace"]
   Runtime --> Settings["SettingsService"]
-  Runtime --> Actions["RDX shell actions"]
+  Runtime --> Actions["RDC shell actions"]
   Actions --> Shell["ShellInvocationService"]
-  Shell --> CLI["System-installed RDX CLI"]
+  Shell --> CLI["System-installed RDC-Tool CLI"]
   Trace --> Renderer
 ```
 
-The RDX CLI command is not hardcoded or bundled. System-installed CLI commands, action arguments, working directory, environment variables, timeout, and catalog path are Settings data.
+The RDC-Tool CLI command is not hardcoded or bundled. System-installed CLI commands, action arguments, working directory, environment variables, timeout, and catalog path are Settings data.
 
 ## Public Boundaries
 
 - Renderer/preload can read catalog and runtime status through IPC.
 - Renderer/preload do not expose arbitrary tool execution.
-- RDX vertical entries call configured shell actions through `ShellInvocationService`; agents use allowed shell access and read stable runtime context through `rdxContext`.
+- RDC vertical entries call configured shell actions through `ShellInvocationService`; agents use allowed shell access and read stable runtime context through `rdcContext`.
 - Agentic Trace exposes projection APIs under `trace:*`.
 - Debugger workflow actions remain under `workflow:*`.
 

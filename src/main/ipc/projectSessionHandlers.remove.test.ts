@@ -35,7 +35,7 @@ vi.mock('../sessions/StorageAdapter', () => ({
   storageAdapter: storage,
 }));
 vi.mock('./projectInputLifecycleHandlers', () => ({ registerProjectInputLifecycleHandlers: vi.fn() }));
-vi.mock('../sessions', () => ({ rdxSessionService: { clearOpenedCaptureForSession: vi.fn(async () => true) } }));
+vi.mock('../sessions', () => ({ rdcSessionService: { clearOpenedCaptureForSession: vi.fn(async () => true) } }));
 
 vi.mock('../workflow/debugger/AgentOrchestrator', () => ({
   agentOrchestrator: { syncSessionSlots, releaseSessionToolState: vi.fn(), backgroundSubagents: { abortSession: abortBackgroundSession } },
@@ -69,8 +69,8 @@ vi.mock('../workflow/debugger/RunExecutionService', () => ({
   },
 }));
 
-vi.mock('../tools/RdxCliInvokerService', () => ({
-  rdxCliInvokerService: { abortRun: vi.fn() },
+vi.mock('../tools/RdcCliInvokerService', () => ({
+  rdcCliInvokerService: { abortRun: vi.fn() },
 }));
 
 import { registerProjectSessionHandlers } from './projectSessionHandlers';

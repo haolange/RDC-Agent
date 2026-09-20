@@ -1,7 +1,7 @@
 import React, { useState, type Dispatch, type SetStateAction } from 'react';
-import type { AgentShellSettings, CodeInterpreterSettings, RdxCliInvokerSettings } from '@shared/types/settings';
+import type { AgentShellSettings, CodeInterpreterSettings, RdcCliInvokerSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
-import { RdxCliInvokerSettingsFields } from './RdxCliInvokerSettingsFields';
+import { RdcCliInvokerSettingsFields } from './RdcCliInvokerSettingsFields';
 import { CodeInterpreterSettingsFields } from './CodeInterpreterSettingsFields';
 import { ShellSettingsFields } from './ShellSettingsFields';
 import { LocalToolDisclosure } from './LocalToolDisclosure';
@@ -11,10 +11,10 @@ type Translate = ReturnType<typeof useI18n>['t'];
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 interface ToolsSettingsProps {
-  rdxCliDraft: RdxCliInvokerSettings;
+  rdcCliDraft: RdcCliInvokerSettings;
   codeInterpreterDraft: CodeInterpreterSettings;
   shellDraft: AgentShellSettings;
-  onRdxCliDraftChange: Dispatch<SetStateAction<RdxCliInvokerSettings>>;
+  onRdcCliDraftChange: Dispatch<SetStateAction<RdcCliInvokerSettings>>;
   onCodeInterpreterDraftChange: Dispatch<SetStateAction<CodeInterpreterSettings>>;
   onShellDraftChange: Dispatch<SetStateAction<AgentShellSettings>>;
   onSaveToolsConfig: () => void | Promise<void>;
@@ -24,10 +24,10 @@ interface ToolsSettingsProps {
 }
 
 export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
-  rdxCliDraft,
+  rdcCliDraft,
   codeInterpreterDraft,
   shellDraft,
-  onRdxCliDraftChange,
+  onRdcCliDraftChange,
   onCodeInterpreterDraftChange,
   onShellDraftChange,
   onSaveToolsConfig,
@@ -77,11 +77,11 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
 
       <LocalToolDisclosure
         icon="cube"
-        title={t('settings.rdxToolchainTitle')}
-        description={t('settings.rdxToolchainHint')}
-        testId="settings-rdx-block"
+        title={t('settings.rdcToolchainTitle')}
+        description={t('settings.rdcToolchainHint')}
+        testId="settings-rdc-block"
       >
-        <RdxCliInvokerSettingsFields rdxCliDraft={rdxCliDraft} onRdxCliDraftChange={onRdxCliDraftChange} t={t} />
+        <RdcCliInvokerSettingsFields rdcCliDraft={rdcCliDraft} onRdcCliDraftChange={onRdcCliDraftChange} t={t} />
       </LocalToolDisclosure>
 
       <LocalToolDisclosure

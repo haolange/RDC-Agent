@@ -33,7 +33,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   profile: { nickname: 'RDC Operator', avatarPath: '' },
   tooling: {
-    rdxCli: {
+    rdcCli: {
       enabled: false,
       command: '',
       argsPrefix: [],
@@ -73,7 +73,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     diagnostics: [],
   },
   paths: {
-    userRdxRoot: '',
+    userRdcRoot: '',
     settingsPath: '',
     instructionsPath: '',
     agentsPath: '',

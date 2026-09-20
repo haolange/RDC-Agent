@@ -9,7 +9,7 @@ import { writeFileTool } from './WriteFileTool';
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
 async function fixture() {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-read-gate-')); roots.push(root);
+  const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-gate-')); roots.push(root);
   await writeFile(path.join(root, 'file.txt'), 'before');
   const context: ToolExecutionContext = { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: 'session', successfulFileReads: new Set() };
   return { root, context };

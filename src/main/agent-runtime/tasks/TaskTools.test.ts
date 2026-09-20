@@ -15,7 +15,7 @@ function textOf(result: { content: Array<{ type: string; text?: string }> }): st
 
 describe('TaskTools', () => {
   it('executes all five task tools', async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-tools-'));
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-tools-'));
     roots.push(dir);
     const registry = new TaskRegistry(dir);
     const tools = createTaskTools(registry);
@@ -56,7 +56,7 @@ describe('TaskTools', () => {
   });
 
   it('creates a durable parent-child Task relationship through the tool surface', async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-tools-'));
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-tools-'));
     roots.push(dir);
     const registry = new TaskRegistry(dir);
     const create = createTaskTools(registry).find((tool) => tool.name === 'task_create')!;

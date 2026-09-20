@@ -14,10 +14,10 @@ const {
   createDefaultUiPreferences,
   sanitizeUiPreferences,
   compileThemeChrome,
-  serializeRdxThemeV1,
-  parseRdxThemeV1,
+  serializeRdcThemeV1,
+  parseRdcThemeV1,
   deriveComposeAccentVars,
-  RDX_THEME_V1_PREFIX,
+  RDC_THEME_V1_PREFIX,
 } = require('../src/shared/theme/index.ts');
 
 function assert(condition, message) {
@@ -64,13 +64,13 @@ assert(
   'dark/light surface-overlay must differ with chrome surface',
 );
 
-const encoded = serializeRdxThemeV1(chrome, 'dark');
-assert(encoded.startsWith(RDX_THEME_V1_PREFIX), 'export uses rdx-theme-v1 prefix');
-const parsed = parseRdxThemeV1(encoded, 'dark');
+const encoded = serializeRdcThemeV1(chrome, 'dark');
+assert(encoded.startsWith(RDC_THEME_V1_PREFIX), 'export uses rdc-theme-v1 prefix');
+const parsed = parseRdcThemeV1(encoded, 'dark');
 assert(parsed.ok, `import round-trip failed: ${parsed.error ?? ''}`);
 assert(parsed.chrome.accent === chrome.accent, 'import preserves accent');
 
-const rejected = parseRdxThemeV1('codex-theme-v1:{"variant":"dark"}');
+const rejected = parseRdcThemeV1('codex-theme-v1:{"variant":"dark"}');
 assert(!rejected.ok, 'codex-theme-v1 must be rejected');
 
 const composeDark = deriveComposeAccentVars('#33d1ff', 'dark');
@@ -220,7 +220,7 @@ assert(
 );
 
 const designSystemMd = fs.readFileSync(path.join(repoRoot, 'docs/ui/design-system.md'), 'utf8');
-assert(designSystemMd.includes('rdx-theme-v1'), 'docs/ui/design-system.md must document rdx-theme-v1');
+assert(designSystemMd.includes('rdc-theme-v1'), 'docs/ui/design-system.md must document rdc-theme-v1');
 assert(designSystemMd.includes('chromeThemes'), 'docs/ui/design-system.md must document chromeThemes');
 
 const workbenchUiMd = fs.readFileSync(path.join(repoRoot, 'docs/ui/workbench-and-transcript.md'), 'utf8');

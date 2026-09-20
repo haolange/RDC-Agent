@@ -18,7 +18,7 @@
 
 ### 2026-09-09 Harness 边界收敛
 
-本设计中的 Mission → General → Scout/Skeptic → 补证 → 回评估是实际 .agent/Skill 中的领域方法，不能成为通用 runtime 固定拓扑。普通 General 任务直接完成；单次 lookup 不强制委派。Scout 和 Skeptic 是隔离 General 子执行的职责，分别通过 requiredSkillIds 预载 knowledge-scout / skeptic-review；Skeptic 不继承生成者叙事或 RDX lease。原 Mission 保留最终评估。
+本设计中的 Mission → General → Scout/Skeptic → 补证 → 回评估是实际 .agent/Skill 中的领域方法，不能成为通用 runtime 固定拓扑。普通 General 任务直接完成；单次 lookup 不强制委派。Scout 和 Skeptic 是隔离 General 子执行的职责，分别通过 requiredSkillIds 预载 knowledge-scout / skeptic-review；Skeptic 不继承生成者叙事或 RDC lease。原 Mission 保留最终评估。
 
 通用 runtime 强制任务依赖、执行实例、代次、资源所有权、预算、取消/join 和明确返回绑定。领域工具校验原生绑定、签名回执和调查记录。方法选择、Challenge 补证和战略改变由模型依指令决定；Hook 不按身份/depth 反推 Big Loop，不自动选择最近 Checkpoint。部分结果通过结构化 disposition/evidenceRefs 声明，不通过正文关键词触发隐藏流程。
 
@@ -53,7 +53,7 @@ Goal → Observed Facts → Structure / Hypotheses → Evidence
 
 **非目标（当前态与目标态共同成立）**
 
-- 不把约 194 个 RDX 命令注册为 Agent Tool 或 MCP。
+- 不把约 194 个 RDC 命令注册为 Agent Tool 或 MCP。
 - 不新建平台级 InvestigationGraph、第二 TaskStore、Mailbox / Blackboard。
 - 不自动写 Memory / Knowledge / Candidate / Promote；LLM 不得自治写 Knowledge。
 - 禁止恢复 Embedding capability / Semantic lane / `settings.llm.embedding`。Discovery 对 embedding/embeddings modality 继续 fail-closed 剔除。
@@ -76,10 +76,10 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 | Plane | 回答 | 仓库映射（目标态） |
 | --- | --- | --- |
 | Control | 目标、当前 Task、谁负责、Verifier、Small / Big Loop | 通用 `taskProjection` + durable `ProfileHandoffState` + plan artifact |
-| Execution | 哪个 Agent、哪些 Skill/Tool、谁可并行、谁必须独占 | builtin Profile + executor 并发合同；Mission 只读 `rdx_probe` + `rdx_context`；General 经 Settings `shell` action 持 lease 执行 Live RDC |
+| Execution | 哪个 Agent、哪些 Skill/Tool、谁可并行、谁必须独占 | builtin Profile + executor 并发合同；Mission 只读 `rdc_probe` + `rdc_context`；General 经 Settings `shell` action 持 lease 执行 Live RDC |
 | Investigation State | 已确认、竞争假设、World State、实验污染 | `rdc.investigation.v1` Session Artifact |
 | Context | 这次推理看什么、如何压缩、如何 drilldown | PromptPlan + Artifactization + Mission Checkpoint |
-| Knowledge | 可复用什么、Scope、验证等级、冲突 | 五服务 + 六 lane markdown-first；canonical 仍在 `~/.rdx/knowledge` 或 `<project-root>/.rdx/knowledge`；读根免审批见 U02 / 裁决 G |
+| Knowledge | 可复用什么、Scope、验证等级、冲突 | 五服务 + 六 lane markdown-first；canonical 仍在 `~/.rdc-agent/knowledge` 或 `<project-root>/.rdc-agent/knowledge`；读根免审批见 U02 / 裁决 G |
 
 端到端生命周期：用户选择 Mission → Planning Orchestrator → 有限探测与 Knowledge 检索 → `plan_artifact` 用户审阅（拒绝修订同一份，批准冻结）→ durable Handoff → General Execution Orchestrator → Tasks 展开 → Live RDC 串行 + Offline 可并行 → 垂直记录 → Skeptic → Small Loop 或 Big Loop → 报告。Session Candidate **不是**默认产物：仅当用户显式点击 / 命令，或 Agent 在本轮得到明确用户意图后显式调用 `knowledge_candidate_create` 才创建。持久 Promote 仍只能 human review。
 
@@ -128,14 +128,14 @@ Embedding capability / Semantic lane **已删除**，见 `DESIGN.md` 裁决 C。
 
 ### 3.7 Mission Plan-Only 与 Run Schema
 
-- Mission planner（`debugger` / `analyzer` / `optimizer`）禁止 `shell` 与 `code_interpreter`；只通过受控只读 `rdx_probe` + `rdx_context` 访问 RDX。allow / deny 与输入 schema 以 `DESIGN.md` 裁决 J 为唯一权威。
+- Mission planner（`debugger` / `analyzer` / `optimizer`）禁止 `shell` 与 `code_interpreter`；只通过受控只读 `rdc_probe` + `rdc_context` 访问 RDC。allow / deny 与输入 schema 以 `DESIGN.md` 裁决 J 为唯一权威。
 - General 经 Settings `shell` action 持 exclusive lease 执行 Live RDC mutate。
 - Run **当前为 v3**（`schemaVersion: '3'`），见裁决 I。不得双读，不得从旧 stage 推断 Mission。
 - Hook trust fingerprint 与旧 YAML-hash 失效策略见裁决 K。
 
 ---
 
-## 4. Coordinator 与 Skill / Hook / RDX
+## 4. Coordinator 与 Skill / Hook / RDC
 
 Coordinator **不是**新 Runtime，也不是 Profile 新字段。它是：
 
@@ -143,7 +143,7 @@ Coordinator **不是**新 Runtime，也不是 Profile 新字段。它是：
 
 的组合。Planning Orchestrator 负责理解目标、澄清、有限探测、编排与计划；General 负责 Task 分解、Shell / Sub-Agent、验证与报告。Knowledge Candidate 仅在用户显式意图下由 `knowledge_candidate_create` 创建，不是 General 的默认收尾步骤。
 
-RDX 仍是外部 CLI：General 通过结构化 `shell.rdx` 调用 prepareTurn 冻结的 Settings CLI binding，使用 `tools list --namespace`、`tools search` 和 `tools describe` 定向发现。Catalog 不展开为模型工具 Schema。共享 `rdx-cli-shell` 只维护身份、错误、输出和副作用规则；三本专业工具手册维护明确成员并由 Tools 2.0 code-owned catalog 生成参数参考。手册知识不能授权操作。Live Capture / shader replace / replay 必须走 exclusive World State，不得进入并发组。
+RDC 仍是外部 CLI：General 通过结构化 `shell.rdc` 调用 prepareTurn 冻结的 Settings CLI binding，使用 `tools list --namespace`、`tools search` 和 `tools describe` 定向发现。Catalog 不展开为模型工具 Schema。共享 `rdc-tool-shell` 只维护身份、错误、输出和副作用规则；三本专业工具手册维护明确成员并由 Tools 2.0 code-owned catalog 生成参数参考。手册知识不能授权操作。Live Capture / shader replace / replay 必须走 exclusive World State，不得进入并发组。
 
 ---
 
@@ -174,13 +174,13 @@ RDX 仍是外部 CLI：General 通过结构化 `shell.rdx` 调用 prepareTurn �
 
 - 只有 `AgentTool.spec.isConcurrencySafe === true` 才安全；**缺省 `false`**。
 - 只并发**连续**安全组；unsafe 调用独占，切开前后组。
-- 下列工具一律串行：`shell`、write、task mutation、RDX / Live Capture（含 `rdx_probe`）、MCP、ask、`output_register`。
-- `domainExtensions.rdx.requiresLease=true` 的 child 必须通过显式、受限、生命周期绑定的 delegated lease 取得 parent RDX context 并串行；child 完成/取消立即撤销。未请求 `domainExtensions.rdx` 的 child **在 allowlist 层**就不能拿到 `rdx_context` / `rdx_probe` / `shell` 中的 RDX 路径。禁止并发 RDX 双 owner。
+- 下列工具一律串行：`shell`、write、task mutation、RDC / Live Capture（含 `rdc_probe`）、MCP、ask、`output_register`。
+- `domainExtensions.rdc.requiresLease=true` 的 child 必须通过显式、受限、生命周期绑定的 delegated lease 取得 parent RDC context 并串行；child 完成/取消立即撤销。未请求 `domainExtensions.rdc` 的 child **在 allowlist 层**就不能拿到 `rdc_context` / `rdc_probe` / `shell` 中的 RDC 路径。禁止并发 RDC 双 owner。
 - `callIndex` 保持稳定顺序，UI / Trace / 结果回灌都按它排序。
 - dispatch 前原子扣减预算；扣减失败整组不开。
 - abort 必须 `Promise.allSettled` join，不得丢孤儿进程。
 - 部分失败不连坐同组其余**已发出**调用的结果记录，但不得继续开新组。
-- offline subagent 不请求 `domainExtensions.rdx`；需要 RDX lease 的工作不得进并发组。
+- offline subagent 不请求 `domainExtensions.rdc`；需要 RDC lease 的工作不得进并发组。
 
 ---
 
@@ -439,7 +439,7 @@ Planning Orchestrator 宽语义、低 raw；Specialist 窄而深；Skeptic 干�
 
 每次委托 Sub-Agent 即时编译，**不是**新平台文件类型。通用字段为 goal/task/scope、事实及来源资格、竞争假设、Challenge 引用、输入引用、否定路径的理由/适用条件/重验条件、能力请求、预算、停止条件和输出要求。Mission、World State、实验等领域内容按任务需要置于有来源的数据或引用，不能成为通用 schema 的必填领域字段。
 
-offline subagent 的 Capsule 不得携带 RDX lease；省略 `domainExtensions.rdx`。Debugger 纵切把该 Capsule 写成 `$debugger-coordinator` / `$renderdoc-execution` 的委托纪律，而不是新平台文件类型。
+offline subagent 的 Capsule 不得携带 RDC lease；省略 `domainExtensions.rdc`。Debugger 纵切把该 Capsule 写成 `$debugger-coordinator` / `$renderdoc-execution` 的委托纪律，而不是新平台文件类型。
 
 ### 10.3 三层 Compaction
 
@@ -601,7 +601,7 @@ assets:
 
 ## 15. Knowledge 读路径
 
-Agent 侧 Knowledge 走 deferred `knowledge_*` Tool 与主进程五服务（单一事实源：`KnowledgeIndexService`）。canonical 读根 `realpath(~/.rdx/knowledge)` + `realpath(<projectRoot>/.rdx/knowledge)` 对 `read_file` / `read_image` / `glob` / `grep` 免审批（**U02 落地**）；写入仍经 `knowledge_*` + human review。grep/glob/read 只是补充证据，禁止第二索引或 renderer 事实源。Planning Orchestrator 只做小规模直接查询，大范围检索委托 Knowledge Scout Sub-Agent（调用者 Profile + `$knowledge-scout`，不是第五个顶层 Profile）。Scout 先六 lane `knowledge_search`，再 grep/glob/read 全文，引用 cardId + contentHash；父 Context 不接收子 transcript。Embedding capability 已废止，见 §3.3 / 裁决 C。
+Agent 侧 Knowledge 走 deferred `knowledge_*` Tool 与主进程五服务（单一事实源：`KnowledgeIndexService`）。canonical 读根 `realpath(~/.rdc-agent/knowledge)` + `realpath(<projectRoot>/.rdc-agent/knowledge)` 对 `read_file` / `read_image` / `glob` / `grep` 免审批（**U02 落地**）；写入仍经 `knowledge_*` + human review。grep/glob/read 只是补充证据，禁止第二索引或 renderer 事实源。Planning Orchestrator 只做小规模直接查询，大范围检索委托 Knowledge Scout Sub-Agent（调用者 Profile + `$knowledge-scout`，不是第五个顶层 Profile）。Scout 先六 lane `knowledge_search`，再 grep/glob/read 全文，引用 cardId + contentHash；父 Context 不接收子 transcript。Embedding capability 已废止，见 §3.3 / 裁决 C。
 
 ---
 
@@ -633,7 +633,7 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 知识�
 
 ## 18. 冷启动
 
-资产来源：现有 Bug Case、Invariant、Procedure、已验证 Experiment、Skill、RDX/RenderDoc 能力描述、项目知识、人工 Rendering Structure、通用 Graphics、合成 Benchmark。
+资产来源：现有 Bug Case、Invariant、Procedure、已验证 Experiment、Skill、RDC/RenderDoc 能力描述、项目知识、人工 Rendering Structure、通用 Graphics、合成 Benchmark。
 
 步骤：资产盘点 → 标准化（§14）→ Scope 标注 → Evidence Link → Seed Agent Card → Benchmark → 人工校准。合成 Knowledge 必须标 provenance，不得冒充 Observed。人工 Pipeline 版图可同时做 Analyzer Ground Truth、Seed Model、Pattern 源与教材；写入 Knowledge 仍须显式 Candidate 创建 + human Promote，不自动进入任一生命周期。
 
@@ -650,7 +650,7 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 知识�
 | 实验状态污染 | World State + 事务 + `S-RDC-01` |
 | Context 无限累积 | 三层 Compaction + Delta Loop |
 | Compact 提升推断等级 | `S-CLAIM-01` |
-| 多 Agent 抢同一 Replay | Live 串行；offline 未请求 `domainExtensions.rdx` |
+| 多 Agent 抢同一 Replay | Live 串行；offline 未请求 `domainExtensions.rdc` |
 | Knowledge Poisoning | Candidate / Scope / Promotion / Conflict / Negative |
 | Confirmation Bias | Contradiction Injection + 独立 Skeptic |
 | Report 漂移 | 只消费 Accepted Claims 与真实 Artifact |
@@ -669,7 +669,7 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 知识�
 - **Optimizer**：Frame Breakdown；解释 Mechanism；至少一个 Replay Experiment；统计高于噪声；检查视觉差异；写明验证上限与 Runtime 风险。
 - **Context**：Sub-Agent 只得 Task-relevant Capsule；原始 Artifact 可恢复；Small Loop 不重放完整历史；Big Loop 经 Checkpoint 恢复；patch 后旧 Evidence 不误用。
 - **Knowledge**：六 Type、多轴 Scope、人类可审可写、冲突不静默覆盖、Promotion 有规则、Negative 可检索、每条可追溯；知识导入 摄入为 Draft/staging 且 `fixed ≠ verified`；Candidate 仅显式创建。
-- **平台非侵入**：无 InvestigationGraph、无第二 TaskStore、无 194 RDX tools / RDX MCP、无自动 Memory / Knowledge / Promote、禁止恢复 Embedding capability / Semantic lane。
+- **平台非侵入**：无 InvestigationGraph、无第二 TaskStore、无 194 RDC tools / RDC MCP、无自动 Memory / Knowledge / Promote、禁止恢复 Embedding capability / Semantic lane。
 
 通用 Runtime 回归仍必须成立：无 RenderDoc Context 时 `general` 保持完整通用能力；Custom Profile 仍可创建；Permission 与 Profile / Handoff 互不替代。
 
@@ -679,7 +679,7 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 知识�
 
 - 平台级 InvestigationGraph、第二 TaskStore、第二 Agent Runtime，以及领域专用 Mailbox / Blackboard；通用 TaskStore 内按执行代次绑定的持久消息属于运行生命周期，不是第二套领域存储。
 - 向 `TaskRecord` / `AgentProfile` / `ConversationMessage` 增加领域字段。
-- 194 个 RDX Agent Tool、RDX MCP、把 catalog 展开给模型。
+- 194 个 RDC Agent Tool、RDC MCP、把 catalog 展开给模型。
 - 自动 Memory / Knowledge / Candidate / Promote；LLM 自治写 Knowledge。
 - 交互式旧 Profile 导出选择面。
 - 恢复 `agent_handoff`、`HandoffStateStore`、强制 return 或 dual-read 旧 `handoff-state.json`。
@@ -703,31 +703,31 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 知识�
 - **U05**：产品级 Browser QA 全矩阵（不得写成已验收）。
 - **U06**：三条 Mission 正常 `completed` 闭环（不得写成已验收）。
 
-禁止再写「Run 当前实现仍为 v2」「Wave 3 已落地独立 Embedding」作为现行差距。连续安全工具并发组仍按 `DESIGN.md` §F。Mission plan-only + `rdx_probe` 见裁决 J。后续按 `DESIGN.md` 裁决落地，落地一项删除一项旧路径。
+禁止再写「Run 当前实现仍为 v2」「Wave 3 已落地独立 Embedding」作为现行差距。连续安全工具并发组仍按 `DESIGN.md` §F。Mission plan-only + `rdc_probe` 见裁决 J。后续按 `DESIGN.md` 裁决落地，落地一项删除一项旧路径。
 
 
 ## 垂直指令与执行真实性收敛（2026-09-09）
 
 以 DESIGN.md 的同名裁决为准。General 直接处理普通代码调试、解释与性能修复；只把明确 RenderDoc/capture 调查转 Mission。标准闭环为 Mission 规划 → 用户点声明按钮切到 General → General 就地终答 → 用户自行切回 Mission 评估与报告。General 任何回合不得宣告调查 `completed`。深度不足或能力缺失保留 checkpoint 与未完成位置，由用户决定是否切回。
 
-General 的 execution-orchestrator 只定义通用工作方法；三个 Mission coordinator 保存目标、计划产物、声明续跑与方法路由；共享执行/Small Loop/Big Loop/capsule 只在 renderdoc-execution 维护。报告按需读对应 Mission 章节。先获取可安全读取的上下文，再问不可获取输入或必需决策；不重复已授权步骤。相似案例只在相关历史问题时检索，单次 lookup 不强制 Scout。canonical Skill 共 31 个：22 个 Mission / Knowledge / Coordinator 与 9 个 General，其中新增三本专业 RDX 工具手册；读取方法不重新武装本轮权限。
+General 的 execution-orchestrator 只定义通用工作方法；三个 Mission coordinator 保存目标、计划产物、声明续跑与方法路由；共享执行/Small Loop/Big Loop/capsule 只在 renderdoc-execution 维护。报告按需读对应 Mission 章节。先获取可安全读取的上下文，再问不可获取输入或必需决策；不重复已授权步骤。相似案例只在相关历史问题时检索，单次 lookup 不强制 Scout。canonical Skill 共 31 个：22 个 Mission / Knowledge / Coordinator 与 9 个 General，其中新增三本专业 RDC 工具手册；读取方法不重新武装本轮权限。
 
-### 专业 RDX 手册与真实预载
+### 专业 RDC 手册与真实预载
 
-Debugger / Analyzer / Optimizer 在「Execute with General」声明的 `requiredSkillIds` 中分别绑定领域方法、`renderdoc-execution`、`rdx-cli-shell` 与本方向的 `*-rdx-tools`。prepareTurn 只在 execution offer 的 target 与冻结计划 hash 匹配时加载这些 Skill，不能只依赖按钮 prompt 中的 `$skill` 文本。
+Debugger / Analyzer / Optimizer 在「Execute with General」声明的 `requiredSkillIds` 中分别绑定领域方法、`renderdoc-execution`、`rdc-tool-shell` 与本方向的 `*-rdc-tool`。prepareTurn 只在 execution offer 的 target 与冻结计划 hash 匹配时加载这些 Skill，不能只依赖按钮 prompt 中的 `$skill` 文本。
 
-`resources/agent-runtime/rdx-tool-guide-members.json` 明确三本手册的专业成员；它不是运行时 allowlist。`scripts/generate-rdx-tool-guides.mjs` 从 Tools 2.0 code-owned catalog 生成每项用途、参数约束、结果、影响、前置条件、失败限制和无身份 `shell.rdx` 示例，并校验成员、示例 schema 与 catalog fingerprint。共享 CLI 规则只在 `rdx-cli-shell` 维护一份；专业 SKILL 保持短流程入口，详细参考按需读取。
+`resources/agent-runtime/rdc-tool-guide-members.json` 明确三本手册的专业成员；它不是运行时 allowlist。`scripts/generate-rdc-tool-guides.mjs` 从 Tools 2.0 code-owned catalog 生成每项用途、参数约束、结果、影响、前置条件、失败限制和无身份 `shell.rdc` 示例，并校验成员、示例 schema 与 catalog fingerprint。共享 CLI 规则只在 `rdc-tool-shell` 维护一份；专业 SKILL 保持短流程入口，详细参考按需读取。
 
-Knowledge 保留 markdown-first 六 lane 五服务与 human review；不恢复 Embedding、第二索引、自动 Candidate 或 Memory。Scout 正文与实际加载 Skill 的受限工具交集一致；rdc-context 通过 rdx_context 查询拥有的状态；debug 明确只读诊断；verify 报告本技能实际可验证的受影响面。删除强制 driver-blame 假设，保留有证据且可区分的替代解释。
+Knowledge 保留 markdown-first 六 lane 五服务与 human review；不恢复 Embedding、第二索引、自动 Candidate 或 Memory。Scout 正文与实际加载 Skill 的受限工具交集一致；rdc-context 通过 rdc_context 查询拥有的状态；debug 明确只读诊断；verify 报告本技能实际可验证的受影响面。删除强制 driver-blame 假设，保留有证据且可区分的替代解释。
 
-Experiment 可选 executionEvidence 五阶段引用的字段、签名、顺序、ownership 和 rollback 门禁见 docs/architecture/rdx-runtime.md。历史记录不改写、不追认；新关闭与新完成失败时不得补造布尔字段。U06 Optimizer 原验收保留取证信息，但撤回缺乏真实介入依据的完成结论。
+Experiment 可选 executionEvidence 五阶段引用的字段、签名、顺序、ownership 和 rollback 门禁见 docs/architecture/rdc-runtime.md。历史记录不改写、不追认；新关闭与新完成失败时不得补造布尔字段。U06 Optimizer 原验收保留取证信息，但撤回缺乏真实介入依据的完成结论。
 
 
 ### 2026-09-10 实施边界补充
 
 通用 Task/执行及后台工具遵守 docs/contracts/runtime-kernel.md，不增建 Investigation store。RDC 证据仍以所属 Session Artifact 的调查记录为权威，子执行输入只读授权不允许覆盖父产物。Scout/Skeptic 为 General 的受约束独立子上下文和冻结 Skill，非新增官方身份。General 创建补证 Task 并局部推进；战略变化回交原 Mission，原 Mission 保留最终评估，没有隐藏总裁决模型。
 
-进程退出、RDX 状态已知与实验恢复是三项不同证据。确认进程退出才可结束资源清理；验证新 binding 才能恢复受控访问；baseline/intervention/variant/rollback/restored 回执才支持实验恢复结论。重新打开 capture 不代替 rollback。参见 acceptance-ledger.md 的各次实际验证范围，静态契约、受控 Provider fixture、真实 native CLI 和真实模型不得互相替代。
+进程退出、RDC 状态已知与实验恢复是三项不同证据。确认进程退出才可结束资源清理；验证新 binding 才能恢复受控访问；baseline/intervention/variant/rollback/restored 回执才支持实验恢复结论。重新打开 capture 不代替 rollback。参见 acceptance-ledger.md 的各次实际验证范围，静态契约、受控 Provider fixture、真实 native CLI 和真实模型不得互相替代。
 
 
 RDC 委派沿用通用 root/child-local 双层预算，不独立计费或恢复额度：同步与后台 Scout/Skeptic 恢复各自局部执行账本，根上限不被局部 Capsule 改写，根消费与 deadline 不因重新委派或回评估重置。已有 live root 不能静默换绑另一旧调查 root；此请求由 runtime 明确拒绝，模型需在授权范围内组织独立执行上下文。同 root 并发绑定由 runtime 保证只合并一次，不由指令手工扣账。
@@ -743,7 +743,7 @@ RDC 委派沿用通用 root/child-local 双层预算，不独立计费或恢复�
 
 材料支持原始附件 hash、用户意图、归一化 ROI、文档位置、时间范围及 Before/Reference/After/Diff 配对条件。派生窗口须引用持久原文与媒体；存在引用不表示模型已看见。来源变化使冻结附件读取失败，用户修订与工具事实分开保留。自动压缩无普通用户入口，原始可见历史不删除，失败保留原窗口。
 
-本轮真实 Debugger 材料为眼睛泪腺白点 capture；没有参考图，事件 6152 仅为线索，IBL/specular/leakage 仅为竞争假设。必须保留正常高光，不能以整体压暗或局部未复现宣称修复。真实项目 Ground Truth 继续按已约定分期；受控 fixture、真实模型请求与原生 RDX 证据分别登记。Debugger 不替代 Analyzer/Optimizer 的旅程验收。实现及实测边界见 acceptance ledger。
+本轮真实 Debugger 材料为眼睛泪腺白点 capture；没有参考图，事件 6152 仅为线索，IBL/specular/leakage 仅为竞争假设。必须保留正常高光，不能以整体压暗或局部未复现宣称修复。真实项目 Ground Truth 继续按已约定分期；受控 fixture、真实模型请求与原生 RDC 证据分别登记。Debugger 不替代 Analyzer/Optimizer 的旅程验收。实现及实测边界见 acceptance ledger。
 
 普通澄清、材料确认和下一步回复不自动宣告调查完成。领域扩展仅在显式 `turn_complete(completed)` 时校验完整报告；逻辑 Task 的必需执行与交付要求仍独立强制。文本里的“完成”不构成运行时完成证据。
 

@@ -3,10 +3,10 @@ import { deriveChildPolicyBudget, flushPolicyBudgetObservers, registerPolicyBudg
 import { bindTaskRootBudget } from './TaskRootBudget';
 import { grantDelegatedArtifactAccess } from '../../sessions/DelegatedArtifactAccess';
 import { shellInvocationService } from '../../tools/ShellInvocationService';
-import { getRdxContextLease } from '../../sessions/RdxRuntimeContextRegistry';
+import { getRdcContextLease } from '../../sessions/RdcRuntimeContextRegistry';
 import { renderDelegationCapsuleInput } from '../../agent-runtime/prompt/DelegationCapsuleCompiler';
 import { processSupervisor } from '../../runtime/ProcessSupervisor';
-import { resolveRdxDelegation } from '../../sessions/RdxDelegation';
+import { resolveRdcDelegation } from '../../sessions/RdcDelegation';
 /**
  * SubagentRunner — isolated sub-agent turns and the subagent tool.
  * Capsule fields are required. Dispatch may run concurrently; domain lease
@@ -45,7 +45,7 @@ import { compileDelegationCapsule } from '../../agent-runtime/prompt/DelegationC
 import {
   grantDelegatedLease,
   revokeDelegatedLease,
-} from '../../sessions/RdxRuntimeContextRegistry';
+} from '../../sessions/RdcRuntimeContextRegistry';
 import {
   TaskRegistry,
   createSessionTaskStore,
@@ -102,7 +102,7 @@ export class SubagentRunner {
     onProviderRequestCommitted?: AgentProfileTurnOptions['onProviderRequestCommitted'];
   }): Promise<{ text: string; status: SubagentResultStatus; subagentId: string; policyBudget?: TurnHandle['policyBudget']; completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null }> {
     const capsule = input.capsule;
-    const rdxDelegation = resolveRdxDelegation(capsule.domainExtensions);
+    const rdcDelegation = resolveRdcDelegation(capsule.domainExtensions);
     const task = capsule.task;
     // Resolve and authorize the exact project profile before mutating parent budgets or emitting a child event.
     const childSettings = settingsService.getAll();
@@ -245,14 +245,14 @@ export class SubagentRunner {
         taskId: ownedTask.id, completionRequirements: ownedTask.completionRequirements,
         rule: 'Return every completionRequirements string verbatim as a key in turn_complete.result.outputs. Values are complete strings. Runtime persists the result; do not invent its reference.',
       }) : '';
-      const capsuleSegments = [...compileDelegationCapsule(frozenCapsule), ...rdxDelegation.segments];
-      if (rdxDelegation.requiresLease) {
+      const capsuleSegments = [...compileDelegationCapsule(frozenCapsule), ...rdcDelegation.segments];
+      if (rdcDelegation.requiresLease) {
         if (!input.parentSessionId?.trim()) {
-          throw new Error('RDX_LEASE_DELEGATE_DENIED: RDX capability requested but no parent session.');
+          throw new Error('RDC_LEASE_DELEGATE_DENIED: RDC capability requested but no parent session.');
         }
         const ownerTurnId = input.parentTurn?.turnId?.trim() ?? '';
         if (!ownerTurnId) {
-          throw new Error('RDX_LEASE_DELEGATE_DENIED: RDX capability requested but parent turn id is missing.');
+          throw new Error('RDC_LEASE_DELEGATE_DENIED: RDC capability requested but parent turn id is missing.');
         }
         grantDelegatedLease({
           parentSessionId: input.parentSessionId,
@@ -281,7 +281,7 @@ export class SubagentRunner {
           preloadSkillIds: frozenCapsule.requiredSkillIds,
           beforeProviderRequestMessages: input.beforeProviderRequestMessages,
           onProviderRequestCommitted: input.onProviderRequestCommitted,
-          excludeRdxLeaseTools: !rdxDelegation.requiresLease,
+          excludeRdcLeaseTools: !rdcDelegation.requiresLease,
           onTerminalContext: (terminal) => { completionDeclaration = terminal.completionDeclaration ?? null; },
           onEvent: (event: SharedAgentEvent) => {
             if (event.type === 'approval.requested' || event.type === 'approval.answered') {
@@ -394,7 +394,7 @@ export class SubagentRunner {
     } finally {
       clearTimeout(deadlineTimer);
       await processSupervisor.joinExecutionProcesses(subagentSessionId);
-      const lease = getRdxContextLease(subagentSessionId);
+      const lease = getRdcContextLease(subagentSessionId);
       revokeDelegatedLease(subagentSessionId, { operationStopped: !!lease && !shellInvocationService.hasUnconfirmedProcesses(lease.contextId) });
       releaseArtifacts?.();
       releaseTaskScope?.();

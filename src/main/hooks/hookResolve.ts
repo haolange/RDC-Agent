@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import type { HookDefinition } from '@shared/types/rdxRuntime';
+import type { HookDefinition } from '@shared/types/rdcRuntime';
 import { appPathService } from '../runtime/AppPathService';
 
 export const isNodeCommand = (command: string): boolean => /^node(\.exe)?$/i.test(command);

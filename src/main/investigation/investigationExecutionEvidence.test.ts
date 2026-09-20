@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createInvestigationHarness, recordedExperiment, SESSION_ID } from './investigationTestFixtures';
-import { RdxExecutionReceipts } from '../tools/RdxExecutionReceipts';
+import { RdcExecutionReceipts } from '../tools/RdcExecutionReceipts';
 import { seedExecutionEvidence } from './investigationExecutionFixtures';
 import { assertExecutionEvidence } from './investigationExecutionEvidence';
 
 function harness() {
   const { resolver } = createInvestigationHarness();
-  const store = new RdxExecutionReceipts(resolver, () => 'test-evidence-signing-key');
+  const store = new RdcExecutionReceipts(resolver, () => 'test-evidence-signing-key');
   const experiment = recordedExperiment({
     experimentId: 'experiment-1', hypothesisClaimId: 'hypothesis-1', baselineWorldStateId: 'baseline',
     variantWorldStateId: 'variant', restoredWorldStateId: 'restored', verifyEvidenceIds: ['evidence-1'],
@@ -17,7 +17,7 @@ describe('native execution evidence', () => {
   it('accepts a signed ordered same-context experiment, including after store recreation', () => {
     const { resolver, store, experiment } = harness();
     experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId);
-    expect(() => assertExecutionEvidence(SESSION_ID, experiment, new RdxExecutionReceipts(resolver, () => 'test-evidence-signing-key'))).not.toThrow();
+    expect(() => assertExecutionEvidence(SESSION_ID, experiment, new RdcExecutionReceipts(resolver, () => 'test-evidence-signing-key'))).not.toThrow();
   });
   it('does not accept booleans without receipts', () => {
     const { store, experiment } = harness();
@@ -34,12 +34,12 @@ describe('native execution evidence', () => {
       if (scenario === 'wrong-replacement') records[3].args.replacement_id = 'other';
       if (scenario === 'different-measurement') records[4].operation = 'rd.export.screenshot';
     });
-    expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).toThrow(/RDX_EXECUTION_EVIDENCE_REQUIRED/);
+    expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).toThrow(/RDC_EXECUTION_EVIDENCE_REQUIRED/);
   });
   it('rejects signed content under a different main key and wrong hashes', () => {
     const { resolver, store, experiment } = harness();
     experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId);
-    expect(() => assertExecutionEvidence(SESSION_ID, experiment, new RdxExecutionReceipts(resolver, () => 'forged-key'))).toThrow(/signature/);
+    expect(() => assertExecutionEvidence(SESSION_ID, experiment, new RdcExecutionReceipts(resolver, () => 'forged-key'))).toThrow(/signature/);
     experiment.executionEvidence.baseline.expectedHash = '0'.repeat(64);
     expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).toThrow();
   });

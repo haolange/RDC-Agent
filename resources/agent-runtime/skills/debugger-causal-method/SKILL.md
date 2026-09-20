@@ -12,7 +12,7 @@ Use this skill during Debugger execution. Do not invent a new kind, Profile, or 
 Shape: one `EvidenceRecord` (`kind: evidence`) plus an optional companion `ClaimRecord` (`claimKind: observed_fact`).
 
 1. Name expected result, observed result, and the earliest event or pixel region where they diverge.
-2. Collect the observation through the Settings-configured RDX CLI (`$rdx-cli-shell`) and `$pixel-forensics` / `$capture-facts`.
+2. Collect the observation through the Settings-configured RDC-Tool CLI (`$rdc-tool-shell`) and `$pixel-forensics` / `$capture-facts`.
 3. Write Evidence first: `mission: debugger`, `epistemicStatus: observed`, `region.kind` in `{event, pixel}`, `contentHashes` matching artifact bytes, `worldStateId` resolvable.
 4. The companion Claim may repeat the event id in `scope.eventId`. It stays `observed_fact`. It must not set `declaresCounterfactual` or a causal `experimentId`.
 
@@ -33,7 +33,7 @@ Do not promote a matrix row to `causal_conclusion` here.
 Shape: one qualifying `ExperimentRecord` plus a Claim that is `claimKind: causal_conclusion` and/or `declaresCounterfactual: true`.
 
 1. Design the Experiment against a matrix row (`hypothesisClaimId`). `intervention.type` must not be `none`. Bind exclusive World States for baseline / variant / restored.
-2. Run the intervention through the configured RDX CLI. Record metrics and visual before / after / diff.
+2. Run the intervention through the configured RDC-Tool CLI. Record metrics and visual before / after / diff.
 3. Rollback must set `executed === true`, `baselineRestored === true`, and `verifyEvidenceIds.length >= 1` (each resolvable). Status must be `recorded` or `rolled_back`.
 4. Only then write the causal / counterfactual Claim with that `experimentId`. A Debugger root-cause Claim also fills the seven-tuple `rootCause` (Trigger · Fault Location · Failure Mechanism · Propagation · Manifestation · Scope · Counterfactual Evidence).
 

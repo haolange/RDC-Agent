@@ -3,7 +3,7 @@ import type { RunSummary } from '@shared/types/session';
 import type { RightPanelViewModel } from '@shared/types/trace';
 import { createSessionTaskStore } from '../agent-runtime/tasks/sessionTaskStore';
 import { TaskRegistry } from '../agent-runtime/tasks/TaskRegistry';
-import { rdxSessionService } from '../sessions';
+import { rdcSessionService } from '../sessions';
 import { listSessionArtifactSources } from '../sessions/SessionArtifactSource';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { settingsService } from '../settings/SettingsService';
@@ -11,7 +11,7 @@ import { requestSnapshotStore } from '../agent-runtime/prompt';
 import { mapRightRailInvestigationArtifacts } from './rightRailInvestigationArtifacts';
 import { collectSessionTaskContextResources } from './rightRailTaskContextResources';
 import {
-  buildRdxContext,
+  buildRdcContext,
   buildTaskContext,
   mapRightRailOutputs,
   mapRightRailProgress,
@@ -26,7 +26,7 @@ const emptyRightPanel = (sessionId: string): RightPanelViewModel => ({
       projectId: '', projectName: '', sessionId, sessionTitle: '', workingDirectory: '',
       configurationPhase: 'next_turn', agentProfile: '', permission: 'default', resources: [],
     },
-    rdx: {
+    rdc: {
       capture: null, availableCaptures: [],
       runtime: {}, diagnostics: [],
     },
@@ -53,11 +53,11 @@ export class RightRailProjectionService {
       Promise.resolve().then(() => mapRightRailInvestigationArtifacts(input.sessionId)),
     ]);
     const project = storageAdapter.getProjectById(session.projectId);
-    const openedCapture = rdxSessionService.snapshotOpenedCaptureForSession({
+    const openedCapture = rdcSessionService.snapshotOpenedCaptureForSession({
       projectId: session.projectId,
       sessionId: input.sessionId,
     });
-    const contextSnapshot = rdxSessionService.snapshotContextForSession({
+    const contextSnapshot = rdcSessionService.snapshotContextForSession({
       projectId: session.projectId,
       sessionId: input.sessionId,
     });
@@ -77,7 +77,7 @@ export class RightRailProjectionService {
       permissionMode: settings.agentRuntime.permissions.mode,
     });
     const projectInputs = await storageAdapter.listProjectInputs(session.projectId);
-    const rdx = buildRdxContext({
+    const rdc = buildRdcContext({
       openedCapture,
       contextSnapshot,
       availableCaptures: projectInputs.map((capture) => ({
@@ -88,7 +88,7 @@ export class RightRailProjectionService {
       progress,
       artifacts,
       outputs,
-      context: { task, rdx },
+      context: { task, rdc },
     };
   }
 }

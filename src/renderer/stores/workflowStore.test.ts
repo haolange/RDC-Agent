@@ -8,7 +8,7 @@ const rightPanel = {
   outputs: { current: [], previous: [] },
   context: {
     task: { projectId: 'p', projectName: 'p', sessionId: 's', sessionTitle: 's', workingDirectory: '.', configurationPhase: 'current_turn', agentProfile: 'general', permission: 'default', resources: [] },
-    rdx: { capture: null, availableCaptures: [], runtime: {}, diagnostics: [] },
+    rdc: { capture: null, availableCaptures: [], runtime: {}, diagnostics: [] },
   },
 } as AgentRunPresentation['rightPanel'];
 

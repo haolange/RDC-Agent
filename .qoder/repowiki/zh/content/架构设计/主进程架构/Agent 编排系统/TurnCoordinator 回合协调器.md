@@ -242,7 +242,7 @@ Persist --> End(["结束"])
 - 输入参数：requestId、turnId、agentId、内容、路由能力、请求计划、提示计划、有效配置、工具白名单、可见回合 ID、活动分支等。
 - 关键步骤：
   - 会话上下文物化：materialize(visibleTurnIds, activeBranchId)，得到消息、选择回合数、重放/过滤制品数量及决策。
-  - 策略编译与权限：compileEffectivePolicy，冻结 RDX 绑定，校验技能交集与工具白名单。
+  - 策略编译与权限：compileEffectivePolicy，冻结 RDC 绑定，校验技能交集与工具白名单。
   - MCP 连接租约：acquireConnections，失败路径释放租约。
   - 工具解析与签名：resolveRuntimeTools、createToolSignature，分区延迟激活工具，预激活任务工具。
   - 提示压缩与缓存：workerPool 压缩消息，promptCacheCompiler 编译缓存键与断点信息。
@@ -253,7 +253,7 @@ Persist --> End(["结束"])
 ```mermaid
 flowchart TD
 A["prepareTurnContext 入口"] --> B["会话上下文物化<br/>materialize(...)"]
-B --> C["编译策略/冻结RDX绑定"]
+B --> C["编译策略/冻结RDC绑定"]
 C --> D["获取MCP连接租约"]
 D --> E["解析工具/生成签名/分区延迟工具"]
 E --> F["提示压缩与缓存编译"]

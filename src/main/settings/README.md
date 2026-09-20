@@ -55,7 +55,7 @@ Provider catalog 中的 coding / token plan entries 必须作为独立 provider 
 
 Plan agent 是独立 profile，用于研究、提问、计划 artifact 与 handoff。Settings 生成或保存 Plan route 时必须 fail-closed：provider/model 不存在、未启用、未配置或不可用时，route 写为空值，不得静默回退到默认模型。
 
-Plan 的 seed manifest 不包含 `bash`、`write`、`edit` 或 `rdxContext`；获批后的实现由 Plan handoff 到 Edit。
+Plan 的 seed manifest 不包含 `bash`、`write`、`edit` 或 `rdcContext`；获批后的实现由 Plan handoff 到 Edit。
 
 ## Validation
 

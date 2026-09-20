@@ -3,11 +3,11 @@ import type {
   AgentShellSettings,
   AppSettings,
   CodeInterpreterSettings,
-  RdxCliInvokerSettings,
+  RdcCliInvokerSettings,
 } from '@shared/types/settings';
 
 export interface ToolsDrafts {
-  rdxCli: RdxCliInvokerSettings;
+  rdcCli: RdcCliInvokerSettings;
   codeInterpreter: CodeInterpreterSettings;
   shell: AgentShellSettings;
 }
@@ -36,7 +36,7 @@ export function computeSettingsDirty(
   },
 ): SettingsDirtyState {
   const toolsBaseline: ToolsDrafts = {
-    rdxCli: settings.tooling.rdxCli,
+    rdcCli: settings.tooling.rdcCli,
     codeInterpreter: settings.tooling.codeInterpreter,
     shell: settings.tooling.shell,
   };
@@ -56,10 +56,10 @@ export function useSettingsDirty(
   settings: AppSettings,
   drafts: { tools: ToolsDrafts; profile: AppSettings['profile']; globalInstructions: string },
 ): SettingsDirtyState {
-  const { rdxCli, codeInterpreter, shell } = drafts.tools;
+  const { rdcCli, codeInterpreter, shell } = drafts.tools;
   const { profile, globalInstructions } = drafts;
   return useMemo(
-    () => computeSettingsDirty(settings, { tools: { rdxCli, codeInterpreter, shell }, profile, globalInstructions }),
-    [settings, rdxCli, codeInterpreter, shell, profile, globalInstructions],
+    () => computeSettingsDirty(settings, { tools: { rdcCli, codeInterpreter, shell }, profile, globalInstructions }),
+    [settings, rdcCli, codeInterpreter, shell, profile, globalInstructions],
   );
 }

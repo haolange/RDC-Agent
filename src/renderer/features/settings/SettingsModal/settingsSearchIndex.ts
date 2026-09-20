@@ -49,7 +49,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     id: 'resource-diagnostics',
     section: 'general',
     titleKey: 'settings.resourceDiagnosticsTitle',
-    keywords: ['workspace', 'paths', 'rdx', 'runtime', 'root', 'diagnostics', '工作区', '路径', '资源', '诊断', '根目录'],
+    keywords: ['workspace', 'paths', 'rdc', 'runtime', 'root', 'diagnostics', '工作区', '路径', '资源', '诊断', '根目录'],
     target: 'resource-diagnostics',
   },
   {

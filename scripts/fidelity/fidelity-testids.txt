@@ -32,10 +32,10 @@ composer-mode-pill
 composer-model-agent-default
 composer-model-effort-fast-mode
 composer-model-effort-max-mode
-composer-model-item-${option.providerId}-${option.modelId}
 composer-model-effort-open-picker
 composer-model-effort-pill
 composer-model-effort-popup
+composer-model-item-${option.providerId}-${option.modelId}
 composer-model-popup
 composer-model-search
 composer-permission-pill
@@ -53,8 +53,11 @@ conversation-edit-preview
 conversation-thread
 empty-workbench-prompt
 empty-workbench-tool-${toolMode}
+handoff-suggestion-row
 knowledge-candidate-${record.cardId}
 knowledge-card-${card.cardId}
+knowledge-card-image
+knowledge-card-images
 knowledge-center-acknowledge-conflicts
 knowledge-center-actions
 knowledge-center-backdrop
@@ -125,6 +128,10 @@ message-bubble-user
 message-variant-navigator
 mode-menu-item-${agent.id}
 open-settings-entry
+panel-resize-handle-${side}
+plan-card
+plan-review-panel
+plan-review-request-panel
 project-capture-import-panel
 right-rail-${id}
 right-rail-capture
@@ -255,8 +262,8 @@ settings-provider-tool-calling-unverified
 settings-provider-unavailable-summary
 settings-provider-upcoming
 settings-provider-user-managed-models
-settings-rdx-enabled
-settings-rdx-toolchain
+settings-rdc-enabled
+settings-rdc-toolchain
 settings-resource-diagnostics
 settings-resource-dialog
 settings-resource-dialog-status
@@ -282,6 +289,7 @@ work-process
 work-process-approval
 work-process-block
 work-process-image-thumbs
+work-process-plan-review
 work-process-section
 work-process-source-pills
 work-process-task-snapshot

@@ -13,7 +13,7 @@ afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recur
 
 describe('MemoryStore explicit scoped storage', () => {
   it('writes only the requested record and never creates an injectable index', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-'));
     roots.push(root);
     const store = new MemoryStore(root);
     await store.writeMemory({ name: 'User Preference', description: 'Preferred language', type: 'user', content: 'Use Chinese.' });
@@ -23,7 +23,7 @@ describe('MemoryStore explicit scoped storage', () => {
   });
 
   it('slugifies Chinese names with Unicode letters and hash-fallback for emoji-only', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-cjk-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-cjk-'));
     roots.push(root);
     const store = new MemoryStore(root);
     const cjk = await store.writeMemory({
@@ -47,7 +47,7 @@ describe('MemoryStore explicit scoped storage', () => {
   });
 
   it('keeps colliding display names in separate owned records', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-collision-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-collision-'));
     roots.push(root);
     const store = new MemoryStore(root);
     const first = await store.writeMemory({ name: 'A B', description: 'first', type: 'user', content: 'one' });
@@ -61,7 +61,7 @@ describe('MemoryStore explicit scoped storage', () => {
   });
 
   it('serializes colliding writes and preserves both owners', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-race-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-race-'));
     roots.push(root);
     const store = new MemoryStore(root);
     const [first, second] = await Promise.all([
@@ -73,7 +73,7 @@ describe('MemoryStore explicit scoped storage', () => {
   });
 
   it('serializes writes from separate store instances targeting the same real directory', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-instance-race-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-instance-race-'));
     roots.push(root);
     const firstStore = new MemoryStore(root);
     const secondStore = new MemoryStore(path.join(root, '.'));
@@ -90,15 +90,15 @@ describe('MemoryStore explicit scoped storage', () => {
   });
 
   it('keeps user and project stores physically isolated', async () => {
-    const userRoot = await mkdtemp(path.join(os.tmpdir(), 'rdx-user-memory-'));
-    const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'rdx-project-memory-'));
+    const userRoot = await mkdtemp(path.join(os.tmpdir(), 'rdc-user-memory-'));
+    const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'rdc-project-memory-'));
     roots.push(userRoot, projectRoot);
     await new MemoryStore(userRoot).writeMemory({ name: 'identity', description: 'User identity', type: 'user', content: 'User scoped.' });
     expect(await new MemoryStore(projectRoot).getMemory('identity')).toBeNull();
   });
 
   it('keeps filename slug as path authority and ignores frontmatter path escape names', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-escape-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-escape-'));
     roots.push(root);
     const store = new MemoryStore(root);
     const evilPath = path.join(root, '..', 'escaped.md');
@@ -142,7 +142,7 @@ describe('MemoryStore explicit scoped storage', () => {
   });
 
   it('skips oversized memory files during listMemories', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-budget-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-budget-'));
     roots.push(root);
     const store = new MemoryStore(root);
     await store.writeMemory({ name: 'ok', description: 'small', type: 'user', content: 'tiny' });

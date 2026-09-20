@@ -1,4 +1,4 @@
-import type { ScopedResourceKind } from '@shared/types/rdxRuntime';
+import type { ScopedResourceKind } from '@shared/types/rdcRuntime';
 
 export type ResourceFormState = {
   id: string;

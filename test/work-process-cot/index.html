@@ -18,7 +18,7 @@
       <div class="conversation-thread">
         <div class="conversation-thread-item">
           <div class="conversation-bubble conversation-bubble-user" data-user-prompt>
-            检查当前 session 的 RDX 上下文归属，并给出下一步计划。
+            检查当前 session 的 RDC 上下文归属，并给出下一步计划。
           </div>
         </div>
         <div class="conversation-thread-item" id="wp-mount"></div>
@@ -59,8 +59,8 @@
           const user = document.querySelector('[data-user-prompt]');
           if (user) {
             user.textContent = CotI18n.getLocale() === 'en'
-              ? 'Check RDX context ownership for this session and propose next steps.'
-              : '检查当前 session 的 RDX 上下文归属，并给出下一步计划。';
+              ? 'Check RDC context ownership for this session and propose next steps.'
+              : '检查当前 session 的 RDC 上下文归属，并给出下一步计划。';
           }
           player.render();
           wireControls();

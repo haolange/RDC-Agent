@@ -32,7 +32,7 @@ RDC-Agent 采用 **纯 CSS Custom Properties（CSS 变量）+ 运行时 Theme Ch
 ## 2. 关键文件与包
 
 - **设计系统 token 定义**：`src/renderer/styles/design-system.css`（primitive 与 semantic token 层）、`src/renderer/styles/global.css`（唯一全局入口，import design-system.css、ui/kit.css、global/base/app-shell/responsive/pointer-cursors.css）
-- **主题编译器与预设**：`src/shared/theme/compiler.ts`、`src/shared/theme/presets.ts`、`src/shared/theme/color.ts`、`src/shared/theme/index.ts`、`src/shared/theme/uiPreferences.ts`、`src/shared/theme/rdxThemeV1.ts`、`src/shared/theme/composeAccent.ts`、`src/shared/theme/sanitize.ts`
+- **主题编译器与预设**：`src/shared/theme/compiler.ts`、`src/shared/theme/presets.ts`、`src/shared/theme/color.ts`、`src/shared/theme/index.ts`、`src/shared/theme/uiPreferences.ts`、`src/shared/theme/rdcThemeV1.ts`、`src/shared/theme/composeAccent.ts`、`src/shared/theme/sanitize.ts`
 - **UI 组件库**：`src/renderer/ui/` 下每个组件一个 `.tsx` + `.css` 对，统一通过 `src/renderer/ui/kit.css` 聚合导入；按钮系统为全局唯一（`.button` + variant 类名）
 - **应用外壳布局**：`src/renderer/styles/global/app-shell.css`（三列 Grid 布局、标题栏、侧边栏、主内容区、上下文用量弹窗、输入栏）
 - **质量门禁脚本**：`scripts/check-design-tokens.mjs`（正则扫描 CSS，禁止 primitive token、硬编码 hex、px 字号/间距/圆角、`!important`、非 `var(--modal-backdrop-filter)` 的 backdrop-filter）、`scripts/check-appearance.mjs`（校验预设目录、默认主题、序列化/反序列化 round-trip、Compose accent 派生规则）
@@ -70,7 +70,7 @@ RDC-Agent 采用 **纯 CSS Custom Properties（CSS 变量）+ 运行时 Theme Ch
 - **Token 使用规则**（`check-design-tokens.mjs` 正则扫描 + `design-system.md` 明文规定）：组件 CSS 必须引用 `--token-*` 语义 token，禁止 primitive `--color-*`、硬编码 hex、px 字号/间距/圆角、`!important`；backdrop-filter 只能写 `var(--modal-backdrop-filter)`。
 - **预设目录锁定**（`check-appearance.mjs`）：`THEME_PRESET_IDS` 必须严格等于 `['rdc','absolutely','ayu','catppuccin','dracula','everforest','github','gruvbox','linear']`，且每个 preset 的 light/dark 必须自标识 `presetId`。
 - **默认主题**：light/dark 默认均为 `rdc`；`sanitizeUiPreferences` 对非法 accent/contrast/presetId 做 fail-closed 处理。
-- **主题序列化格式**：必须使用 `rdx-theme-v1:` 前缀，拒绝 `codex-theme-v1:`。
+- **主题序列化格式**：必须使用 `rdc-theme-v1:` 前缀，拒绝 `codex-theme-v1:`。
 - **Compose accent 派生规则**：`deriveComposeAccentVars` 必须输出 `--composer-mode-accent` 与 `--composer-effort-fill-*`，且 dark/light 模式下普通 effort fill 亮度随等级加深，Max rail 保持半透明。
 - **Checkbox 视觉契约**：checkbox 必须使用 outline + ink（`--checkbox-checked-bg: transparent`），禁止 accent 实心方砖；CheckPill 必须共享 checkbox tokens，不得引入 `--token-accent-primary`。
 - **Composer 运行态动画**：energy orbit 固定角度范围 −130° 至 230°、2.85s 一圈；Max 模式动画拥有 stop opacity 帧交付权，必须在清理时调用 `clearDynStyle`。

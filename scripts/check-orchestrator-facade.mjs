@@ -49,8 +49,8 @@ if (valueImportDecls.length > VALUE_IMPORT_MAX) {
 }
 
 const forbiddenGlobalApis = [
-  { symbol: 'legacyGlobalMirror', reason: 'RDX context must be per-session lease only' },
-  { symbol: 'getRdxRuntimeContext', reason: 'removed global RDX context API; use getRdxContextLease / assertRdxContextLeaseOwnership' },
+  { symbol: 'legacyGlobalMirror', reason: 'RDC context must be per-session lease only' },
+  { symbol: 'getRdcRuntimeContext', reason: 'removed global RDC context API; use getRdcContextLease / assertRdcContextLeaseOwnership' },
 ];
 
 const sourceRoot = path.join(repoRoot, 'src');

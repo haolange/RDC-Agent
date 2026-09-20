@@ -34,14 +34,14 @@
 - 版本管理、兼容性检查与部署策略
 
 ## 项目结构
-RDC-Agent 将内置资源放在 resources 目录，用户与项目级资源位于 ~/.rdx 与 <project-root>/.rdx。Skill 以目录为单位组织，每个 Skill 目录包含一个 SKILL.md 作为入口，并可附带 references、scripts、assets 等子目录。
+RDC-Agent 将内置资源放在 resources 目录，用户与项目级资源位于 ~/.rdc-agent 与 <project-root>/.rdc-agent。Skill 以目录为单位组织，每个 Skill 目录包含一个 SKILL.md 作为入口，并可附带 references、scripts、assets 等子目录。
 
 ```mermaid
 graph TB
 A["应用启动"] --> B["AgentRuntimeConfigService<br/>解析并合并技能清单"]
 B --> C["builtin 目录<br/>resources/agent-runtime/skills"]
-B --> D["user 目录<br/>~/.rdx/skills"]
-B --> E["project 目录<br/><project-root>/.rdx/skills"]
+B --> D["user 目录<br/>~/.rdc-agent/skills"]
+B --> E["project 目录<br/><project-root>/.rdc-agent/skills"]
 C --> F["解析 SKILL.md<br/>生成 SkillLoadResult"]
 D --> F
 E --> F

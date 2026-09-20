@@ -1,4 +1,4 @@
-import { RdxExecutionReceipts } from '../tools/RdxExecutionReceipts';
+import { RdcExecutionReceipts } from '../tools/RdcExecutionReceipts';
 import { seedExecutionEvidence } from './investigationExecutionFixtures';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,7 +24,7 @@ import { serializeInvestigationJson } from './investigationHash';
 import { InvestigationArtifactService } from './InvestigationArtifactService';
 import type { InvestigationArtifactServiceDeps } from './investigationArtifactWrite';
 
-const receiptStores = new WeakMap<InvestigationArtifactService, RdxExecutionReceipts>();
+const receiptStores = new WeakMap<InvestigationArtifactService, RdcExecutionReceipts>();
 export const SESSION_ID = 'inv-session';
 export const SESSION_B_ID = 'inv-session-b';
 
@@ -37,7 +37,7 @@ export function createInvestigationHarness(
   const resolver = new SessionArtifactResolver({
     resolveSessionPath: (id) => (id === sessionId ? sessionPath : null),
   });
-  const receiptStore = new RdxExecutionReceipts(resolver, () => 'test-receipt-key');
+  const receiptStore = new RdcExecutionReceipts(resolver, () => 'test-receipt-key');
   const service = new InvestigationArtifactService({
     resolver, receiptStore,
     now: () => new Date('2026-09-01T00:00:00.000Z'),
@@ -55,7 +55,7 @@ export function reopenInvestigationHarness(
   const resolver = new SessionArtifactResolver({
     resolveSessionPath: (id) => (id === sessionId ? sessionPath : null),
   });
-  const receiptStore = new RdxExecutionReceipts(resolver, () => 'test-receipt-key');
+  const receiptStore = new RdcExecutionReceipts(resolver, () => 'test-receipt-key');
   const service = new InvestigationArtifactService({
     resolver, receiptStore,
     now: () => new Date('2026-09-01T00:00:00.000Z'),
@@ -70,7 +70,7 @@ export function createMultiSessionInvestigationHarness(ids: string[] = [SESSION_
   const resolver = new SessionArtifactResolver({
     resolveSessionPath: (id) => paths[id] ?? null,
   });
-  const receiptStore = new RdxExecutionReceipts(resolver, () => 'test-receipt-key');
+  const receiptStore = new RdcExecutionReceipts(resolver, () => 'test-receipt-key');
   const service = new InvestigationArtifactService({
     resolver, receiptStore,
     now: () => new Date('2026-09-01T00:00:00.000Z'),

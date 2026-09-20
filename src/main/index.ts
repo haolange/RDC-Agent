@@ -11,10 +11,10 @@ import { fileURLToPath } from 'url';
 
 import { registerIPCHandlers, setMainWindow, initializeIpcState, stopAllActiveRuns } from './ipc/handlers';
 import { storageAdapter } from './sessions/StorageAdapter';
-import { rdxSessionService } from './sessions';
-import { harvestOwnedRdxDaemons } from './sessions/OwnedRdxDaemonRegistry';
+import { rdcSessionService } from './sessions';
+import { harvestOwnedRdcDaemons } from './sessions/OwnedRdcDaemonRegistry';
 import { settingsService } from './settings/SettingsService';
-import { rdxCliInvokerService } from './tools/RdxCliInvokerService';
+import { rdcCliInvokerService } from './tools/RdcCliInvokerService';
 import { replayDeviceService } from './captures/ReplayDeviceService';
 import { runtimeLogService } from './runtime/RuntimeLogService';
 import { rendererEventHub } from './browserAppBridge/rendererEventHub';
@@ -37,7 +37,7 @@ import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
 import { acquireUserDataInstanceLock } from './runtime/userDataInstanceLock';
 
 // Re-export for callers that historically imported from main entry.
-export { rdxSessionService } from './sessions';
+export { rdcSessionService } from './sessions';
 
 const SHUTDOWN_TIMEOUT_MS = 45_000;
 let shutdownStarted = false;
@@ -67,10 +67,10 @@ function registerShutdownDisposables(): void {
     },
   });
   shutdownCoordinator.register({
-    id: 'rdx.close-runtime',
+    id: 'rdc.close-runtime',
     phase: 'release_owned_runtimes',
     dispose: async () => {
-      await rdxSessionService.closeAll();
+      await rdcSessionService.closeAll();
     },
   });
   shutdownCoordinator.register({
@@ -190,7 +190,7 @@ const cleanupDisposableBrowserQaUserData = useDisposableBrowserQaUserData
 process.env.RDC_AGENT_USER_DATA = userDataPath;
 fs.mkdirSync(userDataPath, { recursive: true });
 if (useDisposableBrowserQaUserData) {
-  const isolatedHome = path.join(userDataPath, '.rdx');
+  const isolatedHome = path.join(userDataPath, '.rdc-agent');
   fs.mkdirSync(isolatedHome, { recursive: true });
   process.env.RDC_AGENT_HOME = isolatedHome;
   console.log(`[RDC-Agent] Isolated Browser QA home: ${isolatedHome}`);
@@ -564,7 +564,7 @@ app.whenReady().then(async () => {
   const settings = settingsService.initialize();
   if (isSettingsRebuildOnly) {
     console.log('[SettingsRebuildOnly]', JSON.stringify({
-      workspaceRoot: settings.paths.userRdxRoot,
+      workspaceRoot: settings.paths.userRdcRoot,
       settingsPath: settings.paths.settingsPath,
       providerIds: settings.llm.providers.map((provider) => provider.id),
     }));
@@ -687,15 +687,15 @@ async function initializeServices(): Promise<void> {
     const hasConfiguredProvider = settingsService.hasConfiguredProvider();
     console.log('[Main] SettingsService initialized, hasConfiguredProvider:', hasConfiguredProvider);
     
-    await rdxCliInvokerService.getRuntimeSummary();
-    console.log('[Main] RDX CLI invoker initialized');
-    const leftover = await harvestOwnedRdxDaemons();
+    await rdcCliInvokerService.getRuntimeSummary();
+    console.log('[Main] RDC-Tool CLI invoker initialized');
+    const leftover = await harvestOwnedRdcDaemons();
     if (leftover.failed.length) {
       runtimeLogService.log({
         scope: 'app',
         namespace: 'context',
         severity: 'error',
-        title: 'RDX leftover daemon harvest failed',
+        title: 'RDC leftover daemon harvest failed',
         summary: leftover.failed.map((item) => `${item.contextId}: ${item.error}`).join('; '),
         raw: leftover,
       });
@@ -704,7 +704,7 @@ async function initializeServices(): Promise<void> {
         scope: 'app',
         namespace: 'context',
         severity: 'info',
-        title: 'RDX leftover daemons released',
+        title: 'RDC leftover daemons released',
         summary: leftover.released.join(', '),
         raw: leftover,
       });
@@ -713,8 +713,8 @@ async function initializeServices(): Promise<void> {
       scope: 'app',
       namespace: 'system',
       severity: 'success',
-      title: 'RDX CLI invoker ready',
-      summary: 'RDX CLI invoker 诊断已加载。',
+      title: 'RDC-Tool CLI invoker ready',
+      summary: 'RDC-Tool CLI invoker 诊断已加载。',
     });
     
     await initializeIpcState();

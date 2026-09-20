@@ -17,7 +17,7 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 
 当前 session 的 `{sessionPath}/attachments` 作为 scoped readable root 注入 `AgentPermissionPolicy.sessionAttachmentsRoot`。仅 `READ_ONLY_FILE_TOOLS`（`read_file` / `read_image` / `glob` / `grep`）自动可读；写工具、`code_interpreter` 与跨 session 附件目录不继承。依据是用户亲手附加 = 显式意图；`.rdc`、可执行文件与 SVG 不得进入该目录。
 
-canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `knowledgeReadRoots = [realpath(~/.rdx/knowledge), realpath(<projectRoot>/.rdx/knowledge)]`（仅存在且为真实目录；根自身 symlink/junction → 排除 + 诊断）。`AgentPermissionPolicy` **仅**对 `read_file` / `read_image` / `glob` / `grep` 把它们并入免审批读根。`write` / `edit` / `delete` / `shell` / `code_interpreter` 在策略层与执行层双重拒绝。sibling 越界（如 `~/.rdx/memory`、`~/.rdx/agents`）拒。写入 Knowledge 仍只经 `knowledge_*` + human review。见 `DESIGN.md` 裁决 G。
+canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `knowledgeReadRoots = [realpath(~/.rdc-agent/knowledge), realpath(<projectRoot>/.rdc-agent/knowledge)]`（仅存在且为真实目录；根自身 symlink/junction → 排除 + 诊断）。`AgentPermissionPolicy` **仅**对 `read_file` / `read_image` / `glob` / `grep` 把它们并入免审批读根。`write` / `edit` / `delete` / `shell` / `code_interpreter` 在策略层与执行层双重拒绝。sibling 越界（如 `~/.rdc-agent/memory`、`~/.rdc-agent/agents`）拒。写入 Knowledge 仍只经 `knowledge_*` + human review。见 `DESIGN.md` 裁决 G。
 
 ## Electron Sandbox（Phase 6）
 
@@ -28,7 +28,7 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 
 ## IPC Schema（Zod）
 
-**全量** IPC handler 经 `parseIpcArgs`（含 settings / terminal / workflow / memory / conversation / project / capture / shell / rdx-runtime / trace / web 等）。非法 payload fail-closed。`approvalToken` 单次消费（`IpcApprovalTokenService`）。契约测试：`IpcPayloadGuard.test.ts`。Renderer 读取 Investigation 正文的唯一通道是 IPC `investigation:read({ sessionId, artifactId, expectedHash })`：分类 `read`；active project/session owner gate；内部唯一调用 `InvestigationArtifactService.readRecord`；只返回既有 max-bytes 内完整 record，超限 fail-closed；不接受 URI / 绝对路径 / generic artifact。见 `DESIGN.md` 裁决 B / E。**该 IPC 已落地**。T18 知识导入已证见 `DESIGN.md` T18 已证组；产品级 Browser QA 全矩阵见 U05 / [`docs/product/acceptance-ledger.md`](../product/acceptance-ledger.md)。
+**全量** IPC handler 经 `parseIpcArgs`（含 settings / terminal / workflow / memory / conversation / project / capture / shell / rdc-runtime / trace / web 等）。非法 payload fail-closed。`approvalToken` 单次消费（`IpcApprovalTokenService`）。契约测试：`IpcPayloadGuard.test.ts`。Renderer 读取 Investigation 正文的唯一通道是 IPC `investigation:read({ sessionId, artifactId, expectedHash })`：分类 `read`；active project/session owner gate；内部唯一调用 `InvestigationArtifactService.readRecord`；只返回既有 max-bytes 内完整 record，超限 fail-closed；不接受 URI / 绝对路径 / generic artifact。见 `DESIGN.md` 裁决 B / E。**该 IPC 已落地**。T18 知识导入已证见 `DESIGN.md` T18 已证组；产品级 Browser QA 全矩阵见 U05 / [`docs/product/acceptance-ledger.md`](../product/acceptance-ledger.md)。
 
 ## Browser Bridge（QA-only / debug-only）
 - /qa is a QA bootstrap surface: the launcher logs a one-time qaBootstrap, which is consumed before minting the bridge cookie. It isolates browser origins; it is not authentication against a malicious local process.
@@ -52,13 +52,13 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 - 损坏条目 quarantine；文件权限 0600/ACL。
 - Credential 仅进入主进程 opaque lease，不进 manifest / Route / RequestPlan / IPC / Trace。
 
-## RDX Context Lease
+## RDC Context Lease
 
-- 仅 per-session lease：`setRdxRuntimeContextForSession` / `getRdxContextLease` / `assertRdxContextLeaseOwnership`。
-- **禁止** RDX global mirror、`legacyGlobalMirror`、`getRdxRuntimeContext` 全局 API。
+- 仅 per-session lease：`setRdcRuntimeContextForSession` / `getRdcContextLease` / `assertRdcContextLeaseOwnership`。
+- **禁止** RDC global mirror、`legacyGlobalMirror`、`getRdcRuntimeContext` 全局 API。
 - 工具读上下文前必须校验 lease 所有权；空 `sessionId` fail-closed（不写任何全局镜像）。
-- UI 无 session 摘要可经 `getMostRecentRdxContextLease`；工具路径仍须显式 `sessionId` + ownership assert。
-- **Delegated lease**：parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease（`delegatedFrom`），使 `domainExtensions.rdx.requiresLease=true` 的 child 取得 parent RDX context 并串行；同一 parent 同时只允许一条 live delegated lease；无 parent lease 则 fail-closed，不得静默创建。child 完成/取消/抛错立即 `revokeDelegatedLease`，parent lease 不变。child lease 不可再转授。未请求 RDX 领域扩展 的 child **在 allowlist 层**就不能拿到 `rdx_context` / `rdx_probe`（`shell` 可保留，但不继承 parent lease）。禁止并发 RDX 双 owner。Mission 只读面走 `rdx_probe`，不得获得 generic shell。
+- UI 无 session 摘要可经 `getMostRecentRdcContextLease`；工具路径仍须显式 `sessionId` + ownership assert。
+- **Delegated lease**：parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease（`delegatedFrom`），使 `domainExtensions.rdc.requiresLease=true` 的 child 取得 parent RDC context 并串行；同一 parent 同时只允许一条 live delegated lease；无 parent lease 则 fail-closed，不得静默创建。child 完成/取消/抛错立即 `revokeDelegatedLease`，parent lease 不变。child lease 不可再转授。未请求 RDC 领域扩展 的 child **在 allowlist 层**就不能拿到 `rdc_context` / `rdc_probe`（`shell` 可保留，但不继承 parent lease）。禁止并发 RDC 双 owner。Mission 只读面走 `rdc_probe`，不得获得 generic shell。
 
 ## Hook Trust
 
@@ -73,13 +73,13 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 - Project MCP 与 user 同 ID 时，不可覆盖 user 的 `command` / `args` / `url` / `env`。
 - 可执行指纹变化 → `needsRetrust`；连接前 `assertConnectAllowed`。
 - MCP 连接池按 `realpath(projectRoot) + projectId + descriptorHash` 分组；失败缓存指数退避（retryable→permanent）；orphan process quarantine 至 supervised.exit。Transport 仅 `stdio` / `streamable-http`；`sse` → `MCP_TRANSPORT_UNSUPPORTED`。
-- Settings 提供显式 trust 面板；Browser 与 Desktop 均通过相同 `rdx-runtime:trustMcp` handler 和主进程 trust 校验。
+- Settings 提供显式 trust 面板；Browser 与 Desktop 均通过相同 `rdc-runtime:trustMcp` handler 和主进程 trust 校验。
 
 ## Shell 分析
 
 - Agent 命令工具 id 是 `shell`；解释器由 `ShellResolver` 解析（Settings 本机覆盖 → pwsh 7 → Windows PowerShell 5.1；POSIX `$SHELL`∈zsh/bash/sh/dash → zsh → bash → sh）。fish/csh/nu 等 fail-closed。全失败 `SHELL_UNAVAILABLE`。
-- 灾难命令由 `shellHardDeny` 单独维护；文件/RDX 路由硬拒绝是独立规则，两者都先于权限模式求值。PowerShell 先统一 splitter（含 `&`）、折叠反引号、静态别名展开与最短唯一参数 bind，再匹配 `Remove-Item -Recurse -Force` 根路径（含 `$env:SystemDrive` / `\\?\C:\` / UNC 根 / hive 根）、`iwr|iex`（右端含 `bash`/`sh`/`pwsh`/`cmd`）、`-EncodedCommand`、嵌套 `powershell -Command` / `&` 调用运算符、launcher `-ExecutionPolicy Bypass`。cmd 覆盖 `rd /s /q`、`del /s /q`、`diskpart`、`shutdown /s`、`format`。POSIX 覆盖 `rm -rf /`、`dd if=`、`mkfs*`、`> /dev/sd|hd|nvme|xvd`、fork bomb、`chmod 777`；`sudo` 只在与这些灾难组合叠加时硬拒。allow 与 deny 都用词边界匹配。
-- RDX / 通用 shell 经 `ShellInvocationService`；exitCode：`code ?? (signal ? 128+n : 1)`。
+- 灾难命令由 `shellHardDeny` 单独维护；文件/RDC 路由硬拒绝是独立规则，两者都先于权限模式求值。PowerShell 先统一 splitter（含 `&`）、折叠反引号、静态别名展开与最短唯一参数 bind，再匹配 `Remove-Item -Recurse -Force` 根路径（含 `$env:SystemDrive` / `\\?\C:\` / UNC 根 / hive 根）、`iwr|iex`（右端含 `bash`/`sh`/`pwsh`/`cmd`）、`-EncodedCommand`、嵌套 `powershell -Command` / `&` 调用运算符、launcher `-ExecutionPolicy Bypass`。cmd 覆盖 `rd /s /q`、`del /s /q`、`diskpart`、`shutdown /s`、`format`。POSIX 覆盖 `rm -rf /`、`dd if=`、`mkfs*`、`> /dev/sd|hd|nvme|xvd`、fork bomb、`chmod 777`；`sudo` 只在与这些灾难组合叠加时硬拒。allow 与 deny 都用词边界匹配。
+- RDC / 通用 shell 经 `ShellInvocationService`；exitCode：`code ?? (signal ? 128+n : 1)`。
 - `ShellCommandRiskAnalyzer`：结构分析 + denied 词边界与路径前缀；最高分档为 `high`，只做审批路由，没有 `critical` 档位。
 - **风险分类器不是安全边界**；真正边界是 PermissionPolicy + `shellHardDeny` + sandbox/OS。
 
@@ -97,17 +97,17 @@ Decision lattice 为 `allow < auto_review < ask_user < deny`。`approvalFloorByT
 - `src/main/settings/SecretStorageService.test.ts`
 - `src/main/settings/AgentRuntimeConfigService.test.ts`（MCP trust）
 - `src/main/ipc/validation/IpcPayloadGuard.test.ts`
-- `src/main/sessions/RdxRuntimeContextRegistry.test.ts`
+- `src/main/sessions/RdcRuntimeContextRegistry.test.ts`
 - `src/main/agent-runtime/permissions/*`
 - `src/main/testing/contracts/securityContract.test.ts`（矩阵入口）
-- 门禁：`pnpm run check:orchestrator-facade`（禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext`）
+- 门禁：`pnpm run check:orchestrator-facade`（禁止恢复 `legacyGlobalMirror` / `getRdcRuntimeContext`）
 
 
-## 原生 RDX 执行证据
+## 原生 RDC 执行证据
 
-shell 的 command 与 rdx 互斥；ToolValidator oneOf/not 与执行入口双重检查。结构化模式仍是 shell 审批，不属于只读自动许可。General 之外即使 Full access 也拒绝；本机冻结配置、owning project/session lease、非 default context、非 delegated/offline child 同时成立才执行。模型不可传 capture/replay/context identity。操作权限按冻结 catalog 的 scope、effects、前置条件、参数和路径声明校验，不按命名空间授权。未知操作或影响 fail-closed；生命周期、remote、全局配置、窗口及销毁仍由应用专门入口管理。Skill 仅提供知识，不能扩权。
+shell 的 command 与 rdc 互斥；ToolValidator oneOf/not 与执行入口双重检查。结构化模式仍是 shell 审批，不属于只读自动许可。General 之外即使 Full access 也拒绝；本机冻结配置、owning project/session lease、非 default context、非 delegated/offline child 同时成立才执行。模型不可传 capture/replay/context identity。操作权限按冻结 catalog 的 scope、effects、前置条件、参数和路径声明校验，不按命名空间授权。未知操作或影响 fail-closed；生命周期、remote、全局配置、窗口及销毁仍由应用专门入口管理。Skill 仅提供知识，不能扩权。
 
-执行回执仅由主进程在真实原生成功调用后签名，key 在 safeStorage；模型提交的 result JSON、普通 shell 输出或 artifact hash 本身不具备 provenance。签名校验与 SessionArtifactResolver 所有权/hash 同时成立才可引用。实验关闭和新完成必须满足五阶段真实调用与同 replacement 的回滚；旧记录只保留可读性。详见 docs/architecture/rdx-runtime.md。
+执行回执仅由主进程在真实原生成功调用后签名，key 在 safeStorage；模型提交的 result JSON、普通 shell 输出或 artifact hash 本身不具备 provenance。签名校验与 SessionArtifactResolver 所有权/hash 同时成立才可引用。实验关闭和新完成必须满足五阶段真实调用与同 replacement 的回滚；旧记录只保留可读性。详见 docs/architecture/rdc-runtime.md。
 
 Skill 权限只在 prepareTurn 对预载集合取交集；skill_read 只读方法。RenderDoc 方法技能没有局部执行工具白名单；profile/policy/lease 仍强制授权。Knowledge Scout 仍只有四个 Knowledge 只读工具，文件补证属于调用方独立步骤。
 
@@ -123,6 +123,6 @@ plan:* 以当前查看 session + planId/revision/URI/hash 定位持久历史 too
 
 ## 专用工具路由与读取前置
 
-文件路由表独立于灾难 shellHardDeny 表，均在权限模式和自定义允许前缀之前求值；Full access 不能绕过。有效工具集合有对应工具时，shell.command 文件读写/搜索返回 SHELL_FILE_TOOL_BYPASS，命令行 RDX 返回 RDX_VIA_COMMAND_DENIED。edit_file 和覆盖已有文件的 write_file 必须先在同一 session 成功 read_file 同一 realpath，否则 READ_BEFORE_EDIT_REQUIRED。已读状态跨 turn、仅内存持有，重启须重读；子 session 不继承。新建文件免先读。
+文件路由表独立于灾难 shellHardDeny 表，均在权限模式和自定义允许前缀之前求值；Full access 不能绕过。有效工具集合有对应工具时，shell.command 文件读写/搜索返回 SHELL_FILE_TOOL_BYPASS，命令行 RDC 返回 RDC_VIA_COMMAND_DENIED。edit_file 和覆盖已有文件的 write_file 必须先在同一 session 成功 read_file 同一 realpath，否则 READ_BEFORE_EDIT_REQUIRED。已读状态跨 turn、仅内存持有，重启须重读；子 session 不继承。新建文件免先读。
 
-Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDX_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。
+Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDC_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。

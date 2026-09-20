@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { cn } from '../../../../lib/cn';
-import type { RdxRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdxRuntime';
+import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
@@ -24,11 +24,11 @@ export interface RuntimeScopeDetailContext {
 }
 
 export const RuntimeScopePanel: React.FC<{
-  overview: RdxRuntimeOverview | null;
+  overview: RdcRuntimeOverview | null;
   scope: 'user' | 'project';
   onScopeChange: (scope: 'user' | 'project') => void;
   kinds: ScopedResourceKind[];
-  onChanged?: (overview: RdxRuntimeOverview) => void;
+  onChanged?: (overview: RdcRuntimeOverview) => void;
   onDirtyChange?: (dirty: boolean) => void;
   /** `dialog` opens the editor as a task sub-dialog (MCP / Hook / Policy). */
   editorPresentation?: 'inline' | 'dialog';

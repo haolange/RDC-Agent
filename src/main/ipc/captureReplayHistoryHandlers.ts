@@ -1,4 +1,4 @@
-import { rdxSessionService } from '../sessions';
+import { rdcSessionService } from '../sessions';
 import { ipcMain } from 'electron';
 import { z } from 'zod';
 import { replayHistoryStore } from '../captures/replay/ReplayHistoryStore';
@@ -35,6 +35,6 @@ export function registerCaptureReplayHistoryHandlers(): void {
   });
   ipcMain.handle('capture:clearReplayHistory', (_event, ...args: unknown[]) => {
     const [request] = parseIpcArgs(z.tuple([history]), args, { label: 'capture:clearReplayHistory', maxBytes: 2048 });
-    return rdxSessionService.clearReplayHistoryForSession(request, request.captureHash, authorize(request));
+    return rdcSessionService.clearReplayHistoryForSession(request, request.captureHash, authorize(request));
   });
 }

@@ -543,3 +543,8 @@ Android matching-runtime acceptance now passed: Android Studio SDK NDK 27.3.1375
 - Engineering：通过。Agent 413文件/2944项通过，4项 opt-in 默认跳过；coverage ratchet、typecheck、lint、248项 contracts、gates、build 通过。Tools 全量405项、reference/catalog freshness、release gate 通过。隔离 lease 的错误状态及重试提示已修复并独立复验；权限和隔离边界未放宽。
 - Canonical generation：通过。discovery/catalog/三本手册统一 `4eefd77d649bef8a03d53ab408f097314c781c33ff01b0eec436c5c1562caf4f`；生成检查显式传入本次 catalog。原生输出、Mesh/OBJ 限制和教法同步，历史 unsupported 快照仅保留为当时证据。
 - Cleanup：通过。先释放自有 context，再停止 daemon/helper，forward 为空；隔离凭据、测试副本、QA 进程与 Browser 标签页均已清理。正常 start:human 启动实际桌面窗口后退出，canonical instance.lock 不存在，桌面启动权已交还。证据 `agent/desktop-startup.json`、`agent/acceptance.json`；当前源码以 `source-manifest.json` 为准。模型材料补验及追加隔离环境清理均通过，补验两个 context 已释放、自有进程已退出、普通桌面窗口启动和退出再次验证；证据 `agent/supplement/cleanup.json`、`desktop-startup.json`。本计划全部收口，桌面启动权已交还。
+## RDC identity cutover (2026-09-20)
+
+Execution tracking remains in RDC-Tool docs/tool-convergence-tasks.md (T1–T8). This section records evidence only; previous runtime/model facts above are unchanged historical observations.
+
+The canonical CLI binding, shared IPC/schema/policy names, Skill IDs, user/project roots and instruction filename now use RDC identity. Typecheck, lint, generated guides, architecture/design gates and build passed. Initial full tests passed 2939 cases; six identity-sensitive fixtures were corrected and focused rechecks passed. The remaining offline cost test reads historical HEAD with its old profile schema; it will be rerun against the local implementation commit before push, followed by the coverage ratchet. Installed CLI, local data cutover and desktop acceptance are pending.

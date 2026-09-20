@@ -57,7 +57,7 @@ const provider = {
 
 function settingsWith(): AppSettings {
   return {
-    paths: { agentsPath: 'C:/tmp/agents', userRdxRoot: 'C:/tmp/rdx' },
+    paths: { agentsPath: 'C:/tmp/agents', userRdcRoot: 'C:/tmp/rdc' },
     llm: {
       providers: [provider],
       agentRoutes: [{ agentId: 'edit', providerId: 'cline-pass', modelId: 'cline-pass/kimi-k2.7-code' }],
@@ -174,7 +174,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
     vi.mocked(agentManifestService.resolveEffectiveSnapshot).mockReturnValue({
       profiles: [editProfile],
       diagnostics: [
-        'PROJECT_AGENT_MANIFEST_INVALID: D:/Project/.rdx/agents/edit.agent.md: tools/skills/mcp-servers/agents/model must be string arrays when present.',
+        'PROJECT_AGENT_MANIFEST_INVALID: D:/Project/.rdc-agent/agents/edit.agent.md: tools/skills/mcp-servers/agents/model must be string arrays when present.',
       ],
     } as never);
     vi.mocked(resolveEffectiveModelSelection).mockReturnValue({
@@ -186,7 +186,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.overlayDiagnostics).toEqual([
-      'PROJECT_AGENT_MANIFEST_INVALID: D:/Project/.rdx/agents/edit.agent.md: tools/skills/mcp-servers/agents/model must be string arrays when present.',
+      'PROJECT_AGENT_MANIFEST_INVALID: D:/Project/.rdc-agent/agents/edit.agent.md: tools/skills/mcp-servers/agents/model must be string arrays when present.',
     ]);
   });
 
@@ -203,7 +203,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
         compiledRoute: { agentId: 'edit', providerId: '', modelId: '' },
       }],
       diagnostics: [
-        'PROJECT_AGENT_MANIFEST_INVALID: D:/Project/.rdx/agents/edit.agent.md: tools/skills/mcp-servers/agents/model must be string arrays when present.',
+        'PROJECT_AGENT_MANIFEST_INVALID: D:/Project/.rdc-agent/agents/edit.agent.md: tools/skills/mcp-servers/agents/model must be string arrays when present.',
       ],
     } as never);
     const result = resolveAgentRoutePreflight('edit', undefined, null, 'D:/Project');
@@ -211,7 +211,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
     if (result.ok) return;
     expect(result.diagnostic.code).toBe('CONVERSATION_LLM_ROUTE_MISSING');
     expect(result.overlayDiagnostics).toEqual([
-      'PROJECT_AGENT_MANIFEST_INVALID: D:/Project/.rdx/agents/edit.agent.md: tools/skills/mcp-servers/agents/model must be string arrays when present.',
+      'PROJECT_AGENT_MANIFEST_INVALID: D:/Project/.rdc-agent/agents/edit.agent.md: tools/skills/mcp-servers/agents/model must be string arrays when present.',
     ]);
   });
 
@@ -220,7 +220,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
     recordOverlayProfileDiagnostics(
       { projectId: 'proj', session: null, currentRun: null } as never,
       'edit',
-      ['PROJECT_AGENT_MANIFEST_INVALID: D:/Project/.rdx/agents/edit.agent.md: malformed'],
+      ['PROJECT_AGENT_MANIFEST_INVALID: D:/Project/.rdc-agent/agents/edit.agent.md: malformed'],
       false,
     );
     expect(vi.mocked(runtimeLogService.log)).toHaveBeenCalledWith(expect.objectContaining({

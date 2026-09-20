@@ -68,7 +68,7 @@ import {
   type TurnHandle,
 } from './AgentOrchestrator.deps';
 import { applyDelegationCapsuleToPromptPlan } from '../../agent-runtime/prompt/DelegationCapsuleCompiler';
-import { stripRdxLeaseToolsFromAllowlist } from '@shared/constants/rdxLeaseTools';
+import { stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
 
 export type { PreparedAgentTurnContext } from './AgentOrchestrator.deps';
 export class AgentOrchestrator {
@@ -456,8 +456,8 @@ export class AgentOrchestrator {
 
       const resolvedAllowlist = preparedTurn?.toolAllowlist
         ?? resolveAgentToolAllowlistFromDefinition(agentId, effectiveProfile.tools);
-      const toolAllowlist = options?.excludeRdxLeaseTools
-        ? stripRdxLeaseToolsFromAllowlist(resolvedAllowlist)
+      const toolAllowlist = options?.excludeRdcLeaseTools
+        ? stripRdcLeaseToolsFromAllowlist(resolvedAllowlist)
         : resolvedAllowlist;
       const routeProviderId = config.modelProvider;
       const routeModelId = config.modelName;
@@ -549,7 +549,7 @@ export class AgentOrchestrator {
           activeBranchId: options?.activeBranchId,
           signal: options?.signal,
           isolateContext: isSubagentSession || !options?.sessionId,
-          excludeRdxLeaseTools: options?.excludeRdxLeaseTools,
+          excludeRdcLeaseTools: options?.excludeRdcLeaseTools,
           frozenDelegationCapsule: options?.frozenDelegationCapsule,
         });
         preparedTurn = preparedBundle.prepared;
@@ -655,9 +655,9 @@ export class AgentOrchestrator {
   private getMemoryStore(scope: 'user' | 'project', projectRootPath?: string | null): MemoryStore {
     if (scope === 'project') {
       if (!projectRootPath) throw new Error('Project scope memory requires an active project.');
-      return new MemoryStore(appPathService.getProjectRdxPaths(projectRootPath).memoryPath);
+      return new MemoryStore(appPathService.getProjectRdcPaths(projectRootPath).memoryPath);
     }
-    return new MemoryStore(appPathService.getUserRdxPaths().memoryPath);
+    return new MemoryStore(appPathService.getUserRdcPaths().memoryPath);
   }
 
   async listMemoriesForUi(): Promise<Array<{ name: string; description: string; type: string; updatedAt: number }>> {

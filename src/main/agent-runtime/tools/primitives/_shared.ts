@@ -353,7 +353,7 @@ export function formatBinaryRejectMessage(absolutePath: string, reason: string):
   if (ext === '.rdc') {
     return (
       `Cannot read binary RenderDoc capture as text: ${absolutePath}. `
-      + 'Open the .rdc via the session Capture panel / RDX runtime instead of read_file.'
+      + 'Open the .rdc via the session Capture panel / RDC runtime instead of read_file.'
     );
   }
   return `Cannot read binary file as text: ${absolutePath} (${reason}). Use an appropriate binary or domain tool.`;

@@ -22,7 +22,7 @@ import {
 import { CaptureOpenProjectInputArgsSchema } from './captureDeviceSchemas';
 import { CommandExecuteArgsSchema } from './commandSchemas';
 import { KnowledgeCardArgsSchema, KnowledgeCandidateCreateArgsSchema } from './knowledgeSchemas';
-import { RdxRuntimeTrustMcpArgsSchema } from './rdxRuntimeSchemas';
+import { RdcRuntimeTrustMcpArgsSchema } from './rdcRuntimeSchemas';
 import { TraceGetEventsArgsSchema } from './traceSchemas';
 import { WebResolveFaviconArgsSchema } from './webSchemas';
 
@@ -181,9 +181,9 @@ describe('parseIpcArgs', () => {
     }], { label: 'knowledge:candidateCreate' })).toThrow(IpcValidationError);
   });
 
-  it('rejects rdx-runtime trustMcp with empty descriptorId', () => {
-    expect(() => parseIpcArgs(RdxRuntimeTrustMcpArgsSchema, ['D:/proj', ''], {
-      label: 'rdx-runtime:trustMcp',
+  it('rejects rdc-runtime trustMcp with empty descriptorId', () => {
+    expect(() => parseIpcArgs(RdcRuntimeTrustMcpArgsSchema, ['D:/proj', ''], {
+      label: 'rdc-runtime:trustMcp',
     })).toThrow(IpcValidationError);
   });
 

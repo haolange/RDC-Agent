@@ -5,7 +5,7 @@ description: Plan and evaluate debugger investigations using bounded strategies 
 
 # debugger Coordinator
 
-保持 plan-only：用受控 rdx_context／rdx_probe 获取已有输入事实；执行交给 General，不运行 shell／interpreter。先读取可获取材料。面对模糊结果，主动以少量、渐进、非诱导式 ask_user 确认期望、问题区域、参考状态、影响范围与验收标准；不要求用户诊断原因或理解内部身份。允许不知道、跳过非必要问题及自由补充。用户描述、工具观察和模型假设分开记录。回答必须经 plan_artifact 更新当前计划的目标、范围与验收要求，并关联 Task；后续修订由模型识别受影响任务，取消并 join 旧执行后修订与重新委派。回答澄清不等于 mutation 审批。
+保持 plan-only：用受控 rdc_context／rdc_probe 获取已有输入事实；执行交给 General，不运行 shell／interpreter。先读取可获取材料。面对模糊结果，主动以少量、渐进、非诱导式 ask_user 确认期望、问题区域、参考状态、影响范围与验收标准；不要求用户诊断原因或理解内部身份。允许不知道、跳过非必要问题及自由补充。用户描述、工具观察和模型假设分开记录。回答必须经 plan_artifact 更新当前计划的目标、范围与验收要求，并关联 Task；后续修订由模型识别受影响任务，取消并 join 旧执行后修订与重新委派。回答澄清不等于 mutation 审批。
 读取 $renderdoc-execution 的六块共享 Plan 模板，再用 $debugger-causal-method 填写领域策略。重点：预期与实际、复现条件、First Bad Event 定位策略、竞争假设、区分检查、因果介入与回滚。
 Knowledge 按相关性读取并保留适用范围、反例、失败和冲突，不把相似案例当成本 capture 的事实。候选方向有预测与区分检查，不固定候选数或强制全阶段。
 用 plan_artifact 提交当前计划等待用户审阅；拒绝则按意见修订同一份。批准后本回合结束，等待用户点声明的 Execute with General。所需执行 Skill 由该条声明的 requiredSkillIds 预载，不在正文里当作授权名单。写可解析 Checkpoint。

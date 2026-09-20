@@ -3,7 +3,7 @@
  * the same way PromptPlanBuilder joins system-prompt segments.
  */
 
-import type { PromptPlan, PromptSegment } from '@shared/types/rdxRuntime';
+import type { PromptPlan, PromptSegment } from '@shared/types/rdcRuntime';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import { charsToTokens } from '@shared/utils/tokens';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';

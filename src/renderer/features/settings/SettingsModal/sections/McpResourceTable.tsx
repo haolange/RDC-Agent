@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { ScopedResourceDocument } from '@shared/types/rdxRuntime';
+import type { ScopedResourceDocument } from '@shared/types/rdcRuntime';
 import { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { formFromContent } from './scopedResourceForm';

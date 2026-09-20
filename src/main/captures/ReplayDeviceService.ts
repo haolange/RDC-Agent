@@ -1,10 +1,10 @@
 import { BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
-import { parseRdxNativeResult } from '../tools/RdxNativeProtocol';
-import type { RdxCliInvokerSettings } from '@shared/types/settings';
-type RemoteActivationOptions = { contextId?: string; signal?: AbortSignal; cli?: RdxCliInvokerSettings };
+import { rdcCliInvokerService } from '../tools/RdcCliInvokerService';
+import { parseRdcNativeResult } from '../tools/RdcNativeProtocol';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
+type RemoteActivationOptions = { contextId?: string; signal?: AbortSignal; cli?: RdcCliInvokerSettings };
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
@@ -216,7 +216,7 @@ export class ReplayDeviceService {
     options.signal?.throwIfAborted();
     const existingPromise = this.activationPromises.get(deviceId);
     if (existingPromise) {
-      if (options.contextId) throw new Error('RDX_REMOTE_BUSY: cannot join an activation outside the frozen turn binding.');
+      if (options.contextId) throw new Error('RDC_REMOTE_BUSY: cannot join an activation outside the frozen turn binding.');
       return existingPromise;
     }
 
@@ -523,9 +523,9 @@ export class ReplayDeviceService {
       activationUpdatedAt: Date.now(),
     });
 
-    if (!options.contextId || !options.cli) throw new Error('RDX_REMOTE_CONTEXT_REQUIRED: remote activation requires an owning context and frozen CLI.');
+    if (!options.contextId || !options.cli) throw new Error('RDC_REMOTE_CONTEXT_REQUIRED: remote activation requires an owning context and frozen CLI.');
     options.signal?.throwIfAborted();
-    const result = parseRdxNativeResult(await rdxCliInvokerService.executeCLI('call', [
+    const result = parseRdcNativeResult(await rdcCliInvokerService.executeCLI('call', [
       'rd.remote.connect', '--args-json', JSON.stringify({ options: { transport: 'adb_android', device_serial: device.serial } }),
       '--daemon-context', options.contextId,
     ], { contextId: options.contextId, abortSignal: options.signal, settings: options.cli }), options.contextId, 'rd.remote.connect');
@@ -533,7 +533,7 @@ export class ReplayDeviceService {
     const contextId = options.contextId;
     const remoteId = readActionString(result.data, ['remote_id']);
     if (!remoteId) {
-      throw new Error('RDX remote connect result must include remote_id.');
+      throw new Error('RDC remote connect result must include remote_id.');
     }
 
     const bootstrap = parseRemoteBootstrap(result.data);

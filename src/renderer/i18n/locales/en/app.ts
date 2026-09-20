@@ -7,7 +7,7 @@ export const enApp = {
   'app.notice.filesReceived': 'Received {count} files. Confirm them in the Debugger page.',
   'app.notice.newWorkspace': 'Created a new debug workspace.',
   'app.loading': 'Loading',
-  'app.loadingShell': 'Loading RDC Agent workbench…',
+  'app.loadingShell': 'Loading RDC-Agent workbench…',
   'app.leftSidebarExpand': 'Expand left sidebar',
   'app.leftSidebarCollapse': 'Collapse left sidebar',
   'app.rightPanelExpand': 'Expand right panel',

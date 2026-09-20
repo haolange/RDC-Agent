@@ -10,7 +10,7 @@ import type { MCPTransport } from './mcp';
 import type { AgentPromptProfile, AgentToolPolicy } from './profile';
 import type { ProviderOutputRef, ThinkingArtifact } from './reasoning';
 import type { CapabilityState } from './providerCapability';
-import type { ProviderReasoningContract } from './rdxRuntime';
+import type { ProviderReasoningContract } from './rdcRuntime';
 import type {
   ConversationAskUserAnswer,
   ConversationAskUserQuestion,

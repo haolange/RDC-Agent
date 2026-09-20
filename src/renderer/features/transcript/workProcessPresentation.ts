@@ -752,7 +752,7 @@ export const unwrapToolContentLayer = (
     const commandText = sanitizeContentText(
       stringifyPreview(
         argsRecord?.command
-        ?? readNestedValue(argsRecord ?? {}, ['rdx', 'operation'])
+        ?? readNestedValue(argsRecord ?? {}, ['rdc', 'operation'])
         ?? argsRecord?.cmd
         ?? details?.command
         ?? record?.command
@@ -882,7 +882,7 @@ export const unwrapToolContentLayer = (
     };
   }
 
-  if (normalized === 'rdx_context' || normalized === 'agent_handoff') {
+  if (normalized === 'rdc_context' || normalized === 'agent_handoff') {
     const target = sanitizeContentText(stringifyPreview(
       argsRecord?.target ?? argsRecord?.agent ?? details?.target,
     ));

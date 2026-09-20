@@ -58,7 +58,7 @@ describe('offline complete PromptPlan comparison', () => {
     try {
       const cases = [ { task: '聊天问答', id: 'general', extra: [] }, { task: '轻量 coding', id: 'general', extra: [] },
         { task: 'Debugger 规划', id: 'debugger', extra: [] }, { task: 'Analyzer 规划', id: 'analyzer', extra: [] }, { task: 'Optimizer 规划', id: 'optimizer', extra: [] },
-        { task: 'General 调查执行', id: 'general', extra: ['renderdoc-execution', 'debugger-causal-method', 'rdx-cli-shell'] } ];
+        { task: 'General 调查执行', id: 'general', extra: ['renderdoc-execution', 'debugger-causal-method', 'rdc-tool-shell'] } ];
       const rows = cases.map(test => {
         rootSpy.mockReturnValue(root); const before = plan('before', test.id, test.extra);
         rootSpy.mockReturnValue(path.resolve('resources/agent-runtime')); const after = plan('after', test.id, test.extra);
@@ -66,7 +66,7 @@ describe('offline complete PromptPlan comparison', () => {
         expect(after.segments.some(segment => segment.kind === 'tool-capability')).toBe(true);
         if (test.id === 'general' && !test.extra.length) {
           const resident = after.segments.filter(segment => ['core-contract', 'agent-profile', 'preloaded-skill'].includes(segment.kind)).map(segment => segment.content).join('\n');
-          expect(resident).not.toMatch(/RDX|RenderDoc|Checkpoint/);
+          expect(resident).not.toMatch(/RDC|RenderDoc|Checkpoint/);
           expect(resident).toContain('When this turn is executing an approved Mission plan');
           expect(resident).toContain('General finishes in place');
         }

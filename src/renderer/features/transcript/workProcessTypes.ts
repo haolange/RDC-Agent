@@ -43,7 +43,7 @@ export type WorkProcessIconKey =
   | 'skillRead'
   | 'plug'
   | 'monitor'
-  | 'rdxProbe'
+  | 'rdcProbe'
   | 'brain'
   | 'subagentReport'
   | 'taskCreate'

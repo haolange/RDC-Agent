@@ -3,7 +3,7 @@
  *
  * Product surface rule: automatic provider recovery chatter and thinking lifecycle
  * beacons stay in Agent Activity / runtime logs. Work Process only discloses
- * user-facing fail-closed diagnostics (route, tool, RDX, etc.).
+ * user-facing fail-closed diagnostics (route, tool, RDC, etc.).
  */
 export function shouldProjectDiagnosticToWorkProcess(code: string | undefined): boolean {
   if (!code) {

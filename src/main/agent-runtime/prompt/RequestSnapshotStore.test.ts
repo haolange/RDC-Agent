@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { RequestEnvelopeSnapshot } from '@shared/types/rdxRuntime';
+import type { RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 import { RequestSnapshotStore } from './RequestSnapshotStore';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 
@@ -76,7 +76,7 @@ const sampleSnapshot = (overrides: Partial<RequestEnvelopeSnapshot> = {}): Reque
 });
 
 beforeEach(() => {
-  rootPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-snapshot-'));
+  rootPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-snapshot-'));
   store = new RequestSnapshotStore(rootPath);
 });
 

@@ -72,7 +72,7 @@ RDC-Agent 的 UI 风格完全基于 **原生 CSS Custom Properties（CSS 变量�
 - **主题应用方式**：`applyChromeTheme.ts` 必须使用 `adoptedStyleSheets` + `replaceSync`，禁止创建 `<style>` 文本节点或设置 inline style 属性（受 CSP `style-src` 限制）。
 - **入口约束**：`main.tsx` 必须 import `styles/global.css`，不得 import `styles/tokens`；`styles/themes/oklch-themes.css` 与 `styles/tokens/index.css` 等遗留文件必须删除。
 - **ColorField 无障碍**：色板与色相轨必须暴露 `role="slider"` 与键盘事件；不得使用原生 OS color input；hex 输入框宽度固定为 `9.5ch`，不得使用 `width: 100%`。
-- **文档一致性**：`AGENTS.md` 必须包含 Appearance 说明并禁止恢复 translucent sidebar；`DESIGN.md` 必须指向 `docs/ui/` 作为权威来源并记录 CSP `style-src` 与 schema 版本边界；`docs/ui/design-system.md` 必须记录 `rdx-theme-v1` 与 `chromeThemes`。
+- **文档一致性**：`AGENTS.md` 必须包含 Appearance 说明并禁止恢复 translucent sidebar；`DESIGN.md` 必须指向 `docs/ui/` 作为权威来源并记录 CSP `style-src` 与 schema 版本边界；`docs/ui/design-system.md` 必须记录 `rdc-theme-v1` 与 `chromeThemes`。
 - **Token 使用纪律**：组件 CSS 禁止直接使用 `--color-bg-*` 等原始 token，必须通过 `--token-*` 语义层；禁止硬编码 hex 值。
 
 这套体系的核心优势是：视觉规范集中在单一 CSS 文件中，主题切换在运行时通过 CSS 变量注入完成，无需重建前端资源；同时通过脚本门禁将视觉契约固化为可执行的断言，确保多贡献者协作时风格一致。

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { RdxContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
+import type { RdcContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
 import { useI18n } from '../../i18n';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { CapturePanel } from './CapturePanel';
@@ -24,7 +24,7 @@ export const TraceRightPanel: React.FC = () => {
   const artifacts = rightPanel?.artifacts ?? { rows: [], supersededCount: 0, truncatedCount: 0, storeDegraded: false };
   const outputs = rightPanel?.outputs ?? { current: [], previous: [] };
   const taskContext: TaskContextPanelViewModel | undefined = rightPanel?.context?.task;
-  const captureContext: RdxContextPanelViewModel | undefined = rightPanel?.context?.rdx;
+  const captureContext: RdcContextPanelViewModel | undefined = rightPanel?.context?.rdc;
   const hasArtifacts = artifacts.rows.length + artifacts.supersededCount + artifacts.truncatedCount > 0;
   const hasOutputs = outputs.current.length + outputs.previous.length > 0;
   const hasTaskContext = Boolean(taskContext?.resources.length);

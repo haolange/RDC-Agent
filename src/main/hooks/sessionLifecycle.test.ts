@@ -30,7 +30,7 @@ vi.mock('../sessions/StorageAdapter', () => ({
 vi.mock('./runtimeHookDispatch', () => ({
   dispatchRuntimeHooks,
 }));
-vi.mock('../sessions', () => ({ rdxSessionService: { clearOpenedCaptureForSession: closeReplay } }));
+vi.mock('../sessions', () => ({ rdcSessionService: { clearOpenedCaptureForSession: closeReplay } }));
 vi.mock('../captures/replay/ReplayHistoryStore', () => ({ replayHistoryStore: { clearSession: clearReplayHistory } }));
 
 import { createSessionWithHooks, removeSessionWithHooks } from './sessionLifecycle';

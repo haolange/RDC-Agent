@@ -197,8 +197,8 @@ export type {
   ScopedInstructionSource,
   SkillLoadResult,
   SkillMetadata,
-} from './rdxRuntime';
-export { CANONICAL_HOOK_EVENTS } from './rdxRuntime';
+} from './rdcRuntime';
+export { CANONICAL_HOOK_EVENTS } from './rdcRuntime';
 export type {
   ConversationPlanReview,
   PlanApprovalTokenRequest,

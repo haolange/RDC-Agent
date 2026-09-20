@@ -8,7 +8,7 @@ CodePilot 值得学习的是架构表达方式，而不是技术栈迁移：
 
 - CodePilot 用 `Electron shell -> App/API -> lib -> hooks -> feature components -> ui/patterns -> tests/docs` 把每层职责写得很清楚。
 - CodePilot 的 API、Provider、工作区、Bridge、媒体等能力都有源码入口、数据流、故障边界和测试入口。
-- `RDC-Agent` 当前的技术方向仍应保持 `Electron + React + electron-vite`。本仓库的产品边界是通用 agent workbench，RenderDoc `.rdc` 能力通过 Settings 中配置的外部 RDX CLI 接入，不内置 tool 副本。
+- `RDC-Agent` 当前的技术方向仍应保持 `Electron + React + electron-vite`。本仓库的产品边界是通用 agent workbench，RenderDoc `.rdc` 能力通过 Settings 中配置的外部 RDC-Tool CLI 接入，不内置 tool 副本。
 - 本次迁移的是“可读边界”：领域目录、IPC/API 域、共享契约入口、数据流文档和后续拆分路线。
 
 ## 架构对照

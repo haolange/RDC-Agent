@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
+import { rdcCliInvokerService } from '../tools/RdcCliInvokerService';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
@@ -12,12 +12,12 @@ export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void
 
   ipcMain.handle('tool:getCatalog', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'tool:getCatalog', maxBytes: 1024 });
-    return rdxCliInvokerService.loadCatalog();
+    return rdcCliInvokerService.loadCatalog();
   });
 
   ipcMain.handle('tool:getRuntimeSummary', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'tool:getRuntimeSummary', maxBytes: 1024 });
-    return rdxCliInvokerService.getRuntimeSummary(true);
+    return rdcCliInvokerService.getRuntimeSummary(true);
   });
 
   ipcMain.handle('mcp:getStatusSummary', async (_event, ...rawArgs: unknown[]) => {

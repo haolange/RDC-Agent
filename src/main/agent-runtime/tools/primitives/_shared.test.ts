@@ -57,7 +57,7 @@ describe('truncateOutput', () => {
 
 describe('assertTextReadable', () => {
   it('rejects .rdc captures', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-text-rdc-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-text-rdc-'));
     roots.push(root);
     const file = path.join(root, 'cap.rdc');
     await writeFile(file, 'RDOC\0binary', 'utf8');
@@ -65,7 +65,7 @@ describe('assertTextReadable', () => {
   });
 
   it('rejects NUL-containing binaries', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-text-bin-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-text-bin-'));
     roots.push(root);
     const file = path.join(root, 'blob.bin');
     await writeFile(file, Buffer.from([0x00, 0x01, 0x02, 0x03]));
@@ -87,8 +87,8 @@ describe('mutation workspace ownership', () => {
 
 describe('safeResolvePath', () => {
   it('rejects symlink escape outside workspace', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-symlink-ws-'));
-    const outside = await mkdtemp(path.join(os.tmpdir(), 'rdx-symlink-out-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-symlink-ws-'));
+    const outside = await mkdtemp(path.join(os.tmpdir(), 'rdc-symlink-out-'));
     roots.push(root, outside);
     const secret = path.join(outside, 'secret.txt');
     await writeFile(secret, 'leak', 'utf8');
@@ -103,7 +103,7 @@ describe('safeResolvePath', () => {
   });
 
   it('allows ordinary workspace files', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-safe-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-safe-'));
     roots.push(root);
     await mkdir(path.join(root, 'src'), { recursive: true });
     const file = path.join(root, 'src', 'a.ts');
@@ -112,8 +112,8 @@ describe('safeResolvePath', () => {
   });
 
   it('allows temporary roots only from the current ToolExecutionContext', async () => {
-    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-ws-'));
-    const external = await mkdtemp(path.join(os.tmpdir(), 'rdx-ext-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdc-ws-'));
+    const external = await mkdtemp(path.join(os.tmpdir(), 'rdc-ext-'));
     roots.push(workspace, external);
     const externalFile = path.join(external, 'notes.txt');
     await writeFile(externalFile, 'ok', 'utf8');
@@ -139,13 +139,13 @@ describe('safeResolvePath', () => {
     })).toThrow(/超出 workspace/);
   });
 
-  it('rejects sibling ~/.rdx/memory and ~/.rdx/agents even when knowledge is a temporary root', async () => {
-    const userRdx = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-sib-'));
-    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-ws-'));
-    roots.push(userRdx, workspace);
-    const knowledge = path.join(userRdx, 'knowledge');
-    const memory = path.join(userRdx, 'memory');
-    const agents = path.join(userRdx, 'agents');
+  it('rejects sibling ~/.rdc-agent/memory and ~/.rdc-agent/agents even when knowledge is a temporary root', async () => {
+    const userRdc = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-sib-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-ws-'));
+    roots.push(userRdc, workspace);
+    const knowledge = path.join(userRdc, 'knowledge');
+    const memory = path.join(userRdc, 'memory');
+    const agents = path.join(userRdc, 'agents');
     await mkdir(knowledge, { recursive: true });
     await mkdir(memory, { recursive: true });
     await mkdir(agents, { recursive: true });
@@ -165,11 +165,11 @@ describe('safeResolvePath', () => {
   });
 
   it('rejects a junction/symlink planted under a knowledge root that points at a sibling', async () => {
-    const userRdx = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-junc-'));
-    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-jws-'));
-    roots.push(userRdx, workspace);
-    const knowledge = path.join(userRdx, 'knowledge');
-    const memory = path.join(userRdx, 'memory');
+    const userRdc = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-junc-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-jws-'));
+    roots.push(userRdc, workspace);
+    const knowledge = path.join(userRdc, 'knowledge');
+    const memory = path.join(userRdc, 'memory');
     await mkdir(knowledge, { recursive: true });
     await mkdir(memory, { recursive: true });
     const secret = path.join(memory, 'secret.md');
@@ -192,11 +192,11 @@ describe('safeResolvePath', () => {
   });
 
   it('read_file rejects a knowledge-root junction that escapes to a sibling', async () => {
-    const userRdx = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-read-junc-'));
-    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-read-ws-'));
-    roots.push(userRdx, workspace);
-    const knowledge = path.join(userRdx, 'knowledge');
-    const memory = path.join(userRdx, 'memory');
+    const userRdc = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-read-junc-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-read-ws-'));
+    roots.push(userRdc, workspace);
+    const knowledge = path.join(userRdc, 'knowledge');
+    const memory = path.join(userRdc, 'memory');
     await mkdir(knowledge, { recursive: true });
     await mkdir(memory, { recursive: true });
     await writeFile(path.join(memory, 'secret.md'), 'leak', 'utf8');
@@ -216,10 +216,10 @@ describe('safeResolvePath', () => {
   });
 
   it('write_file rejects a path inside a knowledge root at the execution layer', async () => {
-    const userRdx = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-write-'));
-    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-write-ws-'));
-    roots.push(userRdx, workspace);
-    const knowledge = path.join(userRdx, 'knowledge');
+    const userRdc = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-write-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-write-ws-'));
+    roots.push(userRdc, workspace);
+    const knowledge = path.join(userRdc, 'knowledge');
     await mkdir(knowledge, { recursive: true });
     const card = path.join(knowledge, 'card.md');
     await writeFile(card, 'keep', 'utf8');
@@ -232,10 +232,10 @@ describe('safeResolvePath', () => {
   });
 
   it('resolves a missing target through the existing ancestor and refuses to escape the root', async () => {
-    const userRdx = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-miss-'));
-    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-mws-'));
-    roots.push(userRdx, workspace);
-    const knowledge = path.join(userRdx, 'knowledge');
+    const userRdc = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-miss-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-mws-'));
+    roots.push(userRdc, workspace);
+    const knowledge = path.join(userRdc, 'knowledge');
     await mkdir(knowledge, { recursive: true });
     const context = {
       workspaceRoot: workspace,
@@ -251,9 +251,9 @@ describe('safeResolvePath', () => {
   });
 
   it('recognizes project-root case aliases as the same knowledge root', async () => {
-    const project = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-case-'));
+    const project = await mkdtemp(path.join(os.tmpdir(), 'rdc-kn-case-'));
     roots.push(project);
-    const knowledge = path.join(project, '.rdx', 'knowledge');
+    const knowledge = path.join(project, '.rdc-agent', 'knowledge');
     await mkdir(knowledge, { recursive: true });
     const file = path.join(knowledge, 'card.md');
     await writeFile(file, 'ok', 'utf8');
@@ -271,9 +271,9 @@ describe('safeResolvePath', () => {
   it('recognizes a Windows 8.3 project alias as the same knowledge root when available', async () => {
     if (process.platform !== 'win32') return;
     const { realpathSync } = await import('node:fs');
-    const project = await mkdtemp(path.join(os.tmpdir(), 'rdx-e3ident-'));
+    const project = await mkdtemp(path.join(os.tmpdir(), 'rdc-e3ident-'));
     roots.push(project);
-    const knowledge = path.join(project, '.rdx', 'knowledge');
+    const knowledge = path.join(project, '.rdc-agent', 'knowledge');
     await mkdir(knowledge, { recursive: true });
     const file = path.join(knowledge, 'card.md');
     await writeFile(file, 'ok', 'utf8');
@@ -290,7 +290,7 @@ describe('safeResolvePath', () => {
       return;
     }
     if (!shortProject) return;
-    const shortKnowledge = path.join(shortProject, '.rdx', 'knowledge');
+    const shortKnowledge = path.join(shortProject, '.rdc-agent', 'knowledge');
     let realShort = '';
     let realLong = '';
     try {
@@ -311,7 +311,7 @@ describe('safeResolvePath', () => {
   });
 
   it('withTemporaryPathAccess treats missing roots as empty and scopes only the callback', async () => {
-    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-ws-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdc-ws-'));
     roots.push(workspace);
     const context = {
       workspaceRoot: workspace,
@@ -329,7 +329,7 @@ describe('safeResolvePath', () => {
 
 describe('writeTextFileNoFollow', () => {
   it('writes via sibling temp then atomic rename', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-write-atomic-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-write-atomic-'));
     roots.push(root);
     const target = path.join(root, 'note.txt');
     await writeTextFileNoFollow(target, 'hello-atomic');

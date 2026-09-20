@@ -1,6 +1,6 @@
-import { rdxCliInvokerService } from '../../tools/RdxCliInvokerService';
-import { withRdxHostRuntimeEnv } from '../../tools/withRdxHostRuntimeEnv';
-import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
+import { rdcCliInvokerService } from '../../tools/RdcCliInvokerService';
+import { withRdcHostRuntimeEnv } from '../../tools/withRdcHostRuntimeEnv';
+import { assertRdcContextLeaseOwnership } from '../../sessions/RdcRuntimeContextRegistry';
 import { assertExecutionOfferSkillCompatibility } from '../../sessions/handoffSkillCompatibility';
 import { executionOfferRequiredSkillIds } from '../../sessions/handoffSkills';
 /**
@@ -8,14 +8,14 @@ import { executionOfferRequiredSkillIds } from '../../sessions/handoffSkills';
  */
 
 import { createHash } from 'crypto';
-import { bindRdxTurn, freezeRdxTurnBinding, rdxBindingFingerprint } from '../../tools/RdxTurnBindings';
+import { bindRdcTurn, freezeRdcTurnBinding, rdcBindingFingerprint } from '../../tools/RdcTurnBindings';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { ContextUsageBreakdownEntry, PreparedTurnContextSummary } from '@shared/types/session';
-import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdxRuntime';
+import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdcRuntime';
 import { charsToTokens } from '@shared/utils/tokens';
 import {
   resolveCompactionThresholdTokens,
@@ -102,7 +102,7 @@ export interface TurnPreparationServiceDeps {
     projectId?: string | null,
     projectRootPath?: string | null,
     mcpPoolKey?: string | null,
-    options?: { excludeRdxLeaseTools?: boolean },
+    options?: { excludeRdcLeaseTools?: boolean },
   ) => ResolvedRuntimeTools;
   createToolSignature: (tools: ToolDefinition[]) => string;
 }
@@ -136,7 +136,7 @@ export class TurnPreparationService {
     visibleTurnIds: string[];
     activeBranchId?: string | null;
     signal?: AbortSignal;
-    excludeRdxLeaseTools?: boolean;
+    excludeRdcLeaseTools?: boolean;
     frozenDelegationCapsule?: import('@shared/types/delegationCapsule').DelegationCapsule;
   }): Promise<PreparedAgentTurnContext> {
     const throwIfCancelled = () => {
@@ -166,11 +166,11 @@ export class TurnPreparationService {
     // Compile the immutable policy before acquiring any external MCP lease.
     // Invalid policy must not spawn processes or establish network connections.
     const turnSettings = settingsService.getAll();
-    const cliSettings = withRdxHostRuntimeEnv(structuredClone(turnSettings.tooling.rdxCli));
-    const leaseIdentity = assertRdxContextLeaseOwnership({ sessionId: input.sessionId, projectId: input.projectId });
-    const catalog = leaseIdentity ? await rdxCliInvokerService.loadCatalog(cliSettings, true) : null;
+    const cliSettings = withRdcHostRuntimeEnv(structuredClone(turnSettings.tooling.rdcCli));
+    const leaseIdentity = assertRdcContextLeaseOwnership({ sessionId: input.sessionId, projectId: input.projectId });
+    const catalog = leaseIdentity ? await rdcCliInvokerService.loadCatalog(cliSettings, true) : null;
     throwIfCancelled();
-    const rdxBinding = freezeRdxTurnBinding(cliSettings, catalog?.tools ?? [], leaseIdentity);
+    const rdcBinding = freezeRdcTurnBinding(cliSettings, catalog?.tools ?? [], leaseIdentity);
     const compiledPolicy = compileEffectivePolicy(input.projectRootPath);
     const contextCompactionPercent = resolveEffectiveCompactionPercent(
       turnSettings.agentRuntime.context.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
@@ -204,7 +204,7 @@ export class TurnPreparationService {
     const mcpLease = acquiredMcp.lease;
     try {
       throwIfCancelled();
-    const excludeRdxLeaseTools = input.excludeRdxLeaseTools === true;
+    const excludeRdcLeaseTools = input.excludeRdcLeaseTools === true;
     const runtimeTools = this.deps.resolveRuntimeTools(
       input.agentId,
       preparedToolAllowlist,
@@ -213,7 +213,7 @@ export class TurnPreparationService {
       input.projectId,
       input.projectRootPath,
       mcpLease?.poolKey ?? null,
-      { excludeRdxLeaseTools },
+      { excludeRdcLeaseTools },
     );
     const slotKey = agentSlotKey(resolveExecutionScopeId(input.sessionId), input.agentId);
     const toolSignature = this.deps.createToolSignature(runtimeTools.definitions);
@@ -320,13 +320,13 @@ export class TurnPreparationService {
     const initialMessages = compactedMessages.slice(0, -1);
     // prepareTurn 唯一一次解析 settings → 写入 effectivePlan；runAgentTurn/Executor 不得再读。
     const knowledgeResolution = resolveKnowledgeReadRoots({
-      userKnowledgePath: appPathService.getUserRdxPaths().knowledgePath,
+      userKnowledgePath: appPathService.getUserRdcPaths().knowledgePath,
       projectKnowledgePath: input.projectRootPath
-        ? appPathService.getProjectRdxPaths(input.projectRootPath).knowledgePath
+        ? appPathService.getProjectRdcPaths(input.projectRootPath).knowledgePath
         : null,
     });
     const effectivePlan = buildEffectiveRuntimePlan({
-      rdxBindingFingerprint: rdxBindingFingerprint(rdxBinding),
+      rdcBindingFingerprint: rdcBindingFingerprint(rdcBinding),
       agentId: input.agentId,
       projectRootPath: input.projectRootPath,
       projectId: input.projectId,
@@ -349,10 +349,10 @@ export class TurnPreparationService {
       mcpDescriptorHash: aggregateMcpDescriptorHash(profile, input.projectRootPath),
       compactionThresholdPercent: turnSettings.agentRuntime.context.compactionThresholdPercent
         ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
-      excludeRdxLeaseTools,
+      excludeRdcLeaseTools,
       delegationCapsule: input.frozenDelegationCapsule ?? null,
     });
-    bindRdxTurn(effectivePlan, rdxBinding);
+    bindRdcTurn(effectivePlan, rdcBinding);
     const summary: PreparedTurnContextSummary = {
       requestId: input.requestId,
       turnId: input.turnId,

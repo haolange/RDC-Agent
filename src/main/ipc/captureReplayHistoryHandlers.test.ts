@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
     handle: (channel: string, handler: (...args: unknown[]) => unknown) => { handlers.set(channel, handler); },
   },
 }));
-vi.mock('../sessions', () => ({ rdxSessionService: { clearReplayHistoryForSession: vi.fn() } }));
+vi.mock('../sessions', () => ({ rdcSessionService: { clearReplayHistoryForSession: vi.fn() } }));
 vi.mock('../captures/replay/ReplayHistoryStore', () => ({
   replayHistoryStore: { readSelection: vi.fn(), list: vi.fn(), readImage: mocks.readImage },
 }));

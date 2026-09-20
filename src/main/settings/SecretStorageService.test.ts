@@ -34,7 +34,7 @@ describe('SecretStorageService fail-closed', () => {
     previousUserData = process.env.RDC_AGENT_USER_DATA;
     previousHome = process.env.RDC_AGENT_HOME;
     process.env.RDC_AGENT_USER_DATA = path.join(root, 'app-data');
-    process.env.RDC_AGENT_HOME = path.join(root, '.rdx');
+    process.env.RDC_AGENT_HOME = path.join(root, '.rdc-agent');
     electronMock.userDataRoot = process.env.RDC_AGENT_USER_DATA;
     electronMock.encryptionAvailable = true;
     fs.mkdirSync(process.env.RDC_AGENT_USER_DATA, { recursive: true });

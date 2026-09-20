@@ -202,7 +202,7 @@ async function main() {
   assert(agentsSettings.includes('data-testid="settings-agent-manifest-diagnostics"'), 'Agents diagnostics must keep a stable test id.');
   assert(agentsSettings.includes('settings.agentManifestTitle'), 'Agents settings should render manifest management.');
   assert(!agentsSettings.includes('settings.patterns'), 'Agents settings must not expose internal pattern configuration.');
-  assert(!agentsSettings.includes('rdxCliInvoker'), 'Agents settings must not expose the internal CLI invoker name.');
+  assert(!agentsSettings.includes('rdcCliInvoker'), 'Agents settings must not expose the internal CLI invoker name.');
   const modelCascade = readSrcFile(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AgentModelCascadeSelect.tsx'),
     'utf8',
@@ -239,12 +239,12 @@ async function main() {
     'utf8',
   );
   assert(scopedResourceForm.includes("kind === 'skill'") && scopedResourceForm.includes('allowed-tools'), 'Skill settings should create standard scoped SKILL.md content through the canonical scoped resource form.');
-  assert(runtimeScopePanel.includes('rdxRuntime.upsertResource') && runtimeScopePanel.includes('rdxRuntime.deleteResource'), 'Scoped resources should use the canonical RDX Runtime write API.');
+  assert(runtimeScopePanel.includes('rdcRuntime.upsertResource') && runtimeScopePanel.includes('rdcRuntime.deleteResource'), 'Scoped resources should use the canonical RDC Runtime write API.');
   const toolsSettings = readSrcFile(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/ToolsSettings.tsx'),
     'utf8',
   );
-  assert(toolsSettings.includes('RdxCliInvokerSettingsFields'), 'Tools settings should render the local RenderDoc toolchain.');
+  assert(toolsSettings.includes('RdcCliInvokerSettingsFields'), 'Tools settings should render the local RenderDoc toolchain.');
   assert(!toolsSettings.includes('onUpsertMcpServer'), 'Tools settings must not keep the removed Settings-owned MCP write path.');
   const mcpServicesPanel = readSrcFile(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/McpServicesPanel.tsx'),
@@ -252,14 +252,14 @@ async function main() {
   );
   assert(settingsModalSource.includes('McpServicesPanel') && mcpServicesPanel.includes("kinds={['mcp']}"), 'Tools settings should expose Project-aware MCP resources through RuntimeScopePanel.');
   const renderDocToolchain = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RdxCliInvokerSettingsFields.tsx'), 'utf8',
+    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RdcCliInvokerSettingsFields.tsx'), 'utf8',
   );
   assert(renderDocToolchain.includes('settings.localRenderDocToolchain'), 'Skills & Tools should expose the local RenderDoc toolchain.');
-  assert(renderDocToolchain.includes('validateRdxInstallation') && renderDocToolchain.includes('summary.runtime.version')
+  assert(renderDocToolchain.includes('validateRdcInstallation') && renderDocToolchain.includes('summary.runtime.version')
     && renderDocToolchain.includes('summary.runtime.catalog.toolCount'), 'Installation validation must show actual version and discovered capability count.');
-  assert(renderDocToolchain.includes('summary.cli.unavailableReason') && renderDocToolchain.includes('settings.rdxSaveBeforeVerify'),
+  assert(renderDocToolchain.includes('summary.cli.unavailableReason') && renderDocToolchain.includes('settings.rdcSaveBeforeVerify'),
     'Installation validation must preserve explicit failure and unsaved-configuration states.');
-  assert(!toolsSettings.includes('RdxActionsFields') && !renderDocToolchain.includes('catalogPath')
+  assert(!toolsSettings.includes('RdcActionsFields') && !renderDocToolchain.includes('catalogPath')
     && !renderDocToolchain.includes('jsonMode'), 'Settings must not restore lifecycle command templates or separate catalog/JSON modes.');
 
   const composer = readSrcFile(path.join(repoRoot, 'src/renderer/features/composer/Composer.tsx'), 'utf8');
@@ -376,7 +376,7 @@ async function main() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-agent-settings-agents-'));
   try {
     const agentsPath = path.join(tempRoot, 'agents');
-    const instructionsPath = path.join(tempRoot, 'RDX.md');
+    const instructionsPath = path.join(tempRoot, 'RDC.md');
     fs.mkdirSync(agentsPath, { recursive: true });
     const customManifestPath = path.join(agentsPath, `${customAgentId}.agent.md`);
     writeCustomManifest(customManifestPath, {
@@ -465,7 +465,7 @@ Reserved historical filename.
     writeCustomManifest(path.join(agentsPath, 'plan.agent.md'), { name: 'Historical Plan' });
 
     const projectRoot = path.join(tempRoot, 'project');
-    const projectAgents = path.join(projectRoot, '.rdx', 'agents');
+    const projectAgents = path.join(projectRoot, '.rdc-agent', 'agents');
     fs.mkdirSync(projectAgents, { recursive: true });
     writeCustomManifest(path.join(projectAgents, 'edit.agent.md'), { name: 'Project Edit' });
     writeCustomManifest(path.join(projectAgents, 'ask.agent.md'), { name: 'Project Ask' });

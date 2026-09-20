@@ -9,8 +9,8 @@ describe('ScopedResourceResolver', () => {
     const resolver = new ScopedResourceResolver();
     const catalog = resolver.resolve([
       { id: 'ask', kind: 'agent', scope: 'builtin', sourcePath: 'builtin/ask.agent.md', value: { model: 'default' } },
-      { id: 'ask', kind: 'agent', scope: 'user', sourcePath: 'C:/Users/Vip/.rdx/agents/ask.agent.md', value: { model: 'kimi' } },
-      { id: 'ask', kind: 'agent', scope: 'project', sourcePath: 'D:/Project/.rdx/agents/ask.agent.md', value: { model: 'deepseek' } },
+      { id: 'ask', kind: 'agent', scope: 'user', sourcePath: 'C:/Users/Vip/.rdc-agent/agents/ask.agent.md', value: { model: 'kimi' } },
+      { id: 'ask', kind: 'agent', scope: 'project', sourcePath: 'D:/Project/.rdc-agent/agents/ask.agent.md', value: { model: 'deepseek' } },
     ]);
 
     expect(catalog.resources).toHaveLength(1);

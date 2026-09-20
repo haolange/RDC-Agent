@@ -1,5 +1,5 @@
 import path from 'path';
-import { assertRdxCliBinding } from '@shared/utils/rdxCliBinding';
+import { assertRdcCliBinding } from '@shared/utils/rdcCliBinding';
 import {
   DEFAULT_CONTEXT_COMPACTION_PERCENT,
 } from '@shared/types/modelCapability';
@@ -9,7 +9,7 @@ import type {
   AgentRuntimeContextSettings,
   AgentRuntimeSettings,
   LayoutPreferences,
-  RdxCliInvokerSettings,
+  RdcCliInvokerSettings,
   AgentShellSettings,
   CodeInterpreterSettings,
   SidebarLayoutPreference,
@@ -28,7 +28,7 @@ import {
   DEFAULT_AGENT_RUNTIME,
   DEFAULT_LAYOUT,
   DEFAULT_CODE_INTERPRETER,
-  DEFAULT_RDX_CLI_INVOKER,
+  DEFAULT_RDC_CLI_INVOKER,
   DEFAULT_SHELL_TOOLING,
   LEFT_DEFAULTS,
   RIGHT_DEFAULTS,
@@ -66,17 +66,17 @@ export function sanitizeStringRecord(value: unknown): Record<string, string> {
   return sanitized;
 }
 
-export function sanitizeRdxCliInvokerSettings(
+export function sanitizeRdcCliInvokerSettings(
   value: unknown,
-  fallback: RdxCliInvokerSettings = DEFAULT_RDX_CLI_INVOKER,
+  fallback: RdcCliInvokerSettings = DEFAULT_RDC_CLI_INVOKER,
   validate = false,
-): RdxCliInvokerSettings {
-  const candidate = value && typeof value === 'object' ? value as Partial<RdxCliInvokerSettings> : {};
+): RdcCliInvokerSettings {
+  const candidate = value && typeof value === 'object' ? value as Partial<RdcCliInvokerSettings> : {};
   const timeoutMs = typeof candidate.timeoutMs === 'number' && Number.isFinite(candidate.timeoutMs)
     ? clamp(Math.trunc(candidate.timeoutMs), 1000, 600000)
     : fallback.timeoutMs;
 
-  const settings: RdxCliInvokerSettings = {
+  const settings: RdcCliInvokerSettings = {
     enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : fallback.enabled,
     command: typeof candidate.command === 'string' ? candidate.command.trim() : fallback.command,
     argsPrefix: sanitizeStringArray(candidate.argsPrefix ?? fallback.argsPrefix),
@@ -84,7 +84,7 @@ export function sanitizeRdxCliInvokerSettings(
     env: sanitizeStringRecord(candidate.env ?? fallback.env),
     timeoutMs,
   };
-  if (validate && (settings.enabled || settings.command || settings.argsPrefix.length)) assertRdxCliBinding(settings);
+  if (validate && (settings.enabled || settings.command || settings.argsPrefix.length)) assertRdcCliBinding(settings);
   return settings;
 }
 
@@ -121,7 +121,7 @@ export function sanitizeAgentShellSettings(
 export function sanitizeToolingSettings(value: unknown): ToolingSettings {
   const candidate = value && typeof value === 'object' ? value as Partial<ToolingSettings> : {};
   return {
-    rdxCli: sanitizeRdxCliInvokerSettings(candidate.rdxCli),
+    rdcCli: sanitizeRdcCliInvokerSettings(candidate.rdcCli),
     codeInterpreter: sanitizeCodeInterpreterSettings(candidate.codeInterpreter),
     shell: sanitizeAgentShellSettings(candidate.shell),
   };

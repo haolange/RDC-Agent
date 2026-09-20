@@ -1,35 +1,35 @@
-import type { RdxRuntimeOverview } from '@shared/types/rdxRuntime';
+import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 import { getElectronApi } from '../../../../platform/getElectronApi';
 
-const rdxRuntime = () => getElectronApi()?.rdxRuntime;
+const rdcRuntime = () => getElectronApi()?.rdcRuntime;
 
 export async function validateScopedResource(
-  request: Parameters<NonNullable<ReturnType<typeof rdxRuntime>>['validateResource']>[0],
+  request: Parameters<NonNullable<ReturnType<typeof rdcRuntime>>['validateResource']>[0],
 ) {
-  return rdxRuntime()?.validateResource(request);
+  return rdcRuntime()?.validateResource(request);
 }
 
 export async function upsertScopedResource(
-  request: Parameters<NonNullable<ReturnType<typeof rdxRuntime>>['upsertResource']>[0],
+  request: Parameters<NonNullable<ReturnType<typeof rdcRuntime>>['upsertResource']>[0],
 ) {
-  return getElectronApi()?.rdxRuntime.upsertResource(request);
+  return getElectronApi()?.rdcRuntime.upsertResource(request);
 }
 
 export async function deleteScopedResource(
-  kind: Parameters<NonNullable<ReturnType<typeof rdxRuntime>>['deleteResource']>[0],
-  scope: Parameters<NonNullable<ReturnType<typeof rdxRuntime>>['deleteResource']>[1],
+  kind: Parameters<NonNullable<ReturnType<typeof rdcRuntime>>['deleteResource']>[0],
+  scope: Parameters<NonNullable<ReturnType<typeof rdcRuntime>>['deleteResource']>[1],
   id: string,
   projectRoot?: string,
-): Promise<RdxRuntimeOverview | undefined> {
-  return getElectronApi()?.rdxRuntime.deleteResource(kind, scope, id, projectRoot);
+): Promise<RdcRuntimeOverview | undefined> {
+  return getElectronApi()?.rdcRuntime.deleteResource(kind, scope, id, projectRoot);
 }
 
 export async function revealResourceLocation(sourcePath: string): Promise<void> {
-  await rdxRuntime()?.revealResource(sourcePath);
+  await rdcRuntime()?.revealResource(sourcePath);
 }
 
 export async function importScopedResource(
-  request: Parameters<NonNullable<ReturnType<typeof rdxRuntime>>['importResource']>[0],
+  request: Parameters<NonNullable<ReturnType<typeof rdcRuntime>>['importResource']>[0],
 ) {
-  return rdxRuntime()?.importResource(request);
+  return rdcRuntime()?.importResource(request);
 }

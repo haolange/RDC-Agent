@@ -10,7 +10,7 @@ afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recur
 
 describe('ReadFileTool', () => {
   it('reads a workspace file with numbered lines', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-read-file-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-file-'));
     roots.push(root);
     await writeFile(path.join(root, 'sample.txt'), 'alpha\nbeta\ngamma\n', 'utf8');
     const context: ToolExecutionContext = {
@@ -32,7 +32,7 @@ describe('ReadFileTool', () => {
   });
 
   it('rejects paths outside the workspace', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-read-escape-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-escape-'));
     roots.push(root);
     const context: ToolExecutionContext = {
       workspaceRoot: root,
@@ -46,7 +46,7 @@ describe('ReadFileTool', () => {
   });
 
   it('rejects RenderDoc .rdc captures', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-read-rdc-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-rdc-'));
     roots.push(root);
     const rdc = path.join(root, 'WhiteHair.rdc');
     await writeFile(rdc, Buffer.from('RDOC\0\0\0binary-capture'));
@@ -62,8 +62,8 @@ describe('ReadFileTool', () => {
   });
 
   it('still refuses session-artifacts even with an absolute path', async () => {
-    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-read-ws-'));
-    const sessionRoot = await mkdtemp(path.join(os.tmpdir(), 'rdx-read-session-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-ws-'));
+    const sessionRoot = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-session-'));
     roots.push(workspace, sessionRoot);
     const artifact = path.join(sessionRoot, 'session-artifacts', 'tool-outputs', 'offload.json');
     await mkdir(path.dirname(artifact), { recursive: true });

@@ -26,7 +26,7 @@ afterEach(async () => {
 
 describe('ToolImagePreviewStore', () => {
   it('records a thumbnail and returns a data URL for the owning session', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-image-preview-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-image-preview-'));
     roots.push(sessionPath);
     readSession.mockReturnValue({ sessionPath });
 
@@ -46,7 +46,7 @@ describe('ToolImagePreviewStore', () => {
   });
 
   it('rejects spoofed magic bytes', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-image-fake-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-image-fake-'));
     roots.push(sessionPath);
     readSession.mockReturnValue({ sessionPath });
 
@@ -72,7 +72,7 @@ describe('ToolImagePreviewStore', () => {
   });
 
   it('validates source-path attachments before recording', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-image-src-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-image-src-'));
     roots.push(sessionPath);
     const sourcePath = path.join(sessionPath, 'spoof.png');
     await writeFile(sourcePath, Buffer.from('GIF89a-not-png'));

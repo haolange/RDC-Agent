@@ -4,7 +4,7 @@ import type {
   ContextPanelViewModel,
   OutputsPanelViewModel,
   ProgressTask,
-  RdxContextDiagnostic,
+  RdcContextDiagnostic,
   TaskContextResource,
   TraceArtifactRecord,
 } from '@shared/types/trace';
@@ -119,32 +119,32 @@ export function buildTaskContext(input: {
   };
 }
 
-const chooseDiagnosticAction = (summary: string): RdxContextDiagnostic['action'] => {
+const chooseDiagnosticAction = (summary: string): RdcContextDiagnostic['action'] => {
   const normalized = summary.toLowerCase();
   if (normalized.includes('configured') || normalized.includes('settings')) return 'settings';
   if (normalized.includes('unsupported') || normalized.includes('incompatible') || normalized.includes('replay')) return 'change_device';
   return 'retry';
 };
 
-const dedupeDiagnostics = (items: Array<Omit<RdxContextDiagnostic, 'id' | 'repeatCount'>>): RdxContextDiagnostic[] => {
-  const grouped = new Map<string, RdxContextDiagnostic>();
+const dedupeDiagnostics = (items: Array<Omit<RdcContextDiagnostic, 'id' | 'repeatCount'>>): RdcContextDiagnostic[] => {
+  const grouped = new Map<string, RdcContextDiagnostic>();
   for (const item of items) {
     const key = `${item.code ?? 'unknown'}:${item.summary}`;
     const existing = grouped.get(key);
     if (existing) { existing.repeatCount += 1; continue; }
-    grouped.set(key, { ...item, id: `rdx:${grouped.size + 1}`, repeatCount: 1 });
+    grouped.set(key, { ...item, id: `rdc:${grouped.size + 1}`, repeatCount: 1 });
   }
   return [...grouped.values()];
 };
 
-export function buildRdxContext(input: {
+export function buildRdcContext(input: {
   openedCapture: OpenedCaptureState | null;
   contextSnapshot: ContextSnapshot | null;
-  availableCaptures: ContextPanelViewModel['rdx']['availableCaptures'];
-}): ContextPanelViewModel['rdx'] {
+  availableCaptures: ContextPanelViewModel['rdc']['availableCaptures'];
+}): ContextPanelViewModel['rdc'] {
   const opened = input.openedCapture;
   const runtimeContext = input.contextSnapshot?.runtimeContext ?? opened?.runtimeContext ?? null;
-  const diagnostics: Array<Omit<RdxContextDiagnostic, 'id' | 'repeatCount'>> = [];
+  const diagnostics: Array<Omit<RdcContextDiagnostic, 'id' | 'repeatCount'>> = [];
   if (opened?.previewError) {
     diagnostics.push({
       code: opened.previewError.code,

@@ -8,7 +8,7 @@ const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
 async function createRegistry(): Promise<TaskRegistry> {
-  const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-tasks-'));
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-tasks-'));
   roots.push(dir);
   return new TaskRegistry(dir);
 }
@@ -198,7 +198,7 @@ describe('TaskRegistry', () => {
 
   it('cancels the owned execution before terminalizing its task', async () => {
     const cancelled: string[] = [];
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-tasks-'));
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-tasks-'));
     roots.push(dir);
     const registry = new TaskRegistry(dir, { onCancelExecution: async (execution) => { cancelled.push(execution.id); } });
     const task = await registry.createTask('Cancelable');
@@ -243,7 +243,7 @@ describe('TaskRegistry', () => {
   });
 
   it('runs cancellation callback outside the state lock and prevents producer settlement', async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-tasks-'));
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-tasks-'));
     roots.push(dir);
     let registry!: TaskRegistry;
     let settlementRejected = false;
@@ -338,7 +338,7 @@ describe('TaskRegistry', () => {
     await noOwner.startExecution(orphan.id, { mode: 'subagent' });
     await expect(noOwner.cancelTask(orphan.id)).rejects.toThrow(/abort-and-join owner/);
 
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-tasks-'));
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-tasks-'));
     roots.push(dir);
     const cancelled: string[] = [];
     const registry = new TaskRegistry(dir, { onCancelExecution: async (execution) => { cancelled.push(execution.taskId); } });
@@ -352,7 +352,7 @@ describe('TaskRegistry', () => {
   });
 
   it('accepts an independently settled cancelled result during cancellation join', async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-tasks-'));
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-tasks-'));
     roots.push(dir);
     let registry!: TaskRegistry;
     registry = new TaskRegistry(dir, { onCancelExecution: async (execution) => {

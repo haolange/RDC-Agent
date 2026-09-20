@@ -277,7 +277,7 @@ export const KNOWLEDGE_RULE_REGISTRY = [
     id: 'knowledge.forbidden.skill.full-library-inject',
     kind: 'forbidden',
     file: 'resources/agent-runtime/skills',
-    pattern: 'knowledge-state\\.json|~/?\\.rdx/knowledge[\\s\\S]{0,80}inject',
+    pattern: 'knowledge-state\\.json|~/?\\.rdc-agent/knowledge[\\s\\S]{0,80}inject',
     probe: 'walk-pattern',
     note: 'Knowledge skills must not inject the durable store or full library into the prompt',
   },

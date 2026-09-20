@@ -3,7 +3,7 @@ import { watch, type FSWatcher } from 'node:fs';
 import { ProjectInputLifecycle } from '../captures/ProjectInputLifecycle';
 import { replayHistoryStore } from '../captures/replay/ReplayHistoryStore';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { rdxSessionService } from '../sessions';
+import { rdcSessionService } from '../sessions';
 import { conversationService } from '../conversation/ConversationService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { ipcApprovalTokenService } from './validation/IpcApprovalTokenService';
@@ -14,10 +14,10 @@ import type { WorkbenchIpcContext } from './workbenchContext';
 export const projectInputLifecycle = new ProjectInputLifecycle({
   getProject: (id) => storageAdapter.getProjectById(id),
   refresh: (id) => storageAdapter.refreshProjectInputs(id),
-  bindings: (id) => rdxSessionService.listBindingsForProject(id),
-  close: (projectId, inputId) => rdxSessionService.closeMatchingCaptures(projectId, inputId),
-  rebind: (projectId, inputId, input) => rdxSessionService.rebindInput(projectId, inputId, input),
-  block: (projectId, inputId, operation) => rdxSessionService.blockInputOperations(projectId, inputId, operation),
+  bindings: (id) => rdcSessionService.listBindingsForProject(id),
+  close: (projectId, inputId) => rdcSessionService.closeMatchingCaptures(projectId, inputId),
+  rebind: (projectId, inputId, input) => rdcSessionService.rebindInput(projectId, inputId, input),
+  block: (projectId, inputId, operation) => rdcSessionService.blockInputOperations(projectId, inputId, operation),
   stop: async (sessionId) => {
     const result = await conversationService.cancelActiveTurn({ sessionId });
     if (!result.success) throw new Error(result.error || 'PROJECT_INPUT_STOP_FAILED');
@@ -96,7 +96,7 @@ function installProjectInputWatchers(context: WorkbenchIpcContext): void {
       try {
         const watcher = watch(project.rootPath, { recursive: true, persistent: false }, (_event, filename) => {
           const name = filename?.toString().replace(/\\/gu, '/').toLowerCase();
-          if (name === '.rdx' || name === '.rdx/inputs' || name?.startsWith('.rdx/inputs/')) refresh(project.projectId);
+          if (name === '.rdc-agent' || name === '.rdc-agent/inputs' || name?.startsWith('.rdc-agent/inputs/')) refresh(project.projectId);
         });
         watcher.on('error', error => report(project.projectId, error));
         watchers.set(project.projectId, watcher);

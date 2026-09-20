@@ -110,7 +110,7 @@ P-->>R : 回调/返回值
 
 ### 全局 API 对象（electronAPI）
 - 平台信息：platform、isMac、isWindows、isLinux
-- 子模块：appMeta、appShell、web、conversation、command、dialog、workflow、trace、agent、memory、investigation、knowledge、rdxRuntime、tool、mcp、evidence、llm、settings、project、device、session、run、runtimeLog、capture、context、events、windowControls
+- 子模块：appMeta、appShell、web、conversation、command、dialog、workflow、trace、agent、memory、investigation、knowledge、rdcRuntime、tool、mcp、evidence、llm、settings、project、device、session、run、runtimeLog、capture、context、events、windowControls
 - 事件订阅：on(channel, callback)、off(channel, callback)
 
 使用要点
@@ -199,7 +199,7 @@ C-->>U : 更新 UI
 - [src/shared/renderer-api/core.ts:99-119](file://src/shared/renderer-api/core.ts#L99-L119)
 - [src/shared/renderer-api/channels.ts:54-69](file://src/shared/renderer-api/channels.ts#L54-L69)
 
-### 运行时资源（rdxRuntime）
+### 运行时资源（rdcRuntime）
 - getOverview/validateResource/upsertResource/importResource/deleteResource/revealResource
 - trustHook/revokeHook/trustMcp/revokeMcp/testHook
 - listRequestSnapshots/getRequestSnapshot

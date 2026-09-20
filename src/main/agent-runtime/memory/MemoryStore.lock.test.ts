@@ -11,7 +11,7 @@ afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recur
 
 describe('memoryDirectoryLock', () => {
   it('recovers a stale lock from a dead pid', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-stale-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-stale-'));
     roots.push(root);
     const lockPath = path.join(root, '.memory.lock');
     await writeFile(lockPath, JSON.stringify({ pid: 1, createdAt: Date.now() - 120_000 }), 'utf8');
@@ -21,7 +21,7 @@ describe('memoryDirectoryLock', () => {
   });
 
   it('does not steal a live-pid lock even when the owner file is older than 30s', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-live-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-live-'));
     roots.push(root);
     const first = await acquireMemoryDirectoryLock(root);
     await writeFile(first.lockPath, JSON.stringify({
@@ -35,7 +35,7 @@ describe('memoryDirectoryLock', () => {
 
 describe('MemoryStore cross-process lock', () => {
   it('serializes two node processes writing the same memory directory', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-xproc-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-xproc-'));
     roots.push(root);
     const workerPath = path.join(root, 'worker.cjs');
     const registerPath = path.resolve(__dirname, '../../../../scripts/register-ts-source.cjs');

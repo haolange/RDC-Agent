@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 function copyBuiltinRuntime(): string {
-  const root = mkdtempSync(path.join(os.tmpdir(), 'rdx-profile-contract-'));
+  const root = mkdtempSync(path.join(os.tmpdir(), 'rdc-profile-contract-'));
   tempRoots.push(root);
   cpSync(
     path.join(repoRoot, 'resources', 'agent-runtime'),

@@ -41,7 +41,7 @@ A["调用方/上层编排"] --> B["SubagentRunner<br/>runSubagent / createSubage
 B --> C["BackgroundSubagentService<br/>start / execute / join / cancel"]
 C --> D["TaskRegistry<br/>startExecution / settleExecution / updateExecutionBudget"]
 B --> E["Agent 运行时<br/>sendProfileMessage / onEvent"]
-B --> F["会话与权限<br/>RdxRuntimeContext / DelegatedArtifactAccess"]
+B --> F["会话与权限<br/>RdcRuntimeContext / DelegatedArtifactAccess"]
 C --> G["持久化与投影<br/>persistSubagentResult / TraceProjectionRefresh"]
 B --> H["系统工具与进程<br/>ShellTool / ProcessSupervisor"]
 ```
@@ -117,7 +117,7 @@ Service-->>Caller : onEvent('settled')
   - 使用 reserveDispatchBudget 预留子代理槽位，consumeReservedSubagentSlot 实际消费，避免重复计费。
 - 会话与上下文隔离
   - 生成独立 subagentSessionId，避免污染父会话消息与上下文。
-  - 根据 DelegationCapsule 授予 artifact 访问与 RDX 租约，确保能力不越权。
+  - 根据 DelegationCapsule 授予 artifact 访问与 RDC 租约，确保能力不越权。
 - 事件透传与统计
   - 将 assistant.delta、tool.started/completed/denied 等事件转换为 subagent.delta 上报父层，并去重统计 toolCallId，累计到 parentBudget.aggregateToolCalls。
 - 结果聚合与持久化
@@ -132,7 +132,7 @@ flowchart TD
 Start(["进入 runSubagent"]) --> CheckBudget["校验父预算与深度上限"]
 CheckBudget --> Reserve["预留子代理槽位"]
 Reserve --> Isolate["创建独立会话ID与上下文"]
-Isolate --> Grant["授予artifact/RDX租约"]
+Isolate --> Grant["授予artifact/RDC租约"]
 Grant --> RunAgent["sendProfileMessage 执行子代理"]
 RunAgent --> Events{"事件类型?"}
 Events --> |assistant.delta/tool.*| Forward["转发为subagent.delta并统计"]
@@ -248,7 +248,7 @@ Exec --> Update["updateExecutionBudget(单调/仅收窄)"]
 ### 工具创建、父代理通信与上下文传递
 - 工具创建：SubagentRunner.createSubagentTools 暴露 subagent 工具；BackgroundSubagentService.createTools 暴露后台任务工具。
 - 父代理通信：通过 parentOnEvent 透传审批、工具事件、delta 文本；后台模式通过 TaskRegistry 的消息通道实现双向通信。
-- 上下文传递：DelegationCapsule 编译为额外提示段；RDX 租约与 artifact 访问在子会话中生效；会话 ID 分段隔离消息与上下文。
+- 上下文传递：DelegationCapsule 编译为额外提示段；RDC 租约与 artifact 访问在子会话中生效；会话 ID 分段隔离消息与上下文。
 
 章节来源
 - [SubagentRunner.ts:431-679](file://src/main/workflow/debugger/SubagentRunner.ts#L431-L679)
@@ -289,7 +289,7 @@ end
   - TurnCoordinator：预算与槽位管理。
   - BackgroundSubagentService：后台执行入口。
   - TaskRegistry：任务/执行/消息/预算持久化。
-  - 会话与权限：RdxRuntimeContextRegistry、DelegatedArtifactAccess。
+  - 会话与权限：RdcRuntimeContextRegistry、DelegatedArtifactAccess。
   - 系统工具：ShellInvocationService、ProcessSupervisor。
 - BackgroundSubagentService 依赖：
   - TaskRegistry：执行状态机与消息通道。
@@ -345,7 +345,7 @@ BGS --> Proj["TraceProjectionRefresh"]
 ## 故障排查指南
 - 常见错误与定位
   - 预算超限：POLICY_LIMIT_EXCEEDED/SUBAGENT_BUDGET 相关错误，检查 maxToolCalls/maxSubagents/maxChildDepth/maxWallTimeMs。
-  - 会话缺失：ARTIFACT_SESSION_DENIED/RDX_LEASE_DELEGATE_DENIED，确认存在父会话且具备相应能力。
+  - 会话缺失：ARTIFACT_SESSION_DENIED/RDC_TOOL_LEASE_DELEGATE_DENIED，确认存在父会话且具备相应能力。
   - 任务范围拒绝：TASK_SCOPE_DENIED，核对 delegated scope 与目标 task 是否在子树内。
   - 后台执行未找到：BACKGROUND_EXECUTION_NOT_FOUND，确认执行归属与任务子树。
 - 审批与阻塞
@@ -371,4 +371,4 @@ SubagentRunner 提供了强大的子代理执行能力：通过预算链与槽�
 - 最佳实践
   - 明确设置子代理预算与截止时间，避免资源泄漏。
   - 使用 background 模式执行长耗时任务，并通过工具集监控与取消。
-  - 谨慎授予 artifact 与 RDX 租约，遵循最小权限原则。
+  - 谨慎授予 artifact 与 RDC 租约，遵循最小权限原则。

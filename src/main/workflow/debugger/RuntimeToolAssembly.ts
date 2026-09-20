@@ -12,7 +12,7 @@ import type { ToolDefinition } from '../../agent-runtime/core/types';
 import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/tools';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../../agent-runtime/tasks';
-import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
+import { assertRdcContextLeaseOwnership } from '../../sessions/RdcRuntimeContextRegistry';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { createKnowledgeTools } from '../../knowledge/KnowledgeTools';
 import { createInvestigationTools } from '../../investigation/InvestigationTools';
@@ -22,8 +22,8 @@ import {
   isToolAllowedByFrozenAllowlist,
   normalizeToolName,
 } from './DebuggerRuntimePolicy';
-import { isRdxLeaseToolName } from '@shared/constants/rdxLeaseTools';
-import { createRdxProbeTool } from './RdxProbeTool';
+import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
+import { createRdcProbeTool } from './RdcProbeTool';
 import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
@@ -67,9 +67,9 @@ export class RuntimeToolAssembly {
     agentId: AgentRole,
     toolName: string,
     frozenToolAllowlist?: readonly string[],
-    excludeRdxLeaseTools?: boolean,
+    excludeRdcLeaseTools?: boolean,
   ): boolean {
-    if (excludeRdxLeaseTools && isRdxLeaseToolName(toolName)) {
+    if (excludeRdcLeaseTools && isRdcLeaseToolName(toolName)) {
       return false;
     }
     return isToolAllowedByFrozenAllowlist(toolName, agentId, frozenToolAllowlist ?? []);
@@ -130,11 +130,11 @@ export class RuntimeToolAssembly {
     };
   }
 
-  createRdxContextTool(sessionId?: string | null, projectId?: string | null): AgentTool<Record<string, never>, { available: boolean }> {
+  createRdcContextTool(sessionId?: string | null, projectId?: string | null): AgentTool<Record<string, never>, { available: boolean }> {
     return {
-      name: 'rdx_context',
-      label: 'RDX Context',
-      description: 'Read the current stable RDX runtime context captured by configured shell actions.',
+      name: 'rdc_context',
+      label: 'RDC Context',
+      description: 'Read the current stable RDC runtime context captured by configured shell actions.',
       pollable: true,
       parameters: {
         type: 'object',
@@ -143,7 +143,7 @@ export class RuntimeToolAssembly {
       permissionHint: 'readonly',
       spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'system', requiresApproval: false },
       async execute() {
-        const lease = assertRdxContextLeaseOwnership({
+        const lease = assertRdcContextLeaseOwnership({
           sessionId,
           projectId,
         });
@@ -154,7 +154,7 @@ export class RuntimeToolAssembly {
               type: 'text',
               text: sessionId
                 ? 'The capture is not open in this session. Ask the user to select the capture and click Open in the Capture section. Preserve the confirmed goal; do not describe internal leases or diagnose a rendering cause.'
-                : 'RDX runtime context requires an owning sessionId (no global fallback).',
+                : 'RDC runtime context requires an owning sessionId (no global fallback).',
             }],
             details: { available: false },
           };
@@ -539,10 +539,10 @@ export class RuntimeToolAssembly {
     projectId?: string | null,
     projectRootPath?: string | null,
     mcpPoolKey?: string | null,
-    options?: { excludeRdxLeaseTools?: boolean },
+    options?: { excludeRdcLeaseTools?: boolean },
   ): ResolvedRuntimeTools {
-    const excludeRdxLeaseTools = options?.excludeRdxLeaseTools === true
-      || turnHandle?.runtimePlan?.excludeRdxLeaseTools === true;
+    const excludeRdcLeaseTools = options?.excludeRdcLeaseTools === true
+      || turnHandle?.runtimePlan?.excludeRdcLeaseTools === true;
     const availableTools = new Map<string, AgentTool>();
     for (const tool of getPrimitiveTools()) {
       availableTools.set(normalizeToolName(tool.name), tool);
@@ -561,14 +561,14 @@ export class RuntimeToolAssembly {
       enforceMissionTurnCompletion({ profileId: agentId, sessionId, disposition: declaration.disposition, evidenceRefs: declaration.evidenceRefs, finalAnswerText: JSON.stringify(declaration) });
     });
     availableTools.set(turnCompletionTool.name, turnCompletionTool);
-    if (!excludeRdxLeaseTools) {
-      const rdxContextTool = this.createRdxContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);
-      availableTools.set(rdxContextTool.name, rdxContextTool);
-      const rdxProbeTool = createRdxProbeTool(
+    if (!excludeRdcLeaseTools) {
+      const rdcContextTool = this.createRdcContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);
+      availableTools.set(rdcContextTool.name, rdcContextTool);
+      const rdcProbeTool = createRdcProbeTool(
         sessionId,
         projectId ?? turnHandle?.eventSink?.projectId ?? null,
       );
-      availableTools.set(rdxProbeTool.name, rdxProbeTool as unknown as AgentTool);
+      availableTools.set(rdcProbeTool.name, rdcProbeTool as unknown as AgentTool);
     }
     for (const tool of this.createWorkbenchTools(agentId, sessionId, turnHandle)) {
       availableTools.set(normalizeToolName(tool.name), tool);
@@ -584,7 +584,7 @@ export class RuntimeToolAssembly {
     const toolSearchTool = createToolSearchTool(() =>
       Array.from(availableTools.values()).filter((tool) =>
         this.matchesToolAllowlist(tool.name, toolAllowlist)
-        && this.isAllowedForRuntime(agentId, tool.name, toolAllowlist, excludeRdxLeaseTools),
+        && this.isAllowedForRuntime(agentId, tool.name, toolAllowlist, excludeRdcLeaseTools),
       ),
     );
     availableTools.set(normalizeToolName(toolSearchTool.name), toolSearchTool);
@@ -593,7 +593,7 @@ export class RuntimeToolAssembly {
     const toolMap = new Map<string, AgentTool>();
     for (const tool of availableTools.values()) {
       if (!this.matchesToolAllowlist(tool.name, toolAllowlist)) continue;
-      if (!this.isAllowedForRuntime(agentId, tool.name, toolAllowlist, excludeRdxLeaseTools)) continue;
+      if (!this.isAllowedForRuntime(agentId, tool.name, toolAllowlist, excludeRdcLeaseTools)) continue;
       const normalized = normalizeToolName(tool.name);
       if (!toolMap.has(normalized)) {
         toolMap.set(normalized, tool);

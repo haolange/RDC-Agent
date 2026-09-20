@@ -29,14 +29,14 @@ vi.mock('electron', () => ({
 describe('SettingsService provider persistence', () => {
   let userDataRoot = '';
   let previousUserDataEnv: string | undefined;
-  let previousRdxHomeEnv: string | undefined;
+  let previousRdcHomeEnv: string | undefined;
 
   beforeEach(() => {
     previousUserDataEnv = process.env.RDC_AGENT_USER_DATA;
-    previousRdxHomeEnv = process.env.RDC_AGENT_HOME;
+    previousRdcHomeEnv = process.env.RDC_AGENT_HOME;
     userDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-settings-'));
     process.env.RDC_AGENT_USER_DATA = userDataRoot;
-    process.env.RDC_AGENT_HOME = path.join(userDataRoot, '.rdx');
+    process.env.RDC_AGENT_HOME = path.join(userDataRoot, '.rdc-agent');
     electronMock.userDataRoot = userDataRoot;
     electronMock.encryptionAvailable = true;
     vi.resetModules();
@@ -48,10 +48,10 @@ describe('SettingsService provider persistence', () => {
     } else {
       process.env.RDC_AGENT_USER_DATA = previousUserDataEnv;
     }
-    if (previousRdxHomeEnv === undefined) {
+    if (previousRdcHomeEnv === undefined) {
       delete process.env.RDC_AGENT_HOME;
     } else {
-      process.env.RDC_AGENT_HOME = previousRdxHomeEnv;
+      process.env.RDC_AGENT_HOME = previousRdcHomeEnv;
     }
     fs.rmSync(userDataRoot, { recursive: true, force: true });
   });
@@ -61,7 +61,7 @@ describe('SettingsService provider persistence', () => {
     workspaceRoot: string;
   }> {
     const { createProviderEntryFromCatalog } = await import('../provider-catalog/ProviderCatalogRegistry');
-    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     const provider = {
       ...createProviderEntryFromCatalog('deepseek'),
@@ -140,7 +140,7 @@ describe('SettingsService provider persistence', () => {
   });
 
   it('invalidates the removed persisted agentRoutes field instead of using it as a fallback', async () => {
-    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     fs.mkdirSync(workspaceRoot, { recursive: true });
     fs.writeFileSync(settingsPath, JSON.stringify({
@@ -166,7 +166,7 @@ describe('SettingsService provider persistence', () => {
   it('never imports an unkeyed credential after the single-schema cutover', async () => {
     const { createProviderEntryFromCatalog } = await import('../provider-catalog/ProviderCatalogRegistry');
     const { secretStorageService } = await import('./SecretStorageService');
-    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     const provider = {
       ...createProviderEntryFromCatalog('chatgpt-account'),
@@ -198,7 +198,7 @@ describe('SettingsService provider persistence', () => {
 
   it('restores the maintained Super Grok structure when no account credential exists', async () => {
     const { createProviderEntryFromCatalog } = await import('../provider-catalog/ProviderCatalogRegistry');
-    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     const provider = {
       ...createProviderEntryFromCatalog('grok-account'),
@@ -269,7 +269,7 @@ describe('SettingsService provider persistence', () => {
 
   it('stages account-keyed secrets without deleting the source before settings commit', async () => {
     const { secretStorageService } = await import('./SecretStorageService');
-    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const sourceRef = secretStorageService.createProviderSecretRef('deepseek');
     const targetRef = secretStorageService.createProviderAccountSecretRef('deepseek', 'account-staged', 'api-key');
     secretStorageService.setSecret(sourceRef, 'sk-staged', workspaceRoot);
@@ -303,7 +303,7 @@ describe('SettingsService provider persistence', () => {
     const provider = service.getAll().llm.providers.find((entry) => entry.id === 'chatgpt-account');
     const secretRef = secretStorageService.createProviderAccountSecretRef('chatgpt-account', 'acct-rotate', 'oauth');
     expect(provider?.models.map((model) => model.id)).toEqual(modelIdsBeforeRotation);
-    expect(JSON.parse(secretStorageService.getSecret(secretRef, settings.paths.userRdxRoot)) as { refreshToken: string })
+    expect(JSON.parse(secretStorageService.getSecret(secretRef, settings.paths.userRdcRoot)) as { refreshToken: string })
       .toMatchObject({ refreshToken: 'refresh-new' });
   });
 
@@ -489,7 +489,7 @@ describe('SettingsService provider persistence', () => {
 
     service.disconnectProvider('openrouter', 'account');
     expect(service.getProviderOAuthSecret('openrouter')).toBe('');
-    expect(secretStorageService.getSecret(apiSecretRef, initialized.paths.userRdxRoot)).toBe('sk-or-api-key');
+    expect(secretStorageService.getSecret(apiSecretRef, initialized.paths.userRdcRoot)).toBe('sk-or-api-key');
     service.saveProviderConnection(
       'openrouter', '', models, 'https://openrouter.ai/api/v1',
       'OpenRouterChatCompletions', 'api-key',
@@ -687,7 +687,7 @@ describe('SettingsService provider persistence', () => {
 
   it('schema 6 upgrade irreversibly resets chromeThemes to RDC defaults', async () => {
     const { createDefaultChromeThemes } = await import('../../shared/theme/presets');
-    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     const polluted = {
       ...createDefaultChromeThemes().dark,
@@ -728,7 +728,7 @@ describe('SettingsService provider persistence', () => {
   });
 
   it('rebuilds missing schemaVersion and v0-v6 settings to schema 7 without embedding selection', async () => {
-    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     fs.mkdirSync(workspaceRoot, { recursive: true });
     const cases: Array<{ label: string; raw: Record<string, unknown> }> = [
@@ -760,7 +760,7 @@ describe('SettingsService provider persistence', () => {
   });
 
   it('is a no-op when persisted settings are already schema 7 without embedding selection', async () => {
-    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     fs.mkdirSync(workspaceRoot, { recursive: true });
     const current = {
@@ -782,7 +782,7 @@ describe('SettingsService provider persistence', () => {
   });
 
   it('fail-closes unknown higher settings schemaVersion without rewriting the file', async () => {
-    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     fs.mkdirSync(workspaceRoot, { recursive: true });
     const future = {

@@ -58,7 +58,7 @@ export async function atomicWrite(projectRoot: string, target: string, bytes: Bu
 
 const queues = new Map<string, Promise<void>>();
 async function diskLock(projectRoot: string): Promise<() => Promise<void>> {
-  const directory = appPathService.getProjectRdxPaths(projectRoot).projectRdxRoot;
+  const directory = appPathService.getProjectRdcPaths(projectRoot).projectRdcRoot;
   await safePath(projectRoot, directory);
   await fs.mkdir(directory, { recursive: true });
   const target = path.join(directory, 'replay.lock');

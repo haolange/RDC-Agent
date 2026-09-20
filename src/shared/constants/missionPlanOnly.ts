@@ -42,8 +42,8 @@ export const MISSION_PLAN_ONLY_TOOL_IDS = [
   'skills',
   'skill_read',
   'subagent',
-  'rdx_context',
-  'rdx_probe',
+  'rdc_context',
+  'rdc_probe',
 ] as const;
 
 export type MissionPlanOnlyToolId = (typeof MISSION_PLAN_ONLY_TOOL_IDS)[number];

@@ -59,8 +59,8 @@ describe('canonical renderer API', () => {
   it('preserves optional resource deletion arguments across JSON transport', async () => {
     const transport = new RecordingTransport();
     const api = createRendererApi('win32', transport);
-    await api.rdxRuntime.deleteResource('skill', 'user', 'audit');
-    await api.rdxRuntime.deleteResource('skill', 'project', 'audit', 'D:/QA/project');
+    await api.rdcRuntime.deleteResource('skill', 'user', 'audit');
+    await api.rdcRuntime.deleteResource('skill', 'project', 'audit', 'D:/QA/project');
     expect(JSON.parse(JSON.stringify(transport.invocations)).map((call: { args: unknown[] }) => call.args)).toEqual([
       ['skill', 'user', 'audit'],
       ['skill', 'project', 'audit', 'D:/QA/project'],
@@ -70,11 +70,11 @@ describe('canonical renderer API', () => {
   it('omits an absent overview project argument across JSON transport', async () => {
     const transport = new RecordingTransport();
     const api = createRendererApi('win32', transport);
-    await api.rdxRuntime.getOverview();
-    await api.rdxRuntime.getOverview('D:/QA/project');
+    await api.rdcRuntime.getOverview();
+    await api.rdcRuntime.getOverview('D:/QA/project');
     expect(JSON.parse(JSON.stringify(transport.invocations))).toEqual([
-      { channel: 'rdx-runtime:overview', args: [] },
-      { channel: 'rdx-runtime:overview', args: ['D:/QA/project'] },
+      { channel: 'rdc-runtime:overview', args: [] },
+      { channel: 'rdc-runtime:overview', args: ['D:/QA/project'] },
     ]);
   });
 
@@ -149,11 +149,11 @@ describe('canonical renderer API', () => {
       approved: true,
     });
     await api.mcp.getStatusSummary();
-    await api.rdxRuntime.trustHook('D:\\project', 'hook-1');
-    await api.rdxRuntime.revokeHook('D:\\project', 'hook-1');
-    await api.rdxRuntime.trustMcp('D:\\project', 'mcp-1');
-    await api.rdxRuntime.revokeMcp('D:\\project', 'mcp-1');
-    await api.rdxRuntime.testHook('tool.before-call', 'D:\\project', 'hook-1');
+    await api.rdcRuntime.trustHook('D:\\project', 'hook-1');
+    await api.rdcRuntime.revokeHook('D:\\project', 'hook-1');
+    await api.rdcRuntime.trustMcp('D:\\project', 'mcp-1');
+    await api.rdcRuntime.revokeMcp('D:\\project', 'mcp-1');
+    await api.rdcRuntime.testHook('tool.before-call', 'D:\\project', 'hook-1');
 
     expect(transport.invocations.map(({ channel }) => channel)).toEqual([
       'app:copyText',
@@ -166,11 +166,11 @@ describe('canonical renderer API', () => {
       'command:execute',
       'conversation:answerToolApproval',
       'mcp:getStatusSummary',
-      'rdx-runtime:trustHook',
-      'rdx-runtime:revokeHook',
-      'rdx-runtime:trustMcp',
-      'rdx-runtime:revokeMcp',
-      'rdx-runtime:testHook',
+      'rdc-runtime:trustHook',
+      'rdc-runtime:revokeHook',
+      'rdc-runtime:trustMcp',
+      'rdc-runtime:revokeMcp',
+      'rdc-runtime:testHook',
     ]);
   });
 });

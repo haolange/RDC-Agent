@@ -1,4 +1,4 @@
-/** `NAME=value` per line ⇄ record, shared by the local tool forms (RenderDoc CLI, RDX actions). */
+/** `NAME=value` per line ⇄ record, shared by the local tool forms (RDC-Tool, RDC actions). */
 export function envToText(env: Record<string, string>): string {
   return Object.entries(env).map(([key, value]) => `${key}=${value}`).join('\n');
 }

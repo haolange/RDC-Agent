@@ -149,7 +149,7 @@ export const OFFICIAL_SEED_GENERATIONS: OfficialSeedGeneration[] = [
       description: S0_DESCRIPTIONS[id],
       argumentHint: id === 'ask_agent' ? askHint : missionHint,
       userInvocable: id === 'ask_agent' || id === 'rdc-debugger',
-      tools: id === 'ask_agent' ? ['read', 'search', 'web'] : ['read', 'search', 'agent', 'rdx'],
+      tools: id === 'ask_agent' ? ['read', 'search', 'web'] : ['read', 'search', 'agent', 'rdc'],
       agents: id === 'rdc-debugger'
         ? S0_IDS.filter((role) => role !== 'ask_agent' && role !== 'rdc-debugger')
         : [],
@@ -166,7 +166,7 @@ export const OFFICIAL_SEED_GENERATIONS: OfficialSeedGeneration[] = [
       description: descriptions[id],
       tools: id === 'ask'
         ? ['read', 'search', 'web', 'askUser']
-        : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'todo', 'memory', 'rdxContext'],
+        : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'todo', 'memory', 'rdcContext'],
       agents: fourRoleAgents(id),
     })),
   },
@@ -184,7 +184,7 @@ export const OFFICIAL_SEED_GENERATIONS: OfficialSeedGeneration[] = [
           ? ['read', 'search', 'web', 'askUser', 'agent', 'todo', 'memory', 'planArtifact', 'handoff']
           : id === 'edit'
             ? ['read', 'search', 'web', 'bash', 'write', 'edit', 'askUser', 'agent', 'todo', 'memory', 'skill', 'mcp']
-            : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'todo', 'memory', 'rdxContext'],
+            : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'todo', 'memory', 'rdcContext'],
       agents: sixRoleAgents(id),
       handoffs: id === 'plan' ? [planHandoff] : [],
     })),
@@ -204,7 +204,7 @@ export const OFFICIAL_SEED_GENERATIONS: OfficialSeedGeneration[] = [
           ? ['read', 'search', 'web', 'askUser', 'agent', 'todo', 'memory', 'planArtifact', 'handoff']
           : id === 'edit'
             ? ['read', 'search', 'web', 'bash', 'write', 'edit', 'askUser', 'agent', 'todo', 'memory', 'skill', 'mcp']
-            : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'todo', 'memory', 'rdxContext'],
+            : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'todo', 'memory', 'rdcContext'],
       agents: sixRoleAgents(id),
       handoffs: id === 'plan' ? [planHandoff] : [],
     })),
@@ -224,7 +224,7 @@ export const OFFICIAL_SEED_GENERATIONS: OfficialSeedGeneration[] = [
           ? ['read', 'search', 'web', 'askUser', 'agent', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search']
           : id === 'edit'
             ? ['read', 'search', 'web', 'bash', 'write', 'edit', 'git', 'askUser', 'agent', 'task', 'memory', 'skill', 'mcp', 'subagent', 'tool_search']
-            : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'task', 'memory', 'rdxContext', 'subagent', 'tool_search'],
+            : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'task', 'memory', 'rdcContext', 'subagent', 'tool_search'],
       agents: sixRoleAgents(id),
       handoffs: id === 'plan' ? [planHandoff] : [],
     })),
@@ -244,7 +244,7 @@ export const OFFICIAL_SEED_GENERATIONS: OfficialSeedGeneration[] = [
           ? ['read', 'search', 'web', 'askUser', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search']
           : id === 'edit'
             ? ['read', 'search', 'web', 'bash', 'write', 'edit', 'git', 'file-manage', 'askUser', 'handoff', 'task', 'memory', 'memory-write', 'skill', 'mcp', 'subagent', 'tool_search']
-            : ['read', 'search', 'web', 'bash', 'askUser', 'handoff', 'task', 'memory', 'rdxContext', 'subagent', 'tool_search'],
+            : ['read', 'search', 'web', 'bash', 'askUser', 'handoff', 'task', 'memory', 'rdcContext', 'subagent', 'tool_search'],
       agents: sixRoleAgents(id),
       handoffs: id === 'plan' ? [planHandoff] : [],
     })),
@@ -265,7 +265,7 @@ export const OFFICIAL_SEED_GENERATIONS: OfficialSeedGeneration[] = [
           ? ['read', 'search', 'web', 'askUser', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search']
           : id === 'edit'
             ? ['read', 'search', 'web', 'bash', 'write', 'edit', 'git', 'file-manage', 'askUser', 'handoff', 'task', 'memory', 'memory-write', 'skill', 'mcp', 'subagent', 'tool_search']
-            : ['read', 'search', 'web', 'bash', 'askUser', 'handoff', 'task', 'memory', 'rdxContext', 'subagent', 'tool_search'],
+            : ['read', 'search', 'web', 'bash', 'askUser', 'handoff', 'task', 'memory', 'rdcContext', 'subagent', 'tool_search'],
       agents: sixRoleAgents(id),
       handoffs: id === 'plan' ? [planHandoff] : [],
     })),
@@ -286,7 +286,7 @@ export const OFFICIAL_SEED_GENERATIONS: OfficialSeedGeneration[] = [
           ? ['read', 'search', 'web', 'askUser', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search']
           : id === 'edit'
             ? ['read', 'search', 'web', 'bash', 'write', 'edit', 'git', 'file-manage', 'askUser', 'handoff', 'task', 'output', 'memory', 'memory-write', 'skill', 'mcp', 'subagent', 'tool_search']
-            : ['read', 'search', 'web', 'bash', 'askUser', 'handoff', 'task', 'output', 'memory', 'rdxContext', 'subagent', 'tool_search'],
+            : ['read', 'search', 'web', 'bash', 'askUser', 'handoff', 'task', 'output', 'memory', 'rdcContext', 'subagent', 'tool_search'],
       agents: sixRoleAgents(id),
       handoffs: id === 'plan' ? [planHandoff] : [],
     })),
@@ -307,7 +307,7 @@ export const OFFICIAL_SEED_GENERATIONS: OfficialSeedGeneration[] = [
           ? ['read', 'search', 'web', 'askUser', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search']
           : id === 'edit'
             ? ['read', 'search', 'web', 'bash', 'interpreter', 'write', 'edit', 'git', 'file-manage', 'askUser', 'handoff', 'task', 'output', 'memory', 'memory-write', 'skill', 'mcp', 'subagent', 'tool_search']
-            : ['read', 'search', 'web', 'bash', 'interpreter', 'askUser', 'handoff', 'task', 'output', 'memory', 'rdxContext', 'subagent', 'tool_search'],
+            : ['read', 'search', 'web', 'bash', 'interpreter', 'askUser', 'handoff', 'task', 'output', 'memory', 'rdcContext', 'subagent', 'tool_search'],
       agents: sixRoleAgents(id),
       handoffs: id === 'plan' ? [planHandoff] : [],
     })),
@@ -328,7 +328,7 @@ export const OFFICIAL_SEED_GENERATIONS: OfficialSeedGeneration[] = [
           ? ['read', 'search', 'web', 'askUser', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search']
           : id === 'edit'
             ? ['read', 'search', 'web', 'shell', 'interpreter', 'write', 'edit', 'git', 'file-manage', 'askUser', 'handoff', 'task', 'output', 'memory', 'memory-write', 'skill', 'mcp', 'subagent', 'tool_search']
-            : ['read', 'search', 'web', 'shell', 'interpreter', 'askUser', 'handoff', 'task', 'output', 'memory', 'rdxContext', 'subagent', 'tool_search'],
+            : ['read', 'search', 'web', 'shell', 'interpreter', 'askUser', 'handoff', 'task', 'output', 'memory', 'rdcContext', 'subagent', 'tool_search'],
       agents: sixRoleAgents(id),
       handoffs: id === 'plan' ? [planHandoff] : [],
     })),

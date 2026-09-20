@@ -10,7 +10,7 @@ import {
   renderDelegationCapsulePrompt,
   renderDelegationCapsuleInput,
 } from './DelegationCapsuleCompiler';
-import type { PromptPlan } from '@shared/types/rdxRuntime';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 
 function validCapsule(overrides: Partial<DelegationCapsule> = {}): DelegationCapsule {
   return {
@@ -38,7 +38,7 @@ describe('DelegationCapsule', () => {
     expect(prompt).not.toContain('inspect the color target');
     expect(prompt).not.toContain('session://tool-outputs/notes/a.md');
     expect(renderDelegationCapsuleInput(capsule)).toContain('session://tool-outputs/notes/a.md');
-    expect(prompt).not.toContain('# RDX Lease');
+    expect(prompt).not.toContain('# RDC Lease');
     expect(Object.isFrozen(capsule)).toBe(true);
     expect(Object.isFrozen(capsule.budget)).toBe(true);
     expect(Object.isFrozen(segments)).toBe(true);
@@ -56,8 +56,8 @@ describe('DelegationCapsule', () => {
     })).toThrow(/acceptedFacts/);
     expect(() => parseDelegationCapsule({
       ...validCapsule(),
-      requiresRdxLease: undefined,
-    })).toThrow(/requiresRdxLease/);
+      requiresRdcLease: undefined,
+    })).toThrow(/requiresRdcLease/);
     expect(() => parseDelegationCapsule({
       ...validCapsule(),
       budget: { maxToolCalls: 0, maxWallTimeMs: 10 },

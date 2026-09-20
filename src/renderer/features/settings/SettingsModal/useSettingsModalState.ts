@@ -5,7 +5,7 @@ import type {
   AppSettings,
   LlmAgentRoute,
   LlmProviderEntry,
-  RdxCliInvokerSettings,
+  RdcCliInvokerSettings,
   AgentShellSettings,
   CodeInterpreterSettings,
 } from '@shared/types/settings';
@@ -21,7 +21,7 @@ export const useSettingsModalState = (
   const [accountDraft, setAccountDraft] = useState(settings.profile);
   const [providerDrafts, setProviderDrafts] = useState<LlmProviderEntry[]>(settings.llm.providers.map(cloneProvider));
   const [agentRouteDrafts, setAgentRouteDrafts] = useState<LlmAgentRoute[]>(settings.llm.agentRoutes.map(cloneRoute));
-  const [rdxCliDraft, setRdxCliDraft] = useState<RdxCliInvokerSettings>(settings.tooling.rdxCli);
+  const [rdcCliDraft, setRdcCliDraft] = useState<RdcCliInvokerSettings>(settings.tooling.rdcCli);
   const [codeInterpreterDraft, setCodeInterpreterDraft] = useState<CodeInterpreterSettings>(
     settings.tooling.codeInterpreter,
   );
@@ -52,7 +52,7 @@ export const useSettingsModalState = (
     const providers = settings.llm.providers.map(cloneProvider);
     setProviderDrafts(providers);
     setAgentRouteDrafts(settings.llm.agentRoutes.map(cloneRoute));
-    setRdxCliDraft(settings.tooling.rdxCli);
+    setRdcCliDraft(settings.tooling.rdcCli);
     setCodeInterpreterDraft(settings.tooling.codeInterpreter);
     setShellDraft(settings.tooling.shell);
     setAgentManifestDrafts(settings.agents.definitions.map((definition) => (
@@ -75,8 +75,8 @@ export const useSettingsModalState = (
     setProviderDrafts,
     agentRouteDrafts,
     setAgentRouteDrafts,
-    rdxCliDraft,
-    setRdxCliDraft,
+    rdcCliDraft,
+    setRdcCliDraft,
     codeInterpreterDraft,
     setCodeInterpreterDraft,
     shellDraft,

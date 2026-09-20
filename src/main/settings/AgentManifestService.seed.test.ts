@@ -20,10 +20,10 @@ afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recur
 
 describe('AgentManifestService effective builtin snapshot', () => {
   it('loads four builtins without writing user seeds', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-agent-seeds-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-seeds-'));
     roots.push(root);
     const agentsPath = path.join(root, 'agents');
-    const instructionsPath = path.join(root, 'RDX.md');
+    const instructionsPath = path.join(root, 'RDC.md');
 
     const settings = agentManifestService.getSettings(
       { agentsPath, instructionsPath },
@@ -252,10 +252,10 @@ describe('AgentManifestService effective builtin snapshot', () => {
   });
 
   it('rejects saving general into debugger.agent.md and does not delete debugger', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-agent-filename-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-filename-'));
     roots.push(root);
     const agentsPath = path.join(root, 'agents');
-    const instructionsPath = path.join(root, 'RDX.md');
+    const instructionsPath = path.join(root, 'RDC.md');
     await mkdir(agentsPath, { recursive: true });
     const debuggerPath = path.join(agentsPath, 'debugger.agent.md');
     await writeFile(debuggerPath, '---\nname: Debugger\n---\nuser copy\n', 'utf8');
@@ -289,14 +289,14 @@ describe('AgentManifestService effective builtin snapshot', () => {
   });
 
   it('surfaces project invalid candidates as Settings diagnostics without overriding builtin', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-agent-invalid-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-invalid-'));
     roots.push(root);
     const projectRoot = path.join(root, 'project');
-    const projectAgents = path.join(projectRoot, '.rdx', 'agents');
+    const projectAgents = path.join(projectRoot, '.rdc-agent', 'agents');
     await mkdir(projectAgents, { recursive: true });
     await writeFile(path.join(projectAgents, 'general.agent.md'), 'not a valid manifest\n', 'utf8');
     const settings = agentManifestService.getSettings(
-      { agentsPath: path.join(root, 'user-agents'), instructionsPath: path.join(root, 'RDX.md') },
+      { agentsPath: path.join(root, 'user-agents'), instructionsPath: path.join(root, 'RDC.md') },
       [],
       [],
       [],
@@ -309,10 +309,10 @@ describe('AgentManifestService effective builtin snapshot', () => {
   });
 
   it('drops reserved historical ids from effective snapshot and diagnoses both scopes', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-agent-reserved-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-reserved-'));
     roots.push(root);
     const agentsPath = path.join(root, 'user-agents');
-    const projectAgents = path.join(root, 'project', '.rdx', 'agents');
+    const projectAgents = path.join(root, 'project', '.rdc-agent', 'agents');
     await mkdir(agentsPath, { recursive: true });
     await mkdir(projectAgents, { recursive: true });
     await writeFile(path.join(agentsPath, 'ask.agent.md'), `---
@@ -345,7 +345,7 @@ handoffs: []
 reserved
 `, 'utf8');
     const settings = agentManifestService.getSettings(
-      { agentsPath, instructionsPath: path.join(root, 'RDX.md') },
+      { agentsPath, instructionsPath: path.join(root, 'RDC.md') },
       [],
       [],
       [],

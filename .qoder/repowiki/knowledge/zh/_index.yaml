@@ -69,11 +69,11 @@ modules:
         depends_on: []
         related_to: []
     scripts/fidelity_and_extraction:
-        dir_name: 保真度契约与 RDX 工具指南生成脚本
-        title: 保真度契约与 RDX 工具指南生成脚本
+        dir_name: 保真度契约与 RDC 工具指南生成脚本
+        title: 保真度契约与 RDC 工具指南生成脚本
         scope:
             - scripts/extract-*.mjs
-            - scripts/generate-rdx-tool-guides.mjs
+            - scripts/generate-rdc-tool-guides.mjs
         source_files: []
         children: []
         depends_on: []

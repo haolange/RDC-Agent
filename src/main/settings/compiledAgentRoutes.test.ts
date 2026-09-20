@@ -41,7 +41,7 @@ describe('compiledAgentRoutes leftover isolation', () => {
       diagnostics: [],
     } as never);
     const settings = {
-      paths: { agentsPath: 'C:/agents', instructionsPath: 'C:/RDX.md' },
+      paths: { agentsPath: 'C:/agents', instructionsPath: 'C:/RDC.md' },
       agents: { definitions: [{ id: 'general', compiledRoute: { agentId: 'general', providerId: 'real', modelId: 'real-model' } }] },
       llm: { agentRoutes: [{ agentId: 'general', providerId: 'leftover', modelId: 'leftover-model' }] },
     } as unknown as AppSettings;

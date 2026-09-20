@@ -108,7 +108,7 @@ describe('Run v3 schema', () => {
 
 describe('Run profile recovery', () => {
   it('prefers unique terminal assistant agentId and ignores legacy mode', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-recover-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-recover-'));
     roots.push(root);
     await writeFile(path.join(root, 'conversation.jsonl'), `${JSON.stringify({
       runId: 'run_1', role: 'user', status: 'complete', agentId: 'general',
@@ -121,7 +121,7 @@ describe('Run profile recovery', () => {
   });
 
   it('returns legacy:unknown without unique evidence', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-unknown-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-unknown-'));
     roots.push(root);
     const recovered = recoverRunProfileId(root, 'missing');
     expect(recovered.profileId).toBe('legacy:unknown');
@@ -130,7 +130,7 @@ describe('Run profile recovery', () => {
 
 describe('Run archive', () => {
   it('archives original bytes with hash verification and is idempotent', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-archive-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-archive-'));
     roots.push(root);
     const io = new StorageIo();
     const bytes = '{"mode":"debugger","runId":"r1"}';
@@ -143,7 +143,7 @@ describe('Run archive', () => {
   });
 
   it('fail-closes when an existing archive hash conflicts', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-archive-conflict-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-archive-conflict-'));
     roots.push(root);
     const io = new StorageIo();
     const first = archiveRunOriginalBytes(io, root, 'r1', 'json', '{"a":1}');
@@ -153,7 +153,7 @@ describe('Run archive', () => {
   });
 
   it('leaves existing run-v2 archives untouched', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-v2-archive-keep-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-v2-archive-keep-'));
     roots.push(root);
     const legacyPath = path.join(root, RUN_V2_BACKUP_DIR, 'r1', 'legacy.json');
     await mkdir(path.dirname(legacyPath), { recursive: true });
@@ -165,7 +165,7 @@ describe('Run archive', () => {
 
 describe('Run v3 migration', () => {
   it('archives unversioned v0 run.json then writes conversation v3 without inferring mission from lastStage', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-mig-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-mig-'));
     roots.push(sessionPath);
     const runPath = path.join(sessionPath, 'runs', 'r1');
     await mkdir(path.join(runPath, 'notes'), { recursive: true });
@@ -205,7 +205,7 @@ describe('Run v3 migration', () => {
   });
 
   it('migrates v1 to mission from conversation identity, not lastStage', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-mission-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-mission-'));
     roots.push(sessionPath);
     await writeFile(path.join(sessionPath, 'conversation.jsonl'), `${JSON.stringify({
       runId: 'r2', role: 'assistant', status: 'complete', agentId: 'debugger',
@@ -238,7 +238,7 @@ describe('Run v3 migration', () => {
   });
 
   it('archives and rewrites a legal v2 run.json to v3', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-v2-json-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-v2-json-'));
     roots.push(sessionPath);
     const runPath = path.join(sessionPath, 'runs', 'r-v2');
     await mkdir(runPath, { recursive: true });
@@ -272,7 +272,7 @@ describe('Run v3 migration', () => {
   });
 
   it('is idempotent when migration is repeated', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-idemp-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-idemp-'));
     roots.push(sessionPath);
     const runPath = path.join(sessionPath, 'runs', 'r-idemp');
     await mkdir(runPath, { recursive: true });
@@ -307,7 +307,7 @@ describe('Run v3 migration', () => {
   });
 
   it('survives crash after archive and before rewrite', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-crash-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-crash-'));
     roots.push(sessionPath);
     const runPath = path.join(sessionPath, 'runs', 'r-crash');
     await mkdir(runPath, { recursive: true });
@@ -338,7 +338,7 @@ describe('Run v3 migration', () => {
   });
 
   it('fail-closes lock contention from a live owner', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-lock-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-lock-'));
     roots.push(sessionPath);
     const runPath = path.join(sessionPath, 'runs', 'r-lock');
     await mkdir(runPath, { recursive: true });
@@ -370,7 +370,7 @@ describe('Run v3 migration', () => {
   }, 20_000);
 
   it('fail-closes unknown higher schemaVersion without archiving or rewriting', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-version-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-version-'));
     roots.push(sessionPath);
     for (const version of ['future', '1.1', '4', '99']) {
       const runId = `r-${version.replace('.', '_')}`;
@@ -403,7 +403,7 @@ describe('Run v3 migration', () => {
   });
 
   it('fail-closes json/yaml identity conflict without archiving', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-conflict-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-conflict-'));
     roots.push(sessionPath);
     const runPath = path.join(sessionPath, 'runs', 'r-conflict');
     await mkdir(runPath, { recursive: true });
@@ -460,7 +460,7 @@ describe('Run v3 migration', () => {
   });
 
   it('fail-closes json/yaml content conflict when runId/profileId match but captures or status differ', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-content-conflict-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-content-conflict-'));
     roots.push(sessionPath);
 
     const shared = {
@@ -552,7 +552,7 @@ describe('Run v3 migration', () => {
   });
 
   it('rejects a v3 file that still carries lastStage or recommendedSpecialists', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-v3-leftover-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-v3-leftover-'));
     roots.push(sessionPath);
     const v3 = {
       schemaVersion: '3',
@@ -594,7 +594,7 @@ describe('Run v3 migration', () => {
   });
 
   it('archives conversation sidecars without deleting the originals', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-sidecar-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-sidecar-'));
     roots.push(sessionPath);
     const runPath = path.join(sessionPath, 'runs', 'r3');
     await mkdir(path.join(runPath, 'notes'), { recursive: true });
@@ -605,7 +605,7 @@ describe('Run v3 migration', () => {
   });
 
   it('rewrites writer yaml-only v2 to canonical v3 json+yaml', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-writer-yaml-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-writer-yaml-'));
     roots.push(sessionPath);
     const runPath = path.join(sessionPath, 'runs', 'r-writer');
     const run = toPersistedRunV3({
@@ -651,7 +651,7 @@ describe('Run v3 migration', () => {
   });
 
   it('still reads legacy snake_case v2 yaml after normalize and rewrites v3', async () => {
-    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-snake-yaml-'));
+    const sessionPath = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-snake-yaml-'));
     roots.push(sessionPath);
     const runPath = path.join(sessionPath, 'runs', 'r-snake');
     await mkdir(runPath, { recursive: true });
@@ -775,7 +775,7 @@ describe('Run v3 identity', () => {
 
 describe('Run lifecycle without stage finalize', () => {
   it('fail-closes leftover lastStage or workflow_stage on the live write path', async () => {
-    const projectsRoot = await mkdtemp(path.join(os.tmpdir(), 'rdx-run-finalize-'));
+    const projectsRoot = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-finalize-'));
     roots.push(projectsRoot);
     const sessionPath = path.join(projectsRoot, 'sess');
     const runPath = path.join(sessionPath, 'runs', 'r-final');

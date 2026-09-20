@@ -31,8 +31,8 @@ describe('AppPathService', () => {
     const first = service.initializeRuntime();
     const firstCallCount = mkdirSpy.mock.calls.length;
     expect(firstCallCount).toBeGreaterThan(0);
-    expect(first.rdxIntermediateRoot).toBe(path.join(first.userRdxRoot, 'rdx-intermediate'));
-    expect(mkdirSpy.mock.calls.some((call) => String(call[0]).endsWith('rdx-intermediate'))).toBe(false);
+    expect(first.rdcIntermediateRoot).toBe(path.join(first.userRdcRoot, 'rdc-tool-intermediate'));
+    expect(mkdirSpy.mock.calls.some((call) => String(call[0]).endsWith('rdc-tool-intermediate'))).toBe(false);
 
     const second = service.initializeRuntime();
     expect(second).toBe(first);
@@ -41,11 +41,11 @@ describe('AppPathService', () => {
   it('adds replay exclusions to existing project rules without creating an unused replay directory', async () => {
     const { AppPathService } = await import('./AppPathService');
     const service = new AppPathService();
-    fs.mkdirSync(path.join(root, '.rdx'));
-    fs.writeFileSync(path.join(root, '.rdx', '.gitignore'), 'custom-rule/');
-    const paths = service.initializeProjectRdx(root);
-    service.initializeProjectRdx(root);
-    expect(paths.replayPath).toBe(path.join(root, '.rdx', 'replay'));
+    fs.mkdirSync(path.join(root, '.rdc-agent'));
+    fs.writeFileSync(path.join(root, '.rdc-agent', '.gitignore'), 'custom-rule/');
+    const paths = service.initializeProjectRdc(root);
+    service.initializeProjectRdc(root);
+    expect(paths.replayPath).toBe(path.join(root, '.rdc-agent', 'replay'));
     expect(fs.existsSync(paths.replayPath)).toBe(false);
     const ignore = fs.readFileSync(paths.gitignorePath, 'utf8');
     expect(ignore).toContain('custom-rule/');

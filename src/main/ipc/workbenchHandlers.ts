@@ -13,7 +13,7 @@ import { settingsService } from '../settings/SettingsService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { projectSessionForClient } from '../sessions/projectSessionHandoff';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
+import { rdcCliInvokerService } from '../tools/RdcCliInvokerService';
 import { sessionResumeService } from '../sessions/SessionResumeService';
 import { registerAgentHandlers } from './agentHandlers';
 import { registerMemoryHandlers } from './memoryHandlers';
@@ -31,7 +31,7 @@ import { registerWebHandlers } from './webHandlers';
 import { registerToolEvidenceHandlers } from './toolEvidenceHandlers';
 import { registerWorkflowHandlers } from './workflowHandlers';
 import { registerTraceHandlers } from './traceHandlers';
-import { registerRdxRuntimeHandlers } from './rdxRuntimeHandlers';
+import { registerRdcRuntimeHandlers } from './rdcRuntimeHandlers';
 import { assertRendererIpcParity, installIpcInvokeRegistry } from './invokeRegistry';
 import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
 import type {
@@ -193,7 +193,7 @@ function registerToolTraceBridge(): void {
     return;
   }
 
-  rdxCliInvokerService.onInvocationTrace((trace) => {
+  rdcCliInvokerService.onInvocationTrace((trace) => {
     broadcastToRenderer('tool:executionComplete', trace);
     if (state.currentSessionId && state.currentRunId) {
       void appendActionEvent(storageAdapter.createActionEvent({
@@ -277,7 +277,7 @@ export function registerIPCHandlers(): void {
   registerToolEvidenceHandlers(context);
   registerSettingsLlmHandlers(context);
   registerTraceHandlers(context);
-  registerRdxRuntimeHandlers();
+  registerRdcRuntimeHandlers();
   assertRendererIpcParity();
   registerNativeThemeBridge();
 }

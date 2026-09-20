@@ -1,4 +1,4 @@
-import { acquireRdxPreparationLock, setRdxInteractionLock } from '../sessions/RdxOperationCoordinator';
+import { acquireRdcPreparationLock, setRdcInteractionLock } from '../sessions/RdcOperationCoordinator';
 import { reconcileDelegatedInteractionRequests } from './DelegatedInteractionRecovery';
 import { enforceMissionTurnCompletion } from '../investigation/missionCompletionContract';
 import { createHash } from 'crypto';
@@ -30,7 +30,7 @@ import {
 } from './ConversationInteractionAnswers';
 import { traceService } from '../agent-trace/TraceService';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
-import { rdxSessionService } from '../sessions';
+import { rdcSessionService } from '../sessions';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { sessionContextJournal } from './SessionContextJournal';
@@ -216,14 +216,14 @@ export class ConversationService {
   answerToolApproval = answerConversationToolApproval;
   private registerActiveTurn(turn: ActiveConversationTurn): void {
     this.activeTurns.set(turn.turnId, turn);
-    if (turn.sessionId) setRdxInteractionLock(turn.sessionId, turn.turnId, true);
+    if (turn.sessionId) setRdcInteractionLock(turn.sessionId, turn.turnId, true);
   }
   private clearActiveTurn(turnId: string, controller: AbortController): void {
     const active = this.activeTurns.get(turnId);
     if (active?.abortController === controller) {
       const sessionId = active.sessionId;
       this.activeTurns.delete(turnId);
-      if (sessionId) setRdxInteractionLock(sessionId, turnId, false);
+      if (sessionId) setRdcInteractionLock(sessionId, turnId, false);
       if (sessionId) this.notifySessionTurnIdle(sessionId);
     }
   }
@@ -444,7 +444,7 @@ export class ConversationService {
       if (scopeOwner && scopeOwner !== requestId) {
         throw new Error('CONVERSATION_BUSY: another request is preparing for this conversation.');
       }
-      if (scopeKey.startsWith('session:')) acquireRdxPreparationLock(scopeKey.slice(8), requestId);
+      if (scopeKey.startsWith('session:')) acquireRdcPreparationLock(scopeKey.slice(8), requestId);
       this.activeSendScopes.set(scopeKey, requestId);
       this.preparingRequests.set(idempotencyKey, {
         requestId,
@@ -468,7 +468,7 @@ export class ConversationService {
         agentOrchestrator.releaseProviderRuntimeCredentials(requestState.credentialHandle);
       }
       this.preparingRequests.delete(idempotencyKey);
-      if (scopeKey.startsWith('session:')) setRdxInteractionLock(scopeKey.slice(8), requestId, false);
+      if (scopeKey.startsWith('session:')) setRdcInteractionLock(scopeKey.slice(8), requestId, false);
       if (this.activeSendScopes.get(scopeKey) === requestId) this.activeSendScopes.delete(scopeKey);
     };
 
@@ -739,7 +739,7 @@ export class ConversationService {
       : null;
     const projectInputs = projectId ? await storageAdapter.listProjectInputs(projectId) : [];
     const openedCapture = projectId && resolvedSessionId
-      ? rdxSessionService.snapshotOpenedCaptureForSession({ projectId, sessionId: resolvedSessionId })
+      ? rdcSessionService.snapshotOpenedCaptureForSession({ projectId, sessionId: resolvedSessionId })
       : null;
     const activeOpenedCapture = openedCapture?.status === 'open' ? openedCapture : null;
     const replayDevice = replayDeviceService.getDeviceById(input.replayDeviceId || 'local') ?? replayDeviceService.getDeviceById('local');

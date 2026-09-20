@@ -6,7 +6,7 @@ allowed-tools: [subagent_report, turn_complete, artifact_read, investigation_rea
 
 # Skeptic Review
 
-Use this skill in an independent context after a Generator has written Claims. Do not inherit the Generator's long narrative, Task list, or live RDX lease.
+Use this skill in an independent context after a Generator has written Claims. Do not inherit the Generator's long narrative, Task list, or live RDC lease.
 
 Input: Claim, Evidence, Experiment, Negative, Alternative, Scope, Unknown.
 

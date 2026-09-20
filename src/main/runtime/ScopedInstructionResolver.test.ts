@@ -6,7 +6,7 @@ import { ScopedInstructionResolver } from './ScopedInstructionResolver';
 
 const roots: string[] = [];
 const makeRoot = () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-instructions-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-instructions-'));
   roots.push(root);
   return root;
 };
@@ -18,14 +18,14 @@ afterEach(() => {
 describe('ScopedInstructionResolver', () => {
   it('loads user then root-to-target project instructions exactly once', () => {
     const root = makeRoot();
-    const user = path.join(root, 'user-RDX.md');
+    const user = path.join(root, 'user-RDC.md');
     const project = path.join(root, 'project');
     const nested = path.join(project, 'src', 'feature');
     fs.mkdirSync(nested, { recursive: true });
     fs.writeFileSync(user, 'user');
-    fs.writeFileSync(path.join(project, 'RDX.md'), 'root');
-    fs.writeFileSync(path.join(project, 'src', 'RDX.md'), 'src');
-    fs.writeFileSync(path.join(nested, 'RDX.md'), 'feature');
+    fs.writeFileSync(path.join(project, 'RDC.md'), 'root');
+    fs.writeFileSync(path.join(project, 'src', 'RDC.md'), 'src');
+    fs.writeFileSync(path.join(nested, 'RDC.md'), 'feature');
 
     const result = new ScopedInstructionResolver().resolveForPaths({
       userInstructionsPath: user,
@@ -41,7 +41,7 @@ describe('ScopedInstructionResolver', () => {
     const root = makeRoot();
     const project = path.join(root, 'project');
     fs.mkdirSync(project);
-    fs.writeFileSync(path.join(project, 'RDX.md'), '0123456789');
+    fs.writeFileSync(path.join(project, 'RDC.md'), '0123456789');
     const resolver = new ScopedInstructionResolver();
     const result = resolver.resolveForPaths({
       userInstructionsPath: path.join(root, 'missing.md'),

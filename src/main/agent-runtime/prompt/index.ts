@@ -9,4 +9,4 @@ export { RequestEnvelopeBuilder, requestEnvelopeBuilder } from './RequestEnvelop
 export type { RequestEnvelopeInput } from './RequestEnvelopeBuilder';
 export { RequestSnapshotStore, requestSnapshotStore } from './RequestSnapshotStore';
 export { resolvePromptClock } from './promptClock';
-export type { PromptPlan, PromptPlanMetrics, PromptSegment, RequestEnvelopeSnapshot } from '@shared/types/rdxRuntime';
+export type { PromptPlan, PromptPlanMetrics, PromptSegment, RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';

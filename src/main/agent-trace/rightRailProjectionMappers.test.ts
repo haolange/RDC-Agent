@@ -4,7 +4,7 @@ import type { TraceArtifactRecord } from '@shared/types/trace';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 import { TASK_SCHEMA_VERSION } from '../agent-runtime/tasks/TaskContracts';
 import { dedupeSessionArtifactSources, type SessionArtifactSource } from '../sessions/SessionArtifactSource';
-import { buildRdxContext, buildTaskContext, mapRightRailOutputs, mapRightRailProgress } from './rightRailProjectionMappers';
+import { buildRdcContext, buildTaskContext, mapRightRailOutputs, mapRightRailProgress } from './rightRailProjectionMappers';
 
 const task = (id: string, status: TaskRecord['status'], createdAt: number, statusReason?: string): TaskRecord => ({
   schemaVersion: TASK_SCHEMA_VERSION, id, subject: id, description: '', status, statusReason, blockedBy: [], blocks: [],
@@ -26,13 +26,13 @@ const run = (runId: string, startedAt: number): RunSummary => ({ runId, startedA
 
 const openedCapture = {
   projectId: 'project-a', ownerSessionId: 'session-a', inputId: 'input-a', filePath: 'D:/captures/WhiteHair.rdc',
-  captureId: 'capture-a', captureFileId: 'capture-file-a', sessionId: 'rdx-session-a', contextId: 'context-a',
-  replaySessionId: 'rdx-session-a', backend: 'remote', deviceId: 'android-a', deviceLabel: 'Android GPU', status: 'open', openedAt: 10,
-  runtimeContext: { contextId: 'context-a', replaySessionId: 'rdx-session-a', runtimeOwner: 'rdc-agent', ownerLeaseId: 'lease-a', backend: 'remote', deviceLabel: 'Android GPU', remoteId: 'remote-a', remoteStatus: 'connected', updatedAt: 11 },
+  captureId: 'capture-a', captureFileId: 'capture-file-a', sessionId: 'rdc-session-a', contextId: 'context-a',
+  replaySessionId: 'rdc-session-a', backend: 'remote', deviceId: 'android-a', deviceLabel: 'Android GPU', status: 'open', openedAt: 10,
+  runtimeContext: { contextId: 'context-a', replaySessionId: 'rdc-session-a', runtimeOwner: 'rdc-agent', ownerLeaseId: 'lease-a', backend: 'remote', deviceLabel: 'Android GPU', remoteId: 'remote-a', remoteStatus: 'connected', updatedAt: 11 },
 } satisfies OpenedCaptureState;
 
 const contextSnapshot = {
-  contextId: 'context-a', sessionId: 'rdx-session-a', ownerSessionId: 'session-a', backend: 'remote', remoteStatus: 'connected',
+  contextId: 'context-a', sessionId: 'rdc-session-a', ownerSessionId: 'session-a', backend: 'remote', remoteStatus: 'connected',
   runtimeOwner: 'rdc-agent', ownerLeaseId: 'lease-a', captureDescriptors: [], activeCapture: 'capture-a', deviceLabel: 'Android GPU',
   runtimeContext: openedCapture.runtimeContext,
 } satisfies ContextSnapshot;
@@ -70,16 +70,16 @@ describe('right rail projection mappers', () => {
   });
 
   it('fails closed without an owned capture and does not invent CLI diagnostics', () => {
-    const result = buildRdxContext({ openedCapture: null, contextSnapshot: null, availableCaptures: [] });
+    const result = buildRdcContext({ openedCapture: null, contextSnapshot: null, availableCaptures: [] });
     expect(result.capture).toBeNull();
     expect(result.runtime).toEqual({});
     expect(result.diagnostics).toEqual([]);
   });
 
-  it('projects the owner session RDX runtime identifiers for agent consumption', () => {
-    const result = buildRdxContext({ openedCapture, contextSnapshot, availableCaptures: [] });
-    expect(result.capture).toMatchObject({ inputId: 'input-a', captureId: 'capture-a', captureFileId: 'capture-file-a', replaySessionId: 'rdx-session-a' });
-    expect(result.runtime).toMatchObject({ contextId: 'context-a', replaySessionId: 'rdx-session-a', runtimeOwner: 'rdc-agent', ownerLeaseId: 'lease-a', remoteId: 'remote-a', remoteStatus: 'connected' });
+  it('projects the owner session RDC runtime identifiers for agent consumption', () => {
+    const result = buildRdcContext({ openedCapture, contextSnapshot, availableCaptures: [] });
+    expect(result.capture).toMatchObject({ inputId: 'input-a', captureId: 'capture-a', captureFileId: 'capture-file-a', replaySessionId: 'rdc-session-a' });
+    expect(result.runtime).toMatchObject({ contextId: 'context-a', replaySessionId: 'rdc-session-a', runtimeOwner: 'rdc-agent', ownerLeaseId: 'lease-a', remoteId: 'remote-a', remoteStatus: 'connected' });
   });
 
   it('projects concrete resources and deduplicates attachments by canonical path', () => {

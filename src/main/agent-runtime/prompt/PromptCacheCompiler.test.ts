@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CachePlan, RequestPlan } from '@shared/types/providerCapability';
-import type { PromptPlan } from '@shared/types/rdxRuntime';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { PromptCacheCompiler } from './PromptCacheCompiler';

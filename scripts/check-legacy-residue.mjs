@@ -23,7 +23,7 @@ const token = (...parts) => parts.join('');
 
 const FORBIDDEN = {
   stagedHandoff: token('staged', '_handoff'),
-  leakFile: token('rdx-runtime-leak', '.json'),
+  leakFile: token('rdc-runtime-leak', '.json'),
   planPhases: token('PLAN', '_PHASES'),
   writeScope: 'WriteScope',
   intakeContext: token('Intake', 'Context'),
@@ -37,7 +37,7 @@ const FORBIDDEN = {
   harnessStatus: token('Harness', 'Status'),
   contextPacket: token('Context', 'Packet'),
   legacyGlobalMirror: token('legacy', 'GlobalMirror'),
-  getRdxRuntimeContext: token('getRdx', 'RuntimeContext'),
+  getRdcRuntimeContext: token('getRdc', 'RuntimeContext'),
   legacyFallback: token('legacy', ' fallback'),
   coldDataPascal: token('Cold', 'Data'),
   coldDataCamel: token('cold', 'Data'),
@@ -87,7 +87,7 @@ const isExactSymbolAllowlist = (rel, line, symbol) => {
   if (symbol === FORBIDDEN.writeScope && isAgentManifestWriteScope(line)) return true;
   if (symbol === FORBIDDEN.askTurn && line.includes(FORBIDDEN.groupAskTurns)) return false;
 
-  if (symbol === FORBIDDEN.legacyGlobalMirror || symbol === FORBIDDEN.getRdxRuntimeContext) {
+  if (symbol === FORBIDDEN.legacyGlobalMirror || symbol === FORBIDDEN.getRdcRuntimeContext) {
     if (rel === 'scripts/check-orchestrator-facade.mjs') return true;
     if (rel === 'AGENTS.md' && /禁止/.test(line)) return true;
     if (rel.startsWith('docs/contracts/') && /禁止/.test(line)) return true;
@@ -224,7 +224,7 @@ if (!existsSync(harnessPath)) {
 
 const rules = [
   { id: 'staged_handoff', hits: collectPatternHits(FORBIDDEN.stagedHandoff) },
-  { id: 'rdx-runtime-leak.json', hits: [
+  { id: 'rdc-runtime-leak.json', hits: [
     ...collectPatternHits(FORBIDDEN.leakFile),
     ...collectPathHits(FORBIDDEN.leakFile),
   ] },
@@ -261,7 +261,7 @@ const rules = [
   { id: 'HarnessStatus', hits: collectPatternHits(FORBIDDEN.harnessStatus) },
   { id: 'ContextPacket', hits: collectPatternHits(FORBIDDEN.contextPacket) },
   { id: 'legacyGlobalMirror', hits: collectPatternHits(FORBIDDEN.legacyGlobalMirror) },
-  { id: 'getRdxRuntimeContext', hits: collectPatternHits(FORBIDDEN.getRdxRuntimeContext) },
+  { id: 'getRdcRuntimeContext', hits: collectPatternHits(FORBIDDEN.getRdcRuntimeContext) },
   { id: 'legacy-fallback-wording', hits: collectPatternHits(FORBIDDEN.legacyFallback) },
   { id: 'ColdData', hits: collectPatternHits(FORBIDDEN.coldDataPascal) },
   { id: 'coldData', hits: collectPatternHits(FORBIDDEN.coldDataCamel) },

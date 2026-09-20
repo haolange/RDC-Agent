@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 const execute = vi.hoisted(() => vi.fn());
 vi.mock('electron', () => ({ BrowserWindow: class {} }));
-vi.mock('../tools/RdxCliInvokerService', () => ({ rdxCliInvokerService: { executeCLI: execute } }));
+vi.mock('../tools/RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: execute } }));
 vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: {} }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('../browserAppBridge/rendererEventHub', () => ({ rendererEventHub: { emit: vi.fn() } }));
 import { ReplayDeviceService } from './ReplayDeviceService';
-const cli = { enabled: true, command: 'rdx', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 };
+const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 };
 const device: ReplayDeviceEntry = { id: 'selected', label: 'Phone', type: 'android', status: 'offline', transport: 'adb_android', serial: 'SERIAL-SELECTED' };
 function service() {
   const value = new ReplayDeviceService();

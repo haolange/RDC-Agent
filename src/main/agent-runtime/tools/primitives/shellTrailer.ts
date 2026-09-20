@@ -14,7 +14,7 @@ export interface ParsedShellOutput {
 }
 
 export function createShellTrailerMarker(): string {
-  return `RDX_SHELL_${randomUUID().replace(/-/g, '')}`;
+  return `RDC_SHELL_${randomUUID().replace(/-/g, '')}`;
 }
 
 export function createShellBeginMarker(marker: string): string {
@@ -59,36 +59,36 @@ export function wrapPowerShellCommand(command: string, marker: string): string {
     // Only our own writer is UTF-8; forcing Console.OutputEncoding corrupts legacy native output.
     '$__stdout = New-Object System.IO.StreamWriter([Console]::OpenStandardOutput(), (New-Object System.Text.UTF8Encoding $false))',
     '$__stdout.AutoFlush = $true',
-    'function Write-RdxLine([string]$Line) { $__stdout.WriteLine($Line) }',
+    'function Write-RdcLine([string]$Line) { $__stdout.WriteLine($Line) }',
     "$ErrorActionPreference = 'Stop'",
     `$__m = '${marker}'`,
     '$__exit = 0',
     '$__errFile = [System.IO.Path]::GetTempFileName()',
     'try {',
     `  $__src = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}'))`,
-    '  & ([scriptblock]::Create($__src)) 2>$__errFile | ForEach-Object { Write-RdxLine (($_ | Out-String).TrimEnd()) }',
+    '  & ([scriptblock]::Create($__src)) 2>$__errFile | ForEach-Object { Write-RdcLine (($_ | Out-String).TrimEnd()) }',
     '  if ($null -ne $LASTEXITCODE) { $__exit = [int]$LASTEXITCODE }',
     '  if (Test-Path -LiteralPath $__errFile) {',
     '    $__bytes = [System.IO.File]::ReadAllBytes($__errFile)',
     '    if ($__bytes.Length -gt 0) {',
     '      $__enc = if ($PSVersionTable.PSVersion.Major -ge 6) { New-Object System.Text.UTF8Encoding $false } else { [System.Text.Encoding]::Default }',
     '      $__errText = $__enc.GetString($__bytes).TrimEnd()',
-    '      if ($__errText) { Write-RdxLine $__errText }',
+    '      if ($__errText) { Write-RdcLine $__errText }',
     '    }',
     '  }',
     '} catch {',
     '  $__exit = 1',
-    '  Write-RdxLine (($_ | Out-String).TrimEnd())',
+    '  Write-RdcLine (($_ | Out-String).TrimEnd())',
     '} finally {',
     '  Remove-Item -LiteralPath $__errFile -Force -ErrorAction SilentlyContinue',
     '  $__loc = Get-Location',
     '  $__provider = $__loc.Provider.Name',
     "  $__cwd = if ($__provider -eq 'FileSystem') { $__loc.ProviderPath } else { '' }",
-    '  Write-RdxLine ""',
-    '  Write-RdxLine $__m',
-    '  Write-RdxLine ("cwd=" + $__cwd)',
-    '  Write-RdxLine ("provider=" + $__provider)',
-    '  Write-RdxLine ("exit=" + $__exit)',
+    '  Write-RdcLine ""',
+    '  Write-RdcLine $__m',
+    '  Write-RdcLine ("cwd=" + $__cwd)',
+    '  Write-RdcLine ("provider=" + $__provider)',
+    '  Write-RdcLine ("exit=" + $__exit)',
     '  $__stdout.Flush()',
     '}',
     '[Environment]::Exit($__exit)',

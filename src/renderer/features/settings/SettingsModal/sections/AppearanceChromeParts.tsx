@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { ThemeChromeConfig, ThemePresetId, ThemeVariant } from '@shared/types/settings';
 import { THEME_PRESET_CATALOG, getPresetChrome } from '@shared/theme/presets';
-import { serializeRdxThemeV1 } from '@shared/theme/rdxThemeV1';
+import { serializeRdcThemeV1 } from '@shared/theme/rdcThemeV1';
 import { useDynStyle } from '../../../../lib/useDynStyle';
 import { Button } from '../../../../ui/Button';
 import { ColorField } from '../../../../ui/ColorField';
@@ -75,7 +75,7 @@ export function ChromeThemeCard(props: {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(serializeRdxThemeV1(props.chrome, props.variant));
+      await navigator.clipboard.writeText(serializeRdcThemeV1(props.chrome, props.variant));
       setCopyState('copied');
       window.setTimeout(() => setCopyState('idle'), 1600);
     } catch {

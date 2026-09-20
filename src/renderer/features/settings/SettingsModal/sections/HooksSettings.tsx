@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import type { RdxRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdxRuntime';
+import type { RdcRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdcRuntime';
 import { useI18n } from '../../../../i18n';
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { resolveHookTrustProjectRoot } from './hookTrustProjectRoot';
-import { getRdxOverview, revokeHook, testHook, trustHook } from './hooksSettingsActions';
+import { getRdcOverview, revokeHook, testHook, trustHook } from './hooksSettingsActions';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
 import { formFromContent } from './scopedResourceForm';
 
-type HookOverview = RdxRuntimeOverview['hooks'][number];
+type HookOverview = RdcRuntimeOverview['hooks'][number];
 type HookTrustState = 'trusted' | 'needs-retrust' | 'untrusted' | 'builtin';
 
 function hookTrustState(hook: HookOverview | undefined): HookTrustState {
@@ -37,10 +37,10 @@ function HookTrustBadge({ state }: { state: HookTrustState }) {
  * block. Editing happens in the shared task dialog (H02); trust never bypasses policy.
  */
 export const HooksSettings: React.FC<{
-  overview: RdxRuntimeOverview | null;
+  overview: RdcRuntimeOverview | null;
   scope: 'user' | 'project';
   onScopeChange: (scope: 'user' | 'project') => void;
-  onChanged: (overview: RdxRuntimeOverview) => void;
+  onChanged: (overview: RdcRuntimeOverview) => void;
 }> = ({ overview, scope, onScopeChange, onChanged }) => {
   const { t } = useI18n();
   const [busyId, setBusyId] = useState('');
@@ -70,7 +70,7 @@ export const HooksSettings: React.FC<{
       if (!next) return;
       onChanged(
         trustProjectRoot == null && overview?.projectRoot
-          ? (await getRdxOverview(overview.projectRoot)) ?? next
+          ? (await getRdcOverview(overview.projectRoot)) ?? next
           : next,
       );
     } catch (error) {

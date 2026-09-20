@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../sessions', () => ({
-  rdxSessionService: { snapshotOpenedCaptureForSession: vi.fn(() => null) },
+  rdcSessionService: { snapshotOpenedCaptureForSession: vi.fn(() => null) },
 }));
 
 vi.mock('../sessions/StorageAdapter', () => ({
@@ -34,7 +34,7 @@ vi.mock('../agent-trace/TraceService', () => ({
 import { conversationService } from './ConversationService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
-import { beginRdxLifecycle, getRdxInteractionLock } from '../sessions/RdxOperationCoordinator';
+import { beginRdcLifecycle, getRdcInteractionLock } from '../sessions/RdcOperationCoordinator';
 
 type IdempotentService = {
   runIdempotentTurn: (
@@ -54,15 +54,15 @@ type IdempotentService = {
 describe('ConversationService idempotency scoping', () => {
   it('rejects preparation during a pending capture lifecycle without reserving the send scope', async () => {
     const service = conversationService as unknown as IdempotentService;
-    const release = beginRdxLifecycle('session-lifecycle');
+    const release = beginRdcLifecycle('session-lifecycle');
     const operation = vi.fn();
     try {
       await expect(service.runIdempotentTurn({ requestId: 'request-lifecycle', sessionId: 'session-lifecycle',
-        projectId: 'project-a', message: 'inspect' }, operation)).rejects.toThrow('RDX_REPLAY_BUSY');
+        projectId: 'project-a', message: 'inspect' }, operation)).rejects.toThrow('RDC_REPLAY_BUSY');
       expect(operation).not.toHaveBeenCalled();
       expect(service.activeSendScopes.size).toBe(0);
       expect(service.preparingRequests.size).toBe(0);
-      expect(getRdxInteractionLock('session-lifecycle')).toBeNull();
+      expect(getRdcInteractionLock('session-lifecycle')).toBeNull();
     } finally { release(); }
   });
   beforeEach(() => {

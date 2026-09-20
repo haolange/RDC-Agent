@@ -30,7 +30,7 @@ import {
   DEFAULT_LAYOUT,
   DEFAULT_PROFILE,
   DEFAULT_CODE_INTERPRETER,
-  DEFAULT_RDX_CLI_INVOKER,
+  DEFAULT_RDC_CLI_INVOKER,
   DEFAULT_SHELL_TOOLING,
   EMPTY_PATHS,
   LEFT_DEFAULTS,
@@ -150,7 +150,7 @@ export function createDefaultRuntimeSettings(): AppSettings {
     layout: DEFAULT_LAYOUT,
     profile: DEFAULT_PROFILE,
     tooling: {
-      rdxCli: DEFAULT_RDX_CLI_INVOKER,
+      rdcCli: DEFAULT_RDC_CLI_INVOKER,
       codeInterpreter: DEFAULT_CODE_INTERPRETER,
       shell: DEFAULT_SHELL_TOOLING,
     },
@@ -356,7 +356,7 @@ export function toRuntimeSettings(
   persisted: PersistedSettingsPayload,
   runtimePaths?: Partial<AppRuntimePaths>,
 ): AppSettings {
-  const workspaceRoot = appPathService.getUserRdxRoot();
+  const workspaceRoot = appPathService.getUserRdcRoot();
   const normalized = normalizePersistedSettings(persisted, workspaceRoot);
   const hydratedProviders = hydrateProviderSecrets(normalized.llm.providers, workspaceRoot);
   const paths = appPathService.getRuntimePaths();

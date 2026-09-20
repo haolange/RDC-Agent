@@ -62,7 +62,7 @@ describe('replayDeviceDiff', () => {
 });
 
 describe('AdbExecutableCache', () => {
-  const previousAdbPath = process.env.RDX_ANDROID_ADB_PATH;
+  const previousAdbPath = process.env.RDC_ANDROID_ADB_PATH;
   const previousPath = process.env.PATH;
   const previousAndroidHome = process.env.ANDROID_HOME;
   const previousAndroidSdkRoot = process.env.ANDROID_SDK_ROOT;
@@ -70,7 +70,7 @@ describe('AdbExecutableCache', () => {
   const previousLocalAppData = process.env.LOCALAPPDATA;
 
   beforeEach(() => {
-    delete process.env.RDX_ANDROID_ADB_PATH;
+    delete process.env.RDC_ANDROID_ADB_PATH;
     delete process.env.ADB;
     delete process.env.ANDROID_HOME;
     delete process.env.ANDROID_SDK_ROOT;
@@ -79,8 +79,8 @@ describe('AdbExecutableCache', () => {
   });
 
   afterEach(() => {
-    if (previousAdbPath === undefined) delete process.env.RDX_ANDROID_ADB_PATH;
-    else process.env.RDX_ANDROID_ADB_PATH = previousAdbPath;
+    if (previousAdbPath === undefined) delete process.env.RDC_ANDROID_ADB_PATH;
+    else process.env.RDC_ANDROID_ADB_PATH = previousAdbPath;
     if (previousAdb === undefined) delete process.env.ADB;
     else process.env.ADB = previousAdb;
     if (previousAndroidHome === undefined) delete process.env.ANDROID_HOME;
@@ -96,7 +96,7 @@ describe('AdbExecutableCache', () => {
 
   it('caches the resolved path and invalidates after access failure', async () => {
     const fakeAdb = path.join(path.sep === '\\' ? 'C:\\tools' : '/tools', 'adb.exe');
-    process.env.RDX_ANDROID_ADB_PATH = fakeAdb;
+    process.env.RDC_ANDROID_ADB_PATH = fakeAdb;
 
     const accessSpy = vi.spyOn(fs.promises, 'access')
       .mockResolvedValueOnce(undefined)

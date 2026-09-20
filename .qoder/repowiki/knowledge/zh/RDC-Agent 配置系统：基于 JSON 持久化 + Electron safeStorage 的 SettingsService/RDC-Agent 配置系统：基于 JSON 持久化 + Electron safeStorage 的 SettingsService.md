@@ -69,6 +69,6 @@ source_files:
 - **API key 变更触发 ref 轮换**：`SettingsService.setAll` 在 api-key 变化时生成新的 `authAccountIds['api-key']` 与新 `secretRef`，并把旧 ref 加入 `secretRefsToDelete` 在提交后删除。
 - **窗口布局写入走专用窄接口**：`persistWindowLayout` / `persistWindowLayoutAsync` 跳过 provider 归一化与 secret hydration，仅更新 `layout.window`，用于窗口关闭与 move/resize 防抖场景。
 - **Shell 可执行变更需刷新缓存**：修改 `tooling.shell.executable` 时会调用 `shellResolver.clearCache()`。
-- **Project `.rdx` 目录结构固定**：`project.yaml`、`.gitignore`、`agents/skills/mcp/hooks/policies/knowledge/memory/plans(inputs/artifacts/replay)` 等子目录由 `initializeProjectRdx` 自动创建，且 `.gitignore` 强制追加 `replay/` 与 `replay.lock`。
-- **环境变量覆盖**：`RDC_AGENT_USER_DATA` 覆盖应用数据根，`RDC_AGENT_HOME` 覆盖用户 RDX 根，便于测试与多实例隔离。
+- **Project `.rdc-agent` 目录结构固定**：`project.yaml`、`.gitignore`、`agents/skills/mcp/hooks/policies/knowledge/memory/plans(inputs/artifacts/replay)` 等子目录由 `initializeProjectRdc` 自动创建，且 `.gitignore` 强制追加 `replay/` 与 `replay.lock`。
+- **环境变量覆盖**：`RDC_AGENT_USER_DATA` 覆盖应用数据根，`RDC_AGENT_HOME` 覆盖用户 RDC 根，便于测试与多实例隔离。
 - **安全边界**：secret 文件仅在 Electron main 进程内访问；渲染进程只能通过 IPC 间接请求，且 `maskSecretPreview` 仅展示末尾 4 位掩码。

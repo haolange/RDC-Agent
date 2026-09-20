@@ -6,7 +6,7 @@
 import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdxRuntime';
+import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdcRuntime';
 import { generateEventId } from '@shared/utils/id';
 import { imageTokenAdjustmentForContent } from '../../conversation/ConversationAttachmentMaterializer';
 import {
@@ -43,7 +43,7 @@ export interface ProfileTurnPreparationInput {
   signal?: AbortSignal;
   /** When true, skip journal materialization (isolated child turns). */
   isolateContext?: boolean;
-  excludeRdxLeaseTools?: boolean;
+  excludeRdcLeaseTools?: boolean;
   frozenDelegationCapsule?: import('@shared/types/delegationCapsule').DelegationCapsule;
 }
 
@@ -121,7 +121,7 @@ export class ProfileTurnPreparation {
       visibleTurnIds: input.isolateContext ? [] : (input.visibleTurnIds ?? []),
       activeBranchId: input.activeBranchId ?? null,
       signal: input.signal,
-      excludeRdxLeaseTools: input.excludeRdxLeaseTools,
+      excludeRdcLeaseTools: input.excludeRdcLeaseTools,
       frozenDelegationCapsule: input.frozenDelegationCapsule,
     });
     return {

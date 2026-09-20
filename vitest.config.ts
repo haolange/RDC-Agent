@@ -41,8 +41,8 @@ export default defineConfig({
         'src/main/tools/**',
         'src/main/media/**',
         'src/main/captures/**',
-        // Electron/RDX session orchestration + OAuth/browser auth (browser QA / integration).
-        'src/main/sessions/RdxSessionService.ts',
+        // Electron/RDC session orchestration + OAuth/browser auth (browser QA / integration).
+        'src/main/sessions/RdcSessionService.ts',
         'src/main/sessions/RewindService.ts',
         'src/main/sessions/SessionBranchService.ts',
         'src/main/sessions/SessionResumeService.ts',

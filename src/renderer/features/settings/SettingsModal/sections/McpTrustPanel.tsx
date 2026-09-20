@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { RdxRuntimeOverview } from '@shared/types/rdxRuntime';
+import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 import { useI18n } from '../../../../i18n';
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
@@ -7,7 +7,7 @@ import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { revokeMcp, trustMcp } from './mcpTrustActions';
 
-type McpServerOverview = RdxRuntimeOverview['mcpServers'][number];
+type McpServerOverview = RdcRuntimeOverview['mcpServers'][number];
 
 export type McpTrustState = 'trusted' | 'needs-retrust' | 'untrusted' | 'override-rejected' | 'user';
 
@@ -38,9 +38,9 @@ export function McpTrustBadge({ state }: { state: McpTrustState }) {
  * current summary; there is no previous/current diff to compare against.
  */
 export const McpTrustPanel: React.FC<{
-  overview: RdxRuntimeOverview;
+  overview: RdcRuntimeOverview;
   server: McpServerOverview;
-  onChanged: (overview: RdxRuntimeOverview) => void;
+  onChanged: (overview: RdcRuntimeOverview) => void;
 }> = ({ overview, server, onChanged }) => {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);

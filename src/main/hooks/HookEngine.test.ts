@@ -7,7 +7,7 @@ import { HookEngine } from './HookEngine';
 
 const roots: string[] = [];
 const makeRoot = () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-hooks-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-hooks-'));
   roots.push(root);
   return root;
 };
@@ -22,7 +22,7 @@ describe('HookEngine', { timeout: 20_000 }, () => {
   it('requires content-hash trust for project hooks and revokes on change', async () => {
     const root = makeRoot();
     const project = path.join(root, 'project');
-    const hooks = path.join(project, '.rdx', 'hooks');
+    const hooks = path.join(project, '.rdc-agent', 'hooks');
     fs.mkdirSync(hooks, { recursive: true });
     const source = path.join(hooks, 'check.hook.yml');
     const definition = {
@@ -46,7 +46,7 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     const builtin = path.join(root, 'builtin');
     const userHooks = path.join(root, 'user');
     const project = path.join(root, 'project');
-    const projectHooks = path.join(project, '.rdx', 'hooks');
+    const projectHooks = path.join(project, '.rdc-agent', 'hooks');
     fs.mkdirSync(builtin, { recursive: true });
     fs.mkdirSync(userHooks, { recursive: true });
     fs.mkdirSync(projectHooks, { recursive: true });
@@ -114,12 +114,12 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     const builtin = path.join(repoRoot, 'resources', 'agent-runtime', 'hooks');
     const engine = new HookEngine(path.join(makeRoot(), 'trust.json'));
     const loaded = engine.load(path.join(makeRoot(), 'user-hooks'), undefined, builtin)
-      .filter((hook) => ['mission-plan-handoff-check', 'rdx-shell-audit', 'artifact-integrity', 'report-contract']
+      .filter((hook) => ['mission-plan-handoff-check', 'rdc-shell-audit', 'artifact-integrity', 'report-contract']
         .includes(hook.definition.id));
     expect(loaded.map((hook) => hook.definition.id).sort()).toEqual([
       'artifact-integrity',
       'mission-plan-handoff-check',
-      'rdx-shell-audit',
+      'rdc-shell-audit',
       'report-contract',
     ]);
     expect(loaded.every((hook) => hook.scope === 'builtin' && hook.trust.trusted)).toBe(true);
@@ -271,7 +271,7 @@ describe('HookEngine', { timeout: 20_000 }, () => {
       'process.exit(0);',
       '',
     ].join('\n');
-    for (const name of ['artifact-integrity.mjs', 'report-contract.mjs', 'rdx-shell-audit.mjs', 'mission-plan-handoff-check.mjs']) {
+    for (const name of ['artifact-integrity.mjs', 'report-contract.mjs', 'rdc-shell-audit.mjs', 'mission-plan-handoff-check.mjs']) {
       fs.writeFileSync(path.join(hijackDir, name), hijackSource);
       fs.writeFileSync(path.join(project, name), hijackSource);
     }
@@ -289,28 +289,28 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     expect(readyDenied.stderr).toMatch(/sourceRefs/);
   });
 
-  it('audits renderdoccmd with arguments and ignores Settings RDX action names', async () => {
+  it('audits renderdoccmd with arguments and ignores Settings RDC action names', async () => {
     const repoRoot = path.resolve(__dirname, '../../..');
     const builtin = path.join(repoRoot, 'resources', 'agent-runtime', 'hooks');
     const engine = new HookEngine(path.join(makeRoot(), 'trust.json'));
     engine.load(path.join(makeRoot(), 'user-hooks'), makeRoot(), builtin);
 
-    const hardcoded = await engine.test('rdx-shell-audit', {
+    const hardcoded = await engine.test('rdc-shell-audit', {
       event: 'tool.before-call',
       toolName: 'shell',
       payload: { toolName: 'shell', arguments: { command: 'renderdoccmd capture.rdc' } },
     });
     expect(hardcoded.status).toBe('failed');
     expect(hardcoded.allowed).toBe(true);
-    expect(hardcoded.stderr).toMatch(/hardcoded RenderDoc\/RDX CLI/);
+    expect(hardcoded.stderr).toMatch(/hardcoded RenderDoc\/RDC-Tool CLI/);
 
-    const configuredShellCall = await engine.test('rdx-shell-audit', {
+    const configuredShellCall = await engine.test('rdc-shell-audit', {
       event: 'tool.before-call',
       toolName: 'shell',
       payload: { toolName: 'shell', arguments: { command: 'rd.capture.open_file' } },
     });
     expect(configuredShellCall).toMatchObject({ status: 'completed', allowed: true });
-    expect(configuredShellCall.stdout).toMatch(/rdx-shell-audit: ok/);
+    expect(configuredShellCall.stdout).toMatch(/rdc-shell-audit: ok/);
   });
 
   it('does not keep AgentHooks or BackgroundTaskRunner as a second surface', () => {

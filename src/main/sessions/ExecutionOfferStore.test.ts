@@ -42,7 +42,7 @@ describe('ExecutionOfferStore', () => {
   }
 
   it('writes, reads, overwrites, and clears an offer', async () => {
-    roots.push(await mkdtemp(path.join(os.tmpdir(), 'rdx-execution-offer-')));
+    roots.push(await mkdtemp(path.join(os.tmpdir(), 'rdc-execution-offer-')));
     const store = createStore();
     store.write('sess', offer());
     expect(store.read('sess')?.targetAgentId).toBe('general');
@@ -54,7 +54,7 @@ describe('ExecutionOfferStore', () => {
   });
 
   it('unlinks removed handoff-state.json without parsing it', async () => {
-    roots.push(await mkdtemp(path.join(os.tmpdir(), 'rdx-execution-offer-')));
+    roots.push(await mkdtemp(path.join(os.tmpdir(), 'rdc-execution-offer-')));
     const stale = path.join(roots[0]!, REMOVED_HANDOFF_STATE_FILE);
     writeFileSync(stale, '{not-json');
     const store = createStore();

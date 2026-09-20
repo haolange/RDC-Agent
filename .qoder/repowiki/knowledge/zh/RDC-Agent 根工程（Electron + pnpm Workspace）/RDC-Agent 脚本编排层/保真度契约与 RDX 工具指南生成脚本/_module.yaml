@@ -1,9 +1,9 @@
 schema_version: 1
 module_path: scripts/fidelity_and_extraction
-title: 保真度契约与 RDX 工具指南生成脚本
+title: 保真度契约与 RDC 工具指南生成脚本
 scope:
     - scripts/extract-*.mjs
-    - scripts/generate-rdx-tool-guides.mjs
+    - scripts/generate-rdc-tool-guides.mjs
 source_files: []
 depends_on: []
 related_to:

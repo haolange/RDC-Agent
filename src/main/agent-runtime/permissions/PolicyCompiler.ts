@@ -6,7 +6,7 @@ import type {
   CompiledPolicy,
   PolicyApprovalFloor,
   RestrictivePolicy,
-} from '@shared/types/rdxRuntime';
+} from '@shared/types/rdcRuntime';
 import { appPathService } from '../../runtime/AppPathService';
 import { hashScopedResource, scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
 
@@ -199,9 +199,9 @@ export function resolvePolicyApprovalFloor(
  * 任一文件损坏 / 非法 → throw POLICY_INVALID（fail-closed）。
  */
 export function compileEffectivePolicy(projectRoot?: string | null): CompiledPolicy {
-  const userPolicies = loadPolicyDirectory(appPathService.getUserRdxPaths().policiesPath);
+  const userPolicies = loadPolicyDirectory(appPathService.getUserRdcPaths().policiesPath);
   const projectPolicies = projectRoot
-    ? loadPolicyDirectory(appPathService.getProjectRdxPaths(projectRoot).policiesPath)
+    ? loadPolicyDirectory(appPathService.getProjectRdcPaths(projectRoot).policiesPath)
     : [];
   const merged = mergePolicies([...userPolicies, ...projectPolicies]);
   const fingerprint = createHash('sha256')

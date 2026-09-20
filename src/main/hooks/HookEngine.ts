@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
-import type { HookDefinition, HookEvent, HookTrustState, ScopedResourceCandidate } from '@shared/types/rdxRuntime';
+import type { HookDefinition, HookEvent, HookTrustState, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
 import { processSupervisor } from '../runtime/ProcessSupervisor';
@@ -96,7 +96,7 @@ export class HookEngine {
     };
     addDirectory(builtinHooksPath, 'builtin');
     addDirectory(userHooksPath, 'user');
-    if (projectRoot) addDirectory(appPathService.getProjectRdxPaths(projectRoot).hooksPath, 'project');
+    if (projectRoot) addDirectory(appPathService.getProjectRdcPaths(projectRoot).hooksPath, 'project');
 
     const trustStore = this.readTrustStore();
     this.loaded = scopedResourceResolver.resolve(candidates).resources.map((resource) => {

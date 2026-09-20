@@ -46,7 +46,7 @@ const gptSummaryTrace: ConversationWorkTrace = {
       toolName: 'glob',
       status: 'complete',
       argsPreview: JSON.stringify({ pattern: '*' }),
-      resultPreview: JSON.stringify({ files: ['.rdx/.gitignore'] }),
+      resultPreview: JSON.stringify({ files: ['.rdc-agent/.gitignore'] }),
       startedAt: now + 200,
       completedAt: now + 356,
     }],

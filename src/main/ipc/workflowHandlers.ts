@@ -2,7 +2,7 @@ import { ipcMain } from 'electron';
 import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
 import type { RunContextUsageReadResult, RunSummary } from '@shared/types/session';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { rdxSessionService } from '../sessions';
+import { rdcSessionService } from '../sessions';
 import { runExecutionService } from '../workflow/debugger/RunExecutionService';
 import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
 import type { WorkbenchIpcContext } from './workbenchContext';
@@ -67,11 +67,11 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
         const scope = { projectId: session.projectId, sessionId: session.sessionId };
         context.broadcastToRenderer('capture:openedStateChanged', {
           ...scope,
-          payload: rdxSessionService.snapshotOpenedCaptureForSession(scope),
+          payload: rdcSessionService.snapshotOpenedCaptureForSession(scope),
         });
         context.broadcastToRenderer('context:changed', {
           ...scope,
-          payload: rdxSessionService.snapshotContextForSession(scope),
+          payload: rdcSessionService.snapshotContextForSession(scope),
         });
         traceProjectionRefreshService.schedule(session.sessionId);
       }

@@ -75,7 +75,7 @@ it('isolates Scout and Skeptic provider inputs, preserves evidence, and lets Mis
   const harness = createInvestigationHarness('rdc-exploration-provider-');
   const { resolver, service } = harness;
   const profiles = ['general', 'debugger'].map((id) => ({ id, enabled: true, instructions: `Identity ${id}`, skills: [], tools: [], agents: ['general'], handoffs: [], metadata: {}, models: [], mcpServers: [], filePath: `fixture/${id}.agent.md`, name: id, description: id } as unknown as AgentManifestDefinition));
-  vi.spyOn(settingsService, 'getAll').mockReturnValue({ paths: { userRdxRoot: harness.sessionPath }, llm: { providers: [], agentRoutes: [] } } as never);
+  vi.spyOn(settingsService, 'getAll').mockReturnValue({ paths: { userRdcRoot: harness.sessionPath }, llm: { providers: [], agentRoutes: [] } } as never);
   vi.spyOn(agentManifestService, 'getEffectiveProfiles').mockReturnValue(profiles as never);
   vi.spyOn(sessionArtifactResolver, 'read').mockImplementation(resolver.read.bind(resolver));
   vi.spyOn(sessionArtifactResolver, 'write').mockImplementation(resolver.write.bind(resolver));

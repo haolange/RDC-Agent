@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RequestEnvelopeBuilder } from './RequestEnvelopeBuilder';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import type { PromptPlan } from '@shared/types/rdxRuntime';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 
 describe('RequestEnvelopeBuilder', () => {
   it('redacts credentials, image payloads, and opaque reasoning while retaining request structure', () => {

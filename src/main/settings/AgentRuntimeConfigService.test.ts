@@ -17,10 +17,10 @@ describe('AgentRuntimeConfigService scoped resources', () => {
   let previousUserData: string | undefined;
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-runtime-config-'));
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-runtime-config-'));
     previousHome = process.env.RDC_AGENT_HOME;
     previousUserData = process.env.RDC_AGENT_USER_DATA;
-    process.env.RDC_AGENT_HOME = path.join(root, 'user', '.rdx');
+    process.env.RDC_AGENT_HOME = path.join(root, 'user', '.rdc-agent');
     process.env.RDC_AGENT_USER_DATA = path.join(root, 'app-data');
     electronMock.userDataRoot = process.env.RDC_AGENT_USER_DATA;
     electronMock.appRoot = process.cwd();
@@ -37,7 +37,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
 
   it('loads standard directory skills and applies project whole-resource precedence', async () => {
     const project = path.join(root, 'project');
-    const skillDir = path.join(project, '.rdx', 'skills', 'debug');
+    const skillDir = path.join(project, '.rdc-agent', 'skills', 'debug');
     fs.mkdirSync(skillDir, { recursive: true });
     fs.writeFileSync(path.join(skillDir, 'SKILL.md'), [
       '---',
@@ -69,7 +69,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
   it('rejects same-id project MCP executable overrides of user command/args/url/env', async () => {
     const userMcp = path.join(process.env.RDC_AGENT_HOME!, 'mcp');
     const project = path.join(root, 'project');
-    const projectMcp = path.join(project, '.rdx', 'mcp');
+    const projectMcp = path.join(project, '.rdc-agent', 'mcp');
     fs.mkdirSync(userMcp, { recursive: true });
     fs.mkdirSync(projectMcp, { recursive: true });
     fs.writeFileSync(path.join(userMcp, 'docs.mcp.json'), JSON.stringify({ id: 'docs', name: 'User Docs', description: '', transport: 'stdio', command: 'user', enabledByDefault: true }));
@@ -91,7 +91,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
 
   it('marks project-only MCP as needing trust before connect', async () => {
     const project = path.join(root, 'project');
-    const projectMcp = path.join(project, '.rdx', 'mcp');
+    const projectMcp = path.join(project, '.rdc-agent', 'mcp');
     fs.mkdirSync(projectMcp, { recursive: true });
     fs.writeFileSync(path.join(projectMcp, 'local.mcp.json'), JSON.stringify({
       id: 'local',
@@ -185,11 +185,11 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     ))).toBe(false);
   });
 
-  it('hides General-only RDX manuals from Mission catalog and skill_read viewers', async () => {
+  it('hides General-only RDC manuals from Mission catalog and skill_read viewers', async () => {
     const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
     const { isSkillVisibleToProfile } = await import('@shared/constants/canonicalSkills');
     const service = new AgentRuntimeConfigService();
-    const generalOnly = ['rdx-cli-shell', 'debugger-rdx-tools', 'analyzer-rdx-tools', 'optimizer-rdx-tools'];
+    const generalOnly = ['rdc-tool-shell', 'debugger-rdc-tools', 'analyzer-rdc-tools', 'optimizer-rdc-tools'];
     for (const mission of ['debugger', 'analyzer', 'optimizer'] as const) {
       for (const skillId of generalOnly) {
         expect(isSkillVisibleToProfile(mission, skillId)).toBe(false);
