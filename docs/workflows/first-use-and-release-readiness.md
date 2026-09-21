@@ -6,10 +6,14 @@
 
 | Task | 状态 | 范围与通过条件 |
 | --- | --- | --- |
-| RC3-1 源码与版本 | 执行中 | 共享控件、Settings资源编辑与技能候选、用户菜单、Agent列表；版本及中英README一致；提交并非强制推送 |
-| RC3-2 发行包 | 待执行 | 最新源码build、NSIS/zip、包内容校验、SBOM与SHA256 |
+| RC3-1 源码与版本 | 通过 | `e62ef83b` 已非强制推送 main；HEAD、origin/main、直接远端 SHA 一致；版本及中英README同步 |
+| RC3-2 发行包 | 通过 | rc.3 NSIS/zip、52资源与包清洁校验、SBOM 1106 components、SHA256及打包服务启动 smoke 通过；安装向导未实测 |
 | RC3-3 GitHub预发布 | 阻塞 | GitHub CLI尚未标准登录；需用户完成 `gh auth login`，再创建新tag/预发布并上传、核对资产 |
-| RC3-4 收尾 | 待执行 | 仅清理自有过期中间产物，保留可用Browser与发行资产；核对Git三方SHA和桌面锁 |
+| RC3-4 收尾 | 通过 | 删除本轮 win-unpacked 和 builder-debug.yml；保留7项发行资产、现有QA用户副本与必要视觉证据，5127服务可达；自有smoke退出，canonical桌面锁不存在 |
+
+发行候选对应源码 `e62ef83b711af6bc9ce9799bea7a8f640e5f7c0c`：安装包 SHA256 `1f9efbb2b524ca3190bbd2c1290a8fe68a428ac9ff8b563e80376a934cc0c539`，ZIP SHA256 `285fd086496c78d6e1cf13f90737955f8f12bb6846a8bf9463fedf49bba7302f`。NSIS明确为NotSigned；ZIP内asar与通过验证的smoke产物一致。桌面smoke仅证明服务初始化，仍输出Electron meta CSP frame-ancestors及依赖fs.Stats弃用警告，不代表控制台无警告、安装向导或原生IME通过。
+
+收口时源码 [CI 35629602214](https://github.com/haolange/RDC-Agent/actions/runs/35629602214) 为 in_progress，不等同全绿。rc.3 tag和GitHub Release尚未创建；rc.1、rc.2各7项资产未改动。公开上传必须在用户标准GitHub CLI登录后继续，不能用SSH推送成功代替Release API认证。
 
 验收边界沿用 `acceptance-ledger.md` 的 UI-CONTROL-SETTINGS / AGENT-LIST-USER-MENU / AGENT-LIST-VISUAL：最后增量独立renderer115文件474测试、type/lint/专项/build及真实Browser通过；提交前main技能投影2文件24测试、仓库卫生和台账检查通过。原生中文IME需人工输入法补验，历史Knowledge聚合门禁受本机权限限制，均不以局部通过覆盖。GitHub CI为异步运行，发布时记录实际状态，不预称全绿。
 

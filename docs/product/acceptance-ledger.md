@@ -1,5 +1,11 @@
 # Acceptance Ledger
 
+2026-09-22 RC3-CANDIDATE：用户追加授权提交、推送和 `0.6.0-rc.3` 未签名预发布。三轮UI成果已进入 `e62ef83b711af6bc9ce9799bea7a8f640e5f7c0c` 并推送main，以下历史“未提交”仅描述当时证据基线。最终renderer bundle仍为 `index-BWE38meJ.js`。
+
+- 本地发行通过：production build、显式prerelease配置门禁、NSIS/ZIP、52资源包内容校验、1106组件SBOM与校验和；ZIP内asar与已验证产物相同。打包应用服务初始化smoke通过且自有进程退出；安装向导和原生IME未实测。启动仍有meta CSP frame-ancestors及fs.Stats弃用警告，不声称无警告。
+- 发布阻塞：GitHub CLI尚未标准登录，rc.3 tag及Release未创建；rc.1/rc.2不变。源码CI最后快照in_progress，不以局部检查覆盖云端全量检查及既有Knowledge边界。完整状态与产物散列见 `../workflows/first-use-and-release-readiness.md`。
+- 收尾：本轮win-unpacked及builder-debug已清理，7项必要发行文件保留以继续上传；原QA服务5127可达，隔离数据与必要截图保留。canonical桌面锁不存在，桌面启动权已交还（锁检查）。
+
 2026-09-22 AGENT-LIST-VISUAL：本轮设置Agent行视觉比例收敛 verified，基于未提交工作区，production bundle `index-BWE38meJ.js`。上一轮等高证据保留，但不作为本轮视觉比例通过依据。
 
 - 实现：feature内AgentListItem组合共享ListRow/OverflowFade/ModeGlyph；18px图形、28px透明图标列、独立实色细边框行、4px行距，名称中等字重及说明两行排版。ListRow展示变量使上下8px留白不再被加载顺序覆盖，其他调用方默认值不变；旧底座与重复选择器无残留，无IPC/存储/权限变更。
