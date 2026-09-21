@@ -1,8 +1,10 @@
 # Acceptance Ledger
 
-2026-09-21 CI-CROSS-HOST-PORTABILITY：verified。`85a2da92` 修复 Shell/shell trailer/RDC CLI 的跨宿主路径契约与测试临时根 canonicalization，`a4d6b5aa` 修复 macOS Electron 测试并发提取竞争及 desktop smoke 的 Windows 临时目录清理竞态。GitHub [CI run 35566584898](https://github.com/haolange/RDC-Agent/actions/runs/35566584898) 的 Linux build、macOS runtime/primitives、browser smoke、desktop smoke、launcher checks 及全部 job 均 success。`v0.6.0-rc.1` 未移动；rc.2 候选已通过包内版本/入口/资源/开发文件清洁检查，NSIS 与 zip 明确未签名，最终 tag/release 待本收口文档提交后的 HEAD。
+2026-09-21 CI-CROSS-HOST-PORTABILITY：verified。`85a2da92` 修复 Shell/shell trailer/RDC CLI 的跨宿主路径契约与测试临时根 canonicalization，`a4d6b5aa` 修复 macOS Electron 测试并发提取竞争及 desktop smoke 的 Windows 临时目录清理竞态。GitHub [CI run 35567724271](https://github.com/haolange/RDC-Agent/actions/runs/35567724271) 的 Linux build、macOS runtime/primitives、browser smoke、desktop smoke、launcher checks 及全部 job 均 success。`v0.6.0-rc.1` 未移动；`v0.6.0-rc.2` 已按最终全绿 HEAD `70254a76` 创建并发布为未签名预发布。
 
 2026-09-21 RC2-PACKAGE-CANDIDATE：verified on local Windows candidate. NSIS `3ec8ae5e3246c2f1f79ff62b1e6c639b4af87be3219f1031155f14dd434bdc10`；zip `cb200d7630ffdfde50131be313b4d3ca818b70b17cfb00e1f2b37441c699a8f9`；blockmap `ea692a63672d13e4969e632a9735a7e990ed40894663497f8b2dddaab6a7186e`；SBOM `1770d95c48dcd9fdd287c9cbc7fe92c716546c1d25906cfe7e0ea9ec8f212fbc`。`verify-package.mjs` 通过，52 个 builtin/runtime resource 与四张教程图字节一致；release 资产为未签名预发布，正式签名门禁保留。
+
+2026-09-21 RC2-RELEASE：verified。GitHub [v0.6.0-rc.2](https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.2) 为 prerelease，7 项远端资产 digest 与本地候选一致；`v0.6.0-rc.1` 未覆盖。tag 指向 `70254a76`，SBOM provenance 记录实际应用构建提交 `a4d6b5aa`；后续仅为文档台账收口，不改变发行包内容。
 
 2026-09-20 RELEASE-PUBLISHED：Agent `v0.6.0-rc.1`（构建提交392c71f16a327d71084196b9e343b6ee9f739bf4）已作为明确未签名的GitHub预发布公开；Tools `v1.0.1`（04295e47cd87727f109f863980aa5b2cfbef2647）正式发布，v1.0.0未覆盖。9个服务器端资产digest逐项等于本地SHA256；Agent zip内asar等于已验unpacked，52 builtin与四张教程PNG字节一致，NSIS NotSigned符合本次授权。发行门禁5个正负例、安装/引导相关16项、typecheck/lint/check:gates通过；Tools 37测试+2subtests、实际zip/doctor/catalog和文档/identity通过。Tools CI已绿，Agent CI在发布回执时仍运行；历史真实链路沿用，不新增声称NSIS交互安装/独立干净机/LLM矩阵通过。地址、散列、CI链接及清理见docs/workflows/first-use-and-release-readiness.md P1–P3。本回执提交不移动发行tag。
 
