@@ -8,12 +8,12 @@
 | --- | --- | --- |
 | RC3-1 源码与版本 | 通过 | `e62ef83b` 已非强制推送 main；HEAD、origin/main、直接远端 SHA 一致；版本及中英README同步 |
 | RC3-2 发行包 | 通过 | rc.3 NSIS/zip、52资源与包清洁校验、SBOM 1106 components、SHA256及打包服务启动 smoke 通过；安装向导未实测 |
-| RC3-3 GitHub预发布 | 阻塞 | GitHub CLI尚未标准登录；需用户完成 `gh auth login`，再创建新tag/预发布并上传、核对资产 |
+| RC3-3 GitHub预发布 | 通过 | 用户完成标准登录后发布v0.6.0-rc.3，7项远端资产digest与本地SHA256全部一致；draft=false、prerelease=true，tag指向实际构建提交e62ef83b |
 | RC3-4 收尾 | 通过 | 删除本轮 win-unpacked 和 builder-debug.yml；保留7项发行资产、现有QA用户副本与必要视觉证据，5127服务可达；自有smoke退出，canonical桌面锁不存在 |
 
 发行候选对应源码 `e62ef83b711af6bc9ce9799bea7a8f640e5f7c0c`：安装包 SHA256 `1f9efbb2b524ca3190bbd2c1290a8fe68a428ac9ff8b563e80376a934cc0c539`，ZIP SHA256 `285fd086496c78d6e1cf13f90737955f8f12bb6846a8bf9463fedf49bba7302f`。NSIS明确为NotSigned；ZIP内asar与通过验证的smoke产物一致。桌面smoke仅证明服务初始化，仍输出Electron meta CSP frame-ancestors及依赖fs.Stats弃用警告，不代表控制台无警告、安装向导或原生IME通过。
 
-收口时源码 [CI 35629602214](https://github.com/haolange/RDC-Agent/actions/runs/35629602214) 为 in_progress，不等同全绿。rc.3 tag和GitHub Release尚未创建；rc.1、rc.2各7项资产未改动。公开上传必须在用户标准GitHub CLI登录后继续，不能用SSH推送成功代替Release API认证。
+首次收口时GitHub CLI认证阻塞、源码CI尚在运行；用户完成标准登录后，重新核实源码 [CI 35629602214](https://github.com/haolange/RDC-Agent/actions/runs/35629602214) 已completed/success。随后发布 [RDC-Agent v0.6.0-rc.3](https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.3)：先上传草稿并核对7项资产digest，再公开为未签名预发布（非latest），远端tag指向 `e62ef83b711af6bc9ce9799bea7a8f640e5f7c0c`。rc.1、rc.2各7项资产未改动。后续文档回执不移动tag，不改变已验证发行包；临时发布说明在上传后删除，正式说明保留于GitHub Release。
 
 验收边界沿用 `acceptance-ledger.md` 的 UI-CONTROL-SETTINGS / AGENT-LIST-USER-MENU / AGENT-LIST-VISUAL：最后增量独立renderer115文件474测试、type/lint/专项/build及真实Browser通过；提交前main技能投影2文件24测试、仓库卫生和台账检查通过。原生中文IME需人工输入法补验，历史Knowledge聚合门禁受本机权限限制，均不以局部通过覆盖。GitHub CI为异步运行，发布时记录实际状态，不预称全绿。
 
