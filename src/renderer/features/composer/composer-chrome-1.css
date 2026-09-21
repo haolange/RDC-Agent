@@ -40,8 +40,7 @@
   padding: var(--space-0-5) var(--space-0-5) 0;
 }
 
-/* Plain textarea and Markdown surface share one geometry contract (72–180). */
-.composer-input-row > .composer-textarea,
+/* CodeMirror retains its dedicated document geometry. */
 .composer-input-row > .composer-markdown-input {
   flex: 1 1 auto;
   min-width: 0;
@@ -88,8 +87,8 @@
 
 .composer-textarea {
   width: 100%;
-  min-height: 72px;
-  max-height: 180px;
+  flex: 1 1 auto;
+  min-width: 0;
   padding: var(--space-1) 0 var(--space-2);
   resize: none;
   line-height: 1.55;

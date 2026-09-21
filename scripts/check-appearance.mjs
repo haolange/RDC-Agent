@@ -262,29 +262,29 @@ assert(
 );
 assert(colorFieldSource.includes('useDynStyle') || colorFieldSource.includes('assignDynStyle'), 'ColorField must use constructable dyn styles');
 
-const dropdownTypes = scriptRead('src/renderer/ui/DropdownSelect/types.ts');
-assert(dropdownTypes.includes('swatchColor'), 'DropdownOption must support swatchColor');
-assert(dropdownTypes.includes('menuAlign'), 'DropdownSelect must support menuAlign');
+const dropdownTypes = scriptRead('src/renderer/ui/Select/types.ts');
+assert(dropdownTypes.includes('swatchColor'), 'SelectOption must support swatchColor');
+assert(dropdownTypes.includes('menuAlign'), 'Select must support menuAlign');
 
-const dropdownCss = scriptRead('src/renderer/ui/DropdownSelect/DropdownSelect.css');
-const dropdownPrimitives = scriptRead('src/renderer/ui/DropdownSelect/DropdownSelectPrimitives.tsx');
+const dropdownCss = scriptRead('src/renderer/ui/Select/Select.css');
+const dropdownPrimitives = scriptRead('src/renderer/ui/Select/SelectPrimitives.tsx');
 assert(
   !/backdrop-filter:\s*blur|-webkit-backdrop-filter:\s*blur/.test(dropdownCss),
-  'DropdownSelect must not use backdrop blur (restrained chrome uses solid surfaces)',
+  'Select must not use backdrop blur (restrained chrome uses solid surfaces)',
 );
 assert(
   /\.dropdown-select-menu\s*\{[^}]*background:\s*var\(--token-bg-shell\)/s.test(dropdownCss),
-  'DropdownSelect menu must use a solid shell surface',
+  'Select menu must use a solid shell surface',
 );
 assert(
   dropdownCss.includes('dropdown-select-menu-caret'),
-  'DropdownSelect menu must include a caret tip bridging the trigger',
+  'Select menu must include a caret tip bridging the trigger',
 );
 assert(
   dropdownPrimitives.includes('dropdown-select-menu-caret'),
-  'DropdownSelect menu markup must render the caret tip',
+  'Select menu markup must render the caret tip',
 );
-assert(dropdownPrimitives.includes('dropdown-select-option-check-icon'), 'DropdownSelect selected state must use a checkmark icon');
-assert(!dropdownPrimitives.includes('●'), 'DropdownSelect must not use a bullet as the selected marker');
+assert(dropdownPrimitives.includes('dropdown-select-option-check-icon'), 'Select selected state must use a checkmark icon');
+assert(!dropdownPrimitives.includes('●'), 'Select must not use a bullet as the selected marker');
 
 console.log('check:appearance passed');

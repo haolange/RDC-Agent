@@ -147,9 +147,6 @@ export function useComposer(options: {
   });
 
   useComposerDomEffects({
-    promptInputRef,
-    currentMode,
-    promptValue,
     selectedAgentId,
     userInvocableAgents,
     setSelectedAgentId,

@@ -120,14 +120,6 @@ export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormStat
   return form.body;
 };
 
-/** Reads `description:` out of a SKILL.md frontmatter block; empty when there is no frontmatter. */
-export const skillFrontmatterDescription = (content: string): string => {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content);
-  if (!match) return '';
-  const line = match[1].split(/\r?\n/).find((entry) => entry.startsWith('description:'));
-  return line ? line.slice('description:'.length).trim().replace(/^["']|["']$/g, '') : '';
-};
-
 export const resourceCardMeta = (kind: ScopedResourceKind, content: string): string => {
   if (kind === 'mcp') {
     try {
@@ -138,9 +130,6 @@ export const resourceCardMeta = (kind: ScopedResourceKind, content: string): str
   if (kind === 'hook') {
     const event = content.split(/\r?\n/).find((line) => line.startsWith('event:'));
     return event ? event.slice(6).trim() : '';
-  }
-  if (kind === 'skill') {
-    return skillFrontmatterDescription(content);
   }
   return '';
 };

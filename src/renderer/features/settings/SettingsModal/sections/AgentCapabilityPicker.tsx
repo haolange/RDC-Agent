@@ -6,6 +6,7 @@ import { Button } from '../../../../ui/Button';
 import { CheckPill } from '../../../../ui/CheckPill';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { Input } from '../../../../ui/Input';
+import { AgentSkillPicker, type AgentSkillCatalog } from './AgentSkillPicker';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -78,7 +79,7 @@ export const buildAgentCapabilityGroups = (
       id: 'skills',
       label: t('settings.skills'),
       values: selectedAgent.skills,
-      options: uniqueOptions(allAgents.flatMap((agent) => agent.skills), selectedAgent.skills),
+      options: [],
       onChange: (skills) => onUpdateAgent({ skills }),
     },
     {
@@ -102,6 +103,8 @@ export interface AgentCapabilityGroup {
 }
 
 interface AgentCapabilityPickerProps {
+  skills: AgentSkillCatalog;
+  targetAgentId: string;
   groups: AgentCapabilityGroup[];
   t: Translate;
 }
@@ -121,7 +124,7 @@ function partition(group: AgentCapabilityGroup, options: string[]): Array<{ id: 
   return buckets.filter((bucket) => bucket.options.length > 0);
 }
 
-export const AgentCapabilityPicker: React.FC<AgentCapabilityPickerProps> = ({ groups, t }) => {
+export const AgentCapabilityPicker: React.FC<AgentCapabilityPickerProps> = ({ groups, skills, targetAgentId, t }) => {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   const setDraft = (groupId: string, value: string) => {
@@ -149,6 +152,9 @@ export const AgentCapabilityPicker: React.FC<AgentCapabilityPickerProps> = ({ gr
     <div className="settings-capability-picker">
       <p className="settings-capability-note">{t('settings.agentCapabilityNotGrantHint')}</p>
       {groups.map((group) => {
+        if (group.id === 'skills') return <section key={group.id} className="settings-capability-group">
+          <AgentSkillPicker skills={skills} targetAgentId={targetAgentId} value={group.values} onChange={group.onChange} t={t} />
+        </section>;
         const options = uniqueCapabilities([...group.options, ...group.values]);
         return (
           <section key={group.id} className="settings-capability-group">

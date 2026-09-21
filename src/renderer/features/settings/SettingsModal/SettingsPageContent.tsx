@@ -26,11 +26,10 @@ interface SettingsPageContentProps {
   runtime: Pick<ReturnType<typeof useRdcRuntimeOverview>, 'overview' | 'setOverview'>;
   resourceScope: 'user' | 'project';
   setResourceScope: (scope: 'user' | 'project') => void;
-  onOpenResourceDiagnostics: () => void;
   setResourceDraftDirty: (dirty: boolean) => void;
 }
 export function SettingsPageContent({ modal, settings, runtime, resourceScope, setResourceScope,
-  onOpenResourceDiagnostics, setResourceDraftDirty }: SettingsPageContentProps) {
+  setResourceDraftDirty }: SettingsPageContentProps) {
   const {
     activeSection,
     t,
@@ -82,7 +81,6 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
         globalInstructionsDraft={globalInstructionsDraft}
         onGlobalInstructionsDraftChange={setGlobalInstructionsDraft}
         onSavePersonalization={handleSavePersonalization}
-        onOpenResourceDiagnostics={onOpenResourceDiagnostics}
         t={t}
       />
     )}

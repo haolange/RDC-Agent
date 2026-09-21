@@ -111,10 +111,9 @@
 }
 
 .settings-resource-empty.ui-empty-state {
-  align-items: flex-start;
-  text-align: start;
-  padding: var(--space-6) 0 0;
-  min-height: 0;
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-raised);
 }
 
 .settings-resource-split {
@@ -130,6 +129,7 @@
   flex-direction: column;
   gap: var(--space-1);
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
   padding-inline-end: var(--space-1);
   border-inline-end: 1px solid var(--token-border-muted);
@@ -157,6 +157,11 @@
 @container settings-panel (max-width: 60rem) {
   .settings-resource-split {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .settings-resource-split.is-detail-only {
+    grid-template-rows: minmax(0, 1fr);
   }
 
   .settings-resource-list-column {
@@ -189,25 +194,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-}
-
-.settings-choice-group .user-menu-pill {
-  width: auto;
-  min-width: 4.5rem;
-  flex: 0 0 auto;
-  justify-content: center;
-}
-
-.settings-empty {
-  font-size: var(--text-sm);
-  color: var(--token-text-caption);
-  padding: var(--space-3);
-}
-
-.settings-empty-dashed {
-  border: 1px dashed var(--token-border-muted);
-  border-radius: var(--radius-md);
-  text-align: center;
 }
 
 .settings-select-menu {
@@ -260,9 +246,10 @@
 
 .settings-scope-row {
   --ui-list-row-white-space: normal;
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
 }
 
-.settings-manifest-row-copy,
 .settings-scope-row-copy {
   display: flex;
   flex-direction: column;
@@ -270,7 +257,6 @@
   min-width: 0;
 }
 
-.settings-manifest-row-copy small,
 .settings-scope-row-copy small {
   color: var(--token-text-caption);
   font-size: var(--text-xs);

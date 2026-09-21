@@ -114,7 +114,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const blockSubmit = (draft: AgentManifestDraft) => {
     const issues = validateAgentHandoffs(draft.handoffs, {
       selfId: draft.id,
-      definitions: modalState.agentManifestDrafts.filter((entry) => !entry.delete),
+      definitions: modalState.agentManifestAutosaveDrafts.filter((entry) => !entry.delete),
       modelOptions: settings.agents.modelOptions,
     });
     return issues.length === 0 ? null : t('settings.agentHandoffBlocked', { count: issues.length });
@@ -137,9 +137,9 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     blockProjectedSubmit,
   });
   useAgentManifestAutosave({
-    open,
+    open: open && modalState.agentManifestContextReady,
     settings,
-    agentManifestDrafts: modalState.agentManifestDrafts,
+    agentManifestDrafts: modalState.agentManifestAutosaveDrafts,
     currentProjectId,
     onSave: actions.handleSaveAgentManifests,
     onRollback: (failedDrafts, savedDrafts) => {

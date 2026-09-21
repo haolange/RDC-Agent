@@ -4,7 +4,7 @@ import type { useI18n } from '../../../../i18n';
 import { Checkbox } from '../../../../ui/Checkbox';
 import { Input } from '../../../../ui/Input';
 import { Switch } from '../../../../ui/Switch';
-import { AutosizeTextarea } from '../AutosizeTextarea';
+import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
 import { envToText, splitArgs, textToEnv } from './toolEnvText';
 
@@ -71,9 +71,8 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
           />
         </SettingsField>
         <SettingsField label={t('settings.codeInterpreterEnv')} description={t('settings.envLineHint')}>
-          <AutosizeTextarea
-            maxHeight={140}
-            className="input"
+          <Textarea
+            aria-label={t('settings.codeInterpreterEnv')}
             data-testid="settings-code-interpreter-env"
             value={envText}
             placeholder="NAME=value"

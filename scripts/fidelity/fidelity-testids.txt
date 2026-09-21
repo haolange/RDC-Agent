@@ -73,7 +73,6 @@ knowledge-center-create-candidate
 knowledge-center-detail
 knowledge-center-detail-column
 knowledge-center-empty-detail
-knowledge-center-empty-import
 knowledge-center-empty-list
 knowledge-center-error
 knowledge-center-explicit-confirm
@@ -202,7 +201,6 @@ settings-model-option-custom-${option.canonicalId}
 settings-model-option-inherit
 settings-nav-${section.id}
 settings-nav-search
-settings-open-resource-diagnostics
 settings-policy-tighten-note
 settings-provider-app-managed-models
 settings-provider-auth-mode-${mode}
@@ -264,7 +262,6 @@ settings-provider-upcoming
 settings-provider-user-managed-models
 settings-rdc-enabled
 settings-rdc-toolchain
-settings-resource-diagnostics
 settings-resource-dialog
 settings-resource-dialog-status
 settings-resource-id-locked

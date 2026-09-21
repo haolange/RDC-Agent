@@ -21,6 +21,8 @@ export interface TabsProps {
   label?: string;
   /** `segmented` renders a compact single-select control instead of page tabs. */
   variant?: TabsVariant;
+  /** Makes the tab list and each option share the available width equally. */
+  fullWidth?: boolean;
 }
 
 export function Tabs({
@@ -31,6 +33,7 @@ export function Tabs({
   className,
   label,
   variant = 'underline',
+  fullWidth = false,
 }: TabsProps) {
   const instanceId = useId();
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -50,7 +53,7 @@ export function Tabs({
   };
 
   return (
-    <div className={cn('ui-tabs', variant === 'segmented' && 'is-segmented', className)}>
+    <div className={cn('ui-tabs', variant === 'segmented' && 'is-segmented', fullWidth && 'is-full-width', className)}>
       <div className="ui-tabs-list" role="tablist" aria-label={label}>
         {tabs.map((tab, index) => {
           const selected = tab.id === value;

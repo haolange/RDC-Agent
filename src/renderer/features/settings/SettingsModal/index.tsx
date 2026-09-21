@@ -4,7 +4,6 @@ import type { AppSettings } from '@shared/types/settings';
 import { useModalFocus } from '../../../lib/useModalFocus';
 import { useOverlayLayer } from '../../../lib/overlayStack';
 import { useSettingsModal } from './useSettingsModal';
-import { ResourceDiagnosticsDialog } from './sections/ResourceDiagnosticsDialog';
 import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
 import { SettingsCenterNav } from './SettingsCenterNav';
 import { useRdcRuntimeOverview } from './useRdcRuntimeOverview';
@@ -27,7 +26,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const panelRef = useRef<HTMLDivElement>(null);
   const runtime = useRdcRuntimeOverview(open);
   const [resourceScope, setResourceScope] = useState<'user' | 'project'>('user');
-  const [resourceDiagnosticsOpen, setResourceDiagnosticsOpen] = useState(false);
   const {
     t,
     activeSection,
@@ -130,7 +128,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
             <div ref={panelRef} className="settings-center-panel scrollbar-thin" data-testid="settings-center-panel">
               <SettingsPageContent modal={modal} settings={settings} runtime={runtime}
                 resourceScope={resourceScope} setResourceScope={setResourceScope}
-                onOpenResourceDiagnostics={() => setResourceDiagnosticsOpen(true)}
                 setResourceDraftDirty={setResourceDraftDirty} />
             </div>
           </div>
@@ -147,15 +144,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
           onDiscard={discardAndLeave}
         />
       ) : null}
-
-      <ResourceDiagnosticsDialog
-        open={resourceDiagnosticsOpen}
-        overview={runtime.overview}
-        loading={runtime.loading}
-        error={runtime.error}
-        onClose={() => setResourceDiagnosticsOpen(false)}
-        t={t}
-      />
 
       {connectionDraft && connectionProvider && (
         <ProviderConnectDialog

@@ -23,7 +23,7 @@
 
 应用拥有的 session / task / trace / UI / log / cache / secret 在 Electron OS data 下，不得写入 `~/.rdc-agent` 或项目仓库。Project `.rdc-agent/.gitignore` 排除 `inputs`、`artifacts`、`memory` 与 runtime state；`plans/` 不排除。
 
-优先级：`builtin < user < project`。整资源替换。Project disabled override 可故意遮蔽继承资源。Policy 只收紧。`.policy.yml` `limits.contextCompactionPercent` 默认 100（不设限）；用户级 Settings → Policy 顶部 Agent Runtime 压缩阈值为 50–90、步长 5，生效值为 `min(用户设置, policy)`。RDC-Tool CLI actions 与 secret 属本机边界，不能被 project 覆盖。
+优先级：`builtin < user < project`。整资源替换。Project disabled override 可故意遮蔽继承资源。Policy 只收紧。`.policy.yml` `limits.contextCompactionPercent` 默认 100（不设限）；Settings → Policy 在自定义策略资源下方提供独立的全局运行设置，压缩阈值为 50–90、步长 5，作用于全部会话，不随 User / Project 资源切换改变归属；生效值为 `min(用户设置, policy)`。RDC-Tool CLI actions 与 secret 属本机边界，不能被 project 覆盖。
 
 Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导航：User | Project 作用域行 + Import/New + 详情编辑器。禁止装饰性 “RDC Runtime” kicker；禁止 Settings Diagnostics 导航。
 
@@ -40,6 +40,8 @@ Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导
 ## Skills
 
 目录：`skills/<skill-id>/SKILL.md`（可选 `scripts` / `references` / `assets`）。
+
+Settings 的交接预载与 Agent 技能能力选择共享 runtime overview 的只读 `skillSelection` 投影，候选复用主进程实际解析结果及目标可见性，包含 builtin/user/project 的生效覆盖关系。它不是执行权限或冻结目录；读取失败与空目录分别呈现。UI 保留已选但缺失或目标不可用的 ID 并提示，不静默丢弃；新增选择去重且保留顺序，持久化仍为原有 ID 数组。技能资源编辑列表只显示名称/ID及必要状态，完整 description 保留在原文件正文中。
 
 Progressive Skill 面：
 

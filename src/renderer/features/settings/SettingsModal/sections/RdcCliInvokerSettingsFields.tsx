@@ -4,7 +4,7 @@ import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { Input } from '../../../../ui/Input';
 import { Switch } from '../../../../ui/Switch';
-import { AutosizeTextarea } from '../AutosizeTextarea';
+import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
 import { envToText, textToEnv } from './toolEnvText';
 import { useRdcInstallation } from './useRdcInstallation';
@@ -53,7 +53,7 @@ export function RdcCliInvokerSettingsFields({ rdcCliDraft: draft, onRdcCliDraftC
           onChange={(event) => patch({ timeoutMs: Number(event.currentTarget.value) })} />
       </SettingsField>
       <SettingsField label={t('settings.rdcCliEnv')} htmlFor="settings-rdc-environment" description={t('settings.rdcCliEnvHint')}>
-        <AutosizeTextarea id="settings-rdc-environment" maxHeight={180} className="input settings-rdc-cli-textarea" disabled={installation.busy}
+        <Textarea id="settings-rdc-environment" className="settings-rdc-cli-textarea" disabled={installation.busy}
           value={envText} placeholder="NAME=value" spellCheck={false}
           onChange={(event) => { setEnvText(event.currentTarget.value); patch({ env: textToEnv(event.currentTarget.value) }); }} />
       </SettingsField>

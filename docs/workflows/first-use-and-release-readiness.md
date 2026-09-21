@@ -1,5 +1,18 @@
 # 上手引导与发行准备
 
+## UI 收敛与 rc.3（2026-09-22）
+
+用户追加授权：提交当前三轮 UI 收敛至 main，并发布 `0.6.0-rc.3` Windows x64 未签名预发布。此前任务记录中的“不提交/发布”为当时阶段边界；保留 rc.1、rc.2 的 tag 和资产，不升级为稳定正式版。
+
+| Task | 状态 | 范围与通过条件 |
+| --- | --- | --- |
+| RC3-1 源码与版本 | 执行中 | 共享控件、Settings资源编辑与技能候选、用户菜单、Agent列表；版本及中英README一致；提交并非强制推送 |
+| RC3-2 发行包 | 待执行 | 最新源码build、NSIS/zip、包内容校验、SBOM与SHA256 |
+| RC3-3 GitHub预发布 | 阻塞 | GitHub CLI尚未标准登录；需用户完成 `gh auth login`，再创建新tag/预发布并上传、核对资产 |
+| RC3-4 收尾 | 待执行 | 仅清理自有过期中间产物，保留可用Browser与发行资产；核对Git三方SHA和桌面锁 |
+
+验收边界沿用 `acceptance-ledger.md` 的 UI-CONTROL-SETTINGS / AGENT-LIST-USER-MENU / AGENT-LIST-VISUAL：最后增量独立renderer115文件474测试、type/lint/专项/build及真实Browser通过；提交前main技能投影2文件24测试、仓库卫生和台账检查通过。原生中文IME需人工输入法补验，历史Knowledge聚合门禁受本机权限限制，均不以局部通过覆盖。GitHub CI为异步运行，发布时记录实际状态，不预称全绿。
+
 ## HEAD CI 跨平台收口与 rc.2（2026-09-21）
 
 本轮目标：修复 current HEAD 的 Linux `pnpm test` 与 macOS runtime/primitives Vitest 失败，在不移动 `v0.6.0-rc.1` 的前提下，以全绿 HEAD 生成 `v0.6.0-rc.2` 未签名预发布。状态使用「待执行 / 执行中 / 待验证 / 通过 / 阻塞」。

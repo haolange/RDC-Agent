@@ -4,6 +4,7 @@ import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { ResolvedTheme } from '@shared/types/settings';
 import { deriveComposeAccentVars } from '@shared/theme/composeAccent';
 import { useI18n } from '../../i18n';
+import { Textarea } from '../../ui/Textarea';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -182,17 +183,16 @@ export const Composer: React.FC<ComposerProps> = ({
             disabled={isComposerBusy}
           />
         ) : (
-          <textarea
+          <Textarea
             key={composerScopeKey}
             ref={promptInputRef}
-            className="chat-input composer-textarea"
+            className="composer-textarea"
             name="debuggerPrompt"
             value={promptValue}
             onChange={(event) => setPromptValue(event.target.value)}
             onKeyDown={handlePromptKeyDown}
             placeholder={promptPlaceholder}
             aria-label={promptPlaceholder}
-            rows={1}
           />
         )}
         {slashCommand.visible ? (

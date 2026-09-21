@@ -6,7 +6,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { Button } from '../../ui/Button';
-import { DropdownSelect } from '../../ui/DropdownSelect';
+import { Select } from '../../ui/Select';
 import { useI18n } from '../../i18n';
 import { CaptureFrame } from './CaptureFrame';
 import { CaptureHistory } from './CaptureHistory';
@@ -110,13 +110,13 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
       {confirmClear && <><span>{t('control.replay.clearConfirm')}</span><Button variant="danger" size="sm" disabled={disabled} onClick={() => void run('clearHistory')}>{t('control.replay.confirm')}</Button><Button variant="ghost" size="sm" onClick={() => setConfirmClear(false)}>{t('control.replay.cancel')}</Button></>}
     </div>}
     <div className="capture-replay-file-row" title={selectedInput?.filePath}>
-      <DropdownSelect dataTestId="right-rail-capture-input" ariaLabel={t('control.rightRail.capture.title')} value={selectedInput?.inputId ?? ''}
+      <Select dataTestId="right-rail-capture-input" ariaLabel={t('control.rightRail.capture.title')} value={selectedInput?.inputId ?? ''}
         options={capture.availableCaptures.map((input) => ({ value: input.inputId, label: input.fileName }))} disabled={disabled}
         onChange={(inputId) => setDraft({ ...chosen, inputId })} />
       <small>{selectedInput ? sizeLabel(selectedInput.sizeBytes) : ''}</small>
     </div>
     <div className="capture-replay-device-row">
-      <DropdownSelect dataTestId="right-rail-replay-device" ariaLabel={t('control.sessionContextDevice')} value={chosen.deviceId} disabled={disabled}
+      <Select dataTestId="right-rail-replay-device" ariaLabel={t('control.sessionContextDevice')} value={chosen.deviceId} disabled={disabled}
         options={devices.map((device) => ({ value: device.id, label: device.type === 'local' ? t('device.local') : device.label, disabled: device.status === 'loading' }))}
         onChange={(deviceId) => setDraft({ ...chosen, deviceId })} />
       <Button variant="ghost" size="sm" aria-label={t('control.replay.refresh')} aria-busy={action === 'refresh'} disabled={disabled} onClick={() => void run('refresh')}>↻</Button>

@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { SessionRecord } from '@shared/types/session';
 import { useI18n } from '../../i18n';
 import { Icon } from '../../ui/Icon';
 import { Pill } from '../../ui/Pill';
+import { OverflowFade } from '../../ui/OverflowFade';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { readCompiledComposerRoute } from '../../lib/composerEffectiveModel';
@@ -26,10 +27,8 @@ export const ComposerModelEffortControl: React.FC<{
   const menu = useComposerMenu('modelEffort');
   const open = menu.open;
   const [view, setView] = useState<ComposerModelEffortView>('effort');
-  const [labelOverflows, setLabelOverflows] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
-  const labelRef = useRef<HTMLSpanElement>(null);
   const effort = useComposerEffortControl({
     agentId,
     currentSession,
@@ -81,18 +80,6 @@ export const ComposerModelEffortControl: React.FC<{
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [open, view]);
 
-  useLayoutEffect(() => {
-    const el = labelRef.current;
-    if (!el) return undefined;
-    const update = () => {
-      setLabelOverflows(el.scrollWidth > el.clientWidth + 1);
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [capsule.modelLabel]);
-
   return (
     <div ref={assignMenuRoot} className="composer-model-effort-menu">
       <Pill
@@ -116,12 +103,7 @@ export const ComposerModelEffortControl: React.FC<{
             <Icon name="max-mode" size={14} />
           </span>
         ) : null}
-        <span
-          ref={labelRef}
-          className={`composer-model-effort-pill-model${labelOverflows ? ' is-overflowing' : ''}`}
-        >
-          {capsule.modelLabel}
-        </span>
+        <OverflowFade className="composer-model-effort-pill-model" text={capsule.modelLabel} />
         <span className="composer-model-effort-pill-level">{capsule.reasoningLabel}</span>
         <span className="composer-model-effort-pill-caret" aria-hidden="true"><ChevronIcon /></span>
       </Pill>

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import { useDynStyle } from '../../../lib/useDynStyle';
+import { EmptyState } from '../../../ui/EmptyState';
 import {
   formatRaw,
   formatTimestamp,
@@ -87,9 +88,9 @@ export const TerminalActivityPane: React.FC<TerminalActivityPaneProps> = ({ vm }
     >
       <div ref={activityBodyRef} className="runtime-terminal-activity-body scrollbar-thin">
         {isLoading ? (
-          <div className="runtime-terminal-empty">{t('terminal.loading')}</div>
+          <div role="status"><EmptyState layout="compact" title={t('terminal.loading')} /></div>
         ) : filteredEntries.length === 0 ? (
-          <div className="runtime-terminal-empty">{emptyCopy}</div>
+          <EmptyState layout="fill" title={emptyCopy} />
         ) : (
           <>
             {leading > 0 ? <TerminalSpacer height={leading} /> : null}

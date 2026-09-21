@@ -76,7 +76,6 @@ export function ThemeImportDialog({ open, variant, onApply, onClose, t }: ThemeI
           value={text}
           placeholder={t('settings.appearanceImportPlaceholder')}
           spellCheck={false}
-          rows={6}
           error={preview.state === 'invalid'}
           onChange={(event) => setText(event.target.value)}
         />

@@ -1,9 +1,7 @@
-import { Button } from '../../../../ui/Button';
 import React from 'react';
 import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
-import { Icon } from '../../../../ui/Icon';
-import { Pill } from '../../../../ui/Pill';
+import { Tabs } from '../../../../ui/Tabs';
 import { SettingsField, SettingsSection } from '../parts';
 import { PersonalizationSettings } from './PersonalizationSettings';
 import { ProfileSettings } from './ProfileSettings';
@@ -20,7 +18,6 @@ interface GeneralSettingsProps {
   globalInstructionsDraft: string;
   onGlobalInstructionsDraftChange: (value: string) => void;
   onSavePersonalization: () => void | Promise<void>;
-  onOpenResourceDiagnostics: () => void;
   t: Translate;
 }
 
@@ -34,7 +31,6 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
   globalInstructionsDraft,
   onGlobalInstructionsDraftChange,
   onSavePersonalization,
-  onOpenResourceDiagnostics,
   t,
 }) => {
   return (
@@ -55,20 +51,12 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
           data-settings-search="language"
         >
           <SettingsField layout="row" label={t('userMenu.language')} search="language">
-            <div className="settings-choice-group" role="group" aria-label={t('userMenu.language')}>
-              <Pill
-                selected={settings.appearance.language === 'zh-CN'}
-                onClick={() => void onLanguageChange('zh-CN')}
-              >
-                {t('language.zh')}
-              </Pill>
-              <Pill
-                selected={settings.appearance.language === 'en'}
-                onClick={() => void onLanguageChange('en')}
-              >
-                {t('language.en')}
-              </Pill>
-            </div>
+            <Tabs variant="segmented" label={t('userMenu.language')}
+              value={settings.appearance.language}
+              tabs={[{ id: 'zh-CN', label: t('language.zh') }, { id: 'en', label: t('language.en') }]}
+              onChange={(language) => {
+                if (language === 'zh-CN' || language === 'en') void onLanguageChange(language);
+              }} />
           </SettingsField>
         </SettingsSection>
         <PersonalizationSettings
@@ -77,17 +65,6 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
           onSavePersonalization={onSavePersonalization}
           t={t}
         />
-        <Button variant="ghost" size="sm"
-          type="button"
-          className="settings-disclosure-row"
-          data-settings-search="resource-diagnostics"
-          data-testid="settings-open-resource-diagnostics"
-          onClick={onOpenResourceDiagnostics}
-        >
-          <Icon name="chevron-right" size={14} className="settings-disclosure-row-icon" />
-          <span className="settings-disclosure-row-label">{t('settings.resourceDiagnosticsTitle')}</span>
-          <span className="settings-disclosure-row-hint">{t('settings.resourceDiagnosticsOpen')}</span>
-        </Button>
       </div>
     </section>
   );

@@ -7,6 +7,7 @@ export interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 't
   description?: ReactNode;
   actions?: ReactNode;
   visual?: ReactNode;
+  layout?: 'compact' | 'fill';
 }
 
 export function EmptyState({
@@ -14,11 +15,12 @@ export function EmptyState({
   description,
   actions,
   visual,
+  layout = 'compact',
   className,
   ...rest
 }: EmptyStateProps) {
   return (
-    <div className={cn('ui-empty-state', className)} {...rest}>
+    <div className={cn('ui-empty-state', `is-layout-${layout}`, className)} {...rest}>
       {visual ? <div className="ui-empty-state-visual">{visual}</div> : null}
       <p className="ui-empty-state-title">{title}</p>
       {description ? <p className="ui-empty-state-description">{description}</p> : null}

@@ -20,7 +20,6 @@ html[data-pointer-cursors='true'] [role='tab']:not([aria-disabled='true']),
 html[data-pointer-cursors='true'] [role='option']:not([aria-disabled='true']),
 html[data-pointer-cursors='true'] [role='switch']:not([aria-disabled='true']),
 html[data-pointer-cursors='true'] .button:not(:disabled),
-html[data-pointer-cursors='true'] .user-menu-pill,
 html[data-pointer-cursors='true'] [data-pointer-interactive] {
   cursor: pointer;
 }
@@ -41,7 +40,6 @@ html:not([data-pointer-cursors='true']) [role='tab'],
 html:not([data-pointer-cursors='true']) [role='option'],
 html:not([data-pointer-cursors='true']) [role='switch'],
 html:not([data-pointer-cursors='true']) .button,
-html:not([data-pointer-cursors='true']) .user-menu-pill,
 html:not([data-pointer-cursors='true']) [data-pointer-interactive] {
   cursor: default;
 }

@@ -1,9 +1,11 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
 import { RdcRuntimeService } from './RdcRuntimeService';
 import { HookEngine } from '../hooks/HookEngine';
+import { appPathService } from './AppPathService';
 
 let home = '';
 let userData = '';
@@ -16,11 +18,41 @@ beforeEach(() => {
   process.env.RDC_AGENT_USER_DATA = userData;
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   fs.rmSync(home, { recursive: true, force: true }); fs.rmSync(userData, { recursive: true, force: true });
   delete process.env.RDC_AGENT_HOME; delete process.env.RDC_AGENT_USER_DATA;
 });
 
 describe('RdcRuntimeService', () => {
+  it('projects a real skill-directory read failure through overview without claiming an empty catalog', () => {
+    // An existing non-directory passes existsSync but makes the real readdirSync fail.
+    const builtinRoot = path.join(userData, 'unreadable-builtin');
+    fs.mkdirSync(builtinRoot, { recursive: true });
+    fs.writeFileSync(path.join(builtinRoot, 'skills'), 'Not a directory');
+    vi.spyOn(appPathService, 'getBuiltinAgentRuntimeRoot').mockReturnValue(builtinRoot);
+    const overview = service.overview();
+    expect(overview.skillSelection.status).toBe('error');
+    expect(overview.skillSelection.options).toEqual([]);
+    if (overview.skillSelection.status !== 'error') throw new Error('Expected skill catalog read failure');
+    expect(overview.skillSelection.error.code).toBe('SKILL_CATALOG_READ_FAILED');
+    expect(overview.skillSelection.error.message).toContain('ENOTDIR');
+    expect(overview.skillSelection.error.message).toContain('skills');
+    expect(overview.diagnostics).toContain(`skill/catalog: ${overview.skillSelection.error.message}`);
+    expect(() => agentRuntimeConfigService.listSkills()).toThrow('ENOTDIR');
+  });
+  it('includes builtin selection metadata separately from editable scoped documents', () => {
+    const overview = service.overview();
+    expect(overview.skillSelection.status).toBe('ready');
+    expect(overview.skillSelection.options.some((skill) => skill.scope === 'builtin')).toBe(true);
+    expect(overview.resources.every((resource) => resource.scope === 'user' || resource.scope === 'project')).toBe(true);
+  });
+
+  it('preserves selection failure as a discriminated result and overview diagnostic', () => {
+    vi.spyOn(agentRuntimeConfigService, 'listSkillMetadata').mockImplementation(() => { throw new Error('Unreadable skill'); });
+    const overview = service.overview();
+    expect(overview.skillSelection).toEqual({ status: 'error', options: [], error: { code: 'SKILL_CATALOG_READ_FAILED', message: 'Unreadable skill' } });
+    expect(overview.diagnostics).toContain('skill/catalog: Unreadable skill');
+  });
   it('rejects malformed Skill frontmatter without overwriting the saved instructions', () => {
     const request = { kind: 'skill' as const, scope: 'user' as const, id: 'validation-test', content: 'Plain Markdown instructions.' };
     const saved = service.upsert(request);

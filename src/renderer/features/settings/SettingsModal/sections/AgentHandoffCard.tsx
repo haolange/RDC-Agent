@@ -6,7 +6,8 @@ import { Icon } from '../../../../ui/Icon';
 import { IconButton } from '../../../../ui/IconButton';
 import { Input } from '../../../../ui/Input';
 import { Select } from '../../../../ui/Select';
-import { AutosizeTextarea } from '../AutosizeTextarea';
+import { Textarea } from '../../../../ui/Textarea';
+import { AgentSkillPicker, type AgentSkillCatalog } from './AgentSkillPicker';
 import { SettingsField } from '../parts';
 import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
 import {
@@ -20,6 +21,7 @@ type Translate = ReturnType<typeof useI18n>['t'];
 type Field = AgentHandoffIssue['field'];
 
 interface AgentHandoffCardProps {
+  skills: AgentSkillCatalog;
   index: number;
   handoff: AgentHandoffDefinition;
   issues: AgentHandoffIssue[];
@@ -41,6 +43,7 @@ interface AgentHandoffCardProps {
 
 /** One handoff rule: a collapsible numbered card; only one card is expanded at a time. */
 export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
+  skills,
   index,
   handoff,
   issues,
@@ -153,10 +156,8 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
         </SettingsField>
 
         <SettingsField label={t('settings.agentHandoffPrompt')} layout="row" className="settings-handoff-prompt">
-          <AutosizeTextarea
-            rows={3}
-            maxHeight={220}
-            className="input"
+          <Textarea
+            sizing="content"
             value={handoff.prompt}
             placeholder={t('settings.agentHandoffPromptPlaceholder')}
             aria-invalid={visible('prompt').length > 0}
@@ -198,13 +199,8 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
           />
         </SettingsField>
         <SettingsField label={t('settings.agentHandoffRequiredSkills')} layout="stack">
-          <AutosizeTextarea
-            value={(handoff.requiredSkillIds ?? []).join('\n')}
-            onChange={(event) => patch({
-              requiredSkillIds: event.target.value.split(/[\n,]/).map((id) => id.trim()).filter(Boolean),
-            })}
-            placeholder={t('settings.agentHandoffRequiredSkillsPlaceholder')}
-          />
+          <AgentSkillPicker skills={skills} targetAgentId={handoff.agent}
+            value={handoff.requiredSkillIds ?? []} onChange={(requiredSkillIds) => patch({ requiredSkillIds })} t={t} />
         </SettingsField>
       </div>
     </article>

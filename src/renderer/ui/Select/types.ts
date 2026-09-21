@@ -1,4 +1,4 @@
-export interface DropdownOption {
+export interface SelectOption {
   value: string;
   label: string;
   disabled?: boolean;
@@ -7,9 +7,9 @@ export interface DropdownOption {
   swatchColor?: string;
 }
 
-export interface DropdownSelectProps {
+export interface SelectProps {
   value: string;
-  options: DropdownOption[];
+  options: SelectOption[];
   onChange: (value: string) => void;
   placeholder?: string;
   emptyLabel?: string;

@@ -9,7 +9,8 @@ import { Button } from '../../../../ui/Button';
 import { Icon, type IconName } from '../../../../ui/Icon';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { Switch } from '../../../../ui/Switch';
-import { AutosizeTextarea } from '../AutosizeTextarea';
+import { Textarea } from '../../../../ui/Textarea';
+import type { AgentSkillCatalog } from './AgentSkillPicker';
 import { SettingsField, SettingsSection } from '../parts';
 import { AgentIdentityPanel } from './AgentIdentityPanel';
 import { AgentCapabilityPicker, buildAgentCapabilityGroups } from './AgentCapabilityPicker';
@@ -24,6 +25,7 @@ export type AgentProvenanceScope = AgentManifestDefinition['provenance'] extends
   : never;
 
 interface AgentManifestEditorProps {
+  skills: AgentSkillCatalog;
   settings: AppSettings;
   selectedAgent: AgentManifestDraft;
   /** Read-only origin of the definition (builtin / user / project); new drafts have none yet. */
@@ -64,6 +66,7 @@ export function provenanceLabel(scope: AgentProvenanceScope | null, t: Translate
 }
 
 export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
+  skills,
   settings,
   selectedAgent,
   provenanceScope,
@@ -115,7 +118,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
     if (panel === 'permissions') {
       return (
         <>
-          <AgentCapabilityPicker groups={capabilityGroups} t={t} />
+          <AgentCapabilityPicker groups={capabilityGroups} skills={skills} targetAgentId={selectedAgent.id} t={t} />
           {toolDiagnostics.length > 0 ? (
             <div className="settings-agent-tool-diagnostics" data-testid="settings-agent-tool-diagnostics" role="status">
               <div className="settings-agent-tool-diagnostics-title">{t('settings.agentToolDiagnosticsTitle')}</div>
@@ -135,6 +138,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
     if (panel === 'handoffs') {
       return (
         <AgentHandoffEditor
+          skills={skills}
           key={selectedAgent.id}
           selfId={selectedAgent.id}
           handoffs={selectedAgent.handoffs}
@@ -153,11 +157,10 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
             {t('settings.agentInstructionsSource')}: <strong>{provenanceLabel(provenanceScope, t)}</strong>
           </span>
         </div>
-        <AutosizeTextarea
-          rows={12}
-          maxHeight={720}
+        <Textarea
+          sizing="fill"
           aria-label={t('settings.agentInstructions')}
-          className="input settings-agent-instructions settings-agent-instructions--editor"
+          className="settings-agent-instructions settings-agent-instructions--editor"
           value={selectedAgent.instructions}
           onChange={(event) => onUpdateAgent({ instructions: event.currentTarget.value })}
         />
@@ -166,7 +169,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   };
 
   return (
-    <div className="settings-manifest-editor" data-testid="settings-agent-manifest-editor">
+    <div className={`settings-manifest-editor${openPanel === 'instructions' ? ' is-editing-document' : ''}`} data-testid="settings-agent-manifest-editor">
       <div className="settings-manifest-editor-head">
         <div className="settings-agent-editor-title">
           <span className="settings-agent-editor-icon" aria-hidden="true" {...agentAccentStyle}>

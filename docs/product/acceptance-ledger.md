@@ -1,5 +1,31 @@
 # Acceptance Ledger
 
+2026-09-22 AGENT-LIST-VISUAL：本轮设置Agent行视觉比例收敛 verified，基于未提交工作区，production bundle `index-BWE38meJ.js`。上一轮等高证据保留，但不作为本轮视觉比例通过依据。
+
+- 实现：feature内AgentListItem组合共享ListRow/OverflowFade/ModeGlyph；18px图形、28px透明图标列、独立实色细边框行、4px行距，名称中等字重及说明两行排版。ListRow展示变量使上下8px留白不再被加载顺序覆盖，其他调用方默认值不变；旧底座与重复选择器无残留，无IPC/存储/权限变更。
+- 独立工程：定向3文件10测试、renderer115文件474测试、tsc、全量ESLint、design-tokens/renderer-structure（均0 hits）、appearance/fidelity/settings-agents/legacy-residue及production build通过。未用本轮局部通过覆盖既有Knowledge聚合门禁边界。
+- 主线程真实Browser：四个用户Agent和项目长名/长短/空说明样本；深色中文与浅色英文、三档字号、1591px及实际390px宽屏/窄屏组合。各组行高差0，空说明保留位置；短说明无渐隐、长说明实际溢出才渐隐，无横向溢出；图标透明、上下留白对称，Tab/Enter与末项滚动选择可用。三档行高约45.58/48.08/50.44–50.58px，不以固定高度裁切文字。
+- 独立Review：未参与实现和工程验证的审查者实际读取源码、原用户图及深色/浅色/窄屏三张真实截图；条目分隔、去底座和文字比例无finding。独立截图复核与主线程live交互分开归因。共享hover/focus状态优先级保持，不另造Agent状态覆盖。
+- 收尾：仅删除本轮三个临时Agent，文件和刷新后的项目列表确认只剩原有UI Review。保留原隔离QA和最新中文深色大字号Agent页；console无error/warn，canonical桌面锁不存在，桌面启动权已交还（锁检查）。无新增QA进程，无用户数据修改，无提交、推送或发布。任务记录见`ui-interaction-audit.md`本轮节。
+
+2026-09-22 AGENT-LIST-USER-MENU：verified for the two-screen incremental scope on the uncommitted worktree based on `1acae3a2202075ff99d14bba8aa75b8eccd44dde`（不将基线SHA冒充新实现提交）。共享OverflowFade替代Composer局部测量/遮罩；Agent名称/描述各一行、空描述保留高度；Tabs显式fullWidth默认关闭；用户菜单横向三行与紧凑资料头，语言使用自称简体中文/English。无IPC/schema/权限变更、无新增依赖、无提交或发布。
+
+- 独立工程：renderer 114文件471测试通过；定向3文件20项含字体loadingdone/ready/卸载迟到清理；tsc、全量ESLint、design-tokens与renderer-structure均0 hits，appearance/fidelity/settings-agents/legacy-residue及production build通过。独立Review无finding。当前增量不重跑此前未变main/shared的Knowledge聚合门禁，原边界保留。
+- 实际Browser：载入最终`index-BAqOZqgG.js`，隔离用户副本与小型项目。菜单原约352px→约237px，三组边界差0，组内宽差<0.02px。最终英文大字号390×844全部tab水平溢出0；中文浅色小/中/大字号960/640/390关键组合一致对齐。19条项目Agent（长名称、中英长短说明、空说明）在390/640/960/1591px均41.212px等高，渐隐仅真实溢出出现，列表滚动选择且无横溢出；四用户Agent在三档字号下等高。Composer模型胶囊/菜单、disabled控件、自然宽度分段入口保持。
+- 交互：菜单方向键切语言、外部点击关闭、Escape关闭后桌面回用户入口/窄屏回抽屉入口；低高度429×242菜单内部滚动且设置中心键盘可达；刷新恢复中文/深色/大字号。未调用Provider或原生RDC。
+- 独立视觉：审查者因工具会话隔离无法枚举主会话标签，改为独立读取两张最终真实Browser截图，密度/对齐/单行渐隐无finding；该项是截图产物视觉复核，不冒充独立交互。真实交互由主会话执行，分开归因。
+- 收尾：只清理本轮18条临时Agent夹具；保留原隔离QA、原有UI Review项目与用户资源副本、最终可操作页面和两张必要截图。复用原Browser实例，没有新建自有进程；canonical桌面锁不存在，桌面启动权已交还（锁检查）。详细任务状态见`ui-interaction-audit.md`增量修正节。
+
+2026-09-21 UI-CONTROL-SETTINGS：六张标注图的控件与设置页收敛，基于 `1acae3a2202075ff99d14bba8aa75b8eccd44dde` 的未提交工作区；基线不代表包含新实现的提交。本轮不提交、推送或发布。任务状态见 [UI交互审查](ui-interaction-audit.md) 本轮章节，以下历史条目不被覆盖。
+
+- 工程：独立全量428文件/3013项通过、4项既有条件跳过；main/shared coverage ratchet通过（lines75.16%、functions76.86%、branches62.29%、statements72.74%）。最终renderer独立复验113文件/464项、关闭生命周期3文件/16项、scoped/contracts12文件/261项、typecheck/lint/build与专项通过。最终聚合`check:gates`在Knowledge契约的沙箱`realpath C:\Users\Vip` EPERM处中止，未重复提权或绕过；同任务未变main/shared在获批环境的Knowledge门禁已有`OK hits=0`。不将这次聚合命令写成全绿。
+- Browser：真实main bridge、隔离user资源副本与小型项目`ui-review-project`；Settings八页、Knowledge导入、Composer双模式、消息编辑、右栏五卡空态。深色中文/浅色英文、中/大字号，默认宽屏及实际CSS viewport 960×900、640×900、390×843关键场景；非全页面笛卡尔积验收。
+- 六图：全局/交接文本从一行增长至八行封顶并可清空收缩；共享按钮/单选与焦点语言；诊断入口消失但资源位置保留；技能列表无长description，长文填满剩余高度，窄屏保存/取消可达、无横溢出；MCP紧凑/Hooks填充空态；策略资源在上、全局阈值在下，80→85刷新保持后恢复80。技能候选真实覆盖builtin/user/project，缺失ID保留、切目标显示不可用、搜索无结果独立呈现、追加顺序与自动保存刷新通过。
+- 生产构建消息编辑：会话`sess_145198e7e16d`由真实UI创建，离线加入显式“QA合成、非模型输出”的两条消息。自动聚焦、12行封顶165px、清空回32px且发送禁用、Escape/取消保留原消息、390px按钮可达、390→640宽度变化保留草稿；未发送或重写。Composer普通输入/CodeMirror切换保留文本，Shift+Enter换行；已挂载普通输入中→大字号由153→165px重算。
+- 独立Review发现的Agent修改后300ms内关闭丢草稿已闭环：UI与autosave归属草稿分离，真实挂载User/Project100ms关闭提交一次、重开保留、startup未ready不写入、切项目不重绑。独立Verify PASS后复审无剩余finding。最终production Browser实测修改后Escape关闭操作约61ms，重开内容保留。
+- 边界：`TODO(UNVERIFIED: 内置浏览器不支持Input.imeSetComposition，原生中文IME组合提交需人工真实输入法补验)`；普通中文输入与工程composition用例不能替代此原生证据。完整聚合门禁须在允许Knowledge测试访问用户路径的环境补跑；追加权限请求曾被安全审核拒绝，未绕过。未复制secret或真实历史，未调用Provider、MCP/Hook执行或RDC原生能力。
+- 收尾：自有废弃QA进程及失败副本已清理，临时资源根的旧配置备份/旧运行记录已移除，原始用户目录未动。保留最新production同源`/app`和隔离用户资源/小型项目供继续迭代；viewport恢复、深色中文大字号，页面为用户技能详情。canonical桌面锁不存在，桌面启动权已交还（锁检查）；保留QA使用隔离锁。无Git提交、推送或发布。
+
 2026-09-21 CI-CROSS-HOST-PORTABILITY：verified。`85a2da92` 修复 Shell/shell trailer/RDC CLI 的跨宿主路径契约与测试临时根 canonicalization，`a4d6b5aa` 修复 macOS Electron 测试并发提取竞争及 desktop smoke 的 Windows 临时目录清理竞态。GitHub [CI run 35567724271](https://github.com/haolange/RDC-Agent/actions/runs/35567724271) 验证发行源码，最终台账提交另经 [CI run 35568188278](https://github.com/haolange/RDC-Agent/actions/runs/35568188278) 复验；两次的 Linux build、macOS runtime/primitives、browser smoke、desktop smoke、launcher checks 及全部 job 均 success。`v0.6.0-rc.1` 未移动；`v0.6.0-rc.2` 已按全绿 HEAD `70254a76` 创建并发布为未签名预发布。
 
 2026-09-21 RC2-PACKAGE-CANDIDATE：verified on local Windows candidate. NSIS `3ec8ae5e3246c2f1f79ff62b1e6c639b4af87be3219f1031155f14dd434bdc10`；zip `cb200d7630ffdfde50131be313b4d3ca818b70b17cfb00e1f2b37441c699a8f9`；blockmap `ea692a63672d13e4969e632a9735a7e990ed40894663497f8b2dddaab6a7186e`；SBOM `1770d95c48dcd9fdd287c9cbc7fe92c716546c1d25906cfe7e0ea9ec8f212fbc`。`verify-package.mjs` 通过，52 个 builtin/runtime resource 与四张教程图字节一致；release 资产为未签名预发布，正式签名门禁保留。

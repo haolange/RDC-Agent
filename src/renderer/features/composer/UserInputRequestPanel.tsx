@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../../i18n';
-import { assignDynStyle } from '../../lib/useDynStyle';
 import { useConversationStore } from '../../stores/conversationStore';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Button } from '../../ui/Button';
@@ -55,23 +54,12 @@ export const UserInputRequestPanel: React.FC<{
     ? t('chat.userInputNewlineHint', { action: enterAction })
     : enterAction;
 
-  const resizeTextarea = useCallback(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    assignDynStyle(textarea, { height: 'auto' });
-    assignDynStyle(textarea, { height: `${textarea.scrollHeight}px` });
-  }, []);
-
   useEffect(() => {
     setCurrentIndex(0);
     setDrafts({});
     setIsSubmitting(false);
     setError(null);
   }, [requestFingerprint]);
-
-  useEffect(() => {
-    resizeTextarea();
-  }, [customAnswer, currentIndex, resizeTextarea]);
 
   useEffect(() => {
     if (!currentQuestion?.allowFreeform || currentQuestion.options.length > 0) return;
@@ -159,6 +147,7 @@ export const UserInputRequestPanel: React.FC<{
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing || event.keyCode === 229) return;
       const activeElement = document.activeElement;
       if (activeElement && panelRef.current && !panelRef.current.contains(activeElement)) return;
       if (isSubmitting) return;

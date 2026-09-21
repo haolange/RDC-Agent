@@ -1,6 +1,4 @@
 .settings-agent-instructions {
-  min-height: var(--space-20);
-  resize: vertical;
   line-height: 1.5;
 }
 
@@ -46,8 +44,6 @@
 }
 
 .settings-agent-textarea-compact {
-  min-height: var(--input-height-lg);
-  resize: vertical;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -60,7 +56,6 @@
 }
 
 .settings-agent-instructions--editor {
-  min-height: calc(var(--space-20) * 2);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: 1.7;
@@ -68,6 +63,25 @@
 
 .settings-agent-diagnostics-row {
   padding: 0;
+}
+
+.settings-manifest-editor.is-editing-document .settings-agent-panels {
+  flex: 1 0 auto;
+}
+
+.settings-manifest-editor.is-editing-document .settings-agent-panel[data-panel="instructions"].is-open {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+
+.settings-manifest-editor.is-editing-document .settings-agent-panel[data-panel="instructions"] .settings-agent-panel-body {
+  flex: 1 0 auto;
+  min-height: calc(var(--control-height-md) * 8);
+}
+
+.settings-agent-instructions--editor.ui-textarea {
+  flex: 1 1 auto;
 }
 
 .settings-agent-diagnostics-toggle {

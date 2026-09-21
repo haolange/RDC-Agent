@@ -1,7 +1,6 @@
 import type { KnowledgeCandidatesResult, KnowledgeCardRecord, KnowledgeLaneHit } from '@shared/types/knowledge';
 import { cn } from '../../../../lib/cn';
 import { Badge } from '../../../../ui/Badge';
-import { Button } from '../../../../ui/Button';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { ListRow } from '../../../../ui/ListRow';
 import { Panel } from '../../../../ui/Panel';
@@ -16,7 +15,6 @@ import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 interface ListColumnProps {
   state: ReturnType<typeof useKnowledgeCenter>;
   inbox: KnowledgeCandidatesResult | null;
-  onImport: () => void;
 }
 
 function emptyReason(
@@ -94,12 +92,10 @@ function RecordRow({
   );
 }
 
-export function ListColumn({ state, inbox, onImport }: ListColumnProps) {
+export function ListColumn({ state, inbox }: ListColumnProps) {
   const { t } = useI18n();
   const reason = emptyReason(state, inbox);
   const loading = state.loadingQuery || state.loadingOverview;
-  // The import action belongs next to the empty list, not only in the sidebar.
-  const offerImport = reason === 'knowledgeCenter.emptyNoCards' || reason === 'knowledgeCenter.emptyNoSpaces';
   const candidateCount = inbox?.candidates.length ?? 0;
   const conflictCount = state.pack?.conflicts.length ?? 0;
   const hitById = new Map(state.pack?.hits.map((hit) => [hit.cardId, hit] as const) ?? []);
@@ -137,11 +133,6 @@ export function ListColumn({ state, inbox, onImport }: ListColumnProps) {
           <div className="knowledge-center-empty" data-testid="knowledge-center-empty-list">
             <EmptyState
               title={t(reason)}
-              actions={offerImport ? (
-                <Button variant="primary" size="sm" onClick={onImport} data-testid="knowledge-center-empty-import">
-                  {t('knowledgeCenter.importKnowledge')}
-                </Button>
-              ) : undefined}
             />
           </div>
         )}

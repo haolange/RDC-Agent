@@ -100,6 +100,16 @@ export interface SkillLoadResult extends SkillMetadata {
   assetsPath?: string;
 }
 
+/** Read-only authoring metadata, never an execution permission or frozen catalog. */
+export interface SkillSelectionOption extends SkillMetadata {
+  /** Canonical profile IDs for which this skill cannot be discovered or preloaded. */
+  unavailableToAgentIds: string[];
+}
+
+export type SkillSelectionProjection =
+  | { status: 'ready'; options: SkillSelectionOption[] }
+  | { status: 'error'; options: []; error: { code: 'SKILL_CATALOG_READ_FAILED'; message: string } };
+
 export const CANONICAL_HOOK_EVENTS = [
   'session.before-start',
   'session.after-end',
@@ -227,6 +237,7 @@ export interface ScopedResourceDocument {
 }
 
 export interface RdcRuntimeOverview {
+  skillSelection: SkillSelectionProjection;
   userRoot: string;
   projectRoot?: string;
   userPaths: Record<string, string>;

@@ -120,7 +120,11 @@ export class RdcRuntimeService {
       transport: server.transport,
     }));
     const resources = this.list(projectRoot);
+    const skillSelection = agentRuntimeConfigService.getSkillSelection(projectRoot);
     const diagnostics: string[] = [];
+    if (skillSelection.status === 'error') {
+      diagnostics.push(`skill/catalog: ${skillSelection.error.message}`);
+    }
     for (const resource of resources) {
       for (const diagnostic of resource.diagnostics) {
         diagnostics.push(`${resource.kind}/${resource.scope}/${resource.id}: ${diagnostic}`);
@@ -143,7 +147,7 @@ export class RdcRuntimeService {
       ...(projectRoot ? { projectRoot } : {}),
       userPaths: { ...user },
       ...(project ? { projectPaths: { ...project } } : {}),
-      resources, hooks, mcpServers,
+      resources, hooks, mcpServers, skillSelection,
       knowledge: { userPath: user.knowledgePath, ...(project ? { projectPath: project.knowledgePath } : {}) },
       memory: { userPath: user.memoryPath, ...(project ? { projectPath: project.memoryPath } : {}) },
       diagnostics,

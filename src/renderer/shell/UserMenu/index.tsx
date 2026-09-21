@@ -4,6 +4,8 @@ import type { AppLanguage, AppSettings, AppTheme, FontScale } from '@shared/type
 import { useI18n } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { ProfileAvatar } from '../../patterns/ProfileAvatar';
+import { Tabs } from '../../ui/Tabs';
+import { Button } from '../../ui/Button';
 import './UserMenu.css';
 
 interface UserMenuProps {
@@ -18,7 +20,6 @@ interface UserMenuProps {
   onFontScaleChange: (fontScale: FontScale) => void;
 }
 
-const MENU_WIDTH = 332;
 const VIEWPORT_MARGIN = 16;
 const ANCHOR_GAP = 12;
 
@@ -48,7 +49,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
     // Wait for the anchor drawer's focus restoration and measured visibility.
     const frame = requestAnimationFrame(() => {
       returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+      menuRef.current?.querySelector<HTMLButtonElement>('[role="tab"][tabindex="0"]')?.focus();
     });
     return () => cancelAnimationFrame(frame);
   }, [open]);
@@ -81,10 +82,11 @@ export const UserMenu: React.FC<UserMenuProps> = ({
 
   const updatePosition = useCallback(() => {
     const menuElement = menuRef.current;
+    if (!menuElement) return;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    const menuWidth = menuElement?.offsetWidth ?? MENU_WIDTH;
-    const menuHeight = menuElement?.offsetHeight ?? 360;
+    const { width: menuWidth, height: menuHeight } = menuElement.getBoundingClientRect();
+    if (menuWidth <= 0 || menuHeight <= 0) return;
 
     if (!anchorRect) {
       setPosition({
@@ -160,7 +162,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
     <div className="user-menu-backdrop">
       <div
         ref={menuRef}
-        className="user-menu-popover visible"
+        className="user-menu-popover is-visible"
         id="sidebar-user-menu"
         data-testid="sidebar-user-menu"
         role="dialog"
@@ -179,66 +181,38 @@ export const UserMenu: React.FC<UserMenuProps> = ({
           </div>
         </div>
 
+        <div className="user-menu-preferences">
         <div className="user-menu-section">
           <div className="user-menu-section-label">{t('userMenu.language')}</div>
-          <div className="user-menu-pill-group">
-            <button
-              type="button"
-              className={`user-menu-pill ${settings.appearance.language === 'zh-CN' ? 'is-selected' : ''}`}
-              onClick={() => void onLanguageChange('zh-CN')}
-            >
-              {t('language.zh')}
-            </button>
-            <button
-              type="button"
-              className={`user-menu-pill ${settings.appearance.language === 'en' ? 'is-selected' : ''}`}
-              onClick={() => void onLanguageChange('en')}
-            >
-              {t('language.en')}
-            </button>
-          </div>
+          <Tabs variant="segmented" fullWidth label={t('userMenu.language')} value={settings.appearance.language}
+            onChange={(value) => onLanguageChange(value as AppLanguage)}
+            tabs={[{ id: 'zh-CN', label: t('language.zh') }, { id: 'en', label: t('language.en') }]} />
         </div>
 
         <div className="user-menu-section">
           <div className="user-menu-section-label">{t('userMenu.theme')}</div>
-          <div className="user-menu-pill-group">
-            {(['dark', 'light', 'system'] as AppTheme[]).map((theme) => (
-              <button
-                key={theme}
-                type="button"
-                className={`user-menu-pill ${settings.appearance.theme === theme ? 'is-selected' : ''}`}
-                onClick={() => void onThemeChange(theme)}
-              >
-                {t(`theme.${theme}`)}
-              </button>
-            ))}
-          </div>
+          <Tabs variant="segmented" fullWidth label={t('userMenu.theme')} value={settings.appearance.theme}
+            onChange={(value) => onThemeChange(value as AppTheme)}
+            tabs={(['dark', 'light', 'system'] as AppTheme[]).map((theme) => ({ id: theme, label: t(`theme.${theme}`) }))} />
         </div>
 
         <div className="user-menu-section">
           <div className="user-menu-section-label">{t('userMenu.fontScale')}</div>
-          <div className="user-menu-pill-group">
-            {(['small', 'medium', 'large'] as FontScale[]).map((size) => (
-              <button
-                key={size}
-                type="button"
-                className={`user-menu-pill ${settings.appearance.fontScale === size ? 'is-selected' : ''}`}
-                onClick={() => void onFontScaleChange(size)}
-              >
-                {t(`font.${size}`)}
-              </button>
-            ))}
-          </div>
+          <Tabs variant="segmented" fullWidth label={t('userMenu.fontScale')} value={settings.appearance.fontScale}
+            onChange={(value) => onFontScaleChange(value as FontScale)}
+            tabs={(['small', 'medium', 'large'] as FontScale[]).map((size) => ({ id: size, label: t(`font.${size}`) }))} />
+        </div>
         </div>
 
-        <button
+        <Button
           type="button"
+          variant="primary"
           className="user-menu-settings-button"
           data-testid="open-settings-entry"
           onClick={onOpenSettings}
         >
           {t('userMenu.settings')}
-        </button>
+        </Button>
       </div>
     </div>,
     document.body,

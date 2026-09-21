@@ -124,6 +124,7 @@ export const RuntimeScopePanel: React.FC<{
     <section className="settings-runtime-scope" data-testid="settings-runtime-scope" data-resource-kind={kind}>
       <ResourceListDetail
           testId="settings-resource-frame"
+          emptyLayout={kind === 'skill' || kind === 'policy' || kind === 'hook' ? 'fill' : 'compact'}
           isEmpty={panel.resources.length === 0 && !panel.editing}
           emptyTitle={t('settings.scopeEmpty', { kind: kindLabel })}
           emptyDescription={emptyDescriptionExtra ? (
@@ -195,7 +196,7 @@ export const RuntimeScopePanel: React.FC<{
         <TaskDialog
           open={dialogOpen}
           size="md"
-          className={`settings-resource-dialog${kind === 'mcp' ? ' settings-mcp-dialog' : ''}`}
+          className={`settings-resource-dialog${kind === 'mcp' ? ' settings-mcp-dialog' : ''}${kind === 'policy' || kind === 'skill' || kind === 'agent' ? ' settings-document-dialog' : ''}`}
           title={panel.creating
             ? t('settings.scopeAdd', { kind: kindLabel })
             : t('settings.scopeEditTitle', { kind: kindLabel })}
