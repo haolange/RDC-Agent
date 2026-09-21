@@ -14,7 +14,7 @@
 
 当前失败根因已确认：Linux runner 把 Windows 路径交给宿主 POSIX `path`；CLI 绑定结构校验不接受真实 POSIX 测试夹具；macOS `/var` 是指向 `/private/var` 的系统路径别名。生产 symlink 拒绝语义不改变。
 
-本轮修复提交：`85a2da92`（路径契约与测试隔离）及 `a4d6b5aa`（macOS Electron 测试串行化、桌面 smoke 临时目录清理重试）。最终 HEAD CI run `35567724271` 的全部 job 为 success；Linux build 包含完整测试、coverage ratchet、gates 与 build，macOS runtime/primitives 为串行执行后全绿。Windows 本机 `pnpm test` 仍受 Codex 运行时 pnpm store SQLite 权限影响的 Knowledge/SystemDebt 旧环境问题不冒充 Linux 失败；本轮跨宿主门禁以 GitHub runner 结果为准。
+本轮修复提交：`85a2da92`（路径契约与测试隔离）及 `a4d6b5aa`（macOS Electron 测试串行化、桌面 smoke 临时目录清理重试）。发行源码提交 `70254a76` 的 CI run `35567724271`、最终台账收口提交 `65256b00` 的 CI run `35568188278` 均为全 job success；Linux build 包含完整测试、coverage ratchet、gates 与 build，macOS runtime/primitives 为串行执行后全绿。Windows 本机 `pnpm test` 仍受 Codex 运行时 pnpm store SQLite 权限影响的 Knowledge/SystemDebt 旧环境问题不冒充 Linux 失败；本轮跨宿主门禁以 GitHub runner 结果为准。
 
 rc.2 本地产物（应用代码对应 `a4d6b5aa`，发布 tag `v0.6.0-rc.2` 指向收口提交 `70254a76`；文档提交不改变包内代码）：
 

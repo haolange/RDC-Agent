@@ -1,6 +1,6 @@
 # Acceptance Ledger
 
-2026-09-21 CI-CROSS-HOST-PORTABILITY：verified。`85a2da92` 修复 Shell/shell trailer/RDC CLI 的跨宿主路径契约与测试临时根 canonicalization，`a4d6b5aa` 修复 macOS Electron 测试并发提取竞争及 desktop smoke 的 Windows 临时目录清理竞态。GitHub [CI run 35567724271](https://github.com/haolange/RDC-Agent/actions/runs/35567724271) 的 Linux build、macOS runtime/primitives、browser smoke、desktop smoke、launcher checks 及全部 job 均 success。`v0.6.0-rc.1` 未移动；`v0.6.0-rc.2` 已按最终全绿 HEAD `70254a76` 创建并发布为未签名预发布。
+2026-09-21 CI-CROSS-HOST-PORTABILITY：verified。`85a2da92` 修复 Shell/shell trailer/RDC CLI 的跨宿主路径契约与测试临时根 canonicalization，`a4d6b5aa` 修复 macOS Electron 测试并发提取竞争及 desktop smoke 的 Windows 临时目录清理竞态。GitHub [CI run 35567724271](https://github.com/haolange/RDC-Agent/actions/runs/35567724271) 验证发行源码，最终台账提交另经 [CI run 35568188278](https://github.com/haolange/RDC-Agent/actions/runs/35568188278) 复验；两次的 Linux build、macOS runtime/primitives、browser smoke、desktop smoke、launcher checks 及全部 job 均 success。`v0.6.0-rc.1` 未移动；`v0.6.0-rc.2` 已按全绿 HEAD `70254a76` 创建并发布为未签名预发布。
 
 2026-09-21 RC2-PACKAGE-CANDIDATE：verified on local Windows candidate. NSIS `3ec8ae5e3246c2f1f79ff62b1e6c639b4af87be3219f1031155f14dd434bdc10`；zip `cb200d7630ffdfde50131be313b4d3ca818b70b17cfb00e1f2b37441c699a8f9`；blockmap `ea692a63672d13e4969e632a9735a7e990ed40894663497f8b2dddaab6a7186e`；SBOM `1770d95c48dcd9fdd287c9cbc7fe92c716546c1d25906cfe7e0ea9ec8f212fbc`。`verify-package.mjs` 通过，52 个 builtin/runtime resource 与四张教程图字节一致；release 资产为未签名预发布，正式签名门禁保留。
 
