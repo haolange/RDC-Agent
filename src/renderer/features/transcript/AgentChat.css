@@ -26,9 +26,10 @@
   background: linear-gradient(180deg, var(--token-bg-app), color-mix(in srgb, var(--token-bg-app) 92%, transparent));
   }
 
-.agent-chat.is-empty .chat-top-hard-stop {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--token-bg-app) 100%, transparent), color-mix(in srgb, var(--token-bg-app) 97%, transparent));
-  }
+.agent-chat.is-empty .chat-top-hard-stop,
+.agent-chat.is-empty .chat-top-transition-fade {
+  display: none;
+}
 
 .chat-top-transition-fade {
   position: absolute;
@@ -48,17 +49,6 @@
     );
   mask-image: linear-gradient(180deg, rgb(0 0 0) 0%, rgb(0 0 0 / 0.82) 34%, rgb(0 0 0 / 0.26) 72%, transparent 100%);
 }
-
-.agent-chat.is-empty .chat-top-transition-fade {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--token-bg-app) 97%, transparent) 0%,
-      color-mix(in srgb, var(--token-bg-app) 84%, transparent) 34%,
-      color-mix(in srgb, var(--token-bg-app) 48%, transparent) 68%,
-      transparent 100%
-    );
-  }
 
 .chat-messages {
   flex: 1;

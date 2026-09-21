@@ -21,8 +21,9 @@ export function RdcCliInvokerSettingsFields({ rdcCliDraft: draft, onRdcCliDraftC
   const patch = (value: Partial<RdcCliInvokerSettings>) => { installation.invalidate(); change({ ...draft, ...value }); };
   return <section className="settings-local-tool-form settings-renderdoc-toolchain" data-testid="settings-rdc-toolchain">
     <p className="settings-help-text">{t('settings.rdcFolderHint')}</p>
-    <SettingsField label={t('settings.rdcFolder')} layout="row">
-      <Input readOnly value={installation.root || draft.command} placeholder={t('settings.rdcNotSelected')} />
+    <SettingsField label={t('settings.rdcFolder')} htmlFor="settings-rdc-installation-root">
+      <Input id="settings-rdc-installation-root" readOnly value={installation.root || draft.command}
+        title={installation.root || draft.command} placeholder={t('settings.rdcNotSelected')} />
     </SettingsField>
     <div className="settings-actions">
       <Button size="sm" disabled={installation.busy} onClick={() => void installation.detect()}>{t('settings.rdcDetect')}</Button>
@@ -47,12 +48,12 @@ export function RdcCliInvokerSettingsFields({ rdcCliDraft: draft, onRdcCliDraftC
         <Switch checked={draft.enabled} disabled={installation.busy} onCheckedChange={(enabled) => patch({ enabled })}
           aria-label={t('settings.rdcCliEnabled')} data-testid="settings-rdc-enabled" />
       </label>
-      <SettingsField label={t('settings.rdcCliTimeoutMs')} layout="row">
-        <Input type="number" min={1000} max={600000} step={1000} disabled={installation.busy} value={draft.timeoutMs}
+      <SettingsField label={t('settings.rdcCliTimeoutMs')} htmlFor="settings-rdc-timeout" layout="row">
+        <Input id="settings-rdc-timeout" type="number" min={1000} max={600000} step={1000} disabled={installation.busy} value={draft.timeoutMs}
           onChange={(event) => patch({ timeoutMs: Number(event.currentTarget.value) })} />
       </SettingsField>
-      <SettingsField label={t('settings.rdcCliEnv')} layout="row" description={t('settings.rdcCliEnvHint')}>
-        <AutosizeTextarea maxHeight={180} className="input settings-rdc-cli-textarea" disabled={installation.busy}
+      <SettingsField label={t('settings.rdcCliEnv')} htmlFor="settings-rdc-environment" description={t('settings.rdcCliEnvHint')}>
+        <AutosizeTextarea id="settings-rdc-environment" maxHeight={180} className="input settings-rdc-cli-textarea" disabled={installation.busy}
           value={envText} placeholder="NAME=value" spellCheck={false}
           onChange={(event) => { setEnvText(event.currentTarget.value); patch({ env: textToEnv(event.currentTarget.value) }); }} />
       </SettingsField>
