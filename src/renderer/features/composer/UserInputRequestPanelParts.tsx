@@ -1,6 +1,7 @@
 import type { FC, RefObject } from 'react';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
 import { CheckIcon } from './userInputRequestIcons';
+import { Textarea } from '../../ui/Textarea';
 
 export const UserInputOptionList: FC<{
   question: ConversationAskUserQuestion;
@@ -76,7 +77,7 @@ export const UserInputCustomAnswer: FC<{
         ) : null}
       </button>
     ) : null}
-    <textarea
+    <Textarea
       ref={textareaRef}
       className="composer-user-input-custom-field"
       value={customAnswer}
@@ -89,7 +90,6 @@ export const UserInputCustomAnswer: FC<{
       placeholder="Type your answer..."
       disabled={isSubmitting}
       aria-label="Custom answer"
-      rows={1}
     />
   </div>
 );

@@ -5,7 +5,7 @@ import { serializeRdcThemeV1 } from '@shared/theme/rdcThemeV1';
 import { useDynStyle } from '../../../../lib/useDynStyle';
 import { Button } from '../../../../ui/Button';
 import { ColorField } from '../../../../ui/ColorField';
-import { DropdownSelect } from '../../../../ui/DropdownSelect';
+import { Select } from '../../../../ui/Select';
 import { AppearanceFontField } from './AppearanceFontField';
 import { ThemeImportDialog } from './ThemeImportDialog';
 import type { AppearanceTranslate } from './appearanceChromeModel';
@@ -111,7 +111,7 @@ export function ChromeThemeCard(props: {
       <div className="appearance-chrome-fields">
         <div className="appearance-preset-picker">
           <span className="settings-field-label">{props.t('settings.appearancePreset')}</span>
-          <DropdownSelect
+          <Select
             value={props.chrome.presetId}
             options={presetOptions}
             onChange={(value) => handlePreset(value as ThemePresetId)}

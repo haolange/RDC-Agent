@@ -6,7 +6,7 @@ import { createReplayApplyQueue } from './replayApplyQueue';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
-import { DropdownSelect } from '../../ui/DropdownSelect';
+import { Select } from '../../ui/Select';
 
 export function CaptureFrame({ scope, state, disabled, receive }: {
   scope: CaptureScope; state: CaptureReplayState | null; disabled: boolean; receive: (state: CaptureReplayState) => void;
@@ -41,7 +41,7 @@ export function CaptureFrame({ scope, state, disabled, receive }: {
   return <div className="capture-replay-content" role="tabpanel" id="capture-frame-panel" aria-labelledby="capture-frame-tab">
     <div className="capture-image-toolbar">
       <span>{t(state?.isFinalOutput ? 'control.replay.final' : 'control.replay.event')}</span>
-      {(state?.targets.length ?? 0) > 0 && <DropdownSelect dataTestId="capture-color-target" ariaLabel={t('control.replay.color')}
+      {(state?.targets.length ?? 0) > 0 && <Select dataTestId="capture-color-target" ariaLabel={t('control.replay.color')}
         value={state?.target?.textureId ?? ''} disabled={disabled || !state?.appliedEventId}
         options={(state?.targets ?? []).map((target) => ({ value: target.textureId, label: target.outputSlot === null ? t('control.replay.final') : `Color ${target.outputSlot}` }))}
         onChange={(textureId) => state?.appliedEventId && select(state.appliedEventId, true, { textureId })} />}

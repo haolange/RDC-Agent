@@ -7,11 +7,13 @@
 
 .user-menu-popover {
   position: fixed;
-  width: 304px;
+  width: min(304px, calc(100vw - (var(--space-4) * 2)));
+  max-height: calc(100vh - (var(--space-4) * 2));
+  overflow: auto;
   padding: var(--space-3);
   border: 1px solid var(--token-border-card);
   border-radius: var(--radius-xl);
-  background: var(--token-bg-shell);
+  background: var(--token-bg-overlay);
   box-shadow: var(--shadow-lg);
   opacity: 0;
   transform: translateY(-4px) scale(0.98);
@@ -20,7 +22,7 @@
   pointer-events: auto;
 }
 
-.user-menu-popover.visible {
+.user-menu-popover.is-visible {
   opacity: 1;
   transform: translateY(0) scale(1);
   pointer-events: auto;
@@ -29,23 +31,21 @@
 .user-menu-header {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--token-border-card);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--token-bg-panel) 64%, transparent);
+  gap: var(--space-2);
+  padding: var(--space-1);
 }
 
 .user-menu-avatar {
-  width: 44px;
-  height: 44px;
+  width: var(--control-height-md);
+  height: var(--control-height-md);
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
   background: var(--token-accent-primary);
   color: var(--token-text-inverse);
-  font-size: var(--text-lg);
+  font-size: var(--text-sm);
   font-weight: var(--font-semibold);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.24);
 }
@@ -54,81 +54,44 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-0-5);
+  min-width: 0;
 }
 
 .user-menu-name {
-  font-size: var(--text-lg);
+  overflow: hidden;
+  font-size: var(--text-sm);
   font-weight: var(--font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.user-menu-section {
+.user-menu-preferences {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-3);
   margin-top: var(--space-3);
 }
 
+.user-menu-section {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  min-width: 0;
+}
+
 .user-menu-section-label {
-  margin-bottom: var(--space-2);
   color: var(--token-text-caption);
   font-size: var(--text-xs);
   font-weight: var(--font-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.user-menu-pill-group {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: var(--space-2);
-}
-
-.user-menu-pill {
-  width: 100%;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--token-border-card);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--token-bg-panel) 86%, transparent);
-  color: var(--token-text-body);
-  text-align: center;
-  cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
-}
-
-.user-menu-pill:hover,
-.user-menu-pill:focus-visible {
-  color: var(--token-text-heading);
-  border-color: var(--token-border-strong);
-}
-
-.user-menu-pill.is-selected {
-  background: color-mix(in srgb, var(--token-accent-primary) 14%, transparent);
-  border-color: color-mix(in srgb, var(--token-accent-primary) 36%, transparent);
-  color: var(--token-text-heading);
+.user-menu-section .ui-tabs {
+  min-width: 0;
 }
 
 .user-menu-settings-button {
   width: 100%;
   margin-top: var(--space-3);
-  min-height: 44px;
-  padding: var(--space-3) calc(var(--space-3) + var(--space-0-5));
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--token-accent-primary);
-  background: var(--token-accent-primary);
-  color: var(--token-text-inverse);
-  font-size: var(--text-md);
-  font-weight: var(--font-semibold);
-  cursor: pointer;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.user-menu-settings-button:hover,
-.user-menu-settings-button:focus-visible {
-  box-shadow: var(--shadow-panel);
-}
-
-.user-menu-settings-button:active {
-  transform: translateY(1px);
 }

@@ -14,15 +14,16 @@ import {
   findNextEnabledIndex,
   findSelectedEnabledIndex,
   VIEWPORT_MARGIN,
-} from './dropdownSelectUtils';
-import { DropdownSelectMenu, DropdownSelectTrigger } from './DropdownSelectPrimitives';
-import type { DropdownSelectProps } from './types';
+} from './selectUtils';
+import { SelectMenu, SelectTrigger } from './SelectPrimitives';
+import type { SelectProps } from './types';
 import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
-import './DropdownSelect.css';
+import './Select.css';
 
-export type { DropdownOption } from './types';
+export type { SelectOption } from './types';
+export type { SelectProps } from './types';
 
-export const DropdownSelect: React.FC<DropdownSelectProps> = ({
+export const Select: React.FC<SelectProps> = ({
   value,
   options,
   onChange,
@@ -257,7 +258,7 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
 
   return (
     <div className={rootClassName}>
-      <DropdownSelectTrigger
+      <SelectTrigger
         triggerRef={triggerRef}
         variant={variant}
         open={open}
@@ -273,7 +274,7 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
       />
 
       {open && (
-        <DropdownSelectMenu
+        <SelectMenu
           menuRef={menuRef}
           variant={variant}
           dataTestId={dataTestId}
@@ -293,4 +294,4 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
   );
 };
 
-export default DropdownSelect;
+export default Select;

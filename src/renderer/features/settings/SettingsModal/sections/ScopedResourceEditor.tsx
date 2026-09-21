@@ -9,13 +9,13 @@ import { InlineError } from '../../../../ui/InlineError';
 import { Input } from '../../../../ui/Input';
 import { Pill } from '../../../../ui/Pill';
 import { Select } from '../../../../ui/Select';
-import { AutosizeTextarea } from '../AutosizeTextarea';
+import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
 import type { ResourceFormState } from './scopedResourceForm';
 
 const kindLabelKey = (kind: ScopedResourceKind): TranslationKey => `settings.kind.${kind}` as TranslationKey;
 
-/** Enum select whose options always include the current value so a legacy file never gets silently rewritten. */
+/** Enum select whose options always include the current value so an unsupported value never gets silently rewritten. */
 function enumOptions(values: readonly string[], current: string, unsupportedSuffix: string) {
   const options = values.map((value) => ({ value, label: value }));
   if (current && !values.includes(current)) {
@@ -103,12 +103,12 @@ export const ScopedResourceEditor: React.FC<{
 
         {(kind === 'skill' || kind === 'policy' || kind === 'agent') && (
           <SettingsField
-            className="settings-runtime-form-span"
+            className="settings-runtime-form-span settings-resource-document-field"
             label={kind === 'skill' ? t('settings.resourceFieldSkillMd') : t('settings.resourceFieldContent')}
           >
-            <AutosizeTextarea
-              maxHeight={420}
-              className="input settings-agent-instructions"
+            <Textarea
+              sizing="fill" className="settings-resource-document-input"
+              aria-label={kind === 'skill' ? t('settings.resourceFieldSkillMd') : t('settings.resourceFieldContent')}
               value={form.body}
               disabled={busy}
               onChange={(event) => onChange({ body: event.target.value })}
@@ -140,7 +140,7 @@ export const ScopedResourceEditor: React.FC<{
               <Input value={form.command} disabled={busy} onChange={(event) => onChange({ command: event.target.value })} />
             </SettingsField>
             <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldArgsJson')}>
-              <AutosizeTextarea maxHeight={160} className="input" value={form.argsText} disabled={busy} onChange={(event) => onChange({ argsText: event.target.value })} />
+              <Textarea aria-label={t('settings.resourceFieldArgsJson')} value={form.argsText} disabled={busy} onChange={(event) => onChange({ argsText: event.target.value })} />
             </SettingsField>
             <Checkbox
               className="settings-field settings-runtime-form-check"

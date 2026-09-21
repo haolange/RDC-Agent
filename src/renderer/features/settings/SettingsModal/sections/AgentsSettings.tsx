@@ -6,12 +6,12 @@ import { Button } from '../../../../ui/Button';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { Icon } from '../../../../ui/Icon';
-import { ListRow } from '../../../../ui/ListRow';
-import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { SettingsScopeBar } from '../parts';
 import { AgentAutosaveStatus } from './AgentAutosaveStatus';
+import { AgentListItem } from './AgentListItem';
 import { AgentManifestEditor, type AgentProvenanceScope } from './AgentManifestEditor';
 import { uniqueResourceId } from './uniqueResourceId';
+import { useScopedSkillSelection } from '../useScopedSkillSelection';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type AgentScope = 'user' | 'project';
@@ -96,6 +96,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   t,
 }) => {
   const [scope, setScope] = useState<AgentScope>('user');
+  const skills = useScopedSkillSelection(scope);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const activeDrafts = visibleDrafts(agentManifestDrafts);
   const scopedDrafts = useMemo(() => activeDrafts.filter((draft) => draftScope(draft) === scope), [activeDrafts, scope]);
@@ -197,22 +198,15 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
                 title={t('settings.agentScopeEmpty', { scope: scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser') })}
               />
             ) : scopedDrafts.map((agent) => (
-              <ListRow
+              <AgentListItem
                 key={agent.id}
-                className="settings-manifest-row"
+                id={agent.id}
+                name={agent.name}
+                description={getAgentCardDescription(agent, t)}
+                icon={agent.icon}
                 selected={agent.id === selectedId}
-                leading={(
-                  <span className="settings-manifest-card-icon" aria-hidden="true">
-                    <ModeGlyph mode={agent.id} icon={agent.icon ?? 'message-orbit'} size={17} strokeWidth={1.9} />
-                  </span>
-                )}
-                onClick={() => setSelectedAgentId(agent.id)}
-              >
-                <span className="settings-manifest-row-copy">
-                  <strong>{agent.name}</strong>
-                  <small>{getAgentCardDescription(agent, t)}</small>
-                </span>
-              </ListRow>
+                onSelect={() => setSelectedAgentId(agent.id)}
+              />
             ))}
           </div>
 
@@ -240,6 +234,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
 
         {selectedAgent ? (
           <AgentManifestEditor
+            skills={skills}
             settings={settings}
             selectedAgent={selectedAgent}
             provenanceScope={provenanceScope}

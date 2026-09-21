@@ -62,7 +62,6 @@ export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = (
             onGlobalInstructionsDraftChange(event.currentTarget.value);
           }}
           placeholder={t('settings.globalInstructionsPlaceholder')}
-          rows={6}
         />
       </SettingsField>
       <div className="settings-actions settings-actions-split">

@@ -1,0 +1,13 @@
+.ui-overflow-fade {
+  display: block;
+  min-width: 0;
+  min-height: 1lh;
+  overflow: hidden;
+  line-height: inherit;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.ui-overflow-fade.is-overflowing {
+  mask-image: linear-gradient(to right, rgb(0 0 0) calc(100% - 1.25rem), transparent);
+}

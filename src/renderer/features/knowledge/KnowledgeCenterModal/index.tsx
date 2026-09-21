@@ -162,7 +162,7 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
           )}
           <div className="knowledge-center-grid" ref={bodyRef}>
             {showSpaces && <SpacesColumn state={state} />}
-            {showList && <ListColumn state={state} inbox={importer.inbox} onImport={importer.openPanel} />}
+            {showList && <ListColumn state={state} inbox={importer.inbox} />}
             {showDetail && (
               <DetailColumn
                 state={state}

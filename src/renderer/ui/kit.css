@@ -2,6 +2,7 @@
 @import './IconButton.css';
 @import './Input.css';
 @import './SearchField.css';
+@import './SearchMultiSelect.css';
 @import './Checkbox.css';
 @import './Kbd.css';
 @import './Divider.css';
@@ -10,6 +11,7 @@
 @import './Popover.css';
 @import './Menu.css';
 @import './ListRow.css';
+@import './OverflowFade.css';
 @import './Panel.css';
 @import './EmptyState.css';
 @import './InlineError.css';

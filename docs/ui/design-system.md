@@ -116,7 +116,14 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 - 全局唯一按钮系统：`.button`（基类） + `.button-primary / button-secondary / button-ghost / button-danger`，定义在 `src/renderer/ui/Button.css`（由 `styles/global.css` → `ui/kit.css` 导入）。
 - React 层用 `<Button variant="primary|secondary|ghost|danger" size="sm|md|lg">`（`src/renderer/ui/Button.tsx`）。
+- 普通按钮为中性实色表面与细边框，主要动作使用强调色文字及描边，不铺大面积 accent；单选分段使用低饱和实色选中面。输入和按钮统一小圆角，默认控件高度 md，紧凑工具栏 sm。Composer Send 保留 Agent accent 实色的领域契约。
 - **禁止**新增第三套按钮类名，禁止在 feature CSS 中重复定义按钮样式。
+
+### 多行输入与全文编辑
+
+共享 `Textarea` 是多行纯文本输入唯一实现。`sizing="content"` 从一行随内容增长，默认最多八行再内部滚动，清空后收缩；初始/异步值、宽度和字体变化及折叠展开均重新测量。动态尺寸使用 CSP 允许的 constructable stylesheet，不使用内联样式，不提供手动拖拽角。
+
+`sizing="fill"` 用于技能、策略等全文编辑：上级 flex/grid 传递剩余高度，标题、标识与操作栏按内容占位，正文吸收余高并内部滚动，不叠固定像素上限。窄屏资源列表限高、正文保留可用编辑面积。Composer 的发送、IME、快捷键保持领域所有权；CodeMirror 是专用 Markdown 编辑实现，不复制普通 textarea 的测量逻辑。
 
 ## 颜色使用规则
 
@@ -141,6 +148,8 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 所有空态使用统一 `<EmptyState title description? actions? visual?>`。Settings 资源列表、Knowledge 列表、Sidebar 只用文案，不放装饰几何体。Right Rail 五卡通过可选 `visual` 槽恢复 token 着色的等距场景（`RightRailEmptyVisuals`，轻模糊、语义 `stop-color`），配一句 honest copy；需要操作时把按钮放进 `actions` 槽。`check:design-tokens` 不豁免 primitive `stop-color`。
 
+共享空态区分紧凑区块与填充面板用途。资源空态以有边界的中性实色承载标题、说明和统一动作组；Tools 的 MCP 保持紧凑，独立资源页使用剩余空间。资源列表行以实色表面、细边框和明确 hover/focus/selected 状态承载内容，长名称可换行，状态不能被挤掉；技能 description 不在列表展开。
+
 ## Composer 附件卡
 
 - 待发附件走输入框上方托盘（`composer-attachment-tray` / `composer-attachment-card`），不用 chip 文本条。
@@ -157,7 +166,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 知识中心与 Settings 居中，外壳在 `88vw × 86vh`（硬顶 `120rem × 70rem`）内接最大 16:10，不写死 `aspect-ratio`；带 `min(45rem/40rem, 视窗 − 2×inset)` 下限。backdrop `padding: var(--modal-workbench-inset)`（`--space-4`，`≤640px` 为 0），底为 `--modal-backdrop`（`--token-bg-app` 40% 压暗）加 `--modal-backdrop-filter`（`blur(16px)`）；组件 CSS 只写 `var(--modal-backdrop-filter)`，禁止字面量 `blur()`。960 堆叠导航，640 全屏去圆角。禁止再写互相覆盖的多段 media query。设置内容列与面板同宽，只靠 panel padding 留白，不再用居中 `--settings-content-max`。内部表单分栏按 `.settings-center-panel` 容器宽度查询，不按视口猜测。
 
-知识中心与 Settings 的内容使用实色分层、紧凑工具栏与清晰标题，避免嵌套装饰框和重复说明。Knowledge 保持空间 / 列表 / 详情三列（列宽 `224 / minmax(280, 0.8fr) / 1.2fr`），左栏仅放视图与空间导航；类型、生命周期与六条检索通道收进列表的筛选入口，以文字按钮表达多选；索引维护与卡片元数据默认折叠；960px 以下用空间 / 列表 / 详情切换且始终提供关闭入口。Settings 保持八项导航（常规 / 外观 / Provider / Agents / Skills / Tools / Hooks / Policy）与均分 User / Project 作用域；本机资源根与逐项资源路径只读，经常规页的「资源与诊断」任务子弹窗查看，不作为一级导航。640px 以下导航单行横向滚动，内容全屏。宽屏下 Light / Dark 编辑器并排，小屏堆叠。资源空态共用 `EmptyState`，不添加装饰性文案；路径、模型名与元数据允许换行。说明文案仅保留操作条件、作用域和必要风险，内部实现细节留在文档。
+知识中心与 Settings 的内容使用实色分层、紧凑工具栏与清晰标题，避免嵌套装饰框和重复说明。Knowledge 保持空间 / 列表 / 详情三列（列宽 `224 / minmax(280, 0.8fr) / 1.2fr`），左栏仅放视图与空间导航；类型、生命周期与六条检索通道收进列表的筛选入口，以文字按钮表达多选；索引维护与卡片元数据默认折叠；960px 以下用空间 / 列表 / 详情切换且始终提供关闭入口。Settings 保持八项导航（常规 / 外观 / Provider / Agents / Skills / Tools / Hooks / Policy）与均分 User / Project 作用域；常规页不提供「资源与诊断」，只保留资源各自编辑页的只读「资源位置」。640px 以下导航单行横向滚动，内容全屏。宽屏下 Light / Dark 编辑器并排，小屏堆叠。资源空态共用 `EmptyState`，不添加装饰性文案；路径、模型名与元数据允许换行。说明文案仅保留操作条件、作用域和必要风险，内部实现细节留在文档。
 
 ## 任务子弹窗（TaskDialog）
 
@@ -171,7 +180,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 ## 轻量选择控件
 
 - **多选**用 `CheckPill`（勾选 + 文字，`role="checkbox"`，`aria-checked`，`is-selected`）或列表里的 `Checkbox`。两者共用空心方框 + 字色勾（`--checkbox-*`）。禁止 accent 实心方砖，禁止为多选画大方框卡片。`Switch` 是唯一胶囊，开态才灌 accent。
-- **单选**用 `Tabs` 的 `variant="segmented"`（`role="tablist"` / `radiogroup`），用于主题模式、字号、导入输入方式、导出范围与格式。
+- **单选**用 `Tabs` 的 `variant="segmented"`（`role="tablist"` / `radiogroup`），用于主题模式、字号、导入输入方式、导出范围与格式。默认按内容宽度布局；同组需要统一铺满时显式使用 `fullWidth`，各项等分可用宽度。语言选项在所有界面语言下统一使用自称 `简体中文` / `English`，便于用户在不熟悉当前界面语言时识别切换入口，并避免紧凑选择器因外语全称溢出。
 - 动作按钮与选择控件不混同：普通执行 `ghost` / `secondary`，主要动作 `primary`，危险动作 `danger`。
 
 ## 颜色选择浮层
@@ -199,7 +208,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 原子：`Button`、`IconButton`、`Icon`、`Switch`、`Checkbox`、`Kbd`、`Divider`、`Spinner`、`Toast`。
 
-分子：`Pill`、`CheckPill`、`SectionHeader`、`Popover`、`Menu`、`Input`、`Textarea`、`SearchField`、`Select`、`ListRow`、`Panel`、`EmptyState`、`InlineError`、`Tabs`、`ColorField`、`TaskDialog`、`ConfirmationDialog`、`UnsavedChangesDialog`。
+分子：`Pill`、`CheckPill`、`SectionHeader`、`Popover`、`Menu`、`Input`、`Textarea`、`SearchField`、`Select`、`ListRow`、`OverflowFade`、`Panel`、`EmptyState`、`InlineError`、`Tabs`、`ColorField`、`TaskDialog`、`ConfirmationDialog`、`UnsavedChangesDialog`。
 
 每件必须：全部交互态、CSS 变量 variant、共置 CSS ≤300 行、`ui/index.ts` 导出。禁止 feature 再造第二套弹层 / 空态 / 输入。
 
@@ -246,7 +255,7 @@ pnpm run typecheck
 | 分子组件清单与交互态 / CSS 变量 variant / 禁内联 style | `src/renderer/ui` 已落地；luna 审查 | **B2** 已落地 |
 | 统一 `EmptyState` + 可选 visual | 组件已落地；Right Rail 五卡恢复 token 着色等距场景 | **B2** 组件；二次收敛恢复 visual |
 | Composer 运行态 energy orbit | `check:work-process` 验证注册角度、锥形渐变、2.85s 周期、固定遮罩和分层辉光；无偏好停播覆盖 | 真实 busy 状态下验收四角伸缩与终态停止 |
-| DropdownSelect 禁 backdrop blur | `check:appearance` 要求实色 `--token-bg-shell`、禁止 blur | B1 已反转 |
+| Select 禁 backdrop blur | `check:appearance` 要求实色 `--token-bg-shell`、禁止 blur | B1 已反转 |
 | Preview 引用运行时 CSS，删除 `designs/tokens/*` | Preview 已改；副本已删并入 `retired` | **B2** 已落地 |
 | i18n 拆分、硬编码入 i18n、sentence case | key 已拆到 `i18n/locales/{en,zh-CN}/`；硬编码与 sentence case 仍待扫 | **B3** 拆分；**B8** 文案 |
 | `check:architecture` R4 hex exempt | 仅 `design-system.css` | B1 已清空 |
@@ -265,8 +274,9 @@ Case 阅读层按内容安排主次：预期 / 实际使用并列对照，短属
 - Settings 入口装配导航与弹层，`SettingsPageContent` 组合页面；`useSettingsNavigation` 统一未保存导航，各领域 controller 保留独立草稿、校验与保存语义。页面展示组件不直接调用 IPC。
 - Knowledge 查询、选中详情、导入、导出和写入各有明确 controller。`useKnowledgeSelection` 是详情选择的唯一来源；查询或会话切换、关闭及卸载使旧请求失效。失效只阻止迟到结果更新界面，不冒充取消已经提交的写操作。
 - Composer 编辑／预览使用共享 segmented `Tabs`。Tabs 的 DOM ID 按实例生成；没有对应面板的选择控件不输出 `aria-controls`。编辑器内部焦点由 Composer 外壳呈现，不全局关闭焦点样式。
-- 基础控件负责焦点、选中、禁用与内容尺寸；领域层通过语义变量配置布局。ListRow 不因父列表高度不足而压缩内容，列表自己滚动。ColorField 的紧凑布局与隐藏标签由组件自身管理。
+- 基础控件负责焦点、选中、禁用与内容尺寸；领域层通过语义变量配置布局。ListRow 不因父列表高度不足而压缩内容，列表自己滚动。单行长文本使用 `OverflowFade`：保留完整 DOM / `title`，根据真实 overflow、ResizeObserver、字体加载与文本变化决定是否渐隐，空值仍占一行。ColorField 的紧凑布局与隐藏标签由组件自身管理。
 - Provider、Agents、Tools、Appearance 与 Knowledge 的样式按展示职责组织；响应式规则跟随所属组件。CSS 入口仅声明加载关系，不恢复已替代的集中覆盖文件。
+- Settings 的 `AgentListItem` 在 feature 内组合 `ListRow` / `ModeGlyph` / `OverflowFade`，父级持有数据与选择状态。每行沿用共享中性实色表面、细边框、小圆角及选中态，行间 `--space-1`；图形为 18px，位于 28px（`--control-height-sm`）无底色、无边框的图标列，不再使用图标底座。名称 `--text-sm` / `--font-medium`，描述 `--text-xs` / `--token-text-body`，各一行、间隔 `--space-0-5`；空描述仍占位。上下内边距 `--space-2`，行高随字体与两行内容自然增长，不固定高度裁切。布局经 ListRow 变量配置，不依赖全局 kit 与 feature CSS 的加载顺序。等高与渐隐的工程证据不能替代图标比例、条目分隔和深浅主题的真实视觉验收。
 
 ### 工作台壳层接线与项目 Capture 面板
 
@@ -276,7 +286,7 @@ Case 阅读层按内容安排主次：预期 / 实际使用并列对照，短属
 
 Composer Send / Stop 共用 Button 的 primary / danger 状态，尺寸固定 28×28；圆角与 padding 通过 `--btn-*` 配置，避免全局 CSS 加载顺序覆盖。Send 是 agent accent 实色与向上箭头，Stop 为停止方块；禁用、hover、按下使用共享 Button 行为，焦点环跟随 agent accent。不保留全局 chat-send-button 渐变与 icon-only / label 旧分支。
 
-用户入口再次点击直接关闭菜单；外部点击处理须排除入口自身，避免 mousedown 关闭后 click 重开。入口使用 aria-expanded / aria-controls，与弹层状态一致，保留 Escape 焦点返回。项目 Capture 的导入与刷新使用 SectionHeader actions 内两个 28px IconButton（加号 / 刷新），共用默认、hover、focus、disabled 状态和可访问名称，不保留独立文字按钮行。
+用户入口再次点击直接关闭菜单；外部点击处理须排除入口自身，避免 mousedown 关闭后 click 重开。入口使用 aria-expanded / aria-controls，与弹层状态一致，保留 Escape 焦点返回。菜单使用实色 overlay、无嵌套卡片的紧凑头像/名称头部，语言/主题/字号采用公共标签列和等宽 `Tabs fullWidth` 控件列；弹层以实测尺寸定位并限制在 viewport 内，窄屏自身滚动。项目 Capture 的导入与刷新使用 SectionHeader actions 内两个 28px IconButton（加号 / 刷新），共用默认、hover、focus、disabled 状态和可访问名称，不保留独立文字按钮行。
 
 Composer 宽度分配：左组及图标 menu wrapper 不参与压缩；右组允许收缩。model-effort 菜单独随生效模型名 + 思考等级 hug，用 `max-width` 封顶（默认 12rem），`min-width: 0` 可压；胶囊 `width: auto`，不预留固定槽、不贯通 `width: 100%`。窄容器只收紧 `max-width`（560px → 8rem，420px → 6rem），不用 `flex-basis` 预留槽。窄宽规则具有足够 specificity，不受后加载 Pill / Effort 基础样式覆盖。禁止 viewport 规则恢复右组 flex-shrink:0。<=720px 主内容轨道使用留白内全宽，不继续使用桌面 77% 上限；模型名只对实际溢出文本渐隐，完整名留在 `title`。
 

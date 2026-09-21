@@ -25,8 +25,7 @@
 }
 
 .composer-plan-review__feedback {
-  min-height: calc(var(--control-height-md) * 2);
-  resize: vertical;
+  width: 100%;
 }
 
 .composer-plan-review__actions {

@@ -188,7 +188,6 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
               <span>{t('knowledgeCenter.importContentYaml')}</span>
               <Textarea
                 value={importer.source}
-                rows={10}
                 spellCheck={false}
                 disabled={importer.busy}
                 onChange={(event) => importer.setSource(event.target.value)}

@@ -5,21 +5,21 @@ import {
   type RuntimeSeverityFilter,
   type TerminalScopeFilter,
 } from '../../../stores/terminalStore';
-import { type DropdownOption } from '../../../ui/DropdownSelect';
+import { type SelectOption } from '../../../ui/Select';
 import type { useI18n } from '../../../i18n';
 import { formatShortId, stringifyEntryForSearch } from './terminalFormatters';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
 export function useTerminalDrawerOptions(t: Translate, activeRunId: string | null) {
-  const scopeOptions = useMemo<DropdownOption[]>(() => ([
+  const scopeOptions = useMemo<SelectOption[]>(() => ([
     { value: 'current-session', label: t('terminal.scopeCurrentSession') },
     { value: 'current-run', label: t('terminal.scopeCurrentRun'), disabled: !activeRunId },
     { value: 'app', label: t('terminal.scopeApp') },
     { value: 'all-sessions', label: t('terminal.scopeAllSessions') },
   ]), [activeRunId, t]);
 
-  const namespaceOptions = useMemo<DropdownOption[]>(() => ([
+  const namespaceOptions = useMemo<SelectOption[]>(() => ([
     { value: 'all', label: t('terminal.namespaceAll') },
     { value: 'system', label: t('terminal.namespaceSystem') },
     { value: 'agent', label: t('terminal.namespaceAgent') },
@@ -30,7 +30,7 @@ export function useTerminalDrawerOptions(t: Translate, activeRunId: string | nul
     { value: 'llm', label: t('terminal.namespaceLlm') },
   ]), [t]);
 
-  const severityOptions = useMemo<DropdownOption[]>(() => ([
+  const severityOptions = useMemo<SelectOption[]>(() => ([
     { value: 'all', label: t('terminal.severityAll') },
     { value: 'error', label: t('terminal.severityError') },
     { value: 'warning', label: t('terminal.severityWarning') },
@@ -38,7 +38,7 @@ export function useTerminalDrawerOptions(t: Translate, activeRunId: string | nul
     { value: 'info', label: t('terminal.severityInfo') },
   ]), [t]);
 
-  const densityOptions = useMemo<DropdownOption[]>(() => ([
+  const densityOptions = useMemo<SelectOption[]>(() => ([
     { value: 'compact', label: t('terminal.densityCompact') },
     { value: 'expanded', label: t('terminal.densityExpanded') },
   ]), [t]);
@@ -78,7 +78,7 @@ export function useTerminalDrawerContextCopy(options: {
   scopeFilter: TerminalScopeFilter;
   activeSessionId: string | null;
   activeRunId: string | null;
-  scopeOptions: DropdownOption[];
+  scopeOptions: SelectOption[];
 }) {
   const { t, scopeFilter, activeSessionId, activeRunId, scopeOptions } = options;
 

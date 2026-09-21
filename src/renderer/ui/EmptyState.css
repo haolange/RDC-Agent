@@ -30,6 +30,8 @@
 
 .ui-empty-state-actions {
   display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-2);
@@ -42,6 +44,14 @@
   width: 100%;
 }
 
-.resource-empty-state-icon {
-  display: none;
+.ui-empty-state.is-layout-fill {
+  flex: 1;
+  align-self: stretch;
+}
+
+.ui-empty-state.is-layout-compact:not(:has(.ui-empty-state-visual)) {
+  min-height: 0;
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--token-bg-panel);
 }

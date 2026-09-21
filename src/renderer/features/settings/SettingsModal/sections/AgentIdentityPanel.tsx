@@ -4,7 +4,7 @@ import type { useI18n } from '../../../../i18n';
 import { useDynStyle } from '../../../../lib/useDynStyle';
 import { ColorField } from '../../../../ui/ColorField';
 import { Input } from '../../../../ui/Input';
-import { AutosizeTextarea } from '../AutosizeTextarea';
+import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
 import { AgentIconPresetPicker } from './AgentIconPresetPicker';
 
@@ -49,10 +49,10 @@ export const AgentIdentityPanel: React.FC<AgentIdentityPanelProps> = ({ agent, o
         <Input className="settings-agent-name-input" value={agent.name} onChange={(event) => onUpdateAgent({ name: event.currentTarget.value })} />
       </SettingsField>
       <SettingsField label={t('settings.agentArgumentHint')} layout="row">
-        <AutosizeTextarea rows={1} maxHeight={132} className="input settings-agent-textarea-compact" value={agent.argumentHint} onChange={(event) => onUpdateAgent({ argumentHint: event.currentTarget.value })} />
+        <Textarea sizing="content" className="settings-agent-textarea-compact" value={agent.argumentHint} onChange={(event) => onUpdateAgent({ argumentHint: event.currentTarget.value })} />
       </SettingsField>
       <SettingsField label={t('settings.agentDescription')} layout="row">
-        <AutosizeTextarea rows={2} maxHeight={132} className="input settings-agent-textarea-compact settings-agent-description-field" value={agent.description} onChange={(event) => onUpdateAgent({ description: event.currentTarget.value })} />
+        <Textarea sizing="content" className="settings-agent-textarea-compact settings-agent-description-field" value={agent.description} onChange={(event) => onUpdateAgent({ description: event.currentTarget.value })} />
       </SettingsField>
     </div>
   );

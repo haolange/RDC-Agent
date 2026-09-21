@@ -9,6 +9,7 @@ export interface ResourceListDetailProps {
   emptyTitle: string;
   emptyDescription?: ReactNode;
   emptyActions?: ReactNode;
+  emptyLayout?: 'compact' | 'fill';
   isEmpty: boolean;
   list?: ReactNode;
   detail?: ReactNode;
@@ -26,6 +27,7 @@ export function ResourceListDetail({
   emptyTitle,
   emptyDescription,
   emptyActions,
+  emptyLayout = 'compact',
   isEmpty,
   list,
   detail,
@@ -39,6 +41,7 @@ export function ResourceListDetail({
       {isEmpty ? (
         <EmptyState
           className="settings-resource-empty"
+          layout={emptyLayout}
           title={emptyTitle}
           description={emptyDescription}
           actions={emptyActions}

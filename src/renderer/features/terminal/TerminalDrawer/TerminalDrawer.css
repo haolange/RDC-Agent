@@ -385,15 +385,6 @@ body.terminal-resizing {
   flex-shrink: 0;
 }
 
-.runtime-terminal-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100%;
-  color: var(--token-text-caption);
-  font-size: var(--text-sm);
-  text-align: center;
-}
 
 .runtime-terminal-entry {
   position: relative;

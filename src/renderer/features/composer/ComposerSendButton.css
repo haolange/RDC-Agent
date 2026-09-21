@@ -2,6 +2,8 @@
   --btn-radius: var(--radius-full);
   --btn-padding-sm: 0;
   --btn-primary-bg: var(--composer-mode-accent);
+  --btn-primary-text: var(--token-text-inverse);
+  --btn-primary-border: var(--composer-mode-accent);
   --btn-primary-bg-hover: color-mix(in srgb, var(--composer-mode-accent) 88%, var(--token-text-heading));
   flex: 0 0 var(--control-height-sm);
   width: var(--control-height-sm);

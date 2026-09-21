@@ -41,8 +41,17 @@ export const PolicySettings: React.FC<{
 
   return (
     <section className="settings-page settings-page-policy" data-settings-search="policy">
+      <RuntimeScopePanel
+        overview={overview}
+        scope={scope}
+        onScopeChange={onScopeChange}
+        kinds={['policy']}
+        onChanged={onChanged}
+        editorPresentation="dialog"
+        emptyDescriptionExtra={t('settings.policyEmptyBaseline')}
+      />
       <SettingsSection
-        title={t('settings.agentRuntime')}
+        title={t('settings.globalRuntimeSettings')}
         description={t('settings.compactionThresholdHint')}
         data-testid="settings-agent-runtime-block"
       >
@@ -68,15 +77,6 @@ export const PolicySettings: React.FC<{
           />
         </SettingsField>
       </SettingsSection>
-      <RuntimeScopePanel
-        overview={overview}
-        scope={scope}
-        onScopeChange={onScopeChange}
-        kinds={['policy']}
-        onChanged={onChanged}
-        editorPresentation="dialog"
-        emptyDescriptionExtra={t('settings.policyEmptyBaseline')}
-      />
     </section>
   );
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import DropdownSelect from '../../../ui/DropdownSelect';
+import Select from '../../../ui/Select';
 import {
   type RuntimeNamespaceFilter,
   type RuntimeSeverityFilter,
@@ -41,7 +41,7 @@ export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm
       <div className="runtime-terminal-tools">
         <label className="runtime-terminal-select compact">
           <span>{t('terminal.scope')}</span>
-          <DropdownSelect
+          <Select
             variant="inline"
             value={effectiveScopeFilter}
             options={scopeOptions}
@@ -65,7 +65,7 @@ export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm
             <div className="runtime-terminal-filter-popover" role="menu">
               <label className="runtime-terminal-select stacked">
                 <span>{t('terminal.source')}</span>
-                <DropdownSelect
+                <Select
                   variant="inline"
                   value={namespaceFilter}
                   options={namespaceOptions}
@@ -75,7 +75,7 @@ export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm
               </label>
               <label className="runtime-terminal-select stacked">
                 <span>{t('terminal.level')}</span>
-                <DropdownSelect
+                <Select
                   variant="inline"
                   value={severityFilter}
                   options={severityOptions}
@@ -85,7 +85,7 @@ export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm
               </label>
               <label className="runtime-terminal-select stacked">
                 <span>{t('terminal.density')}</span>
-                <DropdownSelect
+                <Select
                   variant="inline"
                   value={density}
                   options={densityOptions}

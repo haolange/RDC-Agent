@@ -21,7 +21,8 @@
     color var(--transition-fast);
 }
 
-.button:hover:not(:disabled) {
+.button:hover:not(:disabled),
+.button:focus-visible:not(:disabled) {
   background: var(--token-bg-raised);
   border-color: var(--token-border-strong);
 }
@@ -41,21 +42,31 @@
   cursor: not-allowed;
 }
 
+:where(.button-primary) {
+  --btn-primary-bg: var(--token-bg-raised);
+  --btn-primary-bg-hover: color-mix(in srgb, var(--token-accent-primary) 10%, var(--token-bg-raised));
+  --btn-primary-text: var(--token-accent-primary);
+  --btn-primary-border: var(--token-accent-primary);
+}
+
 .button-primary {
   background: var(--btn-primary-bg);
-  border-color: transparent;
+  border-color: var(--btn-primary-border);
   color: var(--btn-primary-text);
 }
 
-.button-primary:hover:not(:disabled) {
+.button-primary:hover:not(:disabled),
+.button-primary:focus-visible:not(:disabled) {
   background: var(--btn-primary-bg-hover);
+  border-color: var(--btn-primary-border);
 }
 
 .button-secondary {
   background: var(--btn-secondary-bg);
 }
 
-.button-secondary:hover:not(:disabled) {
+.button-secondary:hover:not(:disabled),
+.button-secondary:focus-visible:not(:disabled) {
   background: var(--btn-secondary-bg-hover);
 }
 
@@ -64,7 +75,8 @@
   border-color: transparent;
 }
 
-.button-ghost:hover:not(:disabled) {
+.button-ghost:hover:not(:disabled),
+.button-ghost:focus-visible:not(:disabled) {
   background: var(--btn-ghost-bg-hover);
 }
 
@@ -74,7 +86,8 @@
   color: var(--token-status-error);
 }
 
-.button-danger:hover:not(:disabled) {
+.button-danger:hover:not(:disabled),
+.button-danger:focus-visible:not(:disabled) {
   background: color-mix(in srgb, var(--token-status-error) 18%, transparent);
 }
 

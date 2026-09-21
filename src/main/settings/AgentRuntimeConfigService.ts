@@ -6,7 +6,8 @@ import type {
   AgentRuntimeSkillDescriptor,
 } from '@shared/types/agentRuntime';
 import { MCP_TRANSPORTS as MCP_TRANSPORT_LIST, type MCPTransport } from '@shared/types/mcp';
-import type { ScopedResourceCandidate, SkillLoadResult, SkillMetadata } from '@shared/types/rdcRuntime';
+import type { ScopedResourceCandidate, SkillLoadResult, SkillMetadata, SkillSelectionProjection } from '@shared/types/rdcRuntime';
+import { MISSION_AGENT_IDS } from '@shared/types/agent';
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
 import {
@@ -86,6 +87,28 @@ export class AgentRuntimeConfigService {
 
   listSkillMetadata(projectRoot?: string, viewerAgentId?: string): SkillMetadata[] {
     return this.resolveSkills(projectRoot, viewerAgentId).map(({ instructions: _instructions, referencesPath: _references, scriptsPath: _scripts, assetsPath: _assets, ...metadata }) => metadata);
+  }
+
+  /** Authoring projection only; runtime discovery/loading retains its fail-closed behavior. */
+  getSkillSelection(projectRoot?: string): SkillSelectionProjection {
+    try {
+      return {
+        status: 'ready',
+        options: this.listSkillMetadata(projectRoot).map((skill) => ({
+          ...skill,
+          unavailableToAgentIds: MISSION_AGENT_IDS.filter((id) => !isSkillVisibleToProfile(id, skill.id)),
+        })),
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        options: [],
+        error: {
+          code: 'SKILL_CATALOG_READ_FAILED',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
   }
 
   loadSkill(id: string, projectRoot?: string, viewerAgentId?: string): SkillLoadResult | null {

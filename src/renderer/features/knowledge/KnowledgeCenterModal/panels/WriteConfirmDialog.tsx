@@ -101,7 +101,6 @@ export function WriteConfirmDialog({ write }: WriteConfirmDialogProps) {
         <Textarea
           value={write.changeReason}
           disabled={write.busy}
-          rows={3}
           required
           error={!write.changeReason.trim()}
           onChange={(event) => write.setChangeReason(event.target.value)}

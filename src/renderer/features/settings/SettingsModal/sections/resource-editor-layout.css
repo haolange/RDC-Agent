@@ -1,0 +1,111 @@
+/* Document geometry is scoped to resource editors, not Agent forms. */
+.settings-page-skills .settings-resource-split {
+  min-height: 0;
+}
+
+.settings-runtime-editor[data-resource-kind='skill'],
+.settings-runtime-editor[data-resource-kind='policy'],
+.settings-runtime-editor[data-resource-kind='agent'] {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.settings-runtime-editor:is([data-resource-kind='skill'], [data-resource-kind='policy'], [data-resource-kind='agent']) .settings-runtime-form-grid {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin-top: 0;
+}
+
+.settings-runtime-editor .settings-resource-document-field {
+  flex: 1;
+  min-height: calc(var(--control-height-md) * 5);
+  justify-content: flex-start;
+}
+
+.settings-resource-document-field > .settings-field-control {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-resource-document-field .settings-resource-document-input {
+  height: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-runtime-editor .settings-manifest-editor-head,
+.settings-runtime-editor .settings-field:not(.settings-resource-document-field),
+.settings-runtime-editor .settings-field-copy,
+.settings-runtime-editor-note {
+  flex-shrink: 0;
+}
+
+.settings-runtime-editor .settings-manifest-editor-head {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.settings-runtime-editor .settings-section-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-document-dialog {
+  height: min(80dvh, 50rem);
+}
+
+.settings-document-dialog .task-dialog-header,
+.settings-document-dialog .task-dialog-footer {
+  flex-shrink: 0;
+}
+
+.settings-document-dialog .task-dialog-body {
+  min-height: 0;
+}
+
+@container settings-panel (max-width: 60rem) {
+  .settings-page-skills .settings-resource-split {
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .settings-page-skills .settings-resource-split.is-detail-only {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .settings-page-skills .settings-resource-list-column {
+    max-height: calc(var(--control-height-md) * 2);
+  }
+
+  .settings-page-skills .settings-runtime-editor {
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .settings-page-skills .settings-manifest-editor-head {
+    flex-direction: row;
+    gap: var(--space-2);
+    padding-bottom: var(--space-2);
+    position: sticky;
+    top: 0;
+    background: var(--token-bg-raised);
+    z-index: 1;
+  }
+
+  .settings-page-skills .settings-runtime-form-grid {
+    gap: var(--space-2);
+  }
+
+  .settings-page-skills .settings-resource-frame {
+    gap: var(--space-2);
+  }
+
+  .settings-page-skills .settings-resource-document-field {
+    min-height: calc(var(--control-height-md) * 3);
+  }
+}

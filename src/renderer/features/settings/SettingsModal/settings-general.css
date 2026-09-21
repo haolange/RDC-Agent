@@ -1,4 +1,4 @@
-/* General page: profile, language, personalization, resource diagnostics entry and dialog. */
+/* General page: profile, language and personalization. */
 
 .settings-page-general .settings-general-grid {
   display: flex;
@@ -65,7 +65,6 @@
 }
 
 .settings-personalization-textarea {
-  min-height: calc(var(--space-20) + var(--space-8));
   line-height: 1.7;
 }
 
@@ -77,136 +76,6 @@
   color: var(--token-status-error);
 }
 
-/* Collapsed entry to the resources & diagnostics task dialog. */
-.settings-disclosure-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--control-height-lg);
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-panel);
-  color: var(--token-text-heading);
-  font-size: var(--text-sm);
-  text-align: start;
-  cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
-}
-
-.settings-disclosure-row:hover {
-  border-color: var(--token-border-default);
-  background: var(--token-interactive-hover);
-}
-
-.settings-disclosure-row:focus-visible {
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
-}
-
-.settings-disclosure-row-icon {
-  flex: none;
-  color: var(--token-text-caption);
-}
-
-.settings-disclosure-row-label {
-  font-weight: var(--font-medium);
-}
-
-.settings-disclosure-row-hint {
-  margin-inline-start: auto;
-  color: var(--token-text-caption);
-  font-size: var(--text-xs);
-}
-
-/* Resources & diagnostics dialog. */
-.settings-path-roots {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.settings-path-root {
-  display: grid;
-  grid-template-columns: minmax(8rem, auto) minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.settings-path-root-label {
-  color: var(--token-text-caption);
-  font-size: var(--text-xs);
-}
-
-.settings-path-root-value,
-.settings-path-value {
-  min-width: 0;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-sm);
-  background: var(--token-bg-panel);
-  color: var(--token-text-body);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-
-.settings-path-actions,
-.settings-path-row-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.settings-path-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.settings-path-group-title {
-  color: var(--token-text-heading);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-}
-
-.settings-path-table {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-
-.settings-path-row {
-  display: grid;
-  grid-template-columns: minmax(6rem, 0.22fr) minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
-  min-height: var(--control-height-lg);
-}
-
-.settings-path-row + .settings-path-row {
-  border-top: 1px solid var(--token-border-muted);
-}
-
-.settings-path-name {
-  color: var(--token-text-body);
-  font-size: var(--text-sm);
-  overflow-wrap: anywhere;
-}
-
-.settings-path-note {
-  margin: 0;
-  color: var(--token-text-caption);
-  font-size: var(--text-xs);
-  line-height: 1.6;
-}
-
 @container settings-panel (max-width: 48rem) {
   .settings-profile-row {
     grid-template-columns: minmax(0, 1fr);
@@ -215,12 +84,5 @@
 
   .settings-profile-actions {
     justify-content: flex-start;
-  }
-}
-
-@media (max-width: 48rem) {
-  .settings-path-root,
-  .settings-path-row {
-    grid-template-columns: minmax(0, 1fr);
   }
 }

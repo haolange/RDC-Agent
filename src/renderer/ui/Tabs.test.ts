@@ -23,6 +23,13 @@ describe('Tabs accessibility and navigation', () => {
     expect(markup).toMatch(/tabindex="0"[^>]*>Write/);
     expect(markup).not.toContain('aria-controls');
   });
+  it('keeps intrinsic width by default and opts into uniform full-width segments explicitly', () => {
+    const intrinsic = renderToStaticMarkup(React.createElement(Tabs, { tabs, value: 'write', onChange() {}, variant: 'segmented' }));
+    const fullWidth = renderToStaticMarkup(React.createElement(Tabs, { tabs, value: 'write', onChange() {}, variant: 'segmented', fullWidth: true }));
+    expect(intrinsic).toContain('class="ui-tabs is-segmented"');
+    expect(intrinsic).not.toContain('is-full-width');
+    expect(fullWidth).toContain('class="ui-tabs is-segmented is-full-width"');
+  });
   it.each([
     [0, 'ArrowRight', 2], [2, 'ArrowRight', 0], [0, 'ArrowLeft', 2],
     [2, 'Home', 0], [0, 'End', 2], [1, 'ArrowLeft', 2],

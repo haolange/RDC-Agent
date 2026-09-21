@@ -17,19 +17,9 @@
 
 .conversation-edit-textarea {
   width: 100%;
-  min-height: calc(var(--space-12) + var(--space-2));
-  max-height: 16.25rem;
-  resize: none;
-  border: 0;
-  background: transparent;
   color: var(--token-text-heading);
   font-size: var(--text-base);
   line-height: 1.7;
-}
-
-.conversation-edit-textarea:focus {
-  outline: 0;
-  box-shadow: none;
 }
 
 .conversation-edit-preview {

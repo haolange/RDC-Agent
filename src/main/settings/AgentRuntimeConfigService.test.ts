@@ -28,11 +28,63 @@ describe('AgentRuntimeConfigService scoped resources', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (previousHome === undefined) delete process.env.RDC_AGENT_HOME;
     else process.env.RDC_AGENT_HOME = previousHome;
     if (previousUserData === undefined) delete process.env.RDC_AGENT_USER_DATA;
     else process.env.RDC_AGENT_USER_DATA = previousUserData;
     fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('projects the same scope winners and target visibility as runtime discovery without skill bodies', async () => {
+    const project = path.join(root, 'project');
+    const writeSkill = (base: string, id: string, name: string) => {
+      const directory = path.join(base, 'skills', id);
+      fs.mkdirSync(directory, { recursive: true });
+      fs.writeFileSync(path.join(directory, 'SKILL.md'), `---\nname: ${name}\ndescription: ${name} description\n---\nPrivate instructions`);
+    };
+    writeSkill(process.env.RDC_AGENT_HOME!, 'debug', 'User Debug');
+    writeSkill(path.join(project, '.rdc-agent'), 'debug', 'Project Debug');
+    writeSkill(process.env.RDC_AGENT_HOME!, 'user-only', 'User Only');
+    const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
+    const service = new AgentRuntimeConfigService();
+    const projection = service.getSkillSelection(project);
+    expect(projection.status).toBe('ready');
+    expect(projection.options.filter((skill) => skill.id === 'debug')).toHaveLength(1);
+    expect(projection.options.find((skill) => skill.id === 'debug')).toMatchObject({ name: 'Project Debug', scope: 'project', effectiveStatus: 'overridden' });
+    expect(service.getSkillSelection().options.find((skill) => skill.id === 'debug')).toMatchObject({ name: 'User Debug', scope: 'user' });
+    expect(projection.options.find((skill) => skill.id === 'user-only')?.scope).toBe('user');
+    expect(projection.options.some((skill) => skill.scope === 'builtin')).toBe(true);
+    expect(projection.options.every((skill) => !('instructions' in skill) && !('scriptsPath' in skill))).toBe(true);
+    for (const target of ['general', 'debugger', 'analyzer', 'optimizer', 'custom-agent']) {
+      expect(projection.options.filter((skill) => !skill.unavailableToAgentIds.includes(target)).map((skill) => skill.id))
+        .toEqual(service.listSkills(project, target).map((skill) => skill.id));
+    }
+    expect(projection.options.find((skill) => skill.id === 'rdc-tool-shell')?.unavailableToAgentIds)
+      .toEqual(['debugger', 'analyzer', 'optimizer']);
+  });
+
+  it('reports malformed overriding skills as catalog errors without exposing a lower-scope fallback', async () => {
+    const project = path.join(root, 'project');
+    const directory = path.join(project, '.rdc-agent', 'skills', 'debug');
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(path.join(directory, 'SKILL.md'), '---\nname: [\n---\nBroken');
+    const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
+    const service = new AgentRuntimeConfigService();
+    expect(service.getSkillSelection(project)).toMatchObject({ status: 'error', options: [], error: { code: 'SKILL_CATALOG_READ_FAILED', message: expect.any(String) } });
+    expect(() => service.listSkills(project)).toThrow();
+    expect(() => service.loadSkill('debug', project)).toThrow();
+  });
+
+  it('distinguishes directory read failure from a successfully empty catalog', async () => {
+    const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
+    const service = new AgentRuntimeConfigService();
+    const read = vi.spyOn(fs, 'readdirSync');
+    read.mockImplementation(() => { throw new Error('EACCES: skill directory unreadable'); });
+    expect(service.getSkillSelection()).toEqual({ status: 'error', options: [], error: { code: 'SKILL_CATALOG_READ_FAILED', message: 'EACCES: skill directory unreadable' } });
+    expect(() => service.listSkills()).toThrow('EACCES');
+    read.mockReturnValue([]);
+    expect(service.getSkillSelection()).toEqual({ status: 'ready', options: [] });
   });
 
   it('loads standard directory skills and applies project whole-resource precedence', async () => {
@@ -64,6 +116,48 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     });
     expect(loaded?.instructions).toContain('Use project evidence only.');
     expect(service.listSkillMetadata(project).every((skill) => !('instructions' in skill))).toBe(true);
+  });
+
+  it.each([
+    ['empty file', '', ''],
+    ['empty delimiters', '---\n---\nBody', '---\n---\nBody'],
+    ['unclosed frontmatter', '---\nname: Ignored\nBody', '---\nname: Ignored\nBody'],
+    ['array frontmatter', '---\n- entry\n---\nBody', 'Body'],
+    ['scalar frontmatter', '---\n42\n---\nBody', 'Body'],
+  ])('preserves canonical parsing of %s without adding validation semantics', async (_label, content, instructions) => {
+    const directory = path.join(process.env.RDC_AGENT_HOME!, 'skills', 'parser-boundary');
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(path.join(directory, 'SKILL.md'), content);
+    const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
+    const service = new AgentRuntimeConfigService();
+    expect(service.loadSkill('parser-boundary')).toMatchObject({ name: 'parser-boundary', description: '', allowedTools: [], instructions });
+    const projection = service.getSkillSelection();
+    expect(projection.status).toBe('ready');
+    expect(projection.options.find((skill) => skill.id === 'parser-boundary')).toMatchObject({ name: 'parser-boundary', description: '', allowedTools: [] });
+  });
+
+  it.each(['', 'null'])('preserves the canonical null access failure for matched YAML %j', async (yaml) => {
+    const directory = path.join(process.env.RDC_AGENT_HOME!, 'skills', 'parser-boundary');
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(path.join(directory, 'SKILL.md'), `---\n${yaml}\n---\nBody`);
+    const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
+    const service = new AgentRuntimeConfigService();
+    expect(() => service.loadSkill('parser-boundary')).toThrow(TypeError);
+    expect(() => service.listSkills()).toThrow(TypeError);
+    expect(service.getSkillSelection()).toMatchObject({ status: 'error', options: [], error: { code: 'SKILL_CATALOG_READ_FAILED' } });
+  });
+
+  it('does not invent enabled:false filtering unsupported by the canonical skill parser', async () => {
+    const directory = path.join(process.env.RDC_AGENT_HOME!, 'skills', 'debug');
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(path.join(directory, 'SKILL.md'), '---\nname: User Debug\nenabled: false\n---\nUser body');
+    const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
+    const service = new AgentRuntimeConfigService();
+    expect(service.loadSkill('debug')).toMatchObject({ name: 'User Debug', scope: 'user', instructions: 'User body' });
+    expect(service.listSkills().find((skill) => skill.id === 'debug')).toMatchObject({ name: 'User Debug', enabledByDefault: true });
+    const projection = service.getSkillSelection();
+    expect(projection.status).toBe('ready');
+    expect(projection.options.find((skill) => skill.id === 'debug')).toMatchObject({ name: 'User Debug', scope: 'user', effectiveStatus: 'overridden' });
   });
 
   it('rejects same-id project MCP executable overrides of user command/args/url/env', async () => {

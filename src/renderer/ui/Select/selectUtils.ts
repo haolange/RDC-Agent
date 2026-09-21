@@ -1,4 +1,4 @@
-import type { DropdownOption } from './types';
+import type { SelectOption } from './types';
 
 export const VIEWPORT_MARGIN = 16;
 /** Gap between trigger and menu; filled by the caret tip for a tight junction. */
@@ -22,14 +22,14 @@ export const normalizeTestIdSegment = (value: string): string => {
   return normalized || 'option';
 };
 
-export const findFirstEnabledIndex = (options: DropdownOption[]): number =>
+export const findFirstEnabledIndex = (options: SelectOption[]): number =>
   options.findIndex((option) => !option.disabled);
 
-export const findSelectedEnabledIndex = (options: DropdownOption[], value: string): number =>
+export const findSelectedEnabledIndex = (options: SelectOption[], value: string): number =>
   options.findIndex((option) => option.value === value && !option.disabled);
 
 export const findNextEnabledIndex = (
-  options: DropdownOption[],
+  options: SelectOption[],
   startIndex: number,
   direction: 1 | -1,
 ): number => {

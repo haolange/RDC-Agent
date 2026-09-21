@@ -20,6 +20,48 @@
 
 .settings-page-skills {
   gap: var(--space-4);
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.settings-center-panel:has(> .settings-page-skills),
+.settings-center-panel:has(> .settings-page-hooks),
+.settings-center-panel:has(> .settings-page-policy) {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-page-skills > .settings-runtime-scope {
+  flex: 1;
+}
+
+.settings-page-hooks {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.settings-page-hooks > .settings-runtime-scope {
+  flex: 1;
+  min-height: 0;
+}
+
+@container settings-panel (max-width: 60rem) {
+  .settings-page-hooks .settings-resource-list-column {
+    max-height: calc(var(--control-height-md) * 2);
+  }
+}
+
+.settings-page-policy {
+  flex: 1 0 auto;
+}
+
+/* Policy resources grow with their content; the global section must never shrink. */
+.settings-page-policy > .settings-block {
+  flex: 0 0 auto;
+}
+
+.settings-page-policy > .settings-runtime-scope {
+  flex: 1 0 auto;
 }
 
 .settings-page-skills .settings-help-text {

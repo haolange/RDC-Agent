@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
-import { toAgentManifestEditorDraft } from '@shared/types/agentManifest';
+import { toAgentManifestEditorDraft, type AgentManifestDefinition } from '@shared/types/agentManifest';
 import type {
   AppSettings,
   LlmAgentRoute,
@@ -11,6 +11,10 @@ import type {
 } from '@shared/types/settings';
 import type { ProviderConnectionDraft, SettingsSection } from './types';
 import { cloneProvider, cloneRoute } from './utils';
+
+export function canInitializeAgentEditor(definitions: AgentManifestDefinition[], currentProjectId?: string | null) {
+  return Boolean(currentProjectId?.trim()) || !definitions.some((definition) => definition.provenance?.scope === 'project');
+}
 
 export const useSettingsModalState = (
   open: boolean,
@@ -26,9 +30,13 @@ export const useSettingsModalState = (
     settings.tooling.codeInterpreter,
   );
   const [shellDraft, setShellDraft] = useState<AgentShellSettings>(settings.tooling.shell);
-  const [agentManifestDrafts, setAgentManifestDrafts] = useState<AgentManifestDraft[]>(
-    settings.agents.definitions.map((definition) => toAgentManifestEditorDraft(definition, currentProjectId)),
-  );
+  // SettingsModal stays mounted while closed, before asynchronous project restoration finishes.
+  // Do not create writable project drafts until their write identity is available.
+  const [agentManifestDrafts, setAgentManifestDrafts] = useState<AgentManifestDraft[]>([]);
+  const [draftProjectId, setDraftProjectId] = useState<string | null | undefined>(undefined);
+  const projectIdentityReady = canInitializeAgentEditor(settings.agents.definitions, currentProjectId);
+  const agentManifestOwnershipReady = projectIdentityReady && draftProjectId === (currentProjectId ?? null);
+  const agentManifestContextReady = open && agentManifestOwnershipReady;
   const [globalInstructionsDraft, setGlobalInstructionsDraft] = useState(settings.agents.globalInstructions);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(settings.llm.providers[0]?.id ?? null);
   const [connectionDraft, setConnectionDraft] = useState<ProviderConnectionDraft | null>(null);
@@ -41,6 +49,14 @@ export const useSettingsModalState = (
   useEffect(() => {
     if (!open) {
       wasOpenRef.current = false;
+      return;
+    }
+    if (!projectIdentityReady) {
+      wasOpenRef.current = false;
+      setDraftProjectId(undefined);
+      setAgentManifestSaveBlocked(true);
+      setAgentManifestSaveState('error');
+      setAgentManifestSaveMessage('AGENT_MANIFEST_PROJECT_ID_REQUIRED: waiting for the current project identity before editing project agents.');
       return;
     }
     const projectChanged = lastProjectIdRef.current !== currentProjectId;
@@ -58,13 +74,14 @@ export const useSettingsModalState = (
     setAgentManifestDrafts(settings.agents.definitions.map((definition) => (
       toAgentManifestEditorDraft(definition, currentProjectId)
     )));
+    setDraftProjectId(currentProjectId ?? null);
     setGlobalInstructionsDraft(settings.agents.globalInstructions);
     setSelectedProviderId(providers[0]?.id ?? null);
     setConnectionDraft(null);
     setAgentManifestSaveState('idle');
     setAgentManifestSaveMessage('');
     setAgentManifestSaveBlocked(false);
-  }, [open, settings, currentProjectId]);
+  }, [open, settings, currentProjectId, projectIdentityReady]);
 
   return {
     activeSection,
@@ -81,7 +98,9 @@ export const useSettingsModalState = (
     setCodeInterpreterDraft,
     shellDraft,
     setShellDraft,
-    agentManifestDrafts,
+    agentManifestDrafts: agentManifestContextReady ? agentManifestDrafts : [],
+    agentManifestAutosaveDrafts: agentManifestOwnershipReady ? agentManifestDrafts : [],
+    agentManifestContextReady,
     setAgentManifestDrafts,
     globalInstructionsDraft,
     setGlobalInstructionsDraft,

@@ -2,12 +2,15 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentHandoffDefinition, AgentManifestDefinition, AgentModelOption } from '@shared/types/agentManifest';
 import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
+import { EmptyState } from '../../../../ui/EmptyState';
+import type { AgentSkillCatalog } from './AgentSkillPicker';
 import { AgentHandoffCard } from './AgentHandoffCard';
 import { persistAgentHandoff, validateAgentHandoffs } from './agentHandoffValidation';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
 interface AgentHandoffEditorProps {
+  skills: AgentSkillCatalog;
   selfId: string;
   handoffs: AgentHandoffDefinition[];
   definitions: AgentManifestDefinition[];
@@ -35,6 +38,7 @@ const swapAt = <T,>(items: T[], index: number, offset: number): T[] => {
 };
 
 export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
+  skills,
   selfId,
   handoffs,
   definitions,
@@ -95,13 +99,14 @@ export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
   return (
     <div className="settings-handoff-editor" data-testid="settings-agent-handoffs">
       {handoffs.length === 0 ? (
-        <div className="settings-empty settings-empty-dashed">{t('settings.agentHandoffEmpty')}</div>
+        <EmptyState layout="compact" title={t('settings.agentHandoffEmpty')} />
       ) : (
         <div className="settings-handoff-list">
           {handoffs.map((handoff, index) => {
             const rowKey = rowKeys[index] ?? String(index);
             return (
               <AgentHandoffCard
+                skills={skills}
                 key={rowKey}
                 index={index}
                 handoff={handoff}

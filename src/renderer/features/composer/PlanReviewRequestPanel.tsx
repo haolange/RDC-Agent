@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
+import { Textarea } from '../../ui/Textarea';
 import { HandoffActionRow } from '../../patterns/HandoffActionRow/HandoffActionRow';
 import { findPendingPlanReview, type PendingPlanReviewRequest } from './planReviewRequestModel';
 import { usePlanReviewSubmit } from './usePlanReviewSubmit';
@@ -57,9 +58,9 @@ export const PlanReviewRequestPanel: React.FC<{
       <label className="composer-plan-review__label" htmlFor="plan-review-feedback">
         {t('chat.planReviewFeedbackLabel')}
       </label>
-      <textarea
+      <Textarea
         id="plan-review-feedback"
-        className="input composer-plan-review__feedback"
+        className="composer-plan-review__feedback"
         value={feedback}
         disabled={isSubmitting}
         placeholder={t('chat.planReviewFeedbackPlaceholder')}

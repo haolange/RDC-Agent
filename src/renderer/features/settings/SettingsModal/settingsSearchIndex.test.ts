@@ -8,7 +8,6 @@ const titles: Record<string, string> = {
   'settings.personalization': 'Personalization',
   'settings.appearance': 'Appearance',
   'userMenu.fontScale': 'Font scale',
-  'settings.resourceDiagnosticsTitle': 'Resources & diagnostics',
   'settings.models': 'Models',
   'settings.agentManifestTitle': 'Agents',
   'settings.skills': 'Skills',
@@ -27,11 +26,12 @@ describe('settingsSearchIndex', () => {
     expect([...sections].sort()).toEqual([...expected].sort());
   });
 
-  it('keeps resource paths reachable from General instead of a Workspace section', () => {
+  it('does not advertise the removed diagnostics surface', () => {
     const titleOf = (key: string) => titles[key] ?? key;
     expect(SETTINGS_SEARCH_INDEX.some((entry) => entry.section === ('workspace' as SettingsSection))).toBe(false);
-    expect(matchSettingsSearchEntries('工作区', titleOf).map((entry) => entry.id)).toContain('resource-diagnostics');
-    expect(matchSettingsSearchEntries('paths', titleOf).map((entry) => entry.section)).toContain('general');
+    expect(SETTINGS_SEARCH_INDEX.some((entry) => entry.id === 'resource-diagnostics')).toBe(false);
+    expect(matchSettingsSearchEntries('diagnostics', titleOf)).toEqual([]);
+    expect(matchSettingsSearchEntries('paths', titleOf)).toEqual([]);
   });
 
   it('matches English and Chinese keywords', () => {

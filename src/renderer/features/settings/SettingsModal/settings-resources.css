@@ -5,16 +5,8 @@
   gap: var(--space-2);
 }
 
-.settings-page-skills .settings-runtime-editor textarea {
-  min-height: clamp(calc(var(--space-20) * 3), 40vh, calc(var(--space-20) * 5));
-}
-
 .settings-page-policy .settings-policy-threshold.is-row {
   justify-content: space-between;
-}
-
-.settings-resource-dialog .settings-runtime-editor[data-resource-kind='policy'] textarea {
-  min-height: calc(var(--space-20) * 3);
 }
 
 .settings-actions {
@@ -23,15 +15,11 @@
   margin-top: var(--space-3);
 }
 
-.settings-runtime-scope,
-.settings-runtime-result {
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-lg);
-  background: var(--token-bg-panel);
-}
-
 .settings-runtime-scope {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
   gap: var(--space-4);
   padding: 0;
   border: 0;
@@ -48,7 +36,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: var(--space-6);
   color: var(--token-text-caption);
   font-size: var(--text-base);
@@ -176,8 +165,6 @@
 }
 
 .settings-runtime-editor textarea {
-  min-height: var(--space-20);
-  resize: vertical;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
 }

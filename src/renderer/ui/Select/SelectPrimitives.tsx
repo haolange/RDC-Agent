@@ -1,8 +1,8 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useDynStyle } from '../../lib/useDynStyle';
-import { normalizeTestIdSegment } from './dropdownSelectUtils';
-import type { DropdownOption } from './types';
+import { normalizeTestIdSegment } from './selectUtils';
+import type { SelectOption } from './types';
 
 function AaSwatch(props: { color: string; className?: string }) {
   const dynStyle = useDynStyle({ '--dropdown-swatch-bg': props.color });
@@ -36,7 +36,7 @@ function CheckIcon() {
   );
 }
 
-interface DropdownSelectTriggerProps {
+interface SelectTriggerProps {
   triggerRef: React.Ref<HTMLButtonElement>;
   variant: 'field' | 'inline';
   open: boolean;
@@ -51,7 +51,7 @@ interface DropdownSelectTriggerProps {
   onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void;
 }
 
-export const DropdownSelectTrigger: React.FC<DropdownSelectTriggerProps> = ({
+export const SelectTrigger: React.FC<SelectTriggerProps> = ({
   triggerRef,
   variant,
   open,
@@ -95,7 +95,7 @@ export const DropdownSelectTrigger: React.FC<DropdownSelectTriggerProps> = ({
   </button>
 );
 
-interface DropdownSelectMenuProps {
+interface SelectMenuProps {
   menuRef: React.Ref<HTMLDivElement>;
   variant: 'field' | 'inline';
   dataTestId: string;
@@ -104,7 +104,7 @@ interface DropdownSelectMenuProps {
   optionClassName: string;
   emptyLabel: string;
   value: string;
-  options: DropdownOption[];
+  options: SelectOption[];
   activeIndex: number;
   menuPosition: {
     left: number;
@@ -118,7 +118,7 @@ interface DropdownSelectMenuProps {
   onCommitSelection: (nextValue: string) => void;
 }
 
-const DropdownSelectMenuPortal: React.FC<DropdownSelectMenuProps> = ({
+const SelectMenuPortal: React.FC<SelectMenuProps> = ({
   menuRef,
   variant,
   dataTestId,
@@ -213,6 +213,6 @@ const DropdownSelectMenuPortal: React.FC<DropdownSelectMenuProps> = ({
   );
 };
 
-export const DropdownSelectMenu: React.FC<DropdownSelectMenuProps> = (props) => (
-  createPortal(<DropdownSelectMenuPortal {...props} />, document.body)
+export const SelectMenu: React.FC<SelectMenuProps> = (props) => (
+  createPortal(<SelectMenuPortal {...props} />, document.body)
 );
