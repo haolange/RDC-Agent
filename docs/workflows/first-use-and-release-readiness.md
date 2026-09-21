@@ -14,9 +14,9 @@
 
 当前失败根因已确认：Linux runner 把 Windows 路径交给宿主 POSIX `path`；CLI 绑定结构校验不接受真实 POSIX 测试夹具；macOS `/var` 是指向 `/private/var` 的系统路径别名。生产 symlink 拒绝语义不改变。
 
-本轮修复提交：`85a2da92`（路径契约与测试隔离）及 `a4d6b5aa`（macOS Electron 测试串行化、桌面 smoke 临时目录清理重试）。最终 HEAD CI run `35566584898` 的全部 job 为 success；Linux build 包含完整测试、coverage ratchet、gates 与 build，macOS runtime/primitives 为串行执行后全绿。Windows 本机 `pnpm test` 仍受 Codex 运行时 pnpm store SQLite 权限影响的 Knowledge/SystemDebt 旧环境问题不冒充 Linux 失败；本轮跨宿主门禁以 GitHub runner 结果为准。
+本轮修复提交：`85a2da92`（路径契约与测试隔离）及 `a4d6b5aa`（macOS Electron 测试串行化、桌面 smoke 临时目录清理重试）。最终 HEAD CI run `35567724271` 的全部 job 为 success；Linux build 包含完整测试、coverage ratchet、gates 与 build，macOS runtime/primitives 为串行执行后全绿。Windows 本机 `pnpm test` 仍受 Codex 运行时 pnpm store SQLite 权限影响的 Knowledge/SystemDebt 旧环境问题不冒充 Linux 失败；本轮跨宿主门禁以 GitHub runner 结果为准。
 
-rc.2 本地产物（构建时应用代码对应 `a4d6b5aa`，最终发布 tag 将包含本节收口文档）：
+rc.2 本地产物（应用代码对应 `a4d6b5aa`，发布 tag `v0.6.0-rc.2` 指向收口提交 `70254a76`；文档提交不改变包内代码）：
 
 - `release/RDC-Agent-0.6.0-rc.2-x64-setup.exe`：SHA256 `3ec8ae5e3246c2f1f79ff62b1e6c639b4af87be3219f1031155f14dd434bdc10`
 - `release/RDC-Agent-0.6.0-rc.2-x64.zip`：SHA256 `cb200d7630ffdfde50131be313b4d3ca818b70b17cfb00e1f2b37441c699a8f9`
@@ -24,6 +24,8 @@ rc.2 本地产物（构建时应用代码对应 `a4d6b5aa`，最终发布 tag �
 - `release/sbom.cdx.json`：SHA256 `1770d95c48dcd9fdd287c9cbc7fe92c716546c1d25906cfe7e0ea9ec8f212fbc`
 
 `verify-package.mjs` 检查通过：版本 `0.6.0-rc.2`、应用入口、52 个 runtime resource、四张教程图字节一致，asar 无源码/开发配置/包管理器。生成器输出 1,099 个 SBOM components；最终 GitHub release 仅保留上述一套发行资产与必要元数据。
+
+GitHub release：[RDC-Agent v0.6.0-rc.2](https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.2)。远端 7 项资产 digest 与本地 SHA256 一致，`prerelease=true`；`v0.6.0-rc.1` tag 与资产保持原状。
 
 ## 发行执行（用户追加授权）
 
