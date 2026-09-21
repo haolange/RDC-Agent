@@ -1,0 +1,26 @@
+diff --git a/dist/style-mod.cjs b/dist/style-mod.cjs
+index 572f6b922761004752a8a8f633a3f586e0c26541..18126475b0365f2d1461bef6ec7833cca008d54d 100644
+--- a/dist/style-mod.cjs
++++ b/dist/style-mod.cjs
+@@ -84,7 +84,7 @@ var adoptedSet = new Map //<Document, StyleSet>
+ 
+ var StyleSet = function StyleSet(root, nonce) {
+   var doc = root.ownerDocument || root, win = doc.defaultView
+-  if (!root.head && root.adoptedStyleSheets && win.CSSStyleSheet) {
++  if (root.adoptedStyleSheets && win.CSSStyleSheet) {
+     var adopted = adoptedSet.get(doc)
+     if (adopted) { return root[SET] = adopted }
+     this.sheet = new win.CSSStyleSheet
+diff --git a/src/style-mod.js b/src/style-mod.js
+index 009b0bee0075c7e408bf533e23c05dfedc059d67..390a632133de3d2480bbee7d9b5d9543a5a72f14 100644
+--- a/src/style-mod.js
++++ b/src/style-mod.js
+@@ -91,7 +91,7 @@ let adoptedSet = new Map //<Document, StyleSet>
+ class StyleSet {
+   constructor(root, nonce) {
+     let doc = root.ownerDocument || root, win = doc.defaultView
+-    if (!root.head && root.adoptedStyleSheets && win.CSSStyleSheet) {
++    if (root.adoptedStyleSheets && win.CSSStyleSheet) {
+       let adopted = adoptedSet.get(doc)
+       if (adopted) return root[SET] = adopted
+       this.sheet = new win.CSSStyleSheet

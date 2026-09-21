@@ -14,3 +14,7 @@ minimumReleaseAgeExclude:
   - '@ai-sdk/gateway@3.0.150'
   - '@ai-sdk/provider-utils@4.0.39'
   - ai@6.0.226
+
+patchedDependencies:
+  # CodeMirror must use constructed sheets in Document under the desktop CSP.
+  style-mod@4.1.3: patches/style-mod@4.1.3.patch
