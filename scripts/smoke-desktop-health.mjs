@@ -104,6 +104,22 @@ async function stopChild(child) {
   if (child.exitCode == null) child.kill('SIGKILL');
 }
 
+async function removeTemporaryRoot(root) {
+  let lastError;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    try {
+      rmSync(root, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      lastError = error;
+      const code = error?.code;
+      if (code !== 'EBUSY' && code !== 'EPERM') throw error;
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  }
+  throw lastError;
+}
+
 async function main() {
   const unpacked = resolveUnpackedDir();
   if (!unpacked) {
@@ -166,7 +182,7 @@ async function main() {
     ok('PASS (packaged services initialized; visual rendering is a separate check)');
   } finally {
     await stopChild(child);
-    rmSync(root, { recursive: true, force: true });
+    await removeTemporaryRoot(root);
   }
 }
 

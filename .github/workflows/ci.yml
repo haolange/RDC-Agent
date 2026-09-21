@@ -66,7 +66,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
-      - run: pnpm exec vitest run src/main/runtime src/main/agent-runtime/tools/primitives
+      # Several runtime suites may lazily initialize Electron on a clean
+      # runner. Keep this OS-bound surface single-file to avoid concurrent
+      # Electron framework extraction into the same node_modules tree.
+      - run: pnpm exec vitest run --no-file-parallelism src/main/runtime src/main/agent-runtime/tools/primitives
 
   launcher-fresh-checkout:
     strategy:
