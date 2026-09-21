@@ -1,5 +1,19 @@
 # 上手引导与发行准备
 
+## HEAD CI 跨平台收口与 rc.2（2026-09-21）
+
+本轮目标：修复 current HEAD 的 Linux `pnpm test` 与 macOS runtime/primitives Vitest 失败，在不移动 `v0.6.0-rc.1` 的前提下，以全绿 HEAD 生成 `v0.6.0-rc.2` 未签名预发布。状态使用「待执行 / 执行中 / 待验证 / 通过 / 阻塞」。
+
+| Task | 状态 | 范围与通过条件 | 验证批次 |
+|---|---|---|---|
+| CI-1 路径契约 | 执行中 | Shell、shell trailer、RDC CLI 绑定按目标路径方言工作；不放宽安全拒绝 | A：受影响 Vitest、typecheck、lint |
+| CI-2 测试隔离 | 待执行 | macOS 临时根 canonicalize；大小写别名按实际文件系统能力断言 | A/B：macOS 与 Linux runner |
+| CI-3 HEAD 全绿 | 待执行 | Linux build、macOS shell 及全部 CI job 全绿 | C：GitHub CI |
+| CI-4 rc.2 发行 | 待执行 | 版本、产物、checksum、SBOM、预发布说明一致；保留 rc.1 | C：隔离产物验证 |
+| CI-5 收尾 | 待执行 | 验收记录、临时目录、进程与 canonical lock 收口 | C：清理复查 |
+
+当前失败根因已确认：Linux runner 把 Windows 路径交给宿主 POSIX `path`；CLI 绑定结构校验不接受真实 POSIX 测试夹具；macOS `/var` 是指向 `/private/var` 的系统路径别名。生产 symlink 拒绝语义不改变。
+
 ## 发行执行（用户追加授权）
 
 2026-09-20用户选择：Agent `0.6.0-rc.1` 未签名预发布、Tools `1.0.1` 正式发布；允许提交main、推送、创建新tag与Release。不创建分支，不改变仓库可见性，不覆盖Tools v1.0.0。以下早期“不发布”记录为历史阶段边界，本节为当前执行范围。

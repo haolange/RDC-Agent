@@ -164,8 +164,13 @@ export function parseShellTrailer(stdout: string, marker: string): ParsedShellOu
 }
 
 export function isPathInsideRoot(target: string, root: string): boolean {
-  const resolvedTarget = path.resolve(target);
-  const resolvedRoot = path.resolve(root);
-  const relative = path.relative(resolvedRoot, resolvedTarget);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+  const isWindowsPath = (value: string): boolean => /^[a-z]:[\\/]/i.test(value) || /^\\\\/.test(value);
+  const targetIsWindows = isWindowsPath(target);
+  const rootIsWindows = isWindowsPath(root);
+  if (targetIsWindows !== rootIsWindows) return false;
+  const pathApi = targetIsWindows ? path.win32 : path.posix;
+  const resolvedTarget = pathApi.resolve(target);
+  const resolvedRoot = pathApi.resolve(root);
+  const relative = pathApi.relative(resolvedRoot, resolvedTarget);
+  return relative === '' || (!relative.startsWith('..') && !pathApi.isAbsolute(relative));
 }

@@ -77,8 +77,13 @@ function defaultDeps(): ShellResolverDeps {
   };
 }
 
-function basenameWithoutExt(executable: string): string {
-  return path.basename(executable).replace(/\.exe$/i, '').toLowerCase();
+function basenameWithoutExt(executable: string, platform: NodeJS.Platform): string {
+  const pathApi = platform === 'win32' ? path.win32 : path.posix;
+  return pathApi.basename(executable).replace(/\.exe$/i, '').toLowerCase();
+}
+
+function joinForPlatform(platform: NodeJS.Platform, ...segments: string[]): string {
+  return (platform === 'win32' ? path.win32 : path.posix).join(...segments);
 }
 
 export class ShellResolver {
@@ -140,13 +145,13 @@ export class ShellResolver {
       const programFiles = env.ProgramFiles || 'C:\\Program Files';
       const systemRoot = env.SystemRoot || 'C:\\Windows';
       return [
-        path.join(programFiles, 'PowerShell', '7', 'pwsh.exe'),
+        joinForPlatform(platform, programFiles, 'PowerShell', '7', 'pwsh.exe'),
         ...this.listWhereMatches('pwsh'),
-        path.join(homedir(), '.dotnet', 'tools', 'pwsh.exe'),
-        path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
-        path.join(systemRoot, 'Sysnative', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
-        path.join(systemRoot, 'System32', 'powershell.exe'),
-        path.join(systemRoot, 'Sysnative', 'powershell.exe'),
+        joinForPlatform(platform, homedir(), '.dotnet', 'tools', 'pwsh.exe'),
+        joinForPlatform(platform, systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+        joinForPlatform(platform, systemRoot, 'Sysnative', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+        joinForPlatform(platform, systemRoot, 'System32', 'powershell.exe'),
+        joinForPlatform(platform, systemRoot, 'Sysnative', 'powershell.exe'),
         '/bin/bash',
         '/bin/sh',
       ];
@@ -166,11 +171,11 @@ export class ShellResolver {
   private resolvePreferredPosixShell(): string | null {
     const raw = this.deps.env.SHELL?.trim();
     if (!raw) return null;
-    return POSIX_ALLOWED_BASENAMES.has(basenameWithoutExt(raw)) ? raw : null;
+    return POSIX_ALLOWED_BASENAMES.has(basenameWithoutExt(raw, this.deps.platform)) ? raw : null;
   }
 
   private assertSupportedPosix(executable: string): void {
-    const base = basenameWithoutExt(executable);
+    const base = basenameWithoutExt(executable, this.deps.platform);
     if ((UNSUPPORTED_POSIX_SHELLS as readonly string[]).includes(base)) {
       throw new ShellUnavailableError(
         `${base} is not a POSIX-compatible shell for agent commands. Configure zsh, bash, or sh.`,
@@ -236,7 +241,7 @@ export class ShellResolver {
   }
 
   private inferKind(executable: string): ShellKind | null {
-    const base = basenameWithoutExt(executable);
+    const base = basenameWithoutExt(executable, this.deps.platform);
     if (base === 'pwsh') return 'pwsh';
     if (base === 'powershell') return 'windows-powershell';
     if (base === 'zsh') return 'zsh';

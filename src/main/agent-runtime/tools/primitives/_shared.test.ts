@@ -258,6 +258,13 @@ describe('safeResolvePath', () => {
     const file = path.join(knowledge, 'card.md');
     await writeFile(file, 'ok', 'utf8');
     const aliasRoot = knowledge.replace(/[a-z]/g, (ch) => ch.toUpperCase());
+    try {
+      const { realpathSync } = await import('node:fs');
+      if (realpathSync.native(aliasRoot) !== realpathSync.native(knowledge)) return;
+    } catch {
+      // Case-sensitive filesystems do not provide a case alias to validate.
+      return;
+    }
     expect(isWithinRootAllowingAliases(file, aliasRoot)).toBe(true);
     expect(safeResolvePath(file, project, {
       workspaceRoot: project,
