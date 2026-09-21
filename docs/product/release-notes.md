@@ -1,4 +1,4 @@
-# RDC-Agent 0.6.0-rc.1
+# RDC-Agent 0.6.0-rc.2
 
 **Windows x64 · 未签名预发布 / Unsigned prerelease**
 
@@ -6,14 +6,15 @@
 
 ## 下载与开始
 
-- `RDC-Agent-0.6.0-rc.1-x64-setup.exe`：NSIS安装包。
-- `RDC-Agent-0.6.0-rc.1-x64.zip`：完整解压后运行`RdcAgent.exe`，不要只复制exe。
+- `RDC-Agent-0.6.0-rc.2-x64-setup.exe`：NSIS安装包。
+- `RDC-Agent-0.6.0-rc.2-x64.zip`：完整解压后运行`RdcAgent.exe`，不要只复制exe。
 - `SHA256SUMS.txt`：下载文件校验和；`sbom.cdx.json`及其`.sha256`：依赖清单与校验和。
 - 首次启动按图文指南连接自己的Provider/API、选择模型并添加项目。右上角问号可随时重看。无需Node.js或pnpm。
 - RenderDoc分析需另下载[RDC-Tool 1.0.1](https://github.com/haolange/RDC-Tool/releases/tag/v1.0.1)，完整解压，在Settings → Tools选择`rdc-tool`文件夹并“验证并应用”。工具自带Python；普通General任务无需配置RDC。
 
 ## 本次改动
 
+- Linux 与 macOS CI 的跨平台路径契约已收敛：Windows shell/CLI 路径在非 Windows runner 上按目标方言解析，macOS 测试临时根使用 canonical 路径；安全 symlink 拒绝规则保持不变。
 - 四步图文教程：真实入口指引、可访问的中英文标注、深浅主题、窄屏布局和键盘焦点管理；示例状态不会被当作当前配置。
 - RDC本机配置收敛为检测安装、选择文件夹、验证并应用；先验证草稿再保存，失败保留原配置，迟到结果丢弃。
 - 官方Agent/Skill/Hook随应用提供，不生成用户副本；保留用户自行配置LLM和Project的边界。

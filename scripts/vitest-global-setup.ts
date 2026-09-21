@@ -7,7 +7,11 @@ import path from 'node:path';
  * A single isolated root is inherited by every worker for the duration of a run.
  */
 export default function setup(): () => void {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-agent-vitest-'));
+  // macOS exposes /var as a symlink to /private/var. Keep the isolated test
+  // root canonical so security-sensitive path tests exercise real user paths,
+  // not the platform alias that production code must reject.
+  const canonicalTempRoot = fs.realpathSync(os.tmpdir());
+  const root = fs.mkdtempSync(path.join(canonicalTempRoot, 'rdc-agent-vitest-'));
   const temporaryEnvironment = Object.fromEntries(['TMP', 'TEMP', 'TMPDIR'].map(key => [key, process.env[key]]));
   const temporaryRoot = path.join(root, 'temp');
   fs.mkdirSync(temporaryRoot);
