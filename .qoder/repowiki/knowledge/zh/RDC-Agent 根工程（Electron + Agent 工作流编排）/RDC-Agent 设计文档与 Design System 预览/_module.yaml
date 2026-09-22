@@ -6,5 +6,4 @@ scope:
     - designs/
 source_files: []
 depends_on: []
-related_to:
-    - path: scripts/launchers_and_smoke_tests
+related_to: []

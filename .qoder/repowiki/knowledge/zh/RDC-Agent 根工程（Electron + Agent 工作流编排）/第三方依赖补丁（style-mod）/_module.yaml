@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: patches
+title: 第三方依赖补丁（style-mod）
+scope:
+    - patches/
+source_files: []
+depends_on: []
+related_to: []
