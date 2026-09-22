@@ -1,15 +1,15 @@
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
-import { CONTRACT_ROOT, requireRegistered, scriptExists, scriptRead } from './renderer-contract.mjs';
+import { CONTRACT_ROOT, requireRegistered, scriptExists, scriptRead, scriptReadCssBundle } from './renderer-contract.mjs';
 
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
 
 const {
   buildWorkProcessPresentation,
-  normalizeWorkProcessText,
-} = require(path.join(CONTRACT_ROOT, requireRegistered('src/renderer/features/transcript/workProcessPresentation.ts')));
+} = require(path.join(CONTRACT_ROOT, requireRegistered('src/renderer/features/transcript/workProcessTracePresentation.ts')));
+const { normalizeWorkProcessText } = require(path.join(CONTRACT_ROOT, requireRegistered('src/renderer/features/transcript/workProcessFormat.ts')));
 const { normalizeAssistantMarkdown } = require(path.join(CONTRACT_ROOT, requireRegistered('src/renderer/patterns/Markdown/normalizeAssistantMarkdown.ts')));
 
 const now = 1_700_000_000_000;
@@ -935,19 +935,19 @@ const componentSource = [
   scriptRead('src/renderer/features/transcript/WorkProcessIcons.tsx', 'utf8'),
 ].join('\n');
 const cssSource = [
-  scriptRead('src/renderer/features/transcript/AgentChat.css', 'utf8'),
-  scriptRead('src/renderer/features/transcript/AgentChat.extras.css', 'utf8'),
+  scriptReadCssBundle('src/renderer/features/transcript/AgentChat.css', 'utf8'),
+  scriptReadCssBundle('src/renderer/features/transcript/AgentChat.extras.css', 'utf8'),
 ].join('\n');
-const composerDir = path.join(CONTRACT_ROOT, 'src/renderer/features/composer');
-const appShellSource = [
-  scriptRead('src/renderer/features/composer/composer-chrome.css', 'utf8'),
-  ...fs.readdirSync(composerDir)
-    .filter((name) => /^composer-chrome-\d+\.css$/.test(name) || name === 'composer-motion.css')
-    .sort()
-    .map((name) => fs.readFileSync(path.join(composerDir, name), 'utf8')),
-].join('\n');
+const appShellSource = scriptReadCssBundle('src/renderer/features/composer/composer-chrome.css');
 const presentationSource = [
-  scriptRead('src/renderer/features/transcript/workProcessPresentation.ts', 'utf8'),
+  scriptRead('src/renderer/features/transcript/workProcessTracePresentation.ts', 'utf8'),
+  scriptRead('src/renderer/features/transcript/workProcessToolRows.ts', 'utf8'),
+  scriptRead('src/renderer/features/transcript/workProcessToolContent.ts', 'utf8'),
+  scriptRead('src/renderer/features/transcript/workProcessContentText.ts', 'utf8'),
+  scriptRead('src/renderer/features/transcript/workProcessDecisionRows.ts', 'utf8'),
+  scriptRead('src/renderer/features/transcript/workProcessWebPresentation.ts', 'utf8'),
+  scriptRead('src/renderer/features/transcript/workProcessBlockText.ts', 'utf8'),
+  scriptRead('src/renderer/features/transcript/workProcessStatus.ts', 'utf8'),
   scriptRead('src/renderer/features/transcript/workProcessBlockProjection.ts', 'utf8'),
   scriptRead('src/renderer/features/transcript/workProcessToolAggregate.ts', 'utf8'),
   scriptRead('src/renderer/features/transcript/workProcessToolCatalog.ts', 'utf8'),
@@ -1130,14 +1130,14 @@ assert(!componentSource.includes("t('chat.workProcessViewSteps'"), 'section shou
 assert(!componentSource.includes('StepsListIcon'), 'legacy steps icon component should be removed');
 assert(!componentSource.includes('thinking-full'), 'component must not render full hidden CoT mode');
 assert(!componentSource.includes('RequestInspector'), 'Request Inspector must not embed in Work Process transcript');
-const traceRightPanelSource = readSource('src/renderer/features/right-rail/TraceRightPanel.tsx');
+const sessionRightRailSource = readSource('src/renderer/features/right-rail/SessionRightRail.tsx');
 assert(
   !scriptExists('src/renderer/features/right-rail/SessionControlPanel.tsx'),
   'Retired session right panel must not return.',
 );
 assert(
-  !traceRightPanelSource.includes('RequestInspector')
-    && !traceRightPanelSource.includes('TraceRequestInspectorSection'),
+  !sessionRightRailSource.includes('RequestInspector')
+    && !sessionRightRailSource.includes('TraceRequestInspectorSection'),
   'Request Inspector must not mount in the default right rail.',
 );
 assert(
@@ -1162,7 +1162,7 @@ assert(
   'Settings nav must list Policy and must not list Diagnostics',
 );
 assert(
-  !traceRightPanelSource.includes('RdcRuntimeContextPanel'),
+  !sessionRightRailSource.includes('RdcRuntimeContextPanel'),
   'Right rail must consume the unified RDC Context projection.',
 );
 

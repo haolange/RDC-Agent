@@ -1,0 +1,75 @@
+.composer-input-row {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  padding: var(--space-0-5) var(--space-0-5) 0;
+}
+
+/* Plain input and Markdown share one shell writing surface (72–180). */
+.composer-input-row > .composer-textarea,
+.composer-input-row > .composer-markdown-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  min-height: var(--composer-prompt-min-height);
+  max-height: var(--composer-prompt-max-height);
+  box-sizing: border-box;
+}
+
+.composer-attach-button {
+  width: var(--control-height-sm);
+  min-width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--control-radius);
+  border: 1px solid var(--token-border-default);
+  background: var(--token-bg-panel);
+  color: var(--token-text-caption);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.composer-attach-button:hover:not(:disabled),
+.composer-attach-button:focus-visible {
+  background: var(--token-interactive-hover);
+  border-color: var(--token-border-strong);
+  color: var(--composer-mode-accent);
+}
+
+.composer-attach-button:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.composer-attach-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.composer-textarea {
+  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-1) 0 var(--space-2);
+  resize: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--token-text-body);
+  line-height: 1.55;
+  /* Keep in lockstep with ComposerMarkdownInput; composer-viewport.css also pins --text-base. */
+  font-size: var(--text-base);
+}
+
+.composer-textarea::placeholder {
+  color: var(--token-text-caption);
+}
+
+.composer-textarea:focus-visible {
+  outline: none;
+}

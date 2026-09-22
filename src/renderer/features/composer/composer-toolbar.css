@@ -1,0 +1,28 @@
+.composer-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.composer-footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: var(--space-3);
+  min-width: 0;
+  padding-top: var(--space-0-5);
+}
+
+.composer-toolbar-group-left {
+  flex: 0 0 auto;
+}
+
+.composer-toolbar-group-right {
+  margin-left: auto;
+  min-width: 0;
+  flex: 1 1 0;
+  justify-content: flex-end;
+}

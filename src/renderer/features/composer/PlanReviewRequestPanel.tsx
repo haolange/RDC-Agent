@@ -1,17 +1,11 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { useConversationStore } from '../../stores/conversationStore';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { Textarea } from '../../ui/Textarea';
 import { HandoffActionRow } from '../../patterns/HandoffActionRow/HandoffActionRow';
-import { findPendingPlanReview, type PendingPlanReviewRequest } from './planReviewRequestModel';
+import { type PendingPlanReviewRequest } from './planReviewRequestModel';
 import { usePlanReviewSubmit } from './usePlanReviewSubmit';
 import './composer-plan-review.css';
-
-export const usePendingPlanReviewRequest = (): PendingPlanReviewRequest | null => {
-  const messages = useConversationStore((state) => state.conversationMessages);
-  return useMemo(() => findPendingPlanReview(messages), [messages]);
-};
 
 export const PlanReviewRequestPanel: React.FC<{
   request: PendingPlanReviewRequest;

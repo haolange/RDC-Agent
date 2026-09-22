@@ -77,7 +77,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
   {
     id: 'investigation.missing.session.artifacts-card',
     kind: 'missing',
-    file: 'src/renderer/features/right-rail/TraceRightPanel.tsx',
+    file: 'src/renderer/features/right-rail/SessionRightRail.tsx',
     pattern: 'id="artifacts"',
     probe: 'source-pattern',
     note: 'Session rail target five cards include Artifacts',
@@ -264,7 +264,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
   {
     id: 'investigation.forbidden.session.four-card',
     kind: 'forbidden',
-    file: 'src/renderer/features/right-rail/TraceRightPanel.tsx',
+    file: 'src/renderer/features/right-rail/SessionRightRail.tsx',
     pattern: 'id="progress"[\\s\\S]*id="outputs"[\\s\\S]*id="context"[\\s\\S]*id="capture"',
     unlessPattern: 'id="artifacts"',
     probe: 'source-pattern',

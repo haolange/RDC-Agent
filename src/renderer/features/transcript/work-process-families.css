@@ -1,0 +1,57 @@
+.work-process-tool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.work-process-tool-card-body.family-interpreter,
+.work-process-tool-card-body.family-memory,
+.work-process-tool-card-body.family-skill,
+.work-process-tool-card-body.family-mcp,
+.work-process-tool-card-body.family-runtime {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.work-process-highlighted-code {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--token-bg-app);
+  color: var(--token-text-body);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: calc(var(--text-xs) * 1.6 * 12);
+  overflow-y: auto;
+}
+
+.work-process-highlighted-code.is-collapsed {
+  max-height: calc(var(--text-xs) * 1.6 * 3);
+  overflow: hidden;
+}
+
+.work-process-highlighted-code .hljs {
+  display: block;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.work-process-family-path {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.work-process-family-stdout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}

@@ -1,2 +1,8 @@
-@import './Debugger-1.css';
-@import './Debugger-2.css';
+.debugger-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--token-bg-app);
+}

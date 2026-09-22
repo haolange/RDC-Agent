@@ -1,0 +1,18 @@
+@media (max-width: 720px) {
+  .app-sidebar-left .sidebar-nav {
+    padding-inline: var(--space-1);
+  }
+
+  .app-sidebar-left .session-section {
+    opacity: 0;
+    transform: translateX(calc(var(--space-3) * -1));
+    pointer-events: none;
+    flex: 0;
+    max-height: 0;
+    margin-top: 0;
+    padding-top: 0;
+    overflow: hidden;
+    border-top-color: transparent;
+  }
+
+}

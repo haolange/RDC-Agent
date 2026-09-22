@@ -4,7 +4,9 @@ import { useI18n } from '../i18n';
 import { useDynStyle } from '../lib/useDynStyle';
 import { formatTokenCount } from '@shared/utils/tokens';
 import { formatUsdCost } from '@shared/utils/cost';
-import { useAppSettingsStore } from '../stores/appSettingsStore';
+import './ContextBreakdownPopover.css';
+import './ContextBreakdownMeter.css';
+import './ContextBreakdownLegend.css';
 import { ContextBreakdownLegend } from './ContextBreakdownLegend';
 import { ContextRunMeterBand, MeterStat } from './ContextRunMeterBand';
 import {
@@ -49,8 +51,10 @@ export const ContextBreakdownPopover: React.FC<{
   selectedProfile: ContextUsageSelectedProfile | null;
   stale: boolean;
   estimated?: boolean;
+  detailsExpanded: boolean;
+  onDetailsExpandedChange: (expanded: boolean) => void;
   onClose: () => void;
-}> = ({ prepared, phase, usage, selectedProfile, stale, estimated = false, onClose }) => {
+}> = ({ prepared, phase, usage, selectedProfile, stale, estimated = false, detailsExpanded, onDetailsExpandedChange, onClose }) => {
   const { t } = useI18n();
   const closeButtonRef = React.useRef<HTMLButtonElement>(null);
   const panelRef = React.useRef<HTMLDivElement>(null);
@@ -74,12 +78,6 @@ export const ContextBreakdownPopover: React.FC<{
       window.removeEventListener('scroll', measure, true);
     };
   }, []);
-  const detailsExpanded = useAppSettingsStore(
-    (state) => state.settings.appearance.contextBreakdownExpanded,
-  );
-  const setContextBreakdownExpanded = useAppSettingsStore(
-    (state) => state.setContextBreakdownExpanded,
-  );
   const showPrepared = phase === 'current' && prepared !== null;
   // A new request must not erase the last truthful snapshot before its own
   // prepared projection arrives. Preparing therefore keeps the same visual
@@ -268,7 +266,7 @@ export const ContextBreakdownPopover: React.FC<{
           aria-expanded={detailsExpanded}
           aria-controls="context-breakdown-details"
           aria-label={detailsExpanded ? t('contextBreakdown.detailsCollapseAria') : t('contextBreakdown.detailsExpandAria')}
-          onClick={() => { void setContextBreakdownExpanded(!detailsExpanded); }}
+          onClick={() => onDetailsExpandedChange(!detailsExpanded)}
         >
           <span className={`context-breakdown-details-chevron${detailsExpanded ? ' is-expanded' : ''}`} aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

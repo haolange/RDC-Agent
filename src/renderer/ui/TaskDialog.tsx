@@ -19,6 +19,8 @@ export interface TaskDialogProps {
   closeLabel: string;
   size?: TaskDialogSize;
   busy?: boolean;
+  /** Image editors keep drafts open when the surrounding backdrop is pressed. */
+  dismissOnBackdrop?: boolean;
   /** Renders as `alertdialog` with no dismiss affordance in the header. */
   variant?: 'task' | 'alert';
   className?: string;
@@ -40,6 +42,7 @@ export function TaskDialog({
   closeLabel,
   size = 'md',
   busy = false,
+  dismissOnBackdrop = true,
   variant = 'task',
   className,
   dataTestId,
@@ -58,7 +61,7 @@ export function TaskDialog({
       className="task-dialog-overlay"
       data-overlay-layer
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy) onClose();
+        if (event.target === event.currentTarget && dismissOnBackdrop && !busy) onClose();
       }}
     >
       <div

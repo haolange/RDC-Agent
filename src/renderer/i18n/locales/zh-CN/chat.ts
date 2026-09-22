@@ -1,4 +1,8 @@
 export const zhChat = {
+  'chat.userInputAnswerChoices': '答案选项',
+  'chat.userInputEnterCustomAnswer': '输入自定义答案',
+  'chat.userInputAnswerPlaceholder': '请输入你的答案…',
+  'chat.userInputCustomAnswer': '自定义答案',
   'chat.userInputUnknown': '不知道',
   'chat.userInputSkip': '跳过此项',
   'chat.you': '你',

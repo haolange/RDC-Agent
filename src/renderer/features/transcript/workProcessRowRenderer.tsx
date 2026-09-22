@@ -1,5 +1,5 @@
 import React from 'react';
-import type { WorkProcessRow } from './workProcessPresentation';
+import type { WorkProcessRow } from './workProcessTypes';
 import { SubagentRow } from './SubagentRow';
 import { TaskSnapshotCard } from './TaskSnapshotCard';
 import {

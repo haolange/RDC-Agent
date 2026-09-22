@@ -430,7 +430,7 @@ describe('Provider Catalog compiler', () => {
       ['grok-4.20-0309-reasoning', 1_000_000, 'fixed', 'unsupported', 'always-on', false, [], 'on'],
       ['grok-4.20-multi-agent-0309', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
       ['grok-4.3', 500_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high'], 'medium'],
-      ['grok-4.7', 500_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'high'],
+      ['grok-4.7', 500_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'high'],
       ['grok-4.6', 500_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'high'],
       ['grok-4.5', 500_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high'], 'medium'],
       ['grok-build-0.1', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on'],

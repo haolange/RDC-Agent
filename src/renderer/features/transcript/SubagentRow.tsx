@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { WorkProcessRow } from './workProcessPresentation';
-import { getRowStatusLabel } from './workProcessPresentation';
+import type { WorkProcessRow } from './workProcessTypes';
+import { getRowStatusLabel } from './workProcessStatus';
 import { ToolRow } from './WorkProcessRowParts';
 import { TaskSnapshotCard } from './TaskSnapshotCard';
 

@@ -84,7 +84,7 @@ export const ComposerModelEffortControl: React.FC<{
     <div ref={assignMenuRoot} className="composer-model-effort-menu">
       <Pill
         ref={assignMenuTrigger}
-        className={`composer-model-effort-pill ${open ? 'open' : ''}${hasChoice ? ' is-override' : ''}${effort.selectedLevel === 'max' ? ' is-level-max' : ''}`}
+        className={`composer-model-effort-pill ${open ? 'is-open' : ''}${hasChoice ? ' is-override' : ''}${effort.selectedLevel === 'max' ? ' is-level-max' : ''}`}
         selected={open}
         data-testid="composer-model-effort-pill"
         aria-haspopup="dialog"

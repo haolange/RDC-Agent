@@ -2,14 +2,17 @@ import type { FC, RefObject } from 'react';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
 import { CheckIcon } from './userInputRequestIcons';
 import { Textarea } from '../../ui/Textarea';
+import { useI18n } from '../../i18n';
 
 export const UserInputOptionList: FC<{
   question: ConversationAskUserQuestion;
   selectedOptionId?: string;
   isSubmitting: boolean;
   onSelect: (optionId: string) => void;
-}> = ({ question, selectedOptionId, isSubmitting, onSelect }) => (
-  <div className="composer-user-input-options" role="radiogroup" aria-label="Answer choices">
+}> = ({ question, selectedOptionId, isSubmitting, onSelect }) => {
+  const { t } = useI18n();
+  return (
+  <div className="composer-user-input-options" role="radiogroup" aria-label={t('chat.userInputAnswerChoices')}>
     {question.options.map((option, index) => {
       const isSelected = selectedOptionId === option.optionId;
       return (
@@ -45,7 +48,8 @@ export const UserInputOptionList: FC<{
       );
     })}
   </div>
-);
+  );
+};
 
 export const UserInputCustomAnswer: FC<{
   question: ConversationAskUserQuestion;
@@ -54,7 +58,9 @@ export const UserInputCustomAnswer: FC<{
   isSubmitting: boolean;
   textareaRef: RefObject<HTMLTextAreaElement>;
   onChange: (answer: string) => void;
-}> = ({ question, selectedOptionId, customAnswer, isSubmitting, textareaRef, onChange }) => (
+}> = ({ question, selectedOptionId, customAnswer, isSubmitting, textareaRef, onChange }) => {
+  const { t } = useI18n();
+  return (
   <div className={`composer-user-input-custom${!selectedOptionId && customAnswer.trim() ? ' is-selected' : ''}`}>
     {question.options.length > 0 ? (
       <button
@@ -69,7 +75,7 @@ export const UserInputCustomAnswer: FC<{
         <span className="composer-user-input-option-index" aria-hidden="true">
           {question.options.length + 1}
         </span>
-        <span className="composer-user-input-custom-label">Enter custom answer</span>
+        <span className="composer-user-input-custom-label">{t('chat.userInputEnterCustomAnswer')}</span>
         {!selectedOptionId && customAnswer.trim() ? (
           <span className="composer-user-input-option-check" aria-hidden="true">
             <CheckIcon />
@@ -87,9 +93,10 @@ export const UserInputCustomAnswer: FC<{
           onChange('');
         }
       }}
-      placeholder="Type your answer..."
+      placeholder={t('chat.userInputAnswerPlaceholder')}
       disabled={isSubmitting}
-      aria-label="Custom answer"
+      aria-label={t('chat.userInputCustomAnswer')}
     />
   </div>
-);
+  );
+};

@@ -115,11 +115,13 @@ export const VirtualMessageList: React.FC<Props> = ({
       const list = listRef.current;
       const parent = list?.closest('.chat-messages') as HTMLElement | null;
       if (!list || !parent) return;
+      if (frame !== undefined) cancelAnimationFrame(frame);
       if (messages.length > VIRTUALIZE_THRESHOLD) {
         parent.scrollTop = list.getBoundingClientRect().top - parent.getBoundingClientRect().top + parent.scrollTop + index * estimateHeight;
         setRange({ start: Math.max(0, index - overscan), end: Math.min(messages.length, index + overscan + 1) });
       }
       frame = requestAnimationFrame(() => {
+        frame = undefined;
         const target = Array.from(list.querySelectorAll<HTMLElement>('[data-message-id]')).find((item) => item.dataset.messageId === messages[index].id);
         target?.scrollIntoView({ block: 'center', behavior: 'auto' });
         if (target) { target.tabIndex = -1; target.focus({ preventScroll: true }); }

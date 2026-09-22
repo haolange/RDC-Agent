@@ -66,7 +66,7 @@ describe('reviewed provider catalog request paths', () => {
     }
   }
 
-  it('activates xAI Priority without granting it to Grok OAuth', () => {
+  it('activates Grok 4.7 Fast independently on xAI and Grok OAuth routes', () => {
     const direct = planModelRequest({ model: effective('xai', 'grok-4.7'), controls: { fastModel: true } });
     expect(direct.ok).toBe(true);
     if (!direct.ok) throw new Error(direct.message);
@@ -74,8 +74,8 @@ describe('reviewed provider catalog request paths', () => {
     const account = planModelRequest({ model: effective('grok-account', 'grok-4.7'), controls: { fastModel: true } });
     expect(account.ok).toBe(true);
     if (!account.ok) throw new Error(account.message);
-    expect(account.plan.fastMode).toBe(false);
-    expect(wire(account.plan)).not.toHaveProperty('service_tier');
+    expect(account.plan.fastMode).toBe(true);
+    expect(wire(account.plan).service_tier).toBe('priority');
   });
 
   for (const surfaceId of ['glm-global-coding-plan']) {

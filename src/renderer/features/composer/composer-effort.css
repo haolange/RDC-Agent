@@ -1,5 +1,8 @@
-@import './composer-effort-1.css';
-@import './composer-effort-2.css';
-@import './composer-effort-3.css';
-@import './composer-effort-4.css';
-@import './composer-effort-5.css';
+@import './composer-permission.css';
+@import './composer-effort-focus.css';
+@import './composer-model-effort-panel.css';
+@import './composer-effort-track.css';
+@import './composer-effort-thumb.css';
+@import './composer-user-input.css';
+@import './composer-permission-options.css';
+@import './composer-viewport.css';

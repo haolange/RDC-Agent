@@ -7,9 +7,9 @@ const { AGENT_WORKBENCH_TOOL_CATALOG } = require('../src/shared/constants/agentW
 const { BUILTIN_AGENT_TOOL_IDS } = require('../src/shared/constants/agentToolTokens.ts');
 const {
   WORK_PROCESS_TOOL_DISPLAY_CATALOG,
-  createToolRowForPresentation,
   getToolFamily,
-} = require('../src/renderer/features/transcript/workProcessPresentation.ts');
+} = require('../src/renderer/features/transcript/workProcessToolCatalog.ts');
+const { createToolRowForPresentation } = require('../src/renderer/features/transcript/workProcessToolRows.ts');
 const { buildToolAggregateSummary } = require('../src/renderer/features/transcript/workProcessToolAggregate.ts');
 
 const fail = (message) => {

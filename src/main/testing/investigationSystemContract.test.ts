@@ -587,7 +587,7 @@ describe('investigation system contract', () => {
 
   it('investigation.contract.rail.five-cards', () => {
     expect.hasAssertions();
-    const rail = readRepo('src/renderer/features/right-rail/TraceRightPanel.tsx');
+    const rail = readRepo('src/renderer/features/right-rail/SessionRightRail.tsx');
     expect(rail).toContain('id="progress"');
     expect(rail).toContain('id="artifacts"');
     expect(rail).toContain('id="outputs"');
@@ -902,8 +902,8 @@ describe('investigation system contract', () => {
     expect(() => journalOnly.service.list(SESSION_ID)).toThrow(/INVESTIGATION_DEGRADED/);
     expect(journalOnly.service.listForProjection(SESSION_ID).storeDegraded).toBe(true);
     expect(journalOnly.service.listForProjection(SESSION_ID).artifacts).toEqual([]);
-    const rail = readRepo('src/renderer/features/right-rail/TraceRightPanel.tsx');
-    expect(rail).toMatch(/storeDegraded \? t\('control\.rightRail\.artifacts\.storeDegraded'\)/);
+    const rail = readRepo('src/renderer/features/right-rail/SessionRightRail.tsx');
+    expect(rail).toMatch(/storeDegraded\s*\?\s*t\('control\.rightRail\.artifacts\.storeDegraded'\)/);
     expect(rail).toMatch(/control\.rightRail\.artifacts\.empty/);
     let listed: unknown = 'empty-disguise';
     try {

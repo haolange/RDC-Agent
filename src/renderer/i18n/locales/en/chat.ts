@@ -1,4 +1,8 @@
 export const enChat = {
+  'chat.userInputAnswerChoices': 'Answer choices',
+  'chat.userInputEnterCustomAnswer': 'Enter custom answer',
+  'chat.userInputAnswerPlaceholder': 'Type your answer...',
+  'chat.userInputCustomAnswer': 'Custom answer',
   'chat.userInputUnknown': "I don't know",
   'chat.userInputSkip': 'Skip this question',
   'chat.you': 'You',

@@ -7,7 +7,7 @@ import { TitleBar } from '../shell/TitleBar';
 import { SettingsModal } from '../features/settings/SettingsModal';
 import { KnowledgeCenterModal } from '../features/knowledge/KnowledgeCenterModal';
 import { useComposer } from '../features/composer/useComposer';
-import { CommandPalette } from '../patterns/CommandPalette';
+import { CommandPaletteController } from './CommandPaletteController';
 import { NotificationToast } from './NotificationToast';
 import { AppProviders } from './AppProviders';
 import { AppShell } from '../shell/AppShell';
@@ -242,7 +242,7 @@ const App: React.FC = () => {
           onClose={() => setKnowledgeCenterOpen(false)}
         />
 
-        <CommandPalette
+        <CommandPaletteController
           onExecute={(cmd) => {
             if (cmd === '/config') {
               setSettingsModalOpen(true);

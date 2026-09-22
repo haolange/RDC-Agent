@@ -255,6 +255,15 @@ export function rebuildPersistedSettings(
     fixes.push('Removed persisted embedding selection (schema 7)');
   }
 
+  const persistedRdcCliTimeout = candidate.tooling?.rdcCli?.timeoutMs;
+  const migrateRdcCliDefaultTimeout = previousSchemaVersion < 8
+    && (persistedRdcCliTimeout == null || persistedRdcCliTimeout === 60000);
+  const tooling = sanitizeToolingSettings(candidate.tooling ?? fallback.tooling);
+  if (migrateRdcCliDefaultTimeout) {
+    tooling.rdcCli = { ...tooling.rdcCli, timeoutMs: DEFAULT_RDC_CLI_INVOKER.timeoutMs };
+    fixes.push('Raised the persisted RDC CLI default timeout to 120000ms (schema 8)');
+  }
+
   const nextSettings: PersistedSettingsPayload = {
     schemaVersion: SETTINGS_SCHEMA_VERSION,
     appearance,
@@ -270,7 +279,7 @@ export function rebuildPersistedSettings(
         : DEFAULT_PROFILE.nickname,
       avatarPath: typeof candidate.profile?.avatarPath === 'string' ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath,
     },
-    tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
+    tooling,
     agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
     llm: {
       providers: catalogProviders.map((provider) => ({ ...provider, apiKey: '' })),

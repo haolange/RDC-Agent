@@ -68,7 +68,7 @@ sequenceDiagram
   participant Conversation as ConversationService
   participant Trace as TraceService
   participant IPC as trace IPC
-  participant UI as AgentRunView / TraceRightPanel
+  participant UI as AgentRunView / SessionRightRail
 
   Conversation->>Trace: publish conversation/tool/action events
   UI->>IPC: trace:getProjection / trace:getRun / trace:getEvents

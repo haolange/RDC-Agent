@@ -98,7 +98,7 @@ export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm
         </div>
 
         <label className="runtime-terminal-search">
-          <span className="sr-only">{t('terminal.search')}</span>
+          <span className="runtime-terminal-search-label">{t('terminal.search')}</span>
           <input
             type="search"
             value={query}

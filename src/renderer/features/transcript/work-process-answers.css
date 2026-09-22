@@ -1,0 +1,91 @@
+.work-process-user-input-transcript-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-2);
+  row-gap: var(--space-1);
+  min-width: 0;
+}
+
+.work-process-user-input-transcript-question,
+.work-process-user-input-transcript-answer,
+.work-process-user-input-transcript-pending,
+.work-process-user-input-transcript-error {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.work-process-user-input-transcript-index {
+  grid-column: 1;
+  grid-row: 1;
+  color: var(--token-text-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.65;
+}
+
+.work-process-user-input-transcript-question {
+  grid-column: 2;
+  grid-row: 1;
+  color: var(--token-text-body);
+}
+
+.work-process-user-input-transcript-answer,
+.work-process-user-input-transcript-pending {
+  grid-column: 2;
+  color: var(--token-text-muted);
+}
+
+.work-process-user-input-transcript-answer {
+  white-space: pre-wrap;
+}
+
+.work-process-user-input-transcript-pending {
+  color: var(--token-text-caption);
+}
+
+.work-process-user-input-transcript-error {
+  grid-column: 1 / -1;
+  color: var(--token-status-error);
+}
+
+.work-process-tool-approval {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0 var(--space-3) var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--token-bg-muted) 72%, transparent);
+  color: var(--token-text-body);
+}
+
+.work-process-tool-approval-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.work-process-tool-approval-verb {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.work-process-tool-approval-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--token-text-muted);
+  font-size: var(--text-xs);
+}
+
+.work-process-tool-approval-message {
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}

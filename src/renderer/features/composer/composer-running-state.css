@@ -1,0 +1,16 @@
+.composer-shell.is-running {
+  border-color: color-mix(in srgb, var(--composer-mode-accent) 44%, var(--token-border-strong));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.03),
+    0 0 0 1px color-mix(in srgb, var(--composer-mode-accent) 12%, transparent),
+    0 0 10px color-mix(in srgb, var(--composer-mode-accent) 16%, transparent);
+}
+
+.composer-shell.is-running:focus-within,
+.composer-shell.is-running:has([aria-expanded="true"]) {
+  border-color: color-mix(in srgb, var(--composer-mode-accent) 52%, var(--token-border-strong));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.03),
+    0 0 0 1px color-mix(in srgb, var(--composer-mode-accent) 18%, transparent),
+    0 0 14px color-mix(in srgb, var(--composer-mode-accent) 20%, transparent);
+}

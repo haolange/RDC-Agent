@@ -1,0 +1,293 @@
+/* Commentary prose — narrative hero */
+.work-process-prose {
+  color: var(--token-text-body);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  max-width: 100%;
+}
+
+.work-process-prose .markdown-body {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.work-process-prose .markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.work-process-prose .markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.work-process-prose .markdown-body h1,
+.work-process-prose .markdown-body h2,
+.work-process-prose .markdown-body h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  color: var(--token-text-heading);
+  letter-spacing: -0.01em;
+}
+
+.work-process-prose .markdown-body p {
+  margin: 0;
+}
+
+.work-process-prose.is-streaming::after {
+  content: '';
+  display: inline-block;
+  width: var(--space-1);
+  height: 1em;
+  margin-left: var(--space-1);
+  border-radius: var(--radius-sm);
+  background: currentColor;
+  opacity: 0.48;
+  vertical-align: -0.12em;
+  animation: work-process-result-pulse 1s ease-in-out infinite;
+}
+
+/* Tool aggregate summary row */
+.work-process-tool-aggregate {
+  grid-template-columns: minmax(0, 1fr);
+  padding-bottom: var(--space-1);
+}
+
+.work-process-tool-aggregate-content {
+  gap: 0;
+}
+
+.work-process-tool-aggregate-summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--space-1) 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.work-process-tool-aggregate-summary::-webkit-details-marker {
+  display: none;
+}
+
+.work-process-tool-aggregate-summary:hover {
+  color: var(--token-text-body);
+}
+
+.work-process-aggregate-caret {
+  align-self: center;
+  flex-shrink: 0;
+  opacity: 0.55;
+}
+
+.work-process-tool-aggregate-details[open] .work-process-aggregate-caret {
+  transform: rotate(90deg);
+}
+
+.work-process-tool-aggregate-text {
+  min-width: 0;
+}
+
+.work-process-tool-inline-meta {
+  flex-shrink: 0;
+  color: var(--token-text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.work-process-tool-aggregate-body {
+  margin: var(--space-1) 0;
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--token-border-subtle);
+  list-style: none;
+}
+
+.work-process-tool-aggregate-body .work-process-step {
+  grid-template-columns: minmax(0, 1fr);
+  padding-bottom: var(--space-3);
+}
+
+.work-process-tool-aggregate-body .work-process-step-rail {
+  display: none;
+}
+
+/*
+ * Process block → final answer (expanded & collapsed).
+ * Stack gap is space-2 (8px); add space-0-5 so the sole break is 10px.
+ */
+.conversation-message-assistant .work-process + .conversation-bubble-assistant {
+  margin-top: var(--space-0-5);
+}
+
+.handoff-suggestion-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.handoff-suggestion-row__label {
+  margin: 0;
+  color: var(--token-text-body);
+  font-size: var(--text-xs);
+}
+
+.work-process.is-collapsed .work-process-header {
+  margin-bottom: 0;
+  color: var(--token-text-caption);
+}
+
+.work-process.is-collapsed .work-process-label:not(.is-active),
+.work-process.is-collapsed .work-process-meta {
+  color: var(--token-text-caption);
+}
+
+.work-process.is-collapsed .work-process-header:hover .work-process-label:not(.is-active),
+.work-process.is-collapsed .work-process-header:hover .work-process-meta {
+  color: var(--token-text-body);
+}
+
+@keyframes work-process-result-pulse {
+  0%, 100% { opacity: 0.32; }
+  50% { opacity: 0.72; }
+}
+
+.work-process-section-list {
+  gap: 0;
+  /* Narrative → first tool: one notch wider than sibling tools (space-2). */
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  /* Same left edge as loop commentary prose (full-bleed content column). */
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.work-process-section-list .work-process-step-rail {
+  display: none;
+}
+
+.work-process-section-list .work-process-step {
+  grid-template-columns: minmax(0, 1fr);
+  /* Sibling tools denser than loop entrance / turn boundary. */
+  padding: var(--space-2) 0 0;
+  border-bottom: 0;
+}
+
+.work-process-section-list .work-process-step:first-child {
+  padding-top: 0;
+}
+
+.work-process-section-list.disclosure-deferred .work-process-tool-card-expand,
+.work-process-section-list.disclosure-deferred .work-process-user-input-items {
+  display: none;
+}
+
+.work-process-path-chip {
+  display: inline-flex;
+  max-width: 100%;
+  padding: var(--space-0-5) var(--space-2);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-full);
+  color: var(--token-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-process-disclosure {
+  width: 100%;
+}
+
+.work-process-disclosure > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.work-process-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.work-process-disclosure > summary:hover {
+  background: var(--token-interactive-hover);
+}
+
+.work-process-disclosure > summary:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: -2px;
+}
+
+.work-process-disclosure:not([open]) > :not(summary) {
+  display: none;
+}
+
+.work-process-row-caret {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 0;
+  height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  opacity: 0.55;
+  transition: transform var(--transition-fast);
+}
+
+.work-process-disclosure[open] .work-process-row-caret {
+  transform: rotate(90deg);
+}
+
+.work-process-summary-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.work-process-summary-line > .work-process-step-summary,
+.work-process-summary-line > .work-process-diagnostic-message {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .work-process-header {
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
+  }
+
+  .work-process-step {
+    grid-template-columns: 8px minmax(0, 1fr);
+    column-gap: var(--space-1);
+  }
+
+  .work-process-tool-card-header,
+  .work-process-tool-card-meta {
+    gap: var(--space-1) var(--space-2);
+  }
+}
+
+/* Keep the process rail left-anchored while calibrating the visible card edge
+ * against its existing left hierarchy gutter. The agent-chat container owns
+ * these breakpoints so a resized work area follows its actual width. */
+@container (max-width: 42rem) {
+  .work-process {
+    --work-process-inline-end-inset: var(--space-4);
+  }
+}
+
+@container (max-width: 32rem) {
+  .work-process {
+    --work-process-inline-end-inset: 0;
+  }
+}

@@ -1,3 +1,4 @@
+import { shouldSendComposerOnEnter } from './composerKeyboard';
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { AgentMode } from '@shared/types/layout';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
@@ -50,7 +51,6 @@ export function useComposerSend(options: {
   const setIsPromptSending = useComposerSessionContextStore((state) => state.setIsPromptSending);
   const promptValueRef = useRef(promptValue);
   promptValueRef.current = promptValue;
-
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
   const setSessions = useProjectStore((state) => state.setSessions);
   const setCurrentSession = useProjectStore((state) => state.setCurrentSession);
@@ -183,7 +183,7 @@ export function useComposerSend(options: {
   ]);
 
   const handlePromptKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (shouldSendComposerOnEnter(event)) {
       event.preventDefault();
       void handlePromptSend();
     }

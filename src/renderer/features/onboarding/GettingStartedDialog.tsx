@@ -30,9 +30,11 @@ export function GettingStartedDialog({ onClose }: { onClose: () => void }) {
       </nav>
       <section key={current} className="getting-started-page" aria-labelledby={`getting-started-${current}`}>
         <div className="getting-started-copy">
-          <p className="getting-started-eyebrow">{t(`onboarding.${current}.eyebrow`)}</p>
-          <h3 id={`getting-started-${current}`}>{t(`onboarding.${current}.headline`)}</h3>
-          <p className="getting-started-summary">{t(`onboarding.${current}.body`)}</p>
+          <header className="getting-started-intro">
+            <p className="getting-started-eyebrow">{t(`onboarding.${current}.eyebrow`)}</p>
+            <h3 id={`getting-started-${current}`}>{t(`onboarding.${current}.headline`)}</h3>
+            <p className="getting-started-summary">{t(`onboarding.${current}.body`)}</p>
+          </header>
           <ol className="getting-started-instructions">
             {(['first', 'second', 'third'] as const).map((item, index) => <li key={item}>
               <span className="getting-started-instruction-number" aria-hidden="true">{index + 1}</span>

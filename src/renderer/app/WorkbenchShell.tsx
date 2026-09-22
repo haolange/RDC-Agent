@@ -1,7 +1,7 @@
 import { useMemo, useRef, type ReactNode, type RefObject } from 'react';
 import { PlanReaderHost } from '../features/transcript/PlanReaderHost';
 import { WorkbenchReadingLayoutContext } from '../lib/WorkbenchReadingLayout';
-import { ControlPanel } from '../features/right-rail';
+import { RightRail } from '../features/right-rail/RightRail';
 import { DeviceSelector } from '../features/captures/DeviceSelector';
 import { Sidebar } from '../features/sidebar/Sidebar';
 import { TerminalDrawer } from '../features/terminal/TerminalDrawer';
@@ -231,7 +231,7 @@ export function WorkbenchShell({
               className={`right-panel-body ${effectiveRightCollapsed ? 'collapsed' : ''}`}
               data-testid="right-rail-scroll"
             >
-              <ControlPanel />
+              <RightRail />
             </div>
           </aside>
         </>
@@ -243,7 +243,7 @@ export function WorkbenchShell({
       ) : null}
       {isRightRailVisible && isRightRailDrawerMode ? (
         <WorkbenchPanelDrawer data-testid="right-rail-drawer" title={t('app.inspector')} closeLabel={t('app.closePanel')} open={isRightRailDrawerOpen} onClose={onCloseRightRailDrawer}>
-          <ControlPanel />
+          <RightRail />
         </WorkbenchPanelDrawer>
       ) : null}
 

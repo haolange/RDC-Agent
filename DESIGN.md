@@ -131,6 +131,8 @@ Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。
 
 **渲染层分层（裁决）**：`ui`（无业务原子/分子组件）→ `patterns`（跨 feature 复合，可读 store，不写 store、不直调 IPC）→ `features`（产品面，禁止横向 import 其它 feature）→ `app` / `shell`（编排与窗口 chrome）。`stores` / `services` / `hooks` / `lib` / `platform` 为被依赖层，不得反向 import `features` / `ui` / `patterns` / `app` / `shell`。组件（`.tsx`）不得直调 `window.electronAPI`。门禁：`pnpm run check:renderer-structure` + ESLint `no-restricted-imports`。
 
+组件按实际职责和状态所有权划分：feature 专属效果与交互留在所属 feature；只有多个独立消费者共享的行为才上提为 pattern。Pattern 的业务写入经调用方传入回调，不能通过取出 store action 间接写入。展示组件接收最小数据与动作；跨 feature 组合由 app 完成。组件样式就近维护，全局 CSS 只承载基础与全局布局；不得使用数字分段文件或旧路径转发掩盖职责。结构重组须保持已有视觉、交互与 IPC/持久化契约，局部体验修正单独验收。
+
 **Token 合规（裁决）**：组件 CSS 只允许语义 token 与刻度变量；primitive `--color-*`、hex 字面量、px 字号 / 间距 / 圆角、`!important` 一律禁止。`backdrop-filter` 禁止字面量 `blur(...)`；模态遮罩只能写 `var(--modal-backdrop-filter)`。豁免仅限 token 定义层与全局 chrome 层。门禁：`pnpm run check:design-tokens`。受门禁锁定的 renderer 文件路径集中登记在 [`scripts/fidelity/renderer-contract.json`](scripts/fidelity/renderer-contract.json)。
 
 **渲染层目录（裁决 / 目标态）**：

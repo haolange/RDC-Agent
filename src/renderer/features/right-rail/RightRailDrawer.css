@@ -1,0 +1,54 @@
+.right-rail-drawer {
+  position: fixed;
+  inset: var(--header-height) 0 0;
+  z-index: var(--z-overlay);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, min(88vw, 28rem));
+  min-width: 0;
+}
+
+.right-rail-drawer-backdrop { grid-column: 1; background: color-mix(in srgb, var(--token-bg-app) 58%, transparent); }
+.right-rail-drawer-sheet {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-inline-start: 1px solid var(--token-border-default);
+  background: var(--token-bg-shell);
+  box-shadow: var(--token-shadow-popover);
+  animation: right-rail-drawer-enter var(--transition-base) both;
+}
+.right-rail-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--space-12);
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--token-border-subtle);
+  color: var(--token-text-heading);
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+}
+.right-rail-drawer-content { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.right-rail-drawer[hidden] { display: none; }
+
+.left-navigation-drawer {
+  grid-template-columns: minmax(0, min(88vw, 22rem)) minmax(0, 1fr);
+}
+.left-navigation-drawer .right-rail-drawer-backdrop { grid-column: 2; grid-row: 1; }
+.left-navigation-drawer .right-rail-drawer-sheet { grid-column: 1; grid-row: 1; }
+.left-navigation-drawer .right-rail-drawer-content { display: flex; flex-direction: column; }
+.left-navigation-drawer .sidebar-nav { flex: 1; min-height: 0; overflow: auto; }
+.left-navigation-drawer .app-sidebar-footer .footer-entry-copy,
+.left-navigation-drawer .app-sidebar-footer .footer-entry-trailing { display: flex; }
+
+@keyframes right-rail-drawer-enter { from { opacity: 0; transform: translateX(var(--space-3)); } to { opacity: 1; transform: translateX(0); } }
+
+@media (max-width: 32rem) {
+  .right-rail-section,
+  .project-capture-rail { inline-size: 100%; }
+  .project-capture-input-row { grid-template-columns: var(--control-height-sm) minmax(0, 1fr) auto; }
+  .right-rail-investigation-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .right-rail-investigation-row .button { min-width: var(--space-8); min-height: var(--space-8); }
+}

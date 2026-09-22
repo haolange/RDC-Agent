@@ -1,6 +1,11 @@
-@import './composer-chrome-1.css';
-@import './composer-chrome-2.css';
-@import './composer-chrome-3.css';
-@import './composer-chrome-4.css';
+@import './composer-shell.css';
+@import './composer-editor.css';
+@import './composer-toolbar.css';
+@import './composer-usage.css';
+@import './composer-agent-trigger.css';
+@import './composer-model-picker.css';
+@import './composer-agent-popup.css';
+@import './composer-running-state.css';
+@import './composer-responsive.css';
 @import './ComposerSendButton.css';
 @import './composer-motion.css';

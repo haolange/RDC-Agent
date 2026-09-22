@@ -1,0 +1,52 @@
+@media (max-width: 900px) {
+  .composer-shell {
+    padding: var(--space-3);
+    border-radius: var(--composer-shell-radius);
+  }
+
+  .composer-permission-popup {
+    left: auto;
+    right: 0;
+  }
+
+  .composer-user-input-question-bar {
+    flex-direction: column;
+  }
+
+  .composer-user-input-progress {
+    align-self: flex-end;
+  }
+
+  .composer-user-input-option-copy {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+
+  .composer-user-input-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .composer-user-input-hint {
+    text-align: center;
+  }
+
+  .composer-tool-approval-actions {
+    justify-content: stretch;
+  }
+
+  .composer-tool-approval-deny,
+  .composer-tool-approval-approve {
+    flex: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .composer-textarea {
+    font-size: var(--text-base);
+  }
+
+  .composer-markdown-input {
+    font-size: var(--text-base);
+  }
+}

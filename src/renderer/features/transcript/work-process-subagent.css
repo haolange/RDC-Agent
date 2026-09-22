@@ -1,0 +1,114 @@
+.work-process-subagent {
+  list-style: none;
+  padding: var(--space-2);
+  margin: var(--space-1) 0;
+}
+
+/* 从「进度」泳道点击定位过来时的高亮闪烁。 */
+.is-trace-flash {
+  border-radius: var(--radius-md);
+  animation: work-process-trace-flash 1.6s ease-out;
+}
+
+@keyframes work-process-trace-flash {
+  0% {
+    background: var(--token-interactive-focus);
+    box-shadow: 0 0 0 2px var(--token-border-focus);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.work-process-subagent-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+}
+
+.work-process-subagent-header:hover {
+  background: var(--token-interactive-hover);
+}
+
+.work-process-subagent-caret {
+  display: inline-block;
+  width: 10px;
+  transition: transform 0.12s ease;
+  color: var(--token-text-caption);
+}
+
+.work-process-subagent-caret.is-open {
+  transform: rotate(90deg);
+}
+
+.work-process-subagent-profile {
+  font-weight: 600;
+  color: var(--token-text-heading);
+}
+
+.work-process-subagent-summary {
+  flex: 1;
+  color: var(--token-text-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-process-subagent-status {
+  font-size: var(--text-xs);
+  color: var(--token-text-caption);
+}
+
+.work-process-subagent-status.status-error {
+  color: var(--token-status-error);
+}
+
+.work-process-subagent-status.status-running {
+  color: var(--token-status-info);
+}
+
+.work-process-subagent-duration {
+  font-size: var(--text-xs);
+  color: var(--token-text-caption);
+}
+
+.work-process-subagent-children {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.work-process-child-summary,
+.work-process-child-diagnostic {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--token-text-body);
+}
+
+.work-process-child-message,
+.work-process-child-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-process-child-diagnostic.status-error .work-process-child-message {
+  color: var(--token-status-error);
+}

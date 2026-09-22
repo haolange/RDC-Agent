@@ -6,7 +6,7 @@
 
 ## 上手指南
 
-首次 bootstrap 后展示四步图文教程：准备开始、连接模型、创建项目、启用 RDC。每页包含一句主说明、至多三条操作与一条完成预期；桌面左文右图，720px 以下上图下文，正文可滚动而底部导航固定。标题栏右上角问号重新打开，重开从第一步开始。使用 TaskDialog、现有 Button/IconButton、overlay stack 和焦点返回；步骤切换沿用 motion token 的短位移与淡入，无自动播放。说明不内嵌业务配置、不探测环境、不创建项目或调用模型。关闭/完成只记录应用 UI 已阅读状态，不标记配置成功。深浅主题、窄屏、键盘与双语使用同一组件。
+首次 bootstrap 后展示四步图文教程：准备开始、连接模型、创建项目、启用 RDC。每页包含导语、至多三条操作与一条完成预期；桌面采用文字栏优先的左文右图布局，步骤编号固定对齐，介绍区块间距紧凑，720px 以下上图下文。正文可滚动而底部导航固定。标题栏右上角问号重新打开，重开从第一步开始。使用 TaskDialog、现有 Button/IconButton、overlay stack 和焦点返回；步骤切换沿用 motion token 的短位移与淡入，无自动播放。说明不内嵌业务配置、不探测环境、不创建项目或调用模型。关闭/完成只记录应用 UI 已阅读状态，不标记配置成功。深浅主题、窄屏、键盘与双语使用同一组件。
 
 四张本地教学配图位于 onboarding/assets，随 renderer 构建离线分发。以实际工作台、供应商设置及项目入口为依据，通过 Image Gen 生成统一的中性底色、正视简化界面：工作台三入口；供应商凭据到模型选择；项目加号到文件夹再到项目栏；zip 到解压目录再到验证。生成要求为无文字、无品牌标识、无装饰光效；模型页二次移除生成的标识。编号、按钮名称和说明均为 HTML/i18n，图片提供替代文本；图卡始终标明“操作示意／非当前配置状态”。成功符号只解释完成预期，不投影用户真实配置。项目加号直接打开文件夹选择器，不虚构中间创建菜单；Tools 选择文件夹而非 exe。
 
@@ -24,7 +24,7 @@ RDC Tools 设置通过目录检测/选择和验证并应用完成安装绑定。
 
 Docked 左导航与右检查栏在可见接缝可拖以改变栏宽；进入抽屉或自动收起后该接缝不再提供拖拽。
 
-Workbench page shell、Local utilities、composer、transcript 共用 `--workbench-outer-rail-width`（源自 `WORKBENCH_CHAT_RAIL_MAX_WIDTH`）。禁止更窄 content-rail 把 composer 挤歪。
+Workbench page shell、Local utilities、composer、transcript 共用 `--workbench-outer-rail-width`（源自 `WORKBENCH_CHAT_RAIL_MAX_WIDTH`）。禁止更窄 content-rail 把 composer 挤歪。Work Process 保留左侧内容起始线；可见卡片的右侧边界以既有左侧层级 gutter 校准，再通过 `--work-process-inline-end-inset` 做容器响应式收口，避免根节点宽度与卡片边界产生额外偏差。tool call、commentary、thinking/summary 及同一工作过程内的卡片共享该内容轨道，Composer 外框和运行态视觉不随 Transcript 收口改变。Final 回复继续占满 Transcript 内容列，不继承 Work Process 卡片收口。
 
 - 用户 prompt：右对齐 raised bubble（`fit-content`、`--token-surface-raised`）。
 - Assistant final answer、Work Process（含 tool 卡片）、loop commentary：full-bleed 透明散文；`.conversation-thread` 共用 `padding-inline: var(--space-3)`。
@@ -54,6 +54,12 @@ Active Signal：`active-signal-shimmer` clipped-gradient 能量扫光（`1.6s li
 `plan_artifact` 与 `ask_user` 同构停顿。三层表面：Work Process 计划卡（`PlanCard`，无同意/拒绝按钮）、只读阅读面板（`PlanReviewPanel`）、Composer 待审门（`PlanReviewRequestPanel` + `HandoffActionRow`）。Composer 优先级 `pendingToolApproval > pendingPlanReview > pendingUserInput`。通过 = 点当前 Agent 声明的 continue 按钮（文案 = `label`）；拒绝意见必填。计划门那一击可以同时批准并 enqueue 续跑。superseded / rejected 降为工具壳行。计划不进 Right Rail。不得把计划写进 `final_answer` 冒充审阅门。Mission 回合成功终态仅在本回合 `plan_artifact` 的真实批准事件已投影到 workTrace 时才在 final answer 下快照 `handoffSuggestions`；该事件在冻结计划后发布。澄清/散文计划不挂 Execute。General 无声明即无建议行。建议行与计划门共用 `HandoffActionRow`；人点后主进程 `applyDeclaredHandoff` 写/确认 offer 并 persist `session.agentId`，`send: true` 才自动发。手动改 Agent pill 不写 offer。
 
 ## Composer 控件
+
+工程边界：`Composer` 编排，`ComposerEditor` 与 `ComposerFooter` 只获得所需字段和动作，草稿与发送仍由 `useComposer` 协调。待处理请求通过纯选择器、订阅 hook 和展示组件分离；会话切换重置菜单与 Effort 生命周期。普通输入的 Enter 在 IME composition 或兼容 keyCode 229 期间不触发发送，Shift+Enter 继续换行。
+
+Composer、Transcript 与右栏样式按组件职责就近维护，入口导入顺序属于 cascade 合同。Composer 当前光环的角度渐变、2.85 秒周期、分层辉光和 accent 联动保持单一路径；右栏仍固定 Progress / Artifacts / Outputs / Context / Capture，不因壳组件收敛减少内容。Context 展开值与持久化动作归 Composer owner，pattern 仅接收值和回调。Material 编辑与查看共用 TaskDialog 的叠层和焦点机制，保留各自图片区域、48rem/70rem 空间与非 backdrop 关闭语义。
+
+Transcript 内容解析与轨迹呈现分离，滚动跟随使用统一生产条件，不检测 `navigator.webdriver`。读者在底部附近时跟随新内容和已渲染消息尺寸变化；离底后保留阅读位置。虚拟列表继续使用既有估算策略，定位帧、尺寸观察与切片监听在替换或卸载时释放，不宣称估算高度等同实测高度。
 
 普通输入与 Markdown 共用外壳书写区：空内容最小高度 72px，随内容增高，上限 180px，超出后在书写区内滚动。高度只由 `COMPOSER_PROMPT_MIN_HEIGHT` / `COMPOSER_PROMPT_MAX_HEIGHT` 定义，通过动态样式表共享给 CSS；Markdown 使用实测 padding，随布局、字号和内容变化重新测量，卸载释放观察器和动态样式。普通输入不使用表单 Textarea 的灰底、边框和圆角，背景透出 `composer-shell`。底栏工具条与书写区同一面板，不另做底色。
 

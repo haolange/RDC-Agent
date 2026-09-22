@@ -35,7 +35,7 @@ export const PermissionModeSelector: React.FC = () => {
     <div ref={setRootRef} className="composer-permission-menu">
       <Pill
         ref={setTriggerRef}
-        className={`composer-permission-pill ${menu.open ? 'open' : ''}`}
+        className={`composer-permission-pill ${menu.open ? 'is-open' : ''}`}
         selected={menu.open}
         data-testid="composer-permission-pill"
         data-mode={current}

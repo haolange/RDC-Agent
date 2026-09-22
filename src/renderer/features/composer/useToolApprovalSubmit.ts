@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { PendingToolApprovalRequest } from './ToolApprovalRequestPanel';
+import type { PendingToolApprovalRequest } from './toolApprovalRequestModel';
 
 export const useToolApprovalSubmit = () => useCallback(async (
   request: PendingToolApprovalRequest,

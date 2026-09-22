@@ -1,6 +1,6 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
-import { getRowStatusLabel } from './workProcessPresentation';
+import { getRowStatusLabel } from './workProcessStatus';
 import { WorkProcessIcon } from './WorkProcessIcons';
 import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';

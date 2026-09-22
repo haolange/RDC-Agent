@@ -479,8 +479,10 @@
       },
       "controls": {
         "fast": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "label": "Fast mode"
         },
         "maxContext": {
           "state": "unsupported",
@@ -508,6 +510,23 @@
           }
         }
       },
+      "executionBindings": [
+        {
+          "id": "fast:priority",
+          "when": {
+            "fast": true
+          },
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "service_tier": "priority"
+              }
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ],
       "factSourceId": "provider-docs:grok-4.7:2026-09-22",
       "fieldFactSourceIds": {
         "toolCalling": "provider-docs:grok-account:tools-2026-08-23"

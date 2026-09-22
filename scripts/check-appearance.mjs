@@ -2,7 +2,7 @@ import { createRequire } from 'module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scriptExists, scriptRead } from './renderer-contract.mjs';
+import { scriptExists, scriptRead, scriptReadCssBundle } from './renderer-contract.mjs';
 
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
@@ -94,10 +94,7 @@ assert(
 );
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const composerChromeSource = [
-  fs.readFileSync(path.join(repoRoot, 'src/renderer/features/composer/composer-chrome-1.css'), 'utf8'),
-  fs.readFileSync(path.join(repoRoot, 'src/renderer/features/composer/composer-chrome-3.css'), 'utf8'),
-].join('\n');
+const composerChromeSource = scriptReadCssBundle('src/renderer/features/composer/composer-chrome.css');
 assert(
   composerChromeSource.includes('.composer-shell:focus-within')
     && composerChromeSource.includes('.composer-shell:has([aria-expanded="true"])')
@@ -132,13 +129,7 @@ const effortPopupSource = scriptRead('src/renderer/features/composer/ComposerMod
 const effortControlSource = scriptRead('src/renderer/features/composer/useComposerEffortControl.ts');
 const effortMaxFieldSource = scriptRead('src/renderer/features/composer/EffortMaxField.tsx');
 const effortLayoutSource = scriptRead('src/renderer/features/composer/useEffortPopupLayout.ts');
-const debuggerCssSource = [
-  scriptRead('src/renderer/features/composer/composer-effort.css'),
-  ...fs.readdirSync(path.join(repoRoot, 'src/renderer/features/composer'))
-    .filter((name) => /^composer-effort-\d+\.css$/.test(name))
-    .sort()
-    .map((name) => fs.readFileSync(path.join(repoRoot, 'src/renderer/features/composer', name), 'utf8')),
-].join('\n');
+const debuggerCssSource = scriptReadCssBundle('src/renderer/features/composer/composer-effort.css');
 assert(
   debuggerCssSource.includes('.composer-model-effort-popup.is-picker')
     && debuggerCssSource.includes('max-height: min(32rem, calc(100vh - var(--space-16)))')
@@ -157,7 +148,7 @@ assert(
   'Fast/Max tips must be raised pills centered on the icons, not pinned cards growing into the panel',
 );
 assert(
-  fs.readFileSync(path.join(repoRoot, 'src/renderer/features/composer/composer-chrome-2.css'), 'utf8')
+  composerChromeSource
     .includes('padding: var(--space-1) var(--space-1) var(--space-2) 0;'),
   'Model list must keep bottom padding so the last row is not clipped by the popup radius',
 );

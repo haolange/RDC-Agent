@@ -1,7 +1,8 @@
 import React, { useEffect, useId, useState } from 'react';
 import { useI18n } from '../../i18n';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
-import { getRowStatusLabel, type WorkProcessRow } from './workProcessPresentation';
+import { getRowStatusLabel } from './workProcessStatus';
+import { type WorkProcessRow } from './workProcessTypes';
 import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { isActiveWorkProcessStatus } from './workProcessActiveSignal';

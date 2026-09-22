@@ -1,8 +1,11 @@
 import React, { useMemo } from 'react';
-import { useCommandPalette } from './useCommandPalette';
 import { useI18n } from '../../i18n';
 
 interface CommandPaletteProps {
+  open: boolean;
+  close: () => void;
+  query: string;
+  setQuery: (query: string) => void;
   onExecute?: (command: string) => void;
 }
 
@@ -16,8 +19,7 @@ const BUILTIN_COMMANDS = [
   { name: '/undo', description: 'Undo last user message' },
 ];
 
-export const CommandPalette: React.FC<CommandPaletteProps> = ({ onExecute }) => {
-  const { open, close, query, setQuery } = useCommandPalette();
+export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, close, query, setQuery, onExecute }) => {
   const { t } = useI18n();
 
   const filtered = useMemo(() => {
