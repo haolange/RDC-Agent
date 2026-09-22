@@ -2,7 +2,7 @@
 
 ## Provider 事实校正 rc.6（2026-09-22）
 
-用户追加授权清理本轮临时产物、整理提交、推送 main 并发布 Windows x64 0.6.0-rc.6 未签名预发布。排除 .qoder/repowiki；旧发布保留。工程和 Settings 验收见 acceptance-ledger 的 Provider 复核节；Composer 三态及已连接 OAuth 控件仍未验证，公开发布说明保留限制。发行包内容与隔离桌面健康 smoke 已通过；当前阶段：提交与远端发布核验。
+用户追加授权清理本轮临时产物、整理提交、推送 main 并发布 Windows x64 0.6.0-rc.6 未签名预发布。排除 .qoder/repowiki；旧发布保留。工程和 Settings 验收见 acceptance-ledger 的 Provider 复核节；Composer 三态及已连接 OAuth 控件仍未验证，公开发布说明保留限制。发行包内容与隔离桌面健康 smoke 已通过；源码 c14ab21e 已推送 main，v0.6.0-rc.6 已公开为预发布，七项远端资产 digest 一致，tag 指向同一源码。临时数据与 unpacked 已清理，桌面启动权已交还；发布时 CI 仍在运行，详情见 acceptance-ledger 的 rc.6 回执。
 
 
 ## 品牌与 Composer 审查收口 rc.5（2026-09-22）
