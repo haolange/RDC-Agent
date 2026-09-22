@@ -45,6 +45,12 @@
   }
 }
 
+.settings-field-label-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .settings-field-copy {
   min-width: 0;
   display: flex;

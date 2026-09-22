@@ -55,8 +55,9 @@ describe('textarea content sizing', () => {
       removeEventListener: (name: string) => fonts.delete(name),
     } });
     let lineHeight = '20px';
+    let maxHeight = 'none';
     vi.stubGlobal('getComputedStyle', () => ({ lineHeight, fontSize: '14px', paddingTop: '4px',
-      paddingBottom: '4px', borderTopWidth: '1px', borderBottomWidth: '1px', minHeight: '32px' }));
+      paddingBottom: '4px', borderTopWidth: '1px', borderBottomWidth: '1px', minHeight: '32px', maxHeight }));
     let visible = true;
     const root = { parentElement: null };
     const element = { scrollHeight: 30, parentElement: root,
@@ -86,6 +87,12 @@ describe('textarea content sizing', () => {
     lineHeight = '30px';
     mutation(); pending?.();
     expect(assignDynStyle).toHaveBeenLastCalledWith(element, { height: '250px', 'overflow-y': 'auto' });
+    maxHeight = '180px';
+    mutation(); pending?.();
+    expect(assignDynStyle).toHaveBeenLastCalledWith(element, { height: '180px', 'overflow-y': 'auto' });
+    Object.defineProperty(element, 'scrollHeight', { value: 50, configurable: true });
+    handlers.get('input')!();
+    expect(assignDynStyle).toHaveBeenLastCalledWith(element, { height: '52px', 'overflow-y': 'hidden' });
     cleanup();
     await Promise.resolve();
     expect(disconnect).toHaveBeenCalledTimes(2);

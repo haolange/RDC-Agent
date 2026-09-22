@@ -80,6 +80,8 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 ## 状态与交互态
 
+Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与点击；错误、不可用和费用提醒仍在相应操作处可见。模型详情依次展示紧凑能力摘要、对齐的偏好表单、默认折叠的详细信息（档位、价格、验证与来源）；选择控件统一使用 Select。Agent 指令随内容增高，最小两行、最多视口高度 45%，之后内部滚动；独立技能/策略全文编辑器仍填满剩余空间。
+
 - 状态类一律 `is-*`：`is-active` / `is-selected` / `is-running` / `is-disabled` / `is-error`，并配对应 `aria-*`。禁止裸 `.active` / `.current`。
 - 任何定义了 `:hover` 的可交互选择器必须同时定义 `:focus-visible`。
 - 焦点环统一 `--token-border-focus`；禁止 `outline: none` 而不提供等效焦点样式。

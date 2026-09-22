@@ -1,0 +1,13 @@
+.ui-help-tip-trigger.button {
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-1);
+  color: var(--token-text-caption);
+}
+.ui-help-tip {
+  max-width: min(22rem, calc(100vw - var(--space-4)));
+  padding: var(--space-3);
+  color: var(--token-text-body);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
+}

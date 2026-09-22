@@ -39,18 +39,17 @@
 
 .settings-model-capability-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
   gap: var(--space-2);
 }
 
 .settings-model-capability-chip {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   gap: var(--space-1);
   min-width: 0;
-  padding: var(--space-2);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-sm);
-  background: var(--token-surface-sunken);
+  padding-block: var(--space-1);
 }
 
 .settings-model-capability-chip[data-tone='warning'] .settings-model-capability-chip-value {

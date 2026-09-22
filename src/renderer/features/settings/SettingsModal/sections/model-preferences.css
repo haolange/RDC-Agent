@@ -1,21 +1,53 @@
 .settings-model-preferences {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-surface-sunken);
+  padding-block: var(--space-3);
+  border-block: 1px solid var(--token-border-muted);
 }
 
 .settings-model-preferences-heading {
-  display: grid;
+  display: flex;
+  align-items: center;
   gap: var(--space-1);
 }
 
 .settings-model-preferences-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
   gap: var(--space-3);
+}
+
+.settings-model-preferences-grid > .settings-field {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(0, 2fr);
+  align-items: center;
+}
+
+.settings-model-preferences-grid .settings-field-control > * {
+  width: 100%;
+}
+
+.settings-model-details > summary {
+  padding-block: var(--space-2);
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.settings-model-details > summary:hover,
+.settings-model-details > summary:focus-visible {
+  color: var(--token-accent-primary);
+}
+
+.settings-model-details-body {
+  display: grid;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .settings-model-preferences-grid > .settings-field {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .settings-model-route-readonly {
@@ -35,9 +67,11 @@
   display: grid;
   gap: var(--space-2);
   padding: var(--space-3);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-surface-sunken);
+  border-top: 1px solid var(--token-border-muted);
+}
+
+.settings-model-capability-probe .settings-model-preferences-heading {
+  display: grid;
 }
 
 .settings-model-capability-probe-actions {

@@ -44,7 +44,7 @@ export function observeTextareaSizing(
       minRows,
       maxRows,
       Math.max(number(css.minHeight), bounds?.minHeight ?? 0),
-      bounds?.maxHeight ?? 0,
+      bounds?.maxHeight ?? number(css.maxHeight),
     );
     assignDynStyle(element, { height: `${result.height}px`, 'overflow-y': result.overflow });
   };
