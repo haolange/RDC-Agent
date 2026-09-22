@@ -1,12 +1,14 @@
 # Acceptance Ledger
 
-2026-09-22 RC5-LAUNCH-BRAND：接续 595e7101 的追加修复。旧候选失效，以下结果属于圆形透明、完整 RGB 换色及正常入口一致性版本；未收到任务栏目视回执前不发布。
+2026-09-22 RC5-LAUNCH-BRAND：接续 595e7101 的追加修复。旧候选失效，以下结果属于圆形透明、完整 RGB 换色及正常入口一致性版本。最终源码及发布 tag 为 5227092551bc183d0ad3746005de5fd8ee29c43f；用户已确认任务栏测试无问题。
 
 - 根因：旧 launcher 直接以 out/main/index.js 启动，真实 app.getAppPath() 为 out/main、版本为 Electron 42.2.0，主进程品牌路径不成立。现统一以 package.json 的 main 启动，cmd 与 Browser 实测版本均为 0.6.0-rc.5、应用根为仓库。品牌资源加入 build fingerprint；直接执行实际指纹函数验证不变稳定、仅品牌变更失效、还原稳定；正常第二次 cmd 跳过构建。新增 Browser smoke 产品版本断言，测试同时隔离 User Scope 与应用状态，不借真实 provider 通过。
 - 数据一致性：正常 cmd 与正常打包 exe 串行启动，日志均指向 ~/.rdc-agent 和 %APPDATA%/rdc-agent；三个已连接 provider、同两张用户 Knowledge 卡片和既有会话实际可见。provider 与 Appearance 字段 SHA 摘要一致；没有复制 secret、迁移数据、发送模型请求或执行 RDC 回放。先前无 provider 的窗口是本轮显式隔离 QA，不是正常安装路径。旧候选与用户 cmd 重建的 316 个输出文件完全相同，外观差异还包含正常 Absolutely 与隔离默认 RDC 主题。
 - 像素工程：主色精确覆盖 #cc7d5e/#33d1ff/自定义色，黑白混合保留层次；白字、近黑、中性、其他色域与透明像素保护通过。共享圆形遮罩及预乘 alpha 单测通过，真实 Windows Electron 验证 PNG 直通 RGBA → BGRA 预乘 → PNG 往返。Browser 深浅主题与强调色切换实际重绘，两个 32px 品牌 canvas 为 128px backing、无 inline style，console 无 error/warn；工具不支持读取 canvas 像素，未冒充像素实测。Composer/侧栏未再改动，沿用本轮先前真实几何验收及全量测试。
 - 工程：442 文件、3070 测试通过，4 项既有条件跳过；coverage lines75.25%、functions76.90%、branches62.35%、statements72.84%，ratchet通过。typecheck/lint、contracts248项、完整gates、实际cmd构建与Browser smoke通过。两个源码窗口均正常退出码0并释放canonical锁。
-- 新包：未签名NSIS/ZIP构建完成；52运行资源及两处品牌校验、316构建文件与ASAR/ZIP字节一致、九种圆形ICO与exe资源逐项一致。正常打包版服务初始化通过。任务栏轮廓、精准观感与系统主题响应待用户回执；打包窗口正常退出与最终发布清理随后收口。历史fs.Stats弃用及meta CSP提示仍存在，安装向导未实测。
+- 新包：未签名NSIS/ZIP构建完成；52运行资源及两处品牌校验、316构建文件与ASAR/ZIP字节一致、九种圆形ICO与exe资源逐项一致。正常打包版服务初始化通过。用户提供任务栏目视通过回执（“任务栏我测了，没问题”）；打包窗口已退出，复查无 Electron/RdcAgent 进程且 canonical instance.lock 不存在。历史fs.Stats弃用及meta CSP提示仍存在，安装向导未实测。
+
+- 发布与收尾：[v0.6.0-rc.5](https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.5) 已公开为未签名预发布、非 latest；7 项上传资产 SHA256 与本地逐项相符，SBOM 源码 SHA 与 tag 一致。NSIS SHA256 `43c5fb1a33bbc4a7224712829cdb99ce18b331014dc9b5760c431025e6e3b784`；ZIP SHA256 `c2bbd135056a4bfc165d7e940b18d1103d99182b077d4915358705d3295fa01b`。[源码 CI](https://github.com/haolange/RDC-Agent/actions/runs/35696652266) completed/success。rc.4 tag 未移动，rc.2 既有资产 digest 未改变。已清理本轮 QA 数据、日志、诊断文件、旧候选、本地旧包副本及 win-unpacked；release 仅保留 7 项正式资产，当前依赖与构建输出保留供正常启动，.qoder 和真实用户数据未动。桌面启动权已交还。后续文档回执提交不移动发行 tag。
 
 2026-09-22 RC5-BRAND-COMPOSER：基于 48f9a0ee 的本轮未提交修复，以下是实际证据，不把基线 SHA 作为新实现 SHA。保持四个官方 Agent、声明式 handoff 及历史实验记录。
 
