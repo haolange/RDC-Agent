@@ -9,8 +9,12 @@ export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
   inputSize?: TextareaSize;
   error?: boolean;
   sizing?: 'content' | 'fill';
+  /** `plain` is the shell writing surface: no field fill, border, or radius. */
+  chrome?: 'field' | 'plain';
   minRows?: number;
   maxRows?: number;
+  minHeight?: number;
+  maxHeight?: number;
 }
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
@@ -21,8 +25,11 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
     disabled,
     rows,
     sizing = 'content',
+    chrome = 'field',
     minRows = 1,
     maxRows = 8,
+    minHeight,
+    maxHeight,
     ...rest
   },
   ref,
@@ -31,9 +38,9 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   useImperativeHandle(ref, () => element.current!, []);
   useLayoutEffect(() => {
     if (sizing === 'content' && element.current) {
-      return observeTextareaSizing(element.current, minRows, maxRows);
+      return observeTextareaSizing(element.current, minRows, maxRows, { minHeight, maxHeight });
     }
-  }, [sizing, minRows, maxRows, rest.value, rest.defaultValue]);
+  }, [sizing, minRows, maxRows, minHeight, maxHeight, rest.value, rest.defaultValue]);
   return (
     <textarea
       ref={element}
@@ -42,8 +49,9 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
       aria-invalid={error || undefined}
       className={cn(
         'ui-textarea',
+        chrome === 'plain' && 'is-chrome-plain',
         `is-sizing-${sizing}`,
-        inputSize !== 'md' && `is-size-${inputSize}`,
+        chrome === 'field' && inputSize !== 'md' && `is-size-${inputSize}`,
         error && 'is-error',
         disabled && 'is-disabled',
         className,

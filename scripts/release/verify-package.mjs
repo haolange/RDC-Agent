@@ -48,10 +48,15 @@ function checkResources(directory, prefix) {
 }
 checkResources(path.join(root, 'resources/agent-runtime'), 'resources/agent-runtime');
 for (const name of ['welcome', 'model', 'project', 'rdc']) {
-  const assets = files.filter(file => file.startsWith(`out/renderer/assets/${name}-`) && file.endsWith('.png'));
+  const assets = files.filter(file => file.startsWith(`out/renderer/assets/${name}-`) && file.endsWith('.png') && !file.startsWith('out/renderer/assets/rdc-agent-logo-'));
   assert.equal(assets.length, 1, `exactly one tutorial image: ${name}`);
   assert.equal(digest(asar.extractFile(archive, path.join(...assets[0].split('/')))),
     digest(readFileSync(path.join(root, 'src/renderer/features/onboarding/assets', `${name}.png`))),
     `tutorial image differs: ${name}`);
 }
+const brand = readFileSync(path.join(root, 'resources/brand/rdc-agent-logo.png'));
+assert.equal(digest(readFileSync(path.join(unpacked, 'resources/brand/rdc-agent-logo.png'))), digest(brand), 'native brand resource differs');
+const logoAssets = files.filter(file => file.startsWith('out/renderer/assets/rdc-agent-logo-') && file.endsWith('.png'));
+assert.equal(logoAssets.length, 1, 'exactly one renderer brand resource');
+assert.equal(digest(asar.extractFile(archive, path.join(...logoAssets[0].split('/')))), digest(brand), 'renderer brand resource differs');
 console.log(`[release:verify] PASS version=${packaged.version}, bundled resources=${resources}, no development entry or package manager`);

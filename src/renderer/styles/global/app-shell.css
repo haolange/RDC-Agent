@@ -140,21 +140,6 @@
   min-width: 0;
 }
 
-.app-logo-icon {
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--token-accent-primary), var(--token-accent-primary));
-  color: white;
-  font-size: var(--text-sm);
-  font-weight: var(--font-bold);
-  letter-spacing: 0.06em;
-  box-shadow: 0 10px 20px color-mix(in srgb, var(--token-accent-primary) 14%, transparent);
-}
-
 .app-logo-copy {
   display: flex;
   flex-direction: column;
@@ -163,6 +148,9 @@
 }
 
 .app-logo-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: var(--text-xl);
   font-weight: var(--font-bold);
   color: var(--token-text-heading);

@@ -98,7 +98,7 @@ Conclusion
 
 发行包用户：安装 `*-setup.exe`，或完整解压 Windows zip 后运行 `RdcAgent.exe`（保留同目录资源）。不需要 Node.js/pnpm。首次上手指南也可从标题栏问号重开；自行配置 Provider/Model 和项目即可使用 General。
 
-当前源码版本 **0.6.0-rc.4 按未签名预发布通道交付**；可下载版本以 [Releases](https://github.com/haolange/RDC-Agent/releases) 为准。Windows 可能提示未知发布者，受管理电脑可能阻止运行。仅从本仓库 Releases 下载并核对 SHA-256；不要关闭安全防护。稳定正式版仍保留签名要求。
+当前源码版本 **0.6.0-rc.5 按未签名预发布通道交付**；可下载版本以 [Releases](https://github.com/haolange/RDC-Agent/releases) 为准。Windows 可能提示未知发布者，受管理电脑可能阻止运行。仅从本仓库 Releases 下载并核对 SHA-256；不要关闭安全防护。稳定正式版仍保留签名要求。
 
 RDC 调查另从 [RDC-Tool Releases](https://github.com/haolange/RDC-Tool/releases) 下载自包含 zip，解压后在 Settings → Tools 检测安装或选择 `rdc-tool` 根目录，再验证并应用；不需要另装 Python。默认安装目录为 `%LOCALAPPDATA%/Programs/rdc-tool`。通用 Code Interpreter 是单独的可选配置。
 

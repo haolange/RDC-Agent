@@ -23,6 +23,8 @@ import { useTerminalStore } from '../stores/terminalStore';
 import { useI18n } from '../i18n';
 import { useWindowControls } from '../hooks/useWindowControls';
 import type { ResolvedTheme } from '@shared/types/settings';
+import { resolveActiveChrome } from './theme/applyChromeTheme';
+import { ProductLogo } from '../ui/ProductLogo';
 
 const App: React.FC = () => {
   const { t } = useI18n();
@@ -142,7 +144,7 @@ const App: React.FC = () => {
   if (isLoading) {
     return (
       <div className="loading-screen">
-        <div className="loading-logo">RD</div>
+        <ProductLogo className="loading-logo" accent={resolveActiveChrome(settings.appearance, resolvedTheme).accent} />
         <div className="loading-text">{t('app.loadingShell')}</div>
         <div className="loading-bar" />
       </div>
@@ -174,6 +176,7 @@ const App: React.FC = () => {
           onMinimize={handleWindowMinimize}
           onToggleMaximize={handleWindowToggleMaximize}
           onClose={handleWindowClose}
+          accent={resolveActiveChrome(settings.appearance, resolvedTheme).accent}
         />}
 
         body={<WorkbenchShell

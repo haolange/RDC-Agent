@@ -87,7 +87,7 @@ The release surface is **Windows-only**. RDC-Agent does not bundle your captures
 
 ## Download and first use
 
-Windows releases provide an NSIS installer (`*-setup.exe`) and a portable zip. Extract the whole zip before running `RdcAgent.exe`; Node.js and pnpm are only needed for source development. Source version **0.6.0-rc.4 targets the unsigned prerelease channel**; see [Releases](https://github.com/haolange/RDC-Agent/releases) for available downloads. Windows may warn about an unknown publisher or block execution under managed security policies. Download only from this repository and verify SHA-256; do not disable security protections. Stable releases still require signing.
+Windows releases provide an NSIS installer (`*-setup.exe`) and a portable zip. Extract the whole zip before running `RdcAgent.exe`; Node.js and pnpm are only needed for source development. Source version **0.6.0-rc.5 targets the unsigned prerelease channel**; see [Releases](https://github.com/haolange/RDC-Agent/releases) for available downloads. Windows may warn about an unknown publisher or block execution under managed security policies. Download only from this repository and verify SHA-256; do not disable security protections. Stable releases still require signing.
 
 The four-step guide appears on first launch and can be reopened from the titlebar question mark. Configure your own provider/API key and model in Settings, then create a Project and import a capture. Official Agents, Skills and Hooks are bundled under `resources/agent-runtime` and are not copied into user space.
 

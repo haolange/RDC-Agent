@@ -12,6 +12,7 @@ const fixture = vi.hoisted(() => ({
   catalog: { providerId: 'deepseek', models: [{ modelId: 'deepseek-v4-flash' }] },
   modelOption: { canonicalId: 'deepseek:deepseek-v4-flash', status: 'ready' },
   load: vi.fn(async () => undefined),
+  applyIcon: vi.fn(),
 }));
 vi.mock('electron', () => ({
   ipcMain: { handle: (name: string, fn: (...args: unknown[]) => unknown) => fixture.handlers.set(name, fn) },
@@ -41,6 +42,8 @@ vi.mock('../settings/ModelsOverrideService', () => ({ modelsOverrideService: {} 
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: {} }));
 vi.mock('../runtime/ShellResolver', () => ({ shellResolver: {}, formatShellInterpreterLabel: vi.fn() }));
 
+vi.mock('../window/productIcon', () => ({ applyProductIcon: fixture.applyIcon }));
+
 import { registerSettingsLlmHandlers } from './settingsLlmHandlers';
 
 describe('appearance settings response', () => {
@@ -54,6 +57,9 @@ describe('appearance settings response', () => {
       expect(result.appearance.theme).toBe(theme);
       expect(result.agents.modelOptions).toEqual([fixture.modelOption]);
     }
+    expect(fixture.applyIcon).toHaveBeenCalledTimes(2);
+    await handle({}, {});
+    expect(fixture.applyIcon).toHaveBeenCalledTimes(2);
     expect(fixture.load).toHaveBeenCalledWith('deepseek');
     expect(broadcastToRenderer).not.toHaveBeenCalled();
     expect(applyCurrentLlmConfig).not.toHaveBeenCalled();

@@ -1,0 +1,7 @@
+.product-logo {
+  display: block;
+  width: var(--control-height-md);
+  height: var(--control-height-md);
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+}

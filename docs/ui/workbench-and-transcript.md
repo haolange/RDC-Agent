@@ -2,6 +2,8 @@
 
 > 产品/架构裁决：`DESIGN.md`。视觉 token 与 Appearance：[`design-system.md`](design-system.md)。本文承载原 DESIGN 中的 **Workbench / Work Process / Composer / Markdown** 产品规格（中文摘要 + 稳定英文术语）。
 
+标题栏、启动闪屏、Settings 产品标记和运行中的任务栏图标使用 `resources/brand/rdc-agent-logo.png`。饱和青绿像素换成当前主题的 accent 色相，白字和近黑底保持原样。安装包里的 `resources/icons` 是默认深色主题色 `#33d1ff` 的静态图，资源管理器中的 exe 图标不随运行中的主题变化。标题栏旁仍显示「RDC-Agent」文字，窄屏单行省略避免挤压窗口控制。三个 renderer 入口复用无 store/IPC 依赖的 `ui/ProductLogo`，canvas 在有限分辨率上重绘，不写内联 style。主进程在窗口创建、Appearance 保存和系统主题变化时更新缓存图标；缺失/解码失败写诊断，不反向失败已成功保存的设置。`pnpm run brand:icons` 从唯一源图生成平滑缩放的多尺寸 Windows ICO 与既有 PNG/ICNS 资产。
+
 ## 上手指南
 
 首次 bootstrap 后展示四步图文教程：准备开始、连接模型、创建项目、启用 RDC。每页包含一句主说明、至多三条操作与一条完成预期；桌面左文右图，720px 以下上图下文，正文可滚动而底部导航固定。标题栏右上角问号重新打开，重开从第一步开始。使用 TaskDialog、现有 Button/IconButton、overlay stack 和焦点返回；步骤切换沿用 motion token 的短位移与淡入，无自动播放。说明不内嵌业务配置、不探测环境、不创建项目或调用模型。关闭/完成只记录应用 UI 已阅读状态，不标记配置成功。深浅主题、窄屏、键盘与双语使用同一组件。
@@ -53,6 +55,8 @@ Active Signal：`active-signal-shimmer` clipped-gradient 能量扫光（`1.6s li
 
 ## Composer 控件
 
+普通输入与 Markdown 共用外壳书写区：空内容最小高度 72px，随内容增高，上限 180px，超出后在书写区内滚动。高度只由 `COMPOSER_PROMPT_MIN_HEIGHT` / `COMPOSER_PROMPT_MAX_HEIGHT` 定义，通过动态样式表共享给 CSS；Markdown 使用实测 padding，随布局、字号和内容变化重新测量，卸载释放观察器和动态样式。普通输入不使用表单 Textarea 的灰底、边框和圆角，背景透出 `composer-shell`。底栏工具条与书写区同一面板，不另做底色。
+
 左：attach / agent / permission；右：model-effort / context usage / send-stop。Permission 不得挨着 send 伪装成执行动作。`+` 只附加图片与文件（选择器 / 拖放 / 粘贴截图）。`.rdc` 不走 Composer，只从 Project 右栏 Import。待发附件渲染为输入框上方托盘：图片 72px 缩略图卡、文件类型字形 + 大小；hover / `:focus-within` 右上角叉移除。非法/超限卡片用错误描边；当前模型无 `visionInput` 时图片卡警告。已发送附件在用户气泡下显示可点击 pill（`app:openPath`）。模型与思考共用一颗胶囊：收起态在 Fast/Max 开启时前置对应图标，后面固定是生效模型名 + 思考等级；覆盖态加 `.is-override`。胶囊 hug 文案，不预留固定槽；只有模型名溢出才渐隐，完整名留在 `title`。点开后是同一弹层：左上 Fast（实心闪电）、右上 Max（层叠卡片；始终占位，不支持灰关、固定灰开、selectable 才可切；hover / `:focus-visible` 出对准图标的实色圆胶囊 tip，完全浮在弹层上方；有约束状态只显示状态，可用时只显示模式名，不占面板内行）、中间思考等级 + 模型名、底部思考滑杆。点模型名切到现有模型列表（搜索、搜索栏下常驻「按 Agent 配置」、按 provider 分组）；列表 picker 高到 `32rem`，宽仍 `320`（`space-10 * 8`）；选完回到思考面板，不关弹层。列表里 Escape 先回思考面板，面板上 Escape 或点空白关闭。无 session 时可先选模型（只记草稿，不建 session）；有 session 则写入 `modelOverride`。选「按 Agent 配置」或 `/model default` 清除覆盖（session 写 `null` / 无 session 清草稿）。Agent 未配置或配置的模型当前不可执行时该行禁用。裸 `default` 先于模型 id；真名叫 `default` 的模型用 canonical `provider:model`。不写回 `.agent.md`，切 Agent 不清模型。能力未就绪时滑杆与 Fast/Max 灰掉不可调，不把整页换成状态大卡。
 
 底栏弹窗（Agent / Permission / model-effort / Usage）走单一互斥注册表：任意时刻只开一个；Escape 关闭并把焦点还给 trigger；点空白关闭。Composer 外环在壳内 `:focus-within` **或** 底栏弹层 `aria-expanded="true"` 时保持，不按点击几何脉冲检测。
@@ -85,6 +89,8 @@ Settings → Appearance 为权威。双体系：全局 chrome vs Composer agent 
 - 浏览器真实会话清单见 `AGENTS.md`
 
 ## Right Rail
+
+左右停靠栏最大宽度同为 520px。最小宽度与默认宽度仍按各自内容下限，不跟着上限一起改。
 
 The right rail has two explicit target surfaces. A selected Project shows only `Import .rdc` and its project-scoped capture inputs. A selected Session always shows `Progress / Artifacts / Outputs / Context / Capture`. Empty sessions keep all five sections with honest empty states; they never fall back to Classic, Working Directory, Memory, Skills/MCP, Capture Library, or other retired panels.
 

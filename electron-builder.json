@@ -20,6 +20,10 @@
       "from": "resources/agent-runtime/hooks",
       "to": "agent-runtime/hooks",
       "filter": ["*.mjs"]
+    },
+    {
+      "from": "resources/brand/rdc-agent-logo.png",
+      "to": "brand/rdc-agent-logo.png"
     }
   ],
   "forceCodeSigning": false,

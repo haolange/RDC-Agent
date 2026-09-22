@@ -5,6 +5,7 @@ import type { ResolvedTheme } from '@shared/types/settings';
 import { deriveComposeAccentVars } from '@shared/theme/composeAccent';
 import { useI18n } from '../../i18n';
 import { Textarea } from '../../ui/Textarea';
+import { COMPOSER_PROMPT_MAX_HEIGHT, COMPOSER_PROMPT_MIN_HEIGHT } from './composerPromptGeometry';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -123,7 +124,11 @@ export const Composer: React.FC<ComposerProps> = ({
     () => deriveComposeAccentVars(currentModeConfig.accentColor, resolvedTheme),
     [currentModeConfig.accentColor, resolvedTheme],
   );
-  const composeAccentStyle = useDynStyle({ ...composeAccentVars });
+  const composeAccentStyle = useDynStyle({
+    ...composeAccentVars,
+    '--composer-prompt-min-height': `${COMPOSER_PROMPT_MIN_HEIGHT}px`,
+    '--composer-prompt-max-height': `${COMPOSER_PROMPT_MAX_HEIGHT}px`,
+  });
 
   useEffect(() => {
     if (!composerMarkdown || isComposerBusy) {
@@ -186,6 +191,9 @@ export const Composer: React.FC<ComposerProps> = ({
           <Textarea
             key={composerScopeKey}
             ref={promptInputRef}
+            chrome="plain"
+            minHeight={COMPOSER_PROMPT_MIN_HEIGHT}
+            maxHeight={COMPOSER_PROMPT_MAX_HEIGHT}
             className="composer-textarea"
             name="debuggerPrompt"
             value={promptValue}

@@ -1,16 +1,31 @@
 import { assignDynStyle, clearDynStyle } from './useDynStyle';
 
-export function textareaHeight(scrollHeight: number, lineHeight: number, padding: number, border: number, minRows: number, maxRows: number, minHeight = 0) {
+export function textareaHeight(
+  scrollHeight: number,
+  lineHeight: number,
+  padding: number,
+  border: number,
+  minRows: number,
+  maxRows: number,
+  minHeight = 0,
+  maxHeight = 0,
+) {
   const min = Math.max(1, Math.floor(minRows));
   const max = Math.max(min, Math.floor(maxRows));
   const floor = Math.max(minHeight, lineHeight * min + padding + border);
-  const ceiling = Math.max(floor, lineHeight * max + padding + border);
+  const rowCeiling = Math.max(floor, lineHeight * max + padding + border);
+  const ceiling = maxHeight > 0 ? Math.max(floor, maxHeight) : rowCeiling;
   const height = Math.max(floor, Math.min(scrollHeight + border, ceiling));
   return { height, overflow: scrollHeight + border > ceiling ? 'auto' : 'hidden' };
 }
 
 /** Observe layout as well as edits: hidden panels, font loading and wrapping change height. */
-export function observeTextareaSizing(element: HTMLTextAreaElement, minRows: number, maxRows: number) {
+export function observeTextareaSizing(
+  element: HTMLTextAreaElement,
+  minRows: number,
+  maxRows: number,
+  bounds?: { minHeight?: number; maxHeight?: number },
+) {
   let frame = 0;
   let disposed = false;
   const measure = () => {
@@ -21,7 +36,16 @@ export function observeTextareaSizing(element: HTMLTextAreaElement, minRows: num
     const padding = number(css.paddingTop) + number(css.paddingBottom);
     const border = number(css.borderTopWidth) + number(css.borderBottomWidth);
     assignDynStyle(element, { height: 'auto', 'overflow-y': 'hidden' });
-    const result = textareaHeight(element.scrollHeight, line, padding, border, minRows, maxRows, number(css.minHeight));
+    const result = textareaHeight(
+      element.scrollHeight,
+      line,
+      padding,
+      border,
+      minRows,
+      maxRows,
+      Math.max(number(css.minHeight), bounds?.minHeight ?? 0),
+      bounds?.maxHeight ?? 0,
+    );
     assignDynStyle(element, { height: `${result.height}px`, 'overflow-y': result.overflow });
   };
   const schedule = () => {
