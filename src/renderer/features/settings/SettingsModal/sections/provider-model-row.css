@@ -92,6 +92,22 @@
   min-width: 0;
 }
 
+@media (max-width: 640px) {
+  .settings-model-columns { display: none; }
+  .settings-model-row-main {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  .settings-model-row-identity {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    flex-wrap: wrap;
+  }
+  .settings-model-row-label {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
 .settings-model-row {
   border: 1px solid var(--token-border-muted);
   background: var(--settings-subtle-bg);

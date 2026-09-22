@@ -30,7 +30,7 @@ export const AgentIdentityPanel: React.FC<AgentIdentityPanelProps> = ({ agent, o
           />
         </div>
       </SettingsField>
-      <SettingsField label={t('settings.agentAccent')} layout="row" description={t('settings.agentAccentHelp')}>
+      <SettingsField label={t('settings.agentAccent')} layout="row" help={t('settings.agentAccentHelp')}>
         <ColorField
           className="settings-agent-accent-color"
           layout="inline"

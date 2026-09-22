@@ -126,6 +126,7 @@ export function Popover({
     'aria-haspopup': trigger.props['aria-haspopup'] ?? 'dialog',
     onClick: (event: MouseEvent<HTMLElement>) => {
       trigger.props.onClick?.(event);
+      if (event.defaultPrevented) return;
       onOpenChange(!open);
     },
     onKeyDown: (event: KeyboardEvent<HTMLElement>) => {

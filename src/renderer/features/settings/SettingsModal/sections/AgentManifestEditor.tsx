@@ -158,7 +158,8 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           </span>
         </div>
         <Textarea
-          sizing="fill"
+          sizing="content"
+          minRows={2}
           aria-label={t('settings.agentInstructions')}
           className="settings-agent-instructions settings-agent-instructions--editor"
           value={selectedAgent.instructions}
@@ -169,7 +170,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   };
 
   return (
-    <div className={`settings-manifest-editor${openPanel === 'instructions' ? ' is-editing-document' : ''}`} data-testid="settings-agent-manifest-editor">
+    <div className="settings-manifest-editor" data-testid="settings-agent-manifest-editor">
       <div className="settings-manifest-editor-head">
         <div className="settings-agent-editor-title">
           <span className="settings-agent-editor-icon" aria-hidden="true" {...agentAccentStyle}>

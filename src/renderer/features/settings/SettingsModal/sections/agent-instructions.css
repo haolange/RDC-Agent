@@ -65,23 +65,8 @@
   padding: 0;
 }
 
-.settings-manifest-editor.is-editing-document .settings-agent-panels {
-  flex: 1 0 auto;
-}
-
-.settings-manifest-editor.is-editing-document .settings-agent-panel[data-panel="instructions"].is-open {
-  display: flex;
-  flex: 1 0 auto;
-  flex-direction: column;
-}
-
-.settings-manifest-editor.is-editing-document .settings-agent-panel[data-panel="instructions"] .settings-agent-panel-body {
-  flex: 1 0 auto;
-  min-height: calc(var(--control-height-md) * 8);
-}
-
 .settings-agent-instructions--editor.ui-textarea {
-  flex: 1 1 auto;
+  max-height: 45vh;
 }
 
 .settings-agent-diagnostics-toggle {

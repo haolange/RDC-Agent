@@ -1,5 +1,13 @@
 # Acceptance Ledger
 
+2026-09-22 SETTINGS-UI-CONVERGENCE：基于 `5d7080ea1b28fcbf023c2aca5e2eb3e2d78d91eb` 的未提交工作区修复；该 SHA 是基线，不是本次实现提交。范围仅为 Settings 展示、交互与共享帮助提示/文本框，不改变能力事实、存储、权限或自动保存语义。
+
+- 工程：受影响 Settings、Textarea、自动保存、Provider 两组专项测试共 436 项通过（重复复跑不累计）；最终 typecheck、lint、design-tokens、renderer-structure、appearance、settings-agents、provider-system 和 production build 通过。未运行全产品矩阵或发行打包；构建仍有既有动态导入提示。
+- Browser QA：使用 pnpm 11.7.0 正式 disposable Browser launcher 与一次性 QA 入口。深色中文中字号、浅色英文大字号、桌面及实际 390 CSS px 窄屏代表组合通过；字段 Tips 可聚焦、Escape 关闭，指令短文本约 45.21px、长文本在桌面约 515.45px（45vh）封顶并内部滚动，删除后回缩，恢复原文保存、折叠展开及切换 Agent 正常。
+- 模型：DeepSeek 多路由偏好对齐、共享下拉点击与键盘选择回显、默认折叠详情及未连接验证禁用通过；xAI 单路由只读展示通过。390px 下模型名称完整独占一行，下拉左右边界约 45.21/335.63px，未越出视口。未知推理、不可用状态、工具未知与验证“不确定”结果由受控组件测试覆盖；未登录的 Super Grok Account 不展示模型，未冒充该账号真实页面验收。未连接真实账号或发送收费模型请求。
+- 提示与异常：正常解释迁入 Tips；真实请求费用提醒保留，异常及验证结果不随详情折叠隐藏。开发期间组件提取曾触发一次临时 HMR 缺模块错误，已修复；最终构建与页面重新加载正常，不将历史控制台记录表述为全程无错误。
+- 收尾：已停止本会话新旧预览服务及自有子进程，清理三份隔离 QA 数据与诊断日志，未触碰真实用户数据；必要当前依赖和构建输出保留。复查自有进程已退出、canonical instance.lock 不存在，桌面启动权已交还（锁检查，未另行启动真实账号桌面）。设计系统与 Appearance 清单已同步，无架构条款变更；未创建分支、提交、推送或发布。
+
 2026-09-22 RC5-LAUNCH-BRAND：接续 595e7101 的追加修复。旧候选失效，以下结果属于圆形透明、完整 RGB 换色及正常入口一致性版本。最终源码及发布 tag 为 5227092551bc183d0ad3746005de5fd8ee29c43f；用户已确认任务栏测试无问题。
 
 - 根因：旧 launcher 直接以 out/main/index.js 启动，真实 app.getAppPath() 为 out/main、版本为 Electron 42.2.0，主进程品牌路径不成立。现统一以 package.json 的 main 启动，cmd 与 Browser 实测版本均为 0.6.0-rc.5、应用根为仓库。品牌资源加入 build fingerprint；直接执行实际指纹函数验证不变稳定、仅品牌变更失效、还原稳定；正常第二次 cmd 跳过构建。新增 Browser smoke 产品版本断言，测试同时隔离 User Scope 与应用状态，不借真实 provider 通过。
