@@ -7,10 +7,14 @@
 | Task | 状态 | 范围与通过条件 |
 | --- | --- | --- |
 | RC4-1 计划交互与外观对照 | 通过 | 文档预览卡、紧凑决策区、Composer 对齐阅读器及异步隔离测试；Browser 使用正常用户 appearance 补验，未复制凭据和会话；完整边界见 acceptance-ledger |
-| RC4-2 工程与候选 | 执行中 | 已有完整 coverage/type/lint/gates/build 证据；版本增量门禁、NSIS/zip、包校验及打包 smoke 待完成 |
-| RC4-3 上传与收尾 | 待执行 | main 非强制推送、新 tag、7 项资产及远端 digest；自有测试数据/进程/打包暂存清理和桌面锁复查 |
+| RC4-2 工程与候选 | 通过 | 完整 coverage/type/lint/gates/build 证据及 rc.4 增量 gates/build；NSIS/zip、52 资源校验、315 个构建文件字节一致、ZIP ASAR 一致及打包桌面服务 smoke 通过 |
+| RC4-3 上传与收尾 | 通过 | 19b0db97 非强制推送 main；v0.6.0-rc.4 已公开为预发布，7 项远端 digest 全部一致；自有 QA 35 文件和进程、打包暂存已清理，canonical lock 不存在 |
 
 外观反馈复盘：原目标是验证用户看到的产品，先前使用 disposable 默认主题、中字号、普通输入进行部分视觉验收，未明确与正常用户 Absolutely、大字号、Markdown 模式的差异，属验收可比性问题。源码共用 Composer 与 renderer，没有测试 UI 分支。补验采用只复制 appearance 的隔离环境，正式构建显示既有编辑/预览并实际切换成功；保留隔离数据原则，后续对照须先匹配外观与 Agent，不能把默认空态作为 canonical 外观证明。未为消除截图差异删除已有设置或复制另一套组件。
+
+发行源码与 tag：`19b0db975a285a36242e3d25020604d08993f967`；[rc.4 Release](https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.4) 为 draft=false、prerelease=true、非 latest。安装包 SHA256 `d8fbaf61ea8be7b3ecf0f7becfe868e5198fb6004fdb222af83d412294a2eb60`，ZIP `119a28606c3f4b70cca66e9b625facb48b40f880e6123a597dee5a3d09b14ae0`；SBOM 1106 components。NSIS 为 NotSigned，安装向导未实测。桌面 smoke 的 fs.Stats 弃用与 meta CSP frame-ancestors 警告仍存在，不宣称控制台无警告。发布前 [源码 CI](https://github.com/haolange/RDC-Agent/actions/runs/35678619476) 快照为 in_progress；云端异步结果不冒充本地工程证据。后续文档提交不移动发行 tag。
+
+本地收口：旧 rc.3 的七项本地副本先核对远端 digest 再删除，远端旧资产保留；本轮隔离 QA、打包 win-unpacked、builder-debug 和中间日志/发布说明清理，打包工具系统临时目录及 smoke 根已消失。保留 rc.4 七项正式资产与当前 out/coverage；其他任务正在使用的 QA 不停止、不删除。用户真实配置修改时间未变，桌面启动权已交还。
 
 ## UI 收敛与 rc.3（2026-09-22）
 

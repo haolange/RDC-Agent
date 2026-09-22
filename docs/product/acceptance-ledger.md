@@ -630,3 +630,5 @@ Execution tracking remains in RDC-Tool docs/tool-convergence-tasks.md (T1–T8).
 
 - 外观差异已定位并补验：正常配置是 Absolutely 深色、大字号、composerMarkdown=true；此前 disposable 使用默认主题、中字号、composerMarkdown=false，截图还选择了测试 llama 模型。只复制 appearance 到自有隔离配置，经 start:agent-browser 的正式构建与 one-time bootstrap 打开产品；创建自有项目/会话，实际观察到暖灰界面与 Markdown 编辑/预览，输入 Markdown 后切换预览成功，切换 Debugger 后控件保持同一结构。未提交模型请求，未复制凭据/用户会话；原配置最后修改时间保持 2026-09-21 23:46:05。不存在测试专用 Composer 分支，不以本次空会话补验覆盖先前计划审批或原生缩放的未验证边界。
 - 工程证据沿用上一节完整 3057 项测试、coverage ratchet、typecheck、lint、gates 和 build；本次只追加版本/文档，不修改运行时代码。版本增量门禁、发行包与清理结果随后按实际回执记录。
+- 发行验证与交付：rc.4 源码/tag 为 19b0db975a285a36242e3d25020604d08993f967；增量 gates/build 通过，包内 52 资源、315 个 out 文件与源码构建一致，ZIP ASAR 与桌面 smoke 产物一致，打包主进程服务启动通过。七项 GitHub 资产 digest 均与本地一致，Release 已公开为未签名预发布，旧 tag/资产保留。详细散列及 CI 快照见 first-use-and-release-readiness.md。
+- 收尾：自有 QA 35 文件、进程及 unpacked 暂存已清理；旧 rc.3 本地资产经远端 digest 核对后删除，保留 rc.4 七项正式资产、当前 build/coverage。真实配置修改时间未变，canonical lock 不存在，桌面启动权已交还。其他任务的活 QA 保留；本次未增加原生缩放或真实 Provider 审批链通过声明。
