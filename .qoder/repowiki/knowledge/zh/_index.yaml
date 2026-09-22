@@ -3,11 +3,11 @@ schema_version: 1
 locale: zh-CN
 branch: main
 nodes_managed: true
-exported_at: "2026-09-22T10:53:40Z"
+exported_at: "2026-09-22T12:00:26Z"
 modules:
     "":
-        dir_name: RDC-Agent 根工程（Electron + Agent 工作流编排）
-        title: RDC-Agent 根工程（Electron + Agent 工作流编排）
+        dir_name: RDC-Agent 根工程（Electron 多进程编排与质量门禁中枢）
+        title: RDC-Agent 根工程（Electron 多进程编排与质量门禁中枢）
         scope:
             - README.md
             - DESIGN.md

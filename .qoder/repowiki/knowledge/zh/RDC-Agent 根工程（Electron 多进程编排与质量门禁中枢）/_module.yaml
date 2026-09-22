@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: ""
-title: RDC-Agent 根工程（Electron + Agent 工作流编排）
+title: RDC-Agent 根工程（Electron 多进程编排与质量门禁中枢）
 scope:
     - README.md
     - DESIGN.md

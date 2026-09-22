@@ -12,7 +12,20 @@
 - [src/main/settings/ProviderConnectionDraft.ts](file://src/main/settings/ProviderConnectionDraft.ts)
 - [src/main/settings/providerConnectionErrors.ts](file://src/main/settings/providerConnectionErrors.ts)
 - [src/main/settings/LiveProviderOAuthContracts.ts](file://src/main/settings/LiveProviderOAuthContracts.ts)
+- [src/renderer/features/settings/SettingsModal/sections/ProviderModelCapabilitySummary.tsx](file://src/renderer/features/settings/SettingsModal/sections/ProviderModelCapabilitySummary.tsx)
+- [src/renderer/features/settings/SettingsModal/sections/ProviderModelPreferences.tsx](file://src/renderer/features/settings/SettingsModal/sections/ProviderModelPreferences.tsx)
+- [src/renderer/features/settings/SettingsModal/sections/ProviderModelDetails.tsx](file://src/renderer/features/settings/SettingsModal/sections/ProviderModelDetails.tsx)
+- [src/renderer/features/settings/SettingsModal/sections/ProviderModelProbe.tsx](file://src/renderer/features/settings/SettingsModal/sections/ProviderModelProbe.tsx)
+- [src/renderer/features/settings/SettingsModal/modelCapabilitySummaryUtils.ts](file://src/renderer/features/settings/SettingsModal/modelCapabilitySummaryUtils.ts)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 重构了ProviderModelCapabilitySummary组件，将其分解为三个专注的子组件
+- 新增ProviderModelPreferences组件处理路由选择、推理偏好和客户端预算配置
+- 新增ProviderModelDetails组件管理上下文层级信息、定价详情和路由选项
+- 新增ProviderModelProbe组件隔离模型探测功能
+- 更新了能力展示和用户交互流程
 
 ## 目录
 1. [简介](#简介)
@@ -27,7 +40,9 @@
 10. [附录：配置示例与最佳实践](#附录配置示例与最佳实践)
 
 ## 简介
-本文件面向“Provider 连接管理”的完整说明，覆盖提供商发现、连接配置与认证设置；解释各类 LLM 提供商的配置项（API 密钥、端点 URL、模型选择）；详述 OAuth 账户登录流程与账户管理；并给出能力探测、连接测试与错误诊断方法。文档同时提供不同提供商的配置思路与常见问题解决方案，帮助使用者快速完成 Provider 接入与排障。
+本文件面向"Provider 连接管理"的完整说明，覆盖提供商发现、连接配置与认证设置；解释各类 LLM 提供商的配置项（API 密钥、端点 URL、模型选择）；详述 OAuth 账户登录流程与账户管理；并给出能力探测、连接测试与错误诊断方法。文档同时提供不同提供商的配置思路与常见问题解决方案，帮助使用者快速完成 Provider 接入与排障。
+
+**更新** 最近对ProviderModelCapabilitySummary组件进行了重大重构，将单一组件分解为三个专注的子组件，提升了代码的可维护性和功能的模块化程度。
 
 ## 项目结构
 Provider 设置位于主进程 settings 层，负责 provider、model route、secret 与有效目录（Effective Catalog）的运行时边界。其关键职责包括：
@@ -55,14 +70,14 @@ ECS --> PCR
 PCS --> CAP["ProviderCapabilityProbeService"]
 ```
 
-图表来源
+**图表来源**
 - [src/main/settings/ProviderConnectionService.ts:53-110](file://src/main/settings/ProviderConnectionService.ts#L53-L110)
 - [src/main/settings/ProviderAccountAuthService.ts:99-194](file://src/main/settings/ProviderAccountAuthService.ts#L99-L194)
 - [src/main/settings/EffectiveCatalogService.ts:84-163](file://src/main/settings/EffectiveCatalogService.ts#L84-L163)
 - [src/main/provider-catalog/ProviderCatalogRegistry.ts:106-147](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L106-L147)
 - [src/main/settings/SettingsService.ts:94-139](file://src/main/settings/SettingsService.ts#L94-L139)
 
-章节来源
+**章节来源**
 - [src/main/settings/README.md:1-72](file://src/main/settings/README.md#L1-L72)
 
 ## 核心组件
@@ -75,7 +90,9 @@ PCS --> CAP["ProviderCapabilityProbeService"]
 - ProviderConnectionDraft：将用户输入与已存储值合并为连接草稿，校验必填字段并计算 baseUrl。
 - LiveProviderOAuthContracts：提供特定提供商（如 OpenRouter）的 PKCE 授权与交换工具。
 
-章节来源
+**更新** 前端组件层新增了三个专门的子组件来替代原来的单一ProviderModelCapabilitySummary组件，提供更好的关注点分离和用户体验。
+
+**章节来源**
 - [src/main/settings/ProviderConnectionService.ts:53-356](file://src/main/settings/ProviderConnectionService.ts#L53-L356)
 - [src/main/settings/ProviderAccountAuthService.ts:99-530](file://src/main/settings/ProviderAccountAuthService.ts#L99-L530)
 - [src/main/settings/EffectiveCatalogService.ts:84-453](file://src/main/settings/EffectiveCatalogService.ts#L84-L453)
@@ -91,6 +108,8 @@ Provider 设置采用分层与边界清晰的设计：
 - 连接与认证在主进程内完成，Secret 仅通过运行时凭据租约传递；
 - 账户登录与 API Key 两种模式并存，按 Provider 声明的 authModes 决定可用方式；
 - 模型能力通过探测结果（observed）动态修正可用性与配额限制。
+
+**更新** 前端架构现在采用了更细粒度的组件拆分，每个子组件专注于特定的功能领域，提高了代码的可测试性和可维护性。
 
 ```mermaid
 sequenceDiagram
@@ -110,7 +129,7 @@ PCS->>E : refreshEffectiveCatalogDiscovery(...)
 PCS-->>UI : 返回测试结果/模型列表
 ```
 
-图表来源
+**图表来源**
 - [src/main/settings/ProviderConnectionService.ts:111-151](file://src/main/settings/ProviderConnectionService.ts#L111-L151)
 - [src/main/settings/ProviderConnectionDraft.ts:18-53](file://src/main/settings/ProviderConnectionDraft.ts#L18-L53)
 - [src/main/provider-catalog/ProviderCatalogRegistry.ts:106-147](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L106-L147)
@@ -136,13 +155,13 @@ Persist --> Emit["通知订阅者"]
 Emit --> End(["结束"])
 ```
 
-图表来源
+**图表来源**
 - [src/main/provider-catalog/ProviderCatalogRegistry.ts:106-147](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L106-L147)
 - [src/main/settings/EffectiveCatalogService.ts:150-244](file://src/main/settings/EffectiveCatalogService.ts#L150-L244)
 - [src/main/settings/EffectiveCatalogService.ts:246-298](file://src/main/settings/EffectiveCatalogService.ts#L246-L298)
 - [src/main/settings/EffectiveCatalogService.ts:423-449](file://src/main/settings/EffectiveCatalogService.ts#L423-L449)
 
-章节来源
+**章节来源**
 - [src/main/provider-catalog/ProviderCatalogRegistry.ts:106-200](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L106-L200)
 - [src/main/settings/EffectiveCatalogService.ts:84-453](file://src/main/settings/EffectiveCatalogService.ts#L84-L453)
 
@@ -162,11 +181,11 @@ C -- 否 --> F
 F --> G["返回 {apiKey, baseUrl, values}"]
 ```
 
-图表来源
+**图表来源**
 - [src/main/settings/ProviderConnectionDraft.ts:18-53](file://src/main/settings/ProviderConnectionDraft.ts#L18-L53)
 - [src/main/settings/providerConnectionErrors.ts:1-15](file://src/main/settings/providerConnectionErrors.ts#L1-L15)
 
-章节来源
+**章节来源**
 - [src/main/settings/ProviderConnectionDraft.ts:18-77](file://src/main/settings/ProviderConnectionDraft.ts#L18-L77)
 - [src/main/settings/providerConnectionErrors.ts:1-15](file://src/main/settings/providerConnectionErrors.ts#L1-L15)
 
@@ -190,12 +209,12 @@ PCS->>E : refreshEffectiveCatalogDiscovery(...)
 PCS-->>UI : {success, models, error?}
 ```
 
-图表来源
+**图表来源**
 - [src/main/settings/ProviderConnectionService.ts:111-151](file://src/main/settings/ProviderConnectionService.ts#L111-L151)
 - [src/main/settings/ProviderConnectionService.ts:153-198](file://src/main/settings/ProviderConnectionService.ts#L153-L198)
 - [src/main/settings/ProviderConnectionService.ts:200-260](file://src/main/settings/ProviderConnectionService.ts#L200-L260)
 
-章节来源
+**章节来源**
 - [src/main/settings/ProviderConnectionService.ts:111-260](file://src/main/settings/ProviderConnectionService.ts#L111-L260)
 
 ### OAuth 账户登录与账户管理
@@ -221,19 +240,21 @@ PAA->>E : refreshEffectiveCatalogDiscovery(...)
 PAA-->>UI : {state, connected, message, ...}
 ```
 
-图表来源
+**图表来源**
 - [src/main/settings/ProviderAccountAuthService.ts:108-194](file://src/main/settings/ProviderAccountAuthService.ts#L108-L194)
 - [src/main/settings/ProviderAccountAuthService.ts:196-248](file://src/main/settings/ProviderAccountAuthService.ts#L196-L248)
 - [src/main/settings/ProviderAccountAuthService.ts:406-473](file://src/main/settings/ProviderAccountAuthService.ts#L406-L473)
 - [src/main/settings/ProviderAccountAuthService.ts:317-372](file://src/main/settings/ProviderAccountAuthService.ts#L317-L372)
 
-章节来源
+**章节来源**
 - [src/main/settings/ProviderAccountAuthService.ts:99-530](file://src/main/settings/ProviderAccountAuthService.ts#L99-L530)
 
 ### 能力探测与证据记录
 - 探测目标：基于有效模型与计划（plan）确定要探测的模式（fast/max-context）。
 - 执行与记录：execute 发送探测请求，成功记录 observed 并授予 entitlement；失败按 HTTP 状态分类（401/404/429/402）并可能标记配额耗尽。
 - 临时配额：recordTransientQuota 在短期内抑制重复探测，提升用户体验。
+
+**更新** 前端现在通过独立的ProviderModelProbe组件来处理模型探测功能，提供了更好的用户交互体验。
 
 ```mermaid
 flowchart TD
@@ -252,11 +273,11 @@ Defer --> Done
 Deny --> Done
 ```
 
-图表来源
+**图表来源**
 - [src/main/settings/ProviderCapabilityProbeService.ts:277-355](file://src/main/settings/ProviderCapabilityProbeService.ts#L277-L355)
 - [src/main/settings/EffectiveCatalogService.ts:300-340](file://src/main/settings/EffectiveCatalogService.ts#L300-L340)
 
-章节来源
+**章节来源**
 - [src/main/settings/ProviderCapabilityProbeService.ts:277-355](file://src/main/settings/ProviderCapabilityProbeService.ts#L277-L355)
 - [src/main/settings/EffectiveCatalogService.ts:300-340](file://src/main/settings/EffectiveCatalogService.ts#L300-L340)
 
@@ -265,8 +286,83 @@ Deny --> Done
 - 运行时凭据：通过 ProviderRuntimeCredentialService 创建 opaque lease，adapter 无 handle 必须 fail-closed。
 - 刷新策略：401 刷新只替换同一 lease 的 credential material，不改变冻结 route。
 
-章节来源
+**章节来源**
 - [src/main/settings/README.md:42-50](file://src/main/settings/README.md#L42-L50)
+
+### 前端组件重构详解
+
+**更新** 最近的前端组件重构将原来单一的ProviderModelCapabilitySummary组件分解为三个专注的子组件：
+
+#### ProviderModelPreferences 组件
+该组件专门处理模型偏好设置，包括：
+- 路由选择：允许用户在多个可用的路由选项中选择首选路由
+- 推理偏好：配置模型的推理级别（off/on/minimal/low/medium/high/xhigh/max）
+- 客户端预算：设置客户端级别的令牌预算限制
+
+```mermaid
+flowchart TD
+Prefs["ProviderModelPreferences"] --> Route["路由选择"]
+Prefs --> Reasoning["推理偏好"]
+Prefs --> Budget["客户端预算"]
+Route --> Select["Select组件"]
+Reasoning --> Select
+Budget --> Input["Input组件"]
+```
+
+**图表来源**
+- [src/renderer/features/settings/SettingsModal/sections/ProviderModelPreferences.tsx:12-61](file://src/renderer/features/settings/SettingsModal/sections/ProviderModelPreferences.tsx#L12-L61)
+
+#### ProviderModelDetails 组件
+该组件负责展示模型的详细信息，包括：
+- 上下文层级信息：显示不同上下文层级的限制和成本
+- 定价详情：展示输入、输出、缓存等不同操作的定价信息
+- 路由选项：列出所有可用的路由选项及其元信息
+
+```mermaid
+flowchart TD
+Details["ProviderModelDetails"] --> Tiers["上下文层级"]
+Details --> Pricing["定价信息"]
+Details --> Routes["路由选项"]
+Tiers --> TierRows["层级行展示"]
+Pricing --> PriceRows["定价行展示"]
+Routes --> RouteMeta["路由元信息"]
+```
+
+**图表来源**
+- [src/renderer/features/settings/SettingsModal/sections/ProviderModelDetails.tsx:5-44](file://src/renderer/features/settings/SettingsModal/sections/ProviderModelDetails.tsx#L5-L44)
+
+#### ProviderModelProbe 组件
+该组件专门处理模型能力探测功能：
+- 探测模式选择：提供default、fast、max-context等探测模式
+- 探测状态管理：跟踪探测进度和结果
+- 用户交互：提供按钮让用户手动触发探测
+
+```mermaid
+flowchart TD
+Probe["ProviderModelProbe"] --> Modes["探测模式"]
+Probe --> Status["探测状态"]
+Probe --> Actions["用户操作"]
+Modes --> Buttons["模式按钮"]
+Status --> Progress["进度指示"]
+Actions --> Click["点击事件"]
+```
+
+**图表来源**
+- [src/renderer/features/settings/SettingsModal/sections/ProviderModelProbe.tsx:11-39](file://src/renderer/features/settings/SettingsModal/sections/ProviderModelProbe.tsx#L11-L39)
+
+#### 工具函数增强
+重构还增强了modelCapabilitySummaryUtils工具函数，提供了：
+- buildCapabilityChips：构建能力展示芯片
+- buildContextTierRows：构建上下文层级行
+- buildPricingRows：构建定价信息行
+- formatReasoningDefault：格式化推理默认值
+
+**章节来源**
+- [src/renderer/features/settings/SettingsModal/sections/ProviderModelCapabilitySummary.tsx:19-141](file://src/renderer/features/settings/SettingsModal/sections/ProviderModelCapabilitySummary.tsx#L19-L141)
+- [src/renderer/features/settings/SettingsModal/sections/ProviderModelPreferences.tsx:1-61](file://src/renderer/features/settings/SettingsModal/sections/ProviderModelPreferences.tsx#L1-L61)
+- [src/renderer/features/settings/SettingsModal/sections/ProviderModelDetails.tsx:1-44](file://src/renderer/features/settings/SettingsModal/sections/ProviderModelDetails.tsx#L1-L44)
+- [src/renderer/features/settings/SettingsModal/sections/ProviderModelProbe.tsx:1-39](file://src/renderer/features/settings/SettingsModal/sections/ProviderModelProbe.tsx#L1-L39)
+- [src/renderer/features/settings/SettingsModal/modelCapabilitySummaryUtils.ts:238-286](file://src/renderer/features/settings/SettingsModal/modelCapabilitySummaryUtils.ts#L238-L286)
 
 ## 依赖关系分析
 - ProviderConnectionService 依赖：
@@ -285,6 +381,8 @@ Deny --> Done
   - ProviderCatalogRegistry：加载 Provider Surface；
   - 文件系统：持久化 catalog-v4.json。
 
+**更新** 前端组件现在依赖于新的子组件结构，每个子组件都有明确的职责和依赖关系。
+
 ```mermaid
 graph LR
 PCS["ProviderConnectionService"] --> SS["SettingsService"]
@@ -298,12 +396,12 @@ ECS --> SS
 ECS --> PCR
 ```
 
-图表来源
+**图表来源**
 - [src/main/settings/ProviderConnectionService.ts:53-110](file://src/main/settings/ProviderConnectionService.ts#L53-L110)
 - [src/main/settings/ProviderAccountAuthService.ts:99-194](file://src/main/settings/ProviderAccountAuthService.ts#L99-L194)
 - [src/main/settings/EffectiveCatalogService.ts:84-163](file://src/main/settings/EffectiveCatalogService.ts#L84-L163)
 
-章节来源
+**章节来源**
 - [src/main/settings/ProviderConnectionService.ts:53-356](file://src/main/settings/ProviderConnectionService.ts#L53-L356)
 - [src/main/settings/ProviderAccountAuthService.ts:99-530](file://src/main/settings/ProviderAccountAuthService.ts#L99-L530)
 - [src/main/settings/EffectiveCatalogService.ts:84-453](file://src/main/settings/EffectiveCatalogService.ts#L84-L453)
@@ -315,7 +413,9 @@ ECS --> PCR
 - 持久化：原子写入 catalog 状态文件，保证一致性。
 - 审计与稳定性：快照包含 catalogRevision，避免无关变更导致前端预检失效。
 
-章节来源
+**更新** 前端组件重构提高了性能，通过组件拆分减少了不必要的重新渲染，提升了用户体验。
+
+**章节来源**
 - [src/main/settings/EffectiveCatalogService.ts:150-244](file://src/main/settings/EffectiveCatalogService.ts#L150-L244)
 - [src/main/settings/EffectiveCatalogService.ts:246-298](file://src/main/settings/EffectiveCatalogService.ts#L246-L298)
 - [src/main/settings/EffectiveCatalogService.ts:423-449](file://src/main/settings/EffectiveCatalogService.ts#L423-L449)
@@ -328,7 +428,9 @@ ECS --> PCR
 - 目录陈旧：若目录过期或被无效化，系统将自动刷新；若持续失败，检查网络与凭据有效性。
 - 无法打开外部浏览器：某些环境禁止 shell.openExternal，需确认系统设置或代理配置。
 
-章节来源
+**更新** 前端组件重构后，错误处理和用户反馈更加明确，各个子组件都有清晰的错误状态展示。
+
+**章节来源**
 - [src/main/settings/ProviderConnectionDraft.ts:35-44](file://src/main/settings/ProviderConnectionDraft.ts#L35-L44)
 - [src/main/settings/providerConnectionErrors.ts:3-14](file://src/main/settings/providerConnectionErrors.ts#L3-L14)
 - [src/main/settings/ProviderAccountAuthService.ts:196-248](file://src/main/settings/ProviderAccountAuthService.ts#L196-L248)
@@ -336,7 +438,7 @@ ECS --> PCR
 - [src/main/settings/EffectiveCatalogService.ts:246-298](file://src/main/settings/EffectiveCatalogService.ts#L246-L298)
 
 ## 结论
-Provider 设置通过清晰的边界与分层设计，实现了安全的凭据管理、稳定的目录发现与灵活的认证方式。连接测试与能力探测提供了可靠的验证手段，结合有效目录的证据机制，确保模型可用性与配额状态的准确性。遵循本文档的流程与最佳实践，可高效完成各类 LLM 提供商的接入与运维。
+Provider 设置通过清晰的边界与分层设计，实现了安全的凭据管理、稳定的目录发现与灵活的认证方式。连接测试与能力探测提供了可靠的验证手段，结合有效目录的证据机制，确保模型可用性与配额状态的准确性。**更新** 最近的前端组件重构进一步提升了代码质量和用户体验，通过关注点分离使得各个功能模块更加独立和可维护。遵循本文档的流程与最佳实践，可高效完成各类 LLM 提供商的接入与运维。
 
 ## 附录：配置示例与最佳实践
 - API Key 模式
@@ -349,10 +451,12 @@ Provider 设置通过清晰的边界与分层设计，实现了安全的凭据�
   - 参考路径：[ProviderAccountAuthService.ts:108-194](file://src/main/settings/ProviderAccountAuthService.ts#L108-L194)、[ProviderAccountAuthService.ts:406-473](file://src/main/settings/ProviderAccountAuthService.ts#L406-L473)
 - 模型选择与偏好
   - 通过 modelPreferences 指定首选模型；有效目录合并后会显示可用模型与能力。
+  - **更新** 现在可以通过独立的ProviderModelPreferences组件来配置路由选择、推理偏好和客户端预算。
   - 参考路径：[ProviderConnectionService.ts:153-198](file://src/main/settings/ProviderConnectionService.ts#L153-L198)
 - 能力探测
   - fast：尝试快速推理模式；max-context：尝试最大上下文模式。
   - 成功会授予相应 entitlement；失败可能因配额耗尽或路由不可用。
+  - **更新** 现在通过独立的ProviderModelProbe组件提供探测功能，支持多种探测模式和状态管理。
   - 参考路径：[ProviderCapabilityProbeService.ts:277-355](file://src/main/settings/ProviderCapabilityProbeService.ts#L277-L355)
 - 常见提供商要点
   - OpenRouter：使用 PKCE 授权与交换，构建授权 URL 与交换请求。
@@ -364,8 +468,9 @@ Provider 设置通过清晰的边界与分层设计，实现了安全的凭据�
   - 定期执行能力探测以确认可用性，尤其是 max-context/fast 模式。
   - 遇到 429/402 时等待配额恢复后再试，避免频繁重试。
   - 保持目录缓存新鲜，避免 stale 导致的模型不可见。
+  - **更新** 利用新的组件结构，可以更好地组织和管理模型配置，提高开发效率。
 
-章节来源
+**章节来源**
 - [src/main/settings/ProviderConnectionDraft.ts:18-53](file://src/main/settings/ProviderConnectionDraft.ts#L18-L53)
 - [src/main/settings/ProviderAccountAuthService.ts:108-194](file://src/main/settings/ProviderAccountAuthService.ts#L108-L194)
 - [src/main/settings/ProviderAccountAuthService.ts:406-473](file://src/main/settings/ProviderAccountAuthService.ts#L406-L473)
