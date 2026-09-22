@@ -37,6 +37,14 @@
       "refreshedAt": "2026-07-15",
       "identityId": "groq",
       "surface": "groq"
+    },
+    {
+      "id": "provider-docs:groq:enterprise-retention-2026-09-22",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://console.groq.com/docs/deprecations ; https://console.groq.com/docs/models",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-22",
+      "surface": "groq"
     }
   ],
   "defaultFactSourceId": "rdc-agent:groq:0",
@@ -193,7 +201,7 @@
       "modelId": "meta-llama/llama-4-scout-17b-16e-instruct",
       "label": "meta-llama/llama-4-scout-17b-16e-instruct",
       "aliases": [],
-      "availability": "available",
+      "availability": "unknown",
       "contextTiers": [
         {
           "id": "default",
@@ -218,7 +226,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "account-entitled",
       "route": {
         "protocol": "OpenAICompatibleChatCompletions",
         "baseUrl": "https://api.groq.com/openai/v1",
@@ -243,13 +251,17 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:groq:0"
+      "factSourceId": "rdc-agent:groq:0",
+      "fieldFactSourceIds": {
+        "availability": "provider-docs:groq:enterprise-retention-2026-09-22",
+        "presencePolicy": "provider-docs:groq:enterprise-retention-2026-09-22"
+      }
     },
     {
       "modelId": "qwen/qwen3-32b",
       "label": "qwen/qwen3-32b",
       "aliases": [],
-      "availability": "available",
+      "availability": "unknown",
       "contextTiers": [
         {
           "id": "default",
@@ -274,7 +286,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "account-entitled",
       "route": {
         "protocol": "OpenAICompatibleChatCompletions",
         "baseUrl": "https://api.groq.com/openai/v1",
@@ -299,7 +311,11 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:groq:0"
+      "factSourceId": "rdc-agent:groq:0",
+      "fieldFactSourceIds": {
+        "availability": "provider-docs:groq:enterprise-retention-2026-09-22",
+        "presencePolicy": "provider-docs:groq:enterprise-retention-2026-09-22"
+      }
     }
   ],
   "protocolOverrides": [],

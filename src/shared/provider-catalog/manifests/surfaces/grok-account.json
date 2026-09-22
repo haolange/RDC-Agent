@@ -42,6 +42,24 @@
       "accountScope": "observed-account"
     },
     {
+      "id": "provider-docs:grok-4.6:2026-09-22",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "docs.x.ai/developers/models/grok-4.6@2026-09-22",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-22",
+      "surface": "grok-account",
+      "accountScope": "public-api"
+    },
+    {
+      "id": "provider-docs:grok-4.7:2026-09-22",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "docs.x.ai/developers/models/grok-4.7@2026-09-22",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-22",
+      "surface": "grok-account",
+      "accountScope": "public-api"
+    },
+    {
       "id": "provider-docs:grok-account:tools-2026-08-23",
       "sourceKind": "provider-docs",
       "sourceRevision": "xai-responses-function-calling-2026-08-23",
@@ -420,6 +438,82 @@
       }
     },
     {
+      "modelId": "grok-4.7",
+      "label": "grok-4.7",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 500000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 500000,
+      "cost": {
+        "input": 2,
+        "output": 6,
+        "cacheRead": 0.5
+      },
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+        "source": "model"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "high",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:grok-4.7:2026-09-22",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
+      }
+    },
+    {
       "modelId": "grok-4.6",
       "label": "grok-4.6",
       "aliases": [],
@@ -440,10 +534,10 @@
         "state": "supported"
       },
       "visionInput": {
-        "state": "unknown"
+        "state": "supported"
       },
       "structuredOutput": {
-        "state": "unknown"
+        "state": "supported"
       },
       "selection": {
         "pickerVisibility": "primary"
@@ -487,7 +581,9 @@
       },
       "factSourceId": "user-observation:grok-account:2026-07-14",
       "fieldFactSourceIds": {
-        "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
+        "toolCalling": "provider-docs:grok-account:tools-2026-08-23",
+        "visionInput": "provider-docs:grok-4.6:2026-09-22",
+        "structuredOutput": "provider-docs:grok-4.6:2026-09-22"
       }
     },
     {
@@ -702,6 +798,7 @@
     "grok-4.20-multi-agent-0309",
     "grok-4.3",
     "grok-4.5",
+    "grok-4.7",
     "grok-4.6",
     "grok-build-0.1"
   ],

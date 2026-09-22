@@ -653,78 +653,7 @@
         "state": "supported"
       },
       "visionInput": {
-        "state": "unsupported"
-      },
-      "structuredOutput": {
         "state": "supported"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "maintained",
-      "route": {
-        "protocol": "OpenAIResponses",
-        "baseUrl": "https://us.api.openai.com/v1",
-        "source": "catalog"
-      },
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "reasoning": {
-          "kind": "levels",
-          "supportsOff": true,
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "xhigh"
-          ],
-          "defaultSelection": "medium",
-          "wireProfile": {
-            "kind": "openai-compatible",
-            "on": "medium",
-            "levels": {
-              "minimal": "minimal",
-              "low": "low",
-              "medium": "medium",
-              "high": "high",
-              "xhigh": "xhigh",
-              "max": "max"
-            },
-            "offMode": "reasoning-none"
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:openai-us:0"
-    },
-    {
-      "modelId": "gpt-5.2-codex",
-      "label": "gpt-5.2-codex",
-      "aliases": [],
-      "availability": "available",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 400000,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "granted"
-        }
-      ],
-      "defaultBudgetTokens": 256000,
-      "toolCalling": {
-        "state": "supported"
-      },
-      "visionInput": {
-        "state": "unsupported"
       },
       "structuredOutput": {
         "state": "supported"

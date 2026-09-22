@@ -160,8 +160,6 @@ const OPENAI_EFFORT_MAP: Record<NamedReasoningLevel, OpenAiWireEffort> = {
   max: 'max',
 };
 
-const CHATGPT_SPARK_MODEL_ID = 'gpt-5.3-codex-spark';
-
 function reasoningLevels(values: unknown): NamedReasoningLevel[] {
   if (!Array.isArray(values)) return [];
   const normalized = values.flatMap((value): NamedReasoningLevel[] => {
@@ -311,7 +309,7 @@ export function parseKimiCodeCatalog(
     });
   return asResult(projectLiveModelObservations(surface, observations));
 }
-/** Parse the account-specific Codex manifest; web-only Instant/Thinking/Pro variants are excluded. */
+/** Account discovery reports availability and windows; structural capabilities remain manifest-owned. */
 export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog {
   const root = record(payload);
   const values = Array.isArray(root.models) ? root.models : [];
@@ -319,11 +317,10 @@ export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog 
     const value = record(candidate);
     const id = text(value.slug) ?? text(value.id);
     const identity = liveIdentity(value, id);
-    const isSpark = identity?.id === CHATGPT_SPARK_MODEL_ID;
     if (
       !id
       || !identity
-      || (value.supported_in_api === false && !isSpark)
+      || value.supported_in_api === false
       || (text(value.visibility) && text(value.visibility) !== 'list')
       || /(?:^|-)pro$/i.test(id)
       || /(?:auto-review|compaction)/i.test(id)
@@ -350,9 +347,6 @@ export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog 
         entitlement: 'unknown',
       });
     }
-    const inputModalities = Array.isArray(value.input_modalities)
-      ? value.input_modalities.map((entry) => text(entry)?.toLowerCase()).filter(Boolean)
-      : [];
     return [{
       modelId: identity.id,
       ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
@@ -361,13 +355,6 @@ export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog 
       route: { protocol: 'OpenAIResponses', baseUrl: 'https://chatgpt.com/backend-api/codex', source: 'model' },
       contextTiers,
       ...(effectiveContextWindow ? { defaultBudgetTokens: effectiveContextWindow } : {}),
-      toolCalling: { state: 'supported' },
-      visionInput: isSpark
-        ? { state: 'unsupported' }
-        : inputModalities.length === 0
-        ? { state: 'unknown' }
-        : capabilityState(inputModalities.includes('image')),
-      structuredOutput: { state: 'supported' },
     }];
   }));
 }

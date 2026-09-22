@@ -38,6 +38,14 @@
       "refreshedAt": "2026-07-15",
       "identityId": "zai",
       "surface": "glm-global"
+    },
+    {
+      "id": "provider-docs:glm-global:models-2026-09-22",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://docs.z.ai/guides/llm/glm-5.3 ; https://docs.z.ai/guides/vlm/glm-5.3-flash ; https://docs.z.ai/guides/capabilities/thinking ; https://docs.z.ai/devpack/overview",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-22T00:00:00+08:00",
+      "surface": "glm-global"
     }
   ],
   "defaultFactSourceId": "rdc-agent:glm-global:0",
@@ -133,6 +141,109 @@
     }
   },
   "models": [
+    {
+      "modelId": "glm-5.3",
+      "label": "glm-5.3",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "1M window",
+          "maxPromptTokens": 1000000,
+          "maxOutputTokens": 128000,
+          "maxTotalTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.z.ai/api/anthropic/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.z.ai/api/anthropic/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "zhipu-ai",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.z.ai/api/paas/v4",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "zhipu-ai",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "high",
+            "max"
+          ],
+          "defaultSelection": "max",
+          "defaultState": "known",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "max",
+            "levels": {
+              "low": "low",
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "enabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:glm-global:0",
+      "fieldFactSourceIds": {
+        "modelId": "provider-docs:glm-global:models-2026-09-22",
+        "contextTiers": "provider-docs:glm-global:models-2026-09-22",
+        "defaultBudgetTokens": "provider-docs:glm-global:models-2026-09-22",
+        "visionInput": "provider-docs:glm-global:models-2026-09-22",
+        "controls": "provider-docs:glm-global:models-2026-09-22"
+      }
+    },
     {
       "modelId": "glm-5",
       "label": "glm-5",
@@ -470,6 +581,66 @@
   ],
   "protocolOverrides": [
     {
+      "modelId": "glm-5.3",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "high",
+              "max"
+            ],
+            "defaultSelection": "max",
+            "defaultState": "known",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "max",
+              "levels": {
+                "low": "low",
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "thinking-enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:glm-global:models-2026-09-22"
+    },
+    {
+      "modelId": "glm-5.3",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "high",
+              "max"
+            ],
+            "defaultSelection": "max",
+            "defaultState": "known",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "max",
+              "levels": {
+                "low": "low",
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:glm-global:models-2026-09-22"
+    },
+    {
       "modelId": "glm-5",
       "protocol": "AnthropicMessages",
       "patch": {
@@ -639,6 +810,7 @@
     }
   ],
   "recommendedModels": [
+    "glm-5.3",
     "sonnet",
     "opus",
     "haiku"

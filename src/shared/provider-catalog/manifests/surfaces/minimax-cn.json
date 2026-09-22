@@ -49,6 +49,14 @@
       "sourceRevision": "571e7b852f82415faf65466e1536357a048bdf5a",
       "refreshedAt": "2026-07-15",
       "surface": "minimax-cn"
+    },
+    {
+      "id": "provider-docs:minimax-cn:models-2026-09-22",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://platform.minimax.cn/docs/guides/models-intro ; https://www.minimax.io/blog/minimax-m3 ; https://platform.minimax.io/docs/api-reference/text-anthropic-api ; https://platform.minimax.io/docs/api-reference/text-openai-api",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-22T00:00:00+08:00",
+      "surface": "minimax-cn"
     }
   ],
   "defaultFactSourceId": "rdc-agent:minimax-cn:0",
@@ -125,6 +133,99 @@
     }
   },
   "models": [
+    {
+      "modelId": "MiniMax-M3",
+      "label": "MiniMax-M3",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "1M window",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.minimaxi.com/anthropic/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.minimaxi.com/anthropic/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "minimax",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.minimaxi.com/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "minimax",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultSelection": "off",
+          "defaultState": "unknown",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "opencode:minimax-cn:571e7b8",
+      "fieldFactSourceIds": {
+        "route": "rdc-agent:minimax-cn:0",
+        "routeOptions": "rdc-agent:minimax-cn:0",
+        "controls": "rdc-agent:minimax-cn:0",
+        "modelId": "provider-docs:minimax-cn:models-2026-09-22",
+        "contextTiers": "provider-docs:minimax-cn:models-2026-09-22",
+        "defaultBudgetTokens": "provider-docs:minimax-cn:models-2026-09-22",
+        "visionInput": "provider-docs:minimax-cn:models-2026-09-22",
+        "structuredOutput": "provider-docs:minimax-cn:models-2026-09-22"
+      }
+    },
     {
       "modelId": "MiniMax-M2.7",
       "label": "MiniMax-M2.7",
@@ -411,6 +512,7 @@
     }
   ],
   "recommendedModels": [
+    "MiniMax-M3",
     "MiniMax-M2.7"
   ],
   "docsUrl": "https://platform.minimaxi.com/"

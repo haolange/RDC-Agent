@@ -120,7 +120,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     });
   });
 
-  it('keeps Kimi for Coding always-on reasoning on the selected OpenAI-compatible route', () => {
+  it('keeps Kimi for Coding reasoning levels on the selected OpenAI-compatible route', () => {
     const openAiKimi = mergeEffectiveCatalog(buildEffectiveCatalogRequest(
       provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions'),
     )).find((model) => model.modelId === 'kimi-for-coding');
@@ -128,10 +128,11 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       route: { protocol: 'OpenAICompatibleChatCompletions' },
       controls: {
         reasoning: {
-          kind: 'always-on',
-          supportsOff: false,
-          lockedSelection: 'on',
-          wireProfile: { kind: 'openai-compatible', on: 'max', onMode: 'thinking-enabled' },
+          kind: 'levels',
+          supportsOff: true,
+          levels: ['low', 'high', 'max'],
+          defaultSelection: 'max',
+          wireProfile: { kind: 'openai-compatible', on: 'max', onMode: 'thinking-enabled', offMode: 'thinking-disabled' },
         },
       },
       routeOptions: [

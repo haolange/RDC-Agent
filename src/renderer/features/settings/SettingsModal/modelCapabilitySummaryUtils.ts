@@ -156,13 +156,23 @@ export function buildContextTierRows(model: EffectiveModel | null, t: Translate)
 
 export function formatReasoningCapabilityValue(control: ReasoningControl | null, t: Translate): string {
   if (!control) return t('settings.providers.capability.unknown');
-  if (control.kind === 'unknown') return t('composer.effort.levelOff');
+  if (control.kind === 'unknown') return t('settings.providers.capability.unknown');
   const levels = getReasoningSelectionOrder(control);
   if (levels.length === 0 || (levels.length === 1 && levels[0] === 'off' && control.kind === 'none')) {
     return t('composer.effort.levelOff');
   }
   const base = levels.map((level) => t(REASONING_LABEL_KEYS[level])).join(', ');
   return control.kind === 'always-on' ? t('settings.providers.capability.lockedValue', { value: base }) : base;
+}
+
+export function formatReasoningDefault(control: ReasoningControl | null, t: Translate): string {
+  if (!control || control.kind === 'unknown' || control.defaultState === 'unknown') {
+    return t('settings.providers.capability.unknown');
+  }
+  if (control.defaultState === 'provider-managed') return t('composer.effort.providerManaged');
+  return t('settings.providers.capability.providerDefault', {
+    value: t(getReasoningLabelKey(control.defaultSelection ?? 'off')),
+  });
 }
 
 export function formatReasoningCapability(model: EffectiveModel | null, t: Translate): string {

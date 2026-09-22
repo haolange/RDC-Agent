@@ -243,7 +243,7 @@ describe('DebuggerLlmService cache aggregation', () => {
       turnId: 'turn_budget',
       sessionId: 'sess_budget',
       providerId: 'deepseek',
-      modelId: 'deepseek-v4-flash',
+      modelId: 'deepseek-flash',
       inputTokens: 12,
       outputTokens: 3,
       precomputedBreakdown: [],

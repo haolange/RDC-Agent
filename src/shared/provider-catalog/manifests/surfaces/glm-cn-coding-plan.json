@@ -38,6 +38,14 @@
       "refreshedAt": "2026-07-15",
       "identityId": "zhipuai-coding-plan",
       "surface": "glm-cn-coding-plan"
+    },
+    {
+      "id": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://docs.bigmodel.cn/cn/coding-plan/overview ; https://docs.bigmodel.cn/api-reference/模型-api/对话补全",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-22T00:00:00+08:00",
+      "surface": "glm-cn-coding-plan"
     }
   ],
   "defaultFactSourceId": "rdc-agent:glm-cn-coding-plan:0",
@@ -134,32 +142,29 @@
   },
   "models": [
     {
-      "modelId": "glm-5",
-      "label": "glm-5",
+      "modelId": "glm-5.3",
+      "label": "glm-5.3",
       "aliases": [],
       "availability": "available",
       "contextTiers": [
         {
           "id": "default",
           "label": "Default",
-          "maxPromptTokens": 200000,
-          "maxOutputTokens": 128000,
-          "maxTotalTokens": 200000,
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 72000,
+      "defaultBudgetTokens": 0,
       "toolCalling": {
         "state": "supported"
       },
       "visionInput": {
-        "state": "unsupported"
+        "state": "unknown"
       },
       "structuredOutput": {
-        "state": "supported"
+        "state": "unknown"
       },
       "selection": {
         "pickerVisibility": "primary"
@@ -200,49 +205,67 @@
           "fixedValue": false
         },
         "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "unknown",
+          "defaultValue": false
         },
         "reasoning": {
-          "kind": "toggle",
-          "supportsOff": true,
-          "levels": [],
-          "defaultSelection": "on",
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "high",
+            "max"
+          ],
+          "defaultSelection": "max",
+          "defaultState": "known",
           "wireProfile": {
             "kind": "anthropic",
-            "on": "high",
-            "onMode": "enabled",
-            "offMode": "disabled"
+            "on": "max",
+            "levels": {
+              "low": "low",
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "enabled"
           }
         }
       },
-      "factSourceId": "rdc-agent:glm-cn-coding-plan:0"
+      "factSourceId": "rdc-agent:glm-cn-coding-plan:0",
+      "fieldFactSourceIds": {
+        "modelId": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "controls.reasoning": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "contextTiers": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "defaultBudgetTokens": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "visionInput": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "structuredOutput": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "controls.maxContext": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "toolCalling": "provider-docs:glm-cn-coding-plan:models-2026-09-22"
+      }
     },
     {
-      "modelId": "glm-4.7",
-      "label": "glm-4.7",
+      "modelId": "glm-5.3-flash",
+      "label": "glm-5.3-flash",
       "aliases": [],
       "availability": "available",
       "contextTiers": [
         {
           "id": "default",
           "label": "Default",
-          "maxPromptTokens": 131072,
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 131072,
+      "defaultBudgetTokens": 0,
       "toolCalling": {
         "state": "supported"
       },
       "visionInput": {
-        "state": "unsupported"
+        "state": "unknown"
       },
       "structuredOutput": {
-        "state": "supported"
+        "state": "unknown"
       },
       "selection": {
         "pickerVisibility": "primary"
@@ -283,228 +306,69 @@
           "fixedValue": false
         },
         "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "unknown",
+          "defaultValue": false
         },
         "reasoning": {
-          "kind": "toggle",
-          "supportsOff": true,
-          "levels": [],
-          "defaultSelection": "on",
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "high",
+            "max"
+          ],
+          "defaultSelection": "max",
+          "defaultState": "known",
           "wireProfile": {
             "kind": "anthropic",
-            "on": "high",
-            "onMode": "enabled",
-            "offMode": "disabled"
+            "on": "max",
+            "levels": {
+              "low": "low",
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "enabled"
           }
         }
       },
-      "factSourceId": "rdc-agent:glm-cn-coding-plan:0"
-    },
-    {
-      "modelId": "glm-4.6",
-      "label": "glm-4.6",
-      "aliases": [],
-      "availability": "available",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 131072,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "granted"
-        }
-      ],
-      "defaultBudgetTokens": 131072,
-      "toolCalling": {
-        "state": "supported"
-      },
-      "visionInput": {
-        "state": "unsupported"
-      },
-      "structuredOutput": {
-        "state": "supported"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "maintained",
-      "route": {
-        "protocol": "AnthropicMessages",
-        "baseUrl": "https://open.bigmodel.cn/api/anthropic/v1",
-        "source": "catalog"
-      },
-      "routeOptions": [
-        {
-          "id": "AnthropicMessages",
-          "route": {
-            "protocol": "AnthropicMessages",
-            "baseUrl": "https://open.bigmodel.cn/api/anthropic/v1",
-            "source": "catalog"
-          },
-          "availability": "available",
-          "endpointOwner": "zhipu-ai",
-          "protocolOwner": "anthropic"
-        },
-        {
-          "id": "OpenAICompatibleChatCompletions",
-          "route": {
-            "protocol": "OpenAICompatibleChatCompletions",
-            "baseUrl": "https://open.bigmodel.cn/api/coding/paas/v4",
-            "source": "catalog"
-          },
-          "availability": "available",
-          "endpointOwner": "zhipu-ai",
-          "protocolOwner": "openai"
-        }
-      ],
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "reasoning": {
-          "kind": "toggle",
-          "supportsOff": true,
-          "levels": [],
-          "defaultSelection": "on",
-          "wireProfile": {
-            "kind": "anthropic",
-            "on": "high",
-            "onMode": "enabled",
-            "offMode": "disabled"
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:glm-cn-coding-plan:0"
-    },
-    {
-      "modelId": "glm-4.5",
-      "label": "glm-4.5",
-      "aliases": [],
-      "availability": "available",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 131072,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "granted"
-        }
-      ],
-      "defaultBudgetTokens": 131072,
-      "toolCalling": {
-        "state": "supported"
-      },
-      "visionInput": {
-        "state": "unsupported"
-      },
-      "structuredOutput": {
-        "state": "supported"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "maintained",
-      "route": {
-        "protocol": "AnthropicMessages",
-        "baseUrl": "https://open.bigmodel.cn/api/anthropic/v1",
-        "source": "catalog"
-      },
-      "routeOptions": [
-        {
-          "id": "AnthropicMessages",
-          "route": {
-            "protocol": "AnthropicMessages",
-            "baseUrl": "https://open.bigmodel.cn/api/anthropic/v1",
-            "source": "catalog"
-          },
-          "availability": "available",
-          "endpointOwner": "zhipu-ai",
-          "protocolOwner": "anthropic"
-        },
-        {
-          "id": "OpenAICompatibleChatCompletions",
-          "route": {
-            "protocol": "OpenAICompatibleChatCompletions",
-            "baseUrl": "https://open.bigmodel.cn/api/coding/paas/v4",
-            "source": "catalog"
-          },
-          "availability": "available",
-          "endpointOwner": "zhipu-ai",
-          "protocolOwner": "openai"
-        }
-      ],
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "reasoning": {
-          "kind": "toggle",
-          "supportsOff": true,
-          "levels": [],
-          "defaultSelection": "on",
-          "wireProfile": {
-            "kind": "anthropic",
-            "on": "high",
-            "onMode": "enabled",
-            "offMode": "disabled"
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:glm-cn-coding-plan:0"
+      "factSourceId": "rdc-agent:glm-cn-coding-plan:0",
+      "fieldFactSourceIds": {
+        "modelId": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "controls.reasoning": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "contextTiers": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "defaultBudgetTokens": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "visionInput": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "structuredOutput": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "controls.maxContext": "provider-docs:glm-cn-coding-plan:models-2026-09-22",
+        "toolCalling": "provider-docs:glm-cn-coding-plan:models-2026-09-22"
+      }
     }
   ],
   "protocolOverrides": [
     {
-      "modelId": "glm-5",
-      "protocol": "AnthropicMessages",
-      "patch": {
-        "controls": {
-          "reasoning": {
-            "kind": "toggle",
-            "supportsOff": true,
-            "levels": [],
-            "defaultSelection": "on",
-            "wireProfile": {
-              "kind": "anthropic",
-              "on": "high",
-              "onMode": "enabled",
-              "offMode": "disabled"
-            }
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:glm-cn-coding-plan:0"
-    },
-    {
-      "modelId": "glm-5",
+      "modelId": "glm-5.3",
       "protocol": "OpenAICompatibleChatCompletions",
       "patch": {
         "controls": {
           "reasoning": {
-            "kind": "toggle",
-            "supportsOff": true,
-            "levels": [],
-            "defaultSelection": "on",
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "high",
+              "max"
+            ],
+            "defaultSelection": "max",
+            "defaultState": "known",
             "wireProfile": {
               "kind": "openai-compatible",
-              "on": "high",
-              "onMode": "thinking-enabled",
-              "offMode": "thinking-disabled"
+              "on": "max",
+              "levels": {
+                "low": "low",
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "thinking-enabled"
             }
           }
         }
@@ -512,125 +376,29 @@
       "factSourceId": "rdc-agent:glm-cn-coding-plan:0"
     },
     {
-      "modelId": "glm-4.7",
-      "protocol": "AnthropicMessages",
-      "patch": {
-        "controls": {
-          "reasoning": {
-            "kind": "toggle",
-            "supportsOff": true,
-            "levels": [],
-            "defaultSelection": "on",
-            "wireProfile": {
-              "kind": "anthropic",
-              "on": "high",
-              "onMode": "enabled",
-              "offMode": "disabled"
-            }
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:glm-cn-coding-plan:0"
-    },
-    {
-      "modelId": "glm-4.7",
+      "modelId": "glm-5.3-flash",
       "protocol": "OpenAICompatibleChatCompletions",
       "patch": {
         "controls": {
           "reasoning": {
-            "kind": "toggle",
-            "supportsOff": true,
-            "levels": [],
-            "defaultSelection": "on",
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "high",
+              "max"
+            ],
+            "defaultSelection": "max",
+            "defaultState": "known",
             "wireProfile": {
               "kind": "openai-compatible",
-              "on": "high",
-              "onMode": "thinking-enabled",
-              "offMode": "thinking-disabled"
-            }
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:glm-cn-coding-plan:0"
-    },
-    {
-      "modelId": "glm-4.6",
-      "protocol": "AnthropicMessages",
-      "patch": {
-        "controls": {
-          "reasoning": {
-            "kind": "toggle",
-            "supportsOff": true,
-            "levels": [],
-            "defaultSelection": "on",
-            "wireProfile": {
-              "kind": "anthropic",
-              "on": "high",
-              "onMode": "enabled",
-              "offMode": "disabled"
-            }
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:glm-cn-coding-plan:0"
-    },
-    {
-      "modelId": "glm-4.6",
-      "protocol": "OpenAICompatibleChatCompletions",
-      "patch": {
-        "controls": {
-          "reasoning": {
-            "kind": "toggle",
-            "supportsOff": true,
-            "levels": [],
-            "defaultSelection": "on",
-            "wireProfile": {
-              "kind": "openai-compatible",
-              "on": "high",
-              "onMode": "thinking-enabled",
-              "offMode": "thinking-disabled"
-            }
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:glm-cn-coding-plan:0"
-    },
-    {
-      "modelId": "glm-4.5",
-      "protocol": "AnthropicMessages",
-      "patch": {
-        "controls": {
-          "reasoning": {
-            "kind": "toggle",
-            "supportsOff": true,
-            "levels": [],
-            "defaultSelection": "on",
-            "wireProfile": {
-              "kind": "anthropic",
-              "on": "high",
-              "onMode": "enabled",
-              "offMode": "disabled"
-            }
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:glm-cn-coding-plan:0"
-    },
-    {
-      "modelId": "glm-4.5",
-      "protocol": "OpenAICompatibleChatCompletions",
-      "patch": {
-        "controls": {
-          "reasoning": {
-            "kind": "toggle",
-            "supportsOff": true,
-            "levels": [],
-            "defaultSelection": "on",
-            "wireProfile": {
-              "kind": "openai-compatible",
-              "on": "high",
-              "onMode": "thinking-enabled",
-              "offMode": "thinking-disabled"
+              "on": "max",
+              "levels": {
+                "low": "low",
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "thinking-enabled"
             }
           }
         }
@@ -639,11 +407,8 @@
     }
   ],
   "recommendedModels": [
-    "glm-5",
-    "glm-4.7",
-    "sonnet",
-    "opus",
-    "haiku"
+    "glm-5.3",
+    "glm-5.3-flash"
   ],
   "docsUrl": "https://open.bigmodel.cn/"
 }

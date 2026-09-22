@@ -74,5 +74,5 @@
   "models": [],
   "protocolOverrides": [],
   "recommendedModels": [],
-  "docsUrl": "https://docs.wandb.ai/guides/integrations/inference/"
+  "docsUrl": "https://docs.wandb.ai/weave/guides/integrations/inference"
 }

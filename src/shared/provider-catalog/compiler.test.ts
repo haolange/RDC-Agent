@@ -172,7 +172,7 @@ describe('Provider Catalog compiler', () => {
       label: 'Kimi for Coding',
       controls: {
         fast: { state: 'selectable' },
-        reasoning: { kind: 'always-on', supportsOff: false, lockedSelection: 'on' },
+        reasoning: { kind: 'levels', supportsOff: true, levels: ['low', 'high', 'max'], defaultSelection: 'max' },
       },
       executionBindings: expect.arrayContaining([
         expect.objectContaining({
@@ -256,10 +256,7 @@ describe('Provider Catalog compiler', () => {
       'grok-4.5',
     ]));
     expect(openCodeGo?.models.length).toBeGreaterThanOrEqual(20);
-    expect(openCodeGo?.models.find((model) => model.modelId === 'hy3-preview')).toMatchObject({
-      availability: 'unavailable',
-      unavailableReason: expect.stringContaining('model_not_supported'),
-    });
+    expect(openCodeGo?.models.find((model) => model.modelId === 'hy3-preview')).toBeUndefined();
     expect(openCodeGo?.models.find((model) => model.modelId === 'kimi-k3')).toMatchObject({
       presencePolicy: 'account-entitled',
       availability: 'unknown',
@@ -335,7 +332,7 @@ describe('Provider Catalog compiler', () => {
     const catalog = compileProviderCatalog(input());
     type ExpectedRow = readonly [
       modelId: string,
-      contextTokens: number,
+      contextTokens: number | undefined,
       maxContext: 'unknown' | 'unsupported' | 'selectable' | 'fixed',
       fast: 'unknown' | 'unsupported' | 'selectable',
       reasoningKind: 'unknown' | 'toggle' | 'always-on' | 'levels',
@@ -371,9 +368,6 @@ describe('Provider Catalog compiler', () => {
       ['gpt-5.6-terra', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-luna', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.5', 272_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
-      ['gpt-5.4-mini', 272_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
-      ['gpt-5.4', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
-      ['gpt-5.3-codex-spark', 256_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
     ]);
     const chatGptAccount = catalog.surfaces.get('chatgpt-account')?.surface;
     for (const model of chatGptAccount?.models ?? []) {
@@ -405,9 +399,8 @@ describe('Provider Catalog compiler', () => {
 
     verify('github-copilot', [
       ['claude-sonnet-4.6', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'max'], 'medium'],
-      ['claude-opus-4.6', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'max'], 'medium'],
       ['claude-opus-4.8', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['claude-opus-4.8-fast', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
+      ['claude-opus-4.8-fast', undefined, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['claude-opus-5', 1_000_000, 'unknown', 'unsupported', 'unknown', false, [], 'off'],
       ['claude-sonnet-5', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['claude-fable-5', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
@@ -417,15 +410,11 @@ describe('Provider Catalog compiler', () => {
       ['gpt-5.6-luna', 256_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-sol', 256_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-terra', 256_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gemini-3.1-pro-preview', 200_000, 'selectable', 'unsupported', 'levels', false, ['low', 'medium', 'high'], 'medium'],
-      ['gemini-3.5-flash', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high'], 'medium'],
+      ['gemini-3.5-flash', undefined, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high'], 'medium'],
       ['kimi-k2.7-code', 256_000, 'unsupported', 'unsupported', 'unknown', false, [], 'on'],
     ]);
     const copilot = catalog.surfaces.get('github-copilot')?.surface;
-    expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.6')).toMatchObject({
-      availability: 'unavailable',
-      unavailableReason: expect.stringContaining('subscription'),
-    });
+    expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.6')).toBeUndefined();
     expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.8')).toMatchObject({
       controls: { fast: { state: 'unsupported' } },
     });
@@ -441,6 +430,7 @@ describe('Provider Catalog compiler', () => {
       ['grok-4.20-0309-reasoning', 1_000_000, 'fixed', 'unsupported', 'always-on', false, [], 'on'],
       ['grok-4.20-multi-agent-0309', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
       ['grok-4.3', 500_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high'], 'medium'],
+      ['grok-4.7', 500_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'high'],
       ['grok-4.6', 500_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'high'],
       ['grok-4.5', 500_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high'], 'medium'],
       ['grok-build-0.1', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on'],
@@ -459,14 +449,15 @@ describe('Provider Catalog compiler', () => {
 
     verify('deepseek', [
       ['deepseek-flash', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['low', 'high', 'max'], 'high'],
+      ['deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['low', 'high', 'max'], 'high'],
     ]);
     const deepseek = catalog.surfaces.get('deepseek')?.surface;
     expect(deepseek?.discovery).toMatchObject({ authority: 'candidate-validation', strategy: { kind: 'json-catalog' } });
-    expect(deepseek?.models.map((model) => model.modelId)).toEqual(['deepseek-flash']);
+    expect(deepseek?.models.map((model) => model.modelId)).toEqual(['deepseek-flash', 'deepseek-v4-pro']);
     expect(deepseek?.models.every((model) => model.aliases.length === 0)).toBe(true);
 
     verify('kimi-coding-plan', [
-      ['kimi-for-coding', 256_000, 'unsupported', 'selectable', 'always-on', false, [], 'on'],
+      ['kimi-for-coding', 1_048_576, 'fixed', 'selectable', 'levels', true, ['low', 'high', 'max'], 'max'],
       ['k3', 256_000, 'selectable', 'unsupported', 'levels', false, ['low', 'high', 'max'], 'high'],
       ['k3-256k', 256_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'high', 'max'], 'high'],
       ['kimi-for-coding-highspeed', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on', 'internal'],
@@ -535,10 +526,16 @@ describe('Provider Catalog compiler', () => {
     const flash = deepseek?.models.find((model) => model.modelId === 'deepseek-flash');
     expect(flash?.route.protocol).toBe('OpenAIResponses');
     expect(flash?.visionInput.state).toBe('supported');
+    const pro = deepseek?.models.find((model) => model.modelId === 'deepseek-v4-pro');
+    expect(pro?.route.protocol).toBe('OpenAIResponses');
+    expect(pro?.visionInput).toEqual({
+      state: 'unsupported',
+      reason: 'DeepSeek Models & Pricing lists vision as not supported for deepseek-v4-pro.',
+    });
     expect(flash?.routeOptions?.map((option) => option.route.protocol)).toEqual([
       'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'AnthropicMessages',
     ]);
-    expect(deepseek?.models).toHaveLength(1);
+    expect(deepseek?.models).toHaveLength(2);
     expect(deepseek?.models.every((model) => model.aliases.length === 0)).toBe(true);
     expect(deepseek?.routes.map((route) => ({
       protocol: route.protocol,
@@ -592,7 +589,7 @@ describe('Provider Catalog compiler', () => {
 
     const subMillionMax = clone(input());
     const gemini = mutableSurface(subMillionMax, 'github-copilot').models
-      .find((model: Record<string, unknown>) => model.modelId === 'gemini-3.1-pro-preview');
+      .find((model: Record<string, unknown>) => model.modelId === 'gpt-5.4');
     gemini.contextTiers.find((tier: Record<string, unknown>) => tier.id === 'one-million')
       .maxPromptTokens = 200_000;
     expect(() => compileProviderCatalog(subMillionMax)).toThrow(/Max mode control references a tier that is not larger than the default context window/u);

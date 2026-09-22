@@ -1,31 +1,30 @@
-# RDC-Agent 0.6.0-rc.2
+# RDC-Agent 0.6.0-rc.6
 
 **Windows x64 · 未签名预发布 / Unsigned prerelease**
 
-本版本供试用与反馈，不是签名稳定版。Windows可能提示未知发布者或SmartScreen警告；组织安全策略可能阻止运行。仅从本仓库Releases下载并核对SHA-256，不要关闭安全防护。
-
-## 下载与开始
-
-- `RDC-Agent-0.6.0-rc.2-x64-setup.exe`：NSIS安装包。
-- `RDC-Agent-0.6.0-rc.2-x64.zip`：完整解压后运行`RdcAgent.exe`，不要只复制exe。
-- `SHA256SUMS.txt`：下载文件校验和；`sbom.cdx.json`及其`.sha256`：依赖清单与校验和。
-- 首次启动按图文指南连接自己的Provider/API、选择模型并添加项目。右上角问号可随时重看。无需Node.js或pnpm。
-- RenderDoc分析需另下载[RDC-Tool 1.0.1](https://github.com/haolange/RDC-Tool/releases/tag/v1.0.1)，完整解压，在Settings → Tools选择`rdc-tool`文件夹并“验证并应用”。工具自带Python；普通General任务无需配置RDC。
+本次更新校正 Provider 模型目录、能力和参数事实，并修复 Settings 将未知推理状态显示为关闭的问题。延续预发布通道，不是签名稳定版。
 
 ## 本次改动
 
-- Linux 与 macOS CI 的跨平台路径契约已收敛：Windows shell/CLI 路径在非 Windows runner 上按目标方言解析，macOS 测试临时根使用 canonical 路径；安全 symlink 拒绝规则保持不变。
-- 四步图文教程：真实入口指引、可访问的中英文标注、深浅主题、窄屏布局和键盘焦点管理；示例状态不会被当作当前配置。
-- RDC本机配置收敛为检测安装、选择文件夹、验证并应用；先验证草稿再保存，失败保留原配置，迟到结果丢弃。
-- 官方Agent/Skill/Hook随应用提供，不生成用户副本；保留用户自行配置LLM和Project的边界。
-- 同时提供安装包与解压包，并核验包内builtin及教程图片、SBOM和校验和。
+- 更新 Grok、DeepSeek、OpenAI/ChatGPT、Anthropic、Google、GLM、MiniMax、Kimi 等内置 surface 的模型与字段，保留逐字段来源；删除已证实退役入口及直接耦合残留。
+- 保持 manifest 基线与账号 discovery 分层。ChatGPT 账号返回的缺失或 text-only 模态不会覆盖已证实的结构能力；Azure 和 Groq 的独立生命周期例外保留。
+- 修正 GLM 可选推理档位、Kimi 关闭思考、DeepSeek 三协议参数和 xAI Priority 接线；Grok OAuth 不继承直连 Priority，未证实字段保持 unknown。
+- Settings 明确区分未知、供应商控制和已证实关闭。继续沿用现有模型行和控件。
 
-## 验证边界
+## 下载
 
-已有完整工程检查、Browser QA、同机隔离Tools/capture打开关闭及桌面正常退出证据；本次发行另验证发布门禁与最终包内容。未声称独立干净Windows、NSIS交互安装、真实LLM效果或完整Android/GPU矩阵通过。签名稳定版门禁继续保留。
+- `RDC-Agent-0.6.0-rc.6-x64-setup.exe`：Windows x64 安装包。
+- `RDC-Agent-0.6.0-rc.6-x64.zip`：完整解压后运行 `RdcAgent.exe`。
+- `SHA256SUMS.txt`、`sbom.cdx.json` 和 `.sha256`：资产校验与依赖清单。
+
+运行不需要 Node.js 或 pnpm。首次使用需配置自己的 Provider。包未签名，Windows 可能显示未知发布者；请从本仓库 Release 下载并核对 SHA256，不关闭安全防护。
+
+## 验证范围与已知限制
+
+完整测试 3093 项通过，4 项按原配置跳过；coverage ratchet、typecheck、lint、Provider 检查、contracts、gates 和 build 通过。隔离 Browser QA 验证 DeepSeek 视觉差异与路由保存、GLM 键盘选择推理档、MiniMax 未知状态、窄屏和焦点。
+
+Composer 三种视觉附件提示及已连接 Grok OAuth 控件尚未完成运行验收；未复制真实凭据，也未调用真实模型。目录缓存和单测不代表账号实际可用或模型调用成功。NSIS 交互安装和完整 GPU/Android 矩阵不在本轮通过声明内。
 
 ## English
 
-This is an **unsigned Windows x64 prerelease**, not a signed stable release. Windows or managed security policies may warn or block execution. Use only official release downloads and verify SHA-256; do not disable security protections.
-
-Use the NSIS setup installer or extract the entire zip and run `RdcAgent.exe`. Configure your own provider/API, model and project. The new bilingual illustrated guide can be reopened with the title-bar question mark. RDC-Tool is optional for general tasks; for capture analysis, download Tools 1.0.1 separately and select its extracted folder in Settings → Tools. Python is included with Tools. No Node.js/pnpm installation is required to run RDC-Agent.
+Unsigned Windows x64 prerelease. This update corrects provider model facts and request parameters, preserves account-specific availability boundaries, and fixes unknown reasoning labels in Settings. All 3,093 tests and engineering gates passed. Composer attachment warnings across all three vision states and connected Grok OAuth controls remain unverified at runtime; no real model request is claimed.

@@ -37,6 +37,14 @@
       "refreshedAt": "2026-07-15",
       "identityId": "google",
       "surface": "google-ai-studio"
+    },
+    {
+      "id": "provider-docs:google-ai-studio:models-2026-09-22",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash ; https://ai.google.dev/gemini-api/docs/latest-model ; https://ai.google.dev/gemini-api/docs/models/gemini-3.7-flash ; https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash ; https://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview ; https://ai.google.dev/gemini-api/docs/models/gemini-2.5-pro ; https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash ; https://ai.google.dev/api/interactions-api-v1 ; https://ai.google.dev/gemini-api/docs/api-versions",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-22",
+      "surface": "google-ai-studio"
     }
   ],
   "defaultFactSourceId": "rdc-agent:google-ai-studio:0",
@@ -98,6 +106,75 @@
   },
   "models": [
     {
+      "modelId": "gemini-3.8-flash",
+      "label": "gemini-3.8-flash",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1048576,
+          "maxOutputTokens": 65536,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "GoogleInteractions",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "gemini-thinking-level",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:google-ai-studio:models-2026-09-22"
+    },
+    {
       "modelId": "gemini-3.7-flash",
       "label": "gemini-3.7-flash",
       "aliases": [],
@@ -148,7 +225,6 @@
           "kind": "levels",
           "supportsOff": false,
           "levels": [
-            "minimal",
             "low",
             "medium",
             "high"
@@ -158,7 +234,6 @@
             "kind": "gemini-thinking-level",
             "on": "medium",
             "levels": {
-              "minimal": "minimal",
               "low": "low",
               "medium": "medium",
               "high": "high"
@@ -166,7 +241,10 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:google-ai-studio:0"
+      "factSourceId": "rdc-agent:google-ai-studio:0",
+      "fieldFactSourceIds": {
+        "controls.reasoning": "provider-docs:google-ai-studio:models-2026-09-22"
+      }
     },
     {
       "modelId": "gemini-3.6-flash",
@@ -252,7 +330,8 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "granted",
+          "maxOutputTokens": 65536
         }
       ],
       "defaultBudgetTokens": 256000,
@@ -307,7 +386,10 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:google-ai-studio:0"
+      "factSourceId": "rdc-agent:google-ai-studio:0",
+      "fieldFactSourceIds": {
+        "contextTiers": "provider-docs:google-ai-studio:models-2026-09-22"
+      }
     },
     {
       "modelId": "gemini-3.1-pro-preview",
@@ -322,7 +404,8 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "granted",
+          "maxOutputTokens": 65536
         }
       ],
       "defaultBudgetTokens": 256000,
@@ -376,14 +459,15 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:google-ai-studio:0"
+      "factSourceId": "rdc-agent:google-ai-studio:0",
+      "fieldFactSourceIds": {
+        "contextTiers": "provider-docs:google-ai-studio:models-2026-09-22"
+      }
     },
     {
       "modelId": "gemini-2.5-pro",
       "label": "gemini-2.5-pro",
-      "aliases": [
-        "gemini-pro"
-      ],
+      "aliases": [],
       "availability": "available",
       "contextTiers": [
         {
@@ -393,7 +477,8 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "granted",
+          "maxOutputTokens": 65536
         }
       ],
       "defaultBudgetTokens": 256000,
@@ -446,7 +531,10 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:google-ai-studio:0"
+      "factSourceId": "rdc-agent:google-ai-studio:0",
+      "fieldFactSourceIds": {
+        "contextTiers": "provider-docs:google-ai-studio:models-2026-09-22"
+      }
     },
     {
       "modelId": "gemini-2.5-flash",
@@ -461,7 +549,8 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "granted",
+          "maxOutputTokens": 65536
         }
       ],
       "defaultBudgetTokens": 256000,
@@ -514,11 +603,15 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:google-ai-studio:0"
+      "factSourceId": "rdc-agent:google-ai-studio:0",
+      "fieldFactSourceIds": {
+        "contextTiers": "provider-docs:google-ai-studio:models-2026-09-22"
+      }
     }
   ],
   "protocolOverrides": [],
   "recommendedModels": [
+    "gemini-3.8-flash",
     "gemini-3.7-flash",
     "gemini-3.6-flash",
     "gemini-3.5-flash"
