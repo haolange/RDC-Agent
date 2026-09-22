@@ -28,7 +28,7 @@
 
 ## 1. 产品定义与三个目标函数
 
-RDC-Agent 仍是通用 Agent Workbench。RenderDoc 垂直能力是建立在通用 Runtime、Profile、Skill、Hook、Task、Sub-Agent、Shell、durable Handoff 之上的内置能力包，不是第二套 Agent 内核。
+RDC-Agent 仍是通用 Agent Workbench。RenderDoc 垂直能力是建立在通用 Runtime、Profile、Skill、Hook、Task、Sub-Agent、Shell、声明式 Handoff 之上的内置能力包，不是第二套 Agent 内核。交接是人点 `.agent.md` 的 `handoffs` 声明，不是 durable 状态机。
 
 三个 Mission 是同一套调查基础设施上的三个目标函数，不是三套独立系统：
 
@@ -66,7 +66,7 @@ Goal → Observed Facts → Structure / Hypotheses → Evidence
 五个 Plane 正交。实现时映射到已有主进程模块与垂直 Session Artifact，不新增平行 Runtime。
 
 ```text
-Control Plane          Plan / Tasks / durable Handoff / Small·Big Loop / Skeptic
+Control Plane          Plan / Tasks / 声明式 Handoff / Small·Big Loop / Skeptic
 Execution Plane        四个 builtin Profile / Sub-Agent / Skill / Tool / 并发组
 Investigation State    WorldState / Evidence / Claim / Experiment / Challenge / Manifest
 Context Plane          L0–L5 选择 / Delegation Capsule / 三层 Compaction / 可恢复引用
@@ -75,13 +75,13 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 
 | Plane | 回答 | 仓库映射（目标态） |
 | --- | --- | --- |
-| Control | 目标、当前 Task、谁负责、Verifier、Small / Big Loop | 通用 `taskProjection` + durable `ProfileHandoffState` + plan artifact |
+| Control | 目标、当前 Task、谁负责、Verifier、Small / Big Loop | 通用 `taskProjection` + session execution offer + plan artifact |
 | Execution | 哪个 Agent、哪些 Skill/Tool、谁可并行、谁必须独占 | builtin Profile + executor 并发合同；Mission 只读 `rdc_probe` + `rdc_context`；General 经 Settings `shell` action 持 lease 执行 Live RDC |
 | Investigation State | 已确认、竞争假设、World State、实验污染 | `rdc.investigation.v1` Session Artifact |
 | Context | 这次推理看什么、如何压缩、如何 drilldown | PromptPlan + Artifactization + Mission Checkpoint |
 | Knowledge | 可复用什么、Scope、验证等级、冲突 | 五服务 + 六 lane markdown-first；canonical 仍在 `~/.rdc-agent/knowledge` 或 `<project-root>/.rdc-agent/knowledge`；读根免审批见 U02 / 裁决 G |
 
-端到端生命周期：用户选择 Mission → Planning Orchestrator → 有限探测与 Knowledge 检索 → `plan_artifact` 用户审阅（拒绝修订同一份，批准冻结）→ durable Handoff → General Execution Orchestrator → Tasks 展开 → Live RDC 串行 + Offline 可并行 → 垂直记录 → Skeptic → Small Loop 或 Big Loop → 报告。Session Candidate **不是**默认产物：仅当用户显式点击 / 命令，或 Agent 在本轮得到明确用户意图后显式调用 `knowledge_candidate_create` 才创建。持久 Promote 仍只能 human review。
+端到端生命周期：用户选择 Mission → Planning Orchestrator → 有限探测与 Knowledge 检索 → `plan_artifact` 用户审阅（拒绝修订同一份，批准冻结）→ 人点声明 handoff 切到 General → General Execution Orchestrator 就地终答 → Tasks 展开 → Live RDC 串行 + Offline 可并行 → 垂直记录 → Skeptic → 用户自行切回 Mission 做 Small Loop 或 Big Loop → 报告。Session Candidate **不是**默认产物：仅当用户显式点击 / 命令，或 Agent 在本轮得到明确用户意图后显式调用 `knowledge_candidate_create` 才创建。持久 Promote 仍只能 human review。
 
 ---
 
@@ -487,7 +487,7 @@ Planning：Triage & Taxonomy → Capture Report → Knowledge Retrieval → plan
 
 阶段：Observed Model → Resource Versioning → Pass Reconstruction → Shader Reconstruction → Traceability → Cross-Capture → Architecture Synthesis → Skeptic。
 
-落地方式（Wave 5）：接到已有 Profile / Skill / Hook / durable Handoff / `investigation_*` / `task_*`，不新建 Runtime。Architecture Model 版本比较 Artifact 与 Observed / Reconstructed / Authoring 分层写在 `$analyzer-architecture-method`（现有 `claim` / `claim_set` kind，无新 Registry 项）。`claimKind` 越层在写入时失败。`$analyzer-coordinator` 负责规划与 Small / Big Loop。仓库只用脱敏 fixture（`src/main/investigation/__fixtures__`）。T18 知识导入 已证见 `DESIGN.md` T18 已证组；Analyzer 正常 `completed` 见 U06。
+落地方式（Wave 5）：接到已有 Profile / Skill / Hook / 声明式 Handoff / `investigation_*` / `task_*`，不新建 Runtime。Architecture Model 版本比较 Artifact 与 Observed / Reconstructed / Authoring 分层写在 `$analyzer-architecture-method`（现有 `claim` / `claim_set` kind，无新 Registry 项）。`claimKind` 越层在写入时失败。`$analyzer-coordinator` 负责规划与 Small / Big Loop。仓库只用脱敏 fixture（`src/main/investigation/__fixtures__`）。T18 知识导入 已证见 `DESIGN.md` T18 已证组；Analyzer 正常 `completed` 见 U06。
 
 最低完整：主要 Pass 可用、Resource 依赖清晰、高频 Shader/Material 有 Fingerprint、用户目标 Trace 可答、Observed / Derived / Inferred 分离、Unknown Frontier 明确、Skeptic 无结构性 blocker。不得把未观察的引擎语义写成 `observed_fact`。
 
