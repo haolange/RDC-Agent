@@ -30,7 +30,7 @@
 | Prompt | `PromptPlan -> RequestEnvelope -> provider adapter` |
 | Task | TaskCreate/Update/Get/List/Stop |
 | Sub-Agent | 单进程独立 Context |
-| Handoff | `agent_handoff` 与 Handoff 事件 |
+| Handoff | `.agent.md` 的 `handoffs` 声明；人点后主进程 `applyDeclaredHandoff` |
 | RDC | 外部 CLI + ShellInvocationService |
 | Work Process | 同一 Agent/Conversation/Trace 事件 |
 | Artifact | 同一 Session Artifact Store |
@@ -489,7 +489,7 @@ Resume：
 | tool started/completed/denied | Tool 行 |
 | task created/updated | Task 树 |
 | subagent started/delta/completed | Sub-Agent 披露 |
-| handoff requested/applied | 控制转移行 + active Profile |
+| 人点声明 handoff（`applyDeclaredHandoff`） | 控制转移行 + active Profile |
 | artifact ready/failed | Artifact 行；Pack/Candidate 保留 kind、ref、hash、freshness |
 | knowledge index changed/stale/failed | `/knowledge status` 与当前列表状态；不伪装成聊天文本 |
 | permission request | 同一审批控件 |
