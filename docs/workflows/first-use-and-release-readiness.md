@@ -1,3 +1,6 @@
+## RDC-Agent 0.6.0-rc.7 发布收口（2026-09-23）
+
+已按既有 Windows x64 未签名预发布通道准备 rc.7；保留 rc.1–rc.6 的 tag 与资产。源码提交、CI、包内资源、SBOM、校验和、远端资产 digest 和清理回执将在本节逐项记录。Composer/Transcript 的历史验收限制继续以 acceptance-ledger 为准。
 # 上手引导与发行准备
 
 ## Provider 事实校正 rc.6（2026-09-22）
