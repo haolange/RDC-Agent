@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react';
-import { recolorLogoRgba } from '@shared/theme/recolorLogo';
+import { maskLogoCircleRgba, recolorLogoRgba } from '@shared/theme/recolorLogo';
 import logoUrl from '../../../resources/brand/rdc-agent-logo.png';
 import './ProductLogo.css';
 
@@ -31,6 +31,7 @@ export function ProductLogo({ accent, className = '' }: { accent: string; classN
       context.drawImage(image, 0, 0, LOGO_SIZE, LOGO_SIZE);
       const frame = context.getImageData(0, 0, canvas.width, canvas.height);
       recolorLogoRgba(frame.data, accent);
+      maskLogoCircleRgba(frame.data, canvas.width, canvas.height);
       context.putImageData(frame, 0, 0);
     }).catch((error: unknown) => { if (!cancelled) console.error(error); });
     return () => { cancelled = true; };

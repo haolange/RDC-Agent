@@ -1,3 +1,4 @@
+import { appPathService } from './runtime/AppPathService';
 /**
  * Electron Main Process Entry
  */
@@ -198,6 +199,13 @@ if (useDisposableBrowserQaUserData) {
 }
 app.commandLine.appendSwitch('user-data-dir', userDataPath);
 app.setPath('userData', userDataPath);
+console.log('[RDC-Agent] Startup identity:', JSON.stringify({
+  version: app.getVersion(),
+  carrier: isHeadlessMode ? 'browser' : app.isPackaged ? 'packaged-desktop' : 'source-desktop',
+  application: app.getAppPath(),
+  userData: userDataPath,
+  userResources: appPathService.getUserRdcRoot(),
+}));
 
 const userDataLock = acquireUserDataInstanceLock(userDataPath, {
   pid: process.pid,

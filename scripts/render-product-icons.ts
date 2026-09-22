@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
-import { recolorLogoRgba } from '../src/shared/theme/recolorLogo.ts';
+import { maskLogoCircleRgba, recolorLogoRgba } from '../src/shared/theme/recolorLogo.ts';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_DARK_ACCENT = '#33d1ff';
@@ -90,11 +90,13 @@ function scale(source: Uint8Array, sourceSize: number, targetSize: number): Uint
         for (let sx = Math.floor(x0); sx < Math.ceil(x1); sx += 1) {
           const weight = (Math.min(sx + 1, x1) - Math.max(sx, x0)) * (Math.min(sy + 1, y1) - Math.max(sy, y0));
           const from = (Math.min(sourceSize - 1, sy) * sourceSize + Math.min(sourceSize - 1, sx)) * 4;
-          for (let channel = 0; channel < 4; channel += 1) sums[channel] += source[from + channel] * weight;
+          for (let channel = 0; channel < 3; channel += 1) sums[channel] += source[from + channel] * source[from + 3] / 255 * weight;
+          sums[3] += source[from + 3] * weight;
         }
       }
       const to = (y * targetSize + x) * 4;
-      for (let channel = 0; channel < 4; channel += 1) target[to + channel] = Math.round(sums[channel] / (ratio * ratio));
+      target[to + 3] = Math.round(sums[3] / (ratio * ratio));
+      for (let channel = 0; channel < 3; channel += 1) target[to + channel] = sums[3] > 0 ? Math.round(sums[channel] * 255 / sums[3]) : 0;
     }
   }
   return target;
@@ -168,6 +170,7 @@ function icnsChunk(type: string, png: Buffer): Buffer {
 const source = decodePng(fs.readFileSync(path.join(repoRoot, 'resources/brand/rdc-agent-logo.png')));
 if (source.width !== source.height || source.width < 512) throw new Error('Brand source must be square and at least 512px.');
 recolorLogoRgba(source.rgba, DEFAULT_DARK_ACCENT);
+maskLogoCircleRgba(source.rgba, source.width, source.height);
 const icons = path.join(repoRoot, 'resources/icons');
 function writeIcon(name: string, bytes: Buffer): void {
   const destination = path.join(icons, name);
