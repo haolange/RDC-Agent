@@ -102,3 +102,19 @@
 ## 工作区与运行清理
 
 初始工作区只有既有未跟踪 .cursor/，本轮不改动它，不创建分支，不提交或推送。本轮 Browser QA launcher 均已停止，进程命令行检查未发现残留 QA launcher / Vite / Electron，canonical instance.lock 不存在；隔离目录残留锁只允许其 owner 已退出。桌面启动权已交还；未启动 canonical 桌面读取真实账号，不将此检查写成真实账号桌面验收。
+
+## 2026-09-22 计划三表面收敛
+
+适用基线：`941b839f4508a24d3b440695914e983088eea7e0` 上本轮工作区修改；没有提交、推送或发布。截图正文仅作为视觉样本。
+
+| 范围 | 状态 | 实现与验证边界 |
+| --- | --- | --- |
+| 文档预览卡 | 通过 | 有界 Markdown、标题去重、自然高度、独立阅读入口；移除分节折叠、内部 URI 页脚及专用样式/本地化键。预览无隐藏可聚焦控件。 |
+| 紧凑决策区 | 待验证 | 实现与组件/异步隔离测试通过：全部 handoff 逐项显示，修订按需展开、聚焦、空值拒绝、失败保留和重复提交保护；实时 Provider → plan_artifact → 人工批准续跑尚未验证。 |
+| 对齐阅读器 | 通过 | Workbench 提供真实外壳边界，稳定 PlanReaderHost 避免断点切换重挂载关闭；深浅主题实测模糊、全文读取、长内容/代码滚动、Escape/遮罩关闭、Tab 循环和回焦。 |
+| 工程收口 | 通过 | 定向 5 文件 18 用例、全量 439 文件 3057 用例、coverage ratchet、typecheck、lint、build、check:gates 通过，详见 acceptance-ledger。 |
+| Electron 缩放 | 阻塞 | 当前工具只能控制 Browser，不能操作原生 Electron；浏览器视口与字体尺度不作为 Electron zoom 证明。 |
+
+Browser 使用正式 disposable one-time bootstrap 进入 `/app`。隔离本地 Provider 尝试被现有有效目录路由/工具能力约束挡住，没有修改能力或权限边界。后续使用隔离持久化计划记录，经过产品 history、plan.read 和 hash 校验进入真实阅读面板；记录来源并非模型生成，不能证明实时待审门。恢复后的无活跃请求会由主进程拒绝，未绕过恢复契约。没有修改 DOM 或注入 renderer demo。
+
+验收覆盖与剩余条件见 `acceptance-ledger.md` 同日期条目；历史报告不回写为本轮通过。

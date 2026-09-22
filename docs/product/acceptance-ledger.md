@@ -613,3 +613,20 @@ Execution tracking remains in RDC-Tool docs/tool-convergence-tasks.md (T1–T8).
 - 桌面恢复：普通 desktop launcher 启动真实原生窗口，历史会话、设置、Capture、资源编辑与确认弹窗已视觉检查。最后正常点击关闭，launcher 退出码 0；原生 Electron、launcher、Tool daemon/worker、ADB forward 与本轮 helper 均无残留，canonical instance.lock 不存在。桌面启动权已交还。
 - 切换收尾：原生资源写读删与历史文件复查通过后，已核对绝对路径、未跟踪状态和无链接边界，删除本轮 9 份恢复副本及其一次性计划（逻辑字节 467923）；切换清单和哈希证据保留。回放临时目录已由产品生命周期释放，没有删除原始 capture、独立会话、原有备份或历史中间态。
 - 启动修正：实际桌面日志发现 CodeMirror `style-mod` 在 Document 创建内联 `<style>` 被 CSP 拒绝。通过 pnpm 管理的 4.1.3 两行补丁让支持构造样式表的 Document 复用库已有采用路径，ESM/CJS 同步；不改 CSP、不升级依赖，锁文件仅增加补丁引用。冻结安装通过，真实桌面重启后原内联样式拒绝消失。原生 Markdown 多行输入、标题/强调/列表呈现及编辑/预览切换已截图检查；验收草稿清空，未发送。meta 中 `frame-ancestors` 被忽略的既有提示仍在。
+
+## 2026-09-22 计划卡、确认区与阅读器收敛
+
+- 适用源码：基线 `941b839f4508a24d3b440695914e983088eea7e0` 上本轮未提交修改；没有发布。范围为 PlanCard、Composer 计划门、PlanReaderHost/PlanReviewPanel、Workbench 几何上下文、直接相关 Markdown/Handoff 展示和文档。
+- 工程通过：新增定向 5 文件 18 用例；最终全量覆盖率 439 文件通过、4 文件按原配置跳过，3057 用例通过、4 跳过。lines 75.21%、functions 76.88%、branches 62.31%、statements 72.78%，coverage ratchet 通过；typecheck、lint、check:gates（含 appearance、work-process、session-projection、legacy-residue、design-tokens、renderer-structure、acceptance-ledger）及 build 通过。为避开受限环境 TEMP 祖先 realpath 权限错误，将测试 TEMP/TMP 定位到本轮仓库内一次性目录，固定 maxWorkers=4；未跳过或弱化测试。build 保留既有静态/动态 import 提示，不影响退出码。
+- 行为测试通过：多执行目标、当前目标提交、重复提交、修订展开聚焦/空值禁用/失败保留、session/revision 隔离、Stop/替换/移除后的迟到响应、批准投影早于 IPC 返回、合法续跑与失败重试。稳定阅读器宿主新增 Transcript 行重挂载后保持打开并回焦新阅读入口的回归；现有主进程计划读取、身份/hash 和审批契约随全量复验。
+- Browser 阅读场景通过：正式 disposable bootstrap → 同源 `/app`，使用隔离持久化计划记录经过真实 history/plan.read/hash 链路，没有 renderer demo 或手工改 DOM。深色中文 medium、浅色英文 large、深色中文 small；桌面约 1591/1454 CSS px、1024、640、390 宽度，最低 450 高度；长标题、12 节正文与长路径代码、双侧栏收起、终端打开、跨断点连续缩放。阅读器左右与 Composer 误差最大约 0.019 CSS px；上下按工作区边界保留 16/8 CSS px 安全间距（亚像素取整差小于 1px），页面横向溢出 0。观察到真实背景模糊，面板正文保持清晰；正文滚动超过 1500px 时标题栏不动，Tab 由末控件回首控件，Escape/遮罩关闭后回焦阅读入口。跨断点曾使卡片重挂载并关闭阅读器，提升至稳定工作区宿主后复验保持打开。
+- 读取失败实测通过：仅修改本轮计划文件造成 hash 不匹配，面板显示 `PLAN_HASH_MISMATCH`，正文为空，复制/下载/保存均禁用，关闭可用；没有以摘要/章节代替全文。
+- TODO(UNVERIFIED)：没有取得修改前真实计划运行态的 Browser 基线；原截图与源码检查仅用于定位。隔离 Provider 的有效目录仍选官方路由（认证失败），改为本地自定义模型后工具能力 unknown 被拒绝；没有放宽权限/目录约束。故实时模型生成 → 待审决策 → 人工批准/修订 → General 续跑，以及待审门完整视觉矩阵不能标通过。当前工具不能控制原生 Electron，Electron zoom、原生导出/保存对话框未验证；Browser 和工程结果不能代替。解除条件为可用且具工具能力的测试 Provider，以及原生 Electron 操作环境。
+- 收尾通过：正式 `start:human` 用本轮隔离数据启动至 main/IPC/renderer 初始化，桌面没有被 QA 实例锁阻挡；这仅证明启动健康，不代表原生视觉或 zoom。随后停止本轮 Browser、Provider 和桌面进程，核对退出；三个自有 QA/测试临时目录及中间日志删除后复查不存在，无链接越界，其他任务进程未动。canonical instance.lock 不存在，桌面启动权已交还。保留当前 build/coverage 产物供开发及复查，未生成发行包。
+
+## QA 外观对照与 rc.4（2026-09-22）
+
+用户追加授权提交、上传与发布；发布任务在 first-use-and-release-readiness.md 的 RC4 清单维护。源码基线仍为 941b839f，加本轮计划交互修改与版本 0.6.0-rc.4。
+
+- 外观差异已定位并补验：正常配置是 Absolutely 深色、大字号、composerMarkdown=true；此前 disposable 使用默认主题、中字号、composerMarkdown=false，截图还选择了测试 llama 模型。只复制 appearance 到自有隔离配置，经 start:agent-browser 的正式构建与 one-time bootstrap 打开产品；创建自有项目/会话，实际观察到暖灰界面与 Markdown 编辑/预览，输入 Markdown 后切换预览成功，切换 Debugger 后控件保持同一结构。未提交模型请求，未复制凭据/用户会话；原配置最后修改时间保持 2026-09-21 23:46:05。不存在测试专用 Composer 分支，不以本次空会话补验覆盖先前计划审批或原生缩放的未验证边界。
+- 工程证据沿用上一节完整 3057 项测试、coverage ratchet、typecheck、lint、gates 和 build；本次只追加版本/文档，不修改运行时代码。版本增量门禁、发行包与清理结果随后按实际回执记录。

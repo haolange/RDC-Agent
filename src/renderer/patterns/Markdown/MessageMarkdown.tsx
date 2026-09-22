@@ -17,6 +17,8 @@ interface MessageMarkdownProps {
   /** Skip KaTeX / math / highlight while the source is still streaming. */
   deferHeavyPlugins?: boolean;
   renderImage?: (props: { src?: string; alt?: string }) => React.ReactNode;
+  /** Clipped excerpts must not contain unreachable links or code actions. */
+  interactive?: boolean;
 }
 
 const STREAMING_REMARK_PLUGINS: NonNullable<Options['remarkPlugins']> = [remarkGfm];
@@ -46,13 +48,13 @@ function defaultMarkdownImage({ src, alt }: { src?: string; alt?: string }) {
   );
 }
 
-function createMarkdownComponents(renderImage?: MessageMarkdownProps['renderImage']): Components {
+function createMarkdownComponents(renderImage: MessageMarkdownProps['renderImage'], interactive: boolean): Components {
   return {
-    a: ({ href, children }) => (
+    a: ({ href, children }) => interactive ? (
       <a href={href} target="_blank" rel="noreferrer noopener">
         {children}
       </a>
-    ),
+    ) : <span>{children}</span>,
     img: ({ src, alt }) => (renderImage ? renderImage({ src, alt }) : defaultMarkdownImage({ src, alt })),
     input: (props) => {
       if (props.type === 'checkbox') {
@@ -69,6 +71,7 @@ function createMarkdownComponents(renderImage?: MessageMarkdownProps['renderImag
       return <input {...props} />;
     },
     pre: ({ children }) => {
+      if (!interactive) return <pre>{children}</pre>;
       const childArray = React.Children.toArray(children);
       const codeElement = childArray.find(
         (child): child is React.ReactElement<{ className?: string; children?: React.ReactNode }> =>
@@ -106,9 +109,10 @@ const MessageMarkdownInner: React.FC<MessageMarkdownProps> = ({
   content,
   deferHeavyPlugins = false,
   renderImage,
+  interactive = true,
 }) => {
   const normalized = useMemo(() => normalizeAssistantMarkdown(content), [content]);
-  const components = useMemo(() => createMarkdownComponents(renderImage), [renderImage]);
+  const components = useMemo(() => createMarkdownComponents(renderImage, interactive), [renderImage, interactive]);
 
   return (
     <div className="markdown-body">

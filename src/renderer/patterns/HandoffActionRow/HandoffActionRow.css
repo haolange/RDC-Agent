@@ -7,3 +7,24 @@
 .handoff-action-row__button {
   min-height: var(--control-height-md);
 }
+
+.handoff-action-row.is-decisions { flex-direction: column; }
+.handoff-action-row.is-decisions .handoff-action-row__button {
+  width: 100%;
+  justify-content: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  text-align: left;
+  white-space: normal;
+}
+.handoff-action-row__label { min-width: 0; overflow-wrap: anywhere; }
+.handoff-action-row__number {
+  display: grid;
+  place-items: center;
+  flex: 0 0 var(--control-height-sm);
+  height: var(--control-height-sm);
+  border: 1px solid var(--token-border-subtle);
+  border-radius: var(--radius-full);
+  color: var(--token-text-body);
+}
+.handoff-action-row__arrow { margin-left: auto; }

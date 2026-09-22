@@ -2,6 +2,7 @@ import React from 'react';
 import { ToolApprovalRequestPanel, usePendingToolApprovalRequest } from './ToolApprovalRequestPanel';
 import { PlanReviewRequestPanel, usePendingPlanReviewRequest } from './PlanReviewRequestPanel';
 import { UserInputRequestPanel, usePendingUserInputRequest } from './UserInputRequestPanel';
+import { planReviewRequestKey } from './planReviewRequestModel';
 
 export function useComposerPendingGate(
   composeAccentStyle: { 'data-dyn-style': string },
@@ -21,7 +22,7 @@ export function useComposerPendingGate(
   if (pendingPlanReview) {
     return (
       <div className="composer-shell composer-shell-plan-review" {...composeAccentStyle}>
-        <PlanReviewRequestPanel request={pendingPlanReview} />
+        <PlanReviewRequestPanel key={planReviewRequestKey(pendingPlanReview)} request={pendingPlanReview} />
       </div>
     );
   }

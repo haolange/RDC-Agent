@@ -290,4 +290,6 @@ Composer Send / Stop 共用 Button 的 primary / danger 状态，尺寸固定 28
 
 Composer 宽度分配：左组及图标 menu wrapper 不参与压缩；右组允许收缩。model-effort 菜单独随生效模型名 + 思考等级 hug，用 `max-width` 封顶（默认 12rem），`min-width: 0` 可压；胶囊 `width: auto`，不预留固定槽、不贯通 `width: 100%`。窄容器只收紧 `max-width`（560px → 8rem，420px → 6rem），不用 `flex-basis` 预留槽。窄宽规则具有足够 specificity，不受后加载 Pill / Effort 基础样式覆盖。禁止 viewport 规则恢复右组 flex-shrink:0。<=720px 主内容轨道使用留白内全宽，不继续使用桌面 77% 上限；模型名只对实际溢出文本渐隐，完整名留在 `title`。
 
-计划卡使用 transcript-card padding/border/radius 与实色 token-bg-raised，底部以该实色渐隐遮罩裁切长内容；复用公共 Button 焦点环，分节 summary 使用 token-border-focus。阅读面板使用 modal-backdrop 和 token-bg-overlay，不引入未定义的颜色或焦点别名。
+计划卡使用 transcript-card padding/border/radius 与实色 token-bg-raised；标题左对齐，正文为连续、有界 Markdown 预览，短内容自然收缩、长内容裁切，无分节折叠、内部 URI 或卡内滚动。阅读入口复用公共 Button 焦点环。Composer 计划门使用紧凑决策列表与按需展开的修改意见，不重复标题/摘要，不以关闭或跳过隐式批准。
+
+计划阅读器左右严格对齐 Composer 外壳；上下使用主工作区边界并留 `--space-4` 安全边距，≤640px 改为 `--space-2`。几何由工作区上下文测量，经 `useDynStyle` 随布局、字体及视口变化更新，不使用固定 rem 宽高上限。全窗口遮罩沿用 `--modal-backdrop` / `--modal-backdrop-filter`，面板采用实色 `--token-bg-overlay`。标题、版本和操作栏固定，正文独立滚动，窄屏将标题与操作分行；保留 overlay stack、键盘焦点循环和关闭回焦。模糊效果须观察实际界面，computed style 不能替代视觉验收。

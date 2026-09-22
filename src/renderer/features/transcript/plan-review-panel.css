@@ -2,21 +2,23 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-modal-backdrop);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-4);
+  --reading-inset: var(--space-4);
   background: var(--modal-backdrop);
   backdrop-filter: var(--modal-backdrop-filter);
   -webkit-backdrop-filter: var(--modal-backdrop-filter);
 }
 
 .plan-review-panel {
+  position: absolute;
+  left: var(--reading-left);
+  top: calc(var(--reading-top) + var(--reading-inset));
   z-index: var(--z-modal);
   display: flex;
   flex-direction: column;
-  width: min(52rem, 100%);
-  max-height: min(40rem, 90vh);
+  width: var(--reading-width);
+  height: calc(var(--reading-height) - 2 * var(--reading-inset));
+  min-height: 0;
+  overflow: hidden;
   border: 1px solid var(--token-border-subtle);
   border-radius: var(--radius-lg);
   background: var(--token-bg-overlay);
@@ -30,18 +32,27 @@
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--token-border-subtle);
+  flex-shrink: 0;
+  flex-wrap: wrap;
 }
+
+.plan-review-panel__heading { min-width: 0; flex: 1 1 0; }
+.plan-review-panel__revision { color: var(--token-text-muted); font-size: var(--text-xs); }
 
 .plan-review-panel__title {
   margin: 0;
   font-size: var(--text-md);
   font-weight: 600;
+  overflow-wrap: anywhere;
+  max-height: 3lh;
+  overflow: auto;
 }
 
 .plan-review-panel__actions {
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  flex-shrink: 0;
 }
 
 .plan-review-panel__body {
@@ -49,7 +60,12 @@
   overflow: auto;
   padding: var(--space-4);
   font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
 }
+
+.plan-review-panel__body .markdown-body { min-width: 0; }
+.plan-review-panel__body pre { max-width: 100%; overflow-x: auto; }
 
 .plan-review-panel__error {
   margin: 0 var(--space-4) var(--space-3);
@@ -57,15 +73,13 @@
   font-size: var(--text-sm);
 }
 
-@media (max-width: 390px) {
+@media (max-width: 640px) {
   .plan-review-panel-overlay {
-    padding: var(--space-2);
+    --reading-inset: var(--space-2);
   }
 
-  .plan-review-panel {
-    max-height: 100vh;
-    border-radius: var(--radius-md);
-  }
+  .plan-review-panel__heading { flex-basis: 100%; }
+  .plan-review-panel__actions { margin-left: auto; }
 }
 
 .plan-review-panel__notice {

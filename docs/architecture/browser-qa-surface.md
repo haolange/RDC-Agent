@@ -45,6 +45,7 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
 
 ## 验证
 
+- 外观对照须匹配主题预设、字号、语言、Composer Markdown 开关及当前 Agent；disposable 默认偏好不能代表正常用户配置。需要复现正常外观时，仅将 appearance 字段复制到自有隔离配置，记录来源与差异，不复制凭据或会话，也不改变产品默认值。普通输入与 Markdown 编辑/预览是同一 Composer 的现有设置，不是 Browser/Desktop 分叉；原生窗口缩放仍需单独验收。
 - 契约：`createRendererApi.test.ts`、`bridgeSecurity.test.ts`、`BrowserAppBridgeServer.contract.test.ts`
 - Smoke：`pnpm run smoke:agent-browser`
 - Manual: run start:agent-browser, copy the complete one-time `/qa?qaBootstrap=...` URL from the latest log, and verify real Settings/Project/Session/usage, language persistence, and parity. Check high-risk channels both without and with `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`; use explicit canonical userData only for an authorized real-data flow.

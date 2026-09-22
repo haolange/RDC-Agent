@@ -9,6 +9,7 @@ import { IconButton } from '../../ui/IconButton';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { usePlanReviewActions } from './usePlanReviewActions';
 import { useProjectStore } from '../../stores/projectStore';
+import { useReadingPanelGeometry } from '../../lib/useReadingPanelGeometry';
 import './plan-review-panel.css';
 
 export const PlanReviewPanel: React.FC<{
@@ -17,9 +18,10 @@ export const PlanReviewPanel: React.FC<{
 }> = ({ plan, onClose }) => {
   const { t } = useI18n();
   const titleId = useId();
+  const geometry = useReadingPanelGeometry();
   const dialogRef = useRef<HTMLDivElement>(null);
   const { layerId } = useOverlayLayer(true);
-  useModalFocus({ open: true, containerRef: dialogRef, onClose, layerId });
+  useModalFocus({ open: geometry.ready, containerRef: dialogRef, onClose, layerId });
   const sessionId = useProjectStore((state) => state.currentSession?.sessionId);
   const { readPlan, copyPlan, saveToProject, exportPlan } = usePlanReviewActions();
   const [markdown, setMarkdown] = useState('');
@@ -62,11 +64,12 @@ export const PlanReviewPanel: React.FC<{
     }
   };
 
-  if (typeof document === 'undefined') return null;
+  if (typeof document === 'undefined' || !geometry.ready) return null;
 
   return createPortal(
     <div
       className="plan-review-panel-overlay"
+      {...geometry.style}
       data-overlay-layer
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -82,7 +85,10 @@ export const PlanReviewPanel: React.FC<{
         data-testid="plan-review-panel"
       >
         <header className="plan-review-panel__header">
-          <h2 id={titleId} className="plan-review-panel__title">{plan.title}</h2>
+          <div className="plan-review-panel__heading">
+            <h2 id={titleId} className="plan-review-panel__title">{plan.title}</h2>
+            <span className="plan-review-panel__revision">{t('chat.planReviewRevision', { revision: plan.revision })}</span>
+          </div>
           <div className="plan-review-panel__actions">
             <IconButton
               label={t('chat.planReviewExport')}
