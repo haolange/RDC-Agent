@@ -5,3 +5,4 @@ export * from './sanitize';
 export * from './rdcThemeV1';
 export * from './composeAccent';
 export * from './uiPreferences';
+export * from './recolorLogo';

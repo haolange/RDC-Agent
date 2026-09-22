@@ -16,6 +16,11 @@ describe('textarea content sizing', () => {
     expect(textareaHeight(1000, 24, 12, 4, 3, 2)).toEqual({ height: 88, overflow: 'auto' });
     expect(textareaHeight(12, 24, 12, 4, 0, 8).height).toBe(40);
   });
+  it('clamps the composer writing surface between 72 and 180', () => {
+    expect(textareaHeight(20, 22, 10, 0, 1, 8, 72, 180)).toEqual({ height: 72, overflow: 'hidden' });
+    expect(textareaHeight(120, 22, 10, 0, 1, 8, 72, 180)).toEqual({ height: 120, overflow: 'hidden' });
+    expect(textareaHeight(400, 22, 10, 0, 1, 8, 72, 180)).toEqual({ height: 180, overflow: 'auto' });
+  });
   it('honors md32 with real 12px/1.5 metrics and does not clip larger fonts', () => {
     // 12px font × 1.5 line height + 8px padding + 2px border = 28px, raised to md32.
     expect(textareaHeight(30, 18, 8, 2, 1, 8, 32)).toEqual({ height: 32, overflow: 'hidden' });

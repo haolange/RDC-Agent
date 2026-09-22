@@ -1,5 +1,12 @@
 # Acceptance Ledger
 
+2026-09-22 RC5-BRAND-COMPOSER：基于 48f9a0ee 的本轮未提交修复，以下是实际证据，不把基线 SHA 作为新实现 SHA。保持四个官方 Agent、声明式 handoff 及历史实验记录。
+
+- 工程通过：pnpm 11.7.0；完整 coverage 442 文件、3066 测试通过，4 项既有条件跳过；lines 75.24%、functions 76.90%、branches 62.35%、statements 72.83%，ratchet 通过。首次与 build/gates 并跑出现三项 5 秒超时，未改断言，限制 maxWorkers=4 独立复跑通过。最终 typecheck、lint、contracts（248 项）、完整 gates 与 production build 通过。
+- Browser QA：正式 renderer 同源 disposable bridge；普通输入空白/清空约 72px，多行约 180px 后内部滚动，无灰底/边框；键盘全选删除、外壳 focus-within、普通/Markdown 编辑与预览切换、内容回缩、大字号和窄屏通过。实际窄屏约 354px，无页面横溢出；标题文字单行截断不挤占窗口按钮。左右拖到头均 520px，设置持久值及重新加载一致；空项目 Capture 保持空态。没有执行模型或 RDC 回放，本轮不重标历史模型与设备验收。结束前 Browser console 无 error/warn。
+- 原生与包：Windows Electron 的 BGRA 解码、真实换色、createFromBitmap/PNG 往返断言通过；图标缓存、关闭释放、appearance IPC、系统主题选择和失败诊断单测通过。打包窗口完成 ReplayDeviceService 初始化，标题栏与 Settings 实际显示同一品牌图，32px 图案可辨识。闪屏复用同一组件，尚无截获闪屏画面的视觉证据。任务栏换色及 Windows 系统主题切换待用户目视回执，未标通过。
+- 发行候选：0.6.0-rc.5 Windows x64 NSIS/ZIP 构建完成，NotSigned；52 运行资源、renderer/native 品牌资源校验通过；316 个构建文件与 ASAR 字节一致，ZIP ASAR 与已运行目录一致；exe 内嵌九种尺寸图标均与生成 ICO 字节一致。仍有既有 fs.Stats 弃用及 meta CSP frame-ancestors 提示；不声明控制台无警告。发布与清理待收口。
+
 2026-09-22 RC3-CANDIDATE：用户追加授权提交、推送和 `0.6.0-rc.3` 未签名预发布。三轮UI成果已进入 `e62ef83b711af6bc9ce9799bea7a8f640e5f7c0c` 并推送main，以下历史“未提交”仅描述当时证据基线。最终renderer bundle仍为 `index-BWE38meJ.js`。
 
 - 本地发行通过：production build、显式prerelease配置门禁、NSIS/ZIP、52资源包内容校验、1106组件SBOM与校验和；ZIP内asar与已验证产物相同。打包应用服务初始化smoke通过且自有进程退出；安装向导和原生IME未实测。启动仍有meta CSP frame-ancestors及fs.Stats弃用警告，不声称无警告。

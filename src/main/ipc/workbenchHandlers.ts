@@ -14,6 +14,7 @@ import { storageAdapter } from '../sessions/StorageAdapter';
 import { projectSessionForClient } from '../sessions/projectSessionHandoff';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rdcCliInvokerService } from '../tools/RdcCliInvokerService';
+import { applyProductIcon } from '../window/productIcon';
 import { sessionResumeService } from '../sessions/SessionResumeService';
 import { registerAgentHandlers } from './agentHandlers';
 import { registerMemoryHandlers } from './memoryHandlers';
@@ -253,6 +254,7 @@ function registerNativeThemeBridge(): void {
 
   nativeTheme.on('updated', () => {
     broadcastToRenderer('app:themeChanged', nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
+    applyProductIcon();
   });
   nativeThemeSubscribed = true;
 }

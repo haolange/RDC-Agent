@@ -1,6 +1,6 @@
 {
   "name": "rdc-agent",
-  "version": "0.6.0-rc.4",
+  "version": "0.6.0-rc.5",
   "description": "RDC-Agent — Electron desktop app for RenderDoc .rdc capture analysis with agentic Debugger/Ask workflows",
   "author": "RDC-Agent Contributors",
   "repository": {
@@ -76,7 +76,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "check:identity": "node scripts/check-identity.mjs"
+    "check:identity": "node scripts/check-identity.mjs",
+    "brand:icons": "node --experimental-strip-types scripts/render-product-icons.ts"
   },
   "dependencies": {
     "@ai-sdk/provider": "3.0.14",

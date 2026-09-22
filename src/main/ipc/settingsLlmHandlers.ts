@@ -21,6 +21,7 @@ import { effectiveCatalogService } from '../settings/EffectiveCatalogService';
 import { providerCapabilityProbeService } from '../settings/ProviderCapabilityProbeService';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { applyProductIcon } from '../window/productIcon';
 import { formatShellInterpreterLabel, shellResolver } from '../runtime/ShellResolver';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
@@ -326,6 +327,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const patch = settings as AppSettingsPatch;
     const previousSettings = settingsService.getAll();
     const nextSettings = settingsService.setAll(patch, appPathService.getRuntimePaths());
+    if (patch.appearance) applyProductIcon();
     const changedProviderIds = new Set<string>();
     if (patch.llm?.providers) context.applyCurrentLlmConfig();
     for (const provider of patch.llm?.providers ? nextSettings.llm.providers : []) {

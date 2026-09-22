@@ -10,7 +10,6 @@ app-context-menu-label
 app-context-menu-shortcut
 app-logo
 app-logo-copy
-app-logo-icon
 app-logo-text
 app-main
 app-sidebar-footer
@@ -181,7 +180,6 @@ composer-model-effort-pill-caret
 composer-model-effort-pill-level
 composer-model-effort-pill-mode
 composer-model-effort-pill-model
-ui-overflow-fade
 composer-model-effort-popup
 composer-model-effort-refreshing
 composer-model-empty
@@ -405,9 +403,9 @@ footer-entry-title
 footer-entry-trailing
 handoff-action-row
 handoff-action-row__arrow
+handoff-action-row__button
 handoff-action-row__label
 handoff-action-row__number
-handoff-action-row__button
 handoff-suggestion-row
 handoff-suggestion-row__label
 hljs
@@ -441,6 +439,7 @@ is-remove
 is-stopped
 is-summary
 is-tone-
+is-visible
 kind-
 kind-section
 knowledge-card-image
@@ -666,6 +665,7 @@ plan-review-panel__notice
 plan-review-panel__revision
 plan-review-panel__title
 plan-review-panel-overlay
+product-logo
 progress-visual
 project-capture-header
 project-capture-import-error
@@ -835,6 +835,11 @@ settings-agent-identity-grid
 settings-agent-instructions
 settings-agent-instructions--editor
 settings-agent-instructions-meta
+settings-agent-list-item
+settings-agent-list-item-copy
+settings-agent-list-item-description
+settings-agent-list-item-icon
+settings-agent-list-item-name
 settings-agent-look-row
 settings-agent-name-input
 settings-agent-panel
@@ -868,7 +873,6 @@ settings-capability-picker
 settings-center
 settings-center-brand
 settings-center-brand-copy
-settings-center-brand-icon
 settings-center-brand-subtitle
 settings-center-brand-title
 settings-center-content
@@ -932,11 +936,6 @@ settings-manifest-list-empty
 settings-manifest-list-toolbar
 settings-manifest-page
 settings-manifest-page-toolbar
-settings-agent-list-item
-settings-agent-list-item-copy
-settings-agent-list-item-description
-settings-agent-list-item-icon
-settings-agent-list-item-name
 settings-manifest-toolbar
 settings-mcp-detail
 settings-mcp-row-trailing
@@ -1207,6 +1206,7 @@ ui-menu
 ui-menu-check
 ui-menu-item
 ui-menu-separator
+ui-overflow-fade
 ui-panel
 ui-panel-body
 ui-panel-header
@@ -1231,7 +1231,6 @@ ui-tabs
 ui-tabs-list
 ui-tabs-panel
 ui-tabs-tab
-user-menu-preferences
 ui-textarea
 ui-toast
 ui-toast-copy
@@ -1245,10 +1244,10 @@ user-menu-header
 user-menu-header-copy
 user-menu-name
 user-menu-popover
+user-menu-preferences
 user-menu-section
 user-menu-section-label
 user-menu-settings-button
-is-visible
 window-control
 window-control-maximize
 window-control-minimize

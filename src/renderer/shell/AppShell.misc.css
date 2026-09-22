@@ -11,14 +11,6 @@
 .loading-logo {
   width: var(--space-12);
   height: var(--space-12);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-  background: var(--token-bg-panel);
-  color: var(--token-text-heading);
-  font-size: var(--text-lg);
-  font-weight: var(--font-semibold);
 }
 
 .loading-text {

@@ -5,12 +5,11 @@ import type { AgentMode } from '@shared/types/layout';
 import {
   LEFT_SIDEBAR_COLLAPSED_WIDTH,
   LEFT_SIDEBAR_DEFAULT_WIDTH,
-  LEFT_SIDEBAR_MAX_WIDTH,
   LEFT_SIDEBAR_MIN_WIDTH,
   RIGHT_PANEL_COLLAPSED_WIDTH,
   RIGHT_PANEL_DEFAULT_WIDTH,
-  RIGHT_PANEL_MAX_WIDTH,
   RIGHT_PANEL_MIN_WIDTH,
+  SIDEBAR_MAX_WIDTH,
   TERMINAL_DEFAULT_HEIGHT,
   TERMINAL_MAX_HEIGHT,
   TERMINAL_MIN_HEIGHT,
@@ -89,19 +88,19 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
     rightPanelCollapsed: settings.layout.rightPanel.collapsed,
     leftSidebarWidth: settings.layout.leftSidebar.collapsed
       ? LEFT_SIDEBAR_COLLAPSED_WIDTH
-      : clamp(settings.layout.leftSidebar.width, LEFT_SIDEBAR_MIN_WIDTH, LEFT_SIDEBAR_MAX_WIDTH),
+      : clamp(settings.layout.leftSidebar.width, LEFT_SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
     rightPanelWidth: settings.layout.rightPanel.collapsed
       ? RIGHT_PANEL_COLLAPSED_WIDTH
-      : clamp(settings.layout.rightPanel.width, RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH),
+      : clamp(settings.layout.rightPanel.width, RIGHT_PANEL_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
     leftSidebarExpandedWidth: clamp(
       settings.layout.leftSidebar.expandedWidth,
       LEFT_SIDEBAR_MIN_WIDTH,
-      LEFT_SIDEBAR_MAX_WIDTH,
+      SIDEBAR_MAX_WIDTH,
     ),
     rightPanelExpandedWidth: clamp(
       settings.layout.rightPanel.expandedWidth,
       RIGHT_PANEL_MIN_WIDTH,
-      RIGHT_PANEL_MAX_WIDTH,
+      SIDEBAR_MAX_WIDTH,
     ),
     terminalHeight: clamp(
       settings.layout.terminal?.height ?? TERMINAL_DEFAULT_HEIGHT,
@@ -118,7 +117,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       leftSidebarCollapsed: nextCollapsed,
       leftSidebarWidth: nextCollapsed
         ? LEFT_SIDEBAR_COLLAPSED_WIDTH
-        : clamp(state.leftSidebarExpandedWidth, LEFT_SIDEBAR_MIN_WIDTH, LEFT_SIDEBAR_MAX_WIDTH),
+        : clamp(state.leftSidebarExpandedWidth, LEFT_SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
     };
     set(nextState);
     await get().persistLayout();
@@ -130,20 +129,20 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       rightPanelCollapsed: nextCollapsed,
       rightPanelWidth: nextCollapsed
         ? RIGHT_PANEL_COLLAPSED_WIDTH
-        : clamp(state.rightPanelExpandedWidth, RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH),
+        : clamp(state.rightPanelExpandedWidth, RIGHT_PANEL_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
     };
     set(nextState);
     await get().persistLayout();
   },
   setLeftSidebarWidth: (width) => set({
     leftSidebarCollapsed: false,
-    leftSidebarWidth: clamp(width, LEFT_SIDEBAR_MIN_WIDTH, LEFT_SIDEBAR_MAX_WIDTH),
-    leftSidebarExpandedWidth: clamp(width, LEFT_SIDEBAR_MIN_WIDTH, LEFT_SIDEBAR_MAX_WIDTH),
+    leftSidebarWidth: clamp(width, LEFT_SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
+    leftSidebarExpandedWidth: clamp(width, LEFT_SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
   }),
   setRightPanelWidth: (width) => set({
     rightPanelCollapsed: false,
-    rightPanelWidth: clamp(width, RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH),
-    rightPanelExpandedWidth: clamp(width, RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH),
+    rightPanelWidth: clamp(width, RIGHT_PANEL_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
+    rightPanelExpandedWidth: clamp(width, RIGHT_PANEL_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
   }),
   setTerminalHeight: (height) => set({
     terminalHeight: clamp(height, TERMINAL_MIN_HEIGHT, TERMINAL_MAX_HEIGHT),

@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
 import { IconButton } from '../../ui/IconButton';
 import { Icon } from '../../ui/Icon';
+import { ProductLogo } from '../../ui/ProductLogo';
 import './TitleBar.css';
 
 export interface TitleBarProps {
@@ -25,7 +25,7 @@ export interface TitleBarProps {
   onMinimize: () => void;
   onToggleMaximize: () => void;
   onClose: () => void;
-  logo?: ReactNode;
+  accent: string;
 }
 
 export function TitleBar({
@@ -50,19 +50,17 @@ export function TitleBar({
   onMinimize,
   onToggleMaximize,
   onClose,
-  logo,
+  accent,
 }: TitleBarProps) {
   return (
     <header className="app-titlebar">
       <div className="app-titlebar-left no-drag">
-        {logo ?? (
-          <div className="app-logo">
-            <div className="app-logo-icon">RD</div>
-            <div className="app-logo-copy">
-              <span className="app-logo-text">RDC-Agent</span>
-            </div>
+        <div className="app-logo">
+          <ProductLogo accent={accent} />
+          <div className="app-logo-copy">
+            <span className="app-logo-text">RDC-Agent</span>
           </div>
-        )}
+        </div>
         <button
           type="button"
           className="shell-panel-toggle titlebar-panel-toggle"

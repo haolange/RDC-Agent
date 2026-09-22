@@ -33,6 +33,7 @@ import {
   bindWindowLayoutPersistence,
   resolveWindowCreationOptions,
 } from './window/windowLayoutPersistence';
+import { bindProductIcon } from './window/productIcon';
 import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
 import { acquireUserDataInstanceLock } from './runtime/userDataInstanceLock';
 
@@ -362,6 +363,7 @@ function createMainWindow(): void {
     titleBarStyle: 'hidden',
     backgroundColor: '#08080c',
   });
+  bindProductIcon(mainWindow);
 
   // Load the renderer.
   if (isDev) {

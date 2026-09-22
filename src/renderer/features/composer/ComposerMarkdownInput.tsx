@@ -1,19 +1,16 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { Prec, type Extension } from '@codemirror/state';
 import { indentWithTab } from '@codemirror/commands';
 import { registerCodeMirrorView } from '../../lib/contextMenuCommands';
-import { assignDynStyle } from '../../lib/useDynStyle';
+import { useComposerMarkdownSizing } from './useComposerMarkdownSizing';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import './ComposerMarkdownInput.css';
 
 export type ComposerMarkdownMode = 'write' | 'preview';
 
-const PROMPT_MIN_HEIGHT = 72;
-const PROMPT_MAX_HEIGHT = 180;
-const PROMPT_VERTICAL_PAD = 10; /* 4px top + 6px bottom, matches .composer-textarea */
 
 interface ComposerMarkdownInputProps {
   value: string;
@@ -107,30 +104,7 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
     if (hostRef.current) registerCodeMirrorView(hostRef.current, null);
   }, []);
 
-  const syncHostHeight = useCallback(() => {
-    const host = hostRef.current;
-    if (!host) {
-      return;
-    }
-    // Mirror useComposer: collapse first so scrollHeight is content-driven, not
-    // floored by a previously expanded clientHeight.
-    assignDynStyle(host, { height: `${PROMPT_MIN_HEIGHT}px` });
-    const contentEl =
-      mode === 'preview'
-        ? (host.querySelector('.composer-markdown-preview') as HTMLElement | null)
-        : (host.querySelector('.cm-content') as HTMLElement | null);
-    const contentHeight = contentEl?.scrollHeight ?? PROMPT_MIN_HEIGHT - PROMPT_VERTICAL_PAD;
-    const next = Math.min(
-      Math.max(contentHeight + PROMPT_VERTICAL_PAD, PROMPT_MIN_HEIGHT),
-      PROMPT_MAX_HEIGHT,
-    );
-    assignDynStyle(host, { height: `${next}px` });
-  }, [mode]);
-
-  // Same growth contract as useComposer textarea resize (72–180).
-  useLayoutEffect(() => {
-    syncHostHeight();
-  }, [value, mode, syncHostHeight]);
+  const syncHostHeight = useComposerMarkdownSizing(hostRef, value, mode);
 
   const extensions = useMemo((): Extension[] => [
       markdown(),

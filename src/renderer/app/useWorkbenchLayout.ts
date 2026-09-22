@@ -10,10 +10,9 @@ import {
 } from '../shell/layoutGeometry';
 import {
   APP_RESIZE_HANDLE_WIDTH,
-  LEFT_SIDEBAR_MAX_WIDTH,
   LEFT_SIDEBAR_MIN_WIDTH,
-  RIGHT_PANEL_MAX_WIDTH,
   RIGHT_PANEL_MIN_WIDTH,
+  SIDEBAR_MAX_WIDTH,
   RIGHT_RAIL_DRAWER_BREAKPOINT,
   WORKBENCH_CHAT_RAIL_MAX_WIDTH,
 } from '@shared/constants/layout';
@@ -138,7 +137,7 @@ export function useWorkbenchLayout(isReady: boolean) {
         const maxByMain = Math.max(
           LEFT_SIDEBAR_MIN_WIDTH,
           Math.min(
-            LEFT_SIDEBAR_MAX_WIDTH,
+            SIDEBAR_MAX_WIDTH,
             containerWidth - getResponsiveMinMainWidth(containerWidth) - APP_RESIZE_HANDLE_WIDTH * 2 - resolvedRight,
           ),
         );
@@ -149,7 +148,7 @@ export function useWorkbenchLayout(isReady: boolean) {
         const maxByMain = Math.max(
           RIGHT_PANEL_MIN_WIDTH,
           Math.min(
-            RIGHT_PANEL_MAX_WIDTH,
+            SIDEBAR_MAX_WIDTH,
             containerWidth - getResponsiveMinMainWidth(containerWidth) - APP_RESIZE_HANDLE_WIDTH * 2 - resolvedLeft,
           ),
         );

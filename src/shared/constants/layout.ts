@@ -1,12 +1,13 @@
 export const LEFT_SIDEBAR_DEFAULT_WIDTH = 256;
 export const LEFT_SIDEBAR_MIN_WIDTH = 220;
-export const LEFT_SIDEBAR_MAX_WIDTH = 420;
 export const LEFT_SIDEBAR_COLLAPSED_WIDTH = 0;
 
 export const RIGHT_PANEL_DEFAULT_WIDTH = 312;
 export const RIGHT_PANEL_MIN_WIDTH = 280;
-export const RIGHT_PANEL_MAX_WIDTH = 520;
 export const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
+
+/** Docked left sidebar and right rail share one drag ceiling. */
+export const SIDEBAR_MAX_WIDTH = 520;
 
 /** The rail remains docked through compact desktop widths; the drawer is for genuinely narrow workspaces. */
 export const RIGHT_RAIL_DRAWER_BREAKPOINT = 920;

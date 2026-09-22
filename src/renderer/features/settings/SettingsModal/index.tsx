@@ -8,6 +8,8 @@ import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
 import { SettingsCenterNav } from './SettingsCenterNav';
 import { useRdcRuntimeOverview } from './useRdcRuntimeOverview';
 import { Icon } from '../../../ui/Icon';
+import { ProductLogo } from '../../../ui/ProductLogo';
+import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { IconButton } from '../../../ui/IconButton';
 import { UnsavedChangesDialog } from '../../../ui/UnsavedChangesDialog';
 import { useSettingsNavigation } from './useSettingsNavigation';
@@ -22,6 +24,8 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, onClose }) => {
   const modal = useSettingsModal(open, settings);
+  const systemTheme = useAppSettingsStore((state) => state.systemTheme);
+  const theme = settings.appearance.theme === 'system' ? systemTheme : settings.appearance.theme;
   const dialogRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const runtime = useRdcRuntimeOverview(open);
@@ -90,7 +94,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
         >
           <div className="settings-center-sidebar">
             <div className="settings-center-brand">
-              <div className="settings-center-brand-icon">RD</div>
+              <ProductLogo accent={settings.appearance.chromeThemes[theme].accent} />
               <div className="settings-center-brand-copy">
                 <div className="settings-center-brand-title">RDC-Agent</div>
                 <div className="settings-center-brand-subtitle">{t('settings.title')}</div>
