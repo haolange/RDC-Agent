@@ -24,6 +24,14 @@
   "catalogOwnership": "app-managed",
   "factSources": [
     {
+      "id": "provider-docs:xai:grok-4.7:2026-09-22",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "docs.x.ai/developers/models/grok-4.7@2026-09-22",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-22",
+      "surface": "xai"
+    },
+    {
       "id": "rdc-agent:xai:0",
       "sourceKind": "rdc-agent",
       "sourceRevision": "provider-registry-v4",
@@ -36,6 +44,14 @@
       "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
       "refreshedAt": "2026-07-15",
       "identityId": "xai",
+      "surface": "xai"
+    },
+    {
+      "id": "provider-docs:xai:review-2026-09-22",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://docs.x.ai/developers/models/grok-4.7 ; https://docs.x.ai/developers/model-capabilities/text/reasoning ; https://docs.x.ai/developers/advanced-api-usage/priority-processing ; https://docs.x.ai/developers/rest-api-reference/inference/responses ; https://docs.x.ai/developers/migration/may-15-retirement @2026-09-22",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-22",
       "surface": "xai"
     }
   ],
@@ -118,11 +134,9 @@
   },
   "models": [
     {
-      "modelId": "grok-4.6",
-      "label": "grok-4.6",
-      "aliases": [
-        "grok-4.6-latest"
-      ],
+      "modelId": "grok-4.7",
+      "label": "grok-4.7",
+      "aliases": [],
       "availability": "available",
       "contextTiers": [
         {
@@ -135,7 +149,102 @@
           "entitlement": "granted"
         }
       ],
-      "defaultBudgetTokens": 256000,
+      "defaultBudgetTokens": 500000,
+      "cost": {
+        "input": 2,
+        "output": 6,
+        "cacheRead": 0.5
+      },
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://api.x.ai/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted"
+        },
+        "maxContext": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "high",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:xai:grok-4.7:2026-09-22",
+      "executionBindings": [
+        {
+          "id": "fast:priority",
+          "when": {
+            "fast": true
+          },
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "service_tier": "priority"
+              }
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ],
+      "fieldFactSourceIds": {
+        "controls": "provider-docs:xai:review-2026-09-22",
+        "executionBindings": "provider-docs:xai:review-2026-09-22"
+      }
+    },
+    {
+      "modelId": "grok-4.6",
+      "label": "grok-4.6",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 500000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 500000,
       "toolCalling": {
         "state": "supported"
       },
@@ -187,15 +296,15 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:xai:0"
+      "factSourceId": "rdc-agent:xai:0",
+      "fieldFactSourceIds": {
+        "defaultBudgetTokens": "provider-docs:xai:review-2026-09-22"
+      }
     },
     {
       "modelId": "grok-4.5",
       "label": "grok-4.5",
-      "aliases": [
-        "grok-4.5-latest",
-        "grok-build-latest"
-      ],
+      "aliases": [],
       "availability": "available",
       "contextTiers": [
         {
@@ -208,7 +317,7 @@
           "entitlement": "granted"
         }
       ],
-      "defaultBudgetTokens": 256000,
+      "defaultBudgetTokens": 500000,
       "toolCalling": {
         "state": "supported"
       },
@@ -259,7 +368,10 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:xai:0"
+      "factSourceId": "rdc-agent:xai:0",
+      "fieldFactSourceIds": {
+        "defaultBudgetTokens": "provider-docs:xai:review-2026-09-22"
+      }
     },
     {
       "modelId": "grok-4.3",
@@ -277,7 +389,7 @@
           "entitlement": "granted"
         }
       ],
-      "defaultBudgetTokens": 256000,
+      "defaultBudgetTokens": 1000000,
       "toolCalling": {
         "state": "supported"
       },
@@ -330,7 +442,10 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:xai:0"
+      "factSourceId": "rdc-agent:xai:0",
+      "fieldFactSourceIds": {
+        "defaultBudgetTokens": "provider-docs:xai:review-2026-09-22"
+      }
     },
     {
       "modelId": "grok-build-0.1",
@@ -396,80 +511,15 @@
         }
       },
       "factSourceId": "rdc-agent:xai:0"
-    },
-    {
-      "modelId": "grok-code-fast-1",
-      "label": "grok-code-fast-1",
-      "aliases": [],
-      "availability": "available",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 256000,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "granted"
-        }
-      ],
-      "defaultBudgetTokens": 256000,
-      "toolCalling": {
-        "state": "supported"
-      },
-      "visionInput": {
-        "state": "unsupported"
-      },
-      "structuredOutput": {
-        "state": "supported"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "maintained",
-      "route": {
-        "protocol": "OpenAIResponses",
-        "baseUrl": "https://api.x.ai/v1",
-        "source": "catalog"
-      },
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "reasoning": {
-          "kind": "toggle",
-          "supportsOff": true,
-          "levels": [],
-          "defaultSelection": "on",
-          "wireProfile": {
-            "kind": "openai-responses",
-            "on": "medium",
-            "levels": {
-              "minimal": "minimal",
-              "low": "low",
-              "medium": "medium",
-              "high": "high",
-              "xhigh": "xhigh",
-              "max": "max"
-            }
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:xai:0"
     }
   ],
   "protocolOverrides": [],
   "recommendedModels": [
+    "grok-4.7",
     "grok-4.6",
     "grok-4.5",
     "grok-4.3",
-    "grok-build-0.1",
-    "grok-code-fast-1"
+    "grok-build-0.1"
   ],
   "docsUrl": "https://docs.x.ai/"
 }

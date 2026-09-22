@@ -32,7 +32,7 @@ describe('ProviderCatalogRegistry lazy loading', () => {
     __testing.reset();
     const models = getProviderModelSummaries('github-copilot');
     // Catalog-marked unavailable stays unavailable; available + account-entitled surfaces as unknown until live discovery.
-    expect(models.find((model) => model.id === 'claude-opus-4.6')?.availability).toBe('unavailable');
+    expect(models.find((model) => model.id === 'claude-opus-4.6')).toBeUndefined();
     expect(models.find((model) => model.id === 'claude-opus-4.8')?.availability).toBe('unknown');
   });
 });

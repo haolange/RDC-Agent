@@ -7,6 +7,7 @@ import {
   formatContextCapability,
   formatFastControl,
   formatReasoningCapability,
+  formatReasoningDefault,
   snapshotMatchesProvider,
 } from './modelCapabilitySummaryUtils';
 
@@ -39,6 +40,7 @@ const t = (key: string, params?: Record<string, string | number>): string => {
     'composer.effort.levelExtra': 'Extra',
     'composer.effort.levelMax': 'Max',
   };
+  if (key === 'settings.providers.capability.providerDefault') return `Provider default (${params?.value})`;
   if (key === 'settings.providers.capability.lockedValue') return `${params?.value} (Locked)`;
   if (key === 'settings.providers.capability.activationModel') return `Model ${params?.model}`;
   if (key === 'settings.providers.capability.activationWithEntitlement') return `${params?.activation} · ${params?.entitlement}`;
@@ -115,7 +117,16 @@ describe('modelCapabilitySummaryUtils', () => {
         ...model().controls,
         reasoning: { kind: 'unknown', supportsOff: false, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
       },
-    }), t)).toBe('Off');
+    }), t)).toBe('Unknown');
+  });
+
+  it('keeps unknown and provider-managed defaults distinct from an explicit Off default', () => {
+    const unknown = { kind: 'unknown' as const, supportsOff: false, levels: [], defaultSelection: 'off' as const, wireProfile: { kind: 'none' as const } };
+    expect(formatReasoningDefault(unknown, t)).toBe('Unknown');
+    expect(formatReasoningDefault({ ...reasoning, defaultState: 'unknown' }, t)).toBe('Unknown');
+    expect(formatReasoningDefault({ ...reasoning, defaultState: 'provider-managed' }, t)).toBe('Provider-managed');
+    expect(formatReasoningDefault({ ...reasoning, defaultSelection: 'off' }, t)).toBe('Provider default (Off)');
+    expect(formatReasoningCapability(model({ controls: { ...model().controls, reasoning: { ...unknown, kind: 'none' } } }), t)).toBe('Off');
   });
 
   it('formats fixed always-on reasoning', () => {

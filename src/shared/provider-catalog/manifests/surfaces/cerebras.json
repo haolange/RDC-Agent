@@ -37,6 +37,14 @@
       "refreshedAt": "2026-07-15",
       "identityId": "cerebras",
       "surface": "cerebras"
+    },
+    {
+      "id": "provider-docs:cerebras:retirement-2026-09-22",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://inference-docs.cerebras.ai/support/deprecation ; https://inference-docs.cerebras.ai/support/change-log",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-22",
+      "surface": "cerebras"
     }
   ],
   "defaultFactSourceId": "rdc-agent:cerebras:0",
@@ -77,118 +85,6 @@
     }
   },
   "models": [
-    {
-      "modelId": "llama-4-scout-17b-16e-instruct",
-      "label": "llama-4-scout-17b-16e-instruct",
-      "aliases": [],
-      "availability": "available",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 131072,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "granted"
-        }
-      ],
-      "defaultBudgetTokens": 131072,
-      "toolCalling": {
-        "state": "supported"
-      },
-      "visionInput": {
-        "state": "unsupported"
-      },
-      "structuredOutput": {
-        "state": "supported"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "maintained",
-      "route": {
-        "protocol": "OpenAICompatibleChatCompletions",
-        "baseUrl": "https://api.cerebras.ai/v1",
-        "source": "catalog"
-      },
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "reasoning": {
-          "kind": "none",
-          "supportsOff": true,
-          "levels": [],
-          "defaultSelection": "off",
-          "wireProfile": {
-            "kind": "none"
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:cerebras:0"
-    },
-    {
-      "modelId": "qwen-3-coder-480b",
-      "label": "qwen-3-coder-480b",
-      "aliases": [],
-      "availability": "available",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 131072,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "granted"
-        }
-      ],
-      "defaultBudgetTokens": 131072,
-      "toolCalling": {
-        "state": "supported"
-      },
-      "visionInput": {
-        "state": "unsupported"
-      },
-      "structuredOutput": {
-        "state": "supported"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "maintained",
-      "route": {
-        "protocol": "OpenAICompatibleChatCompletions",
-        "baseUrl": "https://api.cerebras.ai/v1",
-        "source": "catalog"
-      },
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "reasoning": {
-          "kind": "none",
-          "supportsOff": true,
-          "levels": [],
-          "defaultSelection": "off",
-          "wireProfile": {
-            "kind": "none"
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:cerebras:0"
-    },
     {
       "modelId": "gpt-oss-120b",
       "label": "gpt-oss-120b",
@@ -247,9 +143,6 @@
     }
   ],
   "protocolOverrides": [],
-  "recommendedModels": [
-    "llama-4-scout-17b-16e-instruct",
-    "qwen-3-coder-480b"
-  ],
+  "recommendedModels": [],
   "docsUrl": "https://cloud.cerebras.ai/"
 }

@@ -45,6 +45,14 @@
       "refreshedAt": "2026-07-15",
       "identityId": "anthropic",
       "surface": "anthropic"
+    },
+    {
+      "id": "provider-docs:anthropic:models-pricing-2026-09-22",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://platform.claude.com/docs/en/models/fable-5-1/overview ; https://platform.claude.com/docs/en/build-with-claude/effort ; https://platform.claude.com/docs/en/about-claude/pricing ; https://platform.claude.com/docs/en/build-with-claude/thinking",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-22",
+      "surface": "anthropic"
     }
   ],
   "defaultFactSourceId": "rdc-agent:anthropic:0",
@@ -120,6 +128,85 @@
   },
   "models": [
     {
+      "modelId": "claude-fable-5-1",
+      "label": "claude-fable-5-1",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "maxOutputTokens": 128000,
+          "maxTotalTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.anthropic.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "high",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "onMode": "adaptive"
+          }
+        }
+      },
+      "factSourceId": "provider-docs:anthropic:models-pricing-2026-09-22",
+      "cost": {
+        "input": 10,
+        "output": 50
+      }
+    },
+    {
       "modelId": "claude-fable-5",
       "label": "claude-fable-5",
       "aliases": [],
@@ -192,7 +279,15 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:anthropic:0"
+      "factSourceId": "rdc-agent:anthropic:0",
+      "cost": {
+        "input": 10,
+        "output": 50
+      },
+      "fieldFactSourceIds": {
+        "cost": "provider-docs:anthropic:models-pricing-2026-09-22",
+        "contextTiers": "provider-docs:anthropic:models-pricing-2026-09-22"
+      }
     },
     {
       "modelId": "claude-sonnet-5",
@@ -268,7 +363,15 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:anthropic:0"
+      "factSourceId": "rdc-agent:anthropic:0",
+      "cost": {
+        "input": 2,
+        "output": 10
+      },
+      "fieldFactSourceIds": {
+        "cost": "provider-docs:anthropic:models-pricing-2026-09-22",
+        "contextTiers": "provider-docs:anthropic:models-pricing-2026-09-22"
+      }
     },
     {
       "modelId": "claude-opus-5",
@@ -388,7 +491,9 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "granted",
+          "maxOutputTokens": 128000,
+          "maxTotalTokens": 1000000
         }
       ],
       "defaultBudgetTokens": 256000,
@@ -471,7 +576,15 @@
           "entitlement": "unknown"
         }
       ],
-      "factSourceId": "rdc-agent:anthropic:0"
+      "factSourceId": "rdc-agent:anthropic:0",
+      "cost": {
+        "input": 5,
+        "output": 25
+      },
+      "fieldFactSourceIds": {
+        "cost": "provider-docs:anthropic:models-pricing-2026-09-22",
+        "contextTiers": "provider-docs:anthropic:models-pricing-2026-09-22"
+      }
     },
     {
       "modelId": "claude-haiku-4-5-20251001",
@@ -488,7 +601,8 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "granted",
+          "maxOutputTokens": 64000
         }
       ],
       "defaultBudgetTokens": 200000,
@@ -532,11 +646,20 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:anthropic:0"
+      "factSourceId": "rdc-agent:anthropic:0",
+      "cost": {
+        "input": 1,
+        "output": 5
+      },
+      "fieldFactSourceIds": {
+        "cost": "provider-docs:anthropic:models-pricing-2026-09-22",
+        "contextTiers": "provider-docs:anthropic:models-pricing-2026-09-22"
+      }
     }
   ],
   "protocolOverrides": [],
   "recommendedModels": [
+    "claude-fable-5-1",
     "claude-opus-5",
     "claude-sonnet-5"
   ],

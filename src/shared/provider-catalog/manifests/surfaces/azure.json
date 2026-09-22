@@ -30,6 +30,14 @@
       "refreshedAt": "2026-07-15",
       "identityId": "azure",
       "surface": "azure"
+    },
+    {
+      "id": "provider-docs:azure:lifecycle-2026-09-22",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/model-lifecycle-retirement ; https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-models/concepts/models-sold-directly-by-azure",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-22",
+      "surface": "azure"
     }
   ],
   "defaultFactSourceId": "models.dev:azure:0",

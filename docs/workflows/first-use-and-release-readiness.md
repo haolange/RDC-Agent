@@ -1,5 +1,10 @@
 # 上手引导与发行准备
 
+## Provider 事实校正 rc.6（2026-09-22）
+
+用户追加授权清理本轮临时产物、整理提交、推送 main 并发布 Windows x64 0.6.0-rc.6 未签名预发布。排除 .qoder/repowiki；旧发布保留。工程和 Settings 验收见 acceptance-ledger 的 Provider 复核节；Composer 三态及已连接 OAuth 控件仍未验证，公开发布说明保留限制。发行包内容与隔离桌面健康 smoke 已通过；当前阶段：提交与远端发布核验。
+
+
 ## 品牌与 Composer 审查收口 rc.5（2026-09-22）
 
 已批准：main 原地修复并提交推送，发布 Windows x64 0.6.0-rc.5 未签名预发布；保留旧发布及 .qoder 未提交工作。原始基线 48f9a0ee。首轮源码 595e7101 已推送；用户追加正常入口数据一致性、圆形透明图标与完整 RGB 换色修复，旧 rc.5 候选作废；最终源码 52270925 已发布为 v0.6.0-rc.5 未签名预发布。正常 cmd 与打包 exe 共用 ~/.rdc-agent 和 %APPDATA%/rdc-agent；隔离 QA 数据不作为正常用户数据验收依据。启动日志记录版本、载体、应用路径与数据根，构建指纹包含品牌资源。launcher 以仓库 package.json 启动 Electron，避免直启编译 JS 导致应用根和产品版本错误；Browser smoke 断言产品版本并隔离两种数据根。追加工程、正常入口对照及用户任务栏目视均通过，发布与清理已完成，证据见 acceptance-ledger 的 RC5-LAUNCH-BRAND。

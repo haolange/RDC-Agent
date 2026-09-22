@@ -290,15 +290,13 @@ describe('live Provider Catalog parsers', () => {
   it('parses account-visible ChatGPT ids without duplicating manifest controls', () => {
     const parsed = parseChatGptAccountCatalog(fixture('chatgpt-account.json'));
     expect(parsed.models.map((model) => model.id)).toEqual([
-      'gpt-5.3-codex-spark',
-      'gpt-5.4',
-      'gpt-5.4-mini',
       'gpt-5.5',
       'gpt-5.6-luna',
       'gpt-5.6-sol',
       'gpt-5.6-terra',
     ]);
     const sol = parsed.contributions.find((model) => model.modelId === 'gpt-5.6-sol');
+    expect(sol?.visionInput).toBeUndefined();
     expect(sol).toMatchObject({
       availability: 'available',
       defaultBudgetTokens: 272_000,
@@ -309,10 +307,24 @@ describe('live Provider Catalog parsers', () => {
     });
     expect(sol?.controls).toBeUndefined();
     expect(sol?.executionBindings).toBeUndefined();
-    expect(parsed.contributions.find((model) => model.modelId === 'gpt-5.4')?.contextTiers).toEqual([
-      expect.objectContaining({ id: 'default', maxPromptTokens: 272_000, entitlement: 'granted' }),
-      expect.objectContaining({ id: 'max', maxPromptTokens: 1_000_000, entitlement: 'unknown' }),
-    ]);
+  });
+
+  it.each([undefined, ['text'], ['text', 'image']])('keeps ChatGPT structure manifest-owned for modalities %j', (input_modalities) => {
+    const parsed = parseChatGptAccountCatalog({ models: [
+      { slug: 'gpt-5.5', visibility: 'list', supported_in_api: true, input_modalities },
+    ] });
+    expect(parsed.contributions[0].visionInput).toBeUndefined();
+    expect(parsed.contributions[0].toolCalling).toBeUndefined();
+    expect(parsed.contributions[0].structuredOutput).toBeUndefined();
+  });
+
+  it('excludes hidden and API-unavailable ChatGPT rows', () => {
+    const parsed = parseChatGptAccountCatalog({ models: [
+      { slug: 'hidden-model', visibility: 'hide', supported_in_api: true },
+      { slug: 'unavailable-model', visibility: 'list', supported_in_api: false },
+      { slug: 'gpt-5.5', visibility: 'list', supported_in_api: true },
+    ] });
+    expect(parsed.models.map((model) => model.id)).toEqual(['gpt-5.5']);
   });
 
   it('accepts a Codex Max window below one million when it is larger than the default', () => {
@@ -440,7 +452,7 @@ describe('live Provider Catalog parsers', () => {
 
   it('writes ChatGPT output caps only when the live row reports them', () => {
     const parsed = parseChatGptAccountCatalog({ models: [{
-      slug: 'gpt-5.4-mini', visibility: 'list', supported_in_api: true,
+      slug: 'gpt-5.5', visibility: 'list', supported_in_api: true,
       context_window: 272_000,
     }] });
     expect(parsed.contributions[0].contextTiers?.[0]).toEqual(expect.objectContaining({
@@ -449,7 +461,7 @@ describe('live Provider Catalog parsers', () => {
     expect(parsed.contributions[0].contextTiers?.[0]).not.toHaveProperty('maxOutputTokens');
 
     const withOutput = parseChatGptAccountCatalog({ models: [{
-      slug: 'gpt-5.4-mini', visibility: 'list', supported_in_api: true,
+      slug: 'gpt-5.5', visibility: 'list', supported_in_api: true,
       context_window: 272_000, max_output_tokens: 16_384,
     }] });
     expect(withOutput.contributions[0].contextTiers).toEqual([

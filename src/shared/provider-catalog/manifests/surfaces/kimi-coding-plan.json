@@ -43,6 +43,14 @@
       "surface": "kimi-coding-plan",
       "accountScope": "credential-scoped",
       "plan": "Kimi Coding Plan"
+    },
+    {
+      "id": "provider-docs:kimi-coding-plan:models-2026-09-22",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://www.kimi.com/code/docs/en/kimi-code/models.html ; https://www.kimi.com/code/docs/en/third-party-tools/opencode.html ; https://www.kimi.com/code/docs/en/kimi-code/whats-new.html",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-22T00:00:00+08:00",
+      "surface": "kimi-coding-plan"
     }
   ],
   "defaultFactSourceId": "rdc-agent:kimi-coding-plan:0",
@@ -140,15 +148,15 @@
       "contextTiers": [
         {
           "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 256000,
+          "label": "1M window",
+          "maxPromptTokens": 1048576,
           "activation": {
             "kind": "implicit"
           },
           "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 256000,
+      "defaultBudgetTokens": 1048576,
       "toolCalling": {
         "state": "supported"
       },
@@ -198,20 +206,31 @@
           "entitlement": "unknown"
         },
         "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "unknown"
         },
         "reasoning": {
-          "kind": "always-on",
-          "supportsOff": false,
-          "levels": [],
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "high",
+            "max"
+          ],
+          "defaultSelection": "max",
           "defaultState": "known",
-          "defaultSelection": "on",
-          "lockedSelection": "on",
           "wireProfile": {
             "kind": "anthropic",
             "on": "max",
-            "onMode": "enabled"
+            "levels": {
+              "low": "low",
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "enabled",
+            "offMode": "disabled"
           }
         }
       },
@@ -258,7 +277,8 @@
                 "xhigh": "xhigh",
                 "max": "max"
               },
-              "onMode": "enabled"
+              "onMode": "enabled",
+              "offMode": "disabled"
             },
             "OpenAICompatibleChatCompletions": {
               "kind": "openai-compatible",
@@ -271,7 +291,8 @@
                 "xhigh": "xhigh",
                 "max": "max"
               },
-              "onMode": "thinking-enabled"
+              "onMode": "thinking-enabled",
+              "offMode": "thinking-disabled"
             }
           }
         },
@@ -282,7 +303,10 @@
         ]
       },
       "fieldFactSourceIds": {
-        "toolCalling": "provider-docs:kimi-coding-plan:tools-2026-08-23"
+        "toolCalling": "provider-docs:kimi-coding-plan:tools-2026-08-23",
+        "contextTiers": "provider-docs:kimi-coding-plan:models-2026-09-22",
+        "defaultBudgetTokens": "provider-docs:kimi-coding-plan:models-2026-09-22",
+        "controls": "provider-docs:kimi-coding-plan:models-2026-09-22"
       }
     },
     {
@@ -772,21 +796,30 @@
       "patch": {
         "controls": {
           "reasoning": {
-            "kind": "always-on",
-            "supportsOff": false,
-            "levels": [],
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "high",
+              "max"
+            ],
+            "defaultSelection": "max",
             "defaultState": "known",
-            "defaultSelection": "on",
-            "lockedSelection": "on",
             "wireProfile": {
               "kind": "openai-compatible",
               "on": "max",
-              "onMode": "thinking-enabled"
+              "levels": {
+                "low": "low",
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "thinking-enabled",
+              "offMode": "thinking-disabled"
             }
           }
         }
       },
-      "factSourceId": "rdc-agent:kimi-coding-plan:0"
+      "factSourceId": "provider-docs:kimi-coding-plan:models-2026-09-22"
     },
     {
       "modelId": "kimi-for-coding-highspeed",

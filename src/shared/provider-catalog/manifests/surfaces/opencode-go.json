@@ -33,15 +33,6 @@
       "refreshedAt": "2026-07-25T00:00:00+08:00",
       "surface": "opencode-go",
       "accountScope": "credential-scoped"
-    },
-    {
-      "id": "runtime-observation:opencode-go-hy3-preview:2026-08-01",
-      "sourceKind": "runtime-observation",
-      "sourceRevision": "capability-probe:model-not-supported",
-      "observedAt": "2026-08-01",
-      "refreshedAt": "2026-08-01",
-      "surface": "opencode-go",
-      "accountScope": "credential-scoped"
     }
   ],
   "defaultFactSourceId": "rdc-agent:opencode-go:0",
@@ -1492,75 +1483,6 @@
         }
       },
       "factSourceId": "rdc-agent:opencode-go:0",
-      "liveProjection": {
-        "context": {
-          "observedTierId": "default",
-          "entitlementAuthority": "catalog-observation"
-        },
-        "capabilities": [
-          "toolCalling",
-          "visionInput",
-          "structuredOutput"
-        ]
-      }
-    },
-    {
-      "modelId": "hy3-preview",
-      "label": "HY3 Preview",
-      "aliases": [],
-      "availability": "unavailable",
-      "unavailableReason": "The OpenCode Go inference endpoint rejected this discovered id as model_not_supported.",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Default",
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "unknown",
-          "maxPromptTokens": 128000
-        }
-      ],
-      "defaultBudgetTokens": 128000,
-      "toolCalling": {
-        "state": "unknown"
-      },
-      "visionInput": {
-        "state": "unknown"
-      },
-      "structuredOutput": {
-        "state": "unknown"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "account-entitled",
-      "route": {
-        "protocol": "OpenAICompatibleChatCompletions",
-        "baseUrl": "https://opencode.ai/zen/go/v1",
-        "source": "catalog"
-      },
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "reasoning": {
-          "kind": "unknown",
-          "supportsOff": false,
-          "levels": [],
-          "defaultState": "provider-managed",
-          "defaultSelection": "on",
-          "wireProfile": {
-            "kind": "none"
-          }
-        }
-      },
-      "factSourceId": "runtime-observation:opencode-go-hy3-preview:2026-08-01",
       "liveProjection": {
         "context": {
           "observedTierId": "default",

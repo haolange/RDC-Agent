@@ -163,7 +163,7 @@ describe('catalog output planning', () => {
   it('plans ChatGPT Account live rows that only report an input window', () => {
     const parsed = parseChatGptAccountCatalog({
       models: [{
-        slug: 'gpt-5.4-mini',
+        slug: 'gpt-5.5',
         visibility: 'list',
         supported_in_api: true,
         context_window: 272_000,
@@ -186,10 +186,22 @@ describe('catalog output planning', () => {
     expect(planned).toMatchObject({ ok: true, plan: { maxOutputTokens: 272_000, contextWindowTokens: 272_000 } });
   });
 
+  it.each([undefined, ['text'], ['text', 'image']])('preserves manifest vision through ChatGPT discovery %j', (input_modalities) => {
+    const definition = compiledCatalog.surfaces.get('chatgpt-account')!.surface.models.find((model) => model.modelId === 'gpt-5.5')!;
+    const live = parseChatGptAccountCatalog({ models: [{ slug: 'gpt-5.5', visibility: 'list', supported_in_api: true, input_modalities }] });
+    const [model] = mergeModels({
+      providerId: 'chatgpt-account', protocol: 'OpenAIResponses', baseUrl: definition.route.baseUrl!,
+      catalog: [definition], discovery: live.contributions,
+    });
+    expect(model.visionInput.state).toBe('supported');
+    expect(model.toolCalling.state).toBe('supported');
+    expect(model.structuredOutput.state).toBe('supported');
+  });
+
   it('keeps a compiled output cap when live ChatGPT rows omit max_output_tokens', () => {
     const live = parseChatGptAccountCatalog({
       models: [{
-        slug: 'gpt-5.4-mini',
+        slug: 'gpt-5.5',
         visibility: 'list',
         supported_in_api: true,
         context_window: 272_000,
@@ -200,7 +212,7 @@ describe('catalog output planning', () => {
       protocol: 'OpenAIResponses',
       baseUrl: 'https://chatgpt.com/backend-api/codex',
       catalog: [{
-        modelId: 'gpt-5.4-mini',
+        modelId: 'gpt-5.5',
         availability: 'available',
         contextTiers: [{
           id: 'default',

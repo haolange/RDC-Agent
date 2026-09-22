@@ -16,6 +16,7 @@ import {
   buildContextTierRows,
   buildPricingRows,
   getReasoningLabelKey,
+  formatReasoningDefault,
 } from '../modelCapabilitySummaryUtils';
 import { getProviderProtocolLabel, buildRouteOptionMeta } from '../utils';
 
@@ -51,7 +52,6 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
   const reasoningUnverified = reasoning?.kind === 'unknown';
   const reasoningDefaultUnverified = reasoningUnverified || reasoning?.defaultState === 'unknown' || reasoning?.defaultState === 'provider-managed';
   const reasoningOptions = reasoningUnverified ? [] : getReasoningSelectionOrder(reasoning);
-  const defaultReasoning = reasoning?.defaultSelection ?? 'off';
   const routeOptions = effectiveModel?.routeOptions ?? [];
   const effectiveRouteOption = routeOptions.find((option) => option.routeRevision === effectiveModel?.routeRevision)
     ?? routeOptions.find((option) => option.route.protocol === effectiveModel?.route.protocol);
@@ -207,9 +207,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
                   })}
                 >
                   <option value="">
-                    {reasoningDefaultUnverified
-                      ? t('composer.effort.levelOff')
-                      : t('settings.providers.capability.providerDefault', { value: t(getReasoningLabelKey(defaultReasoning)) })}
+                    {formatReasoningDefault(reasoning ?? null, t)}
                   </option>
                   {reasoningOptions.map((selection) => (
                     <option key={selection} value={selection}>{t(getReasoningLabelKey(selection))}</option>
