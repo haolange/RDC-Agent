@@ -725,3 +725,10 @@ Execution tracking remains in RDC-Tool docs/tool-convergence-tasks.md (T1–T8).
 - **更正**：用户明确确认当前使用的 Grok 4.7 OAuth/Builder route 支持 Fast。此前将 OAuth Fast 保持 Disabled 的审计结论已撤销，不再把公开 xAI API 的 surface 限制套用到当前 OAuth route。
 - **实现**：`grok-account/grok-4.7` 现在暴露 selectable Fast，并通过独立 `fast:priority` → `service_tier=priority` binding 生成请求；xAI 直连继续使用自己的同名 binding，两个 surface 的 entitlement 与 route revision 独立。
 - **验证边界**：catalog/compiler、RequestPlanner/wire review 与 Provider system gate 已复验；本轮未发起真实 Grok 请求，OAuth Fast 的现场响应速度与 usage 回执仍未声称通过。
+
+## RDC-Agent 0.6.0-rc.7 发行回执（2026-09-23）
+
+- 源码提交与 tag `v0.6.0-rc.7` 均指向 `6e7a353b75738a448dbdac218142bef644b98e10`；GitHub CI run [35769889133](https://github.com/haolange/RDC-Agent/actions/runs/35769889133) 全部 job 成功。
+- `release:verify` 通过，版本 `0.6.0-rc.7`、52 个运行资源；SBOM 1106 components。该发布为未签名 Windows x64 prerelease，非 latest。
+- GitHub Release [v0.6.0-rc.7](https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.7) 七项资产远端 digest 全部匹配本地 SHA256。安装包 `2e8f635de7e33a2fa937b9f66a237788f6faf71f045d9370e018d90c534efab9`；ZIP `d616fab9604e14669a9167ce1cd121a8a95021c892a8ab170db853bb0fa7338d`；SBOM `f456a3ae297ac523848773e3a86c39b4aea7484c3e85201b2b106d33804a3987`。
+- 清理：删除已与远端 digest 核对的 rc.4 本地安装包/ZIP和本轮 builder 调试文件；保留当前七项发行资产。真实 OAuth Fast、设备/后端能力及完整断点 UI 验收仍按原边界记录，发版门禁不替代这些现场验收。

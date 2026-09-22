@@ -1,6 +1,6 @@
 ## RDC-Agent 0.6.0-rc.7 发布收口（2026-09-23）
 
-已按既有 Windows x64 未签名预发布通道准备 rc.7；保留 rc.1–rc.6 的 tag 与资产。源码提交、CI、包内资源、SBOM、校验和、远端资产 digest 和清理回执将在本节逐项记录。Composer/Transcript 的历史验收限制继续以 acceptance-ledger 为准。
+已完成 Windows x64 未签名预发布，保留 rc.1–rc.6 的 tag 与资产。发行源码/tag 指向 `6e7a353b75738a448dbdac218142bef644b98e10`；GitHub CI run [35769889133](https://github.com/haolange/RDC-Agent/actions/runs/35769889133) 全部通过。`verify-package.mjs` 通过（52 个 runtime resources），SBOM 含 1106 components。七项远端资产 digest 均与本地 SHA256 一致：安装包 `2e8f635de7e33a2fa937b9f66a237788f6faf71f045d9370e018d90c534efab9`，ZIP `d616fab9604e14669a9167ce1cd121a8a95021c892a8ab170db853bb0fa7338d`；详见 [v0.6.0-rc.7 Release](https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.7)。移除了已在远端核对相同 digest 的旧 rc.4 本地安装包/ZIP和本轮 builder-debug.yml；当前仅保留 rc.7 七项正式本地资产。详细 UI/后端验收边界继续以 acceptance-ledger 为准。
 # 上手引导与发行准备
 
 ## Provider 事实校正 rc.6（2026-09-22）
