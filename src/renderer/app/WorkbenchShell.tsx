@@ -1,4 +1,6 @@
-import type { ReactNode, RefObject } from 'react';
+import { useMemo, useRef, type ReactNode, type RefObject } from 'react';
+import { PlanReaderHost } from '../features/transcript/PlanReaderHost';
+import { WorkbenchReadingLayoutContext } from '../lib/WorkbenchReadingLayout';
 import { ControlPanel } from '../features/right-rail';
 import { DeviceSelector } from '../features/captures/DeviceSelector';
 import { Sidebar } from '../features/sidebar/Sidebar';
@@ -76,6 +78,13 @@ export function WorkbenchShell({
   onToggleTerminal,
   onStartDrag,
 }: WorkbenchShellProps) {
+  const workArea = useRef<HTMLElement>(null);
+  const composerRail = useRef<HTMLDivElement>(null);
+  const readingLayout = useMemo(() => ({ workArea, composerRail,
+    layoutRevision: [resolvedWidths.left, resolvedWidths.right, effectiveLeftCollapsed, effectiveRightCollapsed,
+      isLeftDrawerMode, isRightRailDrawerMode, isRightRailVisible, isTerminalOpen, workbenchRailMaxWidth].join(':'),
+  }), [resolvedWidths.left, resolvedWidths.right, effectiveLeftCollapsed, effectiveRightCollapsed,
+    isLeftDrawerMode, isRightRailDrawerMode, isRightRailVisible, isTerminalOpen, workbenchRailMaxWidth]);
   const showDockedRightRail = isRightRailVisible && !isRightRailDrawerMode;
   const showLeftResizeHandle = isDockedResizeHandleVisible(!isLeftDrawerMode, effectiveLeftCollapsed);
   const showRightResizeHandle = isDockedResizeHandleVisible(showDockedRightRail, effectiveRightCollapsed);
@@ -148,6 +157,8 @@ export function WorkbenchShell({
   </>;
 
   return (
+    <WorkbenchReadingLayoutContext.Provider value={readingLayout}>
+    <PlanReaderHost>
     <div
       ref={appBodyRef}
       className={`app-body ${isResizing ? 'is-resizing' : ''} ${isLeftDrawerMode ? 'has-left-drawer' : ''}`}
@@ -166,7 +177,7 @@ export function WorkbenchShell({
         <div aria-hidden="true" />
       )}
 
-      <main className={`app-main ${isTerminalOpen ? 'terminal-open' : ''}`}>
+      <main ref={workArea} className={`app-main ${isTerminalOpen ? 'terminal-open' : ''}`}>
         <div className="main-content">
           {shellNotice && (
             <div className="shell-notice" role="status" aria-live="polite">
@@ -195,7 +206,7 @@ export function WorkbenchShell({
           <div className="main-page-shell">{mainPage}</div>
         </div>
         {showMainPromptBar && (
-          <div className="main-input-bar">
+          <div ref={composerRail} className="main-input-bar">
             <Composer
               composer={composer}
             />
@@ -237,5 +248,7 @@ export function WorkbenchShell({
       ) : null}
 
     </div>
+    </PlanReaderHost>
+    </WorkbenchReadingLayoutContext.Provider>
   );
 }
