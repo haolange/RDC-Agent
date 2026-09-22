@@ -1,0 +1,261 @@
+.runtime-terminal-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 42px;
+  padding: var(--space-2) var(--runtime-terminal-inline-padding) var(--space-1);
+  border-bottom: 1px solid var(--token-border-card);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--token-bg-shell) 96%, transparent), color-mix(in srgb, var(--token-bg-shell) 72%, transparent));
+}
+
+.runtime-terminal-title-group {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.runtime-terminal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  line-height: 1;
+}
+
+.runtime-terminal-title-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-0-5);
+  width: 24px;
+  height: 24px;
+  border: 1px solid color-mix(in srgb, var(--token-accent-primary) 24%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--token-accent-primary) 10%, transparent);
+  color: var(--token-accent-primary);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
+}
+
+.runtime-terminal-title-glyph.activity span {
+  display: block;
+  width: 3px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+.runtime-terminal-title-glyph.activity span:nth-child(1) {
+  height: 8px;
+  opacity: 0.72;
+}
+
+.runtime-terminal-title-glyph.activity span:nth-child(2) {
+  height: 13px;
+}
+
+.runtime-terminal-title-glyph.activity span:nth-child(3) {
+  height: 6px;
+  opacity: 0.58;
+}
+
+.runtime-terminal-subtitle {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--token-text-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-terminal-close-workspace {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--token-text-caption);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.runtime-terminal-close-workspace:hover,
+.runtime-terminal-close-workspace:focus-visible {
+  background: var(--token-bg-raised);
+  color: var(--token-text-heading);
+}
+
+.runtime-terminal-close-mark {
+  position: relative;
+  width: 12px;
+  height: 12px;
+}
+
+.runtime-terminal-close-mark::before,
+.runtime-terminal-close-mark::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 5px;
+  width: 1.5px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+.runtime-terminal-close-mark::before {
+  transform: rotate(45deg);
+}
+
+.runtime-terminal-close-mark::after {
+  transform: rotate(-45deg);
+}
+
+.runtime-terminal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-height: 46px;
+  padding: var(--space-2) var(--runtime-terminal-inline-padding);
+  border-bottom: 1px solid var(--token-border-card);
+  background: color-mix(in srgb, var(--token-bg-shell) 82%, transparent);
+}
+
+.runtime-terminal-tools {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.runtime-terminal-select {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-app) 52%, transparent);
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+}
+
+.runtime-terminal-select.compact {
+  max-width: 220px;
+}
+
+.runtime-terminal-select.stacked {
+  align-items: stretch;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: auto;
+  padding: var(--space-2);
+  background: color-mix(in srgb, var(--token-bg-panel) 68%, transparent);
+}
+
+.runtime-terminal-select > span {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.runtime-terminal-select .dropdown-select {
+  min-width: 112px;
+}
+
+.runtime-terminal-select .dropdown-select-trigger.variant-inline {
+  width: 100%;
+  color: var(--token-text-heading);
+}
+
+.runtime-terminal-filter-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.runtime-terminal-filter-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr);
+  gap: var(--space-2);
+  width: 226px;
+  padding: var(--space-2);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--token-bg-shell) 98%, transparent);
+  box-shadow: 0 18px 42px rgb(0 0 0 / 0.3);
+}
+
+.runtime-terminal-tool-button,
+.runtime-terminal-entry-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-app) 54%, transparent);
+  color: var(--token-text-body);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.runtime-terminal-tool-button:hover,
+.runtime-terminal-entry-actions button:hover,
+.runtime-terminal-tool-button:focus-visible,
+.runtime-terminal-entry-actions button:focus-visible {
+  background: var(--token-bg-raised);
+  color: var(--token-text-heading);
+}
+
+.runtime-terminal-tool-button.is-active {
+  border-color: color-mix(in srgb, var(--token-accent-primary) 32%, transparent);
+  background: color-mix(in srgb, var(--token-accent-primary) 12%, transparent);
+  color: var(--token-text-heading);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--token-accent-primary) 8%, transparent);
+}
+
+.runtime-terminal-search {
+  min-width: 160px;
+  max-width: 260px;
+  flex: 1 1 180px;
+}
+
+.runtime-terminal-search input {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-app) 72%, transparent);
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  outline: none;
+}
+
+.runtime-terminal-search input:focus {
+  border-color: color-mix(in srgb, var(--token-accent-primary) 50%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--token-accent-primary) 16%, transparent);
+}

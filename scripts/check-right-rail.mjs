@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assertRetiredAbsent, scriptRead } from './renderer-contract.mjs';
+import { assertRetiredAbsent, scriptRead, scriptReadCssBundle } from './renderer-contract.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -11,6 +11,7 @@ const fail = (message) => {
 };
 
 const read = (relativePath) => {
+  if (relativePath.endsWith('.css')) return scriptReadCssBundle(relativePath);
   if (relativePath.startsWith('src/')) return scriptRead(relativePath);
   const absolute = path.join(root, relativePath);
   if (!fs.existsSync(absolute)) fail(`missing required file: ${relativePath}`);
@@ -34,7 +35,7 @@ const requiredFiles = [
   'src/main/agent-trace/rightRailTaskContextResources.ts',
   'src/main/reports/OutputRegistrationTool.ts',
   'src/main/sessions/SessionArtifactSource.ts',
-  'src/renderer/features/right-rail/TraceRightPanel.tsx',
+  'src/renderer/features/right-rail/SessionRightRail.tsx',
   'src/renderer/features/right-rail/ProjectCaptureImportPanel.tsx',
   'src/renderer/features/right-rail/RightRailArtifactList.tsx',
   'src/renderer/features/right-rail/RightRailInvestigationPreview.tsx',
@@ -55,7 +56,7 @@ for (const relativePath of requiredFiles) read(relativePath);
 assertRetiredAbsent(fail);
 
 for (const component of [
-  'src/renderer/features/right-rail/TraceRightPanel.tsx',
+  'src/renderer/features/right-rail/SessionRightRail.tsx',
   'src/renderer/features/right-rail/RightRailArtifactList.tsx',
   'src/renderer/features/right-rail/RightRailInvestigationPreview.tsx',
   'src/renderer/features/right-rail/RightRailArtifactGlyphs.tsx',
@@ -70,12 +71,12 @@ if (lineCount('src/main/agent-trace/rightRailInvestigationArtifacts.ts') > 150) 
   fail('rightRailInvestigationArtifacts.ts must stay under 150 lines');
 }
 
-const tracePanel = read('src/renderer/features/right-rail/TraceRightPanel.tsx');
+const tracePanel = read('src/renderer/features/right-rail/SessionRightRail.tsx');
 for (const requiredSection of ['id="progress"', 'id="artifacts"', 'id="outputs"', 'id="context"', 'id="capture"', 'Progress', 'Artifacts', 'Outputs', 'Context', 'Capture']) {
-  requireText(tracePanel, requiredSection, `TraceRightPanel must render ${requiredSection}`);
+  requireText(tracePanel, requiredSection, `SessionRightRail must render ${requiredSection}`);
 }
 if (!/id="progress"[\s\S]*id="artifacts"[\s\S]*id="outputs"[\s\S]*id="context"[\s\S]*id="capture"/.test(tracePanel)) {
-  fail('TraceRightPanel must render five cards in Progress / Artifacts / Outputs / Context / Capture order');
+  fail('SessionRightRail must render five cards in Progress / Artifacts / Outputs / Context / Capture order');
 }
 for (const required of [
   'EmptyState',
@@ -93,12 +94,12 @@ for (const required of [
   "t('control.rightRail.capture.empty')",
   'CapturePanel',
 ]) {
-  requireText(tracePanel, required, `TraceRightPanel must retain ${required}`);
+  requireText(tracePanel, required, `SessionRightRail must retain ${required}`);
 }
 for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail', 'harnessTasks', 'RequestInspector', 'No tasks', 'aria-expanded', 'useState']) {
-  forbidText(tracePanel, forbidden, `TraceRightPanel must not retain ${forbidden}`);
+  forbidText(tracePanel, forbidden, `SessionRightRail must not retain ${forbidden}`);
 }
-forbidText(tracePanel, 'is-empty', 'TraceRightPanel sections must keep one card shell regardless of content');
+forbidText(tracePanel, 'is-empty', 'SessionRightRail sections must keep one card shell regardless of content');
 
 const projectCaptureImport = [
   read('src/renderer/features/right-rail/ProjectCaptureImportPanel.tsx'),
@@ -107,7 +108,7 @@ const projectCaptureImport = [
 for (const required of ['project.inputs.import', 'project.inputs.refresh', "'projectCapture.import'", "'projectCapture.empty'", 'right-rail-section project-capture-import-section', 'project-capture-input-list']) {
   requireText(projectCaptureImport, required, `ProjectCaptureImportPanel must retain ${required}`);
 }
-for (const forbidden of ['useCaptureStore', 'openedCapture', 'TraceRightPanel', 'project-capture-inputs-section', '<h3>Captures</h3>', 'input.filePath}</small>']) {
+for (const forbidden of ['useCaptureStore', 'openedCapture', 'SessionRightRail', 'project-capture-inputs-section', '<h3>Captures</h3>', 'input.filePath}</small>']) {
   forbidText(projectCaptureImport, forbidden, `ProjectCaptureImportPanel must not retain ${forbidden}`);
 }
 
@@ -269,13 +270,13 @@ for (const forbidden of ['readdirSync', 'globSync', 'payload paths']) {
   forbidText(outputRegistrationTool, forbidden, `OutputRegistrationTool must not scan ${forbidden}`);
 }
 
-const controlPanel = read('src/renderer/features/right-rail/index.tsx');
+const rightRail = read('src/renderer/features/right-rail/RightRail.tsx');
 for (const required of ['rightRailTarget', 'ProjectCaptureImportPanel', "rightRailTarget !== 'session'"]) {
-  requireText(controlPanel, required, `ControlPanel must retain ${required}`);
+  requireText(rightRail, required, `RightRail must retain ${required}`);
 }
 const channels = read('src/shared/renderer-api/channels.ts');
 for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail', 'CaptureLibrary']) {
-  forbidText(controlPanel, forbidden, `ControlPanel must not retain ${forbidden}`);
+  forbidText(rightRail, forbidden, `RightRail must not retain ${forbidden}`);
 }
 forbidText(channels, 'session:outputs:list', 'IPC channel registry must not retain session:outputs:list');
 forbidText(channels, 'session:investigation:', 'IPC channel registry must not add session:investigation channels');

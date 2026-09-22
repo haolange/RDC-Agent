@@ -39,7 +39,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
       argsPrefix: [],
       workingDirectory: '',
       env: {},
-      timeoutMs: 60000,
+      timeoutMs: 120000,
     },
     codeInterpreter: {
       enabled: false,

@@ -1,5 +1,24 @@
 # Acceptance Ledger
 
+2026-09-23 FRONTEND-REAL-UI-LACRIMAL-CAPTURE：用户明确授权使用 canonical userData 与测试工程 `D:\Projects\agentTest\rdc`，并要求改用 `眼睛泪腺白点.rdc` 做剩余右栏现场验收。canonical userData 成功加载已配置的加密 provider，真实 Composer 选择 `grok-4.6 · Low`；已发送一次 Analyzer 计划请求并完成计划门呈现，未复制、打印或改写任何 secret。随后在真实 Capture 面选择 `D:\Projects\agentTest\rdc\.rdc-agent\inputs\眼睛泪腺白点.rdc`（1.5 GB）并执行本地 replay：窗口真实进入“部分就绪”，但右栏 Capture 返回 `Error: RDC_CLI_FAILED: daemon_timeout: Timed out waiting for daemon response to exec`；点击“重试画面”后再次得到相同超时。清理本轮 stale owner/lock 后又以同一 canonical userData 做了一次干净重启和重新打开，结果仍为相同 daemon timeout；capture 文件 ACL 对当前用户可读，因而不是文件读取权限拒绝。当前没有可绑定 event/frame/image，也没有合法调查制品可供右栏 Artifacts 卡片展示，因此 populated Artifacts 不能标记通过，继续保持 `TODO(UNVERIFIED)`。此前 `WhiteHair.rdc` 的 `VK_EXT_fragment_density_map` replay-device 不兼容是另一条独立失败证据，不替代本次 daemon timeout。解锁条件是能完成该 capture 的兼容 replay daemon/device，或一个已知可回放的较小 capture，之后再以 Grok 4.6 Low 执行一次经批准的 General 调查续跑；本次没有再消耗额外模型请求。
+
+2026-09-23 FRONTEND-REAL-UI-CLOSEOUT：按用户指定使用 Grok 4.6 Low，基于隔离 userData 重启真实 `/app` 复核剩余两项现场验收。隔离副本可以显示 Grok 4.6，但复制的 provider secret 在本机 safeStorage 绑定下持续解密失败；未发送模型请求，未消耗本轮额度。将现有用户历史会话的真实 conversation/run 数据放入隔离会话后，Transcript 显示实际思考块、工具动作和任务状态；打开“运行记录”并从“当前会话”切换到“全部会话”后，真实系统足迹条目可见，Agent 足迹历史切换通过。对 `state/sessions`、`state/traces` 和用户配置的受控搜索没有找到合法调查制品记录（`ClaimRecord`、`ready_report` 或可验证 `contentHash`）；没有伪造 Artifact 数据，因此真实 populated Artifacts 仍为 `TODO(UNVERIFIED)`。QA 进程、5127 监听、canonical instance lock 与隔离目录均已清理，原始用户数据未写入。
+
+2026-09-22 FRONTEND-ENGINEERING-CONVERGENCE：基于 `cb9b9847e253b1599837692d961e08591ee363b3` 的未提交工作区；SHA 是基线，不是实现提交。范围为全部 renderer 的职责、样式、接线、测试和文档；没有 backend 业务、IPC、schema 或权限改动。没有提交、推送或发布，既有品牌二进制资源未修改。
+
+- 实现：Composer 分离受控书写区/底栏和 pending selector/hook/view；Transcript 纯呈现模块与样式按职责拆分；RightRail/SessionRightRail 直接入口替代旧名称；Context 设置写入归调用方、组件样式移出全局；Material 共用 TaskDialog；Sidebar/Terminal 样式就近维护；bootstrap 单入口安装与释放领域订阅。九个 feature 完成边界审查并维护 README；Settings/Knowledge 已合理的领域组织保持，不为迁移制造新抽象。AST 门禁覆盖重导出、动态导入与 pattern store action（含 Zustand 方括号/解构别名），renderer coverage 单独统计。
+- 明确行为修正：普通输入 IME 确认不发送；审批/提问同步提交互斥，挂载身份包含 session/turn/request，旧异步完成不能污染新请求的草稿、错误或提交锁；提问自定义答案固定文案与可访问名称接入现有中英 i18n；切会话重置 Composer 菜单，卸载取消焦点帧；Transcript 去掉 webdriver 绕路，离底阅读不强制吸底，观察虚拟切片内实际消息尺寸，定位帧与观察器完整释放。Material 改用统一弹层头/底栏与焦点栈，保留图片操作、48rem/70rem 宽度和 backdrop 不关闭。其余迁移按原声明和导入顺序保持；当前 Composer `composer-motion.css` 与 ActiveSignalText 动效样式未改。
+- 独立复核：交叉实现/验证确认纯呈现模块无环、14 个 IPC callback 函数体规范化后与基线一致、主要 CSS 序列等价。修复了 review 发现的 store alias 门禁遗漏、虚拟列表内部增高观察遗漏，以及删除旧 Debugger 样式时误带走的八个活跃窄屏 Composer 选择器；无消费者的旧选择器未恢复。旧路径删除，fidelity 消费者同步真实 CSS 入口；历史就已无消费者的 supported-model testid 从基线移除，保留 unknown/unsupported 行的真实测试。
+- 工程通过：完整测试 469 文件、3152 测试通过，4 个显式外部现场测试维持原跳过条件；最终 i18n 修复后独立 renderer 146 文件/558 测试全通过。新增真实 Editor/Footer、审批/提问、Sidebar、Terminal、drawer 交互接线测试；审批/提问测试先复现 5 个失败，修复后由独立 verifier 补测同会话换 turn、同 turn 换请求等异步反例。右栏测试实际渲染 Artifact 详情与 Capture 已打开/加载/失败组件，仅 mock 数据边界。main/shared coverage ratchet 通过（lines 75.26%、functions 76.90%、branches 62.38%、statements 72.85%）；独立 renderer 统计为 lines 39.44%、functions 35.30%、branches 33.45%、statements 37.96%，不冒充全覆盖。typecheck、全量 lint、AST 门禁单测、`check:gates` 与 production build 通过，最终 renderer 为 `index-DoEKDEAd.js`。
+- 测试环境：默认系统临时目录导致 Knowledge 路径安全检查收到 `EPERM realpath`；将本轮测试临时目录置于工作区后这些失败消失。完整覆盖运行使用 2 workers、30 秒单测时限，保留断言；未修改 main/shared 基线或产品安全路径。另修复右栏契约正则对格式化换行的敏感性，仍严格断言 degraded 与 empty 分离。
+- 真实 UI：原构建与新构建均使用真实 `/app`；先使用外观与会话副本，随后按用户明确授权复制本机加密凭据及必要 Local State 到隔离根，指定 Grok 4.7。原始用户数据不写入；模型请求只在新建隔离会话中发送，不发送历史会话内容。核对中文暗色、英文浅色、1440/1024/640px 与 919/921px 临界宽度；稳定加载后无页面横溢出。历史版本切换、中文草稿、Markdown 编辑/预览、附件警告/移除、Material 图片区域键盘操作与保存、Context 详情保存/开关、菜单互斥、Escape、左右 drawer、Settings 导航、Knowledge 窄屏与叠层、Terminal 开关和教程四步/完成/重开均有现场操作。
+- 真实运行与 populated 内容：Grok 4.7 完成含长中文正文、表格和清单的回复，持续观察实际 running 光环、Active Signal 与思考流式展开；另实际停止请求，输入和附件恢复。通过模型生产工具创建两项任务、写入并登记界面验收文件、批准一次 write_file、回答 ask_user。Progress/Outputs/Context 来自主进程真实投影，任务定位和深浅色窄屏内容保持；另导入含 15 项历史任务的隔离副本，缺执行证据的历史项准确显示恢复要求。未将任务名称、模型散文或普通输出当作调查证据。
+- Capture 现场：真实 `vkcube_validation.rdc`（65,913 字节）经隔离项目 canonical inputs 发现，在本地打开并得到 EID 21 的实际画面；加载中、就绪、运行锁、关闭与跨会话状态经过操作。逐事件导航显示“正在应用 EID 20 / 当前显示 EID 21”，完成后准确显示 EID 20 无可用画面，再返回 EID 21 恢复图像；两种主题及 640px drawer 下预览、状态和控件可见。Agent 足迹空态已核对；本轮以隔离用户数据导入真实历史会话后，Transcript 实际呈现工具动作、思考块、任务状态，打开“运行记录”并从“当前会话”切换到“全部会话”后显示系统级足迹条目，历史切换路径通过。模型第一次 describe 错将 command 与 rdc 同时传入，被正常拒绝，随后停在再次查询审批。用户要求加快并节省额度后终止当前 High 请求，没有继续新增模型调用；真实 populated Artifacts 仍为 TODO(UNVERIFIED)，不冒充通过。
+- 原生性能对照：同一主进程/真实会话，HEAD `cb9b9847` renderer（仅使用相同最终探针）与当前 renderer，浅色英文、大字号、1440×1000，30 秒固定窗口，重复十次“Wrote file → Asked”披露点击。基线/当前均 20 次点击，原生 Event Timing 观察数 16/15，阈值补值 p95 和 max 均 16 ms；页面 Long Task 各 2 次，最大 107/121 ms。没有显示明显退化，但样本小且 p95 含未观察点击的 16 ms 补值。相同提示词的两次真实 Grok 4.7 思考流式窗口各 30 秒，Long Task 都为 0；无窗口内披露点击，因此流式 p95 为 null。两次 provider 节奏与观察起点不同，这项只作现场观察，不宣称确定性吞吐基准。最小本机回执为 `.local/frontend-convergence/performance-receipt.json`。
+- 边界：Grok 4.7 实际能力使 Fast/Max/Effort slider 禁用，已核对禁用呈现，不将其写成交互动画通过。Artifacts 的真实空态与自动化 populated/详情/hash/错误路径通过，但现存用户样本没有合法调查制品；无 note kind，draft report 仍受 report-contract hook 约束，不为填卡编造引用；WorldState 的必需测量事实缺失也不填零。**真实 populated Artifacts 仍为 TODO(UNVERIFIED)**，不将前端整体视觉验收虚标为完全通过。长虚拟列表的尺寸增长/滚动吸附由真实组件测试覆盖，现场性能样本是实际长会话，不冒充超大数据压测。模型调查质量、多 RDC 后端、Android 或发布打包不扩为本轮目标。
+- 独立后端观察：主动停止 Grok 请求后主进程另投影一条 provider failure，最终请求仍为 stopped；本轮保留准确前端呈现，未扩展修改 provider/后端错误分类。该现象不能证明账号或网络失败。
+- 收尾：用户要求额度收口后停止本轮 launcher；已核对其 Electron owner、RDC daemon 与 worker PID 均不存在，5127 无监听且 canonical instance.lock 不存在，桌面启动权已交还。隔离密文/Local State、会话、项目、Capture 副本及基线源码/构建在本轮边界清理，保留最小测试与性能回执；原始用户资源、账号和 capture 保留。最终源码未提交、未推送。
+
 2026-09-22 SETTINGS-UI-CONVERGENCE：基于 `5d7080ea1b28fcbf023c2aca5e2eb3e2d78d91eb` 的未提交工作区修复；该 SHA 是基线，不是本次实现提交。范围仅为 Settings 展示、交互与共享帮助提示/文本框，不改变能力事实、存储、权限或自动保存语义。
 
 - 工程：受影响 Settings、Textarea、自动保存、Provider 两组专项测试共 436 项通过（重复复跑不累计）；最终 typecheck、lint、design-tokens、renderer-structure、appearance、settings-agents、provider-system 和 production build 通过。未运行全产品矩阵或发行打包；构建仍有既有动态导入提示。
@@ -669,3 +688,40 @@ Execution tracking remains in RDC-Tool docs/tool-convergence-tasks.md (T1–T8).
 - rc.6 发行增量验证：用户追加发布授权后版本升为 0.6.0-rc.6。build/dist、release-config、5 项发行回归及文档/整洁门禁通过；包内 52 资源和 316 个 out 文件一致，ZIP 的 app.asar 与已验证 unpacked 相同。正常 Windows 隔离桌面健康 smoke 完成全部主进程服务初始化并退出；沙箱内 GPU 启动失败不计通过。NSIS/应用为 NotSigned，未做交互安装；既有 fs.Stats 弃用和 meta CSP 提示保留。旧 rc.5 七份本地资产逐项匹配远端 digest 后移除，远端旧发布不变；三处本轮空 QA 拼写目录已清理。
 - rc.6 发布回执：源码 `c14ab21ec0badc51d177bf3bd4624a196aede272` 已非强制推送 main，[v0.6.0-rc.6](https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.6) 的 tag 指向该提交；draft=false、prerelease=true、非 latest，7 项远端资产 digest 全部匹配。安装包 SHA256 `690e0b71e56eddfbac909aecde6512fc8c9447d888120fd9e84aad031266b294`，ZIP `c1fa696a627b13d905d696855dfe6498954a2625131c55a0eaa9d7f7c91dfad9`；SBOM 1106 components，记录同一源码 SHA。发布时[源码 CI](https://github.com/haolange/RDC-Agent/actions/runs/35711535830) 为 in_progress，未等待或宣称云端检查通过。后续回执提交不移动发行 tag。
 - rc.6 清理复查：本轮 `.local/provider-release`、`.local/provider-facts-review`、空 `.local`、unpacked 打包树、builder-debug、临时 PATH shim/日志/测试数据及旧 QA 空目录均已删除。仅保留 rc.6 七项正式资产及当前 out/coverage；当前依赖、真实配置、历史会话、测试源码和 `.qoder/repowiki` 工作未动。自有打包/桌面进程退出，canonical instance.lock 不存在，桌面启动权已交还。
+
+## 2026-09-23 FRONTEND-REAL-UI-LACRIMAL-CAPTURE-CLOSED
+
+适用源码：当前未提交前端收敛实现；canonical userData；真实项目 `D:\Projects\agentTest\rdc`；输入 `眼睛泪腺白点.rdc`（1,647,684,424 bytes）。现场按用户授权使用 Full Access 与 **grok-4.6 Low**，没有复制或输出凭据。
+
+- **Capture / frame replay：通过（限定事件）**。初始打开事件 EID 147 的原生事实是 `Final Present does not identify exactly one swap-buffer resource`，UI 正确显示该错误且没有伪造画面。切换到真实 EID 5550 后，现场显示 `回放就绪`、`颜色输出`、图片 `EID 5550`、`已应用 EID 5550`；Analyzer 的工具直读同时确认 frame 0、D3D12、颜色目标 `ResourceId::308658`、R11G11B10_FLOAT、1444×1276 与 ExecuteIndirect marker 路径。
+- **Right rail / populated artifacts：通过**。Analyzer 通过受控 `rdc_probe` 读取当前 owning session，并在右栏显示 World State `ws-eyes-tear-gland-rdc-sess_ebe3ce14c0a7-frame0-e5550` 与 Evidence `ev-eyes-tear-replay-frame0-e5550`。两项 investigation artifact 均为真实写入的 draft，并保留 content hash；Evidence 的工具直读内容列出 session、capture、frame、event、pipeline、target、viewport、shader 与限制。
+- **Model / interaction：通过（本次窄场景）**。选择器现场为 Analyzer + grok-4.6 Low；Composer 发送了一条最小只读请求，工作过程展示真实 skill/rdc_probe/artifact_read/investigation_write/lease 轨迹，未执行修改或导出。General 的一次尝试因 provider request failure 且无 RDC capability 被立即停止，未继续消耗请求。
+- **工具门限根因与收尾：通过**。该 1.65 GB capture 的 `rd.session.observe` 实际耗时约 16 秒，而安装 rdc-tool 的 session worker/transport 门限为 10/15 秒，导致首次 UI 观察返回 timeout；本次现场仅临时将本机安装的 session 门限提高到 60 秒并重启 launcher，成功完成真实 observe 后已按原始字节恢复安装文件。canonical `rdcCli.timeoutMs` 也已恢复原值；未把现场 workaround 写入产品代码或配置。
+- **未通过/保留边界**。独立 Claim 写入被现有 `report-contract` 生命周期钩子拒绝，Analyzer 因缺少可解引用 MissionCheckpoint 不能标记完整 Mission；这不影响 World State/Evidence 制品已落盘。初始 EID 147 的 Final Present 歧义、Evidence `stale: true` 与 `rdc_context.raw.active_event_id=147` 和运行时 EID 5550 的差异均作为事实保留，未标作产品缺陷或隐藏。
+- **现场清理**。QA tab、launcher、Agent-owned replay/daemon 与临时诊断 context 已停止；临时 rdc-tool timeout 备份、QA 配置备份与本轮临时输出已删除。最终核对 5127 无监听、canonical `instance.lock` 无活 owner，桌面启动权已交还。原始 capture、项目输入、canonical userData 中的真实调查制品和历史会话保留。
+## 2026-09-23 RDC-TOOL-TIMEOUT-POLICY-CLOSURE
+
+- **范围**：收敛 RDC-Tool `rd.session.*` worker/transport 与 RDC-Agent 外层 CLI 等待门限；不改操作 catalog、IPC 结构或 capture 语义。
+- **源代码策略**：RDC-Tool session worker 60s，CLI transport 65s（共享 5s buffer）；RDC-Agent 默认外层 CLI timeout 120000ms。
+- **设置迁移**：RDC-Agent settings schema 8 只把旧默认 60000ms 迁移为 120000ms，其他用户自定义 timeout 保留；未知更高 schema 继续 fail-closed。
+- **安装边界**：实现来自 `D:\Projects\RDX\RDC-Tool` 源码并经现有安装流程验证；不把安装目录手工修改作为长期配置。
+- **真实验证**：使用已授权 canonical userData 与 `D:\Projects\agentTest\rdc` 做只读 `rd.session.observe` / EID 5550 smoke；不调用模型。EID 147 的 Present 资源歧义仍按真实语义错误呈现，不归因于 timeout 修复。
+- **清理**：停止本轮 launcher/daemon，释放端口与 instance lock，恢复桌面启动权；保留用户 capture、调查制品与历史会话。
+
+## 2026-09-23 TRANSCRIPT-WORK-PROCESS-INSET
+
+- **范围**：仅调整 Transcript Work Process 的内容轨道；左侧起始线、Composer 外框/光环/底栏、消息数据、状态与交互保持不变。
+- **工程实现**：Work Process 宽度保持左锚定，桌面右侧使用 `--space-6` 收口，`.agent-chat` 容器不超过 42rem 时使用 `--space-4`，不超过 32rem 时取消额外收口。tool call、commentary、thinking/summary、审批、计划和任务内容统一继承同一轨道；旧窄屏 `width: 100%` 覆盖已删除。Transcript 57 项定向测试、typecheck、lint、renderer-structure、work-process gates 与 build 通过。
+- **真实 UI**：未验证几何通过。Browser QA launcher 能正常启动构建，但本机 CUA 对 `http://127.0.0.1:5127` 返回 `ERR_BLOCKED_BY_CLIENT`，无法取得真实窗口 DOM/截图，因此不把静态工程结果记为视觉验收通过。QA launcher 已停止，5127/5173 无监听，canonical instance lock 不存在，桌面启动权已交还。
+
+## 2026-09-23 TRANSCRIPT-CARD-EDGE-AND-GROK47-FAST-AUDIT
+
+- **几何实现**：Work Process 可见卡片的右侧收口改为以既有左侧层级 gutter 为基准，避免根节点宽度收窄量大于卡片实际左侧偏移；左侧 rail、节点列、层级线、Composer、Final 回复宽度和交互均未改动。
+- **Grok surface 审计**：`xAI` 直连与 `grok-account` OAuth/Builder 继续独立编译。xAI manifest 保留现有 `service_tier=priority` binding；OAuth 不继承直连 Fast，当前没有明确的 Grok 4.7 proxy wire 证据，Composer 对 OAuth Fast 保持 Disabled，并记录 `TODO(UNVERIFIED)`。现有 model list、500K context、reasoning、vision、tool calling 与 structured output 事实按 surface 保持分离。
+- **验证边界**：静态来源、manifest、wire review 与现有 provider tests 已复核；本轮真实窗口几何和 OAuth Fast 实际请求仍未验证。没有发起模型请求，不消耗 Grok credits。
+
+## 2026-09-23 GROK47-OAUTH-FAST-CORRECTION
+
+- **更正**：用户明确确认当前使用的 Grok 4.7 OAuth/Builder route 支持 Fast。此前将 OAuth Fast 保持 Disabled 的审计结论已撤销，不再把公开 xAI API 的 surface 限制套用到当前 OAuth route。
+- **实现**：`grok-account/grok-4.7` 现在暴露 selectable Fast，并通过独立 `fast:priority` → `service_tier=priority` binding 生成请求；xAI 直连继续使用自己的同名 binding，两个 surface 的 entitlement 与 route revision 独立。
+- **验证边界**：catalog/compiler、RequestPlanner/wire review 与 Provider system gate 已复验；本轮未发起真实 Grok 请求，OAuth Fast 的现场响应速度与 usage 回执仍未声称通过。

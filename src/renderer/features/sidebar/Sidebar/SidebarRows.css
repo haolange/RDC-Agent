@@ -1,0 +1,265 @@
+.session-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  min-height: var(--control-height-md);
+  padding: var(--space-2) var(--space-2);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--transition-base) var(--ease-standard),
+    border-color var(--transition-base) var(--ease-standard),
+    transform var(--transition-base) var(--ease-standard),
+    box-shadow var(--transition-base) var(--ease-standard);
+}
+
+.project-item {
+  padding: var(--space-2) var(--space-3);
+}
+
+.project-item-title-wrap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.project-item-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--token-text-heading);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-item-origin-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--token-text-caption) 72%, transparent);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-item:hover,
+.session-item:focus-visible,
+.session-item:focus-within {
+  background: color-mix(in srgb, var(--token-bg-panel) 70%, transparent);
+  border-color: var(--token-border-default);
+  transform: none;
+  box-shadow: none;
+}
+
+.session-item.is-selected {
+  border-color: color-mix(in srgb, var(--token-accent-primary) 32%, transparent);
+  background: color-mix(in srgb, var(--token-accent-primary) 9%, transparent);
+  box-shadow: inset 2px 0 0 var(--token-accent-primary);
+}
+
+.project-sessions-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-left: var(--space-1);
+  padding-top: 0;
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--token-border-card);
+}
+
+.session-subitem {
+  min-height: var(--control-height-md);
+  padding: var(--space-2) var(--space-2);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  box-shadow: none;
+}
+
+.session-subitem .session-item-title {
+  font-size: var(--text-md);
+}
+
+.session-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.project-item-leading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  flex: 1;
+}
+
+.session-item-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-item-select:focus-visible {
+  outline: 1px solid var(--token-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.project-item-chevron,
+.session-item-gutter {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+}
+
+.project-item-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--token-text-caption);
+  cursor: pointer;
+  transition:
+    color var(--transition-base) var(--ease-standard),
+    background var(--transition-base) var(--ease-standard);
+}
+
+.project-item-chevron svg {
+  transition: transform var(--transition-base) var(--ease-standard);
+}
+
+.project-item-chevron.is-expanded svg {
+  transform: rotate(90deg);
+}
+
+.project-item-chevron:hover,
+.project-item-chevron:focus-visible {
+  background: var(--token-bg-raised);
+  color: var(--token-text-heading);
+  outline: none;
+}
+
+.session-item-gutter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in srgb, var(--token-text-caption) 80%, transparent);
+  transition: color var(--transition-base) var(--ease-standard);
+}
+
+.session-subitem:hover .session-item-gutter,
+.session-subitem.is-selected .session-item-gutter,
+.session-subitem:focus-visible .session-item-gutter {
+  color: color-mix(in srgb, var(--token-accent-primary) 90%, transparent);
+}
+
+.session-list-toggle {
+  align-self: flex-start;
+  margin-left: var(--space-10);
+  padding: var(--space-1) 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: color var(--transition-base) var(--ease-standard);
+}
+
+.session-list-toggle:hover,
+.session-list-toggle:focus-visible {
+  color: var(--token-text-heading);
+  outline: none;
+}
+
+.session-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.session-item-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--token-text-heading);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-item-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--token-text-caption);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(2px);
+  transition:
+    opacity var(--transition-base) var(--ease-standard),
+    transform var(--transition-base) var(--ease-standard),
+    background var(--transition-base) var(--ease-standard),
+    color var(--transition-base) var(--ease-standard);
+}
+
+.session-item:hover .session-item-icon-button,
+.session-item:focus-visible .session-item-icon-button,
+.session-item.is-selected .session-item-icon-button {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.session-item-icon-button:hover,
+.session-item-icon-button:focus-visible {
+  background: var(--token-bg-raised);
+  color: var(--token-text-heading);
+  outline: none;
+}
+
+.session-item-icon-button.danger:hover,
+.session-item-icon-button.danger:focus-visible {
+  background: rgb(190 48 58 / 0.16);
+  color: rgb(255 132 144);
+}
+
+.session-item-time {
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}

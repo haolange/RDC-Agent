@@ -26,7 +26,7 @@ import {
   TERMINAL_DEFAULT_HEIGHT,
 } from '@shared/constants/layout';
 
-export const SETTINGS_SCHEMA_VERSION = 7;
+export const SETTINGS_SCHEMA_VERSION = 8;
 
 export type PersistedLlmProviderEntry = Partial<LlmProviderEntry>;
 
@@ -117,7 +117,7 @@ export const DEFAULT_RDC_CLI_INVOKER: RdcCliInvokerSettings = {
   argsPrefix: [],
   workingDirectory: '',
   env: {},
-  timeoutMs: 60000,
+  timeoutMs: 120000,
 };
 
 export const DEFAULT_CODE_INTERPRETER: CodeInterpreterSettings = {

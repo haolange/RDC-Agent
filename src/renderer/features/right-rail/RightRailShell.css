@@ -1,0 +1,87 @@
+.right-rail {
+  container-type: inline-size;
+  container-name: right-rail;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 100%;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--token-bg-shell);
+  color: var(--token-text-body);
+}
+
+.right-rail-section {
+  flex: 0 0 auto;
+  inline-size: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-panel);
+}
+
+.right-rail-section-heading {
+  min-height: var(--control-height-md);
+  margin: 0;
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+}
+
+.right-rail-section-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-top: var(--space-3);
+}
+
+.right-rail-empty-state {
+  display: grid;
+  grid-template-rows: auto auto;
+  justify-items: stretch;
+  justify-content: stretch;
+  align-items: start;
+  min-height: 0;
+  gap: var(--space-2);
+  padding: 0;
+}
+
+.right-rail-empty-state.ui-empty-state {
+  min-height: 0;
+  padding: 0;
+}
+
+.right-rail-empty-state .ui-empty-state-visual {
+  justify-content: center;
+  width: 100%;
+}
+
+.right-rail-empty-state .ui-empty-state-title {
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-normal);
+  text-align: left;
+  text-wrap: pretty;
+}
+
+.right-rail-progress,
+.right-rail-artifact-list,
+.right-rail-investigation-list,
+.right-rail-context,
+.right-rail-resource-list,
+.right-rail-capture-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  gap: var(--space-2);
+  list-style: none;
+}

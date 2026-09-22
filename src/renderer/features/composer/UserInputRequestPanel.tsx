@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../../i18n';
-import { useConversationStore } from '../../stores/conversationStore';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Button } from '../../ui/Button';
 import { ChevronIcon } from './userInputRequestIcons';
@@ -12,18 +11,10 @@ import {
   areAllQuestionsAnswered,
   buildAnswerPayload,
   createRequestFingerprint,
-  findPendingUserInput,
   isQuestionAnswered,
   type PendingUserInputRequest,
   type UserInputAnswerDrafts,
 } from './userInputRequestModel';
-
-export type { PendingUserInputRequest } from './userInputRequestModel';
-
-export const usePendingUserInputRequest = (): PendingUserInputRequest | null => {
-  const messages = useConversationStore((state) => state.conversationMessages);
-  return useMemo(() => findPendingUserInput(messages), [messages]);
-};
 
 export const UserInputRequestPanel: React.FC<{
   request: PendingUserInputRequest;
@@ -37,6 +28,7 @@ export const UserInputRequestPanel: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const submittingRef = useRef(false);
 
   const questionCount = request.questions.length;
   const currentQuestion = request.questions[Math.min(currentIndex, questionCount - 1)];
@@ -72,12 +64,14 @@ export const UserInputRequestPanel: React.FC<{
   }, [questionCount]);
 
   const submitAnswers = useCallback(async () => {
+    if (submittingRef.current) return;
     const answers = buildAnswerPayload(request.questions, drafts);
     if (answers.length !== request.questions.length || isSubmitting) {
       setError(t('chat.userInputAnswerAll'));
       return;
     }
 
+    submittingRef.current = true;
     setIsSubmitting(true);
     setError(null);
     try {
@@ -93,6 +87,7 @@ export const UserInputRequestPanel: React.FC<{
       }
       setError(message);
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   }, [drafts, isSubmitting, request, submitUserInput, t]);

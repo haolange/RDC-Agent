@@ -720,8 +720,8 @@ describe('SettingsService provider persistence', () => {
     };
     const defaults = createDefaultChromeThemes();
 
-    expect(SETTINGS_SCHEMA_VERSION).toBe(7);
-    expect(persisted.schemaVersion).toBe(7);
+    expect(SETTINGS_SCHEMA_VERSION).toBe(8);
+    expect(persisted.schemaVersion).toBe(8);
     expect(runtime.appearance.chromeThemes.dark.accent).toBe(defaults.dark.accent);
     expect(runtime.appearance.chromeThemes.dark.presetId).toBe('rdc');
     expect(persisted.appearance.chromeThemes.dark.accent).toBe(defaults.dark.accent);
@@ -729,7 +729,7 @@ describe('SettingsService provider persistence', () => {
     expect(persisted.appearance.chromeThemes.dark.accent).not.toBe('#ff0000');
   });
 
-  it('rebuilds missing schemaVersion and v0-v6 settings to schema 7 without embedding selection', async () => {
+  it('rebuilds missing schemaVersion and v0-v6 settings to schema 8 without embedding selection', async () => {
     const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     fs.mkdirSync(workspaceRoot, { recursive: true });
@@ -754,19 +754,20 @@ describe('SettingsService provider persistence', () => {
         schemaVersion: number;
         llm: { embedding?: unknown; providers?: unknown };
       };
-      expect(SETTINGS_SCHEMA_VERSION, entry.label).toBe(7);
-      expect(persisted.schemaVersion, entry.label).toBe(7);
+      expect(SETTINGS_SCHEMA_VERSION, entry.label).toBe(8);
+      expect(persisted.schemaVersion, entry.label).toBe(8);
       expect(persisted.llm, entry.label).not.toHaveProperty('embedding');
       expect(runtime.llm, entry.label).not.toHaveProperty('embedding');
     }
   });
 
-  it('is a no-op when persisted settings are already schema 7 without embedding selection', async () => {
+  it('rebuilds schema 7 settings without changing non-default RDC CLI timeout', async () => {
     const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     fs.mkdirSync(workspaceRoot, { recursive: true });
     const current = {
       schemaVersion: 7,
+      tooling: { rdcCli: { timeoutMs: 30000 } },
       llm: { providers: [] },
     };
     fs.writeFileSync(settingsPath, JSON.stringify(current, null, 2), 'utf8');
@@ -776,11 +777,77 @@ describe('SettingsService provider persistence', () => {
     const runtime = service.initialize();
     const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
       schemaVersion: number;
+      tooling: { rdcCli: { timeoutMs: number } };
       llm: { embedding?: unknown };
     };
-    expect(persisted.schemaVersion).toBe(7);
+    expect(persisted.schemaVersion).toBe(8);
+    expect(persisted.tooling.rdcCli.timeoutMs).toBe(30000);
     expect(persisted.llm).not.toHaveProperty('embedding');
     expect(runtime.llm).not.toHaveProperty('embedding');
+  });
+
+  it('preserves a larger user-defined RDC CLI timeout during schema 8 migration', async () => {
+    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
+    const settingsPath = path.join(workspaceRoot, 'config.json');
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    fs.writeFileSync(settingsPath, JSON.stringify({
+      schemaVersion: 7,
+      tooling: { rdcCli: { timeoutMs: 180000 } },
+      llm: { providers: [] },
+    }, null, 2), 'utf8');
+
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const runtime = service.initialize();
+    expect(runtime.tooling.rdcCli.timeoutMs).toBe(180000);
+    expect(JSON.parse(fs.readFileSync(settingsPath, 'utf8')).tooling.rdcCli.timeoutMs).toBe(180000);
+  });
+
+  it('migrates the old RDC CLI default timeout to 120000ms exactly once', async () => {
+    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
+    const settingsPath = path.join(workspaceRoot, 'config.json');
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    fs.writeFileSync(settingsPath, JSON.stringify({
+      schemaVersion: 7,
+      tooling: { rdcCli: { timeoutMs: 60000 } },
+      llm: { providers: [] },
+    }, null, 2), 'utf8');
+
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const runtime = service.initialize();
+    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      schemaVersion: number;
+      tooling: { rdcCli: { timeoutMs: number } };
+    };
+    expect(persisted.schemaVersion).toBe(8);
+    expect(persisted.tooling.rdcCli.timeoutMs).toBe(120000);
+    expect(runtime.tooling.rdcCli.timeoutMs).toBe(120000);
+  });
+
+  it('migrates a schema-less persisted old default without touching other tooling values', async () => {
+    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
+    const settingsPath = path.join(workspaceRoot, 'config.json');
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    fs.writeFileSync(settingsPath, JSON.stringify({
+      tooling: {
+        rdcCli: { timeoutMs: 60000 },
+        codeInterpreter: { timeoutMs: 45000 },
+      },
+      llm: { providers: [] },
+    }, null, 2), 'utf8');
+
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const runtime = service.initialize();
+    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      schemaVersion: number;
+      tooling: { rdcCli: { timeoutMs: number }; codeInterpreter: { timeoutMs: number } };
+    };
+    expect(persisted.schemaVersion).toBe(8);
+    expect(persisted.tooling.rdcCli.timeoutMs).toBe(120000);
+    expect(persisted.tooling.codeInterpreter.timeoutMs).toBe(45000);
+    expect(runtime.tooling.rdcCli.timeoutMs).toBe(120000);
   });
 
   it('fail-closes unknown higher settings schemaVersion without rewriting the file', async () => {
@@ -788,7 +855,7 @@ describe('SettingsService provider persistence', () => {
     const settingsPath = path.join(workspaceRoot, 'config.json');
     fs.mkdirSync(workspaceRoot, { recursive: true });
     const future = {
-      schemaVersion: 8,
+      schemaVersion: 9,
       appearance: { theme: 'dark' },
       llm: { providers: [] },
     };

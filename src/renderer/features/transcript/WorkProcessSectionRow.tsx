@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
-import type { WorkProcessRow } from './workProcessPresentation';
+import type { WorkProcessRow } from './workProcessTypes';
 import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { isActiveThinkingStatus } from './workProcessActiveSignal';

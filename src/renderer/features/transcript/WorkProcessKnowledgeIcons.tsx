@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import type { WorkProcessIconKey } from './workProcessPresentation';
+import type { WorkProcessIconKey } from './workProcessTypes';
 
 export function renderKnowledgeIconPath(icon: WorkProcessIconKey): ReactElement | null {
   switch (icon) {

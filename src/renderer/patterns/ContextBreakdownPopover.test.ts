@@ -14,16 +14,6 @@ vi.mock('../i18n', () => ({
   }),
 }));
 
-vi.mock('../stores/appSettingsStore', () => ({
-  useAppSettingsStore: (selector: (state: {
-    settings: { appearance: { contextBreakdownExpanded: boolean } };
-    setContextBreakdownExpanded: (value: boolean) => void;
-  }) => unknown) => selector({
-    settings: { appearance: { contextBreakdownExpanded: true } },
-    setContextBreakdownExpanded: () => undefined,
-  }),
-}));
-
 const usage: RunContextUsageSummary = {
   runId: 'run-1',
   providerId: 'provider',
@@ -110,6 +100,8 @@ describe('ContextBreakdownPopover phase authority', () => {
   it('Preparing keeps the last actual structure instead of replacing it with a status card', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownPopover, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         prepared: null,
         phase: 'preparing',
         usage,
@@ -130,6 +122,8 @@ describe('ContextBreakdownPopover phase authority', () => {
   it('uses the same meter and details structure when telemetry has not arrived', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownPopover, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         prepared: null,
         phase: 'preparing',
         usage: null,
@@ -151,6 +145,8 @@ describe('ContextBreakdownPopover phase authority', () => {
   it('keeps authoritative zero values distinct from unavailable telemetry', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownPopover, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         prepared: null,
         phase: 'idle',
         usage: {
@@ -175,6 +171,8 @@ describe('ContextBreakdownPopover phase authority', () => {
   it('Current request shows prepared hero without stacking historical Last actual meter', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownPopover, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         prepared,
         phase: 'current',
         usage,
@@ -195,6 +193,8 @@ describe('ContextBreakdownPopover phase authority', () => {
   it('idle Last actual owns three independent metric cards without phase eyebrow', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownPopover, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         prepared: null,
         phase: 'idle',
         usage,
@@ -223,6 +223,8 @@ describe('ContextBreakdownPopover phase authority', () => {
   it('shows projected occupancy against the selected model window', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownPopover, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         prepared: null,
         phase: 'idle',
         usage: {
@@ -259,6 +261,8 @@ describe('ContextBreakdownPopover phase authority', () => {
   it('keeps the projected popover during preparing instead of reverting to Last actual', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownPopover, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         prepared: null,
         phase: 'preparing',
         usage: {
@@ -293,6 +297,8 @@ describe('ContextBreakdownPopover phase authority', () => {
   it('explains the compaction line and remaining generation budget', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownPopover, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         prepared: null,
         phase: 'idle',
         usage: {
@@ -323,6 +329,8 @@ describe('ContextBreakdownPopover phase authority', () => {
   it('adds the full window only when it is larger than the prompt budget', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownPopover, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         prepared: null,
         phase: 'idle',
         usage: {

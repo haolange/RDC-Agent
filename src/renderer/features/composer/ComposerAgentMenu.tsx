@@ -91,7 +91,7 @@ export const ComposerAgentMenu: React.FC<{
     <div ref={setRootRef} className="composer-agent-menu">
       <Pill
         ref={setTriggerRef}
-        className={`composer-agent-pill ${menu.open ? 'open' : ''}`}
+        className={`composer-agent-pill ${menu.open ? 'is-open' : ''}`}
         selected={menu.open}
         data-testid="composer-mode-pill"
         onClick={() => menu.toggle()}

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { WorkProcessRowStatus } from './workProcessPresentation';
+import type { WorkProcessRowStatus } from './workProcessTypes';
 
 export type WorkProcessRailVariant = 'section' | 'step';
 

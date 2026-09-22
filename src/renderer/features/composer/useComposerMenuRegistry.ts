@@ -29,13 +29,22 @@ export function ComposerMenuRegistryProvider({ children }: { children: React.Rea
   const [activeId, setActiveId] = useState<ComposerMenuId | null>(null);
   const rootsRef = useRef(new Map<ComposerMenuId, HTMLElement>());
   const triggersRef = useRef(new Map<ComposerMenuId, HTMLElement>());
+  const focusFrameRef = useRef<number | null>(null);
   const activeIdRef = useRef<ComposerMenuId | null>(null);
   activeIdRef.current = activeId;
 
   const restoreFocus = useCallback((id: ComposerMenuId | null) => {
     if (!id) return;
     const trigger = triggersRef.current.get(id);
-    window.requestAnimationFrame(() => trigger?.focus({ preventScroll: true }));
+    if (focusFrameRef.current !== null) window.cancelAnimationFrame(focusFrameRef.current);
+    focusFrameRef.current = window.requestAnimationFrame(() => {
+      focusFrameRef.current = null;
+      if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+    });
+  }, []);
+
+  useEffect(() => () => {
+    if (focusFrameRef.current !== null) window.cancelAnimationFrame(focusFrameRef.current);
   }, []);
 
   const open = useCallback((id: ComposerMenuId) => {
@@ -116,10 +125,6 @@ export function ComposerMenuRegistryProvider({ children }: { children: React.Rea
   return React.createElement(ComposerMenuRegistryContext.Provider, { value }, children);
 }
 
-export function useComposerMenuRegistry(): ComposerMenuRegistryApi | null {
-  return useContext(ComposerMenuRegistryContext);
-}
-
 export function useComposerMenu(id: ComposerMenuId): {
   open: boolean;
   toggle: () => void;
@@ -127,22 +132,9 @@ export function useComposerMenu(id: ComposerMenuId): {
   setRoot: (node: HTMLElement | null) => void;
   setTrigger: (node: HTMLElement | null) => void;
 } {
-  const registry = useComposerMenuRegistry();
-  const [localOpen, setLocalOpen] = useState(false);
-  const toggleLocal = useCallback(() => setLocalOpen((current) => !current), []);
-  const closeLocal = useCallback(() => setLocalOpen(false), []);
-  const ignoreNode = useCallback((_node: HTMLElement | null) => undefined, []);
-
+  const registry = useContext(ComposerMenuRegistryContext);
+  if (!registry) throw new Error('Composer menus require ComposerMenuRegistryProvider');
   return useMemo(() => {
-    if (!registry) {
-      return {
-        open: localOpen,
-        toggle: toggleLocal,
-        close: closeLocal,
-        setRoot: ignoreNode,
-        setTrigger: ignoreNode,
-      };
-    }
     return {
       open: registry.isOpen(id),
       toggle: () => registry.toggle(id),
@@ -150,5 +142,5 @@ export function useComposerMenu(id: ComposerMenuId): {
       setRoot: (node: HTMLElement | null) => registry.setRoot(id, node),
       setTrigger: (node: HTMLElement | null) => registry.setTrigger(id, node),
     };
-  }, [closeLocal, id, ignoreNode, localOpen, registry, toggleLocal]);
+  }, [id, registry]);
 }

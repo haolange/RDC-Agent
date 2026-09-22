@@ -1,0 +1,59 @@
+.composer-agent-menu {
+  position: relative;
+}
+
+.composer-agent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-height-sm);
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-3);
+  border-radius: var(--control-radius-pill);
+  border: 1px solid var(--token-border-default);
+  background: var(--token-surface-sunken);
+  color: var(--token-text-heading);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
+.composer-agent-pill:hover,
+.composer-agent-pill.is-open,
+.composer-agent-pill:focus-visible {
+  border-color: color-mix(in srgb, var(--composer-mode-accent) 24%, var(--token-border-strong));
+  background: color-mix(in srgb, var(--composer-mode-accent) 8%, var(--token-interactive-hover));
+}
+
+.composer-agent-pill:focus-visible {
+  border-color: var(--token-border-focus);
+  box-shadow: 0 0 0 1px var(--token-border-focus);
+  outline: none;
+}
+
+.composer-agent-pill-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-4);
+  height: var(--space-4);
+  line-height: 0;
+  color: var(--composer-mode-accent);
+}
+
+.composer-agent-pill-icon svg {
+  display: block;
+  width: var(--space-4);
+  height: var(--space-4);
+}
+
+.composer-agent-pill-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.composer-agent-pill-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--token-text-caption);
+}

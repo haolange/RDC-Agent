@@ -7,6 +7,8 @@
  */
 
 import fs from 'node:fs';
+import ts from 'typescript';
+import { moduleReferences, patternStoreActions } from './renderer-source-analysis.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyDebtRatchet, assertContractIntegrity, contractRel } from './renderer-contract.mjs';
@@ -32,17 +34,6 @@ const walk = (dir, files = []) => {
     if (/\.(ts|tsx)$/.test(entry.name)) files.push(fullPath);
   }
   return files;
-};
-
-const importPaths = (content) => {
-  const paths = [];
-  const re = /from\s+['"]([^'"]+)['"]/g;
-  let match = re.exec(content);
-  while (match) {
-    paths.push(match[1]);
-    match = re.exec(content);
-  }
-  return paths;
 };
 
 const layerOf = (rel) => {
@@ -72,6 +63,7 @@ const LAYER_RULES = {
 };
 
 const resolveImport = (fromRel, importPath) => {
+  if (importPath.startsWith('@renderer/')) importPath = './' + path.posix.relative(path.posix.dirname(fromRel), 'src/renderer/' + importPath.slice(10));
   if (importPath.startsWith('@shared')) return { layer: '(shared)' };
   if (!importPath.startsWith('.')) return { layer: '(external)' };
   const fromDir = path.posix.dirname(fromRel);
@@ -80,6 +72,11 @@ const resolveImport = (fromRel, importPath) => {
 };
 
 const files = walk(rendererRoot);
+const config = ts.readConfigFile(path.join(root, 'tsconfig.json'), ts.sys.readFile);
+const parsedConfig = ts.parseJsonConfigFileContent(config.config, ts.sys, root);
+const patternFiles = files.filter((file) => /[\\/]patterns[\\/]/.test(file) && !file.endsWith('.test.ts'));
+const program = ts.createProgram(patternFiles, parsedConfig.options);
+const checker = program.getTypeChecker();
 
 for (const filePath of files) {
   const rel = path.relative(root, filePath).replace(/\\/g, '/');
@@ -88,7 +85,7 @@ for (const filePath of files) {
   const feature = featureOf(rel);
   const rules = LAYER_RULES[layer];
 
-  for (const imp of importPaths(content)) {
+  for (const { path: imp } of moduleReferences(content, rel)) {
     const resolved = resolveImport(rel, imp);
     if (resolved.layer === '(shared)' || resolved.layer === '(external)') continue;
 
@@ -98,6 +95,13 @@ for (const filePath of files) {
 
     if (layer === 'features' && resolved.layer === 'features' && feature && resolved.feature && feature !== resolved.feature) {
       fail(`${rel}: cross-feature import is forbidden (${feature} -> ${resolved.feature} via ${imp})`);
+    }
+  }
+
+  if (layer === 'patterns' && !rel.endsWith('.test.ts')) {
+    const source = program.getSourceFile(filePath);
+    for (const action of source ? patternStoreActions(source, checker) : []) {
+      fail(`${rel}: patterns must receive action callbacks from their owner, not read store action ${action}`);
     }
   }
 
@@ -128,11 +132,11 @@ for (const retired of ['src/renderer/pages', 'src/renderer/components', 'src/ren
 }
 
 // CSS colocation: feature components must not be styled from styles/global.
-for (const globalCss of ['src/renderer/styles/global/app-shell.css']) {
+for (const globalCss of fs.readdirSync(path.join(rendererRoot, 'styles/global')).filter((name) => name.endsWith('.css')).map((name) => `src/renderer/styles/global/${name}`)) {
   const absolute = path.join(root, globalCss);
   if (!fs.existsSync(absolute)) continue;
   const content = fs.readFileSync(absolute, 'utf8');
-  for (const forbiddenPrefix of ['.composer-', '.settings-', '.knowledge-center-', '.right-rail-', '.work-process-', '.session-item', '.sidebar-']) {
+  for (const forbiddenPrefix of ['.composer-', '.settings-', '.knowledge-center-', '.right-rail-', '.work-process-', '.session-item', '.sidebar-', '.context-breakdown', '.command-palette']) {
     if (content.includes(forbiddenPrefix)) {
       fail(`${globalCss}: feature selector "${forbiddenPrefix}" must live in the owning feature directory, not styles/global`);
     }
@@ -146,10 +150,13 @@ const visitRuntime = (relative) => {
   if (reachable.has(relative)) return;
   reachable.add(relative);
   const content = fs.readFileSync(path.join(root, relative), 'utf8');
-  const imports = /(?:\b(?:import|export)\s+(?!type\b)(?:[^;'"\n]*?\s+from\s*)?|@import\s*)['"]([^'"]+)['"]/g;
-  for (const match of content.matchAll(imports)) {
-    if (!match[1].startsWith('.')) continue;
-    const base = path.posix.normalize(path.posix.join(path.posix.dirname(relative), match[1]));
+  const references = relative.endsWith('.css')
+    ? [...content.matchAll(/@import\s*['"]([^'"]+)['"]/g)].map((match) => ({ path: match[1], runtime: true }))
+    : moduleReferences(content, relative);
+  for (const { path: importPath, runtime } of references) {
+    if (!runtime) continue;
+    if (!importPath.startsWith('.')) continue;
+    const base = path.posix.normalize(path.posix.join(path.posix.dirname(relative), importPath));
     const target = [base, `${base}.tsx`, `${base}.ts`, `${base}/index.tsx`, `${base}/index.ts`]
       .find((candidate) => /\.(?:tsx?|css)$/.test(candidate) && fs.existsSync(path.join(root, candidate)));
     if (target) visitRuntime(target);

@@ -609,11 +609,9 @@ markdown-mermaid-fallback
 markdown-mermaid-loading
 markdown-mermaid-source
 markdown-task-checkbox
-material-context-actions
 material-context-editor
 material-context-gallery
 material-context-image
-material-context-overlay
 material-context-preview
 material-context-probe
 material-context-row
@@ -767,6 +765,7 @@ runtime-terminal-filter-menu
 runtime-terminal-filter-popover
 runtime-terminal-resize-handle
 runtime-terminal-search
+runtime-terminal-search-label
 runtime-terminal-select
 runtime-terminal-severity
 runtime-terminal-subtitle
@@ -1158,7 +1157,6 @@ slash-command-footer
 slash-command-item
 slash-command-name
 slash-command-popover
-sr-only
 stacked
 status-
 task-

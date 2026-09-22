@@ -29,7 +29,9 @@ export const ContextUsageIndicator: React.FC<{
   stale?: boolean;
   estimated?: boolean;
   menu?: ContextUsageMenuController;
-}> = ({ usage, prepared, phase, selectedProfile, stale = false, estimated = false, menu }) => {
+  detailsExpanded: boolean;
+  onDetailsExpandedChange: (expanded: boolean) => void;
+}> = ({ usage, prepared, phase, selectedProfile, stale = false, estimated = false, menu, detailsExpanded, onDetailsExpandedChange }) => {
   const { t } = useI18n();
   const [localOpen, setLocalOpen] = useState(false);
   const open = menu?.open ?? localOpen;
@@ -131,6 +133,8 @@ export const ContextUsageIndicator: React.FC<{
           selectedProfile={selectedProfile}
           stale={stale}
           estimated={previewActive}
+          detailsExpanded={detailsExpanded}
+          onDetailsExpandedChange={onDetailsExpandedChange}
           onClose={closePopover}
         />
       ) : null}

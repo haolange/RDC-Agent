@@ -1,0 +1,69 @@
+.work-process-task-snapshot {
+  border: var(--transcript-card-border);
+  border-radius: var(--transcript-card-radius);
+  background: var(--transcript-card-surface);
+  overflow: hidden;
+  font-size: var(--text-sm);
+}
+
+.work-process-task-snapshot-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2);
+}
+
+.work-process-task-snapshot-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--space-6);
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-sm);
+}
+
+.work-process-task-snapshot-item .task-status-marker {
+  flex: 0 0 var(--space-4);
+}
+
+.work-process-task-snapshot-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.work-process-task-snapshot-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.45;
+}
+
+.work-process-task-snapshot-reason {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.work-process-task-snapshot-item.task-completed .work-process-task-snapshot-title {
+  color: var(--token-text-caption);
+  text-decoration: line-through;
+}
+
+.work-process-task-snapshot-item.task-cancelled .work-process-task-snapshot-title {
+  color: var(--token-text-caption);
+}
+
+.work-process-task-snapshot-item.task-in_progress,
+.work-process-task-snapshot-item.task-blocked {
+  background: var(--token-bg-app);
+}
+
+.work-process-task-snapshot-item.task-in_progress .work-process-task-snapshot-title {
+  color: var(--token-text-heading);
+}
+
+.work-process-task-snapshot-item.task-blocked .work-process-task-snapshot-reason {
+  color: var(--token-status-warning);
+}

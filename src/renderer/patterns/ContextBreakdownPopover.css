@@ -1,0 +1,217 @@
+/* ── 上下文用量：锚定 composer 输入区上方（Cursor 式全宽弹层） ── */
+.context-breakdown-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-popover) - 1);
+}
+
+.context-breakdown {
+  container-type: inline-size;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + var(--space-2));
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: auto;
+  max-width: none;
+  /* Soft viewport cap; only the whole panel scrolls — never a nested legend scroller. */
+  max-height: min(var(--context-available-height, 90vh), 880px);
+  padding: 0;
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-xl);
+  background: var(--token-bg-overlay);
+  box-shadow: var(--token-shadow-popover);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Header */
+.context-breakdown-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-3);
+}
+
+.context-breakdown-title {
+  flex: 1 1 auto;
+  color: var(--token-text-heading);
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  letter-spacing: -0.01em;
+}
+
+.context-breakdown-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-8);
+  height: var(--space-8);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--token-text-caption);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.context-breakdown-close:hover,
+.context-breakdown-close:focus-visible {
+  background: var(--token-interactive-hover);
+  color: var(--token-text-body);
+}
+
+.context-breakdown-close:active {
+  background: var(--token-interactive-active);
+}
+
+.context-breakdown-close:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 1px;
+}
+
+.context-breakdown-close:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Hero: % Full · occupied/window · full-width bar */
+.context-breakdown-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+.context-breakdown-hero-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.context-breakdown-hero-usage {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.context-breakdown-pct-large {
+  color: var(--token-text-heading);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.context-breakdown-summary-caption {
+  color: var(--token-text-body);
+  font-size: var(--text-md);
+  font-weight: var(--font-medium);
+}
+
+.context-breakdown-hero-tokens {
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.context-breakdown-window-note {
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+/* Stacked bar — thicker Cursor-style track */
+.context-breakdown-bar {
+  position: relative;
+  display: flex;
+  gap: var(--space-0-5);
+  width: 100%;
+  height: 10px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--token-context-free);
+}
+
+.context-breakdown-bar-threshold {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--context-threshold-left, 80%);
+  width: 2px;
+  margin-left: -var(--space-0-5);
+  background: var(--token-text-caption);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.context-breakdown-bar-segment {
+  height: 100%;
+  min-width: 0;
+  width: var(--context-segment-width, 0%);
+  border-radius: var(--radius-sm);
+  transition: width var(--transition-fast);
+  background: var(--token-context-deferred);
+}
+
+.context-breakdown-bar-segment[data-segment='system_prompt'],
+.context-breakdown-swatch[data-segment='system_prompt'] {
+  background: var(--token-context-system-prompt);
+}
+
+.context-breakdown-bar-segment[data-segment='memory_files'],
+.context-breakdown-swatch[data-segment='memory_files'] {
+  background: var(--token-context-memory-files);
+}
+
+.context-breakdown-bar-segment[data-segment='skills'],
+.context-breakdown-swatch[data-segment='skills'] {
+  background: var(--token-context-skills);
+}
+
+.context-breakdown-bar-segment[data-segment='system_tools'],
+.context-breakdown-swatch[data-segment='system_tools'] {
+  background: var(--token-context-system-tools);
+}
+
+.context-breakdown-bar-segment[data-segment='mcp_tools'],
+.context-breakdown-swatch[data-segment='mcp_tools'] {
+  background: var(--token-context-mcp-tools);
+}
+
+.context-breakdown-bar-segment[data-segment='mcp_tools_deferred'],
+.context-breakdown-bar-segment[data-segment='builtin_tools_deferred'],
+.context-breakdown-swatch[data-segment='mcp_tools_deferred'],
+.context-breakdown-swatch[data-segment='builtin_tools_deferred'] {
+  background: var(--token-context-deferred);
+}
+
+.context-breakdown-bar-segment[data-segment='subagent_definitions'],
+.context-breakdown-swatch[data-segment='subagent_definitions'] {
+  background: var(--token-context-subagents);
+}
+
+.context-breakdown-bar-segment[data-segment='summarized_conversation'],
+.context-breakdown-swatch[data-segment='summarized_conversation'] {
+  background: var(--token-context-summarized);
+}
+
+.context-breakdown-bar-segment[data-segment='conversation'],
+.context-breakdown-swatch[data-segment='conversation'] {
+  background: var(--token-context-conversation);
+}
+
+.context-breakdown-bar-segment[data-segment='free'],
+.context-breakdown-swatch[data-segment='free'] {
+  background: var(--token-context-free);
+}

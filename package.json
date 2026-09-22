@@ -28,7 +28,7 @@
     "fidelity:extract": "node scripts/extract-fidelity-contract.mjs && node scripts/extract-shared-exports.mjs",
     "check:fidelity": "node scripts/check-fidelity.mjs",
     "check:design-tokens": "node scripts/check-design-tokens.mjs",
-    "check:renderer-structure": "node scripts/check-renderer-structure.mjs",
+    "check:renderer-structure": "node --test scripts/renderer-source-analysis.test.mjs && node scripts/check-renderer-structure.mjs",
     "check:shared-exports": "node scripts/check-shared-exports.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
@@ -76,6 +76,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:coverage:renderer": "vitest run --config scripts/vitest-renderer.config.ts --coverage",
     "check:identity": "node scripts/check-identity.mjs",
     "brand:icons": "node --experimental-strip-types scripts/render-product-icons.ts"
   },

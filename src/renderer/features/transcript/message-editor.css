@@ -1,0 +1,43 @@
+.conversation-edit-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--token-border-focus);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-raised) 74%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--token-border-focus) 16%, transparent);
+}
+
+.conversation-message-user.conversation-message-editing .conversation-message-stack {
+  width: min(42rem, 80%);
+  max-width: min(42rem, 80%);
+}
+
+.conversation-edit-textarea {
+  width: 100%;
+  color: var(--token-text-heading);
+  font-size: var(--text-base);
+  line-height: 1.7;
+}
+
+.conversation-edit-preview {
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.conversation-edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.conversation-edit-error {
+  color: var(--token-status-error);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useI18n } from '../../i18n';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
-import type { WorkProcessRow } from './workProcessPresentation';
+import type { WorkProcessRow } from './workProcessTypes';
 import { WorkProcessIcon } from './WorkProcessIcons';
 
 export const TaskSnapshotCard: React.FC<{ row: Extract<WorkProcessRow, { type: 'taskSnapshot' }> }> = ({ row }) => {

@@ -50,7 +50,7 @@ Workflow APIs remain responsible for start/approval/revision/restart/stop action
 
 ## Renderer
 
-Renderer presentation is built from `AgentRunView`, `TraceRightPanel`, and renderer registry cards. Renderer code consumes projected state; it does not reconstruct raw trace storage or execute RDC tools.
+Renderer presentation is built from `AgentRunView`, `SessionRightRail`, and renderer registry cards. Renderer code consumes projected state; it does not reconstruct raw trace storage or execute RDC tools.
 
 ## Verification
 

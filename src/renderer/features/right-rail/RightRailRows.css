@@ -1,0 +1,137 @@
+.right-rail-task-row > button {
+  display: grid;
+  grid-template-columns: var(--space-6) minmax(0, 1fr);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border: 0;
+  background: transparent;
+  color: var(--token-text-body);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.right-rail-task-row > button:hover .right-rail-task-copy strong,
+.right-rail-task-row > button:focus-visible .right-rail-task-copy strong {
+  color: var(--token-text-link);
+}
+
+.right-rail-task-row.status-in_progress .right-rail-task-copy strong {
+  color: var(--token-text-heading);
+}
+
+.right-rail-task-row.status-blocked .right-rail-task-copy small {
+  color: var(--token-status-warning);
+}
+
+.right-rail-task-row.status-completed .right-rail-task-copy strong {
+  color: var(--token-text-caption);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.right-rail-task-row.status-cancelled .right-rail-task-copy strong {
+  color: var(--token-text-caption);
+}
+
+.right-rail-task-stop-error {
+  display: block;
+  color: var(--token-status-danger);
+}
+
+.right-rail-task-copy,
+.right-rail-artifact-copy,
+.project-capture-input-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.right-rail-task-copy strong,
+.right-rail-artifact-copy strong,
+.project-capture-input-copy strong {
+  overflow: hidden;
+  color: var(--token-text-body);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.right-rail-task-copy small,
+.right-rail-artifact-copy small,
+.project-capture-input-size {
+  overflow: hidden;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.right-rail-artifact-row {
+  display: grid;
+  grid-template-columns: var(--space-6) minmax(0, 1fr);
+  align-items: start;
+  min-width: 0;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+}
+
+.right-rail-artifact-row + .right-rail-artifact-row,
+.project-capture-input-row + .project-capture-input-row {
+  border-top: 1px solid var(--token-border-subtle);
+}
+
+.project-capture-input-row {
+  display: grid;
+  grid-template-columns: var(--space-6) minmax(0, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-2);
+  min-height: var(--control-height-lg);
+  padding: var(--space-2) 0;
+}
+
+.right-rail-artifact-icon,
+.project-capture-input-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+}
+
+.right-rail-artifact-icon {
+  grid-row: 1 / span 2;
+  margin-top: var(--space-1);
+}
+
+.right-rail-artifact-icon svg {
+  width: var(--space-5);
+  height: var(--space-5);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+}
+
+.project-capture-input-icon {
+  width: var(--space-5);
+  height: var(--space-5);
+  color: var(--token-text-caption);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.right-rail-artifact-row.status-failed .right-rail-artifact-icon { color: var(--token-status-error); }

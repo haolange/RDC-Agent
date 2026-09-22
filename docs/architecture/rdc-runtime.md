@@ -79,6 +79,8 @@ Memory 与 Knowledge 使用独立 scoped preload domain（`memory` / `knowledge`
 
 Settings 持久化保留 executable、argsPrefix、cwd、env 和 timeout，用户通过安装根目录选择配置前三项。main 解析真实路径，检测只访问已配置目录和 Tools 默认安装目录；验证草稿时读取同安装版本/catalog，成功后走既有 Settings 保存。选择取消、验证失败不覆盖原值。高级面保留 env/timeout。四个生命周期命令模板、模板变量、catalogPath 和 JSON 模式配置已移除。接口匹配根据软件所需契约判定，不把工具总数或包版本作为权限条件。
 
+RDC-Tool 的 session worker 对 `rd.session.*` 统一提供 60 秒操作预算，CLI transport 在此基础上增加 5 秒响应缓冲，实际传输门限为 65 秒；RDC-Agent 的默认外层 CLI 进程等待为 120 秒。Settings schema 8 会把旧默认 60000ms 迁移到 120000ms，非默认用户值保留。三层门限均由各自边界负责，调用方不传第二套 session timeout。
+
 `prepareTurn` 冻结 CLI 配置、完整操作定义及其指纹、owning session/context/replay lease 身份。在途 Settings 变化不影响该轮。General 使用已有 shell 的结构化 RDC 模式，普通 command 与 rdc 互斥；轻量发现只返回匹配操作或单个操作说明，不把完整 catalog 展开进每次模型请求。
 
 普通执行先校验当前身份、定义的 scope、effects、参数 schema、前置条件和路径。未知操作、未知影响、模型覆盖 session/context 身份、非 owning General、Mission 直接执行、越界路径均在执行前拒绝。replay 操作才注入 replay session_id；daemon context 始终由主进程指定。context 更新只允许用户字段，VFS 只允许当前会话的受限结构化路径。生命周期、remote 控制、全局配置、桌面窗口、清理销毁由应用专门入口管理，目录和 Skill 不能自行授予权限。既有 shell 审批、realpath 路径边界、取消、串行 lease 和未知结果隔离继续生效。

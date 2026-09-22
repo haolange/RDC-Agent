@@ -254,7 +254,6 @@ settings-provider-protocol-summary
 settings-provider-search
 settings-provider-summary
 settings-provider-test-${provider.id}
-settings-provider-tool-calling-supported
 settings-provider-tool-calling-unsupported
 settings-provider-tool-calling-unverified
 settings-provider-unavailable-summary

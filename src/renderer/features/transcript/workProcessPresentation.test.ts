@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
 import type { ConversationPlanReview } from '@shared/types/planReview';
-import { buildWorkProcessPresentation, createToolRowForPresentation } from './workProcessPresentation';
+import { buildWorkProcessPresentation } from './workProcessTracePresentation';
+import { createToolRowForPresentation } from './workProcessToolRows';
 
 const now = 1_700_000_000_000;
 

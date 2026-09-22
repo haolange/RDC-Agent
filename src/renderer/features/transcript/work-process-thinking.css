@@ -1,0 +1,212 @@
+.work-process-row-pre {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-left: 2px solid var(--token-border-subtle);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--token-bg-app);
+  color: var(--token-text-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 9rem;
+  overflow-y: auto;
+}
+
+.work-process-step.kind-section {
+  /* Turn gap comes only from the next section's padding-top (space-3). */
+  padding-bottom: 0;
+}
+
+.work-process-step.kind-task-snapshot {
+  grid-template-columns: minmax(0, 1fr);
+  /* Standalone snapshot supplies its own entrance/exit: sections adjacent to it
+   * cannot match .work-process-section + .work-process-section. */
+  padding: var(--space-3) 0;
+  /* Share the nested tool-card indent line (rail 8px + column-gap space-1). */
+  padding-left: calc(var(--space-2) + var(--space-1));
+}
+
+.work-process-step.kind-section .work-process-step-content {
+  /* No flex gap: thinking↔prose and →tools use explicit margins so entrance is exactly space-3. */
+  gap: 0;
+}
+
+.work-process-step.kind-section .work-process-thinking-state + .work-process-prose {
+  margin-top: var(--space-2);
+}
+
+/* Beat kind-section / aggregate bottom padding so process→answer stays 10px. */
+.work-process-steps > .work-process-step:last-child {
+  padding-bottom: 0;
+}
+
+.work-process-thinking-state {
+  display: block;
+  width: 100%;
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+}
+
+.work-process-thinking-state.kind-summary {
+  display: block;
+}
+
+.work-process-thinking-label {
+  flex: 0 0 auto;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+}
+
+.work-process-thinking-text {
+  min-width: 0;
+  color: var(--token-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.work-process-thinking-state.kind-opaque,
+.work-process-thinking-state.visibility-hidden {
+  color: var(--token-text-muted);
+}
+
+.work-process-thinking-summary {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: fit-content;
+  min-height: var(--space-5);
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  list-style: none;
+  transition: color var(--transition-fast);
+}
+
+.work-process-thinking-caption {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.work-process-thinking-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--token-text-muted);
+  opacity: 0.85;
+}
+
+.work-process-thinking-summary::-webkit-details-marker {
+  display: none;
+}
+
+.work-process-thinking-state.status-streaming .work-process-thinking-summary {
+  color: var(--token-text-body);
+}
+
+.work-process-thinking-summary:hover {
+  color: var(--token-text-body);
+}
+
+.work-process-thinking-summary:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.work-process-thinking-state.status-streaming .work-process-thinking-summary::after {
+  content: none;
+}
+
+.work-process-thinking-summary > * {
+  position: relative;
+  z-index: 1;
+}
+
+.work-process-thinking-source {
+  color: var(--token-text-muted);
+  font-size: var(--text-xs);
+}
+
+.work-process-thinking-preview {
+  width: 100%;
+  max-width: 100%;
+  max-height: none;
+  margin: var(--space-1) 0 0;
+  padding: 0 0 0 var(--space-3);
+  overflow: visible;
+  border: 0;
+  border-left: 2px solid var(--token-border-subtle);
+  border-radius: 0;
+  background: transparent;
+  color: var(--token-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.work-process-thinking-preview .markdown-body {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.work-process-thinking-preview .markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.work-process-thinking-preview .markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.work-process-thinking-preview .markdown-body h1,
+.work-process-thinking-preview .markdown-body h2,
+.work-process-thinking-preview .markdown-body h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: inherit;
+  letter-spacing: -0.01em;
+}
+
+.work-process-thinking-preview .markdown-body p {
+  margin: 0 0 var(--space-1);
+}
+
+.work-process-thinking-preview .markdown-body ul,
+.work-process-thinking-preview .markdown-body ol {
+  margin: 0 0 var(--space-1);
+  padding-left: var(--space-5);
+}
+
+.work-process-thinking-preview .markdown-body pre,
+.work-process-thinking-preview .markdown-body table {
+  margin: var(--space-1) 0;
+  font-size: var(--text-xs);
+}
+
+.work-process-thinking-preview .markdown-code-block-header {
+  padding-block: var(--space-1);
+}
+
+.work-process-thinking-preview .markdown-code-block-copy {
+  min-height: 0;
+  padding: 0 var(--space-2);
+}
+
+.work-process-thinking-state[open] .work-process-row-caret {
+  transform: rotate(90deg);
+}

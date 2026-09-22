@@ -69,13 +69,11 @@ const addedClasses = [...currentClasses].filter((item) => !baselineClasses.has(i
 const addedTestIds = [...currentTestIds].filter((item) => !baselineTestIds.has(item)).length;
 
 const appShellCss = scriptRead('src/renderer/styles/global/app-shell.css');
-const composerChromeDir = path.join(repoRoot, 'src/renderer/features/composer');
-const composerChromeCss = [
-  scriptRead('src/renderer/features/composer/composer-chrome.css'),
-  ...fs.readdirSync(composerChromeDir)
-    .filter((name) => /^composer-chrome-\d+\.css$/.test(name))
-    .sort()
-    .map((name) => fs.readFileSync(path.join(composerChromeDir, name), 'utf8')),
+const composerChromeCss = scriptReadCssBundle('src/renderer/features/composer/composer-chrome.css');
+const contextBreakdownCss = [
+  scriptRead('src/renderer/patterns/ContextBreakdownPopover.css'),
+  scriptRead('src/renderer/patterns/ContextBreakdownMeter.css'),
+  scriptRead('src/renderer/patterns/ContextBreakdownLegend.css'),
 ].join('\n');
 const settingsModalCss = scriptReadCssBundle('src/renderer/features/settings/SettingsModal/SettingsModal.css');
 const designSystemCss = scriptRead('src/renderer/styles/design-system.css');
@@ -189,24 +187,24 @@ requireCssContract(
   'Agent menu must keep selected and session-scoped running states separate, accessible, compact, localized, and continuously animated.',
 );
 
-const contextMetricResponsiveStart = appShellCss.indexOf('@container (max-width: 33rem)');
-const contextMetricResponsiveEnd = appShellCss.indexOf('/* Details disclosure toggle */', contextMetricResponsiveStart);
+const contextMetricResponsiveStart = contextBreakdownCss.indexOf('@container (max-width: 33rem)');
+const contextMetricResponsiveEnd = contextBreakdownCss.indexOf('/* Details disclosure toggle */', contextMetricResponsiveStart);
 const contextMetricResponsiveCss = contextMetricResponsiveStart >= 0 && contextMetricResponsiveEnd > contextMetricResponsiveStart
-  ? appShellCss.slice(contextMetricResponsiveStart, contextMetricResponsiveEnd)
+  ? contextBreakdownCss.slice(contextMetricResponsiveStart, contextMetricResponsiveEnd)
   : '';
-const heroOnlyResponsiveStart = appShellCss.indexOf('@container (max-width: 42rem)');
+const heroOnlyResponsiveStart = contextBreakdownCss.indexOf('@container (max-width: 42rem)');
 const heroOnlyResponsiveCss = heroOnlyResponsiveStart >= 0 && contextMetricResponsiveStart > heroOnlyResponsiveStart
-  ? appShellCss.slice(heroOnlyResponsiveStart, contextMetricResponsiveStart)
+  ? contextBreakdownCss.slice(heroOnlyResponsiveStart, contextMetricResponsiveStart)
   : '';
 requireCssContract(
-  cssBlock(appShellCss, '.context-breakdown-run-columns').includes('grid-template-columns: repeat(3, minmax(0, 1fr));')
-    && cssBlock(appShellCss, '.context-breakdown-run-columns').includes('gap: var(--space-3);')
-    && cssBlock(appShellCss, '.context-breakdown-run-col').includes('border: 1px solid var(--token-border-card);')
-    && cssBlock(appShellCss, '.context-breakdown-run-col').includes('border-radius: var(--radius-lg);')
-    && cssBlock(appShellCss, '.context-breakdown-run-col').includes('background: var(--token-bg-panel);')
+  cssBlock(contextBreakdownCss, '.context-breakdown-run-columns').includes('grid-template-columns: repeat(3, minmax(0, 1fr));')
+    && cssBlock(contextBreakdownCss, '.context-breakdown-run-columns').includes('gap: var(--space-3);')
+    && cssBlock(contextBreakdownCss, '.context-breakdown-run-col').includes('border: 1px solid var(--token-border-card);')
+    && cssBlock(contextBreakdownCss, '.context-breakdown-run-col').includes('border-radius: var(--radius-lg);')
+    && cssBlock(contextBreakdownCss, '.context-breakdown-run-col').includes('background: var(--token-bg-panel);')
     && contextMetricResponsiveCss.includes('grid-template-columns: minmax(0, 1fr);')
-    && !appShellCss.includes('border-inline-start')
-    && !appShellCss.includes('column-gap: clamp(0px')
+    && !contextBreakdownCss.includes('border-inline-start')
+    && !contextBreakdownCss.includes('column-gap: clamp(0px')
     && !heroOnlyResponsiveCss.includes('grid-template-columns: minmax(0, 1fr);')
     && !heroOnlyResponsiveCss.includes('flex-wrap: wrap;'),
   'Context Usage metrics must be equal-width cards in one row above 33rem; only the narrow metric query may stack them.',

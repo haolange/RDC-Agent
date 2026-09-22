@@ -1,0 +1,153 @@
+.composer-agent-menu-popup {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + var(--space-2));
+  z-index: var(--z-dropdown);
+  width: min(calc(var(--space-10) * 7), calc(100vw - var(--space-6)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-xl);
+  background: var(--token-bg-overlay);
+  box-shadow: var(--token-shadow-popover);
+}
+
+.composer-agent-menu-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--space-4) minmax(0, 1fr) calc(var(--space-8) * 2) var(--space-4);
+  align-items: center;
+  column-gap: var(--space-2);
+  width: 100%;
+  min-height: var(--control-height-md);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--control-radius);
+  background: var(--token-interactive-rest);
+  color: var(--token-text-body);
+  cursor: pointer;
+  text-align: left;
+}
+
+.composer-agent-menu-item:hover:not(:disabled),
+.composer-agent-menu-item:focus-visible:not(:disabled) {
+  background: var(--token-interactive-hover);
+  color: var(--token-text-heading);
+}
+
+.composer-agent-menu-item.is-selected {
+  background: color-mix(in srgb, var(--composer-mode-accent) 10%, var(--token-bg-raised));
+  color: var(--token-text-heading);
+}
+
+.composer-agent-menu-item:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--token-border-focus);
+  outline: none;
+}
+
+.composer-agent-menu-item:disabled {
+  cursor: not-allowed;
+  color: var(--token-text-disabled);
+  opacity: 0.72;
+}
+
+.composer-agent-menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-4);
+  height: var(--space-4);
+  line-height: 0;
+}
+
+.composer-agent-menu-item-icon svg {
+  display: block;
+  width: var(--space-4);
+  height: var(--space-4);
+}
+
+.composer-agent-menu-item-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-agent-menu-item-running-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--token-status-success);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.composer-agent-menu-item-running-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  flex: 0 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--token-status-success);
+  animation: composer-agent-running-pulse 1.8s ease-in-out infinite;
+}
+
+.composer-agent-menu-item-tooltip {
+  position: absolute;
+  left: calc(100% + var(--space-2));
+  top: 50%;
+  z-index: var(--z-tooltip);
+  width: min(calc(var(--space-10) * 7.5), 42vw);
+  padding: var(--space-3);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-overlay);
+  box-shadow: var(--token-shadow-popover);
+  color: var(--token-text-body);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(var(--space-2), -50%);
+  visibility: hidden;
+  white-space: normal;
+  transition: none;
+}
+
+.composer-agent-menu-item-tooltip::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--space-2) * -1);
+  top: 50%;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-left: 1px solid var(--token-border-default);
+  border-bottom: 1px solid var(--token-border-default);
+  background: var(--token-bg-overlay);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.composer-agent-menu-item:hover:not(:disabled) .composer-agent-menu-item-tooltip,
+.composer-agent-menu-item:focus-visible .composer-agent-menu-item-tooltip {
+  opacity: 1;
+  transform: translate(0, -50%);
+  visibility: visible;
+  transition:
+    opacity var(--transition-base) 0.5s,
+    transform var(--transition-base) 0.5s,
+    visibility 0s 0.5s;
+}
+
+.composer-agent-menu-item-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-4);
+  height: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--composer-mode-accent);
+}

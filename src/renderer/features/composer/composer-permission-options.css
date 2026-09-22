@@ -1,0 +1,60 @@
+.composer-permission-popup {
+  width: min(24rem, 78vw);
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-color: var(--token-border-strong);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-panel) 94%, var(--token-bg-shell));
+}
+
+.composer-permission-menu-item {
+  --permission-tone: var(--token-text-caption);
+  position: relative;
+  gap: var(--space-1);
+  min-height: calc(var(--space-10) + var(--space-4));
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--token-text-body);
+}
+
+.composer-permission-menu-item[data-mode='default'] {
+  --permission-tone: var(--token-status-success);
+}
+
+.composer-permission-menu-item[data-mode='auto-review'] {
+  --permission-tone: var(--token-status-info);
+}
+
+.composer-permission-menu-item[data-mode='full-access'] {
+  --permission-tone: var(--token-status-warning);
+}
+
+.composer-permission-menu-item[data-mode='custom'] {
+  --permission-tone: var(--token-text-caption);
+}
+.composer-permission-menu-item::before {
+  position: absolute;
+  top: var(--space-3);
+  bottom: var(--space-3);
+  left: var(--space-3);
+  width: 3px;
+  border-radius: var(--radius-full);
+  background: var(--permission-tone);
+  content: "";
+  opacity: 0.72;
+}
+
+.composer-permission-menu-item:hover:not(:disabled),
+.composer-permission-menu-item:focus-visible,
+.composer-permission-menu-item.is-selected {
+  border-color: color-mix(in srgb, var(--permission-tone) 34%, var(--token-border-muted));
+  background: color-mix(in srgb, var(--permission-tone) 10%, var(--token-bg-raised));
+}
+
+.composer-permission-menu-label {
+  color: var(--token-text-heading);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  line-height: 1.35;
+}

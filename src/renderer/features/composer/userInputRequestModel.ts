@@ -59,6 +59,7 @@ export const findPendingUserInput = (messages: ConversationMessage[]): PendingUs
 
 export const createRequestFingerprint = (request: PendingUserInputRequest): string => (
   [
+    JSON.stringify([request.sessionId, request.turnId]),
     request.toolCallId,
     ...request.questions.map((question) => [
       question.questionId,

@@ -11,6 +11,12 @@
 
 ## 视觉定位
 
+### 组件与样式归属
+
+`ui` 提供受控基础控件与容器，`patterns` 提供跨产品面组合，`features` 拥有专属交互与状态协调。独特视觉同样组件化，但 Composer 光环、Effort 与 Capture 操作不提升为无真实消费者的通用框架。Pattern 读取投影、通过 props 回调表达写入意图；实际 store action 由 feature 或 app 持有。
+
+专属 CSS 与组件就近维护，按 shell、输入、工具栏、内容与动效等稳定职责命名；不要按行数切成数字文件。迁移保持级联顺序、选择器优先级、变量作用域与容器查询，删除被替代文件和引用。共享弹层统一复用 TaskDialog、overlay stack 和 focus 管理；图片等特殊内容用专属内容布局保留展示空间。视觉调整必须针对明确缺陷，与结构迁移分开记录。
+
 RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 VS Code / JetBrains / Linear 的密度与克制）。裁决见 [`DESIGN.md`](../../DESIGN.md) UI 节。
 
 - 层次由 1px 边框 + 实色表面建立；阴影只用于 popover 与 modal。

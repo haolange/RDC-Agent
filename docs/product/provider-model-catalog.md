@@ -94,7 +94,7 @@ Fast 是同一模型的 request binding，不是 `*-fast` 别名或独立模型�
 | `grok-4.20-0309-reasoning`     | 1M             | 是      | 否         | Just On                        | 可用  |
 | `grok-4.20-multi-agent-0309`   | 1M             | 是      | 否         | Low / Medium / High / Extra    | 可用  |
 | `grok-4.3`                     | 500K           | 是（Max → 1M） | 否     | Non / Low / Medium / High      | 可用  |
-| `grok-4.7`                     | 500K           | 否      | 否         | Low / Medium / High / Extra（默认 High）；视觉 supported | 可用  |
+| `grok-4.7`                     | 500K           | 否      | `service_tier=priority`（Fast） | Low / Medium / High / Extra（默认 High）；视觉 supported | 可用 |
 | `grok-4.6`                     | 500K           | 否      | 否         | Low / Medium / High / Extra（默认 High）；视觉 supported | 可用  |
 | `grok-4.5`                     | 500K           | 否      | 否         | Low / Medium / High（默认 Medium） | 可用  |
 | `grok-build-0.1`               | 256K           | 否      | 否         | Just On                        | 可用  |
@@ -216,7 +216,7 @@ Kimi Coding Plan 的 Anthropic-compatible base URL 是 `https://api.kimi.com/cod
 
 | Surface | 字段与裁决 | 官方来源及交叉来源 |
 | --- | --- | --- |
-| grok-account / xai | 4.7：500K、视觉/工具/结构化输出、Low/Medium/High/Extra、默认High；账号资格独立于API。OAuth不提供Priority，直连4.7以现有request-patch发送Priority。 | [模型页](https://docs.x.ai/developers/models/grok-4.7)、[发布](https://x.ai/news/grok-4-7)、[推理](https://docs.x.ai/developers/model-capabilities/text/reasoning)、[Priority](https://docs.x.ai/developers/advanced-api-usage/priority-processing)、[Responses协议](https://docs.x.ai/developers/rest-api-reference/inference/responses)；交接中的9/22账号缓存只作当时资格观察。 |
+| grok-account / xai | 两个 surface 均独立维护 4.7 的 500K、视觉/工具/结构化输出与 Low/Medium/High/Extra。两者各自拥有 `service_tier=priority` Fast binding，entitlement 不跨 surface 继承；OAuth/Builder 当前按用户确认的 Grok 4.7 Fast 能力收敛。 | [模型页](https://docs.x.ai/developers/models/grok-4.7)、[发布](https://x.ai/news/grok-4-7)、[推理](https://docs.x.ai/developers/model-capabilities/text/reasoning)、[Priority](https://docs.x.ai/developers/advanced-api-usage/priority-processing)、[Responses协议](https://docs.x.ai/developers/rest-api-reference/inference/responses)；交接中的9/22账号缓存只作当时资格观察。 |
 | xai | 4.6/4.5默认预算500K、4.3预算1M；删除code-fast-1退役入口，按用户要求不保留浮动别名。4.5的Extra在模型页与推理指南冲突，不新增档位。 | [4.6](https://docs.x.ai/developers/models/grok-4.6)、[4.5](https://docs.x.ai/developers/models/grok-4.5)、[退役与4.3规格](https://docs.x.ai/developers/migration/may-15-retirement)、[推理指南](https://docs.x.ai/developers/model-capabilities/text/reasoning) |
 | deepseek | Flash原生视觉，Pro无视觉；均支持Responses/Chat/Anthropic、Off/Low/High/Max；Pro继续提供服务。top_p在思考模式有效，不能剥离。价格采用非高峰基线。 | [价格与模型](https://api-docs.deepseek.com/quick_start/pricing/)、[Responses参数枚举](https://api-docs.deepseek.com/api/create-response/)、[Pro正式版](https://api-docs.deepseek.com/news/news260813/)、[Thinking](https://api-docs.deepseek.com/guides/thinking_mode/)、[Anthropic](https://api-docs.deepseek.com/guides/anthropic_api/) |
 | chatgpt-account | 当前Astra、三款5.6和5.5支持图像。5.4的retirement_at为2026-08-31，移除OAuth入口；缺席不是本次删除的唯一理由。discovery只收窄账号资格，不覆盖结构能力。 | [Codex目录](https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json)及9/22本机Codex目录缓存交叉；缓存不是实时请求证明，不包含凭据。 |

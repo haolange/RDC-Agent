@@ -1,35 +1,29 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ContextUsageIndicator } from '../../patterns/ContextUsageIndicator';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { ResolvedTheme } from '@shared/types/settings';
 import { deriveComposeAccentVars } from '@shared/theme/composeAccent';
 import { useI18n } from '../../i18n';
-import { Textarea } from '../../ui/Textarea';
 import { COMPOSER_PROMPT_MAX_HEIGHT, COMPOSER_PROMPT_MIN_HEIGHT } from './composerPromptGeometry';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import type { ComposerController } from './useComposer';
-import { PermissionModeSelector } from './PermissionModeSelector';
-import { ComposerModelEffortControl } from './ComposerModelEffortControl';
-import { useComposerPendingGate } from './useComposerPendingGate';
-import { SlashCommandPopover } from './SlashCommandPopover';
+import { useComposerPendingRequest } from './useComposerPendingRequest';
+import { ComposerPendingRequest } from './ComposerPendingRequest';
+import { ComposerEditor } from './ComposerEditor';
+import { ComposerFooter } from './ComposerFooter';
 import { useSlashCommand } from './useSlashCommand';
-import { ComposerMarkdownInput, type ComposerMarkdownMode } from './ComposerMarkdownInput';
+import { type ComposerMarkdownMode } from './ComposerMarkdownInput';
 import { ComposerMarkdownModeTabs } from './ComposerMarkdownModeTabs';
-import { ComposerAgentMenu } from './ComposerAgentMenu';
-import { ComposerMenuRegistryProvider, useComposerMenu } from './useComposerMenuRegistry';
-import { Button } from '../../ui/Button';
-import { Icon } from '../../ui/Icon';
-import { IconButton } from '../../ui/IconButton';
+import { ComposerMenuRegistryProvider } from './useComposerMenuRegistry';
 import { ComposerAttachIngest } from './ComposerAttachIngest';
 import { ComposerAttachmentTray } from './ComposerAttachmentTray';
 import { buildComposerSessionScopeKey } from '../../lib/composerSessionScope';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { useComposerAttachmentDrop } from './useComposerAttachmentDrop';
 import { useComposerVisionCapability } from './useComposerVisionCapability';
-import './Debugger.composer-panels.css';
+import './composer-pending-requests.css';
 import './composer-chrome.css';
 import './composer-effort.css';
 import './composer-attachments.css';
@@ -42,13 +36,6 @@ export interface ComposerProps {
 function getAgentCapability(agentId: string, definitions: AgentManifestDefinition[]): string {
   const manifest = definitions.find((d) => d.id === agentId);
   return manifest?.description ?? '';
-}
-
-function RegisteredContextUsageIndicator(
-  props: Omit<React.ComponentProps<typeof ContextUsageIndicator>, 'menu'>,
-): React.ReactElement {
-  const menu = useComposerMenu('usage');
-  return <ContextUsageIndicator {...props} menu={menu} />;
 }
 
 export const Composer: React.FC<ComposerProps> = ({
@@ -136,11 +123,11 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   }, [composerMarkdown, isComposerBusy]);
 
-  const pendingGate = useComposerPendingGate(composeAccentStyle);
-  if (pendingGate) return pendingGate;
+  const pendingRequest = useComposerPendingRequest();
+  if (pendingRequest) return <ComposerPendingRequest pending={pendingRequest} composeAccentStyle={composeAccentStyle} />;
 
   return (
-    <ComposerMenuRegistryProvider>
+    <ComposerMenuRegistryProvider key={composerScopeKey}>
     <div
       className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}${isDropActive ? ' is-drop-active' : ''}`}
       {...composeAccentStyle}
@@ -175,105 +162,46 @@ export const Composer: React.FC<ComposerProps> = ({
         removeAttachmentLabel={(fileName) => t('app.removeAttachment', { fileName })}
         visionUnsupportedLabel={t('app.attachVisionUnsupported')}
       />
-      <div className="composer-input-row">
-        {composerMarkdown ? (
-          <ComposerMarkdownInput
-            key={composerScopeKey}
-            value={promptValue}
-            onChange={setPromptValue}
-            onSend={() => void handlePromptSend()}
-            onPasteFiles={(files) => void handleFilesIngest(files)}
-            placeholder={promptPlaceholder}
-            mode={markdownMode}
-            disabled={isComposerBusy}
-          />
-        ) : (
-          <Textarea
-            key={composerScopeKey}
-            ref={promptInputRef}
-            chrome="plain"
-            minHeight={COMPOSER_PROMPT_MIN_HEIGHT}
-            maxHeight={COMPOSER_PROMPT_MAX_HEIGHT}
-            className="composer-textarea"
-            name="debuggerPrompt"
-            value={promptValue}
-            onChange={(event) => setPromptValue(event.target.value)}
-            onKeyDown={handlePromptKeyDown}
-            placeholder={promptPlaceholder}
-            aria-label={promptPlaceholder}
-          />
-        )}
-        {slashCommand.visible ? (
-          <SlashCommandPopover
-            filterText={slashCommand.filterText}
-            onSelect={slashCommand.onSelect}
-            onDismiss={slashCommand.onDismiss}
-          />
-        ) : null}
-      </div>
-      <div className="composer-footer-bar" data-testid="composer-footer-bar">
-        <div className="composer-toolbar-group composer-toolbar-group-left">
-          <IconButton
-            className="composer-attach-button"
-            data-testid="composer-attach-button"
-            size="sm"
-            label={attachButtonLabel}
-            title={attachButtonLabel}
-            disabled={isComposerBusy}
-            onClick={() => void handleAttachmentSelect()}
-          >
-            <Icon name="plus" size={14} />
-          </IconButton>
-          <ComposerAgentMenu
-            currentMode={currentMode}
-            currentModeConfig={currentModeConfig}
-            currentModeLabel={currentModeLabel}
-            selectedAgentId={selectedAgentId}
-            selectedAgentDefinition={selectedAgentDefinition}
-            selectedAgentCapability={selectedAgentCapability}
-            userInvocableAgents={userInvocableAgents}
-            activeAgentId={activeAgentId}
-            setSelectedAgentId={setSelectedAgentId}
-            setCurrentMode={setCurrentMode}
-          />
-          <PermissionModeSelector />
-        </div>
-        <div className="composer-toolbar-group composer-toolbar-group-right">
-          <ComposerModelEffortControl
-            agentId={selectedAgentId}
-            currentSession={currentSession}
-            disabled={isComposerBusy}
-          />
-          <RegisteredContextUsageIndicator
-            usage={lastKnownUsage}
-            prepared={preparedTurnContext}
-            phase={conversationPreparationPhase}
-            selectedProfile={selectedContextProfile}
-            stale={usageStale}
-            estimated={usageEstimated}
-          />
-          <Button
-            variant={isComposerBusy ? 'danger' : 'primary'}
-            size="sm"
-            className="chat-send-button"
-            data-testid={isComposerBusy ? 'debugger-stop-button' : 'debugger-start-button'}
-            onClick={() => void (isComposerBusy ? handlePrimaryStop() : handlePromptSend())}
-            disabled={primaryButtonDisabled}
-            aria-label={primaryButtonDescription}
-            title={primaryButtonDescription}
-          >
-            {isComposerBusy ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12" rx="1" />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 19V5m-6 6 6-6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </Button>
-        </div>
-      </div>
+      <ComposerEditor
+        promptValue={promptValue}
+        setPromptValue={setPromptValue}
+        promptInputRef={promptInputRef}
+        isComposerBusy={isComposerBusy}
+        promptPlaceholder={promptPlaceholder}
+        handlePromptSend={handlePromptSend}
+        handleFilesIngest={handleFilesIngest}
+        handlePromptKeyDown={handlePromptKeyDown}
+        composerMarkdown={composerMarkdown}
+        composerScopeKey={composerScopeKey}
+        markdownMode={markdownMode}
+        slashCommand={slashCommand}
+      />
+      <ComposerFooter
+        currentMode={currentMode}
+        currentModeConfig={currentModeConfig}
+        currentModeLabel={currentModeLabel}
+        selectedAgentId={selectedAgentId}
+        userInvocableAgents={userInvocableAgents}
+        setSelectedAgentId={setSelectedAgentId}
+        lastKnownUsage={lastKnownUsage}
+        usageEstimated={usageEstimated}
+        usageStale={usageStale}
+        preparedTurnContext={preparedTurnContext}
+        conversationPreparationPhase={conversationPreparationPhase}
+        selectedContextProfile={selectedContextProfile}
+        isComposerBusy={isComposerBusy}
+        attachButtonLabel={attachButtonLabel}
+        primaryButtonDisabled={primaryButtonDisabled}
+        primaryButtonDescription={primaryButtonDescription}
+        handlePrimaryStop={handlePrimaryStop}
+        handleAttachmentSelect={handleAttachmentSelect}
+        handlePromptSend={handlePromptSend}
+        selectedAgentDefinition={selectedAgentDefinition}
+        selectedAgentCapability={selectedAgentCapability}
+        activeAgentId={activeAgentId}
+        setCurrentMode={setCurrentMode}
+        currentSession={currentSession}
+      />
     </div>
     </ComposerMenuRegistryProvider>
   );

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { moduleReferences } from './renderer-source-analysis.mjs';
 import { scriptRead } from './renderer-contract.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -20,7 +21,19 @@ const read = (relativePath) => {
   return fs.readFileSync(absolute, 'utf8');
 };
 
-const bridge = read('src/renderer/app/bootstrap/useIpcEventBridge.ts');
+const bridgeModules = new Map();
+const collectBridge = (relative) => {
+  if (bridgeModules.has(relative)) return;
+  const source = read(relative);
+  bridgeModules.set(relative, source);
+  for (const reference of moduleReferences(source, relative)) {
+    if (!reference.runtime || !reference.path.startsWith('./')) continue;
+    const target = path.posix.join(path.posix.dirname(relative), `${reference.path}.ts`);
+    if (fs.existsSync(path.join(root, target))) collectBridge(target);
+  }
+};
+collectBridge('src/renderer/app/bootstrap/useIpcEventBridge.ts');
+const bridge = [...bridgeModules.values()].join('\n');
 const gate = read('src/renderer/stores/sessionEventGate.ts');
 const hygiene = read('src/renderer/stores/sessionSwitchHygiene.ts');
 const projectionStore = read('src/renderer/stores/sessionProjectionStore.ts');

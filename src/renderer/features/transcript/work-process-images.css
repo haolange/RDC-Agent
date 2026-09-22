@@ -1,0 +1,51 @@
+.work-process-tool-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.work-process-tool-thumb-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: var(--cursor-pointer, pointer);
+}
+
+.work-process-tool-thumb {
+  width: var(--space-16);
+  height: var(--space-16);
+  border: var(--transcript-card-border);
+  border-radius: var(--transcript-card-radius);
+  object-fit: cover;
+  background: var(--token-surface-sunken);
+}
+
+.work-process-tool-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: var(--space-6);
+  border: none;
+  background: var(--token-bg-overlay);
+  cursor: var(--cursor-pointer, pointer);
+}
+
+.work-process-tool-lightbox-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: var(--transcript-card-radius);
+  border: var(--transcript-card-border);
+}
+
+.work-process-tool-thumb.is-pending {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+}

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { WorkProcessRow } from './workProcessPresentation';
+import type { WorkProcessRow } from './workProcessTypes';
 import { useWorkProcessLabel } from './workProcessUseLabel';
 import { ToolRow } from './WorkProcessRows';
 

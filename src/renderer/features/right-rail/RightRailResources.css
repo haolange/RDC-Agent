@@ -1,0 +1,129 @@
+.right-rail-output-actions {
+  display: inline-flex;
+  grid-column: 2;
+  justify-self: start;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.right-rail-resource-row {
+  display: grid;
+  grid-template-columns: var(--space-8) minmax(0, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  color: var(--token-text-body);
+}
+
+.right-rail-resource-row + .right-rail-resource-row {
+  border-top: 1px solid var(--token-border-subtle);
+}
+
+.right-rail-resource-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-muted);
+  color: var(--token-text-caption);
+}
+
+.right-rail-resource-mark[data-kind='skill'],
+.right-rail-resource-mark[data-kind='mcp'] {
+  color: var(--token-accent);
+}
+
+.right-rail-resource-mark svg {
+  width: var(--space-4);
+  height: var(--space-4);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.25;
+}
+
+.right-rail-resource-copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.right-rail-resource-label,
+.right-rail-resource-meta,
+.right-rail-diagnostic > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.right-rail-resource-label {
+  color: var(--token-text-body);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-tight);
+}
+
+.right-rail-resource-meta {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+}
+
+.right-rail-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.right-rail-capture-panel .right-rail-capture-utility-actions {
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--token-border-subtle);
+}
+
+.right-rail-inline-actions .button,
+.right-rail-artifact-row .button,
+.right-rail-investigation-row .button,
+.right-rail-resource-row .button {
+  min-height: auto;
+  padding: var(--space-1) var(--space-2);
+  border-color: transparent;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+}
+
+.right-rail-inline-actions .button:hover,
+.right-rail-inline-actions .button:focus-visible,
+.right-rail-artifact-row .button:hover,
+.right-rail-artifact-row .button:focus-visible,
+.right-rail-investigation-row .button:hover,
+.right-rail-investigation-row .button:focus-visible,
+.right-rail-resource-row .button:hover,
+.right-rail-resource-row .button:focus-visible {
+  background: var(--token-bg-muted);
+  color: var(--token-text-body);
+}
+
+.right-rail-diagnostic {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--token-border-subtle);
+  color: var(--token-status-error);
+  font-size: var(--text-sm);
+}
+
+.is-trace-flash { animation: trace-flash 1.6s ease-out; }
+
+@keyframes trace-flash {
+  0%, 100% { outline: 0 solid transparent; }
+  35% { outline: var(--space-1) solid color-mix(in srgb, var(--token-border-focus) 35%, transparent); }
+}

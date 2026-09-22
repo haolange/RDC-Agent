@@ -26,6 +26,8 @@ describe('ContextUsageIndicator', () => {
   it('keeps the ring percent-first without in-ring phase badges', () => {
     const idle = renderToStaticMarkup(
       React.createElement(ContextUsageIndicator, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         usage: null,
         prepared: null,
         phase: 'idle',
@@ -41,6 +43,8 @@ describe('ContextUsageIndicator', () => {
 
     const preparing = renderToStaticMarkup(
       React.createElement(ContextUsageIndicator, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         usage: null,
         prepared: null,
         phase: 'preparing',
@@ -54,6 +58,8 @@ describe('ContextUsageIndicator', () => {
 
     const actual = renderToStaticMarkup(
       React.createElement(ContextUsageIndicator, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         usage: {
           runId: 'run-1',
           providerId: 'provider',
@@ -82,6 +88,8 @@ describe('ContextUsageIndicator', () => {
   it('shows idle occupancy against the prompt budget rather than the full window', () => {
     const idle = renderToStaticMarkup(
       React.createElement(ContextUsageIndicator, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         usage: null,
         prepared: null,
         phase: 'idle',
@@ -100,6 +108,8 @@ describe('ContextUsageIndicator', () => {
   it('shows a projected percent after the selected model window changes', () => {
     const projected = renderToStaticMarkup(
       React.createElement(ContextUsageIndicator, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         usage: {
           runId: 'run-1',
           providerId: 'provider',
@@ -136,6 +146,8 @@ describe('ContextUsageIndicator', () => {
   it('keeps the preparing ring pending instead of snapping back to a last-actual badge', () => {
     const preparing = renderToStaticMarkup(
       React.createElement(ContextUsageIndicator, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         usage: {
           runId: 'run-1',
           providerId: 'provider',
@@ -172,6 +184,8 @@ describe('ContextUsageIndicator', () => {
   it('does not apply the projected ring while a current prepared request is shown', () => {
     const current = renderToStaticMarkup(
       React.createElement(ContextUsageIndicator, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
         usage: {
           runId: 'run-1',
           providerId: 'provider',

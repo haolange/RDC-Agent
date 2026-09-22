@@ -50,6 +50,12 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
 - Smoke：`pnpm run smoke:agent-browser`
 - Manual: run start:agent-browser, copy the complete one-time `/qa?qaBootstrap=...` URL from the latest log, and verify real Settings/Project/Session/usage, language persistence, and parity. Check high-risk channels both without and with `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`; use explicit canonical userData only for an authorized real-data flow.
 
+## 原生交互性能观察
+
+真实 `/app?qaPerformance=1` 安装 `InteractionPerformanceProbe`；普通入口不安装监听器或观察器。默认只统计 Composer Fast/Max/Effort 控件；增加 `qaPerformanceScope=transcript` 时统计真实消息列表内按钮与 summary。`qaPerformanceWindowMs` 可指定 1–300000 ms 固定观察区间，用于没有点击的流式期间收集页面 Long Task。到期和 pagehide 会 drain 并释放观察器、监听器与计时器。
+
+根元素 `data-rdc-qa-performance` 提供范围、实际区间、原生支持标志、观察条目数和汇总。`pointerToPaintP95Ms` 是基于原生 Event Timing、对未观察点击按 16 ms 补值的估算；必须同时记录 `eventTimingObservedCount` 与 `interactionCount`，不能将缺失 target 或尚未送达的条目视作已测得低延迟。Long Task 属于页面整体，按与区间相交计入完整任务时长，不能宣称全由 Transcript 引起。前后比较须使用相同探针、内容、视口、外观、观察区间和动作；工具调用耗时与 RAF 不作为替代指标。
+
 ## Capture Replay QA
 
 capture:getReplayState/getReplaySelection/listReplayHistory/readReplayImage/readLivePreview 为只读面；applyReplayEvent/refreshFrame 为 mutation；clearReplayHistory 为 high-impact，复用共享 channel capability 表。状态事件为 capture:replayChanged，包含完整 scope/generation/revision，不含像素。QA 应覆盖跨 session 迟到结果、运行锁、非空回放与 RDC 归零原空态。真实 Android 显示验收必须来自设备屏幕与原生回执，不以 Browser 图片或 local export 代替。

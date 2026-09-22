@@ -1,0 +1,98 @@
+.right-rail-investigation-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  min-width: 0;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+}
+
+.right-rail-investigation-row + .right-rail-investigation-row {
+  border-top: 1px solid var(--token-border-subtle);
+}
+
+.right-rail-investigation-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  margin-top: var(--space-1);
+  color: var(--token-text-body);
+}
+
+.right-rail-investigation-icon svg {
+  width: var(--space-5);
+  height: var(--space-5);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+}
+
+.right-rail-investigation-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.right-rail-investigation-title,
+.right-rail-investigation-copy strong {
+  overflow: hidden;
+  color: var(--token-text-body);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.right-rail-investigation-meta,
+.right-rail-investigation-copy small {
+  min-width: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.right-rail-investigation-row.status-draft .right-rail-investigation-copy strong,
+.right-rail-investigation-row.status-draft .right-rail-investigation-icon {
+  color: var(--token-text-secondary);
+}
+
+.right-rail-investigation-row.status-stale .right-rail-investigation-copy small,
+.right-rail-investigation-row.status-stale .right-rail-investigation-icon {
+  color: var(--token-status-warning);
+}
+
+.right-rail-investigation-row.status-failed .right-rail-investigation-copy small,
+.right-rail-investigation-row.status-failed .right-rail-investigation-icon,
+.right-rail-investigation-row.is-degraded .right-rail-investigation-copy small,
+.right-rail-investigation-row.is-degraded .right-rail-investigation-icon {
+  color: var(--token-status-error);
+}
+
+.right-rail-investigation-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.right-rail-investigation-footer {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--token-border-subtle);
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+}
+
+.right-rail-investigation-footer p {
+  margin: 0;
+}
