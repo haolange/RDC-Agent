@@ -12,14 +12,18 @@
 - [deepseek.json](file://src/shared/provider-catalog/manifests/surfaces/deepseek.json)
 - [chatgpt-account.json](file://src/shared/provider-catalog/manifests/surfaces/chatgpt-account.json)
 - [LiveProviderCatalogParsers.ts](file://src/main/settings/LiveProviderCatalogParsers.ts)
+- [ProviderCatalogWireReview.test.ts](file://src/main/settings/ProviderCatalogWireReview.test.ts)
+- [providerWireMatrix.test.ts](file://src/main/testing/contracts/providerWireMatrix.test.ts)
+- [reasoningWire.ts](file://src/main/agent-runtime/providers/reasoningWire.ts)
 </cite>
 
 ## 更新摘要
 **所做更改**
-- 更新了 DeepSeek 提供商清单，反映模型重命名和移除操作
-- 新增了 ChatGPT Account 提供商的 GPT-6 Astra 模型支持
-- 增强了 LiveProviderCatalogParsers 中的准入过滤机制
-- 更新了相关测试用例以反映新的模型标识符
+- 新增 ProviderCatalogWireReview 测试基础设施，验证多协议推理映射的正确性
+- 增强 LiveProviderCatalogParsers 中的准入过滤机制和模型发现逻辑
+- 扩展 providerWireMatrix 测试覆盖 9 个适配器表面 × 16 个合同维度
+- 改进 DeepSeek、GLM、Google AI Studio、MiniMax 提供商的多协议支持
+- 完善 reasoningWire 处理逻辑，支持 OpenAI Responses、OpenAI Compatible、Anthropic 等多种协议
 
 ## 目录
 1. [简介](#简介)
@@ -41,12 +45,14 @@
 - 目录加载、排序算法、类别与协议规范
 - 提供商摘要生成、连接模式配置、认证方式支持与可用性状态管理
 - 完整的提供商注册流程示例（从清单到运行时可用）
+- **新增**：wire review 测试基础设施和多协议推理映射验证
 
 ## 项目结构
-Provider 目录由"编译期清单 + 运行期注册表 + 服务层"三层构成：
+Provider 目录由"编译期清单 + 运行期注册表 + 服务层 + 测试基础设施"四层构成：
 - 编译期清单：通过脚本将 manifests 编译为紧凑的 index 与 surface 集合，供运行时加载
 - 运行期注册表：提供查询、缓存、转换能力，将清单项映射为统一的 ProviderEntry
 - 服务层：对外暴露稳定的 API，负责排序、聚合分类与协议定义
+- **新增**：测试基础设施：wire review 测试和矩阵测试确保多协议推理映射的正确性
 
 ```mermaid
 graph TB
@@ -54,17 +60,25 @@ A["清单构建脚本<br/>provider-catalog-index.cjs"] --> B["编译产物<br/>C
 B --> C["ProviderCatalogRegistry<br/>加载/缓存/转换"]
 C --> D["ProviderCatalogService<br/>排序/聚合/对外API"]
 D --> E["调用方<br/>IPC/前端/其他模块"]
+F["Wire Review 测试<br/>ProviderCatalogWireReview.test.ts"] --> G["多协议推理映射验证"]
+H["Wire Matrix 测试<br/>providerWireMatrix.test.ts"] --> I["9×16 合同维度覆盖"]
+G --> J["reasoningWire 处理"]
+I --> J
 ```
 
 **图表来源**
 - [provider-catalog-index.cjs:1-19](file://scripts/provider-catalog-index.cjs#L1-L19)
 - [ProviderCatalogRegistry.ts:1-140](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L1-L140)
 - [ProviderCatalogService.ts:57-70](file://src/main/settings/ProviderCatalogService.ts#L57-L70)
+- [ProviderCatalogWireReview.test.ts:1-117](file://src/main/settings/ProviderCatalogWireReview.test.ts#L1-L117)
+- [providerWireMatrix.test.ts:1-558](file://src/main/testing/contracts/providerWireMatrix.test.ts#L1-L558)
 
 **章节来源**
 - [provider-catalog-index.cjs:1-19](file://scripts/provider-catalog-index.cjs#L1-L19)
 - [ProviderCatalogRegistry.ts:1-140](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L1-L140)
 - [ProviderCatalogService.ts:57-70](file://src/main/settings/ProviderCatalogService.ts#L57-L70)
+- [ProviderCatalogWireReview.test.ts:1-117](file://src/main/settings/ProviderCatalogWireReview.test.ts#L1-L117)
+- [providerWireMatrix.test.ts:1-558](file://src/main/testing/contracts/providerWireMatrix.test.ts#L1-L558)
 
 ## 核心组件
 - ProviderCatalogService：对外提供 getProviderCatalog()，聚合分类、协议与提供商列表，并按分类优先级与标签排序
@@ -73,6 +87,8 @@ D --> E["调用方<br/>IPC/前端/其他模块"]
 - catalogManifestSchema：强类型约束 surface、route、connectionSchema、discovery、models 等
 - constants/llm：分类定义与协议定义常量，用于 UI 展示与排序
 - types/settings：统一的数据契约（如 LlmProviderEntry、LlmProviderCatalogResponse 等）
+- **新增**：reasoningWire：处理多协议推理映射，支持 OpenAI Responses、OpenAI Compatible、Anthropic 等协议
+- **新增**：测试基础设施：ProviderCatalogWireReview 和 providerWireMatrix 确保推理映射正确性
 
 **章节来源**
 - [ProviderCatalogService.ts:1-73](file://src/main/settings/ProviderCatalogService.ts#L1-L73)
@@ -81,9 +97,10 @@ D --> E["调用方<br/>IPC/前端/其他模块"]
 - [catalogManifestSchema.ts:148-235](file://src/shared/provider-catalog/catalogManifestSchema.ts#L148-L235)
 - [llm.ts:10-118](file://src/shared/constants/llm.ts#L10-L118)
 - [settings.ts:420-541](file://src/shared/types/settings.ts#L420-L541)
+- [reasoningWire.ts:1-216](file://src/main/agent-runtime/providers/reasoningWire.ts#L1-L216)
 
 ## 架构总览
-Provider 目录在构建时由清单编译为不可变索引；运行时通过虚拟模块加载该索引，按需解析具体 surface 并转换为统一条目；服务层再按分类与协议进行聚合与排序，最终返回给上层消费。
+Provider 目录在构建时由清单编译为不可变索引；运行时通过虚拟模块加载该索引，按需解析具体 surface 并转换为统一条目；服务层再按分类与协议进行聚合与排序，最终返回给上层消费。**新增**的 wire review 测试基础设施确保多协议推理映射的正确性。
 
 ```mermaid
 sequenceDiagram
@@ -92,6 +109,7 @@ participant Service as "ProviderCatalogService"
 participant Registry as "ProviderCatalogRegistry"
 participant Index as "编译索引"
 participant Surface as "ProviderSurfaceManifest"
+participant WireTest as "Wire Review 测试"
 Caller->>Service : getProviderCatalog()
 Service->>Registry : listProviderSummaries()
 Registry->>Index : 读取 surfaces
@@ -102,12 +120,15 @@ Registry-->>Service : LlmProviderEntry
 end
 Service->>Service : 排序(compareProvider)
 Service-->>Caller : {categories, protocols, providers}
+WireTest->>Service : 验证多协议推理映射
+WireTest->>WireTest : 测试 DeepSeek/GLM/Google/MiniMax
 ```
 
 **图表来源**
 - [ProviderCatalogService.ts:57-70](file://src/main/settings/ProviderCatalogService.ts#L57-L70)
 - [ProviderCatalogRegistry.ts:110-143](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L110-L143)
 - [ProviderCatalogRegistry.ts:210-266](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L210-L266)
+- [ProviderCatalogWireReview.test.ts:41-116](file://src/main/settings/ProviderCatalogWireReview.test.ts#L41-L116)
 
 ## 详细组件分析
 
@@ -241,6 +262,122 @@ Hash --> Output["输出 index + surfaces 映射"]
 - [settings.ts:420-541](file://src/shared/types/settings.ts#L420-L541)
 - [settings.ts:116-144](file://src/shared/types/settings.ts#L116-L144)
 
+### 新增：Wire Review 测试基础设施
+
+**更新** 新增了 ProviderCatalogWireReview.test.ts，提供全面的 wire review 测试基础设施，验证多协议推理映射的正确性。
+
+#### 多协议推理映射验证
+测试覆盖了以下提供商的多协议推理映射：
+- **DeepSeek**：验证 `deepseek-flash` 和 `deepseek-v4-pro` 在 OpenAIResponses、OpenAICompatibleChatCompletions、AnthropicMessages 三种协议下的推理级别映射
+- **GLM**：验证 GLM-5.3 在不同推理级别下的 output_config.effort 设置
+- **MiniMax**：验证 MiniMax-M3 在 AnthropicMessages 和 OpenAICompatibleChatCompletions 协议下保留未解决的推理设置
+
+#### 测试覆盖范围
+```typescript
+// 测试 DeepSeek 多协议推理映射
+for (const modelId of ['deepseek-flash', 'deepseek-v4-pro']) {
+  for (const protocol of ['OpenAIResponses', 'OpenAICompatibleChatCompletions', 'AnthropicMessages'] as const) {
+    // 验证 off/low/high/max 推理级别的正确映射
+  }
+}
+
+// 测试 GLM 推理级别
+for (const level of ['low', 'high', 'max'] as const) {
+  // 验证 output_config.effort 设置
+}
+
+// 测试 MiniMax 未解决推理
+for (const surfaceId of ['minimax-cn', 'minimax-global', 'minimax-cn-coding-plan', 'minimax-global-coding-plan']) {
+  // 验证 reasoningWire.selection 保持 'unknown'
+}
+```
+
+**章节来源**
+- [ProviderCatalogWireReview.test.ts:41-116](file://src/main/settings/ProviderCatalogWireReview.test.ts#L41-L116)
+
+### 新增：Wire Matrix 测试覆盖
+
+**更新** providerWireMatrix.test.ts 提供了 9 个适配器表面 × 16 个合同维度的全面测试覆盖。
+
+#### 测试维度
+- **plain**：基本文本响应
+- **streaming**：流式响应处理
+- **tool_call**：工具调用支持
+- **tool_result_continuation**：工具结果续传
+- **reasoning**：推理内容处理
+- **vision**：视觉输入支持
+- **cache**：缓存使用统计
+- **usage**：使用量统计
+- **cost**：成本计算
+- **context_overflow**：上下文溢出错误处理
+- **http_429**：速率限制错误处理
+- **http_5xx**：服务器错误处理
+- **abort**：请求中止处理
+- **malformed_stream**：畸形流处理
+- **truncated_stream**：截断流处理
+- **secret_non_leak**：敏感信息泄露防护
+
+#### 支持的适配器
+- openai-compatible
+- openai-responses
+- anthropic-messages
+- google-gemini
+- google-interactions
+- ollama-openai-compatible
+- azure-openai-responses
+- mistral-conversations
+- bedrock-converse-stream
+
+**章节来源**
+- [providerWireMatrix.test.ts:33-49](file://src/main/testing/contracts/providerWireMatrix.test.ts#L33-L49)
+- [providerWireMatrix.test.ts:51-68](file://src/main/testing/contracts/providerWireMatrix.test.ts#L51-L68)
+- [providerWireMatrix.test.ts:325-345](file://src/main/testing/contracts/providerWireMatrix.test.ts#L325-L345)
+
+### 新增：ReasoningWire 多协议处理
+
+**更新** reasoningWire.ts 增强了多协议推理映射处理能力，支持多种协议的推理级别转换。
+
+#### 支持的协议
+- **OpenAI Responses**：通过 `buildOpenAiResponsesReasoning` 处理 reasoning.effort
+- **OpenAI Compatible**：通过 `applyOpenAiCompatibleReasoning` 处理 thinking 和 reasoning_effort
+- **Anthropic Messages**：通过 `applyAnthropicReasoning` 处理 thinking.output_config.effort
+- **Google Gemini**：通过 `applyGeminiReasoning` 处理 thinkingConfig
+- **Moonshot**：通过 `applyMoonshotReasoning` 处理 thinking.type
+
+#### 推理级别映射
+```typescript
+// 支持的推理级别
+const REASONING_LEVEL_MAP = {
+  minimal: 'minimal',
+  low: 'low', 
+  medium: 'medium',
+  high: 'high',
+  xhigh: 'xhigh',
+  max: 'max'
+};
+```
+
+**章节来源**
+- [reasoningWire.ts:1-216](file://src/main/agent-runtime/providers/reasoningWire.ts#L1-L216)
+
+### 最新变更：LiveProviderCatalogParsers 增强
+
+**更新** LiveProviderCatalogParsers.ts 增强了准入过滤机制，改进了模型发现和验证逻辑。
+
+#### 改进的过滤机制
+- **更严格的身份验证**：`liveIdentity()` 函数现在使用 `isAdmittedDiscoveredModel()` 进行更严格的模型身份验证
+- **增强的错误处理**：改进了无效模型条目的处理和日志记录
+- **更好的兼容性**：支持更多格式的模型目录响应
+
+#### 支持的模型格式
+- OpenAI 兼容格式：`{ id, name, model }`
+- Anthropic 格式：标准模型列表
+- 自定义格式：支持多种供应商特定的模型目录格式
+
+**章节来源**
+- [LiveProviderCatalogParsers.ts:77-86](file://src/main/settings/LiveProviderCatalogParsers.ts#L77-L86)
+- [LiveProviderCatalogParsers.ts:302-313](file://src/main/settings/LiveProviderCatalogParsers.ts#L302-L313)
+
 ### 最新变更：DeepSeek 提供商重构
 
 **更新** DeepSeek 提供商清单进行了重大重构，移除了 `deepseek-v4-pro` 模型并将 `deepseek-v4-flash` 重命名为 `deepseek-flash`。
@@ -304,87 +441,6 @@ DeepSeek 提供商现在使用严格的准入过滤机制，只允许 `deepseek-
 **章节来源**
 - [chatgpt-account.json:127-250](file://src/shared/provider-catalog/manifests/surfaces/chatgpt-account.json#L127-L250)
 
-### 最新变更：LiveProviderCatalogParsers 改进
-
-**更新** LiveProviderCatalogParsers.ts 增强了准入过滤机制，改进了模型发现和验证逻辑。
-
-#### 改进的过滤机制
-- **更严格的身份验证**：`liveIdentity()` 函数现在使用 `isAdmittedDiscoveredModel()` 进行更严格的模型身份验证
-- **增强的错误处理**：改进了无效模型条目的处理和日志记录
-- **更好的兼容性**：支持更多格式的模型目录响应
-
-#### 支持的模型格式
-- OpenAI 兼容格式：`{ id, name, model }`
-- Anthropic 格式：标准模型列表
-- 自定义格式：支持多种供应商特定的模型目录格式
-
-**章节来源**
-- [LiveProviderCatalogParsers.ts:77-86](file://src/main/settings/LiveProviderCatalogParsers.ts#L77-L86)
-- [LiveProviderCatalogParsers.ts:302-313](file://src/main/settings/LiveProviderCatalogParsers.ts#L302-L313)
-
-### 清单编译与校验：compiler
-- 职责
-  - 解析 identities、profiles、surfaces，应用 profile 的 routeMechanics 与 contracts
-  - 严格校验 surface、model、route、binding、discovery 等
-  - 生成稳定哈希的 catalogRevision 与精简的 summaries
-- 关键点
-  - 合并合约：mergeProviderContracts 基于 profile 与 route 覆盖
-  - 绑定冲突检测：executionBindings 的 selector 与 actions 一致性检查
-  - 公开补丁校验：禁止在清单中嵌入敏感字段
-  - 路由适配器校验：adapterId 必须支持对应 protocol
-  - 发现策略校验：strategy 与 discoveryPolicyId 一致
-
-```mermaid
-flowchart TD
-Input["清单输入(identities/profiles/surfaces)"] --> Parse["解析与标准化"]
-Parse --> Validate["多规则校验(surface/model/route/binding/discovery)"]
-Validate --> Hash["生成 catalogRevision(稳定哈希)"]
-Hash --> Output["输出 index + surfaces 映射"]
-```
-
-**图表来源**
-- [compiler.ts:108-165](file://src/shared/provider-catalog/compiler.ts#L108-L165)
-- [compiler.ts:221-304](file://src/shared/provider-catalog/compiler.ts#L221-L304)
-- [compiler.ts:454-620](file://src/shared/provider-catalog/compiler.ts#L454-L620)
-- [compiler.ts:622-716](file://src/shared/provider-catalog/compiler.ts#L622-L716)
-
-**章节来源**
-- [compiler.ts:622-716](file://src/shared/provider-catalog/compiler.ts#L622-L716)
-
-### 清单 Schema：catalogManifestSchema
-- 定义
-  - ProviderSurfaceManifest：surface 的核心结构，包括 routes、discovery、connectionSchema、authModes、capabilities 等
-  - ConnectionSchema：连接字段、主密钥字段、凭证备选方案、头部映射、端点模板
-  - DiscoveryStrategy：json-catalog 或 custom-parser，含 admission 与 routeRules
-  - ModelManifest：模型元数据、上下文窗口、执行绑定、能力声明等
-- 作用
-  - 确保清单数据的完整性与一致性
-  - 为编译期校验与运行期转换提供强类型基础
-
-**章节来源**
-- [catalogManifestSchema.ts:23-111](file://src/shared/provider-catalog/catalogManifestSchema.ts#L23-L111)
-- [catalogManifestSchema.ts:137-235](file://src/shared/provider-catalog/catalogManifestSchema.ts#L137-L235)
-
-### 分类与协议定义：constants/llm
-- 分类定义：login-authorization、official-direct、cloud-platform、coding-token-plan、compatible-access、local
-- 协议定义：OpenAICompatibleChatCompletions、AnthropicMessages、GoogleGemini、AzureOpenAIChatCompletions 等
-- 用途
-  - 为 UI 展示与排序提供权威来源
-  - 限制协议白名单，防止非法协议接入
-
-**章节来源**
-- [llm.ts:10-118](file://src/shared/constants/llm.ts#L10-L118)
-
-### 数据契约：types/settings
-- LlmProviderEntry：运行时可配置的提供商条目，包含协议、认证模式、连接值、模型列表、能力等
-- LlmProviderCatalogEntry/LlmProviderCatalogResponse：目录查询响应结构
-- LlmProviderConnectionSchema：连接字段与头部映射
-- LlmProviderCapability：能力开关（chat、tool-calling、structured-output 等）
-
-**章节来源**
-- [settings.ts:420-541](file://src/shared/types/settings.ts#L420-L541)
-- [settings.ts:116-144](file://src/shared/types/settings.ts#L116-L144)
-
 ## 依赖关系分析
 - ProviderCatalogService 依赖：
   - 分类与协议常量（llm.ts）
@@ -396,6 +452,9 @@ Hash --> Output["输出 index + surfaces 映射"]
   - 编译器输出（compiler.ts 的类型与常量）
 - 编译脚本依赖：
   - compiler.ts 与 nodeManifestLoader.ts（清单加载）
+- **新增**：测试基础设施依赖：
+  - reasoningWire.ts（多协议推理映射）
+  - LiveProviderCatalogParsers.ts（模型发现与验证）
 
 ```mermaid
 graph LR
@@ -406,17 +465,23 @@ Reg --> Index["compiled index"]
 Reg --> Schema["catalogManifestSchema.ts"]
 Reg --> Compiler["compiler.ts"]
 Script["provider-catalog-index.cjs"] --> Compiler
+WireTest["Wire Review 测试"] --> Reasoning["reasoningWire.ts"]
+WireMatrix["Wire Matrix 测试"] --> Parsers["LiveProviderCatalogParsers.ts"]
 ```
 
 **图表来源**
 - [ProviderCatalogService.ts:1-73](file://src/main/settings/ProviderCatalogService.ts#L1-L73)
 - [ProviderCatalogRegistry.ts:1-143](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L1-L143)
 - [provider-catalog-index.cjs:1-19](file://scripts/provider-catalog-index.cjs#L1-L19)
+- [ProviderCatalogWireReview.test.ts:1-117](file://src/main/settings/ProviderCatalogWireReview.test.ts#L1-L117)
+- [providerWireMatrix.test.ts:1-558](file://src/main/testing/contracts/providerWireMatrix.test.ts#L1-L558)
 
 **章节来源**
 - [ProviderCatalogService.ts:1-73](file://src/main/settings/ProviderCatalogService.ts#L1-L73)
 - [ProviderCatalogRegistry.ts:1-143](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L1-L143)
 - [provider-catalog-index.cjs:1-19](file://scripts/provider-catalog-index.cjs#L1-L19)
+- [ProviderCatalogWireReview.test.ts:1-117](file://src/main/settings/ProviderCatalogWireReview.test.ts#L1-L117)
+- [providerWireMatrix.test.ts:1-558](file://src/main/testing/contracts/providerWireMatrix.test.ts#L1-L558)
 
 ## 性能考量
 - 懒加载与缓存
@@ -429,6 +494,9 @@ Script["provider-catalog-index.cjs"] --> Compiler
 - 编译期优化
   - 生成精简 summaries，减少运行时内存占用
   - 稳定哈希 catalogRevision 便于缓存与变更检测
+- **新增**：测试性能优化
+  - Wire matrix 测试使用批量 fixture 文件，减少 I/O 操作
+  - 推理映射测试采用参数化测试，提高测试效率
 
 ## 故障排查指南
 - 常见错误
@@ -437,28 +505,33 @@ Script["provider-catalog-index.cjs"] --> Compiler
   - 版本不匹配：Compiled Provider surface revision does not match the Catalog index
   - 未知内置提供商：Unknown builtin provider: ${id}
   - 模型准入失败：模型未通过准入过滤检查
+  - **新增**：Wire 映射错误：多协议推理映射不正确
 - 定位建议
   - 检查编译脚本是否成功生成 index 与 surfaces
   - 确认 surface 的 schemaVersion 与 catalogRevision 一致
   - 查看清单校验错误（compiler 抛出），修复 surface/model/route/binding/discovery 问题
   - 验证 connectionSchema 字段与 headerMappings 引用是否存在
   - 检查模型 ID 是否符合准入模式要求
+  - **新增**：运行 wire review 测试，验证多协议推理映射的正确性
 
 **章节来源**
 - [ProviderCatalogRegistry.ts:28-54](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L28-L54)
 - [ProviderCatalogRegistry.ts:119-138](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L119-L138)
 - [ProviderCatalogRegistry.ts:210-214](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L210-L214)
 - [compiler.ts:652-654](file://src/shared/provider-catalog/compiler.ts#L652-L654)
+- [ProviderCatalogWireReview.test.ts:41-116](file://src/main/settings/ProviderCatalogWireReview.test.ts#L41-L116)
 
 ## 结论
-Provider 目录管理系统通过"编译期清单 + 运行期注册表 + 服务层"的分层设计，实现了：
+Provider 目录管理系统通过"编译期清单 + 运行期注册表 + 服务层 + 测试基础设施"的分层设计，实现了：
 - 强类型的清单校验与稳定的目录版本控制
 - 灵活的提供商发现与认证模式支持
 - 清晰的分类与协议体系，便于 UI 展示与排序
 - 高效的懒加载与缓存机制，保障运行时性能
 - 完善的元数据与来源追溯，提升可维护性与可观测性
+- **新增**：全面的 wire review 测试基础设施，确保多协议推理映射的正确性
+- **新增**：9×16 合同维度的 wire matrix 测试，覆盖所有适配器表面的关键功能
 
-最近的更新包括 DeepSeek 提供商的重构、ChatGPT Account 提供商的新功能以及 LiveProviderCatalogParsers 的增强，进一步提升了系统的稳定性和功能性。
+最近的更新包括 DeepSeek 提供商的重构、ChatGPT Account 提供商的新功能、LiveProviderCatalogParsers 的增强，以及新增的 wire review 测试基础设施，进一步提升了系统的稳定性和功能性。
 
 ## 附录：新增提供商注册流程示例
 以下流程展示如何将一个新的 LLM 服务提供商添加到系统中，使其在 ProviderCatalogService 中可见并可被配置使用。
@@ -483,6 +556,11 @@ Provider 目录管理系统通过"编译期清单 + 运行期注册表 + 服务�
    - 选择认证模式（api-key、account、environment、local 等）
    - 测试连接并刷新模型列表，完成配置
 
+5. **新增**：验证多协议推理映射
+   - 运行 ProviderCatalogWireReview 测试，验证新提供商的多协议推理映射
+   - 确保 reasoningWire 正确处理不同协议的推理级别
+   - 验证 wire matrix 测试覆盖新提供商的关键功能
+
 ```mermaid
 sequenceDiagram
 participant Dev as "开发者"
@@ -490,6 +568,7 @@ participant Script as "provider-catalog-index.cjs"
 participant Compiler as "compileProviderCatalog"
 participant Runtime as "ProviderCatalogRegistry"
 participant Service as "ProviderCatalogService"
+participant WireTest as "Wire Review 测试"
 participant User as "用户"
 Dev->>Script : 新增 manifests 并运行脚本
 Script->>Compiler : 编译清单
@@ -499,6 +578,7 @@ User->>Service : 获取目录(getProviderCatalog)
 Service->>Runtime : 列出摘要并创建条目
 Runtime-->>Service : LlmProviderEntry[]
 Service-->>User : {categories, protocols, providers}
+WireTest->>Service : 验证多协议推理映射
 User->>User : 配置连接值与密钥
 User->>User : 测试连接并启用提供商
 ```
@@ -508,9 +588,11 @@ User->>User : 测试连接并启用提供商
 - [compiler.ts:622-716](file://src/shared/provider-catalog/compiler.ts#L622-L716)
 - [ProviderCatalogRegistry.ts:110-143](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L110-L143)
 - [ProviderCatalogService.ts:57-70](file://src/main/settings/ProviderCatalogService.ts#L57-L70)
+- [ProviderCatalogWireReview.test.ts:41-116](file://src/main/settings/ProviderCatalogWireReview.test.ts#L41-L116)
 
 **章节来源**
 - [provider-catalog-index.cjs:1-19](file://scripts/provider-catalog-index.cjs#L1-L19)
 - [compiler.ts:622-716](file://src/shared/provider-catalog/compiler.ts#L622-L716)
 - [ProviderCatalogRegistry.ts:110-143](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L110-L143)
 - [ProviderCatalogService.ts:57-70](file://src/main/settings/ProviderCatalogService.ts#L57-L70)
+- [ProviderCatalogWireReview.test.ts:41-116](file://src/main/settings/ProviderCatalogWireReview.test.ts#L41-L116)

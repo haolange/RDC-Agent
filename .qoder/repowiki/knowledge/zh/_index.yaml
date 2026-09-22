@@ -3,11 +3,11 @@ schema_version: 1
 locale: zh-CN
 branch: main
 nodes_managed: true
-exported_at: "2026-09-20T08:51:30Z"
+exported_at: "2026-09-22T10:53:40Z"
 modules:
     "":
-        dir_name: RDC-Agent 根工程（Electron + Vite 多进程编排）
-        title: RDC-Agent 根工程（Electron + Vite 多进程编排）
+        dir_name: RDC-Agent 根工程（Electron + Agent 工作流编排）
+        title: RDC-Agent 根工程（Electron + Agent 工作流编排）
         scope:
             - README.md
             - DESIGN.md
@@ -28,6 +28,7 @@ modules:
         source_files: []
         children:
             - docs
+            - patches
             - resources
             - scripts
             - tests_and_coverage
@@ -42,8 +43,16 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: scripts/launchers_and_smoke_tests
+        related_to: []
+    patches:
+        dir_name: 第三方依赖补丁（style-mod）
+        title: 第三方依赖补丁（style-mod）
+        scope:
+            - patches/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
     resources:
         dir_name: RDC Agent 运行时静态资源（Agent_Skill_Prompt_Hook_图标）
         title: RDC Agent 运行时静态资源（Agent/Skill/Prompt/Hook/图标）
@@ -92,7 +101,7 @@ modules:
         children: []
         depends_on: []
         related_to:
-            - path: docs
+            - path: tests_and_coverage
     scripts/quality_checks:
         dir_name: 代码质量与架构门禁脚本集
         title: 代码质量与架构门禁脚本集
@@ -127,4 +136,5 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: scripts/launchers_and_smoke_tests
