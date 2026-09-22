@@ -2,7 +2,7 @@
 
 ## 品牌与 Composer 审查收口 rc.5（2026-09-22）
 
-已批准：main 原地修复并提交推送，发布 Windows x64 0.6.0-rc.5 未签名预发布；保留旧发布及 .qoder 未提交工作。原始基线 48f9a0ee。
+已批准：main 原地修复并提交推送，发布 Windows x64 0.6.0-rc.5 未签名预发布；保留旧发布及 .qoder 未提交工作。原始基线 48f9a0ee。首轮源码 595e7101 已推送；用户追加正常入口数据一致性、圆形透明图标与完整 RGB 换色修复，旧 rc.5 候选作废，尚未发布。正常 cmd 与打包 exe 共用 ~/.rdc-agent 和 %APPDATA%/rdc-agent；隔离 QA 数据不作为正常用户数据验收依据。启动日志记录版本、载体、应用路径与数据根，构建指纹包含品牌资源。launcher 以仓库 package.json 启动 Electron，避免直启编译 JS 导致应用根和产品版本错误；Browser smoke 断言产品版本并隔离两种数据根。追加工程与正常入口对照已通过，任务栏目视及发布清理尚待收口，证据见 acceptance-ledger 的 RC5-LAUNCH-BRAND。
 
 | Task | 状态 | 范围与验证 |
 | --- | --- | --- |

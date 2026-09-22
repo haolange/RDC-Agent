@@ -345,6 +345,7 @@ async function ensureDependencies(pnpm, storePath, forcePrepare) {
 function buildFingerprint(dependencyKey) {
   const inputHash = hashPaths([
     path.join(repoRoot, 'src'),
+    path.join(repoRoot, 'resources', 'brand'),
     path.join(repoRoot, 'electron.vite.config.ts'),
     path.join(repoRoot, 'vite.renderer.config.ts'),
     path.join(repoRoot, 'tsconfig.json'),
@@ -485,7 +486,6 @@ async function main() {
   const dependencyState = await ensureDependencies(pnpm, storePath, forcePrepare);
   const effectiveMode = mode === 'prepare-only' ? 'desktop' : mode;
   const env = modeEnvironment(effectiveMode, rebuildSettingsOnly);
-  const mainEntry = path.join(repoRoot, 'out', 'main', 'index.js');
 
   if (effectiveMode === 'desktop-dev' && !prepareOnly) {
     console.log('[RDC-Agent] Starting visible Electron app in development mode...');
@@ -510,7 +510,7 @@ async function main() {
       await waitForRenderer(renderer, rendererUrl);
       const browserEnv = { ...env, ELECTRON_RENDERER_URL: rendererUrl };
       console.log('[RDC-Agent] Starting headless main process for browser verification...');
-      const electron = runChild(dependencyState.electronExecutable, [mainEntry], browserEnv);
+      const electron = runChild(dependencyState.electronExecutable, [repoRoot], browserEnv);
       process.exitCode = await waitForExit(electron);
     } finally {
       process.removeListener('SIGINT', cleanup);
@@ -523,7 +523,7 @@ async function main() {
   console.log(effectiveMode === 'browser'
     ? '[RDC-Agent] Starting headless main process for browser verification...'
     : '[RDC-Agent] Starting visible Electron app from build output...');
-  const electron = runChild(dependencyState.electronExecutable, [mainEntry], env);
+  const electron = runChild(dependencyState.electronExecutable, [repoRoot], env);
   process.exitCode = await waitForExit(electron);
 }
 

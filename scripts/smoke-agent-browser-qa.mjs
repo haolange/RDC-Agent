@@ -136,19 +136,23 @@ async function assertQaSurface(baseUrl, qaUrl) {
     fail(`POST /invoke failed: ${payload.error || invoke.text.slice(0, 200)}`);
     return null;
   }
-  ok('POST /invoke app:getMeta → success');
+  const expectedVersion = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).version;
+  if (payload?.result?.version !== expectedVersion) {
+    fail(`Product version mismatch: expected ${expectedVersion}, received ${String(payload?.result?.version)}`);
+    return null;
+  }
+  ok('POST /invoke app:getMeta → correct product version');
   return true;
 }
 
 async function waitForBridgeFromChild(userDataPath) {
   const child = spawn(
-    process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-    ['run', 'start:agent-browser'],
+    process.execPath,
+    [path.join(repoRoot, 'scripts/launch-rdc-agent.mjs'), '--mode', 'browser'],
     {
       cwd: repoRoot,
-      env: { ...process.env, RDC_AGENT_USER_DATA: userDataPath },
+      env: { ...process.env, RDC_AGENT_USER_DATA: userDataPath, RDC_AGENT_HOME: path.join(userDataPath, '.rdc-agent') },
       stdio: ['ignore', 'pipe', 'pipe'],
-      shell: process.platform === 'win32',
     },
   );
 

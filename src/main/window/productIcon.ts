@@ -1,7 +1,7 @@
 import path from 'path';
 import { app, nativeImage, nativeTheme, type BrowserWindow, type NativeImage } from 'electron';
 import type { UiPreferences } from '@shared/types/settings';
-import { recolorLogoRgba } from '@shared/theme/recolorLogo';
+import { maskLogoCircleRgba, recolorLogoRgba } from '@shared/theme/recolorLogo';
 import { settingsService } from '../settings/SettingsService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 
@@ -43,6 +43,11 @@ export function applyProductIcon(): void {
       const rgba = Uint8Array.from(bitmap);
       for (let i = 0; i < rgba.length; i += 4) [rgba[i], rgba[i + 2]] = [rgba[i + 2], rgba[i]];
       recolorLogoRgba(rgba, accent);
+      maskLogoCircleRgba(rgba, width, height);
+      // Native bitmaps store premultiplied channels; canvas ImageData uses straight RGBA.
+      for (let i = 0; i < rgba.length; i += 4) {
+        for (let c = 0; c < 3; c += 1) rgba[i + c] = Math.round(rgba[i + c] * rgba[i + 3] / 255);
+      }
       for (let i = 0; i < rgba.length; i += 4) [rgba[i], rgba[i + 2]] = [rgba[i + 2], rgba[i]];
       const image = nativeImage.createFromBitmap(Buffer.from(rgba), { width, height });
       if (image.isEmpty()) throw new Error('Product icon bitmap could not be decoded.');

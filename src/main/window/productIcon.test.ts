@@ -17,8 +17,9 @@ beforeEach(() => {
   f.theme.shouldUseDarkColors = true; f.app.isPackaged = false; f.appearance.theme = 'system';
   const original = { isEmpty: () => false, resize: f.resize };
   f.fromPath.mockReturnValue(original);
-  f.resize.mockReturnValue({ getSize: () => ({ width: 3, height: 1 }),
-    toBitmap: () => Buffer.from([0, 255, 0, 255, 255, 255, 255, 255, 8, 12, 4, 255]) });
+  const bitmap = Buffer.alloc(9 * 9 * 4, 255);
+  bitmap.set([0, 255, 0, 255, 255, 255, 255, 255, 8, 12, 4, 255], 156);
+  f.resize.mockReturnValue({ getSize: () => ({ width: 9, height: 9 }), toBitmap: () => bitmap });
   f.fromBitmap.mockImplementation((bytes: Buffer) => ({ isEmpty: () => false, bytes }));
 });
 function windowFixture() {
@@ -34,10 +35,14 @@ describe('product window icon', () => {
     const w = windowFixture(); bindProductIcon(w.window);
     expect(f.fromPath.mock.calls[0][0].replaceAll('\\', '/')).toBe('/application/resources/brand/rdc-agent-logo.png');
     expect(f.resize).toHaveBeenCalledWith({ width: 256, height: 256, quality: 'best' });
-    expect([...f.fromBitmap.mock.calls[0][0]]).toEqual([0, 0, 255, 255, 255, 255, 255, 255, 8, 12, 4, 255]);
+    expect([...f.fromBitmap.mock.calls[0][0]].slice(156, 168)).toEqual([0, 0, 255, 255, 255, 255, 255, 255, 8, 12, 4, 255]);
+    expect([...f.fromBitmap.mock.calls[0][0]].slice(0, 4)).toEqual([0, 0, 0, 0]);
+    const edge = [...f.fromBitmap.mock.calls[0][0]].slice(20, 24);
+    expect(edge[3]).toBeGreaterThan(0); expect(edge[3]).toBeLessThan(255);
+    expect(edge[0]).toBe(edge[3]); // premultiplied white edge
     applyProductIcon(); expect(f.fromBitmap).toHaveBeenCalledTimes(1);
     f.theme.shouldUseDarkColors = false; applyProductIcon();
-    expect([...f.fromBitmap.mock.calls[1][0]].slice(0, 4)).toEqual([255, 0, 0, 255]);
+    expect([...f.fromBitmap.mock.calls[1][0]].slice(156, 160)).toEqual([255, 0, 0, 255]);
     expect(f.fromPath).toHaveBeenCalledTimes(1);
     expect(w.setIcon).toHaveBeenCalledTimes(3);
     w.close(); applyProductIcon(); expect(w.setIcon).toHaveBeenCalledTimes(3);
@@ -48,7 +53,7 @@ describe('product window icon', () => {
     const { bindProductIcon } = await import('./productIcon');
     const w = windowFixture(); bindProductIcon(w.window);
     expect(f.fromPath.mock.calls[0][0].replaceAll('\\', '/')).toBe('/packaged/resources/brand/rdc-agent-logo.png');
-    expect([...f.fromBitmap.mock.calls[0][0]].slice(0, 4)).toEqual([255, 0, 0, 255]);
+    expect([...f.fromBitmap.mock.calls[0][0]].slice(156, 160)).toEqual([255, 0, 0, 255]);
     w.close();
   });
   it('reports missing assets and setIcon failures without rejecting saved settings', async () => {

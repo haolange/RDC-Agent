@@ -689,6 +689,7 @@ LLMStreamEvent
 LLMToolCallDelta
 loadProviderCatalogManifestInput
 LogPreview
+maskLogoCircleRgba
 MaterialContext
 MaterialContextSchema
 MCP_TRANSPORTS
@@ -897,6 +898,8 @@ RdcContextCaptureViewModel
 RdcContextDiagnostic
 RdcContextPanelViewModel
 RdcContextRuntimeViewModel
+RdcInstallationCandidate
+RdcInstallationRequest
 RdcOperationDefinition
 RdcProbeAction
 RdcProbeInput
@@ -920,8 +923,8 @@ ReasoningSummary
 ReasoningVisibility
 ReasoningWireProfile
 ReasoningWireProfileSchema
-REJECTED_TOOL_TOKENS
 recolorLogoRgba
+REJECTED_TOOL_TOKENS
 relativeLuminance
 RENDERER_EVENT_CHANNEL
 RENDERER_EVENT_CHANNELS
@@ -1037,7 +1040,6 @@ SESSION_ARTIFACT_MAX_SESSION_BYTES
 SESSION_ARTIFACT_MAX_TOOL_OUTPUT_FILES
 SESSION_ARTIFACT_ROOT_DIR
 SESSION_ARTIFACT_SCHEME
-SIDEBAR_MAX_WIDTH
 SessionApi
 SessionArtifactCategory
 SessionArtifactError
@@ -1059,6 +1061,7 @@ SettingsApi
 SettingsDiagnostic
 shortArtifactHash
 shouldShowForkNavigatorForMessage
+SIDEBAR_MAX_WIDTH
 SidebarLayoutPreference
 SKILL_ARMED_BY_PROFILE
 skillCallEntry
@@ -1069,6 +1072,8 @@ skillLane
 SkillLoadResult
 SkillMetadata
 SkillParameter
+SkillSelectionOption
+SkillSelectionProjection
 SpecialistToken
 splitCanonicalAgentModelId
 StatePlan
