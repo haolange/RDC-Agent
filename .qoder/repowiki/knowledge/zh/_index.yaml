@@ -3,11 +3,11 @@ schema_version: 1
 locale: zh-CN
 branch: main
 nodes_managed: true
-exported_at: "2026-09-22T12:00:26Z"
+exported_at: "2026-09-23T03:26:13Z"
 modules:
     "":
-        dir_name: RDC-Agent 根工程（Electron 多进程编排与质量门禁中枢）
-        title: RDC-Agent 根工程（Electron 多进程编排与质量门禁中枢）
+        dir_name: RDC-Agent 根工程（Electron + Vite 多进程编排）
+        title: RDC-Agent 根工程（Electron + Vite 多进程编排）
         scope:
             - README.md
             - DESIGN.md
@@ -89,6 +89,7 @@ modules:
         related_to:
             - path: resources
             - path: scripts/quality_checks
+            - path: scripts/runtime_helpers
     scripts/launchers_and_smoke_tests:
         dir_name: RDC-Agent 启动器与冒烟测试脚本
         title: RDC-Agent 启动器与冒烟测试脚本
@@ -128,6 +129,7 @@ modules:
         depends_on: []
         related_to:
             - path: resources
+            - path: scripts/fidelity_and_extraction
     tests_and_coverage:
         dir_name: Agent Work Process CoT 可视化验收套件
         title: Agent Work Process CoT 可视化验收套件

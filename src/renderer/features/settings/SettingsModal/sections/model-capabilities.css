@@ -30,16 +30,18 @@
 
 .settings-model-capability-panel {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-4);
   width: 100%;
-  padding-top: var(--space-3);
+  padding: var(--space-4);
   margin-top: var(--space-2);
-  border-top: 1px solid var(--token-border-muted);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-raised);
 }
 
 .settings-model-capability-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
   gap: var(--space-2);
 }
 
@@ -49,7 +51,10 @@
   align-items: baseline;
   gap: var(--space-1);
   min-width: 0;
-  padding-block: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
 }
 
 .settings-model-capability-chip[data-tone='warning'] .settings-model-capability-chip-value {

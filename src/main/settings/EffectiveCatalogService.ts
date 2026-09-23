@@ -73,6 +73,14 @@ function evidenceKey(providerId: string, accountId: string): string {
   return `${providerId}\u0000${accountId}`;
 }
 
+function catalogProjectionRevision(request: EffectiveCatalogRequest): string {
+  return revisionFor({
+    providerId: request.providerId,
+    protocol: request.protocol ?? null,
+    models: request.catalog.models,
+  });
+}
+
 interface RefreshBackoffState {
   failCount: number;
   lastFailedAtMs: number;
@@ -168,6 +176,9 @@ export class EffectiveCatalogService {
     const cachedDiscovery = rawDiscovery
       ? this.discoveryLayerNormalizer?.(request, rawDiscovery) ?? rawDiscovery
       : undefined;
+    const projectionChanged = Boolean(cachedDiscovery && !request.discovery
+      && cachedDiscovery.catalogProjectionRevision !== catalogProjectionRevision(request));
+    const effectiveDiscovery = projectionChanged ? undefined : cachedDiscovery;
     const cachedEntitlement = request.entitlement ?? this.state.entitlements[key];
     const nowMs = this.now().getTime();
     const rawObserved = request.observed ?? this.state.observed[evidenceKey(request.providerId, request.accountId)];
@@ -177,12 +188,12 @@ export class EffectiveCatalogService {
       .filter((layer) => (
         !layer.expiresAt || Date.parse(layer.expiresAt) > nowMs
       ));
-    const stale = cachedDiscovery?.expiresAt
+    const stale = projectionChanged || (cachedDiscovery?.expiresAt
       ? Date.parse(cachedDiscovery.expiresAt) <= this.now().getTime()
-      : Boolean(cachedDiscovery);
+      : Boolean(cachedDiscovery));
     const mergedRequest: EffectiveCatalogRequest = {
       ...request,
-      discovery: cachedDiscovery,
+      discovery: effectiveDiscovery,
       entitlement: cachedEntitlement,
       observed: persistedObserved,
     };
@@ -258,6 +269,7 @@ export class EffectiveCatalogService {
         const loadedDiscovery: CatalogLayerContribution = {
           ...discovery,
           source: 'discovery',
+          catalogProjectionRevision: catalogProjectionRevision(request),
           observedAt: observedAt.toISOString(),
           expiresAt,
         };

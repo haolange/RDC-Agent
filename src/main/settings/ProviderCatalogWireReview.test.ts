@@ -78,6 +78,53 @@ describe('reviewed provider catalog request paths', () => {
     expect(wire(account.plan).service_tier).toBe('priority');
   });
 
+  it('keeps GPT-6 Fast scoped to supported OpenAI routes and Codex account bindings', () => {
+    for (const surfaceId of ['openai', 'openai-us']) {
+      for (const modelId of ['gpt-6-sol', 'gpt-6-luna']) {
+        const result = planModelRequest({ model: effective(surfaceId, modelId), controls: { fastModel: true } });
+        expect(result.ok, `${surfaceId}/${modelId}`).toBe(true);
+        if (!result.ok) throw new Error(result.message);
+        expect(result.plan.fastMode).toBe(true);
+        expect(wire(result.plan).service_tier).toBe('priority');
+      }
+    }
+
+    for (const modelId of ['gpt-6-sol', 'gpt-6-luna']) {
+      const result = planModelRequest({ model: effective('chatgpt-account', modelId), controls: { fastModel: true } });
+      expect(result.ok, `chatgpt-account/${modelId}`).toBe(true);
+      if (!result.ok) throw new Error(result.message);
+      expect(result.plan.fastMode).toBe(true);
+      expect(wire(result.plan).service_tier).toBe('priority');
+    }
+
+    for (const modelId of ['gpt-6-sol', 'gpt-6-luna']) {
+      const result = planModelRequest({ model: effective('openai-eu', modelId), controls: { fastModel: true } });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error(result.message);
+      expect(result.plan.fastMode).toBe(false);
+      expect(wire(result.plan)).not.toHaveProperty('service_tier');
+    }
+  });
+
+  it('binds Claude Opus 5.5 Fast to Anthropic API only', () => {
+    const api = planModelRequest({ model: effective('anthropic', 'claude-opus-5-5'), controls: { fastModel: true } });
+    expect(api.ok).toBe(true);
+    if (!api.ok) throw new Error(api.message);
+    expect(api.plan.fastMode).toBe(true);
+    expect(api.plan.headers['anthropic-beta']).toContain('fast-mode-2026-02-01');
+    expect(wire(api.plan)).toMatchObject({ speed: 'fast' });
+
+    const account = planModelRequest({
+      model: effective('claude-account', 'claude-opus-5-5'),
+      controls: { fastModel: true },
+    });
+    expect(account.ok).toBe(true);
+    if (!account.ok) throw new Error(account.message);
+    expect(account.plan.fastMode).toBe(false);
+    expect(wire(account.plan)).not.toHaveProperty('speed');
+    expect(account.plan.headers).not.toHaveProperty('anthropic-beta');
+  });
+
   for (const surfaceId of ['glm-global-coding-plan']) {
     it(`${surfaceId} sends each exposed GLM effort and recommends executable identities`, () => {
       const surface = catalog.surfaces.get(surfaceId)!.surface;

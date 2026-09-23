@@ -115,10 +115,14 @@
 .composer-model-effort-mode.is-disabled,
 .composer-model-effort-mode:disabled {
   cursor: default;
+}
+
+.composer-model-effort-mode.is-disabled > .ui-icon,
+.composer-model-effort-mode:disabled > .ui-icon {
   opacity: 0.45;
 }
 
-.composer-model-effort-mode.is-active:disabled {
+.composer-model-effort-mode.is-active:disabled > .ui-icon {
   opacity: 0.75;
 }
 

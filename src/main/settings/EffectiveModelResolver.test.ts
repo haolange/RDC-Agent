@@ -24,6 +24,7 @@ import {
 } from './EffectiveModelResolver';
 import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
 import { getLoadedProviderSurface, loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
+import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { planModelRequest } from './RequestPlanner';
 import { parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface } from './LiveProviderCatalogParsers';
 
@@ -285,6 +286,33 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       availability: 'unavailable',
       unavailableReason: 'This account-scoped model was absent from the authoritative provider catalog.',
     });
+  });
+
+  it('keeps maintained GPT-6 Sol and Luna executable when ChatGPT discovery omits them', () => {
+    const chatgpt = provider('chatgpt-account', 'OpenAIResponses');
+    const request = buildEffectiveCatalogRequest(chatgpt);
+    const discoveryModels = applyDiscoveryAuthority(chatgpt, [{
+      modelId: 'gpt-6-astra',
+      availability: 'available',
+    }]);
+    const models = mergeEffectiveCatalog({
+      ...request,
+      discovery: {
+        source: 'discovery',
+        observedAt: '2026-09-23T00:00:00.000Z',
+        models: discoveryModels,
+      },
+    });
+
+    for (const modelId of ['gpt-6-sol', 'gpt-6-luna']) {
+      const model = models.find((candidate) => candidate.modelId === modelId);
+      expect(model, modelId).toMatchObject({
+        availability: 'available',
+        controls: { fast: { state: 'selectable' } },
+        toolCalling: { state: 'supported' },
+      });
+      expect(isAgentToolExecutableModel(model!), modelId).toBe(true);
+    }
   });
 
   it('keeps user-managed definitions in the user layer', () => {

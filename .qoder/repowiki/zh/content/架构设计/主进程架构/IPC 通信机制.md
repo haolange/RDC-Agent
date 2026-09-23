@@ -12,7 +12,21 @@
 - [src/shared/renderer-api/transport.ts](file://src/shared/renderer-api/transport.ts)
 - [src/main/ipc/conversationHandlers.ts](file://src/main/ipc/conversationHandlers.ts)
 - [src/main/ipc/workflowHandlers.ts](file://src/main/ipc/workflowHandlers.ts)
+- [src/renderer/app/bootstrap/useIpcEventBridge.ts](file://src/renderer/app/bootstrap/useIpcEventBridge.ts)
+- [src/renderer/app/bootstrap/conversationSubscriptions.ts](file://src/renderer/app/bootstrap/conversationSubscriptions.ts)
+- [src/renderer/app/bootstrap/sessionSubscriptions.ts](file://src/renderer/app/bootstrap/sessionSubscriptions.ts)
+- [src/renderer/app/bootstrap/shellSubscriptions.ts](file://src/renderer/app/bootstrap/shellSubscriptions.ts)
+- [src/renderer/app/bootstrap/captureSubscriptions.ts](file://src/renderer/app/bootstrap/captureSubscriptions.ts)
+- [src/renderer/app/bootstrap/conversationEventBatcher.ts](file://src/renderer/app/bootstrap/conversationEventBatcher.ts)
 </cite>
+
+## 更新摘要
+**所做更改**
+- 更新了前端事件处理架构，从单一 useIpcEventBridge 重构为模块化订阅系统
+- 新增专用订阅模块：conversationSubscriptions、sessionSubscriptions、shellSubscriptions、captureSubscriptions
+- 增强了事件批处理和性能优化机制
+- 改进了错误处理和资源管理
+- 提升了可测试性和维护性
 
 ## 目录
 1. [简介](#简介)
@@ -29,17 +43,21 @@
 ## 简介
 本文件系统性解析 RDC-Agent 的 IPC 通信机制，覆盖主进程与渲染器之间的消息路由、类型安全、错误处理、处理器注册与管理、调用注册表（invokeRegistry）的动态加载与生命周期管理。文档提供从前端请求到后端处理的完整链路图，并给出性能优化与调试技巧，帮助读者快速理解与扩展该 IPC 体系。
 
+**更新** 本次更新重点反映了 IPC 事件处理系统的重大架构重构，将原来的单一 useIpcEventBridge（350+行）拆分为多个专用订阅模块，显著提高了代码的可测试性和维护性。
+
 ## 项目结构
 IPC 相关代码主要分布在以下位置：
 - 共享层：定义渲染器可使用的通道常量、传输接口与 API 构造器
 - Preload 层：将 Electron ipcRenderer 封装为安全的 RendererApiTransport，并通过 contextBridge 暴露给渲染器
 - 主进程：集中注册各业务域 IPC 处理器，维护全局上下文与广播能力，并提供 invoke 注册表以支持动态调用
+- **新增** 前端事件处理：按业务领域拆分的专用订阅模块，提供细粒度的事件处理能力
 
 ```mermaid
 graph TB
 subgraph "渲染器"
 R_API["createRendererApi<br/>构建类型化 API"]
 R_EVT["事件订阅 on/off"]
+R_BOOTSTRAP["useIpcEventBridge<br/>协调各订阅模块"]
 end
 subgraph "Preload"
 P_TRANSPORT["createIpcRendererTransport<br/>封装 ipcRenderer"]
@@ -50,22 +68,33 @@ W_HANDLERS["workbenchHandlers<br/>注册各域处理器"]
 INV_REG["invokeRegistry<br/>拦截 ipcMain.handle + 注册表"]
 CHANS["channels.ts<br/>通道常量与类型"]
 end
+subgraph "前端订阅模块"
+CONV_SUB["conversationSubscriptions<br/>对话事件处理"]
+SESS_SUB["sessionSubscriptions<br/>会话状态管理"]
+SHELL_SUB["shellSubscriptions<br/>Shell命令处理"]
+CAPT_SUB["captureSubscriptions<br/>捕获设备管理"]
+end
 R_API --> P_TRANSPORT
 P_BRIDGE --> R_API
 P_TRANSPORT --> |ipcRenderer.invoke/on| W_HANDLERS
 W_HANDLERS --> INV_REG
 W_HANDLERS --> CHANS
+R_BOOTSTRAP --> CONV_SUB
+R_BOOTSTRAP --> SESS_SUB
+R_BOOTSTRAP --> SHELL_SUB
+R_BOOTSTRAP --> CAPT_SUB
 ```
 
-图表来源
+**图表来源**
 - [src/shared/renderer-api/createRendererApi.ts:33-76](file://src/shared/renderer-api/createRendererApi.ts#L33-L76)
 - [src/preload/rendererTransport.ts:9-44](file://src/preload/rendererTransport.ts#L9-L44)
 - [src/preload/index.ts:8-15](file://src/preload/index.ts#L8-L15)
 - [src/main/ipc/workbenchHandlers.ts:259-281](file://src/main/ipc/workbenchHandlers.ts#L259-L281)
 - [src/main/ipc/invokeRegistry.ts:9-21](file://src/main/ipc/invokeRegistry.ts#L9-L21)
 - [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
+- [src/renderer/app/bootstrap/useIpcEventBridge.ts:44-123](file://src/renderer/app/bootstrap/useIpcEventBridge.ts#L44-L123)
 
-章节来源
+**章节来源**
 - [src/main/ipc/handlers.ts:1-7](file://src/main/ipc/handlers.ts#L1-L7)
 - [src/main/ipc/workbenchHandlers.ts:52-77](file://src/main/ipc/workbenchHandlers.ts#L52-L77)
 - [src/main/ipc/invokeRegistry.ts:1-51](file://src/main/ipc/invokeRegistry.ts#L1-L51)
@@ -83,16 +112,22 @@ W_HANDLERS --> CHANS
 - 渲染器 API 构造
   - createRendererApi.ts 基于 transport 生成类型化的 electronAPI，按领域划分方法（如 conversation、workflow、settings 等），并对事件订阅进行白名单校验。
 - 主进程处理器注册中心
-  - workbenchHandlers.ts 负责初始化 IPC 状态、安装 invoke 注册表、桥接系统主题变化、以及按域批量注册 IPC 处理器，并在启动末尾执行“渲染器-主进程通道一致性断言”。
+  - workbenchHandlers.ts 负责初始化 IPC 状态、安装 invoke 注册表、桥接系统主题变化、以及按域批量注册 IPC 处理器，并在启动末尾执行"渲染器-主进程通道一致性断言"。
 - 调用注册表（invokeRegistry）
-  - invokeRegistry.ts 通过拦截 ipcMain.handle 收集所有已注册的 channel，提供运行时查询、断言与统一调用入口，保障“渲染器声明的通道在主进程均有实现”。
+  - invokeRegistry.ts 通过拦截 ipcMain.handle 收集所有已注册的 channel，提供运行时查询、断言与统一调用入口，保障"渲染器声明的通道在主进程均有实现"。
+- **新增** 前端事件订阅模块
+  - 按业务领域拆分的专用订阅模块，每个模块负责特定领域的事件处理，提高代码内聚性和可测试性。
 
-章节来源
+**章节来源**
 - [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
 - [src/preload/rendererTransport.ts:9-44](file://src/preload/rendererTransport.ts#L9-L44)
 - [src/shared/renderer-api/createRendererApi.ts:33-76](file://src/shared/renderer-api/createRendererApi.ts#L33-L76)
 - [src/main/ipc/workbenchHandlers.ts:259-281](file://src/main/ipc/workbenchHandlers.ts#L259-L281)
 - [src/main/ipc/invokeRegistry.ts:9-51](file://src/main/ipc/invokeRegistry.ts#L9-L51)
+- [src/renderer/app/bootstrap/conversationSubscriptions.ts:1-140](file://src/renderer/app/bootstrap/conversationSubscriptions.ts#L1-L140)
+- [src/renderer/app/bootstrap/sessionSubscriptions.ts:1-167](file://src/renderer/app/bootstrap/sessionSubscriptions.ts#L1-L167)
+- [src/renderer/app/bootstrap/shellSubscriptions.ts:1-48](file://src/renderer/app/bootstrap/shellSubscriptions.ts#L1-L48)
+- [src/renderer/app/bootstrap/captureSubscriptions.ts:1-62](file://src/renderer/app/bootstrap/captureSubscriptions.ts#L1-L62)
 
 ## 架构总览
 下图展示从渲染器发起调用到主进程处理器执行的完整链路，包括参数校验、业务处理、结果返回与事件广播。
@@ -116,7 +151,7 @@ P-->>R : 返回值或错误
 Note over M,P : 必要时通过 broadcastToRenderer 推送事件
 ```
 
-图表来源
+**图表来源**
 - [src/preload/rendererTransport.ts:29-32](file://src/preload/rendererTransport.ts#L29-L32)
 - [src/main/ipc/conversationHandlers.ts:43-78](file://src/main/ipc/conversationHandlers.ts#L43-L78)
 - [src/main/ipc/workbenchHandlers.ts:79-87](file://src/main/ipc/workbenchHandlers.ts#L79-L87)
@@ -143,18 +178,18 @@ ParityCheck --> ThemeBridge["nativeTheme.on('updated')<br/>广播 app:themeChang
 ThemeBridge --> Ready(["就绪"])
 ```
 
-图表来源
+**图表来源**
 - [src/main/ipc/workbenchHandlers.ts:52-77](file://src/main/ipc/workbenchHandlers.ts#L52-L77)
 - [src/main/ipc/workbenchHandlers.ts:259-281](file://src/main/ipc/workbenchHandlers.ts#L259-L281)
 - [src/main/ipc/invokeRegistry.ts:9-21](file://src/main/ipc/invokeRegistry.ts#L9-L21)
 
-章节来源
+**章节来源**
 - [src/main/ipc/handlers.ts:1-7](file://src/main/ipc/handlers.ts#L1-L7)
 - [src/main/ipc/workbenchHandlers.ts:52-77](file://src/main/ipc/workbenchHandlers.ts#L52-L77)
 - [src/main/ipc/workbenchHandlers.ts:259-281](file://src/main/ipc/workbenchHandlers.ts#L259-L281)
 
 ### 调用注册表（invokeRegistry）
-- 动态加载：installIpcInvokeRegistry 在首次调用时替换 ipcMain.handle，使每次注册都同时写入本地 Map，形成“调用注册表”。
+- 动态加载：installIpcInvokeRegistry 在首次调用时替换 ipcMain.handle，使每次注册都同时写入本地 Map，形成"调用注册表"。
 - 运行时查询：hasRegisteredIpcChannel 判断某通道是否已注册；invokeRegisteredIpcChannel 通过 Map 查找并调用处理器，自动构造 IpcMainInvokeEvent 的 sender。
 - 生命周期与一致性：assertRendererIpcParity 在启动阶段对比 RENDERER_INVOKE_CHANNELS 与已注册通道集合，缺失即抛错，保证前后端契约一致。
 
@@ -172,10 +207,10 @@ class ElectronIpcMain {
 InvokeRegistry --> ElectronIpcMain : "拦截并增强 handle"
 ```
 
-图表来源
+**图表来源**
 - [src/main/ipc/invokeRegistry.ts:9-51](file://src/main/ipc/invokeRegistry.ts#L9-L51)
 
-章节来源
+**章节来源**
 - [src/main/ipc/invokeRegistry.ts:1-51](file://src/main/ipc/invokeRegistry.ts#L1-L51)
 
 ### 类型安全与参数校验
@@ -194,12 +229,12 @@ F -- 否 --> E
 F -- 是 --> G["返回标准化成功响应"]
 ```
 
-图表来源
+**图表来源**
 - [src/main/ipc/conversationHandlers.ts:43-78](file://src/main/ipc/conversationHandlers.ts#L43-L78)
 - [src/main/ipc/workflowHandlers.ts:21-33](file://src/main/ipc/workflowHandlers.ts#L21-L33)
 
-章节来源
-- [src/shared/renderer-api/channels.ts:220-244](file://src/shared/renderer-api/channels.ts#L220-L244)
+**章节来源**
+- [src/shared/renderer-api/channels.ts:220-244](file://src/shared/renderer-api/channels.ts#L220-244)
 - [src/main/ipc/conversationHandlers.ts:43-78](file://src/main/ipc/conversationHandlers.ts#L43-L78)
 - [src/main/ipc/workflowHandlers.ts:21-33](file://src/main/ipc/workflowHandlers.ts#L21-L33)
 
@@ -220,15 +255,77 @@ Win-->>R : 事件到达
 R->>R : events.on(channel, callback)
 ```
 
-图表来源
+**图表来源**
 - [src/main/ipc/workbenchHandlers.ts:79-87](file://src/main/ipc/workbenchHandlers.ts#L79-L87)
 - [src/main/ipc/workbenchHandlers.ts:190-237](file://src/main/ipc/workbenchHandlers.ts#L190-L237)
 - [src/shared/renderer-api/channels.ts:178-218](file://src/shared/renderer-api/channels.ts#L178-L218)
 
-章节来源
+**章节来源**
 - [src/main/ipc/workbenchHandlers.ts:79-87](file://src/main/ipc/workbenchHandlers.ts#L79-L87)
 - [src/main/ipc/workbenchHandlers.ts:190-237](file://src/main/ipc/workbenchHandlers.ts#L190-L237)
 - [src/shared/renderer-api/channels.ts:178-218](file://src/shared/renderer-api/channels.ts#L178-L218)
+
+### 前端事件处理架构重构
+
+**更新** 前端事件处理系统经历了重大架构重构，从单一的 useIpcEventBridge（350+行）拆分为多个专用订阅模块，显著提高了代码的可测试性和维护性。
+
+#### 模块化订阅架构
+新的架构将事件处理逻辑按业务领域拆分为独立的订阅模块：
+
+- **conversationSubscriptions.ts**：处理对话相关的实时事件，包括消息流、工具执行完成、代理事件等
+- **sessionSubscriptions.ts**：管理会话状态变化，包括运行状态、使用情况、证据事件等
+- **shellSubscriptions.ts**：处理 Shell 命令和系统级事件，如主题切换、窗口状态变化等
+- **captureSubscriptions.ts**：管理捕获设备和上下文快照，处理设备状态变化和捕获状态更新
+
+```mermaid
+flowchart TD
+useIpcEventBridge["useIpcEventBridge<br/>协调器"] --> convSub["conversationSubscriptions<br/>对话事件"]
+useIpcEventBridge --> sessSub["sessionSubscriptions<br/>会话状态"]
+useIpcEventBridge --> shellSub["shellSubscriptions<br/>Shell命令"]
+useIpcEventBridge --> captSub["captureSubscriptions<br/>捕获设备"]
+convSub --> convBatcher["conversationEventBatcher<br/>事件批处理"]
+sessSub --> sessProjection["会话投影"]
+shellSub --> systemEvents["系统事件"]
+captSub --> deviceState["设备状态"]
+```
+
+**图表来源**
+- [src/renderer/app/bootstrap/useIpcEventBridge.ts:44-123](file://src/renderer/app/bootstrap/useIpcEventBridge.ts#L44-L123)
+- [src/renderer/app/bootstrap/conversationSubscriptions.ts:1-140](file://src/renderer/app/bootstrap/conversationSubscriptions.ts#L1-L140)
+- [src/renderer/app/bootstrap/sessionSubscriptions.ts:1-167](file://src/renderer/app/bootstrap/sessionSubscriptions.ts#L1-L167)
+- [src/renderer/app/bootstrap/shellSubscriptions.ts:1-48](file://src/renderer/app/bootstrap/shellSubscriptions.ts#L1-L48)
+- [src/renderer/app/bootstrap/captureSubscriptions.ts:1-62](file://src/renderer/app/bootstrap/captureSubscriptions.ts#L1-L62)
+
+#### 事件批处理优化
+conversationEventBatcher 提供了高性能的事件批处理机制：
+
+- 合并高频 message_patched 事件到单个动画帧
+- 终端事件（message_completed/message_errored）立即刷新
+- 防止内存泄漏，提供 dispose 方法清理资源
+
+```mermaid
+sequenceDiagram
+participant FE as "前端"
+participant Batch as "Event Batcher"
+participant Store as "Store"
+FE->>Batch : message_patched (多次)
+Batch->>Batch : 合并到pending队列
+Batch->>Batch : requestAnimationFrame
+Batch->>Store : 批量应用更新
+Store-->>Batch : 完成
+Batch->>Batch : 清理pending队列
+```
+
+**图表来源**
+- [src/renderer/app/bootstrap/conversationEventBatcher.ts:14-77](file://src/renderer/app/bootstrap/conversationEventBatcher.ts#L14-L77)
+
+**章节来源**
+- [src/renderer/app/bootstrap/useIpcEventBridge.ts:44-123](file://src/renderer/app/bootstrap/useIpcEventBridge.ts#L44-L123)
+- [src/renderer/app/bootstrap/conversationSubscriptions.ts:1-140](file://src/renderer/app/bootstrap/conversationSubscriptions.ts#L1-L140)
+- [src/renderer/app/bootstrap/sessionSubscriptions.ts:1-167](file://src/renderer/app/bootstrap/sessionSubscriptions.ts#L1-L167)
+- [src/renderer/app/bootstrap/shellSubscriptions.ts:1-48](file://src/renderer/app/bootstrap/shellSubscriptions.ts#L1-L48)
+- [src/renderer/app/bootstrap/captureSubscriptions.ts:1-62](file://src/renderer/app/bootstrap/captureSubscriptions.ts#L1-L62)
+- [src/renderer/app/bootstrap/conversationEventBatcher.ts:1-77](file://src/renderer/app/bootstrap/conversationEventBatcher.ts#L1-L77)
 
 ### 前端调用示例流程（以对话发送为例）
 ```mermaid
@@ -248,11 +345,11 @@ MH-->>PT : { status : "accepted", requestId, turn, preparedContext }
 PT-->>FE : 返回结果
 ```
 
-图表来源
+**图表来源**
 - [src/preload/rendererTransport.ts:29-32](file://src/preload/rendererTransport.ts#L29-L32)
 - [src/main/ipc/conversationHandlers.ts:43-78](file://src/main/ipc/conversationHandlers.ts#L43-L78)
 
-章节来源
+**章节来源**
 - [src/main/ipc/conversationHandlers.ts:43-78](file://src/main/ipc/conversationHandlers.ts#L43-L78)
 
 ### 工作流控制流程（resume/stop）
@@ -276,10 +373,10 @@ WH->>DR : stopRun(targetRunId)
 WH-->>PT : { success : true/false, error? }
 ```
 
-图表来源
+**图表来源**
 - [src/main/ipc/workflowHandlers.ts:35-82](file://src/main/ipc/workflowHandlers.ts#L35-L82)
 
-章节来源
+**章节来源**
 - [src/main/ipc/workflowHandlers.ts:35-82](file://src/main/ipc/workflowHandlers.ts#L35-L82)
 
 ## 依赖关系分析
@@ -287,6 +384,7 @@ WH-->>PT : { success : true/false, error? }
 - 注册表耦合：workbenchHandlers 依赖 invokeRegistry 提供的拦截与断言能力；invokeRegistry 依赖 channels 中的 RENDERER_INVOKE_CHANNELS 进行一致性检查。
 - 传输解耦：preload 的 rendererTransport 仅依赖 Electron ipcRenderer，不感知业务通道，便于替换或测试。
 - 处理器内聚：每个业务域处理器独立注册，职责清晰，通过 workbenchHandlers 统一装配。
+- **新增** 前端模块解耦：各订阅模块独立管理特定领域的事件，通过 useIpcEventBridge 协调，降低耦合度。
 
 ```mermaid
 graph LR
@@ -298,9 +396,14 @@ WH --> IR
 WH --> CH
 WH --> H1["conversationHandlers.ts"]
 WH --> H2["workflowHandlers.ts"]
+RT --> EB["useIpcEventBridge.ts"]
+EB --> CS["conversationSubscriptions.ts"]
+EB --> SS["sessionSubscriptions.ts"]
+EB --> SHS["shellSubscriptions.ts"]
+EB --> CPS["captureSubscriptions.ts"]
 ```
 
-图表来源
+**图表来源**
 - [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
 - [src/shared/renderer-api/createRendererApi.ts:33-76](file://src/shared/renderer-api/createRendererApi.ts#L33-L76)
 - [src/preload/rendererTransport.ts:9-44](file://src/preload/rendererTransport.ts#L9-L44)
@@ -308,11 +411,13 @@ WH --> H2["workflowHandlers.ts"]
 - [src/main/ipc/invokeRegistry.ts:9-51](file://src/main/ipc/invokeRegistry.ts#L9-L51)
 - [src/main/ipc/conversationHandlers.ts:43-78](file://src/main/ipc/conversationHandlers.ts#L43-L78)
 - [src/main/ipc/workflowHandlers.ts:21-33](file://src/main/ipc/workflowHandlers.ts#L21-L33)
+- [src/renderer/app/bootstrap/useIpcEventBridge.ts:44-123](file://src/renderer/app/bootstrap/useIpcEventBridge.ts#L44-L123)
 
-章节来源
+**章节来源**
 - [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
 - [src/main/ipc/workbenchHandlers.ts:259-281](file://src/main/ipc/workbenchHandlers.ts#L259-L281)
 - [src/main/ipc/invokeRegistry.ts:9-51](file://src/main/ipc/invokeRegistry.ts#L9-L51)
+- [src/renderer/app/bootstrap/useIpcEventBridge.ts:44-123](file://src/renderer/app/bootstrap/useIpcEventBridge.ts#L44-L123)
 
 ## 性能考虑
 - 参数体积限制：parseIpcArgs 支持 maxBytes 限制，避免大载荷阻塞事件循环。建议对图片/附件类通道设置合理上限，并在前端分片上传。
@@ -320,12 +425,12 @@ WH --> H2["workflowHandlers.ts"]
 - 批量操作与节流：对于高频事件（如 trace、日志），可在主进程侧合并或采样后再广播，减少渲染器压力。
 - 异步与错误隔离：处理器内部 try/catch 包裹业务调用，失败时返回标准化错误，避免未捕获异常导致进程崩溃。
 - 启动顺序：先安装 invoke 注册表再注册处理器，确保断言能覆盖全部通道；将耗时初始化（如恢复会话）放在 initializeIpcState 中，避免阻塞注册流程。
-
-[本节为通用指导，无需特定文件引用]
+- **新增** 前端事件批处理：conversationEventBatcher 合并高频消息事件到动画帧，减少不必要的重渲染。
+- **新增** 模块化资源管理：每个订阅模块独立管理自己的监听器和资源，提供更好的内存管理和测试支持。
 
 ## 故障排查指南
 - 通道缺失报错
-  - 现象：启动时报“Renderer IPC parity violation; missing handlers: ...”
+  - 现象：启动时报"Renderer IPC parity violation; missing handlers: ..."
   - 原因：渲染器声明了某通道，但主进程未注册对应处理器
   - 处理：在对应域处理器文件中注册该通道，或在 channels.ts 中移除未使用的通道
   - 参考
@@ -353,15 +458,26 @@ WH --> H2["workflowHandlers.ts"]
   - 参考
     - [src/main/ipc/workbenchHandlers.ts:248-257](file://src/main/ipc/workbenchHandlers.ts#L248-L257)
 
-章节来源
+- **新增** 前端事件处理问题
+  - 现象：某些事件未正确处理或内存泄漏
+  - 排查：确认对应的订阅模块是否正确注册；检查 unsubscribe 函数是否正确调用；验证事件批处理器的 dispose 方法
+  - 处理：确保每个订阅模块都有对应的清理逻辑；检查 useIpcEventBridge 的 useEffect 依赖数组
+  - 参考
+    - [src/renderer/app/bootstrap/useIpcEventBridge.ts:92-111](file://src/renderer/app/bootstrap/useIpcEventBridge.ts#L92-L111)
+    - [src/renderer/app/bootstrap/conversationSubscriptions.ts:136-139](file://src/renderer/app/bootstrap/conversationSubscriptions.ts#L136-L139)
+
+**章节来源**
 - [src/main/ipc/invokeRegistry.ts:45-51](file://src/main/ipc/invokeRegistry.ts#L45-L51)
 - [src/main/ipc/workbenchHandlers.ts:248-257](file://src/main/ipc/workbenchHandlers.ts#L248-L257)
 - [src/main/ipc/conversationHandlers.ts:43-78](file://src/main/ipc/conversationHandlers.ts#L43-L78)
 - [src/main/ipc/workflowHandlers.ts:21-33](file://src/main/ipc/workflowHandlers.ts#L21-L33)
 - [src/shared/renderer-api/channels.ts:178-218](file://src/shared/renderer-api/channels.ts#L178-L218)
+- [src/renderer/app/bootstrap/useIpcEventBridge.ts:92-111](file://src/renderer/app/bootstrap/useIpcEventBridge.ts#L92-L111)
 
 ## 结论
-该 IPC 体系通过“通道契约 + 预加载传输 + 主进程注册表 + 参数校验 + 事件广播”的组合，实现了高内聚、低耦合、类型安全且可扩展的前后端通信。invokeRegistry 提供了强大的运行时治理能力，确保前后端通道一致；workbenchHandlers 作为组合根，统一管理生命周期与广播；各域处理器职责清晰，易于维护与扩展。遵循本文的性能与排障建议，可进一步提升稳定性与可观测性。
+该 IPC 体系通过"通道契约 + 预加载传输 + 主进程注册表 + 参数校验 + 事件广播"的组合，实现了高内聚、低耦合、类型安全且可扩展的前后端通信。invokeRegistry 提供了强大的运行时治理能力，确保前后端通道一致；workbenchHandlers 作为组合根，统一管理生命周期与广播；各域处理器职责清晰，易于维护与扩展。
+
+**更新** 前端事件处理系统的重大重构进一步提升了代码质量，通过将单一的大文件拆分为多个专用订阅模块，显著提高了可测试性、可维护性和性能。新的模块化架构使得每个业务领域的事件处理逻辑更加内聚，便于单独测试和维护。遵循本文的性能与排障建议，可进一步提升稳定性与可观测性。
 
 ## 附录
 - 常用通道分类（节选）
@@ -373,5 +489,8 @@ WH --> H2["workflowHandlers.ts"]
   - 运行时/追踪：runtimeLog:list、trace:*
 - 事件通道（节选）
   - workflow:runStatusChanged、tool:executionComplete、app:themeChanged、llm:stream 等
-
-[本节为概念性说明，无需特定文件引用]
+- **新增** 前端订阅模块职责
+  - conversationSubscriptions：对话消息流、工具执行跟踪、代理事件处理
+  - sessionSubscriptions：运行状态监控、使用情况统计、证据事件处理
+  - shellSubscriptions：系统命令处理、主题切换、窗口状态管理
+  - captureSubscriptions：设备状态同步、上下文快照管理、捕获状态更新

@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { EffectiveCatalogRequest } from './effectiveCatalogTypes';
+import type { DiscoveryLoader, EffectiveCatalogRequest } from './effectiveCatalogTypes';
 
 const electronMock = vi.hoisted(() => ({ root: '' }));
 vi.mock('electron', () => ({
@@ -684,6 +684,58 @@ describe('EffectiveCatalogService', () => {
     expect(service.getSnapshot(request()).models[0].label).toBe('Cold discovery');
     await vi.waitFor(() => expect(service.getSnapshot(request()).models[0].label).toBe('SWR discovery'));
     expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores persisted discovery without its compiled catalog revision and refreshes', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:00.000Z') });
+    const original = request();
+    await service.refreshDiscovery(original, async () => ({
+      models: [{
+        modelId: 'model-a',
+        controls: { fast: { state: 'unsupported', fixedValue: false } },
+      }],
+    }));
+    const persisted = JSON.parse(fs.readFileSync(statePath, 'utf8')) as {
+      discoveries: Record<string, { catalogProjectionRevision?: string }>;
+    };
+    delete persisted.discoveries['provider-a\u0000account-a\u0000OpenAICompatibleChatCompletions']
+      .catalogProjectionRevision;
+    fs.writeFileSync(statePath, JSON.stringify(persisted), 'utf8');
+
+    const updated = request({
+      catalog: {
+        ...original.catalog,
+        models: [{
+          ...original.catalog.models[0],
+          controls: {
+            ...original.catalog.models[0].controls,
+            fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
+          },
+        }],
+      },
+    });
+    let refreshCount = 0;
+    const loader: DiscoveryLoader = async () => {
+      refreshCount += 1;
+      return {
+        models: [{
+          modelId: 'model-a',
+          controls: { fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' } },
+        }],
+      };
+    };
+    const restartedService = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:00.000Z') });
+    restartedService.setDiscoveryLoaderResolver(() => loader);
+
+    const refreshed = restartedService.getSnapshot(updated);
+    expect(refreshed.stale).toBe(true);
+    expect(refreshed.models[0].controls.fast.state).toBe('selectable');
+    await vi.waitFor(() => {
+      expect(restartedService.getSnapshot(updated).stale).toBe(false);
+      expect(refreshCount).toBe(1);
+    });
+    expect(restartedService.getSnapshot(updated).models[0].controls.fast.state).toBe('selectable');
   });
 
   it('keeps the catalog revision stable when refresh only renews evidence timestamps', async () => {
