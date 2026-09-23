@@ -732,3 +732,10 @@ Execution tracking remains in RDC-Tool docs/tool-convergence-tasks.md (T1–T8).
 - `release:verify` 通过，版本 `0.6.0-rc.7`、52 个运行资源；SBOM 1106 components。该发布为未签名 Windows x64 prerelease，非 latest。
 - GitHub Release [v0.6.0-rc.7](https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.7) 七项资产远端 digest 全部匹配本地 SHA256。安装包 `2e8f635de7e33a2fa937b9f66a237788f6faf71f045d9370e018d90c534efab9`；ZIP `d616fab9604e14669a9167ce1cd121a8a95021c892a8ab170db853bb0fa7338d`；SBOM `f456a3ae297ac523848773e3a86c39b4aea7484c3e85201b2b106d33804a3987`。
 - 清理：删除已与远端 digest 核对的 rc.4 本地安装包/ZIP和本轮 builder 调试文件；保留当前七项发行资产。真实 OAuth Fast、设备/后端能力及完整断点 UI 验收仍按原边界记录，发版门禁不替代这些现场验收。
+## RDC-Agent 0.6.0-rc.8 发行回执（2026-09-23）
+
+- 源码提交与 tag `v0.6.0-rc.8` 均指向 `c9757cdea2f0b71009d134b5ab114c4351215965`；提交已非强制推送至 `main`。GitHub CI run [35827835415](https://github.com/haolange/RDC-Agent/actions/runs/35827835415) 记录时为 in progress，不将其记作通过。
+- `verify-package.mjs` 通过：版本 `0.6.0-rc.8`、52 个 runtime resources；SBOM 1106 components。发布为未签名 Windows x64 prerelease，`draft=false`、`prerelease=true`、`latest=false`。
+- GitHub Release [v0.6.0-rc.8](https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.8) 共七项资产，逐项远端 SHA-256 与本地相同。安装包 `f8fc59c7fb2d611048e739b1e62e714009a7958ddfd6260f41944cec7f4bc6eb`；ZIP `93c451c023236dca3038330cf8cc33e816dd3fee33ace82f8113bea2ecf610b7`；SBOM `849da3f5b57501dd3984272a0ba09ab841363e3c25509a564dad488fb1b4a6d6`。rc.1–rc.7 标签与历史资产保持原状。
+- 目录编译、受影响 provider/catalog 与 Composer 测试、typecheck、受影响 lint、repository hygiene、legacy residue、appearance、design-token 检查通过。隔离数据根下的提权桌面健康 smoke 观察到主进程服务初始化和 smoke PASS；独立视觉窗口/提示 hover-focus、明暗主题与窄窗口矩阵未在本轮现场复验。未发起真实模型请求。
+- 本轮移除了确认无用途的空目录、旧 coverage、已与远端历史资产核对摘要的本地 rc.6 包，以及 `builder-debug.yml`、`out/` 与 `release/win-unpacked/` 等构建中间产物。保留当前 rc.8 七项正式发行资产及 `.qoder/repowiki` 当前知识库存档。桌面健康 smoke 已完成；未观察到本轮遗留的 RdcAgent 进程。
