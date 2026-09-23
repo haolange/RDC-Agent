@@ -11,6 +11,8 @@
 - [provider-catalog-index.cjs](file://scripts/provider-catalog-index.cjs)
 - [deepseek.json](file://src/shared/provider-catalog/manifests/surfaces/deepseek.json)
 - [chatgpt-account.json](file://src/shared/provider-catalog/manifests/surfaces/chatgpt-account.json)
+- [claude-account.json](file://src/shared/provider-catalog/manifests/surfaces/claude-account.json)
+- [grok-account.json](file://src/shared/provider-catalog/manifests/surfaces/grok-account.json)
 - [LiveProviderCatalogParsers.ts](file://src/main/settings/LiveProviderCatalogParsers.ts)
 - [ProviderCatalogWireReview.test.ts](file://src/main/settings/ProviderCatalogWireReview.test.ts)
 - [providerWireMatrix.test.ts](file://src/main/testing/contracts/providerWireMatrix.test.ts)
@@ -19,11 +21,11 @@
 
 ## 更新摘要
 **所做更改**
-- 新增 ProviderCatalogWireReview 测试基础设施，验证多协议推理映射的正确性
-- 增强 LiveProviderCatalogParsers 中的准入过滤机制和模型发现逻辑
-- 扩展 providerWireMatrix 测试覆盖 9 个适配器表面 × 16 个合同维度
-- 改进 DeepSeek、GLM、Google AI Studio、MiniMax 提供商的多协议支持
-- 完善 reasoningWire 处理逻辑，支持 OpenAI Responses、OpenAI Compatible、Anthropic 等多种协议
+- 新增 GPT-6 系列模型支持（gpt-6-astra、gpt-6-sol、gpt-6-luna），包含双上下文层级配置和 Fast 模式
+- 添加 Claude Opus 5.5 模型支持，增强推理级别控制和自适应思考模式
+- 扩展 Grok 4.5+ 能力支持，包括视觉输入和结构化输出功能
+- 更新提供商清单中的新模型配置、定价信息和区域支持详情
+- 增强测试基础设施以验证新模型的 wire 映射和功能特性
 
 ## 目录
 1. [简介](#简介)
@@ -45,6 +47,7 @@
 - 目录加载、排序算法、类别与协议规范
 - 提供商摘要生成、连接模式配置、认证方式支持与可用性状态管理
 - 完整的提供商注册流程示例（从清单到运行时可用）
+- **新增**：GPT-6 系列模型、Claude Opus 5.5、GroK 4.5+ 的完整支持
 - **新增**：wire review 测试基础设施和多协议推理映射验证
 
 ## 项目结构
@@ -262,6 +265,124 @@ Hash --> Output["输出 index + surfaces 映射"]
 - [settings.ts:420-541](file://src/shared/types/settings.ts#L420-L541)
 - [settings.ts:116-144](file://src/shared/types/settings.ts#L116-L144)
 
+### 新增：GPT-6 系列模型支持
+
+**更新** ChatGPT Account 提供商新增了完整的 GPT-6 系列模型支持，包括 gpt-6-astra、gpt-6-sol、gpt-6-luna 三个模型。
+
+#### GPT-6 模型特性
+- **双上下文层级配置**：默认 272,000 tokens（Codex 服务限制），最大 872,000 tokens（Max 模式）
+- **Fast 模式支持**：通过 `service_tier: priority` 实现快速响应
+- **推理级别控制**：支持 low、medium、high、xhigh、max 五个级别
+- **多模态能力**：支持工具调用、视觉输入和结构化输出
+- **账户授权管理**：根据账户权限动态调整可用性和功能
+
+#### 双上下文层级实现
+系统通过 `contextTiers` 数组实现双层级配置：
+
+```json
+"contextTiers": [
+  {
+    "id": "default",
+    "label": "Codex service limit",
+    "maxPromptTokens": 272000,
+    "activation": {"kind": "implicit"},
+    "entitlement": "granted"
+  },
+  {
+    "id": "max", 
+    "label": "Max mode",
+    "maxPromptTokens": 872000,
+    "activation": {"kind": "implicit"},
+    "entitlement": "unknown"
+  }
+]
+```
+
+**章节来源**
+- [chatgpt-account.json:145-516](file://src/shared/provider-catalog/manifests/surfaces/chatgpt-account.json#L145-L516)
+- [chatgpt-account.json:1002-1011](file://src/shared/provider-catalog/manifests/surfaces/chatgpt-account.json#L1002-L1011)
+
+### 新增：Claude Opus 5.5 支持
+
+**更新** Claude Account 提供商新增了 claude-opus-5-5 模型，增强了推理能力和自适应思考模式。
+
+#### Claude Opus 5.5 特性
+- **增强的推理能力**：支持 low、medium、high、xhigh、max 推理级别
+- **自适应思考模式**：默认 medium 级别，支持 adaptive thinking
+- **上下文窗口**：默认 200,000 tokens，可选 1,000,000 tokens（需要额外授权）
+- **多模态支持**：支持工具调用、视觉输入和结构化输出
+- **Fast 模式**：通过 `speed=fast` 和 `anthropic-beta: fast-mode-2026-02-01` 实现
+
+#### 推理级别映射
+```json
+"controls": {
+  "reasoning": {
+    "kind": "levels",
+    "supportsOff": false,
+    "levels": ["low", "medium", "high", "xhigh", "max"],
+    "defaultSelection": "medium",
+    "wireProfile": {
+      "kind": "anthropic",
+      "on": "medium",
+      "levels": {
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "xhigh": "xhigh",
+        "max": "max"
+      },
+      "onMode": "adaptive"
+    }
+  }
+}
+```
+
+**章节来源**
+- [claude-account.json:341-430](file://src/shared/provider-catalog/manifests/surfaces/claude-account.json#L341-L430)
+
+### 新增：Grok 4.5+ 能力增强
+
+**更新** Grok Account 提供商增强了 Grok 4.5+ 模型的能力支持，包括视觉输入和结构化输出功能。
+
+#### Grok 4.5+ 增强特性
+- **视觉输入支持**：新增图像识别和处理能力
+- **结构化输出**：支持 JSON 和其他结构化格式输出
+- **推理级别控制**：支持 low、medium、high、xhigh 推理级别
+- **Fast 模式**：通过 `service_tier: priority` 实现快速响应
+- **上下文窗口**：500,000 tokens 默认窗口
+
+#### 能力声明
+```json
+"capabilities": [
+  "chat",
+  "tool-calling",
+  "vision-input",
+  "model-discovery"
+],
+"controls": {
+  "reasoning": {
+    "kind": "levels",
+    "supportsOff": false,
+    "levels": ["low", "medium", "high", "xhigh"],
+    "defaultSelection": "high",
+    "wireProfile": {
+      "kind": "openai-responses",
+      "on": "high",
+      "levels": {
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "xhigh": "xhigh"
+      }
+    }
+  }
+}
+```
+
+**章节来源**
+- [grok-account.json:85-90](file://src/shared/provider-catalog/manifests/surfaces/grok-account.json#L85-L90)
+- [grok-account.json:616-686](file://src/shared/provider-catalog/manifests/surfaces/grok-account.json#L616-L686)
+
 ### 新增：Wire Review 测试基础设施
 
 **更新** 新增了 ProviderCatalogWireReview.test.ts，提供全面的 wire review 测试基础设施，验证多协议推理映射的正确性。
@@ -271,29 +392,25 @@ Hash --> Output["输出 index + surfaces 映射"]
 - **DeepSeek**：验证 `deepseek-flash` 和 `deepseek-v4-pro` 在 OpenAIResponses、OpenAICompatibleChatCompletions、AnthropicMessages 三种协议下的推理级别映射
 - **GLM**：验证 GLM-5.3 在不同推理级别下的 output_config.effort 设置
 - **MiniMax**：验证 MiniMax-M3 在 AnthropicMessages 和 OpenAICompatibleChatCompletions 协议下保留未解决的推理设置
+- **GPT-6**：验证 gpt-6-sol 和 gpt-6-luna 的 Fast 模式和推理级别映射
 
 #### 测试覆盖范围
 ```typescript
-// 测试 DeepSeek 多协议推理映射
-for (const modelId of ['deepseek-flash', 'deepseek-v4-pro']) {
-  for (const protocol of ['OpenAIResponses', 'OpenAICompatibleChatCompletions', 'AnthropicMessages'] as const) {
-    // 验证 off/low/high/max 推理级别的正确映射
-  }
+// 测试 GPT-6 Fast 模式
+for (const modelId of ['gpt-6-sol', 'gpt-6-luna']) {
+  const result = planModelRequest({ model: effective('chatgpt-account', modelId), controls: { fastModel: true } });
+  expect(result.plan.fastMode).toBe(true);
+  expect(wire(result.plan).service_tier).toBe('priority');
 }
 
-// 测试 GLM 推理级别
-for (const level of ['low', 'high', 'max'] as const) {
-  // 验证 output_config.effort 设置
-}
-
-// 测试 MiniMax 未解决推理
-for (const surfaceId of ['minimax-cn', 'minimax-global', 'minimax-cn-coding-plan', 'minimax-global-coding-plan']) {
-  // 验证 reasoningWire.selection 保持 'unknown'
-}
+// 测试 Claude Opus 5.5 Fast 模式
+const api = planModelRequest({ model: effective('anthropic', 'claude-opus-5-5'), controls: { fastModel: true } });
+expect(api.plan.headers['anthropic-beta']).toContain('fast-mode-2026-02-01');
+expect(wire(api.plan)).toMatchObject({ speed: 'fast' });
 ```
 
 **章节来源**
-- [ProviderCatalogWireReview.test.ts:41-116](file://src/main/settings/ProviderCatalogWireReview.test.ts#L41-L116)
+- [ProviderCatalogWireReview.test.ts:92-115](file://src/main/settings/ProviderCatalogWireReview.test.ts#L92-L115)
 
 ### 新增：Wire Matrix 测试覆盖
 
@@ -403,44 +520,6 @@ DeepSeek 提供商现在使用严格的准入过滤机制，只允许 `deepseek-
 - [deepseek.json:212-228](file://src/shared/provider-catalog/manifests/surfaces/deepseek.json#L212-L228)
 - [deepseek.json:229-369](file://src/shared/provider-catalog/manifests/surfaces/deepseek.json#L229-L369)
 
-### 最新变更：ChatGPT Account 提供商增强
-
-**更新** ChatGPT Account 提供商新增了 GPT-6 Astra 模型，支持双上下文层级配置。
-
-#### GPT-6 Astra 模型特性
-- **默认上下文层级**：272,000 tokens（Codex 服务限制）
-- **最大上下文层级**：872,000 tokens（Max 模式，需要额外授权）
-- **推理级别**：low、medium、high、xhigh、max
-- **快速模式**：可选，启用后设置 `service_tier: priority`
-- **工具调用**：支持
-- **视觉输入**：支持
-- **结构化输出**：支持
-
-#### 双上下文层级实现
-系统通过 `contextTiers` 数组实现双层级配置：
-
-```json
-"contextTiers": [
-  {
-    "id": "default",
-    "label": "Codex service limit",
-    "maxPromptTokens": 272000,
-    "activation": {"kind": "implicit"},
-    "entitlement": "granted"
-  },
-  {
-    "id": "max", 
-    "label": "Max mode",
-    "maxPromptTokens": 872000,
-    "activation": {"kind": "implicit"},
-    "entitlement": "unknown"
-  }
-]
-```
-
-**章节来源**
-- [chatgpt-account.json:127-250](file://src/shared/provider-catalog/manifests/surfaces/chatgpt-account.json#L127-L250)
-
 ## 依赖关系分析
 - ProviderCatalogService 依赖：
   - 分类与协议常量（llm.ts）
@@ -497,6 +576,9 @@ WireMatrix["Wire Matrix 测试"] --> Parsers["LiveProviderCatalogParsers.ts"]
 - **新增**：测试性能优化
   - Wire matrix 测试使用批量 fixture 文件，减少 I/O 操作
   - 推理映射测试采用参数化测试，提高测试效率
+- **新增**：GPT-6 模型优化
+  - 双上下文层级配置减少不必要的上下文切换开销
+  - Fast 模式通过 service_tier 优化响应时间
 
 ## 故障排查指南
 - 常见错误
@@ -506,6 +588,9 @@ WireMatrix["Wire Matrix 测试"] --> Parsers["LiveProviderCatalogParsers.ts"]
   - 未知内置提供商：Unknown builtin provider: ${id}
   - 模型准入失败：模型未通过准入过滤检查
   - **新增**：Wire 映射错误：多协议推理映射不正确
+  - **新增**：GPT-6 模型错误：上下文层级配置错误或 Fast 模式激活失败
+  - **新增**：Claude Opus 5.5 错误：推理级别映射错误或自适应思考模式异常
+  - **新增**：Grok 4.5+ 错误：视觉输入或结构化输出功能异常
 - 定位建议
   - 检查编译脚本是否成功生成 index 与 surfaces
   - 确认 surface 的 schemaVersion 与 catalogRevision 一致
@@ -513,6 +598,9 @@ WireMatrix["Wire Matrix 测试"] --> Parsers["LiveProviderCatalogParsers.ts"]
   - 验证 connectionSchema 字段与 headerMappings 引用是否存在
   - 检查模型 ID 是否符合准入模式要求
   - **新增**：运行 wire review 测试，验证多协议推理映射的正确性
+  - **新增**：检查 GPT-6 模型的 contextTiers 配置是否正确
+  - **新增**：验证 Claude Opus 5.5 的推理级别映射和 Fast 模式配置
+  - **新增**：测试 Grok 4.5+ 的视觉输入和结构化输出功能
 
 **章节来源**
 - [ProviderCatalogRegistry.ts:28-54](file://src/main/provider-catalog/ProviderCatalogRegistry.ts#L28-L54)
@@ -530,8 +618,11 @@ Provider 目录管理系统通过"编译期清单 + 运行期注册表 + 服务�
 - 完善的元数据与来源追溯，提升可维护性与可观测性
 - **新增**：全面的 wire review 测试基础设施，确保多协议推理映射的正确性
 - **新增**：9×16 合同维度的 wire matrix 测试，覆盖所有适配器表面的关键功能
+- **新增**：完整的 GPT-6 系列模型支持，包括双上下文层级和 Fast 模式
+- **新增**：Claude Opus 5.5 模型支持，增强推理能力和自适应思考模式
+- **新增**：Grok 4.5+ 能力增强，支持视觉输入和结构化输出
 
-最近的更新包括 DeepSeek 提供商的重构、ChatGPT Account 提供商的新功能、LiveProviderCatalogParsers 的增强，以及新增的 wire review 测试基础设施，进一步提升了系统的稳定性和功能性。
+最近的更新包括 GPT-6 系列模型的完整支持、Claude Opus 5.5 的新功能、Grok 4.5+ 的能力增强、LiveProviderCatalogParsers 的改进，以及新增的 wire review 测试基础设施，进一步提升了系统的稳定性和功能性。
 
 ## 附录：新增提供商注册流程示例
 以下流程展示如何将一个新的 LLM 服务提供商添加到系统中，使其在 ProviderCatalogService 中可见并可被配置使用。
@@ -560,6 +651,9 @@ Provider 目录管理系统通过"编译期清单 + 运行期注册表 + 服务�
    - 运行 ProviderCatalogWireReview 测试，验证新提供商的多协议推理映射
    - 确保 reasoningWire 正确处理不同协议的推理级别
    - 验证 wire matrix 测试覆盖新提供商的关键功能
+   - **新增**：对于 GPT-6 类模型，验证双上下文层级配置和 Fast 模式
+   - **新增**：对于 Claude Opus 5.5，验证推理级别映射和自适应思考模式
+   - **新增**：对于 Grok 4.5+，验证视觉输入和结构化输出功能
 
 ```mermaid
 sequenceDiagram
