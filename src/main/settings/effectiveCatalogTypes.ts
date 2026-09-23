@@ -69,6 +69,8 @@ export interface CatalogModelContribution {
 
 export interface CatalogLayerContribution {
   source: CapabilityEvidenceSource;
+  /** Catalog model revision used to derive a persisted discovery projection. */
+  catalogProjectionRevision?: string;
   sourceKind?: CapabilityEvidence['sourceKind'];
   observedAt: string;
   refreshedAt?: string;

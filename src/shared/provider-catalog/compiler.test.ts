@@ -364,6 +364,8 @@ describe('Provider Catalog compiler', () => {
 
     verify('chatgpt-account', [
       ['gpt-6-astra', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'low'],
+      ['gpt-6-sol', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
+      ['gpt-6-luna', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-sol', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-terra', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-luna', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
@@ -436,6 +438,10 @@ describe('Provider Catalog compiler', () => {
       ['grok-build-0.1', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on'],
     ]);
     const grokSurface = catalog.surfaces.get('grok-account')?.surface;
+    expect(grokSurface?.models.find((model) => model.modelId === 'grok-4.5')).toMatchObject({
+      visionInput: { state: 'supported' },
+      structuredOutput: { state: 'supported' },
+    });
     expect(grokSurface?.models.find((model) => model.modelId === 'grok-4.20-0309-reasoning')?.controls.reasoning)
       .toMatchObject({ kind: 'always-on', wireProfile: { kind: 'none' } });
     expect(grokSurface?.models.find((model) => model.modelId === 'grok-build-0.1')?.controls.reasoning)
@@ -446,6 +452,22 @@ describe('Provider Catalog compiler', () => {
         headers: { 'x-grok-client-version': '0.2.101' },
       }),
     ]));
+
+    for (const surfaceId of ['openai', 'openai-us', 'openai-eu']) {
+      const surface = catalog.surfaces.get(surfaceId)?.surface;
+      for (const modelId of ['gpt-6-sol', 'gpt-6-luna']) {
+        expect(surface?.models.find((model) => model.modelId === modelId), `${surfaceId}/${modelId}`).toMatchObject({
+          visionInput: { state: 'supported' },
+          structuredOutput: { state: 'supported' },
+          controls: { fast: { state: surfaceId === 'openai-eu' ? 'unsupported' : 'selectable' } },
+        });
+      }
+    }
+
+    for (const surfaceId of ['anthropic', 'claude-account']) {
+      expect(catalog.surfaces.get(surfaceId)?.surface.models.find((model) => model.modelId === 'claude-opus-5-5'), surfaceId)
+        .toMatchObject({ visionInput: { state: 'supported' }, structuredOutput: { state: 'supported' } });
+    }
 
     verify('deepseek', [
       ['deepseek-flash', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['low', 'high', 'max'], 'high'],

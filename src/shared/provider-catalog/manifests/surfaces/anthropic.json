@@ -53,6 +53,14 @@
       "observedAt": "2026-09-22",
       "refreshedAt": "2026-09-22",
       "surface": "anthropic"
+    },
+    {
+      "id": "provider-docs:anthropic:opus55-2026-09-23",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://platform.claude.com/docs/en/models/opus-5-5/overview ; https://platform.claude.com/docs/en/build-with-claude/effort ; https://platform.claude.com/docs/en/build-with-claude/fast-mode",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-23",
+      "surface": "anthropic"
     }
   ],
   "defaultFactSourceId": "rdc-agent:anthropic:0",
@@ -479,6 +487,119 @@
       "factSourceId": "provider-docs:anthropic:2026-08-01"
     },
     {
+      "modelId": "claude-opus-5-5",
+      "label": "claude-opus-5-5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "1M window",
+          "maxPromptTokens": 1000000,
+          "maxOutputTokens": 128000,
+          "maxTotalTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 128000,
+      "cost": {
+        "input": 4,
+        "output": 20,
+        "cacheRead": 0.2,
+        "cacheWrite": 5
+      },
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.anthropic.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "unknown"
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "defaultState": "known",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "onMode": "adaptive"
+          }
+        }
+      },
+      "executionBindings": [
+        {
+          "id": "fast:anthropic-speed",
+          "when": {
+            "fast": true
+          },
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "speed": "fast"
+              }
+            },
+            {
+              "kind": "request-headers",
+              "headers": {
+                "anthropic-beta": "fast-mode-2026-02-01"
+              }
+            }
+          ],
+          "entitlement": "unknown"
+        }
+      ],
+      "factSourceId": "provider-docs:anthropic:opus55-2026-09-23",
+      "fieldFactSourceIds": {
+        "cost": "provider-docs:anthropic:opus55-2026-09-23",
+        "contextTiers": "provider-docs:anthropic:opus55-2026-09-23",
+        "controls": "provider-docs:anthropic:opus55-2026-09-23",
+        "visionInput": "provider-docs:anthropic:opus55-2026-09-23",
+        "structuredOutput": "provider-docs:anthropic:opus55-2026-09-23"
+      }
+    },
+    {
       "modelId": "claude-opus-4-8",
       "label": "claude-opus-4-8",
       "aliases": [],
@@ -659,6 +780,7 @@
   ],
   "protocolOverrides": [],
   "recommendedModels": [
+    "claude-opus-5-5",
     "claude-fable-5-1",
     "claude-opus-5",
     "claude-sonnet-5"

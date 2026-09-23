@@ -9,3 +9,4 @@ depends_on: []
 related_to:
     - path: resources
     - path: scripts/quality_checks
+    - path: scripts/runtime_helpers

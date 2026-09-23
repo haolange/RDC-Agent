@@ -67,6 +67,14 @@
       "refreshedAt": "2026-08-23T00:00:00+08:00",
       "surface": "grok-account",
       "accountScope": "observed-account"
+    },
+    {
+      "id": "provider-docs:grok-account:grok45-capabilities-2026-09-23",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://docs.x.ai/developers/models/grok-4.5",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-23",
+      "surface": "grok-account"
     }
   ],
   "defaultFactSourceId": "user-observation:grok-account:2026-07-14",
@@ -626,10 +634,10 @@
         "state": "supported"
       },
       "visionInput": {
-        "state": "unknown"
+        "state": "supported"
       },
       "structuredOutput": {
-        "state": "unknown"
+        "state": "supported"
       },
       "selection": {
         "pickerVisibility": "primary"
@@ -671,7 +679,9 @@
       },
       "factSourceId": "user-observation:grok-account:2026-07-14",
       "fieldFactSourceIds": {
-        "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
+        "toolCalling": "provider-docs:grok-account:tools-2026-08-23",
+        "visionInput": "provider-docs:grok-account:grok45-capabilities-2026-09-23",
+        "structuredOutput": "provider-docs:grok-account:grok45-capabilities-2026-09-23"
       }
     },
     {

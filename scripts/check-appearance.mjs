@@ -142,6 +142,9 @@ assert(
     && debuggerCssSource.includes('border-radius: var(--radius-full)')
     && debuggerCssSource.includes('background: var(--token-bg-raised);')
     && debuggerCssSource.includes('box-shadow: var(--token-shadow-raised)')
+    && debuggerCssSource.includes('.composer-model-effort-mode:disabled > .ui-icon')
+    && debuggerCssSource.includes('.composer-model-effort-mode.is-active:disabled > .ui-icon')
+    && !/\.composer-model-effort-mode\.is-disabled,\s*\.composer-model-effort-mode:disabled\s*\{[^}]*opacity:/u.test(debuggerCssSource)
     && !debuggerCssSource.includes('.composer-model-effort-mode-tip {\n  position: absolute;\n  top: calc(100%')
     && !debuggerCssSource.includes(".composer-model-effort-mode[data-mode='fast'] .composer-model-effort-mode-tip")
     && !debuggerCssSource.includes(".composer-model-effort-mode[data-mode='max-context'] .composer-model-effort-mode-tip"),

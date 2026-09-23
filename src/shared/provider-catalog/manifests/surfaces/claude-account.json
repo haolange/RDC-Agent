@@ -27,6 +27,14 @@
       "sourceRevision": "provider-registry-v4",
       "refreshedAt": "2026-07-15",
       "surface": "claude-account"
+    },
+    {
+      "id": "provider-docs:claude-account:opus55-2026-09-23",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://platform.claude.com/docs/en/models/opus-5-5/overview ; https://platform.claude.com/docs/en/build-with-claude/effort ; https://platform.claude.com/docs/en/build-with-claude/fast-mode",
+      "observedAt": "2026-09-22",
+      "refreshedAt": "2026-09-23",
+      "surface": "claude-account"
     }
   ],
   "defaultFactSourceId": "rdc-agent:claude-account:0",
@@ -331,6 +339,96 @@
       "factSourceId": "rdc-agent:claude-account:0"
     },
     {
+      "modelId": "claude-opus-5-5",
+      "label": "claude-opus-5-5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 200000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "header",
+            "headers": {
+              "anthropic-beta": "context-1m-2025-08-07"
+            }
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 200000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.anthropic.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "max",
+          "entitlement": "unknown"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "onMode": "adaptive"
+          }
+        }
+      },
+      "factSourceId": "provider-docs:claude-account:opus55-2026-09-23",
+      "fieldFactSourceIds": {
+        "visionInput": "provider-docs:claude-account:opus55-2026-09-23",
+        "structuredOutput": "provider-docs:claude-account:opus55-2026-09-23",
+        "controls": "provider-docs:claude-account:opus55-2026-09-23"
+      }
+    },
+    {
       "modelId": "claude-haiku-4-5-20251001",
       "label": "claude-haiku-4-5-20251001",
       "aliases": [
@@ -391,6 +489,7 @@
   ],
   "protocolOverrides": [],
   "recommendedModels": [
+    "claude-opus-5-5",
     "claude-fable-5",
     "claude-sonnet-5",
     "claude-opus-4-8",

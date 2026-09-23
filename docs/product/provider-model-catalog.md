@@ -1,6 +1,6 @@
 # RDC-Agent Provider Model Catalog
 
-> 权威矩阵（2026-08-02）。Manifest 固化一手资料可确定的结构事实，credential-scoped discovery 决定账户可见性，真实 wire probe 验证 route / control / continuation；三者合并为 Effective Catalog。
+> 权威矩阵（2026-09-23）。Manifest 固化一手资料可确定的结构事实，credential-scoped discovery 决定账户可见性，真实 wire review 验证 route / control / continuation；三者合并为 Effective Catalog。
 > `Context Window` 表示常规上下文预算；`1M Max` 单独表示是否支持 1M / Max mode。
 > 「不清楚」或三角证据未齐 → fail-closed：manifest 用 `unknown` / `unsupported` / `none`（按证据选择）。Agent/Composer 可执行集合只纳入 source-backed `toolCalling.supported` 且具备已实现 structured-tool adapter 的模型；`unknown`/`unsupported` 仍留在 Settings catalog 供审计，但不作为 Agent 选择项。
 > 同名模型在不同 Provider surface 上的 Fast / 1M / 推理控件彼此独立，不可跨 surface 抄写。
@@ -54,19 +54,37 @@ Model manifest 可声明每百万 token 美元定价（`cost` 字段）：
 | Name             | Context Window | Max Output | Fast Mode | 推理等级 | 状态 |
 | ---------------- | --------------:| ----------:| --------- | -------- | ---- |
 | `claude-opus-5`  | 1M             | 128K       | Direct API `speed=fast` + beta header；仅 `usage.speed=fast` 授权 | Off / Low / Medium / High / Extra / Max（默认 High） | 可用；Fast entitlement 需 probe |
+| `claude-opus-5-5` | 1M            | 128K       | Direct API `speed=fast` + beta header；Fast entitlement 需 probe | Low / Medium / High / Extra / Max（默认 Medium；无 Off） | $4 / $20；2026-09-22 发布 |
 | `claude-fable-5-1` | 1M           | 128K       | 否 | Low / Medium / High / Extra / Max（默认 High；无 Off） | 可用；$10 / $50 |
 
-Fast 是同一模型的 request binding，不是 `*-fast` 别名或独立模型。标准价格为 $5 / $25 每百万 input/output tokens；Fast 为 $10 / $50。Bedrock、Google Cloud、Microsoft Foundry 与 GitHub Copilot 不继承 Direct API Fast。
+Fast 是同一模型的 request binding，不是 `*-fast` 别名或独立模型。Opus 5 标准价格为 $5 / $25、Fast 为 $10 / $50；Opus 5.5 标准价格为 $4 / $20 每百万 input/output tokens。Bedrock、Google Cloud、Microsoft Foundry、Claude Account OAuth 与 GitHub Copilot 不继承 Direct API Fast。
+
+## OpenAI Direct API
+
+| Name | Context Window | Max Output | Fast Mode | 推理等级 | 状态 |
+| ---- | -------------: | ---------: | --------- | -------- | ---- |
+| `gpt-6-sol` | 1.05M | 128K | `service_tier=priority`（Fast，标准价格 2×） | Off / Low / Medium / High / Extra / Max（默认 Medium） | $2 / $10；支持视觉、工具与结构化输出 |
+| `gpt-6-luna` | 1.05M | 128K | `service_tier=priority`（Fast，标准价格 2×） | Off / Low / Medium / High / Extra / Max（默认 Medium） | $0.10 / $0.50；支持视觉、工具与结构化输出 |
+
+EU data residency route 只支持标准处理；该 route 对两款 GPT-6 模型关闭 Fast。API 窗口与 Codex account 窗口属于不同 surface，不互相覆盖。
 
 ## ChatGPT Account
 
 | Name                  | Context Window | 1M Max      | Fast Mode                      | 推理等级                                         | 状态   |
 | --------------------- | --------------:| ----------- | ------------------------------ | -------------------------------------------- | ---- |
 | `gpt-6-astra`         | 272K 默认；Max 872K | 是（Codex Max mode，不是 API 1,050,000） | Codex `service_tier=priority`（Fast） | Low / Medium / High / Extra / Max（默认 Low） | 账号 `/models` 出现时可用；窗口与 Fast 取 Codex `models.json` + 本机 ChatGPT Account `/models`，不抄 API 数字 |
-| `gpt-5.6-sol`         | 256K           | 否           | API 参数：`service_tier=priority` | Low / Medium / High / Extra / Max（默认 Medium） | 可用   |
-| `gpt-5.6-terra`       | 256K           | 否           | API 参数：`service_tier=priority` | Low / Medium / High / Extra / Max（默认 Medium） | 可用   |
-| `gpt-5.6-luna`        | 256K           | 否           | API 参数：`service_tier=priority` | Low / Medium / High / Extra / Max（默认 Medium） | 可用   |
-| `gpt-5.5`             | 256K           | 否           | API 参数：`service_tier=priority` | Low / Medium / High / Extra（默认 Medium）       | 可用   |
+| `gpt-6-sol`           | 272K 默认；Max 872K | 是（Codex Max mode） | Codex `service_tier=priority`（Fast） | Low / Medium / High / Extra / Max（默认 Medium） | 维护型账户目录；目录刷新失败不撤销型号 |
+| `gpt-6-luna`          | 272K 默认；Max 872K | 是（Codex Max mode） | Codex `service_tier=priority`（Fast） | Low / Medium / High / Extra / Max（默认 Medium） | 维护型账户目录；目录刷新失败不撤销型号 |
+| `gpt-5.6-sol`         | 272K 默认；Max 872K | 是（Codex Max mode） | Codex `service_tier=priority`（Fast） | Low / Medium / High / Extra / Max（默认 Medium） | 可用 |
+| `gpt-5.6-terra`       | 272K 默认；Max 872K | 是（Codex Max mode） | Codex `service_tier=priority`（Fast） | Low / Medium / High / Extra / Max（默认 Medium） | 可用 |
+| `gpt-5.6-luna`        | 272K 默认；Max 872K | 是（Codex Max mode） | Codex `service_tier=priority`（Fast） | Low / Medium / High / Extra / Max（默认 Medium） | 可用 |
+| `gpt-5.5`             | 272K 默认；Max 872K | 是（Codex Max mode） | Codex `service_tier=priority`（Fast） | Low / Medium / High / Extra（默认 Medium） | 可用 |
+
+GPT-6 Sol/Luna 的 API 目录为 1.05M / 128K；Codex account 则按当前 Codex `models.json` 固化 272K 默认与 872K Max、Fast priority tier。两款型号属于维护型账户目录；过期或失败的当前账户 `/models` 刷新不能将其隐藏。其他 account-entitled 型号仍由当前账户目录决定可见性。
+
+## Claude Account
+
+`claude-opus-5-5` 是 `account-entitled` 候选：仅当前账户 `/models` 精确返回该 ID 时可选。基于该 account route 尚无 Fast entitlement 证据，Fast 不可选；上下文采用账户默认 200K，可选 1M entitlement 仍为 unknown。视觉与结构化输出随模型官方事实支持。
 
 ## GitHub Copilot
 
@@ -96,7 +114,7 @@ Fast 是同一模型的 request binding，不是 `*-fast` 别名或独立模型�
 | `grok-4.3`                     | 500K           | 是（Max → 1M） | 否     | Non / Low / Medium / High      | 可用  |
 | `grok-4.7`                     | 500K           | 否      | `service_tier=priority`（Fast） | Low / Medium / High / Extra（默认 High）；视觉 supported | 可用 |
 | `grok-4.6`                     | 500K           | 否      | 否         | Low / Medium / High / Extra（默认 High）；视觉 supported | 可用  |
-| `grok-4.5`                     | 500K           | 否      | 否         | Low / Medium / High（默认 Medium） | 可用  |
+| `grok-4.5`                     | 500K           | 否      | 否         | Low / Medium / High（默认 Medium） | 视觉与结构化输出 supported；可用  |
 | `grok-build-0.1`               | 256K           | 否      | 否         | Just On                        | 可用  |
 
 ## DeepSeek
@@ -210,7 +228,7 @@ Kimi Coding Plan 的 Anthropic-compatible base URL 是 `https://api.kimi.com/cod
 8. ClinePass：写清的档位已入结构控件；wire 待 probe；「不清楚」行保持 unknown。
 9. OpenCode Go：仅 `kimi-k3` 窗口/推理已写清；其余「不清楚」不宣称已测；Composer 关档统一 `Disabled`/`禁用`。
 
-## 2026-09-22 事实复核来源
+## 2026-09-22 / 2026-09-23 事实复核来源
 
 本次复核以改动前 `6b1c2a520fb2c55a04cb194246607c84668bc91a` 为源码基线；最终提交与工程/运行验收另见 acceptance-ledger。下表是公开事实与适用范围，不代表模型调用成功。Manifest 的 `factSources` / `fieldFactSourceIds` 记录字段归属，166 个 models.dev identity 的固定 revision 不变。
 
@@ -225,6 +243,9 @@ Kimi Coding Plan 的 Anthropic-compatible base URL 是 `https://api.kimi.com/cod
 | anthropic | Fable5.1上下文/输出/价格/推理及其它修改字段确认；5.1不支持forced tool use，当前请求链不发送强制tool_choice。 | [5.1规格](https://platform.claude.com/docs/en/models/fable-5-1/overview)、[Effort](https://platform.claude.com/docs/en/build-with-claude/effort)、[价格](https://platform.claude.com/docs/en/about-claude/pricing)、[输出上限](https://platform.claude.com/docs/zh-CN/build-with-claude/thinking) |
 | google-ai-studio | 3.8 Flash为1,048,576/65,536；3.7不接受minimal；旧模型补输出上限；删除gemini-pro错误别名。稳定v1 Interactions有效。 | [3.8](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash)、[接线指南](https://ai.google.dev/gemini-api/docs/latest-model)、[3.7](https://ai.google.dev/gemini-api/docs/models/gemini-3.7-flash)、[v1 API](https://ai.google.dev/api/interactions-api-v1) |
 | github-copilot | Opus4.6与Gemini3.1 Pro于9/1退役；Opus4.8-fast/Gemini3.5不提供1M。精确200K未证实，保留未知窗口，由账号目录提供正数预算后才能执行。 | [支持与退役表](https://docs.github.com/en/copilot/reference/ai-models/supported-models)、[退役公告](https://github.blog/changelog/2026-08-31-selected-github-copilot-models-deprecated/)、[官方原文](https://raw.githubusercontent.com/github/docs/main/content/copilot/reference/ai-models/supported-models.md) |
+| openai / openai-us / openai-eu | GPT-6 Sol/Luna Direct API 为 1.05M input / 128K output、支持视觉/工具/结构化输出；Fast 用 priority tier，EU endpoint 仅标准处理。Codex account 独立为 272K 默认 / 872K Max，并按其自身目录声明 Fast。 | [Sol API规格](https://developers.openai.com/api/docs/models/gpt-6-sol)、[Luna API规格](https://developers.openai.com/api/docs/models/gpt-6-luna)、[Fast mode](https://developers.openai.com/api/docs/guides/fast-mode)、[Codex目录](https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json) |
+| anthropic / claude-account | Opus 5.5 为 1M / 128K、$4/$20、视觉与结构化输出支持；Direct API Fast 用 `speed=fast` + beta header 且 entitlement 需 probe。Claude Account 只在账号目录精确返回时提供模型，Fast 不从 API route 继承。 | [Opus 5.5规格](https://platform.claude.com/docs/en/models/opus-5-5/overview)、[Effort](https://platform.claude.com/docs/en/build-with-claude/effort)、[Fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) |
+| grok-account | Grok 4.5 的 Vision 与 Structured Output 按官方模型规格记为 supported；Fast 仍 unsupported。 | [Grok 4.5规格](https://docs.x.ai/developers/models/grok-4.5) |
 | groq | Scout/Qwen3-32B通用服务退役有企业合同例外，恢复为account-entitled候选，不能全局删除。 | [退役例外](https://console.groq.com/docs/deprecations)、[通用目录](https://console.groq.com/docs/models) |
 | cerebras | Scout与Coder480B已退役，删除，不猜替代型号。 | [退役表](https://inference-docs.cerebras.ai/support/deprecation)、[更新记录](https://inference-docs.cerebras.ai/support/change-log) |
 | opencode-go | 清理用户明确授权删除的历史hy3-preview拒绝占位；不称当前模型退役。9/22公开models仍有该ID，与产品文档不一致，本轮未做付费推理重测。 | [公开目录](https://opencode.ai/zen/go/v1/models)、[Go文档](https://opencode.ai/docs/go/) |
