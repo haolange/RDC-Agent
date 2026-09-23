@@ -1,3 +1,7 @@
+## RDC-Agent 0.6.0-rc.8 发布收口（2026-09-23）
+
+已完成 Windows x64 未签名预发布；保留 rc.1–rc.7 的 tag 与资产。发行源码/tag 指向 `c9757cdea2f0b71009d134b5ab114c4351215965`。GitHub CI run [35827835415](https://github.com/haolange/RDC-Agent/actions/runs/35827835415) 在回执时仍为 in progress。`verify-package.mjs` 通过（52 个 runtime resources），SBOM 含 1106 components。GitHub Release [v0.6.0-rc.8](https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.8) 七项资产远端 digest 均与本地 SHA256 一致；安装包 `f8fc59c7fb2d611048e739b1e62e714009a7958ddfd6260f41944cec7f4bc6eb`，ZIP `93c451c023236dca3038330cf8cc33e816dd3fee33ace82f8113bea2ecf610b7`，SBOM `849da3f5b57501dd3984272a0ba09ab841363e3c25509a564dad488fb1b4a6d6`。移除本轮构建的 builder-debug、解包目录和 out 中间产物；仅保留 rc.8 七项正式本地资产。详细检查与未完成的视觉验收边界见 acceptance-ledger。
+
 ## RDC-Agent 0.6.0-rc.7 发布收口（2026-09-23）
 
 已完成 Windows x64 未签名预发布，保留 rc.1–rc.6 的 tag 与资产。发行源码/tag 指向 `6e7a353b75738a448dbdac218142bef644b98e10`；GitHub CI run [35769889133](https://github.com/haolange/RDC-Agent/actions/runs/35769889133) 全部通过。`verify-package.mjs` 通过（52 个 runtime resources），SBOM 含 1106 components。七项远端资产 digest 均与本地 SHA256 一致：安装包 `2e8f635de7e33a2fa937b9f66a237788f6faf71f045d9370e018d90c534efab9`，ZIP `d616fab9604e14669a9167ce1cd121a8a95021c892a8ab170db853bb0fa7338d`；详见 [v0.6.0-rc.7 Release](https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.7)。移除了已在远端核对相同 digest 的旧 rc.4 本地安装包/ZIP和本轮 builder-debug.yml；当前仅保留 rc.7 七项正式本地资产。详细 UI/后端验收边界继续以 acceptance-ledger 为准。
