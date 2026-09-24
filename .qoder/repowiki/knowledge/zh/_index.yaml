@@ -3,7 +3,7 @@ schema_version: 1
 locale: zh-CN
 branch: main
 nodes_managed: true
-exported_at: "2026-09-23T06:52:10Z"
+exported_at: "2026-09-24T10:50:23Z"
 modules:
     "":
         dir_name: RDC-Agent 根工程（Electron + Vite 多进程编排）
@@ -35,8 +35,8 @@ modules:
         depends_on: []
         related_to: []
     docs:
-        dir_name: RDC-Agent 设计文档与设计系统预览
-        title: RDC-Agent 设计文档与设计系统预览
+        dir_name: RDC-Agent 设计文档与 Design System 预览
+        title: RDC-Agent 设计文档与 Design System 预览
         scope:
             - docs/
             - designs/

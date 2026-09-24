@@ -8,60 +8,76 @@ source_files:
     - package.json
     - pnpm-workspace.yaml
     - pnpm-lock.yaml
-    - scripts/pnpm-resolver.mjs
     - patches/style-mod@4.1.3.patch
+    - .github/workflows/ci.yml
+    - scripts/pnpm-resolver.mjs
 ---
 
-## 1. 使用的系统与工具
+## 1. 使用的系统与方法
 
-- **包管理器**：pnpm（版本锁定为 `11.7.0`，通过 `package.json#packageManager` 与 `scripts/pnpm-resolver.mjs` 双重约束）。
-- **工作区**：仓库根目录使用 `pnpm-workspace.yaml` 声明全局 store、offline 偏好、构建白名单与 patch/override 策略；当前仓库仅包含一个顶层 package，未拆分子 workspace，但保留了 workspace 配置以支持未来扩展。
-- **锁文件**：`pnpm-lock.yaml` 作为唯一依赖快照，提交至版本库。
-- **Node 引擎**：`engines.node >= 22.13.0`，配合 pnpm 11.x 要求。
-- **打包**：Electron 应用通过 `electron-vite build` + `electron-builder` 产出，依赖在构建期由 pnpm 解析并写入 `out/`。
+- **包管理器**：pnpm（版本锁定在 `package.json` 的 `packageManager: "pnpm@11.7.0"`，CI 通过 `pnpm/action-setup@v4` 固定安装相同版本）。
+- **仓库模式**：单仓 monorepo，使用 `pnpm-workspace.yaml` 声明 workspace；未拆分子 package，所有依赖集中在根 `package.json` 中声明。
+- **Node 版本约束**：`engines.node >= 22.13.0`，CI 与本地均使用 Node 22.13.0。
+- **构建工具链**：electron-vite + vite + electron-builder，依赖由 pnpm 统一解析。
 
 ## 2. 关键文件
 
-| 文件 | 作用 |
-|---|---|
-| `package.json` | 声明运行时依赖 (`dependencies`)、开发依赖 (`devDependencies`)、`overrides`（强制升级 `fast-uri`、`postcss`），并通过 `scripts/*` 暴露质量门禁、启动、测试等命令。 |
-| `pnpm-workspace.yaml` | 全局 pnpm 行为：store 路径 `~/.cache/rdc-agent/pnpm-store`、`preferOffline: true`、对 `yauzl@3.3.1` 的 `overrides`、允许编译原生模块的白名单 (`@swc/core`、`electron-winstaller`、`esbuild`)、`minimumReleaseAgeExclude` 跳过 ai-sdk 新发布冷却期、`patchedDependencies` 指向 `patches/style-mod@4.1.3.patch`。 |
-| `pnpm-lock.yaml` | 完整依赖树与子依赖版本的确定性快照。 |
-| `scripts/pnpm-resolver.mjs` | 启动脚本在运行前按优先级查找 pnpm 可执行文件（相邻 node_modules → corepack → PATH），校验其版本必须等于 `REQUIRED_PNPM = '11.7.0'`，否则抛出错误。 |
-| `patches/style-mod@4.1.3.patch` | 针对 CodeMirror 依赖的 `style-mod@4.1.3` 的本地 diff，移除对 `root.head` 的存在性判断，使其能在 Electron CSP 环境下使用 `adoptedStyleSheets`。 |
-| `.gitignore` / `check-repository-hygiene.mjs` | 将 `node_modules`、`.pnpm-store`、`pnpm-lock`、`.npmrc` 排除出发布产物，防止把依赖缓存或 npm 配置打入安装包。 |
+- `package.json`：唯一依赖清单，分 `dependencies`（运行时）、`devDependencies`（构建/测试）、`overrides`（强制提升版本）。
+- `pnpm-lock.yaml`：锁定的依赖树（由 CI 以 `--frozen-lockfile` 校验）。
+- `pnpm-workspace.yaml`：workspace 全局配置，包括 store 路径、offline 偏好、`overrides`、`allowBuilds`、`minimumReleaseAgeExclude`、`patchedDependencies`。
+- `patches/style-mod@4.1.3.patch`：对第三方库 `style-mod@4.1.3` 的 diff 补丁，由 pnpm patchedDependencies 机制应用。
+- `.github/workflows/ci.yml`：CI 流程，固定 pnpm 版本并执行 `pnpm install --frozen-lockfile`。
+- `scripts/pnpm-resolver.mjs`：自定义 pnpm resolver（用于脚本侧解析依赖），配合测试用例 `src/main/testing/pnpmResolver.test.ts` 验证行为。
 
 ## 3. 架构与约定
 
-### 3.1 单一来源声明
-所有第三方依赖统一集中在根 `package.json` 的 `dependencies` / `devDependencies` 中声明，没有子包级别的 manifest，也没有 vendoring 目录。依赖图由 pnpm 解析并以 `pnpm-lock.yaml` 固化。
+### 3.1 依赖来源与私有源
+
+- 仓库中未发现 `.npmrc` / `.pnpmrc` / `registry=` / `@scope:` 等私有 npm registry 配置，也未见 `GOPRIVATE` 或 Go module proxy 配置。依赖全部来自公共 npm registry。
+- 因此本仓库当前不依赖企业私有 npm registry；若未来引入私有包，需通过 `.npmrc` 或 pnpm config 配置认证。
 
 ### 3.2 版本管理策略
-- **精确版本 vs 范围**：生产依赖大多使用精确主版本号（如 `ai@6.0.226`、`electron@^42.2.0`、`zod@^4.3.6`），开发依赖同样采用 `^` 范围以便获取小版本修复。
-- **强制覆盖 (`overrides`)**：在 `package.json` 中对 `fast-uri`、`postcss` 进行强制覆盖；在 `pnpm-workspace.yaml` 中对 `yauzl@3.3.1` 进行覆盖，解决 electron@42 → extract-zip → yauzl@2 在 Node ≥24.16 下挂起的问题。
-- **补丁机制**：通过 `pnpm-workspace.yaml#patchedDependencies` 将 `style-mod@4.1.3` 映射到 `patches/style-mod@4.1.3.patch`，遵循 pnpm 的 patch-package 兼容格式，使该补丁在每次安装时自动应用。
-- **最小发布年龄豁免**：`minimumReleaseAgeExclude` 排除了 `@ai-sdk/gateway`、`@ai-sdk/provider-utils`、`ai` 的新发布冷却期，使这些高频更新的 AI SDK 能立即被拉取。
 
-### 3.3 构建环境约束
-- `allowBuilds` 白名单只允许 `@swc/core`、`electron-winstaller`、`esbuild` 三个需要编译原生代码的包执行 install 钩子，其余包禁止构建，降低 CI 依赖风险。
-- `preferOffline: true` 鼓励离线安装，适合 CI 缓存场景。
-- Store 固定到 `~/.cache/rdc-agent/pnpm-store`，避免多项目互相污染。
+- **精确版本为主**：多数依赖使用 `^` 语义范围（如 `react ^18.2.0`、`typescript ^5.3.0`），但部分关键依赖使用精确版本（如 `ai 6.0.226`、`electron-store ^8.1.0` 中的 `uuid ^9.0.0` 等）。
+- **transitive 依赖强制提升**：通过 `overrides.fast-uri = "3.1.2"` 和 `overrides.postcss = "8.5.15"` 强制提升两个传递依赖的版本，解决安全或兼容问题。
+- **workspace 级 overrides**：`pnpm-workspace.yaml` 中额外 `overrides.yauzl = "3.3.1"`，修复 electron@42 → extract-zip → yauzl@2 在 Node ≥24.16 下的挂起问题。
+- **最小发布年龄豁免**：`minimumReleaseAgeExclude` 放行了 `@ai-sdk/gateway@3.0.150`、`@ai-sdk/provider-utils@4.0.39`、`ai@6.0.226`，允许新发布的 AI SDK 包跳过 pnpm 的最小发布年龄保护。
 
-### 3.4 运行时入口对 pnpm 的依赖
-`scripts/launch-rdc-agent.mjs` 通过 `import { resolvePnpm } from './pnpm-resolver.mjs'` 在启动阶段验证 pnpm 版本，确保开发者/CI 环境与 `packageManager` 字段一致。失败时会列出已检查到的候选及其版本。
+### 3.3 原生模块构建白名单
+
+`allowBuilds` 显式允许以下包从源码编译：`@swc/core`、`electron-winstaller`、`esbuild`。其他含原生代码的包默认禁止 build，避免意外触发耗时编译。
+
+### 3.4 补丁策略
+
+- 使用 pnpm 内置的 `patchedDependencies` 机制，将 `style-mod@4.1.3` 的修改放入 `patches/style-mod@4.1.3.patch`。
+- 补丁原因注释说明：CodeMirror 必须在桌面 CSP 下使用 `Document` 上构造的 sheet，因此需要修补 style-mod 的样式注入逻辑。
+- 该补丁随仓库提交，安装时自动 apply，无需手动操作。
+
+### 3.5 依赖缓存与离线
+
+- `storeDir: ~/.cache/rdc-agent/pnpm-store`：将 pnpm store 固定在用户目录下的专用路径，避免污染全局 store。
+- `preferOffline: true`：优先使用本地缓存，减少网络请求。
+- CI 通过 `pnpm/action-setup@v4` 缓存 pnpm store，加速构建。
+- Windows 启动器脚本会断言实际 store 路径等于 `$HOME\.cache\rdc-agent\pnpm-store`，确保环境一致性。
+
+### 3.6 可重复安装
+
+- CI 始终使用 `pnpm install --frozen-lockfile`，拒绝任何与 `pnpm-lock.yaml` 不一致的变更。
+- `packageManager` 字段锁定 pnpm 版本，保证不同开发者/CI 使用同一 pnpm。
 
 ## 4. 约定与约束
 
-| 约定 | 说明 | 依据 |
-|---|---|---|
-| 新增依赖必须加到根 `package.json` | 仓库无子 package，所有依赖集中声明 | `package.json` 结构 |
-| 禁止将 `node_modules`、`.pnpm-store`、`pnpm-lock`、`.npmrc` 打入发布包 | 发布产物不得包含依赖缓存或 npm 配置 | `scripts/check-repository-hygiene.mjs` 中的正则过滤 |
-| 原生模块安装需显式允许 | 只有 `@swc/core`、`electron-winstaller`、`esbuild` 可执行构建脚本 | `pnpm-workspace.yaml#allowBuilds` |
-| 第三方库行为变更通过 patch 而非 fork | 对 `style-mod` 的修改以 diff 形式提交到 `patches/` | `pnpm-workspace.yaml#patchedDependencies` |
-| pnpm 版本必须严格匹配 | 启动器会拒绝非 `11.7.0` 的 pnpm | `scripts/pnpm-resolver.mjs` + `package.json#packageManager` |
-| 依赖更新应走 lockfile 变更 | 所有版本锁定在 `pnpm-lock.yaml`，不手动编辑 | pnpm 工作流惯例 |
-| 私有仓库/认证 | 仓库中未发现 `.npmrc`、`NPM_TOKEN`、`NPM_REGISTRY` 等配置；依赖均来自公共 registry | 搜索结果为空 |
+| 约定 | 来源/证据 |
+|---|---|
+| 必须使用 pnpm 11.7.0 | `package.json#packageManager` 与 CI `pnpm/action-setup@v4 with version: 11.7.0` |
+| Node ≥ 22.13.0 | `package.json#engines.node` |
+| 依赖变更必须更新 lockfile 且保持冻结 | CI 步骤 `pnpm install --frozen-lockfile` |
+| 仅允许白名单原生模块编译 | `pnpm-workspace.yaml#allowBuilds` |
+| 新增补丁需放在 `patches/<pkg>@<version>.patch` 并在 `patchedDependencies` 注册 | `pnpm-workspace.yaml#patchedDependencies` 及现有 `patches/` 目录 |
+| 传递依赖冲突通过 `overrides` 集中解决 | `package.json#overrides` 与 `pnpm-workspace.yaml#overrides` |
+| 新发布的 AI 相关包如需跳过最小发布年龄，需在 `minimumReleaseAgeExclude` 添加 | `pnpm-workspace.yaml#minimumReleaseAgeExclude` |
+| 私有 npm registry 尚未配置 | 仓库中未发现 `.npmrc` / `.pnpmrc` / registry 配置 |
 
 ## 5. 总结
 
-该仓库采用 **pnpm 单仓 + 锁文件 + 工作区级 overrides/patches** 的依赖管理模式：所有第三方依赖在根 `package.json` 声明，通过 `pnpm-lock.yaml` 锁定版本，借助 `pnpm-workspace.yaml` 集中管理覆盖、补丁和构建白名单，并用自定义的 `scripts/pnpm-resolver.mjs` 在启动时强制校验 pnpm 版本。这种设计保证了 Electron 应用在多平台下的依赖一致性，同时通过 `allowBuilds` 和 `minimumReleaseAgeExclude` 精细控制原生构建与新包拉取行为。
+本项目采用 **pnpm 单仓 + 严格 lockfile + 补丁/覆盖集中化** 的依赖管理模式：所有依赖在根 `package.json` 声明，通过 `pnpm-workspace.yaml` 统一管理 store、构建白名单、补丁与版本覆盖，并由 CI 以 `--frozen-lockfile` 强制执行可重复安装。当前未接入私有 npm registry，第三方依赖通过官方 npm 源获取，必要时用 `overrides` 与 `patches` 修正传递依赖或上游行为。

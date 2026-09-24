@@ -18,6 +18,9 @@
 - [src/renderer/app/bootstrap/shellSubscriptions.ts](file://src/renderer/app/bootstrap/shellSubscriptions.ts)
 - [src/renderer/app/bootstrap/captureSubscriptions.ts](file://src/renderer/app/bootstrap/captureSubscriptions.ts)
 - [src/renderer/app/bootstrap/conversationEventBatcher.ts](file://src/renderer/app/bootstrap/conversationEventBatcher.ts)
+- [src/main/conversation/DelegationTraceStore.ts](file://src/main/conversation/DelegationTraceStore.ts)
+- [src/shared/types/delegationTrace.ts](file://src/shared/types/delegationTrace.ts)
+- [src/renderer/features/transcript/useDelegationTrace.ts](file://src/renderer/features/transcript/useDelegationTrace.ts)
 </cite>
 
 ## 更新摘要
@@ -27,6 +30,7 @@
 - 增强了事件批处理和性能优化机制
 - 改进了错误处理和资源管理
 - 提升了可测试性和维护性
+- **新增** 委托追踪API支持：conversation.getDelegationTrace 和 conversation.getDelegationReceipt 方法，扩展了Electron API表面以支持委托追踪数据的获取
 
 ## 目录
 1. [简介](#简介)
@@ -43,7 +47,7 @@
 ## 简介
 本文件系统性解析 RDC-Agent 的 IPC 通信机制，覆盖主进程与渲染器之间的消息路由、类型安全、错误处理、处理器注册与管理、调用注册表（invokeRegistry）的动态加载与生命周期管理。文档提供从前端请求到后端处理的完整链路图，并给出性能优化与调试技巧，帮助读者快速理解与扩展该 IPC 体系。
 
-**更新** 本次更新重点反映了 IPC 事件处理系统的重大架构重构，将原来的单一 useIpcEventBridge（350+行）拆分为多个专用订阅模块，显著提高了代码的可测试性和维护性。
+**更新** 本次更新重点反映了 IPC 事件处理系统的重大架构重构，将原来的单一 useIpcEventBridge（350+行）拆分为多个专用订阅模块，显著提高了代码的可测试性和维护性。同时新增了委托追踪相关的API方法，扩展了Electron API表面以支持委托追踪数据的获取。
 
 ## 项目结构
 IPC 相关代码主要分布在以下位置：
@@ -67,6 +71,7 @@ subgraph "主进程"
 W_HANDLERS["workbenchHandlers<br/>注册各域处理器"]
 INV_REG["invokeRegistry<br/>拦截 ipcMain.handle + 注册表"]
 CHANS["channels.ts<br/>通道常量与类型"]
+DELEG_STORE["DelegationTraceStore<br/>委托追踪存储"]
 end
 subgraph "前端订阅模块"
 CONV_SUB["conversationSubscriptions<br/>对话事件处理"]
@@ -79,6 +84,7 @@ P_BRIDGE --> R_API
 P_TRANSPORT --> |ipcRenderer.invoke/on| W_HANDLERS
 W_HANDLERS --> INV_REG
 W_HANDLERS --> CHANS
+W_HANDLERS --> DELEG_STORE
 R_BOOTSTRAP --> CONV_SUB
 R_BOOTSTRAP --> SESS_SUB
 R_BOOTSTRAP --> SHELL_SUB
@@ -117,6 +123,8 @@ R_BOOTSTRAP --> CAPT_SUB
   - invokeRegistry.ts 通过拦截 ipcMain.handle 收集所有已注册的 channel，提供运行时查询、断言与统一调用入口，保障"渲染器声明的通道在主进程均有实现"。
 - **新增** 前端事件订阅模块
   - 按业务领域拆分的专用订阅模块，每个模块负责特定领域的事件处理，提高代码内聚性和可测试性。
+- **新增** 委托追踪存储
+  - DelegationTraceStore 提供委托执行的追踪数据持久化和读取功能，支持分页查询和收据文件管理。
 
 **章节来源**
 - [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
@@ -128,6 +136,7 @@ R_BOOTSTRAP --> CAPT_SUB
 - [src/renderer/app/bootstrap/sessionSubscriptions.ts:1-167](file://src/renderer/app/bootstrap/sessionSubscriptions.ts#L1-L167)
 - [src/renderer/app/bootstrap/shellSubscriptions.ts:1-48](file://src/renderer/app/bootstrap/shellSubscriptions.ts#L1-L48)
 - [src/renderer/app/bootstrap/captureSubscriptions.ts:1-62](file://src/renderer/app/bootstrap/captureSubscriptions.ts#L1-L62)
+- [src/main/conversation/DelegationTraceStore.ts:1-218](file://src/main/conversation/DelegationTraceStore.ts#L1-L218)
 
 ## 架构总览
 下图展示从渲染器发起调用到主进程处理器执行的完整链路，包括参数校验、业务处理、结果返回与事件广播。
@@ -327,6 +336,107 @@ Batch->>Batch : 清理pending队列
 - [src/renderer/app/bootstrap/captureSubscriptions.ts:1-62](file://src/renderer/app/bootstrap/captureSubscriptions.ts#L1-L62)
 - [src/renderer/app/bootstrap/conversationEventBatcher.ts:1-77](file://src/renderer/app/bootstrap/conversationEventBatcher.ts#L1-L77)
 
+### 委托追踪API支持
+
+**新增** 系统新增了委托追踪相关的API方法，扩展了Electron API表面以支持委托追踪数据的获取。
+
+#### 委托追踪API设计
+新增了两个核心API方法：
+
+- **conversation.getDelegationTrace**：获取委托执行的追踪步骤，支持分页查询
+- **conversation.getDelegationReceipt**：获取委托执行的详细收据信息，支持大文本的分页读取
+
+```mermaid
+sequenceDiagram
+participant FE as "前端"
+participant API as "Renderer API"
+participant MH as "main : conversationHandlers"
+participant DTS as "DelegationTraceStore"
+FE->>API : getDelegationTrace({sessionId, parentToolCallId, cursor, pageSize})
+API->>MH : ipcRenderer.invoke("conversation : getDelegationTrace", request)
+MH->>MH : parseIpcArgs(参数校验)
+MH->>MH : 验证sessionId权限
+MH->>DTS : read(sessionId, parentToolCallId, cursor, pageSize)
+DTS-->>MH : DelegationTracePage
+MH-->>API : 返回追踪数据
+API-->>FE : 分页的委托执行步骤
+```
+
+**图表来源**
+- [src/main/ipc/conversationHandlers.ts:122-130](file://src/main/ipc/conversationHandlers.ts#L122-L130)
+- [src/main/conversation/DelegationTraceStore.ts:193-204](file://src/main/conversation/DelegationTraceStore.ts#L193-L204)
+
+#### 委托追踪数据存储
+DelegationTraceStore 实现了完整的委托追踪数据持久化机制：
+
+- **文件存储**：使用JSONL格式存储追踪条目，支持增量追加
+- **缓存机制**：维护解析后的追踪数据缓存，避免重复IO操作
+- **收据管理**：将大型收据内容存储为独立文件，支持分页读取
+- **权限控制**：严格的sessionId验证，确保数据安全
+
+```mermaid
+flowchart TD
+Start(["委托开始"]) --> WriteStart["写入start条目"]
+WriteStart --> TrackEvents["跟踪Agent事件"]
+TrackEvents --> ToolStarted{"tool.started?"}
+ToolStarted -- 是 --> WriteStep["写入step条目"]
+ToolStarted -- 否 --> CheckFinish{"tool.completed/denied?"}
+CheckFinish -- 是 --> WritePatch["写入patch条目"]
+CheckFinish -- 否 --> CheckAssistant{"assistant.completed?"}
+CheckAssistant -- 是 --> WriteMessage["写入message step"]
+CheckAssistant -- 否 --> CheckDiagnostic{"diagnostic?"}
+CheckDiagnostic -- 是 --> WriteDiag["写入diagnostic step"]
+CheckDiagnostic -- 否 --> TrackEvents
+WritePatch --> CheckLarge{"收据过大?"}
+CheckLarge -- 是 --> SaveFile["保存收据文件"]
+CheckLarge -- 否 --> InlineReceipt["内联收据"]
+SaveFile --> TrackEvents
+InlineReceipt --> TrackEvents
+WriteMessage --> TrackEvents
+WriteDiag --> TrackEvents
+TrackEvents --> Finish{"委托结束"}
+Finish --> WriteFinish["写入finish条目"]
+WriteFinish --> End(["完成"])
+```
+
+**图表来源**
+- [src/main/conversation/DelegationTraceStore.ts:140-192](file://src/main/conversation/DelegationTraceStore.ts#L140-L192)
+
+#### 前端集成示例
+前端通过 useDelegationTrace hook 集成委托追踪功能：
+
+- **自动刷新**：监听 delegationChanged 事件，自动重新加载追踪数据
+- **分页加载**：支持逐步加载更多步骤，提升用户体验
+- **错误处理**：完善的错误处理和空状态处理
+
+```mermaid
+sequenceDiagram
+participant Hook as "useDelegationTrace"
+participant API as "Renderer API"
+participant Store as "DelegationTraceStore"
+Hook->>API : getDelegationTrace({sessionId, parentToolCallId, cursor : 0, pageSize : 40})
+API->>Store : read(sessionId, parentToolCallId, 0, 40)
+Store-->>API : DelegationTracePage
+API-->>Hook : 返回追踪数据
+Hook->>Hook : 设置state和visibleCount
+Hook->>API : 监听delegationChanged事件
+API-->>Hook : 事件通知
+Hook->>API : getDelegationTrace({cursor : nextCursor, pageSize : 80})
+API->>Store : read(sessionId, parentToolCallId, nextCursor, 80)
+Store-->>API : 更多追踪数据
+API-->>Hook : 返回扩展的追踪数据
+```
+
+**图表来源**
+- [src/renderer/features/transcript/useDelegationTrace.ts:23-44](file://src/renderer/features/transcript/useDelegationTrace.ts#L23-L44)
+- [src/main/conversation/DelegationTraceStore.ts:193-204](file://src/main/conversation/DelegationTraceStore.ts#L193-L204)
+
+**章节来源**
+- [src/main/ipc/conversationHandlers.ts:122-138](file://src/main/ipc/conversationHandlers.ts#L122-L138)
+- [src/main/conversation/DelegationTraceStore.ts:1-218](file://src/main/conversation/DelegationTraceStore.ts#L1-L218)
+- [src/shared/types/delegationTrace.ts:1-45](file://src/shared/types/delegationTrace.ts#L1-L45)
+- [src/renderer/features/transcript/useDelegationTrace.ts:1-49](file://src/renderer/features/transcript/useDelegationTrace.ts#L1-L49)
+
 ### 前端调用示例流程（以对话发送为例）
 ```mermaid
 sequenceDiagram
@@ -385,6 +495,7 @@ WH-->>PT : { success : true/false, error? }
 - 传输解耦：preload 的 rendererTransport 仅依赖 Electron ipcRenderer，不感知业务通道，便于替换或测试。
 - 处理器内聚：每个业务域处理器独立注册，职责清晰，通过 workbenchHandlers 统一装配。
 - **新增** 前端模块解耦：各订阅模块独立管理特定领域的事件，通过 useIpcEventBridge 协调，降低耦合度。
+- **新增** 委托追踪依赖：DelegationTraceStore 依赖 storageAdapter 进行文件操作，通过 workflowProjectionPublisher 广播状态变更。
 
 ```mermaid
 graph LR
@@ -401,6 +512,8 @@ EB --> CS["conversationSubscriptions.ts"]
 EB --> SS["sessionSubscriptions.ts"]
 EB --> SHS["shellSubscriptions.ts"]
 EB --> CPS["captureSubscriptions.ts"]
+H1 --> DTS["DelegationTraceStore.ts"]
+DTS --> WP["WorkflowProjectionPublisher"]
 ```
 
 **图表来源**
@@ -412,6 +525,7 @@ EB --> CPS["captureSubscriptions.ts"]
 - [src/main/ipc/conversationHandlers.ts:43-78](file://src/main/ipc/conversationHandlers.ts#L43-L78)
 - [src/main/ipc/workflowHandlers.ts:21-33](file://src/main/ipc/workflowHandlers.ts#L21-L33)
 - [src/renderer/app/bootstrap/useIpcEventBridge.ts:44-123](file://src/renderer/app/bootstrap/useIpcEventBridge.ts#L44-L123)
+- [src/main/conversation/DelegationTraceStore.ts:1-218](file://src/main/conversation/DelegationTraceStore.ts#L1-L218)
 
 **章节来源**
 - [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
@@ -427,6 +541,7 @@ EB --> CPS["captureSubscriptions.ts"]
 - 启动顺序：先安装 invoke 注册表再注册处理器，确保断言能覆盖全部通道；将耗时初始化（如恢复会话）放在 initializeIpcState 中，避免阻塞注册流程。
 - **新增** 前端事件批处理：conversationEventBatcher 合并高频消息事件到动画帧，减少不必要的重渲染。
 - **新增** 模块化资源管理：每个订阅模块独立管理自己的监听器和资源，提供更好的内存管理和测试支持。
+- **新增** 委托追踪性能优化：DelegationTraceStore 使用文件追加模式和高性能缓存机制，支持大文件的分页读取。
 
 ## 故障排查指南
 - 通道缺失报错
@@ -466,6 +581,14 @@ EB --> CPS["captureSubscriptions.ts"]
     - [src/renderer/app/bootstrap/useIpcEventBridge.ts:92-111](file://src/renderer/app/bootstrap/useIpcEventBridge.ts#L92-L111)
     - [src/renderer/app/bootstrap/conversationSubscriptions.ts:136-139](file://src/renderer/app/bootstrap/conversationSubscriptions.ts#L136-L139)
 
+- **新增** 委托追踪API问题
+  - 现象：getDelegationTrace 或 getDelegationReceipt 调用失败
+  - 排查：确认sessionId权限验证；检查委托追踪文件是否存在；验证parentToolCallId和stepId的正确性
+  - 处理：检查DelegationTraceStore的错误码；确认委托执行已正确开始和结束
+  - 参考
+    - [src/main/ipc/conversationHandlers.ts:122-138](file://src/main/ipc/conversationHandlers.ts#L122-L138)
+    - [src/main/conversation/DelegationTraceStore.ts:193-216](file://src/main/conversation/DelegationTraceStore.ts#L193-L216)
+
 **章节来源**
 - [src/main/ipc/invokeRegistry.ts:45-51](file://src/main/ipc/invokeRegistry.ts#L45-L51)
 - [src/main/ipc/workbenchHandlers.ts:248-257](file://src/main/ipc/workbenchHandlers.ts#L248-L257)
@@ -473,24 +596,30 @@ EB --> CPS["captureSubscriptions.ts"]
 - [src/main/ipc/workflowHandlers.ts:21-33](file://src/main/ipc/workflowHandlers.ts#L21-L33)
 - [src/shared/renderer-api/channels.ts:178-218](file://src/shared/renderer-api/channels.ts#L178-L218)
 - [src/renderer/app/bootstrap/useIpcEventBridge.ts:92-111](file://src/renderer/app/bootstrap/useIpcEventBridge.ts#L92-L111)
+- [src/main/ipc/conversationHandlers.ts:122-138](file://src/main/ipc/conversationHandlers.ts#L122-L138)
+- [src/main/conversation/DelegationTraceStore.ts:193-216](file://src/main/conversation/DelegationTraceStore.ts#L193-L216)
 
 ## 结论
 该 IPC 体系通过"通道契约 + 预加载传输 + 主进程注册表 + 参数校验 + 事件广播"的组合，实现了高内聚、低耦合、类型安全且可扩展的前后端通信。invokeRegistry 提供了强大的运行时治理能力，确保前后端通道一致；workbenchHandlers 作为组合根，统一管理生命周期与广播；各域处理器职责清晰，易于维护与扩展。
 
-**更新** 前端事件处理系统的重大重构进一步提升了代码质量，通过将单一的大文件拆分为多个专用订阅模块，显著提高了可测试性、可维护性和性能。新的模块化架构使得每个业务领域的事件处理逻辑更加内聚，便于单独测试和维护。遵循本文的性能与排障建议，可进一步提升稳定性与可观测性。
+**更新** 前端事件处理系统的重大重构进一步提升了代码质量，通过将单一的大文件拆分为多个专用订阅模块，显著提高了可测试性、可维护性和性能。新的模块化架构使得每个业务领域的事件处理逻辑更加内聚，便于单独测试和维护。同时，新增的委托追踪API为复杂的代理执行场景提供了完整的追踪和审计能力，支持大文件的分页读取和高效的缓存机制。遵循本文的性能与排障建议，可进一步提升稳定性与可观测性。
 
 ## 附录
 - 常用通道分类（节选）
   - 应用外壳：app:getMeta、dialog:selectFiles、window:minimize 等
-  - 对话：conversation:sendMessage、conversation:getHistory 等
+  - 对话：conversation:sendMessage、conversation:getHistory、conversation:getDelegationTrace、conversation:getDelegationReceipt 等
   - 工作流：workflow:getState、workflow:resume、workflow:stop 等
   - 知识/记忆/调查：knowledge:*、memory:*、investigation:*
   - 设备/会话/项目/运行：device:*、session:*、project:*、run:*
   - 运行时/追踪：runtimeLog:list、trace:*
 - 事件通道（节选）
-  - workflow:runStatusChanged、tool:executionComplete、app:themeChanged、llm:stream 等
+  - workflow:runStatusChanged、tool:executionComplete、app:themeChanged、llm:stream、conversation:delegationChanged 等
 - **新增** 前端订阅模块职责
   - conversationSubscriptions：对话消息流、工具执行跟踪、代理事件处理
   - sessionSubscriptions：运行状态监控、使用情况统计、证据事件处理
   - shellSubscriptions：系统命令处理、主题切换、窗口状态管理
   - captureSubscriptions：设备状态同步、上下文快照管理、捕获状态更新
+- **新增** 委托追踪API说明
+  - getDelegationTrace：获取委托执行的步骤列表，支持分页查询
+  - getDelegationReceipt：获取委托执行的详细收据，支持大文本分页读取
+  - delegationChanged：委托状态变更事件，用于前端自动刷新

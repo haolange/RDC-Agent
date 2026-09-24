@@ -4,14 +4,20 @@
 **本文引用的文件**
 - [SubagentRunner.ts](file://src/main/workflow/debugger/SubagentRunner.ts)
 - [BackgroundSubagentService.ts](file://src/main/workflow/debugger/BackgroundSubagentService.ts)
+- [DelegationTraceStore.ts](file://src/main/conversation/DelegationTraceStore.ts)
+- [delegationTrace.ts](file://src/shared/types/delegationTrace.ts)
 - [TaskRegistry.ts](file://src/main/agent-runtime/tasks/TaskRegistry.ts)
 - [TurnCoordinator.ts](file://src/main/workflow/debugger/TurnCoordinator.ts)
-- [DelegationBudget.test.ts](file://src/main/workflow/debugger/DelegationBudget.test.ts)
-- [BackgroundApprovalAcceptance.test.ts](file://src/main/workflow/debugger/BackgroundApprovalAcceptance.test.ts)
-- [BackgroundSubagentAcceptance.test.ts](file://src/main/workflow/debugger/BackgroundSubagentAcceptance.test.ts)
 - [ShellTool.ts](file://src/main/agent-runtime/tools/primitives/ShellTool.ts)
 - [ToolResourceArbiter.ts](file://src/main/workflow/debugger/ToolResourceArbiter.ts)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 集成了新的扁平化委托追踪系统，替代了旧的嵌套工作块结构
+- 更新了事件处理逻辑以支持标准工具调用事件（tool.started/tool.completed/tool.denied）与委托元数据
+- 增强了委托执行的持久化追踪和审计能力
+- 优化了子代理执行的生命周期管理和状态同步
 
 ## 目录
 1. [简介](#简介)
@@ -26,11 +32,12 @@
 10. [附录](#附录)
 
 ## 简介
-本文件围绕 SubagentRunner 子代理执行器，系统性解析其创建、调度与管理机制，覆盖并行执行模型、资源隔离策略、结果聚合算法、后台子代理服务（异步任务调度、生命周期管理、错误恢复）、工具创建与父代理通信、上下文传递等关键技术点。文档同时给出主代理与子代理交互的完整时序图，并总结并发控制、内存限制与性能优化方案。
+本文件围绕 SubagentRunner 子代理执行器，系统性解析其创建、调度与管理机制，覆盖并行执行模型、资源隔离策略、结果聚合算法、后台子代理服务（异步任务调度、生命周期管理、错误恢复）、工具创建与父代理通信、上下文传递等关键技术点。**最新更新**：集成了新的扁平化委托追踪系统，提供标准化的工具调用事件处理和完整的委托执行审计能力。文档同时给出主代理与子代理交互的完整时序图，并总结并发控制、内存限制与性能优化方案。
 
 ## 项目结构
-- SubagentRunner：负责子代理实例的创建、预算校验、事件透传、会话隔离、工具封装与同步/后台模式切换。
+- SubagentRunner：负责子代理实例的创建、预算校验、事件透传、会话隔离、工具封装与同步/后台模式切换，**新增**委托追踪系统集成。
 - BackgroundSubagentService：提供后台执行能力，维护 TaskRegistry、消息通道、持久化结果、取消与加入、以及请求前消息合并。
+- DelegationTraceStore：**新增**扁平化委托追踪存储，提供标准的工具调用事件记录和委托执行审计。
 - TaskRegistry：任务与执行的持久化注册表，负责状态机、预算继承与校验、消息队列、撤销/恢复、根预算绑定。
 - TurnCoordinator：定义轮次级预算与子代理预算、预留槽位、消费与观察机制。
 - 其他支撑：Shell 工具进程隔离与输出限流、资源仲裁器用于并发访问控制。
@@ -42,29 +49,31 @@ B --> C["BackgroundSubagentService<br/>start / execute / join / cancel"]
 C --> D["TaskRegistry<br/>startExecution / settleExecution / updateExecutionBudget"]
 B --> E["Agent 运行时<br/>sendProfileMessage / onEvent"]
 B --> F["会话与权限<br/>RdxRuntimeContext / DelegatedArtifactAccess"]
-C --> G["持久化与投影<br/>persistSubagentResult / TraceProjectionRefresh"]
-B --> H["系统工具与进程<br/>ShellTool / ProcessSupervisor"]
+B --> G["DelegationTraceStore<br/>委托追踪记录"]
+C --> H["持久化与投影<br/>persistSubagentResult / TraceProjectionRefresh"]
+B --> I["系统工具与进程<br/>ShellTool / ProcessSupervisor"]
+G --> J["标准工具事件<br/>tool.started/completed/denied"]
 ```
 
-图表来源
+**图表来源**
 - [SubagentRunner.ts:80-429](file://src/main/workflow/debugger/SubagentRunner.ts#L80-L429)
 - [BackgroundSubagentService.ts:65-281](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L65-L281)
-- [TaskRegistry.ts:99-196](file://src/main/agent-runtime/tasks/TaskRegistry.ts#L99-L196)
-- [ShellTool.ts:112-213](file://src/main/agent-runtime/tools/primitives/ShellTool.ts#L112-L213)
+- [DelegationTraceStore.ts:139-192](file://src/main/conversation/DelegationTraceStore.ts#L139-L192)
 
 章节来源
-- [SubagentRunner.ts:1-680](file://src/main/workflow/debugger/SubagentRunner.ts#L1-L680)
-- [BackgroundSubagentService.ts:1-427](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L1-L427)
-- [TaskRegistry.ts:1-408](file://src/main/agent-runtime/tasks/TaskRegistry.ts#L1-L408)
+- [SubagentRunner.ts:1-584](file://src/main/workflow/debugger/SubagentRunner.ts#L1-L584)
+- [BackgroundSubagentService.ts:1-428](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L1-L428)
+- [DelegationTraceStore.ts:1-218](file://src/main/conversation/DelegationTraceStore.ts#L1-L218)
 
 ## 核心组件
 - SubagentRunner
-  - runSubagent：构建子代理上下文、预算派生、会话隔离、事件转发、超时与中止传播、结果持久化与聚合。
+  - runSubagent：构建子代理上下文、预算派生、会话隔离、事件转发、超时与中止传播、结果持久化与聚合，**新增**委托追踪记录。
   - createSubagentTools：暴露 subagent 工具，支持 wait/background 两种模式；在 background 模式下委托给 BackgroundSubagentService。
 - BackgroundSubagentService
   - start：创建执行记录、绑定根预算、启动执行、注册取消所有者、发送开始消息、触发 onEvent('started')。
   - execute：注入 beforeProviderRequestMessages 以合并子执行消息与父消息；监听预算变化并落库；处理审批事件；持久化结果并 settle。
   - 工具集：background_query/wait/result/message/join/cancel，提供对后台执行的可观测与控制能力。
+- DelegationTraceStore：**新增**扁平化委托追踪存储，提供标准的工具调用事件记录和委托执行审计。
 - TaskRegistry
   - 任务/执行状态机：startExecution/settleExecution/updateExecutionStatus/updateExecutionBudget。
   - 预算继承与校验：inheritBudget/validateBudget/validateRootBudget。
@@ -77,12 +86,13 @@ B --> H["系统工具与进程<br/>ShellTool / ProcessSupervisor"]
 章节来源
 - [SubagentRunner.ts:80-429](file://src/main/workflow/debugger/SubagentRunner.ts#L80-L429)
 - [BackgroundSubagentService.ts:65-281](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L65-L281)
+- [DelegationTraceStore.ts:139-192](file://src/main/conversation/DelegationTraceStore.ts#L139-L192)
 - [TaskRegistry.ts:99-196](file://src/main/agent-runtime/tasks/TaskRegistry.ts#L99-L196)
 - [TurnCoordinator.ts:65-191](file://src/main/workflow/debugger/TurnCoordinator.ts#L65-L191)
 
 ## 架构总览
 子代理执行分为两条路径：
-- 同步等待模式（mode=wait）：SubagentRunner.runSubagent 直接调用 sendProfileMessage，阻塞等待结果，期间持续转发事件、统计工具调用、维护预算与上下文。
+- 同步等待模式（mode=wait）：SubagentRunner.runSubagent 直接调用 sendProfileMessage，阻塞等待结果，期间持续转发事件、统计工具调用、维护预算与上下文，**新增**委托追踪记录。
 - 后台模式（mode=background）：SubagentRunner 调用 BackgroundSubagentService.start，立即返回 executionId；后台服务在独立生命周期中运行，通过 TaskRegistry 持久化进度与结果，并提供查询/等待/取消等工具。
 
 ```mermaid
@@ -91,22 +101,27 @@ participant Caller as "调用方"
 participant Runner as "SubagentRunner"
 participant Service as "BackgroundSubagentService"
 participant Registry as "TaskRegistry"
+participant Trace as "DelegationTraceStore"
 participant Agent as "Agent 运行时"
 Caller->>Runner : 调用 subagent 工具(mode=background)
+Runner->>Trace : start(委托追踪头)
 Runner->>Service : start({sessionId, taskId, capsule, policyBudget,...})
 Service->>Registry : startExecution(创建执行记录)
 Service-->>Caller : 返回 executionId
 Service->>Agent : 执行子代理(带 beforeProviderRequestMessages)
 Agent-->>Service : 事件/审批/预算更新
+Service->>Trace : event(标准工具事件)
 Service->>Registry : updateExecutionBudget / appendExecutionMessage
 Service->>Service : persistSubagentResult
 Service->>Registry : settleExecution(完成/失败/部分/阻塞)
+Service->>Trace : finish(委托完成)
 Service-->>Caller : onEvent('settled')
 ```
 
-图表来源
+**图表来源**
 - [SubagentRunner.ts:431-679](file://src/main/workflow/debugger/SubagentRunner.ts#L431-L679)
 - [BackgroundSubagentService.ts:65-281](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L65-L281)
+- [DelegationTraceStore.ts:139-192](file://src/main/conversation/DelegationTraceStore.ts#L139-L192)
 - [TaskRegistry.ts:99-196](file://src/main/agent-runtime/tasks/TaskRegistry.ts#L99-L196)
 
 ## 详细组件分析
@@ -118,6 +133,10 @@ Service-->>Caller : onEvent('settled')
 - 会话与上下文隔离
   - 生成独立 subagentSessionId，避免污染父会话消息与上下文。
   - 根据 DelegationCapsule 授予 artifact 访问与 RDX 租约，确保能力不越权。
+- **新增**委托追踪记录
+  - 使用 delegationTraceStore.start() 记录委托执行头信息，包含 parentToolCallId、task、profile、mode、executionId、generation、taskId、childSessionId、invocation、status、startedAt。
+  - 通过 delegationTraceStore.event() 记录标准工具调用事件（tool.started/tool.completed/tool.denied）。
+  - 使用 delegationTraceStore.finish() 记录委托执行完成状态。
 - 事件透传与统计
   - 将 assistant.delta、tool.started/completed/denied 等事件转换为 subagent.delta 上报父层，并去重统计 toolCallId，累计到 parentBudget.aggregateToolCalls。
 - 结果聚合与持久化
@@ -133,23 +152,28 @@ Start(["进入 runSubagent"]) --> CheckBudget["校验父预算与深度上限"]
 CheckBudget --> Reserve["预留子代理槽位"]
 Reserve --> Isolate["创建独立会话ID与上下文"]
 Isolate --> Grant["授予artifact/RDX租约"]
-Grant --> RunAgent["sendProfileMessage 执行子代理"]
+Grant --> TraceStart["delegationTraceStore.start()"]
+TraceStart --> RunAgent["sendProfileMessage 执行子代理"]
 RunAgent --> Events{"事件类型?"}
 Events --> |assistant.delta/tool.*| Forward["转发为subagent.delta并统计"]
 Events --> |approval| ParentForward["透传给父层审批"]
-Forward --> Wait["等待完成或中止"]
-ParentForward --> Wait
+Forward --> TraceEvent["delegationTraceStore.event()"]
+ParentForward --> Wait["等待完成或中止"]
+TraceEvent --> Wait
 Wait --> Cleanup["清理租约/资源/订阅"]
-Cleanup --> Aggregate["聚合预算与结果"]
+Cleanup --> TraceFinish["delegationTraceStore.finish()"]
+TraceFinish --> Aggregate["聚合预算与结果"]
 Aggregate --> End(["返回结果"])
 ```
 
-图表来源
+**图表来源**
 - [SubagentRunner.ts:80-429](file://src/main/workflow/debugger/SubagentRunner.ts#L80-L429)
+- [DelegationTraceStore.ts:139-192](file://src/main/conversation/DelegationTraceStore.ts#L139-L192)
 
 章节来源
 - [SubagentRunner.ts:80-429](file://src/main/workflow/debugger/SubagentRunner.ts#L80-L429)
 - [SubagentRunner.ts:431-679](file://src/main/workflow/debugger/SubagentRunner.ts#L431-L679)
+- [DelegationTraceStore.ts:139-192](file://src/main/conversation/DelegationTraceStore.ts#L139-L192)
 
 ### BackgroundSubagentService：后台执行、消息通道与恢复
 - 启动流程
@@ -179,13 +203,31 @@ Svc->>Store : persistSubagentResult
 Svc->>Reg : settleExecution(写入结果与状态)
 ```
 
-图表来源
+**图表来源**
 - [BackgroundSubagentService.ts:65-281](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L65-L281)
 - [TaskRegistry.ts:154-196](file://src/main/agent-runtime/tasks/TaskRegistry.ts#L154-L196)
 
 章节来源
 - [BackgroundSubagentService.ts:65-281](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L65-L281)
 - [BackgroundSubagentService.ts:370-405](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L370-L405)
+
+### DelegationTraceStore：扁平化委托追踪系统
+- **新增**扁平化追踪结构
+  - DelegationTraceHeader：委托执行头部信息，包含 parentToolCallId、task、profile、mode、executionId、generation、taskId、childSessionId、invocation、status、startedAt、completedAt、result。
+  - DelegationTraceStep：扁平化的执行步骤，支持 message/tool/diagnostic 三种类型，包含 id、kind、status、timestamp、completedAt、text、toolName、args、receipt、receiptTruncated、receiptRef、eventId。
+  - DelegationTracePage：分页查询接口，包含 header、steps、nextCursor、total、error。
+- 事件处理逻辑
+  - tool.started：记录工具调用开始，提取 toolCallId、toolName、args。
+  - tool.completed/tool.denied：记录工具调用完成或拒绝，提取 result/reason，支持大结果分片存储。
+  - assistant.completed：记录助手回复文本。
+  - diagnostic：记录诊断信息。
+- 持久化与查询
+  - 基于文件系统存储，每个委托执行对应独立的 JSONL 文件。
+  - 支持分页查询和收据文件读取，提供完整的审计追踪能力。
+
+**章节来源**
+- [DelegationTraceStore.ts:139-192](file://src/main/conversation/DelegationTraceStore.ts#L139-L192)
+- [delegationTrace.ts:1-45](file://src/shared/types/delegationTrace.ts#L1-L45)
 
 ### TaskRegistry：任务执行状态机与预算治理
 - 关键操作
@@ -212,7 +254,7 @@ class TaskRegistry {
 }
 ```
 
-图表来源
+**图表来源**
 - [TaskRegistry.ts:99-196](file://src/main/agent-runtime/tasks/TaskRegistry.ts#L99-L196)
 - [TaskRegistry.ts:197-283](file://src/main/agent-runtime/tasks/TaskRegistry.ts#L197-L283)
 - [TaskRegistry.ts:364-408](file://src/main/agent-runtime/tasks/TaskRegistry.ts#L364-L408)
@@ -237,57 +279,66 @@ U --> Exec["执行子代理"]
 Exec --> Update["updateExecutionBudget(单调/仅收窄)"]
 ```
 
-图表来源
+**图表来源**
 - [TurnCoordinator.ts:84-134](file://src/main/workflow/debugger/TurnCoordinator.ts#L84-L134)
-- [DelegationBudget.test.ts:1-23](file://src/main/workflow/debugger/DelegationBudget.test.ts#L1-L23)
 
 章节来源
 - [TurnCoordinator.ts:84-134](file://src/main/workflow/debugger/TurnCoordinator.ts#L84-L134)
-- [DelegationBudget.test.ts:1-23](file://src/main/workflow/debugger/DelegationBudget.test.ts#L1-L23)
 
 ### 工具创建、父代理通信与上下文传递
 - 工具创建：SubagentRunner.createSubagentTools 暴露 subagent 工具；BackgroundSubagentService.createTools 暴露后台任务工具。
 - 父代理通信：通过 parentOnEvent 透传审批、工具事件、delta 文本；后台模式通过 TaskRegistry 的消息通道实现双向通信。
 - 上下文传递：DelegationCapsule 编译为额外提示段；RDX 租约与 artifact 访问在子会话中生效；会话 ID 分段隔离消息与上下文。
+- **新增**委托追踪通信：通过 delegationTraceStore 提供标准化的委托执行追踪和审计能力。
 
 章节来源
 - [SubagentRunner.ts:431-679](file://src/main/workflow/debugger/SubagentRunner.ts#L431-L679)
 - [BackgroundSubagentService.ts:370-405](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L370-L405)
+- [DelegationTraceStore.ts:139-192](file://src/main/conversation/DelegationTraceStore.ts#L139-L192)
 
 ### 完整时序图：主代理与子代理交互
 ```mermaid
 sequenceDiagram
 participant Parent as "父代理/调用方"
 participant Runner as "SubagentRunner"
+participant Trace as "DelegationTraceStore"
 participant Service as "BackgroundSubagentService"
 participant Registry as "TaskRegistry"
 participant Agent as "Agent 运行时"
 Parent->>Runner : 调用 subagent 工具
 alt mode=wait
+Runner->>Trace : start(委托追踪头)
 Runner->>Agent : sendProfileMessage(携带capsule/预算/信号)
 Agent-->>Runner : 事件(delta/tool.*)
+Runner->>Trace : event(标准工具事件)
 Runner-->>Parent : 返回结果
+Runner->>Trace : finish(委托完成)
 else mode=background
+Runner->>Trace : start(委托追踪头)
 Runner->>Service : start(...)
 Service->>Registry : startExecution
 Service-->>Parent : 返回executionId
 Service->>Agent : 执行(含beforeProviderRequestMessages)
 Agent-->>Service : 预算/审批/消息
+Service->>Trace : event(标准工具事件)
 Service->>Registry : updateExecutionBudget / appendExecutionMessage
 Service->>Registry : settleExecution
+Service->>Trace : finish(委托完成)
 Service-->>Parent : onEvent('settled')
 end
 ```
 
-图表来源
+**图表来源**
 - [SubagentRunner.ts:80-429](file://src/main/workflow/debugger/SubagentRunner.ts#L80-L429)
 - [BackgroundSubagentService.ts:65-281](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L65-L281)
+- [DelegationTraceStore.ts:139-192](file://src/main/conversation/DelegationTraceStore.ts#L139-L192)
 - [TaskRegistry.ts:99-196](file://src/main/agent-runtime/tasks/TaskRegistry.ts#L99-L196)
 
 ## 依赖关系分析
 - SubagentRunner 依赖：
   - TurnCoordinator：预算与槽位管理。
   - BackgroundSubagentService：后台执行入口。
+  - DelegationTraceStore：**新增**委托追踪存储。
   - TaskRegistry：任务/执行/消息/预算持久化。
   - 会话与权限：RdxRuntimeContextRegistry、DelegatedArtifactAccess。
   - 系统工具：ShellInvocationService、ProcessSupervisor。
@@ -303,22 +354,26 @@ end
 graph LR
 Runner["SubagentRunner"] --> TC["TurnCoordinator"]
 Runner --> BGS["BackgroundSubagentService"]
+Runner --> DTS["DelegationTraceStore"]
 BGS --> TR["TaskRegistry"]
 Runner --> Perm["会话/权限"]
 Runner --> Proc["ProcessSupervisor/Shell"]
 BGS --> Proj["TraceProjectionRefresh"]
+DTS --> FS["文件系统存储"]
 ```
 
-图表来源
-- [SubagentRunner.ts:1-680](file://src/main/workflow/debugger/SubagentRunner.ts#L1-L680)
-- [BackgroundSubagentService.ts:1-427](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L1-L427)
+**图表来源**
+- [SubagentRunner.ts:1-584](file://src/main/workflow/debugger/SubagentRunner.ts#L1-L584)
+- [BackgroundSubagentService.ts:1-428](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L1-L428)
+- [DelegationTraceStore.ts:1-218](file://src/main/conversation/DelegationTraceStore.ts#L1-L218)
 - [TaskRegistry.ts:1-408](file://src/main/agent-runtime/tasks/TaskRegistry.ts#L1-L408)
 - [ShellTool.ts:112-213](file://src/main/agent-runtime/tools/primitives/ShellTool.ts#L112-L213)
 - [ToolResourceArbiter.ts:28-50](file://src/main/workflow/debugger/ToolResourceArbiter.ts#L28-L50)
 
 章节来源
-- [SubagentRunner.ts:1-680](file://src/main/workflow/debugger/SubagentRunner.ts#L1-L680)
-- [BackgroundSubagentService.ts:1-427](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L1-L427)
+- [SubagentRunner.ts:1-584](file://src/main/workflow/debugger/SubagentRunner.ts#L1-L584)
+- [BackgroundSubagentService.ts:1-428](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L1-L428)
+- [DelegationTraceStore.ts:1-218](file://src/main/conversation/DelegationTraceStore.ts#L1-L218)
 - [TaskRegistry.ts:1-408](file://src/main/agent-runtime/tasks/TaskRegistry.ts#L1-L408)
 - [ShellTool.ts:112-213](file://src/main/agent-runtime/tools/primitives/ShellTool.ts#L112-L213)
 - [ToolResourceArbiter.ts:28-50](file://src/main/workflow/debugger/ToolResourceArbiter.ts#L28-L50)
@@ -330,6 +385,7 @@ BGS --> Proj["TraceProjectionRefresh"]
 - 内存与输出限制
   - Shell 工具输出环形缓冲与字节上限，防止大输出导致内存膨胀。
   - 消息通道限制条数与字符数，避免单次合并过大。
+  - **新增**委托追踪结果大小限制：MAX_RECEIPT=16KB，MAX_TEXT=8KB，MAX_RECEIPT_FILE=1MB，支持分片存储。
 - 预算与时间控制
   - 子代理 wallTime 截止定时器，超出即中止。
   - 预算链原子预留与消费，避免重复计费；子代理预算限制深度、子代理数、聚合工具调用与聚合时长。
@@ -341,6 +397,7 @@ BGS --> Proj["TraceProjectionRefresh"]
 - [BackgroundSubagentService.ts:159-212](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L159-L212)
 - [TurnCoordinator.ts:84-134](file://src/main/workflow/debugger/TurnCoordinator.ts#L84-L134)
 - [ToolResourceArbiter.ts:28-50](file://src/main/workflow/debugger/ToolResourceArbiter.ts#L28-L50)
+- [DelegationTraceStore.ts:16-18](file://src/main/conversation/DelegationTraceStore.ts#L16-L18)
 
 ## 故障排查指南
 - 常见错误与定位
@@ -348,27 +405,30 @@ BGS --> Proj["TraceProjectionRefresh"]
   - 会话缺失：ARTIFACT_SESSION_DENIED/RDX_LEASE_DELEGATE_DENIED，确认存在父会话且具备相应能力。
   - 任务范围拒绝：TASK_SCOPE_DENIED，核对 delegated scope 与目标 task 是否在子树内。
   - 后台执行未找到：BACKGROUND_EXECUTION_NOT_FOUND，确认执行归属与任务子树。
+  - **新增**委托追踪错误：DELEGATION_TRACE_MISSING_START、DELEGATION_TRACE_ID_MISMATCH、DELEGATION_RECEIPT_DENIED，检查委托追踪文件的完整性和一致性。
 - 审批与阻塞
   - approval.requested/answered 事件驱动状态切换，若长时间 waiting，检查审批是否被响应。
 - 恢复与重试
   - 重启后中断执行会被标记为 interrupted/blocked，需显式恢复或重新规划。
-- 测试用例参考
-  - 背景任务审批与结果投影、预算继承与保留等场景可在相关测试文件中验证行为。
+- 委托追踪调试
+  - 使用 delegationTraceStore.read() 查询委托执行历史，检查标准工具调用事件的完整性。
+  - 通过 delegationTraceStore.readReceipt() 获取详细的工具调用结果收据。
 
 章节来源
-- [BackgroundApprovalAcceptance.test.ts:12-30](file://src/main/workflow/debugger/BackgroundApprovalAcceptance.test.ts#L12-L30)
-- [BackgroundApprovalAcceptance.test.ts:44-92](file://src/main/workflow/debugger/BackgroundApprovalAcceptance.test.ts#L44-L92)
-- [BackgroundSubagentAcceptance.test.ts:84-95](file://src/main/workflow/debugger/BackgroundSubagentAcceptance.test.ts#L84-L95)
+- [BackgroundSubagentService.ts:361-364](file://src/main/workflow/debugger/BackgroundSubagentService.ts#L361-L364)
+- [DelegationTraceStore.ts:193-216](file://src/main/conversation/DelegationTraceStore.ts#L193-L216)
 
 ## 结论
-SubagentRunner 提供了强大的子代理执行能力：通过预算链与槽位预留实现安全的并发控制；通过会话隔离与上下文传递保障权限与数据边界；通过 TaskRegistry 与消息通道实现后台任务的持久化与可观测；结合 Shell 工具与资源仲裁器，确保系统稳定性与性能。整体设计兼顾了可扩展性、可恢复性与可审计性，适合复杂多代理协作场景。
+SubagentRunner 提供了强大的子代理执行能力：通过预算链与槽位预留实现安全的并发控制；通过会话隔离与上下文传递保障权限与数据边界；通过 TaskRegistry 与消息通道实现后台任务的持久化与可观测；结合 Shell 工具与资源仲裁器，确保系统稳定性与性能。**最新更新**：集成了全新的扁平化委托追踪系统，提供标准化的工具调用事件记录和完整的委托执行审计能力，支持细粒度的执行追踪和结果收据管理。整体设计兼顾了可扩展性、可恢复性与可审计性，适合复杂多代理协作场景。
 
 ## 附录
 - 术语
   - 子代理：由父代理创建的隔离执行单元，拥有独立会话与预算。
   - 后台执行：不阻塞父调用的子代理执行，通过 executionId 进行查询与等待。
   - 预算链：父子共享的预算状态集合，用于全局限额与局部约束。
+  - **新增**委托追踪：扁平化的委托执行历史记录，包含标准工具调用事件和执行状态。
 - 最佳实践
   - 明确设置子代理预算与截止时间，避免资源泄漏。
   - 使用 background 模式执行长耗时任务，并通过工具集监控与取消。
   - 谨慎授予 artifact 与 RDX 租约，遵循最小权限原则。
+  - **新增**利用委托追踪系统进行执行审计和问题排查，定期检查委托追踪文件的完整性。
