@@ -36,7 +36,6 @@ const collectExplicitThinking = (
   const visit = (items: ConversationWorkBlock[] | undefined) => {
     for (const block of items ?? []) {
       if (block.thinking) collected.push({ blockId: block.id, thinking: block.thinking });
-      visit(block.children);
     }
   };
   visit(blocks);
@@ -54,7 +53,6 @@ export function findCanonicalFinalAnswer(
       if (block.result?.outputPhase === 'final_answer' && resultText) {
         finalAnswer = resultText;
       }
-      visit(block.children);
     }
   };
   for (const message of conversations) {

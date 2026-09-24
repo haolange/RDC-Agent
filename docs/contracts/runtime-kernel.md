@@ -12,7 +12,7 @@
 4. 将工具结果回灌 loop；
 5. 产出 final answer。
 
-`ConversationWorkTrace` 是可见进度契约。块类型包括：`llm_turn`、`reasoning`、`approval`、`user_input`、`compaction`、`subagent`、`handoff`、`diagnostic`、`output`。历史不匹配 canonical schema 的 `workTrace` 在存储读边界丢弃（`workTrace: null`），无 legacy 归一化。
+`ConversationWorkTrace` 是可见进度契约。块类型包括：`llm_turn`、`reasoning`、`approval`、`user_input`、`compaction`、`handoff`、`diagnostic`、`output`。`subagent` 是父 tool call，不是独立 work block；其子执行记录单独落在所属 session 的委派日志，父消息只保留关联和短状态。历史不匹配 canonical schema 的 `workTrace` 在存储读边界丢弃（`workTrace: null`），不做归一化。
 
 每个工具回灌轮次必须经过 `LoopProgressGuard`。指纹包含有序工具名、规范化参数、成功/失败、语义结果与 runtime revision，忽略 call id、时间戳和耗时。连续第二次相同只向下一次请求注入不落盘的 `<runtime_no_progress>`；第三次仍相同抛出 `AgentLoopTerminationError('AGENT_NO_PROGRESS')`。参数、结果或 runtime revision 改变立即复位。达到 `maxTurns` 时若 Provider 仍要求 continuation，抛出 `AgentLoopTerminationError('AGENT_MAX_TURNS_EXCEEDED')`，禁止静默完成或伪造缺失 final answer。
 
@@ -205,6 +205,8 @@ RDC delegated lease 暂停父控制权，父级 rebind/clear/close 必须先 joi
 旧格式不由 TaskStore 自动迁移。转换须先逐文件备份原字节与 hash，再验证当前文档、依赖和状态后安装 `task-state.json` 并移除被替代的活动文件；历史完成状态不伪造执行证明。正常运行只有当前格式，无法读取时明确拒绝。runtimeInstanceId 变化使未结束执行转 interrupted；持久化恢复不自动启动模型、工具或重置预算。显式重试/恢复创建新执行，并继承限制与已消费预算。
 
 subagent（mode=background） 必须绑定 Task，持久化启动状态后返回执行标识。query/result 读取状态与结果；wait/join 等待既有执行；message 提交有限补充；cancel 和 task_stop 取消执行树并 join。父回复可以结束而 Task 继续托管；父 Task 正式完成检查子任务、阻塞、失败及结果。用户 Stop、会话删除和应用退出清理运行树；未观察进程退出不能声明清理完成。
+
+每个父 `subagent` tool call 只绑定一份所属 session 的子代理可见记录；child session、Task execution ID 与 generation 用于关联并隔离迟到事件。记录按事件顺序增量写入，包含可见工具开始/结束、可见 assistant commentary、诊断与最终结果；不复制隐藏 reasoning。原始参数和回执写入前过滤凭据，超长内容受限；renderer 仅经当前 session 校验后的 preload/API 分页读取，收起时只取头部。子执行记录不复制进父 `workTrace`，后台完成不修改父回复的 continuation。
 
 后台 subagent 的生命周期由持久 Task 与 mailbox 投影，不进入父回复的同步 subagent continuation，也不由父回复 finalizeTrace 提前结束；审批/信息请求仍走受控入口。结构化 turn_complete 的 disposition、evidenceRefs 位于顶层，result 包含 summary、outputs、counterevidence、unresolved、scope、sideEffects、recoveryState。unresolved 表达认识与适用条件，不自动成为 missingRequirements；完成要求仍由 Task 的必需输出及执行状态校验，不能由通用 runtime 推测科学结论。
 

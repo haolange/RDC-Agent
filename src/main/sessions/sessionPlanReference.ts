@@ -3,9 +3,7 @@ import type { PlanReadRequest } from '@shared/types/planReview';
 import { storageAdapter } from './StorageAdapter';
 import { planArtifactWriter } from './sessionPlanArtifact';
 
-const collectCalls = (blocks: ConversationWorkBlock[]): ConversationToolCall[] => blocks.flatMap(block => [
-  ...block.toolCalls, ...collectCalls(block.children ?? []),
-]);
+const collectCalls = (blocks: ConversationWorkBlock[]): ConversationToolCall[] => blocks.flatMap(block => block.toolCalls);
 
 /** Resolve provenance from persisted history, never from mutable session settings. */
 export function resolvePlanReference(request: PlanReadRequest, history: (sessionId: string) => ConversationMessage[] =

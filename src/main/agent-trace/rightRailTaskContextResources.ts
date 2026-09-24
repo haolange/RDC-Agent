@@ -12,7 +12,6 @@ const collectToolRefs = (
     for (const tool of block.toolCalls) {
       if (tool.status === 'complete') resources.push(...(tool.resourceRefs ?? []));
     }
-    collectToolRefs(block.children, resources);
   }
 };
 

@@ -54,7 +54,7 @@ export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<string, WorkProcessToolDi
   mcp: { icon: 'plug', groupKind: 'mcp', category: 'MCP', groupTitle: 'MCP', groupUnit: '调用', completeVerb: '已查询 MCP', runningVerb: '正在查询 MCP' },
   rdc_context: { icon: 'monitor', groupKind: 'runtime', category: 'RDC', groupTitle: 'RDC 上下文', groupUnit: '读取', completeVerb: '已读取 RDC 上下文', runningVerb: '正在读取 RDC 上下文' },
   rdc_probe: { icon: 'rdcProbe', groupKind: 'runtime', category: 'RDC', groupTitle: 'RDC 探测', groupUnit: '探测', completeVerb: '已探测 RDC', runningVerb: '正在探测 RDC' },
-  subagent: { icon: 'brain', groupKind: 'collaboration', category: '子代理', groupTitle: '子代理', groupUnit: '子任务', completeVerb: '已调用子代理', runningVerb: '正在调用子代理' },
+  subagent: { icon: 'brain', groupKind: 'collaboration', category: '子代理', groupTitle: '子代理', groupUnit: '子任务', completeVerb: '委派已完成', runningVerb: '正在委派' },
   subagent_report: { icon: 'subagentReport', groupKind: 'collaboration', category: '子代理报告', groupTitle: '子代理', groupUnit: '报告', completeVerb: '已报告进展', runningVerb: '正在报告进展' },
   task_create: { icon: 'taskCreate', groupKind: 'task', category: '任务创建', groupTitle: '任务', groupUnit: '创建', completeVerb: '已创建任务', runningVerb: '正在创建任务', mutation: true },
   task_update: { icon: 'taskUpdate', groupKind: 'task', category: '任务更新', groupTitle: '任务', groupUnit: '更新', completeVerb: '已更新任务', runningVerb: '正在更新任务', mutation: true },

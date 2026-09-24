@@ -1,7 +1,15 @@
 .work-process-subagent {
   list-style: none;
-  padding: var(--space-2);
+  padding: var(--transcript-card-padding);
   margin: var(--space-1) 0;
+  min-width: 0;
+  border: var(--transcript-card-border);
+  border-radius: var(--transcript-card-radius);
+  background: var(--transcript-card-surface);
+}
+
+.work-process-subagent.status-error {
+  border-color: var(--token-status-error);
 }
 
 /* 从「进度」泳道点击定位过来时的高亮闪烁。 */
@@ -36,8 +44,16 @@
   border-radius: var(--radius-sm);
 }
 
-.work-process-subagent-header:hover {
+.work-process-subagent-header:hover,
+.work-process-subagent-header:focus-visible {
   background: var(--token-interactive-hover);
+}
+
+.work-process-subagent-header:focus-visible,
+.work-process-subagent-raw-toggle:focus-visible,
+.work-process-subagent-more:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
 }
 
 .work-process-subagent-caret {
@@ -91,6 +107,68 @@
   gap: var(--space-1);
 }
 
+.work-process-subagent-body {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2) var(--space-1);
+  min-width: 0;
+}
+
+.work-process-subagent-boundary {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--token-text-placeholder);
+}
+
+.work-process-subagent-boundary p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--token-text-body);
+  overflow-wrap: anywhere;
+}
+
+.work-process-subagent-process-label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--token-text-caption);
+  border-top: 1px solid var(--token-border-card);
+  padding-top: var(--space-2);
+}
+
+.work-process-subagent-more,
+.work-process-subagent-raw-toggle {
+  justify-self: start;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--token-text-body);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+}
+
+.work-process-subagent-more:hover,
+.work-process-subagent-more:focus-visible,
+.work-process-subagent-raw-toggle:hover,
+.work-process-subagent-raw-toggle:focus-visible {
+  background: var(--token-interactive-hover);
+}
+
+.work-process-subagent-raw {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--token-text-caption);
+}
+
+.work-process-subagent-raw dl { display: grid; gap: var(--space-1); margin: 0; }
+.work-process-subagent-raw dt { font-weight: var(--font-semibold); }
+.work-process-subagent-raw dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.work-process-subagent-raw pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-xs); }
+.work-process-subagent-receipt-error { color: var(--token-status-error); }
+
 .work-process-child-summary,
 .work-process-child-diagnostic {
   display: flex;
@@ -104,9 +182,8 @@
 .work-process-child-message,
 .work-process-child-text {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .work-process-child-diagnostic.status-error .work-process-child-message {

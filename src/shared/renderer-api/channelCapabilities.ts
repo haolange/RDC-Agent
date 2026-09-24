@@ -34,6 +34,8 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'conversation:answerToolApproval': 'mutation',
   'conversation:answerPlanReview': 'mutation',
   'conversation:getHistory': 'read',
+  'conversation:getDelegationTrace': 'read',
+  'conversation:getDelegationReceipt': 'read',
   'conversation:switchBranch': 'mutation',
   'conversation:clearHistory': 'mutation',
   'conversation:undoLastTurn': 'mutation',

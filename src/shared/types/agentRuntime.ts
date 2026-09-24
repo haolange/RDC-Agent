@@ -65,9 +65,6 @@ export type AgentEventType =
   | 'run.failed'
   | 'run.cancelled'
   | 'context.compacted'
-  | 'subagent.started'
-  | 'subagent.delta'
-  | 'subagent.completed'
   | 'handoff.requested'
   | 'handoff.consumed'
   | 'handoff.cancelled';
@@ -179,36 +176,6 @@ export interface AgentContextCompactedPayload extends AgentEventBasePayload {
 }
 
 /**
- * Subagent 事件 payload。
- *
- * 父 agent 通过 task/agent 工具派生子 agent 时，子 agent 的生命周期
- * 以 subagent.* 事件投影到父 trace（嵌套 block），不污染父 trace 的扁平 tool block。
- */
-export interface AgentSubagentEventPayload extends AgentEventBasePayload {
-  /** 子 agent 标识（子 context id）。 */
-  subagentId: string;
-  /** 子 agent profile。 */
-  profile: string;
-  /** 触发该子 agent 的父 toolCallId。 */
-  parentToolCallId: string;
-  /** subagent.started: 任务描述；subagent.delta: 增量文本；subagent.completed: 最终摘要。 */
-  text?: string;
-  /** subagent.completed 时的状态。 */
-  status?: 'complete' | 'failed' | 'cancelled';
-  /** 子 agent 内部 tool/loop 活动的结构化增量（subagent.delta 可选携带）。 */
-  child?: AgentSubagentChildPayload;
-}
-
-export interface AgentSubagentChildPayload extends AgentEventBasePayload {
-  id: string;
-  kind: 'llm_turn' | 'tool';
-  title: string;
-  summary?: string;
-  status: 'pending' | 'running' | 'complete' | 'error';
-  toolName?: string;
-}
-
-/**
  * Historical handoff event payload retained for old transcripts.
  * Live continue actions persist session.agentId through applyDeclaredHandoff.
  */
@@ -255,7 +222,6 @@ export type AgentEventPayload =
   | AgentDiagnosticPayload
   | AgentRunFinalPayload
   | AgentContextCompactedPayload
-  | AgentSubagentEventPayload
   | AgentHandoffRequestedPayload
   | AgentHandoffConsumedPayload
   | AgentHandoffCancelledPayload;

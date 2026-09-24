@@ -19,7 +19,6 @@ const WORK_BLOCK_KINDS = new Set<ConversationWorkBlock['kind']>([
   'user_input',
   'plan_review',
   'compaction',
-  'subagent',
   'handoff',
   'diagnostic',
   'output',
@@ -122,7 +121,6 @@ function cloneWorkBlock(block: ConversationWorkBlock): ConversationWorkBlock {
     ...(thinkingStatus ? { thinkingStatus } : {}),
     ...(result ? { result } : {}),
     toolCalls,
-    children: block.children?.map(cloneWorkBlock),
   };
 }
 
@@ -454,48 +452,6 @@ function applyLoopFields(block: ConversationWorkBlock, options: LoopTraceOptions
   }
 }
 
-export function upsertSubagentChild(
-  trace: ConversationWorkTrace | null | undefined,
-  subagentBlockId: string,
-  childPatch: Partial<ConversationWorkBlock> & { id: string },
-): ConversationWorkTrace {
-  const nextTrace = cloneTrace(trace);
-  const blockIndex = nextTrace.blocks.findIndex((block) => block.id === subagentBlockId);
-  if (blockIndex < 0) {
-    return nextTrace;
-  }
-
-  const parent = nextTrace.blocks[blockIndex];
-  const children = [...(parent.children ?? [])];
-  const childIndex = children.findIndex((child) => child.id === childPatch.id);
-  const childKind = childPatch.kind && normalizeWorkBlockKind(childPatch.kind)
-    ? childPatch.kind
-    : 'llm_turn';
-
-  if (childIndex >= 0) {
-    children[childIndex] = cloneWorkBlock({
-      ...children[childIndex],
-      ...childPatch,
-      kind: childKind,
-      toolCalls: childPatch.toolCalls ?? children[childIndex].toolCalls,
-    });
-  } else {
-    children.push(cloneWorkBlock({
-      ...createWorkBlock(childPatch.id, childPatch.title || childPatch.id, childPatch.stage, childKind),
-      ...childPatch,
-      kind: childKind,
-      toolCalls: childPatch.toolCalls ?? [],
-    }));
-  }
-
-  nextTrace.blocks[blockIndex] = {
-    ...parent,
-    children,
-  };
-  nextTrace.updatedAt = nowMs();
-  return nextTrace;
-}
-
 export function upsertLoopResult(
   trace: ConversationWorkTrace | null | undefined,
   loopId: string,
@@ -674,9 +630,6 @@ export function sanitizeStoredWorkTrace(
       || !block.result.providerOutputRefs.every(isProviderOutputRef)
     )) return null;
     if (hasProviderChannelCollision(block)) return null;
-    if (block.children && !block.children.every((child) => Boolean(normalizeWorkBlockKind(child.kind)))) {
-      return null;
-    }
   }
 
   return trace;

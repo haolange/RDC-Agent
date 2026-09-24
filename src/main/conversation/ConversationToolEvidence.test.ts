@@ -19,20 +19,10 @@ const TRACE: ConversationWorkTrace = {
       { id: 'failed', toolName: 'shell', status: 'error', error: 'exit 1', startedAt: 2, completedAt: 3 },
       { id: 'pending', toolName: 'task_list', status: 'pending', startedAt: 3 },
       { id: 'running', toolName: 'web_search', status: 'running', startedAt: 4 },
+      { id: 'child-ok', toolName: 'grep', status: 'complete', startedAt: 1, completedAt: 2 },
+      // A repeated projection of one call does not inflate evidence.
+      { id: 'ok', toolName: 'read_file', status: 'complete', startedAt: 1, completedAt: 2 },
     ],
-    children: [{
-      id: 'child',
-      kind: 'llm_turn',
-      title: 'Child',
-      status: 'complete',
-      startedAt: 1,
-      completedAt: 2,
-      toolCalls: [
-        { id: 'child-ok', toolName: 'grep', status: 'complete', startedAt: 1, completedAt: 2 },
-        // Repeated projection of the same call must not inflate product evidence.
-        { id: 'ok', toolName: 'read_file', status: 'complete', startedAt: 1, completedAt: 2 },
-      ],
-    }],
   }],
 };
 

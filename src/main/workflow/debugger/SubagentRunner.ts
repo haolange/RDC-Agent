@@ -16,8 +16,6 @@ import { resolveRdcDelegation } from '../../sessions/RdcDelegation';
 import type { AgentRole } from '@shared/types/agent';
 import type {
   AgentEvent as SharedAgentEvent,
-  AgentAssistantDeltaPayload,
-  AgentSubagentEventPayload,
 } from '@shared/types/agentRuntime';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
@@ -57,6 +55,7 @@ import {
 import type { BackgroundSubagentStart } from './BackgroundSubagentService';
 import { createHash } from 'node:crypto';
 import { normalizeSubagentResult, persistSubagentResult, projectSubagentResult } from './SubagentResultEnvelope';
+import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
 
 export interface SubagentRunnerDeps {
   sendProfileMessage: (
@@ -176,19 +175,14 @@ export class SubagentRunner {
       else parentSignal.addEventListener('abort', onParentAbort, { once: true });
     }
 
-    // 通知父 trace：子 agent 启动
-    input.parentOnEvent?.({
-      id: generateEventId('agent-event'),
-      type: 'subagent.started',
-      timestamp: nowMs(),
-      sessionId: input.parentSessionId ?? null,
-      agentId: input.parentAgentId,
-      payload: {
-        subagentId,
-        profile: input.targetProfile,
-        parentToolCallId: input.parentToolCallId,
-        text: task,
-      } satisfies AgentSubagentEventPayload,
+    const ownerSessionId = input.parentSessionId?.split('::subagent::')[0] ?? null;
+    const traceIdentity = `${subagentSessionId}\u0000${input.executionId ?? ''}\u0000${input.taskExecutionGeneration ?? ''}`;
+    if (ownerSessionId) delegationTraceStore.start(ownerSessionId, {
+      parentToolCallId: input.parentToolCallId, task, profile: input.targetProfile,
+      mode: input.detached ? 'background' : 'wait', executionId: input.executionId,
+      generation: input.taskExecutionGeneration, taskId: input.taskId,
+      childSessionId: subagentSessionId, invocation: JSON.stringify(capsule),
+      status: 'running', startedAt: nowMs(),
     });
 
     // 组装子 agent system prompt（目标 profile instructions）
@@ -288,9 +282,10 @@ export class SubagentRunner {
               input.parentOnEvent?.(event);
               return;
             }
-            if (input.parentTurn && !input.parentTurn.isLive(input.parentTurn.generation)) {
+            if (!input.detached && input.parentTurn && !input.parentTurn.isLive(input.parentTurn.generation)) {
               return;
             }
+            if (ownerSessionId) delegationTraceStore.event(ownerSessionId, input.parentToolCallId, traceIdentity, event);
             if (event.type === 'tool.started' || event.type === 'tool.completed' || event.type === 'tool.denied') {
               const toolPayload = event.payload as { toolCallId?: string };
               const toolCallId = typeof toolPayload.toolCallId === 'string' ? toolPayload.toolCallId.trim() : '';
@@ -301,84 +296,6 @@ export class SubagentRunner {
                 childBudget.aggregateToolCalls = parentBudget.aggregateToolCalls;
               }
             }
-            const basePayload = {
-              subagentId,
-              profile: input.targetProfile,
-              parentToolCallId: input.parentToolCallId,
-            } satisfies Pick<AgentSubagentEventPayload, 'subagentId' | 'profile' | 'parentToolCallId'>;
-
-            if (event.type === 'assistant.delta') {
-              const delta = event.payload as AgentAssistantDeltaPayload;
-              if (delta.text) {
-                input.parentOnEvent?.({
-                  id: generateEventId('agent-event'),
-                  type: 'subagent.delta',
-                  timestamp: nowMs(),
-                  sessionId: input.parentSessionId ?? null,
-                  agentId: input.parentAgentId,
-                  payload: {
-                    ...basePayload,
-                    text: delta.text,
-                  } satisfies AgentSubagentEventPayload,
-                });
-              }
-              return;
-            }
-
-            if (event.type === 'tool.started') {
-              const payload = event.payload as { toolCallId?: string; toolName?: string };
-              input.parentOnEvent?.({
-                id: generateEventId('agent-event'),
-                type: 'subagent.delta',
-                timestamp: nowMs(),
-                sessionId: input.parentSessionId ?? null,
-                agentId: input.parentAgentId,
-                payload: {
-                  ...basePayload,
-                  child: {
-                    id: String(payload.toolCallId ?? generateEventId('subagent-tool')),
-                    kind: 'tool',
-                    title: payload.toolName ? `Tool: ${payload.toolName}` : 'Tool',
-                    status: 'running',
-                    toolName: payload.toolName,
-                  },
-                } satisfies AgentSubagentEventPayload,
-              });
-              return;
-            }
-
-            if (event.type === 'tool.completed' || event.type === 'tool.denied') {
-              const payload = event.payload as {
-                toolCallId?: string;
-                toolName?: string;
-                result?: { ok?: boolean; error?: { message?: string } };
-                reason?: string;
-              };
-              const failed = event.type === 'tool.denied' || payload.result?.ok === false;
-              const summary = failed
-                ? (payload.reason || payload.result?.error?.message || 'Tool failed')
-                : 'Tool completed';
-              input.parentOnEvent?.({
-                id: generateEventId('agent-event'),
-                type: 'subagent.delta',
-                timestamp: nowMs(),
-                sessionId: input.parentSessionId ?? null,
-                agentId: input.parentAgentId,
-                payload: {
-                  ...basePayload,
-                  child: {
-                    id: String(payload.toolCallId ?? generateEventId('subagent-tool')),
-                    kind: 'tool',
-                    title: payload.toolName ? `Tool: ${payload.toolName}` : 'Tool',
-                    status: failed ? 'error' : 'complete',
-                    toolName: payload.toolName,
-                    summary,
-                  },
-                } satisfies AgentSubagentEventPayload,
-              });
-              return;
-            }
-            input.parentOnEvent?.({ ...event, sessionId: input.parentSessionId ?? null, payload: { ...(event.payload as Record<string, unknown>), subagentId, parentToolCallId: input.parentToolCallId } } as SharedAgentEvent);
           },
         },
       ));
@@ -409,21 +326,7 @@ export class SubagentRunner {
       );
     }
 
-    // 通知父 trace：子 agent 完成
-    input.parentOnEvent?.({
-      id: generateEventId('agent-event'),
-      type: 'subagent.completed',
-      timestamp: nowMs(),
-      sessionId: input.parentSessionId ?? null,
-      agentId: input.parentAgentId,
-      payload: {
-        subagentId,
-        profile: input.targetProfile,
-        parentToolCallId: input.parentToolCallId,
-        text: resultText,
-        status: resultStatus,
-      } satisfies AgentSubagentEventPayload,
-    });
+    if (ownerSessionId) delegationTraceStore.finish(ownerSessionId, input.parentToolCallId, traceIdentity, resultStatus, resultText);
 
     return { text: resultText, status: resultStatus, subagentId, policyBudget: childPolicyBudget, completionDeclaration };
   }
@@ -508,6 +411,7 @@ export class SubagentRunner {
           }
           const execution = await startBackground({
             sessionId: ownerSessionId,
+            parentToolCallId: toolCallId,
             originSessionId: resolvedSessionId ?? ownerSessionId,
             taskId,
             parentExecutionId: effectiveParentExecutionId,

@@ -4,12 +4,6 @@ import { resolvePlanReference } from './sessionPlanReference';
 const reference = { sessionId: 'parent', planId: 'p', revision: 2, uri: 'session://plans/plan-frozen.md', expectedHash: 'a'.repeat(64) };
 const message = { role: 'assistant', agentId: 'debugger', turnId: 'turn', workTrace: { blocks: [{ toolCalls: [{ id: 'call', toolName: 'plan_artifact', planReview: { planId: 'p', revision: 2, uri: reference.uri, hash: reference.expectedHash } }] }] } } as ConversationMessage;
 describe('historical plan provenance', () => {
-  it('resolves a plan inside nested work blocks without changing its owner', () => {
-    const nested = structuredClone(message);
-    const block = nested.workTrace!.blocks[0];
-    nested.workTrace!.blocks = [{ ...block, toolCalls: [], children: [block] }];
-    expect(resolvePlanReference(reference, () => [nested])).toMatchObject({ ownerSessionId: 'parent', agentId: 'debugger' });
-  });
   it('uses the owning historical message and rejects unrecorded revisions', () => {
     expect(resolvePlanReference(reference, () => [message])).toMatchObject({ ownerSessionId: 'parent', agentId: 'debugger' });
     expect(() => resolvePlanReference({ ...reference, revision: 3 }, () => [message])).toThrow(/REFERENCE_DENIED/);

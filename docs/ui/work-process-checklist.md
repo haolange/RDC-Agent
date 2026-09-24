@@ -22,7 +22,7 @@
 
 ## 统一卡壳
 
-- 审批卡、tool 卡、Asked 卡、计划卡、计划阅读面板、handoff 建议行、Sub Agent 子行、Task 行、Compact 摘要共用 `--transcript-card-*`（radius / padding / border / surface / shadow）。
+- 审批卡、tool 卡、Asked 卡、计划卡、计划阅读面板、handoff 建议行、子代理委派卡、Task 行、Compact 摘要共用 `--transcript-card-*`（radius / padding / border / surface / shadow）。一次委派只出现一张卡，展开后顺序为任务、可见工作步骤、结果；「调用与回执」是卡内第二层。
 - Compact 是正式卡片（`work-process-summary-card`），标题走 i18n `chat.workProcessCompactTitle`，保留 token/message 计数。
 - Task 状态、审批 risk、`output_register`「已发布输出」走 i18n，禁止硬编码英文 `Blocked` / `In progress` 或 `` `${risk} risk` ``。
 - 禁止 primitive token 直用与奇数 px；审批动作使用 `<Button>`。

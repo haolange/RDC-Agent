@@ -3,7 +3,12 @@ import { act, createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import type { ConversationMessage } from '@shared/types/conversation';
-import { VirtualMessageList } from './VirtualMessageList';
+import { VirtualMessageList, measuredMessageOffsets } from './VirtualMessageList';
+
+it('positions expanded messages using measured heights', () => {
+  expect(measuredMessageOffsets([{ id: 'a' }, { id: 'b' }, { id: 'c' }], new Map([['b', 640]]), 160))
+    .toEqual([0, 160, 800, 960]);
+});
 
 it('renders short state samples and windows a long conversation while releasing listeners and observers', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -48,7 +53,7 @@ it('renders short state samples and windows a long conversation while releasing 
     host.scrollTop = 8000;
     await act(async () => host.dispatchEvent(new Event('scroll')));
     expect(list.dataset.virtualized).toBe('true');
-    expect(host.querySelectorAll('[data-message-id]')).toHaveLength(6);
+    expect(host.querySelectorAll('[data-message-id]')).toHaveLength(7);
     expect(host.querySelector('[data-message-id="message-50"]')).not.toBeNull();
     expect(host.querySelector('[data-message-id="message-0"]')).toBeNull();
     const locate = () => window.dispatchEvent(new CustomEvent('rdc:locate-tool-call', {

@@ -19,7 +19,7 @@
 .context-breakdown-run-col {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-width: 0;
   padding: var(--space-3);
   border: 1px solid var(--token-border-card);
@@ -44,8 +44,60 @@
   min-width: 0;
 }
 
-.context-breakdown-run-col[data-col='cache'] .context-breakdown-meter-stats {
-  flex-wrap: wrap;
+.context-breakdown-meter-primary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.context-breakdown-meter-primary-label,
+.context-breakdown-meter-detail dt {
+  color: var(--token-text-placeholder);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+}
+
+.context-breakdown-meter-primary-value {
+  color: var(--token-text-heading);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.context-breakdown-meter-primary.is-empty .context-breakdown-meter-primary-value,
+.context-breakdown-meter-detail.is-empty dd {
+  color: var(--token-text-placeholder);
+  font-weight: var(--font-medium);
+}
+
+.context-breakdown-meter-details {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--token-border-card);
+  min-width: 0;
+}
+
+.context-breakdown-meter-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.context-breakdown-meter-detail dt,
+.context-breakdown-meter-detail dd { margin: 0; }
+
+.context-breakdown-meter-detail dd {
+  color: var(--token-text-body);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .context-breakdown-meter-stat {

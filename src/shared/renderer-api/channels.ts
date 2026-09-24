@@ -27,6 +27,8 @@ export const RENDERER_INVOKE_CHANNEL = {
     answerToolApproval: 'conversation:answerToolApproval',
     answerPlanReview: 'conversation:answerPlanReview',
     getHistory: 'conversation:getHistory',
+    getDelegationTrace: 'conversation:getDelegationTrace',
+    getDelegationReceipt: 'conversation:getDelegationReceipt',
     switchBranch: 'conversation:switchBranch',
     clearHistory: 'conversation:clearHistory',
     undoLastTurn: 'conversation:undoLastTurn',
@@ -209,6 +211,7 @@ export const RENDERER_EVENT_CHANNEL = {
   },
   conversation: {
     event: 'conversation:event',
+    delegationChanged: 'conversation:delegationChanged',
   },
   workflow: {
     runStatusChanged: 'workflow:runStatusChanged',

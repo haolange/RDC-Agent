@@ -15,6 +15,7 @@ import { bindTaskRootBudget } from './TaskRootBudget';
 export interface BackgroundSubagentStart {
   /** Durable Task/result owner. */
   sessionId: string;
+  parentToolCallId: string;
   /** Immediate delegating session used for capability and artifact inheritance. */
   originSessionId?: string;
   taskId: string;
@@ -411,7 +412,7 @@ export function createBackgroundSubagentService(subagents: SubagentRunner, depen
   listRequestSnapshots?: ConstructorParameters<typeof BackgroundSubagentService>[3];
 }): BackgroundSubagentService {
   return new BackgroundSubagentService(async (input) => subagents.runSubagent({
-    parentAgentId: input.parentAgentId, parentToolCallId: input.executionId, targetProfile: input.targetProfile,
+    parentAgentId: input.parentAgentId, parentToolCallId: input.parentToolCallId, targetProfile: input.targetProfile,
     capsule: input.capsule, model: input.capsule.model, parentSessionId: input.originSessionId ?? input.sessionId, projectRootPath: input.projectRootPath,
     projectId: input.projectId, signal: input.signal, detached: true, childSessionId: `${input.sessionId}::subagent::${input.executionId}`,
     // Detached execution progress belongs to TaskRegistry and its durable mailbox,
