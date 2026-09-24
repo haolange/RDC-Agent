@@ -24,6 +24,8 @@ export const enContextBreakdown = {
   'contextBreakdown.tokensColumn': 'Tokens',
   'contextBreakdown.cacheColumn': 'Cache',
   'contextBreakdown.cacheSavedLabel': 'Saved',
+  'contextBreakdown.reasoningAmountLabel': 'Total',
+  'contextBreakdown.reasoningShareLabel': 'Of output',
   'contextBreakdown.cacheLatestLabel': 'Latest',
   'contextBreakdown.cacheCumulativeLabel': 'Cumulative',
   'contextBreakdown.cacheHitMissShort': 'Hit / Miss',

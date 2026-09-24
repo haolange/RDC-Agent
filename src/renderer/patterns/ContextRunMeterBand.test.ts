@@ -24,6 +24,8 @@ describe('ContextRunMeterBand', () => {
     } as Parameters<typeof buildContextRunMeterModel>[0], null);
     expect(actual.map((card) => card.primaryValue)).toEqual(['0', '0', '0']);
     expect(actual[1].details.map((detail) => detail.value)).toEqual(['0%', '0%', '0 / 0']);
+    expect(actual[2].details.map((detail) => detail.value)).toEqual(['—']);
+    expect(buildContextRunMeterModel({ outputTokens: 1_300, reasoningTokens: 410 } as Parameters<typeof buildContextRunMeterModel>[0], null)[2].details[0].value).toBe('32%');
   });
   it('renders three independent metric cards for tokens, cache, and reasoning', () => {
     const html = renderToStaticMarkup(
@@ -59,5 +61,6 @@ describe('ContextRunMeterBand', () => {
     expect(html).toContain('data-col="reasoning"');
     expect(html.match(/class="context-breakdown-run-col"/g)?.length).toBe(3);
     expect(html).toContain('context-breakdown-run-columns');
+    expect(html).toContain('contextBreakdown.reasoningShareLabel');
   });
 });

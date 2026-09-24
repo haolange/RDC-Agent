@@ -7,9 +7,9 @@ const percent = (value: number | undefined): string => typeof value === 'number'
 
 export interface ContextMeterCardModel {
   id: 'tokens' | 'cache' | 'reasoning';
-  primaryLabel: 'total' | 'saved';
+  primaryLabel: 'total' | 'saved' | 'reasoning';
   primaryValue: string;
-  details: Array<{ label: 'input' | 'output' | 'latest' | 'cumulative' | 'hitMiss'; value: string }>;
+  details: Array<{ label: 'input' | 'output' | 'latest' | 'cumulative' | 'hitMiss' | 'reasoningShare'; value: string }>;
 }
 
 export function buildContextRunMeterModel(
@@ -21,6 +21,11 @@ export function buildContextRunMeterModel(
   const preparedValue = prepared ? `~${formatTokenCount(prepared.preparedInputTokens)}` : unavailable;
   const hasCache = actual != null && (typeof actual.cacheHitTokens === 'number' || typeof actual.cacheMissTokens === 'number');
   const saved = actual?.cacheSavedTokens ?? actual?.cacheHitTokens;
+  const reasoningShare = typeof actual?.reasoningTokens === 'number'
+    && typeof actual.outputTokens === 'number'
+    && actual.outputTokens > 0
+    && actual.reasoningTokens <= actual.outputTokens
+    ? `${Math.round(actual.reasoningTokens / actual.outputTokens * 100)}%` : unavailable;
   return [
     {
       id: 'tokens', primaryLabel: 'total',
@@ -38,6 +43,7 @@ export function buildContextRunMeterModel(
         { label: 'hitMiss', value: hasCache ? `${tokens(actual?.cacheHitTokens)} / ${tokens(actual?.cacheMissTokens)}` : unavailable },
       ],
     },
-    { id: 'reasoning', primaryLabel: 'total', primaryValue: tokens(actual?.reasoningTokens), details: [] },
+    { id: 'reasoning', primaryLabel: 'reasoning', primaryValue: tokens(actual?.reasoningTokens),
+      details: [{ label: 'reasoningShare', value: reasoningShare }] },
   ];
 }

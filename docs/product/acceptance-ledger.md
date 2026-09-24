@@ -748,3 +748,9 @@ Execution tracking remains in RDC-Tool docs/tool-convergence-tasks.md (T1–T8).
 - **真实模型观察**：隔离副本用已连接的 Super Grok OAuth，以 `grok-account` / `grok-4.7` / `low` 实际执行。同步委派只读读取 `alpha.txt` 和 `beta.txt`：主 Working 中单张子代理卡依序显示任务、读取步骤与结果；工具步骤可展开，第二层「调用与回执」显示参数、原始回执与事件标识。后台委派先后触发两个受运行时拒绝的冲突尝试，模型新建 Task 后成功启动独立子执行；父回复发生一次 provider 请求失败，后台子代理仍在父回复结束后更新为完成，后续续跑写出结果，任务 `task_1790230772306_a900e99e` 完成。两份成功委派记录各以单个 JSONL 增量记录结束，事件序列均为 10 条，末状态 complete。失败属于模型先把 Task 置为 in_progress 导致的执行归属冲突，以及父回复的 provider 错误，不计为后台成功路径本身的失败。
 - **用量实测**：真实 usage 下，桌面宽度约 1600px 显示 Tokens / Cache / Reasoning 三栏；默认约 1280px 且双侧栏占宽时纵向堆叠。首轮主值分别为 34.7k、12.9k、427，次级输入/输出、最近一轮/累计和命中/未命中保持对齐；后续累计主值 116.0k、54.9k、880。`Last actual` 与真实零值 `0` 均可见。ChatGPT OAuth 在隔离副本内此前出现 Windows safeStorage 0x8009000B，故本轮改用用户指定的 Super Grok OAuth，不将 ChatGPT 路径标为通过。
 - **收尾与待确认事项**：原测试会话 `sess_2cefd2b9b9bc` 的 23 个文件与隔离备份逐项 SHA-256 一致，原 Task/Execution 为空；应用删除对话框明确提示不可撤销，最终 UI 删除确认仍待回复，原会话保留。两轮 Browser QA 进程已退出，隔离 OAuth 副本与测试 TEMP 已清理；本轮留下的 canonical browser lock 对应 PID 已死亡，清理后 lock 不存在，桌面启动权已交还。文档改动后重跑 `check:acceptance-ledger` 与 `check:gates` 通过；后者使用仓库内测试 TEMP 避开受限 shell 对 `C:\Users\Vip` 的 realpath 权限错误。
+
+## 2026-09-24 子代理与用量视觉收敛复验
+
+- **适用源码**：`497581931a2d44de226214088e595a867a812cb6` 上的本轮工作区修改。委派卡收起时用首个动作短句作标题，展开后仅展示实际可见步骤；无步骤省去空过程。卡内「调用与回执」按标识、调用、工具回执分项展开。用量三栏以总量、已节省、推理量为主数值；弹层宽度不超过 `38rem` 时单列，避免 Cache 明细在窄卡内断行。
+- **隔离 Browser 观察**：复制历史会话到本轮隔离 userData，以两条合成委派 trace 检查单卡折叠、无步骤与单步展开、工具详情和第二层调用参数。1280px 宽窗口且双侧栏打开时，卡片仍显示任务、执行者、状态与耗时。实际有数据的用量在宽窗口为三张等宽卡，在 840px 请求视口下变成纵向卡片；Escape 关闭弹层后焦点回到用量按钮。这是 UI/IPC 与布局观察，合成 trace 不代表本轮真实模型再次执行。
+- **验证边界**：受影响单测、typecheck、lint、Working / session projection / design token / renderer structure / contracts 门禁、`check:gates` 与 build 通过。默认并行度的全量 coverage 曾受 Windows 测试临时目录 `EPERM` 和跨域测试超时影响；在正常用户权限下限制为 2 个 worker 后，完整 coverage 为 3167 passed、4 skipped、0 failed，行覆盖率 75.44%、分支 62.52%、函数 77.03%。隔离副本的 OAuth secrets 无法由 Windows safeStorage 解密，本轮没有新模型请求，真实模型路径沿用上一节已记录的验收而不冒充新的通过。

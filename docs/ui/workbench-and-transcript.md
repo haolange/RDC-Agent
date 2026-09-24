@@ -41,7 +41,7 @@ Loop thinking：quiet spark + `正在思考` / `Thinking`（运行中默认展�
 
 Commentary：markdown 散文，不进 thinking 槽。Tool / Asked / Sub Agent / Tasks 快照 / Compact / 审批卡共用 `--transcript-card-*` 卡壳。Tool：统一单披露卡片（icon+动词 + **结果优先** body；展开内容层 + Raw；默认不展开 Raw；无 `toolGroup` 双层壳）。同 loop 连续 tool 外距 `--space-2`；thinking/commentary → 首 tool 与相邻 loop 顶距 `--space-3`。≥8 连续 tools 聚合成摘要行。Compact 是正式卡片，标题走 i18n。Tasks 快照卡与 tool 卡共用 `--transcript-card-icon-size` 与 `--text-sm`。
 
-一次 `subagent` tool call 只显示一张子代理卡：收起时任务、执行者、状态、耗时；展开后按「委派任务 → 可见工作步骤 → 结果摘要」顺序呈现。步骤按时间排序，工具行复用主 Work Process 的状态、详情与错误组件，单步仍可展开；不从模型文字推造隐藏 CoT。第二层「调用与回执」留在卡内、默认收起，展示受过滤的调用参数、原始回执、事件及执行标识。同步与后台共用组件；后台在父回复结束后仍按 Task 状态更新。步骤仅展开时分页挂载，卡片使用页面滚动；消息虚拟列表以实测高度更新占位和定位。
+一次 `subagent` tool call 只显示一张子代理卡：收起时用委派原文的首个动作短句作标题，旁列执行者、准确的运行/完成/失败/取消/中断状态和耗时；完整委派原文仍在展开态。展开后按「委派任务 → 实际可见工作步骤 → 结果摘要」顺序呈现；无可见步骤就不显示空的过程区。步骤按时间排序，工具行复用主 Work Process 的状态、详情与错误组件，单步仍可展开；不从模型文字推造隐藏 CoT。第二层「调用与回执」留在卡内、默认收起，先列存在的执行标识和调用/回执索引；原始 JSON 与长回执逐条展开，不以一整墙 JSON 抢占主叙事。同步与后台共用组件；后台在父回复结束后仍按 Task 状态更新。步骤仅展开时分页挂载，卡片使用页面滚动；消息虚拟列表以实测高度更新占位和定位。
 
 `web_search`：favicon + 域名 source pills（title 仅 tooltip）。`web_fetch`：Fetched page/已抓取 + 异形 page chip；favicon 仅经 `web:resolveFavicon` → data URL。`mcp__*` header glyph = `plug`。
 
@@ -73,9 +73,9 @@ Edit-and-resend 使用 Composer 当前 agent + 当前对话模型，编辑框上
 
 Effort：能力驱动 reasoning rail + `Max mode` + `Fast mode`，嵌在合并胶囊的弹层里。关档文案统一 `Disabled` / `禁用`。`unknown` / `none` → 同关态外观并灰掉不可调；`always-on` / fixed → 锁定开；wire `xhigh` 显示 `Extra`；产品最高档 `Max`。Max/Fast entitlement 未知时关态灰掉且状态文案亦为 `Disabled`。滑杆 inset 几何，松手 snap。Compose 色跟 agent `accent`（`--composer-effort-*`），禁止只用全局 `--token-border-focus`。
 
-Context 环：面只显示 `%` / `—` / `…`；相位文案在 title/aria 与 breakdown。相位权威：Preparing / Current request ~ / Actual|Last actual。占用率分母是可执行 prompt 上限 `promptBudgetTokens`（不再扣模型输出上限，例如 DeepSeek 1M 环分母为 1M）。hero 下显示压缩线、条件完整窗口（仅 window > budget）与本轮可生成；分段条带压缩线刻度，圆环不标压缩位置。Actual 三栏 Tokens | Cache | Reasoning 在弹层宽度大于 `33rem` 时等宽三张独立圆角卡片同行排列，缺遥测显示 `—`，禁止假 0；仅真实窄屏才纵向单列堆叠。
+Context 环：面只显示 `%` / `—` / `…`；相位文案在 title/aria 与 breakdown。相位权威：Preparing / Current request ~ / Actual|Last actual。占用率分母是可执行 prompt 上限 `promptBudgetTokens`（不再扣模型输出上限，例如 DeepSeek 1M 环分母为 1M）。hero 下显示压缩线、条件完整窗口（仅 window > budget）与本轮可生成；分段条带压缩线刻度，圆环不标压缩位置。Actual 三栏 Tokens | Cache | Reasoning 在弹层宽度大于 `38rem` 时等宽三张独立圆角卡片同行排列，缺遥测显示 `—`，禁止假 0；仅真实窄屏才纵向单列堆叠。
 
-`Current request` 固定渲染 `Tokens | Cache | Reasoning` 三栏：Tokens 的 Input 与 Total 都是 `~preparedInputTokens`，Output、Cache 和 Reasoning 都是 `—`；不得混入上一轮的 Actual / Last actual 数值。每栏依次为标题、单一主数值和对齐的次级信息：Tokens 主数值为总量，Cache 为已节省量，Reasoning 为推理量。未知是 `—`，真实零值是 `0`，估值保留 `~`。第一个同一 turn 的真实 provider usage 到达后原位切换为 Actual。终止后保留 Last actual，关闭再打开 session 仍可见；只有应用重启或从 `usage.json` 回读时标记 stale，新 session 从未拿到快照才显示「暂无用量」。产品弹窗不展示 continuation、derived context 或 prompt-cache policy 等内部诊断。
+`Current request` 固定渲染 `Tokens | Cache | Reasoning` 三栏：Tokens 的 Input 与 Total 都是 `~preparedInputTokens`，Output、Cache 和 Reasoning 都是 `—`；不得混入上一轮的 Actual / Last actual 数值。每栏依次为标题、同一基线上的主数值与短说明、底部对齐的次级信息：Tokens 主数值为总量，Cache 为已节省量，Reasoning 为推理量；仅在真实推理量与输出量均已知且推理量不大于输出量时显示占输出比例。未知是 `—`，真实零值是 `0`，估值保留 `~`。第一个同一 turn 的真实 provider usage 到达后原位切换为 Actual。终止后保留 Last actual，关闭再打开 session 仍可见；只有应用重启或从 `usage.json` 回读时标记 stale，新 session 从未拿到快照才显示「暂无用量」。产品弹窗不展示 continuation、derived context 或 prompt-cache policy 等内部诊断。
 
 Send 不因打字/改模型触发 Context preview IPC。在途 turn 冻结创建时 `RequestPlan`。
 

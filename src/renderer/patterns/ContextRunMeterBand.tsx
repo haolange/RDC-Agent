@@ -20,15 +20,18 @@ const ContextMeterCard: React.FC<{ card: ContextMeterCardModel }> = ({ card }) =
     input: t('contextBreakdown.inputLabel'), output: t('contextBreakdown.outputLabel'),
     latest: t('contextBreakdown.cacheLatestLabel'), cumulative: t('contextBreakdown.cacheCumulativeLabel'),
     hitMiss: t('contextBreakdown.cacheHitMissShort'),
+    reasoningShare: t('contextBreakdown.reasoningShareLabel'),
   };
   return (
     <section className="context-breakdown-run-col" data-col={card.id} aria-label={title}>
       <h3 className="context-breakdown-run-col-title">{title}</h3>
       <div className={`context-breakdown-meter-primary${card.primaryValue === METER_UNAVAILABLE ? ' is-empty' : ''}`}>
-        <span className="context-breakdown-meter-primary-label">
-          {card.primaryLabel === 'saved' ? t('contextBreakdown.cacheSavedLabel') : t('contextBreakdown.totalLabel')}
-        </span>
         <strong className="context-breakdown-meter-primary-value">{card.primaryValue}</strong>
+        <span className="context-breakdown-meter-primary-label">
+          {card.primaryLabel === 'saved' ? t('contextBreakdown.cacheSavedLabel')
+            : card.primaryLabel === 'reasoning' ? t('contextBreakdown.reasoningAmountLabel')
+              : t('contextBreakdown.totalLabel')}
+        </span>
       </div>
       {card.details.length > 0 ? (
         <dl className="context-breakdown-meter-details">
