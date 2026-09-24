@@ -188,7 +188,7 @@ requireCssContract(
   'Agent menu must keep selected and session-scoped running states separate, accessible, compact, localized, and continuously animated.',
 );
 
-const contextMetricResponsiveStart = contextBreakdownCss.indexOf('@container (max-width: 33rem)');
+const contextMetricResponsiveStart = contextBreakdownCss.indexOf('@container (max-width: 38rem)');
 const contextMetricResponsiveEnd = contextBreakdownCss.indexOf('/* Details disclosure toggle */', contextMetricResponsiveStart);
 const contextMetricResponsiveCss = contextMetricResponsiveStart >= 0 && contextMetricResponsiveEnd > contextMetricResponsiveStart
   ? contextBreakdownCss.slice(contextMetricResponsiveStart, contextMetricResponsiveEnd)
@@ -208,7 +208,7 @@ requireCssContract(
     && !contextBreakdownCss.includes('column-gap: clamp(0px')
     && !heroOnlyResponsiveCss.includes('grid-template-columns: minmax(0, 1fr);')
     && !heroOnlyResponsiveCss.includes('flex-wrap: wrap;'),
-  'Context Usage metrics must be equal-width cards in one row above 33rem; only the narrow metric query may stack them.',
+  'Context Usage metrics must be equal-width cards in one row above 38rem; only the narrow metric query may stack them.',
 );
 
 console.log(

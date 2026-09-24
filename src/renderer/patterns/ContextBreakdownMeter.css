@@ -1,4 +1,4 @@
-/* Actual / Last actual — independent rounded metric cards */
+/* Current request / Actual / Last actual share the same metric hierarchy. */
 .context-breakdown-run-meter {
   display: flex;
   flex-direction: column;
@@ -21,7 +21,8 @@
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-3);
+  min-height: calc(var(--space-10) * 4);
+  padding: var(--space-4);
   border: 1px solid var(--token-border-card);
   border-radius: var(--radius-lg);
   background: var(--token-bg-panel);
@@ -46,8 +47,9 @@
 
 .context-breakdown-meter-primary {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -60,10 +62,11 @@
 
 .context-breakdown-meter-primary-value {
   color: var(--token-text-heading);
-  font-size: var(--text-lg);
+  font-size: var(--text-3xl);
   font-weight: var(--font-semibold);
-  line-height: 1.2;
+  line-height: var(--leading-tight);
   font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-tight);
 }
 
 .context-breakdown-meter-primary.is-empty .context-breakdown-meter-primary-value,
@@ -75,7 +78,7 @@
 .context-breakdown-meter-details {
   display: grid;
   gap: var(--space-1);
-  margin: 0;
+  margin: auto 0 0;
   padding-top: var(--space-2);
   border-top: 1px solid var(--token-border-card);
   min-width: 0;
@@ -124,10 +127,6 @@
   white-space: nowrap;
 }
 
-.context-breakdown-run-col[data-col='reasoning'] .context-breakdown-meter-stat-value {
-  font-size: var(--text-lg);
-}
-
 .context-breakdown-meter-stat.is-empty .context-breakdown-meter-stat-value {
   color: var(--token-text-placeholder);
   font-weight: var(--font-medium);
@@ -157,7 +156,7 @@
   }
 }
 
-@container (max-width: 33rem) {
+@container (max-width: 38rem) {
   .context-breakdown-run-columns {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-3);
