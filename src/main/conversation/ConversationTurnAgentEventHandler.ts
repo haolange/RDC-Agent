@@ -8,7 +8,6 @@ import type {
   ConversationToolCall,
   ConversationToolImagePreviewRef,
   ConversationTaskSnapshotItem,
-  ConversationWorkBlock,
   ConversationWorkTrace,
 } from '@shared/types/conversation';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
@@ -18,13 +17,13 @@ import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
 import { extractConversationToolResourceRefs } from './ConversationToolResourceRefs';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { redactCredentialLikeText, redactSecretsDeep } from '../runtime/secretRedaction';
 import { shouldProjectDiagnosticToWorkProcess } from './workProcessDiagnosticPolicy';
 import { normalizeToolName } from '../workflow/debugger/DebuggerRuntimePolicy';
 import {
   upsertRuntimeToolApproval,
   upsertRuntimeToolCall,
   upsertLoopResult,
-  upsertSubagentChild,
   upsertWorkBlock,
 } from './ConversationWorkTrace';
 import {
@@ -370,6 +369,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
             }
             if (event.type === 'tool.started') {
               const loopScoped = isLoopTool(String(event.payload.toolName));
+              const isSubagent = normalizeToolName(String(event.payload.toolName)) === 'subagent';
               if (loopScoped) {
                 // Tool execution belongs to the provider loop that requested it. Only a
                 // subsequent assistant semantic event may consume turnStreamState.pendingNewLoop.
@@ -381,7 +381,14 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                   id: String(event.payload.toolCallId),
                   toolName: String(event.payload.toolName),
                   status: 'running',
-                  argsPreview: JSON.stringify(event.payload.args ?? {}).slice(0, 600),
+                  argsPreview: JSON.stringify(isSubagent ? redactSecretsDeep(event.payload.args ?? {}).value : event.payload.args ?? {}).slice(0, 600),
+                  ...(isSubagent ? {
+                    delegation: {
+                      task: redactCredentialLikeText(String((event.payload.args as Record<string, unknown> | undefined)?.task ?? '')),
+                      profile: String((event.payload.args as Record<string, unknown> | undefined)?.profile ?? 'general'),
+                      mode: (event.payload.args as Record<string, unknown> | undefined)?.mode === 'background' ? 'background' as const : 'wait' as const,
+                    },
+                  } : {}),
                   startedAt: nowMs(),
                 }, loopScoped ? currentLoopOptions() : undefined),
               });
@@ -607,12 +614,25 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 error: result?.ok ? undefined : result?.error?.message,
                 completedAt: nowMs(),
               };
+              if (normalizeToolName(String(event.payload.toolName)) === 'subagent') {
+                const existing = turnStreamState.assistantMessage.workTrace?.blocks.flatMap((block) => block.toolCalls)
+                  .find((call) => call.id === toolCallPatch.id);
+                const details = (result?.data?.details ?? result?.error?.details) as Record<string, unknown> | undefined;
+                toolCallPatch.delegation = {
+                  task: existing?.delegation?.task ?? '',
+                  profile: existing?.delegation?.profile ?? String(details?.profile ?? 'general'),
+                  mode: existing?.delegation?.mode ?? 'wait',
+                  executionId: typeof details?.executionId === 'string' ? details.executionId : existing?.delegation?.executionId,
+                  generation: typeof details?.generation === 'number' ? details.generation : existing?.delegation?.generation,
+                };
+              }
               const resourceRefs = extractConversationToolResourceRefs(String(event.payload.toolName), result);
               if (resourceRefs.length > 0) toolCallPatch.resourceRefs = resourceRefs;
               const imagePreviews = extractToolImagePreviews(result);
               if (imagePreviews.length > 0) toolCallPatch.imagePreviews = imagePreviews;
               if (!(isAskUserTool && result?.ok) && !(isPlanArtifactTool && result?.ok)) {
-                toolCallPatch.resultPreview = buildToolResultPreview(event.payload.result ?? {});
+                const preview = buildToolResultPreview(event.payload.result ?? {});
+                toolCallPatch.resultPreview = toolCallPatch.delegation ? redactCredentialLikeText(preview) : preview;
               }
               const loopScopedCompleted = isLoopTool(String(event.payload.toolName));
               commitAssistantMessage('message_patched', {
@@ -642,84 +662,6 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                   status: items.some((item) => item.status === 'in_progress') ? 'running' : 'complete',
                   taskSnapshot: { completed, total: items.length, items },
                   summary: `${completed} of ${items.length} completed`,
-                  completedAt: nowMs(),
-                }),
-              });
-            }
-            if (event.type === 'subagent.started') {
-              const payload = event.payload as { subagentId: string; profile: string; parentToolCallId: string; text?: string };
-              pendingContinuation.subagent = true;
-              markLoopCommentary();
-              commitAssistantMessage('message_patched', {
-                workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
-                  kind: 'subagent',
-                  title: `Sub-agent: ${payload.profile}`,
-                  stage: 'tool',
-                  status: 'running',
-                  summary: payload.text?.slice(0, 200) ?? '',
-                }),
-              });
-            }
-            if (event.type === 'subagent.delta') {
-              const payload = event.payload as {
-                subagentId: string;
-                text?: string;
-                child?: {
-                  id: string;
-                  kind: 'llm_turn' | 'tool';
-                  title: string;
-                  summary?: string;
-                  status: ConversationWorkBlock['status'];
-                  toolName?: string;
-                };
-              };
-              const blockId = `subagent-${payload.subagentId}`;
-              if (payload.child) {
-                const child = payload.child;
-                commitAssistantMessage('message_patched', {
-                  workTrace: upsertSubagentChild(turnStreamState.assistantMessage.workTrace, blockId, {
-                    id: child.id,
-                    kind: 'llm_turn',
-                    title: child.title,
-                    status: child.status,
-                    summary: child.summary,
-                    toolCalls: child.toolName
-                      ? [{
-                          id: child.id,
-                          toolName: child.toolName,
-                          status: child.status === 'error' ? 'error' : child.status === 'complete' ? 'complete' : 'running',
-                          resultPreview: child.summary,
-                          startedAt: nowMs(),
-                          completedAt: child.status === 'complete' || child.status === 'error' ? nowMs() : undefined,
-                        }]
-                      : [],
-                    startedAt: nowMs(),
-                    completedAt: child.status === 'complete' || child.status === 'error' ? nowMs() : undefined,
-                  }),
-                });
-              }
-              if (payload.text) {
-                commitAssistantMessage('message_patched', {
-                  workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, blockId, {
-                    kind: 'subagent',
-                    title: 'Sub-agent',
-                    stage: 'tool',
-                    status: 'running',
-                    summary: payload.text.slice(-200),
-                  }),
-                });
-              }
-            }
-            if (event.type === 'subagent.completed') {
-              const payload = event.payload as { subagentId: string; profile: string; text?: string; status?: string };
-              pendingContinuation.subagent = false;
-              commitAssistantMessage('message_patched', {
-                workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
-                  kind: 'subagent',
-                  title: `Sub-agent: ${payload.profile}`,
-                  stage: 'tool',
-                  status: payload.status === 'failed' ? 'error' : 'complete',
-                  summary: payload.text?.slice(0, 500) ?? '',
                   completedAt: nowMs(),
                 }),
               });

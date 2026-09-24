@@ -20,8 +20,5 @@ export function shouldSnapshotHandoffSuggestions(input: {
 }
 
 function collectToolCalls(blocks: ConversationWorkBlock[]): ConversationToolCall[] {
-  return blocks.flatMap((block) => [
-    ...block.toolCalls,
-    ...collectToolCalls(block.children ?? []),
-  ]);
+  return blocks.flatMap((block) => block.toolCalls);
 }

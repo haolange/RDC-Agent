@@ -102,6 +102,22 @@ export const ConversationRewriteFromMessageArgsSchema = z.tuple([
 ]);
 
 export const ConversationGetHistoryArgsSchema = SessionIdArgsSchema;
+export const ConversationGetDelegationTraceArgsSchema = z.tuple([
+  z.object({
+    sessionId: ipcId(128, 'sessionId'),
+    parentToolCallId: ipcNonEmptyString(200, 'parentToolCallId'),
+    cursor: z.number().int().min(0).max(100000).default(0),
+    pageSize: z.number().int().min(0).max(80).default(40),
+  }).strict(),
+]);
+export const ConversationGetDelegationReceiptArgsSchema = z.tuple([
+  z.object({
+    sessionId: ipcId(128, 'sessionId'),
+    parentToolCallId: ipcNonEmptyString(200, 'parentToolCallId'),
+    stepId: ipcNonEmptyString(200, 'stepId'),
+    offset: z.number().int().min(0).max(1_048_576),
+  }).strict(),
+]);
 export const ConversationClearHistoryArgsSchema = SessionIdArgsSchema;
 export const ConversationUndoLastTurnArgsSchema = SessionIdArgsSchema;
 export const ConversationCompactHistoryArgsSchema = SessionIdArgsSchema;

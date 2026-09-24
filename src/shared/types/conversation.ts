@@ -35,7 +35,6 @@ export type ConversationWorkBlockKind =
   | 'user_input'
   | 'plan_review'
   | 'compaction'
-  | 'subagent'
   | 'handoff'
   | 'diagnostic'
   | 'output'
@@ -140,6 +139,13 @@ export interface ConversationMessageDiagnostic {
 }
 
 export interface ConversationToolCall {
+  delegation?: {
+    task: string;
+    profile: string;
+    mode: 'wait' | 'background';
+    executionId?: string;
+    generation?: number;
+  };
   delegatedRequest?: { executionId: string; childSessionId: string; turnId: string; toolCallId: string };
   id: string;
   toolName: string;
@@ -204,8 +210,6 @@ export interface ConversationWorkBlock {
   toolCalls: ConversationToolCall[];
   startedAt: number;
   completedAt?: number;
-  /** Nested blocks are used by sub-agent traces. */
-  children?: ConversationWorkBlock[];
 }
 
 export interface ConversationWorkTrace {

@@ -13,6 +13,11 @@ import type { RendererApiTransport } from './transport';
 
 export function createEventSubscriptionApi(transport: RendererApiTransport): EventSubscriptionApi {
   return {
+    onDelegationTraceChanged: (callback) => (
+      transport.subscribe(EVENT.conversation.delegationChanged, (payload) => (
+        callback(payload as { sessionId: string; parentToolCallId: string })
+      ))
+    ),
     onRunStatusChanged: (callback) => (
       transport.subscribe(EVENT.workflow.runStatusChanged, (data) => callback(data as Parameters<typeof callback>[0]))
     ),

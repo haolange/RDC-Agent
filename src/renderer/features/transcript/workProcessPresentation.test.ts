@@ -15,6 +15,27 @@ function flattenWorkRows(rows: ReturnType<typeof buildWorkProcessPresentation>['
 }
 
 describe('buildWorkProcessPresentation', () => {
+  it('projects one card per parent subagent tool call without a duplicate tool row', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'running', updatedAt: now + 20,
+      blocks: [{
+        id: 'loop', kind: 'llm_turn', title: 'LLM turn', status: 'running', startedAt: now,
+        result: { status: 'streaming', outputPhase: 'commentary', toolCallIds: ['delegate-1', 'delegate-2'] },
+        toolCalls: [
+          { id: 'delegate-1', toolName: 'subagent', status: 'complete', startedAt: now,
+            delegation: { task: 'Read inputs', profile: 'general', mode: 'wait' } },
+          { id: 'delegate-2', toolName: 'subagent', status: 'running', startedAt: now + 1,
+            delegation: { task: 'Read config', profile: 'general', mode: 'background', executionId: 'exec-2' } },
+        ],
+      }],
+    });
+    const rows = flattenWorkRows(presentation.rows);
+    expect(rows.filter((row) => row.type === 'subagent')).toMatchObject([
+      { id: 'delegate-1', task: 'Read inputs', status: 'complete' },
+      { id: 'delegate-2', task: 'Read config', status: 'running', executionId: 'exec-2' },
+    ]);
+    expect(rows.filter((row) => row.type === 'tool' && row.toolName === 'subagent')).toHaveLength(0);
+  });
   it('withholds runtime context-compaction counters from the human work trace', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'running',

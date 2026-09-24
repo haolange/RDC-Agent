@@ -165,25 +165,6 @@ export function buildPresentationUnits(
       continue;
     }
 
-    if (block.kind === 'subagent') {
-      const childRows = block.children ? ctx.blocksToDetailRows(block.children) : [];
-      ctx.hasVisibleProcessEvidence = true;
-      units.push({
-        kind: 'standalone',
-        rows: [{
-          type: 'subagent',
-          id: block.id,
-          status: block.status,
-          profile: block.title.replace(/^Sub-agent[:?]\s*/, '').trim() || 'sub-agent',
-          summary: deps.getMeaningfulBlockSummary(block) || block.summary || '',
-          duration: formatDurationMs(block.startedAt, block.completedAt),
-          children: childRows,
-        }],
-        loopIds: [block.id],
-      });
-      continue;
-    }
-
     if (block.kind === 'compaction') {
       ctx.hasVisibleProcessEvidence = true;
       const stats = block.compactionStats;
@@ -332,7 +313,13 @@ function projectLlmTurn(
   const steps = ctx.groupProcessRows(
     block.toolCalls
       .filter((call) => !isTaskLifecycleTool(call.toolName))
-      .map((call) => ctx.createToolRow(call)),
+      .map((call): WorkProcessRow => call.delegation ? {
+        type: 'subagent', id: call.id, status: call.status === 'error' ? 'error' : call.status === 'complete' ? 'complete' : 'running',
+        profile: call.delegation.profile, task: call.delegation.task, mode: call.delegation.mode,
+        argsPreview: call.argsPreview ?? '', resultPreview: call.resultPreview ?? '',
+        executionId: call.delegation.executionId, generation: call.delegation.generation,
+        duration: formatDurationMs(call.startedAt, call.completedAt),
+      } : ctx.createToolRow(call)),
   );
   const loopRows: WorkProcessRow[] = [];
 

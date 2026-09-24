@@ -228,9 +228,13 @@ export type WorkProcessRow =
     id: string;
     status: WorkProcessRowStatus;
     profile: string;
-    summary: string;
+    task: string;
+    mode: 'wait' | 'background';
+    argsPreview: string;
+    resultPreview: string;
+    executionId?: string;
+    generation?: number;
     duration: string;
-    children: WorkProcessRow[];
   }
   | {
     type: 'section';

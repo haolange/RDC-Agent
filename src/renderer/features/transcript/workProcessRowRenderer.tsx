@@ -13,7 +13,7 @@ import {
 import { WorkProcessSectionRow } from './WorkProcessSectionRow';
 import { ToolAggregateRow } from './ToolAggregateRow';
 
-export function createWorkProcessRowRenderer() {
+export function createWorkProcessRowRenderer(sessionId?: string | null) {
   const renderRow = (row: WorkProcessRow): React.ReactNode => {
     if (row.type === 'tool') return <ToolRow key={row.id} row={row} />;
     if (row.type === 'toolAggregate') return <ToolAggregateRow key={row.id} row={row} />;
@@ -21,7 +21,7 @@ export function createWorkProcessRowRenderer() {
     if (row.type === 'planReview') return <PlanReviewRow key={row.id} row={row} />;
     if (row.type === 'approval') return <ApprovalRow key={row.id} row={row} />;
     if (row.type === 'diagnostic') return <DiagnosticRow key={row.id} row={row} />;
-    if (row.type === 'subagent') return <SubagentRow key={row.id} row={row} />;
+    if (row.type === 'subagent') return <SubagentRow key={row.id} row={row} sessionId={sessionId} />;
     if (row.type === 'taskSnapshot') return <TaskSnapshotCard key={row.id} row={row} />;
     if (row.type === 'section') {
       return (

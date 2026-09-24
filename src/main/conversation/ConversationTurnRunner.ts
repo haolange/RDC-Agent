@@ -285,7 +285,6 @@ export async function completeProfileTurn(
     approval: false,
     userInput: false,
     planReview: false,
-    subagent: false,
     handoff: false,
   };
   const markProcessEvidence = () => {
@@ -301,7 +300,6 @@ export async function completeProfileTurn(
     pendingContinuation.approval
     || pendingContinuation.userInput
     || pendingContinuation.planReview
-    || pendingContinuation.subagent
     || pendingContinuation.handoff
   );
   const resolveStreamingOutputPhase = (): ConversationLoopOutputPhase | undefined => {

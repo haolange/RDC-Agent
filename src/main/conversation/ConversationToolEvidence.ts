@@ -39,7 +39,6 @@ function collectUniqueToolCalls(blocks: readonly ConversationWorkBlock[]): Conve
     for (const call of block.toolCalls) {
       calls.set(`${call.toolName}\u0000${call.id}`, call);
     }
-    for (const child of block.children ?? []) visit(child);
   };
   for (const block of blocks) visit(block);
   return [...calls.values()];

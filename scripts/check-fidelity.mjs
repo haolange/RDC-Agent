@@ -155,8 +155,9 @@ requireCssContract(
     && !contextBreakdownPopover.includes('showWindowPercent')
     && !contextBreakdownPopover.includes('context-breakdown-meter-eyebrow')
     && !contextBreakdownPopover.includes('context-breakdown-runtime')
-    && contextRunMeterBand.includes('const metricUsage = isCurrent ? null : usage;')
-    && contextRunMeterBand.includes("data-phase={isCurrent ? 'current' : usage ? 'actual' : 'unavailable'}")
+    && contextRunMeterBand.includes('buildContextRunMeterModel(usage, prepared)')
+    && contextRunMeterBand.includes("data-phase={prepared ? 'current' : usage ? 'actual' : 'unavailable'}")
+    && contextRunMeterBand.includes('data-columns="3"')
     && (contextRunMeterBand.match(/data-testid="context-breakdown-run-meter"/g) || []).length === 1,
   'Context popover must keep one visual structure: Current renders the prepared Tokens/Cache/Reasoning strip; Preparing retains the last truthful usage when available; no telemetry remains explicit as unavailable; internal runtime diagnostics stay absent.',
 );

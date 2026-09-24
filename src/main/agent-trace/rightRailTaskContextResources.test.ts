@@ -35,7 +35,7 @@ describe('right rail task context resources', () => {
     expect(resources.map((resource) => resource.id)).toEqual(['output']);
   });
 
-  it('uses only durable resources from successfully completed tool calls, including nested blocks', () => {
+  it('uses only durable resources from successfully completed tool calls', () => {
     const resources = collectSessionTaskContextResources({
       messages: [message([{
         id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'complete', toolCalls: [
@@ -47,12 +47,11 @@ describe('right rail task context resources', () => {
             id: 'two', toolName: 'read_file', status: 'error', startedAt: 2,
             resourceRefs: [{ id: 'file:error', kind: 'file', label: 'error.md' }],
           },
-        ], startedAt: 1, children: [{
-          id: 'nested', kind: 'llm_turn', title: 'Nested', status: 'complete', toolCalls: [{
+          {
             id: 'three', toolName: 'mcp__server__inspect', status: 'complete', startedAt: 3,
             resourceRefs: [{ id: 'mcp:server:inspect', kind: 'mcp', label: 'inspect', summary: 'server' }],
-          }], startedAt: 3,
-        }],
+          },
+        ], startedAt: 1,
       }])],
       promptSegments: [],
       projectRoot: 'D:/project',

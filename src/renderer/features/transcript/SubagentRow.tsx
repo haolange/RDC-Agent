@@ -1,96 +1,134 @@
-import React, { useState } from 'react';
+import React from 'react';
+import type { ConversationToolCall } from '@shared/types/conversation';
+import type { DelegationTraceStep } from '@shared/types/delegationTrace';
 import type { WorkProcessRow } from './workProcessTypes';
 import { getRowStatusLabel } from './workProcessStatus';
+import { formatDurationMs } from './workProcessFormat';
+import { createToolRowForPresentation } from './workProcessToolRows';
 import { ToolRow } from './WorkProcessRowParts';
-import { TaskSnapshotCard } from './TaskSnapshotCard';
+import { useDelegationTrace } from './useDelegationTrace';
+import { useElectronApi } from '../../hooks/useElectronApi';
+import { useI18n } from '../../i18n';
 
-interface SubagentRowProps {
-  row: Extract<WorkProcessRow, { type: 'subagent' }>;
+type SubagentWorkRow = Extract<WorkProcessRow, { type: 'subagent' }>;
+
+function ReceiptEntry({ step, sessionId, parentToolCallId }: {
+  step: DelegationTraceStep; sessionId?: string | null; parentToolCallId: string;
+}) {
+  const api = useElectronApi();
+  const { t } = useI18n();
+  const [content, setContent] = React.useState('');
+  const [offset, setOffset] = React.useState<number | null>(0);
+  const [error, setError] = React.useState(false);
+  const load = async () => {
+    if (!sessionId || !api || !step.receiptRef || offset === null) return;
+    try {
+      const page = await api.conversation.getDelegationReceipt({ sessionId, parentToolCallId, stepId: step.id, offset });
+      setContent((previous) => previous + page.text);
+      setOffset(page.nextOffset);
+      setError(false);
+    } catch { setError(true); }
+  };
+  return <details><summary>{step.toolName} · {step.eventId ?? step.id}</summary>
+    <pre>{step.args}</pre>
+    <pre>{content || step.receipt}</pre>
+    {step.receiptRef && offset !== null ? <button type="button" className="work-process-subagent-more"
+      onClick={() => { void load(); }}>{content ? t('chat.subagentReceiptMore') : t('chat.subagentLoadReceipt')}</button> : null}
+    {error ? <span className="work-process-subagent-receipt-error">{t('chat.subagentReceiptError')}</span> : null}
+    {step.receiptTruncated && offset === null ? <span>{t('chat.subagentReceiptTruncated')}</span> : null}
+  </details>;
 }
 
-/**
- * Subagent row：渲染子 agent 的嵌套工作过程。
- *
- * 可折叠，展开后递归渲染 children rows（复用 WorkProcess 的 row 渲染）。
- * 左侧色带 + 缩进区分层级，避免视觉混乱。
- */
-export const SubagentRow: React.FC<SubagentRowProps> = ({ row }) => {
-  const [expanded, setExpanded] = useState(row.status === 'running');
-  const statusLabel = getRowStatusLabel(row.status);
-  const hasChildren = row.children.length > 0;
+function Step({ step, sessionId }: { step: DelegationTraceStep; sessionId?: string | null }) {
+  if (step.kind === 'tool') {
+    if (step.toolName === 'subagent') {
+      let args: { task?: string; profile?: string; mode?: string } = {};
+      try { args = JSON.parse(step.args ?? '{}') as typeof args; } catch { /* receipt remains available below */ }
+      return <SubagentRow row={{ type: 'subagent', id: step.id, status: step.status, profile: args.profile ?? 'general',
+        task: args.task ?? '', mode: args.mode === 'background' ? 'background' : 'wait',
+        argsPreview: step.args ?? '', resultPreview: step.receipt ?? '',
+        duration: formatDurationMs(step.timestamp, step.completedAt) }} sessionId={sessionId} />;
+    }
+    const call: ConversationToolCall = {
+      id: step.id, toolName: step.toolName ?? 'tool', status: step.status,
+      argsPreview: step.args, resultPreview: step.receipt,
+      startedAt: step.timestamp, completedAt: step.completedAt,
+    };
+    const row = createToolRowForPresentation(call);
+    return row.type === 'tool' ? <ToolRow key={step.id} row={row} /> : null;
+  }
+  if (step.kind === 'diagnostic') return <li className={`work-process-child-diagnostic status-${step.status}`}>
+    <span className="work-process-child-message">{step.text}</span>
+  </li>;
+  return <li className={`work-process-child-summary status-${step.status}`}>
+    <span className="work-process-child-text">{step.text}</span>
+  </li>;
+}
 
+export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | null }> = ({ row, sessionId }) => {
+  const { t } = useI18n();
+  const [expanded, setExpanded] = React.useState(false);
+  const [rawOpen, setRawOpen] = React.useState(false);
+  const { page, showMore } = useDelegationTrace(sessionId, row.id, expanded);
+  const header = page.header;
+  const status = header?.status === 'failed' || header?.status === 'cancelled' || header?.status === 'interrupted' || row.status === 'error' ? 'error'
+    : header?.status === 'running' ? 'running' : header ? 'complete' : row.status;
+  const duration = header ? formatDurationMs(header.startedAt, header.completedAt) : row.duration;
+  const task = header?.task || row.task || t('chat.subagentUntitledTask');
+  const profile = header?.profile || row.profile;
   return (
-    <li className={`work-process-subagent status-${row.status}`} data-work-process-block-id={row.id}>
-      <button
-        type="button"
-        className="work-process-subagent-header"
-        onClick={() => setExpanded((prev) => !prev)}
-        aria-expanded={expanded}
-      >
-        <span className={`work-process-subagent-caret ${expanded ? 'is-open' : ''}`} aria-hidden="true" />
-        <span className="work-process-subagent-profile">{row.profile}</span>
-        {row.summary ? <span className="work-process-subagent-summary">{row.summary}</span> : null}
-        {statusLabel ? <span className={`work-process-subagent-status status-${row.status}`}>{statusLabel}</span> : null}
-        {row.duration ? <span className="work-process-subagent-duration">{row.duration}</span> : null}
+    <li className={`work-process-subagent status-${status}${expanded ? ' is-expanded' : ''}`}
+      data-work-process-block-id={row.id} data-testid="work-process-subagent">
+      <button type="button" className="work-process-subagent-header" onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded} aria-controls={`delegation-${row.id}`}>
+        <span className={`work-process-subagent-caret${expanded ? ' is-open' : ''}`} aria-hidden="true">▸</span>
+        <span className="work-process-subagent-profile">{t('chat.subagentLabel')} · {profile}</span>
+        <span className="work-process-subagent-summary" title={task}>{task}</span>
+        <span className={`work-process-subagent-status status-${status}`}>
+          {header?.status === 'interrupted' ? t('chat.subagentInterrupted')
+            : status === 'complete' ? t('chat.subagentComplete') : getRowStatusLabel(status)}
+        </span>
+        {duration ? <span className="work-process-subagent-duration">{duration}</span> : null}
       </button>
-      {expanded && hasChildren ? (
-        <ol className="work-process-subagent-children">
-          {row.children.map((child) => renderChildRow(child))}
-        </ol>
+      {expanded ? (
+        <div id={`delegation-${row.id}`} className="work-process-subagent-body">
+          <div className="work-process-subagent-boundary">
+            <span>{t('chat.subagentTask')}</span><p>{task}</p>
+          </div>
+          <div className="work-process-subagent-process-label">{t('chat.subagentProcess')}</div>
+          {page.error ? <div className="work-process-subagent-receipt-error" role="alert">{t('chat.subagentTraceError')}</div> : null}
+          <ol className="work-process-subagent-children">
+            {page.steps.map((step) => <Step key={step.id} step={step} sessionId={sessionId} />)}
+          </ol>
+          {page.nextCursor !== null ? (
+            <button type="button" className="work-process-subagent-more" onClick={showMore}>{t('chat.subagentShowMore')}</button>
+          ) : null}
+          <div className="work-process-subagent-boundary">
+            <span>{t('chat.subagentResult')}</span>
+            <p>{header?.result || (status === 'running' ? t('chat.subagentStillRunning') : row.resultPreview)}</p>
+          </div>
+          <button type="button" className="work-process-subagent-raw-toggle" aria-expanded={rawOpen}
+            onClick={() => setRawOpen((value) => !value)}>{t('chat.subagentCallReceipt')} {rawOpen ? '▴' : '▾'}</button>
+          {rawOpen ? (
+            <div className="work-process-subagent-raw">
+              <dl><dt>{t('chat.subagentInvocation')}</dt><dd><pre>{header?.invocation ?? row.argsPreview}</pre></dd>
+                <dt>{t('chat.subagentReceipt')}</dt><dd><pre>{header?.result ?? row.resultPreview}</pre></dd>
+                <dt>{t('chat.subagentExecutionId')}</dt><dd>{header?.executionId ?? row.executionId ?? '—'}</dd>
+                <dt>{t('chat.subagentGeneration')}</dt><dd>{header?.generation ?? row.generation ?? '—'}</dd>
+                <dt>{t('chat.subagentTaskId')}</dt><dd>{header?.taskId ?? '—'}</dd>
+                <dt>{t('chat.subagentChildSession')}</dt><dd>{header?.childSessionId ?? '—'}</dd></dl>
+              {page.steps.filter((step) => step.kind === 'tool').map((step) => (
+                <ReceiptEntry key={step.id} step={step} sessionId={sessionId} parentToolCallId={row.id} />
+              ))}
+              {page.steps.filter((step) => step.kind === 'diagnostic').map((step) => (
+                <div className="work-process-subagent-receipt-error" key={step.id}>{step.eventId ?? step.id} · {step.text}</div>
+              ))}
+              {page.nextCursor !== null ? <button type="button" className="work-process-subagent-more"
+                onClick={showMore}>{t('chat.subagentShowMore')}</button> : null}
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </li>
   );
-};
-
-const renderChildRow = (row: WorkProcessRow): React.ReactNode => {
-  if (row.type === 'tool') return <ToolRow key={row.id} row={row} />;
-  if (row.type === 'taskSnapshot') return <TaskSnapshotCard key={row.id} row={row} />;
-  if (row.type === 'subagent') {
-    return <SubagentRow key={row.id} row={row} />;
-  }
-  if (row.type === 'diagnostic') {
-    return (
-      <li key={row.id} className={`work-process-child-diagnostic status-${row.status}`}>
-        <span className="work-process-child-message">{row.message}</span>
-      </li>
-    );
-  }
-  if (row.type === 'planReview') {
-    return (
-      <li key={row.id} className={`work-process-child-summary status-${row.status}`}>
-        <span className="work-process-child-text">{row.plan.title}</span>
-      </li>
-    );
-  }
-  if (row.type === 'userInput') {
-    const summary = row.items.map((item) => item.prompt).filter(Boolean).join(' · ');
-    return (
-      <li key={row.id} className={`work-process-child-summary status-${row.status}`}>
-        <span className="work-process-child-text">{summary}</span>
-      </li>
-    );
-  }
-  if (row.type === 'approval') {
-    return (
-      <li key={row.id} className={`work-process-child-summary status-${row.status}`}>
-        <span className="work-process-child-text">{row.message}</span>
-      </li>
-    );
-  }
-  if (row.type === 'section') {
-    // 子 agent 的简化扁平视图：把小节内步骤直接展开为子 row。
-    return (
-      <React.Fragment key={row.id}>
-        {row.visibleSteps.map((step) => renderChildRow(step))}
-      </React.Fragment>
-    );
-  }
-  if (row.type === 'summary') {
-    return (
-      <li key={row.id} className={`work-process-child-summary status-${row.status}`}>
-        <span className="work-process-child-text">{row.text}</span>
-      </li>
-    );
-  }
-  return null;
 };

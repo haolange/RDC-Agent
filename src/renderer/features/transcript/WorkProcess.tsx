@@ -7,9 +7,10 @@ import { createWorkProcessRowRenderer } from './workProcessRowRenderer';
 
 interface WorkProcessProps {
   trace: ConversationWorkTrace;
+  sessionId?: string | null;
 }
 
-const WorkProcessInner: React.FC<WorkProcessProps> = ({ trace }) => {
+const WorkProcessInner: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
   const { t } = useI18n();
   const presentation = useMemo(() => buildWorkProcessPresentation(trace), [trace]);
   const [expanded, setExpanded] = useState<boolean>(presentation.defaultExpanded);
@@ -20,7 +21,7 @@ const WorkProcessInner: React.FC<WorkProcessProps> = ({ trace }) => {
     }
   }, [trace.status, presentation.important]);
 
-  const renderRow = useMemo(() => createWorkProcessRowRenderer(), []);
+  const renderRow = useMemo(() => createWorkProcessRowRenderer(sessionId), [sessionId]);
 
   const headlineCopy = trace.status === 'stopped'
     ? t('chat.workProcessHeadlineStopped')

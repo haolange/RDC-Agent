@@ -130,9 +130,7 @@ describe('SubagentRunner', () => {
 
     expect(result.status).toBe('complete');
     expect(result.text).toBe('final answer');
-    expect(parentEvents.some((e) => e.type === 'subagent.started')).toBe(true);
-    expect(parentEvents.some((e) => e.type === 'subagent.delta')).toBe(true);
-    expect(parentEvents.some((e) => e.type === 'subagent.completed')).toBe(true);
+    expect(parentEvents).toEqual([]);
   });
 
   it('passes authoritative Task output keys to the isolated child without parent history', async () => {

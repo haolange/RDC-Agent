@@ -67,8 +67,6 @@ AgentShellKind
 AgentShellSettings
 AgentState
 AgentStatus
-AgentSubagentChildPayload
-AgentSubagentEventPayload
 AgentTaskEventPayload
 AgentTimelineEntry
 AgentToolCallingEvidence

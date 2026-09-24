@@ -87,4 +87,6 @@ Outputs use the same session-owned projection path. `output_register` writes an 
 
 Agent preparing 与 active turn 使用独立锁 owner，准备转入运行时不能出现解锁间隙；delegation 和 native process 未确认退出仍为锁定。运行中允许只读足迹，禁止人工打开/关闭/切文件/切设备/事件 apply。
 
+子代理卡片由父消息中的 tool call 定位；会话拥有的委派日志独立增量持久化。`conversation:getDelegationTrace` 只接受当前 session 与该委派身份，按页返回可见步骤；`conversation:delegationChanged` 仅通知同 session、同父 tool call 的卡片重读。后台 Task 在父消息结束后仍可更新其记录，切换 session 后不得把迟到通知投影到当前视图。
+
 计划门与普通工具审批互斥投影，包括 delegated 请求。子计划的内容与决定绑定 child owner，parent 仅承载显示与回答入口。建议行 Agent 切换成功后才预填/发送；当前会话变化、Stop、请求失效或切换失败必须丢弃迟到结果，不覆盖其他会话草稿。

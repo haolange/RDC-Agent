@@ -18,7 +18,7 @@ function fixture(failSave: boolean, qualified = false) {
 it('completes delivered requirements without promoting unresolved scope conditions into missing outputs', async () => {
  const { service, registry } = fixture(false, true); await service.query('owner', 'none');
  const task = await registry().createTask('design tests', { completionRequirements: ['analysis'] });
- const execution = await service.start({ sessionId: 'owner', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule });
+ const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 'owner', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule });
  await service.join(execution.id);
  expect((await service.query('owner', execution.id))?.result).toMatchObject({ disposition: 'completed', outputs: { analysis: 'Twelve test designs delivered.' }, unresolved: ['Implementation ordering policy needs confirmation before executing these designs.'], scope: 'test design only' });
  expect(JSON.stringify((await service.messages('owner', execution.id)).messages)).toContain('Implementation ordering policy');
@@ -26,7 +26,7 @@ it('completes delivered requirements without promoting unresolved scope conditio
 it('never publishes completion or leaves an unmanaged running execution when result storage fails', async () => {
  const { service, registry } = fixture(true); await service.query('owner', 'none');
  const task = await registry().createTask('check');
- const execution = await service.start({ sessionId: 'owner', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule });
+ const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 'owner', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule });
  await service.join(execution.id).catch(() => undefined);
  const current = await service.query('owner', execution.id);
  expect(['blocked', 'failed', 'interrupted']).toContain(current?.status);
@@ -37,7 +37,7 @@ it('never publishes completion or leaves an unmanaged running execution when res
 it('does not publish a completed message when required output validation fails', async () => {
  const { service, registry } = fixture(false); await service.query('owner', 'none');
  const task = await registry().createTask('check', { completionRequirements: ['evidence'] });
- const execution = await service.start({ sessionId: 'owner', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule });
+ const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 'owner', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule });
  await service.join(execution.id).catch(() => undefined);
  const current = await service.query('owner', execution.id);
  expect(['blocked', 'failed']).toContain(current?.status);
@@ -48,7 +48,7 @@ it('does not publish a completed message when required output validation fails',
 it('returns the persisted artifact reference from the actual background_result tool', async () => {
  const { service, registry } = fixture(false); await service.query('owner', 'none');
  const task = await registry().createTask('result');
- const execution = await service.start({ sessionId: 'owner', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule });
+ const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 'owner', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule });
  await service.join(execution.id);
  const tool = service.createTools('general', 'owner').find((item) => item.name === 'background_result')!;
  const value = await tool.execute('result-read', { executionId: execution.id });
@@ -65,9 +65,9 @@ it('keeps nested result events with the live immediate parent then transfers onl
  }, (_session, onCancel) => { registry = new TaskRegistry(root, { onCancelExecution: onCancel }); return registry; }, (_session, id) => ({ uri: `session://tool-outputs/${id}.json`, hash: `hash-${id}` }));
  await service.query('owner', 'none');
  const parentTask = await registry.createTask('parent');
- const parent = await service.start({ sessionId: 'owner', taskId: parentTask.id, parentAgentId: 'general', targetProfile: 'general', capsule });
+ const parent = await service.start({ parentToolCallId: 'test-tool', sessionId: 'owner', taskId: parentTask.id, parentAgentId: 'general', targetProfile: 'general', capsule });
  const childTask = await registry.createTask('child', { parentTaskId: parentTask.id });
- const child = await service.start({ sessionId: 'owner', taskId: childTask.id, parentExecutionId: parent.id, parentAgentId: 'general', targetProfile: 'general', capsule });
+ const child = await service.start({ parentToolCallId: 'test-tool', sessionId: 'owner', taskId: childTask.id, parentExecutionId: parent.id, parentAgentId: 'general', targetProfile: 'general', capsule });
  await service.join(child.id);
  expect(JSON.stringify((await service.beforeParentProviderRequestMessages('owner')).messages)).not.toContain(child.id);
  release(); await service.join(parent.id);
@@ -91,10 +91,10 @@ it('retains new-parent spending when retry joins an older task root budget', asy
  await service.query('owner', 'none'); const task = await registry.createTask('retry with prior spending');
  const started = Date.now();
  const policy = (toolCalls: number, wallStartedAt: number) => ({ toolCalls, subagents: 0, childDepth: 0, wallStartedAt, maxToolCalls: 10, maxSubagents: 4, maxChildDepth: 2, maxWallTimeMs: 10000 });
- const first = await service.start({ sessionId: 'owner', taskId: task.id, rootBudgetId: 'old-turn-root', parentAgentId: 'general', targetProfile: 'general', capsule, policyBudget: policy(2, started) }); await service.join(first.id);
+ const first = await service.start({ parentToolCallId: 'test-tool', sessionId: 'owner', taskId: task.id, rootBudgetId: 'old-turn-root', parentAgentId: 'general', targetProfile: 'general', capsule, policyBudget: policy(2, started) }); await service.join(first.id);
  const nextPolicy = policy(1, started + 1);
- const second = await service.start({ sessionId: 'owner', taskId: task.id, rootBudgetId: 'new-turn-root', parentAgentId: 'general', targetProfile: 'general', capsule, policyBudget: nextPolicy }); await service.join(second.id);
- const third = await service.start({ sessionId: 'owner', taskId: task.id, rootBudgetId: 'new-turn-root', parentAgentId: 'general', targetProfile: 'general', capsule, policyBudget: nextPolicy }); await service.join(third.id);
+ const second = await service.start({ parentToolCallId: 'test-tool', sessionId: 'owner', taskId: task.id, rootBudgetId: 'new-turn-root', parentAgentId: 'general', targetProfile: 'general', capsule, policyBudget: nextPolicy }); await service.join(second.id);
+ const third = await service.start({ parentToolCallId: 'test-tool', sessionId: 'owner', taskId: task.id, rootBudgetId: 'new-turn-root', parentAgentId: 'general', targetProfile: 'general', capsule, policyBudget: nextPolicy }); await service.join(third.id);
  expect(observed).toEqual([2, 3, 3]);
  expect((await registry.getExecution(second.id))?.rootBudgetId).toBe('old-turn-root');
 });

@@ -21,6 +21,8 @@ import {
   ConversationClearHistoryArgsSchema,
   ConversationGetAttachmentPreviewArgsSchema,
   ConversationGetHistoryArgsSchema,
+  ConversationGetDelegationTraceArgsSchema,
+  ConversationGetDelegationReceiptArgsSchema,
   ConversationGetToolImagePreviewArgsSchema,
   ConversationReleaseAttachmentsArgsSchema,
   ConversationRewriteFromMessageArgsSchema,
@@ -36,6 +38,7 @@ import {
   readAttachmentFilePreviewDataUrl,
 } from '../conversation/attachmentPreview';
 import { NATIVE_IMAGE_MIME_TYPES } from '../conversation/attachmentClassify';
+import { delegationTraceStore } from '../conversation/DelegationTraceStore';
 import { toRejectedSendResult } from '../conversation/conversationSendRejection';
 
 export function registerConversationHandlers(context: WorkbenchIpcContext): void {
@@ -114,6 +117,24 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       return { messages: [], branchState: null };
     }
     return conversationService.getHistory(sessionId);
+  });
+
+  ipcMain.handle('conversation:getDelegationTrace', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(ConversationGetDelegationTraceArgsSchema, rawArgs, {
+      label: 'conversation:getDelegationTrace', maxBytes: 4 * 1024,
+    });
+    if (!state.currentSessionId || request.sessionId !== state.currentSessionId) {
+      return { header: null, steps: [], nextCursor: null, total: 0, error: 'DELEGATION_TRACE_SESSION_DENIED' };
+    }
+    return delegationTraceStore.read(request.sessionId, request.parentToolCallId, request.cursor, request.pageSize);
+  });
+
+  ipcMain.handle('conversation:getDelegationReceipt', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(ConversationGetDelegationReceiptArgsSchema, rawArgs, {
+      label: 'conversation:getDelegationReceipt', maxBytes: 4 * 1024,
+    });
+    if (!state.currentSessionId || request.sessionId !== state.currentSessionId) throw new Error('DELEGATION_RECEIPT_SESSION_DENIED');
+    return delegationTraceStore.readReceipt(request.sessionId, request.parentToolCallId, request.stepId, request.offset);
   });
 
   ipcMain.handle('conversation:switchBranch', async (_event, ...rawArgs: unknown[]) => {
