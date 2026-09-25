@@ -152,8 +152,8 @@ export const ContextBreakdownPopover: React.FC<{
       tokens: formatTokenCount(generatableTokens),
     }));
   }
-  const formatKnownTokens = (value: number | null | undefined): string => (
-    typeof value === 'number' ? formatTokenCount(value) : METER_UNAVAILABLE
+  const formatKnownTokens = (value: number | null | undefined, projected = false): string => (
+    typeof value === 'number' ? `${projected ? '~' : ''}${formatTokenCount(value)}` : METER_UNAVAILABLE
   );
 
   React.useEffect(() => {
@@ -206,7 +206,7 @@ export const ContextBreakdownPopover: React.FC<{
               <span className="context-breakdown-summary-caption">{summaryCaption}</span>
             </div>
             <span className="context-breakdown-hero-tokens">
-              {showPrepared ? '~' : ''}{formatKnownTokens(occupiedTokens)} / {formatKnownTokens(windowTokens)}{' '}
+              {formatKnownTokens(occupiedTokens, showPrepared || showEstimated)} / {formatKnownTokens(windowTokens)}{' '}
               {t('contextBreakdown.tokensLabel')}
             </span>
           </div>
@@ -234,7 +234,7 @@ export const ContextBreakdownPopover: React.FC<{
           </div>
         </div>
 
-        <ContextRunMeterBand usage={showUsage ? usage : null} prepared={showPrepared ? prepared : null} />
+        <ContextRunMeterBand usage={showUsage ? usage : null} prepared={showPrepared ? prepared : null} estimated={showEstimated} />
 
         {showUsage && usage && (usage.cost || typeof usage.cumulativeCost === 'number') ? (
           <div className="context-breakdown-cost-card" data-testid="context-breakdown-cost">

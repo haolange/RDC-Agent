@@ -13,16 +13,21 @@ import {
 import { WorkProcessSectionRow } from './WorkProcessSectionRow';
 import { ToolAggregateRow } from './ToolAggregateRow';
 
-export function createWorkProcessRowRenderer(sessionId?: string | null) {
+export function createWorkProcessRowRenderer(
+  sessionId?: string | null,
+  renderToolDetail?: (row: Extract<WorkProcessRow, { type: 'tool' }>) => React.ReactNode,
+  density: 'normal' | 'compact' = 'normal',
+  latestTaskSnapshotId?: string,
+) {
   const renderRow = (row: WorkProcessRow): React.ReactNode => {
-    if (row.type === 'tool') return <ToolRow key={row.id} row={row} />;
-    if (row.type === 'toolAggregate') return <ToolAggregateRow key={row.id} row={row} />;
+    if (row.type === 'tool') return <ToolRow key={row.id} row={row} extraDetail={renderToolDetail?.(row)} density={density} />;
+    if (row.type === 'toolAggregate') return <ToolAggregateRow key={row.id} row={row} renderToolDetail={renderToolDetail} density={density} />;
     if (row.type === 'userInput') return <UserInputRow key={row.id} row={row} />;
     if (row.type === 'planReview') return <PlanReviewRow key={row.id} row={row} />;
     if (row.type === 'approval') return <ApprovalRow key={row.id} row={row} />;
-    if (row.type === 'diagnostic') return <DiagnosticRow key={row.id} row={row} />;
+    if (row.type === 'diagnostic') return <DiagnosticRow key={row.id} row={row} density={density} />;
     if (row.type === 'subagent') return <SubagentRow key={row.id} row={row} sessionId={sessionId} />;
-    if (row.type === 'taskSnapshot') return <TaskSnapshotCard key={row.id} row={row} />;
+    if (row.type === 'taskSnapshot') return <TaskSnapshotCard key={row.id} row={row} isLatest={row.id === latestTaskSnapshotId} />;
     if (row.type === 'section') {
       return (
         <WorkProcessSectionRow

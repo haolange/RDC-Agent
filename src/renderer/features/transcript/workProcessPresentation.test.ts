@@ -1264,14 +1264,14 @@ describe('buildWorkProcessPresentation', () => {
     expect(row.items.map((item) => item.taskId)).toEqual(['task-a', 'task-b', 'task-c']);
   });
 
-  it('keeps one live task snapshot card when later work arrives after the snapshot', () => {
+  it('projects separate historical task snapshots around later work', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'complete',
       updatedAt: now + 80,
       blocks: [
         {
-          id: 'task-snapshot-turn-1', kind: 'task_snapshot', title: '1 of 1 completed', status: 'complete',
-          taskSnapshot: { completed: 1, total: 1, items: [{ taskId: 'task-a', title: 'One', status: 'completed', order: 0 }] },
+          id: 'task-snapshot-created', kind: 'task_snapshot', title: 'Tasks added', status: 'complete',
+          taskSnapshot: { change: 'created', completed: 0, total: 1, items: [{ taskId: 'task-a', title: 'One', status: 'pending', order: 0 }] },
           toolCalls: [], startedAt: now, completedAt: now + 35,
         },
         {
@@ -1285,11 +1285,19 @@ describe('buildWorkProcessPresentation', () => {
           }],
           startedAt: now + 10, completedAt: now + 20,
         },
+        {
+          id: 'task-snapshot-updated', kind: 'task_snapshot', title: 'Tasks updated', status: 'complete',
+          taskSnapshot: { change: 'updated', completed: 1, total: 1, items: [{ taskId: 'task-a', title: 'One', status: 'completed', order: 0 }] },
+          toolCalls: [], startedAt: now + 30, completedAt: now + 30,
+        },
       ],
     });
     const snapshots = flattenWorkRows(presentation.rows).filter((entry) => entry.type === 'taskSnapshot');
-    expect(snapshots).toHaveLength(1);
-    expect(snapshots[0]).toEqual(expect.objectContaining({ id: 'task-snapshot-turn-1', completed: 1, total: 1 }));
+    expect(snapshots).toHaveLength(2);
+    expect(snapshots).toEqual([
+      expect.objectContaining({ id: 'task-snapshot-created', change: 'created', completed: 0 }),
+      expect.objectContaining({ id: 'task-snapshot-updated', change: 'updated', completed: 1 }),
+    ]);
   });
 
   it('projects memory and interpreter families with chips and code body', () => {

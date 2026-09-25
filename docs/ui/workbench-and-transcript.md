@@ -41,9 +41,17 @@ Loop thinking：quiet spark + `正在思考` / `Thinking`（运行中默认展�
 
 Commentary：markdown 散文，不进 thinking 槽。Tool / Asked / Sub Agent / Tasks 快照 / Compact / 审批卡共用 `--transcript-card-*` 卡壳。Tool：统一单披露卡片（icon+动词 + **结果优先** body；展开内容层 + Raw；默认不展开 Raw；无 `toolGroup` 双层壳）。同 loop 连续 tool 外距 `--space-2`；thinking/commentary → 首 tool 与相邻 loop 顶距 `--space-3`。≥8 连续 tools 聚合成摘要行。Compact 是正式卡片，标题走 i18n。Tasks 快照卡与 tool 卡共用 `--transcript-card-icon-size` 与 `--text-sm`。
 
-一次 `subagent` tool call 只显示一张子代理卡：收起时用委派原文的首个动作短句作标题，旁列执行者、准确的运行/完成/失败/取消/中断状态和耗时；完整委派原文仍在展开态。展开后按「委派任务 → 实际可见工作步骤 → 结果摘要」顺序呈现；无可见步骤就不显示空的过程区。步骤按时间排序，工具行复用主 Work Process 的状态、详情与错误组件，单步仍可展开；不从模型文字推造隐藏 CoT。第二层「调用与回执」留在卡内、默认收起，先列存在的执行标识和调用/回执索引；原始 JSON 与长回执逐条展开，不以一整墙 JSON 抢占主叙事。同步与后台共用组件；后台在父回复结束后仍按 Task 状态更新。步骤仅展开时分页挂载，卡片使用页面滚动；消息虚拟列表以实测高度更新占位和定位。
+Tasks 在主回合内每次真实创建或更新各留下独立历史卡，按事件 ID 保序去重，卡内列表冻结为变更提交当刻的逐项状态；一批创建只产生一张「添加待办」，更新显示「已更新待办」。旧记录没有事件种类时用「任务列表」，不得把旧卡改写为最新状态。卡头右端为完成数和固定箭头，不使用 `0ms`；列表用状态图形呈现待办、进行中、完成、受阻和取消，受阻原因跟随所属项，行内不叠加卡壳。最新卡默认展开，旧卡默认收起，用户手动开合优先并跨分页／窗口化保持。右栏 Progress 仍是带序号的最新列表；其任务定位优先找到最后一张包含该任务的历史卡。父回复结束后的后台变更只更新子代理卡和右栏，不在旧回复中倒插历史卡。
+
+一次 `subagent` tool call 只显示一张子代理卡；Tasks 快照是主时间线的独立历史事件。外卡与普通工具共用卡头：图标、子代理身份、真实状态、耗时和箭头同一行，折叠时分隔线下显示实际任务开头，两行共用单一入口；展开时卸载该预览，由完整 capsule 正文接替，不能同时出现两份任务。点阵仅在折叠时位于分隔线下任务预览的渐隐文字之后，与上方状态、耗时、箭头共用右侧列；展开后连同预览卸载，卡头仅保留身份、状态、耗时和箭头。宽卡点阵为 12 列 × 2 行，窄卡容器内为 6 列 × 2 行，行列间距接近均匀，点数不表达任务数或完成比例。正文按冻结 capsule 字段展示原话，不总结或改写；事实与引用、执行约束仅在任务内部按真实非空内容缩进折叠。下方「工作过程」「最终回复」「调用详情」独立折叠：过程预览真实活跃或最新可见动作及步骤数，展开复用主 Working Process 的同一事件与工具 DOM，以样式调整紧凑密度；final 预览实际回复首个有效文本段，展开直接使用主回复 Markdown；详情逐项按需展示父参数、父回执、完整实际发送载荷、执行标识与错误。短预览不淡出，溢出才轻微淡出；子工具回执留在对应工具行。运行卡首次展开自动打开工作过程，此后尊重手动开合；已结束卡首次展开时下方各区收起。未产生 final 时准确提示且不能空展开，不推造隐藏 CoT。后台卡按 Task Execution 生命周期更新，父回复结束不停止该卡。工作过程首次取最近 40 步，向前每页 40 步；已加载长记录按页面滚动与实测高度窗口化。开合在流式更新、分页和重挂载后保持，加载更早记录保留阅读位置。
+
+三个下方主区采用透明全宽入口、固定右端箭头及细分隔线；任务原话与最终回复直接处于卡片内容流，不再套实色底壳。任务内的事实与引用、执行约束，以及调用详情内每项记录，分别使用同一种二级披露卡：圆角边界、卡头、展开分隔线和所属正文；没有包住整组的额外外卡。不可用回执显示状态且不提供空操作。子过程与主过程共享同一事件渲染路径及工具卡骨架；子过程只收紧工具卡内边距和相邻事件间距，保留卡头、边框、分隔线与正文归属，长代码、JSON、表格才有内层载荷表面。带 toolCallId 的 Hook 诊断按精确调用身份归入主子共用的工具卡，正常完成放在展开详情，警告/错误在收起态提示；工具状态仍只表达工具自身结果。无有效关联的生命周期诊断按原事件位置显示。子过程工作区顶部留白 12px、底部 16px；无真实 commentary 或可见 thinking 时不补造模型叙述。`background_wait` 是可展开的轻量行，原始参数与回执仍可查。后台完成或报告只刷新自身卡片与 Task mailbox；父回复已结束时，不自动生成新的父 Work Process 或 assistant 回复。
 
 `web_search`：favicon + 域名 source pills（title 仅 tooltip）。`web_fetch`：Fetched page/已抓取 + 异形 page chip；favicon 仅经 `web:resolveFavicon` → data URL。`mcp__*` header glyph = `plug`。
+
+缺少工具调用标识的历史 Hook 完成诊断不与相邻工具强行关联；它在原事件位置以紧凑诊断卡显示，默认隐藏原始文字，展开后可读。此卡与工具使用相同的卡头、分隔线和焦点规则，但状态不计入工具执行结果。
+
+独立 Hook 卡到上一工具的可见边框相隔 12px，即使上一工具结束嵌套步骤列表也不贴边；Hook 到下一 turn 沿用共享 turn 留白。此节奏适用于主子同一行渲染路径的正常与紧凑密度。
 
 `error_recovery_*` 仅 Agent Activity / runtime log，不进 Work Process 叙事。Request Inspector 不出现在消息流或右侧默认 Session/Trace。入场动画由真实事件驱动，禁止假 stagger。
 
@@ -75,7 +83,7 @@ Effort：能力驱动 reasoning rail + `Max mode` + `Fast mode`，嵌在合并�
 
 Context 环：面只显示 `%` / `—` / `…`；相位文案在 title/aria 与 breakdown。相位权威：Preparing / Current request ~ / Actual|Last actual。占用率分母是可执行 prompt 上限 `promptBudgetTokens`（不再扣模型输出上限，例如 DeepSeek 1M 环分母为 1M）。hero 下显示压缩线、条件完整窗口（仅 window > budget）与本轮可生成；分段条带压缩线刻度，圆环不标压缩位置。Actual 三栏 Tokens | Cache | Reasoning 在弹层宽度大于 `38rem` 时等宽三张独立圆角卡片同行排列，缺遥测显示 `—`，禁止假 0；仅真实窄屏才纵向单列堆叠。
 
-`Current request` 固定渲染 `Tokens | Cache | Reasoning` 三栏：Tokens 的 Input 与 Total 都是 `~preparedInputTokens`，Output、Cache 和 Reasoning 都是 `—`；不得混入上一轮的 Actual / Last actual 数值。每栏依次为标题、同一基线上的主数值与短说明、底部对齐的次级信息：Tokens 主数值为总量，Cache 为已节省量，Reasoning 为推理量；仅在真实推理量与输出量均已知且推理量不大于输出量时显示占输出比例。未知是 `—`，真实零值是 `0`，估值保留 `~`。第一个同一 turn 的真实 provider usage 到达后原位切换为 Actual。终止后保留 Last actual，关闭再打开 session 仍可见；只有应用重启或从 `usage.json` 回读时标记 stale，新 session 从未拿到快照才显示「暂无用量」。产品弹窗不展示 continuation、derived context 或 prompt-cache policy 等内部诊断。
+`Current request` 固定渲染 `Tokens | Cache | Reasoning` 三栏：Tokens 的 Input 与 Total 都是 `~preparedInputTokens`，Output、Cache 和 Reasoning 都是 `—`；不得混入上一轮的 Actual / Last actual 数值。每栏依次为标题、同一基线上的主数值与短说明、同一刻度起始的次级信息，不使用固定空高：Tokens 主数值为总量，Cache 为已节省量，Reasoning 为推理量；仅在真实推理量与输出量均已知且推理量不大于输出量时显示占输出比例。未知是 `—`，真实零值是 `0`，估值保留 `~`，包括投影中的已知明细。第一个同一 turn 的真实 provider usage 到达后原位切换为 Actual。终止后保留 Last actual，关闭再打开 session 仍可见；只有应用重启或从 `usage.json` 回读时标记 stale，新 session 从未拿到快照才显示「暂无用量」。产品弹窗不展示 continuation、derived context 或 prompt-cache policy 等内部诊断。
 
 Send 不因打字/改模型触发 Context preview IPC。在途 turn 冻结创建时 `RequestPlan`。
 
@@ -123,3 +131,5 @@ Composer 计划门只显示“实施此计划？”、当前计划声明的全�
 工作区内唯一 `PlanReaderHost` 承载阅读器，避免 Transcript 行重挂载打断阅读。WorkBench 布局通过 renderer 内部上下文提供主工作区和 Composer 外壳边界；阅读器左右与外壳对齐，上下占满主工作区并保留 `--space-4`（窄屏 `--space-2`）安全边距。ResizeObserver、布局状态和视口通知驱动 `useDynStyle`，不猜测侧栏宽度、不设置固定阅读宽高上限、不写内联样式。
 
 阅读器保留全窗口 Portal 与模态遮罩，背景使用 blur token，面板实色；标题/版本/操作栏固定，正文单独滚动，窄屏操作栏换行，长路径与代码块不撑破面板。复用 overlay stack 和焦点约束，Escape/遮罩关闭并回焦当前阅读按钮。加载、失败与 hash 校验后的全文明确区分，不拼接 sections 冒充原文；复制、导出、保存集中于阅读器。建议行切换失败展示错误并保留草稿，发送过程中禁重复选择。
+
+委派正文直接读取冻结 capsule 的结构化资源，任务为主体，非空约束、事实、引用与输出要求分组呈现；原始发送内容在调用详情按需展开。预览去除 Markdown 语法外壳但不总结改写，代码原文保留。调用详情的执行标识独立折叠；最终回复与主回复共用 Markdown，展开不重复预览。

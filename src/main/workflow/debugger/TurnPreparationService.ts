@@ -102,7 +102,7 @@ export interface TurnPreparationServiceDeps {
     projectId?: string | null,
     projectRootPath?: string | null,
     mcpPoolKey?: string | null,
-    options?: { excludeRdcLeaseTools?: boolean },
+    options?: { excludeRdcLeaseTools?: boolean; excludeSubagent?: boolean },
   ) => ResolvedRuntimeTools;
   createToolSignature: (tools: ToolDefinition[]) => string;
 }
@@ -138,6 +138,9 @@ export class TurnPreparationService {
     signal?: AbortSignal;
     excludeRdcLeaseTools?: boolean;
     frozenDelegationCapsule?: import('@shared/types/delegationCapsule').DelegationCapsule;
+    subagentDepth?: number;
+    inheritedMaxChildDepth?: number;
+    excludeSubagent?: boolean;
   }): Promise<PreparedAgentTurnContext> {
     const throwIfCancelled = () => {
       if (input.signal?.aborted) throw new Error('REQUEST_CANCELLED: request preparation was cancelled.');
@@ -172,6 +175,8 @@ export class TurnPreparationService {
     throwIfCancelled();
     const rdcBinding = freezeRdcTurnBinding(cliSettings, catalog?.tools ?? [], leaseIdentity);
     const compiledPolicy = compileEffectivePolicy(input.projectRootPath);
+    const effectiveMaxChildDepth = Math.min(compiledPolicy.maxChildDepth, input.inheritedMaxChildDepth ?? Infinity);
+    const excludeSubagent = input.excludeSubagent === true || (input.subagentDepth ?? 0) >= effectiveMaxChildDepth;
     const contextCompactionPercent = resolveEffectiveCompactionPercent(
       turnSettings.agentRuntime.context.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
       compiledPolicy.contextCompactionPercent,
@@ -213,7 +218,7 @@ export class TurnPreparationService {
       input.projectId,
       input.projectRootPath,
       mcpLease?.poolKey ?? null,
-      { excludeRdcLeaseTools },
+      { excludeRdcLeaseTools, excludeSubagent },
     );
     const slotKey = agentSlotKey(resolveExecutionScopeId(input.sessionId), input.agentId);
     const toolSignature = this.deps.createToolSignature(runtimeTools.definitions);
@@ -350,6 +355,7 @@ export class TurnPreparationService {
       compactionThresholdPercent: turnSettings.agentRuntime.context.compactionThresholdPercent
         ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
       excludeRdcLeaseTools,
+      excludeSubagent,
       delegationCapsule: input.frozenDelegationCapsule ?? null,
     });
     bindRdcTurn(effectivePlan, rdcBinding);

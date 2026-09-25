@@ -87,6 +87,10 @@ Outputs use the same session-owned projection path. `output_register` writes an 
 
 Agent preparing 与 active turn 使用独立锁 owner，准备转入运行时不能出现解锁间隙；delegation 和 native process 未确认退出仍为锁定。运行中允许只读足迹，禁止人工打开/关闭/切文件/切设备/事件 apply。
 
-子代理卡片由父消息中的 tool call 定位；会话拥有的委派日志独立增量持久化。`conversation:getDelegationTrace` 只接受当前 session 与该委派身份，按页返回可见步骤；`conversation:delegationChanged` 仅通知同 session、同父 tool call 的卡片重读。后台 Task 在父消息结束后仍可更新其记录，切换 session 后不得把迟到通知投影到当前视图。
+子代理卡片由父消息中的 tool call 定位；会话拥有的委派日志独立增量持久化。`conversation:getDelegationTrace` 的零页只返回头部，含子执行状态及后台 Task Execution 状态；两者含义不同。步骤页带稳定 ID、revision 和可见 `ConversationWorkBlock`；工作过程首次展开取最近 40 步，向前每页 40 步，运行中按 revision 合并。`conversation:getDelegationContent` 校验当前 session、父调用、child session、execution ID 与 generation，再以 UTF-8 字节偏移分块读取结构化任务、实际发送载荷、final、父调用/回执或指定子工具回执；分页不得拆断字符。`conversation:delegationChanged` 携带 session、父调用与 revision，仅刷新对应卡片；切换 session、取消及身份变化后的迟到结果不得进入当前视图。后台 Task 在父消息结束后仍可更新其记录，终态后迟到通知不得重新激活。
+
+Progress 的任务定位仅通过 renderer 内部有类型的请求收集工作记录中的候选卡，由窗口化列表负责展开、滚动与聚焦；请求不提供任务状态，也不增加公共 IPC。历史 Task 卡保留事件发生时的列表，右栏仍读取最新 `taskProjection`。
 
 计划门与普通工具审批互斥投影，包括 delegated 请求。子计划的内容与决定绑定 child owner，parent 仅承载显示与回答入口。建议行 Agent 切换成功后才预填/发送；当前会话变化、Stop、请求失效或切换失败必须丢弃迟到结果，不覆盖其他会话草稿。
+
+委派记录使用显式结构契约；不符合当前契约的详细记录返回不可用。结构化任务与实际发送文本是不同正文种类，读取同受 session、父调用及子执行身份校验。终态先增量持久化收束后的内部步骤，再发布头部 revision；重启中断读出的步骤使用持久时间收束，迟到事件不得恢复运行。

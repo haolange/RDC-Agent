@@ -1,0 +1,73 @@
+/* The child process uses the same event cards and rail as the parent. Density only
+ * changes spacing; it must not create a second tool presentation. */
+.work-process-body.is-compact .work-process-section-list > .work-process-step {
+  padding-top: var(--space-1);
+}
+.work-process-body.is-compact .work-process-section-list > .work-process-step:first-child {
+  padding-top: 0;
+}
+
+.work-process-tool-card.is-compact:not(.is-background-wait) > .work-card-trigger .work-process-tool-card-header {
+  min-height: var(--control-height-sm);
+  padding: var(--space-1) var(--space-2);
+}
+.work-process-tool-card.is-compact:not(.is-background-wait) > .work-process-tool-card-body {
+  padding: var(--space-1) var(--space-2);
+}
+.work-process-tool-card.is-compact:not(.is-background-wait) > .work-process-tool-card-expand {
+  padding: 0 var(--space-2) var(--space-2);
+}
+.work-process-tool-card.is-orphan-hook.is-compact > .work-process-tool-card-expand {
+  padding-top: var(--space-2);
+}
+.work-process-tool-card.is-compact:not(.is-background-wait) > .work-process-tool-diagnostic {
+  padding-inline: var(--space-2);
+}
+.work-process-tool-card.is-compact.has-payload > .work-process-tool-card-body .work-process-tool-card-body-text,
+.work-process-tool-card.is-compact.has-payload > .work-process-tool-card-body .work-process-tool-card-command {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* background_wait is a runtime event, not an ordinary tool result card. */
+.work-process-tool-card.is-background-wait {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.work-process-tool-card.is-background-wait > .work-card-trigger .work-process-tool-card-header {
+  min-height: var(--control-height-sm);
+  padding: 0;
+  border: 0;
+}
+.work-process-tool-card.is-background-wait > .work-card-trigger:hover,
+.work-process-tool-card.is-background-wait > .work-card-trigger:focus-visible {
+  background: transparent;
+}
+.work-process-tool-card.is-background-wait > .work-card-trigger:focus-visible {
+  border-radius: var(--radius-sm);
+  outline-offset: var(--space-1);
+}
+.work-process-tool-card.is-background-wait > .work-process-tool-card-body {
+  padding: var(--space-1) 0 0;
+}
+.work-process-tool-card.is-background-wait > .work-process-tool-card-expand {
+  margin-top: var(--space-1);
+  padding: 0;
+}
+
+/* Informational diagnostics retain their event position but read as metadata,
+ * rather than another tool or model turn. Warnings and errors keep their rail. */
+.work-process-diagnostic.severity-info {
+  padding-bottom: var(--space-1);
+}
+.work-process-diagnostic.severity-info > .work-process-step-rail .work-process-rail-marker {
+  width: var(--space-1);
+  height: var(--space-1);
+  border: 0;
+  background: var(--token-border-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-process-body.is-compact .work-process-step.is-appear { animation: none; }
+}

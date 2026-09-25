@@ -387,6 +387,14 @@ DELEGATION_CAPSULE_MAX_CHARS
 DelegationCapsule
 DelegationCapsuleBudget
 DelegationCapsuleSchema
+DelegationContentKind
+DelegationContentPage
+DelegationContentRequest
+DelegationTaskBody
+delegationTextPreview
+DelegationTraceHeader
+DelegationTracePage
+DelegationTraceStep
 deriveComposeAccentVars
 DerivedContextMessageRef
 DerivedContextView

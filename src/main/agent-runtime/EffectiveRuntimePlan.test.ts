@@ -355,4 +355,27 @@ describe('EffectiveRuntimePlan', () => {
       { name: 'shell', description: '', parameters: { type: 'object', properties: {} } },
     ], plan)).toEqual(['shell']);
   });
+
+  it('excludes new delegation from every frozen tool view at the depth limit', () => {
+    const policy = compilePolicyFromRestrictive({ limits: { maxChildDepth: 1 } });
+    const base = {
+      agentId: 'general', projectRootPath: 'D:/Project', profile: { skills: [] },
+      toolAllowlist: ['read_file', 'subagent'], permissionSettings: basePermission,
+      routeCapability, requestPlan: { executionIdentity: { fingerprint: 'depth' } },
+      promptPlan: { systemPrompt: 'system' }, policy,
+      skillIntersection: ['read_file', 'subagent'], visibleToolNames: ['read_file', 'subagent'],
+      activatedDeferredTools: [] as string[], mcpDescriptorHash: null,
+    };
+    const root = buildEffectiveRuntimePlan(base);
+    const child = buildEffectiveRuntimePlan({ ...base, excludeSubagent: true });
+    expect(root.toolAllowlist).toContain('subagent');
+    expect(child.toolAllowlist).toEqual(['read_file']);
+    expect(child.skillIntersection).toEqual(['read_file']);
+    expect(child.visibleToolNames).toEqual(['read_file']);
+    expect(activeToolNamesForPlan([
+      { name: 'read_file', description: '', parameters: { type: 'object', properties: {} } },
+      { name: 'subagent', description: '', parameters: { type: 'object', properties: {} } },
+    ], child)).toEqual(['read_file']);
+    expect(child.fingerprint).not.toBe(root.fingerprint);
+  });
 });

@@ -66,7 +66,7 @@ export function wrapPowerShellCommand(command: string, marker: string): string {
     '$__errFile = [System.IO.Path]::GetTempFileName()',
     'try {',
     `  $__src = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}'))`,
-    '  & ([scriptblock]::Create($__src)) 2>$__errFile | ForEach-Object { Write-RdcLine (($_ | Out-String).TrimEnd()) }',
+    '  & ([scriptblock]::Create($__src)) 2>$__errFile | Out-String -Stream | ForEach-Object { Write-RdcLine $_ }',
     '  if ($null -ne $LASTEXITCODE) { $__exit = [int]$LASTEXITCODE }',
     '  if (Test-Path -LiteralPath $__errFile) {',
     '    $__bytes = [System.IO.File]::ReadAllBytes($__errFile)',

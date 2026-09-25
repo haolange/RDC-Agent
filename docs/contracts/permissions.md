@@ -88,7 +88,7 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 `.policy.yml` 损坏或非法 → `POLICY_INVALID` fail-closed。Project policy 只能收紧，不能放宽。Policy 优先级为 `built-in hard deny > user/project policy floor > Full access > tool metadata`；数值预算必须是非负整数，`0` 明确表示禁止任何对应执行（例如 `maxTurns: 0`、`maxWallTimeMs: 0` 返回 typed error），且该 floor 即使在 Full access 下仍生效。
 
 Decision lattice 为 `allow < auto_review < ask_user < deny`。`approvalFloorByTool` 是该格上的下界：`user` 永远至少 `ask_user`，**不得**被 Permission Mode（含 Auto-review）降回 `auto_review`；`auto_review` 永远至少 `auto_review`。Mode 只影响 baseline，floor 与 baseline 取更严者。
-- Runtime budget limits are frozen in the turn plan and enforced by one shared budget: `maxTurns`、`maxToolCalls`、`maxSubagents`、`maxChildDepth`、`maxWallTimeMs`；disabled policy files are filtered before merge.
+- Runtime budget limits are frozen in the turn plan and enforced by one shared budget: `maxTurns`、`maxToolCalls`、`maxSubagents`、`maxChildDepth`、`maxWallTimeMs`；disabled policy files are filtered before merge. 根执行深度为 0；全部启用策略未声明 `maxChildDepth` 时默认 1，显式 0 禁止创建子代理，多个显式声明取最严格值。prepareTurn 按实际深度与继承预算冻结可见工具；深度或可创建子代理的预算耗尽时，模型声明、工具搜索和执行入口都排除新建 `subagent`，不移除既有 Task 的合法管理能力。同步、后台、重试与恢复沿用原深度和预算，不重新计数。
 
 ## 相关测试入口
 

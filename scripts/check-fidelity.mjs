@@ -155,7 +155,8 @@ requireCssContract(
     && !contextBreakdownPopover.includes('showWindowPercent')
     && !contextBreakdownPopover.includes('context-breakdown-meter-eyebrow')
     && !contextBreakdownPopover.includes('context-breakdown-runtime')
-    && contextRunMeterBand.includes('buildContextRunMeterModel(usage, prepared)')
+    && contextBreakdownPopover.includes('estimated={showEstimated}')
+    && contextRunMeterBand.includes('buildContextRunMeterModel(usage, prepared, estimated)')
     && contextRunMeterBand.includes("data-phase={prepared ? 'current' : usage ? 'actual' : 'unavailable'}")
     && contextRunMeterBand.includes('data-columns="3"')
     && (contextRunMeterBand.match(/data-testid="context-breakdown-run-meter"/g) || []).length === 1,

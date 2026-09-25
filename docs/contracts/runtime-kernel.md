@@ -206,9 +206,11 @@ RDC delegated lease 暂停父控制权，父级 rebind/clear/close 必须先 joi
 
 subagent（mode=background） 必须绑定 Task，持久化启动状态后返回执行标识。query/result 读取状态与结果；wait/join 等待既有执行；message 提交有限补充；cancel 和 task_stop 取消执行树并 join。父回复可以结束而 Task 继续托管；父 Task 正式完成检查子任务、阻塞、失败及结果。用户 Stop、会话删除和应用退出清理运行树；未观察进程退出不能声明清理完成。
 
-每个父 `subagent` tool call 只绑定一份所属 session 的子代理可见记录；child session、Task execution ID 与 generation 用于关联并隔离迟到事件。记录按事件顺序增量写入，包含可见工具开始/结束、可见 assistant commentary、诊断与最终结果；不复制隐藏 reasoning。原始参数和回执写入前过滤凭据，超长内容受限；renderer 仅经当前 session 校验后的 preload/API 分页读取，收起时只取头部。子执行记录不复制进父 `workTrace`，后台完成不修改父回复的 continuation。
+每个父 `subagent` tool call 只绑定一份所属 session 的子代理可见记录；child session、Task execution ID 与 generation 约束归属并隔离迟到事件。子事件按主 `ConversationWorkBlock` 语义增量投影可见 loop、消息、工具、审批和诊断，不复制 opaque / 隐藏推理。冻结 capsule 的结构化任务正文、实际发送载荷、实际 final、父工具回执、调用参数及子工具长回执分别保存；final 不与结构化完成声明或执行错误混用。后台头部另存 Task Execution 生命周期状态，不能用 child turn 结束或 Task aggregate 状态代替；等待、取消中、部分完成、受阻与终态由实际 Execution 更新。正文受会话所有权、身份和大小上限约束，超限明确标记不可完整读取。renderer 收起时仅取头部，展开后分页读取步骤、按 revision 合并活跃项并按需分块读取正文。子执行记录不复制进父 `workTrace`，后台完成不修改父回复的 continuation。
 
 后台 subagent 的生命周期由持久 Task 与 mailbox 投影，不进入父回复的同步 subagent continuation，也不由父回复 finalizeTrace 提前结束；审批/信息请求仍走受控入口。结构化 turn_complete 的 disposition、evidenceRefs 位于顶层，result 包含 summary、outputs、counterevidence、unresolved、scope、sideEffects、recoveryState。unresolved 表达认识与适用条件，不自动成为 missingRequirements；完成要求仍由 Task 的必需输出及执行状态校验，不能由通用 runtime 推测科学结论。
+
+后台 Task 的 `progress`、`blocked`、`decision_required` 与终态结果先写持久 mailbox，再投影到所属卡片。它们不发起新的父模型请求、不附加空 user turn，也不撤回已完成的父回复；用户下一次显式请求时，现有 request commit 边界负责投递并确认尚未消费的 mailbox 内容。子执行的审批和信息请求仍按 owner 入口处理。
 
 TaskRootBudget 是同一 TaskStore 中的持久预算记录，以 execution.rootBudgetId 关联，不是第二个执行器或独立预算存储。直接执行、同步与后台子执行、handoff 共用根账本；Capsule 的局部上限及已消费量另存当前执行，派发、重试与恢复只收窄局部上限，不把 child 上限写成 root 上限。同步与后台均恢复本执行局部计数，并在工具效果前等待预算预留持久化；保存失败不得执行效果。parent 回复结束后，后台事件续跑沿用同一 live root ledger，不能创建零消费账本。
 
@@ -252,3 +254,5 @@ Task 状态文件的提交保持同一候选文件与原子 rename。短暂 EPER
 文件路由表独立于灾难 shellHardDeny 表，均在权限模式和自定义允许前缀之前求值；Full access 不能绕过。有效工具集合有对应工具时，shell.command 文件读写/搜索返回 SHELL_FILE_TOOL_BYPASS，命令行 RDC 返回 RDC_VIA_COMMAND_DENIED。edit_file 和覆盖已有文件的 write_file 必须先在同一 session 成功 read_file 同一 realpath，否则 READ_BEFORE_EDIT_REQUIRED。已读状态跨 turn、仅内存持有，重启须重读；子 session 不继承。新建文件免先读。
 
 Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDC_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。
+
+主子可见工作过程共享终态收束：完成、失败和停止冻结所属 loop 与思考状态；未执行工具标为 skipped，已启动但无回执的工具明确失败，不推造成功。独立 Task 生命周期不因父执行完成而终止。模型输入包装不承担产品标题或正文的结构契约。

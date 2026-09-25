@@ -17,7 +17,7 @@ const DEFAULT_LIMITS = {
   maxTurns: Number.MAX_SAFE_INTEGER,
   maxToolCalls: Number.MAX_SAFE_INTEGER,
   maxSubagents: Number.MAX_SAFE_INTEGER,
-  maxChildDepth: Number.MAX_SAFE_INTEGER,
+  maxChildDepth: 1,
   maxWallTimeMs: Number.MAX_SAFE_INTEGER,
   contextCompactionPercent: 100,
 } as const;
@@ -35,7 +35,7 @@ const EMPTY_POLICY: RestrictivePolicy = {
   deniedTools: [],
   approval: 'none',
   approvalFloorByTool: {},
-  limits: { ...DEFAULT_LIMITS },
+  limits: {},
 };
 
 function normalizeToolName(name: string): string {
@@ -143,12 +143,17 @@ function loadPolicyDirectory(dir: string): RestrictivePolicy[] {
 }
 
 function mergePolicies(policies: RestrictivePolicy[]): RestrictivePolicy {
-  let merged: RestrictivePolicy = { ...EMPTY_POLICY, limits: { ...DEFAULT_LIMITS } };
+  let merged: RestrictivePolicy = { ...EMPTY_POLICY, limits: {} };
   for (const policy of policies) {
+    const { maxChildDepth, ...otherLimits } = policy.limits ?? {};
+    const priorDepth = merged.limits?.maxChildDepth;
     merged = {
-      ...scopedResourceResolver.tightenPolicy(merged, policy),
+      ...scopedResourceResolver.tightenPolicy(merged, { ...policy, limits: otherLimits }),
       approvalFloorByTool: mergeApprovalFloors(merged.approvalFloorByTool, policy.approvalFloorByTool),
     };
+    if (maxChildDepth !== undefined) {
+      merged.limits = { ...merged.limits, maxChildDepth: Math.min(priorDepth ?? maxChildDepth, maxChildDepth) };
+    }
   }
   return merged;
 }

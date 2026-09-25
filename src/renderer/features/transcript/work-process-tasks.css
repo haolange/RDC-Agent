@@ -6,10 +6,20 @@
   font-size: var(--text-sm);
 }
 
+.work-process-task-snapshot:not(.is-expanded) .work-process-tool-card-header {
+  border-bottom: 0;
+}
+
+.work-process-task-snapshot-count {
+  color: var(--token-text-caption);
+  font-weight: var(--font-normal);
+  white-space: nowrap;
+}
+
 .work-process-task-snapshot-list {
   list-style: none;
   margin: 0;
-  padding: var(--space-2);
+  padding: var(--space-2) var(--space-3);
 }
 
 .work-process-task-snapshot-item {
@@ -17,8 +27,7 @@
   align-items: center;
   gap: var(--space-2);
   min-height: var(--space-6);
-  padding-inline: var(--space-1);
-  border-radius: var(--radius-sm);
+  padding-block: var(--space-1);
 }
 
 .work-process-task-snapshot-item .task-status-marker {
@@ -34,9 +43,7 @@
 
 .work-process-task-snapshot-title {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   line-height: 1.45;
 }
 
@@ -48,20 +55,20 @@
 
 .work-process-task-snapshot-item.task-completed .work-process-task-snapshot-title {
   color: var(--token-text-caption);
-  text-decoration: line-through;
 }
 
 .work-process-task-snapshot-item.task-cancelled .work-process-task-snapshot-title {
   color: var(--token-text-caption);
 }
 
-.work-process-task-snapshot-item.task-in_progress,
-.work-process-task-snapshot-item.task-blocked {
-  background: var(--token-bg-app);
-}
-
 .work-process-task-snapshot-item.task-in_progress .work-process-task-snapshot-title {
   color: var(--token-text-heading);
+}
+
+.work-process-task-snapshot-item:focus {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
 }
 
 .work-process-task-snapshot-item.task-blocked .work-process-task-snapshot-reason {

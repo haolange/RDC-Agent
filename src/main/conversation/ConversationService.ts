@@ -48,7 +48,6 @@ import type {
 import { canonicalJson } from './ConversationRoutePreflight';
 import { prepareConversationPrompt as buildConversationPrompt, type PrepareConversationPromptInput } from './ConversationPromptPreparer';
 import { hashAttachmentContents } from './ConversationAttachmentHashing';
-import { ConversationBackgroundContinuation, type BackgroundContinuationEvent } from './ConversationBackgroundContinuation';
 import { startProfileTurn as runStartProfileTurn } from './ConversationTurnStarter';
 import { completeProfileTurn as runCompleteProfileTurn, type CompleteProfileTurnInput, type ConversationTurnRunnerHost } from './ConversationTurnRunner';
 import {
@@ -84,16 +83,6 @@ export class ConversationService {
   private readonly sendRequests = new Map<string, Promise<ConversationTurnResult>>();
   private readonly sendRequestFingerprints = new Map<string, string>();
   private readonly activeSendScopes = new Map<string, string>();
-  private readonly backgroundContinuations = new ConversationBackgroundContinuation((event) => this.runBackgroundContinuation(event));
-  constructor() {
-    agentOrchestrator.backgroundSubagents.onEvent = (event) => {
-      if (event.type === 'settled' || event.type === 'message') {
-        this.backgroundContinuations.onSettled(event);
-        if (!Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === event.sessionId)) this.notifySessionTurnIdle(event.sessionId);
-      }
-    };
-  }
-
   stopAcceptingTurns(): void {
     this.acceptingTurns = false;
   }
@@ -130,7 +119,6 @@ export class ConversationService {
   }
 
   async clearHistory(sessionId: string): Promise<ConversationMessage[]> {
-    this.backgroundContinuations.suppress(sessionId);
     const stopped = await this.cancelActiveTurn({ sessionId });
     if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${sessionId}.`);
     storageAdapter.writeConversationHistory(sessionId, []);
@@ -192,14 +180,12 @@ export class ConversationService {
     const target = candidates[0];
     if (!target) {
       if (request.sessionId) {
-        this.backgroundContinuations.suppress(request.sessionId);
         await agentOrchestrator.backgroundSubagents.abortSession(request.sessionId);
         return { success: true, phase: 'running' };
       }
       return { success: false, error: 'No active conversation turn.' };
     }
 
-    if (target.sessionId) this.backgroundContinuations.suppress(target.sessionId);
     target.stop();
     await target.stopped;
     if (target.sessionId) await agentOrchestrator.backgroundSubagents.abortSession(target.sessionId);
@@ -224,27 +210,9 @@ export class ConversationService {
       const sessionId = active.sessionId;
       this.activeTurns.delete(turnId);
       if (sessionId) setRdcInteractionLock(sessionId, turnId, false);
-      if (sessionId) this.notifySessionTurnIdle(sessionId);
+      // Background Task settlement updates its own projection, not the parent turn.
     }
   }
-  private notifySessionTurnIdle(sessionId: string): void {
-    this.backgroundContinuations.notifyIdle(sessionId);
-  }
-  private async runBackgroundContinuation(pending: BackgroundContinuationEvent): Promise<void> {
-    const sessionId = pending.sessionId;
-    if (!this.acceptingTurns || Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === sessionId)) return;
-    const session = storageAdapter.readSession(sessionId); if (!session) return;
-    const requestId = generateEventId('request');
-    const input: ConversationContextInput = {
-      requestId, sessionId, projectId: session.projectId, agentId: pending.parentAgentId, profileId: pending.parentAgentId,
-      message: '', turnControls: session.turnControls ?? { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
-    };
-    await this.runIdempotentTurn(input, async (resolvedRequestId, controller, requestFingerprint) => {
-      const context = await this.resolveContext(input);
-      return this.startProfileTurn(context, input.profileId ?? null, input.agentId ?? null, '', [], [], undefined, input.turnControls, resolvedRequestId, controller, undefined, requestFingerprint, undefined, pending.policyBudget);
-    });
-  }
-
   private getPreparingRequestByRequestId(requestId: string) {
     for (const entry of this.preparingRequests.values()) {
       if (entry.requestId === requestId) return entry;
@@ -522,8 +490,6 @@ export class ConversationService {
 
   async sendMessage(input: ConversationContextInput): Promise<ConversationTurnResult> {
     const trimmed = input.message.trim();
-    const requestedSessionId = input.sessionId ?? input.fallbackSessionId;
-    if (requestedSessionId) this.backgroundContinuations.resume(requestedSessionId);
     return this.runIdempotentTurn(input, async (requestId, controller, requestFingerprint, attachments) => {
         const context = await this.resolveContext(input);
         if (context.session && Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === context.session?.sessionId)) {

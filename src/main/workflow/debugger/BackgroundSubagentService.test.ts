@@ -1,12 +1,13 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TaskRegistry } from '../../agent-runtime/tasks';
 import { BackgroundSubagentService } from './BackgroundSubagentService';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import type { RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 import { flushPolicyBudgetObservers } from './DelegationBudget';
+import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
 
 const roots: string[] = [];
 const capsule: DelegationCapsule = {
@@ -26,11 +27,9 @@ function harness(run: ConstructorParameters<typeof BackgroundSubagentService>[0]
 afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
 
 describe('BackgroundSubagentService', () => {
-  it('returns immediately and persists a bounded structured result before settle notification', async () => {
+  it('returns immediately and persists a bounded structured result and parent mailbox receipt', async () => {
     let release!: () => void; const gate = new Promise<void>((resolve) => { release = resolve; });
-    const events: string[] = [];
     const { service, registry } = harness(async (input) => { await gate; await input.onProviderRequestCommitted?.('request-snapshot-1'); await input.onProviderRequestCommitted?.('request-snapshot-2'); return { status: 'complete', text: 'done', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'done', outputs: { report: 'session://result' }, counterevidence: [], unresolved: [], scope: 'one file', sideEffects: [], recoveryState: [] } } }; });
-    service.onEvent = (event) => events.push(event.type);
     await service.query('s1', 'missing');
     const taskRegistry = registry('s1');
     const task = await taskRegistry.createTask('background', { completionRequirements: ['report'] });
@@ -38,7 +37,8 @@ describe('BackgroundSubagentService', () => {
     expect(execution.status).toBe('running'); release(); await service.join(execution.id);
     expect((await registry('s1').getExecution(execution.id))?.result?.outputs.report).toBe('session://result');
     expect((await registry('s1').getExecution(execution.id))?.frozenPlanRef).toBe('request-snapshot-1');
-    expect(events).toEqual(['started', 'settled']);
+    const parentMailbox = await service.beforeParentProviderRequestMessages('s1');
+    expect(JSON.stringify(parentMailbox.messages)).toContain(execution.id);
   });
 
   it('delivers parent events once and acknowledges them only after the request commit', async () => {
@@ -144,6 +144,8 @@ describe('BackgroundSubagentService', () => {
   });
 
   it('does not expose exploratory final text as a successful result when the typed envelope is missing', async () => {
+    const traceStatus = vi.spyOn(delegationTraceStore, 'setExecutionStatus');
+    try {
     const secretExploration = 'private scratch reasoning '.repeat(300);
     const { service, registry } = harness(async () => ({ status: 'complete', text: secretExploration }));
     await service.query('s1', 'missing');
@@ -155,6 +157,9 @@ describe('BackgroundSubagentService', () => {
     expect(stored?.result?.summary).not.toContain('private scratch');
     expect(stored?.result?.error?.length).toBeLessThanOrEqual(8_000);
     expect(stored?.result?.resultRef).toContain('session://tool-outputs/background-');
+    await vi.waitFor(() => expect(traceStatus).toHaveBeenCalledWith('s1', 'test-tool',
+      `s1::subagent::${execution.id}\u0000${execution.id}\u0000${execution.generation}`, 'partial'));
+    } finally { traceStatus.mockRestore(); }
   });
 
   it('persists waiting and running around a delegated approval request', async () => {

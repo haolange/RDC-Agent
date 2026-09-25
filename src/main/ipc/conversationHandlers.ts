@@ -22,7 +22,7 @@ import {
   ConversationGetAttachmentPreviewArgsSchema,
   ConversationGetHistoryArgsSchema,
   ConversationGetDelegationTraceArgsSchema,
-  ConversationGetDelegationReceiptArgsSchema,
+  ConversationGetDelegationContentArgsSchema,
   ConversationGetToolImagePreviewArgsSchema,
   ConversationReleaseAttachmentsArgsSchema,
   ConversationRewriteFromMessageArgsSchema,
@@ -126,15 +126,17 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
     if (!state.currentSessionId || request.sessionId !== state.currentSessionId) {
       return { header: null, steps: [], nextCursor: null, total: 0, error: 'DELEGATION_TRACE_SESSION_DENIED' };
     }
-    return delegationTraceStore.read(request.sessionId, request.parentToolCallId, request.cursor, request.pageSize);
+    return delegationTraceStore.read(request.sessionId, request.parentToolCallId, request.cursor, request.pageSize, request.sinceRevision);
   });
 
-  ipcMain.handle('conversation:getDelegationReceipt', async (_event, ...rawArgs: unknown[]) => {
-    const [request] = parseIpcArgs(ConversationGetDelegationReceiptArgsSchema, rawArgs, {
-      label: 'conversation:getDelegationReceipt', maxBytes: 4 * 1024,
+  ipcMain.handle('conversation:getDelegationContent', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(ConversationGetDelegationContentArgsSchema, rawArgs, {
+      label: 'conversation:getDelegationContent', maxBytes: 4 * 1024,
     });
-    if (!state.currentSessionId || request.sessionId !== state.currentSessionId) throw new Error('DELEGATION_RECEIPT_SESSION_DENIED');
-    return delegationTraceStore.readReceipt(request.sessionId, request.parentToolCallId, request.stepId, request.offset);
+    if (!state.currentSessionId || request.sessionId !== state.currentSessionId) throw new Error('DELEGATION_CONTENT_SESSION_DENIED');
+    return delegationTraceStore.readContent(request.sessionId, request.parentToolCallId,
+      { childSessionId: request.childSessionId, executionId: request.executionId, generation: request.generation },
+      request.kind, request.offset, request.stepId);
   });
 
   ipcMain.handle('conversation:switchBranch', async (_event, ...rawArgs: unknown[]) => {

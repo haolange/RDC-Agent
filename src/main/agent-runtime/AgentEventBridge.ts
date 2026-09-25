@@ -62,6 +62,7 @@ export function buildDiagnosticAgentEvent(
     severity: 'info' | 'warning' | 'error';
     message: string;
     technicalMessage?: string;
+    toolCallId?: string;
   },
 ): SharedAgentEvent {
   return buildSharedAgentEvent(
@@ -71,6 +72,7 @@ export function buildDiagnosticAgentEvent(
       severity: input.severity,
       message: input.message,
       technicalMessage: input.technicalMessage,
+      toolCallId: input.toolCallId,
     },
     context,
   );

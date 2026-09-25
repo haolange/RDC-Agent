@@ -45,6 +45,7 @@ vi.mock('../../settings/EffectiveModelResolver', () => ({
 
 import { TaskRegistry, type TaskRecord } from '../../agent-runtime/tasks';
 import { SubagentRunner } from './SubagentRunner';
+import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
 import { createSubagentBudgetState, createPolicyBudgetState, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import {
@@ -333,7 +334,9 @@ describe('SubagentRunner', () => {
       .rejects.toThrow(/SUBAGENT_DELEGATE_DENIED/);
   });
 
-  it('rejects an invalid model without sending a child turn', async () => {
+  it('rejects an invalid model without sending a child turn and retains its failure details', async () => {
+    const start = vi.spyOn(delegationTraceStore, 'start').mockImplementation(() => {});
+    const finish = vi.spyOn(delegationTraceStore, 'finish').mockImplementation(() => {});
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
     const runner = new SubagentRunner({
       sendProfileMessage,
@@ -346,10 +349,15 @@ describe('SubagentRunner', () => {
       targetProfile: 'ask',
       capsule: testCapsule(),
       model: 'not-canonical',
+      parentSessionId: 'owner',
     });
     expect(result.status).toBe('failed');
     expect(result.text).toMatch(/MODEL_INVALID/);
     expect(sendProfileMessage).not.toHaveBeenCalled();
+    expect(start).toHaveBeenCalledWith('owner', expect.objectContaining({ parentToolCallId: 'parent-tool', status: 'running' }));
+    expect(finish).toHaveBeenCalledWith('owner', 'parent-tool', expect.any(String), 'failed', expect.stringMatching(/MODEL_INVALID/));
+    start.mockRestore();
+    finish.mockRestore();
   });
 
   it('forwards a resolved model override and does not inherit a parent session override', async () => {

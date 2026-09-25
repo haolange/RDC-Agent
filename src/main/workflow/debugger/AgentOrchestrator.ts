@@ -55,6 +55,7 @@ import {
   turnCoordinator,
   TurnPreparationService,
   ProfileTurnPreparation,
+  resolveProfileToolAllowlist,
   OrchestratorMemoryUi,
   resolveExecutionScopeId,
   createEphemeralScopeId,
@@ -68,8 +69,6 @@ import {
   type TurnHandle,
 } from './AgentOrchestrator.deps';
 import { applyDelegationCapsuleToPromptPlan } from '../../agent-runtime/prompt/DelegationCapsuleCompiler';
-import { stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
-
 export type { PreparedAgentTurnContext } from './AgentOrchestrator.deps';
 export class AgentOrchestrator {
   private readonly slots = new AgentSlotRegistry();
@@ -456,9 +455,7 @@ export class AgentOrchestrator {
 
       const resolvedAllowlist = preparedTurn?.toolAllowlist
         ?? resolveAgentToolAllowlistFromDefinition(agentId, effectiveProfile.tools);
-      const toolAllowlist = options?.excludeRdcLeaseTools
-        ? stripRdcLeaseToolsFromAllowlist(resolvedAllowlist)
-        : resolvedAllowlist;
+      const toolAllowlist = resolveProfileToolAllowlist(resolvedAllowlist, options, preparedTurn);
       const routeProviderId = config.modelProvider;
       const routeModelId = config.modelName;
       const sessionControls = options?.sessionId
@@ -551,6 +548,9 @@ export class AgentOrchestrator {
           isolateContext: isSubagentSession || !options?.sessionId,
           excludeRdcLeaseTools: options?.excludeRdcLeaseTools,
           frozenDelegationCapsule: options?.frozenDelegationCapsule,
+          subagentDepth: options?.subagentBudget?.depth ?? options?.policyBudget?.childDepth ?? 0,
+          inheritedMaxChildDepth: options?.policyBudget?.maxChildDepth, excludeSubagent:
+            resolveProfileToolAllowlist(['subagent'], options, preparedTurn).length === 0,
         });
         preparedTurn = preparedBundle.prepared;
         ownsPreparedRuntime = true;

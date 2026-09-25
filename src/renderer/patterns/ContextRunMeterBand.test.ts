@@ -26,6 +26,11 @@ describe('ContextRunMeterBand', () => {
     expect(actual[1].details.map((detail) => detail.value)).toEqual(['0%', '0%', '0 / 0']);
     expect(actual[2].details.map((detail) => detail.value)).toEqual(['—']);
     expect(buildContextRunMeterModel({ outputTokens: 1_300, reasoningTokens: 410 } as Parameters<typeof buildContextRunMeterModel>[0], null)[2].details[0].value).toBe('32%');
+    const projected = buildContextRunMeterModel({ totalTokens: 0, inputTokens: 0, outputTokens: 0,
+      cacheSavedTokens: 0, reasoningTokens: 0 } as Parameters<typeof buildContextRunMeterModel>[0], null, true);
+    expect(projected.map((card) => card.primaryValue)).toEqual(['~0', '~0', '~0']);
+    expect(projected[0].details.map((detail) => detail.value)).toEqual(['~0', '~0']);
+    expect(projected[2].details[0].value).toBe('—');
   });
   it('renders three independent metric cards for tokens, cache, and reasoning', () => {
     const html = renderToStaticMarkup(

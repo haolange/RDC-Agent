@@ -120,8 +120,8 @@ describe('TaskRegistry', () => {
   it('creates a batch in one persist pass and emits one change event', async () => {
     const registry = await createRegistry();
     const events: string[] = [];
-    registry.onTaskChange = ({ type, task }) => {
-      events.push(`${type}:${task.subject}`);
+    registry.onTaskChange = ({ type, task, snapshot }) => {
+      events.push(`${type}:${task.subject}:${snapshot.map((item) => item.title).join(',')}`);
     };
     const created = await registry.createTasks([
       { subject: 'First' },
@@ -129,8 +129,29 @@ describe('TaskRegistry', () => {
       { subject: 'Third' },
     ]);
     expect(created.map((task) => task.subject)).toEqual(['First', 'Second', 'Third']);
-    expect(events).toEqual(['created:Third']);
+    expect(events).toEqual(['created:Third:First,Second,Third']);
     expect((await registry.listTasks()).map((task) => task.subject)).toEqual(['First', 'Second', 'Third']);
+  });
+
+  it('captures each committed state before a later concurrent update can replace it', async () => {
+    const registry = await createRegistry();
+    const snapshots: Array<{ type: string; statuses: string[] }> = [];
+    registry.onTaskChange = ({ type, snapshot }) => snapshots.push({
+      type, statuses: snapshot.map((item) => item.status),
+    });
+    const [first, second] = await registry.createTasks([
+      { subject: 'First', executionRequired: false },
+      { subject: 'Second', executionRequired: false },
+    ]);
+    await Promise.all([
+      registry.updateTask(first.id, { status: 'completed' }),
+      registry.updateTask(second.id, { status: 'blocked', statusReason: 'Waiting for input' }),
+    ]);
+    expect(snapshots).toEqual([
+      { type: 'created', statuses: ['pending', 'pending'] },
+      { type: 'updated', statuses: ['completed', 'pending'] },
+      { type: 'updated', statuses: ['completed', 'blocked'] },
+    ]);
   });
 
   it('requires dependencies to exist and rejects starting before verified completion', async () => {

@@ -151,6 +151,8 @@
   padding: var(--space-2) 0 0;
 }
 
+.work-process-body.is-embedded { padding: 0; }
+
 .work-process-summary {
   max-width: 100%;
   margin: 0 0 var(--space-2);
@@ -186,8 +188,15 @@
   padding-bottom: 0;
 }
 
-/* Loop boundary = same step as within-loop entrance (space-3): one notch above sibling tools (space-2). */
-.work-process-section + .work-process-section {
+/* An unassociated Hook is its own event card. Keep its border separate from
+ * the preceding tool even when that tool ends a nested section list. */
+.work-process-steps > .work-process-step.is-orphan-hook-row:not(:first-child) {
+  padding-top: var(--space-3);
+}
+
+/* A turn starts after any preceding event, including a Hook diagnostic or a
+ * measured-height spacer. Keep this gap larger than adjacent tools. */
+.work-process-steps > .work-process-section:not(:first-child) {
   padding-top: var(--space-3);
 }
 
@@ -209,16 +218,16 @@
   background: var(--token-border-subtle);
 }
 
-.work-process-step:first-child .work-process-step-rail::before {
+.work-process-step:first-child > .work-process-step-rail::before {
   top: 14px;
 }
 
-.work-process-step:last-child .work-process-step-rail::before {
+.work-process-step:last-child > .work-process-step-rail::before {
   bottom: auto;
   height: 14px;
 }
 
-.work-process-step:first-child:last-child .work-process-step-rail::before {
+.work-process-step:first-child:last-child > .work-process-step-rail::before {
   display: none;
 }
 
@@ -240,7 +249,7 @@
   box-sizing: border-box;
 }
 
-.work-process-section.first-line-caption .work-process-rail-marker {
+.work-process-section.first-line-caption > .work-process-step-rail > .work-process-rail-marker {
   margin-top: calc((var(--text-xs) * 1.45 - var(--work-process-rail-marker-size)) / 2);
 }
 
@@ -313,7 +322,9 @@
 }
 
 .work-process-diagnostic.severity-info .work-process-diagnostic-message {
-  color: var(--token-status-info);
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.5;
 }
 
 .work-process-diagnostic.severity-warning .work-process-diagnostic-message {

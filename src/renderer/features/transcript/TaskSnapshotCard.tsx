@@ -1,43 +1,42 @@
-import React, { useState } from 'react';
+import React, { useId } from 'react';
+import { WorkCardHeader } from './WorkCardHeader';
 import { useI18n } from '../../i18n';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
+import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import type { WorkProcessRow } from './workProcessTypes';
 import { WorkProcessIcon } from './WorkProcessIcons';
 
-export const TaskSnapshotCard: React.FC<{ row: Extract<WorkProcessRow, { type: 'taskSnapshot' }> }> = ({ row }) => {
+export const TaskSnapshotCard: React.FC<{
+  row: Extract<WorkProcessRow, { type: 'taskSnapshot' }>;
+  isLatest: boolean;
+}> = ({ row, isLatest }) => {
   const { t } = useI18n();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, toggle] = useScopedWorkDisclosure(`task-snapshot-${row.id}`, isLatest);
+  const listId = useId();
+  const title = row.change === 'created' ? t('chat.workProcessTaskSnapshotCreated')
+    : row.change === 'updated' ? t('chat.workProcessTaskSnapshotUpdated')
+      : t('chat.workProcessTaskSnapshotList');
   return (
-    <li className={`work-process-step is-appear status-${row.status} kind-task-snapshot`} data-testid="work-process-task-snapshot">
+    <li className={`work-process-step is-appear status-${row.status} kind-task-snapshot`}
+      data-testid="work-process-task-snapshot" data-work-process-block-id={row.id}>
       <div className="work-process-step-content">
         <div className={`work-process-task-snapshot${expanded ? ' is-expanded' : ''}`}>
-          <button
-            type="button"
-            className="work-process-tool-card-header"
-            onClick={() => setExpanded((open) => !open)}
-            aria-expanded={expanded}
-          >
-            <span className="work-process-tool-card-title">
-              <WorkProcessIcon icon="taskList" className="work-process-tool-card-icon" />
-              <span className="work-process-tool-card-verb">
-                {t('chat.workProcessTaskSnapshotCount', { completed: row.completed, total: row.total })}
-              </span>
-            </span>
-            <span className="work-process-tool-card-meta">
-              {row.duration ? <span>{row.duration}</span> : null}
-              <span className={`work-process-row-caret${expanded ? ' is-open' : ''}`} aria-hidden="true" />
-            </span>
-          </button>
+          <WorkCardHeader onClick={toggle} expanded={expanded} controls={listId}
+            icon={<WorkProcessIcon icon="taskList" className="work-process-tool-card-icon" />}
+            title={title}
+            status={<span className="work-process-task-snapshot-count">{t('chat.workProcessTaskSnapshotCount', { completed: row.completed, total: row.total })}</span>} />
           {expanded ? (
-            <ul className="work-process-task-snapshot-list">
+            <ul id={listId} className="work-process-task-snapshot-list">
               {row.items.map((item) => (
                 <li
                   key={item.taskId}
                   className={`work-process-task-snapshot-item task-${item.status}`}
                   data-work-process-task-id={item.taskId}
                   data-work-process-task-status={item.status}
+                  tabIndex={-1}
                 >
-                  <TaskStatusMarker status={item.status} order={item.order} />
+                  <TaskStatusMarker status={item.status} order={item.order} variant="snapshot"
+                    label={t(`chat.workProcessTaskStatus.${item.status}`)} />
                   <span className="work-process-task-snapshot-copy">
                     <span className="work-process-task-snapshot-title">{item.title}</span>
                     {item.status === 'blocked' && item.statusReason ? (

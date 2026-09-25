@@ -91,6 +91,26 @@ import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 
 describe('ToolExecutorFactory', () => {
+  it('emits the Hook diagnostic with the real triggering tool call ID', async () => {
+    const onEvent = vi.fn();
+    hookTrigger.mockResolvedValueOnce([{ hookId: 'audit', status: 'completed', allowed: true }] as never);
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      getActiveTurn: () => null,
+      resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }),
+      isAllowedForRuntime: () => true,
+      matchesToolAllowlist: () => true,
+    });
+    await factory.triggerRuntimeHooks('tool.after-call', 'ask', {
+      sessionId: 'session-a', eventContext: { sessionId: 'session-a' }, onEvent,
+    } as never, { toolName: 'shell.command', toolCallId: 'call-a' });
+    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'diagnostic',
+      payload: expect.objectContaining({ code: 'hook.completed', toolCallId: 'call-a' }),
+    }));
+  });
+
   it('activateDeferredTools no-ops without activation or tools', () => {
     const activate = vi.fn();
     const factory = new ToolExecutorFactory({

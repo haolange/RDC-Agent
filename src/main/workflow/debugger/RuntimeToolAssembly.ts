@@ -539,10 +539,12 @@ export class RuntimeToolAssembly {
     projectId?: string | null,
     projectRootPath?: string | null,
     mcpPoolKey?: string | null,
-    options?: { excludeRdcLeaseTools?: boolean },
+    options?: { excludeRdcLeaseTools?: boolean; excludeSubagent?: boolean },
   ): ResolvedRuntimeTools {
     const excludeRdcLeaseTools = options?.excludeRdcLeaseTools === true
       || turnHandle?.runtimePlan?.excludeRdcLeaseTools === true;
+    const excludeSubagent = options?.excludeSubagent === true
+      || turnHandle?.runtimePlan?.excludeSubagent === true;
     const availableTools = new Map<string, AgentTool>();
     for (const tool of getPrimitiveTools()) {
       availableTools.set(normalizeToolName(tool.name), tool);
@@ -571,6 +573,7 @@ export class RuntimeToolAssembly {
       availableTools.set(rdcProbeTool.name, rdcProbeTool as unknown as AgentTool);
     }
     for (const tool of this.createWorkbenchTools(agentId, sessionId, turnHandle)) {
+      if (excludeSubagent && normalizeToolName(tool.name) === 'subagent') continue;
       availableTools.set(normalizeToolName(tool.name), tool);
     }
     for (const tool of this.deps.mcp.getAgentTools(

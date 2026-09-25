@@ -3,17 +3,16 @@ import type { ProgressTask } from '@shared/types/trace';
 import { Button } from '../../ui/Button';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
 import { useSessionWorkStop } from './useSessionWorkStop';
+import { WORK_PROCESS_LOCATE_TASK_EVENT, type WorkProcessTaskLocationRequest } from '../../lib/workProcessTaskLocation';
 
 const focusWorkProcessTask = (taskId: string): void => {
-  const escaped = window.CSS?.escape ? window.CSS.escape(taskId) : taskId;
-  const target = document.querySelector<HTMLElement>(`[data-work-process-task-id="${escaped}"]`) ?? document.querySelector<HTMLElement>('[data-work-process-block-id="runtime-tasks"]');
-  if (!target) return;
-  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  target.focus({ preventScroll: true });
-  target.classList.remove('is-trace-flash');
-  void target.offsetWidth;
-  target.classList.add('is-trace-flash');
-  window.setTimeout(() => target.classList.remove('is-trace-flash'), 1600);
+  const candidates: WorkProcessTaskLocationRequest['candidates'] = [];
+  document.dispatchEvent(new CustomEvent<WorkProcessTaskLocationRequest>(WORK_PROCESS_LOCATE_TASK_EVENT, {
+    detail: { taskId, candidates },
+  }));
+  const latest = candidates.sort((left, right) =>
+    left.element.compareDocumentPosition(right.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1).at(-1);
+  latest?.reveal();
 };
 
 export const RightRailProgressList: React.FC<{ tasks: ProgressTask[]; locateLabel: string; stopLabel: string }> = React.memo(({ tasks, locateLabel, stopLabel }) => {

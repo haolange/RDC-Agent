@@ -2,89 +2,96 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import type { AgentEvent } from '@shared/types/agentRuntime';
-import type { DelegationReceiptPage, DelegationTraceHeader, DelegationTracePage, DelegationTraceStep } from '@shared/types/delegationTrace';
+import type { DelegationContentKind, DelegationContentPage, DelegationTraceHeader, DelegationTracePage, DelegationTraceStep } from '@shared/types/delegationTrace';
+import { finalizeTrace } from './ConversationWorkTrace';
+import { delegationTextPreview } from '@shared/utils/delegationTextPreview';
+import type { DelegationTaskBody } from '@shared/types/delegationTrace';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { redactSecretsDeep, redactCredentialLikeText } from '../runtime/secretRedaction';
+import { safeDelegationText as safeText } from './DelegationTraceText';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
+import { createDelegatedProjectionState, projectDelegatedEvent, type DelegatedProjectionState } from './DelegatedWorkProjection';
 
 type TraceEntry =
   | { kind: 'start'; header: DelegationTraceHeader }
-  | { kind: 'step'; step: DelegationTraceStep }
-  | { kind: 'patch'; id: string; status: DelegationTraceStep['status']; completedAt: number; receipt?: string; receiptTruncated?: boolean; receiptRef?: string; eventId: string }
-  | { kind: 'finish'; status: DelegationTraceHeader['status']; result: string; completedAt: number };
+  | { kind: 'block'; step: DelegationTraceStep }
+  | { kind: 'header'; header: DelegationTraceHeader };
 
-const MAX_RECEIPT = 16_000;
-const MAX_TEXT = 8_000;
-const MAX_RECEIPT_FILE = 1_048_576;
-const active = new Map<string, string>();
+interface ActiveTrace {
+  identity: string;
+  header: DelegationTraceHeader;
+  projection: DelegatedProjectionState;
+  blocks: Map<string, DelegationTraceStep>;
+  pendingDelta: string;
+  pendingTimer?: ReturnType<typeof setTimeout>;
+  pendingTimestamp: number;
+}
+
 interface ParsedTrace {
   size: number;
   header: DelegationTraceHeader | null;
-  steps: DelegationTraceStep[];
-  byId: Map<string, DelegationTraceStep>;
+  order: string[];
+  blocks: Map<string, DelegationTraceStep>;
   invalid: boolean;
 }
+
+const MAX_BODY_BYTES = 8 * 1024 * 1024;
+const PAGE_BYTES = 32_000;
+const active = new Map<string, ActiveTrace>();
+const activeExecutions = new Set<string>();
 const parsed = new Map<string, ParsedTrace>();
 
+function key(sessionId: string, callId: string): string { return `${sessionId}\u0000${callId}`; }
 function identity(header: Pick<DelegationTraceHeader, 'childSessionId' | 'executionId' | 'generation'>): string {
   return `${header.childSessionId}\u0000${header.executionId ?? ''}\u0000${header.generation ?? ''}`;
 }
-
-function activeKey(sessionId: string, parentToolCallId: string): string {
-  return `${sessionId}\u0000${parentToolCallId}`;
-}
-
-function safeRawText(value: unknown): string {
-  return redactCredentialLikeText(typeof value === 'string' ? value : JSON.stringify(redactSecretsDeep(value).value));
-}
-
-function safeText(value: unknown, limit: number): string {
-  const text = safeRawText(value);
-  return text.length > limit ? `${text.slice(0, limit)}\n… [truncated]` : text;
-}
-
-function location(sessionId: string, parentToolCallId: string): string | null {
+const preview = delegationTextPreview;
+function location(sessionId: string, callId: string): string | null {
   const session = storageAdapter.readSession(sessionId);
   if (!session) return null;
-  const file = createHash('sha256').update(parentToolCallId).digest('hex') + '.jsonl';
-  return path.join(session.sessionPath, 'delegations', file);
+  return path.join(session.sessionPath, 'delegations', `${createHash('sha256').update(callId).digest('hex')}.jsonl`);
 }
-
-function append(sessionId: string, parentToolCallId: string, entry: TraceEntry): void {
-  const target = location(sessionId, parentToolCallId);
-  if (!target) return;
+function headLocation(target: string): string { return `${target}.head.json`; }
+function bodyLocation(target: string, kind: DelegationContentKind, stepId?: string): string {
+  const id = `${kind}\u0000${stepId ?? ''}`;
+  const name = createHash('sha256').update(id).digest('hex');
+  return path.join(path.dirname(target), 'bodies', `${path.basename(target, '.jsonl')}-${name}.txt`);
+}
+function writeBody(target: string, kind: DelegationContentKind, text: string, stepId?: string): boolean {
+  if (Buffer.byteLength(text, 'utf8') > MAX_BODY_BYTES) return false;
+  const file = bodyLocation(target, kind, stepId);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, text, 'utf8');
+  return true;
+}
+function append(target: string, entry: TraceEntry): void {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.appendFileSync(target, `${JSON.stringify(entry)}\n`, 'utf8');
-  workflowProjectionPublisher.publish('conversation:delegationChanged', { sessionId, parentToolCallId });
 }
-
-function receiptLocation(sessionId: string, parentToolCallId: string, stepId: string): string | null {
-  const trace = location(sessionId, parentToolCallId);
-  if (!trace) return null;
-  const name = createHash('sha256').update(`${parentToolCallId}\u0000${stepId}`).digest('hex') + '.txt';
-  return path.join(path.dirname(trace), 'receipts', name);
+function saveHeader(target: string, header: DelegationTraceHeader, sessionId: string): void {
+  header.updatedAt = Date.now();
+  append(target, { kind: 'header', header });
+  const head = headLocation(target);
+  const temp = `${head}.tmp`;
+  fs.writeFileSync(temp, JSON.stringify(header), 'utf8');
+  fs.renameSync(temp, head);
+  workflowProjectionPublisher.publish('conversation:delegationChanged', {
+    sessionId, parentToolCallId: header.parentToolCallId, revision: header.revision,
+  });
 }
-
-function parseEntry(trace: ParsedTrace, entry: TraceEntry, parentToolCallId: string): void {
-  if (entry.kind === 'start') {
-    if (entry.header.parentToolCallId !== parentToolCallId) { trace.invalid = true; return; }
-    trace.header = entry.header;
-  } else if (entry.kind === 'step') {
-    trace.steps.push(entry.step);
-    trace.byId.set(entry.step.id, entry.step);
-  } else if (entry.kind === 'patch') {
-    const step = trace.byId.get(entry.id);
-    if (step) Object.assign(step, { status: entry.status, completedAt: entry.completedAt, receipt: entry.receipt, receiptTruncated: entry.receiptTruncated, receiptRef: entry.receiptRef });
-  } else if (entry.kind === 'finish' && trace.header) {
-    trace.header = { ...trace.header, status: entry.status, result: entry.result, completedAt: entry.completedAt };
+function parseEntry(trace: ParsedTrace, entry: TraceEntry, callId: string): void {
+  if (entry.kind === 'start' || entry.kind === 'header') {
+    if (entry.header.parentToolCallId !== callId) trace.invalid = true;
+    else trace.header = entry.header;
+  } else if (entry.kind === 'block') {
+    if (!trace.blocks.has(entry.step.id)) trace.order.push(entry.step.id);
+    trace.blocks.set(entry.step.id, entry.step);
   }
 }
-
-function readParsed(target: string, parentToolCallId: string): ParsedTrace {
+function readParsed(target: string, callId: string): ParsedTrace {
   const size = fs.statSync(target).size;
   let trace = parsed.get(target);
   if (!trace || size < trace.size) {
-    trace = { size: 0, header: null, steps: [], byId: new Map(), invalid: false };
+    trace = { size: 0, header: null, order: [], blocks: new Map(), invalid: false };
     parsed.delete(target);
     parsed.set(target, trace);
   }
@@ -95,123 +102,237 @@ function readParsed(target: string, parentToolCallId: string): ParsedTrace {
     finally { fs.closeSync(descriptor); }
     for (const line of bytes.toString('utf8').split('\n')) {
       if (!line) continue;
-      parseEntry(trace, JSON.parse(line) as TraceEntry, parentToolCallId);
+      try { parseEntry(trace, JSON.parse(line) as TraceEntry, callId); }
+      catch { trace.invalid = true; }
     }
     trace.size = size;
   }
-  // A short bounded cache avoids repeatedly folding long running traces.
   parsed.delete(target);
   parsed.set(target, trace);
   if (parsed.size > 32) parsed.delete(parsed.keys().next().value!);
   return trace;
 }
-
-function readHeader(target: string, sessionId: string, parentToolCallId: string): DelegationTracePage {
-  const size = fs.statSync(target).size;
-  const descriptor = fs.openSync(target, 'r');
-  try {
-    const span = Math.min(size, 131_072);
-    const first = Buffer.allocUnsafe(span);
-    const firstLength = fs.readSync(descriptor, first, 0, span, 0);
-    const firstLine = first.toString('utf8', 0, firstLength).split('\n', 1)[0];
-    const start = JSON.parse(firstLine) as TraceEntry;
-    if (start.kind !== 'start') return { header: null, steps: [], nextCursor: null, total: 0, error: 'DELEGATION_TRACE_MISSING_START' };
-    if (start.header.parentToolCallId !== parentToolCallId) return { header: null, steps: [], nextCursor: null, total: 0, error: 'DELEGATION_TRACE_ID_MISMATCH' };
-    const last = Buffer.allocUnsafe(span);
-    const lastLength = fs.readSync(descriptor, last, 0, span, size - span);
-    const lines = last.toString('utf8', 0, lastLength).trimEnd().split('\n');
-    const end = JSON.parse(lines[lines.length - 1]) as TraceEntry;
-    const header = end.kind === 'finish'
-      ? { ...start.header, status: end.status, result: end.result, completedAt: end.completedAt }
-      : start.header;
-    return { header: currentHeader(sessionId, parentToolCallId, header), steps: [], nextCursor: null, total: 0 };
-  } finally {
-    fs.closeSync(descriptor);
-  }
+function currentHeader(sessionId: string, header: DelegationTraceHeader): DelegationTraceHeader {
+  const ownerKey = key(sessionId, header.parentToolCallId);
+  const executionLive = header.executionStatus === 'queued' || header.executionStatus === 'running'
+    || header.executionStatus === 'waiting' || header.executionStatus === 'cancelling';
+  return (header.mode === 'background' && executionLive && !activeExecutions.has(ownerKey))
+    || (header.status === 'running' && !active.has(ownerKey) && !activeExecutions.has(ownerKey))
+    ? { ...header, status: 'interrupted', executionStatus: header.mode === 'background' ? 'interrupted' : undefined,
+      completedAt: header.updatedAt } : header;
+}
+function readHead(target: string, sessionId: string, callId: string): DelegationTraceHeader | null {
+  const head = headLocation(target);
+  if (!fs.existsSync(head)) return null;
+  const header = JSON.parse(fs.readFileSync(head, 'utf8')) as DelegationTraceHeader;
+  if (header.recordVersion !== 2) throw new Error('DELEGATION_TRACE_UNAVAILABLE');
+  if (header.parentToolCallId !== callId) throw new Error('DELEGATION_TRACE_ID_MISMATCH');
+  return currentHeader(sessionId, header);
+}
+function updateLatestAction(record: ActiveTrace): void {
+  const tools = record.projection.trace.blocks.flatMap(block => block.toolCalls);
+  const tool = [...tools].reverse().find(item => item.status === 'running' || item.status === 'pending') ?? tools.at(-1);
+  record.header.latestAction = tool?.toolName;
+  record.header.latestActionStatus = tool?.status;
 }
 
-function currentHeader(sessionId: string, parentToolCallId: string, header: DelegationTraceHeader): DelegationTraceHeader {
-  return header.status === 'running' && !active.has(activeKey(sessionId, parentToolCallId))
-    ? { ...header, status: 'interrupted' }
-    : header;
+function persistBlocks(record: ActiveTrace, target: string): void {
+  for (const block of record.projection.trace.blocks) {
+    if (JSON.stringify(record.blocks.get(block.id)?.block) === JSON.stringify(block)) continue;
+    const step = { id: block.id, block, revision: ++record.header.revision };
+    record.blocks.set(block.id, step);
+    append(target, { kind: 'block', step });
+  }
+  record.header.total = record.blocks.size;
+  updateLatestAction(record);
+}
+
+function persistProjectedEvent(sessionId: string, record: ActiveTrace, target: string, event: AgentEvent): void {
+  if (event.type === 'tool.completed') {
+    const payload = event.payload as { toolCallId?: string; result?: unknown };
+    if (payload.toolCallId && payload.result !== undefined) {
+      writeBody(target, 'tool_receipt', safeText(payload.result), payload.toolCallId);
+    }
+  }
+  record.projection = projectDelegatedEvent(record.projection, event);
+  const before = record.header.revision;
+  persistBlocks(record, target);
+  if (before === record.header.revision) return;
+  saveHeader(target, record.header, sessionId);
+}
+
+function flushDelta(sessionId: string, record: ActiveTrace, target: string): void {
+  if (record.pendingTimer) clearTimeout(record.pendingTimer);
+  record.pendingTimer = undefined;
+  const text = record.pendingDelta;
+  record.pendingDelta = '';
+  if (!text) return;
+  persistProjectedEvent(sessionId, record, target, {
+    id: `delta-${record.header.revision + 1}`, type: 'assistant.delta', timestamp: record.pendingTimestamp,
+    payload: { text } as AgentEvent['payload'],
+  });
 }
 
 export const delegationTraceStore = {
-  start(sessionId: string, header: DelegationTraceHeader): void {
-    const key = activeKey(sessionId, header.parentToolCallId);
-    const existing = this.read(sessionId, header.parentToolCallId, 0, 0).header;
-    if (existing && identity(existing) !== identity(header)) throw new Error('DELEGATION_TRACE_ID_CONFLICT');
-    active.set(key, identity(header));
+  start(sessionId: string, input: Omit<DelegationTraceHeader, 'total' | 'revision' | 'updatedAt' | 'taskAvailable' | 'taskLength' | 'invocationAvailable' | 'recordVersion'> & { invocation: string }): void {
+    const target = location(sessionId, input.parentToolCallId);
+    if (!target) return;
+    const existing = readHead(target, sessionId, input.parentToolCallId);
+    if (existing && identity(existing) !== identity(input)) throw new Error('DELEGATION_TRACE_ID_CONFLICT');
     if (existing) return;
-    append(sessionId, header.parentToolCallId, { kind: 'start', header: {
-      ...header, task: safeText(header.task, MAX_TEXT), invocation: safeText(JSON.parse(header.invocation), MAX_RECEIPT),
-    } });
+    const task = safeText(input.task);
+    const invocation = safeText(JSON.parse(input.invocation));
+    const taskAvailable = false;
+    const invocationAvailable = writeBody(target, 'invocation', invocation);
+    const header: DelegationTraceHeader = { ...input, recordVersion: 2, task: preview(task), taskLength: task.length, taskAvailable,
+      ...(input.mode === 'background' ? { executionStatus: 'running' as const } : {}),
+      invocationAvailable, total: 0, revision: 0, updatedAt: Date.now() };
+    delete (header as DelegationTraceHeader & { invocation?: string }).invocation;
+    const record: ActiveTrace = { identity: identity(header), header,
+      projection: createDelegatedProjectionState(), blocks: new Map(), pendingDelta: '', pendingTimestamp: 0 };
+    active.set(key(sessionId, header.parentToolCallId), record);
+    if (input.mode === 'background') activeExecutions.add(key(sessionId, header.parentToolCallId));
+    append(target, { kind: 'start', header });
+    saveHeader(target, header, sessionId);
   },
-  event(sessionId: string, parentToolCallId: string, childIdentity: string, event: AgentEvent): void {
-    if (active.get(activeKey(sessionId, parentToolCallId)) !== childIdentity) return;
-    const timestamp = event.timestamp;
-    if (event.type === 'tool.started') {
-      const payload = event.payload as { toolCallId?: string; toolName?: string; args?: unknown };
-      append(sessionId, parentToolCallId, { kind: 'step', step: {
-        id: String(payload.toolCallId ?? event.id), kind: 'tool', status: 'running', timestamp,
-        toolName: String(payload.toolName ?? 'tool'), args: safeText(payload.args ?? {}, MAX_RECEIPT), eventId: event.id,
-      } });
-    } else if (event.type === 'tool.completed' || event.type === 'tool.denied') {
-      const payload = event.payload as { toolCallId?: string; result?: unknown; reason?: string };
-      const stepId = String(payload.toolCallId ?? event.id);
-      const fullReceipt = safeRawText(payload.result ?? payload.reason ?? {});
-      const receipt = fullReceipt.length > MAX_RECEIPT ? `${fullReceipt.slice(0, MAX_RECEIPT)}\n… [truncated]` : fullReceipt;
-      const target = fullReceipt.length > MAX_RECEIPT ? receiptLocation(sessionId, parentToolCallId, stepId) : null;
-      if (target) {
-        fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.writeFileSync(target, fullReceipt.slice(0, MAX_RECEIPT_FILE), 'utf8');
+  updateTask(sessionId: string, callId: string, childIdentity: string, taskBody: DelegationTaskBody, sentPrompt: string): void {
+    const record = active.get(key(sessionId, callId));
+    const target = location(sessionId, callId);
+    if (!record || record.identity !== childIdentity || !target) return;
+    const text = safeText(taskBody);
+    const taskAvailable = writeBody(target, 'task', text);
+    record.header = { ...record.header, task: preview(safeText(taskBody.capsule.task || taskBody.capsule.goal)), taskLength: text.length,
+      sentPromptAvailable: writeBody(target, 'sent_prompt', safeText(sentPrompt)), taskAvailable, revision: record.header.revision + 1 };
+    saveHeader(target, record.header, sessionId);
+  },
+  event(sessionId: string, callId: string, childIdentity: string, event: AgentEvent): void {
+    const record = active.get(key(sessionId, callId));
+    const target = location(sessionId, callId);
+    if (!record || record.identity !== childIdentity || !target) return;
+    if (event.type === 'assistant.delta') {
+      const chunk = (event.payload as { text?: string }).text;
+      if (!chunk) return;
+      record.pendingDelta += chunk;
+      record.pendingTimestamp = event.timestamp;
+      if (!record.pendingTimer) {
+        record.pendingTimer = setTimeout(() => flushDelta(sessionId, record, target), 120);
+        record.pendingTimer.unref?.();
       }
-      append(sessionId, parentToolCallId, { kind: 'patch', id: stepId,
-        status: event.type === 'tool.denied' || (payload.result as { ok?: boolean } | undefined)?.ok === false ? 'error' : 'complete',
-        completedAt: timestamp, receipt, receiptTruncated: fullReceipt.length > MAX_RECEIPT_FILE,
-        receiptRef: target ? stepId : undefined, eventId: event.id });
-    } else if (event.type === 'assistant.completed') {
-      const payload = event.payload as { text?: string; stopReason?: string };
-      const text = safeText(payload.text ?? '', MAX_TEXT).trim();
-      if (text && payload.stopReason !== 'end_turn') append(sessionId, parentToolCallId, { kind: 'step', step: {
-        id: event.id, kind: 'message', status: 'complete', timestamp, text, eventId: event.id,
-      } });
-    } else if (event.type === 'diagnostic') {
-      const payload = event.payload as { message?: string; userMessage?: string };
-      append(sessionId, parentToolCallId, { kind: 'step', step: {
-        id: event.id, kind: 'diagnostic', status: 'error', timestamp,
-        text: safeText(payload.userMessage ?? payload.message ?? 'Execution diagnostic', MAX_TEXT), eventId: event.id,
-      } });
+      return;
     }
+    flushDelta(sessionId, record, target);
+    persistProjectedEvent(sessionId, record, target, event);
   },
-  finish(sessionId: string, parentToolCallId: string, childIdentity: string, status: DelegationTraceHeader['status'], result: string): void {
-    const key = activeKey(sessionId, parentToolCallId);
-    if (active.get(key) !== childIdentity) return;
-    active.delete(key);
-    append(sessionId, parentToolCallId, { kind: 'finish', status, result: safeText(result, MAX_TEXT), completedAt: Date.now() });
+  finish(sessionId: string, callId: string, childIdentity: string, status: DelegationTraceHeader['status'], result: string): void {
+    const record = active.get(key(sessionId, callId));
+    const target = location(sessionId, callId);
+    if (!record || record.identity !== childIdentity || !target) return;
+    flushDelta(sessionId, record, target);
+    const completedAt = Date.now();
+    record.projection.trace = finalizeTrace(record.projection.trace, status === 'complete' ? 'complete' : status === 'failed' ? 'error' : 'stopped', undefined, completedAt);
+    persistBlocks(record, target);
+    const text = safeText(result);
+    const hasFinal = text.trim().length > 0;
+      const finalAvailable = status === 'complete' && hasFinal && writeBody(target, 'final', text);
+    record.header = { ...record.header, status, completedAt, revision: record.header.revision + 1,
+      ...(status === 'complete' ? { finalPreview: preview(text), finalLength: text.length, finalAvailable,
+        ...(!hasFinal || finalAvailable ? {} : { finalUnavailableReason: 'DELEGATION_CONTENT_LIMIT_EXCEEDED' }) }
+        : { error: preview(text) }) };
+    saveHeader(target, record.header, sessionId);
+    active.delete(key(sessionId, callId));
   },
-  read(sessionId: string, parentToolCallId: string, cursor: number, pageSize = 40): DelegationTracePage {
-    const target = location(sessionId, parentToolCallId);
-    if (!target || !fs.existsSync(target)) return { header: null, steps: [], nextCursor: null, total: 0 };
-    if (pageSize === 0) return readHeader(target, sessionId, parentToolCallId);
-    const trace = readParsed(target, parentToolCallId);
-    if (trace.invalid) return { header: null, steps: [], nextCursor: null, total: 0, error: 'DELEGATION_TRACE_ID_MISMATCH' };
-    if (!trace.header) return { header: null, steps: [], nextCursor: null, total: 0, error: 'DELEGATION_TRACE_MISSING_START' };
-    const offset = Math.max(0, cursor);
-    const page = trace.steps.slice(offset, offset + pageSize).map((step) => ({ ...step }));
-    return { header: currentHeader(sessionId, parentToolCallId, trace.header), steps: page,
-      nextCursor: offset + page.length < trace.steps.length ? offset + page.length : null, total: trace.steps.length };
+  setExecutionStatus(sessionId: string, callId: string, childIdentity: string,
+    status: NonNullable<DelegationTraceHeader['executionStatus']>): void {
+    const target = location(sessionId, callId);
+    if (!target || !fs.existsSync(headLocation(target))) return;
+    const header = readHead(target, sessionId, callId);
+    if (!header || header.mode !== 'background' || identity(header) !== childIdentity || header.executionStatus === status) return;
+    if (header.executionStatus === 'completed' || header.executionStatus === 'partial' || header.executionStatus === 'blocked'
+      || header.executionStatus === 'failed' || header.executionStatus === 'cancelled' || header.executionStatus === 'interrupted') return;
+    const terminal = status === 'completed' || status === 'partial' || status === 'blocked'
+      || status === 'failed' || status === 'cancelled' || status === 'interrupted';
+    const next = { ...header, executionStatus: status, revision: header.revision + 1,
+      ...(terminal ? { completedAt: Date.now() } : {}) };
+    const record = active.get(key(sessionId, callId));
+    if (record?.identity === childIdentity) record.header = next;
+    saveHeader(target, next, sessionId);
+    if (terminal) activeExecutions.delete(key(sessionId, callId));
   },
-  readReceipt(sessionId: string, parentToolCallId: string, stepId: string, offset: number): DelegationReceiptPage {
-    const traceTarget = location(sessionId, parentToolCallId);
-    if (!traceTarget || !fs.existsSync(traceTarget)) throw new Error('DELEGATION_RECEIPT_DENIED');
-    const trace = readParsed(traceTarget, parentToolCallId);
-    if (trace.invalid || trace.byId.get(stepId)?.receiptRef !== stepId) throw new Error('DELEGATION_RECEIPT_DENIED');
-    const target = receiptLocation(sessionId, parentToolCallId, stepId);
-    if (!target) throw new Error('DELEGATION_RECEIPT_DENIED');
-    const content = fs.readFileSync(target, 'utf8');
-    const start = Math.min(Math.max(offset, 0), content.length);
-    const end = Math.min(start + 32_000, content.length);
-    return { text: content.slice(start, end), nextOffset: end < content.length ? end : null, total: content.length };
+  setParentReceipt(sessionId: string, callId: string, result: unknown): void {
+    const target = location(sessionId, callId);
+    if (!target || !fs.existsSync(headLocation(target))) return;
+    const header = readHead(target, sessionId, callId);
+    if (!header) return;
+    const text = safeText(result);
+    const parentReceiptAvailable = writeBody(target, 'parent_receipt', text);
+    saveHeader(target, { ...header, parentReceiptPreview: preview(text), parentReceiptAvailable,
+      revision: header.revision + 1 }, sessionId);
+  },
+  read(sessionId: string, callId: string, cursor: number, pageSize = 40, sinceRevision?: number): DelegationTracePage {
+    const target = location(sessionId, callId);
+    const empty: DelegationTracePage = { header: null, steps: [], nextCursor: null, total: 0, revision: 0 };
+    if (!target || !fs.existsSync(target)) return { ...empty, error: 'DELEGATION_TRACE_UNAVAILABLE' };
+    try {
+      const header = readHead(target, sessionId, callId);
+      if (!header) return { ...empty, error: 'DELEGATION_TRACE_UNAVAILABLE' };
+      if (pageSize === 0) return { header, steps: [], nextCursor: null, total: header.total, revision: header.revision };
+      const trace = readParsed(target, callId);
+      if (trace.invalid || trace.header?.childSessionId !== header.childSessionId
+        || trace.header?.executionId !== header.executionId || trace.header?.generation !== header.generation) {
+        return { ...empty, error: 'DELEGATION_TRACE_ID_MISMATCH' };
+      }
+      const source = sinceRevision === undefined ? trace.order : trace.order.filter((id) => (trace.blocks.get(id)?.revision ?? 0) > sinceRevision);
+      const offset = Math.max(0, cursor);
+      const ids = source.slice(offset, offset + Math.min(pageSize, 120));
+      return { header, steps: ids.map((id) => {
+        const step = trace.blocks.get(id)!;
+        if (header.status !== 'interrupted') return step;
+        const settled = finalizeTrace({ status: 'running', blocks: [step.block], updatedAt: header.updatedAt }, 'stopped', undefined, header.completedAt);
+        return { ...step, block: settled.blocks[0]! };
+      }).filter(Boolean),
+        nextCursor: offset + ids.length < source.length ? offset + ids.length : null,
+        total: header.total, revision: header.revision };
+    } catch { return { ...empty, error: 'DELEGATION_TRACE_READ_FAILED' }; }
+  },
+  readContent(sessionId: string, callId: string,
+    childIdentity: Pick<DelegationTraceHeader, 'childSessionId' | 'executionId' | 'generation'>,
+    kind: DelegationContentKind, offset: number, stepId?: string): DelegationContentPage {
+    const target = location(sessionId, callId);
+    if (!target || !fs.existsSync(target)) throw new Error('DELEGATION_CONTENT_DENIED');
+    const header = readHead(target, sessionId, callId);
+    if (!header || identity(header) !== identity(childIdentity)) throw new Error('DELEGATION_CONTENT_DENIED');
+    if (kind === 'tool_receipt') {
+      if (!stepId) throw new Error('DELEGATION_CONTENT_DENIED');
+      const trace = readParsed(target, callId);
+      if (trace.invalid || ![...trace.blocks.values()].some(({ block }) => block.toolCalls.some((call) => call.id === stepId))) {
+        throw new Error('DELEGATION_CONTENT_DENIED');
+      }
+    } else if ((kind === 'task' && !header.taskAvailable)
+      || (kind === 'sent_prompt' && !header.sentPromptAvailable)
+      || (kind === 'invocation' && !header.invocationAvailable)
+      || (kind === 'final' && !header.finalAvailable)
+      || (kind === 'parent_receipt' && !header.parentReceiptAvailable)) {
+      throw new Error('DELEGATION_CONTENT_UNAVAILABLE');
+    }
+    const file = bodyLocation(target, kind, stepId);
+    if (!fs.existsSync(file)) throw new Error('DELEGATION_CONTENT_UNAVAILABLE');
+    const descriptor = fs.openSync(file, 'r');
+    try {
+      const size = fs.fstatSync(descriptor).size;
+      const start = Math.min(Math.max(offset, 0), size);
+      const bytes = Buffer.allocUnsafe(Math.min(PAGE_BYTES, size - start));
+      const count = fs.readSync(descriptor, bytes, 0, bytes.length, start);
+      let length = count;
+      let text = '';
+      let decoded = count === 0;
+      // Byte offsets avoid rereading long bodies. Never split a UTF-8 scalar between pages.
+      for (let attempt = 0; attempt < 4 && length > 0; attempt += 1) {
+        try { text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes.subarray(0, length)); decoded = true; break; }
+        catch { length -= 1; }
+      }
+      if (!decoded) throw new Error('DELEGATION_CONTENT_INVALID_UTF8');
+      const end = start + length;
+      return { text, nextOffset: end < size ? end : null, total: size };
+    } finally { fs.closeSync(descriptor); }
   },
 };

@@ -49,7 +49,8 @@ const ContextMeterCard: React.FC<{ card: ContextMeterCardModel }> = ({ card }) =
 export const ContextRunMeterBand: React.FC<{
   usage: RunContextUsageSummary | null;
   prepared?: PreparedTurnContextSummary | null;
-}> = ({ usage, prepared = null }) => {
+  estimated?: boolean;
+}> = ({ usage, prepared = null, estimated = false }) => {
   return (
     <div
       className="context-breakdown-run-meter"
@@ -58,7 +59,7 @@ export const ContextRunMeterBand: React.FC<{
       data-phase={prepared ? 'current' : usage ? 'actual' : 'unavailable'}
     >
       <div className="context-breakdown-run-columns">
-        {buildContextRunMeterModel(usage, prepared).map((card) => <ContextMeterCard key={card.id} card={card} />)}
+        {buildContextRunMeterModel(usage, prepared, estimated).map((card) => <ContextMeterCard key={card.id} card={card} />)}
       </div>
     </div>
   );

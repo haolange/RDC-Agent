@@ -68,6 +68,7 @@
     "composer.capability": "src/renderer/features/composer/useEffectiveModelCapability.ts",
     "composer.turnControls": "src/renderer/features/composer/useTurnControls.ts",
     "transcript.workProcess": "src/renderer/features/transcript/WorkProcess.tsx",
+    "transcript.workProcessContent": "src/renderer/features/transcript/WorkProcessContent.tsx",
     "transcript.workProcessSectionRow": "src/renderer/features/transcript/WorkProcessSectionRow.tsx",
     "transcript.toolAggregateRow": "src/renderer/features/transcript/ToolAggregateRow.tsx",
     "transcript.workProcessRows": "src/renderer/features/transcript/WorkProcessRows.tsx",
@@ -183,7 +184,9 @@
     "composer.footer": "src/renderer/features/composer/ComposerFooter.tsx",
     "composer.pendingRequest": "src/renderer/features/composer/ComposerPendingRequest.tsx",
     "composer.pendingRequestSelection": "src/renderer/features/composer/pendingRequestSelection.ts",
-    "composer.toolApprovalModel": "src/renderer/features/composer/toolApprovalRequestModel.ts"
+    "composer.toolApprovalModel": "src/renderer/features/composer/toolApprovalRequestModel.ts",
+    "transcriptWorkCardHeader": "src/renderer/features/transcript/WorkCardHeader.tsx",
+    "transcriptWorkDisclosure": "src/renderer/features/transcript/WorkDisclosure.tsx"
   },
   "retired": [
     "src/renderer/styles/themes/oklch-themes.css",

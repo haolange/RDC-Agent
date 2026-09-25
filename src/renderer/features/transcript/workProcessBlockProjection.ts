@@ -203,6 +203,7 @@ export function buildPresentationUnits(
           type: 'taskSnapshot',
           id: block.id,
           status: block.status,
+          change: block.taskSnapshot.change,
           completed: block.taskSnapshot.completed,
           total: block.taskSnapshot.total,
           items: block.taskSnapshot.items,

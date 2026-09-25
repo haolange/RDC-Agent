@@ -28,7 +28,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     answerPlanReview: 'conversation:answerPlanReview',
     getHistory: 'conversation:getHistory',
     getDelegationTrace: 'conversation:getDelegationTrace',
-    getDelegationReceipt: 'conversation:getDelegationReceipt',
+    getDelegationContent: 'conversation:getDelegationContent',
     switchBranch: 'conversation:switchBranch',
     clearHistory: 'conversation:clearHistory',
     undoLastTurn: 'conversation:undoLastTurn',

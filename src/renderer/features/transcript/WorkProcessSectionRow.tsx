@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import type { WorkProcessRow } from './workProcessTypes';
 import { useWorkProcessLabel } from './workProcessUseLabel';
@@ -6,6 +6,8 @@ import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { isActiveThinkingStatus } from './workProcessActiveSignal';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { WorkProcessIcon } from './WorkProcessIcons';
+import { MeasuredWorkRows } from './MeasuredWorkRows';
+import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 
 interface WorkProcessSectionRowProps {
   row: Extract<WorkProcessRow, { type: 'section' }>;
@@ -40,18 +42,11 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
   // Policy hint from projection; sticky user gesture wins until this section remounts (key=row.id).
   // Summary click (not details onToggle) owns the gesture so programmatic `open` updates do not
   // get misclassified as user overrides when the browser emits a synthetic toggle.
-  const [thinkingOpen, setThinkingOpen] = useState(row.thinkingOpenByDefault);
-  const [thinkingUserOverridden, setThinkingUserOverridden] = useState(false);
-
-  useEffect(() => {
-    if (thinkingUserOverridden) return;
-    setThinkingOpen(row.thinkingOpenByDefault);
-  }, [row.thinkingOpenByDefault, thinkingUserOverridden]);
+  const [thinkingOpen, toggleThinking] = useScopedWorkDisclosure(`thinking-${row.id}`, row.thinkingOpenByDefault);
 
   const handleThinkingSummaryClick = (event: React.MouseEvent<HTMLElement>) => {
     event.preventDefault();
-    setThinkingOpen((current) => !current);
-    setThinkingUserOverridden(true);
+    toggleThinking();
   };
 
   return (
@@ -87,9 +82,8 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
           </div>
         ) : null}
         {showSteps ? (
-          <ol className={`work-process-steps work-process-section-list disclosure-${row.stepsDisclosure} ${hasError || row.defaultOpen ? 'is-open' : ''}`}>
-            {visibleSteps.map((step) => renderRow(step))}
-          </ol>
+          <MeasuredWorkRows className={`work-process-steps work-process-section-list disclosure-${row.stepsDisclosure} ${hasError || row.defaultOpen ? 'is-open' : ''}`}
+            rows={visibleSteps} renderRow={renderRow} />
         ) : null}
       </div>
     </li>

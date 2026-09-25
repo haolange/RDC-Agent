@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -18,7 +17,11 @@ afterEach(() => {
   fixture.publish.mockClear();
 });
 
-it('keeps one session-owned delegation record, pages chronological visible steps and rejects stale identity', () => {
+const event = (type: AgentEvent['type'], payload: object, timestamp: number): AgentEvent => ({
+  id: `event-${timestamp}`, type, timestamp, payload: payload as AgentEvent['payload'],
+});
+
+it('stores a single owned child process with revision updates and separate final and parent receipt', () => {
   fixture.root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-delegation-trace-'));
   const id = 'child\u0000execution\u00001';
   delegationTraceStore.start('owner', {
@@ -27,63 +30,170 @@ it('keeps one session-owned delegation record, pages chronological visible steps
     invocation: JSON.stringify({ task: 'Inspect config', apiKey: 'sk-1234567890123456' }),
     status: 'running', startedAt: 1,
   });
-  const tool = (type: AgentEvent['type'], payload: object, timestamp: number): AgentEvent => ({
-    id: `event-${timestamp}`, type, timestamp, payload: payload as AgentEvent['payload'],
-  });
-  delegationTraceStore.event('owner', 'parent-call', id, tool('tool.started', {
+  delegationTraceStore.updateTask('owner', 'parent-call', id, { capsule: {
+    goal: 'Inspect', task: 'Inspect actual config', scope: 'Read only', acceptedFacts: [],
+    hypotheses: [], challengeRefs: [], negativePaths: [], inputArtifactRefs: [],
+    outputRequirements: 'Return findings', stopConditions: [], requiredSkillIds: [], budget: { maxToolCalls: 4, maxWallTimeMs: 60000 },
+  }, completionRequirements: [] }, 'Exact sent prompt');
+  delegationTraceStore.event('owner', 'parent-call', id, event('assistant.thinking_delta', { text: 'Check config' }, 2));
+  delegationTraceStore.event('owner', 'parent-call', id, event('tool.started', {
     toolCallId: 'read', toolName: 'read_file', args: { path: 'config', password: 'private' },
-  }, 2));
-  delegationTraceStore.event('owner', 'parent-call', 'stale', tool('diagnostic', {
-    code: 'IGNORED', severity: 'error', message: 'stale',
   }, 3));
-  delegationTraceStore.event('owner', 'parent-call', id, tool('tool.completed', {
-    toolCallId: 'read', toolName: 'read_file', result: { ok: true, data: { content: 'done' } },
+  delegationTraceStore.event('owner', 'parent-call', 'stale', event('diagnostic', {
+    code: 'IGNORED', severity: 'error', message: 'stale',
   }, 4));
-  delegationTraceStore.event('owner', 'parent-call', id, tool('diagnostic', {
-    code: 'CHECK', severity: 'error', message: 'warning',
+  delegationTraceStore.event('owner', 'parent-call', id, event('tool.completed', {
+    toolCallId: 'read', toolName: 'read_file', result: { ok: true, data: { content: 'done', password: 'private' } },
   }, 5));
-  delegationTraceStore.event('owner', 'parent-call', id, tool('tool.started', {
-    toolCallId: 'large', toolName: 'shell', args: { command: 'inspect' },
+  delegationTraceStore.event('owner', 'parent-call', id, event('assistant.completed', {
+    text: 'Inspected the configuration.', stopReason: 'end_turn',
   }, 6));
-  delegationTraceStore.event('owner', 'parent-call', id, tool('tool.completed', {
-    toolCallId: 'large', toolName: 'shell', result: { ok: true, data: { content: 'x'.repeat(40_000), password: 'private' } },
-  }, 7));
-  delegationTraceStore.finish('owner', 'parent-call', id, 'complete', 'Finished');
+  const longFinal = `Final reply\n\n${'x'.repeat(12_000)}`;
+  delegationTraceStore.finish('owner', 'parent-call', id, 'complete', longFinal);
+  delegationTraceStore.setParentReceipt('owner', 'parent-call', { ok: true, data: { text: 'Parent receipt' } });
 
   const collapsed = delegationTraceStore.read('owner', 'parent-call', 0, 0);
-  expect(collapsed.header).toMatchObject({ status: 'complete', result: 'Finished' });
+  expect(collapsed.header).toMatchObject({ status: 'complete', total: 1, finalAvailable: true });
   expect(collapsed.steps).toEqual([]);
-  expect(collapsed.nextCursor).toBeNull();
-
+  expect(collapsed.header?.finalPreview).toBe('Final reply');
+  expect(collapsed.header?.task).toBe('Inspect actual config');
+  const identity = { childSessionId: 'child', executionId: 'execution', generation: 1 };
+  expect(delegationTraceStore.readContent('owner', 'parent-call', identity, 'final', 0).text).toBe(longFinal);
+  expect(delegationTraceStore.readContent('owner', 'parent-call', identity, 'parent_receipt', 0).text).toContain('Parent receipt');
+  expect(delegationTraceStore.readContent('owner', 'parent-call', identity, 'task', 0).text).toContain('Return findings');
+  expect(delegationTraceStore.readContent('owner', 'parent-call', identity, 'invocation', 0).text).not.toContain('sk-1234567890123456');
   const first = delegationTraceStore.read('owner', 'parent-call', 0, 1);
-  expect(first.header).toMatchObject({ status: 'complete', result: 'Finished', taskId: 'task' });
-  expect(first.header?.invocation).not.toContain('sk-1234567890123456');
-  expect(first.steps).toMatchObject([{ id: 'read', status: 'complete', timestamp: 2 }]);
-  expect(first.steps[0].args).not.toContain('private');
-  expect(first.nextCursor).toBe(1);
-  expect(delegationTraceStore.read('owner', 'parent-call', 1, 1).steps).toMatchObject([{ kind: 'diagnostic', text: 'warning' }]);
-  const large = delegationTraceStore.read('owner', 'parent-call', 2, 1).steps[0];
-  expect(large.receiptRef).toBe('large');
-  expect(large.receipt?.length).toBeLessThan(17_000);
-  const receipt = delegationTraceStore.readReceipt('owner', 'parent-call', 'large', 0);
-  expect(receipt.text.length).toBe(32_000);
-  expect(receipt.nextOffset).toBe(32_000);
-  expect(delegationTraceStore.readReceipt('owner', 'parent-call', 'large', 32_000).text).not.toContain('private');
-  expect(() => delegationTraceStore.readReceipt('owner', 'parent-call', 'read', 0)).toThrow(/RECEIPT_DENIED/);
-  expect(delegationTraceStore.read('other', 'parent-call', 0, 10).header).toBeNull();
-  expect(fixture.publish).toHaveBeenCalledWith('conversation:delegationChanged', { sessionId: 'owner', parentToolCallId: 'parent-call' });
+  expect(first.steps[0]?.block.toolCalls[0]?.argsPreview).not.toContain('private');
+  expect(first.steps[0]?.block.toolCalls[0]?.status).toBe('complete');
+  const update = delegationTraceStore.read('owner', 'parent-call', 0, 40, first.steps[0]!.revision - 1);
+  expect(update.steps).toHaveLength(1);
+  expect(() => delegationTraceStore.readContent('owner', 'parent-call', identity, 'tool_receipt', 0, 'unknown')).toThrow(/DENIED/);
+  expect(() => delegationTraceStore.readContent('owner', 'parent-call', { ...identity, generation: 2 }, 'final', 0)).toThrow(/DENIED/);
+  expect(delegationTraceStore.read('other', 'parent-call', 0, 0).header).toBeNull();
+  expect(fixture.publish).toHaveBeenCalledWith('conversation:delegationChanged',
+    expect.objectContaining({ sessionId: 'owner', parentToolCallId: 'parent-call', revision: expect.any(Number) }));
 });
 
-it('reads a collapsed header without folding steps and marks an unfinished record interrupted after restart', () => {
+it('keeps Task Execution status separate from the child final and rejects stale execution updates', () => {
   fixture.root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-delegation-trace-'));
-  const parentToolCallId = 'unfinished';
-  const target = path.join(fixture.root, 'delegations', `${createHash('sha256').update(parentToolCallId).digest('hex')}.jsonl`);
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, [
-    JSON.stringify({ kind: 'start', header: { parentToolCallId, task: 'Inspect', profile: 'general', mode: 'wait',
-      childSessionId: 'child', invocation: '{}', status: 'running', startedAt: 1 } }),
-    '{ malformed old step }',
-    JSON.stringify({ kind: 'step', step: { id: 'last', kind: 'message', status: 'complete', timestamp: 2, text: 'Visible' } }),
-  ].join('\n') + '\n');
-  expect(delegationTraceStore.read('owner', parentToolCallId, 0, 0).header?.status).toBe('interrupted');
+  const childIdentity = 'child\u0000execution\u00003';
+  delegationTraceStore.start('owner', {
+    parentToolCallId: 'execution-status', task: 'Inspect', profile: 'general', mode: 'background',
+    executionId: 'execution', generation: 3, taskId: 'task', childSessionId: 'child',
+    invocation: '{}', status: 'running', startedAt: Date.now(),
+  });
+  delegationTraceStore.setExecutionStatus('owner', 'execution-status', childIdentity, 'waiting');
+  expect(delegationTraceStore.read('owner', 'execution-status', 0, 0).header?.executionStatus).toBe('waiting');
+  delegationTraceStore.finish('owner', 'execution-status', childIdentity, 'complete', 'Child final');
+  expect(delegationTraceStore.read('owner', 'execution-status', 0, 0).header).toMatchObject({ status: 'complete', executionStatus: 'waiting' });
+  delegationTraceStore.setExecutionStatus('owner', 'execution-status', 'child\u0000execution\u00002', 'completed');
+  expect(delegationTraceStore.read('owner', 'execution-status', 0, 0).header?.executionStatus).toBe('waiting');
+  delegationTraceStore.setExecutionStatus('owner', 'execution-status', childIdentity, 'partial');
+  expect(delegationTraceStore.read('owner', 'execution-status', 0, 0).header).toMatchObject({
+    status: 'complete', executionStatus: 'partial', finalPreview: 'Child final',
+  });
+  delegationTraceStore.setExecutionStatus('owner', 'execution-status', childIdentity, 'running');
+  expect(delegationTraceStore.read('owner', 'execution-status', 0, 0).header?.executionStatus).toBe('partial');
+});
+
+it('reads long Unicode final replies in bounded UTF-8 chunks without losing characters', () => {
+  fixture.root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-delegation-trace-'));
+  const childIdentity = 'child\u0000\u0000';
+  delegationTraceStore.start('owner', {
+    parentToolCallId: 'unicode', task: 'Reply', profile: 'general', mode: 'wait',
+    childSessionId: 'child', invocation: '{}', status: 'running', startedAt: 1,
+  });
+  const final = `答复：${'配置已读取。'.repeat(9000)}`;
+  delegationTraceStore.finish('owner', 'unicode', childIdentity, 'complete', final);
+  let offset: number | null = 0;
+  let collected = '';
+  while (offset !== null) {
+    const page = delegationTraceStore.readContent('owner', 'unicode', { childSessionId: 'child' }, 'final', offset);
+    expect(Buffer.byteLength(page.text, 'utf8')).toBeLessThanOrEqual(32_000);
+    collected += page.text;
+    offset = page.nextOffset;
+  }
+  expect(collected).toBe(final);
+});
+
+it('marks unfinished records interrupted after restart and refuses old records without a head contract', async () => {
+  fixture.root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-delegation-trace-'));
+  delegationTraceStore.start('owner', {
+    parentToolCallId: 'unfinished', task: 'Inspect', profile: 'general', mode: 'wait',
+    childSessionId: 'child', invocation: '{}', status: 'running', startedAt: 1,
+  });
+  delegationTraceStore.event('owner', 'unfinished', 'child\u0000\u0000', event('assistant.thinking_delta', { text: 'Visible work' }, 2));
+  delegationTraceStore.event('owner', 'unfinished', 'child\u0000\u0000', event('tool.started', { toolCallId: 'running', toolName: 'read_file' }, 3));
+  const target = path.join(fixture.root, 'delegations', 'old.jsonl');
+  fs.writeFileSync(target, '{ old record }\n');
+  // No active producer exists after a restart; a persisted running record is interrupted.
+  const head = path.join(fixture.root, 'delegations', fs.readdirSync(path.join(fixture.root, 'delegations')).find((name) => name.endsWith('.head.json'))!);
+  const stored = JSON.parse(fs.readFileSync(head, 'utf8')) as Record<string, unknown>;
+  expect(stored.status).toBe('running');
+  vi.resetModules();
+  const restarted = (await import('./DelegationTraceStore')).delegationTraceStore;
+  const interrupted = restarted.read('owner', 'unfinished', 0, 0).header;
+  expect(interrupted?.status).toBe('interrupted');
+  expect(interrupted?.completedAt).toBe(stored.updatedAt);
+  const recovered = restarted.read('owner', 'unfinished', 0, 40);
+  expect(recovered.steps.length).toBeGreaterThan(0);
+  for (const { block } of recovered.steps) {
+    expect(block.thinkingStatus).toBe('complete');
+    expect(block.status).toBe('error');
+    expect(block.completedAt).toBe(interrupted?.completedAt);
+    expect(block.toolCalls[0]).toMatchObject({ status: 'error', completedAt: interrupted?.completedAt });
+  }
+  expect(delegationTraceStore.read('owner', 'missing', 0, 0).error).toBe('DELEGATION_TRACE_UNAVAILABLE');
+});
+
+it('keeps execution failure separate from final reply and rejects cross-execution content', () => {
+  fixture.root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-delegation-trace-'));
+  const identity = 'child\u0000run\u00002';
+  delegationTraceStore.start('owner', {
+    parentToolCallId: 'failed', task: 'Read config', profile: 'general', mode: 'wait',
+    childSessionId: 'child', executionId: 'run', generation: 2,
+    invocation: '{}', status: 'running', startedAt: Date.now(),
+  });
+  delegationTraceStore.finish('owner', 'failed', identity, 'failed', 'Provider failed');
+  const header = delegationTraceStore.read('owner', 'failed', 0, 0).header;
+  expect(header).toMatchObject({ status: 'failed', error: 'Provider failed' });
+  expect(header?.finalAvailable).toBeUndefined();
+  expect(() => delegationTraceStore.readContent('owner', 'failed',
+    { childSessionId: 'child', executionId: 'run', generation: 2 }, 'final', 0)).toThrow(/UNAVAILABLE/);
+  expect(() => delegationTraceStore.readContent('owner', 'failed',
+    { childSessionId: 'child', executionId: 'different', generation: 2 }, 'task', 0)).toThrow(/DENIED/);
+});
+
+it.each(['complete', 'failed', 'cancelled'] as const)('settles every owned step before publishing %s and rejects late events', (status) => {
+  fixture.root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-delegation-terminal-'));
+  const call = `terminal-${status}`;
+  const identity = 'child\u0000\u0000';
+  delegationTraceStore.start('owner', { parentToolCallId: call, task: 'Inspect', profile: 'general', mode: 'wait',
+    childSessionId: 'child', invocation: '{}', status: 'running', startedAt: 1 });
+  delegationTraceStore.event('owner', call, identity, event('assistant.thinking_delta', { text: 'Visible thought' }, 2));
+  delegationTraceStore.event('owner', call, identity, event('tool.requested', { toolCall: { id: 'pending', name: 'turn_complete', arguments: {} } }, 3));
+  delegationTraceStore.event('owner', call, identity, event('tool.started', { toolCallId: 'started', toolName: 'read_file' }, 4));
+  const before = delegationTraceStore.read('owner', call, 0, 0).revision;
+  delegationTraceStore.finish('owner', call, identity, status, 'Ended');
+  const page = delegationTraceStore.read('owner', call, 0, 40, before);
+  expect(page.steps.length).toBeGreaterThan(0);
+  for (const { block } of page.steps) {
+    expect(['running', 'pending']).not.toContain(block.status);
+    expect(block.thinkingStatus).toBe('complete');
+    expect(block.completedAt).toBe(page.header?.completedAt);
+    expect(block.toolCalls.find(tool => tool.id === 'started')).toMatchObject({ status: 'error', completedAt: page.header?.completedAt });
+    expect(block.toolCalls.find(tool => tool.id === 'pending')?.status).toBe(status === 'complete' ? 'skipped' : 'error');
+  }
+  delegationTraceStore.event('owner', call, identity, event('assistant.thinking_delta', { text: 'Late' }, 9));
+  expect(delegationTraceStore.read('owner', call, 0, 40)).toEqual({ ...page, nextCursor: null });
+});
+
+it('does not offer an empty final body or misreport a resource limit', () => {
+  fixture.root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-delegation-empty-'));
+  delegationTraceStore.start('owner', { parentToolCallId: 'empty', task: 'Inspect', profile: 'general', mode: 'wait',
+    childSessionId: 'child', invocation: '{}', status: 'running', startedAt: 1 });
+  delegationTraceStore.finish('owner', 'empty', 'child\u0000\u0000', 'complete', '  ');
+  const header = delegationTraceStore.read('owner', 'empty', 0, 0).header;
+  expect(header?.finalAvailable).toBe(false);
+  expect(header?.finalUnavailableReason).toBeUndefined();
 });

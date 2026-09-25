@@ -17,11 +17,11 @@
 }
 
 .context-breakdown-run-col {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  align-content: start;
   gap: var(--space-3);
   min-width: 0;
-  min-height: calc(var(--space-10) * 4);
   padding: var(--space-4);
   border: 1px solid var(--token-border-card);
   border-radius: var(--radius-lg);
@@ -78,7 +78,7 @@
 .context-breakdown-meter-details {
   display: grid;
   gap: var(--space-1);
-  margin: auto 0 0;
+  margin: 0;
   padding-top: var(--space-2);
   border-top: 1px solid var(--token-border-card);
   min-width: 0;

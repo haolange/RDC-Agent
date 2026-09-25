@@ -21,6 +21,7 @@ import { redactCredentialLikeText, redactSecretsDeep } from '../runtime/secretRe
 import { shouldProjectDiagnosticToWorkProcess } from './workProcessDiagnosticPolicy';
 import { normalizeToolName } from '../workflow/debugger/DebuggerRuntimePolicy';
 import {
+  attachRuntimeHookDiagnostic,
   upsertRuntimeToolApproval,
   upsertRuntimeToolCall,
   upsertLoopResult,
@@ -37,14 +38,14 @@ import {
   type ConversationLoopContinuationState,
 } from '@shared/conversation/loopOutputPhase';
 import { reduceCanonicalAssistantOutput } from './CanonicalAssistantOutput';
+import { delegationTraceStore } from './DelegationTraceStore';
 import type { CanonicalAssistantOutputState } from './CanonicalAssistantOutput';
 import {
   isActiveRun,
   isLoopTool,
-  mergeThinkingPayload,
-  selectCompletedThinking,
   summarizeRuntimePayload,
 } from './ConversationRoutePreflight';
+import { mergeThinkingPayload, selectCompletedThinking } from './ConversationThinkingArtifacts';
 import type { ConversationTurnRunnerHost, CompleteProfileTurnInput } from './ConversationTurnRunner';
 import type { PlanReviewDecision } from '@shared/types/planReview';
 
@@ -274,6 +275,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 message?: string;
                 severity?: string;
                 phase?: 'started' | 'completed';
+                toolCallId?: string;
               };
               const summary = typeof payload.message === 'string' && payload.message
                 ? payload.message
@@ -310,8 +312,19 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 : payload.severity === 'error'
                   ? 'error'
                   : 'complete';
+              const hookTrace = typeof payload.code === 'string' && payload.code.startsWith('hook.')
+                && typeof payload.toolCallId === 'string'
+                ? attachRuntimeHookDiagnostic(turnStreamState.assistantMessage.workTrace, payload.toolCallId, {
+                  id: event.id,
+                  code: payload.code,
+                  severity: payload.severity === 'error' || payload.severity === 'warning' ? payload.severity : 'info',
+                  message: summary,
+                  timestamp: event.timestamp,
+                })
+                : null;
               commitAssistantMessage('message_patched', {
-                workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, `runtime-diagnostic-${payload.code ?? 'runtime'}`, {
+                workTrace: hookTrace ?? upsertWorkBlock(turnStreamState.assistantMessage.workTrace,
+                  `runtime-diagnostic-${payload.code?.startsWith('hook.') ? `hook.${event.id}` : payload.code ?? 'runtime'}`, {
                   kind: 'diagnostic',
                   status: blockStatus,
                   diagnosticSeverity: payload.severity === 'error' || payload.severity === 'warning'
@@ -599,6 +612,10 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
             }
             if (event.type === 'tool.completed') {
               const result = event.payload.result as ToolCallResult | undefined;
+              if (sessionId && normalizeToolName(String(event.payload.toolName)) === 'subagent') {
+                delegationTraceStore.setParentReceipt(sessionId.split('::subagent::')[0]!,
+                  String(event.payload.toolCallId), result ?? {});
+              }
               const isAskUserTool = normalizeToolName(String(event.payload.toolName)) === 'ask_user';
               const isPlanArtifactTool = normalizeToolName(String(event.payload.toolName)) === 'plan_artifact';
               if (isAskUserTool && result?.ok) {
@@ -653,16 +670,17 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               };
               const items = normalizeTaskSnapshotItems(payload);
               const completed = items.filter((item) => item.status === 'completed').length;
-              const snapshotId = `task-snapshot-${turnStreamState.assistantMessage.turnId}`;
+              const snapshotId = `task-snapshot-${event.id}`;
               commitAssistantMessage('message_patched', {
                 workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, snapshotId, {
                   kind: 'task_snapshot',
-                  title: `${completed} of ${items.length} completed`,
+                  title: event.type === 'task.created' ? 'Tasks added' : 'Tasks updated',
                   stage: 'task',
-                  status: items.some((item) => item.status === 'in_progress') ? 'running' : 'complete',
-                  taskSnapshot: { completed, total: items.length, items },
+                  status: 'complete',
+                  taskSnapshot: { change: event.type === 'task.created' ? 'created' : 'updated', completed, total: items.length, items },
                   summary: `${completed} of ${items.length} completed`,
-                  completedAt: nowMs(),
+                  startedAt: event.timestamp,
+                  completedAt: event.timestamp,
                 }),
               });
             }
