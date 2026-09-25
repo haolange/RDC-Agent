@@ -57,7 +57,7 @@ export interface ToolExecutorFactoryDeps {
     projectId?: string | null,
     projectRootPath?: string | null,
     mcpPoolKey?: string | null,
-    options?: { excludeRdcLeaseTools?: boolean },
+    options?: { excludeRdcLeaseTools?: boolean; excludeSubagent?: boolean },
   ) => ResolvedRuntimeTools;
   isAllowedForRuntime: (
     agentId: AgentRole,
@@ -127,7 +127,8 @@ export class ToolExecutorFactory {
       runtimeContext?.projectId ?? plan?.projectId,
       runtimeContext?.projectRootPath ?? plan?.projectRootPath,
       runtimeContext?.mcpPoolKey ?? null,
-      { excludeRdcLeaseTools: plan?.excludeRdcLeaseTools === true },
+      { excludeRdcLeaseTools: plan?.excludeRdcLeaseTools === true,
+        excludeSubagent: plan?.excludeSubagent === true },
     ).toolMap;
     // Skill allowed-tools 收窄集（DESIGN Skills 条款：只收窄、不扩展）。
     // 多 skill：allowedTools = ∩(skill_i) ∩ runtimeAllowlist（空声明不参与）。
@@ -171,6 +172,7 @@ export class ToolExecutorFactory {
         const normalizedName = normalizeToolName(toolCall.name);
         if (
           (plan?.excludeRdcLeaseTools && isRdcLeaseToolName(toolCall.name))
+          || (plan?.excludeSubagent && normalizedName === 'subagent')
           || !this.deps.isAllowedForRuntime(
             agentId,
             toolCall.name,
@@ -430,6 +432,7 @@ export class ToolExecutorFactory {
         code: `hook.${result.status}`,
         severity: result.status === 'completed' ? 'info' : result.allowed ? 'warning' : 'error',
         message: `Hook ${result.hookId}: ${result.status}`,
+        toolCallId: typeof payload.toolCallId === 'string' ? payload.toolCallId : undefined,
         technicalMessage: JSON.stringify({
           exitCode: result.exitCode,
           reason: result.reason,

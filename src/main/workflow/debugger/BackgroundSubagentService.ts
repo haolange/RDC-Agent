@@ -11,6 +11,7 @@ import { grantDelegatedOutput } from '../../sessions/DelegatedArtifactAccess';
 import { policyBudgetChain, registerPolicyBudgetObserver } from './DelegationBudget';
 import { bounded, normalizeSubagentResult, persistSubagentResult, projectSubagentExecution } from './SubagentResultEnvelope';
 import { bindTaskRootBudget } from './TaskRootBudget';
+import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
 
 export interface BackgroundSubagentStart {
   /** Durable Task/result owner. */
@@ -32,17 +33,13 @@ export interface BackgroundSubagentStart {
 }
 
 interface LiveExecution { controller: AbortController; promise: Promise<void> }
-const backgroundMessageOwners = new Map<string, (kind: 'progress' | 'blocked' | 'decision_required') => void>();
-export function notifyBackgroundExecutionMessage(executionId: string, kind: 'progress' | 'blocked' | 'decision_required'): void { backgroundMessageOwners.get(executionId)?.(kind); }
-
 export class BackgroundSubagentService {
   private readonly live = new Map<string, LiveExecution>();
   private readonly registries = new Map<string, TaskRegistry>();
   private readonly executionSessions = new Map<string, string>();
-  private readonly executionRootBudgets = new Map<string, PolicyBudgetState>();
+  private readonly executionTraceOwners = new Map<string, { sessionId: string; parentToolCallId: string; generation: number }>();
   private readonly ready = new Map<string, Promise<void>>();
   private accepting = true;
-  onEvent?: (event: { sessionId: string; executionId: string; parentAgentId: AgentRole; type: 'started' | 'message' | 'settled'; messageKind?: 'progress' | 'blocked' | 'decision_required'; policyBudget?: PolicyBudgetState }) => void;
 
   constructor(
     private readonly run: (input: BackgroundSubagentStart & { executionId: string; taskExecutionGeneration: number; signal: AbortSignal; restoredPolicyBudget?: PolicyBudgetState; onPolicyBudget?: (budget: PolicyBudgetState) => void; onProviderRequestCommitted?: (requestId: string) => Promise<void> | void; beforeProviderRequestMessages?: () => Promise<{ messages: import('../../agent-runtime/core/types').Message[]; mailboxDeliveries?: import('@shared/types/rdcRuntime').RequestEnvelopeSnapshot['mailboxDeliveries']; commit?: () => Promise<void> }> }) => Promise<{ text: string; status: 'complete' | 'failed' | 'cancelled'; policyBudget?: PolicyBudgetState; completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null }>,
@@ -56,11 +53,27 @@ export class BackgroundSubagentService {
     let registry = this.registries.get(sessionId);
     if (!registry) {
       registry = this.createRegistry(sessionId, async (execution) => this.cancelAndJoin(execution.id));
-      registry.onTaskChange = () => traceProjectionRefreshService.schedule(sessionId);
+      registry.onTaskChange = () => {
+        traceProjectionRefreshService.schedule(sessionId);
+        void this.syncTraceStatuses(sessionId, registry!).catch(() => undefined);
+      };
       this.registries.set(sessionId, registry);
       this.ready.set(sessionId, registry.reconcileInterruptedExecutions().then(() => undefined));
     }
     return registry;
+  }
+
+  private async syncTraceStatuses(sessionId: string, registry: TaskRegistry): Promise<void> {
+    for (const [executionId, owner] of this.executionTraceOwners) {
+      if (owner.sessionId !== sessionId) continue;
+      const execution = await registry.getExecution(executionId);
+      if (!execution || execution.generation !== owner.generation) continue;
+      delegationTraceStore.setExecutionStatus(sessionId, owner.parentToolCallId,
+        `${sessionId}::subagent::${executionId}\u0000${executionId}\u0000${owner.generation}`, execution.status);
+      if (['completed', 'partial', 'blocked', 'failed', 'cancelled', 'interrupted'].includes(execution.status)) {
+        this.executionTraceOwners.delete(executionId);
+      }
+    }
   }
 
   async start(input: BackgroundSubagentStart): Promise<TaskExecutionRecord> {
@@ -119,17 +132,16 @@ export class BackgroundSubagentService {
       maxWallTimeMs: execution.budget.deadlineAt ? Math.max(1, execution.budget.deadlineAt - execution.budget.startedAt) : Number.MAX_SAFE_INTEGER,
     };
     const effectiveInput = { ...input, restoredPolicyBudget };
-    if (rootPolicyBudget) this.executionRootBudgets.set(execution.id, rootPolicyBudget);
     this.executionSessions.set(execution.id, input.sessionId);
+    this.executionTraceOwners.set(execution.id, { sessionId: input.sessionId,
+      parentToolCallId: input.parentToolCallId, generation: execution.generation });
     const controller = new AbortController();
     const live: LiveExecution = { controller, promise: Promise.resolve() };
     this.live.set(execution.id, live);
     const releaseOwner = registerTaskExecutionCancellationOwner(execution.id, async () => this.cancelAndJoin(execution.id));
-    backgroundMessageOwners.set(execution.id, (messageKind) => this.onEvent?.({ sessionId: input.sessionId, executionId: execution.id, parentAgentId: input.parentAgentId, type: 'message', messageKind, policyBudget: rootPolicyBudget }));
     const promise = this.execute(registry, execution, effectiveInput, controller.signal);
     live.promise = promise;
-    this.onEvent?.({ sessionId: input.sessionId, executionId: execution.id, parentAgentId: input.parentAgentId, type: 'started' });
-    const forget = () => { releaseOwner(); backgroundMessageOwners.delete(execution.id); this.live.delete(execution.id); this.executionSessions.delete(execution.id); this.executionRootBudgets.delete(execution.id); };
+    const forget = () => { releaseOwner(); this.live.delete(execution.id); this.executionSessions.delete(execution.id); };
     void promise.then(forget).catch(() => undefined);
     return execution;
   }
@@ -139,7 +151,6 @@ export class BackgroundSubagentService {
     const capsule = { ...input.capsule, outputRequirements: `${input.capsule.outputRequirements}\nBefore returning, call turn_complete with top-level disposition and evidenceRefs, and result containing summary, outputs, counterevidence, unresolved, scope, sideEffects, and recoveryState.` };
     let value: { text: string; status: 'complete' | 'failed' | 'cancelled'; policyBudget?: PolicyBudgetState; completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null };
     let livePolicyBudget: PolicyBudgetState | undefined;
-    const rootPolicyBudget = this.executionRootBudgets.get(execution.id);
     let releaseChildBudgetObserver: (() => void) | undefined;
     const parentExecution = input.parentExecutionId ? await registry.getExecution(input.parentExecutionId) : null;
     const releaseParentBudgetObserver = input.policyBudget && parentExecution
@@ -278,7 +289,6 @@ export class BackgroundSubagentService {
       expectedGeneration: execution.generation, kind: 'result', direction: 'to_parent',
       body: JSON.stringify(projectSubagentExecution(await registry.getExecution(execution.id))?.result),
     });
-    this.onEvent?.({ sessionId: input.sessionId, executionId: execution.id, parentAgentId: input.parentAgentId, type: 'settled', policyBudget: rootPolicyBudget });
   }
 
   async query(sessionId: string, executionId: string) { const registry = this.registry(sessionId); await this.ready.get(sessionId); return registry.getExecution(executionId); }

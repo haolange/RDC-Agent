@@ -79,17 +79,19 @@ describe('ConversationService idempotency scoping', () => {
     service.acceptingTurns = true;
   });
 
-  it('starts one idle parent continuation when an ordinary background execution settles', async () => {
+  it('does not create another parent turn when two background executions report and settle', async () => {
     const service = conversationService as unknown as IdempotentService;
-    const liveRootBudget = { toolCalls: 1 };
-    vi.mocked(storageAdapter.readSession).mockReturnValue({ sessionId: 'session-a', projectId: 'project-a', agentId: 'general', turnControls: { reasoningLevel: 'off', maxContextMode: false, fastModel: false } } as never);
-    service.resolveContext = vi.fn(async () => ({ session: { sessionId: 'session-a', projectId: 'project-a' }, projectId: 'project-a', currentRun: null }));
     service.startProfileTurn = vi.fn(async () => ({ requestId: 'auto', session: { sessionId: 'session-a' } }));
-    agentOrchestrator.backgroundSubagents.onEvent?.({ sessionId: 'session-a', executionId: 'execution-1', parentAgentId: 'general', type: 'settled', policyBudget: liveRootBudget as never });
+    const background = agentOrchestrator.backgroundSubagents as typeof agentOrchestrator.backgroundSubagents & {
+      onEvent?: (event: { sessionId: string; executionId: string; parentAgentId: 'general'; type: 'message' | 'settled' }) => void;
+    };
+    for (const executionId of ['execution-1', 'execution-2']) {
+      background.onEvent?.({ sessionId: 'session-a', executionId, parentAgentId: 'general', type: 'message' });
+      background.onEvent?.({ sessionId: 'session-a', executionId, parentAgentId: 'general', type: 'settled' });
+    }
     await new Promise<void>((resolve) => setImmediate(resolve));
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    expect(service.startProfileTurn).toHaveBeenCalledOnce();
-    expect(service.startProfileTurn.mock.calls[0]?.[13]).toBe(liveRootBudget);
+    expect(service.startProfileTurn).not.toHaveBeenCalled();
+    expect(vi.mocked(storageAdapter.readConversationHistory)).not.toHaveBeenCalled();
   });
 
   it('does not share in-flight promises across sessions with the same requestId', async () => {

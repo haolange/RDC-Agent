@@ -3,7 +3,7 @@ import type { ConversationWorkTrace } from '@shared/types/conversation';
 import { useI18n } from '../../i18n';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
-import { createWorkProcessRowRenderer } from './workProcessRowRenderer';
+import { WorkProcessContent } from './WorkProcessContent';
 
 interface WorkProcessProps {
   trace: ConversationWorkTrace;
@@ -21,8 +21,6 @@ const WorkProcessInner: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
     }
   }, [trace.status, presentation.important]);
 
-  const renderRow = useMemo(() => createWorkProcessRowRenderer(sessionId), [sessionId]);
-
   const headlineCopy = trace.status === 'stopped'
     ? t('chat.workProcessHeadlineStopped')
     : trace.status === 'running'
@@ -31,7 +29,9 @@ const WorkProcessInner: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
   const actionMeta = presentation.actionCount > 0
     ? t('chat.workProcessActions', { count: presentation.actionCount })
     : '';
-  const durationMeta = presentation.duration ? t('chat.workProcessDuration', { duration: presentation.duration }) : '';
+  const durationMeta = presentation.duration
+    ? t(trace.status === 'running' ? 'chat.workProcessDurationRunning' : 'chat.workProcessDuration', { duration: presentation.duration })
+    : '';
   const metaParts = [durationMeta, actionMeta].filter(Boolean);
   const hasBody = Boolean(presentation.summary) || presentation.rows.length > 0;
 
@@ -65,18 +65,7 @@ const WorkProcessInner: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
         </button>
       </div>
 
-      {expanded && hasBody ? (
-        <div className="work-process-body">
-          {presentation.summary ? (
-            <p className="work-process-summary">{presentation.summary}</p>
-          ) : null}
-          {presentation.rows.length > 0 ? (
-            <ol className="work-process-steps work-process-narrative-stream">
-              {presentation.rows.map((row) => renderRow(row))}
-            </ol>
-          ) : null}
-        </div>
-      ) : null}
+      {expanded && hasBody ? <WorkProcessContent presentation={presentation} sessionId={sessionId} /> : null}
     </section>
   );
 };

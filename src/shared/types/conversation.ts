@@ -52,6 +52,7 @@ export interface ConversationTaskSnapshotItem {
 }
 
 export interface ConversationTaskSnapshot {
+  change?: 'created' | 'updated';
   completed: number;
   total: number;
   items: ConversationTaskSnapshotItem[];
@@ -139,6 +140,14 @@ export interface ConversationMessageDiagnostic {
 }
 
 export interface ConversationToolCall {
+  /** Runtime Hook events owned by this exact call, in arrival order. */
+  hookDiagnostics?: Array<{
+    id: string;
+    code: string;
+    severity: ConversationDiagnosticSeverity;
+    message: string;
+    timestamp: number;
+  }>;
   delegation?: {
     task: string;
     profile: string;

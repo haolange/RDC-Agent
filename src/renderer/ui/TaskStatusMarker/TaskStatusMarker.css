@@ -25,6 +25,25 @@
   font-weight: var(--font-semibold);
 }
 
+.task-status-marker.is-snapshot.is-in-progress {
+  background: transparent;
+  color: var(--token-accent-primary);
+}
+
+.task-status-marker.is-snapshot.is-in-progress circle,
+.task-status-marker.is-snapshot.is-completed circle {
+  fill: currentColor;
+}
+
+.task-status-marker.is-snapshot.is-in-progress path,
+.task-status-marker.is-snapshot.is-completed path {
+  stroke: var(--token-text-inverse);
+}
+
+.task-status-marker.is-snapshot.is-completed {
+  color: var(--token-text-caption);
+}
+
 .task-status-marker.is-completed {
   color: var(--token-status-success);
 }

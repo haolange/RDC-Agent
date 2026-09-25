@@ -923,7 +923,10 @@ assert(mcpRow?.target === 'filesystem/read_file', 'dynamic MCP target should sho
 assert(mcpRow?.category === 'MCP' || mcpRow?.groupKind === 'mcp', 'dynamic MCP tools should keep MCP semantics');
 
 const componentSource = [
+  scriptRead('src/renderer/features/transcript/WorkCardHeader.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/WorkDisclosure.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/WorkProcess.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/WorkProcessContent.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/WorkProcessSectionRow.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/ToolAggregateRow.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/workProcessRowRenderer.tsx', 'utf8'),
@@ -1035,6 +1038,15 @@ assert(componentSource.includes('work-process-thinking-icon'), 'thinking folds s
 assert(componentSource.includes('work-process-tool-card'), 'tools should render as a unified tool card');
 assert(componentSource.includes('work-process-tool-card-raw'), 'tool cards should expose a styled Raw panel');
 assert(cssSource.includes('.work-process-tool-card'), 'tool card styling should exist');
+assert(
+  /\.work-process-tool-card\.is-compact:not\(\.is-background-wait\)\s*>\s*\.work-card-trigger\s+\.work-process-tool-card-header\s*\{[^}]*padding:\s*var\(--space-1\)\s+var\(--space-2\)/.test(cssSource),
+  'compact tools must retain the shared card shell and only tighten its header spacing',
+);
+assert(
+  !/\.work-process-tool-card\.is-compact\s*\{[^}]*border:\s*0/.test(cssSource),
+  'compact tools must not remove the shared card border',
+);
+assert(cssSource.includes('.work-process-tool-card.is-background-wait'), 'background_wait must keep its lightweight runtime-event treatment');
 assert(cssSource.includes('.work-process-tool-card-raw'), 'tool card raw panel styling should exist');
 assert(cssSource.includes('.work-process-thinking-icon'), 'thinking icon styling should exist');
 assert(!presentationSource.includes(": '思考过程'"), 'settled thinking must not reuse the Work process header title 思考过程');
@@ -1078,7 +1090,7 @@ const toolRowSource = [
   scriptRead('src/renderer/features/transcript/WorkProcessRowParts.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/WorkProcessToolCardParts.tsx', 'utf8'),
 ].join('\n');
-assert(toolRowSource.includes('useState(false)'), 'tool cards must start collapsed by default');
+assert(toolRowSource.includes('useScopedWorkDisclosure(`tool-${row.id}`, false)'), 'tool cards must start collapsed by default');
 assert(!toolRowSource.includes("row.status === 'running' && canExpand"), 'running tools must not auto-expand detail/Raw');
 assert(!toolRowSource.includes('setExpanded(true)'), 'tool cards must not programmatically auto-expand');
 assert(!toolRowSource.includes('useEffect'), 'tool cards must not use effects to force-expand on status');
@@ -1117,7 +1129,8 @@ assert(
 assert(!componentSource.includes('setRawOpen(true);\n      setPreviewOpen(true);'), 'failed tools must not force-open preview and raw together on error');
 assert(componentSource.includes('<details'), 'thinking should render as a user-collapsible top disclosure');
 assert(componentSource.includes('handleThinkingSummaryClick'), 'thinking disclosure must accept user summary-click gestures');
-assert(componentSource.includes('thinkingUserOverridden'), 'thinking disclosure must sticky-override policy after user gesture');
+assert(componentSource.includes('useScopedWorkDisclosure(`thinking-${row.id}`, row.thinkingOpenByDefault)'),
+  'thinking disclosure must sticky-override policy after user gesture');
 assert(!componentSource.includes('open={row.thinkingOpenByDefault}'), 'thinking disclosure must not bind open solely to policy without local state');
 assert(!componentSource.includes('onToggle={handleThinkingToggle}'), 'thinking must not use details onToggle for sticky override (programmatic open fires toggle)');
 assert(!componentSource.includes('isSummaryThinking'), 'summary thinking must not bypass the top disclosure hierarchy');
@@ -1185,11 +1198,11 @@ assert(
   'section turns should zero bottom padding so turn gap is only the next section top pad',
 );
 assert(
-  /\.work-process-section\s*\+\s*\.work-process-section\s*\{[^}]*padding-top:\s*var\(--space-3\)/.test(cssSource),
-  'adjacent loop sections should share space-3 top padding as loop-boundary breath',
+  /\.work-process-steps\s*>\s*\.work-process-section:not\(:first-child\)\s*\{[^}]*padding-top:\s*var\(--space-3\)/.test(cssSource),
+  'every turn after a preceding event or spacer should use the shared space-3 loop boundary',
 );
 assert(
-  /\.work-process-section-list\s*\{[^}]*margin:\s*var\(--space-3\)\s+0\s+0/.test(cssSource),
+  /\.work-process-prose\s*\+\s*\.work-process-section-list\s*\{[^}]*margin-top:\s*var\(--space-3\)/.test(cssSource),
   'thinking/commentary → first tool should use space-3 entrance margin',
 );
 assert(
@@ -1209,7 +1222,7 @@ assert(
   'last process step must zero bottom padding so expanded ends flush like collapsed',
 );
 assert(
-  /\.work-process-section-list\s+\.work-process-step\s*\{[^}]*padding:\s*var\(--space-2\)\s+0\s+0/.test(cssSource),
+  /\.work-process-section-list\s*>\s*\.work-process-step\s*\{[^}]*padding:\s*var\(--space-2\)\s+0\s+0/.test(cssSource),
   'nested tool rows should use top-only space-2 padding (denser than loop entrance / turn boundary)',
 );
 assert(
@@ -1262,7 +1275,9 @@ assert(cssSource.includes('.work-process-section-list'), 'section list styling s
 assert(cssSource.includes('.work-process-step-rail.status-complete'), 'rail marker color should be status-driven, not section-driven');
 assert(cssSource.includes('.work-process-prose.is-streaming'), 'prose streaming indicator should exist');
 assert(cssSource.includes('.work-process-tool-aggregate'), 'tool aggregate styling should exist');
-assert(cssSource.includes('.work-process-section-list .work-process-step-rail'), 'nested tool rails must be suppressed under section lists');
+assert(cssSource.includes('.work-process-section-list > .work-process-step > .work-process-step-rail'), 'only direct tool rails may be suppressed; nested child execution rails must remain visible');
+assert(!cssSource.includes('.work-process-section-list .work-process-step'), 'parent tool lists must not change nested child execution geometry');
+assert(/\.work-process-section-list\s*\{[^}]*margin:\s*0/.test(cssSource), 'tool-only turns must not reserve narrative space');
 assert(cssSource.includes('--work-process-rail-marker-size: 6px'), 'loop rail marker should be 6px');
 assert(
   /margin-top:\s*calc\(\(var\(--text-sm\)\s*\*\s*1\.65\s*-\s*var\(--work-process-rail-marker-size\)\)\s*\/\s*2\)/.test(cssSource),

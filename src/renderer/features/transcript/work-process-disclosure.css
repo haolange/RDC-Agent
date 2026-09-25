@@ -160,7 +160,7 @@
 .work-process-section-list {
   gap: 0;
   /* Narrative → first tool: one notch wider than sibling tools (space-2). */
-  margin: var(--space-3) 0 0;
+  margin: 0;
   padding: 0;
   /* Same left edge as loop commentary prose (full-bleed content column). */
   overflow: visible;
@@ -169,18 +169,23 @@
   background: transparent;
 }
 
-.work-process-section-list .work-process-step-rail {
+.work-process-thinking-state ~ .work-process-section-list,
+.work-process-prose + .work-process-section-list {
+  margin-top: var(--space-3);
+}
+
+.work-process-section-list > .work-process-step > .work-process-step-rail {
   display: none;
 }
 
-.work-process-section-list .work-process-step {
+.work-process-section-list > .work-process-step {
   grid-template-columns: minmax(0, 1fr);
   /* Sibling tools denser than loop entrance / turn boundary. */
   padding: var(--space-2) 0 0;
   border-bottom: 0;
 }
 
-.work-process-section-list .work-process-step:first-child {
+.work-process-section-list > .work-process-step:first-child {
   padding-top: 0;
 }
 

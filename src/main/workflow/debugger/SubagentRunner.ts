@@ -121,11 +121,21 @@ export class SubagentRunner {
     try {
       modelOverride = resolveSubagentModelOverride(input.model, childSettings);
     } catch (error) {
-      return {
-        text: error instanceof Error ? error.message : String(error),
-        status: 'failed',
-        subagentId: generateEventId('subagent'),
-      };
+      const text = error instanceof Error ? error.message : String(error);
+      const subagentId = generateEventId('subagent');
+      const childSessionId = input.childSessionId ?? `${input.parentSessionId ?? 'ephemeral'}::subagent::${subagentId}`;
+      const ownerSessionId = input.parentSessionId?.split('::subagent::')[0];
+      if (ownerSessionId) {
+        delegationTraceStore.start(ownerSessionId, {
+          parentToolCallId: input.parentToolCallId, task, profile: input.targetProfile,
+          mode: input.detached ? 'background' : 'wait', executionId: input.executionId,
+          generation: input.taskExecutionGeneration, taskId: input.taskId,
+          childSessionId, invocation: JSON.stringify(capsule), status: 'running', startedAt: nowMs(),
+        });
+        delegationTraceStore.finish(ownerSessionId, input.parentToolCallId,
+          `${childSessionId}\u0000${input.executionId ?? ''}\u0000${input.taskExecutionGeneration ?? ''}`, 'failed', text);
+      }
+      return { text, status: 'failed', subagentId };
     }
     const effectiveProfileIds = effectiveProfiles.filter((entry) => entry.enabled).map((entry) => entry.id);
     const systemPrompt = definition.instructions?.trim() || this.deps.systemPromptForAgent(input.targetProfile);
@@ -239,6 +249,9 @@ export class SubagentRunner {
         taskId: ownedTask.id, completionRequirements: ownedTask.completionRequirements,
         rule: 'Return every completionRequirements string verbatim as a key in turn_complete.result.outputs. Values are complete strings. Runtime persists the result; do not invent its reference.',
       }) : '';
+      if (ownerSessionId) delegationTraceStore.updateTask(ownerSessionId, input.parentToolCallId, traceIdentity,
+        { capsule: frozenCapsule, completionRequirements: ownedTask?.completionRequirements ?? [] },
+        renderDelegationCapsuleInput(frozenCapsule) + taskContract);
       const capsuleSegments = [...compileDelegationCapsule(frozenCapsule), ...rdcDelegation.segments];
       if (rdcDelegation.requiresLease) {
         if (!input.parentSessionId?.trim()) {
@@ -279,6 +292,7 @@ export class SubagentRunner {
           onTerminalContext: (terminal) => { completionDeclaration = terminal.completionDeclaration ?? null; },
           onEvent: (event: SharedAgentEvent) => {
             if (event.type === 'approval.requested' || event.type === 'approval.answered') {
+              if (ownerSessionId) delegationTraceStore.event(ownerSessionId, input.parentToolCallId, traceIdentity, event);
               input.parentOnEvent?.(event);
               return;
             }
@@ -286,6 +300,12 @@ export class SubagentRunner {
               return;
             }
             if (ownerSessionId) delegationTraceStore.event(ownerSessionId, input.parentToolCallId, traceIdentity, event);
+            if (ownerSessionId && event.type === 'tool.completed') {
+              const completed = event.payload as { toolCallId?: string; toolName?: string; result?: unknown };
+              if (completed.toolName === 'subagent' && completed.toolCallId && completed.result !== undefined) {
+                delegationTraceStore.setParentReceipt(ownerSessionId, completed.toolCallId, completed.result);
+              }
+            }
             if (event.type === 'tool.started' || event.type === 'tool.completed' || event.type === 'tool.denied') {
               const toolPayload = event.payload as { toolCallId?: string };
               const toolCallId = typeof toolPayload.toolCallId === 'string' ? toolPayload.toolCallId.trim() : '';

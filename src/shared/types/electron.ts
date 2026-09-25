@@ -196,8 +196,8 @@ export interface ElectronAPI {
       messages: ConversationMessage[];
       branchState?: import('./conversationBranch').ConversationBranchState | null;
     }>;
-    getDelegationTrace: (request: { sessionId: string; parentToolCallId: string; cursor: number; pageSize: number }) => Promise<import('./delegationTrace').DelegationTracePage>;
-    getDelegationReceipt: (request: { sessionId: string; parentToolCallId: string; stepId: string; offset: number }) => Promise<import('./delegationTrace').DelegationReceiptPage>;
+    getDelegationTrace: (request: { sessionId: string; parentToolCallId: string; cursor: number; pageSize: number; sinceRevision?: number }) => Promise<import('./delegationTrace').DelegationTracePage>;
+    getDelegationContent: (request: import('./delegationTrace').DelegationContentRequest) => Promise<import('./delegationTrace').DelegationContentPage>;
     switchBranch: (request: import('./conversationBranch').ConversationSwitchBranchRequest) => Promise<import('./conversationBranch').ConversationSwitchBranchResult>;
     clearHistory: (sessionId: string) => Promise<{
       success: boolean;
@@ -564,7 +564,7 @@ export interface ElectronAPI {
       callback: (summary: SessionScopedPayload<RunContextUsageSummary>) => void
     ) => () => void;
     onTraceProjectionChanged: (callback: (payload: TraceProjectionChangedPayload) => void) => () => void;
-    onDelegationTraceChanged: (callback: (payload: { sessionId: string; parentToolCallId: string }) => void) => () => void;
+    onDelegationTraceChanged: (callback: (payload: { sessionId: string; parentToolCallId: string; revision: number }) => void) => () => void;
     onEffectiveCatalogChanged: (callback: (snapshot: EffectiveCatalogSnapshot) => void) => () => void;
     onAgentMessage: (callback: (msg: unknown) => void) => () => void;
     onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;

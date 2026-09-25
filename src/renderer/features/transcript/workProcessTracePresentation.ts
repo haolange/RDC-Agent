@@ -246,6 +246,7 @@ const createDiagnosticRow = (block: ConversationWorkBlock): WorkProcessRow => ({
   id: block.id,
   status: block.status === 'error' ? 'error' : block.status,
   severity: block.diagnosticSeverity ?? (block.status === 'error' ? 'error' : 'info'),
+  isHookDiagnostic: block.id.startsWith('diagnostic-hook.') || block.id.startsWith('runtime-diagnostic-hook.'),
   message: getMeaningfulBlockSummary(block) || block.title || 'Runtime diagnostic',
   detailLines: [],
   duration: formatDurationMs(block.startedAt, block.completedAt),

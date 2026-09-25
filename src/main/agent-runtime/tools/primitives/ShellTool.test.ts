@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -95,6 +96,18 @@ describe('shellTrailer', () => {
     );
     expect(parsed.trailer?.provider).toBe('Registry');
     expect(parsed.trailer?.provider).not.toBe('FileSystem');
+  });
+
+  it('preserves a complete PowerShell formatting stream', () => {
+    if (process.platform !== 'win32') return;
+    const wrapped = wrapPowerShellCommand("@([pscustomobject]@{Name='alpha';Count=1}, [pscustomobject]@{Name='beta';Count=2}) | Format-Table -AutoSize", 'RDC_FORMAT');
+    const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(wrapped, 'utf16le').toString('base64')], { encoding: 'utf8', timeout: 10000 });
+    expect(result.status).toBe(0);
+    const parsed = parseShellTrailer(result.stdout, 'RDC_FORMAT');
+    expect(parsed.trailer?.exit).toBe(0);
+    expect(parsed.body).toContain('alpha');
+    expect(parsed.body).toContain('beta');
+    expect(parsed.body).not.toContain('out-lineoutput');
   });
 
   it('writes UTF-8 through an independent StreamWriter and keeps 5.1 OEM decode', () => {

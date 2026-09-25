@@ -76,6 +76,7 @@ export function createDraftWorkTrace(summary?: string, blocks: ConversationWorkB
 function cloneToolCall(toolCall: ConversationToolCall): ConversationToolCall {
   return {
     ...toolCall,
+    hookDiagnostics: toolCall.hookDiagnostics?.map((diagnostic) => ({ ...diagnostic })),
     providerOutputRef: toolCall.providerOutputRef ? { ...toolCall.providerOutputRef } : undefined,
     userInputQuestions: toolCall.userInputQuestions?.map((question) => ({
       ...question,
@@ -170,6 +171,7 @@ export function finalizeTrace(
   trace: ConversationWorkTrace | null | undefined,
   status: ConversationWorkTrace['status'],
   summary?: string,
+  terminalAt = nowMs(),
 ): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
   const terminalBlockStatus: ConversationWorkBlock['status'] | null =
@@ -180,7 +182,6 @@ export function finalizeTrace(
         : null;
 
   if (terminalBlockStatus) {
-    const terminalAt = nowMs();
     nextTrace.blocks = nextTrace.blocks.map((block) => {
       const isTaskLifecycleBlock = block.stage === 'task';
       const blockStatus = !isTaskLifecycleBlock && (block.status === 'pending' || block.status === 'running')
@@ -205,7 +206,7 @@ export function finalizeTrace(
           }
           return cloned;
         }
-        const terminalToolStatus: ConversationToolCall['status'] = status === 'complete'
+        const terminalToolStatus: ConversationToolCall['status'] = status === 'complete' && toolCall.status === 'pending'
           ? 'skipped'
           : 'error';
         return {
@@ -231,6 +232,7 @@ export function finalizeTrace(
       return {
         ...block,
         status: blockStatus,
+        ...(block.thinkingStatus ? { thinkingStatus: 'complete' as const } : {}),
         completedAt: blockCompletedAt,
         ...(result ? { result } : {}),
         toolCalls,
@@ -240,7 +242,7 @@ export function finalizeTrace(
 
   nextTrace.status = status;
   nextTrace.summary = summary ?? nextTrace.summary;
-  nextTrace.updatedAt = nowMs();
+  nextTrace.updatedAt = terminalAt;
   return nextTrace;
 }
 
@@ -283,6 +285,9 @@ export function upsertRuntimeToolCall(
       resourceRefs: patch.resourceRefs
         ? patch.resourceRefs.map((resource) => ({ ...resource }))
         : existingToolCall.resourceRefs?.map((resource) => ({ ...resource })),
+      hookDiagnostics: patch.hookDiagnostics
+        ? patch.hookDiagnostics.map((diagnostic) => ({ ...diagnostic }))
+        : existingToolCall.hookDiagnostics?.map((diagnostic) => ({ ...diagnostic })),
       approval: nextApproval,
     };
   } else {
@@ -300,6 +305,7 @@ export function upsertRuntimeToolCall(
       argsPreview: patch.argsPreview,
       resultPreview: patch.resultPreview,
       resourceRefs: patch.resourceRefs?.map((resource) => ({ ...resource })),
+      hookDiagnostics: patch.hookDiagnostics?.map((diagnostic) => ({ ...diagnostic })),
       error: patch.error,
       approval: patch.approval ? { ...patch.approval } : undefined,
       startedAt: patch.startedAt ?? nowMs(),
@@ -319,6 +325,26 @@ export function upsertRuntimeToolCall(
   nextTrace.status = 'running';
   nextTrace.updatedAt = nowMs();
   return nextTrace;
+}
+
+/** Associate a runtime Hook with its exact tool call; never infer ownership from row order. */
+export function attachRuntimeHookDiagnostic(
+  trace: ConversationWorkTrace | null | undefined,
+  toolCallId: string,
+  diagnostic: NonNullable<ConversationToolCall['hookDiagnostics']>[number],
+): ConversationWorkTrace | null {
+  if (!toolCallId) return null;
+  const nextTrace = cloneTrace(trace);
+  for (const block of nextTrace.blocks) {
+    const call = block.toolCalls.find((entry) => entry.id === toolCallId);
+    if (!call) continue;
+    if (!call.hookDiagnostics?.some((entry) => entry.id === diagnostic.id)) {
+      call.hookDiagnostics = [...(call.hookDiagnostics ?? []), { ...diagnostic }];
+      nextTrace.updatedAt = nowMs();
+    }
+    return nextTrace;
+  }
+  return null;
 }
 
 export function supersedePreviousPlanReviews(
@@ -618,6 +644,19 @@ export function sanitizeStoredWorkTrace(
     if (typeof block.id !== 'string' || !block.id.trim()) return null;
     if (!['pending', 'running', 'complete', 'error'].includes(block.status)) return null;
     if (!Array.isArray(block.toolCalls)) return null;
+    for (const call of block.toolCalls) {
+      if (!call || typeof call !== 'object') return null;
+      if (call.hookDiagnostics !== undefined && (
+        !Array.isArray(call.hookDiagnostics)
+        || !call.hookDiagnostics.every((diagnostic) => diagnostic
+          && typeof diagnostic.id === 'string'
+          && typeof diagnostic.code === 'string'
+          && ['info', 'warning', 'error'].includes(diagnostic.severity)
+          && typeof diagnostic.message === 'string'
+          && typeof diagnostic.timestamp === 'number'
+          && Number.isFinite(diagnostic.timestamp))
+      )) return null;
+    }
     if (block.diagnosticSeverity !== undefined) {
       if (block.kind !== 'diagnostic') return null;
       if (!['info', 'warning', 'error'].includes(block.diagnosticSeverity)) return null;

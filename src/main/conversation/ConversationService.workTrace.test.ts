@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  attachRuntimeHookDiagnostic,
   finalizeTrace,
   sanitizeStoredWorkTrace,
   upsertWorkBlock,
@@ -8,6 +9,28 @@ import {
 } from './ConversationWorkTrace';
 
 describe('ConversationService work trace tool approvals', () => {
+  it('associates multiple Hook events by exact tool ID without changing tool status', () => {
+    let trace = upsertRuntimeToolCall(undefined, { id: 'tool-a', toolName: 'shell.command', status: 'complete' });
+    trace = upsertRuntimeToolCall(trace, { id: 'tool-b', toolName: 'shell.command', status: 'complete' });
+    const first = { id: 'event-1', code: 'hook.completed', severity: 'info' as const,
+      message: 'Hook audit: completed', timestamp: 100 };
+    const second = { id: 'event-2', code: 'hook.failed', severity: 'warning' as const,
+      message: 'Hook audit: failed', timestamp: 101 };
+    trace = attachRuntimeHookDiagnostic(trace, 'tool-b', first)!;
+    trace = attachRuntimeHookDiagnostic(trace, 'tool-b', second)!;
+    trace = attachRuntimeHookDiagnostic(trace, 'tool-b', first)!;
+    expect(attachRuntimeHookDiagnostic(trace, 'missing', first)).toBeNull();
+    const calls = trace.blocks.flatMap((block) => block.toolCalls);
+    expect(calls.find((call) => call.id === 'tool-a')?.hookDiagnostics).toBeUndefined();
+    expect(calls.find((call) => call.id === 'tool-b')).toMatchObject({
+      status: 'complete', hookDiagnostics: [first, second],
+    });
+    expect(sanitizeStoredWorkTrace(trace)).not.toBeNull();
+    const invalid = structuredClone(trace);
+    invalid.blocks[0].toolCalls[1].hookDiagnostics![0].timestamp = Number.NaN;
+    expect(sanitizeStoredWorkTrace(invalid)).toBeNull();
+  });
+
   it('preserves diagnostic severity only on diagnostic blocks', () => {
     const diagnosticTrace = {
       status: 'complete' as const,
@@ -292,8 +315,8 @@ describe('ConversationService work trace tool approvals', () => {
     ]);
   });
 
-  it('keeps a live task snapshot in place when later work blocks are inserted', () => {
-    let trace = upsertWorkBlock(undefined, 'task-snapshot-turn-1', {
+  it('keeps each task event in sequence when later work blocks are inserted', () => {
+    let trace = upsertWorkBlock(undefined, 'task-snapshot-created', {
       kind: 'task_snapshot',
       title: '0 of 1 completed',
       stage: 'task',
@@ -311,7 +334,7 @@ describe('ConversationService work trace tool approvals', () => {
       status: 'complete',
       toolCalls: [],
     });
-    trace = upsertWorkBlock(trace, 'task-snapshot-turn-1', {
+    trace = upsertWorkBlock(trace, 'task-snapshot-updated', {
       kind: 'task_snapshot',
       title: '1 of 1 completed',
       stage: 'task',
@@ -324,7 +347,8 @@ describe('ConversationService work trace tool approvals', () => {
       toolCalls: [],
     });
 
-    expect(trace.blocks.map((block) => block.id)).toEqual(['task-snapshot-turn-1', 'loop-shell']);
-    expect(trace.blocks[0]?.taskSnapshot).toMatchObject({ completed: 1, total: 1 });
+    expect(trace.blocks.map((block) => block.id)).toEqual(['task-snapshot-created', 'loop-shell', 'task-snapshot-updated']);
+    expect(trace.blocks[0]?.taskSnapshot).toMatchObject({ completed: 0, total: 1 });
+    expect(trace.blocks[2]?.taskSnapshot).toMatchObject({ completed: 1, total: 1 });
   });
 });

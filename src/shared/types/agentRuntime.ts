@@ -157,6 +157,8 @@ export interface AgentDiagnosticPayload extends AgentEventBasePayload {
   severity: ConversationDiagnosticSeverity;
   message: string;
   technicalMessage?: string;
+  /** Present only when a runtime Hook belongs to a concrete tool call. */
+  toolCallId?: string;
   /** Recovery diagnostics: started while retrying, completed after success. */
   phase?: 'started' | 'completed';
 }

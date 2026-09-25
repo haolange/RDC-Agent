@@ -15,7 +15,7 @@ export function createEventSubscriptionApi(transport: RendererApiTransport): Eve
   return {
     onDelegationTraceChanged: (callback) => (
       transport.subscribe(EVENT.conversation.delegationChanged, (payload) => (
-        callback(payload as { sessionId: string; parentToolCallId: string })
+        callback(payload as { sessionId: string; parentToolCallId: string; revision: number })
       ))
     ),
     onRunStatusChanged: (callback) => (

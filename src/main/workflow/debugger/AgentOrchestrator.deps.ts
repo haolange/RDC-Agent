@@ -43,7 +43,7 @@ export { PromptPlanForTurn } from './PromptPlanForTurn';
 export { RuntimeToolAssembly } from './RuntimeToolAssembly';
 export { ToolExecutorFactory } from './ToolExecutorFactory';
 export { TurnPreparationService } from './TurnPreparationService';
-export { ProfileTurnPreparation } from './ProfileTurnPreparation';
+export { ProfileTurnPreparation, resolveProfileToolAllowlist } from './ProfileTurnPreparation';
 export { resolveExecutionScopeId, createEphemeralScopeId, isTransientExecutionScope } from './executionScope';
 export { OrchestratorMemoryUi } from './OrchestratorMemoryUi';
 export { AgentTurnRunner } from './AgentTurnRunner';

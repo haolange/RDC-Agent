@@ -53,6 +53,7 @@ conversation-edit-preview
 conversation-thread
 empty-workbench-prompt
 empty-workbench-tool-${toolMode}
+getting-started
 handoff-suggestion-row
 knowledge-candidate-${record.cardId}
 knowledge-card-${card.cardId}
@@ -279,6 +280,7 @@ sidebar-scroll
 sidebar-user-menu
 sidebar-user-settings-trigger
 terminal-toggle
+titlebar-getting-started
 titlebar-left-panel-toggle
 titlebar-right-panel-toggle
 work-process
@@ -288,6 +290,8 @@ work-process-image-thumbs
 work-process-plan-review
 work-process-section
 work-process-source-pills
+work-process-subagent
+work-process-subagent-details
 work-process-task-snapshot
 work-process-tool-aggregate
 work-process-tool-approval

@@ -6,6 +6,7 @@ import {
   type TaskMessageKind, type TaskRecord, type TaskRootBudgetRecord, type TaskStatus,
 } from './TaskContracts';
 import { cancelOwnedTaskExecution } from './TaskExecutionOwners';
+import { projectTaskItems, type ProjectedTaskItem } from './taskProjection';
 
 const TASK_RUNTIME_INSTANCE_ID = crypto.randomUUID();
 const CANCELLING_TASK_TREES = new Set<string>();
@@ -27,7 +28,7 @@ export interface TaskRegistryOptions {
 }
 
 export class TaskRegistry {
-  onTaskChange?: (event: { type: 'created' | 'updated'; task: TaskRecord }) => void;
+  onTaskChange?: (event: { type: 'created' | 'updated'; task: TaskRecord; snapshot: ProjectedTaskItem[] }) => void;
   private readonly store: TaskStore; private readonly options: TaskRegistryOptions;
   constructor(storeOrDir: TaskStore | string, options: TaskRegistryOptions = {}) { this.store = typeof storeOrDir === 'string' ? new FileTaskStore(storeOrDir) : storeOrDir; this.options = options; }
 
@@ -60,7 +61,7 @@ export class TaskRegistry {
         }
       }
       await this.store.commit({ tasks: [...changed.values()] });
-      this.onTaskChange?.({ type: 'created', task: prepared.at(-1)! }); return prepared;
+      await this.emitTaskChange('created', prepared.at(-1)!); return prepared;
     });
   }
 
@@ -92,7 +93,7 @@ export class TaskRegistry {
       task.disposition = updates.result?.disposition ?? (next === 'cancelled' ? 'cancelled' : next === 'blocked' ? 'blocked' : task.disposition);
       if (semanticsChanged) task.revision += 1; task.updatedAt = Date.now();
       await this.store.commit({ tasks: [task, ...relatedTasks] });
-      this.onTaskChange?.({ type: 'updated', task }); return task;
+      await this.emitTaskChange('updated', task); return task;
     });
   }
 
@@ -119,7 +120,7 @@ export class TaskRegistry {
       const execution: TaskExecutionRecord = { schemaVersion: TASK_SCHEMA_VERSION, id: this.id('execution', now), taskId, taskRevision: task.revision, generation, runtimeInstanceId: TASK_RUNTIME_INSTANCE_ID, parentExecutionId: options.parentExecutionId, rootBudgetId, mode: options.mode, status: 'running', budget, frozenPlanRef: options.frozenPlanRef, childMessageAckSequence: 0, parentMessageAckSequence: 0, createdAt: now, updatedAt: now };
       task.executionIds = [...task.executionIds, execution.id]; task.currentExecutionId = execution.id; task.status = 'in_progress'; task.statusReason = undefined; task.disposition = undefined; task.updatedAt = now;
       await this.store.commit({ tasks: [task], executions: [execution] });
-      this.onTaskChange?.({ type: 'updated', task }); return execution;
+      await this.emitTaskChange('updated', task); return execution;
     });
   }
 
@@ -146,7 +147,7 @@ export class TaskRegistry {
       task.status = options.result.disposition === 'completed' ? 'completed' : options.result.disposition === 'cancelled' ? 'cancelled' : 'blocked';
       task.disposition = options.result.disposition; task.statusReason = options.result.disposition === 'completed' ? undefined : options.result.summary; task.updatedAt = execution.updatedAt;
       await this.store.commit({ tasks: [task], executions: [execution] });
-      this.onTaskChange?.({ type: 'updated', task }); return execution;
+      await this.emitTaskChange('updated', task); return execution;
     });
   }
 
@@ -238,21 +239,21 @@ export class TaskRegistry {
       if (task.status === 'cancelled') return { task, execution: undefined };
       if (!task.currentExecutionId) {
         task.status = 'cancelled'; task.disposition = 'cancelled'; task.statusReason = reason; task.updatedAt = Date.now();
-        await this.store.saveTask(task); return { task, execution: undefined };
+        await this.store.saveTask(task); await this.emitTaskChange('updated', task); return { task, execution: undefined };
       }
       const execution = await this.requireExecution(task.currentExecutionId);
       if (terminal(execution.status)) {
         task.status = 'cancelled'; task.disposition = 'cancelled'; task.statusReason = reason; task.updatedAt = Date.now();
-        await this.store.saveTask(task); return { task, execution: undefined };
+        await this.store.saveTask(task); await this.emitTaskChange('updated', task); return { task, execution: undefined };
       }
       execution.status = 'cancelling'; execution.updatedAt = Date.now();
       const previousStatusReason = task.statusReason;
       task.statusReason = `Cancellation requested; waiting for execution exit. ${reason}`; task.updatedAt = execution.updatedAt;
       await this.store.commit({ tasks: [task], executions: [execution] });
+      await this.emitTaskChange('updated', task);
       return { task, execution, previousStatusReason };
     });
-    if (!intent.execution) { this.onTaskChange?.({ type: 'updated', task: intent.task }); return intent.task; }
-    this.onTaskChange?.({ type: 'updated', task: intent.task });
+    if (!intent.execution) return intent.task;
     const owned = this.options.onCancelExecution
       ? (await this.options.onCancelExecution(intent.execution), true)
       : await cancelOwnedTaskExecution(intent.execution);
@@ -266,7 +267,7 @@ export class TaskRegistry {
           task.statusReason = intent.previousStatusReason;
           task.updatedAt = execution.updatedAt;
           await this.store.commit({ tasks: [task], executions: [execution] });
-          this.onTaskChange?.({ type: 'updated', task });
+          await this.emitTaskChange('updated', task);
         }
       });
       throw new Error('Managed execution cancellation requires a registered abort-and-join owner.');
@@ -278,7 +279,7 @@ export class TaskRegistry {
       if (execution.status !== 'cancelling') throw new Error('Task execution changed while cancellation was in progress.');
       execution.status = 'cancelled'; execution.result = { disposition: 'cancelled', summary: reason, outputs: {} }; execution.updatedAt = Date.now(); execution.settledAt = execution.updatedAt;
       task.status = 'cancelled'; task.disposition = 'cancelled'; task.statusReason = reason; task.updatedAt = execution.updatedAt;
-      await this.store.commit({ tasks: [task], executions: [execution] }); this.onTaskChange?.({ type: 'updated', task }); return task;
+      await this.store.commit({ tasks: [task], executions: [execution] }); await this.emitTaskChange('updated', task); return task;
     });
   }
   async getExecution(id: string): Promise<TaskExecutionRecord | null> { return this.store.loadExecution(id); }
@@ -305,6 +306,10 @@ export class TaskRegistry {
   async listExecutions(taskId?: string): Promise<TaskExecutionRecord[]> { return this.store.listExecutions(taskId); }
   async getTask(id: string): Promise<TaskRecord | null> { return this.store.loadTask(id); }
   async listTasks(): Promise<TaskRecord[]> { return this.store.listTasks(); }
+  private async emitTaskChange(type: 'created' | 'updated', task: TaskRecord): Promise<void> {
+    if (!this.onTaskChange) return;
+    this.onTaskChange({ type, task, snapshot: projectTaskItems(await this.store.listTasks()) });
+  }
   async readConsistentSnapshot(): Promise<{ tasks: TaskRecord[]; executions: TaskExecutionRecord[] }> { return this.store.withLock('state', async () => ({ tasks: await this.store.listTasks(), executions: await this.store.listExecutions() })); }
   async deleteTask(id: string): Promise<void> { await this.store.withLock('state', async () => { const task = await this.requireTask(id); if (task.executionIds.length) throw new Error('Executed tasks retain their durable results and cannot be deleted.'); const related = (await this.store.listTasks()).filter((candidate) => candidate.id !== id && (candidate.blockedBy.includes(id) || candidate.blocks.includes(id) || candidate.parentTaskId === id)); if (related.some((candidate) => candidate.parentTaskId === id)) throw new Error('Cannot delete a task while child tasks still exist.'); for (const candidate of related) { if (candidate.currentExecutionId) { const active = await this.store.loadExecution(candidate.currentExecutionId); if (active && !terminal(active.status)) throw new Error(`Cannot revise graph for active task: ${candidate.id}`); } candidate.blockedBy = candidate.blockedBy.filter((entry) => entry !== id); candidate.blocks = candidate.blocks.filter((entry) => entry !== id); candidate.revision += 1; candidate.updatedAt = Date.now(); } await this.store.commit({ tasks: related, deletedTaskIds: [id] }); }); }
   async canStart(id: string): Promise<boolean> {

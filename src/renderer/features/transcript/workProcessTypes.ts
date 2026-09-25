@@ -154,6 +154,7 @@ export type WorkProcessRow =
     pathChip?: string;
     /** Human-readable one-line diagnostic for failed tools (never the raw JSON envelope). */
     diagnosticCaption?: string;
+    hookDiagnostics?: import('@shared/types/conversation').ConversationToolCall['hookDiagnostics'];
     approval?: WorkProcessToolApproval;
     sourcePills?: Array<{ domain: string; url?: string; title?: string }>;
     /** Single-page chip for web_fetch (distinct from search source pills). */
@@ -172,6 +173,7 @@ export type WorkProcessRow =
     type: 'taskSnapshot';
     id: string;
     status: WorkProcessRowStatus;
+    change?: 'created' | 'updated';
     completed: number;
     total: number;
     items: import('@shared/types/conversation').ConversationTaskSnapshotItem[];
@@ -219,6 +221,7 @@ export type WorkProcessRow =
     id: string;
     status: WorkProcessRowStatus;
     severity: ConversationDiagnosticSeverity;
+    isHookDiagnostic?: boolean;
     message: string;
     detailLines: string[];
     duration: string;

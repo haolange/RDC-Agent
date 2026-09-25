@@ -74,6 +74,8 @@ export interface EffectiveRuntimePlan {
    * Executor / tool_search must keep denying those ids even if a wildcard remains.
    */
   excludeRdcLeaseTools: boolean;
+  /** Frozen depth admission for creating a new child; existing Task management remains available. */
+  excludeSubagent: boolean;
   /** Frozen Delegation Capsule when this plan was prepared for a subagent child. */
   delegationCapsule: DelegationCapsule | null;
   /** Frozen at plan build; Prompt 与 Executor 共用。 */
@@ -115,6 +117,7 @@ export interface BuildEffectiveRuntimePlanInput {
   attachmentManifestFingerprint?: string | null;
   /** When true, strip rdc_context / rdc_probe from frozen allowlists. */
   excludeRdcLeaseTools?: boolean;
+  excludeSubagent?: boolean;
   /** Structured clone stored on the child plan after capsule freeze. */
   delegationCapsule?: DelegationCapsule | null;
 }
@@ -187,25 +190,29 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
   const enabledProfileIds = freezeStringList(input.enabledProfileIds);
   const profileDelegates = freezeStringList(input.profileDelegates ?? input.profile?.agents ?? []);
   const excludeRdcLeaseTools = input.excludeRdcLeaseTools === true;
+  const excludeSubagent = input.excludeSubagent === true;
+  const withoutSubagent = (values: readonly string[]): string[] => excludeSubagent
+    ? values.filter((name) => name.trim().toLowerCase() !== 'subagent')
+    : [...values];
   const applyMissionFilter = (values: readonly string[]): readonly string[] => (
     isMissionProfileId(input.agentId) ? filterMissionPlanOnlyAllowlist(values) : [...values]
   );
   const rawAllowlist = excludeRdcLeaseTools
     ? stripRdcLeaseToolsFromAllowlist(input.toolAllowlist)
     : input.toolAllowlist;
-  const toolAllowlist = freezeStringList(applyMissionFilter(rawAllowlist));
+  const toolAllowlist = freezeStringList(withoutSubagent(applyMissionFilter(rawAllowlist)));
   const skillIntersection = input.skillIntersection === undefined || input.skillIntersection === null
     ? null
-    : freezeStringList(applyMissionFilter(
+    : freezeStringList(withoutSubagent(applyMissionFilter(
       excludeRdcLeaseTools
         ? stripRdcLeaseToolsFromAllowlist(input.skillIntersection)
         : input.skillIntersection,
-    ));
-  const visibleToolNames = freezeStringList(applyMissionFilter(
-    excludeRdcLeaseTools
-      ? stripRdcLeaseToolsFromAllowlist(input.visibleToolNames ?? [])
-      : input.visibleToolNames ?? [],
-  ));
+    )));
+  const visibleToolNames = freezeStringList(withoutSubagent(applyMissionFilter(
+      excludeRdcLeaseTools
+        ? stripRdcLeaseToolsFromAllowlist(input.visibleToolNames ?? [])
+        : input.visibleToolNames ?? [],
+  )));
   const delegationCapsule = input.delegationCapsule
     ? freezeDelegationCapsule(structuredClone(input.delegationCapsule))
     : null;
@@ -245,6 +252,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     attachmentManifestFingerprint,
     input.rdcBindingFingerprint ?? null,
     excludeRdcLeaseTools,
+    excludeSubagent,
     delegationCapsule,
   ]);
   return {
@@ -275,6 +283,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     promptPlanFingerprint,
     attachmentManifestFingerprint,
     excludeRdcLeaseTools,
+    excludeSubagent,
     delegationCapsule,
     rdcBindingFingerprint: input.rdcBindingFingerprint,
     createdAt: Date.now(),
@@ -292,6 +301,7 @@ export function activeToolNamesForPlan(
       if (plan.excludeRdcLeaseTools && isRdcLeaseToolName(name)) {
         return false;
       }
+      if (plan.excludeSubagent && name.trim().toLowerCase() === 'subagent') return false;
       return allow.size === 0 || allow.has(name.trim().toLowerCase());
     });
 }

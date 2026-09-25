@@ -1,9 +1,8 @@
 import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
-import { createTaskTools, TaskRegistry, MemoryTaskStore, createSessionTaskStore, projectTaskItems, getDelegatedTaskScope } from '../../agent-runtime/tasks';
+import { createTaskTools, TaskRegistry, MemoryTaskStore, createSessionTaskStore, getDelegatedTaskScope } from '../../agent-runtime/tasks';
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import type { TurnHandle } from './TurnCoordinator';
-import { notifyBackgroundExecutionMessage } from './BackgroundSubagentService';
 import { sessionArtifactResolver } from '../../sessions/SessionArtifactResolver';
 import { bindTaskRootBudget } from './TaskRootBudget';
 
@@ -30,20 +29,17 @@ export function createTaskRuntimeTools(input: {
       }
     },
   });
-  registry.onTaskChange = ({ type, task }) => {
+  registry.onTaskChange = ({ type, task, snapshot }) => {
     if (resolvedSessionId && !isSubagent) traceProjectionRefreshService.schedule(resolvedSessionId);
     const sink = input.turnHandle?.eventSink ?? input.getActiveTurn(resolvedSessionId)?.eventSink;
     if (!sink?.onEvent || (input.turnHandle && !input.turnHandle.isLive(input.turnHandle.generation))) return;
-    void registry.listTasks().then((tasks) => {
-      if (input.turnHandle && !input.turnHandle.isLive(input.turnHandle.generation)) return;
-      sink.onEvent?.({
-        id: generateEventId('agent-event'),
-        type: type === 'created' ? 'task.created' : 'task.updated',
-        timestamp: nowMs(),
-        sessionId: sink.sessionId ?? null,
-        agentId: sink.agentId,
-        payload: { taskId: task.id, title: task.subject, status: task.status, statusReason: task.statusReason, snapshot: projectTaskItems(tasks) },
-      });
+    sink.onEvent({
+      id: generateEventId('agent-event'),
+      type: type === 'created' ? 'task.created' : 'task.updated',
+      timestamp: nowMs(),
+      sessionId: sink.sessionId ?? null,
+      agentId: sink.agentId,
+      payload: { taskId: task.id, title: task.subject, status: task.status, statusReason: task.statusReason, snapshot },
     });
   };
   const recovery = registry.reconcileInterruptedExecutions();
@@ -91,7 +87,6 @@ export function createTaskRuntimeTools(input: {
         const body = String(args.body ?? '').trim();
         if (!['progress', 'blocked', 'decision_required'].includes(kind) || !body || body.length > 8_000) throw new Error('SUBAGENT_REPORT_INVALID');
         const message = await registry.appendExecutionMessage(delegatedScope.executionId!, { expectedGeneration: delegatedScope.generation!, kind: kind as 'progress' | 'blocked' | 'decision_required', direction: 'to_parent', body });
-        notifyBackgroundExecutionMessage(delegatedScope.executionId!, kind as 'progress' | 'blocked' | 'decision_required');
         return { content: [{ type: 'text', text: `Report queued: ${message.id}` }], details: { messageId: message.id, sequence: message.sequence } };
       },
     });

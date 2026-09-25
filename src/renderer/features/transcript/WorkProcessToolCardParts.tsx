@@ -42,7 +42,9 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   if (isDedicatedFamily(row.family)) return <FamilyLayerBody row={row} />;
 
   const bodyText = resolveBodyText(row);
-  const sampleLines = resolveCollapsedSampleLines(row);
+  const samples = resolveCollapsedSampleLines(row);
+  // Collapse only an exact duplicate. Distinct output and the full raw receipt remain available.
+  const sampleLines = samples.join('\n') === bodyText ? [] : samples;
   if (!bodyText && sampleLines.length === 0 && !row.sourcePills?.length && !row.pageChip && !row.imagePreviews?.length) {
     return null;
   }

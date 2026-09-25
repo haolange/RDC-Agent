@@ -102,6 +102,7 @@ export const createToolRowForPresentation = (call: ConversationToolCall): WorkPr
     pathChip: unwrapped.pathChip,
     chips: unwrapped.chips,
     diagnosticCaption,
+    hookDiagnostics: call.hookDiagnostics,
     approval,
     imagePreviews: call.imagePreviews,
     ...webPresentation,
@@ -213,7 +214,7 @@ const deriveToolStatus = (call: ConversationToolCall, parsedResult: unknown): Wo
   return call.status;
 };
 
-const getToolVerb = (
+export const getToolVerb = (
   toolName: string,
   status: WorkProcessRowStatus,
   resultPreview?: string,

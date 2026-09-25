@@ -17,8 +17,24 @@ import {
   resolveEffectiveModel,
 } from '../../settings/EffectiveModelResolver';
 import { settingsService } from '../../settings/SettingsService';
+import { compileEffectivePolicy } from '../../agent-runtime/permissions/PolicyCompiler';
+import { stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
 import type { TurnPreparationService } from './TurnPreparationService';
-import type { PreparedAgentTurnContext } from './orchestratorTypes';
+import type { AgentProfileTurnOptions, PreparedAgentTurnContext } from './orchestratorTypes';
+import { newDelegationBudgetExhausted } from './DelegationAdmission';
+
+export function resolveProfileToolAllowlist(
+  allowlist: string[],
+  options?: AgentProfileTurnOptions,
+  prepared?: PreparedAgentTurnContext | null,
+): string[] {
+  const leaseFiltered = options?.excludeRdcLeaseTools ? stripRdcLeaseToolsFromAllowlist(allowlist) : allowlist;
+  const maxDepth = Math.min(prepared?.runtime.effectivePlan.policy.maxChildDepth
+    ?? compileEffectivePolicy(options?.projectRootPath ?? null).maxChildDepth, options?.policyBudget?.maxChildDepth ?? Infinity);
+  return (options?.subagentBudget?.depth ?? options?.policyBudget?.childDepth ?? 0) >= maxDepth
+    || newDelegationBudgetExhausted(options?.policyBudget, options?.subagentBudget)
+    ? leaseFiltered.filter((name) => name.trim().toLowerCase() !== 'subagent') : leaseFiltered;
+}
 
 export interface ProfileTurnPreparationInput {
   agentId: AgentRole;
@@ -45,6 +61,9 @@ export interface ProfileTurnPreparationInput {
   isolateContext?: boolean;
   excludeRdcLeaseTools?: boolean;
   frozenDelegationCapsule?: import('@shared/types/delegationCapsule').DelegationCapsule;
+  subagentDepth?: number;
+  inheritedMaxChildDepth?: number;
+  excludeSubagent?: boolean;
 }
 
 export class ProfileTurnPreparation {
@@ -123,6 +142,9 @@ export class ProfileTurnPreparation {
       signal: input.signal,
       excludeRdcLeaseTools: input.excludeRdcLeaseTools,
       frozenDelegationCapsule: input.frozenDelegationCapsule,
+      subagentDepth: input.subagentDepth,
+      inheritedMaxChildDepth: input.inheritedMaxChildDepth,
+      excludeSubagent: input.excludeSubagent,
     });
     return {
       prepared,

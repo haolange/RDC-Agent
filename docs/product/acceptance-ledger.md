@@ -754,3 +754,143 @@ Execution tracking remains in RDC-Tool docs/tool-convergence-tasks.md (T1–T8).
 - **适用源码**：`497581931a2d44de226214088e595a867a812cb6` 上的本轮工作区修改。委派卡收起时用首个动作短句作标题，展开后仅展示实际可见步骤；无步骤省去空过程。卡内「调用与回执」按标识、调用、工具回执分项展开。用量三栏以总量、已节省、推理量为主数值；弹层宽度不超过 `38rem` 时单列，避免 Cache 明细在窄卡内断行。
 - **隔离 Browser 观察**：复制历史会话到本轮隔离 userData，以两条合成委派 trace 检查单卡折叠、无步骤与单步展开、工具详情和第二层调用参数。1280px 宽窗口且双侧栏打开时，卡片仍显示任务、执行者、状态与耗时。实际有数据的用量在宽窗口为三张等宽卡，在 840px 请求视口下变成纵向卡片；Escape 关闭弹层后焦点回到用量按钮。这是 UI/IPC 与布局观察，合成 trace 不代表本轮真实模型再次执行。
 - **验证边界**：受影响单测、typecheck、lint、Working / session projection / design token / renderer structure / contracts 门禁、`check:gates` 与 build 通过。默认并行度的全量 coverage 曾受 Windows 测试临时目录 `EPERM` 和跨域测试超时影响；在正常用户权限下限制为 2 个 worker 后，完整 coverage 为 3167 passed、4 skipped、0 failed，行覆盖率 75.44%、分支 62.52%、函数 77.03%。隔离副本的 OAuth secrets 无法由 Windows safeStorage 解密，本轮没有新模型请求，真实模型路径沿用上一节已记录的验收而不冒充新的通过。
+
+## 2026-09-25 子代理工作卡、共享过程与委派权限收敛
+
+- **适用源码**：`main` 基线 `96cbe633806afab3cc7cb6abb098559b63cee381` 加本轮未提交修改。父工具调用仍为单张委派卡锚点；四区默认收起，委派任务与最终回复从原文首段预览并按需读取完整正文。子过程使用主 Working Process 的内容组件与可见 `ConversationWorkBlock` 语义，子工具回执留在对应工具步骤，调用详情只承载本次调用参数、父回执与身份。后台状态独立于父回复，重启后未结束记录标为中断。默认子代理深度为 1，显式策略可设 0 或更深，合并显式限制后再补默认值；准备阶段和执行入口使用同一深度约束。
+- **工程验证**：最终独立串行 coverage 为 475 文件、3175 项通过，4 文件 / 4 项按原配置跳过，0 失败；lines 75.49%、functions 77.13%、branches 62.49%、statements 73.08%，coverage ratchet 通过。受影响单测、typecheck、lint、contracts 248 项、prompt snapshot、`check:gates`、build 与 `git diff --check` 通过。沙箱中的知识契约曾因 Windows TEMP 写入权限失败；并发运行 coverage 与门禁时两项子进程检查超时，单项及最终独立串行全套复跑通过，未改动测试或门槛。
+- **隔离应用观察**：在受限 userData 副本中打开真实应用与 `D:\Projects\agentTest\rdc`。用明确的合成委派记录观察完成、运行后重启中断、失败三种状态：每次委派只有一张卡，四区开合、主子同型工具行、逐项调用详情、81,009 字符 final 全文、40 步首批与补齐到 132 步、420px 视口无横向溢出均可见；列表窗口化重挂载后外卡与四区开合状态保持，后续补充了单个步骤开合的重挂载回归。五次长记录开合/分页交互中，原生 Event Timing 只捕获 2 次，其余 3 次按探针规则补值；报告 p95 16ms，Long Task 0 次。此前同一场景曾观察到 52ms 长任务，调整实测高度窗口化阈值后消失。合成轨迹只证明 UI、读取与渲染路径，不代表真实模型行为。
+- **TODO(UNVERIFIED)**：隔离副本的 OAuth secrets 在 Windows safeStorage 返回 `0x8009000B`，首选 SuperGrok OAuth · Grok 4.7 · low 的真实请求未取得 provider 响应；同源凭据无法解密，因此未把 ChatGPT OAuth 或 DeepSeek 切换尝试冒充通过。真实同步/后台/嵌套/取消/失败委派和有数据 usage 的本轮模型验收仍未通过；合成与单测证据分别记录，不能替代这些现场路径。历史 2026-09-24 的 Grok 真实委派观察不记作本轮改动的回归通过。
+- **现场收尾**：测试会话只存在于本轮隔离副本；产品删除对话框提示不可撤销，未在浏览器中确认删除。关闭 QA 标签和本轮 launcher 后，核对隔离目录无链接、无活动执行，再整体移除该副本及其中测试会话、OAuth 副本和日志；未触碰 canonical userData 或真实项目文件。仓库测试临时根与构建日志已清理，canonical instance.lock 不存在，5127 无本轮监听，桌面启动权已交还。
+
+
+## 2026-09-25 子代理卡片视觉与执行终态修正
+
+- **适用源码**：`main` 基线 `96cbe633806afab3cc7cb6abb098559b63cee381` 加本轮未提交修改，承接上一节收敛。一次委派使用一个可操作的双行卡头；四区正文同一左边界，展开隐藏预览，Agent 身份沿用现有 glyph。任务来自冻结 capsule 的结构化正文，完整发送文本与参数/父回执分别按需读取；删除 Renderer 的英文 prompt 前缀解析。最终回复保留原始 Markdown，空 final 不生成可展开入口。
+- **状态与 Shell 回归**：主子过程使用共享终态收束，刷新流式缓冲后保存步骤再发布终态。完成、失败、取消和重启恢复的回归断言检查内部 thinking、工具状态及固定 completedAt，迟到事件不能重新激活。PowerShell 5 与 7 均复现原逐对象 `Out-String` 破坏 `Format-Table` 输出的 `Out-LineOutput` 错误；改为整体 `Out-String -Stream` 后同一只读命令成功，补有真实 PowerShell 子进程回归。
+- **工程验证**：独立限为 2 workers 的完整 coverage：476 文件、3186 项通过，4 文件 / 4 项按既有配置跳过，0 失败；lines 75.51%、functions 77.14%、branches 62.54%、statements 73.10%，coverage ratchet 通过。最终增补空 final、重启内部状态和无效模型失败记录后，DelegationTraceStore 8 项及 SubagentRunner 17 项均通过。typecheck、lint、contracts 248 项、PromptPlan snapshot 6 项、完整 `check:gates`（含 Working Process、session projection、design tokens、renderer structure）与 build 通过。初次并发门禁/coverage 遇到 Windows 子进程超时；独立复跑通过，未放宽断言或门槛。
+- **真实模型与视觉**：自行复制本机 userData/必要资源到受限隔离目录，通过正式一次性 Browser QA 入口打开真实工程。使用 SuperGrok OAuth · `grok-account:grok-4.7` · low 完成新的同步只读委派，子执行 19.7s；实际 `Get-ChildItem -Force | Select-Object Mode, Name | Format-Table -AutoSize` 成功，仅观察根目录直接子项，未访问 capture、未修改工程。主子过程、四区、工具参数/回执、最终 Markdown、调用详情、键盘 Space/焦点及窄屏逐项点击检查；运行结束和应用重启后无伪运行状态。有数据 usage 保持三栏主次层级，窄屏纵向堆叠、真实零值显示 0、Escape 返回入口焦点。请求 420px 视口时实际 CSS viewport 为 382px，document.scrollWidth 同为 382，无横向溢出。首次测试输入把模型分隔符误写为斜线而被拒绝，不计作成功模型运行；修正为冒号后完成上述验收。以正常用户身份启动隔离副本后 OAuth 可解密，上一节凭据阻塞在此已解除。
+- **性能证据**：真实记录 60s 交互窗口共 11 次，原生 Event Timing 捕获 5 次，现有探针对另外 6 次按 16ms 阈值补值；报告 p95/max 24ms，Long Task 0。另在同一隔离读取链明确标记 132 步确定性 fixture，验证 40 步分页、加载更早、实测高度窗口化与单工具开合记忆；8 次交互中原生捕获 4 次、补值 4 次，报告 p95/max 16ms，Long Task 0。此为采样观察，不把阈值补值当作逐次实测；合成记录不代表真实模型执行 132 步。无新 renderer demo 或 E2E 门禁。
+- **收尾**：本轮仅新建隔离会话 `sess_4d623c1ab623`，通过应用删除入口删除并核对磁盘目录消失。合成长记录原始副本已恢复后随测试会话清理；隔离 userData/授权副本、自有 launcher 与子进程均清理，未写入工程测试资产。最终 canonical instance.lock 不存在、5127 无监听，桌面启动权已交还。仅保留最小本地验收截图与结果摘要；当前分支未提交、未推送。
+
+## 2026-09-25 子代理卡片视觉层级复核
+
+- **适用源码**：`96cbe633806afab3cc7cb6abb098559b63cee381` 加当前工作区修改。本次增量仅调整子代理卡片视觉层级：身份为主、任务预览为常规次级文字，折叠行减轻字重与尺寸，移除逐行分隔线和高对比悬停底色，仅调用详情保留分组分隔，键盘焦点框保留。设计系统规则同步更新。
+- **真实应用观察**：将用户截图对应的既有会话复制到受限隔离 userData，在正式 Browser QA 入口检查同内容卡片。1280px 宽屏检查收起、四区展开、最终 Markdown 与悬停；Space 展开和焦点框可见。420px 视口下 document.scrollWidth 为 420，无横向溢出。本轮未发送模型请求，属于真实历史记录视觉复验，不计作新模型执行或新的性能测量。
+- **工程验证与收尾**：design tokens、renderer structure、Working Process、typecheck、lint 与 build 通过。关闭验收页面，停止本轮 launcher 及其子进程，核对无链接边界后清理隔离授权/会话副本；原始会话仍存在，canonical instance.lock 不存在，5127 无监听，桌面启动权已交还。保留最小本地截图，未提交或推送。
+## 2026-09-25 子代理统一工具卡布局与正文分组
+
+- **适用源码**：`96cbe633806afab3cc7cb6abb098559b63cee381` 加本轮未提交修改。本条替代此前视觉复核中的“仅调用详情分界”呈现规则。普通工具、任务快照和子代理使用共享 `WorkCardHeader`；四区及次级条目使用 `WorkDisclosure`。任务正文保留原文，事实与引用、执行约束默认折叠；主子过程继续使用同一 `WorkProcessContent`。本轮未变更公共 IPC 或存储契约。
+- **工程验证**：全量 coverage 为 476 文件 / 3187 项通过，4 文件 / 4 项按原配置跳过，0 失败；新增卡头与正文分组的 3 项测试另行通过，最终 transcript 回归共 16 文件 / 65 项通过。coverage ratchet 为 lines 75.52%、functions 77.14%、branches 62.56%、statements 73.11%。typecheck、lint、contracts 248 项、专项检查、完整 `check:gates` 与 build 通过，未放宽门槛。
+- **真实视觉与模型**：复制用户截图对应会话和必要本机资源至受限隔离目录，通过正式 Browser QA 入口检查同内容布局、任务分组、共享过程、工具详情、最终 Markdown、调用详情、Enter/Space 与焦点。另新建测试会话，以 SuperGrok OAuth · `grok-account:grok-4.7` · low 完成同步只读委派，子执行 19.3s；根目录 `glob README*` 零命中，未写工程文件、未打开 capture。终态内部没有运行中的思考或等待工具。模型在输出要求字段实际返回了字面 Unicode 转义序列，界面按原文保留，未擅自解码或改写。
+- **响应式与性能**：1280px 请求视口下用量保持三栏；420px 请求视口下实际 CSS viewport 与 document.scrollWidth 同为 382px，用量纵向堆叠，Escape 返回入口焦点。真实交互观察 9 次，原生 Event Timing 捕获 4 次、另外 5 次由既有探针按 16ms 阈值补值，报告 p95/max 16ms，Long Task 0。单独的 132 步确定性记录验证分页、全部历史可达和滚动窗口化；5 次交互中原生捕获 3 次、补值 2 次，报告 p95/max 16ms，Long Task 0。两者分别记录，不将补值称为逐次实测，也不将合成长记录称为模型执行。
+- **清理**：恢复合成记录前的测试 trace 后，经应用删除本轮会话 `sess_69b911f5a792`，磁盘目录已消失；原始用户会话保留。隔离授权/资源副本与自有 launcher/子进程已清理，canonical instance.lock 不存在，QA 端口无监听，桌面启动权已交还。保留最小截图和验证摘要，未提交、未推送。
+
+## 2026-09-25 子代理次级披露、过程间距与后台回复收束
+
+- **适用源码与修复**：基于 `96cbe633806afab3cc7cb6abb098559b63cee381` 的当前未提交工作区。任务内次级披露取消整行悬停底色，标题和箭头收为内容宽度，保留圆角键盘焦点；删除子代理容器对共享步骤列表顶部间距的覆盖，窗口化占位行继续保留 section 间距。后台子代理进度与收束只更新 Task mailbox 和委派投影；删除完成事件自动触发父 Agent 空 user turn 的协调器与调用链。
+- **历史问题证据**：在隔离副本中只读打开用户截图对应会话 `sess_540e8eda63fb`，可见一条真实用户提问之后多出空 user turn、`耗时 6.3s` 的第二条 assistant 回复。旧记录按既定边界不改写；本轮修复针对之后的运行。
+- **工程验证**：受影响测试 33 项、contracts 248 项、typecheck、lint、Working Process 与工具覆盖、design tokens、renderer structure、session projection、`check:gates` 和 build 通过。全量 coverage 重跑为 475 文件 / 3185 项通过，4 文件 / 4 项按既有配置跳过，0 失败；ratchet 为 lines 75.47%、functions 77.12%、branches 62.55%、statements 73.06%。首次 2-worker coverage 中仅 `systemDebtRatchet` 的外部子检查失败；该子检查独立通过，整个测试文件 15 项独立通过，随后 1-worker 全量 coverage 通过，未改断言或门槛。
+- **真实视觉**：正式一次性 Browser QA 入口打开隔离的历史记录。宽屏检查次级行的细分组线、透明静止态及主子 thinking 到工具卡的节奏；420px 请求视口下实际 CSS 宽度与 `document.scrollWidth` 均为 382px，无横向溢出。Space 可展开「事实与引用」，焦点框贴合文字入口，未出现整行灰色矩形；主子过程仍共用 `WorkProcessContent`。
+- **真实模型边界**：按授权复制 userData、加密 OAuth 文件和必要用户资源，先因原工程的 `project.yaml` 写入被沙箱拒绝而将测试工程轻量元数据复制到受限隔离目录；自动审批明确拒绝放开对原工程的写入，未绕过。隔离工程选择 SuperGrok OAuth · `grok-4.7` · Low 后，应用报告 `grok-account` provider 不可用，隔离实例还记录 safeStorage 解密失败；模型目录未提供指定的 GPT-6-luna 或 DeepSeek 4.1 Flash 备用项。因此没有新的成功模型运行，确定性回归和历史视觉复验不冒充此项通过。
+- **清理**：本轮只在隔离副本新建 `sess_73c8b6db6ea7`；关闭 QA 后连同整个隔离 userData、轻量工程副本、日志和覆盖率临时目录清除，原用户会话及原工程保留。清理前核对绝对路径均在本仓库、无 reparse point，清理后复查目标目录均不存在；canonical `instance.lock` 不存在，5127 无监听，桌面启动权已交还。本轮未提交、未推送。
+
+## 2026-09-25 子代理四区内容层级与共享过程视觉收敛
+
+- **适用源码**：`96cbe633806afab3cc7cb6abb098559b63cee381` 加当前未提交工作区。四区及次级披露统一透明全宽入口、右端箭头与圆角键盘焦点；任务主要章节和 final 复用单一 `WorkDocumentSurface`，事实/约束留在表面下方。调用详情使用共享原始记录样式和页面滚动。未修改 IPC、存储 schema、权限或后台生命周期。
+- **共享过程修正**：父工具列表原有后代选择器会隐藏子过程时间线并覆盖其间距，已改为直属步骤边界；无叙述的 turn 不增加叙述间距，真实 thinking/commentary 到工具沿用共享间距。普通诊断使用紧凑次级样式，完全相同的摘要/输出仅在默认展示中保留一次，完整原始回执不变。
+- **工程验证**：受影响测试 39 项；全量 coverage 475 文件 / 3186 项通过，4 文件 / 4 项按既有配置跳过，0 失败。ratchet 为 lines 75.47%、functions 77.12%、branches 62.55%、statements 73.06%。typecheck、lint、contracts 248 项、Working Process/工具覆盖、design tokens、renderer structure、session projection、check:gates、build 与 diff 检查通过；最终章节选择器收窄后重跑呈现/token 检查与正式 launcher build 通过。
+- **真实视觉证据**：正式一次性 Browser QA 入口读取用户截图对应会话 `sess_fb842166ac49` 的隔离副本，逐项展开任务、工作过程、final、调用参数，检查主子时间线与去重回执。任务与 final 为一个正文表面，次级箭头固定右侧；Enter/Space 可开合，焦点保持透明背景与 4px 圆角。窄屏按复制外观缩放校准后 `innerWidth` 与 `scrollWidth` 均为 420 CSS px；用量面板保持 Tokens/Cache/Reasoning 主次层级，窄屏纵排。最小真实截图保存在 `.local/subagent-card/panels-task.png`、`panels-process.png`、`panels-final-details.png`，未用生成图或 renderer demo 替代。
+- **性能与长记录**：真实历史交互观察窗 120 秒，5 次交互，原生捕获 2 次、阈值补值 3 次，报告 p95/max 24ms，Long Task 0。另在隔离副本追加带明确 QA 标记的确定性步骤，共 137 步；首次读取最近 40 步，经三次分页可达全部历史，窗口化时观察到 18 张工具卡挂载。独立 120 秒窗为 5 次交互、原生捕获 3 次、补值 2 次，报告 p95/max 16ms，Long Task 0。补值不作为逐次实测，合成记录不代表真实模型执行；本轮未取得新的流式模型性能证据。
+- **真实模型阻塞**：新建隔离会话 `sess_f8b1fdabd747`，通过 UI 选择 Super Grok Account / `grok-4.7` / Low 并发出只读委派请求。请求在原工程 `project.yaml` 预检写入遇到沙箱 EPERM 后回退，未进入模型执行；复制的 OAuth 同时出现 safeStorage 解密失败，目录未提供指定的 GPT-6-luna/DeepSeek 4.1 Flash 备用项。没有扩大原工程写入权限，历史视觉复验及确定性记录不冒充新模型验收。
+- **清理**：经应用删除新测试会话时，原工程 `replay.lock` 写入被 EPERM 拒绝；退出本轮自有 launcher/子进程后，将该会话连同本轮隔离 userData、授权/用户资源副本、确定性样本、日志和 coverage 临时输出全部清理。删除前核对仓库内绝对路径、无 Git 跟踪文件、无 reparse point及无自有活进程，删除后目录均不存在；原始用户会话保留。canonical instance.lock 不存在，桌面启动权已交还。当前分支和原有改动保留，未提交、未推送。
+
+## 2026-09-25 子代理工作卡与上下文用量收敛
+
+- **适用源码**：基线 `96cbe633806afab3cc7cb6abb098559b63cee381` 加当前未提交工作区。卡片展开后直接按冻结 capsule 字段展示任务，不重复委派任务折叠或正文底壳；完整发送载荷仍在调用详情。运行中的卡片首次展开自动打开工作过程，手动状态随后保持；已结束卡片首次展开时各区收起。子过程沿用 `WorkProcessContent` 和同一行渲染器的紧凑密度，`background_wait` 为可展开的轻量事件；普通主工具卡保持原密度。后台执行头部记录真实 Task Execution 状态并校验身份，运行点阵仅表达非确定进度；用量预计数值保持 `~`，未知为 `—`、实际零值为 `0`。
+- **工程验证**：受影响组件、存储与服务测试通过；全量 coverage 为 475 文件 / 3189 项通过、4 文件 / 4 项按原配置跳过，ratchet 为 statements 73.09%、branches 62.61%、functions 77.12%、lines 75.5%。typecheck、lint、contracts 248 项、Working Process／工具覆盖、design tokens、renderer structure、session projection、coverage ratchet、`check:gates` 和 build 通过。默认系统 TEMP 下 knowledge 测试因沙箱 `EPERM realpath C:\Users\Vip` 失败；将 TEMP/TMP 指向本仓库隔离临时目录后，受影响测试及完整门禁通过，未更改产品逻辑或门槛。
+- **真实应用历史视觉**：使用复制的 userData 和用户资源，经正式一次性 Browser QA 入口只读打开历史会话 `sess_fb842166ac49`，查看同一次委派的单卡、任务直读、事实／约束分组、紧凑工具与错误、final Markdown、调用详情、后台等待行和用量三栏。420 CSS px 视口中三栏纵向堆叠、无横向溢出；已完成卡片点阵静止。该证据证明历史记录呈现，不证明新模型执行、运行态动画或长记录流式性能。
+- **性能观察**：历史 5 步卡片的 30 秒窗口有 3 次交互，其中原生 Event Timing 捕获 2 次、1 次由探针按 16ms 阈值补值，报告 p95 16ms；Long Task 为 0。补值不作为逐次实测，且 5 步样本不构成长记录验收。长记录与真实流式更新性能仍未取得本轮现场数据。
+- **真实模型阻塞**：在隔离副本中新建 `sess_463cfb3aa5b1`，打开真实工程 `D:\Projects\agentTest\rdc`，通过 UI 选择 SuperGrok OAuth · Grok 4.7 · Low；发送前应用报告 `grok-account` provider 不可用。隔离复制的 OAuth 密文仍出现 Windows safeStorage 解密失败；模型目录没有提供已授权备用 `gpt-6-luna` 或 DeepSeek 4.1 Flash。因此本轮没有新的同步／后台模型执行、运行态截图或流式性能通过声明，也未改用其他模型。测试会话已通过应用删除，历史会话保留。
+- **清理与交还**：关闭本轮 Browser tab 并恢复视口；本轮 launcher 已停止、其锁记录中的 PID 已退出，QA 端口无监听。删除前核对 `qa-20260925`、`test-temp`、完整测试日志和本轮生成的 `coverage` 均位于仓库内、无 reparse point 和 Git 跟踪文件；删除后隔离授权副本及本轮临时目录均不存在。canonical `instance.lock` 不存在，桌面启动权已交还。保留当前分支和已有未提交改动，未提交、未推送。
+
+## 2026-09-25 子代理单一任务呈现与共享工具行密度
+
+- **适用源码**：基线 `96cbe633806afab3cc7cb6abb098559b63cee381` 加当前未提交工作区。折叠卡仅挂载单行任务预览，展开后卸载预览并按冻结 capsule 挂载唯一任务正文；原始发送载荷仍由调用详情按需提供。卡头状态、耗时与两行点阵使用同一右侧轨道。事实与引用、执行约束仅在任务内作为次级分组；主子工具使用同一 `ToolRow` 语义结构，紧凑密度由样式承担，未新增子过程数据投影或修改公共 IPC／存储。
+- **确定性验证**：单卡折叠、展开、加载、读取失败时任务文本各只可见一份；主子密度下工具详情、原始回执、诊断、错误保持同一组件树，后台等待沿共享行呈现。完整 `test` 为 476 文件／3192 项通过、4 文件／4 项按原配置跳过；`test:coverage` 与 ratchet 通过，statements 73.09%、branches 62.61%、functions 77.12%、lines 75.50%。typecheck、lint、contracts 248 项、Working Process／工具覆盖、design tokens、renderer structure、session projection、`check:gates` 与 build 通过，未降低门槛。首次 `check:gates` 使用默认系统 TEMP 时仅 knowledge 临时目录受沙箱拒绝；将 TEMP／TMP 指向仓库受限临时目录后全套通过，未修改产品逻辑或断言。
+- **真实应用视觉**：正式一次性 Browser QA 入口读取隔离副本中的历史会话 `sess_fb842166ac49`，未改写原会话。1280 CSS px、左右边栏收起时，展开卡宽 916px，右侧状态轨道和点阵均为 144px；展开后预览 DOM 缺席，任务正文一份。420 CSS px 时点阵与轨道均为 96px，document.scrollWidth 为 420px；次级任务分组在正文内部，子过程工具为无内层卡壳的共享行。Enter 收起、Space 展开后焦点仍在卡头。真实截图：`.local/subagent-card/single-path-wide.png`、`.local/subagent-card/single-path-420.png`。
+- **性能与模型边界**：历史卡只有 5 个可见步骤，本轮没有新的长记录或流式现场。CDP 原生 Event Timing 与 Long Task 读取均为 0 样本，因此不计算 p95，也不以阈值补值冒充实测。隔离环境的 OAuth 密文仍出现 safeStorage 解密失败，原测试工程 `project.yaml` 的预检写入仍遭 `EPERM`；本轮没有新模型执行或新测试会话，已有确定性与历史视觉证据不替代新模型验收。
+- **清理**：关闭本轮 Browser tab 并恢复默认视口，停止自有 launcher；canonical `instance.lock` 不存在，5127 端口无监听。核对绝对路径在仓库拥有的 `.local/subagent-card/qa-current` 内、无 reparse point 和跟踪文件后删除本轮隔离 userData／授权副本；原会话及工程文件保留。桌面启动权已交还。当前 `main` 与此前未提交改动保留，未提交、未推送。
+
+## 2026-09-25 子代理点阵位置与卡头高度修正
+
+- **适用源码**：基线 `96cbe633806afab3cc7cb6abb098559b63cee381` 加当前未提交工作区。本轮将点阵从卡头状态下方移到分隔线下的渐隐任务预览右侧；外卡展开时预览卸载，点阵进入任务正文开头。普通工具与子代理共用的卡头恢复单行高度，状态、耗时、箭头仍保持原一行；没有改动委派数据、IPC 或执行状态。
+- **确定性验证**：`WorkCardPresentation.test.ts` 和 `SubagentRow.presentation.test.ts` 共 8 项通过，断言折叠点阵属于预览行、展开点阵属于任务开头、卡头无点阵且任务文本只出现一次。typecheck、lint、design tokens、renderer structure、Working Process 及工具覆盖检查通过；本轮 launcher 从当前源码构建成功，`git diff --check` 无内容错误。此为局部 Renderer 呈现修正，未将此前全量测试结果冒充本轮重跑。
+- **真实应用视觉**：经正式一次性 Browser QA 入口使用隔离副本只读打开历史会话 `sess_fb842166ac49`。1280 CSS px 时，卡头高 36.17px，折叠预览行高 35.5px；点阵在卡头分隔线下、任务预览文字之后，宽 144px。展开后预览 DOM 缺席，任务原文只出现一次，点阵仍在分隔线下的正文首段旁。420 CSS px 时点阵宽 96px、状态到箭头约 91.1px，`document.scrollWidth = 420px`。截图：`.local/subagent-card/dots-collapsed-20260925.png`（SHA256 `f8eb73b62aa723b57f9771442dbd1d87273caa4a01f8dc563656a3a90918d81b`）与 `.local/subagent-card/dots-expanded-20260925.png`（SHA256 `187bdf3a5f9919a6b0fc23d93d92aa97c33146022cd8633952938a016412af14`）。
+- **边界与清理**：本轮没有新模型调用或长记录性能采样；隔离 app 的项目元数据刷新尝试写入原测试工程 `project.yaml` 时遭 `EPERM`，未改变该文件。关闭 Browser 标签及自有 launcher 后，PID 56188 已退出，5127 端口无监听；核对隔离路径位于本仓库、无 reparse point 和 Git 跟踪文件后删除本轮 `qa-current` userData／用户资源副本。canonical `instance.lock` 不存在，桌面启动权已交还。历史用户会话与原测试工程保持完整，未提交或推送。
+
+## 2026-09-25 子代理点阵展开态与列宽纠偏
+
+- **适用源码与更正**：基线 `96cbe633806afab3cc7cb6abb098559b63cee381` 加当前未提交工作区。上条记录的“展开后点阵进入任务正文”及 144px／96px 固定宽度是本轮已纠正的错误状态，不再代表当前实现。当前点阵仅随折叠预览挂载；展开时预览与点阵同时卸载。卡头元信息和预览点阵通过同一 CSS subgrid 右列排版，列宽随真实状态、耗时、箭头内容决定。
+- **确定性验证**：`WorkCardPresentation.test.ts`、`SubagentRow.presentation.test.ts` 共 8 项通过；展开卡的点阵为零，任务正文只保留一份。typecheck、lint、design tokens、renderer structure、Working Process 与工具覆盖检查通过；隔离 Browser QA launcher 从本轮源码完成构建。此为局部 Renderer 呈现修正，未将先前全量测试当成本轮重跑。
+- **真实应用验收**：通过正式一次性 `/qa?qaBootstrap=...` 入口读取隔离副本中的历史会话 `sess_fb842166ac49`。同一视口两张折叠卡中，卡头状态列与点阵列的 `x`、`right`、`width` 完全相同；实测右列宽 `91.104px`，两行右边界均为 `929.354px`。展开第二张卡后，预览节点 `0`、点阵节点 `0`，第一张折叠卡仍保留点阵。420 CSS px 视口中元信息与点阵的左右坐标同为 `282.229px`／`373.333px`，宽均为 `91.104px`，`document.documentElement.scrollWidth = 420px`。真实页面截图已在本轮内置浏览器验收中观察；未产生新模型运行证据。
+- **边界与清理**：隔离启动时原测试工程 `project.yaml` 的后台元数据写入仍遭 `EPERM`，本轮没有修改该文件。浏览器视口覆盖已恢复，测试标签关闭，launcher／自有主进程退出。删除前确认本轮 `qa-alignment-20260925` 绝对路径位于仓库拥有的 `.local/subagent-card` 内、无 reparse point 和 Git 跟踪文件，删除后确认隔离副本不存在、5127 端口无监听、canonical `instance.lock` 不存在。桌面启动权已交还；未提交或推送。
+
+## 2026-09-25 子代理二级披露卡
+
+- **适用源码与范围**：基线 `96cbe633806afab3cc7cb6abb098559b63cee381` 加当前未提交工作区。任务正文下的「事实与引用」「执行约束」各用一张 `WorkDisclosure` 二级卡；「调用详情」中的调用参数、父工具回执、实际发送内容、执行标识各用同一二级卡变体。每卡独立边框、圆角、卡头和展开分隔线，正文只挂载在所属卡内。不可用回执仍有明确状态，但没有空展开按钮。子过程内部的工具回执保留独立的轻量 `inline` 变体，避免再套卡；未改 IPC、存储或执行路径。
+- **确定性验证**：`WorkCardPresentation.test.ts`、`SubagentSecondaryCards.test.ts`、`SubagentRow.presentation.test.ts` 共 10 项通过；覆盖两张任务卡独立开合、零预算、四张调用记录卡按需读取、不可用回执和原始内容不套第三层卡。typecheck、lint、design tokens、renderer structure、Working Process／工具覆盖专项检查通过。`check:gates` 在将 TEMP／TMP 指向仓库受限临时目录后通过；默认系统 TEMP 首次运行的 knowledge 临时目录 `EPERM` 属于沙箱路径问题，未改产品断言。隔离 launcher 从当前源码完成 build；`git diff --check` 无内容错误。
+- **真实应用视觉**：正式一次性 Browser QA 入口读取隔离副本的历史会话 `sess_fb842166ac49`。宽屏中，两张任务附属卡与四张调用详情卡均为独立边界和固定右端箭头；调用参数展开后原始 JSON 直接处于该卡内容区，没有第三层卡壳。420 CSS px 视口下，`document.documentElement.scrollWidth = 420px`；六张二级卡的 `clientWidth` 与 `scrollWidth` 各自相同，展开参数为 `pre-wrap` 且无横向溢出。键盘 Enter 展开「执行约束」、Space 收起，焦点轮廓可见；父工具回执「此记录不可用」不能展开。真实页面截图在本轮内置浏览器验收输出中观察，未将旧截图或生成图当作当前视觉证据。
+- **清理与边界**：本轮仅复验历史记录，没有新模型执行。隔离应用读取时仍遇到原测试工程 `project.yaml` 的后台写入 `EPERM`，未修改原工程。恢复浏览器默认视口并关闭临时标签；自有 launcher 和 Electron 退出，QA 与 canonical `instance.lock` 均不存在，5127 端口无监听。确认 `.local/subagent-secondary-qa` 位于本仓库、无 reparse point 和 Git 跟踪文件后删除，复查路径不存在；桌面启动权已交还。保留当前分支和既有未提交改动，未提交或推送。
+
+## 2026-09-25 子代理窄卡点阵间距
+
+- **适用源码**：基线 `96cbe633806afab3cc7cb6abb098559b63cee381` 加当前未提交工作区。仅调整子代理折叠卡的窄容器点阵：不宽于 34rem 时显示 6 列 × 2 行、12 点，行距改为设计 token `--space-2`；宽卡仍显示 12 列 × 2 行、24 点。点阵继续与卡头状态列使用同一右侧 subgrid 轨道，只在折叠预览中挂载；活动循环、终态静止及 reduced motion 规则未改。
+- **工程验证**：`SubagentRow.presentation.test.ts` 与 `WorkCardPresentation.test.ts` 共 8 项通过；typecheck、lint、design tokens、Working Process 及工具覆盖专项检查通过。首次定向 Vitest 在沙箱映射 cwd 下报模块路径无法解析，使用显式仓库 `--root` 后测试通过，未修改断言或产品代码来绕过。隔离 Browser QA launcher 从当前源码 build 成功。
+- **真实视觉**：通过正式一次性 Browser QA 入口读取隔离副本的历史会话 `sess_fb842166ac49`。双侧栏打开的紧凑卡与 420 CSS px 视口中，两张折叠卡均实测为 6 列、12 个可见点、`row-gap: 8px`；点阵与状态列的左右坐标一致，右列宽 `91.104px`。420px 下 `document.documentElement.scrollWidth = 420px`，任务预览仍可读；宽卡保留 12 列、24 个可见点，`row-gap: 2px`，状态列与点阵仍对齐。截图在本轮内置浏览器验收输出中观察；历史完成态只证明静止外观，未将其冒充新的运行态模型实测。
+- **清理**：恢复默认浏览器视口并关闭临时标签；本轮 launcher 结束，QA 锁中的 PID 61748 已退出。确认 `.local/subagent-dots-qa` 位于本仓库、无 reparse point 和 Git 跟踪文件后删除，复查路径不存在。canonical 启动锁不存在、5127 端口无监听，桌面启动权已交还。原工程元数据后台刷新仍报告 `project.yaml` 的 `EPERM`，本轮未修改原工程。当前分支及已有未提交改动保留，未提交或推送。
+
+## 2026-09-25 子代理工作过程与主时间线视觉收敛
+
+- **适用源码与修复**：基线 `96cbe633806afab3cc7cb6abb098559b63cee381` 加当前未提交工作区。子过程继续经同一个 `WorkProcessContent`、`WorkProcessRow` 与 `ToolRow` 呈现；compact 普通工具保留主过程的边框、圆角、卡头分隔和正文边界，仅以设计 token 收紧内边距。`background_wait` 在共享工具树中保留轻量运行时事件外观与详情。信息级 Hook 诊断仍处于原事件位置、降为次级文字；任一前置事件或实测高度窗口化占位行后的 turn 都使用共享 turn 留白。删除窗口化占位行的旧专用间距标记，未添加子代理专用摘要或虚构 commentary。
+- **确定性验证**：同一事件序列的 normal/compact 呈现测试核对工具卡、诊断、thinking、文字顺序及无 commentary；同一错误工具在两种密度下的详情、原始回执和诊断相同。完整 coverage 单 worker 为 477 文件／3195 项通过，4 文件／4 项按既有配置跳过；lines 75.50%、functions 77.12%、branches 62.61%、statements 73.09%，ratchet 通过。并发 coverage 首次仅 system debt 自测触及其固定 20 秒超时，单 worker 重跑全绿；Shell 子进程测试在沙箱中约需 7 秒，命令行使用 15 秒 Vitest 超时，未改产品断言或门槛。typecheck、lint、contracts 248 项、Working Process／工具覆盖、design tokens、renderer structure、完整 `check:gates` 和生产 build 通过。
+- **真实应用视觉**：复制截图对应的既有会话 `sess_fb842166ac49`、项目索引与外观设置至仓库内隔离 userData，经正式一次性 Browser QA 入口只读打开。宽屏和 420 CSS px 截图在本轮 Browser QA 交互记录中可见：子过程的 glob、shell、turn_complete 均有卡头、分隔线和卡内短回执，Hook 信息行与下一轮「已思考 · 204ms」保持真实顺序及不同层级。420px 下 `document.documentElement.scrollWidth = innerWidth = 420`；普通 compact 工具实测边框约 0.67px、圆角 6px；glob 参数和原始回执在同一工具内展开，Space 收起后 `:focus-visible` 为实线焦点框。此为历史记录视觉复验，没有新模型运行或长记录性能实测；原工程 `project.yaml` 元数据刷新仍遭沙箱 `EPERM`，未修改原工程。
+- **清理**：重置浏览器视口、关闭本轮标签并停止自有 launcher；确认 canonical `instance.lock` 不存在、5127 无监听。核对绝对路径位于本仓库 `.local/work-process-qa`、非 reparse point、无 Git 跟踪文件后删除隔离 userData 与外观副本；测试临时目录在验证结束后清理。原用户会话、工程文件和既有未提交工作保留，未创建分支、提交或推送；桌面启动权已交还。
+
+## 2026-09-25 Hook 诊断归属与子过程收尾留白
+
+- **适用源码**：基线 `96cbe633806afab3cc7cb6abb098559b63cee381` 加当前未提交工作区。运行时 Hook 诊断保留真实 `toolCallId`，主、子过程使用同一个工作记录关联函数按工具调用 ID 归属，并按事件 ID 保序去重；正常完成只在工具展开详情中显示，警告及错误另在收起工具卡中提示，不修改工具执行状态。无有效关联的生命周期诊断和不带 ID 的旧记录仍位于原事件位置，不猜测归属。子代理工作过程披露正文顶部沿用 `--space-3`（12px），底部使用 `--space-4`（16px），未给末事件另加 margin。
+- **确定性验证**：并行工具、多次 Hook、重复事件、完成／警告／错误、无关联 Hook、父子投影、旧记录读取及工具卡折叠详情的定向测试 4 文件／40 项通过。完整 coverage 为 477 文件／3199 项通过，既有配置跳过 4 文件／4 项；statements 73.12%、branches 62.67%、functions 77.13%、lines 75.53%，ratchet 通过。typecheck、lint、Working Process／工具覆盖、design tokens、renderer structure、session projection、contracts、`check:gates` 和 build 通过。补充存储校验防御性修正后，定向 40 项复跑通过。
+- **真实应用视觉**：经正式一次性 Browser QA 入口打开仓库内隔离 userData 中的截图对应历史会话 `sess_fb842166ac49`。内置浏览器本轮截图显示，子代理工作过程首项沿用紧凑工具卡结构，末张 `turn_complete` 卡与下一分区之间恢复留白；截图在本轮工具输出中可复查。该历史 Hook 不含工具关联 ID，仍显示为独立诊断，符合不迁移旧记录的边界；新归属及警告提示由确定性测试验证，未冒充新模型实测。隔离应用启动时原测试工程 `project.yaml` 后台刷新报沙箱 `EPERM`，未修改原工程。
+- **清理与交还**：关闭本轮内置浏览器标签、停止自有 launcher；确认隔离锁中 PID 已退出，核验目标位于本仓库 `.local`、无 reparse point 和 Git 跟踪文件后删除隔离 userData、启动日志与测试临时目录。复查 QA 路径不存在、canonical `instance.lock` 不存在、5127 端口无监听，桌面启动权已交还。保留用户会话、当前分支和既有未提交改动；未提交或推送。
+
+## 2026-09-26 历史 Hook 诊断的可见层级纠正
+
+- **问题与修正**：上一轮只处理带真实 `toolCallId` 的新 Hook 归属，却把截图对应的旧记录 `diagnostic-hook.completed` 留成一行裸文本，视觉验收结论过早。该记录没有工具调用标识；主子过程现在由同一诊断行组件将其呈现为紧凑的可展开诊断卡。信息级完成事件默认只露出「Hook 诊断」卡头，展开可读原始 `Hook rdc-shell-audit: completed`；警告和错误保留收起态提示。原事件位置、原文与工具真实状态不变，也不按相邻工具猜测归属。
+- **历史视觉复验**：仅复制截图对应会话及必要项目索引到仓库内隔离 userData，经正式一次性 Browser QA 入口打开。内置浏览器截图确认命令工具与下一轮「已思考」之间不再有裸 Hook 文本；诊断卡独立可折叠，展开后原文可读。此为旧记录的视觉验收，不代表已运行新模型或验证历史 Hook 与命令的真实归属。
+- **工程验证**：定向 3 文件／45 项测试通过；完整 coverage 为 477 文件／3200 项通过，既有配置跳过 4 文件／4 项，statements 73.13%、branches 62.67%、functions 77.13%、lines 75.55%，ratchet 通过。typecheck、lint、Working Process／工具覆盖、design tokens、renderer structure、完整 `check:gates` 和生产 build 通过。
+- **清理与边界**：关闭本轮浏览器标签与自有 launcher，确认 canonical `instance.lock` 不存在且 QA 端口 5127 无监听；核实绝对路径、Git 跟踪及 reparse 边界后删除 `.local/hook-ux-qa` 与 `.local/hook-ux-temp`，复查目标不存在。历史记录没有关联标识，故本轮不迁移、不改写、不声称归属命令工具；未执行新模型验收。保留当前分支与既有未提交改动，未提交或推送；桌面启动权已交还。
+
+## 2026-09-26 独立 Hook 卡边界间距复验
+
+- **问题**：上一轮只确认裸文本消失，没有评分独立诊断卡与前一工具的可见间距。截图对应的 shell 工具恰好结束嵌套步骤列表，组尾规则清零下间距，Hook 卡的上边框因此紧贴 shell 卡的下边框。
+- **修正与视觉循环**：在共享工作时间线中给非首项的独立 Hook 诊断卡设置 `--space-3` 入场间距，不修改事件内容、顺序或工具归属。先用用户截图评估边界分离、相邻卡节奏与 turn 层级，再在隔离真实应用中查看收起、展开和 420 CSS px。DOM 几何实测 shell → Hook 可见边框为 12px，收起及展开一致；420px 下两卡同宽约 289.7px，`scrollWidth = innerWidth = 420`。Hook →「已思考」保持较大的共享 turn 留白；真实截图在本轮 Browser QA 工具输出中可复查。
+- **验证与清理**：受影响的 `WorkCardPresentation` 10 项、typecheck、lint、Working Process、设计 token、完整 `check:gates` 与 build 通过；前一轮同一代码链的完整 coverage 为 477 文件／3200 项通过，本轮仅改变诊断行 class 与间距规则，未重跑全量 coverage。关闭 Browser QA 标签并停止自有 launcher，确认隔离锁 owner PID 46964 已退出、canonical 锁不存在、5127 无监听；核对绝对路径、Git 跟踪及 reparse 边界后删除本轮隔离 userData、日志与测试临时目录，桌面启动权已交还。
+
+## 2026-09-26 Task 逐次历史卡与逐项状态
+
+- **适用源码与行为**：基线 `96cbe633806afab3cc7cb6abb098559b63cee381` 加当前未提交工作区。Task 创建及更新在提交时捕获完整有序列表和逐项状态，主回合的每个真实事件以事件 ID 留一张不可后写覆盖的 `task_snapshot` 卡；批量创建只记一张，Task 工具普通回执仍不重复。父回复结束后的后台变更不续写父时间线。旧卡缺少变更种类时用中性标题。右栏继续读取会话 Task store 的最新状态，序号外观不变。
+- **组件呈现**：卡头显示「添加待办／已更新待办」及当刻完成数，去掉没有执行意义的 `0ms`；卡内复用 Task 状态映射的图形变体，完成项降对比，当前项保留权重，受阻原因跟随条目。最新历史卡默认展开、先前卡默认收起，手动选择跨重挂载保持；右栏任务定位可展开并聚焦对应任务。主子过程仍共用原工作记录结构。
+- **确定性验证**：批量创建、连续及并发更新、事件重放、五种任务状态、阻塞原因、历史中性标题、手动开合与窗口化定位等定向测试通过。全量 `test` 为 479 文件／3206 项通过、既有配置跳过 4 文件／4 项；`test:coverage` 在 4 workers、30 秒单测超时下为同样结果，ratchet 为 lines 75.60%、functions 77.21%、branches 62.76%、statements 73.19%。typecheck、lint、Working Process／工具覆盖、design tokens、renderer structure、session projection、contracts 248 项、`check:gates`、build 与 `git diff --check` 均通过；未降低覆盖率或门禁。
+- **真实应用视觉**：正式一次性 Browser QA 入口打开复制的历史会话 `sess_fb842166ac49`。仅在隔离副本的 conversation 记录中，将原单卡标成「添加待办」并插入一张明确的视觉样本「已更新待办」；这两张卡的画面是布局样本，不冒充两次真实模型事件。宽屏可见旧卡收起、新卡展开、两项完成状态、无 `0ms`；点击右栏最新任务后焦点落到新卡所属条目。420 CSS px 下 `document.documentElement.scrollWidth = 420`，两卡宽约 338px、各自 `scrollWidth = 337px`，展开旧卡可读两项待办，未见横向溢出。真实原 Task store 的两项完成状态在隔离工程根路径修正后由右栏读取；工程根仅指向本轮临时目录，原工程未被修改。截图可在本轮内置 Browser QA 输出复查；本轮没有发起新模型执行。
+- **清理与交还**：恢复浏览器默认视口、关闭本轮标签并停止自有 launcher。核对 `.local/task-history-qa`、`.local/task-history-temp` 和本轮 `coverage` 均位于仓库内、无 reparse point 和 Git 跟踪文件后删除，复查均不存在；canonical `instance.lock` 不存在、5127 无监听，桌面启动权已交还。历史原件、用户会话、当前分支及原有未提交改动保留；未提交或推送。
+
+## 2026-09-26 当前改动的架构审查与等效整理
+
+- **范围与基线**：在当前 `main` 的既有未提交树上审查全部已修改、新增和删除文件，未创建分支或覆盖原改动。整理前定向 6 文件／27 项、typecheck、renderer structure 和 build 通过；以隔离历史会话 `sess_fb842166ac49` 经正式一次性 Browser QA 入口截取宽屏与 420 CSS px 的主子工作过程、Task 卡及子代理折叠/展开状态。保留相同会话、主题、字号和视口作整理后对照。
+- **架构核对**：Task 变更在提交锁内捕获当刻完整列表，经真实事件 ID 持久化为父工作记录；右栏继续读最新 `taskProjection`。父工具调用与子增量记录以 session、parent tool call、child session、execution ID、generation 和 revision 关联；Hook 仅凭真实 `toolCallId` 归属，缺失关联的旧诊断保留原位。主子过程继续共用 `WorkProcessContent`、`ToolRow` 和事件行；后台等待保留自身事件语义，父回复结束后的后台变化不自动产生新父回复。用量三栏的现有数据源和投影未改动。
+- **已处置发现（P3，重复实现）**：委派正文与子过程投影的两份等价纯文本脱敏合并为 `safeDelegationText`；去掉子代理 final 预览中的相同条件分支；将右栏与窗口化工作记录间的任务定位事件名称及载荷收为 renderer 内部有类型契约；工具行中的 `background_wait` 判定仅明确命名。CSS 逐项核对引用与实际截图，没有可证明无效的规则，未删除规则或调整 token、卡片刻度。公共 IPC、存储格式和历史记录未变。
+- **未混入等效整理的发现（P2）**：`useDelegationTrace` 的步骤页若与刚读到的头部身份不一致会提前返回而未清除 loading，可能使展开区持续显示加载；`DelegationTaskDocument` 仅检查 JSON 解析成功及 capsule 存在，形状错误的同版本任务体可能在读取数组或预算字段时抛出渲染异常。两项均需决定明确的失败态和补充测试，改变当前可见行为，故本轮只记录，不伪称已修复。
+- **工程验证**：整理后同一组定向测试仍为 27 项通过；完整 `test` 与 `test:coverage` 均为 479 文件／3206 项通过、既有配置跳过 4 文件／4 项。覆盖率 statements 73.19%、branches 62.76%、functions 77.21%、lines 75.60%，ratchet 通过。typecheck、lint、Working Process／工具覆盖、design tokens、renderer structure、session projection、right rail、contracts 248 项、完整 `check:gates`、build 与 `git diff --check` 通过。第一次全量测试在默认系统 TEMP 下因沙箱 `EPERM realpath C:\Users\Vip` 失败；仅把 TEMP/TMP 指向本轮仓库内隔离目录后复跑通过，未改变测试或产品代码以绕开断言。
+- **真实应用对照**：同一隔离历史记录整理前后截图与可访问内容显示相同的事件顺序及文字：两张子代理卡、历史 Task 卡、子过程中的 glob、shell、无关联旧 Hook、真实 thinking 和 turn complete；任务正文展开后只出现一次。整理后验证右栏点击任务能定位并聚焦历史卡、final Markdown 与调用详情可展开，父回执不可用仍有明确状态。420 CSS px 下 `innerWidth = scrollWidth = 420`，两张子代理卡的 `clientWidth = scrollWidth = 337`，未见横向溢出。此为历史记录视觉与交互抽样对照，不代表像素级全局等同、新模型执行或长记录原生性能实测；分页、窗口化、重挂载与开合记忆由完整确定性测试覆盖。
+- **清理与边界**：本轮未发起新模型执行；既有 provider 可用性问题不由这些整理结果证明已解除。仅保留审查结果、测试及真实应用对照的最小证据，不改用户原会话、权限或子代理生命周期。浏览器标签与自有 launcher 已关闭；核对绝对路径、Git 跟踪和 reparse 边界后删除 `.local/architecture-review-20260926` 与本轮生成的 `coverage`。canonical 桌面启动锁及 QA 端口复查结果见本轮收尾，桌面启动权已交还；未提交或推送。

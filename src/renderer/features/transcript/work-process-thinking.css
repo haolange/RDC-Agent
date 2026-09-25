@@ -29,12 +29,12 @@
   padding-left: calc(var(--space-2) + var(--space-1));
 }
 
-.work-process-step.kind-section .work-process-step-content {
+.work-process-step.kind-section > .work-process-step-content {
   /* No flex gap: thinking↔prose and →tools use explicit margins so entrance is exactly space-3. */
   gap: 0;
 }
 
-.work-process-step.kind-section .work-process-thinking-state + .work-process-prose {
+.work-process-step.kind-section > .work-process-step-content > .work-process-thinking-state + .work-process-prose {
   margin-top: var(--space-2);
 }
 

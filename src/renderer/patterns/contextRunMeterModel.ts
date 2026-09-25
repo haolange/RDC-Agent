@@ -4,6 +4,7 @@ import { formatTokenCount } from '@shared/utils/tokens';
 const unavailable = '—';
 const tokens = (value: number | undefined): string => typeof value === 'number' ? formatTokenCount(value) : unavailable;
 const percent = (value: number | undefined): string => typeof value === 'number' ? `${value}%` : unavailable;
+const estimatedValue = (value: string, estimated: boolean): string => estimated && value !== unavailable ? `~${value}` : value;
 
 export interface ContextMeterCardModel {
   id: 'tokens' | 'cache' | 'reasoning';
@@ -15,6 +16,7 @@ export interface ContextMeterCardModel {
 export function buildContextRunMeterModel(
   usage: RunContextUsageSummary | null,
   prepared: PreparedTurnContextSummary | null,
+  estimated = false,
 ): ContextMeterCardModel[] {
   const current = prepared !== null;
   const actual = current ? null : usage;
@@ -29,21 +31,21 @@ export function buildContextRunMeterModel(
   return [
     {
       id: 'tokens', primaryLabel: 'total',
-      primaryValue: current ? preparedValue : tokens(actual?.totalTokens),
+      primaryValue: current ? preparedValue : estimatedValue(tokens(actual?.totalTokens), estimated),
       details: [
-        { label: 'input', value: current ? preparedValue : tokens(actual?.inputTokens) },
-        { label: 'output', value: current ? unavailable : tokens(actual?.outputTokens) },
+        { label: 'input', value: current ? preparedValue : estimatedValue(tokens(actual?.inputTokens), estimated) },
+        { label: 'output', value: current ? unavailable : estimatedValue(tokens(actual?.outputTokens), estimated) },
       ],
     },
     {
-      id: 'cache', primaryLabel: 'saved', primaryValue: tokens(saved),
+      id: 'cache', primaryLabel: 'saved', primaryValue: estimatedValue(tokens(saved), estimated),
       details: [
-        { label: 'latest', value: percent(actual?.lastTurnCacheHitRate) },
-        { label: 'cumulative', value: percent(actual?.cumulativeCacheHitRate) },
-        { label: 'hitMiss', value: hasCache ? `${tokens(actual?.cacheHitTokens)} / ${tokens(actual?.cacheMissTokens)}` : unavailable },
+        { label: 'latest', value: estimatedValue(percent(actual?.lastTurnCacheHitRate), estimated) },
+        { label: 'cumulative', value: estimatedValue(percent(actual?.cumulativeCacheHitRate), estimated) },
+        { label: 'hitMiss', value: hasCache ? `${estimatedValue(tokens(actual?.cacheHitTokens), estimated)} / ${estimatedValue(tokens(actual?.cacheMissTokens), estimated)}` : unavailable },
       ],
     },
-    { id: 'reasoning', primaryLabel: 'reasoning', primaryValue: tokens(actual?.reasoningTokens),
-      details: [{ label: 'reasoningShare', value: reasoningShare }] },
+    { id: 'reasoning', primaryLabel: 'reasoning', primaryValue: estimatedValue(tokens(actual?.reasoningTokens), estimated),
+      details: [{ label: 'reasoningShare', value: estimatedValue(reasoningShare, estimated) }] },
   ];
 }

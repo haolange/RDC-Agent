@@ -17,7 +17,9 @@ const {
 }));
 
 vi.mock('electron', () => ({
+  app: { getPath: () => process.env.TEMP ?? '.' },
   ipcMain: { handle },
+  BrowserWindow: { getAllWindows: () => [] },
 }));
 
 vi.mock('../conversation/ToolImagePreviewStore', () => ({

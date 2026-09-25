@@ -1,4 +1,5 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useId } from 'react';
+import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { useI18n } from '../../i18n';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { getRowStatusLabel } from './workProcessStatus';
@@ -8,6 +9,8 @@ import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { isActiveWorkProcessStatus } from './workProcessActiveSignal';
 import { ToolRow } from './WorkProcessRowParts';
 import { PlanCard } from './PlanCard';
+import { WorkCardHeader } from './WorkCardHeader';
+import { WorkProcessIcon } from './WorkProcessIcons';
 
 export { ToolRow };
 
@@ -37,7 +40,37 @@ export const SummaryRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'summar
   );
 };
 
-export const DiagnosticRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'diagnostic' }> }> = ({ row }) => (
+const HookDiagnosticCard: React.FC<{
+  row: Extract<WorkProcessRow, { type: 'diagnostic' }>;
+  density: 'normal' | 'compact';
+}> = ({ row, density }) => {
+  const { t } = useI18n();
+  const [expanded, toggle] = useScopedWorkDisclosure(`hook-diagnostic-${row.id}`, false);
+  return <li className={`work-process-step is-appear kind-diagnostic is-orphan-hook-row status-${row.status}`} data-testid="work-process-hook-diagnostic-card">
+    <WorkProcessRailIcon variant="step" status={row.status} />
+    <div className="work-process-step-content">
+      <div className={`work-process-tool-card is-orphan-hook severity-${row.severity}${density === 'compact' ? ' is-compact' : ''}${expanded ? ' is-expanded' : ''}`}>
+        <WorkCardHeader icon={<WorkProcessIcon icon="plug" className="work-process-tool-card-icon" />}
+          title={t('chat.workProcessHookDiagnostics')}
+          status={row.severity === 'error' ? t('chat.workProcessStatusError')
+            : row.severity === 'warning' ? t('chat.workProcessHookWarning') : null}
+          expanded={expanded} onClick={toggle}
+          preview={!expanded && row.severity !== 'info' ? row.message : undefined} />
+        {expanded ? <div className="work-process-tool-card-expand">
+          <p className="work-process-orphan-hook-message">{row.message}</p>
+          {row.detailLines.length ? <pre className="work-process-row-pre">{row.detailLines.join('\n')}</pre> : null}
+        </div> : null}
+      </div>
+    </div>
+  </li>;
+};
+
+export const DiagnosticRow: React.FC<{
+  row: Extract<WorkProcessRow, { type: 'diagnostic' }>;
+  density?: 'normal' | 'compact';
+}> = ({ row, density = 'normal' }) => row.isHookDiagnostic
+  ? <HookDiagnosticCard row={row} density={density} />
+  : (
   <li
     className={`work-process-step is-appear work-process-diagnostic status-${row.status} severity-${row.severity} kind-diagnostic`}
     data-testid="work-process-block"
@@ -72,9 +105,8 @@ export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'user
   const { t } = useI18n();
   const label = useWorkProcessLabel();
   const active = isActiveWorkProcessStatus(row.status);
-  const [expanded, setExpanded] = useState(row.status !== 'complete');
+  const [expanded, toggleDisclosure] = useScopedWorkDisclosure(`user-input-${row.id}`, row.status !== 'complete');
   const transcriptId = useId();
-  useEffect(() => setExpanded(row.status !== 'complete'), [row.id, row.status]);
   const headerText = row.incomplete
     ? label(row.verb)
     : t('chat.workProcessAskCount', { verb: label(row.verb), count: row.questionCount });
@@ -93,7 +125,7 @@ export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'user
             className="work-process-user-input-header"
             aria-controls={transcriptId}
             aria-expanded={expanded}
-            onClick={() => setExpanded((value) => !value)}
+            onClick={toggleDisclosure}
           >
             {active ? (
               <ActiveSignalText active tone="interaction" className="work-process-user-input-verb">{headerText}</ActiveSignalText>

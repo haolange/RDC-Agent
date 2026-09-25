@@ -10,6 +10,36 @@ import {
 } from './PolicyCompiler';
 
 describe('PolicyCompiler', () => {
+  it('defaults to one child level without capping explicit policy limits', () => {
+    expect(compilePolicyFromRestrictive({}).maxChildDepth).toBe(1);
+    expect(compilePolicyFromRestrictive({ limits: { maxChildDepth: 0 } }).maxChildDepth).toBe(0);
+    expect(compilePolicyFromRestrictive({ limits: { maxChildDepth: 2 } }).maxChildDepth).toBe(2);
+  });
+
+  it('takes the strictest explicit child depth across enabled policies', () => {
+    const previousHome = process.env.RDC_AGENT_HOME;
+    const userRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-depth-user-'));
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-depth-project-'));
+    try {
+      process.env.RDC_AGENT_HOME = userRoot;
+      fs.mkdirSync(path.join(userRoot, 'policies'), { recursive: true });
+      fs.mkdirSync(path.join(projectRoot, '.rdc-agent', 'policies'), { recursive: true });
+      const userFile = path.join(userRoot, 'policies', 'user.policy.yml');
+      const projectFile = path.join(projectRoot, '.rdc-agent', 'policies', 'project.policy.yml');
+      fs.writeFileSync(userFile, 'limits:\n  maxChildDepth: 3\n');
+      fs.writeFileSync(projectFile, 'limits:\n  maxChildDepth: 2\n');
+      expect(compileEffectivePolicy(projectRoot).maxChildDepth).toBe(2);
+      fs.writeFileSync(userFile, 'limits:\n  maxChildDepth: 2\n');
+      fs.writeFileSync(projectFile, 'limits:\n  maxChildDepth: 3\n');
+      expect(compileEffectivePolicy(projectRoot).maxChildDepth).toBe(2);
+    } finally {
+      if (previousHome === undefined) delete process.env.RDC_AGENT_HOME;
+      else process.env.RDC_AGENT_HOME = previousHome;
+      fs.rmSync(userRoot, { recursive: true, force: true });
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
+  });
+
   it('compiles deniedTools, approval floors, and limits', () => {
     const compiled = compilePolicyFromRestrictive({
       deniedTools: ['Shell', 'web-search'],

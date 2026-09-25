@@ -107,15 +107,20 @@ export const ConversationGetDelegationTraceArgsSchema = z.tuple([
     sessionId: ipcId(128, 'sessionId'),
     parentToolCallId: ipcNonEmptyString(200, 'parentToolCallId'),
     cursor: z.number().int().min(0).max(100000).default(0),
-    pageSize: z.number().int().min(0).max(80).default(40),
+    pageSize: z.number().int().min(0).max(120).default(40),
+    sinceRevision: z.number().int().min(0).optional(),
   }).strict(),
 ]);
-export const ConversationGetDelegationReceiptArgsSchema = z.tuple([
+export const ConversationGetDelegationContentArgsSchema = z.tuple([
   z.object({
     sessionId: ipcId(128, 'sessionId'),
     parentToolCallId: ipcNonEmptyString(200, 'parentToolCallId'),
-    stepId: ipcNonEmptyString(200, 'stepId'),
-    offset: z.number().int().min(0).max(1_048_576),
+    childSessionId: ipcNonEmptyString(256, 'childSessionId'),
+    executionId: ipcNonEmptyString(200, 'executionId').optional(),
+    generation: z.number().int().min(0).optional(),
+    kind: z.enum(['task', 'final', 'invocation', 'parent_receipt', 'tool_receipt', 'sent_prompt']),
+    stepId: ipcNonEmptyString(200, 'stepId').optional(),
+    offset: z.number().int().min(0).max(8_388_608),
   }).strict(),
 ]);
 export const ConversationClearHistoryArgsSchema = SessionIdArgsSchema;
