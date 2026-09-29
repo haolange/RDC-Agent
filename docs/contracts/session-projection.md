@@ -5,6 +5,8 @@
 ## Active Session
 
 - `projectStore.currentSession.sessionId` 是 renderer 唯一 active session。
+- 跨项目选择项目根而不选会话时，先缓存并清空旧 session 的 transcript、运行态、右栏与 Composer 上下文，再投影目标项目；此时 `currentSession=null` 不代表旧 turn 又成为前台。旧 turn 的流事件及最终返回留在所属 session cache，不能重新选择旧项目或会话。仅从当前所选项目的无会话 Composer 发出的首轮结果可以建立前台新 session。
+- Sidebar 每个项目节点只投影 `session.projectId` 与该节点一致的会话；乐观切换期间旧项目的 session 列表不能暂挂到新项目标题下。
 - Main `session:select` / `session:create` 更新权威 current；不 abort 其它 session 的 active turn（多 session 并行是契约意图，见 `concurrencyContract`）。
 - Capture 所有权仍按 `ownerSessionId` fail-closed（见 `permissions.md`）。
 
@@ -50,6 +52,9 @@ interface ActiveTurnContext {
 ## Session 切换 Hygiene
 
 切换或新建 session 时同步：
+
+跨项目直接选择 session 时，Immediate 清理必须先于 `currentProject/currentSession` 的乐观切换；不能等异步 `project.select` 和 session 列表完成后才清理，否则新项目加载期间会短暂显示旧项目 transcript 与右栏。
+若目标项目或会话选择被拒绝，恢复原选择及其缓存投影，错误只展示在当前导航入口。
 
 1. Immediate：`setConversationSnapshot([], null)`、`setTracePresentation(null)`、`setWorkflowState(null)`、clear usage / prepared turn；
 2. Dispose 并重建 `conversationEventBatcher`（丢弃 pending RAF）；

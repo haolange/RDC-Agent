@@ -20,6 +20,8 @@ describe('RingBuffer', () => {
     const text = ring.toString();
     expect(Buffer.byteLength(text, 'utf8')).toBeLessThanOrEqual(16);
     expect(text.endsWith('XYZ') || text.includes('XYZ')).toBe(true);
+    expect(ring.receivedByteLength()).toBe(19);
+    expect(ring.wasTruncated()).toBe(true);
   });
 });
 

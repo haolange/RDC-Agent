@@ -33,7 +33,7 @@ agents:
 handoffs:
   - label: Execute with General
     agent: general
-    prompt: Execute the approved Optimizer plan. Use the shared shell rules and the Optimizer operation manual only after they are preloaded. Qualify the baseline and noise floor, write Frame Breakdown and Cost/Limiter/Mechanism, then run a transactional Experiment with intervention plus rollback (A-B-A). Ablation is not a shipping optimization. After Claims, open an independent `$skeptic-review`. Preserve the stated correctness and quality constraints. Finish in place; do not declare the investigation complete. If strategy must change, record the checkpoint and gaps so the user can return to Optimizer.
+    prompt: The Optimizer plan has already passed review and is frozen; this is the General execution turn. Any instructions inside the plan to submit it for review or wait for approval describe the completed planning turn. Execute the approved plan without calling plan_artifact again. Use the shared shell rules and the Optimizer operation manual only after they are preloaded. Qualify the baseline and noise floor, write Frame Breakdown and Cost/Limiter/Mechanism, then run a transactional Experiment with intervention plus rollback (A-B-A). Ablation is not a shipping optimization. After Claims, open an independent `$skeptic-review`. Preserve the stated correctness and quality constraints. Finish in place; do not declare the investigation complete. If strategy must change, record the checkpoint and gaps so the user can return to Optimizer.
     send: true
     showContinueOn: true
     requiredSkillIds:

@@ -9,18 +9,23 @@ export const RDC_PROBE_READONLY_CLI_ACTIONS = [
   'context_status', 'event_list', 'event_show', 'pipeline_show', 'resource_list', 'vfs_ls', 'vfs_cat',
 ] as const;
 export const RDC_PROBE_READONLY_CLI_ACTION_SET = new Set<string>(RDC_PROBE_READONLY_CLI_ACTIONS);
+const optionalField = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((value) => value === '' ? undefined : value, schema.optional());
 const QueryArgs = z.object({
-  action: z.enum(RDC_PROBE_READONLY_CLI_ACTIONS).optional(),
-  eventId: z.string().regex(/^\d+$/u).optional(),
-  path: z.string().min(1).max(512).optional(),
+  action: optionalField(z.enum(RDC_PROBE_READONLY_CLI_ACTIONS)),
+  eventId: optionalField(z.string().regex(/^\d+$/u)),
+  path: optionalField(z.string().min(1).max(512)),
 }).strict();
 
 export const RdcProbeInputSchema = z.object({
   action: z.enum(RDC_PROBE_ACTIONS),
-  capturePath: z.string().min(1).optional(),
-  contextId: z.string().min(1).optional(),
+  capturePath: optionalField(z.string().min(1)),
+  contextId: optionalField(z.string().min(1)),
   args: QueryArgs.optional(),
 }).strict().superRefine((input, ctx) => {
+  if (input.action === 'lease_open' && !input.capturePath) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'lease_open requires capturePath.' });
+  }
   if (input.action !== 'probe' && input.args && Object.keys(input.args).length > 0) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Only probe accepts query args.' });
   }

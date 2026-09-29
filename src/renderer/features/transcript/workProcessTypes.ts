@@ -65,6 +65,7 @@ export type WorkProcessIconKey =
   | 'knowledgeRead'
   | 'knowledgeCompile'
   | 'knowledgeCandidate'
+  | 'investigationSchema'
   | 'investigationRead'
   | 'investigationWrite'
   | 'investigationList'

@@ -1,4 +1,5 @@
 import type { AgentTool, AgentToolResult } from '../../agent-runtime/agent/AgentTool';
+import type { JsonSchema } from '../../agent-runtime/core/types';
 import { truncateOutput } from '../../agent-runtime/tools/primitives/_shared';
 import { RDC_PROBE_ACTIONS, RDC_PROBE_READONLY_CLI_ACTIONS, RdcProbeInputSchema, compileRdcProbe, type RdcProbeInput } from '@shared/constants/rdcProbe';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
@@ -8,6 +9,62 @@ import { parseRdcNativeResult } from '../../tools/RdcNativeProtocol';
 import { openProbeLease, closeProbeLease } from '../../tools/RdcProbeLifecycle';
 import type { RdcTurnBinding } from '../../tools/RdcTurnBindings';
 import { assertRdcContextLeaseOwnership, getRdcContextLease, type RdcContextLease } from '../../sessions/RdcRuntimeContextRegistry';
+
+const probeQueryParameters: JsonSchema = {
+  type: 'object',
+  required: ['action'],
+  additionalProperties: false,
+  oneOf: [
+    ...(['context_status', 'event_list', 'resource_list'] as const).map((action) => ({
+      type: 'object', required: ['action'], additionalProperties: false,
+      properties: { action: { const: action } },
+    })),
+    {
+      type: 'object', required: ['action', 'eventId'], additionalProperties: false,
+      properties: { action: { const: 'event_show' }, eventId: { type: 'string', pattern: '^\\d+$' } },
+    },
+    {
+      type: 'object', required: ['action'], additionalProperties: false,
+      properties: { action: { const: 'pipeline_show' }, eventId: { type: 'string', pattern: '^\\d+$' } },
+    },
+    {
+      type: 'object', required: ['action'], additionalProperties: false,
+      properties: { action: { const: 'vfs_ls' }, path: { type: 'string', minLength: 1, maxLength: 512 } },
+    },
+    {
+      type: 'object', required: ['action', 'path'], additionalProperties: false,
+      properties: { action: { const: 'vfs_cat' }, path: { type: 'string', minLength: 1, maxLength: 512 } },
+    },
+  ],
+  properties: {
+    action: { type: 'string', enum: [...RDC_PROBE_READONLY_CLI_ACTIONS] },
+    eventId: { type: 'string', pattern: '^\\d+$', description: 'Only event_show or pipeline_show.' },
+    path: { type: 'string', minLength: 1, maxLength: 512, description: 'Only vfs_ls or vfs_cat.' },
+  },
+};
+
+const probeParameters: JsonSchema = {
+  type: 'object', required: ['action'], additionalProperties: false,
+  oneOf: [
+    {
+      type: 'object', required: ['action', 'args'], additionalProperties: false,
+      properties: { action: { const: 'probe' }, args: probeQueryParameters },
+    },
+    {
+      type: 'object', required: ['action', 'capturePath'], additionalProperties: false,
+      properties: { action: { const: 'lease_open' }, capturePath: { type: 'string', minLength: 1 } },
+    },
+    ...(['enumerate', 'doctor', 'version', 'lease_close', 'preview_status'] as const).map((action) => ({
+      type: 'object', required: ['action'], additionalProperties: false,
+      properties: { action: { const: action } },
+    })),
+  ],
+  properties: {
+    action: { type: 'string', enum: [...RDC_PROBE_ACTIONS] },
+    capturePath: { type: 'string', minLength: 1, description: 'Only lease_open, using a registered project capture.' },
+    args: probeQueryParameters,
+  },
+};
 
 export interface RdcProbeToolDeps {
   getRdcCliSettings?: () => RdcCliInvokerSettings;
@@ -28,29 +85,15 @@ export function createRdcProbeTool(
   const getLease = deps.getLease ?? getRdcContextLease;
   return {
     name: 'rdc_probe', label: 'RDC Probe',
-    description: 'Query native rdc JSON through the frozen local CLI binding. Lease lifecycle is scoped to the current project capture. Never mutates capture bytes.',
-    parameters: {
-      type: 'object', required: ['action'], additionalProperties: false,
-      properties: {
-        action: { type: 'string', enum: [...RDC_PROBE_ACTIONS] },
-        capturePath: { type: 'string', description: 'Registered project capture, only for lease_open; local replay defaults. Select remote replay in Capture first.' },
-        contextId: { type: 'string', description: 'Must match the context already owned by this session.' },
-        args: {
-          type: 'object', additionalProperties: false,
-          properties: {
-            action: { type: 'string', enum: [...RDC_PROBE_READONLY_CLI_ACTIONS] },
-            eventId: { type: 'string', description: 'Nonnegative event id, only for event_show/pipeline_show.' },
-            path: { type: 'string', description: 'Bounded virtual path, only for vfs_ls/vfs_cat.' },
-          },
-        },
-      },
-    },
+    description: 'Read native RDC JSON through the frozen session binding. Use only the fields for the chosen action; never send placeholders. Event list: {"action":"probe","args":{"action":"event_list"}}. Event detail: {"action":"probe","args":{"action":"event_show","eventId":"1248"}}. The owning context is supplied by the runtime; this tool never mutates capture bytes.',
+    parameters: probeParameters,
     permissionHint: 'readonly',
     spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'system', requiresApproval: false },
     async execute(_toolCallId, rawArgs, signal, _onUpdate, context) {
       try {
         const parsed = RdcProbeInputSchema.safeParse(rawArgs);
-        if (!parsed.success) throw new Error('RDC_PROBE_SCHEMA: ' + parsed.error.issues.map((issue) => issue.message).join('; '));
+        if (!parsed.success) throw new Error('RDC_PROBE_SCHEMA: ' + parsed.error.issues.map((issue) => issue.message).join('; ')
+          + ' Example event list: {"action":"probe","args":{"action":"event_list"}}. Omit fields unrelated to the chosen action; placeholders such as "." are not valid event IDs or VFS paths.');
         const input = parsed.data;
         signal?.throwIfAborted();
         if (context?.excludeRdcLeaseTools) throw new Error('RDC_PROBE_OWNER: offline child cannot access RDC.');

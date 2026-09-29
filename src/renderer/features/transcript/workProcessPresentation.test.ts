@@ -501,6 +501,26 @@ describe('buildWorkProcessPresentation', () => {
     });
   });
 
+  it('shows settled thinking while the turn awaits plan review', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'running', updatedAt: now + 100,
+      blocks: [{
+        id: 'runtime-loop-plan-review', kind: 'llm_turn', title: 'LLM turn', status: 'running',
+        result: { status: 'streaming', toolCallIds: ['plan-call'] },
+        thinking: { text: 'Plan is ready', kind: 'summary', source: 'openai-responses-summary', visibility: 'summary' },
+        thinkingStatus: 'complete', startedAt: now, completedAt: now + 100,
+        toolCalls: [{ id: 'plan-call', toolName: 'plan_artifact', status: 'running', startedAt: now + 100,
+          planReview: { planId: 'plan-1', revision: 1, uri: 'session://plans/plan.md',
+            hash: 'a'.repeat(64), title: 'Plan', summary: [], sections: [], status: 'awaiting',
+            handoffOptions: [{ label: 'Execute with General', agent: 'general' }] } }],
+      }],
+    });
+    expect(presentation.rows.find((row) => row.type === 'section')).toMatchObject({
+      thinkingLabel: expect.stringMatching(/^已思考/),
+      thinkingOpenByDefault: false,
+    });
+  });
+
   it('expands active raw thinking and folds settled process-loop thinking by policy', () => {
     const active = buildWorkProcessPresentation({
       status: 'running',

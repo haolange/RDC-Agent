@@ -8,7 +8,7 @@ import {
   isDeferredToolName,
   isMcpPrefixedToolName,
   partitionDeferredTools,
-  preactivateTaskTools,
+  preactivateWorkflowTools,
 } from './deferredTools';
 
 describe('isMcpPrefixedToolName', () => {
@@ -40,10 +40,10 @@ describe('isDeferredToolName', () => {
   });
 });
 
-describe('preactivateTaskTools', () => {
+describe('preactivateWorkflowTools', () => {
   it('activates the complete granted task surface in canonical order', () => {
     const activated = new Set<string>(['mcp__fs__read']);
-    preactivateTaskTools([
+    preactivateWorkflowTools([
       { name: 'task_create' },
       { name: 'task_update' },
       { name: 'task_get' },
@@ -64,8 +64,36 @@ describe('preactivateTaskTools', () => {
 
   it('activates only the read-only task tools granted to Ask', () => {
     const readOnly = new Set<string>();
-    preactivateTaskTools([{ name: 'task_list' }, { name: 'task_get' }], readOnly);
+    preactivateWorkflowTools([{ name: 'task_list' }, { name: 'task_get' }], readOnly);
     expect([...readOnly]).toEqual(['task_get', 'task_list']);
+  });
+
+  it('injects the granted plan review gate without granting it to a role that lacks it', () => {
+    const mission = new Set<string>();
+    preactivateWorkflowTools([{ name: 'plan_artifact' }, { name: 'task_list' }], mission);
+    expect(partitionDeferredTools([{ name: 'plan_artifact' }, { name: 'task_list' }], mission).injected.map((tool) => tool.name))
+      .toEqual(['plan_artifact', 'task_list']);
+
+    const general = new Set<string>();
+    preactivateWorkflowTools([{ name: 'task_list' }], general);
+    expect(general.has('plan_artifact')).toBe(false);
+  });
+
+  it('injects only granted Investigation tools for Mission evaluation or declared execution', () => {
+    const definitions = [
+      { name: 'investigation_schema' },
+      { name: 'investigation_write' },
+      { name: 'task_list' },
+    ];
+    const ordinary = new Set<string>();
+    preactivateWorkflowTools(definitions, ordinary);
+    expect([...ordinary]).toEqual(['task_list']);
+
+    const declared = new Set<string>();
+    preactivateWorkflowTools(definitions, declared, true);
+    expect([...declared]).toEqual(['task_list', 'investigation_schema', 'investigation_write']);
+    expect(declared.has('investigation_read')).toBe(false);
+    expect(declared.has('investigation_list')).toBe(false);
   });
 });
 describe('partitionDeferredTools', () => {

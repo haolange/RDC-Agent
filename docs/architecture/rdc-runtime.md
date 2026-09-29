@@ -13,6 +13,8 @@ RDC Runtime 是 RDC-Agent 的资源解析、Prompt 构建与运行期可观测�
 
 `ScopedResourceResolver` 对 Agent、Skill、MCP、Hook 使用 `builtin < user < project` 的 whole-resource override，同 ID 的 Project disabled resource 可以隐藏继承项。Policy 只允许收紧；放宽、无效或不可比较的配置 fail-closed。
 
+RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`、`"Infinity"`、`"-Infinity"`，保留其异常事实而不伪造 0；有限数值仍为 JSON number。主进程严格解析 JSON，缺失、非法输出和截断分别报错并隔离不确定的 replay/context。字符串标记不能当作有效数值参与因果或性能结论。
+
 每项 resolved resource 携带 `scope`、`sourcePath`、`sourceHash`、`overriddenSource` 与 `effectiveStatus`。Renderer 通过 `rdcRuntime` preload API 获取这些信息，不直接访问文件系统、Secret 或任意 shell。
 
 ## Project Instructions
@@ -85,6 +87,10 @@ RDC-Tool 的 session worker 对 `rd.session.*` 统一提供 60 秒操作预算�
 
 普通执行先校验当前身份、定义的 scope、effects、参数 schema、前置条件和路径。未知操作、未知影响、模型覆盖 session/context 身份、非 owning General、Mission 直接执行、越界路径均在执行前拒绝。replay 操作才注入 replay session_id；daemon context 始终由主进程指定。context 更新只允许用户字段，VFS 只允许当前会话的受限结构化路径。生命周期、remote 控制、全局配置、桌面窗口、清理销毁由应用专门入口管理，目录和 Skill 不能自行授予权限。既有 shell 审批、realpath 路径边界、取消、串行 lease 和未知结果隔离继续生效。
 
+`rd.core.get_capabilities` 的 remote matrix 在调用时按当前 active event 观察事件绑定能力。Present 等无 shader 的事件返回 `not_currently_probed`，不能替代目标 draw 的 shader/disassembly 与 `edit_plan` 回执，也不能凭原始调试源码缺失断言所有可编辑输入不可用。真正的后端不支持、目标事件操作失败与主进程执行拒绝继续分别按各自回执处理。
+
+长反汇编由会话制品保存完整原文并给出 URI/hash；模型可见的有界主进程摘要同时保留已核对身份、目标事件、shader、格式及该次 `edit_plan` 的编辑/构建/替换能力与输入形式。字段缺失须标为未核验，摘要不能授予权限，也不能替代读取完整 ASM 或实验恢复回执。
+
 需要实验执行证据时，主进程在真实执行、身份及结果验证之后签发回执，绑定 session/project/turn/toolCall/experiment/context/lease/replay 身份、操作定义指纹、参数指纹、结果 hash 和执行时间。签名 key 由 OS safeStorage 保管，不进 prompt/IPC/trace；先确认可签名再执行，落盘遵守 SessionArtifactResolver 配额和原子写入边界。普通发现不签执行回执；手写 JSON、普通 shell 回显或目录自称安全/已回滚都不构成可信证据。
 
 实验验收解释受支持的测量、干预和回滚结果，测量必须包含真实有限数值或可验证图像；不接受空值、伪造零值或成功文案。baseline → intervention → variant → rollback → restored 必须属于同一实验、context 和 lease，顺序有效；测量方法、参数与采样条件一致；回滚对应真实 replacement 并确认已恢复。历史记录不自动取得当前执行证明。签名证明执行和结果，不自动证明因果、质量、噪声或优化收益。
@@ -97,7 +103,7 @@ RDC-Tool 的 session worker 对 `rd.session.*` 统一提供 60 秒操作预算�
 
 `rd.session.get_replay_events` 返回完整事件列表；`rd.session.observe` 在原生串行区内应用事件、解析目标并导出画面。默认 final_output 只使用 Present 资源证据，无法识别时不冒充最终输出。Remote 屏幕呈现使用同一远程连接的原生确认，按事件、纹理和新鲜序号报告 presented；缺少能力为 unsupported，窗口或呈现失败为 unavailable。Local 图片路径不能证明设备屏幕显示。
 
-`executeRdcShell` 与人工操作共享 context 队列；native 返回及签名回执完成后才观察并记录足迹，使用该 turn 的冻结 CLI。测量操作是自包含的 awaited 调用，观察不会插入 sampling 内部；是否刷新由操作影响决定，不按工具名称特判。多条命令构成的 experiment 是证据生命周期，不是持续采样事务：命令之间的观察会执行 replay/export，不承诺整个 experiment 零扰动。
+`executeRdcShell` 与人工操作共享 context 队列；native 返回及签名回执完成后，只有 catalog 声明改变回放位置或 shader replacement 的操作才观察并记录足迹，使用该 turn 的冻结 CLI。只读查询不触发额外 replay/export；测量操作是自包含的 awaited 调用，观察不会插入 sampling 内部。是否刷新由操作影响决定，不按工具名称特判。多条命令构成的 experiment 是证据生命周期，不是持续采样事务：有状态操作之间的观察会执行 replay/export，不承诺整个 experiment 零扰动。
 
 远程打开期间通过冻结 CLI 查询所属 daemon 的 `active_operation`；只有原生 transfer stage 才显示传输阶段，查询失败不推测进度。足迹记录原生 `revision`、实际替换/恢复状态和显示参数。观察无法确认 EID 时保存无图片的失败事实；实时 Agent 画面与操作元数据成对投影，不读取手动回放图片。
 
@@ -113,10 +119,20 @@ RDC 接口只维护当前操作契约；包发布号仅用于安装诊断，不�
 
 远端 replay 必须复用 owning runtime 已持有的 native connection，避免第二条连接触发真实 busy。关闭先经 clear_context 确认所属会话和转发释放，再 `daemon stop` 并确认该 context 的 daemon/worker 退出；清理失败保留恢复信息，不得把 clear 成功或缺失 state 文件当成进程已死。CLI canonical 错误中的原始代码与消息应保留到应用恢复提示。
 
+`clear_context` 失败时，Capture 错误态保留 owning lease，并显示 Tool 返回的有界清理原因代码；应用运行记录保留同一错误，禁止用关闭界面或重启进程代替 native 清理回执。Android helper 的进程归属和 ADB forward 由 Tool 核验，应用不自行清理设备进程。
+
 
 ### Capture queries and temporary replay evidence
 
 Frozen turn identity includes the owning capture and replay identities. Capture-scoped queries receive the application's capture ID; model overrides are rejected. Temporary replay queries hold the serial lease while the main process reads context before and after, verifies the restored event and result proof, and rejects identity drift. They do not trigger final-state refresh. Restoration failure quarantines execution.
+
+原生 shader 替换失败只有在同安装 CLI 返回 canonical `validation` 错误、结果种类匹配本次冻结操作、明确 `replacement_attempted:false` 且 `context_preserved:true`，并且主进程再次确认原 lease/capture/replay 身份未变时，才保留可查询的 context。此类拒绝没有 intervention 回执，不代表修复或 rollback。退出超时、取消、协议损坏、未知错误、已尝试替换或身份变化仍隔离，必须经 Capture 生命周期恢复。
+
+原生操作在任何 replay 效果之前拒绝时，Tool 可在 canonical `validation` 错误中提供 `effects_attempted:false` 与 `context_preserved:true`。main 仅在结果种类与冻结操作相符、CLI 非零退出、未取消且 lease/capture/replay 身份复核不变时保留 context；错误仍返回调用者，不生成成功或实验回执。该证明由 Tool 的实际前置检查路径给出，普通运行时错误、部分执行与缺少任一证明字段仍隔离。未知 shader disassembly target 属于此类前置拒绝；Tool 在应用 event 之前检验 target，并返回当前可用 target 名称。
+
+`rd.export.screenshot` 查找目标时可能暂时改变 active event。目标查找失败后，Tool 须实际恢复原 event；只有非零退出的同操作 canonical runtime 错误携带 `failure_stage:resolve_visual_target`、`replay_state_restored:true`、`restored_event_id` 和 `artifact_write_attempted:false`，且 main 在串行 lease 下复核原 event、context/replay/capture 身份均未变，才保留可查询的 context。失败仍如实返回，不能签发截图或实验回执；无原 event、恢复失败、身份漂移、取消及其它阶段失败继续隔离。
+
+`rd.shader.get_source` 在指定事件没有绑定 shader 时仍返回 `shader_binding_lookup_failed`，不会把“无 shader”伪装成可用源码。Tool 在返回前恢复原 event；main 仅接受同操作、同身份、明确 `resolve_binding` 失败与 `replay_state_restored/restored_event_id` 证明，并再次读取原 event 核对后保留 lease。恢复失败返回 `shader_inspection_recovery_failed`；缺证明、取消或身份变化继续隔离。
 
 Frame-timing evidence validates the complete single-queue GPU replay method, seconds, range, samples/warmup, capture and actual replacement set. These checks supplement main-process signed receipts and the existing five-phase experiment validation; catalog claims cannot replace execution proof. Specialist references are generated from the same frozen CLI definitions.
 
@@ -132,6 +148,6 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 
 ## 回放隔离与恢复投影
 
-原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化。失败没有取得可信恢复证明时仍 fail-closed；恢复通过应用生命周期重新建立 owning capture/replay/context 身份。
+原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。`rdc_context` 对同一 session/project 的隔离身份返回明确的受控恢复状态，不将仍打开的 capture 误报为未打开，也不向其他 scope 泄露保留的 lease。新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化。失败没有取得可信恢复证明时仍 fail-closed；恢复通过应用生命周期重新建立 owning capture/replay/context 身份。
 
 Android 的 remote_display 由同一远程连接的原生呈现确认驱动，核对当前事件、目标纹理及新鲜序号；后台窗口、原生失败或缺失能力不得显示 presented。无颜色输出清除手机旧画面并表达无输出，应用 PNG 与手机屏幕状态分别判断。

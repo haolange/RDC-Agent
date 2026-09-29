@@ -141,7 +141,7 @@ export type LlmProviderProtocol =
  * - `environment` : Resolved from ambient environment / cloud credential chain (AWS, GCP).
  */
 export type LlmProviderAuthMode = 'none' | 'api-key' | 'local' | 'account' | 'environment';
-export type LlmProviderLifecycleStatus = 'stable' | 'beta' | 'deprecated' | 'sunset';
+export type LlmProviderLifecycleStatus = 'stable' | 'beta' | 'retiring' | 'sunset';
 export type LlmProviderAvailabilityState = 'available' | 'unavailable' | 'unknown';
 
 export interface LlmProviderAvailability {

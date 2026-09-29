@@ -9,7 +9,7 @@ const estimate = (messages: AgentMessage[]) => JSON.stringify(messages.map(messa
 function setup() {
   const saved: AgentMessage[][] = [];
   const save = vi.fn(async (messages: AgentMessage[]) => { saved.push(structuredClone(messages)); return { uri: 'session://tool-outputs/source.json', hash: 'hash', context: '{}' }; });
-  const generate = vi.fn(async () => ({ ...user('Qualified conclusion; original source available'), derivedContext: { viewId: 'view', handoffId: 'handoff', sourceHash: 'hash' } }));
+  const generate = vi.fn(async (_messages: AgentMessage[], _checkpoint: { uri: string; hash: string; context: string }) => ({ ...user('Qualified conclusion; original source available'), derivedContext: { viewId: 'view', handoffId: 'handoff', sourceHash: 'hash' } }));
   const verify = vi.fn(async () => {});
   const installed = vi.fn(async () => {});
   return { saved, save, generate, verify, installed, window: new RecoverableContextWindow({ tokenLimit: 1500, estimate, save, generate, verify, installed }) };
@@ -36,12 +36,19 @@ describe('recoverable model window', () => {
     const second = await s.window.prepare([...messages, assistant('next')]);
     expect(first.messages).toContainEqual(messages[0]); expect(second.messages).toContainEqual(messages[0]);
   });
-  it('recompacts from original evidence, never a summary of the previous summary', async () => {
+  it('archives every original message while sending only the verified window and new originals to the next handoff', async () => {
     const s = setup(); const messages = history(); await s.window.prepare(messages);
-    await s.window.prepare([...messages, ...history().slice(1)]);
+    const appended = history().slice(1).map((message, index) =>
+      message.role === 'assistant' ? assistant(`new ${index}: ${'evidence '.repeat(30)}`) : message);
+    await s.window.prepare([...messages, ...appended]);
     expect(s.generate).toHaveBeenCalledTimes(2);
     expect(s.saved[1]).toContainEqual(messages[6]);
     expect(s.saved[1].some(message => message.role === 'user' && message.derivedContext)).toBe(false);
+    const handoffInput = s.generate.mock.calls[1][0] as AgentMessage[];
+    expect(handoffInput).toContainEqual(expect.objectContaining({ derivedContext: expect.any(Object) }));
+    expect(handoffInput).toContainEqual(appended[0]);
+    expect(handoffInput).not.toContainEqual(messages[6]);
+    expect(handoffInput.length).toBeLessThan(s.saved[1].length);
   });
   it('invalidates a cached prefix when a user correction replaces old input', async () => {
     const s = setup(); const messages = history(); await s.window.prepare(messages);

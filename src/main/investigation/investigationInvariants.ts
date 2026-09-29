@@ -392,6 +392,32 @@ export function assertSState01(evidence: EvidenceRecord, lookup: InvestigationLo
   }
 }
 
+export function assertObservedToolEvidenceHasArtifact(evidence: EvidenceRecord): void {
+  if (evidence.source.kind === 'tool' && evidence.epistemicStatus === 'observed'
+    && evidence.strength === 'strong' && !evidence.stale && evidence.artifactRefs.length === 0) {
+    throw new InvestigationError(
+      'INVESTIGATION_REF_UNRESOLVED',
+      'strong observed tool evidence requires a resolvable artifactRef and content hash',
+      { invariantId: 'S-CTX-01' },
+    );
+  }
+}
+
+export function assertEvidenceLinks(evidence: EvidenceRecord, lookup: InvestigationLookup): void {
+  for (const claimId of evidence.claimIds) {
+    if (!lookup.getClaim(claimId)) {
+      throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `evidence claim ${claimId}`, {
+        invariantId: 'S-CTX-01',
+      });
+    }
+  }
+  if (evidence.experimentId && !lookup.getExperiment(evidence.experimentId)) {
+    throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `experiment ${evidence.experimentId}`, {
+      invariantId: 'S-CTX-01',
+    });
+  }
+}
+
 export function verifyEvidenceIdsResolvable(
   evidenceIds: string[],
   lookup: InvestigationLookup,

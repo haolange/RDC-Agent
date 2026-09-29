@@ -41,6 +41,18 @@ it('starts compact, offers every declared target and submits the selected one ex
   expect(buttons[0].disabled).toBe(true);
   await act(async () => finish());
 });
+it('stops an awaiting plan without approving its handoff', async () => {
+  let finish!: () => void;
+  const onStop = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+  await act(async () => root.render(createElement(PlanReviewRequestPanel, { request, onStop })));
+  const stop = [...host.querySelectorAll<HTMLButtonElement>('button')]
+    .find((button) => button.textContent === 'chat.planReviewStop')!;
+  await act(async () => { stop.click(); stop.click(); });
+  expect(onStop).toHaveBeenCalledTimes(1);
+  expect(mock.submit).not.toHaveBeenCalled();
+  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
+  await act(async () => finish());
+});
 it('focuses revisions, disallows empty feedback and preserves it on failed submission', async () => {
   await render(); await click('.composer-plan-review__edit');
   const textarea = host.querySelector('textarea')!;

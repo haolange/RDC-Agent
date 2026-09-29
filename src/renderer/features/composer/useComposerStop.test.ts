@@ -68,11 +68,42 @@ describe('stopWorkTrace', () => {
     expect(stopped.status).toBe('stopped');
     expect(stopped.workTrace?.status).toBe('stopped');
     expect(stopped.workTrace?.blocks[0]).toMatchObject({
-      status: 'complete',
+      status: 'error',
       completedAt: Date.now(),
     });
     expect(stopped.workTrace?.blocks[1].status).toBe('complete');
+    expect(stopped.updatedAt).toBe(1);
     vi.useRealTimers();
+  });
+
+  it('settles pending tools, thinking, approval and plan review when stopped during a live loop', () => {
+    const stopped = stopWorkTrace(activeAssistant({
+      workTrace: {
+        status: 'running', updatedAt: 1, blocks: [{
+          id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'running',
+          startedAt: 1, thinkingStatus: 'streaming',
+          result: { status: 'streaming', toolCallIds: [] },
+          toolCalls: [
+            { id: 'queued', toolName: 'investigation_read', status: 'pending', startedAt: 1 },
+            { id: 'review', toolName: 'plan_artifact', status: 'running', startedAt: 1,
+              approval: { approvalId: 'approval', status: 'pending' },
+              planReview: { planId: 'plan', revision: 1, hash: 'hash',
+                uri: 'session://plans/plan.md', title: 'Plan', summary: [], sections: [],
+                status: 'awaiting', handoffOptions: [] } },
+          ],
+        }],
+      },
+    }));
+
+    const loop = stopped.workTrace?.blocks[0];
+    expect(loop).toMatchObject({ status: 'error', thinkingStatus: 'complete' });
+    expect(loop?.result).toMatchObject({ status: 'complete', toolCallIds: ['queued', 'review'] });
+    expect(loop?.toolCalls[0]).toMatchObject({ status: 'skipped', completedAt: expect.any(Number) });
+    expect(loop?.toolCalls[1]).toMatchObject({
+      status: 'error', completedAt: expect.any(Number),
+      approval: { status: 'cancelled' },
+      planReview: { status: 'rejected', decision: { kind: 'reject' } },
+    });
   });
 });
 

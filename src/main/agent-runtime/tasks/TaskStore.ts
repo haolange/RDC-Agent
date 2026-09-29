@@ -260,6 +260,7 @@ function validateState(state: TaskStateDocument): void {
       || !Array.isArray(task.blockedBy) || !Array.isArray(task.blocks) || !Array.isArray(task.executionIds)
       || !Array.isArray(task.completionRequirements) || typeof task.revision !== 'number'
       || typeof task.description !== 'string' || typeof task.createdAt !== 'number' || typeof task.updatedAt !== 'number'
+      || (task.creationTurnRef !== undefined && (typeof task.creationTurnRef !== 'string' || !task.creationTurnRef.trim()))
       || !['pending', 'in_progress', 'blocked', 'completed', 'cancelled'].includes(task.status)) {
       throw new Error(`Malformed canonical task record: ${id}.`);
     }

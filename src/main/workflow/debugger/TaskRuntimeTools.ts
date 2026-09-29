@@ -46,6 +46,10 @@ export function createTaskRuntimeTools(input: {
   const tools = createTaskTools(registry, {
     scopeRootTaskId: delegatedScope?.rootTaskId,
     requestCurrentTurnStop: () => false,
+    getCreationTurnRef: () => {
+      const turn = input.turnHandle ?? input.getActiveTurn(resolvedSessionId);
+      return turn?.turnId ? `turn:${turn.turnId}:generation:${turn.generation}` : undefined;
+    },
     startOptions: async () => {
       const turn = input.turnHandle ?? input.getActiveTurn(resolvedSessionId);
       const scopedExecutions = await registry.listExecutions();

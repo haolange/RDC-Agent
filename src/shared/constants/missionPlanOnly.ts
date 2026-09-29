@@ -28,6 +28,7 @@ export const MISSION_PLAN_ONLY_TOOL_IDS = [
   'background_cancel',
   'background_join',
   'plan_artifact',
+  'investigation_schema',
   'investigation_read',
   'investigation_write',
   'investigation_list',

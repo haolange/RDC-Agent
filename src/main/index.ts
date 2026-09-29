@@ -43,6 +43,8 @@ export { rdcSessionService } from './sessions';
 
 const SHUTDOWN_TIMEOUT_MS = 45_000;
 let shutdownStarted = false;
+let shutdownExitCode = 0;
+let settingsInitialized = false;
 
 function registerShutdownDisposables(): void {
   shutdownCoordinator.register({
@@ -72,7 +74,9 @@ function registerShutdownDisposables(): void {
     id: 'rdc.close-runtime',
     phase: 'release_owned_runtimes',
     dispose: async () => {
-      await rdcSessionService.closeAll();
+      if (settingsInitialized) {
+        await rdcSessionService.closeAll();
+      }
     },
   });
   shutdownCoordinator.register({
@@ -233,6 +237,17 @@ if (!userDataLock.acquired) {
   }
 }
 
+function exitMainProcess(code: number): void {
+  if (userDataLock.acquired) {
+    try {
+      userDataLock.release();
+    } catch (error) {
+      console.error('[Main] Failed to release userData lock:', error);
+    }
+  }
+  app.exit(code);
+}
+
 // Both carriers own the canonical userData lock above. The headless Browser
 // skips Electron's window-oriented single-instance redirect; instance.lock is
 // the cross-carrier boundary, while visible desktop instances keep both locks.
@@ -241,7 +256,7 @@ const hasSingleInstanceLock = isSettingsRebuildOnly
   || app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   console.log('[RDC-Agent] Another instance is already running. Reusing the existing instance.');
-  app.exit(0);
+  exitMainProcess(0);
 }
 
 if (isTestMode || isHeadlessMode) {
@@ -572,13 +587,14 @@ function setupMenu(): void {
 app.whenReady().then(async () => {
   installRendererSecurityPolicy();
   const settings = settingsService.initialize();
+  settingsInitialized = true;
   if (isSettingsRebuildOnly) {
     console.log('[SettingsRebuildOnly]', JSON.stringify({
       workspaceRoot: settings.paths.userRdcRoot,
       settingsPath: settings.paths.settingsPath,
       providerIds: settings.llm.providers.map((provider) => provider.id),
     }));
-    app.exit(0);
+    exitMainProcess(0);
     return;
   }
 
@@ -623,7 +639,8 @@ app.whenReady().then(async () => {
     }
   } else if (isHeadlessMode) {
     console.error('[RDC-Agent] Headless mode requires the browser app bridge.');
-    app.exit(1);
+    shutdownExitCode = 1;
+    app.quit();
     return;
   }
 
@@ -637,6 +654,10 @@ app.whenReady().then(async () => {
       createMainWindow();
     }
   });
+}).catch((error: unknown) => {
+  console.error('[Main] Startup failed:', error);
+  shutdownExitCode = 1;
+  app.quit();
 });
 
 // Quit after all windows close on Windows/Linux.
@@ -664,9 +685,8 @@ app.on('before-quit', (event) => {
 
   registerShutdownDisposables();
   const timeoutMs = isTestMode ? 100 : SHUTDOWN_TIMEOUT_MS;
-  void shutdownCoordinator.shutdownAll(timeoutMs, () => app.exit(0)).then(() => {
-    app.exit(0);
-  });
+  const exitAfterShutdown = () => exitMainProcess(shutdownExitCode);
+  void shutdownCoordinator.shutdownAll(timeoutMs, exitAfterShutdown).then(exitAfterShutdown);
 });
 
 // External QA/CLI launchers use process signals; route them through the same shutdown state machine.

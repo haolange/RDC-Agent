@@ -87,6 +87,8 @@ export const CATALOG_VERB_LABEL_KEYS: Record<string, TranslationKey> = {
   '正在编译知识': 'chat.workProcessVerb.knowledgeCompileRunning',
   '已创建知识候选': 'chat.workProcessVerb.knowledgeCandidateComplete',
   '正在创建知识候选': 'chat.workProcessVerb.knowledgeCandidateRunning',
+  '已读取调查结构': 'chat.workProcessVerb.investigationSchemaComplete',
+  '正在读取调查结构': 'chat.workProcessVerb.investigationSchemaRunning',
   '已读取调查产物': 'chat.workProcessVerb.investigationReadComplete',
   '正在读取调查产物': 'chat.workProcessVerb.investigationReadRunning',
   '已写入调查产物': 'chat.workProcessVerb.investigationWriteComplete',

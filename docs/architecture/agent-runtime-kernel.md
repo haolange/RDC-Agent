@@ -39,6 +39,10 @@ General agent tools are mediated by `AgentPermissionPolicy` before execution. Th
 
 Agent 达到 `maxTurns` 时，只有已经获得 canonical final 才能正常完成；若 Provider 仍要求 continuation，则抛出 `AGENT_MAX_TURNS_EXCEEDED`。Conversation 分别映射为 `CONVERSATION_AGENT_LOOP_STALLED` 与 `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；流式协议完整性违规映射为 `CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION`。三者都和 `CONVERSATION_LLM_REQUEST_FAILED` 互斥。Work Process 的完成摘要由真实 tool result 统计成功、失败、跳过，模型自述不能覆盖 runtime 证据。
 
+`turn_complete` 在接受声明前核对本回合 direct Task 执行是否均已由所属 Task 结算；未结算时返回可操作的 `TASK_COMPLETION_DENIED`，不给模型制造“已声明完成”的假回执。若模型绕过声明直接终答，父回合最终门禁仍将遗留执行标为 blocked，并以本地 Task 完整性诊断收口，不归咎 Provider。
+
+`AgentLoop` 在 Provider 流失败时从本轮内存上下文移除未提交的 partial assistant，再应用既有恢复决策；UI 已收到的流式事件仍用于失败诊断。这样重试不会将尚未执行的工具调用作为缺失结果的历史调用发往下一个 Provider 请求。
+
 ## Provider Event Normalization
 
 Provider-private protocols are normalized before reaching Conversation or Work Process:
@@ -69,7 +73,7 @@ Readable `summary` or `raw` thinking is not inserted into ordinary composer cont
 
 ## Canonical session context
 
-Session history is agent-neutral and append-only. `conversation.jsonl` stores transcript messages, `conversation-branches.json` is the fork and active-leaf authority, and `session-context.jsonl` stores one provider-neutral terminal delta per turn. At request start, the shared branch resolver selects the active leaf's visible turn ids; the route materializer selects those journal entries, filters route-private artifacts, then combines them with the current `PromptPlan`, effective tools, route, and controls. Agent profiles and runtime slots are execution configuration/caches, not independent session truth.
+Session history is agent-neutral and append-only. `conversation.jsonl` stores transcript messages, `conversation-branches.json` is the fork and active-leaf authority, and `session-context.jsonl` stores one provider-neutral terminal delta per turn. Streaming transcript deltas are durable before optional journal compaction. If a Windows reader temporarily blocks the atomic replacement with `EBUSY`, compaction is deferred and retried at the next delta threshold; the committed delta remains readable and the live turn continues. Other persistence errors and terminal commit failures still surface as errors. At request start, the shared branch resolver selects the active leaf's visible turn ids; the route materializer selects those journal entries, filters route-private artifacts, then combines them with the current `PromptPlan`, effective tools, route, and controls. Agent profiles and runtime slots are execution configuration/caches, not independent session truth.
 
 Fast, Max mode, reasoning effort, Agent, model, provider, and protocol changes are immediate local next-turn state and never proactively estimate, compact, or rewrite history. Before send, `ConversationTurnCoordinator` flushes the latest Agent/Provider commit, refreshes credentials and entitlement, freezes the exact catalog/model/route/variant/controls, resolves tools/skills/attachments, and builds the `PromptPlan`, `RequestEnvelope`, and closed `RequestPlan`. It also acquires an opaque main-process credential lease that freezes the selected provider configuration and resolved short-lived credentials without placing secrets in IPC, renderer state, persisted turn summaries, journals, or traces. Preparing uses a bounded worker to estimate the complete canonical input without deleting messages. The execution coordinator performs automatic compaction at the first and subsequent safe Provider request boundaries, counting frozen instructions and the currently activated tool schemas. Every committed turn owns that frozen plan and lease, so later asynchronous changes can affect only the next send.
 

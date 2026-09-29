@@ -10,6 +10,8 @@ import {
 } from '../agent-runtime/reasoning/ContinuationReplayPolicy';
 import { providerStateReuseReason } from '../agent-runtime/reasoning/ProviderStateRefs';
 import { storageAdapter } from '../sessions/StorageAdapter';
+import { INTERRUPTED_CONVERSATION_SUMMARY } from './DelegatedInteractionRecovery';
+import { normalizeBranchId } from './ConversationBranchResolver';
 
 export interface SessionContextTurnEntry {
   schemaVersion: 2;
@@ -128,7 +130,10 @@ export class SessionContextJournal {
     const entries = this.readEntries(sessionId);
     const entryByTurn = new Map(entries.map((entry) => [entry.turnId, entry]));
     const missingTurnIds = visibleTurnIds.filter((turnId) => !entryByTurn.has(turnId));
-    if (missingTurnIds.length > 0) {
+    const interrupted = missingTurnIds.length > 0
+      ? this.recoverInterruptedMessages(sessionId, missingTurnIds)
+      : new Map<string, Message[]>();
+    if (interrupted.size !== missingTurnIds.length) {
       throw new Error('Session context journal is incomplete for ' + missingTurnIds.length + ' visible turn(s).');
     }
 
@@ -141,7 +146,7 @@ export class SessionContextJournal {
     const retainedForReplay = new Set(visibleTurnIds.slice(retentionStartIndex));
     const messages = visibleTurnIds.flatMap((turnId) => {
       const entry = entryByTurn.get(turnId);
-      if (!entry) return [];
+      if (!entry) return interrupted.get(turnId) ?? [];
       const withinRetention = retainedForReplay.has(turnId);
       return entry.messages.map((message, messageIndex) => {
         const filtered = filterSessionContextMessageArtifacts(message, requestPlan, messageIndex, withinRetention);
@@ -158,6 +163,37 @@ export class SessionContextJournal {
       filteredArtifactCount,
       artifactDecisions,
     };
+  }
+
+  private recoverInterruptedMessages(sessionId: string, missingTurnIds: string[]): Map<string, Message[]> {
+    const history = storageAdapter.readConversationHistory(sessionId);
+    const recovered = new Map<string, Message[]>();
+    for (const turnId of missingTurnIds) {
+      const pair = history.filter(message => message.turnId === turnId && message.sessionId === sessionId);
+      if (pair.length !== 2) continue;
+      const user = pair.find(message => message.role === 'user');
+      const assistant = pair.find(message => message.role === 'assistant');
+      if (!user || !assistant || normalizeBranchId(user.branchId) !== normalizeBranchId(assistant.branchId)) continue;
+      // A process crash can persist a visible, interrupted turn before its
+      // terminal context transaction. Replay only the user's actual text and
+      // an explicit gap marker. Tool calls and partial model output remain in
+      // the visible trace, but are not silently promoted into prompt facts.
+      if (assistant.status !== 'error' || !(
+        assistant.diagnostic?.code === 'CONVERSATION_INTERRUPTED'
+        || assistant.workTrace?.summary === INTERRUPTED_CONVERSATION_SUMMARY
+      )) continue;
+      recovered.set(turnId, [
+        { role: 'user', content: user.content, timestamp: user.createdAt },
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: '[Previous turn interrupted before its context journal committed. Its partial tool outputs and attachments are not replayed; inspect their preserved sources before using them as evidence.]' }],
+          model: 'interrupted-turn', provider: 'rdc-agent',
+          usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          stopReason: 'error', timestamp: assistant.updatedAt ?? assistant.createdAt,
+        },
+      ]);
+    }
+    return recovered;
   }
 
   append(sessionId: string, entry: SessionContextTurnEntry): void {

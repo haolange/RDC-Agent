@@ -171,6 +171,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   return {
     t,
     settings,
+    currentProjectId,
     ...modalState,
     sections,
     dirty,

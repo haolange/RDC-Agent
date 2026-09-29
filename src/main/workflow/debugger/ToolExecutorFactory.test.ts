@@ -39,6 +39,9 @@ vi.mock('../../agent-runtime/core/ToolValidator', () => ({
 const { hookTrigger } = vi.hoisted(() => ({
   hookTrigger: vi.fn(async () => [] as Array<{ allowed: boolean; status: string }>),
 }));
+const { permissionEvaluate } = vi.hoisted(() => ({
+  permissionEvaluate: vi.fn(() => ({ action: 'allow' as const })),
+}));
 vi.mock('../../hooks/HookEngine', () => ({
   hookEngine: {
     load: vi.fn(),
@@ -68,7 +71,7 @@ vi.mock('../../sessions/StorageAdapter', () => ({
 
 vi.mock('../../agent-runtime/permissions/AgentPermissionPolicy', () => ({
   agentPermissionPolicyService: {
-    evaluate: () => ({ action: 'allow' }),
+    evaluate: permissionEvaluate,
   },
 }));
 
@@ -87,10 +90,63 @@ vi.mock('../../agent-runtime/interactions/AgentPlanReviewRequestService', () => 
 }));
 
 import { ToolExecutorFactory } from './ToolExecutorFactory';
+import { shellTool } from '../../agent-runtime/tools/primitives/ShellTool';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 
 describe('ToolExecutorFactory', () => {
+  it('rejects a malformed shell request before permission review', async () => {
+    const execute = vi.fn(async () => ({ content: [] }));
+    const toolMap = new Map([['shell', {
+      name: 'shell', description: 'shell', parameters: shellTool.parameters,
+      validateArgs: shellTool.validateArgs, execute,
+    }]]);
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      getActiveTurn: () => null,
+      resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
+      isAllowedForRuntime: () => true,
+      matchesToolAllowlist: () => true,
+    });
+    permissionEvaluate.mockClear();
+    const result = await factory.createToolExecutor('ask', ['shell']).execute({
+      type: 'toolCall', id: 'invalid-shell', name: 'shell',
+      arguments: { command: '', rdc: { discovery: { kind: 'search', query: 'checkpoint investigation', limit: 5 } } },
+    });
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result)).toContain('TOOL_SCHEMA_VIOLATION: SHELL_INPUT');
+    expect(permissionEvaluate).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('shows the bounded reason for a blocking Hook in the tool diagnostic', async () => {
+    const onEvent = vi.fn();
+    hookTrigger.mockResolvedValueOnce([{
+      hookId: 'artifact-integrity', status: 'failed', allowed: false,
+      reason: 'artifact-integrity: sourceRefs[0] expectedHash must be sha256:<64 hex>',
+    }] as never);
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      getActiveTurn: () => null,
+      resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }),
+      isAllowedForRuntime: () => true,
+      matchesToolAllowlist: () => true,
+    });
+    const result = await factory.triggerRuntimeHooks('tool.before-call', 'ask', {
+      sessionId: 'session-a', eventContext: { sessionId: 'session-a' }, onEvent,
+    } as never, { toolName: 'investigation_write', toolCallId: 'call-invalid-hash' });
+    expect(result).toEqual({ allowed: false, reason: 'artifact-integrity: sourceRefs[0] expectedHash must be sha256:<64 hex>' });
+    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'diagnostic',
+      payload: expect.objectContaining({
+        code: 'hook.failed', toolCallId: 'call-invalid-hash',
+        message: expect.stringContaining('sourceRefs[0] expectedHash must be sha256:<64 hex>'),
+      }),
+    }));
+  });
+
   it('emits the Hook diagnostic with the real triggering tool call ID', async () => {
     const onEvent = vi.fn();
     hookTrigger.mockResolvedValueOnce([{ hookId: 'audit', status: 'completed', allowed: true }] as never);

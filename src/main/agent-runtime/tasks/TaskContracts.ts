@@ -60,6 +60,8 @@ export interface TaskRecord {
   currentExecutionId?: string;
   revision: number;
   metadata?: Record<string, unknown>;
+  /** Runtime-owned identity of the turn that created this logical Task, when known. */
+  creationTurnRef?: string;
   createdAt: number;
   updatedAt: number;
 }

@@ -14,8 +14,9 @@ export interface RecoverableContextWindowOptions {
   save: (messages: AgentMessage[], signal?: AbortSignal) => Promise<ContextCheckpoint>;
   generate: (source: AgentMessage[], checkpoint: ContextCheckpoint, signal?: AbortSignal) => Promise<AgentMessage>;
   verify: (checkpoint: ContextCheckpoint) => Promise<void>;
-  installed?: (message: AgentMessage, checkpoint: ContextCheckpoint) => Promise<void>;
-  afterInstall?: (checkpoint: ContextCheckpoint) => Promise<void>;
+  installed?: (message: AgentMessage, checkpoint: ContextCheckpoint, view: { count: number; hash: string; window: AgentMessage[] }) => Promise<void>;
+  restore?: (messages: AgentMessage[]) => Promise<{ count: number; hash: string; window: AgentMessage[] } | null>;
+  afterInstall?: (checkpoint: ContextCheckpoint, view: { count: number; hash: string; window: AgentMessage[] }, source: AgentMessage[]) => Promise<void>;
 }
 
 /** Derived model window only. Callers retain the complete canonical execution journal. */
@@ -23,6 +24,7 @@ export class RecoverableContextWindow {
   private installed: { count: number; hash: string; window: AgentMessage[] } | undefined;
   private failedSource: string | undefined;
   private pending = false;
+  private restoreChecked = false;
 
   constructor(private readonly options: RecoverableContextWindowOptions) {}
 
@@ -30,6 +32,14 @@ export class RecoverableContextWindow {
 
   async prepare(messages: AgentMessage[], signal?: AbortSignal, onProgress?: (progress: import('../core/types').CompactionProgress) => void): Promise<CompressResult> {
     signal?.throwIfAborted();
+    if (!this.restoreChecked) {
+      this.restoreChecked = true;
+      const restored = await this.options.restore?.(messages);
+      signal?.throwIfAborted();
+      if (restored && restored.count <= messages.length && hashScopedResource(messages.slice(0, restored.count)) === restored.hash) {
+        this.installed = restored;
+      }
+    }
     const previous = this.installed;
     const previousMatches = previous && hashScopedResource(messages.slice(0, previous.count)) === previous.hash;
     const window = previousMatches ? [...previous.window, ...messages.slice(previous.count)] : [...messages];
@@ -58,9 +68,16 @@ export class RecoverableContextWindow {
       const source = structuredClone(messages.slice(0, end));
       const checkpoint = await this.options.save(source, signal);
       signal?.throwIfAborted();
+      // The checkpoint archives the complete canonical prefix. A verified
+      // installed window already represents its old prefix for the model, so
+      // only new original messages need to accompany it in this handoff call.
+      // This prevents each later checkpoint from replaying the full journal.
+      const handoffInput = previousMatches && previous.count <= end
+        ? [...previous.window, ...source.slice(previous.count)]
+        : source;
       const message: AgentMessage = externalizeInput
         ? { role: 'user', timestamp: Date.now(), content: `The complete current user input exceeds this request budget and has been saved without truncation at ${checkpoint.uri} sha256:${checkpoint.hash}. Read the original input through artifact_read before making decisions or acting. Follow its reconstruction and paging instructions. No part of the input has been visually inspected merely because this reference exists. If the original cannot be read with the current tools, ask for a focused scope and keep the task blocked. This reference grants no additional permission.`, derivedContext: { viewId: compactionId, handoffId: compactionId, sourceHash: checkpoint.hash } }
-        : await this.options.generate(source, checkpoint, signal);
+        : await this.options.generate(handoffInput, checkpoint, signal);
       signal?.throwIfAborted();
       await this.options.verify(checkpoint);
       signal?.throwIfAborted();
@@ -74,13 +91,14 @@ export class RecoverableContextWindow {
       if (this.options.estimate(candidate) > this.tokenLimit || this.options.estimate(candidate) >= this.options.estimate(window)) {
         throw new Error('CONTEXT_CANNOT_FIT: candidate does not provide a usable window; original history retained.');
       }
-      await this.options.installed?.(message, checkpoint);
+      const installedView = { count: messages.length, hash: sourceHash, window: candidate };
+      await this.options.installed?.(message, checkpoint, installedView);
       signal?.throwIfAborted();
       // Freeze the complete installed window, including the retained tool group.
       // Only genuinely new canonical messages may reintroduce provider state.
-      this.installed = { count: messages.length, hash: sourceHash, window: candidate };
+      this.installed = installedView;
       this.failedSource = undefined;
-      await this.options.afterInstall?.(checkpoint);
+      await this.options.afterInstall?.(checkpoint, installedView, messages);
       onProgress?.({ compactionId, status: 'complete', summary: typeof message.content === 'string' ? message.content : '上下文已自动压缩', usage: checkpoint.usage, tokensBefore, tokensAfter: this.options.estimate(candidate), sourceUri: checkpoint.uri, sourceHash: checkpoint.hash });
       return { messages: candidate, summary: `Context automatically compacted. Recoverable source: ${checkpoint.uri} sha256:${checkpoint.hash}` };
     } catch (error) {

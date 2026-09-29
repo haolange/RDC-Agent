@@ -34,6 +34,7 @@ interface AgentsSettingsProps {
   agentManifestSaveBlocked?: boolean;
   /** Whether a project is open; the Project tab is disabled without one. */
   canProject: boolean;
+  currentProjectId: string | null;
   t: Translate;
 }
 
@@ -51,7 +52,12 @@ const getAgentCardDescription = (agent: AgentManifestDraft, t: Translate): strin
 /** Read-only scope filter: `writeScope` mirrors the definition provenance (builtin drafts write to user). */
 const draftScope = (draft: AgentManifestDraft): AgentScope => (draft.writeScope === 'project' ? 'project' : 'user');
 
-const createNewAgent = (existing: AgentManifestDraft[], t: Translate): AgentManifestDraft => {
+export const createNewAgent = (
+  existing: AgentManifestDraft[],
+  t: Translate,
+  scope: AgentScope,
+  currentProjectId: string | null,
+): AgentManifestDraft => {
   const base = 'custom-agent';
   let index = 1;
   let id = base;
@@ -80,6 +86,8 @@ const createNewAgent = (existing: AgentManifestDraft[], t: Translate): AgentMani
     metadata: {},
     instructions: t('settings.agentDefaultInstructions'),
     enabled: true,
+    writeScope: scope,
+    writeProjectId: scope === 'project' ? currentProjectId ?? undefined : undefined,
   };
 };
 
@@ -93,6 +101,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   agentManifestSaveMessage,
   agentManifestSaveBlocked = false,
   canProject,
+  currentProjectId,
   t,
 }) => {
   const [scope, setScope] = useState<AgentScope>('user');
@@ -117,10 +126,10 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   };
 
   const addAgent = () => {
+    if (scope === 'project' && !currentProjectId) return;
     onAgentManifestDraftsChange((current) => {
-      const next = createNewAgent(current, t);
+      const next = createNewAgent(current, t, scope, currentProjectId);
       setSelectedAgentId(next.id);
-      setScope('user');
       return [...current, next];
     });
   };

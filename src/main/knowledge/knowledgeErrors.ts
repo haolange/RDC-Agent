@@ -20,6 +20,14 @@ export class KnowledgeCandidateRequiresIntentError extends Error {
   }
 }
 
+export class KnowledgeAssetsMissingError extends Error {
+  readonly code = 'KNOWLEDGE_ASSETS_MISSING';
+  constructor() {
+    super('KNOWLEDGE_ASSETS_MISSING: all declared Knowledge images must be available in their owning space before creating or verifying a card.');
+    this.name = 'KnowledgeAssetsMissingError';
+  }
+}
+
 export class KnowledgeLifecycleError extends Error {
   readonly code = 'KNOWLEDGE_LIFECYCLE_INVALID';
   constructor(message: string) {

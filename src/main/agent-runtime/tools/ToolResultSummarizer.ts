@@ -1,5 +1,94 @@
 import type { AgentToolResult } from '../agent/AgentTool';
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function nativeShellSummary(result: AgentToolResult): string | null {
+  const details = asRecord(result.details);
+  const identity = asRecord(details?.rdcExecutionIdentity);
+  const operation = details?.operation;
+  const first = result.content[0];
+  if (typeof operation !== 'string' || !identity || first?.type !== 'text') return null;
+  const ids = ['productSessionId', 'contextId', 'replaySessionId', 'captureFileId'];
+  if (ids.some((key) => typeof identity[key] !== 'string')) return null;
+
+  let output: Record<string, unknown>;
+  try {
+    output = asRecord(JSON.parse(first.text)) ?? {};
+  } catch {
+    return null;
+  }
+  const native = asRecord(output.result);
+  const data = asRecord(native?.data);
+  if (!native || !data || native.result_kind !== operation) return null;
+  const outputIdentity = asRecord(output.rdcExecutionIdentity);
+  if (!outputIdentity || ids.some((key) => outputIdentity[key] !== identity[key])) {
+    return `[shell/${operation}] RDC_EXECUTION_IDENTITY_MISMATCH; inspect the full result`;
+  }
+
+  const parts = [
+    `[shell/${operation}] ok=${String(native.ok)}`,
+    `session=${identity.productSessionId}`,
+    `context=${identity.contextId}`,
+    `replay=${identity.replaySessionId}`,
+    `capture=${identity.captureFileId}`,
+  ];
+  const meta = asRecord(native.meta);
+  if (typeof meta?.trace_id === 'string') parts.push(`trace=${meta.trace_id}`);
+  if (operation === 'rd.texture.get_pixel_history') {
+    const target = asRecord(data.target_metadata);
+    const history = Array.isArray(data.history) ? data.history.map(asRecord).filter((item) => item !== null) : [];
+    const event = data.resolved_event_id;
+    const eventHistory = history.filter((item) => item.event_id === event);
+    const passed = eventHistory.filter((item) => item.passed === true);
+    const validShader = eventHistory.filter((item) => asRecord(item.shader_out)?.valid === true);
+    if (Number.isSafeInteger(event)) parts.push(`event=${event}`);
+    if (typeof target?.texture_id === 'string') parts.push(`target=${target.texture_id}`);
+    if (target && Number.isSafeInteger(target.x) && Number.isSafeInteger(target.y)) parts.push(`pixel=(${target.x},${target.y})`);
+    parts.push(`history=${history.length}`, `eventFragments=${eventHistory.length}`, `passed=${passed.length}`, `shaderValid=${validShader.length}`);
+    const primitives = passed.map((item) => item.primitive_id).filter((value) => Number.isSafeInteger(value));
+    if (primitives.length > 0) parts.push(`passedPrimitiveIds=${primitives.slice(0, 8).join(',')}${primitives.length > 8 ? ',…' : ''}`);
+    if (typeof data.binding_truth_level === 'string') parts.push(`binding=${data.binding_truth_level}`);
+    if (typeof data.evidence_truth_level === 'string') parts.push(`evidence=${data.evidence_truth_level}`);
+    if (Array.isArray(data.summary_degraded_reasons) && data.summary_degraded_reasons.length > 0) {
+      parts.push(`degraded=${JSON.stringify(data.summary_degraded_reasons)}`);
+    }
+  }
+  if (operation === 'rd.shader.get_disassembly' && native.ok === true) {
+    const boundedText = (value: unknown, maxLength: number): string =>
+      typeof value === 'string' && value.length <= maxLength ? value : 'unverified';
+    const boundedList = (value: unknown): string[] | 'unverified' =>
+      Array.isArray(value) && value.length <= 8
+      && value.every((item) => typeof item === 'string' && item.length <= 64)
+        ? value as string[] : 'unverified';
+    if (Number.isSafeInteger(data.resolved_event_id)) parts.push(`event=${data.resolved_event_id}`);
+    parts.push(`shader=${boundedText(data.shader_id, 80)}`);
+    parts.push(`target=${JSON.stringify(boundedText(data.target, 80))}`);
+    parts.push(`encoding=${boundedText(data.source_encoding, 40)}`);
+    parts.push(`sourceHash=${boundedText(data.source_hash, 128)}`);
+    const plan = asRecord(data.edit_plan);
+    if (plan) {
+      const knownBoolean = (value: unknown): boolean | 'unverified' =>
+        typeof value === 'boolean' ? value : 'unverified';
+      parts.push(`editPlan=${JSON.stringify({
+        inputKind: boundedText(plan.input_kind, 64),
+        canEditText: knownBoolean(plan.can_edit_text),
+        canBuild: knownBoolean(plan.can_build),
+        canReplace: knownBoolean(plan.can_replace),
+        allowedEditInputs: boundedList(plan.allowed_edit_inputs),
+        allowedOps: boundedList(plan.allowed_ops),
+        blockedReason: boundedText(plan.blocked_reason, 160),
+      })}`);
+    } else {
+      parts.push('editPlan=unverified');
+    }
+  }
+  return parts.join(' ');
+}
+
 /**
  * ToolResultSummarizer — 工具结果规则引擎摘要。
  * 当工具结果过长时，根据规则生成精简摘要，减少上下文占用。
@@ -37,7 +126,7 @@ export class ToolResultSummarizer {
         return `[read_file] ${lineCount} lines (truncated summary)`;
       },
     });
-    // shell 结果：只保留退出码和首行
+    // Ordinary shell results keep a short first-line projection.
     this.rules.push({
       match: (name, r) => name === 'shell' && !!firstText(r),
       summarize: (name, r) => {
@@ -112,6 +201,12 @@ export class ToolResultSummarizer {
   trySummarize(toolName: string, result: AgentToolResult, maxChars = 500): string | null {
     const text = result.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
     if (text.length <= maxChars) return null;
+    // The full native payload remains at the artifact URI; surface its main-owned
+    // binding and factual counters so large readbacks remain usable in context.
+    if (toolName === 'shell') {
+      const native = nativeShellSummary(result);
+      if (native) return native;
+    }
     for (const rule of this.rules) {
       if (rule.match(toolName, result)) {
         return rule.summarize(toolName, result);

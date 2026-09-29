@@ -60,7 +60,7 @@ export function useKnowledgeWriteConfirm(options: {
     const next = { ...current };
     if (nextAction === 'promote-verified') next.lifecycle = 'verified';
     if (nextAction === 'promote-promoted') next.lifecycle = 'promoted';
-    if (nextAction === 'deprecate') next.lifecycle = 'deprecated';
+    if (nextAction === 'retire') next.lifecycle = 'retired';
     if (nextAction === 'persist-draft') next.lifecycle = 'draft';
     setAction(nextAction);
     setBefore(current);

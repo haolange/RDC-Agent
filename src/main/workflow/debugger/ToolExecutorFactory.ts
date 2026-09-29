@@ -228,6 +228,7 @@ export class ToolExecutorFactory {
         let validatedArgs: Record<string, unknown>;
         try {
           validatedArgs = toolValidator.validate(toolToDefinition(tool), toolCall.arguments ?? {});
+          tool.validateArgs?.(validatedArgs);
         } catch (error) {
           const message = error instanceof ToolValidationError
             ? error.message
@@ -314,13 +315,13 @@ export class ToolExecutorFactory {
         }
         try {
           const projectRootPath = runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null;
-          const beforeHooksAllowed = await this.triggerRuntimeHooks('tool.before-call', agentId, runtimeContext, {
+          const beforeHooks = await this.triggerRuntimeHooks('tool.before-call', agentId, runtimeContext, {
             toolName: toolCall.name,
             toolCallId: toolCall.id,
             arguments: validatedArgs,
           });
-          if (!beforeHooksAllowed) {
-            return denyTool('A blocking lifecycle hook denied this tool call.');
+          if (!beforeHooks.allowed) {
+            return denyTool(`A blocking lifecycle hook denied this tool call: ${beforeHooks.reason ?? 'reason unavailable'}`);
           }
           const toolContext: ToolExecutionContext = {
             successfulFileReads: this.sessionFileReads(runtimeContext?.sessionId ?? sessionId),
@@ -383,6 +384,10 @@ export class ToolExecutorFactory {
                 toolCallId: toolCall.id,
                 toolName: toolCall.name,
                 result,
+                pinBelowThreshold: toolCall.name === 'shell'
+                  && typeof result.details === 'object' && result.details !== null
+                  && 'operation' in result.details && typeof result.details.operation === 'string'
+                  && result.details.operation.startsWith('rd.'),
               });
           return this.agentToolResultToMessage(toolCall, finalized);
         } catch (error) {
@@ -409,7 +414,7 @@ export class ToolExecutorFactory {
     agentId: AgentRole,
     runtimeContext: ToolExecutorRuntimeContext | undefined,
     payload: Record<string, unknown>,
-  ): Promise<boolean> {
+  ): Promise<{ allowed: boolean; reason?: string }> {
     const projectRoot = runtimeContext?.projectRootPath ?? undefined;
     hookEngine.load(appPathService.getUserRdcPaths().hooksPath, projectRoot ?? undefined);
     const results = await toolResourceArbiter.runExclusive(
@@ -425,13 +430,13 @@ export class ToolExecutorFactory {
     }))).catch(() => null);
     // A quarantined process prevents further hook effects; the original tool
     // result must still reach the caller without waiting for an unknown exit.
-    if (!results) return false;
+    if (!results) return { allowed: false, reason: 'Hook process state could not be confirmed' };
     for (const result of results) {
       if (!runtimeContext?.eventContext || !runtimeContext.onEvent) continue;
       runtimeContext.onEvent(buildDiagnosticAgentEvent(runtimeContext.eventContext, {
         code: `hook.${result.status}`,
         severity: result.status === 'completed' ? 'info' : result.allowed ? 'warning' : 'error',
-        message: `Hook ${result.hookId}: ${result.status}`,
+        message: `Hook ${result.hookId}: ${result.status}${!result.allowed && result.reason ? ` · ${result.reason}` : ''}`,
         toolCallId: typeof payload.toolCallId === 'string' ? payload.toolCallId : undefined,
         technicalMessage: JSON.stringify({
           exitCode: result.exitCode,
@@ -441,7 +446,10 @@ export class ToolExecutorFactory {
         }),
       }));
     }
-    return results.every((result) => result.allowed);
+    const blockingResult = results.find((result) => !result.allowed);
+    return blockingResult
+      ? { allowed: false, reason: blockingResult.reason ?? `Hook ${blockingResult.hookId} failed` }
+      : { allowed: true };
   }
 
   async executePlanArtifactTool(

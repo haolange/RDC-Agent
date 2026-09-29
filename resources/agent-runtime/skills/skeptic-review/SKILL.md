@@ -1,7 +1,7 @@
 ---
 name: skeptic-review
 description: Challenge Claims from Evidence, Experiments, negatives, and unknowns. Do not rewrite the Generator narrative.
-allowed-tools: [subagent_report, turn_complete, artifact_read, investigation_read, investigation_write, investigation_list, knowledge_browse, knowledge_search, knowledge_read, knowledge_compile]
+allowed-tools: [subagent_report, turn_complete, artifact_read, investigation_schema, investigation_read, investigation_write, investigation_list, knowledge_browse, knowledge_search, knowledge_read, knowledge_compile]
 ---
 
 # Skeptic Review
@@ -29,6 +29,8 @@ resolutionClaimId    required when status == resolved; must resolve to a ClaimRe
 3. Write one Challenge per gap. `requiredFollowUp` must be a concrete check (event, pixel region, intervention, or missing artifact), not a new narrative.
 4. Leave accepted Claims untouched. Request more evidence instead of inventing a replacement cause.
 5. Confirmation bias is a defect: keep alternatives and unknowns visible.
+
+Before accepting a bounded Capsule, count its required artifact reads plus tool discovery, `investigation_schema`, each intended `investigation_write`, one correction, and `turn_complete`. A five-source review that may need a typed Challenge needs at least ten tool calls and a wall deadline that covers actual Provider latency. If the supplied budget cannot cover that sequence, report the exact missing step as partial/blocked; do not equate an unwritten Challenge with no warranted challenge. Prefer the exact supplied content URIs and hashes over broad searches.
 
 ## Small Loop handoff to General
 

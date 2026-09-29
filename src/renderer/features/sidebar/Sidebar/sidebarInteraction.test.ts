@@ -4,10 +4,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import { RenamePopover, type RenamePopoverProps } from './RenamePopover';
+import { ProjectGroup } from './ProjectGroup';
 import { SessionListItem } from './SessionListItem';
 
 vi.mock('../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
-const project = { projectId: 'project', name: 'Project' } as ProjectRecord;
+const project = { projectId: 'project', name: 'Project', rootPath: 'D:\\project' } as ProjectRecord;
 const session = { sessionId: 'session', projectId: 'project', title: '会话 Long name' } as SessionRecord;
 let root: Root;
 let host: HTMLDivElement;
@@ -26,6 +27,39 @@ it('keeps selection separate from rename/remove actions and targets the exact se
   act(() => buttons[2].click()); expect(remove.mock.calls[0][1]).toBe(session); expect(activate).not.toHaveBeenCalled();
   act(() => buttons[0].click()); expect(activate).toHaveBeenCalledExactlyOnceWith(project, session);
   expect(host.querySelector('.is-selected')).not.toBeNull();
+});
+
+it('never shows another project session beneath the selected project while its list is changing', () => {
+  const otherProject = { projectId: 'other', name: 'Other', rootPath: 'D:\\other' } as ProjectRecord;
+  const otherSession = { sessionId: 'other-session', projectId: 'other', title: 'Other session' } as SessionRecord;
+  const renderGroup = (selectedProject: ProjectRecord) => createElement(ProjectGroup, {
+    project: selectedProject,
+    isCurrentProject: true,
+    isProjectRailActive: true,
+    isExpanded: true,
+    projectSessions: [session, otherSession],
+    showAllSessions: false,
+    rightRailTarget: 'project',
+    onProjectSelect: vi.fn(),
+    onProjectChevronClick: vi.fn(),
+    onToggleProjectExpanded: vi.fn(),
+    onOpenProjectMenu: vi.fn(),
+    onSessionActivate: vi.fn(),
+    onSessionContextMenu: vi.fn(),
+    onRenameClick: vi.fn(),
+    onRemoveClick: vi.fn(),
+    onRenameKeyDown: vi.fn(),
+    onRemoveKeyDown: vi.fn(),
+    onToggleShowAll: vi.fn(),
+  });
+
+  act(() => root.render(renderGroup(project)));
+  expect(host.textContent).toContain(session.title);
+  expect(host.textContent).not.toContain(otherSession.title);
+
+  act(() => root.render(renderGroup(otherProject)));
+  expect(host.textContent).toContain(otherSession.title);
+  expect(host.textContent).not.toContain(session.title);
 });
 
 it('focuses/selects a new rename target, preserves editing focus, commits Enter and dismisses outside', () => {

@@ -12,7 +12,7 @@ import type { useSettingsModal } from './useSettingsModal';
 import type { useRdcRuntimeOverview } from './useRdcRuntimeOverview';
 
 type PageState = Pick<ReturnType<typeof useSettingsModal>,
-  'activeSection' | 't' | 'accountDraft' | 'setAccountDraft' | 'handleAvatarSelect' |
+  'activeSection' | 't' | 'currentProjectId' | 'accountDraft' | 'setAccountDraft' | 'handleAvatarSelect' |
   'handleAccountSave' | 'setLanguage' | 'globalInstructionsDraft' | 'setGlobalInstructionsDraft' | 'handleSavePersonalization' |
   'setTheme' | 'setFontScale' | 'setComposerMarkdown' | 'setUsePointerCursors' |
   'setChromeTheme' | 'accountProviders' | 'providerCatalog' | 'providerCatalogCategories' | 'getResolvedProviderLabel' |
@@ -33,6 +33,7 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
   const {
     activeSection,
     t,
+    currentProjectId,
     accountDraft,
     setAccountDraft,
     handleAvatarSelect,
@@ -119,7 +120,8 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
     {activeSection === 'agents' && (
       <section className="settings-page settings-page-agents" data-settings-search="agents">
       <AgentsSettings
-        canProject={Boolean(runtime.overview?.projectRoot)}
+        canProject={Boolean(currentProjectId && runtime.overview?.projectRoot)}
+        currentProjectId={currentProjectId}
         settings={settings}
         agentManifestDrafts={agentManifestDrafts}
         onAgentManifestDraftsChange={setAgentManifestDrafts}

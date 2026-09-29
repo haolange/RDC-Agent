@@ -45,6 +45,8 @@ import {
 } from '../agent-runtime/providers/internal/http';
 import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
 import { isMissionCompletionError } from '../investigation/missionCompletionContract';
+import { InvestigationError } from '../investigation/investigationErrors';
+import { SessionArtifactError } from '@shared/types/sessionArtifact';
 
 export interface ConversationBranchTurnContext {
   branchId: string;
@@ -529,8 +531,56 @@ export function createTurnFailedDiagnostic(
       technicalMessage: redactTechnicalMessage(error),
     });
   }
+  const compactionFailure = error instanceof AgentRecoveryAbortError ? error.cause : error;
+  if (compactionFailure instanceof SessionArtifactError && compactionFailure.code === 'ARTIFACT_QUOTA_EXCEEDED') {
+    return createConversationDiagnostic({
+      agentId: route.agentId,
+      code: 'CONVERSATION_ARTIFACT_QUOTA_EXCEEDED',
+      severity: 'error',
+      userMessage: '本地会话产物配额已满，当前操作未能完成。原始会话与已写入证据仍保留；清理可证明冗余的产物或调整受控配额后继续。',
+      providerId: route.providerId,
+      modelId: route.modelId,
+      technicalMessage: redactTechnicalMessage(compactionFailure),
+    });
+  }
+  if (error instanceof AgentRecoveryAbortError && compactionFailure instanceof InvestigationError) {
+    return createConversationDiagnostic({
+      agentId: route.agentId,
+      code: 'CONVERSATION_CONTEXT_COMPACTION_FAILED',
+      severity: 'error',
+      userMessage: `本地调查记录无法建立上下文检查点（${compactionFailure.code}）。原始会话和调查证据已保留；修复记录读取问题后可继续。`,
+      providerId: route.providerId,
+      modelId: route.modelId,
+      technicalMessage: redactTechnicalMessage(compactionFailure),
+    });
+  }
+  const compactionCode = compactionFailure instanceof Error && compactionFailure.name === 'Error'
+    ? compactionFailure.message.match(/^(COMPACTION_[A-Z_]+):/u)?.[1]
+    : undefined;
+  if (compactionCode) {
+    return createConversationDiagnostic({
+      agentId: route.agentId,
+      code: 'CONVERSATION_CONTEXT_COMPACTION_FAILED',
+      severity: 'error',
+      userMessage: `本地上下文检查点未能建立（${compactionCode}）。原始会话和调查证据已保留；修复此错误后可继续调查。`,
+      providerId: route.providerId,
+      modelId: route.modelId,
+      technicalMessage: redactTechnicalMessage(compactionFailure),
+    });
+  }
   const technicalMessage = redactTechnicalMessage(error);
   const matchedCode = technicalMessage.match(/^([A-Z][A-Z0-9_]+):/u)?.[1];
+  if (matchedCode === 'TASK_COMPLETION_DENIED') {
+    return createConversationDiagnostic({
+      agentId: route.agentId,
+      code: 'CONVERSATION_TASK_COMPLETION_DENIED',
+      severity: 'error',
+      userMessage: '模型已给出终答，但本回合仍有未结算的直接 Task。运行时已将其标为受阻并保留证据；请查看 Task 状态，明确完成或受阻原因后继续。',
+      providerId: route.providerId,
+      modelId: route.modelId,
+      technicalMessage,
+    });
+  }
   const attachmentCode = matchedCode === 'ATTACHMENT_LIMIT_EXCEEDED'
     || matchedCode === 'ATTACHMENT_MEDIA_UNSUPPORTED'
     || matchedCode === 'ATTACHMENT_NOT_FOUND'

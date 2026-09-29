@@ -339,8 +339,8 @@ describe('OpenRouter manifest admission policy', () => {
     expect(admission.requireContextWindow).toBe(true);
   });
 
-  it('excludes deprecated and experimental models', () => {
-    expect(admission.excludeDeprecated).toBe(true);
+  it('excludes experimental models without a redundant deprecated flag', () => {
+    expect(admission).not.toHaveProperty('excludeDeprecated');
     expect(admission.excludeExperimental).toBe(true);
   });
 });

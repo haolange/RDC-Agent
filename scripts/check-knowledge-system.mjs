@@ -289,7 +289,7 @@ export const KNOWLEDGE_RULE_REGISTRY = [
     includeTests: true,
     pattern: EMBEDDING_RUNTIME_FORBIDDEN,
     probe: 'walk-path-and-content',
-    unlessPattern: "NON_AGENT_MODALITIES[\\s\\S]{0,120}'embedding'[\\s\\S]{0,40}'embeddings'|\\*embedding\\*|semanticHash|semanticContext|Semantic Token|图形学 Semantics|provider deprecated",
+    unlessPattern: "NON_AGENT_MODALITIES[\\s\\S]{0,120}'embedding'[\\s\\S]{0,40}'embeddings'|\\*embedding\\*|semanticContext|Semantic Token|图形学 Semantics",
     note: 'Embedding capability and Semantic lane runtime must be absent from source, tests, scripts, file paths, and export lists',
   },
 ];

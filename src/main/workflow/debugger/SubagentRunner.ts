@@ -26,7 +26,10 @@ import {
   consumeReservedSubagentSlot,
   createSubagentBudgetState,
   createPolicyBudgetState,
+  finishSubagentBudgetChild,
   reserveDispatchBudget,
+  startSubagentBudgetChild,
+  subagentActiveWallMs,
   type SubagentResultStatus,
   type TurnHandle,
 } from './TurnCoordinator';
@@ -120,6 +123,9 @@ export class SubagentRunner {
     let modelOverride: { providerId: string; modelId: string } | undefined;
     try {
       modelOverride = resolveSubagentModelOverride(input.model, childSettings);
+      if (!modelOverride && (!definition.compiledRoute?.providerId || !definition.compiledRoute.modelId)) {
+        throw new Error(`MODEL_ROUTE_REQUIRED: ${input.targetProfile} has no configured model route; set capsule.model to an available providerId:modelId (colon separator).`);
+      }
     } catch (error) {
       const text = error instanceof Error ? error.message : String(error);
       const subagentId = generateEventId('subagent');
@@ -160,7 +166,6 @@ export class SubagentRunner {
       consumeReservedSubagentSlot(policyBudget);
     }
     const childPolicyBudget = deriveChildPolicyBudget(policyBudget ?? createPolicyBudgetState(), capsule.budget, input.restoredPolicyBudget);
-    parentBudget.childrenSpawned += 1;
 
     const subagentId = generateEventId('subagent');
     // 子 agent 用独立 sessionId 段隔离 context/messages（不污染父线程持久化）。
@@ -208,7 +213,6 @@ export class SubagentRunner {
       maxAggregateToolCalls: policyBudget?.maxToolCalls ?? parentBudget.budget.maxAggregateToolCalls,
     }, parentBudget.depth + 1);
     childBudget.aggregateToolCalls = parentBudget.aggregateToolCalls;
-    childBudget.wallStartedAt = parentBudget.wallStartedAt;
 
     const unregisterProducer = input.detached ? undefined : input.parentTurn?.registerProducer({
       id: subagentId,
@@ -228,6 +232,11 @@ export class SubagentRunner {
         generation: input.taskExecutionGeneration,
       })
       : undefined;
+    const childStartedAt = Date.now();
+    startSubagentBudgetChild(parentBudget, childStartedAt);
+    childBudget.wallStartedAt = childStartedAt - subagentActiveWallMs(parentBudget, childStartedAt);
+    // The child's own turn is active throughout nested delegations.
+    childBudget.activeChildren = 1;
     try {
       if (childAbort.signal.aborted) {
         throw new DOMException('Aborted', 'AbortError');
@@ -322,28 +331,39 @@ export class SubagentRunner {
       resultText = await childPromise;
       if (childAbort.signal.aborted) {
         resultStatus = 'cancelled';
+        const reason = childAbort.signal.reason;
+        if (reason instanceof Error && reason.message.startsWith('POLICY_LIMIT_EXCEEDED: maxWallTimeMs')) {
+          resultText = reason.message;
+        }
       }
     } catch (error) {
       const aborted = childAbort.signal.aborted
         || (error instanceof Error && error.name === 'AbortError');
       resultStatus = aborted ? 'cancelled' : 'failed';
-      resultText = error instanceof Error ? error.message : String(error);
+      const reason = childAbort.signal.reason;
+      resultText = aborted && reason instanceof Error && reason.message.startsWith('POLICY_LIMIT_EXCEEDED: maxWallTimeMs')
+        ? reason.message
+        : error instanceof Error ? error.message : String(error);
     } finally {
-      clearTimeout(deadlineTimer);
-      await processSupervisor.joinExecutionProcesses(subagentSessionId);
-      const lease = getRdcContextLease(subagentSessionId);
-      revokeDelegatedLease(subagentSessionId, { operationStopped: !!lease && !shellInvocationService.hasUnconfirmedProcesses(lease.contextId) });
-      releaseArtifacts?.();
-      releaseTaskScope?.();
-      unregisterProducer?.();
-      if (parentSignal) {
-        parentSignal.removeEventListener('abort', onParentAbort);
+      try {
+        clearTimeout(deadlineTimer);
+        await processSupervisor.joinExecutionProcesses(subagentSessionId);
+        const lease = getRdcContextLease(subagentSessionId);
+        revokeDelegatedLease(subagentSessionId, { operationStopped: !!lease && !shellInvocationService.hasUnconfirmedProcesses(lease.contextId) });
+        releaseArtifacts?.();
+        releaseTaskScope?.();
+        unregisterProducer?.();
+        if (parentSignal) {
+          parentSignal.removeEventListener('abort', onParentAbort);
+        }
+        // Propagate child budget usage back to parent.
+        parentBudget.aggregateToolCalls = Math.max(
+          parentBudget.aggregateToolCalls,
+          childBudget.aggregateToolCalls,
+        );
+      } finally {
+        finishSubagentBudgetChild(parentBudget);
       }
-      // Propagate child budget usage back to parent.
-      parentBudget.aggregateToolCalls = Math.max(
-        parentBudget.aggregateToolCalls,
-        childBudget.aggregateToolCalls,
-      );
     }
 
     if (ownerSessionId) delegationTraceStore.finish(ownerSessionId, input.parentToolCallId, traceIdentity, resultStatus, resultText);
@@ -362,7 +382,7 @@ export class SubagentRunner {
     > = {
       name: 'subagent',
       label: 'Subagent',
-      description: 'Delegate a structured Delegation Capsule to an isolated sub-agent. Required fields include goal, task, scope, qualified acceptedFacts, hypotheses, challengeRefs, conditional negativePaths, inputArtifactRefs, requiredSkillIds, stopConditions, outputRequirements and budget. mode=wait waits; mode=background requires taskId and returns its execution id. Capability requests do not grant authority; domain admission and tool resource locks enforce exclusive effects. Optional model is a canonical providerId:modelId and does not inherit the parent session override.',
+      description: 'Delegate a structured Delegation Capsule to an isolated sub-agent. Required fields include goal, task, scope, qualified acceptedFacts, hypotheses, challengeRefs, conditional negativePaths, inputArtifactRefs, requiredSkillIds, stopConditions, outputRequirements and budget. For every parent record the child must read, include its exact session:// contentUri in inputArtifactRefs or a fact sourceRef; a record ID in scope is not a grant. Budget for the required reads, writes and completion. mode=wait waits; mode=background requires taskId and returns its execution id. Capability requests do not grant authority; domain admission and tool resource locks enforce exclusive effects. Set model to an available canonical providerId:modelId when the child profile has no configured route; the child never inherits the parent session override. Use reasoningLevel separately for effort.',
       parameters: {
         ...DELEGATION_CAPSULE_JSON_SCHEMA,
         properties: {
@@ -468,20 +488,22 @@ export class SubagentRunner {
           const rootBudgetId = parentExecution?.rootBudgetId ?? (turn?.policyBudget
             ? await bindTaskRootBudget(registry, ownerSessionId, turn.policyBudget, previousExecution?.rootBudgetId)
             : undefined);
+          const startedAt = Date.now();
           execution = await registry.startExecution(taskId, {
             mode: 'subagent',
             parentExecutionId: effectiveParentExecutionId,
             rootBudgetId,
             frozenPlanRef: `capsule:sha256:${createHash('sha256').update(JSON.stringify(capsule)).digest('hex')}`,
-            budget: turn?.policyBudget ? {
-              maxToolCalls: turn.policyBudget.maxToolCalls,
-              toolCalls: turn.policyBudget.toolCalls,
-              maxSubagents: turn.policyBudget.maxSubagents,
-              subagents: turn.policyBudget.subagents,
-              maxChildDepth: turn.policyBudget.maxChildDepth,
-              childDepth: turn.subagentBudget.depth,
-              deadlineAt: turn.policyBudget.wallStartedAt + turn.policyBudget.maxWallTimeMs,
-            } : undefined,
+            budget: {
+              maxToolCalls: capsule.budget.maxToolCalls,
+              toolCalls: 0,
+              maxSubagents: capsule.budget.maxSubagents,
+              subagents: 0,
+              maxChildDepth: turn?.policyBudget?.maxChildDepth,
+              childDepth: (turn?.subagentBudget.depth ?? 0) + 1,
+              deadlineAt: Math.min(startedAt + capsule.budget.maxWallTimeMs,
+                turn?.policyBudget ? turn.policyBudget.wallStartedAt + turn.policyBudget.maxWallTimeMs : Number.POSITIVE_INFINITY),
+            },
           });
           unregisterOwner = registerTaskExecutionCancellationOwner(execution.id, async () => {
             executionController.abort();
@@ -572,12 +594,30 @@ export class SubagentRunner {
               }
               await registry.settleExecution(execution.id, {
                 expectedGeneration: execution.generation,
-                status: result.status === 'cancelled' ? 'cancelled' : result.status === 'failed' ? 'failed'
+                status: result.status === 'cancelled' ? (envelope.disposition === 'blocked' ? 'blocked' : 'cancelled') : result.status === 'failed' ? 'failed'
                   : envelope.disposition === 'completed' ? 'completed' : envelope.disposition,
                 result: envelope,
               });
             }
           }
+        } catch (error) {
+          if (execution && ownerSessionId) {
+            const registry = new TaskRegistry(createSessionTaskStore(ownerSessionId));
+            const current = await registry.getExecution(execution.id);
+            if (current && !['completed', 'partial', 'blocked', 'failed', 'cancelled', 'interrupted', 'cancelling'].includes(current.status)) {
+              const message = error instanceof Error ? error.message : String(error);
+              await registry.settleExecution(execution.id, {
+                expectedGeneration: execution.generation,
+                status: 'failed',
+                result: {
+                  disposition: 'blocked', summary: `Subagent Task settlement failed: ${message}`,
+                  outputs: {},
+                  resultRef: resultArtifact?.uri, resultHash: resultArtifact?.hash,
+                },
+              });
+            }
+          }
+          throw error;
         } finally {
           releaseExecutionBudgetObserver?.();
           unregisterOwner?.();
@@ -592,7 +632,8 @@ export class SubagentRunner {
             status: result.status,
             executionId: execution?.id,
             generation: execution?.generation,
-            errorCode: result.status === 'cancelled' ? 'SUBAGENT_CANCELLED' : result.status === 'failed' ? 'SUBAGENT_FAILED' : undefined,
+            errorCode: envelope.error === 'POLICY_LIMIT_EXCEEDED: maxWallTimeMs' ? 'POLICY_LIMIT_EXCEEDED'
+              : result.status === 'cancelled' ? 'SUBAGENT_CANCELLED' : result.status === 'failed' ? 'SUBAGENT_FAILED' : undefined,
           },
         };
       },

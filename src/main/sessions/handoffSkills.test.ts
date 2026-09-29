@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EXECUTION_OFFER_SCHEMA } from '@shared/types/executionOffer';
-import { executionOfferRequiredSkillIds } from './handoffSkills';
+import { approvedExecutionOfferForAgent, executionOfferRequiredSkillIds } from './handoffSkills';
 
 const mocks = vi.hoisted(() => ({
   offerRead: vi.fn(),
@@ -35,10 +35,12 @@ describe('executionOfferRequiredSkillIds', () => {
       status: 'approved',
       approvedHash: 'a'.repeat(64),
       frozenUri: 'session://plans/plan-frozen.md',
+      approvedHandoff: { agent: 'general', label: 'Execute with General' },
     });
   });
 
   it('returns declared skills only when the recipient and frozen plan match', () => {
+    expect(approvedExecutionOfferForAgent('sess', 'general')).toEqual(offer);
     expect(executionOfferRequiredSkillIds('sess', 'general')).toEqual([
       'renderdoc-execution',
       'debugger-causal-method',
@@ -46,12 +48,33 @@ describe('executionOfferRequiredSkillIds', () => {
   });
 
   it('returns nothing for a different agent or a different plan hash', () => {
+    expect(approvedExecutionOfferForAgent('sess', 'debugger')).toBeNull();
     expect(executionOfferRequiredSkillIds('sess', 'debugger')).toEqual([]);
     mocks.planRead.mockReturnValue({
       status: 'approved',
       approvedHash: 'b'.repeat(64),
       frozenUri: 'session://plans/plan-frozen.md',
+      approvedHandoff: { agent: 'general', label: 'Execute with General' },
     });
+    expect(approvedExecutionOfferForAgent('sess', 'general')).toBeNull();
+    expect(executionOfferRequiredSkillIds('sess', 'general')).toEqual([]);
+  });
+
+  it('rejects a mismatched approved handoff target or frozen URI', () => {
+    mocks.planRead.mockReturnValue({
+      status: 'approved',
+      approvedHash: 'a'.repeat(64),
+      frozenUri: 'session://plans/another-plan.md',
+      approvedHandoff: { agent: 'general', label: 'Execute with General' },
+    });
+    expect(approvedExecutionOfferForAgent('sess', 'general')).toBeNull();
+    mocks.planRead.mockReturnValue({
+      status: 'approved',
+      approvedHash: 'a'.repeat(64),
+      frozenUri: 'session://plans/plan-frozen.md',
+      approvedHandoff: { agent: 'analyzer', label: 'Execute with Analyzer' },
+    });
+    expect(approvedExecutionOfferForAgent('sess', 'general')).toBeNull();
     expect(executionOfferRequiredSkillIds('sess', 'general')).toEqual([]);
   });
 

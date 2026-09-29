@@ -337,12 +337,18 @@ describe('knowledge path ingest', () => {
         chapters: result.items[0]?.record?.chapters,
         preview: result.items[0]?.record?.preview,
         missingAssets: result.items[0]?.missingAssets,
+        persistedMissingAssets: result.items[0]?.record?.missingAssets,
       });
       expect(published).not.toContain('企业微信');
       expect(published).not.toContain('HairBlack');
       expect(published).not.toMatch(/\.txt/i);
       expect(result.items[0]?.missingAssets.some((id) => id.endsWith('.png'))).toBe(true);
       expect(result.items[0]?.missingAssets.some((id) => /^asset-[a-f0-9]{8}$/.test(id))).toBe(true);
+      expect(result.items[0]?.record?.missingAssets).toEqual(result.items[0]?.missingAssets);
+      const persisted = parseKnowledgeFrontmatter(
+        readFileSync(path.join(spaceRoot, result.items[0]!.record!.relativePath), 'utf8'),
+      );
+      expect(persisted.record.missingAssets).toEqual(result.items[0]?.missingAssets);
     }
     for (const snapshot of before) {
       const after = sourceFingerprint(snapshot.filePath);

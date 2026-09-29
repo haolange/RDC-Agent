@@ -12,6 +12,12 @@ export interface ContextUsageSelectedProfile {
   compactionThresholdTokens: number;
 }
 
+export function awaitsExecutionContextWindow(prepared: PreparedTurnContextSummary | null): boolean {
+  return Boolean(prepared
+    && !prepared.compactionApplied
+    && prepared.preparedInputTokens > prepared.compactionThresholdTokens);
+}
+
 function positiveOrNull(value: number | null | undefined): number | null {
   return typeof value === 'number' && value > 0 ? value : null;
 }

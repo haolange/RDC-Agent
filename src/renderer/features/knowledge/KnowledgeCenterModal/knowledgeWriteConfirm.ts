@@ -116,7 +116,7 @@ export async function issueKnowledgeWrite(input: {
       permissionMode: AgentPermissionMode;
       confirmation: { explicitHumanConfirmation: true };
       approvalToken: string;
-      to: 'verified' | 'promoted' | 'deprecated';
+      to: 'verified' | 'promoted' | 'retired';
     }) => Promise<unknown>;
   };
 }): Promise<{ ok: true } | { ok: false; stale?: true; error?: string }> {
@@ -124,7 +124,7 @@ export async function issueKnowledgeWrite(input: {
   if (isWriteVersionStale(latest.card, input.openedUpdatedAt)) {
     return { ok: false, stale: true };
   }
-  const isPromote = input.action === 'promote-verified' || input.action === 'promote-promoted' || input.action === 'deprecate';
+  const isPromote = input.action === 'promote-verified' || input.action === 'promote-promoted' || input.action === 'retire';
   const issued = await input.api.issueApprovalToken({
     action: isPromote ? 'knowledge.promote' : 'knowledge.write',
     spaceId: input.after.spaceId,
@@ -143,7 +143,7 @@ export async function issueKnowledgeWrite(input: {
   if (isPromote) {
     await input.api.promote({
       ...payload,
-      to: input.action === 'deprecate' ? 'deprecated' : input.action === 'promote-verified' ? 'verified' : 'promoted',
+      to: input.action === 'retire' ? 'retired' : input.action === 'promote-verified' ? 'verified' : 'promoted',
     });
   } else {
     await input.api.write(payload);

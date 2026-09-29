@@ -320,7 +320,7 @@ export interface ElectronAPI {
     promote: (request: {
       spaceId: string;
       card: KnowledgeCardRecord;
-      to: Extract<KnowledgeLifecycle, 'verified' | 'promoted' | 'deprecated'>;
+      to: Extract<KnowledgeLifecycle, 'verified' | 'promoted' | 'retired'>;
       permissionMode: AgentPermissionMode;
       confirmation: KnowledgeHumanConfirmation;
       approvalToken: string;

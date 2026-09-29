@@ -5,6 +5,7 @@ import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import type { AgentPermissionSettings } from '@shared/types/settings';
+import type { ExecutionOffer } from '@shared/types/executionOffer';
 import type {
   EffectiveAgentProfile,
   PromptPlan,
@@ -33,6 +34,8 @@ export interface PromptPlanInput {
   tools: string[];
   workDir: string;
   sessionId?: string | null;
+  /** Main-process verified offer bound to this recipient and the approved plan. */
+  approvedExecutionOffer?: ExecutionOffer | null;
   routeCapability: AgentRouteCapability;
   effectiveModel?: EffectiveModel;
   permissionSettings: AgentPermissionSettings;
@@ -193,6 +196,29 @@ export class PromptPlanBuilder {
       stability: 'volatile',
       content: runtimeFactsContent,
     });
+
+    if (input.approvedExecutionOffer) {
+      const offer = input.approvedExecutionOffer;
+      const offerFact = [
+        '# Approved Execution Offer',
+        'The main process verified that this execution offer matches the currently approved frozen plan for this agent.',
+        `Source agent ID: ${JSON.stringify(offer.sourceAgentId)}`,
+        `Recipient agent ID: ${JSON.stringify(offer.targetAgentId)}`,
+        `Frozen plan URI: ${JSON.stringify(offer.plan.uri)}`,
+        `Frozen plan SHA-256: ${JSON.stringify(offer.plan.hash.replace(/^sha256:/, ''))}`,
+        'Plan review is complete. Earlier source-agent messages about submitting or awaiting approval belong to the planning phase.',
+        'Check the current runtime identity against the frozen plan before acting. This fact grants no tools, permissions, or device access.',
+      ].join('\n');
+      push({
+        id: 'runtime:approved-execution-offer',
+        kind: 'runtime-fact',
+        scope: 'runtime',
+        sourcePath: 'runtime://execution-offer/approved',
+        sourceHash: hashScopedResource(offerFact),
+        stability: 'volatile',
+        content: offerFact,
+      });
+    }
 
     for (const extra of input.extraSegments ?? []) {
       const content = extra.content.trim();

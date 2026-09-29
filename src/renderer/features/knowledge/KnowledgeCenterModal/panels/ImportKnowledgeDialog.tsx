@@ -119,12 +119,12 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
                   <p className="knowledge-import-hint">{t('knowledgeCenter.importExistingCard', { id: existingCardId })}</p>
                 ) : null}
                 {item.missingAssets.length > 0 ? (
-                  <p className="knowledge-import-hint">{t('knowledgeCenter.importMissingImages', { count: item.missingAssets.length })}</p>
+                  <p className="knowledge-import-hint">{t('knowledgeCenter.importMissingAssets', { count: item.missingAssets.length })}</p>
                 ) : null}
                 {item.reason && item.reason !== 'already-present' && item.reason !== 'duplicate-case-id' && item.reason !== 'missing-assets' ? (
                   <InlineError>{item.reason}</InlineError>
                 ) : null}
-                {item.status === 'draft' && item.record && importer.hasSession ? (
+                {item.status === 'draft' && item.record && importer.hasSession && item.missingAssets.length === 0 ? (
                   <Button
                     variant="secondary"
                     size="sm"

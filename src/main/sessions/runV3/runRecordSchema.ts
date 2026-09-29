@@ -1,8 +1,7 @@
 import { z, type ZodType } from 'zod';
-import { isMissionAgentId, LEGACY_UNKNOWN_PROFILE_ID } from '@shared/types/agent';
+import { isMissionAgentId } from '@shared/types/agent';
 import type { MissionKind, RunRecord } from '@shared/types/session';
 import type { PersistedRunRecord } from '../storageTypes';
-import type { StorageMigration } from '../storageSchema';
 
 const CaptureDescriptorSchema = z.object({
   id: z.string().min(1),
@@ -133,11 +132,6 @@ export const PersistedRunRecordV3Schema: ZodType<PersistedRunRecord> = z.discrim
   }
 }) as unknown as ZodType<PersistedRunRecord>;
 
-export interface RunProfileRecovery {
-  profileId: string;
-  diagnostics: string[];
-}
-
 export function classifyRunKind(profileId: string): { kind: RunRecord['kind']; mission?: MissionKind } {
   if (isMissionAgentId(profileId)) {
     return { kind: 'mission', mission: profileId };
@@ -182,45 +176,3 @@ export function toPersistedRunV3(
   }
   return { ...shared, kind: 'conversation' };
 }
-
-export const LEGACY_RUN_PROFILE_ID = LEGACY_UNKNOWN_PROFILE_ID;
-
-function stampLegacyRun(raw: unknown, fromVersion: '0' | '1' | '2'): unknown {
-  const record = raw && typeof raw === 'object' && !Array.isArray(raw)
-    ? { ...(raw as Record<string, unknown>) }
-    : {};
-  delete record.lastStage;
-  delete record.last_stage;
-  if (record.runtime && typeof record.runtime === 'object' && !Array.isArray(record.runtime)) {
-    const runtime = { ...(record.runtime as Record<string, unknown>) };
-    delete runtime.workflow_stage;
-    record.runtime = runtime;
-  }
-  return {
-    ...record,
-    schemaVersion: '3',
-    _legacyRunMigration: fromVersion,
-  };
-}
-
-export const SESSION_RUN_MIGRATIONS: StorageMigration<PersistedRunRecord>[] = [
-  {
-    schemaVersion: '0',
-    schema: z.object({}).passthrough() as unknown as ZodType<PersistedRunRecord>,
-    migrate: (raw) => stampLegacyRun(raw, '0'),
-  },
-  {
-    schemaVersion: '1',
-    schema: z.object({}).passthrough() as unknown as ZodType<PersistedRunRecord>,
-    migrate: (raw) => stampLegacyRun(raw, '1'),
-  },
-  {
-    schemaVersion: '2',
-    schema: z.object({}).passthrough() as unknown as ZodType<PersistedRunRecord>,
-    migrate: (raw) => stampLegacyRun(raw, '2'),
-  },
-  {
-    schemaVersion: '3',
-    schema: PersistedRunRecordV3Schema,
-  },
-];

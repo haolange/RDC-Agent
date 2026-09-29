@@ -22,7 +22,7 @@ A prose guess is not a First Bad Event. Do not mark `ready` without provenance (
 
 Shape: one `ClaimSet` (`kind: claim_set`) of competing `hypothesis` Claims.
 
-1. Write at least two mutually distinguishable hypotheses. Each item is a `ClaimRecord` with `claimKind: hypothesis`, `epistemic: inferred`, `experimentId: null`, and a non-empty `scope`.
+1. Check whether the approved plan records a bounded Knowledge retrieval. If it does not, search by the observed symptom and capture scope before writing the matrix; read relevant hits and their applicability or record the empty/failed result. Treat historical cases only as leads to test against this capture. Write at least two mutually distinguishable hypotheses. Each item is a `ClaimRecord` with `claimKind: hypothesis`, `epistemic: inferred`, `experimentId: null`, and a non-empty `scope`.
 2. Link rivals with `supports` / `contradicts` using resolvable `claimId`s. Keep evidence-backed, distinguishable alternative explanations visible until checked; do not invent a driver-blame hypothesis.
 3. Name the smallest check that would confirm one row and reject another. That check becomes a Task subject later; do not write the matrix into `TaskRecord`.
 

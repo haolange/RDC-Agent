@@ -10,6 +10,8 @@ import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGu
 import { ProviderEmptyStreamError, ProviderHttpError, ProviderWireFailureError } from '../agent-runtime/providers/internal/http';
 import { createTurnFailedDiagnostic } from './ConversationRoutePreflight';
 import { MissionCompletionError } from '../investigation/missionCompletionContract';
+import { InvestigationError } from '../investigation/investigationErrors';
+import { SessionArtifactError } from '@shared/types/sessionArtifact';
 
 const ROUTE = {
   agentId: 'plan' as const,
@@ -43,6 +45,13 @@ describe('conversation turn failure classification', () => {
     );
     expect(diagnostic.code).toBe('CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED');
     expect(diagnostic.userMessage).toContain('25 轮上限');
+  });
+
+  it('classifies an unclosed direct Task as a local completion failure', () => {
+    const diagnostic = createTurnFailedDiagnostic(ROUTE, new Error('TASK_COMPLETION_DENIED: Direct Task executions must be settled before the parent turn completes.'));
+    expect(diagnostic.code).toBe('CONVERSATION_TASK_COMPLETION_DENIED');
+    expect(diagnostic.userMessage).toContain('未结算的直接 Task');
+    expect(diagnostic.userMessage).not.toContain('服务商');
   });
 
   it('classifies 401 as an auth failure with structured technicalMessage', () => {
@@ -99,6 +108,51 @@ describe('conversation turn failure classification', () => {
     expect(diagnostic.code).toBe('CONVERSATION_LLM_REQUEST_FAILED');
     expect(diagnostic.userMessage).toContain('网络连接失败');
     expect(diagnostic.technicalMessage).toBe('provider HTTP n/a · attempts 1/1 · read ECONNRESET');
+  });
+
+  it('reports a failed local compaction checkpoint without blaming the provider', () => {
+    const original = new Error('COMPACTION_AUTHORITY_TOO_LARGE: authoritative state exceeds the bounded input.');
+    const abort = new AgentRecoveryAbortError('[Recovery abort] unrecoverable error', {
+      cause: original,
+      category: 'unknown',
+      attempts: 1,
+      maxAttempts: 1,
+      bodySnippet: original.message,
+    });
+    const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
+    expect(diagnostic.code).toBe('CONVERSATION_CONTEXT_COMPACTION_FAILED');
+    expect(diagnostic.userMessage).toContain('本地上下文检查点');
+    expect(diagnostic.userMessage).toContain('原始会话和调查证据已保留');
+    expect(diagnostic.userMessage).not.toContain('服务商');
+    expect(diagnostic.technicalMessage).toContain('COMPACTION_AUTHORITY_TOO_LARGE');
+  });
+
+  it('reports a local artifact quota failure without blaming the model route', () => {
+    const quota = new SessionArtifactError('ARTIFACT_QUOTA_EXCEEDED', 'tool-outputs would have 257 files (cap 256).');
+    const abort = new AgentRecoveryAbortError('[Recovery abort] unrecoverable error', {
+      cause: quota, category: 'unknown', attempts: 1, maxAttempts: 1,
+    });
+    const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
+    expect(diagnostic.code).toBe('CONVERSATION_ARTIFACT_QUOTA_EXCEEDED');
+    expect(diagnostic.userMessage).toContain('本地会话产物配额');
+    expect(diagnostic.userMessage).not.toContain('服务商');
+    expect(diagnostic.technicalMessage).toContain('ARTIFACT_QUOTA_EXCEEDED');
+  });
+
+  it('reports investigation integrity failures during compaction as local context failures', () => {
+    const invalidEvidence = new InvestigationError(
+      'INVESTIGATION_REF_UNRESOLVED',
+      'strong observed tool evidence requires an artifactRef',
+      { invariantId: 'S-CTX-01' },
+    );
+    const abort = new AgentRecoveryAbortError('[Recovery abort] unrecoverable error', {
+      cause: invalidEvidence, category: 'unknown', attempts: 1, maxAttempts: 1,
+    });
+    const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
+    expect(diagnostic.code).toBe('CONVERSATION_CONTEXT_COMPACTION_FAILED');
+    expect(diagnostic.userMessage).toContain('本地调查记录');
+    expect(diagnostic.userMessage).not.toContain('服务商');
+    expect(diagnostic.technicalMessage).toContain('INVESTIGATION_REF_UNRESOLVED');
   });
 
   it('classifies stream protocol violations independently from account failures', () => {

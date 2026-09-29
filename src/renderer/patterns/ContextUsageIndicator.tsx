@@ -2,6 +2,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import { ContextBreakdownPopover } from './ContextBreakdownPopover';
 import {
+  awaitsExecutionContextWindow,
   resolveDisplayedPromptBudget,
   type ContextUsageSelectedProfile,
 } from './contextUsageDisplay';
@@ -44,10 +45,11 @@ export const ContextUsageIndicator: React.FC<{
     menu?.setTrigger(node);
   }, [menu]);
   const showPrepared = phase === 'current' && prepared !== null;
+  const awaitingWindow = showPrepared && awaitsExecutionContextWindow(prepared);
   const previewActive = estimated && !showPrepared && usage !== null;
   const showEstimatedRing = previewActive && phase !== 'preparing';
   const usagePercent = showPrepared ? prepared.usagePercent : usage?.usagePercent ?? 0;
-  const normalizedPercent = Math.max(0, Math.min(100, usagePercent));
+  const normalizedPercent = awaitingWindow ? 0 : Math.max(0, Math.min(100, usagePercent));
   const windowTokens = resolveDisplayedPromptBudget(showPrepared, prepared, usage, selectedProfile);
   const radius = 14;
   const circumference = 2 * Math.PI * radius;
@@ -72,6 +74,8 @@ export const ContextUsageIndicator: React.FC<{
 
   const windowLabel = phase === 'preparing'
     ? t('contextBreakdown.preparing')
+    : awaitingWindow && prepared
+      ? `${t('contextBreakdown.windowPending')} · ~${formatTokenCount(prepared.uncompactedInputTokens)} / ${formatTokenCount(prepared.promptBudgetTokens)}`
     : showPrepared
       ? `${t('contextBreakdown.currentRequest')} ~${formatTokenCount(prepared.preparedInputTokens)} / ${formatTokenCount(prepared.promptBudgetTokens)}`
       : previewActive
@@ -81,6 +85,8 @@ export const ContextUsageIndicator: React.FC<{
           : `${t('contextBreakdown.noUsageYet')}${windowTokens ? ` ${formatTokenCount(windowTokens)}` : ''}`;
   const ariaLabel = phase === 'preparing'
     ? t('contextBreakdown.preparing')
+    : awaitingWindow
+      ? t('contextBreakdown.windowPendingAria')
     : showPrepared
       ? t('contextBreakdown.currentRequestAria', { percent: normalizedPercent })
       : previewActive
@@ -90,7 +96,7 @@ export const ContextUsageIndicator: React.FC<{
             ? t('contextBreakdown.actualAria', { percent: normalizedPercent })
             : t('contextBreakdown.lastActualAria', { percent: normalizedPercent })
           : t('contextBreakdown.noUsageYet');
-  const valueText = phase === 'preparing'
+  const valueText = phase === 'preparing' || awaitingWindow
     ? '…'
     : usage || showPrepared
       ? percentLabel
@@ -101,7 +107,7 @@ export const ContextUsageIndicator: React.FC<{
       <button
         ref={assignTrigger}
         type="button"
-        className={`composer-usage-indicator${stale && !showPrepared ? ' is-stale' : ''}${phase === 'preparing' ? ' is-pending' : ''}${showEstimatedRing ? ' is-estimated' : ''}`}
+        className={`composer-usage-indicator${stale && !showPrepared ? ' is-stale' : ''}${phase === 'preparing' || awaitingWindow ? ' is-pending' : ''}${showEstimatedRing ? ' is-estimated' : ''}`}
         data-testid="composer-usage-indicator"
         data-estimated={showEstimatedRing ? 'true' : undefined}
         aria-label={ariaLabel}

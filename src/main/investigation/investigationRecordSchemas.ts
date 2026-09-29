@@ -68,12 +68,15 @@ export const WorldStateSchema: ZodType<WorldState> = z.object({
     pixel: z.object({ x: z.number(), y: z.number() }).strict().optional(),
     subresource: optionalNonEmpty,
   }).strict(),
-  benchmark: z.object({
-    warmup: z.number().nonnegative(),
-    resolution: nonEmpty,
-    vsync: z.boolean(),
-    samplingProtocol: nonEmpty,
-  }).strict(),
+  benchmark: z.union([
+    z.object({
+      warmup: z.number().nonnegative(),
+      resolution: nonEmpty,
+      vsync: z.boolean(),
+      samplingProtocol: nonEmpty,
+    }).strict(),
+    z.object({ status: z.literal('not_measured'), reason: nonEmpty }).strict(),
+  ]),
   validity: z.enum(WORLD_STATE_VALIDITIES),
 }).strict();
 
@@ -261,14 +264,14 @@ export const ChallengeRecordSchema: ZodType<ChallengeRecord> = z.object({
 export const MissionCheckpointSchema: ZodType<MissionCheckpoint> = z.object({
   checkpointId: nonEmpty,
   goal: nonEmpty,
-  planVersion: nonEmpty,
-  established: z.array(nonEmpty),
-  rejected: z.array(nonEmpty),
-  completedExperiments: z.array(nonEmpty),
-  openChallenges: z.array(nonEmpty),
+  planVersion: nonEmpty.describe('Stable approved plan version or artifact ID (for example plan-...); do not manually transcribe a content SHA-256 digest here. Verify the frozen plan URI and hash through its plan artifact.'),
+  established: z.array(nonEmpty).describe('Resolvable investigation ClaimRecord.claimId values; not artifact URIs.'),
+  rejected: z.array(nonEmpty).describe('Resolvable investigation ClaimRecord.claimId values; not artifact URIs.'),
+  completedExperiments: z.array(nonEmpty).describe('Resolvable investigation ExperimentRecord.experimentId values.'),
+  openChallenges: z.array(nonEmpty).describe('Resolvable investigation ChallengeRecord.challengeId values.'),
   reasonForReplan: optionalNonEmpty,
-  currentWorldStateId: nonEmpty,
-  criticalArtifactRefs: z.array(nonEmpty),
+  currentWorldStateId: nonEmpty.describe('Resolvable investigation WorldState.worldStateId.'),
+  criticalArtifactRefs: z.array(nonEmpty).describe('Resolvable investigation manifest artifactId values (for example invart-...); not session:// URI strings. Raw content URI and hash pairs belong in EvidenceRecord.artifactRefs.'),
   unresolvedFrontier: nonEmpty,
 }).strict();
 
@@ -341,6 +344,13 @@ const RECORD_SCHEMAS: Record<string, ZodType<unknown>> = {
   MissionCheckpoint: MissionCheckpointSchema,
   InvestigationReport: InvestigationReportSchema,
 };
+
+/** The input shape enforced by parseInvestigationRecord, exposed one kind at a time. */
+export function getInvestigationRecordJsonSchema(recordType: string): Record<string, unknown> {
+  const schema = RECORD_SCHEMAS[recordType];
+  if (!schema) throw new Error(`unknown recordType ${recordType}`);
+  return z.toJSONSchema(schema, { target: 'draft-2020-12', io: 'input' }) as Record<string, unknown>;
+}
 
 export function parseInvestigationRecord(recordType: string, value: unknown): unknown {
   const schema = RECORD_SCHEMAS[recordType];

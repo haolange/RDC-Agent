@@ -633,7 +633,7 @@ export class SessionRecordStore {
   readPersistedRun(sessionId: string, runId: string): PersistedRunRecord | null {
     const location = this.findSessionLocation(sessionId);
     if (!location) return null;
-    return loadPersistedRun(this.host, this.getRunPath(sessionId, runId), sessionId, runId, location.sessionPath);
+    return loadPersistedRun(this.host, this.getRunPath(sessionId, runId), sessionId, runId);
   }
 
   private normalizeSessionTitle(projectId: string, title?: string): string {

@@ -22,6 +22,91 @@ describe('ToolResultSummarizer', () => {
     expect(summary).toBe('[grep] 100 matches (truncated summary)');
   });
 
+  it('keeps native Pixel History binding and factual counters when the payload is offloaded', () => {
+    const identity = {
+      productSessionId: 'sess-owner', contextId: 'rdc-context',
+      replaySessionId: 'sess-replay', captureFileId: 'capf-capture',
+    };
+    const history = Array.from({ length: 80 }, (_, index) => ({
+      event_id: index < 5 ? 12 : 15,
+      primitive_id: index,
+      passed: index === 7 || index === 9,
+      shader_out: { valid: index >= 5, color_rgba: [index / 80, 0, 0, 1] },
+      padding: 'x'.repeat(500),
+    }));
+    const native = {
+      result: {
+        result_kind: 'rd.texture.get_pixel_history', ok: true,
+        data: { resolved_event_id: 15, target_metadata: { texture_id: 'ResourceId::3', x: 7, y: 11 },
+          history, binding_truth_level: 'binding_verified', evidence_truth_level: 'structured_readback',
+          summary_degraded_reasons: [] },
+        meta: { trace_id: 'trc-current' },
+      },
+      rdcExecutionIdentity: identity,
+    };
+    const result: AgentToolResult = {
+      content: [{ type: 'text', text: JSON.stringify(native) }],
+      details: { operation: 'rd.texture.get_pixel_history', exitCode: 0, rdcExecutionIdentity: identity },
+    };
+    const summary = summarizer.trySummarize('shell', result, 400);
+    expect(summary).toContain('session=sess-owner context=rdc-context replay=sess-replay capture=capf-capture');
+    expect(summary).toContain('event=15 target=ResourceId::3 pixel=(7,11)');
+    expect(summary).toContain('history=80 eventFragments=75 passed=2 shaderValid=75 passedPrimitiveIds=7,9');
+    expect(summary).toContain('binding=binding_verified evidence=structured_readback');
+    expect(summary).toContain('trace=trc-current');
+    expect(summary!.length).toBeLessThan(500);
+
+    const wrongIdentity: AgentToolResult = { ...result, details: {
+      operation: 'rd.texture.get_pixel_history', rdcExecutionIdentity: { ...identity, replaySessionId: 'sess-other' },
+    } };
+    expect(summarizer.trySummarize('shell', wrongIdentity, 400)).toContain('RDC_EXECUTION_IDENTITY_MISMATCH');
+  });
+
+  it('keeps the raw disassembly edit plan visible when long ASM is offloaded', () => {
+    const identity = {
+      productSessionId: 'sess-owner', contextId: 'rdc-context',
+      replaySessionId: 'sess-replay', captureFileId: 'capf-capture',
+    };
+    const native = {
+      result: {
+        result_kind: 'rd.shader.get_disassembly', ok: true,
+        data: {
+          disassembly: 'OpFunction\n'.repeat(15000), resolved_event_id: 1248,
+          shader_id: 'ResourceId::192587', target: 'SPIR-V ASM', source_encoding: 'spirvasm',
+          source_hash: 'a'.repeat(64),
+          edit_plan: {
+            input_kind: 'text_ir', can_edit_text: true, can_build: true, can_replace: true,
+            allowed_edit_inputs: ['source_text', 'diff_text', 'ops'],
+            allowed_ops: ['force_full_precision'], blocked_reason: '',
+          },
+        },
+      },
+      rdcExecutionIdentity: identity,
+    };
+    const result: AgentToolResult = {
+      content: [{ type: 'text', text: JSON.stringify(native) }],
+      details: { operation: 'rd.shader.get_disassembly', exitCode: 0, rdcExecutionIdentity: identity },
+    };
+    const summary = summarizer.trySummarize('shell', result, 400)!;
+    expect(summary).toContain('event=1248 shader=ResourceId::192587 target="SPIR-V ASM" encoding=spirvasm');
+    expect(summary).toContain('sourceHash=' + 'a'.repeat(64));
+    expect(summary).toContain('"canEditText":true,"canBuild":true,"canReplace":true');
+    expect(summary).toContain('"allowedEditInputs":["source_text","diff_text","ops"]');
+    expect(summary).not.toContain('OpFunction');
+    expect(summary.length).toBeLessThan(700);
+
+    const mismatched: AgentToolResult = { ...result, details: {
+      operation: 'rd.shader.get_disassembly', rdcExecutionIdentity: { ...identity, replaySessionId: 'sess-other' },
+    } };
+    expect(summarizer.trySummarize('shell', mismatched, 400)).toContain('RDC_EXECUTION_IDENTITY_MISMATCH');
+    expect(summarizer.trySummarize('shell', mismatched, 400)).not.toContain('canReplace');
+  });
+
+  it('keeps ordinary shell summary behavior', () => {
+    const summary = summarizer.trySummarize('shell', textResult(`first line\n${'x'.repeat(800)}`), 400);
+    expect(summary).toBe('[shell] first line...');
+  });
+
   it('web_fetch 保留 URL/Status 头并省略正文', () => {
     const text = [
       'URL: https://example.com/docs',

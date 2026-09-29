@@ -1,5 +1,6 @@
 import { MaterialContextSchema } from '@shared/types/materialContext';
 import { z, type ZodType } from 'zod';
+import type { StorageIo } from './StorageIo';
 import type { RunContextUsageSummary, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
 import type {
   ConversationTerminalCommitJournal,
@@ -11,6 +12,25 @@ export class StorageSchemaError extends Error {
     super(message);
     this.name = 'StorageSchemaError';
   }
+}
+
+export function readCurrentStoredJson<T>(
+  io: StorageIo,
+  filePath: string,
+  schemaVersion: string,
+  schema: ZodType<T>,
+): T | null {
+  const raw = io.readJson<unknown>(filePath);
+  if (raw === null) return null;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)
+    || (raw as { schemaVersion?: unknown }).schemaVersion !== schemaVersion) {
+    throw new StorageSchemaError(`STORAGE_SCHEMA_UNSUPPORTED: ${filePath} requires schemaVersion ${schemaVersion}`);
+  }
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) {
+    throw new StorageSchemaError(`STORAGE_SCHEMA: ${filePath} failed runtime validation: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`);
+  }
+  return parsed.data;
 }
 
 export interface StorageMigration<T> {
@@ -223,23 +243,13 @@ export function toSessionAttachmentManifest(
   return { schemaVersion: CURRENT_STORE_SCHEMA_VERSION, attachments };
 }
 
-function unwrapAttachmentManifest(raw: unknown): unknown {
-  if (Array.isArray(raw)) return raw;
-  if (raw && typeof raw === 'object' && 'attachments' in raw) {
-    return (raw as { attachments: unknown }).attachments;
-  }
-  return raw;
-}
-
-/** Accepts current `{ schemaVersion, attachments }` and legacy bare arrays. */
-export const SessionAttachmentManifestSchema = z
-  .unknown()
-  .transform((raw) => unwrapAttachmentManifest(raw))
-  .pipe(SessionAttachmentRecordsSchema) as unknown as ZodType<SessionAttachmentRecord[]>;
+export const SessionAttachmentManifestSchema = z.object({
+  schemaVersion: z.literal(CURRENT_STORE_SCHEMA_VERSION),
+  attachments: SessionAttachmentRecordsSchema,
+}).strict().transform((document) => document.attachments) as ZodType<SessionAttachmentRecord[]>;
 
 export {
   PersistedRunRecordV3Schema as PersistedRunRecordSchema,
-  SESSION_RUN_MIGRATIONS,
 } from './runV3/runRecordSchema';
 
 const ContextUsageBreakdownEntrySchema = z.object({
@@ -287,7 +297,7 @@ export const RunContextUsageSummarySchema: ZodType<RunContextUsageSummary> = z.o
   ...UsageCoreFields,
   maxOutputTokens: z.number().nullable(),
   compactionThresholdTokens: z.number().nullable(),
-}).passthrough() as ZodType<RunContextUsageSummary>;
+}).strict() as ZodType<RunContextUsageSummary>;
 
 export interface SessionUsageDocument {
   schemaVersion: string;
@@ -296,89 +306,14 @@ export interface SessionUsageDocument {
 
 export const CURRENT_USAGE_SCHEMA_VERSION = '2';
 
-export const SessionUsageV1Schema = z.object({
-  schemaVersion: z.literal('1'),
-  usage: z.object({
-    ...UsageCoreFields,
-    outputReserveTokens: z.number().nullable(),
-  }).passthrough(),
-});
-
 export const SessionUsageV2Schema = z.object({
   schemaVersion: z.literal('2'),
   usage: RunContextUsageSummarySchema,
-});
-
-function migrateSessionUsageV0(raw: unknown): unknown {
-  const record = raw && typeof raw === 'object' && !Array.isArray(raw)
-    ? { ...(raw as Record<string, unknown>) }
-    : {};
-  const nested = record.usage;
-  const legacy = nested && typeof nested === 'object' && !Array.isArray(nested)
-    ? { ...(nested as Record<string, unknown>) }
-    : record;
-  delete legacy.schemaVersion;
-  delete legacy.usage;
-  const oldWindow = typeof legacy.contextWindowTokens === 'number' ? legacy.contextWindowTokens : null;
-  const promptBudgetTokens = typeof legacy.promptBudgetTokens === 'number'
-    ? legacy.promptBudgetTokens
-    : oldWindow;
-  return {
-    schemaVersion: '1',
-    usage: {
-      ...legacy,
-      promptBudgetTokens,
-      contextWindowTokens: null,
-      outputReserveTokens: null,
-    },
-  };
-}
-
-function migrateSessionUsageV1(raw: unknown): unknown {
-  const record = raw && typeof raw === 'object' && !Array.isArray(raw)
-    ? { ...(raw as Record<string, unknown>) }
-    : {};
-  const nested = record.usage && typeof record.usage === 'object' && !Array.isArray(record.usage)
-    ? { ...(record.usage as Record<string, unknown>) }
-    : {};
-  const maxOutputTokens = typeof nested.maxOutputTokens === 'number'
-    ? nested.maxOutputTokens
-    : typeof nested.outputReserveTokens === 'number'
-      ? nested.outputReserveTokens
-      : null;
-  delete nested.outputReserveTokens;
-  return {
-    schemaVersion: CURRENT_USAGE_SCHEMA_VERSION,
-    usage: {
-      ...nested,
-      maxOutputTokens,
-      compactionThresholdTokens: typeof nested.compactionThresholdTokens === 'number'
-        ? nested.compactionThresholdTokens
-        : null,
-    },
-  };
-}
+}).strict();
 
 export function toSessionUsageManifest(usage: RunContextUsageSummary): SessionUsageDocument {
   return { schemaVersion: CURRENT_USAGE_SCHEMA_VERSION, usage };
 }
-
-export const SESSION_USAGE_MIGRATIONS: StorageMigration<SessionUsageDocument>[] = [
-  {
-    schemaVersion: '0',
-    schema: z.object({}).passthrough() as unknown as ZodType<SessionUsageDocument>,
-    migrate: migrateSessionUsageV0,
-  },
-  {
-    schemaVersion: '1',
-    schema: SessionUsageV1Schema as unknown as ZodType<SessionUsageDocument>,
-    migrate: migrateSessionUsageV1,
-  },
-  {
-    schemaVersion: '2',
-    schema: SessionUsageV2Schema as ZodType<SessionUsageDocument>,
-  },
-];
 
 export interface SessionShellState {
   cwd: string;

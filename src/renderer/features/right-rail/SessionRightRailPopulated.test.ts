@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { CaptureReplayState } from '@shared/types/captureReplay';
 import type { InvestigationArtifactRow } from '@shared/types/trace';
+import type { InvestigationReadIpcResult } from '@shared/types/renderdocInvestigation';
 import { SessionRightRail } from './SessionRightRail';
 import { readInvestigationArtifact } from './investigationPreviewActions';
 
@@ -62,6 +63,50 @@ beforeEach(() => {
 });
 
 describe('populated session rail', () => {
+  it('presents an incomplete typed report as seven readable sections without hiding its limits', async () => {
+    const reportRow: InvestigationArtifactRow = { ...artifact, kind: 'report', recordType: 'InvestigationReport', status: 'draft', title: 'Event 1248 assessment' };
+    const current = presentation();
+    current.rightPanel.artifacts.rows = [reportRow];
+    state.tracePresentation = current;
+    const payload: InvestigationReadIpcResult = {
+      ok: true, status: 'ready', contentHash: reportRow.contentHash,
+      manifest: {
+        artifactId: reportRow.artifactId, mission: 'debugger', kind: 'report', status: 'draft',
+        title: reportRow.title, summary: 'Evidence remains incomplete', contentRef: 'record.json',
+        sourceRefs: [], contentHash: reportRow.contentHash, recordType: 'InvestigationReport',
+        createdAt: reportRow.createdAt,
+      },
+      record: {
+        title: reportRow.title, mission: 'debugger', summary: 'The root cause remains unknown.',
+        claims: [], evidenceIds: ['ev-1248'], experimentIds: [],
+        reportContract: {
+          conclusion: 'Partial; no causal fix verified.', evidence: 'Event 1248 has a native pixel-history result.',
+          verification: 'No intervention or restored-state receipt.', limitations: 'The first bad event is unknown.',
+          status: 'partial', links: 'Approved plan: session://plans/example',
+          artifactIds: ['ev-1248'], candidateStatus: 'none',
+        },
+      },
+    };
+    vi.mocked(readInvestigationArtifact).mockResolvedValueOnce(payload);
+    const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+    try {
+      await act(async () => root.render(createElement(SessionRightRail)));
+      const preview = [...host.querySelectorAll<HTMLButtonElement>('.right-rail-investigation-row button')]
+        .find((button) => button.textContent === 'control.rightRail.artifacts.preview');
+      await act(async () => preview!.click());
+      const dialog = document.querySelector('.investigation-preview-dialog');
+      expect(dialog?.getAttribute('data-kind')).toBe('report');
+      expect(dialog?.querySelectorAll('.investigation-report section')).toHaveLength(7);
+      expect(dialog?.textContent).toContain('The root cause remains unknown.');
+      expect(dialog?.textContent).toContain('Partial; no causal fix verified.');
+      expect(dialog?.textContent).toContain('No intervention or restored-state receipt.');
+      expect(dialog?.querySelector('.investigation-preview-source')?.hasAttribute('open')).toBe(false);
+      expect(dialog?.querySelector('.investigation-report-index')?.textContent).toContain('ev-1248');
+      act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+      expect(document.querySelector('.investigation-preview-dialog')).toBeNull();
+    } finally { act(() => root.unmount()); host.remove(); }
+  });
+
   it('renders a typed artifact title/status and opens the real preview with its owning session and hash', async () => {
     const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
     try {

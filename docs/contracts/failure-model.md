@@ -28,6 +28,7 @@
 | --- | --- | --- |
 | Browser Bridge 未 QA / 无 bearer / Origin / 未知或未注册 channel | Security | debug-only；canonical renderer manifest + handler registry fail-closed |
 | `safeStorage` 不可用 / secret IPC 明文 | Security | 禁止明文存储与跨层暴露 |
+| Provider secret 文件不可读（如 `EACCES`） | Availability（凭据操作仍 fail-closed） | 报文件访问失败并保留原件；只有内容确实损坏才隔离，缺文件按空配置处理。启动阶段失败经正常资源释放后以非零状态退出，不留活锁 |
 | Project MCP 覆盖 user executable / 未 trust | Security | `needsRetrust` + `assertConnectAllowed` |
 | IPC Zod 非法 payload / approvalToken 重放 | Security | **全量** handler `parseIpcArgs`；单次消费 token |
 | Sandbox / permission deny-by-default | Security | Electron 面 |
@@ -53,6 +54,7 @@
 | `PROVIDER_STREAM_*` 协议违规 | Integrity | 不重试；`CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION`；不得误报账号/额度 |
 | Agent 连续三轮相同工具结果 | Integrity | `AGENT_NO_PROGRESS` → `CONVERSATION_AGENT_LOOP_STALLED`；不得误报 Provider failure |
 | Agent 达到 maxTurns 仍要求 continuation | Integrity | `AGENT_MAX_TURNS_EXCEEDED` → `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；不得静默完成 |
+| 本回合 direct Task 未结算即声明完成 | Integrity | `turn_complete` 先拒绝并指明待结算 Task；若仍直接终答，自动标 blocked 并以 `CONVERSATION_TASK_COMPLETION_DENIED` 报告，不误报 Provider failure |
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |
 | Storage schema 损坏 | Integrity | quarantine + `STORAGE_CORRUPT` |
 | Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，不 quarantine |

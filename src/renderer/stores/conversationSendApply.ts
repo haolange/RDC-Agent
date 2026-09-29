@@ -90,11 +90,16 @@ export async function applyConversationTurnResult(options: {
     ));
   };
 
-  // Background session: never mutate active project/session selection or UI stores.
-  // With no active session (for example the synchronous handoff after a new-session
-  // creation), the result remains the only visible result and must be applied.
+  // A project-only selection has no active session. A turn sent from another
+  // project must still remain background; a new session created in the selected
+  // project may become foreground when its first turn returns.
   const activeSessionId = getActiveSessionId();
-  if (turnSessionId && activeSessionId && !isActiveSessionEvent(turnSessionId)) {
+  const selectedProjectId = useProjectStore.getState().currentProject?.projectId ?? null;
+  const sendingProjectId = currentProject?.projectId ?? null;
+  const backgroundTurn = activeSessionId
+    ? !isActiveSessionEvent(turnSessionId)
+    : selectedProjectId !== sendingProjectId;
+  if (turnSessionId && backgroundTurn) {
     for (const message of forceStoppedMessages(result.messages ?? [
       result.userMessage,
       result.assistantDraftMessage,
@@ -184,4 +189,3 @@ export async function applyConversationTurnResult(options: {
     });
   }
 }
-

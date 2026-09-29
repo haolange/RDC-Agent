@@ -8,6 +8,7 @@ import { operationFingerprint } from './RdcOperationCatalog';
 const allowedEffects = new Set(['replay_position', 'replay_position_temporary', 'artifact_write', 'context_metadata', 'shader_debug', 'shader_replacement']);
 const scopes = new Set(['global', 'context', 'replay', 'capture']);
 const identityKey = /^(session_?id|context_?id|daemon_?context|target_?context_?id|owner_?session_?id|owner_?lease_?id|runtime_?owner|remote_?id|capture_?file_?id)$/i;
+export const isMainOwnedRdcIdentityKey = (key: string): boolean => identityKey.test(key);
 function denied(message: string): never { throw new Error('RDC_EXECUTION_DENIED: ' + message); }
 
 export function validateRdcArguments(value: unknown, schema: Record<string, unknown>, location = 'args'): void {
@@ -42,7 +43,7 @@ export function validateRdcArguments(value: unknown, schema: Record<string, unkn
 function rejectIdentityOverrides(value: unknown): void {
   if (!value || typeof value !== 'object') return;
   for (const [key, child] of Object.entries(value)) {
-    if (identityKey.test(key)) denied('replay identity is main-owned');
+    if (isMainOwnedRdcIdentityKey(key)) denied('replay identity is main-owned');
     rejectIdentityOverrides(child);
   }
 }
@@ -51,7 +52,7 @@ export function authorizeRdcOperation(operation: string, input: Record<string, u
   if (!binding || operationFingerprint(binding.definitions) !== binding.definitionsFingerprint) denied('frozen catalog fingerprint is invalid');
   const definition = binding.definitions.find(item => item.name === operation) as RdcOperationDefinition | undefined;
   if (!definition || !scopes.has(definition.scope) || !Array.isArray(definition.effects) || definition.effects.some(effect => !allowedEffects.has(effect))) denied('operation capability is unavailable to General');
-  if (!Array.isArray(definition.prerequisites) || definition.prerequisites.some((item: unknown) => !item || typeof item !== 'object' || !((item as { requires?: unknown }).requires === 'session_id' && definition.scope === 'replay') && !((item as { requires?: unknown }).requires === 'capture_file_id' && definition.scope === 'capture'))) denied('unknown prerequisite');
+  if (!Array.isArray(definition.prerequisites) || definition.prerequisites.some((item: unknown) => !item || typeof item !== 'object' || !((item as { requires?: unknown }).requires === 'session_id' && (definition.scope === 'replay' || definition.scope === 'context')) && !((item as { requires?: unknown }).requires === 'capture_file_id' && definition.scope === 'capture'))) denied('unknown prerequisite');
   rejectIdentityOverrides(input);
   const args = structuredClone(input);
   if (definition.scope === 'replay') args.session_id = replaySessionId;

@@ -20,6 +20,8 @@ import {
   CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
   CONVERSATION_TURN_COMMIT_MIGRATIONS,
   SessionAttachmentManifestSchema,
+  readCurrentStoredJson,
+  CURRENT_STORE_SCHEMA_VERSION,
   SessionRecordSchema,
   toSessionAttachmentManifest,
 } from './storageSchema';
@@ -264,9 +266,7 @@ export class ConversationHistoryStore {
     this.applyConversationMessageToCache(sessionId, filePath, message);
     const nextDeltaCount = (this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0) + 1;
     this.host.conversationPendingDeltaCounts.set(sessionId, nextDeltaCount);
-    if (nextDeltaCount >= CONVERSATION_COMPACTION_DELTA_THRESHOLD) {
-      this.compactConversationHistory(sessionId);
-    }
+    this.compactAfterDurableAppend(sessionId, nextDeltaCount);
   }
 
   appendConversationDelta(
@@ -302,8 +302,18 @@ export class ConversationHistoryStore {
     this.applyConversationMessageToCache(sessionId, filePath, nextMessage);
     const nextDeltaCount = (this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0) + 1;
     this.host.conversationPendingDeltaCounts.set(sessionId, nextDeltaCount);
-    if (nextDeltaCount >= CONVERSATION_COMPACTION_DELTA_THRESHOLD) {
+    this.compactAfterDurableAppend(sessionId, nextDeltaCount);
+  }
+
+  private compactAfterDurableAppend(sessionId: string, pendingDeltaCount: number): void {
+    if (pendingDeltaCount % CONVERSATION_COMPACTION_DELTA_THRESHOLD !== 0) return;
+    try {
       this.compactConversationHistory(sessionId);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EBUSY') throw error;
+      // The delta is already durable. A Windows reader can temporarily deny replacement of the journal;
+      // retain its cache and retry maintenance at the next threshold instead of aborting the live turn.
+      console.warn(`[ConversationHistoryStore] Deferred busy conversation compaction for session ${sessionId}.`);
     }
   }
 
@@ -657,7 +667,12 @@ export class ConversationHistoryStore {
   }
 
   readSessionAttachments(sessionId: string): SessionAttachmentRecord[] {
-    return this.host.io.readJson(this.host.sessions.getSessionAttachmentsManifestPath(sessionId), SessionAttachmentManifestSchema) ?? [];
+    return readCurrentStoredJson(
+      this.host.io,
+      this.host.sessions.getSessionAttachmentsManifestPath(sessionId),
+      CURRENT_STORE_SCHEMA_VERSION,
+      SessionAttachmentManifestSchema,
+    ) ?? [];
   }
 
   writeSessionAttachments(sessionId: string, attachments: SessionAttachmentRecord[]): void {

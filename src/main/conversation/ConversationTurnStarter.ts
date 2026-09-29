@@ -533,6 +533,10 @@ export async function startProfileTurn(
   // projection and blank the right-rail sections until the full projection arrives.
   host.publishConversationTrace(traceSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
 
+  const committedTurnRun = workingSession && turnRunId
+    ? storageAdapter.listRuns(workingSession.sessionId).find(run => run.runId === turnRunId) ?? null
+    : null;
+
   if (cancelAfterCommit) {
     await preparedTurn.runtime.mcpLease?.release({ discardIfIdle: true });
   }
@@ -543,9 +547,7 @@ export async function startProfileTurn(
       context: {
         ...context,
         session: workingSession,
-        currentRun: workingSession && turnRunId
-          ? storageAdapter.listRuns(workingSession.sessionId).find((run) => run.runId === turnRunId) ?? null
-          : context.currentRun,
+        currentRun: committedTurnRun ?? context.currentRun,
       },
       requestedProfileId: requestedProfileId ?? conversationAgentId,
       requestedAgentId: conversationAgentId,
@@ -574,7 +576,7 @@ export async function startProfileTurn(
     messages: visibleMessages,
     branchState: branchState ?? null,
     executionTransition: { action: 'none' },
-    runUpdate: null,
+    runUpdate: committedTurnRun,
     tracePresentation,
     errorViewModel: null,
     preparedContext: preparedTurn.summary,

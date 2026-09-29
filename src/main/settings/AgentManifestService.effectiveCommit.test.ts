@@ -53,14 +53,26 @@ function assertEffectiveSaveShape(definition: unknown): asserts definition is {
     provenance?: { sourceHash?: string };
   };
   if (!record.compiledRoute?.agentId || !record.compiledRoute.providerId || !record.compiledRoute.modelId) {
-    throw new Error('legacy save shape missing compiledRoute');
+    throw new Error('effective save shape missing compiledRoute');
   }
   if (!record.provenance?.sourceHash) {
-    throw new Error('legacy save shape missing provenance.sourceHash');
+    throw new Error('effective save shape missing provenance.sourceHash');
   }
 }
 
 describe('AgentManifestService save/delete effective commit', () => {
+  it('rejects reserved ids before creating user or project resources', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-reserved-'));
+    roots.push(root);
+    const paths = { agentsPath: path.join(root, 'agents'), instructionsPath: path.join(root, 'RDC.md') };
+    await expect(agentManifestService.saveDefinition(paths, customDraft('plan', 'openai:test'), { scope: 'user' }))
+      .rejects.toThrow(/AGENT_ID_RESERVED_HISTORICAL/);
+    expect(fs.existsSync(paths.agentsPath)).toBe(false);
+    expect(agentManifestService.routesFromDefinitions([], [customDraft('edit', 'openai:test')])).not.toContainEqual(
+      expect.objectContaining({ agentId: 'edit' }),
+    );
+  });
+
   it('returns compiledRoute and provenance.sourceHash and accepts that hash on the next save', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-save-meta-'));
     roots.push(root);

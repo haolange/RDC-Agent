@@ -23,7 +23,7 @@ it('retains an unconfirmed process until actual close and keeps it cancellable',
   const exit = new Promise<ProcessExitInfo>(resolve => { close = resolve; });
   const abort = vi.fn();
   const process = { id: 'orphan', orphaned: true, exit, abort,
-    stdout: { toString: () => '' }, stderr: { toString: () => '' },
+    stdout: { toString: () => '', receivedByteLength: () => 0, wasTruncated: () => false }, stderr: { toString: () => '' },
     join: async () => ({ reason: 'unconfirmed_orphan', code: null, signal: null, durationMs: 1 }),
   } as unknown as SupervisedProcess;
   const spawn = vi.spyOn(processSupervisor, 'spawn').mockReturnValue(process);
@@ -45,4 +45,6 @@ it('preserves a complete machine result above the default process ring limit', a
   const result = await new ShellInvocationService().invoke({ command: process.execPath,
     args: ['-e', "process.stdout.write(JSON.stringify({data:'x'.repeat(300000)}))"], outputBufferBytes: 8 * 1024 * 1024 });
   expect(result.exitCode).toBe(0); expect(JSON.parse(result.stdout).data).toHaveLength(300000);
+  expect(result.stdoutTruncated).toBe(false);
+  expect(result.stdoutByteLength).toBe(Buffer.byteLength(result.stdout, 'utf8'));
 });

@@ -16,6 +16,7 @@ export type { TaskCompletionResult, TaskExecutionMessage, TaskExecutionRecord, T
 export interface CreateTaskOptions {
   description?: string; blockedBy?: string[]; owner?: string; parentTaskId?: string;
   completionRequirements?: string[]; executionRequired?: boolean; metadata?: Record<string, unknown>;
+  creationTurnRef?: string;
 }
 export interface UpdateTaskOptions {
   status?: TaskStatus; statusReason?: string; subject?: string; description?: string; owner?: string;
@@ -50,7 +51,7 @@ export class TaskRegistry {
             if (parentExecution?.status === 'cancelling') throw new Error('Cannot add a child to a terminal or cancelling parent task.');
           }
         }
-        prepared.push({ schemaVersion: TASK_SCHEMA_VERSION, id, subject: input.subject.trim(), description: input.description ?? '', status: 'pending', owner: input.owner, parentTaskId: input.parentTaskId, blockedBy, blocks: [], completionRequirements: dedupe(input.completionRequirements ?? []), executionRequired: input.executionRequired !== false, executionIds: [], revision: 1, metadata: input.metadata ? { ...input.metadata } : undefined, createdAt, updatedAt: createdAt });
+        prepared.push({ schemaVersion: TASK_SCHEMA_VERSION, id, subject: input.subject.trim(), description: input.description ?? '', status: 'pending', owner: input.owner, parentTaskId: input.parentTaskId, blockedBy, blocks: [], completionRequirements: dedupe(input.completionRequirements ?? []), executionRequired: input.executionRequired !== false, executionIds: [], revision: 1, metadata: input.metadata ? { ...input.metadata } : undefined, creationTurnRef: input.creationTurnRef, createdAt, updatedAt: createdAt });
       }
       const changed = new Map(prepared.map((task) => [task.id, task]));
       for (const task of prepared) {
@@ -115,7 +116,7 @@ export class TaskRegistry {
         }
       }
       const budget = inheritBudget(options.budget, previous.at(-1)?.budget, parent?.budget);
-      validateBudget(budget);
+      validateBudget(budget, true);
       const now = Date.now();
       const execution: TaskExecutionRecord = { schemaVersion: TASK_SCHEMA_VERSION, id: this.id('execution', now), taskId, taskRevision: task.revision, generation, runtimeInstanceId: TASK_RUNTIME_INSTANCE_ID, parentExecutionId: options.parentExecutionId, rootBudgetId, mode: options.mode, status: 'running', budget, frozenPlanRef: options.frozenPlanRef, childMessageAckSequence: 0, parentMessageAckSequence: 0, createdAt: now, updatedAt: now };
       task.executionIds = [...task.executionIds, execution.id]; task.currentExecutionId = execution.id; task.status = 'in_progress'; task.statusReason = undefined; task.disposition = undefined; task.updatedAt = now;
@@ -377,7 +378,9 @@ function inheritBudget(
     return values.length ? Math.min(...values) : undefined;
   };
   const maximum = (key: 'toolCalls' | 'subagents' | 'childDepth'): number => {
-    return Math.max(0, ...sources.map((source) => source[key] ?? 0));
+    // The parent has its own local ledger. Only retries of this Task may carry
+    // local consumption forward; the shared root ledger accounts for ancestors.
+    return Math.max(0, requested?.[key] ?? 0, previous?.[key] ?? 0);
   };
   return {
     maxToolCalls: minimum('maxToolCalls'),
@@ -387,11 +390,11 @@ function inheritBudget(
     maxChildDepth: minimum('maxChildDepth'),
     childDepth: maximum('childDepth'),
     deadlineAt: minimum('deadlineAt'),
-    startedAt: Math.min(Date.now(), previous?.startedAt ?? Number.POSITIVE_INFINITY, parent?.startedAt ?? Number.POSITIVE_INFINITY),
+    startedAt: Math.min(Date.now(), previous?.startedAt ?? Number.POSITIVE_INFINITY),
   };
 }
 
-function validateBudget(budget: TaskExecutionRecord['budget']): void {
+function validateBudget(budget: TaskExecutionRecord['budget'], requireRemainingTime = false): void {
   const nonNegative = ['toolCalls', 'subagents', 'childDepth'] as const;
   const optionalNonNegative = ['maxToolCalls', 'maxSubagents', 'maxChildDepth'] as const;
   for (const key of nonNegative) if (!Number.isFinite(budget[key]) || budget[key] < 0) throw new Error(`Invalid task execution budget: ${key}.`);
@@ -399,7 +402,11 @@ function validateBudget(budget: TaskExecutionRecord['budget']): void {
   if (budget.maxToolCalls !== undefined && budget.toolCalls > budget.maxToolCalls) throw new Error('Task execution tool-call budget is already exhausted.');
   if (budget.maxSubagents !== undefined && budget.subagents > budget.maxSubagents) throw new Error('Task execution subagent budget is already exhausted.');
   if (budget.maxChildDepth !== undefined && budget.childDepth > budget.maxChildDepth) throw new Error('Task execution child-depth budget is exceeded.');
-  if (!Number.isFinite(budget.startedAt) || (budget.deadlineAt !== undefined && (!Number.isFinite(budget.deadlineAt) || budget.deadlineAt <= Date.now()))) throw new Error('Task execution deadline is invalid or expired.');
+  if (!Number.isFinite(budget.startedAt) || (budget.deadlineAt !== undefined && (!Number.isFinite(budget.deadlineAt) || budget.deadlineAt < 0))) throw new Error('Task execution deadline is invalid.');
+  // A running execution may report its final usage after its deadline. The
+  // deadline still bars starting a new execution, but must not prevent the
+  // expired execution from recording consumption and settling its result.
+  if (requireRemainingTime && budget.deadlineAt !== undefined && budget.deadlineAt <= Date.now()) throw new Error('Task execution deadline is expired.');
 }
 
 function validateRootBudget(budget: TaskRootBudgetRecord): void {

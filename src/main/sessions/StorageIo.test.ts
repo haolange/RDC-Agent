@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { StorageIo } from './StorageIo';
+import { renameSyncWithBusyRetry, StorageIo } from './StorageIo';
 
 describe('StorageIo integrity', () => {
   const roots: string[] = [];
@@ -50,6 +50,41 @@ describe('StorageIo integrity', () => {
     expect(io.readJson(filePath)).toEqual({ a: 1, b: [2] });
     const leftovers = fs.readdirSync(path.dirname(filePath)).filter((name) => name.endsWith('.tmp'));
     expect(leftovers).toEqual([]);
+  });
+
+  it('retries a transient busy rename and preserves atomic storage', () => {
+    const root = tempRoot();
+    const filePath = path.join(root, 'context.jsonl');
+    io.writeUtf8Atomic(filePath, 'before\n');
+    const stagedPath = path.join(root, 'staged.tmp');
+    fs.writeFileSync(stagedPath, 'after\n');
+    let busyCount = 0;
+    renameSyncWithBusyRetry(stagedPath, filePath, (source, destination) => {
+      if (busyCount === 0) {
+        busyCount += 1;
+        throw Object.assign(new Error('resource busy'), { code: 'EBUSY' });
+      }
+      fs.renameSync(source, destination);
+    });
+    expect(busyCount).toBe(1);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('after\n');
+    expect(fs.readdirSync(root).filter((name) => name.includes('.tmp'))).toEqual([]);
+  });
+
+  it('does not remove the primary when a busy rename exhausts its bounded retries', () => {
+    const root = tempRoot();
+    const filePath = path.join(root, 'context.jsonl');
+    const stagedPath = path.join(root, 'staged.tmp');
+    fs.writeFileSync(filePath, 'before\n');
+    fs.writeFileSync(stagedPath, 'after\n');
+    let attempts = 0;
+    expect(() => renameSyncWithBusyRetry(stagedPath, filePath, () => {
+      attempts += 1;
+      throw Object.assign(new Error('resource busy'), { code: 'EBUSY' });
+    })).toThrow(/resource busy/);
+    expect(attempts).toBe(5);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('before\n');
+    expect(fs.readFileSync(stagedPath, 'utf8')).toBe('after\n');
   });
 
   it('deepMerge skips __proto__, prototype, and constructor keys', () => {

@@ -107,7 +107,7 @@ const resolveSectionThinking = (
       if (isSummary || isRaw || isUnknown) {
         return {
           preview,
-          label: status === 'streaming' || isActiveBlock
+          label: status === 'streaming'
             ? '正在思考'
             : resolveSettledThinkingLabel(block),
           kind: thinking.kind,
@@ -117,7 +117,7 @@ const resolveSectionThinking = (
           expandable: true,
           // Policy hint for UI: expand while the loop is live; fold after settle.
           // summary / raw / unknown share the same lifecycle (user sticky lives in the row).
-          openByDefault: isActiveBlock || status === 'streaming',
+          openByDefault: status === 'streaming',
         };
       }
     }

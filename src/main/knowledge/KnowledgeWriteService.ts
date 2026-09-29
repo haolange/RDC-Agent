@@ -4,8 +4,10 @@ import path from 'node:path';
 import type { KnowledgeCardRecord, KnowledgeHumanConfirmation, KnowledgeLifecycle, KnowledgeSpace } from '@shared/types/knowledge';
 import type { AgentPermissionMode } from '@shared/types/settings';
 import { missingCaseChapters, serializeKnowledgeCard } from './knowledgeCardSchema';
+import { assertKnowledgeImagesAvailable } from './knowledgeAssetAvailability';
 import {
   KnowledgeApprovalTokenInvalidError,
+  KnowledgeAssetsMissingError,
   KnowledgeHumanConfirmationRequiredError,
   KnowledgeLifecycleError,
   KnowledgeWriteIntegrityError,
@@ -30,7 +32,7 @@ export interface KnowledgeWriteInput {
 export interface KnowledgePromoteInput {
   spaceId: string;
   card: KnowledgeCardRecord;
-  to: Extract<KnowledgeLifecycle, 'verified' | 'promoted' | 'deprecated'>;
+  to: Extract<KnowledgeLifecycle, 'verified' | 'promoted' | 'retired'>;
   permissionMode: AgentPermissionMode;
   confirmation: KnowledgeHumanConfirmation;
   approvalToken?: string;
@@ -79,11 +81,21 @@ export class KnowledgeWriteService {
       throw new KnowledgeLifecycleError('KNOWLEDGE_LIFECYCLE_INVALID: persist Candidate via KnowledgeCandidateService, not Write.');
     }
     assertFixedIsNotVerified(input.card);
+    if ((input.card.lifecycle === 'verified' || input.card.lifecycle === 'promoted') && input.card.missingAssets?.length) {
+      throw new KnowledgeAssetsMissingError();
+    }
     if (input.card.lifecycle === 'verified' && input.card.type === 'case') {
       const missing = missingCaseChapters(input.card.chapters);
       if (missing.length > 0) {
         throw new KnowledgeLifecycleError(`KNOWLEDGE_LIFECYCLE_INVALID: case cannot be verified; missing chapters: ${missing.join(',')}`);
       }
+    }
+    if ((input.card.lifecycle === 'verified' || input.card.lifecycle === 'promoted') && input.card.images?.length) {
+      await assertKnowledgeImagesAvailable(
+        input.card,
+        this.overrides.listSpaces(),
+        input.stagedImages?.map((image) => image.relativePath),
+      );
     }
     const space = resolveSpace(this.overrides.listSpaces(), input.spaceId);
     const absolute = await assertSafeKnowledgeWriteTarget(space.rootPath, input.card.relativePath);

@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TaskRegistry } from './TaskRegistry';
 
 const roots: string[] = [];
@@ -192,6 +192,24 @@ describe('TaskRegistry', () => {
     await expect(registry.getTask(task.id)).resolves.toMatchObject({ status: 'completed', disposition: 'completed' });
   });
 
+  it('keeps a child execution local budget separate from its parent consumption', async () => {
+    const registry = await createRegistry();
+    const parent = await registry.createTask('Parent investigation');
+    const parentRun = await registry.startExecution(parent.id, {
+      mode: 'subagent',
+      budget: { maxToolCalls: 1000, toolCalls: 800, maxSubagents: 12, subagents: 10,
+        maxChildDepth: 2, childDepth: 1, deadlineAt: Date.now() + 60_000 },
+    });
+    const child = await registry.createTask('Independent review', { parentTaskId: parent.id });
+    const childRun = await registry.startExecution(child.id, {
+      mode: 'subagent', parentExecutionId: parentRun.id,
+      budget: { maxToolCalls: 16, toolCalls: 0, maxSubagents: 0, subagents: 0,
+        maxChildDepth: 2, childDepth: 2, deadlineAt: Date.now() + 30_000 },
+    });
+    expect(childRun.budget).toMatchObject({ maxToolCalls: 16, toolCalls: 0, maxSubagents: 0, subagents: 0, childDepth: 2 });
+    expect((await registry.getExecution(parentRun.id))?.budget).toMatchObject({ toolCalls: 800, subagents: 10 });
+  });
+
   it('queues generation-bound messages with a durable cursor', async () => {
     const registry = await createRegistry();
     const task = await registry.createTask('Background work');
@@ -313,6 +331,35 @@ describe('TaskRegistry', () => {
     const task = await registry.createTask('Budgeted');
     await expect(registry.startExecution(task.id, { mode: 'direct', budget: { maxToolCalls: 5, toolCalls: 6 } })).rejects.toThrow(/exhausted/);
     await expect(registry.startExecution(task.id, { mode: 'direct', budget: { deadlineAt: Date.now() - 1 } })).rejects.toThrow(/expired/);
+  });
+
+  it('records final usage and settles a running execution after its wall deadline', async () => {
+    const registry = await createRegistry();
+    const task = await registry.createTask('Timed review');
+    const deadlineAt = Date.now() + 60_000;
+    const execution = await registry.startExecution(task.id, {
+      mode: 'subagent', budget: { maxToolCalls: 8, deadlineAt },
+    });
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(deadlineAt + 1);
+    try {
+      const accounted = await registry.updateExecutionBudget(execution.id, {
+        expectedGeneration: execution.generation,
+        toolCalls: 6,
+        deadlineAt,
+      });
+      expect(accounted.budget).toMatchObject({ toolCalls: 6, deadlineAt });
+      await registry.settleExecution(execution.id, {
+        expectedGeneration: execution.generation,
+        status: 'failed',
+        result: { disposition: 'blocked', summary: 'POLICY_LIMIT_EXCEEDED: maxWallTimeMs', outputs: {} },
+      });
+      expect(await registry.getTask(task.id)).toMatchObject({ status: 'blocked' });
+      await expect(registry.startExecution(task.id, {
+        mode: 'subagent', budget: { deadlineAt: deadlineAt + 60_000 },
+      })).rejects.toThrow(/expired|exhausted/);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it('keeps completed task semantics and dependency proof immutable', async () => {

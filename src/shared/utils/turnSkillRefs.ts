@@ -8,7 +8,10 @@ const DOLLAR_SKILL_REF_PATTERN = /\$([a-zA-Z][a-zA-Z0-9_-]*)/g;
 export function extractDollarSkillRefs(text: string): string[] {
   const ids: string[] = [];
   const seen = new Set<string>();
-  for (const match of text.matchAll(DOLLAR_SKILL_REF_PATTERN)) {
+  // A Skill name shown as Markdown code is a literal reference (for example,
+  // a handoff describing a child review), not an invocation by this turn.
+  const invocationText = text.replace(/(`+)[\s\S]*?\1/g, '');
+  for (const match of invocationText.matchAll(DOLLAR_SKILL_REF_PATTERN)) {
     const id = match[1];
     if (!id || seen.has(id)) continue;
     seen.add(id);

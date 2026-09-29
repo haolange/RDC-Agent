@@ -114,7 +114,7 @@ export const KnowledgePromoteArgsSchema = z.tuple([
   z.object({
     spaceId: KnowledgeSpaceIdSchema,
     card: KnowledgeCardRecordSchema,
-    to: z.enum(['verified', 'promoted', 'deprecated']),
+    to: z.enum(['verified', 'promoted', 'retired']),
     permissionMode: KnowledgePermissionModeSchema,
     confirmation: KnowledgeConfirmationSchema,
     approvalToken: ipcNonEmptyString(128, 'approvalToken'),

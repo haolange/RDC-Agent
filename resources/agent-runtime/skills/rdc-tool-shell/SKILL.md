@@ -19,12 +19,12 @@ General 先从本 turn 冻结的定义做轻量发现；这不会启动 CLI、�
 {"rdc":{"discovery":{"kind":"describe","operation":"rd.texture.get_pixel_history"}}}
 ```
 
-`discovery` 与 `operation` 互斥。搜索匹配操作名称和描述，单项说明返回冻结定义的完整参数与能力声明；未知操作必须拒绝。
+`discovery` 与 `operation` 互斥。搜索在冻结定义的名称、描述、参数名及结果说明上做相关度排序；短的区分词或已知的精确操作名更容易定位目标。候选名称不能代替 `describe`：单项说明才返回冻结定义的完整参数与能力声明；未知操作必须拒绝。
 
 人类在终端可使用同一安装的 CLI 发现入口：
 
 - `rdc-tool tools list --namespace pipeline --json` 按真源 namespace 列举。
-- `rdc-tool tools search "pixel history" --json` 匹配名称、描述和参数，不等同于 namespace 过滤。
+- `rdc-tool tools search "pixel history" --json` 在 CLI 的名称、namespace、group 与描述摘要中查找原词组，不等同于 namespace 过滤；与 Agent 冻结目录搜索的排序语义不同。
 - `rdc-tool tools describe rd.pipeline.get_state --json` 读取完整参数、结果、前置条件、scope、effects 和证据声明。
 
 优先定向发现，不把完整 catalog 塞进上下文。机器调用只读取 canonical JSON 和 catalog fingerprint。实际接口不匹配时停止并报告升级需求，不切回旧命令、旧 catalog 或兼容参数。
@@ -43,7 +43,11 @@ General 先从本 turn 冻结的定义做轻量发现；这不会启动 CLI、�
 
 先检查 canonical envelope 的 `ok`，再解释 `data`、`error`、`meta`、`artifacts` 和可选 projection。合法空集合必须有成功语义；读取失败、后端 unsupported、预算耗尽和取消保持各自错误或状态，不能改写成空值、零值或成功。事件结果同时核对 requested/applied/image EID；图片与导出核对归属、路径和实际格式。
 
+`rd.core.get_capabilities` 的 remote capability matrix 中，事件绑定检查只针对查询时的 active event。当前事件没有绑定 shader 时，`not_currently_probed` 不说明其它目标 draw 被阻断；要在目标事件读取 shader/disassembly 的实际回执与 `edit_plan` 后判断。`rd.shader.get_source` 的原始调试源码不可用也不等于可替换输入都不可用；若回执提供格式明确的 fallback，先验证 fallback 的实际结果。任何总览能力或 fallback 建议都不能代替安全干预与恢复回执。
+
 默认在内存或 stdout 处理统计、直方图、纹理差异和小型读回。只有用户或 Plan 明确要求证据保存时才提供输出路径；大结果先分页、区域化或限制数量。VFS 与 CLI facade 面向人类和受限浏览，不用 raw `.rdc` 或整树展开绕过主进程路径边界。
+
+`rd.export.screenshot` 和 `rd.texture.render_overlay` 是展示画面：输出尺寸可由渲染窗口决定，不能将 PNG 像素坐标直接当成源纹理坐标。需要在原生纹理坐标上选 ROI 或读取像素时，先核对事件、目标 texture、subresource 与尺寸；可按冻结 catalog 使用不带 channels/remap/flip_y 显示控制的 `rd.export.texture` 导出原生纹理，再在该图定位区域并用原生读取操作复核。导出图像及坐标仍只证明所属事件与纹理，不自动证明 Present 或物理设备屏幕呈现。
 
 effects 描述可能的 replay position、artifact write、shader debug/replace 等真实影响。根据回执判断后续刷新与证据资格，不根据工具名猜测。失败、取消或缺少主进程签名回执时，变更与回滚均保持未证；实验遵循 `$renderdoc-execution` 的 baseline → intervention → variant → rollback → restored 契约。
 

@@ -63,6 +63,9 @@ export interface AgentTool<
   readonly permissionHint?: AgentToolPermissionHint;
   readonly spec?: AgentToolSpec;
 
+  /** Reject semantically invalid arguments before permission review or execution. */
+  validateArgs?(args: TParams): void;
+
   execute(
     toolCallId: string,
     args: TParams,

@@ -14,7 +14,13 @@ export function persistSubagentResult(sessionId: string, executionId: string, va
 }
 export function normalizeSubagentResult(text: string, status: 'complete' | 'failed' | 'cancelled', declaration: TurnCompletionDeclaration | null | undefined, artifact?: PersistedSubagentResult): TaskCompletionResult {
   const resultRef = artifact?.uri; const resultHash = artifact?.hash;
-  if (status === 'cancelled') return { disposition: 'cancelled', summary: 'Subagent execution cancelled.', outputs: {}, resultRef, resultHash };
+  if (status === 'cancelled') {
+    if (text.startsWith('POLICY_LIMIT_EXCEEDED: maxWallTimeMs')) return {
+      disposition: 'blocked', summary: 'Subagent execution exceeded its wall-time budget.',
+      outputs: {}, error: 'POLICY_LIMIT_EXCEEDED: maxWallTimeMs', resultRef, resultHash,
+    };
+    return { disposition: 'cancelled', summary: 'Subagent execution cancelled.', outputs: {}, resultRef, resultHash };
+  }
   if (status === 'failed') return { disposition: 'blocked', summary: 'Subagent execution failed; inspect the durable result artifact.', outputs: {}, error: 'SUBAGENT_EXECUTION_FAILED', resultRef, resultHash };
   if (declaration?.result) { const result = declaration.result; return { disposition: declaration.disposition === 'budget_paused' ? 'blocked' : declaration.disposition, summary: result.summary, outputs: { ...result.outputs }, resultRef, resultHash, evidenceRefs: [...declaration.evidenceRefs], counterevidence: [...result.counterevidence], unresolved: [...result.unresolved], scope: result.scope, sideEffects: [...result.sideEffects], recoveryState: [...result.recoveryState] }; }
   void text; // Unstructured transcript is preserved in the result artifact, never promoted into parent input.

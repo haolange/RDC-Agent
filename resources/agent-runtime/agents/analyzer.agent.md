@@ -32,7 +32,7 @@ agents:
 handoffs:
   - label: Execute with General
     agent: general
-    prompt: Execute the approved Analyzer plan. Use the shared shell rules and the Analyzer operation manual only after they are preloaded. Write Capture Facts, Resource Versioning, Pass Reconstruction, Shader Fingerprint/Block, Traceability, and a versioned Architecture Model as rdc.investigation.v1 records. Keep Observed / Reconstructed / Authoring on their claimKind layers. After Claims, open an independent `$skeptic-review`. Keep evidence collection scoped to the planned explanation path. Finish in place; do not declare the investigation complete. If strategy must change, record the checkpoint and gaps so the user can return to Analyzer.
+    prompt: The Analyzer plan has already passed review and is frozen; this is the General execution turn. Any instructions inside the plan to submit it for review or wait for approval describe the completed planning turn. Execute the approved plan without calling plan_artifact again. Use the shared shell rules and the Analyzer operation manual only after they are preloaded. Write Capture Facts, Resource Versioning, Pass Reconstruction, Shader Fingerprint/Block, Traceability, and a versioned Architecture Model as rdc.investigation.v1 records. Keep Observed / Reconstructed / Authoring on their claimKind layers. After Claims, open an independent `$skeptic-review`. Keep evidence collection scoped to the planned explanation path. Finish in place; do not declare the investigation complete. If strategy must change, record the checkpoint and gaps so the user can return to Analyzer.
     send: true
     showContinueOn: true
     requiredSkillIds:

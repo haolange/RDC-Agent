@@ -74,7 +74,7 @@ const TEST_REQUEST_PLAN = createTestRequestPlan({
 it('isolates Scout and Skeptic provider inputs, preserves evidence, and lets Mission evaluate after the user returns', { timeout: 30000 }, async () => {
   const harness = createInvestigationHarness('rdc-exploration-provider-');
   const { resolver, service } = harness;
-  const profiles = ['general', 'debugger'].map((id) => ({ id, enabled: true, instructions: `Identity ${id}`, skills: [], tools: [], agents: ['general'], handoffs: [], metadata: {}, models: [], mcpServers: [], filePath: `fixture/${id}.agent.md`, name: id, description: id } as unknown as AgentManifestDefinition));
+  const profiles = ['general', 'debugger'].map((id) => ({ id, enabled: true, instructions: `Identity ${id}`, skills: [], tools: [], agents: ['general'], handoffs: [], metadata: {}, models: [], mcpServers: [], filePath: `fixture/${id}.agent.md`, name: id, description: id, compiledRoute: { providerId: TEST_MODEL.provider, modelId: TEST_MODEL.id } } as unknown as AgentManifestDefinition));
   vi.spyOn(settingsService, 'getAll').mockReturnValue({ paths: { userRdcRoot: harness.sessionPath }, llm: { providers: [], agentRoutes: [] } } as never);
   vi.spyOn(agentManifestService, 'getEffectiveProfiles').mockReturnValue(profiles as never);
   vi.spyOn(sessionArtifactResolver, 'read').mockImplementation(resolver.read.bind(resolver));

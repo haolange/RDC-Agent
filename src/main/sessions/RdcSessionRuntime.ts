@@ -434,11 +434,13 @@ export class RdcSessionRuntime {
     const previousContext = this.runtimeContext;
 
     let closeOk = true;
+    let closeError = '';
 
     // Stage 1: graceful close via the canonical session operation.
     if (previousContext) {
       const result = await callNative('rd.session.clear_context', {}, previousContext.contextId, options.binding!, options.signal);
       closeOk = result.ok;
+      closeError = result.error ?? '';
       if (!result.ok) {
         runtimeLogService.log({
           scope: 'app',
@@ -452,9 +454,10 @@ export class RdcSessionRuntime {
     } else if (this.contextId) {
       const result = await callNative('rd.session.clear_context', {}, this.contextId, options.binding!, options.signal);
       closeOk = result.ok;
+      closeError = result.error ?? '';
     } else { return; }
 
-    if (!closeOk) throw new Error('RDC_CLOSE_FAILED: runtime close was not confirmed; ownership is retained.');
+    if (!closeOk) throw new Error(`RDC_CLOSE_FAILED: ${closeError || 'runtime close was not confirmed'}; ownership is retained.`);
     if (this.contextId) {
       const cli = options.binding?.cli;
       if (!cli?.enabled || !cli.command) throw new Error('RDC_CLOSE_FAILED: owning CLI is unavailable for daemon shutdown.');

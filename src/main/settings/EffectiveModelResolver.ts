@@ -358,9 +358,9 @@ function modelOverrideToContribution(modelId: string, override: ModelOverride): 
   if (override.cost) {
     contribution.cost = { ...override.cost };
   }
-  if (override.status === 'deprecated') {
+  if (override.status === 'retiring') {
     contribution.availability = 'unavailable';
-    contribution.unavailableReason = 'Marked deprecated by user override (models.json).';
+    contribution.unavailableReason = 'Marked retiring by user override (models.json).';
   }
   if (override.reasoning !== undefined) {
     contribution.controls = {

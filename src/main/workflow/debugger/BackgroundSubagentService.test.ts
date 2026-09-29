@@ -8,6 +8,7 @@ import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import type { RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 import { flushPolicyBudgetObservers } from './DelegationBudget';
 import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
+import { createSubagentBudgetState } from './TurnCoordinator';
 
 const roots: string[] = [];
 const capsule: DelegationCapsule = {
@@ -15,13 +16,13 @@ const capsule: DelegationCapsule = {
   challengeRefs: [], negativePaths: [], inputArtifactRefs: [], outputRequirements: 'Return findings',
   stopConditions: ['done'], requiredSkillIds: [], budget: { maxToolCalls: 4, maxWallTimeMs: 10_000 },
 };
-function harness(run: ConstructorParameters<typeof BackgroundSubagentService>[0], listSnapshots?: ConstructorParameters<typeof BackgroundSubagentService>[3]) {
+function harness(run: ConstructorParameters<typeof BackgroundSubagentService>[0], listDeliveries?: ConstructorParameters<typeof BackgroundSubagentService>[3]) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'background-subagent-')); roots.push(root);
   const registries = new Map<string, TaskRegistry>();
   const service = new BackgroundSubagentService(run, (sessionId, onCancel) => {
     const registry = new TaskRegistry(path.join(root, sessionId), { onCancelExecution: onCancel });
     registries.set(sessionId, registry); return registry;
-  }, (_sessionId, executionId) => ({ uri: `session://tool-outputs/background-${executionId}.json`, hash: 'fixture-hash' }), listSnapshots);
+  }, (_sessionId, executionId) => ({ uri: `session://tool-outputs/background-${executionId}.json`, hash: 'fixture-hash' }), listDeliveries);
   return { service, registry: (sessionId: string) => registries.get(sessionId)! };
 }
 afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
@@ -56,14 +57,14 @@ describe('BackgroundSubagentService', () => {
   });
 
   it('recovers a parent mailbox commit from structured request metadata after a crash before ack', async () => {
-    const snapshots: RequestEnvelopeSnapshot[] = [];
-    const { service, registry } = harness(async () => ({ status: 'complete', text: 'done', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'done', outputs: {}, counterevidence: [], unresolved: [], scope: 'test', sideEffects: [], recoveryState: [] } } }), () => snapshots);
+    const deliveries: NonNullable<RequestEnvelopeSnapshot['mailboxDeliveries']> = [];
+    const { service, registry } = harness(async () => ({ status: 'complete', text: 'done', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'done', outputs: {}, counterevidence: [], unresolved: [], scope: 'test', sideEffects: [], recoveryState: [] } } }), () => deliveries);
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('parent crash recovery');
     const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule });
     await service.join(execution.id);
     const pending = await service.beforeParentProviderRequestMessages('s1');
-    snapshots.push({ mailboxDeliveries: pending.mailboxDeliveries } as RequestEnvelopeSnapshot);
+    deliveries.push(...pending.mailboxDeliveries ?? []);
     const recovered = await service.beforeParentProviderRequestMessages('s1');
     expect(recovered.messages).toEqual([]);
   });
@@ -97,17 +98,17 @@ describe('BackgroundSubagentService', () => {
   });
 
   it('recovers a child mailbox commit from structured request metadata after a crash before ack', async () => {
-    const snapshots: RequestEnvelopeSnapshot[] = [];
+    const deliveries: NonNullable<RequestEnvelopeSnapshot['mailboxDeliveries']> = [];
     let enter!: () => void; const gate = new Promise<void>((resolve) => { enter = resolve; });
     let redelivered = true;
     const { service, registry } = harness(async (input) => {
       await gate;
       const pending = await input.beforeProviderRequestMessages!();
-      snapshots.push({ mailboxDeliveries: pending.mailboxDeliveries } as never);
+      deliveries.push(...pending.mailboxDeliveries ?? []);
       const recovered = await input.beforeProviderRequestMessages!();
       redelivered = recovered.messages.length > 0;
       return { status: 'complete', text: 'done', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'done', outputs: {}, counterevidence: [], unresolved: [], scope: 'test', sideEffects: [], recoveryState: [] } } };
-    }, () => snapshots as never);
+    }, () => deliveries);
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('crash recovery');
     const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule });
@@ -208,9 +209,9 @@ describe('BackgroundSubagentService', () => {
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('root retry');
     const policy = () => ({ toolCalls: 0, subagents: 0, childDepth: 0, wallStartedAt: Date.now(), maxToolCalls: 2, maxSubagents: 2, maxChildDepth: 2, maxWallTimeMs: 10_000 });
-    const first = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, rootBudgetId: 'turn:first', parentAgentId: 'general', targetProfile: 'general', capsule, policyBudget: policy(), subagentBudget: { depth: 0, childrenSpawned: 0, aggregateToolCalls: 0, wallStartedAt: Date.now(), budget: { maxDepth: 2, maxChildren: 2, maxAggregateToolCalls: 2, maxAggregateWallMs: 10_000 } } });
+    const first = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, rootBudgetId: 'turn:first', parentAgentId: 'general', targetProfile: 'general', capsule, policyBudget: policy(), subagentBudget: createSubagentBudgetState({ maxDepth: 2, maxChildren: 2, maxAggregateToolCalls: 2, maxAggregateWallMs: 10_000 }) });
     await service.join(first.id);
-    const second = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, rootBudgetId: 'turn:second', parentAgentId: 'general', targetProfile: 'general', capsule, policyBudget: policy(), subagentBudget: { depth: 0, childrenSpawned: 0, aggregateToolCalls: 0, wallStartedAt: Date.now(), budget: { maxDepth: 2, maxChildren: 2, maxAggregateToolCalls: 2, maxAggregateWallMs: 10_000 } } });
+    const second = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, rootBudgetId: 'turn:second', parentAgentId: 'general', targetProfile: 'general', capsule, policyBudget: policy(), subagentBudget: createSubagentBudgetState({ maxDepth: 2, maxChildren: 2, maxAggregateToolCalls: 2, maxAggregateWallMs: 10_000 }) });
     await service.join(second.id);
     expect(observed).toEqual([0, 1]);
     expect((await registry('s1').getExecution(second.id))?.rootBudgetId).toBe('turn:first');

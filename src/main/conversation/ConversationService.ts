@@ -1,5 +1,5 @@
 import { acquireRdcPreparationLock, setRdcInteractionLock } from '../sessions/RdcOperationCoordinator';
-import { reconcileDelegatedInteractionRequests } from './DelegatedInteractionRecovery';
+import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
 import { enforceMissionTurnCompletion } from '../investigation/missionCompletionContract';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
@@ -87,6 +87,10 @@ export class ConversationService {
     this.acceptingTurns = false;
   }
 
+  isTurnActive(sessionId: string, turnId: string): boolean {
+    return this.activeTurns.get(turnId)?.sessionId === sessionId;
+  }
+
   async abortAllTurns(): Promise<void> {
     for (const preparing of this.preparingRequests.values()) {
       preparing.controller.abort();
@@ -105,7 +109,11 @@ export class ConversationService {
     branchState: ConversationBranchState | null;
   }> {
     const allMessages = storageAdapter.readConversationHistory(sessionId).map((message) => {
-      const recovered = reconcileDelegatedInteractionRequests(sessionId, message);
+      const recovered = reconcileInterruptedConversationTurn(
+        reconcileDelegatedInteractionRequests(sessionId, message),
+        this.activeTurns.has(message.turnId),
+        message.updatedAt,
+      );
       if (recovered !== message) storageAdapter.appendConversationMessage(sessionId, recovered);
       return recovered;
     });
@@ -371,7 +379,9 @@ export class ConversationService {
         messages,
         branchState,
         executionTransition: { action: 'none' },
-        runUpdate: null,
+        runUpdate: assistantDraftMessage.runId
+          ? storageAdapter.listRuns(session.sessionId).find(run => run.runId === assistantDraftMessage.runId) ?? null
+          : null,
         tracePresentation,
         errorViewModel: assistantDraftMessage.diagnostic
           ? {
@@ -749,6 +759,7 @@ export class ConversationService {
       validateCompletion: enforceMissionTurnCompletion,
       persistConversationSnapshot,
       emitConversationEvent,
+      publishRunStatus: (sessionId, runId, status) => workflowProjectionPublisher.publishRunStatus({ sessionId, runId, status }),
       publishConversationTrace: (
         traceSessionId: string,
         messages: ConversationMessage[],

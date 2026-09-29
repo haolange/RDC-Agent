@@ -12,7 +12,7 @@ import {
   toPosixRelative,
   walkMarkdownFiles,
 } from './knowledgeFs';
-import { KnowledgeIndexService } from './KnowledgeIndexService';
+import { KnowledgeIndexService, contentHashOf } from './KnowledgeIndexService';
 import {
   KNOWLEDGE_RETRIEVAL_LANES,
   type KnowledgeIndexEntry,
@@ -81,6 +81,7 @@ function matchesScope(entry: KnowledgeIndexEntry, scope: KnowledgeQueryRequest['
 function toHit(entry: KnowledgeIndexEntry, lanes: KnowledgeRetrievalLane[], score: number): KnowledgeLaneHit {
   return {
     cardId: entry.cardId,
+    contentHash: entry.contentHash,
     spaceId: entry.spaceId,
     relativePath: entry.relativePath,
     title: entry.title,
@@ -146,7 +147,10 @@ export class KnowledgeQueryService {
         parsed.record.preview = extractPreview(parsed.body);
       }
       const updatedAt = await this.deps.statMtime(absolutePath);
-      return toCardDetail(space, normalizedRelative, parsed, updatedAt);
+      return {
+        ...toCardDetail(space, normalizedRelative, parsed, updatedAt),
+        contentHash: contentHashOf(source),
+      };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw error;
@@ -159,6 +163,9 @@ export class KnowledgeQueryService {
     const universe = snapshot.cards.filter((entry) => {
       if (request.spaceIds && !request.spaceIds.includes(entry.spaceId)) return false;
       if (request.type && entry.type && !request.type.includes(entry.type)) return false;
+      // Retired cards remain browsable and explicitly queryable for audit, but
+      // do not enter ordinary retrieval packs or Agent context.
+      if (!request.lifecycle && entry.lifecycle === 'retired') return false;
       if (request.lifecycle && entry.lifecycle && !request.lifecycle.includes(entry.lifecycle)) return false;
       if (request.asOf != null && entry.updatedAt > request.asOf) return false;
       return matchesScope(entry, request.scope);

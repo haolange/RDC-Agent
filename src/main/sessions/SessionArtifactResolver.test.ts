@@ -161,7 +161,11 @@ describe('SessionArtifactResolver', () => {
     expect(() => resolver.read(a.sessionId, 'session://tool-outputs/hashed.json', {
       expectedHash: '0'.repeat(64),
     })).toThrow(/ARTIFACT_HASH_MISMATCH/);
+    expect(() => resolver.read(a.sessionId, written.uri, {
+      expectedHash: `sha256:${'0'.repeat(64)}`,
+    })).toThrow(/ARTIFACT_HASH_MISMATCH/);
     expect(resolver.read(a.sessionId, written.uri, { expectedHash: written.hash }).text).toContain('"n":1');
+    expect(resolver.read(a.sessionId, written.uri, { expectedHash: `sha256:${written.hash}` }).text).toContain('"n":1');
     resolver.sweepToolOutputs(a.sessionId);
     expect(() => resolver.read(a.sessionId, written.uri)).toThrow(/ARTIFACT_NOT_FOUND/);
   });

@@ -39,6 +39,8 @@ Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consu
 
 上述 Browser 能力仍受 main-owned Zod、PermissionPolicy、approval token、MCP trust、`safeStorage`、session ownership 与 shell policy 约束；parity 不等于绕过权限。`command:execute`、`settings:set`、`rdc-runtime:trustMcp`、`rdc-runtime:revokeMcp` 仅在 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时开放，否则 fail-closed。
 
+隔离模型验收若经用户授权复制加密 Provider 凭据，须一并复制同源 Electron `Local State` 到隔离 userData；只复制凭据文件会使 `safeStorage` 解密失败。通过产品实际模型请求确认可用性，不能以“已配置”代替；结束后从隔离副本清除两者，不触碰原件。
+
 ## 状态与实例
 
 Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 时默认使用经过校验的临时 `os.tmpdir()/rdc-agent/qa-*` userData，并在 `will-quit` 清理；显式路径或 canonical 开关才会共享真实数据。进入该 disposable 分支时，主进程同时把 `RDC_AGENT_HOME` 指到同一目录下的 `.rdc-agent`，使 provider 配置与 `userData/secrets` 落在同一隔离边界；launcher 会先清掉继承来的 `RDC_AGENT_HOME`，避免读到或写回真实 `~/.rdc-agent`。只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才落真实 `~/.rdc-agent`。两种载体不得同时占用同一目录；`instance.lock` 冲突应明确失败。涉及真实本机数据的验收必须显式指定 userData。

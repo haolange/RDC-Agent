@@ -12,7 +12,6 @@ import type {
   AgentRuntimeSettings,
   UiPreferences,
 } from '@shared/types/settings';
-import { createDefaultChromeThemes } from '@shared/theme/presets';
 import { sanitizeUiPreferences } from '@shared/theme/uiPreferences';
 import {
   createProviderEntryFromCatalog,
@@ -97,45 +96,50 @@ export function nowIso(): string {
 }
 
 export function readJsonFile<T>(filePath: string): T | null {
+  let parsed: T;
   try {
-    if (!fs.existsSync(filePath)) {
-      return null;
-    }
-    return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+    parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
   } catch (error) {
-    console.warn('[SettingsService] Failed to read JSON:', filePath, error);
-    return null;
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw new StorageSchemaError(`STORAGE_CORRUPT: ${filePath} could not be read as JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
+  assertPersistedSettingsSchemaVersion(parsed, filePath);
+  return parsed;
 }
 
 export function assertPersistedSettingsSchemaVersion(raw: unknown, filePath: string): void {
+  if (raw === null) return;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return;
+    throw new StorageSchemaError(`STORAGE_SCHEMA: ${filePath} must be a settings object`);
   }
   const version = (raw as { schemaVersion?: unknown }).schemaVersion;
-  if (version == null) {
-    return;
-  }
-  const numeric = typeof version === 'number' ? version : Number(version);
-  if (Number.isFinite(numeric) && numeric > SETTINGS_SCHEMA_VERSION) {
+  if (version !== SETTINGS_SCHEMA_VERSION) {
     throw new StorageSchemaError(
-      `STORAGE_SCHEMA_UNSUPPORTED: ${filePath} has schemaVersion ${version}; supported up to ${SETTINGS_SCHEMA_VERSION}`,
+      `STORAGE_SCHEMA_UNSUPPORTED: ${filePath} has schemaVersion ${String(version)}; requires ${SETTINGS_SCHEMA_VERSION}`,
     );
+  }
+  const llm = (raw as { llm?: unknown }).llm;
+  if (llm && typeof llm === 'object' && !Array.isArray(llm) && 'embedding' in llm) {
+    throw new StorageSchemaError(`STORAGE_SCHEMA_UNSUPPORTED: ${filePath} contains a retired embedding selection`);
+  }
+  if (llm && typeof llm === 'object' && !Array.isArray(llm) && 'agentRoutes' in llm) {
+    throw new StorageSchemaError(`STORAGE_SCHEMA_UNSUPPORTED: ${filePath} contains retired persisted agent routes`);
   }
 }
 
 /** Async counterpart of `readJsonFile` for event-loop-friendly reads. */
 export async function readJsonFileAsync<T>(filePath: string): Promise<T | null> {
+  let parsed: T;
   try {
     const raw = await fs.promises.readFile(filePath, 'utf8');
-    return JSON.parse(raw) as T;
+    parsed = JSON.parse(raw) as T;
   } catch (error) {
     const code = (error as NodeJS.ErrnoException | undefined)?.code;
-    if (code !== 'ENOENT') {
-      console.warn('[SettingsService] Failed to read JSON:', filePath, error);
-    }
-    return null;
+    if (code === 'ENOENT') return null;
+    throw new StorageSchemaError(`STORAGE_CORRUPT: ${filePath} could not be read as JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
+  assertPersistedSettingsSchemaVersion(parsed, filePath);
+  return parsed;
 }
 
 export function createDefaultRuntimeSettings(): AppSettings {
@@ -237,32 +241,11 @@ export function rebuildPersistedSettings(
     warnings.push('No configured provider available for Debugger mode.');
   }
 
-  const previousSchemaVersion = typeof candidate.schemaVersion === 'number' ? candidate.schemaVersion : 0;
   const appearance = sanitizeUiPreferences(
     candidate.appearance,
     sanitizeUiPreferences(fallback.appearance, DEFAULT_APPEARANCE),
   );
-  // Schema 6: clear Appearance chrome pollution from dual-theme bring-up and restore RDC defaults.
-  if (previousSchemaVersion < 6) {
-    appearance.chromeThemes = createDefaultChromeThemes();
-    fixes.push('Reset appearance.chromeThemes to RDC preset defaults (schema 6)');
-  }
-
-  const incomingLlm = candidate.llm && typeof candidate.llm === 'object' && !Array.isArray(candidate.llm)
-    ? candidate.llm as { embedding?: unknown; providers?: unknown }
-    : undefined;
-  if (incomingLlm && Object.prototype.hasOwnProperty.call(incomingLlm, 'embedding')) {
-    fixes.push('Removed persisted embedding selection (schema 7)');
-  }
-
-  const persistedRdcCliTimeout = candidate.tooling?.rdcCli?.timeoutMs;
-  const migrateRdcCliDefaultTimeout = previousSchemaVersion < 8
-    && (persistedRdcCliTimeout == null || persistedRdcCliTimeout === 60000);
   const tooling = sanitizeToolingSettings(candidate.tooling ?? fallback.tooling);
-  if (migrateRdcCliDefaultTimeout) {
-    tooling.rdcCli = { ...tooling.rdcCli, timeoutMs: DEFAULT_RDC_CLI_INVOKER.timeoutMs };
-    fixes.push('Raised the persisted RDC CLI default timeout to 120000ms (schema 8)');
-  }
 
   const nextSettings: PersistedSettingsPayload = {
     schemaVersion: SETTINGS_SCHEMA_VERSION,

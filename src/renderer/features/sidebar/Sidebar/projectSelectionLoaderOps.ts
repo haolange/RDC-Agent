@@ -2,6 +2,7 @@ import { useCaptureStore } from '../../../stores/captureStore';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
+import { useSessionProjectionStore } from '../../../stores/sessionProjectionStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
 import { hydrateComposerAgentFromSession } from '../../../stores/sessionAgentHydration';
@@ -65,6 +66,9 @@ export function restoreSelectionSnapshot(
   ctx.setCurrentRun(snapshot.currentRun);
   ctx.setCaptures(snapshot.captures);
   ctx.setRuns(snapshot.runs);
+  if (snapshot.currentSession) {
+    useSessionProjectionStore.getState().activateSession(snapshot.currentSession.sessionId);
+  }
 }
 
 export async function selectSessionOp(
@@ -149,6 +153,9 @@ export async function loadSessionsOp(
     return;
   }
   if (!projectSelection.success || !projectSelection.project) {
+    if (options.rollbackState) {
+      restoreSelectionSnapshot(ctx, options.rollbackState);
+    }
     ctx.setSidebarError(projectSelection.error || ctx.t('sidebar.selectProjectFailed'));
     return;
   }
@@ -172,6 +179,7 @@ export async function loadSessionsOp(
   if (!autoSelectSession) {
     ctx.setRightRailTarget(options.rightRailTarget ?? 'project');
     if (currentSession?.projectId && currentSession.projectId !== selectedProject.projectId) {
+      applySessionSwitchHygiene({ previousSessionId: currentSession.sessionId, nextSessionId: null });
       ctx.setCurrentSession(null);
       ctx.setCurrentRun(null);
       ctx.setCaptures([]);
@@ -193,6 +201,9 @@ export async function loadSessionsOp(
   const targetSessionId = candidateChain.find((id) => id && existingSessionIds.has(id)) ?? null;
 
   if (!targetSessionId) {
+    if (currentSession) {
+      applySessionSwitchHygiene({ previousSessionId: currentSession.sessionId, nextSessionId: null });
+    }
     ctx.setRightRailTarget(options.rightRailTarget ?? 'project');
     ctx.setCurrentSession(null);
     ctx.setCurrentRun(null);
@@ -231,6 +242,10 @@ export async function loadProjectsOp(
     || null;
 
   if (!targetProject) {
+    const currentSession = ctx.getCurrentSession();
+    if (currentSession) {
+      applySessionSwitchHygiene({ previousSessionId: currentSession.sessionId, nextSessionId: null });
+    }
     ctx.setCurrentProject(null);
     useSessionStore.getState().clearUsageSnapshot();
     ctx.setCurrentSession(null);

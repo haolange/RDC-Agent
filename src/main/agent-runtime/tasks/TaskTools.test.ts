@@ -66,4 +66,16 @@ describe('TaskTools', () => {
     const childTaskId = (child.details as { ids: string[] }).ids[0]!;
     await expect(registry.getTask(childTaskId)).resolves.toMatchObject({ parentTaskId });
   });
+
+  it('binds tool-created Tasks to the current turn without exposing an agent-provided owner', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-tools-'));
+    roots.push(dir);
+    const registry = new TaskRegistry(dir);
+    const creationTurnRef = 'turn:stopped:generation:1';
+    const create = createTaskTools(registry, { getCreationTurnRef: () => creationTurnRef })
+      .find((tool) => tool.name === 'task_create')!;
+    const result = await create.execute('c1', { tasks: [{ subject: 'Only this turn' }] });
+    const taskId = (result.details as { ids: string[] }).ids[0]!;
+    await expect(registry.getTask(taskId)).resolves.toMatchObject({ creationTurnRef });
+  });
 });

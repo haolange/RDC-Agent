@@ -42,6 +42,7 @@ describe('SecretStorageService fail-closed', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (previousUserData === undefined) delete process.env.RDC_AGENT_USER_DATA;
     else process.env.RDC_AGENT_USER_DATA = previousUserData;
     if (previousHome === undefined) delete process.env.RDC_AGENT_HOME;
@@ -69,6 +70,26 @@ describe('SecretStorageService fail-closed', () => {
     expect(fs.existsSync(filePath)).toBe(false);
     const quarantined = fs.readdirSync(secretsPath).filter((entry) => entry.includes('.corrupt-'));
     expect(quarantined.length).toBe(1);
+  });
+
+  it('does not quarantine an unreadable but intact secret file', async () => {
+    const { appPathService } = await import('../runtime/AppPathService');
+    const { secretStorageService, SecretStorageUnavailableError } = await import('./SecretStorageService');
+    const secretsPath = appPathService.getRuntimePaths().secretsPath;
+    fs.mkdirSync(secretsPath, { recursive: true });
+    const filePath = path.join(secretsPath, 'provider-secrets.json');
+    fs.writeFileSync(filePath, '{}', 'utf8');
+    vi.spyOn(fs, 'readFileSync').mockImplementationOnce(() => {
+      const error = new Error('Access denied') as NodeJS.ErrnoException;
+      error.code = 'EACCES';
+      throw error;
+    });
+
+    expect(() => secretStorageService.hasSecretRecord('provider-test-api-key')).toThrow(
+      SecretStorageUnavailableError,
+    );
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('{}');
+    expect(fs.readdirSync(secretsPath)).toEqual(['provider-secrets.json']);
   });
 
   it('stores and decrypts with safeStorage only', async () => {

@@ -26,6 +26,7 @@ const spaces: KnowledgeSpace[] = [{ spaceId: 'user', kind: 'user', label: 'User'
 const queryResult: KnowledgeQueryResult = {
   hits: [{
     cardId: card.cardId,
+    contentHash: 'a'.repeat(64),
     spaceId: card.spaceId,
     relativePath: card.relativePath,
     title: card.title,
@@ -43,7 +44,7 @@ function createTools(candidates: KnowledgeCandidateService = createDisposableCan
   const query = {
     listSpaces: vi.fn(() => spaces),
     listCards: vi.fn(async () => [{ cardId: card.cardId, spaceId: card.spaceId, relativePath: card.relativePath, title: card.title }]),
-    getCard: vi.fn(async () => ({ ...card, content: card.body })),
+    getCard: vi.fn(async () => ({ ...card, content: card.body, contentHash: 'a'.repeat(64) })),
     query: vi.fn(async () => queryResult),
   } as unknown as KnowledgeQueryService;
   const compile = new KnowledgeCompileService({ now: () => new Date('2026-09-01T00:00:00.000Z') });
@@ -80,8 +81,10 @@ describe('KnowledgeTools', () => {
     const { byName } = createTools();
     const search = await byName.knowledge_search.execute('c3', { query: 'sample' });
     expect(String(search.content[0] && 'text' in search.content[0] ? search.content[0].text : '')).toContain('1 hits');
+    expect(String(search.content[0] && 'text' in search.content[0] ? search.content[0].text : '')).toContain(`sha256:${'a'.repeat(64)}`);
     const compiled = await byName.knowledge_compile.execute('c4', { query: 'sample' });
     expect(compiled.details).toMatchObject({ packId: expect.stringMatching(/^pack:/), count: 1 });
+    expect(compiled.details).toMatchObject({ hits: [{ cardId: card.cardId, contentHash: 'a'.repeat(64) }] });
     expect(compiled.details).not.toHaveProperty('semanticClaimed');
   });
 
@@ -89,7 +92,7 @@ describe('KnowledgeTools', () => {
     const { byName, query } = createTools();
     const result = await byName.knowledge_read.execute('c5', { spaceId: 'user', relativePath: 'facts/sample.md' });
     expect(query.getCard).toHaveBeenCalledWith('user', 'facts/sample.md');
-    expect(result.details).toMatchObject({ cardId: 'user:facts/sample.md', images: [] });
+    expect(result.details).toMatchObject({ cardId: 'user:facts/sample.md', contentHash: 'a'.repeat(64), images: [] });
   });
 
   it('lists knowledge-root image paths and roles from knowledge_read', async () => {

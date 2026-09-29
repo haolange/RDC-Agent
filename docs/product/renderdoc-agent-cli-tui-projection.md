@@ -327,11 +327,11 @@ Agent Tool、Sub-Agent、Pack/Candidate 都从共享 runtime 产生真实 Work P
 /knowledge specialize <stable-ref> --project <project-id>
 /knowledge import <path> --scope user|project
 /knowledge merge <source-ref> --into <target-ref>
-/knowledge deprecate <stable-ref>
+/knowledge retire <stable-ref>
 /knowledge history <stable-ref>
 ```
 
-这些是人类产品命令，直接调用同一 bounded main service；它们不是对 Agent Tool 的文本模拟，也不扩大 active Profile 的 Tool ceiling。`/knowledge compile` 创建 Session Pack Artifact，不修改正式 Knowledge。New/Edit/Specialize/Import/Merge/Deprecate 经 `KnowledgeWriteService`，先显示 target、diff、stable id、change reason、version、conflict 和 rollback basis，再无限等待用户明确确认；它们不是可供 LLM 自治调用的 Tool。`/knowledge rebuild` 只重建派生索引，不修改 canonical Markdown；`/knowledge status` 显示：
+这些是人类产品命令，直接调用同一 bounded main service；它们不是对 Agent Tool 的文本模拟，也不扩大 active Profile 的 Tool ceiling。`/knowledge compile` 创建 Session Pack Artifact，不修改正式 Knowledge。New/Edit/Specialize/Import/Merge/Retire 经 `KnowledgeWriteService`，先显示 target、diff、stable id、change reason、version、conflict 和 rollback basis，再无限等待用户明确确认；它们不是可供 LLM 自治调用的 Tool。`/knowledge rebuild` 只重建派生索引，不修改 canonical Markdown；`/knowledge status` 显示：
 
 ```text
 Index revision: kidx-20260723-42 · ready
@@ -381,7 +381,7 @@ Rollback basis: v2 / hash 91a...
 规则：
 
 - `knowledge_candidate_create` 和“生成候选”只创建 Session Candidate；
-- Promote/Update/Merge/Deprecate 不是普通 LLM Tool；
+- Promote/Update/Merge/Retire 不是普通 LLM Tool；
 - 持久动作必须显示 scope、path、diff、source、version、conflict、change reason 和 rollback basis；
 - 必须等待用户明确选择，不支持超时自动 Promote；
 - `FullAccess`、Profile、Skill、Sub-Agent 或 Agent 自述不能代替确认；
@@ -520,7 +520,7 @@ TUI 不根据文本关键词猜测事件类型。
 17. truecolor/256/no-color。
 18. Windows 中文路径和长文件名。
 19. Desktop/TUI/Agent Knowledge 同源一致性。
-20. New/Edit/Specialize/Import/Merge/Deprecate 共用 Session Draft、Diff/Conflict/Version/Change Reason/Rollback 确认；取消和失败不改 canonical Markdown/index revision。
+20. New/Edit/Specialize/Import/Merge/Retire 共用 Session Draft、Diff/Conflict/Version/Change Reason/Rollback 确认；取消和失败不改 canonical Markdown/index revision。
 21. Rebuild 只更新派生索引，成功原子发布 revision，失败保留 last-known-good 并显示 stale/failed。
 22. 80/120/160 列下 Authoring View 的 Form/Preview/Confirm 路径均可达，无横向信息丢失。
 23. no TodoWrite、no MCP RDC、no 194 tool schemas、no fixed stage、no TUI Knowledge index、no autonomous Promote。

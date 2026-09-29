@@ -10,6 +10,11 @@ describe('extractDollarSkillRefs', () => {
   it('ignores invalid tokens', () => {
     expect(extractDollarSkillRefs('price $12 and $1bad')).toEqual([]);
   });
+
+  it('does not invoke Skill names quoted as Markdown code', () => {
+    expect(extractDollarSkillRefs('Open an independent `$skeptic-review`; use $debugger-causal-method here.')).toEqual(['debugger-causal-method']);
+    expect(extractDollarSkillRefs('Example:\n```text\n$rdc-tool-shell\n```\nUse $renderdoc-execution.')).toEqual(['renderdoc-execution']);
+  });
 });
 
 describe('mergeTurnPreloadSkillIds', () => {

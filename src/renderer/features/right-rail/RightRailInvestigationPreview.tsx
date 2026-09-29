@@ -1,16 +1,17 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { bareInvestigationHash, type InvestigationReadIpcResult } from '@shared/types/renderdocInvestigation';
+import { bareInvestigationHash, type InvestigationReadIpcResult, type InvestigationReport } from '@shared/types/renderdocInvestigation';
 import type { InvestigationArtifactRow } from '@shared/types/trace';
 import { useI18n, type TranslationKey } from '../../i18n';
 import { copyAppText } from '../../hooks/appShellBridge';
 import { readInvestigationArtifact } from './investigationPreviewActions';
+import { RightRailReportView } from './RightRailReportView';
 import { Button } from '../../ui/Button';
 import './RightRailInvestigationPreview.css';
 
 type PreviewStatus = 'empty' | 'loading' | 'ready' | 'degraded' | 'error' | 'hash-mismatch';
 
-const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE = 'button:not([disabled]), summary, [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const shortHash = (value: string): string => {
   const bare = bareInvestigationHash(value);
@@ -133,6 +134,7 @@ export const RightRailInvestigationPreview: React.FC<{
         aria-modal="true"
         aria-labelledby={titleId}
         data-status={status}
+        data-kind={manifest?.kind ?? row.kind}
       >
         <header className="investigation-preview-header">
           <div className="investigation-preview-heading">
@@ -183,7 +185,15 @@ export const RightRailInvestigationPreview: React.FC<{
         {status === 'empty' ? (
           <p className="investigation-preview-message">{t('control.rightRail.artifacts.preview.empty')}</p>
         ) : null}
-        {body ? <pre className="investigation-preview-body">{body}</pre> : null}
+        {result?.record && manifest?.kind === 'report' ? (
+          <>
+            <RightRailReportView report={result.record as InvestigationReport} />
+            <details className="investigation-preview-source">
+              <summary>{t('control.rightRail.artifacts.preview.rawRecord')}</summary>
+              <pre className="investigation-preview-body">{body}</pre>
+            </details>
+          </>
+        ) : body ? <pre className="investigation-preview-body">{body}</pre> : null}
         {manifest?.supersedes ? (
           <p className="investigation-preview-message">
             {t('control.rightRail.artifacts.preview.supersedes', { id: manifest.supersedes })}

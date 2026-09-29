@@ -7,6 +7,7 @@ import {
   upsertRuntimeToolApproval,
   upsertRuntimeToolCall,
 } from './ConversationWorkTrace';
+import { applyPlanReviewRequested } from './ConversationPlanReviewEvents';
 
 describe('ConversationService work trace tool approvals', () => {
   it('associates multiple Hook events by exact tool ID without changing tool status', () => {
@@ -227,6 +228,60 @@ describe('ConversationService work trace tool approvals', () => {
     expect(stopped.blocks[0].toolCalls[0].approval?.resolvedAt).toEqual(expect.any(Number));
   });
 
+  it('closes an unreviewed plan card when its request stops', () => {
+    const trace = upsertRuntimeToolCall(undefined, {
+      id: 'plan-call',
+      toolName: 'plan_artifact',
+      status: 'running',
+      planReview: {
+        planId: 'plan-1', revision: 1, uri: 'session://plans/plan.md',
+        hash: 'a'.repeat(64), title: 'Plan', summary: [], sections: [],
+        status: 'awaiting', handoffOptions: [{ label: 'Execute with General', agent: 'general' }],
+      },
+    });
+
+    const stopped = finalizeTrace(trace, 'stopped', '请求已停止');
+    expect(stopped.blocks[0].toolCalls[0]).toMatchObject({
+      status: 'error',
+      planReview: { status: 'rejected', decision: { kind: 'reject' } },
+    });
+  });
+
+  it('settles visible thinking when a plan enters human review', () => {
+    const trace = upsertWorkBlock(undefined, 'runtime-loop-1', {
+      kind: 'llm_turn', title: 'Thinking', status: 'running',
+      thinking: { text: 'Preparing the plan', kind: 'summary', source: 'openai-responses-summary', visibility: 'summary' },
+      thinkingStatus: 'streaming', toolCalls: [],
+    });
+    const paused = applyPlanReviewRequested({
+      payload: {
+        toolCallId: 'plan-call',
+        planReview: {
+          planId: 'plan-1', revision: 1, uri: 'session://plans/plan.md',
+          hash: 'a'.repeat(64), title: 'Plan', summary: [], sections: [],
+          status: 'awaiting', handoffOptions: [{ label: 'Execute with General', agent: 'general' }],
+        },
+      },
+      workTrace: trace,
+    });
+    expect(paused?.blocks.find((block) => block.id === 'runtime-loop-1')?.thinkingStatus).toBe('complete');
+    expect(paused?.blocks.flatMap((block) => block.toolCalls).find((call) => call.id === 'plan-call'))
+      .toMatchObject({ status: 'running', planReview: { status: 'awaiting' } });
+  });
+
+  it('closes a streaming Thinking block when persistence fails', () => {
+    const trace = upsertWorkBlock(undefined, 'llm-turn-1', {
+      kind: 'llm_turn',
+      title: 'Thinking',
+      status: 'running',
+      thinkingStatus: 'streaming',
+      toolCalls: [],
+    });
+    const failed = finalizeTrace(trace, 'error', '会话状态保存失败');
+    expect(failed).toMatchObject({ status: 'error', summary: '会话状态保存失败' });
+    expect(failed.blocks[0]).toMatchObject({ status: 'error', thinkingStatus: 'complete' });
+  });
+
   it('does not terminalize TaskRegistry lifecycle blocks when a turn completes', () => {
     const trace = upsertWorkBlock(undefined, 'task-1', {
       kind: 'command',
@@ -259,6 +314,34 @@ describe('ConversationService work trace tool approvals', () => {
     expect(completed.blocks[0].toolCalls[0]).toMatchObject({
       status: 'skipped',
       resultPreview: 'Run completed before this tool call executed.',
+    });
+  });
+
+  it('skips queued tools on stop while preserving started calls as failed', () => {
+    let trace = upsertRuntimeToolCall(undefined, {
+      id: 'tool-running',
+      toolName: 'shell',
+      status: 'running',
+      startedAt: 100,
+    });
+    trace = upsertRuntimeToolCall(trace, {
+      id: 'tool-queued',
+      toolName: 'shell',
+      status: 'pending',
+    });
+
+    const stopped = finalizeTrace(trace, 'stopped', '请求已停止', 200);
+    const calls = stopped.blocks.flatMap((block) => block.toolCalls);
+
+    expect(calls.find((call) => call.id === 'tool-running')).toMatchObject({
+      status: 'error',
+      completedAt: 200,
+      error: 'Run ended before this tool call completed.',
+    });
+    expect(calls.find((call) => call.id === 'tool-queued')).toMatchObject({
+      status: 'skipped',
+      completedAt: 200,
+      resultPreview: 'Run stopped before this tool call executed.',
     });
   });
 

@@ -82,6 +82,18 @@ describe('native owning runtime', () => {
     expect(runtime.getContextId()).toBe(contextId);
     await runtime.clearOpenedCaptureForSession(scope); expect(runtime.getContextId()).toBeNull();
   });
+  it('shows the native cleanup reason and retains the lease when context release fails', async () => {
+    const runtime = new RdcSessionRuntime(); await runtime.openProjectInput(request);
+    const contextId = runtime.getContextId(); nativeStop.mockClear();
+    nativeStop.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ ok: false, error: {
+      code: 'context_cleanup_failed', message: 'Context cleanup failed',
+      details: { cleanup_reason_code: 'expired_remote_cleanup_failed', cleanup_errors: ['private device details'] },
+    } }) });
+    await expect(runtime.clearOpenedCaptureForSession(scope)).rejects.toThrow('cleanup: expired_remote_cleanup_failed');
+    expect(runtime.getContextId()).toBe(contextId);
+    expect(getRdcContextLease('session')?.contextId).toBe(contextId);
+    expect(nativeStop).toHaveBeenCalledTimes(1);
+  });
   it('rejects a native operation returning a foreign context', async () => {
     nativeStop.mockImplementation(async (_command: string, args: string[]) => {
       const context = args[args.lastIndexOf('--daemon-context') + 1] ?? 'default';

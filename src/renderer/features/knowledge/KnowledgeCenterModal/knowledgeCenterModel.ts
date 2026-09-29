@@ -14,7 +14,7 @@ export type KnowledgeWriteAction =
   | 'persist-draft'
   | 'promote-verified'
   | 'promote-promoted'
-  | 'deprecate';
+  | 'retire';
 
 export const ALL_CARD_TYPES: KnowledgeCardType[] = [...KNOWLEDGE_CARD_TYPES];
 export const ALL_LIFECYCLES: KnowledgeLifecycle[] = [...KNOWLEDGE_LIFECYCLES];
@@ -69,6 +69,7 @@ export function detailToRecord(card: {
   caseId?: string;
   chapters?: KnowledgeCardRecord['chapters'];
   images?: KnowledgeCardRecord['images'];
+  missingAssets?: KnowledgeCardRecord['missingAssets'];
 }): KnowledgeCardRecord {
   return {
     cardId: card.cardId,
@@ -86,5 +87,6 @@ export function detailToRecord(card: {
     ...(card.caseId ? { caseId: card.caseId } : {}),
     ...(card.chapters ? { chapters: card.chapters } : {}),
     ...(card.images?.length ? { images: card.images } : {}),
+    ...(card.missingAssets?.length ? { missingAssets: card.missingAssets } : {}),
   };
 }

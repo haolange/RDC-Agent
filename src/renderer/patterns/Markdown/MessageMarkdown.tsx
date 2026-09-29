@@ -56,6 +56,11 @@ function createMarkdownComponents(renderImage: MessageMarkdownProps['renderImage
       </a>
     ) : <span>{children}</span>,
     img: ({ src, alt }) => (renderImage ? renderImage({ src, alt }) : defaultMarkdownImage({ src, alt })),
+    table: ({ children }) => (
+      <div className="markdown-table-scroll">
+        <table>{children}</table>
+      </div>
+    ),
     input: (props) => {
       if (props.type === 'checkbox') {
         return (

@@ -3,6 +3,7 @@ import { KNOWLEDGE_CASE_CHAPTERS } from '@shared/types/knowledge';
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { EmptyState } from '../../../../ui/EmptyState';
+import { InlineError } from '../../../../ui/InlineError';
 import { Icon } from '../../../../ui/Icon';
 import { Panel } from '../../../../ui/Panel';
 import { useI18n } from '../../../../i18n';
@@ -22,9 +23,12 @@ interface DetailColumnProps {
   state: ReturnType<typeof useKnowledgeCenter>;
   write: ReturnType<typeof useKnowledgeWriteConfirm>;
   onCreateCandidate: () => void;
+  candidateHasSession: boolean;
+  candidateBusy: boolean;
+  candidateError: string | null;
 }
 
-export function DetailColumn({ state, write, onCreateCandidate }: DetailColumnProps) {
+export function DetailColumn({ state, write, onCreateCandidate, candidateHasSession, candidateBusy, candidateError }: DetailColumnProps) {
   const { t } = useI18n();
   const card = state.selectedCard;
   const conflict = state.viewMode === 'conflicts' ? state.selectedConflict : null;
@@ -148,9 +152,14 @@ export function DetailColumn({ state, write, onCreateCandidate }: DetailColumnPr
       {card && (
         <div className="knowledge-center-actions" data-testid="knowledge-center-actions">
           {isDraft ? (
-            <Button variant="primary" onClick={onCreateCandidate} data-testid="knowledge-center-create-candidate">
-              {t('knowledgeCenter.createCandidate')}
-            </Button>
+            <>
+              <Button variant="primary" disabled={!candidateHasSession || candidateBusy || Boolean(card.missingAssets?.length)} onClick={onCreateCandidate} data-testid="knowledge-center-create-candidate">
+                {t('knowledgeCenter.createCandidate')}
+              </Button>
+              {!candidateHasSession ? <p className="knowledge-import-hint">{t('knowledgeCenter.sessionRequired')}</p> : null}
+              {card.missingAssets?.length ? <p className="knowledge-import-hint">{t('knowledgeCenter.candidateAssetsMissing')}</p> : null}
+              {candidateError ? <InlineError>{candidateError}</InlineError> : null}
+            </>
           ) : (
             <>
               <Button variant="secondary" onClick={() => void write.openFor('promote-verified', detailToRecord(card))}>
@@ -159,8 +168,8 @@ export function DetailColumn({ state, write, onCreateCandidate }: DetailColumnPr
               <Button variant="secondary" onClick={() => void write.openFor('promote-promoted', detailToRecord(card))}>
                 {t('knowledgeCenter.promotePromoted')}
               </Button>
-              <Button variant="danger" onClick={() => void write.openFor('deprecate', detailToRecord(card))}>
-                {t('knowledgeCenter.deprecate')}
+              <Button variant="danger" onClick={() => void write.openFor('retire', detailToRecord(card))}>
+                {t('knowledgeCenter.retire')}
               </Button>
               <Button
                 variant="primary"

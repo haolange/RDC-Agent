@@ -22,8 +22,9 @@ export function isDeferredToolName(name: string): boolean {
   return isMcpPrefixedToolName(name) || getBuiltinToolTier(name) === 'extended';
 }
 
-/** Tasks are a product capability, not a discover-on-demand plugin surface. */
-export const TASK_TOOL_NAMES = [
+/** Plan review and Tasks are product workflow gates, not discover-on-demand plugin surfaces. */
+export const WORKFLOW_TOOL_NAMES = [
+  'plan_artifact',
   'task_create',
   'task_update',
   'task_get',
@@ -32,19 +33,34 @@ export const TASK_TOOL_NAMES = [
   'output_register',
 ] as const;
 
+/** Investigation records are required for Mission evaluation and declared execution. */
+export const MISSION_EXECUTION_TOOL_NAMES = [
+  'investigation_schema',
+  'investigation_read',
+  'investigation_write',
+  'investigation_list',
+] as const;
+
 /**
- * Inject every task tool already granted by the effective runtime before the first
- * request. Role and policy filtering happen before this function, so Ask receives
- * only its read-only task surface while Plan/Edit receive their writable surface.
+ * Inject workflow gates already granted by the effective runtime before the first
+ * request. Mission evaluation and declared Mission execution also need Investigation
+ * records to close the approved work. Role, Skill, and policy filtering happen before
+ * this function, so preactivation never grants a filtered tool.
  * The set belongs to DeferredToolActivationTracker, so later tool rounds share it.
  */
-export function preactivateTaskTools(
+export function preactivateWorkflowTools(
   definitions: readonly { name: string }[],
   activatedNames: Set<string>,
+  needsInvestigationRecords = false,
 ): void {
   const available = new Set(definitions.map((definition) => definition.name));
-  for (const name of TASK_TOOL_NAMES) {
+  for (const name of WORKFLOW_TOOL_NAMES) {
     if (available.has(name)) activatedNames.add(name);
+  }
+  if (needsInvestigationRecords) {
+    for (const name of MISSION_EXECUTION_TOOL_NAMES) {
+      if (available.has(name)) activatedNames.add(name);
+    }
   }
 }
 

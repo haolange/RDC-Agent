@@ -65,11 +65,16 @@ export class ShellInvocationService {
       const info = await supervised.join(request.timeoutMs ?? 120_000);
       const stdout = supervised.stdout.toString();
       const stderr = supervised.stderr.toString();
+      const outputMetadata = {
+        stdoutByteLength: supervised.stdout.receivedByteLength(),
+        stdoutTruncated: supervised.stdout.wasTruncated(),
+      };
 
       if (info.reason === 'spawn_failed') {
         return {
           exitCode: 2,
           stdout,
+          ...outputMetadata,
           stderr: info.error?.message || stderr || 'spawn failed',
           duration_ms: nowMs() - startTime,
         };
@@ -78,6 +83,7 @@ export class ShellInvocationService {
         return {
           exitCode: 124,
           stdout,
+          ...outputMetadata,
           stderr: stderr || `Process timeout after ${request.timeoutMs}ms`,
           duration_ms: nowMs() - startTime,
         };
@@ -87,6 +93,7 @@ export class ShellInvocationService {
           exitCode: 1,
           processExitReason: 'unconfirmed_orphan',
           stdout,
+          ...outputMetadata,
           stderr: stderr || 'Process termination was not confirmed; the process is quarantined as an orphan.',
           duration_ms: nowMs() - startTime,
         };
@@ -94,6 +101,7 @@ export class ShellInvocationService {
       return {
         exitCode: resolveExitCode(info.code, info.signal),
         stdout,
+        ...outputMetadata,
         stderr,
         duration_ms: nowMs() - startTime,
       };

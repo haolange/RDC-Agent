@@ -127,16 +127,10 @@ const isExactSymbolAllowlist = (rel, line, symbol) => {
 };
 
 const isLegalWordContext = (rel, line) => {
-  if (/\bdeprecated\b/.test(line)) {
-    if (/provider|lifecycle|Knowledge|status:\s*'deprecated'|lifecycle === 'deprecated'/.test(line)) return true;
-  }
   if (/OpenAI.compatible/.test(line)) return true;
   if (line.includes('pdfjs-dist/legacy')) return true;
   if (/Semantic Token|图形学 Semantics/.test(line)) return true;
-  if (rel.endsWith('semanticHash.ts') || rel.endsWith('semanticContext.ts')) return true;
-  if (rel.includes('semanticHash') || rel.includes('semanticContext')) return true;
-  if (line.includes(token('LEGACY_UNKNOWN_PROFILE', '_ID'))) return true;
-  if (line.includes(token('legacy', ':unknown'))) return true;
+  if (rel.endsWith('semanticContext.ts') || rel.includes('semanticContext')) return true;
   return false;
 };
 
