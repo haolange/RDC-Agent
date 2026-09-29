@@ -100,10 +100,11 @@ export const DeviceSelector: React.FC = () => {
   const selectedSummary = selectedEntry?.type === 'local'
     ? t('device.localReplay')
     : (selectedEntry?.label ?? t('device.noDevice'));
-  const utilityLabel = selectedEntry?.type === 'local'
+  const selectedName = selectedEntry?.type === 'local'
     ? t('device.local')
     : (selectedEntry?.label ?? t('device.noDevice'));
-  const triggerTitle = t('device.replayDevice', { summary: selectedSummary });
+  const utilityLabel = t('device.nextRequestShort', { summary: selectedName });
+  const triggerTitle = t('device.nextRequestDevice', { summary: selectedSummary });
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

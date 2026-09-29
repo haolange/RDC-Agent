@@ -97,6 +97,32 @@ describe('ContextBreakdownPopover phase authority', () => {
     vi.clearAllMocks();
   });
 
+  it('labels the full-history estimate while the execution window is unresolved', () => {
+    const html = renderToStaticMarkup(React.createElement(ContextBreakdownPopover, {
+      detailsExpanded: true,
+      onDetailsExpandedChange: () => undefined,
+      prepared: {
+        ...prepared,
+        preparedInputTokens: 943_100,
+        uncompactedInputTokens: 943_100,
+        promptBudgetTokens: 272_000,
+        compactionThresholdTokens: 217_600,
+        usagePercent: 100,
+        breakdown: [{ id: 'conversation', tokens: 930_000 }],
+      },
+      phase: 'current',
+      usage,
+      selectedProfile: profile({ contextBudgetTokens: 272_000 }),
+      stale: false,
+      onClose: () => undefined,
+    }));
+    expect(html).toContain('contextBreakdown.windowPending');
+    expect(html).toContain('contextBreakdown.windowPendingNote');
+    expect(html).toContain('data-phase="unavailable"');
+    expect(html).not.toContain('>100%</span>');
+    expect(html).not.toContain('contextBreakdown.budgetNote.generatable');
+  });
+
   it('Preparing keeps the last actual structure instead of replacing it with a status card', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownPopover, {

@@ -7,7 +7,7 @@ import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledg
 import { StorageIo } from '../sessions/StorageIo';
 import { createDisposableCandidateService } from './KnowledgeCandidateService';
 import { KnowledgeCompileService } from './KnowledgeCompileService';
-import { KnowledgeIndexService } from './KnowledgeIndexService';
+import { KnowledgeIndexService, contentHashOf } from './KnowledgeIndexService';
 import { KnowledgeQueryService } from './KnowledgeQueryService';
 import { KnowledgeWriteService } from './KnowledgeWriteService';
 import { KnowledgeHumanConfirmationRequiredError, KnowledgeLifecycleError } from './knowledgeErrors';
@@ -95,6 +95,18 @@ describe('Knowledge five services', () => {
     expect(pack).not.toHaveProperty('semanticClaimed');
   });
 
+  it('keeps retired cards available for audit without returning them in default retrieval', async () => {
+    const root = tempDir();
+    mkdirSync(path.join(root, 'facts'), { recursive: true });
+    const card = { ...draftCard(), lifecycle: 'retired' as const };
+    writeFileSync(path.join(root, 'facts', 'sample.md'), serializeKnowledgeCard(card), 'utf8');
+    const { query } = createStack({ root });
+    expect((await query.listCards('user'))[0]?.lifecycle).toBe('retired');
+    expect((await query.query({ text: 'vulkan', lanes: ['Lexical'] })).hits).toHaveLength(0);
+    expect((await query.query({ text: 'vulkan', lifecycle: ['retired'], lanes: ['Lexical'] })).hits)
+      .toHaveLength(1);
+  });
+
   it('projects list-row preview/updatedAt into hits and ingest provenance into card detail', async () => {
     const root = tempDir();
     mkdirSync(path.join(root, 'facts'), { recursive: true });
@@ -102,13 +114,16 @@ describe('Knowledge five services', () => {
     card.sourceHash = 'a'.repeat(64);
     card.sourceMtimeMs = 1_700_000_000_000;
     card.sourceSize = 128;
-    writeFileSync(path.join(root, 'facts', 'sample.md'), serializeKnowledgeCard(card), 'utf8');
+    const source = serializeKnowledgeCard(card);
+    writeFileSync(path.join(root, 'facts', 'sample.md'), source, 'utf8');
     const { query } = createStack({ root });
     const result = await query.query({ text: 'vulkan', lanes: ['Lexical'] });
     const hit = result.hits.find((entry) => entry.title === 'Sample fact');
     expect(hit?.preview).toContain('Body text about Vulkan');
     expect(hit?.updatedAt).toBe(Date.parse('2026-09-01T00:00:00.000Z'));
+    expect(hit?.contentHash).toBe(contentHashOf(source));
     const detail = await query.getCard('user', 'facts/sample.md');
+    expect(detail?.contentHash).toBe(hit?.contentHash);
     expect(detail?.sourceHash).toBe('a'.repeat(64));
     expect(detail?.sourceMtimeMs).toBe(1_700_000_000_000);
     expect(detail?.sourceSize).toBe(128);
@@ -161,5 +176,53 @@ describe('Knowledge five services', () => {
     });
     expect(created.card.lifecycle).toBe('candidate');
     expect(await candidates.listCandidates('s1')).toHaveLength(1);
+  });
+
+  it('keeps a card with a missing declared image out of Candidate and Verified', async () => {
+    const root = tempDir();
+    const candidates = createDisposableCandidateService(tempDir(), {
+      listSpaces: () => [space(root)],
+    });
+    const { write } = createStack({ root });
+    const card: KnowledgeCardRecord = {
+      ...draftCard('facts/missing-image.md'),
+      images: [{ relativePath: 'facts/observed.png', role: 'observed' }],
+    };
+    await expect(candidates.createCandidate({
+      sessionId: 's1', card, explicitUserIntent: true,
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_ASSETS_MISSING' });
+    expect(await candidates.listCandidates('s1')).toHaveLength(0);
+    await expect(write.write({
+      spaceId: 'user', card: { ...card, lifecycle: 'verified' },
+      permissionMode: 'default', confirmation: { explicitHumanConfirmation: true },
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_ASSETS_MISSING' });
+
+    mkdirSync(path.join(root, 'facts'), { recursive: true });
+    writeFileSync(path.join(root, 'facts', 'observed.png'), Buffer.from('qa-image'));
+    const candidate = await candidates.createCandidate({
+      sessionId: 's1', card, explicitUserIntent: true,
+    });
+    expect(candidate.card.lifecycle).toBe('candidate');
+  });
+
+  it('keeps an incomplete non-image attachment declaration in Draft', async () => {
+    const root = tempDir();
+    const candidates = createDisposableCandidateService(tempDir(), { listSpaces: () => [space(root)] });
+    const { write, query } = createStack({ root });
+    const card: KnowledgeCardRecord = { ...draftCard('facts/missing-attachment.md'), missingAssets: ['asset-12345678'] };
+    await write.write({
+      spaceId: 'user', card, permissionMode: 'default',
+      confirmation: { explicitHumanConfirmation: true },
+    });
+    const persisted = await query.getCard('user', 'facts/missing-attachment.md');
+    expect(persisted?.missingAssets).toEqual(['asset-12345678']);
+    await expect(candidates.createCandidate({
+      sessionId: 's1', card: { ...card, missingAssets: persisted?.missingAssets }, explicitUserIntent: true,
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_ASSETS_MISSING' });
+    expect(await candidates.listCandidates('s1')).toHaveLength(0);
+    await expect(write.write({
+      spaceId: 'user', card: { ...card, lifecycle: 'verified' }, permissionMode: 'default',
+      confirmation: { explicitHumanConfirmation: true },
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_ASSETS_MISSING' });
   });
 });

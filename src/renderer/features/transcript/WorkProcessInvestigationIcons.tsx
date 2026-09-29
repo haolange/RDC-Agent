@@ -3,6 +3,13 @@ import type { WorkProcessIconKey } from './workProcessTypes';
 
 export function renderInvestigationIconPath(icon: WorkProcessIconKey): ReactElement | null {
   switch (icon) {
+    case 'investigationSchema':
+      return (
+        <>
+          <path d="M7 3.5h7l3 3V20H7V3.5Zm7 0v3h3" />
+          <path d="M10 11h4M10 14h4M10 17h2" />
+        </>
+      );
     case 'investigationRead':
       return (
         <>

@@ -1,7 +1,13 @@
 import { delegatedArtifactOwner, resolveDelegatedArtifactRead, grantDelegatedOutput, assertDelegatedArtifactWrite } from '../sessions/DelegatedArtifactAccess';
-import type { InvestigationMission } from '@shared/types/renderdocInvestigation';
+import {
+  INVESTIGATION_ARTIFACT_KINDS,
+  INVESTIGATION_ARTIFACT_STATUSES,
+  resolveInvestigationKind,
+  type InvestigationMission,
+} from '@shared/types/renderdocInvestigation';
 import type { AgentTool, AgentToolResult } from '../agent-runtime/agent/AgentTool';
 import { InvestigationError, toInvestigationError } from './investigationErrors';
+import { getInvestigationRecordJsonSchema } from './investigationRecordSchemas';
 import {
   investigationArtifactService,
   type InvestigationArtifactService,
@@ -9,6 +15,7 @@ import {
 } from './InvestigationArtifactService';
 
 export const INVESTIGATION_TOOL_IDS = [
+  'investigation_schema',
   'investigation_read',
   'investigation_write',
   'investigation_list',
@@ -43,6 +50,18 @@ function parseWriteStatus(value: unknown): 'draft' | 'ready' {
   throw new InvestigationError('INVESTIGATION_SCHEMA_INVALID', `illegal status "${asString(value) || String(value)}"`);
 }
 
+function parseListFilter(value: unknown, field: 'kind' | 'status'): string | undefined {
+  if (value == null || value === '') return undefined;
+  const parsed = asString(value);
+  if (parsed === 'any') return undefined;
+  const allowed = field === 'kind' ? INVESTIGATION_ARTIFACT_KINDS : INVESTIGATION_ARTIFACT_STATUSES;
+  if (allowed.some((entry) => entry === parsed)) return parsed;
+  throw new InvestigationError(
+    field === 'kind' ? 'INVESTIGATION_KIND_UNKNOWN' : 'INVESTIGATION_SCHEMA_INVALID',
+    `invalid ${field} filter "${parsed || String(value)}"; use "any" or omit ${field} to include all ${field === 'status' ? 'statuses' : 'kinds'}`,
+  );
+}
+
 function defaultDependencies(): InvestigationToolDependencies {
   return { service: investigationArtifactService };
 }
@@ -53,10 +72,48 @@ export function createInvestigationTools(
 ): AgentTool[] {
   const deps: InvestigationToolDependencies = { ...defaultDependencies(), ...overrides };
   return [
+    createInvestigationSchemaTool(),
     createInvestigationReadTool(sessionId, deps),
     createInvestigationWriteTool(sessionId, deps),
     createInvestigationListTool(sessionId, deps),
   ];
+}
+
+function createInvestigationSchemaTool(): AgentTool {
+  return {
+    name: 'investigation_schema',
+    label: 'Read Investigation Schema',
+    description: 'Read the authoritative rdc.investigation.v1 input shape for one kind. This does not read records; use tool_search to activate investigation_read or investigation_list for existing records, or investigation_write to save one.',
+    parameters: {
+      type: 'object',
+      required: ['kind'],
+      properties: {
+        kind: { type: 'string', description: 'Closed Kind Registry id, such as world_state or evidence' },
+      },
+    },
+    permissionHint: 'readonly',
+    spec: {
+      isReadOnly: true,
+      isConcurrencySafe: true,
+      isDestructive: false,
+      sideEffect: 'none',
+      category: 'search',
+      requiresApproval: false,
+    },
+    async execute(_id, args) {
+      const entry = resolveInvestigationKind(asString(args.kind));
+      if (!entry) return errorResult(new InvestigationError('INVESTIGATION_SCHEMA_INVALID', `unknown kind "${asString(args.kind)}"`));
+      const recordSchema = getInvestigationRecordJsonSchema(entry.recordType);
+      const nextStep = 'Schema only. To retrieve an existing record, use tool_search query=investigation_read; to enumerate records, use tool_search query=investigation_list; to save a record, use tool_search query=investigation_write. Repeating this call does not retrieve record content.';
+      const recordIdPolicy = entry.kind === 'claim_set'
+        ? 'ClaimSet.items are new ClaimRecord definitions, not references to previously written claim records. Each claimId must be unique across the session. To cite an existing Claim, use a resolvable claimId in supports or contradicts instead of repeating it in items. Version an existing ClaimSet only through supersedes.'
+        : undefined;
+      return textResult(
+        JSON.stringify({ kind: entry.kind, recordType: entry.recordType, nextStep, recordIdPolicy, schema: recordSchema }),
+        { ok: true, kind: entry.kind, recordType: entry.recordType, nextStep, recordIdPolicy, schema: recordSchema },
+      );
+    },
+  };
 }
 
 function createInvestigationReadTool(
@@ -91,8 +148,8 @@ function createInvestigationReadTool(
         const result = deps.service.readRecord(delegatedArtifactOwner(sessionId) ?? sessionId, artifactId, asString(args.expectedHash) || undefined);
         if (sessionId) resolveDelegatedArtifactRead(sessionId, result.contentUri, result.contentHash);
         return textResult(
-          `${result.manifest.kind}\t${result.manifest.status}\t${result.manifest.title}\n${JSON.stringify(result.record)}`,
-          { ok: true, artifactId, manifest: result.manifest, record: result.record, contentHash: result.contentHash },
+          `${result.manifest.kind}\t${result.manifest.status}\t${result.manifest.title}\ncontentRef\t${result.contentUri}\ncontentHash\t${result.contentHash}\n${JSON.stringify(result.record)}`,
+          { ok: true, artifactId, manifest: result.manifest, record: result.record, contentUri: result.contentUri, contentHash: result.contentHash },
         );
       } catch (error) {
         return errorResult(error);
@@ -124,7 +181,7 @@ function createInvestigationWriteTool(
             type: 'object',
             properties: {
               artifactId: { type: 'string' },
-              expectedHash: { type: 'string' },
+              expectedHash: { type: 'string', description: 'Exact source contentHash from investigation_read/list, including the sha256: prefix (sha256:<64 hex>). Required for ready writes.' },
             },
           },
         },
@@ -197,12 +254,12 @@ function createInvestigationListTool(
   return {
     name: 'investigation_list',
     label: 'List Investigation Artifacts',
-    description: 'List session-owned rdc.investigation.v1 manifests. Does not invent a graph.',
+    description: 'List session-owned rdc.investigation.v1 manifests with contentUri and contentHash. Use kind/status "any" (or omit a filter) to include every value; invalid filters fail instead of looking like an empty session. To delegate a record for child investigation_read, place its exact contentUri in the Capsule read refs; an artifactId in scope does not grant access. Does not invent a graph.',
     parameters: {
       type: 'object',
       properties: {
-        kind: { type: 'string' },
-        status: { type: 'string' },
+        kind: { type: 'string', enum: ['any', ...INVESTIGATION_ARTIFACT_KINDS], description: 'Exact kind, or "any" for all kinds.' },
+        status: { type: 'string', enum: ['any', ...INVESTIGATION_ARTIFACT_STATUSES], description: 'Exact status, or "any" for all statuses.' },
       },
     },
     permissionHint: 'readonly',
@@ -218,14 +275,14 @@ function createInvestigationListTool(
       try {
         const owner = delegatedArtifactOwner(sessionId);
         const items = deps.service.list(owner ?? sessionId, {
-          kind: asString(args.kind) || undefined,
-          status: asString(args.status) || undefined,
+          kind: parseListFilter(args.kind, 'kind'),
+          status: parseListFilter(args.status, 'status'),
         }).filter(item => {
           if (!owner || !sessionId) return true;
           const result = deps.service.readRecord(owner, item.artifactId);
           try { resolveDelegatedArtifactRead(sessionId, result.contentUri, result.contentHash); return true; } catch { return false; }
         });
-        const lines = items.map((item) => `${item.artifactId}\t${item.kind}\t${item.status}\t${item.recordKey}`);
+        const lines = items.map((item) => `${item.artifactId}\t${item.kind}\t${item.status}\t${item.recordKey}\t${item.contentUri}\t${item.contentHash}`);
         return textResult(
           lines.length > 0 ? `artifacts\t${items.length}\n${lines.join('\n')}` : 'No Investigation artifacts in this session.',
           { ok: true, count: items.length, artifacts: items },

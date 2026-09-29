@@ -12,7 +12,7 @@ import type { ToolDefinition } from '../../agent-runtime/core/types';
 import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/tools';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../../agent-runtime/tasks';
-import { assertRdcContextLeaseOwnership } from '../../sessions/RdcRuntimeContextRegistry';
+import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../sessions/RdcRuntimeContextRegistry';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { createKnowledgeTools } from '../../knowledge/KnowledgeTools';
 import { createInvestigationTools } from '../../investigation/InvestigationTools';
@@ -29,6 +29,7 @@ import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
 import { createTaskRuntimeTools as assembleTaskRuntimeTools } from './TaskRuntimeTools';
 import { enforceMissionTurnCompletion } from '../../investigation/missionCompletionContract';
+import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 
 export interface RuntimeToolAssemblyDeps {
   mcp: McpConnectionCoordinator;
@@ -149,14 +150,19 @@ export class RuntimeToolAssembly {
         });
         const runtimeContext = lease?.runtimeContext ?? null;
         if (!runtimeContext) {
+          const retainedLease = sessionId ? getRdcContextLease(sessionId) : null;
+          const requiresRecovery = !!retainedLease && retainedLease.ownerSessionId === sessionId
+            && retainedLease.ownerProjectId === projectId && !!retainedLease.quarantineReason;
           return {
             content: [{
               type: 'text',
-              text: sessionId
+              text: requiresRecovery
+                ? 'The capture is open, but replay requires controlled recovery. Close it in Capture, confirm that close succeeds, then reopen before further RDC operations. Preserve the confirmed goal and earlier evidence.'
+                : sessionId
                 ? 'The capture is not open in this session. Ask the user to select the capture and click Open in the Capture section. Preserve the confirmed goal; do not describe internal leases or diagnose a rendering cause.'
                 : 'RDC runtime context requires an owning sessionId (no global fallback).',
             }],
-            details: { available: false },
+            details: { available: false, requiresRecovery },
           };
         }
         return {
@@ -553,6 +559,16 @@ export class RuntimeToolAssembly {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
     const turnCompletionTool = this.createTurnCompletionTool(turnHandle, async declaration => {
+      if (turnHandle) {
+        const unfinished = await listUnfinishedDirectTasks({
+          sessionId,
+          turnId: turnHandle.turnId,
+          generation: turnHandle.generation,
+        });
+        if (unfinished.length > 0) {
+          throw new Error(`TASK_COMPLETION_DENIED: Settle direct Tasks before turn_complete with task_update(status=completed or blocked): ${unfinished.map((item) => item.taskId).join(', ')}.`);
+        }
+      }
       const scope = sessionId ? getDelegatedTaskScope(sessionId) : null;
       if (scope && declaration.disposition === 'completed') {
         const task = await new TaskRegistry(createSessionTaskStore(scope.ownerSessionId)).getTask(scope.rootTaskId);

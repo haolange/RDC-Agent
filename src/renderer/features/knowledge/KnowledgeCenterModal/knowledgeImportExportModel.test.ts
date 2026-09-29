@@ -9,6 +9,7 @@ import {
 function hit(cardId: string): KnowledgeLaneHit {
   return {
     cardId,
+    contentHash: 'a'.repeat(64),
     spaceId: 'user',
     relativePath: `${cardId}.md`,
     title: cardId,

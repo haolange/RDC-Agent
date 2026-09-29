@@ -1,4 +1,4 @@
-import { executionOfferRequiredSkillIds } from '../sessions/handoffSkills';
+import { approvedExecutionOfferForAgent } from '../sessions/handoffSkills';
 import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
 import { promptPlanBuilder, resolvePromptClock } from '../agent-runtime/prompt';
 import { settingsService } from '../settings/SettingsService';
@@ -58,10 +58,11 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
         activePaths,
       })
     : { sources: [], totalBytes: 0, diagnostics: [] };
+  const approvedExecutionOffer = approvedExecutionOfferForAgent(input.context.session?.sessionId, input.agentId);
   const preloadSkillIds = mergeTurnPreloadSkillIds({
     profileSkills: definition.skills,
     messageText: input.messageText,
-    pendingSkillIds: [...(input.preloadSkillIds ?? []), ...executionOfferRequiredSkillIds(input.context.session?.sessionId, input.agentId)],
+    pendingSkillIds: [...(input.preloadSkillIds ?? []), ...(approvedExecutionOffer?.requiredSkillIds ?? [])],
   });
   const preloadedSkills = [];
   for (const skillId of preloadSkillIds) {
@@ -81,6 +82,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     tools: allowedToolNames,
     workDir: projectRootPath ?? '',
     sessionId: input.context.session?.sessionId ?? null,
+    approvedExecutionOffer,
     routeCapability: input.routePreflight.routeCapability,
     effectiveModel: input.effectiveModel ?? undefined,
     permissionSettings: runtimeSettings.agentRuntime.permissions,

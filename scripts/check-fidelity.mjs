@@ -147,7 +147,8 @@ requireCssContract(
     && contextBreakdownPopover.includes('const showUsage = !showPrepared && usage !== null;')
     && contextBreakdownPopover.includes('className="context-breakdown-hero"')
     && contextBreakdownPopover.includes('className="context-breakdown-bar"')
-    && contextBreakdownPopover.includes('prepared={showPrepared ? prepared : null}')
+    && contextBreakdownPopover.includes('prepared={showPrepared && !awaitingWindow ? prepared : null}')
+    && contextBreakdownPopover.includes("t('contextBreakdown.windowPending')")
     && contextBreakdownPopover.includes('usage={showUsage ? usage : null}')
     && contextBreakdownPopover.includes('unavailable={!hasAuthoritativeBreakdown}')
     && !contextBreakdownPopover.includes('context-breakdown-preparing')
@@ -160,7 +161,7 @@ requireCssContract(
     && contextRunMeterBand.includes("data-phase={prepared ? 'current' : usage ? 'actual' : 'unavailable'}")
     && contextRunMeterBand.includes('data-columns="3"')
     && (contextRunMeterBand.match(/data-testid="context-breakdown-run-meter"/g) || []).length === 1,
-  'Context popover must keep one visual structure: Current renders the prepared Tokens/Cache/Reasoning strip; Preparing retains the last truthful usage when available; no telemetry remains explicit as unavailable; internal runtime diagnostics stay absent.',
+  'Context popover must keep one visual structure: Current renders prepared telemetry after window resolution; pending window stays explicit; Preparing retains the last truthful usage; unavailable telemetry and internal diagnostics stay absent.',
 );
 requireCssContract(
   interactionPerformanceProbe.includes("get(PERFORMANCE_QUERY_KEY) !== '1') return")

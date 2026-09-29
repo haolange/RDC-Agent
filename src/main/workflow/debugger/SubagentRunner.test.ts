@@ -1,7 +1,11 @@
 import { AgentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({
+  BrowserWindow: class { static getAllWindows() { return []; } },
   app: {
     getPath: () => process.env.TEMP ?? process.env.TMP ?? process.cwd(),
     getAppPath: () => process.cwd(),
@@ -21,9 +25,9 @@ vi.mock('../../settings/SettingsService', () => ({
 vi.mock('../../settings/AgentManifestService', () => ({
   agentManifestService: {
     getEffectiveProfiles: () => [
-      { id: 'ask', enabled: true, instructions: 'Ask profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'] },
-      { id: 'debugger', enabled: true, instructions: 'Debugger profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'] },
-      { id: 'general', enabled: true, instructions: 'General profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['debugger'] },
+      { id: 'ask', enabled: true, instructions: 'Ask profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'], compiledRoute: { agentId: 'ask', providerId: 'openai', modelId: 'gpt-5.6-sol' } },
+      { id: 'debugger', enabled: true, instructions: 'Debugger profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'], compiledRoute: { agentId: 'debugger', providerId: 'openai', modelId: 'gpt-5.6-sol' } },
+      { id: 'general', enabled: true, instructions: 'General profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['debugger'], compiledRoute: { agentId: 'general', providerId: 'openai', modelId: 'gpt-5.6-sol' } },
     ],
   },
 }));
@@ -44,8 +48,11 @@ vi.mock('../../settings/EffectiveModelResolver', () => ({
 }));
 
 import { TaskRegistry, type TaskRecord } from '../../agent-runtime/tasks';
+import { createSessionTaskStore } from '../../agent-runtime/tasks/sessionTaskStore';
+import { storageAdapter } from '../../sessions/StorageAdapter';
 import { SubagentRunner } from './SubagentRunner';
 import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
+import { agentManifestService } from '../../settings/AgentManifestService';
 import { createSubagentBudgetState, createPolicyBudgetState, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import {
@@ -183,8 +190,66 @@ describe('SubagentRunner', () => {
     expect(result.text).toBe('boom');
   });
 
+  it('reports the child wall deadline instead of a provider stream abort', async () => {
+    const runner = new SubagentRunner({
+      sendProfileMessage: async (_agentId, _content, options) => new Promise<string>((_resolve, reject) => {
+        options?.signal?.addEventListener('abort', () => reject(new Error('EventStream aborted')), { once: true });
+      }),
+      systemPromptForAgent: () => 'fallback',
+      getActiveTurn: () => null,
+    });
+    const result = await runner.runSubagent({
+      parentAgentId: 'debugger',
+      parentToolCallId: 'deadline-tool',
+      targetProfile: 'ask',
+      capsule: testCapsule({ budget: { maxToolCalls: 8, maxWallTimeMs: 10 } }),
+    });
+    expect(result.status).toBe('cancelled');
+    expect(result.text).toBe('POLICY_LIMIT_EXCEEDED: maxWallTimeMs');
+  });
+
+  it('settles a Task-owned wall timeout as a blocked budget result', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-subagent-wall-timeout-'));
+    const originalUserData = process.env.RDC_AGENT_USER_DATA;
+    process.env.RDC_AGENT_USER_DATA = root;
+    try {
+      await storageAdapter.initializeWorkspace();
+      const projectRoot = path.join(root, 'project');
+      fs.mkdirSync(projectRoot);
+      const project = await storageAdapter.createProject(projectRoot);
+      const sessionId = storageAdapter.createSession(project.projectId).sessionId;
+      const registry = new TaskRegistry(createSessionTaskStore(sessionId));
+      const task = await registry.createTask('Timed review');
+      const runner = new SubagentRunner({
+        sendProfileMessage: async (_agentId, _content, options) => new Promise<string>((_resolve, reject) => {
+          if (options?.signal?.aborted) { reject(new Error('EventStream aborted')); return; }
+          options?.signal?.addEventListener('abort', () => reject(new Error('EventStream aborted')), { once: true });
+        }),
+        systemPromptForAgent: () => 'profile', getActiveTurn: () => null,
+      });
+      const [tool] = runner.createSubagentTools('general', sessionId);
+      const result = await tool.execute('deadline-call', {
+        ...testCapsule({ budget: { maxToolCalls: 8, maxWallTimeMs: 100 } }),
+        taskId: task.id, profile: 'general',
+      } as unknown as Record<string, unknown>);
+      expect(result.details).toMatchObject({ errorCode: 'POLICY_LIMIT_EXCEEDED' });
+      const [execution] = await registry.listExecutions(task.id);
+      expect(execution).toMatchObject({
+        status: 'blocked',
+        result: { disposition: 'blocked', error: 'POLICY_LIMIT_EXCEEDED: maxWallTimeMs' },
+      });
+      expect(await registry.getTask(task.id)).toMatchObject({ status: 'blocked' });
+    } finally {
+      if (originalUserData === undefined) delete process.env.RDC_AGENT_USER_DATA;
+      else process.env.RDC_AGENT_USER_DATA = originalUserData;
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('counts unique toolCallId once across started/completed/denied', async () => {
     const parentBudget = createSubagentBudgetState();
+    parentBudget.wallStartedAt = Date.now() - parentBudget.budget.maxAggregateWallMs - 1;
+    const beforeFirstChild = Date.now();
     const runner = new SubagentRunner({
       sendProfileMessage: async (_agentId, _content, options) => {
         options?.onEvent?.({
@@ -225,6 +290,8 @@ describe('SubagentRunner', () => {
       parentTurn,
     });
     expect(parentBudget.aggregateToolCalls).toBe(2);
+    expect(parentBudget.childrenSpawned).toBe(1);
+    expect(parentBudget.wallStartedAt).toBeGreaterThanOrEqual(beforeFirstChild);
   });
 
   it('does not inflate aggregateToolCalls for events without toolCallId', async () => {
@@ -299,6 +366,60 @@ describe('SubagentRunner', () => {
     expect(result.details).toMatchObject({ executionId: 'execution-1', generation: 3, status: 'running' });
   });
 
+  it('runs a Task-owned child with a fresh local Capsule ledger after parent consumption', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-subagent-local-budget-'));
+    const originalUserData = process.env.RDC_AGENT_USER_DATA;
+    process.env.RDC_AGENT_USER_DATA = root;
+    try {
+      const sessionId = 'spent-parent-budget';
+      const registry = new TaskRegistry(createSessionTaskStore(sessionId));
+      const task = await registry.createTask('Independent review', { completionRequirements: ['skeptic_review_result'] });
+      const parentPolicy = createPolicyBudgetState({ maxToolCalls: 1000, maxSubagents: 12, maxChildDepth: 2, maxWallTimeMs: 60_000 });
+      parentPolicy.toolCalls = 800;
+      parentPolicy.subagents = 10;
+      const sendProfileMessage = vi.fn(async (_agent: string, _content: string, options?: { policyBudget?: { toolCalls: number; maxToolCalls: number } }) => {
+        expect(options?.policyBudget).toMatchObject({ toolCalls: 0, maxToolCalls: 8 });
+        return 'Review has no completed declaration';
+      });
+      const turn = {
+        policyBudget: parentPolicy,
+        subagentBudget: createSubagentBudgetState(),
+        generation: 1,
+        isLive: () => true,
+        registerProducer: () => () => undefined,
+        eventSink: { sessionId, onEvent: () => undefined },
+      } as unknown as TurnHandle;
+      const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'profile', getActiveTurn: () => turn });
+      const [tool] = runner.createSubagentTools('general', sessionId);
+      await tool.execute('review-call', { ...testCapsule(), taskId: task.id, profile: 'general' } as unknown as Record<string, unknown>);
+      expect(sendProfileMessage).toHaveBeenCalledOnce();
+      const execution = (await registry.listExecutions(task.id))[0];
+      expect(execution?.budget).toMatchObject({ toolCalls: 0, maxToolCalls: 8 });
+      expect(execution?.status).toBe('blocked');
+      expect((await registry.getRootBudget(execution!.rootBudgetId!))?.toolCalls).toBeGreaterThanOrEqual(800);
+
+      const inconsistentTask = await registry.createTask('Budget inconsistency');
+      const inconsistentRunner = new SubagentRunner({
+        sendProfileMessage: async (_agent, _content, options) => {
+          options!.policyBudget!.toolCalls = 9;
+          return 'Untrusted child result';
+        },
+        systemPromptForAgent: () => 'profile', getActiveTurn: () => turn,
+      });
+      const [inconsistentTool] = inconsistentRunner.createSubagentTools('general', sessionId);
+      await expect(inconsistentTool.execute('inconsistent-call', {
+        ...testCapsule(), taskId: inconsistentTask.id, profile: 'general',
+      } as unknown as Record<string, unknown>)).rejects.toThrow(/budget/i);
+      const inconsistentExecution = (await registry.listExecutions(inconsistentTask.id))[0];
+      expect(inconsistentExecution?.status).toBe('failed');
+      expect((await registry.getTask(inconsistentTask.id))?.status).toBe('blocked');
+    } finally {
+      if (originalUserData === undefined) delete process.env.RDC_AGENT_USER_DATA;
+      else process.env.RDC_AGENT_USER_DATA = originalUserData;
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('fails closed when the capsule is missing required fields', async () => {
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
     const runner = new SubagentRunner({
@@ -358,6 +479,29 @@ describe('SubagentRunner', () => {
     expect(finish).toHaveBeenCalledWith('owner', 'parent-tool', expect.any(String), 'failed', expect.stringMatching(/MODEL_INVALID/));
     start.mockRestore();
     finish.mockRestore();
+  });
+
+  it('rejects a child without an explicit model or configured profile route before dispatch', async () => {
+    const profiles = vi.spyOn(agentManifestService, 'getEffectiveProfiles').mockReturnValueOnce([
+      { id: 'general', enabled: true, instructions: 'General profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: [] },
+    ] as never);
+    const sendProfileMessage = vi.fn(async () => 'should-not-run');
+    try {
+      const runner = new SubagentRunner({
+        sendProfileMessage,
+        systemPromptForAgent: () => 'fallback',
+        getActiveTurn: () => null,
+      });
+      const result = await runner.runSubagent({
+        parentAgentId: 'debugger', parentToolCallId: 'parent-tool', targetProfile: 'general',
+        capsule: testCapsule(), parentSessionId: 'owner',
+      });
+      expect(result.status).toBe('failed');
+      expect(result.text).toMatch(/MODEL_ROUTE_REQUIRED.*capsule\.model/);
+      expect(sendProfileMessage).not.toHaveBeenCalled();
+    } finally {
+      profiles.mockRestore();
+    }
   });
 
   it('forwards a resolved model override and does not inherit a parent session override', async () => {

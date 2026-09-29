@@ -119,11 +119,14 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
       trailingPreview={expanded ? undefined : progressDots} />
     {expanded ? <div id={contentId} className="work-process-subagent-body">
       {page.error ? <p className="work-process-subagent-receipt-error" role="status">{t('chat.subagentTraceUnavailable')}</p> : null}
+      {!headerLoading && !header && status === 'failed' && row.resultPreview
+        ? <p className="work-process-subagent-receipt-error" role="alert">{row.resultPreview}</p> : null}
       <div className="work-process-subagent-task" aria-label={t('chat.subagentTask')}>
         {headerLoading ? <span className="work-process-subagent-note">{t('chat.subagentLoading')}</span> : null}
+        {!headerLoading && !header && row.task ? <span className="work-process-subagent-note">{row.task}</span> : null}
         <DelegationBody sessionId={sessionId} parentToolCallId={row.id} childSessionId={header?.childSessionId}
           executionId={header?.executionId} generation={header?.generation} kind="task" taskDisclosure={{ factsOpen, constraintsOpen, toggle }} open={expanded} available={!!header?.taskAvailable} />
-        {!headerLoading && !header?.taskAvailable ? <span className="work-process-subagent-note">{t('chat.subagentContentUnavailable')}</span> : null}
+        {!headerLoading && header && !header.taskAvailable ? <span className="work-process-subagent-note">{t('chat.subagentContentUnavailable')}</span> : null}
       </div>
       <WorkDisclosure title={t('chat.subagentProcess')} meta={page.total ? t('chat.subagentStepCount', { count: page.total }) : undefined} preview={processPreview} open={workOpen}
         onToggle={() => toggle('workOpen')} bodyClassName="work-process-subagent-process-body">

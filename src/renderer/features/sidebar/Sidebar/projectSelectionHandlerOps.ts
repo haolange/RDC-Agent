@@ -82,17 +82,19 @@ export async function handleProjectSelectOp(
 ) {
   ctx.setSidebarError(null);
   const requestId = ctx.beginSelectionRequest();
-  ctx.setCurrentProject(project);
-  ctx.updateProjectInputs(project.projectId, project.inputs ?? []);
-  ctx.setRightRailTarget('project');
-  ctx.ensureProjectExpanded(project.projectId);
+  const rollbackState = captureSelectionSnapshot();
   const currentSession = ctx.getCurrentSession();
   if (currentSession?.projectId && currentSession.projectId !== project.projectId) {
+    applySessionSwitchHygiene({ previousSessionId: currentSession.sessionId, nextSessionId: null });
     ctx.setCurrentSession(null);
     ctx.setCurrentRun(null);
     ctx.setCaptures([]);
     ctx.setRuns([]);
   }
+  ctx.setCurrentProject(project);
+  ctx.updateProjectInputs(project.projectId, project.inputs ?? []);
+  ctx.setRightRailTarget('project');
+  ctx.ensureProjectExpanded(project.projectId);
 
   ctx.setIsBusy(true);
   try {
@@ -100,6 +102,7 @@ export async function handleProjectSelectOp(
       autoSelectSession: false,
       rightRailTarget: 'project',
       requestId,
+      rollbackState,
     });
   } finally {
     ctx.setIsBusy(false);
@@ -296,7 +299,11 @@ export async function handleSessionActivateOp(
   const requestId = ctx.beginSelectionRequest();
   const rollbackState = captureSelectionSnapshot();
   const priorProjectId = ctx.getCurrentProject()?.projectId;
+  const previousSessionId = ctx.getCurrentSession()?.sessionId ?? null;
   onCloseRename();
+  if (previousSessionId !== session.sessionId) {
+    applySessionSwitchHygiene({ previousSessionId, nextSessionId: session.sessionId });
+  }
   useSessionStore.getState().clearUsageSnapshot();
   ctx.setCurrentProject(project);
   ctx.setCurrentSession(session);

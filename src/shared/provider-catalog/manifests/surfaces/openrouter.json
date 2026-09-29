@@ -129,7 +129,6 @@
       ],
       "requireCapabilities": ["toolCalling"],
       "requireContextWindow": true,
-      "excludeDeprecated": true,
       "excludeExperimental": true
     }
   },

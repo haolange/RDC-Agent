@@ -45,7 +45,7 @@ export function toInvestigationError(error: unknown): InvestigationError {
     return new InvestigationError('INVESTIGATION_SCHEMA_INVALID', error.message);
   }
   if (error instanceof SessionArtifactError) {
-    return new InvestigationError('INVESTIGATION_STORAGE_FAILED', error.message, {
+    return new InvestigationError(error.code === 'ARTIFACT_SESSION_DENIED' ? 'INVESTIGATION_SESSION_DENIED' : 'INVESTIGATION_STORAGE_FAILED', error.message, {
       details: { artifactCode: error.code },
     });
   }

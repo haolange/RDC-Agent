@@ -19,7 +19,7 @@ const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
 describe('AgentManifestService effective builtin snapshot', () => {
-  it('loads four builtins without writing user seeds', async () => {
+  it('loads four builtins without creating or changing user resources', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-seeds-'));
     roots.push(root);
     const agentsPath = path.join(root, 'agents');
@@ -30,6 +30,8 @@ describe('AgentManifestService effective builtin snapshot', () => {
       [],
       [],
     );
+
+    expect(fs.existsSync(agentsPath)).toBe(false);
 
     expect(settings.definitions.map((definition) => definition.id).sort()).toEqual(
       ['analyzer', 'debugger', 'general', 'optimizer'],

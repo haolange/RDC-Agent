@@ -2,14 +2,17 @@ import { generateShortId } from '@shared/utils/id';
 import type {
   KnowledgeCardRecord,
   KnowledgeReviewRecord,
+  KnowledgeSpace,
   SessionKnowledgeCandidate,
 } from '@shared/types/knowledge';
-import { KnowledgeCandidateRequiresIntentError } from './knowledgeErrors';
+import { assertKnowledgeImagesAvailable } from './knowledgeAssetAvailability';
+import { KnowledgeAssetsMissingError, KnowledgeCandidateRequiresIntentError } from './knowledgeErrors';
 import {
   createSessionScopedKnowledgeStore,
   knowledgeDurableStore,
   type KnowledgeDurableStore,
 } from './KnowledgeDurableStore';
+import { knowledgeQueryService } from './KnowledgeQueryService';
 
 export type { SessionKnowledgeCandidate };
 
@@ -29,6 +32,7 @@ export interface KnowledgeCandidateDependencies {
   now(): Date;
   createId(): string;
   store: KnowledgeDurableStore;
+  listSpaces(): KnowledgeSpace[];
 }
 
 export class KnowledgeCandidateService {
@@ -41,6 +45,13 @@ export class KnowledgeCandidateService {
   async createCandidate(input: KnowledgeCandidateCreateInput): Promise<SessionKnowledgeCandidate> {
     if (input.explicitUserIntent !== true) {
       throw new KnowledgeCandidateRequiresIntentError();
+    }
+    if (input.card.missingAssets?.length) throw new KnowledgeAssetsMissingError();
+    if (input.card.images?.length) {
+      await assertKnowledgeImagesAvailable(
+        input.card,
+        (this.overrides.listSpaces ?? (() => knowledgeQueryService.listSpaces()))(),
+      );
     }
     const candidate: SessionKnowledgeCandidate = {
       candidateId: `cand_${(this.overrides.createId ?? generateShortId)()}`,

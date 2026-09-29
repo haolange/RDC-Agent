@@ -127,6 +127,7 @@ export const zhSettings = {
   'settings.agentConfigTab': '配置',
   'settings.agentStatus': '配置状态',
   'settings.agentStatusAvailable': '可用',
+  'settings.agentStatusNoTools': '至少选择一项工具后才能运行',
   'settings.agentStatusNoModel': '未选择模型',
   'settings.agentInstructionsHint': '作为系统提示指导这个智能体的规划与评估；plan-only 语义由 General 执行。',
   'settings.agentInstructionsSource': '来源',

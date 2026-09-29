@@ -17,14 +17,8 @@ import { canonicalAgentModelId, splitCanonicalAgentModelId } from '@shared/utils
 import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
-import { parseAgentMarkdownStrict, serializeAgentMarkdown } from './agentManifestParse';
-import { agentSeedMigrationService } from './seed-migration/AgentSeedMigrationService';
-import { isHistoricalReservedAgentId } from './seed-migration/officialSeedGenerations';
-import {
-  extractSeedSemanticManifest,
-  hashSeedSemanticManifest,
-  readSeedFrontmatterId,
-} from './seed-migration/semanticHash';
+import { parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
+import { isReservedAgentId } from './reservedAgentIds';
 
 const toSlug = (value: string): string => {
   const slug = value
@@ -59,21 +53,21 @@ const hashManifestContent = (content: string): string => (
   createHash('sha256').update(content, 'utf8').digest('hex')
 );
 
-const hashManifestFile = (filePath: string, id: string): string =>
-  hashSeedSemanticManifest(extractSeedSemanticManifest(fs.readFileSync(filePath, 'utf8'), id));
+const hashManifestFile = (filePath: string): string =>
+  hashManifestContent(fs.readFileSync(filePath, 'utf8'));
 
-const reservedHistoricalIdsForCandidate = (
+const reservedAgentIdsForCandidate = (
   candidate: ScopedResourceCandidate<AgentManifestDefinition>,
 ): string[] => {
   const filenameId = idFromFileName(path.basename(candidate.sourcePath));
   const ids = [filenameId, candidate.id];
   try {
-    const frontmatterId = readSeedFrontmatterId(fs.readFileSync(candidate.sourcePath, 'utf8'));
+    const frontmatterId = readAgentFrontmatterId(fs.readFileSync(candidate.sourcePath, 'utf8'));
     if (frontmatterId) ids.push(frontmatterId);
   } catch {
     // filename / parsed id are enough
   }
-  return [...new Set(ids.filter((id) => isHistoricalReservedAgentId(id)))];
+  return [...new Set(ids.filter((id) => isReservedAgentId(id)))];
 };
 
 export interface AgentManifestCommit {
@@ -187,9 +181,8 @@ export class AgentManifestService {
     paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
     projectRoot?: string,
   ): { profiles: EffectiveAgentProfile[]; diagnostics: string[] } {
-    const migration = agentSeedMigrationService.migrateUserAgents(this.getAgentsDirectory(paths));
     const candidates: Array<ScopedResourceCandidate<AgentManifestDefinition>> = [];
-    const diagnostics: string[] = [...migration.diagnostics];
+    const diagnostics: string[] = [];
 
     const builtinPath = appPathService.getBuiltinAgentsPath();
     if (!fs.existsSync(builtinPath)) {
@@ -200,7 +193,7 @@ export class AgentManifestService {
     }
 
     for (const loaded of loadManifestCandidates(this.getAgentsDirectory(paths), 'user', false)) {
-      const reserved = reservedHistoricalIdsForCandidate(loaded.candidate);
+      const reserved = reservedAgentIdsForCandidate(loaded.candidate);
       if (reserved.length > 0) {
         diagnostics.push(
           `AGENT_ID_RESERVED_HISTORICAL: user agent '${reserved[0]}' is a reserved historical id (${loaded.candidate.sourcePath})`,
@@ -216,7 +209,7 @@ export class AgentManifestService {
     if (projectRoot) {
       const projectAgentsPath = appPathService.getProjectRdcPaths(projectRoot).agentsPath;
       for (const loaded of loadManifestCandidates(projectAgentsPath, 'project', false)) {
-        const reserved = reservedHistoricalIdsForCandidate(loaded.candidate);
+        const reserved = reservedAgentIdsForCandidate(loaded.candidate);
         if (reserved.length > 0) {
           diagnostics.push(
             `AGENT_ID_RESERVED_HISTORICAL: project agent '${reserved[0]}' is a reserved historical id (${loaded.candidate.sourcePath})`,
@@ -238,7 +231,7 @@ export class AgentManifestService {
       effectiveStatus: resource.effectiveStatus,
       provenance: {
         ...resource.provenance,
-        sourceHash: hashManifestFile(resource.provenance.sourcePath, resource.id),
+        sourceHash: hashManifestFile(resource.provenance.sourcePath),
       },
       compiledRoute: this.routeFromDefinition(resource.value),
     }));
@@ -293,6 +286,9 @@ export class AgentManifestService {
     if (!isSafeAgentProfileId(agentId)) {
       throw new Error(`Invalid agent profile id: ${agentId}`);
     }
+    if (isReservedAgentId(agentId)) {
+      throw new Error(`AGENT_ID_RESERVED_HISTORICAL: ${agentId} cannot be saved as a current profile.`);
+    }
     const directory = options.scope === 'project'
       ? this.resolveProjectAgentsPath(options.projectRoot)
       : this.getAgentsDirectory(paths);
@@ -339,16 +335,12 @@ export class AgentManifestService {
       id: agentId,
       fileName,
     });
-    if (options.scope === 'user') {
-      agentSeedMigrationService.writeExplicitUserOverride(directory, fileName, content);
-    } else {
-      const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
-      try {
-        await fs.promises.writeFile(temporaryPath, content, 'utf8');
-        await fs.promises.rename(temporaryPath, filePath);
-      } finally {
-        await fs.promises.rm(temporaryPath, { force: true });
-      }
+    const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+    try {
+      await fs.promises.writeFile(temporaryPath, content, 'utf8');
+      await fs.promises.rename(temporaryPath, filePath);
+    } finally {
+      await fs.promises.rm(temporaryPath, { force: true });
     }
 
     const ownedFileName = fileNameForId(agentId);
@@ -385,6 +377,7 @@ export class AgentManifestService {
     agentId: string,
     options?: { scope?: 'user' | 'project'; projectRoot?: string },
   ): Promise<AgentManifestDefinition | null> {
+    if (isReservedAgentId(agentId)) return null;
     const directory = options?.scope === 'project'
       ? this.resolveProjectAgentsPath(options.projectRoot)
       : this.getAgentsDirectory(paths);
@@ -450,7 +443,7 @@ export class AgentManifestService {
     const routeMap = new Map(currentRoutes.map((route) => [route.agentId, route]));
     const routeAgentIds = new Set<string>(AGENT_ROLES);
     for (const definition of definitions) {
-      if (definition.delete || !isSafeAgentProfileId(definition.id)) {
+      if (definition.delete || !isSafeAgentProfileId(definition.id) || isReservedAgentId(definition.id)) {
         continue;
       }
       routeAgentIds.add(definition.id);

@@ -58,6 +58,7 @@ export const BUILTIN_AGENT_TOOL_IDS = [
   'knowledge_read',
   'knowledge_compile',
   'knowledge_candidate_create',
+  'investigation_schema',
   'investigation_read',
   'investigation_write',
   'investigation_list',
@@ -127,6 +128,7 @@ export const BUILTIN_AGENT_TOOL_TIERS: Record<BuiltinAgentToolId, BuiltinAgentTo
   knowledge_read: 'extended',
   knowledge_compile: 'extended',
   knowledge_candidate_create: 'extended',
+  investigation_schema: 'extended',
   investigation_read: 'extended',
   investigation_write: 'extended',
   investigation_list: 'extended',
@@ -171,7 +173,7 @@ export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
   rdc_probe: ['rdc_probe'],
   subagent: ['subagent'],
   knowledge: ['knowledge_browse', 'knowledge_search', 'knowledge_read', 'knowledge_compile', 'knowledge_candidate_create'],
-  investigation: ['investigation_read', 'investigation_write', 'investigation_list'],
+  investigation: ['investigation_schema', 'investigation_read', 'investigation_write', 'investigation_list'],
 };
 
 /** Tokens intentionally rejected (removed or renamed). No silent fallback. */

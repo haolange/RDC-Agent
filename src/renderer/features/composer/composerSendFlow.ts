@@ -88,6 +88,12 @@ export async function sendComposerConversationTurn(options: {
   const sentSkillIds = [...pendingSkillIds];
   const requestId = createConversationRequestId();
   const owningSessionId = currentSession?.sessionId ?? null;
+  const isOwningSelectionActive = (sessionId: string | null) => {
+    const selection = useProjectStore.getState();
+    return selection.currentSession?.sessionId
+      ? selection.currentSession.sessionId === sessionId
+      : (selection.currentProject?.projectId ?? null) === (currentProject?.projectId ?? null);
+  };
   let turnOwnership = {
     sessionId: owningSessionId ?? 'no-session',
     requestId,
@@ -228,8 +234,10 @@ export async function sendComposerConversationTurn(options: {
       committedSessionId,
     );
     turnOwnership = { ...turnOwnership, sessionId: committedSessionId };
-    useSessionStore.getState().setPreparedTurnContext(result.preparedContext);
-    useSessionStore.getState().setConversationPreparationPhase('current');
+    if (isOwningSelectionActive(committedSessionId)) {
+      useSessionStore.getState().setPreparedTurnContext(result.preparedContext);
+      useSessionStore.getState().setConversationPreparationPhase('current');
+    }
 
     await applyConversationTurnResult({
       electronAPI,
@@ -257,6 +265,7 @@ export async function sendComposerConversationTurn(options: {
       setConversationMessages,
       setTracePresentation,
       setBranchState,
+      shouldApply: () => isOwningSelectionActive(committedSessionId),
     });
     useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
   } catch (error) {

@@ -46,7 +46,7 @@ export class BackgroundSubagentService {
     private readonly createRegistry: (sessionId: string, onCancel: (execution: TaskExecutionRecord) => Promise<void>) => TaskRegistry =
       (sessionId, onCancel) => new TaskRegistry(createSessionTaskStore(sessionId), { onCancelExecution: onCancel }),
     private readonly persistResult: (sessionId: string, executionId: string, value: unknown) => { uri: string; hash: string } = persistSubagentResult,
-    private readonly listRequestSnapshots: (sessionId: string) => ReturnType<typeof requestSnapshotStore.list> = (sessionId) => requestSnapshotStore.list(sessionId),
+    private readonly listMailboxDeliveries: (sessionId: string) => ReturnType<typeof requestSnapshotStore.listMailboxDeliveries> = (sessionId) => requestSnapshotStore.listMailboxDeliveries(sessionId),
   ) {}
 
   private registry(sessionId: string): TaskRegistry {
@@ -171,7 +171,7 @@ export class BackgroundSubagentService {
     const beforeProviderRequestMessages = async () => {
       await checkpointBudget();
       const childSessionId = `${input.sessionId}::subagent::${execution.id}`;
-      const committed = this.listRequestSnapshots(childSessionId).flatMap((snapshot) => snapshot.mailboxDeliveries ?? []);
+      const committed = this.listMailboxDeliveries(childSessionId);
       const recoveredThrough = committed
         .filter((delivery) => delivery.executionId === execution.id && delivery.generation === execution.generation && delivery.direction === 'to_child')
         .reduce((maximum, delivery) => Math.max(maximum, delivery.throughSequence), 0);
@@ -272,7 +272,8 @@ export class BackgroundSubagentService {
     const envelope = savedResult
       ? normalizeSubagentResult(value.text, value.status, value.completionDeclaration, savedResult)
       : { disposition: 'blocked' as const, summary: 'Background result persistence failed.', outputs: {}, error: bounded(artifactError ?? 'Unknown artifact persistence failure.', 2_000), missingRequirements: ['Durable result artifact'] };
-    const status = value.status === 'complete' ? (envelope.disposition === 'completed' ? 'completed' : envelope.disposition) : value.status;
+    const status = value.status === 'complete' || value.status === 'cancelled'
+      ? envelope.disposition : value.status;
     const current = await registry.getExecution(execution.id);
     if (current?.status === 'cancelling') return; // TaskRegistry owns the cancellation terminal commit after join.
     let settledEnvelope = envelope;
@@ -311,7 +312,7 @@ export class BackgroundSubagentService {
     await this.ready.get(sessionId);
     const executions = await registry.listExecutions();
     const tasks = new Map((await registry.listTasks()).map((task) => [task.id, task]));
-    const committedDeliveries = this.listRequestSnapshots(sessionId).flatMap((snapshot) => snapshot.mailboxDeliveries ?? []);
+    const committedDeliveries = this.listMailboxDeliveries(sessionId);
     const selected: Array<{ execution: TaskExecutionRecord; messages: Awaited<ReturnType<TaskRegistry['consumeExecutionMessages']>>['messages'] }> = [];
     let chars = 0; let count = 0;
     for (const execution of executions) {
@@ -401,7 +402,7 @@ export class BackgroundSubagentService {
       name: 'background_wait', label: 'Wait Background Task', description: 'Event-driven join of a live background execution, then returns its durable result.', parameters: { type: 'object', required: ['executionId'], properties: { executionId: { type: 'string' } } }, ...orchestration,
       execute: async (_id, args, signal) => { const id = await requireOwned(args); if (signal?.aborted) throw new DOMException('Aborted', 'AbortError'); let listener: (() => void) | undefined; try { await Promise.race([this.join(id), new Promise<void>((_, reject) => { listener = () => reject(new DOMException('Aborted', 'AbortError')); signal?.addEventListener('abort', listener, { once: true }); })]); } finally { if (listener) signal?.removeEventListener('abort', listener); } const projection = projectSubagentExecution(await this.query(requireSession(), id)); return { content: [{ type: 'text', text: JSON.stringify(projection) }], details: projection }; },
     }, {
-      name: 'background_result', label: 'Background Result', description: 'Read the bounded structured result and durable message cursor.', parameters: { type: 'object', required: ['executionId'], properties: { executionId: { type: 'string' }, cursor: { type: 'number' } } }, ...common,
+      name: 'background_result', label: 'Background Result', description: 'Read the bounded structured result and durable message cursor. Pass the executionId returned by subagent (execution_...), not the resultRef artifact filename (subagent-execution_...json).', parameters: { type: 'object', required: ['executionId'], properties: { executionId: { type: 'string' }, cursor: { type: 'number' } } }, ...common,
       execute: async (_id, args) => { const id = await requireOwned(args); const [execution, mailbox] = await Promise.all([this.query(requireSession(), id), this.messages(requireSession(), id, Number(args.cursor ?? 0))]); const result = projectSubagentExecution(execution)?.result; return { content: [{ type: 'text', text: JSON.stringify({ result, ...mailbox }) }], details: { executionId: execution?.id, result, mailbox } }; },
     }, {
       name: 'background_message', label: 'Message Background Task', description: 'Append bounded untrusted owner data to the durable execution mailbox. It never mutates an in-flight frozen prompt.', parameters: { type: 'object', required: ['executionId', 'generation', 'body'], properties: { executionId: { type: 'string' }, generation: { type: 'number' }, body: { type: 'string', maxLength: 8000 } } }, ...common,
@@ -419,7 +420,7 @@ export class BackgroundSubagentService {
 export function createBackgroundSubagentService(subagents: SubagentRunner, dependencies?: {
   createRegistry?: ConstructorParameters<typeof BackgroundSubagentService>[1];
   persistResult?: ConstructorParameters<typeof BackgroundSubagentService>[2];
-  listRequestSnapshots?: ConstructorParameters<typeof BackgroundSubagentService>[3];
+  listMailboxDeliveries?: ConstructorParameters<typeof BackgroundSubagentService>[3];
 }): BackgroundSubagentService {
   return new BackgroundSubagentService(async (input) => subagents.runSubagent({
     parentAgentId: input.parentAgentId, parentToolCallId: input.parentToolCallId, targetProfile: input.targetProfile,
@@ -433,5 +434,5 @@ export function createBackgroundSubagentService(subagents: SubagentRunner, depen
     onPolicyBudget: input.onPolicyBudget,
     policyBudget: input.policyBudget,
     restoredPolicyBudget: input.restoredPolicyBudget, subagentBudget: input.subagentBudget,
-  }), dependencies?.createRegistry, dependencies?.persistResult, dependencies?.listRequestSnapshots);
+  }), dependencies?.createRegistry, dependencies?.persistResult, dependencies?.listMailboxDeliveries);
 }

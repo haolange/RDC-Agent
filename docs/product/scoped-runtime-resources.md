@@ -33,6 +33,10 @@ Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导
 
 四个 builtin：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件在 `resources/agent-runtime/agents`，再与 `~/.rdc-agent/agents` 和 `<project-root>/.rdc-agent/agents` 合成 effective snapshot。user/project 只能覆盖这四个 id，或新增无关自定义 id。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`；**无运行通道**（U01 落地 v2 迁移：shadow purge，真正改过正文/工具的 builtin-id 副本 `retained-override`）。迁移 marker 为 v2（U01 已落地）。Mission planner 工具面见裁决 J（plan-only + `rdc_probe`）。
 
+自定义 Profile 新建时工具权限为空；运行时按 `AGENT_TOOLS_EMPTY` 拒绝零工具配置。Settings 的配置状态必须同时检查模型路由与至少一项工具授权，零工具时提示用户到「工具权限」选择能力，不显示「可用」。
+
+Settings 的 Agents「新建智能体」沿当前 User/Project 作用域创建；Project 草稿冻结创建时的项目 ID，自动保存到该项目的 `.rdc-agent/agents`，切换项目不会把待保存草稿改写到新项目。User 草稿写入用户资源根；作用域切换只过滤所显示的定义，不暗中改变已有草稿的写入归属。
+
 ## Project Instructions
 
 解析顺序：`~/.rdc-agent/RDC.md` → 项目根 `RDC.md` → 根到活跃目标目录链上的每个 `RDC.md`。拒绝 traversal/symlink escape；有预算与 provenance；不静默截断；不自动导入 `AGENTS.md`/`CLAUDE.md`。指令是模型上下文，不扩展文件系统或权限权威。

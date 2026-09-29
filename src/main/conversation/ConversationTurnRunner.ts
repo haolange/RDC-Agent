@@ -12,7 +12,7 @@ import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
-import type { SessionAttachmentRecord } from '@shared/types/session';
+import type { RunSummary, SessionAttachmentRecord } from '@shared/types/session';
 import { nowMs } from '@shared/utils/id';
 import { agentOrchestrator, type PreparedAgentTurnContext } from '../workflow/debugger/AgentOrchestrator';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
@@ -72,6 +72,7 @@ export interface ConversationTurnRunnerHost {
   validateCompletion: TurnCompletionValidator;
   persistConversationSnapshot(sessionId: string | null | undefined, message: ConversationMessage): Error | null;
   emitConversationEvent(event: ConversationStreamEvent): void;
+  publishRunStatus(sessionId: string, runId: string, status: RunSummary['status']): void;
   publishConversationTrace(traceSessionId: string, messages: ConversationMessage[], persistedSessionId?: string | null): void;
   registerActiveTurn(turn: ActiveConversationTurn): void;
   clearActiveTurn(turnId: string, controller: AbortController): void;
@@ -140,6 +141,7 @@ export async function completeProfileTurn(
         assistantMessage = {
           ...assistantMessage,
           status: 'error',
+          workTrace: finalizeTrace(assistantMessage.workTrace, 'error', '会话状态保存失败'),
           diagnostic: {
             code: 'CONVERSATION_LLM_REQUEST_FAILED',
             severity: 'error',
@@ -474,6 +476,9 @@ export async function completeProfileTurn(
         evidenceRefs: terminalCompletion.value?.evidenceRefs,
       });
     } catch (error) {
+      // A user stop can reject the provider call after the stop request. Let the
+      // terminal stop commit own the visible message and trace in that case.
+      if (abortController.signal.aborted) return;
       llmDiagnostic = createTurnFailedDiagnostic(routePreflight, error);
       errorViewModel = {
         code: llmDiagnostic.code,
@@ -523,6 +528,8 @@ export async function completeProfileTurn(
         ? 'Agent loop stopped after three identical tool rounds.'
         : llmDiagnostic.code === 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED'
           ? 'Agent loop stopped at the configured turn limit.'
+          : llmDiagnostic.code === 'CONVERSATION_TASK_COMPLETION_DENIED'
+            ? 'An unfinished direct Task prevented turn completion.'
           : llmDiagnostic.code === 'CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION'
             ? 'Provider stream protocol integrity check failed.'
             : llmDiagnostic.code === 'MISSION_COMPLETION_DENIED'
@@ -679,6 +686,7 @@ export async function completeProfileTurn(
           status: terminalRunStatus,
           finishedAt: nowMs(),
         });
+        host.publishRunStatus(sessionId, ownedRun.runId, terminalRunStatus);
       } catch (error) {
         console.error(`[ConversationService] Failed to finalize run ${ownedRun.runId}:`, error);
       }

@@ -100,10 +100,9 @@ export class SettingsService {
 
   initialize(): AppSettings {
     const runtimePaths = appPathService.initializeRuntime();
-    executionProfileService.ensureScaffold();
-
     const rawPersisted = readJsonFile<PersistedSettingsPayload>(runtimePaths.settingsPath);
     assertPersistedSettingsSchemaVersion(rawPersisted, runtimePaths.settingsPath);
+    executionProfileService.ensureScaffold();
     const rebuildResult = rebuildPersistedSettings(rawPersisted, runtimePaths.userRdcRoot);
     this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
 

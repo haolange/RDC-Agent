@@ -25,6 +25,25 @@ function resolverFor(sessionPath: string): SessionArtifactResolver {
   });
 }
 
+function pngWithTextBytes(count: number): Buffer {
+  const png = Buffer.from(
+    '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082',
+    'hex',
+  );
+  const type = Buffer.from('tEXt');
+  const body = Buffer.concat([Buffer.from('note\0'), Buffer.alloc(count, 0x61)]);
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(body.length);
+  let crc = 0xffffffff;
+  for (const byte of Buffer.concat([type, body])) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+  }
+  const checksum = Buffer.alloc(4);
+  checksum.writeUInt32BE((crc ^ 0xffffffff) >>> 0);
+  return Buffer.concat([png.subarray(0, 33), length, type, body, checksum, png.subarray(33)]);
+}
+
 describe('ToolResultArtifactizer', () => {
   it('leaves results at or below the 32 KiB threshold in place', () => {
     const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-art-below-'));
@@ -43,6 +62,30 @@ describe('ToolResultArtifactizer', () => {
     expect(result).toEqual(small);
     expect(result.details).toMatchObject({ path: 'a.txt' });
     expect(fs.existsSync(path.join(sessionPath, 'session-artifacts'))).toBe(false);
+  });
+
+  it('pins a small native result without hiding its inline data', () => {
+    const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-art-pin-'));
+    roots.push(sessionPath);
+    fs.writeFileSync(path.join(sessionPath, 'session.json'), '{}');
+    const resolver = resolverFor(sessionPath);
+    const original = {
+      content: [{ type: 'text' as const, text: '{"pixel":0.25}' }],
+      details: { operation: 'rd.texture.get_region_values', exitCode: 0 },
+    };
+    const result = artifactizeToolResult({
+      sessionId: 'sess-1', toolCallId: 'tc-native', toolName: 'shell',
+      result: original, resolver, pinBelowThreshold: true,
+    });
+    expect(result.content[0]).toEqual(original.content[0]);
+    const pinned = (result.details as { evidenceArtifact: { ref: string; hash: string } }).evidenceArtifact;
+    expect(pinned.ref).toBe('session://tool-outputs/tc-native.json');
+    expect(pinned).toMatchObject({ owner: 'sess-1', ownerScope: 'product-session' });
+    expect(result.content[1]).toEqual({ type: 'text', text: `Evidence ref: ${pinned.ref}\nhash: ${pinned.hash}` });
+    const read = resolver.read('sess-1', pinned.ref, { expectedHash: pinned.hash });
+    const stored = JSON.parse(fs.readFileSync(path.join(sessionPath, 'session-artifacts', 'tool-outputs', 'tc-native.json'), 'utf8')) as { chunks: string[] };
+    expect(JSON.parse(stored.chunks.join('')).content).toEqual(original.content);
+    expect(read.hash).toBe(pinned.hash);
   });
 
   it('offloads oversized successful results to session://tool-outputs', () => {
@@ -86,6 +129,7 @@ describe('ToolResultArtifactizer', () => {
     };
     expect(envelope).toMatchObject({
       owner: 'sess-1',
+      ownerScope: 'product-session',
       source: { toolName: 'grep', toolCallId: 'tc-big' },
       mime: 'application/json',
     });
@@ -142,6 +186,70 @@ describe('ToolResultArtifactizer', () => {
   it('keeps explicit artifact vision content through result artifactization', () => {
     const visual = { content: [{ type: 'text' as const, text: 'session://tool-outputs/diff.png sha256=verified ROI=whole-frame' }, { type: 'image' as const, data: 'a'.repeat(50000), mimeType: 'image/png' }] };
     expect(artifactizeToolResult({ sessionId: 'sess-1', toolCallId: 'visual', toolName: 'artifact_read', result: visual })).toBe(visual);
+  });
+
+  it.each(['read_image', 'code_interpreter'])('preserves oversized %s image blocks for the model while offloading the full result', (toolName) => {
+    const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-art-vision-'));
+    roots.push(sessionPath);
+    fs.writeFileSync(path.join(sessionPath, 'session.json'), '{}');
+    const resolver = resolverFor(sessionPath);
+    const image = { type: 'image' as const, data: pngWithTextBytes(40000).toString('base64'), mimeType: 'image/png' };
+    const result = artifactizeToolResult({
+      sessionId: 'sess-1', toolCallId: `vision-${toolName}`, toolName,
+      result: { content: [{ type: 'text', text: 'Viewed current image' }, image] },
+      resolver,
+    });
+    expect(result.isError).not.toBe(true);
+    expect(result.content).toContainEqual(image);
+    expect(result.details).toMatchObject({ artifactized: true, ref: `session://tool-outputs/vision-${toolName}.json` });
+    const stored = JSON.parse(fs.readFileSync(path.join(sessionPath, 'session-artifacts', 'tool-outputs', `vision-${toolName}.json`), 'utf8')) as { chunks: string[] };
+    const envelope = JSON.parse(stored.chunks.join('')) as { content: Array<{ ref?: string; hash?: string }> };
+    expect(envelope.content[1]).toMatchObject({ ref: `session://tool-outputs/vision-${toolName}-image-1.png` });
+    const read = resolver.read('sess-1', envelope.content[1].ref!, { expectedHash: envelope.content[1].hash, includeImageData: true });
+    expect(read.imageData).toBe(image.data);
+  });
+
+  it('keeps a multi-megabyte image resolvable without crossing the JSON artifact cap', () => {
+    const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-art-large-image-'));
+    roots.push(sessionPath);
+    fs.writeFileSync(path.join(sessionPath, 'session.json'), '{}');
+    const resolver = resolverFor(sessionPath);
+    const image = { type: 'image' as const, data: pngWithTextBytes(2 * 1024 * 1024 + 64).toString('base64'), mimeType: 'image/png' };
+    const result = artifactizeToolResult({
+      sessionId: 'sess-1', toolCallId: 'large-image', toolName: 'read_image',
+      result: { content: [{ type: 'text', text: 'Viewed frame' }, image] }, resolver,
+    });
+    expect(result.isError).not.toBe(true);
+    expect(result.content).toContainEqual(image);
+    const manifestPath = path.join(sessionPath, 'session-artifacts', 'tool-outputs', 'large-image.json');
+    expect(fs.statSync(manifestPath).size).toBeLessThan(2 * 1024 * 1024);
+    const manifest = JSON.parse((JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as { chunks: string[] }).chunks.join('')) as {
+      content: Array<{ ref?: string; hash?: string; bytes?: number }>;
+    };
+    const storedImage = manifest.content[1];
+    expect(storedImage).toMatchObject({ ref: 'session://tool-outputs/large-image-image-1.png', bytes: Buffer.from(image.data, 'base64').length });
+    expect(resolver.read('sess-1', storedImage.ref!, { expectedHash: storedImage.hash, includeImageData: true }).imageData).toBe(image.data);
+  });
+
+  it('removes its new image when the manifest cannot fit the session quota', () => {
+    const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-art-image-rollback-'));
+    roots.push(sessionPath);
+    fs.writeFileSync(path.join(sessionPath, 'session.json'), '{}');
+    const bytes = pngWithTextBytes(40000);
+    const resolver = new SessionArtifactResolver({
+      resolveSessionPath: (sessionId) => (sessionId === 'sess-1' ? sessionPath : null),
+      io: new StorageIo(),
+      maxSessionBytes: bytes.length + 100,
+    });
+    const result = artifactizeToolResult({
+      sessionId: 'sess-1', toolCallId: 'quota-image', toolName: 'read_image',
+      result: { content: [{ type: 'text', text: 'Viewed frame' }, { type: 'image', data: bytes.toString('base64'), mimeType: 'image/png' }] },
+      resolver,
+    });
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result)).toContain('ARTIFACT_QUOTA_EXCEEDED');
+    expect(fs.existsSync(path.join(sessionPath, 'session-artifacts', 'tool-outputs', 'quota-image-image-1.png'))).toBe(false);
+    expect(fs.existsSync(path.join(sessionPath, 'session-artifacts', 'tool-outputs', 'quota-image.json'))).toBe(false);
   });
 
 });

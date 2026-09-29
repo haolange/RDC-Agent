@@ -2,6 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { ContextUsageIndicator } from './ContextUsageIndicator';
+import type { PreparedTurnContextSummary } from '@shared/types/session';
 import type { ContextUsageSelectedProfile } from './contextUsageDisplay';
 
 vi.mock('../i18n', () => ({
@@ -23,6 +24,27 @@ const profile = (overrides: Partial<ContextUsageSelectedProfile> = {}): ContextU
 });
 
 describe('ContextUsageIndicator', () => {
+  it('keeps an oversized pre-window estimate pending until actual request usage arrives', () => {
+    const html = renderToStaticMarkup(React.createElement(ContextUsageIndicator, {
+      detailsExpanded: false,
+      onDetailsExpandedChange: () => undefined,
+      usage: null,
+      prepared: {
+        preparedInputTokens: 943_100,
+        uncompactedInputTokens: 943_100,
+        promptBudgetTokens: 272_000,
+        compactionThresholdTokens: 217_600,
+        usagePercent: 100,
+        compactionApplied: false,
+      } as PreparedTurnContextSummary,
+      phase: 'current',
+      selectedProfile: profile({ contextBudgetTokens: 272_000 }),
+    }));
+    expect(html).toContain('is-pending');
+    expect(html).toContain('contextBreakdown.windowPendingAria');
+    expect(html).toContain('>…</span>');
+    expect(html).not.toContain('>100%</span>');
+  });
   it('keeps the ring percent-first without in-ring phase badges', () => {
     const idle = renderToStaticMarkup(
       React.createElement(ContextUsageIndicator, {

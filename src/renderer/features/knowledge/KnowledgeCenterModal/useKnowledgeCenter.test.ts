@@ -5,6 +5,7 @@ import { assignKnowledgeCenterList, includeSelectedSpaceId } from './knowledgeCe
 function hit(cardId: string, score: number): KnowledgeLaneHit {
   return {
     cardId,
+    contentHash: 'a'.repeat(64),
     spaceId: 'user',
     relativePath: `${cardId}.md`,
     title: cardId,

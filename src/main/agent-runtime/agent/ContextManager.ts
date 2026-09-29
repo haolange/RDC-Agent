@@ -29,8 +29,7 @@ export class ContextManager {
     this.config.contextTokenLimit = limit;
   }
   convertToLlm(messages: AgentMessage[]): Message[] {
-    return bridgeToolResultImages(messages.filter((message): message is Message =>
-      message.role === 'user' || message.role === 'assistant' || message.role === 'toolResult'));
+    return convertAgentMessagesToLlm(messages);
   }
   async compress(messages: AgentMessage[], signal?: AbortSignal, onProgress?: (progress: import('../core/types').CompactionProgress) => void): Promise<CompressResult> {
     signal?.throwIfAborted();
@@ -171,9 +170,10 @@ export class ContextManager {
 
 }
 
-function bridgeToolResultImages(messages: Message[]): Message[] {
+export function convertAgentMessagesToLlm(messages: AgentMessage[]): Message[] {
   const next: Message[] = [];
-  for (const message of messages) {
+  for (const message of messages.filter((value): value is Message =>
+    value.role === 'user' || value.role === 'assistant' || value.role === 'toolResult')) {
     if (message.role !== 'toolResult') {
       next.push(message);
       continue;

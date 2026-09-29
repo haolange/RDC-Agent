@@ -1,4 +1,4 @@
-import { authorizeRdcOperation } from './RdcOperationPolicy';
+import { authorizeRdcOperation, isMainOwnedRdcIdentityKey } from './RdcOperationPolicy';
 import { operationFingerprint } from './RdcOperationCatalog';
 import { validateExecutionEvidence, verifyRollbackIdentity } from './RdcValidatedEvidence';
 import { runRdcOperation } from '../sessions/RdcOperationCoordinator';
@@ -6,9 +6,56 @@ import { z } from 'zod';
 import type { AgentToolResult, ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { assertRdcContextLeaseOwnership, getRdcContextLease, quarantineRdcContext } from '../sessions/RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
-import { parseRdcNativeResult } from './RdcNativeProtocol';
+import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
 import { rdcDigest, rdcExecutionReceipts } from './RdcExecutionReceipts';
-import { truncateOutput } from '../agent-runtime/tools/primitives/_shared';
+import type { RdcOperationDefinition } from '@shared/types/tool';
+
+function callableRdcDefinition(definition: RdcOperationDefinition): Record<string, unknown> {
+  const inputSchema = structuredClone(definition.input_schema);
+  const properties = inputSchema.properties as Record<string, unknown> | undefined;
+  const hostSuppliedIdentity = Object.keys(properties ?? {}).filter(isMainOwnedRdcIdentityKey);
+  for (const key of hostSuppliedIdentity) delete properties?.[key];
+  if (Array.isArray(inputSchema.required)) {
+    inputSchema.required = inputSchema.required.filter((key): key is string => typeof key === 'string' && !isMainOwnedRdcIdentityKey(key));
+  }
+  return {
+    name: definition.name, description: definition.description, scope: definition.scope,
+    effects: definition.effects, evidence_kind: definition.evidence_kind,
+    path_inputs: definition.path_inputs, input_schema: inputSchema,
+    host_supplied_identity: hostSuppliedIdentity,
+    returns_raw: definition.returns_raw,
+  };
+}
+
+function searchRdcDefinitions(definitions: readonly RdcOperationDefinition[], query: string, limit: number) {
+  const terms = [...new Set(query.toLowerCase().split(/\s+/).filter(Boolean))];
+  const matches = definitions.map((item, index) => {
+    const name = item.name.toLowerCase();
+    const description = item.description.toLowerCase();
+    const schema = item.input_schema.properties;
+    const parameterNames = schema && typeof schema === 'object' && !Array.isArray(schema)
+      ? Object.keys(schema).join(' ') : '';
+    const supportingText = [item.namespace, item.group, item.parameter_raw, item.returns_raw, parameterNames]
+      .filter((value): value is string => typeof value === 'string').join(' ').toLowerCase();
+    let score = 0;
+    let matchedTerms = 0;
+    for (const term of terms) {
+      if (name.includes(term)) { score += 12; matchedTerms += 1; }
+      else if (description.includes(term)) { score += 4; matchedTerms += 1; }
+      else if (supportingText.includes(term)) { score += 1; matchedTerms += 1; }
+    }
+    if (!matchedTerms) return null;
+    if (name === query.toLowerCase()) score += 100;
+    score += matchedTerms * matchedTerms;
+    return { item, index, score };
+  }).filter((entry): entry is { item: RdcOperationDefinition; index: number; score: number } => entry !== null)
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+  return {
+    matches: matches.slice(0, limit).map(({ item }) => ({ name: item.name, description: item.description, scope: item.scope, effects: item.effects })),
+    total: matches.length,
+    truncated: matches.length > limit,
+  };
+}
 
 export const RdcDiscoverySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('search'), query: z.string().trim().min(1).max(200), limit: z.number().int().min(1).max(20).default(8) }).strict(),
@@ -48,12 +95,11 @@ export async function executeRdcShell(
     const request = input.discovery;
     let data: unknown;
     if (request.kind === 'describe') {
-      data = binding.definitions.find(item => item.name === request.operation);
-      if (!data) throw new Error('RDC_EXECUTION_DENIED: unknown operation.');
+      const definition = binding.definitions.find(item => item.name === request.operation) as RdcOperationDefinition | undefined;
+      if (!definition) throw new Error('RDC_EXECUTION_DENIED: unknown operation.');
+      data = callableRdcDefinition(definition);
     } else {
-      const terms = request.query.toLowerCase().split(/\s+/);
-      const matches = binding.definitions.filter(item => terms.every(term => `${item.name} ${item.description}`.toLowerCase().includes(term)));
-      data = { matches: matches.slice(0, request.limit).map(item => ({ name: item.name, description: item.description, scope: item.scope, effects: item.effects })), total: matches.length, truncated: matches.length > request.limit };
+      data = searchRdcDefinitions(binding.definitions as readonly RdcOperationDefinition[], request.query, request.limit);
     }
     return { content: [{ type: 'text', text: JSON.stringify({ fingerprint: binding.definitionsFingerprint, data }) }], details: { operation: `rdc_tool.tools.${request.kind}`, exitCode: 0 } };
   }
@@ -75,8 +121,7 @@ export async function executeRdcShell(
     throw new Error('RDC_EXECUTION_DENIED: binding changed while queued.');
   }
   const startedAt = Date.now();
-  try {
-    const readReplayEvent = async (): Promise<number> => {
+  const readReplayEvent = async (): Promise<number> => {
       const response = await rdcCliInvokerService.executeCLI('call', [
         'rd.session.get_context', '--args-json', '{}', '--daemon-context', lease.contextId,
       ], { abortSignal: signal, contextId: lease.contextId, settings: cli });
@@ -87,8 +132,12 @@ export async function executeRdcShell(
         throw new Error('RDC_CLI_PROTOCOL: cannot verify temporary replay identity and position.');
       }
       return Number(runtime!.active_event_id);
-    };
-    const originalEvent = definition.effects.includes('replay_position_temporary') ? await readReplayEvent() : undefined;
+  };
+  let originalEvent: number | undefined;
+  try {
+    const temporaryReplayRead = definition.effects.includes('replay_position_temporary');
+    originalEvent = temporaryReplayRead || input.operation === 'rd.export.screenshot' || input.operation === 'rd.shader.get_source'
+      ? await readReplayEvent() : undefined;
     const result = await rdcCliInvokerService.executeCLI('call', [
       input.operation, '--args-json', JSON.stringify(args), '--daemon-context', lease.contextId,
     ], { abortSignal: signal, contextId: lease.contextId, settings: cli });
@@ -104,7 +153,7 @@ export async function executeRdcShell(
     if (!after || after.version !== lease.version || after.contextId !== lease.contextId) {
       throw new Error('RDC_EXECUTION_DENIED: replay ownership changed during execution; inspect state before retrying.');
     }
-    if (originalEvent !== undefined && (payload.data.replay_state_restored !== true
+    if (temporaryReplayRead && originalEvent !== undefined && (payload.data.replay_state_restored !== true
       || payload.data.restored_event_id !== originalEvent || await readReplayEvent() !== originalEvent)) {
       throw new Error('RDC_CLI_PROTOCOL: temporary replay operation did not prove restoration.');
     }
@@ -122,10 +171,54 @@ export async function executeRdcShell(
       const { rdcSessionService } = await import('../sessions');
       await rdcSessionService.observeAgentOperation({ sessionId: sessionId, projectId: projectId }, input.operation, toolCallId, cli, true);
     }
-    return { content: [{ type: 'text', text: truncateOutput(JSON.stringify({ result: payload, receipt }), 24 * 1024) }],
-      details: { operation: input.operation, exitCode: 0, receipt } };
+    const rdcExecutionIdentity = {
+      productSessionId: sessionId,
+      contextId: lease.contextId,
+      replaySessionId,
+      captureFileId: frozenCaptureId,
+    };
+    return { content: [{ type: 'text', text: JSON.stringify({ result: payload, receipt, rdcExecutionIdentity }) }],
+      details: { operation: input.operation, exitCode: 0, receipt, rdcExecutionIdentity } };
   } catch (error) {
-    quarantineRdcContext(sessionId, lease.version, 'Native operation outcome is uncertain; inspect and recover through the capture lifecycle before further execution.');
+    let nativeStateVerifiedSafe = false;
+    if (error instanceof RdcNativeFailure && error.resultKind === input.operation
+      && (error.effectsNotAttempted || (error.replacementNotAttempted
+        && definition.effects.includes('shader_replacement') && !definition.effects.includes('replay_position_temporary')))
+      && !signal?.aborted) {
+      try {
+        const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
+        nativeStateVerifiedSafe = current?.version === lease.version && current.contextId === lease.contextId
+          && current.runtimeContext.replaySessionId === replaySessionId
+          && current.runtimeContext.captureFileId === frozenCaptureId;
+      } catch { /* An unverified lease remains quarantined. */ }
+    }
+    if (!nativeStateVerifiedSafe && error instanceof RdcNativeFailure && input.operation === 'rd.export.screenshot'
+      && originalEvent !== undefined && originalEvent > 0 && error.screenshotTargetRestoration?.eventId === originalEvent
+      && error.screenshotTargetRestoration.contextId === lease.contextId
+      && error.screenshotTargetRestoration.sessionId === replaySessionId && !signal?.aborted) {
+      try {
+        const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
+        nativeStateVerifiedSafe = current?.version === lease.version && current.contextId === lease.contextId
+          && current.runtimeContext.replaySessionId === replaySessionId
+          && current.runtimeContext.captureFileId === frozenCaptureId
+          && await readReplayEvent() === originalEvent;
+      } catch { /* An unverified restoration remains quarantined. */ }
+    }
+    if (!nativeStateVerifiedSafe && error instanceof RdcNativeFailure && input.operation === 'rd.shader.get_source'
+      && originalEvent !== undefined && originalEvent > 0 && error.shaderSourceRestoration?.eventId === originalEvent
+      && error.shaderSourceRestoration.contextId === lease.contextId
+      && error.shaderSourceRestoration.sessionId === replaySessionId && !signal?.aborted) {
+      try {
+        const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
+        nativeStateVerifiedSafe = current?.version === lease.version && current.contextId === lease.contextId
+          && current.runtimeContext.replaySessionId === replaySessionId
+          && current.runtimeContext.captureFileId === frozenCaptureId
+          && await readReplayEvent() === originalEvent;
+      } catch { /* An unverified restoration remains quarantined. */ }
+    }
+    if (!nativeStateVerifiedSafe) {
+      quarantineRdcContext(sessionId, lease.version, 'Native operation outcome is uncertain; inspect and recover through the capture lifecycle before further execution.');
+    }
     throw error;
   }
   });

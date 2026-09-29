@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'crypto';
+import { rm } from 'fs/promises';
 
 vi.mock('electron', () => ({
   app: {
@@ -18,12 +20,12 @@ vi.mock('../../sessions/RdcRuntimeContextRegistry', () => ({
   setRdcRuntimeContextForSession: vi.fn(() => null),
 }));
 
-import { assertRdcContextLeaseOwnership } from '../../sessions/RdcRuntimeContextRegistry';
+import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../sessions/RdcRuntimeContextRegistry';
 import { resolveAgentToolAllowlistFromDefinition } from './DebuggerRuntimePolicy';
 import { RuntimeToolAssembly } from './RuntimeToolAssembly';
 import { toolValidator } from '../../agent-runtime/core/ToolValidator';
 import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
-import { TaskRegistry, createSessionTaskStore, registerDelegatedTaskScope } from '../../agent-runtime/tasks';
+import { TaskRegistry, createSessionTaskStore, registerDelegatedTaskScope, resolveSessionTasksDir } from '../../agent-runtime/tasks';
 import { TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 
@@ -71,6 +73,29 @@ describe('RuntimeToolAssembly', () => {
     expect(turn.completionDeclaration?.disposition).toBe('partial');
   });
 
+  it('rejects turn_complete while a direct Task is running, then accepts it after settlement', async () => {
+    const sessionId = `completion-${randomUUID()}`;
+    const turn = new TurnHandle({ sessionKey: sessionId, turnId: `turn-${randomUUID()}`, generation: 1 });
+    const registry = new TaskRegistry(createSessionTaskStore(sessionId));
+    try {
+      const task = await registry.createTask('Verify the result');
+      const execution = await registry.startExecution(task.id, {
+        mode: 'direct', frozenPlanRef: `turn:${turn.turnId}:generation:${turn.generation}`,
+      });
+      const tool = createAssembly().resolveRuntimeTools('general', ['*'], sessionId, turn).toolMap.get('turn_complete')!;
+      await expect(tool.execute('premature', { disposition: 'partial' })).rejects.toThrow(`TASK_COMPLETION_DENIED: Settle direct Tasks before turn_complete with task_update(status=completed or blocked): ${task.id}`);
+      expect(turn.completionDeclaration).toBeNull();
+      await registry.settleExecution(execution.id, {
+        expectedGeneration: execution.generation, status: 'blocked',
+        result: { disposition: 'blocked', summary: 'Evidence is insufficient.', outputs: {} },
+      });
+      await tool.execute('settled', { disposition: 'partial' });
+      expect(turn.completionDeclaration?.disposition).toBe('partial');
+    } finally {
+      await rm(resolveSessionTasksDir(sessionId), { recursive: true, force: true });
+    }
+  });
+
   it('createToolSignature sorts tool names', () => {
     const assembly = createAssembly();
     expect(assembly.createToolSignature([
@@ -115,8 +140,27 @@ describe('RuntimeToolAssembly', () => {
     const assembly = createAssembly();
     const tool = assembly.createRdcContextTool('sess-1', 'proj-1');
     const result = await tool.execute('tc-1', {});
-    expect(result.details).toEqual({ available: false });
+    expect(result.details).toEqual({ available: false, requiresRecovery: false });
     expect(assertRdcContextLeaseOwnership).toHaveBeenCalled();
+  });
+
+  it('createRdcContextTool reports controlled recovery for its quarantined capture', async () => {
+    vi.mocked(getRdcContextLease).mockReturnValueOnce({
+      ownerSessionId: 'sess-1', ownerProjectId: 'proj-1', quarantineReason: 'uncertain native result',
+    } as never);
+    const result = await createAssembly().createRdcContextTool('sess-1', 'proj-1').execute('tc-1', {});
+    expect(result.details).toEqual({ available: false, requiresRecovery: true });
+    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('Close it in Capture') });
+    expect(result.content[0]).not.toMatchObject({ text: expect.stringContaining('not open') });
+  });
+
+  it('createRdcContextTool does not disclose another project’s retained lease', async () => {
+    vi.mocked(getRdcContextLease).mockReturnValueOnce({
+      ownerSessionId: 'sess-1', ownerProjectId: 'other-project', quarantineReason: 'uncertain native result',
+    } as never);
+    const result = await createAssembly().createRdcContextTool('sess-1', 'proj-1').execute('tc-1', {});
+    expect(result.details).toEqual({ available: false, requiresRecovery: false });
+    expect(result.content[0]).toMatchObject({ text: expect.stringContaining('not open') });
   });
 
   it('createRdcContextTool returns runtime context when lease exists', async () => {

@@ -536,6 +536,7 @@ export function ingestKnowledge(source: string, options: {
     chapters,
     preview,
     ...(sanitizedImages.length > 0 ? { images: sanitizedImages } : {}),
+    ...(missingAssets.length > 0 ? { missingAssets } : {}),
   };
   const leaked = leakedSensitiveReason(sanitizedTitle, body, preview, ...Object.values(chapters));
   if (leaked) {

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RunSummary } from '@shared/types/session';
 
 const { handlers, syncSessionSlots, abortBackgroundSession, storage, conversation } = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
@@ -6,6 +7,7 @@ const { handlers, syncSessionSlots, abortBackgroundSession, storage, conversatio
   abortBackgroundSession: vi.fn(async () => undefined),
   conversation: {
     cancelActiveTurn: vi.fn(async () => ({ success: true })),
+    isTurnActive: vi.fn(() => false),
   },
   storage: {
     readSession: vi.fn(),
@@ -16,7 +18,8 @@ const { handlers, syncSessionSlots, abortBackgroundSession, storage, conversatio
     listSessions: vi.fn((): Array<{ sessionId: string }> => []),
     setCurrentSessionId: vi.fn(async () => undefined),
     setCurrentProjectId: vi.fn(),
-    getLatestRun: vi.fn(() => null),
+    getLatestRun: vi.fn((): RunSummary | null => null),
+    updateRun: vi.fn(async () => undefined),
     executionOffers: { read: vi.fn(() => null), write: vi.fn(), clear: vi.fn(), discardRemovedHandoffState: vi.fn() },
   },
 }));
@@ -84,7 +87,13 @@ describe('session:remove slot sync', () => {
     abortBackgroundSession.mockResolvedValue(undefined);
     conversation.cancelActiveTurn.mockReset();
     conversation.cancelActiveTurn.mockResolvedValue({ success: true });
+    conversation.isTurnActive.mockReset();
+    conversation.isTurnActive.mockReturnValue(false);
     storage.readSession.mockReset();
+    storage.getLatestRun.mockReset();
+    storage.getLatestRun.mockReturnValue(null);
+    storage.updateRun.mockReset();
+    storage.updateRun.mockResolvedValue(undefined);
     storage.getProjectById.mockReset();
     storage.listRuns.mockReset();
     storage.removeSession.mockReset();
@@ -172,6 +181,44 @@ describe('session:remove slot sync', () => {
       success: true,
       session: expect.objectContaining({ sessionId: 'sess_1', agentId: 'general' }),
     });
+  });
+
+  it('does not interrupt an active conversation run when the session is selected', async () => {
+    storage.readSession.mockReturnValue({ sessionId: 'sess_1', projectId: 'proj_1', title: 't' });
+    const running = { runId: 'run_1', turnId: 'turn_1', sessionId: 'sess_1', status: 'running' };
+    storage.getLatestRun.mockReturnValue(running as RunSummary);
+    conversation.isTurnActive.mockReturnValue(true);
+    registerProjectSessionHandlers({
+      state: { currentSessionId: null, currentProjectId: 'proj_1', currentRunId: null },
+      broadcastToRenderer: vi.fn(), broadcastRunStatusChanged: vi.fn(), applyCurrentLlmConfig: vi.fn(),
+      setRunLifecycleState: vi.fn(async () => undefined),
+      selectCurrentProject: vi.fn(async () => ({ project: null, currentSession: null, currentRun: null })),
+      initializeIpcState: vi.fn(async () => undefined),
+    } as unknown as WorkbenchIpcContext);
+
+    const result = await handlers.get('session:select')!({}, 'sess_1');
+    expect(result).toMatchObject({ success: true, currentRun: running });
+    expect(conversation.isTurnActive).toHaveBeenCalledWith('sess_1', 'turn_1');
+    expect(storage.updateRun).not.toHaveBeenCalled();
+  });
+
+  it('interrupts a stale run when neither execution owner is active', async () => {
+    storage.readSession.mockReturnValue({ sessionId: 'sess_1', projectId: 'proj_1', title: 't' });
+    storage.getLatestRun.mockReturnValue({
+      runId: 'run_1', turnId: 'turn_1', sessionId: 'sess_1', status: 'running',
+    } as RunSummary);
+    registerProjectSessionHandlers({
+      state: { currentSessionId: null, currentProjectId: 'proj_1', currentRunId: null },
+      broadcastToRenderer: vi.fn(), broadcastRunStatusChanged: vi.fn(), applyCurrentLlmConfig: vi.fn(),
+      setRunLifecycleState: vi.fn(async () => undefined),
+      selectCurrentProject: vi.fn(async () => ({ project: null, currentSession: null, currentRun: null })),
+      initializeIpcState: vi.fn(async () => undefined),
+    } as unknown as WorkbenchIpcContext);
+
+    await handlers.get('session:select')!({}, 'sess_1');
+    expect(storage.updateRun).toHaveBeenCalledWith('sess_1', 'run_1', expect.objectContaining({
+      status: 'interrupted', stopReason: 'Recovered after app restart',
+    }));
   });
 
   it('cancels an active run without writing lastStage', async () => {

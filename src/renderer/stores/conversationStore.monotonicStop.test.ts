@@ -4,6 +4,7 @@ import {
   shouldRejectActivePatchForMonotonicStop,
   useConversationStore,
 } from './conversationStore';
+import { stopWorkTrace } from '../lib/stopWorkTrace';
 
 const baseAssistant = (overrides: Partial<ConversationMessage> = {}): ConversationMessage => ({
   id: 'assistant-1',
@@ -56,6 +57,29 @@ describe('conversationStore monotonic stop', () => {
     expect(assistant?.content).toBe('stopped locally');
   });
 
+  it('accepts the authoritative terminal trace after an optimistic stop', () => {
+    const store = useConversationStore.getState();
+    store.upsertConversationMessage(baseAssistant({
+      workTrace: { status: 'running', updatedAt: 1, blocks: [{
+        id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1,
+        toolCalls: [{ id: 'pending', toolName: 'investigation_read', status: 'pending', startedAt: 1 }],
+      }] },
+    }));
+    store.markTurnMonotonicallyStopped('turn-1');
+    store.updateAssistantMessageByTurnId('turn-1', stopWorkTrace);
+    expect(useConversationStore.getState().conversationMessages[0].workTrace?.blocks[0].toolCalls[0].status).toBe('skipped');
+
+    store.upsertConversationMessage(baseAssistant({
+      status: 'stopped', updatedAt: 2, workTrace: {
+        status: 'stopped', updatedAt: 2, blocks: [{
+          id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'complete', startedAt: 1,
+          toolCalls: [{ id: 'pending', toolName: 'investigation_read', status: 'complete', startedAt: 1, completedAt: 2 }],
+        }],
+      },
+    }));
+    expect(useConversationStore.getState().conversationMessages[0].workTrace?.blocks[0].toolCalls[0].status).toBe('complete');
+  });
+
   it('consumeRevokedRequest is single-shot', () => {
     const store = useConversationStore.getState();
     store.markRequestRevoked('req-1');
@@ -95,4 +119,3 @@ describe('conversationStore monotonic stop', () => {
     expect(late).toBeUndefined();
   });
 });
-

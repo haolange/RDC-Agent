@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadProjectsOp, loadSessionsOp, type ProjectSelectionLoaderOpsContext } from './projectSelectionLoaderOps';
+import { handleProjectSelectOp, handleSessionActivateOp, type ProjectSelectionHandlerOpsContext } from './projectSelectionHandlerOps';
 import type { ProjectRecord } from '@shared/types/session';
+import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
 
 const reloadSettings = vi.fn(async () => ({ agents: { definitions: [{ id: 'project-only' }] } }));
+const activateSession = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../stores/conversationStore', () => ({
   useConversationStore: { getState: () => ({ setTimeline: vi.fn() }) },
@@ -18,6 +21,9 @@ vi.mock('../../../stores/captureStore', () => ({
 }));
 vi.mock('../../../stores/sessionSwitchHygiene', () => ({
   applySessionSwitchHygiene: vi.fn(),
+}));
+vi.mock('../../../stores/sessionProjectionStore', () => ({
+  useSessionProjectionStore: { getState: () => ({ activateSession }) },
 }));
 
 function project(projectId: string): ProjectRecord {
@@ -98,6 +104,123 @@ describe('loadSessionsOp project-aware settings refresh', () => {
     expect(setCurrentProject).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'proj_b' }));
     expect(order).toEqual(['select', 'reloadSettings', 'setCurrentProject']);
   });
+
+  it('clears the former session projection when project-only selection crosses projects', async () => {
+    const setCurrentSession = vi.fn();
+    const ctx = {
+      t: (key: string) => key,
+      setSidebarError: vi.fn(),
+      ensureProjectExpanded: vi.fn(),
+      loadProjectSessionList: vi.fn(async () => []),
+      isLatestSelectionRequest: () => true,
+      setSessions: vi.fn(),
+      setCurrentProject: vi.fn(),
+      setCurrentSession,
+      updateProjectInputs: vi.fn(),
+      setRightRailTarget: vi.fn(),
+      setCurrentRun: vi.fn(),
+      setRuns: vi.fn(),
+      setCaptures: vi.fn(),
+      getCurrentSession: () => ({ sessionId: 'session-a', projectId: 'proj_a' }),
+      reloadSettings,
+    } as unknown as ProjectSelectionLoaderOpsContext;
+
+    await loadSessionsOp(ctx, project('proj_b'), { autoSelectSession: false, requestId: 1 });
+
+    expect(applySessionSwitchHygiene).toHaveBeenCalledWith({ previousSessionId: 'session-a', nextSessionId: null });
+    expect(setCurrentSession).toHaveBeenCalledWith(null);
+  });
+});
+
+it('clears the active session before projecting another project root', async () => {
+  const order: string[] = [];
+  vi.mocked(applySessionSwitchHygiene).mockImplementation(() => { order.push('hygiene'); });
+  const ctx = {
+    setSidebarError: vi.fn(),
+    beginSelectionRequest: () => 1,
+    getCurrentSession: () => ({ sessionId: 'session-a', projectId: 'proj_a' }),
+    setCurrentSession: () => { order.push('clearSession'); },
+    setCurrentRun: vi.fn(),
+    setCaptures: vi.fn(),
+    setRuns: vi.fn(),
+    setCurrentProject: () => { order.push('setProject'); },
+    updateProjectInputs: vi.fn(),
+    setRightRailTarget: vi.fn(),
+    ensureProjectExpanded: vi.fn(),
+    setIsBusy: vi.fn(),
+    loadSessions: async () => { order.push('loadSessions'); },
+  } as unknown as ProjectSelectionHandlerOpsContext;
+
+  await handleProjectSelectOp(ctx, project('proj_b'));
+
+  expect(applySessionSwitchHygiene).toHaveBeenCalledWith({ previousSessionId: 'session-a', nextSessionId: null });
+  expect(order).toEqual(['hygiene', 'clearSession', 'setProject', 'loadSessions']);
+});
+
+it('clears the former session before projecting a session in another project', async () => {
+  const order: string[] = [];
+  vi.mocked(applySessionSwitchHygiene).mockImplementation(() => { order.push('hygiene'); });
+  const ctx = {
+    setSidebarError: vi.fn(),
+    beginSelectionRequest: () => 1,
+    getCurrentProject: () => project('proj_a'),
+    getCurrentSession: () => ({ sessionId: 'session-a', projectId: 'proj_a' }),
+    setCurrentProject: () => { order.push('setProject'); },
+    setCurrentSession: () => { order.push('setSession'); },
+    setRightRailTarget: vi.fn(),
+    setCurrentRun: vi.fn(),
+    setCaptures: vi.fn(),
+    setRuns: vi.fn(),
+    ensureProjectExpanded: vi.fn(),
+    setIsBusy: vi.fn(),
+    loadSessions: async () => { order.push('loadSessions'); },
+  } as unknown as ProjectSelectionHandlerOpsContext;
+
+  await handleSessionActivateOp(ctx, project('proj_b'), {
+    sessionId: 'session-b', projectId: 'proj_b',
+  } as Parameters<typeof handleSessionActivateOp>[2], vi.fn());
+
+  expect(applySessionSwitchHygiene).toHaveBeenCalledWith({ previousSessionId: 'session-a', nextSessionId: 'session-b' });
+  expect(order).toEqual(['hygiene', 'setProject', 'setSession', 'loadSessions']);
+});
+
+it('restores the former selection when cross-project activation is rejected', async () => {
+  const formerProject = project('proj_a');
+  const formerSession = { sessionId: 'session-a', projectId: 'proj_a' } as Parameters<typeof handleSessionActivateOp>[2];
+  const setCurrentProject = vi.fn();
+  const setCurrentSession = vi.fn();
+  vi.stubGlobal('window', {
+    electronAPI: { project: { select: async () => ({ success: false, error: 'rejected' }) } },
+  });
+  const ctx = {
+    t: (key: string) => key,
+    setSidebarError: vi.fn(),
+    isLatestSelectionRequest: () => true,
+    setCurrentProject,
+    setCurrentSession,
+    setRightRailTarget: vi.fn(),
+    setCurrentRun: vi.fn(),
+    setCaptures: vi.fn(),
+    setRuns: vi.fn(),
+    ensureProjectExpanded: vi.fn(),
+  } as unknown as ProjectSelectionLoaderOpsContext;
+
+  await loadSessionsOp(ctx, project('proj_b'), {
+    rollbackState: {
+      currentProject: formerProject,
+      currentSession: formerSession,
+      rightRailTarget: 'session',
+      currentRun: null,
+      captures: [],
+      runs: [],
+    },
+  });
+
+  expect(ctx.setSidebarError).toHaveBeenCalledWith('rejected');
+  expect(setCurrentProject).toHaveBeenLastCalledWith(formerProject);
+  expect(setCurrentSession).toHaveBeenLastCalledWith(formerSession);
+  expect(activateSession).toHaveBeenCalledWith('session-a');
+  vi.unstubAllGlobals();
 });
 
 describe('loadProjectsOp listing gate', () => {

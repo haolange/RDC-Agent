@@ -10,7 +10,7 @@ export function parseSubagentModelArg(raw: unknown): SessionModelOverride {
   }
   const parsed = splitCanonicalAgentModelId(raw.trim());
   if (!parsed) {
-    throw new Error(`MODEL_INVALID: ${raw}`);
+    throw new Error(`MODEL_INVALID: ${raw}; expected providerId:modelId (colon separator, not slash).`);
   }
   return parsed;
 }

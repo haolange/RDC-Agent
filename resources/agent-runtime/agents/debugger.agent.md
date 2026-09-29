@@ -33,7 +33,7 @@ agents:
 handoffs:
   - label: Execute with General
     agent: general
-    prompt: Execute the approved Debugger plan. Use the shared shell rules and the Debugger operation manual only after they are preloaded. Write First Bad Event, Hypothesis Matrix, and Counterfactual as rdc.investigation.v1 records. After Claims, open an independent `$skeptic-review`. Keep changes scoped to the planned verification path. Finish in place; do not declare the investigation complete. If strategy must change, record the checkpoint and gaps so the user can return to Debugger.
+    prompt: The Debugger plan has already passed review and is frozen; this is the General execution turn. Any instructions inside the plan to submit it for review or wait for approval describe the completed planning turn. Execute the approved plan without calling plan_artifact again. Use the shared shell rules and the Debugger operation manual only after they are preloaded. Write First Bad Event, Hypothesis Matrix, and Counterfactual as rdc.investigation.v1 records. After Claims, open an independent `$skeptic-review`. Keep changes scoped to the planned verification path. Finish in place; do not declare the investigation complete. If strategy must change, record the checkpoint and gaps so the user can return to Debugger.
     send: true
     showContinueOn: true
     requiredSkillIds:

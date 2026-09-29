@@ -49,10 +49,13 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
 }) => {
   const { t } = useI18n();
 
-  const hasOverflowSessions = projectSessions.length > 5;
+  // An optimistic project switch can precede the new session list. Never render
+  // a former project's rows beneath the newly selected project.
+  const scopedSessions = projectSessions.filter((session) => session.projectId === project.projectId);
+  const hasOverflowSessions = scopedSessions.length > 5;
   const visibleSessions = hasOverflowSessions && !showAllSessions
-    ? projectSessions.slice(0, 5)
-    : projectSessions;
+    ? scopedSessions.slice(0, 5)
+    : scopedSessions;
   const projectOriginName = getProjectOriginName(project);
   const shouldShowProjectOriginName = project.name.trim() !== projectOriginName.trim();
 
@@ -133,7 +136,7 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
         <div className="project-sessions-panel">
           <SessionList
             project={project}
-            projectSessions={projectSessions}
+            projectSessions={scopedSessions}
             visibleSessions={visibleSessions}
             hasOverflowSessions={hasOverflowSessions}
             showAllSessions={showAllSessions}

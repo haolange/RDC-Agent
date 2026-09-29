@@ -145,12 +145,26 @@ describe('ReplayHistoryStore', () => {
     await expect(new ReplayHistoryStore({ codec }).append(scope, fact)).rejects.toThrow('REPLAY_STORE_BUSY');
     expect(JSON.parse(await fs.readFile(lock, 'utf8')).token).toBe('another-owner');
   });
+  it('publishes a complete owner before exposing replay.lock', async () => {
+    const scope = await setup();
+    const originalLink = fs.link.bind(fs);
+    const link = vi.spyOn(fs, 'link').mockImplementation(async (source, target) => {
+      expect(String(target)).toBe(path.join(scope.projectRoot, '.rdc-agent', 'replay.lock'));
+      expect(JSON.parse(await fs.readFile(source, 'utf8'))).toMatchObject({ pid: process.pid });
+      await expect(fs.stat(target)).rejects.toHaveProperty('code', 'ENOENT');
+      return originalLink(source, target);
+    });
+    await new ReplayHistoryStore({ codec }).append(scope, fact);
+    expect(link).toHaveBeenCalledOnce();
+    const directory = path.join(scope.projectRoot, '.rdc-agent');
+    expect((await fs.readdir(directory)).filter((name) => name.includes('replay-lock'))).toEqual([]);
+  });
   it.each(['writeFile', 'sync'] as const)('cleans only its own lock when initial %s fails and permits retry', async (method) => {
     const scope = await setup();
     const originalOpen = fs.open.bind(fs);
     const spy = vi.spyOn(fs, 'open').mockImplementation(async (...args: Parameters<typeof fs.open>) => {
       const handle = await originalOpen(...args);
-      if (String(args[0]).endsWith('replay.lock')) vi.spyOn(handle, method).mockRejectedValueOnce(new Error('INJECTED_DISK_FAILURE'));
+      if (String(args[0]).includes('.replay-lock-')) vi.spyOn(handle, method).mockRejectedValueOnce(new Error('INJECTED_DISK_FAILURE'));
       return handle;
     });
     const store = new ReplayHistoryStore({ codec });
@@ -165,7 +179,7 @@ describe('ReplayHistoryStore', () => {
     const originalOpen = fs.open.bind(fs);
     vi.spyOn(fs, 'open').mockImplementation(async (...args: Parameters<typeof fs.open>) => {
       const handle = await originalOpen(...args);
-      if (String(args[0]) === target) vi.spyOn(handle, 'sync').mockImplementationOnce(async () => {
+      if (String(args[0]).includes('.replay-lock-')) vi.spyOn(handle, 'sync').mockImplementationOnce(async () => {
         await fs.writeFile(target, JSON.stringify({ pid: process.pid, token: 'other-owner' }));
         throw new Error('INJECTED_DISK_FAILURE');
       });

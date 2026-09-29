@@ -200,13 +200,25 @@ export function finalizeTrace(
               answer: cloned.approval.answer ?? '请求已取消。',
             }
           : cloned.approval;
+        if ((status === 'stopped' || status === 'error') && cloned.planReview?.status === 'awaiting') {
+          cloned.planReview = {
+            ...cloned.planReview,
+            status: 'rejected',
+            decision: cloned.planReview.decision ?? {
+              kind: 'reject',
+              feedback: status === 'stopped'
+                ? 'The request stopped before plan review.'
+                : 'The request ended before plan review.',
+            },
+          };
+        }
         if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
           if (cancelPendingApproval !== cloned.approval) {
             return { ...cloned, approval: cancelPendingApproval };
           }
           return cloned;
         }
-        const terminalToolStatus: ConversationToolCall['status'] = status === 'complete' && toolCall.status === 'pending'
+        const terminalToolStatus: ConversationToolCall['status'] = toolCall.status === 'pending'
           ? 'skipped'
           : 'error';
         return {
@@ -214,7 +226,11 @@ export function finalizeTrace(
           status: terminalToolStatus,
           completedAt: toolCall.completedAt ?? terminalAt,
           resultPreview: terminalToolStatus === 'skipped'
-            ? (toolCall.resultPreview ?? 'Run completed before this tool call executed.')
+            ? (toolCall.resultPreview ?? (status === 'stopped'
+              ? 'Run stopped before this tool call executed.'
+              : status === 'complete'
+                ? 'Run completed before this tool call executed.'
+                : 'Run ended before this tool call executed.'))
             : toolCall.resultPreview,
           error: terminalToolStatus === 'error'
             ? (toolCall.error ?? 'Run ended before this tool call completed.')

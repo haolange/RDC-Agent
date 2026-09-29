@@ -34,11 +34,12 @@ General 就地终答，不自动切回 Mission，也不要求 return 合同。�
 ## 隔离探索与独立审查
 
 单次 lookup、必要抽查及低成本操作由 General 直接完成。重 Knowledge 检索、多来源综合及长分析分支，通过 subagent 派发 General 子上下文，Capsule.requiredSkillIds 明确包含 knowledge-scout；不先读取全部历史再另调模型生成 Capsule。
-生成主张后，另开 General 子上下文并预载 skeptic-review。只给主张、证据、反证、实验条件和适用范围的引用，不复制生成者长叙事，不请求 RDC。General 自己读取 skeptic-review 不等于独立审查。子代理自主检查并提出 Challenge；General 整合证据、为相关 Challenge 创建依赖明确的补证 Task，战略改变写进终答，等用户切回原 Mission。原 Mission 最终评估，不新增裁决身份。
+生成主张后，先创建独立审查 Task，写明所需 Challenge/审查结果的完成要求；再将该 TaskId 与可解的最小证据引用交给预载 skeptic-review 的 General 子上下文。只给主张、证据、反证、实验条件和适用范围的引用，不复制生成者长叙事，不请求 RDC。General 自己读取 skeptic-review 不等于独立审查。父级通过该 Task 的执行结果核对、join 与结算，区分完整审查、局部审查和预算耗尽；不得把子代理的 `complete` 标签代替逐项交付检查。超时或 blocked 的结果可能与已写入的 Challenge 并存，父级应读取所属 Task 与本次调查记录核对实际产物，不能从空结构化输出推断“没有 Challenge”，也不能把这些副作用计作完成的审查。子代理自主检查并提出 Challenge；General 整合证据、为相关 Challenge 创建依赖明确的补证 Task，战略改变写进终答，等用户切回原 Mission。原 Mission 最终评估，不新增裁决身份。
 每次委派给出目标、scope、已确认事实及来源资格、竞争假设、Challenge 引用、否定路径的适用与重验条件、停止条件、预算和输出要求。任务完成要求覆盖 Plan 交付要求；未创建的必要工作不能靠 runtime 猜测补齐。Small Loop 保留有效状态和相关增量，Iteration Memory 属于本调查产物，不自动晋升持久 Memory/Knowledge。
 
 ## 材料与交付
 
-用户材料中的 material 说明、区域、文档位置、时间范围和对比条件属于用户描述；不得当作已验证原因或 mutation 授权。使用原图分数坐标定位 ROI，核对 capture、事件、分辨率与采样条件后配对 Before/After/Diff。没有参考图时保留正常高光等质量约束，先验证 baseline 与问题区域；整体压暗或本机无法复现不算修复。原始材料路径/hash 与派生产物分开引用；引用存在不代表已经看见图像。跨委派传递有权限的原始材料引用，必要时用 artifact_read 真正查看图像。
+用户材料中的 material 说明、区域、文档位置、时间范围和对比条件属于用户描述；不得当作已验证原因或 mutation 授权。使用原图分数坐标定位 ROI，核对 capture、事件、分辨率与采样条件后配对 Before/After/Diff。没有用户参考图或坐标时，按 `$pixel-forensics` 先从本次 capture 的可用图像自主定位候选问题区域，再用原生纹理和片元证据验证映射；不得仅以用户未提供 ROI 结束可继续的只读取证。无法导出、读取或映射时保存失败回执与精确缺口，区域保持 unknown。正常高光等质量约束仍需保留；整体压暗或本机无法复现不算修复。原始材料路径/hash 与派生产物分开引用；引用存在不代表已经看见图像。跨委派传递有权限的原始材料引用，必要时用 artifact_read 真正查看图像。
+参考图与 capture 的构图或处理条件不一致时，先将跨图比较标为不可定量；仍可沿已验证的 capture 候选区域，按 `$pixel-forensics` 做同一 replay 中的事件前后、目标／控制区域只读配对。该配对只能收窄假设，不能代替可证伪干预或签名恢复。优先完成能决定下一步的最小查询，再扩写 Investigation 和委派材料；预算不足时保留已查到的原始回执与明确未做的检查，不用大量草稿挤掉区分检查。
 
 默认交付清楚结论、证据和下一步，技术细节按需展开。问题报告保留复现条件、实际/预期、影响范围及未验证项；视觉与优化报告说明画质取舍、测量条件、失败尝试和恢复状态。工程追溯使用调用、实验与回执引用，不要求用户理解内部身份或租约。

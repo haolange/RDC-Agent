@@ -17,6 +17,7 @@ describe('workProcessActiveSignal', () => {
   it('activates streaming thinking without making completed thinking live', () => {
     expect(isActiveThinkingStatus('streaming', 'complete')).toBe(true);
     expect(isActiveThinkingStatus('complete', 'complete')).toBe(false);
+    expect(isActiveThinkingStatus('complete', 'running')).toBe(false);
     expect(isActiveThinkingStatus(undefined, 'running')).toBe(true);
   });
 

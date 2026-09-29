@@ -1,4 +1,4 @@
-import { executionOfferRequiredSkillIds } from '../../sessions/handoffSkills';
+import { approvedExecutionOfferForAgent } from '../../sessions/handoffSkills';
 /**
  * PromptPlanForTurn — build PromptPlan for Debug sendMessage / profile turns.
  */
@@ -87,10 +87,11 @@ export class PromptPlanForTurn {
           activePaths,
         })
       : { sources: [], totalBytes: 0, diagnostics: [] };
+    const approvedExecutionOffer = approvedExecutionOfferForAgent(input.sessionId, input.agentId);
     const preloadSkillIds = mergeTurnPreloadSkillIds({
       profileSkills,
       messageText: input.messageText ?? '',
-      pendingSkillIds: [...(input.preloadSkillIds ?? []), ...executionOfferRequiredSkillIds(input.sessionId, input.agentId)],
+      pendingSkillIds: [...(input.preloadSkillIds ?? []), ...(approvedExecutionOffer?.requiredSkillIds ?? [])],
     });
     const preloadedSkills = [];
     for (const skillId of preloadSkillIds) {
@@ -113,6 +114,7 @@ export class PromptPlanForTurn {
       tools,
       workDir: projectRootPath ?? '',
       sessionId: input.sessionId ?? null,
+      approvedExecutionOffer,
       routeCapability,
       effectiveModel: input.capability,
       permissionSettings,

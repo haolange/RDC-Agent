@@ -408,7 +408,7 @@ export class SessionArtifactResolver {
     const mimeType = record.mimeType ?? fileMimeType;
     const byteLength = record.bytes ?? bytes.length;
     if (options?.expectedHash) {
-      const expected = options.expectedHash.toLowerCase();
+      const expected = options.expectedHash.trim().toLowerCase().replace(/^sha256:/, '');
       if (expected !== hash && expected !== fileHash) {
         throw new SessionArtifactError('ARTIFACT_HASH_MISMATCH', 'sha256 does not match expectedHash.');
       }

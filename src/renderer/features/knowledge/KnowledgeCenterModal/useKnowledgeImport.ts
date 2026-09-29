@@ -31,6 +31,7 @@ export function useKnowledgeImport(options: {
   const [inbox, setInbox] = useState<KnowledgeCandidatesResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [candidateError, setCandidateError] = useState<{ cardId: string; message: string } | null>(null);
 
   const refreshInbox = useCallback(async () => {
     if (!options.sessionId) {
@@ -61,6 +62,7 @@ export function useKnowledgeImport(options: {
     setFilePath(null);
     setResult(null);
     setError(null);
+    setCandidateError(null);
   }, [request]);
 
   useEffect(() => {
@@ -70,6 +72,7 @@ export function useKnowledgeImport(options: {
 
   const openPanel = useCallback(() => {
     setSpaceId(options.spaces[0]?.spaceId ?? 'user');
+    setCandidateError(null);
     setOpen(true);
   }, [options.spaces]);
 
@@ -128,13 +131,16 @@ export function useKnowledgeImport(options: {
 
   const createCandidate = useCallback(async (card: KnowledgeCardRecord) => {
     if (!options.sessionId) {
-      setError(t('knowledgeCenter.sessionRequired'));
+      const message = t('knowledgeCenter.sessionRequired');
+      setError(message);
+      setCandidateError({ cardId: card.cardId, message });
       return;
     }
     if (!beginSynchronousFlight(inFlight)) return;
     const seq = request.next();
     setBusy(true);
     setError(null);
+    setCandidateError(null);
     try {
       await window.electronAPI.knowledge.candidateCreate({
         sessionId: options.sessionId,
@@ -145,7 +151,14 @@ export function useKnowledgeImport(options: {
       await refreshInbox();
       if (request.isCurrent(seq)) close();
     } catch (err) {
-      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) {
+        const raw = knowledgeErrorMessage(err);
+        const message = raw.includes('KNOWLEDGE_ASSETS_MISSING')
+          ? t('knowledgeCenter.candidateAssetsMissing')
+          : raw;
+        setError(message);
+        setCandidateError({ cardId: card.cardId, message });
+      }
     } finally {
       inFlight.current = false;
       if (request.isCurrent(seq)) setBusy(false);
@@ -169,6 +182,7 @@ export function useKnowledgeImport(options: {
     refreshInbox,
     busy,
     error,
+    candidateError,
     selectFile,
     importSource,
     createCandidate,

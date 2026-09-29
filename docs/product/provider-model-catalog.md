@@ -151,7 +151,7 @@ Kimi Coding Plan 的 Anthropic-compatible base URL 是 `https://api.kimi.com/cod
 | `kimi-k2.7-code-highspeed` | 256K           | 否       | 否                                   | 只有On                                           | 内部 Fast 目标 |
 | `minimax-m3`               | 204.8K         | 否       | 否                                   | 不清楚                                            | 可用  |
 
-`doubao-seed-2.0-*`、`doubao-seed-code`、`deepseek-v4-pro`、`deepseek-v4-flash` 以及已确认不支持 Coding Plan 的 `minimax-m2.5` / `kimi-k2.5` / `glm-5.1` / `glm-4.7` 已从目录删除，不留 deprecated 占位。仍保留的附加现行项：`minimax-m2.7`、`kimi-k2.6`。
+`doubao-seed-2.0-*`、`doubao-seed-code`、`deepseek-v4-pro`、`deepseek-v4-flash` 以及已确认不支持 Coding Plan 的 `minimax-m2.5` / `kimi-k2.5` / `glm-5.1` / `glm-4.7` 已从目录删除，不留退役占位。仍保留的附加现行项：`minimax-m2.7`、`kimi-k2.6`。
 
 ## ClinePass
 

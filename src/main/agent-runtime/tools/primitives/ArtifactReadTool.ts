@@ -53,7 +53,7 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
       },
       expectedHash: {
         type: 'string',
-        description: 'Optional sha256 hex. Fail-closed with ARTIFACT_HASH_MISMATCH on mismatch.',
+        description: 'Optional SHA-256: 64 hex digits or sha256:<64 hex> from an Investigation record. Fail-closed with ARTIFACT_HASH_MISMATCH on mismatch.',
       },
     },
     required: ['uri'],

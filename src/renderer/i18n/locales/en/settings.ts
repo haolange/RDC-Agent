@@ -313,6 +313,7 @@ export const enSettings = {
   'settings.agentConfigTab': 'Configuration',
   'settings.agentStatus': 'Configuration status',
   'settings.agentStatusAvailable': 'Available',
+  'settings.agentStatusNoTools': 'Select at least one tool to run',
   'settings.agentStatusNoModel': 'No model selected',
   'settings.agentInstructionsHint': 'System prompt guiding this Agent; plan-only semantics are executed by General.',
   'settings.agentInstructionsSource': 'Source',

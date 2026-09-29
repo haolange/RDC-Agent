@@ -4,6 +4,8 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false, decryptString: () => '', encryptString: (v: string) => Buffer.from(v) },
 }));
 import { createRdcProbeTool, type RdcProbeToolDeps } from './RdcProbeTool';
+import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
+import { ToolValidator } from '../../agent-runtime/core/ToolValidator';
 import { clearRdcContextLeases, getRdcContextLease, setRdcRuntimeContextForSession, grantDelegatedLease, quarantineRdcContext } from '../../sessions/RdcRuntimeContextRegistry';
 import type { RdcProbeInput } from '@shared/constants/rdcProbe';
 import { compileRdcProbe, RdcProbeInputSchema } from '@shared/constants/rdcProbe';
@@ -22,6 +24,28 @@ function result(exitCode = 0, body: unknown = { ok: true, result_kind: 'rd.sessi
 }
 afterEach(clearRdcContextLeases);
 describe('native RDC probe', () => {
+  it('advertises action-specific input modes without unrelated placeholder fields', () => {
+    const definition = toolToDefinition(createRdcProbeTool('s', 'p'));
+    const validator = new ToolValidator();
+    for (const input of [
+      { action: 'enumerate' },
+      { action: 'probe', args: { action: 'event_list' } },
+      { action: 'probe', args: { action: 'event_show', eventId: '1248' } },
+      { action: 'probe', args: { action: 'pipeline_show' } },
+      { action: 'probe', args: { action: 'vfs_ls', path: '/draws' } },
+      { action: 'lease_open', capturePath: '/registered.rdc' },
+    ]) {
+      expect(validator.validate(definition, input)).toEqual(input);
+    }
+    for (const input of [
+      { action: 'probe', capturePath: 'active', args: { action: 'event_show', eventId: '1248', path: '/' } },
+      { action: 'probe', args: { action: 'event_show', eventId: '1248', path: '/' } },
+      { action: 'enumerate', args: { action: 'event_list' } },
+      { action: 'probe', contextId: 'active', args: { action: 'event_list' } },
+    ]) {
+      expect(() => validator.validate(definition, input)).toThrow();
+    }
+  });
   it('does not probe or close a parent while delegated execution owns its live context', async () => {
     own();
     grantDelegatedLease({ parentSessionId: 's', childSessionId: 'child', ownerTurnId: 'turn' });
@@ -137,5 +161,28 @@ describe('native RDC probe', () => {
   it('requires bounded query args', () => {
     expect(RdcProbeInputSchema.safeParse({ action: 'probe', args: { action: 'event_show', eventId: '42' } }).success).toBe(true);
     expect(compileRdcProbe({ action: 'probe', args: { action: 'event_show', eventId: '42' } })).toMatchObject({ command: 'event', args: ['show', '--event-id', '42'] });
+  });
+  it('treats empty optional probe fields as omission without relaxing required identity or query fields', async () => {
+    const observed = {
+      action: 'probe', capturePath: '', contextId: 'ctx',
+      args: { action: 'event_show', eventId: '1248', path: '' },
+    } as const;
+    expect(RdcProbeInputSchema.parse(observed)).toEqual({
+      action: 'probe', contextId: 'ctx', args: { action: 'event_show', eventId: '1248' },
+    });
+    expect(compileRdcProbe(observed)).toMatchObject({ command: 'event', args: ['show', '--event-id', '1248'] });
+    expect(compileRdcProbe({ action: 'probe', capturePath: '', args: { action: 'event_list', eventId: '', path: '' } }))
+      .toMatchObject({ command: 'event', args: ['list'] });
+    expect(compileRdcProbe({ action: 'probe', args: { action: 'context_status', eventId: '', path: '' } }))
+      .toMatchObject({ command: 'context', args: ['status'] });
+    expect(RdcProbeInputSchema.safeParse({ action: 'lease_open', capturePath: '' }).success).toBe(false);
+    expect(RdcProbeInputSchema.safeParse({ action: 'probe', args: { action: 'event_show', eventId: '' } }).success).toBe(false);
+    expect(RdcProbeInputSchema.safeParse({ action: 'probe', args: { action: 'event_show', eventId: '1248', path: '/secret' } }).success).toBe(false);
+    own();
+    const executeCli = vi.fn(async () => result());
+    const response = await createRdcProbeTool('s', 'p', { executeCli })
+      .execute('t', observed, undefined, undefined, context);
+    expect(response.isError).not.toBe(true);
+    expect(executeCli).toHaveBeenCalledWith('event', ['show', '--event-id', '1248', '--daemon-context', 'ctx'], expect.anything());
   });
 });

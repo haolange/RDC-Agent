@@ -124,7 +124,7 @@ export const Composer: React.FC<ComposerProps> = ({
   }, [composerMarkdown, isComposerBusy]);
 
   const pendingRequest = useComposerPendingRequest();
-  if (pendingRequest) return <ComposerPendingRequest pending={pendingRequest} composeAccentStyle={composeAccentStyle} />;
+  if (pendingRequest) return <ComposerPendingRequest pending={pendingRequest} composeAccentStyle={composeAccentStyle} onStop={handlePrimaryStop} />;
 
   return (
     <ComposerMenuRegistryProvider key={composerScopeKey}>

@@ -637,6 +637,19 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     approvalRequired: false,
   },
   {
+    id: 'investigation_schema',
+    label: 'Read Investigation Schema',
+    permission: 'readonly',
+    inputSchema: {
+      type: 'object',
+      required: ['kind'],
+      properties: { kind: { type: 'string' } },
+    },
+    resultSummary: 'Returns the authoritative record input shape for one rdc.investigation.v1 kind.',
+    icon: 'file-search',
+    approvalRequired: false,
+  },
+  {
     id: 'investigation_read',
     label: 'Read Investigation Artifact',
     permission: 'readonly',

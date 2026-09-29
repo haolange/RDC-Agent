@@ -4,6 +4,9 @@ import {
   TurnHandle,
   createSubagentBudgetState,
   assertSubagentBudgetAllowsChild,
+  startSubagentBudgetChild,
+  finishSubagentBudgetChild,
+  subagentActiveWallMs,
   DEFAULT_SUBAGENT_BUDGET,
   createPolicyBudgetState,
   assertPolicyWallTimeAllowed,
@@ -168,6 +171,30 @@ describe('SubagentBudget', () => {
 
     const deep = createSubagentBudgetState(DEFAULT_SUBAGENT_BUDGET, 3);
     expect(() => assertSubagentBudgetAllowsChild(deep)).toThrow(/maxDepth/);
+  });
+
+  it('charges child-active wall without charging parent work before or between delegations', () => {
+    const state = createSubagentBudgetState({ ...DEFAULT_SUBAGENT_BUDGET, maxAggregateWallMs: 300_000 });
+    expect(() => assertSubagentBudgetAllowsChild(state, 1_000)).not.toThrow();
+    startSubagentBudgetChild(state, 1_000);
+    finishSubagentBudgetChild(state, 130_000);
+    expect(subagentActiveWallMs(state, 2_000_000)).toBe(129_000);
+    expect(() => assertSubagentBudgetAllowsChild(state, 2_000_000)).not.toThrow();
+    startSubagentBudgetChild(state, 2_000_000);
+    finishSubagentBudgetChild(state, 2_171_000);
+    expect(subagentActiveWallMs(state, 3_000_000)).toBe(300_000);
+    expect(() => assertSubagentBudgetAllowsChild(state, 3_000_000)).toThrow(/maxAggregateWallMs/);
+  });
+
+  it('counts overlapping children once while at least one child remains active', () => {
+    const state = createSubagentBudgetState({ ...DEFAULT_SUBAGENT_BUDGET, maxAggregateWallMs: 1_500 });
+    startSubagentBudgetChild(state, 1_000);
+    startSubagentBudgetChild(state, 1_500);
+    finishSubagentBudgetChild(state, 2_000);
+    expect(subagentActiveWallMs(state, 2_250)).toBe(1_250);
+    finishSubagentBudgetChild(state, 2_500);
+    expect(subagentActiveWallMs(state, 9_000)).toBe(1_500);
+    expect(() => assertSubagentBudgetAllowsChild(state, 9_000)).toThrow(/maxAggregateWallMs/);
   });
 
   it('TurnHandle carries child budget depth', () => {

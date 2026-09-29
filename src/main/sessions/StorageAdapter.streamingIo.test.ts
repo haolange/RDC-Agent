@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
 import type { ConversationMessage } from '@shared/types/conversation';
+import { CONVERSATION_COMPACTION_DELTA_THRESHOLD } from './storageCommitTypes';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-conversation-io-'));
 
@@ -147,5 +148,55 @@ describe('StorageAdapter conversation streaming I/O', () => {
     expect(compacted).toHaveLength(1);
     expect(compacted[0]).not.toContain('"op":"delta"');
     expect(JSON.parse(compacted[0]!).content).toBe('Hello!!!!!!!!');
+  });
+
+  it('keeps a streamed delta durable when a reader blocks journal compaction', async () => {
+    const { storageAdapter } = await import('./StorageAdapter');
+    await storageAdapter.initializeWorkspace();
+    const projectRoot = path.join(tempRoot, 'project-root-busy');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = await storageAdapter.createProject(projectRoot);
+    const session = storageAdapter.createSession(project.projectId, 'busy-stream-io');
+    const conversationPath = storageAdapter.getConversationPath(session.sessionId);
+    const base = makeMessage({
+      id: 'assistant-busy', content: 'start', sessionId: session.sessionId, projectId: project.projectId,
+    });
+    storageAdapter.appendConversationMessage(session.sessionId, base);
+
+    const write = storageAdapter.io.writeJsonlAtomic.bind(storageAdapter.io);
+    let blockedOnce = false;
+    const writeSpy = vi.spyOn(storageAdapter.io, 'writeJsonlAtomic').mockImplementation((filePath, records) => {
+      if (filePath === conversationPath && !blockedOnce) {
+        blockedOnce = true;
+        throw Object.assign(new Error('reader holds conversation journal'), { code: 'EBUSY' });
+      }
+      return write(filePath, records);
+    });
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      for (let index = 1; index <= CONVERSATION_COMPACTION_DELTA_THRESHOLD; index += 1) {
+        storageAdapter.appendConversationMessage(session.sessionId, {
+          ...base, content: `update-${index}`, updatedAt: index + 1,
+        });
+      }
+      expect(blockedOnce).toBe(true);
+      expect(warning).toHaveBeenCalledTimes(1);
+      expect(storageAdapter.conversationPendingDeltaCounts.get(session.sessionId)).toBe(CONVERSATION_COMPACTION_DELTA_THRESHOLD);
+      expect(fs.readFileSync(conversationPath, 'utf8').split('\n').filter(Boolean)).toHaveLength(CONVERSATION_COMPACTION_DELTA_THRESHOLD + 1);
+      expect(storageAdapter.readConversationHistory(session.sessionId)[0]?.content).toBe(`update-${CONVERSATION_COMPACTION_DELTA_THRESHOLD}`);
+
+      for (let index = CONVERSATION_COMPACTION_DELTA_THRESHOLD + 1; index <= 2 * CONVERSATION_COMPACTION_DELTA_THRESHOLD; index += 1) {
+        storageAdapter.appendConversationMessage(session.sessionId, {
+          ...base, content: `update-${index}`, updatedAt: index + 1,
+        });
+      }
+      expect(warning).toHaveBeenCalledTimes(1);
+      expect(writeSpy).toHaveBeenCalledTimes(2);
+      expect(fs.readFileSync(conversationPath, 'utf8').split('\n').filter(Boolean)).toHaveLength(1);
+      expect(storageAdapter.readConversationHistory(session.sessionId)[0]?.content).toBe(`update-${2 * CONVERSATION_COMPACTION_DELTA_THRESHOLD}`);
+    } finally {
+      writeSpy.mockRestore();
+      warning.mockRestore();
+    }
   });
 });

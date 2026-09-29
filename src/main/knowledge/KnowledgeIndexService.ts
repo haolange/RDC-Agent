@@ -52,7 +52,7 @@ const defaultDependencies = (): KnowledgeIndexDependencies => {
   };
 };
 
-function contentHashOf(source: string): string {
+export function contentHashOf(source: string): string {
   return createHash('sha256').update(source, 'utf8').digest('hex');
 }
 

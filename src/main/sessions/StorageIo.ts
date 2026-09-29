@@ -17,6 +17,23 @@ import { parse as parseYamlDocument } from 'yaml';
 
 const DEEP_MERGE_FORBIDDEN_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
+export function renameSyncWithBusyRetry(
+  source: string,
+  destination: string,
+  rename: (from: string, to: string) => void = fs.renameSync,
+): void {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      rename(source, destination);
+      return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EBUSY' || attempt >= 4) throw error;
+      // Windows readers and scanners can briefly deny rename/delete sharing.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 15 * (attempt + 1));
+    }
+  }
+}
+
 export class StorageIo {
   ensureDir(dirPath: string): void {
     if (!fs.existsSync(dirPath)) {
@@ -184,7 +201,7 @@ export class StorageIo {
       fs.writeFileSync(temporaryPath, content, 'utf-8');
     }
     try {
-      fs.renameSync(temporaryPath, filePath);
+      renameSyncWithBusyRetry(temporaryPath, filePath);
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== 'EEXIST' && code !== 'EPERM') {
@@ -195,17 +212,17 @@ export class StorageIo {
       // Windows-safe bak-swap: no rm-then-rename data-loss window.
       const bakTmpPath = `${filePath}.bak.tmp.${process.pid}.${generateShortId()}`;
       try {
-        fs.renameSync(filePath, bakTmpPath);
+        renameSyncWithBusyRetry(filePath, bakTmpPath);
       } catch (bakError) {
         if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
         throw bakError;
       }
 
       try {
-        fs.renameSync(temporaryPath, filePath);
+        renameSyncWithBusyRetry(temporaryPath, filePath);
       } catch (finalError) {
         try {
-          fs.renameSync(bakTmpPath, filePath);
+          renameSyncWithBusyRetry(bakTmpPath, filePath);
         } catch {
           // Leave bakTmp in place for manual recovery.
         }
@@ -218,7 +235,7 @@ export class StorageIo {
         if (fs.existsSync(durableBakPath)) {
           fs.rmSync(durableBakPath, { force: true });
         }
-        fs.renameSync(bakTmpPath, durableBakPath);
+        renameSyncWithBusyRetry(bakTmpPath, durableBakPath);
       } catch {
         try {
           fs.rmSync(bakTmpPath, { force: true });
@@ -248,7 +265,7 @@ export class StorageIo {
       fs.writeFileSync(temporaryPath, content);
     }
     try {
-      fs.renameSync(temporaryPath, filePath);
+      renameSyncWithBusyRetry(temporaryPath, filePath);
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== 'EEXIST' && code !== 'EPERM') {
@@ -258,17 +275,17 @@ export class StorageIo {
 
       const bakTmpPath = `${filePath}.bak.tmp.${process.pid}.${generateShortId()}`;
       try {
-        fs.renameSync(filePath, bakTmpPath);
+        renameSyncWithBusyRetry(filePath, bakTmpPath);
       } catch (bakError) {
         if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
         throw bakError;
       }
 
       try {
-        fs.renameSync(temporaryPath, filePath);
+        renameSyncWithBusyRetry(temporaryPath, filePath);
       } catch (finalError) {
         try {
-          fs.renameSync(bakTmpPath, filePath);
+          renameSyncWithBusyRetry(bakTmpPath, filePath);
         } catch {
           // Leave bakTmp in place for manual recovery.
         }
@@ -281,7 +298,7 @@ export class StorageIo {
         if (fs.existsSync(durableBakPath)) {
           fs.rmSync(durableBakPath, { force: true });
         }
-        fs.renameSync(bakTmpPath, durableBakPath);
+        renameSyncWithBusyRetry(bakTmpPath, durableBakPath);
       } catch {
         try {
           fs.rmSync(bakTmpPath, { force: true });

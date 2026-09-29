@@ -98,8 +98,8 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 - 空 `handoffs` 合法（General 无建议按钮）；空 `agents` 仅表示可委托自身。
 - 不新增 `mission` / `orchestratorType` / `investigationMode` 等 Profile 领域字段。
 - ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`。**不再有 custom manifest 运行通道**。
-- **迁移 v2（U01 落地）**：canonical hash 只排除顶层 `models` / `icon` / `accent` 与 `handoffs[*].model`；marker `schemaVersion:'2'`；v1 视为未完成；崩溃恢复 isolation manifest；shadow（忽略 model/icon/accent 后与 builtin 相同）purge；真正改过正文/工具的 builtin-id 副本 `retained-override`。官方未改 seed 永久清除，不留 `.migrated`。
-- **当前态诚实**：seed 迁移已是 v2 marker；canonical hash 忽略 model/icon/accent 与 handoff.model；v1 视为未完成。
+- **本机收敛**：历史官方 seed 已完成本机分类，四份用户 Agent 覆盖文件均保留；产品不再运行 seed 迁移或写 marker。旧官方 ID 作为拒绝名单保留，不进入有效快照。
+- **当前态**：Builtin 文件从应用 resources 只读加载；用户显式保存使用统一原子替换和原始 Markdown 字节哈希。读取 Agent 资源不会迁移、清除或改写本机文件。
 - 禁止交互式「导出 / 保留 / 移除」选择面。Ask / Plan / Edit 不是目标拓扑，也不是 fallback。
 
 ### 3.2 Right Rail
@@ -116,7 +116,7 @@ Embedding capability / Semantic lane **已删除**，见 `DESIGN.md` 裁决 C。
 
 ### 3.4 Declared Continue 与 Execution Offer（已落地）
 
-`AgentHandoffDefinition` 只是 Copilot 式 UI 声明。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 校验声明、触发 `before-handoff` / `after-handoff`、写入 `<sessionPath>/execution-offer.json` 并 persist `session.agentId`。计划批准写入 offer（source / target / 冻结 plan.uri+hash / 声明 requiredSkillIds）。prepareTurn 仅当本回合 `agentId === targetAgentId` 且批准计划与 offer 同 hash 时预载 Skill。General 就地终答，不自动回 Mission。不存在 `agent_handoff` 工具或 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。`send: true` 只表示点完后预填并自动发送。
+`AgentHandoffDefinition` 只是 Copilot 式 UI 声明。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 校验声明、触发 `before-handoff` / `after-handoff`、写入 `<sessionPath>/execution-offer.json` 并 persist `session.agentId`。计划批准写入 offer（source / target / 冻结 plan.uri+hash / 声明 requiredSkillIds）。prepareTurn 仅在本回合 Agent、批准 handoff target 和 offer target 相同，且冻结计划 URI/hash 与 offer 一致时预载 Skill；同一已核验 offer 作为 volatile runtime fact 说明当前批准状态和计划引用，避免把历史规划消息当成本回合审批要求。该事实不授权操作，General 仍需核对当前 replay 身份并就地终答，不自动回 Mission。不存在 `agent_handoff` 工具或 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。`send: true` 只表示点完后预填并自动发送。
 
 ### 3.5 并发（目标态 / 迁移中）
 
@@ -227,7 +227,7 @@ Confidence 与 Verification **分离**，禁止用单个 `0.92` 代替二者。
 | `shaderReplacement` | 当前替换（可空） |
 | `patchStack` | 已应用 patch 顺序 |
 | `focus` | event / resource / pixel / subresource |
-| `benchmark` | warmup、分辨率、vsync、采样协议 |
+| `benchmark` | 已测量时记录 warmup、分辨率、vsync、采样协议；Debugger/Analyzer 未进行 benchmark 时明确记 `{ status: 'not_measured', reason }`，不可填造数值。Optimizer 仍要求已测量配置 |
 | `validity` | `valid` / `stale` / `polluted` / `unknown` |
 
 旧 patch 状态下的 timing **不得**当 baseline。未持有 exclusive lock 的 mutate 使后续 Evidence `stale` 或 World State `polluted`。
@@ -248,6 +248,8 @@ Confidence 与 Verification **分离**，禁止用单个 `0.92` 代替二者。
 | `taskRef` | 可选通用 task id |
 | `claimIds` | 支撑或反驳的 Claim |
 | `experimentId` | 可选；若存在必须可解引用 `ExperimentRecord` |
+
+`source.kind=tool`、`epistemicStatus=observed` 且 `strength=strong` 的非 stale Evidence 必须有至少一组可解引用的 `artifactRefs` / `contentHashes`。没有原始回执时只能记为未知或较弱的待核观察，不能把工具名称和参数指纹当成执行证明。
 | `region` | 像素 / event / 资源范围 |
 | `strength` | 对所引 Claim 的支持强度 |
 | `stale` | World State 失效后必须为 true |
@@ -326,7 +328,7 @@ Skeptic 的输入应是 Claim / Evidence / Experiment / Negative / Alternative /
 
 ### 8.7 `MissionCheckpoint`
 
-Big Loop 与长任务恢复的精简状态：`goal`、`planVersion`、`established`、`rejected`、`completedExperiments`（`experimentId[]`）、`openChallenges`（`challengeId[]`）、`reasonForReplan`、`currentWorldStateId`、`criticalArtifactRefs`（`artifactId[]`）、`unresolvedFrontier`。不是第二份 TaskStore。所列 id 必须可解引用。
+Big Loop 与长任务恢复的精简状态：`goal`、`planVersion`、`established`、`rejected`、`completedExperiments`（`experimentId[]`）、`openChallenges`（`challengeId[]`）、`reasonForReplan`、`currentWorldStateId`、`criticalArtifactRefs`（`artifactId[]`）、`unresolvedFrontier`。不是第二份 TaskStore。所列 id 必须可解引用。`planVersion` 记录已批准计划的稳定版本标识；当计划有冻结制品时可用其 `plan-...` 制品 ID，计划 URI 与内容 SHA-256 仍以冻结制品及交接记录独立核验，不靠人工把长摘要重抄进此字段。
 
 ### 8.8 `InvestigationArtifactManifest`
 
@@ -372,7 +374,7 @@ Kind Registry（闭集，无悬空 `kind`）。`kind` 必须解析到唯一 `{ r
 2. 每个 `expectedHash` 与该源当前内容 sha256 匹配；本条 `contentHash` 与 `contentRef` 正文 sha256 匹配
 3. `kind` 经 Registry 得到 `recordType + schema`，且正文按该 schema 通过
 
-版本更新把旧清单标 `superseded`，`supersedes` 指向旧 `artifactId`，保留历史引用。原始 Provider opaque payload 不进 Artifact。引用解析失败、hash 不一致或 `kind` 未登记则不得标 `ready`。
+版本更新把旧清单标 `superseded`，`supersedes` 指向旧 `artifactId`，保留历史引用。若 WorldState 的替代版本使用不同 `worldStateId`，同一事务将仍绑定旧 ID 的记录及其依赖标为 `stale`，不自动把旧证据重绑到新状态；Claim／ClaimSet 替代时若旧 `claimId` 不再由现行记录拥有，也须在同一事务将引用这些 ID 的实验和下游调查记录标为 `stale`，不能让旧实验因失去活动假设而阻断列表或上下文归档。既有遗漏传播的记录在列表、读取或右栏投影前核实索引和旧状态后以同样事务修复，投影须使用修复后的状态与内容 hash。已取代或失效记录仍须通过索引、清单、schema 和内容 hash 校验，供审计与上下文完整归档；它们不再承担当前语义不变量，也不得作为当前结论的有效证据。现行记录继续执行完整引用和领域不变量校验。原始 Provider opaque payload 不进 Artifact。引用解析失败、hash 不一致或 `kind` 未登记则不得标 `ready`。
 
 Right Rail **目标** Artifacts 卡只投影 main-owned 本清单及其记录，不混入 Outputs。
 
@@ -388,7 +390,7 @@ Right Rail **目标** Artifacts 卡只投影 main-owned 本清单及其记录，
 | `S-KNOW-02` | 冲突不可静默覆盖；必须保留 `contradicts` 或显式 `supersedes` 原因 |
 | `S-RDC-01` | mutate 必有 Experiment + exclusive World State + rollback / restored 验证；否则 World State `polluted`，相关 Evidence `stale` |
 
-`check:investigation-system` ratchet 已建立；schema + `InvestigationArtifactService` + 三个 deferred 工具 + `investigationSystemContract.test.ts` 已落地并硬执行。应覆盖字段完整性（含 `claimId` / `experimentId` / `challengeId` / `artifactId`）、`ready` 三条件、偏序不可升级、精确 `S-CAUSAL-01`、引用可解、非侵入、Skeptic `ChallengeRecord` 形状、Checkpoint 所列 id 可解引用、Analyzer `claimKind` 越层失败、Optimizer 无 rollback 的 mutate 不得关闭。15 Skill / 4 Hook 与 Session rail 五卡已落地。三条 Mission 方法面已接到 Skill / Hook / Capsule。禁止 skip/todo/无断言空壳。T18 知识导入 已证见 `DESIGN.md` T18 已证组。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。
+`check:investigation-system` ratchet 已建立；schema + `InvestigationArtifactService` + 三个默认 deferred 工具 + `investigationSystemContract.test.ts` 已落地并硬执行。经批准的 Mission→General execution offer 会在有效工具集过滤后预激活四个 Investigation 工具；普通 General 仍按需发现。应覆盖字段完整性（含 `claimId` / `experimentId` / `challengeId` / `artifactId`）、`ready` 三条件、偏序不可升级、精确 `S-CAUSAL-01`、引用可解、非侵入、Skeptic `ChallengeRecord` 形状、Checkpoint 所列 id 可解引用、Analyzer `claimKind` 越层失败、Optimizer 无 rollback 的 mutate 不得关闭。15 Skill / 4 Hook 与 Session rail 五卡已落地。三条 Mission 方法面已接到 Skill / Hook / Capsule。禁止 skip/todo/无断言空壳。T18 知识导入 已证见 `DESIGN.md` T18 已证组。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。
 
 ---
 
@@ -473,7 +475,7 @@ Analyzer 是认知基础，**不是**强制前置模式。Debugger / Optimizer �
 
 Planning：Triage & Taxonomy → Capture Report → Knowledge Retrieval → plan。Execution：First Bad Event → 竞争 Hypothesis → Evidence → Experiment → Skeptic。
 
-落地方式（Wave 5 前半）：接到已有 Profile / Skill / Hook / 声明续跑 / `investigation_*` / `task_*`，不新建 Runtime。First Bad Event / Hypothesis Matrix / Counterfactual Artifact 的记录形状与步骤在 `$debugger-causal-method`（现有 `evidence` / `claim` / `claim_set` / `experiment` kind，无新 Registry 项）。`$debugger-coordinator` 负责规划与 Small / Big Loop；`$skeptic-review` 只写 `ChallengeRecord`；General 用 `task_create` 把 `requiredFollowUp` 变成补证 Task。
+落地方式（Wave 5 前半）：接到已有 Profile / Skill / Hook / 声明续跑 / `investigation_*` / `task_*`，不新建 Runtime。First Bad Event / Hypothesis Matrix / Counterfactual Artifact 的记录形状与步骤在 `$debugger-causal-method`（现有 `evidence` / `claim` / `claim_set` / `experiment` kind，无新 Registry 项）。没有用户标注 ROI 时，General 先检查本次 capture 的可用图像，自主选候选区域，再用原生输出纹理及片元证据核对；无法读取或映射才保留精确缺口，不能以缺用户坐标直接停止。`$debugger-coordinator` 负责规划与 Small / Big Loop；独立 `$skeptic-review` 由 General 先建审查 Task、在 Capsule 中绑定 TaskId 并核对交付与结算，Skeptic 只写 `ChallengeRecord`；General 再用 `task_create` 把 `requiredFollowUp` 变成补证 Task。
 
 | 结局 | 条件 |
 | --- | --- |
@@ -519,7 +521,7 @@ Fact / Constraint / Pattern / Procedure / Case / Model。Scope 是多轴空间�
 
 ### 13.2 Lifecycle 与 Promotion
 
-`Draft → Candidate → Verified → Promoted → Deprecated / Superseded`。
+`Draft → Candidate → Verified → Promoted → Retired / Superseded`。Retired Card 保留审计和历史查询，但不进入默认召回。
 
 - 知识导入 Historical Debug Case 写入所选 user/project 空间 **Draft**，**绝不默认或自动进入 Candidate**。会话不是知识库。
 - 源 YAML `meta.status: fixed` **不等于** `Verified`（`fixed ≠ verified`）。
@@ -568,7 +570,7 @@ Fact / Constraint / Pattern / Procedure / Case / Model。Scope 是多轴空间�
 | `generalization.*` | Derived；推荐 SOP 只是候选 Procedure 引用 |
 | `notes.derived_feature` | Derived；SPIR-V id / HLSL 锚点 |
 
-YAML 破损 → `quarantine`，不解析半份。缺附件 → `Draft`，不得创建 Candidate。重复 `case_id` → 出示 diff，**不覆盖**。staging 只存在于当前 session；canonical 仍只写 user / project Knowledge。摄入本身**不**调用 `knowledge_candidate_create`。本机原始导入案例 **不进仓库**；CI 使用脱敏 fixture（占位文件名如 `symptom-compare-<shortHash>.png`、去绝对路径、去 secret、必要时替换 HLSL）。
+YAML 破损 → `quarantine`，不解析半份。缺附件 → `Draft`，不得创建 Candidate；缺失附件的脱敏 ID 随草稿保存，重开后仍阻止 Candidate、Verified 和 Promoted。完整图片引用还须在所属知识空间核实实际文件；不完整卡不导出成貌似完整的知识包。重复 `case_id` → 出示 diff，**不覆盖**。staging 只存在于当前 session；canonical 仍只写 user / project Knowledge。摄入本身**不**调用 `knowledge_candidate_create`。本机原始导入案例 **不进仓库**；CI 使用脱敏 fixture（占位文件名如 `symptom-compare-<shortHash>.png`、去绝对路径、去 secret、必要时替换 HLSL）。
 
 ### 14.3 Canonical Case Card 最低章节
 
@@ -696,7 +698,7 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 知识�
 
 下游才改代码：
 
-- **U01**：seed 迁移 v2（canonical hash 排除 model/icon/accent；v1 视为未完成；shadow purge；非法 id 诊断；**无 custom manifest 运行通道**）。
+- **U01**：四 builtin 和 user/project 覆盖采用同一资源解析路径；本机旧 seed 已分类并保留真实用户覆盖。旧官方 ID 被明确拒绝；运行时无 seed 迁移器、marker 写入、历史指纹或旧 manifest fallback。
 - **U02**：删除 Embedding / Semantic lane / `llm.embedding`；Knowledge 收敛六 lane markdown-first + 读根免审批。
 - **U03**：legacy 二次清扫 + `check:legacy-residue` 零命中。
 - **U04**：`check:acceptance-ledger` 接入 CI。

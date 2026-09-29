@@ -155,7 +155,7 @@ export const ProviderSurfaceManifestSchema = z.object({
   discoveryPolicyId: z.enum(PROVIDER_DISCOVERY_POLICY_IDS),
   vendorId: z.string().min(1),
   label: z.string().min(1),
-  status: z.enum(['stable', 'beta', 'deprecated', 'sunset']),
+  status: z.enum(['stable', 'beta', 'retiring', 'sunset']),
   sunsetAt: z.string().optional(),
   availability: AvailabilitySchema,
   category: z.enum([
@@ -214,7 +214,6 @@ export const ProviderSurfaceManifestSchema = z.object({
       denyPatterns: z.array(z.string().min(1)).optional(),
       requireCapabilities: z.array(z.string().min(1)).optional(),
       requireContextWindow: z.boolean().optional(),
-      excludeDeprecated: z.boolean().optional(),
       excludeExperimental: z.boolean().optional(),
     }).strict().optional(),
   }).strict(),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInvestigationHarness, recordedExperiment, SESSION_ID } from './investigationTestFixtures';
-import { RdcExecutionReceipts } from '../tools/RdcExecutionReceipts';
+import { RdcExecutionReceipts, rdcDigest } from '../tools/RdcExecutionReceipts';
 import { seedExecutionEvidence } from './investigationExecutionFixtures';
 import { assertExecutionEvidence } from './investigationExecutionEvidence';
 
@@ -18,6 +18,31 @@ describe('native execution evidence', () => {
     const { resolver, store, experiment } = harness();
     experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId);
     expect(() => assertExecutionEvidence(SESSION_ID, experiment, new RdcExecutionReceipts(resolver, () => 'test-evidence-signing-key'))).not.toThrow();
+  });
+  it('accepts distinct image output paths while requiring identical sampling arguments', () => {
+    const { store, experiment } = harness();
+    experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId, records => {
+      for (const [index, phase] of [[0, 'baseline'], [2, 'variant'], [4, 'restored']] as const) {
+        const record = records[index];
+        record.operation = 'rd.export.screenshot';
+        record.args = { session_id: 'replay-fixture', event_id: 11, file_format: 'png', overlay: 'None', output_path: `/owned/${phase}.png` };
+        record.argsFingerprint = rdcDigest(record.args);
+        record.evidence = { kind: 'measurement', method: 'image', conditionsFingerprint: 'b'.repeat(64), values: { sha256: 'c'.repeat(64) } };
+      }
+    });
+    expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).not.toThrow();
+
+    const changed = harness();
+    changed.experiment.executionEvidence = seedExecutionEvidence(changed.store, SESSION_ID, changed.experiment.experimentId, records => {
+      for (const [index, phase] of [[0, 'baseline'], [2, 'variant'], [4, 'restored']] as const) {
+        const record = records[index];
+        record.operation = 'rd.export.screenshot';
+        record.args = { session_id: 'replay-fixture', event_id: 11, file_format: 'png', overlay: index === 2 ? 'Wireframe' : 'None', output_path: `/owned/${phase}.png` };
+        record.argsFingerprint = rdcDigest(record.args);
+        record.evidence = { kind: 'measurement', method: 'image', conditionsFingerprint: 'b'.repeat(64), values: { sha256: 'c'.repeat(64) } };
+      }
+    });
+    expect(() => assertExecutionEvidence(SESSION_ID, changed.experiment, changed.store)).toThrow(/sampling/);
   });
   it('does not accept booleans without receipts', () => {
     const { store, experiment } = harness();

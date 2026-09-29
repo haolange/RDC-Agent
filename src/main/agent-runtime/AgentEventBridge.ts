@@ -88,10 +88,12 @@ export function translateCoreToSharedAgentEvent(
 ): SharedAgentEvent | null {
   switch (event.type) {
     case 'agent_start': {
+      const profileId = context.profileId ?? context.agentId;
+      if (!profileId) throw new Error('AGENT_IDENTITY_MISSING: run.started requires a profileId or agentId');
       return buildSharedAgentEvent(
         'run.started',
         {
-          profileId: context.profileId ?? context.agentId ?? 'legacy:unknown',
+          profileId,
           providerId: context.providerId ?? '',
           modelId: context.modelId ?? '',
           toolAllowlist: context.toolAllowlist ?? [],

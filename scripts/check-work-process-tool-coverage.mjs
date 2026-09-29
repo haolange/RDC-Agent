@@ -278,10 +278,18 @@ const FIXTURES = {
       persisted: false,
     }),
   },
+  investigation_schema: {
+    argsPreview: JSON.stringify({ kind: 'world_state' }),
+    resultPreview: toolEnvelope('{"kind":"world_state","schema":{"type":"object"}}', {
+      kind: 'world_state',
+      schema: { type: 'object' },
+    }),
+  },
   investigation_read: {
     argsPreview: JSON.stringify({ artifactId: 'invart-1' }),
-    resultPreview: toolEnvelope('world_state\tdraft\tBaseline\n{"worldStateId":"ws-1"}', {
+    resultPreview: toolEnvelope('world_state\tdraft\tBaseline\ncontentRef\tsession://investigation/records/invart-1.json\ncontentHash\tsha256:abc\n{"worldStateId":"ws-1"}', {
       artifactId: 'invart-1',
+      contentUri: 'session://investigation/records/invart-1.json',
       contentHash: 'sha256:abc',
     }),
   },
@@ -295,7 +303,7 @@ const FIXTURES = {
   },
   investigation_list: {
     argsPreview: JSON.stringify({ kind: 'claim' }),
-    resultPreview: toolEnvelope('artifacts\t1\ninvart-1\tclaim\tdraft\tclaim-1', { count: 1 }),
+    resultPreview: toolEnvelope('artifacts\t1\ninvart-1\tclaim\tdraft\tclaim-1\tsession://investigation/records/invart-1.json\tsha256:abc', { count: 1 }),
   },
 };
 

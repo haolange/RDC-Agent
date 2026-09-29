@@ -103,4 +103,31 @@ describe('RequestSnapshotStore', () => {
     store.complete('snap-1', 'session-a', 'turn-1', { inputTokens: 12, outputTokens: 3 });
     expect(store.get('session-a', 'turn-1', 'snap-1')?.usage).toEqual({ inputTokens: 12, outputTokens: 3 });
   });
+
+  it('projects prompt resources and mailbox commits without parsing full current requests', () => {
+    const segment = {
+      id: 'project-instruction', kind: 'scoped-instruction' as const, scope: 'project' as const,
+      sourcePath: 'D:/project/AGENTS.md', sourceHash: 'source-hash', precedence: 1,
+      content: 'instruction', stability: 'stable' as const, tokenEstimate: 2,
+    };
+    const delivery = { executionId: 'execution-1', generation: 1, direction: 'to_parent' as const, throughSequence: 2, messageIds: ['message-1'] };
+    const snapshot = sampleSnapshot({ promptPlan: { ...sampleSnapshot().promptPlan, segments: [segment] }, mailboxDeliveries: [delivery] });
+    store.write(snapshot);
+    expect(store.nextCallIndex('session-a', 'turn-1')).toBe(2);
+    const requestFile = fs.readdirSync(path.join(rootPath, 'session-a', 'turn-1')).find((name) => name.endsWith('.json'))!;
+    fs.writeFileSync(path.join(rootPath, 'session-a', 'turn-1', requestFile), 'invalid full request', 'utf8');
+    expect(store.listPromptSegments('session-a')).toEqual([segment]);
+    expect(store.listMailboxDeliveries('session-a')).toEqual([delivery]);
+  });
+
+  it('reads legacy requests one at a time and retains the frozen plan once per turn', () => {
+    const first = sampleSnapshot({ mailboxDeliveries: [{ executionId: 'first', generation: 1, direction: 'to_child', throughSequence: 1, messageIds: ['one'] }] });
+    const second = sampleSnapshot({ id: 'snap-2', callIndex: 2, mailboxDeliveries: [{ executionId: 'second', generation: 1, direction: 'to_parent', throughSequence: 3, messageIds: ['two'] }] });
+    const dir = path.join(rootPath, 'session-a', 'turn-1');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, '001-snap-1.json'), JSON.stringify(first), 'utf8');
+    fs.writeFileSync(path.join(dir, '002-snap-2.json'), JSON.stringify(second), 'utf8');
+    expect(store.listPromptSegments('session-a')).toEqual(first.promptPlan.segments);
+    expect(store.listMailboxDeliveries('session-a').map((item) => item.executionId)).toEqual(['first', 'second']);
+  });
 });

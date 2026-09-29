@@ -76,12 +76,14 @@ const DEFAULT_GRACE_MS = 2_000;
 export class RingBuffer {
   private chunks: Buffer[] = [];
   private size = 0;
+  private received = 0;
 
   constructor(private readonly maxBytes: number) {}
 
   append(chunk: Buffer | string): void {
     const buf = typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk;
     if (buf.length === 0) return;
+    this.received += buf.length;
     this.chunks.push(buf);
     this.size += buf.length;
     while (this.size > this.maxBytes && this.chunks.length > 0) {
@@ -97,6 +99,14 @@ export class RingBuffer {
 
   byteLength(): number {
     return this.size;
+  }
+
+  receivedByteLength(): number {
+    return this.received;
+  }
+
+  wasTruncated(): boolean {
+    return this.received > this.size;
   }
 }
 

@@ -81,7 +81,7 @@ describe('SettingsService provider persistence', () => {
 
     fs.mkdirSync(workspaceRoot, { recursive: true });
     fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 4,
+      schemaVersion: 8,
       llm: {
         providers: [provider],
       },
@@ -139,12 +139,12 @@ describe('SettingsService provider persistence', () => {
     expect(persisted.llm).not.toHaveProperty('agentRoutes');
   });
 
-  it('invalidates the removed persisted agentRoutes field instead of using it as a fallback', async () => {
+  it('rejects removed persisted agentRoutes instead of silently using or deleting them', async () => {
     const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     fs.mkdirSync(workspaceRoot, { recursive: true });
     fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 8,
       llm: {
         providers: [],
         agentRoutes: [{ agentId: 'general', providerId: 'retired-provider', modelId: 'retired-model' }],
@@ -153,14 +153,9 @@ describe('SettingsService provider persistence', () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
 
-    const runtime = service.initialize();
-    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { llm: Record<string, unknown> };
-
-    expect(runtime.llm.agentRoutes.some((route) => (
-      route.providerId === 'retired-provider' || route.modelId === 'retired-model'
-    ))).toBe(false);
-    expect(runtime.llm.agentRoutes.find((route) => route.agentId === 'general')).toBeDefined();
-    expect(persisted.llm).not.toHaveProperty('agentRoutes');
+    const original = fs.readFileSync(settingsPath, 'utf8');
+    expect(() => service.initialize()).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+    expect(fs.readFileSync(settingsPath, 'utf8')).toBe(original);
   });
 
   it('never imports an unkeyed credential after the single-schema cutover', async () => {
@@ -177,8 +172,8 @@ describe('SettingsService provider persistence', () => {
     };
     fs.mkdirSync(workspaceRoot, { recursive: true });
     fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 4,
-      llm: { providers: [provider], agentRoutes: [] },
+      schemaVersion: 8,
+      llm: { providers: [provider] },
     }), 'utf8');
     const unkeyedRef = secretStorageService.createProviderOAuthSecretRef('chatgpt-account');
     secretStorageService.setSecret(unkeyedRef, JSON.stringify({ accessToken: 'unkeyed' }), workspaceRoot);
@@ -213,8 +208,8 @@ describe('SettingsService provider persistence', () => {
     };
     fs.mkdirSync(workspaceRoot, { recursive: true });
     fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 4,
-      llm: { providers: [provider], agentRoutes: [] },
+      schemaVersion: 8,
+      llm: { providers: [provider] },
     }), 'utf8');
 
     const { SettingsService } = await import('./SettingsService');
@@ -687,11 +682,11 @@ describe('SettingsService provider persistence', () => {
     });
   });
 
-  it('schema 6 upgrade irreversibly resets chromeThemes to RDC defaults', async () => {
+  it('preserves valid custom chrome themes in the current settings schema', async () => {
     const { createDefaultChromeThemes } = await import('../../shared/theme/presets');
     const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
-    const polluted = {
+    const custom = {
       ...createDefaultChromeThemes().dark,
       accent: '#ff0000',
       surface: '#112233',
@@ -700,156 +695,82 @@ describe('SettingsService provider persistence', () => {
     };
     fs.mkdirSync(workspaceRoot, { recursive: true });
     fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 5,
+      schemaVersion: 8,
       appearance: {
         theme: 'dark',
-        chromeThemes: {
-          light: polluted,
-          dark: polluted,
-        },
+        chromeThemes: { light: custom, dark: custom },
       },
       llm: { providers: [] },
     }, null, 2), 'utf8');
 
-    const { SettingsService, SETTINGS_SCHEMA_VERSION } = await import('./SettingsService');
-    const service = new SettingsService();
-    const runtime = service.initialize();
+    const { SettingsService } = await import('./SettingsService');
+    const runtime = new SettingsService().initialize();
     const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      schemaVersion: number;
       appearance: { chromeThemes: { light: { accent: string; presetId: string }; dark: { accent: string; presetId: string } } };
     };
-    const defaults = createDefaultChromeThemes();
-
-    expect(SETTINGS_SCHEMA_VERSION).toBe(8);
-    expect(persisted.schemaVersion).toBe(8);
-    expect(runtime.appearance.chromeThemes.dark.accent).toBe(defaults.dark.accent);
-    expect(runtime.appearance.chromeThemes.dark.presetId).toBe('rdc');
-    expect(persisted.appearance.chromeThemes.dark.accent).toBe(defaults.dark.accent);
-    expect(persisted.appearance.chromeThemes.light.presetId).toBe('rdc');
-    expect(persisted.appearance.chromeThemes.dark.accent).not.toBe('#ff0000');
+    expect(runtime.appearance.chromeThemes.dark.accent).toBe('#ff0000');
+    expect(persisted.appearance.chromeThemes.dark.accent).toBe('#ff0000');
+    expect(persisted.appearance.chromeThemes.light.presetId).toBe('dracula');
   });
 
-  it('rebuilds missing schemaVersion and v0-v6 settings to schema 8 without embedding selection', async () => {
+  it('rejects missing and older settings schema versions without changing source bytes', async () => {
     const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     fs.mkdirSync(workspaceRoot, { recursive: true });
-    const cases: Array<{ label: string; raw: Record<string, unknown> }> = [
-      { label: 'missing', raw: { llm: { providers: [], embedding: { providerId: 'openai', modelId: 'text-embedding-3-small' } } } },
-      { label: 'v0', raw: { schemaVersion: 0, llm: { providers: [], embedding: { providerId: 'openai' } } } },
-      { label: 'v1', raw: { schemaVersion: 1, llm: { providers: [], embedding: { providerId: 'openai' } } } },
-      { label: 'v2', raw: { schemaVersion: 2, llm: { providers: [], embedding: { providerId: 'openai' } } } },
-      { label: 'v3', raw: { schemaVersion: 3, llm: { providers: [], embedding: { providerId: 'openai' } } } },
-      { label: 'v4', raw: { schemaVersion: 4, llm: { providers: [], embedding: { providerId: 'openai' } } } },
-      { label: 'v5', raw: { schemaVersion: 5, llm: { providers: [], embedding: { providerId: 'openai' } } } },
-      { label: 'v6', raw: { schemaVersion: 6, llm: { providers: [], embedding: { providerId: 'openai' } } } },
-    ];
 
-    for (const entry of cases) {
+    for (const schemaVersion of [undefined, 0, 1, 2, 3, 4, 5, 6, 7]) {
       vi.resetModules();
-      fs.writeFileSync(settingsPath, JSON.stringify(entry.raw, null, 2), 'utf8');
-      const { SettingsService, SETTINGS_SCHEMA_VERSION } = await import('./SettingsService');
-      const service = new SettingsService();
-      const runtime = service.initialize();
-      const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-        schemaVersion: number;
-        llm: { embedding?: unknown; providers?: unknown };
-      };
-      expect(SETTINGS_SCHEMA_VERSION, entry.label).toBe(8);
-      expect(persisted.schemaVersion, entry.label).toBe(8);
-      expect(persisted.llm, entry.label).not.toHaveProperty('embedding');
-      expect(runtime.llm, entry.label).not.toHaveProperty('embedding');
+      const label = schemaVersion === undefined ? 'missing' : String(schemaVersion);
+      const raw = JSON.stringify({ ...(schemaVersion === undefined ? {} : { schemaVersion }), llm: { providers: [] } }, null, 2);
+      fs.writeFileSync(settingsPath, raw, 'utf8');
+      const { SettingsService } = await import('./SettingsService');
+      expect(() => new SettingsService().initialize(), label).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+      expect(fs.readFileSync(settingsPath, 'utf8'), label).toBe(raw);
     }
   });
 
-  it('rebuilds schema 7 settings without changing non-default RDC CLI timeout', async () => {
+  it('rejects a retired embedding selection in current settings without changing source bytes', async () => {
     const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     fs.mkdirSync(workspaceRoot, { recursive: true });
-    const current = {
-      schemaVersion: 7,
-      tooling: { rdcCli: { timeoutMs: 30000 } },
-      llm: { providers: [] },
-    };
-    fs.writeFileSync(settingsPath, JSON.stringify(current, null, 2), 'utf8');
+    const raw = JSON.stringify({
+      schemaVersion: 8,
+      llm: { providers: [], embedding: { providerId: 'openai' } },
+    }, null, 2);
+    fs.writeFileSync(settingsPath, raw, 'utf8');
 
     const { SettingsService } = await import('./SettingsService');
-    const service = new SettingsService();
-    const runtime = service.initialize();
-    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      schemaVersion: number;
-      tooling: { rdcCli: { timeoutMs: number } };
-      llm: { embedding?: unknown };
-    };
-    expect(persisted.schemaVersion).toBe(8);
-    expect(persisted.tooling.rdcCli.timeoutMs).toBe(30000);
-    expect(persisted.llm).not.toHaveProperty('embedding');
-    expect(runtime.llm).not.toHaveProperty('embedding');
+    expect(() => new SettingsService().initialize()).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+    expect(fs.readFileSync(settingsPath, 'utf8')).toBe(raw);
   });
 
-  it('preserves a larger user-defined RDC CLI timeout during schema 8 migration', async () => {
+  it.each([30000, 60000, 180000])('preserves an explicit current RDC CLI timeout of %ims', async (timeoutMs) => {
     const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     fs.mkdirSync(workspaceRoot, { recursive: true });
     fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 7,
-      tooling: { rdcCli: { timeoutMs: 180000 } },
+      schemaVersion: 8,
+      tooling: { rdcCli: { timeoutMs } },
       llm: { providers: [] },
     }, null, 2), 'utf8');
 
     const { SettingsService } = await import('./SettingsService');
-    const service = new SettingsService();
-    const runtime = service.initialize();
-    expect(runtime.tooling.rdcCli.timeoutMs).toBe(180000);
-    expect(JSON.parse(fs.readFileSync(settingsPath, 'utf8')).tooling.rdcCli.timeoutMs).toBe(180000);
+    const runtime = new SettingsService().initialize();
+    expect(runtime.tooling.rdcCli.timeoutMs).toBe(timeoutMs);
+    expect(JSON.parse(fs.readFileSync(settingsPath, 'utf8')).tooling.rdcCli.timeoutMs).toBe(timeoutMs);
   });
 
-  it('migrates the old RDC CLI default timeout to 120000ms exactly once', async () => {
+  it('rejects malformed settings JSON without replacing the file with defaults', async () => {
     const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     fs.mkdirSync(workspaceRoot, { recursive: true });
-    fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 7,
-      tooling: { rdcCli: { timeoutMs: 60000 } },
-      llm: { providers: [] },
-    }, null, 2), 'utf8');
+    const raw = '{"schemaVersion":8,"llm":';
+    fs.writeFileSync(settingsPath, raw, 'utf8');
 
     const { SettingsService } = await import('./SettingsService');
-    const service = new SettingsService();
-    const runtime = service.initialize();
-    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      schemaVersion: number;
-      tooling: { rdcCli: { timeoutMs: number } };
-    };
-    expect(persisted.schemaVersion).toBe(8);
-    expect(persisted.tooling.rdcCli.timeoutMs).toBe(120000);
-    expect(runtime.tooling.rdcCli.timeoutMs).toBe(120000);
+    expect(() => new SettingsService().initialize()).toThrow(/STORAGE_CORRUPT/);
+    expect(fs.readFileSync(settingsPath, 'utf8')).toBe(raw);
   });
-
-  it('migrates a schema-less persisted old default without touching other tooling values', async () => {
-    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
-    const settingsPath = path.join(workspaceRoot, 'config.json');
-    fs.mkdirSync(workspaceRoot, { recursive: true });
-    fs.writeFileSync(settingsPath, JSON.stringify({
-      tooling: {
-        rdcCli: { timeoutMs: 60000 },
-        codeInterpreter: { timeoutMs: 45000 },
-      },
-      llm: { providers: [] },
-    }, null, 2), 'utf8');
-
-    const { SettingsService } = await import('./SettingsService');
-    const service = new SettingsService();
-    const runtime = service.initialize();
-    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      schemaVersion: number;
-      tooling: { rdcCli: { timeoutMs: number }; codeInterpreter: { timeoutMs: number } };
-    };
-    expect(persisted.schemaVersion).toBe(8);
-    expect(persisted.tooling.rdcCli.timeoutMs).toBe(120000);
-    expect(persisted.tooling.codeInterpreter.timeoutMs).toBe(45000);
-    expect(runtime.tooling.rdcCli.timeoutMs).toBe(120000);
-  });
-
   it('fail-closes unknown higher settings schemaVersion without rewriting the file', async () => {
     const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');

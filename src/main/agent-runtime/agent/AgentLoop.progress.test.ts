@@ -137,6 +137,71 @@ const toolExecutor = {
 };
 
 describe('AgentLoop progress termination', () => {
+  it('warns of the finite turn budget without persisting guidance or weakening the limit', async () => {
+    const requestContexts: string[] = [];
+    const offeredTools: number[] = [];
+    let calls = 0;
+    const provider: ProviderStrategy = {
+      api: TEST_MODEL.api,
+      stream: (_model, context) => {
+        requestContexts.push(textFromContext(context));
+        offeredTools.push(context.tools?.length ?? 0);
+        calls += 1;
+        const message = toolUseMessage(calls);
+        if (calls === 6) {
+          return providerStream({ ...message, content: [{ type: 'text', text: 'unfinished work remains' }], stopReason: 'stop' });
+        }
+        return providerStream({
+          ...message,
+          content: [{ type: 'toolCall', id: `call-${calls}`, name: 'task_list', arguments: { page: calls } }],
+        });
+      },
+    };
+    const context = createContext();
+    context.runtime!.current.activeTools = [{ name: 'task_list', description: 'List tasks', parameters: { type: 'object' } }];
+    const { stream } = agentLoop([], context, {
+      model: TEST_MODEL,
+      convertToLlm: (messages) => messages as Message[],
+      maxTurns: 6,
+      streamOptions: { requestPlan: TEST_REQUEST_PLAN },
+    }, provider, toolExecutor);
+
+    await consume(stream);
+    expect(calls).toBe(6);
+    expect(requestContexts[0]).not.toContain('<runtime_turn_budget');
+    expect(requestContexts.slice(1).map((request) => request.match(/<runtime_turn_budget remaining="(\d)"/)?.[1]))
+      .toEqual(['5', '4', '3', '2', '1']);
+    expect(requestContexts[5]).toContain('No tools are offered');
+    expect(requestContexts[4]).toContain('last request with tools');
+    expect(offeredTools).toEqual([1, 1, 1, 1, 1, 0]);
+    expect(JSON.stringify(context.messages)).not.toContain('<runtime_turn_budget');
+  });
+
+  it('reserves the final request for a truthful answer after the last tool-capable request', async () => {
+    const offeredTools: number[] = [];
+    const context = createContext();
+    context.runtime!.current.activeTools = [{ name: 'turn_complete', description: 'Declare completion', parameters: { type: 'object' } }];
+    const provider: ProviderStrategy = {
+      api: TEST_MODEL.api,
+      stream: (_model, request) => {
+        offeredTools.push(request.tools?.length ?? 0);
+        return providerStream(offeredTools.length === 1
+          ? { ...toolUseMessage(1), content: [{ type: 'toolCall', id: 'complete', name: 'turn_complete', arguments: { disposition: 'partial' } }] }
+          : { ...toolUseMessage(2), content: [{ type: 'text', text: 'Partial: the experiment was not run.' }], stopReason: 'stop' });
+      },
+    };
+    const { stream } = agentLoop([], context, {
+      model: TEST_MODEL,
+      convertToLlm: (messages) => messages as Message[],
+      maxTurns: 2,
+      streamOptions: { requestPlan: TEST_REQUEST_PLAN },
+    }, provider, toolExecutor);
+
+    await consume(stream);
+    expect(offeredTools).toEqual([1, 0]);
+    expect(context.messages.at(-1)).toMatchObject({ role: 'assistant', stopReason: 'stop' });
+  });
+
   it('commits mailbox data at a request boundary and retains it in later provider requests', async () => {
     const requestContexts: string[] = []; let calls = 0; let commits = 0;
     const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: (_model, context) => {

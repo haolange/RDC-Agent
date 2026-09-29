@@ -17,6 +17,16 @@ export interface ManifestParseInvalid {
 
 export type ManifestParseResult = ManifestParseOk | ManifestParseInvalid;
 
+export function readAgentFrontmatterId(rawContent: string): string | null {
+  const raw = rawContent.replace(/^\uFEFF/u, '');
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/u.exec(raw);
+  if (!match) return null;
+  const frontmatter = YAML.parse(match[1]) as unknown;
+  if (!frontmatter || typeof frontmatter !== 'object' || Array.isArray(frontmatter)) return null;
+  const id = (frontmatter as { id?: unknown }).id;
+  return typeof id === 'string' && id.trim() ? id.trim() : null;
+}
+
 const readStringArray = (value: unknown): string[] | null => {
   if (value === undefined || value === null) return [];
   if (Array.isArray(value)) {

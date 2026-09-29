@@ -22,7 +22,7 @@ describe('PromptPlanBuilder', () => {
       id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdc-agent/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', models: [], icon: 'message-orbit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['read_file'], skills: ['debug'], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
     } satisfies AgentManifestDefinition;
     const skillPath = path.join(process.cwd(), 'resources', 'agent-runtime', 'skills', 'debug', 'SKILL.md');
-    const plan = new PromptPlanBuilder().build({
+    const input: import('./PromptPlanBuilder').PromptPlanInput = {
       profile,
       scopedInstructions: { sources: [{ id: 'project:RDC.md', scope: 'project', sourcePath: 'D:/Project/RDC.md', sourceHash: 'hash', content: 'Project instruction', byteLength: 19, precedence: 0 }], totalBytes: 19, diagnostics: [] },
       preloadedSkills: [{ id: 'debug', name: 'debug', description: 'Debug', allowedTools: ['read_file'], scope: 'builtin', sourcePath: skillPath, sourceHash: 'skill-hash', effectiveStatus: 'effective', instructions: fs.readFileSync(skillPath, 'utf8') }],
@@ -30,7 +30,8 @@ describe('PromptPlanBuilder', () => {
       tools: ['read_file'], workDir: 'D:/Project', routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
       permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
       currentDate: '2026-07-11', timeZone: 'Asia/Shanghai',
-    });
+    };
+    const plan = new PromptPlanBuilder().build(input);
     expect(plan.segments.some((segment) => segment.kind === 'scoped-instruction')).toBe(true);
     expect(plan.segments.some((segment) => segment.kind === 'preloaded-skill')).toBe(true);
     expect(plan.systemPrompt).toContain('Effective Tools\n- read_file');
@@ -46,6 +47,29 @@ describe('PromptPlanBuilder', () => {
     expect(plan.systemPrompt).toContain(`Host OS: ${process.platform}`);
     expect(plan.systemPrompt).toContain('Shell: unavailable');
     expect(plan.systemPrompt).toContain('Shell cwd: D:/Project');
+
+    const offeredPlan = new PromptPlanBuilder().build({
+      ...input,
+      approvedExecutionOffer: {
+        schemaVersion: '1',
+        sourceAgentId: 'reviewer',
+        targetAgentId: 'ask',
+        plan: { uri: 'session://plans/plan-approved.md', hash: 'a'.repeat(64) },
+        requiredSkillIds: ['inspect'],
+        label: 'Execute with Ask',
+        prompt: 'Execute the approved plan.',
+        approvedAt: 1,
+      },
+    });
+    const offerFact = offeredPlan.segments.find(segment => segment.id === 'runtime:approved-execution-offer');
+    expect(plan.segments.some(segment => segment.id === 'runtime:approved-execution-offer')).toBe(false);
+    expect(offerFact).toMatchObject({ kind: 'runtime-fact', scope: 'runtime', stability: 'volatile' });
+    expect(offerFact?.content).toContain('Plan review is complete.');
+    expect(offerFact?.content).toContain('session://plans/plan-approved.md');
+    expect(offerFact?.content).toContain('grants no tools, permissions, or device access');
+    expect(offeredPlan.stablePrefix.fingerprint).toBe(plan.stablePrefix.fingerprint);
+    expect(offeredPlan.segments.find(segment => segment.id === 'runtime:tools')?.content)
+      .toBe(plan.segments.find(segment => segment.id === 'runtime:tools')?.content);
   });
 
   it('describes Ask Tasks as read-only and tool_search no-match as authoritative', async () => {

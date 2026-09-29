@@ -22,6 +22,16 @@ describe('capability execution policy', () => {
   it('does not inject replay identity into context/global operations', () => {
     for (const scope of ['context', 'global'] as const) { const item = definition({ scope, input_schema: { type: 'object', properties: {}, additionalProperties: false } }); expect(authorizeRdcOperation(item.name, {}, context(item), 'replay').args).toEqual({}); }
   });
+  it('accepts a context operation requiring an open replay without injecting its identity', () => {
+    const item = definition({ name: 'rd.session.observe', namespace: 'session', scope: 'context',
+      prerequisites: [{ requires: 'session_id' }], effects: ['replay_position', 'artifact_write'],
+      input_schema: { type: 'object', properties: { event_id: { type: 'integer' }, out_path: { type: 'string' } }, required: ['out_path'], additionalProperties: false },
+      path_inputs: [{ name: 'out_path', access: 'write' }] });
+    const outPath = 'observed.png';
+    expect(authorizeRdcOperation(item.name, { event_id: 42, out_path: outPath }, context(item), 'replay').args)
+      .toEqual({ event_id: 42, out_path: expect.stringMatching(/observed[.]png$/) });
+    expect(() => authorizeRdcOperation(item.name, { event_id: 42, out_path: outPath, session_id: 'foreign' }, context(item), 'replay')).toThrow(/main-owned/);
+  });
   it('restricts context updates to user fields', () => {
     const item = definition({ scope: 'context', effects: ['context_metadata'], input_schema: { type: 'object', properties: { key: { type: 'string' }, value: {} }, required: ['key'], additionalProperties: false } });
     expect(authorizeRdcOperation(item.name, { key: 'notes', value: 'observed' }, context(item), 'replay').args.key).toBe('notes');

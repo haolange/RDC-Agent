@@ -1,6 +1,13 @@
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
-import { RdcExecutionReceipts, rdcExecutionReceipts } from '../tools/RdcExecutionReceipts';
+import { RdcExecutionReceipts, rdcDigest, rdcExecutionReceipts, type RdcExecutionReceipt } from '../tools/RdcExecutionReceipts';
 import { InvestigationError } from './investigationErrors';
+
+function samplingArgsFingerprint(receipt: RdcExecutionReceipt): string {
+  if (receipt.evidence.kind !== 'measurement' || receipt.evidence.method !== 'image') return receipt.argsFingerprint;
+  const { output_path: outputPath, ...samplingArgs } = receipt.args;
+  if (typeof outputPath !== 'string' || !outputPath) throw new Error('image measurement requires an output path');
+  return rdcDigest(samplingArgs);
+}
 
 /** Historical reads do not call this gate. Every new close/report completion does. */
 export function assertExecutionEvidence(
@@ -29,7 +36,8 @@ export function assertExecutionEvidence(
       || baseline.operation !== variant.operation || baseline.operation !== restored.operation
       || baseline.evidence.method !== variant.evidence.method || baseline.evidence.method !== restored.evidence.method
       || baseline.evidence.conditionsFingerprint !== variant.evidence.conditionsFingerprint || baseline.evidence.conditionsFingerprint !== restored.evidence.conditionsFingerprint
-      || baseline.argsFingerprint !== variant.argsFingerprint || baseline.argsFingerprint !== restored.argsFingerprint) throw new Error('baseline/variant/restored must use the same measurement and sampling conditions');
+      || samplingArgsFingerprint(baseline) !== samplingArgsFingerprint(variant)
+      || samplingArgsFingerprint(baseline) !== samplingArgsFingerprint(restored)) throw new Error('baseline/variant/restored must use the same measurement and sampling conditions');
     if (intervention.evidence.kind !== 'intervention' || rollback.evidence.kind !== 'rollback'
       || !intervention.evidence.replacementId || intervention.evidence.replacementId !== rollback.evidence.replacementId
       || intervention.result.replacement_id !== intervention.evidence.replacementId

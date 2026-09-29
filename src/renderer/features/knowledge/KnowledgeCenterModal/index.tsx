@@ -167,6 +167,10 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
               <DetailColumn
                 state={state}
                 write={write}
+                candidateHasSession={importer.hasSession}
+                candidateBusy={importer.busy}
+                candidateError={importer.candidateError?.cardId === state.selectedCard?.cardId
+                  ? importer.candidateError?.message ?? null : null}
                 onCreateCandidate={() => {
                   if (state.selectedCard) void importer.createCandidate(detailToRecord(state.selectedCard));
                 }}

@@ -1,9 +1,10 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import { stringifyYaml } from '@shared/utils/yaml';
 import type { RunSummary } from '@shared/types/session';
 import type { PersistedRunRecord } from './storageTypes';
 import type { StorageHost } from './storageHost';
-import { readOrMigratePersistedRun } from './runV3/runMigration';
+import { readCurrentStoredJson, StorageSchemaError } from './storageSchema';
 import { PersistedRunRecordV3Schema } from './runV3/runRecordSchema';
 
 export function toRunSummary(run: PersistedRunRecord): RunSummary {
@@ -26,8 +27,18 @@ export function readPersistedRun(
   runPath: string,
   sessionId: string,
   runId: string,
-  sessionPath?: string,
 ): PersistedRunRecord | null {
-  const resolvedSessionPath = sessionPath ?? path.dirname(path.dirname(runPath));
-  return readOrMigratePersistedRun(host, runPath, resolvedSessionPath, sessionId, runId);
+  const filePath = path.join(runPath, 'run.json');
+  if (!fs.existsSync(filePath)) {
+    if (fs.existsSync(path.join(runPath, 'run.yaml'))) {
+      throw new StorageSchemaError(`STORAGE_SCHEMA_UNSUPPORTED: ${runPath} has run.yaml without a Run v3 run.json`);
+    }
+    return null;
+  }
+  const parsed = readCurrentStoredJson(host.io, filePath, '3', PersistedRunRecordV3Schema);
+  if (parsed === null) return null;
+  if (parsed.runId !== runId || parsed.sessionId !== sessionId || parsed.caseId !== sessionId) {
+    throw new StorageSchemaError(`STORAGE_SCHEMA: ${filePath} Run identity does not match its session or directory`);
+  }
+  return parsed;
 }

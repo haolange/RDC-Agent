@@ -8,6 +8,15 @@ import type {
 } from './core/types';
 import { translateCoreToSharedAgentEvent } from './AgentEventBridge';
 
+describe('run start identity', () => {
+  it('uses the resolved profile and rejects a missing identity', () => {
+    expect(translateCoreToSharedAgentEvent({ type: 'agent_start' }, { agentId: 'general', profileId: 'custom-agent' })?.payload)
+      .toMatchObject({ profileId: 'custom-agent' });
+    expect(() => translateCoreToSharedAgentEvent({ type: 'agent_start' }, {}))
+      .toThrow(/AGENT_IDENTITY_MISSING/);
+  });
+});
+
 const textRef: ProviderOutputRef = {
   protocol: 'test',
   responseId: 'response-1',

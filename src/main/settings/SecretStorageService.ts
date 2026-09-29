@@ -86,12 +86,18 @@ export class SecretStorageService {
 
   private readSecretMap(workspaceRoot?: string): SecretMap {
     const filePath = this.getSecretFilePath(workspaceRoot);
-    if (!fs.existsSync(filePath)) {
-      return {};
+    let contents: string;
+    try {
+      contents = fs.readFileSync(filePath, 'utf8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return {};
+      }
+      throw new SecretStorageUnavailableError('Encrypted Provider secret store is unreadable; check file access.');
     }
 
     try {
-      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as SecretMap;
+      const parsed = JSON.parse(contents) as SecretMap;
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
         this.quarantineCorruptFile(filePath, new Error('Secret map is not an object'));
       }

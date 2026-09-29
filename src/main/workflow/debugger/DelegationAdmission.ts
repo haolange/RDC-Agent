@@ -1,4 +1,4 @@
-import type { PolicyBudgetState, SubagentBudgetState } from './TurnCoordinator';
+import { subagentActiveWallMs, type PolicyBudgetState, type SubagentBudgetState } from './TurnCoordinator';
 
 /** Preparation mirrors child-creation budget checks; existing Task management remains available. */
 export function newDelegationBudgetExhausted(
@@ -14,6 +14,6 @@ export function newDelegationBudgetExhausted(
     child.depth >= child.budget.maxDepth
     || child.childrenSpawned >= child.budget.maxChildren
     || child.aggregateToolCalls >= child.budget.maxAggregateToolCalls
-    || now - child.wallStartedAt >= child.budget.maxAggregateWallMs
+    || subagentActiveWallMs(child, now) >= child.budget.maxAggregateWallMs
   );
 }

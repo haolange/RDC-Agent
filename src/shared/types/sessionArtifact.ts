@@ -31,10 +31,10 @@ export const ARTIFACT_READ_MAX_OUTPUT_LINES = 2000;
 export const TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES = 32 * 1024;
 
 /** 单个 session 下 session-artifacts 合计上限。 */
-export const SESSION_ARTIFACT_MAX_SESSION_BYTES = 96 * 1024 * 1024;
+export const SESSION_ARTIFACT_MAX_SESSION_BYTES = 256 * 1024 * 1024;
 
 /** tool-outputs 最多文件数。 */
-export const SESSION_ARTIFACT_MAX_TOOL_OUTPUT_FILES = 256;
+export const SESSION_ARTIFACT_MAX_TOOL_OUTPUT_FILES = 1024;
 
 export const SESSION_ARTIFACT_ALLOWED_MIME_TYPES = [
   'text/plain',
@@ -97,12 +97,15 @@ export interface SessionArtifactRefDetails {
   bytes?: number;
   mimeType?: string;
   owner: string;
+  ownerScope?: 'product-session';
   source: SessionArtifactSourceRef;
 }
 
 /** Canonical JSON envelope written for auto-artifactized tool outputs. */
 export interface SessionArtifactizedEnvelope {
   owner: string;
+  /** owner is the product conversation session, not a native replay session. */
+  ownerScope?: 'product-session';
   source: SessionArtifactSourceRef;
   hash: string;
   size: number;

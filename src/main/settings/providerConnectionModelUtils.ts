@@ -14,7 +14,7 @@ export function normalizeDiscoveredModels(
   for (const value of values) {
     const identity = extractDiscoveredModelIdentity(value);
     const id = identity.id;
-    if (!isAdmittedDiscoveredModel(value) || isDeprecatedModel(id) || !filterModelId(id)) {
+    if (!isAdmittedDiscoveredModel(value) || isExcludedDiscoveredModel(id) || !filterModelId(id)) {
       continue;
     }
     const label = value && typeof value === 'object' && typeof (value as { display_name?: unknown }).display_name === 'string'
@@ -29,7 +29,7 @@ export function normalizeDiscoveredModels(
   return Array.from(models.values()).sort((left, right) => left.id.localeCompare(right.id));
 }
 
-const isDeprecatedModel = (modelId: string): boolean => {
+const isExcludedDiscoveredModel = (modelId: string): boolean => {
   const normalized = modelId.toLowerCase();
   return (
     normalized.includes('deprecated')

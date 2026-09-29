@@ -19,7 +19,7 @@ export const ModelOverrideSchema = z.object({
     cacheRead: z.number().nonnegative().optional(),
     cacheWrite: z.number().nonnegative().optional(),
   }).optional(),
-  status: z.enum(['active', 'deprecated']).optional(),
+  status: z.enum(['active', 'retiring']).optional(),
 }).strict();
 
 /** Custom model definition — must explicitly declare protocol and adapter. */

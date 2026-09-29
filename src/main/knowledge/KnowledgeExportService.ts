@@ -52,6 +52,7 @@ export function toPackageCard(card: KnowledgeCardDetail, images?: KnowledgeImage
 
 /** Reuses the import guard so an export can never carry out what import refuses in. */
 export function isExportable(card: KnowledgeCardDetail): boolean {
+  if (card.missingAssets?.length) return false;
   const texts = [card.title, card.body, card.caseId, card.sourceStatus, ...Object.values(card.chapters ?? {})];
   return !texts.some((text) => typeof text === 'string' && (hasKnowledgeSecret(text) || containsAbsolutePath(text)));
 }
@@ -107,12 +108,20 @@ export class KnowledgeExportService {
         continue;
       }
       const present: KnowledgeImageRef[] = [];
+      const cardImages = new Map<string, Uint8Array>();
       for (const image of card.images ?? []) {
         if (!isSafeKnowledgeImageRelative(image.relativePath)) continue;
         const bytes = await this.deps.readImage(card.spaceId, image.relativePath);
         if (!bytes || bytes.byteLength === 0 || bytes.byteLength > KNOWLEDGE_IMAGE_MAX_BYTES) continue;
         present.push(image);
-        if (!imageFiles.has(image.relativePath)) imageFiles.set(image.relativePath, bytes);
+        cardImages.set(image.relativePath, bytes);
+      }
+      if (present.length !== (card.images?.length ?? 0)) {
+        excludedCount += 1;
+        continue;
+      }
+      for (const [relativePath, bytes] of cardImages) {
+        if (!imageFiles.has(relativePath)) imageFiles.set(relativePath, bytes);
       }
       cards.push(toPackageCard(card, present.length > 0 ? present : undefined));
     }

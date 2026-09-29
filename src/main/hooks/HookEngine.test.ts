@@ -206,6 +206,19 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     });
     expect(readyDenied.status).toBe('failed');
     expect(readyDenied.allowed).toBe(false);
+    expect(readyDenied.reason).toBe('artifact-integrity: ready requires sourceRefs.length >= 1');
+
+    const unprefixedHash = await engine.test('artifact-integrity', {
+      event: 'tool.before-call',
+      toolName: 'investigation_write',
+      payload: { toolName: 'investigation_write', arguments: {
+        status: 'ready', sourceRefs: [{ artifactId: 'source-a', expectedHash: 'a'.repeat(64) }],
+      } },
+    });
+    expect(unprefixedHash).toMatchObject({
+      status: 'failed', allowed: false,
+      reason: 'artifact-integrity: sourceRefs[0] expectedHash must be sha256:<64 hex>',
+    });
 
     const upgraded = await engine.test('report-contract', {
       event: 'tool.before-call',

@@ -205,6 +205,11 @@ export interface WorldStateBenchmark {
   samplingProtocol: string;
 }
 
+export interface WorldStateBenchmarkNotMeasured {
+  status: 'not_measured';
+  reason: string;
+}
+
 export interface WorldState {
   worldStateId: string;
   kind: WorldStateKind;
@@ -213,7 +218,7 @@ export interface WorldState {
   shaderReplacement: WorldStateShaderReplacement | null;
   patchStack: WorldStatePatch[];
   focus: WorldStateFocus;
-  benchmark: WorldStateBenchmark;
+  benchmark: WorldStateBenchmark | WorldStateBenchmarkNotMeasured;
   validity: WorldStateValidity;
 }
 

@@ -361,6 +361,12 @@ export class HookEngine {
     }
     const code = info.code;
     const succeeded = code === 0;
+    const builtinFailure = hook.scope === 'builtin'
+      ? stderr.trim().split(/\r?\n/, 1)[0]
+      : undefined;
+    const failureReason = builtinFailure?.startsWith(`${definition.id}:`) && builtinFailure.length <= 512
+      ? builtinFailure
+      : `Hook exited with code ${code}.`;
     return {
       hookId: definition.id,
       allowed: succeeded || definition.failurePolicy === 'warn',
@@ -368,7 +374,7 @@ export class HookEngine {
       exitCode: code,
       stdout,
       stderr,
-      ...(!succeeded ? { reason: `Hook exited with code ${code}.` } : {}),
+      ...(!succeeded ? { reason: failureReason } : {}),
     };
   }
 

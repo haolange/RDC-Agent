@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConversationTurnResult } from '@shared/types/conversation';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -162,5 +162,65 @@ describe('applyConversationTurnResult session isolation', () => {
       useSessionProjectionStore.getState().bySessionId['session-a']?.allMessages.some((m) => m.id === 'assistant-1'),
     ).toBe(true);
     expect(useProjectStore.getState().rightRailTarget).toBe('project');
+  });
+
+  it('keeps a completed turn in its source project when another project root is selected', async () => {
+    useProjectStore.setState({
+      currentProject: { projectId: 'project-2' } as never,
+      currentSession: null,
+      rightRailTarget: 'project',
+    });
+    const setCurrentSession = vi.fn();
+    const projectList = vi.fn(async () => ({ projects: [] }));
+    await applyConversationTurnResult({
+      electronAPI: {
+        project: { list: projectList },
+        session: { list: async () => ({ sessions: [] }) },
+        run: { list: async () => ({ runs: [] }) },
+      } as never,
+      result: baseTurn(),
+      currentProject: { projectId: 'project-1' } as never,
+      setCurrentSession,
+      setSessions: vi.fn(),
+      setCurrentRun: vi.fn(),
+      setRuns: vi.fn(),
+      setTracePresentation: vi.fn(),
+      setConversationMessages: useConversationStore.getState().setConversationMessages,
+      setBranchState: useConversationStore.getState().setBranchState,
+      setConversationSnapshot: useConversationStore.getState().setConversationSnapshot,
+      upsertConversationMessages: useConversationStore.getState().upsertConversationMessages,
+    });
+
+    expect(setCurrentSession).not.toHaveBeenCalled();
+    expect(projectList).not.toHaveBeenCalled();
+    expect(useProjectStore.getState().currentProject?.projectId).toBe('project-2');
+    expect(useConversationStore.getState().conversationMessages).toHaveLength(0);
+    expect(useSessionProjectionStore.getState().bySessionId['session-a']?.allMessages).toHaveLength(2);
+  });
+
+  it('still applies the first turn when its own project has no selected session', async () => {
+    useProjectStore.setState({ currentProject: { projectId: 'project-1' } as never, currentSession: null });
+    const setCurrentSession = vi.fn();
+    await applyConversationTurnResult({
+      electronAPI: {
+        project: { list: async () => ({ projects: [] }) },
+        session: { list: async () => ({ sessions: [] }) },
+        run: { list: async () => ({ runs: [] }) },
+      } as never,
+      result: baseTurn(),
+      currentProject: { projectId: 'project-1' } as never,
+      setCurrentSession,
+      setSessions: vi.fn(),
+      setCurrentRun: vi.fn(),
+      setRuns: vi.fn(),
+      setTracePresentation: vi.fn(),
+      setConversationMessages: useConversationStore.getState().setConversationMessages,
+      setBranchState: useConversationStore.getState().setBranchState,
+      setConversationSnapshot: useConversationStore.getState().setConversationSnapshot,
+      upsertConversationMessages: useConversationStore.getState().upsertConversationMessages,
+    });
+
+    expect(setCurrentSession).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'session-a' }));
+    expect(useConversationStore.getState().conversationMessages).toHaveLength(2);
   });
 });

@@ -79,6 +79,7 @@ export const KnowledgeCardRecordSchema = z.object({
   caseId: optionalString,
   chapters: KnowledgeCaseChaptersSchema.optional(),
   images: z.array(KnowledgeImageRefSchema).default([]),
+  missingAssets: z.array(z.string().trim().min(1)).optional(),
   sourceHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   sourceMtimeMs: z.number().int().nonnegative().optional(),
   sourceSize: z.number().int().nonnegative().optional(),
@@ -219,6 +220,10 @@ export function parseKnowledgeFrontmatter(source: string, options: {
     record.caseId,
   );
   if (images.length > 0) record.images = images;
+  if (Array.isArray(meta.missingAssets)) {
+    const missing = meta.missingAssets.filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+    if (missing.length > 0) record.missingAssets = missing;
+  }
   return { meta, body, record };
 }
 
@@ -234,6 +239,7 @@ export function serializeKnowledgeCard(record: KnowledgeCardRecord): string {
     ...(record.caseId ? { caseId: record.caseId } : {}),
     ...(record.chapters ? { chapters: record.chapters } : {}),
     ...(record.images?.length ? { images: record.images } : {}),
+    ...(record.missingAssets?.length ? { missingAssets: record.missingAssets } : {}),
   };
   const yamlLines = [
     `cardId: ${JSON.stringify(frontmatter.cardId)}`,
@@ -250,6 +256,7 @@ export function serializeKnowledgeCard(record: KnowledgeCardRecord): string {
   if (record.sourceSize != null) yamlLines.push(`sourceSize: ${record.sourceSize}`);
   if (record.chapters) yamlLines.push(`chapters: ${JSON.stringify(record.chapters)}`);
   if (record.images?.length) yamlLines.push(`images: ${JSON.stringify(record.images)}`);
+  if (record.missingAssets?.length) yamlLines.push(`missingAssets: ${JSON.stringify(record.missingAssets)}`);
   return `---\n${yamlLines.join('\n')}\n---\n\n${record.body.trim()}\n`;
 }
 

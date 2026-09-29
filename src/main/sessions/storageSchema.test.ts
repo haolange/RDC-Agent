@@ -6,17 +6,20 @@ import {
   SessionRecordSchema,
   SessionAttachmentManifestSchema,
   toSessionAttachmentManifest,
-  SESSION_USAGE_MIGRATIONS,
+  CURRENT_USAGE_SCHEMA_VERSION,
+  SessionUsageV2Schema,
+  readCurrentStoredJson,
   SESSION_SHELL_STATE_MIGRATIONS,
   toSessionUsageManifest,
   toSessionShellStateManifest,
-  SESSION_RUN_MIGRATIONS,
   CONVERSATION_TURN_COMMIT_MIGRATIONS,
   CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
   StorageSchemaError,
   type StorageMigration,
 } from './storageSchema';
 import { StorageIo } from './StorageIo';
+import { readPersistedRun } from './sessionRunPersistence';
+import type { StorageHost } from './storageHost';
 import { assertPersistedSettingsSchemaVersion } from '../settings/settingsServiceHelpers';
 import { SETTINGS_SCHEMA_VERSION } from '../settings/settingsDefaults';
 import { stringifyYaml } from '@shared/utils/yaml';
@@ -113,77 +116,46 @@ describe('storageSchema parseStoredDocument', () => {
 });
 
 describe('session usage schema v2', () => {
-  const legacyUsage = {
-    runId: 'run_legacy',
+  const usage = {
+    runId: 'run_current',
     providerId: 'deepseek',
     modelId: 'deepseek-v4-flash',
     inputTokens: 12,
     outputTokens: 3,
     totalTokens: 15,
-    contextWindowTokens: 616_000,
+    promptBudgetTokens: 616_000,
+    contextWindowTokens: 1_000_000,
+    maxOutputTokens: 384_000,
+    compactionThresholdTokens: 800_000,
     usagePercent: 1,
     occupiedTokens: 12,
     breakdown: null,
     snapshotAt: 1,
   };
 
-  it('migrates a v0 bare usage object onto promptBudgetTokens then v2 output fields', () => {
-    const parsed = parseStoredDocument(legacyUsage, SESSION_USAGE_MIGRATIONS, 'usage.json');
-    expect(parsed).toEqual({
-      schemaVersion: '2',
-      usage: {
-        ...legacyUsage,
-        promptBudgetTokens: 616_000,
-        contextWindowTokens: null,
-        maxOutputTokens: null,
-        compactionThresholdTokens: null,
-      },
-    });
-  });
-
-  it('migrates a v1 document from outputReserveTokens to maxOutputTokens', () => {
-    const parsed = parseStoredDocument({
-      schemaVersion: '1',
-      usage: {
-        ...legacyUsage,
-        promptBudgetTokens: 616_000,
-        contextWindowTokens: 1_000_000,
-        outputReserveTokens: 384_000,
-      },
-    }, SESSION_USAGE_MIGRATIONS, 'usage.json');
-    expect(parsed).toEqual({
-      schemaVersion: '2',
-      usage: {
-        ...legacyUsage,
-        promptBudgetTokens: 616_000,
-        contextWindowTokens: 1_000_000,
-        maxOutputTokens: 384_000,
-        compactionThresholdTokens: null,
-      },
-    });
-  });
-
   it('accepts a current { schemaVersion, usage } document', () => {
-    const usage = {
-      ...legacyUsage,
-      promptBudgetTokens: 616_000,
-      contextWindowTokens: 1_000_000,
-      maxOutputTokens: 384_000,
-      compactionThresholdTokens: 800_000,
-    };
-    expect(parseStoredDocument(
-      toSessionUsageManifest(usage),
-      SESSION_USAGE_MIGRATIONS,
-      'usage.json',
-    )).toEqual({ schemaVersion: '2', usage });
+    expect(SessionUsageV2Schema.parse(toSessionUsageManifest(usage))).toEqual({ schemaVersion: '2', usage });
   });
 
-  it('fail-closes an unknown higher usage schemaVersion', () => {
-    expect(() => parseStoredDocument(
-      { schemaVersion: '9', usage: legacyUsage },
-      SESSION_USAGE_MIGRATIONS,
-      'usage.json',
-    )).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+  it.each([undefined, '0', '1', '9'])('rejects usage version %s and preserves the source bytes', (version) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-usage-version-'));
+    const filePath = path.join(root, 'usage.json');
+    const raw = JSON.stringify({ schemaVersion: version, usage });
+    try {
+      fs.writeFileSync(filePath, raw, 'utf8');
+      expect(() => readCurrentStoredJson(new StorageIo(), filePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageV2Schema))
+        .toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(raw);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects retired usage fields inside a v2 document', () => {
+    expect(SessionUsageV2Schema.safeParse({
+      schemaVersion: '2',
+      usage: { ...usage, outputReserveTokens: 384_000 },
+    }).success).toBe(false);
   });
 });
 
@@ -423,7 +395,7 @@ describe('storage schema store quartet', () => {
       file: 'attachments.json',
       legal: toSessionAttachmentManifest([legalAttachment]),
       corrupt: [{ attachmentId: 1 }],
-      missingOrLegacy: [legalAttachment],
+      missingOrLegacy: toSessionAttachmentManifest([legalAttachment]),
       higher: { schemaVersion: '99', attachments: [legalAttachment] },
       read: (filePath: string) => io.readJson(filePath, SessionAttachmentManifestSchema),
     },
@@ -432,21 +404,9 @@ describe('storage schema store quartet', () => {
       file: 'usage.json',
       legal: toSessionUsageManifest(legalUsage),
       corrupt: { schemaVersion: '1', usage: { runId: 1 } },
-      missingOrLegacy: {
-        runId: 'run_1',
-        providerId: 'provider',
-        modelId: 'model',
-        inputTokens: 10,
-        outputTokens: 2,
-        totalTokens: 12,
-        contextWindowTokens: 100,
-        usagePercent: 10,
-        occupiedTokens: 10,
-        breakdown: null,
-        snapshotAt: 1,
-      },
+      missingOrLegacy: toSessionUsageManifest(legalUsage),
       higher: { schemaVersion: '99', usage: legalUsage },
-      read: (filePath: string) => io.readJson(filePath, SESSION_USAGE_MIGRATIONS),
+      read: (filePath: string) => readCurrentStoredJson(io, filePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageV2Schema),
     },
     {
       name: 'turn-commit',
@@ -473,7 +433,7 @@ describe('storage schema store quartet', () => {
       corrupt: { runId: 1 },
       missingOrLegacy: legalRun,
       higher: { ...legalRun, schemaVersion: '99' },
-      read: (filePath: string) => io.readJson(filePath, SESSION_RUN_MIGRATIONS),
+      read: (filePath: string) => readPersistedRun({ io } as StorageHost, path.dirname(filePath), 'sess_1', 'run_1'),
     },
     {
       name: 'settings',
@@ -537,9 +497,15 @@ describe('storage schema store quartet', () => {
         expect(() => store.read(filePath)).toThrow(/STORAGE_CORRUPT|STORAGE_SCHEMA/);
       });
 
-      it('accepts a current-shaped document without requiring a newer version', () => {
+      it('handles a second document according to the current store version contract', () => {
         const filePath = path.join(tempRoot(), store.file);
         io.writeJsonAtomic(filePath, store.missingOrLegacy);
+        if (store.name === 'settings') {
+          const original = fs.readFileSync(filePath, 'utf8');
+          expect(() => store.read(filePath)).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+          expect(fs.readFileSync(filePath, 'utf8')).toBe(original);
+          return;
+        }
         expect(store.read(filePath)).toBeTruthy();
       });
 
@@ -553,33 +519,24 @@ describe('storage schema store quartet', () => {
     });
   }
 
-  it('validates run.yaml fallback and fail-closes a higher schema_version', () => {
+  it('rejects an old bare attachment array without changing its bytes', () => {
+    const filePath = path.join(tempRoot(), 'attachments.json');
+    const raw = JSON.stringify([legalAttachment]);
+    fs.writeFileSync(filePath, raw, 'utf8');
+    expect(() => readCurrentStoredJson(io, filePath, '1', SessionAttachmentManifestSchema))
+      .toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe(raw);
+  });
+
+  it('rejects a YAML-only Run even when its projection claims the current schema', () => {
     const root = tempRoot();
     const runPath = path.join(root, 'run');
     fs.mkdirSync(runPath, { recursive: true });
     const yamlPath = path.join(runPath, 'run.yaml');
-    fs.writeFileSync(yamlPath, stringifyYaml({
-      schema_version: '99',
-      run_id: 'run_1',
-      project_id: 'proj_1',
-      session_id: 'sess_1',
-      case_id: 'sess_1',
-      mode: 'debugger',
-      goal: 'g',
-      status: 'running',
-      last_stage: 'investigate',
-      created_at: '2026-01-01T00:00:00.000Z',
-      runtime: {
-        backend: 'local',
-        entry_mode: 'cli',
-        context_id: null,
-        runtime_owner: null,
-        session_id: 'sess_1',
-        workflow_stage: 'investigate',
-      },
-      captures: [],
-    }), 'utf8');
-    expect(() => io.readYaml(yamlPath)).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-    expect(fs.existsSync(yamlPath)).toBe(true);
+    const original = stringifyYaml({ schema_version: '3', run_id: 'run_1' });
+    fs.writeFileSync(yamlPath, original, 'utf8');
+    expect(() => readPersistedRun({ io } as StorageHost, runPath, 'sess_1', 'run_1'))
+      .toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+    expect(fs.readFileSync(yamlPath, 'utf8')).toBe(original);
   });
 });

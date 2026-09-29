@@ -9,5 +9,6 @@ export const isActiveThinkingStatus = (
   thinkingStatus: ConversationWorkBlock['thinkingStatus'] | undefined,
   rowStatus: WorkProcessRowStatus,
 ): boolean => (
-  thinkingStatus === 'streaming' || isActiveWorkProcessStatus(rowStatus)
+  thinkingStatus === 'streaming'
+  || (thinkingStatus === undefined && isActiveWorkProcessStatus(rowStatus))
 );

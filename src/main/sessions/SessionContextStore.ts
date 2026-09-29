@@ -5,7 +5,9 @@ import type { RunContextUsageSummary } from '@shared/types/session';
 import type { SessionContextTurnEntry } from '../conversation/SessionContextJournal';
 import {
   SESSION_SHELL_STATE_MIGRATIONS,
-  SESSION_USAGE_MIGRATIONS,
+  CURRENT_USAGE_SCHEMA_VERSION,
+  SessionUsageV2Schema,
+  readCurrentStoredJson,
   toSessionShellStateManifest,
   toSessionUsageManifest,
 } from './storageSchema';
@@ -26,7 +28,7 @@ export class SessionContextStore {
     }
     const usagePath = this.getSessionUsagePath(sessionId);
     if (!usagePath) return null;
-    return this.host.io.readJson(usagePath, SESSION_USAGE_MIGRATIONS)?.usage ?? null;
+    return readCurrentStoredJson(this.host.io, usagePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageV2Schema)?.usage ?? null;
   }
 
   getSessionShellStatePath(sessionId: string): string | null {

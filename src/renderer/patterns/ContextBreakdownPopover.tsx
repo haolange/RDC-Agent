@@ -10,6 +10,7 @@ import './ContextBreakdownLegend.css';
 import { ContextBreakdownLegend } from './ContextBreakdownLegend';
 import { ContextRunMeterBand, MeterStat } from './ContextRunMeterBand';
 import {
+  awaitsExecutionContextWindow,
   resolveDisplayedCompactionThreshold,
   resolveDisplayedContextWindow,
   resolveDisplayedGeneratable,
@@ -22,7 +23,6 @@ import {
 } from './contextBreakdownMeta';
 
 type PreparationPhase = 'idle' | 'preparing' | 'current' | 'actual';
-
 const METER_UNAVAILABLE = '—';
 
 const ContextBarSegment: React.FC<{
@@ -79,6 +79,7 @@ export const ContextBreakdownPopover: React.FC<{
     };
   }, []);
   const showPrepared = phase === 'current' && prepared !== null;
+  const awaitingWindow = showPrepared && awaitsExecutionContextWindow(prepared);
   // A new request must not erase the last truthful snapshot before its own
   // prepared projection arrives. Preparing therefore keeps the same visual
   // structure and falls back to the previous actual usage when available.
@@ -89,17 +90,21 @@ export const ContextBreakdownPopover: React.FC<{
   const compactionThresholdTokens = resolveDisplayedCompactionThreshold(
     showPrepared, prepared, usage, selectedProfile,
   );
-  const generatableTokens = resolveDisplayedGeneratable(showPrepared, prepared, usage, selectedProfile);
+  const generatableTokens = awaitingWindow ? null : resolveDisplayedGeneratable(showPrepared, prepared, usage, selectedProfile);
   const occupiedTokens = showPrepared
     ? prepared.preparedInputTokens
     : usage?.occupiedTokens;
-  const displayUsagePercent = showPrepared
+  const displayUsagePercent = awaitingWindow
+    ? null
+    : showPrepared
     ? prepared.usagePercent
     : usage?.usagePercent;
-  const breakdown = showPrepared
+  const breakdown = awaitingWindow
+    ? []
+    : showPrepared
     ? prepared.breakdown
     : usage?.breakdown ?? [];
-  const hasAuthoritativeBreakdown = showPrepared || Boolean(usage && usage.breakdown !== null);
+  const hasAuthoritativeBreakdown = (showPrepared && !awaitingWindow) || Boolean(!showPrepared && usage && usage.breakdown !== null);
   const denom = typeof windowTokens === 'number' && windowTokens > 0
     ? windowTokens
     : typeof occupiedTokens === 'number'
@@ -115,7 +120,9 @@ export const ContextBreakdownPopover: React.FC<{
       && entry.id !== 'mcp_tools_deferred'
       && entry.id !== 'builtin_tools_deferred',
   );
-  const summaryCaption = showPrepared
+  const summaryCaption = awaitingWindow
+    ? t('contextBreakdown.windowPending')
+    : showPrepared
     ? t('contextBreakdown.currentRequest')
     : showEstimated
       ? t('contextBreakdown.projected')
@@ -133,6 +140,7 @@ export const ContextBreakdownPopover: React.FC<{
     thresholdRatio == null ? {} : { '--context-threshold-left': `${thresholdRatio}%` },
   );
   const budgetNoteParts: string[] = [];
+  if (awaitingWindow) budgetNoteParts.push(t('contextBreakdown.windowPendingNote'));
   if (typeof compactionThresholdTokens === 'number') {
     budgetNoteParts.push(t('contextBreakdown.budgetNote.threshold', {
       threshold: formatTokenCount(compactionThresholdTokens),
@@ -194,7 +202,6 @@ export const ContextBreakdownPopover: React.FC<{
             </svg>
           </button>
         </div>
-
         <div className="context-breakdown-hero">
           <div className="context-breakdown-hero-row">
             <div className="context-breakdown-hero-usage">
@@ -233,9 +240,7 @@ export const ContextBreakdownPopover: React.FC<{
             ) : null}
           </div>
         </div>
-
-        <ContextRunMeterBand usage={showUsage ? usage : null} prepared={showPrepared ? prepared : null} estimated={showEstimated} />
-
+        <ContextRunMeterBand usage={showUsage ? usage : null} prepared={showPrepared && !awaitingWindow ? prepared : null} estimated={showEstimated} />
         {showUsage && usage && (usage.cost || typeof usage.cumulativeCost === 'number') ? (
           <div className="context-breakdown-cost-card" data-testid="context-breakdown-cost">
             <h3 className="context-breakdown-run-col-title">{t('contextBreakdown.costColumn')}</h3>
@@ -259,7 +264,6 @@ export const ContextBreakdownPopover: React.FC<{
             </div>
           </div>
         ) : null}
-
         <button
           type="button"
           className={`context-breakdown-details-toggle${detailsExpanded ? ' is-expanded' : ''}`}

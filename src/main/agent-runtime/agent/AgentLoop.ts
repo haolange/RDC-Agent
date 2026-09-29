@@ -280,7 +280,21 @@ async function runAgentLoop(
       stream.push({ type: 'turn_start', turn: state.turn });
 
       // 5. 调用 LLM 生成助手消息（带错误恢复，内部是独立 transition 子状态机）
-      const ephemeralInstruction = runtimeNoProgressInstruction;
+      const remainingTurns = maxTurns - state.turn + 1;
+      const turnBudgetInstruction = remainingTurns <= 5
+        ? [
+          `<runtime_turn_budget remaining="${remainingTurns}" limit="${maxTurns}">`,
+          remainingTurns === 1
+            ? 'This is the final, text-only provider request in this turn. No tools are offered. Give the canonical final answer now, accurately marking unfinished work and unresolved evidence; do not claim structured completion unless it was already recorded.'
+            : remainingTurns === 2
+              ? 'This is the last request with tools. Settle open Tasks and call turn_complete now if a structured declaration is required; the next and final request is text-only. Preserve a truthful checkpoint and all approval, identity, experiment-restoration, and completion gates. Do not invent missing evidence.'
+              : 'The turn is near its request limit. Prioritize settling open Tasks, preserving a truthful checkpoint when available, and producing an honest final answer before the limit. Keep all approval, identity, experiment-restoration, and completion gates intact; do not invent missing evidence.',
+          '</runtime_turn_budget>',
+        ].join('\n')
+        : undefined;
+      const ephemeralInstruction = [runtimeNoProgressInstruction, turnBudgetInstruction]
+        .filter((instruction): instruction is string => Boolean(instruction))
+        .join('\n\n') || undefined;
       runtimeNoProgressInstruction = undefined;
       const { message: assistantMessage } = await streamAssistantResponseWithRecovery(
         context,
@@ -288,8 +302,17 @@ async function runAgentLoop(
         providerStrategy,
         stream,
         ephemeralInstruction,
+        remainingTurns > 1,
       );
       newMessages.push(assistantMessage);
+
+      if (remainingTurns === 1 && assistantMessage.stopReason === 'toolUse') {
+        throw new AgentLoopTerminationError(
+          'AGENT_MAX_TURNS_EXCEEDED',
+          'Provider requested a tool after the final text-only request.',
+          { turn: state.turn, maxTurns },
+        );
+      }
 
       // 7. 非 toolUse 停止 → terminal
       if (assistantMessage.stopReason !== 'toolUse') {
@@ -409,6 +432,7 @@ async function streamAssistantResponseWithRecovery(
   provider: ProviderStrategy,
   stream: EventStream<AgentEvent, Message[]>,
   ephemeralInstruction?: string,
+  allowToolUse = true,
 ): Promise<{ message: AssistantMessage }> {
   const recovery = config.errorRecovery;
   const CIRCUIT_BREAKER_LIMIT = 3;
@@ -437,6 +461,7 @@ async function streamAssistantResponseWithRecovery(
         provider,
         stream,
         ephemeralInstruction,
+        allowToolUse,
       );
       // 成功时重置断路器
       consecutiveCompactionFailures = 0;
@@ -584,6 +609,7 @@ async function streamAssistantResponse(
   provider: ProviderStrategy,
   stream: EventStream<AgentEvent, Message[]>,
   ephemeralInstruction?: string,
+  allowToolUse = true,
 ): Promise<AssistantMessage> {
   // 1. 可选的上下文变换（压缩 / 剪裁）
   let messages: AgentMessage[] = context.messages;
@@ -620,7 +646,7 @@ async function streamAssistantResponse(
     systemPrompt: context.systemPrompt,
     systemPromptSegments: context.systemPromptSegments,
     messages: llmMessages,
-    tools: context.runtime?.current.activeTools ?? context.tools,
+    tools: allowToolUse ? context.runtime?.current.activeTools ?? context.tools : [],
   };
 
   // 4. 解析 API key（优先动态获取）
@@ -642,82 +668,88 @@ async function streamAssistantResponse(
   if (pendingMailbox?.messages.length) context.messages.push(...pendingMailbox.messages);
 
   // 6. 调用 provider，转发事件
-  const response = provider.stream(config.model, llmContext, streamOptions);
-
   let partialIndex = -1;
   let finalMessage: AssistantMessage | undefined;
+  try {
+    const response = provider.stream(config.model, llmContext, streamOptions);
+    for await (const event of response) {
+      switch (event.type) {
+        case 'start': {
+          // 把 partial assistant message 临时挂到 context 末尾，便于 UI 渲染
+          partialIndex = context.messages.length;
+          context.messages.push(event.partial);
+          stream.push({ type: 'message_start', message: event.partial });
+          break;
+        }
+        case 'text_start':
+        case 'text_delta':
+        case 'text_end':
+        case 'thinking_start':
+        case 'thinking_delta':
+        case 'thinking_end':
+        case 'toolcall_start':
+        case 'toolcall_delta':
+        case 'toolcall_end': {
+          if (partialIndex >= 0) {
+            context.messages[partialIndex] = event.partial;
+          }
+          stream.push({
+            type: 'message_update',
+            assistantMessageEvent: event,
+            message: event.partial,
+          });
+          break;
+        }
+        case 'done': {
+          finalMessage = event.message;
+          if (partialIndex >= 0) {
+            context.messages[partialIndex] = finalMessage;
+          } else {
+            context.messages.push(finalMessage);
+            partialIndex = context.messages.length - 1;
+          }
+          stream.push({ type: 'message_end', message: finalMessage });
+          break;
+        }
+        case 'error': {
+          if (partialIndex >= 0) {
+            context.messages[partialIndex] = event.message;
+          } else {
+            partialIndex = context.messages.length;
+            context.messages.push(event.message);
+          }
+          throw event.error;
+        }
+        default: {
+          // 其它事件透传给 UI
+          stream.push({
+            type: 'message_update',
+            assistantMessageEvent: event as never,
+            message: (event as { partial: AssistantMessage }).partial,
+          });
+          break;
+        }
+      }
+    }
 
-  for await (const event of response) {
-    switch (event.type) {
-      case 'start': {
-        // 把 partial assistant message 临时挂到 context 末尾，便于 UI 渲染
+    if (!finalMessage) {
+      finalMessage = await response.result();
+      if (partialIndex >= 0) {
+        context.messages[partialIndex] = finalMessage;
+      } else {
         partialIndex = context.messages.length;
-        context.messages.push(event.partial);
-        stream.push({ type: 'message_start', message: event.partial });
-        break;
-      }
-      case 'text_start':
-      case 'text_delta':
-      case 'text_end':
-      case 'thinking_start':
-      case 'thinking_delta':
-      case 'thinking_end':
-      case 'toolcall_start':
-      case 'toolcall_delta':
-      case 'toolcall_end': {
-        if (partialIndex >= 0) {
-          context.messages[partialIndex] = event.partial;
-        }
-        stream.push({
-          type: 'message_update',
-          assistantMessageEvent: event,
-          message: event.partial,
-        });
-        break;
-      }
-      case 'done': {
-        finalMessage = event.message;
-        if (partialIndex >= 0) {
-          context.messages[partialIndex] = finalMessage;
-        } else {
-          context.messages.push(finalMessage);
-          partialIndex = context.messages.length - 1;
-        }
-        stream.push({ type: 'message_end', message: finalMessage });
-        break;
-      }
-      case 'error': {
-        if (partialIndex >= 0) {
-          context.messages[partialIndex] = event.message;
-        } else {
-          context.messages.push(event.message);
-        }
-        throw event.error;
-      }
-      default: {
-        // 其它事件透传给 UI
-        stream.push({
-          type: 'message_update',
-          assistantMessageEvent: event as never,
-          message: (event as { partial: AssistantMessage }).partial,
-        });
-        break;
+        context.messages.push(finalMessage);
       }
     }
+
+    await config.onResponse?.(requestId, finalMessage);
+    return finalMessage;
+  } catch (error) {
+    // A failed provider attempt cannot leave an assistant tool call in the next
+    // request without a tool result. The streamed UI events remain diagnostic.
+    if (partialIndex >= 0) context.messages.splice(partialIndex, 1);
+    throw error;
   }
-
-  if (!finalMessage) {
-    finalMessage = await response.result();
-    if (partialIndex >= 0) {
-      context.messages[partialIndex] = finalMessage;
-    } else {
-      context.messages.push(finalMessage);
-    }
-  }
-
-  await config.onResponse?.(requestId, finalMessage);
-
-  return finalMessage;
 }
 
 // =====================================================================

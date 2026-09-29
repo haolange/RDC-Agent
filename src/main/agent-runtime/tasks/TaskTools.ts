@@ -26,6 +26,7 @@ import type { StartTaskExecutionOptions } from './TaskContracts';
 
 export interface TaskToolExecutionContext {
   startOptions?: () => Omit<StartTaskExecutionOptions, 'mode'> | Promise<Omit<StartTaskExecutionOptions, 'mode'>>;
+  getCreationTurnRef?: () => string | undefined;
   scopeRootTaskId?: string;
   requestCurrentTurnStop?: (taskId: string) => boolean;
 }
@@ -126,7 +127,8 @@ export function createTaskCreateTool(
           await assertTaskInScope(registry, dependencyId, context.scopeRootTaskId, false);
         }
       }
-      const created = await registry.createTasks(items);
+      const creationTurnRef = context.getCreationTurnRef?.();
+      const created = await registry.createTasks(items.map((item) => ({ ...item, creationTurnRef })));
       const text = created
         .map((task) => {
           const depsText = task.blockedBy.length > 0
@@ -173,7 +175,7 @@ export function createTaskUpdateTool(
   return {
     name: 'task_update',
     label: 'Update Task',
-    description: 'Update an existing task status or details',
+    description: 'Update an existing Task. status=in_progress starts a new direct execution; call it once per execution, never as a progress note while an execution is active. Do the Task work before status=completed or blocked settles that execution; a partial result leaves the Task blocked. Use task_get to inspect currentExecutionId before starting again. Omit status for description or metadata edits.',
     parameters: {
       type: 'object',
       properties: {

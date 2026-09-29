@@ -24,7 +24,9 @@ import { SessionArtifactResolver, sessionArtifactResolver } from '../sessions/Se
 import { InvestigationError, isInvestigationStoreDegraded, toInvestigationError } from './investigationErrors';
 import {
   collectStalePropagation,
+  collectSupersededWorldStateDependents,
   collectSupersede,
+  retiredClaimIdsForReplacement,
   upsertIndexEntry,
 } from './investigationArtifactMutations';
 import {
@@ -40,6 +42,8 @@ import {
   assertChallengeRecordRefs,
   assertCheckpointRecordRefs,
   assertClaimRecordRefs,
+  assertEvidenceLinks,
+  assertObservedToolEvidenceHasArtifact,
   assertOptimizerExperimentClose,
   assertReportContractPresent,
   assertReportRecordRefs,
@@ -55,8 +59,8 @@ import { requireInvestigationKind } from './investigationKindRegistry';
 import {
   assertInvestigationIndexIntegrity,
   assertTripleContentHash,
-  isReadySourceDriftError,
 } from './investigationReadIntegrity';
+import { InvestigationReadRepair } from './investigationReadRepair';
 import {
   collectRecordKeys,
   collectSupersedeChain,
@@ -103,6 +107,8 @@ export class InvestigationArtifactService {
   private readonly onPersistBoundary?: InvestigationArtifactServiceDeps['onPersistBoundary'];
   private readonly lockMaxAttempts?: number;
   private readonly lockedSessions = new Set<string>();
+  private readonly verifiedIndexes = new Map<string, InvestigationIndexDocument>();
+  private readonly readRepair: InvestigationReadRepair;
 
   constructor(deps: InvestigationArtifactServiceDeps = {}) {
     this.resolver = deps.resolver ?? sessionArtifactResolver;
@@ -110,6 +116,15 @@ export class InvestigationArtifactService {
     this.now = deps.now ?? (() => new Date());
     this.onPersistBoundary = deps.onPersistBoundary;
     this.lockMaxAttempts = deps.lockMaxAttempts;
+    this.readRepair = new InvestigationReadRepair({
+      readIndex: (sessionId) => this.readIndex(sessionId),
+      readIndexSnapshot: (sessionId) => this.readIndexSnapshot(sessionId),
+      readRecordBody: <T>(sessionId: string, entry: InvestigationIndexEntry) => this.readRecordBody<T>(sessionId, entry),
+      readJson: <T>(sessionId: string, uri: string) => this.readJson<T>(sessionId, uri),
+      parseManifest: (value) => this.parseManifest(value),
+      assertReady: (sessionId, manifest, contentText) => this.assertReady(sessionId, manifest, contentText),
+      commitMutations: (sessionId, mutations) => this.commitMutations(sessionId, mutations),
+    });
   }
 
   writeRecord(sessionId: string | null | undefined, input: InvestigationWriteInput): InvestigationWriteResult {
@@ -193,10 +208,18 @@ export class InvestigationArtifactService {
     }
     let supersededArtifactId: string | undefined;
     if (manifest.supersedes) {
-      const superseded = collectSupersede(this.mutationReader(sessionId), manifest.supersedes, workingIndex);
+      const replaced = workingIndex.artifacts.find((entry) => entry.artifactId === manifest.supersedes);
+      const retiredClaimIds = retiredClaimIdsForReplacement(this.mutationReader(sessionId), replaced, kindEntry.kind, parsed);
+      const superseded = collectSupersede(this.mutationReader(sessionId), manifest.supersedes, workingIndex, retiredClaimIds);
       mutations.push(...superseded.mutations);
       workingIndex = superseded.index;
       supersededArtifactId = superseded.artifactId;
+      if (kindEntry.kind === 'world_state' && replaced?.kind === 'world_state'
+        && replaced.recordKey !== (parsed as WorldState).worldStateId) {
+        const stale = collectSupersededWorldStateDependents(this.mutationReader(sessionId), replaced.recordKey, workingIndex);
+        mutations.push(...stale.mutations);
+        workingIndex = stale.index;
+      }
     }
     mutations.push({ uri: contentUri, text: contentText, role: 'content' });
     mutations.push({
@@ -231,6 +254,7 @@ export class InvestigationArtifactService {
   }
 
   private readRecordLocked(sessionId: string, artifactId: string, expectedHash?: string): InvestigationReadResult {
+    this.readRepair.reconcileSupersededRecordDependents(sessionId);
     const entry = this.findIndexEntry(sessionId, artifactId);
     if (!entry) {
       throw new InvestigationError('INVESTIGATION_NOT_FOUND', artifactId);
@@ -254,9 +278,14 @@ export class InvestigationArtifactService {
       throw toInvestigationError(error);
     }
     if (manifest.status === 'ready') {
-      manifest = this.refreshReadyOnRead(sessionId, entry, manifest, contentText);
+      manifest = this.readRepair.refreshReadyOnRead(sessionId, entry, manifest, contentText);
     }
-    this.assertIndexedRecordInvariants(sessionId, entry.kind, record);
+    // A superseded version remains readable for audit and compaction, while
+    // its replacement owns the current semantic invariants. Hash, schema,
+    // manifest, and index integrity are still checked above.
+    if (entry.status === 'ready' || entry.status === 'draft') {
+      this.assertIndexedRecordInvariants(sessionId, entry.kind, record);
+    }
     return {
       manifest,
       record,
@@ -268,18 +297,22 @@ export class InvestigationArtifactService {
   list(sessionId: string | null | undefined, filter?: { kind?: string; status?: string }): InvestigationIndexEntry[] {
     this.assertSession(sessionId);
     return this.withSessionLock(sessionId, () => {
+    this.readRepair.reconcileSupersededRecordDependents(sessionId);
     const entries = this.readIndex(sessionId).artifacts.filter((entry) => (
       (!filter?.kind || entry.kind === filter.kind) && (!filter?.status || entry.status === filter.status)
     ));
     const lookup = this.createLookup(sessionId);
     for (const entry of entries) {
-      if (entry.status === 'superseded') continue;
+      if (entry.status !== 'ready' && entry.status !== 'draft') continue;
       this.assertRecordInvariants(sessionId, entry.kind, this.readRecordBody<InvestigationRecord>(sessionId, entry), lookup);
     }
     return entries;
     });
   }
-
+  /** One transaction-locked, integrity-checked view for context archiving. */
+  readAllRecords(sessionId: string | null | undefined): InvestigationReadResult[] {
+    this.assertSession(sessionId); return this.withSessionLock(sessionId, () => this.list(sessionId).map(entry => this.readRecord(sessionId, entry.artifactId)));
+  }
   listForProjection(sessionId: string | null | undefined): {
     artifacts: InvestigationIndexEntry[];
     storeDegraded: boolean;
@@ -287,7 +320,7 @@ export class InvestigationArtifactService {
     this.assertSession(sessionId);
     try {
       return this.withSessionLock(sessionId, () => ({
-        artifacts: this.readIndexSnapshot(sessionId).artifacts,
+        artifacts: this.readRepair.projectionIndex(sessionId).artifacts,
         storeDegraded: false,
       }));
     } catch (error) {
@@ -404,6 +437,13 @@ export class InvestigationArtifactService {
     lookup: InvestigationLookup,
     mission?: InvestigationMission,
   ): void {
+    const claimSetItems = kind === 'claim_set' ? (record as ClaimSet).items : [];
+    const recordLookup: InvestigationLookup = claimSetItems.length > 0
+      ? { ...lookup, getClaim: (claimId) => claimSetItems.find((item) => item.claimId === claimId) ?? lookup.getClaim(claimId) }
+      : lookup;
+    if (kind === 'world_state' && mission === 'optimizer' && 'status' in (record as WorldState).benchmark) {
+      throw new InvestigationError('INVESTIGATION_SCHEMA_INVALID', 'Optimizer WorldState requires measured benchmark settings');
+    }
     if (kind === 'evidence') {
       this.assertEvidenceInvariants(sessionId, record as EvidenceRecord, lookup);
     }
@@ -417,7 +457,7 @@ export class InvestigationArtifactService {
     }
     if (kind === 'claim_set') {
       for (const claim of (record as ClaimSet).items) {
-        assertClaimRecordRefs(claim, lookup, { mission });
+        assertClaimRecordRefs(claim, recordLookup, { mission });
       }
     }
     if (kind === 'experiment') {
@@ -461,8 +501,8 @@ export class InvestigationArtifactService {
     }
     if (kind !== 'report') {
       for (const claim of collectProjectedClaims(record)) {
-        assertSClaim01(claim, lookup);
-        if (isCausalOrCounterfactualClaim(claim)) assertSCausal01(claim, lookup);
+        assertSClaim01(claim, recordLookup);
+        if (isCausalOrCounterfactualClaim(claim)) assertSCausal01(claim, recordLookup);
       }
     }
   }
@@ -549,6 +589,7 @@ export class InvestigationArtifactService {
     lookup: InvestigationLookup,
   ): void {
     assertSState01(evidence, lookup);
+    assertObservedToolEvidenceHasArtifact(evidence);
     if (evidence.contentHashes.length !== evidence.artifactRefs.length) {
       throw new InvestigationError(
         'INVESTIGATION_HASH_MISMATCH',
@@ -564,18 +605,7 @@ export class InvestigationArtifactService {
         );
       }
     }
-    for (const claimId of evidence.claimIds) {
-      if (!lookup.getClaim(claimId)) {
-        throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `evidence claim ${claimId}`, {
-          invariantId: 'S-CTX-01',
-        });
-      }
-    }
-    if (evidence.experimentId && !lookup.getExperiment(evidence.experimentId)) {
-      throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `experiment ${evidence.experimentId}`, {
-        invariantId: 'S-CTX-01',
-      });
-    }
+    assertEvidenceLinks(evidence, lookup);
   }
 
   private applyEvidenceStale(
@@ -646,27 +676,6 @@ export class InvestigationArtifactService {
     };
   }
 
-  private refreshReadyOnRead(
-    sessionId: string,
-    entry: InvestigationIndexEntry,
-    manifest: InvestigationArtifactManifest,
-    contentText: string,
-  ): InvestigationArtifactManifest {
-    try {
-      this.assertReady(sessionId, manifest, contentText);
-      return manifest;
-    } catch (error) {
-      if (!isReadySourceDriftError(error)) throw error;
-      const next = { ...manifest, status: 'stale' as const };
-      const index = upsertIndexEntry(this.readIndexSnapshot(sessionId), { ...entry, status: 'stale' });
-      this.commitMutations(sessionId, [
-        { uri: entry.manifestUri, text: serializeInvestigationJson(next), role: 'stale' },
-        { uri: INDEX_URI, text: serializeInvestigationJson(index), role: 'index' },
-      ]);
-      return this.parseManifest(next);
-    }
-  }
-
   private findRecord<T>(sessionId: string, kind: InvestigationArtifactKind, recordKey: string): T | null {
     const live = this.readIndex(sessionId).artifacts.filter((entry) => entry.status !== 'superseded');
     const standalone = live.filter((entry) => entry.kind === kind && entry.recordKey === recordKey).at(-1);
@@ -713,8 +722,11 @@ export class InvestigationArtifactService {
   }
 
   private readIndex(sessionId: string): InvestigationIndexDocument {
+    const verified = this.verifiedIndexes.get(sessionId);
+    if (verified) return verified;
     const parsed = this.readIndexSnapshot(sessionId);
     this.assertIndexIntegrity(sessionId, parsed);
+    if (this.lockedSessions.has(sessionId)) this.verifiedIndexes.set(sessionId, parsed);
     return parsed;
   }
 
@@ -800,15 +812,19 @@ export class InvestigationArtifactService {
       const existing = collectRecordKeys(entry.kind, this.readRecordBody<InvestigationRecord>(sessionId, entry));
       const clash = existing.find((key) => incomingSet.has(recordKeyToken(key)));
       if (clash) {
+        const claimSetHint = input.kind === 'claim_set' && clash.space === 'claim'
+          ? '; ClaimSet.items define new Claims and cannot repeat IDs from previously written Claims; cite existing Claims in supports/contradicts or use new item IDs'
+          : '';
         throw new InvestigationError(
           'INVESTIGATION_DUPLICATE_ID',
-          `record id ${clash.id} already exists; version updates must use supersedes`,
+          `record id ${clash.id} already exists; version updates must use supersedes${claimSetHint}`,
         );
       }
     }
   }
 
   private commitMutations(sessionId: string, mutations: InvestigationTxnMutation[]): void {
+    this.verifiedIndexes.delete(sessionId);
     try {
       commitInvestigationTxn(sessionId, mutations, this.txnIo(), {
         onPersistBoundary: this.onPersistBoundary,
@@ -817,18 +833,15 @@ export class InvestigationArtifactService {
       throw error instanceof InvestigationError ? error : toInvestigationError(error);
     }
   }
-
   private recoverStore(sessionId: string): void {
     recoverInvestigationTxn(sessionId, this.txnIo());
   }
-
   private txnIo(): InvestigationTxnIo {
     return {
       resolve: (id, uri) => this.resolver.resolve(id, uri),
       write: (id, uri, text) => this.resolver.write(id, uri, text, { mimeType: 'application/json' }),
     };
   }
-
   private withSessionLock<T>(sessionId: string, operation: () => T): T {
     if (this.lockedSessions.has(sessionId)) return operation();
     const sessionPath = this.resolver.resolve(sessionId, INDEX_URI).sessionPath;
@@ -838,6 +851,7 @@ export class InvestigationArtifactService {
         this.recoverStore(sessionId);
         return operation();
       } finally {
+        this.verifiedIndexes.delete(sessionId);
         this.lockedSessions.delete(sessionId);
       }
     }, { maxAttempts: this.lockMaxAttempts });

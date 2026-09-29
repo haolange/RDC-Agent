@@ -53,7 +53,8 @@ async function recoverStaleRunOnSelection(run: RunSummary | null): Promise<RunSu
   if (!run || !STALE_RECOVERABLE_RUN_STATUSES.includes(run.status)) {
     return run;
   }
-  const isActive = runExecutionService.listActiveRuns().some((activeRun) => activeRun.runId === run.runId);
+  const isActive = (run.turnId ? conversationService.isTurnActive(run.sessionId, run.turnId) : false)
+    || runExecutionService.listActiveRuns().some((activeRun) => activeRun.runId === run.runId);
   if (isActive) {
     return run;
   }

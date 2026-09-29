@@ -36,6 +36,13 @@ it('never returns exploratory final text when structured completion is absent or
   expect(result.disposition).not.toBe('completed');
  }
 });
+it('distinguishes a wall-time limit from an explicit subagent cancellation', () => {
+ const artifact = { uri: 'session://tool-outputs/result.json', hash: 'a'.repeat(64) };
+ expect(normalizeSubagentResult('POLICY_LIMIT_EXCEEDED: maxWallTimeMs', 'cancelled', undefined, artifact))
+  .toMatchObject({ disposition: 'blocked', error: 'POLICY_LIMIT_EXCEEDED: maxWallTimeMs', resultRef: artifact.uri });
+ expect(normalizeSubagentResult('User stopped the turn', 'cancelled', undefined, artifact))
+  .toMatchObject({ disposition: 'cancelled', resultRef: artifact.uri });
+});
 it('does not release a result reference on failed save or readback verification', () => {
  const read = vi.fn(() => ({ hash: 'b'.repeat(64) }));
  const resolver = { write: vi.fn(() => ({ uri: 'session://tool-outputs/x.json', hash: 'a'.repeat(64) })), read };

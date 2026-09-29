@@ -183,7 +183,7 @@ function createKnowledgeSearchTool(deps: KnowledgeToolDependencies): AgentTool {
     async execute(_id, args) {
       const result = await deps.query.query(toQueryRequest(args));
       const lines = result.hits.slice(0, 20).map((hit, index) => (
-        `${index + 1}. ${hit.title} · ${hit.type ?? 'unknown'} · ${hit.lifecycle ?? 'unknown'} · ${hit.lanes.join('+')} · ${hit.cardId}`
+        `${index + 1}. ${hit.title} · ${hit.type ?? 'unknown'} · ${hit.lifecycle ?? 'unknown'} · ${hit.lanes.join('+')} · ${hit.cardId} · sha256:${hit.contentHash} · ${hit.spaceId}/${hit.relativePath}`
       ));
       const header = `${result.hits.length} hits`;
       return textResult(
@@ -191,6 +191,7 @@ function createKnowledgeSearchTool(deps: KnowledgeToolDependencies): AgentTool {
         {
           count: result.hits.length,
           cardIds: result.hits.map((hit) => hit.cardId),
+          hits: result.hits.slice(0, 20).map((hit) => ({ cardId: hit.cardId, contentHash: hit.contentHash, spaceId: hit.spaceId, relativePath: hit.relativePath })),
         },
       );
     },
@@ -231,8 +232,8 @@ function createKnowledgeReadTool(deps: KnowledgeToolDependencies): AgentTool {
         ? `images\t${images.length}\n${imageLines.join('\n')}\n\n`
         : '';
       return textResult(
-        `# ${card.title}\n\n${imageBlock}${card.content}`,
-        { spaceId, relativePath, cardId: card.cardId, title: card.title, images },
+        `# ${card.title}\n\ncardId: ${card.cardId}\ncontentHash: ${card.contentHash ? `sha256:${card.contentHash}` : 'unavailable'}\n\n${imageBlock}${card.content}`,
+        { spaceId, relativePath, cardId: card.cardId, contentHash: card.contentHash, title: card.title, images },
       );
     },
   };
@@ -268,7 +269,7 @@ function createKnowledgeCompileTool(deps: KnowledgeToolDependencies): AgentTool 
       const limit = typeof args.limit === 'number' && Number.isFinite(args.limit) ? Math.max(1, Math.trunc(args.limit)) : 12;
       const pack = deps.compile.compile(query, { limit });
       const hitLines = pack.hits.map((hit, index) => (
-        `${index + 1}. ${hit.title} · ${hit.cardId} · ${hit.reasons.join('; ')}`
+        `${index + 1}. ${hit.title} · ${hit.cardId} · sha256:${hit.contentHash} · ${hit.reasons.join('; ')}`
       ));
       const conflictLines = pack.conflicts.map((conflict) => (
         `conflict ${conflict.kind}: ${conflict.leftCardId} <> ${conflict.rightCardId}`
@@ -282,6 +283,7 @@ function createKnowledgeCompileTool(deps: KnowledgeToolDependencies): AgentTool 
         packId: pack.packId,
         count: pack.hits.length,
         cardIds: pack.hits.map((hit) => hit.cardId),
+        hits: pack.hits.map((hit) => ({ cardId: hit.cardId, contentHash: hit.contentHash, spaceId: hit.spaceId, relativePath: hit.relativePath })),
       });
     },
   };

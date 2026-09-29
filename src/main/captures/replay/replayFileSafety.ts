@@ -65,25 +65,17 @@ async function diskLock(projectRoot: string): Promise<() => Promise<void>> {
   await safePath(projectRoot, target);
   const token = randomUUID();
   for (let attempt = 0; attempt < 2; attempt += 1) {
+    const pending = path.join(directory, `.replay-lock-${process.pid}-${token}.pending`);
     try {
-      const handle = await fs.open(target, 'wx');
-      const created = await handle.stat();
+      // Publish only a complete owner record. A crash between exclusive create
+      // and write otherwise leaves an empty lock with no pid to verify.
+      const handle = await fs.open(pending, 'wx');
       try {
         await handle.writeFile(JSON.stringify({ pid: process.pid, token })); await handle.sync();
-      } catch (error) {
-        await handle.close();
-        await safePath(projectRoot, target);
-        const current = await fs.lstat(target);
-        // Only remove the inode exclusively created by this attempt, never a replacement owner.
-        if (current.dev === created.dev && current.ino === created.ino && current.birthtimeMs === created.birthtimeMs) {
-          const contents = await fs.readFile(target, 'utf8');
-          let recordedToken: unknown;
-          try { recordedToken = (JSON.parse(contents) as { token?: unknown }).token; } catch { /* interrupted own write */ }
-          if (recordedToken === undefined || recordedToken === token) await fs.unlink(target);
-        }
-        throw error;
-      }
-      await handle.close();
+      } finally { await handle.close(); }
+      // A hard link has create-if-absent semantics on the same volume; unlike
+      // rename it cannot replace another process's replay.lock.
+      await fs.link(pending, target);
       return async () => {
         await safePath(projectRoot, target);
         const owner = JSON.parse(await fs.readFile(target, 'utf8')) as { token: string };
@@ -102,6 +94,8 @@ async function diskLock(projectRoot: string): Promise<() => Promise<void>> {
       const after = await fs.stat(target);
       if (before.ino !== after.ino || before.mtimeMs !== after.mtimeMs || before.size !== after.size) throw new Error('REPLAY_STORE_BUSY');
       await fs.unlink(target);
+    } finally {
+      await fs.rm(pending, { force: true });
     }
   }
   throw new Error('REPLAY_STORE_BUSY');

@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { SubagentRow } from './SubagentRow';
 
-const state = vi.hoisted(() => ({ expanded: false, taskLoading: false, taskError: false, headerLoading: false }));
+const state = vi.hoisted(() => ({ expanded: false, taskLoading: false, taskError: false, headerLoading: false, headerMissing: false }));
 const task = 'Use glob to inspect the project root.';
 const body = JSON.stringify({ capsule: {
   task, goal: task, scope: '', outputRequirements: '', stopConditions: [], acceptedFacts: [], hypotheses: [],
@@ -21,7 +21,7 @@ vi.mock('./useSubagentDisclosure', () => ({ useSubagentDisclosure: () => ({
   factsOpen: false, constraintsOpen: false, toggle: () => {}, openCard: () => {},
 }) }));
 vi.mock('./useDelegationTrace', () => ({ useDelegationTrace: () => ({
-  page: { header: state.headerLoading ? null : { task, profile: 'general', status: 'complete', mode: 'wait', startedAt: 1,
+  page: { header: state.headerLoading || state.headerMissing ? null : { task, profile: 'general', status: 'complete', mode: 'wait', startedAt: 1,
     completedAt: 1000, taskAvailable: true }, steps: [], total: 0, revision: 1 },
   loading: false, headerLoading: state.headerLoading, hasEarlier: false, loadEarlier: async () => {}, retry: () => {},
 }) }));
@@ -75,4 +75,19 @@ it('presents the frozen task once in each card state and unmounts the preview on
   expect(pending.body.textContent).not.toContain('chat.subagentNoActions');
   expect(pending.body.textContent).not.toContain('chat.subagentNoFinal');
   state.headerLoading = false;
+});
+
+it('shows the parent receipt and task when admission fails before a child trace exists', () => {
+  state.expanded = true;
+  state.headerMissing = true;
+  const failedRow = { ...row, status: 'error' as const, resultPreview: 'SUBAGENT_BUDGET: child wall time exceeded' };
+  try {
+    const opened = new DOMParser().parseFromString(renderToStaticMarkup(createElement(SubagentRow, { row: failedRow, sessionId: 's1' })), 'text/html');
+    expect(opened.querySelector('.work-process-subagent-receipt-error[role="alert"]')?.textContent).toContain('SUBAGENT_BUDGET');
+    expect(opened.querySelector('.work-process-subagent-task')?.textContent).toContain(task);
+    expect(opened.querySelector('.work-process-subagent-task')?.textContent).not.toContain('chat.subagentContentUnavailable');
+  } finally {
+    state.headerMissing = false;
+    state.expanded = false;
+  }
 });

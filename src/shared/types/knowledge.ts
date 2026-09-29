@@ -20,7 +20,7 @@ export const KNOWLEDGE_LIFECYCLES = [
   'candidate',
   'verified',
   'promoted',
-  'deprecated',
+  'retired',
 ] as const;
 export type KnowledgeLifecycle = (typeof KNOWLEDGE_LIFECYCLES)[number];
 
@@ -125,6 +125,8 @@ export interface KnowledgeCardRecord {
   caseId?: string;
   chapters?: KnowledgeCaseChapters;
   images?: KnowledgeImageRef[];
+  /** Sanitized IDs of declared import attachments that were absent at ingest. */
+  missingAssets?: string[];
   /** Import path provenance. Never an absolute path or original filename. */
   sourceHash?: string;
   sourceMtimeMs?: number;
@@ -153,6 +155,8 @@ export interface KnowledgeCardSummary {
 }
 
 export interface KnowledgeCardDetail extends KnowledgeCardSummary {
+  /** SHA-256 of the exact Markdown source returned by the card read. */
+  contentHash?: string;
   content: string;
   body: string;
   scope: KnowledgeScope;
@@ -161,6 +165,8 @@ export interface KnowledgeCardDetail extends KnowledgeCardSummary {
   caseId?: string;
   chapters?: KnowledgeCaseChapters;
   images?: KnowledgeImageRef[];
+  /** Sanitized IDs preserved from an incomplete import. */
+  missingAssets?: string[];
   /** Ingest provenance projected from the card record; absent for hand-written cards. */
   sourceHash?: string;
   sourceMtimeMs?: number;
@@ -195,6 +201,7 @@ export type KnowledgeRetrievalLane = (typeof KNOWLEDGE_RETRIEVAL_LANES)[number];
 
 export interface KnowledgeLaneHit {
   cardId: string;
+  contentHash: string;
   spaceId: string;
   relativePath: string;
   title: string;

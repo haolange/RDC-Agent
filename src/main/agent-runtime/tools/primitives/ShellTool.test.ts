@@ -98,7 +98,7 @@ describe('shellTrailer', () => {
     expect(parsed.trailer?.provider).not.toBe('FileSystem');
   });
 
-  it('preserves a complete PowerShell formatting stream', () => {
+  it('preserves a complete PowerShell formatting stream', { timeout: 15_000 }, () => {
     if (process.platform !== 'win32') return;
     const wrapped = wrapPowerShellCommand("@([pscustomobject]@{Name='alpha';Count=1}, [pscustomobject]@{Name='beta';Count=2}) | Format-Table -AutoSize", 'RDC_FORMAT');
     const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(wrapped, 'utf16le').toString('base64')], { encoding: 'utf8', timeout: 10000 });
@@ -203,6 +203,19 @@ describe('ShellTool', () => {
       projectId: null,
       sessionId: null,
     })).rejects.toThrow('exactly one of command or rdc');
+    await expect(shellTool.execute('s-whitespace', { command: '  ' }, undefined, undefined, {
+      workspaceRoot: process.cwd(),
+      projectRootPath: process.cwd(),
+      projectId: null,
+      sessionId: null,
+    })).rejects.toThrow('exactly one of command or rdc');
+  });
+
+  it('validates shell input modes without entering approval or execution', () => {
+    expect(() => shellTool.validateArgs?.({ command: 'echo ok' })).not.toThrow();
+    expect(() => shellTool.validateArgs?.({ rdc: { discovery: { kind: 'search', query: 'draw', limit: 5 } } })).not.toThrow();
+    expect(() => shellTool.validateArgs?.({ command: '' })).toThrow('SHELL_INPUT');
+    expect(() => shellTool.validateArgs?.({ command: ' ', rdc: { discovery: { kind: 'search', query: 'draw', limit: 5 } } })).toThrow('SHELL_INPUT');
   });
 
   it('injects the resolved interpreter and host OS into the dynamic description', () => {

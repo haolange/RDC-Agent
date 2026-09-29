@@ -12,9 +12,9 @@ const {
 } = require('../src/shared/utils/agentModelRoute.ts');
 const { AgentManifestService } = require('../src/main/settings/AgentManifestService.ts');
 const {
-  HISTORICAL_RESERVED_AGENT_IDS,
-  isHistoricalReservedAgentId,
-} = require('../src/main/settings/seed-migration/officialSeedGenerations.ts');
+  RESERVED_AGENT_IDS,
+  isReservedAgentId,
+} = require('../src/main/settings/reservedAgentIds.ts');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -194,10 +194,10 @@ async function main() {
     !existsSrc(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/DeveloperDiagnosticsSettings.tsx')),
     'DeveloperDiagnosticsSettings must remain removed.',
   );
-  assert(isHistoricalReservedAgentId('ask') && isHistoricalReservedAgentId('plan') && isHistoricalReservedAgentId('edit'), 'ask/plan/edit must be reserved historical ids.');
-  assert(isHistoricalReservedAgentId('ask_agent') && isHistoricalReservedAgentId('triage-agent'), 'S0 specialist aliases must be reserved.');
-  assert(!isHistoricalReservedAgentId('general') && !isHistoricalReservedAgentId('debugger'), 'Four builtins must not be reserved historical ids.');
-  assert(HISTORICAL_RESERVED_AGENT_IDS.has('rdc-debugger'), 'Shared reserved set must include S0 specialist ids.');
+  assert(isReservedAgentId('ask') && isReservedAgentId('plan') && isReservedAgentId('edit'), 'ask/plan/edit must remain reserved ids.');
+  assert(isReservedAgentId('ask_agent') && isReservedAgentId('triage-agent'), 'Old specialist aliases must remain reserved.');
+  assert(!isReservedAgentId('general') && !isReservedAgentId('debugger'), 'Four builtins must not be reserved.');
+  assert(RESERVED_AGENT_IDS.has('rdc-debugger'), 'Reserved set must include old specialist ids.');
   assert(agentsSettings.includes('settings.agents.diagnostics'), 'Agents settings should render the manifest diagnostics list.');
   assert(agentsSettings.includes('data-testid="settings-agent-manifest-diagnostics"'), 'Agents diagnostics must keep a stable test id.');
   assert(agentsSettings.includes('settings.agentManifestTitle'), 'Agents settings should render manifest management.');
@@ -465,6 +465,7 @@ handoffs: []
 Reserved historical filename.
 `, 'utf8');
     writeCustomManifest(path.join(agentsPath, 'plan.agent.md'), { name: 'Historical Plan' });
+    const reservedUserBytes = fs.readFileSync(path.join(agentsPath, 'plan.agent.md'));
 
     const projectRoot = path.join(tempRoot, 'project');
     const projectAgents = path.join(projectRoot, '.rdc-agent', 'agents');
@@ -501,7 +502,8 @@ Reserved historical filename.
     );
     assert(fs.existsSync(path.join(projectAgents, 'edit.agent.md')), 'Project reserved files must not be auto-deleted.');
     assert(fs.existsSync(path.join(projectAgents, 'ask.agent.md')), 'Project reserved files must remain on disk.');
-    assert(!fs.existsSync(path.join(agentsPath, 'plan.agent.md')), 'Matching user historical plan seed must be purged.');
+    assert(fs.readFileSync(path.join(agentsPath, 'plan.agent.md')).equals(reservedUserBytes), 'Snapshot resolution must not mutate a reserved user file.');
+    assert(!fs.existsSync(path.join(agentsPath, '.seed-migration.json')), 'Snapshot resolution must not create a migration marker.');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

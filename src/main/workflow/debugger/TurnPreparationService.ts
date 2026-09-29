@@ -2,14 +2,14 @@ import { rdcCliInvokerService } from '../../tools/RdcCliInvokerService';
 import { withRdcHostRuntimeEnv } from '../../tools/withRdcHostRuntimeEnv';
 import { assertRdcContextLeaseOwnership } from '../../sessions/RdcRuntimeContextRegistry';
 import { assertExecutionOfferSkillCompatibility } from '../../sessions/handoffSkillCompatibility';
-import { executionOfferRequiredSkillIds } from '../../sessions/handoffSkills';
+import { approvedExecutionOfferForAgent } from '../../sessions/handoffSkills';
 /**
  * TurnPreparationService — prepareTurnContext (compaction / cache / effectivePlan freeze).
  */
 
 import { createHash } from 'crypto';
 import { bindRdcTurn, freezeRdcTurnBinding, rdcBindingFingerprint } from '../../tools/RdcTurnBindings';
-import type { AgentRole } from '@shared/types/agent';
+import { isMissionAgentId, type AgentRole } from '@shared/types/agent';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
@@ -44,7 +44,7 @@ import {
 import {
   isMcpPrefixedToolName,
   partitionDeferredTools,
-  preactivateTaskTools,
+  preactivateWorkflowTools,
 } from './deferredTools';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
@@ -181,7 +181,8 @@ export class TurnPreparationService {
       turnSettings.agentRuntime.context.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
       compiledPolicy.contextCompactionPercent,
     );
-    const profile = { ...input.effectiveProfile, skills: [...new Set([...input.effectiveProfile.skills, ...input.promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)), ...executionOfferRequiredSkillIds(input.sessionId, input.agentId)])] };
+    const approvedExecutionOffer = approvedExecutionOfferForAgent(input.sessionId, input.agentId);
+    const profile = { ...input.effectiveProfile, skills: [...new Set([...input.effectiveProfile.skills, ...input.promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)), ...(approvedExecutionOffer?.requiredSkillIds ?? [])])] };
     const profileSkills = profile.skills;
     const skillIntersection = resolveSkillIntersection(
       profileSkills,
@@ -223,7 +224,12 @@ export class TurnPreparationService {
     const slotKey = agentSlotKey(resolveExecutionScopeId(input.sessionId), input.agentId);
     const toolSignature = this.deps.createToolSignature(runtimeTools.definitions);
     const activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, toolSignature);
-    preactivateTaskTools(runtimeTools.definitions, activatedDeferredTools);
+    preactivateWorkflowTools(
+      runtimeTools.definitions,
+      activatedDeferredTools,
+      isMissionAgentId(input.agentId)
+        || (approvedExecutionOffer !== null && isMissionAgentId(approvedExecutionOffer.sourceAgentId)),
+    );
     const { injected, deferredMcp, deferredBuiltin } = partitionDeferredTools(
       runtimeTools.definitions,
       activatedDeferredTools,

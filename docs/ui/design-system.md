@@ -110,7 +110,7 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 - 唯一全局入口：`src/renderer/main.tsx` → `styles/global.css` → `design-system.css`。
 - 禁止恢复 `styles/tokens/*` 或未接线的 `oklch-themes.css`。
 - 生产 CSP：`style-src 'self'`（无 `unsafe-inline`）+ `style-src-attr 'none'`。Appearance chrome（`applyChromeTheme`）与组件动态样式必须走 constructable stylesheet（`adoptedStyleSheets` / `useDynStyle` / `assignDynStyle`），禁止 `<style>.textContent` 或 `element.style` 注入。
-- Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThemes` 为 RDC 默认（清理历史污染）。
+- 当前 Settings 只接受 `schemaVersion` **8**；合法的 `appearance.chromeThemes` 用户配置经主题校验保留，缺版本或旧版本明确报错并保留原文件。历史版本升级的主题重置不属于现行读取路径。
 
 ## Token 使用规则
 
@@ -154,7 +154,7 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 
 ## 空态
 
-所有空态使用统一 `<EmptyState title description? actions? visual?>`。Settings 资源列表、Knowledge 列表、Sidebar 只用文案，不放装饰几何体。Right Rail 五卡通过可选 `visual` 槽恢复 token 着色的等距场景（`RightRailEmptyVisuals`，轻模糊、语义 `stop-color`），配一句 honest copy；需要操作时把按钮放进 `actions` 槽。`check:design-tokens` 不豁免 primitive `stop-color`。
+所有空态使用统一 `<EmptyState title description? actions? visual?>`。Settings 资源列表、Knowledge 列表、Sidebar 只用文案，不放装饰几何体。Right Rail 五卡通过可选 `visual` 槽显示中性、紧凑的线框图（`RightRailEmptyVisuals`），配一句 honest copy；不用彩色等距场景、渐变或模糊阴影。需要操作时把按钮放进 `actions` 槽。
 
 共享空态区分紧凑区块与填充面板用途。资源空态以有边界的中性实色承载标题、说明和统一动作组；Tools 的 MCP 保持紧凑，独立资源页使用剩余空间。资源列表行以实色表面、细边框和明确 hover/focus/selected 状态承载内容，长名称可换行，状态不能被挤掉；技能 description 不在列表展开。
 
@@ -257,7 +257,7 @@ pnpm run check:appearance
 pnpm run typecheck
 ```
 
-`check:design-tokens` 豁免：token 定义层 `styles/design-system.css`；Right Rail `stop-color` 随 B7 空态收敛删除。新增豁免必须先改本文件再改脚本。
+`check:design-tokens` 豁免仅限 token 定义层 `styles/design-system.css`。新增豁免必须先改本文件再改脚本。
 
 ### 规则 → 门禁 / 债务批次
 

@@ -184,4 +184,5 @@ describe('Cards write confirm without visiting Conflicts', () => {
     expect(write).toHaveBeenCalled();
     expect(promote).not.toHaveBeenCalled();
   });
+
 });

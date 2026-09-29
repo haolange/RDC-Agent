@@ -41,6 +41,14 @@ interface ShellDetails {
   cwd: string;
 }
 
+function validateShellInputMode(params: ShellParams): void {
+  const hasCommand = typeof params.command === 'string' && params.command.trim().length > 0;
+  const hasRdc = params.rdc !== undefined && params.rdc !== null;
+  if (hasCommand === hasRdc || (params.command !== undefined && !hasCommand)) {
+    throw new Error('SHELL_INPUT: provide exactly one of command or rdc.');
+  }
+}
+
 const sessionShellLocks = new Map<string, Promise<unknown>>();
 
 function withSessionShellLock<T>(sessionId: string | null, work: () => Promise<T>): Promise<T> {
@@ -103,9 +111,9 @@ export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operati
         type: 'object', additionalProperties: false,
         oneOf: [{ type: 'object', required: ['operation', 'args'], properties: { operation: {}, args: {}, experimentId: {} }, additionalProperties: false }, { type: 'object', required: ['discovery'], properties: { discovery: {} }, additionalProperties: false }],
         properties: {
-          discovery: { type: 'object', additionalProperties: false, properties: { kind: { enum: ['search', 'describe'] }, query: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 20 }, operation: { type: 'string' } }, required: ['kind'], oneOf: [{ type: 'object', properties: { kind: { const: 'search' }, query: {}, limit: {} }, required: ['query'], additionalProperties: false }, { type: 'object', properties: { kind: { const: 'describe' }, operation: {} }, required: ['operation'], additionalProperties: false }] },
+          discovery: { type: 'object', additionalProperties: false, properties: { kind: { enum: ['search', 'describe'] }, query: { type: 'string', description: 'Search terms must all match one operation name or description. Search alternative operation names separately; use describe for one exact name.' }, limit: { type: 'integer', minimum: 1, maximum: 20 }, operation: { type: 'string' } }, required: ['kind'], oneOf: [{ type: 'object', properties: { kind: { const: 'search' }, query: {}, limit: {} }, required: ['query'], additionalProperties: false }, { type: 'object', properties: { kind: { const: 'describe' }, operation: {} }, required: ['operation'], additionalProperties: false }] },
           operation: { type: 'string', description: 'Discovered RDC operation allowed by its frozen capability contract. General only.' },
-          args: { type: 'object', description: 'Native operation arguments; replay/context identity is injected by main.' },
+          args: { type: 'object', description: 'Native operation arguments. Omit session_id, capture_file_id, context_id, and other replay identity fields even when a native catalog schema lists them as required; main injects the owning identity and rejects overrides.' },
           experimentId: { type: 'string', description: 'Bind a signed execution receipt to this experiment. Required for investigation closure.' },
         },
       },
@@ -126,9 +134,10 @@ export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operati
     requiresApproval: true,
   },
   permissionHint: 'mutation',
+  validateArgs: validateShellInputMode,
 
   async execute(_toolCallId, params, signal, onUpdate, context) {
-    if ((typeof params.command === 'string') === Boolean(params.rdc)) throw new Error('SHELL_INPUT: provide exactly one of command or rdc.');
+    validateShellInputMode(params);
     if (params.rdc) return withSessionShellLock(context?.sessionId ?? null, () => executeRdcShell(params.rdc!, _toolCallId, signal, context));
     return withSessionShellLock(context?.sessionId ?? null, () => executeShellCommand(
       params,

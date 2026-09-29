@@ -63,7 +63,6 @@ export const MISSION_AGENT_IDS = ['debugger', 'analyzer', 'optimizer'] as const;
 export type MissionAgentId = (typeof MISSION_AGENT_IDS)[number];
 export const SAFE_AGENT_PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 export const DEFAULT_AGENT_ID: AgentId = 'general';
-export const LEGACY_UNKNOWN_PROFILE_ID = 'legacy:unknown';
 
 export const DEFAULT_MODEL_ROUTING: Record<AgentId, { provider: LlmProviderId; model: string }> = {
   general: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },

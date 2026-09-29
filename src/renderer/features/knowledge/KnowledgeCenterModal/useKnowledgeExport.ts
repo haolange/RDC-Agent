@@ -5,6 +5,7 @@ import type {
   KnowledgeExportResult,
   KnowledgeExportScope,
 } from '@shared/types/knowledgeExport';
+import { useI18n } from '../../../i18n';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { knowledgeErrorMessage } from './knowledgeCenterModel';
 import { beginSynchronousFlight, knowledgeExportScopeCounts } from './knowledgeImportExportModel';
@@ -20,6 +21,7 @@ export function useKnowledgeExport(options: {
   hits: KnowledgeLaneHit[];
   selected: { spaceId: string; relativePath: string } | null;
 }) {
+  const { t } = useI18n();
   const request = useKnowledgeRequestScope(options.active);
   const inFlight = useRef(false);
   const [open, setOpen] = useState(false);
@@ -93,12 +95,17 @@ export function useKnowledgeExport(options: {
       });
       if (request.isCurrent(seq)) setResult(exported);
     } catch (err) {
-      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) {
+        const raw = knowledgeErrorMessage(err);
+        setError(raw.includes('KNOWLEDGE_EXPORT_EMPTY_RESULT')
+          ? t('knowledgeCenter.exportNoEligibleCards')
+          : raw);
+      }
     } finally {
       inFlight.current = false;
       if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [format, options.hits, options.selected, request, scope, spaceId]);
+  }, [format, options.hits, options.selected, request, scope, spaceId, t]);
 
   return {
     open,

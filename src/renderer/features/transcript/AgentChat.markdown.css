@@ -260,13 +260,19 @@
   border-top: 1px solid var(--token-border-muted);
 }
 
-.markdown-body table {
-  width: 100%;
+.markdown-table-scroll {
+  max-width: 100%;
   margin: 0 0 var(--space-3);
+  overflow-x: auto;
+}
+
+.markdown-body table {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
   border-collapse: collapse;
   border: 1px solid var(--token-border-default);
   border-radius: var(--radius-md);
-  overflow: hidden;
   font-size: var(--text-sm);
 }
 
@@ -278,11 +284,18 @@
 
 .markdown-body th,
 .markdown-body td {
+  min-width: 12ch;
+  max-width: 36ch;
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--token-border-muted);
   border-right: 1px solid var(--token-border-muted);
   text-align: left;
   vertical-align: top;
+}
+
+.markdown-body th:first-child,
+.markdown-body td:first-child {
+  white-space: nowrap;
 }
 
 .markdown-body th:last-child,

@@ -84,7 +84,13 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   const statusTone = resolveCaptureStatusTone({ phase: state?.phase, pending, partial });
   const callouts = collectCaptureCallouts({
     locked,
-    lockedLabel: t('control.replay.locked'),
+    lockedLabel: t(state?.interactionLock === 'agent_running'
+      ? 'control.replay.lockedAgent'
+      : state?.interactionLock === 'delegated_execution'
+        ? 'control.replay.lockedDelegation'
+        : state?.interactionLock === 'native_exit_unconfirmed'
+          ? 'control.replay.lockedUnconfirmed'
+          : 'control.replay.locked'),
     warning: state?.warning ?? null,
     finalPresentTitle: t('control.replay.finalPresentUnavailable'),
     actionError: error,

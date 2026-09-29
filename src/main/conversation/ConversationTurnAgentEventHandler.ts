@@ -476,6 +476,9 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               const toolName = String(payload.toolName ?? 'approval');
               if (isPlanReviewApprovalPayload({ kind: payload.kind, toolName })) {
                 pendingContinuation.planReview = true;
+                if (turnStreamState.currentLoopThinkingStatus === 'streaming') {
+                  turnStreamState.currentLoopThinkingStatus = 'complete';
+                }
                 turnStreamState.turnHadAskPause = true;
                 turnStreamState.pendingNewLoop = true;
                 markLoopCommentary();

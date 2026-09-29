@@ -19,8 +19,16 @@ export function applyPlanReviewRequested(input: {
   const planReview = input.payload.planReview;
   if (!planReview) return input.workTrace ?? null;
   const toolCallId = String(input.payload.toolCallId ?? input.payload.approvalId ?? `approval-${input.payload.toolCallId ?? 'runtime'}`);
+  const pausedTrace = input.workTrace
+    ? {
+        ...input.workTrace,
+        blocks: input.workTrace.blocks.map((block) => block.thinkingStatus === 'streaming'
+          ? { ...block, thinkingStatus: 'complete' as const }
+          : block),
+      }
+    : input.workTrace;
   return upsertRuntimeToolCall(
-    supersedePreviousPlanReviews(input.workTrace, toolCallId),
+    supersedePreviousPlanReviews(pausedTrace, toolCallId),
     {
       id: toolCallId,
       toolName: 'plan_artifact',

@@ -39,6 +39,7 @@ const activeSignalRenderSource = [
 assert(activeSignalSource.includes('data-active-signal={active ? tone : undefined}'), 'ActiveSignalText should expose an active-state DOM contract');
 assert(activeSignalHelper.includes("status === 'running' || status === 'pending'"), 'active signal must be driven by running/pending Work Process status');
 assert(activeSignalHelper.includes("thinkingStatus === 'streaming'"), 'active signal must recognize streaming thinking lifecycle');
+assert(activeSignalHelper.includes('thinkingStatus === undefined && isActiveWorkProcessStatus(rowStatus)'), 'completed thinking must not animate while plan review keeps the work row running');
 assert(activeSignalStyles.includes('.active-signal-text.is-active'), 'active signal text CSS class is missing');
 assert(activeSignalStyles.includes('display: inline-block'), 'active signal must use inline-block so flex headers keep a wash box');
 assert(activeSignalStyles.includes('background-clip: text'), 'active signal must use clipped-gradient energy shimmer');
@@ -1029,7 +1030,8 @@ assert(presentationSource.includes('actionCount'), 'presentation should expose a
 assert(!componentSource.includes('chat.workProcessToolEvidence'), 'Work Process must not render a redundant succeeded/failed/skipped aggregate');
 assert(!i18nSource.includes('chat.workProcessToolEvidence'), 'redundant Work Process tool aggregate copy must be removed');
 assert(presentationSource.includes("normalized.startsWith('mcp__')"), 'dynamic MCP wildcard should have a semantic display path');
-assert(presentationSource.includes("label: status === 'streaming' || isActiveBlock"), 'thinking labels should branch on active vs settled state');
+assert(presentationSource.includes("label: status === 'streaming'"), 'thinking labels should follow the thinking lifecycle');
+assert(!presentationSource.includes("label: status === 'streaming' || isActiveBlock"), 'a pending plan must not keep settled thinking active');
 assert(presentationSource.includes('resolveSettledThinkingLabel'), 'settled thinking should resolve Thought-for labels centrally');
 assert(presentationSource.includes('已思考 ·'), 'settled thinking label should use 已思考 · duration copy');
 assert(!presentationSource.includes('`思考了 ${duration}`') && !presentationSource.includes('思考了 ${duration}'), 'settled thinking must not use 思考了 duration copy');
@@ -1135,9 +1137,8 @@ assert(!componentSource.includes('open={row.thinkingOpenByDefault}'), 'thinking 
 assert(!componentSource.includes('onToggle={handleThinkingToggle}'), 'thinking must not use details onToggle for sticky override (programmatic open fires toggle)');
 assert(!componentSource.includes('isSummaryThinking'), 'summary thinking must not bypass the top disclosure hierarchy');
 assert(
-  presentationSource.includes('openByDefault: isActiveBlock || status === \'streaming\'')
-    || presentationSource.includes('openByDefault: isActiveBlock || status === "streaming"'),
-  'process-loop thinking policy must expand while active/streaming',
+  presentationSource.includes('openByDefault: status === \'streaming\''),
+  'process-loop thinking should expand only while its own thinking is streaming',
 );
 assert(!componentSource.includes("t('chat.workProcessViewSteps'"), 'section should not expose the legacy tool-step disclosure');
 assert(!componentSource.includes('StepsListIcon'), 'legacy steps icon component should be removed');

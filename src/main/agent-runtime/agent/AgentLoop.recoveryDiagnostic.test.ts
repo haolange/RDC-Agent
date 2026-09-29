@@ -87,6 +87,56 @@ function makeProviderStream(factory: () => Promise<AssistantMessage>): EventStre
 }
 
 describe('AgentLoop recovery diagnostics', () => {
+  it('discards an unexecuted streamed tool call before retrying a failed provider response', async () => {
+    const observedCallIds: string[][] = [];
+    let attempts = 0;
+    const provider: ProviderStrategy = {
+      api: 'openai-completions',
+      stream: (_model, requestContext) => {
+        observedCallIds.push(requestContext.messages.flatMap((message) => (
+          message.role === 'assistant'
+            ? message.content.filter((block) => block.type === 'toolCall').map((block) => block.id)
+            : []
+        )));
+        attempts += 1;
+        if (attempts !== 1) return makeProviderStream(async () => makeAssistantMessage('recovered'));
+
+        const response = new EventStream<AssistantMessageEvent, AssistantMessage>();
+        const partial: AssistantMessage = {
+          ...makeAssistantMessage(''),
+          content: [{ type: 'toolCall', id: 'call_without_output', name: 'lookup', arguments: {} }],
+          stopReason: 'error',
+        };
+        void Promise.resolve().then(() => {
+          response.push({ type: 'start', partial });
+          response.error(new ProviderHttpError('openai-responses', 500, 'stream interrupted'));
+        });
+        return response;
+      },
+    };
+    const recovery = new ErrorRecovery({ primaryModel: TEST_MODEL, maxRetries: 1 });
+    vi.spyOn(recovery, 'getRetryDelay').mockReturnValue(0);
+    const context: AgentContext = { messages: [] };
+    const { stream, producerCompletion } = agentLoop([{
+      role: 'user', content: 'look up the value', timestamp: Date.now(),
+    }], context, {
+      model: TEST_MODEL,
+      convertToLlm: (messages) => messages as Message[],
+      errorRecovery: recovery,
+      maxTurns: 1,
+      streamOptions: { requestPlan: TEST_REQUEST_PLAN },
+    }, provider);
+
+    for await (const _event of stream) {
+      // Drain the same UI stream that saw the failed partial response.
+    }
+    await producerCompletion;
+    expect(attempts).toBe(2);
+    expect(observedCallIds).toEqual([[], []]);
+    expect(context.messages.map((message) => message.role)).toEqual(['user', 'assistant']);
+    expect(context.messages[1]).toMatchObject({ content: [{ type: 'text', text: 'recovered' }] });
+  });
+
   it('emits started and completed diagnostics when retry succeeds', async () => {
     let attempts = 0;
     const provider: ProviderStrategy = {

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import type { RequestPlan } from '@shared/types/providerCapability';
+import type { ConversationMessage } from '@shared/types/conversation';
 import type { AssistantMessage, Message } from '../agent-runtime/core/types';
 import { createContinuationArtifact } from '../agent-runtime/reasoning/ContinuationArtifacts';
 import { createProviderStateRef } from '../agent-runtime/reasoning/ProviderStateRefs';
@@ -546,6 +547,35 @@ describe('SessionContextJournal v2', () => {
   it('fails closed when a visible turn is missing from the journal', () => {
     const journal = new SessionContextJournal();
     vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([]);
+    vi.spyOn(storageAdapter, 'readConversationHistory').mockReturnValue([]);
+    expect(() => journal.materialize('session-1', ['missing-turn'], responsesPlan))
+      .toThrow('Session context journal is incomplete');
+  });
+
+  it('continues after a process-interrupted turn without promoting partial tool output into context', () => {
+    const journal = new SessionContextJournal();
+    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([]);
+    const history = [
+      { id: 'user-1', turnId: 'interrupted-turn', sessionId: 'session-1', projectId: 'project-1', role: 'user', content: 'Inspect event 42', createdAt: 1 },
+      { id: 'assistant-1', turnId: 'interrupted-turn', sessionId: 'session-1', projectId: 'project-1', role: 'assistant', content: 'Unverified partial answer', status: 'error', createdAt: 2, updatedAt: 3, diagnostic: { code: 'CONVERSATION_INTERRUPTED', severity: 'error', userMessage: 'Interrupted' } },
+    ] as ConversationMessage[];
+    vi.spyOn(storageAdapter, 'readConversationHistory').mockReturnValue(history);
+
+    const result = journal.materialize('session-1', ['interrupted-turn'], responsesPlan);
+    expect(result.messages).toHaveLength(2);
+    expect(result.messages[0]).toMatchObject({ role: 'user', content: 'Inspect event 42' });
+    expect(JSON.stringify(result.messages)).toContain('interrupted before its context journal committed');
+    expect(JSON.stringify(result.messages)).not.toContain('Unverified partial answer');
+  });
+
+  it('does not recover an unrelated missing terminal entry', () => {
+    const journal = new SessionContextJournal();
+    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([]);
+    vi.spyOn(storageAdapter, 'readConversationHistory').mockReturnValue([
+      { id: 'user-1', turnId: 'missing-turn', sessionId: 'session-1', projectId: 'project-1', role: 'user', content: 'Inspect', createdAt: 1 },
+      { id: 'assistant-1', turnId: 'missing-turn', sessionId: 'session-1', projectId: 'project-1', role: 'assistant', content: 'Answer', status: 'error', createdAt: 2 },
+    ] as ConversationMessage[]);
+
     expect(() => journal.materialize('session-1', ['missing-turn'], responsesPlan))
       .toThrow('Session context journal is incomplete');
   });

@@ -154,6 +154,9 @@ export interface SubagentBudgetState {
   childrenSpawned: number;
   aggregateToolCalls: number;
   wallStartedAt: number;
+  wallPausedMs: number;
+  wallPausedAt: number | null;
+  activeChildren: number;
   budget: SubagentBudget;
 }
 
@@ -166,11 +169,36 @@ export function createSubagentBudgetState(
     childrenSpawned: 0,
     aggregateToolCalls: 0,
     wallStartedAt: Date.now(),
+    wallPausedMs: 0,
+    wallPausedAt: null,
+    activeChildren: 0,
     budget,
   };
 }
 
-export function assertSubagentBudgetAllowsChild(state: SubagentBudgetState): void {
+export function subagentActiveWallMs(state: SubagentBudgetState, now = Date.now()): number {
+  if (state.childrenSpawned === 0 && state.activeChildren === 0) return 0;
+  const idleMs = state.wallPausedAt === null ? 0 : Math.max(0, now - state.wallPausedAt);
+  return Math.max(0, now - state.wallStartedAt - state.wallPausedMs - idleMs);
+}
+
+export function startSubagentBudgetChild(state: SubagentBudgetState, now = Date.now()): void {
+  if (state.childrenSpawned === 0 && state.activeChildren === 0) state.wallStartedAt = now;
+  if (state.wallPausedAt !== null) {
+    state.wallPausedMs += Math.max(0, now - state.wallPausedAt);
+    state.wallPausedAt = null;
+  }
+  state.childrenSpawned += 1;
+  state.activeChildren += 1;
+}
+
+export function finishSubagentBudgetChild(state: SubagentBudgetState, now = Date.now()): void {
+  if (state.activeChildren <= 0) throw new Error('SUBAGENT_BUDGET: no active child to finish.');
+  state.activeChildren -= 1;
+  if (state.activeChildren === 0) state.wallPausedAt = now;
+}
+
+export function assertSubagentBudgetAllowsChild(state: SubagentBudgetState, now = Date.now()): void {
   if (state.depth >= state.budget.maxDepth) {
     throw new Error(`SUBAGENT_BUDGET: maxDepth ${state.budget.maxDepth} exceeded.`);
   }
@@ -182,8 +210,9 @@ export function assertSubagentBudgetAllowsChild(state: SubagentBudgetState): voi
       `SUBAGENT_BUDGET: maxAggregateToolCalls ${state.budget.maxAggregateToolCalls} exceeded.`,
     );
   }
-  const elapsed = Date.now() - state.wallStartedAt;
-  if (elapsed >= state.budget.maxAggregateWallMs) {
+  // Only time with an active child spends the child wall window. Parent work
+  // between delegations must not consume time reserved for child execution.
+  if (subagentActiveWallMs(state, now) >= state.budget.maxAggregateWallMs) {
     throw new Error(
       `SUBAGENT_BUDGET: maxAggregateWallMs ${state.budget.maxAggregateWallMs} exceeded.`,
     );

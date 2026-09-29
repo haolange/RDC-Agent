@@ -31,7 +31,7 @@ export const LIFECYCLE_LABEL_KEYS: Record<KnowledgeLifecycle, TranslationKey> = 
   candidate: 'knowledgeCenter.lifecycleCandidate',
   verified: 'knowledgeCenter.lifecycleVerified',
   promoted: 'knowledgeCenter.lifecyclePromoted',
-  deprecated: 'knowledgeCenter.lifecycleDeprecated',
+  retired: 'knowledgeCenter.lifecycleRetired',
 };
 
 export const LANE_LABEL_KEYS: Record<KnowledgeRetrievalLane, TranslationKey> = {

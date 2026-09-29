@@ -47,15 +47,16 @@ const PANELS: Array<{ id: AgentPanel; icon: IconName }> = [
   { id: 'instructions', icon: 'nav-skills' },
 ];
 
-/** Read-only configuration status derived from the enabled flag and the projected model option. */
+/** Read-only configuration status derived from the enabled flag, model route, and required tool grant. */
 function configStatus(agent: AgentManifestDraft, settings: AppSettings, t: Translate): { label: string; tone: 'success' | 'warning' | 'error' | 'primary' } {
   if (!agent.enabled) return { label: t('settings.disabled'), tone: 'primary' };
   const modelId = agent.models[0] ?? '';
   if (!modelId) return { label: t('settings.agentStatusNoModel'), tone: 'warning' };
   const option = settings.agents.modelOptions.find((entry) => entry.canonicalId === modelId);
   if (!option) return { label: t('settings.routeReasonModelInvalid'), tone: 'error' };
-  if (option.status === 'ready') return { label: t('settings.agentStatusAvailable'), tone: 'success' };
-  return { label: option.disabledReason ?? t('settings.modelUnavailable'), tone: 'warning' };
+  if (option.status !== 'ready') return { label: option.disabledReason ?? t('settings.modelUnavailable'), tone: 'warning' };
+  if (agent.tools.length === 0) return { label: t('settings.agentStatusNoTools'), tone: 'warning' };
+  return { label: t('settings.agentStatusAvailable'), tone: 'success' };
 }
 
 export function provenanceLabel(scope: AgentProvenanceScope | null, t: Translate): string {

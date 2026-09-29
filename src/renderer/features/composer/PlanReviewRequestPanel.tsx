@@ -9,7 +9,8 @@ import './composer-plan-review.css';
 
 export const PlanReviewRequestPanel: React.FC<{
   request: PendingPlanReviewRequest;
-}> = ({ request }) => {
+  onStop?: () => Promise<void>;
+}> = ({ request, onStop }) => {
   const { t } = useI18n();
   const submit = usePlanReviewSubmit();
   const [feedback, setFeedback] = useState('');
@@ -39,6 +40,21 @@ export const PlanReviewRequestPanel: React.FC<{
     }
   };
 
+  const stop = async () => {
+    if (!onStop || submitting.current) return;
+    submitting.current = true;
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      await onStop();
+    } catch (reason) {
+      if (mounted.current) setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      submitting.current = false;
+      if (mounted.current) setIsSubmitting(false);
+    }
+  };
+
   return (
     <section className="composer-plan-review" data-testid="plan-review-request-panel" aria-busy={isSubmitting}>
       <h2 className="composer-plan-review__title">{t('chat.planReviewImplement')}</h2>
@@ -52,6 +68,9 @@ export const PlanReviewRequestPanel: React.FC<{
         aria-expanded={editing} aria-controls={feedbackId} onClick={() => setEditing(!editing)}>
         {t('chat.planReviewFeedbackLabel')}
       </Button>
+      {onStop ? <Button variant="ghost" disabled={isSubmitting} onClick={() => void stop()}>
+        {t('chat.planReviewStop')}
+      </Button> : null}
       {editing ? <div id={feedbackId} className="composer-plan-review__revision">
         <Textarea
           ref={feedbackRef}

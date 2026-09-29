@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({ app: { getPath: () => process.cwd(), getAppPath: () => process.cwd() } }));
 vi.mock('../../settings/SettingsService', () => ({ settingsService: { getAll: () => ({ paths: {}, llm: { providers: [], agentRoutes: [] } }) } }));
-vi.mock('../../settings/AgentManifestService', () => ({ agentManifestService: { getEffectiveProfiles: () => [{ id: 'general', enabled: true, instructions: 'General', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'] }] } }));
+vi.mock('../../settings/AgentManifestService', () => ({ agentManifestService: { getEffectiveProfiles: () => [{ id: 'general', enabled: true, instructions: 'General', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'], compiledRoute: { providerId: 'openai', modelId: 'gpt-5.6-sol' } }] } }));
 
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import { TaskRegistry } from '../../agent-runtime/tasks';

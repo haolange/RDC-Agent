@@ -15,6 +15,7 @@
 
 import { EventStream } from '../core/EventStream';
 import { ErrorRecovery } from './ErrorRecovery';
+import { convertAgentMessagesToLlm } from './ContextManager';
 import type {
   AgentEvent,
   AgentMessage,
@@ -75,7 +76,7 @@ export interface AgentOptions {
   toolExecutor?: ToolExecutor;
   /**
    * 自定义 AgentMessage → LLM Message 的转换函数。
-   * 缺省实现：保留 user / assistant / toolResult 三种标准消息。
+   * 缺省实现：保留标准消息，并将工具图像交给模型的多模态输入。
    */
   convertToLlm?: (messages: AgentMessage[]) => Message[];
   /** 可选的上下文变换（如压缩 / 剪裁）。 */
@@ -97,24 +98,6 @@ export interface AgentOptions {
   onRequest?: AgentLoopConfig['onRequest'];
   onResponse?: AgentLoopConfig['onResponse'];
   beforeRequestMessages?: AgentLoopConfig['beforeRequestMessages'];
-}
-
-// =====================================================================
-// 默认 convertToLlm
-// =====================================================================
-
-/**
- * 默认 convertToLlm：保留三种标准 role 的消息，
- * 其它 CustomAgentMessage 在送入 LLM 之前被丢弃。
- */
-function defaultConvertToLlm(messages: AgentMessage[]): Message[] {
-  const result: Message[] = [];
-  for (const msg of messages) {
-    if (msg.role === 'user' || msg.role === 'assistant' || msg.role === 'toolResult') {
-      result.push(msg as Message);
-    }
-  }
-  return result;
 }
 
 // =====================================================================
@@ -380,7 +363,7 @@ export class Agent {
     const opts = this._options;
     return {
       model: this._state.model,
-      convertToLlm: opts.convertToLlm ?? defaultConvertToLlm,
+      convertToLlm: opts.convertToLlm ?? convertAgentMessagesToLlm,
       transformContext: opts.transformContext,
       streamOptions: opts.streamOptions,
       resolveMaxTokens: opts.resolveMaxTokens,

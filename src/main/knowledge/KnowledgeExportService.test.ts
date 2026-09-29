@@ -143,12 +143,14 @@ describe('KnowledgeExportService', () => {
     expect(reimported.stagedImagesByCardId?.get('user:cases/aird-1.md')?.[0]?.relativePath).toBe(imagePath);
   });
 
-  it('omits missing images from the exported yaml instead of declaring them', async () => {
+  it('excludes incomplete cards instead of exporting a laundered copy', async () => {
     const targetPath = absoluteTarget('knowledge.zip');
     const { service, written } = createService([
       detail({ images: [{ relativePath: 'cases/aird-1/observed.png', role: 'observed' }] }),
+      detail({ cardId: 'user:facts/complete.md', relativePath: 'facts/complete.md', type: 'fact', lifecycle: 'draft', images: [] }),
+      detail({ cardId: 'user:facts/missing.md', relativePath: 'facts/missing.md', missingAssets: ['asset-12345678'] }),
     ]);
-    await service.export({
+    const result = await service.export({
       format: 'package',
       scope: 'space',
       spaceId: 'user',
@@ -157,8 +159,21 @@ describe('KnowledgeExportService', () => {
     const parsed = parseYaml(packageYaml(written.get(targetPath)!)) as {
       cards: Array<{ images?: unknown }>;
     };
+    expect(result.cardCount).toBe(1);
+    expect(result.excludedCount).toBe(2);
     expect(parsed.cards[0]?.images).toBeUndefined();
     expect(packageFiles(written.get(targetPath)!).has('cases/aird-1/observed.png')).toBe(false);
+  });
+
+  it('does not create an export when every selected card has missing assets', async () => {
+    const targetPath = absoluteTarget('knowledge.zip');
+    const { service, written } = createService([
+      detail({ missingAssets: ['asset-12345678'] }),
+    ]);
+    await expect(service.export({
+      format: 'package', scope: 'space', spaceId: 'user', targetPath,
+    })).rejects.toThrow('KNOWLEDGE_EXPORT_EMPTY_RESULT');
+    expect(written.has(targetPath)).toBe(false);
   });
 
   it('reports a duplicate cardId through the existing conflict path', async () => {

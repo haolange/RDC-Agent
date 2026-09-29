@@ -90,11 +90,13 @@ describe('investigation system contract', () => {
     expect(() => writeDraft(service, 'not_a_kind', { worldStateId: 'x' })).toThrow(InvestigationError);
     const tools = createInvestigationTools(SESSION_ID, { service });
     expect(tools.map((tool) => tool.name)).toEqual([
+      'investigation_schema',
       'investigation_read',
       'investigation_write',
       'investigation_list',
     ]);
     expect(CANONICAL_TOOL_TOKEN_EXPANSIONS.investigation).toEqual([
+      'investigation_schema',
       'investigation_read',
       'investigation_write',
       'investigation_list',

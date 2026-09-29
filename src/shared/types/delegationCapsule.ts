@@ -49,13 +49,13 @@ export const DELEGATION_CAPSULE_JSON_SCHEMA = {
     acceptedFacts: { type: 'array', maxItems: 32, items: object({ statement: stringSchema, sourceRefs: refsSchema, qualification: stringSchema }) },
     hypotheses: arraySchema, challengeRefs: refsSchema,
     negativePaths: { type: 'array', maxItems: 32, items: object({ path: stringSchema, reason: stringSchema, applicableWhen: stringSchema, recheckWhen: stringSchema }) },
-    inputArtifactRefs: refsSchema, outputRequirements: stringSchema, stopConditions: arraySchema, requiredSkillIds: arraySchema,
+    inputArtifactRefs: { ...refsSchema, description: 'Exact existing session:// contentUri values the child must read. Copy them from the parent read/list result, including Investigation records. Artifact IDs mentioned in scope are not read grants. Grant only the needed records.' }, outputRequirements: stringSchema, stopConditions: arraySchema, requiredSkillIds: arraySchema,
     budget: { type: 'object', required: ['maxToolCalls', 'maxWallTimeMs'], additionalProperties: false, properties: {
       maxToolCalls: { type: 'integer', minimum: 1 }, maxWallTimeMs: { type: 'integer', minimum: 1 }, maxSubagents: { type: 'integer', minimum: 0 },
     } },
     domainExtensions: { type: 'object', description: 'Domain capability requests; no authorization is granted.' },
     reasoningLevel: { type: 'string', enum: REASONING_SELECTIONS, description: 'Optional reasoning selection such as low; validated by the selected Provider route. Never an agent identity.' },
-    profile: { ...stringSchema, description: 'Agent identity ID, e.g. general; omit to use the calling identity. This is not reasoning effort or model name.' }, model: { ...stringSchema, description: 'Optional canonical providerId:modelId. Use reasoningLevel for effort; do not put effort in profile.' },
+    profile: { ...stringSchema, description: 'Agent identity ID, e.g. general; omit to use the calling identity. This is not reasoning effort or model name.' }, model: { ...stringSchema, description: 'Canonical providerId:modelId with a colon, never providerId/modelId; required when the child profile has no configured route. Never inherited from the parent session. Use reasoningLevel for effort.' },
   }),
   required: ['goal', 'task', 'scope', 'acceptedFacts', 'hypotheses', 'challengeRefs', 'negativePaths', 'inputArtifactRefs', 'outputRequirements', 'stopConditions', 'requiredSkillIds', 'budget'],
 };
