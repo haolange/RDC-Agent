@@ -6,6 +6,7 @@ import { storageAdapter } from '../sessions/StorageAdapter';
 import { rdcSessionService } from '../sessions';
 import { conversationService } from '../conversation/ConversationService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { settingsService } from '../settings/SettingsService';
 import { ipcApprovalTokenService } from './validation/IpcApprovalTokenService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { ProjectInputPrepareRemoveArgsSchema, ProjectInputRemoveArgsSchema } from './validation/projectSessionSchemas';
@@ -29,10 +30,21 @@ async function confirmRemoval(fileName: string, filePath: string, sessions: stri
   const owner = BrowserWindow.getFocusedWindow() ?? undefined;
   if (process.env.RDC_AGENT_BROWSER_QA === '1' && !owner) return process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS === '1';
   if (!owner) return false;
+  const english = settingsService.getAll().appearance.language === 'en';
+  const action = english ? (reference ? 'Remove reference' : 'Delete capture') : (reference ? '移除引用' : '删除抓帧');
+  const consequence = english
+    ? (reference ? 'Associated replays will close and the reference will be removed. The external RDC original will be kept. '
+      : 'Associated replays will close and this RDC file will be deleted. ')
+    : (reference ? '将关闭关联回放并移除登记，保留外部 RDC 原件。' : '将关闭关联回放并删除这个 RDC 文件。');
+  const history = english
+    ? 'Associated replay history will also be cleared when no other input references the same content. Chats, reports and formal investigation evidence will be kept.'
+    : '没有其他同内容输入引用时，也会清理各会话关联的回放足迹。聊天、报告和正式调查证据保留。';
   const result = await dialog.showMessageBox(owner, {
-    type: 'warning', buttons: [reference ? '移除引用' : '删除抓帧', '取消'], defaultId: 1, cancelId: 1, noLink: true,
-    title: reference ? '移除外部抓帧引用' : '删除项目抓帧', message: `${reference ? '移除引用' : '删除'} ${fileName}？`,
-    detail: `${filePath}\n\n${reference ? '将关闭关联回放并移除登记，保留外部 RDC 原件。' : '将关闭关联回放并删除这个 RDC 文件。'}没有其他同内容输入引用时，也会清理各会话关联的回放足迹。聊天、报告和正式调查证据保留。${sessions.length ? `\n关联会话：${sessions.join(', ')}` : ''}`,
+    type: 'warning', buttons: [action, english ? 'Cancel' : '取消'], defaultId: 1, cancelId: 1, noLink: true,
+    title: english ? (reference ? 'Remove external capture reference' : 'Delete project capture')
+      : (reference ? '移除外部抓帧引用' : '删除项目抓帧'),
+    message: english ? `${action} ${fileName}?` : `${reference ? '移除引用' : '删除'} ${fileName}？`,
+    detail: `${filePath}\n\n${consequence}${history}${sessions.length ? `\n${english ? 'Associated sessions: ' : '关联会话：'}${sessions.join(', ')}` : ''}`,
   });
   return result.response === 0;
 }

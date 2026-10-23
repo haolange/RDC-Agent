@@ -7,7 +7,8 @@ import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 import type { ProviderCatalogSnapshot } from './types';
 import { createSettingsModalActions } from './settingsModalActions';
 import { findProjectedHandoffTargetConflicts, validateAgentHandoffs } from './sections/agentHandoffValidation';
-import { rollbackAgentManifestDrafts, useAgentManifestAutosave } from './useAgentManifestAutosave';
+import { useAgentManifestAutosave } from './useAgentManifestAutosave';
+import { rollbackAgentManifestDrafts } from './agentManifestAutosaveState';
 import { useProviderConnection } from './useProviderConnection';
 import { useSettingsModalState } from './useSettingsModalState';
 import { useSettingsDirty } from './settingsDirtyState';
@@ -136,7 +137,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     blockSubmit,
     blockProjectedSubmit,
   });
-  useAgentManifestAutosave({
+  const agentManifestAutosave = useAgentManifestAutosave({
     open: open && modalState.agentManifestContextReady,
     settings,
     agentManifestDrafts: modalState.agentManifestAutosaveDrafts,
@@ -188,6 +189,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     setUsePointerCursors,
     setChromeTheme,
     ...actions,
+    handleSaveAgentManifests: agentManifestAutosave.retry,
     ...providerConnection,
   };
 };

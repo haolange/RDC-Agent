@@ -30,7 +30,7 @@ export function ProjectAddDialog({ onAdd, onClose }: { onAdd: (rootPath: string)
       <Button variant="ghost" disabled={busy} onClick={onClose}>{t('dialog.cancel')}</Button>
       <Button variant="primary" disabled={busy || !rootPath.trim()} onClick={() => void submit()}>{t('sidebar.addProject')}</Button>
     </>}>
-    <Input autoFocus aria-label={t('sidebar.projectPath')} value={rootPath} disabled={busy}
+    <Input aria-label={t('sidebar.projectPath')} value={rootPath} disabled={busy}
       onChange={event => setRootPath(event.target.value)}
       onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void submit(); } }} />
     {error ? <p role="alert">{error}</p> : null}

@@ -9,9 +9,8 @@ import type {
   AgentManifestDraft,
 } from '@shared/types/agentManifest';
 import { resolveAgentWriteTargetFromDraft, toAgentManifestEditorDraft } from '@shared/types/agentManifest';
-import { applyAgentDefinitionSaveResults, selectSubmittableAgentManifestDrafts } from './useAgentManifestAutosave';
+import { applyAgentDefinitionSaveResults, selectSubmittableAgentManifestDrafts } from './agentManifestAutosaveState';
 import type { useI18n } from '../../../i18n';
-import { nextAgentDefinitionClientRevision } from '../../../stores/appSettingsStore';
 import type { useProviderConnection } from './useProviderConnection';
 import type { useSettingsModalState } from './useSettingsModalState';
 import { cloneRoute, getErrorMessage } from './utils';
@@ -107,60 +106,27 @@ export function createSettingsModalActions({
   };
 
   const handleSaveAgentManifests = async (
-    batch?: AgentManifestSaveBatch,
+    batch: AgentManifestSaveBatch,
   ): Promise<AgentDefinitionSaveResult[] | null> => {
-    let request = batch;
-    if (!request) {
-      const { drafts, blockedReason } = selectSubmittableAgentManifestDrafts(
-        modalState.agentManifestDrafts,
-        blockSubmit,
-        blockProjectedSubmit,
-        modalState.agentManifestDrafts,
-      );
-      if (blockedReason) {
-        modalState.setAgentManifestSaveBlocked(true);
-        modalState.setAgentManifestSaveState('error');
-        modalState.setAgentManifestSaveMessage(blockedReason);
-        return null;
-      }
-      modalState.setAgentManifestSaveBlocked(false);
-      if (drafts.length === 0) return [];
-      request = { drafts, clientRevision: nextAgentDefinitionClientRevision() };
-    }
-    const pending = request;
-    const saveBatch = async () => {
-      const results = await Promise.all(pending.drafts.map((draft) => {
-        const write = resolveAgentWriteTargetFromDraft(draft, currentProjectId);
-        return saveAgentDefinition({
-          draft,
-          clientRevision: pending.clientRevision,
-          scope: write.scope,
-          projectId: write.projectId,
-          sourceHash: draft.sourceHash,
-        });
-      }));
-      modalState.setAgentManifestDrafts((current) => applyAgentDefinitionSaveResults(
-        current,
-        pending.drafts,
-        results,
-        currentProjectId,
-      ));
-      return results;
-    };
-    if (batch) return saveBatch();
-
-    modalState.setAgentManifestSaveState('saving');
-    modalState.setAgentManifestSaveMessage('');
-    try {
-      const results = await saveBatch();
-      modalState.setAgentManifestSaveState('saved');
-      modalState.setAgentManifestSaveMessage(t('settings.agentManifestSaved'));
-      return results;
-    } catch (error) {
-      modalState.setAgentManifestSaveState('error');
-      modalState.setAgentManifestSaveMessage(getErrorMessage(error, t('settings.agentManifestSaveFailed')));
-      return null;
-    }
+    const { drafts, blockedReason } = selectSubmittableAgentManifestDrafts(
+      batch.drafts, blockSubmit, blockProjectedSubmit, modalState.agentManifestDrafts,
+    );
+    if (blockedReason) throw new Error(blockedReason);
+    if (drafts.length === 0) return [];
+    const results = await Promise.all(drafts.map((draft) => {
+      const write = resolveAgentWriteTargetFromDraft(draft, currentProjectId);
+      return saveAgentDefinition({
+        draft,
+        clientRevision: batch.clientRevision,
+        scope: write.scope,
+        projectId: write.projectId,
+        sourceHash: draft.sourceHash,
+      });
+    }));
+    modalState.setAgentManifestDrafts((current) => applyAgentDefinitionSaveResults(
+      current, drafts, results, currentProjectId,
+    ));
+    return results;
   };
 
   const handleImportAgentManifest = async () => {

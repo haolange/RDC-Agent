@@ -133,7 +133,7 @@ describe('settingsModalActions project scope save', () => {
     expect(saveAgentDefinition).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call saveAgentDefinition when Retry / handleSaveAgentManifests() is blocked', async () => {
+  it('rejects a blocked explicit batch without calling saveAgentDefinition', async () => {
     const illegal = {
       ...draft,
       handoffs: [{ label: 'WIP', agent: '', prompt: '' }],
@@ -160,12 +160,8 @@ describe('settingsModalActions project scope save', () => {
       blockProjectedSubmit: () => null,
     });
 
-    const result = await actions.handleSaveAgentManifests();
-
-    expect(result).toBeNull();
+    await expect(actions.handleSaveAgentManifests({ drafts: [illegal], clientRevision: 9 })).rejects.toThrow('blocked');
     expect(saveAgentDefinition).not.toHaveBeenCalled();
-    expect(setAgentManifestSaveBlocked).toHaveBeenCalledWith(true);
-    expect(setAgentManifestSaveState).toHaveBeenCalledWith('error');
-    expect(setAgentManifestSaveMessage).toHaveBeenCalledWith('blocked');
+    expect(setAgentManifestSaveState).not.toHaveBeenCalled();
   });
 });

@@ -11,15 +11,6 @@ import {
 } from './agentManifestAutosaveState';
 import type { AgentManifestSaveBatch } from './settingsModalActions';
 
-export {
-  applyAgentDefinitionSaveResults,
-  getChangedAgentManifestDrafts,
-  rollbackAgentManifestDrafts,
-  selectSubmittableAgentManifestDrafts,
-  serializeAgentManifestDraft,
-  shouldRollbackFailedAgentManifestSave,
-} from './agentManifestAutosaveState';
-
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 interface UseAgentManifestAutosaveOptions {
@@ -58,6 +49,8 @@ export function useAgentManifestAutosave({
   const committedRevisionRef = useRef(0);
   const wasOpenRef = useRef(open);
   const draftsRef = useRef(agentManifestDrafts);
+  const failedDraftsRef = useRef<AgentManifestDraft[] | null>(null);
+  const debounceTimerRef = useRef<number | null>(null);
   const saveRef = useRef(onSave);
   const rollbackRef = useRef(onRollback);
   const stateRef = useRef(onSaveStateChange);
@@ -80,11 +73,20 @@ export function useAgentManifestAutosave({
   useEffect(() => { blockProjectedRef.current = blockProjectedSubmit; }, [blockProjectedSubmit]);
 
   useEffect(() => {
-    if (!open) savedDraftsRef.current = settings.agents.definitions.map((entry) => ({ ...entry }));
+    if (!open) {
+      savedDraftsRef.current = settings.agents.definitions.map((entry) => ({ ...entry }));
+      failedDraftsRef.current = null;
+    }
   }, [open, settings.agents.definitions]);
 
-  const executeRef = useRef<(drafts: AgentManifestDraft[], revision: number) => Promise<void>>(async () => {});
-  executeRef.current = async (drafts, revision) => {
+  const selectDrafts = (pending = getChangedAgentManifestDrafts(draftsRef.current, savedDraftsRef.current)) => (
+    selectSubmittableAgentManifestDrafts(
+      pending, blockSubmitRef.current, blockProjectedRef.current, draftsRef.current,
+    )
+  );
+
+  const executeRef = useRef<(drafts: AgentManifestDraft[], revision: number, visibleDrafts?: AgentManifestDraft[]) => Promise<void>>(async () => {});
+  executeRef.current = async (drafts, revision, visibleDrafts = drafts) => {
     blockedRef.current?.(false);
     stateRef.current('saving');
     messageRef.current('');
@@ -101,12 +103,7 @@ export function useAgentManifestAutosave({
         committedRevisionRef.current = revision;
       }
       if (revision !== latestRevisionRef.current) return;
-      const remaining = selectSubmittableAgentManifestDrafts(
-        getChangedAgentManifestDrafts(draftsRef.current, savedDraftsRef.current),
-        blockSubmitRef.current,
-        blockProjectedRef.current,
-        draftsRef.current,
-      );
+      const remaining = selectDrafts();
       if (remaining.drafts.length === 0 && remaining.blockedReason) {
         latestRevisionRef.current = nextAgentDefinitionClientRevision();
         blockedRef.current?.(true);
@@ -115,6 +112,7 @@ export function useAgentManifestAutosave({
         return;
       }
       if (results.every((result) => result.status === 'committed')) {
+        failedDraftsRef.current = null;
         stateRef.current('saved');
         messageRef.current(savedMessage);
       }
@@ -122,9 +120,12 @@ export function useAgentManifestAutosave({
       if (!shouldRollbackFailedAgentManifestSave(
         revision,
         latestRevisionRef.current,
-        drafts,
+        visibleDrafts,
         draftsRef.current,
       )) return;
+      // Keep the attempted values and compare hashes even when the visible draft
+      // rolls back. Retrying must not save unrelated profiles or rebase a conflict.
+      failedDraftsRef.current = drafts;
       rollbackRef.current(drafts, savedDraftsRef.current);
       blockedRef.current?.(false);
       stateRef.current('error');
@@ -134,12 +135,7 @@ export function useAgentManifestAutosave({
 
   useEffect(() => {
     if (!open) return;
-    const { drafts: changed, blockedReason } = selectSubmittableAgentManifestDrafts(
-      getChangedAgentManifestDrafts(agentManifestDrafts, savedDraftsRef.current),
-      blockSubmitRef.current,
-      blockProjectedRef.current,
-      agentManifestDrafts,
-    );
+    const { drafts: changed, blockedReason } = selectDrafts();
     if (changed.length === 0) {
       if (blockedReason) {
         latestRevisionRef.current = nextAgentDefinitionClientRevision();
@@ -155,18 +151,17 @@ export function useAgentManifestAutosave({
     stateRef.current('idle');
     messageRef.current('');
     const timer = window.setTimeout(() => void executeRef.current(changed, revision), 300);
-    return () => window.clearTimeout(timer);
+    debounceTimerRef.current = timer;
+    return () => {
+      window.clearTimeout(timer);
+      if (debounceTimerRef.current === timer) debounceTimerRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- draftSnapshot serializes agentManifestDrafts for deep change detection
   }, [draftSnapshot, open]);
 
   useEffect(() => {
     if (wasOpenRef.current && !open) {
-      const { drafts: changed } = selectSubmittableAgentManifestDrafts(
-        getChangedAgentManifestDrafts(agentManifestDrafts, savedDraftsRef.current),
-        blockSubmitRef.current,
-        blockProjectedRef.current,
-        agentManifestDrafts,
-      );
+      const { drafts: changed } = selectDrafts();
       if (changed.length > 0) {
         const revision = nextAgentDefinitionClientRevision();
         latestRevisionRef.current = revision;
@@ -176,4 +171,27 @@ export function useAgentManifestAutosave({
     wasOpenRef.current = open;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- draftSnapshot serializes agentManifestDrafts for deep change detection
   }, [draftSnapshot, open]);
+
+  const retry = async () => {
+    if (!open) return;
+    const changed = getChangedAgentManifestDrafts(draftsRef.current, savedDraftsRef.current);
+    const pending = changed.length > 0 ? changed : (failedDraftsRef.current ?? []);
+    const { drafts, blockedReason } = selectDrafts(pending);
+    if (blockedReason) {
+      blockedRef.current?.(true);
+      stateRef.current('error');
+      messageRef.current(blockedReason);
+      return;
+    }
+    if (drafts.length === 0) return;
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    const revision = nextAgentDefinitionClientRevision();
+    latestRevisionRef.current = revision;
+    await executeRef.current(drafts, revision, draftsRef.current.filter(current => drafts.some(draft => draft.id === current.id)));
+  };
+
+  return { retry };
 }

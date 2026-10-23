@@ -31,7 +31,7 @@ export function ProjectCaptureReferenceDialog({ projectId, onClose, onRegistered
       <Button variant="ghost" disabled={busy} onClick={onClose}>{t('projectCapture.cancel')}</Button>
       <Button disabled={busy || !filePath.trim()} onClick={() => void submit()}>{t('projectCapture.registerReference')}</Button>
     </>}>
-    <Input aria-label={t('projectCapture.referencePath')} value={filePath} autoFocus disabled={busy}
+    <Input aria-label={t('projectCapture.referencePath')} value={filePath} disabled={busy}
       onChange={event => setFilePath(event.target.value)}
       onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void submit(); } }} />
     {error ? <p role="alert">{error}</p> : null}

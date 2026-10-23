@@ -7,7 +7,7 @@ import {
   selectSubmittableAgentManifestDrafts,
   serializeAgentManifestDraft,
   shouldRollbackFailedAgentManifestSave,
-} from './useAgentManifestAutosave';
+} from './agentManifestAutosaveState';
 import { findProjectedHandoffTargetConflicts, persistAgentHandoff, validateAgentHandoffs } from './sections/agentHandoffValidation';
 
 const draft = (id: string, model: string): AgentManifestDraft => ({

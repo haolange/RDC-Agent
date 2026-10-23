@@ -53,3 +53,25 @@ it('preserves desktop directory browsing and cancellation without adding a proje
   await act(async () => button('sidebar.addProject').click());
   expect(add).toHaveBeenCalledExactlyOnceWith('D:/selected');
 });
+
+it('does not steal the trigger focus before TaskDialog captures its return target', () => {
+  const trigger = document.createElement('button'); document.body.append(trigger); trigger.focus();
+  act(() => root.render(createElement(ProjectAddDialog, { onAdd: vi.fn(), onClose: vi.fn() })));
+  // React autoFocus runs before the modal effect and would capture the input instead.
+  expect(document.activeElement).toBe(trigger);
+  act(() => root.unmount()); root = createRoot(host);
+  expect(document.activeElement).toBe(trigger); trigger.remove();
+});
+
+it('disables controls during submission and does not submit duplicate Enter', async () => {
+  let finish!: () => void;
+  const add = vi.fn(() => new Promise<void>(resolve => { finish = resolve; })), close = vi.fn();
+  act(() => root.render(createElement(ProjectAddDialog, { onAdd: add, onClose: close })));
+  act(() => fill('D:/isolated/project'));
+  act(() => button('sidebar.addProject').click());
+  expect(button('sidebar.addProject').disabled).toBe(true);
+  expect(document.querySelector('input')!.disabled).toBe(true);
+  act(() => document.querySelector('input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(add).toHaveBeenCalledOnce(); expect(close).not.toHaveBeenCalled();
+  await act(async () => finish()); expect(close).toHaveBeenCalledOnce();
+});

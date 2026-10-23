@@ -3649,3 +3649,26 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 最终capture SHA仍03df08d14e6d5819e5173209d9ac1218c2f740010104ec911a7873e97a258d42，未复制/改写原件。round12/13的临时OAuth副本已移除，原授权不动；只保留各自唯一验签secret及配对LocalState。s229-python-deps与s229-temp核验绝对边界/无链接/Git/活动进程后删除，共3021文件、逻辑15936678B，不等同实际释放空间。唯一失败证据与两轮可复查session保留，未删除仍承担证据职责的session/制品。
 - 收尾回执：s233-final-integrity.json、s233-final-resources.json、s233-desktop-start/close.json与log、s233-disk-cleanup.json；日期解析首次把ISO投影成Date再转文化字符串造成出生比对拒绝，未误停进程，改为保留ISO字符串后严格毫秒比对成功。沙箱拒绝读取加密文件后按已授权scope提权完成，不打印凭据。
 - 当前结算：OOM/原长会话恢复、正式原件引用、同冻结版两轮完整SPIR-V验证/恢复/独审/回评、必要门禁、进程/锁/桌面启动权/临时磁盘清理分别通过。无剩余本轮阻断；源码修复与更深机制为明确未验证范围。
+
+
+### 2026-10-23 S234：新增输入与执行上限 UI 收尾（实现/Browser 已验证，原生确认实测未验证）
+- 范围仅本次确认框语言与三个新增UI的验收；不重开shader/模型/设备实验，不改变S205 OOM和S231/S232独立SPIR-V通过结论。main分支、既有改动保留，未提交/推送/发布。
+- projectInputLifecycleHandlers在每次原生确认时读取既有Settings appearance.language，完整中英按钮/标题/主消息/说明/会话标签，外部引用与项目文件删除两分支均覆盖。现有主进程dialog、默认取消、单次token、绑定身份及先关闭关联replay后移除不变；外部原件不删除。测试证明切换语言即时生效、取消不发token、token重复消费拒绝、无owner拒绝，Browser自动确认不冒充原生对话框。
+- 实测直接缺陷：两个新对话框React autoFocus先于TaskDialog记录触发焦点，Escape后落body。仅移除这两处autoFocus，沿用公共TaskDialog初始取消焦点与Tab管理；修后同入口实际回到Add Project/Reference按钮，中英深浅和三宽度均复验。
+- 官方无凭据隔离Browser，当前实现指纹见.local/ui-closeout-20261023/version.json。三个入口各完成中英×深浅×1280/920/390共36个唯一布局组合，0页面横向溢出；任务对话框空值disabled、Tab与Escape/焦点返回逐组合记录。字段点击滚入可视区后核对边界，12张窄屏截图及browser-matrix.json保留；第一张旧limit截图未含目标字段，已被后续准确截图替代，不作证。
+- 新增项目：Enter真实缺失目录错误及成功添加隔离工程，提交中输入/按钮disabled实际观察；引用：修后Enter缺失文件真实错误，登记唯一授权capture实际aria-busy=true且四控件全禁用，完成后正式移除引用、原件SHA仍03df08d14e6d5819e5173209d9ac1218c2f740010104ec911a7873e97a258d42，全程未打开replay。重复Enter防重复及pending控制另有延迟promise组件回归，未用脚本/内部接口替代产品操作。
+- 执行上限：100保存、0回退100、清空默认、101/103保存与Tab下一项实际验证；仅本轮临时profile设只读触发真实EPERM，错误/重试显示，属性恢复后同编辑器重试曾被SOURCE_HASH_CONFLICT保护拒绝，重新打开后保存103成功，随后清空恢复默认。不宣称同编辑器重试完全恢复；没有改弱冲突检测或扩展autosave实现。提交中瞬态saving提示未在真实UI留证，保留未验证。
+- 受影响7文件34测试、contracts248、typecheck、lint、renderer-structure、design-tokens、right-rail、官方prepare/build、diff-check通过。无CSS/资源/Prompt/Skill/权限API修改；无未失效全量绿色重复执行或新增shader验收声明。
+- 原生Windows系统确认：本会话工具明确禁用native computer APIs，Browser headless full-access不显示showMessageBox，故实际中英文渲染、原生键盘/焦点仍未验证；主进程Electron dialog参数测试不替代平台实测，不声称受应用深浅主题控制。解除条件为可用的原生窗口驾驶/人工正式桌面验收，不需要重开shader实验。
+- 收尾：两次自有QA树按出生身份退出，原生context/daemon/worker从未创建，0模型请求；正式canonical桌面启动到Settings/CLI/Debugger/ReplayDevice初始化并取得desktop锁，核身份后CloseMainWindow正常退出，最终自有树0、5127无监听、canonical锁不存在，桌面启动权交还。临时userData/resources/project核绝对边界/无链接/Git/活动进程后删除，34文件逻辑545956B；保留截图/矩阵/源指纹/错误与cleanup.json，用户数据/授权/helper/原capture未改。
+
+
+### 2026-10-23 S235：执行上限保存失败的同编辑器重试（通过）
+- 承接S234实际EPERM后Retry触发source-hash冲突，仅修复Settings Agent保存重试，不重开shader/模型/设备实验，不改Main的sourceHash比较、revision/lane串行与原子替换保护。用户后续明确授权修复验证后提交并推送；本批包括S234仍未提交的确认框双语/新对话框焦点收尾，实际Git结果见本机git-receipt.json。
+- 定向RED：实际useSettingsModal+autosave+actions集成测试复现Retry把失败102回滚后的101及未修改analyzer全部提交，产生无关builtin覆盖；某项失败导致批次成功结果未回投，后续旧hash再写可触发冲突。不是应当取消的外部并发保护。
+- 修复：Retry统一进入原自动保存权威路径；保存失败尝试的值与原compare hash，只重试失败尝试或用户更新后的编辑，取消该编辑尚未触发的debounce；成功更新同一baseline。显式批次写入函数不再提供全量重存的无参分支。失败的可见回滚不丢失重试意图，错误只在revision及可见草稿未被新编辑取代时投影；真实外部修改不重新读取hash绕过CAS。纯状态函数直接从既有模块导入，合并重复筛选，hook197行，未放宽200行门禁。
+- 新增4项集成回归覆盖同编辑器失败/重复失败/原值恢复、后续连续编辑、未改Agent不生成覆盖、外部变更重复Retry仍拒绝、较新编辑优先且不重复debounce保存、真实Retry的handoff gate。既有blocked动作测试改为显式批次入口并保留无写入断言；权限与主进程冲突断言未弱化。
+- 正式Browser：无凭据独立双根，无项目/capture/replay/Task/模型。101保存后将本轮General文件设只读，102实际EPERM，故障仍在Retry保持EPERM；解除只读后，同一设置编辑器点击Retry实际保存102，未关闭Settings，resources/agents只有general.agent.md。外部把该文件102改777时，保存103与再次Retry均SOURCE_HASH_CONFLICT，外部字节SHA3ade41c4fd42ccf4bcf9264967c72a6a588f54c4d3a9f28764a8e5a80553698d保持；撤除本轮并发测试改动后同编辑器Retry成功103。最终行数收敛构建再实测103→104失败→解除故障→同编辑器Retry保存104，final-browser-proof.json与final-recovered.png留证。没有把关闭设置/重新载入当恢复。
+- 最终33文件128回归（Settings、mutation coordinator、definition state/effective commit）、contracts248、typecheck、lint、renderer-structure、完整gates与官方prepare/build通过；gates首轮因hook218>200失败，权威重复逻辑收敛后197行复跑通过，未加allowlist或改门禁。此前S234确定性/Browser绿色限定其适用范围保留，原生Windows确认框仍未实测，本次不冒称补齐。
+- 收尾：两次自有QA按出生身份终止，0模型/0shader/0native context；官方canonical桌面实际启动初始化并取得锁。CloseMainWindow只关闭窗口仍留后台，已按出生和父子树终止本轮自有桌面进程；终态自有进程0、5127无监听，canonical仅留死owner91924，未手改锁，由官方启动恢复机制回收，桌面启动权交还。核绝对边界/无链接/Git/活动进程后清除临时userData/resources/temp，35文件逻辑2677266B；保留最小正反例截图、浏览器读回、源码/构建指纹及cleanup.json。用户helper/授权/数据/原capture未改。
+- 证据：.local/agent-retry-20261023/{acceptance.json,browser-evidence.json,final-browser-proof.json,concurrency.json,cleanup.json,gates-final.log}。本轮关闭S234同编辑器Retry的恢复缺口；不改变已通过的OOM与两轮SPIR-V证据结论。
