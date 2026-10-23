@@ -69,6 +69,11 @@ function nativeShellSummary(result: AgentToolResult): string | null {
     parts.push(`target=${JSON.stringify(boundedText(data.target, 80))}`);
     parts.push(`encoding=${boundedText(data.source_encoding, 40)}`);
     parts.push(`sourceHash=${boundedText(data.source_hash, 128)}`);
+    parts.push(`availableTargets=${JSON.stringify({
+      status: boundedText(data.available_targets_status, 24),
+      targets: boundedList(data.available_targets),
+      error: data.available_targets_error === null ? null : boundedText(data.available_targets_error, 160),
+    })}`);
     const plan = asRecord(data.edit_plan);
     if (plan) {
       const knownBoolean = (value: unknown): boolean | 'unverified' =>

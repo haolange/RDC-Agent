@@ -21,6 +21,11 @@ function activeAssistant(overrides: Partial<ConversationMessage>): ConversationM
 }
 
 describe('stopWorkTrace', () => {
+  it.each(['complete', 'error', 'stopped'] as const)('does not overwrite the authoritative %s terminal message', (status) => {
+    const message = activeAssistant({ status, content: 'Final answer', updatedAt: 10 });
+    expect(stopWorkTrace(message)).toBe(message);
+  });
+
   it('optimistically marks the active assistant message and running work rows as stopped locally', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));

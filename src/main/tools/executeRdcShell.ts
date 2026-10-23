@@ -8,6 +8,8 @@ import { assertRdcContextLeaseOwnership, getRdcContextLease, quarantineRdcContex
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
 import { rdcDigest, rdcExecutionReceipts } from './RdcExecutionReceipts';
+import { rdcInvocationRecord } from './RdcInvocationRecord';
+import { parseRdcProcessIdentity } from './RdcProcessIdentity';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 
 function callableRdcDefinition(definition: RdcOperationDefinition): Record<string, unknown> {
@@ -35,7 +37,7 @@ function searchRdcDefinitions(definitions: readonly RdcOperationDefinition[], qu
     const schema = item.input_schema.properties;
     const parameterNames = schema && typeof schema === 'object' && !Array.isArray(schema)
       ? Object.keys(schema).join(' ') : '';
-    const supportingText = [item.namespace, item.group, item.parameter_raw, item.returns_raw, parameterNames]
+    const supportingText = [item.namespace, item.group, item.parameter_raw, item.returns_raw, parameterNames, item.evidence_kind]
       .filter((value): value is string => typeof value === 'string').join(' ').toLowerCase();
     let score = 0;
     let matchedTerms = 0;
@@ -51,7 +53,7 @@ function searchRdcDefinitions(definitions: readonly RdcOperationDefinition[], qu
   }).filter((entry): entry is { item: RdcOperationDefinition; index: number; score: number } => entry !== null)
     .sort((left, right) => right.score - left.score || left.index - right.index);
   return {
-    matches: matches.slice(0, limit).map(({ item }) => ({ name: item.name, description: item.description, scope: item.scope, effects: item.effects })),
+    matches: matches.slice(0, limit).map(({ item }) => ({ name: item.name, description: item.description, scope: item.scope, effects: item.effects, evidence_kind: item.evidence_kind })),
     total: matches.length,
     truncated: matches.length > limit,
   };
@@ -110,7 +112,11 @@ export async function executeRdcShell(
     throw new Error('RDC_EXECUTION_DENIED: capture/replay identity changed since prepareTurn.');
   }
   const { definition, args } = authorizeRdcOperation(input.operation, input.args, context, replaySessionId, frozenCaptureId);
-  if (input.experimentId && !definition.evidence_kind) throw new Error('RDC_EVIDENCE_INVALID: operation has no supported evidence capability.');
+  if (input.experimentId && !definition.evidence_kind) throw new Error(
+    `RDC_EVIDENCE_INVALID: ${input.operation} has no supported evidence capability; no native operation was executed. `
+    + 'Discover and describe a compatible measurement/intervention/rollback operation in the frozen catalog before requesting an experiment receipt. '
+    + 'Ordinary tool output cannot replace the returned receipt.uri/expectedHash.',
+  );
   verifyRollbackIdentity(definition, args, lease.contextId, input.experimentId);
   // Establish durable signing capability before a potentially mutating call.
   if (input.experimentId) rdcExecutionReceipts.prepare();
@@ -121,7 +127,9 @@ export async function executeRdcShell(
     throw new Error('RDC_EXECUTION_DENIED: binding changed while queued.');
   }
   const startedAt = Date.now();
+  let lastInvocation: ReturnType<typeof rdcInvocationRecord> | undefined;
   const readReplayEvent = async (): Promise<number> => {
+      lastInvocation = rdcInvocationRecord('rd.session.get_context', {});
       const response = await rdcCliInvokerService.executeCLI('call', [
         'rd.session.get_context', '--args-json', '{}', '--daemon-context', lease.contextId,
       ], { abortSignal: signal, contextId: lease.contextId, settings: cli });
@@ -136,8 +144,10 @@ export async function executeRdcShell(
   let originalEvent: number | undefined;
   try {
     const temporaryReplayRead = definition.effects.includes('replay_position_temporary');
-    originalEvent = temporaryReplayRead || input.operation === 'rd.export.screenshot' || input.operation === 'rd.shader.get_source'
+    originalEvent = temporaryReplayRead || input.operation === 'rd.export.screenshot'
+      || input.operation === 'rd.shader.get_source' || input.operation === 'rd.shader.get_constant_buffer_contents'
       ? await readReplayEvent() : undefined;
+    lastInvocation = rdcInvocationRecord(input.operation, args);
     const result = await rdcCliInvokerService.executeCLI('call', [
       input.operation, '--args-json', JSON.stringify(args), '--daemon-context', lease.contextId,
     ], { abortSignal: signal, contextId: lease.contextId, settings: cli });
@@ -163,7 +173,9 @@ export async function executeRdcShell(
       schemaVersion: 1, sessionId: sessionId, projectId: projectId,
       turnId: turnId, toolCallId, experimentId: input.experimentId,
       contextId: lease.contextId, leaseVersion: lease.version, replaySessionId: replaySessionId,
-      operation: input.operation, definitionsFingerprint: context.rdcBinding!.definitionsFingerprint, evidence, args, argsFingerprint: rdcDigest(args),
+      operation: input.operation, definitionsFingerprint: context.rdcBinding!.definitionsFingerprint,
+      processIdentity: parseRdcProcessIdentity((payload.meta as Record<string, unknown> | undefined)?.process_identity),
+      evidence, args, argsFingerprint: rdcDigest(args),
       result: payload.data, resultHash: rdcDigest(payload.data), startedAt, completedAt: Date.now(), exitCode: 0,
     }, signal) : undefined;
     // Perf dispatch awaits all sampling before returning; observe only after its completed result and receipt.
@@ -177,9 +189,11 @@ export async function executeRdcShell(
       replaySessionId,
       captureFileId: frozenCaptureId,
     };
-    return { content: [{ type: 'text', text: JSON.stringify({ result: payload, receipt, rdcExecutionIdentity }) }],
-      details: { operation: input.operation, exitCode: 0, receipt, rdcExecutionIdentity } };
+    const invocation = rdcInvocationRecord(input.operation, args);
+    return { content: [{ type: 'text', text: JSON.stringify({ result: payload, receipt, rdcExecutionIdentity, invocation }) }],
+      details: { operation: input.operation, exitCode: 0, receipt, rdcExecutionIdentity, invocation } };
   } catch (error) {
+    const failedInvocation = lastInvocation;
     let nativeStateVerifiedSafe = false;
     if (error instanceof RdcNativeFailure && error.resultKind === input.operation
       && (error.effectsNotAttempted || (error.replacementNotAttempted
@@ -204,10 +218,10 @@ export async function executeRdcShell(
           && await readReplayEvent() === originalEvent;
       } catch { /* An unverified restoration remains quarantined. */ }
     }
-    if (!nativeStateVerifiedSafe && error instanceof RdcNativeFailure && input.operation === 'rd.shader.get_source'
-      && originalEvent !== undefined && originalEvent > 0 && error.shaderSourceRestoration?.eventId === originalEvent
-      && error.shaderSourceRestoration.contextId === lease.contextId
-      && error.shaderSourceRestoration.sessionId === replaySessionId && !signal?.aborted) {
+    if (!nativeStateVerifiedSafe && error instanceof RdcNativeFailure
+      && originalEvent !== undefined && originalEvent > 0 && error.shaderInspectionRestoration?.eventId === originalEvent
+      && error.shaderInspectionRestoration.contextId === lease.contextId
+      && error.shaderInspectionRestoration.sessionId === replaySessionId && !signal?.aborted) {
       try {
         const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
         nativeStateVerifiedSafe = current?.version === lease.version && current.contextId === lease.contextId
@@ -218,6 +232,29 @@ export async function executeRdcShell(
     }
     if (!nativeStateVerifiedSafe) {
       quarantineRdcContext(sessionId, lease.version, 'Native operation outcome is uncertain; inspect and recover through the capture lifecycle before further execution.');
+    }
+    if (error instanceof RdcNativeFailure) {
+      // Deliver the qualified outcome, not arbitrary private native details or
+      // binary stdout. A native claim alone never asserts a usable owning lease.
+      const proof: Record<string, unknown> = {};
+      if (nativeStateVerifiedSafe) {
+        if (error.effectsNotAttempted) Object.assign(proof, { effects_attempted: false, context_preserved: true });
+        if (error.replacementNotAttempted) Object.assign(proof, { replacement_attempted: false, context_preserved: true });
+        const restored = error.screenshotTargetRestoration ?? error.shaderInspectionRestoration;
+        if (restored) Object.assign(proof, { replay_state_restored: true, restored_event_id: restored.eventId });
+      }
+      const details = {
+        ok: false, source: 'main-qualified-native-failure',
+        operation: input.operation, exitCode: error.nativeError.exitCode,
+        nativeFailure: { code: error.nativeError.code, category: error.nativeError.category,
+          resultKind: error.resultKind, message: error.message, proof },
+        mainValidation: { preservationVerified: nativeStateVerifiedSafe,
+          leaseState: nativeStateVerifiedSafe ? 'retained' : 'quarantined' },
+        rdcExecutionIdentity: { productSessionId: sessionId, contextId: lease.contextId,
+          replaySessionId, captureFileId: frozenCaptureId },
+        invocation: failedInvocation,
+      };
+      error.deliveryResult = { isError: true, content: [{ type: 'text', text: JSON.stringify(details) }], details };
     }
     throw error;
   }

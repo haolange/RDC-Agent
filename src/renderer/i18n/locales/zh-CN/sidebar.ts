@@ -1,4 +1,7 @@
 export const zhSidebar = {
+  'sidebar.projectPath': '工程目录的绝对路径',
+  'sidebar.projectPathHint': '填写已有工程目录的绝对路径。仅将该目录添加为项目，不复制工程文件。',
+  'sidebar.browseDirectory': '浏览目录',
   'sidebar.newTask': '新任务',
   'sidebar.sessionHistory': '会话历史',
   'sidebar.history': '历史记录',

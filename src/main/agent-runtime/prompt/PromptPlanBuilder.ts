@@ -3,7 +3,7 @@ import path from 'path';
 import { appPathService } from '../../runtime/AppPathService';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { EffectiveModel } from '@shared/types/providerCapability';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { AgentPermissionSettings } from '@shared/types/settings';
 import type { ExecutionOffer } from '@shared/types/executionOffer';
 import type {
@@ -22,12 +22,16 @@ import { resolveSkillCatalogBudget } from '../capabilities/SkillCatalogBudget';
 import { formatShellInterpreterLabel } from '../../runtime/ShellResolver';
 import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
 import { storageAdapter } from '../../sessions/StorageAdapter';
+import { applyRequestPlanFacts } from './RequestPlanFacts';
+import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
 
 const CORE_FILES = ['identity-collaboration.md', 'agent-loop.md', 'tool-evidence.md', 'completion.md'];
 
 export interface PromptPlanInput {
   /** Prefer EffectiveAgentProfile so provenance.scope is marked correctly. */
   profile: EffectiveAgentProfile | (AgentManifestDefinition & { provenance?: EffectiveAgentProfile['provenance'] });
+  /** Resolved profile snapshot, not a promise about a future turn's policy or remaining budget. */
+  profileCatalog?: readonly Pick<AgentManifestDefinition, 'id' | 'enabled' | 'maxTurns'>[];
   scopedInstructions: ScopedInstructionResolution;
   preloadedSkills: SkillLoadResult[];
   skillCatalog: SkillMetadata[];
@@ -38,6 +42,8 @@ export interface PromptPlanInput {
   approvedExecutionOffer?: ExecutionOffer | null;
   routeCapability: AgentRouteCapability;
   effectiveModel?: EffectiveModel;
+  /** Execution callers supply their resolved plan; offline prompt-cost builds have no provider request. */
+  requestPlan?: RequestPlan;
   permissionSettings: AgentPermissionSettings;
   currentDate: string;
   timeZone: string;
@@ -197,6 +203,20 @@ export class PromptPlanBuilder {
       content: runtimeFactsContent,
     });
 
+    const catalog = new Map((input.profileCatalog ?? []).filter(profile => profile.enabled).map(profile => [profile.id, profile]));
+    catalog.set(input.profile.id, input.profile);
+    const profileLimits = [
+      '# Profile Loop Ceilings',
+      'These are known enabled profile ceilings at this snapshot, not a future execution reservation. A future turn must resolve its own tighter policy and Task/Capsule limits.',
+      ...[...catalog.values()].sort((a, b) => a.id.localeCompare(b.id)).map(profile => JSON.stringify({
+        agentId: profile.id, ordinaryProviderLoopCeiling: resolveAgentMaxTurns(undefined, profile.maxTurns),
+        source: profile.maxTurns == null ? 'default' : 'profile',
+      })),
+      'Unlisted profiles are unknown. These facts grant no delegation, tools, permissions or extra provider requests.',
+    ].join('\n');
+    push({ id: 'runtime:profile-limits', kind: 'runtime-fact', scope: 'runtime', stability: 'volatile',
+      sourcePath: 'runtime://profiles/loop-ceilings', sourceHash: hashScopedResource(profileLimits), content: profileLimits });
+
     if (input.approvedExecutionOffer) {
       const offer = input.approvedExecutionOffer;
       const offerFact = [
@@ -206,6 +226,9 @@ export class PromptPlanBuilder {
         `Recipient agent ID: ${JSON.stringify(offer.targetAgentId)}`,
         `Frozen plan URI: ${JSON.stringify(offer.plan.uri)}`,
         `Frozen plan SHA-256: ${JSON.stringify(offer.plan.hash.replace(/^sha256:/, ''))}`,
+        `Plan approved at (Unix epoch milliseconds): ${offer.approvedAt}`,
+        `Plan approved at (UTC): ${new Date(offer.approvedAt).toISOString()}`,
+        'This is the persisted main-process approval time. Handoff, subsequent turns, retries and restarts do not reset it or renew a plan budget.',
         'Plan review is complete. Earlier source-agent messages about submitting or awaiting approval belong to the planning phase.',
         'Check the current runtime identity against the frozen plan before acting. This fact grants no tools, permissions, or device access.',
       ].join('\n');
@@ -253,7 +276,7 @@ export class PromptPlanBuilder {
     };
     const scopedInstructions = segments.filter((segment) => segment.kind === 'scoped-instruction').reduce((sum, segment) => sum + segment.content.length, 0);
     const skills = segments.filter((segment) => segment.kind === 'preloaded-skill' || segment.kind === 'skill-catalog').reduce((sum, segment) => sum + segment.content.length, 0);
-    return {
+    const plan: PromptPlan = {
       id: generateEventId('prompt-plan'),
       segments,
       systemPrompt,
@@ -262,6 +285,7 @@ export class PromptPlanBuilder {
       metrics: { systemPrompt: Math.max(0, systemPrompt.length - scopedInstructions - skills), scopedInstructions, skills },
       diagnostics,
     };
+    return input.requestPlan ? applyRequestPlanFacts(plan, input.requestPlan) : plan;
   }
 }
 
@@ -308,8 +332,12 @@ function buildEffectiveToolContent(tools: readonly string[]): string {
       '## Tasks capability',
       'Tasks are writable in this turn. Create, update, inspect, list, or stop Tasks only through the effective task tools shown above.',
       'Create the full multi-step list in one task_create call. Do not create Tasks one by one.',
-      'Before starting a step, mark exactly one task in_progress. When it is done, mark it completed immediately and only then start the next.',
+      'For work you perform directly, task_update(status=in_progress) starts its direct execution. Settle that execution when the work is done; dependencies govern which Tasks may run.',
       'blocked requires a statusReason. Do not create Tasks for single-step or trivial work.',
+    );
+    if (toolSet.has('subagent')) lines.push(
+      'For Task-owned subagent work in either mode=wait or mode=background, pass taskId without first starting a direct execution. The subagent runner claims and settles its own execution.',
+      'Changing status to pending does not release an active execution. Inspect and honestly settle a mistaken direct execution before delegating; never wait for your own direct execution as if it were a child.',
     );
   } else if (readableTasks) {
     lines.push(

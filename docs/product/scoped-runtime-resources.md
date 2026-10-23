@@ -65,6 +65,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 ```
 
 - `skill_read` 只读取方法，不重新收窄本轮冻结工具集；
+- Skill 的 `references/` 文本通过同一个 `skill_read(skill_id, reference, offset?, limit?)` 渐进读取，`reference` 相对当前有效 Skill 的 `SKILL.md`，不得相对工作区猜路径。沿用 profile 可见性和 builtin/user/project 覆盖解析，限制精确引用路径、禁止绝对路径/穿越/符号链接，复用文本大小、二进制及分页门禁，返回原文件完整字节 SHA-256、来源与截断状态。读取不执行脚本、不增加普通文件根、不授予 edit_file/read-before-edit 资格，也不刷新在途权限或 RDC 绑定；本次读取的引用 hash 是方法来源观察，不冒称已预载引用正文。
 - 某个 skill 未声明或声明空列表：该 skill **不参与**收窄；
 - 元工具豁免（如 `skills` / `skill_read` / `ask_user` / `tool_search`）由 `intersectSkillAllowedTools` 保留；
 - 实现：`combineActiveSkillAllowlists`（`DebuggerRuntimePolicy.ts`），Orchestrator 执行路径调用。
@@ -90,7 +91,7 @@ Account providers 是登录产品。Super Grok Account：xAI 公共 native-clien
 
 General 默认只预载 execution-orchestrator；renderdoc-investigation 按真实调查目标匹配，简单问答不路由。显式 Skill、profile 默认 Skill 和 execute 合同的 requiredSkillIds 合并去重；prepareTurn 校验可用性与工具权限交集，冻结来源，来源变化要求重新准备。skill_read 仍只读方法，不重算在途权限。
 
-Mission 必须先经 `plan_artifact` 计划门：用户点声明的 continue handoff 才冻结 Plan 并放行同 hash / 同 target 的 execute。RenderDoc Mission 的 execute 合同固定绑定共享执行方法、对应领域方法、`rdc-tool-shell` 和一本专业工具手册：Debugger 使用 `debugger-rdc-tools`，Analyzer 使用 `analyzer-rdc-tools`，Optimizer 使用 `optimizer-rdc-tools`。这四个 RDC 使用手册只对 General 可见；Mission 可以在合同中声明其 id，但不能读取或执行其工具。手册成员表是知识覆盖，不是权限表；未知操作、身份覆盖、路径越界或未满足前置条件仍在主进程执行前拒绝。
+Mission 必须先经 `plan_artifact` 计划门：用户点声明的 continue handoff 才冻结 Plan 并放行同 hash / 同 target 的 execute。RenderDoc Mission 的 execute 合同固定绑定共享执行方法、对应领域方法、`rdc-tool-shell` 和一本专业工具手册：Debugger 使用 `debugger-rdc-tools`，Analyzer 使用 `analyzer-rdc-tools`，Optimizer 使用 `optimizer-rdc-tools`。General 可发现四本手册；每条 Mission 可按需只读共享手册和对应的专业手册及引用，提前核对参数、输出及调用成本，其它专业手册保持不可见。知识可见性沿用 builtin/user/project 覆盖与来源解析，不自动预载、不授予执行或工作区编辑权限。Mission 的 plan-only、General 的 requiredSkillIds 真正预载与冻结工具交集不变；手册成员表是知识覆盖，不是权限表。未知操作、身份覆盖、路径越界或未满足前置条件仍在主进程执行前拒绝。
 
 专业参数参考由 `scripts/generate-rdc-tool-guides.mjs` 从相邻 RDC-Tool 1.0.0 代码生成 catalog 读取，记录 catalog fingerprint。开发校验使用 `pnpm run check:rdc-tool-guides -- --catalog <RDC-Tool>/spec/tool_catalog.json`；生成内容不作为运行时 catalog，产品执行仍读取 prepareTurn 冻结的同一配置 CLI。
 

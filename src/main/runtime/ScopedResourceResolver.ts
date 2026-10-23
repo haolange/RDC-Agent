@@ -10,21 +10,55 @@ import type {
 const SCOPE_PRECEDENCE = { builtin: 0, user: 1, project: 2 } as const;
 const APPROVAL_STRENGTH = { none: 0, destructive: 1, mutation: 2, all: 3 } as const;
 
-const stableSerialize = (value: unknown): string => {
-  if (value === undefined) return 'undefined';
-  if (typeof value === 'bigint') return `${value.toString()}n`;
-  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entry]) => `${JSON.stringify(key)}:${stableSerialize(entry)}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value) ?? String(value);
+/** Hash the historical canonical serialization without retaining its complete text. */
+export const hashScopedResource = (value: unknown): string => {
+  const hash = createHash('sha256');
+  let pending = '';
+  const emit = (text: string) => {
+    pending += text;
+    if (pending.length >= 16_384) { hash.update(pending); pending = ''; }
+  };
+  const string = (text: string) => {
+    emit('"');
+    for (let start = 0; start < text.length;) {
+      let end = Math.min(start + 8192, text.length);
+      // Keep surrogate pairs together: separate UTF-8 updates must not replace them.
+      const last = text.charCodeAt(end - 1);
+      if (end < text.length && last >= 0xd800 && last <= 0xdbff) end -= 1;
+      emit(JSON.stringify(text.slice(start, end)).slice(1, -1));
+      start = end;
+    }
+    emit('"');
+  };
+  const visit = (entry: unknown): void => {
+    if (entry === undefined) { emit('undefined'); return; }
+    if (typeof entry === 'bigint') { emit(`${entry.toString()}n`); return; }
+    if (typeof entry === 'string') { string(entry); return; }
+    if (Array.isArray(entry)) {
+      emit('[');
+      for (let i = 0; i < entry.length; i++) {
+        if (i) emit(',');
+        // Array.map historically leaves holes empty, unlike explicit undefined.
+        if (i in entry) visit(entry[i]);
+      }
+      emit(']'); return;
+    }
+    if (entry && typeof entry === 'object') {
+      emit('{');
+      const entries = Object.entries(entry as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right));
+      entries.forEach(([key, item], index) => {
+        if (index) emit(',');
+        string(key); emit(':'); visit(item);
+      });
+      emit('}'); return;
+    }
+    emit(JSON.stringify(entry) ?? String(entry));
+  };
+  visit(value);
+  if (pending) hash.update(pending);
+  return hash.digest('hex');
 };
-
-export const hashScopedResource = (value: unknown): string =>
-  createHash('sha256').update(stableSerialize(value)).digest('hex');
 
 export class ScopedResourceResolver {
   resolve<T>(candidates: Array<ScopedResourceCandidate<T>>): ScopedResourceCatalog<T> {

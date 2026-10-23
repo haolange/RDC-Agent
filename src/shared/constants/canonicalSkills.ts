@@ -51,8 +51,8 @@ export type CanonicalSkillId = (typeof CANONICAL_SKILL_IDS)[number];
 export type SkillCallEntry = 'agent.md-skills' | 'task-matched-or-explicit';
 export type CanonicalSkillLane = 'general' | 'mission-knowledge-coordinator';
 
-/** Skills whose tool surface conflicts with Mission plan-only and must stay on General. */
-export const PLAN_ONLY_CONFLICT_SKILL_IDS = [
+/** Operation knowledge: shared CLI rules plus one manual for each Mission. Never an execution grant. */
+export const RDC_OPERATION_MANUAL_SKILL_IDS = [
   'rdc-tool-shell',
   'debugger-rdc-tools',
   'analyzer-rdc-tools',
@@ -91,12 +91,9 @@ export function skillLane(id: string): CanonicalSkillLane | null {
   return null;
 }
 
-export function isPlanOnlyConflictSkill(id: string): boolean {
-  return (PLAN_ONLY_CONFLICT_SKILL_IDS as readonly string[]).includes(id);
-}
-
-/** Mission profiles cannot discover or load plan-only-conflict skills such as rdc-tool-shell. */
+/** Mission planning can read shared and matching operation knowledge; execution stays profile-owned. */
 export function isSkillVisibleToProfile(profileId: string, skillId: string): boolean {
   if (!isMissionAgentId(profileId)) return true;
-  return !isPlanOnlyConflictSkill(skillId);
+  return !(RDC_OPERATION_MANUAL_SKILL_IDS as readonly string[]).includes(skillId)
+    || skillId === 'rdc-tool-shell' || skillId === `${profileId}-rdc-tools`;
 }

@@ -355,6 +355,22 @@ const legalRegistry = {
   }],
 };
 
+describe('external capture registry boundary', () => {
+  const external = { inputId: 'reference_test', fileName: 'original.rdc', filePath: 'D:/source/original.rdc',
+    source: 'external_reference', discoveredAt: 1, lastModifiedAt: 1, size: 8, contentSha256: 'a'.repeat(64),
+    referenceIdentity: { device: '1', inode: '2', birthtimeNs: '3' } };
+  const registry = (input: Record<string, unknown>) => ({ ...legalRegistry,
+    projects: legalRegistry.projects.map(project => ({ ...project, inputs: [input] })) });
+  it('keeps existing registries readable and round-trips the new exact reference fields', () => {
+    expect(parseStoredDocument(legalRegistry, PROJECT_REGISTRY_MIGRATIONS, 'projects.json')).toEqual(legalRegistry);
+    expect(parseStoredDocument(registry(external), PROJECT_REGISTRY_MIGRATIONS, 'projects.json')).toMatchObject(registry(external));
+  });
+  it.each(['contentSha256', 'referenceIdentity'])('rejects external references missing %s', field => {
+    expect(() => parseStoredDocument(registry({ ...external, [field]: undefined }), PROJECT_REGISTRY_MIGRATIONS, 'projects.json'))
+      .toThrow(StorageSchemaError);
+  });
+});
+
 describe('storage schema store quartet', () => {
   const roots: string[] = [];
   const io = new StorageIo();

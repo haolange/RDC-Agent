@@ -277,11 +277,12 @@ export class AgentOrchestrator {
         modelId: config.modelName,
         toolAllowlist,
         contextWindowTokens: activeContextWindow,
-        capability,
+        capability, requestPlan: planning.plan,
         systemPrompt: config.systemPrompt,
         messageText: content,
         preloadSkillIds: options?.preloadSkillIds,
         effectiveProfile,
+        effectiveProfiles: effectiveSnapshot.profiles,
       });
       if (!promptPlan) {
         throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
@@ -313,7 +314,6 @@ export class AgentOrchestrator {
       const responseText = await this.turnRunner.runAgentTurn({
         agentId,
         content,
-        systemPrompt: promptPlan.systemPrompt,
         providerId: config.modelProvider,
         modelId: config.modelName,
         temperature: planning.plan.temperature,
@@ -330,7 +330,6 @@ export class AgentOrchestrator {
         },
         projectRootPath: context?.projectRootPath ?? null,
         projectId: context?.projectId ?? null,
-        promptPlan,
         effectiveModel: preparedBundle.effectiveModel,
         effectiveProfile,
         effectiveProfileIds: effectiveSnapshot.enabledProfileIds,
@@ -505,12 +504,13 @@ export class AgentOrchestrator {
         modelId: routeModelId,
         toolAllowlist,
         contextWindowTokens: activeContextWindow,
-        capability,
+        capability, requestPlan: planning.plan,
         systemPrompt: config.systemPrompt,
         messageText: typeof content === 'string' ? content : '',
         preloadSkillIds: options?.preloadSkillIds,
         effectiveProfile,
         extraSegments: options?.extraPromptSegments,
+        effectiveProfiles,
       });
       if (!promptPlan) throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
       if (options?.promptPlan && options.extraPromptSegments?.length) {
@@ -562,7 +562,6 @@ export class AgentOrchestrator {
       const responseText = await this.turnRunner.runAgentTurn({
         agentId,
         content,
-        systemPrompt: promptPlan.systemPrompt,
         providerId: routeProviderId,
         modelId: routeModelId,
         temperature: planning.plan.temperature,
@@ -579,7 +578,6 @@ export class AgentOrchestrator {
         },
         projectRootPath: options?.projectRootPath ?? null,
         projectId: options?.projectId ?? null,
-        promptPlan,
         effectiveModel: preparedTurn.effectiveModel,
         effectiveProfile,
         effectiveProfileIds,
@@ -697,6 +695,7 @@ export class AgentOrchestrator {
     );
     return {
       profile: profiles.find((definition) => definition.id === agentId && definition.enabled) ?? null,
+      profiles,
       enabledProfileIds: profiles.filter((definition) => definition.enabled).map((definition) => definition.id),
     };
   }

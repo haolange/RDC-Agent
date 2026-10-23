@@ -82,10 +82,10 @@ export class SessionContextStore {
     return path.join(location.sessionPath, 'session-context.jsonl');
   }
 
-  readSessionContextJournal(sessionId: string): SessionContextTurnEntry[] {
+  readSessionContextJournal(sessionId: string, select?: (entry: SessionContextTurnEntry) => boolean): SessionContextTurnEntry[] {
     const journalPath = this.getSessionContextJournalPath(sessionId);
     if (!fs.existsSync(journalPath)) return [];
-    const result = readJsonl<SessionContextTurnEntry>(journalPath);
+    const result = readJsonl<SessionContextTurnEntry>(journalPath, select);
     assertNoJsonlDiagnostics(journalPath, result.diagnostics);
     return result.records;
   }

@@ -26,6 +26,7 @@ import { turnPreparationWorkerPool } from '../../workers/TurnPreparationWorkerPo
 import { requestEnvelopeBuilder } from '../../agent-runtime/prompt';
 import { promptCacheCompiler } from '../../agent-runtime/prompt/PromptCacheCompiler';
 import { requestPlanHeaders } from '../../agent-runtime/providers/requestPlanWire';
+import { applyExecutionLimitFacts } from '../../agent-runtime/prompt/ExecutionLimitFacts';
 import {
   buildEffectiveRuntimePlan,
 } from '../../agent-runtime/EffectiveRuntimePlan';
@@ -175,6 +176,9 @@ export class TurnPreparationService {
     throwIfCancelled();
     const rdcBinding = freezeRdcTurnBinding(cliSettings, catalog?.tools ?? [], leaseIdentity);
     const compiledPolicy = compileEffectivePolicy(input.projectRootPath);
+    const promptPlan = applyExecutionLimitFacts(input.promptPlan, {
+      profileMaxTurns: input.effectiveProfile.maxTurns, policyMaxTurns: compiledPolicy.maxTurns,
+    });
     const effectiveMaxChildDepth = Math.min(compiledPolicy.maxChildDepth, input.inheritedMaxChildDepth ?? Infinity);
     const excludeSubagent = input.excludeSubagent === true || (input.subagentDepth ?? 0) >= effectiveMaxChildDepth;
     const contextCompactionPercent = resolveEffectiveCompactionPercent(
@@ -182,14 +186,14 @@ export class TurnPreparationService {
       compiledPolicy.contextCompactionPercent,
     );
     const approvedExecutionOffer = approvedExecutionOfferForAgent(input.sessionId, input.agentId);
-    const profile = { ...input.effectiveProfile, skills: [...new Set([...input.effectiveProfile.skills, ...input.promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)), ...(approvedExecutionOffer?.requiredSkillIds ?? [])])] };
+    const profile = { ...input.effectiveProfile, skills: [...new Set([...input.effectiveProfile.skills, ...promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)), ...(approvedExecutionOffer?.requiredSkillIds ?? [])])] };
     const profileSkills = profile.skills;
     const skillIntersection = resolveSkillIntersection(
       profileSkills,
       input.toolAllowlist,
       input.projectRootPath,
       input.agentId,
-      input.promptPlan,
+      promptPlan,
     );
     assertExecutionOfferSkillCompatibility({
       sessionId: input.sessionId,
@@ -238,7 +242,7 @@ export class TurnPreparationService {
       ? injected
       : [];
     const toolTokens = charsToTokens(JSON.stringify(activeToolDefinitions).length);
-    const fixedTokens = input.promptPlan.totalTokenEstimate + toolTokens;
+    const fixedTokens = promptPlan.totalTokenEstimate + toolTokens;
     const compactionThreshold = resolveCompactionThresholdTokens(
       input.requestPlan.contextBudgetTokens,
       contextCompactionPercent,
@@ -267,7 +271,7 @@ export class TurnPreparationService {
     const preparedInputTokens = fixedTokens + afterConversationTokens;
     const compactionApplied = computation.compactionApplied;
     const promptCache = promptCacheCompiler.compile({
-      promptPlan: input.promptPlan,
+      promptPlan,
       requestPlan: input.requestPlan,
       tools: activeToolDefinitions,
     });
@@ -280,7 +284,7 @@ export class TurnPreparationService {
     const subagentDefinitions = activeToolDefinitions.filter(isSubagent);
     const systemDefinitions = activeToolDefinitions.filter((definition) => !isMcp(definition) && !isSubagent(definition));
     const classified = computation.classification;
-    const metrics = input.promptPlan.metrics;
+    const metrics = promptPlan.metrics;
     const breakdown: ContextUsageBreakdownEntry[] = [
       { id: 'system_prompt', tokens: charsToTokens(metrics.systemPrompt) },
       ...(metrics.scopedInstructions > 0
@@ -309,7 +313,7 @@ export class TurnPreparationService {
       { id: 'free', tokens: Math.max(0, input.requestPlan.contextBudgetTokens - preparedInputTokens) },
     ];
     requestEnvelopeBuilder.build({
-      promptPlan: input.promptPlan,
+      promptPlan,
       sessionId: input.sessionId ?? undefined,
       turnId: input.turnId,
       callIndex: 0,
@@ -349,7 +353,7 @@ export class TurnPreparationService {
       knowledgeReadRoots: knowledgeResolution.roots,
       routeCapability: input.routeCapability,
       requestPlan: input.requestPlan,
-      promptPlan: input.promptPlan,
+      promptPlan,
       policy: compiledPolicy,
       skillIntersection,
       attachmentManifestFingerprint: input.attachmentManifest
@@ -435,6 +439,7 @@ export class TurnPreparationService {
         knowledgeReadRootDiagnostics: knowledgeResolution.diagnostics,
       },
       runtime: {
+        promptPlan,
         runtimeTools,
         activeToolDefinitions,
         routeCapability: input.routeCapability,

@@ -138,6 +138,17 @@ describe('conversation turn failure classification', () => {
     expect(diagnostic.userMessage).not.toContain('服务商');
     expect(diagnostic.technicalMessage).toContain('ARTIFACT_QUOTA_EXCEEDED');
   });
+  it('reports retained-window artifact size failures as local context errors', () => {
+    const abort = new AgentRecoveryAbortError('[Recovery abort] unrecoverable error', {
+      cause: new SessionArtifactError('ARTIFACT_TOO_LARGE', '3565679 bytes exceeds 2097152 bytes.'),
+      category: 'unknown', attempts: 4, maxAttempts: 1,
+    });
+    const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
+    expect(diagnostic.code).toBe('CONVERSATION_CONTEXT_COMPACTION_FAILED');
+    expect(diagnostic.userMessage).toContain('本地上下文制品');
+    expect(diagnostic.userMessage).not.toMatch(/账号|额度|服务商/);
+    expect(diagnostic.technicalMessage).toContain('ARTIFACT_TOO_LARGE');
+  });
 
   it('reports investigation integrity failures during compaction as local context failures', () => {
     const invalidEvidence = new InvestigationError(

@@ -11,10 +11,8 @@ import {
   useComposerSessionContextStore,
 } from '../../stores/composerSessionContextStore';
 import { stopWorkTrace } from '../../lib/stopWorkTrace';
-import {
-  ACTIVE_ASSISTANT_STATUSES,
-  selectActiveAssistantForTurn,
-} from './composerStopSelection';
+import { selectActiveAssistantForTurn } from './composerStopSelection';
+import { reconcileConversationStop } from './composerStopReconciliation';
 
 export { stopWorkTrace };
 
@@ -138,34 +136,8 @@ export function useComposerStop(options: {
         return;
       }
 
-      const latestConversation = useConversationStore.getState();
-      const latestActiveAssistant = selectActiveAssistantForTurn(
-        latestConversation.conversationMessages,
-        currentSession?.sessionId,
-        activeTurn,
-      )
-        ?? (activeAssistant && ACTIVE_ASSISTANT_STATUSES.has(activeAssistant.status) ? activeAssistant : null);
-
-      const stopRequestId = requestId
-        ?? cancelResult.cancelledRequestId
-        ?? latestActiveAssistant?.requestId
-        ?? null;
-      if (stopRequestId) {
-        latestConversation.markRequestMonotonicallyStopped(stopRequestId);
-      }
-      if (latestActiveAssistant) {
-        latestConversation.markTurnMonotonicallyStopped(latestActiveAssistant.turnId);
-        latestConversation.updateAssistantMessageByTurnId(latestActiveAssistant.turnId, stopWorkTrace);
-      } else if (cancelResult.cancelledTurnId) {
-        latestConversation.markTurnMonotonicallyStopped(cancelResult.cancelledTurnId);
-        latestConversation.updateAssistantMessageByTurnId(cancelResult.cancelledTurnId, stopWorkTrace);
-      }
-
-      if (cancelResult.success) {
-        if (turnOwnership) {
-          useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
-        }
-      }
+      await reconcileConversationStop({ conversationAPI: electronAPI.conversation, cancelResult,
+        sessionId: currentSession?.sessionId, activeAssistant, activeTurn, turnOwnership });
 
       // Do not block notice on workflow stop latency.
       if (workflowStopPromise) {
@@ -181,7 +153,6 @@ export function useComposerStop(options: {
       }
       showNotice(t('app.stopRunSent'));
     } catch (error) {
-      useComposerSessionContextStore.getState().setIsPromptSending(false);
       showNotice(error instanceof Error ? error.message : t('app.stopRunFailed'));
     }
   }, [

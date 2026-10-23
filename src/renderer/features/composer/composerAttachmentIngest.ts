@@ -3,10 +3,7 @@ import type {
   ConversationAttachmentStageItem,
 } from '@shared/types/conversation';
 import type { PendingAttachmentDraft } from '../../types/attachments';
-
-export function isBrowserAppSession(): boolean {
-  return Boolean((window as Window & { __RDC_AGENT_BROWSER_APP_BRIDGE__?: true }).__RDC_AGENT_BROWSER_APP_BRIDGE__);
-}
+import { isBrowserAppSession } from '../../platform/browserSession';
 
 export function descriptorToDraft(descriptor: ComposerAttachmentDescriptor): PendingAttachmentDraft {
   return {

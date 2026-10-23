@@ -131,6 +131,7 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'project:inputs:refresh': 'mutation',
   'project:inputs:import': 'mutation',
   'project:inputs:importPaths': 'mutation',
+  'project:inputs:reference': 'high-impact',
   'project:inputs:prepareRemove': 'high-impact',
   'project:inputs:remove': 'high-impact',
   'device:list': 'read',

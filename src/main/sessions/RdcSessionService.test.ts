@@ -1,9 +1,10 @@
 import { clearRdcContextLeases, setRdcRuntimeContextForSession, quarantineRdcContext } from './RdcRuntimeContextRegistry';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OpenProjectInputRequest } from '@shared/types/session';
-const mocks = vi.hoisted(() => ({ close: vi.fn(), observe: vi.fn(), events: vi.fn(), append: vi.fn(), hash: vi.fn(), saveSelection: vi.fn(), liveRead: vi.fn(), liveClear: vi.fn() }));
+const mocks = vi.hoisted(() => ({ close: vi.fn(), observe: vi.fn(), events: vi.fn(), append: vi.fn(), hash: vi.fn(), saveSelection: vi.fn(), liveRead: vi.fn(), liveClear: vi.fn(), project: vi.fn(), reference: vi.fn() }));
 vi.mock('../captures/replay/captureContentHash', () => ({ hashCaptureFile: mocks.hash }));
-vi.mock('./StorageAdapter', () => ({ storageAdapter: { getProjectById: () => ({ rootPath: '/project' }) } }));
+vi.mock('./StorageAdapter', () => ({ storageAdapter: { getProjectById: mocks.project } }));
+vi.mock('../captures/ExternalCaptureReference', () => ({ verifyExternalCaptureReference: mocks.reference }));
 vi.mock('../captures/replay/ReplayHistoryStore', () => ({ replayHistoryStore: { saveSelection: mocks.saveSelection, append: mocks.append } }));
 vi.mock('../captures/replay/ReplayLivePreviewStore', () => ({
   replayLivePreviewStore: { read: mocks.liveRead, clear: mocks.liveClear, write: vi.fn() },
@@ -31,13 +32,30 @@ const scope = { projectId: 'p', sessionId: 's1' };
 const request = (sessionId = 's1', remote = false): OpenProjectInputRequest => ({ projectId: 'p', sessionId,
   inputId: 'capture', filePath: '/project/capture.rdc', replayDevice: { id: remote ? 'android' : 'local',
     type: remote ? 'android' : 'local', label: 'device', status: 'online', transport: 'local' } });
-beforeEach(() => { clearRdcContextLeases(); vi.clearAllMocks(); mocks.hash.mockReset(); mocks.hash.mockResolvedValue({ sha256: 'a'.repeat(64) }); mocks.close.mockResolvedValue(undefined);
+beforeEach(() => { clearRdcContextLeases(); vi.clearAllMocks(); mocks.project.mockReturnValue({ rootPath: '/project' }); mocks.reference.mockReset(); mocks.hash.mockReset(); mocks.hash.mockResolvedValue({ sha256: 'a'.repeat(64) }); mocks.close.mockResolvedValue(undefined);
   mocks.events.mockResolvedValue([{ eventId: 1 }, { eventId: 9 }]);
   mocks.observe.mockResolvedValue({ appliedEventId: 9, imageEventId: 9, error: null });
   mocks.liveRead.mockResolvedValue(Buffer.from('png'));
   setRdcInteractionLock('s1', 'test', false);
 });
 describe('per-session capture lifecycle', () => {
+  it('rejects a changed external source before opening native replay', async () => {
+    mocks.project.mockReturnValue({ rootPath: '/project', inputs: [{ inputId: 'capture', filePath: '/project/capture.rdc', source: 'external_reference' }] });
+    mocks.reference.mockRejectedValue(new Error('CAPTURE_REFERENCE_CHANGED'));
+    const service = new RdcSessionService();
+    await expect(service.openProjectInput(request())).rejects.toThrow('CAPTURE_REFERENCE_CHANGED');
+    expect(service.snapshotOpenedCaptureForSession(scope)).toBeNull();
+    expect(mocks.saveSelection).not.toHaveBeenCalled();
+  });
+  it('closes replay if external identity changes during open, even with equal bytes', async () => {
+    mocks.project.mockReturnValue({ rootPath: '/project', inputs: [{ inputId: 'capture', filePath: '/project/capture.rdc', source: 'external_reference' }] });
+    mocks.reference.mockResolvedValueOnce({ contentSha256: 'a'.repeat(64) }).mockRejectedValueOnce(new Error('CAPTURE_REFERENCE_CHANGED'));
+    const service = new RdcSessionService();
+    await expect(service.openProjectInput(request())).rejects.toThrow('CAPTURE_REFERENCE_CHANGED');
+    expect(mocks.close).toHaveBeenCalledTimes(1);
+    expect(service.snapshotOpenedCaptureForSession(scope)).toBeNull();
+    expect(mocks.events).not.toHaveBeenCalled();
+  });
   it('keeps same capture independent across sessions', async () => {
     const service = new RdcSessionService(); await service.openProjectInput(request()); await service.openProjectInput(request('s2'));
     expect(mocks.close).not.toHaveBeenCalled();

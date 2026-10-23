@@ -12,6 +12,8 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDC 与 RenderDo
 
 产品不是固定模式向导。**四个 builtin 是唯一官方身份**：`general` / `debugger` / `analyzer` / `optimizer`（`resources/agent-runtime/agents`，scope 优先级 `builtin < user < project`，不再写 user seed）。user/project 只能覆盖这四个 id，或新增无关自定义 id。ask/plan/edit 及 S0 specialist id 为历史非法 id，不是顶层身份。仅 `user-invocable` 的 profile 出现在 composer orchestrator 菜单。`/plan` 不再硬切 builtin plan。Session rail 五卡 `Progress / Artifacts / Outputs / Context / Capture` 已落地。声明式 handoff 已落地：`handoffs` 只驱动建议行和计划门，人点后 `applyDeclaredHandoff` 写 execution offer 并 persist `session.agentId`；不存在 `agent_handoff` 工具或 durable `prepared → committed → consumed` 状态机。三条 Mission 方法面已接到 Skill / Hook / Capsule（Debugger `$debugger-causal-method`，Analyzer `$analyzer-architecture-method`，Optimizer `$optimization-experiment`）。共享 `$rdc-tool-shell` 与 Debugger / Analyzer / Optimizer 三本 RDC 工具手册由 execute handoff 绑定给 General；它们只提供操作知识，权限仍由冻结 catalog、主进程策略与 owning lease 决定。Investigation 垂直 schema（`rdc.investigation.v1`）、`InvestigationArtifactService` 与三个 deferred 工具已落地；IPC `investigation:read` 已落地；15 个垂直方法 Skill 与 4 个 builtin Hook 模板已落地。Knowledge 目标拓扑是 markdown-first **六 lane**（Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version）+ 五服务 + 五个 deferred 工具 + Knowledge Center 三列 UI；**禁止恢复 Embedding capability / Semantic lane**。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。**T18 知识导入 真实验收已证**（见下文 T18 已证组与 [`docs/product/acceptance-ledger.md`](docs/product/acceptance-ledger.md) `T18-colddata-*`）。产品级 Browser QA 全矩阵见 U05；U06 为历史运行事实；其中 Optimizer 的真实实验完成结论已撤回，不代表当前版本验收。裁决见下文「Current / Target / Migration Adjudications」。
 
+操作知识与执行权限分开：三条 Mission 可按需通过 `skills` / `skill_read` 读取共享 `rdc-tool-shell` 及各自一本专业手册和引用，用于规划参数、证据与调用成本；其它专业手册保持不可见。不为此自动预载正文，也不改变 profile 的工具集或在途权限。Mission 仍为 plan-only；General 仍须经批准计划、声明交接及 requiredSkillIds 的真实预载后，按冻结 catalog、审批和 owning lease 执行。
+
 唯一运行时路径是 agent loop：解析 profile / model route / policy / tools → 调用 LLM → 执行已批准工具 → 回灌结果 → 产出 final answer。Renderer 不得伪造推理阶段；隐藏 CoT 永不作为 UI 内容展示或持久化。
 
 Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完成。`LoopProgressGuard` 对工具名、规范化参数、结果语义与 runtime revision 生成稳定指纹；连续第二轮无进展只注入一次不落盘纠偏指令，第三轮仍相同以 `AGENT_NO_PROGRESS` 终止。仍需 continuation 却达到 `maxTurns` 时以 `AGENT_MAX_TURNS_EXCEEDED` 终止。两者分别投影 `CONVERSATION_AGENT_LOOP_STALLED` / `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`，不得归类成 Provider 请求失败。
@@ -406,7 +408,7 @@ Plan 经 session artifact plans 类别版本化：同意前覆盖活文件，同
 
 同一父回合的 `maxAggregateWallMs` 仅累计有子执行实际活跃的墙钟时间；父级独立取证的间隔暂停该窗口，并行子执行重叠时只计一次。首次委派前不消耗此上限；达到上限后不再创建子执行。此局部窗口不替代持久 root budget、Capsule 单次时限或取消/join 规则。
 
-任务取消终态须在实际 producer 与所属进程退出后保存；同 turn 取消请求不 self-join。声明续跑切 Agent 后的新回合是独立 turn，不继承未完成 handoff 取消令牌。字段与调用合同以 [runtime-kernel](docs/contracts/runtime-kernel.md) 的 Task 执行章节为准，领域调查策略仍由实际加载的指令决定。
+任务取消终态须在实际 producer 与所属进程退出后保存；同 turn 取消请求不 self-join。用户在后续 owning 回合明确续跑时，可显式为同一 cancelled Task 创建下一 generation，旧执行终态、原预算与消费不变；禁止同回合复活、自动恢复子树或重开 completed Task。声明续跑切 Agent 后的新回合是独立 turn，不继承未完成 handoff 取消令牌。字段与调用合同以 [runtime-kernel](docs/contracts/runtime-kernel.md) 的 Task 执行章节为准，领域调查策略仍由实际加载的指令决定。
 
 ## Session Capture 内嵌回放裁决（2026-09-13）
 

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { storageAdapter } from './StorageAdapter';
 import { replayHistoryStore } from '../captures/replay/ReplayHistoryStore';
 import { hashCaptureFile } from '../captures/replay/captureContentHash';
+import { verifyExternalCaptureReference } from '../captures/ExternalCaptureReference';
 import type { SessionScope, OpenProjectInputRequest, OpenedCaptureState } from '@shared/types/session';
 import type { CaptureReplayState, CaptureReplayApplyRequest, CaptureReplayBindingRequest } from '@shared/types/captureReplay';
 import { RdcSessionRuntime, type RdcLifecycleOptions } from './RdcSessionRuntime';
@@ -105,18 +106,31 @@ export class RdcSessionService {
       if (remoteId) this.devices.set(remoteId, key);
       this.publish(binding, { phase: 'validating', operationId: randomUUID(), generation: binding.state.generation + 1, error: null });
       try {
-        const hashed = await hashCaptureFile(request.filePath);
+        const project = storageAdapter.getProjectById(scope.projectId);
+        const reference = project?.inputs?.find(input => input.inputId === request.inputId && input.source === 'external_reference');
+        if (reference && reference.filePath !== request.filePath) throw new Error('CAPTURE_REFERENCE_INVALID_PATH');
+        const verifyInput = async () => {
+          if (!reference) return hashCaptureFile(request.filePath);
+          const verified = await verifyExternalCaptureReference(reference);
+          return { sha256: verified.contentSha256! };
+        };
+        const hashed = await verifyInput();
         this.assertInteraction(binding, options);
         await this.closeBinding(scope, binding, options, remoteId);
         this.publish(binding, { captureHash: hashed.sha256, contextId: null, replayDeviceId: null, image: null, observation: null, agentObservation: null, imageEventId: null, appliedEventId: null, requestedEventId: null, events: [], targets: [], target: null });
-        const project = storageAdapter.getProjectById(scope.projectId);
         if (project) await replayHistoryStore.saveSelection(project.rootPath, scope.sessionId, { inputId: request.inputId, captureSha256: hashed.sha256, deviceId: request.replayDevice.id });
         this.assertInteraction(binding, options);
         binding.deviceId = remoteId;
         if (remoteId) this.devices.set(remoteId, key);
         this.publish(binding, { phase: remoteId ? 'connecting' : 'opening', inputId: request.inputId });
         const opened = await binding.runtime.openProjectInput(request, { ...options, onStage: phase => this.publish(binding, { phase }) });
-        const verified = await hashCaptureFile(request.filePath);
+        let verified: { sha256: string };
+        try { verified = await verifyInput(); }
+        catch (error) {
+          this.publish(binding, { captureHash: null, image: null, imageEventId: null });
+          await this.closeBinding(scope, binding, options);
+          throw error;
+        }
         if (verified.sha256 !== hashed.sha256) {
           this.publish(binding, { captureHash: null, image: null, imageEventId: null });
           await this.closeBinding(scope, binding, options);
@@ -179,7 +193,9 @@ export class RdcSessionService {
     if (contextId) await runRdcOperation(contextId, operation); else await this.serial(scope, operation);
   }
   async rebindInput(projectId: string, oldInputId: string, input: import('@shared/types/session').ProjectInputRecord): Promise<void> {
-    const hash = await hashCaptureFile(input.filePath);
+    const hash = input.source === 'external_reference'
+      ? { sha256: (await verifyExternalCaptureReference(input)).contentSha256! }
+      : await hashCaptureFile(input.filePath);
     for (const binding of this.bindings.values()) {
       if (binding.state.projectId !== projectId || binding.state.inputId !== oldInputId || binding.state.captureHash !== hash.sha256) continue;
       binding.runtime.rebindInput(input.inputId, input.filePath);
@@ -202,7 +218,7 @@ export class RdcSessionService {
   listBindingsForProject(projectId: string) {
     return [...this.bindings.values()].filter(binding => binding.state.projectId === projectId).map(binding => ({
       scope: { projectId, sessionId: binding.state.sessionId }, inputId: binding.state.inputId,
-      captureHash: binding.state.captureHash, interactionLock: this.lock(binding), contextId: binding.runtime.getContextId(),
+      captureHash: binding.state.captureHash, phase: binding.state.phase, interactionLock: this.lock(binding), contextId: binding.runtime.getContextId(),
     }));
   }
   async closeMatchingCaptures(projectId: string, inputId: string): Promise<void> {

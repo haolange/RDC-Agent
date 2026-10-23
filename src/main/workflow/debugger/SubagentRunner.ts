@@ -387,7 +387,7 @@ export class SubagentRunner {
         ...DELEGATION_CAPSULE_JSON_SCHEMA,
         properties: {
           ...DELEGATION_CAPSULE_JSON_SCHEMA.properties,
-          taskId: { type: 'string', description: 'Optional logical Task to own this execution.' },
+          taskId: { type: 'string', description: 'Optional logical Task to own this execution. In either wait or background mode, leave it unclaimed: do not start a direct execution with task_update(in_progress) first. Settle an existing execution before dispatching another.' },
           parentExecutionId: { type: 'string', description: 'Optional parent Task execution.' },
           mode: { type: 'string', enum: ['wait', 'background'], description: 'Wait for the result or return a durable execution id immediately.' },
         },

@@ -2,7 +2,6 @@ import type { SessionRecord } from '@shared/types/session';
 import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 import { isHandoffContinueAction } from '@shared/types/planReview';
 import { EXECUTION_OFFER_SCHEMA } from '@shared/types/executionOffer';
-import { nowMs } from '@shared/utils/id';
 import { dispatchRuntimeHooks } from '../hooks/runtimeHookDispatch';
 import { resolveEnabledAgentDefinition } from './ConversationRoutePreflight';
 import { storageAdapter } from '../sessions/StorageAdapter';
@@ -74,7 +73,7 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
       requiredSkillIds: [...(declared.requiredSkillIds ?? [])],
       label: declared.label,
       prompt: declared.prompt,
-      approvedAt: nowMs(),
+      approvedAt: approved.updatedAt,
     });
   }
   const updated = storageAdapter.updateSession(input.sessionId, { agentId: input.agent });
@@ -99,6 +98,7 @@ export function writeExecutionOfferFromApproval(input: {
   projectRoot: string | null;
   handoff: { label: string; agent: string };
   plan: { uri: string; hash: string };
+  approvedAt: number;
 }): PlanReviewHandoffSuggestion | null {
   const declared = findDeclaredHandoff(input.sourceAgentId, input.projectRoot, input.handoff.agent, input.handoff.label);
   if (!declared) return null;
@@ -110,7 +110,7 @@ export function writeExecutionOfferFromApproval(input: {
     requiredSkillIds: [...(declared.requiredSkillIds ?? [])],
     label: declared.label,
     prompt: declared.prompt,
-    approvedAt: nowMs(),
+    approvedAt: input.approvedAt,
   });
   return {
     label: declared.label,

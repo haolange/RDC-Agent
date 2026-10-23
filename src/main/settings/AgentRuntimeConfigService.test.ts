@@ -61,7 +61,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
         .toEqual(service.listSkills(project, target).map((skill) => skill.id));
     }
     expect(projection.options.find((skill) => skill.id === 'rdc-tool-shell')?.unavailableToAgentIds)
-      .toEqual(['debugger', 'analyzer', 'optimizer']);
+      .toEqual([]);
   });
 
   it('reports malformed overriding skills as catalog errors without exposing a lower-scope fallback', async () => {
@@ -220,9 +220,8 @@ describe('AgentRuntimeConfigService scoped resources', () => {
       FORBIDDEN_SKILL_NAMES,
       GENERAL_SKILL_IDS,
       MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS,
-      PLAN_ONLY_CONFLICT_SKILL_IDS,
+      RDC_OPERATION_MANUAL_SKILL_IDS,
       SKILL_ARMED_BY_PROFILE,
-      isPlanOnlyConflictSkill,
       skillCallEntry,
       skillLane,
     } = await import('@shared/constants/canonicalSkills');
@@ -245,9 +244,8 @@ describe('AgentRuntimeConfigService scoped resources', () => {
       expect(loaded?.id).toBe(skill.id);
       expect(loaded?.instructions.length).toBeGreaterThan(0);
     }
-    for (const id of PLAN_ONLY_CONFLICT_SKILL_IDS) {
+    for (const id of RDC_OPERATION_MANUAL_SKILL_IDS) {
       expect(skillLane(id)).toBe('general');
-      expect(isPlanOnlyConflictSkill(id)).toBe(true);
       expect(service.loadSkill(id)?.allowedTools).toEqual([]);
     }
     const { readFileSync } = await import('node:fs');
@@ -259,7 +257,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
         expect(skillCallEntry(skillId)).toBe('agent.md-skills');
       }
       if (profile !== 'general') {
-        for (const skillId of PLAN_ONLY_CONFLICT_SKILL_IDS) {
+        for (const skillId of RDC_OPERATION_MANUAL_SKILL_IDS) {
           expect(source).not.toMatch(new RegExp(`^  - ${skillId}$`, 'm'));
         }
       }
@@ -279,20 +277,21 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     ))).toBe(false);
   });
 
-  it('hides General-only RDC manuals from Mission catalog and skill_read viewers', async () => {
+  it('discovers shared and matching Mission manuals as knowledge while isolating other specialties', async () => {
     const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
     const { isSkillVisibleToProfile } = await import('@shared/constants/canonicalSkills');
     const service = new AgentRuntimeConfigService();
-    const generalOnly = ['rdc-tool-shell', 'debugger-rdc-tools', 'analyzer-rdc-tools', 'optimizer-rdc-tools'];
+    const manuals = ['rdc-tool-shell', 'debugger-rdc-tools', 'analyzer-rdc-tools', 'optimizer-rdc-tools'];
     for (const mission of ['debugger', 'analyzer', 'optimizer'] as const) {
-      for (const skillId of generalOnly) {
-        expect(isSkillVisibleToProfile(mission, skillId)).toBe(false);
-        expect(service.listSkills(undefined, mission).map((skill) => skill.id)).not.toContain(skillId);
-        expect(service.listSkillMetadata(undefined, mission).map((skill) => skill.id)).not.toContain(skillId);
-        expect(service.loadSkill(skillId, undefined, mission)).toBeNull();
+      for (const skillId of manuals) {
+        const visible = skillId === 'rdc-tool-shell' || skillId === `${mission}-rdc-tools`;
+        expect(isSkillVisibleToProfile(mission, skillId)).toBe(visible);
+        expect(service.listSkills(undefined, mission).some((skill) => skill.id === skillId)).toBe(visible);
+        expect(service.listSkillMetadata(undefined, mission).some((skill) => skill.id === skillId)).toBe(visible);
+        expect(service.loadSkill(skillId, undefined, mission)?.id ?? null).toBe(visible ? skillId : null);
       }
     }
-    for (const skillId of generalOnly) {
+    for (const skillId of manuals) {
       expect(isSkillVisibleToProfile('general', skillId)).toBe(true);
       expect(service.listSkills(undefined, 'general').map((skill) => skill.id)).toContain(skillId);
       expect(service.loadSkill(skillId, undefined, 'general')?.id).toBe(skillId);

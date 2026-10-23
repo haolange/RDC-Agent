@@ -1,4 +1,12 @@
 export const enProjectCapture = {
+  'projectCapture.reference': 'Reference external capture (read only)',
+  'projectCapture.referenceHint': 'Register one external RDC without copying it. Only this file is authorized for reading; removing its reference keeps the original.',
+  'projectCapture.referencePath': 'Absolute path to the original RDC',
+  'projectCapture.registerReference': 'Register reference',
+  'projectCapture.referenceFailed': 'External capture registration failed',
+  'projectCapture.external': 'External reference · read only',
+  'projectCapture.detach': 'Remove reference',
+  'projectCapture.cancel': 'Cancel',
   'project.inputs.reconcileFailed': 'Capture data synchronization failed',
   'project.inputs.reconcileRetry': 'Recovery data is retained. Refresh project captures to retry.',
   'projectCapture.title': 'Capture files',

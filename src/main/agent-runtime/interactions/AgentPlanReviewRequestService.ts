@@ -180,7 +180,7 @@ export class AgentPlanReviewRequestService {
       return { success: false, error: 'Plan review approve requires a session-owned turn.' };
     }
     const frozen = this.writer.freezeApprovedPlan(sessionId, pending.planReview.hash);
-    this.store.markDecision(sessionId, 'approved', {
+    const approved = this.store.markDecision(sessionId, 'approved', {
       approvedHash: frozen.hash,
       frozenUri: frozen.uri,
       approvedHandoff: input.decision.handoff,
@@ -200,6 +200,7 @@ export class AgentPlanReviewRequestService {
       projectRoot: session ? storageAdapter.getProjectById(session.projectId)?.rootPath ?? null : null,
       handoff: input.decision.handoff,
       plan: { uri: frozen.uri, hash: frozen.hash },
+      approvedAt: approved.updatedAt,
     });
     const decision = { kind: 'approve' as const, handoff: input.decision.handoff };
     this.deletePending(pending);

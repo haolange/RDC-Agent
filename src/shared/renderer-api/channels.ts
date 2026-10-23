@@ -148,6 +148,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     refreshInputs: 'project:inputs:refresh',
     importInput: 'project:inputs:import',
     importInputPaths: 'project:inputs:importPaths',
+    referenceInput: 'project:inputs:reference',
     prepareRemoveInput: 'project:inputs:prepareRemove',
     removeInput: 'project:inputs:remove',
   },

@@ -1,6 +1,7 @@
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
 import { RdcExecutionReceipts, rdcDigest, rdcExecutionReceipts, type RdcExecutionReceipt } from '../tools/RdcExecutionReceipts';
 import { InvestigationError } from './investigationErrors';
+import { parseRdcProcessIdentity } from '../tools/RdcProcessIdentity';
 
 function samplingArgsFingerprint(receipt: RdcExecutionReceipt): string {
   if (receipt.evidence.kind !== 'measurement' || receipt.evidence.method !== 'image') return receipt.argsFingerprint;
@@ -20,9 +21,13 @@ export function assertExecutionEvidence(
     const phases = ['baseline', 'intervention', 'variant', 'rollback', 'restored'] as const;
     const records = phases.map((phase) => receipts.read(sessionId, refs[phase]));
     const [baseline, intervention, variant, rollback, restored] = records;
+    const processFingerprint = rdcDigest(parseRdcProcessIdentity(baseline.processIdentity));
     if (new Set(phases.map((phase) => refs[phase].uri)).size !== phases.length) throw new Error('receipts must be distinct');
     for (let i = 0; i < records.length; i++) {
       const record = records[i];
+      if (rdcDigest(parseRdcProcessIdentity(record.processIdentity)) !== processFingerprint) {
+        throw new Error('daemon/worker process generation changed within the experiment');
+      }
       if (record.experimentId !== experiment.experimentId || record.contextId !== baseline.contextId
         || record.projectId !== baseline.projectId || record.replaySessionId !== baseline.replaySessionId
         || record.definitionsFingerprint !== baseline.definitionsFingerprint

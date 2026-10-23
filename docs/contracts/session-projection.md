@@ -69,6 +69,7 @@ interface ActiveTurnContext {
 
 - `preparing` → 干净撤销（本 session 草稿恢复；transcript 不留本轮）；
 - `committing` / `running` → 单调落停；
+- Stop 回执成功不代表指定 assistant 被取消：可能仅停止了后台工作，原回合已先完成。committed 回合停止后，renderer 经现有 `conversation.getHistory` 对账同 session/request/turn/agent 的权威终态，仅合并该消息；已完成/失败/停止消息不得再被乐观停止改写。读取期间切换会话时只更新所属 cache，新请求的消息与 ActiveTurnContext 不被旧停止回执覆盖。
 - Rewrite 提交立即写入 ActiveTurnContext；Stop 可在 optimistic 阶段按 `requestId` 落停，IPC reconcile 不得用 `streaming` 覆盖已停止 request。
 - 改写分支的 `anchorUserMessageId/rootTurnId` 标识分叉首轮，不是后续每轮的身份。终态写入须核对当前 user/assistant 的 turn 与 branch，并验证分支锚点仍属于该分支及其 root turn；同分支后续回合允许提交，切换可见分支不撤销后台回合的归属。
 

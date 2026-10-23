@@ -1,12 +1,13 @@
 import type { InvestigationArtifactManifest } from '@shared/types/renderdocInvestigation';
 import {
-  collectRetiredClaimDependents,
+  collectRetiredRecordDependents,
   collectSupersededWorldStateDependents,
   upsertIndexEntry,
+  withPendingInvestigationMutations,
 } from './investigationArtifactMutations';
 import { InvestigationError } from './investigationErrors';
 import { serializeInvestigationJson, sha256Prefixed } from './investigationHash';
-import { collectRecordKeys, type InvestigationIndexDocument, type InvestigationIndexEntry } from './investigationRecordKeys';
+import { collectRecordKeys, recordKeyToken, type InvestigationIndexDocument, type InvestigationIndexEntry } from './investigationRecordKeys';
 import type { InvestigationRecord } from '@shared/types/renderdocInvestigation';
 import { INDEX_URI } from './investigationRecordKeys';
 import { isReadySourceDriftError } from './investigationReadIntegrity';
@@ -29,7 +30,8 @@ export class InvestigationReadRepair {
 
   projectionIndex(sessionId: string): InvestigationIndexDocument {
     let index = this.access.readIndexSnapshot(sessionId);
-    if (!index.artifacts.some((entry) => (entry.kind === 'world_state' || entry.kind === 'claim' || entry.kind === 'claim_set')
+    if (!index.artifacts.some((entry) => (entry.kind === 'world_state' || entry.kind === 'claim' || entry.kind === 'claim_set'
+      || entry.kind === 'evidence' || entry.kind === 'evidence_pack')
       && entry.status === 'superseded')) {
       return index;
     }
@@ -63,28 +65,29 @@ export class InvestigationReadRepair {
       .filter((entry) => entry.kind === 'world_state' && entry.status === 'superseded'
         && !currentWorldStateIds.has(entry.recordKey))
       .map((entry) => entry.recordKey));
-    const reader = {
+    const mutations: InvestigationTxnMutation[] = [];
+    const reader = withPendingInvestigationMutations({
       readRecordBody: <T>(entry: InvestigationIndexEntry) => this.access.readRecordBody<T>(sessionId, entry),
       readJson: <T>(uri: string) => this.access.readJson<T>(sessionId, uri),
       parseManifest: (value: unknown) => this.access.parseManifest(value),
-    };
-    const mutations: InvestigationTxnMutation[] = [];
+    }, mutations);
     for (const worldStateId of orphanedIds) {
       const stale = collectSupersededWorldStateDependents(reader, worldStateId, index);
       mutations.push(...stale.mutations);
       index = stale.index;
     }
-    const currentClaimIds = new Set(index.artifacts
-      .filter(entry => (entry.kind === 'claim' || entry.kind === 'claim_set') && entry.status !== 'superseded')
+    const currentRecordKeys = new Set(index.artifacts
+      .filter(entry => entry.status !== 'superseded')
       .flatMap(entry => collectRecordKeys(entry.kind, reader.readRecordBody<InvestigationRecord>(entry))
-        .filter(key => key.space === 'claim').map(key => key.id)));
-    const retiredClaimIds = new Set(index.artifacts
-      .filter(entry => (entry.kind === 'claim' || entry.kind === 'claim_set') && entry.status === 'superseded')
+        .map(recordKeyToken)));
+    const retiredRecordKeys = new Set(index.artifacts
+      .filter(entry => entry.status === 'superseded')
       .flatMap(entry => collectRecordKeys(entry.kind, reader.readRecordBody<InvestigationRecord>(entry))
-        .filter(key => key.space === 'claim' && !currentClaimIds.has(key.id)).map(key => key.id)));
-    const staleClaimDependents = collectRetiredClaimDependents(reader, retiredClaimIds, index);
-    mutations.push(...staleClaimDependents.mutations);
-    index = staleClaimDependents.index;
+        .filter(key => (key.space === 'claim' || key.space === 'evidence') && !currentRecordKeys.has(recordKeyToken(key)))
+        .map(recordKeyToken)));
+    const staleDependents = collectRetiredRecordDependents(reader, retiredRecordKeys, index);
+    mutations.push(...staleDependents.mutations);
+    index = staleDependents.index;
     if (mutations.length === 0) {
       if (integrityError) throw integrityError;
       return;

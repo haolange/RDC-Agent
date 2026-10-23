@@ -543,6 +543,17 @@ export function createTurnFailedDiagnostic(
       technicalMessage: redactTechnicalMessage(compactionFailure),
     });
   }
+  if (error instanceof AgentRecoveryAbortError && compactionFailure instanceof SessionArtifactError) {
+    return createConversationDiagnostic({
+      agentId: route.agentId,
+      code: 'CONVERSATION_CONTEXT_COMPACTION_FAILED',
+      severity: 'error',
+      userMessage: `本地上下文制品处理失败（${compactionFailure.code}）。原始会话和证据已保留；修复本地制品保存或读取问题后可继续调查。`,
+      providerId: route.providerId,
+      modelId: route.modelId,
+      technicalMessage: redactTechnicalMessage(compactionFailure),
+    });
+  }
   if (error instanceof AgentRecoveryAbortError && compactionFailure instanceof InvestigationError) {
     return createConversationDiagnostic({
       agentId: route.agentId,

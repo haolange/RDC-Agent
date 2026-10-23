@@ -339,8 +339,8 @@ export class StorageAdapter implements StorageHost {
     return this.context.getSessionContextJournalPath(sessionId);
   }
 
-  readSessionContextJournal(sessionId: string): SessionContextTurnEntry[] {
-    return this.context.readSessionContextJournal(sessionId);
+  readSessionContextJournal(sessionId: string, select?: (entry: SessionContextTurnEntry) => boolean): SessionContextTurnEntry[] {
+    return this.context.readSessionContextJournal(sessionId, select);
   }
 
   appendSessionContextTurn(sessionId: string, entry: SessionContextTurnEntry): void {

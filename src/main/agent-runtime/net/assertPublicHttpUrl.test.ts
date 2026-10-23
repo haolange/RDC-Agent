@@ -102,7 +102,7 @@ describe('assertPublicHttpUrl', () => {
         pinnedAddress: '127.0.0.1',
         family: 4,
         pinnedAddresses: ['127.0.0.1'],
-      });
+      }, { maxResponseBytes: 16 });
       expect(response.status).toBe(200);
       expect(await response.text()).toBe('ok');
     } finally {

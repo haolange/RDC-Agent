@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 import { RequestSnapshotStore } from './RequestSnapshotStore';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
@@ -85,6 +85,64 @@ afterEach(() => {
 });
 
 describe('RequestSnapshotStore', () => {
+  it('counts committed attempts across ordinary, auxiliary and child turns without reading request bodies', () => {
+    store.write(sampleSnapshot());
+    store.write(sampleSnapshot({ id: 'failed-2', callIndex: 2 }));
+    store.write(sampleSnapshot({ id: 'compact', turnId: 'compaction-handoff-one' }));
+    store.write(sampleSnapshot({ id: 'child', sessionId: 'session-a::subagent::one', turnId: 'child-turn' }));
+    store.write(sampleSnapshot({ id: 'nested', sessionId: 'session-a::subagent::one::subagent::two' }));
+    store.write(sampleSnapshot({ id: 'foreign', sessionId: 'session-a-other' }));
+    const read = vi.spyOn(fs, 'readFileSync').mockImplementation(() => { throw new Error('request bodies must not be read'); });
+    try {
+      const usage = store.readUsage('session-a');
+      expect(usage).toMatchObject({ scopeId: 'session-a', committedRequests: 5, isReservation: false,
+        source: 'committed-request-snapshots' });
+      expect(usage.scopes).toHaveLength(3);
+      expect(usage.scopes.find(scope => scope.scopeKey === 'session-a')?.turns).toEqual([
+        { turnId: 'compaction-handoff-one', committedRequests: 1 }, { turnId: 'turn-1', committedRequests: 2 },
+      ]);
+      expect(store.readUsage('session-a::subagent::one').committedRequests).toBe(2);
+      expect(store.readUsage('session-a::subagent::one').scopes).toHaveLength(2);
+      expect(store.readUsage('absent').committedRequests).toBe(0);
+      expect(read).not.toHaveBeenCalled();
+    } finally { read.mockRestore(); }
+    store.complete('snap-1', 'session-a', 'turn-1', { inputTokens: 1, outputTokens: 1 });
+    expect(store.readUsage('session-a').committedRequests).toBe(5);
+    expect(new RequestSnapshotStore(rootPath).readUsage('session-a').committedRequests).toBe(5);
+  });
+
+  it('fails closed on an unreadable request inventory instead of returning zero attempts', () => {
+    store.write(sampleSnapshot());
+    const read = vi.spyOn(fs, 'readdirSync').mockImplementation(() => { throw new Error('EACCES'); });
+    try { expect(() => store.readUsage('session-a')).toThrow('EACCES'); }
+    finally { read.mockRestore(); }
+  });
+
+  it('rejects linked scope inventories without following them', () => {
+    fs.mkdirSync(path.join(rootPath, 'foreign'));
+    fs.symlinkSync(path.join(rootPath, 'foreign'), path.join(rootPath, 'session-a'), 'junction');
+    expect(() => store.readUsage('session-a')).toThrow('REQUEST_USAGE_SCOPE_NOT_DIRECTORY');
+  });
+
+  it('rejects linked turn inventories and non-file commits instead of silently undercounting', () => {
+    store.write(sampleSnapshot());
+    const scope = path.join(rootPath, 'session-a');
+    const target = path.join(rootPath, 'foreign');
+    fs.mkdirSync(target);
+    const linkedTurn = path.join(scope, 'linked-turn');
+    fs.symlinkSync(target, linkedTurn, 'junction');
+    expect(() => store.readUsage('session-a')).toThrow('REQUEST_USAGE_TURN_LINK_DENIED');
+    fs.unlinkSync(linkedTurn);
+    fs.mkdirSync(path.join(scope, 'turn-1', '002-non-file.json'));
+    expect(() => store.readUsage('session-a')).toThrow('REQUEST_USAGE_COMMIT_NOT_FILE');
+  });
+
+  it('reports no committed attempts when no request store exists without creating it', () => {
+    const missing = path.join(rootPath, 'not-created');
+    expect(new RequestSnapshotStore(missing).readUsage('session-a').committedRequests).toBe(0);
+    expect(fs.existsSync(missing)).toBe(false);
+  });
+
   it('writes, lists, and gets desensitized snapshots with redaction metadata', () => {
     const snapshot = sampleSnapshot();
     store.write(snapshot);

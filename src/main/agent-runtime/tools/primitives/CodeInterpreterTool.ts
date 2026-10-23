@@ -1,10 +1,11 @@
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
+import { createHash } from 'node:crypto';
 import type { AgentTool } from '../../agent/AgentTool';
 import { requireMutationWorkspaceRoot, truncateOutput } from './_shared';
 import { SHELL_MAX_OUTPUT_BYTES } from './toolLimits';
-import { processSupervisor } from '../../../runtime/ProcessSupervisor';
+import { processSupervisor, type ProcessExitReason } from '../../../runtime/ProcessSupervisor';
 import { settingsService } from '../../../settings/SettingsService';
 import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
 import { detectImageMagicMime } from '../../../conversation/ConversationAttachmentMaterializer';
@@ -18,6 +19,14 @@ interface InterpreterDetails {
   command: string;
   language: string;
   exitCode: number | null;
+  exitReason: ProcessExitReason;
+  invocation: {
+    kind: 'configured-local-interpreter-execution';
+    language: 'python';
+    code: string;
+    codeSha256: string;
+    argsPrefix: string[];
+  };
   durationMs: number;
   truncated: boolean;
   cwd: string;
@@ -43,7 +52,7 @@ export const codeInterpreterTool: AgentTool<InterpreterParams, InterpreterDetail
   name: 'code_interpreter',
   label: '代码解释器',
   description:
-    'Run a short script with the locally configured interpreter (default: system Python). Artifacts written to RDC_INTERPRETER_ARTIFACTS_DIR are collected. Requires Settings → Tools interpreter configuration to be enabled.',
+    'Run a short script with the locally configured interpreter (default: system Python). Artifacts written to RDC_INTERPRETER_ARTIFACTS_DIR are collected. Requires Settings → Tools interpreter configuration to be enabled. Returned executions include exact source and observed exit reason in a hash-bound session artifact, including failures; truncated output remains marked.',
   parameters: {
     type: 'object',
     properties: {
@@ -73,9 +82,11 @@ export const codeInterpreterTool: AgentTool<InterpreterParams, InterpreterDetail
     }
     const cwd = requireMutationWorkspaceRoot(context);
     const command = resolveInterpreterCommand(settings.command);
+    const code = params.code;
+    const argsPrefix = [...settings.argsPrefix];
     const artifactsDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-interp-'));
     const startedAt = Date.now();
-    const args = [...settings.argsPrefix, '-c', params.code];
+    const args = [...argsPrefix, '-c', code];
     const env = {
       ...process.env,
       ...settings.env,
@@ -126,6 +137,14 @@ export const codeInterpreterTool: AgentTool<InterpreterParams, InterpreterDetail
         command,
         language: 'python',
         exitCode: info.code,
+        exitReason: info.reason,
+        invocation: {
+          kind: 'configured-local-interpreter-execution',
+          language: 'python',
+          code,
+          codeSha256: createHash('sha256').update(code, 'utf8').digest('hex'),
+          argsPrefix,
+        },
         durationMs: Date.now() - startedAt,
         truncated: Buffer.byteLength(combined, 'utf8') > SHELL_MAX_OUTPUT_BYTES,
         cwd,

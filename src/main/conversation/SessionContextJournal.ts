@@ -127,7 +127,7 @@ export class SessionContextJournal {
     requestPlan: RequestPlan,
     _activeBranchId?: string,
   ): SessionContextMaterialization {
-    const entries = this.readEntries(sessionId);
+    const entries = this.readEntries(sessionId, visibleTurnIds);
     const entryByTurn = new Map(entries.map((entry) => [entry.turnId, entry]));
     const missingTurnIds = visibleTurnIds.filter((turnId) => !entryByTurn.has(turnId));
     const interrupted = missingTurnIds.length > 0
@@ -198,7 +198,7 @@ export class SessionContextJournal {
 
   append(sessionId: string, entry: SessionContextTurnEntry): void {
     const canonicalEntry = canonicalizeSessionContextTurnEntry(entry);
-    const duplicate = this.readEntries(sessionId).find((candidate) => candidate.turnId === entry.turnId);
+    const duplicate = this.readEntries(sessionId, [entry.turnId]).find((candidate) => candidate.turnId === entry.turnId);
     if (duplicate) {
       if (JSON.stringify(duplicate) !== JSON.stringify(canonicalEntry)) {
         throw new Error('Conflicting session context entry for turn ' + entry.turnId + '.');
@@ -208,9 +208,9 @@ export class SessionContextJournal {
     storageAdapter.appendSessionContextTurn(sessionId, canonicalEntry);
   }
 
-  readEntries(sessionId: string): SessionContextTurnEntry[] {
-    const entries = storageAdapter.readSessionContextJournal(sessionId);
-    for (const entry of entries) {
+  readEntries(sessionId: string, turnIds?: readonly string[]): SessionContextTurnEntry[] {
+    const selected = turnIds ? new Set(turnIds) : null;
+    return storageAdapter.readSessionContextJournal(sessionId, (entry) => {
       if (
         entry?.schemaVersion !== 2
         || !entry.turnId?.trim()
@@ -220,8 +220,8 @@ export class SessionContextJournal {
         || !entry.executionIdentity?.fingerprint?.trim()
         || !Array.isArray(entry.messages)
       ) throw new Error('Session context journal contains an invalid v2 entry. Clear the session before continuing.');
-    }
-    return entries;
+      return !selected || selected.has(entry.turnId);
+    });
   }
 }
 

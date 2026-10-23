@@ -98,6 +98,16 @@
       "observedAt": "2026-09-22",
       "refreshedAt": "2026-09-23",
       "surface": "chatgpt-account"
+    },
+    {
+      "id": "upstream-implementation:chatgpt-account:gpt61-sol-2026-10-19",
+      "sourceKind": "upstream-implementation",
+      "sourceRevision": "https://learn.chatgpt.com/docs/models + https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+      "observedAt": "2026-10-19",
+      "refreshedAt": "2026-10-19",
+      "surface": "chatgpt-account",
+      "accountScope": "observed-account",
+      "surfaceBuild": "Codex account models cache: gpt-6.1-sol context_window=500000 max_context_window=872000, default reasoning low, text/image, priority tier. Official account rollout and Responses tool calling verified. API 1050000 is not the account default; Ultra is client orchestration, not a reasoning wire value."
     }
   ],
   "defaultFactSourceId": "rdc-agent:chatgpt-account:0",
@@ -264,6 +274,131 @@
         "contextTiers": "rdc-agent:chatgpt-account:gpt-6-astra-20260915",
         "controls": "rdc-agent:chatgpt-account:gpt-6-astra-20260915",
         "visionInput": "rdc-agent:chatgpt-account:review-20260922"
+      }
+    },
+    {
+      "modelId": "gpt-6.1-sol",
+      "label": "GPT-6.1 Sol",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Codex service limit",
+          "maxPromptTokens": 500000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
+          "maxPromptTokens": 872000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 500000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://chatgpt.com/backend-api/codex",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "label": "Fast"
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "max",
+          "entitlement": "unknown"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "low",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "low",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "executionBindings": [
+        {
+          "id": "route:chatgpt-codex-parameter-policy",
+          "when": {},
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null
+              }
+            }
+          ],
+          "entitlement": "granted"
+        },
+        {
+          "id": "fast:activation",
+          "when": {
+            "fast": true
+          },
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null,
+                "service_tier": "priority"
+              }
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ],
+      "factSourceId": "upstream-implementation:chatgpt-account:gpt61-sol-2026-10-19",
+      "fieldFactSourceIds": {
+        "controls": "upstream-implementation:chatgpt-account:gpt61-sol-2026-10-19",
+        "contextTiers": "upstream-implementation:chatgpt-account:gpt61-sol-2026-10-19",
+        "visionInput": "upstream-implementation:chatgpt-account:gpt61-sol-2026-10-19",
+        "toolCalling": "upstream-implementation:chatgpt-account:gpt61-sol-2026-10-19",
+        "structuredOutput": "upstream-implementation:chatgpt-account:gpt61-sol-2026-10-19"
       }
     },
     {
@@ -1000,6 +1135,7 @@
   ],
   "protocolOverrides": [],
   "recommendedModels": [
+    "gpt-6.1-sol",
     "gpt-6-astra",
     "gpt-6-sol",
     "gpt-6-luna",

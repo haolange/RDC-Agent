@@ -6,6 +6,7 @@ import { RenamePopover, useSidebarPopovers } from './RenamePopover';
 import { useProjectSelection } from './useProjectSelection';
 import { useProjectTree } from './useProjectTree';
 import { ConfirmationDialog } from '../../../ui/ConfirmationDialog';
+import { ProjectAddDialog } from './ProjectAddDialog';
 import './Sidebar.css';
 import './sidebar-chrome.css';
 
@@ -22,6 +23,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
   const tree = useProjectTree();
   const popovers = useSidebarPopovers();
   const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(null);
+  const [addingProject, setAddingProject] = useState(false);
   const selection = useProjectSelection({
     ensureProjectExpanded: tree.ensureProjectExpanded,
     loadProjectSessionList: tree.loadProjectSessionList,
@@ -84,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
                 </button>
               )}
               <button type="button" className="session-section-action" title={t('sidebar.addProject')}
-                onClick={() => void selection.handleAddProject()} disabled={selection.isBusy}>
+                onClick={() => setAddingProject(true)} disabled={selection.isBusy}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 5v14" /><path d="M5 12h14" />
                 </svg>
@@ -163,6 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
         }}
       />
 
+      {addingProject ? <ProjectAddDialog onAdd={selection.handleAddProject} onClose={() => setAddingProject(false)} /> : null}
       {pendingRemoval ? (
         <ConfirmationDialog
           title={pendingRemoval.kind === 'session'

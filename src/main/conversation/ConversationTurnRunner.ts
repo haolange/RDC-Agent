@@ -32,6 +32,7 @@ import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeSta
 import { EMPTY_CANONICAL_ASSISTANT_OUTPUT, requireCanonicalFinalAnswer } from './CanonicalAssistantOutput';
 import { hydrateFrozenUserContent } from './ConversationAttachmentMaterializer';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
+import { reconcileTerminalToolReceipts } from './ConversationTerminalToolReceipts';
 import type { TurnCompletionValidator } from '../agent-runtime/agent/TurnCompletionValidator';
 import type { TurnCompletionDeclaration } from '../workflow/debugger/TurnCoordinator';
 import type {
@@ -211,11 +212,14 @@ export async function completeProfileTurn(
     agentUserInputRequestService.cancelTurn(assistantMessage.turnId);
     agentPlanReviewRequestService.cancelTurn(assistantMessage.turnId);
     agentToolApprovalRequestService.cancelTurn(assistantMessage.turnId);
+    const stoppedTrace = reconcileTerminalToolReceipts(
+      assistantMessage.workTrace, terminalContext.value?.messages ?? [], input.userMessage.createdAt,
+    );
     commitTerminalAssistantMessage('message_completed', {
       status: 'stopped',
       content: assistantMessage.content || '当前请求已停止。',
       workTrace: finalizeTrace(
-        upsertWorkBlock(assistantMessage.workTrace, 'assistant-output', {
+        upsertWorkBlock(stoppedTrace, 'assistant-output', {
           status: 'complete',
           summary: '用户已停止当前请求。',
           completedAt: nowMs(),

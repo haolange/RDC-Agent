@@ -1,6 +1,12 @@
 import { registerPolicyBudgetObserver } from './DelegationBudget';
 import { createPolicyBudgetState } from './TurnCoordinator';
 import { describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { SessionArtifactResolver } from '../../sessions/SessionArtifactResolver';
+import { StorageIo } from '../../sessions/StorageIo';
+import { grantDelegatedArtifactAccess, resolveDelegatedArtifactRead } from '../../sessions/DelegatedArtifactAccess';
 
 vi.mock('electron', () => ({
   app: {
@@ -90,11 +96,247 @@ vi.mock('../../agent-runtime/interactions/AgentPlanReviewRequestService', () => 
 }));
 
 import { ToolExecutorFactory } from './ToolExecutorFactory';
+import * as toolResultArtifacts from '../../agent-runtime/tools/ToolResultArtifactizer';
 import { shellTool } from '../../agent-runtime/tools/primitives/ShellTool';
+import { parseRdcNativeResult } from '../../tools/RdcNativeProtocol';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 
 describe('ToolExecutorFactory', () => {
+  it('delivers a small file audit as a durable hash-bound result to an explicitly granted reviewer', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-audit-delivery-'));
+    fs.writeFileSync(path.join(root, 'session.json'), '{}');
+    const resolver = new SessionArtifactResolver({ resolveSessionPath: (id) => id === 'audit-owner' ? root : null, io: new StorageIo() });
+    const artifactize = toolResultArtifacts.artifactizeToolResult;
+    const pin = vi.spyOn(toolResultArtifacts, 'artifactizeToolResult').mockImplementation((input) => artifactize({ ...input, resolver }));
+    const original = { content: [{ type: 'text' as const, text: '{"bytesEqual":true}' }],
+      details: { mode: 'audit', path: 'source.bin', bytes: 4, sha256: 'a'.repeat(64), comparison: { bytesEqual: true } } };
+    try {
+      const toolMap = new Map([['read_file', { name: 'read_file', description: 'reader',
+        parameters: { type: 'object', properties: {} }, execute: vi.fn(async () => original) }]]);
+      const factory = new ToolExecutorFactory({
+        slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+        deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+        getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
+        isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+      });
+      const result = await factory.createToolExecutor('general', ['read_file'], 'audit-owner', {
+        effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, activatedDeferredTools: [] } as never,
+      }).execute({ type: 'toolCall', id: 'audit-small', name: 'read_file',
+        arguments: { path: 'source.bin', mode: 'audit', expectedHash: 'a'.repeat(64) } });
+      const evidence = (result.details as { evidenceArtifact?: { ref: string; hash: string } })?.evidenceArtifact;
+      expect(result.isError).not.toBe(true);
+      expect(result.content[0]).toEqual(original.content[0]);
+      expect(evidence?.ref).toBe('session://tool-outputs/audit-small.json');
+      const release = grantDelegatedArtifactAccess('audit-reviewer', 'audit-owner', [evidence!.ref], resolver);
+      try {
+        const grant = resolveDelegatedArtifactRead('audit-reviewer', evidence!.ref, evidence!.hash);
+        const read = resolver.read(grant.sessionId, evidence!.ref, { expectedHash: grant.expectedHash });
+        const envelope = JSON.parse(JSON.parse(read.text!).chunks.join(''));
+        expect(envelope.source).toEqual({ toolName: 'read_file', toolCallId: 'audit-small' });
+        expect(envelope.details).toEqual(original.details);
+        expect(() => resolveDelegatedArtifactRead('audit-reviewer', evidence!.ref, 'b'.repeat(64))).toThrow();
+        expect(() => resolveDelegatedArtifactRead('audit-reviewer', 'session://tool-outputs/unlisted.json')).toThrow();
+      } finally { release(); }
+      const ungranted = resolveDelegatedArtifactRead('ungranted-reviewer', evidence!.ref, evidence!.hash);
+      expect(() => resolver.read(ungranted.sessionId, evidence!.ref, { expectedHash: ungranted.expectedHash })).toThrow();
+    } finally { pin.mockRestore(); fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it.each(['search', 'describe'] as const)('delivers a small frozen catalog %s as independently readable evidence', async (kind) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-discovery-delivery-'));
+    fs.writeFileSync(path.join(root, 'session.json'), '{}');
+    const resolver = new SessionArtifactResolver({ resolveSessionPath: (id) => id === 'catalog-owner' ? root : null, io: new StorageIo() });
+    const artifactize = toolResultArtifacts.artifactizeToolResult;
+    const pin = vi.spyOn(toolResultArtifacts, 'artifactizeToolResult').mockImplementation((input) => artifactize({ ...input, resolver }));
+    const original = { content: [{ type: 'text' as const, text: JSON.stringify({ fingerprint: 'a'.repeat(64),
+      data: kind === 'search' ? { matches: [{ name: 'rd.shader.debug_start' }], total: 38, truncated: true }
+        : { name: 'rd.shader.debug_start', effects: ['shader_debug'], evidence_kind: null } }) }],
+    details: { operation: `rdc_tool.tools.${kind}`, exitCode: 0 } };
+    const execute = vi.fn(async () => original);
+    try {
+      const toolMap = new Map([['shell', { name: 'shell', description: 'shell', parameters: shellTool.parameters,
+        validateArgs: shellTool.validateArgs, execute }]]);
+      const factory = new ToolExecutorFactory({
+        slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+        deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+        getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
+        isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+      });
+      const discovery = kind === 'search' ? { kind, query: 'hardware shader trace', limit: 2 }
+        : { kind, operation: 'rd.shader.debug_start' };
+      const result = await factory.createToolExecutor('general', ['shell'], 'catalog-owner', {
+        effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
+      }).execute({ type: 'toolCall', id: `catalog-${kind}`, name: 'shell', arguments: { rdc: { discovery } } });
+      const evidence = (result.details as { evidenceArtifact?: { ref: string; hash: string } })?.evidenceArtifact;
+      expect(execute).toHaveBeenCalledOnce();
+      expect(result.isError).not.toBe(true);
+      expect(result.content[0]).toEqual(original.content[0]);
+      expect(evidence?.ref).toBe(`session://tool-outputs/catalog-${kind}.json`);
+      const release = grantDelegatedArtifactAccess('catalog-reviewer', 'catalog-owner', [evidence!.ref], resolver);
+      try {
+        const grant = resolveDelegatedArtifactRead('catalog-reviewer', evidence!.ref, evidence!.hash);
+        const read = resolver.read(grant.sessionId, evidence!.ref, { expectedHash: grant.expectedHash });
+        const envelope = JSON.parse(JSON.parse(read.text!).chunks.join(''));
+        expect(envelope.source).toEqual({ toolName: 'shell', toolCallId: `catalog-${kind}` });
+        expect(envelope.content).toEqual(original.content);
+        expect(envelope.details).toEqual(original.details);
+        expect(() => resolveDelegatedArtifactRead('catalog-reviewer', evidence!.ref, 'b'.repeat(64))).toThrow();
+      } finally { release(); }
+      const foreign = resolveDelegatedArtifactRead('foreign-catalog-reader', evidence!.ref, evidence!.hash);
+      expect(() => resolver.read(foreign.sessionId, evidence!.ref, { expectedHash: foreign.expectedHash })).toThrow();
+    } finally { pin.mockRestore(); fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('reports catalog persistence failure without inventing evidence or repeating discovery', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-discovery-quota-'));
+    fs.writeFileSync(path.join(root, 'session.json'), '{}');
+    const resolver = new SessionArtifactResolver({ resolveSessionPath: (id) => id === 'catalog-full' ? root : null,
+      io: new StorageIo(), maxToolOutputFiles: 1 });
+    const history = resolver.write('catalog-full', 'session://tool-outputs/history.json', '{}');
+    const artifactize = toolResultArtifacts.artifactizeToolResult;
+    const pin = vi.spyOn(toolResultArtifacts, 'artifactizeToolResult').mockImplementation((input) => artifactize({ ...input, resolver }));
+    const original = { content: [{ type: 'text' as const, text: '{"fingerprint":"frozen","data":{"matches":[]}}' }],
+      details: { operation: 'rdc_tool.tools.search', exitCode: 0 } };
+    const execute = vi.fn(async () => original);
+    try {
+      const toolMap = new Map([['shell', { name: 'shell', description: 'shell', parameters: shellTool.parameters,
+        validateArgs: shellTool.validateArgs, execute }]]);
+      const factory = new ToolExecutorFactory({
+        slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+        deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+        getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
+        isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+      });
+      const result = await factory.createToolExecutor('general', ['shell'], 'catalog-full', {
+        effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
+      }).execute({ type: 'toolCall', id: 'catalog-overflow', name: 'shell',
+        arguments: { rdc: { discovery: { kind: 'search', query: 'trace', limit: 2 } } } });
+      expect(execute).toHaveBeenCalledOnce();
+      expect(result.isError).toBe(true);
+      expect(result.content).toContainEqual(original.content[0]);
+      expect(result.details).toMatchObject({ code: 'ARTIFACT_QUOTA_EXCEEDED', artifactized: false,
+        executionResult: { isError: false }, originalDetails: original.details });
+      expect(result.details).not.toHaveProperty('evidenceArtifact');
+      expect(resolver.read('catalog-full', history.uri, { expectedHash: history.hash }).hash).toBe(history.hash);
+      expect(fs.existsSync(path.join(root, 'session-artifacts', 'tool-outputs', 'catalog-overflow.json'))).toBe(false);
+    } finally { pin.mockRestore(); fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it.each([undefined, false, true])('pins a small text read only when evidence is requested: %s', async (pinEvidence) => {
+    const original = { content: [{ type: 'text' as const, text: 'Whole file: 12 bytes\nDisplayed 1 lines\n1→small diff' }],
+      details: { path: 'change.diff', truncated: false } };
+    const execute = vi.fn(async () => original);
+    const pin = vi.spyOn(toolResultArtifacts, 'artifactizeToolResult').mockImplementation(input => input.result);
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      getActiveTurn: () => null,
+      resolveRuntimeTools: () => ({ toolMap: new Map([['read_file', { name: 'read_file', description: 'read text',
+        parameters: { type: 'object', properties: { path: { type: 'string' }, pinEvidence: { type: 'boolean' } } }, execute }]]),
+      definitions: [], deferredDefinitions: [] }),
+      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+    });
+    try {
+      const result = await factory.createToolExecutor('general', ['read_file'], 'text-evidence', {
+        effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, activatedDeferredTools: [] } as never,
+      }).execute({ type: 'toolCall', id: 'small-diff', name: 'read_file', arguments: { path: 'change.diff', ...(pinEvidence === undefined ? {} : { pinEvidence }) } });
+      expect(execute).toHaveBeenCalledOnce();
+      expect(result.content).toEqual(original.content);
+      expect(pin).toHaveBeenCalledWith(expect.objectContaining({ toolName: 'read_file', result: original,
+        pinBelowThreshold: pinEvidence === true }));
+    } finally { pin.mockRestore(); }
+  });
+
+  it('keeps ordinary small shell stdout inline without adding catalog evidence', async () => {
+    const original = { content: [{ type: 'text' as const, text: 'bounded output' }], details: { exitCode: 0 } };
+    const execute = vi.fn(async () => original);
+    const toolMap = new Map([['shell', { name: 'shell', description: 'shell', parameters: shellTool.parameters,
+      validateArgs: shellTool.validateArgs, execute }]]);
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
+      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+    });
+    const result = await factory.createToolExecutor('general', ['shell'], 'plain-shell', {
+      effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
+    }).execute({ type: 'toolCall', id: 'plain-output', name: 'shell', arguments: { command: 'echo bounded' } });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(result.content).toEqual(original.content);
+    expect(result.details).toEqual(original.details);
+    expect(result.isError).not.toBe(true);
+  });
+
+  it.each([
+    { native: true, shell: true, pinned: true },
+    { native: false, shell: true, pinned: false },
+    { native: true, shell: false, pinned: false },
+  ])('delivers only bound native shell failures through the artifact path: %j', async ({ native, shell, pinned }) => {
+    let nativeError: unknown;
+    try {
+      parseRdcNativeResult({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
+        result_kind: 'rd.mesh.get_post_transform_data', ok: false, error: { code: 'validation_error',
+          category: 'validation', message: 'Invalid window', details: { effects_attempted: false, context_preserved: true } } }), stderr: '', duration_ms: 1 },
+      undefined, 'rd.mesh.get_post_transform_data');
+    } catch (error) { nativeError = error; }
+    const original = { content: [{ type: 'text' as const, text: 'qualified failure' }], isError: true,
+      details: { operation: 'rd.mesh.get_post_transform_data', exitCode: 1,
+        mainValidation: { preservationVerified: true, leaseState: 'retained' } } };
+    const failure = Object.assign(native ? nativeError as Error : new Error('ordinary error'), { deliveryResult: original });
+    const pin = vi.spyOn(toolResultArtifacts, 'artifactizeToolResult').mockImplementation(input => input.result);
+    const name = shell ? 'shell' : 'read_file';
+    const execute = vi.fn(async () => { throw failure; });
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      getActiveTurn: () => null,
+      resolveRuntimeTools: () => ({ toolMap: new Map([[name, { name, description: name,
+        parameters: { type: 'object', properties: {} }, execute }]]), definitions: [], deferredDefinitions: [] }),
+      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+    });
+    try {
+      const result = await factory.createToolExecutor('general', [name], 'native-failure-session', {
+        effectivePlan: { toolAllowlist: [name], skillIntersection: null, activatedDeferredTools: [name] } as never,
+      }).execute({ type: 'toolCall', id: 'native-failure-call', name, arguments: {} });
+      expect(execute).toHaveBeenCalledOnce();
+      expect(result.isError).toBe(true);
+      if (pinned) {
+        expect(result.details).toEqual(original.details);
+        expect(pin).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'native-failure-session',
+          toolCallId: 'native-failure-call', toolName: 'shell', result: original, pinBelowThreshold: true }));
+      } else {
+        expect(pin).not.toHaveBeenCalled();
+        expect(result.details).toBeUndefined();
+      }
+    } finally { pin.mockRestore(); }
+  });
+  it.each([false, true])('pins interpreter output even below threshold (error=%s)', async (isError) => {
+    const original = { content: [{ type: 'text' as const, text: 'small actual output' }], isError,
+      details: { command: 'python', exitCode: isError ? 7 : 0, exitReason: 'exit' } };
+    const pin = vi.spyOn(toolResultArtifacts, 'artifactizeToolResult').mockImplementation((input) => input.result);
+    try {
+      const toolMap = new Map([['code_interpreter', { name: 'code_interpreter', description: 'interpreter',
+        parameters: { type: 'object', properties: {} }, execute: vi.fn(async () => original) }]]);
+      const factory = new ToolExecutorFactory({
+        slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+        deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+        getActiveTurn: () => null,
+        resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
+        isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+      });
+      const result = await factory.createToolExecutor('general', ['code_interpreter'], 'interpreter-session', {
+        effectivePlan: { toolAllowlist: ['code_interpreter'], skillIntersection: null,
+          activatedDeferredTools: ['code_interpreter'] } as never,
+      }).execute({
+        type: 'toolCall', id: 'interpreter-call', name: 'code_interpreter', arguments: { code: 'print(1)' },
+      });
+      expect(result.isError).toBe(isError);
+      expect(pin).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'interpreter-session',
+        toolCallId: 'interpreter-call', toolName: 'code_interpreter', result: original, pinBelowThreshold: true }));
+    } finally { pin.mockRestore(); }
+  });
+
   it('rejects a malformed shell request before permission review', async () => {
     const execute = vi.fn(async () => ({ content: [] }));
     const toolMap = new Map([['shell', {

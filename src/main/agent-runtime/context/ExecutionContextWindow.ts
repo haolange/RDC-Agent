@@ -29,11 +29,36 @@ const portableContextMessages = (messages: AgentMessage[]): AgentMessage[] => me
   return content.length ? [{ ...portable, content }] : [];
 });
 const portableContextHash = (messages: AgentMessage[]): string => hashScopedResource(portableContextMessages(messages));
+type WindowMedia = { messageIndex: number; blockIndex: number; uri: string; hash: string; mimeType: string };
+function restoreWindowMedia(owner: string, window: AgentMessage[], media: WindowMedia[]): AgentMessage[] {
+  const restored = structuredClone(window);
+  const seen = new Set<string>();
+  for (const entry of media) {
+    const key = `${entry.messageIndex}:${entry.blockIndex}`;
+    const message = restored[entry.messageIndex];
+    const block = message && Array.isArray(message.content) ? message.content[entry.blockIndex] : undefined;
+    if (!Number.isSafeInteger(entry.messageIndex) || entry.messageIndex < 0
+      || !Number.isSafeInteger(entry.blockIndex) || entry.blockIndex < 0 || seen.has(key)
+      || block?.type !== 'text' || !block.text.includes(entry.uri) || !block.text.includes(entry.hash)) {
+      throw new Error('CONTEXT_WINDOW_INVALID: malformed retained media reference.');
+    }
+    const image = sessionArtifactResolver.read(owner, entry.uri, { expectedHash: entry.hash, includeImageData: true });
+    if (!image.imageData || image.mimeType !== entry.mimeType || !image.mimeType.startsWith('image/')) {
+      throw new Error('CONTEXT_WINDOW_INVALID: retained media is not the declared image.');
+    }
+    if (Array.isArray(message.content)) message.content[entry.blockIndex] = { type: 'image', data: image.imageData, mimeType: image.mimeType };
+    seen.add(key);
+  }
+  return restored;
+}
 const stableRouteHash = (identity: ExecutionIdentity): string => {
-  // The aggregate provider catalog can advance while this execution's route
-  // and model contract stay identical. A portable, source-verified window is
-  // data, not a provider continuation or a grant of old catalog capabilities.
-  const { fingerprint: _fingerprint, modelSnapshotId: _snapshot, catalogRevision: _catalog, ...route } = identity;
+  // Source-verified text and images are session data, not model reasoning or
+  // provider continuation. A model/effort switch on the same authenticated
+  // route may reuse them; endpoint, credentials, protocol, bindings and contract
+  // still have to match. Current PromptPlan and permissions are frozen afresh.
+  const { fingerprint: _fingerprint, modelSnapshotId: _snapshot, catalogRevision: _catalog,
+    selectedModelId: _selected, effectiveModelId: _effective, canonicalModelId: _canonical,
+    reasoningMode: _reasoning, variantKey: _variant, ...route } = identity;
   return hashScopedResource(route);
 };
 
@@ -62,9 +87,13 @@ export function createExecutionContextWindow(input: {
       // Its window can be reused within this execution, but there is no child
       // session journal from which a later execution could authorize restore.
       if (input.sessionId.includes('::subagent::')) return null;
-      const priorRoutes = routeIdentity
-        ? new Map(storageAdapter.readSessionContextJournal(input.sessionId).map(entry => [entry.executionIdentity.fingerprint, entry.executionIdentity]))
-        : null;
+      const priorRoutes = routeIdentity ? new Map<string, ExecutionIdentity>() : null;
+      if (priorRoutes) storageAdapter.readSessionContextJournal(input.sessionId, entry => {
+        priorRoutes.set(entry.executionIdentity.fingerprint, entry.executionIdentity);
+        // The JSONL reader still parses/checks every line, but this lookup needs
+        // only identities, never another retained copy of the session messages.
+        return false;
+      });
       const candidates = sessionArtifactResolver.list(owner, 'tool-outputs')
         .filter(uri => uri.endsWith('-window-state.json'))
         .map(uri => ({ uri, modified: fs.statSync(sessionArtifactResolver.resolve(owner, uri).absolutePath).mtimeMs }))
@@ -75,7 +104,7 @@ export function createExecutionContextWindow(input: {
         if (crypto.createHash('sha256').update(bytes).digest('hex') !== checked.hash) throw new Error('CONTEXT_WINDOW_CHANGED: persisted view changed during read.');
         const record = JSON.parse(bytes.toString('utf8')) as {
           schemaVersion?: number; sessionId?: string; routeFingerprint?: string;
-          source?: string; sourceHash?: string; count?: number; hash?: string; portableHash?: string; window?: AgentMessage[];
+          source?: string; sourceHash?: string; count?: number; hash?: string; portableHash?: string; window?: AgentMessage[]; media?: WindowMedia[];
         };
         if (record.schemaVersion !== 1 || record.sessionId !== input.sessionId) continue;
         // The persisted fingerprint names the exact execution that installed
@@ -89,6 +118,8 @@ export function createExecutionContextWindow(input: {
         if (!record.source || !record.sourceHash || typeof record.count !== 'number' || !Number.isSafeInteger(record.count) || !record.hash || !record.portableHash || !Array.isArray(record.window)) {
           throw new Error('CONTEXT_WINDOW_INVALID: persisted view is incomplete.');
         }
+        if (record.media !== undefined && !Array.isArray(record.media)) throw new Error('CONTEXT_WINDOW_INVALID: malformed retained media index.');
+        record.window = portableContextMessages(restoreWindowMedia(owner, record.window, record.media ?? []));
         if (record.count > messages.length) continue;
         const prefix = messages.slice(0, record.count);
         if (portableContextHash(prefix) !== record.portableHash) {
@@ -148,11 +179,18 @@ export function createExecutionContextWindow(input: {
         payload: { applied: true, sourceUri: checkpoint.uri, sourceHash: checkpoint.hash },
       });
       const uri = checkpoint.uri.replace('.json', '-window-state.json');
+      const media: WindowMedia[] = [];
+      const window = projectCompactionJournalMessages(portableContextMessages(view.window), (entry, bytes) => {
+        const image = sessionArtifactResolver.write(owner, entry.uri, bytes, { mimeType: entry.mimeType });
+        sessionArtifactResolver.read(owner, entry.uri, { expectedHash: image.hash, limit: 1 });
+        grantDelegatedOutput(input.sessionId, image.uri, image.hash);
+        media.push({ ...entry, hash: image.hash });
+      });
       const written = sessionArtifactResolver.write(owner, uri, JSON.stringify({
         schemaVersion: 1, sessionId: input.sessionId, routeFingerprint,
         source: checkpoint.uri, sourceHash: checkpoint.hash,
         count: view.count, hash: view.hash, portableHash: portableContextHash(sourceMessages),
-        window: portableContextMessages(view.window),
+        window, media,
       }), { mimeType: 'application/json' });
       sessionArtifactResolver.read(owner, uri, { expectedHash: written.hash, limit: 1 });
       grantDelegatedOutput(input.sessionId, uri, written.hash);

@@ -21,7 +21,9 @@ export function approvedExecutionOfferForAgent(
   })) {
     return null;
   }
-  return offer;
+  // The approved decision owns this timestamp. Declaring a handoff must not
+  // replace it, including when reading an offer written before that fix.
+  return { ...offer, approvedAt: approved.updatedAt };
 }
 
 /** Preload only the skills frozen on the session execution offer for this recipient. */

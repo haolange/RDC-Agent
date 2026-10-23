@@ -4,6 +4,7 @@ import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessio
 import type { RdcValidatedEvidence } from './RdcValidatedEvidence';
 import { canonicalJson } from './RdcOperationCatalog';
 import { secretStorageService } from '../settings/SecretStorageService';
+import type { RdcProcessIdentity } from './RdcProcessIdentity';
 
 export interface RdcExecutionReceipt {
   schemaVersion: 1;
@@ -17,6 +18,8 @@ export interface RdcExecutionReceipt {
   replaySessionId: string;
   operation: string;
   definitionsFingerprint: string;
+  /** Historical receipts remain readable; every new experiment closure requires this proof. */
+  processIdentity?: RdcProcessIdentity;
   evidence: RdcValidatedEvidence;
   argsFingerprint: string;
   args: Record<string, unknown>;

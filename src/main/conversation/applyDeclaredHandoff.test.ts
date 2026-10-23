@@ -52,11 +52,17 @@ describe('applyDeclaredHandoff', () => {
       projectId: 'proj',
       agentId: patch.agentId,
     }));
-    mocks.offerRead.mockReturnValue(null);
+    mocks.offerRead.mockReturnValue({
+      schemaVersion: '1', sourceAgentId: 'debugger', targetAgentId: 'general',
+      plan: { uri: 'session://plans/plan-frozen.md', hash: 'a'.repeat(64) },
+      requiredSkillIds: ['renderdoc-execution'], label: declared.label, prompt: declared.prompt,
+      approvedAt: 1234,
+    });
     mocks.planRead.mockReturnValue({
       status: 'approved',
       approvedHash: 'a'.repeat(64),
       frozenUri: 'session://plans/plan-frozen.md',
+      updatedAt: 1234,
     });
     mocks.resolveEnabled.mockImplementation((agentId: string) => (
       agentId === 'general'
@@ -66,7 +72,7 @@ describe('applyDeclaredHandoff', () => {
     mocks.dispatchHooks.mockResolvedValue(true);
   });
 
-  it('persists the target agent and writes an offer from the approved plan', async () => {
+  it('persists the target agent while preserving the original approval time', async () => {
     const result = await applyDeclaredHandoff({
       sessionId: 'sess',
       agent: 'general',
@@ -78,9 +84,31 @@ describe('applyDeclaredHandoff', () => {
       sourceAgentId: 'debugger',
       targetAgentId: 'general',
       requiredSkillIds: ['renderdoc-execution'],
+      approvedAt: 1234,
     }));
     expect(mocks.dispatchHooks).toHaveBeenCalledWith('agent.before-handoff', expect.any(Object));
     expect(mocks.dispatchHooks).toHaveBeenCalledWith('agent.after-handoff', expect.any(Object));
+  });
+
+  it('keeps the same approval time when declaring the handoff again from General', async () => {
+    mocks.readSession.mockReturnValue({ sessionId: 'sess', projectId: 'proj', agentId: 'general' });
+    await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
+    await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
+    expect(mocks.offerWrite).toHaveBeenCalledTimes(2);
+    for (const [, offer] of mocks.offerWrite.mock.calls) expect(offer.approvedAt).toBe(1234);
+  });
+
+  it.each([null, 9876])('uses the approved decision time even when the offer time is %s', async (offerTime) => {
+    mocks.offerRead.mockReturnValue(offerTime === null ? null : { ...mocks.offerRead(), approvedAt: offerTime });
+    const result = await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
+    expect(result.success).toBe(true);
+    expect(mocks.offerWrite).toHaveBeenCalledWith('sess', expect.objectContaining({ approvedAt: 1234 }));
+  });
+
+  it('does not create an approval from an unapproved plan', async () => {
+    mocks.planRead.mockReturnValue({ status: 'rejected', updatedAt: 9876 });
+    await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
+    expect(mocks.offerWrite).not.toHaveBeenCalled();
   });
 
   it('rejects an undeclared continue action', async () => {
@@ -108,11 +136,13 @@ describe('writeExecutionOfferFromApproval', () => {
       projectRoot: null,
       handoff: { label: 'Execute with General', agent: 'general' },
       plan: { uri: 'session://plans/plan-frozen.md', hash: 'a'.repeat(64) },
+      approvedAt: 1234,
     });
     expect(suggestion?.send).toBe(true);
     expect(mocks.offerWrite).toHaveBeenCalledWith('sess', expect.objectContaining({
       requiredSkillIds: ['renderdoc-execution'],
       targetAgentId: 'general',
+      approvedAt: 1234,
     }));
   });
 });

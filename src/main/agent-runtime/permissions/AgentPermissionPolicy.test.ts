@@ -106,6 +106,27 @@ describe('AgentPermissionPolicyService external reads', () => {
     mockSettings.agentRuntime.permissions.deniedCommandPrefixes = [];
   });
 
+  it('requires independent read authorization for the second audit file', () => {
+    mockSettings.agentRuntime.permissions.mode = 'default';
+    const call = makeReadFileToolCall(path.join(workspaceRoot, 'a.bin'));
+    call.arguments.mode = 'audit';
+    call.arguments.compareWith = { path: path.join(externalRoot, 'b.bin'), expectedHash: 'a'.repeat(64) };
+    const decision = service.evaluate({ tool: readFileTool, toolCall: call, projectRootPath: workspaceRoot });
+    expect(decision.action).not.toBe('allow');
+    expect(decision.temporaryPathRoots).toContain(path.join(externalRoot, 'b.bin'));
+  });
+
+  it('uses configured readable roots for an audit comparison without granting their siblings', () => {
+    mockSettings.agentRuntime.permissions.mode = 'custom';
+    mockSettings.agentRuntime.permissions.readableRoots = [readableRoot];
+    const call = makeReadFileToolCall(path.join(workspaceRoot, 'a.bin'));
+    call.arguments.mode = 'audit';
+    call.arguments.compareWith = { path: path.join(readableRoot, 'b.bin'), expectedHash: 'a'.repeat(64) };
+    expect(service.evaluate({ tool: readFileTool, toolCall: call, projectRootPath: workspaceRoot }).action).toBe('allow');
+    call.arguments.compareWith = { path: path.join(externalRoot, 'b.bin'), expectedHash: 'a'.repeat(64) };
+    expect(service.evaluate({ tool: readFileTool, toolCall: call, projectRootPath: workspaceRoot }).action).not.toBe('allow');
+  });
+
   it('allows full-access reads outside the project root without asking', () => {
     const decision = service.evaluate({
       tool: readFileTool,

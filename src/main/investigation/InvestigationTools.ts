@@ -177,8 +177,10 @@ function createInvestigationWriteTool(
         record: { type: 'object', description: 'Record body matching the kind schema' },
         sourceRefs: {
           type: 'array',
+          description: 'Required and non-empty for ready writes, including Challenges. Cite existing Investigation artifacts as {artifactId, expectedHash} from investigation_read/list. A record targetRef, worldStateId, or evidence artifactRefs does not replace these manifest provenance references.',
           items: {
             type: 'object',
+            required: ['artifactId', 'expectedHash'],
             properties: {
               artifactId: { type: 'string' },
               expectedHash: { type: 'string', description: 'Exact source contentHash from investigation_read/list, including the sha256: prefix (sha256:<64 hex>). Required for ready writes.' },
@@ -187,7 +189,7 @@ function createInvestigationWriteTool(
         },
         worldStateId: { type: 'string' },
         supersedes: { type: 'string' },
-        status: { type: 'string', description: 'draft or ready; ready fail-closed' },
+        status: { type: 'string', description: 'Artifact readiness: draft or ready. Ready requires at least one valid sourceRefs entry; this is separate from Challenge record.status=open/resolved/wont_fix.' },
         artifactId: { type: 'string' },
       },
     },

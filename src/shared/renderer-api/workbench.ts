@@ -24,6 +24,7 @@ export function createProjectApi(transport: RendererApiTransport): ProjectApi {
       prepareRemove: (projectId, inputId) => transport.invoke(INVOKE.project.prepareRemoveInput, projectId, inputId),
       remove: (projectId, inputId, approvalToken) => transport.invoke(INVOKE.project.removeInput, projectId, inputId, approvalToken),
       import: (projectId) => transport.invoke(INVOKE.project.importInput, projectId),
+      referencePath: (projectId, filePath) => transport.invoke(INVOKE.project.referenceInput, projectId, filePath),
       importPaths: (projectId, filePaths) => (
         transport.invoke(INVOKE.project.importInputPaths, projectId, filePaths)
       ),

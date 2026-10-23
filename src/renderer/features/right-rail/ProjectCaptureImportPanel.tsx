@@ -9,6 +9,7 @@ import { Icon } from '../../ui/Icon';
 import { Button } from '../../ui/Button';
 import './CaptureReplay.css';
 import { useI18n } from '../../i18n';
+import { ProjectCaptureReferenceDialog } from './ProjectCaptureReferenceDialog';
 
 const formatSize = (size: number): string => {
   if (size >= 1024 * 1024 * 1024) return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
@@ -30,7 +31,7 @@ const CaptureFileIcon: React.FC = () => (
   </svg>
 );
 
-const InputRow: React.FC<{ input: ProjectInputRecord; remove: () => void; disabled: boolean; removeLabel: string }> = ({ input, remove, disabled, removeLabel }) => (
+const InputRow: React.FC<{ input: ProjectInputRecord; remove: () => void; disabled: boolean; removeLabel: string; referenceLabel: string }> = ({ input, remove, disabled, removeLabel, referenceLabel }) => (
   <article
     className="project-capture-input-row"
     aria-label={`${input.fileName}, ${formatSize(input.size)}. ${input.filePath}`}
@@ -40,6 +41,7 @@ const InputRow: React.FC<{ input: ProjectInputRecord; remove: () => void; disabl
     <CaptureFileIcon />
     <span className="project-capture-input-copy">
       <strong title={`${input.fileName}\n${input.filePath}`}>{input.fileName}</strong>
+      {input.source === 'external_reference' ? <span>{referenceLabel}</span> : null}
     </span>
     <span className="project-capture-input-actions"><span className="project-capture-input-size">{formatSize(input.size)}</span><Button variant="ghost" size="sm" aria-label={`${removeLabel} ${input.fileName}`} disabled={disabled} onClick={remove}>×</Button></span>
   </article>
@@ -52,6 +54,7 @@ export const ProjectCaptureImportPanel: React.FC = () => {
   const updateProjectInputs = useProjectStore((state) => state.updateProjectInputs);
   const [activeAction, setActiveAction] = useState<'import' | 'refresh' | 'remove' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [referenceProjectId, setReferenceProjectId] = useState<string | null>(null);
   const inputs = useMemo(() => projectInputs.filter((input) => input.fileName.toLowerCase().endsWith('.rdc')), [projectInputs]);
 
   const run = useCallback(async (action: 'import' | 'refresh') => {
@@ -92,6 +95,10 @@ export const ProjectCaptureImportPanel: React.FC = () => {
           className="project-capture-header"
           title={t('projectCapture.title')}
           actions={<>
+            <IconButton label={t('projectCapture.reference')} title={t('projectCapture.reference')}
+              size="sm" disabled={activeAction !== null} onClick={() => setReferenceProjectId(currentProject.projectId)}>
+              <Icon name="link" size={16} />
+            </IconButton>
             <IconButton
               label={t(activeAction === 'import' ? 'projectCapture.importing' : 'projectCapture.import')}
               title={t('projectCapture.import')}
@@ -116,9 +123,11 @@ export const ProjectCaptureImportPanel: React.FC = () => {
         />
         <div className="right-rail-section-content">
           {error ? <div className="project-capture-import-error" role="alert">{error}</div> : null}
-          {inputs.length ? <div className="project-capture-input-list" role="list" aria-label={t('projectCapture.title')}>{inputs.map((input) => <InputRow key={input.inputId} input={input} remove={() => void remove(input.inputId)} disabled={activeAction !== null} removeLabel={t('projectCapture.remove')} />)}</div> : <EmptyState className="right-rail-empty-state" title={t('projectCapture.empty')} />}
+          {inputs.length ? <div className="project-capture-input-list" role="list" aria-label={t('projectCapture.title')}>{inputs.map((input) => <InputRow key={input.inputId} input={input} remove={() => void remove(input.inputId)} disabled={activeAction !== null} referenceLabel={t('projectCapture.external')} removeLabel={t(input.source === 'external_reference' ? 'projectCapture.detach' : 'projectCapture.remove')} />)}</div> : <EmptyState className="right-rail-empty-state" title={t('projectCapture.empty')} />}
         </div>
       </section>
+      {referenceProjectId ? <ProjectCaptureReferenceDialog projectId={referenceProjectId} onClose={() => setReferenceProjectId(null)}
+        onRegistered={(projectId, registered) => updateProjectInputs(projectId, registered)} /> : null}
     </aside>
   );
 };

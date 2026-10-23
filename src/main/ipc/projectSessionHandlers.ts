@@ -15,6 +15,7 @@ import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import {
   ProjectAddArgsSchema,
   ProjectInputsImportArgsSchema,
+  ProjectInputReferenceArgsSchema,
   ProjectInputsImportPathsArgsSchema,
   ProjectInputsListArgsSchema,
   ProjectInputsRefreshArgsSchema,
@@ -202,6 +203,19 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         inputs: [] as ProjectInputRecord[],
         error: error instanceof Error ? error.message : String(error),
       };
+    }
+  });
+
+  ipcMain.handle('project:inputs:reference', async (_event, ...rawArgs: unknown[]) => {
+    try {
+      const [projectId, filePath] = parseIpcArgs(ProjectInputReferenceArgsSchema, rawArgs, {
+        label: 'project:inputs:reference', maxBytes: 8192,
+      });
+      const inputs = await storageAdapter.projects.referenceProjectInput(projectId, filePath);
+      context.broadcastToRenderer('project:inputsChanged', { projectId, inputs });
+      return { success: true, inputs };
+    } catch (error) {
+      return { success: false, inputs: [], error: error instanceof Error ? error.message : String(error) };
     }
   });
 

@@ -41,7 +41,9 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
   const accountSaveBlocked = provider.authMode === 'account'
     && !accountConnected
     && (!accountRequiresCode || !draft.authCode.trim());
-  const accountTestBlocked = provider.authMode === 'account' && !accountConnected;
+  const accountTestBlocked = provider.authMode === 'account'
+    && !accountConnected
+    && provider.hasStoredSecretByAuthMode?.account !== true;
   const commonBlocked = draft.busy !== 'idle' || needsCredentials || needsBaseUrl || devicePending;
   const noSupportedModels = provider.catalogOwnership !== 'user-managed' && hasFreshTest && draft.models.length === 0;
   const authModeUnavailable = (provider.authModeAvailability?.[draft.authMode]

@@ -1,8 +1,11 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { acquireUserDataInstanceLock, type UserDataInstanceLockOwner } from './userDataInstanceLock';
+import { execFileSync } from 'node:child_process';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { acquireUserDataInstanceLock, readWindowsProcessStartedAt, type UserDataInstanceLockOwner } from './userDataInstanceLock';
+
+vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 
 describe('userData instance lock', () => {
   let tempRoot = '';
@@ -12,6 +15,8 @@ describe('userData instance lock', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     const resolvedTemp = path.resolve(tempRoot);
     const expectedPrefix = `${path.resolve(os.tmpdir())}${path.sep}rdc-agent-lock-test-`;
     if (resolvedTemp.startsWith(expectedPrefix)) {
@@ -80,5 +85,69 @@ describe('userData instance lock', () => {
     if (first.acquired) first.release();
 
     expect(fs.existsSync(path.join(tempRoot, 'instance.lock'))).toBe(true);
+  });
+
+  const lockTime = Date.parse('2026-09-28T14:05:39.106Z');
+  const writeDatedLock = () => fs.writeFileSync(path.join(tempRoot, 'instance.lock'), JSON.stringify({
+    pid: 212, mode: 'browser', startTs: new Date(lockTime).toISOString(),
+  }));
+
+  it('reclaims an old owner whose PID now belongs to a later-born process without signalling that process', () => {
+    writeDatedLock();
+    const signal = vi.spyOn(process, 'kill').mockReturnValue(true);
+    const birth = vi.fn(() => Date.parse('2026-10-20T14:40:10.839Z'));
+    const lock = acquireUserDataInstanceLock(tempRoot, owner(313), undefined, birth);
+    expect(lock.acquired).toBe(true);
+    expect(signal).toHaveBeenCalledExactlyOnceWith(212, 0);
+    expect(birth).toHaveBeenCalledExactlyOnceWith(212);
+    if (lock.acquired) lock.release();
+  });
+
+  it.each([lockTime - 1000, lockTime, null, Number.NaN])('keeps a live or unproven owner for birth time %s', birth => {
+    writeDatedLock();
+    const before = fs.readFileSync(path.join(tempRoot, 'instance.lock'), 'utf8');
+    const lock = acquireUserDataInstanceLock(tempRoot, owner(313), () => true, () => birth);
+    expect(lock.acquired).toBe(false);
+    expect(fs.readFileSync(path.join(tempRoot, 'instance.lock'), 'utf8')).toBe(before);
+  });
+
+  it('does not treat a permission error as owner death when birth time is unavailable', () => {
+    writeDatedLock();
+    vi.spyOn(process, 'kill').mockImplementation(() => { throw Object.assign(new Error('denied'), { code: 'EPERM' }); });
+    expect(acquireUserDataInstanceLock(tempRoot, owner(313), undefined, () => null).acquired).toBe(false);
+  });
+
+  it('reclaims a process proven absent without querying its birth time', () => {
+    writeDatedLock();
+    vi.spyOn(process, 'kill').mockImplementation(() => { throw Object.assign(new Error('absent'), { code: 'ESRCH' }); });
+    const birth = vi.fn(() => null);
+    const lock = acquireUserDataInstanceLock(tempRoot, owner(313), undefined, birth);
+    expect(lock.acquired).toBe(true);
+    expect(birth).not.toHaveBeenCalled();
+    if (lock.acquired) lock.release();
+  });
+
+  it('does not probe a legacy timestamp or accept an invalid PID', () => {
+    fs.writeFileSync(path.join(tempRoot, 'instance.lock'), JSON.stringify(owner(212)));
+    const birth = vi.fn(() => lockTime + 1);
+    expect(acquireUserDataInstanceLock(tempRoot, owner(313), () => true, birth).acquired).toBe(false);
+    expect(birth).not.toHaveBeenCalled();
+    expect(readWindowsProcessStartedAt(-1)).toBeNull();
+    expect(readWindowsProcessStartedAt(1.5)).toBeNull();
+  });
+
+  it.skipIf(process.platform !== 'win32')('bounds the Windows birth query and fails closed on query failure or invalid output', () => {
+    vi.stubEnv('SystemRoot', 'C:\\Windows');
+    const query = vi.mocked(execFileSync);
+    query.mockReturnValueOnce('2026-10-20T14:40:10.8390740Z\r\n');
+    expect(readWindowsProcessStartedAt(212)).toBe(Date.parse('2026-10-20T14:40:10.839Z'));
+    expect(query).toHaveBeenLastCalledWith('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      "[System.Diagnostics.Process]::GetProcessById(212).StartTime.ToUniversalTime().ToString('o')",
+    ], expect.objectContaining({ timeout: 2000, maxBuffer: 1024, windowsHide: true }));
+    query.mockImplementationOnce(() => { throw new Error('access denied'); });
+    expect(readWindowsProcessStartedAt(212)).toBeNull();
+    query.mockReturnValueOnce('invalid');
+    expect(readWindowsProcessStartedAt(212)).toBeNull();
   });
 });

@@ -71,7 +71,19 @@ export interface ProcessExitInfo {
 }
 
 const DEFAULT_RING_BYTES = 256 * 1024;
-const DEFAULT_GRACE_MS = 2_000;
+const PROCESS_TERMINATION_TIMING = Object.freeze({
+  treeKillTimeoutMs: 5_000,
+  killEscalationDelayMs: 2_000,
+  joinObservationSlackMs: 1_000,
+});
+export const PROCESS_TERMINATION_POLICY = Object.freeze({
+  ...PROCESS_TERMINATION_TIMING,
+  maxTreeKillAttempts: 2,
+  // One idempotent initial termination and one escalation; not a native-exit guarantee.
+  joinTerminationAdditionalWaitMs: 2 * PROCESS_TERMINATION_TIMING.treeKillTimeoutMs
+    + PROCESS_TERMINATION_TIMING.killEscalationDelayMs + PROCESS_TERMINATION_TIMING.joinObservationSlackMs,
+});
+const DEFAULT_GRACE_MS = PROCESS_TERMINATION_POLICY.killEscalationDelayMs;
 
 export class RingBuffer {
   private chunks: Buffer[] = [];
@@ -132,6 +144,8 @@ function terminateTree(pid: number | undefined, signal: NodeJS.Signals = 'SIGTER
     spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], {
       windowsHide: true,
       stdio: 'ignore',
+      timeout: PROCESS_TERMINATION_POLICY.treeKillTimeoutMs,
+      killSignal: 'SIGKILL',
     });
     return;
   }
@@ -277,8 +291,8 @@ export class ProcessSupervisor {
     };
 
     const abort = (reason: ProcessExitReason = 'abort'): void => {
-      if (entry.exitInfo) return;
-      entry.forcedReason ??= reason;
+      if (entry.exitInfo || entry.forcedReason) return;
+      entry.forcedReason = reason;
       terminateTree(child.pid, 'SIGTERM');
       try {
         if (!child.killed) child.kill();
@@ -326,7 +340,7 @@ export class ProcessSupervisor {
                 observationTimer = setTimeout(() => {
                   entry.unconfirmed = true;
                   orphanResolve(null);
-                }, DEFAULT_GRACE_MS + 1_000);
+                }, DEFAULT_GRACE_MS + PROCESS_TERMINATION_POLICY.joinObservationSlackMs);
                 observationTimer.unref?.();
               }),
             ]);

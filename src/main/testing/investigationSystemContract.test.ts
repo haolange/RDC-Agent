@@ -982,7 +982,9 @@ describe('investigation system contract', () => {
       finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`,
       service,
     })).toThrow(/mission_method|MISSION_COMPLETION_DENIED/);
-    expect(isSkillVisibleToProfile('debugger', 'rdc-tool-shell')).toBe(false);
+    expect(isSkillVisibleToProfile('debugger', 'rdc-tool-shell')).toBe(true);
+    expect(isSkillVisibleToProfile('debugger', 'debugger-rdc-tools')).toBe(true);
+    expect(isSkillVisibleToProfile('debugger', 'optimizer-rdc-tools')).toBe(false);
     expect(isSkillVisibleToProfile('general', 'rdc-tool-shell')).toBe(true);
   });
 });

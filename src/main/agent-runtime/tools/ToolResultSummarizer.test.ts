@@ -74,6 +74,8 @@ describe('ToolResultSummarizer', () => {
           disassembly: 'OpFunction\n'.repeat(15000), resolved_event_id: 1248,
           shader_id: 'ResourceId::192587', target: 'SPIR-V ASM', source_encoding: 'spirvasm',
           source_hash: 'a'.repeat(64),
+          available_targets_status: 'complete', available_targets: ['SPIR-V (RenderDoc)', 'GPU ISA'],
+          available_targets_error: null as string | null,
           edit_plan: {
             input_kind: 'text_ir', can_edit_text: true, can_build: true, can_replace: true,
             allowed_edit_inputs: ['source_text', 'diff_text', 'ops'],
@@ -92,14 +94,32 @@ describe('ToolResultSummarizer', () => {
     expect(summary).toContain('sourceHash=' + 'a'.repeat(64));
     expect(summary).toContain('"canEditText":true,"canBuild":true,"canReplace":true');
     expect(summary).toContain('"allowedEditInputs":["source_text","diff_text","ops"]');
+    expect(summary).toContain('availableTargets={"status":"complete","targets":["SPIR-V (RenderDoc)","GPU ISA"],"error":null}');
     expect(summary).not.toContain('OpFunction');
-    expect(summary.length).toBeLessThan(700);
+    expect(summary.length).toBeLessThan(850);
 
     const mismatched: AgentToolResult = { ...result, details: {
       operation: 'rd.shader.get_disassembly', rdcExecutionIdentity: { ...identity, replaySessionId: 'sess-other' },
     } };
     expect(summarizer.trySummarize('shell', mismatched, 400)).toContain('RDC_EXECUTION_IDENTITY_MISMATCH');
     expect(summarizer.trySummarize('shell', mismatched, 400)).not.toContain('canReplace');
+    expect(summarizer.trySummarize('shell', mismatched, 400)).not.toContain('availableTargets');
+
+    native.result.data.available_targets = [];
+    native.result.data.available_targets_status = 'unavailable';
+    native.result.data.available_targets_error = 'native query failed';
+    expect(summarizer.trySummarize('shell', resultWithNative(), 400)).toContain('"status":"unavailable","targets":[]');
+    expect(summarizer.trySummarize('shell', resultWithNative(), 400)).toContain('"error":"native query failed"');
+    native.result.data.available_targets_status = 'complete';
+    expect(summarizer.trySummarize('shell', resultWithNative(), 400)).toContain('"status":"complete","targets":[]');
+    native.result.data.available_targets = Array.from({ length: 100 }, () => 'x'.repeat(500));
+    native.result.data.available_targets_error = 'x'.repeat(500);
+    expect(summarizer.trySummarize('shell', resultWithNative(), 400)).toContain('"targets":"unverified"');
+    expect(summarizer.trySummarize('shell', resultWithNative(), 400)).toContain('"error":"unverified"');
+
+    function resultWithNative(): AgentToolResult {
+      return { ...result, content: [{ type: 'text', text: JSON.stringify(native) }] };
+    }
   });
 
   it('keeps ordinary shell summary behavior', () => {

@@ -43,7 +43,7 @@ walkClaims(record, (claim) => {
 });
 
 const isInvestigationReport = Array.isArray(record.claims);
-if (isInvestigationReport) {
+if (isInvestigationReport && args.status === 'ready') {
   const contract = record.reportContract && typeof record.reportContract === 'object'
     ? record.reportContract
     : null;

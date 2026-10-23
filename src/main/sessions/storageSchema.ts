@@ -4,6 +4,7 @@ import type { StorageIo } from './StorageIo';
 import type { RunContextUsageSummary, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
 import type {
   ConversationTerminalCommitJournal,
+  ConversationTerminalAppendJournal,
   ConversationTurnCommitJournal,
 } from './storageCommitTypes';
 
@@ -122,12 +123,17 @@ const ProjectInputSchema = z.object({
   inputId: z.string().min(1),
   fileName: z.string().min(1),
   filePath: z.string().min(1),
-  source: z.literal('project_resource'),
+  source: z.enum(['project_resource', 'external_reference']),
+  referenceIdentity: z.object({ device: z.string(), inode: z.string(), birthtimeNs: z.string() }).optional(),
   discoveredAt: z.number(),
   lastModifiedAt: z.number(),
   size: z.number(),
   contentSha256: z.string().regex(/^[a-f0-9]{64}$/u).optional(),
-}).passthrough();
+}).passthrough().superRefine((input, ctx) => {
+  if (input.source === 'external_reference' && (!input.referenceIdentity || !input.contentSha256)) {
+    ctx.addIssue({ code: 'custom', message: 'External capture references require file identity and content hash.' });
+  }
+});
 
 const ProjectRecordSchema = z.object({
   projectId: z.string().min(1),
@@ -211,8 +217,21 @@ export const ConversationTerminalCommitV1Schema = z.object({
   afterContext: z.array(z.unknown()),
 }).passthrough();
 
-export const CONVERSATION_TERMINAL_COMMIT_MIGRATIONS: StorageMigration<ConversationTerminalCommitJournal>[] = [
+const TerminalAppendFileSchema = z.object({
+  existed: z.boolean(), bytes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/), append: z.string(),
+}).strict();
+
+export const ConversationTerminalAppendV2Schema = z.object({
+  schemaVersion: z.literal('2'), requestId: z.string().min(1), turnId: z.string().min(1),
+  phase: z.enum(['prepared', 'committing', 'committed']),
+  history: TerminalAppendFileSchema, context: TerminalAppendFileSchema,
+}).strict();
+
+export const CONVERSATION_TERMINAL_COMMIT_MIGRATIONS: StorageMigration<ConversationTerminalCommitJournal | ConversationTerminalAppendJournal>[] = [
   { schemaVersion: '1', schema: ConversationTerminalCommitV1Schema as ZodType<ConversationTerminalCommitJournal> },
+  // Both versions are valid recovery protocols; no session-data migration occurs.
+  { schemaVersion: '2', schema: z.union([ConversationTerminalCommitV1Schema, ConversationTerminalAppendV2Schema]) as ZodType<ConversationTerminalCommitJournal | ConversationTerminalAppendJournal> },
 ];
 
 export const SessionAttachmentRecordSchema = z.object({

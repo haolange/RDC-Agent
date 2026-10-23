@@ -110,18 +110,46 @@ describe('native failure projection', () => {
         undefined, 'rd.shader.get_source'); } catch (error) { return error as RdcNativeFailure; }
       throw new Error('Expected native failure');
     };
-    expect(parse(envelope).shaderSourceRestoration).toEqual({ contextId: 'owned-context', sessionId: 'native-replay', eventId: 1248 });
+    expect(parse(envelope).shaderInspectionRestoration).toEqual({ contextId: 'owned-context', sessionId: 'native-replay', eventId: 1248 });
     for (const details of [
       { ...envelope.error.details, replay_state_restored: false },
       { ...envelope.error.details, failure_stage: 'compile' },
       { ...envelope.error.details, failure_reason: 'unknown' },
       { ...envelope.error.details, restored_event_id: 0 },
     ]) {
-      expect(parse({ ...envelope, error: { ...envelope.error, details } }).shaderSourceRestoration).toBeNull();
+      expect(parse({ ...envelope, error: { ...envelope.error, details } }).shaderInspectionRestoration).toBeNull();
     }
-    expect(parse({ ...envelope, result_kind: 'rd.shader.get_disassembly' }).shaderSourceRestoration).toBeNull();
-    expect(parse({ ...envelope, error: { ...envelope.error, code: 'shader_inspection_recovery_failed' } }).shaderSourceRestoration).toBeNull();
-    expect(parse(envelope, 0).shaderSourceRestoration).toBeNull();
+    expect(parse({ ...envelope, result_kind: 'rd.shader.get_disassembly' }).shaderInspectionRestoration).toBeNull();
+    expect(parse({ ...envelope, error: { ...envelope.error, code: 'shader_inspection_recovery_failed' } }).shaderInspectionRestoration).toBeNull();
+    expect(parse(envelope, 0).shaderInspectionRestoration).toBeNull();
+  });
+  it('accepts only exact constant-buffer failure restoration proof', () => {
+    const details = { context_id: 'owned-context', session_id: 'native-replay',
+      failure_stage: 'decode_constant_buffer', failure_reason: 'slot_unavailable',
+      replay_state_restored: true, restored_event_id: 11 };
+    const envelope = { schema_version: '3.0.0', result_kind: 'rd.shader.get_constant_buffer_contents', ok: false,
+      error: { code: 'constant_buffer_data_unavailable', category: 'runtime', message: 'No buffer', details } };
+    const parse = (value: object, exitCode = 1) => {
+      try { parseRdcNativeResult({ exitCode, stdout: JSON.stringify(value), stderr: '' } as CLIResult,
+        undefined, envelope.result_kind); } catch (error) { return error as RdcNativeFailure; }
+      throw new Error('Expected native failure');
+    };
+    expect(parse(envelope).shaderInspectionRestoration).toEqual({ contextId: 'owned-context', sessionId: 'native-replay', eventId: 11 });
+    for (const change of [
+      { replay_state_restored: false }, { failure_stage: 'compile' }, { failure_reason: 'unknown' },
+      { restored_event_id: 0 }, { restored_event_id: 1.5 }, { context_id: null }, { session_id: null },
+    ]) {
+      expect(parse({ ...envelope, error: { ...envelope.error, details: { ...details, ...change } } })
+        .shaderInspectionRestoration).toBeNull();
+    }
+    for (const change of [
+      { code: 'shader_inspection_recovery_failed' }, { category: 'validation' },
+    ]) {
+      expect(parse({ ...envelope, error: { ...envelope.error, ...change } }).shaderInspectionRestoration).toBeNull();
+    }
+    expect(parse({ ...envelope, schema_version: '2.0.0' }).shaderInspectionRestoration).toBeNull();
+    expect(parse({ ...envelope, result_kind: 'rd.shader.get_source' }).shaderInspectionRestoration).toBeNull();
+    expect(parse(envelope, 0).shaderInspectionRestoration).toBeNull();
   });
   it.each([
     { schema_version: '2.0.0' }, { result_kind: 'rd.shader.other' }, { exitCode: 0 },

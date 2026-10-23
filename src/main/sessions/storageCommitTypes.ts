@@ -30,6 +30,23 @@ export interface ConversationTerminalCommitJournal {
   afterContext: SessionContextTurnEntry[];
 }
 
+/** Append-only terminal WAL; session/history/context formats are unchanged. */
+export interface ConversationTerminalAppendJournal {
+  schemaVersion: '2';
+  requestId: string;
+  turnId: string;
+  phase: 'prepared' | 'committing' | 'committed';
+  history: TerminalAppendFile;
+  context: TerminalAppendFile;
+}
+
+export interface TerminalAppendFile {
+  existed: boolean;
+  bytes: number;
+  sha256: string;
+  append: string;
+}
+
 export interface ConversationDeltaRecord {
   op: 'delta';
   id: string;

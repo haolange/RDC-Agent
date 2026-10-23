@@ -36,6 +36,7 @@ describe('executionOfferRequiredSkillIds', () => {
       approvedHash: 'a'.repeat(64),
       frozenUri: 'session://plans/plan-frozen.md',
       approvedHandoff: { agent: 'general', label: 'Execute with General' },
+      updatedAt: 1,
     });
   });
 
@@ -81,5 +82,12 @@ describe('executionOfferRequiredSkillIds', () => {
   it('returns nothing when the plan is not approved', () => {
     mocks.planRead.mockReturnValue({ status: 'rejected', approvedHash: 'a'.repeat(64) });
     expect(executionOfferRequiredSkillIds('sess', 'general')).toEqual([]);
+  });
+
+  it('projects the original approved decision time without rewriting an overwritten offer', () => {
+    const overwritten = { ...offer, approvedAt: 9999 };
+    mocks.offerRead.mockReturnValue(overwritten);
+    expect(approvedExecutionOfferForAgent('sess', 'general')?.approvedAt).toBe(1);
+    expect(overwritten.approvedAt).toBe(9999);
   });
 });

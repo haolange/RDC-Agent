@@ -45,6 +45,8 @@ Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consu
 
 Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 时默认使用经过校验的临时 `os.tmpdir()/rdc-agent/qa-*` userData，并在 `will-quit` 清理；显式路径或 canonical 开关才会共享真实数据。进入该 disposable 分支时，主进程同时把 `RDC_AGENT_HOME` 指到同一目录下的 `.rdc-agent`，使 provider 配置与 `userData/secrets` 落在同一隔离边界；launcher 会先清掉继承来的 `RDC_AGENT_HOME`，避免读到或写回真实 `~/.rdc-agent`。只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才落真实 `~/.rdc-agent`。两种载体不得同时占用同一目录；`instance.lock` 冲突应明确失败。涉及真实本机数据的验收必须显式指定 userData。
 
+锁恢复不得只将存活 PID 当成原 owner 身份。Windows 在 PID 存活且锁时间有效时，通过系统进程出生时间核验：当前进程晚于锁记录出生才证明 PID 已复用，可由正式启动路径回收旧锁；不向该进程发送终止信号。出生时间不可读、时间无效或无法排除原 owner 时保持拒绝，权限错误不当作进程已死。锁格式和用户数据保持不变。
+
 ## 验证
 
 - 外观对照须匹配主题预设、字号、语言、Composer Markdown 开关及当前 Agent；disposable 默认偏好不能代表正常用户配置。需要复现正常外观时，仅将 appearance 字段复制到自有隔离配置，记录来源与差异，不复制凭据或会话，也不改变产品默认值。普通输入与 Markdown 编辑/预览是同一 Composer 的现有设置，不是 Browser/Desktop 分叉；原生窗口缩放仍需单独验收。

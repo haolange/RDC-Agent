@@ -1,11 +1,11 @@
 ---
 name: debugger-rdc-tools
-description: Choose and interpret the bounded RDC operations needed to localize rendering faults, test competing causes, and verify a restored result. General execution only.
+description: Operation knowledge for Debugger planning and owning General execution to localize rendering faults, test competing causes, and verify a restored result.
 ---
 
 # Debugger RDC-Tool
 
-本手册由 Debugger Mission 通过 execute handoff 绑定给 General。先读 `$rdc-tool-shell` 的发现、身份、错误、输出和副作用规则，再按 Plan 的区分检查读取 [工具参考](references/tools.md) 中对应条目。成员清单是知识覆盖范围，不是运行时权限白名单。
+Debugger 可按需只读本手册及引用，在计划前核对参数、输出、采证和调用成本；执行仍须通过 execute handoff 将手册绑定给 General 并真实预载。先读 `$rdc-tool-shell` 的发现、身份、错误、输出和副作用规则，再按 Plan 的区分检查读取 [工具参考](references/tools.md) 中对应条目。成员清单是知识覆盖范围，不是运行时权限白名单。
 
 ## 选择路径
 
@@ -14,6 +14,8 @@ description: Choose and interpret the bounded RDC operations needed to localize 
    在批量写入调查记录前，优先做能排除候选解释的最小只读配对：从 action search / history 确认可用事件，在同一原生纹理、subresource 和坐标取得事件前后目标点与邻近控制点；再核对 history 中各片元的 valid、passed、shader-out、pre/post-mod。参考图条件不匹配只阻断跨图定量比较，不阻断同 capture 内的这条取证路径。若原生回执缺字段或读数相互矛盾，保留 unknown 并记录具体缺口，不以猜测值设计 shader 干预。
 3. 在候选事件只取需要的 pipeline sections，再查 bindings、constant buffers、vertex/index、post-transform mesh 与 shader source/reflection。管线读取失败保持失败，不能用空绑定代替。若 Pixel History 已给出同 Event 的 surviving `primitive_id`，而具体几何或材质归属仍未知，先以该像素、Event、输出目标和 primitive 尝试 `rd.shader.debug_start`；再按实际 topology/index binding，用 `rd.mesh.get_drawcall_mesh_config` 的有界顶点输入或相应 index 范围核对几何和资源绑定。大片元列表只选能区分假设的少量代表，不按全 Draw 批量导出。Pixel History 的 primitive 是片元归属线索，draw 级 shader/binding 也不自动等于材质身份；只有同一 replay 的索引、顶点属性、纹理/常量及 shader 路径能闭合时才提高归属结论。远端 debug 不支持、mesh 截断或语义不明须保留具体 unknown，继续其它可行的只读检查。
 4. shader debugger 或替换只用于 Plan 中的区分检查。`rd.shader.get_source` 的 `source_available=false` 只说明原始调试源码缺失；如返回 `fallback_args`，必须先按其指定的 target（例如 raw `SPIR-V ASM`）读取反汇编并检查该次 `edit_plan`，不能拿默认只读 `SPIR-V (RenderDoc)` 的 edit plan 宣告所有替换路径不可用。`allowed_edit_inputs` 是可选输入形式，`allowed_ops` 只限制结构化便利操作；两者不得混淆。读取真实 edit plan 和能力后再 compile/replace；没有区分性因果假设和安全恢复路径仍不得干预。每个 counterfactual 都记录真实 replacement，并按 A-B-A 回滚与恢复观察。
+
+需要工作文件以独立构建变体时，使用正式 `rd.export.shader_bundle` 并显式设置与编辑视图一致的 `disassembly_target`；raw SPIR-V 使用 `SPIR-V ASM`。核对 manifest 的实际 target、source_encoding、is_raw_spirv_asm、edit_plan 及文件 hash/大小，再在工程内读取全文、生成最小 diff，并以 `rd.shader.compile.source_path` 独立验证。默认 `auto` 的展示反汇编不是可装配输入，不能仅因该视图不可编译就断言没有合法路径。长文本优先正式导出，避免模型手抄或寻找产品内部制品存储路径。合并构建与替换接口不等于独立事前编译回执；冻结计划要求事前构建时，先用可读工作文件完成该步骤，不能静默跳过前置。
 5. 只导出能支撑当前 Claim 的最小证据。OBJ 仅接受工具定义声明的 post-VS 位置和 primitive indices；unsupported 不是空模型。
 
 结果中把直接读取、工具投影和推断分开。像素历史、管线差异或 debug step 能排除某个假设时说明适用事件、subresource 和参数；不能定位时返回当前候选区间、预算边界和下一项区分检查。

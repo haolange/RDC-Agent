@@ -106,6 +106,24 @@ describe('reviewed provider catalog request paths', () => {
     }
   });
 
+  it('sends GPT-6.1 Sol low on the Codex account route with its account budget', () => {
+    const model = effective('chatgpt-account', 'gpt-6.1-sol');
+    expect(model.defaultBudgetTokens).toBe(500_000);
+    expect(model.controls.fast).toMatchObject({ state: 'selectable', defaultValue: false });
+    for (const level of ['low', 'medium', 'high', 'xhigh', 'max'] as const) {
+      const result = planModelRequest({ model, controls: { reasoningLevel: level } });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error(result.message);
+      expect(wire(result.plan)).toMatchObject({ model: 'gpt-6.1-sol', reasoning: { effort: level } });
+      expect(wire(result.plan)).not.toHaveProperty('temperature');
+      expect(wire(result.plan)).not.toHaveProperty('service_tier');
+    }
+    const fast = planModelRequest({ model, controls: { reasoningLevel: 'low', fastModel: true } });
+    expect(fast.ok).toBe(true);
+    if (!fast.ok) throw new Error(fast.message);
+    expect(wire(fast.plan).service_tier).toBe('priority');
+  });
+
   it('binds Claude Opus 5.5 Fast to Anthropic API only', () => {
     const api = planModelRequest({ model: effective('anthropic', 'claude-opus-5-5'), controls: { fastModel: true } });
     expect(api.ok).toBe(true);

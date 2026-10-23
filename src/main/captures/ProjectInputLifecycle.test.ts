@@ -21,6 +21,7 @@ async function setup() {
       discoveredAt: 1, lastModifiedAt: 1, source: 'project_resource' }] };
   const bindings = [{ scope: { projectId: 'project', sessionId: 'session' }, inputId: 'capture', captureHash: contentSha256, interactionLock: null as string | null }];
   const host: ProjectInputLifecycleHost = { getProject: () => project,
+    detachReference: vi.fn(async () => []),
     rebind: vi.fn(async () => undefined),
     refresh: vi.fn(async () => []), bindings: () => bindings,
     close: vi.fn(async () => { bindings.splice(0); }), block: async (_p, _i, operation) => operation(), stop: vi.fn(async () => { bindings[0].interactionLock = null; }) };
@@ -29,6 +30,30 @@ async function setup() {
 }
 
 describe('ProjectInputLifecycle', () => {
+  it('closes replay and detaches an external reference without deleting its original', async () => {
+    const f = await setup(); const bytes = await fs.readFile(f.filePath);
+    f.project.inputs[0] = { ...f.project.inputs[0], source: 'external_reference',
+      referenceIdentity: { device: '1', inode: '2', birthtimeNs: '3' } };
+    const prepared = await f.service.prepare('project', 'capture');
+    expect(await f.service.remove('project', 'capture', prepared.approvalIdentity)).toMatchObject({ success: true, fileDeleted: false });
+    expect(f.host.close).toHaveBeenCalledBefore(vi.mocked(f.host.detachReference));
+    expect(f.host.detachReference).toHaveBeenCalledWith('project', 'capture');
+    expect(await fs.readFile(f.filePath)).toEqual(bytes);
+  });
+  it('can detach an unavailable external original and rejects a source-type change after approval', async () => {
+    const f = await setup();
+    f.project.inputs[0] = { ...f.project.inputs[0], source: 'external_reference',
+      referenceIdentity: { device: '1', inode: '2', birthtimeNs: '3' } };
+    await fs.unlink(f.filePath);
+    const prepared = await f.service.prepare('project', 'capture');
+    expect((await f.service.remove('project', 'capture', prepared.approvalIdentity)).success).toBe(true);
+    expect(f.host.detachReference).toHaveBeenCalled();
+    await fs.writeFile(f.filePath, 'original capture');
+    f.project.inputs[0].source = 'project_resource';
+    expect(await f.service.remove('project', 'capture', prepared.approvalIdentity))
+      .toMatchObject({ success: false, error: 'PROJECT_INPUT_CHANGED_AFTER_APPROVAL', fileDeleted: false });
+    expect(await fs.readFile(f.filePath, 'utf8')).toBe('original capture');
+  });
   it('closes confirmed bindings before deleting only the selected file', async () => {
     const fixture = await setup();
     const protectedFile = path.join(fixture.project.rootPath, 'report.md'); await fs.writeFile(protectedFile, 'keep');

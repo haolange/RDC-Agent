@@ -135,6 +135,7 @@ Preflight 失败或取消不得留下 Session、Turn、branch、attachment、jou
 ## 重点事实契约
 
 - OpenAI Direct API：GPT-6 Sol/Luna 为 1.05M input / 128K output，支持视觉、工具和结构化输出；Fast 使用 `service_tier=priority`，EU data residency route 仅允许标准处理。ChatGPT Account 是独立 surface：GPT-6 Sol/Luna 属于维护型账户目录模型，Codex 模型目录定义其 272K 默认、872K Max 和 Fast priority tier；账户 discovery 可补充动态资格，但过期或刷新失败的目录不得因缺席撤销这两款已维护型号，API 窗口与 Fast binding 不跨 surface 覆盖。
+- ChatGPT Account 的 GPT-6.1 Sol 独立维护：2026-10-19 官方账户发布文档与实际 Codex 目录确认精确型号 `gpt-6.1-sol`、文本/图像和 Responses 工具调用；账户目录默认 500K、Max 872K，不能套用 API 的 1.05M。默认 low、标准速度；可选 low/medium/high/xhigh/max 和已有 Fast priority binding。Ultra 为客户端编排能力，不写为 Provider reasoning 值；实际账户资格仍由请求验证。
 - ChatGPT OAuth：现行 Codex `models.json` 里 `gpt-6-astra`、`gpt-6-sol`、`gpt-6-luna`、`gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna`、`gpt-5.5` 的 `input_modalities` 都包含 `image`。GPT-6 Sol/Luna 在维护目录中保持可选；HTTP 401 或过期 `/models` 快照不能把它们误判为账户不支持。其余 account-entitled 型号仍按成功获取的账户目录判定。`gpt-5.4-mini` 与 `gpt-5.3-codex-spark` 已不在当前可选目录中，不保留 text-only 特例或 alias。GPT-6 与 GPT-5.5/5.6 的 Fast 均由该 surface 的 Codex priority binding 驱动。5.6 支持 Low/Medium/High/Extra/Max。`gpt-5.4` 的 Codex `upgrade.retirement_at` 为 2026-08-31，已从 OAuth 清单移除；OpenAI API 同名模型独立维护。ChatGPT discovery 不覆盖 manifest 的视觉、工具和结构化输出基线。
 - Anthropic Direct：`claude-opus-5` 为 1M input / 128K output、$5/$25、Low/Medium/High/Extra/Max（默认 High）并显式支持 Off。`claude-opus-5-5` 为 1M / 128K、$4/$20，Low/Medium/High/Extra/Max（默认 Medium），adaptive thinking 始终开启。Fast 是 `speed=fast` + `anthropic-beta: fast-mode-2026-02-01` 的 API request binding；只有真实 usage 返回 `speed=fast` 才授予 entitlement。该 Fast preview 不继承到 Claude Account OAuth 或第三方托管面。
 - Copilot：结构能力由 manifest/user-observed fact 保留，账号 `/models` 的 `supported_reasoning_efforts`、`capabilities.supports`、默认/long-context billing tier、endpoint 与 policy 是当前账户的覆盖真值。支持扩展上下文的模型必须呈现“默认窗口 + 可选 1M”，禁止再把 Claude/GPT 扩展窗口写成固定 1M。`claude-opus-5` 只有在当前账户 discovery 精确返回 model id 和 agent endpoint 时可选，不继承 Direct API Fast。
@@ -151,6 +152,8 @@ Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolic
 只有新 wire protocol、请求签名、OAuth/device/refresh、非标准动态目录或外部进程集成才新增 TS 行为。GitLab Duo 与 SAP AI Core 使用专用 adapter；标准 OpenAI-compatible surface 复用统一 adapter，但不能把原生/混合 surface 强压成兼容协议。
 
 `OpenAIResponsesProvider` 必须处理 `response.reasoning_text.delta/done`、raw reasoning item、function-call continuation、terminal usage/error。DeepSeek 工具 loop 回放 Provider 要求的 raw reasoning/function-call item，且不使用 `previous_response_id`；Chat/Anthropic route 则按各自 continuation contract 回放 `reasoning_content`。
+
+`OpenAIResponsesProvider` 的 function tool 显式发送 `strict: false`，保持 canonical `parameters.required` 的可选字段语义，不依赖服务端对省略 strict 的自动规范。否则“省略”可能变为必填默认值（例如图片读取意外携带启用 JSON 校验的空数组）。这是模型生成格式选项，不改变主进程参数验证、权限、委派引用或操作执行门禁；不通过删除参数或静默忽略不适用字段消除错误。依据：[OpenAI function calling strict mode](https://developers.openai.com/api/docs/guides/function-calling)。
 
 最终操作 URL 按 operation builder 构建并逐 route 测试，禁止重复追加 `/chat/completions`、`/responses` 或 Anthropic `/v1`。所有 stable surface 必须具有 adapter、auth schema、endpoint、Connection Test 与 operation URL；无凭据显示 `Unconfigured`，不得显示假 `Available`。
 

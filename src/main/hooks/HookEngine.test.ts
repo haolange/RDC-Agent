@@ -347,3 +347,36 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     expect((await engine.trigger('turn.before-start', { event: 'turn.before-start' }))[0]).toMatchObject({ status: 'timed-out', allowed: true });
   });
 });
+
+describe('report Hook publication boundary', { timeout: 20_000 }, () => {
+  async function checkReport(status?: 'draft' | 'ready', claims: unknown[] = [], reportContract?: object) {
+    const engine = new HookEngine(path.join(makeRoot(), 'trust.json'));
+    engine.load(path.join(makeRoot(), 'user-hooks'), undefined,
+      path.resolve(__dirname, '../../../resources/agent-runtime/hooks'));
+    return engine.test('report-contract', {
+      event: 'tool.before-call', toolName: 'investigation_write',
+      payload: { toolName: 'investigation_write', arguments: {
+        kind: 'report', ...(status ? { status } : {}),
+        record: { title: 'Incomplete investigation', mission: 'debugger', summary: 'Evidence gap retained.',
+          claims, evidenceIds: [], experimentIds: [], ...(reportContract ? { reportContract } : {}) },
+      } },
+    });
+  }
+
+  it.each(['draft', undefined] as const)('accepts an incomplete %s report without a publication contract', async (status) => {
+    expect(await checkReport(status)).toMatchObject({ status: 'completed', allowed: true });
+  });
+
+  it('still refuses ready publication without its report contract', async () => {
+    expect(await checkReport('ready')).toMatchObject({ status: 'failed', allowed: false,
+      reason: expect.stringContaining('report missing reportContract') });
+  });
+
+  it('still refuses an epistemic upgrade in a draft report', async () => {
+    expect(await checkReport('draft', [{ claimId: 'projection', epistemic: 'observed',
+      compactProvenance: [{ sourceClaimId: 'source', sourceEpistemicStatus: 'inferred',
+        sourceVerificationLevel: 'reconstructed' }] }])).toMatchObject({
+      status: 'failed', allowed: false, reason: expect.stringContaining('raises epistemic rank'),
+    });
+  });
+});

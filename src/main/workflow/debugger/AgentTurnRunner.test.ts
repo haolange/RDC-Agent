@@ -178,7 +178,6 @@ describe('AgentTurnRunner', () => {
     await expect(runner.runAgentTurn({
       agentId: 'ask',
       content: 'x',
-      systemPrompt: 'system',
       providerId: 'test',
       modelId: 'model',
       profileId: 'general',
@@ -186,7 +185,6 @@ describe('AgentTurnRunner', () => {
       contextTokenLimit: 800,
       sessionId: 's',
       turnId: 't',
-      promptPlan: {} as PromptPlan,
       options: { requestPlan },
     })).rejects.toThrow(/TURN_NOT_PREPARED/);
   });
@@ -194,7 +192,7 @@ describe('AgentTurnRunner', () => {
   it('cleans the turn and prepared MCP lease when slot setup throws', async () => {
     const release = vi.fn(async () => undefined);
     const runner = createRunner();
-    vi.spyOn(runner, 'getOrCreateAgentSlot').mockImplementation(() => {
+    const setup = vi.spyOn(runner, 'getOrCreateAgentSlot').mockImplementation(() => {
       throw new Error('slot setup failed');
     });
     const requestPlan = createTestRequestPlan({
@@ -235,6 +233,7 @@ describe('AgentTurnRunner', () => {
       maxWallTimeMs: 10_000,
     } as EffectiveRuntimePlan['policy'];
     const preparedRuntime = {
+      promptPlan: { systemPrompt: 'prepared-system' } as PromptPlan,
       runtimeTools: { definitions: [], toolMap: new Map() },
       activeToolDefinitions: [],
       routeCapability: { toolCallingMode: 'disabled' } as AgentRouteCapability,
@@ -248,7 +247,6 @@ describe('AgentTurnRunner', () => {
     await expect(runner.runAgentTurn({
       agentId: 'ask',
       content: 'setup',
-      systemPrompt: 'system',
       providerId: 'test',
       modelId: 'model',
       profileId: 'general',
@@ -256,11 +254,13 @@ describe('AgentTurnRunner', () => {
       contextTokenLimit: 800,
       sessionId: 'setup-session',
       turnId: 'setup-turn',
-      promptPlan: {} as PromptPlan,
       effectiveModel: {} as never,
       preparedRuntime,
       options: { requestPlan },
     })).rejects.toThrow('slot setup failed');
+
+    expect(setup.mock.calls[0]?.[3]).toBe('prepared-system');
+    expect(setup.mock.calls[0]?.[11]).toBe(preparedRuntime.promptPlan);
 
     expect(release).toHaveBeenCalledWith({ discardIfIdle: false });
     expect(turnCoordinator.getActive('setup-session')).toBeNull();
@@ -331,7 +331,6 @@ describe('AgentTurnRunner', () => {
     await expect(runner.runAgentTurn({
       agentId: 'ask',
       content: 'no-scope',
-      systemPrompt: 'system',
       providerId: 'test',
       modelId: 'model',
       profileId: 'general',
@@ -339,7 +338,6 @@ describe('AgentTurnRunner', () => {
       contextTokenLimit: 800,
       sessionId,
       turnId: 'no-scope-turn',
-      promptPlan: {} as PromptPlan,
       effectiveModel: {} as never,
       preparedRuntime,
       options: { requestPlan },

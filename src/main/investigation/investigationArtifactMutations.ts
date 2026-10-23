@@ -14,13 +14,41 @@ import type {
 import { InvestigationError } from './investigationErrors';
 import { collectProjectedClaims } from './investigationInvariants';
 import { hashesEqual, serializeInvestigationJson, sha256Prefixed } from './investigationHash';
-import { collectRecordKeys, type InvestigationIndexDocument, type InvestigationIndexEntry } from './investigationRecordKeys';
+import { collectRecordKeys, recordKeyToken, type InvestigationIndexDocument, type InvestigationIndexEntry } from './investigationRecordKeys';
 import type { InvestigationTxnMutation } from './investigationTxn';
 
 export interface InvestigationMutationReader {
   readRecordBody<T>(entry: InvestigationIndexEntry): T;
   readJson<T>(uri: string): T;
   parseManifest(value: unknown): InvestigationArtifactManifest;
+}
+
+/** Later propagation steps must read the staged body matching their staged index. */
+export function withPendingInvestigationMutations(
+  reader: InvestigationMutationReader,
+  mutations: readonly InvestigationTxnMutation[],
+): InvestigationMutationReader {
+  const pending = (uri: string) => {
+    for (let index = mutations.length - 1; index >= 0; index -= 1) {
+      if (mutations[index]!.uri === uri) return mutations[index]!.text;
+    }
+    return undefined;
+  };
+  return {
+    readRecordBody<T>(entry: InvestigationIndexEntry): T {
+      const text = pending(entry.contentUri);
+      if (text === undefined) return reader.readRecordBody<T>(entry);
+      if (!hashesEqual(entry.contentHash, sha256Prefixed(text))) {
+        throw new InvestigationError('INVESTIGATION_HASH_MISMATCH', 'staged record does not match staged index');
+      }
+      return JSON.parse(text) as T;
+    },
+    readJson<T>(uri: string): T {
+      const text = pending(uri);
+      return text === undefined ? reader.readJson<T>(uri) : JSON.parse(text) as T;
+    },
+    parseManifest: value => reader.parseManifest(value),
+  };
 }
 
 export function upsertIndexEntry(
@@ -33,19 +61,19 @@ export function upsertIndexEntry(
   };
 }
 
-export function retiredClaimIdsForReplacement(
+export function retiredRecordKeysForReplacement(
   reader: InvestigationMutationReader,
   replaced: InvestigationIndexEntry | undefined,
   incomingKind: InvestigationArtifactKind,
   incoming: InvestigationRecord,
 ): Set<string> {
   if (!replaced) return new Set();
-  const incomingIds = new Set(collectRecordKeys(incomingKind, incoming)
-    .filter(key => key.space === 'claim').map(key => key.id));
+  const incomingIds = new Set(collectRecordKeys(incomingKind, incoming).map(recordKeyToken));
   const retired = new Set(collectRecordKeys(replaced.kind, reader.readRecordBody<InvestigationRecord>(replaced))
-    .filter(key => key.space === 'claim' && !incomingIds.has(key.id)).map(key => key.id));
+    .filter(key => (key.space === 'claim' || key.space === 'evidence') && !incomingIds.has(recordKeyToken(key)))
+    .map(recordKeyToken));
   if (collectProjectedClaims(incoming).some(claim => [...(claim.supports ?? []), ...(claim.contradicts ?? [])]
-    .some(id => retired.has(id)))) {
+    .some(id => retired.has(recordKeyToken({ space: 'claim', id }))))) {
     throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', 'replacement Claim cannot cite a retired Claim ID');
   }
   return retired;
@@ -111,36 +139,47 @@ export function collectSupersededWorldStateDependents(
   return { mutations, index: working };
 }
 
-/** A replaced Claim/ClaimSet can retire logical claim IDs while older records
+/** Replaced records can retire logical IDs while older records
  * still cite them. Keep those records for audit, but remove them from the live
  * semantic graph in the same transaction (or repair an older transaction). */
-export function collectRetiredClaimDependents(
+export function collectRetiredRecordDependents(
   reader: InvestigationMutationReader,
-  retiredClaimIds: Set<string>,
+  retiredRecordKeys: Set<string>,
   index: InvestigationIndexDocument,
 ): { mutations: InvestigationTxnMutation[]; index: InvestigationIndexDocument } {
-  if (retiredClaimIds.size === 0) return { mutations: [], index };
+  if (retiredRecordKeys.size === 0 && !index.artifacts.some(entry => entry.status === 'stale')) {
+    return { mutations: [], index };
+  }
   const mutations: InvestigationTxnMutation[] = [];
-  const staleExperimentIds = new Set<string>();
+  // Seed already-invalidated dependencies as well: read repair can encounter a
+  // checkpoint left live by an earlier, incomplete supersede transaction.
+  const unavailable = new Set([...retiredRecordKeys, ...index.artifacts
+    .filter(entry => entry.status === 'stale')
+    .flatMap(entry => collectRecordKeys(entry.kind, reader.readRecordBody<InvestigationRecord>(entry)).map(recordKeyToken))]);
   let working = index;
   let changed = true;
-  const citesClaim = (ids: readonly string[] | undefined): boolean => Boolean(ids?.some(id => retiredClaimIds.has(id)));
+  const citesRecord = (space: 'claim' | 'evidence' | 'experiment' | 'challenge', id: string | null | undefined): boolean => (
+    Boolean(id && unavailable.has(recordKeyToken({ space, id })))
+  );
+  const citesClaim = (ids: readonly string[] | undefined): boolean => Boolean(ids?.some(id => citesRecord('claim', id)));
   while (changed) {
     changed = false;
     for (const entry of working.artifacts) {
       if (entry.status !== 'ready' && entry.status !== 'draft') continue;
       const record = reader.readRecordBody<InvestigationRecord>(entry);
-      const citesExperiment = (id: string | null | undefined): boolean => Boolean(id && staleExperimentIds.has(id));
+      const citesExperiment = (id: string | null | undefined): boolean => citesRecord('experiment', id);
       let dependent = false;
       switch (entry.kind) {
-        case 'experiment':
-          dependent = retiredClaimIds.has((record as ExperimentRecord).hypothesisClaimId);
+        case 'experiment': {
+          const experiment = record as ExperimentRecord;
+          dependent = citesRecord('claim', experiment.hypothesisClaimId)
+            || experiment.rollback.verifyEvidenceIds.some(id => citesRecord('evidence', id));
           break;
+        }
         case 'challenge': {
           const challenge = record as ChallengeRecord;
-          dependent = (challenge.targetRef.type === 'claim' && retiredClaimIds.has(challenge.targetRef.id))
-            || (challenge.targetRef.type === 'experiment' && citesExperiment(challenge.targetRef.id))
-            || retiredClaimIds.has(challenge.resolutionClaimId ?? '');
+          dependent = citesRecord(challenge.targetRef.type, challenge.targetRef.id)
+            || citesRecord('claim', challenge.resolutionClaimId);
           break;
         }
         case 'claim': {
@@ -164,21 +203,23 @@ export function collectRetiredClaimDependents(
         case 'checkpoint': {
           const checkpoint = record as MissionCheckpoint;
           dependent = citesClaim(checkpoint.established) || citesClaim(checkpoint.rejected)
-            || checkpoint.completedExperiments.some(id => staleExperimentIds.has(id));
+            || checkpoint.completedExperiments.some(id => citesRecord('experiment', id))
+            || checkpoint.openChallenges.some(id => citesRecord('challenge', id));
           break;
         }
         case 'report': {
           const report = record as InvestigationReport;
           dependent = report.claims.some(claim => citesClaim(claim.supports)
-            || citesClaim(claim.contradicts) || claim.compactProvenance?.some(source => retiredClaimIds.has(source.sourceClaimId)))
-            || report.experimentIds.some(id => staleExperimentIds.has(id));
+            || citesClaim(claim.contradicts) || claim.compactProvenance?.some(source => citesRecord('claim', source.sourceClaimId)))
+            || report.experimentIds.some(id => citesRecord('experiment', id))
+            || report.evidenceIds.some(id => citesRecord('evidence', id));
           break;
         }
         default:
           break;
       }
       if (!dependent) continue;
-      if (entry.kind === 'experiment') staleExperimentIds.add((record as ExperimentRecord).experimentId);
+      for (const key of collectRecordKeys(entry.kind, record)) unavailable.add(recordKeyToken(key));
       if (entry.kind === 'evidence') {
         const stale = collectStaleArtifact(reader, entry, { ...(record as EvidenceRecord), stale: true }, working);
         mutations.push(...stale.mutations);
@@ -206,7 +247,7 @@ export function collectSupersede(
   reader: InvestigationMutationReader,
   artifactId: string,
   index: InvestigationIndexDocument,
-  retiredClaimIds: Set<string> = new Set(),
+  retiredRecordKeys: Set<string> = new Set(),
 ): { mutations: InvestigationTxnMutation[]; index: InvestigationIndexDocument; artifactId: string } {
   const entry = index.artifacts.find((item) => item.artifactId === artifactId);
   if (!entry) {
@@ -214,7 +255,7 @@ export function collectSupersede(
   }
   const manifest = reader.readJson<InvestigationArtifactManifest>(entry.manifestUri);
   manifest.status = 'superseded';
-  const stale = collectRetiredClaimDependents(reader, retiredClaimIds,
+  const stale = collectRetiredRecordDependents(reader, retiredRecordKeys,
     upsertIndexEntry(index, { ...entry, status: 'superseded' }));
   return {
     artifactId,

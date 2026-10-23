@@ -13,7 +13,36 @@ async function createRegistry(): Promise<TaskRegistry> {
   return new TaskRegistry(dir);
 }
 
+it('preserves active ownership on a pending request and carries consumption into a settled retry', async () => {
+  const registry = await createRegistry();
+  const [task] = await registry.createTasks([{ subject: 'Independent review', completionRequirements: ['review'] }]);
+  const direct = await registry.startExecution(task.id, { mode: 'direct', budget: { maxToolCalls: 30, toolCalls: 2 } });
+  await expect(registry.updateTask(task.id, { status: 'pending' })).rejects.toThrow('active execution');
+  expect(await registry.getTask(task.id)).toMatchObject({ status: 'in_progress', currentExecutionId: direct.id });
+  expect(await registry.getExecution(direct.id)).toMatchObject({ status: 'running', generation: 1 });
+  await expect(registry.startExecution(task.id, { mode: 'subagent' })).rejects.toThrow('in-progress');
+  await registry.settleExecution(direct.id, {
+    status: 'partial', expectedGeneration: direct.generation,
+    result: { disposition: 'partial', summary: 'Direct execution was claimed before delegation; review was not performed.', outputs: {}, missingRequirements: ['review'] },
+  });
+  const child = await registry.startExecution(task.id, { mode: 'subagent', budget: { maxToolCalls: 30, toolCalls: 0 } });
+  expect(child).toMatchObject({ mode: 'subagent', generation: 2, budget: { maxToolCalls: 30, toolCalls: 2 } });
+});
+
 describe('TaskRegistry', () => {
+  it('diagnoses an incompatible cumulative cap without resetting or consuming a retry generation', async () => {
+    const registry = await createRegistry();
+    const task = await registry.createTask('Continue bounded work');
+    const deadlineAt = Date.now() + 60_000;
+    const first = await registry.startExecution(task.id, { mode: 'direct', budget: { maxToolCalls: 20, toolCalls: 8, maxSubagents: 3, subagents: 1, deadlineAt } });
+    await registry.settleExecution(first.id, { expectedGeneration: first.generation, status: 'partial', result: { disposition: 'partial', summary: 'Increment remains.', outputs: {} } });
+    await expect(registry.startExecution(task.id, { mode: 'subagent', budget: { maxToolCalls: 4 } })).rejects.toThrow('consumed=8; cumulativeMax=4');
+    await expect(registry.startExecution(task.id, { mode: 'subagent', budget: { maxSubagents: 0 } })).rejects.toThrow('consumed=1; cumulativeMax=0');
+    expect(await registry.listExecutions(task.id)).toHaveLength(1);
+    const next = await registry.startExecution(task.id, { mode: 'subagent', budget: { maxToolCalls: 20, maxSubagents: 1, toolCalls: 0, subagents: 0, deadlineAt: Date.now() + 120_000 } });
+    expect(next).toMatchObject({ generation: 2, budget: { toolCalls: 8, subagents: 1, maxToolCalls: 20, maxSubagents: 1, deadlineAt, startedAt: first.budget.startedAt } });
+  });
+
   it('supports create / get / list / update CRUD', async () => {
     const registry = await createRegistry();
     const created = await registry.createTask('Implement login', {
@@ -320,10 +349,74 @@ describe('TaskRegistry', () => {
     await registry.settleExecution(completedRun.id, { status: 'completed', expectedGeneration: 1, result: { disposition: 'completed', summary: 'Done', outputs: {} } });
     await expect(registry.updateTask(completed.id, { status: 'pending' })).rejects.toThrow(/Terminal task/);
     await expect(registry.startExecution(completed.id, { mode: 'direct' })).rejects.toThrow(/Terminal task/);
+    await expect(registry.startExecution(completed.id, { mode: 'direct', resumeCancelled: true, frozenPlanRef: 'turn:new:generation:1' })).rejects.toThrow(/cancelled Task/);
     const blocked = await registry.createTask('Retryable');
     const first = await registry.startExecution(blocked.id, { mode: 'direct' });
     await registry.settleExecution(first.id, { status: 'blocked', expectedGeneration: 1, result: { disposition: 'blocked', summary: 'Retry', outputs: {} } });
     await expect(registry.startExecution(blocked.id, { mode: 'direct' })).resolves.toMatchObject({ generation: 2 });
+  });
+
+  it('explicitly resumes a joined cancelled task in a later turn without changing its ledger or old result', async () => {
+    const registry = await createRegistry();
+    const task = await registry.createTask('Continue the same investigation');
+    const deadlineAt = Date.now() + 60_000;
+    const root = await registry.updateRootBudget('root-resume', {
+      maxToolCalls: 20, toolCalls: 7, maxSubagents: 3, subagents: 1, maxChildDepth: 1,
+      startedAt: Date.now(), deadlineAt,
+    });
+    const first = await registry.startExecution(task.id, {
+      mode: 'direct', rootBudgetId: root.id, frozenPlanRef: 'turn:first:generation:1',
+      budget: { maxToolCalls: 20, toolCalls: 7, maxSubagents: 3, subagents: 1, deadlineAt },
+    });
+    await registry.cancelTask(task.id);
+    const cancelled = await registry.getExecution(first.id);
+    await expect(registry.startExecution(task.id, { mode: 'direct', frozenPlanRef: 'turn:next:generation:1' })).rejects.toThrow(/Terminal task/);
+    await expect(registry.startExecution(task.id, { mode: 'direct', resumeCancelled: true, frozenPlanRef: first.frozenPlanRef })).rejects.toThrow(/later turn/);
+    await expect(registry.startExecution(task.id, { mode: 'subagent', resumeCancelled: true, frozenPlanRef: 'turn:next:generation:1' })).rejects.toThrow(/owning direct turn/);
+    const second = await registry.startExecution(task.id, {
+      mode: 'direct', resumeCancelled: true, frozenPlanRef: 'turn:next:generation:1',
+      budget: { maxToolCalls: 100, toolCalls: 0, subagents: 0, deadlineAt: Date.now() + 120_000 },
+    });
+    expect(second).toMatchObject({ taskId: task.id, taskRevision: first.taskRevision, generation: 2, status: 'running', budget: first.budget });
+    expect(await registry.getExecution(first.id)).toEqual(cancelled);
+    expect(second.rootBudgetId).toBe(root.id);
+    expect(await registry.getRootBudget(root.id)).toEqual(root);
+    expect((await registry.listTasks()).map(value => value.id)).toEqual([task.id]);
+    await expect(registry.settleExecution(first.id, { status: 'completed', expectedGeneration: 1, result: { disposition: 'completed', summary: 'Late old producer', outputs: {} } })).rejects.toThrow(/Stale/);
+  });
+
+  it('does not explicitly resume cancellation before its producer joins', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-tasks-'));
+    roots.push(dir);
+    let joined!: () => void;
+    let entered!: () => void;
+    const producerEntered = new Promise<void>(resolve => { entered = resolve; });
+    const producerJoined = new Promise<void>(resolve => { joined = resolve; });
+    const registry = new TaskRegistry(dir, { onCancelExecution: async () => { entered(); await producerJoined; } });
+    const task = await registry.createTask('Cancellation still pending');
+    await registry.startExecution(task.id, { mode: 'direct', frozenPlanRef: 'turn:first:generation:1' });
+    const cancellation = registry.cancelTask(task.id);
+    await producerEntered;
+    try {
+      await expect(registry.startExecution(task.id, { mode: 'direct', resumeCancelled: true, frozenPlanRef: 'turn:next:generation:1' })).rejects.toThrow(/cancellation is in progress/);
+    } finally { joined(); await cancellation; }
+  });
+
+  it('admits only one explicit continuation and cannot use it to reset an exhausted root', async () => {
+    const registry = await createRegistry();
+    const task = await registry.createTask('One resumed producer');
+    const root = await registry.updateRootBudget('resume-cap', { toolCalls: 4, maxToolCalls: 5,
+      subagents: 0, maxSubagents: 1, maxChildDepth: 1, startedAt: Date.now(), deadlineAt: Date.now() + 60_000 });
+    await registry.startExecution(task.id, { mode: 'direct', rootBudgetId: root.id, frozenPlanRef: 'turn:old:generation:1' });
+    await registry.cancelTask(task.id);
+    const options = { mode: 'direct' as const, resumeCancelled: true, frozenPlanRef: 'turn:new:generation:1' };
+    const attempts = await Promise.allSettled([registry.startExecution(task.id, options), registry.startExecution(task.id, options)]);
+    expect(attempts.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(await registry.listExecutions(task.id)).toHaveLength(2);
+    await registry.cancelTask(task.id);
+    await registry.updateRootBudget(root.id, { ...root, toolCalls: 5 });
+    await expect(registry.startExecution(task.id, { ...options, frozenPlanRef: 'turn:another:generation:1', budget: { toolCalls: 0, maxToolCalls: 100 } })).rejects.toThrow(/Root Task budget is exhausted/);
+    expect(await registry.listExecutions(task.id)).toHaveLength(2);
   });
 
   it('rejects invalid or exhausted execution budgets', async () => {

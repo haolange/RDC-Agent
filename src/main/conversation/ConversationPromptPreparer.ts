@@ -76,6 +76,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
   const promptClock = resolvePromptClock();
   const promptPlan = promptPlanBuilder.build({
     profile: definition,
+    profileCatalog: effectiveProfiles,
     scopedInstructions,
     preloadedSkills,
     skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined, input.agentId),
@@ -85,6 +86,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     approvedExecutionOffer,
     routeCapability: input.routePreflight.routeCapability,
     effectiveModel: input.effectiveModel ?? undefined,
+    requestPlan: input.requestPlan,
     permissionSettings: runtimeSettings.agentRuntime.permissions,
     currentDate: promptClock.currentDate,
     timeZone: promptClock.timeZone,

@@ -103,6 +103,8 @@ export interface TaskExecutionMessage {
 
 export interface StartTaskExecutionOptions {
   mode: TaskExecutionRecord['mode'];
+  /** Explicit new-turn continuation of the same goal after cancellation joined. */
+  resumeCancelled?: boolean;
   parentExecutionId?: string;
   rootBudgetId?: string;
   budget?: Partial<Omit<TaskBudgetState, 'startedAt'>>;

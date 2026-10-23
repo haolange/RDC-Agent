@@ -61,4 +61,28 @@ describe('jsonl fault handling', () => {
 
     expect(() => writeJsonl(filePath, [{ ok: true }])).toThrow();
   });
+
+  it('selects while scanning, preserves split UTF8 and reports unselected corruption', () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-jsonl-'));
+    const filePath = path.join(root, 'chunked.jsonl');
+    const large = `${'x'.repeat(65529)}😀汉字`;
+    fs.writeFileSync(filePath, `${JSON.stringify({ id: 1, value: large })}\r\n{broken}\n${JSON.stringify({ id: 3, value: '终😀' })}`, 'utf8');
+    const seen: number[] = [];
+    const result = readJsonl<{ id: number; value: string }>(filePath, (record) => {
+      seen.push(record.id);
+      if (record.id === 1) expect(record.value).toBe(large);
+      return record.id === 3;
+    });
+    expect(seen).toEqual([1, 3]);
+    expect(result.records).toEqual([{ id: 3, value: '终😀' }]);
+    expect(result.diagnostics).toMatchObject([{ line: 2 }]);
+    expect(() => assertNoJsonlDiagnostics(filePath, result.diagnostics)).toThrow(/JSONL corruption/);
+  });
+
+  it('does not swallow a domain validation rejection in the selector', () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-jsonl-'));
+    const filePath = path.join(root, 'invalid-schema.jsonl');
+    fs.writeFileSync(filePath, '{"schemaVersion":1}\n');
+    expect(() => readJsonl(filePath, () => { throw new Error('invalid context entry'); })).toThrow('invalid context entry');
+  });
 });

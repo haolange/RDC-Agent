@@ -1,6 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
+
+const frozenRequestPlan = createTestRequestPlan({ providerId: 'p', adapterId: 'openai-responses', catalogRevision: 'test', routeRevision: 'test',
+  selectedModelId: 'm', effectiveModelId: 'm', appliedBindingIds: [], route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test', source: 'catalog' },
+  headers: {}, bodyPatch: {}, contextBudgetTokens: 1000, contextMode: 'normal', contextWindowTokens: 1000, activeTierId: 'default', fastMode: false,
+  reasoningWire: { selection: 'off', control: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } } } });
 
 vi.mock('electron', () => ({
   app: {
@@ -151,6 +157,7 @@ describe('PromptPlanForTurn', () => {
       modelId: 'm',
       toolAllowlist: ['read_file'],
       contextWindowTokens: 1000,
+      requestPlan: frozenRequestPlan,
       capability: {
         providerId: 'p',
         modelId: 'm',
@@ -190,6 +197,7 @@ describe('PromptPlanForTurn', () => {
       modelId: 'm',
       toolAllowlist: ['shell'],
       contextWindowTokens: 1000,
+      requestPlan: frozenRequestPlan,
       capability: {
         providerId: 'p',
         modelId: 'm',
@@ -242,6 +250,7 @@ describe('PromptPlanForTurn', () => {
       modelId: 'm',
       toolAllowlist: ['read_file'],
       contextWindowTokens: 1000,
+      requestPlan: frozenRequestPlan,
       capability: {
         providerId: 'p',
         modelId: 'm',
@@ -282,6 +291,7 @@ describe('PromptPlanForTurn', () => {
       modelId: 'm',
       toolAllowlist: ['read_file'],
       contextWindowTokens: 1000,
+      requestPlan: frozenRequestPlan,
       capability: {
         providerId: 'p', modelId: 'm', label: 'M', aliases: [], enabled: true,
         route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test', source: 'catalog' },

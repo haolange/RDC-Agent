@@ -288,7 +288,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     });
   });
 
-  it('keeps maintained GPT-6 Sol and Luna executable when ChatGPT discovery omits them', () => {
+  it('keeps maintained GPT-6.1 Sol, GPT-6 Sol and Luna executable when ChatGPT discovery omits them', () => {
     const chatgpt = provider('chatgpt-account', 'OpenAIResponses');
     const request = buildEffectiveCatalogRequest(chatgpt);
     const discoveryModels = applyDiscoveryAuthority(chatgpt, [{
@@ -304,7 +304,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       },
     });
 
-    for (const modelId of ['gpt-6-sol', 'gpt-6-luna']) {
+    for (const modelId of ['gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna']) {
       const model = models.find((candidate) => candidate.modelId === modelId);
       expect(model, modelId).toMatchObject({
         availability: 'available',

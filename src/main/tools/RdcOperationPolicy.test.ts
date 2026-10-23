@@ -65,3 +65,38 @@ it('enforces exclusive selectors, timepoint conflicts and array budgets', () => 
   expect(() => validateRdcArguments({ state: 'capture_initial', event_id: 4 }, timepoint)).toThrow(/DENIED/);
   expect(() => validateRdcArguments({ state: 'current', event_id: 4 }, timepoint)).not.toThrow();
 });
+
+it('accepts frozen native trace PCs without allowing replay overrides or texture selectors', () => {
+  const item = definition({ name: 'rd.debug.run_to', namespace: 'debug', effects: ['shader_debug', 'replay_position'],
+    input_schema: { type: 'object', properties: { session_id: { type: 'string' }, shader_debug_id: { type: 'string' },
+      target: { type: 'object', properties: { pc: { type: 'integer', minimum: 0 } }, required: ['pc'], additionalProperties: false } },
+    required: ['session_id', 'shader_debug_id', 'target'], additionalProperties: false } });
+  const bound = context(item);
+  for (const pc of [0, 17]) {
+    expect(authorizeRdcOperation(item.name, { shader_debug_id: 'current-debugger', target: { pc } }, bound, 'owning-replay').args)
+      .toEqual({ session_id: 'owning-replay', shader_debug_id: 'current-debugger', target: { pc } });
+  }
+  for (const target of [{}, { texture_id: 'wrong-selector' }, { pc: -1 }, { pc: 1.5 }, { pc: true }, { pc: 17, session_id: 'foreign' }]) {
+    expect(() => authorizeRdcOperation(item.name, { shader_debug_id: 'current-debugger', target }, bound, 'owning-replay')).toThrow(/DENIED/);
+  }
+});
+
+it('enforces native PC breakpoint items and rejects unimplemented stepping modes', () => {
+  const breakpoints = definition({ name: 'rd.debug.set_breakpoints', namespace: 'debug', effects: ['shader_debug'],
+    input_schema: { type: 'object', properties: { session_id: { type: 'string' }, shader_debug_id: { type: 'string' },
+      breakpoints: { type: 'array', items: { type: 'object', properties: { pc: { type: 'integer', minimum: 0 } }, required: ['pc'], additionalProperties: false } } },
+    required: ['session_id', 'shader_debug_id', 'breakpoints'], additionalProperties: false } });
+  const bound = context(breakpoints);
+  expect(authorizeRdcOperation(breakpoints.name, { shader_debug_id: 'current-debugger', breakpoints: [{ pc: 0 }, { pc: 17 }] }, bound, 'owning-replay').args.session_id)
+    .toBe('owning-replay');
+  for (const points of [[{ pc: -1 }], [{ file: 'shader', line: 1 }], [{ pc: 17, contextId: 'foreign' }]]) {
+    expect(() => authorizeRdcOperation(breakpoints.name, { shader_debug_id: 'current-debugger', breakpoints: points }, bound, 'owning-replay')).toThrow(/DENIED/);
+  }
+  const step = definition({ name: 'rd.debug.step', namespace: 'debug', effects: ['shader_debug'],
+    input_schema: { type: 'object', properties: { session_id: { type: 'string' }, shader_debug_id: { type: 'string' }, step_mode: { type: 'string', enum: ['instruction'] } },
+    required: ['session_id', 'shader_debug_id'], additionalProperties: false } });
+  expect(() => authorizeRdcOperation(step.name, { shader_debug_id: 'current-debugger', step_mode: 'instruction' }, context(step), 'owning-replay')).not.toThrow();
+  for (const mode of ['line', 'over', 'out']) {
+    expect(() => authorizeRdcOperation(step.name, { shader_debug_id: 'current-debugger', step_mode: mode }, context(step), 'owning-replay')).toThrow(/DENIED/);
+  }
+});

@@ -43,6 +43,7 @@ import { countSubagentCalls, isAgentToolCallConcurrencySafe } from '../../agent-
 import type { ResolvedRuntimeTools, ToolExecutorRuntimeContext } from './orchestratorTypes';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { artifactizeToolResult } from '../../agent-runtime/tools/ToolResultArtifactizer';
+import { RdcNativeFailure } from '../../tools/RdcNativeProtocol';
 import { toolResourceArbiter, toolResourceKey } from './ToolResourceArbiter';
 
 export interface ToolExecutorFactoryDeps {
@@ -121,7 +122,9 @@ export class ToolExecutorFactory {
       : toolAllowlist;
     const tools = this.deps.resolveRuntimeTools(
       agentId,
-      [...effectiveToolAllowlist],
+      // Match the prepared schemas, including the tool_search closure. Building
+      // from the broader profile list advertises tools the frozen Skill forbids.
+      [...(plan?.skillIntersection ?? effectiveToolAllowlist)],
       sessionId,
       this.deps.getActiveTurn(sessionId),
       runtimeContext?.projectId ?? plan?.projectId,
@@ -377,17 +380,21 @@ export class ToolExecutorFactory {
           }
           // skill_read is discovery only. Armed-skill ∩ is frozen on prepareTurn
           // from profile.skills / composer $skill / /skills — not from a read.
-          const finalized = result.isError === true
+          const finalized = result.isError === true && toolCall.name !== 'code_interpreter'
             ? result
             : artifactizeToolResult({
                 sessionId: runtimeContext?.sessionId ?? sessionId,
                 toolCallId: toolCall.id,
                 toolName: toolCall.name,
                 result,
-                pinBelowThreshold: toolCall.name === 'shell'
+                pinBelowThreshold: (normalizedName === 'read_file' && (validatedToolCall.arguments.mode === 'audit'
+                  || validatedToolCall.arguments.pinEvidence === true))
+                  || toolCall.name === 'code_interpreter' || (toolCall.name === 'shell'
                   && typeof result.details === 'object' && result.details !== null
                   && 'operation' in result.details && typeof result.details.operation === 'string'
-                  && result.details.operation.startsWith('rd.'),
+                  && (result.details.operation.startsWith('rd.')
+                    || result.details.operation === 'rdc_tool.tools.search'
+                    || result.details.operation === 'rdc_tool.tools.describe')),
               });
           return this.agentToolResultToMessage(toolCall, finalized);
         } catch (error) {
@@ -396,6 +403,13 @@ export class ToolExecutorFactory {
             toolCallId: toolCall.id,
             error: error instanceof Error ? error.message : String(error),
           });
+          if (normalizedName === 'shell' && error instanceof RdcNativeFailure && error.deliveryResult) {
+            return this.agentToolResultToMessage(toolCall, artifactizeToolResult({
+              sessionId: runtimeContext?.sessionId ?? sessionId,
+              toolCallId: toolCall.id, toolName: toolCall.name,
+              result: error.deliveryResult, pinBelowThreshold: true,
+            }));
+          }
           return {
             role: 'toolResult',
             toolCallId: toolCall.id,

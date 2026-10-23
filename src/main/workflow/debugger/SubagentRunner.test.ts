@@ -455,7 +455,7 @@ describe('SubagentRunner', () => {
       .rejects.toThrow(/SUBAGENT_DELEGATE_DENIED/);
   });
 
-  it('rejects an invalid model without sending a child turn and retains its failure details', async () => {
+  it.each(['not-canonical', 'chatgpt-account/gpt-6-luna'])('rejects invalid model %s before dispatch and explains canonical routing', async (model) => {
     const start = vi.spyOn(delegationTraceStore, 'start').mockImplementation(() => {});
     const finish = vi.spyOn(delegationTraceStore, 'finish').mockImplementation(() => {});
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
@@ -469,11 +469,11 @@ describe('SubagentRunner', () => {
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
       capsule: testCapsule(),
-      model: 'not-canonical',
+      model,
       parentSessionId: 'owner',
     });
     expect(result.status).toBe('failed');
-    expect(result.text).toMatch(/MODEL_INVALID/);
+    expect(result.text).toMatch(/MODEL_INVALID.*providerId:modelId.*colon separator/);
     expect(sendProfileMessage).not.toHaveBeenCalled();
     expect(start).toHaveBeenCalledWith('owner', expect.objectContaining({ parentToolCallId: 'parent-tool', status: 'running' }));
     expect(finish).toHaveBeenCalledWith('owner', 'parent-tool', expect.any(String), 'failed', expect.stringMatching(/MODEL_INVALID/));

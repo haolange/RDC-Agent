@@ -70,7 +70,7 @@ describe('AgentPlanReviewRequestService', () => {
       freezeApprovedPlan: () => ({ uri: 'session://plans/plan-frozen.md', hash: 'b'.repeat(64) }),
     } as unknown as PlanArtifactWriter;
     const store = {
-      markDecision: () => ({ status: 'approved' }),
+      markDecision: () => ({ status: 'approved', updatedAt: 1234 }),
     } as unknown as PlanReviewStateStore;
     const service = new AgentPlanReviewRequestService(writer, store);
     const pending = service.request({

@@ -110,6 +110,8 @@ export interface ResolvedRuntimeTools {
 }
 
 export interface PreparedAgentRuntime {
+  /** Canonical prompt finalized before estimation, cache compilation and runtime fingerprinting. */
+  promptPlan: PromptPlan;
   runtimeTools: ResolvedRuntimeTools;
   activeToolDefinitions: ToolDefinition[];
   routeCapability: AgentRouteCapability;

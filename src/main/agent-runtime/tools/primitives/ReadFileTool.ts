@@ -2,11 +2,14 @@
  * ReadFileTool — 读取 workspace 内的文本文件。
  *
  * 支持按行 offset / limit 分段读取（offset 从 1 起，limit 默认 2000 行）。
- * 二进制 / `.rdc` / 超大文件 fail-closed；按行窗口流式读取避免整文件入内存。
+ * 默认文本读取拒绝二进制；显式 audit 核对有限大小的实际文件字节。
+ * `.rdc` / 超大文件始终 fail-closed；文本按行窗口流式读取。
  */
 
 import * as fs from 'fs';
+import { createHash } from 'node:crypto';
 import { recordSuccessfulFileRead } from './fileReadAccess';
+import { auditFiles, type FileAuditDetails, type FileAuditParams } from './fileAudit';
 import * as readline from 'readline';
 import type { AgentTool } from '../../agent/AgentTool';
 import { assertTextReadable, safeResolvePath, truncateOutput } from './_shared';
@@ -17,32 +20,45 @@ import {
   TEXT_FILE_MAX_BYTES,
 } from './toolLimits';
 
-interface ReadFileParams {
-  path: string;
+interface ReadFileParams extends FileAuditParams {
+  mode?: 'text' | 'audit';
+  pinEvidence?: boolean;
   offset?: number;
   limit?: number;
 }
 
 interface ReadFileDetails {
   path: string;
+  bytes: number;
+  sha256: string;
   totalLines: number;
   offset: number;
   limit: number;
   truncated: boolean;
 }
 
-export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails> = {
+export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails | FileAuditDetails> = {
   name: 'read_file',
   label: '读取文件',
   description:
-    'Read the contents of a text file in the workspace. A successful uncancelled read permits later edit_file or overwrite of this realpath in the same session. Supports line offset (1-based) and limit. Default limit is 2000 lines. Binary files and RenderDoc .rdc captures are rejected.',
+    'Read workspace text with whole-file SHA-256 and line windows. Default text mode rejects binary and grants read-before-edit after success. pinEvidence=true gives even a small returned window a durable session URI/hash for explicit delegation; it does not persist unread file content or grant child access. Explicit audit mode requires expectedHash, audits actual whole-file bytes (including binary), optionally compares a second hash-bound file and UTF-8 text with only CRLF converted to LF. Audit returns byte identities, first64-byte hex and bounded changed span, not domain validation or an edit grant. Both paths require read access. RenderDoc .rdc/magic always rejected; max8MiB per input. Audit forbids offset/limit.',
   parameters: {
     type: 'object',
     properties: {
+      pinEvidence: { type: 'boolean', description: 'Opt in to a durable URI/hash for the returned text window, including small diffs. Default false avoids extra artifacts. Whole-file hash and totalLines do not mean the displayed window is complete; inspect truncated and page all required content. Explicit child grants remain required.' },
       path: {
         type: 'string',
         description: 'Relative or absolute path inside the workspace.',
       },
+      mode: { type: 'string', enum: ['text', 'audit'], description: 'Default text; audit performs a bounded hash-bound whole-file computation without reading full content into model context.' },
+      expectedHash: { type: 'string', description: 'Audit only: exact input SHA-256, optional sha256: prefix; mismatch fails closed.' },
+      compareWith: {
+        type: 'object', additionalProperties: false,
+        properties: { path: { type: 'string' }, expectedHash: { type: 'string' } },
+        required: ['path', 'expectedHash'],
+        description: 'Audit only: second independently authorized, hash-bound input. Reports actual byte equality.',
+      },
+      textComparison: { type: 'boolean', description: 'Audit only: require valid NUL-free UTF-8, preserve BOM/bare CR, normalize only CRLF to LF. Return normalized hashes and common prefix/suffix line counts plus bounded middle spans. A truncated middle is not a full diff; hashes/equality still cover complete inputs.' },
       offset: {
         type: 'integer',
         description: 'Start line number (1-based, default: 1).',
@@ -62,6 +78,16 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails> = {
       throw new Error('Aborted');
     }
 
+    if (params.mode === 'audit') {
+      if (params.offset !== undefined || params.limit !== undefined) throw new Error('FILE_AUDIT_PAGING_DENIED');
+      const details = await auditFiles(params, context, signal);
+      return { content: [{ type: 'text', text: JSON.stringify(details) }], details };
+    }
+    if ((params.mode !== undefined && params.mode !== 'text') || params.expectedHash !== undefined
+      || params.compareWith !== undefined || params.textComparison !== undefined) {
+      throw new Error('FILE_READ_MODE_INVALID: audit options require explicit mode=audit.');
+    }
+
     const absolute = safeResolvePath(params.path, undefined, context);
     assertTextReadable(absolute, { maxBytes: TEXT_FILE_MAX_BYTES });
 
@@ -71,7 +97,7 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails> = {
       Math.min(READ_FILE_MAX_LIMIT, Math.floor(params.limit ?? READ_FILE_DEFAULT_LIMIT)),
     );
 
-    const { lines, totalLines, hitEof } = await readLineWindow(absolute, offset, limit, signal);
+    const { lines, totalLines, hitEof, bytes, sha256 } = await readLineWindow(absolute, offset, limit, signal);
     if (signal?.aborted) {
       throw new Error('Aborted');
     }
@@ -81,9 +107,10 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails> = {
       .map((line, i) => `${String(startIdx + i + 1).padStart(6, ' ')}→${line}`)
       .join('\n');
 
-    const text = truncateOutput(numbered, READ_FILE_MAX_OUTPUT_BYTES);
+    const display = `Whole file: ${bytes} bytes · sha256=${sha256}\nDisplayed ${lines.length} lines starting at ${offset} (line numbers are not file bytes).\n\n${numbered}`;
+    const text = truncateOutput(display, READ_FILE_MAX_OUTPUT_BYTES);
     const truncated =
-      Buffer.byteLength(numbered, 'utf8') > READ_FILE_MAX_OUTPUT_BYTES
+      Buffer.byteLength(display, 'utf8') > READ_FILE_MAX_OUTPUT_BYTES
       || !hitEof
       || lines.length < Math.min(limit, Math.max(0, totalLines - startIdx));
 
@@ -92,6 +119,8 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails> = {
       content: [{ type: 'text', text }],
       details: {
         path: absolute,
+        bytes,
+        sha256,
         totalLines,
         offset,
         limit,
@@ -106,8 +135,14 @@ async function readLineWindow(
   offset: number,
   limit: number,
   signal?: AbortSignal,
-): Promise<{ lines: string[]; totalLines: number; hitEof: boolean }> {
-  const stream = fs.createReadStream(absolute, { encoding: 'utf8' });
+): Promise<{ lines: string[]; totalLines: number; hitEof: boolean; bytes: number; sha256: string }> {
+  const hash = createHash('sha256');
+  let bytes = 0;
+  const stream = fs.createReadStream(absolute);
+  stream.on('data', (chunk: string | Buffer) => {
+    hash.update(chunk);
+    bytes += Buffer.byteLength(chunk);
+  });
   const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
   const lines: string[] = [];
   let lineNo = 0;
@@ -133,5 +168,7 @@ async function readLineWindow(
     lines,
     totalLines: lineNo,
     hitEof: lastCaptured >= lineNo,
+    bytes,
+    sha256: hash.digest('hex'),
   };
 }

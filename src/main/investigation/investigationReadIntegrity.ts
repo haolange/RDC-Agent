@@ -3,7 +3,7 @@ import type {
   InvestigationRecord,
   WorldState,
 } from '@shared/types/renderdocInvestigation';
-import { InvestigationError } from './investigationErrors';
+import { InvestigationError, toInvestigationError } from './investigationErrors';
 import { hashesEqual, sha256Prefixed } from './investigationHash';
 import { requireInvestigationKind } from './investigationKindRegistry';
 import {
@@ -29,6 +29,18 @@ export interface VerifiedIndexArtifact {
   record: InvestigationRecord;
   bodyHash: string;
   contentText: string;
+}
+
+export function parseVerifiedRecordBody<T>(entry: InvestigationIndexEntry, read: InvestigationContentRead): T {
+  if (read.truncated) {
+    throw new InvestigationError('INVESTIGATION_HASH_MISMATCH', 'contentRef read was truncated');
+  }
+  assertTripleContentHash(entry.contentHash, entry.contentHash, read.text, read.hash);
+  try {
+    return JSON.parse(read.text || '{}') as T;
+  } catch (error) {
+    throw toInvestigationError(error);
+  }
 }
 
 export function assertTripleContentHash(

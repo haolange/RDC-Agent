@@ -63,13 +63,14 @@ function sourcePathOf(attachment: AgentInputAttachment): string {
 
 export async function assertSafeImageAttachment(
   filePath: string,
-  declaredMimeType: string,
+  declaredMimeType: string | null,
   fileName: string,
 ): Promise<{ mimeType: string; size: number }> {
   if (declaredMimeType === 'image/svg+xml' || path.extname(filePath).toLowerCase() === '.svg') {
     throw new Error(`ATTACHMENT_MEDIA_UNSUPPORTED: ${fileName} (image/svg+xml)`);
   }
-  if (!NATIVE_IMAGE_MIME_TYPES.has(declaredMimeType)) {
+  if ((declaredMimeType === null && path.extname(filePath) !== '')
+    || (declaredMimeType !== null && !NATIVE_IMAGE_MIME_TYPES.has(declaredMimeType))) {
     throw new Error(`ATTACHMENT_MEDIA_UNSUPPORTED: ${fileName} (${declaredMimeType})`);
   }
   const handle = await fs.promises.open(filePath, 'r');
@@ -78,8 +79,9 @@ export async function assertSafeImageAttachment(
     const probeSize = Math.min(stats.size, 256 * 1024);
     const probe = Buffer.alloc(probeSize);
     await handle.read(probe, 0, probeSize, 0);
-    assertSafeImageBytes(fileName, declaredMimeType, probe);
-    return { mimeType: declaredMimeType, size: stats.size };
+    const mimeType = declaredMimeType ?? detectImageMagicMime(probe) ?? 'application/octet-stream';
+    assertSafeImageBytes(fileName, mimeType, probe);
+    return { mimeType, size: stats.size };
   } finally {
     await handle.close();
   }

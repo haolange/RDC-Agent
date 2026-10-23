@@ -1,9 +1,10 @@
+import { createHash } from 'node:crypto';
 import type { AgentTool } from '../../agent/AgentTool';
 import { assertPublicHttpUrl, fetchPinnedPublic } from '../../net/assertPublicHttpUrl';
-import { truncateOutput } from './_shared';
-import { WEB_MAX_REDIRECTS, WEB_MAX_RESPONSE_BYTES } from './toolLimits';
+import { WEB_MAX_REDIRECTS, WEB_MAX_RESPONSE_BYTES, WEB_MAX_SOURCE_BYTES } from './toolLimits';
+import { readWebTextPage, validateWebTextCursor, type WebTextCursor } from './WebTextPage';
 
-interface WebFetchParams {
+interface WebFetchParams extends WebTextCursor {
   url: string;
 }
 
@@ -18,6 +19,8 @@ interface WebFetchDetails {
   statusText: string;
   bytes: number;
   truncated: boolean;
+  sourceHash: string;
+  page: { offset: number; bytes: number; nextOffset?: number };
   title?: string;
 }
 
@@ -49,6 +52,7 @@ interface PublicTextResponse {
   bytes: number;
   truncated: boolean;
   text: string;
+  bodyHash: string;
 }
 
 interface SearchProvider {
@@ -77,7 +81,7 @@ const SEARCH_PROVIDERS: SearchProvider[] = [
 export const webFetchTool: AgentTool<WebFetchParams, WebFetchDetails> = {
   name: 'web_fetch',
   label: 'Fetch Web Page',
-  description: 'Fetch a public HTTP(S) URL as read-only text. Localhost, private networks, and oversized responses are blocked.',
+  description: 'Fetch a public UTF-8 HTTP(S) source (at most 2 MiB) in 160 KiB text pages. Results have a metadata block followed by the exact source-text block (stored artifact textPointer /content/1/text). Each call re-fetches the complete bounded source. Use page.nextOffset and the complete sourceHash as expectedSourceHash for continuation; changed bytes fail closed. offset counts UTF-16 code units, not bytes. A page is not complete source coverage. Localhost/private networks are blocked on every redirect.',
   parameters: {
     type: 'object',
     properties: {
@@ -85,6 +89,8 @@ export const webFetchTool: AgentTool<WebFetchParams, WebFetchDetails> = {
         type: 'string',
         description: 'Public http or https URL to fetch.',
       },
+      offset: { type: 'integer', minimum: 0, description: 'UTF-16 offset from page.nextOffset; omit for the first page.' },
+      expectedSourceHash: { type: 'string', pattern: '^[a-fA-F0-9]{64}$', description: 'SHA-256 of the complete fetched UTF-8 source, required for a nonzero offset. This is not the tool-output artifact hash.' },
     },
     required: ['url'],
   },
@@ -92,9 +98,9 @@ export const webFetchTool: AgentTool<WebFetchParams, WebFetchDetails> = {
   permissionHint: 'readonly',
 
   async execute(_toolCallId, params, signal) {
-    const result = await fetchPublicText(params.url, signal);
+    const result = await fetchPublicText(params, signal);
     return {
-      content: [{ type: 'text', text: result.contentText }],
+      content: [{ type: 'text', text: result.contentText }, { type: 'text', text: result.sourceText }],
       details: result.details,
     };
   },
@@ -133,28 +139,39 @@ function extractHtmlTitle(text: string): string | undefined {
   return title ? title.slice(0, 160) : undefined;
 }
 
-async function fetchPublicText(rawUrl: string, signal?: AbortSignal): Promise<{
+async function fetchPublicText(params: WebFetchParams, signal?: AbortSignal): Promise<{
   contentText: string;
+  sourceText: string;
   details: WebFetchDetails;
 }> {
-  const response = await requestPublicText(rawUrl, signal, 'text/plain,text/markdown,text/html,application/json;q=0.9,*/*;q=0.5');
+  const cursor = validateWebTextCursor(params);
+  const response = await requestPublicText(params.url, signal, 'text/plain,text/markdown,text/html,application/json;q=0.9,*/*;q=0.5', WEB_MAX_SOURCE_BYTES);
+  if (response.truncated) throw new Error(`Web source exceeds the ${WEB_MAX_SOURCE_BYTES} byte source limit.`);
+  if (createHash('sha256').update(response.text, 'utf8').digest('hex') !== response.bodyHash) {
+    throw new Error('Web source is not valid UTF-8; replacement text is not original source evidence.');
+  }
+  const selected = readWebTextPage(response.text, response.bodyHash, cursor);
   const title = extractHtmlTitle(response.text);
   return {
     contentText: [
       `URL: ${response.finalUrl}`,
       title ? `Title: ${title}` : '',
       `Status: ${response.status} ${response.statusText}`,
-      response.truncated ? `[truncated at ${MAX_RESPONSE_BYTES} bytes]` : '',
-      '',
-      truncateOutput(response.text, MAX_RESPONSE_BYTES),
+      `Source: ${response.bytes} bytes; sha256:${response.bodyHash}`,
+      `Page: UTF-16 offset ${selected.page.offset}; ${selected.page.bytes} UTF-8 bytes`,
+      selected.truncated ? `Continue: offset=${selected.page.nextOffset}; expectedSourceHash=${response.bodyHash}` : 'End of source.',
+      'Exact source page follows in the second text block; artifact textPointer: /content/1/text.',
     ].filter(Boolean).join('\n'),
+    sourceText: selected.text,
     details: {
       kind: 'fetch',
       url: response.finalUrl,
       status: response.status,
       statusText: response.statusText,
       bytes: response.bytes,
-      truncated: response.truncated,
+      truncated: selected.truncated,
+      sourceHash: response.bodyHash,
+      page: selected.page,
       ...(title ? { title } : {}),
     },
   };
@@ -218,17 +235,20 @@ async function searchPublicWeb(query: string, signal?: AbortSignal): Promise<{
   throw new Error(`Web search failed for "${query}". ${failures.join(' | ')}`);
 }
 
-async function requestPublicText(rawUrl: string, signal?: AbortSignal, accept = '*/*'): Promise<PublicTextResponse> {
+async function requestPublicText(rawUrl: string, signal?: AbortSignal, accept = '*/*', responseLimit = MAX_RESPONSE_BYTES): Promise<PublicTextResponse> {
+  if (signal?.aborted) throw signal.reason ?? new Error('Request aborted');
   let current = await assertPublicHttpUrl(rawUrl);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(new Error(`Timed out after ${REQUEST_TIMEOUT_MS}ms`)), REQUEST_TIMEOUT_MS);
   const abort = (): void => controller.abort(signal?.reason ?? new Error('Request aborted'));
-  signal?.addEventListener('abort', abort, { once: true });
+  if (signal?.aborted) abort();
+  else signal?.addEventListener('abort', abort, { once: true });
   try {
     for (let hop = 0; hop <= WEB_MAX_REDIRECTS; hop += 1) {
       const response = await fetchPinnedPublic(current, {
         redirect: 'manual',
         signal: controller.signal,
+        maxResponseBytes: WEB_MAX_SOURCE_BYTES,
         headers: {
           Accept: accept,
           'User-Agent': 'RDC-Agent/AskReadonlyWebTool',
@@ -243,7 +263,7 @@ async function requestPublicText(rawUrl: string, signal?: AbortSignal, accept = 
         current = await assertPublicHttpUrl(next);
         continue;
       }
-      const { bytes, text, truncated } = await readResponseBodyLimited(response, MAX_RESPONSE_BYTES);
+      const { bytes, text, truncated, bodyHash } = await readResponseBodyLimited(response, responseLimit);
       return {
         finalUrl: current.href,
         status: response.status,
@@ -251,6 +271,7 @@ async function requestPublicText(rawUrl: string, signal?: AbortSignal, accept = 
         bytes,
         truncated,
         text,
+        bodyHash,
       };
     }
     throw new Error(`Too many redirects (>${WEB_MAX_REDIRECTS}) starting from ${rawUrl}`);
@@ -265,9 +286,9 @@ async function requestPublicText(rawUrl: string, signal?: AbortSignal, accept = 
 async function readResponseBodyLimited(
   response: Response,
   maxBytes: number,
-): Promise<{ bytes: number; text: string; truncated: boolean }> {
+): Promise<{ bytes: number; text: string; truncated: boolean; bodyHash: string }> {
   if (!response.body) {
-    return { bytes: 0, text: '', truncated: false };
+    return { bytes: 0, text: '', truncated: false, bodyHash: createHash('sha256').digest('hex') };
   }
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -306,7 +327,8 @@ async function readResponseBodyLimited(
   return {
     bytes: total,
     truncated,
-    text: new TextDecoder('utf-8', { fatal: false }).decode(merged),
+    text: new TextDecoder('utf-8', { fatal: false, ignoreBOM: true }).decode(merged),
+    bodyHash: createHash('sha256').update(merged).digest('hex'),
   };
 }
 

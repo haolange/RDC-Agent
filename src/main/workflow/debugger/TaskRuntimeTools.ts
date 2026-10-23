@@ -5,6 +5,8 @@ import { generateEventId, nowMs } from '@shared/utils/id';
 import type { TurnHandle } from './TurnCoordinator';
 import { sessionArtifactResolver } from '../../sessions/SessionArtifactResolver';
 import { bindTaskRootBudget } from './TaskRootBudget';
+import { readLiveTaskBudget } from './TaskRuntimeBudgetView';
+import { requestSnapshotStore } from '../../agent-runtime/prompt/RequestSnapshotStore';
 
 export function createTaskRuntimeTools(input: {
   sessionId?: string | null;
@@ -45,17 +47,19 @@ export function createTaskRuntimeTools(input: {
   const recovery = registry.reconcileInterruptedExecutions();
   const tools = createTaskTools(registry, {
     scopeRootTaskId: delegatedScope?.rootTaskId,
+    readLiveBudget: (rootBudgetId) => readLiveTaskBudget(input.turnHandle ?? input.getActiveTurn(resolvedSessionId), rootBudgetId),
+    readRequestUsage: resolvedSessionId ? () => requestSnapshotStore.readUsage(resolvedSessionId) : undefined,
     requestCurrentTurnStop: () => false,
     getCreationTurnRef: () => {
       const turn = input.turnHandle ?? input.getActiveTurn(resolvedSessionId);
       return turn?.turnId ? `turn:${turn.turnId}:generation:${turn.generation}` : undefined;
     },
-    startOptions: async () => {
+    startOptions: async (taskId) => {
       const turn = input.turnHandle ?? input.getActiveTurn(resolvedSessionId);
-      const scopedExecutions = await registry.listExecutions();
+      const scopedExecutions = await registry.listExecutions(taskId);
       const priorRootBudgetId = delegatedScope?.executionId
         ? (await registry.getExecution(delegatedScope.executionId))?.rootBudgetId
-        : scopedExecutions.filter((execution) => execution.mode === 'direct').at(-1)?.rootBudgetId;
+        : scopedExecutions.at(-1)?.rootBudgetId;
       const rootBudgetId = turn?.policyBudget && ownerSessionId
         ? await bindTaskRootBudget(registry, ownerSessionId, turn.policyBudget, priorRootBudgetId)
         : undefined;

@@ -10,6 +10,7 @@ import {
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/SessionArtifactResolver';
 import { delegatedArtifactOwner, grantDelegatedOutput } from '../../sessions/DelegatedArtifactAccess';
 import { ToolResultSummarizer } from './ToolResultSummarizer';
+import { storeToolImage } from './ToolImageArtifact';
 
 const summarizer = new ToolResultSummarizer();
 
@@ -67,6 +68,27 @@ function failClosed(code: string, message: string): AgentToolResult {
     content: [{ type: 'text', text: message.startsWith(code) ? message : `${code}: ${message}` }],
     isError: true,
     details: { code, artifactized: false },
+  };
+}
+
+function persistenceFailure(input: ArtifactizeToolResultInput, code: string, message: string, serialized: string): AgentToolResult {
+  // The effect has already returned. A delivery failure must not erase that fact
+  // or invite a second mutation/cleanup. This remains an error, never evidence.
+  const inline = Buffer.byteLength(serialized, 'utf8') <= TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES;
+  const detailsInline = Buffer.byteLength(JSON.stringify(input.result.details ?? null), 'utf8') <= 8 * 1024;
+  const summary = summarizer.trySummarize(input.toolName, input.result, 400);
+  const diagnostic = `${code}: ${message}\nTool execution already returned ${input.result.isError === true ? 'an error' : 'successfully'}; artifact persistence failed. Do not repeat the operation solely because of this persistence error. This offload created no tool-result artifact reference. Verify any separately returned execution receipt independently.`;
+  return {
+    isError: true,
+    content: [
+      { type: 'text', text: diagnostic },
+      ...(inline ? input.result.content : [{ type: 'text' as const, text: (summary ?? 'Full execution result unavailable: artifact persistence failed.').slice(0, 1024) }]),
+    ],
+    details: {
+      code, artifactized: false,
+      executionResult: { isError: input.result.isError === true, inline, detailsInline },
+      ...(detailsInline ? { originalDetails: input.result.details ?? null } : {}),
+    },
   };
 }
 
@@ -131,34 +153,36 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
   const resolver = input.resolver ?? sessionArtifactResolver;
   const mimeType = 'application/json';
   const createdImages: Array<{ uri: string; hash: string }> = [];
+  const imageReferences: Array<{ uri: string; hash: string }> = [];
   let manifestWritten = false;
 
   try {
     // Keep image bytes as native image artifacts. Embedding base64 in the JSON
     // envelope applies the text-file cap to an otherwise valid raster and makes
     // read_image fail before its pixels can reach the model.
-    const storedContent = result.content.map((block, index) => {
+    const storedContent = result.content.map((block) => {
       if (block.type !== 'image' || !block.data) return block;
       const extension = IMAGE_EXTENSION[block.mimeType];
       if (!extension) throw new SessionArtifactError('ARTIFACT_MIME_DENIED', `unsupported image MIME: ${block.mimeType}`);
-      const imageUri = formatSessionArtifactUri('tool-outputs', `${childPrefix}${toolCallId}-image-${index}.${extension}`);
-      if (fs.existsSync(resolver.resolve(ownerSessionId, imageUri).absolutePath)) {
-        throw new SessionArtifactError('ARTIFACT_WRITE_FAILED', `image artifact already exists: ${imageUri}`);
-      }
       const bytes = Buffer.from(block.data, 'base64');
-      const written = resolver.write(ownerSessionId, imageUri, bytes, { mimeType: block.mimeType });
-      createdImages.push({ uri: written.uri, hash: written.hash });
+      const written = storeToolImage(resolver, ownerSessionId, childPrefix, extension, block.mimeType, bytes);
+      if (written.created) createdImages.push({ uri: written.uri, hash: written.hash });
+      imageReferences.push({ uri: written.uri, hash: written.hash });
       return { type: 'image', ref: written.uri, hash: written.hash, mimeType: block.mimeType, bytes: bytes.length };
     });
     const { envelope, record } = serializeEnvelope(ownerSessionId, input.toolName, input.toolCallId || toolCallId, result, storedContent);
     const written = resolver.write(ownerSessionId, uri, Buffer.from(envelope, 'utf8'), { mimeType });
     manifestWritten = true;
-    for (const image of createdImages) grantDelegatedOutput(sessionId, image.uri, image.hash);
+    for (const image of imageReferences) grantDelegatedOutput(sessionId, image.uri, image.hash);
     grantDelegatedOutput(sessionId, written.uri, written.hash);
+    const imageEvidenceText = imageReferences.length
+      ? '\nImage evidence (grant each exact URI explicitly to a reviewer; the result wrapper does not grant pixels):\n'
+        + imageReferences.map(image => `${image.uri}\nsha256:${image.hash}`).join('\n')
+      : '';
     if (belowThreshold) {
       return {
         ...result,
-        content: [...result.content, { type: 'text', text: `Evidence ref: ${written.uri}\nhash: ${written.hash}` }],
+        content: [...result.content, { type: 'text', text: `Evidence ref: ${written.uri}\nhash: ${written.hash}${imageEvidenceText}` }],
         details: { ...(typeof result.details === 'object' && result.details !== null ? result.details : {}),
           evidenceArtifact: { ref: written.uri, hash: written.hash, owner: record.owner, ownerScope: record.ownerScope, source: record.source } },
       };
@@ -173,7 +197,7 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
     return {
       isError: result.isError,
       content: [
-        { type: 'text', text: `${summary}\nref: ${written.uri}\nhash: ${written.hash}` },
+        { type: 'text', text: `${summary}\nref: ${written.uri}\nhash: ${written.hash}${imageEvidenceText}` },
         ...imageBlocks,
       ],
       details: {
@@ -191,11 +215,12 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
   } catch (error) {
     if (!manifestWritten) removeIncompleteImageArtifacts(resolver, ownerSessionId, createdImages);
     if (error instanceof SessionArtifactError) {
-      return failClosed(error.code, error.message);
+      return persistenceFailure(input, error.code, error.message, serialized);
     }
-    return failClosed(
+    return persistenceFailure(input,
       'ARTIFACT_WRITE_FAILED',
       error instanceof Error ? error.message : String(error),
+      serialized,
     );
   }
 }

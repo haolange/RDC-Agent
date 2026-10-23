@@ -12,6 +12,8 @@ export function executionReceiptFixtures(sessionId: string, experimentId: string
     return { schemaVersion: 1, sessionId, projectId: 'project-fixture', turnId: 'turn-fixture', toolCallId: phase,
       experimentId, contextId: 'context-fixture', leaseVersion: 1, replaySessionId: 'replay-fixture',
       definitionsFingerprint: 'a'.repeat(64),
+      processIdentity: { status: 'available', daemon: { pid: 31, start_generation: 'windows-filetime:100' },
+        worker: { pid: 32, start_generation: 'windows-filetime:200' } },
       evidence: phase === 'intervention' ? { kind: 'intervention', replacementId: 'replacement-fixture' }
         : phase === 'rollback' ? { kind: 'rollback', replacementId: 'replacement-fixture' }
           : { kind: 'measurement', method: 'event_durations', conditionsFingerprint: 'b'.repeat(64), values: [2] },

@@ -1,4 +1,7 @@
 export const enSidebar = {
+  'sidebar.projectPath': 'Absolute project directory path',
+  'sidebar.projectPathHint': 'Enter an existing project directory. Adding it does not copy project files.',
+  'sidebar.browseDirectory': 'Browse directory',
   'sidebar.newTask': 'New Task',
   'sidebar.sessionHistory': 'Session History',
   'sidebar.history': 'History',

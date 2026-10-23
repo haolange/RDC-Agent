@@ -20,14 +20,16 @@ import {
   type WorldState,
 } from '@shared/types/renderdocInvestigation';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { readCompleteInvestigationArtifact } from './investigationArtifactRead';
 import { SessionArtifactResolver, sessionArtifactResolver } from '../sessions/SessionArtifactResolver';
 import { InvestigationError, isInvestigationStoreDegraded, toInvestigationError } from './investigationErrors';
 import {
   collectStalePropagation,
   collectSupersededWorldStateDependents,
   collectSupersede,
-  retiredClaimIdsForReplacement,
+  retiredRecordKeysForReplacement,
   upsertIndexEntry,
+  withPendingInvestigationMutations,
 } from './investigationArtifactMutations';
 import {
   commitInvestigationTxn,
@@ -59,6 +61,7 @@ import { requireInvestigationKind } from './investigationKindRegistry';
 import {
   assertInvestigationIndexIntegrity,
   assertTripleContentHash,
+  parseVerifiedRecordBody,
 } from './investigationReadIntegrity';
 import { InvestigationReadRepair } from './investigationReadRepair';
 import {
@@ -200,23 +203,24 @@ export class InvestigationArtifactService {
       this.parseManifest(manifest);
     }
     const mutations: InvestigationTxnMutation[] = [];
+    const mutationReader = withPendingInvestigationMutations(this.mutationReader(sessionId), mutations);
     let workingIndex = this.readIndexSnapshot(sessionId);
     if (isolation.markEvidenceStaleFor) {
-      const stale = collectStalePropagation(this.mutationReader(sessionId), isolation.markEvidenceStaleFor, workingIndex);
+      const stale = collectStalePropagation(mutationReader, isolation.markEvidenceStaleFor, workingIndex);
       mutations.push(...stale.mutations);
       workingIndex = stale.index;
     }
     let supersededArtifactId: string | undefined;
     if (manifest.supersedes) {
       const replaced = workingIndex.artifacts.find((entry) => entry.artifactId === manifest.supersedes);
-      const retiredClaimIds = retiredClaimIdsForReplacement(this.mutationReader(sessionId), replaced, kindEntry.kind, parsed);
-      const superseded = collectSupersede(this.mutationReader(sessionId), manifest.supersedes, workingIndex, retiredClaimIds);
+      const retiredRecordKeys = retiredRecordKeysForReplacement(mutationReader, replaced, kindEntry.kind, parsed);
+      const superseded = collectSupersede(mutationReader, manifest.supersedes, workingIndex, retiredRecordKeys);
       mutations.push(...superseded.mutations);
       workingIndex = superseded.index;
       supersededArtifactId = superseded.artifactId;
       if (kindEntry.kind === 'world_state' && replaced?.kind === 'world_state'
         && replaced.recordKey !== (parsed as WorldState).worldStateId) {
-        const stale = collectSupersededWorldStateDependents(this.mutationReader(sessionId), replaced.recordKey, workingIndex);
+        const stale = collectSupersededWorldStateDependents(mutationReader, replaced.recordKey, workingIndex);
         mutations.push(...stale.mutations);
         workingIndex = stale.index;
       }
@@ -250,11 +254,13 @@ export class InvestigationArtifactService {
 
   readRecord(sessionId: string | null | undefined, artifactId: string, expectedHash?: string): InvestigationReadResult {
     this.assertSession(sessionId);
-    return this.withSessionLock(sessionId, () => this.readRecordLocked(sessionId, artifactId, expectedHash));
+    return this.withSessionLock(sessionId, () => {
+      this.readRepair.reconcileSupersededRecordDependents(sessionId);
+      return this.readReconciledRecord(sessionId, artifactId, expectedHash);
+    });
   }
 
-  private readRecordLocked(sessionId: string, artifactId: string, expectedHash?: string): InvestigationReadResult {
-    this.readRepair.reconcileSupersededRecordDependents(sessionId);
+  private readReconciledRecord(sessionId: string, artifactId: string, expectedHash?: string): InvestigationReadResult {
     const entry = this.findIndexEntry(sessionId, artifactId);
     if (!entry) {
       throw new InvestigationError('INVESTIGATION_NOT_FOUND', artifactId);
@@ -309,9 +315,10 @@ export class InvestigationArtifactService {
     return entries;
     });
   }
-  /** One transaction-locked, integrity-checked view for context archiving. */
+  /** Reconcile the graph once per locked archive; each body still receives full integrity checks. */
   readAllRecords(sessionId: string | null | undefined): InvestigationReadResult[] {
-    this.assertSession(sessionId); return this.withSessionLock(sessionId, () => this.list(sessionId).map(entry => this.readRecord(sessionId, entry.artifactId)));
+    this.assertSession(sessionId); return this.withSessionLock(sessionId, () =>
+      this.list(sessionId).map(entry => this.readReconciledRecord(sessionId, entry.artifactId)));
   }
   listForProjection(sessionId: string | null | undefined): {
     artifacts: InvestigationIndexEntry[];
@@ -679,6 +686,8 @@ export class InvestigationArtifactService {
   private findRecord<T>(sessionId: string, kind: InvestigationArtifactKind, recordKey: string): T | null {
     const live = this.readIndex(sessionId).artifacts.filter((entry) => entry.status !== 'superseded');
     const standalone = live.filter((entry) => entry.kind === kind && entry.recordKey === recordKey).at(-1);
+    // Historical lifecycle records stay readable by artifact ID, not as current semantic refs.
+    if (standalone?.status === 'stale' && (kind === 'challenge' || kind === 'experiment')) return null;
     if (standalone) return this.readRecordBody<T>(sessionId, standalone);
     const packKind = kind === 'claim' ? 'claim_set' : kind === 'evidence' ? 'evidence_pack' : undefined;
     if (!packKind) return null;
@@ -694,16 +703,7 @@ export class InvestigationArtifactService {
 
   private readRecordBody<T>(sessionId: string, entry: InvestigationIndexEntry): T {
     const read = this.readArtifact(sessionId, entry.contentUri);
-    if (read.truncated) {
-      throw new InvestigationError('INVESTIGATION_HASH_MISMATCH', 'contentRef read was truncated');
-    }
-    const contentText = read.text ?? '';
-    assertTripleContentHash(entry.contentHash, entry.contentHash, contentText, read.hash);
-    try {
-      return JSON.parse(contentText || '{}') as T;
-    } catch (error) {
-      throw toInvestigationError(error);
-    }
+    return parseVerifiedRecordBody<T>(entry, { ...read, text: read.text ?? '' });
   }
 
   private findIndexEntry(sessionId: string, artifactId: string): InvestigationIndexEntry | undefined {
@@ -880,7 +880,7 @@ export class InvestigationArtifactService {
     options?: { expectedHash?: string },
   ) {
     try {
-      return this.resolver.read(sessionId, uri, options);
+      return readCompleteInvestigationArtifact(this.resolver, sessionId, uri, options);
     } catch (error) {
       if (error instanceof SessionArtifactError) throw error;
       throw toInvestigationError(error);

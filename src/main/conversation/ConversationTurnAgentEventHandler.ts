@@ -6,15 +6,14 @@ import type {
   ConversationMessageDiagnostic,
   ConversationThinkingStatus,
   ConversationToolCall,
-  ConversationToolImagePreviewRef,
   ConversationTaskSnapshotItem,
   ConversationWorkTrace,
 } from '@shared/types/conversation';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
 import { nowMs } from '@shared/utils/id';
 import type { ToolCallResult } from '@shared/types/tool';
+import { buildConversationToolCompletion } from './ConversationToolCompletion';
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
-import { extractConversationToolResourceRefs } from './ConversationToolResourceRefs';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { redactCredentialLikeText, redactSecretsDeep } from '../runtime/secretRedaction';
@@ -627,33 +626,12 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               if (isPlanArtifactTool && result?.ok) {
                 pendingContinuation.planReview = false;
               }
-              const toolCallPatch: Partial<ConversationToolCall> & { id: string; toolName: string } = {
-                id: String(event.payload.toolCallId),
-                toolName: String(event.payload.toolName),
-                status: result?.ok ? 'complete' : 'error',
-                error: result?.ok ? undefined : result?.error?.message,
-                completedAt: nowMs(),
-              };
-              if (normalizeToolName(String(event.payload.toolName)) === 'subagent') {
-                const existing = turnStreamState.assistantMessage.workTrace?.blocks.flatMap((block) => block.toolCalls)
-                  .find((call) => call.id === toolCallPatch.id);
-                const details = (result?.data?.details ?? result?.error?.details) as Record<string, unknown> | undefined;
-                toolCallPatch.delegation = {
-                  task: existing?.delegation?.task ?? '',
-                  profile: existing?.delegation?.profile ?? String(details?.profile ?? 'general'),
-                  mode: existing?.delegation?.mode ?? 'wait',
-                  executionId: typeof details?.executionId === 'string' ? details.executionId : existing?.delegation?.executionId,
-                  generation: typeof details?.generation === 'number' ? details.generation : existing?.delegation?.generation,
-                };
-              }
-              const resourceRefs = extractConversationToolResourceRefs(String(event.payload.toolName), result);
-              if (resourceRefs.length > 0) toolCallPatch.resourceRefs = resourceRefs;
-              const imagePreviews = extractToolImagePreviews(result);
-              if (imagePreviews.length > 0) toolCallPatch.imagePreviews = imagePreviews;
-              if (!(isAskUserTool && result?.ok) && !(isPlanArtifactTool && result?.ok)) {
-                const preview = buildToolResultPreview(event.payload.result ?? {});
-                toolCallPatch.resultPreview = toolCallPatch.delegation ? redactCredentialLikeText(preview) : preview;
-              }
+              const toolCallId = String(event.payload.toolCallId);
+              const existing = turnStreamState.assistantMessage.workTrace?.blocks.flatMap((block) => block.toolCalls)
+                .find((call) => call.id === toolCallId);
+              const toolCallPatch = buildConversationToolCompletion(
+                toolCallId, String(event.payload.toolName), result, existing, nowMs(),
+              );
               const loopScopedCompleted = isLoopTool(String(event.payload.toolName));
               commitAssistantMessage('message_patched', {
                 workTrace: upsertRuntimeToolCall(
@@ -788,30 +766,6 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               turnStreamState.runWasCancelled = true;
             }
   };
-}
-
-function extractToolImagePreviews(result: ToolCallResult | undefined): ConversationToolImagePreviewRef[] {
-  const details = result?.data && typeof result.data === 'object' && !Array.isArray(result.data)
-    ? (result.data as { details?: unknown }).details
-    : undefined;
-  const raw = details && typeof details === 'object' && !Array.isArray(details)
-    ? (details as { imagePreviews?: unknown }).imagePreviews
-    : undefined;
-  if (!Array.isArray(raw)) return [];
-  return raw.flatMap((entry) => {
-    if (!entry || typeof entry !== 'object') return [];
-    const record = entry as Record<string, unknown>;
-    if (typeof record.previewId !== 'string' || typeof record.fileName !== 'string' || typeof record.mimeType !== 'string') {
-      return [];
-    }
-    return [{
-      previewId: record.previewId,
-      fileName: record.fileName,
-      mimeType: record.mimeType,
-      width: typeof record.width === 'number' ? record.width : undefined,
-      height: typeof record.height === 'number' ? record.height : undefined,
-    }];
-  });
 }
 
 function normalizeTaskSnapshotItems(payload: {

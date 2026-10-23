@@ -571,7 +571,6 @@ isMissionForbiddenToolId
 isMissionPlanOnlyToolId
 isMissionProfileId
 isNamedReasoningLevel
-isPlanOnlyConflictSkill
 isRdcLeaseToolName
 isReasoningSelection
 isRendererEventChannel
@@ -791,7 +790,6 @@ parseSessionArtifactUri
 parseYaml
 PhaseGroupNode
 PhaseKind
-PLAN_ONLY_CONFLICT_SKILL_IDS
 PLAN_REVIEW_STATE_SCHEMA
 PlanApi
 PlanApprovalTokenRequest
@@ -892,6 +890,7 @@ ProviderToolLoopContractSchema
 RawAuditRef
 RawChannelSubscriptionApi
 RDC_LEASE_TOOL_IDS
+RDC_OPERATION_MANUAL_SKILL_IDS
 RDC_PROBE_ACTION_SET
 RDC_PROBE_ACTIONS
 RDC_PROBE_READONLY_CLI_ACTION_SET

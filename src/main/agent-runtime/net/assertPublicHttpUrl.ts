@@ -71,6 +71,8 @@ export async function assertPublicHttpUrl(rawUrl: string): Promise<PinnedPublicH
 }
 
 export type PinnedFetchInit = {
+  /** Enforced while receiving, before buffering the complete response. */
+  maxResponseBytes: number;
   method?: string;
   headers?: Record<string, string>;
   body?: string | Buffer | null;
@@ -84,8 +86,11 @@ export type PinnedFetchInit = {
  */
 export async function fetchPinnedPublic(
   pinned: PinnedPublicHttpUrl,
-  init: PinnedFetchInit = {},
+  init: PinnedFetchInit,
 ): Promise<Response> {
+  if (!Number.isSafeInteger(init.maxResponseBytes) || init.maxResponseBytes <= 0) {
+    throw new Error('Pinned HTTP response byte limit must be a positive safe integer.');
+  }
   const url = new URL(pinned.href);
   const isHttps = pinned.protocol === 'https:';
   const lib = isHttps ? https : http;
@@ -132,10 +137,25 @@ export async function fetchPinnedPublic(
       },
       (incoming) => {
         const chunks: Buffer[] = [];
+        let receivedBytes = 0;
+        let exceeded = false;
         incoming.on('data', (chunk: Buffer) => {
-          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          if (exceeded) return;
+          const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          receivedBytes += bytes.length;
+          if (receivedBytes > init.maxResponseBytes) {
+            exceeded = true;
+            chunks.length = 0;
+            const error = new Error(`Public response exceeds the ${init.maxResponseBytes} byte source limit.`);
+            incoming.destroy(error);
+            request.destroy(error);
+            reject(error);
+            return;
+          }
+          chunks.push(bytes);
         });
         incoming.on('end', () => {
+          if (exceeded) return;
           const body = Buffer.concat(chunks);
           const headerEntries: [string, string][] = [];
           for (const [key, value] of Object.entries(incoming.headers)) {

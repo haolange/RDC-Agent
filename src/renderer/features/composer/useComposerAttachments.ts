@@ -5,7 +5,8 @@ import type { PendingAttachmentDraft } from '../../types/attachments';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import { attachmentRejectKey, COMPOSER_MAX_ATTACHMENT_COUNT, isAttachmentStageOverflow } from './attachmentRejectCopy';
 import { buildComposerSessionScopeKey } from '../../lib/composerSessionScope';
-import { descriptorToDraft, filesToStageItems, isBrowserAppSession } from './composerAttachmentIngest';
+import { descriptorToDraft, filesToStageItems } from './composerAttachmentIngest';
+import { isBrowserAppSession } from '../../platform/browserSession';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

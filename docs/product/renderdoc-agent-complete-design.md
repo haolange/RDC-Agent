@@ -230,6 +230,10 @@ Confidence 与 Verification **分离**，禁止用单个 `0.92` 代替二者。
 | `benchmark` | 已测量时记录 warmup、分辨率、vsync、采样协议；Debugger/Analyzer 未进行 benchmark 时明确记 `{ status: 'not_measured', reason }`，不可填造数值。Optimizer 仍要求已测量配置 |
 | `validity` | `valid` / `stale` / `polluted` / `unknown` |
 
+`shaderReplacement` 和 `patchStack` 是证据状态字段，不要求两个独立的变更系统或枚举 API。同一真实替换登记可以同时支持当前替换与应用顺序，但须以实际实现和对应状态的原始枚举证明覆盖，不能只按字段名推断。其他变更路径只在冻结目录、权限和实现确实可达时成为控制项；经证明不存在的路径记录不适用及依据，存在但未核实或枚举失败的状态仍为 unknown。缺少独立接口不能自动推导另一套未知状态，也不能替代三状态取证、五阶段签名或恢复验证。已批准计划若误设了不适用前置，应按正常回评修订，不在执行中绕过计划。
+
+最小区分实验的进入条件是实际对象／源材料绑定、受限且有语义依据的干预集合、可区分预测以及充分控制与恢复；集合的全局数学最小性、元素的动态必要性和交互机制可以是待检验假设，不要求事先取得实验才可能提供的结论。未检验的主张保持相应证据等级，不降低安全前置或将干预响应直接升级为根因。
+
 旧 patch 状态下的 timing **不得**当 baseline。未持有 exclusive lock 的 mutate 使后续 Evidence `stale` 或 World State `polluted`。
 
 ### 8.3 `EvidenceRecord`
@@ -312,6 +316,8 @@ Trigger · Fault Location · Failure Mechanism · Propagation
 
 Shader Replace 事务：Clean Baseline → Begin Experiment → Apply Patch → Verify Compilation → Replay → Record → Rollback → Verify Baseline Restored。后续 Task **不得**默认继承上一实验的 shader 状态。引用解析：`hypothesisClaimId` → `ClaimRecord`；三个 world state id → `WorldState`；`rollback.verifyEvidenceIds` → `EvidenceRecord`。
 
+计划含条件性的最终画质或设备验收时，必须在冻结策略中安排其前态、变体、恢复态来源及对比条件。目标 draw 的完整五阶段不能自动证明最终 framebuffer 或设备质量。依赖变体现场的证据应在撤销前采集，或由计划明确后续获批质量复验及恢复要求；不得既限制再次介入，又遗漏条件任务唯一可采证的时点。已有同批持久观察须核验身份、时点、条件、hash 与读取授权；恢复态不能补称干预前基线，恢复态设备确认不能代替已结束变体的设备证据。只读目标不因此增加介入要求。独立审查所声明的修改排他性、数值推导范围，须分别授予本次完整 diff 与 before/after 绑定、原始调用配对及指标语义来源；历史语义审查和派生摘录不替代当前原文，范围不足保持局部结论。
+
 ### 8.6 `ChallengeRecord`
 
 | 字段 | 必填 | 合同 |
@@ -374,7 +380,11 @@ Kind Registry（闭集，无悬空 `kind`）。`kind` 必须解析到唯一 `{ r
 2. 每个 `expectedHash` 与该源当前内容 sha256 匹配；本条 `contentHash` 与 `contentRef` 正文 sha256 匹配
 3. `kind` 经 Registry 得到 `recordType + schema`，且正文按该 schema 通过
 
-版本更新把旧清单标 `superseded`，`supersedes` 指向旧 `artifactId`，保留历史引用。若 WorldState 的替代版本使用不同 `worldStateId`，同一事务将仍绑定旧 ID 的记录及其依赖标为 `stale`，不自动把旧证据重绑到新状态；Claim／ClaimSet 替代时若旧 `claimId` 不再由现行记录拥有，也须在同一事务将引用这些 ID 的实验和下游调查记录标为 `stale`，不能让旧实验因失去活动假设而阻断列表或上下文归档。既有遗漏传播的记录在列表、读取或右栏投影前核实索引和旧状态后以同样事务修复，投影须使用修复后的状态与内容 hash。已取代或失效记录仍须通过索引、清单、schema 和内容 hash 校验，供审计与上下文完整归档；它们不再承担当前语义不变量，也不得作为当前结论的有效证据。现行记录继续执行完整引用和领域不变量校验。原始 Provider opaque payload 不进 Artifact。引用解析失败、hash 不一致或 `kind` 未登记则不得标 `ready`。
+版本更新把旧清单标 `superseded`，`supersedes` 指向旧 `artifactId`，保留历史引用。若 WorldState 的替代版本使用不同 `worldStateId`，同一事务将仍绑定旧 ID 的记录及其依赖标为 `stale`，不自动把旧证据重绑到新状态；Claim／ClaimSet 或 Evidence／EvidencePack 替代时若旧 `claimId`／`evidenceId` 不再由现行记录拥有，也须在同一事务将其当前语义依赖标为 `stale`：包括实验的假设和恢复验证证据、Challenge 目标、Report 证据及下游记录，包括经已失效 Challenge 的 `openChallenges` 或已失效 Experiment 的 `completedExperiments` 关联的 Checkpoint，不能让旧记录因失去活动假设而阻断列表或上下文归档。既有遗漏传播的记录在列表、读取或右栏投影前核实索引和旧状态后以同样事务修复，也须传播索引中已经失效的 Challenge／Experiment；投影须使用修复后的状态与内容 hash。新 Checkpoint 的当前语义引用不得复活失效的 Challenge／Experiment；`criticalArtifactRefs` 与来源引用仍可保留经 hash 核验的历史制品作审计。已取代或失效记录仍须通过索引、清单、schema 和内容 hash 校验，供审计与上下文完整归档；它们不再承担当前语义不变量，也不得作为当前结论的有效证据。现行记录继续执行完整引用和领域不变量校验。原始 Provider opaque payload 不进 Artifact。引用解析失败、hash 不一致或 `kind` 未登记则不得标 `ready`。
+
+完整上下文归档在同一调查事务锁内先统一修复退役引用图，再逐条核验记录；不能为每条记录重复扫描整图。此范围内复用已经修复的图，不缓存跨事务的完整性判断；每条正文的 hash、schema、现行引用和 ready 来源检查仍须执行。
+
+调查服务内部读取 index、manifest 与正文时，须在既有单文件大小、所有权和路径边界内读完；通用 `artifact_read` 的模型输出窗口不是索引容量。超过一页时按 Resolver 游标继续，并将后续页绑定首份来源 hash、字节量及单调游标。来源变化、缺少续页或不前进必须拒绝；不能把合法大索引的第一页截断误报为记录损坏，也不因此提高配额、放宽 hash 或另建索引读取路径。
 
 Right Rail **目标** Artifacts 卡只投影 main-owned 本清单及其记录，不混入 Outputs。
 
@@ -716,7 +726,7 @@ General 的 execution-orchestrator 只定义通用工作方法；三个 Mission 
 
 ### 专业 RDC 手册与真实预载
 
-Debugger / Analyzer / Optimizer 在「Execute with General」声明的 `requiredSkillIds` 中分别绑定领域方法、`renderdoc-execution`、`rdc-tool-shell` 与本方向的 `*-rdc-tool`。prepareTurn 只在 execution offer 的 target 与冻结计划 hash 匹配时加载这些 Skill，不能只依赖按钮 prompt 中的 `$skill` 文本。
+Debugger / Analyzer / Optimizer 在「Execute with General」声明的 `requiredSkillIds` 中分别绑定领域方法、`renderdoc-execution`、`rdc-tool-shell` 与本方向的 `*-rdc-tool`。prepareTurn 只在 execution offer 的 target 与冻结计划 hash 匹配时加载这些 Skill，不能只依赖按钮 prompt 中的 `$skill` 文本。Debugger 因果方法要求在解释逐片元颜色、alpha 或测试标记前按需读取 `pixel-forensics`；原生 Pixel History 的格式限制、event-final 值和重建标记须区分，不把不完整字段当完整 blend 账本。方法限定不改写原始工具值、不代替当前后端／二进制适用性核验，也不授予额外权限。共享执行方法要求干预前列清主张所需的原始状态控制证据，独立审查 Capsule 按本次主张／控制条件逐项授予必要测量、身份和语义来源；typed 摘要及五阶段回执不自动证明额外控制条件，也不自动扩大读取权限。缺失的历史取证须限定结论，不能在恢复后补造。
 
 `resources/agent-runtime/rdc-tool-guide-members.json` 明确三本手册的专业成员；它不是运行时 allowlist。`scripts/generate-rdc-tool-guides.mjs` 从 Tools 2.0 code-owned catalog 生成每项用途、参数约束、结果、影响、前置条件、失败限制和无身份 `shell.rdc` 示例，并校验成员、示例 schema 与 catalog fingerprint。共享 CLI 规则只在 `rdc-tool-shell` 维护一份；专业 SKILL 保持短流程入口，详细参考按需读取。
 

@@ -3,6 +3,7 @@
  */
 
 import type { AgentRole } from '@shared/types/agent';
+import path from 'node:path';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
@@ -10,9 +11,11 @@ import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
 import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
 import type { ToolDefinition } from '../../agent-runtime/core/types';
 import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/tools';
+import { readFileTool } from '../../agent-runtime/tools/primitives/ReadFileTool';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../../agent-runtime/tasks';
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../sessions/RdcRuntimeContextRegistry';
+import { rdcSessionService } from '../../sessions';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { createKnowledgeTools } from '../../knowledge/KnowledgeTools';
 import { createInvestigationTools } from '../../investigation/InvestigationTools';
@@ -24,6 +27,7 @@ import {
 } from './DebuggerRuntimePolicy';
 import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
 import { createRdcProbeTool } from './RdcProbeTool';
+import { readRdcHostControls } from '../../tools/RdcHostControls';
 import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
@@ -135,7 +139,7 @@ export class RuntimeToolAssembly {
     return {
       name: 'rdc_context',
       label: 'RDC Context',
-      description: 'Read the current stable RDC runtime context captured by configured shell actions.',
+      description: 'Read the owning RDC runtime context, main-verified captureContentSha256, current session artifact capacity, and frozen CLI deadline controls. Capacity is a point-in-time snapshot, not a future reservation. CLI timeout covers one invocation, not the whole operation or guaranteed native exit. Missing controls remain explicitly unavailable.',
       pollable: true,
       parameters: {
         type: 'object',
@@ -143,13 +147,13 @@ export class RuntimeToolAssembly {
       },
       permissionHint: 'readonly',
       spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'system', requiresApproval: false },
-      async execute() {
+      async execute(_toolCallId, _args, _signal, _onUpdate, executionContext) {
         const lease = assertRdcContextLeaseOwnership({
           sessionId,
           projectId,
         });
         const runtimeContext = lease?.runtimeContext ?? null;
-        if (!runtimeContext) {
+        if (!runtimeContext || !lease) {
           const retainedLease = sessionId ? getRdcContextLease(sessionId) : null;
           const requiresRecovery = !!retainedLease && retainedLease.ownerSessionId === sessionId
             && retainedLease.ownerProjectId === projectId && !!retainedLease.quarantineReason;
@@ -165,8 +169,22 @@ export class RuntimeToolAssembly {
             details: { available: false, requiresRecovery },
           };
         }
+        const ownerSessionId = lease?.delegatedFrom ?? sessionId;
+        const scope = ownerSessionId && projectId ? { sessionId: ownerSessionId, projectId } : null;
+        const opened = scope ? rdcSessionService.snapshotOpenedCaptureForSession(scope) : null;
+        const binding = scope ? rdcSessionService.listBindingsForProject(scope.projectId).find(item =>
+          item.scope.sessionId === scope.sessionId && item.scope.projectId === scope.projectId
+          && item.contextId === runtimeContext.contextId) : undefined;
+        const captureContentSha256 = opened?.status === 'open' && binding && ['ready', 'applying'].includes(binding.phase)
+          && runtimeContext.captureFileId && runtimeContext.replaySessionId
+          && opened.contextId === runtimeContext.contextId && opened.captureFileId === runtimeContext.captureFileId
+          && opened.replaySessionId === runtimeContext.replaySessionId && /^[a-f0-9]{64}$/.test(binding?.captureHash ?? '')
+          ? binding!.captureHash : null;
         return {
-          content: [{ type: 'text', text: JSON.stringify(runtimeContext, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify({ ...runtimeContext, captureContentSha256,
+            hostControls: ownerSessionId && projectId ? readRdcHostControls({ sessionId: ownerSessionId,
+              projectId, contextId: runtimeContext.contextId, leaseVersion: lease.version }, executionContext) : null,
+          }, null, 2) }],
           details: { available: true },
         };
       },
@@ -425,22 +443,25 @@ export class RuntimeToolAssembly {
   }
 
   createSkillReadTool(agentId: AgentRole): AgentTool<
-    { skill_id?: string },
+    { skill_id?: string; reference?: string; offset?: number; limit?: number },
     { skillId: string; agentId: AgentRole }
   > {
     return {
       name: 'skill_read',
       label: 'Read Skill',
-      description: 'Load the full SKILL.md instructions for one discovered effective skill.',
+      description: 'Read one discovered effective Skill. Without reference, returns the full SKILL.md. To read a linked method reference, pass its Skill-relative references/... path plus optional 1-based offset/limit; returns whole-file SHA-256 and truncation metadata. This reads knowledge only and never changes frozen tool permissions or grants editing access. Do not resolve Skill links relative to the project workspace.',
       parameters: {
         type: 'object',
         required: ['skill_id'],
         properties: {
           skill_id: { type: 'string', description: 'Skill id, for example rdc-context.' },
+          reference: { type: 'string', description: 'Exact Skill-relative text path under references/, for example references/tools.md. No absolute paths, traversal or symlinks.' },
+          offset: { type: 'integer', minimum: 1, description: 'Reference start line, 1-based; only valid with reference.' },
+          limit: { type: 'integer', minimum: 1, maximum: 5000, description: 'Reference line window; defaults to 2000, at most 5000.' },
         },
       },
       permissionHint: 'readonly',
-      async execute(_toolCallId, args, _signal, _onUpdate, context) {
+      async execute(_toolCallId, args, signal, _onUpdate, context) {
         const skillKey = typeof args.skill_id === 'string' ? args.skill_id.trim() : '';
         if (!skillKey) {
           return {
@@ -457,6 +478,29 @@ export class RuntimeToolAssembly {
             isError: true,
             details: { skillId: skillKey, agentId },
           };
+        }
+
+        if (args.reference !== undefined) {
+          const reference = args.reference;
+          const parts = typeof reference === 'string' ? reference.replace(/\\/gu, '/').split('/') : [];
+          if (parts[0] !== 'references' || parts.length < 2
+            || parts.some((part) => !part || part === '.' || part === '..' || part.includes(':')
+              || [...part].some((char) => char.charCodeAt(0) < 32))) {
+            throw new Error('SKILL_REFERENCE_PATH_DENIED: use an exact relative path under this Skill references/ directory.');
+          }
+          // Reuse canonical file guards/windowing, but never inherit workspace
+          // roots or successfulFileReads: method knowledge cannot grant edits.
+          const root = path.dirname(skill.sourcePath);
+          const result = await readFileTool.execute(_toolCallId, {
+            path: parts.join('/'), offset: args.offset, limit: args.limit,
+          }, signal, undefined, { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null });
+          return {
+            content: result.content,
+            details: { skillId: skill.id, agentId, sourcePath: skill.sourcePath, sourceHash: skill.sourceHash, scope: skill.scope, reference: result.details },
+          };
+        }
+        if (args.offset !== undefined || args.limit !== undefined) {
+          throw new Error('SKILL_REFERENCE_REQUIRED: offset/limit require a reference path.');
         }
 
         return {

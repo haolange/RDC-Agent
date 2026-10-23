@@ -119,6 +119,27 @@ afterEach(() => {
 });
 
 describe('OpenAIResponsesProvider DeepSeek dialect', () => {
+  it.each(['OpenAIResponses', 'DeepSeekResponses'])('keeps optional tool arguments optional on the %s wire', (dialect) => {
+    const parameters = {
+      type: 'object',
+      properties: {
+        uri: { type: 'string' },
+        jsonTextPointers: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['uri'],
+    };
+    const base = deepSeekPlan();
+    const contracts = dialect === 'DeepSeekResponses' ? base.contracts : createFailClosedProviderContracts('OpenAIResponses');
+    const requestPlan = { ...base, contracts, route: { ...base.route, contracts } };
+    const body = __testing.buildRequestBody(model, {
+      messages: [],
+      tools: [{ name: 'artifact_read', description: 'Read a hash-bound artifact.', parameters }],
+    }, { requestPlan });
+    expect(body.tools).toEqual([{ type: 'function', name: 'artifact_read', description: 'Read a hash-bound artifact.', parameters, strict: false }]);
+    expect(parameters.required).toEqual(['uri']);
+    expect(parameters).not.toHaveProperty('additionalProperties');
+  });
+
   it('streams raw reasoning, preserves the exact item for tool continuation, and omits unsupported state fields', async () => {
     let request: RequestInit | undefined;
     const reasoningItem = { type: 'reasoning', id: 'rs_1', content: 'Need the tool.' };
@@ -184,7 +205,7 @@ describe('OpenAIResponsesProvider DeepSeek dialect', () => {
       model: 'deepseek-v4-flash',
       stream: true,
       reasoning: { effort: 'high' },
-      tools: [expect.objectContaining({ type: 'function', name: 'lookup' })],
+      tools: [expect.objectContaining({ type: 'function', name: 'lookup', strict: false })],
     });
     for (const unsupported of [
       'store', 'parallel_tool_calls', 'previous_response_id', 'include',

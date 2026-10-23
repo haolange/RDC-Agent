@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import type { PromptPlan, RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 import { appPathService } from '../../runtime/AppPathService';
+import { readRequestUsage } from './RequestUsageSnapshot';
 
 const safeSegment = (value: string): string => value.replace(/[^a-zA-Z0-9._-]/g, '-');
 
@@ -19,6 +20,10 @@ export class RequestSnapshotStore {
     const dir = this.turnPath(sessionId, turnId);
     if (!fs.existsSync(dir)) return 1;
     return fs.readdirSync(dir).filter((entry) => entry.endsWith('.json')).length + 1;
+  }
+
+  readUsage(scopeId: string) {
+    return readRequestUsage(this.rootPath, scopeId);
   }
 
   write(snapshot: RequestEnvelopeSnapshot): void {

@@ -8,6 +8,12 @@ export async function refreshProjectInputs(projectId: string) {
   return getElectronApi()?.project.inputs.refresh(projectId);
 }
 
+export async function referenceProjectInput(projectId: string, filePath: string) {
+  const api = getElectronApi();
+  if (!api) throw new Error('Application connection is unavailable');
+  return api.project.inputs.referencePath(projectId, filePath);
+}
+
 export async function removeProjectInput(projectId: string, inputId: string) {
   const api = getElectronApi();
   if (!api) throw new Error('Application connection is unavailable');

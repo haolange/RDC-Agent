@@ -67,6 +67,25 @@ describe('TaskTools', () => {
     await expect(registry.getTask(childTaskId)).resolves.toMatchObject({ parentTaskId });
   });
 
+  it('requires an explicit continuation flag and a later host turn to resume the same cancelled goal', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-tools-'));
+    roots.push(dir);
+    const registry = new TaskRegistry(dir);
+    const task = await registry.createTask('Resume without a replacement Task');
+    let turn = 'turn:first:generation:1';
+    const update = createTaskTools(registry, { startOptions: () => ({ frozenPlanRef: turn }) })[1]!;
+    await update.execute('start', { taskId: task.id, status: 'in_progress' });
+    await registry.cancelTask(task.id);
+    await expect(update.execute('same-turn', { taskId: task.id, status: 'in_progress', resumeCancelled: true })).rejects.toThrow(/later turn/);
+    turn = 'turn:next:generation:1';
+    await expect(update.execute('implicit', { taskId: task.id, status: 'in_progress' })).rejects.toThrow(/Terminal task/);
+    await expect(update.execute('invalid', { taskId: task.id, status: 'pending', resumeCancelled: true })).rejects.toThrow(/status=in_progress/);
+    await expect(update.execute('invalid-type', { taskId: task.id, status: 'in_progress', resumeCancelled: 'true' })).rejects.toThrow(/boolean/);
+    await update.execute('resume', { taskId: task.id, status: 'in_progress', resumeCancelled: true });
+    expect(await registry.listExecutions(task.id)).toMatchObject([{ status: 'cancelled', generation: 1 }, { status: 'running', generation: 2 }]);
+    expect(await registry.listTasks()).toHaveLength(1);
+  });
+
   it('binds tool-created Tasks to the current turn without exposing an agent-provided owner', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-tools-'));
     roots.push(dir);
@@ -77,5 +96,19 @@ describe('TaskTools', () => {
     const result = await create.execute('c1', { tasks: [{ subject: 'Only this turn' }] });
     const taskId = (result.details as { ids: string[] }).ids[0]!;
     await expect(registry.getTask(taskId)).resolves.toMatchObject({ creationTurnRef });
+  });
+
+  it('does not let a delegated scope resume a cancelled descendant', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-tools-'));
+    roots.push(dir);
+    const registry = new TaskRegistry(dir);
+    const parent = await registry.createTask('Parent');
+    const child = await registry.createTask('Child', { parentTaskId: parent.id });
+    await registry.startExecution(child.id, { mode: 'direct', frozenPlanRef: 'turn:old:generation:1' });
+    await registry.cancelTask(child.id);
+    const update = createTaskTools(registry, { scopeRootTaskId: parent.id,
+      startOptions: () => ({ frozenPlanRef: 'turn:new:generation:1' }) })[1]!;
+    await expect(update.execute('resume', { taskId: child.id, status: 'in_progress', resumeCancelled: true })).rejects.toThrow(/non-delegated turn/);
+    expect(await registry.listExecutions(child.id)).toHaveLength(1);
   });
 });

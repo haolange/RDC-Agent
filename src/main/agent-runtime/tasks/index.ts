@@ -2,7 +2,7 @@
  * tasks 子模块统一导出。
  *
  * - `TaskRegistry`：文件持久化的任务注册表（CRUD + 依赖图）；
- * - `createTaskTools` 等：把注册表暴露为 4 个 AgentTool 的工厂；
+ * - `createTaskTools` 等：把注册表暴露为 5 个 AgentTool 的工厂；
  * - 所有相关接口与类型。
  */
 

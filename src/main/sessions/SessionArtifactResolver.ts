@@ -27,6 +27,8 @@ import {
 import { generateShortId } from '@shared/utils/id';
 import { StorageIo } from './StorageIo';
 import { storageAdapter } from './StorageAdapter';
+import { inspectArtifactJson, readArtifactJsonText, type ArtifactJsonInspection, type ArtifactJsonTextView } from './SessionArtifactJsonInspection';
+import { searchArtifactText, type ArtifactTextSearch } from './SessionArtifactTextSearch';
 import {
   commitSessionArtifactReservation,
   getSessionArtifactQuotaSnapshot,
@@ -78,6 +80,9 @@ export interface SessionArtifactResolved {
 }
 
 export interface SessionArtifactReadResult {
+  jsonInspection?: ArtifactJsonInspection;
+  textView?: ArtifactJsonTextView;
+  search?: ArtifactTextSearch;
   /** Opt-in native vision payload; absent from ordinary IPC reads. */
   imageData?: string;
   uri: string;
@@ -103,6 +108,13 @@ export interface SessionArtifactWriteResult {
   mimeType: string;
   hash: string;
   bytes: number;
+}
+
+export interface SessionArtifactCapacity {
+  usage: SessionArtifactQuotaSnapshot;
+  limits: { maxFileBytes: number; maxImageBytes: number; maxSessionBytes: number; maxToolOutputFiles: number };
+  remaining: { bytes: number; toolOutputFiles: number };
+  isReservation: false;
 }
 
 function defaultResolveSessionPath(sessionId: string): string | null {
@@ -379,9 +391,12 @@ export class SessionArtifactResolver {
   read(
     sessionId: string | null | undefined,
     uri: string,
-    options?: { offset?: number; column?: number; limit?: number; maxBytes?: number; expectedHash?: string; includeImageData?: boolean },
+    options?: { offset?: number; column?: number; limit?: number; maxBytes?: number; expectedHash?: string; includeImageData?: boolean; jsonTextPointers?: string[]; textPointer?: string; search?: string },
   ): SessionArtifactReadResult {
     const resolved = this.resolve(sessionId, uri);
+    if ((options?.jsonTextPointers !== undefined || options?.textPointer !== undefined || options?.search !== undefined) && !options.expectedHash) {
+      throw new SessionArtifactError('ARTIFACT_HASH_REQUIRED', 'JSON inspection, text selection and search require expectedHash.');
+    }
     if (!fs.existsSync(resolved.absolutePath)) {
       throw new SessionArtifactError('ARTIFACT_NOT_FOUND', resolved.uri);
     }
@@ -413,6 +428,16 @@ export class SessionArtifactResolver {
         throw new SessionArtifactError('ARTIFACT_HASH_MISMATCH', 'sha256 does not match expectedHash.');
       }
     }
+    if ((options?.jsonTextPointers !== undefined || options?.textPointer !== undefined) && fileMimeType !== 'application/json') {
+      throw new SessionArtifactError('ARTIFACT_MIME_DENIED', options?.textPointer !== undefined
+        ? 'Text selection requires a JSON artifact. Omit textPointer for images or plain text.'
+        : 'JSON inspection requires a JSON artifact. Omit jsonTextPointers entirely for image or plain-text reads; [] explicitly requests JSON inspection. Do not repeat the same rejected arguments.');
+    }
+    if ((options?.search !== undefined || options?.textPointer !== undefined) && mimeType.startsWith('image/')) {
+      throw new SessionArtifactError('ARTIFACT_MIME_DENIED', 'Text selection and search do not read image pixels.');
+    }
+    const view = options?.textPointer === undefined ? undefined : readArtifactJsonText(bytes, options.jsonTextPointers ?? [], options.textPointer);
+    const jsonInspection = options?.jsonTextPointers === undefined || view ? undefined : inspectArtifactJson(bytes, options.jsonTextPointers);
     const offset = Math.max(1, Math.floor(options?.offset ?? 1));
     const limit = Math.max(
       1,
@@ -434,18 +459,24 @@ export class SessionArtifactResolver {
         source: record.source,
       };
     }
-    const text = bytes.toString('utf8');
-    const lines = text.replace(/\r\n/g, '\n').split('\n');
+    const text = view?.text ?? bytes.toString('utf8').replace(/\r\n/g, '\n');
+    const lines = text.split('\n');
     const column = Math.max(0, Math.floor(options?.column ?? 0));
     const firstLine = lines[offset - 1] ?? '';
     if (column > firstLine.length || (column > 0 && /[\uDC00-\uDFFF]/.test(firstLine[column] ?? ''))) {
       throw new SessionArtifactError('ARTIFACT_URI_INVALID', 'Invalid paging column; use the exact returned cursor.');
     }
+    const maxBytes = Math.max(4, Math.min(ARTIFACT_READ_MAX_OUTPUT_BYTES, options?.maxBytes ?? ARTIFACT_READ_MAX_OUTPUT_BYTES));
+    if (options?.search !== undefined) {
+      const found = searchArtifactText(text, options.search, { offset, column }, limit, maxBytes);
+      return { uri: resolved.uri, category: resolved.category, relativePath: resolved.relativePath, mimeType, hash, bytes: byteLength,
+        text: found.text, search: found.search, ...(view ? { textView: view.view } : {}), ...(jsonInspection ? { jsonInspection } : {}),
+        truncated: found.next !== undefined, offset, limit, totalLines: lines.length, ...(found.next ? { next: found.next } : {}), owner: record.owner, source: record.source };
+    }
     const window = lines.slice(offset - 1, offset - 1 + limit);
     if (window.length) window[0] = window[0].slice(column);
     const hasLaterLines = offset - 1 + window.length < lines.length;
     const selected = window.join('\n') + (hasLaterLines ? '\n' : '');
-    const maxBytes = Math.max(4, Math.min(ARTIFACT_READ_MAX_OUTPUT_BYTES, options?.maxBytes ?? ARTIFACT_READ_MAX_OUTPUT_BYTES));
     const rendered = this.sliceUtf8(selected, maxBytes);
     const truncated = hasLaterLines || rendered.length < selected.length;
     const consumed = rendered.split('\n');
@@ -458,6 +489,8 @@ export class SessionArtifactResolver {
       hash,
       bytes: byteLength,
       text: rendered,
+      ...(jsonInspection ? { jsonInspection } : {}),
+      ...(view ? { textView: view.view } : {}),
       truncated,
       offset,
       limit,
@@ -578,6 +611,19 @@ export class SessionArtifactResolver {
       artifactsRoot,
       this.measureDiskUsage(artifactsRoot, categoryRoot),
     );
+  }
+
+  /** Point-in-time logical quota only; writes still reserve and validate atomically. */
+  getQuotaCapacity(sessionId: string | null | undefined): SessionArtifactCapacity {
+    const usage = this.getQuotaUsage(sessionId);
+    return {
+      usage,
+      limits: { maxFileBytes: this.maxFileBytes, maxImageBytes: this.maxImageBytes,
+        maxSessionBytes: this.maxSessionBytes, maxToolOutputFiles: this.maxToolOutputFiles },
+      remaining: { bytes: Math.max(0, this.maxSessionBytes - usage.liveBytes),
+        toolOutputFiles: Math.max(0, this.maxToolOutputFiles - usage.liveToolOutputFiles) },
+      isReservation: false,
+    };
   }
 
   list(sessionId: string | null | undefined, category?: SessionArtifactCategory): string[] {

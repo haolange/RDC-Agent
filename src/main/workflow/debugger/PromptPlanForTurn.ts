@@ -10,7 +10,7 @@ import {
   AGENT_DESCRIPTIONS,
   AGENT_DISPLAY_NAMES,
 } from '@shared/constants/agents';
-import type { EffectiveModel } from '@shared/types/providerCapability';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
 import type { EffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
@@ -43,12 +43,15 @@ export class PromptPlanForTurn {
     toolAllowlist: string[];
     contextWindowTokens: number;
     capability: EffectiveModel;
+    requestPlan: RequestPlan;
     systemPrompt?: string;
     messageText?: string;
     preloadSkillIds?: string[];
     extraSegments?: import('@shared/types/rdcRuntime').PromptSegment[];
     /** Exact effective profile snapshot resolved by the caller. */
     effectiveProfile?: AgentManifestDefinition | null;
+    /** Same resolved catalog used by the caller; absent means only this profile is known. */
+    effectiveProfiles?: readonly AgentManifestDefinition[];
     /**
      * Same-turn frozen plan. When present, permission / profileSkills / toolAllowlist
      * come from the plan — never re-read settings for those execution semantics.
@@ -60,13 +63,15 @@ export class PromptPlanForTurn {
   }): PromptPlan | null {
     const plan = input.effectivePlan;
     const runtimeSettings = settingsService.getAll();
-    const definition = input.effectiveProfile
-      ?? agentManifestService.getEffectiveProfiles(
+    const profiles = input.effectiveProfiles ?? (input.effectiveProfile ? [input.effectiveProfile]
+      : agentManifestService.getEffectiveProfiles(
         runtimeSettings.paths,
         runtimeSettings.llm.providers,
         runtimeSettings.llm.agentRoutes,
         (plan?.projectRootPath ?? input.projectRootPath) ?? undefined,
-      ).find((profile) => profile.id === input.agentId && profile.enabled)
+      ));
+    const definition = input.effectiveProfile
+      ?? profiles.find((profile) => profile.id === input.agentId && profile.enabled)
       ?? null;
     if (!definition || !definition.enabled) {
       return null;
@@ -108,6 +113,7 @@ export class PromptPlanForTurn {
     const promptClock = resolvePromptClock();
     return promptPlanBuilder.build({
       profile: activeDefinition,
+      profileCatalog: profiles,
       scopedInstructions,
       preloadedSkills,
       skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined, input.agentId),
@@ -117,6 +123,7 @@ export class PromptPlanForTurn {
       approvedExecutionOffer,
       routeCapability,
       effectiveModel: input.capability,
+      requestPlan: input.requestPlan,
       permissionSettings,
       currentDate: promptClock.currentDate,
       timeZone: promptClock.timeZone,

@@ -182,6 +182,12 @@ function extractPathTargets(toolName: string, toolCall: ToolCall): string[] {
     || toolName === 'delete_file'
   ) {
     const filePath = extractStringArg(toolCall, 'path');
+    if (toolName === 'read_file') {
+      const comparison = toolCall.arguments.compareWith;
+      const comparisonPath = comparison && typeof comparison === 'object' && !Array.isArray(comparison)
+        && 'path' in comparison && typeof comparison.path === 'string' ? comparison.path : '';
+      return [filePath, comparisonPath].filter(Boolean);
+    }
     return filePath ? [filePath] : [];
   }
   if (toolName === 'notebook_edit') {

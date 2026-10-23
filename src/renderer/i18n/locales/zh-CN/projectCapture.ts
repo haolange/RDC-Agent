@@ -1,4 +1,12 @@
 export const zhProjectCapture = {
+  'projectCapture.reference': '引用外部抓帧（只读）',
+  'projectCapture.referenceHint': '登记一个外部 RDC 原件，不复制文件，仅授权读取该文件；移除引用不会删除原件。',
+  'projectCapture.referencePath': 'RDC 原件的绝对路径',
+  'projectCapture.registerReference': '登记引用',
+  'projectCapture.referenceFailed': '外部抓帧登记失败',
+  'projectCapture.external': '外部引用 · 只读',
+  'projectCapture.detach': '移除引用',
+  'projectCapture.cancel': '取消',
   'project.inputs.reconcileFailed': '抓帧资料同步失败',
   'project.inputs.reconcileRetry': '已保留恢复资料，请刷新项目抓帧重试。',
   'projectCapture.title': 'Capture 文件',

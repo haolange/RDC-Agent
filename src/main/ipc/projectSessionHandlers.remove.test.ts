@@ -10,6 +10,7 @@ const { handlers, syncSessionSlots, abortBackgroundSession, storage, conversatio
     isTurnActive: vi.fn(() => false),
   },
   storage: {
+    projects: { referenceProjectInput: vi.fn() },
     readSession: vi.fn(),
     getProjectById: vi.fn(),
     listRuns: vi.fn((): Array<{ runId: string; status: string }> => []),
@@ -102,6 +103,21 @@ describe('session:remove slot sync', () => {
     storage.listRuns.mockReturnValue([]);
     storage.listSessions.mockReturnValue([]);
     storage.getProjectById.mockReturnValue({ projectId: 'proj_1', rootPath: 'D:/proj_1' });
+  });
+
+  it('registers only the exact explicitly supplied reference through the validated IPC boundary', async () => {
+    const inputs = [{ inputId: 'reference_exact', source: 'external_reference' }];
+    storage.projects.referenceProjectInput.mockResolvedValue(inputs);
+    const broadcast = vi.fn();
+    registerProjectSessionHandlers({ state: {}, broadcastToRenderer: broadcast } as unknown as WorkbenchIpcContext);
+    expect(await handlers.get('project:inputs:reference')!({}, 'proj_1', 'D:/source/original.rdc'))
+      .toEqual({ success: true, inputs });
+    expect(storage.projects.referenceProjectInput).toHaveBeenCalledWith('proj_1', 'D:/source/original.rdc');
+    expect(broadcast).toHaveBeenCalledWith('project:inputsChanged', { projectId: 'proj_1', inputs });
+    storage.projects.referenceProjectInput.mockClear();
+    expect(await handlers.get('project:inputs:reference')!({}, 'proj_1', ['D:/source/original.rdc']))
+      .toMatchObject({ success: false });
+    expect(storage.projects.referenceProjectInput).not.toHaveBeenCalled();
   });
 
   it('does not remove a project when background abort-and-join fails', async () => {

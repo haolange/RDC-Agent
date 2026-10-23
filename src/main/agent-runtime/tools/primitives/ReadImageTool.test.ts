@@ -2,8 +2,10 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 import { readImageTool } from './ReadImageTool';
+import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
 
 vi.mock('../../../conversation/ToolImagePreviewStore', () => ({
   recordToolImagePreview: vi.fn(async () => ({
@@ -54,8 +56,15 @@ describe('ReadImageTool', () => {
     expect(result.content[1]).toMatchObject({ type: 'image', mimeType: 'image/png' });
     expect(result.details).toMatchObject({
       mimeType: 'image/png',
+      bytes: PNG_1X1.length,
+      sha256: createHash('sha256').update(PNG_1X1).digest('hex'),
       imagePreviews: [{ previewId: 'aaaaaaaaaaaaaaaaaaaaaaaa', fileName: 'frame.png' }],
     });
+    const image = result.content[1];
+    if (image.type !== 'image') throw new Error('Expected image block');
+    expect(createHash('sha256').update(Buffer.from(image.data, 'base64')).digest('hex')).toBe(result.details?.sha256);
+    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining(`sha256=${result.details?.sha256}`) });
+    expect(recordToolImagePreview).toHaveBeenLastCalledWith(expect.objectContaining({ bytes: PNG_1X1 }));
   });
 
   it('rejects paths outside the workspace', async () => {
@@ -64,5 +73,32 @@ describe('ReadImageTool', () => {
 
     await expect(readImageTool.execute('img-2', { path: '../outside.png' }, undefined, undefined, context(root)))
       .rejects.toThrow(/超出 workspace/);
+  });
+
+  it('views an immutable extensionless raster artifact using its verified content type', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-image-artifact-'));
+    roots.push(root);
+    const fileName = 'a'.repeat(64);
+    await writeFile(path.join(root, fileName), PNG_1X1);
+    const result = await readImageTool.execute('img-content', { path: fileName }, undefined, undefined, context(root));
+    expect(result.content[1]).toEqual({ type: 'image', mimeType: 'image/png', data: PNG_1X1.toString('base64') });
+    expect(result.details).toMatchObject({ path: path.join(root, fileName), mimeType: 'image/png', bytes: PNG_1X1.length });
+  });
+
+  it.each([
+    ['artifact', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')],
+    ['artifact', Buffer.from('%PDF-1.7')],
+    ['artifact', Buffer.from('MZ executable')],
+    ['artifact', Buffer.alloc(0)],
+    ['frame.exe', PNG_1X1],
+    ['frame.bin', PNG_1X1],
+    ['frame.svg', PNG_1X1],
+    ['frame.png', Buffer.from('MZ executable')],
+  ])('rejects unsupported or disguised media %s', async (fileName, bytes) => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-image-reject-'));
+    roots.push(root);
+    await writeFile(path.join(root, fileName), bytes);
+    await expect(readImageTool.execute('img-reject', { path: fileName }, undefined, undefined, context(root)))
+      .rejects.toThrow(/ATTACHMENT_(MEDIA_UNSUPPORTED|INVALID)/);
   });
 });

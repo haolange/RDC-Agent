@@ -36,6 +36,75 @@ function createResolver(sessions: Record<string, string>, limits?: {
 }
 
 describe('SessionArtifactResolver', () => {
+  it('reports current capacity including in-flight writes without reserving future space', () => {
+    const a = makeSession('capacity');
+    const resolver = createResolver({ [a.sessionId]: a.sessionPath }, {
+      maxFileBytes: 100, maxSessionBytes: 200, maxToolOutputFiles: 4,
+    });
+    resolver.write(a.sessionId, 'session://tool-outputs/a.txt', 'abc');
+    resolver.write(a.sessionId, 'session://tool-outputs/b.txt', '12345', {
+      onAfterReserve: () => {
+        expect(resolver.getQuotaCapacity(a.sessionId)).toMatchObject({
+          usage: { diskBytes: 3, reservedBytes: 5, liveBytes: 8, liveToolOutputFiles: 2 },
+          limits: { maxFileBytes: 100, maxSessionBytes: 200, maxToolOutputFiles: 4 },
+          remaining: { bytes: 192, toolOutputFiles: 2 }, isReservation: false,
+        });
+      },
+    });
+    const status = resolver.getQuotaCapacity(a.sessionId);
+    expect(status.usage.reservedBytes).toBe(0);
+    expect(status.remaining).toEqual({ bytes: 192, toolOutputFiles: 2 });
+    expect(() => resolver.getQuotaCapacity('foreign')).toThrow('ARTIFACT_SESSION_DENIED');
+  });
+
+  it('retains long-session evidence past 1024 files and rejects the finite 2048-file boundary', () => {
+    const a = makeSession('long-history');
+    const outputRoot = path.join(a.sessionPath, 'session-artifacts', 'tool-outputs');
+    fs.mkdirSync(outputRoot, { recursive: true });
+    for (let index = 0; index < 1024; index++) fs.writeFileSync(path.join(outputRoot, `history-${index}.json`), '{}');
+    const resolver = createResolver({ [a.sessionId]: a.sessionPath });
+    const current = resolver.write(a.sessionId, 'session://tool-outputs/current.json', '{}');
+    expect(resolver.read(a.sessionId, current.uri, { expectedHash: current.hash }).hash).toBe(current.hash);
+    for (let index = 1025; index < 2048; index++) fs.writeFileSync(path.join(outputRoot, `history-${index}.json`), '{}');
+    expect(() => resolver.write(a.sessionId, 'session://tool-outputs/overflow.json', '{}')).toThrow('2049 files (cap 2048)');
+    expect(fs.readFileSync(path.join(outputRoot, 'history-0.json'), 'utf8')).toBe('{}');
+    expect(fs.existsSync(path.join(outputRoot, 'overflow.json'))).toBe(false);
+  });
+
+  it('explains how to correct JSON inspection on an image without changing its grant or bytes', () => {
+    const a = makeSession('image-json-retry');
+    const resolver = createResolver({ [a.sessionId]: a.sessionPath });
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/L9sAAAAASUVORK5CYII=', 'base64');
+    const saved = resolver.write(a.sessionId, 'session://tool-outputs/original.png', png, { mimeType: 'image/png' });
+    expect(() => resolver.read(a.sessionId, saved.uri, { expectedHash: saved.hash, includeImageData: true, jsonTextPointers: [] }))
+      .toThrow('Omit jsonTextPointers entirely for image or plain-text reads');
+    const corrected = resolver.read(a.sessionId, saved.uri, { expectedHash: saved.hash, includeImageData: true });
+    expect(corrected.mimeType).toBe('image/png');
+    expect(corrected.hash).toBe(saved.hash);
+    expect(Buffer.from(corrected.imageData!, 'base64')).toEqual(png);
+    expect(corrected.jsonInspection).toBeUndefined();
+    expect(() => resolver.read(a.sessionId, saved.uri, { expectedHash: '0'.repeat(64), includeImageData: true }))
+      .toThrow('ARTIFACT_HASH_MISMATCH');
+  });
+
+  it('inspects the whole hash-bound JSON independently of a short displayed page', () => {
+    const a = makeSession('inspect-own');
+    const b = makeSession('inspect-other');
+    const resolver = createResolver({ [a.sessionId]: a.sessionPath, [b.sessionId]: b.sessionPath });
+    const uri = 'session://tool-outputs/data.json';
+    const saved = resolver.write(a.sessionId, uri, JSON.stringify({ payload: '{"numbers":[1,2,3]}' }));
+    resolver.write(b.sessionId, uri, '{"private":true}');
+    const read = resolver.read(a.sessionId, uri, { expectedHash: saved.hash, maxBytes: 8, jsonTextPointers: ['/payload'] });
+    expect(read.truncated).toBe(true);
+    expect(read.jsonInspection).toMatchObject({ numberCount: 3, arrayLengths: { '3': 1 } });
+    expect(read.jsonInspection?.layers[0].sha256).toBe(saved.hash);
+    expect(() => resolver.read(a.sessionId, uri, { jsonTextPointers: [] })).toThrow('ARTIFACT_HASH_REQUIRED');
+    expect(() => resolver.read(a.sessionId, uri, { expectedHash: '0'.repeat(64), jsonTextPointers: ['/missing'] })).toThrow('ARTIFACT_HASH_MISMATCH');
+    expect(() => resolver.read(b.sessionId, uri, { expectedHash: saved.hash, jsonTextPointers: [] })).toThrow('ARTIFACT_HASH_MISMATCH');
+    const text = resolver.write(a.sessionId, 'session://tool-outputs/data.txt', '{}');
+    expect(() => resolver.read(a.sessionId, text.uri, { expectedHash: text.hash, jsonTextPointers: [] })).toThrow('ARTIFACT_MIME_DENIED');
+  });
+
   it('writes atomically, hashes, and reads back a JSON artifact', () => {
     const a = makeSession('own');
     const resolver = createResolver({ [a.sessionId]: a.sessionPath });

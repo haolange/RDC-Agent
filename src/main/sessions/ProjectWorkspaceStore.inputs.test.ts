@@ -23,6 +23,33 @@ async function setup() {
 }
 
 describe('Project input complete scans', () => {
+  it('rejects a relative project root before creating any project resources', async () => {
+    const { store, persist } = await setup();
+    await expect(store.createProject('relative-project')).rejects.toThrow('PROJECT_ROOT_ABSOLUTE_REQUIRED');
+    expect(persist).not.toHaveBeenCalled();
+  });
+  it('persists and restores an exact external reference without copying it, then detaches it', async () => {
+    const { store, project, persist } = await setup();
+    const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-reference-source-')); roots.push(sourceRoot);
+    const source = path.join(sourceRoot, 'original.rdc'); await fs.writeFile(source, 'RDOCsmall fixture');
+    let durable = structuredClone(project);
+    vi.mocked(store.getProjectById).mockImplementation(id => id === project.projectId ? structuredClone(durable) : null);
+    persist.mockImplementation(next => { durable = structuredClone(next); });
+    const first = await store.referenceProjectInput(project.projectId, source);
+    expect(first).toHaveLength(1); expect(first[0].source).toBe('external_reference');
+    expect(await fs.readdir(project.inputsPath)).toEqual([]);
+    expect(await store.referenceProjectInput(project.projectId, source)).toHaveLength(1);
+    const restarted = new ProjectWorkspaceStore({} as StorageHost);
+    vi.spyOn(restarted, 'getProjectById').mockImplementation(() => structuredClone(durable));
+    vi.spyOn(restarted, 'persistProject').mockImplementation(next => { durable = structuredClone(next); });
+    expect(await restarted.refreshProjectInputs(project.projectId)).toEqual(first);
+    await fs.writeFile(source, 'RDOCchanged');
+    await expect(restarted.refreshProjectInputs(project.projectId)).rejects.toThrow('CAPTURE_REFERENCE_CHANGED');
+    expect(durable.inputs).toEqual(first);
+    expect(await restarted.detachProjectInputReference(project.projectId, first[0].inputId)).toEqual([]);
+    expect(await fs.readFile(source, 'utf8')).toBe('RDOCchanged');
+    await expect(store.referenceProjectInput('foreign-project', source)).rejects.toThrow('PROJECT_NOT_FOUND');
+  });
   it('verifies original content before publishing a complete input index', async () => {
     const { store, project, persist, reconcile } = await setup();
     const file = path.join(project.inputsPath, 'capture.rdc'); await fs.writeFile(file, 'capture');

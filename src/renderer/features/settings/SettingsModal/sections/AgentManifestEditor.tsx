@@ -17,6 +17,7 @@ import { AgentCapabilityPicker, buildAgentCapabilityGroups } from './AgentCapabi
 import { AgentHandoffEditor } from './AgentHandoffEditor';
 import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
 import { AgentAutosaveStatus } from './AgentAutosaveStatus';
+import { AgentExecutionLimitField } from './AgentExecutionLimitField';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type AgentPanel = 'identity' | 'permissions' | 'handoffs' | 'instructions';
@@ -120,6 +121,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
       return (
         <>
           <AgentCapabilityPicker groups={capabilityGroups} skills={skills} targetAgentId={selectedAgent.id} t={t} />
+          <AgentExecutionLimitField agent={selectedAgent} onUpdateAgent={onUpdateAgent} t={t} />
           {toolDiagnostics.length > 0 ? (
             <div className="settings-agent-tool-diagnostics" data-testid="settings-agent-tool-diagnostics" role="status">
               <div className="settings-agent-tool-diagnostics-title">{t('settings.agentToolDiagnosticsTitle')}</div>

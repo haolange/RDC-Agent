@@ -32,17 +32,16 @@ export interface ProjectSelectionHandlerOpsContext extends ProjectSelectionLoade
   onCloseProjectMenu: () => void;
 }
 
-export async function handleAddProjectOp(ctx: ProjectSelectionHandlerOpsContext) {
+export async function handleAddProjectOp(ctx: ProjectSelectionHandlerOpsContext, rootPath: string) {
   ctx.setSidebarError(null);
-  const rootPath = await window.electronAPI.selectDirectory();
-  if (!rootPath) return;
+  if (!rootPath.trim()) throw new Error('Project path is required');
 
   const requestId = ctx.beginSelectionRequest();
   ctx.setIsBusy(true);
   try {
     const result = await window.electronAPI.project.add(rootPath);
     if (!result.success || !result.project) {
-      return;
+      throw new Error(result.error || 'Project could not be added');
     }
 
     await ctx.loadProjects(result.project.projectId, null, {

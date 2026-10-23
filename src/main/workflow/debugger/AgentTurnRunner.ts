@@ -11,6 +11,7 @@ import { generateEventId, nowMs } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
 import { resolveTurnOutputTokens } from '@shared/utils/contextBudget';
 import { Agent } from '../../agent-runtime/agent/Agent';
+import { resolveAgentMaxTurns } from '../../agent-runtime/agent/ExecutionLimits';
 import { createExecutionContextManager } from '../../agent-runtime/context/ExecutionContextWindow';
 import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
 import { ErrorRecovery } from '../../agent-runtime/agent/ErrorRecovery';
@@ -117,16 +118,7 @@ export class AgentTurnRunner {
   constructor(private readonly deps: AgentTurnRunnerDeps) {}
 
   resolveMaxTurns(_agentId: AgentRole, policyMaxTurns?: number, profileMaxTurns?: number | null): number {
-    const profileMax = typeof profileMaxTurns === 'number' && profileMaxTurns > 0
-      ? profileMaxTurns
-      : 25;
-    if (typeof policyMaxTurns === 'number' && Number.isFinite(policyMaxTurns)) {
-      if (policyMaxTurns === 0) {
-        throw new Error('POLICY_MAX_TURNS_ZERO: maxTurns must be greater than zero for an executable turn.');
-      }
-      if (policyMaxTurns > 0) return Math.min(policyMaxTurns, profileMax);
-    }
-    return profileMax;
+    return resolveAgentMaxTurns(policyMaxTurns, profileMaxTurns);
   }
 
   getOrCreateAgentSlot(
@@ -314,7 +306,6 @@ export class AgentTurnRunner {
   async runAgentTurn(input: {
     agentId: AgentRole;
     content: string;
-    systemPrompt: string;
     providerId: string;
     modelId: string;
     temperature?: number;
@@ -326,8 +317,6 @@ export class AgentTurnRunner {
     options?: AgentTurnOptions;
     projectRootPath?: string | null;
     projectId?: string | null;
-    /** Ask 路径由 ConversationService 传入的 prompt 分段字符数，用于细化 breakdown。 */
-    promptPlan: PromptPlan;
     effectiveModel?: EffectiveModel;
     effectiveProfile?: EffectiveAgentProfile | null;
     effectiveProfileIds?: readonly string[];
@@ -351,6 +340,7 @@ export class AgentTurnRunner {
       throw new Error('TURN_NOT_PREPARED: preparedRuntime is required; call prepareTurnContext/prepareProfileTurn before runAgentTurn.');
     }
     const preparedRuntime = input.preparedRuntime;
+    const promptPlan = preparedRuntime.promptPlan;
     const turnPolicy = preparedRuntime.effectivePlan.policy;
     const effectiveModel = input.effectiveModel ?? null;
     const routeCapability = preparedRuntime.routeCapability;
@@ -533,7 +523,7 @@ export class AgentTurnRunner {
       input.agentId,
       input.providerId,
       input.modelId,
-      input.systemPrompt,
+      promptPlan.systemPrompt,
       streamOptions,
       activeToolDefinitions,
       toolExecutor,
@@ -541,7 +531,7 @@ export class AgentTurnRunner {
       executionScopeId,
       input.contextWindow,
       input.contextTokenLimit,
-      input.promptPlan,
+      promptPlan,
       input.initialMessages,
       input.contextDiagnostic,
       runtimeTools.definitions,
@@ -633,10 +623,10 @@ export class AgentTurnRunner {
           const subagentDefs = injectedDefs.filter(isSubagentDef);
           const systemDefs = injectedDefs.filter((d) => !isMcpDef(d) && !isSubagentDef(d));
 
-          const pm = input.promptPlan?.metrics;
+          const pm = promptPlan.metrics;
           const systemPromptChars = pm
             ? pm.systemPrompt
-            : input.systemPrompt.length;
+            : promptPlan.systemPrompt.length;
           const rulesChars    = pm?.scopedInstructions ?? 0;
           const skillsChars   = pm?.skills ?? 0;
 

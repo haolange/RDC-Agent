@@ -23,9 +23,13 @@ import {
   type TaskStatus,
 } from './TaskRegistry';
 import type { StartTaskExecutionOptions } from './TaskContracts';
+import { readTaskBudgetSnapshot, type TaskLiveBudgetSnapshot } from './TaskBudgetSnapshot';
+import type { RequestUsageSnapshot } from '../prompt/RequestUsageSnapshot';
 
 export interface TaskToolExecutionContext {
-  startOptions?: () => Omit<StartTaskExecutionOptions, 'mode'> | Promise<Omit<StartTaskExecutionOptions, 'mode'>>;
+  startOptions?: (taskId: string) => Omit<StartTaskExecutionOptions, 'mode'> | Promise<Omit<StartTaskExecutionOptions, 'mode'>>;
+  readLiveBudget?: (rootBudgetId: string) => TaskLiveBudgetSnapshot | null;
+  readRequestUsage?: () => RequestUsageSnapshot;
   getCreationTurnRef?: () => string | undefined;
   scopeRootTaskId?: string;
   requestCurrentTurnStop?: (taskId: string) => boolean;
@@ -41,7 +45,7 @@ const ALLOWED_STATUS: TaskStatus[] = [
 ];
 
 /**
- * 基于一个 `TaskRegistry` 实例创建 4 个工具。
+ * 基于一个 `TaskRegistry` 实例创建 5 个工具。
  *
  * @param registry 任务注册表实例。
  * @returns 工具数组：`[task_create, task_update, task_get, task_list, task_stop]`。
@@ -151,6 +155,7 @@ export function createTaskCreateTool(
 interface TaskUpdateParams {
   taskId: string;
   status?: TaskStatus;
+  resumeCancelled?: boolean;
   statusReason?: string;
   subject?: string;
   description?: string;
@@ -175,7 +180,7 @@ export function createTaskUpdateTool(
   return {
     name: 'task_update',
     label: 'Update Task',
-    description: 'Update an existing Task. status=in_progress starts a new direct execution; call it once per execution, never as a progress note while an execution is active. Do the Task work before status=completed or blocked settles that execution; a partial result leaves the Task blocked. Use task_get to inspect currentExecutionId before starting again. Omit status for description or metadata edits.',
+    description: 'Update an existing Task. status=in_progress starts a new direct execution; call it once per execution, never as a progress note or before dispatching Task-owned delegated work. After the user explicitly requests continuation in a later turn, resumeCancelled=true can continue the same cancelled goal after all producers joined; history and consumed budgets remain. Completed Tasks and old executions cannot reopen. The delegated runner claims its own execution in both wait and background modes. Do the Task work before status=completed or blocked settles its direct execution; a partial result leaves the Task blocked. status=pending cannot release an active execution. Use task_get to inspect currentExecutionId before starting again. Omit status for description or metadata edits.',
     parameters: {
       type: 'object',
       properties: {
@@ -185,6 +190,7 @@ export function createTaskUpdateTool(
           enum: ['pending', 'in_progress', 'blocked', 'completed', 'cancelled'],
         },
         statusReason: { type: 'string' },
+        resumeCancelled: { type: 'boolean', description: 'Only with status=in_progress after explicit user continuation in a later owning turn; preserve the cancelled execution and all consumed budgets.' },
         subject: { type: 'string' },
         description: { type: 'string' },
         owner: { type: 'string' },
@@ -215,6 +221,11 @@ export function createTaskUpdateTool(
       await assertTaskInScope(registry, taskId, context.scopeRootTaskId, false);
 
       const status = readEnum(params, 'status', ALLOWED_STATUS);
+      if (params.resumeCancelled !== undefined && typeof params.resumeCancelled !== 'boolean') throw new Error('resumeCancelled must be boolean.');
+      const resumeCancelled = params.resumeCancelled === true;
+      if (resumeCancelled && (status !== 'in_progress' || context.scopeRootTaskId)) {
+        throw new Error('Cancelled Task continuation requires status=in_progress in the owning non-delegated turn.');
+      }
       const statusReason = readString(params, 'statusReason', false);
       const subject = readString(params, 'subject', false);
       const description = readString(params, 'description', false);
@@ -237,8 +248,8 @@ export function createTaskUpdateTool(
       if (status && hasSemanticUpdates) throw new Error('Status transitions cannot be combined with task definition updates.');
       let updated: TaskRecord;
       if (status === 'in_progress') {
-        const startOptions = await context.startOptions?.();
-        await registry.startExecution(taskId, { mode: 'direct', ...startOptions });
+        const startOptions = await context.startOptions?.(taskId);
+        await registry.startExecution(taskId, { mode: 'direct', ...startOptions, resumeCancelled });
         updated = (await registry.getTask(taskId))!;
       } else if (status === 'cancelled') {
         if (context.requestCurrentTurnStop?.(taskId)) {
@@ -309,7 +320,7 @@ export function createTaskGetTool(
   return {
     name: 'task_get',
     label: 'Get Task',
-    description: 'Get full details of a specific task',
+    description: 'Get Task fields, budgetSnapshot (execution/root tool and time counters, live policy capacity and subagent admission), and requestUsage (committed model request attempts by turn in the calling execution scope and its descendants, including auxiliary, failed and retried requests). Request counts are local attempt accounting, not provider billing or remaining quota. Null means unavailable. This read does not reserve resources or grant permissions; delegated work still needs an accepted Capsule allocation.',
     pollable: true,
     parameters: {
       type: 'object',
@@ -332,8 +343,11 @@ export function createTaskGetTool(
           details: { id: taskId, found: false },
         } satisfies AgentToolResult<{ id: string; found: boolean }>;
       }
+      const budgetSnapshot = await readTaskBudgetSnapshot(registry, task, context.readLiveBudget);
+      const requestUsage = context.readRequestUsage?.() ?? null;
+      throwIfAborted(signal);
       return {
-        content: [{ type: 'text', text: JSON.stringify(task, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify({ ...task, budgetSnapshot, requestUsage }, null, 2) }],
         details: { id: task.id, found: true },
       } satisfies AgentToolResult<{ id: string; found: boolean }>;
     },

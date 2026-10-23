@@ -4,6 +4,7 @@ import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { SessionContextTurnEntry } from '../conversation/SessionContextJournal';
+import { prepareTerminalAppend } from './ConversationTerminalAppend';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-session-cleanup-'));
 
@@ -338,6 +339,57 @@ function makeTerminalContextEntry(): SessionContextTurnEntry {
 }
 
 describe('StorageAdapter terminal transaction', () => {
+  it('keeps compaction progress across short turns after append-only terminal commits', async () => {
+    const { storageAdapter } = await import('./StorageAdapter');
+    const projectRoot = path.join(tempRoot, 'terminal-compaction-progress');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = await storageAdapter.createProject(projectRoot);
+    const session = storageAdapter.createSession(project.projectId, 'Short terminal turns');
+    for (let turn = 0; turn < 6; turn += 1) {
+      const base = { sessionId: session.sessionId, projectId: project.projectId, turnId: `turn-${turn}`, requestId: `request-${turn}`, createdAt: turn * 100 };
+      storageAdapter.appendConversationMessage(session.sessionId, { ...base, id: `user-${turn}`, role: 'user', content: 'question' });
+      const assistant: ConversationMessage = { ...base, id: `assistant-${turn}`, role: 'assistant', content: '', status: 'streaming' };
+      storageAdapter.appendConversationMessage(session.sessionId, assistant);
+      for (let delta = 1; delta <= 20; delta += 1) {
+        storageAdapter.appendConversationMessage(session.sessionId, { ...assistant, content: `part-${delta}`, updatedAt: base.createdAt + delta });
+      }
+      storageAdapter.commitConversationTerminal(session.sessionId, base.requestId, base.turnId,
+        { ...assistant, content: 'final', status: 'complete', updatedAt: base.createdAt + 21 },
+        { ...makeTerminalContextEntry(), turnId: base.turnId, userMessageId: `user-${turn}`, assistantMessageId: assistant.id });
+    }
+    const history = storageAdapter.readConversationHistory(session.sessionId);
+    const raw = fs.readFileSync(path.join(session.sessionPath, 'conversation.jsonl'), 'utf8').trim().split('\n');
+    expect(history).toHaveLength(12);
+    expect(history.filter((message) => message.role === 'assistant').every((message) => message.content === 'final')).toBe(true);
+    expect(raw.length).toBeLessThan(history.length + 24);
+    expect(storageAdapter.readSessionContextJournal(session.sessionId)).toHaveLength(6);
+  });
+
+  it.each(['prepared', 'committing', 'committed'] as const)('recovers bounded %s WAL without replay duplicates', async (phase) => {
+    const { storageAdapter } = await import('./StorageAdapter');
+    const projectRoot = path.join(tempRoot, `bounded-terminal-${phase}`);
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = await storageAdapter.createProject(projectRoot);
+    const session = storageAdapter.createSession(project.projectId, phase);
+    const assistant: ConversationMessage = {
+      id: 'assistant-terminal', requestId: 'request-terminal', turnId: 'turn-terminal',
+      sessionId: session.sessionId, projectId: project.projectId, role: 'assistant',
+      content: 'partial', status: 'streaming', createdAt: 1, updatedAt: 2,
+    };
+    storageAdapter.writeConversationHistory(session.sessionId, [assistant]);
+    const terminal: ConversationMessage = { ...assistant, content: 'final', status: 'complete', updatedAt: 1 };
+    const wal = prepareTerminalAppend(session.sessionPath, 'request-terminal', 'turn-terminal', terminal, makeTerminalContextEntry(), true, true);
+    fs.appendFileSync(path.join(session.sessionPath, 'conversation.jsonl'), Buffer.from(wal.history.append).subarray(0, 17));
+    fs.writeFileSync(path.join(session.sessionPath, 'terminal-commit.json'), JSON.stringify({ ...wal, phase }));
+    await storageAdapter.initializeWorkspace();
+    await storageAdapter.initializeWorkspace();
+    const history = storageAdapter.readConversationHistory(session.sessionId);
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({ content: phase === 'prepared' ? 'partial' : 'final', status: phase === 'prepared' ? 'streaming' : 'complete' });
+    expect(storageAdapter.readSessionContextJournal(session.sessionId)).toHaveLength(phase === 'prepared' ? 0 : 1);
+    expect(fs.existsSync(path.join(session.sessionPath, 'terminal-commit.json'))).toBe(false);
+  });
+
   it('commits the terminal message and context journal as one durable snapshot', async () => {
     const { storageAdapter } = await import('./StorageAdapter');
     const projectRoot = path.join(tempRoot, 'terminal-commit-project');

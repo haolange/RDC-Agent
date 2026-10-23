@@ -36,6 +36,7 @@
 | RDC context 无 session / lease 所有权不匹配 | Security | 仅 per-session lease；禁止 global mirror |
 | 在途 turn 读可变 Settings / 未冻结 plan | Integrity | `EffectiveRuntimePlan` schemaVersion 3 完整冻结 |
 | SSRF / private DNS（`web_fetch`/`web_search`） | Security | 每跳校验 + pin |
+| Web 来源超完整字节界 / 非法 UTF-8 / 续页来源 hash 不符 | Integrity | 明确拒绝；不将前缀、替换字符或变化后的来源拼为完整资料。页面截断有可校验续读游标，不是不存在匹配资料的证据 |
 | Attachment SVG 脚本 / 超限媒体 | Security | `ATTACHMENT_MEDIA_UNSUPPORTED` |
 | 附件数量/体积超限 | Security | `ATTACHMENT_LIMIT_EXCEEDED`；`retryable: false` |
 | 附件路径缺失 | Integrity | `ATTACHMENT_NOT_FOUND`；`retryable: false` |

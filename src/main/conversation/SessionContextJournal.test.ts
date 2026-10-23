@@ -535,12 +535,14 @@ describe('SessionContextJournal v2', () => {
 
   it('fails closed on legacy v1 entries instead of performing a hot migration', () => {
     const journal = new SessionContextJournal();
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([{
+    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockImplementation((_sessionId, select) => [{
       schemaVersion: 1,
       turnId: 'turn-1',
-    } as unknown as SessionContextTurnEntry]);
+    } as unknown as SessionContextTurnEntry].filter((value) => !select || select(value)));
 
     expect(() => journal.readEntries('session-1'))
+      .toThrow('invalid v2 entry');
+    expect(() => journal.readEntries('session-1', []))
       .toThrow('invalid v2 entry');
   });
 

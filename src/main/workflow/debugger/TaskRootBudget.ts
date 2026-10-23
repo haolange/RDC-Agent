@@ -15,6 +15,12 @@ export function taskRootBudgetId(policyBudget: PolicyBudgetState): string {
   return `policy:${policyBudget.wallStartedAt}`;
 }
 
+/** Observation never implicitly binds a fresh ledger or changes durable accounting. */
+export function getBoundTaskRootBudgetId(policyBudget: PolicyBudgetState): string | undefined {
+  const root = policyBudgetChain(policyBudget).at(-1) ?? policyBudget;
+  return bindings.get(root)?.rootBudgetId;
+}
+
 export async function bindTaskRootBudget(
   registry: TaskRegistry,
   ownerSessionId: string,

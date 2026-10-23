@@ -1,12 +1,36 @@
 import fs from 'fs';
 import path from 'path';
-import type { ConversationToolResourceRef } from '@shared/types/conversation';
+import type { ConversationToolImagePreviewRef, ConversationToolResourceRef } from '@shared/types/conversation';
 import type { ToolCallResult } from '@shared/types/tool';
 import { extractSessionArtifactUris, isSessionArtifactUri } from '@shared/types/sessionArtifact';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 );
+
+export function extractToolImagePreviews(result: ToolCallResult | undefined): ConversationToolImagePreviewRef[] {
+  const details = result?.data && typeof result.data === 'object' && !Array.isArray(result.data)
+    ? (result.data as { details?: unknown }).details
+    : undefined;
+  const raw = details && typeof details === 'object' && !Array.isArray(details)
+    ? (details as { imagePreviews?: unknown }).imagePreviews
+    : undefined;
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const record = entry as Record<string, unknown>;
+    if (typeof record.previewId !== 'string' || typeof record.fileName !== 'string' || typeof record.mimeType !== 'string') {
+      return [];
+    }
+    return [{
+      previewId: record.previewId,
+      fileName: record.fileName,
+      mimeType: record.mimeType,
+      width: typeof record.width === 'number' ? record.width : undefined,
+      height: typeof record.height === 'number' ? record.height : undefined,
+    }];
+  });
+}
 
 const stringValue = (record: Record<string, unknown>, key: string): string | null => {
   const value = record[key];

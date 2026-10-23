@@ -5,6 +5,7 @@ import { assertPublicHttpUrl, fetchPinnedPublic } from '../agent-runtime/net/ass
 import { appPathService } from '../runtime/AppPathService';
 
 const MAX_FAVICON_BYTES = 64 * 1024;
+const MAX_ICON_PAGE_BYTES = 80_000 * 4; // Receive bound for the existing 80k-character HTML window.
 const REQUEST_TIMEOUT_MS = 8_000;
 const MAX_REDIRECTS = 3;
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -119,6 +120,7 @@ async function fetchPublicBytes(rawUrl: string): Promise<{ bytes: Uint8Array; mi
     let current = await assertPublicHttpUrl(rawUrl);
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
       const response = await fetchPinnedPublic(current, {
+        maxResponseBytes: MAX_FAVICON_BYTES,
         redirect: 'manual',
         signal: controller.signal,
         headers: {
@@ -200,6 +202,7 @@ async function discoverIconUrls(domain: string): Promise<string[]> {
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       let response = await fetchPinnedPublic(page, {
+        maxResponseBytes: MAX_ICON_PAGE_BYTES,
         redirect: 'manual',
         signal: controller.signal,
         headers: {
@@ -212,6 +215,7 @@ async function discoverIconUrls(domain: string): Promise<string[]> {
         if (!location) break;
         page = await assertPublicHttpUrl(new URL(location, page.href).toString());
         response = await fetchPinnedPublic(page, {
+          maxResponseBytes: MAX_ICON_PAGE_BYTES,
           redirect: 'manual',
           signal: controller.signal,
           headers: {

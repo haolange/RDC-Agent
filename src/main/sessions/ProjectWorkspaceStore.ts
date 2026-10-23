@@ -9,6 +9,7 @@ import { PROJECT_REGISTRY_MIGRATIONS, SelectionStateSchema } from './storageSche
 import { withDirectoryFileLockSync } from './directoryFileLock';
 import { hashCaptureFile } from '../captures/replay/captureContentHash';
 import { safePath } from '../captures/replay/replayFileSafety';
+import { createExternalCaptureReference, verifyExternalCaptureReference } from '../captures/ExternalCaptureReference';
 
 
 export class ProjectWorkspaceStore {
@@ -52,6 +53,7 @@ export class ProjectWorkspaceStore {
   }
 
   async createProject(rootPath: string): Promise<ProjectRecord> {
+    if (!path.isAbsolute(rootPath)) throw new Error('PROJECT_ROOT_ABSOLUTE_REQUIRED');
     const resolvedRootPath = path.resolve(rootPath);
     if (!fs.existsSync(resolvedRootPath) || !fs.statSync(resolvedRootPath).isDirectory()) {
       throw new Error(`Project root is not a directory: ${resolvedRootPath}`);
@@ -144,8 +146,12 @@ export class ProjectWorkspaceStore {
   }
 
   async refreshProjectInputs(projectId: string): Promise<ProjectInputRecord[]> {
+    return this.queueInputUpdate(projectId, () => this.refreshInputsNow(projectId));
+  }
+
+  private async queueInputUpdate(projectId: string, operation: () => Promise<ProjectInputRecord[]>): Promise<ProjectInputRecord[]> {
     const previous = this.inputRefreshes.get(projectId) ?? Promise.resolve([]);
-    const next = previous.catch(() => []).then(() => this.refreshInputsNow(projectId));
+    const next = previous.catch(() => []).then(operation);
     this.inputRefreshes.set(projectId, next);
     try { return await next; } finally { if (this.inputRefreshes.get(projectId) === next) this.inputRefreshes.delete(projectId); }
   }
@@ -157,9 +163,17 @@ export class ProjectWorkspaceStore {
     await fs.promises.access(project.rootPath);
     await safePath(project.rootPath, project.inputsPath);
     const normalizedProject = this.normalizeProjectRecord(project);
-    const inputs = await this.collectProjectInputs(normalizedProject.inputsPath);
+    const inputs = [
+      ...await this.collectProjectInputs(normalizedProject.inputsPath),
+      ...await Promise.all(project.inputs.filter(input => input.source === 'external_reference').map(verifyExternalCaptureReference)),
+    ];
+    return this.commitProjectInputs(project, inputs);
+  }
+
+  private async commitProjectInputs(project: ProjectRecord, inputs: ProjectInputRecord[]): Promise<ProjectInputRecord[]> {
+    const projectId = project.projectId;
     const nextProject: ProjectRecord = {
-      ...normalizedProject,
+      ...this.normalizeProjectRecord(project),
       inputs,
       inputsUpdatedAt: nowMs(),
     };
@@ -208,6 +222,34 @@ export class ProjectWorkspaceStore {
     }
 
     return this.refreshProjectInputs(projectId);
+  }
+
+  async referenceProjectInput(projectId: string, filePath: string): Promise<ProjectInputRecord[]> {
+    return this.queueInputUpdate(projectId, async () => {
+      const project = this.getProjectById(projectId);
+      if (!project) throw new Error('PROJECT_NOT_FOUND');
+      const registered = await createExternalCaptureReference(filePath);
+      const previous = project.inputs.find(entry => entry.inputId === registered.inputId);
+      const input = { ...registered, discoveredAt: previous?.discoveredAt ?? registered.discoveredAt };
+      // Re-registration is explicit; refresh never silently accepts changed bytes.
+      const inputs = [
+        ...await this.collectProjectInputs(project.inputsPath),
+        ...await Promise.all(project.inputs.filter(entry => entry.source === 'external_reference' && entry.inputId !== input.inputId)
+          .map(verifyExternalCaptureReference)), input,
+      ];
+      return this.commitProjectInputs(project, inputs);
+    });
+  }
+
+  async detachProjectInputReference(projectId: string, inputId: string): Promise<ProjectInputRecord[]> {
+    return this.queueInputUpdate(projectId, async () => {
+      const project = this.getProjectById(projectId);
+      const input = project?.inputs.find(entry => entry.inputId === inputId);
+      if (!project || input?.source !== 'external_reference') throw new Error('CAPTURE_REFERENCE_NOT_FOUND');
+      const inputs = project.inputs.filter(entry => entry.inputId !== inputId);
+      // Never touch the source file, even when it is missing or has changed.
+      return this.commitProjectInputs(project, inputs);
+    });
   }
 
   getCurrentProjectId(): string | null {

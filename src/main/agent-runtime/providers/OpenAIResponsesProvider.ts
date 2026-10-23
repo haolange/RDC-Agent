@@ -570,6 +570,8 @@ function toResponsesTool(tool: ToolDefinition): Record<string, unknown> {
     name: tool.name,
     description: tool.description,
     parameters: tool.parameters,
+    // Preserve canonical optional arguments; Responses may otherwise normalize them to required.
+    strict: false,
   };
 }
 

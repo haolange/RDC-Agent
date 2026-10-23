@@ -14,6 +14,18 @@ function harness() {
   return { resolver, store, experiment };
 }
 describe('native execution evidence', () => {
+  it.each(['missing', 'daemon-restarted', 'worker-restarted', 'pid-reused'])(
+    'rejects %s process proof despite identical logical replay identity', scenario => {
+      const { store, experiment } = harness();
+      experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId, records => {
+        if (scenario === 'missing') delete records[2].processIdentity;
+        else if (scenario === 'daemon-restarted') records[2].processIdentity!.daemon.pid = 41;
+        else if (scenario === 'worker-restarted') records[2].processIdentity!.worker.pid = 42;
+        else records[2].processIdentity!.worker.start_generation = 'windows-filetime:201';
+      });
+      expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).toThrow(/process|PROCESS_IDENTITY/);
+    },
+  );
   it('accepts a signed ordered same-context experiment, including after store recreation', () => {
     const { resolver, store, experiment } = harness();
     experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId);

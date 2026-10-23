@@ -1,6 +1,7 @@
 import type { ConversationMessage } from '@shared/types/conversation';
 
 export const stopWorkTrace = (message: ConversationMessage): ConversationMessage => {
+  if (message.status !== 'draft' && message.status !== 'streaming') return message;
   const stoppedAt = Date.now();
   // Keep the source revision so the main process's terminal message can
   // replace this optimistic projection even when it was committed earlier.

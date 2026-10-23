@@ -43,6 +43,8 @@ export const SHELL_MAX_TIMEOUT_MS = 600_000;
 export const GIT_MAX_OUTPUT_BYTES = 64 * 1024;
 export const GIT_TIMEOUT_MS = 60_000;
 
-/** Web fetch response cap. */
+/** Web text page / search-output window; not a claim of whole-source coverage. */
 export const WEB_MAX_RESPONSE_BYTES = 160 * 1024;
+/** Finite complete public source bound, enforced before transport buffering. */
+export const WEB_MAX_SOURCE_BYTES = 2 * 1024 * 1024;
 export const WEB_MAX_REDIRECTS = 5;

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
+import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 
 vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() } }));
 vi.mock('../../runtime/resolveConfiguredShell', () => ({
@@ -48,6 +49,31 @@ describe('PromptPlanBuilder', () => {
     expect(plan.systemPrompt).toContain('Shell: unavailable');
     expect(plan.systemPrompt).toContain('Shell cwd: D:/Project');
 
+    const limitsPlan = new PromptPlanBuilder().build({
+      ...input,
+      profileCatalog: [profile, { id: 'executor', enabled: true, maxTurns: 50 },
+        { id: 'disabled-profile', enabled: false, maxTurns: 500 }],
+    });
+    const profileLimits = limitsPlan.segments.find(segment => segment.id === 'runtime:profile-limits');
+    expect(profileLimits).toMatchObject({ kind: 'runtime-fact', stability: 'volatile' });
+    expect(profileLimits?.content).toContain('"agentId":"executor","ordinaryProviderLoopCeiling":50');
+    expect(profileLimits?.content).toContain('"agentId":"ask","ordinaryProviderLoopCeiling":25');
+    expect(profileLimits?.content).not.toContain('disabled-profile');
+    expect(profileLimits?.content).toContain('not a future execution reservation');
+    expect(limitsPlan.stablePrefix.fingerprint).toBe(plan.stablePrefix.fingerprint);
+
+    const executionPlan = new PromptPlanBuilder().build({ ...input, requestPlan: createTestRequestPlan({
+      providerId: 'deepseek', adapterId: 'openai-responses', catalogRevision: 'test', routeRevision: 'test',
+      selectedModelId: 'deepseek-v4', effectiveModelId: 'deepseek-v4', appliedBindingIds: [],
+      route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test', source: 'catalog' }, headers: {}, bodyPatch: {},
+      contextBudgetTokens: 1000, contextMode: 'normal', contextWindowTokens: 1000, activeTierId: 'default', fastMode: false,
+      reasoningWire: { selection: 'low', control: { kind: 'levels', supportsOff: true, levels: ['low', 'high'], defaultSelection: 'high',
+        wireProfile: { kind: 'openai-responses', on: 'high', levels: { low: 'low', high: 'high' } } } },
+    }) });
+    expect(executionPlan.systemPrompt).toContain('Resolved reasoning selection: "low"');
+    expect(executionPlan.stablePrefix.fingerprint).toBe(plan.stablePrefix.fingerprint);
+    expect(executionPlan.segments.find(segment => segment.id === 'runtime:request-plan')?.kind).toBe('runtime-fact');
+
     const offeredPlan = new PromptPlanBuilder().build({
       ...input,
       approvedExecutionOffer: {
@@ -65,6 +91,9 @@ describe('PromptPlanBuilder', () => {
     expect(plan.segments.some(segment => segment.id === 'runtime:approved-execution-offer')).toBe(false);
     expect(offerFact).toMatchObject({ kind: 'runtime-fact', scope: 'runtime', stability: 'volatile' });
     expect(offerFact?.content).toContain('Plan review is complete.');
+    expect(offerFact?.content).toContain('Plan approved at (Unix epoch milliseconds): 1');
+    expect(offerFact?.content).toContain('1970-01-01T00:00:00.001Z');
+    expect(offerFact?.content).toContain('do not reset it or renew a plan budget');
     expect(offerFact?.content).toContain('session://plans/plan-approved.md');
     expect(offerFact?.content).toContain('grants no tools, permissions, or device access');
     expect(offeredPlan.stablePrefix.fingerprint).toBe(plan.stablePrefix.fingerprint);
@@ -97,7 +126,7 @@ describe('PromptPlanBuilder', () => {
     expect(plan.systemPrompt).toContain('must not be repeated');
   });
 
-  it('describes Plan/Edit task mutation capability only when mutation tools are effective', async () => {
+  it.each([false, true])('describes task execution ownership with effective subagent=%s', async (includeSubagent) => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const profile = {
       id: 'edit', fileName: 'edit.agent.md', filePath: 'C:/User/.rdc-agent/agents/edit.agent.md', name: 'Edit', description: 'Edit files', argumentHint: '', target: 'rdc-agent', models: [], icon: 'pencil-edit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['task_create', 'task_update', 'task_stop'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Execute.', builtin: false, enabled: true,
@@ -107,7 +136,7 @@ describe('PromptPlanBuilder', () => {
       scopedInstructions: { sources: [], totalBytes: 0, diagnostics: [] },
       preloadedSkills: [],
       skillCatalog: [],
-      tools: ['task_create', 'task_update', 'task_stop'],
+      tools: ['task_create', 'task_update', 'task_stop', ...(includeSubagent ? ['subagent'] : [])],
       workDir: 'D:/Project',
       routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
       permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
@@ -116,6 +145,9 @@ describe('PromptPlanBuilder', () => {
     });
     expect(plan.systemPrompt).toContain('Tasks are writable in this turn.');
     expect(plan.systemPrompt).toContain('Create the full multi-step list in one task_create call.');
+    expect(plan.systemPrompt).toContain('For work you perform directly');
+    expect(plan.systemPrompt).not.toContain('mark exactly one task in_progress');
+    expect(plan.systemPrompt.includes('For Task-owned subagent work in either mode=wait or mode=background')).toBe(includeSubagent);
     expect(plan.systemPrompt).not.toContain('Tasks are read-only in this turn.');
   });
 

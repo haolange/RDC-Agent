@@ -56,6 +56,24 @@ describe('truncateOutput', () => {
 });
 
 describe('assertTextReadable', () => {
+  it('accepts printable diagnostic text beginning with RDOC', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-text-log-'));
+    roots.push(root);
+    const file = path.join(root, 'diagnostic.log');
+    await writeFile(file, 'RDOC 001234: [12:34:56] runtime.cpp - Log - connected\n', 'utf8');
+    expect(() => assertTextReadable(file)).not.toThrow();
+    await writeFile(file, 'RDOC', 'utf8');
+    expect(() => assertTextReadable(file)).not.toThrow();
+  });
+
+  it('rejects a capture header even when renamed as a text log', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-text-magic-'));
+    roots.push(root);
+    const file = path.join(root, 'renamed.log');
+    await writeFile(file, Buffer.from([0x52, 0x44, 0x4f, 0x43, 0, 0, 0, 0, 0x20, 0, 0, 0]));
+    expect(() => assertTextReadable(file)).toThrow(/binary|RenderDoc/i);
+  });
+
   it('rejects .rdc captures', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-text-rdc-'));
     roots.push(root);

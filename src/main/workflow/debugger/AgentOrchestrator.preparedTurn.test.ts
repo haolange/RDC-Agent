@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -203,6 +204,11 @@ describe('AgentOrchestrator prepared turn context', () => {
     });
     expect(result.initialMessages).toEqual([]);
     expect(result.runtime.credentialHandle).toBe('credential-1');
+    expect(result.runtime.promptPlan.systemPrompt).toContain('prepared turn: 25');
+    expect(result.runtime.promptPlan.segments.at(-1)?.id).toBe('runtime:execution-limits');
+    expect(baseInput.promptPlan.segments).toEqual([]);
+    expect(result.runtime.effectivePlan.promptPlanFingerprint).toBe(createHash('sha256')
+      .update(JSON.stringify([result.runtime.promptPlan.systemPrompt])).digest('hex').slice(0, 24));
     expect(Array.isArray(result.runtime.effectivePlan.knowledgeReadRoots)).toBe(true);
     for (const root of result.runtime.effectivePlan.knowledgeReadRoots) {
       expect(result.runtime.effectivePlan.permissionSettings.readableRoots).not.toContain(root);

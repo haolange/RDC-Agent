@@ -77,7 +77,7 @@ export function useProjectSelection({
     onCloseProjectMenu,
   }), [loaderCtx, beginSelectionRequest, loaders.loadProjects, loaders.loadSessions, loaders.selectSession, onCloseProjectMenu, projectMenuOpen]);
 
-  const handleAddProject = useCallback(() => handleAddProjectOp(handlerCtx), [handlerCtx]);
+  const handleAddProject = useCallback((rootPath: string) => handleAddProjectOp(handlerCtx, rootPath), [handlerCtx]);
   const handleRemoveProject = useCallback(
     (project?: ProjectRecord) => handleRemoveProjectOp(handlerCtx, project),
     [handlerCtx],

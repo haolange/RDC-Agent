@@ -427,6 +427,9 @@ export interface ElectronAPI {
       error?: string;
     }>;
     inputs: {
+      referencePath: (projectId: string, filePath: string) => Promise<{
+        success: boolean; inputs: ProjectInputRecord[]; error?: string;
+      }>;
       prepareRemove: (projectId: string, inputId: string) => Promise<import('./session').ProjectInputRemovePreparation>;
       remove: (projectId: string, inputId: string, approvalToken: string) => Promise<import('./session').ProjectInputRemoveResult>;
       list: (projectId: string) => Promise<{ inputs: ProjectInputRecord[] }>;

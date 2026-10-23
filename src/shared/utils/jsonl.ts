@@ -4,6 +4,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { StringDecoder } from 'node:string_decoder';
 
 export interface JsonlDiagnostic {
   line: number;
@@ -20,32 +21,51 @@ export interface JsonlReadResult<T = unknown> {
  * Mid-file parse failures are reported in diagnostics (not silently skipped).
  * File-level I/O errors throw instead of returning an empty array.
  */
-export function readJsonl<T = unknown>(filePath: string): JsonlReadResult<T> {
+export function readJsonl<T = unknown>(filePath: string, select?: (record: T) => boolean): JsonlReadResult<T> {
   if (!fs.existsSync(filePath)) {
     return { records: [], diagnostics: [] };
   }
 
-  let content: string;
-  try {
-    content = fs.readFileSync(filePath, 'utf-8');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to read JSONL file: ${filePath}: ${message}`);
-  }
-
-  const lines = content.split('\n');
   const records: T[] = [];
   const diagnostics: JsonlDiagnostic[] = [];
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const trimmed = lines[index]!.trim();
-    if (!trimmed) continue;
+  let lineNumber = 0;
+  const consume = (line: string) => {
+    lineNumber += 1;
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    let record: T;
     try {
-      records.push(JSON.parse(trimmed) as T);
+      record = JSON.parse(trimmed) as T;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      diagnostics.push({ line: index + 1, error: message });
+      diagnostics.push({ line: lineNumber, error: message });
+      return;
     }
+    if (!select || select(record)) records.push(record);
+  };
+  const ioError = (error: unknown) => new Error(`Failed to read JSONL file: ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+  let fd: number;
+  try { fd = fs.openSync(filePath, 'r'); } catch (error) { throw ioError(error); }
+  try {
+    const buffer = Buffer.allocUnsafe(64 * 1024);
+    const decoder = new StringDecoder('utf8');
+    let pending = '';
+    let bytes: number;
+    const read = () => {
+      try { return fs.readSync(fd, buffer, 0, buffer.length, null); } catch (error) { throw ioError(error); }
+    };
+    while ((bytes = read()) > 0) {
+      pending += decoder.write(buffer.subarray(0, bytes));
+      let newline: number;
+      while ((newline = pending.indexOf('\n')) >= 0) {
+        consume(pending.slice(0, newline));
+        pending = pending.slice(newline + 1);
+      }
+    }
+    pending += decoder.end();
+    if (pending) consume(pending);
+  } finally {
+    fs.closeSync(fd);
   }
 
   return { records, diagnostics };

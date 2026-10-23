@@ -78,6 +78,10 @@ export class TaskRegistry {
       if (next === 'blocked' && !(updates.statusReason ?? task.statusReason)?.trim()) throw new Error('Blocked tasks require a statusReason.');
       if (next === 'in_progress' && !await this.canStart(taskId)) throw new Error('Task dependencies are not completed with verified results.');
       if (next === 'in_progress' && task.executionRequired && !task.currentExecutionId) throw new Error('Executable tasks must be started through startExecution.');
+      if (next === 'pending' && task.currentExecutionId) {
+        const active = await this.store.loadExecution(task.currentExecutionId);
+        if (active && !terminal(active.status)) throw new Error('Settle or cancel and join the active execution before returning its task to pending.');
+      }
       if (next === 'blocked' && task.currentExecutionId) { const active = await this.store.loadExecution(task.currentExecutionId); if (active && !terminal(active.status)) throw new Error('Settle or cancel the active execution before blocking its task.'); }
       if (next === 'completed') await this.assertCanComplete(task, updates.result);
       if (semanticsChanged && task.currentExecutionId) {
@@ -101,9 +105,10 @@ export class TaskRegistry {
   async startExecution(taskId: string, options: StartTaskExecutionOptions): Promise<TaskExecutionRecord> {
     return this.store.withLock('state', async () => {
       const task = await this.requireTask(taskId); if (task.parentTaskId && await this.hasUnavailableAncestor(task.parentTaskId)) throw new Error('Task ancestor is terminal or cancelling.'); if (await this.hasCancellingAncestor(taskId)) throw new Error('Task or ancestor cancellation is in progress.'); if (!await this.canStart(taskId)) throw new Error('Task dependencies are not completed with verified results.');
-      if (terminalTask(task.status)) throw new Error(`Terminal task cannot start another execution: ${task.status}.`);
-      if (task.status === 'in_progress') throw new Error('An in-progress task cannot start another execution.');
-      if (task.currentExecutionId) { const current = await this.store.loadExecution(task.currentExecutionId); if (current && !terminal(current.status)) throw new Error(`Task already has an active execution: ${current.id}`); }
+      if (options.resumeCancelled) await this.assertCancelledContinuation(task, options);
+      else if (terminalTask(task.status)) throw new Error(`Terminal task cannot start another execution: ${task.status}.`);
+      if (task.status === 'in_progress') throw new Error('An in-progress task cannot start another execution. Settle or cancel and join its current execution first; a delegated runner starts its own execution.');
+      if (task.currentExecutionId) { const current = await this.store.loadExecution(task.currentExecutionId); if (current && !terminal(current.status)) throw new Error(`Task already has an active execution: ${current.id}. Settle or cancel and join it first; setting pending does not release it.`); }
       const previous = await this.store.listExecutions(taskId);
       const generation = Math.max(0, ...previous.map((x) => x.generation)) + 1;
       const parent = options.parentExecutionId ? await this.requireExecution(options.parentExecutionId) : undefined;
@@ -329,6 +334,24 @@ export class TaskRegistry {
   }
   async getUnblockedTasks(completedId: string): Promise<TaskRecord[]> { const candidates = (await this.listTasks()).filter((x) => x.status === 'pending' && x.blockedBy.includes(completedId)); const checks = await Promise.all(candidates.map((x) => this.canStart(x.id))); return candidates.filter((_x, index) => checks[index]); }
 
+  private async assertCancelledContinuation(task: TaskRecord, options: StartTaskExecutionOptions): Promise<void> {
+    if (task.status !== 'cancelled' || options.mode !== 'direct' || options.parentExecutionId) {
+      throw new Error('Only the owning direct turn can explicitly resume a cancelled Task.');
+    }
+    const current = task.currentExecutionId ? await this.store.loadExecution(task.currentExecutionId) : null;
+    const priorTurn = current?.frozenPlanRef ?? task.creationTurnRef;
+    if (!priorTurn?.trim() || !options.frozenPlanRef?.trim() || priorTurn.trim() === options.frozenPlanRef.trim()) {
+      throw new Error('Cancelled Task continuation requires a later turn with a frozen execution identity.');
+    }
+    const tree = [task, ...collectDescendants(task.id, await this.store.listTasks())];
+    for (const member of tree) {
+      if (CANCELLING_TASK_TREES.has(member.id)
+        || (await this.store.listExecutions(member.id)).some(execution => !terminal(execution.status))) {
+        throw new Error('Cancelled Task continuation must wait for every owned producer to join.');
+      }
+    }
+  }
+
   private async assertCanComplete(task: TaskRecord, result?: TaskCompletionResult): Promise<void> {
     if (!task.executionRequired) return;
     if (!task.currentExecutionId) throw new Error('Executable task cannot complete without an execution.');
@@ -399,8 +422,8 @@ function validateBudget(budget: TaskExecutionRecord['budget'], requireRemainingT
   const optionalNonNegative = ['maxToolCalls', 'maxSubagents', 'maxChildDepth'] as const;
   for (const key of nonNegative) if (!Number.isFinite(budget[key]) || budget[key] < 0) throw new Error(`Invalid task execution budget: ${key}.`);
   for (const key of optionalNonNegative) if (budget[key] !== undefined && (!Number.isFinite(budget[key]) || budget[key]! < 0)) throw new Error(`Invalid task execution budget: ${key}.`);
-  if (budget.maxToolCalls !== undefined && budget.toolCalls > budget.maxToolCalls) throw new Error('Task execution tool-call budget is already exhausted.');
-  if (budget.maxSubagents !== undefined && budget.subagents > budget.maxSubagents) throw new Error('Task execution subagent budget is already exhausted.');
+  if (budget.maxToolCalls !== undefined && budget.toolCalls > budget.maxToolCalls) throw new Error(`Task execution tool-call budget is already exhausted. consumed=${budget.toolCalls}; cumulativeMax=${budget.maxToolCalls}. This cap includes prior Task generations, not additional allowance; preserve consumption, existing ceilings and deadline when checking a corrected request.`);
+  if (budget.maxSubagents !== undefined && budget.subagents > budget.maxSubagents) throw new Error(`Task execution subagent budget is already exhausted. consumed=${budget.subagents}; cumulativeMax=${budget.maxSubagents}. This cap includes prior Task generations, not additional allowance; preserve consumption, existing ceilings and deadline when checking a corrected request.`);
   if (budget.maxChildDepth !== undefined && budget.childDepth > budget.maxChildDepth) throw new Error('Task execution child-depth budget is exceeded.');
   if (!Number.isFinite(budget.startedAt) || (budget.deadlineAt !== undefined && (!Number.isFinite(budget.deadlineAt) || budget.deadlineAt < 0))) throw new Error('Task execution deadline is invalid.');
   // A running execution may report its final usage after its deadline. The

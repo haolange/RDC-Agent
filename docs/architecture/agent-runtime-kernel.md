@@ -33,11 +33,15 @@ General agent tools are mediated by `AgentPermissionPolicy` before execution. Th
 
 `tool_search` 对最终 effective tool set 做权威搜索。空结果返回结构化 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 和 tool-set fingerprint；同一 fingerprint 下重复相同搜索不能得到新工具。text-only route 在 `PromptPlanBuilder` 中得到空工具集，Prompt 明确禁止把 tool-call-shaped 文本当作调用，也禁止反复搜索本轮不存在的工具。
 
+执行器重建工具实例时同样使用 prepareTurn 冻结的 Skill 工具交集，与预备阶段的 schema 集合一致；不能用更宽的 Profile allowlist 重建 `tool_search` 闭包，再等调用时拒绝。没有 Skill 收窄时保留冻结运行时工具集，空交集不能回退为完整工具集。工具发现不授予权限，调用侧仍执行既有权限校验。
+
 ## Loop Progress 与终止
 
 `LoopProgressGuard` 在每次工具结果回灌后构建稳定指纹：有序工具名、规范化参数、成功/失败、语义结果和 `LoopRuntimeState.revision`；call id、时间戳与耗时不参与。第二个连续相同指纹只为下一次 LLM 请求追加一次易失 `<runtime_no_progress>` 指令，第三次仍相同抛出 `AGENT_NO_PROGRESS`。任一参数、结果或 revision 变化都复位计数。
 
 Agent 达到 `maxTurns` 时，只有已经获得 canonical final 才能正常完成；若 Provider 仍要求 continuation，则抛出 `AGENT_MAX_TURNS_EXCEEDED`。Conversation 分别映射为 `CONVERSATION_AGENT_LOOP_STALLED` 与 `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；流式协议完整性违规映射为 `CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION`。三者都和 `CONVERSATION_LLM_REQUEST_FAILED` 互斥。Work Process 的完成摘要由真实 tool result 统计成功、失败、跳过，模型自述不能覆盖 runtime 证据。
+
+`ExecutionLimits.resolveAgentMaxTurns` 是循环配置与 Prompt 额度事实的共同解析入口。`TurnPreparationService` 在固定输入估算前把实际 profile/policy 上限写入 `runtime:execution-limits`；prepared runtime 持有同一最终 PromptPlan，其缓存、Context 指标和 EffectiveRuntimePlan fingerprint 与执行器一致。规划所见 `runtime:profile-limits` 来自当前已解析 catalog 快照，仅为 profile 上界，不代表未来回合的实际 policy 或剩余预算；辅助压缩请求与普通循环分开计。不得为了满足模型提出的纸面预算修改这些上限。
 
 `turn_complete` 在接受声明前核对本回合 direct Task 执行是否均已由所属 Task 结算；未结算时返回可操作的 `TASK_COMPLETION_DENIED`，不给模型制造“已声明完成”的假回执。若模型绕过声明直接终答，父回合最终门禁仍将遗留执行标为 blocked，并以本地 Task 完整性诊断收口，不归咎 Provider。
 

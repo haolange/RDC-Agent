@@ -13,6 +13,7 @@ import {
   type ConversationHistoryCacheEntry,
   type ConversationDeltaRecord,
   type ConversationTerminalCommitJournal,
+  type ConversationTerminalAppendJournal,
   type ConversationTurnCommitJournal,
   type ExistingConversationTurnCommit,
 } from './storageCommitTypes';
@@ -25,6 +26,7 @@ import {
   SessionRecordSchema,
   toSessionAttachmentManifest,
 } from './storageSchema';
+import { applyTerminalAppend, prepareTerminalAppend } from './ConversationTerminalAppend';
 
 export type {
   ExistingConversationTurnCommit,
@@ -189,41 +191,24 @@ export class ConversationHistoryStore {
       throw new Error('Conversation terminal commit ownership mismatch.');
     }
 
-    const beforeHistory = this.readConversationHistory(sessionId);
-    const beforeBranch = this.readConversationBranchState(sessionId);
-    const beforeContext = this.host.context.readSessionContextJournal(sessionId);
-    const duplicate = beforeContext.find((entry) => entry.turnId === turnId);
+    const duplicate = this.host.context.readSessionContextJournal(sessionId, (entry) => entry.turnId === turnId)[0];
     if (duplicate && JSON.stringify(duplicate) !== JSON.stringify(contextEntry)) {
       throw new Error(`Conflicting session context entry for turn ${turnId}.`);
     }
-    const afterHistory = beforeHistory.slice();
-    const assistantIndex = afterHistory.findIndex((message) => message.id === assistantMessage.id);
-    if (assistantIndex >= 0) afterHistory[assistantIndex] = assistantMessage;
-    else afterHistory.push(assistantMessage);
-    afterHistory.sort((left, right) => left.createdAt - right.createdAt);
-    const afterContext = duplicate ? beforeContext : beforeContext.concat(contextEntry);
-    const journal: ConversationTerminalCommitJournal = {
-      schemaVersion: '1',
-      requestId,
-      turnId,
-      phase: 'prepared',
-      beforeHistory,
-      beforeBranch,
-      beforeContext,
-      afterHistory,
-      afterBranch: beforeBranch,
-      afterContext,
-    };
+    const replaceAssistant = this.readConversationHistory(sessionId).some((message) => message.id === assistantMessage.id);
+    const journal = prepareTerminalAppend(session.sessionPath, requestId, turnId, assistantMessage, contextEntry, !duplicate, replaceAssistant);
     const journalPath = this.getConversationTerminalCommitJournalPath(session.sessionPath);
-    this.host.io.writeJsonAtomic(journalPath, journal);
+    this.host.io.writeUtf8AtomicFsync(journalPath, JSON.stringify(journal));
     this.host.terminalCommitSessionIds.add(sessionId);
-    const committing: ConversationTerminalCommitJournal = { ...journal, phase: 'committing' };
+    const committing: ConversationTerminalAppendJournal = { ...journal, phase: 'committing' };
     try {
-      this.host.io.writeJsonAtomic(journalPath, committing);
+      this.host.io.writeUtf8AtomicFsync(journalPath, JSON.stringify(committing));
       this.applyConversationTerminalJournal(session, committing, true);
-      this.host.io.writeJsonAtomic(journalPath, { ...committing, phase: 'committed' });
+      this.host.io.writeUtf8AtomicFsync(journalPath, JSON.stringify({ ...committing, phase: 'committed' }));
       fs.rmSync(journalPath, { force: true });
       this.host.sessions.updateSession(sessionId, {});
+      // Maintenance may rewrite history only after the append WAL is gone.
+      this.compactAfterDurableAppend(sessionId, this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0);
     } finally {
       this.host.terminalCommitSessionIds.delete(sessionId);
     }
@@ -247,7 +232,7 @@ export class ConversationHistoryStore {
     if (!existing) {
       appendJsonl(filePath, message);
       this.applyConversationMessageToCache(sessionId, filePath, message);
-      this.host.conversationPendingDeltaCounts.set(sessionId, 0);
+      this.compactAfterDurableAppend(sessionId, this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0);
       return;
     }
 
@@ -264,8 +249,7 @@ export class ConversationHistoryStore {
     };
     appendJsonl(filePath, delta);
     this.applyConversationMessageToCache(sessionId, filePath, message);
-    const nextDeltaCount = (this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0) + 1;
-    this.host.conversationPendingDeltaCounts.set(sessionId, nextDeltaCount);
+    const nextDeltaCount = this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0;
     this.compactAfterDurableAppend(sessionId, nextDeltaCount);
   }
 
@@ -300,13 +284,12 @@ export class ConversationHistoryStore {
     };
     appendJsonl(filePath, delta);
     this.applyConversationMessageToCache(sessionId, filePath, nextMessage);
-    const nextDeltaCount = (this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0) + 1;
-    this.host.conversationPendingDeltaCounts.set(sessionId, nextDeltaCount);
+    const nextDeltaCount = this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0;
     this.compactAfterDurableAppend(sessionId, nextDeltaCount);
   }
 
   private compactAfterDurableAppend(sessionId: string, pendingDeltaCount: number): void {
-    if (pendingDeltaCount % CONVERSATION_COMPACTION_DELTA_THRESHOLD !== 0) return;
+    if (pendingDeltaCount < CONVERSATION_COMPACTION_DELTA_THRESHOLD || pendingDeltaCount % CONVERSATION_COMPACTION_DELTA_THRESHOLD !== 0) return;
     try {
       this.compactConversationHistory(sessionId);
     } catch (error) {
@@ -478,6 +461,8 @@ export class ConversationHistoryStore {
     messages: ConversationMessage[],
     rawRecordCount: number,
   ): void {
+    // Redundancy belongs to the session journal, not one message or turn.
+    this.host.conversationPendingDeltaCounts.set(sessionId, Math.max(0, rawRecordCount - messages.length));
     if (!fs.existsSync(filePath)) {
       this.host.conversationHistoryCache.set(sessionId, {
         mtimeMs: 0,
@@ -621,9 +606,18 @@ export class ConversationHistoryStore {
 
   applyConversationTerminalJournal(
     session: SessionRecord,
-    journal: ConversationTerminalCommitJournal,
+    journal: ConversationTerminalCommitJournal | ConversationTerminalAppendJournal,
     useAfter: boolean,
   ): void {
+    if (journal.schemaVersion === '2') {
+      const assistant = applyTerminalAppend(session.sessionPath, journal, useAfter);
+      if (useAfter) this.applyConversationMessageToCache(session.sessionId, this.getConversationPath(session.sessionId), assistant);
+      else {
+        this.invalidateConversationHistoryCache(session.sessionId);
+        this.host.conversationPendingDeltaCounts.delete(session.sessionId);
+      }
+      return;
+    }
     const history = useAfter ? journal.afterHistory : journal.beforeHistory;
     const branch = useAfter ? journal.afterBranch : journal.beforeBranch;
     const context = useAfter ? journal.afterContext : journal.beforeContext;

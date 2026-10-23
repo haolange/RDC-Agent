@@ -8,6 +8,7 @@ import type { ReplayHistoryStore } from './replay/ReplayHistoryStore';
 export interface ProjectInputLifecycleHost {
   getProject(projectId: string): ProjectRecord | null;
   refresh(projectId: string): Promise<ProjectInputRecord[]>;
+  detachReference(projectId: string, inputId: string): Promise<ProjectInputRecord[]>;
   bindings(projectId: string): Array<{ scope: { projectId: string; sessionId: string }; inputId: string | null; captureHash: string | null; interactionLock: string | null }>;
   close(projectId: string, inputId: string): Promise<void>;
   rebind(projectId: string, inputId: string, input: ProjectInputRecord): Promise<void>;
@@ -23,18 +24,24 @@ export class ProjectInputLifecycle {
     if (!project) throw new Error('PROJECT_NOT_FOUND');
     const input = project.inputs.find((item) => item.inputId === inputId);
     if (!input) throw new Error('PROJECT_INPUT_NOT_FOUND');
-    const relative = path.relative(project.inputsPath, input.filePath);
-    if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || path.extname(input.filePath).toLowerCase() !== '.rdc') {
-      throw new Error('PROJECT_INPUT_PATH_ESCAPE');
+    let verified = input;
+    if (input.source === 'external_reference') {
+      // Removing a reference must also work when the original is unavailable.
+      if (!input.referenceIdentity || !input.contentSha256) throw new Error('CAPTURE_REFERENCE_INVALID_RECORD');
+    } else {
+      const relative = path.relative(project.inputsPath, input.filePath);
+      if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || path.extname(input.filePath).toLowerCase() !== '.rdc') {
+        throw new Error('PROJECT_INPUT_PATH_ESCAPE');
+      }
+      await safePath(project.rootPath, input.filePath);
+      const hashed = await hashCaptureFile(input.filePath);
+      verified = { ...input, contentSha256: hashed.sha256, size: hashed.size, lastModifiedAt: hashed.mtimeMs };
     }
-    await safePath(project.rootPath, input.filePath);
-    const hashed = await hashCaptureFile(input.filePath);
-    const verified = { ...input, contentSha256: hashed.sha256, size: hashed.size, lastModifiedAt: hashed.mtimeMs };
     const bindings = this.host.bindings(projectId).filter((binding) => binding.inputId === inputId);
     const busy = bindings.filter((binding) => binding.interactionLock);
     if (busy.length) throw new Error(`PROJECT_INPUT_BUSY: ${busy.map((item) => item.scope.sessionId).join(', ')}`);
     return { project, input: verified, affectedSessionIds: bindings.map((item) => item.scope.sessionId),
-      approvalIdentity: JSON.stringify([projectId, inputId, input.filePath, hashed.sha256]) };
+      approvalIdentity: JSON.stringify([projectId, inputId, input.source, input.filePath, verified.contentSha256, input.referenceIdentity]) };
   }
 
   async remove(projectId: string, inputId: string, approvedIdentity: string): Promise<ProjectInputRemoveResult> {
@@ -47,6 +54,10 @@ export class ProjectInputLifecycle {
         // Revalidate both path ownership and original content after native handles are confirmed closed.
         const final = await this.prepare(projectId, inputId);
         if (final.approvalIdentity !== approvedIdentity) throw new Error('PROJECT_INPUT_CHANGED_AFTER_APPROVAL');
+        if (final.input.source === 'external_reference') {
+          const inputs = await this.host.detachReference(projectId, inputId);
+          return { success: true, inputs, fileDeleted: false, cleanupPending: false };
+        }
         await fs.unlink(final.input.filePath);
         fileDeleted = true;
         const inputs = await this.host.refresh(projectId);
@@ -55,7 +66,8 @@ export class ProjectInputLifecycle {
     } catch (error) {
       const inputs = this.host.getProject(projectId)?.inputs ?? [];
       return { success: false, inputs: fileDeleted ? inputs.filter((input) => input.inputId !== inputId) : inputs,
-        fileDeleted, cleanupPending: fileDeleted, error: error instanceof Error ? error.message : String(error) };
+        fileDeleted, cleanupPending: fileDeleted || !!this.host.getProject(projectId)?.replayCleanupPending,
+        error: error instanceof Error ? error.message : String(error) };
     }
   }
 

@@ -1,11 +1,11 @@
 ---
 name: optimizer-rdc-tools
-description: Choose and interpret the bounded RDC operations needed to measure costs, run controlled shader interventions, and verify visual and numeric restoration. General execution only.
+description: Operation knowledge for Optimizer planning and owning General execution to measure costs, run controlled shader interventions, and verify visual and numeric restoration.
 ---
 
 # Optimizer RDC-Tool
 
-本手册由 Optimizer Mission 通过 execute handoff 绑定给 General。先读 `$rdc-tool-shell`，再按实验 Plan 读取 [工具参考](references/tools.md) 的相关条目。它只提供测量和操作知识，不改变工具、会话或路径权限。
+Optimizer 可按需只读本手册及引用，在计划前核对参数、输出、采证和调用成本；执行仍须通过 execute handoff 将手册绑定给 General 并真实预载。先读 `$rdc-tool-shell`，再按实验 Plan 读取 [工具参考](references/tools.md) 的相关条目。它只提供测量和操作知识，不改变工具、会话或路径权限。
 
 ## 选择路径
 

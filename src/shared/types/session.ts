@@ -13,7 +13,9 @@ export interface ProjectInputRecord {
   inputId: string;
   fileName: string;
   filePath: string;
-  source: 'project_resource';
+  source: 'project_resource' | 'external_reference';
+  /** Exact external file identity; does not authorize its parent directory. */
+  referenceIdentity?: { device: string; inode: string; birthtimeNs: string };
   discoveredAt: number;
   lastModifiedAt: number;
   size: number;

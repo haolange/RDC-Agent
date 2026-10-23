@@ -1,11 +1,11 @@
 ---
 name: analyzer-rdc-tools
-description: Choose and interpret the bounded RDC operations needed to reconstruct passes, resources, bindings, shaders, and data flow without overstating author intent. General execution only.
+description: Operation knowledge for Analyzer planning and owning General execution to reconstruct passes, resources, bindings, shaders, and data flow without overstating author intent.
 ---
 
 # Analyzer RDC-Tool
 
-本手册由 Analyzer Mission 通过 execute handoff 绑定给 General。先读 `$rdc-tool-shell`，再按 Plan 读取 [工具参考](references/tools.md) 的相关条目。成员清单用于知识覆盖和参考新鲜度检查，不授予执行权限。
+Analyzer 可按需只读本手册及引用，在计划前核对参数、输出、采证和调用成本；执行仍须通过 execute handoff 将手册绑定给 General 并真实预载。先读 `$rdc-tool-shell`，再按 Plan 读取 [工具参考](references/tools.md) 的相关条目。成员清单用于知识覆盖和参考新鲜度检查，不授予执行权限。
 
 ## 选择路径
 

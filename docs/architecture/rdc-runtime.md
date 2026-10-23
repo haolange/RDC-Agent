@@ -15,6 +15,10 @@ RDC Runtime 是 RDC-Agent 的资源解析、Prompt 构建与运行期可观测�
 
 RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`、`"Infinity"`、`"-Infinity"`，保留其异常事实而不伪造 0；有限数值仍为 JSON number。主进程严格解析 JSON，缺失、非法输出和截断分别报错并隔离不确定的 replay/context。字符串标记不能当作有效数值参与因果或性能结论。
 
+原生 controller 发生 fatal 错误后可能继续返回默认零值或空对象。Tool 在非生命周期操作实际访问 controller 时及结果发布前检查 `GetFatalErrorStatus`；语义参数校验仍先于原生访问，生命周期清理入口保留。`replay_fatal_error` 与无法核验健康的 `replay_health_unavailable` 都不是有效测量或恢复证明，主进程按原有未知结果规则隔离 owning lease，不发布成功证据。健康控制器的合法零值不受此规则影响；瞬时健康回执也不保证之后的连接或实验恢复。
+
+管线 `sections` 的资格只覆盖实际请求并返回的字段。未采集 section 的模型默认空值不能降级已返回的 bindings，也不能据此声称已核验被省略的 shader 或输出状态；真实请求字段缺失仍保留对应降级原因。
+
 每项 resolved resource 携带 `scope`、`sourcePath`、`sourceHash`、`overriddenSource` 与 `effectiveStatus`。Renderer 通过 `rdcRuntime` preload API 获取这些信息，不直接访问文件系统、Secret 或任意 shell。
 
 ## Project Instructions
@@ -28,6 +32,16 @@ RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`�
 目标目录来自 session cwd、附件或当前 capture。带路径的工具调用会重新解析新增目录链。越界、symlink escape、解析错误和预算截断进入诊断，不静默忽略。不自动读取 `AGENTS.md` 或 `CLAUDE.md`。
 
 ## Agent、Skill、MCP 与 Hook
+
+`rdc_context` 在确认 owning lease 后，按同一 project/session（合法委托使用父 session）核对主进程已打开的 context、captureFileId 和 replaySessionId，并返回 `captureContentSha256`。其来源是打开前后验证一致的实际 capture 文件字节哈希；不匹配、未打开或缺少验证哈希时返回 `null`，不采用 handle 的派生摘要或模型传入值。它只暴露现有主进程身份事实，不授予 capture 生命周期操作权限，也不证明实验已经回滚。
+
+同一响应的 `hostControls` 提供宿主的可复查控制事实。`artifactCapacity` 来自现有 SessionArtifactResolver quota ledger，包含磁盘用量、在途预留、实际单文件/图像/session/文件数上限及扣除在途预留后的当前余量；`measuredAt` 标明读取时间，`isReservation=false`。它不是整批未来空间预留、物理磁盘剩余量或未来写入成功保证；每次写入仍走既有原子预留、限额和事务。计划据此核算保守材料预算，实际失败时保留已发生效果并按恢复合同处理，不把一个 baseline 导出成功当后续容量证明。
+
+`cliProcess` 只在执行上下文与当前 session/project/context/lease version 的冻结绑定一致、CLI 已启用且 timeout 为有效正整数时提供冻结的 `timeoutMs`，不序列化 executable、argv、cwd 或环境。其 scope 是一次 CLI invocation，`wholeOperationDeadline=false`、`nativeTerminationGuaranteed=false`；主进程的前置核验和调用后 replay observation 可能另调用 CLI，排队、模型、存储和后续恢复须另计，不将这个数冒充整个实验或整个操作的绝对墙钟上界。缺失、漂移和读取失败显式 unavailable，不补默认零值。超时或结果不确定依旧隔离 owning context；没有 close/error 回执不能认定子进程退出。Windows 树终止命令自身设置 5 秒 timeout；重复取消、timeout 与 shutdown 合并为一次初始终止和一次升级，保留首个中止原因。`termination.maxTreeKillAttempts=2`，`joinTerminationAdditionalWaitMs=2×5000+2000+1000=13000`，均由同一 ProcessSupervisor 政策导出，供单 CLI join 等待规划；这不覆盖排队、spawn、模型、存储或事件循环停顿，也不承诺目标真实退出。终止命令返回仍不能替代 close/error。
+
+真实进程连续性使用同一受控 CLI 的 `rd.session.get_context.data.process_identity` 和每次 canonical 结果的 `meta.process_identity`。Tool 仅在实际 daemon child 中读取自身与父 daemon 的 OS 进程出生标识，分别返回 `pid + start_generation`；Windows 为进程创建 FILETIME，Linux 为 boot ID 与进程启动 tick。父身份不符、读取失败或平台不支持时明确 unavailable，不用持久逻辑 ID、缓存或零值替代。每个实验阶段须比较完整 daemon/worker 身份，PID 复用或任一世代变化使连续性失效；该字段进入既有主进程签名结果，不自动证明因果、恢复或设备呈现，不增加生命周期权限。
+
+状态控制的实现语义随共享 CLI 方法分发，不能要求每次 capture 调查访问上游源码仓库。RDC-Tool 的 shader 编辑、活动 patch 枚举和撤销共用 PatchEngine 的 session 活动集合；元数据是同一集合的投影，`shaderReplacement` / `patchStack` 不代表两个独立变更接口。对照权威实现为上游 `rdc_tool/server_runtime.py` 的 `_list_replacement_payloads` / `_store_replacement_payload` 及 shader dispatch、`rdc_tool/core/patch_engine.py` 的 `list_patches`；这些位置用于工程核对，不是用户运行前提。实际三状态枚举、冻结身份和五阶段签名仍必需。数据写入控制只在完整冻结目录和有效权限确实没有该可达路径时限定为不适用；关键词空搜索、未知效果或查询失败不能证明无状态，也不能声明外部修改不存在。工具安装语义与方法合同冲突时保存实际反证，回到所属计划或工程修复，不放宽安全门。
 
 - `.agent.md` 是 Agent Profile 的唯一来源，使用 YAML frontmatter + Markdown。
 - Skill 使用 `<skill-id>/SKILL.md` 与可选的 `scripts/`、`references/`、`assets/`。
@@ -87,17 +101,29 @@ RDC-Tool 的 session worker 对 `rd.session.*` 统一提供 60 秒操作预算�
 
 普通执行先校验当前身份、定义的 scope、effects、参数 schema、前置条件和路径。未知操作、未知影响、模型覆盖 session/context 身份、非 owning General、Mission 直接执行、越界路径均在执行前拒绝。replay 操作才注入 replay session_id；daemon context 始终由主进程指定。context 更新只允许用户字段，VFS 只允许当前会话的受限结构化路径。生命周期、remote 控制、全局配置、桌面窗口、清理销毁由应用专门入口管理，目录和 Skill 不能自行授予权限。既有 shell 审批、realpath 路径边界、取消、串行 lease 和未知结果隔离继续生效。
 
-`rd.core.get_capabilities` 的 remote matrix 在调用时按当前 active event 观察事件绑定能力。Present 等无 shader 的事件返回 `not_currently_probed`，不能替代目标 draw 的 shader/disassembly 与 `edit_plan` 回执，也不能凭原始调试源码缺失断言所有可编辑输入不可用。真正的后端不支持、目标事件操作失败与主进程执行拒绝继续分别按各自回执处理。
+`rd.core.get_capabilities` 的 summary 与普通 Context 读取不恢复或探测 replay controller；full 通过既有恢复路径只核验当前选中 session，并在原生 replay 线程读取能力。`current_session_probe` 区分已核验、未探测与获取失败；持久 endpoint 登记、延迟加载或探测异常不能当作连接有效或后端不支持的证明。full 的数量是当前进程已加载对象数量。remote matrix 按当前 active event 观察事件绑定能力；Present 等无 shader 的事件返回 `not_currently_probed`，不能替代目标 draw 的 shader/disassembly 与 `edit_plan` 回执，也不能凭原始调试源码缺失断言所有可编辑输入不可用。真正的后端不支持、目标事件操作失败与主进程执行拒绝继续分别按各自回执处理。
 
-长反汇编由会话制品保存完整原文并给出 URI/hash；模型可见的有界主进程摘要同时保留已核对身份、目标事件、shader、格式及该次 `edit_plan` 的编辑/构建/替换能力与输入形式。字段缺失须标为未核验，摘要不能授予权限，也不能替代读取完整 ASM 或实验恢复回执。
+长反汇编由会话制品保存完整原文并给出 URI/hash；模型可见的有界主进程摘要同时保留已核对身份、目标事件、shader、格式及该次 `edit_plan` 的编辑/构建/替换能力与输入形式。成功结果的 `available_targets` 来自原生目标枚举，`available_targets_status` 区分 complete（含合法空列表）、unavailable（查询失败）和 unsupported（原生接口缺失），异常原因单列；不能据空值猜测 GPU ISA 支持。原生列表与 Tool 的 raw ASM fallback 分别解释，不把派生输入冒充原生 ISA。字段缺失或超过摘要边界须标为未核验，摘要不能授予权限，也不能替代读取完整 ASM 或实验恢复回执。
+
+raw SPIR-V 格式必须同时有匹配的构建编码与实际 opcode 行；注释头、诊断文字、目标名称或编码提示不能单独建立 raw ASM 或可替换性。原生外部视图返回的原文保留供核验，不据其非空就当作 GPU 指令；显式 raw target 与外部 raw fallback 同样校验指令内容。格式识别不替代编译器验证、原生执行或设备数值证据。
+
+区域原生读值按已应用事件、subresource、rect、stride 与 as_type 解释。`get_region_values` 在采样转换后不超过 256 标量时直接返回完整嵌套 `values`；超限为 null／`omitted_limit`，不能据省略判断没有数据。完整 NPZ 与内联视图、总体及逐通道统计来自同一数组，shape／dtype／stride 明确。非有限值保持 canonical 字符串标记，解码分量不单独证明物理 alpha。读取区域数值或统计是取证能力，不自动成立 clipping、细节、首次错误或修复画质结论。
+
+工具制品的 `owner` / `ownerScope=product-session` 表示产品对话归属；原生执行归属由 `rdcExecutionIdentity` 中的 `productSessionId`、`contextId`、`replaySessionId`、`captureFileId` 分别表达。共享 CLI 方法按同名字段核对当前上下文，不能把包装层产品 owner 与原生 replay ID 作相等比较；产品 owner 一致也不替代 replay 检查。分页或压缩摘要未带完整身份时须按 URI/hash 读取来源，保留未知与实际不匹配的区别；Checkpoint 保留字段名和已验证关系，不把不同身份压成单一 session ID。
+
+原生 shader 调试的 `pc` 沿用 RenderDoc trace 的 `stepIndex`，不与 IR ID、`nextInstruction` 或源码行号混同。Tool 逐项消费 `ContinueDebug` 返回的批次，按 `ShaderVariableChange.before/after` 累积当前变量快照，包括变量离开作用域；不能把读取不存在的字段所得空列表当成实际无变量。变量保留原生类型/数值视图与明确截断标识，调用栈只有原生函数名时，未知文件/行保持 null。未实现的源码步进/断点由当前目录明确拒绝；释放失败不得清掉 handle 后报成功。Agent 仍按冻结目录、同身份和实际原生回执判断，未加载该候选的旧安装结果不证明新行为。
 
 需要实验执行证据时，主进程在真实执行、身份及结果验证之后签发回执，绑定 session/project/turn/toolCall/experiment/context/lease/replay 身份、操作定义指纹、参数指纹、结果 hash 和执行时间。签名 key 由 OS safeStorage 保管，不进 prompt/IPC/trace；先确认可签名再执行，落盘遵守 SessionArtifactResolver 配额和原子写入边界。普通发现不签执行回执；手写 JSON、普通 shell 回显或目录自称安全/已回滚都不构成可信证据。
 
 实验验收解释受支持的测量、干预和回滚结果，测量必须包含真实有限数值或可验证图像；不接受空值、伪造零值或成功文案。baseline → intervention → variant → rollback → restored 必须属于同一实验、context 和 lease，顺序有效；测量方法、参数与采样条件一致；回滚对应真实 replacement 并确认已恢复。历史记录不自动取得当前执行证明。签名证明执行和结果，不自动证明因果、质量、噪声或优化收益。
 
-专业手册与共享执行 Skill 经 Mission 声明续跑上的 requiredSkillIds 写入 session execution offer，并在 General prepareTurn 真正加载。手册是操作知识，主进程执行规则是权限权威。生成参考及示例校验见 `pnpm run check:rdc-tool-guides`。
+冻结目录搜索包含并返回 `evidence_kind`，支持按 measurement/intervention/rollback 发现候选，完整参数仍由 describe 核对；不建立第二份操作白名单。无证据能力的操作携带 experimentId 时在原生执行前明确拒绝，并提示核对冻结目录与实际 receipt 引用。Experiment 使用每次结果返回的 `receipt.uri/expectedHash`，普通工具输出及其外层制品不能代替签名文件。方法资源要求干预前取得 baseline 签名，缺失阶段保持未证，不事后补签或自动追认旧实验。
+
+专业手册与共享执行 Skill 经 Mission 声明续跑上的 requiredSkillIds 写入 session execution offer，并在 General prepareTurn 真正加载。Mission 在规划期可按需只读共享手册及对应专业手册和引用，核对操作参数与采证成本；读取不启动 CLI、不取得 lease、不改变冻结执行工具面。手册是操作知识，主进程执行规则是权限权威。生成参考及示例校验见 `pnpm run check:rdc-tool-guides`。
 
 ## 内嵌回放、观察与 Session ownership
+
+项目输入支持 `project_resource` 与显式登记的 `external_reference`。后者由 Capture 面板「引用外部抓帧（只读）」经 `project:inputs:reference` 登记单个绝对路径，不复制 RDC、不扫描父目录、不扩展 Project Scope。登记保留 canonical 路径、文件身份与完整内容 hash；刷新、重启、打开前后与重绑定均复验，替换或内容变化须显式重新登记。移除引用沿同一审批与绑定释放路径解除登记及项目内足迹，永不删除或修改外部原件；原件缺失也能移除引用。原项目内输入的导入、删除与存储格式保持原语义，不批量迁移已有项目。
 
 应用生命周期的唯一入口为 session-scoped `RdcSessionService`，每个 binding 持有 `RdcSessionRuntime`。Open 对原文件计算完整 SHA-256，main 分配 UUID daemon context，先 `daemon start --owner-pid <App pid>` 再通过固定原生 argv 传递。只接受匹配的 native identity，关闭失败保留原 owning context。Android 设备预留先于连接，另一 session 不能抢占。`ShutdownCoordinator` 在 `release_owned_runtimes` 完成 clear+stop 与归属收割后，才进入 `terminate_processes` 的 `ProcessSupervisor.joinAll`。归属记录落在 `userData/state/owned-rdc-daemons.json`，不是全局 lease 镜像。
 
@@ -117,6 +143,8 @@ RDC 接口只维护当前操作契约；包发布号仅用于安装诊断，不�
 
 设备选择只更新选择目标；Capture 打开时才由 RdcSessionRuntime 分配 owning context、冻结 CLI 并预留设备，然后调用同一原生连接。无 context 的 device:activate IPC 已删除。Tools 根据实际状态复用已有 helper 或启动自有 helper，应用不另行启停。设备连接状态只在 connect 与 Ping 都成功后建立；startedActivity 才表示本次启动，包名存在不表示 APK 已验证。失败保留真实错误，可重新打开 Capture 重试。关闭、取消与退出均遵循自有资源清理，借用 helper 必须保留。
 
+helper 进程退出不转移已有安装或配置的所有权。Tool 以成功且可解析的包查询区分已安装与缺失；现有安装即使未运行也不替换、卸载或创建配置，包查询失败或未知时拒绝安装。只有确认缺失才非替换安装一次，并且只有本次新安装允许创建缺失的默认配置；安装冲突或签名、版本错误直接报告，不卸载重试。本次启动的 PID 与 forward 仍按实际归属清理，历史 bootstrap 元数据不能授权新的安装或配置修改。协议不兼容须准确报错，不能靠重新安装掩盖。
+
 远端 replay 必须复用 owning runtime 已持有的 native connection，避免第二条连接触发真实 busy。关闭先经 clear_context 确认所属会话和转发释放，再 `daemon stop` 并确认该 context 的 daemon/worker 退出；清理失败保留恢复信息，不得把 clear 成功或缺失 state 文件当成进程已死。CLI canonical 错误中的原始代码与消息应保留到应用恢复提示。
 
 `clear_context` 失败时，Capture 错误态保留 owning lease，并显示 Tool 返回的有界清理原因代码；应用运行记录保留同一错误，禁止用关闭界面或重启进程代替 native 清理回执。Android helper 的进程归属和 ADB forward 由 Tool 核验，应用不自行清理设备进程。
@@ -128,6 +156,14 @@ Frozen turn identity includes the owning capture and replay identities. Capture-
 
 原生 shader 替换失败只有在同安装 CLI 返回 canonical `validation` 错误、结果种类匹配本次冻结操作、明确 `replacement_attempted:false` 且 `context_preserved:true`，并且主进程再次确认原 lease/capture/replay 身份未变时，才保留可查询的 context。此类拒绝没有 intervention 回执，不代表修复或 rollback。退出超时、取消、协议损坏、未知错误、已尝试替换或身份变化仍隔离，必须经 Capture 生命周期恢复。
 
+其中 `shader_patch_diff_failed` 只在文本 diff 应用失败、尚未编译或替换时附带上述证明。调用可能已导航到目标事件，因此不声明 `effects_attempted:false`，也不声明恢复原事件；模型须修正与当前源码不匹配的 diff，不能把拒绝当实验干预。
+
+RDC 的不可变内容地址制品可能没有文件扩展名。`read_image` 对无扩展名文件通过既有图像字节识别和尺寸校验确认 PNG/JPEG/GIF/WebP，直接读取原制品；不要求重导出或复制改名。已有扩展名仍须匹配声明格式，SVG、可执行扩展名、非图像内容、越权路径与非视觉路由仍拒绝。制品 MIME 或文件名本身不替代真实 raster 校验。
+
+常量缓冲 `slot` 对应 shader reflection `constantBlocks` 的零基索引，与原生 `GetConstantBlock` / `GetCBufferVariableContents` 一致，不读取已移除的 `bindPoint` 或把固定 API 绑定号当索引。原生解码传递该stage实际绑定的ResourceId对象，序列化ID只用于协议；raw fallback必须保留decode_status/decode_error，不能当作结构化解码已成功。`rd.shader.get_constant_buffer_contents` 的已知 `constant_buffer_data_unavailable` 失败须由 Tool 恢复原事件，并返回精确 `decode_constant_buffer` 阶段、失败原因及 context/session/restored-event 证明。main 仅对 schema、操作、错误、阶段、原因和冻结身份全匹配的证明，在串行 lease 内再次读取原事件后保留 context；错误仍返回模型，不签发成功或实验回滚回执。缺证明、未知错误、取消、恢复失败或身份漂移继续隔离。
+
+shader-debug handle 属于创建它的 replay session，重启/reopen 不延续其有效性。Tool 对 `rd.shader.get_debug_state` 及 `rd.debug.*` 的无效/越属 handle，在获取 controller 或应用 event 前返回 canonical `shader_debug_handle_invalid` validation 错误及 `effects_attempted:false/context_preserved:true`。main 复用既有无效果拒绝的冻结 lease 身份复核；此错误不是当前 shader 调试不支持，也不是实验回滚。通过校验后发生的原生失败不取得该证明。
+
 原生操作在任何 replay 效果之前拒绝时，Tool 可在 canonical `validation` 错误中提供 `effects_attempted:false` 与 `context_preserved:true`。main 仅在结果种类与冻结操作相符、CLI 非零退出、未取消且 lease/capture/replay 身份复核不变时保留 context；错误仍返回调用者，不生成成功或实验回执。该证明由 Tool 的实际前置检查路径给出，普通运行时错误、部分执行与缺少任一证明字段仍隔离。未知 shader disassembly target 属于此类前置拒绝；Tool 在应用 event 之前检验 target，并返回当前可用 target 名称。
 
 `rd.export.screenshot` 查找目标时可能暂时改变 active event。目标查找失败后，Tool 须实际恢复原 event；只有非零退出的同操作 canonical runtime 错误携带 `failure_stage:resolve_visual_target`、`replay_state_restored:true`、`restored_event_id` 和 `artifact_write_attempted:false`，且 main 在串行 lease 下复核原 event、context/replay/capture 身份均未变，才保留可查询的 context。失败仍如实返回，不能签发截图或实验回执；无原 event、恢复失败、身份漂移、取消及其它阶段失败继续隔离。
@@ -138,6 +174,12 @@ Frame-timing evidence validates the complete single-queue GPU replay method, sec
 
 Android 回放使用匹配的 Tools/native 服务。服务端在等待用户下一条操作时保持连接，只有开始接收包后才应用接收超时；应用不通过后台抢占或重启用户 helper 来维持会话。Android 文件传输由同一 CLI 以 ADB 和 SHA256 校验完成，已验证设备副本可复用；连接只拥有本次新建的副本。Capture 的图像导出成功与设备实际呈现分别投影，无设备确认时仍显示同步不可用。
 
+### 原生失败的受控交付
+
+`RdcNativeFailure` 必须在 owning 执行路径完成既有身份、取消与恢复检查后，将限定失败投影交付给模型和 UI，不能只留下错误字符串。投影标记 `ok:false` / `source:main-qualified-native-failure`，包含实际 CLI exitCode、错误种类、main-owned 调用参数/身份及 `mainValidation.preservationVerified` / `leaseState`。仅主进程已复核安全时，`nativeFailure.proof` 才表达 canonical `effects_attempted:false/context_preserved:true`、未替换或已复核恢复的对应事实；缺证明、身份漂移或取消时不对外宣称上下文保持，lease 仍按原规则隔离。
+
+这是主进程资格化的失败记录，不是完整原始 CLI stdout，也不是成功、实验或 rollback 签名。`operation` 是产品请求；`invocation` 记录实际失败的原生命令，内置状态前置查询失败时不得声称产品请求已经执行，后续恢复复核也不得覆盖原失败调用。任意私有 native details、二进制 stdout 与 stderr 不透传。执行器只接收 owning shell 路径绑定到该异常的投影，保留 `isError:true` 并经现有 ToolResultArtifactizer 固定保存，即使小于卸货阈值也提供 session owner/ref/hash；普通异常或其它工具不能通过同名属性冒充原生证明。持久化失败保留已返回的错误和可验证交付子集，不以落盘失败重试原生操作。后续真正需要的合法查询仍须通过正常冻结权限/lease 门禁，其连续性另行核验。
+
 ## 同安装 Python 绑定与 Tool batch
 
 共用 assertRdcCliBinding 校验 Settings 保存、安装验证与实际调用；command 固定为同安装捆绑 Python 绝对路径，唯一 argsPrefix 为 cli/run_cli.py。prepareTurn 经 catalog 验证冻结该配对。RDC_TOOL_ROOT 不得重定向，PYTHONHOME/PYTHONPATH 不接受外部导入路径。文件 realpath 不得逃出安装。bat/旧 PowerShell 转发器返回 RDC_BAT_REJECTED，不再改写启动命令。
@@ -147,6 +189,8 @@ Android 回放使用匹配的 Tools/native 服务。服务端在等待用户下�
 Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 校验与 daemon 请求，顺序、首错停止，无新 catalog 操作、服务或 IPC。Agent 不接入 batch，继续使用单 owning lease 与独立签名回执。
 
 ## 回放隔离与恢复投影
+
+普通结构化 RDC 调用成功后，主进程在结果正文和 details 同时附带 `invocation`：`main-validated-cli-arguments`、operation、实际送入冻结 CLI 的参数和 canonical SHA-256 指纹，含主进程解析注入的 replay 身份；不包含 transport 环境或凭据。敏感参数键存在时显式省略参数正文并标记原因。它说明本次调用参数，不替代原生结果、签名实验回执或恢复证明。历史结果不回填；原模型请求只能通过 owning root General 的 hash-bound `artifact_read.includeRecordedRequest` 从 SessionContextJournal 生成独立限定来源凭据，再显式授予审查者。
 
 原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。`rdc_context` 对同一 session/project 的隔离身份返回明确的受控恢复状态，不将仍打开的 capture 误报为未打开，也不向其他 scope 泄露保留的 lease。新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化。失败没有取得可信恢复证明时仍 fail-closed；恢复通过应用生命周期重新建立 owning capture/replay/context 身份。
 

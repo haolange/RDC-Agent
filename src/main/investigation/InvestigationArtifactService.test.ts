@@ -19,6 +19,7 @@ import {
   plantInvestigationRecord,
   recordedExperiment,
   sampleChallenge,
+  sampleCheckpoint,
   sampleReport,
   seedNote,
   writeDraft,
@@ -37,6 +38,21 @@ function toolErrorCode(result: { details?: unknown }): string | undefined {
 }
 
 describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
+  it('keeps archive record reads linear while checking every stored body', () => {
+    const { resolver, service } = createInvestigationHarness();
+    const count = 8;
+    const written = Array.from({ length: count }, (_, index) =>
+      writeDraft(service, 'world_state', baselineWorld(`ws-archive-${index}`)));
+    const read = vi.spyOn(resolver, 'read');
+    try {
+      const records = service.readAllRecords(SESSION_ID);
+      expect(records.map(item => item.manifest.artifactId))
+        .toEqual(written.map(item => item.manifest.artifactId));
+      const bodyReads = read.mock.calls.filter(([, uri]) => uri.includes('/investigation/records/'));
+      expect(bodyReads.length).toBeLessThanOrEqual(count * 5);
+      for (const item of written) expect(bodyReads.some(([, uri]) => uri === item.contentUri)).toBe(true);
+    } finally { read.mockRestore(); }
+  });
   it('archives a verified multi-record snapshot with one index integrity pass', () => {
     const { resolver, service } = createInvestigationHarness();
     const first = writeDraft(service, 'world_state', baselineWorld('ws-batch-first'));
@@ -587,6 +603,161 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     expect(service.readAllRecords(SESSION_ID).map(item => item.manifest.artifactId)).toContain(experiment.manifest.artifactId);
     expect(service.createLookup(SESSION_ID).getClaim('claim-retired')).toBeNull();
     expect(service.createLookup(SESSION_ID).getClaim('claim-current')).toMatchObject({ claimId: 'claim-current' });
+  });
+
+  it.each(['claim', 'experiment'] as const)('stales checkpoint references through a retired %s challenge without losing audit records', (targetType) => {
+    const { service } = createInvestigationHarness();
+    const world = writeDraft(service, 'world_state', baselineWorld('ws-checkpoint-retire'));
+    const oldSet = writeDraft(service, 'claim_set', {
+      items: [hypothesisClaim('ws-checkpoint-retire', 'claim-before-checkpoint')],
+    });
+    if (targetType === 'experiment') writeDraft(service, 'experiment', recordedExperiment({
+      experimentId: 'exp-before-checkpoint', hypothesisClaimId: 'claim-before-checkpoint',
+      baselineWorldStateId: 'ws-checkpoint-retire', variantWorldStateId: 'ws-checkpoint-retire',
+      restoredWorldStateId: 'ws-checkpoint-retire', verifyEvidenceIds: [],
+      status: 'designed', executed: false, baselineRestored: false,
+    }));
+    const challenge = writeDraft(service, 'challenge', sampleChallenge({
+      challengeId: 'ch-before-checkpoint', targetType,
+      targetId: targetType === 'claim' ? 'claim-before-checkpoint' : 'exp-before-checkpoint',
+    }));
+    const checkpoint = service.writeRecord(SESSION_ID, {
+      kind: 'checkpoint', mission: 'debugger', title: 'Current checkpoint', summary: 'Open challenge', status: 'ready',
+      record: sampleCheckpoint({ currentWorldStateId: 'ws-checkpoint-retire', openChallenges: ['ch-before-checkpoint'] }),
+      sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
+    });
+    writeDraft(service, 'claim_set', { items: [hypothesisClaim('ws-checkpoint-retire', 'claim-after-checkpoint')] }, {
+      supersedes: oldSet.manifest.artifactId,
+    });
+    expect(service.list(SESSION_ID).find(entry => entry.artifactId === checkpoint.manifest.artifactId)?.status).toBe('stale');
+    const historical = service.readRecord(SESSION_ID, checkpoint.manifest.artifactId, checkpoint.contentHash);
+    expect(historical.manifest.status).toBe('stale');
+    expect(historical.contentHash).toBe(checkpoint.contentHash);
+    expect(service.readAllRecords(SESSION_ID).map(item => item.manifest.artifactId)).toContain(challenge.manifest.artifactId);
+    expect(() => writeDraft(service, 'checkpoint', sampleCheckpoint({
+      checkpointId: 'cp-expired-challenge', currentWorldStateId: 'ws-checkpoint-retire', openChallenges: ['ch-before-checkpoint'],
+    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    if (targetType === 'experiment') expect(() => writeDraft(service, 'checkpoint', sampleCheckpoint({
+      checkpointId: 'cp-expired-experiment', currentWorldStateId: 'ws-checkpoint-retire', completedExperiments: ['exp-before-checkpoint'],
+    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    const current = writeDraft(service, 'checkpoint', sampleCheckpoint({
+      checkpointId: 'cp-current-audit', currentWorldStateId: 'ws-checkpoint-retire',
+      criticalArtifactRefs: [challenge.manifest.artifactId, oldSet.manifest.artifactId],
+    }));
+    expect(service.readRecord(SESSION_ID, current.manifest.artifactId).manifest.status).toBe('draft');
+  });
+
+  it.each(['evidence', 'evidence_pack'] as const)('retires %s IDs and their semantic dependents without losing audit history', (kind) => {
+    const { resolver, service } = createInvestigationHarness();
+    const world = writeDraft(service, 'world_state', baselineWorld('ws-retired-evidence'));
+    const note = seedNote(resolver);
+    const recordFor = (id: string) => kind === 'evidence'
+      ? evidenceOf('ws-retired-evidence', note, id)
+      : { items: [evidenceOf('ws-retired-evidence', note, id), evidenceOf('ws-retired-evidence', note, 'ev-retained')] };
+    const old = writeDraft(service, kind, recordFor('ev-retired'));
+    writeDraft(service, 'claim', hypothesisClaim('ws-retired-evidence', 'hyp-retired-evidence'));
+    const experiment = writeDraft(service, 'experiment', recordedExperiment({
+      experimentId: 'exp-retired-evidence', hypothesisClaimId: 'hyp-retired-evidence',
+      baselineWorldStateId: 'ws-retired-evidence', variantWorldStateId: 'ws-retired-evidence',
+      restoredWorldStateId: 'ws-retired-evidence', verifyEvidenceIds: ['ev-retired'],
+      status: 'designed', executed: false, baselineRestored: false,
+    }));
+    const challenge = writeDraft(service, 'challenge', sampleChallenge({
+      challengeId: 'ch-retired-evidence', targetType: 'evidence', targetId: 'ev-retired',
+    }));
+    const experimentChallenge = writeDraft(service, 'challenge', sampleChallenge({
+      challengeId: 'ch-retired-evidence-experiment', targetType: 'experiment', targetId: 'exp-retired-evidence',
+    }));
+    const report = writeDraft(service, 'report', sampleReport({ claims: [], evidenceIds: ['ev-retired'] }));
+    const checkpoint = service.writeRecord(SESSION_ID, {
+      kind: 'checkpoint', mission: 'debugger', title: 'Evidence review', summary: 'Keep open challenge', status: 'ready',
+      record: sampleCheckpoint({ currentWorldStateId: 'ws-retired-evidence', openChallenges: ['ch-retired-evidence'] }),
+      sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
+    });
+    const replacement = service.writeRecord(SESSION_ID, {
+      kind, mission: 'debugger', title: 'Qualified evidence', summary: 'Narrow original observation', status: 'ready',
+      record: recordFor('ev-current'), supersedes: old.manifest.artifactId,
+      sourceRefs: [{ artifactId: old.manifest.artifactId, expectedHash: old.contentHash },
+        { artifactId: challenge.manifest.artifactId, expectedHash: challenge.contentHash }],
+    });
+    expect(service.readRecord(SESSION_ID, replacement.manifest.artifactId).manifest.status).toBe('ready');
+    for (const artifact of [experiment, challenge, experimentChallenge, report, checkpoint]) {
+      expect(service.readRecord(SESSION_ID, artifact.manifest.artifactId, artifact.contentHash).manifest.status).toBe('stale');
+    }
+    expect(service.readRecord(SESSION_ID, challenge.manifest.artifactId).record).toMatchObject({
+      status: 'open', targetRef: { type: 'evidence', id: 'ev-retired' },
+    });
+    const lookup = service.createLookup(SESSION_ID);
+    expect(lookup.getEvidence('ev-retired')).toBeNull();
+    expect(lookup.getEvidence('ev-current')).toMatchObject({ evidenceId: 'ev-current' });
+    if (kind === 'evidence_pack') expect(lookup.getEvidence('ev-retained')).toMatchObject({ evidenceId: 'ev-retained' });
+    expect(() => writeDraft(service, 'challenge', sampleChallenge({
+      challengeId: 'ch-invalid-retired-target', targetType: 'evidence', targetId: 'ev-retired',
+    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() => writeDraft(service, 'checkpoint', sampleCheckpoint({
+      checkpointId: 'cp-invalid-retired-challenge', currentWorldStateId: 'ws-retired-evidence',
+      openChallenges: ['ch-retired-evidence'],
+    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(service.readAllRecords(SESSION_ID).find(item => item.manifest.artifactId === old.manifest.artifactId)?.manifest.status)
+      .toBe('superseded');
+    expect(service.listForProjection(SESSION_ID).storeDegraded).toBe(false);
+  });
+
+  it('repairs a prior evidence supersede with an open challenge and checkpoint left live', () => {
+    const { resolver, service } = createInvestigationHarness();
+    const world = writeDraft(service, 'world_state', baselineWorld('ws-evidence-repair'));
+    const note = seedNote(resolver);
+    const old = writeDraft(service, 'evidence', evidenceOf('ws-evidence-repair', note, 'ev-before-repair'));
+    const challenge = service.writeRecord(SESSION_ID, {
+      kind: 'challenge', mission: 'debugger', title: 'Original evidence review', summary: 'Original target', status: 'ready',
+      record: sampleChallenge({ challengeId: 'ch-evidence-repair', targetType: 'evidence', targetId: 'ev-before-repair' }),
+      sourceRefs: [{ artifactId: old.manifest.artifactId, expectedHash: old.contentHash }],
+    });
+    const checkpoint = service.writeRecord(SESSION_ID, {
+      kind: 'checkpoint', mission: 'debugger', title: 'Recovery checkpoint', summary: 'Original challenge', status: 'ready',
+      record: sampleCheckpoint({ currentWorldStateId: 'ws-evidence-repair', openChallenges: ['ch-evidence-repair'] }),
+      sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
+    });
+    writeDraft(service, 'evidence', evidenceOf('ws-evidence-repair', note, 'ev-after-repair'), {
+      supersedes: old.manifest.artifactId,
+    });
+    const repairIds = new Set([challenge.manifest.artifactId, checkpoint.manifest.artifactId]);
+    for (const id of repairIds) overwriteInvestigationManifest(resolver, id, { status: 'ready' });
+    const file = indexPath(resolver.resolve(SESSION_ID, 'session://investigation/index.json').sessionPath);
+    const index = JSON.parse(readFileSync(file, 'utf8')) as { artifacts: Array<{ artifactId: string; status: string }> };
+    writeFileSync(file, serializeInvestigationJson({ ...index, artifacts: index.artifacts.map(entry => (
+      repairIds.has(entry.artifactId) ? { ...entry, status: 'ready' } : entry
+    )) }));
+    expect(service.listForProjection(SESSION_ID).storeDegraded).toBe(false);
+    for (const artifact of [challenge, checkpoint]) {
+      const historical = service.readRecord(SESSION_ID, artifact.manifest.artifactId, artifact.contentHash);
+      expect(historical.manifest.status).toBe('stale');
+      expect(historical.contentHash).toBe(artifact.contentHash);
+    }
+    expect(service.readAllRecords(SESSION_ID)).toHaveLength(5);
+  });
+
+  it('repairs an existing checkpoint after its challenge was already marked stale', () => {
+    const { resolver, service } = createInvestigationHarness();
+    writeDraft(service, 'world_state', baselineWorld('ws-stale-checkpoint'));
+    const oldSet = writeDraft(service, 'claim_set', { items: [hypothesisClaim('ws-stale-checkpoint', 'claim-old-cp')] });
+    writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'ch-old-cp', targetType: 'claim', targetId: 'claim-old-cp' }));
+    const checkpoint = writeDraft(service, 'checkpoint', sampleCheckpoint({
+      currentWorldStateId: 'ws-stale-checkpoint', openChallenges: ['ch-old-cp'],
+    }));
+    writeDraft(service, 'claim_set', { items: [hypothesisClaim('ws-stale-checkpoint', 'claim-new-cp')] }, {
+      supersedes: oldSet.manifest.artifactId,
+    });
+    overwriteInvestigationManifest(resolver, checkpoint.manifest.artifactId, { status: 'draft' });
+    const file = indexPath(resolver.resolve(SESSION_ID, 'session://investigation/index.json').sessionPath);
+    const index = JSON.parse(readFileSync(file, 'utf8')) as { artifacts: Array<{ artifactId: string; status: string }> };
+    writeFileSync(file, serializeInvestigationJson({ ...index, artifacts: index.artifacts.map(entry => (
+      entry.artifactId === checkpoint.manifest.artifactId ? { ...entry, status: 'draft' } : entry
+    )) }));
+    expect(service.listForProjection(SESSION_ID).storeDegraded).toBe(false);
+    const archived = service.readAllRecords(SESSION_ID);
+    expect(archived.find(item => item.manifest.artifactId === checkpoint.manifest.artifactId)?.manifest.status).toBe('stale');
+    expect(service.readRecord(SESSION_ID, checkpoint.manifest.artifactId, checkpoint.contentHash).contentHash).toBe(checkpoint.contentHash);
   });
 
   it('repairs a prior ClaimSet supersede whose old draft experiment remained live', () => {
@@ -1211,9 +1382,10 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     writeDraft(experimentCase.service, 'evidence', evidenceOf('ws-c', verifyNote, 'ev-verify-v2'), {
       supersedes: verify.manifest.artifactId,
     });
-    expect(() => experimentCase.service.readRecord(SESSION_ID, experiment.manifest.artifactId)).toThrow(drifted);
-    expect(() => experimentCase.service.list(SESSION_ID, { kind: 'experiment' })).toThrow(drifted);
-    expect(() => experimentCase.service.createLookup(SESSION_ID).getExperiment('exp-ctx')).toThrow(drifted);
+    expect(experimentCase.service.readRecord(SESSION_ID, experiment.manifest.artifactId).manifest.status).toBe('stale');
+    expect(experimentCase.service.list(SESSION_ID, { kind: 'experiment' })
+      .find(entry => entry.artifactId === experiment.manifest.artifactId)?.status).toBe('stale');
+    expect(experimentCase.service.createLookup(SESSION_ID).getExperiment('exp-ctx')).toBeNull();
     expect(experimentCase.service.createLookup(SESSION_ID).getEvidence('ev-verify-v2'))
       .toMatchObject({ evidenceId: 'ev-verify-v2' });
   });

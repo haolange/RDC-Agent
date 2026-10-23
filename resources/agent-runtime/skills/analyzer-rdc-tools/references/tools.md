@@ -2,7 +2,7 @@
 
 # Analyzer RDC 工具参考
 
-Current catalog fingerprint: `a3c511385c6a424b2d7c1edbad01d22d1d52e249fe84651e7b1faf5b3fad2066`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
+Current catalog fingerprint: `cca35794631fed6c6a73401b6ccb0d4658f8e473de170e769674372f7cfd589b`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
 
 所有 `shell.rdc` 示例都省略由主进程注入的 `session_id` / `capture_file_id` / context 身份。不要把示例补成可覆盖其它会话的身份。共享发现、错误恢复、输出与副作用规则见 `$rdc-tool-shell`。
 
@@ -93,7 +93,7 @@ Current catalog fingerprint: `a3c511385c6a424b2d7c1edbad01d22d1d52e249fe84651e7b
 | 参数 | 必需 | 约束 |
 |---|---:|---|
 | `session_id` | 是 | string; session_id (str) |
-| `query` | 是 | object; query (dict): 查询条件，例如 {name_regex?, name_contains?, flags_include?, flags_exclude?, event_id_min?, event_id_max?}；flags_include/flags_exclude 为 RenderDoc ActionFlags 成员名数组，分别要求全部包含/全部排除，先筛选再应用 max_results；未知名称返回 validation_error |
+| `query` | 是 | object; query (dict): 查询条件，例如 {name_regex?, name_contains?, flags_include?, flags_exclude?, event_id_min?, event_id_max?}；flags_include/flags_exclude 为 RenderDoc ActionFlags 成员名数组（如 Drawcall、Dispatch、Present，不是结果字段 is_draw），分别要求全部包含/全部排除，先筛选再应用 max_results；未知名称在获取回放controller前返回带无效果证明的 validation_error |
 | `max_results` | 否 | integer; max_results (int, 可选, 默认 200) |
 
 **结果解释：** ok (bool); data (dict): {matches}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
@@ -340,20 +340,20 @@ Current catalog fingerprint: `a3c511385c6a424b2d7c1edbad01d22d1d52e249fe84651e7b
 
 ## `rd.pipeline.get_constant_buffers`
 
-获取指定 stage 的 Constant Buffer 绑定（slot/buffer/offset/size）。
+获取指定 stage 的 Constant Buffer 绑定（slot/buffer/offset/size）。 输入范围不足时不调用完整布局解码器，不用未覆盖数据的零填充冒充值。
 
 | 参数 | 必需 | 约束 |
 |---|---:|---|
 | `session_id` | 是 | string; session_id (str) |
 | `stage` | 是 | string; stage (str) |
 | `include_contents` | 否 | boolean; include_contents (bool, 可选, 默认 false): 若 true 则额外解码变量值（可能较慢） |
-| `max_bytes` | 否 | integer; max_bytes (int, 可选, 默认 1048576): 解码上限，避免超大 CB 导致内存压力 |
+| `max_bytes` | 否 | integer; min=0; 每常量块输入字节上限，默认1048576；0表示该块不设上限，负数无效。预算或绑定范围不足完整反射块时不发布完整布局解码值。 |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 | `array_index` | 否 | integer; min=0 |
 | `flatten` | 否 | boolean |
 | `slot` | 否 | integer; min=0 |
 
-**结果解释：** ok (bool); data (dict): {constant_buffers}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {constant_buffers}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选) input_coverage说明required_bytes、binding_bytes、byte_budget、permitted_bytes及complete_range_permitted；这不是原始字节回执。decode_status明确decoded/unavailable/raw_fallback，decode_input_bytes是传给解码器的长度。raw_fallback.byte_size为实际返回字节；truncated表示块读取不全，preview_bytes/preview_truncated另外限定hex_preview交付范围。预算不足、未绑定输入或未知范围不能解释成已观测零。
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -395,7 +395,7 @@ Current catalog fingerprint: `a3c511385c6a424b2d7c1edbad01d22d1d52e249fe84651e7b
 
 ## `rd.resource.list_all`
 
-列出捕获中所有资源（Textures/Buffers/Shaders/Pipelines 等），兼容 V3。
+列出 texture/buffer/descriptor-store 资源行；kind=all 另返回与 get_details 同四种原生库存的完整身份清单 identity_inventory（含仅 GetResources 可见的 shader/pipeline 等身份）。类型行或过滤视图不能单独证明全局身份缺失。
 
 | 参数 | 必需 | 约束 |
 |---|---:|---|
@@ -404,7 +404,7 @@ Current catalog fingerprint: `a3c511385c6a424b2d7c1edbad01d22d1d52e249fe84651e7b
 | `include_unused` | 否 | boolean; include_unused (bool, 可选, 默认 true) |
 | `kind` | 否 | string; enum=all,texture,buffer,descriptor_store |
 
-**结果解释：** ok (bool); data (dict): {resources}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {resources, identity_inventory (kind=all: scope, complete, resource_ids, count, source_counts)}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -421,15 +421,15 @@ Current catalog fingerprint: `a3c511385c6a424b2d7c1edbad01d22d1d52e249fe84651e7b
 
 ## `rd.resource.get_details`
 
-获取资源详细信息，兼容 V3；根据资源类型返回不同字段。
+获取资源详细信息；按原生资源身份精确匹配数字或 ResourceId:: 形式，根据资源类型返回字段。
 
 | 参数 | 必需 | 约束 |
 |---|---:|---|
 | `session_id` | 是 | string; session_id (str) |
-| `resource_id` | 是 | string; resource_id (str) |
+| `resource_id` | 是 | string; Exact resource ID: decimal or ResourceId::<decimal>; integer precision is preserved. |
 | `include_initialization` | 否 | boolean; Recorded initialization chunks and parent/derived resources; not a creation call-stack claim. |
 
-**结果解释：** ok (bool); data (dict): {details}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {details}; artifacts (list); error (dict\|null): Completed inventory miss is validation/resource_not_found with effects_attempted=false and context_preserved=true; native inventory failures carry no such proof.; meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -597,7 +597,7 @@ Current catalog fingerprint: `a3c511385c6a424b2d7c1edbad01d22d1d52e249fe84651e7b
 | `as_type` | 否 | string; as_type (str, 可选, 默认 'float') |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): {values}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {values, values_status, inline_value_limit, values_path, stats, resolved_event_id, texture_id, target_metadata}; values 为 stride/as_type 后完整嵌套数值数组，最多256标量；values_status=complete；超限为values=null/omitted_limit，不截断或伪造空列表。完整同数组仍导出NPZ到values_path。stats反映同一采样数组，含shape/dtype/stride、总体与逐rgba通道有限值min/max/mean和nan/inf_count；通道指解码数组分量，不证明纹理存在物理alpha。非有限值使用NaN/Infinity/-Infinity字符串，不转成0。; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -762,7 +762,7 @@ Current catalog fingerprint: `a3c511385c6a424b2d7c1edbad01d22d1d52e249fe84651e7b
 
 ## `rd.mesh.get_post_transform_data`
 
-Read post-transform vertex data from VS or GS at a replay event. view_index selects an integer multiview/VR view; unbound GS is reported explicitly.
+Read post-transform vertex data from VS or GS at a replay event. view_index selects an integer multiview/VR view; unbound GS is reported explicitly. Optional VS index windows read native post-transform indices and only their referenced output rows.
 
 | 参数 | 必需 | 约束 |
 |---|---:|---|
@@ -772,8 +772,10 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `view_index` | 否 | integer; min=0; Integer multiview/VR view index. |
 | `max_vertices` | 否 | integer; min=0; max_vertices (int, 可选): 限制导出顶点数 |
 | `stage` | 是 | string; enum=vs,gs |
+| `first_index` | 否 | integer; min=0; max=4294967295; First native post-transform index ordinal (elements, not bytes); default 0 when index_count is supplied. |
+| `index_count` | 否 | integer; min=1; max=4096; Explicit native index window length; requires stage=vs and explicit max_vertices between 1 and 256. |
 
-**结果解释：** vertex_rows retain raw bytes and nullable typed position. attributes explicitly reports position/normal/uv present or unsupported; outputs separately exposes a verified D3D11/12 stream-zero float output signature layout and per-row outputs, without assigning TEXCOORD to normal. source=post_transform; no input values are substituted. No attribute layout is guessed. truncated is null when an unbounded native buffer view prevents proving total size.; ok (bool); data (dict): {mesh_data}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** vertex_rows retain raw bytes and nullable typed position. attributes explicitly reports position/normal/uv present or unsupported; outputs exposes verified D3D11/12 stream-zero float signature packing and Vulkan VS per-vertex stream-zero float32 std430 packing, checked against native stride. Vulkan layout reports API/stage, explicit location, system_value, variable_name, native component_mask (null if unavailable), scalar_type, byte_offset and components; a mask is not a proved raster component/interpolation mapping; per-row keys are location:N or builtin:Name. Ambiguous/missing locations, non-leading Position, unsupported types/rates/streams/stages and stride mismatch remain unsupported. Incomplete readback is an error; nonfinite values are null. These are vertex outputs, not raster interpolation, primitive coverage or fragment operands; TEXCOORD is never guessed to be normal. source=post_transform; no input values are substituted. No attribute layout is guessed. truncated is null when an unbounded native buffer view prevents proving total size.; ok (bool); data (dict): {mesh_data}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选) Index-window mode reads only native MeshFormat resource objects, never arbitrary ID lookup or input substitution. index_window includes original index bytes, native index byte offset/stride, element ordinals, base_vertex, index-to-output-row mapping and nullable finite native view bounds. vertex_rows retain absolute output vertex_index and source_byte_offset; raw bytes and typed outputs refer to those rows. Unique referenced rows are bounded by max_vertices (1..256), with combined index/vertex readback at most 1 MiB; short reads fail without zero filling or prefix fallback. complete refers only to the requested index window; truncated remains true for a partial draw or incomplete vertex mapping. Primitive-restart matches are explicitly restart_candidate with null vertex_index and vertex_mapping_complete=false; they do not establish raster primitive association. Non-indexed windows use explicit implicit row ordinals and no index bytes. Native topology_name/base_vertex/allow_restart/restart_index are reported without inferring pixel coverage. Invalid window arguments are rejected before replay access with effects_attempted=false/context_preserved=true; native or post-effect read failures do not carry that proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -797,7 +799,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `session_id` | 是 | string; session_id (str) |
 | `index_buffer_id` | 是 | string; index_buffer_id (str) |
 | `format` | 是 | string; enum=u16,u32; format (str): 'R16_UINT'\|'R32_UINT' |
-| `index_offset` | 否 | integer; index_offset (int, 可选, 默认 0) |
+| `index_offset` | 否 | integer; Byte offset into the original index buffer, not an index ordinal; default 0. |
 | `index_count` | 否 | integer; index_count (int, 可选, 默认 256) |
 | `base_vertex` | 否 | integer; base_vertex (int, 可选, 默认 0) |
 
@@ -854,7 +856,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 | `stage` | 否 | string; enum=vs,hs,ds,gs,ps,cs,ms,as; Use canonical shader stage: vs, hs, ds, gs, ps, cs, ms, or as. Pixel shader is ps. |
 
-**结果解释：** ok (bool); data (dict): {source, files, source_available, fallback_tool?, fallback_args?, edit_plan, failure_stage?, failure_reason?, shader_id, stage, resolved_event_id}; when original debug source is unavailable, returns ok=true with source_available=false and a format-aware fallback. SPIR-V may recommend `rd.shader.get_disassembly` with target='SPIR-V ASM' and source_encoding='spirvasm'; the current edit_plan describes absent source, so inspect the fallback result before editing. DXIL/DXBC recommends read-only disassembly and/or `rd.shader.extract_binary` instead of treating disassembly text as replacement source.; artifacts (list); error (dict\|null): invalid_shader_stage is rejected before any replay effect, with effects_attempted=false and context_preserved=true. An unbound shader at the requested event returns shader_binding_lookup_failed; the original replay event is restored and reported as replay_state_restored/restored_event_id only after native restoration succeeds. A failed restoration reports shader_inspection_recovery_failed and requires controlled recovery.; meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {source, files[{filename, contents}], source_available, source_encoding, entry_point, compile_flags, source_debug_information, fallback_tool?, fallback_args?, edit_plan, failure_stage?, failure_reason?, shader_id, stage, resolved_event_id}; files preserve native order and captured text without reading host paths. source is the first (entry) file contents; source-level debugging availability is independent. Unknown source encoding, source entry and compile flags remain null. When entry source contents are unavailable, returns ok=true with source_available=false and a format-aware fallback. SPIR-V may recommend `rd.shader.get_disassembly` with target='SPIR-V ASM' and source_encoding='spirvasm'; the current edit_plan describes absent source, so inspect the fallback result before editing. DXIL/DXBC recommends read-only disassembly and/or `rd.shader.extract_binary` instead of treating disassembly text as replacement source. Missing native metadata reports shader_source_metadata_unavailable; native read failure reports shader_source_lookup_failed instead of successful source absence. Neither path reads files from the host filesystem.; artifacts (list); error (dict\|null): invalid_shader_stage is rejected before any replay effect, with effects_attempted=false and context_preserved=true. An unbound shader at the requested event returns shader_binding_lookup_failed; the original replay event is restored and reported as replay_state_restored/restored_event_id only after native restoration succeeds. A failed restoration reports shader_inspection_recovery_failed and requires controlled recovery.; meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -881,7 +883,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 | `stage` | 否 | string; enum=vs,hs,ds,gs,ps,cs,ms,as; Use canonical shader stage: vs, hs, ds, gs, ps, cs, ms, or as. Pixel shader is ps. |
 
-**结果解释：** ok (bool); data (dict): {disassembly, target, source_encoding, is_raw_spirv_asm, source_hash, shader_id, resolved_event_id, edit_plan}; `edit_plan` describes shader_format, input_kind, can_edit_text, can_build, can_replace, requires_toolchain, build_input_kind, allowed_edit_inputs, allowed_ops, recommended_next_tool, and blocked_reason. allowed_edit_inputs lists independent input forms (full source_text, diff_text, or structured ops); allowed_ops only names supported structured ops and does not restrict source_text or diff_text edits. The default RenderDoc SPIR-V view is read-only; request target='SPIR-V ASM' and inspect that result edit_plan before attempting replacement. DXIL/DXBC disassembly is read-only unless edit_plan reports a buildable source path.; artifacts (list); error (dict\|null): 绑定失败显式返回 `shader_binding_lookup_failed` / `shader_stage_mismatch`；当请求 target 不存在或源码不可取时，显式返回 `shader_disassembly_unavailable` 并带 `failure_stage` / `failure_reason`；未知 target 在应用 replay event 前拒绝，返回 available_targets 与 effects_attempted=false / context_preserved=true; meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {disassembly, target, source_encoding, is_raw_spirv_asm, source_hash, shader_id, resolved_event_id, edit_plan, available_targets, available_targets_status, available_targets_error}; available_targets 是原生 GetDisassemblyTargets(true) 的结果；status=complete（包括合法空列表）、unavailable（查询失败，error 保留原因）或 unsupported（原生接口缺失）。该列表不隐含 GPU ISA 支持，也不包含 Tool 独立提供的 raw ASM fallback；实际返回 target/is_raw_spirv_asm/edit_plan 分别说明当前视图及可编辑性。; `edit_plan` describes shader_format, input_kind, can_edit_text, can_build, can_replace, requires_toolchain, build_input_kind, allowed_edit_inputs, allowed_ops, recommended_next_tool, and blocked_reason. allowed_edit_inputs lists independent input forms (full source_text, diff_text, or structured ops); allowed_ops only names supported structured ops and does not restrict source_text or diff_text edits. The default RenderDoc SPIR-V view is read-only; request target='SPIR-V ASM' and inspect that result edit_plan before attempting replacement. DXIL/DXBC disassembly is read-only unless edit_plan reports a buildable source path.; artifacts (list); error (dict\|null): 绑定失败显式返回 `shader_binding_lookup_failed` / `shader_stage_mismatch`；当请求 target 不存在或源码不可取时，显式返回 `shader_disassembly_unavailable` 并带 `failure_stage` / `failure_reason`；未知 target 在应用 replay event 前拒绝，返回 available_targets 与 effects_attempted=false / context_preserved=true; meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -980,20 +982,20 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 
 ## `rd.shader.get_constant_buffer_contents`
 
-读取指定 stage/slot 的 Constant Buffer 并按反射结构解码变量值（推荐用于专家级核对）。
+读取指定 stage 的反射常量块索引 slot 并解码变量；slot 不是 API 固定绑定号。无数据仍报错；已知读取失败仅在原事件实际恢复并核验后附恢复证明，恢复失败保持不确定。 输入范围不足时不调用完整布局解码器，不用未覆盖数据的零填充冒充值。
 
 | 参数 | 必需 | 约束 |
 |---|---:|---|
 | `session_id` | 是 | string; session_id (str) |
 | `stage` | 是 | string; enum=vs,hs,ds,gs,ps,cs,ms,as; Use canonical shader stage: vs, hs, ds, gs, ps, cs, ms, or as. Pixel shader is ps. |
-| `slot` | 是 | integer; min=0; slot (int) |
+| `slot` | 是 | integer; min=0; Index in shader reflection constantBlocks, not API fixed binding number. |
 | `array_index` | 否 | integer; min=0; array_index (int, 可选, 默认 0): CB array/space 情况 |
-| `max_bytes` | 否 | integer; max_bytes (int, 可选, 默认 1048576) |
+| `max_bytes` | 否 | integer; min=0; 每常量块输入字节上限，默认1048576；0表示该块不设上限，负数无效。预算或绑定范围不足完整反射块时不发布完整布局解码值。 |
 | `flatten` | 否 | boolean; flatten (bool, 可选, 默认 true): 是否将嵌套结构摊平成 path->value |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 | `shader_id` | 否 | string |
 
-**结果解释：** ok (bool); data (dict): {cbuffer}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {cbuffer}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选) input_coverage说明required_bytes、binding_bytes、byte_budget、permitted_bytes及complete_range_permitted；这不是原始字节回执。decode_status明确decoded/unavailable/raw_fallback，decode_input_bytes是传给解码器的长度。raw_fallback.byte_size为实际返回字节；truncated表示块读取不全，preview_bytes/preview_truncated另外限定hex_preview交付范围。预算不足、未绑定输入或未知范围不能解释成已观测零。
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1372,11 +1374,12 @@ Export post-VS positions or explicit VS input position/normal/UV as Wavefront OB
 | `session_id` | 是 | string; session_id (str) |
 | `event_id` | 否 | integer; min=0; event_id (int, 可选) |
 | `output_dir` | 是 | string; output_dir (str) |
+| `disassembly_target` | 否 | string; auto（默认）或精确反汇编 target；raw 可装配文件用 SPIR-V ASM，不静默替换 target |
 | `include_binaries` | 否 | boolean; include_binaries (bool, 可选, 默认 true) |
 | `include_reflection` | 否 | boolean; include_reflection (bool, 可选, 默认 true) |
 | `include_disassembly` | 否 | boolean; include_disassembly (bool, 可选, 默认 true) |
 
-**结果解释：** ok (bool); data (dict): {output_dir, bundle_path, resolved_event_id}; artifacts (list); error (dict\|null): 当请求 event 没有可绑定 shader 时，显式返回 `shader_bundle_empty`; meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {output_dir, bundle_path, resolved_event_id, disassembly_target, complete, failures}; bundle 的 disassembly export 包含实际 target、source_encoding、is_raw_spirv_asm、source_hash、edit_plan 及精确 UTF-8 文件 hash/大小；显式 target 不匹配时标记 unavailable/complete=false，不保存替代展示文本。; artifacts (list); error (dict\|null): 当请求 event 没有可绑定 shader 时，显式返回 `shader_bundle_empty`; meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1394,7 +1397,7 @@ Export post-VS positions or explicit VS input position/normal/UV as Wavefront OB
 
 ## `rd.export.cbuffer_dump`
 
-导出当前 event 的常量缓冲数据（按 stage/slot 命名），支持结构化变量值。
+导出当前 event 的常量缓冲数据（按 stage/slot 命名），支持结构化变量值。 解码不可得或原始字节仅覆盖前缀时partial=true，导出文件保留范围和错误。
 
 | 参数 | 必需 | 约束 |
 |---|---:|---|
@@ -1402,11 +1405,11 @@ Export post-VS positions or explicit VS input position/normal/UV as Wavefront OB
 | `output_dir` | 是 | string; output_dir (str) |
 | `stages` | 否 | array; stages (list[str], 可选, 默认 ['vs','ps','cs']) |
 | `slots` | 否 | array; slots (list[int], 可选) |
-| `max_bytes` | 否 | integer; max_bytes (int, 可选, 默认 1048576) |
+| `max_bytes` | 否 | integer; min=0; 每常量块输入字节上限，默认1048576；0表示该块不设上限，负数无效。预算或绑定范围不足完整反射块时不发布完整布局解码值。 |
 | `include_raw` | 否 | boolean; include_raw (bool, 可选, 默认 false) |
 | `include_decoded` | 否 | boolean; include_decoded (bool, 可选, 默认 true) |
 
-**结果解释：** ok (bool); data (dict): {dumped_paths, saved_files, failures, partial, stages, slots}; each stage/slot is handled independently and partial failures are recorded instead of blocking the whole request.; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {dumped_paths, saved_files, failures, partial, stages, slots}; each stage/slot is handled independently and partial failures are recorded instead of blocking the whole request.; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选) input_coverage说明required_bytes、binding_bytes、byte_budget、permitted_bytes及complete_range_permitted；这不是原始字节回执。decode_status明确decoded/unavailable/raw_fallback，decode_input_bytes是传给解码器的长度。raw_fallback.byte_size为实际返回字节；truncated表示块读取不全，preview_bytes/preview_truncated另外限定hex_preview交付范围。预算不足、未绑定输入或未知范围不能解释成已观测零。
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1424,13 +1427,14 @@ Export post-VS positions or explicit VS input position/normal/UV as Wavefront OB
 
 ## `rd.util.diff_images`
 
-对比两张图片（支持 PNG、JPEG、EXR 格式），输出差异图及相关指标，如 PSNR、SSIM 和最大绝对误差。
+Compare Pillow-decodable images (including PNG/JPEG) as normalized RGBA. Honor requested metrics; defaults are mse/max_abs/psnr. Optional SSIM averages valid 11x11 Gaussian windows (sigma 1.5, population covariance) over RGBA, requiring both dimensions >=11. Identical PSNR is null with infinite status. Diff images are opaque RGB; alpha differences are shown as gray. Optional region {x,y,width,height} compares the same in-bounds pixel rectangle in both images and exports that rectangle; no clamping, alignment or resize. Results report source_size and effective region. Metrics do not establish repair acceptance.
 
 | 参数 | 必需 | 约束 |
 |---|---:|---|
 | `image_a_path` | 是 | string; image_a_path (str): 第一张图片的文件路径 |
 | `image_b_path` | 是 | string; image_b_path (str): 第二张图片的文件路径 |
 | `metrics` | 否 | array; metrics (list[str], 可选): 需要计算的指标列表，例如 ['psnr', 'ssim', 'max_abs', 'mse'] |
+| `region` | 否 | object; Same pixel rectangle in both images; out-of-bounds is an error. Output diff has this region size. |
 | `output_path` | 否 | string; output_path (str, 可选): 差异图的输出路径 |
 
 **结果解释：** ok (bool); data (dict): {metrics, diff_image_path}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)

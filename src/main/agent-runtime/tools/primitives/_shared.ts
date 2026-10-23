@@ -372,19 +372,13 @@ export function assertFileSizeCap(absolutePath: string, maxBytes: number, label 
 }
 
 function sampleLooksBinary(sample: Buffer): string | null {
+  // FileHeader.magic is a uint64 containing MAKE_FOURCC('R', 'D', 'O', 'C').
+  // The four printable letters also prefix ordinary RenderDoc diagnostic logs.
+  if (sample.length >= 8 && sample.readUInt32LE(0) === 0x434f4452 && sample.readUInt32LE(4) === 0) {
+    return 'RenderDoc RDOC magic';
+  }
   if (sample.includes(0)) {
     return 'NUL byte in file head';
-  }
-  if (sample.length >= 4) {
-    // RenderDoc capture magic "RDOC"
-    if (
-      sample[0] === 0x52
-      && sample[1] === 0x44
-      && sample[2] === 0x4f
-      && sample[3] === 0x43
-    ) {
-      return 'RenderDoc RDOC magic';
-    }
   }
   let suspicious = 0;
   const take = Math.min(sample.length, BINARY_SAMPLE_BYTES);

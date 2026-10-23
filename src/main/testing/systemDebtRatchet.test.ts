@@ -395,8 +395,8 @@ describe('system debt ratchet CLI', () => {
     const localEnv = { CI: '', RDC_SYSTEM_DEBT_BASE_REF: '' };
     const knowledge = spawnNode(knowledgeCli, [], { env: localEnv });
     const investigation = spawnNode(investigationCli, [], { env: localEnv });
-    expect(knowledge.status).toBe(0);
-    expect(investigation.status).toBe(0);
+    expect(knowledge.status, `${knowledge.error?.message ?? ''}\n${knowledge.stderr}\n${knowledge.stdout}`).toBe(0);
+    expect(investigation.status, `${investigation.error?.message ?? ''}\n${investigation.stderr}\n${investigation.stdout}`).toBe(0);
     expect(knowledge.stdout).toMatch(/historical monotonic skipped/);
     expect(investigation.stdout).toMatch(/historical monotonic skipped/);
   }, 60_000);

@@ -384,7 +384,7 @@ function toRecordDetails(details: unknown): Record<string, unknown> | undefined 
     : undefined;
 }
 
-function toolResultToSharedResult(result: ToolResultMessage, durationMs: number): import('@shared/types/tool').ToolCallResult {
+export function toolResultToSharedResult(result: ToolResultMessage, durationMs: number): import('@shared/types/tool').ToolCallResult {
   if (result.isError) {
     return {
       ok: false,

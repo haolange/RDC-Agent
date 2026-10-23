@@ -57,6 +57,7 @@ export const useProviderConnectionActions = (
         updateConnectionDraft({
           busy: 'idle',
           error: '',
+          accountStatus: await window.electronAPI.llm.getProviderAccountStatus(connectionDraft.providerId),
           discoveryDiagnostic: result.discoveryDiagnostic ?? null,
           testedApiKey: connectionDraft.apiKey,
           testedBaseUrl: connectionDraft.baseUrl,
