@@ -102,3 +102,10 @@ Progress 的任务定位仅通过 renderer 内部有类型的请求收集工作�
 计划门与普通工具审批互斥投影，包括 delegated 请求。子计划的内容与决定绑定 child owner，parent 仅承载显示与回答入口。建议行 Agent 切换成功后才预填/发送；当前会话变化、Stop、请求失效或切换失败必须丢弃迟到结果，不覆盖其他会话草稿。
 
 委派记录使用显式结构契约；不符合当前契约的详细记录返回不可用。结构化任务与实际发送文本是不同正文种类，读取同受 session、父调用及子执行身份校验。终态先增量持久化收束后的内部步骤，再发布头部 revision；重启中断读出的步骤使用持久时间收束，迟到事件不得恢复运行。
+
+
+## 调查制品摘要与完整列表
+
+main-owned artifacts 投影仅含 rows（最多5项）、totalCount、storeDegraded；同一选择路径排除已被取代记录并按 createdAt、artifactId 倒序。只读 investigation:list 请求显式 projectId/sessionId 及可选 createdAt/artifactId 游标，主进程校验当前session/project归属、严格游标和固定50项页面；返回 rows/totalCount/storeDegraded 及可选 nextCursor。renderer不重建版本关系，不访问存储。存档及 supersedes 链保持，旧的替代/截断计数UI字段删除。
+
+列表、分页和预览状态按完整project/session身份隔离，切换时关闭并拒收旧结果。预览沿既有 investigation:read 与 expectedHash，分页不能扩大读取权限。上下文只限量展示，不改变被冻结Prompt段和成功tool result的资源来源。

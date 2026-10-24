@@ -21,11 +21,11 @@ export const SessionRightRail: React.FC = () => {
   const presentation = useWorkflowStore((state) => state.tracePresentation);
   const rightPanel = presentation?.rightPanel;
   const tasks = rightPanel?.progress ?? [];
-  const artifacts = rightPanel?.artifacts ?? { rows: [], supersededCount: 0, truncatedCount: 0, storeDegraded: false };
+  const artifacts = rightPanel?.artifacts ?? { rows: [], totalCount: 0, storeDegraded: false };
   const outputs = rightPanel?.outputs ?? { current: [], previous: [] };
   const taskContext: TaskContextPanelViewModel | undefined = rightPanel?.context?.task;
   const captureContext: RdcContextPanelViewModel | undefined = rightPanel?.context?.rdc;
-  const hasArtifacts = artifacts.rows.length + artifacts.supersededCount + artifacts.truncatedCount > 0;
+  const hasArtifacts = artifacts.totalCount > 0;
   const hasOutputs = outputs.current.length + outputs.previous.length > 0;
   const hasTaskContext = Boolean(taskContext?.resources.length);
   const hasCapture = Boolean(taskContext && captureContext && captureContext.availableCaptures.length);

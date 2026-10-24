@@ -5,7 +5,8 @@ import { InvestigationError, isInvestigationStoreDegraded } from '../investigati
 import { investigationArtifactService } from '../investigation/InvestigationArtifactService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
-import { InvestigationReadArgsSchema } from './validation/investigationSchemas';
+import { listInvestigationArtifacts } from '../agent-trace/rightRailInvestigationArtifacts';
+import { InvestigationReadArgsSchema, InvestigationListArgsSchema } from './validation/investigationSchemas';
 import type { WorkbenchIpcContext, WorkbenchIpcState } from './workbenchContext';
 
 function sessionDenied(message: string): InvestigationReadIpcResult {
@@ -69,6 +70,12 @@ function mapInvestigationReadError(error: unknown): InvestigationReadIpcResult {
 }
 
 export function registerInvestigationHandlers(context: WorkbenchIpcContext): void {
+  ipcMain.handle('investigation:list', (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(InvestigationListArgsSchema, rawArgs, { label: 'investigation:list', maxBytes: 4096 });
+    const denied = assertActiveInvestigationOwner(context.state, request.sessionId);
+    if (denied || request.projectId !== context.state.currentProjectId) throw new Error('INVESTIGATION_SESSION_DENIED');
+    return listInvestigationArtifacts(request.sessionId, request.cursor);
+  });
   ipcMain.handle('investigation:read', async (_event, ...rawArgs: unknown[]) => {
     const [request] = parseIpcArgs(InvestigationReadArgsSchema, rawArgs, {
       label: 'investigation:read',

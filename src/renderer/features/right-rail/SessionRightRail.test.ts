@@ -12,7 +12,7 @@ vi.mock('../../stores/workflowStore', () => ({ useWorkflowStore: (select: (value
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, language: 'en' }) }));
 
 describe('session rail projection composition', () => {
-  it('localizes runtime-owned Stop reasons without rewriting user-authored Task reasons', () => {
+  it('keeps task numbers independent of state and hides reasons from the compact list', () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     const host = document.createElement('div'); const root = createRoot(host);
     try {
@@ -24,9 +24,11 @@ describe('session rail projection composition', () => {
         ],
       } };
       act(() => root.render(createElement(SessionRightRail)));
-      expect(host.textContent).toContain('control.rightRail.progress.reason.parentTurnStopped');
-      expect(host.textContent).toContain('control.rightRail.progress.reason.createdTurnStopped');
-      expect(host.textContent).toContain('等待用户确认');
+      expect(host.textContent).not.toContain('control.rightRail.progress.reason.parentTurnStopped');
+      expect(host.textContent).not.toContain('control.rightRail.progress.reason.createdTurnStopped');
+      expect(host.textContent).not.toContain('等待用户确认');
+      expect([...host.querySelectorAll('.right-rail-task-order')].map(el => el.textContent)).toEqual(['1','2','3']);
+      expect(host.querySelectorAll('.right-rail-task-row .task-status-marker')).toHaveLength(3);
       expect(zhControl['control.rightRail.progress.reason.parentTurnStopped']).toBe('主回合停止，所属执行已结束。');
       expect(zhControl['control.rightRail.progress.reason.createdTurnStopped']).toBe('创建此待办的回合已停止，待办尚未开始。');
       expect(enControl['control.rightRail.progress.reason.parentTurnStopped']).toBe(TASK_STATUS_REASONS.parentTurnStopped);
@@ -46,13 +48,13 @@ describe('session rail projection composition', () => {
       expect(host.querySelectorAll('[aria-expanded]')).toHaveLength(0);
       state.tracePresentation = { rightPanel: {
         progress: [{ id: 'task', sessionId: 'session', order: 1, title: 'A blocked task', status: 'blocked', blockerSummary: 'Needs input' }],
-        artifacts: { rows: [], storeDegraded: true, supersededCount: 0, truncatedCount: 0 },
+        artifacts: { rows: [], storeDegraded: true, totalCount: 0 },
         outputs: { current: [{ id: 'output', displayName: 'A long output name', path: '/output', status: 'failed' }], previous: [] },
         context: { task: { resources: [{ id: 'resource', kind: 'skill', label: 'A loaded skill', summary: 'Scope retained' }] } },
       } }; render();
       expect(ids()).toEqual(expected);
       expect(host.textContent).toContain('A blocked task');
-      expect(host.textContent).toContain('Needs input');
+      expect(host.textContent).not.toContain('Needs input');
       expect(host.textContent).toContain('control.rightRail.artifacts.storeDegraded');
       expect(host.textContent).toContain('A loaded skill');
       const missing = [...host.querySelectorAll('button')].find((button) => button.textContent === 'control.rightRail.outputs.missing');

@@ -1,7 +1,7 @@
 .composer-usage-indicator {
   position: relative;
-  width: var(--control-height-lg);
-  height: var(--control-height-lg);
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -37,7 +37,7 @@
 .composer-usage-ring-track,
 .composer-usage-ring-progress {
   fill: none;
-  stroke-width: 2.5;
+  stroke-width: 2;
 }
 
 .composer-usage-ring-track {
@@ -69,8 +69,12 @@
   white-space: nowrap;
 }
 
-.composer-usage-indicator[data-value-length='long'] .composer-usage-value-number {
+.composer-usage-indicator[data-value-length='medium'] .composer-usage-value-number {
   font-size: calc(var(--text-xs) * 2 / 3);
+}
+
+.composer-usage-indicator[data-value-length='long'] .composer-usage-value-number {
+  font-size: calc(var(--text-xs) * 7 / 12);
 }
 
 .composer-usage-indicator.is-pending .composer-usage-ring-progress {

@@ -21,6 +21,8 @@ vi.mock('../sessions/StorageAdapter', () => ({
   storageAdapter: { readSession },
 }));
 
+vi.mock('../agent-trace/rightRailInvestigationArtifacts', () => ({ listInvestigationArtifacts: vi.fn(() => ({ rows: [], totalCount: 0, storeDegraded: false })) }));
+import { listInvestigationArtifacts } from '../agent-trace/rightRailInvestigationArtifacts';
 import { registerInvestigationHandlers } from './investigationHandlers';
 
 const HASH = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -162,5 +164,28 @@ describe('investigation:read', () => {
     });
     expect(readRecord).toHaveBeenCalledTimes(1);
     expect(readRecord).toHaveBeenCalledWith('session-current', 'invart-1', HASH);
+  });
+});
+
+describe('investigation:list ownership and payload', () => {
+  const scope = { projectId: 'project-current', sessionId: 'session-current' };
+  const run = (request: unknown) => {
+    handle.mockReset();
+    readSession.mockReturnValue({ projectId: scope.projectId });
+    registerInvestigationHandlers({ state: { currentSessionId: scope.sessionId, currentProjectId: scope.projectId } } as never);
+    return handle.mock.calls.find(call => call[0] === 'investigation:list')![1]({}, request);
+  };
+  it('passes only an authorized fixed-size cursor request to main selection', () => {
+    const cursor = { createdAt: '2026-01-01T00:00:00.000Z', artifactId: 'invart-1' };
+    expect(run({ ...scope, cursor })).toEqual({ rows: [], totalCount: 0, storeDegraded: false });
+    expect(listInvestigationArtifacts).toHaveBeenLastCalledWith(scope.sessionId, cursor);
+  });
+  it.each([{ ...scope, sessionId: 'other' }, { ...scope, projectId: 'other' }])('rejects foreign scope before listing', request => {
+    vi.mocked(listInvestigationArtifacts).mockClear();
+    expect(() => run(request)).toThrow('INVESTIGATION_SESSION_DENIED');
+    expect(listInvestigationArtifacts).not.toHaveBeenCalled();
+  });
+  it.each([{ ...scope, limit: 999 }, { ...scope, cursor: { createdAt: 'bad', artifactId: '../x' } }])('rejects malformed or adjustable paging', request => {
+    expect(() => run(request)).toThrow(IpcValidationError);
   });
 });

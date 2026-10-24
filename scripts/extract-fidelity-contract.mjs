@@ -52,6 +52,10 @@ const classNamePatterns = [
   /\bcn\(\s*['"]([^'"]+)['"]/g,
 ];
 
+// TaskStatusMarker uses a closed state-to-class map instead of duplicating icon markup.
+const taskMarkerSource = fs.readFileSync(path.join(rendererRoot, 'ui/TaskStatusMarker/index.tsx'), 'utf8');
+const taskMarkerClasses = extractFromStringLiteral(taskMarkerSource, [/(?:pending|in_progress|blocked|completed|cancelled):\s*'([^']+)'/g]);
+
 const testIdPatterns = [
   /data-testid\s*=\s*"([^"]+)"/g,
   /data-testid\s*=\s*'([^']+)'/g,
@@ -61,7 +65,7 @@ const testIdPatterns = [
   /dataTestId\s*=\s*'([^']+)'/g,
 ];
 
-const classNames = new Set();
+const classNames = new Set(taskMarkerClasses);
 const testIds = new Set();
 
 for (const filePath of walkTsx(rendererRoot)) {

@@ -51,7 +51,7 @@ export const ContextUsageIndicator: React.FC<{
   const usagePercent = showPrepared ? prepared.usagePercent : usage?.usagePercent ?? 0;
   const normalizedPercent = awaitingWindow ? 0 : Math.max(0, Math.min(100, usagePercent));
   const windowTokens = resolveDisplayedPromptBudget(showPrepared, prepared, usage, selectedProfile);
-  const radius = 15.5;
+  const radius = 16.5;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - (normalizedPercent / 100));
   const percentLabel = showEstimatedRing ? `~${normalizedPercent}%` : `${normalizedPercent}%`;
@@ -110,7 +110,7 @@ export const ContextUsageIndicator: React.FC<{
         className={`composer-usage-indicator${stale && !showPrepared ? ' is-stale' : ''}${phase === 'preparing' || awaitingWindow ? ' is-pending' : ''}${showEstimatedRing ? ' is-estimated' : ''}`}
         data-testid="composer-usage-indicator"
         data-estimated={showEstimatedRing ? 'true' : undefined}
-        data-value-length={valueText.length > 4 ? 'long' : undefined}
+        data-value-length={valueText.length > 4 ? 'long' : valueText.length === 4 ? 'medium' : undefined}
         aria-label={ariaLabel}
         aria-haspopup="dialog"
         aria-expanded={open}

@@ -60,6 +60,7 @@ export const RENDERER_INVOKE_CHANNEL = {
   },
   investigation: {
     read: 'investigation:read',
+    list: 'investigation:list',
   },
   plan: {
     read: 'plan:read',

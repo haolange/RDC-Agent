@@ -273,6 +273,7 @@ export interface ElectronAPI {
   };
 
   investigation: {
+    list: (request: import('./trace').InvestigationListRequest) => Promise<import('./trace').InvestigationListPage>;
     read: (request: InvestigationReadRequest) => Promise<InvestigationReadIpcResult>;
   };
 

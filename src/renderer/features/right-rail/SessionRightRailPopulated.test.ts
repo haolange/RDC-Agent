@@ -16,7 +16,7 @@ const state = vi.hoisted(() => ({
   reload: vi.fn(), receive: vi.fn(),
 }));
 vi.mock('../../stores/workflowStore', () => ({ useWorkflowStore: (select: (value: typeof state) => unknown) => select(state) }));
-vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (value: { currentSession: { sessionId: string } }) => unknown) => select({ currentSession: { sessionId: 'session' } }) }));
+vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (value: { currentSession: { sessionId: string; projectId: string } }) => unknown) => select({ currentSession: { sessionId: 'session', projectId: 'project' } }) }));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, language: 'en' }) }));
 // Mock data/lifecycle boundaries; render the actual rail, artifact preview, CapturePanel,
 // CaptureWorkspace, replay controls, status chips and callouts throughout these samples.
@@ -35,7 +35,7 @@ function presentation(): AgentRunPresentation {
     projectId: 'project', sessionId: 'session', activeBranchId: 'branch', profileId: 'general',
     updatedAt: '2026-09-22T00:00:00Z', runs: [], rawAuditRefs: [],
     rightPanel: {
-      progress: [], artifacts: { rows: [artifact], supersededCount: 1, truncatedCount: 0, storeDegraded: false },
+      progress: [], artifacts: { rows: [artifact], totalCount: 1, storeDegraded: false },
       outputs: { current: [], previous: [] },
       context: {
         task: { projectId: 'project', projectName: 'Project', sessionId: 'session', sessionTitle: 'Session',
@@ -91,11 +91,9 @@ describe('populated session rail', () => {
     const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
     try {
       await act(async () => root.render(createElement(SessionRightRail)));
-      const preview = [...host.querySelectorAll<HTMLButtonElement>('.right-rail-investigation-row button')]
-        .find((button) => button.textContent === 'control.rightRail.artifacts.preview');
+      const preview = host.querySelector<HTMLButtonElement>('.right-rail-investigation-list button');
       await act(async () => preview!.click());
-      const dialog = document.querySelector('.investigation-preview-dialog');
-      expect(dialog?.getAttribute('data-kind')).toBe('report');
+      const dialog = document.querySelector('[data-testid="investigation-preview"]');
       expect(dialog?.querySelectorAll('.investigation-report section')).toHaveLength(7);
       expect(dialog?.textContent).toContain('The root cause remains unknown.');
       expect(dialog?.textContent).toContain('Partial; no causal fix verified.');
@@ -103,7 +101,7 @@ describe('populated session rail', () => {
       expect(dialog?.querySelector('.investigation-preview-source')?.hasAttribute('open')).toBe(false);
       expect(dialog?.querySelector('.investigation-report-index')?.textContent).toContain('ev-1248');
       act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
-      expect(document.querySelector('.investigation-preview-dialog')).toBeNull();
+      expect(document.querySelector('[data-testid="investigation-preview"]')).toBeNull();
     } finally { act(() => root.unmount()); host.remove(); }
   });
 
@@ -111,19 +109,18 @@ describe('populated session rail', () => {
     const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
     try {
       await act(async () => root.render(createElement(SessionRightRail)));
-      const row = host.querySelector('.right-rail-investigation-row');
-      expect(row?.classList.contains('status-stale')).toBe(true);
+      const row = host.querySelector<HTMLButtonElement>('.right-rail-investigation-list button');
       expect(row?.textContent).toContain(artifact.title);
-      expect(row?.textContent).toContain('control.rightRail.artifacts.status.stale');
-      const preview = [...row!.querySelectorAll('button')].find((button) => button.textContent === 'control.rightRail.artifacts.preview');
+      expect(row?.textContent).not.toContain('control.rightRail.artifacts.status.stale');
+      const preview = row;
       await act(async () => preview!.click());
       expect(readInvestigationArtifact).toHaveBeenCalledExactlyOnceWith({ sessionId: 'session', artifactId: artifact.artifactId, expectedHash: artifact.contentHash });
-      const dialog = document.querySelector('.investigation-preview-dialog');
+      const dialog = document.querySelector('[data-testid="investigation-preview"]');
       expect(dialog?.textContent).toContain(artifact.title);
-      expect(dialog?.getAttribute('data-status')).toBe('error');
+      expect(dialog?.textContent).toContain('control.rightRail.artifacts.preview.state.error');
       expect(dialog?.textContent).toContain('Artifact storage unavailable');
       act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
-      expect(document.querySelector('.investigation-preview-dialog')).toBeNull();
+      expect(document.querySelector('[data-testid="investigation-preview"]')).toBeNull();
     } finally { act(() => root.unmount()); host.remove(); }
   });
 

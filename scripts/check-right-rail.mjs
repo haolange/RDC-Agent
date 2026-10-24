@@ -116,7 +116,7 @@ const artifactList = [
   read('src/renderer/features/right-rail/RightRailArtifactList.tsx'),
   read('src/renderer/hooks/appShellBridge.ts'),
 ].join('\n');
-for (const required of ['RightRailArtifactGlyph', 'control.rightRail.artifacts.copyId', 'control.rightRail.artifacts.preview', 'RightRailInvestigationPreview', 'appShell.copyText']) {
+for (const required of ['RightRailArtifactGlyph', 'RightRailInvestigationPreview', 'TaskDialog', 'totalCount', 'listInvestigationArtifacts']) {
   requireText(artifactList, required, `RightRailArtifactList must retain ${required}`);
 }
 for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:', 'Open', 'Delete', 'Refresh']) {
@@ -127,7 +127,7 @@ const artifactPreview = [
   read('src/renderer/features/right-rail/RightRailInvestigationPreview.tsx'),
   read('src/renderer/features/right-rail/investigationPreviewActions.ts'),
 ].join('\n');
-for (const required of ['investigation.read', 'expectedHash', "role=\"dialog\"", "event.key === 'Escape'", 'hash-mismatch']) {
+for (const required of ['investigation.read', 'expectedHash', 'TaskDialog', 'control.rightRail.artifacts.copyId', 'hash-mismatch']) {
   requireText(artifactPreview, required, `RightRailInvestigationPreview must retain ${required}`);
 }
 for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:', 'ArtifactViewer', 'title={hash}', 'title={row.contentHash}']) {
@@ -148,7 +148,7 @@ for (const forbidden of ['PlanArtifactPreview', 'isPlanArtifact', "artifact.type
 }
 
 const context = read('src/renderer/features/right-rail/RightRailContext.tsx');
-for (const requiredArea of ['TaskContextPanelViewModel', 'TaskContextResource', "t('control.rightRail.context.resources')", "t('control.rightRail.outputs.open')"]) {
+for (const requiredArea of ['TaskContextPanelViewModel', 'TaskContextResource', "t('control.rightRail.context.resources')", "TaskDialog", "slice(0, 5)"]) {
   requireText(context, requiredArea, `RightRailContext must retain ${requiredArea}`);
 }
 for (const forbidden of ['context?: ContextPanelViewModel', 'Rdc', 'Capture', 'Preview', 'Refresh', 'Copy', 'Clear', '<details', 'Session details', 'Replay options', 'Runtime details', 'Context ID', 'Replay session', 'Capture file', 'Remote ID', 'cliSummary', '<Fact label="CLI"', 'toolCount', 'namespace inventory']) {

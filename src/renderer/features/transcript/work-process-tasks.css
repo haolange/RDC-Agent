@@ -74,3 +74,9 @@
 .work-process-task-snapshot-item.task-blocked .work-process-task-snapshot-reason {
   color: var(--token-status-warning);
 }
+
+.work-process-task-snapshot-copy summary { cursor: pointer; }
+.work-process-task-snapshot-copy summary:hover,
+.work-process-task-snapshot-copy summary:focus-visible { color: var(--token-text-heading); }
+.work-process-task-snapshot-copy summary:focus-visible { outline: 2px solid var(--token-border-focus); }
+.work-process-task-snapshot-reason { margin: var(--space-1) 0 0; }

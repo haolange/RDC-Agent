@@ -35,6 +35,8 @@ it('shows event type, completion count and distinct state icons without a fake d
   expect(document.body.textContent).not.toContain('0ms');
   expect(document.querySelectorAll('.task-status-marker.is-snapshot svg')).toHaveLength(5);
   expect(document.querySelector('.task-pending .task-status-marker circle')).not.toBeNull();
+  expect(document.querySelector('.task-blocked details')?.hasAttribute('open')).toBe(false);
+  expect(document.querySelector('.task-blocked summary')?.textContent).toBe('Blocked');
   expect(document.querySelector('.task-blocked .work-process-task-snapshot-reason')?.textContent).toBe('Waiting for input');
   expect(document.querySelector('[data-work-process-task-id="current"]')?.getAttribute('tabindex')).toBe('-1');
   const older = renderToStaticMarkup(createElement(TaskSnapshotCard, { row: snapshot('old'), isLatest: false }));

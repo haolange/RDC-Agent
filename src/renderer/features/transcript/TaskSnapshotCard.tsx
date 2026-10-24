@@ -4,6 +4,7 @@ import { useI18n } from '../../i18n';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import type { WorkProcessRow } from './workProcessTypes';
+import { TASK_STATUS_REASONS } from '@shared/constants/taskStatusReasons';
 import { WorkProcessIcon } from './WorkProcessIcons';
 
 export const TaskSnapshotCard: React.FC<{
@@ -13,6 +14,9 @@ export const TaskSnapshotCard: React.FC<{
   const { t } = useI18n();
   const [expanded, toggle] = useScopedWorkDisclosure(`task-snapshot-${row.id}`, isLatest);
   const listId = useId();
+  const reasonText = (reason: string) => reason === TASK_STATUS_REASONS.parentTurnStopped
+    ? t('control.rightRail.progress.reason.parentTurnStopped') : reason === TASK_STATUS_REASONS.createdTurnStopped
+      ? t('control.rightRail.progress.reason.createdTurnStopped') : reason;
   const title = row.change === 'created' ? t('chat.workProcessTaskSnapshotCreated')
     : row.change === 'updated' ? t('chat.workProcessTaskSnapshotUpdated')
       : t('chat.workProcessTaskSnapshotList');
@@ -35,14 +39,12 @@ export const TaskSnapshotCard: React.FC<{
                   data-work-process-task-status={item.status}
                   tabIndex={-1}
                 >
-                  <TaskStatusMarker status={item.status} order={item.order} variant="snapshot"
+                  <TaskStatusMarker status={item.status}
                     label={t(`chat.workProcessTaskStatus.${item.status}`)} />
-                  <span className="work-process-task-snapshot-copy">
-                    <span className="work-process-task-snapshot-title">{item.title}</span>
-                    {item.status === 'blocked' && item.statusReason ? (
-                      <small className="work-process-task-snapshot-reason">{item.statusReason}</small>
-                    ) : null}
-                  </span>
+                  {item.statusReason ? <details className="work-process-task-snapshot-copy">
+                    <summary className="work-process-task-snapshot-title">{item.title}</summary>
+                    <p className="work-process-task-snapshot-reason">{reasonText(item.statusReason)}</p>
+                  </details> : <span className="work-process-task-snapshot-title">{item.title}</span>}
                 </li>
               ))}
             </ul>

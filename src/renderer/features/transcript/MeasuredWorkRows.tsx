@@ -98,6 +98,8 @@ export const MeasuredWorkRows: React.FC<{
             }
             return;
           }
+          const reason = target.querySelector('details');
+          if (reason) reason.open = true;
           target.scrollIntoView({ behavior: 'smooth', block: 'center' });
           target.focus({ preventScroll: true });
           target.classList.remove('is-trace-flash');

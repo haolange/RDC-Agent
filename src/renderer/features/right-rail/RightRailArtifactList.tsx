@@ -1,109 +1,67 @@
-import React, { useState } from 'react';
-import type { InvestigationArtifactKind, InvestigationArtifactStatus, InvestigationMission } from '@shared/types/renderdocInvestigation';
-import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel } from '@shared/types/trace';
-import { useI18n, type TranslationKey } from '../../i18n';
-import { copyAppText } from '../../hooks/appShellBridge';
+import React, { useEffect, useState } from 'react';
+import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel, InvestigationListPage } from '@shared/types/trace';
+import { useI18n } from '../../i18n';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../../ui/Button';
+import { TaskDialog } from '../../ui/TaskDialog';
 import { RightRailArtifactGlyph } from './RightRailArtifactGlyphs';
 import { RightRailInvestigationPreview } from './RightRailInvestigationPreview';
+import { listInvestigationArtifacts } from './investigationPreviewActions';
 
-const kindKey = (kind: InvestigationArtifactKind): TranslationKey => `control.rightRail.artifacts.kind.${kind}` as TranslationKey;
-const statusKey = (status: InvestigationArtifactStatus): TranslationKey => `control.rightRail.artifacts.status.${status}` as TranslationKey;
-const missionKey = (mission: InvestigationMission | 'unknown'): TranslationKey => `control.rightRail.artifacts.mission.${mission}` as TranslationKey;
+function ArtifactRows({ rows, select }: { rows: InvestigationArtifactRow[]; select: (row: InvestigationArtifactRow) => void }) {
+  const { t } = useI18n();
+  return <div className="right-rail-investigation-list">{rows.map(row => <Button key={row.artifactId} variant="ghost"
+    className="right-rail-compact-row" title={row.title || row.artifactId} onClick={() => select(row)}>
+    <span className="right-rail-compact-icon" aria-hidden="true"><RightRailArtifactGlyph kind={row.kind} /></span>
+    <span className="right-rail-compact-title">{row.title || `${t(`control.rightRail.artifacts.kind.${row.kind}`)} · ${row.artifactId}`}</span>
+    <span aria-hidden="true">›</span>
+  </Button>)}</div>;
+}
 
-const formatRelativeTime = (iso: string, language: string): string => {
-  const deltaMs = Date.parse(iso) - Date.now();
-  if (!Number.isFinite(deltaMs)) return iso;
-  const absSec = Math.round(Math.abs(deltaMs) / 1000);
-  const formatter = new Intl.RelativeTimeFormat(language === 'zh-CN' ? 'zh-CN' : 'en', { numeric: 'auto' });
-  if (absSec < 60) return formatter.format(Math.round(deltaMs / 1000), 'second');
-  if (absSec < 3600) return formatter.format(Math.round(deltaMs / 60000), 'minute');
-  if (absSec < 86400) return formatter.format(Math.round(deltaMs / 3600000), 'hour');
-  if (absSec < 86400 * 30) return formatter.format(Math.round(deltaMs / 86400000), 'day');
-  return formatter.format(Math.round(deltaMs / (86400000 * 30)), 'month');
+function ScopedArtifactList({ artifacts, projectId, sessionId }: {
+  artifacts: InvestigationArtifactsPanelViewModel; projectId: string; sessionId: string;
+}) {
+  const { t } = useI18n();
+  const [all, setAll] = useState(false);
+  const [preview, setPreview] = useState<InvestigationArtifactRow | null>(null);
+  const [page, setPage] = useState<InvestigationListPage | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [cursor, setCursor] = useState<InvestigationListPage['nextCursor']>();
+  useEffect(() => {
+    if (!all) return;
+    let active = true;
+    setLoading(true); setError(false);
+    void listInvestigationArtifacts({ projectId, sessionId, cursor }).then(next => {
+      if (!active) return;
+      if (next.storeDegraded) { setError(true); return; }
+      setPage(previous => ({ ...next, rows: cursor && previous
+        ? [...previous.rows, ...next.rows.filter(row => !previous.rows.some(old => old.artifactId === row.artifactId))] : next.rows }));
+    }).catch(() => { if (active) setError(true); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [all, projectId, sessionId, cursor, attempt]);
+  return <>
+    <ArtifactRows rows={artifacts.rows} select={setPreview} />
+    {artifacts.totalCount > 5 && <Button variant="ghost" size="sm" className="right-rail-browse-all"
+      onClick={() => { setPage(null); setCursor(undefined); setAll(true); }}>{t('control.rightRail.browse.all', { count: artifacts.totalCount })}</Button>}
+    <TaskDialog open={all} title={t('control.rightRail.artifacts.title')} closeLabel={t('control.rightRail.browse.close')}
+      onClose={() => setAll(false)} dataTestId="investigation-list">
+      {page && <ArtifactRows rows={page.rows} select={setPreview} />}
+      {loading && <p role="status">{t('control.rightRail.browse.loading')}</p>}
+      {error && <div role="alert"><p>{t('control.rightRail.browse.error')}</p><Button variant="ghost" size="sm"
+        onClick={() => setAttempt(value => value + 1)}>{t('control.rightRail.browse.retry')}</Button></div>}
+      {!loading && !error && page?.rows.length === 0 && <p>{t('control.rightRail.artifacts.empty')}</p>}
+      {!loading && !error && page?.nextCursor && <Button variant="ghost" size="sm"
+        onClick={() => setCursor(page.nextCursor)}>{t('control.rightRail.browse.more')}</Button>}
+    </TaskDialog>
+    {preview && <RightRailInvestigationPreview key={preview.artifactId} sessionId={sessionId} row={preview} onClose={() => setPreview(null)} />}
+  </>;
+}
+
+export const RightRailArtifactList: React.FC<{ artifacts: InvestigationArtifactsPanelViewModel }> = ({ artifacts }) => {
+  const session = useProjectStore(state => state.currentSession);
+  return session ? <ScopedArtifactList key={`${session.projectId}:${session.sessionId}`} artifacts={artifacts}
+    projectId={session.projectId} sessionId={session.sessionId} /> : null;
 };
-
-const rowTitle = (
-  row: InvestigationArtifactRow,
-  kindLabel: string,
-): { text: string; title: string } => {
-  const fallback = `${kindLabel} · ${row.artifactId.slice(0, 8)}`;
-  if (!row.title || row.degraded) {
-    return { text: fallback, title: row.degraded && row.contentHashShort ? row.contentHashShort : fallback };
-  }
-  return { text: row.title, title: row.title };
-};
-
-const rowClass = (row: InvestigationArtifactRow): string => {
-  const status = row.degraded ? 'failed' : row.status;
-  return `right-rail-investigation-row status-${status}${row.degraded ? ' is-degraded' : ''}`;
-};
-
-export const RightRailArtifactList: React.FC<{ artifacts: InvestigationArtifactsPanelViewModel }> = React.memo(({ artifacts }) => {
-  const { t, language } = useI18n();
-  const sessionId = useProjectStore((state) => state.currentSession?.sessionId ?? '');
-  const [previewRow, setPreviewRow] = useState<InvestigationArtifactRow | null>(null);
-  return (
-    <div className="right-rail-investigation-list">
-      {artifacts.rows.map((row) => {
-        const kindLabel = t(kindKey(row.kind));
-        const heading = rowTitle(row, kindLabel);
-        const meta = [
-          kindLabel,
-          t(row.degraded ? 'control.rightRail.artifacts.status.degraded' : statusKey(row.status)),
-          formatRelativeTime(row.createdAt, language),
-          t(missionKey(row.mission)),
-          row.worldStateId ? t('control.rightRail.artifacts.worldState', { id: row.worldStateId }) : '',
-          row.sourceRefCount > 0 ? t('control.rightRail.artifacts.sourceCount', { count: row.sourceRefCount }) : '',
-        ].filter(Boolean).join(' · ');
-        return (
-          <article key={row.artifactId} className={rowClass(row)}>
-            <span className="right-rail-investigation-icon" aria-hidden="true">
-              <RightRailArtifactGlyph kind={row.kind} />
-            </span>
-            <span className="right-rail-investigation-copy">
-              <strong title={heading.title}>{heading.text}</strong>
-              <small>{meta}</small>
-            </span>
-            <span className="right-rail-investigation-actions">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => void copyAppText(row.artifactId)}
-              >
-                {t('control.rightRail.artifacts.copyId')}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setPreviewRow(row)}
-              >
-                {t('control.rightRail.artifacts.preview')}
-              </Button>
-            </span>
-          </article>
-        );
-      })}
-      {previewRow && sessionId ? (
-        <RightRailInvestigationPreview
-          sessionId={sessionId}
-          row={previewRow}
-          onClose={() => setPreviewRow(null)}
-        />
-      ) : null}
-      {artifacts.supersededCount > 0 || artifacts.truncatedCount > 0 ? (
-        <footer className="right-rail-investigation-footer">
-          {artifacts.supersededCount > 0 ? (
-            <p>{t('control.rightRail.artifacts.supersededCount', { count: artifacts.supersededCount })}</p>
-          ) : null}
-          {artifacts.truncatedCount > 0 ? (
-            <p>{t('control.rightRail.artifacts.truncated', { count: artifacts.truncatedCount })}</p>
-          ) : null}
-        </footer>
-      ) : null}
-    </div>
-  );
-});
-
 export default RightRailArtifactList;

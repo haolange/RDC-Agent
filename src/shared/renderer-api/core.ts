@@ -107,6 +107,7 @@ export function createAgentApi(transport: RendererApiTransport): AgentApi {
 export function createInvestigationApi(transport: RendererApiTransport): InvestigationApi {
   return {
     read: (request) => transport.invoke(INVOKE.investigation.read, request),
+    list: (request) => transport.invoke(INVOKE.investigation.list, request),
   };
 }
 

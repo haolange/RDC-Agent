@@ -24,6 +24,13 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+const usageIndicatorCss = fs.readFileSync(path.join(process.cwd(), 'src/renderer/features/composer/composer-usage.css'), 'utf8');
+const usageIndicatorBox = usageIndicatorCss.match(/\.composer-usage-indicator\s*\{([^}]+)\}/)?.[1] ?? '';
+for (const axis of ['width', 'height']) {
+  assert(new RegExp(`${axis}:\\s*var\\(--control-height-sm\\)`).test(usageIndicatorBox),
+    'Context usage must keep its original sm footprint; fit text inside the ring instead of enlarging the control');
+}
+
 const expectedPresets = [
   'rdc', 'absolutely', 'ayu', 'catppuccin', 'dracula', 'everforest', 'github', 'gruvbox', 'linear',
 ];

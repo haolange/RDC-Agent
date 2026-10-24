@@ -6,13 +6,12 @@ import {
   type InvestigationMission,
   type InvestigationRecordType,
 } from '@shared/types/renderdocInvestigation';
-import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel } from '@shared/types/trace';
-import { isInvestigationStoreDegraded } from '../investigation/investigationErrors';
+import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel, InvestigationListCursor, InvestigationListPage } from '@shared/types/trace';
 import { hashesEqual } from '../investigation/investigationHash';
 import { investigationArtifactService } from '../investigation/InvestigationArtifactService';
 import { collectSupersedeChain, type InvestigationIndexEntry } from '../investigation/investigationRecordKeys';
 
-const ROW_LIMIT = 50;
+const PAGE_SIZE = 50;
 
 const knownMission = (value: string | undefined): InvestigationMission | 'unknown' => (
   value && (INVESTIGATION_MISSIONS as readonly string[]).includes(value)
@@ -32,8 +31,7 @@ export interface InvestigationArtifactsSource {
 
 const emptyArtifacts = (storeDegraded = false): InvestigationArtifactsPanelViewModel => ({
   rows: [],
-  supersededCount: 0,
-  truncatedCount: 0,
+  totalCount: 0,
   storeDegraded,
 });
 
@@ -76,10 +74,10 @@ const toRow = (
   };
 };
 
-export function mapRightRailInvestigationArtifacts(
-  sessionId: string,
+export function listInvestigationArtifacts(
+  sessionId: string, cursor?: InvestigationListCursor,
   source: InvestigationArtifactsSource = investigationArtifactService,
-): InvestigationArtifactsPanelViewModel {
+): InvestigationListPage {
   try {
     const listed = source.listForProjection(sessionId);
     if (listed.storeDegraded) {
@@ -87,19 +85,28 @@ export function mapRightRailInvestigationArtifacts(
     }
     const entries = listed.artifacts.slice().sort((left, right) => {
       const time = left.createdAt.localeCompare(right.createdAt);
-      return time !== 0 ? time : left.artifactId.localeCompare(right.artifactId);
+      return time !== 0 ? -time : right.artifactId.localeCompare(left.artifactId);
     });
     const manifests = source.listManifests(sessionId);
     const superseded = collectSuperseded(entries);
     const visible = entries.filter((entry) => !superseded.has(entry.artifactId));
-    const truncatedCount = Math.max(0, visible.length - ROW_LIMIT);
+    const remaining = cursor ? visible.filter(entry => entry.createdAt < cursor.createdAt
+      || (entry.createdAt === cursor.createdAt && entry.artifactId.localeCompare(cursor.artifactId) < 0)) : visible;
+    const page = remaining.slice(0, PAGE_SIZE);
+    const last = page.at(-1);
     return {
-      rows: visible.slice(-ROW_LIMIT).map((entry) => toRow(entry, manifests.get(entry.artifactId) ?? null)),
-      supersededCount: superseded.size,
-      truncatedCount,
+      rows: page.map((entry) => toRow(entry, manifests.get(entry.artifactId) ?? null)),
+      totalCount: visible.length,
+      ...(last && remaining.length > PAGE_SIZE ? { nextCursor: { createdAt: last.createdAt, artifactId: last.artifactId } } : {}),
       storeDegraded: false,
     };
-  } catch (error) {
-    return emptyArtifacts(isInvestigationStoreDegraded(error) || /INVESTIGATION_INDEX_CORRUPT|INVESTIGATION_INDEX_MISSING|INVESTIGATION_DEGRADED/.test(String(error)));
+  } catch {
+    return emptyArtifacts(true);
   }
+}
+
+export function mapRightRailInvestigationArtifacts(sessionId: string,
+  source: InvestigationArtifactsSource = investigationArtifactService): InvestigationArtifactsPanelViewModel {
+  const page = listInvestigationArtifacts(sessionId, undefined, source);
+  return { rows: page.rows.slice(0, 5), totalCount: page.totalCount, storeDegraded: page.storeDegraded };
 }

@@ -1,5 +1,32 @@
 # Acceptance Ledger
 
+
+## main 上传前清理与复核（2026-10-25）
+
+- 按用户后续授权，将已批准的右栏/Transcript紧凑浏览、制品分页与28px圆环纠正一起提交当前main，不创建分支或发布版本。当前源码验证复用上方已记录的完整套件、构建与真实Browser证据；本次复验受影响19文件/101项、typecheck/lint、coverage ratchet和完整gates均通过，未重开模型、RDC或Browser实验。
+- 清除本会话两张被明确否定的设计草图、冗余seed元数据与可重建HTML/lcov覆盖率明细；coverage-summary、当前out和依赖保留。旧release中的7个rc.7文件已与GitHub发布资产逐项核对SHA256完全一致，确认无活进程后删除本地副本及空目录；远端版本未修改。发布来源：https://github.com/haolange/RDC-Agent/releases/tag/v0.6.0-rc.7 。以上文件逻辑391966763B，不等同磁盘实际释放量。
+- 原始附件/capture、正式调查记录、签名材料与唯一失败证据保留，不以目录大小、年龄或gitignore为删除依据。已接受的设计参考与最小验收截图/回执保留；本轮没有运行产品进程，canonical实例锁无活owner。
+- 删除前核对绝对路径、Git跟踪、链接与进程边界，删除后复查。最小回执位于.local/context-ring-proportion/{main-cleanup.json,discarded-designs-cleanup.json,TASKS.md}；本轮最终验证TEMP和日志也已收口。Git提交/推送结果由后续上传回执单独核验，不把本地绿色写成云端CI通过。
+
+
+## Context 圆环恢复原始外框（2026-10-25）
+
+- 用户指出前轮将28px外框扩大到36px破坏底栏比例。前轮36px几何测量仍是历史事实，但不再作为符合用户比例要求的验收。当前外框恢复sm token（28px），数字按短/四字符/长估值采用xs的0.75、2/3、7/12倍；SVG固定正方形，内部半径16.5、线宽2（viewBox单位），不改变用量计算或弹窗内容。
+- 专项10项通过，保留0%隐藏弧、100%完整闭环、估值/未知/准备中与原有相位语义；增加100%四字符分档断言。typecheck、lint、appearance及design-token门禁通过。appearance新增固定sm外框检查，阻止再次通过增大控件规避文字重叠。局部UI修改未重复运行无关完整套件。
+- 正式隔离Browser实际测得外框与发送按钮均28×28、垂直中心差0；最终59%在小/中/大字号为7.5/8.25/9px，大字号文字角点距弧内缘2.797px。100%大字号8px、间距1.818px；最长~100%组件分档与浏览器真实等宽字体测量宽19.243px、径向余量1.243px，后者明确为字体几何测量，不冒充真实模型请求。0/59/100及未知值来自隔离会话usage fixture，准备中由组件测试覆盖。深浅主题、Enter打开/Escape返回焦点与焦点环通过，Browser控制台error/warn为空。
+- 最终Browser与正式隔离桌面renderer同为index-BdQFBX9R.js，SHA256 5e5199d5628a0abd408578f7861e29fb4aa8d1f2b5be8eb173971bcbf9fbf132。桌面可见并正常exit0，末次Browser/desktop PID7152/127804均退出，隔离锁消失。原右栏修改保留，无提交推送发布；0模型/0RDC、不复制凭据或capture。数据与appearance均由自有脚本及正式Bridge准备，非真实用量证据。
+- 本轮Task/最小几何回执与截图位于.local/context-ring-proportion；自有工程、userData、脚本、cookie和输出日志按路径/Git/链接/进程边界核对后清理，桌面启动权已交还。DESIGN无尺寸专门裁决，本次同步视觉权威design-system及workbench契约；不追加AGENTS临时规则。
+
+
+## 右栏与 Transcript 信息收敛（2026-10-25）
+
+- 源码基线 `1d67e1a253ed2d5ebbd8b6783d73ce07934ce6f0` 加本条工作区修改；按批准计划保留五卡结构与原信息身份。Progress 序号/状态独立、完成不划线；快照原因按项展开并支持原历史定位。制品最新五项、上下文原序五项，列表仅名称/图标，完整浏览经弹窗；ID复制移入预览。
+- main 单一制品选择路径维护版本替代与倒序，摘要最多5项、分页固定50项；新增只读 investigation:list，严格project/session及游标校验，跨会话迟到结果丢弃。旧截断/替代计数UI字段和专属全局弹窗键盘处理删除；用户存档及权限边界保留。文件系统读取失败返回不可用，不冒充成功空页。
+- 确定性验证：完整513文件/3770项通过、4项既有跳过；coverage statements75.06/branches65.29/functions78.92/lines77.42，ratchet通过。其后补文件系统失败、上下文0/5/6边界与ID复制失败，相关3文件/32项通过。typecheck、lint、完整gates及构建通过；最终CSS只恢复未改领域的诊断截断样式，专项right-rail/design-tokens/fidelity/browser-capability复核通过。无断言放宽；早期两条旧排序/旧DOM断言按新契约修正，失败事实不写成产品通过。
+- 真实Browser：官方隔离启动与一次性bootstrap进入同源/app，数据经外部临时脚本调用StorageAdapter/InvestigationArtifactService准备，appearance经正式Bridge注入。57制品/57上下文，摘要各5，制品分页50→57、上下文挂载50→57；原生按钮Enter预览、ID复制反馈、两次Escape分别返回列表和原按钮，列表滚动位置及焦点返回成立；右栏定位揭示历史快照原因。1506px深色中字号与480px浅色大字号无横向溢出，序号1–5完整；资源行实测33.475px、图标15.994px，浅色大字号正文15px。Browser控制台error/warn为空。数据明确为visual fixture，0模型/0RDC，不作为调查或模型效果证据。
+- 最终正式桌面用同隔离根实际显示新界面，正常关闭exit0；Browser/桌面PID129192/130108退出，隔离实例锁消失，canonical死owner91924未修改，桌面启动权已交还。最终renderer `index-DhC4K5oO.js` SHA256 `3cff9b86854d3d20e89b674527fb10f68c2c1a49000ffd6c1887ddfcbabfaaef`；Browser截图属于末次读取失败传播及无关诊断CSS恢复前阶段，最终桌面验证当前构建。Desktop日志仍有既有Electron meta CSP frame-ancestors忽略提示，未改变CSP源码或放宽策略。
+- 本轮三处临时根（隔离userData、工程、测试TEMP）、注入/配置脚本、QA cookie与重复日志按绝对路径/Git/链接/进程边界清理并复查；保留 `.local/rail-density/{TASKS.md,receipt.json,seed-receipt.json,desktop.png,light.png,narrow.png}` 最小证据，当前依赖/构建/覆盖率报告继续使用。无提交、推送或发布，未读取或修改真实用户配置、capture与历史会话。
+
 ## 圆环比例与单一 EID 回放轨道（2026-10-25）
 
 - 本条按用户明确修订的方案验收，替代下方上一轮「同页面两种查看方式」的产品语义结论；旧测试与现场事实保留。源码为 `c098a14c53bfba8bd5b230046c3784ab497bc0c8` + 本条提交差异。代码验收时未提交；后续提交和推送按用户明确授权执行，不创建分支或发布。

@@ -34,7 +34,10 @@ describe('ContextUsageIndicator', () => {
     expect(html).toContain(`>${usagePercent}%</span>`);
     if (usagePercent === 0) expect(document).toContain('visibility="hidden"');
     else expect(document).not.toContain('visibility="hidden"');
-    if (usagePercent === 100) expect(document).not.toContain('stroke-dash');
+    if (usagePercent === 100) {
+      expect(document).not.toContain('stroke-dash');
+      expect(html).toContain('data-value-length="medium"');
+    }
     expect(html).not.toContain('width="36"');
   });
   it('keeps an oversized pre-window estimate pending until actual request usage arrives', () => {

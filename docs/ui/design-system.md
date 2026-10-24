@@ -160,6 +160,8 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 
 ## Composer 附件卡
 
+Composer 底栏用量环保持 `--control-height-sm` 的原始外框，与发送按钮同为 28px；文字按内容长度在环内缩小，不通过扩大外框或改变底栏比例容纳百分比。SVG 必须保持正方形，百分比与圆弧内缘留出清晰间距；键盘焦点环沿用现有规则。
+
 - 待发附件走输入框上方托盘（`composer-attachment-tray` / `composer-attachment-card`），不用 chip 文本条。
 - 图片卡 72px 圆角真实缩略图；文件卡类型字形 + 文件名 + `TYPE · size`。
 - 移除叉仅 hover / `:focus-within` 显现；键盘聚焦时常驻。

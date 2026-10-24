@@ -13,6 +13,7 @@ import {
 } from '../investigation/investigationTestFixtures';
 import {
   mapRightRailInvestigationArtifacts,
+  listInvestigationArtifacts,
   type InvestigationArtifactsSource,
   type InvestigationListSnapshot,
 } from './rightRailInvestigationArtifacts';
@@ -72,7 +73,7 @@ describe('mapRightRailInvestigationArtifacts', () => {
       [late, earlyB, earlyA],
       [earlyA, earlyB, late].map((item) => [item.artifactId, manifestOf(item.artifactId)]),
     ));
-    expect(result.rows.map((row) => row.artifactId)).toEqual(['a-early', 'b-early', 'b-late']);
+    expect(result.rows.map((row) => row.artifactId)).toEqual(['b-late', 'b-early', 'a-early']);
     expect(result.rows.every((row) => !row.degraded)).toBe(true);
     expect(result.rows.every((row) => row.contentHash.startsWith('sha256:') && row.contentHash.length === 71)).toBe(true);
     expect(result.rows.every((row) => row.contentHashShort === 'sha256:aaaaaaaaaaaa')).toBe(true);
@@ -86,24 +87,23 @@ describe('mapRightRailInvestigationArtifacts', () => {
       [[old.artifactId, manifestOf('old')], [next.artifactId, manifestOf('next')]],
     ));
     expect(result.rows.map((row) => row.artifactId)).toEqual(['next']);
-    expect(result.supersededCount).toBe(1);
+    expect(result.totalCount).toBe(1);
   });
 
-  it('keeps the newest 50 visible rows and counts earlier truncated records', () => {
-    const entries = Array.from({ length: 52 }, (_, index) => {
-      const id = `art-${String(index).padStart(2, '0')}`;
-      return entry(id, `2026-01-01T00:00:${String(index).padStart(2, '0')}.000Z`);
-    });
-    const result = mapRightRailInvestigationArtifacts('session-a', sourceOf(
-      entries,
-      entries.map((item) => [item.artifactId, manifestOf(item.artifactId)]),
-    ));
-    expect(result.rows).toHaveLength(50);
-    expect(result.truncatedCount).toBe(2);
-    expect(result.rows[0]?.artifactId).toBe('art-02');
-    expect(result.rows[49]?.artifactId).toBe('art-51');
-    expect(result.rows.map((row) => row.artifactId)).not.toContain('art-00');
-    expect(result.rows.map((row) => row.artifactId)).not.toContain('art-01');
+  it('projects newest five and pages beyond fifty without dropping or repeating ties', () => {
+    const entries = Array.from({ length: 57 }, (_, index) => entry(`art-${String(index).padStart(3, '0')}`, '2026-01-01T00:00:00.000Z'));
+    const source = sourceOf(entries, entries.map(item => [item.artifactId, manifestOf(item.artifactId)]));
+    const result = mapRightRailInvestigationArtifacts('session-a', source);
+    expect(result.totalCount).toBe(57);
+    expect(result.rows.map(row => row.artifactId)).toEqual(['art-056','art-055','art-054','art-053','art-052']);
+    const first = listInvestigationArtifacts('session-a', undefined, source);
+    expect(first.rows).toHaveLength(50);
+    expect(first.nextCursor).toEqual({ createdAt: entries[0].createdAt, artifactId: 'art-007' });
+    const second = listInvestigationArtifacts('session-a', first.nextCursor, source);
+    expect(second.rows).toHaveLength(7);
+    expect(second.nextCursor).toBeUndefined();
+    expect(new Set([...first.rows,...second.rows].map(row => row.artifactId)).size).toBe(57);
+    expect(second.rows.at(-1)?.artifactId).toBe('art-000');
   });
 
   it('marks a missing or mismatched manifest as degraded instead of dropping the row', () => {
@@ -114,21 +114,21 @@ describe('mapRightRailInvestigationArtifacts', () => {
       [[drifted.artifactId, manifestOf('drifted', { contentHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' })]],
     ));
     expect(result.rows).toHaveLength(2);
-    expect(result.rows[0]).toMatchObject({
+    expect(result.rows[1]).toMatchObject({
       artifactId: 'missing',
       degraded: true,
       title: '',
       mission: 'unknown',
       contentHash: missing.contentHash,
     });
-    expect(result.rows[1]).toMatchObject({
+    expect(result.rows[0]).toMatchObject({
       artifactId: 'drifted',
       degraded: true,
       title: '',
       mission: 'debugger',
       contentHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     });
-    expect(result.rows[0]?.contentHashShort).toBe('sha256:aaaaaaaaaaaa');
+    expect(result.rows[1]?.contentHashShort).toBe('sha256:aaaaaaaaaaaa');
   });
 
   it('keeps a valid row when a sibling manifest is drifted', () => {
@@ -158,8 +158,7 @@ describe('mapRightRailInvestigationArtifacts', () => {
     expect(() => service.list(SESSION_ID)).toThrow(/INVESTIGATION_INDEX_CORRUPT/);
     expect(mapRightRailInvestigationArtifacts(SESSION_ID, service)).toEqual({
       rows: [],
-      supersededCount: 0,
-      truncatedCount: 0,
+      totalCount: 0,
       storeDegraded: true,
     });
   });
@@ -168,7 +167,7 @@ describe('mapRightRailInvestigationArtifacts', () => {
     const result = mapRightRailInvestigationArtifacts('session-a', sourceOf([], [], () => {
       throw new Error('INVESTIGATION_INDEX_CORRUPT');
     }));
-    expect(result).toEqual({ rows: [], supersededCount: 0, truncatedCount: 0, storeDegraded: true });
+    expect(result).toEqual({ rows: [], totalCount: 0, storeDegraded: true });
   });
 
   it('does not invent a debugger mission when the manifest is missing', () => {
@@ -201,4 +200,9 @@ describe('mapRightRailInvestigationArtifacts', () => {
     expect(outputs.current.some((item) => item.id === 'inv-1')).toBe(false);
     expect(outputs.current.map((item) => item.id)).toEqual(['out-1']);
   });
+});
+
+it('does not report a failed filesystem read as an empty successful page', () => {
+  const source = sourceOf([], [], () => { throw new Error('EACCES'); });
+  expect(listInvestigationArtifacts('session-a', undefined, source)).toEqual({ rows: [], totalCount: 0, storeDegraded: true });
 });

@@ -1,5 +1,5 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useEffect, useState } from 'react';
+import { TaskDialog } from '../../ui/TaskDialog';
 import { bareInvestigationHash, type InvestigationReadIpcResult, type InvestigationReport } from '@shared/types/renderdocInvestigation';
 import type { InvestigationArtifactRow } from '@shared/types/trace';
 import { useI18n, type TranslationKey } from '../../i18n';
@@ -10,8 +10,6 @@ import { Button } from '../../ui/Button';
 import './RightRailInvestigationPreview.css';
 
 type PreviewStatus = 'empty' | 'loading' | 'ready' | 'degraded' | 'error' | 'hash-mismatch';
-
-const FOCUSABLE = 'button:not([disabled]), summary, [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const shortHash = (value: string): string => {
   const bare = bareInvestigationHash(value);
@@ -24,54 +22,9 @@ export const RightRailInvestigationPreview: React.FC<{
   onClose: () => void;
 }> = ({ sessionId, row, onClose }) => {
   const { t } = useI18n();
-  const titleId = useId();
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previouslyFocusedRef = useRef<HTMLElement | null>(
-    typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null,
-  );
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [status, setStatus] = useState<PreviewStatus>(row.contentHash ? 'loading' : 'empty');
   const [result, setResult] = useState<InvestigationReadIpcResult | null>(null);
-
-  useEffect(() => {
-    const previouslyFocused = previouslyFocusedRef.current;
-    return () => {
-      if (previouslyFocused?.isConnected) previouslyFocused.focus();
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== 'Tab') return;
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE))
-        .filter((element) => !element.hasAttribute('aria-hidden'));
-      if (focusable.length === 0) {
-        event.preventDefault();
-        dialog.focus();
-        return;
-      }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement;
-      if (event.shiftKey && (active === first || !dialog.contains(active))) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
 
   useEffect(() => {
     if (!row.contentHash) {
@@ -119,32 +72,15 @@ export const RightRailInvestigationPreview: React.FC<{
     ? JSON.stringify(result.record, null, 2)
     : '';
 
-  return createPortal(
-    <div
-      className="investigation-preview-overlay"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div
-        ref={dialogRef}
-        className="investigation-preview-dialog"
-        role="dialog"
-        tabIndex={-1}
-        aria-modal="true"
-        aria-labelledby={titleId}
-        data-status={status}
-        data-kind={manifest?.kind ?? row.kind}
-      >
-        <header className="investigation-preview-header">
-          <div className="investigation-preview-heading">
-            <h2 id={titleId}>{t('control.rightRail.artifacts.preview.title')}</h2>
-            <p>{heading}</p>
-          </div>
-          <Button variant="ghost" size="sm" autoFocus onClick={onClose}>
-            {t('control.rightRail.artifacts.preview.close')}
-          </Button>
-        </header>
+  return <TaskDialog open title={heading} onClose={onClose} closeLabel={t('control.rightRail.artifacts.preview.close')}
+    size={row.kind === 'report' ? 'lg' : 'md'} dataTestId="investigation-preview" className="investigation-preview-content">
+    <div className="investigation-preview-id">
+      <code>{row.artifactId}</code>
+      <Button variant="ghost" size="sm" onClick={() => {
+        void copyAppText(row.artifactId).then(() => setCopyState('copied'), () => setCopyState('failed'));
+      }}>{t('control.rightRail.artifacts.copyId')}</Button>
+    </div>
+    {copyState !== 'idle' && <p role="status">{t(`control.rightRail.browse.copy.${copyState}`)}</p>}
         <dl className="investigation-preview-meta">
           <div>
             <dt>{t('control.rightRail.artifacts.preview.version')}</dt>
@@ -199,10 +135,7 @@ export const RightRailInvestigationPreview: React.FC<{
             {t('control.rightRail.artifacts.preview.supersedes', { id: manifest.supersedes })}
           </p>
         ) : null}
-      </div>
-    </div>,
-    document.body,
-  );
+  </TaskDialog>;
 };
 
 export default RightRailInvestigationPreview;

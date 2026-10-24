@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { TaskDialog } from '../../ui/TaskDialog';
 import type { TaskContextPanelViewModel, TaskContextResource } from '@shared/types/trace';
 import { openAppPath } from '../../hooks/appShellBridge';
 import { useI18n } from '../../i18n';
@@ -23,43 +24,41 @@ const ResourceMark: React.FC<{ resource: TaskContextResource }> = ({ resource })
   return <svg viewBox="0 0 16 16"><path d="M4 2.5h5l3 3v8H4zM9 2.5v3h3" /></svg>;
 };
 
-const ResourceRow: React.FC<{ resource: TaskContextResource }> = ({ resource }) => {
-  const { t } = useI18n();
-  const description = resource.summary?.trim();
-  const tooltip = [resource.label, description].filter(Boolean).join(' — ');
-  return (
-    <div className="right-rail-resource-row" title={tooltip || resource.label}>
-      <span className="right-rail-resource-mark" data-kind={resource.kind} aria-hidden="true">
-        <ResourceMark resource={resource} />
-      </span>
-      <span className="right-rail-resource-copy">
-        <span className="right-rail-resource-label">{resource.label}</span>
-        {description ? <span className="right-rail-resource-meta">{description}</span> : null}
-      </span>
-      {resource.path ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="right-rail-row-action"
-          aria-label={`${t('control.rightRail.outputs.open')} ${resource.label}`}
-          onClick={() => void openAppPath(resource.path!)}
-        >
-          {t('control.rightRail.outputs.open')}
-        </Button>
-      ) : null}
-    </div>
-  );
-};
+const ResourceRow: React.FC<{ resource: TaskContextResource; select: (resource: TaskContextResource) => void }> = ({ resource, select }) => (
+  <Button variant="ghost" className="right-rail-compact-row" title={resource.label} onClick={() => select(resource)}>
+    <span className="right-rail-compact-icon" aria-hidden="true"><ResourceMark resource={resource} /></span>
+    <span className="right-rail-compact-title">{resource.label}</span><span aria-hidden="true">›</span>
+  </Button>
+);
 
-export const RightRailContext: React.FC<{ task: TaskContextPanelViewModel }> = ({ task }) => {
+function ScopedContext({ task }: { task: TaskContextPanelViewModel }) {
   const { t } = useI18n();
-  return (
-    <div className="right-rail-context" aria-label={t('control.rightRail.context.resources')}>
-      <div className="right-rail-resource-list">
-        {task.resources.map((resource) => <ResourceRow key={resource.id} resource={resource} />)}
-      </div>
-    </div>
-  );
-};
-
+  const [all, setAll] = useState(false);
+  const [visible, setVisible] = useState(50);
+  const [detail, setDetail] = useState<TaskContextResource | null>(null);
+  const [error, setError] = useState(false);
+  const select = (resource: TaskContextResource) => {
+    if (resource.path) void openAppPath(resource.path).catch(() => { setDetail(resource); setError(true); });
+    else { setDetail(resource); setError(false); }
+  };
+  const rows = (resources: TaskContextResource[]) => resources.map(resource => <ResourceRow key={resource.id} resource={resource} select={select} />);
+  return <div className="right-rail-context" aria-label={t('control.rightRail.context.resources')}>
+    {rows(task.resources.slice(0, 5))}
+    {task.resources.length > 5 && <Button variant="ghost" size="sm" className="right-rail-browse-all"
+      onClick={() => { setVisible(50); setAll(true); }}>{t('control.rightRail.browse.all', { count: task.resources.length })}</Button>}
+    <TaskDialog open={all} title={t('control.rightRail.context.title')} closeLabel={t('control.rightRail.browse.close')}
+      onClose={() => setAll(false)} dataTestId="context-list">
+      {rows(task.resources.slice(0, visible))}
+      {visible < task.resources.length && <Button variant="ghost" size="sm"
+        onClick={() => setVisible(value => value + 50)}>{t('control.rightRail.browse.more')}</Button>}
+    </TaskDialog>
+    <TaskDialog open={Boolean(detail)} title={detail?.label ?? ''} closeLabel={t('control.rightRail.browse.close')} onClose={() => setDetail(null)}>
+      {detail && <div className="right-rail-resource-detail"><code>{detail.id}</code><p>{detail.summary}</p>
+        {detail.path && <code>{detail.path}</code>}{detail.url && <code>{detail.url}</code>}
+        {error && <p role="alert">{t('control.rightRail.browse.error')}</p>}</div>}
+    </TaskDialog>
+  </div>;
+}
+export const RightRailContext: React.FC<{ task: TaskContextPanelViewModel }> = ({ task }) =>
+  <ScopedContext key={`${task.projectId}:${task.sessionId}`} task={task} />;
 export default RightRailContext;

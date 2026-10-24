@@ -21,3 +21,9 @@ export const InvestigationReadArgsSchema = z.tuple([
     ),
   }).strict(),
 ]);
+
+export const InvestigationListArgsSchema = z.tuple([z.object({
+  projectId: investigationOpaqueId(128, 'projectId'),
+  sessionId: investigationOpaqueId(128, 'sessionId'),
+  cursor: z.object({ createdAt: z.iso.datetime(), artifactId: investigationOpaqueId(128, 'artifactId') }).strict().optional(),
+}).strict()]);

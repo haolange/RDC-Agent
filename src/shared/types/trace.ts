@@ -148,8 +148,7 @@ export interface InvestigationArtifactRow {
 
 export interface InvestigationArtifactsPanelViewModel {
   rows: InvestigationArtifactRow[];
-  supersededCount: number;
-  truncatedCount: number;
+  totalCount: number;
   storeDegraded: boolean;
 }
 
@@ -264,3 +263,8 @@ export interface TraceRevisionResult extends TraceSessionResult {
 export interface TraceBranchSwitchResult extends TraceSessionResult {
   activeBranchId?: string;
 }
+
+/** Read-only pages of the same current Investigation selection used by the rail. */
+export interface InvestigationListCursor { createdAt: string; artifactId: string }
+export interface InvestigationListRequest { projectId: string; sessionId: string; cursor?: InvestigationListCursor }
+export interface InvestigationListPage extends InvestigationArtifactsPanelViewModel { nextCursor?: InvestigationListCursor }

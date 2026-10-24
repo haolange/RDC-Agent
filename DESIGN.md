@@ -354,6 +354,9 @@ Enforcement 必须同时发生在：(1) profile allowlist 解析（token 展开�
 
 ## Right Rail Authority
 
+右栏密度裁决：Progress 始终分离任务序号、状态与标题，完成不划线；Transcript Task 快照默认仅标题与真实状态，原因按项展开并保留历史定位。Artifacts 只显示 main-owned 最新五项名称，Context 只显示现有顺序前五项名称；超出时经「查看全部」弹窗访问，不能持续撑长侧栏。制品整行打开预览，ID 复制位于预览 ID 区域；元数据与 provenance 留在详情。列表与预览沿用共享弹层栈及焦点管理，不另建键盘监听路径。
+
+
 Right Rail 有两个按选择对象区分的表面。选中 Project 时**只**渲染项目级 `Import .rdc` 输入面与已导入 capture 列表，永不读取 session runtime。
 
 选中 Session 时渲染五张不可折叠圆角卡 `Progress / Artifacts / Outputs / Context / Capture`。Artifacts 只投影 main-owned Investigation Artifacts；Outputs 仍只接受 `output_register`；Capture 保留 scoped `.rdc` 选择、Replay Device、open / close / 单一实际 EID 回放轨道 / refresh 与紧凑诊断。

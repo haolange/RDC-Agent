@@ -63,3 +63,8 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
 ## Capture Replay QA
 
 capture:getReplayState/getReplaySelection/readLivePreview 为只读面；applyReplayEvent/refreshFrame 为 mutation，复用共享 channel capability 表。人工与 Agent 共用同一实际 EID 回放轨道；不提供独立足迹浏览、播放或清空 IPC。状态事件为 capture:replayChanged，包含完整 scope/generation/revision，不含像素。QA 应覆盖跨 session 迟到结果、运行锁、非空回放与 RDC 归零原空态。真实 Android 显示验收必须来自设备屏幕与原生回执，不以 Browser 图片或 local export 代替。
+
+
+## 右栏紧凑浏览验收
+
+investigation:list 是只读能力，与Desktop共享factory/manifest/handler、active project/session校验和50项游标分页。验收必须覆盖摘要五项限制、超过50项的完整浏览、嵌套预览、ID复制、顶层Escape及焦点恢复、切session迟到隔离。QA项目/userData以外部临时脚本按当前存储格式或正式Bridge注入，不新增renderer demo、产品内固定数据或特殊授权路径；无模型/RDC调用的视觉fixture单独标识。

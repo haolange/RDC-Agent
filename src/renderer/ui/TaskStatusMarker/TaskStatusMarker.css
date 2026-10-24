@@ -2,8 +2,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--space-6);
-  height: var(--space-6);
+  width: var(--space-4);
+  height: var(--space-4);
   border: 0;
   border-radius: var(--radius-full);
   background: transparent;
@@ -17,12 +17,6 @@
 .task-status-marker.is-pending {
   color: var(--token-text-caption);
   font-weight: var(--font-medium);
-}
-
-.task-status-marker.is-in-progress {
-  background: var(--token-accent-primary);
-  color: var(--token-text-inverse);
-  font-weight: var(--font-semibold);
 }
 
 .task-status-marker.is-snapshot.is-in-progress {
