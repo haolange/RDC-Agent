@@ -69,9 +69,6 @@ button-sm
 capture-event-controls
 capture-event-input
 capture-event-slider
-capture-history-controls
-capture-history-detail
-capture-history-toolbar
 capture-image-state
 capture-image-toolbar
 capture-replay-callout
@@ -87,7 +84,6 @@ capture-replay-panel
 capture-replay-pending
 capture-replay-status
 capture-replay-status-row
-capture-replay-tabs
 chat-messages
 chat-send-button
 chat-top-hard-stop
@@ -740,7 +736,6 @@ right-rail-section-content
 right-rail-section-heading
 right-rail-task-copy
 right-rail-task-row
-right-rail-task-stop-error
 runtime-terminal-activity-body
 runtime-terminal-activity-pane
 runtime-terminal-close-mark

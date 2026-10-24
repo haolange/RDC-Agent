@@ -520,10 +520,7 @@ export interface ElectronAPI {
 
   capture: {
     getReplaySelection: (scope: SessionScope) => Promise<import('./captureReplay').CaptureReplaySelection | null>;
-    listReplayHistory: (request: import('./captureReplay').CaptureReplayHistoryRequest) => Promise<{ entries: import('./captureReplay').CaptureReplayHistoryEntry[]; nextSequence?: number }>;
-    readReplayImage: (request: SessionScope & { captureHash: string; imageHash: string }) => Promise<Uint8Array>;
     readLivePreview: (scope: SessionScope) => Promise<Uint8Array>;
-    clearReplayHistory: (request: SessionScope & { captureHash: string }) => Promise<void>;
     getReplayState: (scope: SessionScope) => Promise<CaptureReplayState>;
     applyReplayEvent: (request: CaptureReplayApplyRequest) => Promise<CaptureReplayState>;
     refreshFrame: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<CaptureReplayState>;

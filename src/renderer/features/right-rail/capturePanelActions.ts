@@ -1,4 +1,4 @@
-import type { CaptureReplayApplyRequest, CaptureReplayBindingRequest, CaptureReplayHistoryRequest } from '@shared/types/captureReplay';
+import type { CaptureReplayApplyRequest, CaptureReplayBindingRequest } from '@shared/types/captureReplay';
 import { getElectronApi } from '../../platform/getElectronApi';
 export type CaptureScope = { projectId: string; sessionId: string };
 const api = () => {
@@ -14,10 +14,7 @@ export const getReplaySelection = (scope: CaptureScope) => api().capture.getRepl
 export const applyReplayEvent = (request: CaptureReplayApplyRequest) => api().capture.applyReplayEvent(request);
 export const refreshReplayFrame = (scope: CaptureReplayBindingRequest) => api().capture.refreshFrame(scope);
 export const subscribeReplay = (listener: Parameters<ReturnType<typeof api>['events']['onCaptureReplayChanged']>[0]) => api().events.onCaptureReplayChanged(listener);
-export const listReplayHistory = (request: CaptureReplayHistoryRequest) => api().capture.listReplayHistory(request);
-export const readReplayImage = (request: CaptureScope & { captureHash: string; imageHash: string }) => api().capture.readReplayImage(request);
 export const readLivePreview = (scope: CaptureScope) => api().capture.readLivePreview(scope);
-export const clearReplayHistory = (request: CaptureScope & { captureHash: string }) => api().capture.clearReplayHistory(request);
 export const clearOpenedCapture = (scope: CaptureReplayBindingRequest) => api().capture.clearOpenedState(scope);
 export const refreshProjectCaptureInputs = (projectId: string) => api().project.inputs.refresh(projectId);
 export const refreshReplayDevices = () => api().device.refresh();

@@ -1,5 +1,30 @@
 # Acceptance Ledger
 
+## 圆环比例与单一 EID 回放轨道（2026-10-25）
+
+- 本条按用户明确修订的方案验收，替代下方上一轮「同页面两种查看方式」的产品语义结论；旧测试与现场事实保留。源码为 `c098a14c53bfba8bd5b230046c3784ab497bc0c8` + 本条提交差异。代码验收时未提交；后续提交和推送按用户明确授权执行，不创建分支或发布。
+- 圆环保持圆心百分比，控件为 36px lg token，SVG 同尺寸正方形，数字用等宽小字号；0% 隐藏进度弧，100% 无 dash 端点。Browser 的 59% 大字号实测文字 9px、宽 14.854px，SVG 两轴均 34.667px且居中；小/中/大字体与浅色均通过，按实际等宽字宽推导最长 `~100%` 的大字号单侧留白 2.719px。0%/100% 在正式页面分别验证隐藏弧/完整闭环，准备中与最长估值有组件测试。圆环 Browser 数值来自隔离会话的显式 visual-fixture，不是新增模型用量或模型效果证据。
+- Capture 只有同一当前图片、原生事件列表和始终存在的一组 EID 控件，控制权仅决定 disabled。独立足迹 UI/播放/历史图片接口与 `agentObservation` 镜像已删除，后台证据存档和既有用户记录保留。修复 Agent 观察后 requested EID 未随 applied EID 更新导致滑条仍指向人工旧位置的问题；失败不将旧图归到新事件。
+- 确定性验证：完整 coverage 512 文件 / 3755 测试通过、4 项既有 skip；Statements 75.05%、Branches 65.27%、Functions 78.91%、Lines 77.42%，ratchet 通过。首次完整测试中两条既有 Git 子进程测试触发 5 秒时限，本轮 CLI `--testTimeout=15000` 复验全绿，无测试源码/断言放宽；补最长估值后圆环专项 10 项通过。typecheck、lint、完整 check:gates、构建通过；完整套件包含 IPC/Bridge、RdcSessionRuntime/RdcSessionService/executeRdcShell/ReplayHistoryStore 与安全契约。最终样式仅清除 EOF 空行后由正式桌面 launcher 重建，核对 renderer bundle 身份复用 Browser 证据。
+- 真实 Browser：默认 disposable 官方 bootstrap → `/app`；只读引用原始 168591424 B WhiteHair.rdc，同安装 catalog 验证后 darwin 实际打开，EID 3029→1248，960px 图片加载完成与原生同步回执已证。只有 1 图/1 事件滑条/0 足迹折叠区；900/480px 无横向溢出。正式关闭后 owning records 为空、daemon 退出；移除最后一个测试引用后恢复五卡原空态，页面控制台错误为空。
+- 证据边界：Agent 接管、三类锁、原位控件身份、后台位置更新和交还后的实际事件调用由组件交互与主进程测试证明；本轮未新增模型轮次，不把测试投影当成真实模型接管。设备同步采用主进程原生回执，未独立拍摄手机屏幕。
+- 最终正式隔离桌面实际显示五卡空态与59%测试圆环，正常关闭 exit 0，实例锁消失；主进程/daemon/桌面 PID 74132/128888/128284 均退出，桌面启动权已交还。canonical 旧死 owner 锁与真实配置未手改。最终 renderer bundle `index-DMH978k_.js` SHA-256 `f09e01a28f995a7d8d5c00a1bca0303b1717a3c0b385babea43b32032cdfc658` 与 Browser 版一致。
+- 本轮任务与证据位于 `.local/capture-workspace/{TASKS.md,ring-fixed.png,single-track.png,unified-receipt.json}`。本轮隔离工程、测试 TEMP 和 disposable userData 三处均已核对进程/绝对路径/Git/链接边界后删除并复查；上轮 receipt 与截图作为历史事实保留，当前构建、依赖和覆盖率报告保留供使用与复核。
+- 提交前复查发现并修复重复 EID 请求：未修改输入框失焦、滑条 Tab 切焦点，以及防抖已提交后松手均不应再次 apply。两项真实组件交互回归先 RED；改为仅刷新队列现有意图，修复后相关 10 文件 / 61 项通过（含队列无意图、释放、dispose）；typecheck、lint、完整 gates 和构建重新通过。此前完整覆盖率与 Browser 验收仍按上述源码阶段记录；此次只改变提交触发逻辑，未重开模型或原生实验，也不把旧 Browser bundle 写成新构建身份。复查未发现其他阻断项或无关改动。
+
+## Capture 单画面与 Progress 入口收敛（2026-10-25）
+
+本节记录上一轮实现的验证事实；其中独立足迹浏览的产品语义已由上方单一 EID 轨道修订替代，不作为当前用户需求验收。
+
+- 源码基线 `c098a14c53bfba8bd5b230046c3784ab497bc0c8` + 本轮未提交修改；renderer 构建 `index-D53SsSTC.js` SHA-256 `a8730f515b06ddc6492a856e33a6e3af183ea85eae1c267decfd31acd3e98749`。未创建分支、提交、推送或发布。
+- Progress 专属会话停止入口及其单消费者 hook/action/文案/样式删除；Composer Stop 保持既有生命周期。Capture 移除双 Tab，当前回放/配对 Agent 观察/只读历史共用唯一画面，足迹默认折叠。历史选择隐藏人工回放控件，返回当前后按实际 interactionLock 恢复；同 EID replacement 的图片刷新纳入 updatedAt，图片读取可独立重试。
+- 确定性验证通过：受影响 12 文件 / 158 测试（含 RdcSessionRuntime、RdcSessionService、executeRdcShell、ReplayHistoryStore），覆盖三类锁、接管/解锁、失败历史、只读播放、折叠停播、消息定位、清空/换 capture/generation、迟到图片与 URL 回收；typecheck、lint、完整 check:gates、官方 launcher 构建通过。系统 TEMP 的 Knowledge realpath EPERM 经本轮 repo-local TEMP/TMP 复验通过，未弱化断言或产品路径安全。
+- 真实 Browser：默认 disposable `start:agent-browser`，官方一次性 bootstrap → 同源 `/app`；只读引用 168591424 B 的原始 WhiteHair.rdc，未复制大文件/凭据/历史会话。产品检测并验证本机 Tools catalog（128 操作），实际 darwin 打开后由 UI 将 EID 3029 切为 1248，图片自然宽 960，requested/shown 在途分别标识，终态 `回放就绪 / 已应用 EID 1248 / 设备画面已同步`；DOM 唯一画面、零 Tab。
+- 桌面宽与抽屉验证：实际 CSS 宽 1506、818、436；两档窄屏无横向溢出（最窄 Capture clientWidth/scrollWidth 均 325），键盘展开足迹和 Escape 关闭回焦通过；中文深色大字号、英文浅色通过。关闭后不标实时；移除最后一个测试引用后恢复五卡原空态，Capture 控件数为 0。
+- 证据边界：本轮不新增模型请求或 Agent 实验；接管与非空历史播放由真实组件交互测试和主进程套件证明，不冒充新增模型轮次。设备同步是原生主进程回执，未独立拍摄手机屏幕。重启 QA 时旧 cookie 的一次 401 被明确识别；重新 bootstrap 后实际路径通过。
+- 正式关闭 capture 后 owning records 为空、daemon 退出；两个 QA 主进程退出。隔离桌面初次沙箱 GPU 子进程失败；核实旧进程和端口均退出后，沙箱外正式 `start:human` 实际显示五卡空态、正常关闭 exit 0、实例锁消失，桌面启动权已交还。canonical 旧死 owner 锁未手改，真实用户数据未使用。
+- 本轮计划与最小证据：`.local/capture-workspace/{TASKS.md,desktop.png,narrow.png,receipt.json}`；清理回执记录本轮测试工程、repo-local TEMP 和两处 disposable userData 的删除与复查。保留当前构建供使用，不生成发行包。
+
 2026-10-23 S221第九干净轮已批准并声明执行：proj_8f20380de836/sess_5279d7327110，launcher78488/Main86196；ctx1cb97eb4-f0d1-437e-ba83-618e750812cd/replay423ff3cc0f86/capf4c530c5cb4b9/remote154717758665，daemon81980/gen134371898874203995、worker25756/gen134371898881481210，设备同SMARTISAN aries11指纹。正式引用原件无副本，UI最终EID3029+设备同步，两原图按序正式附入；原2776字指令。首turn01f83c4559ab-1792716359185 SolLow、selectedTurn0、instruction0、Knowledge[]；本机解释器实际enabled true。新root只有两Agent路由文件与最小Provider/必要全部本机工具配置、单密文/对应LocalState，无历史Case/Memory/Hook/MCP/Task答案。正常计划门修订预算/时钟/实际四技能声明，不注入旧shader结果。
 v2计划session://plans/plan-2026-10-23T005316784Z-0d9af97c.md hash0d9af97cd8e5f6fcc087774e3a2afcc3ef325c44b109c763bd18c8e96d6a421f，T0=1792716796802（08:53:16.802）；科学+105min、执行+150、回评+180。G100请求/300工具（科学75/220，保护25/80），S40/80，P20/50，D25/60，全轮185/490，阶段是可调估算。General turn12821356068f-1792716834215实际SolLow，execution-orchestrator+四requiredSkill正文真实预载。原态读取进行中，尚无本轮shader干预；s221-clean-entry与approved-execution receipts保留。源aa433d13/Main5702f4f9/artifact方法a348247b不变、全量3657与专项绿沿用。下一让产品自主完成原流程，不追加工具命令；核首实验5签名、真实variant图/差图、恢复、独审两参考图及原文闭包、General终答→Debugger回评。B真实HLSL/include/编译映射外部缺口仍待用户路径；完整两实验/整轮与同版独立复跑0，Goal active，终态资源与清理未结算。
 2026-10-23 S220准备失败（Codex配置过滤遗漏，非产品shader缺陷）/S221第九干净轮启动：round08独立工程proj_cbf482ca8d6d/sess_62b4dcc5e239，Main86392/launcher5248，ctx1df85299/replay6e80029f60a2/capf094565d8ce36/remotef0d8949e1368，原件hash一致、EID3029/设备同步、两原图hash一致、首请求SolLow/selectedTurn0/无instruction/Knowledge旧源。但精简配置只复制rdcCli，漏源round07已启用codeInterpreter，实际新根默认disabled。未批准任何计划，无编译/替换/实验；规划9Provider及两次正常预算/声明反馈保留，官方停止后4Tasks均cancelled。通过正式Settings恢复与原完全相同的解释器配置，General正常Composer3Provider/1实际code_interpreter运行仅无文件环境检查，Python3.14.3/numpy2.4.2/Pillow12.1.1成功。截图settings与productcheck、s220-preparation-failure-receipt保留。正式close后owned records{}、daemon78496退出、forward空；核CIM精确创建时间停QA5248/Main86392。不是产品回归，不改源码撞此配置问题，不续算为有效通过轮。

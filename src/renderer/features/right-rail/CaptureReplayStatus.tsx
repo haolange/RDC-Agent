@@ -2,7 +2,7 @@ import type { CaptureReplayError, CaptureReplayPhase, CaptureReplayState } from 
 import type { TranslationKey } from '../../i18n';
 import { Button } from '../../ui/Button';
 
-export type CaptureRetryAction = 'open' | 'close' | 'refresh' | 'image' | 'clearHistory';
+export type CaptureRetryAction = 'open' | 'close' | 'refresh' | 'image';
 export type CaptureStatusTone = 'success' | 'warning' | 'error' | 'info';
 export type CaptureCalloutTone = 'warning' | 'info' | 'error';
 
@@ -45,8 +45,6 @@ export function resolveCaptureStatusTone(args: {
 }
 
 export function collectCaptureCallouts(args: {
-  locked: boolean;
-  lockedLabel: string;
   warning: { code: string; message: string } | null;
   finalPresentTitle: string;
   actionError: { message: string; action: CaptureRetryAction } | null;
@@ -55,7 +53,6 @@ export function collectCaptureCallouts(args: {
   factLabels: { no_color_output: string; missing_target: string; export_failure: string };
 }): CaptureCallout[] {
   const items: CaptureCallout[] = [];
-  if (args.locked) items.push({ id: 'locked', tone: 'info', title: args.lockedLabel });
   if (args.warning) {
     items.push({
       id: `warning:${args.warning.code}`,

@@ -52,7 +52,7 @@ class BrowserAppBridgeClient implements RendererApiTransport {
     if (!response.ok || !payload.success) {
       throw new Error(payload.error || `Bridge invoke failed for ${channel}`);
     }
-    if (channel === 'capture:readLivePreview' || channel === 'capture:readReplayImage') {
+    if (channel === 'capture:readLivePreview') {
       const bytes = payload.result as { type?: unknown; data?: unknown } | null;
       if (bytes?.type !== 'Buffer' || !Array.isArray(bytes.data)
         || !bytes.data.every(value => Number.isInteger(value) && value >= 0 && value <= 255)) {

@@ -235,23 +235,25 @@ it('does not attribute the preceding EID to a failed Agent observation', async (
   expect(mocks.append).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ eventId: null,
     toolCallId: 'tool-new', failure: expect.stringContaining('RDC_OBSERVE_FAILED') }), undefined);
 });
-it('keeps paired Agent pixels and metadata isolated from manual apply and reports unsaved output', async () => {
+it('uses one replay projection for Agent and human operations and reports unsaved evidence', async () => {
   const service = new RdcSessionService(); await service.openProjectInput(request());
   const image = { imagePath: 'live:1:9', width: 1, height: 1, source: 'framebuffer_screenshot', updatedAt: 1 };
   const observation = { nativeRevision: 7, modificationState: 'intervention', displayParameters: { mip: 0, slice: 0, sample: 0, rangeMin: 0, rangeMax: 1 } };
   mocks.observe.mockResolvedValueOnce({ appliedEventId: 9, imageEventId: 9, image, observation });
   mocks.append.mockRejectedValueOnce(new Error('REPLAY_QUOTA_EXCEEDED'));
   await service.observeAgentOperation(scope, 'rd.shader.edit_and_replace', 'agent-tool');
-  const paired = service.snapshotReplayForSession(scope).agentObservation;
-  expect(paired).toMatchObject({ eventId: 9, image, observation, saved: false, saveError: expect.stringContaining('QUOTA') });
+  expect(service.snapshotReplayForSession(scope)).toMatchObject({ requestedEventId: 9, appliedEventId: 9,
+    imageEventId: 9, image, observation, error: { code: 'REPLAY_SAVE_FAILED', message: expect.stringContaining('QUOTA') } });
   expect(mocks.append).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ nativeRevision: 7,
     modificationState: 'intervention', displayParameters: observation.displayParameters }), expect.any(Buffer));
   mocks.observe.mockResolvedValueOnce({ appliedEventId: 1, imageEventId: 1, image: { ...image, imagePath: 'live:1:1' } });
   await service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 1 });
-  expect(service.snapshotReplayForSession(scope).agentObservation).toEqual(paired);
+  expect(service.snapshotReplayForSession(scope)).toMatchObject({ requestedEventId: 1, appliedEventId: 1, imageEventId: 1,
+    image: { imagePath: 'live:1:1' } });
   mocks.observe.mockRejectedValueOnce(new Error('observation failed'));
   await service.observeAgentOperation(scope, 'rd.event.set_active', 'failed-tool');
-  expect(service.snapshotReplayForSession(scope).agentObservation).toEqual(paired);
+  expect(service.snapshotReplayForSession(scope)).toMatchObject({ requestedEventId: null, appliedEventId: null,
+    imageEventId: null, image: null, error: { code: 'RDC_OBSERVE_FAILED' } });
 });
 it('correlates lifecycle stages with one main-owned operation ID and assigns fresh mutation IDs', async () => {
   const service = new RdcSessionService(); const states: Array<{ operationId: string | null; phase: string }> = [];

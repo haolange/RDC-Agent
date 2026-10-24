@@ -17,7 +17,6 @@ describe('BrowserAppBridge scoped capture contract', () => {
     installBrowserAppBridge();
     const scope = { projectId: 'project-a', sessionId: 'session-a' };
     expect(await browserWindow.electronAPI!.capture.readLivePreview(scope)).toEqual(new Uint8Array(png));
-    expect(await browserWindow.electronAPI!.capture.readReplayImage({ ...scope, captureHash: 'a'.repeat(64), imageHash: 'b'.repeat(64) })).toEqual(new Uint8Array(png));
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ success: true, result: { type: 'Buffer', data: [256] } }) });
     await expect(browserWindow.electronAPI!.capture.readLivePreview(scope)).rejects.toThrow('BRIDGE_INVALID_IMAGE_BYTES');
   });

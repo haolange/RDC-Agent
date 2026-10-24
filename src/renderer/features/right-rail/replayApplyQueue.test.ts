@@ -3,6 +3,21 @@ import { createReplayApplyQueue } from './replayApplyQueue';
 
 afterEach(() => vi.useRealTimers());
 describe('replay apply queue', () => {
+  it('flushes only existing intent and never repeats an applied value', async () => {
+    vi.useFakeTimers();
+    const apply = vi.fn().mockResolvedValue(undefined);
+    const queue = createReplayApplyQueue<number>(apply, vi.fn());
+    queue.flush();
+    expect(apply).not.toHaveBeenCalled();
+    queue.enqueue(3); queue.flush();
+    await vi.runAllTimersAsync();
+    expect(apply.mock.calls).toEqual([[3]]);
+    queue.flush(); await vi.runAllTimersAsync();
+    expect(apply.mock.calls).toEqual([[3]]);
+    queue.enqueue(4); queue.dispose(); queue.flush();
+    await vi.runAllTimersAsync();
+    expect(apply.mock.calls).toEqual([[3]]);
+  });
   it('coalesces dragging and flushes the final value after an in-flight operation', async () => {
     vi.useFakeTimers();
     let finish!: () => void;

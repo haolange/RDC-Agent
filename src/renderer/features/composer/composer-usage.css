@@ -1,7 +1,7 @@
 .composer-usage-indicator {
   position: relative;
-  width: var(--control-height-sm);
-  height: var(--control-height-sm);
+  width: var(--control-height-lg);
+  height: var(--control-height-lg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -10,7 +10,6 @@
   border: 1px solid var(--token-border-default);
   background: color-mix(in srgb, var(--token-bg-shell) 82%, transparent);
   color: var(--token-text-body);
-  outline: none;
   transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
 }
 
@@ -22,13 +21,23 @@
 }
 
 .composer-usage-ring {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
   transform: rotate(-90deg);
+}
+
+.composer-usage-indicator:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
 }
 
 .composer-usage-ring-track,
 .composer-usage-ring-progress {
   fill: none;
-  stroke-width: 3.5;
+  stroke-width: 2.5;
 }
 
 .composer-usage-ring-track {
@@ -52,17 +61,21 @@
 
 .composer-usage-value-number {
   color: var(--token-text-body);
-  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  font-size: calc(var(--text-xs) * .75);
   font-weight: var(--font-semibold);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.composer-usage-indicator[data-value-length='long'] .composer-usage-value-number {
+  font-size: calc(var(--text-xs) * 2 / 3);
 }
 
 .composer-usage-indicator.is-pending .composer-usage-ring-progress {
   opacity: 0.55;
 }
-
-/* composer-usage-tooltip 已移除，改为 title attribute hover */
 
 .composer-usage {
   /* 不建 containing block：弹窗改锚定到 .composer-shell，铺满输入区宽度 */
@@ -86,8 +99,4 @@
 
 .composer-usage-indicator.is-estimated .composer-usage-ring-progress {
   stroke: color-mix(in srgb, var(--composer-mode-accent) 72%, var(--token-text-caption));
-}
-
-.composer-usage-indicator.is-estimated .composer-usage-value-number {
-  letter-spacing: -0.04em;
 }

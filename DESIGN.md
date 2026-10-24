@@ -356,7 +356,7 @@ Enforcement 必须同时发生在：(1) profile allowlist 解析（token 展开�
 
 Right Rail 有两个按选择对象区分的表面。选中 Project 时**只**渲染项目级 `Import .rdc` 输入面与已导入 capture 列表，永不读取 session runtime。
 
-选中 Session 时渲染五张不可折叠圆角卡 `Progress / Artifacts / Outputs / Context / Capture`。Artifacts 只投影 main-owned Investigation Artifacts；Outputs 仍只接受 `output_register`；Capture 保留 scoped `.rdc` 选择、Replay Device、open / close / 内嵌帧回放 / Agent 足迹 / refresh 与紧凑诊断。
+选中 Session 时渲染五张不可折叠圆角卡 `Progress / Artifacts / Outputs / Context / Capture`。Artifacts 只投影 main-owned Investigation Artifacts；Outputs 仍只接受 `output_register`；Capture 保留 scoped `.rdc` 选择、Replay Device、open / close / 单一实际 EID 回放轨道 / refresh 与紧凑诊断。
 
 main-owned `RightRailProjectionService` 为显式 `{ projectId, sessionId }` 组装 `RightPanelViewModel`；renderer 只消费投影，不从 action events、全局 capture、工作目录扫描或 tool catalog 重建 Progress / Artifacts / Outputs / Context / Capture。Progress 是单一规范列表（`RightPanelViewModel.progress: ProgressTask[]`），创建序，已完成项就地保留，并与 transcript `taskProjection` 同序同态。Context 只含被冻结 Prompt 段或成功 tool result 证明的具体任务资源。Capture 在 session 中始终可见：诚实空态或 owner-session 操作面。Outputs 拒绝 inputs 与 plan。Investigation Artifacts 不得混进 Outputs。卡外壳在 empty / populated 之间不变；空内容用安静线框插图，有内容只增高本卡并在兄弟行间使用内部 hairline。Dock 在紧凑桌面宽度仍可用，仅在 `RIGHT_RAIL_DRAWER_BREAKPOINT`（920px）及以下或无法保住最小工作面时变为共享 overlay drawer。静态门禁：`pnpm run check:right-rail`，只认五卡。
 
@@ -414,7 +414,8 @@ Task 可通过通用 `executionRequirements` 声明必要执行方式、必需�
 
 ## Session Capture 内嵌回放裁决（2026-09-13）
 
-- 项目 RDC 列表为空时保持原 Capture 空态外观、文案与交互；不挂载新控件、历史或画面。非空时右下角五卡结构不变，Capture 内提供文件、设备、打开/关闭、帧回放和 Agent 足迹。
+- 项目 RDC 列表为空时保持原 Capture 空态外观、文案与交互；不挂载新控件、历史或画面。非空时右下角五卡结构不变，Capture 内提供文件、设备、打开/关闭和唯一实际 EID 回放轨道。
+- 人工与 Agent 共用同一个 CaptureReplayState、当前图片、事件列表和控件，不设双 Tab 或独立足迹浏览/播放界面。Agent 接管仅锁定人工操作，控件原位显示并跟随实际回放，释放后恢复操作且不自动 apply。后台证据存档保留，不能作为第二套回放投影。Progress 不再提供额外的会话级停止按钮，沿用 Composer Stop。
 - 完整文件扫描确认的输入列表独立提交和广播；最后一个 RDC 消失后，即使回放释放或足迹清理失败，也必须保持真实空态。清理待办单独持久化，不能用旧输入列表保存恢复状态；扫描不完整或项目不可访问时不得推断文件缺失。
 - `RdcSessionService` 按 project/session 管理独立 `RdcSessionRuntime`。native daemon context 由 main 分配，与 inputId 不等价；配置的 lifecycle action 必须使用 `{{contextId}}`，返回身份不一致拒绝绑定。关闭失败、半开失败和未确认子进程保留 owning context，不能清空其他 session lease。
 - Android 设备由单个 session 独占，不抢占。Agent preparing 至 active turn 收口期间禁止人工改变回放；delegated child 未 join 与 native exit 未确认继续锁定。人工和 Agent 原生命令经过同一 context 队列。

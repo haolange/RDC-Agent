@@ -8,8 +8,7 @@ import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { Button } from '../../ui/Button';
 import { Select } from '../../ui/Select';
 import { useI18n } from '../../i18n';
-import { CaptureFrame } from './CaptureFrame';
-import { CaptureHistory } from './CaptureHistory';
+import { CaptureWorkspace } from './CaptureWorkspace';
 import {
   CaptureReplayCallouts,
   CaptureReplayStatusChip,
@@ -20,10 +19,10 @@ import {
   resolveCaptureStatusTone,
 } from './CaptureReplayStatus';
 import { useCaptureReplay } from './useCaptureReplay';
-import { clearOpenedCapture, clearReplayHistory, getTraceProjection, openProjectCaptureInput, refreshProjectCaptureInputs, refreshReplayDevices, refreshReplayFrame, type CaptureScope } from './capturePanelActions';
+import { clearOpenedCapture, getTraceProjection, openProjectCaptureInput, refreshProjectCaptureInputs, refreshReplayDevices, refreshReplayFrame, type CaptureScope } from './capturePanelActions';
 import './CaptureReplay.css';
 
-type Action = 'open' | 'close' | 'refresh' | 'image' | 'clearHistory';
+type Action = 'open' | 'close' | 'refresh' | 'image';
 const sizeLabel = (size: number) => size >= 1024 ** 3 ? `${(size / 1024 ** 3).toFixed(1)} GB` : `${(size / 1024 ** 2).toFixed(1)} MB`;
 
 function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: RdcContextPanelViewModel }) {
@@ -33,10 +32,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   const [draft, setDraft] = useState<{ inputId: string; deviceId: string } | null>(null);
   const [action, setAction] = useState<Action | null>(null);
   const [error, setError] = useState<{ message: string; action: Action } | null>(null);
-  const [tab, setTab] = useState<'frame' | 'history'>('frame');
   const [more, setMore] = useState(false);
-  const [confirmClear, setConfirmClear] = useState(false);
-  const [historyEpoch, setHistoryEpoch] = useState(0);
   const [copied, setCopied] = useState(false);
   const actualInputId = state?.inputId ?? selection?.inputId ?? capture.availableCaptures[0]?.inputId ?? '';
   const actualDeviceId = state?.replayDeviceId ?? selection?.deviceId ?? 'local';
@@ -47,7 +43,6 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   const phaseBusy = Boolean(state && ['validating', 'connecting', 'transferring', 'opening', 'loading_image', 'closing'].includes(state.phase));
   const locked = Boolean(state?.interactionLock);
   const disabled = locked || phaseBusy || action !== null || !state;
-  const captureHash = state?.captureHash ?? selection?.captureSha256 ?? null;
   const partial = isCapturePartialReady(state);
   const refreshProjection = useCallback(async () => {
     await reload();
@@ -73,9 +68,6 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
         const [result, nextDevices] = await Promise.all([refreshProjectCaptureInputs(scope.projectId), refreshReplayDevices()]);
         useDeviceStore.getState().setDevices(nextDevices);
         useProjectStore.getState().updateProjectInputs(scope.projectId, result.inputs);
-      } else if (operation === 'clearHistory' && captureHash) {
-        await clearReplayHistory({ ...scope, captureHash });
-        setConfirmClear(false); setMore(false); setHistoryEpoch((value) => value + 1);
       }
       if (operation === 'refresh') await refreshProjection();
     } catch (reason) { setError({ message: reason instanceof Error ? reason.message : String(reason), action: operation }); }
@@ -83,14 +75,6 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   };
   const statusTone = resolveCaptureStatusTone({ phase: state?.phase, pending, partial });
   const callouts = collectCaptureCallouts({
-    locked,
-    lockedLabel: t(state?.interactionLock === 'agent_running'
-      ? 'control.replay.lockedAgent'
-      : state?.interactionLock === 'delegated_execution'
-        ? 'control.replay.lockedDelegation'
-        : state?.interactionLock === 'native_exit_unconfirmed'
-          ? 'control.replay.lockedUnconfirmed'
-          : 'control.replay.locked'),
     warning: state?.warning ?? null,
     finalPresentTitle: t('control.replay.finalPresentUnavailable'),
     actionError: error,
@@ -112,8 +96,6 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
       <Button variant="ghost" size="sm" disabled={!state?.contextId} onClick={() => {
         if (state?.contextId) void copyAppText(state.contextId).then(() => setCopied(true)).catch((reason) => setError({ message: String(reason), action: 'refresh' }));
       }}>{t(copied ? 'control.replay.copied' : 'control.replay.copyContext')}</Button>
-      <Button variant="ghost" size="sm" disabled={disabled || !captureHash} onClick={() => setConfirmClear(true)}>{t('control.replay.clearHistory')}</Button>
-      {confirmClear && <><span>{t('control.replay.clearConfirm')}</span><Button variant="danger" size="sm" disabled={disabled} onClick={() => void run('clearHistory')}>{t('control.replay.confirm')}</Button><Button variant="ghost" size="sm" onClick={() => setConfirmClear(false)}>{t('control.replay.cancel')}</Button></>}
     </div>}
     <div className="capture-replay-file-row" title={selectedInput?.filePath}>
       <Select dataTestId="right-rail-capture-input" ariaLabel={t('control.rightRail.capture.title')} value={selectedInput?.inputId ?? ''}
@@ -135,14 +117,8 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
       retryLabels={{ open: t('control.replay.retryOpen'), close: t('control.replay.retryClose'), image: t('control.replay.retryImage') }}
       onRetry={(operation) => void run(operation)}
     />
-    <div className="capture-replay-tabs" role="tablist" aria-label={t('control.rightRail.capture.title')}>
-      {(['frame', 'history'] as const).map((id) => <Button key={id} variant="ghost" size="sm" role="tab" id={`capture-${id}-tab`} aria-controls={`capture-${id}-panel`} aria-selected={tab === id}
-        tabIndex={tab === id ? 0 : -1} className={tab === id ? 'is-selected' : ''} onClick={() => setTab(id)} onKeyDown={(event) => {
-          if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); const next = event.key === 'Home' ? 'frame' : event.key === 'End' ? 'history' : id === 'frame' ? 'history' : 'frame'; setTab(next); document.getElementById(`capture-${next}-tab`)?.focus(); }
-        }}>{t(`control.replay.${id}`)}</Button>)}
-    </div>
-    <div hidden={tab !== 'frame'}><CaptureFrame scope={scope} state={state} disabled={disabled || !open || pending || tab !== 'frame' || state?.error?.retry === 'close'} receive={receive} /></div>
-    <div hidden={tab !== 'history'}><CaptureHistory key={`${captureHash ?? 'none'}:${historyEpoch}`} scope={scope} captureHash={captureHash} state={state} active={tab === 'history'} /></div>
+    <CaptureWorkspace scope={scope} state={state}
+      disabled={disabled || !open || pending || state?.error?.retry === 'close'} receive={receive} />
   </div>;
 }
 

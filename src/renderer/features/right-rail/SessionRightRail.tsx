@@ -39,7 +39,6 @@ export const SessionRightRail: React.FC = () => {
             key={progressSessionId}
             tasks={tasks}
             locateLabel={t('control.rightRail.locateTask')}
-            stopLabel={t('control.rightRail.stopBackground')}
           />
         ) : <EmptyState kind="progress" copy={t('control.rightRail.progress.empty')} />}
       </RailSection>

@@ -91,7 +91,9 @@ Outputs use the same session-owned projection path. `output_register` writes an 
 
 `project:inputsChanged` 反映完整扫描确认并持久化的当前输入，发布不等待回放清理成功。清理错误与待办通过独立 `replayCleanupPending` 和 `project:inputsError` 保留；renderer 不从清理待办、旧 capture binding 或历史足迹恢复已确认不存在的 RDC。最后一个输入删除后，重新挂载或重启仍显示原空态。
 
-Agent preparing 与 active turn 使用独立锁 owner，准备转入运行时不能出现解锁间隙；delegation 和 native process 未确认退出仍为锁定。运行中允许只读足迹，禁止人工打开/关闭/切文件/切设备/事件 apply。
+Agent preparing 与 active turn 使用独立锁 owner，准备转入运行时不能出现解锁间隙；delegation 和 native process 未确认退出仍为锁定。运行中同一画面和 EID 控件继续投影实际状态，禁止人工打开/关闭/切文件/切设备/事件 apply。
+
+Capture 的人工与 Agent 控制共用同一当前回放状态、图片、原生事件列表与控件，不按控制者选择图片来源，不提供独立历史滑条。interactionLock 仅决定人工操作可用性，不卸载控件；Agent 观察成功时 requestedEventId 同步该次 appliedEventId，失败时不保留旧 requested/image 归属。图片刷新包含 image.updatedAt，避免同 EID replacement 留旧图；迟到图片与状态仍按 scope/generation/revision 隔离。既有操作证据保留在主进程存档，不向 renderer 暴露第二套图片镜像。
 
 子代理卡片由父消息中的 tool call 定位；会话拥有的委派日志独立增量持久化。`conversation:getDelegationTrace` 的零页只返回头部，含子执行状态及后台 Task Execution 状态；两者含义不同。步骤页带稳定 ID、revision 和可见 `ConversationWorkBlock`；工作过程首次展开取最近 40 步，向前每页 40 步，运行中按 revision 合并。`conversation:getDelegationContent` 校验当前 session、父调用、child session、execution ID 与 generation，再以 UTF-8 字节偏移分块读取结构化任务、实际发送载荷、final、父调用/回执或指定子工具回执；分页不得拆断字符。`conversation:delegationChanged` 携带 session、父调用与 revision，仅刷新对应卡片；切换 session、取消及身份变化后的迟到结果不得进入当前视图。后台 Task 在父消息结束后仍可更新其记录，终态后迟到通知不得重新激活。
 

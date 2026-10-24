@@ -159,7 +159,6 @@ CapabilityEvidence
 CapabilityEvidenceSource
 CapabilityState
 CapabilityStateSchema
-CaptureAgentObservation
 CaptureApi
 CaptureControl
 CaptureDescriptor
@@ -168,8 +167,6 @@ CaptureReplayApplyRequest
 CaptureReplayBindingRequest
 CaptureReplayError
 CaptureReplayEvent
-CaptureReplayHistoryEntry
-CaptureReplayHistoryRequest
 CaptureReplayObservation
 CaptureReplayPhase
 CaptureReplaySelection

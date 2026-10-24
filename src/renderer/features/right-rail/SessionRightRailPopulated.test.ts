@@ -19,9 +19,9 @@ vi.mock('../../stores/workflowStore', () => ({ useWorkflowStore: (select: (value
 vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (value: { currentSession: { sessionId: string } }) => unknown) => select({ currentSession: { sessionId: 'session' } }) }));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, language: 'en' }) }));
 // Mock data/lifecycle boundaries; render the actual rail, artifact preview, CapturePanel,
-// CaptureFrame, CaptureHistory, status chips and callouts throughout these samples.
+// CaptureWorkspace, replay controls, status chips and callouts throughout these samples.
 vi.mock('./useCaptureReplay', () => ({ useCaptureReplay: () => ({ state: state.replay, selection: null, error: null, reload: state.reload, receive: state.receive }) }));
-vi.mock('./useCapturePreviewUrl', () => ({ useCapturePreviewUrl: (_scope: unknown, source: { imagePath?: string | null }) => source.imagePath ? state.previewUrl : null }));
+vi.mock('./useCapturePreview', () => ({ useCapturePreview: (_scope: unknown, source: { imagePath?: string | null }) => ({ url: source.imagePath ? state.previewUrl : null, loading: false, error: false }) }));
 vi.mock('./investigationPreviewActions', () => ({ readInvestigationArtifact: vi.fn(async () => ({ ok: false, status: 'error', error: 'Artifact storage unavailable' })) }));
 
 const artifact: InvestigationArtifactRow = {
@@ -50,7 +50,7 @@ function replay(): CaptureReplayState {
     projectId: 'project', sessionId: 'session', generation: 1, revision: 1, operationId: null,
     phase: 'ready', replayDeviceId: 'local', inputId: 'input', captureHash: null, contextId: 'context',
     requestedEventId: 42, appliedEventId: 42, imageEventId: 42, events: [{ eventId: 21 }, { eventId: 42 }],
-    targets: [], target: null, isFinalOutput: false, image: null, observation: null, agentObservation: null,
+    targets: [], target: null, isFinalOutput: false, image: null, observation: null,
     devicePresentation: { status: 'not_applicable', eventId: null, textureId: null, sequence: null, reason: null },
     warning: null, interactionLock: null, error: null,
   };

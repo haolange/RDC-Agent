@@ -19,7 +19,7 @@ interface Binding { runtime: RdcSessionRuntime; state: CaptureReplayState; devic
 const empty = (scope: SessionScope): CaptureReplayState => ({ ...scope, generation: 0, revision: 0, operationId: null,
   phase: 'closed', replayDeviceId: null, inputId: null, captureHash: null, contextId: null,
   requestedEventId: null, appliedEventId: null, imageEventId: null, events: [], targets: [], target: null,
-  isFinalOutput: false, image: null, observation: null, agentObservation: null, devicePresentation: { status: 'not_applicable', eventId: null, textureId: null, sequence: null, reason: null }, warning: null, interactionLock: null, error: null });
+  isFinalOutput: false, image: null, observation: null, devicePresentation: { status: 'not_applicable', eventId: null, textureId: null, sequence: null, reason: null }, warning: null, interactionLock: null, error: null });
 
 /** Per-session application ownership. Device reservations survive uncertain native close. */
 export class RdcSessionService {
@@ -117,7 +117,7 @@ export class RdcSessionService {
         const hashed = await verifyInput();
         this.assertInteraction(binding, options);
         await this.closeBinding(scope, binding, options, remoteId);
-        this.publish(binding, { captureHash: hashed.sha256, contextId: null, replayDeviceId: null, image: null, observation: null, agentObservation: null, imageEventId: null, appliedEventId: null, requestedEventId: null, events: [], targets: [], target: null });
+        this.publish(binding, { captureHash: hashed.sha256, contextId: null, replayDeviceId: null, image: null, observation: null, imageEventId: null, appliedEventId: null, requestedEventId: null, events: [], targets: [], target: null });
         if (project) await replayHistoryStore.saveSelection(project.rootPath, scope.sessionId, { inputId: request.inputId, captureSha256: hashed.sha256, deviceId: request.replayDevice.id });
         this.assertInteraction(binding, options);
         binding.deviceId = remoteId;
@@ -181,16 +181,6 @@ export class RdcSessionService {
         this.publish(binding, { phase: 'error', error: { code: 'RDC_CLOSE_FAILED', message: String(error), retry: 'close' } }); throw error;
       }
     });
-  }
-  async clearReplayHistoryForSession(scope: SessionScope, captureHash: string, projectRoot: string): Promise<void> {
-    const binding = this.binding(scope);
-    const operation = async () => {
-      this.assertInteraction(binding);
-      await replayHistoryStore.clearCapture({ projectRoot, sessionId: scope.sessionId, captureSha256: captureHash });
-      this.publish(binding, {});
-    };
-    const contextId = binding.runtime.getContextId();
-    if (contextId) await runRdcOperation(contextId, operation); else await this.serial(scope, operation);
   }
   async rebindInput(projectId: string, oldInputId: string, input: import('@shared/types/session').ProjectInputRecord): Promise<void> {
     const hash = input.source === 'external_reference'
@@ -260,10 +250,6 @@ export class RdcSessionService {
     const project = storageAdapter.getProjectById(scope.projectId);
     if (!project || !state.captureHash || (state.appliedEventId === null && !state.error)) return;
     const summary = `${operationId}${state.appliedEventId === null ? '' : ` · EID ${state.appliedEventId}`}${state.target ? ` · ${state.target.textureId}` : ''}${state.observation ? ` · ${state.observation.modificationState}` : ''}`;
-    const agentObservation = state.image && state.appliedEventId !== null && state.imageEventId === state.appliedEventId
-      ? { eventId: state.appliedEventId, operationId, toolCallId, summary, image: state.image, target: state.target,
-        observation: state.observation, saved: false, saveError: null } : null;
-    if (agentObservation) this.publish(this.binding(scope), { agentObservation });
     try {
       const imageBytes = state.image ? await replayLivePreviewStore.read(scope.sessionId) : undefined;
       await replayHistoryStore.append({ projectRoot: project.rootPath, sessionId: scope.sessionId, captureSha256: state.captureHash }, {
@@ -273,10 +259,9 @@ export class RdcSessionService {
         resourceId: state.target?.textureId, bindingGeneration: state.generation,
         ...(state.error ? { failure: `${state.error.code}: ${state.error.message}` } : {}),
       }, imageBytes);
-      if (this.binding(scope).state.generation === generation) this.publish(this.binding(scope), agentObservation ? { agentObservation: { ...agentObservation, saved: true } } : {});
+      if (this.binding(scope).state.generation === generation) this.publish(this.binding(scope), {});
     } catch (error) {
       if (this.binding(scope).state.generation === generation) this.publish(this.binding(scope), {
-        ...(agentObservation ? { agentObservation: { ...agentObservation, saveError: String(error) } } : {}),
         error: { code: 'REPLAY_SAVE_FAILED', message: String(error), retry: null } });
     }
   }
@@ -295,9 +280,10 @@ export class RdcSessionService {
         const observed = await observeReplay(owner, args, frozenCli ?? binding.runtime.getCliSettings(), {
           sessionId: scope.sessionId, generation,
         });
-        if (generation === binding.state.generation) this.publish(binding, { ...observed, operationId, phase: 'ready' });
+        if (generation === binding.state.generation) this.publish(binding, { ...observed, operationId,
+          ...(!human ? { requestedEventId: observed.appliedEventId ?? null } : {}), phase: 'ready' });
       }
-      catch (error) { if (generation === binding.state.generation) this.publish(binding, { operationId, image: null, observation: null, imageEventId: null, appliedEventId: null, target: null, targets: [], isFinalOutput: false, phase: 'ready', error: { code: 'RDC_OBSERVE_FAILED', message: String(error), retry: 'image' } }); }
+      catch (error) { if (generation === binding.state.generation) this.publish(binding, { operationId, ...(!human ? { requestedEventId: null } : {}), image: null, observation: null, imageEventId: null, appliedEventId: null, target: null, targets: [], isFinalOutput: false, phase: 'ready', error: { code: 'RDC_OBSERVE_FAILED', message: String(error), retry: 'image' } }); }
     };
     if (alreadySerialized) await operation(); else await runRdcOperation(owner.contextId, operation);
     return this.snapshotReplayForSession(scope);

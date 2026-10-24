@@ -51,7 +51,7 @@ export const ContextUsageIndicator: React.FC<{
   const usagePercent = showPrepared ? prepared.usagePercent : usage?.usagePercent ?? 0;
   const normalizedPercent = awaitingWindow ? 0 : Math.max(0, Math.min(100, usagePercent));
   const windowTokens = resolveDisplayedPromptBudget(showPrepared, prepared, usage, selectedProfile);
-  const radius = 14;
+  const radius = 15.5;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - (normalizedPercent / 100));
   const percentLabel = showEstimatedRing ? `~${normalizedPercent}%` : `${normalizedPercent}%`;
@@ -110,21 +110,23 @@ export const ContextUsageIndicator: React.FC<{
         className={`composer-usage-indicator${stale && !showPrepared ? ' is-stale' : ''}${phase === 'preparing' || awaitingWindow ? ' is-pending' : ''}${showEstimatedRing ? ' is-estimated' : ''}`}
         data-testid="composer-usage-indicator"
         data-estimated={showEstimatedRing ? 'true' : undefined}
+        data-value-length={valueText.length > 4 ? 'long' : undefined}
         aria-label={ariaLabel}
         aria-haspopup="dialog"
         aria-expanded={open}
         title={windowLabel}
         onClick={togglePopover}
       >
-        <svg className="composer-usage-ring" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true">
+        <svg className="composer-usage-ring" viewBox="0 0 36 36" aria-hidden="true">
           <circle className="composer-usage-ring-track" cx="18" cy="18" r={radius} />
           <circle
             className="composer-usage-ring-progress"
             cx="18"
             cy="18"
             r={radius}
-            strokeDasharray={`${circumference} ${circumference}`}
-            strokeDashoffset={dashOffset}
+            strokeDasharray={normalizedPercent >= 100 ? undefined : `${circumference} ${circumference}`}
+            strokeDashoffset={normalizedPercent >= 100 ? undefined : dashOffset}
+            visibility={normalizedPercent <= 0 || phase === 'preparing' || awaitingWindow ? 'hidden' : undefined}
           />
         </svg>
         <span className="composer-usage-value">

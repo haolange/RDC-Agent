@@ -8,11 +8,6 @@ export interface CaptureReplayObservation {
   modificationState: 'baseline' | 'intervention' | 'restored';
   displayParameters: { mip: number; slice: number; sample: number; rangeMin: number; rangeMax: number };
 }
-export interface CaptureAgentObservation {
-  eventId: number; operationId: string; toolCallId: string; summary: string;
-  image: OpenedCapturePreview; target: CaptureReplayTarget | null; observation: CaptureReplayObservation | null;
-  saved: boolean; saveError: string | null;
-}
 export interface CaptureReplayState extends SessionScope {
   generation: number; revision: number; operationId: string | null; phase: CaptureReplayPhase;
   replayDeviceId: string | null; inputId: string | null; captureHash: string | null; contextId: string | null;
@@ -20,7 +15,6 @@ export interface CaptureReplayState extends SessionScope {
   events: CaptureReplayEvent[]; targets: CaptureReplayTarget[]; target: CaptureReplayTarget | null;
   isFinalOutput: boolean; image: OpenedCapturePreview | null;
   observation: CaptureReplayObservation | null;
-  agentObservation: CaptureAgentObservation | null;
   devicePresentation: { status: 'not_applicable' | 'unsupported' | 'unavailable' | 'presented'; eventId: number | null; textureId: string | null; sequence: number | null; reason: string | null };
   warning: { code: string; message: string } | null;
   interactionLock: string | null; error: CaptureReplayError | null;
@@ -28,10 +22,4 @@ export interface CaptureReplayState extends SessionScope {
 export interface CaptureReplayBindingRequest extends SessionScope { bindingGeneration: number }
 export interface CaptureReplayApplyRequest extends CaptureReplayBindingRequest { eventId: number; target?: { textureId?: string; outputSlot?: number } }
 
-export interface CaptureReplayHistoryRequest extends SessionScope { captureHash: string; afterSequence?: number; limit?: number }
-export interface CaptureReplayHistoryEntry {
-  sequence: number; eventId: number | null; operationId: string; summary: string; timestamp: number; saved: true;
-  imageSha256?: string; resourceId?: string; toolCallId?: string; modificationState?: string; failure?: string;
-  nativeRevision?: number; displayParameters?: CaptureReplayObservation['displayParameters'];
-}
 export interface CaptureReplaySelection { inputId: string; captureSha256?: string; deviceId?: string }

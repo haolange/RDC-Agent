@@ -161,13 +161,17 @@ for (const forbidden of ['TOOL_LABELS', 'Runtime lookup', 'displayLabel']) {
 const capturePanel = [
   read('src/renderer/features/right-rail/CapturePanel.tsx'),
   read('src/renderer/features/right-rail/capturePanelActions.ts'),
-  read('src/renderer/features/right-rail/CaptureFrame.tsx'),
-  read('src/renderer/features/right-rail/CaptureHistory.tsx'),
+  read('src/renderer/features/right-rail/CaptureReplayControls.tsx'),
+  read('src/renderer/features/right-rail/CaptureWorkspace.tsx'),
 ].join('\n');
-for (const required of ['RdcContextPanelViewModel', 'control.captureOpen', 'capture.openProjectInput', 'capture.clearOpenedState', 'capture.applyReplayEvent', 'capture.refreshFrame', 'capture.listReplayHistory', 'capture.readReplayImage', 'capture.readLivePreview', 'capture-replay-device-row', 'role="tablist"', 'aria-selected', 'CaptureFrame', 'CaptureHistory']) {
+for (const required of ['RdcContextPanelViewModel', 'control.captureOpen', 'capture.openProjectInput', 'capture.clearOpenedState', 'capture.applyReplayEvent', 'capture.refreshFrame', 'capture.readLivePreview', 'capture-replay-device-row', 'CaptureWorkspace', 'CaptureReplayControls', 'interactionLock', 'controlAgent', 'controlHuman']) {
   requireText(capturePanel, required, `CapturePanel must retain ${required}`);
 }
-for (const retired of ['openHumanPreview', 'closeHumanPreview', 'humanPreviewStatus']) forbidText(capturePanel, retired, `Capture must retire ${retired}`);
+for (const retired of ['openHumanPreview', 'closeHumanPreview', 'humanPreviewStatus', 'role="tablist"', 'role="tabpanel"', 'capture-replay-tabs', 'CaptureHistoryControls', 'agentObservation', 'returnCurrent']) forbidText(capturePanel, retired, `Capture must retire ${retired}`);
+const workspace = read('src/renderer/features/right-rail/CaptureWorkspace.tsx');
+if ((workspace.match(/className="capture-replay-image"/g) ?? []).length !== 1) fail('CaptureWorkspace must own exactly one image viewport');
+const progress = read('src/renderer/features/right-rail/RightRailProgressList.tsx');
+for (const retired of ['stopLabel', 'useSessionWorkStop', 'stopBackgroundWork']) forbidText(progress + tracePanel, retired, `Progress must retire ${retired}`);
 forbidText(capturePanel, 'right-rail-capture-summary', 'CapturePanel must not duplicate the selected capture above its picker');
 
 const emptyState = read('src/renderer/features/right-rail/RightRailEmptyState.tsx');

@@ -1,4 +1,4 @@
-import { registerCaptureReplayHistoryHandlers } from './captureReplayHistoryHandlers';
+import { registerCaptureReplayReadHandlers } from './captureReplayReadHandlers';
 import { ipcMain } from 'electron';
 import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
 import type { OpenProjectInputRequest, SessionScope, SessionScopedPayload } from '@shared/types/session';
@@ -24,7 +24,7 @@ const envelope = <T>(scope: SessionScope, payload: T): SessionScopedPayload<T> =
 });
 
 export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): void {
-  registerCaptureReplayHistoryHandlers();
+  registerCaptureReplayReadHandlers();
   const authorizeReplayScope = (scope: SessionScope) => {
     if (storageAdapter.readSession(scope.sessionId)?.projectId !== scope.projectId) throw new Error('REPLAY_SCOPE_DENIED');
   };

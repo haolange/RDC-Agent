@@ -24,6 +24,19 @@ const profile = (overrides: Partial<ContextUsageSelectedProfile> = {}): ContextU
 });
 
 describe('ContextUsageIndicator', () => {
+  it.each([0, 59, 100])('renders %i percent with clean arc endpoints and keeps the percentage centered', (usagePercent) => {
+    const html = renderToStaticMarkup(React.createElement(ContextUsageIndicator, {
+      usage: null, phase: 'current', selectedProfile: profile(), detailsExpanded: false, onDetailsExpandedChange: () => undefined,
+      prepared: { preparedInputTokens: 1, uncompactedInputTokens: 1, promptBudgetTokens: 100,
+        compactionThresholdTokens: 100, compactionApplied: false, usagePercent } as PreparedTurnContextSummary,
+    }));
+    const document = html.match(/<circle class="composer-usage-ring-progress"[^>]*>/)![0];
+    expect(html).toContain(`>${usagePercent}%</span>`);
+    if (usagePercent === 0) expect(document).toContain('visibility="hidden"');
+    else expect(document).not.toContain('visibility="hidden"');
+    if (usagePercent === 100) expect(document).not.toContain('stroke-dash');
+    expect(html).not.toContain('width="36"');
+  });
   it('keeps an oversized pre-window estimate pending until actual request usage arrives', () => {
     const html = renderToStaticMarkup(React.createElement(ContextUsageIndicator, {
       detailsExpanded: false,
@@ -127,7 +140,7 @@ describe('ContextUsageIndicator', () => {
     expect(idle).not.toContain('composer-usage-ring-threshold');
   });
 
-  it('shows a projected percent after the selected model window changes', () => {
+  it.each([12, 100])('shows a projected %i percent after the selected model window changes', (usagePercent) => {
     const projected = renderToStaticMarkup(
       React.createElement(ContextUsageIndicator, {
         detailsExpanded: true,
@@ -136,7 +149,7 @@ describe('ContextUsageIndicator', () => {
           runId: 'run-1',
           providerId: 'provider',
           modelId: 'model',
-          usagePercent: 12,
+          usagePercent,
           promptBudgetTokens: 1_000_000,
           contextWindowTokens: 1_000_000,
           maxOutputTokens: 0,
@@ -158,10 +171,11 @@ describe('ContextUsageIndicator', () => {
         estimated: true,
       }),
     );
-    expect(projected).toContain('~12%');
+    expect(projected).toContain(`~${usagePercent}%`);
     expect(projected).toContain('is-estimated');
     expect(projected).toContain('data-estimated="true"');
-    expect(projected).toContain('title="contextBreakdown.projected ~12% 1M"');
+    expect(projected).toContain(`title="contextBreakdown.projected ~${usagePercent}% 1M"`);
+    if (usagePercent === 100) expect(projected).toContain('data-value-length="long"');
     expect(projected).not.toContain('composer-usage-value-label');
   });
 

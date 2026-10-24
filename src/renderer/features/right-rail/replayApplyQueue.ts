@@ -26,6 +26,10 @@ export function createReplayApplyQueue<T>(apply: (value: T) => Promise<unknown>,
         else timer = setTimeout(() => void drain(), interval);
       }
     },
+    flush() {
+      if (timer) { clearTimeout(timer); timer = undefined; }
+      if (!running) void drain();
+    },
     dispose() { disposed = true; pending = undefined; if (timer) clearTimeout(timer); },
   };
 }

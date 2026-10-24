@@ -81,7 +81,7 @@ Edit-and-resend 使用 Composer 当前 agent + 当前对话模型，编辑框上
 
 Effort：能力驱动 reasoning rail + `Max mode` + `Fast mode`，嵌在合并胶囊的弹层里。关档文案统一 `Disabled` / `禁用`。`unknown` / `none` → 同关态外观并灰掉不可调；`always-on` / fixed → 锁定开；wire `xhigh` 显示 `Extra`；产品最高档 `Max`。Max/Fast entitlement 未知时关态灰掉且状态文案亦为 `Disabled`。滑杆 inset 几何，松手 snap。Compose 色跟 agent `accent`（`--composer-effort-*`），禁止只用全局 `--token-border-focus`。
 
-Context 环：面只显示 `%` / `—` / `…`；相位文案在 title/aria 与 breakdown。相位权威：Preparing / Current request ~ / Actual|Last actual。占用率分母是可执行 prompt 上限 `promptBudgetTokens`（不再扣模型输出上限，例如 DeepSeek 1M 环分母为 1M）。hero 下显示压缩线、条件完整窗口（仅 window > budget）与本轮可生成；分段条带压缩线刻度，圆环不标压缩位置。Actual 三栏 Tokens | Cache | Reasoning 在弹层宽度大于 `38rem` 时等宽三张独立圆角卡片同行排列，缺遥测显示 `—`，禁止假 0；仅真实窄屏才纵向单列堆叠。
+Context 环：控件使用 lg 高度 token，SVG 同尺寸填满，圆心等宽文字采用 xs 字号的 0.75 倍，长估值采用 2/3 倍，与圆弧保持内边距；0% 无亮点、100% 无端点凸起。面只显示 `%` / `—` / `…`；相位文案在 title/aria 与 breakdown。相位权威：Preparing / Current request ~ / Actual|Last actual。占用率分母是可执行 prompt 上限 `promptBudgetTokens`（不再扣模型输出上限，例如 DeepSeek 1M 环分母为 1M）。hero 下显示压缩线、条件完整窗口（仅 window > budget）与本轮可生成；分段条带压缩线刻度，圆环不标压缩位置。Actual 三栏 Tokens | Cache | Reasoning 在弹层宽度大于 `38rem` 时等宽三张独立圆角卡片同行排列，缺遥测显示 `—`，禁止假 0；仅真实窄屏才纵向单列堆叠。
 
 `Current request` 固定渲染 `Tokens | Cache | Reasoning` 三栏：Tokens 的 Input 与 Total 都是 `~preparedInputTokens`，Output、Cache 和 Reasoning 都是 `—`；不得混入上一轮的 Actual / Last actual 数值。每栏依次为标题、同一基线上的主数值与短说明、同一刻度起始的次级信息，不使用固定空高：Tokens 主数值为总量，Cache 为已节省量，Reasoning 为推理量；仅在真实推理量与输出量均已知且推理量不大于输出量时显示占输出比例。未知是 `—`，真实零值是 `0`，估值保留 `~`，包括投影中的已知明细。第一个同一 turn 的真实 provider usage 到达后原位切换为 Actual。终止后保留 Last actual，关闭再打开 session 仍可见；只有应用重启或从 `usage.json` 回读时标记 stale，新 session 从未拿到快照才显示「暂无用量」。产品弹窗不展示 continuation、derived context 或 prompt-cache policy 等内部诊断。
 
@@ -120,9 +120,11 @@ The visual form follows a quiet cowork inspector. Project import and Session ins
 
 ## 右下角 Capture 内容
 
-RDC 非空时保留固定卡片：文件与大小、实际设备与打开/关闭、帧回放/Agent 足迹 Tab、等比完整显示的内嵌画面、事件或历史步骤滑条和简短反馈。修改文件或设备为待切换，确认后才改变实际绑定；重试对应失败动作，不统一重开 capture。Agent 运行时禁止手动回放变化，历史回看继续可用。历史播放不执行工具，返回实时恢复跟随。没有活跃回放不能标记实时。
+RDC 非空时保留固定卡片：文件与大小、实际设备与打开/关闭、紧凑控制权状态、唯一等比完整画面、颜色输出与 EID 控件、唯一原生事件滑条和简短反馈。人工与 Agent 共享同一套实际 EID 回放，不设双 Tab、Agent 足迹折叠区、历史播放或返回当前入口。EID 输入和滑条操作实际回放，不浏览历史快照。
 
-项目 RDC 为零时保持改造前原空态，不显示选择器、Tab、画面或历史。右栏宽度、drawer、五卡顺序不变；不恢复独立 preview 窗口，不加最小窗口宽度。
+Agent preparing/running、委派和原生退出未确认均以主进程 interactionLock 为权威，禁用文件/设备/打开/关闭/刷新与事件操作；同一控件原位显示并跟随实际 EID，锁释放后原位恢复，不自动 apply。控制权用一行状态呈现，详细锁定原因放 title，不重复展示大幅说明。requested/applied/image EID 在途状态分别表达，旧图不得改标为新事件；图片读取失败可独立重试，不触发 replay。后台证据保存与既有记录保留，不构成第二套 UI。
+
+项目 RDC 为零时保持改造前原空态，不显示选择器、画面或历史。右栏宽度、drawer、五卡顺序不变；不恢复独立 preview 窗口，不加最小窗口宽度。Progress 只展示任务与定位入口，不提供额外的「停止此会话全部工作」按钮；停止执行沿用 Composer 的会话级 Stop 生命周期。
 
 计划卡是文档预览入口：类型和真实状态、左对齐标题、摘要与章节的有界 Markdown 摘录、独立公共阅读 Button。短内容自然收缩，长内容裁切且不产生卡内滚动；预览不含链接、代码复制等次级交互，卡片空白可打开阅读器，选择文字不触发打开。不展示内部 URI，不在卡片内批准或折叠分节。
 

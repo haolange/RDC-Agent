@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CaptureReplayApplyRequest, CaptureReplayState } from '@shared/types/captureReplay';
 import { applyReplayEvent, type CaptureScope } from './capturePanelActions';
-import { useCapturePreviewUrl } from './useCapturePreviewUrl';
 import { createReplayApplyQueue } from './replayApplyQueue';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Select } from '../../ui/Select';
 
-export function CaptureFrame({ scope, state, disabled, receive }: {
+export function CaptureReplayControls({ scope, state, disabled, receive }: {
   scope: CaptureScope; state: CaptureReplayState | null; disabled: boolean; receive: (state: CaptureReplayState) => void;
 }) {
   const { t } = useI18n();
@@ -23,7 +22,9 @@ export function CaptureFrame({ scope, state, disabled, receive }: {
     setRequested((value) => value === request.eventId ? null : value);
   }, (reason) => { setError(String(reason)); setRequested(null); }), [scope, state?.generation, receive, disabled]);
   useEffect(() => () => queue.dispose(), [queue]);
-  useEffect(() => { if (disabled) queue.dispose(); }, [disabled, queue]);
+  useEffect(() => {
+    if (disabled) { queue.dispose(); setRequested(null); setError(null); }
+  }, [disabled, queue]);
   const events = state?.events ?? [];
   const eventId = requested ?? state?.requestedEventId ?? state?.appliedEventId;
   const position = Math.max(0, events.findIndex((event) => event.eventId === eventId));
@@ -32,39 +33,33 @@ export function CaptureFrame({ scope, state, disabled, receive }: {
     if (disabled || !state || !events.some((event) => event.eventId === id)) return;
     setRequested(id); setError(null); queue.enqueue({ ...scope, bindingGeneration: state.generation, eventId: id, ...(target ? { target } : {}) }, flush);
   };
-  const image = state?.image;
-  const previewUrl = useCapturePreviewUrl(scope, { imagePath: image?.imagePath });
-  const busyImage = state && ['validating', 'connecting', 'opening', 'loading_image', 'closing'].includes(state.phase);
-  const feedback = requested !== null || state?.phase === 'applying' || (state?.requestedEventId !== null && state?.requestedEventId !== state?.appliedEventId)
+  const feedback = requested !== null || state?.phase === 'applying' || (state?.requestedEventId != null && state.requestedEventId !== state.appliedEventId)
+    || (state?.image && state.imageEventId !== state.appliedEventId)
     ? t('control.replay.requested', { requested: requested ?? state?.requestedEventId ?? '—', shown: state?.imageEventId ?? '—' })
     : state?.appliedEventId !== null && state?.appliedEventId !== undefined ? t('control.replay.applied', { eid: state.appliedEventId }) : '';
-  return <div className="capture-replay-content" role="tabpanel" id="capture-frame-panel" aria-labelledby="capture-frame-tab">
+  return <div className="capture-replay-content" role="group" aria-label={t('control.replay.controls')} aria-disabled={disabled}>
     <div className="capture-image-toolbar">
       <span>{t(state?.isFinalOutput ? 'control.replay.final' : 'control.replay.event')}</span>
       {(state?.targets.length ?? 0) > 0 && <Select dataTestId="capture-color-target" ariaLabel={t('control.replay.color')}
-        value={state?.target?.textureId ?? ''} disabled={disabled || !state?.appliedEventId}
+        value={state?.target?.textureId ?? ''} disabled={disabled || state?.appliedEventId == null}
         options={(state?.targets ?? []).map((target) => ({ value: target.textureId, label: target.outputSlot === null ? t('control.replay.final') : `Color ${target.outputSlot}` }))}
-        onChange={(textureId) => state?.appliedEventId && select(state.appliedEventId, true, { textureId })} />}
-    </div>
-    <div className="capture-replay-image" aria-busy={Boolean(busyImage)}>
-      {previewUrl ? <img src={previewUrl} alt={`EID ${state?.imageEventId ?? '—'}`} /> : <span>{busyImage ? t(`control.replay.${state.phase}`) : t(state?.contextId ? 'control.replay.noOutput' : 'control.replay.noImage')}</span>}
-      {image && busyImage && <span className="capture-image-state">{t(`control.replay.${state.phase}`)}</span>}
+        onChange={(textureId) => state?.appliedEventId != null && select(state.appliedEventId, true, { textureId })} />}
     </div>
     <div className="capture-event-controls">
       <Button variant="ghost" size="sm" aria-label={t('control.replay.previous')} disabled={disabled || position === 0} onClick={() => select(events[position - 1].eventId, true)}>‹</Button>
       <label className="capture-event-input">EID <Input inputSize="sm" aria-label={t('control.replay.eventId')} value={draft} disabled={disabled || !events.length}
         inputMode="numeric" onChange={(event) => setDraft(event.target.value)}
-        onBlur={() => { const value = Number(draft); if (events.some((event) => event.eventId === value)) select(value, true); else setDraft(String(eventId ?? '')); }}
+        onBlur={() => { const value = Number(draft); if (events.some((event) => event.eventId === value)) { if (value !== eventId) select(value, true); } else setDraft(String(eventId ?? '')); }}
         onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /></label>
       <Button variant="ghost" size="sm" aria-label={t('control.replay.next')} disabled={disabled || !events.length || position >= events.length - 1} onClick={() => select(events[position + 1].eventId, true)}>›</Button>
     </div>
     <input className="capture-event-slider" type="range" min={0} max={Math.max(0, events.length - 1)} value={position} disabled={disabled || events.length < 2}
       aria-label={t('control.replay.eventSlider')} aria-valuetext={`EID ${eventId ?? '—'}`}
       onChange={(event) => select(events[Number(event.target.value)].eventId)}
-      onPointerUp={(event) => events[Number(event.currentTarget.value)] && select(events[Number(event.currentTarget.value)].eventId, true)}
-      onKeyUp={(event) => events[Number(event.currentTarget.value)] && select(events[Number(event.currentTarget.value)].eventId, true)} />
+      onPointerUp={() => queue.flush()}
+      onKeyUp={(event) => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) queue.flush(); }} />
     <div className="capture-replay-feedback" role="status">{error ?? feedback}</div>
-    {state?.devicePresentation.status === 'presented' && <small>{t('control.replay.synced')}</small>}
-    {state && ['unsupported', 'unavailable'].includes(state.devicePresentation.status) && <small title={state.devicePresentation.reason ?? undefined}>{t('control.replay.remoteUnavailable')}</small>}
+    {state?.contextId && state.devicePresentation.status === 'presented' && <small>{t('control.replay.synced')}</small>}
+    {state?.contextId && ['unsupported', 'unavailable'].includes(state.devicePresentation.status) && <small title={state.devicePresentation.reason ?? undefined}>{t('control.replay.remoteUnavailable')}</small>}
   </div>;
 }
