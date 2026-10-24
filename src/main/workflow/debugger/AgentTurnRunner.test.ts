@@ -248,7 +248,9 @@ describe('AgentTurnRunner', () => {
       maxWallTimeMs,
     } as EffectiveRuntimePlan['policy'];
     const preparedRuntime = {
-      promptPlan: { systemPrompt: 'prepared-system' } as PromptPlan,
+      promptPlan: { systemPrompt: 'prepared-system', segments: [
+        { id: 'skill:actual-analysis', kind: 'preloaded-skill', sourceHash: 'd'.repeat(64) },
+      ] } as PromptPlan,
       runtimeTools: { definitions: [], toolMap: new Map() },
       activeToolDefinitions: [],
       routeCapability: { toolCallingMode: 'disabled' } as AgentRouteCapability,
@@ -256,9 +258,10 @@ describe('AgentTurnRunner', () => {
       mcpLease: lease,
       credentialHandle: 'credential',
       promptCache: {},
-      effectivePlan: { policy, toolAllowlist: [], routeCapability: { toolCallingMode: 'disabled' } } as unknown as EffectiveRuntimePlan,
+      effectivePlan: { policy, fingerprint: 'e'.repeat(24), toolAllowlist: [], routeCapability: { toolCallingMode: 'disabled' } } as unknown as EffectiveRuntimePlan,
     } as unknown as PreparedAgentRuntime;
 
+    const onTaskPreparation = vi.fn(async () => undefined);
     await expect(runner.runAgentTurn({
       agentId: 'ask',
       content: 'setup',
@@ -271,8 +274,12 @@ describe('AgentTurnRunner', () => {
       turnId: 'setup-turn',
       effectiveModel: {} as never,
       preparedRuntime,
-      options: { requestPlan, subagentBudget: inheritedBudget },
+      options: { requestPlan, subagentBudget: inheritedBudget, onTaskPreparation },
     })).rejects.toThrow('slot setup failed');
+    expect(onTaskPreparation).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: 'setup-session', turnId: 'setup-turn', runtimeFingerprint: 'e'.repeat(24),
+      skills: [{ id: 'actual-analysis', hash: 'd'.repeat(64) }], selectedTurnCount: null,
+    }));
 
     if (inheritedBudget) {
       expect(observedBudget).toBe(inheritedBudget);

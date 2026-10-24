@@ -36,6 +36,35 @@ beforeEach(() => {
   mock.write.mockReturnValue({ uri: 'session://tool-outputs/receipt.json', expectedHash: 'sha256:abc' });
 });
 
+it('enumerates the complete frozen capability surface in hash-bound pages without native effects', async () => {
+  expect(RdcShellInputSchema.parse({ discovery: { kind: 'list' } })).toEqual({ discovery: { kind: 'list', limit: 20 } });
+  for (const discovery of [{ kind: 'list', query: 'hidden' }, { kind: 'list', limit: 21 },
+    { kind: 'list', cursor: { offset: -1, fingerprint: 'a'.repeat(64) } },
+    { kind: 'list', cursor: { offset: 0, fingerprint: 'invalid' } }]) {
+    expect(() => RdcShellInputSchema.parse({ discovery })).toThrow();
+  }
+  const definitions = Array.from({ length: 22 }, (_, index) => ({ ...definition, name: `rd.perf.query_${index}` }));
+  definitions.push({ ...definition, name: 'rd.buffer.write', effects: ['buffer_write'] });
+  const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, definitions, lease) };
+  const first = await executeRdcShell({ discovery: { kind: 'list', limit: 20 } }, 'page-1', undefined, bound);
+  const page = JSON.parse((first.content[0] as { text: string }).text);
+  expect(page.data).toMatchObject({ total: 23, offset: 0, truncated: true,
+    capabilitySummary: { checkedOperations: 23, admittedOperations: 22, deniedOperations: 1, admittedEffects: ['replay_position'] },
+    policy: { argumentChecksStillRequired: true, isAuthorization: false } });
+  expect(page.data.operations).toHaveLength(20);
+  const last = await executeRdcShell({ discovery: { kind: 'list', cursor: page.data.next, limit: 20 } }, 'page-2', undefined, bound);
+  const tail = JSON.parse((last.content[0] as { text: string }).text);
+  expect(tail.data).toMatchObject({ total: 23, offset: 20, truncated: false, next: null });
+  expect([...page.data.operations, ...tail.data.operations].map((item: { name: string }) => item.name)).toEqual(definitions.map(item => item.name));
+  expect(tail.data.operations.at(-1).capabilityAdmission).toMatchObject({ available: false });
+  await expect(executeRdcShell({ discovery: { kind: 'list', limit: 20, cursor: { ...page.data.next, fingerprint: '0'.repeat(64) } } },
+    'stale', undefined, bound)).rejects.toThrow(/fingerprint/);
+  await expect(executeRdcShell({ discovery: { kind: 'list', limit: 20,
+    cursor: { offset: 24, fingerprint: page.fingerprint } } }, 'out-of-range', undefined, bound)).rejects.toThrow(/offset/);
+  await expect(executeRdcShell({ operation: 'rd.buffer.write', args: {} }, 'denied', undefined, bound)).rejects.toThrow(/capability/);
+  expect(mock.execute).not.toHaveBeenCalled(); expect(mock.observe).not.toHaveBeenCalled(); expect(mock.write).not.toHaveBeenCalled();
+});
+
 it.each(['replay_fatal_error', 'replay_health_unavailable'])(
   'quarantines native %s without publishing default-zero evidence', async code => {
     const query: RdcOperationDefinition = { ...definition, name: 'rd.texture.get_pixel_value',

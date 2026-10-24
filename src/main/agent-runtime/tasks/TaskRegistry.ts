@@ -7,6 +7,8 @@ import {
 } from './TaskContracts';
 import { cancelOwnedTaskExecution } from './TaskExecutionOwners';
 import { projectTaskItems, type ProjectedTaskItem } from './taskProjection';
+import { TaskExecutionRequirementsSchema, type TaskExecutionRequirements, type TaskExecutionPreparation, type PlanTaskRequirement } from '@shared/types/taskExecution';
+import { assertApprovedTaskRequirement, assertTaskExecutionStart, assertTaskExecutionPreparation, assertTaskExecutionCompletion, readIndependentTaskSources, hashTaskRequirement } from './TaskExecutionRequirements';
 
 const TASK_RUNTIME_INSTANCE_ID = crypto.randomUUID();
 const CANCELLING_TASK_TREES = new Set<string>();
@@ -16,12 +18,14 @@ export type { TaskCompletionResult, TaskExecutionMessage, TaskExecutionRecord, T
 export interface CreateTaskOptions {
   description?: string; blockedBy?: string[]; owner?: string; parentTaskId?: string;
   completionRequirements?: string[]; executionRequired?: boolean; metadata?: Record<string, unknown>;
+  executionRequirements?: TaskExecutionRequirements;
   creationTurnRef?: string;
 }
 export interface UpdateTaskOptions {
   status?: TaskStatus; statusReason?: string; subject?: string; description?: string; owner?: string;
   addBlockedBy?: string[]; addBlocks?: string[]; completionRequirements?: string[]; metadata?: Record<string, unknown>;
   result?: TaskCompletionResult;
+  executionRequirements?: TaskExecutionRequirements;
 }
 export interface TaskRegistryOptions {
   onCancelExecution?: (execution: TaskExecutionRecord) => Promise<void>;
@@ -41,6 +45,8 @@ export class TaskRegistry {
       for (const [index, input] of inputs.entries()) {
         if (!input.subject.trim()) throw new Error('Task subject is required.');
         const createdAt = base + index; const id = this.id('task', createdAt); const blockedBy = dedupe(input.blockedBy ?? []);
+        const executionRequirements = input.executionRequirements === undefined ? undefined : TaskExecutionRequirementsSchema.parse(input.executionRequirements);
+        if (executionRequirements && input.executionRequired === false) throw new Error('TASK_EXECUTION_REQUIREMENTS: constrained work requires an execution.');
         await this.assertDependenciesExist(blockedBy); await this.assertNoDependencyCycle(id, blockedBy);
         if (input.parentTaskId) {
           const parent = await this.store.loadTask(input.parentTaskId);
@@ -51,7 +57,7 @@ export class TaskRegistry {
             if (parentExecution?.status === 'cancelling') throw new Error('Cannot add a child to a terminal or cancelling parent task.');
           }
         }
-        prepared.push({ schemaVersion: TASK_SCHEMA_VERSION, id, subject: input.subject.trim(), description: input.description ?? '', status: 'pending', owner: input.owner, parentTaskId: input.parentTaskId, blockedBy, blocks: [], completionRequirements: dedupe(input.completionRequirements ?? []), executionRequired: input.executionRequired !== false, executionIds: [], revision: 1, metadata: input.metadata ? { ...input.metadata } : undefined, creationTurnRef: input.creationTurnRef, createdAt, updatedAt: createdAt });
+        prepared.push({ schemaVersion: TASK_SCHEMA_VERSION, id, subject: input.subject.trim(), description: input.description ?? '', status: 'pending', owner: input.owner, parentTaskId: input.parentTaskId, blockedBy, blocks: [], completionRequirements: dedupe(input.completionRequirements ?? []), executionRequirements, executionRequired: input.executionRequired !== false, executionIds: [], revision: 1, metadata: input.metadata ? { ...input.metadata } : undefined, creationTurnRef: input.creationTurnRef, createdAt, updatedAt: createdAt });
       }
       const changed = new Map(prepared.map((task) => [task.id, task]));
       for (const task of prepared) {
@@ -71,7 +77,7 @@ export class TaskRegistry {
     return this.store.withLock('state', async () => {
       const task = await this.requireTask(taskId); const next = updates.status ?? task.status;
       if (terminalTask(task.status) && next !== task.status) throw new Error(`Terminal task cannot transition from ${task.status} to ${next}.`);
-      const semanticsChanged = updates.subject !== undefined || updates.description !== undefined || updates.completionRequirements !== undefined || Boolean(updates.addBlockedBy?.length) || Boolean(updates.addBlocks?.length);
+      const semanticsChanged = updates.subject !== undefined || updates.description !== undefined || updates.completionRequirements !== undefined || updates.executionRequirements !== undefined || Boolean(updates.addBlockedBy?.length) || Boolean(updates.addBlocks?.length);
       if (terminalTask(task.status) && semanticsChanged) {
         throw new Error('Terminal task semantics are immutable; create or reopen a new task revision explicitly.');
       }
@@ -93,10 +99,15 @@ export class TaskRegistry {
       if (updates.description !== undefined) task.description = updates.description;
       if (updates.owner !== undefined) task.owner = updates.owner;
       if (updates.completionRequirements !== undefined) task.completionRequirements = dedupe(updates.completionRequirements);
+      if (updates.executionRequirements !== undefined) {
+        if (!task.executionRequired) throw new Error('TASK_EXECUTION_REQUIREMENTS: constrained work requires an execution.');
+        task.executionRequirements = TaskExecutionRequirementsSchema.parse(updates.executionRequirements);
+      }
       if (updates.metadata !== undefined) task.metadata = { ...(task.metadata ?? {}), ...updates.metadata };
       task.status = next; task.statusReason = updates.statusReason ?? (next === 'blocked' ? task.statusReason : undefined);
       task.disposition = updates.result?.disposition ?? (next === 'cancelled' ? 'cancelled' : next === 'blocked' ? 'blocked' : task.disposition);
       if (semanticsChanged) task.revision += 1; task.updatedAt = Date.now();
+      await this.assertApprovedRequirement(task);
       await this.store.commit({ tasks: [task, ...relatedTasks] });
       await this.emitTaskChange('updated', task); return task;
     });
@@ -105,6 +116,8 @@ export class TaskRegistry {
   async startExecution(taskId: string, options: StartTaskExecutionOptions): Promise<TaskExecutionRecord> {
     return this.store.withLock('state', async () => {
       const task = await this.requireTask(taskId); if (task.parentTaskId && await this.hasUnavailableAncestor(task.parentTaskId)) throw new Error('Task ancestor is terminal or cancelling.'); if (await this.hasCancellingAncestor(taskId)) throw new Error('Task or ancestor cancellation is in progress.'); if (!await this.canStart(taskId)) throw new Error('Task dependencies are not completed with verified results.');
+      await this.assertApprovedRequirement(task);
+      await assertTaskExecutionStart(task, options, this.store);
       if (options.resumeCancelled) await this.assertCancelledContinuation(task, options);
       else if (terminalTask(task.status)) throw new Error(`Terminal task cannot start another execution: ${task.status}.`);
       if (task.status === 'in_progress') throw new Error('An in-progress task cannot start another execution. Settle or cancel and join its current execution first; a delegated runner starts its own execution.');
@@ -123,7 +136,7 @@ export class TaskRegistry {
       const budget = inheritBudget(options.budget, previous.at(-1)?.budget, parent?.budget);
       validateBudget(budget, true);
       const now = Date.now();
-      const execution: TaskExecutionRecord = { schemaVersion: TASK_SCHEMA_VERSION, id: this.id('execution', now), taskId, taskRevision: task.revision, generation, runtimeInstanceId: TASK_RUNTIME_INSTANCE_ID, parentExecutionId: options.parentExecutionId, rootBudgetId, mode: options.mode, status: 'running', budget, frozenPlanRef: options.frozenPlanRef, childMessageAckSequence: 0, parentMessageAckSequence: 0, createdAt: now, updatedAt: now };
+      const execution: TaskExecutionRecord = { schemaVersion: TASK_SCHEMA_VERSION, id: this.id('execution', now), taskId, taskRevision: task.revision, generation, runtimeInstanceId: TASK_RUNTIME_INSTANCE_ID, parentExecutionId: options.parentExecutionId, rootBudgetId, mode: options.mode, status: 'running', budget, frozenPlanRef: options.frozenPlanRef, preparation: options.preparation ? structuredClone(options.preparation) : undefined, childMessageAckSequence: 0, parentMessageAckSequence: 0, createdAt: now, updatedAt: now };
       task.executionIds = [...task.executionIds, execution.id]; task.currentExecutionId = execution.id; task.status = 'in_progress'; task.statusReason = undefined; task.disposition = undefined; task.updatedAt = now;
       await this.store.commit({ tasks: [task], executions: [execution] });
       await this.emitTaskChange('updated', task); return execution;
@@ -148,7 +161,11 @@ export class TaskRegistry {
       if (options.result.disposition === 'completed' && options.result.missingRequirements?.length) {
         throw new Error('Completed task result cannot declare missing requirements.');
       }
-      if (options.result.disposition === 'completed') await this.assertCompletionClosure(task, options.result);
+      if (options.result.disposition === 'completed') {
+        await this.assertApprovedRequirement(task);
+        await assertTaskExecutionCompletion(task, execution, this.store);
+        await this.assertCompletionClosure(task, options.result);
+      }
       execution.status = options.status; execution.result = options.result; execution.updatedAt = Date.now(); execution.settledAt = execution.updatedAt;
       task.status = options.result.disposition === 'completed' ? 'completed' : options.result.disposition === 'cancelled' ? 'cancelled' : 'blocked';
       task.disposition = options.result.disposition; task.statusReason = options.result.disposition === 'completed' ? undefined : options.result.summary; task.updatedAt = execution.updatedAt;
@@ -158,6 +175,62 @@ export class TaskRegistry {
   }
 
   async updateExecutionStatus(id: string, status: 'running' | 'waiting', expectedGeneration: number): Promise<TaskExecutionRecord> { await this.requireExecution(id); return this.store.withLock('state', async () => { const execution = await this.requireExecution(id); const task = await this.requireTask(execution.taskId); this.assertCurrent(task, execution, expectedGeneration); if (terminal(execution.status) || execution.status === 'cancelling') throw new Error('Settled or cancelling execution cannot return to a running state.'); execution.status = status; execution.updatedAt = Date.now(); await this.store.saveExecution(execution); return execution; }); }
+
+  async bindExecutionPreparation(id: string, expectedGeneration: number, preparation: TaskExecutionPreparation): Promise<void> {
+    await this.store.withLock('state', async () => {
+      const execution = await this.requireExecution(id); const task = await this.requireTask(execution.taskId);
+      this.assertCurrent(task, execution, expectedGeneration);
+      if (terminal(execution.status) || execution.status === 'cancelling') throw new Error('Cannot prepare a settled or cancelling execution.');
+      await this.assertApprovedRequirement(task);
+      await assertTaskExecutionPreparation(task, execution.mode, preparation, this.store);
+      if (execution.preparation && JSON.stringify(execution.preparation) !== JSON.stringify(preparation)) throw new Error('TASK_EXECUTION_REQUIREMENTS: execution preparation is immutable.');
+      execution.preparation = structuredClone(preparation);
+      const independentSources = await readIndependentTaskSources(task, this.store);
+      if (execution.independentSources && JSON.stringify(execution.independentSources) !== JSON.stringify(independentSources)) throw new Error('TASK_EXECUTION_REQUIREMENTS: independent sources are immutable.');
+      if (independentSources.length) execution.independentSources = independentSources;
+      await this.store.saveExecution(execution);
+    });
+  }
+
+  async assertApprovedTasksCompleted(): Promise<void> {
+    for (const snapshot of await this.store.readApprovedRequirements?.() ?? []) {
+      const task = await this.requireTask(snapshot.taskId);
+      await this.assertApprovedRequirement(task);
+      if (task.status !== 'completed') throw new Error(`TASK_EXECUTION_REQUIREMENTS: approved Task is not completed: ${task.id}`);
+      await this.assertCanComplete(task);
+    }
+  }
+
+  /** Install only a user-approved, hash-bound proposal. Does not start or reset an execution. */
+  async installApprovedTaskRevisions(snapshots: readonly PlanTaskRequirement[]): Promise<void> {
+    await this.store.withLock('state', async () => {
+      const changed: TaskRecord[] = [];
+      for (const snapshot of snapshots) {
+        const task = await this.requireTask(snapshot.taskId);
+        if (snapshot.replacesRevision === undefined) {
+          assertApprovedTaskRequirement(task, [snapshot]);
+          if (task.revision !== snapshot.revision) throw new Error('TASK_PLAN_REVISION_CONFLICT: Task changed since plan submission.');
+          continue;
+        }
+        if (task.revision === snapshot.revision) { assertApprovedTaskRequirement(task, [snapshot]); continue; }
+        if (task.status === 'completed') throw new Error('TASK_PLAN_REVISION_CONFLICT: completed Tasks cannot be reopened.');
+        const active = task.currentExecutionId ? await this.store.loadExecution(task.currentExecutionId) : null;
+        if (active && !terminal(active.status)) throw new Error('TASK_PLAN_REVISION_CONFLICT: cancel and join before revising active work.');
+        if (task.revision !== snapshot.replacesRevision || hashTaskRequirement(task) !== snapshot.previousRequirementHash) {
+          throw new Error('TASK_PLAN_REVISION_CONFLICT: Task changed since the approved proposal was prepared.');
+        }
+        changed.push({ ...task, subject: snapshot.subject, description: snapshot.description,
+          completionRequirements: [...snapshot.completionRequirements], executionRequirements: snapshot.executionRequirements,
+          revision: snapshot.revision, updatedAt: Date.now() });
+      }
+      if (changed.length) await this.store.commit({ tasks: changed });
+      for (const task of changed) await this.emitTaskChange('updated', task);
+    });
+  }
+
+  private async assertApprovedRequirement(task: TaskRecord): Promise<void> {
+    assertApprovedTaskRequirement(task, await this.store.readApprovedRequirements?.() ?? []);
+  }
   async updateExecutionBudget(id: string, input: {
     expectedGeneration: number;
     toolCalls?: number;
@@ -353,6 +426,7 @@ export class TaskRegistry {
   }
 
   private async assertCanComplete(task: TaskRecord, result?: TaskCompletionResult): Promise<void> {
+    await this.assertApprovedRequirement(task);
     if (!task.executionRequired) return;
     if (!task.currentExecutionId) throw new Error('Executable task cannot complete without an execution.');
     const execution = await this.requireExecution(task.currentExecutionId);
@@ -364,6 +438,7 @@ export class TaskRegistry {
       throw new Error('Task completion result cannot replace the execution owner result.');
     }
     const effective = execution.result;
+    await assertTaskExecutionCompletion(task, execution, this.store);
     const missing = task.completionRequirements.filter((key) => !effective.outputs[key]);
     if (missing.length) throw new Error(`Task result is missing requirements: ${missing.join(', ')}`);
     await this.assertCompletionClosure(task, effective);

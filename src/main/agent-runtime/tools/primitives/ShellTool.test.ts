@@ -21,6 +21,8 @@ vi.mock('../../../sessions/StorageAdapter', () => ({
   },
 }));
 import type { ToolExecutionContext } from '../../agent/AgentTool';
+import { toolToDefinition } from '../../agent/AgentTool';
+import { toolValidator } from '../../core/ToolValidator';
 import { shellTool } from './ShellTool';
 import {
   isPathInsideRoot,
@@ -216,6 +218,23 @@ describe('ShellTool', () => {
     expect(() => shellTool.validateArgs?.({ rdc: { discovery: { kind: 'search', query: 'draw', limit: 5 } } })).not.toThrow();
     expect(() => shellTool.validateArgs?.({ command: '' })).toThrow('SHELL_INPUT');
     expect(() => shellTool.validateArgs?.({ command: ' ', rdc: { discovery: { kind: 'search', query: 'draw', limit: 5 } } })).toThrow('SHELL_INPUT');
+  });
+
+  it('validates bounded frozen catalog listing in the actual tool schema validator', () => {
+    const definition = toolToDefinition(shellTool);
+    for (const discovery of [
+      { kind: 'list', limit: 20 },
+      { kind: 'list', limit: 3, cursor: { offset: 20, fingerprint: 'a'.repeat(64) } },
+    ]) {
+      expect(() => toolValidator.validate(definition, { rdc: { discovery } })).not.toThrow();
+    }
+    for (const discovery of [
+      { kind: 'list', query: 'hidden' }, { kind: 'list', limit: 21 },
+      { kind: 'list', cursor: { offset: -1, fingerprint: 'a'.repeat(64) } },
+      { kind: 'list', cursor: { offset: 0, fingerprint: 'invalid' } },
+    ]) {
+      expect(() => toolValidator.validate(definition, { rdc: { discovery } })).toThrow();
+    }
   });
 
   it('injects the resolved interpreter and host OS into the dynamic description', () => {

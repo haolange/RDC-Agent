@@ -2,6 +2,7 @@ import { AgentToolApprovalRequestService } from '../../agent-runtime/permissions
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({
@@ -51,6 +52,7 @@ import { TaskRegistry, type TaskRecord } from '../../agent-runtime/tasks';
 import { createSessionTaskStore } from '../../agent-runtime/tasks/sessionTaskStore';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { SubagentRunner } from './SubagentRunner';
+import type { AgentProfileTurnOptions } from './orchestratorTypes';
 import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
 import { agentManifestService } from '../../settings/AgentManifestService';
 import { createSubagentBudgetState, createPolicyBudgetState, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
@@ -79,6 +81,53 @@ function testCapsule(overrides: Partial<DelegationCapsule> = {}): DelegationCaps
 }
 
 describe('SubagentRunner', () => {
+  it.each(['prepared', 'missing-method', 'missing-proof'])('settles constrained work only with actual child preparation (%s)', async state => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-subagent-preparation-'));
+    const originalUserData = process.env.RDC_AGENT_USER_DATA;
+    process.env.RDC_AGENT_USER_DATA = root;
+    try {
+      const projectRoot = path.join(root, 'project'); fs.mkdirSync(projectRoot);
+      const project = await storageAdapter.createProject(projectRoot);
+      const sessionId = storageAdapter.createSession(project.projectId).sessionId;
+      const registry = new TaskRegistry(createSessionTaskStore(sessionId));
+      const task = await registry.createTask('Isolated analysis', {
+        completionRequirements: ['analysis'],
+        executionRequirements: { mode: 'subagent', requiredSkillIds: ['analysis-method'], independentOfTaskIds: [] },
+      });
+      const sendProfileMessage = vi.fn(async (_agent: string, _content: string, options?: AgentProfileTurnOptions) => {
+        expect(options?.preloadSkillIds).toEqual(['analysis-method']);
+        if (state !== 'missing-proof') await options?.onTaskPreparation?.({
+          sessionId: options.sessionId!, turnId: 'child-turn', runtimeFingerprint: 'a'.repeat(24),
+          capsuleHash: createHash('sha256').update(JSON.stringify(options.frozenDelegationCapsule)).digest('hex'),
+          skills: state === 'prepared' ? [{ id: 'analysis-method', hash: 'b'.repeat(64) }] : [],
+          selectedTurnCount: 0, inputArtifacts: [], requestsDomainCapability: false,
+        });
+        options?.onTerminalContext?.({
+          messages: [], status: 'complete', selectedTurnCount: 0, filteredArtifactCount: 0,
+          executionIdentity: {} as never,
+          completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: {
+            summary: 'Read bounded inputs.', outputs: { analysis: 'Findings, source ranges and limitations.' },
+            counterevidence: [], unresolved: [], scope: 'offline analysis', sideEffects: [], recoveryState: [],
+          } },
+        });
+        return 'Findings, source ranges and limitations.';
+      });
+      const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'profile', getActiveTurn: () => null });
+      const [tool] = runner.createSubagentTools('general', sessionId);
+      const promise = tool.execute('analysis-call', { ...testCapsule({ requiredSkillIds: ['analysis-method'] }), taskId: task.id, profile: 'general' } as never);
+      if (state === 'missing-proof') await expect(promise).rejects.toThrow('preparation proof');
+      else expect((await promise).isError).toBe(state !== 'prepared');
+      expect((await registry.getTask(task.id))?.status).toBe(state === 'prepared' ? 'completed' : 'blocked');
+      const execution = (await registry.listExecutions(task.id))[0];
+      if (state === 'prepared') expect(execution.preparation?.skills).toEqual([{ id: 'analysis-method', hash: 'b'.repeat(64) }]);
+      expect(sendProfileMessage).toHaveBeenCalledOnce();
+    } finally {
+      if (originalUserData === undefined) delete process.env.RDC_AGENT_USER_DATA;
+      else process.env.RDC_AGENT_USER_DATA = originalUserData;
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('runSubagent completes and forwards tool/assistant events', async () => {
     const parentEvents: Array<{ type: string }> = [];
     const runner = new SubagentRunner({

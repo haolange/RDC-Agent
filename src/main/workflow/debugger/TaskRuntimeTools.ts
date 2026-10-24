@@ -65,6 +65,7 @@ export function createTaskRuntimeTools(input: {
         : undefined;
       return {
         parentExecutionId: delegatedScope?.executionId,
+        preparation: turn?.taskPreparation ?? undefined,
         rootBudgetId,
         frozenPlanRef: turn?.turnId ? `turn:${turn.turnId}:generation:${turn.generation}` : undefined,
         budget: turn?.policyBudget ? {

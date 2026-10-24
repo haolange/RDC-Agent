@@ -404,6 +404,8 @@ Plan 经 session artifact plans 类别版本化：同意前覆盖活文件，同
 
 ### Task 预算与取消所有权（2026-09-10）
 
+Task 可通过通用 `executionRequirements` 声明必要执行方式、必需方法与独立性来源；`plan_artifact` 绑定必需 Task，并把主进程读取的要求快照纳入批准 hash。启动、实际准备和结算核对同一义务与执行来源，不以描述或 metadata 充当保证。正常重规划可在原计划门显式提出同一 Task 的定义修订，批准后保留原执行、root、消费和期限，不重开已完成 Task。此为新增的可选合同，历史记录不追认；字段、修订和完成门见 runtime-kernel，真实产品验收以 acceptance-ledger 为准。
+
 通用 harness 的逻辑 Task、执行实例与 root budget 统一持久化在 TaskStore。Task 的创建回合归属由 runtime 写入可选 `creationTurnRef`；Stop 在 producer join 后取消仅由被停回合创建且尚未启动的 Task，不猜测旧记录或其他回合的归属。直接执行、同步/后台子执行共享根预算；Capsule 只收窄 child-local 账本，重试恢复原执行已消费量和原 root 关联。预算预留持久化先于工具效果，父回复结束不重置账本。并发首次绑定同一 root 只合并一次；已绑定 root A 的同一 live ledger 请求 root B 时显式拒绝，保持原账本与观察者归属，不建立多根合并或静默换绑路径。
 
 同一父回合的 `maxAggregateWallMs` 仅累计有子执行实际活跃的墙钟时间；父级独立取证的间隔暂停该窗口，并行子执行重叠时只计一次。首次委派前不消耗此上限；达到上限后不再创建子执行。此局部窗口不替代持久 root budget、Capsule 单次时限或取消/join 规则。

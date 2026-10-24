@@ -18,7 +18,7 @@ export function answerConversationUserInput(
 
 export function answerConversationPlanReview(
   request: ConversationAnswerPlanReviewRequest,
-): ConversationAnswerPlanReviewResult {
+): Promise<ConversationAnswerPlanReviewResult> {
   return agentPlanReviewRequestService.answer(request);
 }
 

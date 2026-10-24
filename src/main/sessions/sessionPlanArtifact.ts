@@ -2,6 +2,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import { formatSessionArtifactUri, shortArtifactHash } from '@shared/types/sessionArtifact';
 import type { PlanReviewSection } from '@shared/types/planReview';
+import { PLAN_TASK_REQUIREMENTS_HEADING, renderPlanTaskRequirements, parsePlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
 import { sessionArtifactResolver, type SessionArtifactResolver, type SessionArtifactWriteResult } from './SessionArtifactResolver';
 
 export const LIVE_PLAN_RELATIVE_PATH = 'plan.md';
@@ -11,11 +12,13 @@ export function normalizeArtifactHash(hash: string): string {
   return hash.trim().toLowerCase().replace(/^sha256:/, '');
 }
 
-export function composePlanMarkdown(input: { title: string; summary: string[]; content: string }): string {
+export function composePlanMarkdown(input: { title: string; summary: string[]; content: string; taskRequirements?: PlanTaskRequirement[] }): string {
   const title = input.title.trim();
   const bullets = input.summary.map((line) => `- ${line.trim()}`).join('\n');
   const body = input.content.replace(/\r\n/g, '\n').trim();
-  return `# ${title}\n\n${bullets}\n\n${body}\n`;
+  if (body.includes(PLAN_TASK_REQUIREMENTS_HEADING)) throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: task contracts must be generated from requiredTaskIds, not supplied as Markdown.');
+  const tasks = input.taskRequirements?.length ? `\n${renderPlanTaskRequirements(input.taskRequirements)}` : '';
+  return `# ${title}\n\n${bullets}\n\n${body}\n${tasks}`;
 }
 
 export function sectionsFromMarkdown(markdown: string): PlanReviewSection[] {
@@ -40,11 +43,12 @@ export class PlanArtifactWriter {
     return this.resolver.write(sessionId, LIVE_PLAN_URI, markdown);
   }
 
-  freezeApprovedPlan(sessionId: string, expectedHash: string): SessionArtifactWriteResult {
+  freezeApprovedPlan(sessionId: string, expectedHash: string): SessionArtifactWriteResult & { taskRequirements: PlanTaskRequirement[] } {
     const { markdown, hash } = this.readMarkdown(sessionId, LIVE_PLAN_URI, expectedHash);
+    const taskRequirements = parsePlanTaskRequirements(markdown);
     const stamp = new Date().toISOString().replace(/[:.]/g, '');
     const frozenUri = formatSessionArtifactUri('plans', `plan-${stamp}-${shortArtifactHash(hash)}.md`);
-    return this.resolver.write(sessionId, frozenUri, markdown);
+    return { ...this.resolver.write(sessionId, frozenUri, markdown), taskRequirements };
   }
 
   readMarkdown(sessionId: string, uri: string, expectedHash: string): { markdown: string; hash: string; uri: string } {

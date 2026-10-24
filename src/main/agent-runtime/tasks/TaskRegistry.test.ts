@@ -30,6 +30,17 @@ it('preserves active ownership on a pending request and carries consumption into
 });
 
 describe('TaskRegistry', () => {
+  it('rejects direct execution when a Task requires isolated delegation', async () => {
+    const registry = await createRegistry();
+    const task = await registry.createTask('Independent material analysis', {
+      completionRequirements: ['analysis'],
+      executionRequirements: { mode: 'subagent', requiredSkillIds: ['analysis-method'], independentOfTaskIds: [] },
+    });
+    await expect(registry.startExecution(task.id, { mode: 'direct' })).rejects.toThrow('TASK_EXECUTION_REQUIREMENTS');
+    expect(await registry.listExecutions(task.id)).toHaveLength(0);
+    expect((await registry.getTask(task.id))?.status).toBe('pending');
+  });
+
   it('diagnoses an incompatible cumulative cap without resetting or consuming a retry generation', async () => {
     const registry = await createRegistry();
     const task = await registry.createTask('Continue bounded work');

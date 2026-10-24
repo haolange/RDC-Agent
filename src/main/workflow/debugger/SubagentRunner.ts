@@ -295,6 +295,13 @@ export class SubagentRunner {
           extraPromptSegments: capsuleSegments,
           frozenDelegationCapsule: frozenCapsule,
           preloadSkillIds: frozenCapsule.requiredSkillIds,
+          onTaskPreparation: async (preparation) => {
+            if (!ownedTask || !input.executionId || input.taskExecutionGeneration === undefined) return;
+            const capsuleHash = createHash('sha256').update(JSON.stringify(frozenCapsule)).digest('hex');
+            if (preparation.capsuleHash !== capsuleHash) throw new Error('TASK_EXECUTION_REQUIREMENTS: prepared Capsule differs from dispatched work.');
+            await new TaskRegistry(createSessionTaskStore(inheritedTaskScope?.ownerSessionId ?? input.parentSessionId!))
+              .bindExecutionPreparation(input.executionId, input.taskExecutionGeneration, preparation);
+          },
           beforeProviderRequestMessages: input.beforeProviderRequestMessages,
           onProviderRequestCommitted: input.onProviderRequestCommitted,
           excludeRdcLeaseTools: !rdcDelegation.requiresLease,
@@ -491,6 +498,7 @@ export class SubagentRunner {
           const startedAt = Date.now();
           execution = await registry.startExecution(taskId, {
             mode: 'subagent',
+            requiredSkillIds: capsule.requiredSkillIds,
             parentExecutionId: effectiveParentExecutionId,
             rootBudgetId,
             frozenPlanRef: `capsule:sha256:${createHash('sha256').update(JSON.stringify(capsule)).digest('hex')}`,

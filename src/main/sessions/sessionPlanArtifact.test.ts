@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { StorageIo } from './StorageIo';
+import { parsePlanTaskRequirements, renderPlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
 import { SessionArtifactResolver } from './SessionArtifactResolver';
 import {
   LIVE_PLAN_URI,
@@ -49,6 +50,30 @@ describe('PlanArtifactWriter', () => {
 });
 
 describe('plan markdown helpers', () => {
+  const task: PlanTaskRequirement = {
+    taskId: 'task-review', revision: 3, subject: 'Independent review', description: 'Review current material only.',
+    blockedBy: ['task-generation'], completionRequirements: ['review'],
+    executionRequirements: { mode: 'subagent', requiredSkillIds: ['review-method'], independentOfTaskIds: ['task-generation'] },
+  };
+
+  it('includes the exact main-owned Task obligations in the reviewed and hashed Markdown', () => {
+    const input = { title: 'Plan', summary: ['Goal'], content: '## Work\nRead and verify.' };
+    const markdown = composePlanMarkdown({ ...input, taskRequirements: [task] });
+    expect(parsePlanTaskRequirements(markdown)).toEqual([task]);
+    expect(sectionsFromMarkdown(markdown).at(-1)?.heading).toBe('Task execution requirements');
+    expect(composePlanMarkdown({ ...input, taskRequirements: [{ ...task, completionRequirements: ['review', 'limitations'] }] })).not.toBe(markdown);
+    expect(() => composePlanMarkdown({ ...input, content: markdown })).toThrow('generated from requiredTaskIds');
+  });
+
+  it('keeps old plans readable without inferring execution proofs from prose', () => {
+    expect(parsePlanTaskRequirements('# Plan\n\nMust delegate the review.')).toEqual([]);
+    expect(() => parsePlanTaskRequirements('## Task execution requirements\ninvalid')).toThrow('malformed');
+    const section = renderPlanTaskRequirements([task]);
+    expect(() => parsePlanTaskRequirements(section + section)).toThrow('duplicate');
+    expect(() => parsePlanTaskRequirements(section + '\nUnbound trailing instructions.')).toThrow('terminate');
+    expect(() => renderPlanTaskRequirements([{ ...task, executionRequirements: { ...task.executionRequirements!, mode: 'direct' } }])).toThrow();
+  });
+
   it('composes title, summary and content then splits ## sections', () => {
     const markdown = composePlanMarkdown({
       title: 'Frame drop',

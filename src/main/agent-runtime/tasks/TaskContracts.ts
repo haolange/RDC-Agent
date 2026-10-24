@@ -1,3 +1,5 @@
+import type { TaskExecutionRequirements, TaskExecutionPreparation, TaskIndependentSource } from '@shared/types/taskExecution';
+
 export const TASK_SCHEMA_VERSION = 2 as const;
 
 export type TaskStatus = 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
@@ -55,6 +57,7 @@ export interface TaskRecord {
   blockedBy: string[];
   blocks: string[];
   completionRequirements: string[];
+  executionRequirements?: TaskExecutionRequirements;
   executionRequired: boolean;
   executionIds: string[];
   currentExecutionId?: string;
@@ -80,6 +83,8 @@ export interface TaskExecutionRecord {
   status: TaskExecutionStatus;
   budget: TaskBudgetState;
   frozenPlanRef?: string;
+  preparation?: TaskExecutionPreparation;
+  independentSources?: TaskIndependentSource[];
   childMessageAckSequence: number;
   parentMessageAckSequence: number;
   result?: TaskCompletionResult;
@@ -109,6 +114,10 @@ export interface StartTaskExecutionOptions {
   rootBudgetId?: string;
   budget?: Partial<Omit<TaskBudgetState, 'startedAt'>>;
   frozenPlanRef?: string;
+  /** Runtime facts; not exposed in Task tool parameters. */
+  preparation?: TaskExecutionPreparation;
+  /** Requested preload, checked before dispatch and again against actual preparation. */
+  requiredSkillIds?: readonly string[];
 }
 
 export interface TaskRootBudgetRecord {

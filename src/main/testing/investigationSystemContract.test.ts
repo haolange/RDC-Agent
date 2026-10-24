@@ -61,6 +61,15 @@ function readRepo(relative: string): string {
 }
 
 describe('investigation system contract', () => {
+  it('routes Knowledge retrieval, current-material analysis and independent review by responsibility', () => {
+    const method = readRepo('resources/agent-runtime/skills/renderdoc-execution/SKILL.md');
+    expect(method).toMatch(/Knowledge 检索与历史适用性综合使用 knowledge-scout/);
+    expect(method).toMatch(/当前 shader／IR 深分析使用 shader-ir-analysis/);
+    expect(method).toMatch(/独立交付审查使用 skeptic-review/);
+    expect(method).not.toMatch(/长分析分支[\s\S]{0,120}明确包含 knowledge-scout/);
+    expect(method).toContain('父级按需抽查关键原文');
+  });
+
   it('investigation.contract.schema.namespace-fields', () => {
     expect.hasAssertions();
     expect(INVESTIGATION_SCHEMA_NAMESPACE).toBe('rdc.investigation.v1');

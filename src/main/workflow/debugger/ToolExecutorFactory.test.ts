@@ -65,6 +65,7 @@ vi.mock('../../runtime/AppPathService', () => ({
     getRuntimePaths: () => ({
       appStateRoot: process.env.TEMP ?? process.cwd(),
     }),
+    getAppStatePaths: () => ({ tasksPath: 'unused-plan-task-fixture' }),
     getAppPath: () => process.cwd(),
   },
 }));
@@ -92,10 +93,15 @@ vi.mock('../../agent-runtime/interactions/AgentUserInputRequestService', () => (
 }));
 
 vi.mock('../../agent-runtime/interactions/AgentPlanReviewRequestService', () => ({
-  agentPlanReviewRequestService: {},
+  agentPlanReviewRequestService: { request: vi.fn(async () => 'rejected') },
 }));
 
 import { ToolExecutorFactory } from './ToolExecutorFactory';
+import { TaskRegistry, registerDelegatedTaskScope } from '../../agent-runtime/tasks';
+import { planArtifactWriter } from '../../sessions/sessionPlanArtifact';
+import { planReviewStateStore } from '../../sessions/PlanReviewStateStore';
+import { agentPlanReviewRequestService } from '../../agent-runtime/interactions/AgentPlanReviewRequestService';
+import { parsePlanTaskRequirements } from '@shared/types/taskExecution';
 import * as toolResultArtifacts from '../../agent-runtime/tools/ToolResultArtifactizer';
 import { shellTool } from '../../agent-runtime/tools/primitives/ShellTool';
 import { parseRdcNativeResult } from '../../tools/RdcNativeProtocol';
@@ -143,7 +149,7 @@ describe('ToolExecutorFactory', () => {
     } finally { pin.mockRestore(); fs.rmSync(root, { recursive: true, force: true }); }
   });
 
-  it.each(['search', 'describe'] as const)('delivers a small frozen catalog %s as independently readable evidence', async (kind) => {
+  it.each(['search', 'describe', 'list'] as const)('delivers a small frozen catalog %s as independently readable evidence', async (kind) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-discovery-delivery-'));
     fs.writeFileSync(path.join(root, 'session.json'), '{}');
     const resolver = new SessionArtifactResolver({ resolveSessionPath: (id) => id === 'catalog-owner' ? root : null, io: new StorageIo() });
@@ -151,7 +157,9 @@ describe('ToolExecutorFactory', () => {
     const pin = vi.spyOn(toolResultArtifacts, 'artifactizeToolResult').mockImplementation((input) => artifactize({ ...input, resolver }));
     const original = { content: [{ type: 'text' as const, text: JSON.stringify({ fingerprint: 'a'.repeat(64),
       data: kind === 'search' ? { matches: [{ name: 'rd.shader.debug_start' }], total: 38, truncated: true }
-        : { name: 'rd.shader.debug_start', effects: ['shader_debug'], evidence_kind: null } }) }],
+        : kind === 'describe' ? { name: 'rd.shader.debug_start', effects: ['shader_debug'], evidence_kind: null }
+          : { total: 1, offset: 0, truncated: false, next: null,
+            operations: [{ name: 'rd.shader.debug_start', effects: ['shader_debug'] }] } }) }],
     details: { operation: `rdc_tool.tools.${kind}`, exitCode: 0 } };
     const execute = vi.fn(async () => original);
     try {
@@ -164,7 +172,7 @@ describe('ToolExecutorFactory', () => {
         isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
       });
       const discovery = kind === 'search' ? { kind, query: 'hardware shader trace', limit: 2 }
-        : { kind, operation: 'rd.shader.debug_start' };
+        : kind === 'describe' ? { kind, operation: 'rd.shader.debug_start' } : { kind, limit: 20 };
       const result = await factory.createToolExecutor('general', ['shell'], 'catalog-owner', {
         effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
       }).execute({ type: 'toolCall', id: `catalog-${kind}`, name: 'shell', arguments: { rdc: { discovery } } });
@@ -1030,6 +1038,33 @@ it('durably saves reserved cost before effects and rejects effects when durable 
 });
 
 describe('ToolExecutorFactory plan_artifact gate', () => {
+  it('generates reviewed obligations from canonical Tasks rather than caller metadata', async () => {
+    const getTask = vi.spyOn(TaskRegistry.prototype, 'getTask').mockResolvedValue({ id: 'task-real', revision: 2, subject: 'Actual analysis', description: 'Read current material', blockedBy: [], completionRequirements: ['analysis'], executionRequirements: { mode: 'subagent', requiredSkillIds: ['analysis-method'], independentOfTaskIds: [] } } as never);
+    const write = vi.spyOn(planArtifactWriter, 'writeLivePlan').mockReturnValue({ uri: 'session://plans/plan.md', hash: 'a'.repeat(64) } as never);
+    const begin = vi.spyOn(planReviewStateStore, 'beginRevision').mockReturnValue({ planId: 'plan', revision: 1 } as never);
+    try {
+      const factory = createFactory();
+      const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' }, effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', showContinueOn: true }] } } as never;
+      const value = await factory.executePlanArtifactTool({ id: 'plan-call', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: '## Work\nAnalyze.', requiredTaskIds: ['task-real'], metadata: { executionRequirements: { mode: 'direct' } } } }, 'debugger', context);
+      expect(value.isError, JSON.stringify(value.content)).toBe(false);
+      expect(getTask).toHaveBeenCalledWith('task-real');
+      const snapshots = parsePlanTaskRequirements(write.mock.calls[0][1]);
+      expect(snapshots[0]).toMatchObject({ taskId: 'task-real', revision: 2, subject: 'Actual analysis', executionRequirements: { mode: 'subagent' } });
+      write.mockClear();
+      const duplicate = await factory.executePlanArtifactTool({ id: 'duplicate', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: 'Work', requiredTaskIds: ['task-real', 'task-real'] } }, 'debugger', context);
+      expect(duplicate.isError).toBe(true); expect(write).not.toHaveBeenCalled();
+      getTask.mockResolvedValue(null); write.mockClear();
+      const missing = await factory.executePlanArtifactTool({ id: 'missing', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: 'Work', requiredTaskIds: ['missing'] } }, 'debugger', context);
+      expect(missing.isError).toBe(true); expect(write).not.toHaveBeenCalled();
+      const release = registerDelegatedTaskScope('sess', { ownerSessionId: 'owner', rootTaskId: 'root' });
+      try {
+        const denied = await factory.executePlanArtifactTool({ id: 'scope', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: 'Work', requiredTaskIds: ['task-real'] } }, 'general', context);
+        expect(denied.isError).toBe(true); expect(JSON.stringify(denied.content)).toContain('TASK_SCOPE_DENIED');
+        expect(write).not.toHaveBeenCalled();
+      } finally { release(); }
+    } finally { getTask.mockRestore(); write.mockRestore(); begin.mockRestore(); vi.mocked(agentPlanReviewRequestService.request).mockClear(); }
+  });
+
   const planTool = {
     name: 'plan_artifact',
     description: 'plan',

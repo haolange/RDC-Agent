@@ -120,6 +120,7 @@ export class BackgroundSubagentService {
     };
     const execution = await registry.startExecution(input.taskId, {
       mode: 'subagent', parentExecutionId: input.parentExecutionId, rootBudgetId: durableRoot ? rootBudgetId : undefined, budget,
+      requiredSkillIds: input.capsule.requiredSkillIds,
     });
     const restoredPolicyBudget: PolicyBudgetState = {
       toolCalls: execution.budget.toolCalls,

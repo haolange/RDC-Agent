@@ -11,7 +11,7 @@ Mission 可按需只读本文及对应专业手册，提前核对操作参数、
 
 离线阅读专业 Skill 链接的 `references/` 方法正文时，用 `skill_read` 的 `reference`（例如 `skill_id="debugger-rdc-tools", reference="references/tools.md"`），路径相对该有效 Skill；可加 `offset`/`limit`，按返回的整文件 hash 和截断状态继续分页，不依赖固定行号。不要把 Skill 链接当成项目相对路径。此方法读取不需要打开 capture，不执行 RDC，也不刷新在途权限或绑定。正文的能力说明不能代替已打开 capture 下冻结的实际 catalog。
 
-General 先从本 turn 冻结的定义做轻量发现；这不会启动 CLI、产生执行回执或展开完整 catalog：
+General 先从本 turn 冻结的定义做轻量发现；这不会启动 CLI 或产生原生执行回执：
 
 ```json
 {"rdc":{"discovery":{"kind":"search","query":"texture pixel","limit":8}}}
@@ -21,7 +21,15 @@ General 先从本 turn 冻结的定义做轻量发现；这不会启动 CLI、�
 {"rdc":{"discovery":{"kind":"describe","operation":"rd.texture.get_pixel_history"}}}
 ```
 
-`discovery` 与 `operation` 互斥。搜索在冻结定义的名称、描述、参数名、结果说明及 evidence_kind 上做相关度排序，保留部分搜索词匹配的候选，不要求所有词命中同一操作；候选同时显示证据能力。结合 `total` / `truncated` 判断本次覆盖，截断或空结果不证明全目录没有能力；短的区分词或已知的精确操作名更容易定位目标。候选名称不能代替 `describe`：单项说明才返回冻结定义的完整参数与能力声明；未知操作必须拒绝。成功的 search / describe 保留小型正文并附 owning session 的持久 URI/hash，供后续独立读取；它是冻结目录材料，不是原生执行或实验签名。
+需要核对完整可达能力边界时，使用同一冻结目录的分页列举：
+
+```json
+{"rdc":{"discovery":{"kind":"list","limit":20}}}
+```
+
+后续把返回的 `next` 原样作为 `cursor`，直到 `next=null`；游标绑定 catalog fingerprint，不能跨冻结目录使用。每页返回有界的名称、scope、effects、证据类型及静态准入原因；`capabilitySummary` 覆盖完整冻结目录，`policy` 来自实际主进程 scope/effects/prerequisites 检查。它可用于核对该冻结边界是否存在某类可达效果；单项参数、路径、身份、审批及运行期条件仍须另行验证，`available` 不是操作授权。此摘要也不是 live 原生状态观察，不能据此声称外部修改不存在。需要具体调用时仍读取 `describe`。
+
+`discovery` 与 `operation` 互斥。搜索在冻结定义的名称、描述、参数名、结果说明及 evidence_kind 上做相关度排序，保留部分搜索词匹配的候选，不要求所有词命中同一操作；候选同时显示证据能力。结合 `total` / `truncated` 判断本次覆盖，截断或空结果不证明全目录没有能力；短的区分词或已知的精确操作名更容易定位目标。候选名称不能代替 `describe`：单项说明才返回冻结定义的完整参数与能力声明；未知操作必须拒绝。成功的 search / describe / list 保留小型正文并附 owning session 的持久 URI/hash，供后续独立读取；它是冻结目录材料，不是原生执行或实验签名。
 
 人类在终端可使用同一安装的 CLI 发现入口：
 

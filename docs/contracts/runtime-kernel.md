@@ -246,6 +246,16 @@ RDC delegated lease 暂停父控制权，父级 rebind/clear/close 必须先 joi
 
 ### Task 执行、消息与资源生命周期
 
+计划的必需 Task 绑定和定义修订由 canonical owning planner session 提交；委派 Capsule 不取得修改所属父计划义务的权限，新增计划绑定/修订参数在委派调用中明确拒绝。委派仍可按已有 Task 子树合同组织自身范围内的工作；本扩展不宣称实现嵌套计划义务覆盖或扩大子执行权力。
+
+本次新增通用执行要求合同：Task 可声明严格类型的 `executionRequirements`（`mode: direct|subagent`、`requiredSkillIds`、`independentOfTaskIds`）。省略表示没有声明额外执行方式要求，不代表历史记录已证明独立性。`plan_artifact.requiredTaskIds` 从所属 TaskStore 读取必需工作，主进程生成可见目标、完成键、依赖与执行要求快照，纳入同一计划 Markdown 及批准 hash；不从自然语言或 metadata 猜测要求。批准绑定不能通过修改 Task、换同义 Task 或旧结果削弱；允许在原范围新增细分/补证工作，改变批准义务须走原计划修订。
+
+启动门检查当前 Task、批准快照、依赖与实际执行方式；`subagent` 必需工作拒绝父级 direct 启动。必需 Skill 必须出现在真实准备后的 PromptPlan，不能仅凭 Capsule 声明或事后 skill_read 满足。独立执行绑定不同的实际 child session、当前 execution/generation 与最小 Capsule 输入，不继承生成者历史或共享 live domain 授权。结算重复验证 runtime 产生的准备证明、结果来源和必需输出，模型不能通过结果或 metadata 自报执行证明。材料可读和实际读取范围分别验证；科学正确性与审查完整性仍由领域方法和验收判断，不从 mode、空 Challenge 或 completed 标签推断。
+
+此为向当前单一 Task/计划路径增加的可选合同，旧记录不迁移、不重写、不补造证明；取消/join、持久 root/child-local 预算、重启 interrupted 与原消费/期限规则继续生效。
+
+正常重规划使用 `plan_artifact.taskRevisions` 显式提出对同一必需 Task 的变更，携带 expectedRevision；主进程读取当前定义并生成下一修订及前一修订/hash，展示在同一计划快照中。批准前不修改 Task，批准后按同一 TaskStore 原子安装定义修订，再发布批准；活执行须先取消/join，已完成 Task 不重开。CAS 冲突不安装候选或发布批准；同一提案重试不重复增代。原 execution、root、消费及期限不修改，新执行仍从原记录继承预算。取消或持久化失败不得发布迟到批准；已获用户点击授权但尚未完成批准发布的定义变更保持不可执行，正常重提计划可恢复，不手改状态。
+
 单一 TaskStore 的 canonical 文件为 `task-state.json`（仅当前 schema）。Task 保存目标、依赖、父任务、完成要求、修订与执行关联；TaskExecution 独立保存 executionId、taskRevision、generation、父执行、运行状态、共享预算快照、结果及可选冻结计划引用。取消或修订不会让旧结果覆盖新实例。不存在全局唯一 in_progress 限制；依赖存在、无环、已满足，以及完成要求的输出键与执行终态由 TaskRegistry 校验。要求覆盖是否完整、科学结论是否成立仍由模型及领域证据合同负责。
 
 task_update(in_progress)只启动调用者自己的direct execution；Task托管的subagent在wait/background两种模式都由runner独占启动，父级不得先占用同一Task。活跃执行未结算或取消并join之前不能改成pending，也不能再次派发；错误提示保留当前归属并说明恢复边界。误启动的direct execution只能诚实结算未完成结果，重试保留历史、generation和已消费预算，不移除互斥检查或自动改派。
@@ -302,7 +312,7 @@ Small/Big Loop、Scout/Skeptic 委派和补证方向由实际加载的 Skill 与
 
 工具效果返回后发生的制品持久化失败必须与执行失败分开：整体工具回执仍标错误并给出存储错误码，明确原工具已返回成功或错误、禁止仅因落盘错误重复执行。序列化结果不超过 32 KiB 时保留完整原正文；更大正文仅保留有界事实索引，明确全文不可得。原 details 独立按 8 KiB 上限保留并显式投影是否省略，以免大正文丢失已先行写入的签名回执引用；该回执仍须独立验签。本次失败外置不生成成功的工具结果 URI/hash 或合格证据。不删除历史证据、不绕过配额；文件数容量与 Task/模型调用预算分别计量。
 
-冻结 RDC 目录的 `search` / `describe` 成功结果也经同一工具结果归档器提供 owning session 的 URI/hash；小结果仍保留内联正文。归档记录保留实际 catalog fingerprint、完整结果及 toolCallId，沿既有 owner/hash、委派引用与配额规则读取；目录材料不是原生观察或五阶段签名。持久化失败仍给错误且不生成假引用。搜索按关键词相关度保留部分匹配，`total` / `truncated` 仅表示本次候选覆盖，不能用于断言全目录没有某能力。
+冻结 RDC 目录的 `search` / `describe` / `list` 成功结果也经同一工具结果归档器提供 owning session 的 URI/hash；小结果仍保留内联正文。归档记录保留实际 catalog fingerprint、完整结果及 toolCallId，沿既有 owner/hash、委派引用与配额规则读取；目录材料不是原生观察或五阶段签名。持久化失败仍给错误且不生成假引用。搜索按关键词相关度保留部分匹配，`total` / `truncated` 仅表示本次候选覆盖，不能用于断言全目录没有某能力。`list` 以绑定 fingerprint 的游标有界分页，提供全冻结目录的 scope/effects/prerequisites 静态准入汇总及同源策略；不替代参数、路径、身份、审批和运行期检查，不授予权限，也不证明外部原生状态为空。
 
 超阈值的原生 RDC `shell` 回执保留完整 session artifact 引用和文件 hash；模型可见摘要从同一主进程校验后的结果提取四项 execution identity、原生 result kind/ok/trace。Pixel History 另投影目标、事件、历史/片元/通过/有效 shader 数量和少量通过的 primitive ID。摘要仅是可追溯的事实索引，不替代完整 payload、五阶段签名回执或领域结论；身份不一致时显式报错，不生成看似可信的正常摘要。
 

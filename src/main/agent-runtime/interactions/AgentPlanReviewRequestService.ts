@@ -8,8 +8,12 @@ import { planReviewStateStore, type PlanReviewStateStore } from '../../sessions/
 import type { TurnHandle } from '../../workflow/debugger/TurnCoordinator';
 import { writeExecutionOfferFromApproval } from '../../conversation/applyDeclaredHandoff';
 import { storageAdapter } from '../../sessions/StorageAdapter';
+import type { PlanTaskRequirement } from '@shared/types/taskExecution';
+import { TaskRegistry, createSessionTaskStore } from '../tasks';
+import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
 
 interface PendingPlanReviewRequest {
+  answering?: boolean;
   delegatedOwner?: DelegatedInteractionOwner;
   agentId: AgentRole;
   sessionId: string | null;
@@ -73,6 +77,11 @@ export class AgentPlanReviewRequestService {
   constructor(
     private readonly writer: PlanArtifactWriter = planArtifactWriter,
     private readonly store: PlanReviewStateStore = planReviewStateStore,
+    private readonly installTaskRevisions: (sessionId: string, tasks: readonly PlanTaskRequirement[], onChange: NonNullable<TaskRegistry['onTaskChange']>) => Promise<void>
+      = (sessionId, tasks, onChange) => {
+        const registry = new TaskRegistry(createSessionTaskStore(sessionId)); registry.onTaskChange = onChange;
+        return registry.installApprovedTaskRevisions(tasks);
+      },
   ) {}
 
   async request(input: AgentPlanReviewRequestInput): Promise<string> {
@@ -134,7 +143,7 @@ export class AgentPlanReviewRequestService {
     return !!pending && (pending.delegatedOwner?.ownerSessionId ?? pending.sessionId) === sessionId;
   }
 
-  answer(input: AgentPlanReviewAnswerInput): AgentPlanReviewAnswerResult {
+  async answer(input: AgentPlanReviewAnswerInput): Promise<AgentPlanReviewAnswerResult> {
     const pending = this.pending.get(keyFor(input.turnId, input.toolCallId));
     if (!pending) {
       return { success: false, error: 'No pending plan review request was found for this turn.' };
@@ -142,6 +151,7 @@ export class AgentPlanReviewRequestService {
     if ((input.sessionId ?? null) !== (pending.delegatedOwner?.ownerSessionId ?? pending.sessionId)) {
       return { success: false, error: 'Pending plan review request belongs to a different session.' };
     }
+    if (pending.answering) return { success: false, error: 'Plan review answer is already committing.' };
 
     if (input.decision.kind === 'reject') {
       const feedback = input.decision.feedback.trim();
@@ -179,7 +189,18 @@ export class AgentPlanReviewRequestService {
     if (!sessionId) {
       return { success: false, error: 'Plan review approve requires a session-owned turn.' };
     }
+    pending.answering = true;
+    try {
     const frozen = this.writer.freezeApprovedPlan(sessionId, pending.planReview.hash);
+    if (frozen.taskRequirements.length) await this.installTaskRevisions(sessionId, frozen.taskRequirements, ({ task, snapshot }) => {
+      traceProjectionRefreshService.schedule(sessionId);
+      pending.onEvent?.(buildSharedAgentEvent('task.updated', {
+        taskId: task.id, title: task.subject, status: task.status, statusReason: task.statusReason, snapshot,
+      }, pending.context));
+    });
+    if (this.pending.get(keyFor(input.turnId, input.toolCallId)) !== pending || pending.signal?.aborted) {
+      return { success: false, error: 'Plan review was cancelled while committing.' };
+    }
     const approved = this.store.markDecision(sessionId, 'approved', {
       approvedHash: frozen.hash,
       frozenUri: frozen.uri,
@@ -222,6 +243,7 @@ export class AgentPlanReviewRequestService {
     });
     pending.resolve(formatApprovedResult(input.decision.handoff, frozen.uri, frozen.hash));
     return { success: true };
+    } finally { pending.answering = false; }
   }
 
   cancelTurn(turnId?: string): void {

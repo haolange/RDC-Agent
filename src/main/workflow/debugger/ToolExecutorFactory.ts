@@ -24,6 +24,8 @@ import {
   sectionsFromMarkdown,
 } from '../../sessions/sessionPlanArtifact';
 import { planReviewStateStore } from '../../sessions/PlanReviewStateStore';
+import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../../agent-runtime/tasks';
+import { preparePlanTaskRequirements } from '../../agent-runtime/tasks/TaskExecutionRequirements';
 import { agentPermissionPolicyService } from '../../agent-runtime/permissions/AgentPermissionPolicy';
 import { agentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { isToolDeniedByPolicy } from '../../agent-runtime/permissions/PolicyCompiler';
@@ -395,7 +397,8 @@ export class ToolExecutorFactory {
                   && 'operation' in result.details && typeof result.details.operation === 'string'
                   && (result.details.operation.startsWith('rd.')
                     || result.details.operation === 'rdc_tool.tools.search'
-                    || result.details.operation === 'rdc_tool.tools.describe')),
+                    || result.details.operation === 'rdc_tool.tools.describe'
+                    || result.details.operation === 'rdc_tool.tools.list')),
               });
           return this.agentToolResultToMessage(toolCall, finalized);
         } catch (error) {
@@ -498,7 +501,18 @@ export class ToolExecutorFactory {
       }
       const turnHandle = this.deps.getActiveTurn(sessionId);
       if (turnHandle) turnHandle.approvedPlan = null;
-      const markdown = composePlanMarkdown({ title, summary, content });
+      const requiredTaskIds = args.requiredTaskIds;
+      if (getDelegatedTaskScope(sessionId) && (requiredTaskIds !== undefined || args.taskRevisions !== undefined)) {
+        throw new Error('TASK_SCOPE_DENIED: approved Task bindings and revisions belong to the owning planner session, not a delegated Capsule.');
+      }
+      if (requiredTaskIds !== undefined && (!Array.isArray(requiredTaskIds) || requiredTaskIds.length > 128
+        || requiredTaskIds.some(id => typeof id !== 'string' || !id.trim()) || new Set(requiredTaskIds).size !== requiredTaskIds.length)) {
+        throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: requiredTaskIds must be distinct existing Task ids.');
+      }
+      const registry = Array.isArray(requiredTaskIds) && requiredTaskIds.length ? new TaskRegistry(createSessionTaskStore(sessionId)) : null;
+      if (args.taskRevisions !== undefined && !registry) throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: taskRevisions requires requiredTaskIds.');
+      const taskRequirements = registry ? await preparePlanTaskRequirements(registry, requiredTaskIds as string[], args.taskRevisions) : [];
+      const markdown = composePlanMarkdown({ title, summary, content, taskRequirements });
       const written = planArtifactWriter.writeLivePlan(sessionId, markdown);
       const revision = planReviewStateStore.beginRevision(sessionId);
       const planReview = {

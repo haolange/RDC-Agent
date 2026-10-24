@@ -3,6 +3,8 @@
  */
 
 import type { AgentRole } from '@shared/types/agent';
+import { createHash } from 'node:crypto';
+import { delegatedArtifactReferences } from '../../sessions/DelegatedArtifactAccess';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { ContextUsageBreakdownEntry } from '@shared/types/session';
 import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdcRuntime';
@@ -397,6 +399,19 @@ export class AgentTurnRunner {
     let setupCleanupComplete = false;
     try {
     slotKey = agentSlotKey(executionScopeId, input.agentId);
+    const capsule = preparedRuntime.effectivePlan.delegationCapsule;
+    turnHandle.taskPreparation = {
+      sessionId: executionScopeId, turnId: turnHandle.turnId,
+      runtimeFingerprint: preparedRuntime.effectivePlan.fingerprint,
+      skills: promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => ({
+        id: segment.id.replace(/^skill:/, ''), hash: segment.sourceHash.replace(/^sha256:/, ''),
+      })),
+      inputArtifacts: delegatedArtifactReferences(executionScopeId) ?? [],
+      selectedTurnCount: typeof input.contextDiagnostic?.selectedTurnCount === 'number' ? input.contextDiagnostic.selectedTurnCount : null,
+      ...(capsule ? { capsuleHash: createHash('sha256').update(JSON.stringify(capsule)).digest('hex') } : {}),
+      requestsDomainCapability: Object.values(capsule?.domainExtensions ?? {}).some(flags => Object.values(flags).some(Boolean)),
+    };
+    await input.options?.onTaskPreparation?.(turnHandle.taskPreparation);
     const turnGeneration = turnHandle.generation;
     turnHandle.eventSink = {
       onEvent: (event) => {

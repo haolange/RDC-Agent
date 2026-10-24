@@ -1,4 +1,4 @@
-import { authorizeRdcOperation, isMainOwnedRdcIdentityKey } from './RdcOperationPolicy';
+import { authorizeRdcOperation, isMainOwnedRdcIdentityKey, rdcCapabilityPolicy, rdcOperationCapability } from './RdcOperationPolicy';
 import { operationFingerprint } from './RdcOperationCatalog';
 import { isUnchangedShaderResult, validateExecutionEvidence, verifyRollbackIdentity } from './RdcValidatedEvidence';
 import { runRdcOperation } from '../sessions/RdcOperationCoordinator';
@@ -62,6 +62,9 @@ function searchRdcDefinitions(definitions: readonly RdcOperationDefinition[], qu
 export const RdcDiscoverySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('search'), query: z.string().trim().min(1).max(200), limit: z.number().int().min(1).max(20).default(8) }).strict(),
   z.object({ kind: z.literal('describe'), operation: z.string().regex(/^rd[.][a-z_]+[.][a-z0-9_]+$/) }).strict(),
+  z.object({ kind: z.literal('list'), limit: z.number().int().min(1).max(20).default(20),
+    cursor: z.object({ offset: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), fingerprint: z.string().regex(/^[a-f0-9]{64}$/) }).strict().optional(),
+  }).strict(),
 ]);
 export const RdcShellInputSchema = z.union([
   z.object({ operation: z.string().regex(/^rd[.][a-z_]+[.][a-z0-9_]+$/), args: z.record(z.string(), z.unknown()), experimentId: z.string().trim().min(1).max(128).optional() }).strict(),
@@ -100,6 +103,24 @@ export async function executeRdcShell(
       const definition = binding.definitions.find(item => item.name === request.operation) as RdcOperationDefinition | undefined;
       if (!definition) throw new Error('RDC_EXECUTION_DENIED: unknown operation.');
       data = callableRdcDefinition(definition);
+    } else if (request.kind === 'list') {
+      if (request.cursor && request.cursor.fingerprint !== binding.definitionsFingerprint) throw new Error('RDC_DISCOVERY_CURSOR: frozen catalog fingerprint mismatch.');
+      const offset = request.cursor?.offset ?? 0;
+      const definitions = binding.definitions as readonly RdcOperationDefinition[];
+      if (offset > definitions.length) throw new Error('RDC_DISCOVERY_CURSOR: offset is outside the frozen catalog.');
+      const admitted = definitions.filter(item => rdcOperationCapability(item).available);
+      const end = Math.min(offset + request.limit, definitions.length);
+      data = {
+        total: definitions.length, offset, truncated: end < definitions.length,
+        next: end < definitions.length ? { offset: end, fingerprint: binding.definitionsFingerprint } : null,
+        policy: rdcCapabilityPolicy(),
+        capabilitySummary: { coverage: 'complete-frozen-catalog', checkedOperations: definitions.length,
+          admittedOperations: admitted.length, deniedOperations: definitions.length - admitted.length,
+          admittedEffects: [...new Set(admitted.flatMap(item => item.effects))].sort(),
+          isNativeStateObservation: false },
+        operations: definitions.slice(offset, end).map(item => ({ name: item.name, scope: item.scope,
+          effects: item.effects, evidence_kind: item.evidence_kind, capabilityAdmission: rdcOperationCapability(item) })),
+      };
     } else {
       data = searchRdcDefinitions(binding.definitions as readonly RdcOperationDefinition[], request.query, request.limit);
     }

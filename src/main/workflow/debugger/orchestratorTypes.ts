@@ -46,6 +46,8 @@ export interface AgentTurnContext {
 }
 
 export interface AgentTurnOptions {
+  /** Internal callback before model/tool effects; facts come from the prepared runtime. */
+  onTaskPreparation?: (preparation: import('@shared/types/taskExecution').TaskExecutionPreparation) => Promise<void>;
   signal?: AbortSignal;
   onChunk?: (text: string) => void;
   onEvent?: (event: SharedAgentEvent) => void;

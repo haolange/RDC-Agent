@@ -25,6 +25,7 @@ import {
 import type { StartTaskExecutionOptions } from './TaskContracts';
 import { readTaskBudgetSnapshot, type TaskLiveBudgetSnapshot } from './TaskBudgetSnapshot';
 import type { RequestUsageSnapshot } from '../prompt/RequestUsageSnapshot';
+import { TaskExecutionRequirementsSchema, TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA, type TaskExecutionRequirements } from '@shared/types/taskExecution';
 
 export interface TaskToolExecutionContext {
   startOptions?: (taskId: string) => Omit<StartTaskExecutionOptions, 'mode'> | Promise<Omit<StartTaskExecutionOptions, 'mode'>>;
@@ -68,6 +69,7 @@ interface TaskCreateItem {
   blockedBy?: string[];
   completionRequirements?: string[];
   parentTaskId?: string;
+  executionRequirements?: TaskExecutionRequirements;
 }
 
 interface TaskCreateParams {
@@ -111,6 +113,7 @@ export function createTaskCreateTool(
                 description: 'Exact keys required in result.outputs before completion, e.g. ["analysis"]. Put acceptance prose in description, not here. Every listed string must be returned verbatim as an output key.',
               },
               parentTaskId: { type: 'string', description: 'Optional parent logical Task id.' },
+              executionRequirements: TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA,
             },
             required: ['subject'],
           },
@@ -163,6 +166,7 @@ interface TaskUpdateParams {
   addBlockedBy?: string[];
   addBlocks?: string[];
   metadata?: Record<string, unknown>;
+  executionRequirements?: TaskExecutionRequirements;
   result?: { disposition: 'completed' | 'partial' | 'blocked' | 'cancelled'; summary: string; outputs: Record<string, string>; missingRequirements?: string[]; resultRef?: string; resultHash?: string };
 }
 
@@ -197,6 +201,7 @@ export function createTaskUpdateTool(
         addBlockedBy: { type: 'array', items: { type: 'string' } },
         addBlocks: { type: 'array', items: { type: 'string' } },
         metadata: { type: 'object' },
+        executionRequirements: TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA,
         result: {
           type: 'object',
           properties: {
@@ -221,6 +226,8 @@ export function createTaskUpdateTool(
       await assertTaskInScope(registry, taskId, context.scopeRootTaskId, false);
 
       const status = readEnum(params, 'status', ALLOWED_STATUS);
+      const executionRequirements = params.executionRequirements === undefined ? undefined : TaskExecutionRequirementsSchema.parse(params.executionRequirements);
+      if (executionRequirements && status && status !== 'pending') throw new Error('TASK_EXECUTION_REQUIREMENTS: revise requirements separately before starting or settling work.');
       if (params.resumeCancelled !== undefined && typeof params.resumeCancelled !== 'boolean') throw new Error('resumeCancelled must be boolean.');
       const resumeCancelled = params.resumeCancelled === true;
       if (resumeCancelled && (status !== 'in_progress' || context.scopeRootTaskId)) {
@@ -244,7 +251,7 @@ export function createTaskUpdateTool(
 
       const result = readCompletionResult(params.result);
       const hasSemanticUpdates = subject !== undefined || description !== undefined || owner !== undefined
-        || Boolean(addBlockedBy?.length) || Boolean(addBlocks?.length) || metadata !== undefined;
+        || Boolean(addBlockedBy?.length) || Boolean(addBlocks?.length) || metadata !== undefined || executionRequirements !== undefined;
       if (status && hasSemanticUpdates) throw new Error('Status transitions cannot be combined with task definition updates.');
       let updated: TaskRecord;
       if (status === 'in_progress') {
@@ -277,6 +284,7 @@ export function createTaskUpdateTool(
         addBlockedBy,
         addBlocks,
         metadata,
+        executionRequirements,
         result,
       });
 
@@ -512,6 +520,7 @@ function readTaskItems(params: object): TaskCreateItem[] {
       blockedBy: readStringArray(record, 'blockedBy'),
       completionRequirements: readStringArray(record, 'completionRequirements'),
       parentTaskId: readString(record, 'parentTaskId', false),
+      executionRequirements: record.executionRequirements === undefined ? undefined : TaskExecutionRequirementsSchema.parse(record.executionRequirements),
     };
   });
 }

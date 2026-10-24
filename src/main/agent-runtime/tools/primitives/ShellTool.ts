@@ -111,7 +111,23 @@ export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operati
         type: 'object', additionalProperties: false,
         oneOf: [{ type: 'object', required: ['operation', 'args'], properties: { operation: {}, args: {}, experimentId: {} }, additionalProperties: false }, { type: 'object', required: ['discovery'], properties: { discovery: {} }, additionalProperties: false }],
         properties: {
-          discovery: { type: 'object', additionalProperties: false, properties: { kind: { enum: ['search', 'describe'] }, query: { type: 'string', description: 'Rank frozen operation names, descriptions, and supporting catalog fields by matching search terms. Partial matches remain visible; inspect total and truncated before judging coverage. Use describe for one exact operation name.' }, limit: { type: 'integer', minimum: 1, maximum: 20 }, operation: { type: 'string' } }, required: ['kind'], oneOf: [{ type: 'object', properties: { kind: { const: 'search' }, query: {}, limit: {} }, required: ['query'], additionalProperties: false }, { type: 'object', properties: { kind: { const: 'describe' }, operation: {} }, required: ['operation'], additionalProperties: false }] },
+          discovery: {
+            type: 'object', additionalProperties: false, required: ['kind'],
+            properties: {
+              kind: { enum: ['search', 'describe', 'list'] },
+              query: { type: 'string', description: 'Rank frozen operation names, descriptions, and supporting fields. Search may be truncated. Use list for complete frozen capability coverage and describe for one operation contract.' },
+              limit: { type: 'integer', minimum: 1, maximum: 20 }, operation: { type: 'string' },
+              cursor: { type: 'object', additionalProperties: false, required: ['offset', 'fingerprint'], properties: {
+                offset: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+                fingerprint: { type: 'string', pattern: '^[a-f0-9]{64}$' },
+              } },
+            },
+            oneOf: [
+              { type: 'object', properties: { kind: { const: 'search' }, query: {}, limit: {} }, required: ['query'], additionalProperties: false },
+              { type: 'object', properties: { kind: { const: 'describe' }, operation: {} }, required: ['operation'], additionalProperties: false },
+              { type: 'object', properties: { kind: { const: 'list' }, cursor: {}, limit: {} }, additionalProperties: false },
+            ],
+          },
           operation: { type: 'string', description: 'Discovered RDC operation allowed by its frozen capability contract. General only.' },
           args: { type: 'object', description: 'Native operation arguments. Omit session_id, capture_file_id, context_id, and other replay identity fields even when a native catalog schema lists them as required; main injects the owning identity and rejects overrides.' },
           experimentId: { type: 'string', description: 'Bind a signed execution receipt to this experiment. Required for investigation closure.' },

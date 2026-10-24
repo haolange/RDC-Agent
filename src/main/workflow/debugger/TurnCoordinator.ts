@@ -243,6 +243,7 @@ export class TurnHandle {
   readonly policyBudget: PolicyBudgetState;
   /** Frozen runtime authority installed before any tool can execute. */
   runtimePlan: EffectiveRuntimePlan | null = null;
+  taskPreparation: import('@shared/types/taskExecution').TaskExecutionPreparation | null = null;
   /** Structured model-declared completion, populated only by turn_complete. */
   completionDeclaration: TurnCompletionDeclaration | null = null;
 

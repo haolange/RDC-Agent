@@ -11,6 +11,25 @@ const identityKey = /^(session_?id|context_?id|daemon_?context|target_?context_?
 export const isMainOwnedRdcIdentityKey = (key: string): boolean => identityKey.test(key);
 function denied(message: string): never { throw new Error('RDC_EXECUTION_DENIED: ' + message); }
 
+/** A conservative capability boundary, not argument/path/approval authorization. */
+export function rdcOperationCapability(definition: RdcOperationDefinition | undefined): { available: boolean; reason: string | null } {
+  if (!definition || !scopes.has(definition.scope) || !Array.isArray(definition.effects)
+    || definition.effects.some(effect => !allowedEffects.has(effect))) {
+    return { available: false, reason: 'operation capability is unavailable to General' };
+  }
+  if (!Array.isArray(definition.prerequisites) || definition.prerequisites.some((item: unknown) => !item || typeof item !== 'object'
+    || !((item as { requires?: unknown }).requires === 'session_id' && (definition.scope === 'replay' || definition.scope === 'context'))
+    && !((item as { requires?: unknown }).requires === 'capture_file_id' && definition.scope === 'capture'))) {
+    return { available: false, reason: 'unknown prerequisite' };
+  }
+  return { available: true, reason: null };
+}
+
+export function rdcCapabilityPolicy() {
+  return { source: 'main-operation-policy', scope: 'scope-effects-prerequisites-only',
+    allowedScopes: [...scopes], allowedEffects: [...allowedEffects], argumentChecksStillRequired: true, isAuthorization: false };
+}
+
 export function validateRdcArguments(value: unknown, schema: Record<string, unknown>, location = 'args'): void {
   const satisfies = (candidate: unknown): boolean => {
     if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) denied('invalid argument constraint');
@@ -51,8 +70,9 @@ export function authorizeRdcOperation(operation: string, input: Record<string, u
   const binding = context.rdcBinding;
   if (!binding || operationFingerprint(binding.definitions) !== binding.definitionsFingerprint) denied('frozen catalog fingerprint is invalid');
   const definition = binding.definitions.find(item => item.name === operation) as RdcOperationDefinition | undefined;
-  if (!definition || !scopes.has(definition.scope) || !Array.isArray(definition.effects) || definition.effects.some(effect => !allowedEffects.has(effect))) denied('operation capability is unavailable to General');
-  if (!Array.isArray(definition.prerequisites) || definition.prerequisites.some((item: unknown) => !item || typeof item !== 'object' || !((item as { requires?: unknown }).requires === 'session_id' && (definition.scope === 'replay' || definition.scope === 'context')) && !((item as { requires?: unknown }).requires === 'capture_file_id' && definition.scope === 'capture'))) denied('unknown prerequisite');
+  if (!definition) denied('operation capability is unavailable to General');
+  const capability = rdcOperationCapability(definition);
+  if (!capability.available) denied(capability.reason!);
   rejectIdentityOverrides(input);
   const args = structuredClone(input);
   if (definition.scope === 'replay') args.session_id = replaySessionId;

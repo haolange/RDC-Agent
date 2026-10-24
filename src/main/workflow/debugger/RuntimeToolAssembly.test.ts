@@ -386,6 +386,14 @@ describe('RuntimeToolAssembly', () => {
     expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('"captureContentSha256": null') });
   });
 
+  it('validates plan Task obligations through the actual strict tool schema', () => {
+    const tool = createAssembly().createPlanArtifactTool('sess-1');
+    const input = { title: 'Plan', summary: ['Work'], content: '## Work\nRead material.', requiredTaskIds: ['analysis'],
+      taskRevisions: [{ taskId: 'analysis', expectedRevision: 1, executionRequirements: { mode: 'subagent', requiredSkillIds: ['shader-ir-analysis'] } }] };
+    expect(toolValidator.validate(toolToDefinition(tool), input)).toEqual(input);
+    expect(() => toolValidator.validate(toolToDefinition(tool), { ...input, taskRevisions: [{ taskId: 'analysis', expectedRevision: 0 }] })).toThrow();
+  });
+
   it('createPlanArtifactTool is a fail-closed stub', async () => {
     const assembly = createAssembly();
     const tool = assembly.createPlanArtifactTool('sess-1');

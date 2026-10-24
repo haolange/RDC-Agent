@@ -2,6 +2,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { orderTasks } from './taskProjection';
+import { TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, TaskIndependentSourceSchema, type PlanTaskRequirement } from '@shared/types/taskExecution';
 import {
   TASK_SCHEMA_VERSION,
   type TaskExecutionMessage,
@@ -27,6 +28,7 @@ export interface TaskStoreCommit {
 }
 
 export interface TaskStore {
+  readApprovedRequirements?: () => Promise<PlanTaskRequirement[]>;
   loadTask(id: string): Promise<TaskRecord | null>;
   saveTask(task: TaskRecord): Promise<void>;
   listTasks(): Promise<TaskRecord[]>;
@@ -49,7 +51,7 @@ export class FileTaskStore implements TaskStore {
   private readonly root: string;
   private readonly statePath: string;
 
-  constructor(tasksDir: string) {
+  constructor(tasksDir: string, readonly readApprovedRequirements?: () => Promise<PlanTaskRequirement[]>) {
     this.root = path.resolve(tasksDir);
     this.statePath = path.join(this.root, 'task-state.json');
   }
@@ -256,6 +258,11 @@ function validateState(state: TaskStateDocument): void {
     }
   }
   for (const [id, task] of Object.entries(state.tasks)) {
+    if (task.executionRequirements !== undefined) {
+      TaskExecutionRequirementsSchema.parse(task.executionRequirements);
+      if (task.executionRequired !== true) throw new Error(`Malformed constrained task without execution: ${id}.`);
+      if (!Array.isArray(task.executionRequirements.requiredSkillIds) || !Array.isArray(task.executionRequirements.independentOfTaskIds)) throw new Error(`Malformed canonical task requirements: ${id}.`);
+    }
     if (task.schemaVersion !== TASK_SCHEMA_VERSION || task.id !== id || typeof task.subject !== 'string'
       || !Array.isArray(task.blockedBy) || !Array.isArray(task.blocks) || !Array.isArray(task.executionIds)
       || !Array.isArray(task.completionRequirements) || typeof task.revision !== 'number'
@@ -276,6 +283,11 @@ function validateState(state: TaskStateDocument): void {
     if (task.currentExecutionId && state.executions[task.currentExecutionId]?.taskId !== id) throw new Error(`Task ${id} references an invalid current execution.`);
   }
   for (const [id, execution] of Object.entries(state.executions)) {
+    if (execution.preparation !== undefined) TaskExecutionPreparationSchema.parse(execution.preparation);
+    if (execution.independentSources !== undefined) {
+      if (!Array.isArray(execution.independentSources)) throw new Error(`Malformed independent source binding: ${id}.`);
+      execution.independentSources.forEach(source => TaskIndependentSourceSchema.parse(source));
+    }
     const owner = state.tasks[execution.taskId];
     if (execution.schemaVersion !== TASK_SCHEMA_VERSION || execution.id !== id || !owner
       || !owner.executionIds.includes(id) || !Number.isInteger(execution.generation) || execution.generation < 1

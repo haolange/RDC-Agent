@@ -25,6 +25,7 @@ import { AgentPlanReviewRequestService } from './AgentPlanReviewRequestService';
 import type { PlanArtifactWriter } from '../../sessions/sessionPlanArtifact';
 import type { PlanReviewStateStore } from '../../sessions/PlanReviewStateStore';
 import type { TurnHandle } from '../../workflow/debugger/TurnCoordinator';
+import type { PlanTaskRequirement } from '@shared/types/taskExecution';
 
 const planReview: ConversationPlanReview = {
   planId: 'plan-1',
@@ -49,7 +50,7 @@ describe('AgentPlanReviewRequestService', () => {
       planReview,
       context: { runId: 'run', turnId: 'turn-1', sessionId: 'sess', agentId: 'debugger' },
     });
-    expect(service.answer({
+    expect(await service.answer({
       sessionId: 'sess',
       turnId: 'turn-1',
       toolCallId: 'call-1',
@@ -58,16 +59,16 @@ describe('AgentPlanReviewRequestService', () => {
     expect(service.isPending('sess', 'turn-1', 'call-1')).toBe(true);
     service.cancelTurn('turn-1');
     await expect(pending).rejects.toThrow(/cancelled/);
-    expect(service.answer({ sessionId: 'sess', turnId: 'turn-1', toolCallId: 'call-1',
+    expect((await service.answer({ sessionId: 'sess', turnId: 'turn-1', toolCallId: 'call-1',
       decision: { kind: 'approve', handoff: planReview.handoffOptions[0] },
-    }).success).toBe(false);
+    })).success).toBe(false);
   });
 
   it('approves by freezing the plan and recording the handoff target', async () => {
     const events: SharedAgentEvent[] = [];
     const turnHandle = { approvedPlan: null } as TurnHandle;
     const writer = {
-      freezeApprovedPlan: () => ({ uri: 'session://plans/plan-frozen.md', hash: 'b'.repeat(64) }),
+      freezeApprovedPlan: () => ({ uri: 'session://plans/plan-frozen.md', hash: 'b'.repeat(64), taskRequirements: [] }),
     } as unknown as PlanArtifactWriter;
     const store = {
       markDecision: () => ({ status: 'approved', updatedAt: 1234 }),
@@ -83,14 +84,14 @@ describe('AgentPlanReviewRequestService', () => {
       context: { runId: 'run', turnId: 'turn-2', sessionId: 'sess', agentId: 'debugger' },
       onEvent: (event) => events.push(event),
     });
-    expect(service.answer({ sessionId: 'other-owner', turnId: 'turn-2', toolCallId: 'call-2',
+    expect((await service.answer({ sessionId: 'other-owner', turnId: 'turn-2', toolCallId: 'call-2',
       decision: { kind: 'approve', handoff: planReview.handoffOptions[0] },
-    }).success).toBe(false);
-    expect(service.answer({ sessionId: 'sess', turnId: 'turn-2', toolCallId: 'call-2',
+    })).success).toBe(false);
+    expect((await service.answer({ sessionId: 'sess', turnId: 'turn-2', toolCallId: 'call-2',
       decision: { kind: 'approve', handoff: { label: 'wrong', agent: 'optimizer' } },
-    }).success).toBe(false);
+    })).success).toBe(false);
     expect(turnHandle.approvedPlan).toBeNull();
-    expect(service.answer({
+    expect(await service.answer({
       sessionId: 'sess',
       turnId: 'turn-2',
       toolCallId: 'call-2',
@@ -104,24 +105,57 @@ describe('AgentPlanReviewRequestService', () => {
       planId: 'plan-1',
     });
     expect(events[1]?.payload).toMatchObject({ kind: 'plan_review', status: 'approved' });
-    expect(service.answer({ sessionId: 'sess', turnId: 'turn-2', toolCallId: 'call-2',
+    expect((await service.answer({ sessionId: 'sess', turnId: 'turn-2', toolCallId: 'call-2',
       decision: { kind: 'approve', handoff: planReview.handoffOptions[0] },
-    }).success).toBe(false);
+    })).success).toBe(false);
     expect(events).toHaveLength(2);
   });
 });
 
 it.each(['freeze', 'persist'])('does not publish authority when %s fails', async failure => {
   const turnHandle = { approvedPlan: null } as TurnHandle;
-  const writer = { freezeApprovedPlan: () => { if (failure === 'freeze') throw new Error('disk failure'); return { uri: 'session://plans/plan-frozen.md', hash: 'a'.repeat(64) }; } } as unknown as PlanArtifactWriter;
+  const writer = { freezeApprovedPlan: () => { if (failure === 'freeze') throw new Error('disk failure'); return { uri: 'session://plans/plan-frozen.md', hash: 'a'.repeat(64), taskRequirements: [] }; } } as unknown as PlanArtifactWriter;
   const store = { markDecision: () => { throw new Error('disk failure'); } } as unknown as PlanReviewStateStore;
   const service = new AgentPlanReviewRequestService(writer, store);
   const onEvent = vi.fn();
   const pending = service.request({ agentId: 'debugger', sessionId: 'sess', turnId: 'turn', toolCallId: 'call', planReview, turnHandle, onEvent, context: { runId: 'run', turnId: 'turn', sessionId: 'sess', agentId: 'debugger' } });
-  expect(() => service.answer({ sessionId: 'sess', turnId: 'turn', toolCallId: 'call', decision: { kind: 'approve', handoff: planReview.handoffOptions[0] } })).toThrow('disk failure');
+  await expect(service.answer({ sessionId: 'sess', turnId: 'turn', toolCallId: 'call', decision: { kind: 'approve', handoff: planReview.handoffOptions[0] } })).rejects.toThrow('disk failure');
   expect(turnHandle.approvedPlan).toBeNull();
   expect(service.isPending('sess', 'turn', 'call')).toBe(true);
   expect(onEvent).toHaveBeenCalledTimes(1);
   service.cancelTurn('turn');
   await expect(pending).rejects.toThrow(/cancelled/);
+});
+
+it.each(['finish', 'cancel', 'fail'])('joins the approved Task installation before publishing approval (%s)', async action => {
+  let finish!: () => void;
+  const held = new Promise<void>(resolve => { finish = resolve; });
+  const task: PlanTaskRequirement = { taskId: 'task', revision: 2, replacesRevision: 1, previousRequirementHash: 'a'.repeat(64), subject: 'Work', description: '', completionRequirements: ['result'], blockedBy: [] };
+  const writer = { freezeApprovedPlan: () => ({ uri: 'session://plans/frozen.md', hash: 'b'.repeat(64), taskRequirements: [task] }) } as unknown as PlanArtifactWriter;
+  const markDecision = vi.fn(() => ({ updatedAt: 1234 }));
+  const store = { markDecision } as unknown as PlanReviewStateStore;
+  const install = vi.fn(async () => { await held; if (action === 'fail') throw new Error('TASK_PLAN_REVISION_CONFLICT'); });
+  const service = new AgentPlanReviewRequestService(writer, store, install);
+  const turnHandle = { approvedPlan: null } as TurnHandle;
+  const pending = service.request({ agentId: 'debugger', sessionId: 'sess', turnId: 'turn', toolCallId: 'call', planReview, turnHandle, context: { sessionId: 'sess', turnId: 'turn', agentId: 'debugger' } });
+  const pendingRejection = action === 'cancel' ? expect(pending).rejects.toThrow('cancelled') : undefined;
+  const input = { sessionId: 'sess', turnId: 'turn', toolCallId: 'call', decision: { kind: 'approve' as const, handoff: planReview.handoffOptions[0] } };
+  const first = service.answer(input);
+  expect(markDecision).not.toHaveBeenCalled();
+  expect(turnHandle.approvedPlan).toBeNull();
+  expect(await service.answer(input)).toEqual({ success: false, error: 'Plan review answer is already committing.' });
+  if (action === 'cancel') service.cancelTurn('turn');
+  finish();
+  if (action === 'fail') {
+    await expect(first).rejects.toThrow('TASK_PLAN_REVISION_CONFLICT');
+    expect(markDecision).not.toHaveBeenCalled();
+    service.cancelTurn('turn'); await expect(pending).rejects.toThrow('cancelled');
+  } else if (action === 'cancel') {
+    expect((await first).success).toBe(false); await pendingRejection;
+    expect(markDecision).not.toHaveBeenCalled();
+  } else {
+    expect(await first).toEqual({ success: true });
+    expect(markDecision).toHaveBeenCalledOnce();
+    await expect(pending).resolves.toContain('approved');
+  }
 });

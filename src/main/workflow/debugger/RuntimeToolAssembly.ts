@@ -3,6 +3,7 @@
  */
 
 import type { AgentRole } from '@shared/types/agent';
+import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from '@shared/types/taskExecution';
 import path from 'node:path';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
@@ -253,7 +254,7 @@ export class RuntimeToolAssembly {
   }
 
   createPlanArtifactTool(sessionId?: string | null): AgentTool<
-    { title?: string; summary?: string[]; content?: string },
+    { title?: string; summary?: string[]; content?: string; requiredTaskIds?: string[]; taskRevisions?: unknown[] },
     { sessionId: string | null }
   > {
     return {
@@ -273,6 +274,15 @@ export class RuntimeToolAssembly {
             description: 'One to four concise summary lines. Do not put the full plan here.',
           },
           content: { type: 'string', description: 'Markdown plan body. Use ## headings for sections.' },
+          requiredTaskIds: { type: 'array', maxItems: 128, items: { type: 'string', minLength: 1 }, description: 'Existing owning-session Tasks required by this plan; canonical owner planner only, not delegated Capsules. Main freezes goals, output keys, dependencies and executionRequirements into the reviewed hash. Bind mandatory direct, isolated-analysis and independent-review work. Later in-scope detail Tasks remain possible; do not place task contracts in Markdown or metadata.' },
+          taskRevisions: { type: 'array', maxItems: 128, description: 'Explicit proposed changes to existing required Tasks, installed only after user approval. Preserve history, consumed budgets and deadlines; stop/join active work first. Completed Tasks cannot reopen.', items: {
+            type: 'object', additionalProperties: false, required: ['taskId', 'expectedRevision'], properties: {
+              taskId: { type: 'string' }, expectedRevision: { type: 'integer', minimum: 1 },
+              subject: { type: 'string', minLength: 1 }, description: { type: 'string' },
+              completionRequirements: { type: 'array', items: { type: 'string', minLength: 1 }, maxItems: 64 },
+              executionRequirements: TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA,
+            },
+          } },
         },
       },
       permissionHint: 'session_mutation',
@@ -614,6 +624,9 @@ export class RuntimeToolAssembly {
         }
       }
       const scope = sessionId ? getDelegatedTaskScope(sessionId) : null;
+      if (sessionId && !scope && declaration.disposition === 'completed') {
+        await new TaskRegistry(createSessionTaskStore(sessionId)).assertApprovedTasksCompleted();
+      }
       if (scope && declaration.disposition === 'completed') {
         const task = await new TaskRegistry(createSessionTaskStore(scope.ownerSessionId)).getTask(scope.rootTaskId);
         if (!task) throw new Error('TASK_NOT_FOUND: cannot declare completion without the owning Task.');

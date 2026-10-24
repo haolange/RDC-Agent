@@ -41,7 +41,7 @@ RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`�
 
 真实进程连续性使用同一受控 CLI 的 `rd.session.get_context.data.process_identity` 和每次 canonical 结果的 `meta.process_identity`。Tool 仅在实际 daemon child 中读取自身与父 daemon 的 OS 进程出生标识，分别返回 `pid + start_generation`；Windows 为进程创建 FILETIME，Linux 为 boot ID 与进程启动 tick。父身份不符、读取失败或平台不支持时明确 unavailable，不用持久逻辑 ID、缓存或零值替代。每个实验阶段须比较完整 daemon/worker 身份，PID 复用或任一世代变化使连续性失效；该字段进入既有主进程签名结果，不自动证明因果、恢复或设备呈现，不增加生命周期权限。
 
-状态控制的实现语义随共享 CLI 方法分发，不能要求每次 capture 调查访问上游源码仓库。RDC-Tool 的 shader 编辑、活动 patch 枚举和撤销共用 PatchEngine 的 session 活动集合；元数据是同一集合的投影，`shaderReplacement` / `patchStack` 不代表两个独立变更接口。对照权威实现为上游 `rdc_tool/server_runtime.py` 的 `_list_replacement_payloads` / `_store_replacement_payload` 及 shader dispatch、`rdc_tool/core/patch_engine.py` 的 `list_patches`；这些位置用于工程核对，不是用户运行前提。实际三状态枚举、冻结身份和五阶段签名仍必需。数据写入控制只在完整冻结目录和有效权限确实没有该可达路径时限定为不适用；关键词空搜索、未知效果或查询失败不能证明无状态，也不能声明外部修改不存在。工具安装语义与方法合同冲突时保存实际反证，回到所属计划或工程修复，不放宽安全门。
+状态控制的实现语义随共享 CLI 方法分发，不能要求每次 capture 调查访问上游源码仓库。RDC-Tool 的 shader 编辑、活动 patch 枚举和撤销共用 PatchEngine 的 session 活动集合；元数据是同一集合的投影，`shaderReplacement` / `patchStack` 不代表两个独立变更接口。对照权威实现为上游 `rdc_tool/server_runtime.py` 的 `_list_replacement_payloads` / `_store_replacement_payload` 及 shader dispatch、`rdc_tool/core/patch_engine.py` 的 `list_patches`；这些位置用于工程核对，不是用户运行前提。实际三状态枚举、冻结身份和五阶段签名仍必需。数据写入控制只在完整冻结目录和有效权限确实没有该可达路径时限定为不适用；关键词空搜索、未知效果或查询失败不能证明无状态，也不能声明外部修改不存在。`shell.rdc.discovery.list` 从同一冻结定义有界分页，游标绑定目录指纹，提供完整静态准入汇总及同源 scope/effects/prerequisites 策略；参数、路径、身份、审批和运行期检查仍由既有执行路径完成。目录汇总不授予权限，也不是 live 原生状态观察。工具安装语义与方法合同冲突时保存实际反证，回到所属计划或工程修复，不放宽安全门。
 
 - `.agent.md` 是 Agent Profile 的唯一来源，使用 YAML frontmatter + Markdown。
 - Skill 使用 `<skill-id>/SKILL.md` 与可选的 `scripts/`、`references/`、`assets/`。
