@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createKnowledgeTools } from './KnowledgeTools';
@@ -110,6 +110,44 @@ describe('KnowledgeTools', () => {
       images: [{ relativePath: 'cases/sample/observed.png', role: 'observed' }],
     });
   });
+
+  it('returns directly usable image arguments only inside the frozen Knowledge read scope', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'rdc-knowledge-image-ref-'));
+    const knowledge = path.join(root, 'knowledge'); mkdirSync(knowledge);
+    const imagePath = path.join(knowledge, 'reference.png'); writeFileSync(imagePath, 'small image fixture');
+    const { byName, query } = createTools(createDisposableCandidateService(path.join(root, 'candidates')));
+    vi.mocked(query.listSpaces).mockReturnValue([{ spaceId: 'user', kind: 'user', label: 'User', rootPath: knowledge }]);
+    vi.mocked(query.getCard).mockResolvedValue({ ...card, content: card.body,
+      images: [{ relativePath: 'reference.png', role: 'reference' }] });
+    const context = { workspaceRoot: root, projectRootPath: root, projectId: 'p', sessionId: 's', knowledgeReadRoots: [knowledge] };
+    try {
+      const result = await byName.knowledge_read.execute('image-ref', { spaceId: 'user', relativePath: card.relativePath }, undefined, undefined, context);
+      expect(result.details).toMatchObject({ images: [{ relativePath: 'reference.png', role: 'reference', readImageArgs: { path: imagePath } }] });
+      expect(result.content[0]).toMatchObject({ text: expect.stringContaining(JSON.stringify({ path: imagePath })) });
+      const denied = await byName.knowledge_read.execute('no-image-scope', { spaceId: 'user', relativePath: card.relativePath },
+        undefined, undefined, { ...context, knowledgeReadRoots: [] });
+      expect(denied.details).toMatchObject({ images: [{ readError: 'KNOWLEDGE_IMAGE_READ_SCOPE_UNAVAILABLE' }] });
+      expect(JSON.stringify(denied)).not.toContain(imagePath.replace(/\\/g, '\\\\'));
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it.each(['missing.png', '../private.png', 'linked/private.png', 'absolute'])(
+    'does not emit image read arguments for an invalid declared path: %s', async (declared) => {
+      const root = mkdtempSync(path.join(tmpdir(), 'rdc-knowledge-image-boundary-'));
+      const knowledge = path.join(root, 'knowledge'), outside = path.join(root, 'outside');
+      mkdirSync(knowledge); mkdirSync(outside); writeFileSync(path.join(outside, 'private.png'), 'private fixture');
+      symlinkSync(outside, path.join(knowledge, 'linked'), 'junction');
+      const { byName, query } = createTools(createDisposableCandidateService(path.join(root, 'candidates')));
+      vi.mocked(query.listSpaces).mockReturnValue([{ spaceId: 'user', kind: 'user', label: 'User', rootPath: knowledge }]);
+      vi.mocked(query.getCard).mockResolvedValue({ ...card, content: card.body,
+        images: [{ relativePath: declared === 'absolute' ? path.join(outside, 'private.png') : declared, role: 'reference' }] });
+      try {
+        const result = await byName.knowledge_read.execute('invalid-image', { spaceId: 'user', relativePath: card.relativePath },
+          undefined, undefined, { workspaceRoot: root, projectRootPath: root, projectId: 'p', sessionId: 's', knowledgeReadRoots: [knowledge] });
+        expect(result.details).toMatchObject({ images: [{ readError: 'KNOWLEDGE_IMAGE_PATH_UNAVAILABLE' }] });
+        expect(JSON.stringify(result)).not.toContain('readImageArgs');
+      } finally { rmSync(root, { recursive: true, force: true }); }
+    });
 
   it('creates a session candidate only after explicit intent and never as verified/promoted', async () => {
     const candidates = createDisposableCandidateService(mkdtempSync(path.join(tmpdir(), 'rdc-knowledge-tools-')));

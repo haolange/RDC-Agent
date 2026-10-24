@@ -236,6 +236,8 @@ Confidence 与 Verification **分离**，禁止用单个 `0.92` 代替二者。
 
 旧 patch 状态下的 timing **不得**当 baseline。未持有 exclusive lock 的 mutate 使后续 Evidence `stale` 或 World State `polluted`。
 
+变体原文必须在变体有效时采集，记录资格则在真实恢复证明闭合后评定。`S-RDC-01` 对有修改的 WorldState 要求 exclusiveLock 与所绑定实验的真实恢复证明同时成立，不能仅凭排他字段将其标为 valid。计划锚保留稳定 `worldStateId`；恢复状态及验证 Evidence 登记后，正式更新原实验的五阶段与恢复结果，再以 `supersedes` 更新该实验绑定的变体锚，最后登记依赖它的 Evidence。此顺序不接受画质或因果结论，也不允许恢复后重建历史观察；返回的 polluted/stale 必须保留并处理，不直接改记录或放宽不变量。
+
 ### 8.3 `EvidenceRecord`
 
 | 字段 | 合同 |
@@ -331,6 +333,10 @@ Shader Replace 事务：Clean Baseline → Begin Experiment → Apply Patch → 
 | `resolutionClaimId` | 条件 | `status == resolved` 时必填，可解引用 `ClaimRecord` |
 
 Skeptic 的输入应是 Claim / Evidence / Experiment / Negative / Alternative / Scope / Unknown，而不是 Generator 长叙事。
+
+独立审查的时点与范围服从获批目标：实验型目标在实际区分实验、变体采证与恢复形成交付材料后审查，竞争假设的建立本身不自动触发交付审查。提前的方法审查是局部审查，须在原预算内保留后续实验及其独立审查，不刷新同义任务额度。Challenge 限制其目标及依赖结论；未解释的数值或机制不自动成为所有区分实验的前置。实际对象绑定、受限修改、状态控制、权限、恢复和预算仍为硬条件，最终接受前仍须处理相应开放 Challenge。
+
+局部主张的诚实收窄不取消 Plan 的必要画质目标。交付审查须覆盖该目标的有限区域核查，包括代表性暗部、发丝/表面结构、合理高光和控制区；存在具体观察缺口时继续计划内补证，不能通过排除该要求使“局部无 Challenge”等同完成。定性核查不要求证明所有像素无损、完整材质模型或生产部署正确，也不能以非零像素或单纯变暗代替质量判断。需要区域原生读数的观察应在变体有效时采集并保留条件；真实缺口、实际失败和预算均保留，不补造历史或刷新同义任务。
 
 ### 8.7 `MissionCheckpoint`
 

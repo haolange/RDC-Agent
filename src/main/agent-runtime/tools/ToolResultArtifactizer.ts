@@ -168,7 +168,7 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
       const written = storeToolImage(resolver, ownerSessionId, childPrefix, extension, block.mimeType, bytes);
       if (written.created) createdImages.push({ uri: written.uri, hash: written.hash });
       imageReferences.push({ uri: written.uri, hash: written.hash });
-      return { type: 'image', ref: written.uri, hash: written.hash, mimeType: block.mimeType, bytes: bytes.length };
+      return { type: 'image' as const, ref: written.uri, hash: written.hash, mimeType: block.mimeType, bytes: bytes.length };
     });
     const { envelope, record } = serializeEnvelope(ownerSessionId, input.toolName, input.toolCallId || toolCallId, result, storedContent);
     const written = resolver.write(ownerSessionId, uri, Buffer.from(envelope, 'utf8'), { mimeType });
@@ -189,6 +189,14 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
     }
     const summary = summarizer.trySummarize(input.toolName, result, 400)
       ?? `[${input.toolName}] ${record.size} bytes stored`;
+    const textReads = storedContent.flatMap((block, index) => block.type === 'text' && block.text
+      ? [{ uri: written.uri, expectedHash: written.hash, textPointer: `/content/${index}/text` }]
+      : []).slice(0, 8);
+    const textReadHint = textReads.length
+      ? '\nDecoded tool text: call artifact_read with one of the following exact selections, then follow its next cursor. '
+        + 'These select returned text blocks, not omitted source-file ranges or domain validation.\n'
+        + textReads.map(selection => JSON.stringify(selection)).join('\n')
+      : '';
     // Offload large text and evidence payloads, but keep native image blocks in
     // the model result. ContextManager bridges them into the next vision input;
     // replacing them with a URI would make read_image look successful while the
@@ -197,7 +205,7 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
     return {
       isError: result.isError,
       content: [
-        { type: 'text', text: `${summary}\nref: ${written.uri}\nhash: ${written.hash}${imageEvidenceText}` },
+        { type: 'text', text: `${summary}\nref: ${written.uri}\nhash: ${written.hash}${textReadHint}${imageEvidenceText}` },
         ...imageBlocks,
       ],
       details: {

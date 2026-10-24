@@ -248,6 +248,26 @@ describe('ToolExecutorFactory', () => {
     } finally { pin.mockRestore(); }
   });
 
+  it('pins main-owned context controls as durable evidence without offloading their small inline result', async () => {
+    const original = { content: [{ type: 'text' as const, text: JSON.stringify({ hostControls: {
+      replayIsolation: { available: true, scope: 'rdc-agent-context', exclusive: true } } }) }], details: { available: true } };
+    const execute = vi.fn(async () => original);
+    const pin = vi.spyOn(toolResultArtifacts, 'artifactizeToolResult').mockImplementation(input => input.result);
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker, getActiveTurn: () => null,
+      resolveRuntimeTools: () => ({ toolMap: new Map([['rdc_context', { name: 'rdc_context', description: 'owning context',
+        parameters: { type: 'object', properties: {} }, execute }]]), definitions: [], deferredDefinitions: [] }),
+      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+    });
+    try {
+      const result = await factory.createToolExecutor('general', ['rdc_context'], 'context-evidence', {
+        effectivePlan: { toolAllowlist: ['rdc_context'], skillIntersection: null, activatedDeferredTools: [] } as never,
+      }).execute({ type: 'toolCall', id: 'owner-proof', name: 'rdc_context', arguments: {} });
+      expect(result.content).toEqual(original.content);
+      expect(pin).toHaveBeenCalledWith(expect.objectContaining({ toolName: 'rdc_context', result: original, pinBelowThreshold: true }));
+    } finally { pin.mockRestore(); }
+  });
   it('keeps ordinary small shell stdout inline without adding catalog evidence', async () => {
     const original = { content: [{ type: 'text' as const, text: 'bounded output' }], details: { exitCode: 0 } };
     const execute = vi.fn(async () => original);
@@ -827,12 +847,14 @@ describe('ToolExecutorFactory', () => {
   it('injects knowledgeReadRoots only for the four read-only file tools', async () => {
     const knowledgeRoot = 'D:/Users/me/.rdc-agent/knowledge';
     const seen = new Map<string, readonly string[] | undefined>();
+    const metadataRoots = new Map<string, readonly string[] | undefined>();
     const makeTool = (name: string) => ({
       name,
       description: name,
       parameters: { type: 'object', properties: {} },
-      execute: vi.fn(async (_id: string, _args: unknown, _signal?: AbortSignal, _onUpdate?: unknown, context?: { temporaryAllowedPathRoots?: readonly string[] }) => {
+      execute: vi.fn(async (_id: string, _args: unknown, _signal?: AbortSignal, _onUpdate?: unknown, context?: { temporaryAllowedPathRoots?: readonly string[]; knowledgeReadRoots?: readonly string[] }) => {
         seen.set(name, context?.temporaryAllowedPathRoots);
+        metadataRoots.set(name, context?.knowledgeReadRoots);
         return { content: [{ type: 'text' as const, text: 'ok' }] };
       }),
     });
@@ -846,6 +868,7 @@ describe('ToolExecutorFactory', () => {
       'delete_file',
       'shell',
       'code_interpreter',
+      'knowledge_read',
     ].map((name) => [name, makeTool(name)] as const);
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
@@ -859,11 +882,12 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => true,
     });
-    const executor = factory.createToolExecutor('ask', tools.map(([name]) => name), null, {
+    const executor = factory.createToolExecutor('general', tools.map(([name]) => name), null, {
       effectivePlan: {
         toolAllowlist: tools.map(([name]) => name),
         skillIntersection: null,
         knowledgeReadRoots: [knowledgeRoot],
+        activatedDeferredTools: ['knowledge_read'],
         permissionSettings: {
           mode: 'default',
           readableRoots: [],
@@ -877,18 +901,24 @@ describe('ToolExecutorFactory', () => {
       } as never,
     });
     for (const [name] of tools) {
-      await executor.execute({
+      const result = await executor.execute({
         type: 'toolCall',
         id: `tc-${name}`,
         name,
-        arguments: name === 'shell' ? { command: 'echo ok' } : { path: 'a.txt' },
+        arguments: name === 'shell' ? { command: 'echo ok' }
+          : name === 'knowledge_read' ? { spaceId: 'user', relativePath: 'facts/a.md' } : { path: 'a.txt' },
       });
+      if (name === 'knowledge_read') expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
     }
     for (const name of ['read_file', 'read_image', 'glob', 'grep']) {
       expect(seen.get(name)).toContain(knowledgeRoot);
     }
-    for (const name of ['write_file', 'edit_file', 'delete_file', 'shell', 'code_interpreter']) {
+    for (const name of ['write_file', 'edit_file', 'delete_file', 'shell', 'code_interpreter', 'knowledge_read']) {
       expect(seen.get(name) ?? []).not.toContain(knowledgeRoot);
+    }
+    expect(metadataRoots.get('knowledge_read')).toEqual([knowledgeRoot]);
+    for (const name of ['read_file', 'read_image', 'glob', 'grep', 'write_file', 'shell', 'code_interpreter']) {
+      expect(metadataRoots.get(name)).toBeUndefined();
     }
   });
 

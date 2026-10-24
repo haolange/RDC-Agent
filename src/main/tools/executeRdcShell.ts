@@ -1,6 +1,6 @@
 import { authorizeRdcOperation, isMainOwnedRdcIdentityKey } from './RdcOperationPolicy';
 import { operationFingerprint } from './RdcOperationCatalog';
-import { validateExecutionEvidence, verifyRollbackIdentity } from './RdcValidatedEvidence';
+import { isUnchangedShaderResult, validateExecutionEvidence, verifyRollbackIdentity } from './RdcValidatedEvidence';
 import { runRdcOperation } from '../sessions/RdcOperationCoordinator';
 import { z } from 'zod';
 import type { AgentToolResult, ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
@@ -167,7 +167,8 @@ export async function executeRdcShell(
       || payload.data.restored_event_id !== originalEvent || await readReplayEvent() !== originalEvent)) {
       throw new Error('RDC_CLI_PROTOCOL: temporary replay operation did not prove restoration.');
     }
-    const evidence = input.experimentId ? await validateExecutionEvidence(definition, args, payload.data, context, lease.contextId, input.experimentId) : null;
+    const unchangedShader = isUnchangedShaderResult(definition, payload.data);
+    const evidence = input.experimentId && !unchangedShader ? await validateExecutionEvidence(definition, args, payload.data, context, lease.contextId, input.experimentId) : null;
     signal?.throwIfAborted();
     const receipt = input.experimentId && evidence ? rdcExecutionReceipts.write({
       schemaVersion: 1, sessionId: sessionId, projectId: projectId,
@@ -190,7 +191,9 @@ export async function executeRdcShell(
       captureFileId: frozenCaptureId,
     };
     const invocation = rdcInvocationRecord(input.operation, args);
-    return { content: [{ type: 'text', text: JSON.stringify({ result: payload, receipt, rdcExecutionIdentity, invocation }) }],
+    const executionEvidence = unchangedShader ? { status: 'not-executed', reason: 'native-shader-noop', receiptIssued: false,
+      message: 'Native status=noop: no build or shader replacement was performed. No intervention receipt was issued.' } : undefined;
+    return { content: [{ type: 'text', text: JSON.stringify({ result: payload, receipt, executionEvidence, rdcExecutionIdentity, invocation }) }],
       details: { operation: input.operation, exitCode: 0, receipt, rdcExecutionIdentity, invocation } };
   } catch (error) {
     const failedInvocation = lastInvocation;

@@ -3,6 +3,8 @@
  * Persistent writes stay on KnowledgeWriteService + human confirmation; never exposed here.
  */
 
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 import {
   KNOWLEDGE_CARD_TYPES,
   KNOWLEDGE_LIFECYCLES,
@@ -11,6 +13,7 @@ import {
   type KnowledgeLifecycle,
   type KnowledgeRelation,
   type KnowledgeScope,
+  type KnowledgeImageRef,
 } from '@shared/types/knowledge';
 import type { AgentTool, AgentToolResult } from '../agent-runtime/agent/AgentTool';
 import { knowledgeCandidateService, type KnowledgeCandidateService } from './KnowledgeCandidateService';
@@ -21,6 +24,8 @@ import {
   type KnowledgeRetrievalLane,
 } from './knowledgeLanes';
 import { knowledgeQueryService, type KnowledgeQueryService } from './KnowledgeQueryService';
+import { pathIdentityKey } from '../agent-runtime/knowledgeReadRoots';
+import { isPathInside, resolveWithinRoot } from './knowledgeFs';
 
 export interface KnowledgeToolDependencies {
   query: KnowledgeQueryService;
@@ -198,11 +203,28 @@ function createKnowledgeSearchTool(deps: KnowledgeToolDependencies): AgentTool {
   };
 }
 
+type KnowledgeImageReadRef = KnowledgeImageRef & { readImageArgs?: { path: string }; readError?: string };
+async function imageReadRefs(images: KnowledgeImageRef[], spaceRoot: string | undefined, frozenRoots: readonly string[]): Promise<KnowledgeImageReadRef[]> {
+  if (!images.length) return [];
+  let root: string | undefined;
+  try { if (spaceRoot) root = await fs.realpath(spaceRoot); } catch { /* Missing space roots do not grant image access. */ }
+  const permitted = root && frozenRoots.some(candidate => pathIdentityKey(candidate) === pathIdentityKey(root!));
+  return Promise.all(images.map(async image => {
+    if (!permitted || !root) return { ...image, readError: 'KNOWLEDGE_IMAGE_READ_SCOPE_UNAVAILABLE' };
+    try {
+      if (path.isAbsolute(image.relativePath) || /^[a-z]:[\\/]/i.test(image.relativePath)) throw new Error('Absolute declaration');
+      const target = await resolveWithinRoot(root, image.relativePath);
+      if (!isPathInside(root, target)) throw new Error('Escaped frozen root');
+      return { ...image, readImageArgs: { path: target } };
+    } catch { return { ...image, readError: 'KNOWLEDGE_IMAGE_PATH_UNAVAILABLE' }; }
+  }));
+}
+
 function createKnowledgeReadTool(deps: KnowledgeToolDependencies): AgentTool {
   return {
     name: 'knowledge_read',
     label: 'Read Knowledge',
-    description: 'Read one Knowledge card by space and relative path. Lists knowledge-root relative image paths and roles; inspect pixels with read_image.',
+    description: 'Read one Knowledge card by space and relative path. Declared images include roles and readImageArgs for read_image when inside the frozen Knowledge read scope; otherwise readError. Relative declarations are not workspace paths. Pixels remain unobserved until read_image succeeds.',
     parameters: {
       type: 'object',
       required: ['spaceId', 'relativePath'],
@@ -220,14 +242,16 @@ function createKnowledgeReadTool(deps: KnowledgeToolDependencies): AgentTool {
       category: 'search',
       requiresApproval: false,
     },
-    async execute(_id, args) {
+    async execute(_id, args, _signal, _onUpdate, context) {
       const spaceId = asString(args.spaceId);
       const relativePath = asString(args.relativePath);
       if (!spaceId || !relativePath) return errorResult('spaceId and relativePath are required.');
+      const space = deps.query.listSpaces().find(candidate => candidate.spaceId === spaceId);
       const card = await deps.query.getCard(spaceId, relativePath);
       if (!card) return errorResult(`Knowledge card not found: ${spaceId}:${relativePath}`, { spaceId, relativePath });
-      const images = card.images ?? [];
-      const imageLines = images.map((image) => `- ${image.role}\t${image.relativePath}`);
+      const images = await imageReadRefs(card.images ?? [], space?.rootPath, context?.knowledgeReadRoots ?? []);
+      const imageLines = images.map(image => `- ${image.role}\t${image.relativePath}\t${image.readImageArgs
+        ? `read_image ${JSON.stringify(image.readImageArgs)}` : image.readError}`);
       const imageBlock = imageLines.length > 0
         ? `images\t${images.length}\n${imageLines.join('\n')}\n\n`
         : '';

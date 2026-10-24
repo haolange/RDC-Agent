@@ -376,6 +376,7 @@ export class AgentTurnRunner {
         maxDepth: turnPolicy.maxChildDepth ?? DEFAULT_SUBAGENT_BUDGET.maxDepth,
         maxChildren: turnPolicy.maxSubagents ?? DEFAULT_SUBAGENT_BUDGET.maxChildren,
         maxAggregateToolCalls: turnPolicy.maxToolCalls ?? DEFAULT_SUBAGENT_BUDGET.maxAggregateToolCalls,
+        maxAggregateWallMs: turnPolicy.maxWallTimeMs ?? DEFAULT_SUBAGENT_BUDGET.maxAggregateWallMs,
       }),
       policyBudget: createPolicyBudgetState(
         turnPolicy,

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 import { readImageTool } from './ReadImageTool';
+import { withTemporaryPathAccess } from './_shared';
 import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
 
 vi.mock('../../../conversation/ToolImagePreviewStore', () => ({
@@ -73,6 +74,19 @@ describe('ReadImageTool', () => {
 
     await expect(readImageTool.execute('img-2', { path: '../outside.png' }, undefined, undefined, context(root)))
       .rejects.toThrow(/超出 workspace/);
+  });
+
+  it('reads granted Knowledge image bytes without retaining access outside that call', async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdc-knowledge-image-workspace-'));
+    const knowledge = await mkdtemp(path.join(os.tmpdir(), 'rdc-knowledge-image-root-'));
+    roots.push(workspace, knowledge);
+    const imagePath = path.join(knowledge, 'reference.png'); await writeFile(imagePath, PNG_1X1);
+    const execution = { ...context(workspace), knowledgeReadRoots: [knowledge] };
+    const result = await withTemporaryPathAccess(execution, [knowledge], scoped =>
+      readImageTool.execute('knowledge-pixels', { path: imagePath }, undefined, undefined, scoped));
+    expect(result.details).toMatchObject({ path: imagePath, sha256: createHash('sha256').update(PNG_1X1).digest('hex') });
+    expect(result.content[1]).toEqual({ type: 'image', mimeType: 'image/png', data: PNG_1X1.toString('base64') });
+    await expect(readImageTool.execute('not-granted', { path: imagePath }, undefined, undefined, execution)).rejects.toThrow(/超出 workspace/);
   });
 
   it('views an immutable extensionless raster artifact using its verified content type', async () => {

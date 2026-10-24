@@ -36,11 +36,11 @@ export const readImageTool: AgentTool<ReadImageParams, ReadImageDetails> = {
   name: 'read_image',
   label: '查看图片',
   description:
-    'Read a workspace image (png/jpeg/gif/webp) for vision-capable routes. Returns the SHA-256 of the exact file bytes delivered as the image block. Non-vision routes fail closed.',
+    'Read an image (png/jpeg/gif/webp) from the workspace or frozen Knowledge read scope for vision-capable routes. For declared Knowledge images, use knowledge_read readImageArgs exactly; its relative declarations are not workspace paths. Returns the SHA-256 of exact image-block bytes. Non-vision routes and paths outside the effective read scope fail closed.',
   parameters: {
     type: 'object',
     properties: {
-      path: { type: 'string', description: 'Relative or absolute image path inside the workspace.' },
+      path: { type: 'string', description: 'Workspace-relative path, or absolute path inside the workspace or frozen Knowledge read scope. Use returned readImageArgs for Knowledge images; do not guess a knowledge root.' },
     },
     required: ['path'],
   },

@@ -38,6 +38,66 @@ function toolErrorCode(result: { details?: unknown }): string | undefined {
 }
 
 describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
+  it('qualifies captured variant evidence only after closing the linked experiment restoration', () => {
+    const { resolver, service } = createInvestigationHarness();
+    const note = seedNote(resolver);
+    writeDraft(service, 'world_state', baselineWorld('ws-close-baseline'));
+    const anchor = writeDraft(service, 'world_state', {
+      ...baselineWorld('ws-close-variant'), kind: 'unknown', validity: 'unknown',
+    });
+    writeDraft(service, 'world_state', baselineWorld('ws-close-restored'));
+    writeDraft(service, 'claim', hypothesisClaim('ws-close-baseline'));
+    const design = recordedExperiment({
+      experimentId: 'exp-close', hypothesisClaimId: 'claim-hyp',
+      baselineWorldStateId: 'ws-close-baseline', variantWorldStateId: 'ws-close-variant',
+      restoredWorldStateId: 'ws-close-restored', verifyEvidenceIds: [],
+      executed: false, baselineRestored: false, status: 'designed',
+    });
+    design.result = { summary: 'Not executed; planned state anchors only', accepted: false };
+    const planned = writeDraft(service, 'experiment', design);
+    // Synthetic receipt fixtures exercise record ordering, not native execution.
+    writeDraft(service, 'evidence', evidenceOf('ws-close-restored', note, 'ev-close-restored'));
+    writeDraft(service, 'experiment', {
+      ...design, status: 'rolled_back',
+      rollback: { executed: true, baselineRestored: true, verifyEvidenceIds: ['ev-close-restored'] },
+    }, { supersedes: planned.manifest.artifactId });
+    const observed = writeDraft(service, 'world_state', exclusiveWorld('ws-close-variant', true), {
+      supersedes: anchor.manifest.artifactId,
+    });
+    expect(observed.record).toMatchObject({ worldStateId: 'ws-close-variant', validity: 'valid' });
+    const evidence = writeDraft(service, 'evidence', {
+      ...evidenceOf('ws-close-variant', note, 'ev-close-variant'), experimentId: 'exp-close',
+    });
+    expect(evidence.record).toMatchObject({ stale: false });
+    expect(service.createLookup(SESSION_ID).getEvidence('ev-close-variant')).toMatchObject({ stale: false });
+    expect(service.readRecord(SESSION_ID, anchor.manifest.artifactId).manifest.status).toBe('superseded');
+  });
+
+  it('keeps an unlinked or unrestored variant polluted instead of inferring restoration from exclusivity', () => {
+    const { resolver, service } = createInvestigationHarness();
+    const note = seedNote(resolver);
+    writeDraft(service, 'world_state', baselineWorld('ws-open-baseline'));
+    const anchor = writeDraft(service, 'world_state', baselineWorld('ws-open-variant'));
+    writeDraft(service, 'world_state', baselineWorld('ws-open-restored'));
+    writeDraft(service, 'claim', hypothesisClaim('ws-open-baseline'));
+    const design = recordedExperiment({
+      experimentId: 'exp-open', hypothesisClaimId: 'claim-hyp',
+      baselineWorldStateId: 'ws-open-baseline', variantWorldStateId: 'ws-open-variant',
+      restoredWorldStateId: 'ws-open-restored', verifyEvidenceIds: [],
+      executed: false, baselineRestored: false, status: 'designed',
+    });
+    design.result = { summary: 'Not executed; planned state anchors only', accepted: false };
+    writeDraft(service, 'experiment', design);
+    const unlinked = writeDraft(service, 'world_state', exclusiveWorld('ws-unlinked-variant', true));
+    expect(unlinked.record).toMatchObject({ validity: 'polluted' });
+    const linked = writeDraft(service, 'world_state', exclusiveWorld('ws-open-variant', true), {
+      supersedes: anchor.manifest.artifactId,
+    });
+    expect(linked.record).toMatchObject({ validity: 'polluted' });
+    const evidence = writeDraft(service, 'evidence', evidenceOf('ws-open-variant', note, 'ev-open-variant'));
+    expect(evidence.record).toMatchObject({ stale: true });
+  });
+
   it('keeps archive record reads linear while checking every stored body', () => {
     const { resolver, service } = createInvestigationHarness();
     const count = 8;

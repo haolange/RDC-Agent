@@ -274,6 +274,8 @@ Task 启动时必须有未过期的 deadline；运行中的执行到期后仍须
 
 父回合内 `maxAggregateWallMs` 的计时窗口从首个子执行开始，仅在至少一个子执行活跃时推进；全部子执行结束至下次委派期间暂停，重叠活跃时间只计一次。准备阶段和执行入口共用该计数；此窗口不重置 TaskRootBudget，也不放宽 child-local `maxWallTimeMs`。
 
+新顶层回合的 subagent-tree 上限来自同一冻结 policy：depth、children、aggregate tools 和 aggregate wall 分别取 `maxChildDepth`、`maxSubagents`、`maxToolCalls`、`maxWallTimeMs`。不得在已有有效 policy 之外另套未投影的默认五分钟墙钟；较短的 policy 同样必须收窄准入。显式传入的子树账本保持其原上限、活跃计时与消费，不在续跑时重建；Capsule 的局部 deadline、父 policy deadline 和持久 TaskRootBudget 仍各自独立执行。
+
 同一 root 的首次并发绑定串行提交，旧持久消费与新上下文独立消费只合并一次；后续绑定同一 live ledger 不重复计费。root 的计数不下降、cap 不增加、deadline 不延后。已经绑定 root A 的 live ledger 再请求不同 root B 时显式拒绝 TASK_ROOT_BUDGET_REBIND_DENIED，保留 A/B 与观察者归属，须由独立执行上下文处理，不能静默换绑。已有执行的重试继续使用原 rootBudgetId，不允许借新父轮次脱离旧预算。
 
 direct Task 启动按目标 taskId 查找本 Task 的既有执行；重试只恢复该 Task 的原预算根，新 Task 使用当前执行上下文的根。不得取整个会话最近一次无关 direct 执行来绑定预算。受委派执行仍由实际 parentExecutionId 继承根，逻辑 parentTaskId 或依赖关系不替代执行归属。

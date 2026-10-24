@@ -2,7 +2,7 @@
 
 # Debugger RDC 工具参考
 
-Current catalog fingerprint: `cca35794631fed6c6a73401b6ccb0d4658f8e473de170e769674372f7cfd589b`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
+Current catalog fingerprint: `3ebcd4a37dfa886cc46d6580b8399c7c4501e4918d879db2ade823f997f5160c`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
 
 所有 `shell.rdc` 示例都省略由主进程注入的 `session_id` / `capture_file_id` / context 身份。不要把示例补成可覆盖其它会话的身份。共享发现、错误恢复、输出与副作用规则见 `$rdc-tool-shell`。
 
@@ -1226,7 +1226,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `stage` | 是 | string; enum=vs,hs,ds,gs,ps,cs,ms,as; Use canonical shader stage: vs, hs, ds, gs, ps, cs, ms, or as. Pixel shader is ps. |
 | `event_id` | 否 | integer; min=0; event_id (int, 可选) |
 | `shader_id` | 否 | string; shader_id (str, 可选): expected bound shader identity |
-| `ops` | 否 | array; Structured patch ops. For SPIR-V ASM, {"op":"force_full_precision","variables":["493"]} targets only OpDecorate %493 RelaxedPrecision; an empty variables list removes all RelaxedPrecision decorations. |
+| `ops` | 否 | array; Structured patch ops. For SPIR-V ASM, force_full_precision removes RelaxedPrecision decorations only for the IDs listed in variables; an empty variables list applies to all RelaxedPrecision decorations. |
 | `source_text` | 否 | string; source_text (str, 可选): full replacement source text |
 | `source_path` | 否 | string; source_path (str, 可选): full replacement source file path |
 | `entry` | 否 | string; entry (str, required for full HLSL/GLSL replacement unless reflection provides it) |

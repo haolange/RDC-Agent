@@ -4,6 +4,7 @@ import { DEFAULT_RDC_CLI_INVOKER } from '../settings/settingsDefaults';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 import { executeRdcShell, RdcShellInputSchema } from './executeRdcShell';
+import { verifyRollbackIdentity } from './RdcValidatedEvidence';
 const mock = vi.hoisted(() => ({ execute: vi.fn(), lease: vi.fn(), retainedLease: vi.fn(), prepare: vi.fn(), write: vi.fn(), quarantine: vi.fn(), observe: vi.fn() }));
 vi.mock('../sessions', () => ({ rdcSessionService: { observeAgentOperation: mock.observe } }));
 vi.mock('./RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: mock.execute } }));
@@ -185,6 +186,57 @@ describe('structured RDC shell', () => {
     expect(mock.write).not.toHaveBeenCalled();
     expect(mock.observe).not.toHaveBeenCalled();
   });
+  it('delivers an unchanged shader result without an intervention receipt and keeps the owning replay usable', async () => {
+    const replacement: RdcOperationDefinition = { ...definition, name: 'rd.shader.edit_and_replace', namespace: 'shader',
+      effects: ['shader_replacement', 'replay_position'], evidence_kind: 'intervention' };
+    const query: RdcOperationDefinition = { ...definition, name: 'rd.event.get_active', namespace: 'event', effects: [], evidence_kind: null };
+    const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [replacement, query], lease) };
+    const hash = 'a'.repeat(64);
+    const data = { replacement_id: 'not-applied', status: 'noop', resolved_event_id: 7,
+      replacement: { replacement_id: 'not-applied', status: 'noop', resolved_event_id: 7,
+        original_shader_id: 'ResourceId::9', original_shader_hash: hash, applied_to_shader_hash: hash,
+        compile: { build_input: { status: 'unavailable', reason: 'No successful shader build and replacement observed.' } } } };
+    mock.execute.mockResolvedValueOnce({ exitCode: 0, stdout: JSON.stringify({ schema_version: '3.0.0',
+      ok: true, result_kind: replacement.name, meta: { process_identity: processIdentity }, data }) });
+    const result = await executeRdcShell({ operation: replacement.name, args: {}, experimentId: 'noop-exp' }, 'noop', undefined, bound);
+    expect(JSON.parse(result.content[0].type === 'text' ? result.content[0].text : '')).toMatchObject({ result: { data },
+      executionEvidence: { status: 'not-executed', reason: 'native-shader-noop', receiptIssued: false } });
+    expect(result.details?.receipt).toBeUndefined();
+    expect(mock.write).not.toHaveBeenCalled();
+    expect(mock.quarantine).not.toHaveBeenCalled();
+    expect(mock.observe).toHaveBeenCalledOnce();
+    expect(() => verifyRollbackIdentity({ ...replacement, evidence_kind: 'rollback' },
+      { replacement_id: 'not-applied' }, 'owned-context', 'noop-exp')).toThrow(/host-verified intervention/);
+    mock.execute.mockResolvedValueOnce({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: query.name,
+      data: { session_id: 'native-replay', active_event_id: 7 } }) });
+    await expect(executeRdcShell({ operation: query.name, args: {} }, 'follow-up', undefined, bound)).resolves.toBeDefined();
+  });
+  it.each(['status', 'id', 'event', 'hash', 'build', 'lease', 'observe', 'cancel'])(
+    'does not trust an unchanged shader result with invalid %s', async failure => {
+      const replacement: RdcOperationDefinition = { ...definition, name: 'rd.shader.edit_and_replace', namespace: 'shader',
+        effects: ['shader_replacement', 'replay_position'], evidence_kind: 'intervention' };
+      const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [replacement], lease) };
+      const data = { replacement_id: 'untrusted-noop', status: 'noop', resolved_event_id: 7,
+        replacement: { replacement_id: 'untrusted-noop', status: 'noop', resolved_event_id: 7,
+          original_shader_id: 'ResourceId::9', original_shader_hash: 'a'.repeat(64), applied_to_shader_hash: 'a'.repeat(64),
+          compile: { build_input: { status: 'unavailable' } } } };
+      if (failure === 'status') data.replacement.status = 'applied';
+      if (failure === 'id') data.replacement.replacement_id = 'different';
+      if (failure === 'event') data.replacement.resolved_event_id = 8;
+      if (failure === 'hash') data.replacement.applied_to_shader_hash = 'b'.repeat(64);
+      if (failure === 'build') data.replacement.compile.build_input.status = 'available';
+      if (failure === 'lease') mock.lease.mockReturnValueOnce(lease).mockReturnValueOnce(lease).mockReturnValueOnce({ ...lease, version: 8 });
+      if (failure === 'observe') mock.observe.mockRejectedValueOnce(new Error('observation failed'));
+      const controller = new AbortController();
+      mock.execute.mockImplementationOnce(async () => {
+        if (failure === 'cancel') controller.abort();
+        return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: replacement.name, data }) };
+      });
+      await expect(executeRdcShell({ operation: replacement.name, args: {}, experimentId: 'untrusted-noop-exp' },
+        'noop', controller.signal, bound)).rejects.toThrow();
+      expect(mock.quarantine).toHaveBeenCalledOnce();
+      expect(mock.write).not.toHaveBeenCalled();
+    });
   it('keeps the owning replay usable after a proven pre-effect validation rejection', async () => {
     const query: RdcOperationDefinition = { ...definition, name: 'rd.pipeline.get_state', namespace: 'pipeline',
       effects: ['replay_position'], evidence_kind: null };

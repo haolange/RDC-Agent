@@ -45,6 +45,46 @@ function pngWithTextBytes(count: number): Buffer {
 }
 
 describe('ToolResultArtifactizer', () => {
+  it('delivers executable decoded-text selections for offloaded pages without changing their bytes', () => {
+    const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-art-text-view-'));
+    roots.push(sessionPath);
+    fs.writeFileSync(path.join(sessionPath, 'session.json'), '{}');
+    const resolver = resolverFor(sessionPath);
+    const sourcePage = 'Whole file: 10000 lines; displayed 500 lines only\r\n'
+      + 'shader \\"text\\" 😀\r\n'.repeat(2500);
+    const original = { content: [{ type: 'text' as const, text: sourcePage }], details: { truncated: true } };
+    const result = artifactizeToolResult({ sessionId: 'sess-1', toolCallId: 'page', toolName: 'read_file', result: original, resolver });
+    const text = result.content.find(block => block.type === 'text');
+    expect(text?.type).toBe('text');
+    const selection = JSON.parse((text as { text: string }).text.split('\n').find(line => line.startsWith('{"uri":'))!);
+    expect(selection).toEqual({ uri: 'session://tool-outputs/page.json', expectedHash: expect.stringMatching(/^[a-f0-9]{64}$/), textPointer: '/content/0/text' });
+    let restored = '';
+    let cursor = { offset: 1, column: 0 };
+    for (;;) {
+      const page = resolver.read('sess-1', selection.uri, { ...selection, ...cursor });
+      restored += page.text;
+      if (!page.next) break;
+      cursor = page.next;
+    }
+    expect(restored).toBe(sourcePage);
+    expect((text as { text: string }).text).toContain('not omitted source-file ranges or domain validation');
+    expect(() => resolver.read('sess-1', selection.uri, { ...selection, expectedHash: '0'.repeat(64) })).toThrow('ARTIFACT_HASH_MISMATCH');
+    expect(() => resolver.read('other-session', selection.uri, selection)).toThrow();
+    const stored = JSON.parse(fs.readFileSync(resolver.resolve('sess-1', selection.uri).absolutePath, 'utf8'));
+    expect(JSON.parse(stored.chunks.join('')).details).toEqual(original.details);
+  });
+
+  it('bounds text selections and keeps each pointer at its actual content index', () => {
+    const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-art-text-pointers-'));
+    roots.push(sessionPath);
+    fs.writeFileSync(path.join(sessionPath, 'session.json'), '{}');
+    const result = artifactizeToolResult({ sessionId: 'sess-1', toolCallId: 'blocks', toolName: 'unknown', thresholdBytes: 1,
+      resolver: resolverFor(sessionPath), result: { content: [{ type: 'text', text: '' }, ...Array.from({ length: 12 }, () => ({ type: 'text' as const, text: 'body' }))] } });
+    const hint = (result.content[0] as { text: string }).text;
+    const selections = hint.split('\n').filter(line => line.startsWith('{"uri":')).map(line => JSON.parse(line));
+    expect(selections.map(item => item.textPointer)).toEqual(Array.from({ length: 8 }, (_, index) => `/content/${index + 1}/text`));
+  });
+
   it('leaves results at or below the 32 KiB threshold in place', () => {
     const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-art-below-'));
     roots.push(sessionPath);

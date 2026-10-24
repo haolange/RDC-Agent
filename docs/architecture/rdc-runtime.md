@@ -115,6 +115,8 @@ raw SPIR-V 格式必须同时有匹配的构建编码与实际 opcode 行；注�
 
 需要实验执行证据时，主进程在真实执行、身份及结果验证之后签发回执，绑定 session/project/turn/toolCall/experiment/context/lease/replay 身份、操作定义指纹、参数指纹、结果 hash 和执行时间。签名 key 由 OS safeStorage 保管，不进 prompt/IPC/trace；先确认可签名再执行，落盘遵守 SessionArtifactResolver 配额和原子写入边界。普通发现不签执行回执；手写 JSON、普通 shell 回显或目录自称安全/已回滚都不构成可信证据。
 
+shader replacement 返回一致的 `status=noop`（顶层与 replacement 的身份、事件一致，原始与应用源码 hash 相同，构建输入明确 unavailable）时，主进程交付原结果并明确标记未执行构建或替换，不签干预回执、不登记回滚资格。通过 owning lease 和现场观察核验后保留可用现场；no-op 不是未修改源码的编译对照，也不是实验干预或恢复证明。状态矛盾、身份变化、取消或观察失败仍按未知结果隔离。
+
 实验验收解释受支持的测量、干预和回滚结果，测量必须包含真实有限数值或可验证图像；不接受空值、伪造零值或成功文案。baseline → intervention → variant → rollback → restored 必须属于同一实验、context 和 lease，顺序有效；测量方法、参数与采样条件一致；回滚对应真实 replacement 并确认已恢复。历史记录不自动取得当前执行证明。签名证明执行和结果，不自动证明因果、质量、噪声或优化收益。
 
 冻结目录搜索包含并返回 `evidence_kind`，支持按 measurement/intervention/rollback 发现候选，完整参数仍由 describe 核对；不建立第二份操作白名单。无证据能力的操作携带 experimentId 时在原生执行前明确拒绝，并提示核对冻结目录与实际 receipt 引用。Experiment 使用每次结果返回的 `receipt.uri/expectedHash`，普通工具输出及其外层制品不能代替签名文件。方法资源要求干预前取得 baseline 签名，缺失阶段保持未证，不事后补签或自动追认旧实验。
@@ -130,6 +132,8 @@ raw SPIR-V 格式必须同时有匹配的构建编码与实际 opcode 行；注�
 `rd.session.get_replay_events` 返回完整事件列表；`rd.session.observe` 在原生串行区内应用事件、解析目标并导出画面。默认 final_output 只使用 Present 资源证据，无法识别时不冒充最终输出。Remote 屏幕呈现使用同一远程连接的原生确认，按事件、纹理和新鲜序号报告 presented；缺少能力为 unsupported，窗口或呈现失败为 unavailable。Local 图片路径不能证明设备屏幕显示。
 
 `executeRdcShell` 与人工操作共享 context 队列；native 返回及签名回执完成后，只有 catalog 声明改变回放位置或 shader replacement 的操作才观察并记录足迹，使用该 turn 的冻结 CLI。只读查询不触发额外 replay/export；测量操作是自包含的 awaited 调用，观察不会插入 sampling 内部。是否刷新由操作影响决定，不按工具名称特判。多条命令构成的 experiment 是证据生命周期，不是持续采样事务：有状态操作之间的观察会执行 replay/export，不承诺整个 experiment 零扰动。
+
+`rdc_context.hostControls.replayIsolation` 是 Main 对当前受控 context 的点时排他证明，读取实际 owning lease、冻结身份和该 turn 持有的交互锁；非 owning General、漂移、隔离、委派、同 context 重复 lease 或未持锁均返回 unavailable。成功来源固定为 main-owned-lease-and-turn-lock，绑定 session/project/turn/context/leaseVersion/capture/replay，范围仅 rdc-agent-context。`WorldState.replay.exclusiveLock` 在此受控范围内有该来源支撑，仍须三态分别保存并与阶段回执核对；不是整批 native mutex 或外部进程排除证明，不免除实际变更状态及恢复校验。context 小结果沿既有制品路径保留 inline 正文和持久 URI/hash；不能据新的证明回填旧实验资格。
 
 远程打开期间通过冻结 CLI 查询所属 daemon 的 `active_operation`；只有原生 transfer stage 才显示传输阶段，查询失败不推测进度。足迹记录原生 `revision`、实际替换/恢复状态和显示参数。观察无法确认 EID 时保存无图片的失败事实；实时 Agent 画面与操作元数据成对投影，不读取手动回放图片。
 

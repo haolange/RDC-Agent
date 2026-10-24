@@ -30,6 +30,9 @@ export function setRdcInteractionLock(sessionId: string, owner: string, locked: 
 export function getRdcInteractionLock(sessionId: string): string | null {
   return locks.get(sessionId)?.size ? 'agent_running' : null;
 }
+export function ownsRdcInteractionLock(sessionId: string, turnId: string): boolean {
+  return locks.get(sessionId)?.has(turnId) === true;
+}
 export function subscribeRdcInteractionLock(listener: (sessionId: string) => void): () => void {
   listeners.add(listener); return () => { listeners.delete(listener); };
 }

@@ -13,6 +13,20 @@ const digest = (value: unknown) => createHash('sha256').update(canonicalJson(val
 const finite = (value: unknown) => typeof value === 'number' && Number.isFinite(value);
 const eventId = (value: unknown) => Number.isSafeInteger(value) && Number(value) >= 0;
 function invalid(): never { throw new Error('RDC_EVIDENCE_INVALID: native result does not provide supported execution evidence.'); }
+export function isUnchangedShaderResult(definition: RdcOperationDefinition, result: Record<string, unknown>): boolean {
+  if (definition.evidence_kind !== 'intervention' || !definition.effects.includes('shader_replacement')
+    || result.status !== 'noop' || !eventId(result.resolved_event_id)) return false;
+  const replacement = result.replacement as Record<string, unknown> | undefined;
+  const compile = replacement?.compile as Record<string, unknown> | undefined;
+  const build = compile?.build_input as Record<string, unknown> | undefined;
+  return typeof result.replacement_id === 'string' && result.replacement_id.length > 0
+    && replacement?.replacement_id === result.replacement_id && replacement.status === 'noop'
+    && replacement.resolved_event_id === result.resolved_event_id
+    && typeof replacement.original_shader_id === 'string' && replacement.original_shader_id.length > 0
+    && typeof replacement.original_shader_hash === 'string' && /^[a-f0-9]{64}$/i.test(replacement.original_shader_hash)
+    && replacement.original_shader_hash === replacement.applied_to_shader_hash
+    && build?.status === 'unavailable';
+}
 export function verifyRollbackIdentity(definition: RdcOperationDefinition, args: Record<string, unknown>, contextId: string, experimentId?: string): void {
   if (definition.evidence_kind !== 'rollback' || !experimentId) return;
   const known = replacements.get(String(args.replacement_id));

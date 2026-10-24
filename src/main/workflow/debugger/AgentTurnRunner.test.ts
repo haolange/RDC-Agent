@@ -39,7 +39,7 @@ import type { PreparedAgentRuntime } from './orchestratorTypes';
 import type { EffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
-import { turnCoordinator } from './TurnCoordinator';
+import { createSubagentBudgetState, turnCoordinator, type SubagentBudgetState } from './TurnCoordinator';
 
 function createRunner(): AgentTurnRunner {
   return new AgentTurnRunner({
@@ -189,10 +189,25 @@ describe('AgentTurnRunner', () => {
     })).rejects.toThrow(/TURN_NOT_PREPARED/);
   });
 
-  it('cleans the turn and prepared MCP lease when slot setup throws', async () => {
+  it.each([
+    { maxWallTimeMs: 10_000, inherited: false },
+    { maxWallTimeMs: 900_000, inherited: false },
+    { maxWallTimeMs: 900_000, inherited: true },
+  ])('freezes child wall admission from policy and preserves inherited consumption ($maxWallTimeMs/$inherited)', async ({ maxWallTimeMs, inherited }) => {
     const release = vi.fn(async () => undefined);
     const runner = createRunner();
+    const inheritedBudget = inherited ? createSubagentBudgetState({
+      maxDepth: 2, maxChildren: 4, maxAggregateToolCalls: 8, maxAggregateWallMs: 30_000,
+    }) : undefined;
+    if (inheritedBudget) {
+      inheritedBudget.childrenSpawned = 2;
+      inheritedBudget.aggregateToolCalls = 3;
+      inheritedBudget.wallStartedAt = 1_000;
+      inheritedBudget.wallPausedAt = 2_000;
+    }
+    let observedBudget: SubagentBudgetState | undefined;
     const setup = vi.spyOn(runner, 'getOrCreateAgentSlot').mockImplementation(() => {
+      observedBudget = turnCoordinator.getActive('setup-session')?.subagentBudget;
       throw new Error('slot setup failed');
     });
     const requestPlan = createTestRequestPlan({
@@ -230,7 +245,7 @@ describe('AgentTurnRunner', () => {
       maxToolCalls: 5,
       maxSubagents: 2,
       maxChildDepth: 2,
-      maxWallTimeMs: 10_000,
+      maxWallTimeMs,
     } as EffectiveRuntimePlan['policy'];
     const preparedRuntime = {
       promptPlan: { systemPrompt: 'prepared-system' } as PromptPlan,
@@ -256,8 +271,16 @@ describe('AgentTurnRunner', () => {
       turnId: 'setup-turn',
       effectiveModel: {} as never,
       preparedRuntime,
-      options: { requestPlan },
+      options: { requestPlan, subagentBudget: inheritedBudget },
     })).rejects.toThrow('slot setup failed');
+
+    if (inheritedBudget) {
+      expect(observedBudget).toBe(inheritedBudget);
+      expect(observedBudget).toMatchObject({ childrenSpawned: 2, aggregateToolCalls: 3,
+        wallStartedAt: 1_000, wallPausedAt: 2_000, budget: { maxAggregateWallMs: 30_000 } });
+    } else {
+      expect(observedBudget?.budget.maxAggregateWallMs).toBe(maxWallTimeMs);
+    }
 
     expect(setup.mock.calls[0]?.[3]).toBe('prepared-system');
     expect(setup.mock.calls[0]?.[11]).toBe(preparedRuntime.promptPlan);

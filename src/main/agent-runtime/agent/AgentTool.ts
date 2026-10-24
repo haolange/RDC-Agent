@@ -32,6 +32,8 @@ export interface ToolExecutionContext {
   visionInputMode?: 'native' | 'disabled';
   /** Per-call temporary path roots; never module-global. */
   temporaryAllowedPathRoots?: readonly string[];
+  /** Frozen Knowledge roots for reference formatting; not a filesystem access grant. */
+  knowledgeReadRoots?: readonly string[];
 }
 
 export interface AgentToolSpec {

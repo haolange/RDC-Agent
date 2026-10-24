@@ -47,6 +47,8 @@ General 先从本 turn 冻结的定义做轻量发现；这不会启动 CLI、�
 
 实验准入还须核对真实进程连续性。当前 `rd.session.get_context` 的 `data.process_identity` 及每次 canonical 结果的 `meta.process_identity` 提供实际 daemon/worker 的 `pid + start_generation`，来源是 OS 进程出生标识；两者均完整且 status=available 才能确认当前批身份。五阶段须逐项比较完整两进程身份，PID复用、任一世代变化或 unavailable 都不能合格；同context/replay/hash不替代此证明。主进程将实际结果中的 process identity 写入签名回执，新实验关闭门要求五份一致。缺少此字段的历史记录仍可读，不追认当前连续性、不补签；保存具体回执，由工程修复受控投影，不用普通shell、读取daemon私有状态或生命周期旁路取代。
 
+受控现场的排他性从 `rdc_context.hostControls.replayIsolation` 读取：只有 `available=true`、`exclusive=true` 且 session/project/turn/context/leaseVersion/replay/capture 与当前执行及阶段回执一致时，才有主进程依据将该受控范围的 `WorldState.replay.exclusiveLock` 记为 true。该证明来自实际 owning lease 和当前 turn 持有的交互锁；人工操作被阻止，受控操作仍逐项串行。它不是整批 native mutex、系统全局隔离或未来预留，也不授予操作权限，不替代三态 replacement 枚举及其他实际可变路径的控制。baseline、variant、restored 分别保存当前证明及其返回的持久 URI/hash，结合对应阶段记录核对；不可事后追认旧阶段。缺失、漂移或 unavailable 保持 unknown，必要控制未闭合时不干预。不要将本受控范围的排他合同另行扩大为产品未承诺的全局整批锁，再把该不可读条件当外部阻塞。
+
 正式 shader 状态合同：`rd.shader.edit_and_replace` 将活动变更登记到所属 replay 的 PatchEngine；`rd.shader.list_replacements` 枚举同一活动集合并附带对应元数据，`rd.shader.revert_replacement` 撤销该集合中的指定项。这里的 shader replacement 和 patch 应用顺序不是两套独立可变状态；WorldState 的 `shaderReplacement` / `patchStack` 可引用同一状态的实际枚举回执，仍须分别在基线、变体、恢复态取得，不能拿本段知识代替观察。该合同是工具实现语义说明，不要求普通 capture 调查额外获得软件源码目录读取权。若当前安装的目录、能力或实际回执与合同冲突，保存冲突并保持 unknown，不自行推断为空。
 
 数据变更的适用性按完整冻结目录与本次有效权限判断：确认该执行面没有可达的数据写入/替换操作时，只能将该范围的 `dataState` 控制记为不适用，不能声称全局数据为空或没有外部修改。查询/导出制品不是 replay 数据写入；单次关键词空搜索不足以证明完整目录无此能力。不可枚举、未知 effects、存在可达变更但状态不明或查询失败，均保留 unknown 并按计划安全门处理。实施新的软件能力是工程任务，不能作为使用现有操作时每轮必做的源码审计。
@@ -88,3 +90,5 @@ texture/buffer 的 `state=capture_initial` 只读取捕获实际保存且可重�
 Settings 中 command 必须是本安装 binaries/windows/x64/python/python.exe 的绝对路径，argsPrefix 只含同安装 cli/run_cli.py。bat、PowerShell、薄 cmd/exe、跨安装组合和环境重定向会被拒绝；旧值保持可见，由用户修正。安装验证失败不得执行。RDC_BAT_REJECTED 与 RDC_VIA_COMMAND_DENIED 是拒绝，不是建议改写 argv。
 
 人类 PATH 使用薄 bin/rdc-tool.cmd；双击安装使用 install.cmd。Tool CLI 的只读 batch 是人类/外部客户端功能。Agent 没有 batch 工具，每个 shell.rdc 操作独立调用冻结的 Python argv；discovery 仅读冻结 catalog，不启动 CLI。不要用 shell.command 调用 rdc 或 Python 入口绕过宿主。
+
+这里禁止的是聚合 CLI/argv 旁路，不是要求每个工具各占一次模型响应。已知互不依赖的 discovery/describe、Skill、schema 或精确制品读取，可在同一模型响应中列出多个独立工具调用；每项仍分别经过原权限与执行校验。原生现场仍按 owning lease 串行，不能假定同一响应意味着并行执行。依赖前次结果的查询、下一页游标，以及干预、采证、恢复的先后关系必须等待相应结果，不打包猜测参数或省略阶段。

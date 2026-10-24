@@ -337,6 +337,7 @@ export class ToolExecutorFactory {
             projectId: runtimeContext?.projectId ?? plan?.projectId ?? null,
             sessionId: runtimeContext?.sessionId ?? null,
             visionInputMode: plan?.routeCapability?.visionInputMode ?? 'disabled',
+            ...(normalizedName === 'knowledge_read' ? { knowledgeReadRoots } : {}),
           };
           const injectKnowledgeRoots = isKnowledgeReadFileTool(normalizedName);
           const executeToolEffect = () => withProcessExecutionOwner(runtimeContext?.sessionId ?? sessionId, () => withTemporaryPathAccess(
@@ -389,7 +390,7 @@ export class ToolExecutorFactory {
                 result,
                 pinBelowThreshold: (normalizedName === 'read_file' && (validatedToolCall.arguments.mode === 'audit'
                   || validatedToolCall.arguments.pinEvidence === true))
-                  || toolCall.name === 'code_interpreter' || (toolCall.name === 'shell'
+                  || normalizedName === 'rdc_context' || toolCall.name === 'code_interpreter' || (toolCall.name === 'shell'
                   && typeof result.details === 'object' && result.details !== null
                   && 'operation' in result.details && typeof result.details.operation === 'string'
                   && (result.details.operation.startsWith('rd.')
