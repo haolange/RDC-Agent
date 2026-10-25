@@ -25,6 +25,16 @@ function resolverFor(sessionPath: string): SessionArtifactResolver {
   });
 }
 
+it('preserves structured preview references after offloading a large image result', () => {
+  const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'preview-offload-')); roots.push(sessionPath);
+  fs.writeFileSync(path.join(sessionPath, 'session.json'), '{}');
+  const imagePreviews = [{ previewId: 'abc123', fileName: 'pixel.png', mimeType: 'image/png' }];
+  const result = artifactizeToolResult({ sessionId: 'sess-1', toolCallId: 'image', toolName: 'read_image',
+    resolver: resolverFor(sessionPath), thresholdBytes: 1,
+    result: { content: [{ type: 'text', text: 'large result' }], details: { imagePreviews } } });
+  expect(result.details).toMatchObject({ artifactized: true, imagePreviews });
+});
+
 function pngWithTextBytes(count: number): Buffer {
   const png = Buffer.from(
     '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082',

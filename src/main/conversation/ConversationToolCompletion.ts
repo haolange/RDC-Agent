@@ -11,9 +11,12 @@ export function buildConversationToolCompletion(
   existing: ConversationToolCall | undefined, completedAt: number,
 ): Partial<ConversationToolCall> & { id: string; toolName: string } {
   const normalized = normalizeToolName(toolName);
+  const cancelled = !result?.ok && (existing?.status === 'cancelled'
+    || result?.error?.details?.reason === 'abort');
   const patch: Partial<ConversationToolCall> & { id: string; toolName: string } = {
-    id, toolName, status: result?.ok ? 'complete' : 'error',
-    error: result?.ok ? undefined : result?.error?.message, completedAt,
+    id, toolName, status: cancelled ? 'cancelled' : result?.ok ? 'complete' : 'error',
+    error: cancelled || result?.ok ? undefined : result?.error?.message,
+    completedAt: cancelled ? existing?.completedAt ?? completedAt : completedAt,
   };
   if (normalized === 'subagent') {
     const details = (result?.data?.details ?? result?.error?.details) as Record<string, unknown> | undefined;

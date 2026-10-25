@@ -20,7 +20,8 @@ const input: ComposerPendingRequestState = { kind: 'user-input', request: {
   ],
 } };
 const render = (pending: ComposerPendingRequestState) => act(async () => {
-  root.render(createElement(ComposerPendingRequest, { pending, composeAccentStyle: { 'data-dyn-style': 'test' } }));
+  root.render(createElement(ComposerPendingRequest, { pending, composeAccentStyle: { 'data-dyn-style': 'test' },
+    agentId: 'general', currentSession: null }));
 });
 const click = (selector: string) => act(async () => { host.querySelector<HTMLButtonElement>(selector)!.click(); });
 beforeEach(() => {

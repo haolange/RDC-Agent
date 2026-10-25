@@ -5,6 +5,7 @@ import { useProjectStore } from '../../stores/projectStore';
 
 export function useQueuedHandoffSuggestion(input: {
   sessionId?: string | null;
+  isComposerBusy: boolean;
   promptValue: string;
   setPromptValue: (value: string) => void;
   sendPrompt: () => Promise<void> | void;
@@ -46,7 +47,7 @@ export function useQueuedHandoffSuggestion(input: {
     }
     if (ready.sessionId !== input.sessionId) { setReady(null); return; }
     if (input.promptValue !== ready.prompt) return;
-    if (activeTurn || isPromptSending) return;
+    if (activeTurn || isPromptSending || input.isComposerBusy) return;
     setReady(null);
     store.clearHandoffSuggestion();
     if (!ready.prompt.trim()) return;
@@ -55,5 +56,5 @@ export function useQueuedHandoffSuggestion(input: {
         callbacks.current.showNotice(error instanceof Error ? error.message : String(error));
       }
     });
-  }, [ready, input.promptValue, input.sessionId, activeTurn, isPromptSending]);
+  }, [ready, input.promptValue, input.sessionId, input.isComposerBusy, activeTurn, isPromptSending]);
 }

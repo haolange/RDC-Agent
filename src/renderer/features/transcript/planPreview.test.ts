@@ -13,3 +13,9 @@ it('bounds large excerpts and allows genuinely short cards', () => {
   expect(planPreview({ title: 'T', summary: [], sections: [] } as unknown as ConversationPlanReview)).toBe('');
   expect(planPreview({ title: 'T', summary: ['x'.repeat(5000)], sections: [] } as unknown as ConversationPlanReview)).toHaveLength(4000);
 });
+it('does not repeat a summary already present verbatim in the canonical Markdown excerpt', () => {
+  const plan = { title: 'Plan', summary: ['Keep scope', 'Independent summary'],
+    sections: [{ heading: 'Plan', body: '# Plan\n\n- Keep scope\n\nOriginal content' }] } as ConversationPlanReview;
+  expect(planPreview(plan)).toBe('Independent summary\n\n- Keep scope\n\nOriginal content');
+  expect(plan.sections[0].body).toBe('# Plan\n\n- Keep scope\n\nOriginal content');
+});

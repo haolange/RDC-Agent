@@ -60,12 +60,12 @@ export function applyPlanReviewAnswered(input: {
   return upsertRuntimeToolCall(input.workTrace, {
     id: String(input.payload.toolCallId ?? approvalId),
     toolName: 'plan_artifact',
-    status: cancelled ? 'error' : 'running',
+    status: cancelled ? 'cancelled' : 'running',
     planReview: planReview
       ? {
           ...planReview,
           status: cancelled
-            ? 'rejected'
+            ? 'cancelled'
             : (input.payload.decision?.kind === 'approve' ? 'approved' : input.payload.decision?.kind === 'reject' ? 'rejected' : planReview.status),
           decision: input.payload.decision ?? planReview.decision,
         }
@@ -75,7 +75,7 @@ export function applyPlanReviewAnswered(input: {
       : input.payload.decision?.kind === 'reject'
         ? input.payload.decision.feedback
         : existing?.resultPreview,
-    error: cancelled ? String(input.payload.answer ?? 'Plan review request was cancelled.') : undefined,
+    error: undefined,
     completedAt: cancelled ? nowMs() : undefined,
   });
 }

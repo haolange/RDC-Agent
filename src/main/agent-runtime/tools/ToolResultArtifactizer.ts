@@ -210,6 +210,8 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
       ],
       details: {
         artifactized: true,
+        ...(result.details && typeof result.details === 'object' && 'imagePreviews' in result.details
+          && Array.isArray(result.details.imagePreviews) ? { imagePreviews: result.details.imagePreviews } : {}),
         ref: written.uri,
         hash: written.hash,
         summary,

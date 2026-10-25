@@ -217,16 +217,8 @@ export async function completeProfileTurn(
     );
     commitTerminalAssistantMessage('message_completed', {
       status: 'stopped',
-      content: assistantMessage.content || '当前请求已停止。',
-      workTrace: finalizeTrace(
-        upsertWorkBlock(stoppedTrace, 'assistant-output', {
-          status: 'complete',
-          summary: '用户已停止当前请求。',
-          completedAt: nowMs(),
-        }),
-        'stopped',
-        '请求已停止',
-      ),
+      content: assistantMessage.content,
+      workTrace: finalizeTrace(stoppedTrace, 'stopped'),
     });
   };
 

@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { useQueuedHandoffSuggestion } from './useQueuedHandoffSuggestion';
 const mock = vi.hoisted(() => ({ effects: [] as Array<() => void | (() => void)>, ready: null as unknown,
-  currentSession: 's', request: null as any, apply: vi.fn(), clear: vi.fn(), send: vi.fn(), setPrompt: vi.fn(), notice: vi.fn() }));
+  currentSession: 's', busy: false, request: null as any, apply: vi.fn(), clear: vi.fn(), send: vi.fn(), setPrompt: vi.fn(), notice: vi.fn() }));
 vi.mock('react', () => ({ useRef: (current: unknown) => ({ current }), useState: () => [mock.ready, (value: unknown) => { mock.ready = value; }], useEffect: (effect: () => void) => { mock.effects.push(effect); } }));
 vi.mock('./sessionAgentId', () => ({ applyDeclaredHandoffOnClient: mock.apply }));
 vi.mock('../../stores/projectStore', () => ({ useProjectStore: { getState: () => ({ currentSession: { sessionId: mock.currentSession } }) } }));
@@ -11,11 +11,11 @@ vi.mock('../../stores/composerSessionContextStore', () => {
 });
 const RenderProbe = (promptValue = 'original draft') => {
   mock.effects = [];
-  useQueuedHandoffSuggestion({ sessionId: mock.currentSession, promptValue, setPromptValue: mock.setPrompt, sendPrompt: mock.send, showNotice: mock.notice });
+  useQueuedHandoffSuggestion({ sessionId: mock.currentSession, isComposerBusy: mock.busy, promptValue, setPromptValue: mock.setPrompt, sendPrompt: mock.send, showNotice: mock.notice });
 };
 const flush = async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); };
 beforeEach(() => {
-  vi.clearAllMocks(); mock.ready = null; mock.currentSession = 's';
+  vi.clearAllMocks(); mock.ready = null; mock.currentSession = 's'; mock.busy = false;
   mock.request = { sessionId: 's', agentId: 'general', label: 'Execute with General', prompt: 'execute', send: true };
   mock.clear.mockImplementation(() => { mock.request = null; });
   mock.apply.mockResolvedValue({ ok: true, suggestion: { label: 'Execute with General', agent: 'general', prompt: 'execute', send: true } });
@@ -44,4 +44,12 @@ it('prefills without sending for send false', async () => {
   mock.request.send = false;
   RenderProbe(); mock.effects[0](); await flush();
   expect(mock.setPrompt).toHaveBeenCalledWith('execute'); expect(mock.ready).toBeNull(); expect(mock.send).not.toHaveBeenCalled();
+});
+it('retains the queued handoff while the restored conversation is busy without a local activeTurn', async () => {
+  mock.busy = true;
+  RenderProbe(); mock.effects[0](); await flush();
+  RenderProbe('execute'); mock.effects[1]();
+  expect(mock.send).not.toHaveBeenCalled(); expect(mock.clear).not.toHaveBeenCalled();
+  mock.busy = false; RenderProbe('execute'); mock.effects[1](); mock.effects[1]();
+  expect(mock.send).toHaveBeenCalledTimes(1);
 });

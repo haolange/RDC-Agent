@@ -199,7 +199,6 @@ composer-permission-pill-icon
 composer-permission-pill-label
 composer-permission-popup
 composer-plan-review
-composer-plan-review__edit
 composer-plan-review__error
 composer-plan-review__feedback
 composer-plan-review__revision
@@ -425,7 +424,6 @@ handoff-action-row
 handoff-action-row__arrow
 handoff-action-row__button
 handoff-action-row__label
-handoff-action-row__number
 handoff-suggestion-row
 handoff-suggestion-row__label
 hljs
@@ -467,7 +465,6 @@ is-picker
 is-pin-
 is-remove
 is-snapshot
-is-stopped
 is-summary
 is-tone-
 is-unbounded
@@ -682,7 +679,6 @@ panel-resize-handle-right
 placement-
 plan-card
 plan-card__head
-plan-card__open
 plan-card__preview
 plan-card__title
 plan-review-panel
@@ -1375,8 +1371,6 @@ work-process-tool-diagnostic-text
 work-process-tool-hook-attention
 work-process-tool-hook-details
 work-process-tool-inline-meta
-work-process-tool-lightbox
-work-process-tool-lightbox-image
 work-process-tool-line
 work-process-tool-meta
 work-process-tool-summary

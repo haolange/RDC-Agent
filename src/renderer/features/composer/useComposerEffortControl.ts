@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
-import type { SessionRecord } from '@shared/types/session';
 import { useI18n } from '../../i18n';
 import {
   hasSelectableFastMode,
@@ -22,19 +21,17 @@ import { clampCenteredTooltipPercent, EFFORT_THUMB_WIDTH_PX, thumbInsetPercent }
 import { createEffortSliderHandlers } from './effortSliderHandlers';
 import { useEffortPopupLayout } from './useEffortPopupLayout';
 import { useMaxVisualController } from './useMaxVisualController';
-import { useTurnControls } from './useTurnControls';
+import { useComposerTurnControls } from './ComposerTurnControlsContext';
 
 export function useComposerEffortControl(options: {
-  agentId: string;
-  currentSession: SessionRecord | null;
   open: boolean;
   disabled: boolean;
   menuRef: RefObject<HTMLDivElement | null>;
   popupRef: RefObject<HTMLDivElement | null>;
 }) {
-  const { agentId, currentSession, open, disabled, menuRef, popupRef } = options;
+  const { open, disabled, menuRef, popupRef } = options;
   const { t } = useI18n();
-  const { turnControls, capability, capabilityState, retryCapability, updateTurnControls } = useTurnControls(agentId, currentSession);
+  const { turnControls, capability, capabilityState, retryCapability, updateTurnControls } = useComposerTurnControls();
   const [dragRatio, setDragRatio] = useState<number | null>(null);
   const [snapLevel, setSnapLevel] = useState<ReasoningSelection | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);

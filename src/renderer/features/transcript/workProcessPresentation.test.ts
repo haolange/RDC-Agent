@@ -3,8 +3,16 @@ import type { ConversationWorkTrace } from '@shared/types/conversation';
 import type { ConversationPlanReview } from '@shared/types/planReview';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { createToolRowForPresentation } from './workProcessToolRows';
+import { createApprovalRow } from './workProcessDecisionRows';
 
 const now = 1_700_000_000_000;
+
+it.each(['tool-approval', 'auto-review-approval'])('does not label cancelled %s as approved', id => {
+  expect(createApprovalRow({ id, kind: 'approval', title: 'Approval', status: 'cancelled',
+    toolCalls: [], startedAt: now, completedAt: now + 10 })).toMatchObject({
+    type: 'approval', status: 'cancelled', verb: '已取消',
+  });
+});
 
 function flattenWorkRows(rows: ReturnType<typeof buildWorkProcessPresentation>['rows']): Array<(typeof rows)[number]> {
   return rows.flatMap((row) => {
@@ -1512,7 +1520,7 @@ describe('buildWorkProcessPresentation', () => {
     });
     expect(shell).toMatchObject({
       type: 'tool',
-      verb: '已更新计划 · 已拒绝',
+      verb: '计划 · 已提出修改',
       bodyText: '请补上复现条件。',
     });
   });

@@ -114,9 +114,10 @@ export class AgentPlanReviewRequestService {
         signal: input.signal,
       };
 
+      this.pending.set(key, pending);
       if (input.signal) {
         if (input.signal.aborted) {
-          reject(new Error('Plan review request was cancelled.'));
+          this.cancelPending(key, 'Plan review request was cancelled.');
           return;
         }
         pending.abortListener = () => {
@@ -125,7 +126,6 @@ export class AgentPlanReviewRequestService {
         input.signal.addEventListener('abort', pending.abortListener, { once: true });
       }
 
-      this.pending.set(key, pending);
       this.emit(pending, 'approval.requested', {
         approvalId,
         title: 'Plan review requested',
@@ -160,7 +160,8 @@ export class AgentPlanReviewRequestService {
       }
       const sessionId = pending.sessionId;
       if (sessionId) {
-        this.store.markDecision(sessionId, 'rejected');
+        this.store.markDecision(sessionId, 'rejected', { turnId: pending.turnId,
+          planId: pending.planReview.planId, revision: pending.planReview.revision });
       }
       const decision = { kind: 'reject' as const, feedback };
       this.deletePending(pending);
@@ -201,7 +202,8 @@ export class AgentPlanReviewRequestService {
     if (this.pending.get(keyFor(input.turnId, input.toolCallId)) !== pending || pending.signal?.aborted) {
       return { success: false, error: 'Plan review was cancelled while committing.' };
     }
-    const approved = this.store.markDecision(sessionId, 'approved', {
+    const approved = this.store.markDecision(sessionId, 'approved', { turnId: pending.turnId,
+      planId: pending.planReview.planId, revision: pending.planReview.revision }, {
       approvedHash: frozen.hash,
       frozenUri: frozen.uri,
       approvedHandoff: input.decision.handoff,
@@ -259,6 +261,13 @@ export class AgentPlanReviewRequestService {
     const pending = this.pending.get(key);
     if (!pending) return;
     this.deletePending(pending);
+    try {
+      if (pending.sessionId) this.store.cancelReview(pending.sessionId, pending.turnId,
+        pending.planReview.planId, pending.planReview.revision);
+    } catch (error) {
+      pending.reject(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
     this.emit(pending, 'approval.answered', {
       approvalId: pending.approvalId,
       title: 'Plan review cancelled',
@@ -266,10 +275,12 @@ export class AgentPlanReviewRequestService {
       kind: 'plan_review',
       toolCallId: pending.toolCallId,
       toolName: 'plan_artifact',
-      planReview: pending.planReview,
+      planReview: { ...pending.planReview, status: 'cancelled' },
       answer: reason,
     });
-    pending.reject(new Error(reason));
+    const cancellation = new Error(reason);
+    cancellation.name = 'AbortError';
+    pending.reject(cancellation);
   }
 
   private deletePending(pending: PendingPlanReviewRequest): void {

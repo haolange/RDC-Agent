@@ -8,7 +8,7 @@ export function readingBounds(workArea: DOMRect, rail: DOMRect, viewportWidth: n
   const left = Math.max(0, rail.left);
   const right = Math.min(viewportWidth, rail.right);
   const top = Math.max(0, workArea.top);
-  const bottom = Math.min(viewportHeight, workArea.bottom);
+  const bottom = Math.min(viewportHeight, workArea.bottom, rail.top);
   return right > left && bottom > top ? { left, top, width: right - left, height: bottom - top } : null;
 }
 
@@ -50,6 +50,7 @@ export function useReadingPanelGeometry() {
   const style = useDynStyle(bounds ? {
     '--reading-left': `${bounds.left}px`, '--reading-top': `${bounds.top}px`,
     '--reading-width': `${bounds.width}px`, '--reading-height': `${bounds.height}px`,
+    '--reading-bottom': `${bounds.top + bounds.height}px`,
   } : {});
   return { ready: bounds !== null, style };
 }

@@ -8,7 +8,7 @@ import { readingBounds, useReadingPanelGeometry } from './useReadingPanelGeometr
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); document.body.replaceChildren(); });
 it('aligns to an asymmetric composer and clamps to the visible work area', () => {
   expect(readingBounds(new DOMRect(280, 42, 960, 1000), new DOMRect(340, 750, 800, 120), 1600, 900))
-    .toEqual({ left: 340, top: 42, width: 800, height: 858 });
+    .toEqual({ left: 340, top: 42, width: 800, height: 708 });
   expect(readingBounds(new DOMRect(0, 42, 390, 780), new DOMRect(18, 700, 354, 90), 390, 844)?.width).toBe(354);
   expect(readingBounds(new DOMRect(), new DOMRect(), 390, 844)).toBeNull();
 });

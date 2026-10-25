@@ -1038,6 +1038,23 @@ it('durably saves reserved cost before effects and rejects effects when durable 
 });
 
 describe('ToolExecutorFactory plan_artifact gate', () => {
+  it('retains the typed cancellation cause in the terminal receipt without treating normal failures as aborts', async () => {
+    const write = vi.spyOn(planArtifactWriter, 'writeLivePlan').mockReturnValue({ uri: 'session://plans/plan.md', hash: 'a'.repeat(64) } as never);
+    const begin = vi.spyOn(planReviewStateStore, 'beginRevision').mockReturnValue({ planId: 'plan', revision: 1 } as never);
+    try {
+      const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' },
+        effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', showContinueOn: true }] } } as never;
+      for (const name of ['AbortError', 'Error']) {
+        const error = new Error('review did not complete'); error.name = name;
+        vi.mocked(agentPlanReviewRequestService.request).mockRejectedValueOnce(error);
+        const result = await createFactory().executePlanArtifactTool({ id: 'call', type: 'toolCall', name: 'plan_artifact',
+          arguments: { title: 'Plan', summary: ['Work'], content: 'Work' } }, 'debugger', context);
+        expect(result.isError).toBe(true);
+        expect(result.details).toEqual(name === 'AbortError' ? { reason: 'abort' } : undefined);
+      }
+    } finally { write.mockRestore(); begin.mockRestore(); }
+  });
+
   it('generates reviewed obligations from canonical Tasks rather than caller metadata', async () => {
     const getTask = vi.spyOn(TaskRegistry.prototype, 'getTask').mockResolvedValue({ id: 'task-real', revision: 2, subject: 'Actual analysis', description: 'Read current material', blockedBy: [], completionRequirements: ['analysis'], executionRequirements: { mode: 'subagent', requiredSkillIds: ['analysis-method'], independentOfTaskIds: [] } } as never);
     const write = vi.spyOn(planArtifactWriter, 'writeLivePlan').mockReturnValue({ uri: 'session://plans/plan.md', hash: 'a'.repeat(64) } as never);

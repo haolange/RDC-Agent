@@ -41,6 +41,7 @@ describe('pending Composer request precedence', () => {
     if (!pending) throw new Error('Expected pending request');
     const html = renderToStaticMarkup(createElement(ComposerPendingRequest, {
       pending, composeAccentStyle: { 'data-dyn-style': 'accent-request' },
+      agentId: 'general', currentSession: null,
     }));
     expect(html).toBe(`<div class="composer-shell composer-shell-${kind}" data-dyn-style="accent-request">${content}</div>`);
   });

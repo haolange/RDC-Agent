@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const persistInvoke = vi.fn();
+const projection = vi.hoisted(() => ({ projectId: 'project-a', sessionId: 'session-a' as string | null,
+  current: vi.fn(), sessions: vi.fn(), listeners: new Set<() => void>() }));
 
 vi.mock('../../platform/getElectronApi', () => ({
   getElectronApi: () => ({
@@ -15,12 +17,17 @@ vi.mock('../../platform/getElectronApi', () => ({
 vi.mock('../../stores/projectStore', () => ({
   useProjectStore: {
     getState: () => ({
-      currentSession: null,
-      currentProject: { projectId: 'project-a' },
+      currentSession: projection.sessionId ? { sessionId: projection.sessionId } : null,
+      currentProject: { projectId: projection.projectId },
       sessions: [],
-      setCurrentSession: vi.fn(),
-      setSessions: vi.fn(),
+      setCurrentSession: projection.current,
+      setSessions: projection.sessions,
     }),
+    subscribe: (listener: (state: unknown) => void) => {
+      const notify = () => listener({ currentProject: { projectId: projection.projectId },
+        currentSession: projection.sessionId ? { sessionId: projection.sessionId } : null });
+      projection.listeners.add(notify); return () => projection.listeners.delete(notify);
+    },
   },
 }));
 
@@ -30,6 +37,11 @@ import {
   useComposerModelDraftStore,
   writeComposerDraftModel,
 } from '../../stores/composerModelDraftStore';
+
+beforeEach(() => {
+  projection.projectId = 'project-a'; projection.sessionId = 'session-a';
+  projection.current.mockClear(); projection.sessions.mockClear(); projection.listeners.clear();
+});
 
 describe('commitComposerModelChoice', () => {
   beforeEach(() => {
@@ -50,6 +62,21 @@ describe('commitComposerModelChoice', () => {
       modelId: 'gpt-5.6-sol',
     });
   });
+});
+
+it.each(['project', 'no-session', 'switch-back'])('does not project a late model save after %s navigation', async (kind) => {
+  let finish!: (value: unknown) => void;
+  persistInvoke.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  const pending = commitComposerModelChoice({ providerId: 'openai', modelId: 'model' }, 'session-a', 'project-a');
+  if (kind === 'project') projection.projectId = 'project-b';
+  else projection.sessionId = null;
+  projection.listeners.forEach((listener) => listener());
+  if (kind === 'switch-back') { projection.sessionId = 'session-a'; projection.listeners.forEach((listener) => listener()); }
+  finish({ success: true, session: { sessionId: 'session-a', projectId: 'project-a' } });
+  await pending;
+  expect(projection.current).not.toHaveBeenCalled();
+  expect(projection.sessions).not.toHaveBeenCalled();
+  expect(projection.listeners.size).toBe(0);
 });
 
 describe('clearComposerModelChoice', () => {

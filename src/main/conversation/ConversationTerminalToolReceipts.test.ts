@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
 import type { ToolResultMessage } from '../agent-runtime/core/types';
 import { reconcileTerminalToolReceipts } from './ConversationTerminalToolReceipts';
-import { finalizeTrace } from './ConversationWorkTrace';
+import { finalizeTrace, upsertRuntimeToolCall } from './ConversationWorkTrace';
+
+it('retains image references when a terminal receipt creates the tool row', () => {
+  const imagePreviews = [{ previewId: 'preview-a', fileName: 'plot.png', mimeType: 'image/png' }];
+  const result = upsertRuntimeToolCall(null, { id: 'image-a', toolName: 'read_image', status: 'complete', imagePreviews });
+  expect(result.blocks[0].toolCalls[0].imagePreviews).toEqual(imagePreviews);
+});
 
 const trace = (): ConversationWorkTrace => ({
   status: 'running', updatedAt: 100, blocks: [{
@@ -22,11 +28,12 @@ describe('stopped turn canonical tool receipts', () => {
     const stopped = finalizeTrace(reconcileTerminalToolReceipts(source, [receipt()], 100), 'stopped');
     const tool = stopped.blocks[0].toolCalls[0];
     expect(stopped.status).toBe('stopped');
-    expect(tool).toMatchObject({ status: 'error', completedAt: 150, error: '[aborted]\nworking directory was not updated.' });
+    expect(tool).toMatchObject({ status: 'cancelled', completedAt: 150 });
+    expect(tool.error).toBeUndefined();
     const preview = JSON.parse(tool.resultPreview!);
     expect(preview.ok).toBe(false);
     expect(JSON.stringify(preview)).toContain('abort');
-    expect(tool.error).not.toContain('Run ended before');
+    expect(tool.resultPreview).toContain('working directory was not updated');
     expect(source.blocks[0].toolCalls[0].status).toBe('running');
   });
 
@@ -105,6 +112,7 @@ describe('stopped turn canonical tool receipts', () => {
     expect(reconcileTerminalToolReceipts(undefined, [receipt()], 100)).toBeUndefined();
     expect(reconcileTerminalToolReceipts(null, [receipt()], 100)).toBeNull();
     const stopped = finalizeTrace(source, 'stopped');
-    expect(stopped.blocks[0].toolCalls[0]).toMatchObject({ status: 'error', error: 'Run ended before this tool call completed.' });
+    expect(stopped.blocks[0].toolCalls[0].error).toBeUndefined();
+    expect(stopped.blocks[0].toolCalls[0]).toMatchObject({ status: 'cancelled' });
   });
 });

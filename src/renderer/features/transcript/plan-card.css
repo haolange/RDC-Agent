@@ -6,11 +6,15 @@
   padding: var(--transcript-card-padding);
   border: var(--transcript-card-border);
   border-radius: var(--transcript-card-radius);
-  background: var(--token-bg-raised);
+  background: var(--token-bg-panel);
   color: var(--token-text-heading);
   text-align: left;
   min-width: 0;
+  cursor: var(--cursor-pointer, pointer);
 }
+
+.plan-card:hover { border-color: var(--token-border-focus); }
+.plan-card:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: 2px; }
 
 .plan-card__head {
   display: flex;
@@ -26,22 +30,26 @@
   font-size: var(--text-lg);
   font-weight: 600;
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .plan-card__preview {
-  max-height: 10lh;
+  max-height: min(6lh, 28dvh);
   overflow: hidden;
   overflow-wrap: anywhere;
   font-size: var(--text-sm);
   color: var(--token-text-body);
+  font-weight: 400;
+  line-height: var(--leading-normal);
+}
+
+.plan-card__preview.is-overflowing {
+  mask-image: linear-gradient(to bottom, black var(--plan-fade-start), rgb(0 0 0 / 45%) var(--plan-fade-end));
 }
 
 .plan-card__preview .markdown-body { font-size: inherit; }
 .plan-card__preview .markdown-body > :first-child { margin-top: 0; }
 .plan-card__preview .markdown-body > :last-child { margin-bottom: 0; }
-
-.plan-card__open {
-  align-self: flex-start;
-  white-space: normal;
-  text-align: left;
-}

@@ -9,6 +9,23 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  min-height: 0;
+  max-height: 55dvh;
+}
+
+.composer-plan-review__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.composer-plan-review__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .composer-plan-review__title {
@@ -18,17 +35,50 @@
 }
 
 .composer-plan-review__feedback {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--token-text-body);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  padding: 0;
+  margin: 0;
 }
+
+.composer-plan-review__feedback:focus-visible { outline: 0; }
 
 .composer-plan-review__revision {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--space-2);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--token-bg-panel);
+  color: var(--token-text-caption);
+  min-height: var(--control-height-md);
+  box-sizing: border-box;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
 }
 
-.composer-plan-review__edit { align-self: flex-start; white-space: normal; text-align: left; }
+.composer-plan-review__revision > .ui-icon { align-self: center; flex-shrink: 0; }
+.composer-plan-review__revision > .icon-button { align-self: center; }
+.composer-plan-review__revision.is-multiline > .ui-icon {
+  align-self: flex-start;
+  margin-top: max(var(--space-0), calc((1lh - var(--space-4)) / 2));
+}
+.composer-plan-review__revision.is-multiline > .icon-button { align-self: flex-end; }
+.composer-plan-review__feedback { align-self: center; }
+.composer-plan-review__revision:focus-within {
+  border-color: var(--token-border-focus);
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+.composer-plan-review__footer { display: flex; flex-shrink: 0; min-height: var(--control-height-sm); }
 
 .composer-plan-review__error {
   margin: 0;

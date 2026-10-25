@@ -10,6 +10,7 @@ import { useUserMessageRewrite } from './useUserMessageRewrite';
 import { MessageAttachments } from './MessageAttachments';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { HandoffSuggestionRow } from './HandoffSuggestionRow';
+import { hasPlanReviewInteraction } from '@shared/conversation/planReviewPresentation';
 import { SystemMessage } from './SystemMessage';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
@@ -78,9 +79,6 @@ const MessageMetaBar: React.FC<{
     ) : null}
     {status === 'error' ? (
       <span className="conversation-message-status-tag is-error">{t('chat.messageError')}</span>
-    ) : null}
-    {status === 'stopped' ? (
-      <span className="conversation-message-status-tag is-stopped">{t('chat.messageStopped')}</span>
     ) : null}
     <MessageActions message={message} branchState={branchState} onEditResend={onEditResend} />
   </footer>
@@ -216,7 +214,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
               {renderContentWithCursor(message.content, status)}
             </div>
           ) : null}
-          {!isInProgress && message.handoffSuggestions && message.handoffSuggestions.length > 0 ? (
+          {!isInProgress && !hasPlanReviewInteraction(trace) && message.handoffSuggestions && message.handoffSuggestions.length > 0 ? (
             <HandoffSuggestionRow suggestions={message.handoffSuggestions} />
           ) : null}
           {showDiagnosticBlock && message.diagnostic ? (

@@ -12,6 +12,7 @@ import {
 } from './WorkProcessRows';
 import { WorkProcessSectionRow } from './WorkProcessSectionRow';
 import { ToolAggregateRow } from './ToolAggregateRow';
+import { WorkProcessImageRow } from './WorkProcessImageRow';
 
 export function createWorkProcessRowRenderer(
   sessionId?: string | null,
@@ -20,6 +21,7 @@ export function createWorkProcessRowRenderer(
   latestTaskSnapshotId?: string,
 ) {
   const renderRow = (row: WorkProcessRow): React.ReactNode => {
+    if (row.type === 'tool' && row.imageCalls) return <WorkProcessImageRow key={row.id} row={row} renderToolDetail={renderToolDetail} />;
     if (row.type === 'tool') return <ToolRow key={row.id} row={row} extraDetail={renderToolDetail?.(row)} density={density} />;
     if (row.type === 'toolAggregate') return <ToolAggregateRow key={row.id} row={row} renderToolDetail={renderToolDetail} density={density} />;
     if (row.type === 'userInput') return <UserInputRow key={row.id} row={row} />;

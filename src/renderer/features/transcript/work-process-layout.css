@@ -283,12 +283,14 @@
   background: transparent;
 }
 
-.work-process-step-rail.status-skipped .work-process-rail-marker {
+.work-process-step-rail.status-skipped .work-process-rail-marker,
+.work-process-step-rail.status-cancelled .work-process-rail-marker {
   border-color: color-mix(in srgb, var(--token-text-caption) 55%, transparent);
   background: color-mix(in srgb, var(--token-text-caption) 16%, transparent);
 }
 
-.work-process-tool-card.status-skipped .work-process-tool-card-verb {
+.work-process-tool-card.status-skipped .work-process-tool-card-verb,
+.work-process-tool-card.status-cancelled .work-process-tool-card-verb {
   color: var(--token-text-muted);
 }
 

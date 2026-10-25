@@ -63,3 +63,16 @@ it('keeps a real plan tool failure visible as an error', () => {
   const { presentation } = render([loop('loop-15'), failed]);
   expect(presentation.rows.find((row) => row.type === 'section')?.status).toBe('error');
 });
+it('renders a cancelled review neutrally and retains its full reader reference', () => {
+  const cancelled = review('cancelled');
+  cancelled.status = 'cancelled';
+  cancelled.toolCalls[0].status = 'cancelled';
+  cancelled.toolCalls[0].planReview = { ...plan, status: 'cancelled', decision: undefined };
+  const { presentation, document } = render([loop('loop-15'), cancelled]);
+  const section = presentation.rows.find(row => row.type === 'section');
+  expect(section?.steps[0]).toMatchObject({ type: 'tool', status: 'cancelled', verb: '计划 · 审阅已取消' });
+  expect(document.querySelector('.status-error')).toBeNull();
+  expect(document.querySelector('.status-running')).toBeNull();
+  expect(document.querySelector('button[disabled]')).toBeNull();
+  expect(cancelled.toolCalls[0].planReview.hash).toBe(plan.hash);
+});

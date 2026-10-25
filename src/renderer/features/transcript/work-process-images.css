@@ -1,51 +1,27 @@
-.work-process-tool-thumbs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
+.work-process-tool-thumbs { display: flex; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.work-process-tool-thumb-button.button {
+  padding: 0; border: 0; min-height: 0; height: auto;
+  border-radius: var(--transcript-card-radius); flex-shrink: 0;
 }
-
-.work-process-tool-thumb-button {
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: var(--cursor-pointer, pointer);
-}
-
 .work-process-tool-thumb {
-  width: var(--space-16);
-  height: var(--space-16);
-  border: var(--transcript-card-border);
-  border-radius: var(--transcript-card-radius);
-  object-fit: cover;
-  background: var(--token-surface-sunken);
+  display: block; width: var(--space-20); height: var(--space-20);
+  border: var(--transcript-card-border); border-radius: var(--transcript-card-radius);
+  object-fit: contain; background: var(--token-surface-sunken); box-sizing: border-box;
 }
-
-.work-process-tool-lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  padding: var(--space-6);
-  border: none;
-  background: var(--token-bg-overlay);
-  cursor: var(--cursor-pointer, pointer);
-}
-
-.work-process-tool-lightbox-image {
-  max-width: 90vw;
-  max-height: 90vh;
-  border-radius: var(--transcript-card-radius);
-  border: var(--transcript-card-border);
-}
-
+.work-process-tool-thumb-button:hover,
+.work-process-tool-thumb-button:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: 2px; }
+.work-process-tool-preview-image { display: block; max-width: 100%; max-height: 70dvh; margin: auto; object-fit: contain; }
 .work-process-tool-thumb.is-pending {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--token-text-caption); font-size: var(--text-xs); overflow-wrap: anywhere;
+}
+.work-process-tool-thumb.is-pending > .button { white-space: normal; height: auto; }
+.work-process-image-summary { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-3); }
+.work-process-image-details { padding: 0 var(--space-3) var(--space-3); }
+.work-process-image-additional:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: 2px; }
+.work-process-image-receipt { display: grid; gap: var(--space-1); padding: var(--space-2) 0; border-top: var(--transcript-card-border); }
+.work-process-image-name { font-size: var(--text-sm); overflow-wrap: anywhere; }
+.work-process-image-unavailable { color: var(--token-text-caption); font-size: var(--text-xs); }
+@container (max-width: 30rem) {
+  .work-process-tool-thumb { width: var(--space-16); height: var(--space-16); }
 }

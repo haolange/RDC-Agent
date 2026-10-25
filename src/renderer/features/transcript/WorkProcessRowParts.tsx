@@ -13,11 +13,22 @@ import {
   type ToolRowModel,
 } from './WorkProcessToolCardParts';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
+import { usePlanReader } from './PlanReaderHost';
+import { Button } from '../../ui/Button';
+
+const PlanReadAction: React.FC<{ plan: NonNullable<ToolRowModel['planReview']> }> = ({ plan }) => {
+  const { t } = useI18n();
+  const open = usePlanReader();
+  const ref = React.useRef<HTMLButtonElement>(null);
+  return <Button ref={ref} data-plan-id={plan.planId} variant="ghost" size="sm" aria-label={`${t('chat.planReviewReadFull')} · ${plan.title}`}
+    onClick={() => { ref.current?.focus(); open(plan); }}>{t('chat.planReviewReadFull')}</Button>;
+};
 
 export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNode; density?: 'normal' | 'compact' }> = ({ row, extraDetail, density = 'normal' }) => {
   const { t } = useI18n();
   const label = useWorkProcessLabel();
-  const statusLabel = row.status === 'complete' ? '' : label(getRowStatusLabel(row.status));
+  const statusLabel = row.status === 'complete' || (row.planReview && row.status === 'cancelled')
+    ? '' : label(getRowStatusLabel(row.status));
   const hasDetail = row.previewLines.length > 0
     || Boolean(row.hookDiagnostics?.length)
     || Boolean(row.commandText)
@@ -26,7 +37,7 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
     || Boolean(row.imagePreviews?.length)
     || Boolean(row.sourcePills?.length && row.family === 'web');
   const hasRaw = row.argsLines.length > 0 || row.rawLines.length > 0;
-  const canExpand = hasDetail || hasRaw || Boolean(extraDetail);
+  const canExpand = hasDetail || hasRaw || Boolean(extraDetail) || Boolean(row.planReview);
   const hasApproval = Boolean(row.approval);
   const diagnosticCaption = row.diagnosticCaption?.trim() || '';
   const hasDiagnostic = row.status === 'error' && Boolean(diagnosticCaption);
@@ -97,6 +108,7 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
 
           {expanded ? (
             <div className="work-process-tool-card-expand">
+              {row.planReview ? <PlanReadAction plan={row.planReview} /> : null}
               <FamilyDetail row={row} />
               <RawPanel row={row} />
               {row.hookDiagnostics?.length ? (

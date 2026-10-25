@@ -1,6 +1,6 @@
 export const PLAN_REVIEW_STATE_SCHEMA = '1' as const;
 
-export type PlanReviewStatus = 'awaiting' | 'approved' | 'rejected' | 'superseded';
+export type PlanReviewStatus = 'awaiting' | 'approved' | 'rejected' | 'superseded' | 'cancelled';
 
 export interface PlanReviewSection {
   heading: string;
@@ -39,6 +39,8 @@ export interface ConversationPlanReview {
 export interface PlanReviewStateDocument {
   schemaVersion: typeof PLAN_REVIEW_STATE_SCHEMA;
   planId: string;
+  /** Absence means ownership is unproven; never infer it from the active session. */
+  ownerTurnId?: string;
   revision: number;
   status: PlanReviewStatus;
   approvedHash?: string;

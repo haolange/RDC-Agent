@@ -1,4 +1,5 @@
 import { normalizeWorkProcessText, formatDurationMs } from './workProcessFormat';
+import { groupImageRows } from './groupImageRows';
 import { type ConversationWorkBlock, type ConversationReasoningState, type ConversationLoopStopReason, type ConversationLoopOutputPhase, type ConversationWorkTrace } from '@shared/types/conversation';
 import { isMeaningfulText, getMeaningfulBlockSummary, isNoisyText } from './workProcessBlockText';
 import { type ThinkingArtifact } from '@shared/types/reasoning';
@@ -212,12 +213,13 @@ export const buildWorkProcessPresentation = (
   };
 };
 
-const groupProcessRows = (rows: WorkProcessRow[]): WorkProcessRow[] => rows;
+const groupProcessRows = groupImageRows;
 
 const countToolSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, row) => {
   if (row.type === 'section') return total + countToolSteps(row.steps);
   if (row.type === 'toolAggregate') return total + row.children.length;
-  if (row.type === 'tool' || row.type === 'userInput' || row.type === 'planReview') return total + 1;
+  if (row.type === 'tool') return total + (row.imageCalls?.length ?? 1);
+  if (row.type === 'userInput' || row.type === 'planReview') return total + 1;
   return total;
 }, 0);
 

@@ -18,11 +18,15 @@ import {
   type ComposerModelEffortView,
 } from './composerModelEffortView';
 
+export interface ComposerModelSaveState { saving: boolean; error?: string }
+
 export const ComposerModelEffortControl: React.FC<{
   agentId: string;
   currentSession: SessionRecord | null;
   disabled?: boolean;
-}> = ({ agentId, currentSession, disabled = false }) => {
+  showAgentDefault?: boolean;
+  onSaveStateChange?: (state: ComposerModelSaveState) => void;
+}> = ({ agentId, currentSession, disabled = false, showAgentDefault = false, onSaveStateChange }) => {
   const { t } = useI18n();
   const menu = useComposerMenu('modelEffort');
   const open = menu.open;
@@ -30,9 +34,15 @@ export const ComposerModelEffortControl: React.FC<{
   const menuRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const previousViewRef = useRef(view);
+  const [saveState, setSaveState] = useState<ComposerModelSaveState>({ saving: false });
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const handleSaveState = useCallback((state: ComposerModelSaveState) => {
+    if (!mounted.current) return;
+    setSaveState(state);
+    onSaveStateChange?.(state);
+  }, [onSaveStateChange]);
   const effort = useComposerEffortControl({
-    agentId,
-    currentSession,
     open,
     disabled,
     menuRef,
@@ -44,6 +54,8 @@ export const ComposerModelEffortControl: React.FC<{
     agentRoute?.providerId,
   );
   const { effective, hasChoice } = useComposerEffectiveModel(agentId, currentSession);
+  const agentDefault = showAgentDefault && !hasChoice;
+  const capsuleLabel = agentDefault ? t('composer.model.agentDefault') : undefined;
   const currentOption = options.find((option) => (
     option.providerId === effective?.providerId && option.modelId === effective?.modelId
   ));
@@ -56,6 +68,8 @@ export const ComposerModelEffortControl: React.FC<{
     fastModel: effort.turnControls.fastModel,
     fastModelLabel: t('composer.effort.fastModel'),
   });
+  const title = capsuleLabel ?? capsule.title;
+  const activeView = agentDefault ? 'models' : view;
 
   const assignMenuRoot = useCallback((node: HTMLDivElement | null) => {
     menuRef.current = node;
@@ -93,31 +107,32 @@ export const ComposerModelEffortControl: React.FC<{
     <div ref={assignMenuRoot} className="composer-model-effort-menu">
       <Pill
         ref={assignMenuTrigger}
-        className={`composer-model-effort-pill ${open ? 'is-open' : ''}${hasChoice ? ' is-override' : ''}${effort.selectedLevel === 'max' ? ' is-level-max' : ''}`}
+        className={`composer-model-effort-pill ${open ? 'is-open' : ''}${hasChoice ? ' is-override' : ''}${!agentDefault && effort.selectedLevel === 'max' ? ' is-level-max' : ''}`}
         selected={open}
         data-testid="composer-model-effort-pill"
         aria-haspopup="dialog"
         aria-expanded={open}
-        title={capsule.title}
-        aria-label={capsule.title}
+        title={title}
+        aria-label={title}
+        disabled={disabled || saveState.saving}
         onClick={() => menu.toggle()}
       >
-        {capsule.showFast ? (
+        {!agentDefault && capsule.showFast ? (
           <span className="composer-model-effort-pill-mode" data-mode="fast" aria-hidden="true">
             <Icon name="lightning" size={14} />
           </span>
         ) : null}
-        {capsule.showMax ? (
+        {!agentDefault && capsule.showMax ? (
           <span className="composer-model-effort-pill-mode" data-mode="max-context" aria-hidden="true">
             <Icon name="max-mode" size={14} />
           </span>
         ) : null}
-        <OverflowFade className="composer-model-effort-pill-model" text={capsule.modelLabel} />
-        <span className="composer-model-effort-pill-level">{capsule.reasoningLabel}</span>
+        <OverflowFade className="composer-model-effort-pill-model" text={capsuleLabel ?? capsule.modelLabel} />
+        {!agentDefault ? <span className="composer-model-effort-pill-level">{capsule.reasoningLabel}</span> : null}
         <span className="composer-model-effort-pill-caret" aria-hidden="true"><ChevronIcon /></span>
       </Pill>
 
-      {open && view === 'effort' ? (
+      {open && activeView === 'effort' ? (
         <ComposerModelEffortPanel
           popupRef={popupRef}
           popupShiftPx={effort.popupShift}
@@ -160,13 +175,18 @@ export const ComposerModelEffortControl: React.FC<{
         />
       ) : null}
 
-      {open && view === 'models' ? (
+      {open && activeView === 'models' ? (
         <ComposerModelPickerPanel
           agentId={agentId}
           currentSession={currentSession}
           popupRef={popupRef}
           popupShiftPx={effort.popupShift}
-          onChosen={() => setView(nextComposerModelEffortView(view, 'chosen'))}
+          onChosen={(chosenDefault) => {
+            if (chosenDefault && showAgentDefault) menu.close();
+            else setView(nextComposerModelEffortView(view, 'chosen'));
+          }}
+          onSaveStateChange={handleSaveState}
+          agentDefaultLabelOnly={showAgentDefault}
         />
       ) : null}
     </div>

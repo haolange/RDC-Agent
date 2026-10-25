@@ -19,7 +19,7 @@ export function PlanReaderHost({ children }: { children: ReactNode }) {
     requestAnimationFrame(() => {
       if (!target || useProjectStore.getState().currentSession?.sessionId !== target.sessionId) return;
       // The original trigger may have remounted while the reader stayed open.
-      Array.from(document.querySelectorAll<HTMLButtonElement>('button[data-plan-id]'))
+      Array.from(document.querySelectorAll<HTMLElement>('[data-plan-id]'))
         .find((button) => button.dataset.planId === target.planId)?.focus({ preventScroll: true });
     });
   }, []);

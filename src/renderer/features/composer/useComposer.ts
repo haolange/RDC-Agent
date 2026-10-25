@@ -143,6 +143,7 @@ export function useComposer(options: {
     : (!hasMessageContent && !hasPendingAttachments);
 
   useQueuedHandoffSuggestion({
+    isComposerBusy: send.isComposerBusy,
     sessionId: currentSession?.sessionId, promptValue, setPromptValue, sendPrompt: send.handlePromptSend, showNotice,
   });
 

@@ -64,7 +64,8 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
   }, [loadEarlier]);
   const header = page.header;
   const executionStatus = header?.mode === 'background' ? header.executionStatus : undefined;
-  const rawStatus = executionStatus ?? header?.status ?? (row.status === 'error' ? 'failed' : row.status === 'complete' ? 'complete' : 'running');
+  const rawStatus = executionStatus ?? header?.status ?? (row.status === 'error' ? 'failed'
+    : row.status === 'complete' ? 'complete' : row.status === 'cancelled' || row.status === 'skipped' ? 'cancelled' : 'running');
   const status = rawStatus === 'completed' ? 'complete' : rawStatus;
   const active = status === 'queued' || status === 'running' || status === 'waiting' || status === 'cancelling';
   const startedAt = header?.startedAt;
@@ -86,7 +87,7 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
   }), [active, status, page.steps, header?.completedAt]);
   const presentation = React.useMemo(() => buildWorkProcessPresentation(trace), [trace]);
   const renderToolDetail = React.useCallback((tool: Extract<WorkProcessRow, { type: 'tool' }>) => (
-    tool.status === 'complete' || tool.status === 'error'
+    tool.status === 'complete' || tool.status === 'error' || tool.status === 'cancelled' || tool.status === 'skipped'
       ? <DelegatedToolReceipt sessionId={sessionId} parentToolCallId={row.id} toolCallId={tool.id}
         childSessionId={header?.childSessionId} executionId={header?.executionId} generation={header?.generation} />
       : null

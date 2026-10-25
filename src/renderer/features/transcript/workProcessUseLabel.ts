@@ -4,6 +4,8 @@ import { useI18n, type TranslationKey } from '../../i18n';
 import { CATALOG_VERB_LABEL_KEYS } from './workProcessCatalogVerbLabels';
 
 const LABEL_TO_KEY: Record<string, TranslationKey> = {
+  '计划 · 审阅已取消': 'chat.planReviewStatusCancelled',
+  '计划 · 已提出修改': 'chat.planReviewFeedbackRecorded',
   '正在整理上下文': 'chat.workProcessCompactRunning',
   '上下文已自动压缩': 'chat.workProcessCompactComplete',
   '上下文整理失败': 'chat.workProcessCompactFailed',

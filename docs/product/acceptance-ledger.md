@@ -3904,3 +3904,47 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 工程：相邻7文件68项通过；补齐决定终态及真实错误后，最终4文件22项通过，包含取消与委派交互投影。typecheck/lint、contracts248、session-projection、work-process、architecture/fidelity/renderer-structure/appearance通过；官方prepare-only构建通过，main产物SHA256为3c9022656b7483ac02d85372e11adf618c546dfb573f9d97635263b7dfefc9a7。未重复无变化的完整suite，不以旧绿色替代新状态回归。
 - Browser：正式disposable launcher及一次性bootstrap进入/app；外部临时脚本用同一main状态函数生成小型隔离会话，正式Bridge读取，未复制原会话、凭据或RDC。原生DOM与可见截图确认：等待回执蓝点及pulse；拒绝并读取完成后两段灰点且无pulse；后续调用只点亮第三段，之前两段保持灰色。工具卡Enter开合及恢复通过，console错误/警告为空。首轮持久fixture中的悬空人工审批被既有恢复逻辑终结，保留该事实并修正fixture；Browser等待场景为审批已回答但工具回执未到，真实等待人工审批由组件测试覆盖。此为确定性UI验收，不冒充真实模型重跑。
 - 桌面与清理：受限执行首次桌面启动的GPU/renderer子进程失败，正常桌面权限下同隔离根官方start:human成功打开RDC-Agent窗口；隔离profile的解密及meta CSP诊断单列，不冒充账号或全桌面console验收。本轮launcher及精确出生身份的自有子进程全部退出，5127释放、canonical锁不存在，桌面启动权已交还。核对绝对路径、Git及无链接边界后清理本轮注入脚本、隔离双根、测试TEMP与构建/启动日志；仅保留.local/transcript-state内Tasks、最小回执和两张截图。原Grok文件哈希逐项一致，ledger仅追加本节，无DeepSeek修改、提交、推送或发布。
+
+### 2026-10-26 计划预览与审批区 UI 收敛
+
+- 用户批准按最后确认图片在原界面内精修，基线9f29e91d；保留实色工具风、字体/宽度/时间线/圆点/扫光及声明式handoff流程。当前分支未提交推送发布，真实配置/会话/授权与RDC未修改；隔离环境仅复制appearance字段。
+- 计划卡正文最多min(6lh,28dvh)，仅真实溢出时末两行透明淡出；短内容自然收缩，无内部滚动。标题两行且完整名称可访问，状态/阅读动作不受遮罩；节选中完全相同的摘要只显示一次，原计划与阅读内容不改写。拒绝/替代项保留紧凑工具卡头与可展开反馈，真实错误仍可见。背景使用现有实色panel token。
+- 审批区复用Composer壳及共享按钮/输入：声明顺序的32px handoff行，移除序号圆圈；常驻意见单行自适应至五行，Enter提交/Shift+Enter换行/IME保护，失败保留意见，停止保持原语义。低高度仅内容区滚动，模型弹层不被裁切。原Model/Effort组件及目录/保存/菜单体系复用，底栏实测28px；未覆盖显示“按Agent配置”，菜单缺省项也不误标当前Agent模型为所有交接目标的模型。
+- 真实UI检查发现Effort随计划修订重挂被旧会话值覆盖，收敛到Composer稳定父层唯一控制状态；修订及返回编辑器仍保留选择，真正切会话重新初始化。最终审查另以3项RED证明模型保存迟到会回选旧会话（跨项目/无会话/离开再切回）；沿同一保存路径补scope订阅及单调失效后GREEN，订阅均释放，无新接口/持久字段/存储版本或兼容路径。
+- 最终受影响16文件111项通过，包含蓝点/归属、审批、模型保存、稳定控制状态、队列及计划hash/存储；typecheck/lint、contracts248、architecture/fidelity、design-tokens、work-process、session-projection、renderer-structure及appearance通过。fidelity只删除已移除的意见折叠入口和序号类名，未降低行为断言。正式prepare-only最终构建通过（renderer8.94s），main产物SHA256仍3c9022656b7483ac02d85372e11adf618c546dfb573f9d97635263b7dfefc9a7；未重复无变化的完整suite。
+- Browser经官方disposable launcher/一次性bootstrap进入同源app。数据和临时provider由外部脚本准备，最终使用明确标记synthetic-local-route-fixture的隔离路由投影，仅改localhost transport，编译能力和权限不变；正式设置/发送/plan_artifact/批准及handoff链实际运行。12次合成localhost请求与主进程记录分列：拒绝后原请求仍Sol/Low，修订后Luna/High不丢失，批准后的General新请求实际Luna/High；无覆盖时交接到Analyzer实际Luna/Medium。此为确定性wire/UI证明，不冒充真实账号、模型能力或推理效果。
+- 实际Browser覆盖桌面深色、浅色大字号、480px及390x360低高度，均无横向溢出；长预览117px/19.5px行高为六行，低高度受28dvh约束为101px；短预览61px、mask=none。390px多行意见body可滚动，模型仍在视口内；320px模型菜单保持屏内。完整阅读键盘打开及Escape焦点返回、模型菜单Escape返回、单/多handoff、停止请求通过，最终Browser console警告/错误为空。必要截图与DOM回执位于.local/plan-review-ui。
+- 失败边界保留：受限启动safeStorage读取失败后以正常Windows身份重建；无vendor前缀的占位Key被拒绝；首方endpoint锁定导致一次无效占位Key请求返回401，未计为模型成功。后续在发送前核验实际localhost endpoint。初始stub未在批准后结束而重复计划，修正夹具后才计handoff通过；非法API参数及新增测试profile文件名不符均被产品拒绝，不据此改产品边界。
+- 官方start:human在同隔离双根实际打开窗口（main164716、出生2026-10-26T00:04:21.760+08:00）；既有meta CSP诊断单列。退出后本轮QA/main及精确子进程、provider均消失，5127/60412无监听，canonical锁不存在，桌面启动权已交还。核对绝对路径/Git/无链接边界后删除25个临时目标、隔离虚拟凭据、脚本及TEMP，逻辑9082955B；仅保留Tasks、最小回执、wire/Browser证据和两图，当前依赖与可运行out保留。DESIGN/AGENTS原则无需新增规则，文档及中英文已同步。
+
+### 2026-10-26 计划交接、取消状态与请求边界修正
+
+- 范围：在9f29e91d及上一轮未提交UI修改上继续；没有分支、提交、推送或发布。保留原布局、六行预览及模型/动效，仅收敛交接、取消与请求归属；原记录不批量迁移。Tasks与最小回执位于`.local/plan-review-ui`。
+- 原问题固化：重复result建议、取消误判与跨Turn计划周期先失败5项；随后补原生结构化abort回执、重载审批队列忙碌屏障、迟到审批不覆盖真实complete/error回执的失败回归并通过。图3原驾驶记录证明是外部Bridge发起不同requestId却未经过Composer用户消息对账，本轮新请求均由实际Composer或已批准handoff按钮发送。
+- 实现：共享计划交互判定抑制main/renderer result建议；只保留底部待审区动作。通用cancelled与skipped/error/rejected分开，main/乐观停止共用纯结算；取消不生成拒绝意见、重复正文或停止徽标，原文与原始回执保留。当前计划ownerTurnId及决定/取消按owner/planId/revision核对，跨Turn与终态后开新周期。无新IPC、模式开关、历史兼容别名或权限放宽。
+- 工程：完整530文件测试3843通过、4个仓库既有跳过；coverage ratchet通过（lines77.53%、functions79%、branches65.44%、statements75.15%）。该全量节点之后，类型化计划取消回执、重载队列及迟到审批保真等直接耦合修正按受影响范围复验：最终42文件325项通过，typecheck、lint、contracts248通过；完整gates通过，最终受影响的session/work-process/appearance/renderer/token门禁通过，官方prepare-only构建通过。首次全量旧取消断言按新语义同步；Git扫描测试在coverage下超过5秒，未改断言，命令测试时间预算30秒后通过。最初gates未设受控TEMP导致Knowledge夹具失败，使用仓库隔离TEMP后通过；不归因于产品功能。
+- Browser：官方disposable launcher、一次性bootstrap及正式Bridge，外部脚本仅准备隔离项目/配置/虚构账号；正式发送与审批链由Composer驾驶。11次成功localhost合成wire，不代表真实模型或RDC效果。原请求内反馈生成revision2，仍为原user/assistant；取消请求的持久message为stopped，工具及review为cancelled且无error/伪decision；重新发送明确有新user消息、不同request/turn/planId与revision1。重载待审后批准，队列等待发送器同一busy屏障，新增一次Analyzer请求并complete，实际wire为Luna/Medium；result无重复handoff。
+- UI：取消历史行保持中性，可展开并经原hash校验阅读，Escape返回入口；浅色、深色大字号、键盘与窄屏无横向溢出。宿主缩放下nominal480/390对应实际CSS436/354，两档控件可达，模型菜单可键盘展开/Escape返回；不将其冒充精确CSS480/390。Browser发现无正文取消卡详情禁用及计划取消类型丢失、重载后交接只填草稿等问题均先记录后修正；旧失败夹具原值不回写。最终场景控制台warn/error为空；主动更换launcher期间的SSE断开/401单列为准备阶段现象。
+- 桌面与清理：官方start:human使用同隔离双根实际打开RDC-Agent窗口（79368642）；既有meta CSP诊断单列。退出后精确自有进程、5127/51522监听及canonical锁均为空，桌面启动权已交还。自动清理首次因证据位置疑虑被拒，复核证实汇总回执和两图在删除目录外，保留项删除前后哈希一致；经授权边界复核后清理runtime、虚构vault、脚本、TEMP、coverage与重复基线，只留Tasks、两张必要截图及汇总回执，上一轮六项证据保留。最终差异检查通过。
+
+
+### 2026-10-26 修改意见、计划预览、图片工具与子 Agent 密度优化
+
+- 基线为 main `9f29e91d16621cad6ffeeacf62fe167ce2bafbb7` 加此前74项未提交差异；本轮保留原改动，不创建分支、提交、推送或发布。Tasks、来源哈希及最小汇总为 `.local/plan-review-ui/TASKS.md`、`density-receipt.json`；不改真实数据，不运行真实模型或RDC实验。
+- 意见栏使用32px外框、16px图标和原字号，局部归零Textarea内边距；单行居中、多行对齐首行，保留五行滚动、IME及保存屏障。计划整卡为唯一阅读入口，选择文字不打开；短计划无mask，长计划六行限高。用户复查发现遮罩落在Markdown底部空白，新增Range定位回归先失败后通过：最终可见文字底87.41px，淡出73.91→87.41px，避开预览底部20.5px空白，末端保留45%可见度。
+- 阅读器按用户补充改为Context Window式的Composer上方同宽实色卡片，保留原hash读取、操作及弹层焦点体系；短内容自然收缩，长内容限高滚动。实际390×600视口卡高370.20px、正文261px/scrollHeight558px，距Composer约8px；Browser Use最终1280×720复验卡宽782.31px、高486px，无横向溢出，Escape回焦原计划卡，console warn/error为空。截图 `density-reader.png` 为真实Browser页面，不是生成图。
+- 图片通过正式read_image→结果归档→工具完成→会话trace链路产生25个引用；修复大结果转存和终态直接建行两处引用丢失，均有失败回归。renderer仅合并同段连续成功图片，保留独立调用和回执；默认4张、展开20、加载25，图片局部重试/并发4/会话迟到隔离、共享预览及焦点通过。缺失历史引用不猜路径、不新增读取权限或IPC。
+- 子Agent点阵按容器宽高采用8/6/4列与三/两行，不增加卡片自然厚度；实测卡片70px、预览34px，缩放微差单列。用户指出点阵与上方状态列脱节，修正右缘对齐；最终24点与元信息右缘一致。原活动周期、终态静止和减少动画路径保留；未以CSS注入伪造运行验收。
+- 工程：完整529个通过文件、4个既有跳过，3863项通过/4项跳过，coverage ratchet通过（lines77.50%、functions79%、branches65.47%、statements75.12%）。首次默认并发4项I/O测试超时且无断言失败，改为4 workers及命令测试时间预算30秒后通过，没有弱化断言或修改产品超时。全量节点后直接修补按受影响范围最终12文件116项通过，typecheck、lint及design-token/appearance/renderer/session/work-process等相关门禁通过；完整gates及官方prepare-only构建通过。全量证据不冒充晚于该节点的局部修补证据。
+- Browser使用官方disposable launcher、一次性bootstrap及正式Bridge；数据通过外部脚本注入，审批由实际Composer与按钮触发。三次localhost确定性推理请求验证待审、原Turn反馈修订及停止；深浅主题、标准/大字号、实际CSS480/390、图片展开/复制/预览及键盘焦点通过。无真实账号或模型效果证明；初始虚构路由/隔离加密状态准备失败单列，不计为产品成功。后续按用户指示仅用Browser Use查看页面，未继续Computer Use。
+- 桌面启动已由官方入口实际观察RDC-Agent窗口40505380；该事实与Browser验收分开记录。收尾以汇总回执中的进程、端口、锁及清理结果为准；仅保留Tasks、必要截图与最小回执，真实数据、既有证据、当前依赖及可运行构建保留。
+- 清理闭合：最终自有进程及5127/51522监听为空，canonical无锁，隔离锁owner已死，桌面启动权已交还。核对绝对路径/Git/链接边界后移除runtime、虚构vault、脚本、TEMP、重复日志及coverage（预检924文件、逻辑27168786B，不等同实际磁盘释放量）；首次受限权限无法删除虚构vault，使用正常Windows权限完成。13项必要/历史保留文件哈希一致，删除无效缩放截图，汇总回执留在目标外。Tasks全部通过，acceptance-ledger/repository-hygiene/secrets及diff检查通过。
+
+
+### 2026-10-26 提交 main 前复查
+
+- 冻结已批准的计划预览/审批模型控件、取消与交接语义、图片工具与子Agent密度范围；93项差异均属本会话授权，原源码哈希核对一致。清除design-system中残留的独立阅读按钮、折叠意见输入及背景模糊旧约定，避免同主题规则冲突。
+- 复查发现通用审批块的cancelled标题仍落入成功默认分支。普通审批和自动检查两项回归先失败，补齐取消映射后4文件55项通过，未变更权限或审批协议。typecheck、lint、work-process/session-projection/appearance/design-token/renderer结构检查及官方构建通过（renderer index-DIXc2o3X.js）。原完整tests/coverage/gates及四项UI矩阵沿用对应来源，未冒充新代码全量复测。
+- Browser Use通过官方disposable launcher、一次性bootstrap和正式Bridge，外部注入最小停止trace；两种审批均显示已取消，没有已批准或自动检查通过，console warn/error为空。该场景是确定性投影验收，未请求模型、RDC或真实用户数据；截图及最小回执保留于.local/plan-review-ui。提交、推送及最终清理由本轮Tasks与回执记录。
+
+- 复查收尾：官方隔离桌面实际窗口7605660可见后退出，无Computer Use；自有进程、5127/51522及canonical锁均为空，桌面启动权已交还。核对路径/链接/Git边界后清除publish-runtime（89文件、逻辑6128703B），仅保留既有density回执中的publicationReview与一张必要Browser截图。未新增IPC、存储版本、模式或真实凭据副本。

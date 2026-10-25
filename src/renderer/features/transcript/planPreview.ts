@@ -10,5 +10,7 @@ export function planPreview(plan: ConversationPlanReview): string {
     ));
     return [title && title !== plan.title.trim() ? `### ${title}` : '', content].filter(Boolean).join('\n\n');
   });
-  return [...summary, ...sections].join('\n\n').slice(0, 4000);
+  const sectionLines = new Set(sections.flatMap((section) => section.split('\n')
+    .map((line) => line.replace(/^\s*[-*+]\s+/, '').trim())));
+  return [...summary.filter((line) => !sectionLines.has(line.trim())), ...sections].join('\n\n').slice(0, 4000);
 }

@@ -268,13 +268,12 @@ const renderIconPath = (icon: WorkProcessIconKey): ReactElement => {
         </>
       );
     case 'imageRead':
-      return (
-        <>
-          <path d="M5 6h14v12H5V6Z" />
-          <path d="m5 15 4-4 3 3 2-2 5 5" />
-          <circle cx="9" cy="10" r="1" />
-        </>
-      );
+      return <>
+          <path d="m8 4 11-1 2 12-3 .3" />
+          <rect x="3" y="7" width="14" height="13" rx="2" />
+          <path d="m3 17 4-4 3 3 2-2 5 5" />
+          <circle cx="7" cy="11" r="1" />
+        </>;
     case 'tool':
     default:
       return <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2 2.5-2.5Z" />;

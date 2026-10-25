@@ -229,7 +229,7 @@ export const delegationTraceStore = {
     if (!record || record.identity !== childIdentity || !target) return;
     flushDelta(sessionId, record, target);
     const completedAt = Date.now();
-    record.projection.trace = finalizeTrace(record.projection.trace, status === 'complete' ? 'complete' : status === 'failed' ? 'error' : 'stopped', undefined, completedAt);
+    record.projection.trace = finalizeTrace(record.projection.trace, status === 'complete' ? 'complete' : status === 'failed' || status === 'interrupted' ? 'error' : 'stopped', undefined, completedAt);
     persistBlocks(record, target);
     const text = safeText(result);
     const hasFinal = text.trim().length > 0;
@@ -287,7 +287,7 @@ export const delegationTraceStore = {
       return { header, steps: ids.map((id) => {
         const step = trace.blocks.get(id)!;
         if (header.status !== 'interrupted') return step;
-        const settled = finalizeTrace({ status: 'running', blocks: [step.block], updatedAt: header.updatedAt }, 'stopped', undefined, header.completedAt);
+        const settled = finalizeTrace({ status: 'running', blocks: [step.block], updatedAt: header.updatedAt }, 'error', undefined, header.completedAt);
         return { ...step, block: settled.blocks[0]! };
       }).filter(Boolean),
         nextCursor: offset + ids.length < source.length ? offset + ids.length : null,

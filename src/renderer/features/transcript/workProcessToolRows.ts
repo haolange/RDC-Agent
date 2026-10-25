@@ -50,7 +50,7 @@ export const createToolRowForPresentation = (call: ConversationToolCall): WorkPr
     return createUserInputRow(call);
   }
   if (normalizeToolName(call.toolName) === 'plan_artifact' && call.planReview) {
-    if (call.planReview.status === 'superseded' || call.planReview.status === 'rejected') {
+    if (call.planReview.status === 'superseded' || call.planReview.status === 'rejected' || call.planReview.status === 'cancelled') {
       return createPlanReviewShellRow(call);
     }
     return createPlanReviewRow(call);
@@ -194,7 +194,7 @@ const isGenericDecisionText = (value: string): boolean => (
 );
 
 const isToolApprovalRejected = (approval: ConversationToolApproval | undefined): boolean => (
-  approval?.status === 'rejected' || approval?.status === 'cancelled'
+  approval?.status === 'rejected'
 );
 
 const isApprovalRequiredPreview = (parsedResult: unknown, raw?: string): boolean => {
@@ -206,8 +206,11 @@ const isApprovalRequiredPreview = (parsedResult: unknown, raw?: string): boolean
 };
 
 const deriveToolStatus = (call: ConversationToolCall, parsedResult: unknown): WorkProcessRowStatus => {
-  if (call.approval?.status === 'pending') return 'running';
-  if (isToolApprovalRejected(call.approval)) return 'error';
+  if (call.status !== 'complete' && call.status !== 'error') {
+    if (call.status === 'cancelled' || call.approval?.status === 'cancelled') return 'cancelled';
+    if (call.approval?.status === 'pending') return 'running';
+    if (isToolApprovalRejected(call.approval)) return 'error';
+  }
   if (call.status === 'error' || call.error) return 'error';
   if (call.status !== 'complete') return call.status;
   if (resultIndicatesFailure(parsedResult, call.resultPreview)) return 'error';
@@ -225,6 +228,7 @@ export const getToolVerb = (
   if (status === 'pending') return display.pendingVerb ?? '等待执行';
   if (status === 'running') return display.runningVerb;
   if (status === 'skipped') return '已跳过';
+  if (status === 'cancelled') return '已取消';
   if (status !== 'error') return display.completeVerb;
   return isToolApprovalRejected(approval) || /approval required|no changes were made/i.test(resultPreview ?? '') ? '已阻断' : '执行失败';
 };

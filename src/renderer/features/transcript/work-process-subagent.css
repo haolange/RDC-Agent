@@ -44,7 +44,29 @@
 .work-process-subagent-status.is-blocked { color: var(--token-status-warning); }
 .work-process-subagent-status.is-partial::before,
 .work-process-subagent-status.is-blocked::before { background: var(--token-status-warning); }
-.work-process-subagent-dots { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); justify-items: center; gap: var(--space-0-5); width: 100%; }
+.work-card-preview-trailing {
+  inline-size: min(20cqi, calc(var(--space-16) - var(--space-1)));
+  block-size: calc(1lh + var(--space-1)); margin-block: calc(-1 * var(--space-0-5));
+  position: relative; align-self: center; justify-self: end;
+  container: subagent-signal / size;
+}
+.work-process-subagent-dots {
+  position: absolute; inset-inline-end: 0; top: 50%; transform: translateY(-50%);
+  display: grid; grid-template-columns: repeat(8, var(--space-1)); gap: var(--space-1);
+}
+/* Allow half a CSS pixel for fractional geometry under native page zoom. */
+@container subagent-signal (width < 59.5px) {
+  .work-process-subagent-dots { grid-template-columns: repeat(6, var(--space-1)); }
+  .work-process-subagent-dots > span:nth-child(n + 19) { display: none; }
+}
+@container subagent-signal (width < 43.5px) {
+  .work-process-subagent-dots { grid-template-columns: repeat(4, var(--space-1)); }
+  .work-process-subagent-dots > span:nth-child(n + 13) { display: none; }
+}
+@container subagent-signal (width < 27.5px) { .work-process-subagent-dots { display: none; } }
+@container subagent-signal (height < 20px) { .work-process-subagent-dots > span:nth-child(n + 17) { display: none; } }
+@container subagent-signal (height < 20px) and (width < 59.5px) { .work-process-subagent-dots > span:nth-child(n + 13) { display: none; } }
+@container subagent-signal (height < 20px) and (width < 43.5px) { .work-process-subagent-dots > span:nth-child(n + 9) { display: none; } }
 .work-process-subagent-dots > span { width: var(--space-1); height: var(--space-1); border-radius: var(--radius-full); background: var(--token-border-muted); }
 .work-process-subagent-dots.is-complete > span { background: var(--token-status-success); }
 .work-process-subagent-dots.is-active > span { animation: subagent-progress-breathe 2.8s ease-in-out infinite; }
@@ -160,8 +182,6 @@
 
 @container (max-width: 34rem) {
   .work-process-subagent-identifiers > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
-  .work-process-subagent-dots { grid-template-columns: repeat(6, minmax(0, 1fr)); row-gap: var(--space-2); }
-  .work-process-subagent-dots > span:nth-child(n + 13) { display: none; }
 }
 
 .work-process-subagent-more:hover,

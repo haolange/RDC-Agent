@@ -6,6 +6,7 @@ const ROW_STATUS_LABEL: Record<WorkProcessRowStatus, string> = {
   complete: '',
   error: '失败',
   skipped: '已跳过',
+  cancelled: '已取消',
 };
 
 export const getRowStatusLabel = (status: WorkProcessRowStatus): string => ROW_STATUS_LABEL[status];

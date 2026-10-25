@@ -1,4 +1,5 @@
 import type { WorkProcessRow, WorkProcessRowStatus, WorkProcessToolGroupKind } from './workProcessTypes';
+import { groupImageRows } from './groupImageRows';
 
 const TOOL_AGGREGATE_THRESHOLD = 8;
 
@@ -46,6 +47,7 @@ function deriveStatus(rows: ToolRow[]): WorkProcessRowStatus {
   if (rows.some((row) => row.status === 'error')) return 'error';
   if (rows.some((row) => row.status === 'running')) return 'running';
   if (rows.some((row) => row.status === 'pending')) return 'pending';
+  if (rows.some((row) => row.status === 'cancelled')) return 'cancelled';
   if (rows.some((row) => row.status === 'skipped')) return 'skipped';
   return 'complete';
 }
@@ -126,8 +128,8 @@ export function aggregateSectionSteps(steps: WorkProcessRow[]): WorkProcessRow[]
     pendingTools = [];
   };
 
-  for (const step of steps) {
-    if (step.type === 'tool') {
+  for (const step of groupImageRows(steps)) {
+    if (step.type === 'tool' && !step.imageCalls) {
       pendingTools.push(step);
       continue;
     }

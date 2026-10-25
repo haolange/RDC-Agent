@@ -219,10 +219,9 @@ describe('ConversationService work trace tool approvals', () => {
 
     expect(stopped.status).toBe('stopped');
     expect(stopped.blocks[0].toolCalls[0]).toMatchObject({
-      status: 'error',
+      status: 'cancelled',
       approval: {
         status: 'cancelled',
-        answer: '请求已取消。',
       },
     });
     expect(stopped.blocks[0].toolCalls[0].approval?.resolvedAt).toEqual(expect.any(Number));
@@ -242,8 +241,8 @@ describe('ConversationService work trace tool approvals', () => {
 
     const stopped = finalizeTrace(trace, 'stopped', '请求已停止');
     expect(stopped.blocks[0].toolCalls[0]).toMatchObject({
-      status: 'error',
-      planReview: { status: 'rejected', decision: { kind: 'reject' } },
+      status: 'cancelled',
+      planReview: { status: 'cancelled' },
     });
   });
 
@@ -317,7 +316,7 @@ describe('ConversationService work trace tool approvals', () => {
     });
   });
 
-  it('skips queued tools on stop while preserving started calls as failed', () => {
+  it('skips queued tools and cancels started calls on stop', () => {
     let trace = upsertRuntimeToolCall(undefined, {
       id: 'tool-running',
       toolName: 'shell',
@@ -334,14 +333,14 @@ describe('ConversationService work trace tool approvals', () => {
     const calls = stopped.blocks.flatMap((block) => block.toolCalls);
 
     expect(calls.find((call) => call.id === 'tool-running')).toMatchObject({
-      status: 'error',
+      status: 'cancelled',
       completedAt: 200,
-      error: 'Run ended before this tool call completed.',
+      error: undefined,
     });
     expect(calls.find((call) => call.id === 'tool-queued')).toMatchObject({
       status: 'skipped',
       completedAt: 200,
-      resultPreview: 'Run stopped before this tool call executed.',
+      resultPreview: undefined,
     });
   });
 

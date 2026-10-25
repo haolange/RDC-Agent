@@ -11,12 +11,14 @@ import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import type { ComposerController } from './useComposer';
 import { useComposerPendingRequest } from './useComposerPendingRequest';
 import { ComposerPendingRequest } from './ComposerPendingRequest';
+import { planReviewRequestKey } from './planReviewRequestModel';
 import { ComposerEditor } from './ComposerEditor';
 import { ComposerFooter } from './ComposerFooter';
 import { useSlashCommand } from './useSlashCommand';
 import { type ComposerMarkdownMode } from './ComposerMarkdownInput';
 import { ComposerMarkdownModeTabs } from './ComposerMarkdownModeTabs';
 import { ComposerMenuRegistryProvider } from './useComposerMenuRegistry';
+import { ComposerTurnControlsProvider } from './ComposerTurnControlsContext';
 import { ComposerAttachIngest } from './ComposerAttachIngest';
 import { ComposerAttachmentTray } from './ComposerAttachmentTray';
 import { buildComposerSessionScopeKey } from '../../lib/composerSessionScope';
@@ -124,11 +126,12 @@ export const Composer: React.FC<ComposerProps> = ({
   }, [composerMarkdown, isComposerBusy]);
 
   const pendingRequest = useComposerPendingRequest();
-  if (pendingRequest) return <ComposerPendingRequest pending={pendingRequest} composeAccentStyle={composeAccentStyle} onStop={handlePrimaryStop} />;
-
   return (
-    <ComposerMenuRegistryProvider key={composerScopeKey}>
-    <div
+    <ComposerTurnControlsProvider agentId={selectedAgentId} currentSession={currentSession}>
+    <ComposerMenuRegistryProvider key={pendingRequest?.kind === 'plan-review'
+      ? `${composerScopeKey}:${planReviewRequestKey(pendingRequest.request)}` : composerScopeKey}>
+    {pendingRequest ? <ComposerPendingRequest pending={pendingRequest} composeAccentStyle={composeAccentStyle}
+      agentId={activeAgentId ?? selectedAgentId} currentSession={currentSession} onStop={handlePrimaryStop} /> : <div
       className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}${isDropActive ? ' is-drop-active' : ''}`}
       {...composeAccentStyle}
       onDragOver={attachmentDrop.handleDragOver}
@@ -202,7 +205,8 @@ export const Composer: React.FC<ComposerProps> = ({
         setCurrentMode={setCurrentMode}
         currentSession={currentSession}
       />
-    </div>
+    </div>}
     </ComposerMenuRegistryProvider>
+    </ComposerTurnControlsProvider>
   );
 };

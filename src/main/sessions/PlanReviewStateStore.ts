@@ -13,8 +13,9 @@ import type { StorageIo } from './StorageIo';
 const planReviewStateSchema = z.object({
   schemaVersion: z.literal(PLAN_REVIEW_STATE_SCHEMA),
   planId: z.string().trim().min(1),
+  ownerTurnId: z.string().trim().min(1).optional(),
   revision: z.number().int().positive(),
-  status: z.enum(['awaiting', 'approved', 'rejected', 'superseded']),
+  status: z.enum(['awaiting', 'approved', 'rejected', 'superseded', 'cancelled']),
   approvedHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   frozenUri: z.string().regex(/^session:\/\/plans\/plan-.+\.md$/).optional(),
   approvedHandoff: z.object({ label: z.string().trim().min(1), agent: z.string().trim().min(1) }).strict().optional(),
@@ -51,12 +52,15 @@ export class PlanReviewStateStore {
     return filePath ? this.host.io.readJson(filePath, planReviewStateSchema) : null;
   }
 
-  beginRevision(sessionId: string): BeginPlanRevisionResult {
+  beginRevision(sessionId: string, ownerTurnId: string): BeginPlanRevisionResult {
+    if (!ownerTurnId.trim()) throw new Error('PLAN_REVIEW_OWNER_REQUIRED: a plan requires its owning turn.');
     const previous = this.read(sessionId);
-    const newCycle = !previous || previous.status === 'approved';
+    const newCycle = !previous || previous.ownerTurnId !== ownerTurnId
+      || previous.status === 'approved' || previous.status === 'cancelled';
     const next: PlanReviewStateDocument = {
       schemaVersion: PLAN_REVIEW_STATE_SCHEMA,
       planId: newCycle ? `plan-${generateShortId()}` : previous.planId,
+      ownerTurnId,
       revision: newCycle ? 1 : previous.revision + 1,
       status: 'awaiting',
       updatedAt: nowMs(),
@@ -66,14 +70,28 @@ export class PlanReviewStateStore {
     return { planId: next.planId, revision: next.revision, newCycle };
   }
 
+  cancelReview(sessionId: string, ownerTurnId: string, planId: string, revision: number): boolean {
+    const current = this.read(sessionId);
+    if (!current || current.ownerTurnId !== ownerTurnId || current.planId !== planId
+      || current.revision !== revision || current.status !== 'awaiting') return false;
+    this.write(sessionId, { ...current, status: 'cancelled', updatedAt: nowMs() });
+    storageAdapter.executionOffers.clear(sessionId);
+    return true;
+  }
+
   markDecision(
     sessionId: string,
     status: Extract<PlanReviewStatus, 'approved' | 'rejected'>,
+    owner: { turnId: string; planId: string; revision: number },
     extras?: { approvedHash?: string; frozenUri?: string; approvedHandoff?: PlanReviewHandoffOption },
   ): PlanReviewStateDocument {
     const current = this.read(sessionId);
     if (!current) {
       throw new Error('PLAN_REVIEW_STATE_MISSING: no live plan review to decide.');
+    }
+    if (current.ownerTurnId !== owner.turnId || current.planId !== owner.planId
+      || current.revision !== owner.revision || current.status !== 'awaiting') {
+      throw new Error('PLAN_REVIEW_SCOPE_CHANGED: this review no longer owns the current plan.');
     }
     const next: PlanReviewStateDocument = {
       ...current,

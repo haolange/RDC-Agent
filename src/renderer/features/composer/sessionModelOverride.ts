@@ -25,14 +25,25 @@ export async function persistSessionModelOverride(
   if (!sessionId) return { ok: false, error: 'SESSION_MISSING' };
   const api = getElectronApi();
   if (!api) return { ok: false, error: 'BRIDGE_UNAVAILABLE' };
-  let result: Awaited<ReturnType<typeof api.session.setModelOverride>>;
-  try { result = await api.session.setModelOverride(sessionId, modelOverride); }
-  catch { return { ok: false, error: 'MODEL_SAVE_FAILED' }; }
-  if (!result.success || !result.session) {
-    return { ok: false, error: result.error || 'MODEL_UNAVAILABLE' };
+  const initial = useProjectStore.getState();
+  const projectId = initial.currentProject?.projectId;
+  const selectedSessionId = initial.currentSession?.sessionId;
+  let invalidated = false;
+  const off = useProjectStore.subscribe((state) => {
+    if (state.currentProject?.projectId !== projectId || state.currentSession?.sessionId !== selectedSessionId) {
+      invalidated = true;
+    }
+  });
+  try {
+    const result = await api.session.setModelOverride(sessionId, modelOverride);
+    if (!result.success || !result.session) return { ok: false, error: result.error || 'MODEL_UNAVAILABLE' };
+    if (!invalidated) applySessionRecordToStore(result.session);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'MODEL_SAVE_FAILED' };
+  } finally {
+    off();
   }
-  applySessionRecordToStore(result.session);
-  return { ok: true };
 }
 
 export async function commitComposerModelChoice(

@@ -39,6 +39,7 @@ const resolveCollapsedSampleLines = (row: ToolRowModel): string[] => {
 };
 
 export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
+  if (row.toolName === 'plan_artifact' && row.status !== 'error') return null;
   if (isDedicatedFamily(row.family)) return <FamilyLayerBody row={row} />;
 
   const bodyText = resolveBodyText(row);

@@ -17,6 +17,7 @@ import { clearComposerModelChoice, commitComposerModelChoice } from './sessionMo
 import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
 import { Button } from '../../ui/Button';
 import { InlineError } from '../../ui/InlineError';
+import type { ComposerModelSaveState } from './ComposerModelEffortControl';
 
 function formatAgentDefaultMeta(
   state: ComposerAgentDefaultState,
@@ -36,13 +37,18 @@ export const ComposerModelPickerPanel: React.FC<{
   currentSession: SessionRecord | null;
   popupRef: React.RefObject<HTMLDivElement>;
   popupShiftPx: number;
-  onChosen: () => void;
-}> = ({ agentId, currentSession, popupRef, popupShiftPx, onChosen }) => {
+  onChosen: (agentDefault?: boolean) => void;
+  onSaveStateChange?: (state: ComposerModelSaveState) => void;
+  agentDefaultLabelOnly?: boolean;
+}> = ({ agentId, currentSession, popupRef, popupShiftPx, onChosen, onSaveStateChange, agentDefaultLabelOnly = false }) => {
   const { t } = useI18n();
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
+  const mounted = useRef(true);
+  const savingRef = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const providers = useAppSettingsStore((state) => state.settings.llm.providers);
   const agentRoute = useAppSettingsStore((state) => readCompiledComposerRoute(state.settings, agentId));
   const agentName = useAppSettingsStore((state) => (
@@ -69,14 +75,19 @@ export const ComposerModelPickerPanel: React.FC<{
   }, []);
 
   const selectModel = async (next: { providerId: string; modelId: string }) => {
-    if (saving) return;
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaveError('');
     setSaving(true);
+    onSaveStateChange?.({ saving: true });
     const result = await commitComposerModelChoice(
       next,
       currentSession?.sessionId,
       projectId,
     );
+    savingRef.current = false;
+    onSaveStateChange?.({ saving: false, error: result.ok ? undefined : t('composer.model.saveFailed') });
+    if (!mounted.current) return;
     setSaving(false);
     if (!result.ok) {
       setSaveError(t('composer.model.saveFailed'));
@@ -87,16 +98,21 @@ export const ComposerModelPickerPanel: React.FC<{
 
   const selectAgentDefault = async () => {
     if (!agentDefault.selectable) return;
-    if (saving) return;
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaveError('');
     setSaving(true);
+    onSaveStateChange?.({ saving: true });
     const result = await clearComposerModelChoice(currentSession?.sessionId, projectId);
+    savingRef.current = false;
+    onSaveStateChange?.({ saving: false, error: result.ok ? undefined : t('composer.model.saveFailed') });
+    if (!mounted.current) return;
     setSaving(false);
     if (!result.ok) {
       setSaveError(t('composer.model.saveFailed'));
       return;
     }
-    onChosen();
+    onChosen(true);
   };
 
   const handleMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -155,12 +171,12 @@ export const ComposerModelPickerPanel: React.FC<{
           data-testid="composer-model-agent-default"
           role="menuitemradio"
           aria-checked={!hasChoice}
-          title={agentDefaultTitle}
+          title={agentDefaultLabelOnly ? t('composer.model.agentDefault') : agentDefaultTitle}
           disabled={saving || !agentDefault.selectable}
           onClick={() => void selectAgentDefault()}
         >
           <span className="composer-model-item-label">{t('composer.model.agentDefault')}</span>
-          <span className="composer-model-item-meta">{agentDefaultMeta}</span>
+          {!agentDefaultLabelOnly ? <span className="composer-model-item-meta">{agentDefaultMeta}</span> : null}
         </Button>
         {saving ? <p className="composer-model-empty" role="status">{t('settings.saving')}</p> : null}
         {failedProviders.length ? <div className="composer-model-errors">{failedProviders.map((provider) => <InlineError key={provider.id}>

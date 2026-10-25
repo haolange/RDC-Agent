@@ -9,6 +9,7 @@ import type {
   ConversationWorkTrace,
 } from '@shared/types/conversation';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
+import { cancelWorkTrace } from '@shared/conversation/cancelWorkTrace';
 import { nowMs } from '@shared/utils/id';
 import { normalizeToolName } from '../workflow/debugger/DebuggerRuntimePolicy';
 
@@ -84,6 +85,7 @@ function cloneToolCall(toolCall: ConversationToolCall): ConversationToolCall {
     })),
     planReview: toolCall.planReview ? { ...toolCall.planReview, summary: [...toolCall.planReview.summary], sections: toolCall.planReview.sections.map((section) => ({ ...section })), handoffOptions: toolCall.planReview.handoffOptions.map((option) => ({ ...option })), decision: toolCall.planReview.decision ? { ...toolCall.planReview.decision } : undefined } : undefined,
     resourceRefs: toolCall.resourceRefs?.map((resource) => ({ ...resource })),
+    imagePreviews: toolCall.imagePreviews?.map((preview) => ({ ...preview })),
     approval: toolCall.approval ? { ...toolCall.approval } : undefined,
   };
 }
@@ -174,10 +176,11 @@ export function finalizeTrace(
   terminalAt = nowMs(),
 ): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
+  if (status === 'stopped') return cancelWorkTrace(nextTrace, terminalAt);
   const terminalBlockStatus: ConversationWorkBlock['status'] | null =
     status === 'complete'
       ? 'complete'
-      : status === 'error' || status === 'stopped'
+      : status === 'error'
         ? 'error'
         : null;
 
@@ -192,30 +195,10 @@ export function finalizeTrace(
         : block.completedAt ?? terminalAt;
       const toolCalls = block.toolCalls.map((toolCall) => {
         const cloned = cloneToolCall(toolCall);
-        const cancelPendingApproval = status === 'stopped' && cloned.approval?.status === 'pending'
-          ? {
-              ...cloned.approval,
-              status: 'cancelled' as const,
-              resolvedAt: cloned.approval.resolvedAt ?? terminalAt,
-              answer: cloned.approval.answer ?? '请求已取消。',
-            }
-          : cloned.approval;
-        if ((status === 'stopped' || status === 'error') && cloned.planReview?.status === 'awaiting') {
-          cloned.planReview = {
-            ...cloned.planReview,
-            status: 'rejected',
-            decision: cloned.planReview.decision ?? {
-              kind: 'reject',
-              feedback: status === 'stopped'
-                ? 'The request stopped before plan review.'
-                : 'The request ended before plan review.',
-            },
-          };
+        if (status === 'error' && cloned.planReview?.status === 'awaiting') {
+          cloned.planReview = { ...cloned.planReview, status: 'cancelled' };
         }
         if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
-          if (cancelPendingApproval !== cloned.approval) {
-            return { ...cloned, approval: cancelPendingApproval };
-          }
           return cloned;
         }
         const terminalToolStatus: ConversationToolCall['status'] = toolCall.status === 'pending'
@@ -226,16 +209,13 @@ export function finalizeTrace(
           status: terminalToolStatus,
           completedAt: toolCall.completedAt ?? terminalAt,
           resultPreview: terminalToolStatus === 'skipped'
-            ? (toolCall.resultPreview ?? (status === 'stopped'
-              ? 'Run stopped before this tool call executed.'
-              : status === 'complete'
+            ? (toolCall.resultPreview ?? (status === 'complete'
                 ? 'Run completed before this tool call executed.'
                 : 'Run ended before this tool call executed.'))
             : toolCall.resultPreview,
           error: terminalToolStatus === 'error'
             ? (toolCall.error ?? 'Run ended before this tool call completed.')
             : toolCall.error,
-          approval: cancelPendingApproval,
         };
       });
       const result = block.kind === 'llm_turn'
@@ -268,6 +248,7 @@ export function upsertRuntimeToolCall(
   options?: LoopTraceOptions,
 ): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
+  if (nextTrace.status === 'stopped') return nextTrace;
   const blockMeta = getRuntimeToolBlockMeta(patch.toolName, patch.id, options?.loopId);
   const blockId = blockMeta.id;
   const existingBlock = nextTrace.blocks.find((entry) => (
@@ -321,6 +302,7 @@ export function upsertRuntimeToolCall(
       argsPreview: patch.argsPreview,
       resultPreview: patch.resultPreview,
       resourceRefs: patch.resourceRefs?.map((resource) => ({ ...resource })),
+      imagePreviews: patch.imagePreviews?.map((preview) => ({ ...preview })),
       hookDiagnostics: patch.hookDiagnostics?.map((diagnostic) => ({ ...diagnostic })),
       error: patch.error,
       approval: patch.approval ? { ...patch.approval } : undefined,
@@ -330,10 +312,11 @@ export function upsertRuntimeToolCall(
   }
   syncLoopResultToolIds(block);
   if (block.toolCalls.length > 0 && block.toolCalls.every((toolCall) => (
-    toolCall.status === 'complete' || toolCall.status === 'error' || toolCall.status === 'skipped'
+    toolCall.status === 'complete' || toolCall.status === 'error' || toolCall.status === 'skipped' || toolCall.status === 'cancelled'
   ))) {
-    block.status = block.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error' : 'complete';
-    block.completedAt = nowMs();
+    block.status = block.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error'
+      : block.toolCalls.some((toolCall) => toolCall.status === 'cancelled') ? 'cancelled' : 'complete';
+    block.completedAt ??= nowMs();
     if (block.kind === 'llm_turn') {
       block.result = { ...ensureLoopResult(block), status: 'complete' };
     }
@@ -377,7 +360,6 @@ export function supersedePreviousPlanReviews(
         planReview: {
           ...toolCall.planReview,
           status: 'superseded',
-          decision: toolCall.planReview.decision ?? { kind: 'reject', feedback: 'Superseded by a newer plan revision.' },
         },
       };
     }
@@ -401,10 +383,11 @@ export function upsertRuntimeToolApproval(
   options?: LoopTraceOptions,
 ): ConversationWorkTrace {
   const status = normalizeToolApprovalStatus(input.status);
-  const failed = status === 'rejected' || status === 'cancelled';
+  const failed = status === 'rejected';
   const existingToolCall = trace?.blocks
     .flatMap((block) => block.toolCalls)
     .find((toolCall) => toolCall.id === input.toolCallId);
+  const settled = existingToolCall && existingToolCall.status !== 'pending' && existingToolCall.status !== 'running';
   const now = nowMs();
   const approval: NonNullable<ConversationToolCall['approval']> = {
     approvalId: input.approvalId,
@@ -423,14 +406,15 @@ export function upsertRuntimeToolApproval(
   const toolPatch: Partial<ConversationToolCall> & { id: string; toolName: string } = {
     id: input.toolCallId,
     toolName: input.toolName,
-    status: failed
+    status: settled ? existingToolCall.status : status === 'cancelled' ? 'cancelled' : failed
       ? 'error'
       : existingToolCall?.status === 'complete'
         ? 'complete'
         : 'running',
     approval,
   };
-  if (failed) {
+  if (status === 'cancelled' && !settled) toolPatch.completedAt = existingToolCall?.completedAt ?? now;
+  if (failed && !settled) {
     toolPatch.error = answer || input.reason || 'Tool approval was denied.';
     toolPatch.completedAt = now;
   }
@@ -507,6 +491,7 @@ export function upsertLoopResult(
   providerOutputRefs?: ProviderOutputRef[],
 ): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
+  if (nextTrace.status === 'stopped') return nextTrace;
   let block = nextTrace.blocks.find((entry) => entry.id === loopId);
   if (!block) {
     block = createWorkBlock(loopId, 'LLM turn', 'model', 'llm_turn');
@@ -529,7 +514,8 @@ export function upsertLoopResult(
     block.status = 'running';
     delete block.completedAt;
   } else {
-    block.status = block.toolCalls.some((call) => call.status === 'error') ? 'error' : 'complete';
+    block.status = block.toolCalls.some((call) => call.status === 'error') ? 'error'
+      : block.toolCalls.some((call) => call.status === 'cancelled') ? 'cancelled' : 'complete';
     block.completedAt ??= nowMs();
   }
   nextTrace.status = 'running';
@@ -666,7 +652,7 @@ export function sanitizeStoredWorkTrace(
     if (!block || typeof block !== 'object') return null;
     if (!normalizeWorkBlockKind(block.kind)) return null;
     if (typeof block.id !== 'string' || !block.id.trim()) return null;
-    if (!['pending', 'running', 'complete', 'error'].includes(block.status)) return null;
+    if (!['pending', 'running', 'complete', 'error', 'cancelled'].includes(block.status)) return null;
     if (!Array.isArray(block.toolCalls)) return null;
     for (const call of block.toolCalls) {
       if (!call || typeof call !== 'object') return null;

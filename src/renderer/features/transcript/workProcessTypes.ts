@@ -7,7 +7,7 @@ import type {
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 
-export type WorkProcessRowStatus = 'pending' | 'running' | 'complete' | 'error' | 'skipped';
+export type WorkProcessRowStatus = 'pending' | 'running' | 'complete' | 'error' | 'skipped' | 'cancelled';
 
 /** Per-builtin Work Process header glyph. Each catalog tool maps to a unique key. */
 export type WorkProcessIconKey =
@@ -126,6 +126,9 @@ export type WorkProcessRow =
   }
   | {
     type: 'tool';
+    /** Renderer-only image group; source calls and receipts remain unchanged. */
+    imageCalls?: Array<Extract<WorkProcessRow, { type: 'tool' }>>;
+    planReview?: import('@shared/types/planReview').ConversationPlanReview;
     id: string;
     status: WorkProcessRowStatus;
     verb: string;

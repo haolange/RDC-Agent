@@ -18,9 +18,11 @@ export const createPlanReviewShellRow = (call: ConversationToolCall): WorkProces
   const feedback = call.planReview?.decision?.kind === 'reject' ? call.planReview.decision.feedback : call.resultPreview;
   return {
     type: 'tool',
+    planReview: call.planReview,
     id: call.id,
     status: call.status,
-    verb: rejected ? '已更新计划 · 已拒绝' : '已更新计划',
+    verb: call.planReview?.status === 'cancelled' ? '计划 · 审阅已取消'
+      : rejected ? '计划 · 已提出修改' : '已更新计划',
     category: '计划产物',
     icon: 'planArtifact',
     groupKind: 'runtime',
@@ -38,7 +40,7 @@ export const createPlanReviewShellRow = (call: ConversationToolCall): WorkProces
 export const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
   const questions = call.userInputQuestions ?? [];
   const incomplete = questions.length === 0;
-  const status = incomplete
+  const status = call.status === 'cancelled' ? 'cancelled' : incomplete
     ? 'error'
     : call.status === 'complete'
     ? 'complete'
@@ -63,7 +65,7 @@ export const createUserInputRow = (call: ConversationToolCall): WorkProcessRow =
     type: 'userInput',
     id: call.id,
     status,
-    verb: incomplete ? '问题数据不完整' : status === 'complete' ? '已询问' : status === 'error' ? '询问已中断' : '正在询问',
+    verb: status === 'cancelled' ? '已取消' : incomplete ? '问题数据不完整' : status === 'complete' ? '已询问' : status === 'error' ? '询问已中断' : '正在询问',
     questionCount: questions.length,
     items,
     answeredCount: items.filter((item) => Boolean(item.answer)).length,
@@ -92,6 +94,7 @@ export const createApprovalRow = (block: ConversationWorkBlock): WorkProcessRow 
 };
 
 const getApprovalVerb = (status: WorkProcessRowStatus, isAutoReview: boolean): string => {
+  if (status === 'cancelled') return '已取消';
   if (status === 'error') return isAutoReview ? '自动检查拒绝' : '已拒绝';
   if (status === 'running' || status === 'pending') return isAutoReview ? '自动检查中' : '等待审批';
   return isAutoReview ? '自动检查通过' : '已批准';

@@ -32,6 +32,8 @@
 
 ## Active Turn Context
 
+计划审批局部状态按session、turn、toolCall及计划身份隔离，切换会话/修订时销毁意见、错误和弹层；模型保存的迟到反馈不能回填新面板。审批区复用既有SessionRecord.modelOverride，保存期间阻止审批提交但允许停止。覆盖只影响之后的新请求，不能改动已冻结的当前请求；批准交接沿原队列使用新配置，拒绝后仍恢复原冻结请求。无覆盖时由各声明目标Agent原配置决定模型，UI显示“按Agent配置”。
+
 Send 与 Rewrite 共用 session-scoped `ActiveTurnContext`：
 
 ```typescript
@@ -114,3 +116,16 @@ main-owned artifacts 投影仅含 rows（最多5项）、totalCount、storeDegra
 ### 目录内存投影
 
 Renderer 的 EffectiveCatalog snapshot 只按 provider/account/protocol 保存，不写用户资源或历史会话。会话与 Agent 选择共用快照，账号或协议切换后旧请求和事件不得进入新 scope；模型选择成功才更新会话，失败不推进本地选择。共享目录不会替代 prepareTurn 冻结的 RequestPlan，也不会改变子 Agent 的模型继承边界。
+
+## 请求取消与计划归属
+
+- ConversationMessage/WorkTrace 的 stopped 是当前请求终态，不表示会话结束或某种模式退出。main 与 renderer 乐观停止共用纯取消结算，结束时间幂等，已完成及真实失败不被取消覆盖。未执行工具 skipped，运行中中止工具及工作块 cancelled；后台 Task 保留自身生命周期。
+- 待审计划取消使用 cancelled，无伪造 reject decision；修改意见继续通过 reject + feedback 恢复同一冻结请求。通用结果回执不得将明确已取消的交互改回 error/running。
+- PlanReviewState 的 ownerTurnId 在新写入时必需；未证明归属的已有记录只读不推断。不同 owning Turn 开启新周期；取消/决定按 ownerTurnId、planId、revision 核对。无新 IPC、模式开关或批量历史迁移。
+- 包含计划交互的 assistant result 永不渲染 handoff 建议；共享判定用于主进程及 renderer，不按 Agent 名称新增显示特判。审批区是唯一计划执行入口。
+- 新请求的 user/assistant 共用 owning request/turn，按真实消息顺序投影；审批反馈不是新 user 消息。Bridge 外部调用与真实 Composer 驾驶证据须分别记录，不能通过伪用户消息修饰历史。
+
+
+### 图片工具展示投影
+
+同段相邻成功read_image可在renderer形成只读展示组；原ConversationToolCall身份、顺序、回执与终态不改变，不跨Turn/段落/子过程。imageCalls仅属renderer行模型，不落持久会话。imagePreviews由main在工具结果转存后保留并按既有session scope读取；renderer不扫描存储或重读源路径。预览响应按会话隔离，缺失/失败不同于加载中；展示数量不取决于缩略图是否成功加载。

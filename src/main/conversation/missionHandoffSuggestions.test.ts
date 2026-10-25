@@ -41,12 +41,12 @@ describe('shouldSnapshotHandoffSuggestions', () => {
     })).toBe(false);
   });
 
-  it('emits Mission suggestions only after an approved plan_artifact', () => {
+  it('does not repeat approved plan handoffs underneath the result', () => {
     expect(shouldSnapshotHandoffSuggestions({
       agentId: 'analyzer',
       finalStatus: 'complete',
       workTrace: traceWith([approvedCall]),
-    })).toBe(true);
+    })).toBe(false);
   });
 
   it.each(['awaiting', 'rejected', 'superseded'] as const)('does not emit suggestions for a %s plan', (status) => {
@@ -62,5 +62,11 @@ describe('shouldSnapshotHandoffSuggestions', () => {
       agentId: 'general',
       finalStatus: 'streaming',
     })).toBe(false);
+  });
+  it('suppresses plan-result actions for custom profiles too', () => {
+    expect(shouldSnapshotHandoffSuggestions({ agentId: 'custom-planner', finalStatus: 'complete',
+      workTrace: traceWith([approvedCall]) })).toBe(false);
+    expect(shouldSnapshotHandoffSuggestions({ agentId: 'custom-helper', finalStatus: 'complete',
+      workTrace: undefined })).toBe(true);
   });
 });

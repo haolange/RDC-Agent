@@ -2,27 +2,25 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-modal-backdrop);
-  --reading-inset: var(--space-4);
-  background: var(--modal-backdrop);
-  backdrop-filter: var(--modal-backdrop-filter);
-  -webkit-backdrop-filter: var(--modal-backdrop-filter);
+  --reading-inset: var(--space-2);
 }
 
 .plan-review-panel {
   position: absolute;
   left: var(--reading-left);
-  top: calc(var(--reading-top) + var(--reading-inset));
+  bottom: calc(100dvh - var(--reading-bottom) + var(--reading-inset));
   z-index: var(--z-modal);
   display: flex;
   flex-direction: column;
   width: var(--reading-width);
-  height: calc(var(--reading-height) - 2 * var(--reading-inset));
+  max-height: calc(var(--reading-height) - 2 * var(--reading-inset));
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--token-border-subtle);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-xl);
   background: var(--token-bg-overlay);
   color: var(--token-text-heading);
+  box-shadow: var(--token-shadow-popover);
 }
 
 .plan-review-panel__header {

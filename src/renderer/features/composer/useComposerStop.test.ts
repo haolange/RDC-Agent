@@ -73,7 +73,7 @@ describe('stopWorkTrace', () => {
     expect(stopped.status).toBe('stopped');
     expect(stopped.workTrace?.status).toBe('stopped');
     expect(stopped.workTrace?.blocks[0]).toMatchObject({
-      status: 'error',
+      status: 'cancelled',
       completedAt: Date.now(),
     });
     expect(stopped.workTrace?.blocks[1].status).toBe('complete');
@@ -101,13 +101,13 @@ describe('stopWorkTrace', () => {
     }));
 
     const loop = stopped.workTrace?.blocks[0];
-    expect(loop).toMatchObject({ status: 'error', thinkingStatus: 'complete' });
+    expect(loop).toMatchObject({ status: 'cancelled', thinkingStatus: 'complete' });
     expect(loop?.result).toMatchObject({ status: 'complete', toolCallIds: ['queued', 'review'] });
     expect(loop?.toolCalls[0]).toMatchObject({ status: 'skipped', completedAt: expect.any(Number) });
     expect(loop?.toolCalls[1]).toMatchObject({
-      status: 'error', completedAt: expect.any(Number),
+      status: 'cancelled', completedAt: expect.any(Number),
       approval: { status: 'cancelled' },
-      planReview: { status: 'rejected', decision: { kind: 'reject' } },
+      planReview: { status: 'cancelled' },
     });
   });
 });

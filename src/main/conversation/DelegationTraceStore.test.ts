@@ -181,7 +181,7 @@ it.each(['complete', 'failed', 'cancelled'] as const)('settles every owned step 
     expect(['running', 'pending']).not.toContain(block.status);
     expect(block.thinkingStatus).toBe('complete');
     expect(block.completedAt).toBe(page.header?.completedAt);
-    expect(block.toolCalls.find(tool => tool.id === 'started')).toMatchObject({ status: 'error', completedAt: page.header?.completedAt });
+    expect(block.toolCalls.find(tool => tool.id === 'started')).toMatchObject({ status: status === 'cancelled' ? 'cancelled' : 'error', completedAt: page.header?.completedAt });
     expect(block.toolCalls.find(tool => tool.id === 'pending')?.status).toBe('skipped');
   }
   delegationTraceStore.event('owner', call, identity, event('assistant.thinking_delta', { text: 'Late' }, 9));

@@ -21,7 +21,7 @@ export type ConversationRole = 'user' | 'assistant' | 'system';
 
 export type ConversationMessageStatus = 'draft' | 'streaming' | 'complete' | 'error' | 'stopped';
 
-export type ConversationWorkBlockStatus = 'pending' | 'running' | 'complete' | 'error';
+export type ConversationWorkBlockStatus = 'pending' | 'running' | 'complete' | 'error' | 'cancelled';
 
 /** Durable TaskRegistry lifecycle state carried by task work-trace blocks. */
 export type ConversationTaskStatus = 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
@@ -77,7 +77,7 @@ export interface ConversationToolImagePreviewRef {
   height?: number;
 }
 
-export type ConversationToolCallStatus = 'pending' | 'running' | 'complete' | 'error' | 'skipped';
+export type ConversationToolCallStatus = 'pending' | 'running' | 'complete' | 'error' | 'skipped' | 'cancelled';
 
 export type ConversationToolResourceKind = 'file' | 'directory' | 'skill' | 'mcp' | 'web';
 

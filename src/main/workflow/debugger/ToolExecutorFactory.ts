@@ -514,7 +514,7 @@ export class ToolExecutorFactory {
       const taskRequirements = registry ? await preparePlanTaskRequirements(registry, requiredTaskIds as string[], args.taskRevisions) : [];
       const markdown = composePlanMarkdown({ title, summary, content, taskRequirements });
       const written = planArtifactWriter.writeLivePlan(sessionId, markdown);
-      const revision = planReviewStateStore.beginRevision(sessionId);
+      const revision = planReviewStateStore.beginRevision(sessionId, runtimeContext.turnId);
       const planReview = {
         planId: revision.planId,
         revision: revision.revision,
@@ -552,6 +552,7 @@ export class ToolExecutorFactory {
         toolName: toolCall.name,
         content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
         isError: true,
+        details: error instanceof Error && error.name === 'AbortError' ? { reason: 'abort' } : undefined,
         timestamp: Date.now(),
       };
     }
