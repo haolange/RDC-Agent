@@ -3888,3 +3888,11 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 工程：最终完整 suite 519 files / 3797 tests passed，4 files /4 tests按现有配置 skipped，208.60s；coverage statements75.05 / branches65.27 / functions78.90 / lines77.42，ratchet通过。含应用内登录窗口4项、设备键盘及重发登录迟到失败隔离回归；后者先RED后GREEN。typecheck/lint、完整 gates、contracts/scoped-resources及正式构建通过，未削弱断言。系统TEMP权限、参数转发造成的无效尝试已停止；并发4时一个未修改的Git扫描测试超过5秒，独立8项通过，受控TEMP与显式maxWorkers=2最终全套通过。完整gates一次遗漏受控TEMP造成Knowledge测试失败，补同一环境后通过；隔离DPAPI启动失败由相同Windows用户身份重启解决，无明文fallback。
 - 资源清理与桌面启动权：官方 `start:human` 在隔离双根实际打开 RDC-Agent，main145332/出生2026-10-25T08:57:57.926+08:00、父83508与窗口身份匹配；launcher退出后主进程及三个子进程均消失，5127无监听、canonical锁不存在，桌面启动权已交还。最后仅将诊断里的套餐名改为真实Grok Build权限要求并修正缩进，17项账号回归与正式构建再次通过。经绝对路径、Git、链接和进程边界核验，删除本轮5个隔离/测试根、授权副本、临时脚本与重复输出，逻辑47962959B（不代表实测物理释放量）；只保留Tasks、来源/请求/性能/动态回执和五张截图，约0.4MB。当前out与依赖保留可运行；canonical用户配置、历史、授权、原capture和Grok Build未改。`receipt.json`记录最终构建hash、失败尝试和清理清单；新OAuth人类授权仍明确未验收，无提交推送发布。
 - 提交前复查：用户随后明确授权清理、提交并上传main。远端main与原基线一致；清除五组无消费者中英文文案、设备分支不可能使用的浏览器等待说明，以及无需求依据的OpenRouter `context_windows`接线；仍需手动code的provider改用通用授权页占位文字。6文件/66项相邻回归、provider-system的249项与157项合约、typecheck/lint、legacy/fidelity/renderer结构、仓库整洁与验收门禁、正式构建均通过；未重复既有全量suite或冒充新登录授权成功。清理本次受控TEMP和构建日志，最小回执保留于原任务区；提交及远端SHA在该回执记录。
+
+### 2026-10-25 Grok 新登录与历史命名闭合
+
+- 用户批准保留唯一应用内登录入口，Chrome仅协助本次正常登录；本次不提交推送。以3705539f为源码基线，清理当前代码的历史账号/诊断命名与伪造套餐字段；保留有日期的原始事实来源，不迁移历史配置，不增加登录方式、IPC或QA产品分支。新的正式配置无planLabel，不将认证方式当套餐。
+- 独立App正式设置入口从Unconfigured发起唯一PKCE flow；Chrome现有账号直接进入Grok Build标准授权页，未输入密码、复制Cookie、读取旧Token或使用CLI授权。相同state/nonce/动态回调完成新授权，2026-10-25T12:42:30.831Z正式连接写入并取得grok-4.7/4.6/4.5三个可选模型。与上一阶段旧凭据测试分开，不将当时未授权事实追认为通过。
+- 原App确实在登录页已经加载后仍显示Opening browser：主设置等待BrowserWindow.loadURL整页Promise返回。补“页面未加载完仍应返回flow”测试先RED，改为窗口拥有异步导航、启动立即返回pending后GREEN；页面失败仍abort并关闭，取消后迟到导航错误不写回失败。33项账号/回调/身份/窗口回归、typecheck/lint、contracts248、provider-system249+157、renderer/fidelity/仓库整洁及官方构建通过；未削弱断言或重跑无变化的全量矩阵。
+- 最终构建经官方start:human重启，未再次授权即恢复Connected；UI再次Test成功，正式lastTestedAt更新为2026-10-25T12:47:29.912Z、三模型目录与refreshAvailable成立。这一重启后真实调用证明安全存储可恢复，不能只凭缓存UI判定。现有Composer模型选择保留；未新增会话、推理请求或RDC实验。
+- 新授权、首次目录、重启恢复与重读目录分别通过；Chrome临时授权页已关闭、原X页保留。授权完成后的loopback端口已无监听；本轮App/launcher退出、锁及磁盘清理结果归入原任务区receipt.json的grokLoginClosure，保留一张无凭据的最终App连接截图。此前“新授权未验收”边界在本次明确关闭。

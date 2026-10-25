@@ -467,7 +467,7 @@ export const enSettings = {
   'settings.noProvidersInGroup': 'No providers in this group.',
   'settings.signOut': 'Sign out',
   'settings.oauthConnectHint': 'Open the authorization page and complete account sign-in.',
-  'settings.superGrokOAuthConnectHint': 'Sign in to Grok in your browser. The app connects automatically using your subscription.',
+  'settings.grokSubscriptionConnectHint': 'Sign in to Grok in your browser. The app connects automatically using your subscription.',
   'settings.githubAuthorizationPending': 'Waiting for GitHub authorization. Enter the device code on GitHub to finish connecting.',
   'settings.oauthDeviceAuthorizationPending': 'Waiting for authorization. Open the authorization page, enter the device code, and keep this dialog open.',
   'settings.openAuthPage': 'Open authorization page',

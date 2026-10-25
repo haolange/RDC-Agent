@@ -123,7 +123,7 @@ const httpGetText = (url: string): Promise<{ statusCode: number; body: string }>
   }).on('error', reject);
 });
 
-describe('ProviderAccountAuthService Super Grok OAuth', () => {
+describe('ProviderAccountAuthService Grok sign-in', () => {
   beforeEach(() => {
     process.env.RDC_AGENT_TEST_MODE = '1';
     mocks.savedConnections.length = 0;
@@ -224,6 +224,8 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
       expect(mocks.savedConnections).toHaveLength(cancel ? 0 : 1);
       if (!cancel) {
         expect(publish).toHaveBeenCalledOnce();
+        expect(JSON.parse(mocks.savedConnections[0].secretPayload)).not.toHaveProperty('planLabel');
+        expect(mocks.savedConnections[0].accountSummary).not.toHaveProperty('planLabel', expect.any(String));
         expect(fetchMock).toHaveBeenCalledWith('https://cli-chat-proxy.grok.com/v1/models',
           expect.objectContaining({ headers: expect.objectContaining({ 'X-XAI-Token-Auth': 'xai-grok-cli' }) }));
       }
@@ -264,7 +266,7 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
     expect(mocks.disconnectedProviders).toHaveLength(0);
   });
 
-  it('refreshes expired Super Grok bundles using metadata token endpoint and the public client', async () => {
+  it('refreshes expired Grok subscription bundles using metadata token endpoint and the public client', async () => {
     const service = new ProviderAccountAuthService();
     mocks.provider = {
       id: 'grok-account',
@@ -341,7 +343,7 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
     expect(status.error).toContain('fetch failed');
   });
 
-  it('revokes Super Grok tokens best-effort through metadata before clearing the local account', async () => {
+  it('revokes Grok subscription tokens best-effort through metadata before clearing the local account', async () => {
     const service = new ProviderAccountAuthService();
     mocks.oauthSecret = JSON.stringify({
       providerId: 'grok-account',

@@ -3,7 +3,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { openGrokLoginWindow } from './grokLoginWindow';
 import type { OAuthFlowState } from './oauthTypes';
 
-const mocks = vi.hoisted(() => ({ windows: [] as unknown[], fail: false }));
+const mocks = vi.hoisted(() => ({ windows: [] as unknown[], fail: false, pending: false,
+  rejectLoad: undefined as undefined | ((error: Error) => void) }));
 vi.mock('electron', () => ({ BrowserWindow: class extends EventEmitter {
   static getFocusedWindow = () => undefined;
   destroyed = false;
@@ -11,7 +12,10 @@ vi.mock('electron', () => ({ BrowserWindow: class extends EventEmitter {
     session: { setPermissionRequestHandler: vi.fn() }, setWindowOpenHandler: vi.fn(),
   });
   constructor(public options: Record<string, unknown>) { super(); mocks.windows.push(this); }
-  loadURL = vi.fn(async () => { if (mocks.fail) throw new Error('offline'); });
+  loadURL = vi.fn(async () => {
+    if (mocks.pending) await new Promise((_resolve, reject) => { mocks.rejectLoad = reject; });
+    if (mocks.fail) throw new Error('offline');
+  });
   isDestroyed = () => this.destroyed;
   close = vi.fn(() => { this.destroyed = true; this.emit('closed'); });
 } }));
@@ -23,7 +27,18 @@ type TestWindow = EventEmitter & { options: { webPreferences: Record<string, unk
 const window = () => mocks.windows.at(-1) as TestWindow;
 const flow = (): OAuthFlowState => ({ providerId: 'grok-account', flowId: 'owned', state: 's',
   expiresAt: Date.now() + 60000, redirectUri: 'http://127.0.0.1:3456/callback', abortController: new AbortController() });
-beforeEach(() => { mocks.windows.length = 0; mocks.fail = false; });
+beforeEach(() => { mocks.windows.length = 0; mocks.fail = false; mocks.pending = false; mocks.rejectLoad = undefined; });
+
+it('returns the login flow while the authorization page is still loading', async () => {
+  mocks.pending = true;
+  const attempt = flow(); let returned = false;
+  void openGrokLoginWindow(attempt, 'https://auth.x.ai/authorize').then(() => { returned = true; });
+  try {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(returned).toBe(true);
+    expect(window().destroyed).toBe(false);
+  } finally { attempt.abortController!.abort(); }
+});
 
 it('opens an ephemeral sandbox browser without preload or OS-browser delegation', async () => {
   const attempt = flow(); await openGrokLoginWindow(attempt, 'https://auth.x.ai/authorize');
@@ -52,6 +67,14 @@ it('allows only HTTPS or its own loopback callback and keeps popups in the owned
 });
 it('releases the window on page-load failure', async () => {
   mocks.fail = true; const attempt = flow();
-  await expect(openGrokLoginWindow(attempt, 'https://auth.x.ai/authorize')).rejects.toThrow('offline');
+  await openGrokLoginWindow(attempt, 'https://auth.x.ai/authorize');
+  await vi.waitFor(() => expect(attempt.abortController!.signal.aborted).toBe(true));
   expect(window().destroyed).toBe(true); expect(attempt.error).toContain('network');
+});
+it('does not turn cancellation into a late navigation error', async () => {
+  mocks.pending = true; const attempt = flow();
+  await openGrokLoginWindow(attempt, 'https://auth.x.ai/authorize');
+  attempt.abortController!.abort(); mocks.rejectLoad!(new Error('navigation cancelled'));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  expect(window().destroyed).toBe(true); expect(attempt.error).toBeUndefined();
 });

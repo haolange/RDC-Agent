@@ -465,7 +465,7 @@ export const zhSettings = {
   'settings.noProvidersInGroup': '这一组暂无供应商。',
   'settings.signOut': '退出登录',
   'settings.oauthConnectHint': '打开授权页并完成账号登录。',
-  'settings.superGrokOAuthConnectHint': '在浏览器中登录 Grok，完成后自动返回连接。此入口使用订阅额度。',
+  'settings.grokSubscriptionConnectHint': '在浏览器中登录 Grok，完成后自动返回连接。此入口使用订阅额度。',
   'settings.githubAuthorizationPending': '等待 GitHub 授权。请在 GitHub 输入设备码以完成连接。',
   'settings.oauthDeviceAuthorizationPending': '正在等待授权。请打开授权页，输入 device code，并保持此窗口打开。',
   'settings.openAuthPage': '打开授权页',

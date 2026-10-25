@@ -11,7 +11,10 @@ export async function openGrokLoginWindow(flow: OAuthFlowState, authorizationUrl
       webSecurity: true, allowRunningInsecureContent: false, partition: `grok-login-${flow.flowId}` },
   });
   const close = () => { if (!window.isDestroyed()) window.close(); };
-  const fail = (message: string) => { flow.error = message; flow.abortController?.abort(); };
+  const fail = (message: string) => {
+    if (flow.abortController?.signal.aborted) return;
+    flow.error = message; flow.abortController?.abort();
+  };
   const allowsNavigation = (target: string) => {
     try {
       const url = new URL(target);
@@ -35,6 +38,7 @@ export async function openGrokLoginWindow(flow: OAuthFlowState, authorizationUrl
     if (allowsNavigation(url)) void window.loadURL(url).catch(() => fail('Grok sign-in page could not be loaded. Try again.'));
     return { action: 'deny' };
   });
-  try { await window.loadURL(authorizationUrl); }
-  catch (error) { fail('Grok sign-in page could not be loaded. Check your network and try again.'); throw error; }
+  // The window owns navigation; page load must not keep the settings action busy.
+  void window.loadURL(authorizationUrl)
+    .catch(() => fail('Grok sign-in page could not be loaded. Check your network and try again.'));
 }

@@ -62,10 +62,10 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
   t,
 }) => {
   const status = connectionDraft.accountStatus;
-  const isSuperGrok = connectionProvider.id === 'grok-account';
+  const isGrokSubscription = connectionProvider.id === 'grok-account';
   const isOpenRouter = connectionProvider.id === 'openrouter';
   const diagnostic = status?.diagnostic;
-  const selectedMode = isSuperGrok
+  const selectedMode = isGrokSubscription
     ? 'browser'
     : isOpenRouter || connectionProvider.id === 'claude-account' ? 'browser' : 'device';
   const busy = connectionDraft.busy !== 'idle';
@@ -91,7 +91,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
     );
   }
 
-  const openPageButton = status?.authUrl && !isSuperGrok ? (
+  const openPageButton = status?.authUrl && !isGrokSubscription ? (
     <a
       className="button button-primary button-sm settings-oauth-link-button"
       href={status.authUrl}
@@ -119,7 +119,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
   return (
     <div className="settings-provider-oauth-panel">
       <div className="settings-provider-notice">
-        {t(isSuperGrok ? 'settings.superGrokOAuthConnectHint' : 'settings.oauthConnectHint')}
+        {t(isGrokSubscription ? 'settings.grokSubscriptionConnectHint' : 'settings.oauthConnectHint')}
       </div>
 
       <ol className="settings-oauth-steps" data-testid="settings-provider-oauth-steps" data-mode={selectedMode}>
@@ -192,8 +192,8 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
             <Step
               index={2}
               state={started ? 'active' : 'pending'}
-              title={t(isOpenRouter || isSuperGrok ? 'settings.oauthStepWait' : 'settings.oauthStepPasteCode')}
-              description={t(isOpenRouter || isSuperGrok ? 'settings.oauthStepWaitHint' : 'settings.oauthStepPasteCodeHint')}
+              title={t(isOpenRouter || isGrokSubscription ? 'settings.oauthStepWait' : 'settings.oauthStepPasteCode')}
+              description={t(isOpenRouter || isGrokSubscription ? 'settings.oauthStepWaitHint' : 'settings.oauthStepPasteCodeHint')}
             >
               {status?.requiresCodeInput ? (
                 <div className="settings-provider-oauth-manual-code">

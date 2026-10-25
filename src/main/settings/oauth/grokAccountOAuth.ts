@@ -100,8 +100,7 @@ export async function exchangeGrokCode(flow: OAuthFlowState, code: string): Prom
     redirectUri: flow.redirectUri,
     accountId: account.accountId,
     expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
-    accountLabel: account.accountLabel ?? 'Super Grok Account',
-    planLabel: 'Super Grok OAuth',
+    accountLabel: account.accountLabel ?? 'Grok account',
   };
 }
 

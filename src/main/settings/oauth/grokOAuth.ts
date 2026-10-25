@@ -21,7 +21,7 @@ export const readOAuthError = (payload: unknown): { error?: string; detail?: str
   };
 };
 
-const SUPER_GROK_OAUTH_CHECKLIST = [
+const GROK_LOGIN_CHECKLIST = [
   'Use an xAI account with Grok Build access.',
   'Allow the requested Grok Build and API scopes in the browser.',
   'Complete sign-in in your browser and return to RDC Agent.',
@@ -38,7 +38,7 @@ export const createGrokOAuthDiagnostic = (
   providerError: options.providerError,
   requestedScopes: options.requestedScopes,
   redirectUri: options.redirectUri,
-  checklist: options.checklist ?? SUPER_GROK_OAUTH_CHECKLIST,
+  checklist: options.checklist ?? GROK_LOGIN_CHECKLIST,
 });
 
 export const renderGrokOAuthDiagnosticMessage = (diagnostic: LlmProviderAccountDiagnostic): string => [
@@ -55,7 +55,7 @@ export const createGrokOAuthFailureDiagnostic = (
   const { error, detail } = readOAuthError(payload);
   return createGrokOAuthDiagnostic(
     stage,
-    'Super Grok OAuth ' + operation + ' failed. Check the xAI public OAuth Client ID, redirect URI, and allowed scopes.',
+    'Grok sign-in ' + operation + ' failed. Check the xAI public OAuth Client ID, redirect URI, and allowed scopes.',
     {
       providerError: error || parseProviderError(payload),
       detail,
@@ -79,12 +79,12 @@ export const createGrokOAuthStartupDiagnostic = (
 ): LlmProviderAccountDiagnostic => {
   const message = parseProviderError(error);
   const stage: LlmProviderAccountDiagnostic['stage'] = message.startsWith('xAI OAuth metadata') ? 'metadata' : 'authorization';
-  if (message.startsWith('Super Grok OAuth ') || message.startsWith('xAI OAuth metadata')) {
+  if (message.startsWith('Grok sign-in ') || message.startsWith('xAI OAuth metadata')) {
     return createGrokOAuthDiagnostic(stage, message, { requestedScopes: scope, redirectUri });
   }
   return createGrokOAuthDiagnostic(
     stage,
-    'Super Grok OAuth ' + mode + ' authorization failed. Check the xAI public OAuth Client ID, xAI OAuth metadata network access, redirect URI, and allowed scopes.',
+    'Grok sign-in ' + mode + ' authorization failed. Check the xAI public OAuth Client ID, xAI OAuth metadata network access, redirect URI, and allowed scopes.',
     { detail: message, requestedScopes: scope, redirectUri },
   );
 };
