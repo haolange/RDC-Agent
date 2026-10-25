@@ -38,6 +38,14 @@
       "refreshedAt": "2026-07-15",
       "identityId": "xiaomi",
       "surface": "xiaomi-mimo"
+    },
+    {
+      "id": "provider-docs:xiaomi-mimo:2026-10-25",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://mimo.mi.com/static/docs/quick-start/summary/model.md ; https://mimo.mi.com/static/docs/api/chat/openai-api.md ; https://mimo.mi.com/docs/en-US/quick-start/faq/token-plan/Plans%26Pricing ; https://mimo.mi.com/docs/en-US/api/chat/responses ; https://mimo.mi.com/docs/tokenplan/integration/codex-configuration",
+      "observedAt": "2026-10-25",
+      "refreshedAt": "2026-10-25",
+      "surface": "xiaomi-mimo"
     }
   ],
   "defaultFactSourceId": "rdc-agent:xiaomi-mimo:0",
@@ -115,8 +123,8 @@
   },
   "models": [
     {
-      "modelId": "mimo-v2.5-pro",
-      "label": "mimo-v2.5-pro",
+      "modelId": "mimo-v2.6-pro",
+      "label": "mimo-v2.6-pro",
       "aliases": [],
       "availability": "available",
       "contextTiers": [
@@ -127,7 +135,8 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "granted",
+          "maxOutputTokens": 131072
         }
       ],
       "defaultBudgetTokens": 256000,
@@ -197,7 +206,179 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:xiaomi-mimo:0"
+      "factSourceId": "provider-docs:xiaomi-mimo:2026-10-25"
+    },
+    {
+      "modelId": "mimo-v2.6-flash",
+      "label": "mimo-v2.6-flash",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted",
+          "maxOutputTokens": 131072
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.xiaomimimo.com/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.xiaomimimo.com/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "xiaomi",
+          "protocolOwner": "openai"
+        },
+        {
+          "id": "OpenAIResponses",
+          "route": {
+            "protocol": "OpenAIResponses",
+            "baseUrl": "https://api.xiaomimimo.com/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "xiaomi",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "high",
+            "onMode": "thinking-enabled",
+            "offMode": "thinking-disabled"
+          }
+        }
+      },
+      "factSourceId": "provider-docs:xiaomi-mimo:2026-10-25"
+    },
+    {
+      "modelId": "mimo-v2.5-pro",
+      "label": "mimo-v2.5-pro",
+      "aliases": [],
+      "availability": "unavailable",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.xiaomimimo.com/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.xiaomimimo.com/v1",
+            "source": "catalog"
+          },
+          "availability": "unavailable",
+          "endpointOwner": "xiaomi",
+          "protocolOwner": "openai"
+        },
+        {
+          "id": "OpenAIResponses",
+          "route": {
+            "protocol": "OpenAIResponses",
+            "baseUrl": "https://api.xiaomimimo.com/v1",
+            "source": "catalog"
+          },
+          "availability": "unavailable",
+          "endpointOwner": "xiaomi",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "high",
+            "onMode": "thinking-enabled",
+            "offMode": "thinking-disabled"
+          }
+        }
+      },
+      "factSourceId": "provider-docs:xiaomi-mimo:2026-10-25",
+      "unavailableReason": "Retired by Xiaomi on 2026-10-21. Select a MiMo V2.6 model explicitly."
     }
   ],
   "protocolOverrides": [

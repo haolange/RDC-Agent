@@ -1,3 +1,4 @@
+import { providerAccountAuthService } from './settings/ProviderAccountAuthService';
 import { appPathService } from './runtime/AppPathService';
 /**
  * Electron Main Process Entry
@@ -47,6 +48,7 @@ let shutdownExitCode = 0;
 let settingsInitialized = false;
 
 function registerShutdownDisposables(): void {
+  shutdownCoordinator.register({ id: 'oauth.dispose', phase: 'terminate_processes', dispose: () => providerAccountAuthService.dispose() });
   shutdownCoordinator.register({
     id: 'conversation.stop-accepting',
     phase: 'stop_accepting_turns',

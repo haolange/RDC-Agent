@@ -38,6 +38,15 @@
       "refreshedAt": "2026-07-15",
       "identityId": "moonshotai-cn",
       "surface": "moonshot"
+    },
+    {
+      "id": "provider-docs:moonshot-k31:2026-10-25",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart",
+      "observedAt": "2026-10-25",
+      "refreshedAt": "2026-10-25",
+      "surface": "moonshot",
+      "accountScope": "surface-specific"
     }
   ],
   "defaultFactSourceId": "rdc-agent:moonshot:0",
@@ -132,6 +141,220 @@
     }
   },
   "models": [
+    {
+      "modelId": "kimi-k3.1-pro",
+      "label": "kimi-k3.1-pro",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.moonshot.cn/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.moonshot.cn/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "moonshot-ai",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "tierId": "max",
+          "label": "Max mode"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "high",
+            "max"
+          ],
+          "defaultSelection": "max",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "max",
+            "levels": {
+              "low": "low",
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "thinking-enabled"
+          }
+        }
+      },
+      "executionBindings": [
+        {
+          "id": "context:max",
+          "when": {
+            "maxContext": true
+          },
+          "actions": [
+            {
+              "kind": "client-tier",
+              "tierId": "max"
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ],
+      "factSourceId": "provider-docs:moonshot-k31:2026-10-25"
+    },
+    {
+      "modelId": "kimi-k3.1-pro-highspeed",
+      "label": "kimi-k3.1-pro-highspeed",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.moonshot.cn/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.moonshot.cn/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "moonshot-ai",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "tierId": "max",
+          "label": "Max mode"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "high",
+            "max"
+          ],
+          "defaultSelection": "max",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "max",
+            "levels": {
+              "low": "low",
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "thinking-enabled"
+          }
+        }
+      },
+      "executionBindings": [
+        {
+          "id": "context:max",
+          "when": {
+            "maxContext": true
+          },
+          "actions": [
+            {
+              "kind": "client-tier",
+              "tierId": "max"
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ],
+      "factSourceId": "provider-docs:moonshot-k31:2026-10-25"
+    },
     {
       "modelId": "kimi-k3",
       "label": "Kimi K3",
@@ -666,6 +889,8 @@
     }
   ],
   "recommendedModels": [
+    "kimi-k3.1-pro",
+    "kimi-k3.1-pro-highspeed",
     "kimi-k3",
     "kimi-k2.7-code",
     "kimi-k2.6",

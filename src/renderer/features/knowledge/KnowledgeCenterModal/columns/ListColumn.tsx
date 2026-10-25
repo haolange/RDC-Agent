@@ -6,7 +6,6 @@ import { ListRow } from '../../../../ui/ListRow';
 import { Panel } from '../../../../ui/Panel';
 import { SearchField } from '../../../../ui/SearchField';
 import { useI18n, type TranslationKey } from '../../../../i18n';
-import { formatKnowledgeTime } from '../knowledgeCenterLabels';
 import { CardBadges } from '../parts/CardBadges';
 import { KnowledgeFilters } from '../parts/KnowledgeFilters';
 import { ConflictRow } from '../parts/ConflictRow';
@@ -38,9 +37,8 @@ function emptyReason(
   return null;
 }
 
-/** Cards row: title + badges, one-line preview, updated time. Order follows the service hits. */
+/** Title, meaningful preview and badges. Order follows the service hits. */
 function HitButton({ hit: card, active, onSelect }: { hit: KnowledgeLaneHit; active: boolean; onSelect: () => void }) {
-  const updated = formatKnowledgeTime(card.updatedAt);
   return (
     <ListRow
       className={cn('knowledge-center-card-button', active && 'is-active')}
@@ -53,12 +51,11 @@ function HitButton({ hit: card, active, onSelect }: { hit: KnowledgeLaneHit; act
         <CardBadges type={card.type} lifecycle={card.lifecycle} />
       </span>
       {card.preview && card.preview.trim() !== card.title.trim() ? <span className="knowledge-center-card-preview">{card.preview}</span> : null}
-      {updated ? <span className="knowledge-center-card-time">{updated}</span> : null}
     </ListRow>
   );
 }
 
-/** Candidate row: title, origin, time, pending-review badge. */
+/** Candidate title and actionable pending-review status. */
 function RecordRow({
   record,
   active,
@@ -70,9 +67,6 @@ function RecordRow({
   pendingLabel: string;
   onSelect: () => void;
 }) {
-  const { t } = useI18n();
-  const updated = formatKnowledgeTime(record.updatedAt);
-  const origin = [record.sourceStatus, record.caseId].filter(Boolean).join(' · ');
   return (
     <ListRow
       className={cn('knowledge-center-inbox-row', active && 'is-active')}
@@ -85,9 +79,7 @@ function RecordRow({
         <span className="knowledge-center-card-title">{record.title}</span>
         <CardBadges type={record.type} lifecycle={record.lifecycle} />
       </span>
-      {origin ? <span className="knowledge-center-card-preview">{t('knowledgeCenter.sourceLabel')}: {origin}</span> : null}
       {record.preview && record.preview.trim() !== record.title.trim() ? <span className="knowledge-center-card-preview">{record.preview}</span> : null}
-      {updated ? <span className="knowledge-center-card-time">{updated}</span> : null}
     </ListRow>
   );
 }

@@ -71,11 +71,16 @@ describe('reviewed provider catalog request paths', () => {
     expect(direct.ok).toBe(true);
     if (!direct.ok) throw new Error(direct.message);
     expect(wire(direct.plan).service_tier).toBe('priority');
-    const account = planModelRequest({ model: effective('grok-account', 'grok-4.7'), controls: { fastModel: true } });
+    const subscription = effective('grok-account', 'grok-4.7');
+    expect(planModelRequest({ model: subscription, controls: { fastModel: true } }).ok).toBe(false);
+    subscription.controls.fast = { state: 'selectable', defaultValue: false, entitlement: 'granted' };
+    const target = effective('grok-account', 'grok-4.7-build-fast');
+    const account = planModelRequest({ model: subscription, catalogModels: [subscription, target], controls: { fastModel: true } });
     expect(account.ok).toBe(true);
     if (!account.ok) throw new Error(account.message);
     expect(account.plan.fastMode).toBe(true);
-    expect(wire(account.plan).service_tier).toBe('priority');
+    expect(account.plan.effectiveModelId).toBe('grok-4.7-build-fast');
+    expect(wire(account.plan)).not.toHaveProperty('service_tier');
   });
 
   it('keeps GPT-6 Fast scoped to supported OpenAI routes and Codex account bindings', () => {

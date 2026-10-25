@@ -56,7 +56,7 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
 
 ## 原生交互性能观察
 
-真实 `/app?qaPerformance=1` 安装 `InteractionPerformanceProbe`；普通入口不安装监听器或观察器。默认只统计 Composer Fast/Max/Effort 控件；增加 `qaPerformanceScope=transcript` 时统计真实消息列表内按钮与 summary。`qaPerformanceWindowMs` 可指定 1–300000 ms 固定观察区间，用于没有点击的流式期间收集页面 Long Task。到期和 pagehide 会 drain 并释放观察器、监听器与计时器。
+真实 `/app?qaPerformance=1` 安装 `InteractionPerformanceProbe`；普通入口不安装监听器或观察器。默认统计 Composer 模型入口、模型选择按钮及 Fast/Max/Effort 控件；增加 `qaPerformanceScope=transcript` 时统计真实消息列表内按钮与 summary。`qaPerformanceWindowMs` 可指定 1–300000 ms 固定观察区间，用于没有点击的流式期间收集页面 Long Task。到期和 pagehide 会 drain 并释放观察器、监听器与计时器。
 
 根元素 `data-rdc-qa-performance` 提供范围、实际区间、原生支持标志、观察条目数和汇总。`pointerToPaintP95Ms` 是基于原生 Event Timing、对未观察点击按 16 ms 补值的估算；必须同时记录 `eventTimingObservedCount` 与 `interactionCount`，不能将缺失 target 或尚未送达的条目视作已测得低延迟。Long Task 属于页面整体，按与区间相交计入完整任务时长，不能宣称全由 Transcript 引起。前后比较须使用相同探针、内容、视口、外观、观察区间和动作；工具调用耗时与 RAF 不作为替代指标。
 
@@ -68,3 +68,6 @@ capture:getReplayState/getReplaySelection/readLivePreview 为只读面；applyRe
 ## 右栏紧凑浏览验收
 
 investigation:list 是只读能力，与Desktop共享factory/manifest/handler、active project/session校验和50项游标分页。验收必须覆盖摘要五项限制、超过50项的完整浏览、嵌套预览、ID复制、顶层Escape及焦点恢复、切session迟到隔离。QA项目/userData以外部临时脚本按当前存储格式或正式Bridge注入，不新增renderer demo、产品内固定数据或特殊授权路径；无模型/RDC调用的视觉fixture单独标识。
+
+
+`llm:cancelProviderAccountLogin` 属 mutation，仅释放待登录的自有监听器，不撤销既有账号。Grok 浏览器回调是 main 独立 loopback listener，不借用 QA bridge，也不将令牌返回 renderer。带真实凭据的隔离 QA 使用同源加密凭据与 Local State 的自有副本；原始文件不修改，验收后清理副本。API/订阅目录、少量推理和 Browser UI 的证据分开记录。

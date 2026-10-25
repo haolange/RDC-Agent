@@ -4,7 +4,6 @@ import type {
   LlmProviderProtocolDescriptor,
 } from '@shared/types/settings';
 
-export const SUPER_GROK_OAUTH_REDIRECT_URI = 'http://127.0.0.1:56121/callback';
 
 
 export const LLM_PROVIDER_CATEGORY_DEFINITIONS: LlmProviderCategoryDescriptor[] = [

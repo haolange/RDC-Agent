@@ -584,7 +584,8 @@ export function sanitizeUserProvider(
   const hasEnabledModels = models.some((model) => model.enabled !== false);
   const enabled = status === 'verified' && hasEnabledModels;
   const label = builtinFallback.label;
-  const recommendedModels = builtinFallback.recommendedModels;
+  const recommendedModels = builtinFallback.recommendedModels.filter((id) => models.some((model) =>
+    model.id === id && model.enabled !== false && model.availability !== 'unavailable'));
   const docsUrl = builtinFallback.docsUrl;
 
   return {

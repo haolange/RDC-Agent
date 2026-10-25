@@ -123,12 +123,17 @@ export const useProviderConnectionDraft = ({
     t,
   ]);
 
+  const loginOwner = open && connectionDraft ? connectionDraft.providerId : null;
+  useEffect(() => () => {
+    if (loginOwner) void window.electronAPI.llm.cancelProviderAccountLogin(loginOwner).catch(() => undefined);
+  }, [loginOwner]);
+
   const openProviderConnection = (provider: LlmProviderEntry) => {
     setConnectionDraft(createProviderConnectionDraft(provider));
   };
 
   const updateConnectionDraft = (patch: Partial<ProviderConnectionDraft>) => {
-    setConnectionDraft((current) => current ? { ...current, ...patch } : current);
+    setConnectionDraft((current) => current && current.providerId === connectionDraft?.providerId ? { ...current, ...patch } : current);
   };
 
   const connectionNeedsCredentials = Boolean(

@@ -2,7 +2,6 @@ import { shell } from 'electron';
 import type {
   LlmProviderAccountDiagnostic,
   LlmProviderAccountLoginFinishRequest,
-  LlmProviderAccountLoginMode,
   LlmProviderAccountLoginStartRequest,
   LlmProviderAccountStatus,
   LlmProviderId,
@@ -34,11 +33,9 @@ import {
 import {
   discoverGrokCatalog,
   exchangeGrokCode,
-  pollGrokDevice,
   refreshGrokBundle,
   revokeGrokBundle,
   startGrokBrowserLogin,
-  startGrokDeviceLogin,
 } from './oauth/grokAccountOAuth';
 import {
   createGrokOAuthStartupDiagnostic,
@@ -58,7 +55,8 @@ import {
   startOpenRouterLogin,
 } from './oauth/openRouterAccountOAuth';
 import { GROK_OAUTH_CLIENT_ID } from './oauth/oauthConstants';
-import { parseProviderError, shouldOpenSystemBrowser } from './oauth/oauthHttp';
+import { openGrokLoginWindow } from './oauth/grokLoginWindow';
+import { isTestMode, parseProviderError, shouldOpenSystemBrowser } from './oauth/oauthHttp';
 import type { AccountProviderId, OAuthFlowState, OAuthSecretBundle } from './oauth/oauthTypes';
 import { isAccountProviderId } from './oauth/oauthTypes';
 
@@ -83,13 +81,10 @@ const canRefreshBundle = (bundle: OAuthSecretBundle): boolean => {
 
 function pendingAuthorizationMessage(
   providerId: LlmProviderId,
-  mode: LlmProviderAccountLoginMode | undefined,
 ): string {
   if (providerId === 'github-copilot') return 'Waiting for GitHub authorization.';
   if (providerId === 'grok-account') {
-    return mode === 'device'
-      ? 'Waiting for Super Grok device-code authorization.'
-      : 'xAI is displaying a one-time code. Paste it into RDC Agent to finish connecting.';
+    return 'Complete Grok sign-in in your browser, then return to RDC Agent.';
   }
   if (providerId === 'openrouter') return 'Waiting for OpenRouter browser authorization.';
   if (providerId === 'nous') return 'Waiting for Nous Portal device-code authorization.';
@@ -99,7 +94,6 @@ function pendingAuthorizationMessage(
 export class ProviderAccountAuthService {
   private catalogPublisher?: AccountCatalogPublisher;
   private readonly pendingFlows = new Map<string, OAuthFlowState>();
-  private lastGrokCatalogSourceDiagnostic?: string;
 
   setCatalogPublisher(publisher?: AccountCatalogPublisher): void {
     this.catalogPublisher = publisher;
@@ -107,6 +101,7 @@ export class ProviderAccountAuthService {
 
   async startLogin(request: LlmProviderAccountLoginStartRequest): Promise<LlmProviderAccountStatus> {
     const providerId = request.providerId;
+    let startedGrokFlowId: string | undefined;
     if (!isAccountProviderId(providerId)) {
       return this.status(providerId, 'Provider does not support account login.');
     }
@@ -142,19 +137,12 @@ export class ProviderAccountAuthService {
         return this.status(providerId);
       }
       if (providerId === 'grok-account') {
-        const mode: LlmProviderAccountLoginMode = request.accountLoginMode === 'device' ? 'device' : 'browser';
-        if (mode === 'device') {
-          await startGrokDeviceLogin(
-            GROK_OAUTH_CLIENT_ID,
-            (flow) => this.setFlow(flow),
-            (url) => this.openExternal(url),
-            async (bundle) => { await this.persistAccount(providerId, bundle); },
-            (flow, message, diagnostic) => { flow.error = message; flow.diagnostic = diagnostic; },
-          );
-        } else {
-          await startGrokBrowserLogin(GROK_OAUTH_CLIENT_ID, (flow) => this.setFlow(flow), (url) => this.openExternal(url));
-          void this.openExternal(this.findFlow(providerId)?.authUrl);
-        }
+        if (request.accountLoginMode === 'device') throw new Error('Grok subscriptions use browser sign-in.');
+        await startGrokBrowserLogin(GROK_OAUTH_CLIENT_ID, (flow) => { startedGrokFlowId = flow.flowId; this.setFlow(flow); },
+          async (url, flow) => { if (!isTestMode() && process.env.RDC_AGENT_HEADLESS !== '1') await openGrokLoginWindow(flow, url); }, async (flow, code) => {
+            const status = await this.finishLoginInternal('grok-account', flow.flowId, code);
+            if (!status.connected) throw new Error(status.error ?? 'Grok sign-in failed.');
+          });
         return this.status(providerId);
       }
       if (providerId === 'nous') {
@@ -186,6 +174,9 @@ export class ProviderAccountAuthService {
     } catch (error) {
       if (providerId === 'grok-account') {
         const diagnostic = resolveGrokOAuthDiagnostic(error, request.accountLoginMode === 'device' ? 'device' : 'browser');
+        const active = this.findFlow('grok-account');
+        if (startedGrokFlowId && active?.flowId !== startedGrokFlowId) return this.status(providerId);
+        if (active) { active.error = renderGrokOAuthDiagnosticMessage(diagnostic); active.diagnostic = diagnostic; }
         return this.status(providerId, renderGrokOAuthDiagnosticMessage(diagnostic), 'failed', diagnostic);
       }
       return this.status(providerId, parseProviderError(error), 'failed');
@@ -194,6 +185,7 @@ export class ProviderAccountAuthService {
   }
 
   async finishLogin(request: LlmProviderAccountLoginFinishRequest): Promise<LlmProviderAccountStatus> {
+    if (request.providerId === 'grok-account') return this.status(request.providerId, 'Complete sign-in through the browser callback.', 'failed');
     return this.finishLoginInternal(request.providerId, request.flowId ?? '', request.code?.trim() ?? '');
   }
 
@@ -219,15 +211,21 @@ export class ProviderAccountAuthService {
       } else if (providerId === 'github-copilot') {
         bundle = await pollGitHubDevice(flow);
       } else if (providerId === 'grok-account') {
-        bundle = flow.authorizationMode === 'browser'
-          ? await exchangeGrokCode(flow, code)
-          : await pollGrokDevice(flow);
+        bundle = await exchangeGrokCode(flow, code);
       } else if (providerId === 'nous') {
         bundle = await pollNousDevice(flow);
       } else if (providerId === 'openrouter') {
         bundle = await exchangeOpenRouterCode(flow, code);
       } else {
         return this.status(providerId, 'Provider does not support account login.', 'failed');
+      }
+      if (providerId === 'grok-account') {
+        if (flow.abortController?.signal.aborted || this.pendingFlows.get(flow.flowId) !== flow) throw new Error('Grok sign-in was cancelled.');
+        const discovery = await this.discoverCatalog(bundle, flow.abortController?.signal);
+        if (flow.abortController?.signal.aborted || this.pendingFlows.get(flow.flowId) !== flow) throw new Error('Grok sign-in was cancelled.');
+        await this.saveAccountDiscovery(providerId, bundle, discovery, true);
+        this.clearFlows(providerId);
+        return this.status(providerId);
       }
       return await this.persistAccount(providerId, bundle);
     } catch (error) {
@@ -333,7 +331,7 @@ export class ProviderAccountAuthService {
     const available = isAccount && provider?.authModeAvailability?.account?.state !== 'unavailable';
     const state: LlmProviderAccountStatus['state'] = forcedState
       ?? (flow?.error ? 'failed' : flow ? 'pending' : connected ? 'connected' : isAccount ? 'signed-out' : 'unavailable');
-    const pendingMessage = pendingAuthorizationMessage(providerId, flow?.authorizationMode);
+    const pendingMessage = pendingAuthorizationMessage(providerId);
     const activeDiagnostic = diagnostic ?? flow?.diagnostic;
     return {
       providerId,
@@ -349,8 +347,7 @@ export class ProviderAccountAuthService {
       authUrl: flow?.authUrl,
       verificationUri: flow?.verificationUri,
       userCode: flow?.userCode,
-      requiresCodeInput: flow?.providerId === 'claude-account'
-        || (flow?.providerId === 'grok-account' && flow.authorizationMode === 'browser'),
+      requiresCodeInput: flow?.providerId === 'claude-account',
       authorizationMode: flow?.authorizationMode ?? accountBundle?.authorizationMode,
       diagnostic: activeDiagnostic,
       requestedScopes: flow?.requestedScopes ?? activeDiagnostic?.requestedScopes ?? accountBundle?.requestedScopes,
@@ -445,7 +442,7 @@ export class ProviderAccountAuthService {
     return bundle;
   }
 
-  private async discoverCatalog(bundle: OAuthSecretBundle): Promise<AccountCatalogDiscovery> {
+  private async discoverCatalog(bundle: OAuthSecretBundle, signal?: AbortSignal): Promise<AccountCatalogDiscovery> {
     await loadProviderSurface(bundle.providerId);
     if (bundle.providerId === 'github-copilot') {
       return discoverCopilotCatalog(bundle);
@@ -457,11 +454,7 @@ export class ProviderAccountAuthService {
       return discoverClaudeCatalog(bundle);
     }
     if (bundle.providerId === 'grok-account') {
-      return discoverGrokCatalog(
-        bundle,
-        this.lastGrokCatalogSourceDiagnostic,
-        (value) => { this.lastGrokCatalogSourceDiagnostic = value; },
-      );
+      return discoverGrokCatalog(bundle, signal);
     }
     if (bundle.providerId === 'nous') {
       return discoverNousCatalog(bundle);
@@ -487,7 +480,7 @@ export class ProviderAccountAuthService {
 
   private findFlow(providerId: AccountProviderId, flowId?: string): OAuthFlowState | null {
     for (const flow of this.pendingFlows.values()) {
-      if (flow.providerId === providerId && (!flowId || flow.flowId === flowId) && Date.now() <= flow.expiresAt) {
+      if (flow.providerId === providerId && (!flowId || flow.flowId === flowId) && (Date.now() <= flow.expiresAt || Boolean(flow.error))) {
         return flow;
       }
     }
@@ -497,6 +490,15 @@ export class ProviderAccountAuthService {
   private setFlow(flow: OAuthFlowState): void {
     this.clearFlows(flow.providerId);
     this.pendingFlows.set(flow.flowId, flow);
+  }
+
+  cancelLogin(providerId: LlmProviderId): void {
+    if (isAccountProviderId(providerId)) this.clearFlows(providerId);
+  }
+
+  dispose(): void {
+    for (const flow of this.pendingFlows.values()) this.closeFlowServer(flow);
+    this.pendingFlows.clear();
   }
 
   private clearFlows(providerId: AccountProviderId): void {
@@ -509,6 +511,8 @@ export class ProviderAccountAuthService {
   }
 
   private closeFlowServer(flow: OAuthFlowState): void {
+    clearTimeout(flow.timeout);
+    flow.abortController?.abort();
     const server = flow.server;
     if (!server) {
       return;

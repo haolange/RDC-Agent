@@ -1,5 +1,5 @@
+import { Details } from '../../../../ui/Details';
 import React, { type ReactNode } from 'react';
-import { SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
@@ -49,7 +49,7 @@ const Step: React.FC<{ index: number; state: StepState; title: string; descripti
 
 /**
  * Account login as a short step list. Device flow: open page → enter code → wait. Browser
- * flow: complete login in the browser → paste the one-time code. The footer Connect/Save
+ * flow: complete login in the browser, with automatic callbacks where supported. The footer Connect/Save
  * button remains the single submit; codes never persist to logs.
  */
 export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps> = ({
@@ -66,36 +66,32 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
   const isOpenRouter = connectionProvider.id === 'openrouter';
   const diagnostic = status?.diagnostic;
   const selectedMode = isSuperGrok
-    ? connectionDraft.accountLoginMode === 'device' ? 'device' : 'browser'
+    ? 'browser'
     : isOpenRouter || connectionProvider.id === 'claude-account' ? 'browser' : 'device';
   const busy = connectionDraft.busy !== 'idle';
   const isAuthorizationPending = connectionDevicePending || busy;
   const isBrowserCodePending = selectedMode === 'browser' && status?.requiresCodeInput === true;
-  const redirectUri = status?.redirectUri ?? (isSuperGrok && selectedMode === 'browser' ? SUPER_GROK_OAUTH_REDIRECT_URI : '');
+  const redirectUri = status?.redirectUri ?? '';
   const started = Boolean(status?.verificationUri || status?.authUrl || connectionDevicePending || isBrowserCodePending);
 
   const waitingText = connectionProvider.id === 'github-copilot'
     ? t('settings.githubAuthorizationPending')
-    : selectedMode === 'browser'
-      ? t('settings.oauthBrowserAuthorizationPending')
-      : t('settings.oauthDeviceAuthorizationPending');
+    : t('settings.oauthDeviceAuthorizationPending');
 
   if (connectionAccountConnected) {
     return (
       <div className="settings-provider-oauth-panel">
-        <div className="settings-provider-notice">{t('settings.oauthConnectedHint')}</div>
         {(status?.accountLabel || status?.planLabel) ? (
-          <div className="settings-secret-status settings-provider-oauth-summary" data-testid="settings-provider-oauth-summary">
-            <span>{[status.accountLabel, status.planLabel].filter(Boolean).join(t('settings.accountSummarySeparator'))}</span>
-            <span>{t(status.oauthRefreshAvailable ? 'settings.oauthRefreshAvailable' : 'settings.oauthRefreshSession')}</span>
-            <span>{t('settings.providerModelCount', { count: connectionDraft.models.length })}</span>
-          </div>
+          <Details summary={status.accountLabel || status.planLabel!} data-testid="settings-provider-oauth-summary">
+            {status.planLabel ? <p>{status.planLabel}</p> : null}
+            <p>{t(status.oauthRefreshAvailable ? 'settings.oauthRefreshAvailable' : 'settings.oauthRefreshSession')}</p>
+          </Details>
         ) : null}
       </div>
     );
   }
 
-  const openPageButton = status?.authUrl ? (
+  const openPageButton = status?.authUrl && !isSuperGrok ? (
     <a
       className="button button-primary button-sm settings-oauth-link-button"
       href={status.authUrl}
@@ -123,37 +119,8 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
   return (
     <div className="settings-provider-oauth-panel">
       <div className="settings-provider-notice">
-        {status?.message || (isSuperGrok ? t('settings.superGrokOAuthConnectHint') : t('settings.oauthConnectHint'))}
+        {t(isSuperGrok ? 'settings.superGrokOAuthConnectHint' : 'settings.oauthConnectHint')}
       </div>
-
-      {isSuperGrok && (
-        <>
-          <div className="settings-provider-oauth-mode" role="group" aria-label={t('settings.oauthMode')}>
-            {(['browser', 'device'] as const).map((mode) => (
-              <Button
-                key={mode}
-                variant="secondary"
-                size="sm"
-                className={`settings-provider-oauth-mode-button${mode === selectedMode ? ' is-active' : ''}`}
-                aria-pressed={mode === selectedMode}
-                data-testid={`settings-provider-oauth-mode-${mode}`}
-                onClick={() => onUpdateConnectionDraft({
-                  accountLoginMode: mode,
-                  accountStatus: undefined,
-                  authCode: '',
-                  error: '',
-                })}
-                disabled={busy || connectionDevicePending}
-              >
-                {mode === 'browser' ? t('settings.oauthBrowserLogin') : t('settings.oauthDeviceCodeLogin')}
-              </Button>
-            ))}
-          </div>
-          <p className="settings-provider-oauth-mode-hint">
-            {t(selectedMode === 'browser' ? 'settings.oauthBrowserCodeHint' : 'settings.oauthDeviceCodeHint')}
-          </p>
-        </>
-      )}
 
       <ol className="settings-oauth-steps" data-testid="settings-provider-oauth-steps" data-mode={selectedMode}>
         {selectedMode === 'device' ? (
@@ -206,7 +173,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
           <>
             <Step
               index={1}
-              state={isBrowserCodePending ? 'done' : 'active'}
+              state={started ? 'done' : 'active'}
               title={t('settings.oauthStepBrowserLogin')}
               description={t('settings.oauthStepBrowserLoginHint')}
             >
@@ -224,9 +191,9 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
             </Step>
             <Step
               index={2}
-              state={isBrowserCodePending ? 'active' : 'pending'}
-              title={t(isOpenRouter ? 'settings.oauthStepWait' : 'settings.oauthStepPasteCode')}
-              description={t(isOpenRouter ? 'settings.oauthStepWaitHint' : 'settings.oauthStepPasteCodeHint')}
+              state={started ? 'active' : 'pending'}
+              title={t(isOpenRouter || isSuperGrok ? 'settings.oauthStepWait' : 'settings.oauthStepPasteCode')}
+              description={t(isOpenRouter || isSuperGrok ? 'settings.oauthStepWaitHint' : 'settings.oauthStepPasteCodeHint')}
             >
               {status?.requiresCodeInput ? (
                 <div className="settings-provider-oauth-manual-code">
@@ -239,7 +206,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
                     value={connectionDraft.authCode}
                     onChange={(event) => onUpdateConnectionDraft({ authCode: event.target.value, error: '' })}
                   />
-                  {isSuperGrok ? <span className="settings-help-text">{t('settings.oauthCodeSubmitHint')}</span> : null}
+
                 </div>
               ) : null}
             </Step>
@@ -248,8 +215,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
       </ol>
 
       {redirectUri || status?.requestedScopes || diagnostic?.requestedScopes ? (
-        <details className="settings-provider-oauth-technical" data-testid="settings-provider-oauth-details">
-          <summary>{t('settings.oauthTechnicalDetails')}</summary>
+        <Details className="settings-provider-oauth-technical" data-testid="settings-provider-oauth-details" summary={t('settings.oauthTechnicalDetails')}>
           <div className="settings-provider-oauth-detail-grid">
             {redirectUri ? (
               <>
@@ -264,12 +230,11 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
               </>
             ) : null}
           </div>
-        </details>
+        </Details>
       ) : null}
 
       {diagnostic ? (
-        <div className="settings-provider-oauth-diagnostic" data-testid="settings-provider-oauth-diagnostic">
-          <strong>{diagnostic.summary}</strong>
+        <Details className="settings-provider-oauth-diagnostic" data-testid="settings-provider-oauth-diagnostic" summary={t('settings.oauthTechnicalDetails')}>
           {diagnostic.providerError ? <span>{t('settings.oauthProviderError', { error: diagnostic.providerError })}</span> : null}
           {diagnostic.detail ? <span>{diagnostic.detail}</span> : null}
           {diagnostic.checklist && diagnostic.checklist.length > 0 ? (
@@ -277,7 +242,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
               {diagnostic.checklist.map((item) => <li key={item}>{item}</li>)}
             </ul>
           ) : null}
-        </div>
+        </Details>
       ) : null}
     </div>
   );

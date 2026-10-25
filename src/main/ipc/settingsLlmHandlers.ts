@@ -1,3 +1,4 @@
+import { providerAccountAuthService } from '../settings/ProviderAccountAuthService';
 import { ipcMain } from 'electron';
 import type {
   AppSettings,
@@ -174,6 +175,13 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       await broadcastCatalog(request.providerId);
     }
     return result;
+  });
+
+  ipcMain.handle('llm:cancelProviderAccountLogin', (_event, ...rawArgs: unknown[]) => {
+    const [providerId] = parseIpcArgs(LlmProviderIdArgsSchema, rawArgs, {
+      label: 'llm:cancelProviderAccountLogin', maxBytes: 1024,
+    });
+    providerAccountAuthService.cancelLogin(providerId);
   });
 
   ipcMain.handle('llm:logoutProviderAccount', async (_event, ...rawArgs: unknown[]) => {

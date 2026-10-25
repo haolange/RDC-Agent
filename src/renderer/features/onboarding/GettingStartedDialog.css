@@ -37,7 +37,6 @@
 .getting-started-page p { margin: 0; }
 .getting-started-copy { display: grid; align-content: start; gap: var(--space-3); padding-block: var(--space-3); }
 .getting-started-intro { display: grid; gap: var(--space-2); }
-.getting-started-eyebrow { color: var(--token-text-caption); font-size: var(--text-xs); }
 .getting-started-copy h3 {
   margin: 0;
   max-width: 28ch;

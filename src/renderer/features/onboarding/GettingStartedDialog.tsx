@@ -31,7 +31,6 @@ export function GettingStartedDialog({ onClose }: { onClose: () => void }) {
       <section key={current} className="getting-started-page" aria-labelledby={`getting-started-${current}`}>
         <div className="getting-started-copy">
           <header className="getting-started-intro">
-            <p className="getting-started-eyebrow">{t(`onboarding.${current}.eyebrow`)}</p>
             <h3 id={`getting-started-${current}`}>{t(`onboarding.${current}.headline`)}</h3>
             <p className="getting-started-summary">{t(`onboarding.${current}.body`)}</p>
           </header>

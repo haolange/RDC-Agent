@@ -49,12 +49,15 @@ context-breakdown-cost
 context-breakdown-projected-note
 context-breakdown-run-meter
 context-breakdown-window-note
+context-list
 conversation-edit-preview
 conversation-thread
 empty-workbench-prompt
 empty-workbench-tool-${toolMode}
 getting-started
 handoff-suggestion-row
+investigation-list
+investigation-preview
 knowledge-candidate-${record.cardId}
 knowledge-card-${card.cardId}
 knowledge-card-image
@@ -203,7 +206,6 @@ settings-model-option-inherit
 settings-nav-${section.id}
 settings-nav-search
 settings-policy-tighten-note
-settings-provider-app-managed-models
 settings-provider-auth-mode-${mode}
 settings-provider-auth-state
 settings-provider-card-${provider.id}
@@ -230,7 +232,6 @@ settings-provider-discovery
 settings-provider-discovery-empty
 settings-provider-environment-notice
 settings-provider-error-toggle-${provider.id}
-settings-provider-model-capability-badge-${model.id}
 settings-provider-model-capability-panel-${model.id}
 settings-provider-model-capability-toggle-${model.id}
 settings-provider-model-list
@@ -245,7 +246,6 @@ settings-provider-oauth-code
 settings-provider-oauth-details
 settings-provider-oauth-device-code
 settings-provider-oauth-diagnostic
-settings-provider-oauth-mode-${mode}
 settings-provider-oauth-open-page
 settings-provider-oauth-start
 settings-provider-oauth-steps
@@ -259,7 +259,6 @@ settings-provider-tool-calling-unsupported
 settings-provider-tool-calling-unverified
 settings-provider-unavailable-summary
 settings-provider-upcoming
-settings-provider-user-managed-models
 settings-rdc-enabled
 settings-rdc-toolchain
 settings-resource-dialog
@@ -286,6 +285,7 @@ titlebar-right-panel-toggle
 work-process
 work-process-approval
 work-process-block
+work-process-hook-diagnostic-card
 work-process-image-thumbs
 work-process-plan-review
 work-process-section

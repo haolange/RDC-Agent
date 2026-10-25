@@ -5,35 +5,7 @@
   gap: var(--space-3);
 }
 
-.settings-provider-oauth-mode {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-surface-sunken);
-}
 
-.settings-provider-oauth-mode-button {
-  min-width: 0;
-  min-height: var(--btn-height-sm);
-}
-
-.settings-provider-oauth-mode-button:active:not(:disabled),
-.settings-provider-oauth-mode-button.is-active {
-  border-color: var(--token-border-focus);
-  background: color-mix(in srgb, var(--token-border-focus) 14%, var(--token-surface-raised));
-  color: var(--token-text-heading);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--token-border-focus) 18%, transparent);
-}
-
-.settings-provider-oauth-mode-hint {
-  margin: 0;
-  color: var(--token-text-body);
-  font-size: var(--text-sm);
-  line-height: 1.6;
-}
 
 .settings-provider-oauth-technical {
   overflow: hidden;
@@ -99,17 +71,4 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
-}
-
-.settings-provider-oauth-summary {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-lg);
-  background: var(--token-surface-sunken);
-  color: var(--token-text-body);
-  font-size: var(--text-sm);
 }

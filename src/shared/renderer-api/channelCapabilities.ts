@@ -108,6 +108,7 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'llm:startProviderAccountLogin': 'high-impact',
   'llm:getProviderAccountStatus': 'read',
   'llm:finishProviderAccountLogin': 'high-impact',
+  'llm:cancelProviderAccountLogin': 'mutation',
   'llm:logoutProviderAccount': 'high-impact',
   'settings:get': 'read',
   'settings:getProviderCatalog': 'read',

@@ -19,23 +19,6 @@ export interface ExpectedCapabilityRoute {
   modelId: string;
 }
 
-export class CapabilityRequestGate {
-  private currentRevision = 0;
-
-  begin(): number {
-    this.currentRevision += 1;
-    return this.currentRevision;
-  }
-
-  invalidate(): void {
-    this.currentRevision += 1;
-  }
-
-  isCurrent(revision: number): boolean {
-    return revision === this.currentRevision;
-  }
-}
-
 export function resolvedCapability(state: CapabilityResolutionState): EffectiveModel | null {
   return state.status === 'ready' || state.status === 'refreshing' ? state.model : null;
 }

@@ -8,6 +8,7 @@ import {
   mapActionEventToTimelineEntry,
 } from '../../services/conversationTimeline';
 import { applyChromeTheme } from '../theme/applyChromeTheme';
+import { reconcileCatalogProviders, startCatalogProjection } from '../../stores/effectiveCatalogStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useEvidenceStore } from '../../stores/evidenceStore';
@@ -201,6 +202,15 @@ export function useAppBootstrap(options: {
       unsubscribe?.();
     };
   }, []);
+
+  useEffect(() => startCatalogProjection(), []);
+  useEffect(() => {
+    if (useAppSettingsStore.getState().hydrated) {
+      const active = settings.llm.providers.filter((provider) => provider.enabled !== false
+        || settings.llm.agentRoutes.some((route) => route.providerId === provider.id));
+      reconcileCatalogProviders(active);
+    }
+  }, [settings.llm.providers, settings.llm.agentRoutes]);
 
   useProjectInputsBootstrap(runtimeTestMode);
   useSessionRestoreBootstrap(runtimeTestMode);

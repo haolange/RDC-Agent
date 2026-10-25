@@ -131,9 +131,11 @@
   right: 24px;
 }
 
-.device-selector-option {
+.button.device-selector-option {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   gap: var(--space-2);
   width: 100%;
   padding: var(--space-3);
@@ -142,6 +144,7 @@
   background: transparent;
   color: var(--token-text-body);
   text-align: left;
+  white-space: normal;
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }

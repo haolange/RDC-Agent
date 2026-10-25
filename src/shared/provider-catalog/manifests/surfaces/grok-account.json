@@ -9,7 +9,7 @@
   "authSchemaId": "oauth-account",
   "discoveryPolicyId": "grok-account-catalog",
   "vendorId": "xai",
-  "label": "Super Grok Account",
+  "label": "Grok Subscription",
   "status": "beta",
   "availability": {
     "state": "available"
@@ -75,6 +75,24 @@
       "observedAt": "2026-09-22",
       "refreshedAt": "2026-09-23",
       "surface": "grok-account"
+    },
+    {
+      "id": "provider-docs:grok-build-subscription:2026-10-25",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://github.com/xai-org/grok-build/tree/2bdd1d6a6369de0e8c68132ea4539e9abd9e14a8",
+      "observedAt": "2026-10-25",
+      "refreshedAt": "2026-10-25",
+      "surface": "grok-account",
+      "accountScope": "subscription-observation"
+    },
+    {
+      "id": "provider-source:grok-proxy-headers:2026-10-25",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://github.com/xai-org/grok-build/blob/2bdd1d6a6369de0e8c68132ea4539e9abd9e14a8/crates/codegen/xai-grok-shell/src/agent/proxy_headers.rs",
+      "observedAt": "2026-10-25",
+      "refreshedAt": "2026-10-25",
+      "surface": "grok-account",
+      "accountScope": "subscription-protocol"
     }
   ],
   "defaultFactSourceId": "user-observation:grok-account:2026-07-14",
@@ -95,7 +113,9 @@
       "adapterId": "openai-responses",
       "baseUrl": "https://cli-chat-proxy.grok.com/v1",
       "headers": {
-        "x-grok-client-version": "0.2.101"
+        "X-XAI-Token-Auth": "xai-grok-cli",
+        "x-grok-client-version": "1.0.62",
+        "x-authenticateresponse": "authenticate-response"
       },
       "default": true,
       "protocolOwner": "openai",
@@ -178,7 +198,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "discovered",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
@@ -240,7 +260,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "discovered",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
@@ -303,7 +323,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "discovered",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
@@ -387,7 +407,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "discovered",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
@@ -454,14 +474,23 @@
         {
           "id": "default",
           "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
           "maxPromptTokens": 500000,
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 500000,
+      "defaultBudgetTokens": 256000,
       "cost": {
         "input": 2,
         "output": 6,
@@ -479,7 +508,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "discovered",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
@@ -489,12 +518,15 @@
         "fast": {
           "state": "selectable",
           "defaultValue": false,
-          "entitlement": "granted",
+          "entitlement": "unknown",
           "label": "Fast mode"
         },
         "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "max",
+          "entitlement": "unknown",
+          "label": "Max mode"
         },
         "reasoning": {
           "kind": "levels",
@@ -520,24 +552,44 @@
       },
       "executionBindings": [
         {
-          "id": "fast:priority",
+          "id": "fast:build",
           "when": {
             "fast": true
           },
           "actions": [
             {
-              "kind": "request-patch",
-              "patch": {
-                "service_tier": "priority"
-              }
+              "kind": "model-switch",
+              "targetModelId": "grok-4.7-build-fast"
             }
           ],
           "entitlement": "granted"
+        },
+        {
+          "id": "context:max",
+          "when": {
+            "maxContext": true
+          },
+          "actions": [
+            {
+              "kind": "client-tier",
+              "tierId": "max"
+            }
+          ],
+          "entitlement": "unknown"
         }
       ],
       "factSourceId": "provider-docs:grok-4.7:2026-09-22",
       "fieldFactSourceIds": {
-        "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
+        "toolCalling": "provider-docs:grok-account:tools-2026-08-23",
+        "contextTiers": "provider-docs:grok-build-subscription:2026-10-25",
+        "controls.maxContext": "provider-docs:grok-build-subscription:2026-10-25"
+      },
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "maxTierId": "max",
+          "entitlementAuthority": "catalog-observation"
+        }
       }
     },
     {
@@ -549,14 +601,23 @@
         {
           "id": "default",
           "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
           "maxPromptTokens": 500000,
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 500000,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "supported"
       },
@@ -569,7 +630,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "discovered",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
@@ -581,8 +642,11 @@
           "fixedValue": false
         },
         "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "max",
+          "entitlement": "unknown",
+          "label": "Max mode"
         },
         "reasoning": {
           "kind": "levels",
@@ -610,7 +674,31 @@
       "fieldFactSourceIds": {
         "toolCalling": "provider-docs:grok-account:tools-2026-08-23",
         "visionInput": "provider-docs:grok-4.6:2026-09-22",
-        "structuredOutput": "provider-docs:grok-4.6:2026-09-22"
+        "structuredOutput": "provider-docs:grok-4.6:2026-09-22",
+        "contextTiers": "provider-docs:grok-build-subscription:2026-10-25",
+        "controls.maxContext": "provider-docs:grok-build-subscription:2026-10-25"
+      },
+      "executionBindings": [
+        {
+          "id": "context:max",
+          "when": {
+            "maxContext": true
+          },
+          "actions": [
+            {
+              "kind": "client-tier",
+              "tierId": "max"
+            }
+          ],
+          "entitlement": "unknown"
+        }
+      ],
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "maxTierId": "max",
+          "entitlementAuthority": "catalog-observation"
+        }
       }
     },
     {
@@ -622,14 +710,23 @@
         {
           "id": "default",
           "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
           "maxPromptTokens": 500000,
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 500000,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "supported"
       },
@@ -642,7 +739,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "discovered",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
@@ -654,8 +751,11 @@
           "fixedValue": false
         },
         "maxContext": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "max",
+          "entitlement": "unknown",
+          "label": "Max mode"
         },
         "reasoning": {
           "kind": "levels",
@@ -681,7 +781,31 @@
       "fieldFactSourceIds": {
         "toolCalling": "provider-docs:grok-account:tools-2026-08-23",
         "visionInput": "provider-docs:grok-account:grok45-capabilities-2026-09-23",
-        "structuredOutput": "provider-docs:grok-account:grok45-capabilities-2026-09-23"
+        "structuredOutput": "provider-docs:grok-account:grok45-capabilities-2026-09-23",
+        "contextTiers": "provider-docs:grok-build-subscription:2026-10-25",
+        "controls.maxContext": "provider-docs:grok-build-subscription:2026-10-25"
+      },
+      "executionBindings": [
+        {
+          "id": "context:max",
+          "when": {
+            "maxContext": true
+          },
+          "actions": [
+            {
+              "kind": "client-tier",
+              "tierId": "max"
+            }
+          ],
+          "entitlement": "unknown"
+        }
+      ],
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "maxTierId": "max",
+          "entitlementAuthority": "catalog-observation"
+        }
       }
     },
     {
@@ -713,7 +837,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "discovered",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
@@ -773,7 +897,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "account-entitled",
+      "presencePolicy": "discovered",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
@@ -816,6 +940,116 @@
       },
       "factSourceId": "user-observation:grok-account:2026-07-14",
       "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
+      }
+    },
+    {
+      "modelId": "grok-4.7-build-fast",
+      "label": "Grok 4.7 Fast",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
+          "maxPromptTokens": 500000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "internal",
+        "relatedPrimaryModelIds": [
+          "grok-4.7"
+        ]
+      },
+      "presencePolicy": "discovered",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+        "source": "model"
+      },
+      "controls": {
+        "fast": {
+          "state": "fixed",
+          "fixedValue": true
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "max",
+          "entitlement": "unknown",
+          "label": "Max mode"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "high",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh"
+            }
+          }
+        }
+      },
+      "executionBindings": [
+        {
+          "id": "context:max",
+          "when": {
+            "maxContext": true
+          },
+          "actions": [
+            {
+              "kind": "client-tier",
+              "tierId": "max"
+            }
+          ],
+          "entitlement": "unknown"
+        }
+      ],
+      "factSourceId": "provider-docs:grok-build-subscription:2026-10-25",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "maxTierId": "max",
+          "entitlementAuthority": "catalog-observation"
+        }
+      },
+      "fieldFactSourceIds": {
+        "contextTiers": "provider-docs:grok-build-subscription:2026-10-25",
+        "controls.maxContext": "provider-docs:grok-build-subscription:2026-10-25",
         "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
       }
     }

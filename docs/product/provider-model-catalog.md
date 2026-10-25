@@ -1,6 +1,6 @@
 # RDC-Agent Provider Model Catalog
 
-> 权威矩阵（2026-09-23）。Manifest 固化一手资料可确定的结构事实，credential-scoped discovery 决定账户可见性，真实 wire review 验证 route / control / continuation；三者合并为 Effective Catalog。
+> 当前结构基线（2026-10-25）。Manifest 固化一手资料可确定的结构事实，credential-scoped discovery 决定账户可见性，真实 wire review 验证 route / control / continuation；三者合并为 Effective Catalog。
 > `Context Window` 表示常规上下文预算；`1M Max` 单独表示是否支持 1M / Max mode。
 > 「不清楚」或三角证据未齐 → fail-closed：manifest 用 `unknown` / `unsupported` / `none`（按证据选择）。Agent/Composer 可执行集合只纳入 source-backed `toolCalling.supported` 且具备已实现 structured-tool adapter 的模型；`unknown`/`unsupported` 仍留在 Settings catalog 供审计，但不作为 Agent 选择项。
 > 同名模型在不同 Provider surface 上的 Fast / 1M / 推理控件彼此独立，不可跨 surface 抄写。
@@ -104,18 +104,17 @@ GPT-6 Sol/Luna 的 API 目录为 1.05M / 128K；Codex account 则按当前 Codex
 | `gemini-3.5-flash`       | 待账号目录确认 | 否       | 否                     | Minimal(对应Non) / Low / Medium / High（默认 Medium）    | 2026-10-02 前仍在 GA 列表 |
 | `kimi-k2.7-code`         | 256K           | 否       | 否                     | 不清楚（UI=`Disabled`）                                  | 可用          |
 
-## Super Grok Account
+## Grok Subscription
 
-| Name                           | Context Window | 1M Max | Fast Mode | 推理等级                           | 状态  |
-| ------------------------------ | --------------:| ------ | --------- | ------------------------------ | --- |
-| `grok-4.20-0309-non-reasoning` | 1M             | 是      | 否         | 不清楚（UI=`Disabled`）              | 可用  |
-| `grok-4.20-0309-reasoning`     | 1M             | 是      | 否         | Just On                        | 可用  |
-| `grok-4.20-multi-agent-0309`   | 1M             | 是      | 否         | Low / Medium / High / Extra    | 可用  |
-| `grok-4.3`                     | 500K           | 是（Max → 1M） | 否     | Non / Low / Medium / High      | 可用  |
-| `grok-4.7`                     | 500K           | 否      | `service_tier=priority`（Fast） | Low / Medium / High / Extra（默认 High）；视觉 supported | 可用 |
-| `grok-4.6`                     | 500K           | 否      | 否         | Low / Medium / High / Extra（默认 High）；视觉 supported | 可用  |
-| `grok-4.5`                     | 500K           | 否      | 否         | Low / Medium / High（默认 Medium） | 视觉与结构化输出 supported；可用  |
-| `grok-build-0.1`               | 256K           | 否      | 否         | Just On                        | 可用  |
+仅应用内浏览器 PKCE 自动回调；订阅目录是账号可见性的唯一发现面。API Key 是独立 xAI surface，订阅不读取公共 API 来补齐权限。账号未发现或未验证的结构模板不代表当前可用。
+
+| Name | 常规 / Max | Fast | 推理 |
+| --- | --- | --- | --- |
+| `grok-4.7` | live catalog 验证 256K / 500K 档位 | live catalog 验证 `grok-4.7-build-fast` 后模型切换 | Low / Medium / High / Extra |
+| `grok-4.6` | live catalog 验证 256K / 500K 档位 | 无 | Low / Medium / High / Extra |
+| `grok-4.5` | live catalog 验证 256K / 500K 档位 | 无 | Low / Medium / High |
+
+其它历史结构模板仅在订阅目录实际返回时可用。当前周额度属于跨 Grok 产品共享用量；不按套餐名称推算余额或展示固定每日额度。
 
 ## DeepSeek
 
@@ -234,7 +233,7 @@ Kimi Coding Plan 的 Anthropic-compatible base URL 是 `https://api.kimi.com/cod
 
 | Surface | 字段与裁决 | 官方来源及交叉来源 |
 | --- | --- | --- |
-| grok-account / xai | 两个 surface 均独立维护 4.7 的 500K、视觉/工具/结构化输出与 Low/Medium/High/Extra。两者各自拥有 `service_tier=priority` Fast binding，entitlement 不跨 surface 继承；OAuth/Builder 当前按用户确认的 Grok 4.7 Fast 能力收敛。 | [模型页](https://docs.x.ai/developers/models/grok-4.7)、[发布](https://x.ai/news/grok-4-7)、[推理](https://docs.x.ai/developers/model-capabilities/text/reasoning)、[Priority](https://docs.x.ai/developers/advanced-api-usage/priority-processing)、[Responses协议](https://docs.x.ai/developers/rest-api-reference/inference/responses)；交接中的9/22账号缓存只作当时资格观察。 |
+| grok-account / xai | 两个 surface 均独立维护 4.7 的 500K、视觉/工具/结构化输出与 Low/Medium/High/Extra。API 使用 `service_tier=priority`；订阅改用 live catalog 验证的 `grok-4.7-build-fast` 模型切换，entitlement 不跨 surface 继承。 | [模型页](https://docs.x.ai/developers/models/grok-4.7)、[发布](https://x.ai/news/grok-4-7)、[推理](https://docs.x.ai/developers/model-capabilities/text/reasoning)、[Priority](https://docs.x.ai/developers/advanced-api-usage/priority-processing)、[Responses协议](https://docs.x.ai/developers/rest-api-reference/inference/responses)；交接中的9/22账号缓存只作当时资格观察。 |
 | xai | 4.6/4.5默认预算500K、4.3预算1M；删除code-fast-1退役入口，按用户要求不保留浮动别名。4.5的Extra在模型页与推理指南冲突，不新增档位。 | [4.6](https://docs.x.ai/developers/models/grok-4.6)、[4.5](https://docs.x.ai/developers/models/grok-4.5)、[退役与4.3规格](https://docs.x.ai/developers/migration/may-15-retirement)、[推理指南](https://docs.x.ai/developers/model-capabilities/text/reasoning) |
 | deepseek | Flash原生视觉，Pro无视觉；均支持Responses/Chat/Anthropic、Off/Low/High/Max；Pro继续提供服务。top_p在思考模式有效，不能剥离。价格采用非高峰基线。 | [价格与模型](https://api-docs.deepseek.com/quick_start/pricing/)、[Responses参数枚举](https://api-docs.deepseek.com/api/create-response/)、[Pro正式版](https://api-docs.deepseek.com/news/news260813/)、[Thinking](https://api-docs.deepseek.com/guides/thinking_mode/)、[Anthropic](https://api-docs.deepseek.com/guides/anthropic_api/) |
 | chatgpt-account | 当前Astra、三款5.6和5.5支持图像。5.4的retirement_at为2026-08-31，移除OAuth入口；缺席不是本次删除的唯一理由。discovery只收窄账号资格，不覆盖结构能力。 | [Codex目录](https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json)及9/22本机Codex目录缓存交叉；缓存不是实时请求证明，不包含凭据。 |
@@ -255,3 +254,16 @@ Kimi Coding Plan 的 Anthropic-compatible base URL 是 `https://api.kimi.com/cod
 | kimi-coding-plan | kimi-for-coding对应K2.8 Preview，1M、Off/Low/High/Max默认Max；K3关闭思考会换到K2.8 Preview，仍不暴露Off。 | [模型配置](https://www.kimi.com/code/docs/en/kimi-code/models.html)、[OpenCode配置](https://www.kimi.com/code/docs/en/third-party-tools/opencode.html)、[更新](https://www.kimi.com/code/docs/en/kimi-code/whats-new.html) |
 
 文档链接修复只改 `docsUrl`：custom-endpoint、evroc、inferx、morph、privatemode-ai、wafer.ai、wandb、v0、routing-run、crof。未改这些surface的endpoint/protocol；Crof官网重定向Nahcrof不等于API地址变更。v0官方搜索可见文档，直接抓取工具报错，不宣称现场页面读取通过。discovery-only不新增猜测模型，暂缓的Qwen/火山/ClinePass/SAP等事实仍保持原边界。
+
+
+## 官方目录复核
+
+本轮逐项核对 182 个 surface 定义，其中 38 个带结构基线；结构记录由 267 增至 289（包括保留明确退役原因的不可选记录）。纯 discovery surface 不复制厂商公共清单。公开说明出现新名称而没有对应接入面的完整能力或权限事实时，继续使用原有 discovery 验证；GitLab AI Gateway、SAP deployments、Coding Plan 均不借用厂商 API 身份。
+
+OpenAI 新模型的上下文为 1,050,000，输出 128,000；Astra / 6.1 Sol 不提供 Off / Minimal。Fast 使用 `service_tier=fast`；EU 的 6.1 Sol 与 Astra 权限分别处理，不能沿用同族旧规则。来源：[Astra](https://developers.openai.com/api/docs/models/gpt-6-astra)、[6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol)、[Fast 区域说明](https://developers.openai.com/api/docs/guides/fast-mode)。
+
+MiMo API 与 Token Plan 分别补入 V2.6 Pro / Flash，工具、视觉、结构化输出与 thinking 开关均有官方依据，输出上限 131,072；Responses 与 Chat 各自沿用已实现的请求映射。V2.5 Pro 在 2026-10-21 退役，保存的旧路由显示原因，用户必须显式选新模型；不改历史消息身份。定制 Ultraspeed 不假定账号已获权。来源：[官方模型规格](https://mimo.mi.com/static/docs/quick-start/summary/model.md)、[Chat API](https://mimo.mi.com/static/docs/api/chat/openai-api.md)、[Responses](https://mimo.mi.com/docs/en-US/api/chat/responses)、[Token Plan](https://mimo.mi.com/docs/en-US/quick-start/faq/token-plan/Plans%26Pricing)。
+
+新增能力基线：OpenAI API 的 GPT-6 Astra / GPT-6.1 Sol；Anthropic API 的 Sonnet 5.5 / Haiku 5.5；Gemini 4 Argon；Kimi API 与 Coding Plan 各自命名空间的 K3.1 Pro / Highspeed；LongCat 2.5 Preview；Mistral Large 4 / Medium 3.5；Groq GPT-OSS 20B。Gemini 的统一输入/输出窗口与常规输出上限分别记录；不把 long-decode 上限当作同步 API 默认能力。Groq GPT-OSS 推理等级补齐 low/medium/high。区域 API 与订阅新增模型需对应目录验证，不从公共 API 继承账号授权。
+
+来源：[OpenAI](https://developers.openai.com/api/docs/models)、[Claude 模型](https://platform.claude.com/docs/en/models/overview)、[Claude effort](https://platform.claude.com/docs/en/build-with-claude/effort)、[Gemini](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon)、[Kimi API](https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart)、[Kimi Code](https://www.kimi.com/code/docs/en/kimi-code/models.html)、[LongCat](https://longcat.chat/platform/docs/api/model-params)、[Mistral](https://docs.mistral.ai/models)、[Groq](https://console.groq.com/docs/models)。Manifest 的 factSources 绑定具体字段与接入面；未取得明确更新证据的 provider 保留既有基线与 discovery，不猜测新模型 ID。第三方目录和部署面不继承厂商 API 的权限或退役日期。

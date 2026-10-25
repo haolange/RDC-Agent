@@ -68,11 +68,6 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
         <span className="settings-model-row-check" title={statusTitle}>{statusLabel}</span>
         <span className="settings-model-row-identity">
           <span className="settings-model-row-label" title={model.label}>{model.label}</span>
-        <span className="settings-model-capability-badge" data-testid={`settings-provider-model-capability-badge-${model.id}`}>
-          {provider.catalogOwnership !== 'user-managed'
-            ? t('settings.providers.capability.appManagedBadge')
-            : t('settings.providers.capability.userManagedBadge')}
-        </span>
         </span>
         <Switch
           checked={model.enabled}

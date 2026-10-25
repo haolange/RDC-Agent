@@ -229,6 +229,8 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     }]);
     expect(discovery).toEqual([
       expect.objectContaining({ modelId: 'kimi-for-coding', availability: 'available' }),
+      expect.objectContaining({ modelId: 'k3.1-pro', availability: 'unavailable' }),
+      expect.objectContaining({ modelId: 'k3.1-pro-highspeed', availability: 'unavailable' }),
       expect.objectContaining({ modelId: 'k3', availability: 'unavailable' }),
       expect.objectContaining({ modelId: 'k3-256k', availability: 'unavailable' }),
       expect.objectContaining({ modelId: 'kimi-for-coding-highspeed', availability: 'unavailable' }),

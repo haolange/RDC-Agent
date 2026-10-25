@@ -135,13 +135,6 @@ function asResult(
   };
 }
 
-export function mergeParsedLiveCatalogs(...catalogs: ParsedLiveCatalog[]): ParsedLiveCatalog {
-  return asResult(
-    catalogs.flatMap((catalog) => catalog.contributions),
-    catalogs.flatMap((catalog) => catalog.entitlementContributions ?? []),
-  );
-}
-
 const REASONING_LEVEL_MAP: Record<string, NamedReasoningLevel | undefined> = {
   minimal: 'minimal',
   low: 'low',
@@ -289,6 +282,8 @@ function observationFromCatalogRow(value: Record<string, unknown>): LiveModelObs
     availability: 'available',
     protocol: explicitProtocol(value),
     contextWindowTokens: contextTokens(value),
+    contextWindowChoices: Array.isArray(value.context_windows)
+      ? value.context_windows.map(positiveInteger).filter((tokens): tokens is number => tokens !== undefined) : undefined,
     ...(maxOutputTokens ? { maxOutputTokens } : {}),
     reasoning: observedReasoning(value),
     ...(toolCalling ? { toolCalling } : {}),
@@ -585,41 +580,6 @@ export function parseOpenRouterAccountCatalog(
   });
   return asResult(projectLiveModelObservations(surface, observations));
 }
-/** Grok account discovery contributes availability and context facts; the OAuth proxy route remains manifest-owned. */
-export function parseGrokAccountCatalog(payload: unknown): ParsedLiveCatalog {
-  const contributions = records(payload).flatMap((value): CatalogModelContribution[] => {
-    const identity = liveIdentity(value);
-    if (!identity) return [];
-    const windowTokens = contextTokens(value);
-    const maxOutputTokens = outputTokens(value);
-    return [{
-      modelId: identity.id,
-      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
-      label: text(value.label) ?? identity.id,
-      availability: 'available',
-      contextTiers: [{
-        id: 'default',
-        label: 'Default',
-        maxPromptTokens: windowTokens,
-        ...(maxOutputTokens ? { maxOutputTokens } : {}),
-        activation: { kind: 'implicit' },
-        entitlement: 'granted',
-      }],
-      ...(windowTokens ? { defaultBudgetTokens: windowTokens } : {}),
-      ...(explicitCapabilityState(record(value.capabilities).tool_calls)
-        ? { toolCalling: explicitCapabilityState(record(value.capabilities).tool_calls) }
-        : {}),
-      ...(explicitCapabilityState(record(value.capabilities).vision)
-        ? { visionInput: capabilityState(record(value.capabilities).vision) }
-        : {}),
-      ...(explicitCapabilityState(record(value.capabilities).structured_output)
-        ? { structuredOutput: capabilityState(record(value.capabilities).structured_output) }
-        : {}),
-    }];
-  });
-  return asResult(contributions);
-}
-
 /** Parse Builder observations; the compiled Grok surface owns identity, route, controls, and bindings. */
 export function parseGrokBuilderCatalog(
   payload: unknown,

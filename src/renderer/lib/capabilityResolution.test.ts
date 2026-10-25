@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
-  CapabilityRequestGate,
   resolvedCapability,
   validateCapabilityResolution,
 } from './capabilityResolution';
@@ -58,15 +57,5 @@ describe('capability resolution state', () => {
     )).toMatchObject({ status: 'unavailable', reason });
   });
 
-  it('rejects stale A and B requests after the C request begins', () => {
-    const gate = new CapabilityRequestGate();
-    const a = gate.begin();
-    const b = gate.begin();
-    const c = gate.begin();
-    expect(gate.isCurrent(a)).toBe(false);
-    expect(gate.isCurrent(b)).toBe(false);
-    expect(gate.isCurrent(c)).toBe(true);
-    gate.invalidate();
-    expect(gate.isCurrent(c)).toBe(false);
-  });
+
 });

@@ -15,6 +15,8 @@ import {
 } from './composerAgentDefaultModel';
 import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
 import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
+import { Button } from '../../ui/Button';
+import { InlineError } from '../../ui/InlineError';
 
 function formatAgentDefaultMeta(
   state: ComposerAgentDefaultState,
@@ -40,12 +42,13 @@ export const ComposerModelPickerPanel: React.FC<{
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
   const providers = useAppSettingsStore((state) => state.settings.llm.providers);
   const agentRoute = useAppSettingsStore((state) => readCompiledComposerRoute(state.settings, agentId));
   const agentName = useAppSettingsStore((state) => (
     state.settings.agents.definitions.find((entry) => entry.id === agentId)?.name || agentId
   ));
-  const { options, loading } = useComposerModelPickerOptions(providers, agentRoute?.providerId);
+  const { options, loading, failedProviders, retry } = useComposerModelPickerOptions(providers, agentRoute?.providerId);
   const { effective, hasChoice, projectId } = useComposerEffectiveModel(agentId, currentSession);
   const agentDefault = resolveComposerAgentDefaultState(agentRoute, options, !loading);
   const agentDefaultMeta = formatAgentDefaultMeta(agentDefault, agentName, t);
@@ -66,12 +69,15 @@ export const ComposerModelPickerPanel: React.FC<{
   }, []);
 
   const selectModel = async (next: { providerId: string; modelId: string }) => {
+    if (saving) return;
     setSaveError('');
+    setSaving(true);
     const result = await commitComposerModelChoice(
       next,
       currentSession?.sessionId,
       projectId,
     );
+    setSaving(false);
     if (!result.ok) {
       setSaveError(t('composer.model.saveFailed'));
       return;
@@ -81,8 +87,11 @@ export const ComposerModelPickerPanel: React.FC<{
 
   const selectAgentDefault = async () => {
     if (!agentDefault.selectable) return;
+    if (saving) return;
     setSaveError('');
+    setSaving(true);
     const result = await clearComposerModelChoice(currentSession?.sessionId, projectId);
+    setSaving(false);
     if (!result.ok) {
       setSaveError(t('composer.model.saveFailed'));
       return;
@@ -123,6 +132,7 @@ export const ComposerModelPickerPanel: React.FC<{
       className="composer-model-effort-popup is-picker"
       data-testid="composer-model-popup"
       data-option-count={options.length}
+      aria-busy={saving}
       data-loading={loading ? '1' : '0'}
       role="menu"
       onKeyDown={handleMenuKeyDown}
@@ -139,20 +149,25 @@ export const ComposerModelPickerPanel: React.FC<{
           aria-label={t('composer.model.searchPlaceholder')}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <button
+        <Button variant="ghost" size="sm"
           type="button"
           className={`composer-model-item composer-model-default${hasChoice ? '' : ' is-selected'}`}
           data-testid="composer-model-agent-default"
           role="menuitemradio"
           aria-checked={!hasChoice}
           title={agentDefaultTitle}
-          disabled={!agentDefault.selectable}
+          disabled={saving || !agentDefault.selectable}
           onClick={() => void selectAgentDefault()}
         >
           <span className="composer-model-item-label">{t('composer.model.agentDefault')}</span>
           <span className="composer-model-item-meta">{agentDefaultMeta}</span>
-        </button>
-        {saveError ? <p className="composer-model-empty">{saveError}</p> : null}
+        </Button>
+        {saving ? <p className="composer-model-empty" role="status">{t('settings.saving')}</p> : null}
+        {failedProviders.length ? <div className="composer-model-errors">{failedProviders.map((provider) => <InlineError key={provider.id}>
+          {provider.label}: {provider.error}
+          <Button variant="ghost" size="sm" onClick={() => retry(provider.id)}>{t('settings.retry')}</Button>
+        </InlineError>)}</div> : null}
+        {saveError ? <InlineError>{saveError}</InlineError> : null}
         {loading && groups.length === 0 ? (
           <p className="composer-model-empty">{t('composer.model.loading')}</p>
         ) : groups.length === 0 ? (
@@ -171,12 +186,13 @@ export const ComposerModelPickerPanel: React.FC<{
                   && option.modelId === effective.modelId,
                 );
                 return (
-                  <button
+                  <Button variant="ghost" size="sm"
                     key={`${option.providerId}:${option.modelId}`}
                     type="button"
                     className={`composer-model-item ${selected ? 'is-selected' : ''}`}
                     data-testid={`composer-model-item-${option.providerId}-${option.modelId}`}
                     role="menuitemradio"
+                    disabled={saving}
                     aria-checked={selected}
                     onClick={() => void selectModel({
                       providerId: option.providerId,
@@ -194,7 +210,7 @@ export const ComposerModelPickerPanel: React.FC<{
                         <span className="composer-model-badge">{t('composer.model.reasoningBadge')}</span>
                       ) : null}
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>

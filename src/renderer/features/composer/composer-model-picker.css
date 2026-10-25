@@ -95,6 +95,13 @@
   background: var(--token-bg-overlay);
 }
 
+.composer-model-errors {
+  max-height: calc(var(--control-height-md) * 3);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.composer-model-errors .ui-inline-error > span { min-width: 0; }
+
 .composer-model-search {
   width: 100%;
   height: var(--control-height-md);
@@ -152,7 +159,7 @@
   flex-shrink: 0;
 }
 
-.composer-model-item {
+.button.composer-model-item {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -164,6 +171,7 @@
   background: var(--token-bg-raised);
   color: var(--token-text-body);
   text-align: left;
+  white-space: normal;
   cursor: pointer;
 }
 

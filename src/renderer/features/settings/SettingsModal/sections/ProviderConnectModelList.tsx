@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
-import { getEffectiveCatalog, subscribeEffectiveCatalogChanged } from './providerCatalogActions';
-import { snapshotMatchesProvider } from '../modelCapabilitySummaryUtils';
+import { catalogScopeKey, useEffectiveCatalogStore } from '../../../../stores/effectiveCatalogStore';
 import { projectProviderModels } from '../providerModelProjection';
 import { SearchField } from '../../../../ui/SearchField';
 import { ProviderConnectModelRow } from './ProviderConnectModelRow';
@@ -33,44 +31,15 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   onModelCountChange,
   t,
 }) => {
-  const [snapshot, setSnapshot] = useState<EffectiveCatalogSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
   const [query, setQuery] = useState('');
-  const catalogAccountId = discoveryAccountId?.trim()
-    || provider.activeAccountId
-    || `anonymous:${provider.id}`;
-
-  useEffect(() => {
-    let cancelled = false;
-    setSnapshot(null);
-    setLoading(true);
-    setLoadFailed(false);
-    void Promise.resolve(getEffectiveCatalog(provider.id, catalogAccountId)).then((next) => {
-        if (cancelled) return;
-        const matched = next && snapshotMatchesProvider(next, provider, catalogAccountId) ? next : null;
-        setSnapshot(matched);
-        setLoadFailed(false);
-        setLoading(matched?.refreshing === true);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setLoadFailed(true);
-          setLoading(false);
-        }
-      });
-    const unsubscribe = subscribeEffectiveCatalogChanged((next) => {
-      if (!cancelled && snapshotMatchesProvider(next, provider, catalogAccountId)) {
-        setSnapshot(next);
-        setLoading(next.refreshing === true);
-        setLoadFailed(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-      unsubscribe?.();
-    };
-  }, [catalogAccountId, provider]);
+  const catalogAccountId = discoveryAccountId?.trim() || provider.activeAccountId || `anonymous:${provider.id}`;
+  const scope = useMemo(() => ({ id: provider.id, activeAccountId: catalogAccountId, protocol: provider.protocol }),
+    [provider.id, provider.protocol, catalogAccountId]);
+  const projection = useEffectiveCatalogStore((state) => state.entries[catalogScopeKey(scope)]);
+  const snapshot = projection?.snapshot ?? null;
+  const loading = !projection || projection.loading;
+  const loadFailed = Boolean(projection?.error);
+  useEffect(() => { void useEffectiveCatalogStore.getState().load(scope); }, [scope]);
 
   const resolvedModels = useMemo(
     () => projectProviderModels(provider.catalogOwnership, models, snapshot),
@@ -107,15 +76,6 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
           })}
         </span>
       </div>
-      {provider.catalogOwnership !== 'user-managed' ? (
-        <div className="settings-provider-notice" data-testid="settings-provider-app-managed-models">
-          {t('settings.providers.capability.appManagedProviderHint')}
-        </div>
-      ) : (
-        <div className="settings-provider-notice" data-testid="settings-provider-user-managed-models">
-          {t('settings.providers.capability.userManagedProviderHint')}
-        </div>
-      )}
       {allUnavailable ? (
         <div className="settings-provider-notice" data-testid="settings-provider-connect-unavailable-hint">
           {t('settings.providers.allModelsUnavailableHint')}

@@ -1,3 +1,4 @@
+import { Details } from '../../../../ui/Details';
 import React, { useState } from 'react';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
@@ -22,9 +23,7 @@ interface ProviderCardProps {
 }
 
 /**
- * Fixed five-band skeleton — identity / status / model summary / protocol /
- * actions — so cards stay the same height and the action row keeps its baseline
- * before, during and after a connection test.
+ * Compact identity and status; technical connection facts remain in native disclosure.
  */
 export const ProviderCard: React.FC<ProviderCardProps> = ({
   provider,
@@ -62,6 +61,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
         <span className="settings-provider-card-status-label">{t(status.labelKey)}</span>
       </div>
 
+      <Details summary={t('settings.oauthTechnicalDetails')}>
       <dl className="settings-provider-card-summary">
         <div className="settings-provider-card-summary-row">
           <dt>{t('settings.providerIdentity')}</dt>
@@ -78,6 +78,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
           </dd>
         </div>
       </dl>
+      </Details>
 
       {status.detail ? (
         <div className="settings-provider-card-error">

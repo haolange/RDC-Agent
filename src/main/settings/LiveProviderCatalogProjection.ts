@@ -18,6 +18,7 @@ export interface LiveModelObservation {
   unavailableReason?: string;
   protocol?: LlmProviderProtocol;
   contextWindowTokens?: number;
+  contextWindowChoices?: number[];
   maxOutputTokens?: number;
   reasoning?: {
     supported?: boolean;
@@ -186,6 +187,8 @@ function projectContext(
   );
   const maxEntitlement = policy.entitlementAuthority === 'manifest'
     ? maxTier.entitlement
+    : policy.entitlementAuthority === 'catalog-observation' && observation.contextWindowChoices
+      ? observation.contextWindowChoices.includes(contextTierWindowTokens(maxTier) ?? 0) ? 'granted' as const : 'denied' as const
     : policy.entitlementAuthority === 'catalog-observation' && observedTier.id === maxTier.id
       ? defaultWindow !== undefined && tokens > defaultWindow ? 'granted' as const : 'denied' as const
       : 'unknown' as const;

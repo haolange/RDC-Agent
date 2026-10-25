@@ -4,12 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { compileProviderCatalog } from '@shared/provider-catalog/compiler';
 import { loadProviderCatalogManifestInput } from '@shared/provider-catalog/nodeManifestLoader';
 import {
-  mergeParsedLiveCatalogs,
   parseChatGptAccountCatalog,
   parseClaudeAccountCatalog,
   parseClineCatalog,
   parseClinePassCatalog,
-  parseGrokAccountCatalog,
   parseGrokBuilderCatalog as parseGrokBuilderCatalogWithSurface,
   parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface,
   parseOpenCodeGoCatalog as parseOpenCodeGoCatalogWithSurface,
@@ -360,33 +358,18 @@ describe('live Provider Catalog parsers', () => {
     expect(parsed.contributions[0].controls).toBeUndefined();
   });
 
-  it('merges Grok API and Builder surfaces without collapsing independent models', () => {
-    const parsed = mergeParsedLiveCatalogs(
-      parseGrokAccountCatalog(fixture('grok-account.json')),
-      parseGrokBuilderCatalog(fixture('grok-builder.json')),
-    );
-    expect(parsed.models.map((model) => model.id)).toEqual([
-      'grok-4.20-0309-non-reasoning',
-      'grok-4.20-0309-reasoning',
-      'grok-4.20-multi-agent-0309',
-      'grok-4.3',
-      'grok-4.5',
-      'grok-composer-2.5-fast',
-    ]);
-    expect(parsed.contributions.find((model) => model.modelId === 'grok-4.3')).toMatchObject({
-      contextTiers: [expect.objectContaining({ id: 'default', maxPromptTokens: 1_000_000 })],
-      defaultBudgetTokens: 1_000_000,
+  it('uses only subscription observations and grants Max/Fast only from the same live catalog', () => {
+    const parsed = parseGrokBuilderCatalog({ models: {
+      'grok-4.7': { info: { id: 'grok-4.7', api_backend: 'responses', context_window: 256000, context_windows: [256000, 500000] } },
+      'grok-4.7-build-fast': { info: { id: 'grok-4.7-build-fast', api_backend: 'responses', context_window: 256000, context_windows: [256000, 500000] } },
+    } });
+    expect(parsed.models.map((model) => model.id)).toEqual(['grok-4.7', 'grok-4.7-build-fast']);
+    expect(parsed.contributions.find((model) => model.modelId === 'grok-4.7')).toMatchObject({
+      controls: { maxContext: { entitlement: 'granted' }, fast: { entitlement: 'granted' } },
+      contextTiers: [expect.objectContaining({ maxPromptTokens: 256000 }), expect.objectContaining({ maxPromptTokens: 500000 })],
     });
-    expect(parsed.contributions.find((model) => model.modelId === 'grok-4.3'))
-      .not.toHaveProperty('route');
-    expect(parsed.contributions.find((model) => model.modelId === 'grok-4.5')).toMatchObject({
-      route: { protocol: 'OpenAIResponses', baseUrl: 'https://cli-chat-proxy.grok.com/v1' },
-      controls: { reasoning: { levels: ['low', 'medium', 'high'] } },
-    });
-    expect(parsed.contributions.find((model) => model.modelId === 'grok-4.5')?.controls?.fast)
-      .toEqual({ state: 'unsupported', fixedValue: false });
-    expect(parsed.contributions.find((model) => model.modelId === 'grok-4.20-0309-reasoning')?.controls)
-      .toBeUndefined();
+    const restricted = parseGrokBuilderCatalog({ models: [{ id: 'grok-4.7', api_backend: 'responses', context_window: 256000, context_windows: [256000] }] });
+    expect(restricted.contributions[0]).toMatchObject({ controls: { maxContext: { entitlement: 'denied' }, fast: { entitlement: 'denied' } } });
   });
 
   it('admits Composer 2.5 from every supported Builder envelope without inventing Fast mode', () => {
@@ -469,15 +452,13 @@ describe('live Provider Catalog parsers', () => {
     ]);
   });
 
-  it('filters media models and canonicalizes proven aliases', () => {
-    const parsed = parseGrokAccountCatalog({ data: [
-      { id: 'grok-4.3', context_window: 1_000_000 },
-      { id: 'grok-latest', type: 'alias', canonical_id: 'grok-4.3', context_window: 1_000_000 },
+  it('filters generated media and hidden subscription models', () => {
+    const parsed = parseGrokBuilderCatalog({ models: [
+      { id: 'grok-4.7', api_backend: 'responses', context_window: 256000 },
+      { id: 'grok-4.6', hidden: true },
       { id: 'grok-image-1', modality: 'image' },
       { id: 'grok-imagine-video-1.5', output_modalities: ['video'] },
     ] });
-    expect(parsed.models).toEqual([{
-      id: 'grok-4.3', label: 'grok-4.3', enabled: true, aliases: ['grok-latest'],
-    }]);
+    expect(parsed.models.map((model) => model.id)).toEqual(['grok-4.7']);
   });
 });

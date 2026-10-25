@@ -149,18 +149,20 @@ describe('Provider Catalog compiler', () => {
     expect(() => compileProviderCatalog(foreignWire)).toThrow(/first-party direct.*protocol owner/u);
   });
 
-  it('keeps all four official Kimi model ids behind credential-scoped discovery', () => {
+  it('keeps all six official Kimi model ids behind credential-scoped discovery', () => {
     const catalog = compileProviderCatalog(input());
     const surface = catalog.surfaces.get('kimi-coding-plan')?.surface;
     expect(catalog.index.surfaces.find((entry) => entry.id === 'kimi-coding-plan')).toMatchObject({
       discoveryAuthority: 'authoritative-list',
-      modelCount: 3,
+      modelCount: 5,
     });
     expect(surface?.discovery).toMatchObject({
       authority: 'authoritative-list',
       strategy: { kind: 'custom-parser', parserId: 'kimi-code-catalog' },
     });
     expect(surface?.models.map((model) => model.modelId)).toEqual([
+      'k3.1-pro',
+      'k3.1-pro-highspeed',
       'kimi-for-coding',
       'k3',
       'k3-256k',
@@ -328,6 +330,42 @@ describe('Provider Catalog compiler', () => {
     });
   });
 
+  it('keeps new OpenAI reasoning and regional Fast capabilities tied to their own specifications', () => {
+    const catalog = compileProviderCatalog(input());
+    for (const provider of ['openai', 'openai-us', 'openai-eu']) {
+      for (const modelId of ['gpt-6-astra', 'gpt-6.1-sol']) {
+        const model = catalog.surfaces.get(provider)!.surface.models.find((row) => row.modelId === modelId)!;
+        expect(model.contextTiers[0].maxTotalTokens).toBe(1_050_000);
+        expect(model.controls.reasoning.supportsOff).toBe(false);
+        expect(model.controls.reasoning.wireProfile).not.toHaveProperty('offMode');
+        if (provider === 'openai-eu' && modelId === 'gpt-6-astra') {
+          expect(model.controls.fast.state).toBe('unsupported');
+          expect(model.executionBindings).toBeUndefined();
+        } else {
+          expect(model.controls.fast.state).toBe('selectable');
+          expect(model.executionBindings?.[0].actions).toEqual([{ kind: 'request-patch', patch: { service_tier: 'fast' } }]);
+        }
+      }
+    }
+  });
+
+  it('offers MiMo V2.6 on separately documented API and Token Plan surfaces and rejects the retired route', () => {
+    const catalog = compileProviderCatalog(input());
+    for (const providerId of ['xiaomi-mimo', 'xiaomi-mimo-token-plan']) {
+      const models = catalog.surfaces.get(providerId)!.surface.models;
+      const retired = models.find((model) => model.modelId === 'mimo-v2.5-pro')!;
+      expect(retired.availability).toBe('unavailable');
+      expect(retired.unavailableReason).toContain('2026-10-21');
+      for (const modelId of ['mimo-v2.6-pro', 'mimo-v2.6-flash']) {
+        const model = models.find((row) => row.modelId === modelId)!;
+        expect(model.contextTiers[0].maxOutputTokens).toBe(131_072);
+        expect(model.controls.reasoning).toMatchObject({ kind: 'toggle', supportsOff: true, defaultSelection: 'on' });
+        expect(model.toolCalling.state).toBe('supported');
+        expect(model.routeOptions?.map((route) => route.route.protocol)).toEqual(['OpenAICompatibleChatCompletions', 'OpenAIResponses']);
+      }
+    }
+  });
+
   it('matches every control-panel row recorded in the user Catalog', () => {
     const catalog = compileProviderCatalog(input());
     type ExpectedRow = readonly [
@@ -433,9 +471,9 @@ describe('Provider Catalog compiler', () => {
       ['grok-4.20-0309-reasoning', 1_000_000, 'fixed', 'unsupported', 'always-on', false, [], 'on'],
       ['grok-4.20-multi-agent-0309', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
       ['grok-4.3', 500_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high'], 'medium'],
-      ['grok-4.7', 500_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'high'],
-      ['grok-4.6', 500_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'high'],
-      ['grok-4.5', 500_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high'], 'medium'],
+      ['grok-4.7', 256_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'high'],
+      ['grok-4.6', 256_000, 'selectable', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'high'],
+      ['grok-4.5', 256_000, 'selectable', 'unsupported', 'levels', false, ['low', 'medium', 'high'], 'medium'],
       ['grok-build-0.1', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on'],
     ]);
     const grokSurface = catalog.surfaces.get('grok-account')?.surface;
@@ -450,7 +488,7 @@ describe('Provider Catalog compiler', () => {
     expect(grokSurface?.routes).toEqual(expect.arrayContaining([
       expect.objectContaining({
         baseUrl: 'https://cli-chat-proxy.grok.com/v1',
-        headers: { 'x-grok-client-version': '0.2.101' },
+        headers: { 'X-XAI-Token-Auth': 'xai-grok-cli', 'x-grok-client-version': '1.0.62', 'x-authenticateresponse': 'authenticate-response' },
       }),
     ]));
 

@@ -10,8 +10,8 @@
 }
 
 .settings-provider-group + .settings-provider-group {
-  margin-top: var(--space-6);
-  padding-top: var(--space-5);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--token-border-muted);
 }
 
@@ -23,8 +23,8 @@
 }
 
 .settings-provider-upcoming {
-  margin-top: var(--space-6);
-  padding-top: var(--space-5);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--token-border-muted);
 }
 

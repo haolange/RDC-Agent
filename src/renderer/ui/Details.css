@@ -1,0 +1,15 @@
+.ui-details { min-width: 0; }
+.ui-details > summary {
+  cursor: pointer;
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  border-radius: var(--radius-sm);
+}
+.ui-details > summary:hover,
+.ui-details > summary:focus-visible { color: var(--token-text-heading); }
+.ui-details > summary:focus-visible {
+  outline: 2px solid var(--token-accent-primary);
+  outline-offset: 2px;
+}
+.ui-details[open] > summary { margin-bottom: var(--space-2); }

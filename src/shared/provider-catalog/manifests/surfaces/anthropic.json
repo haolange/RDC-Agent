@@ -61,6 +61,15 @@
       "observedAt": "2026-09-22",
       "refreshedAt": "2026-09-23",
       "surface": "anthropic"
+    },
+    {
+      "id": "provider-docs:anthropic-current:2026-10-25",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://platform.claude.com/docs/en/models/overview",
+      "observedAt": "2026-10-25",
+      "refreshedAt": "2026-10-25",
+      "surface": "anthropic",
+      "accountScope": "public-api"
     }
   ],
   "defaultFactSourceId": "rdc-agent:anthropic:0",
@@ -135,6 +144,160 @@
     }
   },
   "models": [
+    {
+      "modelId": "claude-haiku-5-5",
+      "label": "claude-haiku-5-5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "maxOutputTokens": 128000,
+          "maxTotalTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.anthropic.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "onMode": "adaptive"
+          }
+        }
+      },
+      "factSourceId": "provider-docs:anthropic-current:2026-10-25"
+    },
+    {
+      "modelId": "claude-sonnet-5-5",
+      "label": "claude-sonnet-5-5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "maxOutputTokens": 128000,
+          "maxTotalTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.anthropic.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "high",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "onMode": "adaptive"
+          }
+        }
+      },
+      "factSourceId": "provider-docs:anthropic-current:2026-10-25",
+      "cost": {
+        "input": 2,
+        "output": 10
+      }
+    },
     {
       "modelId": "claude-fable-5-1",
       "label": "claude-fable-5-1",
@@ -507,9 +670,7 @@
       "defaultBudgetTokens": 128000,
       "cost": {
         "input": 4,
-        "output": 20,
-        "cacheRead": 0.2,
-        "cacheWrite": 5
+        "output": 20
       },
       "toolCalling": {
         "state": "supported"
@@ -592,11 +753,12 @@
       ],
       "factSourceId": "provider-docs:anthropic:opus55-2026-09-23",
       "fieldFactSourceIds": {
-        "cost": "provider-docs:anthropic:opus55-2026-09-23",
+        "cost": "provider-docs:anthropic-current:2026-10-25",
         "contextTiers": "provider-docs:anthropic:opus55-2026-09-23",
         "controls": "provider-docs:anthropic:opus55-2026-09-23",
         "visionInput": "provider-docs:anthropic:opus55-2026-09-23",
-        "structuredOutput": "provider-docs:anthropic:opus55-2026-09-23"
+        "structuredOutput": "provider-docs:anthropic:opus55-2026-09-23",
+        "controls.reasoning": "provider-docs:anthropic-current:2026-10-25"
       }
     },
     {
@@ -782,8 +944,8 @@
   "recommendedModels": [
     "claude-opus-5-5",
     "claude-fable-5-1",
-    "claude-opus-5",
-    "claude-sonnet-5"
+    "claude-sonnet-5-5",
+    "claude-haiku-5-5"
   ],
   "docsUrl": "https://platform.claude.com/settings/keys"
 }

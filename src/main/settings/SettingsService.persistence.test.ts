@@ -191,7 +191,7 @@ describe('SettingsService provider persistence', () => {
     expect(secretStorageService.hasSecret(unkeyedRef, workspaceRoot)).toBe(true);
   });
 
-  it('restores the maintained Super Grok structure when no account credential exists', async () => {
+  it('does not advertise subscription models without account discovery', async () => {
     const { createProviderEntryFromCatalog } = await import('../provider-catalog/ProviderCatalogRegistry');
     const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
     const settingsPath = path.join(workspaceRoot, 'config.json');
@@ -219,23 +219,14 @@ describe('SettingsService provider persistence', () => {
       llm: { providers: Array<{ id: string; models: unknown[] }> };
     };
 
-    const expectedIds = [
-      'grok-4.20-0309-non-reasoning',
-      'grok-4.20-0309-reasoning',
-      'grok-4.20-multi-agent-0309',
-      'grok-4.3',
-      'grok-4.7',
-      'grok-4.6',
-      'grok-4.5',
-      'grok-build-0.1',
-    ];
+    const expectedIds: string[] = [];
     expect(runtime.llm.providers.find((entry) => entry.id === 'grok-account')?.models.map((model) => model.id))
       .toEqual(expectedIds);
     expect(persisted.llm.providers.find((entry) => entry.id === 'grok-account')?.models)
       .toEqual(expect.arrayContaining(expectedIds.map((id) => expect.objectContaining({ id }))));
   });
 
-  it('keeps structural Super Grok facts and appends admitted live account models', async () => {
+  it('keeps only admitted live subscription models and excludes generated media', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
     service.initialize();
@@ -250,17 +241,7 @@ describe('SettingsService provider persistence', () => {
 
     const connected = service.getAll().llm.providers.find((entry) => entry.id === 'grok-account');
     expect(connected).toMatchObject({ isConfigured: true });
-    expect(connected?.models.map((model) => model.id)).toEqual([
-      'grok-4.20-0309-non-reasoning',
-      'grok-4.20-0309-reasoning',
-      'grok-4.20-multi-agent-0309',
-      'grok-4.3',
-      'grok-4.7',
-      'grok-4.6',
-      'grok-4.5',
-      'grok-build-0.1',
-      'grok-composer-2.5-fast',
-    ]);
+    expect(connected?.models.map((model) => model.id)).toEqual(['grok-composer-2.5-fast']);
     expect(connected?.models.some((model) => model.id === 'grok-imagine-video-1.5')).toBe(false);
   });
 

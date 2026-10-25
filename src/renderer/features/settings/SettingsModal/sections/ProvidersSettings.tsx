@@ -1,3 +1,4 @@
+import { SectionHeader } from '../../../../ui/SectionHeader';
 import React, { useMemo, useState } from 'react';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
@@ -66,12 +67,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
     testId: string,
   ) => (
     <section className="settings-provider-group" data-testid={testId} key={testId}>
-      <header className="settings-section-header">
-        <div>
-          <div className="settings-section-title">{title}</div>
-          {subtitle ? <div className="settings-section-subtitle">{subtitle}</div> : null}
-        </div>
-      </header>
+      <SectionHeader title={title} description={subtitle || undefined} />
       <div className="settings-provider-grid">{providers.map(renderCard)}</div>
     </section>
   );

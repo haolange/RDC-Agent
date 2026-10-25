@@ -45,6 +45,24 @@
       "observedAt": "2026-09-22",
       "refreshedAt": "2026-09-22",
       "surface": "groq"
+    },
+    {
+      "id": "provider-docs:groq-current:2026-10-25",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://console.groq.com/docs/models",
+      "observedAt": "2026-10-25",
+      "refreshedAt": "2026-10-25",
+      "surface": "groq",
+      "accountScope": "public-api"
+    },
+    {
+      "id": "provider-docs:groq-reasoning:2026-10-25",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://console.groq.com/docs/reasoning",
+      "observedAt": "2026-10-25",
+      "refreshedAt": "2026-10-25",
+      "surface": "groq",
+      "accountScope": "surface-specific"
     }
   ],
   "defaultFactSourceId": "rdc-agent:groq:0",
@@ -154,7 +172,8 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "granted",
+          "maxOutputTokens": 65536
         }
       ],
       "defaultBudgetTokens": 131072,
@@ -186,16 +205,29 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "none",
-          "supportsOff": true,
-          "levels": [],
-          "defaultSelection": "off",
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "medium",
           "wireProfile": {
-            "kind": "none"
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            }
           }
         }
       },
-      "factSourceId": "rdc-agent:groq:0"
+      "factSourceId": "rdc-agent:groq:0",
+      "fieldFactSourceIds": {
+        "controls.reasoning": "provider-docs:groq-reasoning:2026-10-25"
+      }
     },
     {
       "modelId": "meta-llama/llama-4-scout-17b-16e-instruct",
@@ -316,12 +348,86 @@
         "availability": "provider-docs:groq:enterprise-retention-2026-09-22",
         "presencePolicy": "provider-docs:groq:enterprise-retention-2026-09-22"
       }
+    },
+    {
+      "modelId": "openai/gpt-oss-20b",
+      "label": "GPT OSS 20B",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted",
+          "maxOutputTokens": 65536
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.groq.com/openai/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:groq-current:2026-10-25",
+      "cost": {
+        "input": 0.075,
+        "output": 0.3
+      },
+      "fieldFactSourceIds": {
+        "controls.reasoning": "provider-docs:groq-reasoning:2026-10-25"
+      }
     }
   ],
   "protocolOverrides": [],
   "recommendedModels": [
     "openai/gpt-oss-120b",
-    "llama-3.3-70b-versatile"
+    "openai/gpt-oss-20b"
   ],
   "docsUrl": "https://console.groq.com/keys"
 }

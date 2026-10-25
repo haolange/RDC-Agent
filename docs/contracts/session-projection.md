@@ -109,3 +109,8 @@ Progress 的任务定位仅通过 renderer 内部有类型的请求收集工作�
 main-owned artifacts 投影仅含 rows（最多5项）、totalCount、storeDegraded；同一选择路径排除已被取代记录并按 createdAt、artifactId 倒序。只读 investigation:list 请求显式 projectId/sessionId 及可选 createdAt/artifactId 游标，主进程校验当前session/project归属、严格游标和固定50项页面；返回 rows/totalCount/storeDegraded 及可选 nextCursor。renderer不重建版本关系，不访问存储。存档及 supersedes 链保持，旧的替代/截断计数UI字段删除。
 
 列表、分页和预览状态按完整project/session身份隔离，切换时关闭并拒收旧结果。预览沿既有 investigation:read 与 expectedHash，分页不能扩大读取权限。上下文只限量展示，不改变被冻结Prompt段和成功tool result的资源来源。
+
+
+### 目录内存投影
+
+Renderer 的 EffectiveCatalog snapshot 只按 provider/account/protocol 保存，不写用户资源或历史会话。会话与 Agent 选择共用快照，账号或协议切换后旧请求和事件不得进入新 scope；模型选择成功才更新会话，失败不推进本地选择。共享目录不会替代 prepareTurn 冻结的 RequestPlan，也不会改变子 Agent 的模型继承边界。

@@ -17,6 +17,9 @@ const PERFORMANCE_QUERY_KEY = 'qaPerformance';
 const PERFORMANCE_ATTRIBUTE = 'data-rdc-qa-performance';
 const EVENT_TIMING_THRESHOLD_MS = 16 as const;
 const COMPOSER_CONTROL_SELECTOR = [
+  '[data-testid="composer-model-effort-pill"]',
+  '[data-testid="composer-model-popup"] button',
+  '[data-testid="composer-model-effort-open-picker"]',
   '[data-testid="composer-effort-fast-row"] [role="switch"]',
   '[data-testid="composer-effort-max-context-row"] [role="switch"]',
   '[data-testid="composer-effort-slider"]',

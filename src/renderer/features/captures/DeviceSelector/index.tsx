@@ -1,9 +1,11 @@
+import { Button } from '../../../ui/Button';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDeviceStore } from '../../../stores/deviceStore';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import { useI18n } from '../../../i18n';
 import { useDynStyle } from '../../../lib/useDynStyle';
+import { isTopOverlayLayer, useOverlayLayer } from '../../../lib/overlayStack';
 import {
   DeviceStatusIcon,
   DeviceTypeIcon,
@@ -45,17 +47,27 @@ const DeviceSelectorDropdown: React.FC<{
       className={`device-selector-dropdown placement-${dropdownPosition.placement}`}
       data-testid={dropdownTestId}
       role="listbox"
+      onKeyDown={(event) => {
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+        const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button[role="option"]:not(:disabled)'));
+        if (!options.length) return;
+        const current = options.indexOf(document.activeElement as HTMLButtonElement);
+        const index = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1
+          : (current + (event.key === 'ArrowUp' ? -1 : 1) + options.length) % options.length;
+        event.preventDefault(); options[index]?.focus({ preventScroll: true });
+      }}
       {...dynStyle}
     >
       {devices.map((device) => {
         const selectable = device.status !== 'loading';
         const bootstrapSummary = getBootstrapSummary(device, t);
         return (
-          <button
+          <Button variant="ghost" size="sm"
             key={device.id}
             className={`device-selector-option ${device.id === selectedDevice ? 'is-selected' : ''}`}
             onClick={() => onSelect(device)}
             role="option"
+            disabled={!selectable}
             aria-selected={device.id === selectedDevice}
           >
             <div className="device-selector-option-main">
@@ -63,7 +75,7 @@ const DeviceSelectorDropdown: React.FC<{
                 <DeviceTypeIcon type={device.type} />
                 <div className="device-option-copy">
                   <span className="device-option-name">{device.type === 'local' ? t('device.local') : device.label}</span>
-                  <span className="device-option-detail">{device.type === 'local' ? t('device.localReplayReady') : (device.detailText ?? t('device.ready'))}</span>
+                  {device.type !== 'local' && device.detailText ? <span className="device-option-detail">{device.detailText}</span> : null}
                 </div>
               </div>
               <div className="device-option-trailing">
@@ -71,10 +83,10 @@ const DeviceSelectorDropdown: React.FC<{
                 <span className={`device-option-status ${device.status}`}>{t(STATUS_TEXT_KEYS[device.status])}</span>
               </div>
             </div>
-            {device.serial && <div className="device-option-meta">{device.serial}</div>}
+            {device.serial && device.status !== 'connected' && <div className="device-option-meta">{device.serial}</div>}
             {bootstrapSummary && <div className="device-option-bootstrap">{bootstrapSummary}</div>}
             {!selectable && device.lastError && <div className="device-option-error">{device.lastError}</div>}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -87,6 +99,7 @@ export const DeviceSelector: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { layerId } = useOverlayLayer(isOpen);
   const dropdownTestId = 'utility-device-selector-dropdown';
   const triggerTestId = 'utility-device-selector-trigger';
 
@@ -107,15 +120,28 @@ export const DeviceSelector: React.FC = () => {
   const triggerTitle = t('device.nextRequestDevice', { summary: selectedSummary });
 
   useEffect(() => {
+    if (!isOpen) return undefined;
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
       setIsOpen(false);
     };
-
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !isTopOverlayLayer(layerId)) return;
+      event.preventDefault(); event.stopPropagation();
+      setIsOpen(false); triggerRef.current?.focus({ preventScroll: true });
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [isOpen, layerId]);
+
+  useEffect(() => {
+    if (isOpen) menuRef.current?.querySelector<HTMLButtonElement>('button[aria-selected="true"]:not(:disabled), button[role="option"]:not(:disabled)')?.focus({ preventScroll: true });
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -138,12 +164,13 @@ export const DeviceSelector: React.FC = () => {
     // Opening a capture creates the owning context and connects the selected device.
     setSelectedDevice(device.id);
     setIsOpen(false);
+    triggerRef.current?.focus({ preventScroll: true });
   };
 
   return (
     <div className="device-selector-container">
       <div className="device-selector-group">
-        <button
+        <Button variant="ghost" size="sm"
           ref={triggerRef}
           className="device-selector-trigger device-selector-trigger-utility main-utility-toggle"
           data-testid={triggerTestId}
@@ -167,7 +194,7 @@ export const DeviceSelector: React.FC = () => {
                 <path d="M6 8L1 3h10l-5 5z" />
               </svg>
             </>
-        </button>
+        </Button>
       </div>
       {isOpen && createPortal(
         <DeviceSelectorDropdown

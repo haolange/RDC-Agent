@@ -50,6 +50,10 @@ Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。
 9. **对话模型**：Composer 底栏与 `/model` 选择的是**当前对话模型**，不写回 `.agent.md`。Settings 里的 Agent provider/model 只在用户还没点选时作为种子。未 override 是显式可选状态（菜单「按 Agent 配置」与 `/model default`）：有 session 时清除写入 `SessionRecord.modelOverride = null`，无 session 时清 Composer 草稿。Agent route 当前不可执行时禁止清除，避免把会话推进发送必失败的种子。`/model` 与底栏共用 EffectiveCatalog + `isAgentToolExecutableModel` 可选集；裸 `default` 先于 `provider:model` 解析，真名叫 `default` 的模型用 canonical `provider:model` 逃生。有 session 时写入 `SessionRecord.modelOverride`；无 session 时只记 Composer 草稿，首次发送随 `configurationCommit` 进入 `resolveAgentRoutePreflight` 并在 session 落地后粘性保存。切 Agent **不清**模型。父 session 模型 **不传** sub agent。Agent 可执行模型必须具备 source-backed `toolCalling.supported` 与已实现 structured-tool adapter；`unknown`/`unsupported` 不是选择项，已持久 override 或 Agent route 指向它们时 fail-closed 并给出同 provider 已验证候选项，禁止静默回退。Settings catalog 仍保留完整可审计记录。非法 model fail-closed，禁止静默回退 Agent 种子。
 10. **Agent Shell**：命令工具 id 是 `shell`。解释器由 `ShellResolver` 解析（Settings `tooling.shell.executable` 本机覆盖 → 真实 pwsh 7 → Windows PowerShell 5.1；POSIX 优先 `$SHELL`（basename ∈ zsh/bash/sh/dash）→ `/bin/zsh` → `/bin/bash` → `/bin/sh`）。fish/csh/nu 等 fail-closed。全部失败抛 `SHELL_UNAVAILABLE`，不静默降级到 `cmd.exe`。POSIX 非交互走 login `-lc`；Windows 5.1 不改 `[Console]::OutputEncoding`，改用独立 UTF-8 writer，并显式 `$PSNativeCommandUseErrorActionPreference = $false`。每次调用 spawn 新进程，只用 GUID begin/trailer 回读 cwd；只持久化文件系统且位于 project root 内的 cwd 到 session `shell-state.json`，不存 env。旧 token `bash` 进入 `REJECTED_TOOL_TOKENS`，无展示别名、无静默映射。
 
+### Provider 连接与选择响应
+
+Grok 订阅只有浏览器 PKCE 自动回调入口；独立 xAI API Key 面保留，目录与计费不混用。Renderer 以共享内存快照投影 main EffectiveCatalog，按 provider/account/protocol 去重、失效和隔离迟到结果；菜单打开不再等待全量目录加载。现有控件刻度、Composer 角度扫光与 Transcript ActiveSignalText 保持，冗余技术信息通过所属详情按需披露。细节见 Provider 架构与设计系统。
+
 ## Authority Map
 
 | 主题 | 权威位置 |

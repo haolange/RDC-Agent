@@ -49,7 +49,7 @@ export const fetchJson = async (url: string, init: RequestInit): Promise<unknown
   try {
     const response = await fetch(url, {
       ...init,
-      signal: controller.signal,
+      signal: init.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal,
     });
     const text = await response.text();
     const payload = text ? JSON.parse(text) as unknown : {};
@@ -71,7 +71,7 @@ export const fetchOAuthJson = async (url: string, init: RequestInit): Promise<un
   try {
     const response = await fetch(url, {
       ...init,
-      signal: controller.signal,
+      signal: init.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal,
     });
     const text = await response.text();
     const payload = text ? JSON.parse(text) as unknown : {};

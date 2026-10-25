@@ -29,6 +29,7 @@ export const ComposerModelEffortControl: React.FC<{
   const [view, setView] = useState<ComposerModelEffortView>('effort');
   const menuRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+  const previousViewRef = useRef(view);
   const effort = useComposerEffortControl({
     agentId,
     currentSession,
@@ -67,6 +68,14 @@ export const ComposerModelEffortControl: React.FC<{
   useEffect(() => {
     if (!open) setView((current) => nextComposerModelEffortView(current, 'menu-closed'));
   }, [open]);
+
+  useEffect(() => {
+    const previous = previousViewRef.current;
+    previousViewRef.current = view;
+    if (open && previous === 'models' && view === 'effort') {
+      popupRef.current?.querySelector<HTMLButtonElement>('[data-testid="composer-model-effort-open-picker"]')?.focus({ preventScroll: true });
+    }
+  }, [open, view]);
 
   useEffect(() => {
     if (!open || view !== 'models') return undefined;

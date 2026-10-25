@@ -35,3 +35,5 @@ export { TaskDialog, type TaskDialogProps, type TaskDialogSize } from './TaskDia
 export { Textarea, type TextareaProps, type TextareaSize } from './Textarea';
 export { UnsavedChangesDialog, type UnsavedChangesDialogProps } from './UnsavedChangesDialog';
 export { Toast, ToastStack, type ToastProps, type ToastTone } from './Toast';
+
+export { Details, type DetailsProps } from './Details';

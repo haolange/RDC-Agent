@@ -67,6 +67,12 @@ Scoped Runtime Resolution
 
 迟到事件的代际硬拒绝不放宽。停止回合在最终提交时，从其已取得的 canonical terminal context 补齐本回合已有 pending/running 工具行：call ID、工具名及回合/工具开始时间须匹配，既有终态工具不改写，不创建未知工具行。复用正常事件的结果转换、预览和资源引用规则，保留真实成功或错误回执；有回执不再记成“未取得回执”，无回执仍明确失败。此对账不发起工具、恢复模型循环、结算独立子Task或生成实验签名。
 
+## Provider 登录与目录投影
+
+Grok 订阅仅走浏览器 Authorization Code + PKCE 和动态 loopback 回调；state、OIDC 签名/issuer/audience/nonce/有效期由主进程核验。一次登录拥有自己的监听、超时及 AbortController，取消、重启登录和退出均关闭监听并隔离迟到结果。订阅目录和请求使用订阅代理；独立 xAI API Key 入口不作为失败 fallback，不隐式改变计费入口。
+
+Renderer 的 EffectiveCatalog store 只是主进程快照镜像：按 provider/account/protocol 合并请求、接受目录事件并隔离失效 scope，不推断能力。路由保存期间保持 syncing，提交后重新计算能力；偏好和连接变化失效，单纯测试时间戳变化不重取。发送前仍由主进程冻结和核验执行计划。
+
 ## Provider Reasoning 与输出通道
 
 语义值：`raw` | `summary` | `opaque` | `none` | `unknown`。声明缺失保持 `unknown`，禁止静默升级。

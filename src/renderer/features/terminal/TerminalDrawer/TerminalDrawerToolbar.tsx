@@ -1,3 +1,4 @@
+import { Button } from '../../../ui/Button';
 import React from 'react';
 import Select from '../../../ui/Select';
 import {
@@ -51,7 +52,7 @@ export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm
         </label>
 
         <div ref={filterMenuRef} className="runtime-terminal-filter-menu">
-          <button
+          <Button variant="ghost" size="sm"
             type="button"
             className={`runtime-terminal-tool-button ${filtersOpen ? 'is-active' : ''}`}
             data-testid="runtime-terminal-filter-toggle"
@@ -60,7 +61,7 @@ export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm
             onClick={() => setFiltersOpen((current) => !current)}
           >
             {t('terminal.filters')}
-          </button>
+          </Button>
           {filtersOpen && (
             <div className="runtime-terminal-filter-popover" role="menu">
               <label className="runtime-terminal-select stacked">
@@ -108,7 +109,7 @@ export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm
           />
         </label>
 
-        <button
+        <Button variant="ghost" size="sm"
           type="button"
           className={`runtime-terminal-tool-button ${followOutput ? 'is-active' : ''}`}
           data-testid="runtime-terminal-follow"
@@ -116,7 +117,7 @@ export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm
           onClick={() => setFollowOutput(!followOutput)}
         >
           {t('terminal.follow')}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -17,6 +17,12 @@ export interface OAuthFlowState {
   flowId: string;
   state: string;
   codeVerifier?: string;
+  nonce?: string;
+  issuer?: string;
+  jwksUri?: string;
+  abortController?: AbortController;
+  timeout?: ReturnType<typeof setTimeout>;
+  exchanging?: boolean;
   authUrl?: string;
   verificationUri?: string;
   userCode?: string;
@@ -56,7 +62,8 @@ export interface OAuthSecretBundle {
 
 export interface GrokOAuthMetadata {
   authorizationEndpoint: string;
-  deviceAuthorizationEndpoint: string;
+  issuer: string;
+  jwksUri: string;
   tokenEndpoint: string;
   userinfoEndpoint: string;
   revocationEndpoint: string;

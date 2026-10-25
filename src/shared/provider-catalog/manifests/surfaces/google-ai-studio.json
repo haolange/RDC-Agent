@@ -45,6 +45,15 @@
       "observedAt": "2026-09-22",
       "refreshedAt": "2026-09-22",
       "surface": "google-ai-studio"
+    },
+    {
+      "id": "provider-docs:gemini-4-argon:2026-10-25",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://ai.google.dev/gemini-api/docs/models/gemini-4-argon",
+      "observedAt": "2026-10-25",
+      "refreshedAt": "2026-10-25",
+      "surface": "google-ai-studio",
+      "accountScope": "public-api"
     }
   ],
   "defaultFactSourceId": "rdc-agent:google-ai-studio:0",
@@ -105,6 +114,76 @@
     }
   },
   "models": [
+    {
+      "modelId": "gemini-4-argon",
+      "label": "Gemini 4 Argon",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1048576,
+          "maxOutputTokens": 65536,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted",
+          "maxTotalTokens": 1048576
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "GoogleInteractions",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "gemini-thinking-level",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:gemini-4-argon:2026-10-25"
+    },
     {
       "modelId": "gemini-3.8-flash",
       "label": "gemini-3.8-flash",
@@ -611,6 +690,7 @@
   ],
   "protocolOverrides": [],
   "recommendedModels": [
+    "gemini-4-argon",
     "gemini-3.8-flash",
     "gemini-3.7-flash",
     "gemini-3.6-flash",

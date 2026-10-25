@@ -55,6 +55,7 @@ export function createLlmApi(transport: RendererApiTransport): LlmApi {
     startProviderAccountLogin: (request) => transport.invoke(INVOKE.llm.startProviderAccountLogin, request),
     getProviderAccountStatus: (providerId) => transport.invoke(INVOKE.llm.getProviderAccountStatus, providerId),
     finishProviderAccountLogin: (request) => transport.invoke(INVOKE.llm.finishProviderAccountLogin, request),
+    cancelProviderAccountLogin: (providerId) => transport.invoke(INVOKE.llm.cancelProviderAccountLogin, providerId),
     logoutProviderAccount: (providerId) => transport.invoke(INVOKE.llm.logoutProviderAccount, providerId),
   };
 }

@@ -2,8 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
-import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { generateKeyPairSync, sign } from 'node:crypto';
 import { getProviderModelDefinitions } from '../provider-catalog/ProviderCatalogRegistry';
 import { ProviderAccountAuthService } from './ProviderAccountAuthService';
 
@@ -74,6 +73,8 @@ vi.mock('./SettingsService', () => ({
 }));
 
 const grokMetadata = {
+  issuer: 'https://auth.x.ai',
+  jwks_uri: 'https://auth.x.ai/.well-known/jwks.json',
   authorization_endpoint: 'https://auth.x.ai/oauth2/authorize',
   device_authorization_endpoint: 'https://auth.x.ai/oauth2/device/code',
   token_endpoint: 'https://auth.x.ai/oauth2/token',
@@ -138,328 +139,129 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
     vi.restoreAllMocks();
   });
 
-  it('starts Super Grok browser OAuth with the public Grok Build client, PKCE, and manual one-time code completion', async () => {
-    const service = new ProviderAccountAuthService();
-    const fetchMock = mockFetchJson(grokMetadata);
-
-    const status = await service.startLogin({ providerId: 'grok-account' });
-
-    expect(status.state).toBe('pending');
-    expect(status.authorizationMode).toBe('browser');
-    expect(status.requiresCodeInput).toBe(true);
-    expect(status.redirectUri).toBe(SUPER_GROK_OAUTH_REDIRECT_URI);
-    expect(status.authUrl).toContain('https://auth.x.ai/oauth2/authorize');
-    const authUrl = new URL(status.authUrl ?? '');
-    expect(authUrl.searchParams.get('client_id')).toBe(GROK_PUBLIC_CLIENT_ID);
-    expect(authUrl.searchParams.get('response_type')).toBe('code');
-    expect(authUrl.searchParams.get('redirect_uri')).toBe(SUPER_GROK_OAUTH_REDIRECT_URI);
-    expect(authUrl.searchParams.get('scope')).toBe('openid profile email offline_access grok-cli:access api:access');
-    expect(authUrl.searchParams.get('code_challenge_method')).toBe('S256');
-    expect(authUrl.searchParams.get('code_challenge')).toBeTruthy();
-    expect(authUrl.searchParams.get('state')).toBeTruthy();
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      'https://auth.x.ai/.well-known/openid-configuration',
-      expect.objectContaining({ method: 'GET' }),
-    );
-
-    service.logout('grok-account');
-  });
-
-  it('keeps headless Browser verification from launching the operating-system browser', async () => {
-    const { shell } = await import('electron');
-    delete process.env.RDC_AGENT_TEST_MODE;
-    process.env.RDC_AGENT_HEADLESS = '1';
+  it('uses one dynamic callback, matching state and PKCE without manual completion', async () => {
     const service = new ProviderAccountAuthService();
     mockFetchJson(grokMetadata);
-
     try {
       const status = await service.startLogin({ providerId: 'grok-account' });
-      expect(status.state).toBe('pending');
-      expect(status.authUrl).toContain('https://auth.x.ai/oauth2/authorize');
-      expect(shell.openExternal).not.toHaveBeenCalled();
-    } finally {
-      service.logout('grok-account');
-      process.env.RDC_AGENT_TEST_MODE = '1';
-      delete process.env.RDC_AGENT_HEADLESS;
-    }
+      expect(status).toMatchObject({ state: 'pending', authorizationMode: 'browser', requiresCodeInput: false });
+      expect(status.redirectUri).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/callback$/);
+      const authorization = new URL(status.authUrl!);
+      expect(authorization.searchParams.get('redirect_uri')).toBe(status.redirectUri);
+      expect(authorization.searchParams.get('client_id')).toBe(GROK_PUBLIC_CLIENT_ID);
+      expect(authorization.searchParams.get('code_challenge_method')).toBe('S256');
+      expect(authorization.searchParams.get('nonce')).toBeTruthy();
+      expect((await httpGetText(`${status.redirectUri}?code=wrong&state=wrong`)).statusCode).toBe(400);
+      expect(mocks.savedConnections).toHaveLength(0);
+      expect((await service.finishLogin({ providerId: 'grok-account', code: 'manual' })).connected).toBe(false);
+    } finally { service.dispose(); }
   });
 
-  it('exchanges Super Grok browser authorization code and persists account models', async () => {
-    const service = new ProviderAccountAuthService();
-    const publishCatalog = vi.fn(async () => undefined);
-    service.setCatalogPublisher(publishCatalog);
-    const fetchMock = mockFetchJson(
-      grokMetadata,
-      {
-        access_token: 'access-1',
-        refresh_token: 'refresh-1',
-        id_token: 'id-1',
-        expires_in: 3600,
-      },
-      {
-        sub: 'acct-1',
-        email: 'operator@example.com',
-      },
-      {
-        models: {
-          'grok-4.5': {
-            info: {
-              id: 'grok-4.5', name: 'Grok 4.5', api_backend: 'responses',
-              context_window: 500000, supported_in_api: true,
-            },
-          },
-          'grok-composer-2.5-fast': {
-            info: {
-              id: 'grok-composer-2.5-fast', name: 'Composer 2.5', api_backend: 'responses',
-              context_window: 200000, supported_in_api: true,
-            },
-          },
-        },
-      },
-      {
-        data: [{ id: 'grok-4.3', context_window: 1000000 }],
-      },
-    );
-
-    await service.startLogin({ providerId: 'grok-account' });
-    const status = await service.finishLogin({ providerId: 'grok-account', code: 'auth-code-1' });
-
-    expect(status.state).toBe('connected');
-    expect(mocks.savedConnections).toHaveLength(1);
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      'https://auth.x.ai/oauth2/token',
-      expect.objectContaining({ method: 'POST' }),
-    );
-    const tokenBody = new URLSearchParams(fetchMock.mock.calls[1][1].body as string);
-    expect(tokenBody.get('grant_type')).toBe('authorization_code');
-    expect(tokenBody.get('client_id')).toBe(GROK_PUBLIC_CLIENT_ID);
-    expect(tokenBody.get('code')).toBe('auth-code-1');
-    expect(tokenBody.get('redirect_uri')).toBe(SUPER_GROK_OAUTH_REDIRECT_URI);
-    expect(tokenBody.get('code_verifier')).toBeTruthy();
-    const bundle = JSON.parse(mocks.savedConnections[0].secretPayload) as {
-      authorizationMode?: string;
-      refreshToken?: string;
-      requestedScopes?: string;
-      redirectUri?: string;
-      accountLabel?: string;
-      planLabel?: string;
-    };
-    expect(bundle.authorizationMode).toBe('browser');
-    expect(bundle.refreshToken).toBe('refresh-1');
-    expect(bundle.requestedScopes).toBe('openid profile email offline_access grok-cli:access api:access');
-    expect(bundle.redirectUri).toBe(SUPER_GROK_OAUTH_REDIRECT_URI);
-    expect(bundle.accountLabel).toBe('operator@example.com');
-    expect(bundle.planLabel).toBe('Super Grok OAuth');
-    expect(mocks.savedConnections[0].models).toEqual([
-      { id: 'grok-4.3', label: 'grok-4.3', enabled: true },
-      { id: 'grok-4.5', label: 'grok-4.5', enabled: true },
-      { id: 'grok-composer-2.5-fast', label: 'Composer 2.5', enabled: true },
-    ]);
-    expect(publishCatalog).toHaveBeenCalledWith('grok-account', expect.objectContaining({
-      contributions: expect.arrayContaining([
-        expect.objectContaining({ modelId: 'grok-4.3' }),
-        expect.objectContaining({
-          modelId: 'grok-4.5',
-          route: expect.objectContaining({ protocol: 'OpenAIResponses' }),
-        }),
-        expect.objectContaining({
-          modelId: 'grok-composer-2.5-fast',
-          route: expect.objectContaining({
-            protocol: 'OpenAIResponses',
-            baseUrl: 'https://cli-chat-proxy.grok.com/v1',
-          }),
-        }),
-      ]),
-    }));
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
-      'https://cli-chat-proxy.grok.com/v1/models',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: 'Bearer access-1',
-          'x-grok-client-version': '0.2.101',
-        }),
-      }),
-    );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      5,
-      'https://api.x.ai/v1/models',
-      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer access-1' }) }),
-    );
-  });
-
-  it('fails closed when the Super Grok browser one-time code is missing', async () => {
+  it('does not launch an operating-system browser in headless verification', async () => {
+    const { shell } = await import('electron');
     const service = new ProviderAccountAuthService();
     mockFetchJson(grokMetadata);
+    process.env.RDC_AGENT_HEADLESS = '1';
+    delete process.env.RDC_AGENT_TEST_MODE;
+    try {
+      expect((await service.startLogin({ providerId: 'grok-account' })).state).toBe('pending');
+      expect(shell.openExternal).not.toHaveBeenCalled();
+    } finally { service.dispose(); delete process.env.RDC_AGENT_HEADLESS; process.env.RDC_AGENT_TEST_MODE = '1'; }
+  });
 
-    await service.startLogin({ providerId: 'grok-account' });
-    const status = await service.finishLogin({ providerId: 'grok-account', code: '  ' });
+  it('does not let a replaced login startup failure mark the new attempt failed', async () => {
+    const service = new ProviderAccountAuthService(); let rejectOld!: (error: Error) => void;
+    vi.stubGlobal('fetch', vi.fn()
+      .mockReturnValueOnce(new Promise((_resolve, reject) => { rejectOld = reject; }))
+      .mockResolvedValueOnce(jsonResponse(grokMetadata)));
+    const old = service.startLogin({ providerId: 'grok-account' });
+    try {
+      const current = await service.startLogin({ providerId: 'grok-account' });
+      expect(current.state).toBe('pending');
+      rejectOld(new Error('cancelled earlier metadata'));
+      await old;
+      expect(service.status('grok-account')).toMatchObject({ state: 'pending', authUrl: current.authUrl });
+    } finally { service.dispose(); }
+  });
 
-    expect(status.state).toBe('failed');
-    expect(status.diagnostic?.stage).toBe('authorization');
-    expect(status.message).toContain('one-time code shown by xAI');
+  function signedToken(nonce: string): { token: string; key: unknown } {
+    const keys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+    const header = Buffer.from(JSON.stringify({ alg: 'ES256', kid: 'key' })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify({ iss: grokMetadata.issuer, aud: GROK_PUBLIC_CLIENT_ID,
+      sub: 'account', nonce, iat: Date.now() / 1000, exp: Date.now() / 1000 + 3600 })).toString('base64url');
+    const signature = sign('sha256', Buffer.from(`${header}.${payload}`), { key: keys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+    return { token: `${header}.${payload}.${signature}`, key: { ...keys.publicKey.export({ format: 'jwk' }), kid: 'key' } };
+  }
+
+  it.each([false, true])('validates identity and never persists a cancelled exchange (cancel=%s)', async (cancel) => {
+    const service = new ProviderAccountAuthService();
+    const publish = vi.fn(async () => undefined);
+    service.setCatalogPublisher(publish);
+    mockFetchJson(grokMetadata);
+    const status = await service.startLogin({ providerId: 'grok-account' });
+    const url = new URL(status.authUrl!);
+    const signed = signedToken(url.searchParams.get('nonce')!);
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input.endsWith('/token')) {
+        if (cancel) await gate;
+        return jsonResponse({ access_token: 'access', id_token: signed.token, expires_in: 3600 });
+      }
+      if (input.endsWith('jwks.json')) return jsonResponse({ keys: [signed.key] });
+      if (input.endsWith('/userinfo')) return jsonResponse({ sub: 'account' });
+      if (input.endsWith('/models')) return jsonResponse(fixture('grok-builder.json'));
+      throw new Error('Unexpected endpoint: ' + input);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const callback = httpGetText(`${status.redirectUri}?code=code&state=${url.searchParams.get('state')}`);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      if (cancel) service.cancelLogin('grok-account');
+      release?.();
+      const result = await callback;
+      expect(result.statusCode).toBe(cancel ? 400 : 200);
+      expect(mocks.savedConnections).toHaveLength(cancel ? 0 : 1);
+      if (!cancel) {
+        expect(publish).toHaveBeenCalledOnce();
+        expect(fetchMock).toHaveBeenCalledWith('https://cli-chat-proxy.grok.com/v1/models',
+          expect.objectContaining({ headers: expect.objectContaining({ 'X-XAI-Token-Auth': 'xai-grok-cli' }) }));
+      }
+      expect(fetchMock.mock.calls.some(([endpoint]) => endpoint.startsWith('https://api.x.ai'))).toBe(false);
+    } finally { release?.(); service.dispose(); }
+  });
+
+  it('rejects device mode and incompatible or unreachable metadata with an actionable failure', async () => {
+    const service = new ProviderAccountAuthService();
+    expect((await service.startLogin({ providerId: 'grok-account', accountLoginMode: 'device' })).state).toBe('failed');
+    mockFetchJson({ ...grokMetadata, scopes_supported: ['openid'] });
+    expect((await service.startLogin({ providerId: 'grok-account' })).error).toContain('scope');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network unavailable')));
+    expect((await service.startLogin({ providerId: 'grok-account' })).error).toContain('Network unavailable');
+    service.dispose();
+  });
+
+  it('does not use the public API as a subscription catalog fallback', async () => {
+    const service = new ProviderAccountAuthService();
+    mocks.oauthSecret = JSON.stringify({ providerId: 'grok-account', accessToken: 'access', expiresAt: new Date(Date.now() + 3600000).toISOString() });
+    const fetchMock = vi.fn().mockRejectedValue(new Error('HTTP 403'));
+    vi.stubGlobal('fetch', fetchMock);
+    expect((await service.test('grok-account')).state).toBe('failed');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('https://cli-chat-proxy.grok.com/v1/models');
     expect(mocks.savedConnections).toHaveLength(0);
   });
 
-  it('keeps the live API catalog when Builder is unavailable and records a redacted source diagnostic', async () => {
+  it('replaces a pending flow and closes both superseded and disposed listeners', async () => {
     const service = new ProviderAccountAuthService();
-    const publishCatalog = vi.fn(async () => undefined);
-    service.setCatalogPublisher(publishCatalog);
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse(grokMetadata))
-      .mockResolvedValueOnce(jsonResponse({ access_token: 'access-1', refresh_token: 'refresh-1', expires_in: 3600 }))
-      .mockResolvedValueOnce(jsonResponse({ sub: 'acct-1' }))
-      .mockRejectedValueOnce(new Error('HTTP 403'))
-      .mockResolvedValueOnce(jsonResponse({ data: [{ id: 'grok-4.3', context_window: 1000000 }] }));
-    vi.stubGlobal('fetch', fetchMock);
-    const previousLogCount = runtimeLogService.list('app').length;
-
-    await service.startLogin({ providerId: 'grok-account' });
-    const status = await service.finishLogin({ providerId: 'grok-account', code: 'auth-code-1' });
-
-    expect(status.connected).toBe(true);
-    expect(mocks.savedConnections[0].models).toEqual([
-      { id: 'grok-4.3', label: 'grok-4.3', enabled: true },
-    ]);
-    expect(publishCatalog).toHaveBeenCalledWith('grok-account', expect.objectContaining({
-      detail: 'Builder unavailable (HTTP 403); xAI API returned 1 agent-routable model(s)',
-    }));
-    const newLogs = runtimeLogService.list('app').slice(previousLogCount);
-    expect(newLogs).toEqual([expect.objectContaining({
-      namespace: 'llm',
-      severity: 'warning',
-      title: 'Super Grok catalog source incomplete',
-      detail: 'Builder unavailable (HTTP 403); xAI API returned 1 agent-routable model(s)',
-    })]);
-    expect(JSON.stringify(newLogs)).not.toContain('access-1');
-    expect(JSON.stringify(newLogs)).not.toContain('auth-code-1');
-  });
-
-  it('starts Super Grok device flow from OIDC metadata and persists successful token polling', async () => {
-    const service = new ProviderAccountAuthService();
-    const fetchMock = mockFetchJson(
-      grokMetadata,
-      {
-        device_code: 'device-1',
-        user_code: 'ABCD-EFGH',
-        verification_uri: 'https://auth.x.ai/activate',
-        verification_uri_complete: 'https://auth.x.ai/activate?user_code=ABCD-EFGH',
-        interval: 1,
-        expires_in: 600,
-      },
-      {
-        access_token: 'access-1',
-        refresh_token: 'refresh-1',
-        id_token: 'id-1',
-        expires_in: 3600,
-      },
-      {
-        sub: 'acct-1',
-        email: 'operator@example.com',
-      },
-      {
-        models: {
-          'grok-4.5': {
-            info: {
-              id: 'grok-4.5', name: 'Grok 4.5', api_backend: 'responses',
-              context_window: 500000, supported_in_api: true,
-            },
-          },
-        },
-      },
-      {
-        data: [{ id: 'grok-4.3', context_window: 1000000 }],
-      },
-    );
-
-    const status = await service.startLogin({ providerId: 'grok-account', accountLoginMode: 'device' });
-
-    expect(status.state).toBe('pending');
-    expect(status.authorizationMode).toBe('device');
-    expect(status.verificationUri).toBe('https://auth.x.ai/activate');
-    expect(status.authUrl).toBe('https://auth.x.ai/activate?user_code=ABCD-EFGH');
-    expect(status.userCode).toBe('ABCD-EFGH');
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      'https://auth.x.ai/oauth2/device/code',
-      expect.objectContaining({ method: 'POST' }),
-    );
-    const deviceBody = new URLSearchParams(fetchMock.mock.calls[1][1].body as string);
-    expect(deviceBody.get('client_id')).toBe(GROK_PUBLIC_CLIENT_ID);
-    expect(deviceBody.get('scope')).toBe('openid profile email offline_access grok-cli:access api:access');
-    await vi.waitFor(() => expect(mocks.savedConnections).toHaveLength(1));
-    const bundle = JSON.parse(mocks.savedConnections[0].secretPayload) as { authorizationMode?: string; refreshToken?: string; accessToken?: string };
-    expect(bundle.authorizationMode).toBe('device');
-    expect(bundle.refreshToken).toBe('refresh-1');
-    expect(bundle.accessToken).toBe('access-1');
-  });
-
-  it('surfaces actionable Super Grok device authorization errors', async () => {
-    const service = new ProviderAccountAuthService();
-    mockFetchJson(
-      grokMetadata,
-      { payload: { error: 'invalid_request', error_description: 'bad client' }, ok: false, status: 400 },
-    );
-
-    const status = await service.startLogin({ providerId: 'grok-account', accountLoginMode: 'device' });
-
-    expect(status.state).toBe('failed');
-    expect(status.message).toContain('Super Grok OAuth device authorization failed');
-    expect(status.diagnostic?.checklist).toContain('Use a SuperGrok or X Premium Plus account with Grok Build access.');
-    expect(status.message).toContain('openid profile email offline_access grok-cli:access api:access');
-    expect(status.message).toContain('invalid_request');
-    expect(status.message).toContain('bad client');
-    expect(status.diagnostic?.providerError).toBe('invalid_request');
-  });
-
-  it('wraps Super Grok startup network failures with actionable diagnostics', async () => {
-    const service = new ProviderAccountAuthService();
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValueOnce(new TypeError('fetch failed')));
-
-    const status = await service.startLogin({ providerId: 'grok-account' });
-
-    expect(status.state).toBe('failed');
-    expect(status.message).toContain('Super Grok OAuth browser authorization failed');
-    expect(status.message).toContain('metadata network access');
-    expect(status.message).toContain('fetch failed');
-    expect(status.diagnostic?.stage).toBe('authorization');
-  });
-
-  it('fails clearly when xAI metadata rejects the required Grok Build scope', async () => {
-    const service = new ProviderAccountAuthService();
-    mockFetchJson({
-      ...grokMetadata,
-      scopes_supported: ['openid', 'profile', 'email', 'offline_access'],
-    });
-
-    const status = await service.startLogin({ providerId: 'grok-account' });
-
-    expect(status.state).toBe('failed');
-    expect(status.message).toContain('required Grok Build scope');
-    expect(status.message).toContain('grok-cli:access');
-  });
-
-  it('surfaces Super Grok token polling errors on the pending device flow', async () => {
-    const service = new ProviderAccountAuthService();
-    mockFetchJson(
-      grokMetadata,
-      {
-        device_code: 'device-1',
-        user_code: 'ABCD-EFGH',
-        verification_uri: 'https://auth.x.ai/activate',
-        expires_in: 600,
-      },
-      { payload: { error: 'access_denied', error_description: 'Denied by user' }, ok: false, status: 400 },
-    );
-
-    await service.startLogin({ providerId: 'grok-account', accountLoginMode: 'device' });
-
-    await vi.waitFor(() => expect(service.status('grok-account').state).toBe('failed'));
-    expect(service.status('grok-account').error).toContain('Super Grok OAuth device token polling failed');
-    expect(service.status('grok-account').error).toContain('access_denied');
-    expect(service.status('grok-account').error).toContain('Denied by user');
+    mockFetchJson(grokMetadata, grokMetadata);
+    const first = await service.startLogin({ providerId: 'grok-account' });
+    const second = await service.startLogin({ providerId: 'grok-account' });
+    expect(first.redirectUri).not.toBe(second.redirectUri);
+    await expect(httpGetText(first.redirectUri!)).rejects.toThrow();
+    service.dispose();
+    await expect(httpGetText(second.redirectUri!)).rejects.toThrow();
+    expect(mocks.disconnectedProviders).toHaveLength(0);
   });
 
   it('refreshes expired Super Grok bundles using metadata token endpoint and the public client', async () => {
@@ -476,7 +278,7 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
       refreshToken: 'refresh-1',
       authorizationMode: 'browser',
       requestedScopes: 'openid profile email offline_access grok-cli:access api:access',
-      redirectUri: SUPER_GROK_OAUTH_REDIRECT_URI,
+      redirectUri: 'http://127.0.0.1:12345/callback',
       expiresAt: new Date(Date.now() - 1000).toISOString(),
     });
     const fetchMock = mockFetchJson(
@@ -495,9 +297,6 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
             },
           },
         },
-      },
-      {
-        data: [{ id: 'grok-4.3', context_window: 1000000 }],
       },
     );
 

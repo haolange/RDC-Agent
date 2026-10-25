@@ -1,5 +1,4 @@
 import type { LlmProviderAccountDiagnostic, LlmProviderAccountLoginMode } from '@shared/types/settings';
-import { SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
 import type { GrokOAuthMetadata } from './oauthTypes';
 import {
   GROK_OAUTH_REQUESTED_SCOPES,
@@ -23,9 +22,9 @@ export const readOAuthError = (payload: unknown): { error?: string; detail?: str
 };
 
 const SUPER_GROK_OAUTH_CHECKLIST = [
-  'Use a SuperGrok or X Premium Plus account with Grok Build access.',
+  'Use an xAI account with Grok Build access.',
   'Allow the requested Grok Build and API scopes in the browser.',
-  'Copy the one-time code shown by xAI back into RDC Agent before it expires.',
+  'Complete sign-in in your browser and return to RDC Agent.',
 ];
 
 export const createGrokOAuthDiagnostic = (
@@ -43,11 +42,7 @@ export const createGrokOAuthDiagnostic = (
 });
 
 export const renderGrokOAuthDiagnosticMessage = (diagnostic: LlmProviderAccountDiagnostic): string => [
-  diagnostic.summary,
-  diagnostic.requestedScopes ? 'Requested scopes: ' + diagnostic.requestedScopes + '.' : '',
-  diagnostic.redirectUri ? 'Redirect URI: ' + diagnostic.redirectUri + '.' : '',
-  diagnostic.providerError ? 'Provider error: ' + diagnostic.providerError + '.' : '',
-  diagnostic.detail ? 'Detail: ' + diagnostic.detail + '.' : '',
+  diagnostic.summary, diagnostic.detail,
 ].filter(Boolean).join(' ');
 
 export const createGrokOAuthFailureDiagnostic = (
@@ -106,12 +101,13 @@ export const resolveGrokOAuthDiagnostic = (
 );
 
 const parseGrokOAuthMetadata = (payload: unknown): GrokOAuthMetadata => {
-const record = payload && typeof payload === 'object' && !Array.isArray(payload)
+  const record = payload && typeof payload === 'object' && !Array.isArray(payload)
     ? payload as Record<string, unknown>
     : {};
   const metadata: GrokOAuthMetadata = {
     authorizationEndpoint: readString(record.authorization_endpoint) ?? '',
-    deviceAuthorizationEndpoint: readString(record.device_authorization_endpoint) ?? '',
+    issuer: readString(record.issuer) ?? '',
+    jwksUri: readString(record.jwks_uri) ?? '',
     tokenEndpoint: readString(record.token_endpoint) ?? '',
     userinfoEndpoint: readString(record.userinfo_endpoint) ?? '',
     revocationEndpoint: readString(record.revocation_endpoint) ?? '',
@@ -120,15 +116,12 @@ const record = payload && typeof payload === 'object' && !Array.isArray(payload)
     codeChallengeMethodsSupported: readStringArray(record.code_challenge_methods_supported),
     tokenEndpointAuthMethodsSupported: readStringArray(record.token_endpoint_auth_methods_supported),
   };
-  if (!metadata.authorizationEndpoint || !metadata.deviceAuthorizationEndpoint || !metadata.tokenEndpoint || !metadata.userinfoEndpoint || !metadata.revocationEndpoint) {
-    throw new Error('xAI OAuth metadata is missing required browser, device, token, userinfo, or revocation endpoints.');
+  if (!metadata.authorizationEndpoint || !metadata.tokenEndpoint || !metadata.userinfoEndpoint || !metadata.revocationEndpoint) {
+    throw new Error('xAI OAuth metadata is missing required browser, token, userinfo, or revocation endpoints.');
   }
   if (metadata.grantTypesSupported.length > 0) {
     if (!metadata.grantTypesSupported.includes('authorization_code')) {
       throw new Error('xAI OAuth metadata does not advertise browser authorization-code support.');
-    }
-    if (!metadata.grantTypesSupported.includes('urn:ietf:params:oauth:grant-type:device_code')) {
-      throw new Error('xAI OAuth metadata does not advertise device authorization support.');
     }
   }
   if (metadata.codeChallengeMethodsSupported.length > 0 && !metadata.codeChallengeMethodsSupported.includes('S256')) {
@@ -137,11 +130,17 @@ const record = payload && typeof payload === 'object' && !Array.isArray(payload)
   if (metadata.tokenEndpointAuthMethodsSupported.length > 0 && !metadata.tokenEndpointAuthMethodsSupported.includes('none')) {
     throw new Error('xAI OAuth metadata does not advertise public-client token exchange support.');
   }
+  if (metadata.issuer !== 'https://auth.x.ai' || !metadata.jwksUri
+    || [metadata.authorizationEndpoint, metadata.tokenEndpoint, metadata.userinfoEndpoint,
+      metadata.revocationEndpoint, metadata.jwksUri].some((endpoint) => new URL(endpoint).origin !== metadata.issuer)) {
+    throw new Error('xAI OAuth metadata contains an untrusted issuer or endpoint.');
+  }
   return metadata;
 };
 
-export const fetchGrokOAuthMetadata = async (): Promise<GrokOAuthMetadata> => {
+export const fetchGrokOAuthMetadata = async (signal?: AbortSignal): Promise<GrokOAuthMetadata> => {
   const payload = await fetchJson(GROK_OPENID_CONFIGURATION_URL, {
+    signal,
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -151,7 +150,7 @@ export const fetchGrokOAuthMetadata = async (): Promise<GrokOAuthMetadata> => {
 };
 
 export const resolveGrokOAuthScope = (metadata: GrokOAuthMetadata): string => {
-const supported = new Set(metadata.scopesSupported);
+  const supported = new Set(metadata.scopesSupported);
   const requested = GROK_OAUTH_REQUESTED_SCOPES.filter((scope) => (
     supported.size === 0 || supported.has(scope)
   ));
@@ -167,5 +166,3 @@ const supported = new Set(metadata.scopesSupported);
   }
   return requested.join(' ');
 };
-
-export const SUPER_GROK_OAUTH_REDIRECT = SUPER_GROK_OAUTH_REDIRECT_URI;

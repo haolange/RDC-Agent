@@ -121,6 +121,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     startProviderAccountLogin: 'llm:startProviderAccountLogin',
     getProviderAccountStatus: 'llm:getProviderAccountStatus',
     finishProviderAccountLogin: 'llm:finishProviderAccountLogin',
+    cancelProviderAccountLogin: 'llm:cancelProviderAccountLogin',
     logoutProviderAccount: 'llm:logoutProviderAccount',
   },
   settings: {

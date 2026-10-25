@@ -7,7 +7,7 @@ import { InlineError } from '../../../../ui/InlineError';
 import { Icon } from '../../../../ui/Icon';
 import { Panel } from '../../../../ui/Panel';
 import { useI18n } from '../../../../i18n';
-import { CHAPTER_LABEL_KEYS, formatKnowledgeTime } from '../knowledgeCenterLabels';
+import { CHAPTER_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { detailToRecord } from '../knowledgeCenterModel';
 import { CaseChapterContent } from '../parts/CaseChapterContent';
 import { KnowledgeCardImages } from '../parts/KnowledgeCardImages';
@@ -40,8 +40,6 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
   const isCandidateView = state.viewMode === 'candidates';
   const space = card ? state.spaces.find((entry) => entry.spaceId === card.spaceId) : undefined;
   const spaceLabel = space?.kind === 'user' ? t('knowledgeCenter.userSpace') : (space?.label ?? card?.spaceId ?? '');
-  const updated = formatKnowledgeTime(card?.updatedAt);
-  const origin = card ? [card.sourceStatus, card.caseId].filter(Boolean).join(' · ') : '';
 
   return (
     <Panel className="knowledge-center-content" data-testid="knowledge-center-detail-column">
@@ -60,9 +58,6 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
                 <div className="knowledge-center-meta-line" data-testid="knowledge-center-meta-line">
                   {isCandidateView ? <Badge tone="warning">{t('knowledgeCenter.pendingReview')}</Badge> : null}
                   <CardBadges type={card.type} lifecycle={card.lifecycle} sourceStatus={card.sourceStatus} />
-                  {updated ? <span>{t('knowledgeCenter.updatedAtPrefix')} {updated}</span> : null}
-                  <span>{t('knowledgeCenter.spaceLabel')} {spaceLabel}</span>
-                  {isCandidateView && origin ? <span>{t('knowledgeCenter.sourceLabel')} {origin}</span> : null}
                 </div>
               </>
             ) : null}

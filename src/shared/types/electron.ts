@@ -384,6 +384,7 @@ export interface ElectronAPI {
     startProviderAccountLogin: (request: LlmProviderAccountLoginStartRequest) => Promise<LlmProviderAccountStatus>;
     getProviderAccountStatus: (providerId: LlmProviderId) => Promise<LlmProviderAccountStatus>;
     finishProviderAccountLogin: (request: LlmProviderAccountLoginFinishRequest) => Promise<LlmProviderAccountStatus>;
+    cancelProviderAccountLogin: (providerId: LlmProviderId) => Promise<void>;
     logoutProviderAccount: (providerId: LlmProviderId) => Promise<LlmProviderAccountStatus>;
   };
 

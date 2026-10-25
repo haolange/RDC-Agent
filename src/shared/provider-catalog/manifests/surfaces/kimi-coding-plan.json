@@ -51,6 +51,15 @@
       "observedAt": "2026-09-22",
       "refreshedAt": "2026-09-22T00:00:00+08:00",
       "surface": "kimi-coding-plan"
+    },
+    {
+      "id": "provider-docs:kimi-coding-plan-k31:2026-10-25",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://www.kimi.com/code/docs/en/kimi-code/models.html",
+      "observedAt": "2026-10-25",
+      "refreshedAt": "2026-10-25",
+      "surface": "kimi-coding-plan",
+      "accountScope": "surface-specific"
     }
   ],
   "defaultFactSourceId": "rdc-agent:kimi-coding-plan:0",
@@ -140,6 +149,350 @@
     }
   },
   "models": [
+    {
+      "modelId": "k3.1-pro",
+      "label": "k3.1-pro",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.kimi.com/coding",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.kimi.com/coding",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "moonshot-ai",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.kimi.com/coding/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "moonshot-ai",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "unknown",
+          "tierId": "max",
+          "label": "Max mode"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "high",
+            "max"
+          ],
+          "defaultState": "known",
+          "defaultSelection": "max",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "max",
+            "levels": {
+              "low": "low",
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "enabled"
+          }
+        }
+      },
+      "executionBindings": [
+        {
+          "id": "context:max",
+          "when": {
+            "maxContext": true
+          },
+          "actions": [
+            {
+              "kind": "client-tier",
+              "tierId": "max"
+            }
+          ],
+          "entitlement": "unknown"
+        }
+      ],
+      "factSourceId": "provider-docs:kimi-coding-plan-k31:2026-10-25",
+      "liveProjection": {
+        "entitlementDenialMatchers": [
+          {
+            "mode": "max-context",
+            "statuses": [
+              403
+            ]
+          }
+        ],
+        "context": {
+          "observedTierId": "default",
+          "maxTierId": "max",
+          "entitlementAuthority": "execution-evidence"
+        },
+        "reasoning": {
+          "offPolicy": "forbidden",
+          "wireProfiles": {
+            "AnthropicMessages": {
+              "kind": "anthropic",
+              "on": "high",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "onMode": "enabled"
+            },
+            "OpenAICompatibleChatCompletions": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "levels": {
+                "minimal": "minimal",
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "onMode": "thinking-enabled"
+            }
+          }
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:kimi-coding-plan:tools-2026-08-23"
+      }
+    },
+    {
+      "modelId": "k3.1-pro-highspeed",
+      "label": "k3.1-pro-highspeed",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.kimi.com/coding",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.kimi.com/coding",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "moonshot-ai",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.kimi.com/coding/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "moonshot-ai",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "unknown",
+          "tierId": "max",
+          "label": "Max mode"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "high",
+            "max"
+          ],
+          "defaultState": "known",
+          "defaultSelection": "max",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "max",
+            "levels": {
+              "low": "low",
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "enabled"
+          }
+        }
+      },
+      "executionBindings": [
+        {
+          "id": "context:max",
+          "when": {
+            "maxContext": true
+          },
+          "actions": [
+            {
+              "kind": "client-tier",
+              "tierId": "max"
+            }
+          ],
+          "entitlement": "unknown"
+        }
+      ],
+      "factSourceId": "provider-docs:kimi-coding-plan-k31:2026-10-25",
+      "liveProjection": {
+        "entitlementDenialMatchers": [
+          {
+            "mode": "max-context",
+            "statuses": [
+              403
+            ]
+          }
+        ],
+        "context": {
+          "observedTierId": "default",
+          "maxTierId": "max",
+          "entitlementAuthority": "execution-evidence"
+        },
+        "reasoning": {
+          "offPolicy": "forbidden",
+          "wireProfiles": {
+            "AnthropicMessages": {
+              "kind": "anthropic",
+              "on": "high",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "onMode": "enabled"
+            },
+            "OpenAICompatibleChatCompletions": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "levels": {
+                "minimal": "minimal",
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "onMode": "thinking-enabled"
+            }
+          }
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:kimi-coding-plan:tools-2026-08-23"
+      }
+    },
     {
       "modelId": "kimi-for-coding",
       "label": "Kimi for Coding",
@@ -845,6 +1198,8 @@
     }
   ],
   "recommendedModels": [
+    "k3.1-pro",
+    "k3.1-pro-highspeed",
     "kimi-for-coding"
   ],
   "docsUrl": "https://www.kimi.com/code/docs/en/"

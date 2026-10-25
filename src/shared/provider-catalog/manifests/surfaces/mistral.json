@@ -37,6 +37,15 @@
       "refreshedAt": "2026-07-15",
       "identityId": "mistral",
       "surface": "mistral"
+    },
+    {
+      "id": "provider-docs:mistral-current:2026-10-25",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://docs.mistral.ai/models/mistral-large-4-0",
+      "observedAt": "2026-10-25",
+      "refreshedAt": "2026-10-25",
+      "surface": "mistral",
+      "accountScope": "surface-specific"
     }
   ],
   "defaultFactSourceId": "rdc-agent:mistral:0",
@@ -77,6 +86,127 @@
     }
   },
   "models": [
+    {
+      "modelId": "mistral-medium-3-5",
+      "label": "mistral-medium-3-5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.mistral.ai/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "none",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "provider-docs:mistral-current:2026-10-25",
+      "cost": {
+        "input": 1.5,
+        "output": 7.5
+      }
+    },
+    {
+      "modelId": "mistral-large-4",
+      "label": "mistral-large-4",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.mistral.ai/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "none",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "provider-docs:mistral-current:2026-10-25",
+      "cost": {
+        "input": 1.36,
+        "output": 4.18,
+        "cacheRead": 0.14
+      }
+    },
     {
       "modelId": "mistral-small-2603",
       "label": "Mistral Small 4",
@@ -250,6 +380,8 @@
   ],
   "protocolOverrides": [],
   "recommendedModels": [
+    "mistral-large-4",
+    "mistral-medium-3-5",
     "mistral-large-latest",
     "codestral-latest"
   ],

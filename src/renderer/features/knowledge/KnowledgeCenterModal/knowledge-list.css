@@ -100,12 +100,6 @@
   line-height: 1.5;
 }
 
-.knowledge-center-card-time {
-  color: var(--token-text-placeholder);
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
-}
-
 .knowledge-center-list-head {
   display: flex;
   flex-direction: column;

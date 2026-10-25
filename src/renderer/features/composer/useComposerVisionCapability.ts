@@ -1,35 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import type { SessionRecord } from '@shared/types/session';
-import { getElectronApi } from '../../platform/getElectronApi';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
+import { useAppSettingsStore } from '../../stores/appSettingsStore';
+import { catalogScopeKey, useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
 
-export function useComposerVisionCapability(
-  agentId: string,
-  currentSession: SessionRecord | null,
-): boolean {
+export function useComposerVisionCapability(agentId: string, currentSession: SessionRecord | null): boolean {
   const { effective } = useComposerEffectiveModel(agentId, currentSession);
-  const providerId = effective?.providerId;
-  const modelId = effective?.modelId;
-  const [supported, setSupported] = useState(true);
-
-  useEffect(() => {
-    const api = getElectronApi();
-    if (!api || !providerId || !modelId) {
-      setSupported(false);
-      return undefined;
-    }
-    let cancelled = false;
-    void api.settings.getEffectiveCatalog(providerId).then((catalog) => {
-      if (cancelled) return;
-      const model = catalog?.models.find((entry) => entry.modelId === modelId);
-      setSupported(model?.visionInput.state === 'supported');
-    }).catch(() => {
-      if (!cancelled) setSupported(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [providerId, modelId]);
-
-  return supported;
+  const provider = useAppSettingsStore((state) => state.settings.llm.providers.find((entry) => entry.id === effective?.providerId));
+  const entry = useEffectiveCatalogStore((state) => provider ? state.entries[catalogScopeKey(provider)] : undefined);
+  useEffect(() => { if (provider) void useEffectiveCatalogStore.getState().load(provider); }, [provider]);
+  return entry?.snapshot?.models.find((model) => model.modelId === effective?.modelId)?.visionInput.state === 'supported';
 }

@@ -25,7 +25,9 @@ export async function persistSessionModelOverride(
   if (!sessionId) return { ok: false, error: 'SESSION_MISSING' };
   const api = getElectronApi();
   if (!api) return { ok: false, error: 'BRIDGE_UNAVAILABLE' };
-  const result = await api.session.setModelOverride(sessionId, modelOverride);
+  let result: Awaited<ReturnType<typeof api.session.setModelOverride>>;
+  try { result = await api.session.setModelOverride(sessionId, modelOverride); }
+  catch { return { ok: false, error: 'MODEL_SAVE_FAILED' }; }
   if (!result.success || !result.session) {
     return { ok: false, error: result.error || 'MODEL_UNAVAILABLE' };
   }
