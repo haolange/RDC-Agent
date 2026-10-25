@@ -268,7 +268,7 @@ export function upsertRuntimeToolCall(
   options?: LoopTraceOptions,
 ): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
-  const blockMeta = getRuntimeToolBlockMeta(patch.toolName, options?.loopId);
+  const blockMeta = getRuntimeToolBlockMeta(patch.toolName, patch.id, options?.loopId);
   const blockId = blockMeta.id;
   const existingBlock = nextTrace.blocks.find((entry) => (
     entry.toolCalls.some((toolCall) => toolCall.id === patch.id)
@@ -524,6 +524,14 @@ export function upsertLoopResult(
     loopThinking: thinking,
     loopThinkingStatus: thinkingStatus,
   });
+  const hasActiveTools = block.toolCalls.some((call) => call.status === 'pending' || call.status === 'running');
+  if (resultStatus === 'streaming' || hasActiveTools) {
+    block.status = 'running';
+    delete block.completedAt;
+  } else {
+    block.status = block.toolCalls.some((call) => call.status === 'error') ? 'error' : 'complete';
+    block.completedAt ??= nowMs();
+  }
   nextTrace.status = 'running';
   nextTrace.updatedAt = nowMs();
   return nextTrace;
@@ -692,12 +700,13 @@ export function sanitizeStoredWorkTrace(
 
 function getRuntimeToolBlockMeta(
   toolName: string,
+  toolCallId: string,
   loopId?: string,
 ): Pick<ConversationWorkBlock, 'id' | 'title' | 'stage' | 'kind'> {
   const normalizedToolName = normalizeToolName(toolName);
   if (normalizedToolName === 'ask_user') {
     return {
-      id: 'runtime-user-input',
+      id: `runtime-user-input-${toolCallId}`,
       title: 'User input requested',
       stage: 'decision',
       kind: 'user_input',
@@ -705,7 +714,7 @@ function getRuntimeToolBlockMeta(
   }
   if (normalizedToolName === 'plan_artifact') {
     return {
-      id: 'runtime-plan-review',
+      id: `runtime-plan-review-${toolCallId}`,
       title: 'Plan review requested',
       stage: 'decision',
       kind: 'plan_review',

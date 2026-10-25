@@ -3896,3 +3896,11 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 原App确实在登录页已经加载后仍显示Opening browser：主设置等待BrowserWindow.loadURL整页Promise返回。补“页面未加载完仍应返回flow”测试先RED，改为窗口拥有异步导航、启动立即返回pending后GREEN；页面失败仍abort并关闭，取消后迟到导航错误不写回失败。33项账号/回调/身份/窗口回归、typecheck/lint、contracts248、provider-system249+157、renderer/fidelity/仓库整洁及官方构建通过；未削弱断言或重跑无变化的全量矩阵。
 - 最终构建经官方start:human重启，未再次授权即恢复Connected；UI再次Test成功，正式lastTestedAt更新为2026-10-25T12:47:29.912Z、三模型目录与refreshAvailable成立。这一重启后真实调用证明安全存储可恢复，不能只凭缓存UI判定。现有Composer模型选择保留；未新增会话、推理请求或RDC实验。
 - 新授权、首次目录、重启恢复与重读目录分别通过；Chrome临时授权页已关闭、原X页保留。授权完成后的loopback端口已无监听；本轮App/launcher退出、锁及磁盘清理结果归入原任务区receipt.json的grokLoginClosure，保留一张无凭据的最终App连接截图。此前“新授权未验收”边界在本次明确关闭。
+
+### 2026-10-25 Transcript 段落蓝点结算与交互归属
+
+- 基线3705539f，保留上轮Grok未提交差异。只读定位原会话sess_65f880ea3579：模型第15段结果complete、计划拒绝及工具完成，段落却仍running；第16段artifact_read完成后为complete。最小脱敏事件用当前main函数复现，8项新增主进程回归先4项失败，准确复现状态、调用归属与完成时间问题；原历史未迁移或回写。
+- 直接修复upsertLoopResult：流结束且本段工具已终结时结算，未返回工具继续running，真实错误保留error；首个完成时间保留，明确恢复streaming清除旧时间。plan_artifact与同构ask_user按toolCallId建立独立交互块，后续审批不再挂回旧段。投影回归另发现审批决定被当作工具终态，沿原行投影改为读取真实call.status；批准、拒绝及superseded均须等工具回执。生产修改仅main状态函数与renderer决定行两文件，无CSS、IPC、共享字段、存储版本或兼容分支；段落完成不提前完成整个Turn，后台子执行语义不变。
+- 工程：相邻7文件68项通过；补齐决定终态及真实错误后，最终4文件22项通过，包含取消与委派交互投影。typecheck/lint、contracts248、session-projection、work-process、architecture/fidelity/renderer-structure/appearance通过；官方prepare-only构建通过，main产物SHA256为3c9022656b7483ac02d85372e11adf618c546dfb573f9d97635263b7dfefc9a7。未重复无变化的完整suite，不以旧绿色替代新状态回归。
+- Browser：正式disposable launcher及一次性bootstrap进入/app；外部临时脚本用同一main状态函数生成小型隔离会话，正式Bridge读取，未复制原会话、凭据或RDC。原生DOM与可见截图确认：等待回执蓝点及pulse；拒绝并读取完成后两段灰点且无pulse；后续调用只点亮第三段，之前两段保持灰色。工具卡Enter开合及恢复通过，console错误/警告为空。首轮持久fixture中的悬空人工审批被既有恢复逻辑终结，保留该事实并修正fixture；Browser等待场景为审批已回答但工具回执未到，真实等待人工审批由组件测试覆盖。此为确定性UI验收，不冒充真实模型重跑。
+- 桌面与清理：受限执行首次桌面启动的GPU/renderer子进程失败，正常桌面权限下同隔离根官方start:human成功打开RDC-Agent窗口；隔离profile的解密及meta CSP诊断单列，不冒充账号或全桌面console验收。本轮launcher及精确出生身份的自有子进程全部退出，5127释放、canonical锁不存在，桌面启动权已交还。核对绝对路径、Git及无链接边界后清理本轮注入脚本、隔离双根、测试TEMP与构建/启动日志；仅保留.local/transcript-state内Tasks、最小回执和两张截图。原Grok文件哈希逐项一致，ledger仅追加本节，无DeepSeek修改、提交、推送或发布。

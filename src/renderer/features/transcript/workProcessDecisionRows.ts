@@ -8,7 +8,7 @@ import { getMeaningfulBlockSummary } from './workProcessBlockText';
 export const createPlanReviewRow = (call: ConversationToolCall): WorkProcessRow => ({
   type: 'planReview',
   id: call.id,
-  status: call.status === 'error' ? 'error' : call.planReview?.status === 'approved' ? 'complete' : 'running',
+  status: call.status,
   plan: call.planReview!,
   duration: formatDurationMs(call.startedAt, call.completedAt),
 });
@@ -19,7 +19,7 @@ export const createPlanReviewShellRow = (call: ConversationToolCall): WorkProces
   return {
     type: 'tool',
     id: call.id,
-    status: rejected || call.status === 'error' ? 'complete' : 'complete',
+    status: call.status,
     verb: rejected ? '已更新计划 · 已拒绝' : '已更新计划',
     category: '计划产物',
     icon: 'planArtifact',

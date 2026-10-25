@@ -33,6 +33,8 @@ Workbench page shell、Local utilities、composer、transcript 共用 `--workben
 
 真实 runtime transcript，不是假 stage 日志。
 
+模型结果流结束时，主进程同步结算所属段落；本段仍有未完成工具则继续运行，段落结束不等于整个请求结束。计划审批与提问按工具调用身份保序，不跨模型段合并。审批决定与工具执行终态分开，拒绝或批准不能提前替代工具回执。左侧蓝点只由真实段落及所属未完成操作驱动，历史完成段不得因后续审批重新点亮；普通灰点、扫光及布局保持既有规则。
+
 - 运行中标题：`工作中` / `Working` + Active Signal；
 - 结束后：`工作过程` / `Work process` + duration/action meta；
 - 禁止用 `执行完成` 做主标题。
