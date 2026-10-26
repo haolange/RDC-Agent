@@ -1,475 +1,838 @@
-# 渲染器 API
+# 渲染进程 API
 
 <cite>
-**本文引用的文件**
-- [src/shared/renderer-api/index.ts](file://src/shared/renderer-api/index.ts)
-- [src/shared/renderer-api/createRendererApi.ts](file://src/shared/renderer-api/createRendererApi.ts)
-- [src/shared/renderer-api/core.ts](file://src/shared/renderer-api/core.ts)
-- [src/shared/renderer-api/workbench.ts](file://src/shared/renderer-api/workbench.ts)
-- [src/shared/renderer-api/settings.ts](file://src/shared/renderer-api/settings.ts)
-- [src/shared/renderer-api/events.ts](file://src/shared/renderer-api/events.ts)
-- [src/shared/renderer-api/channels.ts](file://src/shared/renderer-api/channels.ts)
-- [src/shared/renderer-api/transport.ts](file://src/shared/renderer-api/transport.ts)
-- [src/shared/renderer-api/channelCapabilities.ts](file://src/shared/renderer-api/channelCapabilities.ts)
-- [scripts/renderer-contract.mjs](file://scripts/renderer-contract.mjs)
-- [src/shared/types/electron-api.ts](file://src/shared/types/electron-api.ts)
-- [src/shared/types/electron/index.ts](file://src/shared/types/electron/index.ts)
+**本文引用的文件**   
+- [preload/index.ts](file://src/preload/index.ts)
+- [preload/rendererTransport.ts](file://src/preload/rendererTransport.ts)
+- [shared/renderer-api/index.ts](file://src/shared/renderer-api/index.ts)
+- [shared/renderer-api/createRendererApi.ts](file://src/shared/renderer-api/createRendererApi.ts)
+- [shared/renderer-api/channels.ts](file://src/shared/renderer-api/channels.ts)
+- [shared/renderer-api/channelCapabilities.ts](file://src/shared/renderer-api/channelCapabilities.ts)
+- [shared/renderer-api/events.ts](file://src/shared/renderer-api/events.ts)
+- [shared/renderer-api/transport.ts](file://src/shared/renderer-api/transport.ts)
+- [shared/renderer-api/core.ts](file://src/shared/renderer-api/core.ts)
+- [shared/renderer-api/settings.ts](file://src/shared/renderer-api/settings.ts)
+- [shared/renderer-api/workbench.ts](file://src/shared/renderer-api/workbench.ts)
 </cite>
 
 ## 目录
-1. [简介](#简介)
+
+1. [引言](#引言)
 2. [项目结构](#项目结构)
 3. [核心组件](#核心组件)
 4. [架构总览](#架构总览)
 5. [详细组件分析](#详细组件分析)
 6. [依赖关系分析](#依赖关系分析)
 7. [性能与可靠性](#性能与可靠性)
-8. [故障排查指南](#故障排查指南)
+8. [排错指南](#排错指南)
 9. [结论](#结论)
 10. [附录：API 参考](#附录api-参考)
 
-## 简介
-本文件为 Renderer API 的完整参考文档，面向需要在渲染进程（浏览器端）集成 RDC-Agent 能力的开发者。文档覆盖向渲染器暴露的所有公共接口，包括：
-- 核心 API：应用元信息、对话框、窗口控制、Web 能力等
-- 工作区 API：项目、设备、会话、运行、捕获、上下文、追踪日志等
-- 设置与运行时 API：记忆、LLM 提供商、设置、RDX 运行时资源等
-- 事件订阅：工作流状态、设备/捕获/上下文变更、运行时日志、主题变化等
+## 引言
 
-每个方法均说明用途、参数类型、返回值、异步处理与错误处理要点，并提供使用示例、最佳实践与兼容性说明，以及客户端集成指南和常见问题解决方案。
+本文面向需要在 Electron 渲染进程中调用桌面能力的开发者，系统化说明预加载层暴露给渲染进程的受控接口。重点包括：
+
+- `createRendererApi` 如何把平台信息、IPC 传输通道和多个能力域组装成全局 `electronAPI`。
+- API 分组职责：Agent、Conversation、Settings、Workbench、对话、工作流、设备、会话、捕获、追踪等。
+- `channelCapabilities` 能力矩阵机制、能力发现流程和失败关闭策略。
+- 事件订阅系统、事件类型定义和订阅生命周期管理。
+- 传输层抽象 `RendererApiTransport`、错误处理策略以及重试建议。
+- 完整的 API 方法签名、参数类型、返回值结构和最佳实践。
+
+该文档既适合初次接触 Renderer API 的开发者，也适合作为扩展新能力时的权威参考。
 
 ## 项目结构
-渲染器 API 由“通道定义 + 传输抽象 + 各域 API 工厂 + 统一入口”构成：
-- 通道定义：集中声明所有 IPC 调用与事件通道名，提供类型化校验工具
-- 传输抽象：定义 invoke/subscribe/listener 的统一接口，屏蔽底层实现差异
-- 各域 API 工厂：按功能域创建具体 API 对象，内部通过 transport.invoke 调用对应通道
-- 统一入口：createRendererApi 聚合所有域 API，并暴露 on/off 事件订阅
+
+Renderer API 由三部分构成：
+
+| 层次 | 主要职责 | 关键文件 |
+|---|---|---|
+| 预加载脚本 | 将 `createRendererApi` 构建出的对象挂载到 `window.electronAPI`，并封装 `rdcDesktop` 辅助方法 | [preload/index.ts](file://src/preload/index.ts) |
+| 共享 API 定义 | 描述 IPC channel、能力矩阵、事件通道、传输接口和各能力域工厂 | [shared/renderer-api/*](file://src/shared/renderer-api/index.ts) |
+| 传输实现 | 基于 `ipcRenderer.invoke` 和 `ipcRenderer.on` 提供 RPC 与事件订阅 | [preload/rendererTransport.ts](file://src/preload/rendererTransport.ts) |
 
 ```mermaid
 graph TB
-subgraph "共享层"
-CH["channels.ts<br/>通道常量与类型"]
-TR["transport.ts<br/>传输抽象接口"]
-CAP["channelCapabilities.ts<br/>通道能力矩阵"]
-end
-subgraph "API 工厂"
-CORE["core.ts<br/>核心 API 工厂"]
-WB["workbench.ts<br/>工作区 API 工厂"]
-SET["settings.ts<br/>设置/运行时 API 工厂"]
-EVT["events.ts<br/>事件订阅 API 工厂"]
-end
-ENTRY["createRendererApi.ts<br/>统一入口"]
-IDX["index.ts<br/>对外导出"]
-CH --> CORE
-CH --> WB
-CH --> SET
-CH --> EVT
-TR --> CORE
-TR --> WB
-TR --> SET
-TR --> EVT
-CAP --> ENTRY
-CORE --> ENTRY
-WB --> ENTRY
-SET --> ENTRY
-EVT --> ENTRY
-ENTRY --> IDX
+    Renderer["渲染进程"] --> Preload["预加载脚本<br/>contextBridge.exposeInMainWorld"]
+    Preload --> ApiFactory["createRendererApi"]
+    ApiFactory --> Transport["RendererApiTransport"]
+    Transport --> Ipc["Electron ipcRenderer"]
+    MainProcess["主进程"] <--> Ipc
 ```
 
-图表来源
-- [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
-- [src/shared/renderer-api/transport.ts:1-12](file://src/shared/renderer-api/transport.ts#L1-L12)
-- [src/shared/renderer-api/channelCapabilities.ts:1-179](file://src/shared/renderer-api/channelCapabilities.ts#L1-L179)
-- [src/shared/renderer-api/core.ts:1-145](file://src/shared/renderer-api/core.ts#L1-L145)
-- [src/shared/renderer-api/workbench.ts:1-92](file://src/shared/renderer-api/workbench.ts#L1-L92)
-- [src/shared/renderer-api/settings.ts:1-86](file://src/shared/renderer-api/settings.ts#L1-L86)
-- [src/shared/renderer-api/events.ts:1-84](file://src/shared/renderer-api/events.ts#L1-L84)
-- [src/shared/renderer-api/createRendererApi.ts:1-77](file://src/shared/renderer-api/createRendererApi.ts#L1-L77)
-- [src/shared/renderer-api/index.ts:1-18](file://src/shared/renderer-api/index.ts#L1-L18)
+**图表来源**  
+- [preload/index.ts:13-25](file://src/preload/index.ts#L13-L25)
+- [shared/renderer-api/createRendererApi.ts:1-80](file://src/shared/renderer-api/createRendererApi.ts#L1-L80)
+- [preload/rendererTransport.ts:1-44](file://src/preload/rendererTransport.ts#L1-L44)
 
-章节来源
-- [src/shared/renderer-api/index.ts:1-18](file://src/shared/renderer-api/index.ts#L1-L18)
-- [src/shared/renderer-api/createRendererApi.ts:1-77](file://src/shared/renderer-api/createRendererApi.ts#L1-L77)
+**章节来源**  
+- [preload/index.ts:1-25](file://src/preload/index.ts#L1-L25)
+- [shared/renderer-api/index.ts:1-17](file://src/shared/renderer-api/index.ts#L1-L17)
 
 ## 核心组件
-- 通道与类型：集中管理所有 IPC 通道名与类型，提供 isRendererInvokeChannel/isRendererEventChannel 校验
-- 传输抽象：RendererApiTransport 定义 invoke/subscribe/listener 的统一契约
-- 能力矩阵：对每个通道标注 read/mutation/high-impact/desktop-only，用于安全策略与平台限制
-- API 工厂：按域创建 typed API，封装 transport.invoke 调用
-- 统一入口：createRendererApi 组装 ElectronAPI 形态的对象，供渲染进程直接使用
 
-章节来源
-- [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
-- [src/shared/renderer-api/transport.ts:1-12](file://src/shared/renderer-api/transport.ts#L1-L12)
-- [src/shared/renderer-api/channelCapabilities.ts:1-179](file://src/shared/renderer-api/channelCapabilities.ts#L1-L179)
-- [src/shared/renderer-api/core.ts:1-145](file://src/shared/renderer-api/core.ts#L1-L145)
-- [src/shared/renderer-api/workbench.ts:1-92](file://src/shared/renderer-api/workbench.ts#L1-L92)
-- [src/shared/renderer-api/settings.ts:1-86](file://src/shared/renderer-api/settings.ts#L1-L86)
-- [src/shared/renderer-api/events.ts:1-84](file://src/shared/renderer-api/events.ts#L1-L84)
-- [src/shared/renderer-api/createRendererApi.ts:1-77](file://src/shared/renderer-api/createRendererApi.ts#L1-L77)
+### createRendererApi：全局 API 装配器
+
+`createRendererApi` 是渲染进程 API 的唯一入口。它接收两个参数：
+
+| 参数 | 类型 | 含义 |
+|---|---|---|
+| `platform` | `NodeJS.Platform` | 当前操作系统，用于生成 `isMac`、`isWindows`、`isLinux` |
+| `transport` | `RendererApiTransport` | 底层 IPC 传输抽象，屏蔽具体 IPC 实现差异 |
+
+它返回一个 `ElectronAPI` 对象，包含以下顶层字段：
+
+| 字段 | 类型或用途 | 说明 |
+|---|---|---|
+| `platform` | 原始平台值 | 透传传入的平台标识 |
+| `isMac` | `boolean` | 是否为 macOS |
+| `isWindows` | `boolean` | 是否为 Windows |
+| `isLinux` | `boolean` | 是否为 Linux |
+| `appMeta` | 应用元数据 API | 获取应用元数据 |
+| `appShell` | 应用外壳 API | 打开路径、剪贴板、头像、引导状态等 |
+| `web` | Web 能力 API | 解析 Favicon |
+| `conversation` | 对话 API | 发送消息、历史、分支、附件等 |
+| `command` | 命令 API | 列出和执行命令 |
+| `selectFiles` | 文件选择快捷方法 | 直接委托对话框 API |
+| `selectRdcFiles` | RDC 文件选择快捷方法 | 直接委托对话框 API |
+| `selectKnowledgeImport` | 知识导入选择快捷方法 | 直接委托对话框 API |
+| `selectDirectory` | 目录选择快捷方法 | 直接委托对话框 API |
+| `saveFile` | 保存文件快捷方法 | 直接委托对话框 API |
+| `workflow` | 工作流 API | 查询状态、恢复、停止、用量、运行列表 |
+| `trace` | 追踪 API | 查询运行、事件、投影、导出、切换分支 |
+| `agent` | Agent 运行 API | 发送消息、查询状态、配置 |
+| `memory` | 内存 API | 授权令牌、读写、删除 |
+| `investigation` | 调查 API | 读取和列举 |
+| `plan` | 计划 API | 读取、审批令牌、保存到项目、导出 |
+| `knowledge` | 知识库 API | 概览、查询、卡片、编译、候选、导入、写入、推广、导出 |
+| `rdcRuntime` | RDC 运行时 API | 资源操作、钩子/MCP 信任、快照 |
+| `tool` | 工具 API | 目录、运行时摘要、安装检测 |
+| `mcp` | MCP API | MCP 状态摘要 |
+| `evidence` | 证据链 API | 证据链和事件 |
+| `llm` | 大模型提供商 API | 测试、连接、登录、登出、刷新模型 |
+| `settings` | 设置 API | 设置、提供商目录、模型覆盖、Agent/Provider 定义 |
+| `project` | 项目 API | 增删改查及输入项管理 |
+| `device` | 设备 API | 列举、刷新、监听生命周期 |
+| `session` | 会话 API | 增删改查、选中、代理和模型覆盖 |
+| `run` | 运行 API | 列举运行 |
+| `runtimeLog` | 运行时日志 API | 查询日志 |
+| `capture` | 捕获 API | 回放、预览、帧刷新、录制列表 |
+| `context` | 上下文 API | 获取上下文快照 |
+| `events` | 事件订阅 API | 结构化事件订阅入口 |
+| `on` / `off` | 通用事件订阅方法 | 安全包装 `transport.addListener/removeListener` |
+
+**章节来源**  
+- [shared/renderer-api/createRendererApi.ts:1-80](file://src/shared/renderer-api/createRendererApi.ts#L1-L80)
+
+### 传输层抽象：RendererApiTransport
+
+`RendererApiTransport` 是所有能力域的底层通信契约：
+
+| 方法 | 参数 | 返回值 | 语义 |
+|---|---|---|---|
+| `invoke` | `channel`、可变参数 | `Promise<TResult>` | 发起一次请求响应式调用 |
+| `subscribe` | `channel`、回调 | 取消函数 | 订阅事件并返回清理函数 |
+| `addListener` | `channel`、回调 | `void` | 添加事件监听器 |
+| `removeListener` | `channel`、回调 | `void` | 移除单个监听器 |
+| `removeAllListeners` | `channel` | `void` | 清空某频道所有监听器 |
+
+实际实现由预加载层的 `createIpcRendererTransport` 提供，它封装了 `ipcRenderer.invoke` 和 `ipcRenderer.on`，并维护一个按频道分组的监听器映射，避免重复绑定和泄漏。
+
+**章节来源**  
+- [shared/renderer-api/transport.ts:1-11](file://src/shared/renderer-api/transport.ts#L1-L11)
+- [preload/rendererTransport.ts:1-44](file://src/preload/rendererTransport.ts#L1-L44)
+
+### 通道定义：channels
+
+`channels.ts` 是 Renderer API 的“总线字典”，集中定义两类常量：
+
+| 常量 | 用途 |
+|---|---|
+| `RENDERER_INVOKE_CHANNEL` | 所有可调用 IPC 方法的命名空间 + 方法名到真实 IPC 字符串的映射 |
+| `RENDERER_EVENT_CHANNEL` | 所有可订阅 IPC 事件的命名空间 + 事件名到真实 IPC 字符串的映射 |
+
+同时导出：
+
+- `RendererInvokeChannel`：所有 invoke channel 字面量联合类型。
+- `RendererEventChannel`：所有 event channel 字面量联合类型。
+- `RENDERER_INVOKE_CHANNELS` / `RENDERER_EVENT_CHANNELS`：冻结数组，便于校验。
+- `isRendererInvokeChannel` / `isRendererEventChannel`：运行时类型守卫。
+
+这种设计让 TypeScript 能检查调用方是否使用了合法 channel，也让运行时可以通过白名单过滤非法事件。
+
+**章节来源**  
+- [shared/renderer-api/channels.ts:1-271](file://src/shared/renderer-api/channels.ts#L1-L271)
 
 ## 架构总览
-渲染器通过 createRendererApi 获取统一的 ElectronAPI 对象，所有方法最终通过 transport.invoke 或 transport.subscribe/listener 与主进程通信。通道名在 channels.ts 中统一定义，能力矩阵在 channelCapabilities.ts 中约束。
 
 ```mermaid
 sequenceDiagram
-participant UI as "渲染进程 UI"
-participant API as "createRendererApi"
-participant T as "RendererApiTransport"
-participant MP as "主进程处理器"
-UI->>API : 调用某域方法(如 conversation.sendMessage)
-API->>T : invoke(channel, args)
-T-->>MP : 发送 IPC 消息
-MP-->>T : 返回 Promise 结果或抛出错误
-T-->>API : 返回 Promise<TResult>
-API-->>UI : 返回 TResult / 抛错
+    participant UI as "渲染进程界面"
+    participant Api as "electronAPI"
+    participant Domain as "领域 API 工厂"
+    participant Channels as "channel 常量"
+    participant Transport as "RendererApiTransport"
+    participant Ipc as "ipcRenderer"
+    participant Main as "主进程处理器"
+
+    UI->>Api: "conversation.sendMessage(request)"
+    Api->>Domain: "createConversationApi(...).sendMessage"
+    Domain->>Channels: "查找 conversation:sendMessage"
+    Domain->>Transport: "invoke(channel, request)"
+    Transport->>Ipc: "invoke(channel, request)"
+    Ipc-->>Transport: "Promise<Result>"
+    Transport-->>Domain: "Result"
+    Domain-->>Api: "Result"
+    Api-->>UI: "Result"
 ```
 
-图表来源
-- [src/shared/renderer-api/createRendererApi.ts:33-76](file://src/shared/renderer-api/createRendererApi.ts#L33-L76)
-- [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
-- [src/shared/renderer-api/transport.ts:5-11](file://src/shared/renderer-api/transport.ts#L5-L11)
+**图表来源**  
+- [shared/renderer-api/core.ts:60-103](file://src/shared/renderer-api/core.ts#L60-L103)
+- [shared/renderer-api/channels.ts:1-200](file://src/shared/renderer-api/channels.ts#L1-L200)
+- [preload/rendererTransport.ts:20-33](file://src/preload/rendererTransport.ts#L20-L33)
+
+整体流程如下：
+
+1. 预加载脚本创建 transport。
+2. 预加载脚本用 platform 和 transport 调用 `createRendererApi`。
+3. `createRendererApi` 调用各领域工厂构造 API 对象。
+4. 每个领域工厂通过 `RENDERER_INVOKE_CHANNEL` 把业务方法映射到 IPC channel。
+5. transport 把调用转发给 `ipcRenderer.invoke`。
+6. 主进程根据 IPC channel 执行对应逻辑并返回结果。
+
+**章节来源**  
+- [preload/index.ts:13-25](file://src/preload/index.ts#L13-L25)
+- [shared/renderer-api/createRendererApi.ts:1-80](file://src/shared/renderer-api/createRendererApi.ts#L1-L80)
 
 ## 详细组件分析
 
-### 核心 API（应用、对话框、窗口、Web）
-- appMeta：获取应用元信息
-- appShell：选择头像、打开路径、复制/读取剪贴板
-- dialog：选择文件/目录/RDC 文件
-- windowControls：最小化、最大化切换、关闭、查询最大化状态
-- web：解析 favicon
+### 能力分组与职责划分
 
-这些方法均为异步调用，通过 transport.invoke 执行，返回 Promise<TResult>。错误由主进程侧抛出，渲染侧需 try/catch 或 .catch 处理。
+#### AgentApi
 
-章节来源
-- [src/shared/renderer-api/core.ts:20-53](file://src/shared/renderer-api/core.ts#L20-L53)
-- [src/shared/renderer-api/channels.ts:1-17](file://src/shared/renderer-api/channels.ts#L1-L17)
+负责与独立 Agent 实例交互。
 
-### 对话与工作流 API
-- conversation：发送消息、重写、取消轮次、回答用户输入/工具审批、历史操作、附件暂存与预览、分支切换等；支持 onEvent/offEvent 订阅对话事件
-- workflow：获取状态、恢复/停止运行、查询用量、列出运行/活跃运行
+| 方法 | 参数 | 返回值 | 说明 |
+|---|---|---|---|
+| `sendMessage` | `agentId`、`content` | `Promise` | 向指定 Agent 发送消息 |
+| `getState` | `agentId`、`sessionId` | `Promise` | 查询 Agent 当前状态 |
+| `getAllStates` | 无 | `Promise` | 获取全部 Agent 状态 |
+| `configure` | `agentId`、`config` | `Promise` | 配置 Agent |
 
-注意：conversation.onEvent/on off 基于 transport.addListener/removeListener，需在合适时机解绑以避免内存泄漏。
+**章节来源**  
+- [shared/renderer-api/core.ts:105-115](file://src/shared/renderer-api/core.ts#L105-L115)
+- [shared/renderer-api/channels.ts:49-56](file://src/shared/renderer-api/channels.ts#L49-L56)
 
-章节来源
-- [src/shared/renderer-api/core.ts:55-88](file://src/shared/renderer-api/core.ts#L55-L88)
-- [src/shared/renderer-api/channels.ts:18-46](file://src/shared/renderer-api/channels.ts#L18-L46)
+#### ConversationApi
 
-### 工作区 API（项目、设备、会话、运行、捕获、上下文、追踪）
-- project：增删改查项目与输入项
-- device：列表、刷新、激活、watch 生命周期
-- session：增删改查、选择、模型覆盖、Agent 配置
-- run：列出运行
-- runtimeLog：列出运行时日志
-- capture：列表、选择、打开项目输入、查询/清理已打开状态
-- context：获取上下文快照、打开/关闭人类预览
-- trace：获取运行、事件、投影、导出、分支切换
+负责用户对话、分支、附件、工具预览和事件。
 
-章节来源
-- [src/shared/renderer-api/workbench.ts:14-91](file://src/shared/renderer-api/workbench.ts#L14-L91)
-- [src/shared/renderer-api/channels.ts:123-175](file://src/shared/renderer-api/channels.ts#L123-L175)
+| 方法 | 参数 | 返回值 | 说明 |
+|---|---|---|---|
+| `sendMessage` | `request` | `Promise` | 发送对话消息 |
+| `rewriteFromMessage` | `request` | `Promise` | 基于已有消息重写 |
+| `cancelActiveTurn` | `request` | `Promise` | 取消当前回合 |
+| `answerUserInput` | `request` | `Promise` | 回答用户输入 |
+| `answerToolApproval` | `request` | `Promise` | 回答工具审批 |
+| `answerPlanReview` | `request` | `Promise` | 回答计划评审 |
+| `getHistory` | `sessionId` | `Promise` | 获取对话历史 |
+| `getDelegationTrace` | `request` | `Promise` | 获取委派追踪 |
+| `getDelegationContent` | `request` | `Promise` | 获取委派内容 |
+| `switchBranch` | `request` | `Promise` | 切换分支 |
+| `clearHistory` | `sessionId` | `Promise` | 清空历史 |
+| `undoLastTurn` | `sessionId` | `Promise` | 撤销上一轮 |
+| `getToolImagePreview` | `request` | `Promise` | 获取工具图片预览 |
+| `stageAttachments` | `request` | `Promise` | 暂存附件 |
+| `releaseAttachments` | `request` | `Promise` | 释放附件 |
+| `getAttachmentPreview` | `request` | `Promise` | 获取附件预览 |
+| `onEvent` | `callback` | `void` | 订阅对话事件 |
+| `offEvent` | `callback` | `void` | 取消对话事件订阅 |
 
-### 设置与运行时 API（记忆、LLM、设置、RDX 运行时）
-- memory：颁发批准令牌、列举/读写/删除
-- rdxRuntime：概览、资源验证/增删改查、导入、揭示、信任/撤销 Hook/MCP、测试 Hook、请求快照
-- llm：测试草稿/能力、连接/断开、账号登录流程、刷新模型、登出
-- settings：获取设置/目录/有效模型/目录、检查密钥、导入 Agent 清单、保存定义、查询提交、模型覆盖、解析 Shell、批量设置
+**章节来源**  
+- [shared/renderer-api/core.ts:60-103](file://src/shared/renderer-api/core.ts#L60-L103)
+- [shared/renderer-api/channels.ts:24-47](file://src/shared/renderer-api/channels.ts#L24-L47)
 
-章节来源
-- [src/shared/renderer-api/settings.ts:6-85](file://src/shared/renderer-api/settings.ts#L6-L85)
-- [src/shared/renderer-api/channels.ts:47-122](file://src/shared/renderer-api/channels.ts#L47-L122)
+#### SettingsApi
 
-### 事件订阅 API
-提供一系列 onXxx 方法，订阅工作流状态、运行状态/用量、追踪投影、有效目录、Agent 消息/状态、工具执行完成、证据事件、设备/捕获/上下文变更、项目输入变更、运行时日志追加、主题变化等。同时提供 removeAllListeners 以批量移除监听。
+负责应用设置、提供商、模型覆盖和 Agent/Provider 定义。
 
-章节来源
-- [src/shared/renderer-api/events.ts:14-83](file://src/shared/renderer-api/events.ts#L14-L83)
-- [src/shared/renderer-api/channels.ts:178-218](file://src/shared/renderer-api/channels.ts#L178-L218)
+| 方法 | 参数 | 返回值 | 说明 |
+|---|---|---|---|
+| `get` | 无 | `Promise` | 读取设置 |
+| `getProviderCatalog` | 无 | `Promise` | 获取提供商目录 |
+| `getEffectiveModel` | `agentId` | `Promise` | 获取生效模型 |
+| `getEffectiveCatalog` | `providerId`、可选 `accountId` | `Promise` | 获取生效目录 |
+| `hasProviderSecret` | `providerId` | `Promise` | 检查提供商密钥 |
+| `importAgentManifest` | `filePath` | `Promise` | 导入 Agent 清单 |
+| `saveAgentDefinition` | `request` | `Promise` | 保存 Agent 定义 |
+| `getAgentDefinitionCommit` | `query` | `Promise` | 查询 Agent 定义提交 |
+| `saveProviderDefinition` | `request` | `Promise` | 保存 Provider 定义 |
+| `getProviderDefinitionCommit` | `providerId` | `Promise` | 查询 Provider 定义提交 |
+| `getModelsOverride` | 无 | `Promise` | 获取模型覆盖 |
+| `setModelsOverride` | `overrides` | `Promise` | 设置模型覆盖 |
+| `getResolvedShell` | `executable` | `Promise` | 解析 Shell |
+| `set` | `settings` | `Promise` | 写入设置 |
 
-### 统一入口与平台能力
-createRendererApi 根据 platform 注入 isMac/isWindows/isLinux，并聚合所有域 API。顶层暴露 on/off 用于原始事件通道订阅，内部会进行通道类型校验。
+注意：`getEffectiveCatalog` 对可选 `accountId` 做了运行时判断；如果为空字符串则省略第二个参数。
 
-章节来源
-- [src/shared/renderer-api/createRendererApi.ts:33-76](file://src/shared/renderer-api/createRendererApi.ts#L33-L76)
-- [src/shared/renderer-api/channels.ts:237-243](file://src/shared/renderer-api/channels.ts#L237-L243)
+**章节来源**  
+- [shared/renderer-api/settings.ts:43-86](file://src/shared/renderer-api/settings.ts#L43-L86)
+- [shared/renderer-api/channels.ts:105-120](file://src/shared/renderer-api/channels.ts#L105-L120)
+
+#### WorkbenchApi（项目、设备、会话、运行、日志、捕获、上下文、追踪）
+
+Workbench 相关 API 分布在多个工厂中，但共同服务于工作台场景。
+
+##### ProjectApi
+
+| 方法 | 参数 | 返回值 | 说明 |
+|---|---|---|---|
+| `list` | 无 | `Promise` | 列举项目 |
+| `add` | `rootPath` | `Promise` | 添加项目根路径 |
+| `select` | `projectId` | `Promise` | 选中项目 |
+| `rename` | `projectId`、`newName` | `Promise` | 重命名项目 |
+| `remove` | `projectId` | `Promise` | 移除项目 |
+| `inputs.list` | `projectId` | `Promise` | 列举项目输入 |
+| `inputs.refresh` | `projectId` | `Promise` | 刷新项目输入 |
+| `inputs.prepareRemove` | `projectId`、`inputId` | `Promise` | 准备移除输入 |
+| `inputs.remove` | `projectId`、`inputId`、`approvalToken` | `Promise` | 移除项目输入 |
+| `inputs.import` | `projectId` | `Promise` | 导入项目输入 |
+| `inputs.referencePath` | `projectId`、`filePath` | `Promise` | 引用输入路径 |
+| `inputs.importPaths` | `projectId`、`filePaths` | `Promise` | 批量导入输入路径 |
+
+**章节来源**  
+- [shared/renderer-api/workbench.ts:1-36](file://src/shared/renderer-api/workbench.ts#L1-L36)
+- [shared/renderer-api/channels.ts:122-134](file://src/shared/renderer-api/channels.ts#L122-L134)
+
+##### DeviceApi
+
+| 方法 | 参数 | 返回值 | 说明 |
+|---|---|---|---|
+| `list` | 无 | `Promise` | 列举设备 |
+| `refresh` | 无 | `Promise` | 刷新设备 |
+| `watchStart` | 无 | `Promise` | 开始监听设备 |
+| `watchRenew` | 无 | `Promise` | 续期设备监听 |
+| `watchStop` | 无 | `Promise` | 停止设备监听 |
+
+**章节来源**  
+- [shared/renderer-api/workbench.ts:38-47](file://src/shared/renderer-api/workbench.ts#L38-L47)
+- [shared/renderer-api/channels.ts:136-142](file://src/shared/renderer-api/channels.ts#L136-L142)
+
+##### SessionApi
+
+| 方法 | 参数 | 返回值 | 说明 |
+|---|---|---|---|
+| `list` | `projectId` | `Promise` | 列举会话 |
+| `create` | `projectId`、`title` | `Promise` | 创建会话 |
+| `rename` | `id`、`title` | `Promise` | 重命名会话 |
+| `remove` | `id` | `Promise` | 移除会话 |
+| `select` | `id` | `Promise` | 选中等效会话 |
+| `setModelOverride` | `id`、`modelOverride` | `Promise` | 设置会话模型覆盖 |
+| `setAgentId` | `id`、`agentId` | `Promise` | 设置会话代理 |
+| `applyDeclaredHandoff` | `id`、`agent`、`label` | `Promise` | 应用声明式交接 |
+
+**章节来源**  
+- [shared/renderer-api/workbench.ts:49-65](file://src/shared/renderer-api/workbench.ts#L49-L65)
+- [shared/renderer-api/channels.ts:144-152](file://src/shared/renderer-api/channels.ts#L144-L152)
+
+##### RunApi
+
+| 方法 | 参数 | 返回值 | 说明 |
+|---|---|---|---|
+| `list` | `sessionId` | `Promise` | 列举运行 |
+
+**章节来源**  
+- [shared/renderer-api/workbench.ts:67-69](file://src/shared/renderer-api/workbench.ts#L67-L69)
+- [shared/renderer-api/channels.ts:154-156](file://src/shared/renderer-api/channels.ts#L154-L156)
+
+##### RuntimeLogApi
+
+| 方法 | 参数 | 返回值 | 说明 |
+|---|---|---|---|
+| `list` | `request` | `Promise` | 查询运行时日志 |
+
+**章节来源**  
+- [shared/renderer-api/workbench.ts:71-73](file://src/shared/renderer-api/workbench.ts#L71-L73)
+- [shared/renderer-api/channels.ts:158-160](file://src/shared/renderer-api/channels.ts#L158-L160)
+
+##### CaptureApi
+
+| 方法 | 参数 | 返回值 | 说明 |
+|---|---|---|---|
+| `getReplaySelection` | `scope` | `Promise` | 获取回放选择 |
+| `readLivePreview` | `scope` | `Promise` | 读取实时预览 |
+| `getReplayState` | `scope` | `Promise` | 获取回放状态 |
+| `applyReplayEvent` | `request` | `Promise` | 应用回放事件 |
+| `refreshFrame` | `scope` | `Promise` | 刷新帧 |
+| `list` | `scope` | `Promise` | 列举捕获 |
+| `select` | `request` | `Promise` | 选择捕获 |
+| `openProjectInput` | `request` | `Promise` | 打开项目输入 |
+| `getOpenedState` | `scope` | `Promise` | 获取已打开状态 |
+| `clearOpenedState` | `scope` | `Promise` | 清除已打开状态 |
+
+**章节来源**  
+- [shared/renderer-api/workbench.ts:75-91](file://src/shared/renderer-api/workbench.ts#L75-L91)
+- [shared/renderer-api/channels.ts:162-175](file://src/shared/renderer-api/channels.ts#L162-L175)
+
+##### ContextApi
+
+| 方法 | 参数 | 返回值 | 说明 |
+|---|---|---|---|
+| `get` | `scope` | `Promise` | 获取上下文 |
+
+**章节来源**  
+- [shared/renderer-api/workbench.ts:93-96](file://src/shared/renderer-api/workbench.ts#L93-L96)
+- [shared/renderer-api/channels.ts:177-179](file://src/shared/renderer-api/channels.ts#L177-L179)
+
+##### TraceApi
+
+| 方法 | 参数 | 返回值 | 说明 |
+|---|---|---|---|
+| `getRun` | `runId` | `Promise` | 获取运行 |
+| `getEvents` | `runId`、`afterSeq` | `Promise` | 获取运行事件 |
+| `getProjection` | `sessionId` | `Promise` | 获取投影 |
+| `exportRun` | `runId` | `Promise` | 导出运行 |
+| `switchBranch` | `sessionId`、`branchId` | `Promise` | 切换分支 |
+
+**章节来源**  
+- [shared/renderer-api/workbench.ts:98-106](file://src/shared/renderer-api/workbench.ts#L98-L106)
+- [shared/renderer-api/channels.ts:179-187](file://src/shared/renderer-api/channels.ts#L179-L187)
+
+### 能力发现与限制：channelCapabilities
+
+`channelCapabilities.ts` 维护一个“闭合集”：
+
+| 概念 | 说明 |
+|---|---|
+| `BridgeChannelCapability` | 通道能力枚举：`read`、`mutation`、`high-impact`、`desktop-only` |
+| `CHANNEL_CAPABILITY` | 每个真实 IPC channel 到能力的映射 |
+| `hasBridgeChannelCapability` | 判断 channel 是否在能力表中 |
+| `resolveBridgeChannelCapability` | 解析能力，未注册时抛出错误 |
+| `listUnclassifiedInvokeChannels` | 列出未分类的 invoke channel |
+| `assertChannelCapabilityCoverage` | 断言所有 channel 都已正确分类 |
+
+能力含义：
+
+| 能力 | 适用场景 |
+|---|---|
+| `read` | 只读查询 |
+| `mutation` | 普通状态变更 |
+| `high-impact` | 高影响操作，例如修改设置、导入数据、信任钩子、断开提供商 |
+| `desktop-only` | 仅限桌面端，例如窗口控制、路径选择、Favicon 解析 |
+
+```mermaid
+flowchart TD
+    Start["新增 IPC channel"] --> AddChannel["在 RENDERER_INVOKE_CHANNEL 中添加映射"]
+    AddChannel --> Classify["在 CHANNEL_CAPABILITY 中标注能力"]
+    Classify --> TypeCheck["TypeScript 编译检查"]
+    TypeCheck --> BuildTime["构建时断言"]
+    BuildTime --> Assert["assertChannelCapabilityCoverage"]
+    Assert --> Missing{"存在未分类 channel？"}
+    Missing -->|是| Error["抛出 BRIDGE_CAPABILITY_MISSING"]
+    Missing -->|否| Extra{"存在多余能力条目？"}
+    Extra -->|是| ErrorExtra["抛出 BRIDGE_CAPABILITY_EXTRA"]
+    Extra -->|否| Pass["校验通过"]
+```
+
+**图表来源**  
+- [shared/renderer-api/channelCapabilities.ts:1-202](file://src/shared/renderer-api/channelCapabilities.ts#L1-L202)
+- [shared/renderer-api/channels.ts:1-271](file://src/shared/renderer-api/channels.ts#L1-L271)
+
+**章节来源**  
+- [shared/renderer-api/channelCapabilities.ts:1-202](file://src/shared/renderer-api/channelCapabilities.ts#L1-L202)
+- [shared/renderer-api/channels.ts:1-271](file://src/shared/renderer-api/channels.ts#L1-L271)
+
+### 事件订阅系统
+
+#### 事件通道定义
+
+事件通道集中在 `RENDERER_EVENT_CHANNEL`，涵盖：
+
+| 域 | 示例事件 |
+|---|---|
+| shell | 主题变化、窗口最大化变化 |
+| conversation | 对话事件、委派变化 |
+| workflow | 运行状态变化、用量变化、阻塞、追踪投影变化 |
+| llm | 流式输出、生效目录变化 |
+| agent | Agent 消息、状态变化 |
+| tools | 工具执行完成、证据新增 |
+| workbench | 设备状态、捕获状态、上下文变化、项目输入变化、捕获回放变化 |
+| runtime | 运行时日志追加 |
+
+#### EventSubscriptionApi
+
+`createEventSubscriptionApi` 为渲染进程提供一组语义化订阅方法，内部统一委托 `transport.subscribe`。
+
+| 方法 | 回调参数类型 | 说明 |
+|---|---|---|
+| `onDelegationTraceChanged` | `{ sessionId, parentToolCallId, revision }` | 委派追踪变化 |
+| `onRunStatusChanged` | 运行状态 | 工作流运行状态变化 |
+| `onRunUsageChanged` | `SessionScopedPayload<RunContextUsageSummary>` | 运行用量变化 |
+| `onTraceProjectionChanged` | `TraceProjectionChangedPayload` | 追踪投影变化 |
+| `onEffectiveCatalogChanged` | 目录快照 | 生效目录变化 |
+| `onAgentMessage` | Agent 消息 | Agent 消息事件 |
+| `onAgentStatusChanged` | Agent 状态 | Agent 状态变化 |
+| `onToolExecutionComplete` | 追踪记录 | 工具执行完成 |
+| `onEvidenceEventAdded` | 证据事件 | 新增证据事件 |
+| `onDeviceStatusChanged` | 设备状态 | 设备状态变化 |
+| `onCaptureStatusChanged` | `SessionScopedPayload<unknown>` | 捕获状态变化 |
+| `onContextChanged` | `SessionScopedPayload<ContextSnapshot \| null>` | 上下文变化 |
+| `onProjectInputsChanged` | `{ projectId, inputs }` | 项目输入变化 |
+| `onProjectInputsError` | `{ projectId, error }` | 项目输入错误 |
+| `onCaptureReplayChanged` | 回放状态 | 捕获回放变化 |
+| `onOpenedCaptureStateChanged` | `SessionScopedPayload<OpenedCaptureState \| null>` | 已打开捕获状态变化 |
+| `onRuntimeLogAppended` | `RuntimeLogEntry` | 运行时日志追加 |
+| `onAppThemeChanged` | 主题 | 应用主题变化 |
+| `removeAllListeners` | `channel` | 移除某个频道的所有监听器 |
+
+此外，`createRendererApi` 还暴露顶层 `on` 和 `off`，它们会先通过 `isRendererEventChannel` 校验 channel，再调用 transport 监听器。
+
+```mermaid
+sequenceDiagram
+    participant UI as "渲染进程界面"
+    participant Events as "events API"
+    participant Transport as "RendererApiTransport"
+    participant Ipc as "ipcRenderer"
+
+    UI->>Events: "onAgentMessage(callback)"
+    Events->>Transport: "subscribe(agent:message, wrapper)"
+    Transport->>Ipc: "on('agent:message', wrappedCallback)"
+    Ipc-->>Transport: "event payload"
+    Transport-->>Events: "payload"
+    Events-->>UI: "callback(payload)"
+```
+
+**图表来源**  
+- [shared/renderer-api/events.ts:1-88](file://src/shared/renderer-api/events.ts#L1-L88)
+- [preload/rendererTransport.ts:14-33](file://src/preload/rendererTransport.ts#L14-L33)
+
+**章节来源**  
+- [shared/renderer-api/channels.ts:201-271](file://src/shared/renderer-api/channels.ts#L201-L271)
+- [shared/renderer-api/events.ts:1-88](file://src/shared/renderer-api/events.ts#L1-L88)
+- [shared/renderer-api/createRendererApi.ts:48-80](file://src/shared/renderer-api/createRendererApi.ts#L48-L80)
+
+### 传输层与错误处理
+
+#### 传输实现
+
+`createIpcRendererTransport` 使用 `Map<RendererEventChannel, Map<RendererEventCallback, RendererEventCallback>>` 维护回调映射，解决以下问题：
+
+- 同一回调多次 `subscribe` 不会重复绑定。
+- `unsubscribe` 能准确移除原回调。
+- 频道无监听器时可清理 `ipcRenderer` 监听器。
+- `removeAllListeners` 可一次性销毁频道级监听器。
+
+```mermaid
+classDiagram
+    class RendererApiTransport {
+        +invoke(channel, ...args) Promise
+        +subscribe(channel, callback) Function
+        +addListener(channel, callback) void
+        +removeListener(channel, callback) void
+        +removeAllListeners(channel) void
+    }
+
+    class IpcRendererTransport {
+        -listenerMap Map
+        +invoke(channel, ...args) Promise
+        +subscribe(channel, callback) Function
+        +addListener(channel, callback) void
+        +removeListener(channel, callback) void
+        +removeAllListeners(channel) void
+    }
+
+    RendererApiTransport <|.. IpcRendererTransport : "实现"
+```
+
+**图表来源**  
+- [shared/renderer-api/transport.ts:1-11](file://src/shared/renderer-api/transport.ts#L1-L11)
+- [preload/rendererTransport.ts:1-44](file://src/preload/rendererTransport.ts#L1-L44)
+
+#### 错误处理策略
+
+当前代码没有内置重试、超时或幂等封装，错误处理主要由调用方决定：
+
+| 层级 | 行为 |
+|---|---|
+| Channel 白名单 | 非白名单 channel 会被 `isRendererEventChannel` 拒绝，`on/off` 不会注册监听器 |
+| Capability 断言 | 未分类或多余 channel 会在断言阶段抛出 `BRIDGE_CAPABILITY_MISSING` / `BRIDGE_CAPABILITY_EXTRA` |
+| Capability 解析 | 未注册 channel 在运行时解析能力时会抛出 `BRIDGE_CAPABILITY_MISSING` |
+| IPC 调用 | 直接透传 `ipcRenderer.invoke` 的 Promise 结果，异常向上冒泡 |
+| 事件回调 | 不做 try/catch，异常由上层订阅者处理 |
+
+因此，渲染进程侧应自行处理 Promise 拒绝和事件回调中的异常。
+
+**章节来源**  
+- [preload/rendererTransport.ts:1-44](file://src/preload/rendererTransport.ts#L1-L44)
+- [shared/renderer-api/channelCapabilities.ts:173-202](file://src/shared/renderer-api/channelCapabilities.ts#L173-L202)
+- [shared/renderer-api/channels.ts:255-271](file://src/shared/renderer-api/channels.ts#L255-L271)
+
+### 完整 API 方法签名总览
+
+为避免复制代码，下表以“模块 + 方法 + 参数 + 返回值”形式给出签名摘要。
+
+| 模块 | 方法 | 参数 | 返回值 |
+|---|---|---|---|
+| appMeta | `get` | 无 | `Promise` |
+| appShell | `hasSeenGettingStarted` | 无 | `Promise` |
+| appShell | `acknowledgeGettingStarted` | 无 | `Promise` |
+| appShell | `selectAvatar` | 无 | `Promise` |
+| appShell | `getAvatarDataUrl` | `avatarPath` | `Promise` |
+| appShell | `openPath` | `targetPath` | `Promise` |
+| appShell | `copyText` | `text` | `Promise` |
+| appShell | `readClipboardText` | 无 | `Promise` |
+| web | `resolveFavicon` | `domain` | `Promise` |
+| dialog | `selectFiles` | 无 | `Promise` |
+| dialog | `selectRdcFiles` | 无 | `Promise` |
+| dialog | `selectKnowledgeImport` | 无 | `Promise` |
+| dialog | `selectDirectory` | 无 | `Promise` |
+| dialog | `saveFile` | `request` | `Promise` |
+| windowControls | `minimize` | 无 | `Promise` |
+| windowControls | `toggleMaximize` | 无 | `Promise` |
+| windowControls | `close` | 无 | `Promise` |
+| windowControls | `isMaximized` | 无 | `Promise` |
+| conversation | 见 ConversationApi 表 | 见上表 | `Promise` 或 `void` |
+| workflow | `getState` | 无 | `Promise` |
+| workflow | `resume` | `sessionId` | `Promise` |
+| workflow | `stop` | `runId` | `Promise` |
+| workflow | `getRunUsage` | `request` | `Promise` |
+| workflow | `listRuns` | 无 | `Promise` |
+| workflow | `listActiveRuns` | 无 | `Promise` |
+| agent | 见 AgentApi 表 | 见上表 | `Promise` |
+| investigation | `read` | `request` | `Promise` |
+| investigation | `list` | `request` | `Promise` |
+| plan | `read` | `request` | `Promise` |
+| plan | `issueApprovalToken` | `request` | `Promise` |
+| plan | `saveToProject` | `request` | `Promise` |
+| plan | `export` | `request` | `Promise` |
+| knowledge | `overview` | 无 | `Promise` |
+| knowledge | `query` | `request` | `Promise` |
+| knowledge | `card` | `spaceId`、`relativePath` | `Promise` |
+| knowledge | `compile` | `request` | `Promise` |
+| knowledge | `indexRebuild` | 无 | `Promise` |
+| knowledge | `candidates` | `sessionId` | `Promise` |
+| knowledge | `candidateCreate` | `request` | `Promise` |
+| knowledge | `import` | `request` | `Promise` |
+| knowledge | `image` | `request` | `Promise` |
+| knowledge | `issueApprovalToken` | `request` | `Promise` |
+| knowledge | `write` | `request` | `Promise` |
+| knowledge | `promote` | `request` | `Promise` |
+| knowledge | `export` | `request` | `Promise` |
+| command | `list` | `category` | `Promise` |
+| command | `execute` | `request` | `Promise` |
+| tool | `getCatalog` | 无 | `Promise` |
+| tool | `getRuntimeSummary` | 无 | `Promise` |
+| tool | `detectInstallations` | 无 | `Promise` |
+| tool | `resolveInstallation` | `request` | `Promise` |
+| tool | `verifyInstallation` | `request` | `Promise` |
+| mcp | `getStatusSummary` | 无 | `Promise` |
+| evidence | `getChain` | 无 | `Promise` |
+| evidence | `getEvents` | `eventType` | `Promise` |
+| memory | `issueApprovalToken` | `request` | `Promise` |
+| memory | `list` | `scope`、`projectRoot` | `Promise` |
+| memory | `get` | `scope`、`name`、`projectRoot` | `Promise` |
+| memory | `write` | `request` | `Promise` |
+| memory | `delete` | `scope`、`name`、`approvalToken`、`projectRoot` | `Promise` |
+| rdcRuntime | 见 RdcRuntimeApi 表 | 见上表 | `Promise` |
+| llm | 见 LlmApi 表 | 见上表 | `Promise` |
+| settings | 见 SettingsApi 表 | 见上表 | `Promise` |
+| project | 见 ProjectApi 表 | 见上表 | `Promise` |
+| device | 见 DeviceApi 表 | 见上表 | `Promise` |
+| session | 见 SessionApi 表 | 见上表 | `Promise` |
+| run | `list` | `sessionId` | `Promise` |
+| runtimeLog | `list` | `request` | `Promise` |
+| capture | 见 CaptureApi 表 | 见上表 | `Promise` |
+| context | `get` | `scope` | `Promise` |
+| trace | 见 TraceApi 表 | 见上表 | `Promise` |
+| events | 见 EventSubscriptionApi 表 | 见上表 | 回调或清理函数 |
+| electronAPI | `on` | `channel`、`callback` | `void` |
+| electronAPI | `off` | `channel`、`callback` | `void` |
+
+**章节来源**  
+- [shared/renderer-api/core.ts:1-167](file://src/shared/renderer-api/core.ts#L1-L167)
+- [shared/renderer-api/settings.ts:1-86](file://src/shared/renderer-api/settings.ts#L1-L86)
+- [shared/renderer-api/workbench.ts:1-99](file://src/shared/renderer-api/workbench.ts#L1-L99)
+- [shared/renderer-api/events.ts:1-88](file://src/shared/renderer-api/events.ts#L1-L88)
 
 ## 依赖关系分析
-- channels.ts 是所有通道的单一事实来源，被 core/workbench/settings/events 共同引用
-- transport.ts 定义抽象接口，所有 API 工厂仅依赖该接口，便于替换底层实现
-- channelCapabilities.ts 维护通道能力矩阵，用于构建期/运行期校验
-- createRendererApi.ts 聚合所有工厂，形成 ElectronAPI 形态
-- types 层将各域类型重新导出，保持对外稳定
 
 ```mermaid
 graph LR
-CH["channels.ts"] --> CORE["core.ts"]
-CH --> WB["workbench.ts"]
-CH --> SET["settings.ts"]
-CH --> EVT["events.ts"]
-TR["transport.ts"] --> CORE
-TR --> WB
-TR --> SET
-TR --> EVT
-CAP["channelCapabilities.ts"] --> ENTRY["createRendererApi.ts"]
-CORE --> ENTRY
-WB --> ENTRY
-SET --> ENTRY
-EVT --> ENTRY
+    Index["preload/index.ts"] --> CreateApi["createRendererApi.ts"]
+    CreateApi --> Channels["channels.ts"]
+    CreateApi --> Core["core.ts"]
+    CreateApi --> Settings["settings.ts"]
+    CreateApi --> Workbench["workbench.ts"]
+    CreateApi --> Events["events.ts"]
+    CreateApi --> TransportType["transport.ts"]
+    CreateApi --> Types["types/electron-api.ts"]
+    CreateApi --> ElectronTypes["types/electron.ts"]
+    TransportImpl["preload/rendererTransport.ts"] --> TransportType
+    TransportImpl --> Channels
 ```
 
-图表来源
-- [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
-- [src/shared/renderer-api/transport.ts:1-12](file://src/shared/renderer-api/transport.ts#L1-L12)
-- [src/shared/renderer-api/channelCapabilities.ts:1-179](file://src/shared/renderer-api/channelCapabilities.ts#L1-L179)
-- [src/shared/renderer-api/createRendererApi.ts:1-77](file://src/shared/renderer-api/createRendererApi.ts#L1-L77)
+**图表来源**  
+- [preload/index.ts:13-25](file://src/preload/index.ts#L13-L25)
+- [shared/renderer-api/createRendererApi.ts:1-80](file://src/shared/renderer-api/createRendererApi.ts#L1-L80)
+- [preload/rendererTransport.ts:1-44](file://src/preload/rendererTransport.ts#L1-L44)
 
-章节来源
-- [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
-- [src/shared/renderer-api/createRendererApi.ts:1-77](file://src/shared/renderer-api/createRendererApi.ts#L1-L77)
+耦合特点：
+
+- 预加载脚本只依赖 `createRendererApi` 和 `createIpcRendererTransport`，不直接持有领域 API。
+- 领域工厂只依赖 `channels` 和 `transport`，不关心 Electron 细节。
+- `createRendererApi` 是聚合根，集中编排平台信息和 API 树。
+- capability 校验与 channel 定义解耦，但两者必须同步更新。
+
+**章节来源**  
+- [shared/renderer-api/createRendererApi.ts:1-80](file://src/shared/renderer-api/createRendererApi.ts#L1-L80)
+- [shared/renderer-api/channels.ts:1-271](file://src/shared/renderer-api/channels.ts#L1-L271)
+- [preload/rendererTransport.ts:1-44](file://src/preload/rendererTransport.ts#L1-L44)
 
 ## 性能与可靠性
-- 异步 I/O：所有方法均为异步，避免阻塞 UI；建议合理并发与重试
-- 事件去重与节流：高频事件（如日志追加、运行状态）建议在 UI 层做节流/合并
-- 资源释放：及时移除事件监听，避免内存泄漏
-- 能力矩阵：high-impact 通道应谨慎调用，必要时增加确认与限流
-- 平台限制：desktop-only 通道在非桌面环境不应调用
+
+### 性能特征
+
+- 所有 RPC 调用都是异步 Promise，不会阻塞渲染线程。
+- 事件订阅基于 `ipcRenderer.on`，适合高频状态推送。
+- 预加载层没有额外序列化或重试逻辑，延迟主要来自 IPC 和主进程处理。
+- `listenerMap` 使用双 Map 结构，增加和移除监听器的复杂度接近 O(1)。
+
+### 可靠性建议
+
+| 场景 | 建议 |
+|---|---|
+| 网络或主进程繁忙 | 在调用方实现指数退避重试，避免风暴式重试 |
+| 长耗时任务 | 不要无限重试；结合超时和熔断 |
+| 事件回调异常 | 在回调内 try/catch，防止污染后续事件 |
+| 订阅泄漏 | 使用 `events` API 返回的清理函数，或在组件卸载时显式移除 |
+| 未分类 channel | 优先修复 capability 断言失败，而不是绕过检查 |
+| 可选参数 | 严格遵循工厂函数的参数判断逻辑，不要随意插入 undefined |
 
 [本节为通用指导，不直接分析具体文件]
 
-## 故障排查指南
-- 未知通道：若出现 BRIDGE_CAPABILITY_MISSING，请检查是否在 channelCapabilities.ts 中登记了该通道
-- 未注册路径：构建脚本 renderer-contract.mjs 会校验合同文件完整性，缺失或废弃路径会导致失败
-- 事件未触发：确认通道名与订阅方法匹配，且未在组件卸载前移除监听
-- 权限/平台错误：desktop-only 通道在非桌面环境不可用；mutation/high-impact 通道可能被安全策略拦截
+## 排错指南
 
-章节来源
-- [src/shared/renderer-api/channelCapabilities.ts:148-176](file://src/shared/renderer-api/channelCapabilities.ts#L148-L176)
-- [scripts/renderer-contract.mjs:111-118](file://scripts/renderer-contract.mjs#L111-L118)
+### 常见问题与定位方式
+
+| 现象 | 可能原因 | 排查步骤 |
+|---|---|---|
+| 新增 API 后 TypeScript 报错 | 缺少 channel 映射或 capability | 检查 `RENDERER_INVOKE_CHANNEL` 和 `CHANNEL_CAPABILITY` |
+| 构建时报 `BRIDGE_CAPABILITY_MISSING` | 新增了 channel 但未标注能力 | 运行能力断言或检查遗漏映射 |
+| 构建时报 `BRIDGE_CAPABILITY_EXTRA` | capability 表中有冗余条目 | 清理未使用的 capability 键 |
+| `electronAPI.on` 不触发事件 | channel 不是白名单事件 | 确认 channel 属于 `RENDERER_EVENT_CHANNEL` |
+| 事件回调未被移除 | 没有保存取消函数或未调用清理 | 检查 `subscribe` 返回函数或 `removeAllListeners` |
+| 调用 Promise 被拒绝 | 主进程处理失败或参数无效 | 捕获 Promise rejection 并查看主进程日志 |
+| `getEffectiveCatalog` 行为异常 | 空字符串 accountId 导致参数省略 | 明确传入有效 providerId 和 accountId |
+
+### 推荐调试流程
+
+```mermaid
+flowchart TD
+    Problem["API 行为异常"] --> CheckType["TypeScript 类型是否通过"]
+    CheckType -->|否| FixType["修复类型或 channel 映射"]
+    CheckType -->|是| CheckCapability["capability 是否分类"]
+    CheckCapability -->|否| FixCapability["补充 CHANNEL_CAPABILITY"]
+    CheckCapability -->|是| CheckChannel["channel 是否在白名单"]
+    CheckChannel -->|否| FixChannel["使用 RENDERER_INVOKE_CHANNEL 或 RENDERER_EVENT_CHANNEL"]
+    CheckChannel -->|是| TryCatch["调用方捕获 Promise 和回调异常"]
+    TryCatch --> Log["记录参数、channel、返回值"]
+    Log --> MainProcess["检查主进程处理逻辑"]
+```
+
+**图表来源**  
+- [shared/renderer-api/channelCapabilities.ts:173-202](file://src/shared/renderer-api/channelCapabilities.ts#L173-L202)
+- [shared/renderer-api/channels.ts:255-271](file://src/shared/renderer-api/channels.ts#L255-L271)
+
+**章节来源**  
+- [shared/renderer-api/channelCapabilities.ts:173-202](file://src/shared/renderer-api/channelCapabilities.ts#L173-L202)
+- [shared/renderer-api/channels.ts:255-271](file://src/shared/renderer-api/channels.ts#L255-L271)
 
 ## 结论
-Renderer API 通过清晰的通道定义、传输抽象与能力矩阵，提供了稳定、可审计、可扩展的跨进程接口集合。遵循本文的最佳实践与兼容性说明，可在渲染进程中安全高效地集成 RDC-Agent 的各项能力。
+
+Renderer API 通过 `createRendererApi` 将平台信息、IPC 传输、能力域和事件系统组合成一个稳定、可验证的受控接口。其设计强调：
+
+- **白名单驱动**：所有调用和事件都必须经过 channel 白名单。
+- **能力分层**：通过 `channelCapabilities` 区分只读、变更、高影响和桌面专属能力。
+- **传输抽象**：渲染进程不直接依赖 `ipcRenderer`，便于替换或测试。
+- **事件优先**：复杂状态通过事件通道推送，减少轮询。
+- **失败关闭**：缺失 capability 或非法 channel 应快速失败，而不是静默忽略。
+
+扩展新 API 时，请始终同步更新三个位置：channel 映射、capability 分类、领域工厂方法。这样可以保持类型安全、构建期校验和运行时一致性。
 
 [本节为总结性内容，不直接分析具体文件]
 
 ## 附录：API 参考
 
-### 统一入口
-- createRendererApi(platform, transport): 返回 ElectronAPI 对象，包含所有域 API 与 on/off 事件订阅
+### 使用示例
 
-章节来源
-- [src/shared/renderer-api/createRendererApi.ts:33-76](file://src/shared/renderer-api/createRendererApi.ts#L33-L76)
+以下示例仅描述调用方式，不包含源代码片段。
 
-### 核心 API
-- appMeta.get(): Promise<AppMeta>
-- appShell.selectAvatar(): Promise<void>
-- appShell.getAvatarDataUrl(avatarPath): Promise<string>
-- appShell.openPath(targetPath): Promise<void>
-- appShell.copyText(text): Promise<void>
-- appShell.readClipboardText(): Promise<string>
-- web.resolveFavicon(domain): Promise<string>
-- dialog.selectFiles(): Promise<string[]>
-- dialog.selectRdcFiles(): Promise<string[]>
-- dialog.selectDirectory(): Promise<string>
-- windowControls.minimize(): Promise<void>
-- windowControls.toggleMaximize(): Promise<void>
-- windowControls.close(): Promise<void>
-- windowControls.isMaximized(): Promise<boolean>
+#### 初始化与基础属性
 
-章节来源
-- [src/shared/renderer-api/core.ts:20-53](file://src/shared/renderer-api/core.ts#L20-L53)
-- [src/shared/renderer-api/channels.ts:1-17](file://src/shared/renderer-api/channels.ts#L1-L17)
+```javascript
+const api = window.electronAPI;
 
-### 对话与工作流
-- conversation.sendMessage(request): Promise<void>
-- conversation.rewriteFromMessage(request): Promise<void>
-- conversation.cancelActiveTurn(request): Promise<void>
-- conversation.answerUserInput(request): Promise<void>
-- conversation.answerToolApproval(request): Promise<void>
-- conversation.getHistory(sessionId): Promise<ConversationHistory>
-- conversation.switchBranch(request): Promise<void>
-- conversation.clearHistory(sessionId): Promise<void>
-- conversation.undoLastTurn(sessionId): Promise<void>
-- conversation.getToolImagePreview(request): Promise<ImagePreview>
-- conversation.stageAttachments(request): Promise<void>
-- conversation.releaseAttachments(request): Promise<void>
-- conversation.getAttachmentPreview(request): Promise<AttachmentPreview>
-- conversation.onEvent(callback): void
-- conversation.offEvent(callback): void
+console.log(api.platform);
+console.log(api.isMac);
+console.log(api.isWindows);
+console.log(api.isLinux);
+```
 
-- workflow.getState(): Promise<WorkflowState>
-- workflow.resume(sessionId): Promise<void>
-- workflow.stop(runId): Promise<void>
-- workflow.getRunUsage(request): Promise<RunContextUsageSummary>
-- workflow.listRuns(): Promise<RunList>
-- workflow.listActiveRuns(): Promise<ActiveRunList>
+#### 调用对话 API
 
-章节来源
-- [src/shared/renderer-api/core.ts:55-88](file://src/shared/renderer-api/core.ts#L55-L88)
-- [src/shared/renderer-api/channels.ts:18-46](file://src/shared/renderer-api/channels.ts#L18-L46)
+```javascript
+await api.conversation.sendMessage({ content: '你好' });
+const history = await api.conversation.getHistory(sessionId);
+```
 
-### 工作区 API
-- project.list(): Promise<ProjectList>
-- project.add(rootPath): Promise<void>
-- project.select(projectId): Promise<void>
-- project.rename(projectId, newName): Promise<void>
-- project.remove(projectId): Promise<void>
-- project.inputs.list(projectId): Promise<InputList>
-- project.inputs.refresh(projectId): Promise<void>
-- project.inputs.import(projectId): Promise<void>
-- project.inputs.importPaths(projectId, filePaths): Promise<void>
+#### 订阅事件
 
-- device.list(): Promise<DeviceList>
-- device.refresh(): Promise<void>
-- device.activate(deviceId): Promise<void>
-- device.watchStart(): Promise<void>
-- device.watchRenew(): Promise<void>
-- device.watchStop(): Promise<void>
+```javascript
+const dispose = api.events.onAgentMessage((message) => {
+  console.log(message);
+});
 
-- session.list(projectId): Promise<SessionList>
-- session.create(projectId, title): Promise<Session>
-- session.rename(id, title): Promise<void>
-- session.remove(id): Promise<void>
-- session.select(id): Promise<void>
-- session.setModelOverride(id, modelOverride): Promise<void>
-- session.setAgentId(id, agentId): Promise<void>
+// 组件卸载或不再需要时调用
+dispose();
+```
 
-- run.list(sessionId): Promise<RunList>
+#### 使用通用 on/off
 
-- runtimeLog.list(request): Promise<RuntimeLogEntry[]>
+```javascript
+function handler(payload) {
+  console.log(payload);
+}
 
-- capture.list(scope): Promise<CaptureList>
-- capture.select(request): Promise<void>
-- capture.openProjectInput(request): Promise<void>
-- capture.getOpenedState(scope): Promise<OpenedCaptureState>
-- capture.clearOpenedState(scope): Promise<void>
+api.on('agent:message', handler);
 
-- context.get(scope): Promise<ContextSnapshot | null>
-- context.openHumanPreview(scope): Promise<void>
-- context.closeHumanPreview(scope): Promise<void>
+// 稍后移除
+api.off('agent:message', handler);
+```
 
-- trace.getRun(runId): Promise<TraceRun>
-- trace.getEvents(runId, afterSeq): Promise<TraceEvent[]>
-- trace.getProjection(sessionId): Promise<TraceProjection>
-- trace.exportRun(runId): Promise<void>
-- trace.switchBranch(sessionId, branchId): Promise<void>
+#### 错误处理模板
 
-章节来源
-- [src/shared/renderer-api/workbench.ts:14-91](file://src/shared/renderer-api/workbench.ts#L14-L91)
-- [src/shared/renderer-api/channels.ts:123-175](file://src/shared/renderer-api/channels.ts#L123-L175)
+```javascript
+try {
+  const result = await api.settings.set(settings);
+  handleSuccess(result);
+} catch (error) {
+  handleError(error);
+}
+```
 
-### 设置与运行时 API
-- memory.issueApprovalToken(request): Promise<Token>
-- memory.list(scope, projectRoot): Promise<MemoryRecord[]>
-- memory.get(scope, name, projectRoot): Promise<MemoryRecord>
-- memory.write(request): Promise<void>
-- memory.delete(scope, name, approvalToken, projectRoot): Promise<void>
+#### 事件清理最佳实践
 
-- rdxRuntime.getOverview(projectRoot?): Promise<RdxRuntimeOverview>
-- rdxRuntime.validateResource(request): Promise<ValidationResult>
-- rdxRuntime.upsertResource(request): Promise<ResourceHandle>
-- rdxRuntime.importResource(request): Promise<ResourceHandle>
-- rdxRuntime.deleteResource(kind, scope, id, projectRoot): Promise<void>
-- rdxRuntime.revealResource(sourcePath): Promise<void>
-- rdxRuntime.trustHook(projectRoot, hookId): Promise<void>
-- rdxRuntime.revokeHook(projectRoot, hookId): Promise<void>
-- rdxRuntime.trustMcp(projectRoot, descriptorId): Promise<void>
-- rdxRuntime.revokeMcp(projectRoot, descriptorId): Promise<void>
-- rdxRuntime.testHook(event, projectRoot, hookId): Promise<TestResult>
-- rdxRuntime.listRequestSnapshots(sessionId, turnId): Promise<SnapshotList>
-- rdxRuntime.getRequestSnapshot(sessionId, turnId, snapshotId): Promise<RequestSnapshot>
+```javascript
+const subscriptions = [
+  api.events.onAgentStatusChanged(handlerA),
+  api.events.onRunStatusChanged(handlerB),
+];
 
-- llm.testProviderDraft(request): Promise<TestResult>
-- llm.testModelCapability(request): Promise<ModelCapability>
-- llm.connectProvider(request): Promise<void>
-- llm.refreshProviderModels(providerId): Promise<void>
-- llm.disconnectProvider(providerId): Promise<void>
-- llm.startProviderAccountLogin(request): Promise<void>
-- llm.getProviderAccountStatus(providerId): Promise<AccountStatus>
-- llm.finishProviderAccountLogin(request): Promise<void>
-- llm.logoutProviderAccount(providerId): Promise<void>
+// 统一清理
+subscriptions.forEach((dispose) => dispose());
+```
 
-- settings.get(): Promise<Settings>
-- settings.getProviderCatalog(): Promise<ProviderCatalog>
-- settings.getEffectiveModel(agentId): Promise<EffectiveModel>
-- settings.getEffectiveCatalog(providerId, accountId?): Promise<EffectiveCatalog>
-- settings.hasProviderSecret(providerId): Promise<boolean>
-- settings.importAgentManifest(filePath): Promise<void>
-- settings.saveAgentDefinition(request): Promise<void>
-- settings.getAgentDefinitionCommit(query): Promise<CommitInfo>
-- settings.saveProviderDefinition(request): Promise<void>
-- settings.getProviderDefinitionCommit(providerId): Promise<CommitInfo>
-- settings.getModelsOverride(): Promise<ModelOverrides>
-- settings.setModelsOverride(overrides): Promise<void>
-- settings.getResolvedShell(executable): Promise<ResolvedShell>
-- settings.set(settings): Promise<void>
-
-章节来源
-- [src/shared/renderer-api/settings.ts:6-85](file://src/shared/renderer-api/settings.ts#L6-L85)
-- [src/shared/renderer-api/channels.ts:47-122](file://src/shared/renderer-api/channels.ts#L47-L122)
-
-### 事件订阅 API
-- events.onWorkflowStateChanged(callback): () => void
-- events.onRunStatusChanged(callback): () => void
-- events.onRunUsageChanged(callback): () => void
-- events.onTraceProjectionChanged(callback): () => void
-- events.onEffectiveCatalogChanged(callback): () => void
-- events.onAgentMessage(callback): () => void
-- events.onAgentStatusChanged(callback): () => void
-- events.onToolExecutionComplete(callback): () => void
-- events.onEvidenceEventAdded(callback): () => void
-- events.onDeviceStatusChanged(callback): () => void
-- events.onCaptureStatusChanged(callback): () => void
-- events.onContextChanged(callback): () => void
-- events.onProjectInputsChanged(callback): () => void
-- events.onOpenedCaptureStateChanged(callback): () => void
-- events.onRuntimeLogAppended(callback): () => void
-- events.onAppThemeChanged(callback): () => void
-- events.removeAllListeners(channel): void
-
-章节来源
-- [src/shared/renderer-api/events.ts:14-83](file://src/shared/renderer-api/events.ts#L14-L83)
-- [src/shared/renderer-api/channels.ts:178-218](file://src/shared/renderer-api/channels.ts#L178-L218)
-
-### 传输与通道
-- RendererApiTransport.invoke(channel, ...args): Promise<TResult>
-- RendererApiTransport.subscribe(channel, callback): () => void
-- RendererApiTransport.addListener(channel, callback): void
-- RendererApiTransport.removeListener(channel, callback): void
-- RendererApiTransport.removeAllListeners(channel): void
-- isRendererInvokeChannel(channel): boolean
-- isRendererEventChannel(channel): boolean
-- RENDERER_INVOKE_CHANNELS / RENDERER_EVENT_CHANNELS：只读通道列表
-
-章节来源
-- [src/shared/renderer-api/transport.ts:1-12](file://src/shared/renderer-api/transport.ts#L1-L12)
-- [src/shared/renderer-api/channels.ts:220-244](file://src/shared/renderer-api/channels.ts#L220-L244)
-
-### 类型与导出
-- electron-api.ts 重新导出各域类型别名
-- electron/index.ts 汇总导出各域类型
-
-章节来源
-- [src/shared/types/electron-api.ts:1-32](file://src/shared/types/electron-api.ts#L1-L32)
-- [src/shared/types/electron/index.ts:1-19](file://src/shared/types/electron/index.ts#L1-L19)
-
-### 使用示例（路径指引）
-- 初始化与调用：参见 [createRendererApi.ts:33-76](file://src/shared/renderer-api/createRendererApi.ts#L33-L76)
-- 对话发送消息：参见 [core.ts:55-77](file://src/shared/renderer-api/core.ts#L55-L77)
-- 工作区项目操作：参见 [workbench.ts:14-30](file://src/shared/renderer-api/workbench.ts#L14-L30)
-- 设置与 LLM：参见 [settings.ts:48-85](file://src/shared/renderer-api/settings.ts#L48-L85)
-- 事件订阅：参见 [events.ts:14-83](file://src/shared/renderer-api/events.ts#L14-L83)
-
-### 最佳实践
-- 始终使用 createRendererApi 获取 API，不要直接拼接通道字符串
-- 对 high-impact 与 mutation 通道进行必要的前置校验与用户确认
-- 事件监听在组件卸载时及时移除，避免内存泄漏
-- 对网络/IO 密集的操作进行节流与重试，提升用户体验
-- 利用能力矩阵与平台判断，避免在不支持的环境调用 desktop-only 通道
-
-### 兼容性说明
-- 平台相关：isMac/isWindows/isLinux 可用于条件渲染与行为分支
-- 桌面专属：部分通道标记为 desktop-only，非桌面环境不应调用
-- 构建期校验：renderer-contract.mjs 确保合同文件完整性与废弃路径不被引入
-
-章节来源
-- [scripts/renderer-contract.mjs:111-118](file://scripts/renderer-contract.mjs#L111-L118)
-- [src/shared/renderer-api/channelCapabilities.ts:11-146](file://src/shared/renderer-api/channelCapabilities.ts#L11-L146)
+**章节来源**  
+- [shared/renderer-api/createRendererApi.ts:1-80](file://src/shared/renderer-api/createRendererApi.ts#L1-L80)
+- [shared/renderer-api/events.ts:1-88](file://src/shared/renderer-api/events.ts#L1-L88)
+- [shared/renderer-api/core.ts:60-115](file://src/shared/renderer-api/core.ts#L60-L115)

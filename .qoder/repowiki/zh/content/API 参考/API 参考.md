@@ -3,15 +3,24 @@
 <cite>
 **本文引用的文件**
 - [src/main/ipc/README.md](file://src/main/ipc/README.md)
+- [src/main/ipc/handlers.ts](file://src/main/ipc/handlers.ts)
+- [src/main/ipc/invokeRegistry.ts](file://src/main/ipc/invokeRegistry.ts)
+- [src/main/ipc/workbenchHandlers.ts](file://src/main/ipc/workbenchHandlers.ts)
+- [src/main/ipc/shellHandlers.ts](file://src/main/ipc/shellHandlers.ts)
+- [src/main/ipc/conversationHandlers.ts](file://src/main/ipc/conversationHandlers.ts)
 - [src/preload/index.ts](file://src/preload/index.ts)
 - [src/preload/rendererTransport.ts](file://src/preload/rendererTransport.ts)
 - [src/shared/renderer-api/index.ts](file://src/shared/renderer-api/index.ts)
-- [src/shared/renderer-api/channels.ts](file://src/shared/renderer-api/channels.ts)
 - [src/shared/renderer-api/createRendererApi.ts](file://src/shared/renderer-api/createRendererApi.ts)
+- [src/shared/renderer-api/transport.ts](file://src/shared/renderer-api/transport.ts)
+- [src/shared/renderer-api/channels.ts](file://src/shared/renderer-api/channels.ts)
+- [src/shared/renderer-api/events.ts](file://src/shared/renderer-api/events.ts)
 - [src/shared/renderer-api/core.ts](file://src/shared/renderer-api/core.ts)
-- [src/shared/renderer-api/workbench.ts](file://src/shared/renderer-api/workbench.ts)
 - [src/shared/renderer-api/settings.ts](file://src/shared/renderer-api/settings.ts)
-- [src/main/ipc/handlers.ts](file://src/main/ipc/handlers.ts)
+- [src/shared/renderer-api/workbench.ts](file://src/shared/renderer-api/workbench.ts)
+- [src/shared/types/electron-api.ts](file://src/shared/types/electron-api.ts)
+- [src/shared/types/electron.ts](file://src/shared/types/electron.ts)
+- [src/main/ipc/validation/IpcPayloadGuard.ts](file://src/main/ipc/validation/IpcPayloadGuard.ts)
 </cite>
 
 ## 目录
@@ -21,338 +30,447 @@
 4. [架构总览](#架构总览)
 5. [详细组件分析](#详细组件分析)
 6. [依赖关系分析](#依赖关系分析)
-7. [性能考虑](#性能考虑)
-8. [故障排查指南](#故障排查指南)
-9. [结论](#结论)
-10. [附录](#附录)
+7. [性能与容量限制](#性能与容量限制)
+8. [客户端实现指南](#客户端实现指南)
+9. [错误处理与排障](#错误处理与排障)
+10. [版本兼容性与迁移策略](#版本兼容性与迁移策略)
+11. [结论](#结论)
 
 ## 简介
-本文件为 RDC-Agent 的完整 API 参考，覆盖 Renderer 侧暴露给渲染进程的所有公共接口，包括 IPC 通道、Renderer API、Provider（LLM）API、工作区与运行时相关能力等。文档按“协议规范—消息格式—事件类型—调用示例—错误处理”的结构组织，并提供客户端实现指南、最佳实践、版本兼容性与迁移建议。
+本 API 参考文档面向 Electron 应用中的 Renderer 进程开发者，系统性说明以下两部分：
+- Main-Renderer IPC 通信协议：包括通道命名、消息格式、参数校验、返回值结构与错误传播机制。
+- Renderer 暴露的受控接口：通过 preload 注入的 `electronAPI` 对象对外提供的能力集合，涵盖对话、工作流、会话、项目、工具链、设置、知识、追踪等域。
+
+该设计遵循“通道即契约”的原则：所有 IPC 通道集中在共享层定义，渲染端只能调用显式暴露的 API，Main 侧对入参进行严格校验并广播事件，形成清晰的主从边界。
 
 ## 项目结构
-RDC-Agent 通过 Electron 的 preload 脚本将安全的 API 暴露到渲染进程，并通过 IPC 与主进程通信。关键路径：
-- 渲染进程入口：preload 暴露 electronAPI 与 rdcDesktop
-- 共享 API 定义：shared/renderer-api 提供统一的通道与 API 构造器
-- 主进程端：ipc handlers 注册并处理来自渲染进程的请求
+IPC 相关代码分布在三个关键位置：
+- Main 侧：IPC 处理器注册入口、领域处理器、参数校验守卫与运行时上下文。
+- Preload 侧：将 Renderer 的传输抽象桥接到 Electron 原生 `ipcRenderer`。
+- Shared 侧：统一声明 IPC 通道常量、Renderer API 构造器、类型定义和事件订阅包装。
 
 ```mermaid
 graph TB
-subgraph "渲染进程"
-UI["应用界面"]
-RT["rendererTransport<br/>IPC 传输层"]
-end
-subgraph "Preload"
-EB["contextBridge.exposeInMainWorld"]
-RA["createRendererApi<br/>组装各域 API"]
-end
-subgraph "主进程"
-H["handlers.ts<br/>统一导出初始化/注册"]
-D["各域 Handlers<br/>conversation/shell/..."]
-end
-UI --> RT
-RT --> EB
-EB --> RA
-RA --> |invoke/subscribe| RT
-RT <- --> |IPC| H
-H --> D
+  subgraph "Renderer"
+    R_App["业务逻辑<br/>调用 electronAPI"]
+    R_Transport["rendererTransport.ts"]
+  end
+
+  subgraph "Preload"
+    P_Index["preload/index.ts"]
+    P_Transport["preload/rendererTransport.ts"]
+  end
+
+  subgraph "Shared"
+    S_Channels["channels.ts<br/>通道常量"]
+    S_CreateApi["createRendererApi.ts<br/>API 组装"]
+    S_Types["types/electron.ts<br/>类型契约"]
+    S_Events["events.ts<br/>事件订阅封装"]
+    S_Workbench["workbench.ts<br/>工作台 API"]
+    S_Core["core.ts<br/>核心能力 API"]
+    S_Settings["settings.ts<br/>设置与运行时 API"]
+  end
+
+  subgraph "Main"
+    M_Handlers["handlers.ts / workbenchHandlers.ts"]
+    M_SHELL["shellHandlers.ts"]
+    M_Conversation["conversationHandlers.ts"]
+    M_Validate["validation/IpcPayloadGuard.ts"]
+    M_InvokeReg["invokeRegistry.ts"]
+  end
+
+  R_App --> R_Transport
+  R_Transport -->|ipcRenderer.invoke / on| P_Transport
+  P_Index -->|contextBridge| R_App
+  P_Transport -->|Electron IPC| M_Handlers
+  M_Handlers --> M_SHELL
+  M_Handlers --> M_Conversation
+  M_Handlers --> M_Validate
+  M_Handlers --> M_InvokeReg
+  S_CreateApi --> S_Channels
+  S_CreateApi --> S_Core
+  S_CreateApi --> S_Workbench
+  S_CreateApi --> S_Settings
+  S_CreateApi --> S_Events
+  S_CreateApi --> S_Types
 ```
 
-图表来源
-- [src/preload/index.ts:1-26](file://src/preload/index.ts#L1-L26)
-- [src/shared/renderer-api/createRendererApi.ts:33-76](file://src/shared/renderer-api/createRendererApi.ts#L33-L76)
-- [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
-- [src/main/ipc/handlers.ts:1-7](file://src/main/ipc/handlers.ts#L1-L7)
+**图表来源**
+- [src/preload/index.ts:1-25](file://src/preload/index.ts#L1-L25)
+- [src/preload/rendererTransport.ts:1-44](file://src/preload/rendererTransport.ts#L1-L44)
+- [src/shared/renderer-api/createRendererApi.ts:1-80](file://src/shared/renderer-api/createRendererApi.ts#L1-L80)
+- [src/shared/renderer-api/channels.ts:1-271](file://src/shared/renderer-api/channels.ts#L1-L271)
+- [src/main/ipc/handlers.ts:1-6](file://src/main/ipc/handlers.ts#L1-L6)
+- [src/main/ipc/workbenchHandlers.ts:1-120](file://src/main/ipc/workbenchHandlers.ts#L1-L120)
+- [src/main/ipc/shellHandlers.ts:1-200](file://src/main/ipc/shellHandlers.ts#L1-L200)
+- [src/main/ipc/conversationHandlers.ts:1-200](file://src/main/ipc/conversationHandlers.ts#L1-L200)
+- [src/main/ipc/validation/IpcPayloadGuard.ts:1-87](file://src/main/ipc/validation/IpcPayloadGuard.ts#L1-L87)
+- [src/main/ipc/invokeRegistry.ts:1-50](file://src/main/ipc/invokeRegistry.ts#L1-L50)
 
-章节来源
-- [src/main/ipc/README.md:1-10](file://src/main/ipc/README.md#L1-L10)
-- [src/preload/index.ts:1-26](file://src/preload/index.ts#L1-L26)
-- [src/shared/renderer-api/index.ts:1-18](file://src/shared/renderer-api/index.ts#L1-L18)
+**章节来源**
+- [src/main/ipc/README.md:1-9](file://src/main/ipc/README.md#L1-L9)
+- [src/main/ipc/handlers.ts:1-6](file://src/main/ipc/handlers.ts#L1-L6)
 
 ## 核心组件
-- 传输层（RendererApiTransport）：封装 invoke 与事件订阅，基于 ipcRenderer 实现
-- 通道定义（channels）：集中声明所有 RPC 通道名与事件通道名，并提供类型守卫
-- API 构造器（createRendererApi + core/workbench/settings）：按领域聚合方法，形成稳定的对外 API 对象
-- Preload 桥接：将 transport 注入 createRendererApi，并通过 contextBridge 暴露给渲染进程
+本节聚焦构建整个 IPC 体系的关键模块。
 
-章节来源
-- [src/shared/renderer-api/transport.ts](file://src/shared/renderer-api/transport.ts)
-- [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
-- [src/shared/renderer-api/createRendererApi.ts:33-76](file://src/shared/renderer-api/createRendererApi.ts#L33-L76)
-- [src/preload/rendererTransport.ts:1-45](file://src/preload/rendererTransport.ts#L1-L45)
+### IPC 通道与类型契约
+- `RENDERER_INVOKE_CHANNEL`：集中声明所有渲染端可调用的主进程 RPC 通道名，按领域分组，如 shell、conversation、workflow、agent、memory、investigation、plan、knowledge、rdcRuntime、command、tools、llm、settings、project、device、session、run、runtime、capture、context、trace。
+- `RENDERER_EVENT_CHANNEL`：集中声明所有主进程向渲染端广播的事件通道名，如 themeChanged、runStatusChanged、agent.message、tool:executionComplete、runtime:logAppended 等。
+- `RendererInvokeChannel`、`RendererEventChannel`：由通道常量推导出的联合类型，配合 `isRendererInvokeChannel`、`isRendererEventChannel` 在运行时做白名单校验，避免渲染端误用未声明通道。
+- `RENDERER_INVOKE_CHANNELS`、`RENDERER_EVENT_CHANNELS`：冻结的通道数组，用于完整性校验（例如确保渲染端声明的通道都在 Main 侧有对应处理器）。
+
+这些常量是 IPC 契约的唯一真相源，新增或修改 IPC 必须同时更新：
+- shared 层通道常量；
+- preload 与 renderer API 映射；
+- main 侧处理器注册；
+- 浏览器 fallback 或测试基线（仓库约定要求）。
+
+**章节来源**
+- [src/shared/renderer-api/channels.ts:1-271](file://src/shared/renderer-api/channels.ts#L1-L271)
+
+### Renderer API 构造器
+`createRendererApi(platform, transport)` 负责把底层 `RendererApiTransport` 包装成稳定的 `ElectronAPI` 对象，暴露给 Renderer 业务使用。它组合多个子 API：
+- 平台信息：`platform`、`isMac`、`isWindows`、`isLinux`。
+- 应用元信息与 Shell：`appMeta`、`appShell`、`web`、`windowControls`、`dialog`。
+- 对话与工作流：`conversation`、`workflow`、`agent`。
+- 项目与会话：`project`、`session`、`run`、`device`、`capture`、`context`。
+- 工具与证据：`tool`、`mcp`、`evidence`。
+- 知识与计划：`knowledge`、`plan`、`investigation`。
+- 运行环境与设置：`rdcRuntime`、`llm`、`settings`、`memory`、`runtimeLog`。
+- 追踪：`trace`。
+- 事件订阅：`events`，以及全局 `on`、`off`。
+
+所有方法都通过 `transport.invoke(channel, ...args)` 发送请求，或通过 `transport.subscribe` 订阅事件。
+
+**章节来源**
+- [src/shared/renderer-api/createRendererApi.ts:1-80](file://src/shared/renderer-api/createRendererApi.ts#L1-L80)
+- [src/shared/types/electron-api.ts:1-32](file://src/shared/types/electron-api.ts#L1-L32)
+
+### 传输层抽象
+`RendererApiTransport` 定义了渲染端与 Electron IPC 之间的最小接口：
+- `invoke<TResult>(channel, ...args)`：同步调用返回 Promise。
+- `subscribe(channel, callback)`：返回取消订阅函数。
+- `addListener`、`removeListener`、`removeAllListeners`：供内部 API 直接管理事件监听器。
+
+Preload 层的 `createIpcRendererTransport()` 将其适配到 `ipcRenderer.invoke` 和 `ipcRenderer.on`，并通过 Map 维护回调去重与移除逻辑。
+
+```mermaid
+classDiagram
+  class RendererApiTransport {
+    +invoke(channel, args) Promise
+    +subscribe(channel, callback) Function
+    +addListener(channel, callback) void
+    +removeListener(channel, callback) void
+    +removeAllListeners(channel) void
+  }
+
+  class IpcRendererTransport {
+    -listenerMap Map
+    +invoke()
+    +subscribe()
+    +addListener()
+    +removeListener()
+    +removeAllListeners()
+  }
+
+  RendererApiTransport <|.. IpcRendererTransport : "preload 实现"
+```
+
+**图表来源**
+- [src/shared/renderer-api/transport.ts:1-11](file://src/shared/renderer-api/transport.ts#L1-L11)
+- [src/preload/rendererTransport.ts:1-44](file://src/preload/rendererTransport.ts#L1-L44)
+
+**章节来源**
+- [src/shared/renderer-api/transport.ts:1-11](file://src/shared/renderer-api/transport.ts#L1-L11)
+- [src/preload/rendererTransport.ts:1-44](file://src/preload/rendererTransport.ts#L1-L44)
+
+### 预加载注入点
+Preload 脚本仅暴露安全能力：
+- `electronAPI`：通过 `createRendererApi(process.platform, createIpcRendererTransport())` 创建。
+- `rdcDesktop.getPathForFile(file)`：基于 `webUtils.getPathForFile` 的安全包装，失败时返回 null。
+
+Preload 明确禁止引入 Node 内置模块，只允许使用 `contextBridge`、`webUtils` 和 `process.platform`，以降低攻击面。
+
+**章节来源**
+- [src/preload/index.ts:1-25](file://src/preload/index.ts#L1-L25)
 
 ## 架构总览
-渲染进程通过 electronAPI 调用各域方法；每个方法映射到一个 IPC 通道名；主进程 handlers 接收并路由到具体服务；结果以 Promise 或事件形式返回。
+Main-Renderer IPC 采用“RPC + 事件”的双通道模型：
+- 请求-响应：Renderer 通过 `electronAPI.*` 调用方法，底层走 `ipcRenderer.invoke`，Main 侧通过 `ipcMain.handle` 或自定义 invoke 注册表处理。
+- 事件推送：Main 通过 `BrowserWindow.webContents.send` 或事件中心向 Renderer 广播，Renderer 通过 `events` API 或全局 `on/off` 订阅。
 
 ```mermaid
 sequenceDiagram
-participant R as "渲染进程"
-participant P as "Preload"
-participant T as "rendererTransport"
-participant M as "主进程 handlers"
-participant S as "业务服务"
-R->>P : electronAPI.conversation.sendMessage(request)
-P->>T : invoke("conversation : sendMessage", request)
-T->>M : ipcRenderer.invoke(...)
-M->>S : 路由到 ConversationService
-S-->>M : 响应/流式事件
-M-->>T : 返回值/事件
-T-->>P : Promise resolve / on(event)
-P-->>R : 回调/返回值
+  participant R as "Renderer 业务"
+  participant E as "electronAPI"
+  participant T as "RendererApiTransport"
+  participant P as "Preload ipcRenderer 适配"
+  participant M as "Main IPC 处理器"
+  participant S as "领域服务"
+
+  R->>E: 调用 conversation.sendMessage(request)
+  E->>T: invoke("conversation:sendMessage", request)
+  T->>P: ipcRenderer.invoke(...)
+  P->>M: ipcMain.handle("conversation:sendMessage")
+  M->>M: parseIpcArgs(schema, args)
+  M->>S: conversationService.sendMessage(...)
+  S-->>M: 结果或错误
+  M-->>P: Promise 结果
+  P-->>T: Promise 结果
+  T-->>E: Promise 结果
+  E-->>R: 返回结果或抛出异常
 ```
 
-图表来源
-- [src/shared/renderer-api/core.ts:55-77](file://src/shared/renderer-api/core.ts#L55-L77)
-- [src/shared/renderer-api/channels.ts:18-32](file://src/shared/renderer-api/channels.ts#L18-L32)
-- [src/preload/rendererTransport.ts:29-43](file://src/preload/rendererTransport.ts#L29-L43)
-- [src/main/ipc/handlers.ts:1-7](file://src/main/ipc/handlers.ts#L1-L7)
+**图表来源**
+- [src/shared/renderer-api/core.ts:1-167](file://src/shared/renderer-api/core.ts#L1-L167)
+- [src/shared/renderer-api/transport.ts:1-11](file://src/shared/renderer-api/transport.ts#L1-L11)
+- [src/preload/rendererTransport.ts:1-44](file://src/preload/rendererTransport.ts#L1-L44)
+- [src/main/ipc/conversationHandlers.ts:1-200](file://src/main/ipc/conversationHandlers.ts#L1-L200)
+- [src/main/ipc/validation/IpcPayloadGuard.ts:1-87](file://src/main/ipc/validation/IpcPayloadGuard.ts#L1-L87)
 
 ## 详细组件分析
 
-### 全局 API 对象（electronAPI）
-- 平台信息：platform、isMac、isWindows、isLinux
-- 子模块：appMeta、appShell、web、conversation、command、dialog、workflow、trace、agent、memory、investigation、knowledge、rdxRuntime、tool、mcp、evidence、llm、settings、project、device、session、run、runtimeLog、capture、context、events、windowControls
-- 事件订阅：on(channel, callback)、off(channel, callback)
+### 主进程 IPC 注册与一致性检查
+- `handlers.ts` 作为 IPC 初始化入口，导出 `initializeIpcState`、`registerIPCHandlers`、`setMainWindow`、`stopAllActiveRuns`，实际注册逻辑集中在 `workbenchHandlers.ts`。
+- `workbenchHandlers.ts` 聚合各域处理器：conversation、project/session、workflow、agent、memory、knowledge、plan、shell、web、tools、trace、rdcRuntime 等，并在启动时恢复当前 session/project/run 状态、恢复中断运行。
+- `invokeRegistry.ts` 提供：
+  - `installIpcInvokeRegistry()`：拦截 `ipcMain.handle`，记录已注册通道。
+  - `assertRendererIpcParity()`：断言渲染端声明的所有 invoke 通道都有对应 handler，缺失则抛错。
+  - `invokeRegisteredIpcChannel()`：供非标准调用路径触发已注册 handler。
 
-使用要点
-- 仅通过 electronAPI 访问能力，避免直接操作 ipcRenderer
-- 事件订阅需配合 isRendererEventChannel 校验（由 on/off 内部完成）
+这种设计使“通道列表”成为可验证契约：若 renderer 新增通道但未在主进程注册，构建或运行时会发现不一致。
 
-章节来源
-- [src/shared/renderer-api/createRendererApi.ts:33-76](file://src/shared/renderer-api/createRendererApi.ts#L33-L76)
-- [src/shared/renderer-api/channels.ts:178-218](file://src/shared/renderer-api/channels.ts#L178-L218)
+**章节来源**
+- [src/main/ipc/handlers.ts:1-6](file://src/main/ipc/handlers.ts#L1-L6)
+- [src/main/ipc/workbenchHandlers.ts:1-120](file://src/main/ipc/workbenchHandlers.ts#L1-L120)
+- [src/main/ipc/invokeRegistry.ts:1-50](file://src/main/ipc/invokeRegistry.ts#L1-L50)
 
-### 应用外壳与系统能力（appShell/web/dialog/windowControls）
-- appMeta.get：获取应用元信息
-- appShell.selectAvatar/getAvatarDataUrl/openPath/copyText/readClipboardText
-- web.resolveFavicon：解析域名 favicon
-- dialog.selectFiles/selectRdcFiles/selectDirectory：文件选择
-- windowControls.minimize/toggleMaximize/close/isMaximized：窗口控制
+### Shell 与窗口能力
+Shell 能力通过 `appShell`、`appMeta`、`web`、`windowControls` 暴露，主要通道包括：
+- `app:getMeta`、`app:hasSeenGettingStarted`、`app:acknowledgeGettingStarted`
+- `app:selectAvatar`、`app:getAvatarDataUrl`、`app:openPath`、`app:copyText`、`app:readClipboardText`
+- `dialog:selectFiles`、`dialog:selectRdcFiles`、`dialog:selectKnowledgeImport`、`dialog:selectDirectory`、`dialog:saveFile`
+- `web:resolveFavicon`
+- `window:minimize`、`window:toggleMaximize`、`window:close`、`window:isMaximized`
 
-错误处理
-- 若底层系统调用失败，Promise 将拒绝；建议在调用处捕获异常并提示用户
+返回值多为 Promise，成功时返回结构化数据，失败时可能返回空值或包含 error 字段的结果。具体类型定义见 `types/electron.ts` 中 `ElectronAPI.appMeta`、`ElectronAPI.appShell`、`ElectronAPI.web`、`ElectronAPI.windowControls`。
 
-章节来源
-- [src/shared/renderer-api/core.ts:20-53](file://src/shared/renderer-api/core.ts#L20-L53)
-- [src/shared/renderer-api/channels.ts:2-17](file://src/shared/renderer-api/channels.ts#L2-L17)
+**章节来源**
+- [src/shared/renderer-api/core.ts:1-167](file://src/shared/renderer-api/core.ts#L1-L167)
+- [src/shared/renderer-api/channels.ts:1-120](file://src/shared/renderer-api/channels.ts#L1-L120)
+- [src/main/ipc/shellHandlers.ts:1-200](file://src/main/ipc/shellHandlers.ts#L1-L200)
+- [src/shared/types/electron.ts:1-200](file://src/shared/types/electron.ts#L1-L200)
 
-### 会话与对话（conversation）
-- sendMessage/rewriteFromMessage/cancelActiveTurn/answerUserInput/answerToolApproval
-- getHistory/switchBranch/clearHistory/undoLastTurn
-- getToolImagePreview/stageAttachments/releaseAttachments/getAttachmentPreview
-- 事件：conversation:event（用于流式或增量更新）
+### 对话能力
+对话 API 通过 `conversation` 暴露，典型操作包括：
+- `sendMessage`、`rewriteFromMessage`、`cancelActiveTurn`
+- `answerUserInput`、`answerToolApproval`、`answerPlanReview`
+- `getHistory`、`switchBranch`、`clearHistory`、`undoLastTurn`
+- `getDelegationTrace`、`getDelegationContent`
+- `stageAttachments`、`releaseAttachments`、`getAttachmentPreview`、`getToolImagePreview`
 
-调用流程
-```mermaid
-sequenceDiagram
-participant U as "UI"
-participant C as "conversation API"
-participant T as "transport"
-participant H as "主进程"
-U->>C : sendMessage(request)
-C->>T : invoke("conversation : sendMessage")
-T->>H : 转发请求
-H-->>T : 返回/推送事件
-T-->>C : 回调/事件
-C-->>U : 更新 UI
-```
+主进程侧在 `conversationHandlers.ts` 中对每个通道解析参数、更新当前 project/session/run 上下文、调用 `conversationService`，并返回标准化结果。部分方法返回带 `status`、`requestId`、`turn`、`preparedContext` 的结构化响应，错误时转换为拒绝态结果。
 
-图表来源
-- [src/shared/renderer-api/core.ts:55-77](file://src/shared/renderer-api/core.ts#L55-L77)
-- [src/shared/renderer-api/channels.ts:18-32](file://src/shared/renderer-api/channels.ts#L18-L32)
-- [src/preload/rendererTransport.ts:29-43](file://src/preload/rendererTransport.ts#L29-L43)
+**章节来源**
+- [src/shared/renderer-api/core.ts:1-167](file://src/shared/renderer-api/core.ts#L1-L167)
+- [src/shared/renderer-api/channels.ts:1-120](file://src/shared/renderer-api/channels.ts#L1-L120)
+- [src/main/ipc/conversationHandlers.ts:1-200](file://src/main/ipc/conversationHandlers.ts#L1-L200)
+- [src/shared/types/electron.ts:1-200](file://src/shared/types/electron.ts#L1-L200)
 
-章节来源
-- [src/shared/renderer-api/core.ts:55-77](file://src/shared/renderer-api/core.ts#L55-L77)
-- [src/shared/renderer-api/channels.ts:18-32](file://src/shared/renderer-api/channels.ts#L18-L32)
+### 工作流与代理
+- `workflow`：获取状态、恢复运行、停止运行、查询运行用量、列举运行。
+- `agent`：发送消息、获取状态、获取全部状态、配置 agent。
 
-### 工作流（workflow）
-- getState/resume/stop/getRunUsage/listRuns/listActiveRuns
-- 事件：workflow:stateChanged、workflow:runStatusChanged、workflow:runUsageChanged、workflow:blocked、trace:projectionChanged
+这两个能力分别通过 `workflowHandlers.ts` 和 `agentHandlers.ts` 对接工作流执行引擎与代理编排器，事件方面会广播 `workflow:runStatusChanged`、`agent:message`、`agent:statusChanged`。
 
-章节来源
-- [src/shared/renderer-api/core.ts:79-88](file://src/shared/renderer-api/core.ts#L79-L88)
-- [src/shared/renderer-api/channels.ts:33-40](file://src/shared/renderer-api/channels.ts#L33-L40)
-- [src/shared/renderer-api/channels.ts:189-195](file://src/shared/renderer-api/channels.ts#L189-L195)
+**章节来源**
+- [src/shared/renderer-api/core.ts:1-167](file://src/shared/renderer-api/core.ts#L1-L167)
+- [src/shared/renderer-api/channels.ts:1-200](file://src/shared/renderer-api/channels.ts#L1-L200)
+- [src/main/ipc/workbenchHandlers.ts:120-293](file://src/main/ipc/workbenchHandlers.ts#L120-L293)
 
-### Agent（agent）
-- sendMessage/sendState/getAllStates/configure
-- 事件：agent:message、agent:statusChanged
+### 项目、设备、会话、捕获与上下文
+- `project`：增删改查项目、管理项目输入项。
+- `device`：列出设备、刷新、开启/续期/关闭 watch。
+- `session`：列出、创建、重命名、删除、选择会话，设置模型覆盖与 agent 切换。
+- `capture`：列出、选择、打开项目输入、读取回放状态、应用回放事件、刷新帧。
+- `context`：获取上下文快照。
+- `trace`：读取 trace run、事件、投影，导出 trace，切换分支。
 
-章节来源
-- [src/shared/renderer-api/core.ts:90-97](file://src/shared/renderer-api/core.ts#L90-L97)
-- [src/shared/renderer-api/channels.ts:41-46](file://src/shared/renderer-api/channels.ts#L41-L46)
-- [src/shared/renderer-api/channels.ts:200-203](file://src/shared/renderer-api/channels.ts#L200-L203)
+这些 API 由 `workbench.ts` 统一封装，底层通道集中在 `channels.ts` 中。
 
-### 记忆与权限（memory）
-- issueApprovalToken/list/get/write/delete
-- 说明：写删除等操作通常需要审批令牌，确保敏感操作可审计
+**章节来源**
+- [src/shared/renderer-api/workbench.ts:1-99](file://src/shared/renderer-api/workbench.ts#L1-L99)
+- [src/shared/renderer-api/channels.ts:120-271](file://src/shared/renderer-api/channels.ts#L120-L271)
 
-章节来源
-- [src/shared/renderer-api/settings.ts:6-16](file://src/shared/renderer-api/settings.ts#L6-L16)
-- [src/shared/renderer-api/channels.ts:47-53](file://src/shared/renderer-api/channels.ts#L47-L53)
+### 设置、LLM、内存与 RDC 运行时
+- `settings`：读取设置、导入 agent manifest、保存 provider 定义、获取有效模型/目录、设置模型覆盖、解析 shell。
+- `llm`：测试 provider、连接/断开 provider、刷新模型、账户登录流程、检测模型能力。
+- `memory`：申请 approvalToken、列出/读取/写入/删除记忆。
+- `rdcRuntime`：查看 overview、验证/导入/更新/删除资源、信任/撤销 hook 或 mcp、测试 hook、查看请求快照。
 
-### 调查与知识（investigation/knowledge）
-- investigation.read：读取调查记录
-- knowledge.overview/query/card/compile/indexRebuild/candidates/candidateCreate/coldDataImport/issueApprovalToken/write/promote
+这些能力由 `settings.ts` 与 `core.ts` 组合暴露，参数通常经过 schema 校验后再进入主进程。
 
-章节来源
-- [src/shared/renderer-api/core.ts:99-119](file://src/shared/renderer-api/core.ts#L99-L119)
-- [src/shared/renderer-api/channels.ts:54-69](file://src/shared/renderer-api/channels.ts#L54-L69)
+**章节来源**
+- [src/shared/renderer-api/settings.ts:1-86](file://src/shared/renderer-api/settings.ts#L1-L86)
+- [src/shared/renderer-api/core.ts:1-167](file://src/shared/renderer-api/core.ts#L1-L167)
+- [src/shared/renderer-api/channels.ts:1-200](file://src/shared/renderer-api/channels.ts#L1-L200)
 
-### 运行时资源（rdxRuntime）
-- getOverview/validateResource/upsertResource/importResource/deleteResource/revealResource
-- trustHook/revokeHook/trustMcp/revokeMcp/testHook
-- listRequestSnapshots/getRequestSnapshot
+### 事件订阅机制
+`events` 子 API 为常用事件提供语义化订阅方法，包括：
+- `onDelegationTraceChanged`
+- `onRunStatusChanged`
+- `onRunUsageChanged`
+- `onTraceProjectionChanged`
+- `onEffectiveCatalogChanged`
+- `onAgentMessage`
+- `onAgentStatusChanged`
+- `onToolExecutionComplete`
+- `onEvidenceEventAdded`
+- `onDeviceStatusChanged`
+- `onCaptureStatusChanged`
+- `onContextChanged`
+- `onProjectInputsChanged`
+- `onProjectInputsError`
+- `onCaptureReplayChanged`
+- `onOpenedCaptureStateChanged`
+- `onRuntimeLogAppended`
+- `onAppThemeChanged`
 
-章节来源
-- [src/shared/renderer-api/settings.ts:18-46](file://src/shared/renderer-api/settings.ts#L18-L46)
-- [src/shared/renderer-api/channels.ts:70-84](file://src/shared/renderer-api/channels.ts#L70-L84)
+底层通过 `transport.subscribe` 绑定 `RENDERER_EVENT_CHANNEL` 中的事件通道，并将原始 payload 转换为更明确的类型。
 
-### 命令（command）
-- list/category 过滤
-- execute：执行命令
-
-章节来源
-- [src/shared/renderer-api/core.ts:121-126](file://src/shared/renderer-api/core.ts#L121-L126)
-- [src/shared/renderer-api/channels.ts:85-88](file://src/shared/renderer-api/channels.ts#L85-L88)
-
-### 工具与证据（tool/mcp/evidence）
-- tool.getCatalog/getRuntimeSummary
-- mcp.getStatusSummary
-- evidence.getChain/getEvents
-
-章节来源
-- [src/shared/renderer-api/core.ts:128-144](file://src/shared/renderer-api/core.ts#L128-L144)
-- [src/shared/renderer-api/channels.ts:89-95](file://src/shared/renderer-api/channels.ts#L89-L95)
-
-### LLM Provider（llm）
-- testProviderDraft/testModelCapability/connectProvider/refreshProviderModels/disconnectProvider
-- startProviderAccountLogin/getProviderAccountStatus/finishProviderAccountLogin/logoutProviderAccount
-- 事件：llm:stream、llm:effectiveCatalogChanged
-
-章节来源
-- [src/shared/renderer-api/settings.ts:48-60](file://src/shared/renderer-api/settings.ts#L48-L60)
-- [src/shared/renderer-api/channels.ts:96-106](file://src/shared/renderer-api/channels.ts#L96-L106)
-- [src/shared/renderer-api/channels.ts:196-199](file://src/shared/renderer-api/channels.ts#L196-L199)
-
-### 设置（settings）
-- get/getProviderCatalog/getEffectiveModel/getEffectiveCatalog/hasProviderSecret
-- importAgentManifest/saveAgentDefinition/getAgentDefinitionCommit
-- saveProviderDefinition/getProviderDefinitionCommit
-- getModelsOverride/setModelsOverride/getResolvedShell/set
-
-章节来源
-- [src/shared/renderer-api/settings.ts:62-85](file://src/shared/renderer-api/settings.ts#L62-L85)
-- [src/shared/renderer-api/channels.ts:107-122](file://src/shared/renderer-api/channels.ts#L107-L122)
-
-### 工作区与工作项（project/device/session/run/runtimeLog/capture/context/trace）
-- project：list/add/select/rename/remove；inputs.list/refresh/import/importPaths
-- device：list/refresh/activate/watchStart/watchRenew/watchStop
-- session：list/create/rename/remove/select/setModelOverride/setAgentId
-- run：list(sessionId)
-- runtimeLog：list(request)
-- capture：list/select/openProjectInput/getOpenedState/clearOpenedState
-- context：get/openHumanPreview/closeHumanPreview
-- trace：getRun/getEvents/getProjection/exportRun/switchBranch
-
-章节来源
-- [src/shared/renderer-api/workbench.ts:14-92](file://src/shared/renderer-api/workbench.ts#L14-L92)
-- [src/shared/renderer-api/channels.ts:123-176](file://src/shared/renderer-api/channels.ts#L123-L176)
-- [src/shared/renderer-api/channels.ts:208-217](file://src/shared/renderer-api/channels.ts#L208-L217)
-
-### 事件系统（events）
-- 事件通道集中在 RENDERER_EVENT_CHANNEL，包含 shell/conversation/workflow/llm/agent/tools/workbench/runtime 等
-- 通过 electronAPI.on/off 进行订阅与取消
-
-章节来源
-- [src/shared/renderer-api/channels.ts:178-218](file://src/shared/renderer-api/channels.ts#L178-L218)
-- [src/shared/renderer-api/createRendererApi.ts:69-74](file://src/shared/renderer-api/createRendererApi.ts#L69-L74)
+**章节来源**
+- [src/shared/renderer-api/events.ts:1-88](file://src/shared/renderer-api/events.ts#L1-L88)
+- [src/shared/renderer-api/channels.ts:200-271](file://src/shared/renderer-api/channels.ts#L200-L271)
 
 ## 依赖关系分析
-- 渲染进程依赖 shared/renderer-api 提供的稳定 API 与通道类型
-- Preload 负责将 transport 注入 createRendererApi 并暴露到全局
-- 主进程 handlers 通过 workbenchHandlers 统一注册，再分发到各域处理器
 
 ```mermaid
 graph LR
-A["rendererTransport.ts"] --> B["createRendererApi.ts"]
-B --> C["core.ts"]
-B --> D["workbench.ts"]
-B --> E["settings.ts"]
-F["channels.ts"] --> B
-G["preload/index.ts"] --> B
-H["main/ipc/handlers.ts"] --> I["各域 handlers"]
-A <- --> H
+  A["shared/renderer-api/createRendererApi.ts"] --> B["shared/renderer-api/channels.ts"]
+  A --> C["shared/renderer-api/core.ts"]
+  A --> D["shared/renderer-api/workbench.ts"]
+  A --> E["shared/renderer-api/settings.ts"]
+  A --> F["shared/renderer-api/events.ts"]
+  G["preload/index.ts"] --> A
+  H["preload/rendererTransport.ts"] --> I["shared/renderer-api/transport.ts"]
+  J["main/ipc/workbenchHandlers.ts"] --> K["main/ipc/shellHandlers.ts"]
+  J --> L["main/ipc/conversationHandlers.ts"]
+  J --> M["main/ipc/validation/IpcPayloadGuard.ts"]
+  N["main/ipc/invokeRegistry.ts"] --> B
 ```
 
-图表来源
-- [src/preload/rendererTransport.ts:1-45](file://src/preload/rendererTransport.ts#L1-L45)
-- [src/shared/renderer-api/createRendererApi.ts:33-76](file://src/shared/renderer-api/createRendererApi.ts#L33-L76)
-- [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
-- [src/main/ipc/handlers.ts:1-7](file://src/main/ipc/handlers.ts#L1-L7)
+**图表来源**
+- [src/shared/renderer-api/createRendererApi.ts:1-80](file://src/shared/renderer-api/createRendererApi.ts#L1-L80)
+- [src/shared/renderer-api/channels.ts:1-271](file://src/shared/renderer-api/channels.ts#L1-L271)
+- [src/shared/renderer-api/core.ts:1-167](file://src/shared/renderer-api/core.ts#L1-L167)
+- [src/shared/renderer-api/workbench.ts:1-99](file://src/shared/renderer-api/workbench.ts#L1-L99)
+- [src/shared/renderer-api/settings.ts:1-86](file://src/shared/renderer-api/settings.ts#L1-L86)
+- [src/shared/renderer-api/events.ts:1-88](file://src/shared/renderer-api/events.ts#L1-L88)
+- [src/preload/index.ts:1-25](file://src/preload/index.ts#L1-L25)
+- [src/preload/rendererTransport.ts:1-44](file://src/preload/rendererTransport.ts#L1-L44)
+- [src/main/ipc/workbenchHandlers.ts:1-120](file://src/main/ipc/workbenchHandlers.ts#L1-L120)
+- [src/main/ipc/shellHandlers.ts:1-200](file://src/main/ipc/shellHandlers.ts#L1-L200)
+- [src/main/ipc/conversationHandlers.ts:1-200](file://src/main/ipc/conversationHandlers.ts#L1-L200)
+- [src/main/ipc/validation/IpcPayloadGuard.ts:1-87](file://src/main/ipc/validation/IpcPayloadGuard.ts#L1-L87)
+- [src/main/ipc/invokeRegistry.ts:1-50](file://src/main/ipc/invokeRegistry.ts#L1-L50)
 
-章节来源
-- [src/preload/index.ts:1-26](file://src/preload/index.ts#L1-L26)
-- [src/shared/renderer-api/index.ts:1-18](file://src/shared/renderer-api/index.ts#L1-L18)
+**章节来源**
+- [src/shared/renderer-api/index.ts:1-17](file://src/shared/renderer-api/index.ts#L1-L17)
 
-## 性能考虑
-- 批量操作：对频繁的小请求尽量合并（如 inputs.refresh），减少 IPC 次数
-- 事件驱动：优先使用事件订阅（如 conversation/event、workflow/stateChanged）而非轮询
-- 超时与重试：对网络或外部依赖（LLM Provider）增加超时与重试策略
-- 资源释放：及时移除事件监听，避免内存泄漏
-- 大对象传输：尽量避免在 IPC 中传递超大对象，必要时分片或使用文件句柄
+## 性能与容量限制
+IPC 参数在进入主进程处理器前会经过统一校验：
+- 默认最大序列化字节长度为 256 KiB。
+- 可通过 `parseIpcArgs` 的 `maxBytes` 选项为不同通道调整上限，例如对话消息可达 2 MiB，对话框请求通常为 4 KiB。
+- 校验失败会抛出 `IpcValidationError`，错误码为 `IPC_VALIDATION_ERROR`，便于上层区分参数非法与服务异常。
+- 支持 `padTo` 补齐可选尾部参数，避免零参调用被 Zod tuple 拒绝。
+- 还提供 `ipcString`、`ipcNonEmptyString`、`ipcId`、`ipcStringArray` 等辅助 schema，防止路径遍历、超长字符串和无意义 id。
 
-[本节为通用指导，不直接引用具体文件]
+建议：
+- 大型数据优先使用会话级 ID 引用，而非一次性跨进程传递完整正文。
+- 流式或增量数据应结合事件通道分片上报。
+- 对敏感或外部输入一律使用 `parseIpcArgs` 校验，不要绕过。
 
-## 故障排查指南
-- 通道未注册：新增 IPC 需在 channels 登记，并在主进程 handlers 中注册对应处理器
-- 事件未触发：确认 on/off 使用的 channel 属于 RENDERER_EVENT_CHANNEL，且主进程正确派发
-- 权限问题：memory/knowledge 等写操作需要 approval token，先调用 issueApprovalToken
-- 调试技巧：在主进程 handlers 中打印入参/出参；在渲染进程捕获 Promise 拒绝原因
+**章节来源**
+- [src/main/ipc/validation/IpcPayloadGuard.ts:1-87](file://src/main/ipc/validation/IpcPayloadGuard.ts#L1-L87)
+- [src/main/ipc/shellHandlers.ts:1-200](file://src/main/ipc/shellHandlers.ts#L1-L200)
+- [src/main/ipc/conversationHandlers.ts:1-200](file://src/main/ipc/conversationHandlers.ts#L1-L200)
 
-章节来源
-- [src/main/ipc/README.md:1-10](file://src/main/ipc/README.md#L1-L10)
-- [src/shared/renderer-api/channels.ts:226-244](file://src/shared/renderer-api/channels.ts#L226-L244)
+## 客户端实现指南
+
+### 接入步骤
+1. 在 Renderer 中通过全局对象访问 `window.electronAPI`。
+2. 使用 `electronAPI.events.on*` 订阅所需事件。
+3. 调用 `electronAPI.*` 下的受控方法完成业务操作。
+4. 对所有异步调用使用 try/catch 或 Promise reject 处理。
+5. 在组件卸载时取消事件订阅，避免内存泄漏。
+
+### 推荐调用模式
+- 读取型操作：直接 await 调用，如 `electronAPI.appMeta.get()`、`electronAPI.project.list()`。
+- 写型操作：先校验 UI 输入，再调用 `electronAPI.*`，并根据返回结构判断成功或展示错误。
+- 事件驱动更新：使用 `events.onRunStatusChanged`、`events.onAgentMessage` 等更新 UI，而不是轮询。
+- 文件选择与保存：使用 `electronAPI.dialog.selectFiles`、`electronAPI.dialog.saveFile`，避免直接操作文件系统。
+
+### 最佳实践
+- 始终使用 `electronAPI` 暴露的方法，不要尝试直接调用底层 IPC 通道。
+- 对可能失败的 API，同时处理 Promise 拒绝与返回值中的错误字段。
+- 事件回调应保持幂等和轻量，避免阻塞事件分发。
+- 使用 `events.removeAllListeners(channel)` 清理不再需要的事件。
+- 不要在 Renderer 中缓存不可变的全局状态，应以事件为准重新计算。
+
+[本节为通用实现指导，不直接分析具体源码]
+
+## 错误处理与排障
+
+### 错误分类
+1. **参数校验错误**：由 `IpcPayloadGuard.parseIpcArgs` 抛出，错误码固定为 `IPC_VALIDATION_ERROR`，消息包含字段路径和错误原因。
+2. **通道缺失错误**：如果渲染端声明了某个 invoke 通道但主进程没有注册处理器，`assertRendererIpcParity` 会抛出错误，提示缺失通道列表。
+3. **业务错误**：某些方法返回结构化结果（如 `{ success, error }`），而非直接抛错，需根据返回体判断。
+4. **权限或上下文拒绝**：例如 delegation trace 访问当前 session 不匹配时返回特定错误码或抛出明确错误。
+
+### 常见排查清单
+- 调用未声明通道：检查是否通过 `electronAPI` 暴露的方法调用，而非直接使用字符串通道。
+- 事件未触发：确认频道名称是否正确、订阅是否在正确时机注册、是否过早销毁组件。
+- 大消息失败：检查是否超过默认 256 KiB 或对应 handler 的 `maxBytes`。
+- 对话发送失败：查看 `conversationHandlers` 返回的拒绝态结果，定位 requestId 和错误原因。
+- 窗口控制无效：确认调用来自正确的 BrowserWindow，某些窗口操作依赖 sender。
+
+**章节来源**
+- [src/main/ipc/validation/IpcPayloadGuard.ts:1-87](file://src/main/ipc/validation/IpcPayloadGuard.ts#L1-L87)
+- [src/main/ipc/invokeRegistry.ts:1-50](file://src/main/ipc/invokeRegistry.ts#L1-L50)
+- [src/main/ipc/conversationHandlers.ts:1-200](file://src/main/ipc/conversationHandlers.ts#L1-L200)
+
+## 版本兼容性与迁移策略
+
+### 向后兼容原则
+- 通道名称一旦发布，不应随意更改；如需变更，应新增通道并保持旧通道一段时间。
+- 参数扩展应采用可选字段，并使用 `padTo` 保证旧调用方仍能传较少参数。
+- 返回值新增字段应保持可选，客户端不得假设字段一定存在。
+- 事件 payload 新增字段应视为可选，客户端不应依赖旧版 payload 的完整形状。
+
+### 迁移建议
+- 当升级 API 时，先在 shared 层增加新通道或新方法，保持旧方法可用。
+- 在 main 侧为新方法添加校验 schema，并为旧方法保留兼容逻辑。
+- 在 preload 与 renderer API 中逐步引导调用方迁移到新方法。
+- 使用 `assertRendererIpcParity` 在开发阶段发现遗漏的通道实现。
+- 对破坏性变更，应在产品层面提供迁移提示，并在日志中记录旧通道使用情况。
+
+### 兼容性检查机制
+- `RENDERER_INVOKE_CHANNELS` 与 `RENDERER_EVENT_CHANNELS` 冻结数组可作为契约基线。
+- `isRendererInvokeChannel`、`isRendererEventChannel` 可在运行时过滤非法通道。
+- `assertRendererIpcParity` 可在应用启动时断言渲染端与主进程通道一致。
+
+**章节来源**
+- [src/shared/renderer-api/channels.ts:250-271](file://src/shared/renderer-api/channels.ts#L250-L271)
+- [src/main/ipc/invokeRegistry.ts:30-50](file://src/main/ipc/invokeRegistry.ts#L30-L50)
 
 ## 结论
-RDC-Agent 通过清晰的通道定义与统一的 API 构造器，将复杂的主进程能力安全地暴露给渲染进程。遵循本文档的调用约定与最佳实践，可实现稳定、可扩展的跨进程交互。
+本项目将 IPC 协议收敛在共享层，Renderer 只能通过 `electronAPI` 访问受控能力，Main 侧通过统一校验和事件广播保障稳定性与安全。通道常量、传输抽象、API 构造器与类型定义共同构成清晰的边界，适合在长期演进中维持 API 稳定、可测试、可审计。
 
-[本节为总结性内容，不直接引用具体文件]
+对于使用者而言，最重要的原则是：
+- 使用 `electronAPI`，不直接触碰底层 IPC。
+- 使用 `events` 订阅状态变化，避免轮询。
+- 正确处理 Promise 错误与结构化返回。
+- 关注参数大小与通道兼容性，必要时迁移到新 API。
 
-## 附录
-
-### 协议与消息格式
-- 请求：通过 rendererTransport.invoke(channel, ...args) 发送
-- 响应：Promise<TResult> 返回
-- 事件：通过 rendererTransport.subscribe(channel, callback) 订阅，返回取消函数
-
-章节来源
-- [src/preload/rendererTransport.ts:29-43](file://src/preload/rendererTransport.ts#L29-L43)
-- [src/shared/renderer-api/channels.ts:226-244](file://src/shared/renderer-api/channels.ts#L226-L244)
-
-### 客户端实现指南与最佳实践
-- 始终通过 electronAPI 访问能力，不要直接调用 ipcRenderer
-- 使用 isRendererEventChannel 保护事件订阅（on/off 已内置）
-- 对异步调用增加 try/catch，区分网络错误与业务错误
-- 对长耗时任务使用事件流（如 llm:stream、conversation:event）
-- 合理管理事件生命周期，避免重复订阅与内存泄漏
-
-章节来源
-- [src/preload/index.ts:1-26](file://src/preload/index.ts#L1-L26)
-- [src/shared/renderer-api/createRendererApi.ts:69-74](file://src/shared/renderer-api/createRendererApi.ts#L69-L74)
-
-### 版本兼容性与废弃策略
-- 新增通道：先在 channels 登记，再实现主/渲染两侧逻辑
-- 废弃通道：保留旧通道一段时间，提供迁移提示与降级路径
-- 事件变更：保持向后兼容，新增字段采用可选方式
-
-[本节为通用策略，不直接引用具体文件]
-
-### 迁移指南
-- 从旧版 IPC 迁移：对照 channels 中的新通道名替换调用
-- 事件升级：根据新的事件通道名调整订阅逻辑
-- Provider 配置：使用 settings.getEffectiveCatalog 获取最终生效的配置
-
-章节来源
-- [src/shared/renderer-api/channels.ts:1-244](file://src/shared/renderer-api/channels.ts#L1-L244)
-- [src/shared/renderer-api/settings.ts:62-85](file://src/shared/renderer-api/settings.ts#L62-L85)
+[本节为总结，不直接分析具体源码]
