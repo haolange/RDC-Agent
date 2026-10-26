@@ -30,7 +30,7 @@ Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。
 
 本节裁决原生 CLI、会话权限与技能交接的统一边界。验收以实际证据为准。
 
-- 原生 `rdc` 是唯一 CLI 协议，安装位置仍由本机 Settings 配置。应用 session id 不等于 replay session id；daemon context 必须绑定 owning session，不使用 default。probe 翻译为真实 argv，不发送 lease-open / lease-close / preview-status 假想命令。进程成功、canonical JSON ok:true 与 context 一致后才更新 lease。
+- `rdc-tool` 是公开 CLI 命令，操作名使用 `rd.*`；桌面通过同安装捆绑 Python 与 `cli/run_cli.py` 调用 canonical JSON 协议，安装位置由本机 Settings 配置。应用 session id 不等于 replay session id；daemon context 必须绑定 owning session，不使用 default。probe 翻译为真实 argv，不发送 lease-open / lease-close / preview-status 假想命令。进程成功、canonical JSON ok:true 与 context 一致后才更新 lease。
 - 四 Agent 身份不变。普通工作留在 General；RenderDoc Mission 走规划 → General 执行 → 原 Mission 评估。方法按需读取，skill_read 不改变当前轮权限；仅 prepareTurn 显式武装参与交集。执行方法不重复列举整个工作流权限，授权由 profile / policy / lease enforcement 决定。
 - General 的 shell 接受互斥的普通 command 或结构化 RDC operation/args。后者经配置的原生 CLI、既有审批与 session lease，主进程生成执行回执；目录由同一个配置 CLI 发现；普通操作按冻结定义的能力校验，定向查询和单工具说明按需提供给模型。软件生命周期、remote 控制、全局设置、窗口与销毁操作仍由应用专门入口管理。
 - prepareTurn 同时冻结 capture、replay 与 context 身份；只读 capture 能力使用主进程持有的身份。临时时间点查询须由主进程核对执行前后 context 与恢复结果，恢复失败隔离 lease，不刷新为查询中的临时画面。整帧证据校验 GPU 测量方法、完整范围、采样条件与 replacement，不接受事件总和或 CPU 耗时替代。
@@ -311,7 +311,7 @@ T19 逐项裁决（删除 / 保留理由 / 调用方）：
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | 三 Mission profile 已为严格 plan-only：token 展开剔除 `shell` / `code_interpreter` / `output_register`，四层 enforcement（profile 解析、冻结 EffectiveRuntimePlan、AgentPermissionPolicy hard deny、tool activation）已落地，Full access 不能绕过。`rdc_probe` 已实现（Settings `tooling.rdc-agentCli` 只读 closed allowlist；lease 仅当前 session；raw `.rdc` bytes 不进模型）。T18 知识导入 已证见下文已证组。产品级 Browser QA 全矩阵见 U05；U06 仅保留历史运行事实；Optimizer 真实实验结论已撤回，见 ledger 更正。 |
+| **当前态** | 三 Mission profile 已为严格 plan-only：token 展开剔除 `shell` / `code_interpreter` / `output_register`，四层 enforcement（profile 解析、冻结 EffectiveRuntimePlan、AgentPermissionPolicy hard deny、tool activation）已落地，Full access 不能绕过。`rdc_probe` 已实现（Settings `tooling.rdcCli` 同安装 CLI 的只读 closed allowlist；lease 仅当前 session；raw `.rdc` bytes 不进模型）。T18 知识导入 已证见下文已证组。产品级 Browser QA 全矩阵见 U05；U06 仅保留历史运行事实；Optimizer 真实实验结论已撤回，见 ledger 更正。 |
 | **目标态** | Mission profiles（`debugger` / `analyzer` / `optimizer`）runtime allowlist **仅允许**下列工具。**General** 通过 Settings 配置的 CLI 与结构化 `shell.rdc-agent` 执行需要 lease 的 Live RDC 操作。 |
 | **迁移门禁** | T00 定稿契约；T03 落地四层 enforcement；T06 落地 delegated lease 与 `rdc_probe` 执行。不得只靠 prompt 文案。Full access 不能绕过。 |
 
@@ -330,7 +330,7 @@ Mission profiles runtime allowlist **仅允许**：
 **`rdc_probe` 契约（T00 定稿，T03/T06 实现）**：
 
 - tool id: `rdc_probe`
-- 唯一执行路径：Settings `tooling.rdc-agentCli` 指定的原生 rdc executable。七个外层 action 经 `compileRdcProbe` 编译为真实命令，lease 开闭复用 capture lifecycle 和已有桌面 actions。应用 session ID 不作为 CLI replay ID；拥有者 daemon context 必须显式绑定。
+- 唯一执行路径：Settings `tooling.rdcCli` 指定的同安装捆绑 Python 与 `cli/run_cli.py`。七个外层 action 经 `compileRdcProbe` 编译为真实命令，lease 开闭复用 capture lifecycle 和已有桌面 actions。应用 session ID 不作为 CLI replay ID；拥有者 daemon context 必须显式绑定。
 - 输入 schema（语义，实现时 Zod）：`{ action: 'enumerate' | 'doctor' | 'version' | 'probe' | 'lease_open' | 'lease_close' | 'preview_status'; capturePath?: string; contextId?: string; args?: Record<string, string> }`。`probe` 只允许只读查询类 action name（由共享闭集逐操作校验），禁止 shader replace / replay mutate / write capture / 任意 argv。
 - 输出：结构化 JSON（exitCode、stdout 截断摘要、artifact ref 若超阈值、world-state 戳）。raw `.rdc` bytes 永不进入模型上下文或 Provider。
 - lease open/close 只创建/释放 **当前 session** 的 per-session lease；不执行 mutate。
@@ -426,10 +426,10 @@ Task 可通过通用 `executionRequirements` 声明必要执行方式、必需�
 - 项目 RDC 列表为空时保持原 Capture 空态外观、文案与交互；不挂载新控件、历史或画面。非空时右下角五卡结构不变，Capture 内提供文件、设备、打开/关闭和唯一实际 EID 回放轨道。
 - 人工与 Agent 共用同一个 CaptureReplayState、当前图片、事件列表和控件，不设双 Tab 或独立足迹浏览/播放界面。Agent 接管仅锁定人工操作，控件原位显示并跟随实际回放，释放后恢复操作且不自动 apply。后台证据存档保留，不能作为第二套回放投影。Progress 不再提供额外的会话级停止按钮，沿用 Composer Stop。
 - 完整文件扫描确认的输入列表独立提交和广播；最后一个 RDC 消失后，即使回放释放或足迹清理失败，也必须保持真实空态。清理待办单独持久化，不能用旧输入列表保存恢复状态；扫描不完整或项目不可访问时不得推断文件缺失。
-- `RdcSessionService` 按 project/session 管理独立 `RdcSessionRuntime`。native daemon context 由 main 分配，与 inputId 不等价；配置的 lifecycle action 必须使用 `{{contextId}}`，返回身份不一致拒绝绑定。关闭失败、半开失败和未确认子进程保留 owning context，不能清空其他 session lease。
+- `RdcSessionService` 按 project/session 管理独立 `RdcSessionRuntime`。native daemon context 由 main 分配，与 inputId 不等价；固定生命周期由主进程生成原生 argv，不提供自定义 lifecycle action 或参数模板，返回身份不一致拒绝绑定。关闭失败、半开失败和未确认子进程保留 owning context，不能清空其他 session lease。
 - Android 设备由单个 session 独占，不抢占。Agent preparing 至 active turn 收口期间禁止人工改变回放；delegated child 未 join 与 native exit 未确认继续锁定。人工和 Agent 原生命令经过同一 context 队列。
 - Open 加载可证的最终呈现颜色输出；事件滑条实际 apply。requested/applied/image EID、generation、revision 分离，迟到画面不得重标为新事件。应用 preview 是 main 校验后交付的内嵌图片；退役独立 human-preview API 和 Settings action。独立 Tools CLI 的窗口输出仍是有效外部功能。
 - 足迹位于 `<project>/.rdc-agent/replay/<sessionId>/<captureSha256>`，内容 SHA-256 与 lease 身份摘要分离。图片最大边 960 px，PNG 保持 alpha；session 256 MiB、project 2 GiB，到限停止保存、不淘汰旧证据。关闭保留历史；重启只恢复选择和历史，不自动打开或占设备。
-- native Remote 当前返回 `unsupported`，不能声称 Android 设备显示已同步。本地 native observation 通过不代表 Android 屏幕呈现通过；真实验收依 acceptance ledger 分项记录。
+- Android 呈现以同安装原生 `remote_display` 回执为准：`presented` 必须匹配实际 EID、目标与新完成序号；`unsupported`、`unavailable` 和本地 `not_applicable` 不表示设备已同步。本地 native observation 通过不代表 Android 屏幕呈现通过；真实验收仍须设备画面与回执，依 acceptance ledger 分项记录。
 
 Android 设备选择不发起脱离 owning context 的连接。连接统一发生在 Capture 会话生命周期中；已有 helper 的借用与自有 helper 的清理由 Tools 实际归属决定，应用不得按设备类型关闭用户服务。确定性 Mission 编排验收与真实模型效果验收分别记录。
