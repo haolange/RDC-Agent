@@ -10,6 +10,7 @@ import type {
 } from '@shared/types/trace';
 import { nowIso } from '@shared/utils/id';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
+import type { TaskExecutionRecord } from '../agent-runtime/tasks/TaskContracts';
 import { projectTaskItems } from '../agent-runtime/tasks/taskProjection';
 import type { SessionArtifactSource } from '../sessions/SessionArtifactSource';
 import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
@@ -21,9 +22,10 @@ export function mapRightRailProgress(
   sessionId: string,
   branchId: string,
   records: TaskRecord[],
+  executions: TaskExecutionRecord[] = [],
 ): ProgressTask[] {
   const byId = new Map(records.map((task) => [task.id, task] as const));
-  return projectTaskItems(records).map((item) => {
+  return projectTaskItems(records, executions).map((item) => {
     const task = byId.get(item.taskId);
     return {
       id: item.taskId,
@@ -37,6 +39,7 @@ export function mapRightRailProgress(
       updatedAt: toIso(task?.updatedAt),
       completedAt: item.status === 'completed' ? toIso(task?.updatedAt) : undefined,
       blockerSummary: item.statusReason,
+      waitingOn: item.waitingOn,
     };
   });
 }

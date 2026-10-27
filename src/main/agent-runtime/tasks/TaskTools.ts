@@ -105,7 +105,7 @@ export function createTaskCreateTool(
               blockedBy: {
                 type: 'array',
                 items: { type: 'string' },
-                description: 'Task IDs that block this',
+                description: 'Prerequisite Task IDs. Waiting for these keeps the new Task pending; dependencies are not a blocked execution outcome.',
               },
               completionRequirements: {
                 type: 'array',
@@ -184,7 +184,7 @@ export function createTaskUpdateTool(
   return {
     name: 'task_update',
     label: 'Update Task',
-    description: 'Update an existing Task. status=in_progress starts a new direct execution; call it once per execution, never as a progress note or before dispatching Task-owned delegated work. After the user explicitly requests continuation in a later turn, resumeCancelled=true can continue the same cancelled goal after all producers joined; history and consumed budgets remain. Completed Tasks and old executions cannot reopen. The delegated runner claims its own execution in both wait and background modes. Do the Task work before status=completed or blocked settles its direct execution; a partial result leaves the Task blocked. status=pending cannot release an active execution. Use task_get to inspect currentExecutionId before starting again. Omit status for description or metadata edits.',
+    description: 'Update an existing Task. Unfinished prerequisites keep a Task pending; blocked records a real obstacle or incomplete execution result, not ordinary dependency waiting. status=in_progress starts a new direct execution; call it once per execution, never as a progress note or before dispatching Task-owned delegated work. After the user explicitly requests continuation in a later turn, resumeCancelled=true can continue the same cancelled goal after all producers joined; history and consumed budgets remain. Completed Tasks and old executions cannot reopen. The delegated runner claims its own execution in both wait and background modes. Do the Task work before status=completed or blocked settles its direct execution; a partial result leaves the Task blocked. status=pending cannot release an active execution. Use task_get to inspect currentExecutionId before starting again. Omit status for description or metadata edits.',
     parameters: {
       type: 'object',
       properties: {

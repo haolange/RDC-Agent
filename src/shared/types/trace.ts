@@ -4,6 +4,7 @@ import type {
   InvestigationMission,
   InvestigationRecordType,
 } from './renderdocInvestigation';
+import type { TaskDependencyWait } from './taskExecution';
 
 export interface RawAuditRef {
   id: string;
@@ -34,6 +35,7 @@ export interface ProgressTask {
   completedAt?: string;
   linkedEventIds?: string[];
   blockerSummary?: string;
+  waitingOn?: TaskDependencyWait[];
 }
 
 export type TraceArtifactType =

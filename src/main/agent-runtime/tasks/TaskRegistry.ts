@@ -7,6 +7,7 @@ import {
 } from './TaskContracts';
 import { cancelOwnedTaskExecution } from './TaskExecutionOwners';
 import { projectTaskItems, type ProjectedTaskItem } from './taskProjection';
+import { taskDependencyWait } from './taskDependencies';
 import { TaskExecutionRequirementsSchema, type TaskExecutionRequirements, type TaskExecutionPreparation, type PlanTaskRequirement } from '@shared/types/taskExecution';
 import { assertApprovedTaskRequirement, assertTaskExecutionStart, assertTaskExecutionPreparation, assertTaskExecutionCompletion, readIndependentTaskSources, hashTaskRequirement } from './TaskExecutionRequirements';
 
@@ -387,7 +388,7 @@ export class TaskRegistry {
   async listTasks(): Promise<TaskRecord[]> { return this.store.listTasks(); }
   private async emitTaskChange(type: 'created' | 'updated', task: TaskRecord): Promise<void> {
     if (!this.onTaskChange) return;
-    this.onTaskChange({ type, task, snapshot: projectTaskItems(await this.store.listTasks()) });
+    this.onTaskChange({ type, task, snapshot: projectTaskItems(await this.store.listTasks(), await this.store.listExecutions()) });
   }
   async readConsistentSnapshot(): Promise<{ tasks: TaskRecord[]; executions: TaskExecutionRecord[] }> { return this.store.withLock('state', async () => ({ tasks: await this.store.listTasks(), executions: await this.store.listExecutions() })); }
   async deleteTask(id: string): Promise<void> { await this.store.withLock('state', async () => { const task = await this.requireTask(id); if (task.executionIds.length) throw new Error('Executed tasks retain their durable results and cannot be deleted.'); const related = (await this.store.listTasks()).filter((candidate) => candidate.id !== id && (candidate.blockedBy.includes(id) || candidate.blocks.includes(id) || candidate.parentTaskId === id)); if (related.some((candidate) => candidate.parentTaskId === id)) throw new Error('Cannot delete a task while child tasks still exist.'); for (const candidate of related) { if (candidate.currentExecutionId) { const active = await this.store.loadExecution(candidate.currentExecutionId); if (active && !terminal(active.status)) throw new Error(`Cannot revise graph for active task: ${candidate.id}`); } candidate.blockedBy = candidate.blockedBy.filter((entry) => entry !== id); candidate.blocks = candidate.blocks.filter((entry) => entry !== id); candidate.revision += 1; candidate.updatedAt = Date.now(); } await this.store.commit({ tasks: related, deletedTaskIds: [id] }); }); }
@@ -396,12 +397,8 @@ export class TaskRegistry {
     if (!task) return false;
     for (const dependencyId of task.blockedBy) {
       const dependency = await this.store.loadTask(dependencyId);
-      if (!dependency || dependency.status !== 'completed' || dependency.disposition !== 'completed') return false;
-      if (dependency.executionRequired) {
-        if (!dependency.currentExecutionId) return false;
-        const proof = await this.store.loadExecution(dependency.currentExecutionId);
-        if (!proof || proof.taskRevision !== dependency.revision || proof.status !== 'completed' || proof.result?.disposition !== 'completed') return false;
-      }
+      const proof = dependency?.currentExecutionId ? await this.store.loadExecution(dependency.currentExecutionId) : undefined;
+      if (taskDependencyWait(dependencyId, dependency, proof)) return false;
     }
     return true;
   }

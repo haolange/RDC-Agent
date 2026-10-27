@@ -19,7 +19,7 @@ vi.mock('../../i18n', () => ({ useI18n: () => ({
 const snapshot = (id: string, change?: 'created' | 'updated'): Extract<WorkProcessRow, { type: 'taskSnapshot' }> => ({
   type: 'taskSnapshot', id, change, status: 'complete', completed: 1, total: 5, duration: '0ms',
   items: [
-    { taskId: 'pending', title: 'Long pending task with enough text to wrap on a narrow card', status: 'pending', order: 0 },
+    { taskId: 'pending', title: 'Long pending task with enough text to wrap on a narrow card', status: 'pending', order: 0, waitingOn: [{ taskId: 'upstream', title: 'Upstream', reason: 'unfinished' }] },
     { taskId: 'current', title: 'Current', status: 'in_progress', order: 1 },
     { taskId: 'done', title: 'Done', status: 'completed', order: 2 },
     { taskId: 'blocked', title: 'Blocked', status: 'blocked', statusReason: 'Waiting for input', order: 3 },
@@ -35,6 +35,9 @@ it('shows event type, completion count and distinct state icons without a fake d
   expect(document.body.textContent).not.toContain('0ms');
   expect(document.querySelectorAll('.task-status-marker.is-snapshot svg')).toHaveLength(5);
   expect(document.querySelector('.task-pending .task-status-marker circle')).not.toBeNull();
+  expect(document.querySelector('.task-pending .task-status-marker')?.getAttribute('aria-label')).toBe('chat.taskWaitingDependencies');
+  expect(document.querySelector('.task-pending details')?.hasAttribute('open')).toBe(false);
+  expect(document.querySelectorAll('.task-blocked')).toHaveLength(1);
   expect(document.querySelector('.task-blocked details')?.hasAttribute('open')).toBe(false);
   expect(document.querySelector('.task-blocked summary')?.textContent).toBe('Blocked');
   expect(document.querySelector('.task-blocked .work-process-task-snapshot-reason')?.textContent).toBe('Waiting for input');

@@ -18,6 +18,7 @@ export interface LastSentPrompt {
   prompt: string;
   attachments: PendingAttachmentDraft[];
   skillIds: string[];
+  preserveDraft?: boolean;
 }
 
 export interface HandoffSuggestionRequest {
@@ -26,6 +27,7 @@ export interface HandoffSuggestionRequest {
   label: string;
   prompt: string;
   send: boolean;
+  sourcePlan?: { turnId: string; toolCallId: string; planId: string; revision: number; hash: string };
 }
 
 interface ComposerSessionContextState {
@@ -107,6 +109,7 @@ export function restoreLastSentIfCurrentSession(
   if (normalizeComposerSessionOwner(currentSessionId) !== normalizeComposerSessionOwner(lastSent.sessionId)) {
     return false;
   }
+  if (lastSent.preserveDraft) return true;
   apply(lastSent);
   return true;
 }

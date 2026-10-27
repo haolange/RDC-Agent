@@ -4,11 +4,12 @@ import { useDynStyle } from './useDynStyle';
 
 interface ReadingBounds { left: number; top: number; width: number; height: number }
 
-export function readingBounds(workArea: DOMRect, rail: DOMRect, viewportWidth: number, viewportHeight: number): ReadingBounds | null {
+export function readingBounds(workArea: DOMRect, rail: DOMRect, viewportWidth: number, viewportHeight: number,
+  inset = { top: 16, gap: 8 }): ReadingBounds | null {
   const left = Math.max(0, rail.left);
   const right = Math.min(viewportWidth, rail.right);
-  const top = Math.max(0, workArea.top);
-  const bottom = Math.min(viewportHeight, workArea.bottom, rail.top);
+  const top = Math.max(0, workArea.top) + inset.top;
+  const bottom = Math.min(viewportHeight, workArea.bottom, rail.top - inset.gap);
   return right > left && bottom > top ? { left, top, width: right - left, height: bottom - top } : null;
 }
 
@@ -17,11 +18,13 @@ export function useReadingPanelGeometry() {
   const [bounds, setBounds] = useState<ReadingBounds | null>(null);
   useLayoutEffect(() => {
     const area = layout?.workArea.current;
-    const rail = layout?.composerRail.current;
+    const rail = layout?.composerShell;
     if (!area || !rail) { setBounds(null); return; }
     let frame = 0;
     const measure = () => {
-      const next = readingBounds(area.getBoundingClientRect(), rail.getBoundingClientRect(), window.innerWidth, window.innerHeight);
+      const tokens = getComputedStyle(area);
+      const next = readingBounds(area.getBoundingClientRect(), rail.getBoundingClientRect(), window.innerWidth, window.innerHeight,
+        { top: Number.parseFloat(tokens.getPropertyValue('--space-4')) || 16, gap: Number.parseFloat(tokens.getPropertyValue('--space-2')) || 8 });
       setBounds((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next);
     };
     const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };

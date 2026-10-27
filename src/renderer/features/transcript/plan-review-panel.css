@@ -2,20 +2,20 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-modal-backdrop);
-  --reading-inset: var(--space-2);
 }
 
 .plan-review-panel {
   position: absolute;
   left: var(--reading-left);
-  bottom: calc(100dvh - var(--reading-bottom) + var(--reading-inset));
+  bottom: calc(100dvh - var(--reading-bottom));
   z-index: var(--z-modal);
   display: flex;
   flex-direction: column;
   width: var(--reading-width);
-  max-height: calc(var(--reading-height) - 2 * var(--reading-inset));
+  max-height: var(--reading-height);
+  box-sizing: border-box;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid var(--token-border-default);
   border-radius: var(--radius-xl);
   background: var(--token-bg-overlay);
@@ -72,10 +72,6 @@
 }
 
 @media (max-width: 640px) {
-  .plan-review-panel-overlay {
-    --reading-inset: var(--space-2);
-  }
-
   .plan-review-panel__heading { flex-basis: 100%; }
   .plan-review-panel__actions { margin-left: auto; }
 }

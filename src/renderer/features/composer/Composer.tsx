@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { ResolvedTheme } from '@shared/types/settings';
 import { deriveComposeAccentVars } from '@shared/theme/composeAccent';
+import { InlineError } from '../../ui/InlineError';
+import { Button } from '../../ui/Button';
 import { useI18n } from '../../i18n';
 import { COMPOSER_PROMPT_MAX_HEIGHT, COMPOSER_PROMPT_MIN_HEIGHT } from './composerPromptGeometry';
 import { useDynStyle } from '../../lib/useDynStyle';
@@ -33,6 +35,7 @@ import './composer-plan-review.css';
 
 export interface ComposerProps {
   composer: ComposerController;
+  shellRef?: React.Ref<HTMLDivElement>;
 }
 
 function getAgentCapability(agentId: string, definitions: AgentManifestDefinition[]): string {
@@ -42,6 +45,7 @@ function getAgentCapability(agentId: string, definitions: AgentManifestDefinitio
 
 export const Composer: React.FC<ComposerProps> = ({
   composer,
+  shellRef,
 }) => {
   const { t } = useI18n();
   const composerMarkdown = useAppSettingsStore((state) => state.settings.appearance.composerMarkdown);
@@ -130,9 +134,9 @@ export const Composer: React.FC<ComposerProps> = ({
     <ComposerTurnControlsProvider agentId={selectedAgentId} currentSession={currentSession}>
     <ComposerMenuRegistryProvider key={pendingRequest?.kind === 'plan-review'
       ? `${composerScopeKey}:${planReviewRequestKey(pendingRequest.request)}` : composerScopeKey}>
-    {pendingRequest ? <ComposerPendingRequest pending={pendingRequest} composeAccentStyle={composeAccentStyle}
+    {pendingRequest ? <ComposerPendingRequest shellRef={shellRef} pending={pendingRequest} composeAccentStyle={composeAccentStyle}
       agentId={activeAgentId ?? selectedAgentId} currentSession={currentSession} onStop={handlePrimaryStop} /> : <div
-      className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}${isDropActive ? ' is-drop-active' : ''}`}
+      ref={shellRef} className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}${isDropActive ? ' is-drop-active' : ''}`}
       {...composeAccentStyle}
       onDragOver={attachmentDrop.handleDragOver}
       onDragLeave={attachmentDrop.handleDragLeave}
@@ -165,6 +169,12 @@ export const Composer: React.FC<ComposerProps> = ({
         removeAttachmentLabel={(fileName) => t('app.removeAttachment', { fileName })}
         visionUnsupportedLabel={t('app.attachVisionUnsupported')}
       />
+      {composer.handoff?.error ? <InlineError>
+        {composer.handoff.error === 'HANDOFF_DELIVERY_UNCONFIRMED' ? t('app.handoffUnconfirmed') : composer.handoff.error}
+        <Button variant="ghost" size="sm" onClick={() => void composer.handoff.retry()}>
+          {t(composer.handoff.checking ? 'app.handoffCheckDelivery' : 'app.handoffRetry')}
+        </Button>
+      </InlineError> : null}
       <ComposerEditor
         promptValue={promptValue}
         setPromptValue={setPromptValue}

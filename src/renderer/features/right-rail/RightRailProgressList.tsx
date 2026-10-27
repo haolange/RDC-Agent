@@ -19,9 +19,10 @@ export const RightRailProgressList: React.FC<{ tasks: ProgressTask[]; locateLabe
   return <>
     <ol className="right-rail-progress">{tasks.map((task) => (
       <li key={task.id} className={`right-rail-task-row status-${task.status}`}>
-        <button type="button" onClick={() => focusWorkProcessTask(task.id)} title={`${task.title} — ${locateLabel}`}>
+        <button type="button" onClick={() => focusWorkProcessTask(task.id)} title={`${task.title} — ${task.waitingOn?.length ? `${t('chat.taskWaitingDependencies')} — ` : ''}${locateLabel}`}>
           <span className="right-rail-task-order">{task.order + 1}</span>
-          <TaskStatusMarker status={task.status} label={t(`chat.workProcessTaskStatus.${task.status}`)} />
+          <TaskStatusMarker status={task.status} label={task.status === 'pending' && task.waitingOn?.length
+            ? t('chat.taskWaitingDependencies') : t(`chat.workProcessTaskStatus.${task.status}`)} />
           <span className="right-rail-task-copy"><strong>{task.title}</strong></span>
         </button>
       </li>

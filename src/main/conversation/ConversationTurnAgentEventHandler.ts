@@ -781,6 +781,7 @@ function normalizeTaskSnapshotItems(payload: {
       title: item.title,
       status: item.status,
       statusReason: item.statusReason,
+      waitingOn: item.waitingOn?.map(wait => ({ ...wait })),
       order: typeof item.order === 'number' ? item.order : index,
     }));
   }

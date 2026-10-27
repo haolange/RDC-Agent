@@ -59,7 +59,7 @@ it('stops an awaiting plan without approving its handoff', async () => {
   await act(async () => root.render(createElement(PlanReviewRequestPanel, { request, onStop,
     agentId: 'debugger', currentSession: null })));
   const stop = [...host.querySelectorAll<HTMLButtonElement>('button')]
-    .find((button) => button.textContent === 'chat.planReviewStop')!;
+    .find((button) => button.getAttribute('aria-label') === 'chat.planReviewStop')!;
   await act(async () => { stop.click(); stop.click(); });
   expect(onStop).toHaveBeenCalledTimes(1);
   expect(mock.submit).not.toHaveBeenCalled();
@@ -102,7 +102,7 @@ it('holds approval while a model saves, retains failures and still allows stop',
   await click('.handoff-action-row__button');
   expect(mock.submit).not.toHaveBeenCalled();
   expect(host.querySelector<HTMLTextAreaElement>('textarea')!.disabled).toBe(true);
-  const stop = [...host.querySelectorAll('button')].find((button) => button.textContent === 'chat.planReviewStop')!;
+  const stop = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'chat.planReviewStop')!;
   await act(async () => stop.click());
   expect(onStop).toHaveBeenCalledOnce();
   await act(async () => mock.modelSave({ saving: false, error: 'Save failed' }));

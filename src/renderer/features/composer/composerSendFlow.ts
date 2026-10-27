@@ -23,6 +23,7 @@ import {
 import { useProjectStore } from '../../stores/projectStore';
 import { persistComposerDraftToSession } from './sessionModelOverride';
 import { readComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
+import { inspectHandoffCommit, type ComposerSendOutcome } from './composerHandoffSend';
 import { createConversationRequestId } from '../../services/conversationRequestId';
 
 export { createConversationRequestId };
@@ -55,7 +56,8 @@ export async function sendComposerConversationTurn(options: {
   setTracePresentation: (presentation: AgentRunPresentation | null) => void;
   showNotice: (message: string) => void;
   failedSummary: string;
-}): Promise<void> {
+  preserveDraft?: boolean;
+}): Promise<ComposerSendOutcome> {
   const {
     electronAPI,
     trimmed,
@@ -83,6 +85,9 @@ export async function sendComposerConversationTurn(options: {
     failedSummary,
   } = options;
 
+  const { preserveDraft = false } = options;
+  let dispatchStarted = false;
+  let accepted = false;
   const sentPrompt = trimmed;
   const sentAttachments = [...pendingAttachments];
   const sentSkillIds = [...pendingSkillIds];
@@ -123,14 +128,17 @@ export async function sendComposerConversationTurn(options: {
     optimisticTurnId: optimistic.assistantDraftMessage.turnId,
     realTurnId: null,
   });
-  setPromptValue('');
-  setPendingAttachments([]);
-  setPendingSkillIds([]);
+  if (!preserveDraft) {
+    setPromptValue('');
+    setPendingAttachments([]);
+    setPendingSkillIds([]);
+  }
   useSessionStore.getState().setPreparedTurnContext(null);
   useSessionStore.getState().setConversationPreparationPhase('preparing');
   upsertConversationMessages([optimistic.userMessage, optimistic.assistantDraftMessage]);
 
   const restoreComposerDraft = () => {
+    if (preserveDraft) return;
     const activeSessionId = useProjectStore.getState().currentSession?.sessionId ?? null;
     if (owningSessionId && activeSessionId !== owningSessionId) {
       return;
@@ -176,6 +184,7 @@ export async function sendComposerConversationTurn(options: {
     });
     const profileId = resolveComposerProfileId(currentMode, selectedAgentId);
     const turnControls = { ...useTurnControlsStore.getState().turnControls };
+    dispatchStarted = true;
     const result = await electronAPI.conversation.sendMessage({
       requestId,
       projectId: currentProject?.projectId ?? null,
@@ -192,7 +201,7 @@ export async function sendComposerConversationTurn(options: {
     });
 
     if (finishRevokedOrCancelled()) {
-      return;
+      return { status: 'cancelled', requestId };
     }
 
     if (result.status === 'rejected') {
@@ -202,17 +211,18 @@ export async function sendComposerConversationTurn(options: {
         useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
         useSessionStore.getState().setPreparedTurnContext(null);
         useSessionStore.getState().setConversationPreparationPhase('idle');
-        return;
+        return { status: 'cancelled', requestId };
       }
       rollbackOptimistic();
       restoreComposerDraft();
       useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
       useSessionStore.getState().setPreparedTurnContext(null);
       useSessionStore.getState().setConversationPreparationPhase('idle');
-      showNotice(result.error.message || failedSummary);
-      return;
+      if (!preserveDraft) showNotice(result.error.message || failedSummary);
+      return { status: 'rejected', requestId, error: result.error.message || failedSummary };
     }
 
+    accepted = true;
     const stagedIds = sentAttachments
       .map((attachment) => attachment.stagingId)
       .filter((stagingId): stagingId is string => Boolean(stagingId));
@@ -253,7 +263,7 @@ export async function sendComposerConversationTurn(options: {
       setConversationSnapshot,
       upsertConversationMessages,
     });
-    await persistComposerDraftToSession(
+    if (!preserveDraft) await persistComposerDraftToSession(
       turn.session?.sessionId ?? committedSessionId,
       currentProject?.projectId,
     );
@@ -268,18 +278,20 @@ export async function sendComposerConversationTurn(options: {
       shouldApply: () => isOwningSelectionActive(committedSessionId),
     });
     useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
+    return { status: 'accepted', requestId };
   } catch (error) {
     if (finishRevokedOrCancelled()) {
-      return;
+      return { status: 'cancelled', requestId };
     }
     rollbackOptimistic();
     restoreComposerDraft();
     useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
     useSessionStore.getState().setPreparedTurnContext(null);
     useSessionStore.getState().setConversationPreparationPhase('idle');
-    if (isRequestCancelledError(error)) {
-      return;
-    }
-    showNotice(error instanceof Error ? error.message : failedSummary);
+    if (isRequestCancelledError(error)) return { status: 'cancelled', requestId };
+    if (!preserveDraft) showNotice(error instanceof Error ? error.message : failedSummary);
+    if (accepted) return { status: 'accepted', requestId };
+    if (preserveDraft && dispatchStarted && owningSessionId) return inspectHandoffCommit(electronAPI.conversation, owningSessionId, requestId);
+    return { status: 'rejected', requestId, error: error instanceof Error ? error.message : failedSummary };
   }
 }

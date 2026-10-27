@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+/** Read-only dependency explanation, never a lifecycle state or execution grant. */
+export interface TaskDependencyWait {
+  taskId: string;
+  title?: string;
+  reason: 'unfinished' | 'unverified' | 'missing';
+}
+
 const id = z.string().trim().min(1).max(256);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 

@@ -29,7 +29,6 @@ export const HandoffActionRow: React.FC<HandoffActionRowProps> = ({
         onClick={() => onSelect(option)}
       >
         <span className="handoff-action-row__label">{option.label}</span>
-        {presentation === 'decisions' ? <span className="handoff-action-row__arrow" aria-hidden="true">→</span> : null}
       </Button>
     ))}
   </div>

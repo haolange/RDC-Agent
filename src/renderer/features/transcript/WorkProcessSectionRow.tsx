@@ -51,7 +51,7 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
 
   return (
     <li
-      className={`work-process-step work-process-section kind-section status-${row.status}${hasProse ? ' has-prose' : ''}${firstLineCaption ? ' first-line-caption' : ''}`}
+      className={`work-process-step work-process-section kind-section status-${row.status}${hasProse || row.thinkingLabel || row.thinkingExpandable ? ' has-narrative' : ''}${hasProse ? ' has-prose' : ''}${firstLineCaption ? ' first-line-caption' : ''}`}
       data-testid="work-process-section"
     >
       <WorkProcessRailIcon variant="section" status={row.status} />

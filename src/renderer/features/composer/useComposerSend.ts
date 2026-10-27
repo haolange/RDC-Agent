@@ -15,6 +15,7 @@ import {
   isConcurrentModelSwitchCommand,
   shouldClearSubmittedPrompt,
 } from './composerCommandConcurrency';
+import { inspectHandoffCommit, type HandoffSendPayload } from './composerHandoffSend';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -79,11 +80,16 @@ export function useComposerSend(options: {
   }, [currentSession?.sessionId, setIsPromptSending]);
 
   const isComposerBusy = isPromptSending || hasActiveConversationTurn || hasActiveDebugRun;
+  const sendingRef = useRef(false);
 
-  const handlePromptSend = useCallback(async () => {
-    const trimmed = promptValue.trim();
+  const performSend = useCallback(async (handoff?: HandoffSendPayload) => {
+    const session = handoff ? useProjectStore.getState().currentSession : currentSession;
+    if (handoff && session?.sessionId !== handoff.sessionId) return { status: 'cancelled' as const, requestId: '' };
+    const trimmed = (handoff?.prompt ?? promptValue).trim();
+    const sentAttachments = handoff ? [] : pendingAttachments;
+    const sentSkills = handoff ? [] : pendingSkillIds;
     const concurrentModelSwitch = isConcurrentModelSwitchCommand(trimmed);
-    if ((!trimmed && !pendingAttachments.some((attachment) => !attachment.error))
+    if ((!trimmed && !sentAttachments.some((attachment) => !attachment.error))
       || (isComposerBusy && !concurrentModelSwitch)) {
       return;
     }
@@ -91,7 +97,7 @@ export function useComposerSend(options: {
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
 
-    if (trimmed.startsWith('/')) {
+    if (!handoff && trimmed.startsWith('/')) {
       if (!concurrentModelSwitch) setIsPromptSending(true);
       try {
         const handled = await executeSlashCommand(trimmed, {
@@ -115,25 +121,28 @@ export function useComposerSend(options: {
       }
     }
 
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     setIsPromptSending(true);
     useComposerSessionContextStore.getState().setLastSent({
       sessionId: currentSession?.sessionId ?? 'no-session',
       projectId: currentProject?.projectId ?? null,
       prompt: trimmed,
-      attachments: [...pendingAttachments],
-      skillIds: [...pendingSkillIds],
+      attachments: [...sentAttachments],
+      skillIds: [...sentSkills],
+      ...(handoff ? { preserveDraft: true } : {}),
     });
     try {
-      await sendComposerConversationTurn({
+      return await sendComposerConversationTurn({
         electronAPI,
         trimmed,
-        pendingAttachments,
-        pendingSkillIds,
+        pendingAttachments: sentAttachments,
+        pendingSkillIds: sentSkills,
         currentMode,
         currentProject,
-        currentSession,
+        currentSession: session,
         currentRun,
-        selectedAgentId,
+        selectedAgentId: handoff?.agentId ?? selectedAgentId,
         selectedDeviceEntry,
         setPromptValue,
         setPendingAttachments,
@@ -149,38 +158,28 @@ export function useComposerSend(options: {
         setTracePresentation,
         showNotice,
         failedSummary: t('app.conversationRequestFailed'),
+        preserveDraft: Boolean(handoff),
       });
     } finally {
+      sendingRef.current = false;
       setIsPromptSending(false);
     }
   }, [
-    armPendingSkill,
-    currentProject,
-    currentMode,
-    currentRun,
-    currentSession,
-    isComposerBusy,
-    pendingAttachments,
-    pendingSkillIds,
-    promptValue,
-    selectedDeviceEntry,
-    selectedAgentId,
-    setSelectedAgentId,
-    setCurrentMode,
-    openSettings,
-    setConversationMessages, setBranchState, setConversationSnapshot,
-    setCurrentRun, setCurrentSession,
-    setIsPromptSending,
-    setPendingAttachments,
-    setPendingSkillIds,
-    setPromptValue,
-    setTracePresentation,
-    setRuns,
-    setSessions,
-    showNotice,
-    t,
-    upsertConversationMessages,
+    armPendingSkill, currentProject, currentMode, currentRun, currentSession, isComposerBusy,
+    pendingAttachments, pendingSkillIds, promptValue, selectedDeviceEntry, selectedAgentId,
+    setSelectedAgentId, setCurrentMode, openSettings, setConversationMessages, setBranchState,
+    setConversationSnapshot, setCurrentRun, setCurrentSession, setIsPromptSending,
+    setPendingAttachments, setPendingSkillIds, setPromptValue, setTracePresentation,
+    setRuns, setSessions, showNotice, t, upsertConversationMessages,
   ]);
+
+  const handlePromptSend = useCallback(async () => { await performSend(); }, [performSend]);
+  const sendHandoffPrompt = useCallback((payload: HandoffSendPayload) => performSend(payload), [performSend]);
+  const inspectHandoff = useCallback((sessionId: string, requestId: string) => {
+    const api = window.electronAPI;
+    return api ? inspectHandoffCommit(api.conversation, sessionId, requestId)
+      : Promise.resolve({ status: 'unknown' as const, requestId, error: 'BRIDGE_UNAVAILABLE' });
+  }, []);
 
   const handlePromptKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (shouldSendComposerOnEnter(event)) {
@@ -194,6 +193,7 @@ export function useComposerSend(options: {
     isComposerBusy,
     handlePrimaryStop,
     handlePromptSend,
+    sendHandoffPrompt, inspectHandoff,
     handlePromptKeyDown,
   };
 }

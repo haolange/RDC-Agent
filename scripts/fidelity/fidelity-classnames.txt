@@ -421,7 +421,6 @@ guide-illustration-legend
 guide-illustration-pin
 guide-illustration-stage
 handoff-action-row
-handoff-action-row__arrow
 handoff-action-row__button
 handoff-action-row__label
 handoff-suggestion-row

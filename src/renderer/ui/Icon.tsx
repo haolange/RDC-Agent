@@ -39,6 +39,7 @@ export type IconName =
   | 'copy'
   | 'external'
   | 'play'
+  | 'stop'
   | 'edit'
   | 'trash'
   | 'terminal'
@@ -125,6 +126,7 @@ const ICONS: Record<IconName, readonly IconPart[]> = {
   terminal: [{ r: [3, 5, 18, 14, 2] }, { d: 'M7 9l3 3-3 3M12 15h5' }],
   cube: [{ d: 'M12 3 4 7.5v9L12 21l8-4.5v-9L12 3Z' }, { d: 'M4 7.5 12 12l8-4.5M12 12v9' }],
   code: [{ d: 'M8 8 4 12l4 4M16 8l4 4-4 4M14 5l-4 14' }],
+  stop: [{ r: [6, 6, 12, 12, 1] }],
   'arrow-up': [{ d: 'M12 19V5M6 11l6-6 6 6' }],
   'arrow-down': [{ d: 'M12 5v14M6 13l6 6 6-6' }],
   link: [{ d: 'M10 14 14 10' }, { d: 'M8.5 15.5 7 17a3.5 3.5 0 0 1-5-5l3-3a3.5 3.5 0 0 1 5 0' }, { d: 'M15.5 8.5 17 7a3.5 3.5 0 0 1 5 5l-3 3a3.5 3.5 0 0 1-5 0' }],

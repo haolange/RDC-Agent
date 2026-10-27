@@ -1,4 +1,7 @@
 export const zhChat = {
+  'app.handoffUnconfirmed': '尚未确认请求是否提交，请先核对发送结果。',
+  'app.handoffCheckDelivery': '检查发送结果',
+  'app.handoffRetry': '重试交接',
   'chat.userInputAnswerChoices': '答案选项',
   'chat.userInputEnterCustomAnswer': '输入自定义答案',
   'chat.userInputAnswerPlaceholder': '请输入你的答案…',
@@ -186,6 +189,10 @@ export const zhChat = {
   'chat.workProcessTaskStatus.pending': '待办',
   'chat.workProcessTaskStatus.in_progress': '进行中',
   'chat.workProcessTaskStatus.blocked': '受阻',
+  'chat.taskWaitingDependencies': '等待前置任务',
+  'chat.taskDependency.unfinished': '等待前置任务：{title}',
+  'chat.taskDependency.unverified': '前置任务完成证明待核验：{title}',
+  'chat.taskDependency.missing': '前置任务记录不可用：{title}',
   'chat.workProcessTaskStatus.completed': '已完成',
   'chat.workProcessTaskStatus.cancelled': '已取消',
   'chat.workProcessVerb.imageComplete': '已查看图片',

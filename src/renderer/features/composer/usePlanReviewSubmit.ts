@@ -32,6 +32,8 @@ export const usePlanReviewSubmit = () => {
       useComposerSessionContextStore.getState().queueHandoffSuggestion({
         sessionId: request.sessionId, agentId: decision.handoff.agent,
         label: decision.handoff.label, prompt: '', send: true,
+        sourcePlan: { turnId: request.turnId, toolCallId: request.toolCallId,
+          planId: request.planReview.planId, revision: request.planReview.revision, hash: request.planReview.hash },
       });
     }
   } finally {

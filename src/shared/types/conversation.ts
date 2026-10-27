@@ -1,4 +1,5 @@
 import type { AgentRole } from './agent';
+import type { TaskDependencyWait } from './taskExecution';
 import type { ConversationTurnControls } from './modelCapability';
 import type { AgentEvent } from './agentRuntime';
 import type { ConversationBranchState } from './conversationBranch';
@@ -48,6 +49,7 @@ export interface ConversationTaskSnapshotItem {
   title: string;
   status: ConversationTaskStatus;
   statusReason?: string;
+  waitingOn?: TaskDependencyWait[];
   order: number;
 }
 

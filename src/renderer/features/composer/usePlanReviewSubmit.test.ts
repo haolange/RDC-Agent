@@ -47,7 +47,7 @@ it.each([false, true])('queues the declared target even when approval projects b
   mock.answer.mockImplementation(async () => { mock.messages = [trace('approved', 1, delegated)]; notify(); return { success: true }; });
   await usePlanReviewSubmit()(request, approve);
   expect(mock.answer).toHaveBeenCalledWith({ sessionId: 's', turnId: 't', toolCallId: 'c', decision: approve });
-  expect(mock.queue).toHaveBeenCalledExactlyOnceWith({ sessionId: 's', agentId: 'general', label: 'Execute', prompt: '', send: true });
+  expect(mock.queue).toHaveBeenCalledExactlyOnceWith({ sessionId: 's', agentId: 'general', label: 'Execute', prompt: '', send: true, sourcePlan: { turnId: 't', toolCallId: 'c', planId: 'p', revision: 1, hash: 'h' } });
   expect(mock.sessionListeners.size + mock.conversationListeners.size).toBe(0);
 });
 

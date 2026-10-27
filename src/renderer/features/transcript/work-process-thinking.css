@@ -16,15 +16,12 @@
 }
 
 .work-process-step.kind-section {
-  /* Turn gap comes only from the next section's padding-top (space-3). */
+  /* Visible event spacing is owned by the containing list. */
   padding-bottom: 0;
 }
 
 .work-process-step.kind-task-snapshot {
   grid-template-columns: minmax(0, 1fr);
-  /* Standalone snapshot supplies its own entrance/exit: sections adjacent to it
-   * cannot match .work-process-section + .work-process-section. */
-  padding: var(--space-3) 0;
   /* Share the nested tool-card indent line (rail 8px + column-gap space-1). */
   padding-left: calc(var(--space-2) + var(--space-1));
 }

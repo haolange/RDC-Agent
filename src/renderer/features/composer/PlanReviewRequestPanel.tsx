@@ -1,7 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { SessionRecord } from '@shared/types/session';
 import { useI18n } from '../../i18n';
-import { Button } from '../../ui/Button';
 import { Textarea } from '../../ui/Textarea';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
@@ -73,9 +72,10 @@ export const PlanReviewRequestPanel: React.FC<{
     <section className="composer-plan-review" data-testid="plan-review-request-panel" aria-busy={isSubmitting}>
       <div className="composer-plan-review__header">
         <h2 className="composer-plan-review__title">{t('chat.planReviewImplement')}</h2>
-        {onStop ? <Button variant="ghost" size="sm" disabled={isSubmitting} onClick={() => void stop()}>
-          {t('chat.planReviewStop')}
-        </Button> : null}
+        {onStop ? <IconButton className="composer-plan-review__stop" size="sm" label={t('chat.planReviewStop')}
+          title={t('chat.planReviewStop')} disabled={isSubmitting} onClick={() => void stop()}>
+          <Icon name="stop" size={16} />
+        </IconButton> : null}
       </div>
       <div className="composer-plan-review__body">
       <HandoffActionRow

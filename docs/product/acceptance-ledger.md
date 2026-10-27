@@ -3975,3 +3975,17 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - Browser Use通过官方disposable launcher、一次性bootstrap和正式Bridge，外部注入最小停止trace；两种审批均显示已取消，没有已批准或自动检查通过，console warn/error为空。该场景是确定性投影验收，未请求模型、RDC或真实用户数据；截图及最小回执保留于.local/plan-review-ui。提交、推送及最终清理由本轮Tasks与回执记录。
 
 - 复查收尾：官方隔离桌面实际窗口7605660可见后退出，无Computer Use；自有进程、5127/51522及canonical锁均为空，桌面启动权已交还。核对路径/链接/Git边界后清除publish-runtime（89文件、逻辑6128703B），仅保留既有density回执中的publicationReview与一张必要Browser截图。未新增IPC、存储版本、模式或真实凭据副本。
+
+
+### 2026-10-27 Tasks 状态、Transcript 间距与计划交接体验修正
+
+- 基线 main `010dd888`，开始时工作树干净；本轮无新分支、提交、推送或发布。范围仅五项体验及直接耦合点，不增加IPC、持久化任务状态或Plan Mode；真实数据、配置、凭据和RDC保持完整。Tasks及最小回执为 `.local/plan-review-ui/TASKS.md` / `flow-receipt.json`，两张必要Browser截图随回执保留。
+- Tasks由同一主进程依赖谓词驱动准入与只读waitingOn，五种生命周期不重算。pending等待保持灰色空心圆，依赖名称/unfinished-unverified-missing原因只在详情；真实blocked保留自身原因。完成证明的任务身份/当前修订/执行与结果不匹配仍拒绝准入。原投影两项回归先失败；Registry、投影、右栏、快照定向通过，最终补等待标签/折叠详情回归共2文件12项通过。历史老快照不回写为新规则。
+- 工具/快照同层边框间距统一space-2，只有真实thinking/commentary入口space-3。基线同数据间距8/12/24px混杂，Browser修改后连续10卡均8px（舍入误差小于0.001px）；47事件长列表实际窗口化（16行挂载/1占位）仍8px，右栏定位展开最新快照依赖详情并聚焦对应pending项。未重排/删除历史事件。
+- 阅读卡由Workbench提供当前Composer border-box，壳切换重新绑定观察；桌面宽535.9167px、480宽444px、390宽354px，均与Composer一致，顶部16px/底部8px。深色中字号桌面、浅色大字号390×600、390×360低高度通过；关闭可达，Browser键盘Enter打开、Escape关闭回焦原卡。实际provider生成计划沿正式读取成功；缺provenance的静态夹具明确报错并禁用下载/复制，未伪装有效内容。handoff/意见栏同32px最小高度/md圆角/表面，移除横箭头、保留意见提交向上图标，右上为可访问停止方块。
+- send:true显式载荷沿原Composer链直接发送，send:false仍预填；不写入、清空或恢复配套prompt到个人草稿，不夹带附件/临时Skill。主进程确认、旧请求释放、配置保存及权限屏障均保留。组件覆盖重复提交、失败重试、结果不明按requestId对账、会话/停止/修订隔离；最终复查对“后续审阅已结束也不复活旧交接”及“失效计划连交接确认都不调用”增加失败回归，修复后3文件27项通过。不重新批准，不以历史缺记录作为可重发证明。
+- Browser使用官方disposable launcher、一次性bootstrap、正式Bridge与外部注入，只用Browser Use；本地确定性provider经实际Composer完成意见修订/批准/新请求与普通自定义Agent交接。持久记录显示旧请求终态→真实新user→General新Turn，各只有一组requestId，模型gpt-6.1-sol/无推理覆盖符合隔离配置。最终构建普通交接时textarea观察唯一值始终为原个人草稿，配套prompt仅进入Transcript。夹具最初的重复计划、空tools准入拒绝和无效工具参数单列校正，没有为测试修改产品门禁，不能当作真实模型效果。
+- 原生Event Timing两个handoff点击样本32ms/16ms，观察期无Long Task，最终普通交接无console warning/error及请求错误。审批确认约247ms、声明交接确认2291ms（普通交接1100ms）、配置准备约322ms（普通290ms）、发送确认2170ms（普通2031ms）分别记录；后台等待不冒充渲染卡顿。样本量小，未取得修改前原生延迟基线，不宣称统计性提速比例或大样本p95达标。
+- 工程完整tests/coverage节点为530文件3883通过、4既有跳过，ratchet通过（lines77.49/functions78.97/branches65.47/statements75.12%）。首次全量仅Investigation子门禁1项失败，独立15项通过，降低并行度补齐完整绿色与coverage，未改产品超时或弱化断言。完整gates通过；晚于完整节点的局部迟到保护/等待标签分别以27项/12项、typecheck/lint和受影响architecture/work-process/session-projection验证。间距门禁明确强制8px普通事件/12px真实叙述，fidelity移除已删除箭头条目；文档同步清除相反旧句。最终官方构建及桌面启动/清理结果见本轮回执，不把代码完成当清理完成。
+
+- 收尾：最终官方构建 `index-Co4YK1Fz.js`，隔离桌面实际窗口12915646观察后退出，既有Electron meta CSP frame-ancestors诊断单列（本轮无HTML/CSP修改）。本轮自有进程及5127/51522为空、canonical无锁，桌面启动权已交还。核对绝对路径、Git、链接及活owner后删除flow-runtime/coverage，750文件、逻辑26512053B；删除后目录不存在，仅新增保留Tasks、最小回执与两张截图，旧证据、真实数据、依赖和可运行out保留。本轮不提交推送发布。

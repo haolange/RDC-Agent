@@ -1,4 +1,4 @@
-import { useMemo, useRef, type ReactNode, type RefObject } from 'react';
+import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { PlanReaderHost } from '../features/transcript/PlanReaderHost';
 import { WorkbenchReadingLayoutContext } from '../lib/WorkbenchReadingLayout';
 import { RightRail } from '../features/right-rail/RightRail';
@@ -79,11 +79,11 @@ export function WorkbenchShell({
   onStartDrag,
 }: WorkbenchShellProps) {
   const workArea = useRef<HTMLElement>(null);
-  const composerRail = useRef<HTMLDivElement>(null);
-  const readingLayout = useMemo(() => ({ workArea, composerRail,
+  const [composerShell, setComposerShell] = useState<HTMLDivElement | null>(null);
+  const readingLayout = useMemo(() => ({ workArea, composerShell,
     layoutRevision: [resolvedWidths.left, resolvedWidths.right, effectiveLeftCollapsed, effectiveRightCollapsed,
       isLeftDrawerMode, isRightRailDrawerMode, isRightRailVisible, isTerminalOpen, workbenchRailMaxWidth].join(':'),
-  }), [resolvedWidths.left, resolvedWidths.right, effectiveLeftCollapsed, effectiveRightCollapsed,
+  }), [composerShell, resolvedWidths.left, resolvedWidths.right, effectiveLeftCollapsed, effectiveRightCollapsed,
     isLeftDrawerMode, isRightRailDrawerMode, isRightRailVisible, isTerminalOpen, workbenchRailMaxWidth]);
   const showDockedRightRail = isRightRailVisible && !isRightRailDrawerMode;
   const showLeftResizeHandle = isDockedResizeHandleVisible(!isLeftDrawerMode, effectiveLeftCollapsed);
@@ -206,9 +206,10 @@ export function WorkbenchShell({
           <div className="main-page-shell">{mainPage}</div>
         </div>
         {showMainPromptBar && (
-          <div ref={composerRail} className="main-input-bar">
+          <div className="main-input-bar">
             <Composer
               composer={composer}
+              shellRef={setComposerShell}
             />
           </div>
         )}

@@ -1,4 +1,7 @@
 import type { TaskRecord, TaskStatus } from './TaskRegistry';
+import type { TaskExecutionRecord } from './TaskContracts';
+import type { TaskDependencyWait } from '@shared/types/taskExecution';
+import { taskDependencyWait } from './taskDependencies';
 
 export type ProjectedTaskStatus = TaskStatus;
 
@@ -8,6 +11,7 @@ export interface ProjectedTaskItem {
   title: string;
   status: ProjectedTaskStatus;
   statusReason?: string;
+  waitingOn?: TaskDependencyWait[];
 }
 
 export function createdAtFromTaskId(id: string): number {
@@ -23,28 +27,23 @@ export function orderTasks(records: readonly TaskRecord[]): TaskRecord[] {
     .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
 }
 
-export function projectTaskItems(records: readonly TaskRecord[]): ProjectedTaskItem[] {
+export function projectTaskItems(records: readonly TaskRecord[], executions: readonly TaskExecutionRecord[] = []): ProjectedTaskItem[] {
   const ordered = orderTasks(records);
   const byId = new Map(ordered.map((task) => [task.id, task] as const));
-  const completed = new Set(ordered.filter((task) => task.status === 'completed').map((task) => task.id));
+  const byExecution = new Map(executions.map(execution => [execution.id, execution] as const));
   return ordered.map((task, order) => {
-    const blockers = task.blockedBy
-      .map((id) => byId.get(id))
-      .filter((blocker): blocker is TaskRecord => blocker !== undefined && !completed.has(blocker.id));
-    const status: ProjectedTaskStatus = task.status === 'completed'
-      || task.status === 'cancelled'
-      || task.status === 'blocked'
-      || task.status === 'in_progress'
-      ? task.status
-      : blockers.length > 0 ? 'blocked' : 'pending';
+    const waitingOn = task.status === 'pending' ? task.blockedBy.flatMap(id => {
+      const dependency = byId.get(id);
+      const wait = taskDependencyWait(id, dependency, dependency?.currentExecutionId ? byExecution.get(dependency.currentExecutionId) : undefined);
+      return wait ? [wait] : [];
+    }) : [];
     return {
       order,
       taskId: task.id,
       title: task.subject,
-      status,
-      statusReason: task.statusReason ?? (blockers.length > 0
-        ? blockers.map((blocker) => blocker.subject).join(', ')
-        : undefined),
+      status: task.status,
+      statusReason: task.statusReason,
+      ...(waitingOn.length ? { waitingOn } : {}),
     };
   });
 }

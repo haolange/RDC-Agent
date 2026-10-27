@@ -142,9 +142,9 @@ export function useComposer(options: {
     ? currentRun?.status === 'stopping' && !hasActiveConversationTurn && !send.isPromptSending
     : (!hasMessageContent && !hasPendingAttachments);
 
-  useQueuedHandoffSuggestion({
+  const handoff = useQueuedHandoffSuggestion({
     isComposerBusy: send.isComposerBusy,
-    sessionId: currentSession?.sessionId, promptValue, setPromptValue, sendPrompt: send.handlePromptSend, showNotice,
+    sessionId: currentSession?.sessionId, setPromptValue, sendPrompt: send.sendHandoffPrompt, inspectRequest: send.inspectHandoff,
   });
 
   useComposerDomEffects({
@@ -187,6 +187,7 @@ export function useComposer(options: {
     fileInputRef: attachments.fileInputRef,
     isDropActive: attachments.isDropActive,
     setIsDropActive: attachments.setIsDropActive,
+    handoff,
     handlePromptSend: send.handlePromptSend,
     handlePromptKeyDown: send.handlePromptKeyDown,
     setPromptValueDirect: setPromptValue,

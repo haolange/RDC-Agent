@@ -1199,8 +1199,12 @@ assert(
   'section turns should zero bottom padding so turn gap is only the next section top pad',
 );
 assert(
-  /\.work-process-steps\s*>\s*\.work-process-section:not\(:first-child\)\s*\{[^}]*padding-top:\s*var\(--space-3\)/.test(cssSource),
-  'every turn after a preceding event or spacer should use the shared space-3 loop boundary',
+  /\.work-process-steps\s*>\s*\.work-process-section\.has-narrative:not\(:first-child\)\s*\{[^}]*padding-top:\s*var\(--space-3\)/.test(cssSource),
+  'visible narrative entrances after events or spacers should use space-3',
+);
+assert(
+  /\.work-process-steps\s*>\s*\.work-process-step:not\(:first-child\)\s*\{[^}]*padding-top:\s*var\(--space-2\)/.test(cssSource),
+  'adjacent visible tools and task snapshots must share one space-2 boundary',
 );
 assert(
   /\.work-process-prose\s*\+\s*\.work-process-section-list\s*\{[^}]*margin-top:\s*var\(--space-3\)/.test(cssSource),

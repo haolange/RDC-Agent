@@ -203,7 +203,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 计划门是另一条人机停顿：`plan_artifact` 写活计划并挂起，`approval.requested kind=plan_review`；拒绝意见回同一 tool result，批准写入 `TurnHandle.approvedPlan`（`approvedHash` + target + frozenUri）并覆盖 execution offer。审批决定的时间权威是匹配 `plan-state` 在 approved 状态下的 `updatedAt`；offer 的 `approvedAt` 从该值生成，后续声明交接必须保留同一批准的时间，不能用点击交接的当前时间补写。prepareTurn 在核对批准状态、target 与计划 URI/hash 后，从该决定投影原时间（epoch milliseconds 与 UTC）到已批准交接事实；历史 offer 的错误交接时间不覆盖审批决定，也不重写历史记录，供执行者核对计划期限，后续回合、重试和重启不续预算。回合成功终态把冻结 `profileHandoffs`（`showContinueOn !== false`）快照到 assistant `handoffSuggestions`。Mission 仅在本回合 workTrace 含真实已批准 `plan_artifact` 时才快照 Execute；General 无声明即无按钮。
 
-`send: true` 只表示点完后预填并自动发送。失败提示并留草稿，迟到结果不得写进别的 session。手动改 Composer Agent pill 不写 offer、不预载调查 Skill。prepareTurn 仅在 Agent、批准 handoff target 及冻结计划 URI/hash 与 execution offer 一致时，把声明 `requiredSkillIds` 并入 PromptPlan preload，并追加 volatile 的已批准交接事实（source/target/plan 引用）。它不改变工具、权限或 RDC lease；历史 Mission 规划消息仍作为历史处理。`handoff` / `agent` / `agent_handoff` token 拒绝。
+`send: true` 表示声明交接确认且原请求释放后，显式载荷经同一 Composer 发送链直接发送，不预填输入框；`send: false` 才预填。原草稿、附件与临时 Skill 不参与自动交接，失败也不被配套 prompt 覆盖。未提交才可重试，结果不明按 requestId 对账；迟到结果不得写进别的 session。手动改 Composer Agent pill 不写 offer、不预载调查 Skill。prepareTurn 仅在 Agent、批准 handoff target 及冻结计划 URI/hash 与 execution offer 一致时，把声明 `requiredSkillIds` 并入 PromptPlan preload，并追加 volatile 的已批准交接事实（source/target/plan 引用）。它不改变工具、权限或 RDC lease；历史 Mission 规划消息仍作为历史处理。`handoff` / `agent` / `agent_handoff` token 拒绝。
 
 ## RDC / Capture
 
@@ -342,3 +342,5 @@ Task 状态文件的提交保持同一候选文件与原子 rename。短暂 EPER
 Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDC_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。
 
 主子可见工作过程共享终态收束：完成、失败和停止冻结所属 loop 与思考状态；未执行工具标为 skipped，已启动但无回执的工具明确失败，不推造成功。独立 Task 生命周期不因父执行完成而终止。模型输入包装不承担产品标题或正文的结构契约。
+
+任务依赖准入与等待投影共用 taskDependencyWait：依赖须 completed/disposition=completed，需要执行的任务还须匹配当前任务 ID、revision、currentExecutionId 的 completed 执行与结果。waitingOn 只描述 pending 的依赖等待，不转换为 blocked，不放宽准入。事件快照在已有写锁中读取任务/执行，右栏通过一致性读取获取同一对数据，不嵌套存储锁。blockedBy 表示先后依赖；正常等待不应写成 blocked。

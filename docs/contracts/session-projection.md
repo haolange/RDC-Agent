@@ -101,7 +101,7 @@ Capture 的人工与 Agent 控制共用同一当前回放状态、图片、原�
 
 Progress 的任务定位仅通过 renderer 内部有类型的请求收集工作记录中的候选卡，由窗口化列表负责展开、滚动与聚焦；请求不提供任务状态，也不增加公共 IPC。历史 Task 卡保留事件发生时的列表，右栏仍读取最新 `taskProjection`。
 
-计划门与普通工具审批互斥投影，包括 delegated 请求。子计划的内容与决定绑定 child owner，parent 仅承载显示与回答入口。建议行 Agent 切换成功后才预填/发送；当前会话变化、Stop、请求失效或切换失败必须丢弃迟到结果，不覆盖其他会话草稿。
+计划门与普通工具审批互斥投影，包括 delegated 请求。子计划的内容与决定绑定 child owner，parent 仅承载显示与回答入口。建议行 Agent 切换成功后，send:true直接发送显式载荷、send:false才预填；当前会话变化、Stop、请求失效或切换失败必须丢弃迟到结果，不覆盖其他会话草稿。
 
 委派记录使用显式结构契约；不符合当前契约的详细记录返回不可用。结构化任务与实际发送文本是不同正文种类，读取同受 session、父调用及子执行身份校验。终态先增量持久化收束后的内部步骤，再发布头部 revision；重启中断读出的步骤使用持久时间收束，迟到事件不得恢复运行。
 
@@ -129,3 +129,7 @@ Renderer 的 EffectiveCatalog snapshot 只按 provider/account/protocol 保存�
 ### 图片工具展示投影
 
 同段相邻成功read_image可在renderer形成只读展示组；原ConversationToolCall身份、顺序、回执与终态不改变，不跨Turn/段落/子过程。imageCalls仅属renderer行模型，不落持久会话。imagePreviews由main在工具结果转存后保留并按既有session scope读取；renderer不扫描存储或重读源路径。预览响应按会话隔离，缺失/失败不同于加载中；展示数量不取决于缩略图是否成功加载。
+
+### Tasks 依赖等待投影
+
+ProgressTask 与 ConversationTaskSnapshotItem 可带只读 waitingOn（taskId、可选 title、reason: unfinished/unverified/missing）。五种 status 不因依赖变化改写；statusReason 只保留任务本身原因。主进程执行准入和等待信息共用同一证明判定。右栏读取任务与执行的一致快照，任务事件在当前事务中冻结同一信息；renderer 不重算依赖，历史快照不跟随最新状态。pending 等待使用灰色空心圆及“等待前置任务”提示，原因按需展开；真正 blocked 才使用黄色受阻标记。

@@ -5,26 +5,28 @@ import { planReviewRequestKey } from './planReviewRequestModel';
 import { createRequestFingerprint } from './userInputRequestModel';
 import type { ComposerPendingRequestState } from './pendingRequestSelection';
 import type { SessionRecord } from '@shared/types/session';
+import type { Ref } from 'react';
 
-export function ComposerPendingRequest({ pending, composeAccentStyle, agentId, currentSession, onStop }: {
+export function ComposerPendingRequest({ pending, composeAccentStyle, agentId, currentSession, onStop, shellRef }: {
   pending: ComposerPendingRequestState;
   composeAccentStyle: { 'data-dyn-style': string };
   agentId: string;
   currentSession: SessionRecord | null;
   onStop?: () => Promise<void>;
+  shellRef?: Ref<HTMLDivElement>;
 }) {
   if (pending.kind === 'tool-approval') {
-    return <div className="composer-shell composer-shell-tool-approval" {...composeAccentStyle}>
+    return <div ref={shellRef} className="composer-shell composer-shell-tool-approval" {...composeAccentStyle}>
       <ToolApprovalRequestPanel key={JSON.stringify([pending.request.sessionId, pending.request.turnId, pending.request.approvalId])} request={pending.request} />
     </div>;
   }
   if (pending.kind === 'plan-review') {
-    return <div className="composer-shell composer-shell-plan-review" {...composeAccentStyle}>
+    return <div ref={shellRef} className="composer-shell composer-shell-plan-review" {...composeAccentStyle}>
       <PlanReviewRequestPanel key={planReviewRequestKey(pending.request)} request={pending.request}
         agentId={agentId} currentSession={currentSession} onStop={onStop} />
     </div>;
   }
-  return <div className="composer-shell composer-shell-user-input" {...composeAccentStyle}>
+  return <div ref={shellRef} className="composer-shell composer-shell-user-input" {...composeAccentStyle}>
     <UserInputRequestPanel key={createRequestFingerprint(pending.request)} request={pending.request} />
   </div>;
 }

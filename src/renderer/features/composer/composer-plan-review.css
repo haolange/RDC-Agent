@@ -56,7 +56,7 @@
   gap: var(--space-2);
   padding: 0 var(--space-2);
   border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--token-bg-panel);
   color: var(--token-text-caption);
   min-height: var(--control-height-md);
@@ -79,6 +79,7 @@
   outline-offset: 2px;
 }
 .composer-plan-review__footer { display: flex; flex-shrink: 0; min-height: var(--control-height-sm); }
+.composer-plan-review__stop .ui-icon { fill: currentColor; }
 
 .composer-plan-review__error {
   margin: 0;

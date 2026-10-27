@@ -1,4 +1,7 @@
 export const enChat = {
+  'app.handoffUnconfirmed': 'Delivery has not been confirmed. Check the request before retrying.',
+  'app.handoffCheckDelivery': 'Check delivery',
+  'app.handoffRetry': 'Retry handoff',
   'chat.userInputAnswerChoices': 'Answer choices',
   'chat.userInputEnterCustomAnswer': 'Enter custom answer',
   'chat.userInputAnswerPlaceholder': 'Type your answer...',
@@ -202,6 +205,10 @@ export const enChat = {
   'chat.workProcessTaskStatus.pending': 'Pending',
   'chat.workProcessTaskStatus.in_progress': 'In progress',
   'chat.workProcessTaskStatus.blocked': 'Blocked',
+  'chat.taskWaitingDependencies': 'Waiting for prerequisites',
+  'chat.taskDependency.unfinished': 'Waiting for: {title}',
+  'chat.taskDependency.unverified': 'Completion evidence required: {title}',
+  'chat.taskDependency.missing': 'Prerequisite record unavailable: {title}',
   'chat.workProcessTaskStatus.completed': 'Completed',
   'chat.workProcessTaskStatus.cancelled': 'Cancelled',
   'chat.workProcessVerb.imageComplete': 'Viewed image',

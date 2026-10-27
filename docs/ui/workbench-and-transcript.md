@@ -41,7 +41,7 @@ Workbench page shell、Local utilities、composer、transcript 共用 `--workben
 
 Loop thinking：quiet spark + `正在思考` / `Thinking`（运行中默认展开）→ `已思考 · {duration}` / `Thought for`（完成后默认折叠）；手动开合 sticky 覆盖。禁止 `深度思考` / settled `思考了`。Readable `raw`/`summary`/`unknown` 共用标签；opaque/hidden 永不渲染 CoT 占位句。
 
-Commentary：markdown 散文，不进 thinking 槽。Tool / Asked / Sub Agent / Tasks 快照 / Compact / 审批卡共用 `--transcript-card-*` 卡壳。Tool：统一单披露卡片（icon+动词 + **结果优先** body；展开内容层 + Raw；默认不展开 Raw；无 `toolGroup` 双层壳）。同 loop 连续 tool 外距 `--space-2`；thinking/commentary → 首 tool 与相邻 loop 顶距 `--space-3`。≥8 连续 tools 聚合成摘要行。Compact 是正式卡片，标题走 i18n。Tasks 快照卡与 tool 卡共用 `--transcript-card-icon-size` 与 `--text-sm`。
+Commentary：markdown 散文，不进 thinking 槽。Tool / Asked / Sub Agent / Tasks 快照 / Compact / 审批卡共用 `--transcript-card-*` 卡壳。Tool：统一单披露卡片（icon+动词 + **结果优先** body；展开内容层 + Raw；默认不展开 Raw；无 `toolGroup` 双层壳）。相邻可见 tool、Tasks 快照与无叙述 section 的边框间距统一 `--space-2`，只由事件列表边界提供；有可见 thinking/commentary 的段落入口及其首 tool 保留 `--space-3`。隐藏或空模型段不补空位，窗口化占位不重复添加间距。≥8 连续 tools 聚合成摘要行。Compact 是正式卡片，标题走 i18n。Tasks 快照卡与 tool 卡共用 `--transcript-card-icon-size` 与 `--text-sm`。
 
 Tasks 在主回合内每次真实创建或更新各留下独立历史卡，按事件 ID 保序去重，卡内列表冻结为变更提交当刻的逐项状态；一批创建只产生一张「添加待办」，更新显示「已更新待办」。旧记录没有事件种类时用「任务列表」，不得把旧卡改写为最新状态。卡头右端为完成数和固定箭头，不使用 `0ms`；列表用状态图形呈现待办、进行中、完成、受阻和取消，原因仅在所属项详情展开时显示，默认无副标题或底部 tips，行内不叠加卡壳。最新卡默认展开，旧卡默认收起，用户手动开合优先并跨分页／窗口化保持。右栏 Progress 仍是带序号的最新列表；其任务定位优先找到最后一张包含该任务的历史卡。父回复结束后的后台变更只更新子代理卡和右栏，不在旧回复中倒插历史卡。
 
@@ -53,7 +53,7 @@ Tasks 在主回合内每次真实创建或更新各留下独立历史卡，按�
 
 缺少工具调用标识的历史 Hook 完成诊断不与相邻工具强行关联；它在原事件位置以紧凑诊断卡显示，默认隐藏原始文字，展开后可读。此卡与工具使用相同的卡头、分隔线和焦点规则，但状态不计入工具执行结果。
 
-独立 Hook 卡到上一工具的可见边框相隔 12px，即使上一工具结束嵌套步骤列表也不贴边；Hook 到下一 turn 沿用共享 turn 留白。此节奏适用于主子同一行渲染路径的正常与紧凑密度。
+独立 Hook 卡到上一工具的可见边框相隔 `--space-2`，与其他同层事件一致；下一段有可见叙述时才使用 `--space-3`。此节奏适用于主子同一行渲染路径的正常与紧凑密度。
 
 `error_recovery_*` 仅 Agent Activity / runtime log，不进 Work Process 叙事。Request Inspector 不出现在消息流或右侧默认 Session/Trace。入场动画由真实事件驱动，禁止假 stagger。
 
@@ -69,7 +69,7 @@ Active Signal：`active-signal-shimmer` clipped-gradient 能量扫光（`1.6s li
 
 计划卡采用既有Transcript实色卡壳；标题最多两行，完整名称保留于可访问名称及阅读器。正文预览最多`min(6lh, 28dvh)`，真实溢出以DOM Range定位最后可见文字，在该文字末尾0.75lh由100%淡至45%可见度；不让Markdown段落/标题留白吞掉淡出；内容、字号、字体和宽度变化重测。短内容不遮罩、不撑高。标题、状态与背景不参与淡出；预览卡不再设置独立阅读按钮，整卡支持点击、Tab/Enter/Space及焦点返回，文本选中不打开。历史拒绝/替代/取消计划保留紧凑工具壳与按需阅读，不重复摘要。
 
-计划待审区沿用Composer壳与菜单注册表：顶部标题及次级停止，按声明顺序的紧凑handoff行、常驻自适应修改意见输入、左下角模型胶囊。意见Enter提交、Shift+Enter换行、IME不提交；失败保留输入。低高度时仅内容区滚动，模型弹层不被裁切。无会话模型覆盖时胶囊显示“按Agent配置”并直接打开既有模型列表，不展示当前Agent默认模型作为所有交接目标的模型；选定后复用原Effort/Fast/Max，清除后恢复缺省标签。
+计划待审区沿用Composer壳与菜单注册表：顶部标题及停止方块 IconButton（可访问名称/悬停为“停止当前请求”），按声明顺序的紧凑handoff行（无末尾箭头）、常驻自适应修改意见输入（仅保留向上提交图标）；二者使用相同32px最小高度、md圆角、边框和表面。随后是左下角模型胶囊。意见Enter提交、Shift+Enter换行、IME不提交；失败保留输入。低高度时仅内容区滚动，模型弹层不被裁切。无会话模型覆盖时胶囊显示“按Agent配置”并直接打开既有模型列表，不展示当前Agent默认模型作为所有交接目标的模型；选定后复用原Effort/Fast/Max，清除后恢复缺省标签。
 
 模型选择保存到现有会话覆盖，只影响后续新请求。保存期间批准与修改意见提交暂停，停止仍可用；保存失败显示错误并保留原选择。批准后由原handoff队列按新配置发起请求；拒绝意见恢复当前冻结请求，不能中途切换模型。弹层及局部意见/错误随会话或计划身份重置，不另建目录或权限路径。
 
@@ -174,3 +174,11 @@ Progress 保持创建序，序号来自原始 order，状态图标占独立列�
 同段连续成功的read_image在renderer组成图片展示组，其他调用/状态打断，不跨Turn或子过程。数量取成功图片实例而非缩略图加载数，原始调用顺序和回执不变；该组先于通用聚合。默认最多四张80px缩略图，窄容器64px、8px间距、object-fit:contain；+N展开其余图片，详情按调用展示完整路径/复制/原始回执，每批20项显式加载。只有原结构化预览引用可读，历史缺引用明确不可用，不猜路径。结果转存保留imagePreviews。
 
 缩略图独立呈现，全局最多四项并发；失败可单项重试，会话切换隔离迟到结果。预览复用TaskDialog/overlay/focus，展示既有受控分辨率；无独立全局Escape和固定z-index遮罩，不宣称原图。
+
+### 依赖等待与交接发送
+
+Tasks 的五种生命周期状态忠实投影；pending 的未满足依赖以可选只读 waitingOn 表示，灰色空心圆的提示与可访问名称为“等待前置任务”。依赖 ID、标题及 unfinished/unverified/missing 原因只在已有详情展开。statusReason 仅为任务自身原因；blocked 保持黄色，依赖完成不自动解除真实受阻或启动下游。历史快照冻结事件当时的任务与执行证明，不能用当前右栏替换。
+
+阅读器由 Workbench 提供当前可见 Composer border-box 引用；普通/审批壳切换重新绑定测量，左右同宽，底部间距 space-2、主内容顶部至少 space-4；短内容收缩、长正文滚动。透明外部点击层、hash检查、键盘与关闭回焦不变。
+
+send:true 声明交接使用主进程确认目标与 prompt 直接调用同一 sendComposerConversationTurn，不写入或恢复到输入框，也不携带/清空原草稿、附件及临时 Skill。send:false 仍预填。队列等待旧请求/Run释放，单次领取并核对 session 与来源计划的 Turn/call/revision/hash；失败保留原位重试，结果不明只通过 requestId 查历史确认，不盲目重发或重复批准。配套 prompt 仍是 Transcript 中真实的新用户消息。

@@ -188,15 +188,10 @@
   padding-bottom: 0;
 }
 
-/* An unassociated Hook is its own event card. Keep its border separate from
- * the preceding tool even when that tool ends a nested section list. */
-.work-process-steps > .work-process-step.is-orphan-hook-row:not(:first-child) {
-  padding-top: var(--space-3);
-}
-
-/* A turn starts after any preceding event, including a Hook diagnostic or a
- * measured-height spacer. Keep this gap larger than adjacent tools. */
-.work-process-steps > .work-process-section:not(:first-child) {
+/* One boundary owns sibling spacing, including standalone snapshots and virtual rows. */
+.work-process-steps > .work-process-step { padding-bottom: 0; }
+.work-process-steps > .work-process-step:not(:first-child) { padding-top: var(--space-2); }
+.work-process-steps > .work-process-section.has-narrative:not(:first-child) {
   padding-top: var(--space-3);
 }
 

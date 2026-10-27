@@ -29,6 +29,7 @@ export async function applyDeclaredHandoffOnClient(
   sessionId: string,
   agent: string,
   label: string,
+  isCurrent: () => boolean,
 ): Promise<{ ok: boolean; error?: string; suggestion?: PlanReviewHandoffSuggestion }> {
   const api = getElectronApi();
   if (!api) return { ok: false, error: 'BRIDGE_UNAVAILABLE' };
@@ -36,6 +37,7 @@ export async function applyDeclaredHandoffOnClient(
   if (!result.success) {
     return { ok: false, error: result.error || 'DECLARED_HANDOFF_FAILED' };
   }
+  if (!isCurrent()) return { ok: false, error: 'HANDOFF_CONTEXT_CHANGED' };
   if (result.session) {
     applySessionRecordToStore(result.session);
     if (useProjectStore.getState().currentSession?.sessionId === sessionId) {

@@ -45,9 +45,9 @@ export class RightRailProjectionService {
     if (!session) return emptyRightPanel(input.sessionId);
 
     const taskRegistry = new TaskRegistry(createSessionTaskStore(input.sessionId));
-    const [sources, taskRecords, conversations, promptSegments, artifacts] = await Promise.all([
+    const [sources, taskSnapshot, conversations, promptSegments, artifacts] = await Promise.all([
       listSessionArtifactSources(input.sessionId),
-      taskRegistry.reconcileInterruptedExecutions().then(() => taskRegistry.listTasks()),
+      taskRegistry.reconcileInterruptedExecutions().then(() => taskRegistry.readConsistentSnapshot()),
       Promise.resolve(storageAdapter.readConversationHistory(input.sessionId)),
       Promise.resolve().then(() => requestSnapshotStore.listPromptSegments(input.sessionId)).catch(() => []),
       Promise.resolve().then(() => mapRightRailInvestigationArtifacts(input.sessionId)),
@@ -61,7 +61,7 @@ export class RightRailProjectionService {
       projectId: session.projectId,
       sessionId: input.sessionId,
     });
-    const progress = mapRightRailProgress(input.sessionId, input.branchId, taskRecords);
+    const progress = mapRightRailProgress(input.sessionId, input.branchId, taskSnapshot.tasks, taskSnapshot.executions);
     const outputs = mapRightRailOutputs({
       sessionId: input.sessionId, branchId: input.branchId, sources, runs: input.runs,
     });
