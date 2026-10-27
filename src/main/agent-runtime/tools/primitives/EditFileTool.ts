@@ -9,6 +9,7 @@
 import * as fs from 'fs/promises';
 import { requireSuccessfulFileRead } from './fileReadAccess';
 import type { AgentTool } from '../../agent/AgentTool';
+import { assertFileWriteBoundary } from '../../permissions/FileOperationBoundary';
 import { assertTextReadable, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from './_shared';
 import { TEXT_FILE_MAX_BYTES } from './toolLimits';
 
@@ -67,6 +68,7 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
 
     const workspaceRoot = requireMutationWorkspaceRoot(context);
     const absolute = safeResolvePath(params.path, workspaceRoot, context);
+    assertFileWriteBoundary(absolute);
     assertTextReadable(absolute, { maxBytes: TEXT_FILE_MAX_BYTES });
     requireSuccessfulFileRead(absolute, context);
 

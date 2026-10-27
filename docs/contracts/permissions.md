@@ -7,7 +7,7 @@
 Composer 暴露：`Default`、`Auto-review`、`Full access`、`Custom(config.toml)`。主进程 `AgentPermissionPolicy` 为权威，结合 profile allowlist、permission mode、workspace root、readable/writable roots、command allow/deny、tool metadata、`CompiledPolicy`。
 
 - `Default`：例行 workspace 只读可自动；外部文件、网络、变更、破坏性 shell、未知命令需审批。
-- `Auto-review`：记录 reviewer 决策后继续。
+- `Auto-review`：先执行确定性规则；已验证的低风险操作记录规则批准，其余可审操作提交一次独立、无工具的模型审核。没有有效批准不执行；不自动切人工或 Full access。
 - `Full access`：显式信任本地文件与命令；仍受 primitive 硬约束（二进制/`.rdc`、realpath、灾难 shell、SSRF）。
 - `Custom`：按配置根与命令列表。
 
@@ -83,7 +83,24 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 - 灾难命令由 `shellHardDeny` 单独维护；文件/RDC 路由硬拒绝是独立规则，两者都先于权限模式求值。PowerShell 先统一 splitter（含 `&`）、折叠反引号、静态别名展开与最短唯一参数 bind，再匹配 `Remove-Item -Recurse -Force` 根路径（含 `$env:SystemDrive` / `\\?\C:\` / UNC 根 / hive 根）、`iwr|iex`（右端含 `bash`/`sh`/`pwsh`/`cmd`）、`-EncodedCommand`、嵌套 `powershell -Command` / `&` 调用运算符、launcher `-ExecutionPolicy Bypass`。cmd 覆盖 `rd /s /q`、`del /s /q`、`diskpart`、`shutdown /s`、`format`。POSIX 覆盖 `rm -rf /`、`dd if=`、`mkfs*`、`> /dev/sd|hd|nvme|xvd`、fork bomb、`chmod 777`；`sudo` 只在与这些灾难组合叠加时硬拒。allow 与 deny 都用词边界匹配。
 - RDC / 通用 shell 经 `ShellInvocationService`；exitCode：`code ?? (signal ? 128+n : 1)`。
 - `ShellCommandRiskAnalyzer`：结构分析 + denied 词边界与路径前缀；最高分档为 `high`，只做审批路由，没有 `critical` 档位。
-- **风险分类器不是安全边界**；真正边界是 PermissionPolicy + `shellHardDeny` + sandbox/OS。
+- **风险分类器不是安全边界**；真正边界是 PermissionPolicy + `shellHardDeny` + 原生身份/路径等执行检查与操作系统权限。Electron renderer sandbox 不隔离主进程派生的普通 shell；不得宣称存在命令级 OS sandbox。
+- shell.rdc 与 shell.command 互斥。严格合法的 search/describe/list 仅读冻结目录，按 low risk 审核；原生操作先复用执行边界验证 owning General、冻结 binding/catalog、lease、scope/effects、参数与路径。已验证的读取、测量、受控 artifact 写入及可恢复 replay 位置操作按 low risk；shader replacement 按 medium 进入独立审核，敏感配置路径按 high。未知效果、身份覆盖、非法参数或越权直接拒绝，不由审核模型补授权。实际执行再次验证，保留串行、取消、恢复及签名证据合同。
+- 普通 shell 的例行/允许前缀必须覆盖每个静态简单子命令；一个 `git status` 不授权后续 `git reset --hard`。仓库脚本不因 typecheck/check 名称免审；动态展开、重定向、引用或无法确认的组合进入审核；灾难和文件/RDC 旁路硬拒绝优先。专用 Git 工具仍经原权限入口，shell 不增加 Git 权限。
+- project 内普通 write_file/edit_file 可按 low risk 自动批准；执行层仍要求 realpath、无链接写入、文本大小及覆盖前同 session 成功读取。capture 输入、Git 元数据与 canonical knowledge 不作为通用写入目标；Agent/Skill/Hook/Policy/MCP/Memory、secret 与环境配置需要明确审核，不获得通用自动编辑许可。
+
+### 独立权限审核
+
+原生动作同时传递已经验证的冻结操作合同：说明、完整 input schema、路径参数及前置条件。审核据此解释参数的 before/after 身份语义，不从字段名称猜测；合同仅说明动作，不建立用户授权，也不替代实际执行校验。
+
+审核复用冻结 RequestPlan、opaque credential、PromptPlan、Provider adapter 与请求快照；没有工具、Agent 身份、Task 或 RDC lease。输入包含当前精确动作、当前主进程控制与预算事实、真实 user 消息、经 hash 验证的已批准计划，以及当前隔离 slot 的有界工具观察。历史原生回执须先由主进程校验签名、hash 和归属，保留原 context/time；持久记录仅证明 bytes/schema/存在，不把其正文或 intent 自述升级为执行证明。敏感文件观察不进入审核，凭据型动作在发送前拒绝；模型的工具参数和授权自述均不是用户许可。父执行历史不泄露给隔离子执行。原生变更审核还直接取得同一冻结目录的完整能力摘要和其中已准入的 rollback 定义，复用目录查询的规范投影，不依赖历史正文是否仍在窗口内；这些只证明声明的能力边界和接口合同，不能证明当前状态、实际回滚成功或科学结论。
+
+工具观察最多保留 16 种不同实际调用的最后结果，以工具名和实际调用参数区分；只有相同调用可替代旧观察，不把不同文件、审计选择器或目录目标合并。其中最多 8 条优先保留当前动作明确引用或实际参数键值相同的既有成功观察，再用最近观察填满；不读取其它执行历史或现场，不按领域判断重要性。参数只整理观察，不提供授权，也不将失败调用变成成功证明。实际调用参数、主进程身份、调用回执元数据分别有界传递，避免正文前缀挤掉身份；截断附原始长度与 hash。JSON 先结构化脱敏，受保护文件正文省略。文件审计的实际差异与原生结果正文随观察传递，不能仅有调用参数却声称已提供结果。该投影不推断前置条件、不重读现场、不赋予记录正文执行证明。
+
+审核必须使用现有回执合同：签名 `evidence.kind` 只有 measurement、intervention、rollback；Experiment.executionEvidence 中的 baseline、variant、restored 是三个不同 measurement 回执的引用角色，不存在额外的 baseline kind 或工具 phase 参数。介入前核验当前实验、归属、采样条件及时间匹配的真实基线和来源/安全控制，不索取未来阶段回执；不能因为合法基线的 kind 为 measurement 就拒绝。该准入判断不追认未来执行，实验关闭仍由现有门禁检查五个不同引用、真实签名、时序、采样条件和 daemon/worker 身份。
+
+每个待审批调用最多一次审核，30 秒上限；输入最多 32768 估算 tokens，并服从冻结模型的更紧输入预算及扣除1024输出预留后的窗口；输出最多1024 tokens。只接受终态、无工具的严格 approved/reason JSON。超限、缺路由、服务失败、非法响应、超时、取消或过期 generation 均拒绝，保留原因；不重试、不静默 fallback、不自动重启 Turn。明确 user policy floor 仍人工审批，deny 仍不可覆写。
+
+请求尝试及实测 token 计入同 session/child 的既有 RequestSnapshot 用量；待审批工具在审核前已预留原预算，审核后重查原期限，不重置 Task、消费或批准历史。审核记录及工具结果均传递实际 rule/model/error/cancel 原因；模型批准只属于当前精确调用，不能授权后续命令或绕过执行验证。
 
 ## Policy 编译
 
@@ -107,7 +124,7 @@ Decision lattice 为 `allow < auto_review < ask_user < deny`。`approvalFloorByT
 
 ## 原生 RDC 执行证据
 
-shell 的 command 与 rdc 互斥；ToolValidator oneOf/not 与执行入口双重检查。结构化模式仍是 shell 审批，不属于只读自动许可。General 之外即使 Full access 也拒绝；本机冻结配置、owning project/session lease、非 default context、非 delegated/offline child 同时成立才执行。模型不可传 capture/replay/context identity。操作权限按冻结 catalog 的 scope、effects、前置条件、参数和路径声明校验，不按命名空间授权。未知操作或影响 fail-closed；生命周期、remote、全局配置、窗口及销毁仍由应用专门入口管理。Skill 仅提供知识，不能扩权。
+shell 的 command 与 rdc 互斥；ToolValidator oneOf/not 与执行入口双重检查。结构化模式仍进入 shell 的同一审批入口；low 分类须来自已验证的具体语义，不能仅凭工具名称或模型声称只读。General 之外即使 Full access 也拒绝；本机冻结配置、owning project/session lease、非 default context、非 delegated/offline child 同时成立才执行。模型不可传 capture/replay/context identity。操作权限按冻结 catalog 的 scope、effects、前置条件、参数和路径声明校验，不按命名空间授权。未知操作或影响 fail-closed；生命周期、remote、全局配置、窗口及销毁仍由应用专门入口管理。Skill 仅提供知识，不能扩权。
 
 执行回执仅由主进程在真实原生成功调用后签名，key 在 safeStorage；模型提交的 result JSON、普通 shell 输出或 artifact hash 本身不具备 provenance。签名校验与 SessionArtifactResolver 所有权/hash 同时成立才可引用。实验关闭和新完成必须满足五阶段真实调用与同 replacement 的回滚；旧记录只保留可读性。详见 docs/architecture/rdc-runtime.md。
 

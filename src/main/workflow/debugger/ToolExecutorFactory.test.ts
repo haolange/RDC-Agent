@@ -1,4 +1,6 @@
 import { registerPolicyBudgetObserver } from './DelegationBudget';
+const handoffPreflight = vi.hoisted(() => vi.fn());
+vi.mock('../../conversation/applyDeclaredHandoff', () => ({ assertDeclaredHandoffForPlan: handoffPreflight }));
 import { createPolicyBudgetState } from './TurnCoordinator';
 import { describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
@@ -85,6 +87,7 @@ vi.mock('../../agent-runtime/permissions/AgentPermissionPolicy', () => ({
 vi.mock('../../agent-runtime/permissions/AgentToolApprovalRequestService', () => ({
   agentToolApprovalRequestService: {
     requestApproval: async () => ({ approved: true }),
+    autoReview: vi.fn(async () => ({ approved: false, reason: 'Native mutation requires review.' })),
   },
 }));
 
@@ -109,6 +112,20 @@ import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 
 describe('ToolExecutorFactory', () => {
+  it('delivers the actual auto-review risk and reason without executing a rejected call', async () => {
+    const execute = vi.fn();
+    const toolMap = new Map([['shell', { ...shellTool, execute }]]);
+    const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
+      getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
+      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+    permissionEvaluate.mockReturnValueOnce({ action: 'auto_review', risk: 'high', reason: 'Native mutation requires review.' } as never);
+    const executor = factory.createToolExecutor('general', ['shell'], 'review-owner', { sessionId: 'review-owner', turnId: 'review-turn',
+      eventContext: { sessionId: 'review-owner', turnId: 'review-turn' }, effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null } as never });
+    const result = await executor.execute({ id: 'rejected-native', type: 'toolCall', name: 'shell', arguments: { rdc: { operation: 'rd.buffer.write', args: {} } } });
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain('AUTO_REVIEW_DENIED: risk=high; Native mutation requires review.');
+    expect(execute).not.toHaveBeenCalled();
+  });
   it('delivers a small file audit as a durable hash-bound result to an explicitly granted reviewer', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-audit-delivery-'));
     fs.writeFileSync(path.join(root, 'session.json'), '{}');

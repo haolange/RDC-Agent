@@ -150,6 +150,7 @@ export interface PreparedAgentTurnContext {
 }
 
 export interface ToolExecutorRuntimeContext {
+  reviewPermission?: import('../../agent-runtime/permissions/PermissionReviewRuntime').PermissionReviewer;
   sessionId?: string | null;
   runId?: string;
   turnId?: string;

@@ -1,10 +1,10 @@
-import { authorizeRdcOperation, isMainOwnedRdcIdentityKey, rdcCapabilityPolicy, rdcOperationCapability } from './RdcOperationPolicy';
+import { assertRdcBindingOwnership, authorizeRdcOperation, isMainOwnedRdcIdentityKey, rdcCapabilityPolicy, rdcCatalogCapabilitySummary, rdcOperationCapability } from './RdcOperationPolicy';
 import { operationFingerprint } from './RdcOperationCatalog';
 import { isUnchangedShaderResult, validateExecutionEvidence, verifyRollbackIdentity } from './RdcValidatedEvidence';
 import { runRdcOperation } from '../sessions/RdcOperationCoordinator';
-import { z } from 'zod';
+import { assertRdcDiscovery, RdcShellInputSchema, type RdcShellInput } from './RdcShellInput';
 import type { AgentToolResult, ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
-import { assertRdcContextLeaseOwnership, getRdcContextLease, quarantineRdcContext } from '../sessions/RdcRuntimeContextRegistry';
+import { assertRdcContextLeaseOwnership, quarantineRdcContext } from '../sessions/RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
 import { rdcDigest, rdcExecutionReceipts } from './RdcExecutionReceipts';
@@ -59,19 +59,6 @@ function searchRdcDefinitions(definitions: readonly RdcOperationDefinition[], qu
   };
 }
 
-export const RdcDiscoverySchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('search'), query: z.string().trim().min(1).max(200), limit: z.number().int().min(1).max(20).default(8) }).strict(),
-  z.object({ kind: z.literal('describe'), operation: z.string().regex(/^rd[.][a-z_]+[.][a-z0-9_]+$/) }).strict(),
-  z.object({ kind: z.literal('list'), limit: z.number().int().min(1).max(20).default(20),
-    cursor: z.object({ offset: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), fingerprint: z.string().regex(/^[a-f0-9]{64}$/) }).strict().optional(),
-  }).strict(),
-]);
-export const RdcShellInputSchema = z.union([
-  z.object({ operation: z.string().regex(/^rd[.][a-z_]+[.][a-z0-9_]+$/), args: z.record(z.string(), z.unknown()), experimentId: z.string().trim().min(1).max(128).optional() }).strict(),
-  z.object({ discovery: RdcDiscoverySchema }).strict(),
-]);
-export type RdcShellInput = z.infer<typeof RdcShellInputSchema>;
-
 export async function executeRdcShell(
   raw: RdcShellInput, toolCallId: string, signal: AbortSignal | undefined, context?: ToolExecutionContext,
 ): Promise<AgentToolResult<{ operation: string; exitCode: number; receipt?: import("@shared/types/renderdocInvestigation").InvestigationContentRef }>> {
@@ -80,44 +67,27 @@ export async function executeRdcShell(
   if (context?.agentId !== 'general' || context.excludeRdcLeaseTools || !context.sessionId || !context.projectId || !context.turnId) {
     throw new Error('RDC_EXECUTION_DENIED: only the owning General turn may execute native operations.');
   }
-  const lease = assertRdcContextLeaseOwnership({ sessionId: context.sessionId, projectId: context.projectId });
-  const retainedLease = !lease ? getRdcContextLease(context.sessionId) : null;
-  if (retainedLease?.ownerProjectId === context.projectId && retainedLease.quarantineReason) {
-    throw new Error('RDC_CONTEXT_QUARANTINED: replay outcome is uncertain; close and reopen the capture before execution.');
-  }
-  const cli = context.rdcBinding?.cli;
-  const identity = context.rdcBinding?.identity;
-  if (!lease || !identity || identity.version !== lease.version || identity.contextId !== lease.contextId || identity.ownerSessionId !== context.sessionId) {
-    throw new Error('RDC_EXECUTION_DENIED: binding changed since prepareTurn; prepare a new turn before execution.');
-  }
-  if (!lease || lease.delegatedFrom || lease.ownerSessionId !== context.sessionId || lease.ownerProjectId !== context.projectId || lease.contextId === 'default'
-    || !lease.runtimeContext.replaySessionId || !cli?.enabled || !cli.command.trim()) {
-    throw new Error('RDC_EXECUTION_DENIED: requires a frozen binding and an owned replay session.');
-  }
+  const lease = assertRdcBindingOwnership(context);
+  const cli = context.rdcBinding!.cli;
+  const identity = context.rdcBinding!.identity!;
   if ('discovery' in input) {
     const binding = context.rdcBinding!;
     if (operationFingerprint(binding.definitions) !== binding.definitionsFingerprint) throw new Error('RDC_EXECUTION_DENIED: invalid frozen catalog.');
     const request = input.discovery;
+    assertRdcDiscovery(request, binding);
     let data: unknown;
     if (request.kind === 'describe') {
       const definition = binding.definitions.find(item => item.name === request.operation) as RdcOperationDefinition | undefined;
-      if (!definition) throw new Error('RDC_EXECUTION_DENIED: unknown operation.');
-      data = callableRdcDefinition(definition);
+      data = callableRdcDefinition(definition!);
     } else if (request.kind === 'list') {
-      if (request.cursor && request.cursor.fingerprint !== binding.definitionsFingerprint) throw new Error('RDC_DISCOVERY_CURSOR: frozen catalog fingerprint mismatch.');
       const offset = request.cursor?.offset ?? 0;
       const definitions = binding.definitions as readonly RdcOperationDefinition[];
-      if (offset > definitions.length) throw new Error('RDC_DISCOVERY_CURSOR: offset is outside the frozen catalog.');
-      const admitted = definitions.filter(item => rdcOperationCapability(item).available);
       const end = Math.min(offset + request.limit, definitions.length);
       data = {
         total: definitions.length, offset, truncated: end < definitions.length,
         next: end < definitions.length ? { offset: end, fingerprint: binding.definitionsFingerprint } : null,
         policy: rdcCapabilityPolicy(),
-        capabilitySummary: { coverage: 'complete-frozen-catalog', checkedOperations: definitions.length,
-          admittedOperations: admitted.length, deniedOperations: definitions.length - admitted.length,
-          admittedEffects: [...new Set(admitted.flatMap(item => item.effects))].sort(),
-          isNativeStateObservation: false },
+        capabilitySummary: rdcCatalogCapabilitySummary(definitions),
         operations: definitions.slice(offset, end).map(item => ({ name: item.name, scope: item.scope,
           effects: item.effects, evidence_kind: item.evidence_kind, capabilityAdmission: rdcOperationCapability(item) })),
       };
@@ -127,7 +97,7 @@ export async function executeRdcShell(
     return { content: [{ type: 'text', text: JSON.stringify({ fingerprint: binding.definitionsFingerprint, data }) }], details: { operation: `rdc_tool.tools.${request.kind}`, exitCode: 0 } };
   }
   const sessionId = context.sessionId; const projectId = context.projectId; const turnId = context.turnId;
-  const replaySessionId = lease.runtimeContext.replaySessionId;
+  const replaySessionId = lease.runtimeContext.replaySessionId!;
   const frozenCaptureId = identity.runtimeContext?.captureFileId;
   if (frozenCaptureId !== lease.runtimeContext.captureFileId || identity.runtimeContext?.replaySessionId !== replaySessionId) {
     throw new Error('RDC_EXECUTION_DENIED: capture/replay identity changed since prepareTurn.');
@@ -215,7 +185,7 @@ export async function executeRdcShell(
     const executionEvidence = unchangedShader ? { status: 'not-executed', reason: 'native-shader-noop', receiptIssued: false,
       message: 'Native status=noop: no build or shader replacement was performed. No intervention receipt was issued.' } : undefined;
     return { content: [{ type: 'text', text: JSON.stringify({ result: payload, receipt, executionEvidence, rdcExecutionIdentity, invocation }) }],
-      details: { operation: input.operation, exitCode: 0, receipt, rdcExecutionIdentity, invocation } };
+      details: { operation: input.operation, exitCode: 0, receipt, rdcExecutionIdentity, invocation, executionEvidence } };
   } catch (error) {
     const failedInvocation = lastInvocation;
     let nativeStateVerifiedSafe = false;

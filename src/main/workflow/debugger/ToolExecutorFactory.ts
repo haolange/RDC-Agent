@@ -26,6 +26,7 @@ import {
 import { planReviewStateStore } from '../../sessions/PlanReviewStateStore';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../../agent-runtime/tasks';
 import { preparePlanTaskRequirements } from '../../agent-runtime/tasks/TaskExecutionRequirements';
+import { assertDeclaredHandoffForPlan } from '../../conversation/applyDeclaredHandoff';
 import { agentPermissionPolicyService } from '../../agent-runtime/permissions/AgentPermissionPolicy';
 import { agentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { isToolDeniedByPolicy } from '../../agent-runtime/permissions/PolicyCompiler';
@@ -264,7 +265,22 @@ export class ToolExecutorFactory {
           }
         }
         const knowledgeReadRoots = plan?.knowledgeReadRoots ?? [];
+        const projectRootPath = runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null;
+        const toolContext: ToolExecutionContext = {
+          successfulFileReads: this.sessionFileReads(runtimeContext?.sessionId ?? sessionId),
+          rdcBinding: plan ? getRdcTurnBinding(plan) : undefined,
+          agentId,
+          turnId: runtimeContext?.turnId,
+          excludeRdcLeaseTools: plan?.excludeRdcLeaseTools,
+          workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
+          projectRootPath,
+          projectId: runtimeContext?.projectId ?? plan?.projectId ?? null,
+          sessionId: runtimeContext?.sessionId ?? null,
+          visionInputMode: plan?.routeCapability?.visionInputMode ?? 'disabled',
+          ...(normalizedName === 'knowledge_read' ? { knowledgeReadRoots } : {}),
+        };
         const permissionDecision = agentPermissionPolicyService.evaluate({
+          executionContext: toolContext,
           effectiveToolNames: [...tools.keys()].filter(name => !activeSkillAllowlist || activeSkillAllowlist.has(name)),
           tool,
           toolCall: validatedToolCall,
@@ -302,7 +318,13 @@ export class ToolExecutorFactory {
           if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
             return denyTool('Auto-review requires an active conversation turn.');
           }
-          const approved = agentToolApprovalRequestService.autoReview({
+          const reviewedArguments = JSON.stringify(validatedArgs);
+          const reviewTurn = this.deps.getActiveTurn(executorSessionId);
+          const reviewGeneration = reviewTurn?.generation;
+          const verdict = await agentToolApprovalRequestService.autoReview({
+            action: { tool: toolCall.name, arguments: structuredClone(validatedArgs), reason: permissionDecision.reason ?? 'Review required',
+              facts: { ...permissionDecision.operationFacts, executionBudget: policyBudget ? { ...policyBudget, observedAt: Date.now() } : null } },
+            reviewer: runtimeContext.reviewPermission,
             agentId,
             sessionId: runtimeContext.sessionId ?? null,
             turnId: runtimeContext.turnId,
@@ -314,33 +336,27 @@ export class ToolExecutorFactory {
             onEvent: runtimeContext.onEvent,
             signal,
           });
-          if (!approved) {
-            return denyTool('Auto-review denied this tool call.');
+          if (JSON.stringify(validatedArgs) !== reviewedArguments || reviewTurn && !reviewTurn.isLive(reviewGeneration!)) {
+            return denyTool('PERMISSION_REVIEW_STALE: pending action or turn changed during review.');
+          }
+          if (!verdict.approved) {
+            return denyTool(`AUTO_REVIEW_DENIED: risk=${permissionDecision.risk}; ${verdict.reason}`);
           }
         }
+        if (signal?.aborted) return denyTool('Tool call cancelled before execution.');
+        if (policyBudget) {
+          const current = reserveDispatchBudget(policyBudget, { toolCalls: 0, subagents: 0 });
+          if (!current.ok) return this.createPolicyLimitToolResult(toolCall, agentId, current.limit);
+        }
         try {
-          const projectRootPath = runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null;
           const beforeHooks = await this.triggerRuntimeHooks('tool.before-call', agentId, runtimeContext, {
             toolName: toolCall.name,
             toolCallId: toolCall.id,
-            arguments: validatedArgs,
+            arguments: structuredClone(validatedArgs),
           });
           if (!beforeHooks.allowed) {
             return denyTool(`A blocking lifecycle hook denied this tool call: ${beforeHooks.reason ?? 'reason unavailable'}`);
           }
-          const toolContext: ToolExecutionContext = {
-            successfulFileReads: this.sessionFileReads(runtimeContext?.sessionId ?? sessionId),
-            rdcBinding: plan ? getRdcTurnBinding(plan) : undefined,
-            agentId,
-            turnId: runtimeContext?.turnId,
-            excludeRdcLeaseTools: plan?.excludeRdcLeaseTools,
-            workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
-            projectRootPath,
-            projectId: runtimeContext?.projectId ?? plan?.projectId ?? null,
-            sessionId: runtimeContext?.sessionId ?? null,
-            visionInputMode: plan?.routeCapability?.visionInputMode ?? 'disabled',
-            ...(normalizedName === 'knowledge_read' ? { knowledgeReadRoots } : {}),
-          };
           const injectKnowledgeRoots = isKnowledgeReadFileTool(normalizedName);
           const executeToolEffect = () => withProcessExecutionOwner(runtimeContext?.sessionId ?? sessionId, () => withTemporaryPathAccess(
             toolContext,
@@ -512,6 +528,8 @@ export class ToolExecutorFactory {
       const registry = Array.isArray(requiredTaskIds) && requiredTaskIds.length ? new TaskRegistry(createSessionTaskStore(sessionId)) : null;
       if (args.taskRevisions !== undefined && !registry) throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: taskRevisions requires requiredTaskIds.');
       const taskRequirements = registry ? await preparePlanTaskRequirements(registry, requiredTaskIds as string[], args.taskRevisions) : [];
+      for (const handoff of handoffOptions) assertDeclaredHandoffForPlan({ sourceAgentId: agentId,
+        projectRoot: runtimeContext.projectRootPath ?? runtimeContext.effectivePlan?.projectRootPath ?? null, handoff, tasks: taskRequirements });
       const markdown = composePlanMarkdown({ title, summary, content, taskRequirements });
       const written = planArtifactWriter.writeLivePlan(sessionId, markdown);
       const revision = planReviewStateStore.beginRevision(sessionId, runtimeContext.turnId);

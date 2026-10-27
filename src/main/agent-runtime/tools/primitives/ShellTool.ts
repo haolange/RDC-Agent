@@ -1,4 +1,5 @@
-import { executeRdcShell, type RdcShellInput } from '../../../tools/executeRdcShell';
+import { executeRdcShell } from '../../../tools/executeRdcShell';
+import { parseShellRdcInput, type RdcShellInput } from '../../../tools/RdcShellInput';
 /**
  * ShellTool — spawn a fresh interpreter for each call and persist only cwd.
  */
@@ -42,11 +43,7 @@ interface ShellDetails {
 }
 
 function validateShellInputMode(params: ShellParams): void {
-  const hasCommand = typeof params.command === 'string' && params.command.trim().length > 0;
-  const hasRdc = params.rdc !== undefined && params.rdc !== null;
-  if (hasCommand === hasRdc || (params.command !== undefined && !hasCommand)) {
-    throw new Error('SHELL_INPUT: provide exactly one of command or rdc.');
-  }
+  parseShellRdcInput(params);
 }
 
 const sessionShellLocks = new Map<string, Promise<unknown>>();

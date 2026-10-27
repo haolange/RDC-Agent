@@ -1,3 +1,4 @@
+import type { PermissionReviewer, PermissionReviewAction, PermissionReviewVerdict } from './PermissionReviewRuntime';
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
@@ -90,8 +91,7 @@ export class AgentToolApprovalRequestService {
     });
   }
 
-  autoReview(input: ToolApprovalRequestInput): boolean {
-    const approved = input.risk === 'low';
+  async autoReview(input: ToolApprovalRequestInput & { action?: PermissionReviewAction; reviewer?: PermissionReviewer }): Promise<PermissionReviewVerdict> {
     const approvalId = `auto-review-${input.toolCallId}`;
     const synthetic: PendingToolApprovalRequest = {
       ...input,
@@ -113,21 +113,32 @@ export class AgentToolApprovalRequestService {
       risk: input.risk,
       reviewer: 'auto_review',
     } as AgentApprovalEventPayload);
+    let verdict: PermissionReviewVerdict;
+    try {
+      input.signal?.throwIfAborted();
+      verdict = input.risk === 'low'
+        ? { approved: true, reason: `RULE_APPROVED: ${input.reason}` }
+        : input.reviewer && input.action
+          ? await input.reviewer(input.action, input.signal)
+          : { approved: false, reason: 'PERMISSION_REVIEW_UNAVAILABLE: no frozen reviewer is available.' };
+      input.signal?.throwIfAborted();
+    } catch (error) {
+      verdict = { approved: false, reason: `${input.signal?.aborted ? 'PERMISSION_REVIEW_CANCELLED' : 'PERMISSION_REVIEW_FAILED'}: ${error instanceof Error ? error.message : String(error)}` };
+    }
+    const { approved, reason } = verdict;
     this.emit(synthetic, 'approval.answered', {
       approvalId,
       title: `Auto-review ${input.toolName}`,
-      status: approved ? 'approved' : 'rejected',
-      reason: input.reason,
+      status: input.signal?.aborted ? 'cancelled' : approved ? 'approved' : 'rejected',
+      reason,
       kind: 'tool',
       toolCallId: input.toolCallId,
       toolName: input.toolName,
-      answer: approved
-        ? 'Auto-review approved this low-risk action.'
-        : 'Auto-review denied this action. Use a safer workspace-scoped path or switch permissions.',
+      answer: reason,
       risk: input.risk,
       reviewer: 'auto_review',
     } as AgentApprovalEventPayload);
-    return approved;
+    return verdict;
   }
 
   isPending(sessionId: string, turnId: string, approvalId: string): boolean {

@@ -3,6 +3,8 @@
  */
 
 import type { AgentRole } from '@shared/types/agent';
+import { executePermissionReview } from '../../agent-runtime/permissions/PermissionReviewRuntime';
+import { permissionReviewAuthority, permissionReviewEvidence } from '../../agent-runtime/permissions/PermissionReviewAuthority';
 import { createHash } from 'node:crypto';
 import { delegatedArtifactReferences } from '../../sessions/DelegatedArtifactAccess';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
@@ -424,7 +426,6 @@ export class AgentTurnRunner {
       projectId: input.projectId ?? null,
       agentId: input.agentId,
     };
-
     const frozenToolAllowlist = [...preparedRuntime.effectivePlan.toolAllowlist];
     const liveRuntimeTools = this.deps.resolveRuntimeTools(
       input.agentId,
@@ -487,6 +488,13 @@ export class AgentTurnRunner {
       mcpPoolKey: mcpLease?.poolKey ?? null,
       effectivePlan,
       policyBudget: turnHandle.policyBudget,
+      reviewPermission: (action, signal) => executePermissionReview({
+        sessionId: executionScopeId, plan: requestPlan, credentialHandle: preparedRuntime.credentialHandle,
+        reasoning: routeCapability.reasoningContract, evidence: permissionReviewEvidence(slot?.agent.messages ?? [], executionScopeId, action.arguments),
+        authority: permissionReviewAuthority({ sessionId: executionScopeId, messages: input.initialMessages ?? [],
+          currentRequest: input.content, promptPlan, workspace: effectivePlan.projectRootPath, agentId: input.agentId,
+          delegated: !!effectivePlan.delegationCapsule }), action, signal,
+      }),
     });
     const promptCache = preparedRuntime.promptCache;
     const streamOptions: StreamOptions = {

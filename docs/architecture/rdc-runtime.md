@@ -199,3 +199,7 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。`rdc_context` 对同一 session/project 的隔离身份返回明确的受控恢复状态，不将仍打开的 capture 误报为未打开，也不向其他 scope 泄露保留的 lease。新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化。失败没有取得可信恢复证明时仍 fail-closed；恢复通过应用生命周期重新建立 owning capture/replay/context 身份。
 
 Android 的 remote_display 由同一远程连接的原生呈现确认驱动，核对当前事件、目标纹理及新鲜序号；后台窗口、原生失败或缺失能力不得显示 presented。无颜色输出清除手机旧画面并表达无输出，应用 PNG 与手机屏幕状态分别判断。
+
+## 审批前原生事实
+
+权限策略与执行入口共享 owning binding 校验和 authorizeRdcOperation：只有冻结 catalog 的已知 scope/effects、主进程身份注入、参数及文件边界全部成立才分类。无副作用读取、测量和受控 artifact/replay 操作可按 low 自动批准；shader replacement 和敏感配置路径分别进入 medium/high 审核。模型审核只评估当前动作与实际用户授权，不提供 lease、能力或签名资格；执行前及队列后继续校验身份，恢复失败仍隔离。目录查询保持冻结目录语义，不调用原生 CLI。

@@ -40,7 +40,7 @@ import { ToolExecutorFactory } from './ToolExecutorFactory';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
 import { toolValidator } from '../../agent-runtime/core/ToolValidator';
 import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
-import { TaskRegistry, createSessionTaskStore, registerDelegatedTaskScope, resolveSessionTasksDir } from '../../agent-runtime/tasks';
+import { TaskRegistry, FileTaskStore, createSessionTaskStore, registerDelegatedTaskScope, resolveSessionTasksDir } from '../../agent-runtime/tasks';
 import { TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
@@ -61,6 +61,41 @@ function createAssembly(): RuntimeToolAssembly {
 }
 
 describe('RuntimeToolAssembly', () => {
+  it('completes ordinary document work through discovered method reads without preload and cannot turn those reads into hard-constraint proof', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'document-method-'));
+    fs.mkdirSync(path.join(root, 'references'));
+    fs.writeFileSync(path.join(root, 'references', 'terms.md'), 'Term A means a bounded claim.');
+    const method: SkillLoadResult = { id: 'document-review', name: 'Document review', description: 'Compare document claims.',
+      instructions: 'Read the terminology reference before comparing claims.', sourcePath: path.join(root, 'SKILL.md'),
+      sourceHash: 'a'.repeat(64), scope: 'user', effectiveStatus: 'effective', allowedTools: ['read_file'] };
+    const load = vi.spyOn(agentRuntimeConfigService, 'loadSkill').mockReturnValue(method);
+    const catalog = vi.spyOn(agentRuntimeConfigService, 'listSkills').mockReturnValue([{ id: method.id, name: method.name,
+      label: method.name, description: method.description, source: 'user', path: method.sourcePath, enabledByDefault: true }]);
+    const preparation = { sessionId: 'document-owner', turnId: 'document-turn', runtimeFingerprint: 'b'.repeat(24),
+      skills: [], inputArtifacts: [], selectedTurnCount: 0, requestsDomainCapability: false };
+    const original = JSON.stringify(preparation);
+    const reads = new Set<string>();
+    const context = { workspaceRoot: root, projectRootPath: root, projectId: 'document-project', sessionId: preparation.sessionId, successfulFileReads: reads };
+    try {
+      const registry = new TaskRegistry(new FileTaskStore(path.join(root, 'tasks')));
+      const task = await registry.createTask('Compare the claims', { description: 'Read document-review and its terminology before use.', completionRequirements: ['comparison'] });
+      const assembly = createAssembly();
+      const index = await assembly.createSkillsCatalogTool('general').execute('discover', { query: 'document' }, undefined, undefined, context);
+      expect(JSON.stringify(index.content)).toContain('document-review');
+      const reader = assembly.createSkillReadTool('general');
+      expect((await reader.execute('read', { skill_id: 'document-review' }, undefined, undefined, context)).isError).not.toBe(true);
+      const terms = await reader.execute('reference', { skill_id: 'document-review', reference: 'references/terms.md' }, undefined, undefined, context);
+      expect(JSON.stringify(terms.content)).toContain('bounded claim');
+      const execution = await registry.startExecution(task.id, { mode: 'direct', preparation });
+      await registry.settleExecution(execution.id, { expectedGeneration: execution.generation, status: 'completed',
+        result: { disposition: 'completed', summary: 'Compared using the read terminology.', outputs: { comparison: 'Term A denotes a bounded claim.' } } });
+      expect((await registry.getTask(task.id))?.status).toBe('completed');
+      const constrained = await registry.createTask('Freeze comparison procedure', { executionRequirements: { mode: 'direct', requiredSkillIds: ['document-review'], independentOfTaskIds: [] } });
+      await expect(registry.startExecution(constrained.id, { mode: 'direct', preparation })).rejects.toThrow('Required methods');
+      expect(JSON.stringify(preparation)).toBe(original);
+      expect(reads.size).toBe(0);
+    } finally { load.mockRestore(); catalog.mockRestore(); await rm(root, { recursive: true, force: true }); }
+  });
   it.each(['debugger', 'analyzer', 'optimizer'] as const)('lets %s read its operation knowledge without execution or workspace edit rights', async (mission) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-planning-knowledge-'));
     const previousHome = process.env.RDC_AGENT_HOME;

@@ -36,6 +36,8 @@ describe('PromptPlanBuilder', () => {
     expect(plan.segments.some((segment) => segment.kind === 'scoped-instruction')).toBe(true);
     expect(plan.segments.some((segment) => segment.kind === 'preloaded-skill')).toBe(true);
     expect(plan.systemPrompt).toContain('Effective Tools\n- read_file');
+    expect(plan.systemPrompt).toContain('Declared handoffs (main-resolved profile metadata): []');
+    expect(plan.systemPrompt).toContain('Methods used as knowledge remain discoverable and readable with skill_read');
     expect(plan.segments.find(segment => segment.id === 'core:file-tool-routing')?.content).toContain('same realpath in this session');
     expect(plan.systemPrompt).toContain('after restart read again');
     expect(plan.systemPrompt).not.toContain('MEMORY.md');

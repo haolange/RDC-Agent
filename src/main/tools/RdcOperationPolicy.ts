@@ -4,12 +4,38 @@ import type { RdcOperationDefinition } from '@shared/types/tool';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { safeResolvePath } from '../agent-runtime/tools/primitives/_shared';
 import { operationFingerprint } from './RdcOperationCatalog';
+import { assertFileWriteBoundary } from '../agent-runtime/permissions/FileOperationBoundary';
+import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../sessions/RdcRuntimeContextRegistry';
 
 const allowedEffects = new Set(['replay_position', 'replay_position_temporary', 'artifact_write', 'context_metadata', 'shader_debug', 'shader_replacement']);
 const scopes = new Set(['global', 'context', 'replay', 'capture']);
 const identityKey = /^(session_?id|context_?id|daemon_?context|target_?context_?id|owner_?session_?id|owner_?lease_?id|runtime_?owner|remote_?id|capture_?file_?id)$/i;
 export const isMainOwnedRdcIdentityKey = (key: string): boolean => identityKey.test(key);
 function denied(message: string): never { throw new Error('RDC_EXECUTION_DENIED: ' + message); }
+
+/** Same ownership check before approval and immediately before native execution. */
+export function assertRdcBindingOwnership(context?: ToolExecutionContext) {
+  if (context?.agentId !== 'general' || context.excludeRdcLeaseTools || !context.sessionId || !context.projectId || !context.turnId) {
+    denied('only the owning General turn may execute native operations.');
+  }
+  const lease = assertRdcContextLeaseOwnership({ sessionId: context.sessionId, projectId: context.projectId });
+  const retained = !lease ? getRdcContextLease(context.sessionId) : null;
+  if (retained?.ownerProjectId === context.projectId && retained.quarantineReason) {
+    throw new Error('RDC_CONTEXT_QUARANTINED: replay outcome is uncertain; close and reopen the capture before execution.');
+  }
+  const binding = context.rdcBinding;
+  const identity = binding?.identity;
+  if (!lease || !identity || identity.version !== lease.version || identity.contextId !== lease.contextId || identity.ownerSessionId !== context.sessionId) {
+    denied('binding changed since prepareTurn; prepare a new turn before execution.');
+  }
+  if (lease.delegatedFrom || lease.ownerSessionId !== context.sessionId || lease.ownerProjectId !== context.projectId || lease.contextId === 'default'
+    || !lease.runtimeContext.replaySessionId || !binding?.cli.enabled || !binding.cli.command.trim()) denied('requires a frozen binding and an owned replay session.');
+  if (identity.runtimeContext?.captureFileId !== lease.runtimeContext.captureFileId || identity.runtimeContext?.replaySessionId !== lease.runtimeContext.replaySessionId) {
+    denied('capture/replay identity changed since prepareTurn.');
+  }
+  if (operationFingerprint(binding.definitions) !== binding.definitionsFingerprint) denied('invalid frozen catalog.');
+  return lease;
+}
 
 /** A conservative capability boundary, not argument/path/approval authorization. */
 export function rdcOperationCapability(definition: RdcOperationDefinition | undefined): { available: boolean; reason: string | null } {
@@ -28,6 +54,15 @@ export function rdcOperationCapability(definition: RdcOperationDefinition | unde
 export function rdcCapabilityPolicy() {
   return { source: 'main-operation-policy', scope: 'scope-effects-prerequisites-only',
     allowedScopes: [...scopes], allowedEffects: [...allowedEffects], argumentChecksStillRequired: true, isAuthorization: false };
+}
+
+/** Complete frozen definition coverage, never a native state or recovery observation. */
+export function rdcCatalogCapabilitySummary(definitions: readonly RdcOperationDefinition[]) {
+  const admitted = definitions.filter(item => rdcOperationCapability(item).available);
+  return { coverage: 'complete-frozen-catalog', checkedOperations: definitions.length,
+    admittedOperations: admitted.length, deniedOperations: definitions.length - admitted.length,
+    admittedEffects: [...new Set(admitted.flatMap(item => item.effects))].sort(),
+    isNativeStateObservation: false };
 }
 
 export function validateRdcArguments(value: unknown, schema: Record<string, unknown>, location = 'args'): void {
@@ -92,6 +127,7 @@ export function authorizeRdcOperation(operation: string, input: Record<string, u
     const check = (item: unknown): string => {
       if (typeof item !== 'string') denied('invalid filesystem input');
       const resolved = safeResolvePath(item, undefined, context);
+      if (entry.access === 'write') assertFileWriteBoundary(resolved);
       if (entry.access !== 'write') {
         const stat = fs.statSync(resolved);
         if (entry.access === 'read_directory' ? !stat.isDirectory() : !stat.isFile()) denied('filesystem input has the wrong kind');

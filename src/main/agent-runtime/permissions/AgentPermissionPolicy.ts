@@ -2,6 +2,7 @@ import * as os from 'os';
 import { matchShellFileToolBypass } from './shellFileToolBypass';
 import * as path from 'path';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
+import type { RdcOperationDefinition } from '@shared/types/tool';
 import type { CompiledPolicy } from '@shared/types/rdcRuntime';
 import type { AgentTool } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
@@ -20,6 +21,12 @@ import {
 import { isMissionForbiddenToolId, isMissionProfileId } from '@shared/constants/missionPlanOnly';
 import { isKnowledgeReadFileTool } from '../knowledgeReadRoots';
 import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
+import { assertRdcDiscovery, parseShellRdcInput, type RdcShellInput } from '../../tools/RdcShellInput';
+import { assertRdcBindingOwnership, authorizeRdcOperation, rdcCatalogCapabilitySummary, rdcOperationCapability } from '../../tools/RdcOperationPolicy';
+import type { ToolExecutionContext } from '../agent/AgentTool';
+import { safeResolvePath } from '../tools/primitives/_shared';
+import { fileOperationBoundary } from './FileOperationBoundary';
+import { readRdcHostControls } from '../../tools/RdcHostControls';
 
 /**
  * Agent permission risk classifier for tool / shell calls.
@@ -35,9 +42,12 @@ export interface AgentPermissionDecision {
   reason?: string;
   risk: 'low' | 'medium' | 'high';
   temporaryPathRoots: string[];
+  /** Main-owned operation facts; no executable, environment or credential material. */
+  operationFacts?: Record<string, unknown>;
 }
 
 export interface AgentPermissionDecisionInput {
+  executionContext?: ToolExecutionContext;
   /** Actual tools available to this executor after frozen skill intersection. */
   effectiveToolNames?: readonly string[];
   tool: AgentTool;
@@ -82,9 +92,6 @@ const WINDOWS_ROUTINE_COMMAND_PREFIXES = [
   'git diff',
   'git show',
   'git log',
-  'node scripts/check-',
-  'pnpm run check:',
-  'pnpm run typecheck',
 ];
 
 const POSIX_ROUTINE_COMMAND_PREFIXES = [
@@ -97,9 +104,6 @@ const POSIX_ROUTINE_COMMAND_PREFIXES = [
   'git diff',
   'git show',
   'git log',
-  'node scripts/check-',
-  'pnpm run check:',
-  'pnpm run typecheck',
 ];
 const DANGEROUS_COMMAND_PATTERNS = [
   /\brm\b/i,
@@ -233,7 +237,7 @@ function isCommandDeniedByRule(command: string, permissions: AgentPermissionSett
 }
 
 function isCommandAllowedByRule(command: string, permissions: AgentPermissionSettings): boolean {
-  return permissions.allowedCommandPrefixes.some((prefix) => matchesDeniedCommandPrefix(command, prefix));
+  return simpleCommandSegments(command)?.every(segment => permissions.allowedCommandPrefixes.some(prefix => matchesDeniedCommandPrefix(segment, prefix))) ?? false;
 }
 
 function routineCommandPrefixes(): string[] {
@@ -245,7 +249,14 @@ function routineCommandPrefixes(): string[] {
 
 function isRoutineCommand(command: string, permissions: AgentPermissionSettings): boolean {
   if (isCommandAllowedByRule(command, permissions)) return true;
-  return routineCommandPrefixes().some((prefix) => matchesDeniedCommandPrefix(command, prefix));
+  return simpleCommandSegments(command)?.every(segment => routineCommandPrefixes().some(prefix => matchesDeniedCommandPrefix(segment, prefix))) ?? false;
+}
+
+/** Only statically simple chains qualify for rule-based allow. Opaque syntax is reviewed. */
+function simpleCommandSegments(command: string): string[] | null {
+  if (/["'`$(){}<>\\]/.test(command) || /\r|\|&|(^|[^&])&([^&]|$)|--(?:output|ext-diff|textconv|exec-path)/i.test(command)) return null;
+  const segments = command.split(/&&|\|\||[;|\n]/).map(segment => segment.trim());
+  return segments.length && segments.every(Boolean) ? segments : null;
 }
 
 function resolveShellKind(): ShellKind {
@@ -301,6 +312,7 @@ function maxDecision(
   return DECISION_STRENGTH[floor.action] > DECISION_STRENGTH[baseline.action]
     ? {
         ...floor,
+        operationFacts: baseline.operationFacts,
         temporaryPathRoots: floor.temporaryPathRoots.length > 0
           ? floor.temporaryPathRoots
           : baseline.temporaryPathRoots,
@@ -350,8 +362,14 @@ export class AgentPermissionPolicyService {
       return denied(`Policy deniedTools blocked tool "${input.toolCall.name}".`, 'high');
     }
 
-    if (toolName === 'shell' && input.toolCall.arguments.rdc && input.agentId !== 'general') {
-      return denied('RDC_EXECUTION_DENIED: General only.', 'high');
+    let rdcRequest: RdcShellInput | null = null;
+    if (toolName === 'shell' && input.toolCall.arguments.rdc !== undefined) {
+      try {
+        rdcRequest = parseShellRdcInput(input.toolCall.arguments);
+      } catch (error) {
+        return denied(`SHELL_INPUT_INVALID: ${error instanceof Error ? error.message : String(error)}`, 'high');
+      }
+      if (input.agentId !== 'general') return denied('RDC_EXECUTION_DENIED: General only.', 'high');
     }
 
     // Catastrophic shell patterns are hard-denied in every mode, including full-access.
@@ -365,7 +383,7 @@ export class AgentPermissionPolicyService {
       if (bypass) return denied(bypass);
     }
 
-    const baseline = this.evaluateBaseline(input, permissions, mode, toolName, workspaceRoot);
+    const baseline = this.evaluateBaseline(input, permissions, mode, toolName, workspaceRoot, rdcRequest);
     if (!input.compiledPolicy) return baseline;
     const floor = resolvePolicyApprovalFloor(
       input.compiledPolicy,
@@ -381,7 +399,41 @@ export class AgentPermissionPolicyService {
     mode: AgentPermissionMode,
     toolName: string,
     workspaceRoot: string,
+    rdcRequest: RdcShellInput | null,
   ): AgentPermissionDecision {
+    if (rdcRequest) {
+        if ('discovery' in rdcRequest) {
+          if (input.executionContext) { try { assertRdcBindingOwnership(input.executionContext); assertRdcDiscovery(rdcRequest.discovery, input.executionContext.rdcBinding!); } catch (error) { return denied(error instanceof Error ? error.message : String(error)); } }
+          return mode === 'full-access' ? { action: 'allow', risk: 'low', temporaryPathRoots: [] }
+            : request(mode, `Frozen RDC catalog ${rdcRequest.discovery.kind}; reads definitions without native execution.`, 'low');
+        }
+        if (!input.executionContext) return request(mode, `Native RDC operation requires verified execution context: ${rdcRequest.operation}`, 'high');
+        try {
+          const lease = assertRdcBindingOwnership(input.executionContext);
+          const admitted = authorizeRdcOperation(rdcRequest.operation, rdcRequest.args, input.executionContext,
+            lease.runtimeContext.replaySessionId!, lease.runtimeContext.captureFileId);
+          const effects = admitted.definition.effects;
+          const changesShader = effects.includes('shader_replacement');
+          const protectedPaths = admitted.definition.path_inputs.some(entry => {
+            const values = admitted.args[entry.name];
+            return (Array.isArray(values) ? values : [values]).some(value => typeof value === 'string' && fileOperationBoundary(value).protected);
+          });
+          const decision = mode === 'full-access' ? { action: 'allow' as const, risk: 'low' as const, temporaryPathRoots: [] }
+            : request(mode, protectedPaths ? 'Protected native filesystem input requires specific authorization.'
+              : changesShader ? 'Owned replay shader change requires authorization review.' : 'Validated operation within the owning replay and workspace.', protectedPaths ? 'high' : changesShader ? 'medium' : 'low');
+          const definitions = input.executionContext.rdcBinding!.definitions as readonly RdcOperationDefinition[];
+          return { ...decision, operationFacts: { operation: admitted.definition.name, scope: admitted.definition.scope,
+            operationContract: { description: admitted.definition.description, inputSchema: admitted.definition.input_schema,
+              pathInputs: admitted.definition.path_inputs, prerequisites: admitted.definition.prerequisites },
+            effects, evidenceKind: admitted.definition.evidence_kind, arguments: admitted.args, experimentId: rdcRequest.experimentId ?? null,
+            catalogFingerprint: input.executionContext.rdcBinding!.definitionsFingerprint,
+            catalogCapabilities: changesShader ? rdcCatalogCapabilitySummary(definitions) : undefined,
+            rollbackContracts: changesShader ? definitions
+              .filter(item => item.evidence_kind === 'rollback' && rdcOperationCapability(item).available) : undefined,
+            hostControls: changesShader || protectedPaths ? readRdcHostControls({ sessionId: input.executionContext.sessionId!, projectId: input.executionContext.projectId!,
+              contextId: lease.contextId, leaseVersion: lease.version }, input.executionContext) : undefined } };
+        } catch (error) { return denied(error instanceof Error ? error.message : String(error)); }
+      }
     if (mode === 'full-access') {
       return { action: 'allow', risk: 'low', temporaryPathRoots: ['*'] };
     }
@@ -433,7 +485,6 @@ export class AgentPermissionPolicyService {
 
     if (toolName === 'shell') {
       const command = extractStringArg(input.toolCall, 'command');
-      if (input.toolCall.arguments.rdc) return request(mode, 'Native RDC operation requires review: ' + JSON.stringify(input.toolCall.arguments.rdc), 'high');
       if (!command) return denied('Shell command is empty.', 'medium');
       if (isCommandAllowedByRule(command, permissions)) {
         return { action: 'allow', risk: 'low', temporaryPathRoots: [] };
@@ -454,6 +505,16 @@ export class AgentPermissionPolicyService {
     if (MUTATION_TOOLS.has(toolName) || input.tool.permissionHint === 'mutation' || input.tool.permissionHint === 'destructive') {
       const targets = extractPathTargets(toolName, input.toolCall).map((target) => resolveToolTarget(target, workspaceRoot));
       const externalTargets = targets.filter((target) => !isInsideWorkspace(target, workspaceRoot));
+      if (['write_file', 'edit_file'].includes(toolName) && input.projectRootPath && externalTargets.length === 0 && targets.length) {
+        try {
+          const resolved = targets.map(target => safeResolvePath(target, workspaceRoot, input.executionContext));
+          const boundaries = resolved.map(fileOperationBoundary);
+          if (boundaries.some(boundary => boundary.readOnly)) return denied('FILE_WRITE_PROTECTED: capture inputs, Git metadata and canonical knowledge are not generic write targets.');
+          return request(mode, boundaries.some(boundary => boundary.protected)
+            ? 'Protected configuration or credential-related write requires specific authorization.' : 'Bounded workspace text edit; runtime read-before-edit and path checks remain enforced.',
+          boundaries.some(boundary => boundary.protected) ? 'high' : 'low');
+        } catch (error) { return denied(error instanceof Error ? error.message : String(error)); }
+      }
       if (mode === 'custom' && externalTargets.length > 0) {
         const allowedTargets = externalTargets.filter((target) => configuredWritableRoots.some((root) => isWithinRoot(target, root)));
         if (allowedTargets.length === externalTargets.length) {

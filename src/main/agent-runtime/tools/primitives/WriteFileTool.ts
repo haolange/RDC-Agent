@@ -12,6 +12,7 @@ import * as path from 'path';
 import type { AgentTool } from '../../agent/AgentTool';
 import { isPathExisting, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from './_shared';
 import { WRITE_FILE_MAX_CONTENT_BYTES } from './toolLimits';
+import { assertFileWriteBoundary } from '../../permissions/FileOperationBoundary';
 
 interface WriteFileParams {
   path: string;
@@ -62,6 +63,7 @@ export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
 
     const workspaceRoot = requireMutationWorkspaceRoot(context);
     const absolute = safeResolvePath(params.path, workspaceRoot, context);
+    assertFileWriteBoundary(absolute);
     const dir = path.dirname(absolute);
 
     if (isPathExisting(absolute)) {

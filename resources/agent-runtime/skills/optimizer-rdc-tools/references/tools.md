@@ -2,7 +2,7 @@
 
 # Optimizer RDC 工具参考
 
-Current catalog fingerprint: `3ebcd4a37dfa886cc46d6580b8399c7c4501e4918d879db2ade823f997f5160c`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
+Current catalog fingerprint: `e1e6fd9158e829d7dd4422726e47189ef3ae992c965474d11b1200a327a5d110`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
 
 所有 `shell.rdc` 示例都省略由主进程注入的 `session_id` / `capture_file_id` / context 身份。不要把示例补成可覆盖其它会话的身份。共享发现、错误恢复、输出与副作用规则见 `$rdc-tool-shell`。
 
@@ -1088,7 +1088,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `diff_text` | 否 | string; diff_text (str, 可选) |
 | `emit_patch_artifacts` | 否 | boolean; emit_patch_artifacts (bool, 可选) |
 | `output_dir` | 否 | string; output_dir (str, 可选) |
-| `expected_source_hash` | 否 | string |
+| `expected_source_hash` | 否 | string; SHA-256 of the currently bound original shader source before applying this patch, not the replacement source_text/source_path file hash. A mismatch rejects before compilation or replacement. |
 | `include_dirs` | 否 | array |
 | `intent` | 否 | string |
 | `max_diff_ops` | 否 | integer; min=0 |

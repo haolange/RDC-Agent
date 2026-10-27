@@ -260,6 +260,8 @@ RDC delegated lease 暂停父控制权，父级 rebind/clear/close 必须先 joi
 
 此为向当前单一 Task/计划路径增加的可选合同，旧记录不迁移、不重写、不补造证明；取消/join、持久 root/child-local 预算、重启 interrupted 与原消费/期限规则继续生效。
 
+`requiredSkillIds` 不是方法阅读清单。普通方法经 descriptor 发现、首次使用前 `skill_read`，不要求预载；只有明确合同或实际准备需要才声明必须预载的方法，并在 Task 描述说明必要性。Runtime 不理解领域语义，也不根据方法名称或 allowed-tools 判定重要性。计划提交和批准对照目标 profile/声明交接，声明交接再次核对 hash-bound direct Task 要求；子执行方法留在自身 Capsule。prepareTurn 比较真实 PromptPlan、来源 hash 和工具交集，不自动补载或重启；不相容应经现有显式准备入口或同 Task 的正常计划修订处理，保留消费、期限与批准历史。批准前检查不代表未来准备证明，普通 General 不因此新增计划门。
+
 正常重规划使用 `plan_artifact.taskRevisions` 显式提出对同一必需 Task 的变更，携带 expectedRevision；主进程读取当前定义并生成下一修订及前一修订/hash，展示在同一计划快照中。批准前不修改 Task，批准后按同一 TaskStore 原子安装定义修订，再发布批准；活执行须先取消/join，已完成 Task 不重开。CAS 冲突不安装候选或发布批准；同一提案重试不重复增代。原 execution、root、消费及期限不修改，新执行仍从原记录继承预算。取消或持久化失败不得发布迟到批准；已获用户点击授权但尚未完成批准发布的定义变更保持不可执行，正常重提计划可恢复，不手改状态。
 
 单一 TaskStore 的 canonical 文件为 `task-state.json`（仅当前 schema）。Task 保存目标、依赖、父任务、完成要求、修订与执行关联；TaskExecution 独立保存 executionId、taskRevision、generation、父执行、运行状态、共享预算快照、结果及可选冻结计划引用。取消或修订不会让旧结果覆盖新实例。不存在全局唯一 in_progress 限制；依赖存在、无环、已满足，以及完成要求的输出键与执行终态由 TaskRegistry 校验。要求覆盖是否完整、科学结论是否成立仍由模型及领域证据合同负责。
@@ -344,3 +346,5 @@ Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；�
 主子可见工作过程共享终态收束：完成、失败和停止冻结所属 loop 与思考状态；未执行工具标为 skipped，已启动但无回执的工具明确失败，不推造成功。独立 Task 生命周期不因父执行完成而终止。模型输入包装不承担产品标题或正文的结构契约。
 
 任务依赖准入与等待投影共用 taskDependencyWait：依赖须 completed/disposition=completed，需要执行的任务还须匹配当前任务 ID、revision、currentExecutionId 的 completed 执行与结果。waitingOn 只描述 pending 的依赖等待，不转换为 blocked，不放宽准入。事件快照在已有写锁中读取任务/执行，右栏通过一致性读取获取同一对数据，不嵌套存储锁。blockedBy 表示先后依赖；正常等待不应写成 blocked。
+
+独立权限审核是同一冻结 Provider 路由的一次无工具辅助请求，经 PromptPlan/RequestEnvelope/快照记录实际尝试与用量；没有第二执行器或恢复状态机。硬性 policy/user floor、Task 准入、Skill 工具交集与 owning lease 均不被审核批准替代。待审批调用保留原预算与期限，取消、过期 generation 或审核失败不执行。有效 profile 的声明交接及 requiredSkillIds 必须呈现在 PromptPlan，批准后的声明变更需重新审阅，不能沿用旧 offer 改写准备合同。

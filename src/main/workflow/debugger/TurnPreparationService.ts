@@ -84,7 +84,8 @@ function resolveSkillIntersection(
     const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined, agentId);
     if (!skill) throw new Error('SKILL_UNAVAILABLE: ' + skillId);
     const frozen = promptPlan.segments.find(segment => segment.id === 'skill:' + skillId && segment.kind === 'preloaded-skill');
-    if (frozen && frozen.sourceHash !== skill.sourceHash) throw new Error('SKILL_SOURCE_CHANGED: rebuild preparation for ' + skillId);
+    if (!frozen) throw new Error('SKILL_NOT_PRELOADED: rebuild preparation for ' + skillId);
+    if (frozen.sourceHash !== skill.sourceHash) throw new Error('SKILL_SOURCE_CHANGED: rebuild preparation for ' + skillId);
     if (skill.allowedTools?.length) {
       skillAllowedLists.push([...skill.allowedTools]);
     }
@@ -196,6 +197,7 @@ export class TurnPreparationService {
       promptPlan,
     );
     assertExecutionOfferSkillCompatibility({
+      preloadedSkillIds: promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)),
       sessionId: input.sessionId,
       agentId: input.agentId,
       tools: input.toolAllowlist,

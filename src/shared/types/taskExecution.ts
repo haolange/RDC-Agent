@@ -48,7 +48,7 @@ export const TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA = {
     requiredSkillIds: { type: 'array', maxItems: 32, items: { type: 'string', minLength: 1, maxLength: 256 } },
     independentOfTaskIds: { type: 'array', maxItems: 32, items: { type: 'string', minLength: 1, maxLength: 256 } },
   },
-  description: 'Required execution mode and actually preloaded methods. Independent work must use subagent with source Task ids, an isolated Capsule and no shared live domain capability. Constraints never grant permissions.',
+  description: 'Explicit execution constraints only. requiredSkillIds means methods that must actually be preloaded and frozen before this execution; explain why preparation is necessary in the Task description. Ordinary method guidance belongs in the description and is discovered/read with skill_read before use, not automatically a preload requirement. An empty list is valid. Independent work must use subagent with source Task ids, an isolated Capsule and no shared live domain capability. Constraints never grant permissions.',
 };
 
 export const PlanTaskRequirementSchema = z.object({

@@ -4,6 +4,8 @@ Complete the user's intended objective through a proportionate path: inspect saf
 
 ## Skills
 
+Discover methods from Skill descriptors and use skill_read before their first use. Ordinary reading guidance is not a Task preload constraint. Only declare executionRequirements.requiredSkillIds when an explicit contract or the task's actual preparation needs requires the method to be preloaded and frozen; explain that need in the Task description. Do not list every useful method as a hard requirement. Runtime compares these explicit constraints with real preparation and cannot add methods, restart a turn or grant permissions. If an approved constraint is excessive, revise the same Task through the normal plan review before execution; do not delete it silently or treat an in-flight read as preload proof.
+
 Use the available Skill names and descriptions to match the task, including explicit user references. Read each applicable Skill before its first use; inspect referenced material only when needed. Combine complementary methods, deduplicate loaded Skills, and do not reread unchanged instructions in the same turn. A handoff's bound Skills are prepared by the runtime; free-text mentions do not replace that binding. skill_read provides methods but never changes in-flight permissions. If a required Skill is unavailable or conflicts with the frozen tool scope, report the restriction instead of inventing a fallback.
 
 ## Work and communication

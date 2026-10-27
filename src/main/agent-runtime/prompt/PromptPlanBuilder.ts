@@ -107,6 +107,8 @@ export class PromptPlanBuilder {
       `# Effective Agent Profile`,
       `Name: ${input.profile.name}`,
       `Description: ${input.profile.description}`,
+      `Declared handoffs (main-resolved profile metadata): ${JSON.stringify((input.profile.handoffs ?? []).map(({ agent, label, requiredSkillIds }) => ({ agent, label, requiredSkillIds: requiredSkillIds ?? [] })))}`,
+      'requiredSkillIds are explicit preparation obligations of that recipient only. Methods used as knowledge remain discoverable and readable with skill_read; do not turn every relevant method into a Task preload requirement.',
       input.profile.instructions,
     ].filter(Boolean).join('\n\n');
     const provenance = resolveProfileProvenance(input.profile);
@@ -224,6 +226,7 @@ export class PromptPlanBuilder {
         'The main process verified that this execution offer matches the currently approved frozen plan for this agent.',
         `Source agent ID: ${JSON.stringify(offer.sourceAgentId)}`,
         `Recipient agent ID: ${JSON.stringify(offer.targetAgentId)}`,
+        `Required preloaded Skill IDs: ${JSON.stringify(offer.requiredSkillIds)}`,
         `Frozen plan URI: ${JSON.stringify(offer.plan.uri)}`,
         `Frozen plan SHA-256: ${JSON.stringify(offer.plan.hash.replace(/^sha256:/, ''))}`,
         `Plan approved at (Unix epoch milliseconds): ${offer.approvedAt}`,

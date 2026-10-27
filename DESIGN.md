@@ -32,6 +32,8 @@ Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。
 
 - `rdc-tool` 是公开 CLI 命令，操作名使用 `rd.*`；桌面通过同安装捆绑 Python 与 `cli/run_cli.py` 调用 canonical JSON 协议，安装位置由本机 Settings 配置。应用 session id 不等于 replay session id；daemon context 必须绑定 owning session，不使用 default。probe 翻译为真实 argv，不发送 lease-open / lease-close / preview-status 假想命令。进程成功、canonical JSON ok:true 与 context 一致后才更新 lease。
 - 四 Agent 身份不变。普通工作留在 General；RenderDoc Mission 走规划 → General 执行 → 原 Mission 评估。方法按需读取，skill_read 不改变当前轮权限；仅 prepareTurn 显式武装参与交集。执行方法不重复列举整个工作流权限，授权由 profile / policy / lease enforcement 决定。
+- 方法知识与执行前约束分开：descriptor/skill_read 保持渐进读取，普通方法不要求预载。Task.requiredSkillIds 仅指确需冻结的显式准备要求；计划提交、批准及声明交接对照目标 profile/交接核验，prepareTurn 和 Task 准入核验真实预载。差异经现有配置、准备或计划修订处理，不自动增删要求、合并父子方法或重启续跑。
+- shell.rdc 的受控 discovery 经严格解析后属于低风险冻结目录查询；实际原生操作按冻结 scope/effects、身份/lease/catalog、参数和路径确定风险，执行检查仍为硬边界。规则不能确定自动许可的动作进入一次无工具独立审核，复用冻结 Provider 请求与用量账本；明确 deny/user floor 不可被覆盖，失败不续跑。Electron sandbox 不隔离普通 shell 子进程。非法、混合及越权请求不因 discovery 名称或 Full access 获准；审批与工具结果保留真实分类原因。
 - General 的 shell 接受互斥的普通 command 或结构化 RDC operation/args。后者经配置的原生 CLI、既有审批与 session lease，主进程生成执行回执；目录由同一个配置 CLI 发现；普通操作按冻结定义的能力校验，定向查询和单工具说明按需提供给模型。软件生命周期、remote 控制、全局设置、窗口与销毁操作仍由应用专门入口管理。
 - prepareTurn 同时冻结 capture、replay 与 context 身份；只读 capture 能力使用主进程持有的身份。临时时间点查询须由主进程核对执行前后 context 与恢复结果，恢复失败隔离 lease，不刷新为查询中的临时画面。整帧证据校验 GPU 测量方法、完整范围、采样条件与 replacement，不接受事件总和或 CPU 耗时替代。
 - 新关闭实验须有 baseline / intervention / variant / rollback / restored 的真实执行引用。模型声明、拒绝执行或普通 shell 回显不是已执行实验。旧记录保持可读、不自动追认；新完成判定按当前证据合同执行。

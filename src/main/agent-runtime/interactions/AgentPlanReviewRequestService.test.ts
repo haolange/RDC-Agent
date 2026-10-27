@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+const preflight = vi.hoisted(() => vi.fn());
+vi.mock('../../sessions/handoffSkillCompatibility', () => ({ assertDeclaredHandoffSkillCompatibility: preflight }));
 
 vi.mock('../../sessions/StorageAdapter', () => ({
   storageAdapter: {
@@ -39,6 +41,21 @@ const planReview: ConversationPlanReview = {
   status: 'awaiting',
   handoffOptions: [{ label: '交给 General 执行', agent: 'general' }],
 };
+
+it('keeps incompatible approval pending without installing revisions or publishing qualification', async () => {
+  const markDecision = vi.fn(); const install = vi.fn(); const onEvent = vi.fn();
+  const writer = { freezeApprovedPlan: () => ({ uri: 'session://plans/frozen.md', hash: 'b'.repeat(64), taskRequirements: [] }) } as unknown as PlanArtifactWriter;
+  const store = { cancelReview: () => false, markDecision } as unknown as PlanReviewStateStore;
+  const service = new AgentPlanReviewRequestService(writer, store, install);
+  const turnHandle = { approvedPlan: null } as TurnHandle;
+  const pending = service.request({ agentId: 'planner', sessionId: 'sess', turnId: 'turn', toolCallId: 'call', planReview, turnHandle, onEvent, context: { sessionId: 'sess', turnId: 'turn' } });
+  preflight.mockImplementationOnce(() => { throw new Error('TASK_EXECUTION_REQUIREMENTS: document-method missing'); });
+  await expect(service.answer({ sessionId: 'sess', turnId: 'turn', toolCallId: 'call', decision: { kind: 'approve', handoff: planReview.handoffOptions[0] } })).rejects.toThrow('document-method');
+  expect(markDecision).not.toHaveBeenCalled(); expect(install).not.toHaveBeenCalled();
+  expect(turnHandle.approvedPlan).toBeNull(); expect(onEvent).toHaveBeenCalledTimes(1);
+  expect(service.isPending('sess', 'turn', 'call')).toBe(true);
+  service.cancelTurn('turn'); await expect(pending).rejects.toThrow('cancelled');
+});
 
 describe('AgentPlanReviewRequestService', () => {
   it.each([false, true])('persists exact review cancellation including already-aborted=%s', async alreadyAborted => {

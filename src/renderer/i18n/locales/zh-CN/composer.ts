@@ -57,7 +57,7 @@ export const zhComposer = {
   'composer.permission.full-access': '完全访问',
   'composer.permission.custom': '自定义',
   'composer.permission.defaultDesc': '工作区常规操作直接执行，外部或高风险操作先询问',
-  'composer.permission.auto-reviewDesc': '低风险操作自动通过，高风险操作自动拦截',
+  'composer.permission.auto-reviewDesc': '已验证的低风险操作自动通过，其余操作独立审查；明确审批限制仍生效',
   'composer.permission.full-accessDesc': '信任模式，所有操作直接放行（类 Yolo）',
   'composer.permission.customDesc': '按当前应用设置里的访问根目录执行',
 } as const;

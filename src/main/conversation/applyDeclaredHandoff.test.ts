@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   planRead: vi.fn(),
   resolveEnabled: vi.fn(),
   dispatchHooks: vi.fn(async () => true),
+  compatibility: vi.fn(),
 }));
 
 vi.mock('../sessions/StorageAdapter', () => ({
@@ -31,6 +32,8 @@ vi.mock('./ConversationRoutePreflight', () => ({
 vi.mock('../hooks/runtimeHookDispatch', () => ({
   dispatchRuntimeHooks: mocks.dispatchHooks,
 }));
+vi.mock('../sessions/handoffSkillCompatibility', () => ({ assertDeclaredHandoffSkillCompatibility: mocks.compatibility }));
+vi.mock('../sessions/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: () => ({ markdown: '# Approved plan' }) } }));
 
 import { applyDeclaredHandoff, writeExecutionOfferFromApproval } from './applyDeclaredHandoff';
 
@@ -62,6 +65,7 @@ describe('applyDeclaredHandoff', () => {
       status: 'approved',
       approvedHash: 'a'.repeat(64),
       frozenUri: 'session://plans/plan-frozen.md',
+      approvedHandoff: { agent: 'general', label: declared.label },
       updatedAt: 1234,
     });
     mocks.resolveEnabled.mockImplementation((agentId: string) => (
@@ -88,6 +92,13 @@ describe('applyDeclaredHandoff', () => {
     }));
     expect(mocks.dispatchHooks).toHaveBeenCalledWith('agent.before-handoff', expect.any(Object));
     expect(mocks.dispatchHooks).toHaveBeenCalledWith('agent.after-handoff', expect.any(Object));
+  });
+  it('rejects changed preparation requirements after approval without rewriting the offer or session', async () => {
+    mocks.resolveEnabled.mockImplementation((agentId: string) => agentId === 'general' ? { id: 'general', handoffs: [] }
+      : { id: 'debugger', handoffs: [{ ...declared, requiredSkillIds: ['another-method'] }] });
+    const result = await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining('EXECUTION_OFFER_CHANGED') });
+    expect(mocks.offerWrite).not.toHaveBeenCalled(); expect(mocks.updateSession).not.toHaveBeenCalled();
   });
 
   it('keeps the same approval time when declaring the handoff again from General', async () => {
@@ -120,6 +131,21 @@ describe('applyDeclaredHandoff', () => {
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/DECLARED_HANDOFF_NOT_FOUND/);
     expect(mocks.updateSession).not.toHaveBeenCalled();
+  });
+
+  it('does not switch agents or write an offer when explicit preparation is incompatible', async () => {
+    mocks.compatibility.mockImplementationOnce(() => { throw new Error('TASK_EXECUTION_REQUIREMENTS: comparison-method missing'); });
+    const result = await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining('comparison-method') });
+    expect(mocks.updateSession).not.toHaveBeenCalled();
+    expect(mocks.offerWrite).not.toHaveBeenCalled();
+    expect(mocks.dispatchHooks).not.toHaveBeenCalled();
+  });
+  it('rejects a different target than the approved action without changing approval time', async () => {
+    mocks.planRead.mockReturnValue({ status: 'approved', approvedHash: 'a'.repeat(64), frozenUri: 'session://plans/plan.md', approvedHandoff: { agent: 'optimizer', label: 'Different' }, updatedAt: 1234 });
+    expect((await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label })).error).toContain('TARGET_MISMATCH');
+    expect(mocks.updateSession).not.toHaveBeenCalled();
+    expect(mocks.offerWrite).not.toHaveBeenCalled();
   });
 });
 

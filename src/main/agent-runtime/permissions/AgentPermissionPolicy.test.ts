@@ -8,6 +8,11 @@ import type { ToolCall } from '../core/types';
 import { AgentPermissionPolicyService } from './AgentPermissionPolicy';
 import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
 import { compilePolicyFromRestrictive } from './PolicyCompiler';
+import { freezeRdcTurnBinding } from '../../tools/RdcTurnBindings';
+import { DEFAULT_RDC_CLI_INVOKER } from '../../settings/settingsDefaults';
+import type { RdcOperationDefinition } from '@shared/types/tool';
+const ownership = vi.hoisted(() => ({ lease: vi.fn() }));
+vi.mock('../../sessions/RdcRuntimeContextRegistry', () => ({ assertRdcContextLeaseOwnership: ownership.lease, getRdcContextLease: () => null }));
 
 const { mockSettings } = vi.hoisted(() => ({
   mockSettings: {
@@ -219,6 +224,32 @@ describe('AgentPermissionPolicyService external reads', () => {
       sessionAttachmentsRoot: ownRoot,
     });
     expect(decision.action).toBe('ask_user');
+  });
+});
+
+describe('structured RDC semantic risk', () => {
+  const service = new AgentPermissionPolicyService();
+  const evaluate = (arguments_: Record<string, unknown>, mode: AgentPermissionMode = 'auto-review', floor = false) => service.evaluate({
+    agentId: 'general', tool: shellTool, toolCall: { id: 'rdc-query', type: 'toolCall', name: 'shell', arguments: arguments_ },
+    projectRootPath: workspaceRoot, permissionSettings: { mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
+    compiledPolicy: compilePolicyFromRestrictive(floor ? { approvalFloorByTool: { shell: 'user' } } : {}),
+  });
+  it.each([{ kind: 'search', query: 'export.texture get_details', limit: 8 }, { kind: 'describe', operation: 'rd.texture.get_details' }, { kind: 'list' }])('reviews a valid frozen catalog query as low risk: %j', discovery => {
+    expect(evaluate({ rdc: { discovery } })).toMatchObject({ action: 'auto_review', risk: 'low' });
+    expect(evaluate({ rdc: { discovery } }, 'auto-review', true).action).toBe('ask_user');
+  });
+  it('keeps native shader replacement under high-risk review', () => {
+    expect(evaluate({ rdc: { operation: 'rd.shader.edit_and_replace', args: {} } })).toMatchObject({ action: 'auto_review', risk: 'high' });
+  });
+  it.each([
+    { rdc: { discovery: { kind: 'search', query: '' } } },
+    { rdc: { discovery: { kind: 'unknown' } } },
+    { rdc: { discovery: { kind: 'list', limit: 21 } } },
+    { rdc: { discovery: { kind: 'list' }, operation: 'rd.buffer.write', args: {} } },
+    { command: 'echo hidden', rdc: { discovery: { kind: 'list' } } },
+  ])('rejects malformed and mixed requests even in full access: %j', args => {
+    expect(evaluate(args).action).toBe('deny');
+    expect(evaluate(args, 'full-access').action).toBe('deny');
   });
 });
 
@@ -729,6 +760,73 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
 
 
 describe('file routing across permission modes', () => {
+  it.each(['git status; git reset --hard', 'git status && git reset --hard', 'git status & git reset --hard',
+    'git diff --output=result.txt', 'git status; echo $(danger)', 'git status | unknown-command'])('does not authorize an entire shell chain by its safe prefix: %s', command => {
+    const decision = new AgentPermissionPolicyService().evaluate({ tool: shellTool,
+      toolCall: { type: 'toolCall', id: 'compound', name: 'shell', arguments: { command } },
+      permissionSettings: { mode: 'auto-review', readableRoots: [], writableRoots: [], allowedCommandPrefixes: ['git status', 'git diff'], deniedCommandPrefixes: [] } });
+    expect(decision.action).not.toBe('allow');
+    expect(decision.risk).not.toBe('low');
+  });
+  it.each(['pnpm run typecheck', 'node scripts/check-', 'pnpm run check:'])('reviews repository scripts whose effects cannot be derived from the command name: %s', command => {
+    const decision = new AgentPermissionPolicyService().evaluate({ tool: shellTool,
+      toolCall: { type: 'toolCall', id: 'repo-script', name: 'shell', arguments: { command } },
+      permissionSettings: { mode: 'auto-review', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] } });
+    expect(decision).toMatchObject({ action: 'auto_review', risk: 'medium' });
+  });
+  it('allows bounded workspace text edits but separates protected and read-only targets', () => {
+    const service = new AgentPermissionPolicyService();
+    const evaluate = (file: string) => service.evaluate({ tool: { ...deleteFileTool, name: 'write_file', permissionHint: 'mutation' },
+      toolCall: { type: 'toolCall', id: 'write', name: 'write_file', arguments: { path: file, content: 'test' } }, projectRootPath: workspaceRoot,
+      permissionSettings: { mode: 'auto-review', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] } });
+    expect(evaluate('results/source.txt')).toMatchObject({ action: 'auto_review', risk: 'low' });
+    expect(evaluate('.rdc-agent/skills/x/SKILL.md')).toMatchObject({ action: 'auto_review', risk: 'high' });
+    for (const target of ['capture.rdc', '.rdc-agent/inputs/source.txt', '.rdc-agent/knowledge/cases/example.md', '.git/config']) expect(evaluate(target).action).toBe('deny');
+  });
+  it('uses verified catalog effects and ownership for native decisions without operation-name allowlists', () => {
+    const service = new AgentPermissionPolicyService();
+    const lease = { contextId: 'owned', version: 7, ownerProjectId: 'project', ownerSessionId: 'session',
+      runtimeContext: { replaySessionId: 'replay', captureFileId: 'capture' } };
+    ownership.lease.mockReturnValue(lease);
+    const definition: RdcOperationDefinition = { name: 'rd.example.inspect', namespace: 'example', description: 'test',
+      input_schema: { type: 'object', properties: { session_id: { type: 'string' },
+        expected_revision: { type: 'string', description: 'Revision of the current object before applying the requested change.' } }, required: ['session_id'], additionalProperties: false },
+      scope: 'replay', effects: [], evidence_kind: null, path_inputs: [], prerequisites: [{ requires: 'session_id' }] };
+    const executionContext = { agentId: 'general', sessionId: 'session', projectId: 'project', turnId: 'turn', workspaceRoot, projectRootPath: workspaceRoot,
+      rdcBinding: freezeRdcTurnBinding({ ...DEFAULT_RDC_CLI_INVOKER, enabled: true, command: 'native' }, [definition], lease) };
+    const evaluate = (args = {}, mode: AgentPermissionMode = 'auto-review') => service.evaluate({ tool: shellTool, agentId: 'general', executionContext,
+      toolCall: { type: 'toolCall', id: 'native', name: 'shell', arguments: { rdc: { operation: definition.name, args } } },
+      permissionSettings: { mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] } });
+    expect(evaluate()).toMatchObject({ action: 'auto_review', risk: 'low', operationFacts: { effects: [], arguments: { session_id: 'replay' } } });
+    expect(evaluate({ expected_revision: 'before' }).operationFacts).toMatchObject({
+      operationContract: { description: definition.description, inputSchema: definition.input_schema,
+        pathInputs: definition.path_inputs, prerequisites: definition.prerequisites },
+      arguments: { expected_revision: 'before', session_id: 'replay' },
+    });
+    expect(evaluate({ session_id: 'forged' }, 'full-access').action).toBe('deny');
+    expect(evaluate({ unknown: true }).action).toBe('deny');
+    const discovery = (kind: Record<string, unknown>) => service.evaluate({ tool: shellTool, agentId: 'general', executionContext,
+      toolCall: { type: 'toolCall', id: 'discovery', name: 'shell', arguments: { rdc: { discovery: kind } } },
+      permissionSettings: { mode: 'full-access', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] } });
+    expect(discovery({ kind: 'describe', operation: definition.name }).action).toBe('allow');
+    expect(discovery({ kind: 'describe', operation: 'rd.example.unknown' }).action).toBe('deny');
+    expect(discovery({ kind: 'list', cursor: { offset: 0, fingerprint: '0'.repeat(64) } }).action).toBe('deny');
+    const replacement = { ...definition, effects: ['shader_replacement'] };
+    const rollback: RdcOperationDefinition = { ...replacement, name: 'rd.example.restore', evidence_kind: 'rollback' };
+    const unknownWriter = { ...definition, name: 'rd.example.write', effects: ['unknown_data_write'] };
+    executionContext.rdcBinding = freezeRdcTurnBinding(executionContext.rdcBinding.cli, [replacement, rollback, unknownWriter], lease);
+    expect(evaluate()).toMatchObject({ action: 'auto_review', risk: 'medium', operationFacts: {
+      catalogCapabilities: { coverage: 'complete-frozen-catalog', checkedOperations: 3,
+        admittedOperations: 2, deniedOperations: 1, admittedEffects: ['shader_replacement'], isNativeStateObservation: false },
+      rollbackContracts: [rollback],
+    } });
+    expect(discovery({ kind: 'describe', operation: unknownWriter.name }).action).toBe('allow');
+    expect(service.evaluate({ tool: shellTool, agentId: 'general', executionContext,
+      toolCall: { type: 'toolCall', id: 'unknown-write', name: 'shell', arguments: { rdc: { operation: unknownWriter.name, args: {} } } },
+      permissionSettings: { mode: 'auto-review', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] } }).action).toBe('deny');
+    ownership.lease.mockReturnValue({ ...lease, version: 8 });
+    expect(evaluate().action).toBe('deny');
+  });
   it.each(['default', 'auto-review', 'full-access', 'custom'] as const)('%s cannot allow file or RDC bypass', mode => {
     for (const command of ['rg pattern', 'Get-Content file', 'type file', 'rdc-tool version']) {
       const decision = new AgentPermissionPolicyService().evaluate({

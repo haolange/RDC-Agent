@@ -6,7 +6,7 @@ import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEve
 import { planArtifactWriter, type PlanArtifactWriter } from '../../sessions/sessionPlanArtifact';
 import { planReviewStateStore, type PlanReviewStateStore } from '../../sessions/PlanReviewStateStore';
 import type { TurnHandle } from '../../workflow/debugger/TurnCoordinator';
-import { writeExecutionOfferFromApproval } from '../../conversation/applyDeclaredHandoff';
+import { assertDeclaredHandoffForPlan, writeExecutionOfferFromApproval } from '../../conversation/applyDeclaredHandoff';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import type { PlanTaskRequirement } from '@shared/types/taskExecution';
 import { TaskRegistry, createSessionTaskStore } from '../tasks';
@@ -193,6 +193,9 @@ export class AgentPlanReviewRequestService {
     pending.answering = true;
     try {
     const frozen = this.writer.freezeApprovedPlan(sessionId, pending.planReview.hash);
+    const session = storageAdapter.readSession(sessionId);
+    const projectRoot = session ? storageAdapter.getProjectById(session.projectId)?.rootPath ?? null : null;
+    assertDeclaredHandoffForPlan({ sourceAgentId: pending.agentId, projectRoot, handoff, tasks: frozen.taskRequirements });
     if (frozen.taskRequirements.length) await this.installTaskRevisions(sessionId, frozen.taskRequirements, ({ task, snapshot }) => {
       traceProjectionRefreshService.schedule(sessionId);
       pending.onEvent?.(buildSharedAgentEvent('task.updated', {
@@ -216,11 +219,10 @@ export class AgentPlanReviewRequestService {
         planId: pending.planReview.planId,
       };
     }
-    const session = storageAdapter.readSession(sessionId);
     writeExecutionOfferFromApproval({
       sessionId,
       sourceAgentId: pending.agentId,
-      projectRoot: session ? storageAdapter.getProjectById(session.projectId)?.rootPath ?? null : null,
+      projectRoot,
       handoff: input.decision.handoff,
       plan: { uri: frozen.uri, hash: frozen.hash },
       approvedAt: approved.updatedAt,

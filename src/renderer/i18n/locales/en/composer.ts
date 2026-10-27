@@ -57,7 +57,7 @@ export const enComposer = {
   'composer.permission.full-access': 'Full access',
   'composer.permission.custom': 'Custom',
   'composer.permission.defaultDesc': 'Workspace routine actions run; external or risky actions ask first.',
-  'composer.permission.auto-reviewDesc': 'Risky actions are reviewed by policy before they continue.',
+  'composer.permission.auto-reviewDesc': 'Verified low-risk actions pass automatically; other actions receive independent review. Explicit approval restrictions still apply.',
   'composer.permission.full-accessDesc': 'Trusted mode for direct local file and command access.',
   'composer.permission.customDesc': 'Use local access roots from the current app settings.',
 } as const;

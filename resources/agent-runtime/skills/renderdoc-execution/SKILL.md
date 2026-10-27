@@ -38,7 +38,7 @@ General 就地终答，不自动切回 Mission，也不要求 return 合同。�
 ## 执行与证据
 
 按规模使用 task_create / task_update，在计划边界内调整 Tasks；开放 Challenge 的后续检查引用 challengeId 和 requiredFollowUp，更新或 supersede 原 claim_set，不把领域字段写进 TaskRecord。通过 investigation_* 写 Evidence／Claim／Experiment／Challenge／Checkpoint，按 provenance 门禁标记 ready。
-因果介入与优化实验必须有真实执行及恢复；shell.rdc 的 experimentId 绑定 baseline→intervention→variant→rollback→restored 签名回执（Experiment.executionEvidence）。权限拒绝、未执行、布尔声明或原 capture hash 不变均不是回滚证据。General 任何回合不得宣告调查 completed；调查完成只能由用户切回后的 Mission 声明。
+因果介入与优化实验必须有真实执行及恢复；shell.rdc 的 experimentId 绑定 baseline→intervention→variant→rollback→restored 签名回执（Experiment.executionEvidence）。baseline、variant、restored 是三个不同 measurement 回执的引用角色，不是额外的回执 kind 或工具 phase 参数；intervention、rollback 分别引用实际介入、撤销回执。介入前保存真实基线，未来阶段只在实际执行后取得，不得要求或伪造尚未发生的阶段证明；关闭实验时仍由现有门禁核验五个不同引用、签名、时序、采样条件及进程身份。权限拒绝、未执行、布尔声明或原 capture hash 不变均不是回滚证据。General 任何回合不得宣告调查 completed；调查完成只能由用户切回后的 Mission 声明。
 原生采证时点与记录资格闭合分开：变体仍有效时保存图像、参数、替换枚举、隔离身份和签名原文，不必在恢复尚未成立时把变体 WorldState 提升为 valid。`S-RDC-01` 对有修改的 WorldState 同时要求匹配的 Experiment 和可解析的真实恢复证明，exclusiveLock=true 本身不足。设计若使用未观测的 WorldState 计划锚，保留其稳定 worldStateId；真实恢复后，先登记恢复状态及验证 Evidence，再以原 experimentId 的正式版本更新写入真实五阶段和恢复结果（不因此接受画质或因果），随后通过 supersedes 将所绑定的变体计划锚更新为当时已经采得的状态，最后登记依赖该合格状态的 Evidence。更新时核对返回的 validity/stale，而非只看写入成功。不要另起未被实验绑定的新 ID、提前声称恢复，或以恢复态新查询补造过去观察；原始身份、时点和条件不闭合时保持 unknown/polluted，不补签、不直接改存储。
 计划含条件性的最终画质或设备验收时，须提前安排各自需要的前态、变体和恢复态来源、对比条件与呈现回执。目标 draw 的五阶段不自动覆盖最终 framebuffer 或设备；需要变体现场的证据须在撤销前保存，或在冻结策略中明确后续质量复验及其恢复要求。不得同时限制再次介入，又把依赖变体现场的条件任务留到撤销后才首次准备。已有同批主进程或工具持久制品，须核验身份、时点、条件、hash 与实际读取授权后才能复用；恢复图不能补称干预前基线，恢复态设备确认不能证明已结束的变体。只读任务不因此被强加介入或无关图像；缺必要采集安排时在介入前正常回评策略，不事后补造观察。
 普通 subagent 子代理不请求领域扩展；需要 RDC 时显式申请可选扩展并遵守串行租约和及时回收。用户未要求时不写持久 Memory／Knowledge。
@@ -46,7 +46,7 @@ General 就地终答，不自动切回 Mission，也不要求 return 合同。�
 
 ## 隔离探索与独立审查
 
-计划明确要求发生的直接工作、隔离分析和独立审查，须在所属 Task 的 executionRequirements 中声明实际 mode、必需预载方法，以及独立审查所针对的生成 Task。提交 plan_artifact 时用 requiredTaskIds 绑定这些必需 Task，主进程生成批准快照；不以 description 或 metadata 代替执行约束。允许 General 在批准范围内补充细分、材料与 Challenge Tasks，但不能降低冻结义务或用另一个同义 Task 绕过；必要变更正常回评修订。条件工作须写清适用条件与未触发时的结算要求，不预先穷举未知命令或无关 Task。
+计划明确要求发生的直接工作、隔离分析和独立审查，须在所属 Task 的 executionRequirements 中声明实际 mode，以及独立审查所针对的生成 Task。requiredSkillIds 只列确需在该执行准备时预载并冻结的方法，在 Task 描述中说明该必要性；可为空。普通取证、解释、记录方法通过 descriptor 发现并在使用前 skill_read，不因计划引用就升级成预载门槛。独立子执行等已有明确方法准备合同仍须落实。提交 plan_artifact 时用 requiredTaskIds 绑定这些必需 Task，主进程生成批准快照；不以 description 或 metadata 代替执行约束。批准前核对目标 profile/交接的显式预载能满足硬要求，不能假定 Runtime 自动补载。过度声明须经同一 Task 的正常计划修订纠正，保留方法阅读与原交付义务、失败历史、消费和期限。允许 General 在批准范围内补充细分、材料与 Challenge Tasks，但不能降低冻结义务或用另一个同义 Task 绕过。条件工作须写清适用条件与未触发时的结算要求，不预先穷举未知命令或无关 Task。
 已批准义务需要变更时，先停止并 join 受影响执行，读取原 Task/revision，在新 plan_artifact.taskRevisions 中显式提出同一 Task 的修改与 expectedRevision，经正常计划门批准后生效；不要先 task_update 改掉冻结要求，也不要换 Task 清预算。主进程保留原执行、消费和期限，完成的 Task 不重开。
 
 单次 lookup、必要抽查及低成本操作由 General 直接完成。需要隔离的重检索、多来源综合和长分析，通过 subagent 派发 General 子上下文，按实际材料和问题选择 Capsule.requiredSkillIds：Knowledge 检索与历史适用性综合使用 knowledge-scout；当前 shader／IR 深分析使用 shader-ir-analysis；其他代码或材料分析使用相应的可用方法，不统一套用 Knowledge 检索方法。独立交付审查使用 skeptic-review。父级给出问题、方向、精确来源与输出要求，由子级深读并返回出处、反证和未知项；父级按需抽查关键原文，不先全文阅读再为形式委派让子级重读。
