@@ -5,7 +5,7 @@
    * by an unrelated fixed amount. The root and its card edges are different
    * geometry layers: the root stays left-anchored; cards use this calibrated
    * end inset. */
-  --work-process-visible-inline-start-inset: var(--space-3);
+  --work-process-visible-inline-start-inset: var(--space-5);
   --work-process-inline-end-inset: var(--work-process-visible-inline-start-inset);
   position: relative;
   width: calc(100% - var(--work-process-inline-end-inset));
@@ -175,7 +175,7 @@
 .work-process-step {
   display: grid;
   /* Compact rail + tight gap: gray node stays close to Thinking copy. */
-  grid-template-columns: var(--space-2) minmax(0, 1fr);
+  grid-template-columns: var(--space-4) minmax(0, 1fr);
   column-gap: var(--space-1);
   padding: 0 0 var(--space-2);
 }
@@ -210,7 +210,7 @@
   left: 50%;
   width: 1px;
   transform: translateX(-50%);
-  background: var(--token-border-subtle);
+  background: var(--token-border-muted);
 }
 
 .work-process-step:first-child > .work-process-step-rail::before {
@@ -262,7 +262,7 @@
 .work-process-step-rail.status-running .work-process-rail-marker::after {
   content: '';
   position: absolute;
-  inset: calc(var(--space-1) * -1);
+  inset: calc(var(--space-0-5) * -1);
   border-radius: var(--radius-full);
   border: 1px solid color-mix(in srgb, var(--token-status-info) 38%, transparent);
   animation: work-process-rail-pulse 1.5s ease-out infinite;

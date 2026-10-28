@@ -271,11 +271,6 @@
     gap: var(--space-1) var(--space-2);
   }
 
-  .work-process-step {
-    grid-template-columns: 8px minmax(0, 1fr);
-    column-gap: var(--space-1);
-  }
-
   .work-process-tool-card-header,
   .work-process-tool-card-meta {
     gap: var(--space-1) var(--space-2);

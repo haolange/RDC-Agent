@@ -16,6 +16,37 @@ import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, values?: { count: number }) => `${key}${values ? `:${values.count}` : ''}` }) }));
 vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({ MessageMarkdown: ({ content }: { content: string }) => createElement('p', null, content) }));
 
+it.each(['approved', 'pending', 'rejected', 'cancelled'] as const)('discloses %s approval without requiring output and retains it after updates', async status => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  const row: ToolRowModel = { type: 'tool', id: `approval-${status}`, status: 'complete', verb: 'Ran command',
+    category: 'task', icon: 'terminal', groupKind: 'task', family: 'shell', toolName: 'shell.command', target: '',
+    duration: '', argsLines: [], previewLines: [], rawLines: [],
+    approval: { status, verb: `Decision ${status}`, message: 'Original decision reason', metaLines: ['Risk low'] } };
+  try {
+    const render = (value: ToolRowModel) => act(async () => root.render(createElement(ScopedWorkDisclosure, {
+      scope: `approval-${status}`, children: createElement(ToolRow, { row: value }),
+    })));
+    await render(row);
+    const trigger = host.querySelector<HTMLButtonElement>('.work-card-trigger')!;
+    expect(trigger.disabled).toBe(false);
+    expect(host.querySelector('[data-testid="work-process-tool-approval"]')).toBeNull();
+    expect(host.textContent?.includes('Original decision reason')).toBe(status !== 'approved');
+    if (status !== 'approved') {
+      await render({ ...row, approval: { ...row.approval!, verb: row.verb } });
+      expect(host.querySelector('.work-process-tool-approval-attention')?.textContent).toBe('Original decision reason');
+    }
+    await act(async () => trigger.click());
+    expect(host.querySelector('.work-process-tool-card-expand [data-testid="work-process-tool-approval"]')?.textContent)
+      .toContain('Original decision reason');
+    await render({ ...row, duration: '100ms' });
+    expect(host.querySelector('.work-card-trigger')?.getAttribute('aria-expanded')).toBe('true');
+    await act(async () => trigger.click());
+    expect(host.querySelector('[data-testid="work-process-tool-approval"]')).toBeNull();
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
+});
+
 const documentText = JSON.stringify({ capsule: {
   task: 'Original task', goal: 'Original task', scope: 'Read only', outputRequirements: 'Original output',
   stopConditions: ['Original stop'], acceptedFacts: [{ statement: 'Original fact', qualification: 'Qualified', sourceRefs: ['source'] }],

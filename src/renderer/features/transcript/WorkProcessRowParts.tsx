@@ -37,7 +37,7 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
     || Boolean(row.imagePreviews?.length)
     || Boolean(row.sourcePills?.length && row.family === 'web');
   const hasRaw = row.argsLines.length > 0 || row.rawLines.length > 0;
-  const canExpand = hasDetail || hasRaw || Boolean(extraDetail) || Boolean(row.planReview);
+  const canExpand = hasDetail || hasRaw || Boolean(extraDetail) || Boolean(row.planReview) || Boolean(row.approval);
   const hasApproval = Boolean(row.approval);
   const diagnosticCaption = row.diagnosticCaption?.trim() || '';
   const hasDiagnostic = row.status === 'error' && Boolean(diagnosticCaption);
@@ -48,6 +48,9 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
   const [expanded, toggleDisclosure] = useScopedWorkDisclosure(`tool-${row.id}`, false);
   const durationTitleFull = row.duration ? `${row.toolName} · ${row.duration}` : row.toolName;
   const verbLabel = label(row.verb);
+  const approvalAttention = row.approval && row.approval.status !== 'approved'
+    ? [label(row.approval.verb) !== verbLabel ? label(row.approval.verb) : '', row.approval.message].filter(Boolean).join(' · ')
+    : '';
   const isBackgroundWait = row.toolName === 'background_wait';
   const compact = density === 'compact' || isBackgroundWait;
   const payloadText = row.bodyText?.trim() ?? '';
@@ -104,10 +107,13 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
             </div>
           ) : null}
 
-          {hasApproval ? <ToolApprovalCallout approval={row.approval!} /> : null}
+          {!expanded && approvalAttention && !hasDiagnostic ? (
+            <p className="work-process-tool-approval-attention">{approvalAttention}</p>
+          ) : null}
 
           {expanded ? (
             <div className="work-process-tool-card-expand">
+              {hasApproval ? <ToolApprovalCallout approval={row.approval!} /> : null}
               {row.planReview ? <PlanReadAction plan={row.planReview} /> : null}
               <FamilyDetail row={row} />
               <RawPanel row={row} />

@@ -1,12 +1,5 @@
 /* The child process uses the same event cards and rail as the parent. Density only
  * changes spacing; it must not create a second tool presentation. */
-.work-process-body.is-compact .work-process-section-list > .work-process-step {
-  padding-top: var(--space-1);
-}
-.work-process-body.is-compact .work-process-section-list > .work-process-step:first-child {
-  padding-top: 0;
-}
-
 .work-process-tool-card.is-compact:not(.is-background-wait) > .work-card-trigger .work-process-tool-card-header {
   min-height: var(--control-height-sm);
   padding: var(--space-1) var(--space-2);

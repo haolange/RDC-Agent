@@ -78,7 +78,7 @@ export function TaskDialog({
       >
         <header className="task-dialog-header">
           <div className="task-dialog-heading">
-            <h2 id={titleId} className="task-dialog-title">{title}</h2>
+            <h2 id={titleId} className="task-dialog-title" title={title}>{title}</h2>
             {description ? (
               <p id={descriptionId} className="task-dialog-description">{description}</p>
             ) : null}

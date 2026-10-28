@@ -26,9 +26,9 @@ export const WorkProcessImageThumbs: React.FC<{ previews: ConversationToolImageP
           aria-label={t('chat.imageRetry', { name: preview.fileName })}>{t('chat.imageUnavailable')}</Button> : t('chat.imageLoading')}
       </span>;
     })}
-    {current && src ? <TaskDialog open title={current.fileName} description={t('chat.imagePreviewResolution')}
+    {current && src ? <TaskDialog open title={current.fileName} className="tool-image-preview-dialog"
       size="lg" closeLabel={t('chat.workProcessCloseImage')} onClose={() => setOpened(null)}>
-      <img className="work-process-tool-preview-image" src={src} alt={current.fileName} />
+      <img title={current.fileName} className="work-process-tool-preview-image" src={src} alt={current.fileName} />
     </TaskDialog> : null}
   </div>;
 };

@@ -1260,8 +1260,8 @@ assert(
   'Work Process must not keep a WP-only right gutter; share the thread gutter instead',
 );
 assert(
-  /\.work-process-step\s*\{[^}]*grid-template-columns:\s*8px\s+minmax\(0,\s*1fr\)/.test(cssSource),
-  'loop rail column should stay compact (8px) so Thinking copy stays close to the gray node',
+  /\.work-process-step\s*\{[^}]*grid-template-columns:\s*var\(--space-4\)\s+minmax\(0,\s*1fr\)/.test(cssSource),
+  'loop rail must reserve a 16px slot for the running halo',
 );
 assert(
   /\.work-process-step\s*\{[^}]*column-gap:\s*var\(--space-1\)/.test(cssSource),

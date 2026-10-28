@@ -1,5 +1,22 @@
 # Acceptance Ledger
 
+## 五处 UI 修复提交前复查（2026-10-28）
+
+- 用户明确授权本轮复查、必要清理、当前main提交推送，替代上一轮不提交边界。源基线仍为 `32628b27` 加本轮差异。逐项复核发现并修正四项：制品图标误用首行对齐（恢复center）、设计系统重复段落仍写45%淡出、图片标题缺原文tooltip、相同审批状态短语重复；无权限/IPC/存储格式变化。
+- 38项定向回归（原9文件36项及共享焦点2项）、typecheck/lint、work-process、tool-coverage、renderer-structure、design-tokens、appearance、right-rail、session-projection、acceptance-ledger、repository-hygiene通过。最终构建 `index-CJKejOYY.js` 的正式one-time Bridge /app再验：成功审批收起隐藏且展开完整；Plan mask终点透明；图片头44.7px、单行及完整文件名tooltip，Escape关闭并回焦缩略图；Progress完整标题且无line-clamp；console warning/error为空。主子窗口化/窄屏/字号沿用本轮未受影响的先前实测，不冒称新的模型/流式/性能样本。
+- 本次QA无真实凭据/模型/RDC；仅确定性存储fixture。首个选用品牌PNG超过Node回退的512KiB限制，被正常拒绝，换用小型现有JPEG，未修改产品限制。复核后停止自有launcher/进程，核对owner/reparse边界后清除本次QA根；canonical锁无，桌面启动权保持交还。最小复查来源为 `.local/transcript-state/TASKS.md` 审视报告及 `review-image-header-20261028.png`。原始用户数据、截图与旧证据保留；未运行全库coverage、发行打包或等待云端CI。
+
+
+## 工作台五处 UI 收敛（2026-10-28，定向与实际应用验收）
+
+- 来源：用户五张截图及已批准计划；源码基线 main `32628b27` 加本轮未提交差异，最终 renderer `index-DTEdx0GU.js`。无分支、提交、推送或发布，无主进程权限/IPC/存储格式变更。
+- Progress 完整标题按首行对齐；主子事件间距统一 space-2，时间线独占16px槽位；成功审批详情按需展开；Plan真实溢出淡至透明；图片弹窗使用单行紧凑标题。已删除旧的4px子过程间距覆盖、窄屏8px节点覆盖和技术副标题文案。
+- 工程：9文件36项定向回归通过；typecheck、lint、design-tokens、appearance、renderer-structure、work-process、work-process-tool-coverage、right-rail、session-projection、repository-hygiene通过；最终正式构建成功。新增覆盖审批各终态与仅审批可展开、24/25行窗口化及开合记忆、图片Escape/回焦/切会话隔离/失败重试。沿用未受影响测试，不运行全库coverage、发行pack或完整产品矩阵。
+- 实际应用：正式one-time Bridge进入/app，隔离确定性存储fixture；主子同段/跨段卡边框约8px，28步子过程真实窗口化；Plan DOM mask终点透明且真实溢出；图片头部约44.6px，低高度实际327px视口内弹窗约top48.5/bottom278.7；中/小/大字体实测12/11/13px，深浅主题及窄屏无横溢。无真实模型/RDC调用，没有脚本化provider流式或性能统计通过声明。未采修改前同内容Browser截图，不宣称像素前后对照。
+- 首轮fixture缺toolCallIds及历史增量已修正；初次settings:set因未开启QA full access被拒，最终隔离开关下复验；QA重启造成旧bundle事件流断连，单列为验收生命周期记录。受限环境桌面GPU子进程启动失败，正常Windows环境同构建创建窗口并实际渲染通过；既有meta CSP诊断未放宽。桌面和Browser使用同一renderer，未创建产品demo。
+- 清理：自有进程退出，canonical锁为空；核对绝对路径、无reparse及lock owner已死后，清除两个临时根共118文件并复查不存在。桌面启动权已交还。最小证据在 `.local/transcript-state/ui-convergence-20261028.json`、`child-spacing-20261028.png`、`progress-narrow-20261028.png`，原始用户截图/用户数据保持。
+
+
 ## 独审交付与审批可解释性（2026-10-28，工程及定向通过；原始干净起步经获批只读补审完成有限验收）
 
 - 基线为 Agent `53a8d268`、Tool `3c3bfff`；当前 main 工作区修改，未创建分支、提交、推送或发布，Tool 未改。`investigation_read/list` 将既有权威 artifact 身份、readiness、URI/hash 与 `supersedes` 投影到模型正文，关联关系不增加读取权。独审方法明确子级交回覆盖、结论及限制，父级负责自身记录版本化；审查完成不等于关闭 open Challenge 或接受被审主张。

@@ -221,7 +221,6 @@ export const enChat = {
   'chat.imageUnavailable': 'Retry preview',
   'chat.imageLoading': 'Loading',
   'chat.imageMissingReference': 'No image preview was retained for this record',
-  'chat.imagePreviewResolution': 'Stored image preview',
   'chat.imagesShowMore': 'Show {count} more images',
   'chat.imagesLoadMore': 'Load more',
   'chat.workProcessCloseImage': 'Close image preview',

@@ -205,7 +205,6 @@ export const zhChat = {
   'chat.imageUnavailable': '重试预览',
   'chat.imageLoading': '加载中',
   'chat.imageMissingReference': '此记录未保留图片预览',
-  'chat.imagePreviewResolution': '受控图片预览',
   'chat.imagesShowMore': '查看其余 {count} 张图片',
   'chat.imagesLoadMore': '加载更多',
   'chat.workProcessCloseImage': '关闭图片预览',
