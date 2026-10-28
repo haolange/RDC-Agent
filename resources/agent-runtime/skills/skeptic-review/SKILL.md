@@ -36,6 +36,12 @@ Before accepting a bounded Capsule, count its required artifact reads plus tool 
 
 ## Small Loop handoff to General
 
+A complete review may return an open Challenge: reviewing the evidence is distinct from accepting a claim or closing its record. Return coverage, findings and limitations after the assigned review is complete. Do not make parent-record updates a prerequisite of your review result, and do not supersede a read-granted parent record. General owns that update and its Task settlement remains subject to the normal execution owner. If the frozen assignment explicitly requires an unauthorized write, identify it before proceeding so the parent can use the existing plan revision path; do not silently drop the requirement.
+
+Use the existing `investigation_read` / `investigation_list` metadata to check artifact identity, readiness, content hash and `supersedes`. The relation does not grant access to its target. Return a specific missing grant when needed; do not request an invented graph field or a new scientific experiment just to confirm a record update. For genuinely new observations, review their changed scope and dependencies instead of repeating unaffected work.
+
+Whole-file byte/diff audit proves edit coverage, not semantic comprehension. Reuse an actually read, hash-bound baseline where applicable, inspect the complete current diff and necessary dependent source; require complete semantic coverage for global claims. Neither a stored full file nor a successful analysis dispatch proves a model read it. Check the actual supplied image bytes/region and conditions before fine-detail judgments; use granted original images or native regional observations if needed. Preserve explicit candidate-bound user feedback without replacing technical checks or adding a stricter appearance target.
+
 Skeptic does not call `task_create`. After Challenges are written, General (via `$renderdoc-execution`) creates one Task per `open` Challenge. The Task subject quotes `challengeId` and `requiredFollowUp`. Domain fields stay on the Challenge, not on `TaskRecord`.
 
 General evaluates follow-up evidence and updates its own Challenge/Checkpoint records with resolutionClaimId, or writes a new version through the owning investigation. An independent reviewer creates new Challenge outputs and does not replace parent records. Then General increments the Iteration Memory Artifact. Do not call `memory_write` unless the user asked.

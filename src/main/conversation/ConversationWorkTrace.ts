@@ -378,6 +378,8 @@ export function upsertRuntimeToolApproval(
     reason?: string;
     risk?: unknown;
     reviewer?: unknown;
+    reviewMethod?: unknown;
+    errorCode?: unknown;
     answer?: unknown;
   },
   options?: LoopTraceOptions,
@@ -398,6 +400,8 @@ export function upsertRuntimeToolApproval(
   if (risk) approval.risk = risk as NonNullable<ConversationToolCall['approval']>['risk'];
   const reviewer = stringifyApprovalField(input.reviewer);
   if (reviewer) approval.reviewer = reviewer as NonNullable<ConversationToolCall['approval']>['reviewer'];
+  if (input.reviewMethod === 'rule' || input.reviewMethod === 'model') approval.reviewMethod = input.reviewMethod;
+  if (typeof input.errorCode === 'string' && input.errorCode) approval.errorCode = input.errorCode;
   const answer = stringifyApprovalField(input.answer);
   if (answer) approval.answer = answer;
   if (status === 'pending') approval.requestedAt = now;

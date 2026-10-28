@@ -627,7 +627,7 @@ const approvalPresentation = buildWorkProcessPresentation({
 const approvalRows = flattenRows(approvalPresentation.rows);
 const approvalRow = approvalRows.find((row) => row.type === 'tool' && row.toolName === 'web_search');
 assert(!approvalRows.some((row) => row.type === 'approval'), 'pending tool approval should not render as top-level approval row');
-assert(approvalRow?.approval?.verb === '自动检查中', 'pending auto-review should use reviewer semantics');
+assert(approvalRow?.approval?.verb === '自动审查中', 'pending auto-review should use reviewer semantics');
 assert(approvalRow.approval.message.includes('web_search'), 'pending approval reason should be visible inside tool row');
 assert(approvalRow.previewLines.length === 0, 'approval-required intermediate errors should not render as result previews');
 

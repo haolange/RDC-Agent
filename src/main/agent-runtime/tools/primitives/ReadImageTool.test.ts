@@ -3,6 +3,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
+import { crc32, deflateSync } from 'node:zlib';
+import { convertAgentMessagesToLlm } from '../../agent/ContextManager';
+import { __testing as responses } from '../../providers/OpenAIResponsesProvider';
+import { createTestRequestPlan } from '../../../testing/createTestRequestPlan';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 import { readImageTool } from './ReadImageTool';
 import { withTemporaryPathAccess } from './_shared';
@@ -38,6 +42,44 @@ function context(root: string, vision: 'native' | 'disabled' = 'native'): ToolEx
 }
 
 describe('ReadImageTool', () => {
+  it('delivers native 1552×720 PNG bytes through the tool-image bridge into Responses independently of the UI preview', async () => {
+    const chunk = (name: string, data: Buffer) => {
+      const body = Buffer.concat([Buffer.from(name), data]);
+      const length = Buffer.alloc(4); length.writeUInt32BE(data.length);
+      const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(body));
+      return Buffer.concat([length, body, crc]);
+    };
+    const header = Buffer.alloc(13);
+    header.writeUInt32BE(1552, 0); header.writeUInt32BE(720, 4); header[8] = 8; header[9] = 6;
+    const bytes = Buffer.concat([PNG_1X1.subarray(0, 8), chunk('IHDR', header),
+      chunk('IDAT', deflateSync(Buffer.alloc((1552 * 4 + 1) * 720))), chunk('IEND', Buffer.alloc(0))]);
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-image-wire-')); roots.push(root);
+    await writeFile(path.join(root, 'frame.png'), bytes);
+    const result = await readImageTool.execute('native-image', { path: 'frame.png' }, undefined, undefined, context(root));
+    const messages = convertAgentMessagesToLlm([{ role: 'toolResult', toolCallId: 'native-image', toolName: 'read_image',
+      content: result.content, isError: false, timestamp: 1 }]);
+    const body = responses.buildRequestBody({ id: 'vision', name: 'Vision', provider: 'account', api: 'openai-responses',
+      contextWindow: 32768, maxTokens: 1024, reasoning: true, vision: true }, { messages }, {
+      requestPlan: createTestRequestPlan({ providerId: 'account', adapterId: 'openai-responses', catalogRevision: 'test',
+        routeRevision: 'test', selectedModelId: 'vision', effectiveModelId: 'vision', appliedBindingIds: [],
+        route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.invalid', source: 'catalog' },
+        headers: {}, bodyPatch: {}, contextBudgetTokens: 32768, contextWindowTokens: 32768, contextMode: 'normal',
+        activeTierId: 'default', fastMode: false, reasoningWire: { selection: 'off', control: {
+          kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' },
+        } },
+      }),
+    });
+    const imageUrl = `data:image/png;base64,${bytes.toString('base64')}`;
+    const parts = (body.input as Array<{ content?: Array<{ type: string; image_url?: string }> }>).flatMap(item => item.content ?? []);
+    const wireImage = parts.find(part => part.type === 'input_image')?.image_url;
+    expect(wireImage).toBe(imageUrl);
+    const delivered = Buffer.from(wireImage!.split(',')[1], 'base64');
+    expect(delivered.readUInt32BE(16)).toBe(1552);
+    expect(delivered.readUInt32BE(20)).toBe(720);
+    expect(createHash('sha256').update(delivered).digest('hex')).toBe(result.details?.sha256);
+    expect(result.details).toMatchObject({ imagePreviews: [{ width: 1, height: 1 }] });
+    expect(recordToolImagePreview).toHaveBeenLastCalledWith(expect.objectContaining({ bytes }));
+  });
   it('fails closed on non-vision routes', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-image-'));
     roots.push(root);

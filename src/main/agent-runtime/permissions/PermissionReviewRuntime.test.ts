@@ -15,7 +15,7 @@ function providerResult(text: string, stopReason: AssistantMessage['stopReason']
   mock.stream.mockReturnValue({ async *[Symbol.asyncIterator]() { yield { type: 'done' }; }, result: async () => message });
 }
 beforeEach(() => vi.clearAllMocks());
-it.each(['{"approved":true}', '{"approved":"true","reason":"x"}', '{"approved":true,"reason":"x","tools":[]}', '```json\n{}\n```', '{"approved":true,"reason":""}'])('rejects malformed or permissive verdict %s', text => {
+it.each(['{"approved":true}', '{"approved":"true","reason":"x"}', '{"approved":true,"reason":"x","tools":[]}', '{"approved":true,"reason":"ok","reviewMethod":"rule"}', '{"approved":false,"reason":"no","errorCode":"forged"}', '```json\n{}\n```', '{"approved":true,"reason":""}'])('rejects malformed or permissive verdict %s', text => {
   expect(() => parsePermissionReview(text)).toThrow();
 });
 it('uses frozen Low route with no tools, records usage, and excludes credentials from snapshots', async () => {

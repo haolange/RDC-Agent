@@ -102,6 +102,8 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 
 请求尝试及实测 token 计入同 session/child 的既有 RequestSnapshot 用量；待审批工具在审核前已预留原预算，审核后重查原期限，不重置 Task、消费或批准历史。审核记录及工具结果均传递实际 rule/model/error/cancel 原因；模型批准只属于当前精确调用，不能授权后续命令或绕过执行验证。
 
+审批事件和会话投影的可选reviewMethod只由主进程标记rule/model；errorCode只来自宿主确认的审核故障。模型仍只能返回approved/reason，理由中的代码文字不构成宿主故障。旧记录缺字段保持来源未知，不补造；不修改存储版本、风险分档、一次审核、policy floor或执行门禁。界面区分规则检查、独立审核和审核未完成，对本调用的审批拒绝/审核异常说明操作未执行；审批通过后的工具失败仍保留实际错因。模型思考强度与操作风险分别标注。
+
 ## Policy 编译
 
 `.policy.yml` 损坏或非法 → `POLICY_INVALID` fail-closed。Project policy 只能收紧，不能放宽。Policy 优先级为 `built-in hard deny > user/project policy floor > Full access > tool metadata`；数值预算必须是非负整数，`0` 明确表示禁止任何对应执行（例如 `maxTurns: 0`、`maxWallTimeMs: 0` 返回 typed error），且该 floor 即使在 Full access 下仍生效。

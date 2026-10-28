@@ -6,6 +6,21 @@ const event = (id: string, type: AgentEvent['type'], payload: object, timestamp:
   id, type, timestamp, payload: payload as AgentEvent['payload'],
 });
 
+it('preserves the host-selected approval method and failure code in child work projection', () => {
+  let state = createDelegatedProjectionState();
+  state = projectDelegatedEvent(state, event('request', 'approval.requested', {
+    approvalId: 'auto-review-child', kind: 'tool', toolCallId: 'child', toolName: 'shell', status: 'pending',
+    reviewer: 'auto_review', reviewMethod: 'model',
+  }, 1));
+  state = projectDelegatedEvent(state, event('answer', 'approval.answered', {
+    approvalId: 'auto-review-child', kind: 'tool', toolCallId: 'child', toolName: 'shell', status: 'rejected',
+    reviewer: 'auto_review', reviewMethod: 'model', errorCode: 'PERMISSION_REVIEW_TIMEOUT', reason: 'No verdict.',
+  }, 2));
+  expect(state.trace.blocks.flatMap(block => block.toolCalls).find(call => call.id === 'child')).toMatchObject({
+    status: 'error', approval: { reviewMethod: 'model', errorCode: 'PERMISSION_REVIEW_TIMEOUT', status: 'rejected' },
+  });
+});
+
 it('projects visible loop and tool status while excluding hidden reasoning and credentials', () => {
   let state = createDelegatedProjectionState();
   state = projectDelegatedEvent(state, event('hidden', 'assistant.thinking_delta', {

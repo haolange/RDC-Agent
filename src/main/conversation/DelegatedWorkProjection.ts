@@ -101,6 +101,7 @@ export function projectDelegatedEvent(state: DelegatedProjectionState, event: Ag
       toolName: String(payload.toolName ?? 'approval'),
       status: String(payload.status ?? 'pending'), reason: safeText(payload.reason ?? ''),
       answer: safeText(payload.answer ?? ''), risk: payload.risk, reviewer: payload.reviewer,
+      reviewMethod: payload.reviewMethod, errorCode: payload.errorCode,
     }, loopOptions());
   } else if (event.type === 'assistant.completed') {
     beginContent();

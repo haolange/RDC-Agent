@@ -263,11 +263,11 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     });
     expect(read.isError).not.toBe(true);
     expect(read.content).toEqual(expect.arrayContaining([
-      expect.objectContaining({ text: expect.stringContaining(`contentRef\t${written.contentUri}`) }),
+      expect.objectContaining({ text: expect.stringContaining(`"contentRef":"${written.contentUri}"`) }),
     ]));
     expect(read.details).toMatchObject({ contentUri: written.contentUri, contentHash: written.contentHash });
     expect(listed.content).toEqual(expect.arrayContaining([
-      expect.objectContaining({ text: expect.stringContaining(`${written.contentUri}\t${written.contentHash}`) }),
+      expect.objectContaining({ text: expect.stringContaining(`"contentUri":"${written.contentUri}","contentHash":"${written.contentHash}","supersedes":null`) }),
     ]));
     const filtered = await tools.investigation_list.execute('list-filtered', { kind: 'world_state', status: 'draft' });
     expect(filtered.details).toMatchObject({ count: 1 });

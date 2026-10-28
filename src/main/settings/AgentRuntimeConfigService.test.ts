@@ -262,6 +262,17 @@ describe('AgentRuntimeConfigService scoped resources', () => {
         }
       }
     }
+    const simplify = service.loadSkill('simplify');
+    const { combineActiveSkillAllowlists } = await import('../workflow/debugger/DebuggerRuntimePolicy');
+    const reviewTools = ['read_file', 'artifact_read', 'subagent_report', 'turn_complete', 'shell', 'write_file'];
+    const actualReviewTools = combineActiveSkillAllowlists(reviewTools, [simplify?.allowedTools ?? []]);
+    expect(actualReviewTools).toEqual(expect.arrayContaining(['artifact_read', 'subagent_report', 'turn_complete']));
+    expect(actualReviewTools).not.toEqual(expect.arrayContaining(['shell']));
+    expect(actualReviewTools).not.toEqual(expect.arrayContaining(['write_file']));
+    expect(combineActiveSkillAllowlists(reviewTools, [simplify?.allowedTools ?? [], ['artifact_read']]))
+      .toEqual(expect.arrayContaining(['artifact_read']));
+    expect(combineActiveSkillAllowlists(reviewTools, [simplify?.allowedTools ?? [], ['artifact_read']]))
+      .not.toEqual(expect.arrayContaining(['turn_complete']));
     const provenance = service.loadSkill('artifact-provenance');
     expect(provenance?.allowedTools).toEqual([]);
     expect(provenance?.instructions).toContain('sourceRefs.length >= 1');

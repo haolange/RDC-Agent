@@ -135,6 +135,8 @@ export interface AgentTaskEventPayload extends AgentEventBasePayload {
 }
 
 export interface AgentApprovalEventPayload extends AgentEventBasePayload {
+  reviewMethod?: 'rule' | 'model';
+  errorCode?: string;
   delegatedRequest?: { executionId: string; childSessionId: string; turnId: string };
   approvalId: string;
   title: string;

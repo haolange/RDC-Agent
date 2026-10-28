@@ -55,7 +55,7 @@ export const ComposerModelEffortPanel: React.FC<{
   fastModelStatusLabel?: string;
   maxContextMode: boolean;
   fastModel: boolean;
-  t: (key: TranslationKey) => string;
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   onTrackPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
   onTrackPointerMove: (event: React.PointerEvent<HTMLDivElement>) => void;
   onTrackPointerUp: (event: React.PointerEvent<HTMLDivElement>) => void;
@@ -135,7 +135,7 @@ export const ComposerModelEffortPanel: React.FC<{
           <Icon name="lightning" size={16} />
         </EffortModeIconButton>
         <div className="composer-model-effort-identity">
-          <span className="composer-model-effort-level">{reasoningLabel}</span>
+          <span className="composer-model-effort-level">{t('composer.effort.reasoningValue', { level: reasoningLabel })}</span>
           <button
             type="button"
             className="composer-model-effort-model"

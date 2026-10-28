@@ -446,6 +446,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                     approval: payload.kind === 'ask_user' || payload.kind === 'plan_review' ? undefined : {
                       approvalId: payload.approvalId, status: payload.status, reason: payload.reason,
                       risk: typeof payload.risk === 'string' ? payload.risk : undefined, reviewer: typeof payload.reviewer === 'string' ? payload.reviewer : undefined,
+                      reviewMethod: payload.reviewMethod, errorCode: payload.errorCode,
                     },
                   }),
                 };
@@ -469,6 +470,8 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 planReview?: ConversationToolCall['planReview'];
                 risk?: unknown;
                 reviewer?: unknown;
+                reviewMethod?: unknown;
+                errorCode?: unknown;
               };
               const approvalId = payload.approvalId ?? `approval-${payload.toolCallId ?? 'runtime'}`;
               const toolCallId = String(payload.toolCallId ?? approvalId);
@@ -545,11 +548,15 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                   reason,
                   risk: payload.risk,
                   reviewer: payload.reviewer,
+                  reviewMethod: payload.reviewMethod,
+                  errorCode: payload.errorCode,
                 }, currentLoopOptions()),
               });
             }
             if (event.type === 'approval.answered') {
               const payload = event.payload as {
+                reviewMethod?: unknown;
+                errorCode?: unknown;
                 approvalId?: string;
                 status?: string;
                 answer?: unknown;
@@ -609,6 +616,8 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                   toolName: String(payload.toolName ?? 'approval'),
                   status: approvalStatus,
                   answer: answerText,
+                  reviewMethod: payload.reviewMethod,
+                  errorCode: payload.errorCode,
                 }, currentLoopOptions()),
               });
             }

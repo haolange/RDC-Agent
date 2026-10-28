@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ComposerModelEffortControl, type ComposerModelSaveState } from './ComposerModelEffortControl';
 import { ComposerMenuRegistryProvider } from './useComposerMenuRegistry';
 const mock = vi.hoisted(() => ({ choice: false, commit: vi.fn(), clear: vi.fn(), save: vi.fn() }));
-vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
+vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, params?: Record<string, string | number>) => key === 'composer.effort.reasoningValue' ? `模型思考：${params?.level}` : key }) }));
 vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: (select: (state: unknown) => unknown) => select({
   settings: { llm: { providers: [] }, agents: { definitions: [
     { id: 'debugger', name: 'Debugger', compiledRoute: { providerId: 'p', modelId: 'model' } },
@@ -50,6 +50,7 @@ it('uses a neutral agent-default label only in review and opens the existing mod
   await click('[role="menuitemradio"]:not([data-testid="composer-model-agent-default"])');
   expect(mock.commit).toHaveBeenCalledOnce();
   expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.textContent).toBe('ModelLow');
+  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.getAttribute('aria-label')).toContain('模型思考：Low');
   expect(host.querySelector('[data-testid="open-models"]')).not.toBeNull();
   await click('[data-testid="open-models"]');
   await click('[data-testid="composer-model-agent-default"]');
@@ -60,6 +61,7 @@ it('uses a neutral agent-default label only in review and opens the existing mod
 it('preserves the normal Composer model and effort label without an override', async () => {
   await render(false);
   expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.textContent).toBe('ModelLow');
+  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.getAttribute('aria-label')).toContain('模型思考：Low');
 });
 it('keeps the save barrier after closing the popup and reports a failed save without changing the model', async () => {
   let finish!: (result: { ok: boolean }) => void;

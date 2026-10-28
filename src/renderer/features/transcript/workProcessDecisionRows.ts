@@ -95,7 +95,7 @@ export const createApprovalRow = (block: ConversationWorkBlock): WorkProcessRow 
 
 const getApprovalVerb = (status: WorkProcessRowStatus, isAutoReview: boolean): string => {
   if (status === 'cancelled') return '已取消';
-  if (status === 'error') return isAutoReview ? '自动检查拒绝' : '已拒绝';
-  if (status === 'running' || status === 'pending') return isAutoReview ? '自动检查中' : '等待审批';
-  return isAutoReview ? '自动检查通过' : '已批准';
+  if (status === 'error') return isAutoReview ? '自动审查未通过' : '已拒绝';
+  if (status === 'running' || status === 'pending') return isAutoReview ? '自动审查中' : '等待审批';
+  return isAutoReview ? '自动审查通过' : '已批准';
 };

@@ -1,4 +1,5 @@
 import type { PermissionReviewer, PermissionReviewAction, PermissionReviewVerdict } from './PermissionReviewRuntime';
+import { PermissionReviewError } from './PermissionReviewRuntime';
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
@@ -92,6 +93,8 @@ export class AgentToolApprovalRequestService {
   }
 
   async autoReview(input: ToolApprovalRequestInput & { action?: PermissionReviewAction; reviewer?: PermissionReviewer }): Promise<PermissionReviewVerdict> {
+    const reviewMethod = input.risk === 'low' ? 'rule' as const : 'model' as const;
+    let errorCode: string | undefined;
     const approvalId = `auto-review-${input.toolCallId}`;
     const synthetic: PendingToolApprovalRequest = {
       ...input,
@@ -112,18 +115,25 @@ export class AgentToolApprovalRequestService {
       toolName: input.toolName,
       risk: input.risk,
       reviewer: 'auto_review',
+      reviewMethod,
     } as AgentApprovalEventPayload);
     let verdict: PermissionReviewVerdict;
     try {
       input.signal?.throwIfAborted();
-      verdict = input.risk === 'low'
-        ? { approved: true, reason: `RULE_APPROVED: ${input.reason}` }
-        : input.reviewer && input.action
-          ? await input.reviewer(input.action, input.signal)
-          : { approved: false, reason: 'PERMISSION_REVIEW_UNAVAILABLE: no frozen reviewer is available.' };
+      if (input.risk === 'low') {
+        verdict = { approved: true, reason: `RULE_APPROVED: ${input.reason}` };
+      } else {
+        if (!input.reviewer || !input.action) throw new PermissionReviewError('PERMISSION_REVIEW_UNAVAILABLE', 'no frozen reviewer is available.');
+        const result = await input.reviewer(input.action, input.signal);
+        // Only the strict verdict crosses this boundary; route/failure metadata belongs to the host.
+        verdict = { approved: result.approved, reason: result.reason };
+      }
       input.signal?.throwIfAborted();
     } catch (error) {
-      verdict = { approved: false, reason: `${input.signal?.aborted ? 'PERMISSION_REVIEW_CANCELLED' : 'PERMISSION_REVIEW_FAILED'}: ${error instanceof Error ? error.message : String(error)}` };
+      errorCode = input.signal?.aborted ? 'PERMISSION_REVIEW_CANCELLED'
+        : error instanceof PermissionReviewError ? error.code : 'PERMISSION_REVIEW_FAILED';
+      verdict = { approved: false, reason: error instanceof PermissionReviewError && !input.signal?.aborted
+        ? error.message : `${errorCode}: ${error instanceof Error ? error.message : String(error)}` };
     }
     const { approved, reason } = verdict;
     this.emit(synthetic, 'approval.answered', {
@@ -137,6 +147,8 @@ export class AgentToolApprovalRequestService {
       answer: reason,
       risk: input.risk,
       reviewer: 'auto_review',
+      reviewMethod,
+      errorCode,
     } as AgentApprovalEventPayload);
     return verdict;
   }

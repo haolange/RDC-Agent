@@ -4,6 +4,8 @@
 
 ## Active Session
 
+工具审批的 `reviewMethod` / `errorCode` 来自主进程，随 owning session / turn / toolCall 的现有 workTrace 持久化及 delegated 投影传递。规则检查、独立模型判定、审核异常与人工审批分别显示；历史缺字段保持未知，不依据 risk 或 reason 补造来源。拒绝与审核异常明确当前动作未执行，已批准后的工具错误按实际执行结果展示。Composer 的“模型思考”与审批的“操作风险”分开标识，不改变原有 generation、取消及 currentSession 隔离。
+
 - `projectStore.currentSession.sessionId` 是 renderer 唯一 active session。
 - 跨项目选择项目根而不选会话时，先缓存并清空旧 session 的 transcript、运行态、右栏与 Composer 上下文，再投影目标项目；此时 `currentSession=null` 不代表旧 turn 又成为前台。旧 turn 的流事件及最终返回留在所属 session cache，不能重新选择旧项目或会话。仅从当前所选项目的无会话 Composer 发出的首轮结果可以建立前台新 session。
 - Sidebar 每个项目节点只投影 `session.projectId` 与该节点一致的会话；乐观切换期间旧项目的 session 列表不能暂挂到新项目标题下。

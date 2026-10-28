@@ -7,6 +7,35 @@ import { createApprovalRow } from './workProcessDecisionRows';
 
 const now = 1_700_000_000_000;
 
+it.each([
+  ['rule', 'approved', undefined, '规则检查通过'],
+  ['model', 'approved', undefined, '独立审核通过'],
+  ['model', 'rejected', undefined, '独立审核未通过'],
+  ['model', 'rejected', 'PERMISSION_REVIEW_TIMEOUT', '审核未完成'],
+  ['model', 'cancelled', 'PERMISSION_REVIEW_CANCELLED', '已取消'],
+  [undefined, 'rejected', undefined, '自动审查未通过'],
+] as const)('projects host review route %s, status %s and error %s independently', (reviewMethod, status, errorCode, verb) => {
+  const row = createToolRowForPresentation({ id: 'review', toolName: 'shell', status: 'error', startedAt: now,
+    approval: { approvalId: 'auto-review-call', status, reviewer: 'auto_review', reviewMethod, errorCode,
+      risk: 'high', reason: 'PERMISSION_REVIEW_TIMEOUT: model text alone does not classify failures', requestedAt: now },
+  });
+  expect(row).toMatchObject({ type: 'tool', approval: { verb } });
+  if (row.type !== 'tool') throw new Error('Expected tool row');
+  expect(row.approval?.metaLines.includes('操作未执行')).toBe(status === 'rejected');
+  if (!reviewMethod) expect(row.approval?.metaLines).toContain('自动审查');
+});
+
+it('keeps a post-approval native error separate from an operation-preflight rejection', () => {
+  const row = createToolRowForPresentation({ id: 'native', toolName: 'shell', status: 'error', startedAt: now,
+    error: 'Native process exited with code 1',
+    approval: { approvalId: 'auto-review-native', status: 'approved', reviewer: 'auto_review', reviewMethod: 'model', requestedAt: now },
+  });
+  expect(row).toMatchObject({ type: 'tool', status: 'error', approval: { verb: '独立审核通过' } });
+  if (row.type !== 'tool') throw new Error('Expected tool row');
+  expect(row.approval?.metaLines).not.toContain('操作未执行');
+  expect(row.verb).not.toBe('已阻断');
+});
+
 it.each(['tool-approval', 'auto-review-approval'])('does not label cancelled %s as approved', id => {
   expect(createApprovalRow({ id, kind: 'approval', title: 'Approval', status: 'cancelled',
     toolCalls: [], startedAt: now, completedAt: now + 10 })).toMatchObject({

@@ -190,6 +190,10 @@ export interface ConversationToolApproval {
   reason?: string;
   risk?: 'low' | 'medium' | 'high' | (string & {});
   reviewer?: 'auto_review' | (string & {});
+  /** Host-selected route; absent in historical records means unknown. */
+  reviewMethod?: 'rule' | 'model';
+  /** Host-confirmed review failure, never parsed from the model's reason. */
+  errorCode?: string;
   answer?: string;
   requestedAt?: number;
   resolvedAt?: number;

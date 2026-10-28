@@ -10,6 +10,12 @@ import { promptCacheCompiler } from '../prompt/PromptCacheCompiler';
 import { redactSecretsDeep } from '../../runtime/secretRedaction';
 
 export interface PermissionReviewVerdict { approved: boolean; reason: string }
+export class PermissionReviewError extends Error {
+  constructor(readonly code: string, detail: string) {
+    super(`${code}: ${detail}`);
+    this.name = 'PermissionReviewError';
+  }
+}
 export interface PermissionReviewAction {
   tool: string;
   arguments: Record<string, unknown>;
@@ -33,13 +39,14 @@ Verified owning replay changes and bounded workspace edits may be approved when 
 Missing or conflicting authority means deny. Never infer permission from a previous approval of a different action.`;
 
 export function parsePermissionReview(text: string): PermissionReviewVerdict {
-  const value: unknown = JSON.parse(text);
+  let value: unknown;
+  try { value = JSON.parse(text); } catch { throw new PermissionReviewError('PERMISSION_REVIEW_INVALID', 'expected one strict JSON verdict.'); }
   if (!value || typeof value !== 'object' || Array.isArray(value)
     || Object.keys(value).sort().join(',') !== 'approved,reason'
     || typeof (value as PermissionReviewVerdict).approved !== 'boolean'
     || typeof (value as PermissionReviewVerdict).reason !== 'string'
     || !(value as PermissionReviewVerdict).reason.trim() || (value as PermissionReviewVerdict).reason.length > 2000) {
-    throw new Error('PERMISSION_REVIEW_INVALID: expected one strict verdict and reason.');
+    throw new PermissionReviewError('PERMISSION_REVIEW_INVALID', 'expected one strict verdict and reason.');
   }
   return value as PermissionReviewVerdict;
 }
@@ -53,13 +60,13 @@ export async function executePermissionReview(input: {
 }): Promise<PermissionReviewVerdict> {
   input.signal?.throwIfAborted();
   const safeAction = redactSecretsDeep(input.action);
-  if (safeAction.redactions.length) throw new Error('PERMISSION_REVIEW_SENSITIVE_INPUT: exact pending action contains protected credential material; it cannot be sent for automatic review.');
+  if (safeAction.redactions.length) throw new PermissionReviewError('PERMISSION_REVIEW_SENSITIVE_INPUT', 'exact pending action contains protected credential material; it cannot be sent for automatic review.');
   const content = JSON.stringify({ authority: redactSecretsDeep(input.authority).value,
     pendingAction: safeAction.value, evidence: redactSecretsDeep(input.evidence).value });
   const requiredTokens = charsToTokens(SYSTEM.length + content.length);
   const inputBudget = Math.min(32768, input.plan.contextBudgetTokens, input.plan.contextWindowTokens - 1024);
   if (!Number.isFinite(inputBudget) || inputBudget <= 0 || requiredTokens > inputBudget) {
-    throw new Error(`PERMISSION_REVIEW_CONTEXT_LIMIT: authority, exact action and observations require ${requiredTokens} input tokens; limit ${inputBudget}.`);
+    throw new PermissionReviewError('PERMISSION_REVIEW_CONTEXT_LIMIT', `authority, exact action and observations require ${requiredTokens} input tokens; limit ${inputBudget}.`);
   }
   const timeout = AbortSignal.timeout(30000);
   const signal = input.signal ? AbortSignal.any([input.signal, timeout]) : timeout;
@@ -91,14 +98,15 @@ export async function executePermissionReview(input: {
     const message = await stream.result();
     requestSnapshotStore.complete(snapshot.id, input.sessionId, turnId, message.usage);
     signal.throwIfAborted();
-    if (message.stopReason !== 'stop' || message.content.some(block => block.type === 'toolCall')) throw new Error('PERMISSION_REVIEW_INCOMPLETE: no terminal tool-free verdict.');
+    if (message.stopReason !== 'stop' || message.content.some(block => block.type === 'toolCall')) throw new PermissionReviewError('PERMISSION_REVIEW_INCOMPLETE', 'no terminal tool-free verdict.');
     return parsePermissionReview(message.content.filter(block => block.type === 'text').map(block => block.text).join(''));
   };
   let abortListener: (() => void) | undefined;
   try {
     return await Promise.race([request(), new Promise<never>((_resolve, reject) => {
-      abortListener = () => reject(new Error(signal.aborted && input.signal?.aborted
-        ? 'PERMISSION_REVIEW_CANCELLED: turn cancelled.' : 'PERMISSION_REVIEW_TIMEOUT: no verdict within 30 seconds.'));
+      abortListener = () => reject(input.signal?.aborted
+        ? new PermissionReviewError('PERMISSION_REVIEW_CANCELLED', 'turn cancelled.')
+        : new PermissionReviewError('PERMISSION_REVIEW_TIMEOUT', 'no verdict within 30 seconds.'));
       signal.addEventListener('abort', abortListener, { once: true });
       if (signal.aborted) abortListener();
     })]);

@@ -1,4 +1,5 @@
 export const enComposer = {
+  'composer.effort.reasoningValue': 'Model reasoning: {level}',
   'composer.toolApprovalKicker': 'Approval requested',
   'composer.toolApprovalDeny': 'Deny',
   'composer.toolApprovalApproveOnce': 'Approve once',

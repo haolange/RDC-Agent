@@ -216,7 +216,7 @@ export const ToolApprovalCallout: React.FC<{ approval: NonNullable<ToolRowModel[
         <span className="work-process-tool-approval-verb">{label(approval.verb)}</span>
         {approval.metaLines.length > 0 ? (
           <span className="work-process-tool-approval-meta">
-            {approval.metaLines.map((line) => <span key={line}>{line}</span>)}
+            {approval.metaLines.map((line) => <span key={line}>{label(line)}</span>)}
           </span>
         ) : null}
       </div>

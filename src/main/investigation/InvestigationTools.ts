@@ -148,7 +148,7 @@ function createInvestigationReadTool(
         const result = deps.service.readRecord(delegatedArtifactOwner(sessionId) ?? sessionId, artifactId, asString(args.expectedHash) || undefined);
         if (sessionId) resolveDelegatedArtifactRead(sessionId, result.contentUri, result.contentHash);
         return textResult(
-          `${result.manifest.kind}\t${result.manifest.status}\t${result.manifest.title}\ncontentRef\t${result.contentUri}\ncontentHash\t${result.contentHash}\n${JSON.stringify(result.record)}`,
+          `${result.manifest.kind}\t${result.manifest.status}\t${result.manifest.title}\nmetadata\t${JSON.stringify({ artifactId, status: result.manifest.status, contentRef: result.contentUri, contentHash: result.contentHash, supersedes: result.manifest.supersedes ?? null })}\n${JSON.stringify(result.record)}`,
           { ok: true, artifactId, manifest: result.manifest, record: result.record, contentUri: result.contentUri, contentHash: result.contentHash },
         );
       } catch (error) {
@@ -165,7 +165,7 @@ function createInvestigationWriteTool(
   return {
     name: 'investigation_write',
     label: 'Write Investigation Artifact',
-    description: 'Write or version a session-owned rdc.investigation.v1 record through InvestigationArtifactService. Schema and invariants fail closed; ready is never set on invalid records.',
+    description: 'Write or version a session-owned rdc.investigation.v1 record through InvestigationArtifactService. Schema and invariants fail closed; ready is never set on invalid records. A delegated read grant does not authorize replacing its source record. Independent reviewers return findings and their own outputs; the owning parent versions parent records.',
     parameters: {
       type: 'object',
       required: ['kind', 'mission', 'title', 'summary', 'record'],
@@ -284,7 +284,7 @@ function createInvestigationListTool(
           const result = deps.service.readRecord(owner, item.artifactId);
           try { resolveDelegatedArtifactRead(sessionId, result.contentUri, result.contentHash); return true; } catch { return false; }
         });
-        const lines = items.map((item) => `${item.artifactId}\t${item.kind}\t${item.status}\t${item.recordKey}\t${item.contentUri}\t${item.contentHash}`);
+        const lines = items.map((item) => JSON.stringify({ artifactId: item.artifactId, kind: item.kind, status: item.status, recordKey: item.recordKey, contentUri: item.contentUri, contentHash: item.contentHash, supersedes: item.supersedes ?? null }));
         return textResult(
           lines.length > 0 ? `artifacts\t${items.length}\n${lines.join('\n')}` : 'No Investigation artifacts in this session.',
           { ok: true, count: items.length, artifacts: items },

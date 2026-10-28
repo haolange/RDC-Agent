@@ -141,6 +141,7 @@ describe('ConversationService work trace tool approvals', () => {
       reason: 'Network tool "web_search" requires approval in the current permission mode.',
       risk: 'medium',
       reviewer: 'auto_review',
+      reviewMethod: 'model',
     });
 
     expect(trace.blocks).toHaveLength(1);
@@ -156,6 +157,7 @@ describe('ConversationService work trace tool approvals', () => {
         reason: 'Network tool "web_search" requires approval in the current permission mode.',
         risk: 'medium',
         reviewer: 'auto_review',
+        reviewMethod: 'model',
       },
     });
     const requestedAt = pendingCall.approval?.requestedAt;
@@ -167,6 +169,7 @@ describe('ConversationService work trace tool approvals', () => {
       toolName: 'web_search',
       status: 'approved',
       answer: 'Approved once',
+      reviewMethod: 'model',
     });
 
     const approvedCall = trace.blocks[0].toolCalls[0];
@@ -175,8 +178,28 @@ describe('ConversationService work trace tool approvals', () => {
       status: 'approved',
       requestedAt,
       answer: 'Approved once',
+      reviewMethod: 'model',
     });
     expect(approvedCall.approval?.resolvedAt).toEqual(expect.any(Number));
+  });
+
+  it('preserves host review failures through stored work trace without deriving them from reason text', () => {
+    const trace = upsertRuntimeToolApproval(undefined, {
+      approvalId: 'auto-review-timeout', toolCallId: 'timeout', toolName: 'shell',
+      status: 'rejected', reviewer: 'auto_review', reviewMethod: 'model',
+      errorCode: 'PERMISSION_REVIEW_TIMEOUT', answer: 'No verdict within 30 seconds.',
+    });
+    const stored = sanitizeStoredWorkTrace(JSON.parse(JSON.stringify(trace)));
+    expect(stored?.blocks[0].toolCalls[0].approval).toMatchObject({
+      status: 'rejected', reviewMethod: 'model', errorCode: 'PERMISSION_REVIEW_TIMEOUT',
+    });
+    const historical = upsertRuntimeToolApproval(undefined, {
+      approvalId: 'auto-review-old', toolCallId: 'old', toolName: 'shell',
+      status: 'rejected', reviewer: 'auto_review', reason: 'PERMISSION_REVIEW_TIMEOUT',
+      reviewMethod: 'invented',
+    });
+    expect(historical.blocks[0].toolCalls[0].approval?.reviewMethod).toBeUndefined();
+    expect(historical.blocks[0].toolCalls[0].approval?.errorCode).toBeUndefined();
   });
 
   it('marks rejected tool approval as the same tool row error', () => {

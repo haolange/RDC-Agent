@@ -3,6 +3,31 @@ import { createInvestigationTools } from './InvestigationTools';
 import { baselineWorld, createInvestigationHarness, observedClaim, sampleChallenge, writeDraft, reopenInvestigationHarness } from './investigationTestFixtures';
 import { grantDelegatedArtifactAccess } from '../sessions/DelegatedArtifactAccess';
 describe('delegated investigation writes', () => {
+  it('exposes authoritative version metadata without granting the predecessor or permitting a false hash', async () => {
+    const { service, resolver, sessionId } = createInvestigationHarness();
+    const first = writeDraft(service, 'world_state', baselineWorld('versioned-world'));
+    const revised = writeDraft(service, 'world_state', baselineWorld('versioned-world'), { supersedes: first.manifest.artifactId });
+    const release = grantDelegatedArtifactAccess('version-reader', sessionId, [revised.contentUri], resolver);
+    try {
+      const tools = createInvestigationTools('version-reader', { service });
+      const read = tools.find(tool => tool.name === 'investigation_read')!;
+      const result = await read.execute('read', { artifactId: revised.manifest.artifactId, expectedHash: revised.contentHash });
+      expect(result.isError).not.toBe(true);
+      expect(result.content[0]).toMatchObject({ text: expect.stringContaining(JSON.stringify({
+        artifactId: revised.manifest.artifactId, status: revised.manifest.status,
+        contentRef: revised.contentUri, contentHash: revised.contentHash, supersedes: first.manifest.artifactId,
+      })) });
+      const list = await tools.find(tool => tool.name === 'investigation_list')!.execute('list', {});
+      expect(list.details).toMatchObject({ count: 1 });
+      expect(list.content[0]).toMatchObject({ text: expect.stringContaining(`"supersedes":"${first.manifest.artifactId}"`) });
+      expect((await read.execute('predecessor', { artifactId: first.manifest.artifactId })).isError).toBe(true);
+      expect((await read.execute('forged-hash', { artifactId: revised.manifest.artifactId, expectedHash: `sha256:${'0'.repeat(64)}` })).isError).toBe(true);
+      expect(service.readRecord(sessionId, first.manifest.artifactId).manifest.status).toBe('superseded');
+    } finally { release(); }
+    const original = await createInvestigationTools(sessionId, { service }).find(tool => tool.name === 'investigation_read')!
+      .execute('original', { artifactId: first.manifest.artifactId });
+    expect(original.content[0]).toMatchObject({ text: expect.stringContaining('"supersedes":null') });
+  });
   it('persists an open ready Challenge using exact granted Investigation provenance and rejects empty, false, or ungranted sources', async () => {
     const { service, resolver, sessionId, sessionPath } = createInvestigationHarness();
     writeDraft(service, 'world_state', baselineWorld('review-world'));

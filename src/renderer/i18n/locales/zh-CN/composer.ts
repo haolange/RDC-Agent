@@ -1,4 +1,5 @@
 export const zhComposer = {
+  'composer.effort.reasoningValue': '模型思考：{level}',
   'composer.toolApprovalKicker': '等待审批',
   'composer.toolApprovalDeny': '拒绝',
   'composer.toolApprovalApproveOnce': '批准一次',

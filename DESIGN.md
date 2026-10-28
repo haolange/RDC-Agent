@@ -404,6 +404,8 @@ main-owned `RightRailProjectionService` 为显式 `{ projectId, sessionId }` 组
 
 ## 通用 Harness 与声明续跑（2026-09-15）
 
+独立审查结论、父级记录更新与最终接受是不同责任：通过现有Task与Investigation版本化交付，不建立额外结算状态机。工具正文投影已存的版本关系而不扩展读取授权。审批主进程来源/故障元数据仅解释结果，不改变授权或领域证明；历史未知不得推断为新资格。
+
 General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 策略采用 renderdoc-execution 的六块 Markdown 模板，按规模填写；Knowledge 相似性仅是检查线索。
 
 `handoffs` 只驱动建议行和计划门按钮。人点后主进程 `applyDeclaredHandoff` 校验声明属于当前（或刚批准的）profile，写入/确认 session execution offer，触发 `before-handoff` / `after-handoff`，并 persist `session.agentId`。`send: true` 只表示点完后预填并自动发送。不存在 `agent_handoff` 工具、durable `prepared → committed → consumed` 状态机、强制 return 或自动回 Mission。

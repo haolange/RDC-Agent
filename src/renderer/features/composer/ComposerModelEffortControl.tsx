@@ -62,7 +62,7 @@ export const ComposerModelEffortControl: React.FC<{
   const modelLabel = currentOption?.label || effective?.modelId || t('settings.selectModelPlaceholder');
   const capsule = buildModelEffortCapsulePresentation({
     modelLabel,
-    reasoningLabel: effort.effortLabel,
+    reasoningLabel: t('composer.effort.reasoningValue', { level: effort.effortLabel }),
     maxContextMode: effort.turnControls.maxContextMode,
     maxContextLabel: t('composer.effort.maxContext'),
     fastModel: effort.turnControls.fastModel,
@@ -128,7 +128,7 @@ export const ComposerModelEffortControl: React.FC<{
           </span>
         ) : null}
         <OverflowFade className="composer-model-effort-pill-model" text={capsuleLabel ?? capsule.modelLabel} />
-        {!agentDefault ? <span className="composer-model-effort-pill-level">{capsule.reasoningLabel}</span> : null}
+        {!agentDefault ? <span className="composer-model-effort-pill-level" title={capsule.reasoningLabel}>{effort.effortLabel}</span> : null}
         <span className="composer-model-effort-pill-caret" aria-hidden="true"><ChevronIcon /></span>
       </Pill>
 

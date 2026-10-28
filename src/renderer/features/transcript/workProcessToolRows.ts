@@ -153,22 +153,27 @@ const createToolApprovalPresentation = (
   const message = compactText(messageSource || fallbackApprovalMessage(approval.status), 300);
   const metaLines = [
     approval.risk ? `风险：${approval.risk}` : '',
-    isAutoReview ? '自动检查' : '人工审批',
+    isAutoReview ? approval.reviewMethod === 'rule' ? '规则检查' : approval.reviewMethod === 'model' ? '独立审核' : '自动审查' : '人工审批',
+    approval.status === 'rejected' ? '操作未执行' : '',
   ].filter(Boolean);
 
   return {
     status: approval.status,
-    verb: getToolApprovalVerb(approval.status, isAutoReview),
+    verb: getToolApprovalVerb(approval, isAutoReview),
     message,
     metaLines,
   };
 };
 
-const getToolApprovalVerb = (status: ConversationToolApprovalStatus, isAutoReview: boolean): string => {
-  if (status === 'pending') return isAutoReview ? '自动检查中' : '等待审批';
-  if (status === 'approved') return isAutoReview ? '自动检查通过' : '已批准';
-  if (status === 'rejected') return isAutoReview ? '自动检查拒绝' : '已拒绝';
-  return '已取消';
+const getToolApprovalVerb = (approval: ConversationToolApproval, isAutoReview: boolean): string => {
+  const { status, reviewMethod, errorCode } = approval;
+  if (status === 'cancelled') return '已取消';
+  if (status === 'rejected' && errorCode) return '审核未完成';
+  if (isAutoReview && reviewMethod === 'rule') return status === 'pending' ? '规则检查中' : status === 'approved' ? '规则检查通过' : '规则检查未通过';
+  if (isAutoReview && reviewMethod === 'model') return status === 'pending' ? '独立审核中' : status === 'approved' ? '独立审核通过' : '独立审核未通过';
+  if (status === 'pending') return isAutoReview ? '自动审查中' : '等待审批';
+  if (status === 'approved') return isAutoReview ? '自动审查通过' : '已批准';
+  return isAutoReview ? '自动审查未通过' : '已拒绝';
 };
 
 const fallbackApprovalMessage = (status: ConversationToolApprovalStatus): string => {
