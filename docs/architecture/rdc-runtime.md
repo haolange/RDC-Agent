@@ -95,6 +95,8 @@ Memory 与 Knowledge 使用独立 scoped preload domain（`memory` / `knowledge`
 
 Settings 持久化保留 executable、argsPrefix、cwd、env 和 timeout，用户通过安装根目录选择配置前三项。main 解析真实路径，检测只访问已配置目录和 Tools 默认安装目录；验证草稿时读取同安装版本/catalog，成功后走既有 Settings 保存。选择取消、验证失败不覆盖原值。高级面保留 env/timeout。四个生命周期命令模板、模板变量、catalogPath 和 JSON 模式配置已移除。接口匹配根据软件所需契约判定，不把工具总数或包版本作为权限条件。
 
+正式安装来源按发布资产 SHA-256、`RELEASE_MANIFEST.json` / `SBOM.json` 的版本与 `source_revision`、安装文件哈希逐层核对，再通过实际主进程的运行摘要、catalog 和安装验证入口确认同安装绑定。升级使用已验证的正式包，不向安装目录混拷开发源码或重写发行清单；包版本用于来源诊断，不能替代实际能力校验。历史发行记录保留其当时版本和验证边界。
+
 RDC-Tool 的 session worker 对 `rd.session.*` 统一提供 60 秒操作预算，CLI transport 在此基础上增加 5 秒响应缓冲，实际传输门限为 65 秒；RDC-Agent 的默认外层 CLI 进程等待为 120 秒。Settings schema 8 会把旧默认 60000ms 迁移到 120000ms，非默认用户值保留。三层门限均由各自边界负责，调用方不传第二套 session timeout。
 
 `prepareTurn` 冻结 CLI 配置、完整操作定义及其指纹、owning session/context/replay lease 身份。在途 Settings 变化不影响该轮。General 使用已有 shell 的结构化 RDC 模式，普通 command 与 rdc 互斥；轻量发现只返回匹配操作或单个操作说明，不把完整 catalog 展开进每次模型请求。
