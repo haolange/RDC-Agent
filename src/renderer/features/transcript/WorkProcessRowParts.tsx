@@ -69,7 +69,7 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
       className={`work-process-step is-appear status-${row.status} kind-tool family-${row.family}${compact ? ' is-compact-tool' : ''}`}
       data-testid="work-process-tool-call"
     >
-      <WorkProcessRailIcon variant="step" status={row.status} />
+      <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
         <div
           className={`work-process-tool-card status-${row.status}${expanded ? ' is-expanded' : ''}${canExpand ? ' is-expandable' : ''}${compact ? ' is-compact' : ''}${isBackgroundWait ? ' is-background-wait' : ''}${hasPayloadSurface ? ' has-payload' : ''}`}
@@ -79,7 +79,7 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
           <WorkCardHeader onClick={toggleExpanded} expanded={canExpand ? expanded : undefined}
             disabled={!canExpand} tooltip={durationTitleFull} duration={row.duration}
             icon={<WorkProcessIcon icon={row.icon} className="work-process-tool-card-icon" />}
-            title={verbLabel} status={statusLabel ? <span className={row.status === 'error' ? 'work-process-tool-status-error' : undefined}>{statusLabel}</span> : null} />
+            title={verbLabel} status={statusLabel && statusLabel !== verbLabel ? <span className={row.status === 'error' ? 'work-process-tool-status-error' : undefined}>{statusLabel}</span> : null} />
 
           {(!isBackgroundWait || expanded) ? <CardBody row={row} /> : null}
 

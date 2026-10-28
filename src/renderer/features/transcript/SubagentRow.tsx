@@ -23,6 +23,7 @@ import { WorkCardHeader } from './WorkCardHeader';
 import { SubagentProgressDots } from './SubagentProgressDots';
 import { WorkDisclosure, FadingPreview } from './WorkDisclosure';
 import { useI18n } from '../../i18n';
+import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 
 type SubagentWorkRow = Extract<WorkProcessRow, { type: 'subagent' }>;
 
@@ -65,7 +66,8 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
   const header = page.header;
   const executionStatus = header?.mode === 'background' ? header.executionStatus : undefined;
   const rawStatus = executionStatus ?? header?.status ?? (row.status === 'error' ? 'failed'
-    : row.status === 'complete' ? 'complete' : row.status === 'cancelled' || row.status === 'skipped' ? 'cancelled' : 'running');
+    : row.status === 'complete' ? 'complete' : row.status === 'cancelled' || row.status === 'skipped' ? 'cancelled'
+      : row.status === 'pending' ? 'queued' : 'running');
   const status = rawStatus === 'completed' ? 'complete' : rawStatus;
   const active = status === 'queued' || status === 'running' || status === 'waiting' || status === 'cancelling';
   const startedAt = header?.startedAt;
@@ -101,8 +103,9 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
       : t('chat.subagentNoFinal'));
   const finalAvailable = !!header?.finalAvailable;
   const progressDots = <SubagentProgressDots state={active ? 'active' : status === 'complete' ? 'complete' : 'stopped'} />;
-  return <li ref={cardRef} className={`work-process-subagent is-${status}${expanded ? ' is-expanded' : ''}`}
-    data-work-process-block-id={row.id} data-testid="work-process-subagent">
+  return <li ref={cardRef} className="work-process-step kind-subagent" data-work-process-block-id={row.id}>
+    <WorkProcessRailIcon row={row} active={status === 'running'} />
+    <div className={`work-process-step-content work-process-subagent is-${status}${expanded ? ' is-expanded' : ''}`} data-testid="work-process-subagent">
     <WorkCardHeader onClick={() => openCard(active)} expanded={expanded} controls={contentId}
       icon={<ModeGlyph mode={mode} icon={definition?.icon ?? undefined} className="work-process-tool-card-icon" />}
       title={`${t('chat.subagentIdentity')} · ${agentLabel}`} duration={headerLoading ? undefined : duration}
@@ -131,12 +134,11 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
       </div>
       <WorkDisclosure title={t('chat.subagentProcess')} meta={page.total ? t('chat.subagentStepCount', { count: page.total }) : undefined} preview={processPreview} open={workOpen}
         onToggle={() => toggle('workOpen')} bodyClassName="work-process-subagent-process-body">
-        {hasEarlier ? <button type="button" className="work-process-subagent-more" onClick={() => void loadEarlierWithAnchor()}>
-          {t('chat.subagentShowEarlier')}</button> : null}
         {loading || headerLoading ? <span className="work-process-subagent-note">{t('chat.subagentLoading')}</span> : null}
         {page.error ? <button type="button" className="work-process-subagent-more" onClick={retry}>{t('chat.subagentRetry')}</button> : null}
         {!loading && !headerLoading && !page.error && page.steps.length === 0 ? <span className="work-process-subagent-note">{t('chat.subagentNoActions')}</span> : null}
         <WorkProcessContent embedded density="compact" presentation={presentation} sessionId={sessionId} renderToolDetail={renderToolDetail}
+          leadingContent={hasEarlier ? <button type="button" className="work-process-subagent-more" onClick={() => void loadEarlierWithAnchor()}>{t('chat.subagentShowEarlier')}</button> : null}
           disclosureScope={`${sessionId ?? ''}\u0000${row.id}`} />
       </WorkDisclosure>
       <WorkDisclosure title={t('chat.subagentFinal')} preview={finalPreview} open={finalOpen}
@@ -150,5 +152,6 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
           executionId={row.executionId} generation={row.generation} /></ScopedWorkDisclosure>
       </WorkDisclosure>
     </div> : null}
+    </div>
   </li>;
 };

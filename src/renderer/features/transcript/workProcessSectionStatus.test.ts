@@ -34,19 +34,18 @@ it('renders both settled sections gray after a rejected plan and a completed rea
   const { presentation, document } = render([loop('loop-15'), review('first'), next]);
   expect(presentation.rows.filter((row) => row.type === 'section').map((row) => row.status))
     .toEqual(['complete', 'complete']);
-  expect(document.querySelectorAll('.work-process-section > .work-process-step-rail.status-complete')).toHaveLength(2);
-  expect(document.querySelector('.work-process-section > .work-process-step-rail.status-running')).toBeNull();
+  expect(document.querySelectorAll('.work-process-section > [data-work-node="structure"]')).toHaveLength(2);
+  expect(document.querySelector('[data-work-node="activity"]')).toBeNull();
 });
 
-it('keeps a real pending review blue only on its own section', () => {
+it('keeps pending review lifecycle but does not paint a waiting interaction as active execution', () => {
   const { presentation, document } = render([loop('loop-15'), review('first'), loop('loop-16'), review('second', true)]);
   const sections = presentation.rows.filter((row) => row.type === 'section');
   expect(sections.map((row) => row.status)).toEqual(['complete', 'running']);
   expect(sections[0].steps.map((step) => step.id)).toEqual(['first']);
   expect(sections[1].steps.map((step) => step.id)).toEqual(['second']);
-  const rails = document.querySelectorAll('.work-process-section > .work-process-step-rail');
-  expect(rails[0].classList.contains('status-complete')).toBe(true);
-  expect(rails[1].classList.contains('status-running')).toBe(true);
+  expect(document.querySelectorAll('.work-process-section > [data-work-node="structure"]')).toHaveLength(2);
+  expect(document.querySelector('[data-work-node="activity"]')).toBeNull();
 });
 
 it.each(['approved', 'rejected', 'superseded'] as const)('does not treat %s as a completed tool before its receipt arrives', (status) => {

@@ -1,0 +1,66 @@
+.work-process-track {
+  position: relative;
+  --work-track-display: none;
+  --work-track-start: 0px;
+}
+
+.work-process-track::before {
+  content: '';
+  display: var(--work-track-display);
+  position: absolute;
+  top: var(--work-track-start);
+  bottom: 0;
+  left: calc(var(--space-3) + var(--space-2));
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--token-border-muted);
+  pointer-events: none;
+}
+
+.work-process-track > .work-process-narrative-stream,
+.work-process-track-leading {
+  padding-left: calc(var(--space-3) + var(--space-4) + var(--space-1));
+}
+
+.work-process-event-anchor {
+  position: absolute;
+  left: calc((var(--space-4) + var(--space-1)) * -1);
+  width: var(--space-4);
+  height: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.work-process-rail-marker {
+  position: relative;
+  display: block;
+  width: calc(var(--space-1) + var(--space-0-5));
+  height: calc(var(--space-1) + var(--space-0-5));
+  margin: 0 auto;
+  transform: translateY(-50%);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--token-text-caption) 60%, var(--token-bg-app));
+}
+
+.work-process-rail-marker.is-running {
+  background: var(--token-status-info);
+  box-shadow: 0 0 0 var(--space-1) color-mix(in srgb, var(--token-status-info) 16%, transparent);
+}
+
+.work-process-rail-marker.is-running::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--space-0-5) * -1);
+  border-radius: var(--radius-full);
+  border: 1px solid color-mix(in srgb, var(--token-status-info) 38%, transparent);
+  animation: work-process-rail-pulse 1.5s ease-out infinite;
+}
+
+.work-process-section-list,
+.work-process-tool-aggregate-body { padding-left: 0; }
+.work-process-track-leading { padding-bottom: var(--space-2); }
+.work-process-track .work-process-step.is-appear { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .work-process-rail-marker.is-running::after { animation: none; }
+}

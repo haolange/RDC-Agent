@@ -1,5 +1,20 @@
 # Acceptance Ledger
 
+## Progress 单行自适应渐隐（2026-10-29）
+
+- 最新用户明确取消换行，替代前轮自然换行偏好。沿当前未提交Progress排版，标题使用共享OverflowFade，单行占据序号/状态后的剩余网格宽度，不设字符截断或固定文本宽度。仅实测scrollWidth溢出才加末尾遮罩，原文保留DOM/title；复用ResizeObserver、字体加载及内容变化重测。删除pretty/normal/anywhere换行规则，保留卡头计数、顺序、状态与原定位按钮。
+- 7项OverflowFade/SessionRightRail回归通过；typecheck/lint、design-tokens、appearance、renderer-structure、right-rail、session-projection通过。首次测试因sandbox映射cwd无法解析/@fs/D:而未加载，在实际仓库路径重跑通过，无配置修改。正式one-time Bridge同源browser-dev /app实拖：标题宽220px首项fade=true，拖宽到380px变false，缩到188px变true；各标题均18px单行，短文本不淡出，长文本title完整。没有新增字体切换Browser或键盘焦点通过声明；字体重测由共享组件测试覆盖，原按钮/焦点结构保持。
+- Browser console当时无warning/error。闭合标签后新标签无cookie返回401，符合one-time认证边界，未绕过。仅保留两张小型宽/窄卡截图与回执（`.local/transcript-state/progress-single-line-20261029.json`），自有QA根34文件在确认owner退出/无reparse后清理，canonical锁无，桌面启动权交还。无真实模型/RDC/发行包/全量矩阵，本次不提交推送。
+
+
+## Progress 视觉返工与评分迭代（2026-10-28）
+
+- 用户明确否定前轮 Progress 实际观感；前轮工程通过不代表视觉验收通过。本轮基线 `93783f31`，只改 Progress 排版及直接共享卡头、定向回归和文档；未提交/推送。通过Goal追踪三轮设计迭代，评分维度为比例、对齐、间距、可读性和状态辨识，门槛各维≥8、平均≥8.5；分数为主观自评，不冒称用户接受。
+- 正式同源/app基线实测：标题32px、正文间隔12px、前缀52px、281.3px宽卡高223.3px。移除非空Progress无用途标题空高，前缀36px，列间6px，正文pretty换行，32px单行刻度及低对比hairline，卡头右侧复用既有完成数文案；最终同宽同内容标题18px、正文间隔8px、卡高197.3px。序号/状态分离、完整标题、定位原事件及五卡空态保持，Progress样式归单一RightRailProgress.css，删除原混杂覆盖。
+- 基线5.0→第一轮7.0（孤字尾行/行节奏扣分）→第二轮8.5→最终8.8；五态真实投影区分、键盘焦点、深浅主题、11/12/13px字号及390×844请求窄视口检查，无横向溢出/裁切；完成只计completed，取消不算完成，清空后计数和非空密度卸载由3项定向测试覆盖。typecheck/lint、right-rail、session-projection、appearance、design-tokens、renderer-structure通过；最终正式构建 `index-i4EWFpry.js`。开发阶段用HMR，最终只构建一次；无模型/RDC/发行包/全量矩阵。本次未新做桌面呈现验收。
+- 证据：`.local/transcript-state/progress-design-20261028.json` 及 baseline/round1/round2/final/states/final-narrow 的小型卡片截图。开发载体重启出现旧dev事件流断连，独立记录，不当作最终bundle功能失败。清理与启动权回执在同目录Tasks维护。
+
+
 ## 五处 UI 修复提交前复查（2026-10-28）
 
 - 用户明确授权本轮复查、必要清理、当前main提交推送，替代上一轮不提交边界。源基线仍为 `32628b27` 加本轮差异。逐项复核发现并修正四项：制品图标误用首行对齐（恢复center）、设计系统重复段落仍写45%淡出、图片标题缺原文tooltip、相同审批状态短语重复；无权限/IPC/存储格式变化。
@@ -4072,3 +4087,37 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 工程完整tests/coverage节点为530文件3883通过、4既有跳过，ratchet通过（lines77.49/functions78.97/branches65.47/statements75.12%）。首次全量仅Investigation子门禁1项失败，独立15项通过，降低并行度补齐完整绿色与coverage，未改产品超时或弱化断言。完整gates通过；晚于完整节点的局部迟到保护/等待标签分别以27项/12项、typecheck/lint和受影响architecture/work-process/session-projection验证。间距门禁明确强制8px普通事件/12px真实叙述，fidelity移除已删除箭头条目；文档同步清除相反旧句。最终官方构建及桌面启动/清理结果见本轮回执，不把代码完成当清理完成。
 
 - 收尾：最终官方构建 `index-Co4YK1Fz.js`，隔离桌面实际窗口12915646观察后退出，既有Electron meta CSP frame-ancestors诊断单列（本轮无HTML/CSP修改）。本轮自有进程及5127/51522为空、canonical无锁，桌面启动权已交还。核对绝对路径、Git、链接及活owner后删除flow-runtime/coverage，750文件、逻辑26512053B；删除后目录不存在，仅新增保留Tasks、最小回执与两张截图，旧证据、真实数据、依赖和可运行out保留。本轮不提交推送发布。
+
+### 2026-10-29 工具卡摘要、对齐与视觉复验
+
+- 来源：main `93783f312ce791a32e41b04e7776b12bc11f5431` 加本轮工作树差异；保留此前已验收的 Progress 单行渐隐。工具技能名改为正文，路径留详情；调查产物摘要使用标题及独立种类/状态，协议 ID/hash 留原详情；工具搜索使用紧凑名称行和数量，跳过状态不重复，本轮结果按实际 disposition 呈现。任务快照修正旧轨道缩进，原因箭头移到右侧，标题不再错列。
+- 工程：10 个定向文件、86 项通过，typecheck、lint、design-tokens、renderer-structure、work-process、work-process-tool-coverage、appearance、right-rail、session-projection、repository-hygiene 通过。新增测试的 startedAt 缺失经类型检查发现后补齐；未弱化断言。最终正式构建 renderer `index-Wjzw3Sqm.js`。未运行全套测试、发行打包、真实模型或 RDC。
+- 实际应用：官方 disposable launcher、一次性 bootstrap、同源 /app 和隔离确定性存储数据；深浅主题实看。主流程七个卡头均 34.6667px，x=191.8646；任务四个标题 x=227.8646。相邻主工具/任务卡和子工具同段、跨段、展开后均 8px（舍入误差小于 0.01px）；子卡头 28px。390 CSS px 子过程无页面横向溢出。任务原因 Enter 展开显示真实原因。最终 console warn/error 为空。
+- 原后四项：成功审批收起 0 个 callout、展开 1 个；图片真实加载且 contain，标题栏 44.6667px，Escape 回焦缩略图；长 Plan 文字在最后可见行 94.5→108px 淡至透明，最终正式构建截图复核通过。时间线光环槽位沿用已通过实现，本轮未新增真实运行态模型测量；聚合/窗口化边界和迟到隔离以受影响测试验证，不冒充持续 provider 实测。子过程 fixture 未提供完整 task capsule，不据此声称委派正文体验通过。
+- 视觉迭代自评（信息层级/对齐/空间/可读性/交互）：基线 4/5/4/5/6，首轮 7/9/8/8/8，修正任务箭头和结果标签后 8/9/8/8/9。分数用于缺陷跟踪，不代表用户认可。截图、几何与限制保留于 `.local/transcript-state/tools-visual-20261029.json` 及对应图片；准备阶段错误 task kind、图片 MIME、Node 通知宿主已在 Tasks 单列，不作为产品通过证据。
+- 收口：自有 launcher 已退出，隔离 QA 根 62 文件及两份准备脚本清除，复查无 Electron、5127/5173 监听或 canonical 锁，桌面启动权已交还。保留六张最小对照/功能截图和回执，原有证据及用户数据未动。本轮未提交、推送或发布。
+
+### 2026-10-29 Plan 文字淡出曲线
+
+- 基于 main `93783f312ce791a32e41b04e7776b12bc11f5431` 及此前工作树，按用户 Codex 对照图将原0.75行线性遮罩改为2行、前缓后快的透明度曲线，等距节点100/94/75/44/0%。沿用最后可见文字Range终点；低高度过渡最长占可见正文一半。短内容无mask，标题/状态/卡壳不受影响；不改IPC或持久化契约。
+- 官方disposable /app先采原版，再通过开发态试1.75行，最终2行。小/中/大字号实际行高16.5/18/19.5px，对应渐隐33/36/39px；1280和390 CSS px实看列表/正文，窄屏无横溢出。短文21px高及宽屏完整正文均无mask。低高度上限由回归验证，未声称完整低高度Browser矩阵。
+- 同内容中字号卡片仍899.59375×191.33334px，渐隐94.5→108px改为72→108px。视觉自评按过渡连续性/有效正文可读性/尺寸一致性，基线5/8/7、首轮7.5/8.5/9、最终8.5/8.5/9；仅主观对照，非Codex内部参数或用户认可。四张最小截图及回执位于 `.local/transcript-state/plan-fade-*`。
+- 2文件8项定向测试、typecheck/lint及design-tokens、work-process、renderer-structure、appearance、repository-hygiene通过；最终正式构建 `index-CmxnYP5z.js`，同内容卡片及390大字号正文复验，console warn/error为空。未运行模型/RDC、发行打包或无关矩阵。同步三份UI规范，移除检查清单45%旧描述。
+- 自有开发/正式launcher与标签页关闭，恢复视口；临时QA根54文件和准备脚本清除，复查无Electron、5127/5173监听或canonical锁，桌面启动权已交还。既有证据、用户数据、依赖和可运行构建保留，未提交推送。
+
+### 2026-10-29 工作过程连续轨道与语义节点
+
+- 来源为 main `93783f312ce791a32e41b04e7776b12bc11f5431` 加既有工作树。连续轨道由共享过程容器持有；灰点只标起始及真实叙述，运行/流式蓝点按实际事件判定，等待不误蓝。Tasks/审批/Plan经过同一轨道，子过程拥有独立作用域。删除section分段、14px尾线、嵌套隐藏轨道及无用首行偏移标记，不改变顺序、IPC或存储。
+- 本轮实际发现并修复：灰点引用未定义旧token而透明；关闭details子项仍返回布局矩形导致误计；主过程未传披露作用域导致窗口化丢失开合。分别采用现有不透明语义色、关闭聚合卸载/排除关闭详情、会话+消息作用域。主子继续共用渲染与披露机制。
+- 工程节点为11文件82项定向通过；最后作用域/清理修补13项复验，typecheck/lint及work-process/tool-coverage/design-tokens/renderer-structure/appearance/session-projection/right-rail/repository-hygiene通过。最终官方生产bundle `index-DxLSMKj0.js`，静态混排与主子轨道复验无console warn/error。早期真实验收发现遗漏后修复并重建，未把首次构建当最终证据；未运行全套矩阵或发行打包。
+- 官方隔离Browser、one-time bootstrap和/app实际验收：纯工具3卡1节点，新说明2节点；单事件1节点且无短线；混排6处间距8±0.001px，末端误差0.00004px。聚合错误+2运行收起1蓝/数量2，展开2蓝；pending无蓝。30行实际窗口化，首挂载tool-0→tool-21时起点17.25px保持，往返和整段折叠后原工具仍展开。45步子过程加载入口位于子轨道范围，补齐早期记录后同一子轨道继续覆盖，父子各自收尾。24/25边界由组件回归覆盖，不冒称真实25轮模型请求。
+- 本地脚本化provider经真实Composer、Agent loop和原生read_file产生两次完整10调用请求（4+4+2与8+2），执行区间存在重叠，动态样本记录5/8/10项、首工具展开保持、结算蓝点归零；第二次实际进入8项聚合。能力目录为明确标记的隔离fixture，不证明真实模型效果。准备阶段缺计数、协议/上下文档位/路由错误、隐式QA缓存EPERM及载体重启断流分别记录后校正；未修改产品权限或放宽准入。
+- 深浅主题、1280/390 CSS px、三档字号实看；窄屏无横溢出，叙述中心随字号重测。减少动画仿真下活动环animation为none，仿真已复位。基线沿用此前实际截图及用户原图，不复原旧源码；五维自评最终8.5/9/8.5/9/9仅作缺陷跟踪，不代表用户接受。六张必要截图与最小综合回执 `.local/transcript-state/track-receipt.json` 保留。
+- 自有launcher/provider与标签页关闭、视口复位，核验无Electron、5127/5173/5129监听或canonical锁，桌面启动权已交还。隔离QA根219文件、8份准备脚本和合并后的重复回执清除；用户数据、此前证据、依赖及可运行构建保留。本轮不提交推送。
+
+### 2026-10-29 工作台 UI 提交前复查
+
+- 对 main `93783f312ce791a32e41b04e7776b12bc11f5431` 上本会话全部 UI 差异复查，保留 Progress 单行随宽度渐隐与完整提示、工具结果摘要、紧凑图片预览、Plan 两行衰减曲线和主子共享连续轨道。清单残留的 loop 节点与旧 margin 定位公式已删除；子代理 pending 被投影为 running 的遗漏已修正，header 尚未读回时显示 queued，不产生蓝色活动节点。事件顺序、历史快照、审批权限和公开跨层契约未改变。
+- 最终源码定向回归15文件105项通过，覆盖节点状态、聚合、测量列表、披露作用域、任务定位、结果摘要、右栏和Plan；typecheck、lint及work-process、tool-coverage、design-tokens、renderer-structure、appearance、session-projection、right-rail、fidelity、acceptance-ledger、repository-hygiene通过。官方launcher正式构建 renderer `index-BB_et5ue.js`，未发行打包或重复无关全量矩阵。
+- 官方 disposable launcher、一次性 bootstrap 和正式 `/app` 使用隔离最小存储样本复验：待启动委派显示“排队中”，蓝点0；轨道终点与卡片底边误差小于0.001 CSS px；Plan 中字号渐隐72→108px，曲线100/94/75/44/0%，console warn/error为空。必要截图为 `.local/transcript-state/review-final.jpg`。持续新增、真实并行、7→8聚合、窗口化往返、子过程分页、开合保持、深浅/390px/三档字号沿用上条同源码路径的确定性应用证据与本次受影响回归，不冒称本轮重新执行全矩阵；未调用真实模型或RDC。
+- 清理本次隔离根35文件（逻辑541903B）及准备脚本，复查无链接、Electron、自有监听或 canonical 锁；截图与既有最小回执保留，真实用户数据和依赖未动，桌面启动权已交还。用户本轮授权在当前 main 提交并推送，Git与远端结果另以提交回执为准。

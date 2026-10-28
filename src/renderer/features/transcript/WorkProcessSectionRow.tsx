@@ -24,7 +24,6 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
   const showSteps = visibleSteps.length > 0;
   const hasProse = Boolean(row.proseText);
   const thinkingActive = isActiveThinkingStatus(row.thinkingStatus, row.status);
-  const firstLineCaption = Boolean(row.thinkingExpandable || row.thinkingLabel) && !hasProse;
   const thinkingClassName = [
     'work-process-thinking-state',
     row.thinkingKind ? `kind-${row.thinkingKind}` : '',
@@ -51,10 +50,10 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
 
   return (
     <li
-      className={`work-process-step work-process-section kind-section status-${row.status}${hasProse || row.thinkingLabel || row.thinkingExpandable ? ' has-narrative' : ''}${hasProse ? ' has-prose' : ''}${firstLineCaption ? ' first-line-caption' : ''}`}
+      className={`work-process-step work-process-section kind-section status-${row.status}${hasProse || row.thinkingLabel || row.thinkingExpandable ? ' has-narrative' : ''}${hasProse ? ' has-prose' : ''}`}
       data-testid="work-process-section"
     >
-      <WorkProcessRailIcon variant="section" status={row.status} />
+      <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
         {row.thinkingExpandable ? (
           <details className={thinkingClassName} open={thinkingOpen}>

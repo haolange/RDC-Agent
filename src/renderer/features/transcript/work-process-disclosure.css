@@ -49,8 +49,7 @@
 
 /* Tool aggregate summary row */
 .work-process-tool-aggregate {
-  grid-template-columns: minmax(0, 1fr);
-  padding-bottom: var(--space-1);
+  padding-bottom: 0;
 }
 
 .work-process-tool-aggregate-content {
@@ -101,19 +100,9 @@
 }
 
 .work-process-tool-aggregate-body {
-  margin: var(--space-1) 0;
-  padding-left: var(--space-3);
-  border-left: 2px solid var(--token-border-subtle);
+  margin: var(--space-2) 0 0;
+  padding: 0;
   list-style: none;
-}
-
-.work-process-tool-aggregate-body .work-process-step {
-  grid-template-columns: minmax(0, 1fr);
-  padding-bottom: var(--space-3);
-}
-
-.work-process-tool-aggregate-body .work-process-step-rail {
-  display: none;
 }
 
 /*
@@ -174,13 +163,8 @@
   margin-top: var(--space-3);
 }
 
-.work-process-section-list > .work-process-step > .work-process-step-rail {
-  display: none;
-}
-
 .work-process-section-list > .work-process-step {
-  grid-template-columns: minmax(0, 1fr);
-  /* Sibling tools denser than loop entrance / turn boundary. */
+  /* The containing list owns the same sibling rhythm as the root stream. */
   padding: var(--space-2) 0 0;
   border-bottom: 0;
 }

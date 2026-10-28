@@ -32,7 +32,9 @@ export function usePlanPreviewOverflow(content: string) {
       range.detach();
       const lineHeight = Number.parseFloat(getComputedStyle(preview).lineHeight) || textLineHeight;
       const end = lastTextBottom || bounds.height;
-      assignDynStyle(preview, { '--plan-fade-start': `${Math.max(0, end - .75 * lineHeight)}px`, '--plan-fade-end': `${end}px` });
+      // Keep the first half readable even when viewport height limits the excerpt.
+      const length = Math.min(2 * lineHeight, end / 2);
+      assignDynStyle(preview, { '--plan-fade-start': `${end - length}px`, '--plan-fade-length': `${length}px` });
     };
     measure();
     const observer = new ResizeObserver(measure);

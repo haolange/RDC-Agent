@@ -67,6 +67,8 @@ export const CATALOG_VERB_LABEL_KEYS: Record<string, TranslationKey> = {
   '正在读取 RDC 上下文': 'chat.workProcessVerb.rdcContextRunning',
   '委派已完成': 'chat.workProcessVerb.subagentComplete',
   '正在委派': 'chat.workProcessVerb.subagentRunning',
+  '已记录本轮结果': 'chat.toolOutcomeRecorded',
+  '正在记录本轮结果': 'chat.toolOutcomeRecording',
   '已创建任务': 'chat.workProcessVerb.taskCreateComplete',
   '正在创建任务': 'chat.workProcessVerb.taskCreateRunning',
   '已更新任务': 'chat.workProcessVerb.taskUpdateComplete',

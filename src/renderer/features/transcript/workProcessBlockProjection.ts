@@ -315,7 +315,7 @@ function projectLlmTurn(
     block.toolCalls
       .filter((call) => !isTaskLifecycleTool(call.toolName))
       .map((call): WorkProcessRow => call.delegation ? {
-        type: 'subagent', id: call.id, status: call.status === 'pending' ? 'running' : call.status,
+        type: 'subagent', id: call.id, status: call.status,
         profile: call.delegation.profile, task: call.delegation.task, mode: call.delegation.mode,
         argsPreview: call.argsPreview ?? '', resultPreview: call.resultPreview ?? '',
         executionId: call.delegation.executionId, generation: call.delegation.generation,

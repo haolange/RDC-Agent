@@ -1,6 +1,7 @@
 {
   "$comment": "Renderer 契约清单：check-* 脚本读取本文件定位被锁定的文件与锚点。目录重组或文件移动时只改本文件；新增锚点须先在本文件登记。",
   "files": {
+    "workProcessTrackCss": "src/renderer/features/transcript/work-process-track.css",
     "styles.designSystem": "src/renderer/styles/design-system.css",
     "styles.appShell": "src/renderer/styles/global/app-shell.css",
     "shell.appShellCss": "src/renderer/shell/AppShell.css",

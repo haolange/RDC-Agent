@@ -6,7 +6,7 @@ import { expect, it, vi } from 'vitest';
 import { WorkCardHeader } from './WorkCardHeader';
 import { WorkDisclosure } from './WorkDisclosure';
 import { DelegationTaskDocument } from './DelegationTaskDocument';
-import { CardBody, RawPanel, type ToolRowModel } from './WorkProcessToolCardParts';
+import { CardBody, FamilyDetail, RawPanel, type ToolRowModel } from './WorkProcessToolCardParts';
 import { ToolRow } from './WorkProcessRowParts';
 import { DiagnosticRow } from './WorkProcessRows';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
@@ -15,6 +15,21 @@ import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, values?: { count: number }) => `${key}${values ? `:${values.count}` : ''}` }) }));
 vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({ MessageMarkdown: ({ content }: { content: string }) => createElement('p', null, content) }));
+
+it('keeps skill identity in the compact body and exposes its copyable path only in details', () => {
+  const row: ToolRowModel = { type: 'tool', id: 'skill', status: 'complete', verb: 'Loaded skill',
+    category: 'runtime', icon: 'spark', groupKind: 'runtime', family: 'skill', toolName: 'skill_read',
+    target: 'rdc-tool-shell', duration: '', argsLines: [], rawLines: [],
+    chips: ['rdc-tool-shell'], pathChip: '/skills/rdc-tool-shell/SKILL.md', previewLines: ['Read the tool manual.'] };
+  const body = renderToStaticMarkup(createElement(CardBody, { row }));
+  const detail = renderToStaticMarkup(createElement(FamilyDetail, { row }));
+  expect(body).toContain('rdc-tool-shell');
+  expect(body).not.toContain('work-process-path-chip');
+  expect(body).not.toContain('SKILL.md');
+  expect(detail).toContain('/skills/rdc-tool-shell/SKILL.md');
+  expect(detail).toContain('Read the tool manual.');
+  expect(detail).toContain('work-process-tool-card-copy');
+});
 
 it.each(['approved', 'pending', 'rejected', 'cancelled'] as const)('discloses %s approval without requiring output and retains it after updates', async status => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

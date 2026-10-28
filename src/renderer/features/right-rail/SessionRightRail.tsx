@@ -9,9 +9,9 @@ import { RightRailEmptyState as EmptyState } from './RightRailEmptyState';
 import { RightRailOutputList } from './RightRailOutputList';
 import { RightRailProgressList } from './RightRailProgressList';
 
-const RailSection: React.FC<{ id: 'progress' | 'artifacts' | 'outputs' | 'context' | 'capture'; title: string; children: React.ReactNode }> = ({ id, title, children }) => (
-  <section className="right-rail-section" data-testid={`right-rail-${id}`}>
-    <h2 className="right-rail-section-heading">{title}</h2>
+const RailSection: React.FC<{ id: 'progress' | 'artifacts' | 'outputs' | 'context' | 'capture'; title: string; populated?: boolean; meta?: string; children: React.ReactNode }> = ({ id, title, populated = false, meta, children }) => (
+  <section className={`right-rail-section${populated ? ' is-populated' : ''}`} data-testid={`right-rail-${id}`}>
+    <h2 className="right-rail-section-heading">{title}{meta ? <span className="right-rail-section-meta">{meta}</span> : null}</h2>
     <div className="right-rail-section-content">{children}</div>
   </section>
 );
@@ -33,7 +33,7 @@ export const SessionRightRail: React.FC = () => {
 
   return (
     <aside className="right-rail" aria-label={t('control.rightRail.inspector')}>
-      <RailSection id="progress" title={t('control.rightRail.progress.title')}>
+      <RailSection id="progress" populated={tasks.length > 0} meta={tasks.length ? t('control.traceProgressCount', { done: tasks.filter(task => task.status === 'completed').length, total: tasks.length }) : undefined} title={t('control.rightRail.progress.title')}>
         {tasks.length ? (
           <RightRailProgressList
             key={progressSessionId}

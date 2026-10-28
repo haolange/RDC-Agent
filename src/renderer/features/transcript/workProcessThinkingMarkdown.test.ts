@@ -57,7 +57,7 @@ const gptSummaryTrace: ConversationWorkTrace = {
 
 describe('Work Process thinking markdown', () => {
   it('renders GPT summary titles through MessageMarkdown instead of literal **', () => {
-    const html = renderToStaticMarkup(createElement(WorkProcess, { trace: gptSummaryTrace }));
+    const html = renderToStaticMarkup(createElement(WorkProcess, { trace: gptSummaryTrace, messageId: 'thinking-markdown' }));
     expect(html).toContain('work-process-thinking-preview');
     expect(html).toContain('markdown-body');
     expect(html).toContain('<strong>Planning project purpose inspection</strong>');

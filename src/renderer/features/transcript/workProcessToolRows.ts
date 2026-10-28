@@ -6,6 +6,7 @@ import { parsePreview, createDetailLines, prettyPrint, toRecord, readNestedStrin
 import { emptyUnwrappedContent, unwrapToolContentLayer, sanitizeContentText } from './workProcessToolContent';
 import { extractWebToolPresentation } from './workProcessWebPresentation';
 import { formatDurationMs, normalizeWorkProcessText, compactText } from './workProcessFormat';
+import { getToolOutcome } from './workProcessOutcome';
 
 const TARGET_KEYS = [
   'uri',
@@ -96,6 +97,7 @@ export const createToolRowForPresentation = (call: ConversationToolCall): WorkPr
     previewLines,
     rawLines: suppressApprovalPreview ? [] : createDetailLines(prettyPrint(call.error || call.resultPreview), 40),
     bodyText: unwrapped.bodyText,
+    outcome: status === 'complete' ? getToolOutcome(normalizeToolName(call.toolName), parsedResult, call.argsPreview) : undefined,
     bodyLines: unwrapped.bodyLines,
     previewKind: unwrapped.previewKind,
     commandText: unwrapped.commandText,

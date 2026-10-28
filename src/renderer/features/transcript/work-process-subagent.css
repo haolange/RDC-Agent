@@ -2,7 +2,7 @@
   container-type: inline-size;
   list-style: none;
   min-width: 0;
-  margin: var(--space-1) 0;
+  margin: 0;
   border: var(--transcript-card-border);
   border-radius: var(--transcript-card-radius);
   background: var(--transcript-card-surface);

@@ -4,6 +4,7 @@ import { useWorkProcessLabel } from './workProcessUseLabel';
 import type { ToolRowModel } from './workProcessToolTypes';
 import { SourcePills, WebPageDestination } from './WorkProcessWebParts';
 import { WorkProcessImageThumbs } from './WorkProcessImageThumbs';
+import { ToolOutcomeSummary } from './ToolOutcomeSummary';
 import {
   CopyPathButton,
   FamilyLayerBody,
@@ -40,6 +41,7 @@ const resolveCollapsedSampleLines = (row: ToolRowModel): string[] => {
 
 export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   if (row.toolName === 'plan_artifact' && row.status !== 'error') return null;
+  if (row.outcome) return <ToolOutcomeSummary outcome={row.outcome} />;
   if (isDedicatedFamily(row.family)) return <FamilyLayerBody row={row} />;
 
   const bodyText = resolveBodyText(row);

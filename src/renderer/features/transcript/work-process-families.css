@@ -2,7 +2,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin-bottom: var(--space-2);
 }
 
 .work-process-tool-card-body.family-interpreter,
@@ -54,4 +53,20 @@
   flex-direction: column;
   gap: var(--space-1);
   min-width: 0;
+}
+
+.work-process-outcome-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--token-text-body);
+}
+.work-process-outcome-meta {
+  flex: 0 0 auto;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+@container (max-width: 400px) {
+  .work-process-outcome { flex-wrap: wrap; gap: var(--space-1); }
+  .work-process-outcome-title { flex-basis: 100%; }
 }

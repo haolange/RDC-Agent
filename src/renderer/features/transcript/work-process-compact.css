@@ -49,18 +49,6 @@
   padding: 0;
 }
 
-/* Informational diagnostics retain their event position but read as metadata,
- * rather than another tool or model turn. Warnings and errors keep their rail. */
-.work-process-diagnostic.severity-info {
-  padding-bottom: var(--space-1);
-}
-.work-process-diagnostic.severity-info > .work-process-step-rail .work-process-rail-marker {
-  width: var(--space-1);
-  height: var(--space-1);
-  border: 0;
-  background: var(--token-border-muted);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .work-process-body.is-compact .work-process-step.is-appear { animation: none; }
 }

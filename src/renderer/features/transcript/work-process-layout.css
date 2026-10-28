@@ -173,10 +173,8 @@
 }
 
 .work-process-step {
-  display: grid;
-  /* Compact rail + tight gap: gray node stays close to Thinking copy. */
-  grid-template-columns: var(--space-4) minmax(0, 1fr);
-  column-gap: var(--space-1);
+  position: relative;
+  display: block;
   padding: 0 0 var(--space-2);
 }
 
@@ -193,95 +191,6 @@
 .work-process-steps > .work-process-step:not(:first-child) { padding-top: var(--space-2); }
 .work-process-steps > .work-process-section.has-narrative:not(:first-child) {
   padding-top: var(--space-3);
-}
-
-.work-process-step-rail {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  min-height: 100%;
-}
-
-.work-process-step-rail::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 1px;
-  transform: translateX(-50%);
-  background: var(--token-border-muted);
-}
-
-.work-process-step:first-child > .work-process-step-rail::before {
-  top: 14px;
-}
-
-.work-process-step:last-child > .work-process-step-rail::before {
-  bottom: auto;
-  height: 14px;
-}
-
-.work-process-step:first-child:last-child > .work-process-step-rail::before {
-  display: none;
-}
-
-/* Quiet 6px loop-level node: hollow stroke at rest, status color when live */
-.work-process-rail-marker {
-  --work-process-rail-marker-size: 6px;
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: var(--work-process-rail-marker-size);
-  height: var(--work-process-rail-marker-size);
-  /* Center the 6px node on the first text-sm line, not a fixed 12px drop. */
-  margin-top: calc((var(--text-sm) * 1.65 - var(--work-process-rail-marker-size)) / 2);
-  margin-inline: auto;
-  flex-shrink: 0;
-  border-radius: var(--radius-full);
-  border: 2px solid color-mix(in srgb, var(--token-text-muted) 70%, transparent);
-  background: var(--token-bg-app);
-  box-sizing: border-box;
-}
-
-.work-process-section.first-line-caption > .work-process-step-rail > .work-process-rail-marker {
-  margin-top: calc((var(--text-xs) * 1.45 - var(--work-process-rail-marker-size)) / 2);
-}
-
-.work-process-step-rail.status-complete .work-process-rail-marker {
-  border-color: color-mix(in srgb, var(--token-text-muted) 70%, transparent);
-  background: color-mix(in srgb, var(--token-text-caption) 28%, transparent);
-}
-
-.work-process-step-rail.status-running .work-process-rail-marker {
-  border-color: var(--token-status-info);
-  background: var(--token-status-info);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--token-status-info) 16%, transparent);
-}
-
-.work-process-step-rail.status-running .work-process-rail-marker::after {
-  content: '';
-  position: absolute;
-  inset: calc(var(--space-0-5) * -1);
-  border-radius: var(--radius-full);
-  border: 1px solid color-mix(in srgb, var(--token-status-info) 38%, transparent);
-  animation: work-process-rail-pulse 1.5s ease-out infinite;
-}
-
-.work-process-step-rail.status-error .work-process-rail-marker {
-  border-color: var(--token-status-error);
-  background: color-mix(in srgb, var(--token-status-error) 65%, transparent);
-}
-
-.work-process-step-rail.status-pending .work-process-rail-marker {
-  border-color: color-mix(in srgb, var(--token-text-caption) 45%, transparent);
-  background: transparent;
-}
-
-.work-process-step-rail.status-skipped .work-process-rail-marker,
-.work-process-step-rail.status-cancelled .work-process-rail-marker {
-  border-color: color-mix(in srgb, var(--token-text-caption) 55%, transparent);
-  background: color-mix(in srgb, var(--token-text-caption) 16%, transparent);
 }
 
 .work-process-tool-card.status-skipped .work-process-tool-card-verb,

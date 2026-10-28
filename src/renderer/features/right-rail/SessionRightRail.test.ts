@@ -9,7 +9,7 @@ import { SessionRightRail } from './SessionRightRail';
 
 const state = vi.hoisted(() => ({ tracePresentation: null as null | { rightPanel: Record<string, unknown> } }));
 vi.mock('../../stores/workflowStore', () => ({ useWorkflowStore: (select: (value: typeof state) => unknown) => select(state) }));
-vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, language: 'en' }) }));
+vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, values?: { done: number; total: number }) => values ? `${key}:${values.done}/${values.total}` : key, language: 'en' }) }));
 
 describe('session rail projection composition', () => {
   it('keeps task numbers independent of state and hides reasons from the compact list', () => {
@@ -33,6 +33,31 @@ describe('session rail projection composition', () => {
       expect(zhControl['control.rightRail.progress.reason.createdTurnStopped']).toBe('创建此待办的回合已停止，待办尚未开始。');
       expect(enControl['control.rightRail.progress.reason.parentTurnStopped']).toBe(TASK_STATUS_REASONS.parentTurnStopped);
       expect(enControl['control.rightRail.progress.reason.createdTurnStopped']).toBe(TASK_STATUS_REASONS.createdTurnStopped);
+    } finally { act(() => root.unmount()); state.tracePresentation = null; host.remove(); }
+  });
+
+  it('shows progress count from the current projection and removes populated density when cleared', () => {
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    const host = document.createElement('div'); const root = createRoot(host);
+    try {
+      state.tracePresentation = { rightPanel: { progress: [
+        { id: 'done', sessionId: 'session', order: 0, title: 'Complete title retained', status: 'completed' },
+        { id: 'live', sessionId: 'session', order: 1, title: 'Live', status: 'in_progress' },
+        { id: 'cancelled', sessionId: 'session', order: 2, title: 'Cancelled', status: 'cancelled' },
+      ] } };
+      act(() => root.render(createElement(SessionRightRail)));
+      const progress = host.querySelector('[data-testid="right-rail-progress"]')!;
+      expect(progress.classList.contains('is-populated')).toBe(true);
+      expect(progress.querySelector('.right-rail-section-meta')?.textContent).toBe('control.traceProgressCount:1/3');
+      expect(host.querySelectorAll('.right-rail-section.is-populated')).toHaveLength(1);
+      expect(progress.textContent).toContain('Complete title retained');
+      const title = progress.querySelector<HTMLElement>('.right-rail-task-copy .ui-overflow-fade')!;
+      expect(title.textContent).toBe('Complete title retained');
+      expect(title.title).toBe('Complete title retained');
+      state.tracePresentation = null;
+      act(() => root.render(createElement(SessionRightRail)));
+      expect(progress.classList.contains('is-populated')).toBe(false);
+      expect(progress.querySelector('.right-rail-section-meta')).toBeNull();
     } finally { act(() => root.unmount()); state.tracePresentation = null; host.remove(); }
   });
 

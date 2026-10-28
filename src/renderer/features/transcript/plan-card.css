@@ -47,7 +47,12 @@
 }
 
 .plan-card__preview.is-overflowing {
-  mask-image: linear-gradient(to bottom, black var(--plan-fade-start), transparent var(--plan-fade-end));
+  mask-image: linear-gradient(to bottom,
+    black var(--plan-fade-start),
+    rgb(0 0 0 / 94%) calc(var(--plan-fade-start) + var(--plan-fade-length) * .25),
+    rgb(0 0 0 / 75%) calc(var(--plan-fade-start) + var(--plan-fade-length) * .5),
+    rgb(0 0 0 / 44%) calc(var(--plan-fade-start) + var(--plan-fade-length) * .75),
+    transparent calc(var(--plan-fade-start) + var(--plan-fade-length)));
 }
 
 .plan-card__preview .markdown-body { font-size: inherit; }

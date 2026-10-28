@@ -939,6 +939,7 @@ const componentSource = [
   scriptRead('src/renderer/features/transcript/WorkProcessIcons.tsx', 'utf8'),
 ].join('\n');
 const cssSource = [
+  scriptReadCssBundle('src/renderer/features/transcript/work-process-track.css', 'utf8'),
   scriptReadCssBundle('src/renderer/features/transcript/AgentChat.css', 'utf8'),
   scriptReadCssBundle('src/renderer/features/transcript/AgentChat.extras.css', 'utf8'),
 ].join('\n');
@@ -1259,14 +1260,8 @@ assert(
   !/\.work-process\s*\{[^}]*padding-inline-end:\s*var\(--space-3\)/.test(cssSource),
   'Work Process must not keep a WP-only right gutter; share the thread gutter instead',
 );
-assert(
-  /\.work-process-step\s*\{[^}]*grid-template-columns:\s*var\(--space-4\)\s+minmax\(0,\s*1fr\)/.test(cssSource),
-  'loop rail must reserve a 16px slot for the running halo',
-);
-assert(
-  /\.work-process-step\s*\{[^}]*column-gap:\s*var\(--space-1\)/.test(cssSource),
-  'loop rail-to-thinking gap should be space-1',
-);
+assert(cssSource.includes('.work-process-track::before'), 'one process container must own its continuous guide');
+assert(cssSource.includes('var(--space-4) + var(--space-1)'), 'track must reserve the fixed 16px slot and 4px content gap');
 assert(
   !/\.work-process-section-list\s*\{[^}]*padding-left:\s*calc\(14px\s*\+\s*var\(--space-1\)\)/.test(cssSource),
   'section tool rows must not keep spark-aligned padding-left; they share commentary left edge',
@@ -1277,21 +1272,12 @@ assert(
 );
 assert(cssSource.includes('.work-process-icon'), 'local tool icon styling should exist');
 assert(cssSource.includes('.work-process-section-list'), 'section list styling should exist');
-assert(cssSource.includes('.work-process-step-rail.status-complete'), 'rail marker color should be status-driven, not section-driven');
 assert(cssSource.includes('.work-process-prose.is-streaming'), 'prose streaming indicator should exist');
 assert(cssSource.includes('.work-process-tool-aggregate'), 'tool aggregate styling should exist');
-assert(cssSource.includes('.work-process-section-list > .work-process-step > .work-process-step-rail'), 'only direct tool rails may be suppressed; nested child execution rails must remain visible');
-assert(!cssSource.includes('.work-process-section-list .work-process-step'), 'parent tool lists must not change nested child execution geometry');
-assert(/\.work-process-section-list\s*\{[^}]*margin:\s*0/.test(cssSource), 'tool-only turns must not reserve narrative space');
-assert(cssSource.includes('--work-process-rail-marker-size: 6px'), 'loop rail marker should be 6px');
-assert(
-  /margin-top:\s*calc\(\(var\(--text-sm\)\s*\*\s*1\.65\s*-\s*var\(--work-process-rail-marker-size\)\)\s*\/\s*2\)/.test(cssSource),
-  'rail marker must center on the first text-sm line instead of a fixed space-3 drop',
-);
-assert(
-  !/\.work-process-rail-marker\s*\{[^}]*margin-top:\s*var\(--space-3\)/.test(cssSource),
-  'rail marker must not keep the legacy space-3 top offset',
-);
+assert(!cssSource.includes('.work-process-step-rail'), 'segmented guides and nested rail suppression must be removed');
+assert(cssSource.includes('.work-process-rail-marker.is-running'), 'actual activity owns blue markers');
+assert(cssSource.includes('var(--space-1) + var(--space-0-5)'), 'markers retain the 6px geometry');
+assert(!cssSource.includes('.work-process-step:last-child > .work-process-step-rail::before'), 'fixed last-section short line must not return');
 assert(
   /\.work-process-summary\s*\{[^}]*margin:\s*0\s+0\s+var\(--space-2\)/.test(cssSource),
   'failure summary must use space-2 gap before diagnostic rows',

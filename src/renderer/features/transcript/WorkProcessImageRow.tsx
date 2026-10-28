@@ -32,7 +32,7 @@ export function WorkProcessImageRow({ row, renderToolDetail }: {
   const previews = initial.flatMap(preview => preview ? [preview] : []);
   const showMore = () => { focusExtra.current = true; if (!expanded) toggle(); else extra.current?.focus(); };
   return <li className="work-process-step kind-tool family-image" data-testid="work-process-image-group">
-    <WorkProcessRailIcon variant="step" status="complete" />
+    <WorkProcessRailIcon row={row} />
     <div className="work-process-step-content">
       <div className={`work-process-tool-card${expanded ? ' is-expanded' : ''}`}>
         <WorkCardHeader icon={<WorkProcessIcon icon="imageRead" className="work-process-tool-card-icon" />}

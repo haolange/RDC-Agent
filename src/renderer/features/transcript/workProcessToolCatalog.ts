@@ -61,7 +61,7 @@ export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<string, WorkProcessToolDi
   task_get: { icon: 'taskGet', groupKind: 'task', category: '任务读取', groupTitle: '任务', groupUnit: '读取', completeVerb: '已读取任务', runningVerb: '正在读取任务' },
   task_list: { icon: 'taskList', groupKind: 'task', category: '任务列表', groupTitle: '任务', groupUnit: '列表', completeVerb: '已列出任务', runningVerb: '正在列出任务' },
   task_stop: { icon: 'taskStop', groupKind: 'task', category: '任务停止', groupTitle: '任务', groupUnit: '停止', completeVerb: '已停止任务', runningVerb: '正在停止任务', mutation: true, errorAccent: true },
-  turn_complete: { icon: 'turnComplete', groupKind: 'task', category: '任务完成', groupTitle: '任务', groupUnit: '完成', completeVerb: '已声明完成', runningVerb: '正在确认完成' },
+  turn_complete: { icon: 'turnComplete', groupKind: 'task', category: '任务完成', groupTitle: '任务', groupUnit: '完成', completeVerb: '已记录本轮结果', runningVerb: '正在记录本轮结果' },
   background_query: { icon: 'backgroundQuery', groupKind: 'task', category: '后台任务', groupTitle: '后台任务', groupUnit: '状态', completeVerb: '已读取后台状态', runningVerb: '正在读取后台状态' },
   background_wait: { icon: 'backgroundWait', groupKind: 'task', category: '后台任务', groupTitle: '后台任务', groupUnit: '等待', completeVerb: '后台等待已结束', runningVerb: '正在等待后台任务' },
   background_result: { icon: 'backgroundResult', groupKind: 'task', category: '后台任务', groupTitle: '后台任务', groupUnit: '结果', completeVerb: '已读取后台结果', runningVerb: '正在读取后台结果' },

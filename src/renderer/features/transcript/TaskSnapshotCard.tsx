@@ -6,6 +6,7 @@ import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import type { WorkProcessRow } from './workProcessTypes';
 import { TASK_STATUS_REASONS } from '@shared/constants/taskStatusReasons';
 import { WorkProcessIcon } from './WorkProcessIcons';
+import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 
 export const TaskSnapshotCard: React.FC<{
   row: Extract<WorkProcessRow, { type: 'taskSnapshot' }>;
@@ -23,6 +24,7 @@ export const TaskSnapshotCard: React.FC<{
   return (
     <li className={`work-process-step is-appear status-${row.status} kind-task-snapshot`}
       data-testid="work-process-task-snapshot" data-work-process-block-id={row.id}>
+      <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
         <div className={`work-process-task-snapshot${expanded ? ' is-expanded' : ''}`}>
           <WorkCardHeader onClick={toggle} expanded={expanded} controls={listId}

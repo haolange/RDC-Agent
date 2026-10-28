@@ -52,17 +52,6 @@ const ChipRow: React.FC<{ chips?: string[] }> = ({ chips }) => {
   );
 };
 
-const SampleList: React.FC<{ lines: string[] }> = ({ lines }) => {
-  if (lines.length === 0) return null;
-  return (
-    <ul className="work-process-tool-card-body-list">
-      {lines.map((line) => (
-        <li key={line} className="work-process-tool-card-body-list-item" title={line}>{line}</li>
-      ))}
-    </ul>
-  );
-};
-
 const PathRow: React.FC<{ path: string }> = ({ path }) => (
   <div className="work-process-family-path">
     <code className="work-process-tool-card-path" title={path}>{path}</code>
@@ -124,12 +113,11 @@ const MemoryDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
 };
 
 const SkillBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
-  const path = row.pathChip?.trim() || '';
-  if (!row.chips?.length && !path) return null;
+  const name = row.chips?.join(' · ') || row.target;
+  if (!name) return null;
   return (
     <div className="work-process-tool-card-body family-skill">
-      <ChipRow chips={row.chips} />
-      {path ? <PathRow path={path} /> : null}
+      <span className="work-process-tool-card-body-text is-summary" title={name}>{name}</span>
     </div>
   );
 };
@@ -168,17 +156,6 @@ const McpDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
 
 const RuntimeBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   const path = row.pathChip?.trim() || '';
-  const hits = row.bodyLines ?? [];
-  if (row.toolName === 'tool_search') {
-    return (
-      <div className="work-process-tool-card-body family-runtime">
-        {row.bodyText ? (
-          <span className="work-process-tool-card-body-text is-summary" title={row.bodyText}>{row.bodyText}</span>
-        ) : null}
-        <SampleList lines={hits.slice(0, 3)} />
-      </div>
-    );
-  }
   if (path) {
     return (
       <div className="work-process-tool-card-body family-runtime">

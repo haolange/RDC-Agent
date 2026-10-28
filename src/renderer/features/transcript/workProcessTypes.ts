@@ -148,6 +148,7 @@ export type WorkProcessRow =
      * When absent, the card falls back to args target / path / command.
      */
     bodyText?: string;
+    outcome?: import('./workProcessOutcome').ToolOutcome;
     /** Optional short result sample shown under bodyText while collapsed (search family). */
     bodyLines?: string[];
     /** Content-layer preview shape; family drives the card template. */

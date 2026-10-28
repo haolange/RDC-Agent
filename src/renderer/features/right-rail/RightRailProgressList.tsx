@@ -1,5 +1,7 @@
 import React from 'react';
 import type { ProgressTask } from '@shared/types/trace';
+import './RightRailProgress.css';
+import { OverflowFade } from '../../ui/OverflowFade';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
 import { useI18n } from '../../i18n';
 import { WORK_PROCESS_LOCATE_TASK_EVENT, type WorkProcessTaskLocationRequest } from '../../lib/workProcessTaskLocation';
@@ -23,7 +25,7 @@ export const RightRailProgressList: React.FC<{ tasks: ProgressTask[]; locateLabe
           <span className="right-rail-task-order">{task.order + 1}</span>
           <TaskStatusMarker status={task.status} label={task.status === 'pending' && task.waitingOn?.length
             ? t('chat.taskWaitingDependencies') : t(`chat.workProcessTaskStatus.${task.status}`)} />
-          <span className="right-rail-task-copy"><strong>{task.title}</strong></span>
+          <span className="right-rail-task-copy"><strong><OverflowFade text={task.title} /></strong></span>
         </button>
       </li>
     ))}</ol>

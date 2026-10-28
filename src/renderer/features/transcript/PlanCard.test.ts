@@ -54,7 +54,8 @@ it('ends the fade at visible text rather than the Markdown whitespace below it',
   } as unknown as Range);
   await act(async () => root.render(createElement(PlanCard, { plan })));
   const css = document.adoptedStyleSheets.flatMap(sheet => Array.from(sheet.cssRules, rule => rule.cssText)).join('');
-  expect(css).toMatch(/--plan-fade-end:\s*70px/);
+  expect(css).toMatch(/--plan-fade-start:\s*35px/);
+  expect(css).toMatch(/--plan-fade-length:\s*35px/);
 });
 it('opens with Enter and Space while preserving selected text clicks', async () => {
   await act(async () => root.render(createElement(PlanCard, { plan })));
@@ -67,4 +68,26 @@ it('opens with Enter and Space while preserving selected text clicks', async () 
   vi.spyOn(window, 'getSelection').mockReturnValue({ toString: () => 'selected text' } as Selection);
   await act(async () => card.click());
   expect(mock.open).toHaveBeenCalledTimes(2);
+});
+
+it('scales the fade with font reflow and preserves half of a height-limited excerpt', async () => {
+  mock.height = 180;
+  let visibleHeight = 120;
+  let lineHeight = 18;
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => new DOMRect(0, 0, 200, visibleHeight));
+  vi.spyOn(window, 'getComputedStyle').mockImplementation(() => ({ lineHeight: `${lineHeight}px` }) as CSSStyleDeclaration);
+  const declarations = () => document.adoptedStyleSheets.flatMap(sheet => Array.from(sheet.cssRules, rule => rule.cssText)).join('');
+  await act(async () => root.render(createElement(PlanCard, { plan })));
+  expect(declarations()).toMatch(/--plan-fade-length:\s*36px/);
+  lineHeight = 24;
+  await act(async () => mock.measure());
+  expect(declarations()).toMatch(/--plan-fade-length:\s*48px/);
+  visibleHeight = 50;
+  await act(async () => mock.measure());
+  expect(declarations()).toMatch(/--plan-fade-start:\s*25px/);
+  expect(declarations()).toMatch(/--plan-fade-length:\s*25px/);
+  mock.height = 80;
+  await act(async () => mock.measure());
+  expect(host.querySelector('.plan-card__preview.is-overflowing')).toBeNull();
+  expect(declarations()).not.toContain('--plan-fade-length');
 });

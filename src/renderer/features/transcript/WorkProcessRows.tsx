@@ -19,7 +19,7 @@ export const SummaryRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'summar
   const title = label(row.text);
   return (
     <li className={`work-process-step is-appear status-${row.status} kind-summary`} data-testid="work-process-block">
-      <WorkProcessRailIcon variant="step" status={row.status} />
+      <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
         <div className="work-process-summary-card">
           {row.detailLines.length > 0 ? (
@@ -47,7 +47,7 @@ const HookDiagnosticCard: React.FC<{
   const { t } = useI18n();
   const [expanded, toggle] = useScopedWorkDisclosure(`hook-diagnostic-${row.id}`, false);
   return <li className={`work-process-step is-appear kind-diagnostic is-orphan-hook-row status-${row.status}`} data-testid="work-process-hook-diagnostic-card">
-    <WorkProcessRailIcon variant="step" status={row.status} />
+    <WorkProcessRailIcon row={row} />
     <div className="work-process-step-content">
       <div className={`work-process-tool-card is-orphan-hook severity-${row.severity}${density === 'compact' ? ' is-compact' : ''}${expanded ? ' is-expanded' : ''}`}>
         <WorkCardHeader icon={<WorkProcessIcon icon="plug" className="work-process-tool-card-icon" />}
@@ -75,7 +75,7 @@ export const DiagnosticRow: React.FC<{
     className={`work-process-step is-appear work-process-diagnostic status-${row.status} severity-${row.severity} kind-diagnostic`}
     data-testid="work-process-block"
   >
-    <WorkProcessRailIcon variant="step" status={row.status} />
+    <WorkProcessRailIcon row={row} />
     <div className="work-process-step-content">
       {row.detailLines.length > 0 ? (
         <details className="work-process-disclosure" open={row.status === 'error'}>
@@ -94,7 +94,7 @@ export const DiagnosticRow: React.FC<{
 
 export const PlanReviewRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'planReview' }> }> = ({ row }) => (
   <li className={`work-process-step is-appear status-${row.status} kind-plan-review`} data-testid="work-process-plan-review">
-    <WorkProcessRailIcon variant="step" status={row.status} />
+    <WorkProcessRailIcon row={row} />
     <div className="work-process-step-content">
       <PlanCard plan={row.plan} />
     </div>
@@ -117,7 +117,7 @@ export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'user
 
   return (
     <li className={`work-process-step is-appear status-${row.status} kind-user-input`} data-testid="work-process-user-input">
-      <WorkProcessRailIcon variant="step" status={row.status} />
+      <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
         <div className={`work-process-user-input${expanded ? ' is-expanded' : ''}`} data-testid="work-process-user-input-transcript">
           <button
@@ -184,7 +184,7 @@ export const ApprovalRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'appro
 
   return (
     <li className={`work-process-step is-appear status-${row.status} kind-approval`} data-testid="work-process-approval">
-      <WorkProcessRailIcon variant="step" status={row.status} />
+      <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
         <div className="work-process-approval">
           <div className="work-process-tool-summary work-process-tool-summary-static">{summaryLine}</div>

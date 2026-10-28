@@ -8,9 +8,10 @@ import { WorkProcessContent } from './WorkProcessContent';
 interface WorkProcessProps {
   trace: ConversationWorkTrace;
   sessionId?: string | null;
+  messageId: string;
 }
 
-const WorkProcessInner: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
+const WorkProcessInner: React.FC<WorkProcessProps> = ({ trace, sessionId, messageId }) => {
   const { t } = useI18n();
   const presentation = useMemo(() => buildWorkProcessPresentation(trace), [trace]);
   const [expanded, setExpanded] = useState<boolean>(presentation.defaultExpanded);
@@ -65,7 +66,8 @@ const WorkProcessInner: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
         </button>
       </div>
 
-      {expanded && hasBody ? <WorkProcessContent presentation={presentation} sessionId={sessionId} /> : null}
+      {expanded && hasBody ? <WorkProcessContent presentation={presentation} sessionId={sessionId}
+        disclosureScope={`${sessionId ?? ''}\u0000${messageId}`} /> : null}
     </section>
   );
 };
