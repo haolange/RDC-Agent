@@ -1,5 +1,15 @@
 # Acceptance Ledger
 
+## Tools 1.1.2 发行与官方升级（2026-10-29）
+
+- 用户追加授权两库提交推送 main、Tools 补丁发布和本机官方升级。Agent 六项实现提交 `e89dc86eb413a54abfa07fb4547fdc86ba54a464`；Tools 发行源码 `bcb1275ed8fa5acc908e08ac328da3d581c2ff54`。两库没有创建分支。历史源码验收与本次正式安装验收分开保存。
+- [Tools v1.1.2](https://github.com/haolange/RDC-Tool/releases/tag/v1.1.2) 为稳定 latest，非 draft/prerelease；tag、manifest 与 SBOM 的 source_revision 均指向上述 Tools 提交。ZIP SHA-256 `3bd5ca30c0601e91bffb3021241ba53028e9c04163aadd592bbdc39eb0bd81e1`，3143 个 ZIP entries 的 CRC、完整发行门禁、版本和许可证校验通过。仅上传 ZIP 与 SHA256SUMS，两项远端 digest 均与本地一致；SHA256SUMS 只列该 ZIP。
+- 使用与已发布资产摘要相同的正式包，运行包内 `scripts/rdc_tool_install.ps1 -Action upgrade`，将既有本机安装从 1.1.1 升级至 1.1.2。逐文件核对全部 3140 个安装清单文件；旧 distribution metadata 已移除。升级前与运行后，1592 个配置、会话、capture、缓存及安装内非程序文件哈希一致，其中安装内非程序文件 493 个；用户 PATH、原 ADB server 保留。本次没有修改真实用户设置或复制原 capture。
+- 真实 Electron 主进程服务在显式双隔离根中，经 `RdcSessionService → RdcCliInvokerService → 安装版 Python/CLI` 完成 Android 首次打开及 EID 3029 设备呈现。随后 owning General 冻结 catalog/CLI/lease，经 `executeRdcShell` 对主进程确认的 `ResourceId::148783` 执行 `rd.export.texture`。签名测量回执验证通过；重算外层 hash 的篡改仍被拒绝。daemon/worker 的安装路径、PID 与 Windows process birth 均经 OS 复核，与回执一致；catalog 指纹 `e1e6fd9158e829d7dd4422726e47189ef3ae992c965474d11b1200a327a5d110`。属于真实服务集成验收，没有调用真实模型，也没有 shader 介入或回滚声明。
+- 保留负结果：末帧复制事件缺少普通截图输出时，`rd.export.screenshot` 明确返回 `preview_event_output_unavailable`；后续一次重开返回 Network I/O，同一时间手机 RenderDoc helper 于 19:15:11 +08:00 在 Vulkan pipeline compilation 中 SIGSEGV。人工重开后实际取证及签名验证通过；这不构成驱动根因结论，也不声明整套 Android 稳定性矩阵通过。最小证据位于 `.local/interaction-state/receipt.json`、`installed-execution-receipt.json` 和 `android-crash.log`。
+- 未变的 82 个 Agent 来源指纹与既有完整 4021 测试、覆盖率 ratchet、typecheck/lint/gates/build 证据一致；Tools 沿用既有 828 测试与 2 subtests，并补跑 99 项发布、安装和 bootstrap 回归。发行源码的 [Tools CI](https://github.com/haolange/RDC-Tool/actions/runs/40862831389) 与 [Agent 实现 CI](https://github.com/haolange/RDC-Agent/actions/runs/40862872726) 均 success；后续验收文档提交的 CI 状态单独报告。
+- 正式桌面入口再次启动并可关闭上手指南，随后正常退出。原生资源先 clear context 再 stop daemon，OS 确认 daemon/worker 退出，手机自有 helper 不在运行，canonical 锁不存在，桌面启动权已交还。按路径、归属和链接边界清理本轮提取包、测试依赖、脚本、日志与 QA 数据，解除 43 个测试链接，移除 263076405 逻辑字节；此数不表示实际释放磁盘空间。保留当前正式发行包和最小验收证据，既有用户资产不作清理对象。
+
 ## 六项交互与执行状态收敛（2026-10-29）
 
 - 来源为 Agent main `de7c36f4343dd402e85d6f6b9f2e09f742dc135a`、Tools main `654fcc0bd238e744c6c61d9de68009e1c4361a9c` 加本轮差异；两库不创建分支、不提交推送、不发布或升级正式安装。正式构建 Main SHA-256 `acfeaa4c6618f52554a39440426202bcf803edcc83d4b88f9aef9d079be55431`。最小来源、文件指纹及观察回执为 `.local/interaction-state/receipt.json` 与 `proof.png`；本轮只覆盖六项交互，不包含 shader 修复或调查预算改造。
