@@ -71,20 +71,20 @@ export const ComposerModelEffortControl: React.FC<{
   const currentOption = options.find((option) => (
     option.providerId === selected?.providerId && option.modelId === selected?.modelId
   ));
-  const modelLabel = waiting ? t('composer.model.preparing') : unavailable ? t('composer.model.unavailable')
+  const modelLabel = unavailable ? t('composer.model.unavailable')
     : currentOption?.label || (frozen ? selected?.modelId : undefined) || t('settings.selectModelPlaceholder');
   const displayedControls = frozen?.controls ?? effort.turnControls;
   const displayedEffort = frozen ? t(EFFORT_LABEL_KEYS[displayedControls.reasoningLevel]) : effort.effortLabel;
   const capsule = buildModelEffortCapsulePresentation({
     modelLabel,
     reasoningLabel: t('composer.effort.reasoningValue', { level: displayedEffort }),
-    maxContextMode: !waiting && !unavailable && displayedControls.maxContextMode,
+    maxContextMode: !unavailable && displayedControls.maxContextMode,
     maxContextLabel: t('composer.effort.maxContext'),
-    fastModel: !waiting && !unavailable && displayedControls.fastModel,
+    fastModel: !unavailable && displayedControls.fastModel,
     fastModelLabel: t('composer.effort.fastModel'),
   });
-  const title = capsuleLabel ?? (waiting || unavailable ? modelLabel : capsule.title);
-  const activeView = agentDefault ? 'models' : view;
+  const title = capsuleLabel ?? (unavailable ? modelLabel : waiting ? `${capsule.title} · ${t('composer.model.preparing')}` : capsule.title);
+  const activeView = view;
 
   const assignMenuRoot = useCallback((node: HTMLDivElement | null) => {
     menuRef.current = node;
@@ -132,18 +132,18 @@ export const ComposerModelEffortControl: React.FC<{
         disabled={disabled || saveState.saving || controlsState.saveState.saving}
         onClick={() => menu.toggle()}
       >
-        {!agentDefault && capsule.showFast ? (
+        {capsule.showFast ? (
           <span className="composer-model-effort-pill-mode" data-mode="fast" aria-hidden="true">
             <Icon name="lightning" size={14} />
           </span>
         ) : null}
-        {!agentDefault && capsule.showMax ? (
+        {capsule.showMax ? (
           <span className="composer-model-effort-pill-mode" data-mode="max-context" aria-hidden="true">
             <Icon name="max-mode" size={14} />
           </span>
         ) : null}
         <OverflowFade className="composer-model-effort-pill-model" text={capsuleLabel ?? capsule.modelLabel} />
-        {!agentDefault && !waiting && !unavailable ? <span className="composer-model-effort-pill-level" title={capsule.reasoningLabel}>{displayedEffort}</span> : null}
+        {!agentDefault && !unavailable ? <span className="composer-model-effort-pill-level" title={capsule.reasoningLabel}>{displayedEffort}</span> : null}
         <span className="composer-model-effort-pill-caret" aria-hidden="true"><ChevronIcon /></span>
       </Pill>
 

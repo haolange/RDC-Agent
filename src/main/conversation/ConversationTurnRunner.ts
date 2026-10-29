@@ -29,6 +29,7 @@ import { finalizeTrace, upsertWorkBlock } from './ConversationWorkTrace';
 import { attachToolExecutionEvidence } from './ConversationToolEvidence';
 import type { ConversationLoopContinuationState } from '@shared/conversation/loopOutputPhase';
 import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeState';
+import { verifyApprovedPlanExit } from './approvedPlanExit';
 import { EMPTY_CANONICAL_ASSISTANT_OUTPUT, requireCanonicalFinalAnswer } from './CanonicalAssistantOutput';
 import { hydrateFrozenUserContent } from './ConversationAttachmentMaterializer';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
@@ -119,6 +120,7 @@ export async function completeProfileTurn(
     executionIdentity: ExecutionIdentity;
     status: 'complete' | 'stopped' | 'error';
   } | null } = { value: null };
+  let approvedPlanExit = false;
   const terminalCompletion: { value: TurnCompletionDeclaration | null } = { value: null };
 
   const applyAssistantMessagePatch = (
@@ -449,6 +451,7 @@ export async function completeProfileTurn(
               status: result.status,
             };
             terminalCompletion.value = result.completionDeclaration ?? null;
+            approvedPlanExit = result.status === 'complete' && verifyApprovedPlanExit(sessionId, assistantMessage.turnId, result.approvedPlan);
           },
           onEvent: createAgentEventHandler({
             host, sessionId, input, agentLabel, turnStreamState,
@@ -462,7 +465,7 @@ export async function completeProfileTurn(
         },
       );
 
-      requireCanonicalFinalAnswer(canonicalOutput);
+      if (!approvedPlanExit) requireCanonicalFinalAnswer(canonicalOutput);
       host.validateCompletion({
         profileId: conversationAgentId,
         turnId: assistantMessage.turnId,
@@ -501,7 +504,7 @@ export async function completeProfileTurn(
   if (abortController.signal.aborted || runWasCancelled) return;
   const assistantContent = llmDiagnostic
     ? llmDiagnostic.userMessage.trim()
-    : requireCanonicalFinalAnswer(canonicalOutput);
+    : approvedPlanExit ? '' : requireCanonicalFinalAnswer(canonicalOutput);
   visibleResponse = assistantContent;
   const isRouteMissingDiagnostic = llmDiagnostic?.code === 'CONVERSATION_LLM_ROUTE_MISSING';
   const finalStatus: ConversationMessage['status'] = runWasCancelled
@@ -531,9 +534,9 @@ export async function completeProfileTurn(
             : llmDiagnostic.code === 'MISSION_COMPLETION_DENIED'
               ? 'Mission completion contract was not satisfied.'
             : 'Model request failed; diagnostic recorded.'
-    : 'Final answer generated.';
+    : approvedPlanExit ? 'Plan approved; declared handoff ready.' : 'Final answer generated.';
 
-  const traceWithOutput = upsertWorkBlock(assistantMessage.workTrace, 'assistant-output', {
+  const traceWithOutput = approvedPlanExit && assistantMessage.workTrace ? assistantMessage.workTrace : upsertWorkBlock(assistantMessage.workTrace, 'assistant-output', {
     kind: 'output',
     status: finalStatus === 'error' ? 'error' : 'complete',
     summary: outputSummary,

@@ -133,8 +133,9 @@ describe('AgentPlanReviewRequestService', () => {
       toolCallId: 'call-2',
       decision: { kind: 'approve', handoff: { label: '交给 General 执行', agent: 'general' } },
     })).toEqual({ success: true });
-    await expect(pending).resolves.toContain('已冻结，本回合结束，等待用户点声明按钮。');
+    await expect(pending).resolves.toContain('已冻结计划并确认声明交接。');
     expect(turnHandle.approvedPlan).toEqual({
+      toolCallId: 'call-2',
       hash: 'b'.repeat(64),
       target: 'general',
       frozenUri: 'session://plans/plan-frozen.md',

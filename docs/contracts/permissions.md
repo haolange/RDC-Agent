@@ -149,3 +149,8 @@ plan:* 以当前查看 session + planId/revision/URI/hash 定位持久历史 too
 文件路由表独立于灾难 shellHardDeny 表，均在权限模式和自定义允许前缀之前求值；Full access 不能绕过。有效工具集合有对应工具时，shell.command 文件读写/搜索返回 SHELL_FILE_TOOL_BYPASS，命令行 RDC 返回 RDC_VIA_COMMAND_DENIED。edit_file 和覆盖已有文件的 write_file 必须先在同一 session 成功 read_file 同一 realpath，否则 READ_BEFORE_EDIT_REQUIRED。已读状态跨 turn、仅内存持有，重启须重读；子 session 不继承。新建文件免先读。
 
 Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDC_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。
+
+
+### 自动审查与计划交接
+
+自动审查以主进程 reviewer=auto_review 识别，只在 Work Process 展示规则/独立审核及真实结论，不是人工待回答请求。Composer 只提供真实人工请求的批准入口，混合请求分别结算，不改变人工 policy floor。审核来源不从命令文本、风险或 ID 格式推测。

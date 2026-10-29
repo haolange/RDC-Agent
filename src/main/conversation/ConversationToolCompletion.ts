@@ -13,9 +13,10 @@ export function buildConversationToolCompletion(
   const normalized = normalizeToolName(toolName);
   const cancelled = !result?.ok && (existing?.status === 'cancelled'
     || result?.error?.details?.reason === 'abort');
+  const skipped = result?.error?.details?.reason === 'turn completed after tool';
   const patch: Partial<ConversationToolCall> & { id: string; toolName: string } = {
-    id, toolName, status: cancelled ? 'cancelled' : result?.ok ? 'complete' : 'error',
-    error: cancelled || result?.ok ? undefined : result?.error?.message,
+    id, toolName, status: skipped ? 'skipped' : cancelled ? 'cancelled' : result?.ok ? 'complete' : 'error',
+    error: skipped || cancelled || result?.ok ? undefined : result?.error?.message,
     completedAt: cancelled ? existing?.completedAt ?? completedAt : completedAt,
   };
   if (normalized === 'subagent') {

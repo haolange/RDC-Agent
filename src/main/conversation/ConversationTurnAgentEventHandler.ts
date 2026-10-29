@@ -10,6 +10,7 @@ import type {
   ConversationWorkTrace,
 } from '@shared/types/conversation';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
+import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
 import { nowMs } from '@shared/utils/id';
 import type { ToolCallResult } from '@shared/types/tool';
 import { buildConversationToolCompletion } from './ConversationToolCompletion';
@@ -538,7 +539,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               const reason = typeof payload.reason === 'string' && payload.reason
                 ? payload.reason
                 : 'This action requires user approval before it can run.';
-              pendingContinuation.approval = true;
+              if (!isAutomaticToolApproval(payload)) pendingContinuation.approval = true;
               markLoopCommentary();
               commitAssistantMessage('message_patched', {
                 workTrace: upsertRuntimeToolApproval(turnStreamState.assistantMessage.workTrace, {
@@ -602,9 +603,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 return;
               }
               const approvalStatus = typeof payload.status === 'string' ? payload.status : 'approved';
-              if (approvalStatus !== 'pending') {
-                pendingContinuation.approval = false;
-              }
+              pendingContinuation.approval = (turnStreamState.assistantMessage.workTrace?.blocks ?? []).some(block => block.toolCalls.some(call => !call.delegatedRequest && call.approval?.status === 'pending' && call.approval.approvalId !== approvalId && !isAutomaticToolApproval(call.approval)));
               const answerText = payload.answer === undefined || payload.answer === null
                 ? ''
                 : typeof payload.answer === 'string'

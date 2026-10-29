@@ -1,5 +1,6 @@
 import React from 'react';
 import { ContextUsageIndicator } from '../../patterns/ContextUsageIndicator';
+import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { PermissionModeSelector } from './PermissionModeSelector';
 import { ComposerModelEffortControl } from './ComposerModelEffortControl';
@@ -49,6 +50,7 @@ export function ComposerFooter({
   handlePromptSend,
   selectedAgentDefinition, selectedAgentCapability, activeAgentId, setCurrentMode, currentSession,
 }: ComposerFooterProps) {
+  const handingOff = useComposerSessionContextStore(state => !!state.handoffSuggestionRequest);
   const detailsExpanded = useAppSettingsStore((state) => state.settings.appearance.contextBreakdownExpanded);
   const setDetailsExpanded = useAppSettingsStore((state) => state.setContextBreakdownExpanded);
   return (
@@ -84,12 +86,12 @@ export function ComposerFooter({
             agentId={selectedAgentId}
             currentSession={currentSession}
             disabled={isComposerBusy}
-            prepared={preparedTurnContext}
+            prepared={handingOff && conversationPreparationPhase !== 'preparing' ? null : preparedTurnContext}
             preparing={conversationPreparationPhase === 'preparing'}
           />
           <RegisteredContextUsageIndicator
             usage={lastKnownUsage}
-            prepared={preparedTurnContext}
+            prepared={handingOff && conversationPreparationPhase !== 'preparing' ? null : preparedTurnContext}
             phase={conversationPreparationPhase}
             selectedProfile={selectedContextProfile}
             stale={usageStale}

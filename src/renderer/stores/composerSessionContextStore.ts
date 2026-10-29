@@ -22,6 +22,7 @@ export interface LastSentPrompt {
 }
 
 export interface HandoffSuggestionRequest {
+  phase?: 'confirming' | 'handoff';
   sessionId: string;
   agentId: string;
   label: string;

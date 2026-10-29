@@ -4176,3 +4176,13 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 验收脚本曾只设置Electron userData，遗漏状态层的RDC_AGENT_USER_DATA，触及真实项目registry/selection和secret map；未删除用户记录。恢复前在内存重建三份原始字节，全部与升级前SHA256吻合后才写回；清除12个由精确测试项目/会话ID及本轮路径确认的新增文件。之后补齐隔离环境断言，在独立状态目录重跑完整原生链成功，再次核对1044个原文件无变化。此失误及恢复留最小回执，不将首次运行冒充隔离验证通过，也未将测试签名密钥遗留在真实凭据文件。
 - 官方launcher使用独立用户数据启动正式桌面，实际RDC-Agent窗口和ReplayDeviceService等服务初始化后正常关闭；不是仅凭PID存活判断可用。原生回放先clear context再stop daemon，均有成功回执；最终清理与Git文档提交结果以本节收尾回执为准。最小证据收敛于 `.local/runtime-release/receipt.json`、单份签名回执及PNG，原生验证使用的用户数据/备份/脚本/构建副本不作为长期资源保留。
 - R1–R6收尾：正式包、官方升级、独立原生链、保护文件恢复/核对与文档检查均通过。经路径/归属/进程/链接核验，清除两个磁盘上的本轮临时根内4997文件和169个只指向本轮根的测试链接，逻辑259468455B，不等同实际回收空间；正式ZIP/校验文件和三份最小证据保留。清理后再次核对3140项安装文件、1044项保护文件和Python metadata版本1.1.1；保护快照摘要前后均为 `d51f5250ea8b61d34fd72c7e01ac7b1693b31263c6c8ebb32c881f53f5e9ea39`，真实用户目录无本轮新增文件。自有Electron、daemon/worker、ADB、QA/loopback监听与canonical锁均无残留，桌面启动权已交还。此验收补记随本轮Agent main推送，不移动Tools发行tag或更换已发布资产。
+
+## 2026-10-30 自动审查与计划执行交接修正
+
+- 源码：当前 main 基线 b29d1cb0 的 working tree；不提交、推送或发布。源码文件 SHA256 清单及摘要 `5447ef8c930ec0ddcd1deb21b2edfef1f06eb7cda20aab3fe2cbf76c60d366be` 见 `.local/plan-review-ui/approval-handoff-receipt.json`；保留此前已有记录。
+- 工程：最终独立 TEMP、单 worker 全量 546 文件/4033 用例通过，4 项既有跳过；coverage ratchet lines77.8/functions79.25/branches66.01/statements75.45 通过；contracts 248、完整 gates、typecheck、lint、正式 build 通过。全量后直接耦合的 delegated pause guard 与批准投影延迟补丁分别通过15项和20项定向回归，再验类型、lint、相关门禁及构建。首轮沙箱 realpath 失败、两次覆盖率运行重叠导致首份报告无效，以及单项Git扫描超时均保留为失败经历，最终串行全量通过；未修改超时或弱化断言。
+- 真实产品：官方隔离 launcher、一次性 bootstrap、同源 /app、真实 Composer 驾驶。GPT-6.1 Sol→DeepSeek V4 Pro、Grok4.7、GPT-6 Luna 三组通过，均实际执行PowerShell并返回437。追加同模型仅调Fast验证，批准前 modelOverride=null、fastModel=true，新请求真实冻结Sol/Low/Fast且执行成功；最终renderer补验再次真实执行成功。每个成功规划回合只有一次规划模型请求，批准后没有补调规划模型。Grok真实独立审核的pending、超时与另一精确调用的批准均保留在Work Process，没有人工授权面板。
+- 外部边界：GPT→Kimi K3、Kimi K3→GPT两组返回HTTP403，服务明确说明当前订阅没有K3访问权限；后一组未进入批准/目标执行。用户已明确“先完成其余验收，准确记录Kimi阻塞”，两组不标通过，不改账号或绕过权限。
+- Browser：深浅主题、窄屏（480px窗口/436 CSS px）、无横向溢出、菜单Esc焦点返回通过。最终原生点击样本24ms、Long Task=0；确认→交接→准备的提示连续且无回跳，实际主进程交接/准备约4.4s。该单样本不构成普遍性能或前后提速结论。截图、请求冻结元数据、计划/工具回执、最终回答和时序保留在同一最小回执；初始化重启时的旧401不冒充当前请求错误。
+- 收尾：本轮QA及子进程已退出，隔离目录和coverage均已删除（871个文件，逻辑25151297B；不作为实际释放空间声明）；原config、加密凭据、Local State三项SHA256均不变，canonical锁不存在，桌面启动权已交还。最小回执和5张不同验收目的截图保留；未改真实会话、账号或capture。
+- 2026-10-30上传收口：复核本库无release/dist旧发行包，Tools dist仅保留当前1.1.2正式ZIP及校验文件；保留可运行out和必要历史证据。另核对历史QA三个owner PID均不存在、路径无链接，删除1139B孤立daemon临时状态文件，回执 `.local/plan-review-ui/upload-cleanup.json`。通俗背景与使用变化已补到Workbench主题文档；本次用户授权当前main提交和正常推送，取代上文当时的本地交付边界。

@@ -375,3 +375,23 @@ describe('AgentLoop dynamic max tokens', () => {
     expect(calls).toBe(0);
   });
 });
+
+it('ends at a host-confirmed tool boundary without another provider request or later tool effects', async () => {
+  let requests = 0;
+  const execute = vi.fn(toolExecutor.execute);
+  const source = toolUseMessage(1);
+  source.content.push({ type: 'toolCall', id: 'later', name: 'read_file', arguments: {} });
+  const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: () => { requests++; return providerStream(source); } };
+  const events: AgentEvent[] = [];
+  const handle = agentLoop([], createContext(), { model: TEST_MODEL, convertToLlm: messages => messages as Message[],
+    streamOptions: { requestPlan: TEST_REQUEST_PLAN } }, provider, {
+    execute, shouldEndTurnAfterToolResult: result => result.toolCallId === 'call-1' && !result.isError,
+  });
+  for await (const event of handle.stream) events.push(event);
+  await handle.producerCompletion;
+  expect(requests).toBe(1);
+  expect(execute).toHaveBeenCalledTimes(1);
+  expect(events.some(event => event.type === 'agent_end')).toBe(true);
+  const ended = events.find(event => event.type === 'turn_end');
+  expect(ended?.type === 'turn_end' && ended.toolResults?.[1].details).toMatchObject({ reason: 'turn completed after tool' });
+});

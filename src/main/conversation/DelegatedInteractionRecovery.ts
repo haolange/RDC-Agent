@@ -3,6 +3,7 @@ import { agentToolApprovalRequestService } from '../agent-runtime/permissions/Ag
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { finalizeTrace } from './ConversationWorkTrace';
+import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
 
 export const INTERRUPTED_CONVERSATION_SUMMARY = '请求在应用退出后中断，需重新发起。';
 
@@ -18,6 +19,7 @@ export function reconcileDelegatedInteractionRequests(sessionId: string, message
       return { ...call, planReview: { ...call.planReview, status: 'rejected' as const } };
     }
     const pendingApproval = call.approval?.status === 'pending';
+    if (pendingApproval && isAutomaticToolApproval(call.approval!)) return call;
     const pendingInput = call.toolName === 'ask_user' && (call.status === 'pending' || call.status === 'running') && !call.resultPreview;
     const pendingPlan = call.toolName === 'plan_artifact' && (call.status === 'pending' || call.status === 'running') && call.planReview?.status === 'awaiting';
     if (!pendingApproval && !pendingInput && !pendingPlan) return call;

@@ -330,7 +330,7 @@ export class AgentTurnRunner {
     initialMessages?: Message[];
     contextDiagnostic?: Record<string, unknown>;
     preparedRuntime?: PreparedAgentRuntime;
-    terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error', pendingHandoff?: import('./TurnCoordinator').PendingHandoff, completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null) => void;
+    terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error', pendingHandoff?: import('./TurnCoordinator').PendingHandoff, completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null, approvedPlan?: import('./TurnCoordinator').TurnHandle['approvedPlan']) => void;
   }): Promise<string> {
     if (!input.providerId || !input.modelId) {
       throw new Error('No provider/model route is configured for this agent.');
@@ -832,7 +832,7 @@ export class AgentTurnRunner {
         input.options.signal.removeEventListener('abort', abortListener);
       }
       cancelTurnInteractionRequests(turnHandle.turnId);
-      input.terminalContext?.(activeSlot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus, turnHandle.pendingHandoff ?? undefined, turnHandle.completionDeclaration);
+      input.terminalContext?.(activeSlot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus, turnHandle.pendingHandoff ?? undefined, turnHandle.completionDeclaration, terminalStatus === 'complete' ? turnHandle.approvedPlan : null);
       this.deps.slots.flush(activeSlot);
       if (turnHandle.isAborted) {
         await turnHandle.abortAndJoin({ reason: turnHandle.reason ?? 'user_stop' });

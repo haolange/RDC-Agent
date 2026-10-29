@@ -59,7 +59,7 @@ const keyFor = (turnId: string, toolCallId: string): string => `${turnId}::${too
 function formatApprovedResult(handoff: PlanReviewHandoffOption, frozenUri: string, hash: string): string {
   return [
     'approved',
-    '已冻结，本回合结束，等待用户点声明按钮。',
+    '已冻结计划并确认声明交接。',
     `label: ${handoff.label}`,
     `target: ${handoff.agent}`,
     `plan.uri: ${frozenUri}`,
@@ -213,6 +213,7 @@ export class AgentPlanReviewRequestService {
     });
     if (pending.turnHandle) {
       pending.turnHandle.approvedPlan = {
+        toolCallId: pending.toolCallId,
         hash: frozen.hash,
         target: input.decision.handoff.agent,
         frozenUri: frozen.uri,

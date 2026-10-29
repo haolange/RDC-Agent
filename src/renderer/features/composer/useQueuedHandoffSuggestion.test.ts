@@ -86,3 +86,15 @@ it('does not revive an earlier approved handoff when a later review has already 
       { id: 'later', planReview: { planId: 'p', revision: 2, hash: 'h2', status: 'cancelled' } }] }] } }] as never });
   await render(); expect(send).not.toHaveBeenCalled();
 });
+
+it('shows confirmation before handoff and never regresses after sending starts', async () => {
+  context.setState({ handoffSuggestionRequest: { ...request(), phase: 'confirming' } });
+  await render(); expect(controller.phase).toBe('confirming'); expect(mock.apply).not.toHaveBeenCalled();
+  let finish!: (value: unknown) => void;
+  send.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  await act(async () => { context.getState().queueHandoffSuggestion({ ...request(), phase: 'handoff' }); });
+  await render(); expect(controller.phase).toBe('preparing');
+  await render(true); await render(false); expect(controller.phase).toBe('preparing');
+  await act(async () => finish({ status: 'accepted', requestId: 'confirmed' }));
+  expect(controller.phase).toBeUndefined(); expect(send).toHaveBeenCalledTimes(1);
+});

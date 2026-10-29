@@ -54,7 +54,7 @@ Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。
 
 ### Provider 连接与选择响应
 
-计划授权区与 Composer 共用会话模型覆盖和回合参数。模型、Effort、Fast、Max 写入同一 SessionRecord；保存中或失败不得批准计划，授权交接等待最新保存并校验声明目标的模型可执行性。切换 Agent 只合法化不支持的参数；prepare/commit 后禁用的 Composer 显示主进程确认的 route/controls，准备中明确显示正在准备。停用、断连或模型失效时保留配置引用，选择入口显示不可用并阻止新请求，不自动清除覆盖或切换路由；历史和在途请求仍按冻结快照显示。
+计划授权区与 Composer 共用会话模型覆盖和回合参数。模型、Effort、Fast、Max 写入同一 SessionRecord；保存中或失败不得批准计划，授权交接等待最新保存并校验声明目标的模型可执行性。切换 Agent 只合法化不支持的参数；prepare/commit 后禁用的 Composer 显示主进程确认的 route/controls，准备中保留所选模型与参数，另以阶段提示标明待主进程确认；确认后显示冻结请求事实。停用、断连或模型失效时保留配置引用，选择入口显示不可用并阻止新请求，不自动清除覆盖或切换路由；历史和在途请求仍按冻结快照显示。
 
 普通工具声明及流式参数保留在审计记录，实际开始后才进入主执行轨道；审批、用户输入与执行前失败保留独立可见入口。executionStartedAt 由真实执行事件写入，历史缺失不补造耗时；蓝点仅表示真实 running。连续工具组全部终止后才按既有阈值聚合，子项身份与用户披露状态保持。每张 Task 更新卡初次出现默认展开，手动折叠不会因后续活动重置，历史快照不被最新状态覆盖。
 
@@ -441,3 +441,8 @@ Task 可通过通用 `executionRequirements` 声明必要执行方式、必需�
 - Android 呈现以同安装原生 `remote_display` 回执为准：`presented` 必须匹配实际 EID、目标与新完成序号；`unsupported`、`unavailable` 和本地 `not_applicable` 不表示设备已同步。本地 native observation 通过不代表 Android 屏幕呈现通过；真实验收仍须设备画面与回执，依 acceptance ledger 分项记录。
 
 Android 设备选择不发起脱离 owning context 的连接。连接统一发生在 Capture 会话生命周期中；已有 helper 的借用与自有 helper 的清理由 Tools 实际归属决定，应用不得按设备类型关闭用户服务。确定性 Mission 编排验收与真实模型效果验收分别记录。
+
+
+### 自动审查与计划交接
+
+计划批准由宿主确认的工具边界正常结束 owning 规划回合，不再请求规划模型补终答；已启动执行仍须 join，未开始调用 skipped。Conversation 验证同回合冻结计划和 execution offer 后接受该计划门退出，不冒充 Mission 完成或放宽普通 canonical final_answer 合同。交接仍沿原有声明按钮、offer 和发送队列，无新增持久状态机。

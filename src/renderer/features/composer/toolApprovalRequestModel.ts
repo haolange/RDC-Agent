@@ -1,4 +1,5 @@
 import type { ConversationMessage } from '@shared/types/conversation';
+import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
 
 export interface PendingToolApprovalRequest {
   sessionId: string | null;
@@ -19,7 +20,7 @@ export const findPendingToolApproval = (messages: ConversationMessage[]): Pendin
   for (const message of assistantMessages) {
     for (const block of message.workTrace?.blocks ?? []) {
       for (const toolCall of block.toolCalls) {
-        if (toolCall.approval?.status !== 'pending') continue;
+        if (toolCall.approval?.status !== 'pending' || isAutomaticToolApproval(toolCall.approval)) continue;
         return {
           sessionId: message.sessionId,
           turnId: toolCall.delegatedRequest?.turnId ?? message.turnId,

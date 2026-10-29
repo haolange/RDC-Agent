@@ -36,7 +36,7 @@
 
 计划审批局部状态按session、turn、toolCall及计划身份隔离，切换会话/修订时销毁意见、错误和弹层；模型保存的迟到反馈不能回填新面板。审批区复用 SessionRecord.modelOverride 与 turnControls，模型和参数保存串行提交；保存中或失败阻止批准但允许停止，批准前等待最新保存。排队保存离开所属会话后失效，不能切回时重新投影。覆盖只影响之后的新请求，不能改动已冻结的当前请求；批准交接沿原队列使用新配置，拒绝后仍恢复原冻结请求。无覆盖时由各声明目标 Agent 原配置决定模型，UI显示“按Agent配置”，每个继续入口校验实际目标模型。
 
-执行准备期间不显示旧模型/参数作为本轮事实；主进程返回 PreparedTurnContextSummary 后，禁用的 Composer 从其 route 与 controls 显示实际请求。provider 停用/断连、模型不可执行时，保存的引用保持不变，选择区明确不可用，发送与批准均阻止；恢复可用后原引用可继续使用，在途请求不读取可变设置。
+执行准备期间保留本次提交的模型/参数作为待确认选择，阶段提示与模型身份分开；不得将旧请求配置标为本轮事实；主进程返回 PreparedTurnContextSummary 后，禁用的 Composer 从其 route 与 controls 显示实际请求。provider 停用/断连、模型不可执行时，保存的引用保持不变，选择区明确不可用，发送与批准均阻止；恢复可用后原引用可继续使用，在途请求不读取可变设置。
 
 工具声明时间 startedAt 与实际执行时间 executionStartedAt 分开。后者仅由 tool.started 事件写入并在后续合并中保持；事件在权限、前置 Hook 与资源队列准入后、真实工具 effect 前产生。审批通过本身不代表工具已经开始。迟到参数声明不能将已运行或终止调用降为 pending。普通 pending/未执行跳过记录保留审计但不投影成主轨道工具卡；审批、输入和执行前错误仍可见。耗时以真实起点计算，历史缺少起点时留空。隐藏的后续声明仍参与整组是否终止的判断，不能因前八项完成而提前聚合。Task 快照按原事件身份与内容保留，默认展开及手动开合按所属 scope 记忆。
 
@@ -139,3 +139,8 @@ Renderer 的 EffectiveCatalog snapshot 只按 provider/account/protocol 保存�
 ### Tasks 依赖等待投影
 
 ProgressTask 与 ConversationTaskSnapshotItem 可带只读 waitingOn（taskId、可选 title、reason: unfinished/unverified/missing）。五种 status 不因依赖变化改写；statusReason 只保留任务本身原因。主进程执行准入和等待信息共用同一证明判定。右栏读取任务与执行的一致快照，任务事件在当前事务中冻结同一信息；renderer 不重算依赖，历史快照不跟随最新状态。pending 等待使用灰色空心圆及“等待前置任务”提示，原因按需展开；真正 blocked 才使用黄色受阻标记。
+
+
+### 自动审查与计划交接
+
+Plan 批准的正常退出携带宿主 owning turn 的批准身份；主进程核对冻结制品、当前计划与 execution offer，普通缺失 final_answer 仍失败。批准确认到交接共用来源计划身份，迟到成功、Stop、会话切换与修订均不能重新发送；投递不确定只核查 requestId。准备时保留本次选择并标待确认，不能投影旧请求模型/参数。

@@ -28,6 +28,7 @@ export interface ConcurrentToolSchedulerInput<TCall, TResult> {
   createBudgetFailure: (call: TCall, index: number, limit: string) => TResult;
   createNotStarted: (call: TCall, index: number, reason: string) => TResult;
   isErrorResult?: (result: TResult) => boolean;
+  shouldStopAfterResult?: (result: TResult) => boolean;
   signal?: AbortSignal;
 }
 
@@ -39,6 +40,7 @@ export async function executeConcurrentToolGroups<TCall, TResult>(
     input.calls.map((call, index) => input.isSafe(call, index)),
   );
   let stopNewGroups = false;
+  let terminalResult = false;
 
   const fillRange = (
     indexes: readonly number[],
@@ -71,7 +73,7 @@ export async function executeConcurrentToolGroups<TCall, TResult>(
     }
     if (stopNewGroups) {
       fillRange(group.callIndexes, (call, index) => (
-        input.createNotStarted(call, index, 'prior group failed')
+        input.createNotStarted(call, index, terminalResult ? 'turn completed after tool' : 'prior group failed')
       ));
       continue;
     }
@@ -92,6 +94,7 @@ export async function executeConcurrentToolGroups<TCall, TResult>(
       const index = group.callIndexes[offset];
       if (entry.status === 'fulfilled') {
         results[index] = entry.value;
+        if (input.shouldStopAfterResult?.(entry.value)) terminalResult = true;
         if (input.isErrorResult?.(entry.value) === true) {
           groupFailed = true;
         }
@@ -101,7 +104,7 @@ export async function executeConcurrentToolGroups<TCall, TResult>(
         results[index] = input.createNotStarted(input.calls[index], index, message);
       }
     });
-    if (groupFailed || input.signal?.aborted) {
+    if (groupFailed || terminalResult || input.signal?.aborted) {
       stopNewGroups = true;
     }
   }

@@ -45,19 +45,29 @@ export const usePlanReviewSubmit = () => {
         throw new Error('MODEL_UNAVAILABLE: Please select an available model before executing the plan.');
       }
     }
+    const continuation = decision.kind === 'approve' && request.sessionId ? {
+      sessionId: request.sessionId, agentId: decision.handoff.agent, label: decision.handoff.label, prompt: '', send: true,
+      sourcePlan: { turnId: request.turnId, toolCallId: request.toolCallId, planId: request.planReview.planId, revision: request.planReview.revision, hash: request.planReview.hash },
+    } : null;
+    if (continuation) useComposerSessionContextStore.getState().queueHandoffSuggestion({ ...continuation, phase: 'confirming' });
     const result = await api.conversation.answerPlanReview({
       sessionId: request.sessionId, turnId: request.turnId, toolCallId: request.toolCallId, decision,
     });
     if (!result.success) throw new Error(result.error || 'Unable to submit the plan review.');
     if (!invalidated && isCurrent() && decision.kind === 'approve' && request.sessionId) {
-      useComposerSessionContextStore.getState().queueHandoffSuggestion({
-        sessionId: request.sessionId, agentId: decision.handoff.agent,
-        label: decision.handoff.label, prompt: '', send: true,
-        sourcePlan: { turnId: request.turnId, toolCallId: request.toolCallId,
-          planId: request.planReview.planId, revision: request.planReview.revision, hash: request.planReview.hash },
-      });
+      useComposerSessionContextStore.getState().queueHandoffSuggestion({ ...continuation!, phase: 'handoff' });
     }
+  } catch (error) {
+    const queued = useComposerSessionContextStore.getState().handoffSuggestionRequest;
+    if (queued?.sessionId === request.sessionId && queued.sourcePlan?.toolCallId === request.toolCallId) {
+      useComposerSessionContextStore.getState().clearHandoffSuggestion();
+    }
+    throw error;
   } finally {
+    const queued = useComposerSessionContextStore.getState().handoffSuggestionRequest;
+    if (queued?.phase === 'confirming' && queued.sessionId === request.sessionId && queued.sourcePlan?.toolCallId === request.toolCallId) {
+      useComposerSessionContextStore.getState().clearHandoffSuggestion();
+    }
     offSession();
     offConversation();
   }

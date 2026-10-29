@@ -588,7 +588,7 @@ export class AgentOrchestrator {
         contextDiagnostic: preparedTurn.contextDiagnostic,
         preparedRuntime: preparedTurn.runtime,
         terminalContext: options?.onTerminalContext
-          ? (messages, status, pendingHandoff, completionDeclaration) => options.onTerminalContext?.({
+          ? (messages, status, pendingHandoff, completionDeclaration, approvedPlan) => options.onTerminalContext?.({
               messages,
               executionIdentity: planning.plan.executionIdentity,
               status,
@@ -596,6 +596,7 @@ export class AgentOrchestrator {
               filteredArtifactCount: preparedTurn!.contextDiagnostic.filteredArtifactCount,
               pendingHandoff,
               completionDeclaration,
+              approvedPlan,
             })
           : undefined,
       });

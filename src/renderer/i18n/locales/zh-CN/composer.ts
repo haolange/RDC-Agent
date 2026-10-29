@@ -1,4 +1,7 @@
 export const zhComposer = {
+  'composer.handoff.confirming': '正在确认计划…',
+  'composer.handoff.switching': '正在交接…',
+  'composer.handoff.preparing': '正在准备请求…',
   'composer.effort.reasoningValue': '模型思考：{level}',
   'composer.toolApprovalKicker': '等待审批',
   'composer.toolApprovalDeny': '拒绝',

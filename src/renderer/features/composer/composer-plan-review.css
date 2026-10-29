@@ -86,3 +86,10 @@
   color: var(--token-status-error);
   font-size: var(--text-sm);
 }
+
+.composer-transition-status {
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--token-text-caption);
+}

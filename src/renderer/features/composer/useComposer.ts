@@ -145,7 +145,7 @@ export function useComposer(options: {
     ? currentRun?.status === 'stopping' && !hasActiveConversationTurn && !send.isPromptSending
     : (!modelReady || (!hasMessageContent && !hasPendingAttachments));
   const handoff = useQueuedHandoffSuggestion({
-    isComposerBusy: send.isComposerBusy,
+    isComposerBusy: send.isPromptSending || hasActiveConversationTurn || hasActiveDebugRun,
     sessionId: currentSession?.sessionId, setPromptValue, sendPrompt: send.sendHandoffPrompt, inspectRequest: send.inspectHandoff,
   });
 

@@ -148,6 +148,10 @@ export class ToolExecutorFactory {
     const planActivatedDeferredTools = new Set(plan?.activatedDeferredTools ?? []);
     const reservedCallIds = new Set<string>();
     return {
+      shouldEndTurnAfterToolResult: (result) => {
+        const approved = this.deps.getActiveTurn(sessionId)?.approvedPlan;
+        return !result.isError && result.toolName === 'plan_artifact' && approved?.toolCallId === result.toolCallId;
+      },
       isConcurrencySafe: (toolCall: ToolCall) => {
         const normalizedName = normalizeToolName(toolCall.name);
         return isAgentToolCallConcurrencySafe(tools.get(normalizedName), {

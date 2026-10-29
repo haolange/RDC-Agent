@@ -114,6 +114,8 @@ export interface LoopRuntimeState {
 
 /** AgentTool 执行器接口（具体实现见 Tool 子系统）。 */
 export interface ToolExecutor {
+  /** Host-owned successful tool boundary; never inferred from model text. */
+  shouldEndTurnAfterToolResult?(result: ToolResultMessage): boolean;
   /**
    * 执行一次工具调用。
    * @param toolCall   待执行的工具调用。
@@ -339,6 +341,8 @@ async function runAgentLoop(
         message: assistantMessage,
         toolResults: toolResults.results,
       });
+
+      if (toolResults.results.some(result => toolExecutor?.shouldEndTurnAfterToolResult?.(result))) break;
 
       const progress = progressGuard.observe(
         assistantMessage,
@@ -851,6 +855,7 @@ async function executeToolCalls(
       { code: 'TOOL_GROUP_NOT_STARTED', reason },
     ),
     isErrorResult: (result) => result.isError === true,
+    shouldStopAfterResult: (result) => toolExecutor?.shouldEndTurnAfterToolResult?.(result) === true,
     signal: stream.signal,
   });
 

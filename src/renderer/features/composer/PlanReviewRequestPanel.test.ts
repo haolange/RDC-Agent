@@ -2,6 +2,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { PlanReviewRequestPanel } from './PlanReviewRequestPanel';
 import { planReviewRequestKey, type PendingPlanReviewRequest } from './planReviewRequestModel';
 
@@ -29,6 +30,7 @@ const click = (selector: string) => act(async () => { host.querySelector<HTMLBut
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  useComposerSessionContextStore.getState().clearHandoffSuggestion();
   mock.submit.mockReset().mockResolvedValue(undefined);
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
@@ -130,4 +132,17 @@ it('submits Enter once while Shift+Enter and IME remain editing input', async ()
   });
   expect(mock.submit).toHaveBeenCalledExactlyOnceWith(request, { kind: 'reject', feedback: 'Revise scope' });
   await act(async () => finish());
+});
+
+it('retains acknowledgement and locks decisions until the approval projection catches up, without locking a new revision', async () => {
+  await render();
+  await act(async () => useComposerSessionContextStore.getState().queueHandoffSuggestion({
+    sessionId: 's', agentId: 'general', label: 'Execute', prompt: '', send: true, phase: 'handoff',
+    sourcePlan: { turnId: 't', toolCallId: 'c', planId: 'p', revision: 1, hash: 'h' },
+  }));
+  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
+  expect(host.querySelector('[role="status"]')?.textContent).toBe('composer.handoff.switching');
+  await click('.handoff-action-row__button'); expect(mock.submit).not.toHaveBeenCalled();
+  await render({ ...request, planReview: { ...request.planReview, revision: 2 } });
+  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(false);
 });

@@ -49,6 +49,7 @@ export function useComposerSend(options: {
     pendingSkillIds, setPendingSkillIds, armPendingSkill,
   } = options;
   const isPromptSending = useComposerSessionContextStore((state) => state.isPromptSending);
+  const handoffPending = useComposerSessionContextStore(state => !!state.handoffSuggestionRequest);
   const setIsPromptSending = useComposerSessionContextStore((state) => state.setIsPromptSending);
   const promptValueRef = useRef(promptValue);
   promptValueRef.current = promptValue;
@@ -81,7 +82,6 @@ export function useComposerSend(options: {
 
   const isComposerBusy = isPromptSending || hasActiveConversationTurn || hasActiveDebugRun;
   const sendingRef = useRef(false);
-
   const performSend = useCallback(async (handoff?: HandoffSendPayload) => {
     const session = handoff ? useProjectStore.getState().currentSession : currentSession;
     if (handoff && session?.sessionId !== handoff.sessionId) return { status: 'cancelled' as const, requestId: '' };
@@ -190,7 +190,7 @@ export function useComposerSend(options: {
 
   return {
     isPromptSending,
-    isComposerBusy,
+    isComposerBusy: isComposerBusy || handoffPending,
     handlePrimaryStop,
     handlePromptSend,
     sendHandoffPrompt, inspectHandoff,

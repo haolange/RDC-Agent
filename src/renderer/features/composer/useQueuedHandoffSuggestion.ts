@@ -44,7 +44,7 @@ export function useQueuedHandoffSuggestion(input: {
   const callbacks = useRef(input);
   callbacks.current = input;
   useEffect(() => {
-    if (!request || request.sessionId !== input.sessionId || !current(request)) { setReady(null); return; }
+    if (!request || request.phase === 'confirming' || request.sessionId !== input.sessionId || !current(request)) { setReady(null); return; }
     let mounted = true;
     const live = () => mounted && current(request);
     void applyDeclaredHandoffOnClient(request.sessionId, request.agentId, request.label, live).then(result => {
@@ -95,6 +95,6 @@ export function useQueuedHandoffSuggestion(input: {
       } else { claimed.current = null; setReady({ ...ready, error: undefined, outcome: undefined }); }
     } finally { retrying.current = false; }
   };
-  return { error: ready && request === ready.request ? ready.error : undefined,
+  return { phase: request ? request.phase === 'confirming' ? 'confirming' as const : claimed.current?.request === request ? 'preparing' as const : 'handoff' as const : undefined, error: ready && request === ready.request ? ready.error : undefined,
     checking: ready?.outcome?.status === 'unknown', retry };
 }

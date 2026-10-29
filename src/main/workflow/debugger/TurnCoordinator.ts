@@ -252,6 +252,7 @@ export class TurnHandle {
   pendingHandoff: PendingHandoff | null = null;
   /** Same-turn plan gate: Mission execute must match this hash and target. */
   approvedPlan: {
+    toolCallId: string;
     hash: string;
     target: string;
     frozenUri: string;

@@ -1,4 +1,7 @@
 export const enComposer = {
+  'composer.handoff.confirming': 'Confirming plan…',
+  'composer.handoff.switching': 'Handing off…',
+  'composer.handoff.preparing': 'Preparing request…',
   'composer.effort.reasoningValue': 'Model reasoning: {level}',
   'composer.toolApprovalKicker': 'Approval requested',
   'composer.toolApprovalDeny': 'Deny',

@@ -4,7 +4,7 @@ import { usePlanReviewSubmit } from './usePlanReviewSubmit';
 import type { PendingPlanReviewRequest } from './planReviewRequestModel';
 
 const mock = vi.hoisted(() => ({
-  sessionId: 's', messages: [] as ConversationMessage[], answer: vi.fn(), queue: vi.fn(),
+  sessionId: 's', messages: [] as ConversationMessage[], answer: vi.fn(), queue: vi.fn(), clear: vi.fn(),
   sessionListeners: new Set<() => void>(), conversationListeners: new Set<() => void>(),
 }));
 vi.mock('./useComposerModelPickerOptions', () => ({ loadComposerModelPickerOptions: async () => [{ providerId: 'p', modelId: 'model' }] }));
@@ -22,7 +22,7 @@ vi.mock('../../stores/conversationStore', () => ({ useConversationStore: {
   subscribe: (fn: () => void) => { mock.conversationListeners.add(fn); return () => mock.conversationListeners.delete(fn); },
 } }));
 vi.mock('../../stores/composerSessionContextStore', () => ({ useComposerSessionContextStore: {
-  getState: () => ({ queueHandoffSuggestion: mock.queue }),
+  getState: () => ({ queueHandoffSuggestion: mock.queue, clearHandoffSuggestion: mock.clear }),
 } }));
 
 const request: PendingPlanReviewRequest = {
@@ -51,7 +51,7 @@ it.each([false, true])('queues the declared target even when approval projects b
   mock.answer.mockImplementation(async () => { mock.messages = [trace('approved', 1, delegated)]; notify(); return { success: true }; });
   await usePlanReviewSubmit()(request, approve);
   expect(mock.answer).toHaveBeenCalledWith({ sessionId: 's', turnId: 't', toolCallId: 'c', decision: approve });
-  expect(mock.queue).toHaveBeenCalledExactlyOnceWith({ sessionId: 's', agentId: 'general', label: 'Execute', prompt: '', send: true, sourcePlan: { turnId: 't', toolCallId: 'c', planId: 'p', revision: 1, hash: 'h' } });
+  expect(mock.queue).toHaveBeenLastCalledWith({ phase: 'handoff', sessionId: 's', agentId: 'general', label: 'Execute', prompt: '', send: true, sourcePlan: { turnId: 't', toolCallId: 'c', planId: 'p', revision: 1, hash: 'h' } });
   expect(mock.sessionListeners.size + mock.conversationListeners.size).toBe(0);
 });
 
@@ -68,7 +68,7 @@ it.each(['session', 'stop', 'revision', 'superseded', 'removed'])('drops late su
   notify();
   mock.sessionId = 's'; mock.messages = [trace('approved')]; notify();
   finish({ success: true }); await running;
-  expect(mock.queue).not.toHaveBeenCalled();
+  expect(mock.queue.mock.calls.some(([value]) => value.phase === 'handoff')).toBe(false);
   expect(mock.sessionListeners.size + mock.conversationListeners.size).toBe(0);
 });
 
@@ -80,7 +80,7 @@ it('surfaces a failed approval and allows retry while releasing subscriptions', 
   mock.answer.mockResolvedValueOnce({ success: false, error: 'unavailable' });
   const submit = usePlanReviewSubmit();
   await expect(submit(request, approve)).rejects.toThrow('unavailable');
-  expect(mock.queue).not.toHaveBeenCalled();
+  expect(mock.queue.mock.calls.some(([value]) => value.phase === 'handoff')).toBe(false);
   expect(mock.sessionListeners.size + mock.conversationListeners.size).toBe(0);
-  await submit(request, approve); expect(mock.queue).toHaveBeenCalledTimes(1);
+  await submit(request, approve); expect(mock.queue).toHaveBeenLastCalledWith(expect.objectContaining({ phase: 'handoff' }));
 });

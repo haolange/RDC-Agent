@@ -46,3 +46,12 @@ describe('pending Composer request precedence', () => {
     expect(html).toBe(`<div class="composer-shell composer-shell-${kind}" data-dyn-style="accent-request">${content}</div>`);
   });
 });
+
+it.each(['rule', 'model'] as const)('keeps %s review out of Composer, including delegated and mixed approvals', method => {
+  const automated = { ...approval, id: 'auto', delegatedRequest: { executionId: 'e', childSessionId: 'child', turnId: 'ct', toolCallId: 'auto' },
+    approval: { ...approval.approval!, approvalId: 'auto-review-auto', reviewer: 'auto_review', reviewMethod: method } };
+  expect(resolveComposerPendingRequest([message([automated])])).toBeNull();
+  expect(resolveComposerPendingRequest([message([automated, plan])])?.kind).toBe('plan-review');
+  expect(resolveComposerPendingRequest([message([automated, approval])])?.request).toMatchObject({ approvalId: 'approval' });
+  expect(resolveComposerPendingRequest([{ ...message([automated]), status: 'complete' }])).toBeNull();
+});

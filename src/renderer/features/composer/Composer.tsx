@@ -130,12 +130,14 @@ export const Composer: React.FC<ComposerProps> = ({
   }, [composerMarkdown, isComposerBusy]);
 
   const pendingRequest = useComposerPendingRequest();
+  const reviewTargets = pendingRequest?.kind === 'plan-review' ? [...new Set(pendingRequest.request.planReview.handoffOptions.map(option => option.agent))] : [];
+  const controlsAgentId = reviewTargets.length === 1 ? reviewTargets[0] : selectedAgentId;
   return (
-    <ComposerTurnControlsProvider agentId={selectedAgentId} currentSession={currentSession}>
+    <ComposerTurnControlsProvider agentId={controlsAgentId} currentSession={currentSession}>
     <ComposerMenuRegistryProvider key={pendingRequest?.kind === 'plan-review'
       ? `${composerScopeKey}:${planReviewRequestKey(pendingRequest.request)}` : composerScopeKey}>
     {pendingRequest ? <ComposerPendingRequest shellRef={shellRef} pending={pendingRequest} composeAccentStyle={composeAccentStyle}
-      agentId={activeAgentId ?? selectedAgentId} currentSession={currentSession} onStop={handlePrimaryStop} /> : <div
+      agentId={pendingRequest.kind === 'plan-review' ? controlsAgentId : activeAgentId ?? selectedAgentId} currentSession={currentSession} onStop={handlePrimaryStop} /> : <div
       ref={shellRef} className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}${isDropActive ? ' is-drop-active' : ''}`}
       {...composeAccentStyle}
       onDragOver={attachmentDrop.handleDragOver}
@@ -175,6 +177,7 @@ export const Composer: React.FC<ComposerProps> = ({
           {t(composer.handoff.checking ? 'app.handoffCheckDelivery' : 'app.handoffRetry')}
         </Button>
       </InlineError> : null}
+      {composer.handoff?.phase || (isComposerBusy && conversationPreparationPhase === 'preparing') ? <p className="composer-transition-status" role="status">{t(conversationPreparationPhase === 'preparing' || composer.handoff?.phase === 'preparing' ? 'composer.handoff.preparing' : composer.handoff?.phase === 'confirming' ? 'composer.handoff.confirming' : 'composer.handoff.switching')}</p> : null}
       <ComposerEditor
         promptValue={promptValue}
         setPromptValue={setPromptValue}

@@ -42,11 +42,13 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
-it('uses a neutral agent-default label only in review and opens the existing model list', async () => {
+it('opens effort directly in review while retaining the shared agent-default choice', async () => {
   await render();
   expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.textContent).toBe('composer.model.agentDefault');
   expect(host.querySelector('.composer-model-effort-pill-level')).toBeNull();
   await click('[data-testid="composer-model-effort-pill"]');
+  expect(host.querySelector('[data-testid="open-models"]')).not.toBeNull();
+  await click('[data-testid="open-models"]');
   expect(host.querySelector('[data-testid="composer-model-search"]')).not.toBeNull();
   expect(host.querySelector('[data-testid="composer-model-agent-default"]')?.textContent).toBe('composer.model.agentDefault');
   await click('[role="menuitemradio"]:not([data-testid="composer-model-agent-default"])');
@@ -72,9 +74,9 @@ it('shows the main-confirmed request while disabled, and hides stale draft label
       agentId: 'debugger', currentSession: null, disabled: true, prepared, preparing,
     }) })));
   await paint(null, true);
-  expect(host.textContent).toContain('composer.model.preparing');
-  expect(host.textContent).not.toContain('Model');
-  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.getAttribute('title')).toBe('composer.model.preparing');
+  expect(host.textContent).toContain('Model');
+  expect(host.textContent).toContain('Low');
+  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.getAttribute('title')).toContain('composer.model.preparing');
   await paint({ route: { providerId: 'p', effectiveModelId: 'confirmed-model' },
     controls: { reasoningLevel: 'high', fastModel: true, maxContextMode: true } } as PreparedTurnContextSummary, false);
   expect(host.textContent).toContain('confirmed-model');
@@ -91,7 +93,7 @@ it('retains the choice but labels an invalid provider as unavailable', async () 
 it('keeps the save barrier after closing the popup and reports a failed save without changing the model', async () => {
   let finish!: (result: { ok: boolean }) => void;
   mock.commit.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
-  await render(); await click('[data-testid="composer-model-effort-pill"]');
+  await render(); await click('[data-testid="composer-model-effort-pill"]'); await click('[data-testid="open-models"]');
   await click('[role="menuitemradio"]:not([data-testid="composer-model-agent-default"])');
   expect(mock.save).toHaveBeenLastCalledWith({ saving: true });
   await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
@@ -105,7 +107,7 @@ it('keeps the save barrier after closing the popup and reports a failed save wit
 it('does not deliver an old save failure into the next session or plan revision', async () => {
   let finish!: (result: { ok: boolean }) => void;
   mock.commit.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
-  await render(); await click('[data-testid="composer-model-effort-pill"]');
+  await render(); await click('[data-testid="composer-model-effort-pill"]'); await click('[data-testid="open-models"]');
   await click('[role="menuitemradio"]:not([data-testid="composer-model-agent-default"])');
   await render(true, 'next');
   mock.save.mockClear();

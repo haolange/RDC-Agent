@@ -101,6 +101,7 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
     status: 'complete' | 'stopped' | 'error';
     selectedTurnCount: number;
     filteredArtifactCount: number;
+    approvedPlan?: import('./TurnCoordinator').TurnHandle['approvedPlan'];
     pendingHandoff?: PendingHandoff;
     completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null;
   }) => void;

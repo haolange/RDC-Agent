@@ -7,6 +7,7 @@ import { emptyUnwrappedContent, unwrapToolContentLayer, sanitizeContentText } fr
 import { extractWebToolPresentation } from './workProcessWebPresentation';
 import { formatDurationMs, normalizeWorkProcessText, compactText } from './workProcessFormat';
 import { getToolOutcome } from './workProcessOutcome';
+import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
 
 const TARGET_KEYS = [
   'uri',
@@ -146,7 +147,7 @@ const createToolApprovalPresentation = (
   toolName: string,
 ): WorkProcessToolApproval | undefined => {
   if (!approval) return undefined;
-  const isAutoReview = approval.reviewer === 'auto_review' || approval.approvalId.startsWith('auto-review-');
+  const isAutoReview = isAutomaticToolApproval(approval);
   const reason = normalizeApprovalMessage(approval.reason, toolName);
   const answer = normalizeApprovalMessage(approval.answer, toolName);
   const messageSource = approval.status === 'approved'
@@ -231,7 +232,7 @@ export const getToolVerb = (
   approval?: ConversationToolApproval,
 ): string => {
   const display = getToolDisplay(toolName);
-  if (approval?.status === 'pending') return '等待审批';
+  if (approval?.status === 'pending') return getToolApprovalVerb(approval, isAutomaticToolApproval(approval));
   if (status === 'pending') return display.pendingVerb ?? '等待执行';
   if (status === 'running') return display.runningVerb;
   if (status === 'skipped') return '已跳过';
