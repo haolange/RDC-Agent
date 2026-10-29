@@ -1,5 +1,16 @@
 # Acceptance Ledger
 
+## 六项交互与执行状态收敛（2026-10-29）
+
+- 来源为 Agent main `de7c36f4343dd402e85d6f6b9f2e09f742dc135a`、Tools main `654fcc0bd238e744c6c61d9de68009e1c4361a9c` 加本轮差异；两库不创建分支、不提交推送、不发布或升级正式安装。正式构建 Main SHA-256 `acfeaa4c6618f52554a39440426202bcf803edcc83d4b88f9aef9d079be55431`。最小来源、文件指纹及观察回执为 `.local/interaction-state/receipt.json` 与 `proof.png`；本轮只覆盖六项交互，不包含 shader 修复或调查预算改造。
+- 模型/参数共用 SessionRecord 串行保存与交接屏障；实际 one-time Bridge `/app` 中将授权区选择改为 B/Low/Max，保存后的会话、General 提交、主进程 RequestPlan 与执行中禁用的 Composer 一致，准备时显示“正在准备”。确定性 localhost 端点记录真实协议请求，不冒称真实模型效果。Fast 保存、能力合法化、保存失败及迟到结果隔离由回归覆盖。正式 Settings 断开该测试 provider 后，Settings 与 Composer 显示模型不可用、发送禁止，原引用保留；测试配置恢复后引用不变。401 与临时网络失败的区分由服务/HTTP 回归验证；自定义连接编辑器 fixture 的端点模板错误单独保留，不算作成功的 401 UI 验收。
+- 普通声明/pending 留在审计，审批与执行前错误保持可见；执行开始事件在权限、前置 Hook 与资源队列准入后产生。实测等待审批约一分钟的三秒命令，工具耗时为 3.6s，审批期间无运行计时或蓝点。八条串行命令没有未来占位卡，终态后才聚合；另补“八条完成、隐藏第九条尚未开始”的边界和已展开详情重挂回归。Task 历史卡默认展开，手动折叠在后续活动与窗口化重挂后保持；成功 Task 回执去重不隐藏待审批、拒绝或执行前错误，负路径由确定性投影回归验证。
+- Remote 直接失败点为当前 Windows worker 的 `adb devices -l` 返回退出码 0、空 stdout/stderr，不能据此认定设备兼容问题或合法无设备。最终 Tools 对冻结 serial 查询 `get-state`，只有 `device` 才准备 helper；未指定 serial 的独立 CLI 仍明确枚举，异常响应 fail-closed，不增加 fallback 或隐藏重试。无诊断写盘的最终应用冷启动，首次 Android 连接 1.729s、open replay 10.399s，EID 3029 与设备画面同步通过；实际 CLI/ADB/worker 均来自所选源码 Tools，同一 owning context。本次启动 helper 与 forward，未重装 APK 或写设备配置；关闭执行 clear context 后 stop daemon。原始 WhiteHair SHA-256 `03df08d14e6d5819e5173209d9ac1218c2f740010104ec911a7873e97a258d42`，未进行 shader 介入。未授权、离线、取消、借用服务与迟到归属由相应回归覆盖，不冒称新的实机拔插矩阵。
+- 最终完整 Agent 544 文件/4021 测试通过，原有 4 文件/4 测试跳过保持；main/shared 覆盖率域未变，沿用已通过的 coverage ratchet（lines 77.75%、functions 79.19%、branches 65.93%、statements 75.40%）。typecheck、lint、contracts、完整 gates（含 session projection/right rail/design tokens/renderer structure）与正式 build 通过。Tools 828 测试及 2 subtests、源码/布局/运行清单门禁通过；本轮没有发行包验证声明。
+- Browser QA 覆盖深浅主题、390px 视口（document scrollWidth=390）和可见键盘焦点。原生 Event Timing：轨道 12 次交互 p95=48ms、Remote 菜单 40 次开合 p95=32ms，均在 30 秒窗口无 Long Task；扫描期间输入仍可用。不是工具往返或 RAF 计时。
+- 正式桌面续验：用户明确表示未见飞书弹窗；重新枚举窗口也未见该弹窗，因此先前观察不能作为持续阻塞依据，没有修改任何网络权限。显式断言两个隔离根后，官方 `--mode desktop` 入口成功启动；实际点击模型控件打开 B/Low/Max 弹层，Task 第一张手动折叠时第二张保持展开，随后恢复。主 Remote 菜单异步发现 darwin 并显示待连接；为当前 Capture 选择 Android 后，本次应用启动的第一次打开成功，原生 context `rdc-7f02e32b-bcaf-4b22-a039-fc7a54e2d04d`，EID 3029 与设备画面同步。最小桌面画面为 `.local/interaction-state/desktop-proof.png`；未重复发送模型请求，不把历史记录冒充新增模型运行。
+- 已退出本轮主进程、启动器、localhost 测试端点及原生 daemon/worker；Capture 关闭后 context 快照为空、daemon 状态文件移除，手机自有 helper 退出，原有用户 ADB server 保留，canonical 锁不存在，桌面启动权已交还。前轮真实用户 610 文件哈希核对一致，本次始终隔离；原 capture 再次哈希复核一致。核对路径、归属与链接后清除无用途的测试、覆盖率输出、诊断和脚本；补验后的隔离 fixture 一并清理，只保留最小 receipt、Browser/桌面画面与当前 Tasks。T1–T6 均已完成；正式安装未更新，不声明发行包或安装升级通过。
+
 ## Progress 单行自适应渐隐（2026-10-29）
 
 - 最新用户明确取消换行，替代前轮自然换行偏好。沿当前未提交Progress排版，标题使用共享OverflowFade，单行占据序号/状态后的剩余网格宽度，不设字符截断或固定文本宽度。仅实测scrollWidth溢出才加末尾遮罩，原文保留DOM/title；复用ResizeObserver、字体加载及内容变化重测。删除pretty/normal/anywhere换行规则，保留卡头计数、顺序、状态与原定位按钮。

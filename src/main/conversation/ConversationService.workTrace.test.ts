@@ -10,6 +10,15 @@ import {
 import { applyPlanReviewRequested } from './ConversationPlanReviewEvents';
 
 describe('ConversationService work trace tool approvals', () => {
+  it('preserves the real execution start and terminal status under late declarations', () => {
+    let trace = upsertRuntimeToolCall(undefined, { id: 'call', toolName: 'read_file', status: 'pending', startedAt: 100 });
+    trace = upsertRuntimeToolCall(trace, { id: 'call', toolName: 'read_file', status: 'running', executionStartedAt: 500 });
+    trace = upsertRuntimeToolCall(trace, { id: 'call', toolName: 'read_file', status: 'pending', argsPreview: 'complete args' });
+    expect(trace.blocks[0].toolCalls[0]).toMatchObject({ status: 'running', startedAt: 100, executionStartedAt: 500, argsPreview: 'complete args' });
+    trace = upsertRuntimeToolCall(trace, { id: 'call', toolName: 'read_file', status: 'complete', completedAt: 800 });
+    trace = upsertRuntimeToolCall(trace, { id: 'call', toolName: 'read_file', status: 'running', executionStartedAt: 900 });
+    expect(sanitizeStoredWorkTrace(trace)?.blocks[0].toolCalls[0]).toMatchObject({ status: 'complete', executionStartedAt: 500, completedAt: 800 });
+  });
   it('associates multiple Hook events by exact tool ID without changing tool status', () => {
     let trace = upsertRuntimeToolCall(undefined, { id: 'tool-a', toolName: 'shell.command', status: 'complete' });
     trace = upsertRuntimeToolCall(trace, { id: 'tool-b', toolName: 'shell.command', status: 'complete' });
@@ -150,7 +159,7 @@ describe('ConversationService work trace tool approvals', () => {
     expect(pendingCall).toMatchObject({
       id: 'tool-web-search',
       toolName: 'web_search',
-      status: 'running',
+      status: 'pending',
       approval: {
         approvalId: 'tool-approval-tool-web-search',
         status: 'pending',
@@ -173,7 +182,8 @@ describe('ConversationService work trace tool approvals', () => {
     });
 
     const approvedCall = trace.blocks[0].toolCalls[0];
-    expect(approvedCall.status).toBe('running');
+    expect(approvedCall.status).toBe('pending');
+    expect(approvedCall.executionStartedAt).toBeUndefined();
     expect(approvedCall.approval).toMatchObject({
       status: 'approved',
       requestedAt,
@@ -242,7 +252,7 @@ describe('ConversationService work trace tool approvals', () => {
 
     expect(stopped.status).toBe('stopped');
     expect(stopped.blocks[0].toolCalls[0]).toMatchObject({
-      status: 'cancelled',
+      status: 'skipped',
       approval: {
         status: 'cancelled',
       },

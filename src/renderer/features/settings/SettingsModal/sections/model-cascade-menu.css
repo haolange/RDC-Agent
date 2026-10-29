@@ -139,8 +139,7 @@
   white-space: nowrap;
 }
 
-.settings-model-option-cost,
-.settings-model-option-reason {
+.settings-model-option-cost {
   flex: 0 1 auto;
   min-width: 0;
   color: var(--token-text-caption);

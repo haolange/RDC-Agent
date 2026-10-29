@@ -20,5 +20,3 @@ export function isTrackActivity(row: WorkProcessRow): boolean {
   if (row.type === 'subagent') return row.status === 'running';
   return false;
 }
-
-export const runningToolCount = (rows: Extract<WorkProcessRow, { type: 'tool' }>[]): number => rows.filter(isTrackActivity).length;

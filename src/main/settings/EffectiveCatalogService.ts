@@ -3,6 +3,7 @@ import path from 'path';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { LlmProviderProtocol } from '@shared/types/settings';
 import { appPathService } from '../runtime/AppPathService';
+import { ProviderConnectionError } from './providerConnectionErrors';
 import {
   cloneJson,
   enforceDiscoveryAdmission,
@@ -96,7 +97,7 @@ export class EffectiveCatalogService {
   private state: PersistedCatalogState;
   private readonly refreshes = new Map<string, Promise<EffectiveCatalogSnapshot>>();
   private readonly listeners = new Set<EffectiveCatalogListener>();
-  private readonly lastErrors = new Map<string, string>();
+  private readonly lastErrors = new Map<string, { message: string; authenticationRejected: boolean }>();
   private readonly refreshBackoff = new Map<string, RefreshBackoffState>();
   private readonly lastEmitFingerprints = new Map<string, string>();
   private readonly transientQuota = new Map<string, TransientQuotaEntry>();
@@ -200,6 +201,10 @@ export class EffectiveCatalogService {
     const mergedModels = mergeEffectiveCatalog(mergedRequest);
     const now = this.now();
     const models = mergedModels.map((model) => {
+      if (this.lastErrors.get(key)?.authenticationRejected) return {
+        ...model, availability: 'unavailable' as const,
+        unavailableReason: this.lastErrors.get(key)!.message,
+      };
       const quotaKey = this.quotaKey(request, model.modelId);
       const entry = this.transientQuota.get(quotaKey);
       if (!entry) return model;
@@ -249,7 +254,7 @@ export class EffectiveCatalogService {
       generatedAt: now.toISOString(),
       stale,
       refreshing: this.refreshes.has(key),
-      lastRefreshError: this.lastErrors.get(key),
+      lastRefreshError: this.lastErrors.get(key)?.message,
     };
     return snapshot;
   }
@@ -296,7 +301,11 @@ export class EffectiveCatalogService {
         this.refreshBackoff.delete(key);
         this.persistState();
       } catch (error) {
-        this.lastErrors.set(key, error instanceof Error ? error.message : String(error));
+        this.lastErrors.set(key, {
+          message: error instanceof Error ? error.message : String(error),
+          authenticationRejected: (error instanceof ProviderConnectionError && error.httpStatus === 401)
+            || this.lastErrors.get(key)?.authenticationRejected === true,
+        });
         this.recordRefreshFailure(key);
       } finally {
         this.refreshes.delete(key);

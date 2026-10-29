@@ -215,3 +215,7 @@ ADB、所需 Windows DLL 与 SPIR-V 汇编/反汇编工具归 RDC-Tool 安装所
 设备菜单展开立即异步扫描，展开期间正常每 5 秒查询本机 ADB server，失败退避至最多 60 秒；关闭停止并取消所属发现。重新展开及手动刷新允许一次新的 server 启动尝试；并发扫描合并，取消后的结果不能提交。ADB 启动由 ProcessSupervisor 有界管理；正常轮询不派生进程、不重做完整内容哈希，也不后台持续扫描。选择设备不连接，真实连接继续在 owning Capture context 内发生。
 
 Settings 的显式验证执行同安装 doctor，检查 Python、RenderDoc、Android APK 和捆绑主机工具完整性；设备未连接不作为安装损坏。
+
+选择 Remote 只更新目标，不预先创建 helper 或无 owner 的连接。首次打开在分配的 owning context 与冻结 CLI 内完成 helper 准备、服务就绪、forward、握手和 replay 打开；准备条目只允许相同 context 消费，错误/取消或过期身份不可复用。运行态在原生确认前不得显示 connected；失败保留原生错误码与所属连接阶段，并由显式重开先清理本次自有资源。Android 进程启动与服务复用统一由 Tools 负责，Agent 不复制设备进程逻辑。
+
+已选 Android 的首次连接由同一 Tools ADB 先确保 server 就绪，再对冻结 serial 执行 `get-state`；只有 `device` 才进入 helper 准备，不重新枚举或选择其它设备。未指定 serial 的独立 CLI 调用仍按完整设备列表选择，异常空输出不等于合法无设备。两种明确输入语义都共享原有连接 deadline、取消、归属清理及原生错误投影，没有第二份设备进程逻辑或隐式重试。

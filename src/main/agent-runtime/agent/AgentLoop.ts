@@ -119,11 +119,13 @@ export interface ToolExecutor {
    * @param toolCall   待执行的工具调用。
    * @param signal     中止信号（来自 EventStream / Agent）。
    * @param onUpdate   工具执行过程中的增量回调（用于 UI 进度展示）。
+   * @param onExecutionStart 授权、前置检查及资源排队完成后，实际进入工具 effect 时通知一次。
    */
   execute(
     toolCall: ToolCall,
     signal?: AbortSignal,
     onUpdate?: (partialResult: unknown) => void,
+    onExecutionStart?: () => void,
   ): Promise<ToolResultMessage>;
   /** Missing implementation defaults to unsafe (serial). */
   isConcurrencySafe?(toolCall: ToolCall): boolean;
@@ -789,14 +791,12 @@ async function executeToolCalls(
 
   const executeOne = async (toolCall: ToolCall, index: number): Promise<ToolResultMessage> => {
     void index;
-    const startTime = Date.now();
-
-    stream.push({
-      type: 'tool_execution_start',
-      toolCallId: toolCall.id,
-      toolName: toolCall.name,
-      args: toolCall.arguments,
-    });
+    let startTime: number | undefined;
+    const onExecutionStart = () => {
+      if (startTime !== undefined) return;
+      startTime = Date.now();
+      stream.push({ type: 'tool_execution_start', toolCallId: toolCall.id, toolName: toolCall.name, args: toolCall.arguments });
+    };
 
     let result: ToolResultMessage;
     if (toolExecutor) {
@@ -812,6 +812,7 @@ async function executeToolCalls(
               partialResult: partial,
             });
           },
+          onExecutionStart,
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -829,7 +830,7 @@ async function executeToolCalls(
       toolCallId: toolCall.id,
       toolName: toolCall.name,
       result,
-      durationMs: Date.now() - startTime,
+      durationMs: startTime === undefined ? 0 : Date.now() - startTime,
     });
     return result;
   };

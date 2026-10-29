@@ -484,6 +484,7 @@ export interface ElectronAPI {
     setModelOverride: (
       id: string,
       modelOverride: SessionRecord['modelOverride'],
+      turnControls?: import('./modelCapability').ConversationTurnControls,
     ) => Promise<{
       success: boolean;
       session?: SessionRecord;

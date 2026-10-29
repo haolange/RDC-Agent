@@ -114,7 +114,7 @@ export class RdcSessionRuntime {
     this.activeCaptureId = capture.id;
     this.replayDevice = replayDevice;
     this.deviceLabel = replayDevice.label;
-    this.remoteStatus = isRemoteReplay ? 'connected' : 'disconnected';
+    this.remoteStatus = 'disconnected';
 
 
 
@@ -126,7 +126,7 @@ export class RdcSessionRuntime {
         replayDevice = await this.ensureReplayDeviceReady(replayDevice, { ...options, contextId: allocatedContextId });
       }
       const preparedRemote = isRemoteReplay
-        ? replayDeviceService.consumePreparedRemote(replayDevice.id)
+        ? replayDeviceService.consumePreparedRemote(replayDevice.id, allocatedContextId)
         : null;
 
       options.onStage?.('opening');

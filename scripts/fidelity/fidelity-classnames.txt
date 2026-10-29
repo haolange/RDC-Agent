@@ -360,7 +360,6 @@ device-selector-trigger-utility
 device-selector-utility-label
 device-status-icon
 device-type-icon
-disclosure-
 dropdown-select-empty
 dropdown-select-menu-caret
 dropdown-select-menu-panel
@@ -987,7 +986,6 @@ settings-model-option-cost
 settings-model-option-custom
 settings-model-option-id
 settings-model-option-label
-settings-model-option-reason
 settings-model-preferences
 settings-model-preferences-grid
 settings-model-preferences-heading

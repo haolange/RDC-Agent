@@ -7,6 +7,7 @@ import { planReviewRequestKey, type PendingPlanReviewRequest } from './planRevie
 
 const mock = vi.hoisted(() => ({ submit: vi.fn(), modelSave: (_state: { saving: boolean; error?: string }) => {} }));
 vi.mock('./usePlanReviewSubmit', () => ({ usePlanReviewSubmit: () => mock.submit }));
+vi.mock('./usePlanReviewModelAvailability', () => ({ usePlanReviewModelAvailability: () => () => true }));
 vi.mock('./ComposerModelEffortControl', () => ({ ComposerModelEffortControl: (props: {
   onSaveStateChange: typeof mock.modelSave;
 }) => { mock.modelSave = props.onSaveStateChange; return createElement('button', null, 'Model'); } }));
@@ -107,7 +108,7 @@ it('holds approval while a model saves, retains failures and still allows stop',
   expect(onStop).toHaveBeenCalledOnce();
   await act(async () => mock.modelSave({ saving: false, error: 'Save failed' }));
   expect(host.querySelector('[role="alert"]')?.textContent).toBe('Save failed');
-  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(false);
+  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
 });
 
 it('submits Enter once while Shift+Enter and IME remain editing input', async () => {

@@ -393,6 +393,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                   id: String(event.payload.toolCallId),
                   toolName: String(event.payload.toolName),
                   status: 'running',
+                  executionStartedAt: event.timestamp,
                   argsPreview: JSON.stringify(isSubagent ? redactSecretsDeep(event.payload.args ?? {}).value : event.payload.args ?? {}).slice(0, 600),
                   ...(isSubagent ? {
                     delegation: {

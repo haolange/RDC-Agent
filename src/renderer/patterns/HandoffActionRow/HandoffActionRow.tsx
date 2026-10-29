@@ -7,6 +7,7 @@ export interface HandoffActionRowProps {
   options: PlanReviewHandoffOption[];
   onSelect: (option: PlanReviewHandoffOption) => void;
   disabled?: boolean;
+  isOptionDisabled?: (option: PlanReviewHandoffOption) => boolean;
   testId?: string;
   presentation?: 'buttons' | 'decisions';
 }
@@ -15,6 +16,7 @@ export const HandoffActionRow: React.FC<HandoffActionRowProps> = ({
   options,
   onSelect,
   disabled = false,
+  isOptionDisabled,
   testId = 'handoff-action-row',
   presentation = 'buttons',
 }) => (
@@ -25,7 +27,7 @@ export const HandoffActionRow: React.FC<HandoffActionRowProps> = ({
         type="button"
         variant={presentation === 'decisions' ? 'secondary' : 'primary'}
         className="handoff-action-row__button"
-        disabled={disabled}
+        disabled={disabled || isOptionDisabled?.(option)}
         onClick={() => onSelect(option)}
       >
         <span className="handoff-action-row__label">{option.label}</span>

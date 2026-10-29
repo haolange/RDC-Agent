@@ -7,6 +7,7 @@ import { useConversationStore } from '../../stores/conversationStore';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
+import { useTurnControlsStore } from '../../stores/turnControlsStore';
 import { useDeviceStore } from '../../stores/deviceStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useComposerAttachments } from './useComposerAttachments';
@@ -138,10 +139,11 @@ export function useComposer(options: {
     hasActiveDebugRun,
     isComposerBusy: send.isComposerBusy,
   });
+  const capabilityState = useTurnControlsStore((state) => state.capabilityState);
+  const modelReady = capabilityState.status === 'ready' || capabilityState.status === 'refreshing';
   const primaryButtonDisabled = send.isComposerBusy
     ? currentRun?.status === 'stopping' && !hasActiveConversationTurn && !send.isPromptSending
-    : (!hasMessageContent && !hasPendingAttachments);
-
+    : (!modelReady || (!hasMessageContent && !hasPendingAttachments));
   const handoff = useQueuedHandoffSuggestion({
     isComposerBusy: send.isComposerBusy,
     sessionId: currentSession?.sessionId, setPromptValue, sendPrompt: send.sendHandoffPrompt, inspectRequest: send.inspectHandoff,

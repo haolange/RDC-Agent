@@ -10,7 +10,7 @@ vi.mock('../../stores/appSettingsStore', () => ({
     getState: () => ({
       flushAgentDefinitionSaves,
       flushProviderSaves,
-      settings: { agents: { definitions } },
+      settings: { agents: { definitions }, llm: { providers: ['openai', 'kimi-coding-plan'].map((id) => ({ id, enabled: true, isConfigured: true })) } },
     }),
   },
 }));

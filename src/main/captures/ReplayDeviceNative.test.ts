@@ -28,6 +28,10 @@ describe('native remote activation', () => {
     expect(JSON.parse(argv[2])).toEqual({ options: { transport: 'adb_android', device_serial: 'SERIAL-SELECTED' } });
     expect(argv.slice(-2)).toEqual(['--daemon-context', 'owned']); expect(options.settings).toBe(cli);
     expect(value.peekPreparedRemote('selected')).toMatchObject({ contextId: 'owned', remoteId: 'remote', serial: 'SERIAL-SELECTED' });
+    expect(value.consumePreparedRemote('selected', 'foreign')).toBeNull();
+    expect(value.peekPreparedRemote('selected')).not.toBeNull();
+    expect(value.consumePreparedRemote('selected', 'owned')).toMatchObject({ remoteId: 'remote' });
+    expect(value.consumePreparedRemote('selected', 'owned')).toBeNull();
   });
   it.each([
     [{ context_id: 'foreign', remote_id: 'remote' }, 'rd.remote.connect'],

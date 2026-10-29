@@ -50,6 +50,7 @@ const { hookTrigger } = vi.hoisted(() => ({
 const { permissionEvaluate } = vi.hoisted(() => ({
   permissionEvaluate: vi.fn(() => ({ action: 'allow' as const })),
 }));
+const approvalRequest = vi.hoisted(() => vi.fn(async () => true));
 vi.mock('../../hooks/HookEngine', () => ({
   hookEngine: {
     load: vi.fn(),
@@ -86,7 +87,7 @@ vi.mock('../../agent-runtime/permissions/AgentPermissionPolicy', () => ({
 
 vi.mock('../../agent-runtime/permissions/AgentToolApprovalRequestService', () => ({
   agentToolApprovalRequestService: {
-    requestApproval: async () => ({ approved: true }),
+    request: approvalRequest,
     autoReview: vi.fn(async () => ({ approved: false, reason: 'Native mutation requires review.' })),
   },
 }));
@@ -112,6 +113,61 @@ import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 
 describe('ToolExecutorFactory', () => {
+  it('does not announce execution while approval or a before-call hook is pending', async () => {
+    let approve!: () => void;
+    let continueHook!: () => void;
+    const approval = new Promise<void>((resolve) => { approve = resolve; });
+    const hook = new Promise<void>((resolve) => { continueHook = resolve; });
+    approvalRequest.mockImplementationOnce(async () => { await approval; return true; });
+    permissionEvaluate.mockReturnValueOnce({ action: 'ask_user', risk: 'medium', reason: 'Review test effect' } as never);
+    hookTrigger.mockImplementationOnce(async () => { await hook; return []; });
+    const started = vi.fn();
+    const effect = vi.fn(async () => { expect(started).toHaveBeenCalledTimes(1); return { content: [] }; });
+    const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
+      getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap: new Map([['shell', { ...shellTool, execute: effect }]]), definitions: [], deferredDefinitions: [] }),
+      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+    const executor = factory.createToolExecutor('general', ['shell'], 'start-boundary', {
+      sessionId: 'start-boundary', turnId: 'start-turn', eventContext: { sessionId: 'start-boundary', turnId: 'start-turn' },
+      effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null } as never });
+    const execution = executor.execute({ id: 'effect', type: 'toolCall', name: 'shell', arguments: { command: 'Write-Output test' } }, undefined, undefined, started);
+    try {
+      await vi.waitFor(() => expect(approvalRequest).toHaveBeenCalled());
+      expect(started).not.toHaveBeenCalled();
+      approve();
+      await vi.waitFor(() => expect(hookTrigger).toHaveBeenCalled());
+      expect(started).not.toHaveBeenCalled();
+      continueHook();
+      await execution;
+      expect(effect).toHaveBeenCalledTimes(1);
+      expect(started).toHaveBeenCalledTimes(1);
+    } finally { approve(); continueHook(); await execution; }
+  });
+
+  it('announces an unsafe effect only after the owning resource queue admits it', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const started = [vi.fn(), vi.fn()];
+    const effect = vi.fn(async (id: string) => { if (id === 'first') await gate; return { content: [] }; });
+    const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
+      getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap: new Map([['shell', { ...shellTool, execute: effect }]]), definitions: [], deferredDefinitions: [] }),
+      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+    const executor = factory.createToolExecutor('general', ['shell'], 'queued-start', {
+      sessionId: 'queued-start', effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null } as never });
+    const hooks = vi.spyOn(factory, 'triggerRuntimeHooks').mockResolvedValue({ allowed: true });
+    const first = executor.execute({ id: 'first', type: 'toolCall', name: 'shell', arguments: { command: 'Write-Output first' } }, undefined, undefined, started[0]);
+    let second: ReturnType<typeof executor.execute> | undefined;
+    try {
+      await vi.waitFor(() => expect(effect).toHaveBeenCalledTimes(1));
+      second = executor.execute({ id: 'second', type: 'toolCall', name: 'shell', arguments: { command: 'Write-Output second' } }, undefined, undefined, started[1]);
+      await vi.waitFor(() => expect(hooks).toHaveBeenCalledTimes(2));
+      expect(started[0]).toHaveBeenCalledTimes(1);
+      expect(started[1]).not.toHaveBeenCalled();
+      release();
+      await Promise.all([first, second]);
+      expect(started[1]).toHaveBeenCalledTimes(1);
+    } finally { release(); await Promise.all([first, second]); }
+  });
+
   it('delivers the actual auto-review risk and reason without executing a rejected call', async () => {
     const execute = vi.fn();
     const toolMap = new Map([['shell', { ...shellTool, execute }]]);
@@ -121,10 +177,12 @@ describe('ToolExecutorFactory', () => {
     permissionEvaluate.mockReturnValueOnce({ action: 'auto_review', risk: 'high', reason: 'Native mutation requires review.' } as never);
     const executor = factory.createToolExecutor('general', ['shell'], 'review-owner', { sessionId: 'review-owner', turnId: 'review-turn',
       eventContext: { sessionId: 'review-owner', turnId: 'review-turn' }, effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null } as never });
-    const result = await executor.execute({ id: 'rejected-native', type: 'toolCall', name: 'shell', arguments: { rdc: { operation: 'rd.buffer.write', args: {} } } });
+    const started = vi.fn();
+    const result = await executor.execute({ id: 'rejected-native', type: 'toolCall', name: 'shell', arguments: { rdc: { operation: 'rd.buffer.write', args: {} } } }, undefined, undefined, started);
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result.content)).toContain('AUTO_REVIEW_DENIED: risk=high; Native mutation requires review.');
     expect(execute).not.toHaveBeenCalled();
+    expect(started).not.toHaveBeenCalled();
   });
   it('delivers a small file audit as a durable hash-bound result to an explicitly granted reviewer', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-audit-delivery-'));

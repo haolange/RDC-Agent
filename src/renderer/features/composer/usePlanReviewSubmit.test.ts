@@ -7,6 +7,10 @@ const mock = vi.hoisted(() => ({
   sessionId: 's', messages: [] as ConversationMessage[], answer: vi.fn(), queue: vi.fn(),
   sessionListeners: new Set<() => void>(), conversationListeners: new Set<() => void>(),
 }));
+vi.mock('./useComposerModelPickerOptions', () => ({ loadComposerModelPickerOptions: async () => [{ providerId: 'p', modelId: 'model' }] }));
+vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: { getState: () => ({ settings: {
+  llm: { providers: [{ id: 'p', enabled: true, isConfigured: true }] }, agents: { definitions: [{ id: 'general', compiledRoute: { providerId: 'p', modelId: 'model' } }] },
+} }) } }));
 vi.mock('react', () => ({ useCallback: (fn: unknown) => fn }));
 vi.mock('../../hooks/useElectronApi', () => ({ useElectronApi: () => ({ conversation: { answerPlanReview: mock.answer } }) }));
 vi.mock('../../stores/projectStore', () => ({ useProjectStore: {
@@ -55,6 +59,7 @@ it.each(['session', 'stop', 'revision', 'superseded', 'removed'])('drops late su
   let finish!: (value: { success: boolean }) => void;
   mock.answer.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
   const running = usePlanReviewSubmit()(request, approve);
+  await vi.waitFor(() => expect(mock.answer).toHaveBeenCalledOnce());
   if (reason === 'session') mock.sessionId = 'other';
   if (reason === 'stop') mock.messages[0].status = 'stopped';
   if (reason === 'revision') mock.messages = [trace('awaiting', 2)];

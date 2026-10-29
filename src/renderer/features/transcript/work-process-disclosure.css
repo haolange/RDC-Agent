@@ -173,10 +173,7 @@
   padding-top: 0;
 }
 
-.work-process-section-list.disclosure-deferred .work-process-tool-card-expand,
-.work-process-section-list.disclosure-deferred .work-process-user-input-items {
-  display: none;
-}
+
 
 .work-process-path-chip {
   display: inline-flex;

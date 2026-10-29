@@ -1,5 +1,4 @@
 export const zhChat = {
-  'chat.workProcessRunningCount': '{count} 项执行中',
   'chat.toolOutcomeRecorded': '已记录本轮结果',
   'chat.toolOutcomeRecording': '正在记录本轮结果',
   'chat.toolOutcomeArtifact': '调查产物',

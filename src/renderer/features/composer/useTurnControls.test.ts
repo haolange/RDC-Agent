@@ -162,6 +162,15 @@ describe('useTurnControls sync guards', () => {
     });
   });
 
+  it('keeps review choices through target handoff after transient capability loading', () => {
+    const selected = { reasoningLevel: 'low' as const, maxContextMode: false, fastModel: true };
+    const result = resolveTurnControlsForCapabilityChange({ previousCapabilityKey: null, nextCapabilityKey: 'general:route',
+      sessionChanged: false, sessionControlsChanged: false, sameModelRoute: true, capability: noMaxCapability,
+      sessionControls: maxControls, currentControls: selected, rememberedControls: undefined });
+    expect(result.reasoningLevel).toBe('low');
+    expect(result.maxContextMode).toBe(false);
+  });
+
   it('clamps remembered max down when the target model has no max', () => {
     expect(resolveTurnControlsForCapabilityChange({
       previousCapabilityKey: 'ask:deepseek:deepseek-v4-flash',

@@ -272,6 +272,9 @@ export function upsertRuntimeToolCall(
     block.toolCalls[toolIndex] = {
       ...existingToolCall,
       ...patch,
+      executionStartedAt: existingToolCall.executionStartedAt ?? patch.executionStartedAt,
+      status: existingToolCall.completedAt || (existingToolCall.executionStartedAt && patch.status === 'pending')
+        ? existingToolCall.status : patch.status ?? existingToolCall.status,
       userInputQuestions: patch.userInputQuestions
         ? patch.userInputQuestions.map((question) => ({
             ...question,
@@ -306,6 +309,7 @@ export function upsertRuntimeToolCall(
       hookDiagnostics: patch.hookDiagnostics?.map((diagnostic) => ({ ...diagnostic })),
       error: patch.error,
       approval: patch.approval ? { ...patch.approval } : undefined,
+      executionStartedAt: patch.executionStartedAt,
       startedAt: patch.startedAt ?? nowMs(),
       completedAt: patch.completedAt,
     });
@@ -414,7 +418,7 @@ export function upsertRuntimeToolApproval(
       ? 'error'
       : existingToolCall?.status === 'complete'
         ? 'complete'
-        : 'running',
+        : existingToolCall?.executionStartedAt !== undefined ? 'running' : 'pending',
     approval,
   };
   if (status === 'cancelled' && !settled) toolPatch.completedAt = existingToolCall?.completedAt ?? now;
@@ -660,6 +664,7 @@ export function sanitizeStoredWorkTrace(
     if (!Array.isArray(block.toolCalls)) return null;
     for (const call of block.toolCalls) {
       if (!call || typeof call !== 'object') return null;
+      if (call.executionStartedAt !== undefined && (!Number.isFinite(call.executionStartedAt) || call.executionStartedAt < 0)) return null;
       if (call.hookDiagnostics !== undefined && (
         !Array.isArray(call.hookDiagnostics)
         || !call.hookDiagnostics.every((diagnostic) => diagnostic

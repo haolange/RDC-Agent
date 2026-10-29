@@ -54,7 +54,7 @@ export const ComposerModelPickerPanel: React.FC<{
   const agentName = useAppSettingsStore((state) => (
     state.settings.agents.definitions.find((entry) => entry.id === agentId)?.name || agentId
   ));
-  const { options, loading, failedProviders, retry } = useComposerModelPickerOptions(providers, agentRoute?.providerId);
+  const { options, loading, failedProviders, retry } = useComposerModelPickerOptions(providers);
   const { effective, hasChoice, projectId } = useComposerEffectiveModel(agentId, currentSession);
   const agentDefault = resolveComposerAgentDefaultState(agentRoute, options, !loading);
   const agentDefaultMeta = formatAgentDefaultMeta(agentDefault, agentName, t);

@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
 import path from 'path';
 import { createHash, randomUUID } from 'crypto';
 import { isSafeAgentProfileId } from '@shared/types/agent';
@@ -514,7 +515,7 @@ export class AgentManifestService {
     );
     const fromEffectiveModel = (provider: LlmProviderEntry, model: EffectiveModel): AgentModelOption => {
       const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
-      const providerUnavailable = !provider.enabled || !provider.isConfigured;
+      const providerUnavailable = !isProviderExecutable(provider);
       const modelDisabled = model.enabled === false;
       const missingVerifiedBudget = !Number.isFinite(model.defaultBudgetTokens) || model.defaultBudgetTokens <= 0;
       const eligibility = classifyAgentToolEligibility(model);
@@ -601,7 +602,7 @@ export class AgentManifestService {
           continue;
         }
         if (!referenced.has(canonicalId)) continue;
-        const providerUnavailable = !provider.enabled || !provider.isConfigured;
+        const providerUnavailable = !isProviderExecutable(provider);
         const disabled = model.enabled === false;
         const status: AgentModelOption['status'] = providerUnavailable
           ? 'provider-unavailable'

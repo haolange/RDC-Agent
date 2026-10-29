@@ -84,6 +84,8 @@ export function ComposerFooter({
             agentId={selectedAgentId}
             currentSession={currentSession}
             disabled={isComposerBusy}
+            prepared={preparedTurnContext}
+            preparing={conversationPreparationPhase === 'preparing'}
           />
           <RegisteredContextUsageIndicator
             usage={lastKnownUsage}

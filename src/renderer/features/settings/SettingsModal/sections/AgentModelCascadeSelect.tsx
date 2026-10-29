@@ -28,8 +28,7 @@ interface AgentModelCascadeSelectProps {
 }
 
 /**
- * Single searchable list grouped by provider: label + canonical id per row, a check on
- * the selected row, and the real disabled reason on unavailable rows.
+ * Searchable executable models grouped by provider, with stable canonical identities.
  */
 export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = ({
   value,
@@ -41,7 +40,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
-  const selected = options.find((option) => option.canonicalId === value);
+  const selected = options.find((option) => option.canonicalId === value && option.configured);
   const inheriting = Boolean(inherit) && !value;
   const invalidSelection = isAgentModelSelectionInvalid(value, options);
   const groups = useMemo(() => buildAgentModelGroups(options, query), [options, query]);
@@ -67,7 +66,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
 
   const triggerPrimary = inheriting
     ? inherit?.label
-    : selected ? selected.modelLabel : t('settings.selectModelPlaceholder');
+    : invalidSelection ? t('composer.model.unavailable') : selected ? selected.modelLabel : t('settings.selectModelPlaceholder');
   const triggerSecondary = inheriting
     ? null
     : selected ? selected.canonicalId : t('settings.selectProviderPlaceholder');
@@ -158,7 +157,6 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
                       data-provider-id={option.providerId}
                       data-model-id={option.modelId}
                       data-canonical-id={option.canonicalId}
-                      disabled={!option.configured}
                       role="option"
                       aria-label={accessibleLabel}
                       aria-selected={selectedRow}
@@ -179,11 +177,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
                         </span>
                         <span className="settings-model-option-id">{option.canonicalId}</span>
                       </span>
-                      {!option.configured ? (
-                        <span className="settings-model-option-reason">
-                          {t('settings.modelUnavailable')}: {option.disabledReason ?? t('settings.modelUnavailable')}
-                        </span>
-                      ) : option.cost ? (
+                      {option.cost ? (
                         <span className="settings-model-option-cost">
                           {formatPricePerMillion(option.cost.input)} / {formatPricePerMillion(option.cost.output)}
                         </span>

@@ -261,7 +261,6 @@ export type WorkProcessRow =
     /** Policy hint: expand while loop is live; fold after settle. UI may sticky-override. */
     thinkingOpenByDefault: boolean;
     stepCount: number;
-    stepsDisclosure: 'visible' | 'deferred';
     duration: string;
     defaultOpen: boolean;
     steps: WorkProcessRow[];

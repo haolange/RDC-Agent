@@ -28,7 +28,7 @@ const snapshot = (id: string, change?: 'created' | 'updated'): Extract<WorkProce
 });
 
 it('shows event type, completion count and distinct state icons without a fake duration', () => {
-  const html = renderToStaticMarkup(createElement(TaskSnapshotCard, { row: snapshot('new', 'created'), isLatest: true }));
+  const html = renderToStaticMarkup(createElement(TaskSnapshotCard, { row: snapshot('new', 'created') }));
   const document = new DOMParser().parseFromString(html, 'text/html');
   expect(document.body.textContent).toContain('chat.workProcessTaskSnapshotCreated');
   expect(document.body.textContent).toContain('1 / 5 completed');
@@ -42,32 +42,32 @@ it('shows event type, completion count and distinct state icons without a fake d
   expect(document.querySelector('.task-blocked summary')?.textContent).toBe('Blocked');
   expect(document.querySelector('.task-blocked .work-process-task-snapshot-reason')?.textContent).toBe('Waiting for input');
   expect(document.querySelector('[data-work-process-task-id="current"]')?.getAttribute('tabindex')).toBe('-1');
-  const older = renderToStaticMarkup(createElement(TaskSnapshotCard, { row: snapshot('old'), isLatest: false }));
+  const older = renderToStaticMarkup(createElement(TaskSnapshotCard, { row: snapshot('old') }));
   expect(older).toContain('chat.workProcessTaskSnapshotList');
-  expect(older).not.toContain('Long pending task');
+  expect(older).toContain('Long pending task');
 });
 
-it('auto-opens only the latest card and preserves manual choices across remounts', async () => {
+it('keeps all snapshots open until the user collapses one and remembers that gesture across remounts', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
-  const render = (latestId: string) => createElement(ScopedWorkDisclosure, {
+  const render = () => createElement(ScopedWorkDisclosure, {
     scope: 'task-card-test',
     children: createElement('ol', null,
-      createElement(TaskSnapshotCard, { row: snapshot('created', 'created'), isLatest: latestId === 'created' }),
-      createElement(TaskSnapshotCard, { row: snapshot('updated', 'updated'), isLatest: latestId === 'updated' })),
+      createElement(TaskSnapshotCard, { row: snapshot('created', 'created') }),
+      createElement(TaskSnapshotCard, { row: snapshot('updated', 'updated') })),
   });
   let root = createRoot(host);
   try {
-    await act(async () => root.render(render('created')));
-    expect([...host.querySelectorAll('.work-card-trigger')].map((button) => button.getAttribute('aria-expanded'))).toEqual(['true', 'false']);
-    await act(async () => root.render(render('updated')));
-    expect([...host.querySelectorAll('.work-card-trigger')].map((button) => button.getAttribute('aria-expanded'))).toEqual(['false', 'true']);
+    await act(async () => root.render(render()));
+    expect([...host.querySelectorAll('.work-card-trigger')].map((button) => button.getAttribute('aria-expanded'))).toEqual(['true', 'true']);
+    await act(async () => root.render(render()));
+    expect([...host.querySelectorAll('.work-card-trigger')].map((button) => button.getAttribute('aria-expanded'))).toEqual(['true', 'true']);
     await act(async () => (host.querySelectorAll('.work-card-trigger')[0] as HTMLButtonElement).click());
     await act(async () => root.unmount());
     root = createRoot(host);
-    await act(async () => root.render(render('updated')));
-    expect([...host.querySelectorAll('.work-card-trigger')].map((button) => button.getAttribute('aria-expanded'))).toEqual(['true', 'true']);
+    await act(async () => root.render(render()));
+    expect([...host.querySelectorAll('.work-card-trigger')].map((button) => button.getAttribute('aria-expanded'))).toEqual(['false', 'true']);
   } finally {
     await act(async () => root.unmount());
     host.remove();
@@ -75,11 +75,11 @@ it('auto-opens only the latest card and preserves manual choices across remounts
   }
 });
 
-it('selects the latest historical card even when cards belong to separate turns', () => {
+it('defaults historical cards to open even when they belong to separate turns', () => {
   const section = (id: string, step: Extract<WorkProcessRow, { type: 'taskSnapshot' }>): Extract<WorkProcessRow, { type: 'section' }> => ({
     type: 'section', id, status: 'complete', proseText: '', proseStreaming: false,
     thinkingPreview: '', thinkingLabel: '', thinkingExpandable: false, thinkingOpenByDefault: false,
-    stepCount: 1, stepsDisclosure: 'visible', duration: '', defaultOpen: true,
+    stepCount: 1, duration: '', defaultOpen: true,
     steps: [step], visibleSteps: [step], loopId: id,
   });
   const html = renderToStaticMarkup(createElement(WorkProcessContent, {
@@ -90,7 +90,7 @@ it('selects the latest historical card even when cards belong to separate turns'
   }));
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   expect([...parsed.querySelectorAll('.kind-task-snapshot .work-card-trigger')]
-    .map((button) => button.getAttribute('aria-expanded'))).toEqual(['false', 'true']);
+    .map((button) => button.getAttribute('aria-expanded'))).toEqual(['true', 'true']);
 });
 
 it('locates the latest matching history card after windowing has unmounted it', async () => {
@@ -115,7 +115,7 @@ it('locates the latest matching history card after windowing has unmounted it', 
   try {
     await act(async () => root.render(createElement(ScopedWorkDisclosure, { scope: 'task-locator-test',
       children: createElement(MeasuredWorkRows, { rows, className: 'work-process-steps',
-        renderRow: createWorkProcessRowRenderer(undefined, undefined, 'normal', 'history-29') }),
+        renderRow: createWorkProcessRowRenderer(undefined, undefined, 'normal') }),
     })));
     expect(host.querySelector('[data-work-process-block-id="history-29"]')).toBeNull();
     const candidates: WorkProcessTaskLocationRequest['candidates'] = [];

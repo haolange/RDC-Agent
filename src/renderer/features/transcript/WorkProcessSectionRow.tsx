@@ -81,7 +81,7 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
           </div>
         ) : null}
         {showSteps ? (
-          <MeasuredWorkRows className={`work-process-steps work-process-section-list disclosure-${row.stepsDisclosure} ${hasError || row.defaultOpen ? 'is-open' : ''}`}
+          <MeasuredWorkRows className={`work-process-steps work-process-section-list ${hasError || row.defaultOpen ? 'is-open' : ''}`}
             rows={visibleSteps} renderRow={renderRow} />
         ) : null}
       </div>

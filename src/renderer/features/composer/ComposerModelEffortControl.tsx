@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { SessionRecord } from '@shared/types/session';
 import { useI18n } from '../../i18n';
+import { useComposerTurnControls } from './ComposerTurnControlsContext';
+import { EFFORT_LABEL_KEYS } from './effortControlParts';
+import type { PreparedTurnContextSummary } from '@shared/types/session';
 import { Icon } from '../../ui/Icon';
 import { Pill } from '../../ui/Pill';
 import { OverflowFade } from '../../ui/OverflowFade';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
-import { readCompiledComposerRoute } from '../../lib/composerEffectiveModel';
 import { useComposerMenu } from './useComposerMenuRegistry';
 import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
 import { buildModelEffortCapsulePresentation, ChevronIcon } from './effortControlParts';
@@ -18,16 +20,19 @@ import {
   type ComposerModelEffortView,
 } from './composerModelEffortView';
 
-export interface ComposerModelSaveState { saving: boolean; error?: string }
+export interface ComposerModelSaveState { saving: boolean; error?: string; retry?: () => void }
 
 export const ComposerModelEffortControl: React.FC<{
   agentId: string;
   currentSession: SessionRecord | null;
   disabled?: boolean;
   showAgentDefault?: boolean;
+  prepared?: PreparedTurnContextSummary | null;
+  preparing?: boolean;
   onSaveStateChange?: (state: ComposerModelSaveState) => void;
-}> = ({ agentId, currentSession, disabled = false, showAgentDefault = false, onSaveStateChange }) => {
+}> = ({ agentId, currentSession, disabled = false, showAgentDefault = false, onSaveStateChange, prepared, preparing = false }) => {
   const { t } = useI18n();
+  const controlsState = useComposerTurnControls();
   const menu = useComposerMenu('modelEffort');
   const open = menu.open;
   const [view, setView] = useState<ComposerModelEffortView>('effort');
@@ -40,35 +45,45 @@ export const ComposerModelEffortControl: React.FC<{
   const handleSaveState = useCallback((state: ComposerModelSaveState) => {
     if (!mounted.current) return;
     setSaveState(state);
-    onSaveStateChange?.(state);
-  }, [onSaveStateChange]);
+  }, []);
   const effort = useComposerEffortControl({
     open,
     disabled,
     menuRef,
     popupRef,
   });
-  const agentRoute = useAppSettingsStore((state) => readCompiledComposerRoute(state.settings, agentId));
+  const controlSaveError = controlsState.saveState.error ? t('composer.model.saveFailed') : undefined;
+  useEffect(() => {
+    onSaveStateChange?.({ saving: saveState.saving || controlsState.saveState.saving,
+      error: saveState.error || controlSaveError,
+      retry: controlsState.saveState.error ? controlsState.retrySave : undefined });
+  }, [saveState, controlsState.saveState, controlsState.retrySave, controlSaveError, onSaveStateChange]);
   const { options, loading } = useComposerModelPickerOptions(
     useAppSettingsStore((state) => state.settings.llm.providers),
-    agentRoute?.providerId,
   );
   const { effective, hasChoice } = useComposerEffectiveModel(agentId, currentSession);
-  const agentDefault = showAgentDefault && !hasChoice;
+  const frozen = disabled ? prepared : null;
+  const selected = frozen ? { providerId: frozen.route.providerId, modelId: frozen.route.effectiveModelId } : effective;
+  const unavailable = !frozen && controlsState.capabilityState.status === 'unavailable';
+  const waiting = disabled && preparing && !frozen;
+  const agentDefault = showAgentDefault && !hasChoice && !unavailable && !waiting;
   const capsuleLabel = agentDefault ? t('composer.model.agentDefault') : undefined;
   const currentOption = options.find((option) => (
-    option.providerId === effective?.providerId && option.modelId === effective?.modelId
+    option.providerId === selected?.providerId && option.modelId === selected?.modelId
   ));
-  const modelLabel = currentOption?.label || effective?.modelId || t('settings.selectModelPlaceholder');
+  const modelLabel = waiting ? t('composer.model.preparing') : unavailable ? t('composer.model.unavailable')
+    : currentOption?.label || (frozen ? selected?.modelId : undefined) || t('settings.selectModelPlaceholder');
+  const displayedControls = frozen?.controls ?? effort.turnControls;
+  const displayedEffort = frozen ? t(EFFORT_LABEL_KEYS[displayedControls.reasoningLevel]) : effort.effortLabel;
   const capsule = buildModelEffortCapsulePresentation({
     modelLabel,
-    reasoningLabel: t('composer.effort.reasoningValue', { level: effort.effortLabel }),
-    maxContextMode: effort.turnControls.maxContextMode,
+    reasoningLabel: t('composer.effort.reasoningValue', { level: displayedEffort }),
+    maxContextMode: !waiting && !unavailable && displayedControls.maxContextMode,
     maxContextLabel: t('composer.effort.maxContext'),
-    fastModel: effort.turnControls.fastModel,
+    fastModel: !waiting && !unavailable && displayedControls.fastModel,
     fastModelLabel: t('composer.effort.fastModel'),
   });
-  const title = capsuleLabel ?? capsule.title;
+  const title = capsuleLabel ?? (waiting || unavailable ? modelLabel : capsule.title);
   const activeView = agentDefault ? 'models' : view;
 
   const assignMenuRoot = useCallback((node: HTMLDivElement | null) => {
@@ -114,7 +129,7 @@ export const ComposerModelEffortControl: React.FC<{
         aria-expanded={open}
         title={title}
         aria-label={title}
-        disabled={disabled || saveState.saving}
+        disabled={disabled || saveState.saving || controlsState.saveState.saving}
         onClick={() => menu.toggle()}
       >
         {!agentDefault && capsule.showFast ? (
@@ -128,7 +143,7 @@ export const ComposerModelEffortControl: React.FC<{
           </span>
         ) : null}
         <OverflowFade className="composer-model-effort-pill-model" text={capsuleLabel ?? capsule.modelLabel} />
-        {!agentDefault ? <span className="composer-model-effort-pill-level" title={capsule.reasoningLabel}>{effort.effortLabel}</span> : null}
+        {!agentDefault && !waiting && !unavailable ? <span className="composer-model-effort-pill-level" title={capsule.reasoningLabel}>{displayedEffort}</span> : null}
         <span className="composer-model-effort-pill-caret" aria-hidden="true"><ChevronIcon /></span>
       </Pill>
 
@@ -139,10 +154,10 @@ export const ComposerModelEffortControl: React.FC<{
           trackRef={effort.trackRef}
           modelLabel={loading && !currentOption && !effective ? t('composer.model.loading') : modelLabel}
           onOpenModels={() => setView(nextComposerModelEffortView(view, 'open-models'))}
-          capabilityStateDetail={effort.capabilityStateDetail}
+          capabilityStateDetail={controlsState.saveState.error ? t('composer.model.saveFailed') : effort.capabilityStateDetail}
           capabilityRefreshing={effort.capabilityRefreshing}
-          capabilityRetryLabel={effort.capabilityRetryLabel}
-          onRetryCapability={effort.retryCapability}
+          capabilityRetryLabel={controlsState.saveState.error ? t('composer.model.retrySave') : effort.capabilityRetryLabel}
+          onRetryCapability={controlsState.saveState.error ? controlsState.retrySave : effort.retryCapability}
           hasAdjustableReasoning={effort.hasAdjustableReasoning}
           displayLevel={effort.displayLevel}
           displayLevels={effort.displayLevels}

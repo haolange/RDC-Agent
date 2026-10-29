@@ -735,7 +735,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(visibleSteps.map((row) => row.type)).toEqual(Array(7).fill('tool'));
   });
 
-  it('projects structured tool evidence and keeps skipped calls visibly distinct', () => {
+  it('retains skipped audit counts without projecting calls that never executed', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'complete',
       toolEvidence: { total: 3, succeeded: 1, failed: 1, skipped: 1 },
@@ -759,8 +759,8 @@ describe('buildWorkProcessPresentation', () => {
     expect(presentation.toolEvidence).toEqual({ total: 3, succeeded: 1, failed: 1, skipped: 1 });
     expect(flattenWorkRows(presentation.rows)).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'tool', id: 'failed', status: 'error' }),
-      expect.objectContaining({ type: 'tool', id: 'skipped', status: 'skipped', verb: '已跳过' }),
     ]));
+    expect(flattenWorkRows(presentation.rows).some((row) => row.id === 'skipped')).toBe(false);
   });
 
   it('preserves info, warning, and error diagnostic severity in Work Process rows', () => {

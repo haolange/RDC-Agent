@@ -1,4 +1,6 @@
-export class ProviderConnectionError extends Error {}
+export class ProviderConnectionError extends Error {
+  constructor(message: string, readonly httpStatus?: number) { super(message); }
+}
 
 export function parseProviderError(error: unknown): string {
   if (error instanceof ProviderConnectionError) {

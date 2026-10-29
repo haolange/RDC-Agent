@@ -14,7 +14,7 @@ const ReasoningSelectionSchema = z.enum([
   'max',
 ]);
 
-const ConversationTurnControlsSchema = z.object({
+export const ConversationTurnControlsSchema = z.object({
   reasoningLevel: ReasoningSelectionSchema,
   maxContextMode: z.boolean(),
   fastModel: z.boolean(),

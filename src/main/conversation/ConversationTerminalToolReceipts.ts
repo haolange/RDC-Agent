@@ -18,7 +18,7 @@ export function reconcileTerminalToolReceipts(
     if (!call || call.toolName !== message.toolName || !Number.isFinite(call.startedAt)
       || call.startedAt < turnStartedAt || message.timestamp < call.startedAt
       || (call.status !== 'pending' && call.status !== 'running')) continue;
-    const result = toolResultToSharedResult(message, message.timestamp - call.startedAt);
+    const result = toolResultToSharedResult(message, call.executionStartedAt === undefined ? 0 : message.timestamp - call.executionStartedAt);
     const patch = buildConversationToolCompletion(call.id, call.toolName, result, call, message.timestamp);
     next = upsertRuntimeToolCall(next, patch);
   }

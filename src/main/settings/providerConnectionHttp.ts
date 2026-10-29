@@ -17,7 +17,7 @@ export const getJson = async (url: string, init: RequestInit): Promise<unknown> 
       signal: controller.signal,
     });
     if (!response.ok) {
-      throw new ProviderConnectionError(formatHttpError(response.status));
+      throw new ProviderConnectionError(formatHttpError(response.status), response.status);
     }
     return await response.json();
   } finally {

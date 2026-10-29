@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { EventStream } from '../core/EventStream';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type {
@@ -12,7 +12,7 @@ import type {
   ToolResultMessage,
 } from '../core/types';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import { agentLoop, type AgentContext } from './AgentLoop';
+import { agentLoop, type AgentContext, type ToolExecutor } from './AgentLoop';
 import {
   AgentLoopTerminationError,
   RUNTIME_NO_PROGRESS_INSTRUCTION,
@@ -137,6 +137,39 @@ const toolExecutor = {
 };
 
 describe('AgentLoop progress termination', () => {
+  it.each([true, false])('starts and times only the actual tool effect (admitted=%s)', async (admitted) => {
+    let now = 1_000;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    let release!: () => void;
+    let entered!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const waiting = new Promise<void>((resolve) => { entered = resolve; });
+    const events: AgentEvent[] = [];
+    let calls = 0;
+    const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: () => providerStream(++calls === 1
+      ? toolUseMessage(1)
+      : { ...toolUseMessage(2), content: [{ type: 'text', text: 'done' }], stopReason: 'stop' }) };
+    const executor: ToolExecutor = { execute: async (call, _signal, _update, onStart) => {
+      entered();
+      await gate;
+      if (admitted) { onStart?.(); onStart?.(); now += 25; }
+      return { ...await toolExecutor.execute(call), isError: !admitted };
+    } };
+    try {
+      const { stream } = agentLoop([], createContext(), { model: TEST_MODEL,
+        convertToLlm: (messages) => messages as Message[], maxTurns: 2,
+        streamOptions: { requestPlan: TEST_REQUEST_PLAN } }, provider, executor);
+      const draining = (async () => { for await (const event of stream) events.push(event); })();
+      await waiting;
+      expect(events.some((event) => event.type === 'tool_execution_start')).toBe(false);
+      now = 5_000;
+      release();
+      await draining;
+      expect(events.filter((event) => event.type === 'tool_execution_start')).toHaveLength(admitted ? 1 : 0);
+      expect(events.find((event) => event.type === 'tool_execution_end')).toMatchObject({ durationMs: admitted ? 25 : 0 });
+    } finally { release(); clock.mockRestore(); }
+  });
+
   it('warns of the finite turn budget without persisting guidance or weakening the limit', async () => {
     const requestContexts: string[] = [];
     const offeredTools: number[] = [];

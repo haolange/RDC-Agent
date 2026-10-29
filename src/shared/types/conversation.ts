@@ -178,6 +178,8 @@ export interface ConversationToolCall {
   imagePreviews?: ConversationToolImagePreviewRef[];
   error?: string;
   approval?: ConversationToolApproval;
+  /** Scheduler start, separate from the earlier model declaration timestamp. */
+  executionStartedAt?: number;
   startedAt: number;
   completedAt?: number;
 }

@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiscoveryLoader, EffectiveCatalogRequest } from './effectiveCatalogTypes';
+import { ProviderConnectionError } from './providerConnectionErrors';
 
 const electronMock = vi.hoisted(() => ({ root: '' }));
 vi.mock('electron', () => ({
@@ -61,6 +62,28 @@ describe('EffectiveCatalogService', () => {
   afterEach(() => {
     fs.rmSync(root, { recursive: true, force: true });
     vi.restoreAllMocks();
+  });
+
+  it('blocks a rejected credential even with a cached catalog, scopes it to the account, and restores only after verification', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const service = new EffectiveCatalogService({ statePath });
+    const input = request();
+    const rejected = await service.refreshDiscovery(input, async () => { throw new ProviderConnectionError('Invalid credential', 401); });
+    expect(rejected.models[0]).toMatchObject({ modelId: 'model-a', availability: 'unavailable' });
+    expect(service.getSnapshot(request({ accountId: 'other-account' })).models[0].availability).toBe('available');
+    const stillRejected = await service.refreshDiscovery(input, async () => { throw new Error('Network unavailable'); });
+    expect(stillRejected.models[0].availability).toBe('unavailable');
+    const restored = await service.refreshDiscovery(input, async () => ({ models: [] }));
+    expect(restored.models[0].availability).toBe('available');
+    expect(restored.catalogRevision).not.toBe(rejected.catalogRevision);
+  });
+
+  it('does not treat a transient directory failure as credential rejection', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const service = new EffectiveCatalogService({ statePath });
+    const snapshot = await service.refreshDiscovery(request(), async () => { throw new ProviderConnectionError('Service unavailable', 503); });
+    expect(snapshot.models[0].availability).toBe('available');
+    expect(snapshot.lastRefreshError).toBe('Service unavailable');
   });
 
   it('marks a discovery-only model without a positive executable context budget unavailable', async () => {

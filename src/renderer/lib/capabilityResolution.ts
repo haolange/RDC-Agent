@@ -1,9 +1,11 @@
 import type { EffectiveModel } from '@shared/types/providerCapability';
+import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 
 export type CapabilityUnavailableReason =
   | 'missing-model'
   | 'missing-revision'
   | 'route-mismatch';
+// Provider availability is evaluated before a cached catalog may be used.
 
 export type CapabilityResolutionState =
   | { status: 'unconfigured' }
@@ -11,7 +13,7 @@ export type CapabilityResolutionState =
   | { status: 'loading' }
   | { status: 'ready'; model: EffectiveModel }
   | { status: 'refreshing'; model: EffectiveModel }
-  | { status: 'unavailable'; reason: CapabilityUnavailableReason; message: string }
+  | { status: 'unavailable'; reason: CapabilityUnavailableReason | 'provider-unavailable'; message: string }
   | { status: 'error'; message: string };
 
 export interface ExpectedCapabilityRoute {
@@ -34,6 +36,7 @@ export function validateCapabilityResolution(
       message: 'The committed model is not available in the effective catalog.',
     };
   }
+  if (!isAgentToolExecutableModel(resolved)) return { status: 'unavailable', reason: 'missing-model', message: 'The selected model is not executable.' };
   if (!resolved.catalogRevision || !resolved.routeRevision) {
     return {
       status: 'unavailable',

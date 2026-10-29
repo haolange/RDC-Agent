@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ConversationTurnControlsSchema } from './conversationSchemas';
 import { ipcId, ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 import { FilePathArraySchema, OptionalProjectIdArgsSchema, ProjectIdArgsSchema } from './commonIpcSchemas';
 
@@ -49,6 +50,7 @@ export const SessionSetModelOverrideArgsSchema = z.tuple([
     providerId: ipcNonEmptyString(128, 'providerId'),
     modelId: ipcNonEmptyString(256, 'modelId'),
   }).nullable(),
+  ConversationTurnControlsSchema.optional(),
 ]);
 
 export const SessionSetAgentIdArgsSchema = z.tuple([

@@ -12,9 +12,33 @@ import { DiagnosticRow } from './WorkProcessRows';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkProcessContent } from './WorkProcessContent';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
+import { ToolAggregateRow } from './ToolAggregateRow';
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, values?: { count: number }) => `${key}${values ? `:${values.count}` : ''}` }) }));
 vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({ MessageMarkdown: ({ content }: { content: string }) => createElement('p', null, content) }));
+
+it('retains an open tool detail when the settled group reparents it into an aggregate', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const row: ToolRowModel = { type: 'tool', id: 'reparented', status: 'complete', verb: 'Read',
+    category: 'File', icon: 'fileRead', groupKind: 'explore', family: 'file', toolName: 'read_file',
+    target: 'source.txt', duration: '', argsLines: ['path: source.txt'], rawLines: [], previewLines: ['retained detail'] };
+  const render = (grouped: boolean) => root.render(createElement(ScopedWorkDisclosure, { scope: 'aggregate-reparent',
+    children: createElement('ul', null, grouped
+      ? createElement(ToolAggregateRow, { row: { type: 'toolAggregate', id: 'group', status: 'complete', summary: 'Read files', duration: '', children: [row] } })
+      : createElement(ToolRow, { row })),
+  }));
+  try {
+    await act(async () => render(false));
+    await act(async () => host.querySelector<HTMLButtonElement>('.work-card-trigger')!.click());
+    await act(async () => render(true));
+    expect(host.querySelector('details')?.open).toBe(true);
+    expect(host.querySelector('.work-card-trigger')?.getAttribute('aria-expanded')).toBe('true');
+    expect(host.textContent).toContain('retained detail');
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
+});
 
 it('keeps skill identity in the compact body and exposes its copyable path only in details', () => {
   const row: ToolRowModel = { type: 'tool', id: 'skill', status: 'complete', verb: 'Loaded skill',

@@ -87,7 +87,7 @@ async function switchModel(modelId: string, context: SlashCommandContext): Promi
   const { settings } = useAppSettingsStore.getState();
   const language = settings.appearance.language;
   const route = readCompiledComposerRoute(settings, context.selectedAgentId);
-  const options = await loadComposerModelPickerOptions(settings.llm.providers, route?.providerId);
+  const options = await loadComposerModelPickerOptions(settings.llm.providers);
   if (isComposerAgentDefaultToken(modelId)) {
     const state = resolveComposerAgentDefaultState(route, options, true);
     if (!state.selectable) {

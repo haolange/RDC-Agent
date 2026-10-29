@@ -3,8 +3,9 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ComposerModelEffortControl, type ComposerModelSaveState } from './ComposerModelEffortControl';
+import type { PreparedTurnContextSummary } from '@shared/types/session';
 import { ComposerMenuRegistryProvider } from './useComposerMenuRegistry';
-const mock = vi.hoisted(() => ({ choice: false, commit: vi.fn(), clear: vi.fn(), save: vi.fn() }));
+const mock = vi.hoisted(() => ({ controls: { saveState: { saving: false }, retrySave: () => {}, capabilityState: { status: 'ready' } }, choice: false, commit: vi.fn(), clear: vi.fn(), save: vi.fn() }));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, params?: Record<string, string | number>) => key === 'composer.effort.reasoningValue' ? `模型思考：${params?.level}` : key }) }));
 vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: (select: (state: unknown) => unknown) => select({
   settings: { llm: { providers: [] }, agents: { definitions: [
@@ -18,6 +19,7 @@ vi.mock('./useComposerModelPickerOptions', () => ({ useComposerModelPickerOption
   options: [{ providerId: 'p', providerLabel: 'Provider', modelId: 'model', label: 'Model', aliases: [],
     contextWindowTokens: 1000, contextWindowLabel: '1k', hasReasoning: true }], loading: false, failedProviders: [], retry: vi.fn(),
 }) }));
+vi.mock('./ComposerTurnControlsContext', () => ({ useComposerTurnControls: () => mock.controls }));
 vi.mock('./sessionModelOverride', () => ({ commitComposerModelChoice: mock.commit, clearComposerModelChoice: mock.clear }));
 vi.mock('./useComposerEffortControl', () => ({ useComposerEffortControl: () => ({
   effortLabel: 'Low', selectedLevel: 'low', turnControls: { maxContextMode: false, fastModel: false }, sliderHandlers: {},
@@ -34,7 +36,7 @@ const click = (selector: string) => act(async () => host.querySelector<HTMLButto
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  mock.choice = false; vi.clearAllMocks();
+  mock.choice = false; mock.controls.capabilityState.status = 'ready'; vi.clearAllMocks();
   mock.commit.mockImplementation(async () => { mock.choice = true; return { ok: true }; });
   mock.clear.mockImplementation(async () => { mock.choice = false; return { ok: true }; });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
@@ -62,6 +64,29 @@ it('preserves the normal Composer model and effort label without an override', a
   await render(false);
   expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.textContent).toBe('ModelLow');
   expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.getAttribute('aria-label')).toContain('模型思考：Low');
+});
+
+it('shows the main-confirmed request while disabled, and hides stale draft labels during preparation', async () => {
+  const paint = (prepared: PreparedTurnContextSummary | null, preparing: boolean) => act(async () => root.render(
+    createElement(ComposerMenuRegistryProvider, { children: createElement(ComposerModelEffortControl, {
+      agentId: 'debugger', currentSession: null, disabled: true, prepared, preparing,
+    }) })));
+  await paint(null, true);
+  expect(host.textContent).toContain('composer.model.preparing');
+  expect(host.textContent).not.toContain('Model');
+  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.getAttribute('title')).toBe('composer.model.preparing');
+  await paint({ route: { providerId: 'p', effectiveModelId: 'confirmed-model' },
+    controls: { reasoningLevel: 'high', fastModel: true, maxContextMode: true } } as PreparedTurnContextSummary, false);
+  expect(host.textContent).toContain('confirmed-model');
+  expect(host.textContent).toContain('composer.effort.levelHigh');
+  expect(host.querySelector<HTMLButtonElement>('[data-testid="composer-model-effort-pill"]')!.disabled).toBe(true);
+});
+
+it('retains the choice but labels an invalid provider as unavailable', async () => {
+  mock.choice = true; mock.controls.capabilityState.status = 'unavailable';
+  await render(false);
+  expect(host.textContent).toBe('composer.model.unavailable');
+  expect(mock.clear).not.toHaveBeenCalled();
 });
 it('keeps the save barrier after closing the popup and reports a failed save without changing the model', async () => {
   let finish!: (result: { ok: boolean }) => void;

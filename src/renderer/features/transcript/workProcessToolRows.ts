@@ -92,7 +92,7 @@ export const createToolRowForPresentation = (call: ConversationToolCall): WorkPr
     family: getToolFamily(call.toolName),
     toolName: call.toolName,
     target: getToolTarget(call.toolName, call.argsPreview),
-    duration: formatDurationMs(call.startedAt, call.completedAt),
+    duration: formatDurationMs(call.executionStartedAt, call.completedAt),
     argsLines: createDetailLines(prettyPrint(call.argsPreview), 10),
     previewLines,
     rawLines: suppressApprovalPreview ? [] : createDetailLines(prettyPrint(call.error || call.resultPreview), 40),

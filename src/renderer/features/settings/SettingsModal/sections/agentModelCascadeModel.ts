@@ -10,7 +10,7 @@ export interface AgentModelProviderGroup {
 export const isAgentModelSelectionInvalid = (
   value: string,
   options: AgentModelOption[],
-): boolean => Boolean(value && !options.some((option) => option.canonicalId === value));
+): boolean => Boolean(value && !options.some((option) => option.canonicalId === value && option.configured));
 
 export const agentModelOptionAccessibleLabel = (
   option: AgentModelOption,
@@ -28,17 +28,14 @@ export function matchesAgentModelQuery(option: AgentModelOption, query: string):
     .some((field) => field.toLowerCase().includes(needle));
 }
 
-/**
- * Groups projected options by provider. Every projected provider stays visible:
- * hiding whole groups made catalogs look incomplete next to the Provider page.
- */
+/** Only executable options enter the selector; Provider retains catalog diagnostics. */
 export function buildAgentModelGroups(
   options: AgentModelOption[],
   query: string,
 ): AgentModelProviderGroup[] {
   const map = new Map<string, AgentModelOption[]>();
   for (const option of options) {
-    if (!matchesAgentModelQuery(option, query)) continue;
+    if (!option.configured || !matchesAgentModelQuery(option, query)) continue;
     const current = map.get(option.providerId) ?? [];
     current.push(option);
     map.set(option.providerId, current);

@@ -31,7 +31,7 @@ vi.mock('../../stores/projectStore', () => ({
   },
 }));
 
-import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
+import { clearComposerModelChoice, commitComposerModelChoice, persistSessionModelOverride, flushSessionModelSaves } from './sessionModelOverride';
 import {
   readComposerDraftModel,
   useComposerModelDraftStore,
@@ -41,6 +41,34 @@ import {
 beforeEach(() => {
   projection.projectId = 'project-a'; projection.sessionId = 'session-a';
   projection.current.mockClear(); projection.sessions.mockClear(); projection.listeners.clear();
+});
+
+it('serializes controls after the model save and holds approval until all fields commit', async () => {
+  let finish!: (value: unknown) => void;
+  persistInvoke.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }))
+    .mockResolvedValueOnce({ success: true, session: { sessionId: 'session-a' } });
+  const first = commitComposerModelChoice({ providerId: 'p', modelId: 'm' }, 'session-a', 'project-a');
+  const controls = { reasoningLevel: 'high' as const, fastModel: true, maxContextMode: true };
+  const second = persistSessionModelOverride('session-a', null, controls);
+  const barrier = flushSessionModelSaves('session-a');
+  expect(persistInvoke).toHaveBeenCalledTimes(1);
+  finish({ success: true, session: { sessionId: 'session-a' } });
+  await Promise.all([first, second, barrier]);
+  expect(persistInvoke).toHaveBeenLastCalledWith('session-a', null, controls);
+});
+
+it('cancels queued saves after leaving and returning to the session', async () => {
+  let finish!: (value: unknown) => void;
+  persistInvoke.mockReset().mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  const first = commitComposerModelChoice({ providerId: 'p', modelId: 'm' }, 'session-a', 'project-a');
+  const second = persistSessionModelOverride('session-a', null, { reasoningLevel: 'low', fastModel: false, maxContextMode: false });
+  projection.sessionId = null; projection.listeners.forEach((listener) => listener());
+  projection.sessionId = 'session-a'; projection.listeners.forEach((listener) => listener());
+  finish({ success: true, session: { sessionId: 'session-a' } });
+  await first;
+  expect(await second).toEqual({ ok: false, error: 'MODEL_SAVE_CANCELLED' });
+  expect(persistInvoke).toHaveBeenCalledTimes(1);
+  expect(projection.current).not.toHaveBeenCalled();
 });
 
 describe('commitComposerModelChoice', () => {

@@ -27,7 +27,7 @@ const PlanReadAction: React.FC<{ plan: NonNullable<ToolRowModel['planReview']> }
 export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNode; density?: 'normal' | 'compact' }> = ({ row, extraDetail, density = 'normal' }) => {
   const { t } = useI18n();
   const label = useWorkProcessLabel();
-  const statusLabel = row.status === 'complete' || (row.planReview && row.status === 'cancelled')
+  const statusLabel = row.status === 'complete' || (row.approval && row.approval.status !== 'approved') || (row.planReview && row.status === 'cancelled')
     ? '' : label(getRowStatusLabel(row.status));
   const hasDetail = row.previewLines.length > 0
     || Boolean(row.hookDiagnostics?.length)

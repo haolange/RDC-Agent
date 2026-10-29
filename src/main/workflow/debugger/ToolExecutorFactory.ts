@@ -168,7 +168,7 @@ export class ToolExecutorFactory {
         }
         return reserved;
       },
-      execute: async (toolCall: ToolCall, signal?: AbortSignal, onUpdate?: (partialResult: unknown) => void) => {
+      execute: async (toolCall: ToolCall, signal?: AbortSignal, onUpdate?: (partialResult: unknown) => void, onExecutionStart?: () => void) => {
         const denyTool = (reason?: string) => this.createPolicyDeniedToolResult(
           toolCall,
           agentId,
@@ -250,10 +250,10 @@ export class ToolExecutorFactory {
         }
         const validatedToolCall: ToolCall = { ...toolCall, arguments: validatedArgs };
         if (normalizedName === 'ask_user') {
-          return this.executeAskUserTool(validatedToolCall, agentId, runtimeContext, signal);
+          return this.executeAskUserTool(validatedToolCall, agentId, runtimeContext, signal, onExecutionStart);
         }
         if (normalizedName === 'plan_artifact') {
-          return this.executePlanArtifactTool(validatedToolCall, agentId, runtimeContext, signal);
+          return this.executePlanArtifactTool(validatedToolCall, agentId, runtimeContext, signal, onExecutionStart);
         }
         const executorSessionId = runtimeContext?.sessionId ?? sessionId ?? null;
         let sessionAttachmentsRoot: string | null = null;
@@ -364,13 +364,13 @@ export class ToolExecutorFactory {
               ...(permissionDecision.temporaryPathRoots ?? []),
               ...(injectKnowledgeRoots ? knowledgeReadRoots : []),
             ],
-            (scopedContext) => tool.execute(
+            (scopedContext) => { onExecutionStart?.(); return tool.execute(
               toolCall.id,
               validatedArgs,
               signal,
               onUpdate,
               scopedContext,
-            ),
+            ); },
           ));
           // Unsafe effects from parent and detached children share the same
           // session/project gate. The subagent call itself is orchestration;
@@ -491,6 +491,7 @@ export class ToolExecutorFactory {
     agentId: AgentRole,
     runtimeContext: ToolExecutorRuntimeContext | undefined,
     signal?: AbortSignal,
+    onExecutionStart?: () => void,
   ): Promise<ToolResultMessage> {
     try {
       const args = toolCall.arguments ?? {};
@@ -531,6 +532,7 @@ export class ToolExecutorFactory {
       for (const handoff of handoffOptions) assertDeclaredHandoffForPlan({ sourceAgentId: agentId,
         projectRoot: runtimeContext.projectRootPath ?? runtimeContext.effectivePlan?.projectRootPath ?? null, handoff, tasks: taskRequirements });
       const markdown = composePlanMarkdown({ title, summary, content, taskRequirements });
+      onExecutionStart?.();
       const written = planArtifactWriter.writeLivePlan(sessionId, markdown);
       const revision = planReviewStateStore.beginRevision(sessionId, runtimeContext.turnId);
       const planReview = {
@@ -581,6 +583,7 @@ export class ToolExecutorFactory {
     agentId: AgentRole,
     runtimeContext: ToolExecutorRuntimeContext | undefined,
     signal?: AbortSignal,
+    onExecutionStart?: () => void,
   ): Promise<ToolResultMessage> {
     try {
       const args = toolCall.arguments ?? {};
@@ -593,6 +596,7 @@ export class ToolExecutorFactory {
         throw new Error('ask_user requires an active conversation interaction bridge.');
       }
 
+      onExecutionStart?.();
       const answer = await agentUserInputRequestService.request({
         agentId,
         sessionId: runtimeContext.sessionId ?? null,

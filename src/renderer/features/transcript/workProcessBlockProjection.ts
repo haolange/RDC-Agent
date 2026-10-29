@@ -3,6 +3,7 @@ import type {
   ConversationLoopStopReason,
   ConversationReasoningState,
   ConversationWorkBlock,
+  ConversationToolCall,
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import { formatDurationMs, normalizeWorkProcessText } from './workProcessFormat';
@@ -13,6 +14,12 @@ import type {
 } from './workProcessUnits';
 import { aggregateSectionSteps } from './workProcessToolAggregate';
 import type { WorkProcessRow } from './workProcessTypes';
+
+function isVisibleToolCall(call: ConversationToolCall): boolean {
+  if (call.approval || call.planReview || call.userInputQuestions) return true;
+  return call.status === 'error' || call.status === 'running' || call.status === 'complete'
+    || call.executionStartedAt !== undefined;
+}
 
 export type { LoopPresentationUnit, PresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
 
@@ -84,7 +91,7 @@ export function buildPresentationUnits(
     }
 
     if (block.kind === 'plan_review') {
-      const planReviewRows = ctx.groupProcessRows(block.toolCalls.map((call) => ctx.createToolRow(call)));
+      const planReviewRows = ctx.groupProcessRows(block.toolCalls.filter(isVisibleToolCall).map((call) => ctx.createToolRow(call)));
       if (planReviewRows.length > 0) {
         ctx.hasVisibleProcessEvidence = true;
         const lastUnit = units[units.length - 1];
@@ -92,11 +99,6 @@ export function buildPresentationUnits(
           const sectionRow = lastUnit.rows.find((row): row is Extract<WorkProcessRow, { type: 'section' }> => row.type === 'section');
           if (sectionRow) {
             sectionRow.steps.push(...planReviewRows);
-            const shouldDeferMergedRows = shouldDeferMergedSectionSteps(sectionRow);
-            sectionRow.stepsDisclosure = shouldDeferMergedRows ? 'deferred' : 'visible';
-            sectionRow.visibleSteps = aggregateSectionSteps(
-              createVisibleSectionSteps(sectionRow.steps, shouldDeferMergedRows),
-            );
             sectionRow.stepCount = deps.countToolSteps(sectionRow.steps);
             if (sectionRow.status === 'complete' && planReviewRows.some((child) => child.status === 'running' || child.status === 'pending')) {
               sectionRow.status = 'running';
@@ -118,7 +120,7 @@ export function buildPresentationUnits(
     }
 
     if (block.kind === 'user_input') {
-      const userInputRows = ctx.groupProcessRows(block.toolCalls.map((call) => ctx.createToolRow(call)));
+      const userInputRows = ctx.groupProcessRows(block.toolCalls.filter(isVisibleToolCall).map((call) => ctx.createToolRow(call)));
       if (userInputRows.length > 0) {
         ctx.hasVisibleProcessEvidence = true;
         const lastUnit = units[units.length - 1];
@@ -126,11 +128,6 @@ export function buildPresentationUnits(
           const sectionRow = lastUnit.rows.find((row): row is Extract<WorkProcessRow, { type: 'section' }> => row.type === 'section');
           if (sectionRow) {
             sectionRow.steps.push(...userInputRows);
-            const shouldDeferMergedRows = shouldDeferMergedSectionSteps(sectionRow);
-            sectionRow.stepsDisclosure = shouldDeferMergedRows ? 'deferred' : 'visible';
-            sectionRow.visibleSteps = aggregateSectionSteps(
-              createVisibleSectionSteps(sectionRow.steps, shouldDeferMergedRows),
-            );
             sectionRow.stepCount = deps.countToolSteps(sectionRow.steps);
             if (sectionRow.status === 'complete' && userInputRows.some((child) => child.status === 'running' || child.status === 'pending')) {
               sectionRow.status = 'running';
@@ -246,6 +243,15 @@ export function buildPresentationUnits(
     }
   }
 
+  const sources = new Map(blocks.map((block) => [block.id, block]));
+  for (const unit of units) {
+    if (unit.kind !== 'loop') continue;
+    const source = sources.get(unit.loopId);
+    const settled = !source?.toolCalls.some((call) => call.status === 'pending' || call.status === 'running');
+    for (const row of unit.rows) {
+      if (row.type === 'section') row.visibleSteps = aggregateSectionSteps(row.steps, settled);
+    }
+  }
   return units;
 }
 
@@ -253,54 +259,6 @@ function shouldSkipStandalone(block: ConversationWorkBlock, deps: LoopProjection
   return deps.shouldSkipBlock(block);
 }
 
-function shouldDeferMergedSectionSteps(row: Extract<WorkProcessRow, { type: 'section' }>): boolean {
-  if (row.steps.length === 0) return false;
-  const hasStreamingThinking = row.thinkingStatus === 'streaming'
-    && Boolean(row.thinkingLabel || row.thinkingPreview);
-  const hasStreamingProse = row.proseStreaming && Boolean(row.proseText);
-  return hasStreamingThinking || hasStreamingProse;
-}
-
-function shouldDeferSectionSteps(
-  steps: WorkProcessRow[],
-  sectionProse: ReturnType<LoopProjectionDeps['resolveSectionProse']>,
-  sectionThinking: ReturnType<LoopProjectionDeps['resolveSectionThinking']>,
-): boolean {
-  if (steps.length === 0) return false;
-  const hasStreamingThinking = sectionThinking.status === 'streaming'
-    && Boolean(sectionThinking.label || sectionThinking.preview);
-  const hasStreamingProse = sectionProse.proseStreaming && Boolean(sectionProse.proseText);
-  return hasStreamingThinking || hasStreamingProse;
-}
-
-function createDeferredVisibleStep(row: WorkProcessRow): WorkProcessRow {
-  if (row.type === 'tool') {
-    return {
-      ...row,
-      argsLines: [],
-      previewLines: [],
-      rawLines: [],
-      bodyText: undefined,
-      bodyLines: undefined,
-      approval: row.approval
-        ? { ...row.approval, message: '', metaLines: [] }
-        : undefined,
-      sourcePills: undefined,
-      pageChip: undefined,
-    };
-  }
-  if (row.type === 'userInput') {
-    return {
-      ...row,
-      items: [...row.items],
-    };
-  }
-  return row;
-}
-
-function createVisibleSectionSteps(steps: WorkProcessRow[], deferred: boolean): WorkProcessRow[] {
-  return deferred ? steps.map(createDeferredVisibleStep) : [...steps];
-}
 function projectLlmTurn(
   block: ConversationWorkBlock,
   deps: LoopProjectionDeps,
@@ -309,17 +267,18 @@ function projectLlmTurn(
   const outputPhase = deps.resolveOutputPhase(block, ctx.hasVisibleProcessEvidence);
   const reasoningState = deps.resolveReasoningState(block);
   const stopReason = block.result?.stopReason;
-  // TaskRegistry mutations already arrive as authoritative command blocks. Rendering
-  // their raw tool receipt here as well created a second, JSON-like task history.
+  // Successful TaskRegistry mutations already have authoritative snapshots;
+  // pending approval and failed mutations still need their own interaction/error.
   const steps = ctx.groupProcessRows(
     block.toolCalls
-      .filter((call) => !isTaskLifecycleTool(call.toolName))
+      .filter((call) => isVisibleToolCall(call) && (!isTaskLifecycleTool(call.toolName)
+        || call.status === 'error' || Boolean(call.approval && call.approval.status !== 'approved')))
       .map((call): WorkProcessRow => call.delegation ? {
         type: 'subagent', id: call.id, status: call.status,
         profile: call.delegation.profile, task: call.delegation.task, mode: call.delegation.mode,
         argsPreview: call.argsPreview ?? '', resultPreview: call.resultPreview ?? '',
         executionId: call.delegation.executionId, generation: call.delegation.generation,
-        duration: formatDurationMs(call.startedAt, call.completedAt),
+        duration: formatDurationMs(call.executionStartedAt, call.completedAt),
       } : ctx.createToolRow(call)),
   );
   const loopRows: WorkProcessRow[] = [];
@@ -373,7 +332,6 @@ function projectLlmTurn(
         thinkingExpandable: sectionThinking.expandable,
         thinkingOpenByDefault: sectionThinking.openByDefault,
         stepCount: 0,
-        stepsDisclosure: 'visible',
         duration: formatDurationMs(block.startedAt, block.completedAt),
         defaultOpen: false,
         steps: [],
@@ -409,8 +367,6 @@ function projectLlmTurn(
   }
 
   if (shouldRenderSection) {
-    const deferSteps = shouldDeferSectionSteps(steps, sectionProse, sectionThinking);
-    const visibleSteps = aggregateSectionSteps(createVisibleSectionSteps(steps, deferSteps));
     loopRows.push({
       type: 'section',
       id: block.id,
@@ -427,11 +383,10 @@ function projectLlmTurn(
       thinkingExpandable: sectionThinking.expandable,
       thinkingOpenByDefault: sectionThinking.openByDefault,
       stepCount: deps.countToolSteps(steps),
-      stepsDisclosure: deferSteps ? 'deferred' : 'visible',
       duration: formatDurationMs(block.startedAt, block.completedAt),
       defaultOpen: false,
       steps,
-      visibleSteps,
+      visibleSteps: steps,
       outputPhase,
       stopReason,
     });

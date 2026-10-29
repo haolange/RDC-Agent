@@ -10,10 +10,9 @@ import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 
 export const TaskSnapshotCard: React.FC<{
   row: Extract<WorkProcessRow, { type: 'taskSnapshot' }>;
-  isLatest: boolean;
-}> = ({ row, isLatest }) => {
+}> = ({ row }) => {
   const { t } = useI18n();
-  const [expanded, toggle] = useScopedWorkDisclosure(`task-snapshot-${row.id}`, isLatest);
+  const [expanded, toggle] = useScopedWorkDisclosure(`task-snapshot-${row.id}`, true);
   const listId = useId();
   const reasonText = (reason: string) => reason === TASK_STATUS_REASONS.parentTurnStopped
     ? t('control.rightRail.progress.reason.parentTurnStopped') : reason === TASK_STATUS_REASONS.createdTurnStopped

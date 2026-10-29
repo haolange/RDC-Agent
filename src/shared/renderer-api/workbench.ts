@@ -49,8 +49,9 @@ export function createSessionApi(transport: RendererApiTransport): SessionApi {
     rename: (id, title) => transport.invoke(INVOKE.session.rename, id, title),
     remove: (id) => transport.invoke(INVOKE.session.remove, id),
     select: (id) => transport.invoke(INVOKE.session.select, id),
-    setModelOverride: (id, modelOverride) => (
-      transport.invoke(INVOKE.session.setModelOverride, id, modelOverride)
+    setModelOverride: (id, modelOverride, turnControls) => (
+      turnControls ? transport.invoke(INVOKE.session.setModelOverride, id, modelOverride, turnControls)
+        : transport.invoke(INVOKE.session.setModelOverride, id, modelOverride)
     ),
     setAgentId: (id, agentId) => transport.invoke(INVOKE.session.setAgentId, id, agentId),
     applyDeclaredHandoff: (id, agent, label) => (

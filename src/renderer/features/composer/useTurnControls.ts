@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { persistSessionModelOverride } from './sessionModelOverride';
+import { useProjectStore } from '../../stores/projectStore';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { SessionRecord } from '@shared/types/session';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
@@ -11,6 +13,8 @@ import {
 import { resolvedCapability } from '../../lib/capabilityResolution';
 import { useEffectiveModelCapability } from './useEffectiveModelCapability';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
+
+const IDLE_SAVE: { saving: boolean; error?: string } = { saving: false };
 
 export function useTurnControls(agentId: string, currentSession: SessionRecord | null) {
   const turnControls = useTurnControlsStore((state) => state.turnControls);
@@ -39,6 +43,27 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const routeSyncState = useAppSettingsStore((state) => state.agentRouteSyncById[agentId]);
   const settingsHydrated = useAppSettingsStore((state) => state.hydrated);
   const sessionId = currentSession?.sessionId ?? null;
+  const [saveState, setSaveState] = useState<{ sessionId: string | null; saving: boolean; error?: string }>({ sessionId, saving: false });
+  const pendingSaves = useRef(0);
+  const saveRevision = useRef(0);
+  const invalidateSave = useCallback(() => { saveRevision.current++; }, []);
+  useEffect(() => {
+    invalidateSave();
+    setSaveState({ sessionId, saving: false });
+    return invalidateSave;
+  }, [sessionId, invalidateSave]);
+  const saveControls = useCallback(async (controls: ConversationTurnControls) => {
+    if (!sessionId) return;
+    const revision = ++saveRevision.current;
+    pendingSaves.current++;
+    setSaveState({ sessionId, saving: true });
+    try {
+      const result = await persistSessionModelOverride(sessionId, currentSession?.modelOverride ?? null, controls);
+      if (revision === saveRevision.current && useProjectStore.getState().currentSession?.sessionId === sessionId) {
+        setSaveState({ sessionId, saving: false, error: result.ok ? undefined : result.error });
+      }
+    } finally { pendingSaves.current--; }
+  }, [sessionId, currentSession?.modelOverride]);
   const sessionControls = currentSession?.turnControls ?? null;
   const capability = resolvedCapability(capabilityState);
   const lastSessionIdRef = useRef<string | null>(null);
@@ -61,7 +86,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
 
   useEffect(() => {
     const sessionChanged = lastSessionIdRef.current !== sessionId;
-    const sessionControlsChanged = lastSessionControlsKeyRef.current !== sessionControlsKey;
+    const sessionControlsChanged = lastSessionControlsKeyRef.current !== sessionControlsKey && pendingSaves.current === 0;
     const previousCapabilityKey = lastCapabilityKeyRef.current;
     const store = useTurnControlsStore.getState();
 
@@ -119,18 +144,20 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
 
   const updateTurnControls = useCallback((patch: Partial<ConversationTurnControls>) => {
     if (!capability || !capabilityKey) return;
-    setTurnControls((current) => {
-      const next = sanitizeTurnControls({ ...current, ...patch }, capability);
-      rememberControls(capabilityKey, next);
-      return next;
-    });
-  }, [capability, capabilityKey, rememberControls, setTurnControls]);
+    const next = sanitizeTurnControls({ ...useTurnControlsStore.getState().turnControls, ...patch }, capability);
+    rememberControls(capabilityKey, next);
+    setTurnControls(next);
+    void saveControls(next);
+  }, [capability, capabilityKey, rememberControls, setTurnControls, saveControls]);
+  const retrySave = useCallback(() => { void saveControls(useTurnControlsStore.getState().turnControls); }, [saveControls]);
 
   return {
     turnControls,
     capability,
     capabilityState,
     retryCapability,
+    saveState: saveState.sessionId === sessionId ? saveState : IDLE_SAVE,
+    retrySave,
     updateTurnControls,
     setTurnControls: (next: ConversationTurnControls) => {
       if (!capability || !capabilityKey) return;

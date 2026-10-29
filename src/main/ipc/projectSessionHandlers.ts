@@ -355,7 +355,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
 
   ipcMain.handle('session:setModelOverride', async (_event, ...rawArgs: unknown[]) => {
     try {
-      const [id, modelOverride] = parseIpcArgs(SessionSetModelOverrideArgsSchema, rawArgs, {
+      const [id, modelOverride, turnControls] = parseIpcArgs(SessionSetModelOverrideArgsSchema, rawArgs, {
         label: 'session:setModelOverride',
         maxBytes: 4 * 1024,
       });
@@ -383,7 +383,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
           };
         }
       }
-      const updated = storageAdapter.updateSession(id, { modelOverride });
+      const updated = storageAdapter.updateSession(id, { modelOverride, ...(turnControls ? { turnControls } : {}) });
       return { success: true, session: updated };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };

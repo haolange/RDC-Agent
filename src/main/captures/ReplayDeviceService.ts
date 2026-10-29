@@ -2,7 +2,7 @@ import { BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { rdcCliInvokerService } from '../tools/RdcCliInvokerService';
-import { parseRdcNativeResult } from '../tools/RdcNativeProtocol';
+import { parseRdcNativeResult, RdcNativeFailure } from '../tools/RdcNativeProtocol';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 type RemoteActivationOptions = { contextId?: string; signal?: AbortSignal; cli?: RdcCliInvokerSettings };
 import { settingsService } from '../settings/SettingsService';
@@ -268,9 +268,9 @@ export class ReplayDeviceService {
     return prepared ? { ...prepared } : null;
   }
 
-  consumePreparedRemote(deviceId: string): PreparedRemoteSurface | null {
+  consumePreparedRemote(deviceId: string, contextId: string): PreparedRemoteSurface | null {
     const prepared = this.resolvePreparedRemote(deviceId);
-    if (!prepared) {
+    if (!prepared || prepared.contextId !== contextId) {
       return null;
     }
 
@@ -553,7 +553,7 @@ export class ReplayDeviceService {
         currentDevice,
         currentDevice.activationPhase ?? 'connect',
         message,
-        currentDevice.activationErrorCode,
+        error instanceof RdcNativeFailure ? error.nativeError.code : currentDevice.activationErrorCode,
       );
       this.updateDevice(failedDevice);
       return failedDevice;

@@ -23,20 +23,9 @@ export const WorkProcessContent: React.FC<{
   const trackRef = React.useRef<HTMLDivElement>(null);
   const firstId = firstTrackEvent(presentation.rows);
   useWorkProcessTrack(trackRef, firstId);
-  const latestTaskSnapshotId = React.useMemo(() => {
-    let latest: string | undefined;
-    const visit = (rows: WorkProcessRow[]) => {
-      for (const row of rows) {
-        if (row.type === 'taskSnapshot') latest = row.id;
-        else if (row.type === 'section') visit(row.visibleSteps);
-      }
-    };
-    visit(presentation.rows);
-    return latest;
-  }, [presentation.rows]);
   const renderRow = React.useMemo(
-    () => createWorkProcessRowRenderer(sessionId, renderToolDetail, density, latestTaskSnapshotId),
-    [sessionId, renderToolDetail, density, latestTaskSnapshotId],
+    () => createWorkProcessRowRenderer(sessionId, renderToolDetail, density),
+    [sessionId, renderToolDetail, density],
   );
   if (!presentation.summary && presentation.rows.length === 0) return null;
   return <ScopedWorkDisclosure scope={disclosureScope}><div className={`work-process-body${embedded ? ' is-embedded' : ''}${density === 'compact' ? ' is-compact' : ''}`}>

@@ -76,6 +76,15 @@ const separator = (type: 'approval' | 'userInput' | 'planReview' | 'diagnostic',
 };
 
 describe('aggregateSectionSteps', () => {
+  it('keeps the active eighth call flat and aggregates only after the group settles', () => {
+    const rows = Array.from({ length: 8 }, (_, index) => tool(`call-${index}`));
+    rows[7].status = 'running';
+    expect(aggregateSectionSteps(rows).map((row) => row.id)).toEqual(rows.map((row) => row.id));
+    rows[7].status = 'complete';
+    const grouped = aggregateSectionSteps(rows);
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0].type === 'toolAggregate' && grouped[0].children.map((row) => row.id)).toEqual(rows.map((row) => row.id));
+  });
   it('keeps one through seven consecutive tools flat and aggregates at eight', () => {
     for (let count = 1; count <= 7; count += 1) {
       expect(aggregateSectionSteps(Array.from({ length: count }, (_, index) => tool(`flat-${index}`))))

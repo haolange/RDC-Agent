@@ -45,8 +45,6 @@ function classifyTool(row: ToolRow): AggregateBucket {
 
 function deriveStatus(rows: ToolRow[]): WorkProcessRowStatus {
   if (rows.some((row) => row.status === 'error')) return 'error';
-  if (rows.some((row) => row.status === 'running')) return 'running';
-  if (rows.some((row) => row.status === 'pending')) return 'pending';
   if (rows.some((row) => row.status === 'cancelled')) return 'cancelled';
   if (rows.some((row) => row.status === 'skipped')) return 'skipped';
   return 'complete';
@@ -104,16 +102,16 @@ export function buildToolAggregateSummary(tools: ToolRow[]): string {
 }
 
 /**
- * Hybrid tool disclosure: ≤7 tools stay flat; ≥8 consecutive tools become one aggregate row.
+ * Settled tool disclosure: ≤7 tools stay flat; ≥8 consecutive tools become one aggregate row.
  * Non-tool rows (userInput / approval / …) flush any pending tools and pass through.
  */
-export function aggregateSectionSteps(steps: WorkProcessRow[]): WorkProcessRow[] {
+export function aggregateSectionSteps(steps: WorkProcessRow[], settled = true): WorkProcessRow[] {
   const output: WorkProcessRow[] = [];
   let pendingTools: ToolRow[] = [];
 
   const flushTools = () => {
     if (pendingTools.length === 0) return;
-    if (pendingTools.length < TOOL_AGGREGATE_THRESHOLD) {
+    if (!settled || pendingTools.length < TOOL_AGGREGATE_THRESHOLD || pendingTools.some((row) => row.status === 'running' || row.status === 'pending')) {
       output.push(...pendingTools);
     } else {
       output.push({

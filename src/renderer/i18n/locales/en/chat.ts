@@ -1,5 +1,4 @@
 export const enChat = {
-  'chat.workProcessRunningCount': '{count} running',
   'chat.toolOutcomeRecorded': 'Recorded turn outcome',
   'chat.toolOutcomeRecording': 'Recording turn outcome',
   'chat.toolOutcomeArtifact': 'Investigation artifact',

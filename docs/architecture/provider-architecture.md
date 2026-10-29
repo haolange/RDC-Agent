@@ -228,6 +228,8 @@ cost.total  = input + output + cacheRead + cacheWrite
 
 ## models.json 用户覆盖（3 层真值合并）
 
+模型可执行性同时核对当前 provider 的 enabled/isConfigured 与 EffectiveCatalog 的工具能力、可用性及选择权限。已缓存目录不能让停用或断连的 provider 继续出现在可选集。Settings Agent 模型、计划授权与 Composer 保留失效引用但显示“模型不可用，请重新选择”；发送和批准入口阻止执行，主进程保持 fail-closed，不自动改用其它 provider。重新连接并验证后可恢复原选择；历史请求只显示冻结时使用的模型。
+
 Effective Catalog 的模型事实来自三层合并（优先级递增）：
 
 1. **Manifest 基线**（`src/shared/provider-catalog/manifests`）：编译期确定的结构能力、协议、route、controls、bindings。
@@ -266,6 +268,8 @@ Bedrock 使用 `cachePoint: { type: 'default' }` 标记 stable prefix。`partiti
 
 
 ## 订阅与目录投影
+
+目录发现明确返回 HTTP 401 时，将当前 provider/account/protocol 的模型投影为不可执行，直到同一 scope 的发现成功；随后临时网络失败不能清除已知认证拒绝。这表示凭据当前不可用，不改变模型结构能力或订阅 entitlement。普通网络/5xx 目录刷新失败保留已有可执行事实并单独报告错误，不把暂时刷新失败当作账号断连；配置中的模型引用不被删除或自动替换。
 
 Grok 订阅保留系统默认浏览器 PKCE 登录一种方式：动态 loopback callback、同一 state、nonce 与 ES256/JWKS 身份校验；取消、替换、超时和退出释放监听器并隔离迟到提交；外部浏览器标签页不由应用管理。主进程 `llm:cancelProviderAccountLogin` 仅取消待登录流程，不登出、不吊销既有凭据。订阅请求携带 `X-XAI-Token-Auth: xai-grok-cli`，目录只读取订阅代理，不合并公共 API。独立 xAI API Key 路径保持独立计费和权限，不互相 fallback。现有令牌不满足当前协议时要求重新登录。
 
