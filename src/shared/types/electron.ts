@@ -31,7 +31,7 @@ import type {
   ConversationStreamEvent,
   ConversationTurnResult,
 } from './conversation';
-import type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from './device';
+import type { ReplayDeviceSnapshot, ReplayDeviceStatusChangedPayload } from './device';
 import type {
   PlanApprovalTokenRequest,
   PlanExportRequest,
@@ -450,8 +450,8 @@ export interface ElectronAPI {
   };
 
   device: {
-    list: () => Promise<ReplayDeviceEntry[]>;
-    refresh: () => Promise<ReplayDeviceEntry[]>;
+    list: () => Promise<ReplayDeviceSnapshot>;
+    refresh: () => Promise<ReplayDeviceSnapshot>;
     watchStart: () => Promise<void>;
     watchRenew: () => Promise<void>;
     watchStop: () => Promise<void>;

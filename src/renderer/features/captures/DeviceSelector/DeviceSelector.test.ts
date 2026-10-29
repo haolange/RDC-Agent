@@ -5,7 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { DeviceSelector } from './index';
 const mocks = vi.hoisted(() => ({ start: vi.fn(), stop: vi.fn(), select: vi.fn() }));
 vi.mock('../../../stores/deviceStore', () => ({ useDeviceStore: () => ({
-  selectedDevice: 'local', devices: [
+  selectedDevice: 'local', discovery: { status: 'ready' }, refreshDevices: vi.fn(), devices: [
     { id: 'local', type: 'local', label: 'Local', status: 'connected' },
     { id: 'loading', type: 'android', label: 'Loading', status: 'loading' },
     { id: 'remote', type: 'android', label: 'Remote', status: 'disconnected' },

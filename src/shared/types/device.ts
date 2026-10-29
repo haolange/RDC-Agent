@@ -33,6 +33,7 @@ export interface ReplayDeviceEntry {
   status: ReplayDeviceStatus;
   transport: ReplayDeviceTransport;
   serial?: string;
+  adbState?: 'device' | 'unauthorized' | 'offline' | 'missing' | 'unknown';
   detailText?: string;
   lastError?: string;
   lastSeen?: number;
@@ -44,7 +45,10 @@ export interface ReplayDeviceEntry {
   activationUpdatedAt?: number;
 }
 
-export interface ReplayDeviceStatusChangedPayload {
-  device: ReplayDeviceEntry;
+export interface ReplayDeviceSnapshot {
+  revision: number;
   devices: ReplayDeviceEntry[];
+  discovery: { status: 'idle' | 'scanning' | 'ready' | 'failed'; error?: string };
 }
+
+export type ReplayDeviceStatusChangedPayload = ReplayDeviceSnapshot;

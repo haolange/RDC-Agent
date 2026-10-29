@@ -250,6 +250,7 @@ export function parseAdbDeviceLine(line: string): ReplayDeviceEntry | null {
     id: `android-${sanitizeDeviceId(serial)}`,
     label,
     serial,
+    adbState: adbState === 'device' || adbState === 'unauthorized' || adbState === 'offline' ? adbState : 'unknown',
     type: 'android',
     status,
     transport: 'adb_android',

@@ -190,12 +190,13 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
 
   ipcMain.handle('device:list', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'device:list', maxBytes: 1024 });
-    return replayDeviceService.listDevices();
+    return replayDeviceService.getSnapshot();
   });
 
   ipcMain.handle('device:refresh', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'device:refresh', maxBytes: 1024 });
-    return replayDeviceService.refreshDevices();
+    await replayDeviceService.refreshDevices();
+    return replayDeviceService.getSnapshot();
   });
 
   ipcMain.handle('device:watch:start', async (_event, ...rawArgs: unknown[]) => {

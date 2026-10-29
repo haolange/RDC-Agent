@@ -1,11 +1,12 @@
 ﻿import { create } from 'zustand';
-import type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from '@shared/types/device';
+import type { ReplayDeviceEntry, ReplayDeviceSnapshot, ReplayDeviceStatusChangedPayload } from '@shared/types/device';
 
 interface DeviceState {
   devices: ReplayDeviceEntry[];
   selectedDevice: string;
+  revision: number;
+  discovery: ReplayDeviceSnapshot['discovery'];
 
-  setDevices: (devices: ReplayDeviceEntry[]) => void;
   setSelectedDevice: (deviceId: string) => void;
   applyStatusPayload: (payload: ReplayDeviceStatusChangedPayload) => void;
   loadDevices: () => Promise<void>;
@@ -16,6 +17,7 @@ interface DeviceState {
 
 const DEVICE_WATCH_RENEW_MS = 5000;
 let deviceWatchRenewTimer: ReturnType<typeof setInterval> | null = null;
+let watchGeneration = 0;
 
 const LOCAL_DEVICE: ReplayDeviceEntry = {
   id: 'local',
@@ -34,11 +36,11 @@ function normalizeDevices(devices: ReplayDeviceEntry[], selectedDevice: string):
   };
 }
 
-export const useDeviceStore = create<DeviceState>((set) => ({
+export const useDeviceStore = create<DeviceState>((set, get) => ({
   devices: [LOCAL_DEVICE],
   selectedDevice: 'local',
-
-  setDevices: (devices) => set((state) => normalizeDevices(devices, state.selectedDevice)),
+  revision: -1,
+  discovery: { status: 'idle' },
 
   setSelectedDevice: (deviceId) => set((state) => {
     const target = state.devices.find((device) => device.id === deviceId);
@@ -54,34 +56,37 @@ export const useDeviceStore = create<DeviceState>((set) => ({
   }),
 
   applyStatusPayload: (payload) => {
-    set((state) => normalizeDevices(payload.devices, state.selectedDevice));
+    set((state) => payload.revision < state.revision ? state : ({
+      ...normalizeDevices(payload.devices, state.selectedDevice), revision: payload.revision, discovery: payload.discovery,
+    }));
   },
 
   loadDevices: async () => {
     try {
-      const devices = await window.electronAPI.device.list();
-      set((state) => normalizeDevices(devices ?? [LOCAL_DEVICE], state.selectedDevice));
-    } catch {
-      set((state) => normalizeDevices(state.devices, state.selectedDevice));
+      get().applyStatusPayload(await window.electronAPI.device.list());
+    } catch (error) {
+      set({ discovery: { status: 'failed', error: error instanceof Error ? error.message : String(error) } });
     }
   },
 
   refreshDevices: async () => {
     try {
-      const devices = await window.electronAPI.device.refresh();
-      set((state) => normalizeDevices(devices ?? state.devices, state.selectedDevice));
-    } catch {
-      set((state) => normalizeDevices(state.devices, state.selectedDevice));
+      get().applyStatusPayload(await window.electronAPI.device.refresh());
+    } catch (error) {
+      set({ discovery: { status: 'failed', error: error instanceof Error ? error.message : String(error) } });
     }
   },
 
   startDeviceWatch: async () => {
+    const generation = ++watchGeneration;
     try {
       await window.electronAPI.device.watchStart();
-    } catch {
+    } catch (error) {
+      if (generation === watchGeneration) set({ discovery: { status: 'failed', error: error instanceof Error ? error.message : String(error) } });
       return;
     }
 
+    if (generation !== watchGeneration) return;
     if (deviceWatchRenewTimer) {
       clearInterval(deviceWatchRenewTimer);
     }
@@ -92,6 +97,7 @@ export const useDeviceStore = create<DeviceState>((set) => ({
   },
 
   stopDeviceWatch: async () => {
+    watchGeneration += 1;
     if (deviceWatchRenewTimer) {
       clearInterval(deviceWatchRenewTimer);
       deviceWatchRenewTimer = null;

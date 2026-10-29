@@ -1,8 +1,5 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ReplayDeviceEntry } from '@shared/types/device';
-import { AdbExecutableCache } from './adbExecutable';
 import {
   AdbServerProtocolError,
   AdbServerUnreachableError,
@@ -58,70 +55,6 @@ describe('replayDeviceDiff', () => {
     expect(interval).toBe(POLL_MAX_MS);
     interval = nextPollIntervalMs(interval, true);
     expect(interval).toBe(POLL_BASE_MS);
-  });
-});
-
-describe('AdbExecutableCache', () => {
-  const previousAdbPath = process.env.RDC_ANDROID_ADB_PATH;
-  const previousPath = process.env.PATH;
-  const previousAndroidHome = process.env.ANDROID_HOME;
-  const previousAndroidSdkRoot = process.env.ANDROID_SDK_ROOT;
-  const previousAdb = process.env.ADB;
-  const previousLocalAppData = process.env.LOCALAPPDATA;
-
-  beforeEach(() => {
-    delete process.env.RDC_ANDROID_ADB_PATH;
-    delete process.env.ADB;
-    delete process.env.ANDROID_HOME;
-    delete process.env.ANDROID_SDK_ROOT;
-    delete process.env.LOCALAPPDATA;
-    process.env.PATH = '';
-  });
-
-  afterEach(() => {
-    if (previousAdbPath === undefined) delete process.env.RDC_ANDROID_ADB_PATH;
-    else process.env.RDC_ANDROID_ADB_PATH = previousAdbPath;
-    if (previousAdb === undefined) delete process.env.ADB;
-    else process.env.ADB = previousAdb;
-    if (previousAndroidHome === undefined) delete process.env.ANDROID_HOME;
-    else process.env.ANDROID_HOME = previousAndroidHome;
-    if (previousAndroidSdkRoot === undefined) delete process.env.ANDROID_SDK_ROOT;
-    else process.env.ANDROID_SDK_ROOT = previousAndroidSdkRoot;
-    if (previousLocalAppData === undefined) delete process.env.LOCALAPPDATA;
-    else process.env.LOCALAPPDATA = previousLocalAppData;
-    if (previousPath === undefined) delete process.env.PATH;
-    else process.env.PATH = previousPath;
-    vi.restoreAllMocks();
-  });
-
-  it('caches the resolved path and invalidates after access failure', async () => {
-    const fakeAdb = path.join(path.sep === '\\' ? 'C:\\tools' : '/tools', 'adb.exe');
-    process.env.RDC_ANDROID_ADB_PATH = fakeAdb;
-
-    const accessSpy = vi.spyOn(fs.promises, 'access')
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(new Error('ENOENT'))
-      .mockResolvedValueOnce(undefined);
-
-    const cache = new AdbExecutableCache();
-    const first = await cache.resolveAdbExecutableAsync();
-    expect(first).toBe(path.resolve(fakeAdb));
-    expect(cache.getCachedPath()).toBe(path.resolve(fakeAdb));
-
-    // Cached path fails access → invalidate and re-resolve
-    const second = await cache.resolveAdbExecutableAsync();
-    expect(second).toBe(path.resolve(fakeAdb));
-    expect(accessSpy).toHaveBeenCalledTimes(3);
-
-    cache.invalidate();
-    expect(cache.getCachedPath()).toBeNull();
-  });
-
-  it('throws when no candidate is accessible', async () => {
-    vi.spyOn(fs.promises, 'access').mockRejectedValue(new Error('ENOENT'));
-    const cache = new AdbExecutableCache();
-    await expect(cache.resolveAdbExecutableAsync()).rejects.toThrow(/adb executable not found/i);
-    expect(cache.getCachedPath()).toBeNull();
   });
 });
 

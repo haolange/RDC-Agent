@@ -66,7 +66,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
       } else if (operation === 'image') receive(await refreshReplayFrame({ ...scope, bindingGeneration: state.generation }));
       else if (operation === 'refresh') {
         const [result, nextDevices] = await Promise.all([refreshProjectCaptureInputs(scope.projectId), refreshReplayDevices()]);
-        useDeviceStore.getState().setDevices(nextDevices);
+        useDeviceStore.getState().applyStatusPayload(nextDevices);
         useProjectStore.getState().updateProjectInputs(scope.projectId, result.inputs);
       }
       if (operation === 'refresh') await refreshProjection();

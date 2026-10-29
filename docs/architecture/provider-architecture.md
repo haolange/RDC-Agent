@@ -267,8 +267,8 @@ Bedrock 使用 `cachePoint: { type: 'default' }` 标记 stable prefix。`partiti
 
 ## 订阅与目录投影
 
-Grok 订阅保留应用内浏览器 PKCE 登录一种方式：动态 loopback callback、同一 state、nonce 与 ES256/JWKS 身份校验；取消、替换、超时、窗口关闭和退出释放监听器并隔离迟到提交。主进程 `llm:cancelProviderAccountLogin` 仅取消待登录流程，不登出、不吊销既有凭据。订阅请求携带 `X-XAI-Token-Auth: xai-grok-cli`，目录只读取订阅代理，不合并公共 API。独立 xAI API Key 路径保持独立计费和权限，不互相 fallback。现有令牌不满足当前协议时要求重新登录。
+Grok 订阅保留系统默认浏览器 PKCE 登录一种方式：动态 loopback callback、同一 state、nonce 与 ES256/JWKS 身份校验；取消、替换、超时和退出释放监听器并隔离迟到提交；外部浏览器标签页不由应用管理。主进程 `llm:cancelProviderAccountLogin` 仅取消待登录流程，不登出、不吊销既有凭据。订阅请求携带 `X-XAI-Token-Auth: xai-grok-cli`，目录只读取订阅代理，不合并公共 API。独立 xAI API Key 路径保持独立计费和权限，不互相 fallback。现有令牌不满足当前协议时要求重新登录。
 
-应用内登录窗口创建并发起导航后即返回待授权状态，不等待页面完整加载；导航失败通过所属 flow 投影明确错误，取消后的迟到导航错误不覆盖终态。账号显示使用服务端真实身份，缺失时仅用中性账号名称；认证协议名不写入套餐字段，不推断套餐或余额。历史证据中的原始套餐名称保留来源与日期，不成为当前账号事实。
+默认浏览器打开请求完成后返回待授权状态，不等待网页加载；打开失败通过所属 flow 投影明确错误并释放回调。待授权期间允许重新打开同一有效授权页；关闭外部标签页不等同取消，取消入口、超时与退出负责收口，迟到结果不覆盖终态。账号显示使用服务端真实身份，缺失时仅用中性账号名称；认证协议名不写入套餐字段，不推断套餐或余额。历史证据中的原始套餐名称保留来源与日期，不成为当前账号事实。
 
 Renderer `effectiveCatalogStore` 是 main 快照的内存投影，以 provider/account/protocol 为 scope，合并在途请求，逐 provider 呈现结果；配置和账号变化精确失效，迟到响应不得覆盖新 scope 或较新事件。service 通过注入的 ElectronAPI 读取；组件不直调 IPC。Composer、能力控件和 Settings 共用该投影；菜单重挂载不重读完整 settings，也不等待全部 provider。后台刷新保持已有内容，错误单独呈现并允许重试。主进程的执行前权限与 route 校验仍为唯一权威。

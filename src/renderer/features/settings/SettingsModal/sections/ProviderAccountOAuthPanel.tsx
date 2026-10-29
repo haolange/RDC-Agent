@@ -91,7 +91,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
     );
   }
 
-  const openPageButton = status?.authUrl && !isGrokSubscription ? (
+  const openPageButton = status?.authUrl && (!isGrokSubscription || connectionDevicePending) ? (
     <a
       className="button button-primary button-sm settings-oauth-link-button"
       href={status.authUrl}

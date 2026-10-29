@@ -56,7 +56,7 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
 
 ## 原生交互性能观察
 
-真实 `/app?qaPerformance=1` 安装 `InteractionPerformanceProbe`；普通入口不安装监听器或观察器。默认统计 Composer 模型入口、模型选择按钮及 Fast/Max/Effort 控件；增加 `qaPerformanceScope=transcript` 时统计真实消息列表内按钮与 summary。`qaPerformanceWindowMs` 可指定 1–300000 ms 固定观察区间，用于没有点击的流式期间收集页面 Long Task。到期和 pagehide 会 drain 并释放观察器、监听器与计时器。
+真实 `/app?qaPerformance=1` 安装 `InteractionPerformanceProbe`；普通入口不安装监听器或观察器。默认统计 Composer 模型入口、模型选择按钮及 Fast/Max/Effort 控件；增加 `qaPerformanceScope=transcript` 时统计真实消息列表内按钮与 summary；`qaPerformanceScope=devices` 统计正式 Remote 入口及菜单内按钮。`qaPerformanceWindowMs` 可指定 1–300000 ms 固定观察区间，用于没有点击的流式期间收集页面 Long Task。到期和 pagehide 会 drain 并释放观察器、监听器与计时器。
 
 根元素 `data-rdc-qa-performance` 提供范围、实际区间、原生支持标志、观察条目数和汇总。`pointerToPaintP95Ms` 是基于原生 Event Timing、对未观察点击按 16 ms 补值的估算；必须同时记录 `eventTimingObservedCount` 与 `interactionCount`，不能将缺失 target 或尚未送达的条目视作已测得低延迟。Long Task 属于页面整体，按与区间相交计入完整任务时长，不能宣称全由 Transcript 引起。前后比较须使用相同探针、内容、视口、外观、观察区间和动作；工具调用耗时与 RAF 不作为替代指标。
 

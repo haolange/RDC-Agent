@@ -205,3 +205,13 @@ Android 的 remote_display 由同一远程连接的原生呈现确认驱动，�
 ## 审批前原生事实
 
 权限策略与执行入口共享 owning binding 校验和 authorizeRdcOperation：只有冻结 catalog 的已知 scope/effects、主进程身份注入、参数及文件边界全部成立才分类。无副作用读取、测量和受控 artifact/replay 操作可按 low 自动批准；shader replacement 和敏感配置路径分别进入 medium/high 审核。模型审核只评估当前动作与实际用户授权，不提供 lease、能力或签名资格；执行前及队列后继续校验身份，恢复失败仍隔离。目录查询保持冻结目录语义，不调用原生 CLI。
+
+### 主机工具与设备发现
+
+ADB、所需 Windows DLL 与 SPIR-V 汇编/反汇编工具归 RDC-Tool 安装所有。Agent 不随包复制，不搜索系统 PATH、SDK 或另一份 RenderDoc；从所选安装的 runtime manifest 获取 ADB 路径并校验内容。Tools 默认使用同安装依赖；高级显式覆盖仍受本机配置约束，错误路径直接失败，不静默退回默认。Capture/Turn 冻结 CLI 与显式主机工具环境，设置变更不影响在途执行。
+
+设备 list/refresh 和 statusChanged 使用同一 revision 快照，包含 devices 与 discovery（idle/scanning/ready/failed、失败原因）。首次扫描失败与合法空设备列表分别呈现；ADB 的 device/unauthorized/offline/missing 状态与 RenderDoc 连接状态分别解释。Renderer 丢弃较旧快照。
+
+设备菜单展开立即异步扫描，展开期间正常每 5 秒查询本机 ADB server，失败退避至最多 60 秒；关闭停止并取消所属发现。重新展开及手动刷新允许一次新的 server 启动尝试；并发扫描合并，取消后的结果不能提交。ADB 启动由 ProcessSupervisor 有界管理；正常轮询不派生进程、不重做完整内容哈希，也不后台持续扫描。选择设备不连接，真实连接继续在 owning Capture context 内发生。
+
+Settings 的显式验证执行同安装 doctor，检查 Python、RenderDoc、Android APK 和捆绑主机工具完整性；设备未连接不作为安装损坏。

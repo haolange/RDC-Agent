@@ -42,6 +42,14 @@ afterEach(() => {
 });
 
 describe('query-gated native performance probe', () => {
+  it('measures device controls without counting unrelated Composer actions', () => {
+    window.history.replaceState({}, '', '/app?qaPerformance=1&qaPerformanceScope=devices');
+    const button = document.createElement('button'); button.dataset.testid = 'utility-device-selector-trigger'; document.body.append(button);
+    dispose = installInteractionPerformanceProbe();
+    document.querySelector<HTMLButtonElement>('[role="switch"]')!.click();
+    button.click();
+    expect(snapshot()).toMatchObject({ scope: 'devices', interactionCount: 1 });
+  });
   it('installs nothing on normal product paths', () => {
     dispose = installInteractionPerformanceProbe();
     document.querySelector<HTMLButtonElement>('button')!.click();

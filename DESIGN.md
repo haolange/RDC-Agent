@@ -54,9 +54,9 @@ Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。
 
 ### Provider 连接与选择响应
 
-Grok 订阅只有浏览器 PKCE 自动回调入口；独立 xAI API Key 面保留，目录与计费不混用。Renderer 以共享内存快照投影 main EffectiveCatalog，按 provider/account/protocol 去重、失效和隔离迟到结果；菜单打开不再等待全量目录加载。现有控件刻度、Composer 角度扫光与 Transcript ActiveSignalText 保持，冗余技术信息通过所属详情按需披露。细节见 Provider 架构与设计系统。
+Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API Key 面保留，目录与计费不混用。Renderer 以共享内存快照投影 main EffectiveCatalog，按 provider/account/protocol 去重、失效和隔离迟到结果；菜单打开不再等待全量目录加载。现有控件刻度、Composer 角度扫光与 Transcript ActiveSignalText 保持，冗余技术信息通过所属详情按需披露。细节见 Provider 架构与设计系统。
 
-登录窗口创建后即进入等待授权，不能用网页完整加载阻塞设置操作；失败、取消与迟到结果按同一 flow 生命周期处理。账号与套餐必须分开：认证方式不能伪装为套餐名，缺失的套餐或额度保持未知。
+系统默认浏览器打开请求完成后即进入等待授权，不等待网页加载；打开失败、取消与迟到结果按同一 flow 生命周期处理。浏览器标签页不归应用所有，取消只释放当前授权流程与回调。账号与套餐必须分开：认证方式不能伪装为套餐名，缺失的套餐或额度保持未知。
 
 ## Authority Map
 

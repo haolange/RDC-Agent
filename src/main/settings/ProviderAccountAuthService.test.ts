@@ -169,6 +169,26 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
     } finally { service.dispose(); delete process.env.RDC_AGENT_HEADLESS; process.env.RDC_AGENT_TEST_MODE = '1'; }
   });
 
+  it('opens Grok in the system default browser and reports launch failures without leaving a callback', async () => {
+    const { shell } = await import('electron');
+    const service = new ProviderAccountAuthService();
+    delete process.env.RDC_AGENT_TEST_MODE;
+    mockFetchJson(grokMetadata);
+    try {
+      const status = await service.startLogin({ providerId: 'grok-account' });
+      expect(shell.openExternal).toHaveBeenCalledWith(status.authUrl);
+      expect(status.state).toBe('pending');
+      service.cancelLogin('grok-account');
+      vi.mocked(shell.openExternal).mockRejectedValueOnce(new Error('Default browser launch failed'));
+      mockFetchJson(grokMetadata);
+      const failed = await service.startLogin({ providerId: 'grok-account' });
+      expect(failed.state).toBe('failed');
+      expect(failed.error).toContain('Default browser launch failed');
+      const flows = (service as unknown as { pendingFlows: Map<string, { abortController: AbortController; server?: http.Server }> }).pendingFlows;
+      expect([...flows.values()][0].abortController.signal.aborted).toBe(true);
+    } finally { service.dispose(); process.env.RDC_AGENT_TEST_MODE = '1'; }
+  });
+
   it('does not let a replaced login startup failure mark the new attempt failed', async () => {
     const service = new ProviderAccountAuthService(); let rejectOld!: (error: Error) => void;
     vi.stubGlobal('fetch', vi.fn()

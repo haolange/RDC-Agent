@@ -66,6 +66,14 @@ function readSocketRequest(socket: net.Socket): Promise<string> {
 describe('queryAdbDevicesLines', () => {
   const closers: Array<() => Promise<void>> = [];
 
+  it('aborts a pending query and releases its socket', async () => {
+    const server = await listenEphemeral(() => {}); closers.push(server.close);
+    const controller = new AbortController();
+    const query = queryAdbDevicesLines({ port: server.port, signal: controller.signal });
+    controller.abort();
+    await expect(query).rejects.toThrow('cancelled');
+  });
+
   afterEach(async () => {
     while (closers.length > 0) {
       const close = closers.pop();

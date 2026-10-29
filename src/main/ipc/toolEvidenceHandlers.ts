@@ -9,6 +9,7 @@ import { EvidenceGetEventsArgsSchema } from './validation/toolEvidenceSchemas';
 import { RdcInstallationArgsSchema } from './validation/rdcInstallationSchemas';
 import { detectRdcInstallations, resolveRdcInstallation } from '../tools/RdcInstallationService';
 import { settingsService } from '../settings/SettingsService';
+import { parseRdcNativeResult } from '../tools/RdcNativeProtocol';
 
 export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;
@@ -25,6 +26,7 @@ export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void
     const settings = resolveRdcInstallation(request);
     const summary = await rdcCliInvokerService.getRuntimeSummary(true, settings);
     if (!summary.cli.available) throw new Error(summary.cli.unavailableReason);
+    parseRdcNativeResult(await rdcCliInvokerService.executeCLI('doctor', ['--json'], { settings }), undefined, 'rdc_tool.doctor');
     return { settings, summary };
   });
 

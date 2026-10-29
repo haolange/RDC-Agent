@@ -82,10 +82,13 @@ export function installInteractionPerformanceProbe(): () => void {
   if (query.get(PERFORMANCE_QUERY_KEY) !== '1') return noop;
   if (document.documentElement.dataset.rdcQaPerformanceInstalled === 'true') return noop;
 
-  const scope = query.get('qaPerformanceScope') === 'transcript' ? 'transcript' : 'composer';
+  const requestedScope = query.get('qaPerformanceScope');
+  const scope = requestedScope === 'transcript' || requestedScope === 'devices' ? requestedScope : 'composer';
   const selector = scope === 'transcript'
     ? '[data-testid="conversation-thread"] button, [data-testid="conversation-thread"] summary'
-    : COMPOSER_CONTROL_SELECTOR;
+    : scope === 'devices'
+      ? '[data-testid="utility-device-selector-trigger"], [data-testid="utility-device-selector-dropdown"] button'
+      : COMPOSER_CONTROL_SELECTOR;
   const requestedWindow = Number(query.get('qaPerformanceWindowMs'));
   const windowMs = Number.isFinite(requestedWindow) && requestedWindow >= 1 && requestedWindow <= 300_000
     ? requestedWindow : null;

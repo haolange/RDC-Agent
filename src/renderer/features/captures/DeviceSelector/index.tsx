@@ -2,7 +2,7 @@ import { Button } from '../../../ui/Button';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDeviceStore } from '../../../stores/deviceStore';
-import type { ReplayDeviceEntry } from '@shared/types/device';
+import type { ReplayDeviceEntry, ReplayDeviceSnapshot } from '@shared/types/device';
 import { useI18n } from '../../../i18n';
 import { useDynStyle } from '../../../lib/useDynStyle';
 import { isTopOverlayLayer, useOverlayLayer } from '../../../lib/overlayStack';
@@ -17,6 +17,7 @@ import {
   type DeviceDropdownPosition,
 } from './useDeviceDropdownPosition';
 import './DeviceSelector.css';
+import './DeviceDiscovery.css';
 
 const DeviceSelectorDropdown: React.FC<{
   menuRef: React.Ref<HTMLDivElement>;
@@ -25,6 +26,8 @@ const DeviceSelectorDropdown: React.FC<{
   devices: ReplayDeviceEntry[];
   selectedDevice: string;
   onSelect: (device: ReplayDeviceEntry) => void;
+  discovery: ReplayDeviceSnapshot['discovery'];
+  onRefresh: () => void;
 }> = ({
   menuRef,
   dropdownTestId,
@@ -32,6 +35,8 @@ const DeviceSelectorDropdown: React.FC<{
   devices,
   selectedDevice,
   onSelect,
+  discovery,
+  onRefresh,
 }) => {
   const { t } = useI18n();
   const dynStyle = useDynStyle({
@@ -46,7 +51,9 @@ const DeviceSelectorDropdown: React.FC<{
       ref={menuRef}
       className={`device-selector-dropdown placement-${dropdownPosition.placement}`}
       data-testid={dropdownTestId}
-      role="listbox"
+      role="dialog"
+      aria-label={t('device.discovery.title')}
+      aria-busy={discovery.status === 'scanning'}
       onKeyDown={(event) => {
         if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
         const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button[role="option"]:not(:disabled)'));
@@ -58,6 +65,7 @@ const DeviceSelectorDropdown: React.FC<{
       }}
       {...dynStyle}
     >
+      <div role="listbox" aria-label={t('device.discovery.title')}>
       {devices.map((device) => {
         const selectable = device.status !== 'loading';
         const bootstrapSummary = getBootstrapSummary(device, t);
@@ -80,7 +88,7 @@ const DeviceSelectorDropdown: React.FC<{
               </div>
               <div className="device-option-trailing">
                 <DeviceStatusIcon device={device} connectedLabel={t('device.status.connected')} />
-                <span className={`device-option-status ${device.status}`}>{t(STATUS_TEXT_KEYS[device.status])}</span>
+                <span className={`device-option-status ${device.status}`}>{t(device.adbState === 'device' && device.status === 'offline' ? 'device.status.disconnected' : STATUS_TEXT_KEYS[device.status])}</span>
               </div>
             </div>
             {device.serial && device.status !== 'connected' && <div className="device-option-meta">{device.serial}</div>}
@@ -89,13 +97,24 @@ const DeviceSelectorDropdown: React.FC<{
           </Button>
         );
       })}
+      </div>
+      <div className="device-discovery-footer">
+        <div role="status" className={`device-discovery-status ${discovery.status === 'failed' ? 'is-error' : ''}`}>
+          {discovery.status === 'failed' ? discovery.error : discovery.status === 'scanning' || discovery.status === 'idle'
+            ? t('device.discovery.scanning') : devices.some((device) => device.type === 'android' && device.adbState !== 'missing')
+              ? t('device.discovery.watching') : t('device.discovery.empty')}
+        </div>
+        <Button variant="ghost" size="sm" onClick={onRefresh} disabled={discovery.status === 'scanning'}>
+          {t('device.discovery.refresh')}
+        </Button>
+      </div>
     </div>
   );
 };
 
 export const DeviceSelector: React.FC = () => {
   const { t } = useI18n();
-  const { devices, selectedDevice, setSelectedDevice, startDeviceWatch, stopDeviceWatch } = useDeviceStore();
+  const { devices, selectedDevice, discovery, refreshDevices, setSelectedDevice, startDeviceWatch, stopDeviceWatch } = useDeviceStore();
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -140,8 +159,8 @@ export const DeviceSelector: React.FC = () => {
   }, [isOpen, layerId]);
 
   useEffect(() => {
-    if (isOpen) menuRef.current?.querySelector<HTMLButtonElement>('button[aria-selected="true"]:not(:disabled), button[role="option"]:not(:disabled)')?.focus({ preventScroll: true });
-  }, [isOpen]);
+    if (isOpen && dropdownPosition.ready) menuRef.current?.querySelector<HTMLButtonElement>('button[aria-selected="true"]:not(:disabled), button[role="option"]:not(:disabled)')?.focus({ preventScroll: true });
+  }, [isOpen, dropdownPosition.ready]);
 
   useEffect(() => {
     if (isOpen) {
@@ -204,6 +223,8 @@ export const DeviceSelector: React.FC = () => {
           devices={devices}
           selectedDevice={selectedDevice}
           onSelect={(device) => void handleSelect(device)}
+          discovery={discovery}
+          onRefresh={() => void refreshDevices()}
         />,
         document.body,
       )}

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { appPathService } from '../runtime/AppPathService';
 import { RDC_INTERMEDIATE_ROOT_ENV, hostRdcIntermediateRoot, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
 
@@ -13,6 +13,14 @@ const cli = {
 };
 
 describe('withRdcHostRuntimeEnv', () => {
+  it('binds native dependencies to the selected installation instead of an inherited root', () => {
+    vi.stubEnv('RDC_TOOL_ROOT', 'C:\\other-installation');
+    const root = path.resolve('selected-tools');
+    try {
+      const result = withRdcHostRuntimeEnv({ ...cli, command: path.join(root, 'binaries/windows/x64/python/python.exe'), argsPrefix: [path.join(root, 'cli/run_cli.py')], workingDirectory: root });
+      expect(result.env.RDC_TOOL_ROOT).toBe(root);
+    } finally { vi.unstubAllEnvs(); }
+  });
   it('injects the user-scope intermediate root when Settings env omits it', () => {
     const resolved = withRdcHostRuntimeEnv(cli);
     const expected = appPathService.getUserRdcPaths().rdcIntermediateRoot;

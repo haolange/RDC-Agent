@@ -25,7 +25,7 @@ import {
 export async function startGrokBrowserLogin(
   clientId: string,
   setFlow: (flow: OAuthFlowState) => void,
-  openBrowser: (url: string, flow: OAuthFlowState) => Promise<void>,
+  openBrowser: (url: string) => Promise<void>,
   complete: (flow: OAuthFlowState, code: string) => Promise<void>,
 ): Promise<OAuthFlowState> {
   const { verifier, challenge } = createPkce();
@@ -49,7 +49,8 @@ export async function startGrokBrowserLogin(
       scope: flow.requestedScopes, code_challenge: challenge, code_challenge_method: 'S256',
       state: flow.state, nonce: flow.nonce!,
     });
-    await openBrowser(flow.authUrl, flow);
+    await openBrowser(flow.authUrl);
+    flow.abortController?.signal.throwIfAborted();
     return flow;
   } catch (error) {
     flow.abortController?.abort();

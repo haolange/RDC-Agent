@@ -1,98 +1,46 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
+import { configuredInstallationRoot } from '../tools/RdcInstallationService';
 
-export function adbUnavailableMessage(): string {
-  return 'adb executable not found. Configure RDC_ANDROID_ADB_PATH or install Android platform-tools.';
-}
-
-export function candidateAdbPaths(): string[] {
-  const candidates: string[] = [];
-  const push = (value?: string) => {
-    const trimmed = value?.trim();
-    if (trimmed) {
-      candidates.push(trimmed);
-    }
-  };
-
-  push(process.env.RDC_ANDROID_ADB_PATH);
-  push(process.env.ADB);
-
-  for (const envName of ['ANDROID_SDK_ROOT', 'ANDROID_HOME']) {
-    const root = process.env[envName]?.trim();
-    if (!root) {
-      continue;
-    }
-    push(path.join(root, 'platform-tools', 'adb.exe'));
-    push(path.join(root, 'platform-tools', 'adb'));
-  }
-
-  const localAppData = process.env.LOCALAPPDATA?.trim();
-  if (localAppData) {
-    push(path.join(localAppData, 'Android', 'Sdk', 'platform-tools', 'adb.exe'));
-  }
-
-  return candidates;
-}
-
-async function pathIsAccessible(candidate: string): Promise<boolean> {
-  try {
-    await fs.promises.access(candidate);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function resolveFromCandidates(): Promise<string | null> {
-  for (const candidate of candidateAdbPaths()) {
-    if (await pathIsAccessible(candidate)) {
-      return path.resolve(candidate);
-    }
-  }
-
-  for (const entry of (process.env.PATH ?? '').split(path.delimiter)) {
-    const trimmed = entry.trim();
-    if (!trimmed) {
-      continue;
-    }
-
-    for (const adbName of ['adb.exe', 'adb']) {
-      const candidate = path.join(trimmed, adbName);
-      if (await pathIsAccessible(candidate)) {
-        return path.resolve(candidate);
-      }
-    }
-  }
-
-  return null;
-}
-
-/** Cached async adb resolver — invalidate after spawn/access failure. */
+/** Reads the selected Tools installation, never searches PATH or another SDK. */
 export class AdbExecutableCache {
   private cachedPath: string | null = null;
+  private cacheKey = '';
+  invalidate(): void { this.cachedPath = null; this.cacheKey = ''; }
+  getCachedPath(): string | null { return this.cachedPath; }
 
-  invalidate(): void {
-    this.cachedPath = null;
-  }
-
-  getCachedPath(): string | null {
-    return this.cachedPath;
-  }
-
-  async resolveAdbExecutableAsync(): Promise<string> {
-    if (this.cachedPath) {
-      if (await pathIsAccessible(this.cachedPath)) {
-        return this.cachedPath;
+  async resolveAdbExecutableAsync(settings: RdcCliInvokerSettings): Promise<string> {
+    const root = configuredInstallationRoot(settings);
+    if (!root) throw new Error('RDC_INSTALLATION_INVALID: verify the selected RDC-Tool installation in Settings.');
+    const override = (settings.env.RDC_TOOL_ANDROID_ADB_PATH ?? process.env.RDC_TOOL_ANDROID_ADB_PATH ?? '').trim();
+    const key = JSON.stringify([root, override ?? '']);
+    if (key === this.cacheKey && this.cachedPath) {
+      try { await fs.access(this.cachedPath); return this.cachedPath; } catch { this.invalidate(); }
+    }
+    let executable: string;
+    if (override?.trim()) {
+      if (!path.isAbsolute(override)) throw new Error('RDC_TOOL_ANDROID_ADB_PATH must be an absolute path.');
+      executable = override;
+    } else {
+      const binaryRoot = path.join(root, 'binaries', 'windows', 'x64');
+      const manifest = JSON.parse(await fs.readFile(path.join(binaryRoot, 'manifest.runtime.json'), 'utf8')) as {
+        bundled_tools?: { adb?: { path?: string } }; files: Array<{ path: string; sha256: string }>;
+      };
+      const relative = manifest.bundled_tools?.adb?.path;
+      if (!relative || path.isAbsolute(relative)) throw new Error('ADB_MISSING: selected RDC-Tool has no bundled ADB metadata. Verify or repair the installation.');
+      executable = path.resolve(binaryRoot, relative);
+      if (!executable.startsWith(`${binaryRoot}${path.sep}`)) throw new Error('ADB_INVALID: bundled ADB path escapes the installation.');
+      if ((await fs.realpath(executable)).toLowerCase() !== executable.toLowerCase()) throw new Error('ADB_INVALID: bundled ADB must not redirect outside its installation.');
+      const record = manifest.files.find((item) => item.path === relative);
+      const bytes = await fs.readFile(executable);
+      if (!record || createHash('sha256').update(bytes).digest('hex') !== record.sha256) {
+        throw new Error('ADB_INVALID: bundled ADB integrity check failed. Repair the selected RDC-Tool installation.');
       }
-      this.cachedPath = null;
     }
-
-    const resolved = await resolveFromCandidates();
-    if (!resolved) {
-      throw new Error(adbUnavailableMessage());
-    }
-
-    this.cachedPath = resolved;
-    return resolved;
+    if (!(await fs.stat(executable)).isFile()) throw new Error('ADB_MISSING: configured ADB is not a regular file.');
+    this.cachedPath = await fs.realpath(executable); this.cacheKey = key;
+    return this.cachedPath;
   }
 }

@@ -1,4 +1,10 @@
 export const enDevice = {
+  'device.discovery.title': 'Replay devices',
+  'device.discovery.scanning': 'Looking for Android devices…',
+  'device.discovery.empty': 'No Android devices found. Check USB debugging and device authorization.',
+  'device.discovery.watching': 'Watching for device changes',
+  'device.discovery.refresh': 'Refresh',
+  'device.status.disconnected': 'Not connected',
   'device.localReplay': 'Local replay',
   'device.localReplayReady': 'Local replay ready',
   'device.ready': 'Ready',

@@ -86,7 +86,7 @@ Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / In
 
 ## Provider Account（产品）
 
-Account providers 是登录产品。Grok Subscription：xAI 公共 native-client + PKCE；仅应用内、无 preload 的 sandbox 浏览器窗口登录，动态 loopback 自动完成；无设备码、手动粘贴或 CLI 凭据复用模式。关闭登录窗口会取消当前尝试；取消、超时及退出同时释放回调与窗口。不得导入 `~/.grok/auth.json` 或共享 refresh token。xAI (Grok) API-key 为独立 provider，不作订阅失败的 fallback。
+Account providers 是登录产品。Grok Subscription：xAI 公共 native-client + PKCE；仅系统默认浏览器登录，动态 loopback 自动完成；无设备码、手动粘贴或 CLI 凭据复用模式。外部标签页不归应用管理；取消、替换、超时及退出释放当前回调并隔离迟到结果。不得导入 `~/.grok/auth.json` 或共享 refresh token。xAI (Grok) API-key 为独立 provider，不作订阅失败的 fallback。
 
 
 ## 任务匹配与交接预载

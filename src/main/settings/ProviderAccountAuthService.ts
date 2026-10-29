@@ -55,8 +55,7 @@ import {
   startOpenRouterLogin,
 } from './oauth/openRouterAccountOAuth';
 import { GROK_OAUTH_CLIENT_ID } from './oauth/oauthConstants';
-import { openGrokLoginWindow } from './oauth/grokLoginWindow';
-import { isTestMode, parseProviderError, shouldOpenSystemBrowser } from './oauth/oauthHttp';
+import { parseProviderError, shouldOpenSystemBrowser } from './oauth/oauthHttp';
 import type { AccountProviderId, OAuthFlowState, OAuthSecretBundle } from './oauth/oauthTypes';
 import { isAccountProviderId } from './oauth/oauthTypes';
 
@@ -139,7 +138,7 @@ export class ProviderAccountAuthService {
       if (providerId === 'grok-account') {
         if (request.accountLoginMode === 'device') throw new Error('Grok subscriptions use browser sign-in.');
         await startGrokBrowserLogin(GROK_OAUTH_CLIENT_ID, (flow) => { startedGrokFlowId = flow.flowId; this.setFlow(flow); },
-          async (url, flow) => { if (!isTestMode() && process.env.RDC_AGENT_HEADLESS !== '1') await openGrokLoginWindow(flow, url); }, async (flow, code) => {
+          (url) => this.openExternal(url), async (flow, code) => {
             const status = await this.finishLoginInternal('grok-account', flow.flowId, code);
             if (!status.connected) throw new Error(status.error ?? 'Grok sign-in failed.');
           });

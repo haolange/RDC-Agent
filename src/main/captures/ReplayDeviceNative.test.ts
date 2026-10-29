@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 const execute = vi.hoisted(() => vi.fn());
+vi.mock('../settings/SettingsService', () => ({ settingsService: { getAll: () => ({ tooling: { rdcCli: { env: {} } } }) } }));
+vi.mock('../tools/withRdcHostRuntimeEnv', () => ({ withRdcHostRuntimeEnv: (value: unknown) => value }));
 vi.mock('electron', () => ({ BrowserWindow: class {} }));
 vi.mock('../tools/RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: execute } }));
 vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: {} }));

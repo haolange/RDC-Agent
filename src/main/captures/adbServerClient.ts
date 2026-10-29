@@ -24,6 +24,7 @@ export class AdbServerProtocolError extends Error {
 }
 
 export interface QueryAdbDevicesOptions {
+  signal?: AbortSignal;
   timeoutMs?: number;
   /** Test seam — production always uses 127.0.0.1:5037. */
   host?: string;
@@ -63,6 +64,7 @@ function parseAdbDevicesResponse(buffer: Buffer): { done: true; payload: string 
 
   const status = buffer.subarray(0, 4).toString('ascii');
   const lengthHex = buffer.subarray(4, 8).toString('ascii');
+  if (!/^[0-9a-fA-F]{4}$/.test(lengthHex)) throw new AdbServerProtocolError('Invalid ADB length prefix.');
   const payloadLength = Number.parseInt(lengthHex, 16);
   if (!Number.isFinite(payloadLength) || payloadLength < 0) {
     throw new AdbServerProtocolError(`Invalid ADB length prefix: ${lengthHex}`);
@@ -86,6 +88,7 @@ function parseAdbDevicesResponse(buffer: Buffer): { done: true; payload: string 
  * Returns payload lines (same device-row format as `adb devices -l`, without the header).
  */
 export async function queryAdbDevicesLines(options?: QueryAdbDevicesOptions): Promise<string[]> {
+  options?.signal?.throwIfAborted();
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const host = options?.host ?? DEFAULT_HOST;
   const port = options?.port ?? DEFAULT_PORT;
@@ -101,6 +104,7 @@ export async function queryAdbDevicesLines(options?: QueryAdbDevicesOptions): Pr
         return;
       }
       settled = true;
+      options?.signal?.removeEventListener('abort', abort);
       clearTimeout(timer);
       destroySocket(socket);
       if (error) {
@@ -110,6 +114,8 @@ export async function queryAdbDevicesLines(options?: QueryAdbDevicesOptions): Pr
       resolve(lines ?? []);
     };
 
+    const abort = () => settle(new Error('ADB discovery cancelled.'));
+    options?.signal?.addEventListener('abort', abort, { once: true });
     const timer = setTimeout(() => {
       timedOut = true;
       settle(new AdbServerUnreachableError(

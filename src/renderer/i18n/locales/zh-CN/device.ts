@@ -1,4 +1,10 @@
 export const zhDevice = {
+  'device.discovery.title': '回放设备',
+  'device.discovery.scanning': '正在查找 Android 设备…',
+  'device.discovery.empty': '未发现 Android 设备，请检查 USB 调试与设备授权。',
+  'device.discovery.watching': '正在检测设备变化',
+  'device.discovery.refresh': '刷新',
+  'device.status.disconnected': '待连接',
   'device.localReplay': '本地回放',
   'device.localReplayReady': '本地回放已就绪',
   'device.ready': '就绪',
