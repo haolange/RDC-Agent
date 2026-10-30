@@ -6,12 +6,11 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { CommandListResult } from '@shared/types/command';
+import { useCommandCatalog } from '../../hooks/useCommandCatalog';
 import { useI18n } from '../../i18n';
 import { Kbd } from '../../ui/Kbd';
 import './SlashCommandPopover.css';
 
-type CommandItem = CommandListResult['commands'][number];
 
 interface SlashCommandPopoverProps {
   filterText: string;
@@ -25,20 +24,9 @@ export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({
   onDismiss,
 }) => {
   const { t } = useI18n();
-  const [commands, setCommands] = useState<CommandItem[]>([]);
+  const { commands, loading, error } = useCommandCatalog();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const api = (window as { electronAPI?: { command?: { list: (category?: string) => Promise<CommandListResult> } } }).electronAPI;
-
-  useEffect(() => {
-    const loadCommands = async () => {
-      if (!api?.command) return;
-      const result = await api.command.list();
-      setCommands(result.commands);
-    };
-    void loadCommands();
-  }, [api?.command]);
-
   const filtered = commands.filter(
     (c) =>
       c.name.startsWith(filterText.toLowerCase()) ||
@@ -81,6 +69,10 @@ export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  if (loading || error) return <div className="slash-command-popover" role="status">
+    <p>{t(error ? 'app.commandsFailed' : 'app.commandsLoading')}</p>
+    {error ? <p>{error}</p> : null}
+  </div>;
   if (filtered.length === 0) return null;
 
   return (

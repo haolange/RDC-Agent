@@ -29,7 +29,7 @@ export const findPendingToolApproval = (messages: ConversationMessage[]): Pendin
           toolName: toolCall.toolName,
           question: toolCall.approval.reason?.trim()
             || block.summary?.trim()
-            || 'The agent needs approval before continuing.',
+            || '',
           risk: (toolCall.approval.risk === 'low' || toolCall.approval.risk === 'high'
             ? toolCall.approval.risk
             : 'medium') as PendingToolApprovalRequest['risk'],

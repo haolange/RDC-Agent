@@ -1,6 +1,5 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
-import { useWorkProcessLabel } from './workProcessUseLabel';
 import type { ToolRowModel } from './workProcessToolTypes';
 import { SourcePills, WebPageDestination } from './WorkProcessWebParts';
 import { WorkProcessImageThumbs } from './WorkProcessImageThumbs';
@@ -211,14 +210,13 @@ export const RawPanel: React.FC<{ row: ToolRowModel }> = ({ row }) => {
 };
 
 export const ToolApprovalCallout: React.FC<{ approval: NonNullable<ToolRowModel['approval']> }> = ({ approval }) => {
-  const label = useWorkProcessLabel();
   return (
     <div className={`work-process-tool-approval status-${approval.status}`} data-testid="work-process-tool-approval">
       <div className="work-process-tool-approval-head">
-        <span className="work-process-tool-approval-verb">{label(approval.verb)}</span>
+        <span className="work-process-tool-approval-verb">{approval.verb}</span>
         {approval.metaLines.length > 0 ? (
           <span className="work-process-tool-approval-meta">
-            {approval.metaLines.map((line) => <span key={line}>{label(line)}</span>)}
+            {approval.metaLines.map((line) => <span key={line}>{line}</span>)}
           </span>
         ) : null}
       </div>

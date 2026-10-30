@@ -1,3 +1,4 @@
+vi.mock('../settings/SettingsService', () => ({ settingsService: { getAll: () => ({ appearance: { language: electronState.language } }) } }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { dialog } from 'electron';
 
@@ -8,6 +9,7 @@ const { handlers, electronState, knowledgeState, writeMocks } = vi.hoisted(() =>
     electronState: {
       focused: undefined as object | undefined,
       handlers: registered,
+      language: 'zh-CN',
     },
     knowledgeState: {
       spaces: [
@@ -202,4 +204,18 @@ describe('knowledge mutation approval boundaries', () => {
     });
     expect(writeMocks.write).not.toHaveBeenCalled();
   });
+});
+
+it.each([['zh-CN', '确认更改知识', '取消'], ['en', 'Confirm knowledge change', 'Cancel']])('localizes %s native confirmation and issues no token after cancellation', async (language, title, cancel) => {
+  delete process.env.RDC_AGENT_TEST_MODE;
+  delete process.env.RDC_AGENT_BROWSER_QA;
+  registerKnowledgeHandlers({} as never);
+  electronState.focused = {};
+  electronState.language = language;
+  vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 1, checkboxChecked: false });
+  const result = await handlers.get('knowledge:issueApprovalToken')!({}, { action: 'knowledge.write', spaceId: 'user', relativePath: 'facts/language.md' });
+  expect(result).not.toHaveProperty('token');
+  expect(dialog.showMessageBox).toHaveBeenLastCalledWith(expect.any(Object), expect.objectContaining({
+    title, buttons: [expect.any(String), cancel], defaultId: 1, cancelId: 1,
+  }));
 });

@@ -1,3 +1,4 @@
+import { agentDescription } from '../../lib/agentDescription';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Icon } from '../../ui/Icon';
 import { ModeGlyph } from '../../ui/ModeGlyph';
@@ -118,6 +119,7 @@ export const ComposerAgentMenu: React.FC<{
         >
           {userInvocableAgents.map((agent) => {
             const agentMode: AgentMode = agent.id;
+            const description = agentDescription(agent, t);
             const isSelected = selectedAgentId === agent.id;
             const isRunning = activeAgentId === agent.id;
             return (
@@ -129,7 +131,7 @@ export const ComposerAgentMenu: React.FC<{
                 data-selected={isSelected}
                 role="menuitemradio"
                 aria-checked={isSelected}
-                title={agent.description || agent.name}
+                title={description || agent.name}
                 onClick={() => selectAgent(agent)}
               >
                 <span className="composer-agent-menu-item-icon" aria-hidden="true">
@@ -147,9 +149,9 @@ export const ComposerAgentMenu: React.FC<{
                 <span className="composer-agent-menu-item-check" aria-hidden="true">
                   {isSelected ? <Icon name="check" size={12} /> : null}
                 </span>
-                {agent.description ? (
+                {description ? (
                   <span className="composer-agent-menu-item-tooltip" role="tooltip">
-                    {agent.description}
+                    {description}
                   </span>
                 ) : null}
               </button>

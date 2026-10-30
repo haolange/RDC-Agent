@@ -56,6 +56,17 @@ function listApiFunctions(value: unknown, prefix = ''): Array<{ path: string; fn
 }
 
 describe('canonical renderer API', () => {
+  it('omits an absent command category across JSON transport', async () => {
+    const transport = new RecordingTransport();
+    const api = createRendererApi('win32', transport);
+    await api.command.list();
+    await api.command.list('system');
+    expect(JSON.parse(JSON.stringify(transport.invocations))).toEqual([
+      { channel: 'command:list', args: [] },
+      { channel: 'command:list', args: ['system'] },
+    ]);
+  });
+
   it('preserves optional resource deletion arguments across JSON transport', async () => {
     const transport = new RecordingTransport();
     const api = createRendererApi('win32', transport);

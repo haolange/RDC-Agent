@@ -100,7 +100,7 @@ export function useComposer(options: {
         id: selectedAgent?.id ?? currentMode,
         label: selectedAgent?.name ?? currentMode,
         icon: selectedAgent?.icon ?? 'message-orbit',
-        description: selectedAgent?.description ?? 'Agent profile',
+        description: selectedAgent?.description ?? t('composer.agentProfile'),
         accentColor: selectedAgent?.accent ?? agentAccent ?? COMPOSE_ACCENT_FALLBACK,
         disabled: false,
       };

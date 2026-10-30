@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { translate } from '../../i18n/messages';
+const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -212,7 +214,7 @@ it('keeps one event sequence and wording across process densities without invent
         toolCalls: [{ id: 'done', toolName: 'turn_complete', status: 'complete', argsPreview: '{}',
           resultPreview: 'Turn completion recorded: completed.', startedAt: now + 220, completedAt: now + 245 }],
         startedAt: now + 200, completedAt: now + 245 },
-    ] });
+    ] }, t);
   const render = (density: 'normal' | 'compact') => new DOMParser().parseFromString(renderToStaticMarkup(createElement(
     WorkProcessContent, { presentation, density, embedded: density === 'compact' })), 'text/html');
   const normal = render('normal');
@@ -224,7 +226,7 @@ it('keeps one event sequence and wording across process densities without invent
     expect(document.querySelector('[data-testid="work-process-hook-diagnostic-card"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="work-process-hook-diagnostic-card"]')?.textContent)
       .not.toContain('Hook rdc-shell-audit: completed');
-    expect(document.querySelector('.work-process-thinking-summary')?.textContent).toContain('workProcessThoughtFor');
+    expect(document.querySelector('.work-process-thinking-summary')?.textContent).toContain('已思考 · 20ms');
     expect([...document.querySelectorAll('.work-process-prose')]).toHaveLength(0);
   }
   expect(normal.querySelector('.work-process-steps')?.textContent).toBe(compact.querySelector('.work-process-steps')?.textContent);

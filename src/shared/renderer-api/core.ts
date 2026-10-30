@@ -140,7 +140,9 @@ export function createKnowledgeApi(transport: RendererApiTransport): KnowledgeAp
 
 export function createCommandApi(transport: RendererApiTransport): CommandApi {
   return {
-    list: (category) => transport.invoke(INVOKE.command.list, category),
+    list: (category) => category === undefined
+      ? transport.invoke(INVOKE.command.list)
+      : transport.invoke(INVOKE.command.list, category),
     execute: (request) => transport.invoke(INVOKE.command.execute, request),
   };
 }

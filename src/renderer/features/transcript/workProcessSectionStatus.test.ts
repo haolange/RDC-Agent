@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { translate } from '../../i18n/messages';
+const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
@@ -21,7 +23,7 @@ const review = (id: string, pending = false): ConversationWorkBlock => ({ id: `r
     planReview: pending ? { ...plan, status: 'awaiting', decision: undefined } : plan }] });
 function render(blocks: ConversationWorkBlock[]) {
   const trace: ConversationWorkTrace = { status: 'running', updatedAt: 5, blocks };
-  const presentation = buildWorkProcessPresentation(trace);
+  const presentation = buildWorkProcessPresentation(trace, t);
   const html = renderToStaticMarkup(createElement(PlanReaderHost, {
     children: createElement(WorkProcessContent, { presentation }),
   }));

@@ -1,3 +1,4 @@
+import type { Translator } from '../../i18n/messages';
 import type {
   ConversationLoopOutputPhase,
   ConversationLoopStopReason,
@@ -24,6 +25,7 @@ function isVisibleToolCall(call: ConversationToolCall): boolean {
 export type { LoopPresentationUnit, PresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
 
 export interface BlockProjectionContext {
+  t: Translator;
   visibleThinkingKeys: Set<string>;
   hasVisibleProcessEvidence: boolean;
   createToolRow: (call: import('@shared/types/conversation').ConversationToolCall) => WorkProcessRow;
@@ -80,6 +82,7 @@ export function buildPresentationUnits(
   ctx: BlockProjectionContext,
 ): PresentationUnit[] {
   const units: PresentationUnit[] = [];
+  const { t } = ctx;
 
   for (let blockIndex = 0; blockIndex < blocks.length; blockIndex += 1) {
     const block = blocks[blockIndex];
@@ -166,15 +169,15 @@ export function buildPresentationUnits(
       ctx.hasVisibleProcessEvidence = true;
       const stats = block.compactionStats;
       const detailLines: string[] = block.summary ? [block.summary] : [];
-      if (stats?.usage) detailLines.push(`Compaction provider usage: ${stats.usage.inputTokens} input / ${stats.usage.outputTokens} output tokens`);
+      if (stats?.usage) detailLines.push(t('chat.compactionUsage', { input: stats.usage.inputTokens, output: stats.usage.outputTokens }));
       if (stats?.sourceUri) detailLines.push(`${stats.sourceUri} sha256:${stats.sourceHash ?? ""}`);
       if (stats?.messagesBefore != null && stats.messagesAfter != null) {
-        detailLines.push(`${stats.messagesBefore} → ${stats.messagesAfter} messages`);
+        detailLines.push(t('chat.compactionMessages', { before: stats.messagesBefore, after: stats.messagesAfter }));
       }
       if (stats?.tokensBefore != null && stats.tokensAfter != null) {
-        detailLines.push(`${stats.tokensBefore} → ${stats.tokensAfter} estimated tokens`);
+        detailLines.push(t('chat.compactionTokens', { before: stats.tokensBefore, after: stats.tokensAfter }));
       } else if (stats?.tokensBefore != null) {
-        detailLines.push(`${stats.tokensBefore} estimated tokens`);
+        detailLines.push(t('chat.compactionTokensBefore', { count: stats.tokensBefore }));
       }
       units.push({
         kind: 'standalone',
@@ -182,7 +185,7 @@ export function buildPresentationUnits(
           type: 'summary',
           id: block.id,
           status: block.status,
-          text: block.status === 'running' ? '正在整理上下文' : block.status === 'error' ? '上下文整理失败' : '上下文已自动压缩',
+          text: block.status === 'running' ? t('chat.workProcessCompactRunning') : block.status === 'error' ? t('chat.workProcessCompactFailed') : t('chat.workProcessCompactComplete'),
           detailLines,
           duration: formatDurationMs(block.startedAt, block.completedAt),
           compactionProvenance: stats?.provenance,
@@ -249,7 +252,7 @@ export function buildPresentationUnits(
     const source = sources.get(unit.loopId);
     const settled = !source?.toolCalls.some((call) => call.status === 'pending' || call.status === 'running');
     for (const row of unit.rows) {
-      if (row.type === 'section') row.visibleSteps = aggregateSectionSteps(row.steps, settled);
+      if (row.type === 'section') row.visibleSteps = aggregateSectionSteps(row.steps, t, settled);
     }
   }
   return units;

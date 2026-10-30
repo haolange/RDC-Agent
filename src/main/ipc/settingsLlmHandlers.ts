@@ -1,3 +1,4 @@
+import { refreshApplicationMenu } from '../window/applicationMenu';
 import { providerAccountAuthService } from '../settings/ProviderAccountAuthService';
 import { ipcMain } from 'electron';
 import type {
@@ -336,6 +337,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const previousSettings = settingsService.getAll();
     const nextSettings = settingsService.setAll(patch, appPathService.getRuntimePaths());
     if (patch.appearance) applyProductIcon();
+    if (previousSettings.appearance.language !== nextSettings.appearance.language) refreshApplicationMenu();
     const changedProviderIds = new Set<string>();
     if (patch.llm?.providers) context.applyCurrentLlmConfig();
     for (const provider of patch.llm?.providers ? nextSettings.llm.providers : []) {

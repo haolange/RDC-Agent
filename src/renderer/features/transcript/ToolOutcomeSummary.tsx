@@ -14,8 +14,8 @@ export const ToolOutcomeSummary: React.FC<{ outcome: ToolOutcome }> = ({ outcome
   } else if (outcome.type === 'completion') {
     title = t(`chat.toolOutcomeCompletion.${outcome.disposition}`);
   } else {
-    title = outcome.names.join('、') || t('chat.toolOutcomeNoTools');
-    meta = t('chat.toolOutcomeToolsCount', { count: outcome.count });
+    title = outcome.names.join(t('chat.listSeparator')) || t('chat.toolOutcomeNoTools');
+    meta = t(outcome.count === 1 ? 'chat.toolOutcomeToolOne' : 'chat.toolOutcomeToolsCount', { count: outcome.count });
   }
   return <div className="work-process-tool-card-body work-process-outcome">
     <span className="work-process-outcome-title"><OverflowFade text={title} /></span>

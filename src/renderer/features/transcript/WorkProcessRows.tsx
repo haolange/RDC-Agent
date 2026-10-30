@@ -4,7 +4,6 @@ import { useI18n } from '../../i18n';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { getRowStatusLabel } from './workProcessStatus';
 import { type WorkProcessRow } from './workProcessTypes';
-import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { isActiveWorkProcessStatus } from './workProcessActiveSignal';
 import { ToolRow } from './WorkProcessRowParts';
@@ -16,8 +15,7 @@ import { WorkProcessIcon } from './WorkProcessIcons';
 export { ToolRow };
 
 export const SummaryRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'summary' }> }> = ({ row }) => {
-  const label = useWorkProcessLabel();
-  const title = label(row.text);
+  const title = row.text;
   return (
     <li className={`work-process-step is-appear status-${row.status} kind-summary`} data-testid="work-process-block">
       <WorkProcessRailIcon row={row} />
@@ -107,13 +105,12 @@ export const PlanReviewRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'pla
 
 export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'userInput' }> }> = ({ row }) => {
   const { t } = useI18n();
-  const label = useWorkProcessLabel();
   const active = isActiveWorkProcessStatus(row.status);
   const [expanded, toggleDisclosure] = useScopedWorkDisclosure(`user-input-${row.id}`, row.status !== 'complete');
   const transcriptId = useId();
   const headerText = row.incomplete
-    ? label(row.verb)
-    : t('chat.workProcessAskCount', { verb: label(row.verb), count: row.questionCount });
+    ? row.verb
+    : t('chat.workProcessAskCount', { verb: row.verb, count: row.questionCount });
   const pendingAnswerLabel = row.status === 'error'
     ? t('chat.workProcessUserAnswerMissing')
     : t('chat.workProcessUserAnswerPending');
@@ -170,16 +167,16 @@ export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'user
 };
 
 export const ApprovalRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'approval' }> }> = ({ row }) => {
-  const label = useWorkProcessLabel();
-  const statusLabel = row.status === 'complete' ? '' : label(getRowStatusLabel(row.status));
+  const { t } = useI18n();
+  const statusLabel = row.status === 'complete' ? '' : getRowStatusLabel(row.status, t);
   const summaryLine = (
     <>
       <span className="work-process-tool-line">
-        <span className="work-process-tool-verb">{label(row.verb)}</span>
+        <span className="work-process-tool-verb">{row.verb}</span>
         <span className="work-process-approval-message">{row.message}</span>
       </span>
       <span className="work-process-tool-meta">
-        {row.metaLines.map((line) => <span key={line}>{label(line)}</span>)}
+        {row.metaLines.map((line) => <span key={line}>{line}</span>)}
         {row.duration ? <span>{row.duration}</span> : null}
         {statusLabel ? <span>{statusLabel}</span> : null}
       </span>

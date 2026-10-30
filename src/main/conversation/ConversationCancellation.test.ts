@@ -1,3 +1,4 @@
+import { translate } from '../../renderer/i18n/messages';
 import { describe, expect, it } from 'vitest';
 import { finalizeTrace, upsertLoopResult, upsertRuntimeToolApproval, upsertRuntimeToolCall } from './ConversationWorkTrace';
 import { createToolRowForPresentation } from '../../renderer/features/transcript/workProcessToolRows';
@@ -60,6 +61,6 @@ describe('request cancellation is not rejection or failure', () => {
     const call = next.blocks[0].toolCalls[0];
     expect(call.status).toBe(status);
     expect(call.completedAt).toBe(2);
-    expect(createToolRowForPresentation(call).status).toBe(status);
+    expect(createToolRowForPresentation(call, (key, params) => translate('zh-CN', key, params)).status).toBe(status);
   });
 });

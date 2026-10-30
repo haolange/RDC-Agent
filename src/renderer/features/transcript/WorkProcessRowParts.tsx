@@ -3,7 +3,6 @@ import { WorkCardHeader } from './WorkCardHeader';
 import { useI18n } from '../../i18n';
 import { getRowStatusLabel } from './workProcessStatus';
 import { WorkProcessIcon } from './WorkProcessIcons';
-import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import {
   CardBody,
@@ -26,9 +25,8 @@ const PlanReadAction: React.FC<{ plan: NonNullable<ToolRowModel['planReview']> }
 
 export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNode; density?: 'normal' | 'compact' }> = ({ row, extraDetail, density = 'normal' }) => {
   const { t } = useI18n();
-  const label = useWorkProcessLabel();
   const statusLabel = row.status === 'complete' || (row.approval && row.approval.status !== 'approved') || (row.planReview && row.status === 'cancelled')
-    ? '' : label(getRowStatusLabel(row.status));
+    ? '' : getRowStatusLabel(row.status, t);
   const hasDetail = row.previewLines.length > 0
     || Boolean(row.hookDiagnostics?.length)
     || Boolean(row.commandText)
@@ -47,9 +45,9 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
   // users expand individual cards when they want detail / Raw.
   const [expanded, toggleDisclosure] = useScopedWorkDisclosure(`tool-${row.id}`, false);
   const durationTitleFull = row.duration ? `${row.toolName} · ${row.duration}` : row.toolName;
-  const verbLabel = label(row.verb);
+  const verbLabel = row.verb;
   const approvalAttention = row.approval && row.approval.status !== 'approved'
-    ? [label(row.approval.verb) !== verbLabel ? label(row.approval.verb) : '', row.approval.message].filter(Boolean).join(' · ')
+    ? [row.approval.verb !== verbLabel ? row.approval.verb : '', row.approval.message].filter(Boolean).join(' · ')
     : '';
   const isBackgroundWait = row.toolName === 'background_wait';
   const compact = density === 'compact' || isBackgroundWait;

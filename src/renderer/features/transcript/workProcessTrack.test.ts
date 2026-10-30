@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { translate } from '../../i18n/messages';
+const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
@@ -11,7 +13,7 @@ import type { ConversationToolCall } from '@shared/types/conversation';
 
 const tool = (id: string, status: 'running' | 'pending' | 'error' | 'complete' = 'complete') => createToolRowForPresentation({
   id, toolName: 'read_file', status, startedAt: 1,
-}) as Extract<WorkProcessRow, { type: 'tool' }>;
+}, t) as Extract<WorkProcessRow, { type: 'tool' }>;
 const section = (id: string, steps: WorkProcessRow[], proseText = ''): Extract<WorkProcessRow, { type: 'section' }> => ({
   type: 'section', id, loopId: id, status: 'running', proseText, proseStreaming: false,
   thinkingPreview: '', thinkingLabel: '', thinkingExpandable: false, thinkingOpenByDefault: false,
@@ -22,7 +24,7 @@ it('preserves pending delegation until execution starts instead of creating a ru
     id: 'delegation-loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1,
     toolCalls: [{ id: 'queued-child', toolName: 'subagent', status: 'pending', startedAt: 1,
       delegation: { profile: 'general', task: 'Review', mode: 'wait' } }],
-  }] });
+  }] }, t);
   expect(presentation.rows).toHaveLength(0);
 });
 it('retains task approval and pre-execution errors while suppressing successful duplicate task receipts', () => {
@@ -34,7 +36,7 @@ it('retains task approval and pre-execution errors while suppressing successful 
         approval: { approvalId: 'task-approval-request', status: 'pending', reason: 'Review required' } },
       { id: 'done-task', toolName: 'task_create', status: 'complete', startedAt: 1, executionStartedAt: 2, completedAt: 3 },
     ],
-  }] });
+  }] }, t);
   const row = presentation.rows[0] as Extract<WorkProcessRow, { type: 'section' }>;
   expect(row.visibleSteps.map((step) => step.id)).toEqual(['failed-task', 'task-approval']);
   expect(row.visibleSteps.some(isTrackActivity)).toBe(false);
@@ -47,7 +49,7 @@ it('does not aggregate eight completed calls while a hidden ninth declaration st
   }));
   const project = () => buildWorkProcessPresentation({ status: 'running', updatedAt: 4, blocks: [{
     id: 'boundary-loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1, toolCalls: calls,
-  }] }).rows[0] as Extract<WorkProcessRow, { type: 'section' }>;
+  }] }, t).rows[0] as Extract<WorkProcessRow, { type: 'section' }>;
   expect(project().visibleSteps.map((row) => row.id)).toEqual(calls.slice(0, 8).map((call) => call.id));
   calls[8] = { ...calls[8], status: 'running', executionStartedAt: 4 };
   expect(project().visibleSteps).toHaveLength(9);
@@ -72,7 +74,7 @@ it('keeps started details stable during streaming and excludes future calls whil
       { id: 'future', toolName: 'read_file', status: 'pending', startedAt: 1 },
       { id: 'denied', toolName: 'shell', status: 'error', startedAt: 1, completedAt: 10, error: 'Permission denied' },
     ],
-  }] });
+  }] }, t);
   const row = presentation.rows.find((entry) => entry.type === 'section');
   expect(row?.type === 'section' && row.steps.map((entry) => entry.id)).toEqual(['running', 'denied']);
   expect(row?.type === 'section' && JSON.stringify(row.steps[0])).toContain('actual.txt');

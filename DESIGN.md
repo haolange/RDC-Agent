@@ -172,7 +172,8 @@ src/renderer/
   patterns/       跨 feature 复合（含 Markdown），可读 store，不写 store、不直调 IPC
   ui/             原子 + 分子组件库
   stores/  services/  hooks/  lib/  platform/
-  i18n/           index.ts + locales/{en,zh-CN}/<feature>.ts
+  i18n.ts         当前语言 React hook
+  i18n/           messages.ts 纯翻译 + locales/{en,zh-CN}/<feature>.ts
   styles/         design-system.css、global.css、base.css、responsive.css（仅真 @media）
 ```
 

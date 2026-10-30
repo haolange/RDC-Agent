@@ -5,7 +5,7 @@ import type { WorkbenchIpcContext } from './workbenchContext';
 const fixture = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   settings: {
-    appearance: { theme: 'dark' },
+    appearance: { theme: 'dark', language: 'zh-CN' },
     llm: { providers: [{ id: 'deepseek', catalogOwnership: 'provider-managed' }], agentRoutes: [] },
     agents: { definitions: [], modelOptions: [] },
   },
@@ -13,6 +13,7 @@ const fixture = vi.hoisted(() => ({
   modelOption: { canonicalId: 'deepseek:deepseek-v4-flash', status: 'ready' },
   load: vi.fn(async () => undefined),
   applyIcon: vi.fn(),
+  refreshMenu: vi.fn(),
 }));
 vi.mock('electron', () => ({
   ipcMain: { handle: (name: string, fn: (...args: unknown[]) => unknown) => fixture.handlers.set(name, fn) },
@@ -42,6 +43,7 @@ vi.mock('../settings/ModelsOverrideService', () => ({ modelsOverrideService: {} 
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: {} }));
 vi.mock('../runtime/ShellResolver', () => ({ shellResolver: {}, formatShellInterpreterLabel: vi.fn() }));
 
+vi.mock('../window/applicationMenu', () => ({ refreshApplicationMenu: fixture.refreshMenu }));
 vi.mock('../window/productIcon', () => ({ applyProductIcon: fixture.applyIcon }));
 
 import { registerSettingsLlmHandlers } from './settingsLlmHandlers';
@@ -64,4 +66,16 @@ describe('appearance settings response', () => {
     expect(broadcastToRenderer).not.toHaveBeenCalled();
     expect(applyCurrentLlmConfig).not.toHaveBeenCalled();
   });
+});
+
+it('refreshes native menus only after a committed language change', async () => {
+  registerSettingsLlmHandlers({ broadcastToRenderer: vi.fn(), applyCurrentLlmConfig: vi.fn() } as unknown as WorkbenchIpcContext);
+  const handle = fixture.handlers.get('settings:set')!;
+  for (const language of ['en', 'zh-CN']) {
+    const result = await handle({}, { appearance: { language } }) as AppSettings;
+    expect(result.appearance.language).toBe(language);
+  }
+  expect(fixture.refreshMenu).toHaveBeenCalledTimes(2);
+  await handle({}, { appearance: { language: 'zh-CN' } });
+  expect(fixture.refreshMenu).toHaveBeenCalledTimes(2);
 });

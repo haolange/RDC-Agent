@@ -5,6 +5,9 @@ import { CONTRACT_ROOT, requireRegistered, scriptExists, scriptRead, scriptReadC
 
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
+const { translate } = require('../src/renderer/i18n/messages.ts');
+const t = (key, params) => translate('zh-CN', key, params);
+
 
 const {
   buildWorkProcessPresentation,
@@ -186,7 +189,7 @@ const presentation = buildWorkProcessPresentation({
       completedAt: now + 900,
     },
   ],
-});
+}, t);
 
 const flatRows = flattenRows(presentation.rows);
 const visibleText = collectVisible(presentation.rows).join('\n');
@@ -233,7 +236,7 @@ const rawThinkingPresentation = buildWorkProcessPresentation({
       completedAt: now + 220,
     },
   ],
-});
+}, t);
 const rawThinkingSection = rawThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(rawThinkingSection?.type === 'section', 'raw thinking loop should render a section');
 assert(rawThinkingSection.thinkingLabel === '已思考 · 0ms', 'raw thinking should use 已思考 · duration settled label');
@@ -261,7 +264,7 @@ const activeRawThinkingPresentation = buildWorkProcessPresentation({
       startedAt: now + 200,
     },
   ],
-});
+}, t);
 const activeRawThinkingSection = activeRawThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(activeRawThinkingSection?.type === 'section', 'active raw thinking loop should render a section');
 assert(activeRawThinkingSection.thinkingLabel === '正在思考', 'active raw thinking should use streaming label');
@@ -288,7 +291,7 @@ const activeSummaryThinkingPresentation = buildWorkProcessPresentation({
       startedAt: now + 210,
     },
   ],
-});
+}, t);
 const activeSummaryThinkingSection = activeSummaryThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(activeSummaryThinkingSection?.type === 'section', 'active summary thinking loop should render a section');
 assert(activeSummaryThinkingSection.thinkingOpenByDefault === true, 'active process-loop summary thinking should expand by policy');
@@ -316,7 +319,7 @@ const summaryThinkingPresentation = buildWorkProcessPresentation({
       completedAt: now + 230,
     },
   ],
-});
+}, t);
 const summaryThinkingSection = summaryThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(summaryThinkingSection?.type === 'section', 'summary thinking should render as process evidence');
 assert(summaryThinkingSection.proseText === '', 'answer-only thinking must not duplicate final answer text');
@@ -367,7 +370,7 @@ const duplicateSummaryPresentation = buildWorkProcessPresentation({
       completedAt: now + 365,
     },
   ],
-});
+}, t);
 const duplicateSummarySections = duplicateSummaryPresentation.rows.filter((row) => row.type === 'section');
 assert(duplicateSummarySections.length === 1, 'duplicate provider summary should not create repeated Work Process sections');
 assert(!duplicateSummaryPresentation.rows.some((row) => row.type === 'response'), 'answer-only loops must not create Reply response boundary rows');
@@ -425,7 +428,7 @@ const streamingResponsePresentation = buildWorkProcessPresentation({
       startedAt: now + 380,
     },
   ],
-});
+}, t);
 assert(streamingResponsePresentation.rows.map((row) => row.type).join(',') === 'section,section', 'final answer streaming should render process section plus quiet thinking-only section');
 assert(!streamingResponsePresentation.rows.some((row) => row.type === 'response'), 'final answer streaming must not create a Reply boundary row');
 const closingThinking = streamingResponsePresentation.rows.filter((row) => row.type === 'section').at(-1);
@@ -480,7 +483,7 @@ const settledClosingThinkingPresentation = buildWorkProcessPresentation({
       completedAt: now + 390,
     },
   ],
-});
+}, t);
 const settledClosingThinking = settledClosingThinkingPresentation.rows.filter((row) => row.type === 'section').at(-1);
 assert(settledClosingThinking?.thinkingOpenByDefault === false, 'settled closing thinking should fold by policy');
 assert(settledClosingThinking?.thinkingPreview === 'Now produce the final answer settled.', 'settled closing thinking keeps preview behind disclosure');
@@ -512,7 +515,7 @@ const activeFinalAnswerThinkingPresentation = buildWorkProcessPresentation({
       startedAt: now + 400,
     },
   ],
-});
+}, t);
 const activeFinalAnswerThinkingSection = activeFinalAnswerThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(activeFinalAnswerThinkingSection?.type === 'section', 'active final-answer thinking should render a section');
 assert(activeFinalAnswerThinkingSection.thinkingOpenByDefault === true, 'active final-answer thinking should expand by policy');
@@ -547,7 +550,7 @@ const opaquePresentation = buildWorkProcessPresentation({
       completedAt: now + 360,
     },
   ],
-});
+}, t);
 assert(opaquePresentation.rows.length === 0, 'opaque final_answer without visible evidence must stay answer-body-only');
 assert(!opaquePresentation.rows.some((row) => row.type === 'section'), 'opaque provider state should not render a section row');
 assert(!opaquePresentation.rows.some((row) => row.type === 'reasoningIndicator'), 'opaque/hidden must never render a CoT placeholder indicator');
@@ -588,7 +591,7 @@ const opaqueToolPresentation = buildWorkProcessPresentation({
       completedAt: now + 390,
     },
   ],
-});
+}, t);
 const opaqueToolRows = flattenRows(opaqueToolPresentation.rows);
 assert(opaqueToolRows.some((row) => row.type === 'tool' && row.toolName === 'web_search'), 'opaque + tools must still surface real tool evidence');
 assert(!opaqueToolRows.some((row) => row.type === 'reasoningIndicator'), 'opaque + tools must not insert a CoT placeholder');
@@ -623,7 +626,7 @@ const approvalPresentation = buildWorkProcessPresentation({
       startedAt: now + 4300,
     },
   ],
-});
+}, t);
 const approvalRows = flattenRows(approvalPresentation.rows);
 const approvalRow = approvalRows.find((row) => row.type === 'tool' && row.toolName === 'web_search');
 assert(!approvalRows.some((row) => row.type === 'approval'), 'pending tool approval should not render as top-level approval row');
@@ -664,7 +667,7 @@ const askUserPresentation = buildWorkProcessPresentation({
       startedAt: now + 3000,
     },
   ],
-});
+}, t);
 const askUserRows = flattenRows(askUserPresentation.rows);
 const askUserRow = askUserRows.find((row) => row.type === 'userInput');
 assert(askUserRow?.verb === '正在询问', 'pending ask_user should render asking verb');
@@ -704,7 +707,7 @@ const webSearchPresentation = buildWorkProcessPresentation({
       completedAt: now + 7020,
     },
   ],
-});
+}, t);
 const webSearchRow = flattenRows(webSearchPresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'web_search');
 assert(webSearchRow?.verb === '已联网搜索', 'web_search should use dedicated web search verb');
 assert(webSearchRow.previewLines.includes('Provider: DuckDuckGo HTML'), 'web_search preview should include provider');
@@ -753,7 +756,7 @@ const webFetchPresentation = buildWorkProcessPresentation({
       completedAt: now + 8050,
     },
   ],
-});
+}, t);
 const webFetchRow = flattenRows(webFetchPresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'web_fetch');
 assert(webFetchRow?.verb === '已抓取', 'web_fetch should use Fetched page/已抓取 verb');
 assert(webFetchRow?.icon === 'webFetch', 'web_fetch should use dedicated webFetch icon');
@@ -799,7 +802,7 @@ const shellEnvelopePresentation = buildWorkProcessPresentation({
       completedAt: now + 8090,
     },
   ],
-});
+}, t);
 const shellEnvelopeRow = flattenRows(shellEnvelopePresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'shell');
 assert(shellEnvelopeRow?.previewKind === 'shell', 'shell should project shell preview kind');
 assert(shellEnvelopeRow?.commandText === 'pnpm run typecheck', 'shell should expose commandText for the terminal header');
@@ -845,7 +848,7 @@ const skillEnvelopePresentation = buildWorkProcessPresentation({
       completedAt: now + 8112,
     },
   ],
-});
+}, t);
 const skillEnvelopeRow = flattenRows(skillEnvelopePresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'skill_read');
 assert(skillEnvelopeRow?.previewKind === 'skill', 'skill_read should project skill preview kind');
 assert(skillEnvelopeRow?.pathChip === '/skills/arming-thought/SKILL.md', 'skill_read should expose path chip');
@@ -884,7 +887,7 @@ const fileGutterPresentation = buildWorkProcessPresentation({
       completedAt: now + 8210,
     },
   ],
-});
+}, t);
 const fileGutterRow = flattenRows(fileGutterPresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'read_file');
 assert(fileGutterRow?.previewKind === 'file', 'read_file should project file preview kind');
 assert(fileGutterRow?.pathChip === '.rdc-agent/project.yaml', 'read_file should expose pathChip');
@@ -916,7 +919,7 @@ const mcpPresentation = buildWorkProcessPresentation({
       completedAt: now + 7110,
     },
   ],
-});
+}, t);
 const mcpRows = flattenRows(mcpPresentation.rows);
 const mcpRow = mcpRows.find((row) => row.type === 'tool');
 assert(!mcpRows.some((row) => row.type === 'toolGroup'), 'dynamic MCP tools must stay flat without toolGroup shells');
@@ -1034,7 +1037,7 @@ assert(presentationSource.includes("normalized.startsWith('mcp__')"), 'dynamic M
 assert(presentationSource.includes("label: status === 'streaming'"), 'thinking labels should follow the thinking lifecycle');
 assert(!presentationSource.includes("label: status === 'streaming' || isActiveBlock"), 'a pending plan must not keep settled thinking active');
 assert(presentationSource.includes('resolveSettledThinkingLabel'), 'settled thinking should resolve Thought-for labels centrally');
-assert(presentationSource.includes('已思考 ·'), 'settled thinking label should use 已思考 · duration copy');
+assert(presentationSource.includes("t('chat.workProcessThoughtFor', { duration })"), 'settled thinking label should use 已思考 · duration copy');
 assert(!presentationSource.includes('`思考了 ${duration}`') && !presentationSource.includes('思考了 ${duration}'), 'settled thinking must not use 思考了 duration copy');
 assert(!presentationSource.includes('深度思考'), 'depth-thinking copy must not appear in presentation');
 assert(componentSource.includes('work-process-thinking-icon'), 'thinking folds should show a quiet leading icon');

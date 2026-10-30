@@ -1,3 +1,5 @@
+import { translate } from '../../i18n/messages';
+const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 import { describe, expect, it } from 'vitest';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
 import type { ConversationPlanReview } from '@shared/types/planReview';
@@ -18,7 +20,7 @@ it.each([
   const row = createToolRowForPresentation({ id: 'review', toolName: 'shell', status: 'error', startedAt: now,
     approval: { approvalId: 'auto-review-call', status, reviewer: 'auto_review', reviewMethod, errorCode,
       risk: 'high', reason: 'PERMISSION_REVIEW_TIMEOUT: model text alone does not classify failures', requestedAt: now },
-  });
+  }, t);
   expect(row).toMatchObject({ type: 'tool', approval: { verb } });
   if (row.type !== 'tool') throw new Error('Expected tool row');
   expect(row.approval?.metaLines.includes('操作未执行')).toBe(status === 'rejected');
@@ -29,7 +31,7 @@ it('keeps a post-approval native error separate from an operation-preflight reje
   const row = createToolRowForPresentation({ id: 'native', toolName: 'shell', status: 'error', startedAt: now,
     error: 'Native process exited with code 1',
     approval: { approvalId: 'auto-review-native', status: 'approved', reviewer: 'auto_review', reviewMethod: 'model', requestedAt: now },
-  });
+  }, t);
   expect(row).toMatchObject({ type: 'tool', status: 'error', approval: { verb: '独立审核通过' } });
   if (row.type !== 'tool') throw new Error('Expected tool row');
   expect(row.approval?.metaLines).not.toContain('操作未执行');
@@ -38,7 +40,7 @@ it('keeps a post-approval native error separate from an operation-preflight reje
 
 it.each(['tool-approval', 'auto-review-approval'])('does not label cancelled %s as approved', id => {
   expect(createApprovalRow({ id, kind: 'approval', title: 'Approval', status: 'cancelled',
-    toolCalls: [], startedAt: now, completedAt: now + 10 })).toMatchObject({
+    toolCalls: [], startedAt: now, completedAt: now + 10 }, t)).toMatchObject({
     type: 'approval', status: 'cancelled', verb: '已取消',
   });
 });
@@ -65,7 +67,7 @@ describe('buildWorkProcessPresentation', () => {
             delegation: { task: 'Read config', profile: 'general', mode: 'background', executionId: 'exec-2' } },
         ],
       }],
-    });
+    }, t);
     const rows = flattenWorkRows(presentation.rows);
     expect(rows.filter((row) => row.type === 'subagent')).toMatchObject([
       { id: 'delegate-1', task: 'Read inputs', status: 'complete' },
@@ -85,7 +87,7 @@ describe('buildWorkProcessPresentation', () => {
         },
         toolCalls: [], startedAt: now, completedAt: now + 10,
       }],
-    });
+    }, t);
     expect(presentation.rows).toHaveLength(0);
   });
 
@@ -97,7 +99,7 @@ describe('buildWorkProcessPresentation', () => {
         { id: 'compact-1', kind: 'compaction', title: 'Context compacted', summary: 'old counts', status: 'complete', toolCalls: [], startedAt: now, completedAt: now + 5 },
         { id: 'compact-2', kind: 'compaction', title: 'Context compacted', summary: 'new counts', status: 'complete', toolCalls: [], startedAt: now + 10, completedAt: now + 15 },
       ],
-    });
+    }, t);
     expect(presentation.rows).toEqual(['compact-1', 'compact-2'].map(id => expect.objectContaining({ id, type: 'summary', text: '上下文已自动压缩' })));
   });
 
@@ -127,7 +129,7 @@ describe('buildWorkProcessPresentation', () => {
           toolCalls: [], startedAt: now + 10,
         },
       ],
-    });
+    }, t);
     const rows = flattenWorkRows(presentation.rows);
     expect(rows.filter((row) => row.type === 'tool' && row.toolName === 'task_create')).toHaveLength(0);
     expect(rows.filter((row) => row.type === 'taskSnapshot')).toEqual([
@@ -152,7 +154,7 @@ describe('buildWorkProcessPresentation', () => {
         toolCalls: [],
         startedAt: now,
       }],
-    });
+    }, t);
     const row = flattenWorkRows(presentation.rows).find((entry) => entry.type === 'taskSnapshot');
     expect(row).toEqual(expect.objectContaining({ type: 'taskSnapshot', completed: 0, total: 1 }));
     if (!row || row.type !== 'taskSnapshot') throw new Error('expected task snapshot');
@@ -177,7 +179,7 @@ describe('buildWorkProcessPresentation', () => {
           startedAt: now,
         },
       ],
-    });
+    }, t);
 
     expect(presentation.rows).toHaveLength(0);
   });
@@ -202,7 +204,7 @@ describe('buildWorkProcessPresentation', () => {
           startedAt: now,
         },
       ],
-    });
+    }, t);
 
     const section = presentation.rows.find((row) => row.type === 'section');
     expect(section).toMatchObject({
@@ -262,7 +264,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 900,
         },
       ],
-    });
+    }, t);
 
     const sections = presentation.rows.filter((row) => row.type === 'section');
     expect(sections).toEqual(expect.arrayContaining([
@@ -325,7 +327,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 400,
         },
       ],
-    });
+    }, t);
 
     const finalSection = presentation.rows.find((row) => (
       row.type === 'section' && row.proseText === 'Final answer body only'
@@ -403,7 +405,7 @@ describe('buildWorkProcessPresentation', () => {
           startedAt: now + 500,
         },
       ],
-    });
+    }, t);
 
     expect(presentation.rows.some((row) => (
       row.type === 'section'
@@ -448,7 +450,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 1600,
         },
       ],
-    });
+    }, t);
 
     const section = presentation.rows.find((row) => row.type === 'section');
     expect(section).toMatchObject({
@@ -492,7 +494,7 @@ describe('buildWorkProcessPresentation', () => {
           startedAt: now,
         },
       ],
-    });
+    }, t);
 
     const section = presentation.rows.find((row) => row.type === 'section');
     expect(section).toMatchObject({
@@ -531,7 +533,7 @@ describe('buildWorkProcessPresentation', () => {
           startedAt: now,
         },
       ],
-    });
+    }, t);
     expect(presentation.rows.find((row) => row.type === 'section')).toMatchObject({
       thinkingOpenByDefault: true,
       thinkingLabel: '正在思考',
@@ -551,7 +553,7 @@ describe('buildWorkProcessPresentation', () => {
             hash: 'a'.repeat(64), title: 'Plan', summary: [], sections: [], status: 'awaiting',
             handoffOptions: [{ label: 'Execute with General', agent: 'general' }] } }],
       }],
-    });
+    }, t);
     expect(presentation.rows.find((row) => row.type === 'section')).toMatchObject({
       thinkingLabel: expect.stringMatching(/^已思考/),
       thinkingOpenByDefault: false,
@@ -588,7 +590,7 @@ describe('buildWorkProcessPresentation', () => {
           startedAt: now,
         },
       ],
-    });
+    }, t);
     expect(active.rows.find((row) => row.type === 'section')).toMatchObject({
       thinkingOpenByDefault: true,
       thinkingLabel: '正在思考',
@@ -626,7 +628,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 200,
         },
       ],
-    });
+    }, t);
     expect(settled.rows.find((row) => row.type === 'section')).toMatchObject({
       thinkingOpenByDefault: false,
       thinkingLabel: '已思考 · 100ms',
@@ -657,7 +659,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: undefined,
         },
       ],
-    });
+    }, t);
 
     // Without startedAt the loop may not project duration; if section exists, label must not reuse 思考过程.
     const section = presentation.rows.find((row) => row.type === 'section');
@@ -693,7 +695,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 30,
         },
       ],
-    });
+    }, t);
 
     const section = presentation.rows.find((row) => row.type === 'section');
     const visibleSteps = section?.type === 'section' ? section.visibleSteps : [];
@@ -728,7 +730,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 10,
         },
       ],
-    });
+    }, t);
 
     const section = presentation.rows.find((row) => row.type === 'section');
     const visibleSteps = section?.type === 'section' ? section.visibleSteps : [];
@@ -754,7 +756,7 @@ describe('buildWorkProcessPresentation', () => {
         startedAt: now,
         completedAt: now + 5,
       }],
-    });
+    }, t);
 
     expect(presentation.toolEvidence).toEqual({ total: 3, succeeded: 1, failed: 1, skipped: 1 });
     expect(flattenWorkRows(presentation.rows)).toEqual(expect.arrayContaining([
@@ -799,7 +801,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 5,
         },
       ],
-    });
+    }, t);
 
     expect(presentation.rows.filter((row) => row.type === 'diagnostic')).toEqual([
       expect.objectContaining({ id: 'diagnostic-info', severity: 'info' }),
@@ -841,7 +843,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 20,
         },
       ],
-    });
+    }, t);
 
     const tool = flattenWorkRows(presentation.rows).find((row) => row.type === 'tool');
     expect(tool).toMatchObject({
@@ -897,7 +899,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 40,
         },
       ],
-    });
+    }, t);
 
     expect(withThinking.rows.every((row) => row.type !== 'response' as string)).toBe(true);
     const closing = withThinking.rows.filter((row) => row.type === 'section').at(-1);
@@ -943,7 +945,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 40,
         },
       ],
-    });
+    }, t);
     expect(withoutThinking.rows.every((row) => row.type !== 'response' as string)).toBe(true);
     expect(withoutThinking.rows.filter((row) => row.type === 'section')).toHaveLength(1);
   });
@@ -984,7 +986,7 @@ describe('buildWorkProcessPresentation', () => {
       ],
     };
 
-    expect(buildWorkProcessPresentation(trace)).toEqual(buildWorkProcessPresentation(trace));
+    expect(buildWorkProcessPresentation(trace, t)).toEqual(buildWorkProcessPresentation(trace, t));
   });
 
   it('unwraps shell envelope into shell content-layer preview without ok/trace_id', () => {
@@ -1021,7 +1023,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 120,
         },
       ],
-    });
+    }, t);
 
     const shellRow = flattenWorkRows(presentation.rows).find(
       (row) => row.type === 'tool' && row.toolName === 'shell',
@@ -1093,7 +1095,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 40,
         },
       ],
-    });
+    }, t);
 
     const skillRow = flattenWorkRows(presentation.rows).find(
       (row) => row.type === 'tool' && row.toolName === 'skill_read',
@@ -1142,7 +1144,7 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 20,
         },
       ],
-    });
+    }, t);
 
     const readRow = flattenWorkRows(presentation.rows).find(
       (row) => row.type === 'tool' && row.toolName === 'read_file',
@@ -1191,14 +1193,14 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 16,
         },
       ],
-    });
+    }, t);
 
     const globRow = flattenWorkRows(presentation.rows).find(
       (row) => row.type === 'tool' && row.toolName === 'glob',
     );
     if (!globRow || globRow.type !== 'tool') throw new Error('expected glob tool row');
     expect(globRow.family).toBe('search');
-    expect(globRow.bodyText).toBe('3 files');
+    expect(globRow.bodyText).toBe('3 个文件');
     expect(globRow.bodyText).not.toBe('**/*');
     expect(globRow.bodyLines).toEqual(['src/a.ts', 'src/b.ts', 'README.md']);
     expect(globRow.previewLines).toContain('src/a.ts');
@@ -1237,13 +1239,13 @@ describe('buildWorkProcessPresentation', () => {
           completedAt: now + 10,
         },
       ],
-    });
+    }, t);
 
     const readRow = flattenWorkRows(presentation.rows).find(
       (row) => row.type === 'tool' && row.toolName === 'read_file',
     );
     if (!readRow || readRow.type !== 'tool') throw new Error('expected read tool row');
-    expect(readRow.bodyText).toBe('DESIGN.md · 240 lines');
+    expect(readRow.bodyText).toBe('DESIGN.md · 240 行');
     expect(readRow.pathChip).toBe('DESIGN.md');
   });
 
@@ -1279,7 +1281,7 @@ describe('buildWorkProcessPresentation', () => {
         startedAt: now,
         completedAt: now + 8,
       }],
-    });
+    }, t);
     const row = flattenWorkRows(presentation.rows).find(
       (entry) => entry.type === 'tool' && entry.toolName === 'grep',
     );
@@ -1310,7 +1312,7 @@ describe('buildWorkProcessPresentation', () => {
         startedAt: now,
         completedAt: now + 20,
       }],
-    });
+    }, t);
     const row = flattenWorkRows(presentation.rows).find((entry) => entry.type === 'taskSnapshot');
     expect(row).toEqual(expect.objectContaining({
       type: 'taskSnapshot',
@@ -1348,7 +1350,7 @@ describe('buildWorkProcessPresentation', () => {
           toolCalls: [], startedAt: now + 30, completedAt: now + 30,
         },
       ],
-    });
+    }, t);
     const snapshots = flattenWorkRows(presentation.rows).filter((entry) => entry.type === 'taskSnapshot');
     expect(snapshots).toHaveLength(2);
     expect(snapshots).toEqual([
@@ -1396,7 +1398,7 @@ describe('buildWorkProcessPresentation', () => {
         startedAt: now,
         completedAt: now + 10,
       }],
-    });
+    }, t);
     const rows = flattenWorkRows(presentation.rows);
     const memory = rows.find((row) => row.type === 'tool' && row.toolName === 'memory_search');
     const interpreter = rows.find((row) => row.type === 'tool' && row.toolName === 'code_interpreter');
@@ -1478,7 +1480,7 @@ describe('buildWorkProcessPresentation', () => {
         startedAt: now,
         completedAt: now + 16,
       }],
-    });
+    }, t);
     const rows = flattenWorkRows(presentation.rows);
     expect(rows.find((row) => row.type === 'tool' && row.toolName === 'skill_read')).toEqual(
       expect.objectContaining({
@@ -1530,7 +1532,7 @@ describe('buildWorkProcessPresentation', () => {
       planReview: awaiting,
       argsPreview: JSON.stringify({ title: awaiting.title }),
       startedAt: now,
-    });
+    }, t);
     expect(card).toMatchObject({ type: 'planReview', plan: awaiting });
 
     const shell = createToolRowForPresentation({
@@ -1546,7 +1548,7 @@ describe('buildWorkProcessPresentation', () => {
       resultPreview: '请补上复现条件。',
       startedAt: now,
       completedAt: now + 10,
-    });
+    }, t);
     expect(shell).toMatchObject({
       type: 'tool',
       verb: '计划 · 已提出修改',

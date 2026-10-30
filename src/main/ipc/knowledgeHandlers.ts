@@ -1,3 +1,4 @@
+import { nativeMessage } from '../window/nativeI18n';
 import { BrowserWindow, dialog, ipcMain } from 'electron';
 import type { KnowledgeIndexOverview, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
 import { KNOWLEDGE_IMPORT_MAX_BYTES } from '../knowledge/knowledgeIngest';
@@ -107,12 +108,12 @@ async function confirmKnowledgeMutation(
   if (!owner) return false;
   const result = await dialog.showMessageBox(owner, {
     type: 'warning',
-    buttons: ['Allow once', 'Cancel'],
+    buttons: [nativeMessage('allowOnce'), nativeMessage('cancel')],
     defaultId: 1,
     cancelId: 1,
-    title: 'Confirm knowledge change',
-    message: action === 'knowledge.write' ? 'Save this knowledge card?' : 'Promote or change this knowledge card?',
-    detail: `${spaceId} / ${relativePath}. The action is authorized by the native main-process dialog.`,
+    title: nativeMessage('knowledgeTitle'),
+    message: nativeMessage(action === 'knowledge.write' ? 'knowledgeWrite' : 'knowledgePromote'),
+    detail: `${spaceId} / ${relativePath}`,
     noLink: true,
   });
   return result.response === 0;

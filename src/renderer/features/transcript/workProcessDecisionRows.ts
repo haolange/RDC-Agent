@@ -1,3 +1,4 @@
+import type { Translator } from '../../i18n/messages';
 import { type ConversationToolCall, type ConversationWorkBlock } from '@shared/types/conversation';
 import { type WorkProcessRow, type WorkProcessUserInputItem, type WorkProcessRowStatus } from './workProcessTypes';
 import { formatDurationMs, compactText } from './workProcessFormat';
@@ -13,7 +14,7 @@ export const createPlanReviewRow = (call: ConversationToolCall): WorkProcessRow 
   duration: formatDurationMs(call.startedAt, call.completedAt),
 });
 
-export const createPlanReviewShellRow = (call: ConversationToolCall): WorkProcessRow => {
+export const createPlanReviewShellRow = (call: ConversationToolCall, t: Translator): WorkProcessRow => {
   const rejected = call.planReview?.status === 'rejected';
   const feedback = call.planReview?.decision?.kind === 'reject' ? call.planReview.decision.feedback : call.resultPreview;
   return {
@@ -21,9 +22,9 @@ export const createPlanReviewShellRow = (call: ConversationToolCall): WorkProces
     planReview: call.planReview,
     id: call.id,
     status: call.status,
-    verb: call.planReview?.status === 'cancelled' ? '计划 · 审阅已取消'
-      : rejected ? '计划 · 已提出修改' : '已更新计划',
-    category: '计划产物',
+    verb: call.planReview?.status === 'cancelled' ? t('chat.planShellCancelled')
+      : rejected ? t('chat.planShellFeedback') : t('chat.planUpdated'),
+    category: t('chat.toolDisplay.plan_artifact.category'),
     icon: 'planArtifact',
     groupKind: 'runtime',
     family: 'runtime',
@@ -37,7 +38,7 @@ export const createPlanReviewShellRow = (call: ConversationToolCall): WorkProces
   };
 };
 
-export const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
+export const createUserInputRow = (call: ConversationToolCall, t: Translator): WorkProcessRow => {
   const questions = call.userInputQuestions ?? [];
   const incomplete = questions.length === 0;
   const status = call.status === 'cancelled' ? 'cancelled' : incomplete
@@ -65,7 +66,7 @@ export const createUserInputRow = (call: ConversationToolCall): WorkProcessRow =
     type: 'userInput',
     id: call.id,
     status,
-    verb: status === 'cancelled' ? '已取消' : incomplete ? '问题数据不完整' : status === 'complete' ? '已询问' : status === 'error' ? '询问已中断' : '正在询问',
+    verb: status === 'cancelled' ? t('chat.workProcessApprovalCancelled') : incomplete ? t('chat.workProcessAskIncomplete') : status === 'complete' ? t('chat.workProcessAskComplete') : status === 'error' ? t('chat.workProcessAskInterrupted') : t('chat.workProcessAskRunning'),
     questionCount: questions.length,
     items,
     answeredCount: items.filter((item) => Boolean(item.answer)).length,
@@ -75,7 +76,7 @@ export const createUserInputRow = (call: ConversationToolCall): WorkProcessRow =
   };
 };
 
-export const createApprovalRow = (block: ConversationWorkBlock): WorkProcessRow => {
+export const createApprovalRow = (block: ConversationWorkBlock, t: Translator): WorkProcessRow => {
   const resolvedText = (getMeaningfulBlockSummary(block) || '').trim();
   const isGenericDecision = /^(approved once|user denied)$/i.test(resolvedText);
   const message = isGenericDecision ? '' : compactText(resolvedText, 300);
@@ -85,7 +86,7 @@ export const createApprovalRow = (block: ConversationWorkBlock): WorkProcessRow 
     type: 'approval',
     id: block.id,
     status: block.status,
-    verb: getApprovalVerb(block.status, isAutoReview),
+    verb: getApprovalVerb(block.status, isAutoReview, t),
     message,
     duration: formatDurationMs(block.startedAt, block.completedAt),
     detailLines: [],
@@ -93,9 +94,9 @@ export const createApprovalRow = (block: ConversationWorkBlock): WorkProcessRow 
   };
 };
 
-const getApprovalVerb = (status: WorkProcessRowStatus, isAutoReview: boolean): string => {
-  if (status === 'cancelled') return '已取消';
-  if (status === 'error') return isAutoReview ? '自动审查未通过' : '已拒绝';
-  if (status === 'running' || status === 'pending') return isAutoReview ? '自动审查中' : '等待审批';
-  return isAutoReview ? '自动审查通过' : '已批准';
+const getApprovalVerb = (status: WorkProcessRowStatus, isAutoReview: boolean, t: Translator): string => {
+  if (status === 'cancelled') return t('chat.workProcessApprovalCancelled');
+  if (status === 'error') return isAutoReview ? t('chat.workProcessAutoReviewRejected') : t('chat.workProcessApprovalRejected');
+  if (status === 'running' || status === 'pending') return isAutoReview ? t('chat.workProcessAutoReviewPending') : t('chat.workProcessApprovalPending');
+  return isAutoReview ? t('chat.workProcessAutoReviewApproved') : t('chat.workProcessApprovalApproved');
 };

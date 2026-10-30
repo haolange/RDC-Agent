@@ -1,3 +1,4 @@
+import { nativeMessage } from '../window/nativeI18n';
 import { dialog, ipcMain } from 'electron';
 import type {
   ProjectInputRecord,
@@ -175,7 +176,8 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       maxBytes: 4 * 1024,
     });
     const result = await dialog.showOpenDialog({
-      filters: [{ name: 'RenderDoc Capture', extensions: ['rdc'] }],
+      title: nativeMessage('selectCaptures'),
+      filters: [{ name: nativeMessage('captureFilter'), extensions: ['rdc'] }],
       properties: ['openFile', 'multiSelections'],
     });
 

@@ -155,8 +155,6 @@ const renderIconPath = (icon: WorkProcessIconKey): ReactElement => {
           <path d="M19 19 21.5 21.5" />
         </>
       );
-    case 'handoff':
-      return <path d="M7 7h10l-3-3m3 3-3 3M17 17H7l3 3m-3-3 3-3" />;
     case 'planArtifact':
       return (
         <>

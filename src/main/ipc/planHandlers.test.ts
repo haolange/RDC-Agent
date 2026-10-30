@@ -1,3 +1,4 @@
+vi.mock('../settings/SettingsService', () => ({ settingsService: { getAll: () => ({ appearance: { language: mocks.language } }) } }));
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,6 +10,7 @@ import type { WorkbenchIpcContext } from './workbenchContext';
 
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => Promise<any>>(),
+  language: 'zh-CN',
   read: vi.fn(), saveDialog: vi.fn(), confirm: vi.fn(),
   location: vi.fn(), paths: vi.fn(),
 }));
@@ -70,4 +72,13 @@ describe('plan IPC file authority', () => {
     mocks.confirm.mockImplementationOnce(async () => { context.state.currentSessionId = 'other'; return { response: 0 }; });
     await expect(invoke('plan:issueApprovalToken', { ...request, action: 'plan.saveToProject' })).rejects.toThrow(/SESSION_DENIED/);
   });
+});
+
+it.each([['zh-CN', '确认写入计划文件', '取消'], ['en', 'Confirm plan file write', 'Cancel']])('localizes %s plan confirmation and does not issue after cancellation', async (language, title, cancel) => {
+  mocks.language = language;
+  mocks.confirm.mockResolvedValueOnce({ response: 1 });
+  expect(await invoke('plan:issueApprovalToken', { ...request, action: 'plan.saveToProject' })).toEqual({ cancelled: true });
+  expect(mocks.confirm).toHaveBeenLastCalledWith(expect.any(Object), expect.objectContaining({
+    title, buttons: [expect.any(String), cancel], defaultId: 1, cancelId: 1,
+  }));
 });

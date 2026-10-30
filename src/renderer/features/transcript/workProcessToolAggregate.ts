@@ -1,3 +1,4 @@
+import type { Translator } from '../../i18n/messages';
 import type { WorkProcessRow, WorkProcessRowStatus, WorkProcessToolGroupKind } from './workProcessTypes';
 import { groupImageRows } from './groupImageRows';
 
@@ -55,57 +56,10 @@ function formatDuration(rows: ToolRow[]): string {
 }
 
 /**
- * Build a Chinese natural-language aggregate summary.
- * Locale mapping happens in workProcessUseLabel / i18n (EN equivalents).
- */
-export function buildToolAggregateSummary(tools: ToolRow[]): string {
-  const counts: Record<AggregateBucket, number> = {
-    created: 0,
-    edited: 0,
-    deleted: 0,
-    read: 0,
-    ran: 0,
-    searched: 0,
-    listed: 0,
-    other: 0,
-  };
-  for (const tool of tools) {
-    counts[classifyTool(tool)] += 1;
-  }
-
-  const parts: string[] = [];
-  if (counts.created > 0) {
-    parts.push(counts.created === 1 ? '创建了 1 个文件' : `创建了 ${counts.created} 个文件`);
-  }
-  if (counts.edited > 0) {
-    parts.push(counts.edited === 1 ? '编辑了 1 个文件' : `编辑了 ${counts.edited} 个文件`);
-  }
-  if (counts.deleted > 0) {
-    parts.push(counts.deleted === 1 ? '删除了 1 个文件' : `删除了 ${counts.deleted} 个文件`);
-  }
-  if (counts.read > 0) {
-    parts.push(counts.read === 1 ? '读取了 1 个文件' : `读取了 ${counts.read} 个文件`);
-  }
-  if (counts.ran > 0) {
-    parts.push(counts.ran === 1 ? '运行了 1 条命令' : `运行了 ${counts.ran} 条命令`);
-  }
-  if (counts.searched > 0) {
-    parts.push(counts.searched === 1 ? '搜索了 1 次' : `搜索了 ${counts.searched} 次`);
-  }
-  if (counts.listed > 0) {
-    parts.push(counts.listed === 1 ? '列出了 1 项' : `列出了 ${counts.listed} 项`);
-  }
-  if (counts.other > 0) {
-    parts.push(counts.other === 1 ? '使用了 1 个工具' : `使用了 ${counts.other} 个工具`);
-  }
-  return parts.join('，') || `使用了 ${tools.length} 个工具`;
-}
-
-/**
  * Settled tool disclosure: ≤7 tools stay flat; ≥8 consecutive tools become one aggregate row.
  * Non-tool rows (userInput / approval / …) flush any pending tools and pass through.
  */
-export function aggregateSectionSteps(steps: WorkProcessRow[], settled = true): WorkProcessRow[] {
+export function aggregateSectionSteps(steps: WorkProcessRow[], t: Translator, settled = true): WorkProcessRow[] {
   const output: WorkProcessRow[] = [];
   let pendingTools: ToolRow[] = [];
 
@@ -118,7 +72,7 @@ export function aggregateSectionSteps(steps: WorkProcessRow[], settled = true): 
         type: 'toolAggregate',
         id: `tool-agg-${pendingTools[0].id}`,
         status: deriveStatus(pendingTools),
-        summary: buildToolAggregateSummary(pendingTools),
+        summary: buildToolAggregateSummary(pendingTools, t),
         duration: formatDuration(pendingTools),
         children: pendingTools,
       });
@@ -136,4 +90,21 @@ export function aggregateSectionSteps(steps: WorkProcessRow[], settled = true): 
   }
   flushTools();
   return output;
+}/** Summarize application-owned counts directly in the selected language. */
+export function buildToolAggregateSummary(tools: ToolRow[], t: Translator): string {
+  const counts: Record<AggregateBucket, number> = { created: 0, edited: 0, deleted: 0, read: 0, ran: 0, searched: 0, listed: 0, other: 0 };
+  for (const tool of tools) counts[classifyTool(tool)] += 1;
+  const keys = {
+    created: ['chat.workProcessAggregateCreatedOne', 'chat.workProcessAggregateCreatedMany'],
+    edited: ['chat.workProcessAggregateEditedOne', 'chat.workProcessAggregateEditedMany'],
+    deleted: ['chat.workProcessAggregateDeletedOne', 'chat.workProcessAggregateDeletedMany'],
+    read: ['chat.workProcessAggregateReadOne', 'chat.workProcessAggregateReadMany'],
+    ran: ['chat.workProcessAggregateRanOne', 'chat.workProcessAggregateRanMany'],
+    searched: ['chat.workProcessAggregateSearchedOne', 'chat.workProcessAggregateSearchedMany'],
+    listed: ['chat.workProcessAggregateListedOne', 'chat.workProcessAggregateListedMany'],
+    other: ['chat.workProcessAggregateUsedOne', 'chat.workProcessAggregateUsedMany'],
+  } as const;
+  return (Object.keys(counts) as AggregateBucket[]).filter(bucket => counts[bucket] > 0)
+    .map(bucket => t(keys[bucket][counts[bucket] === 1 ? 0 : 1], { count: counts[bucket] }))
+    .join(t('chat.aggregateSeparator'));
 }

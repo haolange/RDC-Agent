@@ -39,4 +39,11 @@ export const zhApp = {
   'app.removeArmedSkill': '移除武装技能 {skillId}',
   'app.inspector': '检查面板',
   'app.closePanel': '关闭面板',
+  'app.commandPaletteInput': "命令面板输入",
+  'app.noMatchingCommands': "没有匹配的命令",
+  'app.appearanceUpdateFailed': "无法更新外观偏好。",
+  'app.selectPlaceholder': "请选择",
+  'app.selectEmpty': "没有可用选项",
+  'app.commandsLoading': '正在加载命令…',
+  'app.commandsFailed': '无法读取命令列表',
 } as const;

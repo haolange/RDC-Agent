@@ -2,6 +2,9 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
+const { translate } = require('../src/renderer/i18n/messages.ts');
+const t = (key, params) => translate('zh-CN', key, params);
+
 
 const { AGENT_WORKBENCH_TOOL_CATALOG } = require('../src/shared/constants/agentWorkbenchCatalog.ts');
 const { BUILTIN_AGENT_TOOL_IDS } = require('../src/shared/constants/agentToolTokens.ts');
@@ -323,9 +326,9 @@ const aggregateTools = ['read_file', 'read_file', 'glob'].map((toolName, index) 
   resultPreview: FIXTURES[toolName].resultPreview,
   startedAt: now + index,
   completedAt: now + index + 10,
-}));
+}, t));
 assert(typeof buildToolAggregateSummary === 'function', 'buildToolAggregateSummary should be exported');
-assert(buildToolAggregateSummary(aggregateTools).includes('读取了'), 'tool aggregate summary should classify read_file actions');
+assert(buildToolAggregateSummary(aggregateTools, t).includes('读取了'), 'tool aggregate summary should classify read_file actions');
 
 const PLAN_REQUIRED_TOOLS = [...workbenchToolIds, 'mcp__filesystem__read_file'];
 const allTools = [...new Set(PLAN_REQUIRED_TOOLS)];
@@ -357,7 +360,7 @@ for (const toolName of allTools) {
     resultPreview: fixture.resultPreview,
     startedAt: now,
     completedAt: now + 50,
-  });
+  }, t);
 
   if (toolName === 'ask_user') {
     assert(row.type === 'userInput', 'ask_user should render as userInput row');
@@ -392,21 +395,21 @@ for (const toolName of allTools) {
   }
 
   if (toolName === 'glob') {
-    assert(row.bodyText && /\d+\s+files?/.test(row.bodyText), `glob bodyText should be a file count, got "${row.bodyText}"`);
+    assert(row.bodyText && /\d+ 个文件/.test(row.bodyText), `glob bodyText should be a file count, got "${row.bodyText}"`);
     assert(row.bodyText !== '**/package.json', 'glob collapsed body must not be only the pattern');
     assert(row.bodyLines?.includes('package.json'), 'glob should expose path samples in bodyLines');
     assert(row.previewLines.includes('package.json'), 'glob previewLines should include matched paths');
   }
 
   if (toolName === 'grep') {
-    assert(row.bodyText && /match/i.test(row.bodyText), `grep bodyText should summarize matches, got "${row.bodyText}"`);
+    assert(row.bodyText && /匹配/.test(row.bodyText), `grep bodyText should summarize matches, got "${row.bodyText}"`);
     assert(row.bodyText !== 'export' && row.bodyText !== 'src', 'grep collapsed body must not be only args');
     assert(row.previewLines.some((line) => line.includes('src/index.ts')), 'grep preview should include match lines');
   }
 
   if (toolName === 'read_file') {
     assert(row.bodyText && row.bodyText.includes('src/main/index.ts'), 'read_file body should keep the path');
-    assert(row.bodyText.includes('12 lines'), `read_file body should include totalLines, got "${row.bodyText}"`);
+    assert(row.bodyText.includes('12 行'), `read_file body should include totalLines, got "${row.bodyText}"`);
     assert(row.previewLines.some((line) => line.includes('export')), 'read_file preview should include file content');
   }
 

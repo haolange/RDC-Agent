@@ -1,3 +1,4 @@
+import { useI18n } from '../../../i18n';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import { useDynStyle } from '../../../lib/useDynStyle';
@@ -126,7 +127,9 @@ const TerminalLogEntry: React.FC<TerminalLogEntryProps> = ({
   onToggle,
   onCopy,
   copyLabel,
-}) => (
+}) => {
+  const { t } = useI18n();
+  return (
   <article
     className={`runtime-terminal-entry namespace-${entry.namespace} severity-${entry.severity} ${isExpanded ? 'expanded' : ''}`}
     data-testid={`runtime-log-entry-${entry.id}`}
@@ -150,9 +153,9 @@ const TerminalLogEntry: React.FC<TerminalLogEntryProps> = ({
           <div className="runtime-terminal-entry-detail">{entry.detail}</div>
         )}
         <div className="runtime-terminal-entry-meta">
-          <span>session {formatShortId(entry.sessionId)}</span>
-          <span>run {formatShortId(entry.runId)}</span>
-          <span>project {formatShortId(entry.projectId)}</span>
+          <span>{t('terminal.metaSession')} {formatShortId(entry.sessionId)}</span>
+          <span>{t('terminal.metaRun')} {formatShortId(entry.runId)}</span>
+          <span>{t('terminal.metaProject')} {formatShortId(entry.projectId)}</span>
         </div>
         {entry.raw != null && (
           <pre className="runtime-terminal-entry-raw">{formatRaw(entry.raw)}</pre>
@@ -165,4 +168,5 @@ const TerminalLogEntry: React.FC<TerminalLogEntryProps> = ({
       </div>
     )}
   </article>
-);
+  );
+};

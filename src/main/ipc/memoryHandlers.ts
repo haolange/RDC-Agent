@@ -1,3 +1,4 @@
+import { nativeMessage } from '../window/nativeI18n';
 import { BrowserWindow, dialog, ipcMain } from 'electron';
 import type { MemoryWriteRequest } from '@shared/types/electron';
 import { MemoryStore } from '../agent-runtime/memory';
@@ -43,12 +44,12 @@ async function confirmMemoryMutation(action: 'memory.write' | 'memory.delete', s
   if (!owner) return false;
   const result = await dialog.showMessageBox(owner, {
     type: 'warning',
-    buttons: ['Allow once', 'Cancel'],
+    buttons: [nativeMessage('allowOnce'), nativeMessage('cancel')],
     defaultId: 1,
     cancelId: 1,
-    title: 'Confirm memory change',
-    message: action === 'memory.write' ? 'Save this memory entry?' : 'Delete this memory entry?',
-    detail: `${scope}${name ? ` ? ${name}` : ''}. The action is authorized by the native main-process dialog.`,
+    title: nativeMessage('memoryTitle'),
+    message: nativeMessage(action === 'memory.write' ? 'memoryWrite' : 'memoryDelete'),
+    detail: `${nativeMessage(scope === 'user' ? 'userScope' : 'projectScope')}${name ? ` · ${name}` : ''}`,
     noLink: true,
   });
   return result.response === 0;

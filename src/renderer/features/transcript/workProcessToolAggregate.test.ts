@@ -1,3 +1,5 @@
+import { translate } from '../../i18n/messages';
+const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 import { describe, expect, it } from 'vitest';
 import type { WorkProcessRow } from './workProcessTypes';
 import { aggregateSectionSteps } from './workProcessToolAggregate';
@@ -79,19 +81,19 @@ describe('aggregateSectionSteps', () => {
   it('keeps the active eighth call flat and aggregates only after the group settles', () => {
     const rows = Array.from({ length: 8 }, (_, index) => tool(`call-${index}`));
     rows[7].status = 'running';
-    expect(aggregateSectionSteps(rows).map((row) => row.id)).toEqual(rows.map((row) => row.id));
+    expect(aggregateSectionSteps(rows, t).map((row) => row.id)).toEqual(rows.map((row) => row.id));
     rows[7].status = 'complete';
-    const grouped = aggregateSectionSteps(rows);
+    const grouped = aggregateSectionSteps(rows, t);
     expect(grouped).toHaveLength(1);
     expect(grouped[0].type === 'toolAggregate' && grouped[0].children.map((row) => row.id)).toEqual(rows.map((row) => row.id));
   });
   it('keeps one through seven consecutive tools flat and aggregates at eight', () => {
     for (let count = 1; count <= 7; count += 1) {
-      expect(aggregateSectionSteps(Array.from({ length: count }, (_, index) => tool(`flat-${index}`))))
+      expect(aggregateSectionSteps(Array.from({ length: count }, (_, index) => tool(`flat-${index}`)), t))
         .toHaveLength(count);
     }
 
-    const aggregated = aggregateSectionSteps(Array.from({ length: 8 }, (_, index) => tool(`agg-${index}`)));
+    const aggregated = aggregateSectionSteps(Array.from({ length: 8 }, (_, index) => tool(`agg-${index}`)), t);
     expect(aggregated).toHaveLength(1);
     expect(aggregated[0]).toMatchObject({ type: 'toolAggregate', status: 'complete' });
     expect(aggregated[0]?.type === 'toolAggregate' ? aggregated[0].children : []).toHaveLength(8);
@@ -104,7 +106,7 @@ describe('aggregateSectionSteps', () => {
       ...Array.from({ length: 4 }, (_, index) => tool(`after-${index}`)),
     ];
 
-    expect(aggregateSectionSteps(rows).map((row) => row.type)).toEqual([
+    expect(aggregateSectionSteps(rows, t).map((row) => row.type)).toEqual([
       'tool', 'tool', 'tool', 'tool', type, 'tool', 'tool', 'tool', 'tool',
     ]);
   });

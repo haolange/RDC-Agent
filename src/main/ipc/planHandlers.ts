@@ -1,3 +1,4 @@
+import { nativeMessage } from '../window/nativeI18n';
 import { BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -33,12 +34,12 @@ async function confirmPlanMutation(action: 'plan.saveToProject' | 'plan.export',
   if (!owner) return false;
   const result = await dialog.showMessageBox(owner, {
     type: 'warning',
-    buttons: ['Allow once', 'Cancel'],
+    buttons: [nativeMessage('allowOnce'), nativeMessage('cancel')],
     defaultId: 1,
     cancelId: 1,
-    title: 'Confirm plan file write',
-    message: action === 'plan.saveToProject' ? 'Save this plan into the project?' : 'Export this plan to a file?',
-    detail: `Session ${sessionId}. The action is authorized by the native main-process dialog.`,
+    title: nativeMessage('planTitle'),
+    message: nativeMessage(action === 'plan.saveToProject' ? 'planSave' : 'planExport'),
+    detail: nativeMessage('session', { id: sessionId }),
     noLink: true,
   });
   return result.response === 0;
@@ -78,6 +79,7 @@ export function registerPlanHandlers(context: WorkbenchIpcContext): void {
     let targetPath: string;
     if (request.action === 'plan.export') {
       const result = await dialog.showSaveDialog({
+        title: nativeMessage('exportPlan'),
         defaultPath: selected.plan.title.replace(/[\\/:*?"<>|]/g, '-') + '.md',
         filters: [{ name: 'Markdown', extensions: ['md'] }],
         properties: ['createDirectory', 'showOverwriteConfirmation'],

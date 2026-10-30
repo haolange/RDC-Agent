@@ -1,3 +1,4 @@
+import type { Translator } from '../../i18n/messages';
 import { normalizeToolName, formatMcpTarget } from './workProcessToolCatalog';
 import { toRecord, parsePreview, stringifyPreview, createDetailLines, readNestedValue, isLikelyBinaryText, collectReadableText, extractContentTextFromJsonishString, isJsonLike, isEnvelopeText, ENVELOPE_KEY_PATTERN } from './workProcessContentText';
 import { getDetailsRecord, getRecordArray } from './workProcessWebPresentation';
@@ -33,8 +34,9 @@ const FILE_TOOL_NAMES = /^(?:read_file|artifact_read|write_file|edit_file|delete
 export const unwrapToolContentLayer = (
   toolName: string,
   parsed: unknown,
-  raw?: string,
-  argsPreview?: string,
+  raw: string | undefined,
+  argsPreview: string | undefined,
+  t: Translator,
 ): UnwrappedToolContent => {
   const normalized = normalizeToolName(toolName);
   const record = toRecord(parsed);
@@ -83,7 +85,7 @@ export const unwrapToolContentLayer = (
       return {
         previewKind: 'shell',
         commandText: commandText || undefined,
-        previewLines: ['Binary content omitted from preview.'],
+        previewLines: [t('chat.binaryPreviewOmitted')],
       };
     }
     const previewLines = filterEnvelopeLines(createDetailLines(stdout, SHELL_PREVIEW_MAX_LINES));
@@ -138,7 +140,7 @@ export const unwrapToolContentLayer = (
     return {
       previewKind: 'generic',
       chips: names.slice(0, 4),
-      bodyText: names.length > 0 ? `${names.length} skills` : contentText || undefined,
+      bodyText: names.length > 0 ? t(names.length === 1 ? 'chat.previewSkillsOne' : 'chat.previewSkillsMany', { count: names.length }) : contentText || undefined,
       previewLines: names,
     };
   }
@@ -177,7 +179,7 @@ export const unwrapToolContentLayer = (
     const hits = collectReadableText(record?.matches ?? record?.tools ?? details?.matches, 8);
     return {
       previewKind: 'generic',
-      bodyText: hits.length > 0 ? `${hits.length} tools` : contentText || undefined,
+      bodyText: hits.length > 0 ? t(hits.length === 1 ? 'chat.previewToolsOne' : 'chat.previewToolsMany', { count: hits.length }) : contentText || undefined,
       bodyLines: hits.slice(0, 3),
       previewLines: hits,
     };
@@ -195,7 +197,7 @@ export const unwrapToolContentLayer = (
     };
   }
 
-  if (normalized === 'rdc_context' || normalized === 'agent_handoff') {
+  if (normalized === 'rdc_context') {
     const target = sanitizeContentText(stringifyPreview(
       argsRecord?.target ?? argsRecord?.agent ?? details?.target,
     ));
@@ -226,7 +228,7 @@ export const unwrapToolContentLayer = (
         previewLines.length > 0 ? previewLines.length : undefined
       );
       if (matched != null) {
-        bodyText = `${matched} file${matched === 1 ? '' : 's'}${truncated ? '+' : ''}`;
+        bodyText = `${t(matched === 1 ? 'chat.previewFilesOne' : 'chat.previewFilesMany', { count: matched })}${truncated ? '+' : ''}`;
       }
     } else {
       const matchedLines = asFiniteNumber(
@@ -234,8 +236,8 @@ export const unwrapToolContentLayer = (
       ) ?? (previewLines.length > 0 ? previewLines.length : undefined);
       const matchedFiles = asFiniteNumber(details?.matchedFiles ?? record?.matchedFiles);
       const parts: string[] = [];
-      if (matchedLines != null) parts.push(`${matchedLines} match${matchedLines === 1 ? '' : 'es'}`);
-      if (matchedFiles != null) parts.push(`${matchedFiles} file${matchedFiles === 1 ? '' : 's'}`);
+      if (matchedLines != null) parts.push(t(matchedLines === 1 ? 'chat.previewMatchesOne' : 'chat.previewMatchesMany', { count: matchedLines }));
+      if (matchedFiles != null) parts.push(t(matchedFiles === 1 ? 'chat.previewFilesOne' : 'chat.previewFilesMany', { count: matchedFiles }));
       bodyText = parts.join(' · ');
       if (truncated && bodyText) bodyText += '+';
     }
@@ -279,7 +281,7 @@ export const unwrapToolContentLayer = (
       ? createDetailLines(contentText, previewLineLimit)
       : extractReadableResultLines(parsed, undefined, previewLineLimit);
     const binarySafe = isLikelyBinaryText(baseLines.join('\n'))
-      ? ['Binary content omitted from preview.']
+      ? [t('chat.binaryPreviewOmitted')]
       : filterEnvelopeLines(baseLines);
     const previewLines = filterEnvelopeLines(enhanceToolPreviewLines(
       toolName,
@@ -296,7 +298,7 @@ export const unwrapToolContentLayer = (
     );
     let bodyText = pathChip || undefined;
     if (isRead && bodyText && totalLines != null) {
-      bodyText = `${bodyText} · ${totalLines} lines`;
+      bodyText = `${bodyText} · ${t(totalLines === 1 ? 'chat.previewLineOne' : 'chat.previewLines', { count: totalLines })}`;
     } else if (!isRead && previewLines.length > 0 && !bodyText) {
       bodyText = previewLines[0];
     }
@@ -319,10 +321,10 @@ export const unwrapToolContentLayer = (
       );
       const query = stringifyPreview(argsRecord?.query ?? details?.query ?? record?.query);
       const countLabel = resultCount != null
-        ? `${String(resultCount)} 来源`
-        : '来源';
+        ? t(resultCount === 1 ? 'chat.previewSourceOne' : 'chat.previewSources', { count: resultCount })
+        : t('chat.previewSource');
       const summary = query
-        ? `${countLabel}的 “${compactText(query, 36)}”`
+        ? t('chat.previewSearchSummary', { sources: countLabel, query: compactText(query, 36) })
         : countLabel;
       const enhanced = enhanceToolPreviewLines(
         toolName,
@@ -341,7 +343,7 @@ export const unwrapToolContentLayer = (
     const bytes = asFiniteNumber(details?.bytes ?? record?.bytes);
     const statusBits: string[] = [];
     if (status != null) statusBits.push(`HTTP ${status}`);
-    if (bytes != null) statusBits.push(`${bytes} bytes`);
+    if (bytes != null) statusBits.push(t('chat.previewBytes', { count: bytes }));
     const enhanced = enhanceToolPreviewLines(
       toolName,
       parsed,
@@ -364,7 +366,7 @@ export const unwrapToolContentLayer = (
     ? createDetailLines(contentText, previewLineLimit)
     : extractReadableResultLines(parsed, undefined, previewLineLimit);
   const binarySafe = isLikelyBinaryText(baseLines.join('\n'))
-    ? ['Binary content omitted from preview.']
+    ? [t('chat.binaryPreviewOmitted')]
     : filterEnvelopeLines(baseLines);
   const previewLines = filterEnvelopeLines(enhanceToolPreviewLines(
     toolName,

@@ -72,9 +72,9 @@ const App: React.FC = () => {
 
   const applyAppearancePreference = useCallback((mutation: () => Promise<void>) => {
     void mutation().catch((error: unknown) => {
-      showNotice(error instanceof Error ? error.message : 'Unable to update appearance preferences.');
+      showNotice(error instanceof Error ? error.message : t('app.appearanceUpdateFailed'));
     });
-  }, [showNotice]);
+  }, [showNotice, t]);
 
   const syncCapturesFromSnapshot = useSyncCapturesFromSnapshot();
   const handleToggleLeftSidebar = useCallback(() => {

@@ -1,7 +1,8 @@
+import { agentDescription } from '../../../../lib/agentDescription';
 import React, { type Dispatch, type SetStateAction, useMemo, useState } from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
-import type { TranslationKey, useI18n } from '../../../../i18n';
+import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { EmptyState } from '../../../../ui/EmptyState';
@@ -15,13 +16,6 @@ import { useScopedSkillSelection } from '../useScopedSkillSelection';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type AgentScope = 'user' | 'project';
-
-const AGENT_DESCRIPTION_KEYS: Partial<Record<string, TranslationKey>> = {
-  analyzer: 'settings.agentDescription.analyzer',
-  general: 'settings.agentDescription.general',
-  debugger: 'settings.agentDescription.debugger',
-  optimizer: 'settings.agentDescription.optimizer',
-};
 
 interface AgentsSettingsProps {
   settings: AppSettings;
@@ -43,11 +37,6 @@ const visibleDrafts = (drafts: AgentManifestDraft[]): AgentManifestDraft[] =>
 
 const toSlug = (value: string): string =>
   value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'agent';
-
-const getAgentCardDescription = (agent: AgentManifestDraft, t: Translate): string => {
-  const key = AGENT_DESCRIPTION_KEYS[agent.id];
-  return key ? t(key) : agent.description;
-};
 
 /** Read-only scope filter: `writeScope` mirrors the definition provenance (builtin drafts write to user). */
 const draftScope = (draft: AgentManifestDraft): AgentScope => (draft.writeScope === 'project' ? 'project' : 'user');
@@ -211,7 +200,8 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
                 key={agent.id}
                 id={agent.id}
                 name={agent.name}
-                description={getAgentCardDescription(agent, t)}
+                description={settings.agents.definitions.some(definition => definition.id === agent.id && definition.description === agent.description)
+                  ? agentDescription(settings.agents.definitions.find(definition => definition.id === agent.id), t) : agent.description}
                 icon={agent.icon}
                 selected={agent.id === selectedId}
                 onSelect={() => setSelectedAgentId(agent.id)}

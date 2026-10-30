@@ -13,7 +13,7 @@ interface WorkProcessProps {
 
 const WorkProcessInner: React.FC<WorkProcessProps> = ({ trace, sessionId, messageId }) => {
   const { t } = useI18n();
-  const presentation = useMemo(() => buildWorkProcessPresentation(trace), [trace]);
+  const presentation = useMemo(() => buildWorkProcessPresentation(trace, t), [trace, t]);
   const [expanded, setExpanded] = useState<boolean>(presentation.defaultExpanded);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ const WorkProcessInner: React.FC<WorkProcessProps> = ({ trace, sessionId, messag
       ? t('chat.workProcessHeadlineRunning')
       : t('chat.workProcessTitle');
   const actionMeta = presentation.actionCount > 0
-    ? t('chat.workProcessActions', { count: presentation.actionCount })
+    ? t(presentation.actionCount === 1 ? 'chat.workProcessActionOne' : 'chat.workProcessActions', { count: presentation.actionCount })
     : '';
   const durationMeta = presentation.duration
     ? t(trace.status === 'running' ? 'chat.workProcessDurationRunning' : 'chat.workProcessDuration', { duration: presentation.duration })

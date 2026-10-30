@@ -12,4 +12,6 @@ export const enMemory = {
   'memory.namePlaceholder': 'name (kebab-case)',
   'memory.descriptionPlaceholder': 'description',
   'memory.contentPlaceholder': 'content (markdown)',
+  'memory.writeApprovalFailed': "Unable to authorize saving the memory.",
+  'memory.deleteApprovalFailed': "Unable to authorize deleting the memory.",
 } as const;

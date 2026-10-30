@@ -1,5 +1,5 @@
+import { agentDescription } from '../../lib/agentDescription';
 import React, { useEffect, useMemo, useState } from 'react';
-import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { ResolvedTheme } from '@shared/types/settings';
 import { deriveComposeAccentVars } from '@shared/theme/composeAccent';
 import { InlineError } from '../../ui/InlineError';
@@ -36,11 +36,6 @@ import './composer-plan-review.css';
 export interface ComposerProps {
   composer: ComposerController;
   shellRef?: React.Ref<HTMLDivElement>;
-}
-
-function getAgentCapability(agentId: string, definitions: AgentManifestDefinition[]): string {
-  const manifest = definitions.find((d) => d.id === agentId);
-  return manifest?.description ?? '';
 }
 
 export const Composer: React.FC<ComposerProps> = ({
@@ -112,7 +107,7 @@ export const Composer: React.FC<ComposerProps> = ({
     handleFilesIngest,
   });
   const selectedAgentDefinition = userInvocableAgents.find((agent) => agent.id === selectedAgentId);
-  const selectedAgentCapability = getAgentCapability(selectedAgentId, userInvocableAgents);
+  const selectedAgentCapability = agentDescription(userInvocableAgents.find(agent => agent.id === selectedAgentId), t);
   const composeAccentVars = useMemo(
     () => deriveComposeAccentVars(currentModeConfig.accentColor, resolvedTheme),
     [currentModeConfig.accentColor, resolvedTheme],

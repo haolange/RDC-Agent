@@ -1,3 +1,4 @@
+import { formatToolApprovalReason } from '../../lib/toolApprovalText';
 import React, { useRef, useState } from 'react';
 import type { PendingToolApprovalRequest } from './toolApprovalRequestModel';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
@@ -10,7 +11,7 @@ export const ToolApprovalRequestPanel: React.FC<{
 }> = ({ request }) => {
   const { t } = useI18n();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message?: string } | null>(null);
   const submitApproval = useToolApprovalSubmit();
   const submittingRef = useRef(false);
 
@@ -22,7 +23,7 @@ export const ToolApprovalRequestPanel: React.FC<{
     try {
       await submitApproval(request, approved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to submit the approval decision.');
+      setError(err instanceof Error ? { message: err.message } : {});
     } finally {
       submittingRef.current = false;
       setIsSubmitting(false);
@@ -33,9 +34,9 @@ export const ToolApprovalRequestPanel: React.FC<{
     <section className="composer-tool-approval-panel" data-testid="composer-tool-approval-panel">
       <div className="composer-tool-approval-header">
         <ActiveSignalText active tone="info" className="composer-tool-approval-kicker">{t('composer.toolApprovalKicker')}</ActiveSignalText>
-        <p>{request.question}</p>
+        <p>{formatToolApprovalReason(request.question, t) || t('chat.approvalRequiredMessage')}</p>
       </div>
-      <div className="composer-tool-approval-meta" aria-label="Approval context">
+      <div className="composer-tool-approval-meta" aria-label={t('composer.toolApprovalContext')}>
         <span>{request.toolName}</span>
         <span>{t((
           {
@@ -44,7 +45,7 @@ export const ToolApprovalRequestPanel: React.FC<{
             high: 'composer.toolApprovalRisk.high',
           } as const
         )[request.risk])}</span>
-        {request.reviewer ? <span>{request.reviewer}</span> : null}
+        {request.reviewer ? <span>{request.reviewer === 'user' ? t('chat.workProcessManualReviewMeta') : request.reviewer}</span> : null}
       </div>
       <div className="composer-tool-approval-actions">
         <Button
@@ -66,7 +67,7 @@ export const ToolApprovalRequestPanel: React.FC<{
       </div>
       {error ? (
         <p className="composer-user-input-error" role="alert">
-          {error}
+          {error.message || t('composer.toolApprovalSubmitFailed')}
         </p>
       ) : null}
     </section>

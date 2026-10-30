@@ -1,3 +1,5 @@
+import { formatToolApprovalReason } from '../../lib/toolApprovalText';
+import type { Translator } from '../../i18n/messages';
 import { type ConversationToolCall, type ConversationToolApproval, type ConversationToolApprovalStatus } from '@shared/types/conversation';
 import { type WorkProcessRow, type WorkProcessToolApproval, type WorkProcessRowStatus } from './workProcessTypes';
 import { normalizeToolName, getToolDisplay, getToolFamily, formatMcpTarget } from './workProcessToolCatalog';
@@ -47,25 +49,25 @@ const TARGET_KEYS = [
 
 const RAW_PAYLOAD_TARGET_KEYS = new Set(['content', 'text', 'body', 'payload']);
 
-export const createToolRowForPresentation = (call: ConversationToolCall): WorkProcessRow => {
+export const createToolRowForPresentation = (call: ConversationToolCall, t: Translator): WorkProcessRow => {
   if (normalizeToolName(call.toolName) === 'ask_user') {
-    return createUserInputRow(call);
+    return createUserInputRow(call, t);
   }
   if (normalizeToolName(call.toolName) === 'plan_artifact' && call.planReview) {
     if (call.planReview.status === 'superseded' || call.planReview.status === 'rejected' || call.planReview.status === 'cancelled') {
-      return createPlanReviewShellRow(call);
+      return createPlanReviewShellRow(call, t);
     }
     return createPlanReviewRow(call);
   }
   const display = getToolDisplay(call.toolName);
-  const approval = createToolApprovalPresentation(call.approval, call.toolName);
+  const approval = createToolApprovalPresentation(call.approval, t);
   const rawResult = call.error || call.resultPreview;
   const parsedResult = parsePreview(rawResult);
   const suppressApprovalPreview = Boolean(approval) && isApprovalRequiredPreview(parsedResult, rawResult);
   const status = deriveToolStatus(call, parsedResult);
   const unwrapped = suppressApprovalPreview
     ? emptyUnwrappedContent()
-    : unwrapToolContentLayer(call.toolName, parsedResult, call.error ? undefined : call.resultPreview, call.argsPreview);
+    : unwrapToolContentLayer(call.toolName, parsedResult, call.error ? undefined : call.resultPreview, call.argsPreview, t);
   const previewLines = call.error && !suppressApprovalPreview
     ? (
       unwrapped.previewLines.length > 0
@@ -86,8 +88,8 @@ export const createToolRowForPresentation = (call: ConversationToolCall): WorkPr
     type: 'tool',
     id: call.id,
     status,
-    verb: getToolVerb(call.toolName, status, call.error || call.resultPreview, call.approval),
-    category: display.category,
+    verb: getToolVerb(call.toolName, status, call.error || call.resultPreview, call.approval, t),
+    category: t(display.category),
     icon: display.icon,
     groupKind: display.groupKind,
     family: getToolFamily(call.toolName),
@@ -144,57 +146,47 @@ export const extractDiagnosticCaption = (
 
 const createToolApprovalPresentation = (
   approval: ConversationToolApproval | undefined,
-  toolName: string,
+  t: Translator,
 ): WorkProcessToolApproval | undefined => {
   if (!approval) return undefined;
   const isAutoReview = isAutomaticToolApproval(approval);
-  const reason = normalizeApprovalMessage(approval.reason, toolName);
-  const answer = normalizeApprovalMessage(approval.answer, toolName);
+  const reason = formatToolApprovalReason(approval.reason, t);
+  const answer = formatToolApprovalReason(approval.answer, t);
   const messageSource = approval.status === 'approved'
     ? (isGenericDecisionText(answer) ? '' : answer)
     : (isGenericDecisionText(answer) ? reason : answer) || reason;
-  const message = compactText(messageSource || fallbackApprovalMessage(approval.status), 300);
+  const message = compactText(messageSource || fallbackApprovalMessage(approval.status, t), 300);
+  const riskKey = approval.risk === 'low' ? 'chat.workProcessRiskLow' : approval.risk === 'medium' ? 'chat.workProcessRiskMedium' : approval.risk === 'high' ? 'chat.workProcessRiskHigh' : undefined;
   const metaLines = [
-    approval.risk ? `风险：${approval.risk}` : '',
-    isAutoReview ? approval.reviewMethod === 'rule' ? '规则检查' : approval.reviewMethod === 'model' ? '独立审核' : '自动审查' : '人工审批',
-    approval.status === 'rejected' ? '操作未执行' : '',
+    approval.risk ? (riskKey ? t(riskKey) : t('chat.approvalRisk', { risk: approval.risk })) : '',
+    isAutoReview ? approval.reviewMethod === 'rule' ? t('chat.workProcessRuleReview') : approval.reviewMethod === 'model' ? t('chat.workProcessModelReview') : t('chat.workProcessAutoReviewMeta') : t('chat.workProcessManualReviewMeta'),
+    approval.status === 'rejected' ? t('chat.workProcessNotExecuted') : '',
   ].filter(Boolean);
 
   return {
     status: approval.status,
-    verb: getToolApprovalVerb(approval, isAutoReview),
+    verb: getToolApprovalVerb(approval, isAutoReview, t),
     message,
     metaLines,
   };
 };
 
-const getToolApprovalVerb = (approval: ConversationToolApproval, isAutoReview: boolean): string => {
+const getToolApprovalVerb = (approval: ConversationToolApproval, isAutoReview: boolean, t: Translator): string => {
   const { status, reviewMethod, errorCode } = approval;
-  if (status === 'cancelled') return '已取消';
-  if (status === 'rejected' && errorCode) return '审核未完成';
-  if (isAutoReview && reviewMethod === 'rule') return status === 'pending' ? '规则检查中' : status === 'approved' ? '规则检查通过' : '规则检查未通过';
-  if (isAutoReview && reviewMethod === 'model') return status === 'pending' ? '独立审核中' : status === 'approved' ? '独立审核通过' : '独立审核未通过';
-  if (status === 'pending') return isAutoReview ? '自动审查中' : '等待审批';
-  if (status === 'approved') return isAutoReview ? '自动审查通过' : '已批准';
-  return isAutoReview ? '自动审查未通过' : '已拒绝';
+  if (status === 'cancelled') return t('chat.workProcessApprovalCancelled');
+  if (status === 'rejected' && errorCode) return t('chat.workProcessReviewIncomplete');
+  if (isAutoReview && reviewMethod === 'rule') return status === 'pending' ? t('chat.workProcessRulePending') : status === 'approved' ? t('chat.workProcessRuleApproved') : t('chat.workProcessRuleRejected');
+  if (isAutoReview && reviewMethod === 'model') return status === 'pending' ? t('chat.workProcessModelPending') : status === 'approved' ? t('chat.workProcessModelApproved') : t('chat.workProcessModelRejected');
+  if (status === 'pending') return isAutoReview ? t('chat.workProcessAutoReviewPending') : t('chat.workProcessApprovalPending');
+  if (status === 'approved') return isAutoReview ? t('chat.workProcessAutoReviewApproved') : t('chat.workProcessApprovalApproved');
+  return isAutoReview ? t('chat.workProcessAutoReviewRejected') : t('chat.workProcessApprovalRejected');
 };
 
-const fallbackApprovalMessage = (status: ConversationToolApprovalStatus): string => {
-  if (status === 'pending') return '当前权限模式要求先审批这个动作。';
-  if (status === 'approved') return '这个动作已经批准继续执行。';
-  if (status === 'rejected') return '这个动作已被拒绝。';
-  return '这个动作已取消。';
-};
-
-const normalizeApprovalMessage = (value: string | undefined, toolName: string): string => {
-  const text = value?.trim() ?? '';
-  if (!text) return '';
-  const networkMatch = text.match(/^Network tool "([^"]+)" requires approval in the current permission mode.?$/i);
-  if (networkMatch) return `当前权限模式要求先审批 ${networkMatch[1]}。`;
-  const toolMatch = text.match(/^Tool "([^"]+)" requires approval(?: before it can run)?.?$/i);
-  if (toolMatch) return `当前权限模式要求先审批 ${toolMatch[1]}。`;
-  if (/requires approval/i.test(text)) return `当前权限模式要求先审批 ${toolName}。`;
-  return text;
+const fallbackApprovalMessage = (status: ConversationToolApprovalStatus, t: Translator): string => {
+  if (status === 'pending') return t('chat.approvalRequiredMessage');
+  if (status === 'approved') return t('chat.approvalApprovedMessage');
+  if (status === 'rejected') return t('chat.approvalRejectedMessage');
+  return t('chat.approvalCancelledMessage');
 };
 
 const isGenericDecisionText = (value: string): boolean => (
@@ -228,17 +220,18 @@ const deriveToolStatus = (call: ConversationToolCall, parsedResult: unknown): Wo
 export const getToolVerb = (
   toolName: string,
   status: WorkProcessRowStatus,
-  resultPreview?: string,
-  approval?: ConversationToolApproval,
+  resultPreview: string | undefined,
+  approval: ConversationToolApproval | undefined,
+  t: Translator,
 ): string => {
   const display = getToolDisplay(toolName);
-  if (approval?.status === 'pending') return getToolApprovalVerb(approval, isAutomaticToolApproval(approval));
-  if (status === 'pending') return display.pendingVerb ?? '等待执行';
-  if (status === 'running') return display.runningVerb;
-  if (status === 'skipped') return '已跳过';
-  if (status === 'cancelled') return '已取消';
-  if (status !== 'error') return display.completeVerb;
-  return isToolApprovalRejected(approval) || /approval required|no changes were made/i.test(resultPreview ?? '') ? '已阻断' : '执行失败';
+  if (approval?.status === 'pending') return getToolApprovalVerb(approval, isAutomaticToolApproval(approval), t);
+  if (status === 'pending') return display.pendingVerb ? t(display.pendingVerb) : t('chat.workProcessToolPending');
+  if (status === 'running') return t(display.runningVerb);
+  if (status === 'skipped') return t('chat.workProcessStatusSkipped');
+  if (status === 'cancelled') return t('chat.workProcessApprovalCancelled');
+  if (status !== 'error') return t(display.completeVerb);
+  return isToolApprovalRejected(approval) || /approval required|no changes were made/i.test(resultPreview ?? '') ? t('chat.workProcessToolBlocked') : t('chat.workProcessToolFailed');
 };
 
 const resultIndicatesFailure = (parsedResult: unknown, raw?: string): boolean => {

@@ -107,7 +107,7 @@ Browser QA 默认 disposable start:agent-browser，使用完整 one-time /qa?qaB
 
 人类入口 `scripts/start-rdc-agent.cmd` / `pnpm run start:human` / `start:human:dev` 与 QA/Electron 共享 canonical `%APPDATA%/rdc-agent/instance.lock`；活 owner 永不回收。启动过 QA/Electron，结束前停止本轮 launcher 及自有子进程，确认 lock 不存在或 owner 已死；不得停止用户的其他进程。改 launcher/main/window/userData 或跑 QA 后验证桌面不因占锁失败，并报告「桌面启动权已交还」。验收写 docs/product/acceptance-ledger.md，保留历史来源、SHA、日期；只标记实际通过的对应场景。
 
-会话投影变更运行 `pnpm run check:session-projection`，右栏变更运行 `pnpm run check:right-rail`。
+会话投影变更运行 `pnpm run check:session-projection`，右栏变更运行 `pnpm run check:right-rail`。界面文案或语言切换变更运行 `pnpm run check:i18n`，本地化边界见 `docs/ui/workbench-and-transcript.md`。
 
 ## Right Rail single-track gate
 

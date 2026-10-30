@@ -39,4 +39,11 @@ export const enApp = {
   'app.removeArmedSkill': 'Remove armed skill {skillId}',
   'app.inspector': 'Inspector',
   'app.closePanel': 'Close panel',
+  'app.commandPaletteInput': "Command palette input",
+  'app.noMatchingCommands': "No matching commands",
+  'app.appearanceUpdateFailed': "Unable to update appearance preferences.",
+  'app.selectPlaceholder': "Select",
+  'app.selectEmpty': "No options available",
+  'app.commandsLoading': 'Loading commands…',
+  'app.commandsFailed': 'Unable to load commands',
 } as const;

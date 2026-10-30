@@ -1,7 +1,11 @@
+import type { CommandListResult } from '@shared/types/command';
 import React, { useMemo } from 'react';
 import { useI18n } from '../../i18n';
 
 interface CommandPaletteProps {
+  commands: CommandListResult['commands'];
+  loading?: boolean;
+  error?: string | null;
   open: boolean;
   close: () => void;
   query: string;
@@ -9,26 +13,16 @@ interface CommandPaletteProps {
   onExecute?: (command: string) => void;
 }
 
-const BUILTIN_COMMANDS = [
-  { name: '/help', description: 'Show available commands' },
-  { name: '/clear', description: 'Clear current conversation' },
-  { name: '/status', description: 'Show system status' },
-  { name: '/config', description: 'Open settings' },
-  { name: '/mode', description: 'Switch agent mode' },
-  { name: '/model', description: 'Switch conversation model, or use the Agent configuration' },
-  { name: '/undo', description: 'Undo last user message' },
-];
-
-export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, close, query, setQuery, onExecute }) => {
+export const CommandPalette: React.FC<CommandPaletteProps> = ({ commands, loading, error, open, close, query, setQuery, onExecute }) => {
   const { t } = useI18n();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return BUILTIN_COMMANDS;
-    return BUILTIN_COMMANDS.filter(
+    if (!q) return commands;
+    return commands.filter(
       (c) => c.name.includes(q) || c.description.toLowerCase().includes(q),
     );
-  }, [query]);
+  }, [query, commands]);
 
   if (!open) return null;
 
@@ -43,10 +37,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, close, que
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('app.inputPlaceholder')}
-            aria-label="Command palette input"
+            aria-label={t('app.commandPaletteInput')}
           />
         </div>
         <div className="command-palette-list">
+          {loading ? <p role="status">{t('app.commandsLoading')}</p> : null}
+          {error ? <p role="alert">{t('app.commandsFailed')}: {error}</p> : null}
           {filtered.map((cmd) => (
             <button
               key={cmd.name}
@@ -54,15 +50,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, close, que
               className="command-palette-item"
               title={cmd.description}
               onClick={() => {
-                onExecute?.(cmd.name);
+                onExecute?.(`/${cmd.name}`);
                 close();
               }}
             >
-              <span className="command-palette-name">{cmd.name}</span>
+              <span className="command-palette-name">/{cmd.name}</span>
             </button>
           ))}
-          {filtered.length === 0 && (
-            <div className="command-palette-empty">No matching commands</div>
+          {!loading && !error && filtered.length === 0 && (
+            <div className="command-palette-empty">{t('app.noMatchingCommands')}</div>
           )}
         </div>
       </div>

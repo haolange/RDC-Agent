@@ -12,4 +12,6 @@ export const zhMemory = {
   'memory.namePlaceholder': '名称（kebab-case）',
   'memory.descriptionPlaceholder': '描述',
   'memory.contentPlaceholder': '内容（markdown）',
+  'memory.writeApprovalFailed': "无法授权保存记忆。",
+  'memory.deleteApprovalFailed': "无法授权删除记忆。",
 } as const;

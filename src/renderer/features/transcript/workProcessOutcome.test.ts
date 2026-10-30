@@ -1,9 +1,11 @@
+import { translate } from '../../i18n/messages';
+const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 import { describe, expect, it } from 'vitest';
 import { createToolRowForPresentation } from './workProcessToolRows';
 
 const project = (toolName: string, args: unknown, details: unknown, status: 'complete' | 'error' | 'skipped' = 'complete') => {
   const resultPreview = JSON.stringify({ content: [{ type: 'text', text: 'invart-internal\tsha256:receipt' }], details });
-  const row = createToolRowForPresentation({ id: 'test', toolName, status, startedAt: 1, argsPreview: JSON.stringify(args), resultPreview });
+  const row = createToolRowForPresentation({ id: 'test', toolName, status, startedAt: 1, argsPreview: JSON.stringify(args), resultPreview }, t);
   if (row.type !== 'tool') throw new Error('Expected tool');
   return row;
 };

@@ -1,6 +1,5 @@
 import React from 'react';
 import type { WorkProcessRow } from './workProcessTypes';
-import { useWorkProcessLabel } from './workProcessUseLabel';
 import { ToolRow } from './WorkProcessRows';
 import { useHasOpenWorkDisclosure, useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
@@ -11,7 +10,6 @@ export const ToolAggregateRow: React.FC<{ row: ToolAggregateRowModel;
   renderToolDetail?: (row: Extract<WorkProcessRow, { type: 'tool' }>) => React.ReactNode;
   density?: 'normal' | 'compact';
 }> = ({ row, renderToolDetail, density }) => {
-  const label = useWorkProcessLabel();
   const hasOpenChild = useHasOpenWorkDisclosure(row.children.map((child) => `tool-${child.id}`));
   const [expanded, toggle] = useScopedWorkDisclosure(`aggregate-${row.id}`, hasOpenChild);
 
@@ -25,7 +23,7 @@ export const ToolAggregateRow: React.FC<{ row: ToolAggregateRowModel;
         <details className="work-process-tool-aggregate-details" open={expanded}>
           <summary className="work-process-tool-aggregate-summary" onClick={(event) => { event.preventDefault(); toggle(); }}>
             <span className="work-process-row-caret work-process-aggregate-caret" aria-hidden="true" />
-            <span className="work-process-tool-aggregate-text">{label(row.summary)}</span>
+            <span className="work-process-tool-aggregate-text">{row.summary}</span>
             {row.duration ? <span className="work-process-tool-inline-meta">{row.duration}</span> : null}
           </summary>
           {expanded ? <ul className="work-process-steps work-process-tool-aggregate-body">

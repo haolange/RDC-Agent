@@ -43,4 +43,7 @@ export const enTerminal = {
   'terminal.emptyRun': 'No activity is available for the current run yet.',
   'terminal.emptyRunHint': 'Start or select a run before using Current Run scope.',
   'terminal.emptyAllSessions': 'No runtime activity is available yet.',
+  'terminal.metaSession': "Session",
+  'terminal.metaRun': "Run",
+  'terminal.metaProject': "Project",
 } as const;

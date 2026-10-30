@@ -1,12 +1,7 @@
-import { type WorkProcessRowStatus } from './workProcessTypes';
-
-const ROW_STATUS_LABEL: Record<WorkProcessRowStatus, string> = {
-  pending: '等待中',
-  running: '进行中',
-  complete: '',
-  error: '失败',
-  skipped: '已跳过',
-  cancelled: '已取消',
+import type { Translator, TranslationKey } from '../../i18n/messages';
+import type { WorkProcessRowStatus } from './workProcessTypes';
+const ROW_STATUS_KEY: Record<Exclude<WorkProcessRowStatus, 'complete'>, TranslationKey> = {
+  pending: 'chat.workProcessStatusPending', running: 'chat.workProcessStatusRunning', error: 'chat.workProcessStatusError',
+  skipped: 'chat.workProcessStatusSkipped', cancelled: 'chat.workProcessApprovalCancelled',
 };
-
-export const getRowStatusLabel = (status: WorkProcessRowStatus): string => ROW_STATUS_LABEL[status];
+export const getRowStatusLabel = (status: WorkProcessRowStatus, t: Translator): string => status === 'complete' ? '' : t(ROW_STATUS_KEY[status]);

@@ -2,7 +2,6 @@ import React from 'react';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
 import type { WorkProcessRow } from './workProcessTypes';
 import { getToolVerb } from './workProcessToolRows';
-import { useWorkProcessLabel } from './workProcessUseLabel';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { getRowStatusLabel } from './workProcessStatus';
 import { formatDurationMs } from './workProcessFormat';
@@ -47,7 +46,6 @@ function DelegationBody({ sessionId, parentToolCallId, childSessionId, execution
 
 export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | null }> = ({ row, sessionId }) => {
   const { t } = useI18n();
-  const label = useWorkProcessLabel();
   const { expanded, workOpen, finalOpen, detailsOpen, factsOpen, constraintsOpen, toggle, openCard } = useSubagentDisclosure(sessionId, row.id);
   const contentId = React.useId();
   const cardRef = React.useRef<HTMLLIElement>(null);
@@ -87,7 +85,7 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
     status: active ? 'running' : status === 'complete' ? 'complete' : status === 'cancelled' || status === 'interrupted' || status === 'partial' || status === 'blocked' ? 'stopped' : 'error',
     blocks: page.steps.map((step) => step.block), updatedAt: header?.completedAt ?? Date.now(),
   }), [active, status, page.steps, header?.completedAt]);
-  const presentation = React.useMemo(() => buildWorkProcessPresentation(trace), [trace]);
+  const presentation = React.useMemo(() => buildWorkProcessPresentation(trace, t), [trace, t]);
   const renderToolDetail = React.useCallback((tool: Extract<WorkProcessRow, { type: 'tool' }>) => (
     tool.status === 'complete' || tool.status === 'error' || tool.status === 'cancelled' || tool.status === 'skipped'
       ? <DelegatedToolReceipt sessionId={sessionId} parentToolCallId={row.id} toolCallId={tool.id}
@@ -95,7 +93,7 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
       : null
   ), [sessionId, row.id, header?.childSessionId, header?.executionId, header?.generation]);
   const latest = header?.latestAction
-    ? label(getToolVerb(header.latestAction, header.latestActionStatus ?? 'complete'))
+    ? getToolVerb(header.latestAction, header.latestActionStatus ?? 'complete', undefined, undefined, t)
     : active ? t('chat.subagentStillRunning') : t('chat.subagentProcessEnded');
   const processPreview = page.total ? `${latest} · ${t('chat.subagentStepCount', { count: page.total })}` : latest;
   const finalPreview = headerLoading ? t('chat.subagentLoading') : header?.finalPreview || (header?.finalUnavailableReason
@@ -118,7 +116,7 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
                   : status === 'interrupted' ? t('chat.subagentInterrupted')
           : status === 'cancelled' ? t('chat.subagentCancelled')
             : status === 'complete' ? t('chat.subagentComplete')
-              : status === 'failed' ? t('chat.subagentFailed') : label(getRowStatusLabel('running'))}
+              : status === 'failed' ? t('chat.subagentFailed') : getRowStatusLabel('running', t)}
       </span>} preview={expanded ? undefined : <FadingPreview text={task} />}
       trailingPreview={expanded ? undefined : progressDots} />
     {expanded ? <div id={contentId} className="work-process-subagent-body">

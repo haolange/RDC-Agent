@@ -1,3 +1,4 @@
+import { createToolRowForPresentation } from './workProcessToolRows';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
@@ -10,10 +11,12 @@ vi.mock('../../i18n', async importOriginal => {
 });
 
 it('translates operation risk, review source and non-execution labels independently of the host reason', () => {
-  const html = renderToStaticMarkup(createElement(ToolApprovalCallout, { approval: {
-    status: 'rejected', verb: '审核未完成', message: 'Host timeout detail.',
-    metaLines: ['风险：high', '独立审核', '操作未执行'],
-  } }));
+  const row = createToolRowForPresentation({ id: 'approval', toolName: 'shell', status: 'error', startedAt: 1,
+    approval: { approvalId: 'approval', status: 'rejected', risk: 'high', reviewMethod: 'model', reviewer: 'auto_review',
+      errorCode: 'REVIEW_TIMEOUT', reason: 'Host timeout detail.' },
+  }, (key, params) => translate('en', key, params));
+  if (row.type !== 'tool' || !row.approval) throw new Error('expected approval row');
+  const html = renderToStaticMarkup(createElement(ToolApprovalCallout, { approval: row.approval }));
   for (const key of ['chat.workProcessReviewIncomplete', 'chat.workProcessRiskHigh', 'chat.workProcessModelReview', 'chat.workProcessNotExecuted'] as const) {
     expect(html).toContain(translate('en', key));
   }

@@ -1,3 +1,4 @@
+import { useUiLabels } from '../../lib/useUiLabels';
 import React, {
   useCallback,
   useEffect,
@@ -28,8 +29,8 @@ export const Select: React.FC<SelectProps> = ({
   value,
   options,
   onChange,
-  placeholder = 'Select',
-  emptyLabel = 'No options available',
+  placeholder: suppliedPlaceholder,
+  emptyLabel: suppliedEmptyLabel,
   disabled = false,
   dataTestId,
   ariaLabel,
@@ -41,6 +42,9 @@ export const Select: React.FC<SelectProps> = ({
   menuClassName = '',
   optionClassName = '',
 }) => {
+  const labels = useUiLabels();
+  const placeholder = suppliedPlaceholder ?? labels.selectPlaceholder;
+  const emptyLabel = suppliedEmptyLabel ?? labels.selectEmpty;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);

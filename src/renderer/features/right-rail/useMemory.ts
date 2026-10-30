@@ -1,3 +1,4 @@
+import { useI18n } from '../../i18n';
 import { useCallback, useEffect, useState } from 'react';
 import type { MemoryDetail, MemorySummary, MemoryWriteRequest } from '@shared/types/electron';
 import { useProjectStore } from '../../stores/projectStore';
@@ -21,6 +22,7 @@ export interface MemoryState {
 }
 
 export function useMemory(): MemoryState {
+  const { t } = useI18n();
   const projectRoot = useProjectStore((state) => state.currentProject?.rootPath);
   const [scope, setScope] = useState<'user' | 'project'>(projectRoot ? 'project' : 'user');
   const [memories, setMemories] = useState<MemorySummary[]>([]);
@@ -63,7 +65,7 @@ export function useMemory(): MemoryState {
       projectRoot,
     });
     if (!tokenResult.token) {
-      return { success: false, error: tokenResult.error || 'Failed to issue memory write approvalToken.' };
+      return { success: false, error: tokenResult.error || t('memory.writeApprovalFailed') };
     }
     const result = await window.electronAPI.memory.write({
       ...request,
@@ -75,7 +77,7 @@ export function useMemory(): MemoryState {
       await refresh();
     }
     return { success: result.success, error: result.error };
-  }, [projectRoot, refresh, scope]);
+  }, [projectRoot, refresh, scope, t]);
 
   const remove = useCallback(async (name: string) => {
     const tokenResult = await window.electronAPI.memory.issueApprovalToken({
@@ -85,7 +87,7 @@ export function useMemory(): MemoryState {
       projectRoot,
     });
     if (!tokenResult.token) {
-      return { success: false, error: tokenResult.error || 'Failed to issue memory delete approvalToken.' };
+      return { success: false, error: tokenResult.error || t('memory.deleteApprovalFailed') };
     }
     const result = await window.electronAPI.memory.delete(scope, name, tokenResult.token, projectRoot);
     if (result.success) {
@@ -93,7 +95,7 @@ export function useMemory(): MemoryState {
       await refresh();
     }
     return { success: result.success, error: result.error };
-  }, [projectRoot, refresh, scope]);
+  }, [projectRoot, refresh, scope, t]);
 
   useEffect(() => {
     void refresh();

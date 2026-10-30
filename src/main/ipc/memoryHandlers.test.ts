@@ -1,3 +1,4 @@
+vi.mock('../settings/SettingsService', () => ({ settingsService: { getAll: () => ({ appearance: { language: electronState.language } }) } }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { dialog } from 'electron';
 
@@ -8,6 +9,7 @@ const { handlers, electronState } = vi.hoisted(() => {
     handlers: registered,
     electronState: {
       ...state,
+      language: 'zh-CN',
       handlers: registered,
     },
   };
@@ -87,4 +89,18 @@ describe('memory mutation approval boundaries', () => {
     });
     expect(result).toMatchObject({ token: expect.any(String) });
   });
+});
+
+it.each([['zh-CN', '确认更改记忆', '取消'], ['en', 'Confirm memory change', 'Cancel']])('localizes %s native confirmation and issues no token after cancellation', async (language, title, cancel) => {
+  delete process.env.RDC_AGENT_TEST_MODE;
+  delete process.env.RDC_AGENT_BROWSER_QA;
+  registerMemoryHandlers({} as never);
+  electronState.focused = {};
+  electronState.language = language;
+  vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 1, checkboxChecked: false });
+  const result = await handlers.get('memory:issueApprovalToken')!({}, { action: 'memory.write', scope: 'user', name: 'language-test' });
+  expect(result).not.toHaveProperty('token');
+  expect(dialog.showMessageBox).toHaveBeenLastCalledWith(expect.any(Object), expect.objectContaining({
+    title, buttons: [expect.any(String), cancel], defaultId: 1, cancelId: 1,
+  }));
 });

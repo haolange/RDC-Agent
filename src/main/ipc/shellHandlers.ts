@@ -1,3 +1,4 @@
+import { nativeMessage } from '../window/nativeI18n';
 import fs from 'fs';
 import path from 'path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, shell, type IpcMainInvokeEvent } from 'electron';
@@ -79,7 +80,8 @@ export function registerShellHandlers(): void {
   ipcMain.handle('dialog:selectRdcFiles', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectRdcFiles', maxBytes: 1024 });
     const result = await dialog.showOpenDialog({
-      filters: [{ name: 'RenderDoc Capture', extensions: ['rdc'] }],
+      title: nativeMessage('selectCaptures'),
+      filters: [{ name: nativeMessage('captureFilter'), extensions: ['rdc'] }],
       properties: ['openFile', 'multiSelections'],
     });
     return result.canceled ? null : result.filePaths;
@@ -88,9 +90,10 @@ export function registerShellHandlers(): void {
   ipcMain.handle('dialog:selectKnowledgeImport', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectKnowledgeImport', maxBytes: 1024 });
     const result = await dialog.showOpenDialog({
+      title: nativeMessage('selectKnowledge'),
       filters: [
-        { name: 'Knowledge package', extensions: ['zip'] },
-        { name: 'Case YAML', extensions: ['yaml', 'yml'] },
+        { name: nativeMessage('knowledgeFilter'), extensions: ['zip'] },
+        { name: nativeMessage('caseFilter'), extensions: ['yaml', 'yml'] },
       ],
       properties: ['openFile'],
     });
@@ -100,6 +103,7 @@ export function registerShellHandlers(): void {
   ipcMain.handle('dialog:selectFiles', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectFiles', maxBytes: 1024 });
     const result = await dialog.showOpenDialog({
+      title: nativeMessage('selectFiles'),
       properties: ['openFile', 'multiSelections'],
     });
     return result.canceled ? null : result.filePaths;
@@ -108,6 +112,7 @@ export function registerShellHandlers(): void {
   ipcMain.handle('dialog:selectDirectory', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectDirectory', maxBytes: 1024 });
     const result = await dialog.showOpenDialog({
+      title: nativeMessage('selectDirectory'),
       properties: ['openDirectory', 'createDirectory'],
     });
     return result.canceled ? null : result.filePaths[0];
@@ -168,7 +173,8 @@ export function registerShellHandlers(): void {
   ipcMain.handle('app:selectAvatar', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'app:selectAvatar', maxBytes: 1024 });
     const result = await dialog.showOpenDialog({
-      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
+      title: nativeMessage('selectAvatar'),
+      filters: [{ name: nativeMessage('imageFilter'), extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
       properties: ['openFile'],
     });
     if (result.canceled || result.filePaths.length === 0) {

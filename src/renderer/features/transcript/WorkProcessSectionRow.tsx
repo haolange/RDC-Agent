@@ -1,7 +1,6 @@
 import React from 'react';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import type { WorkProcessRow } from './workProcessTypes';
-import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { isActiveThinkingStatus } from './workProcessActiveSignal';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
@@ -18,7 +17,6 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
   row,
   renderRow,
 }) => {
-  const label = useWorkProcessLabel();
   const hasError = row.status === 'error' || row.steps.some((step) => step.status === 'error');
   const visibleSteps = row.visibleSteps;
   const showSteps = visibleSteps.length > 0;
@@ -34,7 +32,7 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
   const thinkingLabelNode = (
     <>
       <WorkProcessIcon icon="spark" className="work-process-thinking-icon" />
-      <ActiveSignalText active={thinkingActive} tone="info">{label(row.thinkingLabel)}</ActiveSignalText>
+      <ActiveSignalText active={thinkingActive} tone="info">{row.thinkingLabel}</ActiveSignalText>
     </>
   );
 

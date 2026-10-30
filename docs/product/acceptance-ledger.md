@@ -1,5 +1,14 @@
 # Acceptance Ledger
 
+## 中英文界面与语言切换收敛（2026-10-30）
+
+- 基线 `eb0ba66aaa64d44a84151bec164215ef33c7dfd0`，本轮在 main 原地修复；实现验收后用户追加授权，以结构化提交说明提交并推送 main。未创建分支或发布版本。Tool 目录改用类型化翻译 key，删除中文字符串反查及正则补译模块、无运行入口的 `agent_handoff` 展示和废弃翻译。补齐有效中文缺译，统一状态、审批、计时、聚合、预览数量、无障碍及原生应用文案；内置 Agent 说明按 builtin provenance 本地化，User / Project 内容保留。
+- 命令面板与斜杠菜单共用真实命令目录。Browser QA 发现省略分类时 `undefined` 经 JSON transport 变成 `null`，触发 `command:list` 校验拒绝；共享 API 工厂改为真正省略参数，未放宽 IPC schema。命令读取失败、合法空目录与加载中分别展示。`check:i18n` 已加入 gates，核对双语 key、重复项、参数和全部 57 个 builtin 工具。
+- 固定 pnpm 11.7.0；完整覆盖率运行 552 个测试文件通过、4 个原有跳过，4059 项测试通过、4 项原有跳过；lines 77.78%、functions 79.17%、branches 66.00%、statements 75.43%，coverage ratchet 通过。追加文案/单复数收尾的受影响回归 64 文件、277 项通过；typecheck、lint、contracts、完整 gates 和正式构建分别核验，最终结果与源码指纹见本轮 receipt。初次 sandbox 的本地端口/链接限制，以及无 worker 限制时两项文件压力测试超时不作为绿色证据；使用隔离临时目录及 4 个 worker 重跑，未跳过或放宽测试。
+- 正式 one-time bootstrap 同源 `/app`：中英文菜单即时切换；Settings 八页、Knowledge 空态、历史 Tool/后台工具聚合与原始输出、命令目录读取与双语说明已观察。英文大字号、浅色主题的 390×844 视口无页面横向溢出；深色宽屏另行观察。真实词典挂载测试证明语言变化保留展开状态、焦点与源 trace，不执行 IPC。历史记录为按正式存储格式写入的自有 UI fixture，不代表真实模型选工具或 RDC 执行。
+- 标准 `start:human` 使用明确隔离的 userData/HOME，真实 Electron 完成服务初始化并显示中英文界面。原生目录选择框应用标题实测为「选择文件夹」/「Select a folder」，取消后未添加项目；Windows 自带控件保持系统语言。原生菜单构造/保存后刷新、Memory/Knowledge/Plan 审批取消不发令牌由测试覆盖；frameless Windows 窗口未取得原生菜单弹出视觉证据，不冒称通过。Electron 保留已有 meta CSP `frame-ancestors` 提示；本轮 Browser 最终观察无 console warning/error。未调用真实模型、RDC/Android 或生成发行包。
+- 最小证据为 `.local/ui-language/` 的 Tasks、receipt 与两张截图。隔离 userData、项目、测试临时目录、工具选择 shim、日志和 coverage 中间产物已在核对绝对路径、跟踪状态、无 reparse 后清理；原 sandbox 临时根已不存在。自有 Electron 正常退出，无残留 Electron 进程，canonical 与 QA 实例锁不存在，桌面启动权已交还。保留当前依赖及最终 out，未清理其他工作资产。
+
 ## Tools 1.1.2 发行与官方升级（2026-10-29）
 
 - 用户追加授权两库提交推送 main、Tools 补丁发布和本机官方升级。Agent 六项实现提交 `e89dc86eb413a54abfa07fb4547fdc86ba54a464`；Tools 发行源码 `bcb1275ed8fa5acc908e08ac328da3d581c2ff54`。两库没有创建分支。历史源码验收与本次正式安装验收分开保存。

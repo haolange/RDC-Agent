@@ -38,4 +38,7 @@ export const zhSidebar = {
   'sidebar.noSessionsHint': '先创建一个会话，或直接开始一次调试。',
   'sidebar.projectRequired': '请先添加并选择一个项目',
   'sidebar.userSettings': '用户设置',
+  'sidebar.showMore': "展开更多",
+  'sidebar.showLess': "收起",
+  'sidebar.userName': "用户",
 } as const;

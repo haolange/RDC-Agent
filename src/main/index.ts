@@ -1,10 +1,12 @@
+import { installApplicationMenu } from './window/applicationMenu';
+import { nativeMessage } from './window/nativeI18n';
 import { providerAccountAuthService } from './settings/ProviderAccountAuthService';
 import { appPathService } from './runtime/AppPathService';
 /**
  * Electron Main Process Entry
  */
 
-import { app, BrowserWindow, dialog, Menu, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, session, shell } from 'electron';
 import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -309,8 +311,9 @@ function getDevRendererUrl(): string {
 
 async function openRdcFiles(): Promise<void> {
   const result = await dialog.showOpenDialog({
+    title: nativeMessage('selectCaptures'),
     filters: [
-      { name: 'RenderDoc Capture', extensions: ['rdc'] },
+      { name: nativeMessage('captureFilter'), extensions: ['rdc'] },
     ],
     properties: ['openFile', 'multiSelections'],
   });
@@ -321,7 +324,7 @@ async function openRdcFiles(): Promise<void> {
       namespace: 'system',
       severity: 'info',
       title: 'Open files',
-      summary: `已选择 ${result.filePaths.length} 个外部 .rdc 文件。`,
+      summary: nativeMessage('selectedCaptures', { count: result.filePaths.length }),
       raw: {
         filePaths: result.filePaths,
       },
@@ -444,145 +447,11 @@ function createMainWindow(): void {
   // Register window controls and shortcuts.
   setMainWindow(mainWindow);
   setupKeyboardShortcuts(mainWindow);
-  setupMenu();
-}
-
-/**
- * Set the application menu.
- */
-function setupMenu(): void {
-  if (process.platform === 'darwin') {
-    const template: Electron.MenuItemConstructorOptions[] = [
-      { role: 'appMenu' },
-      {
-        label: 'File',
-        submenu: [
-          {
-            label: 'Open .rdc File',
-            accelerator: 'CmdOrCtrl+O',
-            click: async () => openRdcFiles(),
-          },
-          {
-            label: 'New Case',
-            accelerator: 'CmdOrCtrl+N',
-            click: () => {
-              rendererEventHub.emit('case:new');
-              mainWindow?.webContents.send('case:new');
-            },
-          },
-          {
-            label: 'Settings',
-            accelerator: 'CmdOrCtrl+,',
-            click: () => {
-              rendererEventHub.emit('settings:open');
-              mainWindow?.webContents.send('settings:open');
-            },
-          },
-          { type: 'separator' },
-          { role: 'close' },
-        ],
-      },
-      {
-        label: 'Edit',
-        submenu: [
-          { role: 'undo' },
-          { role: 'redo' },
-          { type: 'separator' },
-          { role: 'cut' },
-          { role: 'copy' },
-          { role: 'paste' },
-          { role: 'selectAll' },
-        ],
-      },
-      {
-        label: 'View',
-        submenu: [
-          { role: 'reload' },
-          { role: 'forceReload' },
-          { role: 'toggleDevTools' },
-          { type: 'separator' },
-          { role: 'togglefullscreen' },
-        ],
-      },
-      {
-        label: 'Help',
-        submenu: [
-          {
-            label: 'Documentation',
-            click: () => {
-              shell.openExternal('https://github.com/haolange/RDC-Agent#readme');
-            },
-          },
-          {
-            label: 'Report Issue',
-            click: () => {
-              shell.openExternal('https://github.com/haolange/RDC-Agent/issues');
-            },
-          },
-          { type: 'separator' },
-          {
-            label: 'About RDC-Agent',
-            click: () => {
-              const version = app.getVersion();
-              const detail = [
-                `Version: ${version}`,
-                `Electron: ${process.versions.electron ?? 'N/A'}`,
-                `Node: ${process.versions.node ?? 'N/A'}`,
-                `Chrome: ${process.versions.chrome ?? 'N/A'}`,
-              ].join('\n');
-              void dialog.showMessageBox({
-                type: 'info',
-                title: 'About RDC-Agent',
-                message: 'RDC-Agent',
-                detail,
-              });
-            },
-          },
-        ],
-      },
-    ];
-
-    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-    return;
-  }
-
-  // Non-darwin: still expose Help with real repo links (no placeholder URLs).
-  Menu.setApplicationMenu(Menu.buildFromTemplate([
-    {
-      label: 'Help',
-      submenu: [
-        {
-          label: 'Documentation',
-          click: () => {
-            shell.openExternal('https://github.com/haolange/RDC-Agent#readme');
-          },
-        },
-        {
-          label: 'Report Issue',
-          click: () => {
-            shell.openExternal('https://github.com/haolange/RDC-Agent/issues');
-          },
-        },
-        { type: 'separator' },
-        {
-          label: 'About RDC-Agent',
-          click: () => {
-            const version = app.getVersion();
-            void dialog.showMessageBox({
-              type: 'info',
-              title: 'About RDC-Agent',
-              message: 'RDC-Agent',
-              detail: [
-                `Version: ${version}`,
-                `Electron: ${process.versions.electron ?? 'N/A'}`,
-                `Node: ${process.versions.node ?? 'N/A'}`,
-              ].join('\n'),
-            });
-          },
-        },
-      ],
-    },
-  ]));
+  installApplicationMenu({
+    openRdcFiles,
+    newCase: () => { rendererEventHub.emit('case:new'); mainWindow?.webContents.send('case:new'); },
+    openSettings: () => { rendererEventHub.emit('settings:open'); mainWindow?.webContents.send('settings:open'); },
+  });
 }
 
 // App lifecycle.

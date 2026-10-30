@@ -1,3 +1,4 @@
+import type { Translator } from '../../i18n/messages';
 import { normalizeWorkProcessText, formatDurationMs } from './workProcessFormat';
 import { groupImageRows } from './groupImageRows';
 import { type ConversationWorkBlock, type ConversationReasoningState, type ConversationLoopStopReason, type ConversationLoopOutputPhase, type ConversationWorkTrace } from '@shared/types/conversation';
@@ -76,14 +77,15 @@ const resolveThinkingDurationLabel = (block: ConversationWorkBlock): string => {
   return formatDurationMs(start, end);
 };
 
-const resolveSettledThinkingLabel = (block: ConversationWorkBlock): string => {
+const resolveSettledThinkingLabel = (block: ConversationWorkBlock, t: Translator): string => {
   const duration = resolveThinkingDurationLabel(block);
-  return duration ? `已思考 · ${duration}` : '已思考';
+  return duration ? t('chat.workProcessThoughtFor', { duration }) : t('chat.workProcessThinkingComplete');
 };
 
 const resolveSectionThinking = (
   block: ConversationWorkBlock,
   hasVisibleEvidence: boolean,
+  t: Translator,
 ): {
   preview: string;
   label: string;
@@ -109,8 +111,8 @@ const resolveSectionThinking = (
         return {
           preview,
           label: status === 'streaming'
-            ? '正在思考'
-            : resolveSettledThinkingLabel(block),
+            ? t('chat.workProcessThinkingStreaming')
+            : resolveSettledThinkingLabel(block, t),
           kind: thinking.kind,
           source: '',
           visibility: thinking.visibility,
@@ -130,6 +132,7 @@ const resolveSectionThinking = (
 
 const resolveResponseThinking = (
   block: ConversationWorkBlock,
+  t: Translator,
 ): {
   preview: string;
   label: string;
@@ -141,7 +144,7 @@ const resolveResponseThinking = (
 } => {
   // Final-answer / closing thinking shares the same lifecycle policy as process loops:
   // expand while the section is live, fold after settle (UI may sticky-override).
-  const resolved = resolveSectionThinking(block, Boolean(block.thinking));
+  const resolved = resolveSectionThinking(block, Boolean(block.thinking), t);
   if (!resolved.expandable) return { ...resolved, label: '', openByDefault: false };
   return {
     preview: resolved.preview,
@@ -154,46 +157,49 @@ const resolveResponseThinking = (
   };
 };
 
-const getLoopProjectionDeps = () => ({
+const getLoopProjectionDeps = (t: Translator) => ({
   resolveOutputPhase,
   resolveReasoningState,
   resolveSectionProse,
-  resolveSectionThinking,
-  resolveResponseThinking,
+  resolveSectionThinking: (block: ConversationWorkBlock, visible: boolean) => resolveSectionThinking(block, visible, t),
+  resolveResponseThinking: (block: ConversationWorkBlock) => resolveResponseThinking(block, t),
   isNonFinalStopReason,
   normalizeThinkingDedupKey,
-  createApprovalRow,
-  createDiagnosticRow,
+  createApprovalRow: (block: ConversationWorkBlock) => createApprovalRow(block, t),
+  createDiagnosticRow: (block: ConversationWorkBlock) => createDiagnosticRow(block, t),
   shouldSkipBlock,
   getMeaningfulBlockSummary,
   countToolSteps,
 });
 
-const buildProjectionContext = (): {
+const buildProjectionContext = (t: Translator): {
   visibleThinkingKeys: Set<string>;
   hasVisibleProcessEvidence: boolean;
-  createToolRow: typeof createToolRowForPresentation;
+  createToolRow: (call: import('@shared/types/conversation').ConversationToolCall) => WorkProcessRow;
   groupProcessRows: typeof groupProcessRows;
-  blocksToDetailRows: typeof blocksToDetailRows;
+  blocksToDetailRows: (blocks: ConversationWorkBlock[]) => WorkProcessRow[];
+  t: Translator;
 } => ({
   visibleThinkingKeys: new Set(),
   hasVisibleProcessEvidence: false,
-  createToolRow: createToolRowForPresentation,
+  createToolRow: (call) => createToolRowForPresentation(call, t),
   groupProcessRows,
-  blocksToDetailRows,
+  blocksToDetailRows: (blocks) => blocksToDetailRows(blocks, t),
+  t,
 });
 
-function blocksToDetailRows(blocks: ConversationWorkBlock[]): WorkProcessRow[] {
-  const ctx = buildProjectionContext();
-  const units = buildPresentationUnits(blocks, getLoopProjectionDeps(), ctx);
+function blocksToDetailRows(blocks: ConversationWorkBlock[], t: Translator): WorkProcessRow[] {
+  const ctx = buildProjectionContext(t);
+  const units = buildPresentationUnits(blocks, getLoopProjectionDeps(t), ctx);
   return presentationUnitsToDetailRows(units);
 }
 
 export const buildWorkProcessPresentation = (
   trace: ConversationWorkTrace,
+  t: Translator,
 ): WorkProcessPresentation => {
   const blocks = Array.isArray(trace.blocks) ? trace.blocks : [];
-  const rows = blocksToDetailRows(blocks);
+  const rows = blocksToDetailRows(blocks, t);
   markLastSectionOpen(rows);
   const toolCount = countToolSteps(rows);
   const stepCount = countSteps(rows);
@@ -243,13 +249,13 @@ const formatTraceDuration = (blocks: ConversationWorkBlock[]): string => {
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
-const createDiagnosticRow = (block: ConversationWorkBlock): WorkProcessRow => ({
+const createDiagnosticRow = (block: ConversationWorkBlock, t: Translator): WorkProcessRow => ({
   type: 'diagnostic',
   id: block.id,
   status: block.status === 'error' ? 'error' : block.status,
   severity: block.diagnosticSeverity ?? (block.status === 'error' ? 'error' : 'info'),
   isHookDiagnostic: block.id.startsWith('diagnostic-hook.') || block.id.startsWith('runtime-diagnostic-hook.'),
-  message: getMeaningfulBlockSummary(block) || block.title || 'Runtime diagnostic',
+  message: getMeaningfulBlockSummary(block) || block.title || t('chat.runtimeDiagnostic'),
   detailLines: [],
   duration: formatDurationMs(block.startedAt, block.completedAt),
 });
