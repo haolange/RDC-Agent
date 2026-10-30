@@ -1,3 +1,4 @@
+import { runtimePermissionStateService } from '../agent-runtime/permissions/RuntimePermissionStateService';
 /**
  * SettingsService — persists and normalizes application settings.
  *
@@ -107,7 +108,9 @@ export class SettingsService {
     this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
 
     this.initialized = true;
-    return this.getAll(runtimePaths);
+    const settings = this.getAll(runtimePaths);
+    runtimePermissionStateService.initialize(settings.agentRuntime.permissions.mode);
+    return settings;
   }
 
   private ensureInitialized(): void {
@@ -368,6 +371,7 @@ export class SettingsService {
     };
 
     writeSettings(nextPersisted);
+    runtimePermissionStateService.commitMode(sanitizeAgentPermissionSettings(nextPersisted.agentRuntime?.permissions).mode);
     deleteSecretsAfterCommit(secretRefsToDelete, nextPaths.userRdcRoot);
     return this.getAll({
       ...nextPaths,

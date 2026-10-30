@@ -58,7 +58,7 @@ export class PromptPlanForTurn {
      */
     effectivePlan?: Pick<
       EffectiveRuntimePlan,
-      'permissionSettings' | 'profileSkills' | 'toolAllowlist' | 'projectRootPath'
+      'permissionConstraints' | 'profileSkills' | 'toolAllowlist' | 'projectRootPath'
     >;
   }): PromptPlan | null {
     const plan = input.effectivePlan;
@@ -109,7 +109,7 @@ export class PromptPlanForTurn {
     const baseTools = (plan ? [...plan.toolAllowlist] : input.toolAllowlist)
       .map((toolName) => normalizeToolName(toolName));
     const tools = combineActiveSkillAllowlists(baseTools, preloadedSkills.map(skill => skill.allowedTools ?? [])) ?? baseTools;
-    const permissionSettings = plan?.permissionSettings ?? runtimeSettings.agentRuntime.permissions;
+    const permissionConstraints = plan?.permissionConstraints ?? runtimeSettings.agentRuntime.permissions;
     const promptClock = resolvePromptClock();
     return promptPlanBuilder.build({
       profile: activeDefinition,
@@ -124,7 +124,7 @@ export class PromptPlanForTurn {
       routeCapability,
       effectiveModel: input.capability,
       requestPlan: input.requestPlan,
-      permissionSettings,
+      permissionConstraints,
       currentDate: promptClock.currentDate,
       timeZone: promptClock.timeZone,
       contextWindowTokens: input.contextWindowTokens,

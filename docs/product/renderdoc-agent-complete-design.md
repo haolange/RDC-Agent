@@ -1,8 +1,8 @@
 # RenderDoc Agent 完整设计（v2）
 
-> **文档地位**：本文件是受根目录 [`DESIGN.md`](../../DESIGN.md) 裁决的详细目标设计，**不是第二产品权威**。若与 `DESIGN.md` / `AGENTS.md` 冲突，以 `DESIGN.md` 为准并回改本文。
+> **文档地位**：本文件是受根目录 [`ARCHITECTURE.md`](../../ARCHITECTURE.md) 裁决的详细目标设计，**不是第二产品权威**。若与 `ARCHITECTURE.md` / `AGENTS.md` 冲突，以 `ARCHITECTURE.md` 为准并回改本文。
 >
-> **实现状态**：文中模块、schema、服务以目标态叙述。Knowledge 目标拓扑是五服务 + **六 lane** markdown-first + 五个 deferred 工具与 Knowledge Center 三列 UI（Embedding / Semantic lane 已由 U02 删除）。Wave 4 schema 已落地 `rdc.investigation.v1`、`InvestigationArtifactService` 与三个 deferred Investigation 工具；IPC `investigation:read` 已落地；4 个 builtin Hook 模板与 Session rail 五卡已落地。Wave 5：三条 Mission 方法面已接到 Skill / Hook / Capsule（Debugger `$debugger-causal-method`，Analyzer `$analyzer-architecture-method`，Optimizer `$optimization-experiment`；现 15 个垂直方法 Skill）。**T18 知识导入 真实验收已证**（见 `DESIGN.md` T18 已证组与 [`acceptance-ledger.md`](acceptance-ledger.md) `T18-colddata-*`）。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。声明续跑与 session execution offer 已落地。Run 当前为 v3。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。
+> **实现状态**：文中模块、schema、服务以目标态叙述。Knowledge 目标拓扑是五服务 + **六 lane** markdown-first + 五个 deferred 工具与 Knowledge Center 三列 UI（Embedding / Semantic lane 已由 U02 删除）。Wave 4 schema 已落地 `rdc.investigation.v1`、`InvestigationArtifactService` 与三个 deferred Investigation 工具；IPC `investigation:read` 已落地；4 个 builtin Hook 模板与 Session rail 五卡已落地。Wave 5：三条 Mission 方法面已接到 Skill / Hook / Capsule（Debugger `$debugger-causal-method`，Analyzer `$analyzer-architecture-method`，Optimizer `$optimization-experiment`；现 15 个垂直方法 Skill）。**T18 知识导入 真实验收已证**（见 `ARCHITECTURE.md` T18 已证组与 [`acceptance-ledger.md`](acceptance-ledger.md) `T18-colddata-*`）。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。声明续跑与 session execution offer 已落地。Run 当前为 v3。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。
 >
 > **读者**：实现后续 Wave 的 Codex / Agent。路径相对本仓库。中文为主，产品术语保留英文。
 
@@ -87,7 +87,7 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 
 ## 3. 仓库化裁决摘要
 
-权威表在 `DESIGN.md`「Current / Target / Migration Adjudications」。此处只列实现时不得走样的合同。
+权威表在 `ARCHITECTURE.md`「Current / Target / Migration Adjudications」。此处只列实现时不得走样的合同。
 
 ### 3.1 四个 builtin Profile
 
@@ -112,7 +112,7 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 
 ### 3.3 已废止：Independent Embedding Capability
 
-Embedding capability / Semantic lane **已删除**，见 `DESIGN.md` 裁决 C。**禁止恢复** Embedding capability / Semantic lane / `llm.embedding`。Discovery 对 embedding/embeddings modality 继续 fail-closed 剔除。真实 OpenAI embed **不再补跑**。
+Embedding capability / Semantic lane **已删除**，见 `ARCHITECTURE.md` 裁决 C。**禁止恢复** Embedding capability / Semantic lane / `llm.embedding`。Discovery 对 embedding/embeddings modality 继续 fail-closed 剔除。真实 OpenAI embed **不再补跑**。
 
 ### 3.4 Declared Continue 与 Execution Offer（已落地）
 
@@ -124,11 +124,11 @@ Embedding capability / Semantic lane **已删除**，见 `DESIGN.md` 裁决 C。
 
 ### 3.6 Knowledge 与 Investigation 门禁
 
-门禁脚本：`pnpm run check:knowledge-system`、`pnpm run check:investigation-system`。**ratchet 已建立**；Investigation schema / Service / contract suite / 五卡已清零。三条 Mission 方法面已接到 Skill / Hook / Capsule。禁止用空壳测试、skip/todo 或只加类名绕过。债务 allowlist 已空（hits=0）。Investigation 目标态：record/manifest/index/supersede/stale-propagation 同一事务；renderer 唯一读取通道 `investigation:read({ sessionId, artifactId, expectedHash })`；Mission 正常 `completed` 须可解引用 `MissionCheckpoint` + `kind=report`/`status=ready` + 完整章节 + `outputPhase=final_answer` 引用该 report（见 `DESIGN.md` 裁决 E / L）。**当前态**：事务已落地（journal / temp-set / commit marker / atomic replace）；完成合同已落地（turn 收口：checkpoint + ready report + 完整章节 + `final_answer` 引用）；IPC `investigation:read({ sessionId, artifactId, expectedHash })` **已落地**；投影携带完整 `contentHash`（renderer 只缩显）。T18 知识导入 已证见 `DESIGN.md` T18 已证组。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。
+门禁脚本：`pnpm run check:knowledge-system`、`pnpm run check:investigation-system`。**ratchet 已建立**；Investigation schema / Service / contract suite / 五卡已清零。三条 Mission 方法面已接到 Skill / Hook / Capsule。禁止用空壳测试、skip/todo 或只加类名绕过。债务 allowlist 已空（hits=0）。Investigation 目标态：record/manifest/index/supersede/stale-propagation 同一事务；renderer 唯一读取通道 `investigation:read({ sessionId, artifactId, expectedHash })`；Mission 正常 `completed` 须可解引用 `MissionCheckpoint` + `kind=report`/`status=ready` + 完整章节 + `outputPhase=final_answer` 引用该 report（见 `ARCHITECTURE.md` 裁决 E / L）。**当前态**：事务已落地（journal / temp-set / commit marker / atomic replace）；完成合同已落地（turn 收口：checkpoint + ready report + 完整章节 + `final_answer` 引用）；IPC `investigation:read({ sessionId, artifactId, expectedHash })` **已落地**；投影携带完整 `contentHash`（renderer 只缩显）。T18 知识导入 已证见 `ARCHITECTURE.md` T18 已证组。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。
 
 ### 3.7 Mission Plan-Only 与 Run Schema
 
-- Mission planner（`debugger` / `analyzer` / `optimizer`）禁止 `shell` 与 `code_interpreter`；只通过受控只读 `rdc_probe` + `rdc_context` 访问 RDC。allow / deny 与输入 schema 以 `DESIGN.md` 裁决 J 为唯一权威。
+- Mission planner（`debugger` / `analyzer` / `optimizer`）禁止 `shell` 与 `code_interpreter`；只通过受控只读 `rdc_probe` + `rdc_context` 访问 RDC。allow / deny 与输入 schema 以 `ARCHITECTURE.md` 裁决 J 为唯一权威。
 - General 经 Settings `shell` action 持 exclusive lease 执行 Live RDC mutate。
 - Run **当前为 v3**（`schemaVersion: '3'`），见裁决 I。不得双读，不得从旧 stage 推断 Mission。
 - Hook trust fingerprint 与旧 YAML-hash 失效策略见裁决 K。
@@ -408,7 +408,7 @@ Right Rail **目标** Artifacts 卡只投影 main-owned 本清单及其记录，
 | `S-KNOW-02` | 冲突不可静默覆盖；必须保留 `contradicts` 或显式 `supersedes` 原因 |
 | `S-RDC-01` | mutate 必有 Experiment + exclusive World State + rollback / restored 验证；否则 World State `polluted`，相关 Evidence `stale` |
 
-`check:investigation-system` ratchet 已建立；schema + `InvestigationArtifactService` + 三个默认 deferred 工具 + `investigationSystemContract.test.ts` 已落地并硬执行。经批准的 Mission→General execution offer 会在有效工具集过滤后预激活四个 Investigation 工具；普通 General 仍按需发现。应覆盖字段完整性（含 `claimId` / `experimentId` / `challengeId` / `artifactId`）、`ready` 三条件、偏序不可升级、精确 `S-CAUSAL-01`、引用可解、非侵入、Skeptic `ChallengeRecord` 形状、Checkpoint 所列 id 可解引用、Analyzer `claimKind` 越层失败、Optimizer 无 rollback 的 mutate 不得关闭。15 Skill / 4 Hook 与 Session rail 五卡已落地。三条 Mission 方法面已接到 Skill / Hook / Capsule。禁止 skip/todo/无断言空壳。T18 知识导入 已证见 `DESIGN.md` T18 已证组。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。
+`check:investigation-system` ratchet 已建立；schema + `InvestigationArtifactService` + 三个默认 deferred 工具 + `investigationSystemContract.test.ts` 已落地并硬执行。经批准的 Mission→General execution offer 会在有效工具集过滤后预激活四个 Investigation 工具；普通 General 仍按需发现。应覆盖字段完整性（含 `claimId` / `experimentId` / `challengeId` / `artifactId`）、`ready` 三条件、偏序不可升级、精确 `S-CAUSAL-01`、引用可解、非侵入、Skeptic `ChallengeRecord` 形状、Checkpoint 所列 id 可解引用、Analyzer `claimKind` 越层失败、Optimizer 无 rollback 的 mutate 不得关闭。15 Skill / 4 Hook 与 Session rail 五卡已落地。三条 Mission 方法面已接到 Skill / Hook / Capsule。禁止 skip/todo/无断言空壳。T18 知识导入 已证见 `ARCHITECTURE.md` T18 已证组。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。
 
 ---
 
@@ -507,7 +507,7 @@ Planning：Triage & Taxonomy → Capture Report → Knowledge Retrieval → plan
 
 阶段：Observed Model → Resource Versioning → Pass Reconstruction → Shader Reconstruction → Traceability → Cross-Capture → Architecture Synthesis → Skeptic。
 
-落地方式（Wave 5）：接到已有 Profile / Skill / Hook / 声明式 Handoff / `investigation_*` / `task_*`，不新建 Runtime。Architecture Model 版本比较 Artifact 与 Observed / Reconstructed / Authoring 分层写在 `$analyzer-architecture-method`（现有 `claim` / `claim_set` kind，无新 Registry 项）。`claimKind` 越层在写入时失败。`$analyzer-coordinator` 负责规划与 Small / Big Loop。仓库只用脱敏 fixture（`src/main/investigation/__fixtures__`）。T18 知识导入 已证见 `DESIGN.md` T18 已证组；Analyzer 正常 `completed` 见 U06。
+落地方式（Wave 5）：接到已有 Profile / Skill / Hook / 声明式 Handoff / `investigation_*` / `task_*`，不新建 Runtime。Architecture Model 版本比较 Artifact 与 Observed / Reconstructed / Authoring 分层写在 `$analyzer-architecture-method`（现有 `claim` / `claim_set` kind，无新 Registry 项）。`claimKind` 越层在写入时失败。`$analyzer-coordinator` 负责规划与 Small / Big Loop。仓库只用脱敏 fixture（`src/main/investigation/__fixtures__`）。T18 知识导入 已证见 `ARCHITECTURE.md` T18 已证组；Analyzer 正常 `completed` 见 U06。
 
 最低完整：主要 Pass 可用、Resource 依赖清晰、高频 Shader/Material 有 Fingerprint、用户目标 Trace 可答、Observed / Derived / Inferred 分离、Unknown Frontier 明确、Skeptic 无结构性 blocker。不得把未观察的引擎语义写成 `observed_fact`。
 
@@ -515,7 +515,7 @@ Planning：Triage & Taxonomy → Capture Report → Knowledge Retrieval → plan
 
 三层性能概念：Objective Budget、Hardware Constraint、Efficiency Indicator。Capability Ceiling O0–O6。三类动作 C / R / E。Shader Lab 分 Diagnostic Ablation、Semantics-Preserving、Quality Trade-off；Ablation 不得当正式优化。
 
-落地方式（Wave 5）：接到已有 Profile / Skill / Hook / `investigation_*`，不新建 Runtime。Baseline Qualification + Noise Floor → Frame Breakdown → Cost/Limiter/Mechanism → 事务性 Experiment → Replay Benchmark（A-B-A）→ Visual/Numerical Regression 写在 `$optimizer-coordinator` 与 `$optimization-experiment`。Experiment 必须 intervention + rollback；`type == none` 不能当 counterfactual；无 rollback 的 mutate 不得关闭。最终回答结构由 `$report-composition` + `report-contract` hook 卡住。仓库只用脱敏 fixture。T18 知识导入 已证见 `DESIGN.md` T18 已证组；Optimizer 正常 `completed` 见 U06。
+落地方式（Wave 5）：接到已有 Profile / Skill / Hook / `investigation_*`，不新建 Runtime。Baseline Qualification + Noise Floor → Frame Breakdown → Cost/Limiter/Mechanism → 事务性 Experiment → Replay Benchmark（A-B-A）→ Visual/Numerical Regression 写在 `$optimizer-coordinator` 与 `$optimization-experiment`。Experiment 必须 intervention + rollback；`type == none` 不能当 counterfactual；无 rollback 的 mutate 不得关闭。最终回答结构由 `$report-composition` + `report-contract` hook 卡住。仓库只用脱敏 fixture。T18 知识导入 已证见 `ARCHITECTURE.md` T18 已证组；Optimizer 正常 `completed` 见 U06。
 
 | 结局 | 条件 |
 | --- | --- |
@@ -527,7 +527,7 @@ Planning：Triage & Taxonomy → Capture Report → Knowledge Retrieval → plan
 
 ## 13. Knowledge Engine
 
-五个主进程服务已落地：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`。目标拓扑 **六 lane**（markdown-first）：Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version。**禁止** Semantic lane / Embedding capability（U02 已删除第七轴）。五个 deferred 工具与 `$knowledge-scout` / `$knowledge-candidate` 已落地。Knowledge Center 三列 UI（Spaces / List / Detail）、Candidate Inbox 与 知识导入 Import 已落地；browse-only IPC 已删除。Candidate/review 已落到 session durable store（`<sessionPath>/knowledge-state.json`，跨进程锁 + revision）；知识导入 bounded path ingest 记录并复核源 hash/mtime/size，经 WriteService 写入所选 user/project 空间 draft，Cards 可读；human-confirm 写入经 realpath + 原子替换。**T18 旧桌面证据**见 `DESIGN.md` T18 已证组与 ledger；现行导入不再写 session inbox。产品级 Browser QA 全矩阵见 U05。
+五个主进程服务已落地：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`。目标拓扑 **六 lane**（markdown-first）：Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version。**禁止** Semantic lane / Embedding capability（U02 已删除第七轴）。五个 deferred 工具与 `$knowledge-scout` / `$knowledge-candidate` 已落地。Knowledge Center 三列 UI（Spaces / List / Detail）、Candidate Inbox 与 知识导入 Import 已落地；browse-only IPC 已删除。Candidate/review 已落到 session durable store（`<sessionPath>/knowledge-state.json`，跨进程锁 + revision）；知识导入 bounded path ingest 记录并复核源 hash/mtime/size，经 WriteService 写入所选 user/project 空间 draft，Cards 可读；human-confirm 写入经 realpath + 原子替换。**T18 旧桌面证据**见 `ARCHITECTURE.md` T18 已证组与 ledger；现行导入不再写 session inbox。产品级 Browser QA 全矩阵见 U05。
 
 三个逻辑平面：Evidence（不可变事实，不是 Knowledge）→ Knowledge（结构化、带 Scope 与验证）→ Compiled Context（即时 Pack）。Card 是 Projection，不是存储本体。
 
@@ -723,12 +723,12 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 知识�
 - **U05**：产品级 Browser QA 全矩阵（不得写成已验收）。
 - **U06**：三条 Mission 正常 `completed` 闭环（不得写成已验收）。
 
-禁止再写「Run 当前实现仍为 v2」「Wave 3 已落地独立 Embedding」作为现行差距。连续安全工具并发组仍按 `DESIGN.md` §F。Mission plan-only + `rdc_probe` 见裁决 J。后续按 `DESIGN.md` 裁决落地，落地一项删除一项旧路径。
+禁止再写「Run 当前实现仍为 v2」「Wave 3 已落地独立 Embedding」作为现行差距。连续安全工具并发组仍按 `ARCHITECTURE.md` §F。Mission plan-only + `rdc_probe` 见裁决 J。后续按 `ARCHITECTURE.md` 裁决落地，落地一项删除一项旧路径。
 
 
 ## 垂直指令与执行真实性收敛（2026-09-09）
 
-以 DESIGN.md 的同名裁决为准。General 直接处理普通代码调试、解释与性能修复；只把明确 RenderDoc/capture 调查转 Mission。标准闭环为 Mission 规划 → 用户点声明按钮切到 General → General 就地终答 → 用户自行切回 Mission 评估与报告。General 任何回合不得宣告调查 `completed`。深度不足或能力缺失保留 checkpoint 与未完成位置，由用户决定是否切回。
+以 ARCHITECTURE.md 的同名裁决为准。General 直接处理普通代码调试、解释与性能修复；只把明确 RenderDoc/capture 调查转 Mission。标准闭环为 Mission 规划 → 用户点声明按钮切到 General → General 就地终答 → 用户自行切回 Mission 评估与报告。General 任何回合不得宣告调查 `completed`。深度不足或能力缺失保留 checkpoint 与未完成位置，由用户决定是否切回。
 
 General 的 execution-orchestrator 只定义通用工作方法；三个 Mission coordinator 保存目标、计划产物、声明续跑与方法路由；共享执行/Small Loop/Big Loop/capsule 只在 renderdoc-execution 维护。报告按需读对应 Mission 章节。先获取可安全读取的上下文，再问不可获取输入或必需决策；不重复已授权步骤。相似案例只在相关历史问题时检索，单次 lookup 不强制 Scout。canonical Skill 共 31 个：22 个 Mission / Knowledge / Coordinator 与 9 个 General，其中新增三本专业 RDC 工具手册；读取方法不重新武装本轮权限。
 

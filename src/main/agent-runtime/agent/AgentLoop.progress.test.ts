@@ -1,3 +1,4 @@
+import { RuntimePermissionStateService } from '../permissions/RuntimePermissionStateService';
 import { describe, expect, it, vi } from 'vitest';
 import { EventStream } from '../core/EventStream';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
@@ -168,6 +169,27 @@ describe('AgentLoop progress termination', () => {
       expect(events.filter((event) => event.type === 'tool_execution_start')).toHaveLength(admitted ? 1 : 0);
       expect(events.find((event) => event.type === 'tool_execution_end')).toMatchObject({ durationMs: admitted ? 25 : 0 });
     } finally { release(); clock.mockRestore(); }
+  });
+
+  it('samples live permission context per actual provider request without changing the frozen context or history', async () => {
+    const permissions = new RuntimePermissionStateService(); permissions.initialize('default');
+    const context = createContext(); context.systemPrompt = 'Frozen prompt'; context.systemPromptSegments = [];
+    const requestModes: string[] = []; const sourceHashes: string[] = []; let calls = 0;
+    const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: (_model, request) => {
+      requestModes.push(request.systemPrompt!);
+      sourceHashes.push(request.systemPromptSegments!.find(segment => segment.id === 'runtime:permission')!.sourceHash);
+      if (++calls === 1) { permissions.commitMode('full-access'); return providerStream(toolUseMessage(1)); }
+      return providerStream({ ...toolUseMessage(2), content: [{ type: 'text', text: 'done' }], stopReason: 'stop' });
+    } };
+    const { stream } = agentLoop([], context, { model: TEST_MODEL, convertToLlm: messages => messages as Message[],
+      maxTurns: 2, streamOptions: { requestPlan: TEST_REQUEST_PLAN }, resolvePermissionState: () => permissions.getSnapshot() }, provider, toolExecutor);
+    await consume(stream);
+    expect(requestModes).toHaveLength(2);
+    expect(requestModes[0]).toContain('Mode: default'); expect(requestModes[1]).toContain('Mode: full-access');
+    expect(requestModes.every(prompt => prompt.split('# Current Runtime Permission').length === 2)).toBe(true);
+    expect(sourceHashes[0]).not.toBe(sourceHashes[1]);
+    expect(context.systemPrompt).toBe('Frozen prompt'); expect(context.systemPromptSegments).toEqual([]);
+    expect(JSON.stringify(context.messages)).not.toContain('Current Runtime Permission');
   });
 
   it('warns of the finite turn budget without persisting guidance or weakening the limit', async () => {

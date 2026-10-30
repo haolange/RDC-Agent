@@ -211,7 +211,7 @@ describe('AgentOrchestrator prepared turn context', () => {
       .update(JSON.stringify([result.runtime.promptPlan.systemPrompt])).digest('hex').slice(0, 24));
     expect(Array.isArray(result.runtime.effectivePlan.knowledgeReadRoots)).toBe(true);
     for (const root of result.runtime.effectivePlan.knowledgeReadRoots) {
-      expect(result.runtime.effectivePlan.permissionSettings.readableRoots).not.toContain(root);
+      expect(result.runtime.effectivePlan.permissionConstraints.readableRoots).not.toContain(root);
     }
     expect(result.summary.wirePatch.headers).toEqual({ 'anthropic-beta': 'context-1m' });
     expect(result.summary.breakdown.some((entry) => entry.id === 'free')).toBe(true);
@@ -260,7 +260,7 @@ describe('AgentOrchestrator prepared turn context', () => {
       pathIdentityKey(userKnowledge),
       pathIdentityKey(projectKnowledge),
     ]);
-    expect(result.runtime.effectivePlan.permissionSettings.readableRoots).toEqual([]);
+    expect(result.runtime.effectivePlan.permissionConstraints.readableRoots).toEqual([]);
     expect(result.contextDiagnostic.knowledgeReadRootDiagnostics ?? []).toEqual([]);
   });
 

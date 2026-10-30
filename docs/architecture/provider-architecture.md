@@ -1,6 +1,6 @@
 # Provider / Model Catalog 架构
 
-本文定义 RDC-Agent 唯一的 Provider、Model、Route、能力解析和请求编译链。产品语义以根目录 `DESIGN.md` 为最高权威；机器可验证契约位于 `src/shared/provider-catalog`、`src/shared/types/providerCapability.ts`、`EffectiveCatalogService` 与 `RequestPlanner`。
+本文定义 RDC-Agent 唯一的 Provider、Model、Route、能力解析和请求编译链。产品语义以根目录 `ARCHITECTURE.md` 为最高权威；机器可验证契约位于 `src/shared/provider-catalog`、`src/shared/types/providerCapability.ts`、`EffectiveCatalogService` 与 `RequestPlanner`。
 
 ## 核心不变量
 

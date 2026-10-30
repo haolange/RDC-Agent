@@ -168,6 +168,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
     'src/main/workflow/debugger/AgentTurnRunner.ts',
     'src/main/workflow/debugger/ToolExecutorFactory.ts',
     'src/main/workflow/debugger/TurnPreparationService.ts',
+    'src/main/agent-runtime/permissions/ToolPermissionAuthorization.ts',
   ].map(read).join('\n');
   assert(orchestrator.includes('configuredRuntimeProvider'), 'AgentOrchestrator must use the configured runtime provider path.');
   assert(!orchestrator.includes('llmAdapterProvider'), 'AgentOrchestrator must not use the settings LLMAdapterProvider.');
@@ -182,6 +183,10 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(orchestrator.includes('agentPermissionPolicyService.evaluate'), 'AgentOrchestrator must mediate tools through AgentPermissionPolicy.');
   assert(orchestrator.includes('agentToolApprovalRequestService.request'), 'AgentOrchestrator must pause for tool approval requests.');
   assert(orchestrator.includes('agentToolApprovalRequestService.autoReview'), 'AgentOrchestrator must emit auto-review decisions.');
+  assert(orchestrator.includes('executeWithPermissionAdmission'), 'Tool effects must use the revision-checked final admission path.');
+  const admission = read('src/main/agent-runtime/permissions/ToolPermissionAdmission.ts');
+  assert(admission.includes('authority.getSnapshot().revision !== snapshot.revision'), 'Final tool admission must reject stale permission revisions after resource acquisition.');
+  assert(!read('src/main/agent-runtime/permissions/AgentPermissionPolicy.ts').includes('settingsService.getAll'), 'Policy evaluation must explicitly receive frozen constraints and main-owned mode.');
   assert(orchestrator.includes('withTemporaryPathAccess'), 'approved external path access must be scoped to the tool execution.');
   assert(orchestrator.includes('PromptPlan is required before creating an agent runtime slot.'), 'Agent runtime slots must require PromptPlan.');
   assert(orchestrator.includes('requestEnvelopeBuilder.build'), 'Agent runtime requests must create RequestEnvelope snapshots.');
@@ -220,7 +225,10 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(promptPlanBuilder.includes('CORE_FILES'), 'PromptPlanBuilder must assemble source-controlled Core Prompt modules.');
   assert(promptPlanBuilder.includes("kind: 'skill-catalog'"), 'PromptPlanBuilder must own progressive Skill catalog composition.');
   assert(promptPlanBuilder.includes('resolveSkillCatalogBudget'), 'PromptPlanBuilder must use SkillCatalogBudget for progressive skill index.');
-  assert(promptPlanBuilder.includes('Permission mode:'), 'PromptPlanBuilder must describe effective runtime permission mode.');
+  assert(!promptPlanBuilder.includes('Permission mode:'), 'Frozen PromptPlan must not advertise a stale current permission mode.');
+  const permissionContext = read('src/main/agent-runtime/permissions/RuntimePermissionContext.ts');
+  assert(permissionContext.includes('Mode: ${state.mode}') && permissionContext.includes('sourceHash: hashScopedResource(content)'), 'Runtime permission context must identify the current mode and its request-local source hash.');
+  assert(read('src/main/agent-runtime/agent/AgentLoop.ts').includes('appendRuntimePermissionContext(llmContext, config.resolvePermissionState())'), 'Each actual provider request must sample its runtime permission context.');
   assert(promptPlanBuilder.includes('routeCapability'), 'PromptPlanBuilder must include effective route capabilities.');
   assert(skillCatalogBudget.includes('includeSkillCatalog'), 'SkillCatalogBudget must decide catalog inclusion.');
   assert(!skillCatalogBudget.includes("harness:"), 'SkillCatalogBudget must not restore harness frontmatter modes.');
@@ -246,7 +254,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   }
   assert(conversationPromptPreparer.includes('promptPlanBuilder.build'), 'Conversation prompt preparation must build a PromptPlan for system instructions.');
   assert(conversationPromptPreparer.includes('routeCapability: input.routePreflight.routeCapability'), 'Conversation prompt preparation must pass the frozen route capability into PromptPlanBuilder.');
-  assert(conversationPromptPreparer.includes('permissionSettings: runtimeSettings.agentRuntime.permissions'), 'Conversation prompt preparation must pass runtime permission settings into PromptPlanBuilder.');
+  assert(conversationPromptPreparer.includes('permissionConstraints: runtimeSettings.agentRuntime.permissions'), 'Conversation prompt preparation must pass explicit frozen permission constraints into PromptPlanBuilder.');
   assert(conversationService.includes('answerToolApproval'), 'ConversationService must expose tool approval resume.');
   for (const token of ['prepareTurnContext', 'prepareConversationPrompt', 'materializeAgentUserInput', 'preparedTurn', 'requestId']) {
     assert(conversationRuntimeSources.includes(token), `Conversation preflight path must include ${token}.`);

@@ -1,6 +1,6 @@
 # Session Projection 契约
 
-> 产品边界与不变量以根目录 `DESIGN.md` 为 SSOT。本文约定 renderer **Active Session Projection**：主进程允许多 session 并行 turn，UI 只投影当前 active session；后台 session 事件写入 sidelined cache，切回时 hydrate。
+> 产品边界与不变量以根目录 `ARCHITECTURE.md` 为 SSOT。本文约定 renderer **Active Session Projection**：主进程允许多 session 并行 turn，UI 只投影当前 active session；后台 session 事件写入 sidelined cache，切回时 hydrate。
 
 ## Active Session
 
@@ -144,3 +144,10 @@ ProgressTask 与 ConversationTaskSnapshotItem 可带只读 waitingOn（taskId、
 ### 自动审查与计划交接
 
 Plan 批准的正常退出携带宿主 owning turn 的批准身份；主进程核对冻结制品、当前计划与 execution offer，普通缺失 final_answer 仍失败。批准确认到交接共用来源计划身份，迟到成功、Stop、会话切换与修订均不能重新发送；投递不确定只核查 requestId。准备时保留本次选择并标待确认，不能投影旧请求模型/参数。
+
+
+## 权限挡位事实与审批换代
+
+Composer 的待保存选择不是已生效权限；当前 mode/revision 只来自主进程只读快照和变更事件，订阅先于快照读取，迟到旧 revision 不可覆盖新事实。右栏使用同源权限状态。切换保持草稿、焦点、卡片身份和展开状态，并说明全局作用域、尚未准入工具采用新权限及已启动命令继续。
+
+工具开始事件记录实际准入 mode/revision；历史记录不因后续切挡改写，缺失信息显示未知。审批取消使用现有 cancelled 状态与明确原因 PERMISSION_MODE_CHANGED，不伪装成用户拒绝。每次重授权请求有新审批 ID，旧按钮与迟到审核结果不属于新请求；工具调用身份保持不变。主/子审批仍依真实 owner session 和 child turn/request/execution 路由，不能由 renderer 推断批准或授权。

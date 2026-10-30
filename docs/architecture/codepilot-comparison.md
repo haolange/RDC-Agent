@@ -19,7 +19,7 @@ CodePilot 值得学习的是架构表达方式，而不是技术栈迁移：
 | 应用/API 层 | Next.js App Router + REST API | preload + IPC 是主要 API 面 | 以 `window.electronAPI`、IPC channel、shared types 作为跨层契约 |
 | 核心业务 | `src/lib` 承载 db、SDK、stream、provider、workspace | `src/main` 已收敛到 workflow、sessions、captures、conversation、tools、settings、runtime、reports、shell | 后续继续拆内部 facade，不恢复 services 技术桶 |
 | UI 分层 | `components/ui`、业务组件、layout 分层明显 | `src/renderer` 已收敛到 shell、features、ui、patterns、platform | 后续继续拆 `App.tsx` glue，不恢复 components 技术桶 |
-| 数据流文档 | wiki 中按 API、workspace、Bridge 分域描述 | 已有架构总览、数据流、模块地图 | 继续以 `DESIGN.md` 与 `docs/architecture/*` 为稳定入口 |
+| 数据流文档 | wiki 中按 API、workspace、Bridge 分域描述 | 已有架构总览、数据流、模块地图 | 继续以 `ARCHITECTURE.md` 与 `docs/architecture/*` 为稳定入口 |
 | 测试策略 | Playwright、单元、构建文档有集中描述 | 以 `typecheck`、契约 `check:*`、浏览器真实会话为主；不以 Playwright E2E 为门禁 | UI/UX 验收走 `pnpm run start:agent-browser` |
 
 ## 明确迁移

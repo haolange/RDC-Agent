@@ -98,6 +98,7 @@ export interface AgentOptions {
   onRequest?: AgentLoopConfig['onRequest'];
   onResponse?: AgentLoopConfig['onResponse'];
   beforeRequestMessages?: AgentLoopConfig['beforeRequestMessages'];
+  resolvePermissionState?: AgentLoopConfig['resolvePermissionState'];
 }
 
 // =====================================================================
@@ -374,6 +375,7 @@ export class Agent {
       onRequest: opts.onRequest,
       onResponse: opts.onResponse,
       beforeRequestMessages: opts.beforeRequestMessages,
+      resolvePermissionState: opts.resolvePermissionState,
     };
   }
 }

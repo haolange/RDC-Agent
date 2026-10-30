@@ -1390,7 +1390,7 @@ S120 原Task预算诊断产品复验（2026-10-20 17:48）：原a9c54983 gen1的
 
 2026-09-20 FIRST-USE-RELEASE退出补验：现有打包`release/win-unpacked/RdcAgent.exe`在隔离profile/home启动，原生窗口与上手指南目视正常；Alt+F4后主进程及该exe子进程退出，canonical instance.lock释放，未强制结束。临时配置删除并复查，桌面启动权已交还。此回执补齐下表该行历史未验的原生容器/正常退出项；计划T1–T6通过。代码仍未提交，表行保留planned而不将基线SHA冒充已提交实现；签名、独立干净机与发布不在本轮完成声明中。
 
-Verifier 结论落盘。本文件是二次收敛（U00–U07）与 T18 现场取证的验收台账，不是第二产品权威；产品裁决以根目录 [`DESIGN.md`](../../DESIGN.md) 为准。
+Verifier 结论落盘。本文件是二次收敛（U00–U07）与 T18 现场取证的验收台账，不是第二产品权威；产品裁决以根目录 [`ARCHITECTURE.md`](../../ARCHITECTURE.md) 为准。历史行中的 DESIGN.md 仍指当时源码的架构权威。
 
 **Browser 证据路径在仓库外** `%LOCALAPPDATA%/rdc-agent-qa/<sha>/`。条目若引用 Browser 证据，只记相对该目录的路径、build SHA、QA `projectId` / `sessionId`、viewport、theme/motion、DOM selector、IPC channel + 结果码。**禁止**写入 token / cookie / secret / qaBootstrap。
 
@@ -4219,3 +4219,23 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 补充模型验收：deepseek-flash 冻结 reasoningLevel=low，实际响应 status-streaming 后停止（观察1939字符，14.6s），最终status-stopped、Composer运行态归零、停止按钮消失，新输入草稿保留。发现并修复会话能力加载期间把持久Low显示成Off的问题；回归测试和真实页面重新加载恢复Low通过。追加Low要求后的请求均Low，无新增Off/Max请求。
 - 补充工程：上述修复的26项及23项定向测试通过（两组有重叠），最终typecheck、lint、check:gates、build、design:build通过。门禁初次遇到沙箱realpath EPERM，正常用户权限执行通过，未放松断言。沿用未受影响的完整coverage/ratchet，不重复全套。最终源码哈希与逐表面清单仍在同一工作记录。
 - 最终补验收尾：新增 QA/组件目录服务及自有子进程退出，新增隔离凭据、Local State、项目、素材、fixture脚本及日志均已删除；5127/5173无监听，canonical锁不存在，桌面启动权已交还。唯一工作记录更新为T1–T7通过，保留3张必要画面及更新后的源码哈希回执。
+
+### 2026-10-30 权限挡位动态切换与文档权威拆分
+
+- 源码身份：Agent main 基线 `ccc6eac0f14546e5b6e74788d7290684765ff718` 加本轮未提交工作树；保持当前分支，未提交、推送或发布。工程验证与窗口呈现分开结算，不把完整工程通过记为全部产品验收通过。最小证据为 `.local/permission-switch/verification-receipt.json` 和 `runtime-receipt.json`，Tasks 同目录。
+- 文档权威：原 DESIGN 的工程原则、产品边界、Authority Map、运行时不变量和验证要求迁入 `ARCHITECTURE.md`；`DESIGN.md` 收敛为 UI/UX 入口，沿用现有视觉系统，未自行引入 Google/Material 规则。AGENTS、当前引用、主题文档及门禁同步迁移；历史验收行保留当时源码中的 DESIGN 来源。
+- 运行时收敛：主进程在权限设置成功持久化后发布全局 mode/revision，覆盖活动会话与前后台子 Agent；只有 mode 动态，读写根、命令规则、Profile/Skill/policy、预算、Provider 路由和 RDC 身份继续冻结。工具在审批、Hook 与全部资源队列等待之后同步完成最终准入；过期许可先释放资源再重新授权，不重复预算、前置 Hook 或副作用。已经准入的命令继续，显式 Stop 仍走既有取消/join/进程退出回执；切挡不宣称撤销已有副作用。
+- 审批与产品接线：旧 pending 请求以 cancelled / PERMISSION_MODE_CHANGED 结束，新请求使用唯一身份，迟到回答或审核不能批准新调用；已明确拒绝/失败保持终态。模型每次实际请求读取动态权限段，界面通过受控只读状态查询/事件显示 pending 和主进程确认事实。右栏迟到投影覆盖与审核失败/切挡竞争两项 P2 已聚焦修复并独立复查；不保留读取完整 Settings 的权限兼容 fallback 或第二执行器。
+- 工程证据：完整 coverage 为557文件、4094项测试通过，另4文件/4项既有跳过；coverage ratchet 通过（lines 77.85%、functions 79.2%、branches 66.03%、statements 75.5%）。初轮6项失败中3项为旧审批 ID 断言，已改为使用实际事件身份；另3项为并行负载下原5000ms超时，限制 maxWorkers=4 后完整复跑通过，未放宽超时、覆盖率阈值或行为断言。之后删除一行不可达旧取消语句，对应3文件31项回归通过；再由实际运行发现下述投影缺陷，修复后独立7文件96项回归、全库 typecheck、lint、完整 check:gates 与最终 build 通过。contracts 为10文件248项通过；未受影响的全量 coverage/ratchet 证据按执行纪律沿用，不宣称投影修复后又重跑完整覆盖率。
+- 实际主进程与进程链路：官方 launcher 启动隔离 headless Electron main，经完整 one-time /qa bootstrap、cookie 与同源正式 HTTP Bridge 驱动。使用明确标记的脚本化 Provider 和合成能力目录，实际工具、审批、主进程存储与 shell 为生产链路。最终新轮中，A 已启动后从 Full access 调到 Default，实际 pwsh 继续18423ms并 exit0；B 保持待人工审批，再切到 Full access，旧审批 cancelled / PERMISSION_MODE_CHANGED、旧回答 success:false，实际 node --version 返回 v24.22.1、exit0，正式工具状态 complete。另一新轮用正式 Stop 取消真实运行 shell，返回 phase:running，工具 cancelled、shell reason:abort，进程复查为空。
+- 实际运行发现并修复：首轮 B 的旧审批虽正确取消且命令实际成功，主进程/renderer 却将整个工具错误投影为 cancelled。修复仅让权限换代引起的审批取消不终结工具，新审批重置请求元数据，真实 Stop 的单调终态保持不变；上述96项回归和最终正式 Bridge 重跑证明 B 为 complete、真实 Stop 仍为 cancelled。最初 fixture 的路由配置失败及 node -e 命中原有硬拒绝均保留为失败事实，修正隔离路由/另开新轮执行安全的 node --version，未放松原硬拒绝规则。
+- 窗口验收边界：本轮 Computer Use 因无法确认当前浏览器 URL 的可信状态而结束操作；未绕过该策略继续控制窗口。中英文实际切换、390px/大字/主题、键盘/焦点、审批卡片视觉和原生 Electron 窗口交互均无本轮呈现通过证据，T7窗口部分保留阻塞。解除条件为可可靠识别当前 URL 的 Computer Use 新回合或可用的独立界面验收条件。以上 HTTP Bridge 与真实进程证据只证明各自链路，不能替代窗口验收，也不代表真实模型效果、RDC回放或Android设备呈现。
+- QA收尾：本轮 main、Provider、Edge树与 shell 均确认退出，5127/60496/57069无监听，canonical instance.lock 不存在，桌面启动权已交还。绝对边界、Git跟踪、reparse与进程核验后，qa/verify 中隔离配置、占位凭据、认证、浏览器profile、脚本、日志和缓存均已删除；单独旧 Stop 回执被同一最终构建的组合回执替代后移除，根任务另经绝对边界、Git跟踪与reparse核验清除测试tmp和过时初始计划，最终仅保留Tasks及两份最小回执。不以进程清理或工程通过代替仍阻塞的窗口验收。
+
+### 2026-10-30 权限切换续验收：Browser 与原生窗口
+
+- 来源与授权：用户在新回合明确要求补完 Browser／原生窗口验收，并授权随后提交、推送 main；保持当前分支，不发布版本。补验前111个源码／文档文件与上一轮回执哈希一致，沿用基线 `ccc6eac0f14546e5b6e74788d7290684765ff718` 加工作树的有效工程证据。本回合实际新增为权限换代文案的4文件定向修正和本续记录；不把上一节的工具URL策略停止改写为当时已通过，本节以新回合真实窗口证据解除该项阻塞。
+- Browser 实际呈现：正式 disposable one-time bootstrap 进入同源 /app；四挡位菜单的 radio 选中、Escape 关闭和焦点返回、主进程确认反馈通过。中英文双向切换保留输入草稿、光标/选区、已展开工具与中英文原始回执，未补译原始内容。390×844、浅色、大字号、长英文下主文档与滚动容器宽度均为390，无横向溢出；深色与重新加载后的偏好恢复通过，renderer console error为0。当前右栏没有可见权限标签，本次不宣称其视觉标签验收；底层权限投影回归沿用前项工程证据。
+- 本回合发现并修复：已完成工具的详情仍显示旧审批 Cancelled / PERMISSION_MODE_CHANGED，容易被读成整个工具取消。仅对主进程类型化的权限换代原因显示明确的“原审批因权限切换已撤销”／“Approval withdrawn after permission change”说明，不通过原始字符串猜测原因，不改写工具结果或普通取消语义。52项定向测试、typecheck、lint、check:i18n（2185 keys）、work-process、session-projection 与 build通过，最终 Browser 中英文和390px说明重新实测通过。该52项为本回合增量，不与上一节4094项全量及96项增量相加，也不宣称文案修正后重跑完整覆盖率。
+- 原生 Electron 实际呈现：官方标准 start:human 使用同一隔离数据启动，窗口约1404×902；四挡位 radio 菜单的 Enter 选择、Escape 关闭及可见焦点环，Default→Auto-review确认、中文草稿保留、English→中文与浅色切换、已展开原始回执保持通过。新中文审批撤回说明清楚显示。原生“选择文件夹”子窗口使用 Escape 取消，随后取消添加项目，项目数保持1；真实标题栏关闭后窗口列表为空。该项是原生窗口与对话框取消证据，不是实际工具执行、模型效果或设备呈现的替代证据。
+- 证据与收尾：保留 `.local/permission-switch/evidence/browser-dark.png`、`browser-narrow.png`、`native-light.jpg` 三张不同目的画面及 `window-lifecycle-receipt.json`；样本为明确隔离的历史UI数据，未调用真实模型、Provider或RDC，也未使用真实凭据。原生标题栏关闭使官方 launcher正常exit0；本轮原生main、launcher及子进程和先前Browser main均经精确进程身份核验已退出，5127无监听，canonical与隔离userData的instance.lock均不存在。核对绝对边界、Git跟踪、reparse和进程后，window-qa内HOME、userData、project、temp和bootstrap已删除并复查目录不存在。桌面启动权已交还。沿用上一节正式HTTP／真实shell回执，本续节补齐窗口范围，不增加真实模型、RDC回放或Android设备验收声明。

@@ -1,6 +1,6 @@
 # 权限与安全边界
 
-> 产品不变量以 `DESIGN.md` 为准。失败分类见 [`failure-model.md`](failure-model.md)。本文描述 **Permission / Electron Sandbox / IPC / Browser Bridge / Secret / MCP trust / Shell** 稳定边界。
+> 产品不变量以 `ARCHITECTURE.md` 为准。失败分类见 [`failure-model.md`](failure-model.md)。本文描述 **Permission / Electron Sandbox / IPC / Browser Bridge / Secret / MCP trust / Shell** 稳定边界。
 
 ## Permission Mode
 
@@ -11,6 +11,18 @@ Composer 暴露：`Default`、`Auto-review`、`Full access`、`Custom(config.tom
 - `Full access`：显式信任本地文件与命令；仍受 primitive 硬约束（二进制/`.rdc`、realpath、灾难 shell、SSRF）。
 - `Custom`：按配置根与命令列表。
 
+### 在途权限切换
+
+挡位 mode 是主进程确认的全局授权事实，覆盖所有活动会话及前后台子 Agent。Settings 成功持久化后同步发布新的 mode/revision，再确认切换成功；同值不递增，保存失败不生效。读取/写入根、命令规则、工具目录、Profile/Skill 交集、CompiledPolicy、预算、Provider 路由及 RDC 身份仍在 prepareTurn 冻结。切到 Custom 使用本轮冻结规则，规则修改在新轮生效。
+
+每个工具在审批、前置 Hook、项目锁及全局不安全锁等待后同步复核版本、消费许可并记录准入；这段提交不得包含 await 或可重入扩展。模型生成、scheduler 派发或排队不等于准入。锁内发现旧许可须先释放资源，再按最新版本重授权；不能持锁等待人工或模型审核。一次调用只保留一次预算和前置 Hook，不因重授权重复执行。并行工具逐调用准入，子 Agent 调度本身不持资源锁，子工具自行检查最新挡位和自身冻结限制。
+
+切挡取消旧 pending 审批/审核，记录 cancelled 和 PERMISSION_MODE_CHANGED；原工具调用身份不变，每次新请求使用唯一审批身份。旧回答和迟到审核不能执行。已批准的历史事件保持不变，但未消费的旧版本许可失效；用户拒绝、审核拒绝和失败保持终态，不因切挡复活。审批与切挡竞争以主进程先合法结算的结果为准。同一 revision 内只有一次有效审核；非切挡原因的失败不自动重试、改人工或提权，已发生审核用量照实记录。
+
+已准入操作继续，包括 tool.execute 内部后续 await、长命令和后台进程。切挡不自动终止，也不撤销已有副作用；Stop/task_stop、会话删除及退出继续走 cancel/join 和进程退出回执。计划批准、ask_user、Knowledge/Memory 专门确认和安全 IPC token 不随挡位自动代答。Full access 不能突破硬拒绝、policy/user floor、Capsule/Profile/Skill、预算或 owning lease。
+
+模型每次实际 Provider 请求前读取主进程权限事实；静态 PromptPlan 不保存易过时的当前挡位，模型流不中断。动态上下文不授权工具，最终执行准入仍为权威。
+
 Work Process 必须展示真实 `Requested approval` / `Approved` / `Denied` / `Auto-reviewed`，不得把策略暂停伪装成普通失败 shell。
 
 Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllowedPathRoots`。
@@ -19,7 +31,7 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 
 `read_file` 的显式 `mode: audit` 沿用该工具的冻结可用性与读取权限；`path` 和 `compareWith.path` 分别提取并审批，第一路径在工程内不自动授权第二路径。执行层对两者分别 realpath/根边界校验，且校验各自预期hash；不由模型脚本直接读磁盘，不增加新工具身份或向受限reviewer授予 `read_file`。审计只返回有界字节信息和整文件比较结果，不授予编辑前置读取资格。capture拒绝、8MiB输入上限和取消合同见 runtime-kernel。
 
-canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `knowledgeReadRoots = [realpath(~/.rdc-agent/knowledge), realpath(<projectRoot>/.rdc-agent/knowledge)]`（仅存在且为真实目录；根自身 symlink/junction → 排除 + 诊断）。`AgentPermissionPolicy` **仅**对 `read_file` / `read_image` / `glob` / `grep` 把它们并入免审批读根。`write` / `edit` / `delete` / `shell` / `code_interpreter` 在策略层与执行层双重拒绝。sibling 越界（如 `~/.rdc-agent/memory`、`~/.rdc-agent/agents`）拒。写入 Knowledge 仍只经 `knowledge_*` + human review。见 `DESIGN.md` 裁决 G。
+canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `knowledgeReadRoots = [realpath(~/.rdc-agent/knowledge), realpath(<projectRoot>/.rdc-agent/knowledge)]`（仅存在且为真实目录；根自身 symlink/junction → 排除 + 诊断）。`AgentPermissionPolicy` **仅**对 `read_file` / `read_image` / `glob` / `grep` 把它们并入免审批读根。`write` / `edit` / `delete` / `shell` / `code_interpreter` 在策略层与执行层双重拒绝。sibling 越界（如 `~/.rdc-agent/memory`、`~/.rdc-agent/agents`）拒。写入 Knowledge 仍只经 `knowledge_*` + human review。见 `ARCHITECTURE.md` 裁决 G。
 
 ## Electron Sandbox（Phase 6）
 
@@ -30,7 +42,7 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 
 ## IPC Schema（Zod）
 
-**全量** IPC handler 经 `parseIpcArgs`（含 settings / terminal / workflow / memory / conversation / project / capture / shell / rdc-runtime / trace / web 等）。非法 payload fail-closed。`approvalToken` 单次消费（`IpcApprovalTokenService`）。契约测试：`IpcPayloadGuard.test.ts`。Renderer 读取 Investigation 正文的唯一通道是 IPC `investigation:read({ sessionId, artifactId, expectedHash })`：分类 `read`；active project/session owner gate；内部唯一调用 `InvestigationArtifactService.readRecord`；只返回既有 max-bytes 内完整 record，超限 fail-closed；不接受 URI / 绝对路径 / generic artifact。见 `DESIGN.md` 裁决 B / E。**该 IPC 已落地**。T18 知识导入已证见 `DESIGN.md` T18 已证组；产品级 Browser QA 全矩阵见 U05 / [`docs/product/acceptance-ledger.md`](../product/acceptance-ledger.md)。
+**全量** IPC handler 经 `parseIpcArgs`（含 settings / terminal / workflow / memory / conversation / project / capture / shell / rdc-runtime / trace / web 等）。非法 payload fail-closed。`approvalToken` 单次消费（`IpcApprovalTokenService`）。契约测试：`IpcPayloadGuard.test.ts`。Renderer 读取 Investigation 正文的唯一通道是 IPC `investigation:read({ sessionId, artifactId, expectedHash })`：分类 `read`；active project/session owner gate；内部唯一调用 `InvestigationArtifactService.readRecord`；只返回既有 max-bytes 内完整 record，超限 fail-closed；不接受 URI / 绝对路径 / generic artifact。见 `ARCHITECTURE.md` 裁决 B / E。**该 IPC 已落地**。T18 知识导入已证见 `ARCHITECTURE.md` T18 已证组；产品级 Browser QA 全矩阵见 U05 / [`docs/product/acceptance-ledger.md`](../product/acceptance-ledger.md)。
 
 ## Browser Bridge（QA-only / debug-only）
 - /qa is a QA bootstrap surface: the launcher logs a one-time qaBootstrap, which is consumed before minting the bridge cookie. It isolates browser origins; it is not authentication against a malicious local process.
@@ -67,7 +79,7 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 - Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity。任一变化 → `needsRetrust`。
 - builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。
 - 旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。
-- 12 canonical events 保持单一 `HookEngine` 路径。见 `DESIGN.md` 裁决 K。
+- 12 canonical events 保持单一 `HookEngine` 路径。见 `ARCHITECTURE.md` 裁决 K。
 - **当前态**：上述条款已由 `HookEngine` + `hook-trust.json` schemaVersion 2 落地；信任匹配只认 `trustFingerprint`，不再接受 YAML-only `sourceHash`。
 
 ## MCP Trust

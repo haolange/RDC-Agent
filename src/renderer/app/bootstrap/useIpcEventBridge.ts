@@ -20,6 +20,7 @@ import {
   subscribeRunUsageChanged,
   subscribeTraceProjectionChanged,
 } from './sessionSubscriptions';
+import { subscribePermissionState } from './permissionSubscriptions';
 import { subscribeAppThemeChanged, subscribeRuntimeLogAppended, subscribeShellCommands } from './shellSubscriptions';
 
 export function useSyncCapturesFromSnapshot() {
@@ -62,6 +63,7 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
     if (!electronAPI) return;
 
 
+    const unsubscribePermissionState = subscribePermissionState(electronAPI);
     const unsubscribeRunUsageChanged = subscribeRunUsageChanged(electronAPI);
     const unsubscribeTraceProjectionChanged = subscribeTraceProjectionChanged(electronAPI);
 
@@ -90,6 +92,7 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
     const unsubscribeShellCommands = subscribeShellCommands(electronAPI, { showNotice, t, setSettingsModalOpen, setWindowMaximized });
 
     return () => {
+      unsubscribePermissionState();
       conversation.disposeBatcher();
       unsubscribeRunUsageChanged();
       unsubscribeTraceProjectionChanged();

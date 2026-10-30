@@ -1,6 +1,6 @@
 # 架构文档
 
-产品边界、架构边界与验证门禁以根目录 [DESIGN.md](../../DESIGN.md) 为 SSOT。跨层契约权威在 [`docs/contracts/`](../contracts/)；本目录承载实现向架构说明与模块地图，不与 contracts 双轨裁决。
+产品边界、架构边界与验证门禁以根目录 [ARCHITECTURE.md](../../ARCHITECTURE.md) 为 SSOT。跨层契约权威在 [`docs/contracts/`](../contracts/)；本目录承载实现向架构说明与模块地图，不与 contracts 双轨裁决。
 
 ## 契约入口（权威）
 

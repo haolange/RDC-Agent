@@ -147,6 +147,8 @@ BuiltinAgentToolId
 BuiltinAgentToolTier
 BuiltinLlmProviderId
 CachePlan
+cancelConversationToolCall
+cancelWorkTrace
 CANONICAL_HOOK_EVENTS
 CANONICAL_SKILL_IDS
 CANONICAL_TOOL_TOKEN_EXPANSIONS
@@ -515,6 +517,7 @@ HalReasoningLevel
 halReasoningLevelFromCanonical
 hasBridgeChannelCapability
 hasImplementedStructuredToolAdapter
+hasPlanReviewInteraction
 hexToHsv
 hexToRgb
 HookDefinition
@@ -558,6 +561,7 @@ INVESTIGATOR_AGENTS
 isAgentIconPreset
 isAgentToolExecutableModel
 isAlphanumeric
+isAutomaticToolApproval
 isCatalogVisibleAgentModel
 isCausalOrCounterfactualClaim
 isClosedExperimentStatus
@@ -571,6 +575,7 @@ isMissionForbiddenToolId
 isMissionPlanOnlyToolId
 isMissionProfileId
 isNamedReasoningLevel
+isProviderExecutable
 isRdcLeaseToolName
 isReasoningSelection
 isRendererEventChannel
@@ -950,6 +955,7 @@ renderPlanTaskRequirements
 repairConversationBranchState
 ReplayBackendHint
 ReplayDeviceEntry
+ReplayDeviceSnapshot
 ReplayDeviceStatus
 ReplayDeviceStatusChangedPayload
 ReplayDeviceTransport
@@ -1021,6 +1027,8 @@ RuntimeLogEntry
 RuntimeLogNamespace
 RuntimeLogScope
 RuntimeLogSeverity
+RuntimePermissionApi
+RuntimePermissionState
 RuntimeResourceCatalog
 SAFE_AGENT_PROFILE_ID_PATTERN
 sanitizeChromeThemes
@@ -1106,6 +1114,7 @@ TASK_STATUS_REASONS
 TaskContextPanelViewModel
 TaskContextResource
 TaskContextResourceKind
+TaskDependencyWait
 TaskExecutionPreparation
 TaskExecutionPreparationSchema
 TaskExecutionRequirements

@@ -14,6 +14,7 @@ const fixture = vi.hoisted(() => ({
   load: vi.fn(async () => undefined),
   applyIcon: vi.fn(),
   refreshMenu: vi.fn(),
+  log: vi.fn(),
 }));
 vi.mock('electron', () => ({
   ipcMain: { handle: (name: string, fn: (...args: unknown[]) => unknown) => fixture.handlers.set(name, fn) },
@@ -40,7 +41,7 @@ vi.mock('../settings/resolveRegisteredProjectRoot', () => ({ tryCurrentProjectRo
 vi.mock('../settings/ProviderConnectionService', () => ({ providerConnectionService: {} }));
 vi.mock('../settings/ProviderCapabilityProbeService', () => ({ providerCapabilityProbeService: {} }));
 vi.mock('../settings/ModelsOverrideService', () => ({ modelsOverrideService: {} }));
-vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: {} }));
+vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: fixture.log } }));
 vi.mock('../runtime/ShellResolver', () => ({ shellResolver: {}, formatShellInterpreterLabel: vi.fn() }));
 
 vi.mock('../window/applicationMenu', () => ({ refreshApplicationMenu: fixture.refreshMenu }));
@@ -78,4 +79,12 @@ it('refreshes native menus only after a committed language change', async () => 
   expect(fixture.refreshMenu).toHaveBeenCalledTimes(2);
   await handle({}, { appearance: { language: 'zh-CN' } });
   expect(fixture.refreshMenu).toHaveBeenCalledTimes(2);
+});
+
+it('returns committed settings when a native notification fails', async () => {
+  fixture.applyIcon.mockImplementationOnce(() => { throw new Error('native observer failed'); });
+  registerSettingsLlmHandlers({ broadcastToRenderer: vi.fn(), applyCurrentLlmConfig: vi.fn() } as unknown as WorkbenchIpcContext);
+  const result = await fixture.handlers.get('settings:set')!({}, { appearance: { theme: 'light' } }) as AppSettings;
+  expect(result.appearance.theme).toBe('light');
+  expect(fixture.log).toHaveBeenCalledWith(expect.objectContaining({ raw: { code: 'SETTINGS_COMMITTED_NOTIFICATION_FAILED' } }));
 });

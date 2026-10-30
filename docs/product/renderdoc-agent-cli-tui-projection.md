@@ -1,7 +1,7 @@
 # RenderDoc Agent CLI / TUI 投影附录
 
 > 本文是 `renderdoc-agent-complete-design.md` 的 CLI/TUI 投影附录（draft）。
-> 它不定义第二套 Agent 架构，也不是当前产品权威；权威边界以根目录 `DESIGN.md` 为准。
+> 它不定义第二套 Agent 架构，也不是当前产品权威；权威边界以根目录 `ARCHITECTURE.md` 为准。
 > 所有 Profile、Skill、Hook、Permission、Task、Sub-Agent、Handoff、RDC、Artifact 和 Knowledge 事实均来自与 Electron Workbench 相同的主进程与共享合同。
 
 ## 1. 目标

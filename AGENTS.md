@@ -4,11 +4,11 @@
 
 本文件只约束 `RDC-Agent` 仓库内的修改方式、文档治理和交付边界。
 
-本仓库是面向 RenderDoc `.rdc` capture 的 Electron 桌面应用，核心代码分布在 `src/main`、`src/preload`、`src/renderer` 和 `src/shared`。若本文件与系统、平台安全规则或用户本轮明确指令冲突，以更高优先级指令为准，并在交付说明中指出采用了哪个约束。仓库内部文档之间出现冲突时，产品边界、架构边界和验证门禁以 `DESIGN.md` 为准，再同步修正文档。
+本仓库是面向 RenderDoc `.rdc` capture 的 Electron 桌面应用，核心代码分布在 `src/main`、`src/preload`、`src/renderer` 和 `src/shared`。若本文件与系统、平台安全规则或用户本轮明确指令冲突，以更高优先级指令为准，并在交付说明中指出采用了哪个约束。仓库内部文档之间出现冲突时，产品边界、架构边界和验证门禁以 `ARCHITECTURE.md` 为准，再同步修正文档。
 
 ## 修改原则
 
-- UI/UX、产品、架构、跨层契约、feature 拆分与验证策略先读 DESIGN.md 的 Architecture Principles / Authority Map，再读相关 docs/contracts/*、docs/architecture/*；视觉权威是 docs/ui/design-system.md。
+- 产品、工程架构、跨层契约、feature 拆分与验证策略先读 ARCHITECTURE.md 的 Architecture Principles / Authority Map，再读相关 docs/contracts/*、docs/architecture/*；UI/UX 先读 DESIGN.md，详细视觉权威是 docs/ui/design-system.md。
 - 根目录只放入口和长期跨层约定，领域规则归稳定主题文档，Task 记录状态，正式验收记录保存证据；不把临时禁令、机器路径、PID、某轮延期或进度流水账写成永久规则。标准 Electron 布局，不恢复顶层 Config/Saved/Intermediate/Binaries。
 - main/preload/renderer/shared 联动；角色、阶段、IPC、共享类型须核对 runtime 与 UI。只改本次必需文件，不添加兼容 shim、双写双读或静默 fallback，替代路径删除旧入口与文案。
 - 路径相对本库；上游仓库概念只作标记明确的对照，不能成为运行前提。文档中文为主，保留必要技术术语。
@@ -36,8 +36,8 @@
 - `src/shared` 负责跨层共享的常量、类型与工具函数。
 - `docs/` 只放稳定设计说明、流程说明和使用文档，不要把运行时代码规则写回文档层。
 - `docs/` 下的正式文档按稳定主题归类到 `contracts/`、`product/`、`architecture/`、`workflows/`、`ui/`。
-  - `contracts/`：runtime kernel、permissions、failure-model 等跨层契约（DESIGN 分拆权威）。
-  - 产品/架构冲突以 `DESIGN.md` 裁决，再同步 `docs/**`。
+  - `contracts/`：runtime kernel、permissions、failure-model 等跨层契约（ARCHITECTURE 分拆权威）。
+  - 产品/架构冲突以 `ARCHITECTURE.md` 裁决，再同步 `docs/**`。
 - `resources/` 只放需要随应用分发或运行时依赖的资源；`scripts/` 只放可复用的开发脚本。
 
 ## 设计系统约束（agent 写 CSS 必读）
@@ -81,7 +81,7 @@ Appearance 详细规则见 docs/ui/appearance-checklist.md；禁止恢复 transl
 ## 按任务读取权威与验证
 
 模块字段、历史阶段和完整验收矩阵在主题文档维护，根文件不重复：
-- 运行时/安全：DESIGN.md、docs/contracts/runtime-kernel.md、permissions.md、failure-model.md、docs/architecture/agent-runtime-kernel.md。
+- 运行时/安全：ARCHITECTURE.md、docs/contracts/runtime-kernel.md、permissions.md、failure-model.md、docs/architecture/agent-runtime-kernel.md。
 - Agent/Skill/Hook/Memory：docs/product/scoped-runtime-resources.md；RenderDoc 调查与 handoff：docs/product/renderdoc-agent-complete-design.md。
 - RDC 原生协议：docs/architecture/rdc-runtime.md；Browser bridge：docs/architecture/browser-qa-surface.md。
 - UI/Composer/Settings：docs/ui/workbench-and-transcript.md、design-system.md、appearance-checklist.md；session gate：docs/contracts/session-projection.md。

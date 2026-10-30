@@ -8,7 +8,7 @@
 
 RenderDoc `.rdc` capture × AI Agent workbench × RDC 原生诊断
 
-[English](./README.en.md) · [设计与架构](./DESIGN.md) · [问题反馈](https://github.com/haolange/RDC-Agent/issues)
+[English](./README.en.md) · [工程架构](./ARCHITECTURE.md) · [UI/UX 设计](./DESIGN.md) · [问题反馈](https://github.com/haolange/RDC-Agent/issues)
 
 </div>
 
@@ -141,7 +141,7 @@ pnpm run build
 
 ## 文档入口
 
-- [产品与架构裁决](./DESIGN.md)
+- [产品与架构裁决](./ARCHITECTURE.md)
 - [运行时与权限契约](./docs/contracts/runtime-kernel.md)
 - [RDC 运行时](./docs/architecture/rdc-runtime.md)
 - [Workbench / Transcript / Composer](./docs/ui/workbench-and-transcript.md)

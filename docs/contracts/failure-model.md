@@ -1,6 +1,6 @@
 # Fail-closed 三分类
 
-> 权威裁决：`DESIGN.md` Architecture Principles §7。本文定义失败语义分类，并标注仓库内关键点。默认：**安全类必须 fail-closed**；完整性类允许 degrade-safe；可用性类应 recoverable。不得把可用性故障一律升级为安全 fail-closed，也不得把安全边界降级为“尽量继续”。
+> 权威裁决：`ARCHITECTURE.md` Architecture Principles §7。本文定义失败语义分类，并标注仓库内关键点。默认：**安全类必须 fail-closed**；完整性类允许 degrade-safe；可用性类应 recoverable。不得把可用性故障一律升级为安全 fail-closed，也不得把安全边界降级为“尽量继续”。
 
 ## 三类定义
 

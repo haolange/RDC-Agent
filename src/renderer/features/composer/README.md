@@ -1,6 +1,6 @@
 # Composer
 
-Composer 保留产品专属输入、附件、Agent 配置与运行态视觉；领域组件留在本 feature，不提升为通用 UI。架构与视觉权威仍为 `DESIGN.md` 和 `docs/ui/workbench-and-transcript.md`。
+Composer 保留产品专属输入、附件、Agent 配置与运行态视觉；领域组件留在本 feature，不提升为通用 UI。工程架构以 `ARCHITECTURE.md` 为准；UI/UX 以 `DESIGN.md`、`docs/ui/design-system.md` 和 `docs/ui/workbench-and-transcript.md` 为准。
 
 ## 入口与所有权
 

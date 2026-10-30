@@ -226,8 +226,8 @@ describe('PromptPlanForTurn', () => {
         provenance: [],
       },
       effectivePlan: {
-        permissionSettings: {
-          mode: 'default',
+        permissionConstraints: {
+
           readableRoots: [],
           writableRoots: [],
           allowedCommandPrefixes: [],

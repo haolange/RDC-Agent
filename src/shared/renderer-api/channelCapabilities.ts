@@ -151,6 +151,7 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'session:applyDeclaredHandoff': 'mutation',
   'run:list': 'read',
   'runtimeLog:list': 'read',
+  'runtime:getPermissionState': 'read',
   'capture:list': 'read',
   'capture:select': 'mutation',
   'capture:openProjectInput': 'mutation',

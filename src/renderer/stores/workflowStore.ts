@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useRuntimePermissionStore } from './runtimePermissionStore';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { RightPanelViewModel } from '@shared/types/trace';
 import type { WorkflowState } from '@shared/types/workflow';
@@ -33,9 +34,14 @@ export const useWorkflowStore = create<WorkflowStoreState>((set) => ({
   tracePresentation: null,
 
   setWorkflowState: (workflowState) => set({ workflowState }),
-  setTracePresentation: (tracePresentation) => set((state) => (
-    sameTracePresentation(state.tracePresentation, tracePresentation) ? state : { tracePresentation }
-  )),
+  setTracePresentation: (presentation) => set((state) => {
+    const mode = useRuntimePermissionStore.getState().snapshot?.mode;
+    const tracePresentation = presentation && mode && presentation.rightPanel.context.task.permission !== mode
+      ? { ...presentation, rightPanel: { ...presentation.rightPanel, context: {
+        ...presentation.rightPanel.context, task: { ...presentation.rightPanel.context.task, permission: mode },
+      } } } : presentation;
+    return sameTracePresentation(state.tracePresentation, tracePresentation) ? state : { tracePresentation };
+  }),
   reset: () => set({
     workflowState: null,
     tracePresentation: null,

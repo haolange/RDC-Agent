@@ -40,7 +40,7 @@ describe('EffectiveRuntimePlan', () => {
       projectId: 'proj-1',
       profile: { skills: ['inspect'] },
       toolAllowlist: ['read_file', 'shell'],
-      permissionSettings: basePermission,
+      permissionConstraints: basePermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'exec-fp' } },
       promptPlan: { systemPrompt: 'system' },
@@ -69,7 +69,7 @@ describe('EffectiveRuntimePlan', () => {
       projectId: 'proj-1',
       profile: { skills: ['inspect'] },
       toolAllowlist: ['read_file', 'shell'],
-      permissionSettings: basePermission,
+      permissionConstraints: basePermission,
       routeCapability: plan.routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'exec-fp' } },
       promptPlan: { systemPrompt: 'system' },
@@ -93,7 +93,7 @@ describe('EffectiveRuntimePlan', () => {
       projectId: 'proj-2',
       profile: { skills: ['capture'] },
       toolAllowlist: ['read_file', 'grep'],
-      permissionSettings: basePermission,
+      permissionConstraints: basePermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'turn-exec' } },
       promptPlan: { systemPrompt: 'frozen-system' },
@@ -109,7 +109,7 @@ describe('EffectiveRuntimePlan', () => {
       planId: plan.planId,
       fingerprint: plan.fingerprint,
       promptPlanFingerprint: plan.promptPlanFingerprint,
-      permissionSettings: plan.permissionSettings,
+      permissionConstraints: plan.permissionConstraints,
       profileSkills: plan.profileSkills,
       toolAllowlist: plan.toolAllowlist,
     };
@@ -117,13 +117,13 @@ describe('EffectiveRuntimePlan', () => {
       planId: plan.planId,
       fingerprint: plan.fingerprint,
       policyFingerprint: plan.policyFingerprint,
-      permissionSettings: plan.permissionSettings,
+      permissionConstraints: plan.permissionConstraints,
       skillIntersection: plan.skillIntersection,
       toolAllowlist: plan.toolAllowlist,
     };
     expect(promptView.planId).toBe(executorView.planId);
     expect(promptView.fingerprint).toBe(executorView.fingerprint);
-    expect(promptView.permissionSettings).toEqual(executorView.permissionSettings);
+    expect(promptView.permissionConstraints).toEqual(executorView.permissionConstraints);
     expect(promptView.toolAllowlist).toEqual(executorView.toolAllowlist);
   });
 
@@ -134,9 +134,9 @@ describe('EffectiveRuntimePlan', () => {
       projectRootPath: 'D:/Project',
       profile: { skills: ['inspect'] },
       toolAllowlist: ['read_file'],
-      permissionSettings: {
+      permissionConstraints: {
         ...basePermission,
-        mode: 'default',
+
         readableRoots: ['D:/Project'],
       },
       routeCapability,
@@ -165,7 +165,7 @@ describe('EffectiveRuntimePlan', () => {
       projectRootPath: 'D:/Project',
       profile: { skills: ['other'] },
       toolAllowlist: ['shell'],
-      permissionSettings: driftedPermission,
+      permissionConstraints: driftedPermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'stable' } },
       promptPlan: { systemPrompt: 'system' },
@@ -176,8 +176,8 @@ describe('EffectiveRuntimePlan', () => {
       mcpDescriptorHash: 'changed',
     });
 
-    expect(plan.permissionSettings.mode).toBe('default');
-    expect(plan.permissionSettings.readableRoots).toEqual(['D:/Project']);
+    expect(plan.permissionConstraints).not.toHaveProperty('mode');
+    expect(plan.permissionConstraints.readableRoots).toEqual(['D:/Project']);
     expect(plan.profileSkills).toEqual(['inspect']);
     expect(plan.toolAllowlist).toEqual(['read_file']);
     expect(plan.skillIntersection).toEqual(['read_file']);
@@ -194,7 +194,7 @@ describe('EffectiveRuntimePlan', () => {
       projectRootPath: 'D:/Project',
       profile: { skills: [] as string[] },
       toolAllowlist: ['read_file'],
-      permissionSettings: basePermission,
+      permissionConstraints: basePermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'kn-fp' } },
       promptPlan: { systemPrompt: 'system' },
@@ -220,7 +220,7 @@ describe('EffectiveRuntimePlan', () => {
       'D:/Users/me/.rdc-agent/knowledge',
       'D:/Project/.rdc-agent/knowledge',
     ]);
-    expect(withRoots.permissionSettings.readableRoots).toEqual([]);
+    expect(withRoots.permissionConstraints.readableRoots).toEqual([]);
     expect(withRoots.fingerprint).not.toBe(empty.fingerprint);
     expect(again.fingerprint).toBe(withRoots.fingerprint);
   });
@@ -232,7 +232,7 @@ describe('EffectiveRuntimePlan', () => {
       projectRootPath: 'D:/Project',
       profile: { skills: [] },
       toolAllowlist: ['Read_File', 'grep'],
-      permissionSettings: basePermission,
+      permissionConstraints: basePermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'x' } },
       promptPlan: { systemPrompt: 'system' },
@@ -252,7 +252,7 @@ describe('EffectiveRuntimePlan', () => {
       projectRootPath: 'D:/Project',
       profile: { skills: [] },
       toolAllowlist: [],
-      permissionSettings: basePermission,
+      permissionConstraints: basePermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'y' } },
       promptPlan: { systemPrompt: 'system' },
@@ -277,7 +277,7 @@ describe('EffectiveRuntimePlan', () => {
       projectId: 'proj-1',
       profile: { skills: ['inspect'] },
       toolAllowlist: ['read_file'],
-      permissionSettings: basePermission,
+      permissionConstraints: basePermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'exec-fp' } },
       promptPlan: { systemPrompt: 'system' },
@@ -311,7 +311,7 @@ describe('EffectiveRuntimePlan', () => {
       projectRootPath: 'D:/Project',
       profile: { skills: [] },
       toolAllowlist: ['read_file', 'shell', 'code_interpreter', 'output_register', 'rdc_probe', 'task_create'],
-      permissionSettings: basePermission,
+      permissionConstraints: basePermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'mission' } },
       promptPlan: { systemPrompt: 'system' },
@@ -335,7 +335,7 @@ describe('EffectiveRuntimePlan', () => {
       projectRootPath: 'D:/Project',
       profile: { skills: [] },
       toolAllowlist: ['read_file', 'rdc_context', 'rdc_probe', 'rdc', 'shell'],
-      permissionSettings: basePermission,
+      permissionConstraints: basePermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'offline' } },
       promptPlan: { systemPrompt: 'system' },
@@ -360,7 +360,7 @@ describe('EffectiveRuntimePlan', () => {
     const policy = compilePolicyFromRestrictive({ limits: { maxChildDepth: 1 } });
     const base = {
       agentId: 'general', projectRootPath: 'D:/Project', profile: { skills: [] },
-      toolAllowlist: ['read_file', 'subagent'], permissionSettings: basePermission,
+      toolAllowlist: ['read_file', 'subagent'], permissionConstraints: basePermission,
       routeCapability, requestPlan: { executionIdentity: { fingerprint: 'depth' } },
       promptPlan: { systemPrompt: 'system' }, policy,
       skillIntersection: ['read_file', 'subagent'], visibleToolNames: ['read_file', 'subagent'],

@@ -54,10 +54,10 @@ export interface EffectiveRuntimePlan {
   activatedDeferredTools: readonly string[];
   /** Aggregate hash of enabled MCP descriptors; null when none enabled. */
   mcpDescriptorHash: string | null;
-  permissionSettings: AgentPermissionSettings;
+  permissionConstraints: Omit<AgentPermissionSettings, 'mode'>;
   /**
    * Frozen canonical knowledge read roots (realpath, existing real directories only).
-   * Not written into persisted permissionSettings.readableRoots.
+   * Not written into persisted permissionConstraints.readableRoots.
    */
   knowledgeReadRoots: readonly string[];
   policy: CompiledPolicy;
@@ -96,7 +96,7 @@ export interface BuildEffectiveRuntimePlanInput {
   enabledProfileIds?: readonly string[];
   profileDelegates?: readonly string[];
   toolAllowlist: readonly string[];
-  permissionSettings: AgentPermissionSettings;
+  permissionConstraints: Omit<AgentPermissionSettings, 'mode'>;
   /** Existing real knowledge directories; omitted when empty. Never copied into readableRoots. */
   knowledgeReadRoots?: readonly string[];
   routeCapability: AgentRouteCapability;
@@ -164,12 +164,11 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
       ? emptyCompiledPolicy()
       : compileEffectivePolicy(input.projectRootPath)
   );
-  const permissionSettings: AgentPermissionSettings = {
-    mode: input.permissionSettings.mode,
-    readableRoots: [...input.permissionSettings.readableRoots],
-    writableRoots: [...input.permissionSettings.writableRoots],
-    allowedCommandPrefixes: [...input.permissionSettings.allowedCommandPrefixes],
-    deniedCommandPrefixes: [...input.permissionSettings.deniedCommandPrefixes],
+  const permissionConstraints: Omit<AgentPermissionSettings, 'mode'> = {
+    readableRoots: [...input.permissionConstraints.readableRoots],
+    writableRoots: [...input.permissionConstraints.writableRoots],
+    allowedCommandPrefixes: [...input.permissionConstraints.allowedCommandPrefixes],
+    deniedCommandPrefixes: [...input.permissionConstraints.deniedCommandPrefixes],
   };
   const knowledgeReadRoots = freezeStringList(input.knowledgeReadRoots);
   const profileSkills = freezeStringList(input.profile?.skills ?? []);
@@ -242,7 +241,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     visibleToolNames,
     activatedDeferredTools,
     mcpDescriptorHash,
-    permissionSettings,
+    permissionConstraints,
     knowledgeReadRoots,
     policyFingerprint,
     contextCompactionPercent,
@@ -273,7 +272,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     visibleToolNames,
     activatedDeferredTools,
     mcpDescriptorHash,
-    permissionSettings,
+    permissionConstraints,
     knowledgeReadRoots,
     policy,
     policyFingerprint,

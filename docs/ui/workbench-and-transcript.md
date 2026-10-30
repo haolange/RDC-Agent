@@ -1,6 +1,6 @@
 # Workbench 与 Transcript UI
 
-> 产品/架构裁决：`DESIGN.md`。视觉 token 与 Appearance：[`design-system.md`](design-system.md)。本文承载原 DESIGN 中的 **Workbench / Work Process / Composer / Markdown** 产品规格（中文摘要 + 稳定英文术语）。
+> 产品/架构裁决：`ARCHITECTURE.md`。视觉 token 与 Appearance：[`design-system.md`](design-system.md)。本文承载原架构文中的的 **Workbench / Work Process / Composer / Markdown** 产品规格（中文摘要 + 稳定英文术语）。
 
 标题栏、启动闪屏、Settings 产品标记和运行中的任务栏图标使用 `resources/brand/rdc-agent-logo.png`。饱和青绿像素换成当前主题的完整 accent RGB；主色精确匹配，阴影和高光仅与黑白混合，白字和近黑底保持原样。安装包里的 `resources/icons` 是默认深色主题色 `#33d1ff` 的静态图，资源管理器中的 exe 图标不随运行中的主题变化。标题栏旁仍显示「RDC-Agent」文字，窄屏单行省略避免挤压窗口控制。三个 renderer 入口复用无 store/IPC 依赖的 `ui/ProductLogo`，canvas 在有限分辨率上重绘，不写内联 style。主进程在窗口创建、Appearance 保存和系统主题变化时更新缓存图标；缺失/解码失败写诊断，不反向失败已成功保存的设置。`pnpm run brand:icons` 从唯一源图生成平滑缩放的多尺寸 Windows ICO 与既有 PNG/ICNS 资产。所有入口沿源图圆环采用抗锯齿圆形轮廓，外部透明；缩放与原生位图按预乘 alpha 处理，避免黑边。
 
@@ -252,3 +252,10 @@ Max 档位效果由 `useMaxVisualController`、`maxVisual` 与 `EffortMaxField` 
 会话切换期间能力目录尚未就绪时，Composer 保留待恢复的持久控制值；目录到达后再按真实能力解析，不能让加载阶段的临时 Off 覆盖会话中的 Low。用户在同一会话里的正常编辑仍优先，不因普通重渲染重置。
 
 运行记录筛选属于表单浮层，使用共享 Popover；内部 Select 的 Escape 先关闭选择菜单，再关闭筛选浮层，并逐层返回触发器。Knowledge 空结构明确显示无条目/无字段，未知、false、0 和 null 不合并为空；写入确认的版本时间使用统一格式。
+
+
+## 权限挡位切换
+
+Composer 权限挡位是全局设置。保存中展示 pending，只有主进程确认后显示已生效；失败与迟到响应按主进程事实恢复，不让乐观选择冒充执行权限。提示“尚未开始的工具使用新权限”，同时说明已启动命令继续，需要停止时使用现有 Stop。自定义读写根与命令规则仍在新轮生效。右栏与 Composer 使用同一权限事实。
+
+切挡可以取消并替换待审批控件，不能丢失原工具卡片身份、展开状态、草稿或焦点。历史审批保留真实 approved/rejected/cancelled，切挡取消明确表达权限变化，不能显示成用户拒绝或工具失败。前后台子 Agent 使用同一事实，但受自身冻结限制。验收覆盖双语长文案、窄屏、大字号、深浅主题、键盘操作与焦点返回。

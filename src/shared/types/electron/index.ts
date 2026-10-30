@@ -16,4 +16,4 @@ export type { PlanApi } from './plan';
 export type { EvidenceApi, McpApi, ToolApi } from './tools';
 export type { LlmApi, SettingsApi } from './settings';
 export type { CaptureApi, ContextApi, DeviceApi, ProjectApi, RunApi, SessionApi } from './project-session';
-export type { EventSubscriptionApi, RuntimeLogApi } from './runtime';
+export type { EventSubscriptionApi, RuntimeLogApi, RuntimePermissionApi } from './runtime';

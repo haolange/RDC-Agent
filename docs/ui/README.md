@@ -5,4 +5,4 @@
 - [`work-process-checklist.md`](work-process-checklist.md)：Work Process UI 验收清单（运行态/完成态/tool 卡片/web 族/full-bleed/边界排除）。
 - [`appearance-checklist.md`](appearance-checklist.md)：Appearance / Provider/Composer 控件 / Effort 滑杆验收清单。
 - [`knowledge-center.md`](knowledge-center.md)：知识中心浏览壳（入口、模态、只读 IPC 边界）。
-- Agentic Trace 消息流 UI 以 `docs/architecture/agentic-trace-protocol.md`、`workbench-and-transcript.md`、`DESIGN.md` 和 `src/renderer/stream/` 的 renderer registry 为准。
+- Agentic Trace 消息流 UI 以 `docs/architecture/agentic-trace-protocol.md`、`workbench-and-transcript.md`、`ARCHITECTURE.md` 和 `src/renderer/stream/` 的 renderer registry 为准。

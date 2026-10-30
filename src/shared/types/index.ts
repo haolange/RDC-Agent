@@ -425,3 +425,5 @@ export type {
   TraceArtifactRecord,
   TraceContextRecord,
 } from './trace';
+
+export type { RuntimePermissionState } from './runtimePermission';

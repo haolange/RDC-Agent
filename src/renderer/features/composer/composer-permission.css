@@ -143,3 +143,11 @@
   line-height: 1.45;
   font-weight: var(--font-normal);
 }
+
+.composer-permission-status {
+  margin: var(--space-2);
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  white-space: normal;
+}

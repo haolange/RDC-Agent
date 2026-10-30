@@ -6,7 +6,7 @@ import { TaskRegistry } from '../agent-runtime/tasks/TaskRegistry';
 import { rdcSessionService } from '../sessions';
 import { listSessionArtifactSources } from '../sessions/SessionArtifactSource';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { settingsService } from '../settings/SettingsService';
+import { runtimePermissionStateService } from '../agent-runtime/permissions/RuntimePermissionStateService';
 import { requestSnapshotStore } from '../agent-runtime/prompt';
 import { mapRightRailInvestigationArtifacts } from './rightRailInvestigationArtifacts';
 import { collectSessionTaskContextResources } from './rightRailTaskContextResources';
@@ -65,7 +65,7 @@ export class RightRailProjectionService {
     const outputs = mapRightRailOutputs({
       sessionId: input.sessionId, branchId: input.branchId, sources, runs: input.runs,
     });
-    const settings = settingsService.getAll();
+    const permissionState = runtimePermissionStateService.getSnapshot();
     const taskResources = collectSessionTaskContextResources({
       messages: conversations,
       promptSegments,
@@ -74,7 +74,7 @@ export class RightRailProjectionService {
     const task = buildTaskContext({
       session, project, runs: input.runs, profileId: input.profileId,
       attachments: sources, resources: taskResources,
-      permissionMode: settings.agentRuntime.permissions.mode,
+      permissionMode: permissionState.mode,
     });
     const projectInputs = await storageAdapter.listProjectInputs(session.projectId);
     const rdc = buildRdcContext({

@@ -1,3 +1,5 @@
+import { appendRuntimePermissionContext } from '../permissions/RuntimePermissionContext';
+import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 /**
  * AgentLoop — transition 状态机式 Agent 主循环。
  *
@@ -89,6 +91,7 @@ export interface AgentLoopConfig {
     mailboxDeliveries?: import('@shared/types/rdcRuntime').RequestEnvelopeSnapshot['mailboxDeliveries'];
   }) => Promise<string | undefined> | string | undefined;
   onResponse?: (requestId: string | undefined, message: AssistantMessage) => Promise<void> | void;
+  resolvePermissionState?: () => RuntimePermissionState;
   beforeRequestMessages?: () => Promise<{ messages: Message[]; mailboxDeliveries?: import('@shared/types/rdcRuntime').RequestEnvelopeSnapshot['mailboxDeliveries']; commit?: () => Promise<void> }>;
 }
 
@@ -127,7 +130,7 @@ export interface ToolExecutor {
     toolCall: ToolCall,
     signal?: AbortSignal,
     onUpdate?: (partialResult: unknown) => void,
-    onExecutionStart?: () => void,
+    onExecutionStart?: (permissionState?: RuntimePermissionState) => void,
   ): Promise<ToolResultMessage>;
   /** Missing implementation defaults to unsafe (serial). */
   isConcurrencySafe?(toolCall: ToolCall): boolean;
@@ -669,6 +672,7 @@ async function streamAssistantResponse(
     signal: stream.signal,
   };
 
+  if (config.resolvePermissionState) Object.assign(llmContext, appendRuntimePermissionContext(llmContext, config.resolvePermissionState()));
   const requestId = await config.onRequest?.({ model: config.model, context: llmContext, streamOptions, mailboxDeliveries: pendingMailbox?.mailboxDeliveries });
   await pendingMailbox?.commit?.();
   if (pendingMailbox?.messages.length) context.messages.push(...pendingMailbox.messages);
@@ -796,10 +800,10 @@ async function executeToolCalls(
   const executeOne = async (toolCall: ToolCall, index: number): Promise<ToolResultMessage> => {
     void index;
     let startTime: number | undefined;
-    const onExecutionStart = () => {
+    const onExecutionStart = (permissionState?: RuntimePermissionState) => {
       if (startTime !== undefined) return;
       startTime = Date.now();
-      stream.push({ type: 'tool_execution_start', toolCallId: toolCall.id, toolName: toolCall.name, args: toolCall.arguments });
+      stream.push({ type: 'tool_execution_start', toolCallId: toolCall.id, toolName: toolCall.name, args: toolCall.arguments, permissionState });
     };
 
     let result: ToolResultMessage;

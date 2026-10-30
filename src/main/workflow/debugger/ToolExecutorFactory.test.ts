@@ -1,8 +1,10 @@
+import { runtimePermissionStateService } from '../../agent-runtime/permissions/RuntimePermissionStateService';
+beforeEach(() => { runtimePermissionStateService.initialize('default'); runtimePermissionStateService.commitMode('default'); });
 import { registerPolicyBudgetObserver } from './DelegationBudget';
 const handoffPreflight = vi.hoisted(() => vi.fn());
 vi.mock('../../conversation/applyDeclaredHandoff', () => ({ assertDeclaredHandoffForPlan: handoffPreflight }));
 import { createPolicyBudgetState } from './TurnCoordinator';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -126,7 +128,7 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
       getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap: new Map([['shell', { ...shellTool, execute: effect }]]), definitions: [], deferredDefinitions: [] }),
       isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
-    const executor = factory.createToolExecutor('general', ['shell'], 'start-boundary', {
+    const executor = preparedExecutor(factory, 'general', ['shell'], 'start-boundary', {
       sessionId: 'start-boundary', turnId: 'start-turn', eventContext: { sessionId: 'start-boundary', turnId: 'start-turn' },
       effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null } as never });
     const execution = executor.execute({ id: 'effect', type: 'toolCall', name: 'shell', arguments: { command: 'Write-Output test' } }, undefined, undefined, started);
@@ -151,7 +153,7 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
       getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap: new Map([['shell', { ...shellTool, execute: effect }]]), definitions: [], deferredDefinitions: [] }),
       isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
-    const executor = factory.createToolExecutor('general', ['shell'], 'queued-start', {
+    const executor = preparedExecutor(factory, 'general', ['shell'], 'queued-start', {
       sessionId: 'queued-start', effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null } as never });
     const hooks = vi.spyOn(factory, 'triggerRuntimeHooks').mockResolvedValue({ allowed: true });
     const first = executor.execute({ id: 'first', type: 'toolCall', name: 'shell', arguments: { command: 'Write-Output first' } }, undefined, undefined, started[0]);
@@ -175,7 +177,7 @@ describe('ToolExecutorFactory', () => {
       getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
       isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
     permissionEvaluate.mockReturnValueOnce({ action: 'auto_review', risk: 'high', reason: 'Native mutation requires review.' } as never);
-    const executor = factory.createToolExecutor('general', ['shell'], 'review-owner', { sessionId: 'review-owner', turnId: 'review-turn',
+    const executor = preparedExecutor(factory, 'general', ['shell'], 'review-owner', { sessionId: 'review-owner', turnId: 'review-turn',
       eventContext: { sessionId: 'review-owner', turnId: 'review-turn' }, effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null } as never });
     const started = vi.fn();
     const result = await executor.execute({ id: 'rejected-native', type: 'toolCall', name: 'shell', arguments: { rdc: { operation: 'rd.buffer.write', args: {} } } }, undefined, undefined, started);
@@ -201,7 +203,7 @@ describe('ToolExecutorFactory', () => {
         getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
         isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
       });
-      const result = await factory.createToolExecutor('general', ['read_file'], 'audit-owner', {
+      const result = await preparedExecutor(factory, 'general', ['read_file'], 'audit-owner', {
         effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, activatedDeferredTools: [] } as never,
       }).execute({ type: 'toolCall', id: 'audit-small', name: 'read_file',
         arguments: { path: 'source.bin', mode: 'audit', expectedHash: 'a'.repeat(64) } });
@@ -248,7 +250,7 @@ describe('ToolExecutorFactory', () => {
       });
       const discovery = kind === 'search' ? { kind, query: 'hardware shader trace', limit: 2 }
         : kind === 'describe' ? { kind, operation: 'rd.shader.debug_start' } : { kind, limit: 20 };
-      const result = await factory.createToolExecutor('general', ['shell'], 'catalog-owner', {
+      const result = await preparedExecutor(factory, 'general', ['shell'], 'catalog-owner', {
         effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
       }).execute({ type: 'toolCall', id: `catalog-${kind}`, name: 'shell', arguments: { rdc: { discovery } } });
       const evidence = (result.details as { evidenceArtifact?: { ref: string; hash: string } })?.evidenceArtifact;
@@ -291,7 +293,7 @@ describe('ToolExecutorFactory', () => {
         getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
         isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
       });
-      const result = await factory.createToolExecutor('general', ['shell'], 'catalog-full', {
+      const result = await preparedExecutor(factory, 'general', ['shell'], 'catalog-full', {
         effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
       }).execute({ type: 'toolCall', id: 'catalog-overflow', name: 'shell',
         arguments: { rdc: { discovery: { kind: 'search', query: 'trace', limit: 2 } } } });
@@ -321,7 +323,7 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
     });
     try {
-      const result = await factory.createToolExecutor('general', ['read_file'], 'text-evidence', {
+      const result = await preparedExecutor(factory, 'general', ['read_file'], 'text-evidence', {
         effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, activatedDeferredTools: [] } as never,
       }).execute({ type: 'toolCall', id: 'small-diff', name: 'read_file', arguments: { path: 'change.diff', ...(pinEvidence === undefined ? {} : { pinEvidence }) } });
       expect(execute).toHaveBeenCalledOnce();
@@ -344,7 +346,7 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
     });
     try {
-      const result = await factory.createToolExecutor('general', ['rdc_context'], 'context-evidence', {
+      const result = await preparedExecutor(factory, 'general', ['rdc_context'], 'context-evidence', {
         effectivePlan: { toolAllowlist: ['rdc_context'], skillIntersection: null, activatedDeferredTools: [] } as never,
       }).execute({ type: 'toolCall', id: 'owner-proof', name: 'rdc_context', arguments: {} });
       expect(result.content).toEqual(original.content);
@@ -362,7 +364,7 @@ describe('ToolExecutorFactory', () => {
       getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
       isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
     });
-    const result = await factory.createToolExecutor('general', ['shell'], 'plain-shell', {
+    const result = await preparedExecutor(factory, 'general', ['shell'], 'plain-shell', {
       effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
     }).execute({ type: 'toolCall', id: 'plain-output', name: 'shell', arguments: { command: 'echo bounded' } });
     expect(execute).toHaveBeenCalledOnce();
@@ -399,7 +401,7 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
     });
     try {
-      const result = await factory.createToolExecutor('general', [name], 'native-failure-session', {
+      const result = await preparedExecutor(factory, 'general', [name], 'native-failure-session', {
         effectivePlan: { toolAllowlist: [name], skillIntersection: null, activatedDeferredTools: [name] } as never,
       }).execute({ type: 'toolCall', id: 'native-failure-call', name, arguments: {} });
       expect(execute).toHaveBeenCalledOnce();
@@ -428,7 +430,7 @@ describe('ToolExecutorFactory', () => {
         resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
         isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
       });
-      const result = await factory.createToolExecutor('general', ['code_interpreter'], 'interpreter-session', {
+      const result = await preparedExecutor(factory, 'general', ['code_interpreter'], 'interpreter-session', {
         effectivePlan: { toolAllowlist: ['code_interpreter'], skillIntersection: null,
           activatedDeferredTools: ['code_interpreter'] } as never,
       }).execute({
@@ -455,7 +457,7 @@ describe('ToolExecutorFactory', () => {
       matchesToolAllowlist: () => true,
     });
     permissionEvaluate.mockClear();
-    const result = await factory.createToolExecutor('ask', ['shell']).execute({
+    const result = await preparedExecutor(factory, 'ask', ['shell']).execute({
       type: 'toolCall', id: 'invalid-shell', name: 'shell',
       arguments: { command: '', rdc: { discovery: { kind: 'search', query: 'checkpoint investigation', limit: 5 } } },
     });
@@ -565,7 +567,7 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => false,
       matchesToolAllowlist: () => true,
     });
-    const executor = factory.createToolExecutor('ask', ['read_file']);
+    const executor = preparedExecutor(factory, 'ask', ['read_file']);
     const result = await executor.execute({
       type: 'toolCall',
       id: 'tc-1',
@@ -595,12 +597,12 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => true,
     });
-    const executor = factory.createToolExecutor('ask', ['shell'], null, {
+    const executor = preparedExecutor(factory, 'ask', ['shell'], null, {
       effectivePlan: {
         toolAllowlist: ['shell'],
         skillIntersection: null,
-        permissionSettings: {
-          mode: 'default',
+        permissionConstraints: {
+
           readableRoots: [],
           writableRoots: [],
           allowedCommandPrefixes: [],
@@ -646,12 +648,12 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => false,
     });
-    const executor = factory.createToolExecutor('ask', ['shell'], null, {
+    const executor = preparedExecutor(factory, 'ask', ['shell'], null, {
       effectivePlan: {
         toolAllowlist: ['shell'],
         skillIntersection: ['read_file'],
-        permissionSettings: {
-          mode: 'default',
+        permissionConstraints: {
+
           readableRoots: [],
           writableRoots: [],
           allowedCommandPrefixes: [],
@@ -694,7 +696,7 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => true,
     });
-    const executor = factory.createToolExecutor('ask', ['mcp__x__y']);
+    const executor = preparedExecutor(factory, 'ask', ['mcp__x__y']);
     const result = await executor.execute({
       type: 'toolCall',
       id: 'tc-deferred',
@@ -724,13 +726,13 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => true,
     });
-    const executor = factory.createToolExecutor('plan', ['task_create'], 'session-1', {
+    const executor = preparedExecutor(factory, 'plan', ['task_create'], 'session-1', {
       effectivePlan: {
         toolAllowlist: ['task_create'],
         activatedDeferredTools: ['task_create'],
         skillIntersection: null,
-        permissionSettings: {
-          mode: 'default',
+        permissionConstraints: {
+
           readableRoots: [],
           writableRoots: [],
           allowedCommandPrefixes: [],
@@ -765,7 +767,7 @@ describe('ToolExecutorFactory', () => {
       matchesToolAllowlist: () => true,
     });
     const budget = { toolCalls: 0, subagents: 0, childDepth: 0, wallStartedAt: Date.now(), maxToolCalls: 1, maxSubagents: 3, maxChildDepth: 3, maxWallTimeMs: 60_000 };
-    const executor = factory.createToolExecutor('ask', ['read_file'], null, {
+    const executor = preparedExecutor(factory, 'ask', ['read_file'], null, {
       effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
       policyBudget: budget,
     });
@@ -776,7 +778,7 @@ describe('ToolExecutorFactory', () => {
     expect(execute).toHaveBeenCalledOnce();
 
     const expired = { ...budget, toolCalls: 0, wallStartedAt: Date.now() - 100, maxWallTimeMs: 1 };
-    const expiredExecutor = factory.createToolExecutor('ask', ['read_file'], null, {
+    const expiredExecutor = preparedExecutor(factory, 'ask', ['read_file'], null, {
       effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
       policyBudget: expired,
     });
@@ -806,12 +808,12 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => true,
     });
-    const executor = factory.createToolExecutor('ask', ['read_file'], null, {
+    const executor = preparedExecutor(factory, 'ask', ['read_file'], null, {
       effectivePlan: {
         toolAllowlist: ['read_file'],
         skillIntersection: ['read_file'],
-        permissionSettings: {
-          mode: 'default',
+        permissionConstraints: {
+
           readableRoots: [],
           writableRoots: [],
           allowedCommandPrefixes: [],
@@ -869,7 +871,7 @@ describe('ToolExecutorFactory', () => {
       maxChildDepth: 3,
       maxWallTimeMs: 60_000,
     };
-    const executor = factory.createToolExecutor('ask', ['read_file', 'shell'], null, {
+    const executor = preparedExecutor(factory, 'ask', ['read_file', 'shell'], null, {
       effectivePlan: { toolAllowlist: ['read_file', 'shell'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
       policyBudget: budget,
     });
@@ -916,7 +918,7 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: (agentId, toolName) => agentId !== 'debugger' || toolName !== 'shell',
       matchesToolAllowlist: () => true,
     });
-    const executor = factory.createToolExecutor('debugger', ['shell']);
+    const executor = preparedExecutor(factory, 'debugger', ['shell']);
     const result = await executor.execute({
       type: 'toolCall',
       id: 'tc-mission-shell',
@@ -965,14 +967,14 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => true,
     });
-    const executor = factory.createToolExecutor('general', tools.map(([name]) => name), null, {
+    const executor = preparedExecutor(factory, 'general', tools.map(([name]) => name), null, {
       effectivePlan: {
         toolAllowlist: tools.map(([name]) => name),
         skillIntersection: null,
         knowledgeReadRoots: [knowledgeRoot],
         activatedDeferredTools: ['knowledge_read'],
-        permissionSettings: {
-          mode: 'default',
+        permissionConstraints: {
+
           readableRoots: [],
           writableRoots: [],
           allowedCommandPrefixes: [],
@@ -1041,13 +1043,13 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => true,
     });
-    const executor = factory.createToolExecutor('ask', ['read_file', 'write_file'], null, {
+    const executor = preparedExecutor(factory, 'ask', ['read_file', 'write_file'], null, {
       effectivePlan: {
         toolAllowlist: ['read_file', 'write_file'],
         skillIntersection: null,
         knowledgeReadRoots: [knowledge],
-        permissionSettings: {
-          mode: 'default',
+        permissionConstraints: {
+
           readableRoots: [],
           writableRoots: [],
           allowedCommandPrefixes: [],
@@ -1088,7 +1090,7 @@ it('passes the frozen native vision capability into the production tool context'
  const toolMap = new Map([['artifact_read', { name: 'artifact_read', description: 'read', parameters: { type: 'object', properties: {} }, execute }]]);
  const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as unknown as AgentSlotRegistry, deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker, getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }), isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
  for (const visionInputMode of ['native', 'disabled'] as const) {
-  const executor = factory.createToolExecutor('general', ['artifact_read'], 'vision-session', { effectivePlan: { toolAllowlist: ['artifact_read'], skillIntersection: null, projectId: null, projectRootPath: null, routeCapability: { visionInputMode } } as never });
+  const executor = preparedExecutor(factory, 'general', ['artifact_read'], 'vision-session', { effectivePlan: { toolAllowlist: ['artifact_read'], skillIntersection: null, projectId: null, projectRootPath: null, routeCapability: { visionInputMode } } as never });
   await executor.execute({ type: 'toolCall', id: visionInputMode, name: 'artifact_read', arguments: {} });
   expect(execute).toHaveBeenLastCalledWith(visionInputMode, {}, undefined, undefined, expect.objectContaining({ visionInputMode }));
  }
@@ -1101,7 +1103,7 @@ it('durably saves reserved cost before effects and rejects effects when durable 
  const ledger = createPolicyBudgetState(); let release!: () => void; const persisted: number[] = [];
  const gate = new Promise<void>((resolve) => { release = resolve; });
  const unregister = registerPolicyBudgetObserver(ledger, async (snapshot) => { await gate; persisted.push(snapshot.toolCalls); });
- const executor = factory.createToolExecutor('general', ['read_file'], null, { effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never, policyBudget: ledger });
+ const executor = preparedExecutor(factory, 'general', ['read_file'], null, { effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never, policyBudget: ledger });
  const call = { type: 'toolCall' as const, id: 'persisted', name: 'read_file', arguments: {} };
  executor.reserveDispatchBudget?.([call]);
  const running = executor.execute(call);
@@ -1180,7 +1182,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
   }
 
   it('fails closed when the profile has no continue handoff', async () => {
-    const executor = createFactory().createToolExecutor('debugger', ['plan_artifact'], 'sess', {
+    const executor = preparedExecutor(createFactory(), 'debugger', ['plan_artifact'], 'sess', {
       sessionId: 'sess',
       turnId: 'turn-1',
       eventContext: { sessionId: 'sess', requestId: 'req-1' },
@@ -1220,7 +1222,7 @@ it('keeps private file-read state across turns and agent switches, isolates and 
   });
   const factory = make();
   const run = async (session: string, agent = 'general', owner = factory) => {
-    const executor = owner.createToolExecutor(agent, ['read_file'], session);
+    const executor = preparedExecutor(owner, agent, ['read_file'], session);
     const result = await executor.execute({ type: 'toolCall', id: 'read-' + seen.length, name: 'read_file', arguments: {} });
     expect(result.isError).not.toBe(true);
     return seen.at(-1)!;
@@ -1234,4 +1236,47 @@ it('keeps private file-read state across turns and agent switches, isolates and 
   expect((await run('a')).size).toBe(0);
   expect((await run('a::subagent::child')).size).toBe(0);
   expect((await run('a', 'general', make())).size).toBe(0);
+});
+
+function preparedExecutor(factory: ToolExecutorFactory, ...args: Parameters<ToolExecutorFactory['createToolExecutor']>) {
+ const [agent,tools,session,context]=args;
+ return factory.createToolExecutor(agent,tools,session,{...context,effectivePlan:{toolAllowlist:tools,...context?.effectivePlan,permissionConstraints:context?.effectivePlan?.permissionConstraints??{readableRoots:[],writableRoots:[],allowedCommandPrefixes:[],deniedCommandPrefixes:[]}}} as never);
+}
+
+it('reauthorizes prepared parent/child executors after a global mode switch without repeating their hooks or reserved dispatch', async () => {
+  let release!: () => void; let entered!: () => void; let queued!: () => void;
+  const hold = new Promise<void>(resolve => { release = resolve; });
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const waiting = new Promise<void>(resolve => { queued = resolve; });
+  runtimePermissionStateService.commitMode('full-access');
+  approvalRequest.mockClear();
+  const observed: string[] = [];
+  permissionEvaluate.mockImplementation(((input: { permissionState: { mode: string }; permissionConstraints: unknown }) => {
+    observed.push(input.permissionState.mode);
+    expect(input.permissionConstraints).toEqual({ readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] });
+    return { action: input.permissionState.mode === 'full-access' ? 'allow' : 'ask_user', risk: 'medium', temporaryPathRoots: [] };
+  }) as never);
+  const execute = vi.fn(async (id: string) => { if (id === 'parent') { entered(); await hold; } return { content: [] }; });
+  const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
+    getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap: new Map([['shell', { ...shellTool, execute }]]), definitions: [], deferredDefinitions: [] }),
+    isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+  const hook = vi.spyOn(factory, 'triggerRuntimeHooks').mockImplementation(async event => { if (event === 'tool.before-call' && execute.mock.calls.length === 1) queued(); return { allowed: true }; });
+  const ledger = createPolicyBudgetState({ maxToolCalls: 2, maxWallTimeMs: Number.MAX_SAFE_INTEGER, maxSubagents: 1, maxChildDepth: 1 });
+  const context = { sessionId: 'owner', turnId: 'turn', projectRootPath: 'D:/permission-owner', eventContext: { sessionId: 'owner', turnId: 'turn' }, policyBudget: ledger };
+  const parent = preparedExecutor(factory, 'general', ['shell'], 'owner', context);
+  const child = preparedExecutor(factory, 'general', ['shell'], 'owner::subagent::child', { ...context, sessionId: 'owner::subagent::child' });
+  const calls = ['parent','child'].map(id => ({ type: 'toolCall' as const, id, name: 'shell', arguments: { command: 'Write-Output test' } }));
+  expect(parent.reserveDispatchBudget?.([calls[0]]).ok).toBe(true);
+  expect(child.reserveDispatchBudget?.([calls[1]]).ok).toBe(true);
+  const running = parent.execute(calls[0]); await started;
+  const childRun = child.execute(calls[1]);
+  try {
+    await waiting; runtimePermissionStateService.commitMode('default'); release();
+    await Promise.all([running,childRun]);
+    expect(observed).toEqual(['full-access','full-access','default']);
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(approvalRequest).toHaveBeenCalledOnce();
+    expect(hook.mock.calls.filter(([event]) => event === 'tool.before-call')).toHaveLength(2);
+    expect(ledger.toolCalls).toBe(2);
+  } finally { release(); await Promise.allSettled([running, childRun]); permissionEvaluate.mockReturnValue({ action: 'allow' }); }
 });

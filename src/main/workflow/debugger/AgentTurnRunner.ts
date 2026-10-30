@@ -1,3 +1,5 @@
+import { runtimePermissionStateService } from '../../agent-runtime/permissions/RuntimePermissionStateService';
+import { RUNTIME_PERMISSION_TOKEN_RESERVE } from '../../agent-runtime/permissions/RuntimePermissionContext';
 /**
  * AgentTurnRunner — runAgentTurn + agent slot creation/reuse.
  */
@@ -121,10 +123,6 @@ export interface AgentTurnRunnerDeps {
 export class AgentTurnRunner {
   constructor(private readonly deps: AgentTurnRunnerDeps) {}
 
-  resolveMaxTurns(_agentId: AgentRole, policyMaxTurns?: number, profileMaxTurns?: number | null): number {
-    return resolveAgentMaxTurns(policyMaxTurns, profileMaxTurns);
-  }
-
   getOrCreateAgentSlot(
     agentId: AgentRole,
     providerId: string,
@@ -206,7 +204,6 @@ export class AgentTurnRunner {
     });
 
     // ErrorRecovery：错误分类与恢复策略（retry/reactive_compact/continue/abort）。
-    // fallbackModel 暂省略（无 settings route fallback 配置时只做非 switch 恢复）。
     const errorRecovery = new ErrorRecovery({ primaryModel: agentModel });
 
     const agent: Agent = new Agent({
@@ -218,18 +215,19 @@ export class AgentTurnRunner {
         messages: initialMessages,
       },
       provider: configuredRuntimeProvider,
+      resolvePermissionState: () => runtimePermissionStateService.getSnapshot(),
       toolExecutor,
       streamOptions,
-      maxTurns: this.resolveMaxTurns(agentId, policyMaxTurns, profileMaxTurns),
+      maxTurns: resolveAgentMaxTurns(policyMaxTurns, profileMaxTurns),
       transformContext: (messages, signal, onProgress) => {
-        contextManager.setRequestTokenLimit(requestCompactionThreshold - promptPlan.totalTokenEstimate - charsToTokens(JSON.stringify(agent.state.tools).length));
+        contextManager.setRequestTokenLimit(requestCompactionThreshold - promptPlan.totalTokenEstimate - RUNTIME_PERMISSION_TOKEN_RESERVE - charsToTokens(JSON.stringify(agent.state.tools).length));
         return contextManager.compress(messages, signal, onProgress);
       },
       errorRecovery,
       resolveMaxTokens: (messages) => resolveTurnOutputTokens({
         contextWindowTokens: streamOptions.requestPlan.contextWindowTokens,
         maxOutputTokens: streamOptions.requestPlan.maxOutputTokens,
-        promptTokens: promptPlan.totalTokenEstimate + charsToTokens(JSON.stringify(agent.state.tools).length) + this.deps.tokenizerService.countMessagesTokens(messages, modelId),
+        promptTokens: promptPlan.totalTokenEstimate + RUNTIME_PERMISSION_TOKEN_RESERVE + charsToTokens(JSON.stringify(agent.state.tools).length) + this.deps.tokenizerService.countMessagesTokens(messages, modelId),
       }),
       onRequest: async ({ model, context: requestContext, streamOptions: requestOptions, mailboxDeliveries }) => {
         const callIndex = requestSnapshotStore.nextCallIndex(executionScopeId, turnSignature || undefined);
@@ -253,6 +251,7 @@ export class AgentTurnRunner {
             topP: requestOptions.topP,
             reasoningSelection: requestOptions.reasoning?.selection,
             contextDiagnostic,
+            runtimePermissionContext: requestContext.systemPromptSegments?.find(segment => segment.id === 'runtime:permission'),
           },
           reasoning: reasoningContract,
           cache: requestOptions.promptCache ?? streamOptions.promptCache ?? promptCacheCompiler.compile({

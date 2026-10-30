@@ -22,6 +22,7 @@ export type {
   RawChannelSubscriptionApi,
   RunApi,
   RuntimeLogApi,
+  RuntimePermissionApi,
   SessionApi,
   SettingsApi,
   ToolApi,

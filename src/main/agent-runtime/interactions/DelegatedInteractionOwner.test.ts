@@ -11,10 +11,12 @@ describe('delegated controlled interactions', () => {
     const service = new AgentToolApprovalRequestService(); const events: AgentEvent[] = [];
     const pending = withDelegatedInteractionOwner(owner, () => service.request({ agentId: 'general', sessionId: 'child', turnId: 'child-turn', toolCallId: 'tool', toolName: 'shell', reason: 'run scoped command', risk: 'high', context, onEvent: (event) => events.push(event) }));
     expect(events[0]).toMatchObject({ sessionId: 'parent', turnId: 'child-turn', payload: { delegatedRequest: { executionId: 'execution-1', childSessionId: 'child', turnId: 'child-turn' } } });
-    for (const sessionId of ['other', 'child', null]) expect(service.answer({ sessionId, turnId: 'child-turn', approvalId: 'tool-approval-tool', approved: true }).success).toBe(false);
-    expect(service.answer({ sessionId: 'parent', turnId: 'child-turn', approvalId: 'tool-approval-tool', approved: true }).success).toBe(true);
+    const approvalId = (events[0].payload as { approvalId: string }).approvalId;
+    expect(approvalId).toMatch(/^tool-approval-tool-.+/);
+    for (const sessionId of ['other', 'child', null]) expect(service.answer({ sessionId, turnId: 'child-turn', approvalId, approved: true }).success).toBe(false);
+    expect(service.answer({ sessionId: 'parent', turnId: 'child-turn', approvalId, approved: true }).success).toBe(true);
     await expect(pending).resolves.toBe(true);
-    expect(service.answer({ sessionId: 'parent', turnId: 'child-turn', approvalId: 'tool-approval-tool', approved: true }).success).toBe(false);
+    expect(service.answer({ sessionId: 'parent', turnId: 'child-turn', approvalId, approved: true }).success).toBe(false);
     expect(events[1]).toMatchObject({ sessionId: 'parent', payload: { status: 'approved' } });
   });
   it('answers child information requests through the owner and cancels pending requests', async () => {

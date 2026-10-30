@@ -94,7 +94,7 @@ function parseLedgerRows(markdown) {
 }
 
 function collectMarkdownFiles() {
-  const files = ['DESIGN.md', 'AGENTS.md'];
+  const files = ['ARCHITECTURE.md', 'AGENTS.md'];
   const walk = (dir) => {
     if (!existsSync(dir)) return;
     let entries;
@@ -202,16 +202,16 @@ function scanForbiddenPhrases(files) {
 }
 
 function requirePhrases() {
-  const design = existsSync(path.join(repoRoot, 'DESIGN.md')) ? read('DESIGN.md') : '';
+  const design = existsSync(path.join(repoRoot, 'ARCHITECTURE.md')) ? read('ARCHITECTURE.md') : '';
   const agents = existsSync(path.join(repoRoot, 'AGENTS.md')) ? read('AGENTS.md') : '';
   if (!design.includes(PHRASE.sixLanes) && !agents.includes(PHRASE.sixLanes)) {
-    fail(`Required phrase "${PHRASE.sixLanes}" must appear in DESIGN.md or AGENTS.md.`);
+    fail(`Required phrase "${PHRASE.sixLanes}" must appear in ARCHITECTURE.md or AGENTS.md.`);
   }
   const docsHit = collectMarkdownFiles()
-    .filter((rel) => rel === 'DESIGN.md' || rel.startsWith('docs/'))
+    .filter((rel) => rel === 'ARCHITECTURE.md' || rel.startsWith('docs/'))
     .some((rel) => read(rel).includes(PHRASE.investigationRead));
   if (!docsHit) {
-    fail(`Required phrase "${PHRASE.investigationRead}" must appear in DESIGN.md or docs/.`);
+    fail(`Required phrase "${PHRASE.investigationRead}" must appear in ARCHITECTURE.md or docs/.`);
   }
 }
 
@@ -281,7 +281,7 @@ for (const row of parsed.rows) {
   }
 }
 
-const authorityFiles = ['DESIGN.md', 'AGENTS.md'].filter((rel) => existsSync(path.join(repoRoot, rel)));
+const authorityFiles = ['ARCHITECTURE.md', 'DESIGN.md', 'AGENTS.md'].filter((rel) => existsSync(path.join(repoRoot, rel)));
 for (const rel of authorityFiles) {
   const lines = read(rel).split(/\r?\n/);
   for (let i = 0; i < lines.length; i += 1) {

@@ -198,7 +198,12 @@
     "ui.popover": "src/renderer/ui/Popover.tsx",
     "ui.contextMenu": "src/renderer/ui/ContextMenu/index.tsx",
     "design.livePreview": "designs/rdc-agent-design-system/preview.tsx",
-    "settings.shellCss": "src/renderer/features/settings/SettingsModal/sections/settings-shell.css"
+    "settings.shellCss": "src/renderer/features/settings/SettingsModal/sections/settings-shell.css",
+    "bootstrap.permissionSubscriptions": "src/renderer/app/bootstrap/permissionSubscriptions.ts",
+    "bootstrap.permissionSubscriptionsTest": "src/renderer/app/bootstrap/permissionSubscriptions.test.ts",
+    "stores.runtimePermission": "src/renderer/stores/runtimePermissionStore.ts",
+    "stores.runtimePermissionTest": "src/renderer/stores/runtimePermissionStore.test.ts",
+    "composer.permissionSelectorTest": "src/renderer/features/composer/PermissionModeSelector.test.ts"
   },
   "retired": [
     "src/renderer/styles/themes/oklch-themes.css",

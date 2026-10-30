@@ -6,7 +6,7 @@ import type { RdcOperationDefinition } from '@shared/types/tool';
 import type { CompiledPolicy } from '@shared/types/rdcRuntime';
 import type { AgentTool } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
-import { settingsService } from '../../settings/SettingsService';
+import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import { matchShellHardDeny } from '../tools/primitives/shellHardDeny';
 import {
   matchesDeniedCommandPrefix,
@@ -56,15 +56,16 @@ export interface AgentPermissionDecisionInput {
   agentId?: string | null;
   /** 当前激活项目根目录；权限边界以它为准，回退固定 User Scope。 */
   projectRootPath?: string | null;
-  /** Turn 冻结的权限快照；缺省时才读 settingsService（兼容旧调用）。 */
-  permissionSettings?: AgentPermissionSettings;
+  /** Frozen constraints, explicitly supplied by the prepared plan. */
+  permissionConstraints: Omit<AgentPermissionSettings, 'mode'>;
+  permissionState: RuntimePermissionState;
   /** Turn 冻结的 CompiledPolicy；缺省视为空策略。 */
   compiledPolicy?: CompiledPolicy;
   /** Current session attachments directory; readable by read-only file tools only. */
   sessionAttachmentsRoot?: string | null;
   /**
    * Frozen plan knowledge read roots. Merged only into READ_ONLY_FILE_TOOLS.
-   * Never written into persisted permissionSettings.readableRoots.
+   * Never written into persisted permissionConstraints.readableRoots.
    */
   knowledgeReadRoots?: readonly string[];
 }
@@ -339,15 +340,11 @@ export class AgentPermissionPolicyService {
    * Final action = max(baseline, policy approval floor) on allow<auto_review<ask_user<deny.
    */
   evaluate(input: AgentPermissionDecisionInput): AgentPermissionDecision {
-    const settings = input.permissionSettings
-      ? null
-      : settingsService.getAll();
-    const permissions = input.permissionSettings ?? settings!.agentRuntime.permissions;
+    const permissions = { ...input.permissionConstraints, mode: input.permissionState.mode };
     const mode = permissions.mode;
     const toolName = normalizeToolName(input.toolCall.name);
     const workspaceRoot = path.resolve(
       input.projectRootPath
-      || settings?.paths.userRdcRoot
       || process.cwd(),
     );
 

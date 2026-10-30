@@ -1,6 +1,6 @@
 # Runtime Kernel 契约
 
-> 产品边界与不变量以根目录 `DESIGN.md` 为 SSOT。本文是从 DESIGN 分拆出的 **Runtime / Prompt / Provider / Tool / Session** 稳定契约；实现细节见 `docs/architecture/agent-runtime-kernel.md` 与源码，二者冲突时以 `DESIGN.md` + 本文为准并修正架构文。
+> 产品边界与不变量以根目录 `ARCHITECTURE.md` 为 SSOT。本文是从架构文分拆出的 **Runtime / Prompt / Provider / Tool / Session** 稳定契约；实现细节见 `docs/architecture/agent-runtime-kernel.md` 与源码，二者冲突时以 `ARCHITECTURE.md` + 本文为准并修正架构文。
 
 历史压缩的冗余计数按整个 session journal 的实际记录数与有效消息数恢复和累计，新消息或 append-only 终态不得无条件清零。终态触发的历史维护只能在 WAL 已完成并移除后执行，不能改写仍受恢复前缀校验保护的文件。
 
@@ -161,7 +161,7 @@ Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（49 ids，含 `shell` / `read
 
 `investigation_list` 的 `kind` / `status` 可选；传 `any` 或省略即包含全部对应值，其他允许值作精确过滤。工具目录列出允许值，未知值须明确拒绝，不能把错误输入解释成“本会话无调查产物”。
 
-Run **当前实现**唯一活跃 `schemaVersion` 为 `'3'`（`src/main/sessions/runV3/`）：discriminated union `kind: conversation|mission` + `profileId`，新写无 `mode` / `lastStage` / `runtime.workflow_stage`。产品只读 `run.json` v3；仅有 `run.yaml`、缺版本、旧版本或未知版本时明确报 `STORAGE_SCHEMA_UNSUPPORTED`，保留源文件，不在读取时迁移。只有精确三 Mission profile 才是 `kind: mission`；conversation 的 `captures=[]` 且不消费 investigation sidecar。既有一次性本机转换备份仅供核验，不参与 Run 枚举、IPC、UI 或 Right Rail。见 `DESIGN.md` 裁决 I。
+Run **当前实现**唯一活跃 `schemaVersion` 为 `'3'`（`src/main/sessions/runV3/`）：discriminated union `kind: conversation|mission` + `profileId`，新写无 `mode` / `lastStage` / `runtime.workflow_stage`。产品只读 `run.json` v3；仅有 `run.yaml`、缺版本、旧版本或未知版本时明确报 `STORAGE_SCHEMA_UNSUPPORTED`，保留源文件，不在读取时迁移。只有精确三 Mission profile 才是 `kind: mission`；conversation 的 `captures=[]` 且不消费 investigation sidecar。既有一次性本机转换备份仅供核验，不参与 Run 枚举、IPC、UI 或 Right Rail。见 `ARCHITECTURE.md` 裁决 I。
 
 Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only route 的有效工具集为空，不得列出或模仿工具调用。`tool_search` 无结果时返回 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 与工具集 fingerprint；fingerprint 未变化时重复同一搜索属于无进展。
 
@@ -185,7 +185,7 @@ Slash 命令是 runtime 输入，不绕过 profile 权限。基线：`/help` `/c
 
 ## Skills 工具收窄
 
-见产品文 [`../product/scoped-runtime-resources.md`](../product/scoped-runtime-resources.md) 与 `DESIGN.md` Invariant：
+见产品文 [`../product/scoped-runtime-resources.md`](../product/scoped-runtime-resources.md) 与 `ARCHITECTURE.md` Invariant：
 
 ```text
 allowedTools = ∩(skill_i) ∩ runtimeAllowlist
@@ -207,7 +207,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 ## RDC / Capture
 
-无内置 RDC toolchain。Settings `tooling.rdcCli` 必须配对同安装捆绑 Python 与 `cli/run_cli.py`。General 的 `shell.rdc`、主进程固定 open/remote/close 生命周期及 Live RDC mutate 经原生调用边界直接执行冻结 Python argv，并校验 exclusive lease；`shell.command` 不得调用 RDC，UI 不恢复旧 shell action 或 human-preview 入口。Mission planner 禁止 `shell` 与 `code_interpreter`，只通过受控只读 `rdc_probe` + `rdc_context` 访问 RDC（见 `DESIGN.md` 裁决 J）；probe 同样使用已验证绑定。`rdc_probe` 的模型可见参数按 action/query 分支收窄：非 `probe` 不携带 query args，`capturePath` 只用于 `lease_open`，event 与 VFS 字段只用于对应查询；session context 身份由冻结绑定提供，不要求模型填占位值。运行时仍校验同一身份与路径边界。仓库不硬编码本机安装路径。已打开 `.rdc` 由 `ownerSessionId` 拥有，不匹配 fail-closed；Local + Android-origin capture 不得静默 fallback remote。
+无内置 RDC toolchain。Settings `tooling.rdcCli` 必须配对同安装捆绑 Python 与 `cli/run_cli.py`。General 的 `shell.rdc`、主进程固定 open/remote/close 生命周期及 Live RDC mutate 经原生调用边界直接执行冻结 Python argv，并校验 exclusive lease；`shell.command` 不得调用 RDC，UI 不恢复旧 shell action 或 human-preview 入口。Mission planner 禁止 `shell` 与 `code_interpreter`，只通过受控只读 `rdc_probe` + `rdc_context` 访问 RDC（见 `ARCHITECTURE.md` 裁决 J）；probe 同样使用已验证绑定。`rdc_probe` 的模型可见参数按 action/query 分支收窄：非 `probe` 不携带 query args，`capturePath` 只用于 `lease_open`，event 与 VFS 字段只用于对应查询；session context 身份由冻结绑定提供，不要求模型填占位值。运行时仍校验同一身份与路径边界。仓库不硬编码本机安装路径。已打开 `.rdc` 由 `ownerSessionId` 拥有，不匹配 fail-closed；Local + Android-origin capture 不得静默 fallback remote。
 
 RDC runtime context 仅绑定 per-session lease（`RdcRuntimeContextRegistry`）。禁止恢复 `legacyGlobalMirror` / `getRdcRuntimeContext` 全局 API；工具路径经 `assertRdcContextLeaseOwnership`，不得回退 parent。parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease；child 结束经实际停止确认后 `revokeDelegatedLease`；未确认时父资源保持隔离。未请求 `domainExtensions.rdc` 的 child 在 allowlist 编译期不得看到 `rdc_context` / `rdc_probe`。
 
@@ -243,7 +243,7 @@ Plan 经 session artifact plans 类别版本化：同意前覆盖 `session://pla
 
 Compact 使用原始 Journal、Task/执行记录及应用层组装的领域记录，不由通用 compactor 猜测调查步骤。压缩前保存可按行读取的分块 JSON 权威 Checkpoint；模型看到有界权威记录，以及首次的原始文本或经来源与路由核验的已安装窗口加新增原始文本。权威索引本身超出模型输入上限时，模型只接收明确标注总数、收录数和遗漏数的部分索引；完整 Task、执行、产物和调查记录仍在带 URI/hash 的权威 Checkpoint 中，需要依赖遗漏项时须读取原件。已校验的旧 Checkpoint 若与当前 Journal 前缀一致，新 Checkpoint 只存新增原文及旧源 URI/hash/count；读取或恢复时校验完整引用链，未匹配时保留完整原文分块。完整原始前缀始终可按 URI/hash 复原，不逐条截去长消息尾部。保存失败、hash 复核失败或该增量输入仍超过安全界限时保留原 view，禁止静默丢失。原始图像/测量产物按 URI/hash 保留，摘要须保留来源资格、适用条件和反证的重验条件。
 
-跨回合复用的压缩窗口必须通过原始 Journal 前缀、归档 hash 和已提交的来源执行身份核验，并与当前认证路由匹配（Provider、credential scope、endpoint、协议、binding、contract 不变）。同一路由内仅模型、推理档位或聚合 Catalog revision 改变，不使已验证的可移植文本/图片失效；恢复时再次剥离旧 thinking、Provider response 与 output block 引用，当前 PromptPlan、工具目录和权限仍重新冻结。不匹配的认证/路由或未知来源执行仍拒绝复用，不能通过重放全历史绕过来源验证。稳定 hash 使用有界增量序列化，保持原规范化字节与历史 hash；执行身份查询逐行扫描但不额外保留消息正文，不能为降低内存跳过坏行或来源校验。
+跨回合复用的压缩窗口必须通过原始 Journal 前缀、归档 hash 和已提交的来源执行身份核验，并与当前认证路由匹配（Provider、credential scope、endpoint、协议、binding、contract 不变）。同一路由内仅模型、推理档位或聚合 Catalog revision 改变，不使已验证的可移植文本/图片失效；恢复时再次剥离旧 thinking、Provider response 与 output block 引用，当前 PromptPlan、工具目录和权限约束仍重新冻结；挡位 mode/revision 由主进程动态提供。不匹配的认证/路由或未知来源执行仍拒绝复用，不能通过重放全历史绕过来源验证。稳定 hash 使用有界增量序列化，保持原规范化字节与历史 hash；执行身份查询逐行扫描但不额外保留消息正文，不能为降低内存跳过坏行或来源校验。
 
 已安装窗口保留的原生图片也使用同一 compaction-authority 图片制品与 URI/hash 索引，不把 base64 再塞进受 2 MiB 文本上限约束的窗口 JSON。跨执行恢复须核对图片归属、hash、MIME 与消息/块位置，再恢复原始 vision bytes；缺失、篡改或位置冲突 fail-closed，不能静默替换为纯文本摘要。此类本地制品错误属于 Context 失败，不提示用户检查 Provider 账号或额度。
 
@@ -348,3 +348,8 @@ Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；�
 任务依赖准入与等待投影共用 taskDependencyWait：依赖须 completed/disposition=completed，需要执行的任务还须匹配当前任务 ID、revision、currentExecutionId 的 completed 执行与结果。waitingOn 只描述 pending 的依赖等待，不转换为 blocked，不放宽准入。事件快照在已有写锁中读取任务/执行，右栏通过一致性读取获取同一对数据，不嵌套存储锁。blockedBy 表示先后依赖；正常等待不应写成 blocked。
 
 独立权限审核是同一冻结 Provider 路由的一次无工具辅助请求，经 PromptPlan/RequestEnvelope/快照记录实际尝试与用量；没有第二执行器或恢复状态机。硬性 policy/user floor、Task 准入、Skill 工具交集与 owning lease 均不被审核批准替代。待审批调用保留原预算与期限，取消、过期 generation 或审核失败不执行。有效 profile 的声明交接及 requiredSkillIds 必须呈现在 PromptPlan，批准后的声明变更需重新审阅，不能沿用旧 offer 改写准备合同。
+
+
+## 工具权限最终准入
+
+EffectiveRuntimePlan 冻结权限约束，不冻结当前 mode；在途执行不重读完整 Settings。全局挡位只由主进程成功提交点发布版本，工具执行许可绑定真实 session/turn/generation、toolCallId、参数、冻结计划指纹和权限 revision。最后一个异步等待（包括资源锁）之后同步复核并消费许可，再进入执行。旧许可需要锁外重新授权，不能重复预算、Hook 或工具副作用。具体切挡、审批、已运行命令及子 Agent 语义见 [permissions.md](permissions.md)「在途权限切换」。

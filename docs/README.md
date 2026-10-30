@@ -1,6 +1,6 @@
 # Docs Index
 
-`docs/` 只承载稳定设计文档，不作为运行时代码规则堆放区。修改产品边界、架构边界、跨层契约或验证策略时，先同步 `DESIGN.md`，再更新本目录。
+`docs/` 只承载稳定设计文档，不作为运行时代码规则堆放区。修改产品边界、架构边界、跨层契约或验证策略时，先同步 `ARCHITECTURE.md`，再更新本目录。
 
 ## 分类
 
@@ -13,7 +13,7 @@
 ## 推荐阅读顺序
 
 1. `README.md`（仓库根）
-2. `DESIGN.md`
+2. `ARCHITECTURE.md`（工程）与 `DESIGN.md`（UI/UX）
 3. `AGENTS.md`
 4. `docs/contracts/runtime-kernel.md`
 5. `docs/contracts/permissions.md`

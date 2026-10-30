@@ -740,7 +740,11 @@ it('forwards a child approval with its actual execution identity and controlled 
   });
   const result = await runner.runSubagent({ parentAgentId: 'general', targetProfile: 'general', parentToolCallId: 'dispatch-tool', executionId: 'durable-execution-7', parentSessionId: 'parent', capsule: testCapsule(), parentOnEvent: (event) => {
     events.push(event);
-    if (event.type === 'approval.requested') expect(approvals.answer({ sessionId: 'parent', turnId: 'child-permission-turn', approvalId: 'tool-approval-mutation', approved: true }).success).toBe(true);
+    if (event.type === 'approval.requested') {
+      const approvalId = (event.payload as { approvalId: string }).approvalId;
+      expect(approvalId).toMatch(/^tool-approval-mutation-.+/);
+      expect(approvals.answer({ sessionId: 'parent', turnId: 'child-permission-turn', approvalId, approved: true }).success).toBe(true);
+    }
   } });
   expect(result.status).toBe('complete');
   expect(events.find((event) => event.type === 'approval.requested')).toMatchObject({ sessionId: 'parent', payload: { delegatedRequest: { executionId: 'durable-execution-7', turnId: 'child-permission-turn' }, risk: 'high' } });

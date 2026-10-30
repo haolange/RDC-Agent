@@ -336,17 +336,26 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const patch = settings as AppSettingsPatch;
     const previousSettings = settingsService.getAll();
     const nextSettings = settingsService.setAll(patch, appPathService.getRuntimePaths());
-    if (patch.appearance) applyProductIcon();
-    if (previousSettings.appearance.language !== nextSettings.appearance.language) refreshApplicationMenu();
+    const notifyCommitted = async (notify: () => unknown): Promise<void> => {
+      try { await notify(); } catch (error) {
+        runtimeLogService.log({ scope: 'app', namespace: 'system', severity: 'error',
+          title: 'Settings committed; observer update failed',
+          summary: 'The saved settings remain authoritative.',
+          detail: error instanceof Error ? error.message : String(error),
+          raw: { code: 'SETTINGS_COMMITTED_NOTIFICATION_FAILED' } });
+      }
+    };
+    if (patch.appearance) await notifyCommitted(applyProductIcon);
+    if (previousSettings.appearance.language !== nextSettings.appearance.language) await notifyCommitted(refreshApplicationMenu);
     const changedProviderIds = new Set<string>();
-    if (patch.llm?.providers) context.applyCurrentLlmConfig();
+    if (patch.llm?.providers) await notifyCommitted(() => context.applyCurrentLlmConfig());
     for (const provider of patch.llm?.providers ? nextSettings.llm.providers : []) {
       const previous = previousSettings.llm.providers.find((entry) => entry.id === provider.id);
       const changed = !previous || JSON.stringify(previous) !== JSON.stringify(provider);
       if (changed) changedProviderIds.add(provider.id);
     }
     const settledSettings = settingsService.getAll();
-    for (const providerId of changedProviderIds) await broadcastCatalog(providerId);
+    for (const providerId of changedProviderIds) await notifyCommitted(() => broadcastCatalog(providerId));
     return withEffectiveAgentModelOptions(settledSettings);
   });
 

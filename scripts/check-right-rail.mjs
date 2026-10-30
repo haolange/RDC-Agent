@@ -288,7 +288,7 @@ requireText(channels, "read: 'investigation:read'", 'IPC channel registry must e
 requireText(read('src/shared/renderer-api/channelCapabilities.ts'), "'investigation:read': 'read'", 'investigation:read must be classified as read');
 
 const docs = {
-  design: read('DESIGN.md'),
+  design: read('ARCHITECTURE.md'),
   uiSpec: read('docs/ui/workbench-and-transcript.md'),
   traceProtocol: read('docs/architecture/agentic-trace-protocol.md'),
   sessionProjectionContract: read('docs/contracts/session-projection.md'),

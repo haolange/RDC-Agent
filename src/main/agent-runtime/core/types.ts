@@ -1,3 +1,4 @@
+import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { CompiledPromptCache, DerivedContextMessageRef } from '@shared/types/semanticContext';
 import type { PromptSegment } from '@shared/types/rdcRuntime';
 import type { AssistantMessageDiagnostic } from '@shared/types/providerErrors';
@@ -302,6 +303,7 @@ export type AgentEvent =
   | { type: 'message_end'; message: Message }
   | {
       type: 'tool_execution_start';
+      permissionState?: RuntimePermissionState;
       toolCallId: string;
       toolName: string;
       args: Record<string, unknown>;

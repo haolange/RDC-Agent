@@ -56,6 +56,16 @@ function listApiFunctions(value: unknown, prefix = ''): Array<{ path: string; fn
 }
 
 describe('canonical renderer API', () => {
+  it('uses the same readonly permission state and event channels for every transport', async () => {
+    const transport = new RecordingTransport();
+    const api = createRendererApi('win32', transport);
+    await api.runtime.getPermissionState();
+    const dispose = api.events.onPermissionStateChanged(() => undefined);
+    expect(transport.invocations).toEqual([{ channel: 'runtime:getPermissionState', args: [] }]);
+    expect(transport.subscriptions).toContain('runtime:permissionStateChanged');
+    dispose();
+    expect(transport.removedListeners).toContain('runtime:permissionStateChanged');
+  });
   it('omits an absent command category across JSON transport', async () => {
     const transport = new RecordingTransport();
     const api = createRendererApi('win32', transport);

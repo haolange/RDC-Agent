@@ -65,6 +65,7 @@ export function createRendererApi(platform: NodeJS.Platform, transport: Renderer
     device: createDeviceApi(transport),
     session: createSessionApi(transport),
     run: createRunApi(transport),
+    runtime: { getPermissionState: () => transport.invoke('runtime:getPermissionState') },
     runtimeLog: createRuntimeLogApi(transport),
     capture: createCaptureApi(transport),
     context: createContextApi(transport),

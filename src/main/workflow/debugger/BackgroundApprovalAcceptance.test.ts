@@ -35,8 +35,10 @@ it('canonical background dispatch projects the child approval after parent reply
  parent.eventSink = { sessionId: 'owner', onEvent: (event: AgentEvent) => {
   events.push(event);
   if (event.type === 'approval.requested') {
-   expect(approvals.answer({ sessionId: 'unrelated', turnId: 'child-turn', approvalId: 'tool-approval-mutation', approved: true }).success).toBe(false);
-   expect(approvals.answer({ sessionId: 'owner', turnId: 'child-turn', approvalId: 'tool-approval-mutation', approved: true }).success).toBe(true);
+   const approvalId = (event.payload as { approvalId: string }).approvalId;
+   expect(approvalId).toMatch(/^tool-approval-mutation-.+/);
+   expect(approvals.answer({ sessionId: 'unrelated', turnId: 'child-turn', approvalId, approved: true }).success).toBe(false);
+   expect(approvals.answer({ sessionId: 'owner', turnId: 'child-turn', approvalId, approved: true }).success).toBe(true);
   }
  } } as never;
  const tool = runner.createSubagentTools('general', 'owner', parent)[0]!;

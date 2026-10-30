@@ -185,6 +185,7 @@ export function translateCoreToSharedAgentEvent(
           toolCallId: event.toolCallId,
           toolName: event.toolName,
           args: event.args,
+          permissionState: event.permissionState,
         },
         context,
       );

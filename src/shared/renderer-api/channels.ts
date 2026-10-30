@@ -176,6 +176,7 @@ export const RENDERER_INVOKE_CHANNEL = {
   },
   runtime: {
     listLogs: 'runtimeLog:list',
+    getPermissionState: 'runtime:getPermissionState',
   },
   capture: {
     list: 'capture:list',
@@ -242,6 +243,7 @@ export const RENDERER_EVENT_CHANNEL = {
   },
   runtime: {
     logAppended: 'runtime:logAppended',
+    permissionStateChanged: 'runtime:permissionStateChanged',
   },
 } as const;
 

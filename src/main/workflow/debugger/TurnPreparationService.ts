@@ -351,7 +351,7 @@ export class TurnPreparationService {
       profileProvenance: profile.provenance,
       enabledProfileIds: input.effectiveProfileIds,
       toolAllowlist: input.toolAllowlist,
-      permissionSettings: turnSettings.agentRuntime.permissions,
+      permissionConstraints: turnSettings.agentRuntime.permissions,
       knowledgeReadRoots: knowledgeResolution.roots,
       routeCapability: input.routeCapability,
       requestPlan: input.requestPlan,

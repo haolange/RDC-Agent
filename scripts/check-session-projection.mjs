@@ -40,7 +40,7 @@ const projectionStore = read('src/renderer/stores/sessionProjectionStore.ts');
 const composerContext = read('src/renderer/stores/composerSessionContextStore.ts');
 const sendFlow = read('src/renderer/features/composer/composerSendFlow.ts');
 const contract = read('docs/contracts/session-projection.md');
-const design = read('DESIGN.md');
+const design = read('ARCHITECTURE.md');
 const agents = read('AGENTS.md');
 
 if (!gate.includes('export function isActiveSessionEvent')) {
@@ -94,7 +94,7 @@ if (!contract.includes('Active Session') || !contract.includes('isActiveSessionE
 }
 
 if (!design.includes('session-projection.md')) {
-  fail('DESIGN.md Authority Map must reference session-projection.md');
+  fail('ARCHITECTURE.md Authority Map must reference session-projection.md');
 }
 
 if (!agents.includes('check:session-projection')) {

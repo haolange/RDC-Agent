@@ -1,3 +1,4 @@
+import { resolveAgentMaxTurns } from '../../agent-runtime/agent/ExecutionLimits';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({
@@ -102,34 +103,29 @@ describe('AgentTurnRunner', () => {
   });
 
   it('resolveMaxTurns prefers finite policy capped by profile', () => {
-    const runner = createRunner();
-    expect(runner.resolveMaxTurns('ask', 100, 12)).toBe(12);
-    expect(runner.resolveMaxTurns('ask', 5, 12)).toBe(5);
+    expect(resolveAgentMaxTurns(100, 12)).toBe(12);
+    expect(resolveAgentMaxTurns(5, 12)).toBe(5);
   });
 
   it('resolveMaxTurns uses profile max when policy omitted', () => {
-    const runner = createRunner();
-    expect(runner.resolveMaxTurns('ask', undefined, 12)).toBe(12);
+    expect(resolveAgentMaxTurns(undefined, 12)).toBe(12);
   });
 
   it('rejects a zero policy maxTurns as a typed policy error', () => {
-    const runner = createRunner();
-    expect(() => runner.resolveMaxTurns('ask', 0, 12)).toThrow(/POLICY_MAX_TURNS_ZERO/);
+    expect(() => resolveAgentMaxTurns(0, 12)).toThrow(/POLICY_MAX_TURNS_ZERO/);
   });
 
   it('resolveMaxTurns uses a single default when profile maxTurns is omitted', () => {
-    const runner = createRunner();
-    expect(runner.resolveMaxTurns('edit', 80)).toBe(25);
-    expect(runner.resolveMaxTurns('custom-writer' as never, 80)).toBe(25);
-    expect(runner.resolveMaxTurns('debugger')).toBe(25);
-    expect(runner.resolveMaxTurns('optimizer' as never)).toBe(25);
+    expect(resolveAgentMaxTurns(80)).toBe(25);
+    expect(resolveAgentMaxTurns(80)).toBe(25);
+    expect(resolveAgentMaxTurns()).toBe(25);
+    expect(resolveAgentMaxTurns()).toBe(25);
   });
 
   it('resolveMaxTurns uses profile maxTurns for any id, including custom edit', () => {
-    const runner = createRunner();
-    expect(runner.resolveMaxTurns('edit', 80, 40)).toBe(40);
-    expect(runner.resolveMaxTurns('custom-writer' as never, 80, 40)).toBe(40);
-    expect(runner.resolveMaxTurns('debugger', undefined, 50)).toBe(50);
+    expect(resolveAgentMaxTurns(80, 40)).toBe(40);
+    expect(resolveAgentMaxTurns(80, 40)).toBe(40);
+    expect(resolveAgentMaxTurns(undefined, 50)).toBe(50);
   });
 
   it('getOrCreateAgentSlot requires PromptPlan', () => {

@@ -8,7 +8,7 @@
 
 RenderDoc `.rdc` capture × AI Agent workbench × native RDC diagnostics
 
-[中文](./README.md) · [Design & architecture](./DESIGN.md) · [Issues](https://github.com/haolange/RDC-Agent/issues)
+[中文](./README.md) · [Architecture](./ARCHITECTURE.md) · [UI/UX design](./DESIGN.md) · [Issues](https://github.com/haolange/RDC-Agent/issues)
 
 </div>
 
@@ -117,7 +117,7 @@ pnpm run check:gates
 pnpm run build
 ```
 
-Read the [design and architecture guide](./DESIGN.md) for the product boundary, the [RDC runtime contract](./docs/architecture/rdc-runtime.md) for native operations, and the [acceptance ledger](./docs/product/acceptance-ledger.md) for evidence and unverified boundaries.
+Read the [design and architecture guide](./ARCHITECTURE.md) for the product boundary, the [RDC runtime contract](./docs/architecture/rdc-runtime.md) for native operations, and the [acceptance ledger](./docs/product/acceptance-ledger.md) for evidence and unverified boundaries.
 
 This repository is evolving quickly. Please report reproducible problems with the smallest safe reproduction you can share. Never upload private `.rdc` captures, provider keys, user data, or logs containing sensitive paths.
 

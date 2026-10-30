@@ -87,7 +87,7 @@ plan:* 以 shared 类型和 Zod 为唯一当前接口，不恢复弱绑定形态
 
 ## 12. 新 AI 接手指令
 
-请立即核对 checkout，再按 AGENTS.md → DESIGN.md Architecture Principles/Authority Map → docs/contracts/{runtime-kernel,permissions,session-projection}.md → docs/ui/{design-system,workbench-and-transcript}.md → docs/architecture/{rdc-runtime,browser-qa-surface}.md → docs/product/acceptance-ledger.md 的顺序读取相关部分。以本文第11节为收敛范围执行到验证和清理完成。
+请立即核对 checkout，再按 AGENTS.md → ARCHITECTURE.md Architecture Principles/Authority Map → docs/contracts/{runtime-kernel,permissions,session-projection}.md → docs/ui/{design-system,workbench-and-transcript}.md → docs/architecture/{rdc-runtime,browser-qa-surface}.md → docs/product/acceptance-ledger.md 的顺序读取相关部分。以本文第11节为收敛范围执行到验证和清理完成。
 
 搜索/历史核对只委托 Luna 子 Agent，主 Agent 负责计划、实现与验证裁决。保持现有组件层级、公共Button和语义token，不留legacy/双路径。不因跨电脑路径或已清理旧QA会话重新打开整个产品设计。不可逆数据操作或安全边界冲突必须明确询问；其余可逆操作说明默认选择后继续。
 

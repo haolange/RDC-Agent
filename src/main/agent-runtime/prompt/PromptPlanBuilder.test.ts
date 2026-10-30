@@ -29,7 +29,7 @@ describe('PromptPlanBuilder', () => {
       preloadedSkills: [{ id: 'debug', name: 'debug', description: 'Debug', allowedTools: ['read_file'], scope: 'builtin', sourcePath: skillPath, sourceHash: 'skill-hash', effectiveStatus: 'effective', instructions: fs.readFileSync(skillPath, 'utf8') }],
       skillCatalog: [],
       tools: ['read_file'], workDir: 'D:/Project', routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
-      permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
+      permissionConstraints: {  readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
       currentDate: '2026-07-11', timeZone: 'Asia/Shanghai',
     };
     const plan = new PromptPlanBuilder().build(input);
@@ -116,7 +116,7 @@ describe('PromptPlanBuilder', () => {
       tools: ['task_list', 'task_get', 'tool_search'],
       workDir: 'D:/Project',
       routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
-      permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
+      permissionConstraints: {  readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
       currentDate: '2026-08-01',
       timeZone: 'Asia/Shanghai',
     });
@@ -141,7 +141,7 @@ describe('PromptPlanBuilder', () => {
       tools: ['task_create', 'task_update', 'task_stop', ...(includeSubagent ? ['subagent'] : [])],
       workDir: 'D:/Project',
       routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
-      permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
+      permissionConstraints: {  readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
       currentDate: '2026-08-01',
       timeZone: 'Asia/Shanghai',
     });
@@ -166,7 +166,7 @@ describe('PromptPlanBuilder', () => {
       tools: ['task_create', 'task_update', 'task_list', 'tool_search'],
       workDir: 'D:/Project',
       routeCapability: { providerId: 'cline-pass', modelId: 'glm-5.2', toolCallingMode: 'text-only', reasoningVisibility: 'none', reasoningDelivery: 'none', reasoningContract: { semantic: 'none', source: 'none', displayLabel: 'None', carrier: 'none', artifactFormat: 'none', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'none' }, supportsStreaming: true, supportsToolResults: false, toolCallingEvidence: 'unknown', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'prompt-fallback' },
-      permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
+      permissionConstraints: {  readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
       currentDate: '2026-08-01',
       timeZone: 'Asia/Shanghai',
     });
@@ -190,7 +190,7 @@ describe('PromptPlanBuilder', () => {
       skillCatalog: [{ id: 'debug', name: 'debug', description: 'Debug workflows', allowedTools: [], scope: 'builtin', sourcePath: 'skill://debug', sourceHash: 'h', effectiveStatus: 'effective' }],
       tools: ['read_file'], workDir: 'D:/Project',
       routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
-      permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
+      permissionConstraints: {  readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
       currentDate: '2026-07-11', timeZone: 'Asia/Shanghai',
       ...(contextWindowTokens !== undefined ? { contextWindowTokens } : {}),
     });

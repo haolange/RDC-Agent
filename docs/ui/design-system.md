@@ -2,7 +2,7 @@
 
 权威来源（按优先级）：
 
-1. [`DESIGN.md`](../../DESIGN.md) — 产品边界与不变量裁决
+1. [`DESIGN.md`](../../DESIGN.md) — UI/UX 上位原则；[`ARCHITECTURE.md`](../../ARCHITECTURE.md) — 产品边界与工程不变量
 2. [`workbench-and-transcript.md`](workbench-and-transcript.md) — Workbench / Composer Effort / transcript 产品规格
 3. [`AGENTS.md`](../../AGENTS.md) — token / 按钮 / Appearance 执行纪律
 4. [`src/renderer/styles/design-system.css`](../../src/renderer/styles/design-system.css) — primitive + semantic token 定义
@@ -21,7 +21,7 @@
 
 专属 CSS 与组件就近维护，按 shell、输入、工具栏、内容与动效等稳定职责命名；不要按行数切成数字文件。迁移保持级联顺序、选择器优先级、变量作用域与容器查询，删除被替代文件和引用。共享弹层统一复用 TaskDialog、overlay stack 和 focus 管理；图片等特殊内容用专属内容布局保留展示空间。视觉调整必须针对明确缺陷，与结构迁移分开记录。
 
-RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 VS Code / JetBrains / Linear 的密度与克制）。裁决见 [`DESIGN.md`](../../DESIGN.md) UI 节。
+RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 VS Code / JetBrains / Linear 的密度与克制）。裁决见 [`DESIGN.md`](../../DESIGN.md)「视觉定位」。
 
 - 层次由 1px 边框 + 实色表面建立；阴影只用于 popover 与 modal。
 - 不使用无状态含义的装饰性背景。backdrop blur 只允许模态全屏遮罩（`--modal-backdrop` + `--modal-backdrop-filter`）；Dropdown / popover / chrome 仍为实色。Active Signal、Composer 绕光与 Effort 是核心状态视觉，保留完整动效。
@@ -250,7 +250,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 
 ## 目标目录
 
-见 [`DESIGN.md`](../../DESIGN.md) UI 节「渲染层目录」。CSS 与组件共置；`pages/`、`styles/tokens/*`、`styles/base/` 不得恢复。
+见 [`ARCHITECTURE.md`](../../ARCHITECTURE.md) 「Renderer 架构」。CSS 与组件共置；`pages/`、`styles/tokens/*`、`styles/base/` 不得恢复。
 
 ## 视觉参考
 

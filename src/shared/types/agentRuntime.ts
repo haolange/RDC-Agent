@@ -108,6 +108,7 @@ export interface AgentToolRequestedPayload extends AgentEventBasePayload {
 }
 
 export interface AgentToolStartedPayload extends AgentEventBasePayload {
+  permissionState?: import('./runtimePermission').RuntimePermissionState;
   toolCallId: string;
   toolName: string;
   args: Record<string, unknown>;

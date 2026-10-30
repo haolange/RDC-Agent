@@ -1,6 +1,6 @@
 # Agent Runtime Kernel
 
-> 契约权威：[`docs/contracts/runtime-kernel.md`](../contracts/runtime-kernel.md) 与根目录 `DESIGN.md`。本文保留实现向边界与模块说明；冲突时先改 contracts / DESIGN，再同步本文。
+> 契约权威：[`docs/contracts/runtime-kernel.md`](../contracts/runtime-kernel.md) 与根目录 `ARCHITECTURE.md`。本文保留实现向边界与模块说明；冲突时先改 contracts / ARCHITECTURE，再同步本文。
 
 The agent runtime owns agent turns, tool mediation policy, deterministic events, provider routing, approval events, and final run status.
 
@@ -10,7 +10,7 @@ The agent runtime owns agent turns, tool mediation policy, deterministic events,
 - Agent route capability gates tool registration before each turn. Only `native-structured` routes receive tool schemas and enter the tool execution loop.
 - Prompt composition lives in `src/main/agent-runtime/prompt`. Conversation code collects context, but does not hand-code provider/tool prompt fragments.
 - Tool capability comes only from the effective profile manifest ∩ active skill ∩ policy ∩ runtime prerequisites. Empty tools fail-closed (`AGENT_TOOLS_EMPTY`). There is no Ask-readonly / Plan→Edit / custom→Edit hardcoded fallback. General is the Execution Orchestrator; Debugger / Analyzer / Optimizer are Planning Orchestrators. ask/plan/edit and S0 specialist ids are reserved historical ids: drop from the effective snapshot with `AGENT_ID_RESERVED_HISTORICAL`. There is no custom-manifest runtime channel (U01).
-- Mission profiles (`debugger` / `analyzer` / `optimizer`) are plan-only: they must not receive `shell` or `code_interpreter`. They access RDC only through controlled read-only `rdc_probe` plus `rdc_context` (current session lease status). `plan_artifact` is a human-in-the-loop gate: approve freezes the plan and writes a session execution offer; the user clicks the declared continue button to switch to General. General executes lease-holding Live RDC operations through the fixed session boundary and `shell`; installation settings are mediated by `ShellInvocationService`. See `DESIGN.md` adjudication J and D.
+- Mission profiles (`debugger` / `analyzer` / `optimizer`) are plan-only: they must not receive `shell` or `code_interpreter`. They access RDC only through controlled read-only `rdc_probe` plus `rdc_context` (current session lease status). `plan_artifact` is a human-in-the-loop gate: approve freezes the plan and writes a session execution offer; the user clicks the declared continue button to switch to General. General executes lease-holding Live RDC operations through the fixed session boundary and `shell`; installation settings are mediated by `ShellInvocationService`. See `ARCHITECTURE.md` adjudication J and D.
 - No RDC-specific bridge, MCP server, or skill registry is injected as a hidden default tool path.
 - Assistant text is never parsed as an executable tool call. Textual tool-call shaped output produces a diagnostic event only.
 
@@ -107,3 +107,8 @@ After at least one visible process section exists, a later answer-only `llm_turn
 ## 通用完成接口与任务绑定
 
 AgentTurnRunner / ConversationTurnRunner 仅调用注入的 TurnCompletionValidator。AgentOrchestrator / ConversationService 组合现有 Investigation 校验器；prepareTurn 由主进程根据真实派发者选择校验策略并冻结 TaskCompletionBinding。普通 General turn 没有领域完成要求。RDC Capsule 扩展由 sessions/RdcDelegation 验证及注入；通用 Capsule 编译器不含租约方法段。详见 runtime-kernel 的结构化交接契约。
+
+
+## Live permission mode and frozen execution constraints
+
+Only the main-owned global permission mode/revision changes during an active turn. Prepared roots, command rules, tools, skill intersection, policy, provider route and RDC binding remain frozen. The executor authorizes outside resource claims, then synchronously rechecks and consumes the exact revision-bound grant at final admission after hooks and queues. A stale grant releases its claims before reauthorization; it does not repeat the call budget or before-hook. Already admitted tools retain their execution lifetime and are stopped only through the existing cancellation/join path. Parent, foreground and background child effects share this permission source while retaining their own frozen scope. See [permissions contract](../contracts/permissions.md#在途权限切换).

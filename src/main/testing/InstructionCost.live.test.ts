@@ -38,7 +38,7 @@ function plan(version: 'before' | 'after', id: string) {
         artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'comparison', continuation: 'exact-execution' },
       supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false,
       visionInputMode: 'disabled', structuredOutputMode: 'native' },
-    permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
+    permissionConstraints: {  readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
     currentDate: '2026-09-09', timeZone: 'Asia/Shanghai',
   });
 }

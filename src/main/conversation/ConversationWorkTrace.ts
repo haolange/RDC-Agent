@@ -267,7 +267,9 @@ export function upsertRuntimeToolCall(
   if (toolIndex >= 0) {
     const existingToolCall = block.toolCalls[toolIndex];
     const nextApproval = patch.approval
-      ? { ...(existingToolCall.approval ?? {}), ...patch.approval }
+      ? existingToolCall.approval?.approvalId === patch.approval.approvalId
+        ? { ...existingToolCall.approval, ...patch.approval }
+        : { ...patch.approval }
       : existingToolCall.approval ? { ...existingToolCall.approval } : undefined;
     block.toolCalls[toolIndex] = {
       ...existingToolCall,
@@ -390,6 +392,8 @@ export function upsertRuntimeToolApproval(
 ): ConversationWorkTrace {
   const status = normalizeToolApprovalStatus(input.status);
   const failed = status === 'rejected';
+  const superseded = status === 'cancelled' && input.errorCode === 'PERMISSION_MODE_CHANGED';
+  const toolCancelled = status === 'cancelled' && !superseded;
   const existingToolCall = trace?.blocks
     .flatMap((block) => block.toolCalls)
     .find((toolCall) => toolCall.id === input.toolCallId);
@@ -414,14 +418,14 @@ export function upsertRuntimeToolApproval(
   const toolPatch: Partial<ConversationToolCall> & { id: string; toolName: string } = {
     id: input.toolCallId,
     toolName: input.toolName,
-    status: settled ? existingToolCall.status : status === 'cancelled' ? 'cancelled' : failed
+    status: settled || superseded ? existingToolCall?.status ?? 'pending' : toolCancelled ? 'cancelled' : failed
       ? 'error'
       : existingToolCall?.status === 'complete'
         ? 'complete'
         : existingToolCall?.executionStartedAt !== undefined ? 'running' : 'pending',
     approval,
   };
-  if (status === 'cancelled' && !settled) toolPatch.completedAt = existingToolCall?.completedAt ?? now;
+  if (toolCancelled && !settled) toolPatch.completedAt = existingToolCall?.completedAt ?? now;
   if (failed && !settled) {
     toolPatch.error = answer || input.reason || 'Tool approval was denied.';
     toolPatch.completedAt = now;

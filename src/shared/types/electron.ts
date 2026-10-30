@@ -45,6 +45,7 @@ import type {
 import type { EffectiveCatalogSnapshot, EffectiveModel } from './providerCapability';
 import type { ModelsOverride } from '../provider-catalog/modelsOverrideSchema';
 import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
+import type { RuntimePermissionState } from './runtimePermission';
 import type {
   AgentPermissionMode,
   AppSettings,
@@ -515,6 +516,10 @@ export interface ElectronAPI {
     list: (sessionId: string) => Promise<{ runs: RunSummary[] }>;
   };
 
+  runtime: {
+    getPermissionState: () => Promise<RuntimePermissionState>;
+  };
+
   runtimeLog: {
     list: (request: { scope: RuntimeLogScope; sessionId?: string | null }) => Promise<{
       entries: RuntimeLogEntry[];
@@ -579,6 +584,7 @@ export interface ElectronAPI {
     onProjectInputsChanged: (callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void) => () => void;
     onProjectInputsError: (callback: (payload: { projectId: string; error: string }) => void) => () => void;
     onOpenedCaptureStateChanged: (callback: (state: SessionScopedPayload<OpenedCaptureState | null>) => void) => () => void;
+    onPermissionStateChanged: (callback: (state: RuntimePermissionState) => void) => () => void;
     onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void) => () => void;
     onAppThemeChanged: (callback: (theme: ResolvedTheme) => void) => () => void;
     removeAllListeners: (channel: string) => void;

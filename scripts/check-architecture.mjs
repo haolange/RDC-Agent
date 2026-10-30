@@ -37,16 +37,18 @@ const countLines = (filePath) => {
   return lineCount(filePath);
 };
 
-if (!exists('DESIGN.md')) {
-  fail('DESIGN.md is required as the product and architecture authority.');
+if (!exists('DESIGN.md')) fail('DESIGN.md is required as the UI/UX authority.');
+if (!read('AGENTS.md').includes('DESIGN.md')) fail('AGENTS.md must link UI/UX to DESIGN.md.');
+if (!exists('ARCHITECTURE.md')) {
+  fail('ARCHITECTURE.md is required as the product and architecture authority.');
 }
 
-if (!read('AGENTS.md').includes('DESIGN.md')) {
-  fail('AGENTS.md must link UI/UX and architecture iteration to DESIGN.md.');
+if (!read('AGENTS.md').includes('ARCHITECTURE.md')) {
+  fail('AGENTS.md must link engineering iteration to ARCHITECTURE.md.');
 }
 
-if (!read('README.md').includes('DESIGN.md') || !read('docs/README.md').includes('DESIGN.md')) {
-  fail('README.md and docs/README.md must include DESIGN.md in the reading path.');
+if (!read('README.md').includes('ARCHITECTURE.md') || !read('docs/README.md').includes('ARCHITECTURE.md')) {
+  fail('README.md and docs/README.md must include ARCHITECTURE.md in the reading path.');
 }
 
 // Legacy buckets: main/services + renderer/components (not renderer/services)
@@ -78,7 +80,7 @@ for (const filePath of walk(path.join(repoRoot, 'docs'), [], /\.(md)$/)) {
   }
 }
 
-for (const relativePath of ['README.md', 'AGENTS.md', 'DESIGN.md']) {
+for (const relativePath of ['README.md', 'AGENTS.md', 'ARCHITECTURE.md', 'DESIGN.md']) {
   if (!exists(relativePath)) continue;
   const content = read(relativePath);
   if (MOJIBAKE_PATTERNS.some((pattern) => pattern.test(content))) {

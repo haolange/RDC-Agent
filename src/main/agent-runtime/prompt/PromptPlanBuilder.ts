@@ -44,7 +44,7 @@ export interface PromptPlanInput {
   effectiveModel?: EffectiveModel;
   /** Execution callers supply their resolved plan; offline prompt-cost builds have no provider request. */
   requestPlan?: RequestPlan;
-  permissionSettings: AgentPermissionSettings;
+  permissionConstraints: Omit<AgentPermissionSettings, 'mode'>;
   currentDate: string;
   timeZone: string;
   contextWindowTokens?: number;
@@ -173,7 +173,7 @@ export class PromptPlanBuilder {
       content: effectiveToolContent,
     });
 
-    const permission = input.permissionSettings;
+    const permission = input.permissionConstraints;
     const runtimeFactsContent = [
       '# Runtime Facts',
       `Agent id: ${input.profile.id}`,
@@ -189,7 +189,7 @@ export class PromptPlanBuilder {
       `Host OS: ${process.platform}`,
       `Shell: ${resolvePromptShellLabel()}`,
       `Shell cwd: ${resolvePromptShellCwd(input.sessionId, input.workDir)}`,
-      `Permission mode: ${permission.mode}`,
+      'Permission mode is controlled live by the host; runtime permission context applies to future tool admission.',
       `Additional readable roots: ${permission.readableRoots.join(', ') || '(none)'}`,
       `Additional writable roots: ${permission.writableRoots.join(', ') || '(none)'}`,
       `Current date: ${input.currentDate}`,

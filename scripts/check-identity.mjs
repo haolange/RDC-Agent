@@ -15,7 +15,7 @@ const visit = (dir) => {
 };
 visit(path.join(root, 'docs'));
 visit(path.join(root, 'resources', 'agent-runtime'));
-for (const file of ['README.md', 'README.en.md', 'AGENTS.md', 'DESIGN.md']) {
+for (const file of ['README.md', 'README.en.md', 'AGENTS.md', 'ARCHITECTURE.md', 'DESIGN.md']) {
   if (/rdx-tools|`rdx`|RDX CLI/u.test(fs.readFileSync(path.join(root, file), 'utf8'))) failures.push(file);
 }
 if (failures.length) throw new Error(`Retired product identity: ${failures.join(', ')}`);

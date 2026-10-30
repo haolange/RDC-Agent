@@ -87,7 +87,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     routeCapability: input.routePreflight.routeCapability,
     effectiveModel: input.effectiveModel ?? undefined,
     requestPlan: input.requestPlan,
-    permissionSettings: runtimeSettings.agentRuntime.permissions,
+    permissionConstraints: runtimeSettings.agentRuntime.permissions,
     currentDate: promptClock.currentDate,
     timeZone: promptClock.timeZone,
     contextWindowTokens: input.requestPlan.contextWindowTokens,

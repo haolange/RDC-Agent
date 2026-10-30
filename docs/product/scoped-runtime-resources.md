@@ -1,6 +1,6 @@
 # Scoped Runtime Resources（产品规格）
 
-> 产品边界裁决：`DESIGN.md`。Runtime 执行细节：`docs/contracts/runtime-kernel.md`。
+> 产品边界裁决：`ARCHITECTURE.md`。Runtime 执行细节：`docs/contracts/runtime-kernel.md`。
 
 ## Scope 与存储
 
@@ -80,7 +80,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 Memory：显式 search/read/write/delete；写入需用户意图或交互审批；删除需确认；禁止轮次自动抽取/consolidation/全索引注入。
 
-Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / Index / Compile / Candidate / Write；独立 `knowledge` IPC。目标拓扑 **六 lane** markdown-first；canonical 读根对 `read_file` / `read_image` / `glob` / `grep` 免审批（U02 落地）。持久写入须显式人类确认；知识导入 摄入为 staging / Draft，不自动 Candidate。不生成、不自动注入 prompt。**当前态**：Candidate/Draft/review 已落到 session durable store；知识导入 记录并复核源 hash/mtime/size；写路径 realpath + 原子替换。Embedding capability / Semantic lane **已由 U02 删除**，禁止恢复。**T18 知识导入 已证**。产品级 Browser QA 全矩阵见 U05。目标态见 `DESIGN.md` 裁决 C / G。
+Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / Index / Compile / Candidate / Write；独立 `knowledge` IPC。目标拓扑 **六 lane** markdown-first；canonical 读根对 `read_file` / `read_image` / `glob` / `grep` 免审批（U02 落地）。持久写入须显式人类确认；知识导入 摄入为 staging / Draft，不自动 Candidate。不生成、不自动注入 prompt。**当前态**：Candidate/Draft/review 已落到 session durable store；知识导入 记录并复核源 hash/mtime/size；写路径 realpath + 原子替换。Embedding capability / Semantic lane **已由 U02 删除**，禁止恢复。**T18 知识导入 已证**。产品级 Browser QA 全矩阵见 U05。目标态见 `ARCHITECTURE.md` 裁决 C / G。
 
 `knowledge_read` 在 Agent 主动读取卡片后，为声明图片保留知识根相对路径和角色，并仅在当前空间 realpath 与冻结 Knowledge 读根匹配、图片 realpath 未越界时返回可直接交给 `read_image` 的 `readImageArgs`。知识相对路径不按工程路径解释；缺失读范围、文件消失或链接越界分别显式返回 `readError`，不猜根、不回退。该参数不新增授权，也不代表像素已读；实际图像、类型及 hash 仍以正常 `read_image` 成功结果为准。卡片和图片不会因此自动注入初始 Prompt，持久内容/schema 不变。
 

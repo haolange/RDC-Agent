@@ -1,6 +1,6 @@
 # RDC Runtime
 
-RDC Runtime 是 RDC-Agent 的资源解析、Prompt 构建与运行期可观测性边界。产品与工程决策以根目录 `DESIGN.md` 为 SSOT；本文描述对应的稳定实现契约。
+RDC Runtime 是 RDC-Agent 的资源解析、Prompt 构建与运行期可观测性边界。产品与工程决策以根目录 `ARCHITECTURE.md` 为 SSOT；本文描述对应的稳定实现契约。
 
 ## Scope 与存储边界
 

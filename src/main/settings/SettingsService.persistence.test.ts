@@ -90,6 +90,27 @@ describe('SettingsService provider persistence', () => {
     return { settingsPath, workspaceRoot };
   }
 
+  it('publishes permission mode only after durable settings commit and survives notification failures', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const { runtimePermissionStateService } = await import('../agent-runtime/permissions/RuntimePermissionStateService');
+    const service = new SettingsService(); service.initialize();
+    const before = runtimePermissionStateService.getSnapshot();
+    const notifications = vi.fn(); const stop = runtimePermissionStateService.subscribe(notifications);
+    const rename = vi.spyOn(fs, 'renameSync').mockImplementationOnce(() => { throw new Error('permission commit failed'); });
+    try {
+      expect(() => service.setAll({ agentRuntime: { permissions: { mode: 'full-access' } } })).toThrow('permission commit failed');
+      expect(runtimePermissionStateService.getSnapshot()).toBe(before);
+      expect(notifications).not.toHaveBeenCalled();
+    } finally { rename.mockRestore(); }
+    const stopBroken = runtimePermissionStateService.subscribe(() => { throw new Error('notification failed'); });
+    try {
+      expect(service.setAll({ agentRuntime: { permissions: { mode: 'full-access' } } }).agentRuntime.permissions.mode).toBe('full-access');
+      expect(runtimePermissionStateService.getSnapshot()).toEqual({ mode: 'full-access', revision: before.revision + 1 });
+      expect(notifications).toHaveBeenCalledOnce();
+      expect(service.getAll().agentRuntime.permissions.mode).toBe('full-access');
+    } finally { stop(); stopBroken(); }
+  });
+
   it('keeps persisted provider metadata during startup rebuild when secrets are temporarily unavailable', async () => {
     const { settingsPath } = await createVerifiedPersistedSettings();
     const { SettingsService } = await import('./SettingsService');

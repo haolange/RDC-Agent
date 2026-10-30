@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { PermissionModeChangedError } from './RuntimePermissionStateService';
 import type { PermissionReviewer, PermissionReviewAction, PermissionReviewVerdict } from './PermissionReviewRuntime';
 import { PermissionReviewError } from './PermissionReviewRuntime';
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
@@ -50,9 +52,8 @@ export class AgentToolApprovalRequestService {
     if (!turnId) {
       throw new Error('Tool approval requires an active conversation turn.');
     }
-    const approvalId = `tool-approval-${input.toolCallId}`;
+    const approvalId = `tool-approval-${input.toolCallId}-${randomUUID()}`;
     const key = keyFor(turnId, approvalId);
-    this.cancelPending(key, 'Superseded by a new approval request.');
 
     return new Promise<boolean>((resolve, reject) => {
       const pending: PendingToolApprovalRequest = {
@@ -71,7 +72,7 @@ export class AgentToolApprovalRequestService {
           return;
         }
         pending.abortListener = () => {
-          this.cancelPending(key, 'Tool approval request was cancelled.');
+          this.cancelPending(key, input.signal?.reason instanceof PermissionModeChangedError ? 'PERMISSION_MODE_CHANGED' : 'Tool approval request was cancelled.');
         };
         input.signal.addEventListener('abort', pending.abortListener, { once: true });
       }
@@ -95,7 +96,7 @@ export class AgentToolApprovalRequestService {
   async autoReview(input: ToolApprovalRequestInput & { action?: PermissionReviewAction; reviewer?: PermissionReviewer }): Promise<PermissionReviewVerdict> {
     const reviewMethod = input.risk === 'low' ? 'rule' as const : 'model' as const;
     let errorCode: string | undefined;
-    const approvalId = `auto-review-${input.toolCallId}`;
+    const approvalId = `auto-review-${input.toolCallId}-${randomUUID()}`;
     const synthetic: PendingToolApprovalRequest = {
       ...input,
       delegatedOwner: getDelegatedInteractionOwner(input.sessionId),
@@ -118,28 +119,33 @@ export class AgentToolApprovalRequestService {
       reviewMethod,
     } as AgentApprovalEventPayload);
     let verdict: PermissionReviewVerdict;
+    let settledRejection = false;
+    let modeCancelled = false;
+    let reviewCancelled = false;
     try {
       input.signal?.throwIfAborted();
       if (input.risk === 'low') {
         verdict = { approved: true, reason: `RULE_APPROVED: ${input.reason}` };
       } else {
         if (!input.reviewer || !input.action) throw new PermissionReviewError('PERMISSION_REVIEW_UNAVAILABLE', 'no frozen reviewer is available.');
-        const result = await input.reviewer(input.action, input.signal);
+        const result = await awaitReview(input.reviewer(input.action, input.signal), input.signal, (result) => { settledRejection = !result.approved; });
         // Only the strict verdict crosses this boundary; route/failure metadata belongs to the host.
         verdict = { approved: result.approved, reason: result.reason };
       }
-      input.signal?.throwIfAborted();
+      if (!settledRejection) input.signal?.throwIfAborted();
     } catch (error) {
-      errorCode = input.signal?.aborted ? 'PERMISSION_REVIEW_CANCELLED'
+      modeCancelled = error instanceof PermissionModeChangedError;
+      reviewCancelled = input.signal?.aborted === true && error === input.signal.reason;
+      errorCode = modeCancelled ? 'PERMISSION_MODE_CHANGED' : reviewCancelled ? 'PERMISSION_REVIEW_CANCELLED'
         : error instanceof PermissionReviewError ? error.code : 'PERMISSION_REVIEW_FAILED';
-      verdict = { approved: false, reason: error instanceof PermissionReviewError && !input.signal?.aborted
+      verdict = { approved: false, reason: error instanceof PermissionReviewError && !reviewCancelled
         ? error.message : `${errorCode}: ${error instanceof Error ? error.message : String(error)}` };
     }
     const { approved, reason } = verdict;
     this.emit(synthetic, 'approval.answered', {
       approvalId,
       title: `Auto-review ${input.toolName}`,
-      status: input.signal?.aborted ? 'cancelled' : approved ? 'approved' : 'rejected',
+      status: reviewCancelled ? 'cancelled' : approved ? 'approved' : 'rejected',
       reason,
       kind: 'tool',
       toolCallId: input.toolCallId,
@@ -150,6 +156,7 @@ export class AgentToolApprovalRequestService {
       reviewMethod,
       errorCode,
     } as AgentApprovalEventPayload);
+    if (modeCancelled) throw new PermissionModeChangedError();
     return verdict;
   }
 
@@ -205,9 +212,10 @@ export class AgentToolApprovalRequestService {
       toolCallId: pending.toolCallId,
       toolName: pending.toolName,
       answer: reason,
+      errorCode: reason === 'PERMISSION_MODE_CHANGED' ? reason : undefined,
       risk: pending.risk,
     } as AgentApprovalEventPayload);
-    pending.reject(new Error(reason));
+    pending.reject(pending.signal?.reason instanceof PermissionModeChangedError ? pending.signal.reason : new Error(reason));
   }
 
   private deletePending(pending: PendingToolApprovalRequest): void {
@@ -228,3 +236,15 @@ export class AgentToolApprovalRequestService {
 }
 
 export const agentToolApprovalRequestService = new AgentToolApprovalRequestService();
+
+async function awaitReview<T>(review: Promise<T>, signal: AbortSignal | undefined, onSettled: (value: T) => void): Promise<T> {
+  if (!signal) return review.then(value => { onSettled(value); return value; });
+  signal.throwIfAborted();
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const finish = () => { settled = true; signal.removeEventListener('abort', abort); };
+    const abort = () => { finish(); reject(signal.reason); };
+    signal.addEventListener('abort', abort, { once: true });
+    review.then(value => { if (settled) return; finish(); onSettled(value); resolve(value); }, error => { if (settled) return; finish(); reject(error); });
+  });
+}

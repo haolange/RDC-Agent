@@ -1,4 +1,5 @@
 import type { EventSubscriptionApi } from '../types/electron-api';
+import type { RuntimePermissionState } from '../types/runtimePermission';
 import type { RuntimeLogEntry } from '../types/runtimeLog';
 import type {
   ContextSnapshot,
@@ -73,6 +74,9 @@ export function createEventSubscriptionApi(transport: RendererApiTransport): Eve
       transport.subscribe(EVENT.workbench.openedCaptureStateChanged, (payload) => (
         callback(payload as SessionScopedPayload<OpenedCaptureState | null>)
       ))
+    ),
+    onPermissionStateChanged: (callback) => (
+      transport.subscribe(EVENT.runtime.permissionStateChanged, (state) => callback(state as RuntimePermissionState))
     ),
     onRuntimeLogAppended: (callback) => (
       transport.subscribe(EVENT.runtime.logAppended, (entry) => callback(entry as RuntimeLogEntry))

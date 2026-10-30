@@ -3,7 +3,7 @@
  * Renderer structure gate: dependency direction, feature isolation, IPC access
  * layering, and retired technology buckets. Complements check-architecture.mjs
  * (line budgets / hex) with the target-state module graph from
- * docs/ui/design-system.md and DESIGN.md.
+ * ARCHITECTURE.md, DESIGN.md and docs/ui/design-system.md.
  */
 
 import fs from 'node:fs';

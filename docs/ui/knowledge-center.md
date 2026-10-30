@@ -40,4 +40,4 @@
 
 IPC 通道：`knowledge:overview` / `query` / `card` / `compile` / `index:rebuild` / `candidates` / `candidateCreate` / `import` / `image` / `issueApprovalToken` / `write` / `promote` / `export`。写/提升必须消费 Main 签发的 `approvalToken`，并带 `explicitHumanConfirmation`；`knowledge:export` 为 `high-impact`，目标路径由 `dialog:saveFile` 的系统保存对话框返回（知识包扩展名 zip），renderer 不得自行拼绝对路径。知识导入选文件走 `dialog:selectKnowledgeImport`（zip / yaml / yml），不走 `dialog:selectFiles`。已删除 browse-only 的 `knowledge:listSpaces` / `listCards` / `getCard`。
 
-权威产品边界见根目录 `DESIGN.md`「Knowledge」。
+权威产品边界见根目录 `ARCHITECTURE.md`「Knowledge」。

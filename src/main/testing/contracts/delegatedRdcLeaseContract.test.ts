@@ -203,8 +203,8 @@ describe('delegatedRdcLeaseContract: offline child allowlist', () => {
       projectRootPath: 'D:/Project',
       profile: { skills: [] },
       toolAllowlist: ['read_file', 'rdc_context', 'rdc_probe', 'shell'],
-      permissionSettings: {
-        mode: 'default',
+      permissionConstraints: {
+
         readableRoots: [],
         writableRoots: [],
         allowedCommandPrefixes: [],

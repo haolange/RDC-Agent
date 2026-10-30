@@ -69,6 +69,7 @@ if (rootLogFiles.length > 0) {
 const allowedRootFiles = new Set([
   'AGENTS.md',
   'DESIGN.md',
+  'ARCHITECTURE.md',
   'README.md',
   'README.en.md',
   'LICENSE',

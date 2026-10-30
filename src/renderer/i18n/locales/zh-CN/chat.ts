@@ -63,6 +63,8 @@ export const zhChat = {
   'chat.workProcessAutoReviewApproved': '自动审查通过',
   'chat.workProcessApprovalRejected': '已拒绝',
   'chat.workProcessAutoReviewRejected': '自动审查未通过',
+  'chat.workProcessApprovalModeChanged': '原审批因权限切换已撤销',
+  'chat.workProcessApprovalModeChangedMessage': '仅撤销原审批请求，工具会按新权限重新检查。',
   'chat.workProcessApprovalCancelled': '已取消',
   'chat.workProcessUserAnswered': '已回答',
   'chat.workProcessUserWaiting': '等待用户',

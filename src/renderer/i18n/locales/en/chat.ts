@@ -79,6 +79,8 @@ export const enChat = {
   'chat.workProcessAutoReviewApproved': 'Auto-review passed',
   'chat.workProcessApprovalRejected': 'Rejected',
   'chat.workProcessAutoReviewRejected': 'Auto-review rejected',
+  'chat.workProcessApprovalModeChanged': 'Approval withdrawn after permission change',
+  'chat.workProcessApprovalModeChangedMessage': 'Only the previous approval request was withdrawn. The tool is checked against the new permissions.',
   'chat.workProcessApprovalCancelled': 'Cancelled',
   'chat.workProcessUserAnswered': 'Answered',
   'chat.workProcessUserWaiting': 'Waiting for user',

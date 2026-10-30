@@ -1,3 +1,4 @@
+import { PermissionModeChangedError } from './RuntimePermissionStateService';
 import { expect, it, vi } from 'vitest';
 import { AgentToolApprovalRequestService } from './AgentToolApprovalRequestService';
 import { PermissionReviewError } from './PermissionReviewRuntime';
@@ -54,4 +55,15 @@ it('cancellation defeats an otherwise approved answer', async () => {
   const result = await new AgentToolApprovalRequestService().autoReview({ ...base, signal: abort.signal, onEvent,
     reviewer: async () => { abort.abort(); return { approved: true, reason: 'late' }; } });
   expect(result.approved).toBe(false); expect(JSON.stringify(onEvent.mock.calls)).toContain('cancelled');
+});
+
+it('keeps a reviewer failure which settled before a later mode change as the original rejection', async () => {
+  let fail!: (error: Error) => void;
+  const review = new Promise<{ approved: boolean; reason: string }>((_resolve, reject) => { fail = reject; });
+  const controller = new AbortController(); const onEvent = vi.fn();
+  const result = new AgentToolApprovalRequestService().autoReview({ ...base, signal: controller.signal, onEvent, reviewer: () => review });
+  fail(new PermissionReviewError('PERMISSION_REVIEW_TIMEOUT', 'original timeout'));
+  queueMicrotask(() => controller.abort(new PermissionModeChangedError()));
+  await expect(result).resolves.toMatchObject({ approved: false, reason: expect.stringContaining('original timeout') });
+  expect(onEvent.mock.calls.at(-1)?.[0].payload).toMatchObject({ status: 'rejected', errorCode: 'PERMISSION_REVIEW_TIMEOUT' });
 });

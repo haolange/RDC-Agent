@@ -63,4 +63,44 @@ describe('request cancellation is not rejection or failure', () => {
     expect(call.completedAt).toBe(2);
     expect(createToolRowForPresentation(call, (key, params) => translate('zh-CN', key, params)).status).toBe(status);
   });
+  it.each(['pending', 'running'] as const)('keeps a %s tool live when only its old permission approval is cancelled', status => {
+    let trace = upsertRuntimeToolCall(undefined, { id: 'switch', toolName: 'shell', status, startedAt: 10,
+      ...(status === 'running' ? { executionStartedAt: 20 } : {}) });
+    const blockId = trace.blocks[0].id;
+    trace = upsertRuntimeToolApproval(trace, { approvalId: 'old-approval', toolCallId: 'switch', toolName: 'shell', status: 'pending' });
+    trace = upsertRuntimeToolApproval(trace, { approvalId: 'old-approval', toolCallId: 'switch', toolName: 'shell', status: 'cancelled', errorCode: 'PERMISSION_MODE_CHANGED', answer: 'PERMISSION_MODE_CHANGED' });
+    let call = trace.blocks[0].toolCalls[0];
+    expect(call).toMatchObject({ id: 'switch', status, approval: { approvalId: 'old-approval', status: 'cancelled', errorCode: 'PERMISSION_MODE_CHANGED' } });
+    expect(call.completedAt).toBeUndefined(); expect(call.error).toBeUndefined();
+    expect(createToolRowForPresentation(call, (key, params) => translate('en', key, params)).status).toBe(status);
+    trace = upsertRuntimeToolCall(trace, { id: 'switch', toolName: 'shell', status: 'running', executionStartedAt: 30 });
+    expect(trace.blocks[0].toolCalls[0].status).toBe('running');
+    trace = upsertRuntimeToolCall(trace, { id: 'switch', toolName: 'shell', status: 'complete', completedAt: 40, resultPreview: 'node version', });
+    call = trace.blocks[0].toolCalls[0];
+    expect(trace.blocks[0].id).toBe(blockId); expect(call.status).toBe('complete');
+    expect(call.approval?.status).toBe('cancelled'); expect(call.completedAt).toBe(40);
+    expect(createToolRowForPresentation(call, (key, params) => translate('en', key, params)).status).toBe('complete');
+  });
+
+  it('does not merge a superseded approval cancellation into the next unique request', () => {
+    let trace = upsertRuntimeToolApproval(undefined, { approvalId: 'old', toolCallId: 'switch', toolName: 'shell', status: 'cancelled', errorCode: 'PERMISSION_MODE_CHANGED', answer: 'old cancellation' });
+    trace = upsertRuntimeToolApproval(trace, { approvalId: 'new', toolCallId: 'switch', toolName: 'shell', status: 'pending' });
+    const call = trace.blocks[0].toolCalls[0];
+    expect(call.status).toBe('pending');
+    expect(call.approval).toMatchObject({ approvalId: 'new', status: 'pending' });
+    expect(call.approval?.errorCode).toBeUndefined(); expect(call.approval?.resolvedAt).toBeUndefined();
+    expect(call.approval?.answer).toBeUndefined();
+  });
+
+  it.each(['pending', 'running'] as const)('keeps actual Stop terminal after a %s permission approval was superseded', status => {
+    let trace = upsertRuntimeToolCall(undefined, { id: 'stop', toolName: 'shell', status, startedAt: 10 });
+    trace = upsertRuntimeToolApproval(trace, { approvalId: 'old', toolCallId: 'stop', toolName: 'shell', status: 'cancelled', errorCode: 'PERMISSION_MODE_CHANGED' });
+    trace = finalizeTrace(trace, 'stopped', undefined, 50);
+    const expected = status === 'pending' ? 'skipped' : 'cancelled';
+    expect(trace.blocks[0].toolCalls[0]).toMatchObject({ status: expected, completedAt: 50 });
+    expect(upsertRuntimeToolCall(trace, { id: 'stop', toolName: 'shell', status: 'running', executionStartedAt: 60 })).toEqual(trace);
+    expect(upsertRuntimeToolCall(trace, { id: 'stop', toolName: 'shell', status: 'complete', completedAt: 70 })).toEqual(trace);
+    expect(upsertRuntimeToolApproval(trace, { approvalId: 'late', toolCallId: 'stop', toolName: 'shell', status: 'cancelled', errorCode: 'PERMISSION_MODE_CHANGED' })).toEqual(trace);
+  });
+
 });

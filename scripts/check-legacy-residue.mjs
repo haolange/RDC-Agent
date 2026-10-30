@@ -73,7 +73,7 @@ const walkFiles = (relativeRoot) => {
 };
 
 const scanRoots = ['src', 'scripts', 'resources', 'docs', '.github'];
-const extraFiles = ['DESIGN.md', 'AGENTS.md', 'package.json'];
+const extraFiles = ['DESIGN.md', 'ARCHITECTURE.md', 'AGENTS.md', 'package.json'];
 const files = [
   ...new Set([
     ...scanRoots.flatMap((root) => walkFiles(root)),
@@ -91,11 +91,11 @@ const isExactSymbolAllowlist = (rel, line, symbol) => {
     if (rel === 'scripts/check-orchestrator-facade.mjs') return true;
     if (rel === 'AGENTS.md' && /禁止/.test(line)) return true;
     if (rel.startsWith('docs/contracts/') && /禁止/.test(line)) return true;
-    if (rel === 'DESIGN.md' && /禁止/.test(line)) return true;
+    if (rel === 'ARCHITECTURE.md' && /禁止/.test(line)) return true;
   }
 
   if (symbol === FORBIDDEN.embeddingService) {
-    if (rel === 'DESIGN.md' && /禁止恢复/.test(line)) return true;
+    if (rel === 'ARCHITECTURE.md' && /禁止恢复/.test(line)) return true;
     if (rel.startsWith('docs/architecture/') && /禁止恢复/.test(line)) return true;
     if (rel === 'docs/product/acceptance-ledger.md' && /U02-delete-embedding|禁止恢复/.test(line)) return true;
   }
@@ -115,7 +115,7 @@ const isExactSymbolAllowlist = (rel, line, symbol) => {
     || symbol === FORBIDDEN.askTurn
     || symbol === FORBIDDEN.legacyFallback
   ) {
-    if (rel === 'DESIGN.md' && /\|\s*`/.test(line)) return true;
+    if (rel === 'ARCHITECTURE.md' && /\|\s*`/.test(line)) return true;
     if (rel === 'docs/product/acceptance-ledger.md' && /U03-/.test(line)) return true;
   }
 

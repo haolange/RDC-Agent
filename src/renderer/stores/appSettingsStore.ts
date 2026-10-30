@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useRuntimePermissionStore } from './runtimePermissionStore';
 import { DEFAULT_SETTINGS } from './defaultAppSettings';
 import {
   beginAgentDefinitionSave,
@@ -32,7 +33,6 @@ const agentDefinitionMutations = new AgentDefinitionMutationCoordinator(
   (request) => window.electronAPI.settings.saveAgentDefinition(request),
 );
 
-let permissionModeRevision = 0;
 
 export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
@@ -154,19 +154,11 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
     });
   },
   setAgentPermissionMode: async (mode) => {
-    const previousMode = get().settings.agentRuntime?.permissions?.mode ?? 'default';
-    if (previousMode === mode) return;
-    const revision = ++permissionModeRevision;
-    set((state) => ({ settings: withPermissionMode(state.settings, mode), hydrated: true }));
     try {
-      const nextSettings = await window.electronAPI.settings.set({ agentRuntime: { permissions: { mode } } });
-      if (revision !== permissionModeRevision) return;
-      set({ settings: nextSettings, hydrated: true });
-    } catch (error) {
-      if (revision === permissionModeRevision) {
-        set((state) => ({ settings: withPermissionMode(state.settings, previousMode) }));
-      }
-      throw error;
+      await useRuntimePermissionStore.getState().saveMode(mode);
+    } finally {
+      const snapshot = useRuntimePermissionStore.getState().snapshot;
+      if (snapshot) set((state) => ({ settings: withPermissionMode(state.settings, snapshot.mode) }));
     }
   },
   setCompactionThresholdPercent: async (percent) => {

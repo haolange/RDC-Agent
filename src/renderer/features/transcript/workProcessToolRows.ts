@@ -155,7 +155,9 @@ const createToolApprovalPresentation = (
   const messageSource = approval.status === 'approved'
     ? (isGenericDecisionText(answer) ? '' : answer)
     : (isGenericDecisionText(answer) ? reason : answer) || reason;
-  const message = compactText(messageSource || fallbackApprovalMessage(approval.status, t), 300);
+  const message = approval.status === 'cancelled' && approval.errorCode === 'PERMISSION_MODE_CHANGED'
+    ? t('chat.workProcessApprovalModeChangedMessage')
+    : compactText(messageSource || fallbackApprovalMessage(approval.status, t), 300);
   const riskKey = approval.risk === 'low' ? 'chat.workProcessRiskLow' : approval.risk === 'medium' ? 'chat.workProcessRiskMedium' : approval.risk === 'high' ? 'chat.workProcessRiskHigh' : undefined;
   const metaLines = [
     approval.risk ? (riskKey ? t(riskKey) : t('chat.approvalRisk', { risk: approval.risk })) : '',
@@ -173,7 +175,8 @@ const createToolApprovalPresentation = (
 
 const getToolApprovalVerb = (approval: ConversationToolApproval, isAutoReview: boolean, t: Translator): string => {
   const { status, reviewMethod, errorCode } = approval;
-  if (status === 'cancelled') return t('chat.workProcessApprovalCancelled');
+  if (status === 'cancelled') return t(errorCode === 'PERMISSION_MODE_CHANGED'
+    ? 'chat.workProcessApprovalModeChanged' : 'chat.workProcessApprovalCancelled');
   if (status === 'rejected' && errorCode) return t('chat.workProcessReviewIncomplete');
   if (isAutoReview && reviewMethod === 'rule') return status === 'pending' ? t('chat.workProcessRulePending') : status === 'approved' ? t('chat.workProcessRuleApproved') : t('chat.workProcessRuleRejected');
   if (isAutoReview && reviewMethod === 'model') return status === 'pending' ? t('chat.workProcessModelPending') : status === 'approved' ? t('chat.workProcessModelApproved') : t('chat.workProcessModelRejected');
@@ -207,7 +210,7 @@ const isApprovalRequiredPreview = (parsedResult: unknown, raw?: string): boolean
 
 const deriveToolStatus = (call: ConversationToolCall, parsedResult: unknown): WorkProcessRowStatus => {
   if (call.status !== 'complete' && call.status !== 'error') {
-    if (call.status === 'cancelled' || call.approval?.status === 'cancelled') return 'cancelled';
+    if (call.status === 'cancelled' || (call.approval?.status === 'cancelled' && call.approval.errorCode !== 'PERMISSION_MODE_CHANGED')) return 'cancelled';
     if (call.approval?.status === 'pending') return 'running';
     if (isToolApprovalRejected(call.approval)) return 'error';
   }
