@@ -1,3 +1,4 @@
+import { Details } from '../../../../ui/Details';
 import { KnowledgeIcon } from '../parts/KnowledgeIcon';
 import { Checkbox } from '../../../../ui/Checkbox';
 import { EmptyState } from '../../../../ui/EmptyState';
@@ -59,10 +60,9 @@ export function SpacesColumn({ state }: SpacesColumnProps) {
         ))}
       </div>
       <div className="knowledge-center-sidebar-footer">
-        <details className="knowledge-center-index-disclosure" data-testid="knowledge-center-index-tools">
-          <summary>{t('knowledgeCenter.indexTools')}</summary>
+        <Details className="knowledge-center-index-disclosure" data-testid="knowledge-center-index-tools" summary={t('knowledgeCenter.indexTools')}>
           <IndexStatusBar index={state.index} rebuilding={state.rebuilding} onRebuild={() => void state.rebuildIndex()} />
-        </details>
+        </Details>
       </div>
       {state.error && (
         <InlineError className="knowledge-center-error" data-severity="error" data-testid="knowledge-center-error">

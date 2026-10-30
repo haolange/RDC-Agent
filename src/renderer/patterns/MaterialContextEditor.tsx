@@ -1,6 +1,7 @@
+import { Details } from '../ui/Details';
 import React, { useState } from 'react';
 import { MaterialContextSchema, type MaterialContext } from '@shared/types/materialContext';
-import { Button, Input, Textarea } from '../ui';
+import { Button, Input, Textarea, Select } from '../ui';
 import { TaskDialog } from '../ui/TaskDialog';
 import { useI18n } from '../i18n';
 import './MaterialContextEditor.css';
@@ -59,20 +60,30 @@ export const MaterialContextEditor: React.FC<{
       <label>{t('material.intent')}
         <Textarea value={draft.intent ?? ''} onChange={event => setDraft(current => ({ ...current, intent: event.target.value }))} maxLength={2000} />
       </label>
-      <details><summary>{t('material.locationAndComparison')}</summary>
+      <Details summary={t('material.locationAndComparison')}>
         <label>{t('material.documentLocation')}<Input value={draft.documentLocation ?? ''} onChange={event => setDraft(current => ({ ...current, documentLocation: event.target.value }))} maxLength={1000} /></label>
         <div className="material-context-row">
           <label>{t('material.startSeconds')}<Input type="number" min="0" value={draft.timeRange?.startSeconds ?? ''} onChange={event => setDraft(current => ({ ...current, timeRange: event.target.value === '' ? undefined : { startSeconds: Number(event.target.value), endSeconds: current.timeRange?.endSeconds ?? Number(event.target.value)+1 } }))} /></label>
           <label>{t('material.endSeconds')}<Input type="number" min="0" value={draft.timeRange?.endSeconds ?? ''} onChange={event => setDraft(current => ({ ...current, timeRange: event.target.value === '' ? undefined : { startSeconds: current.timeRange?.startSeconds ?? 0, endSeconds: Number(event.target.value) } }))} /></label>
         </div>
-        <label>{t('material.comparisonRole')}<select value={draft.comparison?.role ?? ''} onChange={event => setDraft(current => ({ ...current, comparison: event.target.value ? { group: current.comparison?.group ?? '', conditions: current.comparison?.conditions ?? '', role: event.target.value as NonNullable<MaterialContext['comparison']>['role'] } : undefined }))}>
-          <option value="">{t('material.noComparison')}</option><option value="baseline">{t('material.baseline')}</option><option value="reference">{t('material.reference')}</option><option value="after">{t('material.after')}</option><option value="diff">{t('material.diff')}</option>
-        </select></label>
+        <label>{t('material.comparisonRole')}<Select dataTestId="material-comparison-role" ariaLabel={t('material.comparisonRole')}
+          value={draft.comparison?.role ?? ''}
+          options={[
+            { value: '', label: t('material.noComparison') },
+            { value: 'baseline', label: t('material.baseline') },
+            { value: 'reference', label: t('material.reference') },
+            { value: 'after', label: t('material.after') },
+            { value: 'diff', label: t('material.diff') },
+          ]}
+          onChange={role => setDraft(current => ({ ...current, comparison: role ? {
+            group: current.comparison?.group ?? '', conditions: current.comparison?.conditions ?? '',
+            role: role as NonNullable<MaterialContext['comparison']>['role'],
+          } : undefined }))} /></label>
         {draft.comparison && <>
           <label>{t('material.comparisonGroup')}<Input value={draft.comparison.group} maxLength={120} onChange={event => setDraft(current => ({ ...current, comparison: { ...current.comparison!, group: event.target.value } }))} /></label>
           <label>{t('material.comparisonConditions')}<Textarea value={draft.comparison.conditions} maxLength={2000} onChange={event => setDraft(current => ({ ...current, comparison: { ...current.comparison!, conditions: event.target.value } }))} /></label>
         </>}
-      </details>
+      </Details>
       {error && <p role="alert">{error}</p>}
   </TaskDialog>;
 };

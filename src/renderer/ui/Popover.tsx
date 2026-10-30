@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../lib/cn';
+import { placeAnchoredSurface } from '../lib/anchoredSurface';
 import { useDynStyle } from '../lib/useDynStyle';
 import { isTopOverlayLayer, useOverlayLayer } from '../lib/overlayStack';
 import './Popover.css';
@@ -67,16 +68,8 @@ export function Popover({
     if (!triggerRect || !content) return;
     const width = content.offsetWidth;
     const height = content.offsetHeight;
-    let left = align === 'end' ? triggerRect.right - width : triggerRect.left;
-    let top = side === 'top' ? triggerRect.top - height - ANCHOR_GAP : triggerRect.bottom + ANCHOR_GAP;
-    if (top + height > window.innerHeight - VIEWPORT_MARGIN) {
-      top = triggerRect.top - height - ANCHOR_GAP;
-    }
-    if (top < VIEWPORT_MARGIN) {
-      top = triggerRect.bottom + ANCHOR_GAP;
-    }
-    left = Math.min(Math.max(VIEWPORT_MARGIN, left), window.innerWidth - width - VIEWPORT_MARGIN);
-    top = Math.min(Math.max(VIEWPORT_MARGIN, top), window.innerHeight - height - VIEWPORT_MARGIN);
+    const { left, top } = placeAnchoredSurface(triggerRect, { width, height },
+      { width: window.innerWidth, height: window.innerHeight }, align, side, VIEWPORT_MARGIN, ANCHOR_GAP);
     setCoords({ left, top, ready: true });
   }, [align, side]);
 
@@ -91,6 +84,7 @@ export function Popover({
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
+      if (!isTopOverlayLayer(layerId)) return;
       const target = event.target as Node;
       if (contentRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
       onOpenChange(false);
@@ -104,12 +98,18 @@ export function Popover({
       triggerRef.current?.focus();
     };
     const onReposition = () => updatePosition();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(onReposition);
+    if (contentRef.current) observer?.observe(contentRef.current);
+    if (triggerRef.current) observer?.observe(triggerRef.current);
+    document.fonts?.addEventListener('loadingdone', onReposition);
     window.addEventListener('pointerdown', onPointerDown);
     // Capture phase so the popover wins the key before any modal below it.
     window.addEventListener('keydown', onKeyDown, true);
     window.addEventListener('resize', onReposition);
     window.addEventListener('scroll', onReposition, true);
     return () => {
+      observer?.disconnect();
+      document.fonts?.removeEventListener('loadingdone', onReposition);
       window.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('resize', onReposition);
@@ -131,7 +131,7 @@ export function Popover({
     },
     onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
       trigger.props.onKeyDown?.(event);
-      if (event.key === 'Escape' && open) {
+      if (event.key === 'Escape' && open && isTopOverlayLayer(layerId)) {
         event.preventDefault();
         onOpenChange(false);
         triggerRef.current?.focus();

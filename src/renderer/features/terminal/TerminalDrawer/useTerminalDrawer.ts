@@ -15,7 +15,7 @@ export function useTerminalDrawer() {
   const resize = useTerminalDrawerResize();
 
   const activityBodyRef = useRef<HTMLDivElement>(null);
-  const filterMenuRef = useRef<HTMLDivElement>(null);
+
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const isOpen = useTerminalStore((state) => state.isOpen);
@@ -69,24 +69,8 @@ export function useTerminalDrawer() {
   }, [filteredEntries.length, followOutput]);
 
   useEffect(() => {
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      const targetElement = event.target as Element | null;
-      if (
-        filterMenuRef.current?.contains(target)
-        || targetElement?.closest?.('.dropdown-select-menu')
-      ) {
-        return;
-      }
-      setFiltersOpen(false);
-    };
-
-    if (filtersOpen) {
-      document.addEventListener('mousedown', handlePointerDown);
-    }
-
-    return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [filtersOpen]);
+    if (!isOpen) setFiltersOpen(false);
+  }, [isOpen]);
 
   const handleCopyEntry = useCallback((entry: RuntimeLogEntry) => {
     void window.electronAPI?.appShell.copyText(buildEntryCopy(entry));
@@ -100,7 +84,6 @@ export function useTerminalDrawer() {
     t,
     terminalHeight: resize.terminalHeight,
     activityBodyRef,
-    filterMenuRef,
     filtersOpen,
     setFiltersOpen,
     isResizing: resize.isResizing,

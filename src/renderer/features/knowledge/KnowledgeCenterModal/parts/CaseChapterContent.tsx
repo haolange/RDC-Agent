@@ -36,13 +36,13 @@ function StructuredValue({ value, chinese, depth = 0 }: { value: Value; chinese:
   if (value === null || typeof value !== 'object') return <span>{value === null ? 'null' : String(value)}</span>;
   if (depth > 12) return <pre className="knowledge-case-raw">{JSON.stringify(value, null, 2)}</pre>;
   if (Array.isArray(value)) {
-    if (!value.length) return <code>[]</code>;
+    if (!value.length) return <span>{chinese ? '没有条目' : 'No items'}</span>;
     const compact = isCompactList(value);
     return <ul className={`knowledge-case-values${compact ? ' is-compact' : ''}`}>{value.map((item, index) => (
       <li key={index}><StructuredValue value={item} chinese={chinese} depth={depth + 1} /></li>
     ))}</ul>;
   }
-  if (!Object.keys(value).length) return <code>{'{}'}</code>;
+  if (!Object.keys(value).length) return <span>{chinese ? '没有字段' : 'No fields'}</span>;
   return <dl className="knowledge-case-fields">{Object.entries(value).map(([key, item]) => (
     <div key={key} className={!isCompactList(item) && (typeof item === 'object' && item !== null || String(item).length > 75) ? 'is-wide' : undefined}>
       <dt title={key}>{labels[key]?.[chinese ? 1 : 0] ?? key}</dt>

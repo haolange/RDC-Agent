@@ -1,3 +1,4 @@
+import { Details } from '../../../../ui/Details';
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../../../../ui/Icon';
 
@@ -23,16 +24,15 @@ export function LocalToolDisclosure({
   defaultOpen = false,
 }: LocalToolDisclosureProps) {
   return (
-    <details className="settings-local-tool" data-testid={testId} open={defaultOpen}>
-      <summary className="settings-local-tool-summary">
+    <Details className="settings-local-tool" data-testid={testId} open={defaultOpen} summaryClassName="settings-local-tool-summary" summary={<>
         <Icon name={icon} size={16} className="settings-local-tool-icon" />
         <span className="settings-local-tool-copy">
           <span className="settings-local-tool-title">{title}</span>
           <span className="settings-local-tool-description">{description}</span>
         </span>
-        <Icon name="chevron-down" size={14} className="settings-local-tool-caret" />
-      </summary>
+
+       </>}>
       <div className="settings-local-tool-body">{children}</div>
-    </details>
+    </Details>
   );
 }

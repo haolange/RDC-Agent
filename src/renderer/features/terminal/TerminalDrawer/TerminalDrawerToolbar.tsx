@@ -1,6 +1,8 @@
 import { Button } from '../../../ui/Button';
 import React from 'react';
 import Select from '../../../ui/Select';
+import { Popover } from '../../../ui/Popover';
+import { SearchField } from '../../../ui/SearchField';
 import {
   type RuntimeNamespaceFilter,
   type RuntimeSeverityFilter,
@@ -16,7 +18,6 @@ interface TerminalDrawerToolbarProps {
 export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm }) => {
   const {
     t,
-    filterMenuRef,
     filtersOpen,
     setFiltersOpen,
     effectiveScopeFilter,
@@ -51,19 +52,14 @@ export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm
           />
         </label>
 
-        <div ref={filterMenuRef} className="runtime-terminal-filter-menu">
-          <Button variant="ghost" size="sm"
+        <Popover open={filtersOpen && vm.isOpen} onOpenChange={setFiltersOpen} align="end"
+          className="runtime-terminal-filter-popover" trigger={<Button variant="ghost" size="sm"
             type="button"
             className={`runtime-terminal-tool-button ${filtersOpen ? 'is-active' : ''}`}
             data-testid="runtime-terminal-filter-toggle"
-            aria-haspopup="menu"
-            aria-expanded={filtersOpen}
-            onClick={() => setFiltersOpen((current) => !current)}
           >
             {t('terminal.filters')}
-          </Button>
-          {filtersOpen && (
-            <div className="runtime-terminal-filter-popover" role="menu">
+          </Button>}>
               <label className="runtime-terminal-select stacked">
                 <span>{t('terminal.source')}</span>
                 <Select
@@ -94,14 +90,12 @@ export const TerminalDrawerToolbar: React.FC<TerminalDrawerToolbarProps> = ({ vm
                   onChange={(nextValue) => setDensity(nextValue as TerminalDensity)}
                 />
               </label>
-            </div>
-          )}
-        </div>
+        </Popover>
 
         <label className="runtime-terminal-search">
           <span className="runtime-terminal-search-label">{t('terminal.search')}</span>
-          <input
-            type="search"
+          <SearchField
+            aria-label={t('terminal.search')}
             value={query}
             data-testid="runtime-terminal-search"
             placeholder={t('terminal.search')}

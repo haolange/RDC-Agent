@@ -30,3 +30,9 @@ Rules:
 | Context / Material | `patterns/ContextBreakdownPopover`、`MaterialContextEditor` / `Viewer` 负责展示；Material 使用共享 TaskDialog | Context 展开值和写入回调由 Composer owner 提供；pattern 不写业务 store |
 
 各 feature README 说明局部边界。`pnpm run test:coverage:renderer` 单独输出 renderer 覆盖统计；它不替代真实工作台验收，也不改变 main/shared coverage ratchet。全局 CSS 不承载 feature/pattern 专属选择器；AST 分层门禁检查静态导入、重导出、动态导入与 pattern store 写入。
+
+### UI 组件与内部活文档
+
+`renderer/ui` 持有基础输入、选择、披露、菜单、弹层与反馈；`renderer/lib/anchoredSurface` 持有共享视口几何。`patterns` 复用基础组件组织跨页面内容，业务写入继续经调用方回调。SettingsField/资源列表编辑器、Composer Effort/Max、Transcript 历史轨道与计划、Right Rail 投影留在各自领域。
+
+`designs/rdc-agent-design-system` 作为独立开发入口导入上述生产组件与主题编译逻辑；不被 renderer 产品入口导入、不进入发行包，不以示例状态代替应用验收。

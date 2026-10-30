@@ -70,6 +70,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const lastCapabilityKeyRef = useRef<string | null>(null);
   const lastSessionControlsKeyRef = useRef<string>('none');
   const lastRouteIdentityRef = useRef<string | null>(null);
+  const pendingSessionRestoreRef = useRef(false);
   const retryCapability = useEffectiveModelCapability(
     agentId,
     routeFingerprint,
@@ -95,6 +96,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
       if (!sessionChanged && previousCapabilityKey) rememberControls(previousCapabilityKey, store.turnControls);
       lastCapabilityKeyRef.current = null;
       if (sessionChanged || sessionControlsChanged) {
+        pendingSessionRestoreRef.current = true;
         setTurnControls(buildInitialTurnControls(null, sessionControls));
       }
       lastSessionIdRef.current = sessionId;
@@ -114,13 +116,14 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
       previousCapabilityKey,
       nextCapabilityKey: capabilityKey,
       sessionChanged,
-      sessionControlsChanged,
+      sessionControlsChanged: sessionControlsChanged || pendingSessionRestoreRef.current,
       capability,
       sessionControls,
       currentControls: store.turnControls,
       rememberedControls,
       sameModelRoute: lastRouteIdentityRef.current === routeIdentity,
     }));
+    pendingSessionRestoreRef.current = false;
 
     lastSessionIdRef.current = sessionId;
     lastCapabilityKeyRef.current = capabilityKey;

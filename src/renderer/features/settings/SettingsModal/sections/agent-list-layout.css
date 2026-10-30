@@ -71,7 +71,7 @@
   flex: 0 0 auto;
 }
 
-@container settings-panel (max-width: 60rem) {
+@container settings-panel (max-width: 48rem) {
   .settings-page-agents .settings-manifest-list-column {
     height: auto;
     max-height: 15rem;

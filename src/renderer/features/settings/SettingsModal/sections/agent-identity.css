@@ -109,7 +109,7 @@
   gap: var(--space-3);
 }
 
-@container settings-panel (max-width: 60rem) {
+@container settings-panel (max-width: 48rem) {
   .settings-agent-flags,
   .settings-page-agents .settings-agent-flags {
     width: 100%;

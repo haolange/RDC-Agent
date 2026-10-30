@@ -222,21 +222,18 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                 <span className="settings-field-label">{t('settings.agentEnabled')}</span>
                 <span className="settings-switch-row">
                   <Switch checked={selectedAgent.enabled} onCheckedChange={(enabled) => onUpdateAgent({ enabled })} aria-label={t('settings.agentEnabled')} />
-                  <span>{selectedAgent.enabled ? t('settings.enabled') : t('settings.disabled')}</span>
                 </span>
               </label>
               <label className="settings-agent-flag">
                 <span className="settings-field-label">{t('settings.userInvocable')}</span>
                 <span className="settings-switch-row">
                   <Switch checked={selectedAgent.userInvocable} onCheckedChange={(userInvocable) => onUpdateAgent({ userInvocable })} aria-label={t('settings.userInvocable')} />
-                  <span>{selectedAgent.userInvocable ? t('settings.enabled') : t('settings.disabled')}</span>
                 </span>
               </label>
               <label className="settings-agent-flag">
                 <span className="settings-field-label">{t('settings.disableModelInvocation')}</span>
                 <span className="settings-switch-row">
                   <Switch checked={selectedAgent.disableModelInvocation} onCheckedChange={(disableModelInvocation) => onUpdateAgent({ disableModelInvocation })} aria-label={t('settings.disableModelInvocation')} />
-                  <span>{selectedAgent.disableModelInvocation ? t('settings.enabled') : t('settings.disabled')}</span>
                 </span>
               </label>
             </div>

@@ -1,9 +1,10 @@
+import { OverflowFade } from '../../ui/OverflowFade';
 import { Button } from '../../ui/Button';
 import { MaterialContextEditor } from '../../patterns/MaterialContextEditor';
 import type { MaterialContext } from '@shared/types/materialContext';
 import React, { useEffect, useState } from 'react';
 import type { PendingAttachmentDraft } from '../../types/attachments';
-import { ellipsizeFileName, fileExtensionLabel, formatBytes } from '../../services/attachmentHelpers';
+import { fileExtensionLabel, formatBytes } from '../../services/attachmentHelpers';
 import { getAttachmentPreview } from '../../hooks/conversationPreview';
 import { useI18n } from '../../i18n';
 import { attachmentRejectKey } from './attachmentRejectCopy';
@@ -72,7 +73,7 @@ export const AttachmentCard: React.FC<{
       </div>
       <span className="composer-attachment-card-copy">
         <span className="composer-attachment-card-name" title={attachment.fileName}>
-          {ellipsizeFileName(attachment.fileName)}
+          <OverflowFade text={attachment.fileName} />
         </span>
         <span className="composer-attachment-card-meta">{meta}</span>
       </span>

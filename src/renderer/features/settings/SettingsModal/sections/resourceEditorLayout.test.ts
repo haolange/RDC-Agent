@@ -42,8 +42,8 @@ describe('resource editor layout contracts (not Browser geometry)', () => {
     expect(source('parts/settings-kit.css')).toMatch(/\.settings-resource-empty\.ui-empty-state\s*\{[^}]*border:[^}]*background:/);
   });
 
-  it('uses compact MCP empty states but fill for independent Skills, Policy and Hooks pages', () => {
-    expect(source('sections/RuntimeScopePanel.tsx')).toContain("emptyLayout={kind === 'skill' || kind === 'policy' || kind === 'hook' ? 'fill' : 'compact'}");
+  it('uses compact Policy and MCP empty states while Skills and Hooks fill their document area', () => {
+    expect(source('sections/RuntimeScopePanel.tsx')).toContain("emptyLayout={kind === 'skill' || kind === 'hook' ? 'fill' : 'compact'}");
     expect(source('sections/settings-page-layout.css')).toMatch(/\.settings-page-policy > \.settings-block\s*\{\s*flex: 0 0 auto;/);
   });
 

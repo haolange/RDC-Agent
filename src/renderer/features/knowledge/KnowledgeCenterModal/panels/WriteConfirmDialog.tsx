@@ -1,3 +1,4 @@
+import { Details } from '../../../../ui/Details';
 import { Button } from '../../../../ui/Button';
 import { Checkbox } from '../../../../ui/Checkbox';
 import { InlineError } from '../../../../ui/InlineError';
@@ -7,6 +8,7 @@ import { useI18n } from '../../../../i18n';
 import { ConflictRow } from '../parts/ConflictRow';
 import type { useKnowledgeWriteConfirm } from '../useKnowledgeWriteConfirm';
 import { WriteConfirmDiff } from './WriteConfirmDiff';
+import { formatKnowledgeTime } from '../knowledgeCenterLabels';
 
 interface WriteConfirmDialogProps {
   write: ReturnType<typeof useKnowledgeWriteConfirm>;
@@ -70,7 +72,7 @@ export function WriteConfirmDialog({ write }: WriteConfirmDialogProps) {
         )}
         {fact(
           t('knowledgeCenter.confirmVersion'),
-          write.after.updatedAt != null ? String(write.after.updatedAt) : '—',
+          formatKnowledgeTime(write.after.updatedAt) || '—',
         )}
         {fact(
           t('knowledgeCenter.confirmConflict'),
@@ -109,13 +111,12 @@ export function WriteConfirmDialog({ write }: WriteConfirmDialogProps) {
         <span className="knowledge-write-hint">{t('knowledgeCenter.confirmChangeReasonRequired')}</span>
       </label>
 
-      <details className="knowledge-write-basis">
-        <summary>{t('knowledgeCenter.confirmRollbackBasis')}</summary>
+      <Details className="knowledge-write-basis" summary={t('knowledgeCenter.confirmRollbackBasis')}>
         <p className="knowledge-write-basis-value">
           {write.basis ? `${write.basis.hash} · ${write.basis.bytes}` : '—'}
         </p>
         <p className="knowledge-write-hint">{t('knowledgeCenter.confirmNoAutoRollback')}</p>
-      </details>
+      </Details>
 
       {write.block === 'draft-to-verified' && <InlineError>{t('knowledgeCenter.confirmBlockedLifecycle')}</InlineError>}
       {write.block?.startsWith('missing-chapters') && <InlineError>{t('knowledgeCenter.confirmMissingChapters')}</InlineError>}

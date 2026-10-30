@@ -17,6 +17,8 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "design:dev": "vite --config designs/rdc-agent-design-system/vite.config.ts",
+    "design:build": "vite build --config designs/rdc-agent-design-system/vite.config.ts",
     "dev": "node scripts/launch-rdc-agent.mjs --mode desktop-dev",
     "dev:renderer": "vite --config vite.renderer.config.ts",
     "build": "electron-vite build",

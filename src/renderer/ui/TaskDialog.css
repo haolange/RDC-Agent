@@ -16,7 +16,7 @@
   display: flex;
   flex-direction: column;
   width: min(var(--task-dialog-width), 100%);
-  max-height: min(88vh, 60rem);
+  max-height: min(calc(100dvh - var(--space-6) * 2), 60rem);
   border: 1px solid var(--token-border-card);
   border-radius: var(--radius-xl);
   background: var(--token-bg-overlay);
@@ -34,6 +34,7 @@
 }
 
 .task-dialog-header {
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   gap: var(--space-4);
@@ -76,6 +77,7 @@
 }
 
 .task-dialog-footer {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: flex-end;

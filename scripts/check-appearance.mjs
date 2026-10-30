@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scriptExists, scriptRead, scriptReadCssBundle } from './renderer-contract.mjs';
+import './check-component-catalog.mjs';
 
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
@@ -287,5 +288,26 @@ assert(
 );
 assert(dropdownPrimitives.includes('dropdown-select-option-check-icon'), 'Select selected state must use a checkmark icon');
 assert(!dropdownPrimitives.includes('●'), 'Select must not use a bullet as the selected marker');
+
+// Keep the shared component path authoritative for ordinary configuration disclosure.
+for (const file of [
+  'src/renderer/features/settings/SettingsModal/sections/RdcCliInvokerSettingsFields.tsx',
+  'src/renderer/features/settings/SettingsModal/sections/ProviderConnectDialog.tsx',
+  'src/renderer/features/settings/SettingsModal/sections/LocalToolDisclosure.tsx',
+  'src/renderer/features/knowledge/KnowledgeCenterModal/columns/SpacesColumn.tsx',
+  'src/renderer/patterns/MaterialContextEditor.tsx',
+]) {
+  const source = scriptRead(file);
+  assert(source.includes('<Details'), `${file} must use shared Details`);
+  assert(!/<details\b|<select\b/.test(source), `${file} must not restore native unstyled controls`);
+}
+for (const file of ['Popover.tsx', 'Select/index.tsx', 'ContextMenu/index.tsx']) {
+  assert(scriptRead(`src/renderer/ui/${file}`).includes('placeAnchoredSurface'), `${file} must share viewport geometry`);
+}
+const livePreview = scriptRead('designs/rdc-agent-design-system/preview.tsx');
+assert(livePreview.includes('src/renderer/ui') && livePreview.includes('applyChromeTheme'), 'Live preview must reuse production controls and theme compiler');
+assert(!scriptExists('designs/rdc-agent-design-system/Design System Preview.html'), 'Duplicated HTML preview must remain retired');
+const settingsShell = scriptRead('src/renderer/features/settings/SettingsModal/sections/settings-shell.css');
+assert(!settingsShell.includes('aspect-ratio') && !/height:[^;]*100vw/.test(settingsShell), 'Settings height must be independent of width');
 
 console.log('check:appearance passed');

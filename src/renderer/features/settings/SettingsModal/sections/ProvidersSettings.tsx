@@ -1,3 +1,4 @@
+import { Details } from '../../../../ui/Details';
 import { SectionHeader } from '../../../../ui/SectionHeader';
 import React, { useMemo, useState } from 'react';
 import type { LlmProviderEntry } from '@shared/types/settings';
@@ -119,16 +120,15 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
       ))}
 
       {upcoming.length > 0 ? (
-        <details className="settings-provider-upcoming" data-testid="settings-provider-upcoming">
-          <summary className="settings-provider-upcoming-summary">
+        <Details className="settings-provider-upcoming" data-testid="settings-provider-upcoming" summaryClassName="settings-provider-upcoming-summary" summary={<>
             <span>{t('settings.providers.upcoming')}</span>
             <span>{t('settings.providerCount', { count: upcoming.length })}</span>
-          </summary>
+           </>}>
           <div className="settings-provider-upcoming-body">
             <div className="settings-section-subtitle">{t('settings.providers.upcomingHint')}</div>
             <div className="settings-provider-grid">{upcoming.map(renderCard)}</div>
           </div>
-        </details>
+        </Details>
       ) : null}
     </>
   );

@@ -54,7 +54,7 @@ Appearance 详细规则见 docs/ui/appearance-checklist.md；禁止恢复 transl
 - 任何 `:hover` 必须配 `:focus-visible`；禁止 `outline: none` 而不提供等效焦点样式。
 - 新组件必须覆盖所有交互状态、通过 CSS 变量控制 variant、不使用内联 style、文件行数 ≤300/200。
 - 渲染层分层与依赖方向由 `pnpm run check:renderer-structure` 与 ESLint `no-restricted-imports` 强制：`ui → lib`；`patterns → ui/lib/stores`（可读 store，不得写 store、不得直调 IPC）；`features` 不得横向 import 其它 feature，也不得 import `app` / `shell`；`stores` / `services` / `hooks` 不得 import `features` / `ui` / `patterns`；组件（`.tsx`）不得直调 `window.electronAPI` / `getElectronApi`。
-- 视觉参考：`designs/rdc-agent-design-system/Design System Preview.html`。
+- 视觉参考：`designs/rdc-agent-design-system/index.html`。
 
 ## 产物与命名治理
 

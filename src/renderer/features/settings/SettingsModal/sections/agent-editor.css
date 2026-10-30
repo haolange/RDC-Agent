@@ -93,7 +93,7 @@
   overflow: auto;
 }
 
-@container settings-panel (max-width: 60rem) {
+@container settings-panel (max-width: 48rem) {
   .settings-manifest-editor,
   .settings-page-agents .settings-manifest-editor {
     height: auto;
@@ -103,7 +103,7 @@
 
   .settings-manifest-editor-head,
   .settings-page-agents .settings-manifest-editor-head {
-    flex-direction: column;
+    flex-wrap: wrap;
   }
 
   .settings-page-agents .settings-manifest-editor-actions {
@@ -115,7 +115,8 @@
   .settings-manifest-editor-body {
     flex: 0 0 auto;
     height: auto;
-    max-height: min(42rem, 72vh);
+    max-height: none;
+    overflow: visible;
   }
 }
 

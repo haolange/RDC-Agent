@@ -1,7 +1,6 @@
 import React, { useRef } from 'react';
 import type { ConversationPlanReview } from '@shared/types/planReview';
 import { useI18n } from '../../i18n';
-import { usePlanReader } from './PlanReaderHost';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { planPreview } from './planPreview';
 import { usePlanPreviewOverflow } from './usePlanPreviewOverflow';
@@ -17,13 +16,13 @@ const STATUS_KEY = {
 
 export const PlanCard: React.FC<{
   plan: ConversationPlanReview;
-}> = ({ plan }) => {
+  onOpen: (plan: ConversationPlanReview) => void;
+}> = ({ plan, onOpen }) => {
   const { t } = useI18n();
-  const open = usePlanReader();
   const readButton = useRef<HTMLElement>(null);
   const preview = planPreview(plan);
   const { previewRef, overflowing } = usePlanPreviewOverflow(preview);
-  const showPlan = () => { readButton.current?.focus(); open(plan); };
+  const showPlan = () => { readButton.current?.focus(); onOpen(plan); };
 
   return (
     <>

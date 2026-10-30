@@ -150,6 +150,8 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 
 组件按实际职责和状态所有权划分：feature 专属效果与交互留在所属 feature；只有多个独立消费者共享的行为才上提为 pattern。Pattern 的业务写入经调用方传入回调，不能通过取出 store action 间接写入。展示组件接收最小数据与动作；跨 feature 组合由 app 完成。组件样式就近维护，全局 CSS 只承载基础与全局布局；不得使用数字分段文件或旧路径转发掩盖职责。结构重组须保持已有视觉、交互与 IPC/持久化契约，局部体验修正单独验收。
 
+内部组件活文档直接复用生产视图和主题编译逻辑，独立开发入口不进入产品导航或发行包。组件示例不连接真实配置、模型或 RDC，不能替代真实产品链路验收。通用披露/浮层几何在 ui/lib 收敛；Composer Max 特殊滑条及核心运行光效仍由所属领域持有唯一实现。
+
 **Token 合规（裁决）**：组件 CSS 只允许语义 token 与刻度变量；primitive `--color-*`、hex 字面量、px 字号 / 间距 / 圆角、`!important` 一律禁止。`backdrop-filter` 禁止字面量 `blur(...)`；模态遮罩只能写 `var(--modal-backdrop-filter)`。豁免仅限 token 定义层与全局 chrome 层。门禁：`pnpm run check:design-tokens`。受门禁锁定的 renderer 文件路径集中登记在 [`scripts/fidelity/renderer-contract.json`](scripts/fidelity/renderer-contract.json)。
 
 **渲染层目录（裁决 / 目标态）**：

@@ -45,7 +45,7 @@
   min-height: 0;
 }
 
-@container settings-panel (max-width: 60rem) {
+@container settings-panel (max-width: 48rem) {
   .settings-page-hooks .settings-resource-list-column {
     max-height: calc(var(--control-height-md) * 2);
   }
@@ -76,7 +76,7 @@
   font-size: var(--text-sm);
 }
 
-@container settings-panel (max-width: 60rem) {
+@container settings-panel (max-width: 48rem) {
   .settings-page-agents {
     display: block;
     flex: 0 0 auto;
@@ -87,14 +87,18 @@
 
 @container settings-panel (max-width: 48rem) {
   .settings-profile-actions {
-    justify-content: stretch;
+    justify-content: flex-start;
   }
 
   .settings-profile-actions .button {
-    width: 100%;
+    width: auto;
   }
 
   .settings-runtime-actions {
     flex-wrap: wrap;
   }
+}
+
+.settings-page-policy > .settings-runtime-scope:has(.settings-resource-empty) {
+  flex: 0 0 auto;
 }

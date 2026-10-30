@@ -121,6 +121,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.color-field-hex.input {
+  padding-inline: var(--space-1);
+}
+
 @media (max-width: 720px) {
   .color-field--grid {
     grid-template-columns: auto;

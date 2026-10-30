@@ -756,7 +756,6 @@ runtime-terminal-entry-spacer
 runtime-terminal-entry-summary
 runtime-terminal-entry-time
 runtime-terminal-entry-title
-runtime-terminal-filter-menu
 runtime-terminal-filter-popover
 runtime-terminal-resize-handle
 runtime-terminal-search
@@ -908,7 +907,6 @@ settings-language-section
 settings-link
 settings-local-tool
 settings-local-tool-body
-settings-local-tool-caret
 settings-local-tool-copy
 settings-local-tool-description
 settings-local-tool-form

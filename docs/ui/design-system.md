@@ -7,7 +7,7 @@
 3. [`AGENTS.md`](../../AGENTS.md) — token / 按钮 / Appearance 执行纪律
 4. [`src/renderer/styles/design-system.css`](../../src/renderer/styles/design-system.css) — primitive + semantic token 定义
 5. [`src/shared/theme/`](../../src/shared/theme/) — preset catalog、`ThemeChromeCompiler`、`rdc-theme-v1`、compose accent 派生
-6. [`designs/rdc-agent-design-system/Design System Preview.html`](../../designs/rdc-agent-design-system/Design%20System%20Preview.html) — 可交互预览
+6. [`designs/rdc-agent-design-system/index.html`](../../designs/rdc-agent-design-system/index.html) — 可交互预览
 
 ## 视觉定位
 
@@ -254,7 +254,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 
 ## 视觉参考
 
-`designs/rdc-agent-design-system/Design System Preview.html` 已经直接引用运行时 `src/renderer/styles/design-system.css` 与 `src/renderer/ui/kit.css`（含 `.button-*` 与分子 class）。`designs/tokens/*` 与独立 `styles.css` 已删除，不得恢复。
+`designs/rdc-agent-design-system/index.html` 是独立 Vite 开发入口（`pnpm run design:dev`），直接导入生产 React 组件、就近样式、`design-system.css` 与 `applyChromeTheme`。基础控件和 Composer / Transcript / Right Rail 领域组件共用真实实现；样例数据仅在页面内存，业务动作由样例回调接收，不连接配置、模型或 RDC。`design:build` 输出到开发缓存，不进入产品导航和发行包。旧手写 HTML 控件预览已退役，不恢复第二套组件或主题计算。
 
 ## 验证
 
@@ -349,3 +349,11 @@ Progress 标题采用 text-sm / normal / leading-normal，固定单行，剩余�
 过程根容器统一绘制连续1px border-muted轨道，起始节点至最后可见事件底边，不采用section分段、固定14px尾线或首尾DOM伪类拼接。单事件只显示起始点。灰色实心节点仅用于起始及真实叙述入口，蓝色活动点仅用于真实执行/流式输出，等待状态由卡片表达。节点直径6px、不透底，光环完整留在space-4槽位内，距内容space-1；轨道终点无箭头/拐角/装饰圆点。
 
 纯工具模型续接不增结构节点；Tasks/审批/Plan保持顺序和内容左边界，轨道连续经过。聚合收起显示一个蓝点与n项执行中，展开按实际工具标记活动；错误不能掩盖其他子项活动。子代理只为自己的工作过程建立独立轨道，不与父轨道串接。开合/持续新增/分页/窗口化均以当前内容和稳定事件身份重测，不使用首个挂载DOM推断逻辑起点；普通间距8px、叙述入口12px保持。
+
+### 披露、浮层与容器契约
+
+- `ui/Details` 是普通披露的唯一入口，inline 用于所属详情，panel 用于需要独立边界的内容。沿用原生 summary 的键盘语义；折叠隐藏内容但不卸载草稿，各项独立。Transcript 的受控工作轨道仍由 `WorkCardHeader` / `ScopedWorkDisclosure` 持有时间顺序与会话展开记忆。
+- 表单标签、说明、错误与动作各承担一项职责。标签已经说明的内容不重复写提示；权限、费用、未保存和前置约束不能收进详情。SettingsField 是设置领域组合，不为单一消费者创建新的基础表单框架。
+- Popover、Select、ContextMenu 共用 `lib/anchoredSurface`：安全边距、翻转和视口约束按实测尺寸计算。内容/锚点尺寸变化、窗口缩放、字体加载重新定位；菜单内部负责超高内容滚动。Escape 只消费顶层，关闭后恢复触发焦点。
+- Settings 独立约束宽高，不以宽高比例决定高度。桌面列表与编辑器分配剩余空间；窄容器改为顺序布局时正文由页面滚动，不能再给同一编辑正文独立高度上限。TaskDialog 头部和操作区不收缩，正文负责滚动。
+- 受保护动效包括 ActiveSignalText 左到右扫光、Composer `composerEnergyOrbit` 角度绕光/柔和外沿，以及 Max 档位的 `EffortMaxField` 粒子场、进入/退出与滑杆联动。它们只有一个生产实现；Max 的控制器、时间线和绘制仍归 Composer，基础组件不理解模型档位。活文档可复用效果组件，但不能以展示样例替代真实模型验证。

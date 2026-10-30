@@ -40,3 +40,26 @@ it('preserves an edited effort across review revisions and return to the editor,
     await render('other', { ...session, sessionId: 'other' }); expect(host.textContent).toBe('low');
   } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });
+
+it('restores persisted effort when a new session arrives while its capability is loading', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const selectableOffModel: EffectiveModel = { ...model, controls: { ...model.controls,
+    reasoning: { kind: 'levels', supportsOff: true, levels: ['low', 'high'], defaultSelection: 'low', wireProfile: { kind: 'none' } } } };
+  useTurnControlsStore.setState({ capabilityState: { status: 'ready', model: selectableOffModel }, controlsByCapabilityKey: {} });
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  const render = (currentSession: SessionRecord | null) => root.render(createElement(ComposerTurnControlsProvider,
+    { agentId: 'general', currentSession, children: createElement(Consumer) }));
+  try {
+    await act(async () => render(null));
+    expect(host.textContent).toBe('low');
+    await act(async () => {
+      useTurnControlsStore.setState({ capabilityState: { status: 'loading' } });
+      render(session);
+    });
+    await act(async () => useTurnControlsStore.setState({ capabilityState: { status: 'ready', model: selectableOffModel } }));
+    expect(host.textContent).toBe('low');
+    // The next ordinary render must keep the restored choice instead of a temporary Off.
+    await act(async () => render({ ...session }));
+    expect(host.textContent).toBe('low');
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
+});

@@ -1,7 +1,11 @@
 .ui-popover {
   position: fixed;
   z-index: var(--z-floating);
-  min-width: calc(var(--control-height-md) * 6);
+  min-width: min(calc(var(--control-height-md) * 6), calc(100vw - var(--space-4)));
+  max-height: calc(100dvh - var(--space-4));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
   max-width: min(360px, calc(100vw - var(--space-4)));
   padding: var(--space-1);
   border: 1px solid var(--token-border-card);

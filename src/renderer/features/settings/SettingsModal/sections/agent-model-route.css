@@ -77,7 +77,7 @@
   gap: var(--space-4);
 }
 
-@container settings-panel (max-width: 60rem) {
+@container settings-panel (max-width: 48rem) {
   .settings-agent-route-grid,
   .settings-model-route-row {
     grid-template-columns: minmax(0, 1fr);

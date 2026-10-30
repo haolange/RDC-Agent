@@ -1,3 +1,4 @@
+import { Details } from '../ui/Details';
 import React from 'react';
 import type { MaterialContext } from '@shared/types/materialContext';
 import { Button } from '../ui';
@@ -27,7 +28,7 @@ export const MaterialContextViewer: React.FC<{
         {item.material?.timeRange && <p>{item.material.timeRange.startSeconds}–{item.material.timeRange.endSeconds} s</p>}
         {item.material?.comparison && <p>{({ baseline: t('material.viewerBaseline'), reference: t('material.viewerReference'), after: t('material.viewerAfter'), diff: t('material.viewerDiff') })[item.material.comparison.role]} · {item.material.comparison.group}<br />{item.material.comparison.conditions}</p>}
         <Button variant="ghost" onClick={() => onOpenOriginal(item.id)}>{t('material.openOriginal')}</Button>
-        {item.hash && <details><summary>{t('material.fingerprint')}</summary><code>{item.hash}</code></details>}
+        {item.hash && <Details summary={t('material.fingerprint')}><code>{item.hash}</code></Details>}
       </figure>)}</div>
   </TaskDialog>;
 };

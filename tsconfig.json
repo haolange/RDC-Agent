@@ -22,6 +22,6 @@
     },
     "types": ["node"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "designs/rdc-agent-design-system/**/*.tsx", "designs/rdc-agent-design-system/**/*.ts"],
   "exclude": ["node_modules", "dist", "release"]
 }

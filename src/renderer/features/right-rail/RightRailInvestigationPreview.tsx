@@ -1,3 +1,4 @@
+import { Details } from '../../ui/Details';
 import React, { useEffect, useState } from 'react';
 import { TaskDialog } from '../../ui/TaskDialog';
 import { bareInvestigationHash, type InvestigationReadIpcResult, type InvestigationReport } from '@shared/types/renderdocInvestigation';
@@ -124,10 +125,9 @@ export const RightRailInvestigationPreview: React.FC<{
         {result?.record && manifest?.kind === 'report' ? (
           <>
             <RightRailReportView report={result.record as InvestigationReport} />
-            <details className="investigation-preview-source">
-              <summary>{t('control.rightRail.artifacts.preview.rawRecord')}</summary>
+            <Details className="investigation-preview-source" summary={t('control.rightRail.artifacts.preview.rawRecord')}>
               <pre className="investigation-preview-body">{body}</pre>
-            </details>
+            </Details>
           </>
         ) : body ? <pre className="investigation-preview-body">{body}</pre> : null}
         {manifest?.supersedes ? (

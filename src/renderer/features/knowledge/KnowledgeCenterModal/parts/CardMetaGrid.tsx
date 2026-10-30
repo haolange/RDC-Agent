@@ -1,3 +1,4 @@
+import { Details } from '../../../../ui/Details';
 import { KNOWLEDGE_SCOPE_AXES, type KnowledgeCardDetail } from '@shared/types/knowledge';
 import { useI18n } from '../../../../i18n';
 import { formatKnowledgeTime, LIFECYCLE_LABEL_KEYS, SCOPE_LABELS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
@@ -104,8 +105,7 @@ export function CardMetaGrid({ card, spaceLabel, onOpenRelation }: CardMetaGridP
           </section>
         </div>
       </div>
-      <details className="knowledge-center-meta-details" data-testid="knowledge-center-provenance">
-        <summary>{t('knowledgeCenter.metaProvenance')}</summary>
+      <Details className="knowledge-center-meta-details" data-testid="knowledge-center-provenance" summary={t('knowledgeCenter.metaProvenance')}>
         {hasProvenance ? (
           <dl className="knowledge-center-meta knowledge-center-meta--compact">
             <div>
@@ -124,7 +124,7 @@ export function CardMetaGrid({ card, spaceLabel, onOpenRelation }: CardMetaGridP
         ) : (
           <p className="knowledge-center-meta-empty">{t('knowledgeCenter.metaProvenanceNone')}</p>
         )}
-      </details>
+      </Details>
     </div>
   );
 }

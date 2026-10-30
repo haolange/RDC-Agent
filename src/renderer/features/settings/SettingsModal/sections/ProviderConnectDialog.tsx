@@ -1,3 +1,4 @@
+import { Details } from '../../../../ui/Details';
 import React, { useState } from 'react';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
@@ -158,10 +159,9 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         </SettingsField>
 
         {authMode !== 'account' && (
-          <details className="settings-provider-summary" data-testid="settings-provider-summary">
-            <summary>{t('settings.providers.summary.title')}</summary>
+          <Details className="settings-provider-summary" data-testid="settings-provider-summary" summary={t('settings.providers.summary.title')}>
             <ProviderProtocolSummary provider={connectionProvider} t={t} />
-          </details>
+          </Details>
         )}
 
         {authMode === 'account' && (

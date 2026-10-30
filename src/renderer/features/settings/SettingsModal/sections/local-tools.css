@@ -18,7 +18,8 @@
   display: none;
 }
 
-.settings-local-tool-summary:hover {
+.settings-local-tool-summary:hover,
+.settings-local-tool-summary:focus-visible {
   background: var(--token-interactive-hover);
 }
 
@@ -53,15 +54,6 @@
   overflow-wrap: normal;
 }
 
-.settings-local-tool-caret {
-  flex: none;
-  color: var(--token-text-caption);
-  transition: transform var(--transition-fast);
-}
-
-.settings-local-tool[open] .settings-local-tool-caret {
-  transform: rotate(180deg);
-}
 
 .settings-local-tool-body {
   padding: var(--space-4);

@@ -2,6 +2,7 @@ import { useState, type Dispatch, type SetStateAction } from 'react';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
+import { Details } from '../../../../ui/Details';
 import { Input } from '../../../../ui/Input';
 import { Switch } from '../../../../ui/Switch';
 import { Textarea } from '../../../../ui/Textarea';
@@ -41,8 +42,8 @@ export function RdcCliInvokerSettingsFields({ rdcCliDraft: draft, onRdcCliDraftC
         ? `${t('settings.rdcApplied')}: ${installation.summary.runtime.version} · ${installation.summary.runtime.catalog.toolCount} ${t('settings.rdcOperations')}`
         : installation.detected && !installation.candidates.length ? t('settings.rdcNotFound') : t('settings.rdcVerifyHint'))}
     </p>
-    <details>
-      <summary>{t('settings.rdcAdvanced')}</summary>
+    <Details summary={t('settings.rdcAdvanced')}>
+      <div className="settings-local-tool-grid">
       <label className="settings-switch-row">
         <span>{t('settings.rdcCliEnabled')}</span>
         <Switch checked={draft.enabled} disabled={installation.busy} onCheckedChange={(enabled) => patch({ enabled })}
@@ -57,6 +58,7 @@ export function RdcCliInvokerSettingsFields({ rdcCliDraft: draft, onRdcCliDraftC
           value={envText} placeholder="NAME=value" spellCheck={false}
           onChange={(event) => { setEnvText(event.currentTarget.value); patch({ env: textToEnv(event.currentTarget.value) }); }} />
       </SettingsField>
-    </details>
+      </div>
+    </Details>
   </section>;
 }

@@ -20,8 +20,8 @@
   container-name: settings-shell;
   position: relative;
   z-index: var(--z-modal);
-  width: min(88vw, 120rem, calc(min(86vh, 70rem) * 16 / 10));
-  height: min(86vh, 70rem, calc(min(88vw, 120rem) * 10 / 16));
+  width: min(76rem, calc(100vw - 2 * var(--modal-workbench-inset)));
+  height: min(56rem, calc(100dvh - 2 * var(--modal-workbench-inset)));
   min-width: min(45rem, calc(100vw - 2 * var(--modal-workbench-inset)));
   min-height: min(30rem, calc(100vh - 2 * var(--modal-workbench-inset)));
   display: grid;

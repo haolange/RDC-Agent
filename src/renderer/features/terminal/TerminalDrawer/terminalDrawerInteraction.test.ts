@@ -30,7 +30,7 @@ it('renders error details, filters, follows new output only when enabled and clo
   expect(host.textContent).toContain('"exitCode": 1');
   const filter = host.querySelector<HTMLButtonElement>('[data-testid="runtime-terminal-filter-toggle"]')!;
   act(() => filter.click()); expect(filter.getAttribute('aria-expanded')).toBe('true');
-  act(() => document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+  act(() => document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
   expect(filter.getAttribute('aria-expanded')).toBe('false');
   act(() => useTerminalStore.setState({ entries: [entry, { ...entry, id: 'second' }] }));
   expect(body.scrollTop).toBe(900);
@@ -41,4 +41,20 @@ it('renders error details, filters, follows new output only when enabled and clo
   act(() => host.querySelector<HTMLButtonElement>('.runtime-terminal-close-workspace')!.click());
   expect(useTerminalStore.getState().isOpen).toBe(false);
   expect(host.querySelector('[data-testid="runtime-terminal"]')?.getAttribute('aria-hidden')).toBe('true');
+});
+
+it('closes only the nested selector on Escape and returns focus through both layers', () => {
+  act(() => root.render(createElement(TerminalDrawer)));
+  const filter = host.querySelector<HTMLButtonElement>('[data-testid="runtime-terminal-filter-toggle"]')!;
+  act(() => { filter.focus(); filter.click(); });
+  const select = document.querySelector<HTMLButtonElement>('[data-testid="runtime-terminal-severity"]')!;
+  act(() => { select.focus(); select.click(); });
+  expect(document.querySelector('.dropdown-select-menu')).not.toBeNull();
+  act(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(document.querySelector('.dropdown-select-menu')).toBeNull();
+  expect(document.querySelector('.runtime-terminal-filter-popover')).not.toBeNull();
+  expect(document.activeElement).toBe(select);
+  act(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(document.querySelector('.runtime-terminal-filter-popover')).toBeNull();
+  expect(document.activeElement).toBe(filter);
 });

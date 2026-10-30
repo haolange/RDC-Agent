@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { useDynStyle } from '../../lib/useDynStyle';
 import type { ContextMenuCommandId } from '../../lib/contextMenuCommands';
 import type { ContextMenuItem } from '../../lib/contextMenuItems';
+import { placeAnchoredSurface } from '../../lib/anchoredSurface';
+import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
 import './ContextMenu.css';
 
 const VIEWPORT_MARGIN = 8;
@@ -36,6 +38,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onSelect,
   onClose,
 }) => {
+  const { layerId } = useOverlayLayer(true);
   const menuRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ left: x, top: y });
   const [activeIndex, setActiveIndex] = useState(() => enabledCommandIndexes(items)[0] ?? -1);
@@ -47,33 +50,39 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   useLayoutEffect(() => {
     const menu = menuRef.current;
     if (!menu) return;
-    const width = menu.offsetWidth;
-    const height = menu.offsetHeight;
-    let left = x;
-    let top = y;
-    if (left + width > window.innerWidth - VIEWPORT_MARGIN) {
-      left = window.innerWidth - width - VIEWPORT_MARGIN;
-    }
-    if (top + height > window.innerHeight - VIEWPORT_MARGIN) {
-      top = window.innerHeight - height - VIEWPORT_MARGIN;
-    }
-    setCoords({
-      left: Math.max(VIEWPORT_MARGIN, left),
-      top: Math.max(VIEWPORT_MARGIN, top),
-    });
+    const position = () => {
+      const next = placeAnchoredSurface({ left: x, right: x, top: y, bottom: y },
+        { width: menu.offsetWidth, height: menu.offsetHeight },
+        { width: window.innerWidth, height: window.innerHeight }, 'start', 'bottom', VIEWPORT_MARGIN, 0);
+      setCoords({ left: next.left, top: next.top });
+    };
+    position();
+    const observer = new ResizeObserver(position);
+    observer.observe(menu);
+    window.addEventListener('resize', position);
+    document.fonts?.addEventListener('loadingdone', position);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', position);
+      document.fonts?.removeEventListener('loadingdone', position);
+    };
   }, [x, y, items]);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
+      if (!isTopOverlayLayer(layerId)) return;
       if (menuRef.current?.contains(event.target as Node)) return;
       onClose();
     };
     const onKeyDown = (event: KeyboardEvent) => {
+      if (!isTopOverlayLayer(layerId)) return;
       if (event.key === 'Escape') {
         event.preventDefault();
+        event.stopPropagation();
         onClose();
         return;
       }
+      if (event.key === 'Tab') { onClose(); return; }
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
         setActiveIndex((current) => nextEnabledIndex(items, current, event.key === 'ArrowDown' ? 1 : -1));
@@ -94,12 +103,21 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       }
     };
     window.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
     return () => {
       window.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, true);
     };
-  }, [activeIndex, items, onClose, onSelect]);
+  }, [activeIndex, items, layerId, onClose, onSelect]);
+
+  useEffect(() => {
+    const origin = document.activeElement;
+    return () => { if (origin instanceof HTMLElement && origin.isConnected) origin.focus({ preventScroll: true }); };
+  }, []);
+
+  useEffect(() => {
+    menuRef.current?.querySelector<HTMLElement>('[tabindex="0"]')?.focus({ preventScroll: true });
+  }, [activeIndex]);
 
   const labelledBy = useMemo(
     () => items.find((item) => item.type === 'command')?.id ?? 'copy',

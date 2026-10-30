@@ -99,8 +99,10 @@ export function useRuntimeScopePanel({
     if (creating) setSelectedId(null);
   });
 
-  const patchForm = (patch: Partial<ResourceFormState>) =>
+  const patchForm = (patch: Partial<ResourceFormState>) => {
     setForm((current) => ({ ...current, ...patch }));
+    setMessage((current) => current === t('settings.scopeSaved') || current === t('settings.scopeImported') ? '' : current);
+  };
 
   const save = async () => {
     setBusy(true);

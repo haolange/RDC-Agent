@@ -1,6 +1,7 @@
 {
   "$comment": "Renderer 契约清单：check-* 脚本读取本文件定位被锁定的文件与锚点。目录重组或文件移动时只改本文件；新增锚点须先在本文件登记。",
   "files": {
+    "ui.select": "src/renderer/ui/Select/index.tsx",
     "workProcessTrackCss": "src/renderer/features/transcript/work-process-track.css",
     "styles.designSystem": "src/renderer/styles/design-system.css",
     "styles.appShell": "src/renderer/styles/global/app-shell.css",
@@ -47,7 +48,7 @@
     "ui.modeGlyph": "src/renderer/ui/ModeGlyph.tsx",
     "ui.buttonCss": "src/renderer/ui/Button.css",
     "ui.kitCss": "src/renderer/ui/kit.css",
-    "designs.preview": "designs/rdc-agent-design-system/Design System Preview.html",
+    "designs.preview": "designs/rdc-agent-design-system/index.html",
     "composer.composer": "src/renderer/features/composer/Composer.tsx",
     "composer.agentMenu": "src/renderer/features/composer/ComposerAgentMenu.tsx",
     "stores.composerSessionContext": "src/renderer/stores/composerSessionContextStore.ts",
@@ -189,7 +190,15 @@
     "composer.pendingRequestSelection": "src/renderer/features/composer/pendingRequestSelection.ts",
     "composer.toolApprovalModel": "src/renderer/features/composer/toolApprovalRequestModel.ts",
     "transcriptWorkCardHeader": "src/renderer/features/transcript/WorkCardHeader.tsx",
-    "transcriptWorkDisclosure": "src/renderer/features/transcript/WorkDisclosure.tsx"
+    "transcriptWorkDisclosure": "src/renderer/features/transcript/WorkDisclosure.tsx",
+    "settings.providerConnectDialog": "src/renderer/features/settings/SettingsModal/sections/ProviderConnectDialog.tsx",
+    "settings.localToolDisclosure": "src/renderer/features/settings/SettingsModal/sections/LocalToolDisclosure.tsx",
+    "knowledge.spacesColumn": "src/renderer/features/knowledge/KnowledgeCenterModal/columns/SpacesColumn.tsx",
+    "patterns.materialContextEditor": "src/renderer/patterns/MaterialContextEditor.tsx",
+    "ui.popover": "src/renderer/ui/Popover.tsx",
+    "ui.contextMenu": "src/renderer/ui/ContextMenu/index.tsx",
+    "design.livePreview": "designs/rdc-agent-design-system/preview.tsx",
+    "settings.shellCss": "src/renderer/features/settings/SettingsModal/sections/settings-shell.css"
   },
   "retired": [
     "src/renderer/styles/themes/oklch-themes.css",
@@ -249,6 +258,7 @@
     "src/renderer/features/settings/SettingsModal/sections/SkillsAgentsSettings.tsx",
     "src/renderer/features/settings/SettingsModal/sections/WorkspaceSettings.tsx",
     "src/renderer/hooks/useModalFocus.ts",
-    "src/main/ipc/sessionOutputs.ts"
+    "src/main/ipc/sessionOutputs.ts",
+    "designs/rdc-agent-design-system/Design System Preview.html"
   ]
 }

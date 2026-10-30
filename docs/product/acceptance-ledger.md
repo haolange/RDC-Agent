@@ -4177,6 +4177,13 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 官方launcher使用独立用户数据启动正式桌面，实际RDC-Agent窗口和ReplayDeviceService等服务初始化后正常关闭；不是仅凭PID存活判断可用。原生回放先clear context再stop daemon，均有成功回执；最终清理与Git文档提交结果以本节收尾回执为准。最小证据收敛于 `.local/runtime-release/receipt.json`、单份签名回执及PNG，原生验证使用的用户数据/备份/脚本/构建副本不作为长期资源保留。
 - R1–R6收尾：正式包、官方升级、独立原生链、保护文件恢复/核对与文档检查均通过。经路径/归属/进程/链接核验，清除两个磁盘上的本轮临时根内4997文件和169个只指向本轮根的测试链接，逻辑259468455B，不等同实际回收空间；正式ZIP/校验文件和三份最小证据保留。清理后再次核对3140项安装文件、1044项保护文件和Python metadata版本1.1.1；保护快照摘要前后均为 `d51f5250ea8b61d34fd72c7e01ac7b1693b31263c6c8ebb32c881f53f5e9ea39`，真实用户目录无本轮新增文件。自有Electron、daemon/worker、ADB、QA/loopback监听与canonical锁均无残留，桌面启动权已交还。此验收补记随本轮Agent main推送，不移动Tools发行tag或更换已发布资产。
 
+### 2026-10-29 本机 RDC-Tool 1.1.2 正式安装更新
+
+- 按用户要求读取云端latest正式Release v1.1.2，从公开资产升级本机原1.1.0，不修改源码checkout、Settings或PATH，不提交或发布。发行来源 `bcb1275ed8fa5acc908e08ac328da3d581c2ff54`；下载ZIP SHA256 `3bd5ca30c0601e91bffb3021241ba53028e9c04163aadd592bbdc39eb0bd81e1`，与远端digest及SHA256SUMS一致。正式包和安装的3140个清单文件逐一核验哈希通过，官方upgrade及doctor成功。
+- 官方隔离launcher完整one-time bootstrap进入/app，实际主进程getRuntimeSummary/getCatalog/verifyInstallation通过，原安装内Python/CLI返回available:true、1.1.2、128项操作；指纹 `e1e6fd9158e829d7dd4422726e47189ef3ae992c965474d11b1200a327a5d110` 与新安装spec一致。仅复制rdcCli配置到隔离环境，无凭据/会话副本；未重跑真实Android或capture，不把上游设备证明当作本轮验收。
+- 保留唯一当前正式ZIP和SHA256SUMS于Tools dist，清除旧1.1.0包及3168个自有解压/QA临时文件；用户运行数据保留。launcher退出，无Electron、5127监听或canonical锁，桌面启动权已交还。最小回执 `.local/transcript-state/tool-update-receipt.json` 保留。
+
+
 ## 2026-10-30 自动审查与计划执行交接修正
 
 - 源码：当前 main 基线 b29d1cb0 的 working tree；不提交、推送或发布。源码文件 SHA256 清单及摘要 `5447ef8c930ec0ddcd1deb21b2edfef1f06eb7cda20aab3fe2cbf76c60d366be` 见 `.local/plan-review-ui/approval-handoff-receipt.json`；保留此前已有记录。
@@ -4186,3 +4193,20 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - Browser：深浅主题、窄屏（480px窗口/436 CSS px）、无横向溢出、菜单Esc焦点返回通过。最终原生点击样本24ms、Long Task=0；确认→交接→准备的提示连续且无回跳，实际主进程交接/准备约4.4s。该单样本不构成普遍性能或前后提速结论。截图、请求冻结元数据、计划/工具回执、最终回答和时序保留在同一最小回执；初始化重启时的旧401不冒充当前请求错误。
 - 收尾：本轮QA及子进程已退出，隔离目录和coverage均已删除（871个文件，逻辑25151297B；不作为实际释放空间声明）；原config、加密凭据、Local State三项SHA256均不变，canonical锁不存在，桌面启动权已交还。最小回执和5张不同验收目的截图保留；未改真实会话、账号或capture。
 - 2026-10-30上传收口：复核本库无release/dist旧发行包，Tools dist仅保留当前1.1.2正式ZIP及校验文件；保留可运行out和必要历史证据。另核对历史QA三个owner PID均不存在、路径无链接，删除1139B孤立daemon临时状态文件，回执 `.local/plan-review-ui/upload-cleanup.json`。通俗背景与使用变化已补到Workbench主题文档；本次用户授权当前main提交和正常推送，取代上文当时的本地交付边界。
+
+## 2026-10-30 全界面组件体系与 UI/UX 收敛
+
+- 源码：HEAD `7d6968a71a2eb3ff0f5a33a569b7258d47b403cd` 加本轮工作树；未创建分支、提交、推送或发布。实现/任务状态与最终源码 SHA256 清单分别保留于 `.local/ui-system-convergence/TASKS.md`、`receipt.json`。此前已有台账内容原样保留。
+- 组件与工程：统一 Details 的 inline/panel 表现，迁移 Settings、Knowledge、素材和调查详情的普通披露；Popover/Select/ContextMenu 共享视口几何与边界约束，补菜单键盘/焦点、尺寸和字体变化重定位。PlanCard 的全文入口由领域回调持有；附件使用真实宽度渐隐；不改变 IPC、schema、权限、Provider 或 capture/lease 契约。Settings 独立宽高、Agent 双栏与窄屏滚动、Policy 短空态及重复文案收敛。资源开始新编辑时清除旧成功提示，保留错误。
+- 工程验证：完整 coverage 548 文件、4039 测试通过，4 项原有跳过；ratchet lines77.8/functions79.25/branches66.01/statements75.44 通过。typecheck、lint、完整 check:gates、生产 build、design:build 通过。初轮高并发导致子进程超时，旧 Policy 布局断言同步后仍有 Git 扫描超过默认5s；最终本轮 CLI 使用2 workers/15s执行预算，未修改产品超时、断言或覆盖率阈值。全量之后的资源成功提示小修通过原生保存→再次编辑定向验证，不重复全套。
+- Browser：官方 one-time bootstrap / 同源 app，Settings 八页、子弹层、保存、搜索、资源作用域、草稿保留/放弃、Knowledge 空态与索引披露、左右栏、历史回答、运行记录和上手入口已检查；1440×900、1280×720、960×640、390×844、960×480，中文深色中字号与英文浅色大字号代表组合，无 document 横向溢出。资料及 Skill 保存成功；未将纯文本 Skill 当成校验错误（产品允许正文文档）。QA 未开启 full access 时设置写入没有生效，重新按隔离验收要求启动后验证成功。
+- 动效与模型：ActiveSignalText、Composer 绕光及 Effort/Max 的生产实现保持原样。真实请求中观察 working 扫光、Composer 绕光、输入草稿保留和完成收束；追加 Low 要求后只执行 Low：一轮11.3s完成，一轮准备阶段取消。追加要求前两轮分别为 High 完成和 Off 完成，不能描述为全程 Low。Max 仅做滑条进入/持续能量场/关闭重开/退出视觉检查，随后恢复 Low，没有 Max 模型请求。准备取消不冒充 provider 持续流式中途取消，未执行模型工具或 RDC 设备操作。
+- 原生窗口：官方 start:human 使用同一隔离 userData 实际启动；最大化/恢复、通过系统窗口菜单连续收窄和降低高度（约1072×635）、低窗口 Settings 和边缘用户菜单、三档字号、资源保存与重新编辑反馈、文本菜单剪切可用。使用当前系统 DPI，未改变显示设置。原生启动仅有既有 meta CSP frame-ancestors 提示及 PNG 色彩配置警告；不宣称多显示器/DPI切换或 Android/Remote 设备验收。
+- 活文档：`pnpm run design:dev` 独立入口直接导入生产组件、样式和主题编译；搜索/分类、主题/字号、窄容器/长内容、真实领域组件目录和消费者表可用，嵌套 Escape 只关闭顶层并返回焦点。旧手写 HTML 入口删除；目录 HMR 根节点边界已拆开。目录证据仅代表组件，不替代真实模型、审批或设备链路。
+- 收尾：本轮 Browser QA、原生 Electron 和目录开发服务器均已退出；隔离凭据/同源 Local State、QA 会话/资源、项目与测试临时文件已删除，最初系统 temp QA 的死 owner 锁一并清理。未触碰原账户、用户配置、capture 或其他进程。canonical 锁不存在，桌面启动权已交还。保留当前 out/依赖/有效构建缓存及3张不同目的截图与最小回执，移除重复日志和 coverage 中间输出。
+
+- 补充闭环：生产公共控件37项的精确直接消费者目录已生成并纳入 appearance 门禁；16组活文档契约补充用途、不适用、状态、props、键盘、布局、动效和真实使用位置。ContextMenu、颜色、导航、未保存草稿、失败重试均直接操作生产组件；目录和产品控制台无 renderer error。
+- 补充产品验收：Terminal 筛选收敛为共享 Popover，嵌套 Select 的 Escape/焦点返回测试与页面检查通过。真实素材上传86B文件，比较条件缺失时报错且保留草稿，有效保存重开和撤回附件通过。Provider协议披露、本机工具多项展开及不可用shell提示通过。Knowledge错误YAML隔离、有效draft导入、candidate创建、人工写入确认通过；空结构显示与版本时间统一。历史Plan和Investigation使用明确标注的隔离存储样本，经生产主进程/hash读取，正文滚动/详情/Escape/保存到项目通过；样本不作为模型审批或设备调查证据。
+- 补充模型验收：deepseek-flash 冻结 reasoningLevel=low，实际响应 status-streaming 后停止（观察1939字符，14.6s），最终status-stopped、Composer运行态归零、停止按钮消失，新输入草稿保留。发现并修复会话能力加载期间把持久Low显示成Off的问题；回归测试和真实页面重新加载恢复Low通过。追加Low要求后的请求均Low，无新增Off/Max请求。
+- 补充工程：上述修复的26项及23项定向测试通过（两组有重叠），最终typecheck、lint、check:gates、build、design:build通过。门禁初次遇到沙箱realpath EPERM，正常用户权限执行通过，未放松断言。沿用未受影响的完整coverage/ratchet，不重复全套。最终源码哈希与逐表面清单仍在同一工作记录。
+- 最终补验收尾：新增 QA/组件目录服务及自有子进程退出，新增隔离凭据、Local State、项目、素材、fixture脚本及日志均已删除；5127/5173无监听，canonical锁不存在，桌面启动权已交还。唯一工作记录更新为T1–T7通过，保留3张必要画面及更新后的源码哈希回执。

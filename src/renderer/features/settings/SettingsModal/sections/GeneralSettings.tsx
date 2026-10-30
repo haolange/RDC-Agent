@@ -46,7 +46,6 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
 
         <SettingsSection
           title={t('settings.appearancePreferences')}
-          description={t('settings.languagePreferenceHint')}
           className="settings-language-section"
           data-settings-search="language"
         >

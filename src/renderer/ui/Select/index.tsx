@@ -18,6 +18,7 @@ import {
 import { SelectMenu, SelectTrigger } from './SelectPrimitives';
 import type { SelectProps } from './types';
 import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
+import { placeAnchoredSurface } from '../../lib/anchoredSurface';
 import './Select.css';
 
 export type { SelectOption } from './types';
@@ -90,28 +91,19 @@ export const Select: React.FC<SelectProps> = ({
       menuElement?.offsetWidth ?? 0,
       minMenuWidth,
     );
-    const width = Math.min(measuredWidth, viewportWidth - VIEWPORT_MARGIN * 2);
-    const menuHeight = menuElement?.offsetHeight ?? 320;
-    const maxLeft = viewportWidth - width - VIEWPORT_MARGIN;
-    const maxTop = viewportHeight - menuHeight - VIEWPORT_MARGIN;
-    const preferredTop = triggerRect.bottom + ANCHOR_GAP;
-    const fallbackTop = triggerRect.top - menuHeight - ANCHOR_GAP;
-    const opensBelow = preferredTop <= maxTop;
-    const topCandidate = opensBelow ? preferredTop : fallbackTop;
-    const preferredLeft = menuAlign === 'end'
-      ? triggerRect.right - width
-      : triggerRect.left;
-    const left = clamp(preferredLeft, VIEWPORT_MARGIN, maxLeft);
+    const { width, left, top, placement } = placeAnchoredSurface(triggerRect,
+      { width: measuredWidth, height: menuElement?.offsetHeight ?? 320 },
+      { width: viewportWidth, height: viewportHeight }, menuAlign, 'bottom', VIEWPORT_MARGIN, ANCHOR_GAP);
     const tipAnchorX = menuAlign === 'end'
       ? triggerRect.right - 16
       : triggerRect.left + Math.min(20, triggerRect.width / 2);
 
     setMenuPosition({
       left,
-      top: clamp(topCandidate, VIEWPORT_MARGIN, maxTop),
+      top,
       width,
       caretX: clamp(tipAnchorX - left, 14, width - 14),
-      placement: opensBelow ? 'bottom' : 'top',
+      placement,
       ready: true,
     });
   }, [menuAlign, minMenuWidth]);
@@ -133,6 +125,7 @@ export const Select: React.FC<SelectProps> = ({
     }
 
     const handlePointerDown = (event: MouseEvent) => {
+      if (!isTopOverlayLayer(layerId)) return;
       const target = event.target as Node;
       if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) {
         return;
@@ -217,10 +210,13 @@ export const Select: React.FC<SelectProps> = ({
       resizeObserver.observe(menuRef.current);
     }
 
+    if (triggerRef.current) resizeObserver?.observe(triggerRef.current);
+    document.fonts?.addEventListener('loadingdone', handleViewportChange);
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);
     return () => {
       resizeObserver?.disconnect();
+      document.fonts?.removeEventListener('loadingdone', handleViewportChange);
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
     };

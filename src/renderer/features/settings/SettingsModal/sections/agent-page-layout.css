@@ -57,7 +57,7 @@
 
 .settings-page-agents .settings-manifest-layout {
   align-items: stretch;
-  grid-template-columns: minmax(20rem, 22rem) minmax(32rem, 1fr);
+  grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr);
   flex: 1 1 auto;
   height: auto;
   min-height: 0;
@@ -69,9 +69,10 @@
   flex: 0 0 auto;
 }
 
-@container settings-panel (max-width: 60rem) {
+@container settings-panel (max-width: 48rem) {
   .settings-manifest-toolbar {
     flex-direction: column;
+    align-items: flex-start;
   }
 
   .settings-manifest-layout,
@@ -100,8 +101,7 @@
     min-width: 0;
   }
 
-  .settings-page-agents .settings-manifest-actions,
-  .settings-page-agents .settings-manifest-actions .button {
-    width: 100%;
+  .settings-page-agents .settings-manifest-actions {
+    justify-content: flex-start;
   }
 }

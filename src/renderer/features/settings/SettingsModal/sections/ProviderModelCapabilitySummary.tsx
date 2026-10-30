@@ -1,3 +1,4 @@
+import { Details } from '../../../../ui/Details';
 import React, { useState } from 'react';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type {
@@ -101,11 +102,10 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
           ) : null}
 
           <ProviderModelPreferences {...{ model, effectiveModel, snapshot, loading, onModelChange, t }} />
-          <details className="settings-model-details">
-            <summary>{t('settings.providers.capability.details')}</summary>
+          <Details className="settings-model-details" summary={t('settings.providers.capability.details')}>
             <ProviderModelDetails {...{ model, effectiveModel, provider, t }} />
             <ProviderModelProbe {...{ model, provider, t, probeMode, probeModes, runProbe }} />
-          </details>
+          </Details>
           {probeResult ? (
             <div
               className={`settings-model-capability-probe-result settings-model-capability-probe-result--${probeResult.status}`}

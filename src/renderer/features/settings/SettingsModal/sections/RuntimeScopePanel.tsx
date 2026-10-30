@@ -124,7 +124,7 @@ export const RuntimeScopePanel: React.FC<{
     <section className="settings-runtime-scope" data-testid="settings-runtime-scope" data-resource-kind={kind}>
       <ResourceListDetail
           testId="settings-resource-frame"
-          emptyLayout={kind === 'skill' || kind === 'policy' || kind === 'hook' ? 'fill' : 'compact'}
+          emptyLayout={kind === 'skill' || kind === 'hook' ? 'fill' : 'compact'}
           isEmpty={panel.resources.length === 0 && !panel.editing}
           emptyTitle={t('settings.scopeEmpty', { kind: kindLabel })}
           emptyDescription={emptyDescriptionExtra ? (

@@ -45,7 +45,6 @@ export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = (
     <SettingsSection
       className="settings-personalization-block"
       title={t('settings.personalizationTitle')}
-      description={t('settings.personalizationHint')}
       data-settings-search="personalization"
     >
       <SettingsField

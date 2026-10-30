@@ -48,7 +48,6 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   return (
     <SettingsSection
       title={t('settings.profile')}
-      description={t('settings.profileHint')}
       className="settings-profile-section"
       data-settings-search="profile"
     >

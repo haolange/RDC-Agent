@@ -1,3 +1,4 @@
+import { Details } from '../../../../ui/Details';
 import React from 'react';
 import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
 import type { RdcRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdcRuntime';
@@ -69,8 +70,7 @@ export const McpServicesPanel: React.FC<{
     const server = overviewFor(resource);
     const trust = server ? mcpTrustState(server) : null;
     return (
-      <details key={resource.id} className="settings-mcp-detail" data-testid="settings-mcp-detail">
-        <summary className="settings-local-tool-summary">
+      <Details key={resource.id} className="settings-mcp-detail" data-testid="settings-mcp-detail" summaryClassName="settings-local-tool-summary" summary={<>
           <span className="settings-runtime-detail-title">
             <strong>{form.name || resource.id}</strong>
             <span className="settings-runtime-detail-badges">
@@ -78,8 +78,8 @@ export const McpServicesPanel: React.FC<{
               {trust ? <McpTrustBadge state={trust} /> : null}
             </span>
           </span>
-          <Icon name="chevron-down" size={14} className="settings-local-tool-caret" />
-        </summary>
+
+         </>}>
         <div className="settings-runtime-detail">
           <div className="settings-runtime-actions">
             <Button variant="secondary" size="sm" onClick={edit} data-testid="settings-mcp-detail-edit">
@@ -103,7 +103,7 @@ export const McpServicesPanel: React.FC<{
         {live?.lastError ? <InlineError>{live.lastError}</InlineError> : null}
         {server && overview ? <McpTrustPanel overview={overview} server={server} onChanged={onChanged} /> : null}
         </div>
-      </details>
+      </Details>
     );
   };
 

@@ -1,7 +1,8 @@
 import { createElement } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CaseChapterContent, parseChapterValue } from './CaseChapterContent';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({ language: 'en' }) }));
 
 describe('Case chapter reading', () => {
   it('leaves ordinary Markdown and invalid JSON on the Markdown path', () => {
@@ -13,7 +14,7 @@ describe('Case chapter reading', () => {
     const value = { unknown: [false, 0, null, '', [], {}], source: { file: '中文.md' } };
     expect(parseChapterValue(JSON.stringify(value))).toEqual(value);
     const markup = renderToStaticMarkup(createElement(CaseChapterContent, { spaceId: 'user', content: JSON.stringify(value) }));
-    for (const text of ['unknown', 'false', '>0<', 'null', '[]', '{}', '中文.md']) expect(markup).toContain(text);
+    for (const text of ['unknown', 'false', '>0<', 'null', 'No items', 'No fields', '中文.md']) expect(markup).toContain(text);
   });
   it('renders evidence as readable fields and escapes embedded HTML', () => {
     const markup = renderToStaticMarkup(createElement(CaseChapterContent, { spaceId: 'user', content: '[{"summary":"<script>alert(1)</script>","evidence_id":"e_1"}]' }));
@@ -32,7 +33,7 @@ describe('Case chapter reading', () => {
   });
   it('retains empty and heterogeneous evidence and non-string symptom values', () => {
     const evidence = renderToStaticMarkup(createElement(CaseChapterContent, { spaceId: 'user', chapter: 'evidence', content: '[{},null,0,false]' }));
-    for (const text of ['{}', 'null', '>0<', 'false']) expect(evidence).toContain(text);
+    for (const text of ['No fields', 'null', '>0<', 'false']) expect(evidence).toContain(text);
     const symptoms = renderToStaticMarkup(createElement(CaseChapterContent, { spaceId: 'user', chapter: 'symptoms', content: '{"expected":false,"observed":0,"custom":"retained"}' }));
     for (const text of ['false', '>0<', 'retained']) expect(symptoms).toContain(text);
   });
