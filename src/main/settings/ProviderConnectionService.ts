@@ -15,6 +15,7 @@ import type {
 import { settingsService } from '../settings/SettingsService';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
 import {
+  buildEffectiveCatalogRequest,
   applyDiscoveryAuthority,
   refreshEffectiveCatalogDiscovery,
   toDiscoveryModelContributions,
@@ -23,6 +24,7 @@ import type {
   DiscoveryLoader,
   EffectiveCatalogRequest,
 } from './effectiveCatalogTypes';
+import { effectiveCatalogService } from './EffectiveCatalogService';
 import { parseProviderError, ProviderConnectionError } from './providerConnectionErrors';
 import {
   resolveProviderConnectionDraft,
@@ -201,55 +203,19 @@ export class ProviderConnectionService {
   async refreshProviderModels(providerId: LlmProviderId): Promise<LlmProviderConnectionResult> {
     try {
       const provider = this.getProvider(providerId);
-      if (provider.authMode === 'account') {
-        const status = await providerAccountAuthService.test(provider.id);
-        if (!status.connected) {
-          throw new ProviderConnectionError(status.error || status.message || 'Account provider is not connected');
-        }
-        const nextProvider = settingsService.getAll().llm.providers.find((entry) => entry.id === provider.id);
-        const discoveryAccountId = nextProvider?.activeAccountId?.trim()
-          || `anonymous:${provider.id}`;
-        return {
-          success: true,
-          provider: nextProvider,
-          discoveryAccountId,
-          models: nextProvider?.models ?? [],
-        };
+      const request = buildEffectiveCatalogRequest(provider);
+      const loader = this.createEffectiveCatalogDiscoveryLoader(request);
+      if (!loader) throw new ProviderConnectionError('Provider is not configured for catalog discovery.');
+      const snapshot = await effectiveCatalogService.refreshDiscovery(request, loader);
+      const current = settingsService.getAll().llm.providers.find(entry => entry.id === providerId);
+      if (!current || buildEffectiveCatalogRequest(current).configurationRevision !== request.configurationRevision) {
+        throw new ProviderConnectionError('Provider configuration changed while refreshing.');
       }
-      const connection = resolveProviderConnectionDraft(
-        provider,
-        {},
-        settingsService.getProviderConnectionValues(provider.id),
-      );
-      const discovery = await discoverProviderModels(provider, connection.apiKey, connection.baseUrl, connection.values);
-      const { models } = discovery;
-      const nextSettings = settingsService.saveProviderConnection(
-        provider.id,
-        '',
-        models,
-        connection.baseUrl,
-        provider.protocol,
-        provider.authMode,
-      );
-      const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
-      const discoveryAccountId = nextProvider
-        ? resolveTestDiscoveryAccountId(nextProvider, {})
-        : `anonymous:${provider.id}`;
-      if (nextProvider) {
-        await refreshEffectiveCatalogDiscovery(
-          nextProvider,
-          models,
-          discovery.contributions,
-          discovery.entitlementContributions,
-          undefined,
-          discoveryAccountId,
-        );
-      }
+      if (snapshot.lastRefreshError) throw new ProviderConnectionError(snapshot.lastRefreshError);
       return {
-        success: true,
-        provider: nextProvider,
-        discoveryAccountId,
-        ...discovery,
+        success: true, provider: current, discoveryAccountId: snapshot.accountId,
+        models: snapshot.models.map(model => ({ id: model.modelId, label: model.label,
+          enabled: model.enabled, availability: model.availability, unavailableReason: model.unavailableReason })),
       };
     } catch (error) {
       return {

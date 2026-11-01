@@ -565,6 +565,24 @@
           "entitlement": "granted"
         },
         {
+          "id": "fast:build+max",
+          "when": {
+            "fast": true,
+            "maxContext": true
+          },
+          "actions": [
+            {
+              "kind": "model-switch",
+              "targetModelId": "grok-4.7-build-fast"
+            },
+            {
+              "kind": "client-tier",
+              "tierId": "max"
+            }
+          ],
+          "entitlement": "unknown"
+        },
+        {
           "id": "context:max",
           "when": {
             "maxContext": true

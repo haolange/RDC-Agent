@@ -7,12 +7,12 @@ import type { ComposerPendingRequestState } from './pendingRequestSelection';
 import type { SessionRecord } from '@shared/types/session';
 import type { Ref } from 'react';
 
-export function ComposerPendingRequest({ pending, composeAccentStyle, agentId, currentSession, onStop, shellRef }: {
+export function ComposerPendingRequest({ pending, composeAccentStyle, agentId, currentSession, onReplan, shellRef }: {
   pending: ComposerPendingRequestState;
   composeAccentStyle: { 'data-dyn-style': string };
   agentId: string;
   currentSession: SessionRecord | null;
-  onStop?: () => Promise<void>;
+  onReplan?: (payload: import('./composerHandoffSend').HandoffSendPayload) => Promise<unknown>;
   shellRef?: Ref<HTMLDivElement>;
 }) {
   if (pending.kind === 'tool-approval') {
@@ -23,7 +23,7 @@ export function ComposerPendingRequest({ pending, composeAccentStyle, agentId, c
   if (pending.kind === 'plan-review') {
     return <div ref={shellRef} className="composer-shell composer-shell-plan-review" {...composeAccentStyle}>
       <PlanReviewRequestPanel key={planReviewRequestKey(pending.request)} request={pending.request}
-        agentId={agentId} currentSession={currentSession} onStop={onStop} />
+        agentId={agentId} currentSession={currentSession} onReplan={onReplan} />
     </div>;
   }
   return <div ref={shellRef} className="composer-shell composer-shell-user-input" {...composeAccentStyle}>

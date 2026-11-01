@@ -114,7 +114,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       maxBytes: 4 * 1024,
     });
     if (!sessionId) {
-      return { messages: [], branchState: null };
+      return { messages: [], branchState: null, planReview: null };
     }
     return conversationService.getHistory(sessionId);
   });
@@ -199,6 +199,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       label: 'conversation:answerPlanReview',
       maxBytes: 32 * 1024,
     }) as [ConversationAnswerPlanReviewRequest];
+    if (request.sessionId !== state.currentSessionId) throw new Error('PLAN_SESSION_DENIED');
     return conversationService.answerPlanReview(request);
   });
 

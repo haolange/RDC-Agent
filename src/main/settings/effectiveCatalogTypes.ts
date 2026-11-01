@@ -88,6 +88,8 @@ export interface CatalogLayerContribution {
 }
 
 export interface EffectiveCatalogRequest {
+  /** Main-only normalized connection identity; never carries credentials. */
+  configurationRevision?: string;
   providerId: string;
   accountId: string;
   protocol?: LlmProviderProtocol;

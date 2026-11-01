@@ -13,6 +13,7 @@ const approval: ConversationToolCall = { id: 'approve', toolName: 'shell', statu
   approval: { approvalId: 'approval', status: 'pending', risk: 'high' } };
 const plan: ConversationToolCall = { id: 'plan', toolName: 'plan_artifact', status: 'running', startedAt: 1,
   planReview: { planId: 'p', revision: 1, uri: 'session://plans/p.md', hash: 'a'.repeat(64), title: 'Plan', summary: [], sections: [], status: 'awaiting', handoffOptions: [] } };
+const review = { sessionId: 's', reviewId: 'review', agentId: 'debugger', recovered: false, turnId: 't', toolCallId: 'plan', planReview: plan.planReview! };
 const input: ConversationToolCall = { id: 'ask', toolName: 'ask_user', status: 'running', startedAt: 1,
   userInputQuestions: [{ questionId: 'q', prompt: 'Where?', options: [], allowFreeform: true }] };
 const message = (calls: ConversationToolCall[], sessionId = 's'): ConversationMessage => ({
@@ -23,8 +24,8 @@ const message = (calls: ConversationToolCall[], sessionId = 's'): ConversationMe
 
 describe('pending Composer request precedence', () => {
   it('chooses approval before plan before questions independent of tool order', () => {
-    expect(resolveComposerPendingRequest([message([input, plan, approval])])?.kind).toBe('tool-approval');
-    expect(resolveComposerPendingRequest([message([input, plan])])?.kind).toBe('plan-review');
+    expect(resolveComposerPendingRequest([message([input, plan, approval])], review)?.kind).toBe('tool-approval');
+    expect(resolveComposerPendingRequest([message([input, plan])], review)?.kind).toBe('plan-review');
     expect(resolveComposerPendingRequest([message([input])])?.kind).toBe('user-input');
   });
   it('uses only supplied active projection and drops requests when that projection clears', () => {
@@ -37,7 +38,7 @@ describe('pending Composer request precedence', () => {
     [plan, 'plan-review', 'plan panel'],
     [input, 'user-input', 'question panel'],
   ] as const)('preserves each pending shell and accent identity', (call, kind, content) => {
-    const pending = resolveComposerPendingRequest([message([call])]);
+    const pending = resolveComposerPendingRequest([message([call])], kind === 'plan-review' ? review : null);
     if (!pending) throw new Error('Expected pending request');
     const html = renderToStaticMarkup(createElement(ComposerPendingRequest, {
       pending, composeAccentStyle: { 'data-dyn-style': 'accent-request' },
@@ -51,7 +52,7 @@ it.each(['rule', 'model'] as const)('keeps %s review out of Composer, including 
   const automated = { ...approval, id: 'auto', delegatedRequest: { executionId: 'e', childSessionId: 'child', turnId: 'ct', toolCallId: 'auto' },
     approval: { ...approval.approval!, approvalId: 'auto-review-auto', reviewer: 'auto_review', reviewMethod: method } };
   expect(resolveComposerPendingRequest([message([automated])])).toBeNull();
-  expect(resolveComposerPendingRequest([message([automated, plan])])?.kind).toBe('plan-review');
+  expect(resolveComposerPendingRequest([message([automated, plan])], review)?.kind).toBe('plan-review');
   expect(resolveComposerPendingRequest([message([automated, approval])])?.request).toMatchObject({ approvalId: 'approval' });
   expect(resolveComposerPendingRequest([{ ...message([automated]), status: 'complete' }])).toBeNull();
 });

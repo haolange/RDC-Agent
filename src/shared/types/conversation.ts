@@ -378,6 +378,7 @@ export interface ConversationExecutionTransition {
 }
 
 export interface ConversationSendRequest {
+  planSource?: import('./planReview').PlanReadRequest;
   requestId: string;
   projectId?: string | null;
   sessionId?: string | null;

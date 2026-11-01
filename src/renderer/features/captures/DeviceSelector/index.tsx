@@ -7,10 +7,9 @@ import { useI18n } from '../../../i18n';
 import { useDynStyle } from '../../../lib/useDynStyle';
 import { isTopOverlayLayer, useOverlayLayer } from '../../../lib/overlayStack';
 import {
-  DeviceStatusIcon,
   DeviceTypeIcon,
   getBootstrapSummary,
-  STATUS_TEXT_KEYS,
+  getDeviceStatusKey,
 } from './DeviceSelectorParts';
 import {
   useDeviceDropdownPosition,
@@ -45,6 +44,9 @@ const DeviceSelectorDropdown: React.FC<{
     width: `${dropdownPosition.width}px`,
     visibility: dropdownPosition.ready ? 'visible' : 'hidden',
   });
+  const discoveryMessage = discovery.status === 'failed' ? discovery.error
+    : discovery.status === 'scanning' || discovery.status === 'idle' ? t('device.discovery.scanning')
+    : devices.some(device => device.type === 'android' && device.adbState !== 'missing') ? null : t('device.discovery.empty');
 
   return (
     <div
@@ -69,6 +71,9 @@ const DeviceSelectorDropdown: React.FC<{
       {devices.map((device) => {
         const selectable = device.status !== 'loading';
         const bootstrapSummary = getBootstrapSummary(device, t);
+        const name = device.type === 'local' ? t('device.local') : device.label;
+        const statusKey = getDeviceStatusKey(device);
+        const needsAttention = statusKey === 'device.status.unauthorized' || statusKey === 'device.status.offline';
         return (
           <Button variant="ghost" size="sm"
             key={device.id}
@@ -77,33 +82,19 @@ const DeviceSelectorDropdown: React.FC<{
             role="option"
             disabled={!selectable}
             aria-selected={device.id === selectedDevice}
+            title={[name, device.serial, device.detailText, bootstrapSummary, device.lastError].filter(Boolean).join('\n')}
           >
-            <div className="device-selector-option-main">
-              <div className="device-option-leading">
-                <DeviceTypeIcon type={device.type} />
-                <div className="device-option-copy">
-                  <span className="device-option-name">{device.type === 'local' ? t('device.local') : device.label}</span>
-                  {device.type !== 'local' && device.detailText ? <span className="device-option-detail">{device.detailText}</span> : null}
-                </div>
-              </div>
-              <div className="device-option-trailing">
-                <DeviceStatusIcon device={device} connectedLabel={t('device.status.connected')} />
-                <span className={`device-option-status ${device.status}`}>{t(device.adbState === 'device' && device.status === 'offline' ? 'device.status.disconnected' : STATUS_TEXT_KEYS[device.status])}</span>
-              </div>
-            </div>
-            {device.serial && device.status !== 'connected' && <div className="device-option-meta">{device.serial}</div>}
-            {bootstrapSummary && <div className="device-option-bootstrap">{bootstrapSummary}</div>}
-            {!selectable && device.lastError && <div className="device-option-error">{device.lastError}</div>}
+            <span className="device-option-leading">
+              <DeviceTypeIcon type={device.type} />
+              <span className="device-option-name">{name}</span>
+            </span>
+            <span className={`device-option-status${needsAttention ? ' is-error' : device.status === 'connected' || device.status === 'online' ? ' is-ready' : ''}`}>{t(statusKey)}</span>
           </Button>
         );
       })}
       </div>
       <div className="device-discovery-footer">
-        <div role="status" className={`device-discovery-status ${discovery.status === 'failed' ? 'is-error' : ''}`}>
-          {discovery.status === 'failed' ? discovery.error : discovery.status === 'scanning' || discovery.status === 'idle'
-            ? t('device.discovery.scanning') : devices.some((device) => device.type === 'android' && device.adbState !== 'missing')
-              ? t('device.discovery.watching') : t('device.discovery.empty')}
-        </div>
+        {discoveryMessage ? <div role="status" className={`device-discovery-status ${discovery.status === 'failed' ? 'is-error' : ''}`}>{discoveryMessage}</div> : null}
         <Button variant="ghost" size="sm" onClick={onRefresh} disabled={discovery.status === 'scanning'}>
           {t('device.discovery.refresh')}
         </Button>
@@ -199,13 +190,13 @@ export const DeviceSelector: React.FC = () => {
           aria-label={triggerTitle}
           title={triggerTitle}
         >
-          <span className={`device-selector-trigger-icon ${selectedEntry?.type === 'android' ? 'android' : 'local'}`}>
+          <span className="device-selector-trigger-icon">
             <DeviceTypeIcon type={selectedEntry?.type ?? 'local'} />
           </span>
             <>
               <span className="device-selector-utility-label">{utilityLabel}</span>
               <svg
-                className={`device-selector-arrow device-selector-arrow-utility ${isOpen ? 'open' : ''}`}
+                className={`device-selector-arrow ${isOpen ? 'is-open' : ''}`}
                 viewBox="0 0 12 12"
                 fill="currentColor"
                 aria-hidden="true"

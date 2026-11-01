@@ -113,6 +113,8 @@ export function createInvestigationApi(transport: RendererApiTransport): Investi
 
 export function createPlanApi(transport: RendererApiTransport): PlanApi {
   return {
+    reopenReview: (request) => transport.invoke(INVOKE.plan.reopenReview, request),
+    cancelReview: (request) => transport.invoke(INVOKE.plan.cancelReview, request),
     read: (request) => transport.invoke(INVOKE.plan.read, request),
     issueApprovalToken: (request) => transport.invoke(INVOKE.plan.issueApprovalToken, request),
     saveToProject: (request) => transport.invoke(INVOKE.plan.saveToProject, request),

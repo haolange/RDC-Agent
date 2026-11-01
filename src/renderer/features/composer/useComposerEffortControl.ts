@@ -86,7 +86,8 @@ export function useComposerEffortControl(options: {
   const tooltipLabel = t(reasoningLockedDisabled ? 'composer.effort.levelOff' : EFFORT_LABEL_KEYS[displayLevel]);
   const statusPresentation = capabilityStatusPresentation(capabilityState);
   const capabilityStateLabel = statusPresentation.labelKey ? t(statusPresentation.labelKey) : undefined;
-  const capabilityStateDetail = statusPresentation.detailKey ? t(statusPresentation.detailKey) : undefined;
+  const capabilityStateDetail = capabilityState.status === 'unavailable' || capabilityState.status === 'error'
+    ? capabilityState.message : statusPresentation.detailKey ? t(statusPresentation.detailKey) : undefined;
   const { maxContextStatusLabel, fastModelStatusLabel } = buildEffortCapabilityStatusLabels({
     capability,
     capabilityReady,

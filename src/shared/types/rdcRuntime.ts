@@ -157,6 +157,7 @@ export type PromptSegmentKind =
   | 'skill-catalog'
   | 'tool-capability'
   | 'runtime-fact'
+  | 'plan-revision'
   | 'delegation-capsule';
 
 export interface PromptSegment {

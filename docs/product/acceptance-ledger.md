@@ -1,5 +1,37 @@
 # Acceptance Ledger
 
+## 前三轮修复的架构审查与小范围收敛（2026-11-02）
+
+- 基线 `94e09f36da01f39ba74b77dc1dc6de1726046eac`，审查当前 Fast/Max、计划门/模型目录与 Android 菜单的未提交改动，保留既有实现。模型事实仍归 Manifest/EffectiveCatalog，会话沿用唯一 `modelOverride + turnControls`，刷新经既有主进程接口；设备菜单沿用语义 token 和紧凑单行。本轮不修改 IPC、schema、权限或用户配置，不创建分支、提交、推送或发布。
+- 确认并修复的直接问题为编译器旧 `selectorKey/selectorActions` 提前误拒绝：route 完全分离，或较低优先规则已被更具体组合完整覆盖，仍因相同 `when` 被判冲突。新增两项合法规则回归先失败，删除旧判定后只保留组合胜出检查；实际 route 重叠和未完整覆盖仍拒绝，重复 ID、无效 route、缺失 target/tier 四项完整性回归继续通过。同步 Provider 主题契约，移除设备箭头无用途类名及 fidelity 登记，不改变已验收视觉。根架构/设计/Agent 规则未发现需要修订的冲突。
+- 受影响回归 12 文件、104 项通过（新增 6 项），typecheck、lint、完整 check:gates、fidelity 与官方 `start:prepare` 构建通过；gates 内 Provider 专项为 16 文件、264 项通过。首轮 Knowledge 契约因 sandbox 无权 realpath 系统 TEMP 祖先 `C:\Users\Vip` 失败，直接复现错误后限定本轮仓库 TEMP，原断言和安全校验保持，完整门禁复跑通过。未重复全量 coverage、真实模型或 Android 回放，前三节证据按未受影响范围沿用。
+- 官方 launcher 在无账号的全新隔离双根启动 Browser，复用本轮唯一构建；一次性 `/qa` → cookie → 同源 `/app` 返回产品 HTML，`app:getMeta` 版本为 `0.6.0-rc.8`，真实主进程 `settings:getProviderCatalog` 返回 182 个 Provider，含 Grok 与 DeepSeek；未认证页面访问返回 401。该证据为实际启动与目录服务验收，不冒充本轮重新完成视觉矩阵或模型效果验收。
+- Tasks 按依赖和验证状态维护，最小证据保留 `.local/change-review/TASKS.md`、`receipt.json`。自有 launcher/Electron tree 已退出，5127 无监听、canonical 锁不存在，桌面启动权已交还。临时脚本、隔离 runtime/temp 经绝对路径、Git 跟踪、reparse 与进程边界核对后删除并复查；当前依赖、out 及前轮唯一证据保留，未清理非本轮资产。
+
+## Android 设备菜单单行收敛（2026-11-02）
+
+- 基线 `94e09f36da01f39ba74b77dc1dc6de1726046eac`，保留前两节尚未提交的修复，在当前分支收敛设备选择呈现。Local 与 Android 统一为图标、名称、短状态；删除行内详细诊断、序列号、APK/ABI 段落与重复状态图标。诊断保留 title，待连接为中性文字，未授权、离线与缺失保持明确异常。健康监听不再常驻提示；删除 12 个废弃样式基线项，无新旧并行呈现路径。
+- 受影响设备组件/store 共 2 文件、6 项测试通过，覆盖长元数据不进入行正文、tooltip、连接状态去重、未授权/离线/缺失、键盘和监听清理。typecheck、lint、appearance、renderer structure、design tokens、i18n、fidelity、repository hygiene、完整 check:gates 与 launcher 正式构建通过；沿用前节全量覆盖率，不将其冒充本次新增测试。
+- 官方 disposable Browser launcher 在隔离双根中经一次性 `/qa` 进入同源 `/app`，仅复制外观和原生 CLI 配置，无账号、凭据或会话副本。真实 CLI 发现 Android `darwin`，大字号深色英文的 Local/Android 均为 36px 单行，选中项与刷新正常。中文浅色 390×844 CSS px 下菜单 280×134、左右边界 16/296，无页面横溢出、名称/状态无重叠；方向键移至 Android、Escape 关闭并回焦触发器通过。未连接 replay、安装 helper 或打开 capture，不能作为设备回放验收。
+- 首次隔离 QA 未启用 full access，外观修改被现有 bridge 拒绝并回滚；随后按既有 QA 配置重启再完成主题/语言检查，没有放宽生产权限。最小证据保留 `.local/device-selector/device-menu.png` 与 `receipt.json`。验证标签及自有 launcher/Electron 已停止，5127 无监听、canonical 锁不存在；隔离 runtime/temp 经路径、链接、跟踪与进程边界核对后清理，桌面启动权已交还。本地 out 已更新，未提交、推送或发布。
+
+## 计划模型身份、目录加载与完整模型列表（2026-11-02）
+
+- 基线 `94e09f36da01f39ba74b77dc1dc6de1726046eac`，保留本页上一轮 Grok Max 修复，在当前分支追加可逆的 renderer 修正，未创建分支、提交、推送或发布。用户明确截图来自尚未重启的原窗口，模型列表未输入搜索词。本轮只读当前配置与持久目录，未修改真实账号或会话；Grok Subscription 已启用/配置/验证，持久目录重新走实际 resolver 后，4.7/4.6/4.5 均为 executable。截图时旧进程的内存状态已经不可复查，不能将当前磁盘结果冒充当时的运行证据，也不能把缺项归因于关键词。
+- 四项可复现问题先失败后通过：计划面板将尚在加载的目录等同不可用；不可用文案替换了保存的模型名；已配置但暂无可执行条目的 Provider 整组消失；Retry 仅重读同一快照而未刷新目录。现在普通 Composer 与计划门共用 `resolveCatalogCapability`，加载中等待，明确拒绝和完成后的缺失仍终结；胶囊保留模型名，空目录分组显示加载/空结果与重试，Retry 调用既有 `llm.refreshProviderModels` 后重新读取对应账号/协议快照。在途去重及迟到隔离保持，不改变 selectable gate 或主进程执行权限。
+- 继续使用唯一会话 `modelOverride + turnControls`，不创建计划专属配置；无覆盖时仍按执行目标 Agent 配置。新增批准回归确认显式 Composer 覆盖优先于 General 默认路由，失败不清覆盖。相关 42 文件、233 测试通过；全量 coverage 为 558 文件、4115 测试通过，4 项既有跳过；ratchet 通过（lines 77.88%、functions 79.30%、branches 66.08%、statements 75.54%）。typecheck、lint、完整 gates、build、diff whitespace 通过。能力解析移入共享函数后，同步了 settings gate 的源码注册与检查位置，未移除“完成后缺失必须不可用”的验证。
+- 真实产品 Browser 验证使用官方 launcher、全新隔离双根、one-time `/qa`→同源 `/app`、无凭据的本地确定性 Ollama 协议夹具。通过真实 Composer 选模型、切 Debugger、发送请求，计划审批显示相同 `QA Plan Model`、执行按钮可用、完整模型列表保留选中项；批准后 General 请求的 selected/effective model 与会话覆盖保持 `qa-plan-model`，实际收到最终答复。重载后再次进入计划仍保留覆盖；共 3 次本地模型请求。480 请求视口在宿主缩放下实际 CSS 宽 436，菜单宽 320，无页面横向溢出，Escape 逐层关闭并回焦模型胶囊。截图用全幅证据替换了错误坐标裁切的中间图。未新增真实 Grok 请求，未把本地夹具当成账号资格或真实模型效果验收。
+- 负结果保留在最小回执：首个 Ollama 夹具未提供实际 `/api/chat`，请求返回 404；随后单协议 Chat 夹具因缺 API key 在 HTTP 前被拒绝，均不算计划成功，最后按现有原生协议修正夹具后通过。同源 QA 服务有意重启时的旧 SSE 断连/401 日志不计为当前无错误证据。固定 PID 终止命令曾被自动审批以身份未验证拒绝；按 owner 文件、父子 PID、实例锁及命令行核验后安全停止自有树，未停止其它进程。
+- 最小证据为 `.local/plan-model/TASKS.md`、`receipt.json`、`diagnostic-receipt.json` 与 `plan-review.png`。本轮最后的截图计划已通过 Stop 正常取消，验证标签已关闭，自有 launcher/Electron 已退出，canonical 锁不存在，桌面启动权已交还。临时夹具、隔离双根、诊断脚本、测试临时根与 coverage 中间产物按绝对路径、无跟踪/链接及无活进程边界清理；当前 out 保留供桌面重启加载。
+
+## Grok 4.7 仅开启 Max 时的执行规则误冲突（2026-11-02）
+
+- 基线 `94e09f36da01f39ba74b77dc1dc6de1726046eac`，当前分支原地修复，未创建分支、提交、推送或发布。用户明确复现条件为 Fast 关闭、Max 开启。新增回归先失败，得到与截图一致的 `Conflicting execution bindings fast:build and context:max`；目录编译器漏报跨控件重叠的回归也先失败。
+- 根因：`resolveModelControls` 为投影 Fast 可用性试算 Fast=true，却无条件将该假设的错误返回给当前请求；Grok 的两条单控件规则缺少更具体组合，编译期又只检查相同维度。现在未请求 Fast 时不传播 Fast 试算错误；manifest 明确声明 Fast + Max 的 model-switch/client-tier 组合，继续保留 unknown entitlement；编译器按控件、推理与路由组合核验最终胜出规则，拒绝未消解的同等具体度冲突。
+- 确定性验证：真实编译 manifest → discovery contribution → Effective Catalog → RequestPlan 的四种 Fast/Max 组合通过。只开 Max 使用 `grok-4.7`、500000 窗口；两个开关全关为 256000；Fast 开启使用 `grok-4.7-build-fast`，窗口随 Max 为 256000/500000。Fast target 缺席时，仅 Max 仍可规划；实际请求 Fast 则拒绝。相关单测和 contracts 共 362 项通过，不代表账号 entitlement 或真实模型调用验收。
+- 完整验证：`vitest run --coverage --maxWorkers=2` 为 557 文件、4108 测试通过，4 项既有跳过；coverage ratchet 通过（lines 77.88%、functions 79.30%、branches 66.08%、statements 75.54%）。typecheck、lint、完整 gates、build、diff whitespace 检查通过。首轮默认临时目录因 sandbox 对用户路径祖先的 realpath 返回 EPERM，且并行负载出现测试超时；没有改断言或加超时，通过将临时根限定在本轮仓库隔离目录、限制 worker 数后完整复跑通过。
+- 官方 Browser launcher 在全新隔离 userData 中真实启动 main；one-time `/qa` → cookie → 同源 `/app`、未认证/缺少 Origin/foreign Origin 拒绝及 `app:getMeta` 版本核验通过。smoke 功能步骤 PASS，但脚本因沙箱内删除隔离目录 EPERM 返回失败；随后核验无自有活进程、无实例锁、无链接及无 Git 跟踪，已清理该目录。不冒称真实 Grok 请求或完整 UI 点击矩阵通过。原用户桌面进程保持运行；本轮 QA 锁已释放，桌面启动权已交还，原桌面继续持有其 canonical 锁。已更新本地构建，当前桌面需重启加载修复。
+
 ## 中英文界面与语言切换收敛（2026-10-30）
 
 - 基线 `eb0ba66aaa64d44a84151bec164215ef33c7dfd0`，本轮在 main 原地修复；实现验收后用户追加授权，以结构化提交说明提交并推送 main。未创建分支或发布版本。Tool 目录改用类型化翻译 key，删除中文字符串反查及正则补译模块、无运行入口的 `agent_handoff` 展示和废弃翻译。补齐有效中文缺译，统一状态、审批、计时、聚合、预览数量、无障碍及原生应用文案；内置 Agent 说明按 builtin provenance 本地化，User / Project 内容保留。
@@ -4239,3 +4271,17 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 本回合发现并修复：已完成工具的详情仍显示旧审批 Cancelled / PERMISSION_MODE_CHANGED，容易被读成整个工具取消。仅对主进程类型化的权限换代原因显示明确的“原审批因权限切换已撤销”／“Approval withdrawn after permission change”说明，不通过原始字符串猜测原因，不改写工具结果或普通取消语义。52项定向测试、typecheck、lint、check:i18n（2185 keys）、work-process、session-projection 与 build通过，最终 Browser 中英文和390px说明重新实测通过。该52项为本回合增量，不与上一节4094项全量及96项增量相加，也不宣称文案修正后重跑完整覆盖率。
 - 原生 Electron 实际呈现：官方标准 start:human 使用同一隔离数据启动，窗口约1404×902；四挡位 radio 菜单的 Enter 选择、Escape 关闭及可见焦点环，Default→Auto-review确认、中文草稿保留、English→中文与浅色切换、已展开原始回执保持通过。新中文审批撤回说明清楚显示。原生“选择文件夹”子窗口使用 Escape 取消，随后取消添加项目，项目数保持1；真实标题栏关闭后窗口列表为空。该项是原生窗口与对话框取消证据，不是实际工具执行、模型效果或设备呈现的替代证据。
 - 证据与收尾：保留 `.local/permission-switch/evidence/browser-dark.png`、`browser-narrow.png`、`native-light.jpg` 三张不同目的画面及 `window-lifecycle-receipt.json`；样本为明确隔离的历史UI数据，未调用真实模型、Provider或RDC，也未使用真实凭据。原生标题栏关闭使官方 launcher正常exit0；本轮原生main、launcher及子进程和先前Browser main均经精确进程身份核验已退出，5127无监听，canonical与隔离userData的instance.lock均不存在。核对绝对边界、Git跟踪、reparse和进程后，window-qa内HOME、userData、project、temp和bootstrap已删除并复查目录不存在。桌面启动权已交还。沿用上一节正式HTTP／真实shell回执，本续节补齐窗口范围，不增加真实模型、RDC回放或Android设备验收声明。
+
+## 2026-11-02 模型目录一致性与计划审批恢复
+
+- 源码：基线 HEAD `94e09f36da01f39ba74b77dc1dc6de1726046eac` 加本轮工作树；保留前轮未提交内容，未创建分支、提交、推送或发布。任务及最小回执：`.local/catalog-plan-recovery/TASKS.md`、`receipt.json`。
+- 目录：主进程配置代次与单调投影版本、刷新首次状态、失效完成隔离、Renderer IPC/事件统一接收、会话/菜单只读重验证和 Retry 同一刷新链。运行时顺序字段不落缓存，不改变可执行性或账号权限；后台刷新保留已确认缓存，明确拒绝立即生效。
+- 审批：main-owned reviewId 与持久来源证明；正常/恢复共用冻结、Task 要求、决定和声明 handoff。Stop 后阅读器显式重开、强退 awaiting 自动恢复、恢复反馈作为真实新规划请求均实测。旧中断历史仍终态且计划不伪造拒绝；过期 reviewId、来源/分支/hash 变化及持久化失败有确定性负例。响应丢失只读确认，不重发决定/执行。实际发现的交接队列释放与同 session 重验证误清理有先失败后通过的定向回归。
+- 工程：完整 coverage 559 文件、4138 测试通过，4 项原有跳过；ratchet lines77.96/functions79.32/branches66.15/statements75.61。首次全量的四个并发超时用原超时限制、两个 worker 复跑通过，未放宽超时或断言。全量后的交接/选择/来源与空会话 DTO 收敛另以受影响测试验证：42 文件241例与 IPC/恢复等19文件149例；不相加为唯一用例总数，不宣称末次小修后重跑完整 coverage。typecheck、lint、完整 gates、正式构建结果见最终回执；不生成发行包。
+- 真实账号：只读复制 C 盘最小配置、加密凭据及同源 Local State、目录、一个目标会话历史和计划，项目根映射到隔离项目。真实 Grok 目录刷新成功；grok-4.7 经 canonical capability probe 只发一次简短无工具请求，requestSent=true、status=verified。此请求没有真实会话上下文，不代表完整 Grok 计划执行验收。
+- 产品验收：官方 launcher/one-time bootstrap/同源 app；原停止会话的阅读器重开、审批模型列表 Grok 可见与可选通过。受控本地模型验证正常计划、Stop、手动恢复、修改意见新规划、强制退出重启恢复与批准后 General 完成。最终正常与恢复批准分别返回 CONTROLLED_OK，计两次独立执行，输入与发送恢复可用。受控目录能力事实明确标为 fixture，不冒充真实 Provider 证据；原项目、capture 和设备工具未执行。
+- 视觉：既有 Composer 审批区与阅读器操作区，无新增审批模态。深浅主题、中英文、大字号、800px 窄视口无横向溢出；模型菜单 Enter/方向键/Escape 和焦点返回通过。保留 `plan-recovered.png`、`plan-completed.png` 两张不同目的最小截图。该证据不涵盖原生窗口缩放、真实 Android 或完整模型效果矩阵。
+- 清理：本轮隔离凭据、user data、项目、夹具、临时日志/缓存与 coverage 输出的清理及锁/进程复查以 receipt.json 为准；保留当前依赖、构建及前轮唯一证据。
+- 最终收尾复查：typecheck、lint、完整 gates、最终正式 build 与 diff 检查通过；781个本轮文件、逻辑25304936B已删除（不声称实际释放空间）。本轮 main/子进程和受控服务均退出，5127/11434无监听，隔离锁已随自有目录删除、canonical实例锁不存在，桌面启动权已交还。仅保留上述Tasks、receipt及两张截图；依赖、当前构建与前轮唯一证据保留。原C盘数据没有写回。
+- 收尾主子归属补验：活跃计划来自子会话时，Stop 按已核验的 viewing session 取消承载它的父请求，不再以 child turnId 匹配 root active turn。恢复审批仍只取消审批。3文件29例（含父/子 ID 不同情形）、typecheck/lint/当前正式build通过；增量构建日志及Node编译缓存已清理，最终文件/逻辑字节统计以 receipt.json 为准。
+- 上传收口：用户本轮明确授权整理并上传 main，取代本节开始时“尚未提交/推送”的本地交付边界。上传前确认当前 main 与 origin/main 无分叉、关键源码指纹匹配验收回执，任务目录仅四份必要证据、canonical 锁不存在且 QA 端口无监听。保留原始验收限制，不把受控模型结果写成完整 Grok/Android 验收；不发布发行包。

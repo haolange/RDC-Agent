@@ -4,6 +4,7 @@ import type {
   EffectiveCatalogRequest,
 } from './effectiveCatalogTypes';
 import { effectiveCatalogService } from './EffectiveCatalogService';
+import { revisionFor } from './effectiveCatalogMerge';
 import { modelsOverrideService } from './ModelsOverrideService';
 import type { ModelOverride, CustomModel } from '@shared/provider-catalog/modelsOverrideSchema';
 import type {
@@ -458,6 +459,9 @@ export function buildEffectiveCatalogRequest(
   );
   return {
     providerId: provider.id,
+    configurationRevision: revisionFor({ authMode: provider.authMode, enabled: provider.enabled,
+      isConfigured: provider.isConfigured, baseUrl: provider.baseUrl, connectionValues: provider.connectionValues,
+      activeAccountId: provider.activeAccountId, protocol: provider.protocol }),
     accountId: provider.activeAccountId ?? `anonymous:${provider.id}`,
     protocol: provider.protocol,
     catalogOwnership: provider.catalogOwnership,

@@ -4,6 +4,7 @@ import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/pro
 import type { LlmProviderProtocol } from '@shared/types/settings';
 import { appPathService } from '../runtime/AppPathService';
 import { ProviderConnectionError } from './providerConnectionErrors';
+import { CatalogProjectionClock } from './CatalogProjectionClock';
 import {
   cloneJson,
   enforceDiscoveryAdmission,
@@ -102,8 +103,10 @@ export class EffectiveCatalogService {
   private readonly lastEmitFingerprints = new Map<string, string>();
   private readonly transientQuota = new Map<string, TransientQuotaEntry>();
   private readonly latestRequests = new Map<string, EffectiveCatalogRequest>();
+  private readonly projectionClock = new CatalogProjectionClock();
   private discoveryLoaderResolver?: DiscoveryLoaderResolver;
   private discoveryLayerNormalizer?: DiscoveryLayerNormalizer;
+  private configurationIsCurrent: (request: EffectiveCatalogRequest) => boolean = () => true;
   private stateNeedsRewrite = false;
 
   constructor(options: EffectiveCatalogServiceOptions = {}) {
@@ -125,6 +128,10 @@ export class EffectiveCatalogService {
     this.discoveryLoaderResolver = resolver;
   }
 
+  setConfigurationValidator(validate: (request: EffectiveCatalogRequest) => boolean): void {
+    this.configurationIsCurrent = validate;
+  }
+
   setDiscoveryLayerNormalizer(normalizer?: DiscoveryLayerNormalizer): void {
     this.discoveryLayerNormalizer = normalizer;
   }
@@ -135,12 +142,17 @@ export class EffectiveCatalogService {
     const cachedKeys = new Set([
       ...Object.keys(this.state.discoveries),
       ...Object.keys(this.state.entitlements),
+      ...this.latestRequests.keys(),
     ]);
     for (const key of cachedKeys) {
       if (key === exactKey || (!exactKey && key.startsWith(prefix))) {
         delete this.state.discoveries[key];
         delete this.state.entitlements[key];
         this.clearKeyRefreshState(key);
+        this.projectionClock.invalidate(key);
+        this.refreshes.delete(key);
+        const latest = this.latestRequests.get(key);
+        if (latest) this.bindRequest(key, latest);
       }
     }
     const observedKey = evidenceKey(input.providerId, input.accountId);
@@ -158,7 +170,7 @@ export class EffectiveCatalogService {
 
   getSnapshot(request: EffectiveCatalogRequest, loader?: DiscoveryLoader): EffectiveCatalogSnapshot {
     const key = cacheKey(request.providerId, request.accountId, request.protocol);
-    this.latestRequests.set(key, cloneJson(request));
+    this.bindRequest(key, request);
     const snapshot = this.createSnapshot(request);
     const activeLoader = loader ?? this.discoveryLoaderResolver?.(request);
     if (
@@ -168,7 +180,14 @@ export class EffectiveCatalogService {
     ) {
       void this.refreshDiscovery(request, activeLoader);
     }
-    return snapshot;
+    return this.refreshes.has(key) ? this.createSnapshot(request) : snapshot;
+  }
+
+  private bindRequest(key: string, request: EffectiveCatalogRequest): string {
+    const { generation, changed } = this.projectionClock.bind(key, request);
+    if (changed) { this.refreshes.delete(key); this.clearKeyRefreshState(key); }
+    this.latestRequests.set(key, cloneJson(request));
+    return generation;
   }
 
   private createSnapshot(request: EffectiveCatalogRequest): EffectiveCatalogSnapshot {
@@ -246,6 +265,7 @@ export class EffectiveCatalogService {
     });
     const revisionedModels = models.map((model) => ({ ...model, catalogRevision }));
     const snapshot: EffectiveCatalogSnapshot = {
+      ...this.projectionClock.stamp(key, [catalogRevision, stale, this.refreshes.has(key), this.lastErrors.get(key)?.message ?? ''].join('\u0000')),
       providerId: request.providerId,
       accountId: request.accountId,
       protocol: request.protocol,
@@ -261,13 +281,19 @@ export class EffectiveCatalogService {
 
   refreshDiscovery(request: EffectiveCatalogRequest, loader: DiscoveryLoader): Promise<EffectiveCatalogSnapshot> {
     const key = cacheKey(request.providerId, request.accountId, request.protocol);
+    const generation = this.bindRequest(key, request);
     const active = this.refreshes.get(key);
     if (active) {
       return active;
     }
-    const refresh = (async () => {
+    let resolveRefresh!: (snapshot: EffectiveCatalogSnapshot) => void;
+    let rejectRefresh!: (error: unknown) => void;
+    const refresh = new Promise<EffectiveCatalogSnapshot>((resolve, reject) => { resolveRefresh = resolve; rejectRefresh = reject; });
+    this.refreshes.set(key, refresh);
+    void (async () => {
       try {
         const loaded = await loader();
+        if (this.projectionClock.generation(key) !== generation || !this.configurationIsCurrent(request)) return this.createSnapshot(this.latestRequests.get(key)!);
         const observedAt = this.now();
         const expiresAt = new Date(observedAt.getTime() + this.discoveryTtlMs).toISOString();
         const { entitlement, ...discovery } = loaded;
@@ -301,6 +327,7 @@ export class EffectiveCatalogService {
         this.refreshBackoff.delete(key);
         this.persistState();
       } catch (error) {
+        if (this.projectionClock.generation(key) !== generation || !this.configurationIsCurrent(request)) return this.createSnapshot(this.latestRequests.get(key)!);
         this.lastErrors.set(key, {
           message: error instanceof Error ? error.message : String(error),
           authenticationRejected: (error instanceof ProviderConnectionError && error.httpStatus === 401)
@@ -308,13 +335,12 @@ export class EffectiveCatalogService {
         });
         this.recordRefreshFailure(key);
       } finally {
-        this.refreshes.delete(key);
+        if (this.projectionClock.generation(key) === generation) this.refreshes.delete(key);
       }
       const snapshot = this.createSnapshot(request);
       this.emit(snapshot);
       return snapshot;
-    })();
-    this.refreshes.set(key, refresh);
+    })().then(resolveRefresh, rejectRefresh);
     return refresh;
   }
 
@@ -389,6 +415,8 @@ export class EffectiveCatalogService {
       snapshot.stale,
       snapshot.refreshing,
       snapshot.lastRefreshError ?? '',
+      snapshot.scopeGeneration,
+      snapshot.projectionVersion,
     ].join('\u0000');
   }
 

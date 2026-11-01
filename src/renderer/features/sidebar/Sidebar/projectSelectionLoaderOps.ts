@@ -1,3 +1,4 @@
+import { usePlanReviewStore } from '../../../stores/planReviewStore';
 import { useCaptureStore } from '../../../stores/captureStore';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
@@ -80,7 +81,7 @@ export async function selectSessionOp(
   const previousSessionId = ctx.getCurrentSession()?.sessionId ?? null;
 
   if (options.optimisticSession) {
-    applySessionSwitchHygiene({
+    if (previousSessionId !== options.optimisticSession.sessionId) applySessionSwitchHygiene({
       previousSessionId,
       nextSessionId: options.optimisticSession.sessionId,
     });
@@ -109,7 +110,7 @@ export async function selectSessionOp(
     return false;
   }
 
-  if (!options.optimisticSession || options.optimisticSession.sessionId !== result.session.sessionId) {
+  if ((options.optimisticSession?.sessionId ?? previousSessionId) !== result.session.sessionId) {
     applySessionSwitchHygiene({
       previousSessionId: options.optimisticSession?.sessionId ?? previousSessionId,
       nextSessionId: result.session.sessionId,
@@ -119,6 +120,7 @@ export async function selectSessionOp(
   hydrateComposerAgentFromSession(result.session);
   const history = await window.electronAPI.conversation.getHistory(result.session.sessionId).catch(() => null);
   if (history && ctx.isLatestSelectionRequest(options.requestId)) {
+    if (history.planReview) usePlanReviewStore.getState().accept(history.planReview);
     useConversationStore.getState().setConversationSnapshot(history.messages ?? [], history.branchState ?? null);
   }
   const trace = await window.electronAPI.trace.getProjection(result.session.sessionId).catch(() => null);

@@ -244,6 +244,7 @@ describe('composerSendHelpers', () => {
     };
     vi.mocked(electronAPI.conversation.getHistory).mockResolvedValue({
       messages: [assistantDone],
+      planReview: { sessionId: 'session-1', projectionVersion: 1, review: null, recoverable: null },
       branchState,
     });
     const setConversationMessages = vi.fn();

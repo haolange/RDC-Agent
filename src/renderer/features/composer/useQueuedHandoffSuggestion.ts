@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { isPlanReviewContinuationCurrent } from './planReviewRequestModel';
+import { isCurrentPlanReview, usePlanReviewStore } from '../../stores/planReviewStore';
 import { applyDeclaredHandoffOnClient } from './sessionAgentId';
 import { useComposerSessionContextStore, type HandoffSuggestionRequest } from '../../stores/composerSessionContextStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useConversationStore } from '../../stores/conversationStore';
 import type { ComposerSendOutcome, HandoffSendPayload } from './composerHandoffSend';
 
 interface Delivery {
@@ -18,14 +17,7 @@ function current(request: HandoffSuggestionRequest): boolean {
   if (useComposerSessionContextStore.getState().handoffSuggestionRequest !== request
     || useProjectStore.getState().currentSession?.sessionId !== request.sessionId) return false;
   if (!request.sourcePlan) return true;
-  const messages = useConversationStore.getState().conversationMessages;
-  const plan = messages.flatMap(message => message.workTrace?.blocks.flatMap(block => block.toolCalls
-    .filter(call => (call.delegatedRequest?.turnId ?? message.turnId) === request.sourcePlan!.turnId)) ?? [])
-    .filter(call => call.planReview).at(-1)?.planReview;
-  if (plan?.planId !== request.sourcePlan.planId || plan.revision !== request.sourcePlan.revision
-    || plan.hash !== request.sourcePlan.hash) return false;
-  return !!plan && isPlanReviewContinuationCurrent(messages, { sessionId: request.sessionId,
-    turnId: request.sourcePlan.turnId, toolCallId: request.sourcePlan.toolCallId, planReview: plan });
+  return isCurrentPlanReview({ sessionId: request.sessionId, reviewId: request.sourcePlan.reviewId }, 'approve');
 }
 
 export function useQueuedHandoffSuggestion(input: {
@@ -36,6 +28,7 @@ export function useQueuedHandoffSuggestion(input: {
   inspectRequest: (sessionId: string, requestId: string) => Promise<ComposerSendOutcome>;
 }) {
   const request = useComposerSessionContextStore(state => state.handoffSuggestionRequest);
+  const review = usePlanReviewStore(state => request?.sourcePlan ? state.bySession[request.sessionId] : undefined);
   const activeTurn = useComposerSessionContextStore(state => state.activeTurn);
   const isPromptSending = useComposerSessionContextStore(state => state.isPromptSending);
   const [ready, setReady] = useState<Delivery | null>(null);
@@ -43,6 +36,13 @@ export function useQueuedHandoffSuggestion(input: {
   const retrying = useRef(false);
   const callbacks = useRef(input);
   callbacks.current = input;
+  useEffect(() => {
+    if (request?.sourcePlan && !current(request)
+      && useComposerSessionContextStore.getState().handoffSuggestionRequest === request) {
+      useComposerSessionContextStore.getState().clearHandoffSuggestion();
+      setReady(null);
+    }
+  }, [request, review]);
   useEffect(() => {
     if (!request || request.phase === 'confirming' || request.sessionId !== input.sessionId || !current(request)) { setReady(null); return; }
     let mounted = true;

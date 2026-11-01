@@ -3,17 +3,50 @@ import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability'
 import { catalogScopeKey, reconcileCatalogProviders, resetCatalogProjection, useEffectiveCatalogStore } from './effectiveCatalogStore';
 import type { LlmProviderEntry } from '@shared/types/settings';
 
-const { read } = vi.hoisted(() => ({ read: vi.fn() }));
+const { read, refresh } = vi.hoisted(() => ({ read: vi.fn(), refresh: vi.fn() }));
 vi.mock('../platform/getElectronApi', () => ({ getElectronApi: () => undefined }));
-vi.mock('../services/effectiveCatalogService', () => ({ readEffectiveCatalog: read, observeEffectiveCatalog: () => () => undefined }));
+vi.mock('../services/effectiveCatalogService', () => ({ readEffectiveCatalog: read, refreshEffectiveCatalog: refresh, observeEffectiveCatalog: () => () => undefined }));
 const scope = { id: 'grok-account', activeAccountId: 'a', protocol: 'OpenAIResponses' as const };
 const snapshot = (accountId = 'a', generatedAt = '2026-10-25T01:00:00Z'): EffectiveCatalogSnapshot => ({
+  scopeGeneration: 'scope-a', projectionVersion: Date.parse(generatedAt),
   providerId: scope.id, accountId, protocol: scope.protocol, catalogRevision: 'revision',
   models: [], generatedAt, stale: false, refreshing: false,
 });
 const store = () => useEffectiveCatalogStore.getState();
 describe('effective catalog projection', () => {
-  beforeEach(() => { resetCatalogProjection(); read.mockReset(); });
+  it('keeps a completed event over an older response in the same millisecond and revalidates on demand', async () => {
+    let finish!: (value: EffectiveCatalogSnapshot) => void;
+    read.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    const pending = store().load(scope);
+    store().accept({ ...snapshot(), projectionVersion: 2, catalogRevision: 'completed' });
+    finish({ ...snapshot(), projectionVersion: 1 }); await pending;
+    expect(store().entries[catalogScopeKey(scope)].snapshot?.catalogRevision).toBe('completed');
+    read.mockResolvedValueOnce({ ...snapshot(), projectionVersion: 3 });
+    await store().load(scope, false, true);
+    expect(read).toHaveBeenCalledTimes(2);
+  });
+  it('binds a fresh generation from the read and ignores an old configuration event', async () => {
+    read.mockResolvedValueOnce(snapshot()); await store().load(scope); store().invalidate(scope);
+    let finish!: (value: EffectiveCatalogSnapshot) => void;
+    read.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    const pending = store().load(scope);
+    store().accept({ ...snapshot(), projectionVersion: Number.MAX_SAFE_INTEGER });
+    finish({ ...snapshot(), scopeGeneration: 'scope-b', projectionVersion: 1 }); await pending;
+    store().accept({ ...snapshot(), projectionVersion: Number.MAX_SAFE_INTEGER });
+    expect(store().entries[catalogScopeKey(scope)].snapshot?.scopeGeneration).toBe('scope-b');
+  });
+  beforeEach(() => { resetCatalogProjection(); read.mockReset(); refresh.mockReset().mockResolvedValue(undefined); });
+  it('explicit retry refreshes the provider directory instead of rereading the same rejected snapshot', async () => {
+    read.mockResolvedValueOnce({ ...snapshot(), projectionVersion: 0, lastRefreshError: 'HTTP 401' }).mockResolvedValueOnce(snapshot());
+    await store().load(scope);
+    const first = store().load(scope, true);
+    const duplicate = store().load(scope, true);
+    expect(first).toBe(duplicate);
+    await first;
+    expect(refresh).toHaveBeenCalledExactlyOnceWith(undefined, 'grok-account');
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(store().entries[catalogScopeKey(scope)].error).toBeUndefined();
+  });
   it('coalesces requests and reuses snapshots when a menu remounts', async () => {
     let finish!: (value: EffectiveCatalogSnapshot) => void;
     read.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
@@ -69,7 +102,7 @@ describe('effective catalog projection', () => {
     expect(read).toHaveBeenCalledTimes(2);
   });
   it('exposes a main-process refresh failure while retaining its cached catalog', async () => {
-    read.mockResolvedValue({ ...snapshot(), lastRefreshError: 'HTTP 401' });
+    read.mockResolvedValue({ ...snapshot(), projectionVersion: 0, lastRefreshError: 'HTTP 401' });
     await store().load(scope);
     expect(store().entries[catalogScopeKey(scope)]).toMatchObject({ error: 'HTTP 401', loading: false });
     expect(store().entries[catalogScopeKey(scope)].snapshot).not.toBeNull();

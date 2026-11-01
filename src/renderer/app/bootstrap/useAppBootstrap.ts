@@ -8,7 +8,8 @@ import {
   mapActionEventToTimelineEntry,
 } from '../../services/conversationTimeline';
 import { applyChromeTheme } from '../theme/applyChromeTheme';
-import { reconcileCatalogProviders, startCatalogProjection } from '../../stores/effectiveCatalogStore';
+import { reconcileCatalogProviders, startCatalogProjection, useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
+import { usePlanReviewStore } from '../../stores/planReviewStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useEvidenceStore } from '../../stores/evidenceStore';
@@ -137,6 +138,7 @@ export function useAppBootstrap(options: {
       ]);
       if (cancelled) return;
       if (historyResult) {
+        if ('planReview' in historyResult && historyResult.planReview) usePlanReviewStore.getState().accept(historyResult.planReview);
         setConversationSnapshot(
           hydrateMessagesWithActionEvents(
             historyResult.messages ?? [],
@@ -204,6 +206,13 @@ export function useAppBootstrap(options: {
   }, []);
 
   useEffect(() => startCatalogProjection(), []);
+  useEffect(() => {
+    if (!currentSession?.sessionId) return;
+    for (const provider of useAppSettingsStore.getState().settings.llm.providers) {
+      if (provider.enabled !== false && provider.isConfigured) void useEffectiveCatalogStore.getState().load(provider, false, true);
+    }
+  }, [currentSession?.sessionId]);
+  useEffect(() => window.electronAPI?.events.onPlanReviewChanged(projection => usePlanReviewStore.getState().accept(projection)), []);
   useEffect(() => {
     if (useAppSettingsStore.getState().hydrated) {
       const active = settings.llm.providers.filter((provider) => provider.enabled !== false

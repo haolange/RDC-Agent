@@ -3,6 +3,7 @@ import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   resolvedCapability,
   validateCapabilityResolution,
+  resolveCatalogCapability,
 } from './capabilityResolution';
 
 const effectiveModel = (overrides: Partial<EffectiveModel> = {}): EffectiveModel => ({
@@ -37,6 +38,18 @@ const effectiveModel = (overrides: Partial<EffectiveModel> = {}): EffectiveModel
 });
 
 describe('capability resolution state', () => {
+  it('waits for discovery but never conceals a denial or a completed missing result', () => {
+    const route = { providerId: 'provider-b', modelId: 'model-b' };
+    const snapshot = { models: [effectiveModel({ availability: 'unknown' })], refreshing: true };
+    const projection = { snapshot: snapshot as import('@shared/types/providerCapability').EffectiveCatalogSnapshot, loading: false };
+    expect(resolveCatalogCapability(route, projection).status).toBe('loading');
+    snapshot.models[0].availability = 'unavailable';
+    expect(resolveCatalogCapability(route, projection).status).toBe('unavailable');
+    snapshot.models = []; snapshot.refreshing = false;
+    expect(resolveCatalogCapability(route, projection).status).toBe('unavailable');
+    expect(resolveCatalogCapability(route, { ...projection, error: 'offline' }).status).toBe('error');
+    expect(resolveCatalogCapability(route, undefined).status).toBe('loading');
+  });
   it('accepts only a revisioned model matching the committed Agent route', () => {
     const result = validateCapabilityResolution(
       { providerId: 'provider-b', modelId: 'model-b' },

@@ -7,6 +7,8 @@ import { parse } from 'yaml';
 import { registerPlanHandlers } from './planHandlers';
 import { StorageIo } from '../sessions/StorageIo';
 import type { WorkbenchIpcContext } from './workbenchContext';
+import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
+import { conversationService } from '../conversation/ConversationService';
 
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => Promise<any>>(),
@@ -20,6 +22,12 @@ vi.mock('../sessions/sessionPlanReference', () => ({ readReferencedPlan: mocks.r
 vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: { sessions: { findSessionLocation: mocks.location }, get io() { return new StorageIo(); } } }));
 vi.mock('../runtime/AppPathService', () => ({ appPathService: { getProjectRdcPaths: mocks.paths } }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
+vi.mock('../conversation/ConversationService', () => ({ conversationService: {
+  isSessionBusy: () => false, isTurnActive: () => false, cancelActiveTurn: vi.fn(),
+} }));
+vi.mock('../agent-runtime/interactions/AgentPlanReviewRequestService', () => ({ agentPlanReviewRequestService: {
+  setBusyChecker: vi.fn(), subscribe: vi.fn(), reopen: vi.fn(), cancel: vi.fn(),
+} }));
 
 const request = { sessionId: 's', planId: 'old-plan', revision: 2, uri: 'session://plans/plan-frozen.md', expectedHash: 'a'.repeat(64) };
 const context = { state: { currentSessionId: 's' } } as WorkbenchIpcContext;
@@ -40,6 +48,11 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
 describe('plan IPC file authority', () => {
+  it('stops the owning parent request when the live review belongs to a delegated child turn', async () => {
+    vi.mocked(agentPlanReviewRequestService.cancel).mockReturnValueOnce({ success: true, liveTurnId: 'child-turn' });
+    expect(await invoke('plan:cancelReview', { sessionId: 's', reviewId: 'review' })).toEqual({ success: true });
+    expect(conversationService.cancelActiveTurn).toHaveBeenCalledExactlyOnceWith({ sessionId: 's' });
+  });
   it('saves selected history metadata, not latest session state', async () => {
     const grant = await invoke('plan:issueApprovalToken', { ...request, action: 'plan.saveToProject' });
     const result = await invoke('plan:saveToProject', { ...request, approvalToken: grant.token });

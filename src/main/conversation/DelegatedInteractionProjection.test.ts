@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ConversationMessage } from '@shared/types/conversation';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
 import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
-import { findPendingPlanReview } from '../../renderer/features/composer/planReviewRequestModel';
+import { resolveComposerPendingRequest } from '../../renderer/features/composer/pendingRequestSelection';
 import { findPendingUserInput } from '../../renderer/features/composer/userInputRequestModel';
 
 describe('delegated request projection after parent completion', () => {
@@ -29,10 +29,11 @@ it('projects child plans exclusively and degrades orphaned requests on restart',
   const host = { emitConversationEvent: vi.fn(), persistConversationSnapshot: vi.fn(() => null), publishConversationTrace: vi.fn() };
   const handler = createAgentEventHandler({ host, sessionId: 'parent', input: { userMessage: {} }, turnStreamState: state, commitAssistantMessage: vi.fn() } as unknown as Parameters<typeof createAgentEventHandler>[0]);
   handler({ id: 'event', type: 'approval.requested', sessionId: 'parent', turnId: 'child-turn', timestamp: 2, payload: { approvalId: 'plan-review-call', title: 'Plan', status: 'pending', kind: 'plan_review', toolCallId: 'call', toolName: 'plan_artifact', planReview: { planId: 'plan', revision: 1, uri: 'session://plans/plan.md', hash: 'a'.repeat(64), title: 'Plan', summary: ['Summary'], sections: [], status: 'awaiting', handoffOptions: [{ agent: 'general', label: 'Execute' }] }, delegatedRequest: { executionId: 'exec', childSessionId: 'child', turnId: 'child-turn' } } });
-  expect(findPendingPlanReview([state.assistantMessage])).toMatchObject({ sessionId: 'parent', turnId: 'child-turn', toolCallId: 'call' });
+  expect(state.assistantMessage.workTrace?.blocks.flatMap(block => block.toolCalls).find(call => call.planReview)?.delegatedRequest).toMatchObject({ childSessionId: 'child', turnId: 'child-turn' });
+  expect(resolveComposerPendingRequest([state.assistantMessage])).toBeNull();
   const call = state.assistantMessage.workTrace!.blocks.flatMap(b => b.toolCalls).find(c => c.planReview);
   expect(call?.approval).toBeUndefined();
-  expect(findPendingPlanReview([reconcileDelegatedInteractionRequests('parent', state.assistantMessage)])).toBeNull();
+  expect(resolveComposerPendingRequest([reconcileDelegatedInteractionRequests('parent', state.assistantMessage)])).toBeNull();
 });
 
 it('settles an orphaned parent turn and its thinking after a plan request is rejected on restart', () => {
@@ -54,7 +55,7 @@ it('settles an orphaned parent turn and its thinking after a plan request is rej
   expect(recovered.workTrace?.status).toBe('error');
   expect(recovered.workTrace?.blocks[0]).toMatchObject({ status: 'error', thinkingStatus: 'complete' });
   expect(recovered.workTrace?.blocks[0]?.completedAt).toBe(2);
-  expect(recovered.workTrace?.blocks[0]?.toolCalls[0]).toMatchObject({ status: 'error', planReview: { status: 'rejected' } });
+  expect(recovered.workTrace?.blocks[0]?.toolCalls[0]).toMatchObject({ status: 'error', planReview: { status: 'cancelled' } });
   expect(reconcileInterruptedConversationTurn(recovered, false)).toBe(recovered);
 });
 
@@ -73,8 +74,8 @@ it('settles an awaiting plan on a stopped message without rewriting its terminal
   } as ConversationMessage;
   const recovered = reconcileDelegatedInteractionRequests('session', message);
   expect(recovered.workTrace?.blocks[0]?.toolCalls[0]).toMatchObject({
-    status: 'error', resultPreview: 'Cancelled by the user.', planReview: { status: 'rejected' },
+    status: 'error', resultPreview: 'Cancelled by the user.', planReview: { status: 'cancelled' },
   });
-  expect(findPendingPlanReview([recovered])).toBeNull();
+  expect(resolveComposerPendingRequest([recovered])).toBeNull();
   expect(reconcileDelegatedInteractionRequests('session', recovered)).toBe(recovered);
 });

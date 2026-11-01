@@ -89,6 +89,10 @@ Fast、1M 和 reasoning 的执行方式只在 `ExecutionBinding` 中声明一次
 
 最具体 selector 胜出；同等具体度冲突在编译期失败。Fast 为 model variant 时，target 只存在于 `model-switch` action；Fast 为 service tier 或 request patch 时不改变模型 ID。Reasoning Max 可以是普通 wire effort，也可以由 `reasoning=max` binding 切换真实模型。固定 1M 始终解析为开启且 disabled；unsupported 始终关闭且 disabled。
 
+编译期按 Fast / Max / reasoning / route 的组合检查实际胜出规则，跨控件的同等具体度冲突也必须拒绝；显式的更具体组合规则可以消除重叠。Grok 订阅 4.7 的 Fast + Max 组合明确执行 Fast target 切换及 Max client tier，不隐式合并两条规则，组合 entitlement 继续服从目录与执行证据。控件可用性的假设试算只影响该控件状态，未开启 Fast 时不能用 Fast 试算失败阻断当前 Max 请求。
+
+冲突判定只检查同一实际组合下的最高具体度规则；route 不相交或被更具体规则完整覆盖的不同动作不构成冲突。不另设只按 `when` 判重的前置检查；binding ID 唯一性与 route、target、tier 引用完整性仍独立验证。
+
 `ModelSelection.pickerVisibility` 与 execution role 解耦。Doubao Lite 可以既是 primary model，又作为其他模型的执行 target；Kimi highspeed、Opus Fast 等纯内部 target 才隐藏。关联必须来自 live metadata 或精确 manifest fact，禁止后缀猜测。Agent/Composer 可执行集合再叠加共享 `isAgentToolExecutableModel` gate：只有 source-backed `toolCalling.supported` 且 route 有已实现 structured-tool adapter 的模型可被选择；Settings catalog 仍展示完整事实。
 
 禁止恢复 Embedding capability / Semantic lane / `settings.llm.embedding`。Discovery 继续 fail-closed 剔除非 agent modality（含 embedding/embeddings）。不得把 `EmbeddingCatalog` / `EmbeddingExecutionService` 写成现行产品能力；U02 删除这些源码。
@@ -114,7 +118,7 @@ Structural capability, account entitlement, expiring execution evidence, and tra
 
 ## 凭据与请求事务
 
-Settings schema 当前为 v4，Effective Catalog cache schema 为 v6。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。稳定 provider/model/surface ID、secret ref 与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
+Settings schema 当前为 v4，Effective Catalog cache schema 为 v8。运行时投影顺序字段不修改缓存 schema。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。稳定 provider/model/surface ID、secret ref 与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
 
 发送 preflight 创建主进程内 opaque credential lease，冻结 provider 配置、typed connection values、认证 headers、OAuth/Vertex 短时 token 与 AWS Bedrock credentials。认证 header 不进入 `ModelRoute` 或 `RequestPlan`。Adapter 必须持有 lease handle 才能发送；运行中不允许回读 Settings。
 
@@ -157,7 +161,7 @@ Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolic
 
 最终操作 URL 按 operation builder 构建并逐 route 测试，禁止重复追加 `/chat/completions`、`/responses` 或 Anthropic `/v1`。所有 stable surface 必须具有 adapter、auth schema、endpoint、Connection Test 与 operation URL；无凭据显示 `Unconfigured`，不得显示假 `Available`。
 
-Connection Test、Connect 与已配置 Refresh 共用同一条 credential-scoped discovery 写入路径（`refreshEffectiveCatalogDiscovery` → Effective Catalog）。Test 成功必须就地写入已发现的 contributions 并广播，禁止为徽章另开 renderer 假状态；未提交的替换密钥写入 `anonymous:{providerId}`，不得覆盖 live `activeAccountId`。Settings 模型行徽章只反映 catalog `availability`：有新鲜缓存显示 OK；无缓存或 `refreshing` 显示加载中，禁止先闪「未验证」。
+Connection Test、Connect 的贡献经 `refreshEffectiveCatalogDiscovery` 写入 Effective Catalog；已配置 Refresh 与自动 SWR 共用 `EffectiveCatalogService.refreshDiscovery` 和同一 discovery loader，不再先写回 Provider 设置。Test 成功必须就地写入已发现的 contributions 并广播，禁止为徽章另开 renderer 假状态；未提交的替换密钥写入 `anonymous:{providerId}`，不得覆盖 live `activeAccountId`。Settings 模型行徽章只反映 catalog `availability`：有新鲜缓存显示 OK；无缓存或 `refreshing` 显示加载中，禁止先闪「未验证」。
 
 ## HAL Adapter 实现注册
 
@@ -276,3 +280,5 @@ Grok 订阅保留系统默认浏览器 PKCE 登录一种方式：动态 loopback
 默认浏览器打开请求完成后返回待授权状态，不等待网页加载；打开失败通过所属 flow 投影明确错误并释放回调。待授权期间允许重新打开同一有效授权页；关闭外部标签页不等同取消，取消入口、超时与退出负责收口，迟到结果不覆盖终态。账号显示使用服务端真实身份，缺失时仅用中性账号名称；认证协议名不写入套餐字段，不推断套餐或余额。历史证据中的原始套餐名称保留来源与日期，不成为当前账号事实。
 
 Renderer `effectiveCatalogStore` 是 main 快照的内存投影，以 provider/account/protocol 为 scope，合并在途请求，逐 provider 呈现结果；配置和账号变化精确失效，迟到响应不得覆盖新 scope 或较新事件。service 通过注入的 ElectronAPI 读取；组件不直调 IPC。Composer、能力控件和 Settings 共用该投影；菜单重挂载不重读完整 settings，也不等待全部 provider。后台刷新保持已有内容，错误单独呈现并允许重试。主进程的执行前权限与 route 校验仍为唯一权威。
+
+目录运行时顺序独立于语义 revision：scopeGeneration 代表规范化配置代次，projectionVersion 在代次内递增，generatedAt 只审计，两字段不落目录缓存。刷新登记在途后才产生首次快照；完成前复核代次和当前连接配置，旧任务不能持久化发现、广播或清除新任务状态。账号 discovery 只返回贡献，不写设置；凭据续期独立核对原账号所有权。Renderer 的 IPC 与事件共用版本接收器；配置失效后由有效读取绑定新代次，早到事件只暂存并匹配代次。菜单/会话进入只读重验证，显式 Retry 使用上述同一刷新链；不新增轮询。

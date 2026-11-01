@@ -123,13 +123,23 @@ main-owned artifacts 投影仅含 rows（最多5项）、totalCount、storeDegra
 
 Renderer 的 EffectiveCatalog snapshot 只按 provider/account/protocol 保存，不写用户资源或历史会话。会话与 Agent 选择共用快照，账号或协议切换后旧请求和事件不得进入新 scope；模型选择成功才更新会话，失败不推进本地选择。共享目录不会替代 prepareTurn 冻结的 RequestPlan，也不会改变子 Agent 的模型继承边界。
 
+Composer 与计划审批使用同一目录能力状态解析：尚在加载/刷新的缺失或 unknown 模型保持待确认，明确 unavailable 不因后台刷新而恢复；完成后的缺失必须终结为不可用，读取失败有独立错误。已保存的模型身份不被状态文案替换。显式重试调用既有 Provider 目录刷新，再读取对应 scope；在途去重和迟到结果隔离保持，不能用目录 UI 状态替代主进程执行校验。
+
 ## 请求取消与计划归属
 
 - ConversationMessage/WorkTrace 的 stopped 是当前请求终态，不表示会话结束或某种模式退出。main 与 renderer 乐观停止共用纯取消结算，结束时间幂等，已完成及真实失败不被取消覆盖。未执行工具 skipped，运行中中止工具及工作块 cancelled；后台 Task 保留自身生命周期。
-- 待审计划取消使用 cancelled，无伪造 reject decision；修改意见继续通过 reject + feedback 恢复同一冻结请求。通用结果回执不得将明确已取消的交互改回 error/running。
-- PlanReviewState 的 ownerTurnId 在新写入时必需；未证明归属的已有记录只读不推断。不同 owning Turn 开启新周期；取消/决定按 ownerTurnId、planId、revision 核对。无新 IPC、模式开关或批量历史迁移。
+- 待审计划取消使用 cancelled，无伪造 reject decision。活跃审批的 reject + feedback 返回原循环；恢复审批的反馈是用户实际提交的新规划请求，经主进程校验 planSource 后进入原创建 Agent 的 prepareTurn/PromptPlan。通用结果回执不得将明确已取消的交互改回 error/running。
+- PlanReviewState 的 ownerTurnId 在新写入时必需；未证明归属的已有记录只读不推断。不同 owning Turn 开启新周期；取消/决定按 ownerTurnId、planId、revision 核对。运行时 reviewId 不落盘；不增加持久审批队列、存储版本或批量历史迁移。
 - 包含计划交互的 assistant result 永不渲染 handoff 建议；共享判定用于主进程及 renderer，不按 Agent 名称新增显示特判。审批区是唯一计划执行入口。
-- 新请求的 user/assistant 共用 owning request/turn，按真实消息顺序投影；审批反馈不是新 user 消息。Bridge 外部调用与真实 Composer 驾驶证据须分别记录，不能通过伪用户消息修饰历史。
+- 新请求的 user/assistant 共用 owning request/turn，按真实消息顺序投影；活跃审批反馈不新增 user 消息，恢复后的修改请求记录真实用户提交，旧 stopped/tool 记录保持终态。Bridge 外部调用与真实 Composer 驾驶证据须分别记录，不能通过伪用户消息修饰历史。
+
+### 计划审批恢复投影
+
+主进程以 plan-state.json 加持久历史、可见分支和计划 hash 验证归属，签发 PlanReviewProjection 与运行时 reviewId；getHistory 和 plan:reviewChanged 共用同一投影。Renderer 不从 streaming 或工具历史重建审批权限。answerPlanReview 仅接受 sessionId/reviewId/decision；reopenReview 与 cancelReview 共用来源和决定处理链。
+
+Stop 后 cancelled 只提供阅读器“重新审批”，有效 awaiting 在进入所属 session 时恢复原 Composer 审批区，不执行模型。approved/rejected/superseded、草稿不自动恢复；文件、hash、owner 或分支证明无效时拒绝恢复。存在其他请求禁止重开，重复或旧 reviewId 不能提交。重开不改旧历史；批准沿既有冻结、Task、offer 与声明 handoff，恢复不重启旧循环。决定响应不确定时读取当前状态，不自动重发或执行。
+
+EffectiveCatalogSnapshot 的 scopeGeneration 由主进程配置代次签发，projectionVersion 在代次内单调，generatedAt 只审计。IPC 返回和事件进入同一接收器，失效后以有效读取绑定代次并吸收同代次暂存事件。菜单打开与会话进入只读重验证合并在途读取；Retry 才强制刷新 Provider，保持 TTL 与退避，无定时轮询。
 
 
 ### 图片工具展示投影

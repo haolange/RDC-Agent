@@ -71,8 +71,7 @@ export const ComposerModelEffortControl: React.FC<{
   const currentOption = options.find((option) => (
     option.providerId === selected?.providerId && option.modelId === selected?.modelId
   ));
-  const modelLabel = unavailable ? t('composer.model.unavailable')
-    : currentOption?.label || (frozen ? selected?.modelId : undefined) || t('settings.selectModelPlaceholder');
+  const modelLabel = currentOption?.label || selected?.modelId || t('settings.selectModelPlaceholder');
   const displayedControls = frozen?.controls ?? effort.turnControls;
   const displayedEffort = frozen ? t(EFFORT_LABEL_KEYS[displayedControls.reasoningLevel]) : effort.effortLabel;
   const capsule = buildModelEffortCapsulePresentation({
@@ -83,7 +82,7 @@ export const ComposerModelEffortControl: React.FC<{
     fastModel: !unavailable && displayedControls.fastModel,
     fastModelLabel: t('composer.effort.fastModel'),
   });
-  const title = capsuleLabel ?? (unavailable ? modelLabel : waiting ? `${capsule.title} · ${t('composer.model.preparing')}` : capsule.title);
+  const title = capsuleLabel ?? (unavailable ? `${modelLabel} · ${t('composer.model.unavailable')}` : waiting ? `${capsule.title} · ${t('composer.model.preparing')}` : capsule.title);
   const activeView = view;
 
   const assignMenuRoot = useCallback((node: HTMLDivElement | null) => {

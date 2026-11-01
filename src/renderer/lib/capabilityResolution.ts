@@ -1,5 +1,5 @@
-import type { EffectiveModel } from '@shared/types/providerCapability';
-import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
+import { isAgentToolExecutableModel, classifyAgentToolEligibility, describeAgentToolIneligibility } from '@shared/utils/agentToolCapability';
 
 export type CapabilityUnavailableReason =
   | 'missing-model'
@@ -21,6 +21,20 @@ export interface ExpectedCapabilityRoute {
   modelId: string;
 }
 
+export function resolveCatalogCapability(
+  expected: ExpectedCapabilityRoute,
+  projection: { snapshot: EffectiveCatalogSnapshot | null; loading: boolean; error?: string } | undefined,
+): CapabilityResolutionState {
+  const model = projection?.snapshot?.models.find((entry) => entry.modelId === expected.modelId) ?? null;
+  if (!projection || ((projection.loading || projection.snapshot?.refreshing) && (!model || model.availability === 'unknown'))) {
+    return { status: 'loading' };
+  }
+  if (projection.error && (!model || model.availability === 'unknown')) return { status: 'error', message: projection.error };
+  const next = validateCapabilityResolution(expected, model);
+  return next.status === 'ready' && (projection.loading || projection.snapshot?.refreshing)
+    ? { status: 'refreshing', model: next.model } : next;
+}
+
 export function resolvedCapability(state: CapabilityResolutionState): EffectiveModel | null {
   return state.status === 'ready' || state.status === 'refreshing' ? state.model : null;
 }
@@ -36,7 +50,12 @@ export function validateCapabilityResolution(
       message: 'The committed model is not available in the effective catalog.',
     };
   }
-  if (!isAgentToolExecutableModel(resolved)) return { status: 'unavailable', reason: 'missing-model', message: 'The selected model is not executable.' };
+  if (!isAgentToolExecutableModel(resolved)) {
+    const eligibility = classifyAgentToolEligibility(resolved);
+    return { status: 'unavailable', reason: 'missing-model', message: resolved.unavailableReason
+      || (eligibility !== 'executable' ? describeAgentToolIneligibility(eligibility, expected.providerId, expected.modelId).userMessage
+        : 'The selected model is not executable.') };
+  }
   if (!resolved.catalogRevision || !resolved.routeRevision) {
     return {
       status: 'unavailable',

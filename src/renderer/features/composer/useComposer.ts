@@ -191,9 +191,9 @@ export function useComposer(options: {
     setIsDropActive: attachments.setIsDropActive,
     handoff,
     handlePromptSend: send.handlePromptSend,
+    sendExplicitPrompt: send.sendHandoffPrompt,
     handlePromptKeyDown: send.handlePromptKeyDown,
     setPromptValueDirect: setPromptValue,
   };
 }
-
 export type ComposerController = ReturnType<typeof useComposer>;

@@ -6,16 +6,17 @@ import { useComposerSessionContextStore } from '../../stores/composerSessionCont
 import { PlanReviewRequestPanel } from './PlanReviewRequestPanel';
 import { planReviewRequestKey, type PendingPlanReviewRequest } from './planReviewRequestModel';
 
-const mock = vi.hoisted(() => ({ submit: vi.fn(), modelSave: (_state: { saving: boolean; error?: string }) => {} }));
+const mock = vi.hoisted(() => ({ stop: vi.fn(), submit: vi.fn(), availability: 'available', modelSave: (_state: { saving: boolean; error?: string }) => {} }));
+vi.mock('../../services/planReviewService', () => ({ cancelPlanReview: mock.stop }));
 vi.mock('./usePlanReviewSubmit', () => ({ usePlanReviewSubmit: () => mock.submit }));
-vi.mock('./usePlanReviewModelAvailability', () => ({ usePlanReviewModelAvailability: () => () => true }));
+vi.mock('./usePlanReviewModelAvailability', () => ({ usePlanReviewModelAvailability: () => () => mock.availability }));
 vi.mock('./ComposerModelEffortControl', () => ({ ComposerModelEffortControl: (props: {
   onSaveStateChange: typeof mock.modelSave;
 }) => { mock.modelSave = props.onSaveStateChange; return createElement('button', null, 'Model'); } }));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 let root: Root;
 let host: HTMLDivElement;
-const request: PendingPlanReviewRequest = {
+const request: PendingPlanReviewRequest = { reviewId: 'review', agentId: 'debugger', recovered: false,
   sessionId: 's', turnId: 't', toolCallId: 'c', planReview: {
     planId: 'p', revision: 1, uri: 'session://plans/plan.md', hash: 'h', title: 'Do not repeat title',
     summary: ['Do not repeat summary'], sections: [], status: 'awaiting',
@@ -23,6 +24,7 @@ const request: PendingPlanReviewRequest = {
   },
 };
 const render = (value = request) => act(async () => {
+  if (value.planReview.revision !== request.planReview.revision) value = { ...value, reviewId: `review-${value.planReview.revision}` };
   root.render(createElement(PlanReviewRequestPanel, { key: planReviewRequestKey(value), request: value,
     agentId: 'debugger', currentSession: null }));
 });
@@ -31,10 +33,22 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   useComposerSessionContextStore.getState().clearHandoffSuggestion();
-  mock.submit.mockReset().mockResolvedValue(undefined);
+  mock.submit.mockReset().mockResolvedValue(undefined); mock.stop.mockReset().mockResolvedValue(undefined);
+  mock.availability = 'available';
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); vi.unstubAllGlobals(); host.remove(); });
+
+it('waits for the shared catalog without claiming the selected model is unavailable', async () => {
+  mock.availability = 'loading';
+  await render();
+  expect(host.textContent).toContain('composer.model.loading');
+  expect(host.textContent).not.toContain('composer.model.unavailable');
+  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
+  mock.availability = 'available';
+  await render();
+  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(false);
+});
 
 it('starts compact, offers every declared target and submits the selected one exactly once', async () => {
   let finish!: () => void;
@@ -59,7 +73,8 @@ it('renders a single declared target without numbering or an invented alternativ
 it('stops an awaiting plan without approving its handoff', async () => {
   let finish!: () => void;
   const onStop = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
-  await act(async () => root.render(createElement(PlanReviewRequestPanel, { request, onStop,
+  mock.stop.mockImplementation(onStop);
+  await act(async () => root.render(createElement(PlanReviewRequestPanel, { request,
     agentId: 'debugger', currentSession: null })));
   const stop = [...host.querySelectorAll<HTMLButtonElement>('button')]
     .find((button) => button.getAttribute('aria-label') === 'chat.planReviewStop')!;
@@ -97,9 +112,9 @@ it.each(['session', 'revision'])('resets editor/error and ignores the previous r
 });
 
 it('holds approval while a model saves, retains failures and still allows stop', async () => {
-  const onStop = vi.fn(async () => {});
+  const onStop = vi.fn(async () => {}); mock.stop.mockImplementation(onStop);
   await act(async () => root.render(createElement(PlanReviewRequestPanel, {
-    request, onStop, agentId: 'debugger', currentSession: null,
+    request, agentId: 'debugger', currentSession: null,
   })));
   await act(async () => mock.modelSave({ saving: true }));
   await click('.handoff-action-row__button');
@@ -138,7 +153,7 @@ it('retains acknowledgement and locks decisions until the approval projection ca
   await render();
   await act(async () => useComposerSessionContextStore.getState().queueHandoffSuggestion({
     sessionId: 's', agentId: 'general', label: 'Execute', prompt: '', send: true, phase: 'handoff',
-    sourcePlan: { turnId: 't', toolCallId: 'c', planId: 'p', revision: 1, hash: 'h' },
+    sourcePlan: { reviewId: 'review', turnId: 't', toolCallId: 'c', planId: 'p', revision: 1, hash: 'h' },
   }));
   expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
   expect(host.querySelector('[role="status"]')?.textContent).toBe('composer.handoff.switching');

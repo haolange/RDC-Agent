@@ -292,6 +292,8 @@ export const enChat = {
   'chat.planReviewFeedbackPlaceholder': 'Suggest changes…',
   'chat.planReviewReject': 'Submit changes',
   'chat.planReviewStop': 'Stop current request',
+  'chat.planReviewReopen': 'Review again',
+  'chat.planReviewReopened': 'Plan review restored',
   'chat.handoffSuggestionTitle': 'Continue',
   'chat.subagentComplete': 'Completed',
   'chat.subagentQueued': 'Queued',

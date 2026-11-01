@@ -38,6 +38,8 @@ import type {
   PlanExportResult,
   PlanReadRequest,
   PlanReadResult,
+  PlanReviewProjection,
+  PlanCancelReviewRequest,
   PlanReviewHandoffSuggestion,
   PlanSaveToProjectRequest,
   PlanSaveToProjectResult,
@@ -195,6 +197,7 @@ export interface ElectronAPI {
     answerPlanReview: (request: ConversationAnswerPlanReviewRequest) => Promise<ConversationAnswerPlanReviewResult>;
     getHistory: (sessionId: string) => Promise<{
       messages: ConversationMessage[];
+      planReview: PlanReviewProjection | null;
       branchState?: import('./conversationBranch').ConversationBranchState | null;
     }>;
     getDelegationTrace: (request: { sessionId: string; parentToolCallId: string; cursor: number; pageSize: number; sinceRevision?: number }) => Promise<import('./delegationTrace').DelegationTracePage>;
@@ -279,6 +282,8 @@ export interface ElectronAPI {
   };
 
   plan: {
+    reopenReview: (request: PlanReadRequest) => Promise<PlanReviewProjection>;
+    cancelReview: (request: PlanCancelReviewRequest) => Promise<{ success: boolean }>;
     read: (request: PlanReadRequest) => Promise<PlanReadResult>;
     issueApprovalToken: (request: PlanApprovalTokenRequest) => Promise<{ token?: string; targetPath?: string; cancelled?: boolean; error?: string }>;
     saveToProject: (request: PlanSaveToProjectRequest) => Promise<PlanSaveToProjectResult>;
@@ -574,6 +579,7 @@ export interface ElectronAPI {
     onTraceProjectionChanged: (callback: (payload: TraceProjectionChangedPayload) => void) => () => void;
     onDelegationTraceChanged: (callback: (payload: { sessionId: string; parentToolCallId: string; revision: number }) => void) => () => void;
     onEffectiveCatalogChanged: (callback: (snapshot: EffectiveCatalogSnapshot) => void) => () => void;
+    onPlanReviewChanged: (callback: (projection: PlanReviewProjection) => void) => () => void;
     onAgentMessage: (callback: (msg: unknown) => void) => () => void;
     onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;
     onToolExecutionComplete: (callback: (trace: unknown) => void) => () => void;

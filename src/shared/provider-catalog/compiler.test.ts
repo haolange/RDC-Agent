@@ -26,6 +26,79 @@ function mutableSurface(value: ProviderCatalogCompileInput, id: string): Record<
 }
 
 describe('Provider Catalog compiler', () => {
+  it('allows distinct actions on disjoint routes but rejects an actual route overlap', () => {
+    const source = clone(input());
+    const model = mutableSurface(source, 'deepseek').models.find(
+      (entry: Record<string, unknown>) => entry.modelId === 'deepseek-flash',
+    );
+    const [firstRoute, secondRoute] = model.routeOptions.map((route: { id: string }) => route.id);
+    model.executionBindings = [
+      { id: 'route:first', when: { fast: true }, actions: [{ kind: 'fixed' }],
+        entitlement: 'unknown', routeOptionIds: [firstRoute] },
+      { id: 'route:second', when: { fast: true }, actions: [{ kind: 'unsupported' }],
+        entitlement: 'unknown', routeOptionIds: [secondRoute] },
+    ];
+    expect(() => compileProviderCatalog(source)).not.toThrow();
+    model.executionBindings[1].routeOptionIds.push(firstRoute);
+    expect(() => compileProviderCatalog(source)).toThrow(/equal-specificity.*route:first.*route:second/u);
+  });
+
+  it('checks only winning bindings when more-specific rules cover the full overlap', () => {
+    const source = clone(input());
+    const model = mutableSurface(source, 'deepseek').models.find(
+      (entry: Record<string, unknown>) => entry.modelId === 'deepseek-flash',
+    );
+    model.executionBindings = [
+      { id: 'base:first', when: { fast: true }, actions: [{ kind: 'fixed' }], entitlement: 'unknown' },
+      { id: 'base:second', when: { fast: true }, actions: [{ kind: 'unsupported' }], entitlement: 'unknown' },
+      ...[false, true].map(maxContext => ({ id: `combined:${maxContext}`,
+        when: { fast: true, maxContext }, actions: [{ kind: 'fixed' }], entitlement: 'unknown' })),
+    ];
+    expect(() => compileProviderCatalog(source)).not.toThrow();
+    model.executionBindings.pop();
+    expect(() => compileProviderCatalog(source)).toThrow(/equal-specificity.*base:first.*base:second/u);
+  });
+
+  it.each([
+    ['duplicate id', (model: Record<string, any>) => { model.executionBindings.push({ ...model.executionBindings[0] }); }, /duplicate binding id/u],
+    ['unknown route', (model: Record<string, any>) => { model.executionBindings[0].routeOptionIds = ['missing-route']; }, /missing source route/u],
+    ['missing target', (model: Record<string, any>) => { model.executionBindings[0].actions = [{ kind: 'model-switch', targetModelId: 'missing-target' }]; }, /targets missing model/u],
+    ['missing tier', (model: Record<string, any>) => { model.executionBindings[0].actions = [{ kind: 'client-tier', tierId: 'missing-tier' }]; }, /missing context tier/u],
+  ] as const)('preserves binding integrity validation for %s', (_name, mutate, expected) => {
+    const source = clone(input());
+    const model = mutableSurface(source, 'deepseek').models.find(
+      (entry: Record<string, unknown>) => entry.modelId === 'deepseek-flash',
+    );
+    model.executionBindings = [{ id: 'integrity', when: { fast: true },
+      actions: [{ kind: 'fixed' }], entitlement: 'unknown' }];
+    mutate(model);
+    expect(() => compileProviderCatalog(source)).toThrow(expected);
+  });
+
+  it('rejects cross-control ties unless a more-specific binding resolves every overlap', () => {
+    const source = clone(input());
+    const grok = mutableSurface(source, 'grok-account').models.find(
+      (model: Record<string, unknown>) => model.modelId === 'grok-4.7',
+    );
+    grok.executionBindings = grok.executionBindings.filter(
+      (binding: { when: { fast?: boolean; maxContext?: boolean } }) => (
+        !(binding.when.fast === true && binding.when.maxContext === true)
+      ),
+    );
+    expect(() => compileProviderCatalog(source)).toThrow(/equal-specificity.*fast:build.*context:max/u);
+    grok.executionBindings.push({
+      id: 'fast:max', when: { fast: true, maxContext: true },
+      actions: [
+        { kind: 'model-switch', targetModelId: 'grok-4.7-build-fast' },
+        { kind: 'client-tier', tierId: 'max' },
+      ],
+      entitlement: 'unknown',
+    });
+    expect(() => compileProviderCatalog(source)).not.toThrow();
+    grok.executionBindings.at(-1).when.reasoning = ['high'];
+    expect(() => compileProviderCatalog(source)).toThrow(/equal-specificity/u);
+  });
+
   it('keeps every user-facing one-million control named Max mode', () => {
     const translations = fs.readFileSync(
       path.resolve(process.cwd(), 'src/renderer/i18n.ts'),
@@ -689,7 +762,7 @@ describe('Provider Catalog compiler', () => {
         actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
         entitlement: 'granted',
       });
-    expect(() => compileProviderCatalog(conflict)).toThrow(/conflicting bindings/u);
+    expect(() => compileProviderCatalog(conflict)).toThrow(/conflicting equal-specificity bindings/u);
 
     const overlap = clone(input());
     const overlapKimi = mutableSurface(overlap, 'kimi-coding-plan');

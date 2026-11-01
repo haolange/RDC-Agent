@@ -11,18 +11,25 @@ import { usePlanReviewActions } from './usePlanReviewActions';
 import { useProjectStore } from '../../stores/projectStore';
 import { useReadingPanelGeometry } from '../../lib/useReadingPanelGeometry';
 import './plan-review-panel.css';
+import { Button } from '../../ui/Button';
+import { usePlanReviewStore } from '../../stores/planReviewStore';
+import { reopenPlanReview } from '../../services/planReviewService';
+import { useElectronApi } from '../../hooks/useElectronApi';
 
 export const PlanReviewPanel: React.FC<{
   plan: ConversationPlanReview;
   onClose: () => void;
 }> = ({ plan, onClose }) => {
   const { t } = useI18n();
+  const api = useElectronApi();
   const titleId = useId();
   const geometry = useReadingPanelGeometry();
   const dialogRef = useRef<HTMLDivElement>(null);
   const { layerId } = useOverlayLayer(true);
   useModalFocus({ open: geometry.ready, containerRef: dialogRef, onClose, layerId });
   const sessionId = useProjectStore((state) => state.currentSession?.sessionId);
+  const projection = usePlanReviewStore(state => sessionId ? state.bySession[sessionId] : undefined);
+  const canReopen = projection?.recoverable?.planId === plan.planId && projection.recoverable.revision === plan.revision;
   const { readPlan, copyPlan, saveToProject, exportPlan } = usePlanReviewActions();
   const [markdown, setMarkdown] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +97,11 @@ export const PlanReviewPanel: React.FC<{
             <span className="plan-review-panel__revision">{t('chat.planReviewRevision', { revision: plan.revision })}</span>
           </div>
           <div className="plan-review-panel__actions">
+          {canReopen ? <Button variant="secondary" size="sm" disabled={busy || loading} onClick={() => void runAction(async () => {
+            const restored = await reopenPlanReview(api, reference);
+            usePlanReviewStore.getState().accept(restored); onClose(); return true;
+          }, t('chat.planReviewReopened'))}>{t('chat.planReviewReopen')}</Button> : null}
+
             <IconButton
               label={t('chat.planReviewExport')}
               size="sm"
@@ -120,7 +132,7 @@ export const PlanReviewPanel: React.FC<{
           </div>
         </header>
         {notice ? <p className="plan-review-panel__notice" role="status">{notice}</p> : null}
-        {error ? <p className="plan-review-panel__error" role="alert">{error}</p> : null}
+        {error || projection?.error ? <p className="plan-review-panel__error" role="alert">{error || projection?.error}</p> : null}
         <div className="plan-review-panel__body" aria-busy={loading}>
           {loading ? <p role="status">{t('chat.planReviewLoading')}</p> : markdown ? <MessageMarkdown content={markdown} /> : null}
         </div>

@@ -84,10 +84,11 @@ it('shows the main-confirmed request while disabled, and hides stale draft label
   expect(host.querySelector<HTMLButtonElement>('[data-testid="composer-model-effort-pill"]')!.disabled).toBe(true);
 });
 
-it('retains the choice but labels an invalid provider as unavailable', async () => {
+it('retains the selected model identity when its provider is temporarily unavailable', async () => {
   mock.choice = true; mock.controls.capabilityState.status = 'unavailable';
   await render(false);
-  expect(host.textContent).toBe('composer.model.unavailable');
+  expect(host.textContent).toBe('Model');
+  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.getAttribute('title')).toContain('composer.model.unavailable');
   expect(mock.clear).not.toHaveBeenCalled();
 });
 it('keeps the save barrier after closing the popup and reports a failed save without changing the model', async () => {

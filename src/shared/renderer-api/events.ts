@@ -14,6 +14,8 @@ import type { RendererApiTransport } from './transport';
 
 export function createEventSubscriptionApi(transport: RendererApiTransport): EventSubscriptionApi {
   return {
+    onPlanReviewChanged: (callback) => transport.subscribe(EVENT.conversation.planReviewChanged,
+      payload => callback(payload as Parameters<typeof callback>[0])),
     onDelegationTraceChanged: (callback) => (
       transport.subscribe(EVENT.conversation.delegationChanged, (payload) => (
         callback(payload as { sessionId: string; parentToolCallId: string; revision: number })

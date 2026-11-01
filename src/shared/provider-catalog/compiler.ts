@@ -181,34 +181,40 @@ function uniqueModels(values: ModelManifest[], label: string, errors: string[]):
   return result;
 }
 
-function selectorKey(binding: ExecutionBinding): string {
-  return stableJson(binding.when);
-}
-
 function bindingSpecificity(binding: ExecutionBinding): number {
   return Number(binding.when.fast !== undefined)
     + Number(binding.when.maxContext !== undefined)
     + Number(Boolean(binding.when.reasoning));
 }
 
-function bindingDimensions(binding: ExecutionBinding): string {
-  return [
-    binding.when.fast !== undefined ? 'fast' : '',
-    binding.when.maxContext !== undefined ? 'maxContext' : '',
-    binding.when.reasoning ? 'reasoning' : '',
-  ].filter(Boolean).join('|');
-}
-
-function bindingsCanOverlap(left: ExecutionBinding, right: ExecutionBinding): boolean {
-  if (left.when.fast !== undefined && right.when.fast !== undefined && left.when.fast !== right.when.fast) return false;
-  if (left.when.maxContext !== undefined
-    && right.when.maxContext !== undefined
-    && left.when.maxContext !== right.when.maxContext) return false;
-  if (left.when.reasoning && right.when.reasoning
-    && !left.when.reasoning.some((selection) => right.when.reasoning?.includes(selection))) return false;
-  if (left.routeOptionIds && right.routeOptionIds
-    && !left.routeOptionIds.some((routeId) => right.routeOptionIds?.includes(routeId))) return false;
-  return true;
+function validateBindingSelections(
+  surfaceId: string,
+  model: ModelManifest,
+  errors: string[],
+): void {
+  const bindings = model.executionBindings ?? [];
+  const reasoningSelections = new Set([undefined, ...bindings.flatMap((binding) => binding.when.reasoning ?? [])]);
+  const routeIds = model.routeOptions?.map((option) => option.id) ?? [model.route.protocol];
+  const conflicts = new Set<string>();
+  for (const fast of [false, true]) for (const maxContext of [false, true]) {
+    for (const reasoning of reasoningSelections) for (const routeId of routeIds) {
+      const matches = bindings.filter((binding) => (
+        (binding.when.fast === undefined || binding.when.fast === fast)
+        && (binding.when.maxContext === undefined || binding.when.maxContext === maxContext)
+        && (!binding.when.reasoning || (reasoning !== undefined && binding.when.reasoning.includes(reasoning)))
+        && (!binding.routeOptionIds?.length || binding.routeOptionIds.includes(routeId))
+      )).sort((left, right) => bindingSpecificity(right) - bindingSpecificity(left));
+      const first = matches[0];
+      if (!first) continue;
+      for (const other of matches.slice(1)) {
+        if (bindingSpecificity(first) !== bindingSpecificity(other)) break;
+        if (stableJson(first.actions) !== stableJson(other.actions)) {
+          conflicts.add(`${surfaceId}/${model.modelId} has conflicting equal-specificity bindings ${first.id} and ${other.id}`);
+        }
+      }
+    }
+  }
+  errors.push(...conflicts);
 }
 
 function modelProtocols(model: ModelManifest): Set<string> {
@@ -245,19 +251,11 @@ function validateBindingTargets(
   errors: string[],
 ): void {
   const bindingIds = new Set<string>();
-  const selectorActions = new Map<string, string>();
   for (const binding of model.executionBindings ?? []) {
     if (bindingIds.has(binding.id)) {
       errors.push(`${surface.id}/${model.modelId} has duplicate binding id ${binding.id}`);
     }
     bindingIds.add(binding.id);
-    const key = selectorKey(binding);
-    const actions = stableJson(binding.actions);
-    const previous = selectorActions.get(key);
-    if (previous && previous !== actions) {
-      errors.push(`${surface.id}/${model.modelId} has conflicting bindings for selector ${key}`);
-    }
-    selectorActions.set(key, actions);
     for (const routeOptionId of binding.routeOptionIds ?? []) {
       if (!model.routeOptions?.some((option) => option.id === routeOptionId)) {
         errors.push(`${surface.id}/${model.modelId} binding ${binding.id} references missing source route ${routeOptionId}`);
@@ -285,18 +283,7 @@ function validateBindingTargets(
       }
     }
   }
-  const bindings = model.executionBindings ?? [];
-  for (let leftIndex = 0; leftIndex < bindings.length; leftIndex += 1) {
-    for (let rightIndex = leftIndex + 1; rightIndex < bindings.length; rightIndex += 1) {
-      const left = bindings[leftIndex];
-      const right = bindings[rightIndex];
-      if (bindingDimensions(left) !== bindingDimensions(right)
-        || bindingSpecificity(left) !== bindingSpecificity(right)
-        || !bindingsCanOverlap(left, right)
-        || stableJson(left.actions) === stableJson(right.actions)) continue;
-      errors.push(`${surface.id}/${model.modelId} has conflicting equal-specificity bindings ${left.id} and ${right.id}`);
-    }
-  }
+  validateBindingSelections(surface.id, model, errors);
   if (model.controls.fast.state === 'selectable') {
     const hasFastBinding = (model.executionBindings ?? []).some((binding) => binding.when.fast === true);
     if (!hasFastBinding) errors.push(`${surface.id}/${model.modelId} exposes selectable Fast without an execution binding`);
@@ -375,8 +362,9 @@ function validateModel(
           || action.kind === 'model-switch'
         ))
       ));
-      if (maxBindings.length !== 1) {
-        errors.push(`${surface.id}/${model.modelId} live Max projection requires one executable binding`);
+      // Combined selectors may add paths; validateBindingSelections rejects ambiguous winners.
+      if (maxBindings.length === 0) {
+        errors.push(`${surface.id}/${model.modelId} live Max projection requires an executable binding`);
       }
     }
   }

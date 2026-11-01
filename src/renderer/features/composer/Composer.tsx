@@ -132,7 +132,7 @@ export const Composer: React.FC<ComposerProps> = ({
     <ComposerMenuRegistryProvider key={pendingRequest?.kind === 'plan-review'
       ? `${composerScopeKey}:${planReviewRequestKey(pendingRequest.request)}` : composerScopeKey}>
     {pendingRequest ? <ComposerPendingRequest shellRef={shellRef} pending={pendingRequest} composeAccentStyle={composeAccentStyle}
-      agentId={pendingRequest.kind === 'plan-review' ? controlsAgentId : activeAgentId ?? selectedAgentId} currentSession={currentSession} onStop={handlePrimaryStop} /> : <div
+      agentId={pendingRequest.kind === 'plan-review' ? controlsAgentId : activeAgentId ?? selectedAgentId} currentSession={currentSession} onReplan={composer.sendExplicitPrompt} /> : <div
       ref={shellRef} className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}${isDropActive ? ' is-drop-active' : ''}`}
       {...composeAccentStyle}
       onDragOver={attachmentDrop.handleDragOver}

@@ -276,6 +276,8 @@ export const zhChat = {
   'chat.planReviewFeedbackPlaceholder': '提出修改意见…',
   'chat.planReviewReject': '提交修改意见',
   'chat.planReviewStop': '停止当前请求',
+  'chat.planReviewReopen': '重新审批',
+  'chat.planReviewReopened': '已恢复计划审批',
   'chat.handoffSuggestionTitle': '继续',
   'chat.subagentComplete': '已完成',
   'chat.subagentQueued': '排队中',

@@ -159,6 +159,7 @@ export function useComposerSend(options: {
         showNotice,
         failedSummary: t('app.conversationRequestFailed'),
         preserveDraft: Boolean(handoff),
+        planSource: handoff?.planSource,
       });
     } finally {
       sendingRef.current = false;
@@ -172,7 +173,6 @@ export function useComposerSend(options: {
     setPendingAttachments, setPendingSkillIds, setPromptValue, setTracePresentation,
     setRuns, setSessions, showNotice, t, upsertConversationMessages,
   ]);
-
   const handlePromptSend = useCallback(async () => { await performSend(); }, [performSend]);
   const sendHandoffPrompt = useCallback((payload: HandoffSendPayload) => performSend(payload), [performSend]);
   const inspectHandoff = useCallback((sessionId: string, requestId: string) => {

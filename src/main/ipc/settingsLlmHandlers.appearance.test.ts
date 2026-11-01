@@ -34,7 +34,7 @@ vi.mock('../settings/AgentManifestService', () => ({ agentManifestService: {
   }),
 } }));
 vi.mock('../settings/EffectiveModelResolver', () => ({ resolveEffectiveCatalog: () => fixture.catalog, resolveEffectiveModel: vi.fn() }));
-vi.mock('../settings/EffectiveCatalogService', () => ({ effectiveCatalogService: { setDiscoveryLoaderResolver: vi.fn(), subscribe: vi.fn() } }));
+vi.mock('../settings/EffectiveCatalogService', () => ({ effectiveCatalogService: { setConfigurationValidator: vi.fn(), setDiscoveryLoaderResolver: vi.fn(), subscribe: vi.fn() } }));
 vi.mock('../provider-catalog/ProviderCatalogRegistry', () => ({ loadProviderSurface: fixture.load }));
 vi.mock('../settings/compiledAgentRoutes', () => ({ resolveCompiledRouteForAgent: vi.fn() }));
 vi.mock('../settings/resolveRegisteredProjectRoot', () => ({ tryCurrentProjectRoot: vi.fn() }));

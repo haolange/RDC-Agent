@@ -16,7 +16,7 @@ export function reconcileDelegatedInteractionRequests(sessionId: string, message
     if (call.toolName === 'plan_artifact' && call.planReview?.status === 'awaiting'
       && (message.status === 'stopped' || message.status === 'error')) {
       changed = true;
-      return { ...call, planReview: { ...call.planReview, status: 'rejected' as const } };
+      return { ...call, planReview: { ...call.planReview, status: 'cancelled' as const } };
     }
     const pendingApproval = call.approval?.status === 'pending';
     if (pendingApproval && isAutomaticToolApproval(call.approval!)) return call;
@@ -30,7 +30,7 @@ export function reconcileDelegatedInteractionRequests(sessionId: string, message
         : agentUserInputRequestService.isPending(sessionId, origin!.turnId, origin!.toolCallId);
     if (live) return call;
     changed = true;
-    return { ...call, status: 'error' as const, planReview: call.planReview ? { ...call.planReview, status: 'rejected' as const } : undefined, resultPreview: 'Child request was interrupted or cancelled. Explicit recovery is required.', approval: call.approval ? { ...call.approval, status: 'cancelled' as const } : undefined };
+    return { ...call, status: 'error' as const, planReview: call.planReview ? { ...call.planReview, status: 'cancelled' as const } : undefined, resultPreview: 'Child request was interrupted or cancelled. Explicit recovery is required.', approval: call.approval ? { ...call.approval, status: 'cancelled' as const } : undefined };
   }) }));
   return changed ? { ...message, workTrace: { ...message.workTrace!, blocks: blocks!, updatedAt: Date.now() }, updatedAt: Date.now() } : message;
 }

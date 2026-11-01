@@ -6,6 +6,10 @@
   border-top: 1px solid var(--token-border-muted);
 }
 
+.device-discovery-footer > .button {
+  margin-left: auto;
+}
+
 .device-discovery-status {
   flex: 1;
   min-width: 0;

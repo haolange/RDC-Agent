@@ -167,6 +167,7 @@ describe('modelCapabilitySummaryUtils', () => {
   it('filters snapshots by provider, account and protocol', () => {
     const snapshot = {
       providerId: 'provider-a', accountId: 'account-a', protocol: 'AnthropicMessages' as const,
+      scopeGeneration: 'fixture', projectionVersion: 1,
       catalogRevision: 'test-catalog', models: [], generatedAt: '2026-07-13T00:00:00.000Z',
       stale: false, refreshing: false,
     };

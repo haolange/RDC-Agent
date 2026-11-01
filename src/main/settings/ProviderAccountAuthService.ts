@@ -300,7 +300,8 @@ export class ProviderAccountAuthService {
     }
     const activeBundle = await this.refreshBundleIfNeeded(bundle);
     const discovery = await this.discoverCatalog(activeBundle);
-    await this.saveAccountDiscovery(providerId, activeBundle, discovery, false);
+    // EffectiveCatalogService owns discovery publication and persistence after
+    // checking configuration generation. Discovery must not rewrite settings.
     return discovery;
   }
 
@@ -402,6 +403,11 @@ export class ProviderAccountAuthService {
   private async refreshBundleIfNeeded(bundle: OAuthSecretBundle, force = false): Promise<OAuthSecretBundle> {
     const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === bundle.providerId);
     const accountId = provider?.activeAccountId ?? bundle.accountId ?? `anonymous:${bundle.providerId}`;
+    const ownsAccount = () => {
+      const current = settingsService.getAll().llm.providers.find(entry => entry.id === bundle.providerId);
+      return current?.activeAccountId === provider?.activeAccountId
+        && JSON.stringify(this.readBundle(bundle.providerId)) === JSON.stringify(bundle);
+    };
     return oauthRefreshManager.refresh({
       key: { providerId: bundle.providerId, accountId },
       current: bundle,
@@ -409,6 +415,7 @@ export class ProviderAccountAuthService {
       force: force || (bundle.providerId === 'github-copilot' && !bundle.copilotToken),
       refresh: () => this.performBundleRefresh(bundle),
       commit: (refreshed) => {
+        if (!ownsAccount()) throw new Error('PROVIDER_ACCOUNT_CHANGED: credential refresh no longer owns this account.');
         settingsService.rotateProviderAccountCredential(bundle.providerId, JSON.stringify(refreshed), {
           accountLabel: refreshed.accountLabel,
           planLabel: refreshed.planLabel,
@@ -417,7 +424,7 @@ export class ProviderAccountAuthService {
         });
       },
       onInvalidGrant: (error) => {
-        settingsService.markProviderAccountRefreshFailure(bundle.providerId, error.message);
+        if (ownsAccount()) settingsService.markProviderAccountRefreshFailure(bundle.providerId, error.message);
       },
     });
   }

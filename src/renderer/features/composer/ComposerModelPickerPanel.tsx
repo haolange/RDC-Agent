@@ -3,6 +3,7 @@ import type { SessionRecord } from '@shared/types/session';
 import { useI18n } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
+import { useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
 import { readCompiledComposerRoute } from '../../lib/composerEffectiveModel';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import {
@@ -50,11 +51,16 @@ export const ComposerModelPickerPanel: React.FC<{
   const savingRef = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const providers = useAppSettingsStore((state) => state.settings.llm.providers);
+  useEffect(() => {
+    for (const provider of providers.filter(entry => entry.enabled && entry.isConfigured)) {
+      void useEffectiveCatalogStore.getState().load(provider, false, true);
+    }
+  }, [providers]);
   const agentRoute = useAppSettingsStore((state) => readCompiledComposerRoute(state.settings, agentId));
   const agentName = useAppSettingsStore((state) => (
     state.settings.agents.definitions.find((entry) => entry.id === agentId)?.name || agentId
   ));
-  const { options, loading, failedProviders, retry } = useComposerModelPickerOptions(providers);
+  const { options, loading, failedProviders, unavailableProviders = [], retry } = useComposerModelPickerOptions(providers);
   const { effective, hasChoice, projectId } = useComposerEffectiveModel(agentId, currentSession);
   const agentDefault = resolveComposerAgentDefaultState(agentRoute, options, !loading);
   const agentDefaultMeta = formatAgentDefaultMeta(agentDefault, agentName, t);
@@ -66,6 +72,9 @@ export const ComposerModelPickerPanel: React.FC<{
     [options, query],
   );
   const groups = useMemo(() => groupComposerPickerOptions(filtered), [filtered]);
+  const unavailableGroups = unavailableProviders.filter(provider => (
+    !query.trim() || `${provider.id} ${provider.label}`.toLowerCase().includes(query.trim().toLowerCase())
+  ));
   const popupDynStyle = useDynStyle({
     '--composer-effort-popup-shift-x': `${popupShiftPx}px`,
   });
@@ -184,14 +193,19 @@ export const ComposerModelPickerPanel: React.FC<{
           <Button variant="ghost" size="sm" onClick={() => retry(provider.id)}>{t('settings.retry')}</Button>
         </InlineError>)}</div> : null}
         {saveError ? <InlineError>{saveError}</InlineError> : null}
-        {loading && groups.length === 0 ? (
+        {loading && groups.length === 0 && unavailableGroups.length === 0 ? (
           <p className="composer-model-empty">{t('composer.model.loading')}</p>
-        ) : groups.length === 0 ? (
+        ) : groups.length === 0 && unavailableGroups.length === 0 ? (
           <p className="composer-model-empty">{t('composer.model.empty')}</p>
         ) : null}
       </div>
-      {groups.length > 0 ? (
+      {groups.length > 0 || unavailableGroups.length > 0 ? (
         <div className="composer-model-list">
+          {unavailableGroups.map(provider => <div key={provider.id} className="composer-model-group" data-testid={`composer-model-provider-${provider.id}`}>
+            <p className="composer-model-group-label">{provider.label}</p>
+            <p className="composer-model-empty" role="status">{t(provider.loading ? 'composer.model.loading' : 'composer.model.empty')}</p>
+            <Button variant="ghost" size="sm" disabled={provider.retrying} onClick={() => retry(provider.id)}>{t('settings.retry')}</Button>
+          </div>)}
           {groups.map((group) => (
             <div key={group.providerId} className="composer-model-group">
               <p className="composer-model-group-label">{group.providerLabel}</p>

@@ -448,4 +448,4 @@ Android 设备选择不发起脱离 owning context 的连接。连接统一发�
 
 ### 自动审查与计划交接
 
-计划批准由宿主确认的工具边界正常结束 owning 规划回合，不再请求规划模型补终答；已启动执行仍须 join，未开始调用 skipped。Conversation 验证同回合冻结计划和 execution offer 后接受该计划门退出，不冒充 Mission 完成或放宽普通 canonical final_answer 合同。交接仍沿原有声明按钮、offer 和发送队列，无新增持久状态机。
+计划批准由宿主确认的工具边界正常结束 owning 规划回合，不再请求规划模型补终答；已启动执行仍须 join，未开始调用 skipped。Conversation 验证同回合冻结计划和 execution offer 后接受该计划门退出，不冒充 Mission 完成或放宽普通 canonical final_answer 合同。交接仍沿原有声明按钮、offer 和发送队列，无新增持久状态机。审批授权来自 main-owned PlanReviewProjection 与运行时 reviewId，以持久 plan-state/历史/文件证明来源，不依赖仍存活的 Promise 或历史 streaming。正常、重开和重启恢复共用决定链，不自动执行或复活旧回合；活跃反馈返回原循环，恢复反馈是携带已核验计划引用的新用户规划请求。详细恢复边界见 session-projection 契约。

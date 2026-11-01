@@ -79,6 +79,13 @@ export class PlanReviewStateStore {
     return true;
   }
 
+  reopenReview(sessionId: string, ownerTurnId: string, planId: string, revision: number): void {
+    const current = this.read(sessionId);
+    if (!current || current.ownerTurnId !== ownerTurnId || current.planId !== planId
+      || current.revision !== revision || current.status !== 'cancelled') throw new Error('PLAN_REVIEW_SCOPE_CHANGED: plan cannot be reopened.');
+    this.write(sessionId, { ...current, status: 'awaiting', updatedAt: nowMs() });
+  }
+
   markDecision(
     sessionId: string,
     status: Extract<PlanReviewStatus, 'approved' | 'rejected'>,

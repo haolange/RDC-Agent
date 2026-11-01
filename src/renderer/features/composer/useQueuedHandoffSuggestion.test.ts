@@ -6,6 +6,7 @@ import { useQueuedHandoffSuggestion } from './useQueuedHandoffSuggestion';
 import { useComposerSessionContextStore as context } from '../../stores/composerSessionContextStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useConversationStore } from '../../stores/conversationStore';
+import { usePlanReviewStore } from '../../stores/planReviewStore';
 const mock = vi.hoisted(() => ({ apply: vi.fn() }));
 vi.mock('./sessionAgentId', () => ({ applyDeclaredHandoffOnClient: mock.apply }));
 let root: Root;
@@ -20,6 +21,7 @@ function Probe({ busy = false }) {
 const render = (busy = false) => act(async () => root.render(createElement(Probe, { busy })));
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); vi.clearAllMocks();
+  usePlanReviewStore.getState().reset();
   useProjectStore.setState({ currentSession: { sessionId: 's' } as never });
   context.setState({ handoffSuggestionRequest: request(), activeTurn: null, isPromptSending: false });
   useConversationStore.setState({ conversationMessages: [] });
@@ -74,12 +76,26 @@ it('reconciles uncertain delivery without sending again, including repeated chec
   expect(context.getState().handoffSuggestionRequest).toBeNull(); expect(send).toHaveBeenCalledTimes(1);
 });
 it('does not send a superseded source plan', async () => {
-  context.setState({ handoffSuggestionRequest: { ...request(), sourcePlan: { turnId: 'old', toolCallId: 'old', planId: 'old', revision: 1, hash: 'old' } } });
+  context.setState({ handoffSuggestionRequest: { ...request(), sourcePlan: { reviewId: 'review', turnId: 'old', toolCallId: 'old', planId: 'old', revision: 1, hash: 'old' } } });
   await render(); expect(mock.apply).not.toHaveBeenCalled(); expect(send).not.toHaveBeenCalled(); expect(setPrompt).not.toHaveBeenCalled();
+});
+it('releases the handoff queue when a dispatched execution retires its review', async () => {
+  const sourcePlan = { reviewId: 'review', turnId: 't', toolCallId: 'c', planId: 'p', revision: 1, hash: 'h' };
+  usePlanReviewStore.getState().accept({ sessionId: 's', projectionVersion: 1, review: null, recoverable: null,
+    decision: { reviewId: 'review', kind: 'approve' } });
+  context.setState({ handoffSuggestionRequest: { ...request(), sourcePlan } });
+  send.mockImplementation(async () => {
+    usePlanReviewStore.getState().accept({ sessionId: 's', projectionVersion: 2, review: null, recoverable: null });
+    return { status: 'accepted', requestId: 'execution' };
+  });
+  await render();
+  expect(send).toHaveBeenCalledOnce();
+  expect(context.getState().handoffSuggestionRequest).toBeNull();
+  expect(controller.phase).toBeUndefined();
 });
 
 it('does not revive an earlier approved handoff when a later review has already ended', async () => {
-  const sourcePlan = { turnId: 't', toolCallId: 'c', planId: 'p', revision: 1, hash: 'h' };
+  const sourcePlan = { reviewId: 'review', turnId: 't', toolCallId: 'c', planId: 'p', revision: 1, hash: 'h' };
   context.setState({ handoffSuggestionRequest: { ...request(), sourcePlan } });
   useConversationStore.setState({ conversationMessages: [{ role: 'assistant', sessionId: 's', turnId: 't', status: 'complete',
     workTrace: { blocks: [{ toolCalls: [{ id: 'c', planReview: { planId: 'p', revision: 1, hash: 'h', status: 'approved' } },

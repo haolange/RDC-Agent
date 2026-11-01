@@ -1,4 +1,4 @@
-export interface HandoffSendPayload { sessionId: string; agentId: string; prompt: string }
+export interface HandoffSendPayload { sessionId: string; agentId: string; prompt: string; planSource?: import('@shared/types/planReview').PlanReadRequest }
 export interface ComposerSendOutcome {
   status: 'accepted' | 'rejected' | 'cancelled' | 'unknown';
   requestId: string;

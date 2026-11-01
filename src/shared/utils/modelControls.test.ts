@@ -43,6 +43,31 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
 }
 
 describe('resolveModelControls', () => {
+  it('does not reject Max-only requests because hypothetical Fast bindings conflict', () => {
+    const base = model({
+      contextTiers: [model().contextTiers[0], {
+        id: 'max', label: 'Max', maxPromptTokens: 500_000,
+        activation: { kind: 'implicit' }, entitlement: 'unknown',
+      }],
+      controls: {
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' },
+        maxContext: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'max' },
+        reasoning: noReasoning,
+      },
+      executionBindings: [
+        { id: 'fast:build', when: { fast: true }, actions: [{ kind: 'model-switch', targetModelId: 'fast' }], entitlement: 'granted' },
+        { id: 'context:max', when: { maxContext: true }, actions: [{ kind: 'client-tier', tierId: 'max' }], entitlement: 'unknown' },
+      ],
+    });
+    const result = resolveModelControls(base, { maxContextMode: true, fastModel: false });
+    expect(result.error).toBeUndefined();
+    expect(result.controls).toMatchObject({ maxContextMode: true, fastModel: false });
+    expect(result.binding?.id).toBe('context:max');
+    expect(result.resolved.fast).toMatchObject({ state: 'blocked', disabled: true, value: false });
+    expect(resolveModelControls(base, { maxContextMode: true, fastModel: true }).error?.code)
+      .toBe('PLAN_CONFLICT');
+  });
+
   it('uses one binding as the only Fast target truth', () => {
     const base = model({
       controls: {

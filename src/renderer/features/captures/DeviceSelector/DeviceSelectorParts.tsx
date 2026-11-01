@@ -28,7 +28,7 @@ export const DeviceTypeIcon: React.FC<{ type: ReplayDeviceEntry['type'] }> = ({ 
   return (
     <svg className="device-type-icon" viewBox="0 0 16 16" fill="currentColor">
       <rect x="4" y="1.5" width="8" height="13" rx="1.5" />
-      <rect x="6" y="3.25" width="4" height="8" rx="0.75" fill="rgb(var(--color-bg-1))" />
+      <rect x="6" y="3.25" width="4" height="8" rx="0.75" fill="var(--token-bg-shell)" />
     </svg>
   );
 };
@@ -39,6 +39,16 @@ export const STATUS_TEXT_KEYS: Record<ReplayDeviceEntry['status'], TranslationKe
   connected: 'device.status.connected',
   online: 'device.status.online',
 };
+
+export function getDeviceStatusKey(device: ReplayDeviceEntry): TranslationKey {
+  if (device.status === 'connected' || device.status === 'loading') return STATUS_TEXT_KEYS[device.status];
+  if (device.type === 'android') {
+    if (device.adbState === 'unauthorized') return 'device.status.unauthorized';
+    if (device.adbState === 'missing' || device.adbState === 'offline') return 'device.status.offline';
+    if (device.adbState === 'device' && device.status === 'offline') return 'device.status.disconnected';
+  }
+  return STATUS_TEXT_KEYS[device.status];
+}
 
 export function getBootstrapSummary(
   device: ReplayDeviceEntry,
@@ -65,19 +75,3 @@ export function getBootstrapSummary(
 
   return summary.length > 0 ? summary.join(' · ') : null;
 }
-
-export const DeviceStatusIcon: React.FC<{
-  device: ReplayDeviceEntry;
-  connectedLabel: string;
-}> = ({ device, connectedLabel }) => {
-  if (device.status === 'online') {
-    return <span className="device-status-icon online" aria-hidden="true">✓</span>;
-  }
-  if (device.status === 'connected') {
-    return <span className="device-status-icon connected">{connectedLabel}</span>;
-  }
-  if (device.status === 'loading') {
-    return <span className="device-status-icon loading" aria-hidden="true" />;
-  }
-  return <span className="device-status-icon offline" aria-hidden="true">✕</span>;
-};

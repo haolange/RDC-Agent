@@ -39,7 +39,7 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   const snapshot = projection?.snapshot ?? null;
   const loading = !projection || projection.loading;
   const loadFailed = Boolean(projection?.error);
-  useEffect(() => { void useEffectiveCatalogStore.getState().load(scope); }, [scope]);
+  useEffect(() => { void useEffectiveCatalogStore.getState().load(scope, false, true); }, [scope]);
 
   const resolvedModels = useMemo(
     () => projectProviderModels(provider.catalogOwnership, models, snapshot),

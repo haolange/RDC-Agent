@@ -1,4 +1,7 @@
 import { acquireRdcPreparationLock, setRdcInteractionLock } from '../sessions/RdcOperationCoordinator';
+import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
+import { readReferencedPlan } from '../sessions/sessionPlanReference';
+import { planReviewStateStore } from '../sessions/PlanReviewStateStore';
 import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
 import { enforceMissionTurnCompletion } from '../investigation/missionCompletionContract';
 import { createHash } from 'crypto';
@@ -90,6 +93,10 @@ export class ConversationService {
   isTurnActive(sessionId: string, turnId: string): boolean {
     return this.activeTurns.get(turnId)?.sessionId === sessionId;
   }
+  isSessionBusy(sessionId: string): boolean {
+    return [...this.activeTurns.values()].some(turn => turn.sessionId === sessionId)
+      || [...this.preparingRequests.values()].some(request => request.scopeKey === sessionId || request.scopeKey.endsWith(`:${sessionId}`));
+  }
 
   async abortAllTurns(): Promise<void> {
     for (const preparing of this.preparingRequests.values()) {
@@ -107,6 +114,7 @@ export class ConversationService {
   async getHistory(sessionId: string): Promise<{
     messages: ConversationMessage[];
     branchState: ConversationBranchState | null;
+    planReview: import('@shared/types/planReview').PlanReviewProjection;
   }> {
     const allMessages = storageAdapter.readConversationHistory(sessionId).map((message) => {
       const recovered = reconcileInterruptedConversationTurn(
@@ -123,6 +131,7 @@ export class ConversationService {
       // variant navigation concrete after refresh or session reselection.
       messages: allMessages,
       branchState,
+      planReview: agentPlanReviewRequestService.projection(sessionId),
     };
   }
 
@@ -300,6 +309,7 @@ export class ConversationService {
         preloadSkillIds: [...(input.preloadSkillIds ?? [])].sort(),
         branchAnchor,
         configurationCommit: input.configurationCommit ?? null,
+        planSource: input.planSource ?? null,
       }))
       .digest('hex');
   }
@@ -505,6 +515,7 @@ export class ConversationService {
         if (context.session && Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === context.session?.sessionId)) {
           throw new Error('CONVERSATION_BUSY: this conversation already has a running turn.');
         }
+        if (context.session) agentPlanReviewRequestService.retireRecovered(context.session.sessionId);
         return await this.startProfileTurn(
           context,
           input.profileId ?? input.agentId ?? null,
@@ -676,8 +687,10 @@ export class ConversationService {
     }
 
     fork.activeBranchId = input.branchId;
+    agentPlanReviewRequestService.retireRecovered(input.sessionId);
     branchState.activeLeafBranchId = input.branchId;
     storageAdapter.writeConversationBranchState(input.sessionId, branchState);
+    agentPlanReviewRequestService.projection(input.sessionId);
 
     const visibleMessages = resolveVisibleConversationMessages(allMessages, branchState);
     const tracePresentation = await traceService.buildConversationPresentation(input.sessionId, visibleMessages);
@@ -719,6 +732,23 @@ export class ConversationService {
       : null;
     const activeOpenedCapture = openedCapture?.status === 'open' ? openedCapture : null;
     const replayDevice = replayDeviceService.getDeviceById(input.replayDeviceId || 'local') ?? replayDeviceService.getDeviceById('local');
+    let planSource: ResolvedConversationContext['planSource'];
+    if (input.planSource) {
+      if (input.planSource.sessionId !== resolvedSessionId) throw new Error('PLAN_SESSION_DENIED: revision belongs to another session.');
+      const source = readReferencedPlan(input.planSource);
+      const state = planReviewStateStore.read(source.ownerSessionId);
+      const history = storageAdapter.readConversationHistory(resolvedSessionId!);
+      const visible = resolveVisibleConversationMessages(history, storageAdapter.readConversationBranchState(resolvedSessionId!));
+      if (source.agentId !== (input.agentId ?? input.profileId) || state?.status !== 'rejected'
+        || state.ownerTurnId !== source.turnId
+        || state.planId !== input.planSource.planId || state.revision !== input.planSource.revision
+        || !visible.some(message => message.workTrace?.blocks.some(block => block.toolCalls.some(call =>
+          call.planReview?.planId === state.planId && call.planReview.revision === state.revision
+          && call.planReview.hash === input.planSource!.expectedHash)))) {
+        throw new Error('PLAN_REVIEW_SCOPE_CHANGED: revision source is no longer current.');
+      }
+      planSource = { reference: input.planSource, markdown: source.markdown };
+    }
 
     return {
       projectId,
@@ -728,6 +758,7 @@ export class ConversationService {
       openedCapture: activeOpenedCapture,
       openedCapturePath: activeOpenedCapture?.filePath ?? null,
       replayDevice,
+      ...(planSource ? { planSource } : {}),
     };
   }
 

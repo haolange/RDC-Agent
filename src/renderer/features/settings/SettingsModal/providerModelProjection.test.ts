@@ -37,6 +37,7 @@ function effectiveModel(modelId: string, label: string): EffectiveModel {
 function snapshot(models: EffectiveModel[]): EffectiveCatalogSnapshot {
   return {
     providerId: 'provider-a', accountId: 'account-a', protocol: 'OpenAIResponses', catalogRevision: 'test-catalog', models,
+    scopeGeneration: 'fixture', projectionVersion: 1,
     generatedAt: '2026-07-13T00:00:00.000Z', stale: false, refreshing: false,
   };
 }

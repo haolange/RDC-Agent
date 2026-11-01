@@ -12,18 +12,22 @@ import { usePlanReviewSubmit } from './usePlanReviewSubmit';
 import { usePlanReviewModelAvailability } from './usePlanReviewModelAvailability';
 import { ComposerModelEffortControl, type ComposerModelSaveState } from './ComposerModelEffortControl';
 import './composer-plan-review.css';
+import { cancelPlanReview } from '../../services/planReviewService';
+import type { HandoffSendPayload } from './composerHandoffSend';
+import { useElectronApi } from '../../hooks/useElectronApi';
 
 export const PlanReviewRequestPanel: React.FC<{
   request: PendingPlanReviewRequest;
   agentId: string;
   currentSession: SessionRecord | null;
-  onStop?: () => Promise<void>;
-}> = ({ request, agentId, currentSession, onStop }) => {
+  onReplan?: (payload: HandoffSendPayload) => Promise<unknown>;
+}> = ({ request, agentId, currentSession, onReplan }) => {
   const { t } = useI18n();
-  const submit = usePlanReviewSubmit();
+  const api = useElectronApi();
+  const submit = usePlanReviewSubmit(onReplan);
   const transition = useComposerSessionContextStore(state => {
     const queued = state.handoffSuggestionRequest;
-    return queued?.sessionId === request.sessionId && queued.sourcePlan?.turnId === request.turnId
+    return queued?.sessionId === request.sessionId && queued.sourcePlan?.reviewId === request.reviewId && queued.sourcePlan.turnId === request.turnId
       && queued.sourcePlan.toolCallId === request.toolCallId && queued.sourcePlan.planId === request.planReview.planId
       && queued.sourcePlan.revision === request.planReview.revision && queued.sourcePlan.hash === request.planReview.hash ? queued : null;
   });
@@ -49,7 +53,7 @@ export const PlanReviewRequestPanel: React.FC<{
   const canReject = feedback.trim().length > 0;
 
   const run = async (decision: Parameters<typeof submit>[1]) => {
-    if (submitting.current || transition || modelSave.saving || (decision.kind === 'approve' && (modelSave.error || !modelAvailable(decision.handoff.agent))) || (decision.kind === 'reject' && !decision.feedback.trim())) return;
+    if (submitting.current || transition || modelSave.saving || (decision.kind === 'approve' && (modelSave.error || modelAvailable(decision.handoff.agent) !== 'available')) || (decision.kind === 'reject' && !decision.feedback.trim())) return;
     submitting.current = true;
     setIsSubmitting(true);
     setError(null);
@@ -64,12 +68,12 @@ export const PlanReviewRequestPanel: React.FC<{
   };
 
   const stop = async () => {
-    if (!onStop || submitting.current) return;
+    if (submitting.current) return;
     submitting.current = true;
     setIsSubmitting(true);
     setError(null);
     try {
-      await onStop();
+      await cancelPlanReview(api, { sessionId: request.sessionId, reviewId: request.reviewId });
     } catch (reason) {
       if (mounted.current) setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -82,17 +86,17 @@ export const PlanReviewRequestPanel: React.FC<{
     <section className="composer-plan-review" data-testid="plan-review-request-panel" aria-busy={isSubmitting}>
       <div className="composer-plan-review__header">
         <h2 className="composer-plan-review__title">{t('chat.planReviewImplement')}</h2>
-        {onStop ? <IconButton className="composer-plan-review__stop" size="sm" label={t('chat.planReviewStop')}
+        <IconButton className="composer-plan-review__stop" size="sm" label={t('chat.planReviewStop')}
           title={t('chat.planReviewStop')} disabled={isSubmitting} onClick={() => void stop()}>
           <Icon name="stop" size={16} />
-        </IconButton> : null}
+        </IconButton>
       </div>
       <div className="composer-plan-review__body">
       <HandoffActionRow
         presentation="decisions"
         options={request.planReview.handoffOptions}
         disabled={isSubmitting || !!transition || modelSave.saving || !!modelSave.error}
-        isOptionDisabled={(option) => !modelAvailable(option.agent)}
+        isOptionDisabled={(option) => modelAvailable(option.agent) !== 'available'}
         onSelect={(handoff) => void run({ kind: 'approve', handoff })}
       />
       <div className={`composer-plan-review__revision${multiline ? ' is-multiline' : ''}`}>
@@ -126,7 +130,8 @@ export const PlanReviewRequestPanel: React.FC<{
       {modelSave.error ? <p className="composer-plan-review__error" role="alert">{modelSave.error}{modelSave.retry ? <Button variant="ghost" size="sm" onClick={modelSave.retry}>{t('composer.model.retrySave')}</Button> : null}</p> : null}
       {isSubmitting || transition ? <p className="composer-transition-status" role="status">{t(transition?.phase === 'handoff' ? 'composer.handoff.switching' : 'composer.handoff.confirming')}</p> : null}
       {error ? <p className="composer-plan-review__error" role="alert">{error}</p> : null}
-      {request.planReview.handoffOptions.every((option) => !modelAvailable(option.agent)) ? <p className="composer-plan-review__error" role="status">{t('composer.model.unavailable')}</p> : null}
+      {request.planReview.handoffOptions.every((option) => modelAvailable(option.agent) === 'unavailable') ? <p className="composer-plan-review__error" role="status">{t('composer.model.unavailable')}</p> : null}
+      {request.planReview.handoffOptions.some((option) => modelAvailable(option.agent) === 'loading') ? <p className="composer-transition-status" role="status">{t('composer.model.loading')}</p> : null}
       </div>
       <div className="composer-plan-review__footer">
         <ComposerModelEffortControl agentId={agentId} currentSession={currentSession}

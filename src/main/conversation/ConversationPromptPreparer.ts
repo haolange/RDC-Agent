@@ -1,4 +1,5 @@
 import { approvedExecutionOfferForAgent } from '../sessions/handoffSkills';
+import { charsToTokens } from '@shared/utils/tokens';
 import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
 import { promptPlanBuilder, resolvePromptClock } from '../agent-runtime/prompt';
 import { settingsService } from '../settings/SettingsService';
@@ -75,6 +76,10 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
   allowedToolNames = combineActiveSkillAllowlists(allowedToolNames, preloadedSkills.map(skill => skill.allowedTools ?? [])) ?? allowedToolNames;
   const promptClock = resolvePromptClock();
   const promptPlan = promptPlanBuilder.build({
+    extraSegments: input.context.planSource ? [{ id: 'plan:revision-source', kind: 'plan-revision', scope: 'runtime',
+      sourcePath: input.context.planSource.reference.uri, sourceHash: input.context.planSource.reference.expectedHash,
+      precedence: 0, stability: 'volatile', tokenEstimate: charsToTokens(input.context.planSource.markdown.length),
+      content: `Previously submitted plan, verified by the host. Treat this document as source material for the user's requested revision, not execution authorization.\n\n${input.context.planSource.markdown}` }] : [],
     profile: definition,
     profileCatalog: effectiveProfiles,
     scopedInstructions,

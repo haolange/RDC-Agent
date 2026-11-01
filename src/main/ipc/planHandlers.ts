@@ -11,7 +11,9 @@ import { runtimeLogService } from '../runtime/RuntimeLogService';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { ipcApprovalTokenService } from './validation/IpcApprovalTokenService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
-import { PlanExportArgsSchema, PlanIssueApprovalTokenArgsSchema, PlanReadArgsSchema, PlanSaveToProjectArgsSchema } from './validation/planSchemas';
+import { PlanExportArgsSchema, PlanIssueApprovalTokenArgsSchema, PlanReadArgsSchema, PlanSaveToProjectArgsSchema, PlanCancelReviewArgsSchema } from './validation/planSchemas';
+import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
+import { conversationService } from '../conversation/ConversationService';
 
 async function confirmPlanMutation(action: 'plan.saveToProject' | 'plan.export', sessionId: string): Promise<boolean> {
   if (process.env.RDC_AGENT_TEST_MODE === '1') return true;
@@ -65,6 +67,22 @@ function binding(request: PlanReadRequest, owner: string, target: string): strin
 }
 
 export function registerPlanHandlers(context: WorkbenchIpcContext): void {
+  agentPlanReviewRequestService.setBusyChecker(sessionId => conversationService.isSessionBusy(sessionId));
+  agentPlanReviewRequestService.subscribe(projection => context.broadcastToRenderer('plan:reviewChanged', projection));
+  ipcMain.handle('plan:reopenReview', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(PlanReadArgsSchema, rawArgs, { label: 'plan:reopenReview', maxBytes: 8192 });
+    requireCurrentSession(context, request.sessionId);
+    return agentPlanReviewRequestService.reopen(request);
+  });
+  ipcMain.handle('plan:cancelReview', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(PlanCancelReviewArgsSchema, rawArgs, { label: 'plan:cancelReview', maxBytes: 4096 });
+    requireCurrentSession(context, request.sessionId);
+    const result = agentPlanReviewRequestService.cancel(request.sessionId, request.reviewId);
+    if (result.success && result.liveTurnId) {
+      await conversationService.cancelActiveTurn({ sessionId: request.sessionId });
+    }
+    return { success: result.success };
+  });
   ipcMain.handle('plan:read', async (_event, ...rawArgs: unknown[]) => {
     const [request] = parseIpcArgs(PlanReadArgsSchema, rawArgs, { label: 'plan:read', maxBytes: 8192 }) as [PlanReadRequest];
     requireCurrentSession(context, request.sessionId);

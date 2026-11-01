@@ -4,7 +4,7 @@ import { isProviderExecutable } from '@shared/utils/providerExecutionAvailabilit
 import type { AgentRouteSyncState } from '../../stores/agentRouteSyncState';
 import { catalogScopeKey, useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
-import { type CapabilityResolutionState, validateCapabilityResolution } from '../../lib/capabilityResolution';
+import { type CapabilityResolutionState, resolveCatalogCapability } from '../../lib/capabilityResolution';
 
 export function useEffectiveModelCapability(
   agentId: string, routeFingerprint: string, routeSyncState: AgentRouteSyncState | undefined,
@@ -28,12 +28,7 @@ export function useEffectiveModelCapability(
     if (routeSyncState?.status === 'saving') return setCapabilityState({ status: 'syncing-route' });
     if (!agentId || !providerId || !modelId) return setCapabilityState({ status: 'unconfigured' });
     if (!isProviderExecutable(provider)) return setCapabilityState({ status: 'unavailable', reason: 'provider-unavailable', message: 'Provider is disabled or disconnected.' });
-    const model = entry?.snapshot?.models.find((item) => item.modelId === modelId) ?? null;
-    if (!entry || (entry.loading && !model)) return setCapabilityState({ status: 'loading' });
-    if (entry.error && !model) return setCapabilityState({ status: 'error', message: entry.error });
-    const next = validateCapabilityResolution({ providerId, modelId }, model);
-    setCapabilityState(next.status === 'ready' && (entry.loading || entry.snapshot?.refreshing)
-      ? { status: 'refreshing', model: next.model } : next);
+    setCapabilityState(resolveCatalogCapability({ providerId, modelId }, entry));
   }, [agentId, providerId, modelId, provider, routeFingerprint, routeCommitKey, settingsHydrated, routeSyncState?.status, entry, setCapabilityState]);
   return useCallback(() => { if (scope.id && scope.protocol) void useEffectiveCatalogStore.getState().load(scope, true); }, [scope]);
 }

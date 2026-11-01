@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadProjectsOp, loadSessionsOp, type ProjectSelectionLoaderOpsContext } from './projectSelectionLoaderOps';
+import { loadProjectsOp, loadSessionsOp, selectSessionOp, type ProjectSelectionLoaderOpsContext } from './projectSelectionLoaderOps';
 import { handleProjectSelectOp, handleSessionActivateOp, type ProjectSelectionHandlerOpsContext } from './projectSelectionHandlerOps';
 import type { ProjectRecord } from '@shared/types/session';
 import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
@@ -41,6 +41,20 @@ function project(projectId: string): ProjectRecord {
     updatedAt: 0,
   };
 }
+
+it.each([false, true])('preserves review and handoff state on same-session revalidation (optimistic=%s)', async optimistic => {
+  vi.mocked(applySessionSwitchHygiene).mockClear();
+  const session = { sessionId: 'session-a', projectId: 'proj_a', agentId: 'general' } as never;
+  vi.stubGlobal('window', { electronAPI: { session: { select: async () => ({ success: true, session }) },
+    conversation: { getHistory: async () => null }, trace: { getProjection: async () => null }, run: { list: async () => ({ runs: [] }) } } });
+  const ctx = { getCurrentSession: () => session, isLatestSelectionRequest: () => true,
+    setCurrentSession: vi.fn(), setRightRailTarget: vi.fn(), setCurrentRun: vi.fn(), setCaptures: vi.fn(), setRuns: vi.fn(),
+  } as unknown as ProjectSelectionLoaderOpsContext;
+  try {
+    expect(await selectSessionOp(ctx, 'session-a', optimistic ? { optimisticSession: session } : {})).toBe(true);
+    expect(applySessionSwitchHygiene).not.toHaveBeenCalled();
+  } finally { vi.unstubAllGlobals(); }
+});
 
 describe('loadSessionsOp project-aware settings refresh', () => {
   const selectProject = vi.fn(async () => ({ success: true, project: project('proj_b') }));

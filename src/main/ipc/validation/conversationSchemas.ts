@@ -2,6 +2,7 @@ import { MaterialContextSchema } from '@shared/types/materialContext';
 import { z } from 'zod';
 import { ipcId, ipcNonEmptyString, ipcString, ipcStringArray } from './IpcPayloadGuard';
 import { SessionIdArgsSchema } from './commonIpcSchemas';
+import { planReference } from './planSchemas';
 
 const ReasoningSelectionSchema = z.enum([
   'off',
@@ -77,6 +78,7 @@ const ConfigurationCommitSchema = z.object({
 const NullableId = z.union([ipcId(128, 'id'), z.null()]);
 
 export const ConversationSendRequestSchema = z.object({
+  planSource: z.object(planReference).strict().optional(),
   requestId: ipcNonEmptyString(200, 'requestId'),
   projectId: NullableId.optional(),
   sessionId: NullableId.optional(),
@@ -170,9 +172,8 @@ export const ConversationAnswerUserInputArgsSchema = z.tuple([
  */
 export const ConversationAnswerPlanReviewArgsSchema = z.tuple([
   z.object({
-    sessionId: z.union([ipcId(128, 'sessionId'), z.null()]).optional(),
-    turnId: ipcNonEmptyString(200, 'turnId'),
-    toolCallId: ipcNonEmptyString(200, 'toolCallId'),
+    sessionId: ipcId(128, 'sessionId'),
+    reviewId: ipcNonEmptyString(128, 'reviewId'),
     decision: z.discriminatedUnion('kind', [
       z.object({
         kind: z.literal('approve'),

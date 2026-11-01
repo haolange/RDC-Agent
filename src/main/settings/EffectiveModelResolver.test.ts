@@ -51,7 +51,61 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       loadProviderSurface('cortecs'),
       loadProviderSurface('custom-endpoint'),
       loadProviderSurface('cline-pass'),
+      loadProviderSurface('grok-account'),
     ]);
+  });
+
+  it('keeps Grok Max usable when the unselected Fast target is absent', () => {
+    const grok = provider('grok-account', 'OpenAIResponses');
+    const request = buildEffectiveCatalogRequest(grok);
+    request.discovery = {
+      source: 'discovery', observedAt: '2026-11-02T00:00:00.000Z',
+      models: applyDiscoveryAuthority(grok, [{ modelId: 'grok-4.7', availability: 'available' }]),
+    };
+    const models = mergeEffectiveCatalog(request);
+    const base = models.find((model) => model.modelId === 'grok-4.7')!;
+    expect(planModelRequest({
+      model: base, catalogModels: models, controls: { fastModel: false, maxContextMode: true },
+    })).toMatchObject({
+      ok: true, plan: { effectiveModelId: 'grok-4.7', activeTierId: 'max', contextWindowTokens: 500_000 },
+    });
+    expect(planModelRequest({
+      model: base, catalogModels: models, controls: { fastModel: true, maxContextMode: true },
+    }).ok).toBe(false);
+  });
+
+  it.each([
+    [false, false, 'grok-4.7', 256_000, []],
+    [false, true, 'grok-4.7', 500_000, ['context:max']],
+    [true, false, 'grok-4.7-build-fast', 256_000, ['fast:build']],
+    [true, true, 'grok-4.7-build-fast', 500_000, ['fast:build+max']],
+  ] as const)('plans Grok Fast=%s Max=%s from the compiled and discovered catalog', (
+    fastModel, maxContextMode, effectiveModelId, contextWindowTokens, appliedBindingIds,
+  ) => {
+    const grok = provider('grok-account', 'OpenAIResponses');
+    const request = buildEffectiveCatalogRequest(grok);
+    request.discovery = {
+      source: 'discovery', observedAt: '2026-11-02T00:00:00.000Z',
+      models: applyDiscoveryAuthority(grok, [
+        { modelId: 'grok-4.7', availability: 'available' },
+        { modelId: 'grok-4.7-build-fast', availability: 'available' },
+      ]),
+    };
+    const models = mergeEffectiveCatalog(request);
+    const base = models.find((model) => model.modelId === 'grok-4.7')!;
+    const result = planModelRequest({
+      model: base, catalogModels: models,
+      controls: { fastModel, maxContextMode, reasoningLevel: 'low' },
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      controls: { fastModel, maxContextMode, reasoningLevel: 'low' },
+      plan: {
+        selectedModelId: 'grok-4.7', effectiveModelId, contextWindowTokens,
+        appliedBindingIds: [...appliedBindingIds], fastMode: fastModel,
+        activeTierId: maxContextMode ? 'max' : 'default',
+      },
+    });
   });
 
   it('projects the dedicated tools fact source onto Cline Pass kimi-k2.7-code', () => {

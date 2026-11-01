@@ -63,6 +63,8 @@ export const RENDERER_INVOKE_CHANNEL = {
     list: 'investigation:list',
   },
   plan: {
+    reopenReview: 'plan:reopenReview',
+    cancelReview: 'plan:cancelReview',
     read: 'plan:read',
     issueApprovalToken: 'plan:issueApprovalToken',
     saveToProject: 'plan:saveToProject',
@@ -212,6 +214,7 @@ export const RENDERER_EVENT_CHANNEL = {
   },
   conversation: {
     event: 'conversation:event',
+    planReviewChanged: 'plan:reviewChanged',
     delegationChanged: 'conversation:delegationChanged',
   },
   workflow: {

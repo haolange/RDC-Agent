@@ -18,7 +18,7 @@ import { resolveCompiledRouteForAgent } from '../settings/compiledAgentRoutes';
 import { tryCurrentProjectRoot } from '../settings/resolveRegisteredProjectRoot';
 import { providerConnectionService } from '../settings/ProviderConnectionService';
 import { settingsService } from '../settings/SettingsService';
-import { resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
+import { buildEffectiveCatalogRequest, resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
 import { effectiveCatalogService } from '../settings/EffectiveCatalogService';
 import { providerCapabilityProbeService } from '../settings/ProviderCapabilityProbeService';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
@@ -53,6 +53,10 @@ import type { ModelsOverride } from '@shared/provider-catalog/modelsOverrideSche
 import { modelsOverrideService } from '../settings/ModelsOverrideService';
 
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
+  effectiveCatalogService.setConfigurationValidator((request) => {
+    const provider = settingsService.getAll().llm.providers.find(entry => entry.id === request.providerId);
+    return !!provider && buildEffectiveCatalogRequest(provider).configurationRevision === request.configurationRevision;
+  });
   effectiveCatalogService.setDiscoveryLoaderResolver((request) => (
     providerConnectionService.createEffectiveCatalogDiscoveryLoader(request)
   ));
@@ -125,8 +129,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const result = await providerConnectionService.refreshProviderModels(providerId);
     if (result.success) {
       context.applyCurrentLlmConfig();
-      // Account Test already published via catalogPublisher; rebroadcast live account snapshot.
-      // Api-key refresh also emitted via subscribe; broadcast keeps agent options in sync.
+      // Shared discovery published the versioned catalog; refresh agent option projection.
       await broadcastCatalog(providerId);
     }
     return result;

@@ -57,6 +57,7 @@ export async function sendComposerConversationTurn(options: {
   showNotice: (message: string) => void;
   failedSummary: string;
   preserveDraft?: boolean;
+  planSource?: import('@shared/types/planReview').PlanReadRequest;
 }): Promise<ComposerSendOutcome> {
   const {
     electronAPI,
@@ -196,6 +197,7 @@ export async function sendComposerConversationTurn(options: {
       message: sentPrompt,
       attachments: toConversationAttachmentInputs(sentAttachments),
       preloadSkillIds: sentSkillIds,
+      ...(options.planSource ? { planSource: options.planSource } : {}),
       turnControls,
       configurationCommit: configuration.configurationCommit,
     });

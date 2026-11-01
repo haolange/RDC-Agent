@@ -19,7 +19,7 @@ export async function loadComposerModelPickerOptions(
 
 export function useComposerModelPickerOptions(
   providers: readonly LlmProviderEntry[],
-): { options: ComposerModelPickerOption[]; loading: boolean; failedProviders: { id: string; label: string; error: string }[]; retry: (providerId: string) => void } {
+): { options: ComposerModelPickerOption[]; loading: boolean; failedProviders: { id: string; label: string; error: string }[]; unavailableProviders: { id: string; label: string; loading: boolean; retrying: boolean }[]; retry: (providerId: string) => void } {
   const entries = useEffectiveCatalogStore((state) => state.entries);
   const resolved = useMemo(() => providers.filter(isProviderExecutable), [providers]);
   useEffect(() => {
@@ -32,6 +32,13 @@ export function useComposerModelPickerOptions(
     failedProviders: resolved.flatMap((provider) => {
       const error = entries[catalogScopeKey(provider)]?.error;
       return error ? [{ id: provider.id, label: provider.label, error }] : [];
+    }),
+    unavailableProviders: resolved.flatMap((provider) => {
+      const entry = entries[catalogScopeKey(provider)];
+      if (entry?.error || entry?.snapshot?.models.some(isComposerPickerModel)) return [];
+      return [{ id: provider.id, label: provider.label,
+        loading: !entry || entry.loading || entry.snapshot?.refreshing === true,
+        retrying: entry?.loading === true }];
     }),
     retry: (providerId) => {
       const provider = resolved.find((entry) => entry.id === providerId);

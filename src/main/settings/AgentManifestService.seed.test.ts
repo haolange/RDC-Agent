@@ -86,6 +86,7 @@ describe('AgentManifestService effective builtin snapshot', () => {
     };
     const catalog = {
       providerId: 'github-copilot', accountId: 'account-a', protocol: 'OpenAICompatibleChatCompletions', catalogRevision: 'test-catalog',
+      scopeGeneration: 'fixture', projectionVersion: 1,
       generatedAt: '2026-07-14T00:00:00.000Z', stale: false, refreshing: false,
       models: [
         { ...baseModel, modelId: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', availability: 'available' as const },
@@ -132,6 +133,7 @@ describe('AgentManifestService effective builtin snapshot', () => {
     } as unknown as AgentManifestSettings;
     const catalog = {
       providerId: 'github-copilot', accountId: 'account-a', protocol: 'OpenAICompatibleChatCompletions',
+      scopeGeneration: 'fixture', projectionVersion: 1,
       catalogRevision: 'test-catalog', generatedAt: '2026-07-17T00:00:00.000Z', stale: false, refreshing: false,
       models: [{
         providerId: 'github-copilot', modelId: 'unverified-budget', label: 'Unverified budget', aliases: [], enabled: true,
@@ -181,6 +183,7 @@ describe('AgentManifestService effective builtin snapshot', () => {
       accountId: 'account-a',
       protocol: 'OpenAICompatibleChatCompletions',
       catalogRevision: 'test-catalog',
+      scopeGeneration: 'fixture', projectionVersion: 1,
       generatedAt: '2026-07-17T00:00:00.000Z',
       stale: false,
       refreshing: false,

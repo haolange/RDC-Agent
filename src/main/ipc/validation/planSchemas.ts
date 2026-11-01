@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ipcId, ipcNonEmptyString } from './IpcPayloadGuard';
 
-const planReference = {
+export const planReference = {
   sessionId: ipcId(128, 'sessionId'),
   planId: ipcId(128, 'planId'),
   revision: z.number().int().positive(),
@@ -9,6 +9,7 @@ const planReference = {
   expectedHash: z.string().regex(/^[a-f0-9]{64}$/),
 };
 export const PlanReadArgsSchema = z.tuple([z.object(planReference).strict()]);
+export const PlanCancelReviewArgsSchema = z.tuple([z.object({ sessionId: ipcId(128, 'sessionId'), reviewId: ipcNonEmptyString(128, 'reviewId') }).strict()]);
 export const PlanIssueApprovalTokenArgsSchema = z.tuple([z.object({
   ...planReference, action: z.enum(['plan.saveToProject', 'plan.export']),
 }).strict()]);

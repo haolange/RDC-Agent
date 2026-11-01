@@ -286,8 +286,9 @@ async function main() {
   );
   assert(capabilityHook.includes("status: 'syncing-route'"), 'Composer capability resolution should wait for the committed Agent route revision.');
   assert(capabilityHook.includes('routeCommitKey'), 'Composer capability resolution should re-run on Agent route commits even when route text is unchanged.');
-  assert(capabilityHook.includes('validateCapabilityResolution'), 'Capability mismatches should terminate as unavailable instead of loading forever.');
-  assert(capabilityHook.includes("status: 'error'"), 'Capability request failures should have an explicit error state.');
+  const catalogCapability = readSrcFile(path.join(repoRoot, 'src/renderer/lib/capabilityResolution.ts'), 'utf8');
+  assert(capabilityHook.includes('resolveCatalogCapability') && catalogCapability.includes('validateCapabilityResolution(expected, model)'), 'Capability mismatches should terminate as unavailable instead of loading forever.');
+  assert(catalogCapability.includes("status: 'error'"), 'Capability request failures should have an explicit error state.');
   assert(!capabilityHook.includes('catch {'), 'Capability request failures must not be swallowed by an empty catch.');
   assert(!turnControls.includes(':pending'), 'Turn controls must not retain the legacy pending capability-key sentinel.');
   assert(turnControls.includes('capabilityState'), 'Turn controls should consume the closed capability resolution state.');

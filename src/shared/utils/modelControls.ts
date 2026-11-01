@@ -322,6 +322,6 @@ export function resolveModelControls(
     controls,
     resolved,
     binding: selectedBinding.binding,
-    error: fastBindingSelection.error ?? selectedBinding.error ?? blockedRequest,
+    error: (requestedFast ? fastBindingSelection.error : undefined) ?? selectedBinding.error ?? blockedRequest,
   };
 }

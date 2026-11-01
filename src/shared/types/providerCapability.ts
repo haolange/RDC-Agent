@@ -202,6 +202,8 @@ export interface EffectiveModel {
 }
 
 export interface EffectiveCatalogSnapshot {
+  scopeGeneration: string;
+  projectionVersion: number;
   providerId: string;
   accountId: string;
   protocol?: LlmProviderProtocol;

@@ -68,6 +68,7 @@ export function canonicalJson(value: unknown): string {
 }
 
 export interface ResolvedConversationContext {
+  planSource?: { reference: import('@shared/types/planReview').PlanReadRequest; markdown: string };
   projectId: string | null;
   session: SessionRecord | null;
   currentRun: RunSummary | null;

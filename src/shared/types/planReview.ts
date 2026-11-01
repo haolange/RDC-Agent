@@ -98,15 +98,36 @@ export interface PlanApprovalTokenRequest extends PlanReadRequest {
 }
 
 export interface ConversationAnswerPlanReviewRequest {
-  sessionId?: string | null;
-  turnId: string;
-  toolCallId: string;
+  sessionId: string;
+  reviewId: string;
   decision: PlanReviewDecision;
 }
+
+export interface PlanReviewContext {
+  reviewId: string;
+  sessionId: string;
+  turnId: string;
+  toolCallId: string;
+  agentId: string;
+  recovered: boolean;
+  planReview: ConversationPlanReview;
+}
+
+export interface PlanReviewProjection {
+  sessionId: string;
+  projectionVersion: number;
+  review: PlanReviewContext | null;
+  recoverable: PlanReadRequest | null;
+  error?: string;
+  decision?: { reviewId: string; kind: 'approve' | 'reject' | 'cancel' };
+}
+
+export interface PlanCancelReviewRequest { sessionId: string; reviewId: string }
 
 export interface ConversationAnswerPlanReviewResult {
   success: boolean;
   error?: string;
+  replan?: { agentId: string; source: PlanReadRequest; feedback: string };
 }
 
 export function isHandoffContinueAction(handoff: { showContinueOn?: boolean }): boolean {

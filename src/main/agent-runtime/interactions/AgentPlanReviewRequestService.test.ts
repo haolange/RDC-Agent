@@ -50,7 +50,7 @@ it('keeps incompatible approval pending without installing revisions or publishi
   const turnHandle = { approvedPlan: null } as TurnHandle;
   const pending = service.request({ agentId: 'planner', sessionId: 'sess', turnId: 'turn', toolCallId: 'call', planReview, turnHandle, onEvent, context: { sessionId: 'sess', turnId: 'turn' } });
   preflight.mockImplementationOnce(() => { throw new Error('TASK_EXECUTION_REQUIREMENTS: document-method missing'); });
-  await expect(service.answer({ sessionId: 'sess', turnId: 'turn', toolCallId: 'call', decision: { kind: 'approve', handoff: planReview.handoffOptions[0] } })).rejects.toThrow('document-method');
+  await expect(service.answer({ sessionId: 'sess',  reviewId: service.projection('sess').review?.reviewId ?? 'expired', decision: { kind: 'approve', handoff: planReview.handoffOptions[0] } })).rejects.toThrow('document-method');
   expect(markDecision).not.toHaveBeenCalled(); expect(install).not.toHaveBeenCalled();
   expect(turnHandle.approvedPlan).toBeNull(); expect(onEvent).toHaveBeenCalledTimes(1);
   expect(service.isPending('sess', 'turn', 'call')).toBe(true);
@@ -88,15 +88,13 @@ describe('AgentPlanReviewRequestService', () => {
     });
     expect(await service.answer({
       sessionId: 'sess',
-      turnId: 'turn-1',
-      toolCallId: 'call-1',
-      decision: { kind: 'reject', feedback: '   ' },
+       reviewId: service.projection('sess').review?.reviewId ?? 'expired', decision: { kind: 'reject', feedback: '   ' },
     })).toEqual({ success: false, error: 'Rejecting a plan requires non-empty feedback.' });
     expect(service.isPending('sess', 'turn-1', 'call-1')).toBe(true);
     service.cancelTurn('turn-1');
     await expect(pending).rejects.toThrow(/cancelled/);
-    expect((await service.answer({ sessionId: 'sess', turnId: 'turn-1', toolCallId: 'call-1',
-      decision: { kind: 'approve', handoff: planReview.handoffOptions[0] },
+    expect((await service.answer({ sessionId: 'sess',
+       reviewId: service.projection('sess').review?.reviewId ?? 'expired', decision: { kind: 'approve', handoff: planReview.handoffOptions[0] },
     })).success).toBe(false);
   });
 
@@ -120,18 +118,16 @@ describe('AgentPlanReviewRequestService', () => {
       context: { runId: 'run', turnId: 'turn-2', sessionId: 'sess', agentId: 'debugger' },
       onEvent: (event) => events.push(event),
     });
-    expect((await service.answer({ sessionId: 'other-owner', turnId: 'turn-2', toolCallId: 'call-2',
-      decision: { kind: 'approve', handoff: planReview.handoffOptions[0] },
+    expect((await service.answer({ sessionId: 'other-owner',
+       reviewId: service.projection('sess').review?.reviewId ?? 'expired', decision: { kind: 'approve', handoff: planReview.handoffOptions[0] },
     })).success).toBe(false);
-    expect((await service.answer({ sessionId: 'sess', turnId: 'turn-2', toolCallId: 'call-2',
-      decision: { kind: 'approve', handoff: { label: 'wrong', agent: 'optimizer' } },
+    expect((await service.answer({ sessionId: 'sess',
+       reviewId: service.projection('sess').review?.reviewId ?? 'expired', decision: { kind: 'approve', handoff: { label: 'wrong', agent: 'optimizer' } },
     })).success).toBe(false);
     expect(turnHandle.approvedPlan).toBeNull();
     expect(await service.answer({
       sessionId: 'sess',
-      turnId: 'turn-2',
-      toolCallId: 'call-2',
-      decision: { kind: 'approve', handoff: { label: '交给 General 执行', agent: 'general' } },
+       reviewId: service.projection('sess').review?.reviewId ?? 'expired', decision: { kind: 'approve', handoff: { label: '交给 General 执行', agent: 'general' } },
     })).toEqual({ success: true });
     await expect(pending).resolves.toContain('已冻结计划并确认声明交接。');
     expect(turnHandle.approvedPlan).toEqual({
@@ -142,8 +138,8 @@ describe('AgentPlanReviewRequestService', () => {
       planId: 'plan-1',
     });
     expect(events[1]?.payload).toMatchObject({ kind: 'plan_review', status: 'approved' });
-    expect((await service.answer({ sessionId: 'sess', turnId: 'turn-2', toolCallId: 'call-2',
-      decision: { kind: 'approve', handoff: planReview.handoffOptions[0] },
+    expect((await service.answer({ sessionId: 'sess',
+       reviewId: service.projection('sess').review?.reviewId ?? 'expired', decision: { kind: 'approve', handoff: planReview.handoffOptions[0] },
     })).success).toBe(false);
     expect(events).toHaveLength(2);
   });
@@ -156,7 +152,7 @@ it.each(['freeze', 'persist'])('does not publish authority when %s fails', async
   const service = new AgentPlanReviewRequestService(writer, store);
   const onEvent = vi.fn();
   const pending = service.request({ agentId: 'debugger', sessionId: 'sess', turnId: 'turn', toolCallId: 'call', planReview, turnHandle, onEvent, context: { runId: 'run', turnId: 'turn', sessionId: 'sess', agentId: 'debugger' } });
-  await expect(service.answer({ sessionId: 'sess', turnId: 'turn', toolCallId: 'call', decision: { kind: 'approve', handoff: planReview.handoffOptions[0] } })).rejects.toThrow('disk failure');
+  await expect(service.answer({ sessionId: 'sess',  reviewId: service.projection('sess').review?.reviewId ?? 'expired', decision: { kind: 'approve', handoff: planReview.handoffOptions[0] } })).rejects.toThrow('disk failure');
   expect(turnHandle.approvedPlan).toBeNull();
   expect(service.isPending('sess', 'turn', 'call')).toBe(true);
   expect(onEvent).toHaveBeenCalledTimes(1);
@@ -176,7 +172,7 @@ it.each(['finish', 'cancel', 'fail'])('joins the approved Task installation befo
   const turnHandle = { approvedPlan: null } as TurnHandle;
   const pending = service.request({ agentId: 'debugger', sessionId: 'sess', turnId: 'turn', toolCallId: 'call', planReview, turnHandle, context: { sessionId: 'sess', turnId: 'turn', agentId: 'debugger' } });
   const pendingRejection = action === 'cancel' ? expect(pending).rejects.toThrow('cancelled') : undefined;
-  const input = { sessionId: 'sess', turnId: 'turn', toolCallId: 'call', decision: { kind: 'approve' as const, handoff: planReview.handoffOptions[0] } };
+  const input = { sessionId: 'sess', reviewId: service.projection('sess').review!.reviewId, decision: { kind: 'approve' as const, handoff: planReview.handoffOptions[0] } };
   const first = service.answer(input);
   expect(markDecision).not.toHaveBeenCalled();
   expect(turnHandle.approvedPlan).toBeNull();

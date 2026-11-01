@@ -64,6 +64,34 @@ describe('EffectiveCatalogService', () => {
     vi.restoreAllMocks();
   });
 
+  it('publishes refreshing on the first cold read and orders completion in the same millisecond', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:00Z') });
+    let finish!: (value: { models: [] }) => void;
+    service.setDiscoveryLoaderResolver(() => () => new Promise(resolve => { finish = resolve; }));
+    const first = service.getSnapshot(request());
+    expect(first.refreshing).toBe(true);
+    finish({ models: [] });
+    await vi.waitFor(() => expect(service.getSnapshot(request()).refreshing).toBe(false));
+    const last = service.getSnapshot(request());
+    expect(last.scopeGeneration).toBe(first.scopeGeneration);
+    expect(last.projectionVersion).toBeGreaterThan(first.projectionVersion);
+  });
+
+  it('discards an old configuration refresh before persisting or publishing its result', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const service = new EffectiveCatalogService({ statePath });
+    let finish!: (value: { models: { modelId: string; label: string }[] }) => void;
+    const pending = service.refreshDiscovery(request(), () => new Promise(resolve => { finish = resolve; }));
+    const current = request({ user: { source: 'user', observedAt: '2026-01-01T00:00:00Z', models: [{ modelId: 'model-a', label: 'Current' }] } });
+    const head = service.getSnapshot(current);
+    const listener = vi.fn(); service.subscribe(listener);
+    finish({ models: [{ modelId: 'model-a', label: 'Old' }] }); await pending;
+    expect(listener).not.toHaveBeenCalled();
+    expect(service.getSnapshot(current).scopeGeneration).toBe(head.scopeGeneration);
+    expect(fs.existsSync(statePath)).toBe(false);
+  });
+
   it('blocks a rejected credential even with a cached catalog, scopes it to the account, and restores only after verification', async () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     const service = new EffectiveCatalogService({ statePath });

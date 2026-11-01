@@ -68,6 +68,7 @@
     "composer.toolApprovalPanel": "src/renderer/features/composer/ToolApprovalRequestPanel.tsx",
     "composer.toolApprovalSubmit": "src/renderer/features/composer/useToolApprovalSubmit.ts",
     "composer.capability": "src/renderer/features/composer/useEffectiveModelCapability.ts",
+    "composer.capabilityResolution": "src/renderer/lib/capabilityResolution.ts",
     "composer.turnControls": "src/renderer/features/composer/useTurnControls.ts",
     "transcript.workProcess": "src/renderer/features/transcript/WorkProcess.tsx",
     "transcript.workProcessContent": "src/renderer/features/transcript/WorkProcessContent.tsx",
