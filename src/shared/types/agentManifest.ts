@@ -1,9 +1,10 @@
-import type { LlmProviderId } from './settings';
+import type { AppLanguage, LlmProviderId } from './settings';
 import type { ModeIconKey } from './layout';
 import type { ModelCost } from '../provider-catalog/modelManifestSchema';
 
 export interface AgentHandoffDefinition {
   label: string;
+  labelTranslations?: HandoffLabelTranslations;
   agent: string;
   prompt: string;
   send?: boolean;
@@ -11,6 +12,8 @@ export interface AgentHandoffDefinition {
   model?: string;
   requiredSkillIds?: string[];
 }
+
+export type HandoffLabelTranslations = Readonly<Partial<Record<AppLanguage, string>>>;
 
 export interface AgentManifestDefinition {
   id: string;

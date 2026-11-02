@@ -26,11 +26,10 @@ export const ComposerModelEffortControl: React.FC<{
   agentId: string;
   currentSession: SessionRecord | null;
   disabled?: boolean;
-  showAgentDefault?: boolean;
   prepared?: PreparedTurnContextSummary | null;
   preparing?: boolean;
   onSaveStateChange?: (state: ComposerModelSaveState) => void;
-}> = ({ agentId, currentSession, disabled = false, showAgentDefault = false, onSaveStateChange, prepared, preparing = false }) => {
+}> = ({ agentId, currentSession, disabled = false, onSaveStateChange, prepared, preparing = false }) => {
   const { t } = useI18n();
   const controlsState = useComposerTurnControls();
   const menu = useComposerMenu('modelEffort');
@@ -66,8 +65,6 @@ export const ComposerModelEffortControl: React.FC<{
   const selected = frozen ? { providerId: frozen.route.providerId, modelId: frozen.route.effectiveModelId } : effective;
   const unavailable = !frozen && controlsState.capabilityState.status === 'unavailable';
   const waiting = disabled && preparing && !frozen;
-  const agentDefault = showAgentDefault && !hasChoice && !unavailable && !waiting;
-  const capsuleLabel = agentDefault ? t('composer.model.agentDefault') : undefined;
   const currentOption = options.find((option) => (
     option.providerId === selected?.providerId && option.modelId === selected?.modelId
   ));
@@ -82,7 +79,7 @@ export const ComposerModelEffortControl: React.FC<{
     fastModel: !unavailable && displayedControls.fastModel,
     fastModelLabel: t('composer.effort.fastModel'),
   });
-  const title = capsuleLabel ?? (unavailable ? `${modelLabel} · ${t('composer.model.unavailable')}` : waiting ? `${capsule.title} · ${t('composer.model.preparing')}` : capsule.title);
+  const title = unavailable ? `${modelLabel} · ${t('composer.model.unavailable')}` : waiting ? `${capsule.title} · ${t('composer.model.preparing')}` : capsule.title;
   const activeView = view;
 
   const assignMenuRoot = useCallback((node: HTMLDivElement | null) => {
@@ -121,7 +118,7 @@ export const ComposerModelEffortControl: React.FC<{
     <div ref={assignMenuRoot} className="composer-model-effort-menu">
       <Pill
         ref={assignMenuTrigger}
-        className={`composer-model-effort-pill ${open ? 'is-open' : ''}${hasChoice ? ' is-override' : ''}${!agentDefault && effort.selectedLevel === 'max' ? ' is-level-max' : ''}`}
+        className={`composer-model-effort-pill ${open ? 'is-open' : ''}${hasChoice ? ' is-override' : ''}${effort.selectedLevel === 'max' ? ' is-level-max' : ''}`}
         selected={open}
         data-testid="composer-model-effort-pill"
         aria-haspopup="dialog"
@@ -141,8 +138,8 @@ export const ComposerModelEffortControl: React.FC<{
             <Icon name="max-mode" size={14} />
           </span>
         ) : null}
-        <OverflowFade className="composer-model-effort-pill-model" text={capsuleLabel ?? capsule.modelLabel} />
-        {!agentDefault && !unavailable ? <span className="composer-model-effort-pill-level" title={capsule.reasoningLabel}>{displayedEffort}</span> : null}
+        <OverflowFade className="composer-model-effort-pill-model" text={capsule.modelLabel} />
+        {!unavailable ? <span className="composer-model-effort-pill-level" title={capsule.reasoningLabel}>{displayedEffort}</span> : null}
         <span className="composer-model-effort-pill-caret" aria-hidden="true"><ChevronIcon /></span>
       </Pill>
 
@@ -195,12 +192,8 @@ export const ComposerModelEffortControl: React.FC<{
           currentSession={currentSession}
           popupRef={popupRef}
           popupShiftPx={effort.popupShift}
-          onChosen={(chosenDefault) => {
-            if (chosenDefault && showAgentDefault) menu.close();
-            else setView(nextComposerModelEffortView(view, 'chosen'));
-          }}
+          onChosen={() => setView(nextComposerModelEffortView(view, 'chosen'))}
           onSaveStateChange={handleSaveState}
-          agentDefaultLabelOnly={showAgentDefault}
         />
       ) : null}
     </div>

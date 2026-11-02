@@ -11,6 +11,7 @@ import {
 } from './settingsLlmSchemas';
 import { EvidenceGetEventsArgsSchema } from './toolEvidenceSchemas';
 import { InvestigationReadArgsSchema } from './investigationSchemas';
+import { ConversationAnswerPlanReviewArgsSchema } from './conversationSchemas';
 
 const HANDLERS_DIR = path.join(__dirname, '..');
 const HANDLER_FILES = readdirSync(HANDLERS_DIR)
@@ -18,6 +19,15 @@ const HANDLER_FILES = readdirSync(HANDLERS_DIR)
   .sort();
 
 describe('IPC schema coverage', () => {
+  it('accepts only declared handoff identity in plan approval, never display translations', () => {
+    const request = { sessionId: 'session', reviewId: 'review', decision: {
+      kind: 'approve', handoff: { agent: 'general', label: 'Implement Plan' },
+    } };
+    expect(parseIpcArgs(ConversationAnswerPlanReviewArgsSchema, [request])).toEqual([request]);
+    expect(() => parseIpcArgs(ConversationAnswerPlanReviewArgsSchema, [{ ...request, decision: {
+      ...request.decision, handoff: { ...request.decision.handoff, labelTranslations: { 'zh-CN': '执行计划' } },
+    } }])).toThrow();
+  });
   it('enumerates every IPC handler module and requires parseIpcArgs wiring', () => {
     expect(HANDLER_FILES.length).toBeGreaterThan(10);
     const compositionRoots = new Set(['workbenchHandlers.ts', 'handlers.ts']);

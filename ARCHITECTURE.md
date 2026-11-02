@@ -54,7 +54,7 @@ Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。
 
 ### Provider 连接与选择响应
 
-计划授权区与 Composer 共用会话模型覆盖和回合参数。模型、Effort、Fast、Max 写入同一 SessionRecord；保存中或失败不得批准计划，授权交接等待最新保存并校验声明目标的模型可执行性。切换 Agent 只合法化不支持的参数；prepare/commit 后禁用的 Composer 显示主进程确认的 route/controls，准备中保留所选模型与参数，另以阶段提示标明待主进程确认；确认后显示冻结请求事实。停用、断连或模型失效时保留配置引用，选择入口显示不可用并阻止新请求，不自动清除覆盖或切换路由；历史和在途请求仍按冻结快照显示。
+计划授权区与 Composer 共用会话模型覆盖和回合参数。进入计划审批不切换到执行目标 Agent 的默认模型；无覆盖时继续使用当前对话的有效模型，批准前将继承模型与 Effort、Fast、Max 经既有接口一并保存到同一 SessionRecord，使交接后的新请求保持一致。保存中或失败不得批准计划，授权交接等待最新保存并核对当前选择的模型可执行性。相同模型的 Agent 切换、目录刷新和控件重挂不重置参数；用户换模型时才按新能力合法化。prepare/commit 后禁用的 Composer 显示主进程确认的 route/controls，准备中保留所选模型与参数，另以阶段提示标明待主进程确认；确认后显示冻结请求事实。停用、断连或模型失效时保留配置引用，选择入口显示不可用并阻止新请求，不自动清除覆盖或切换路由；历史和在途请求仍按冻结快照显示。
 
 普通工具声明及流式参数保留在审计记录，实际开始后才进入主执行轨道；审批、用户输入与执行前失败保留独立可见入口。executionStartedAt 由真实执行事件写入，历史缺失不补造耗时；蓝点仅表示真实 running。连续工具组全部终止后才按既有阈值聚合，子项身份与用户披露状态保持。每张 Task 更新卡初次出现默认展开，手动折叠不会因后续活动重置，历史快照不被最新状态覆盖。
 
@@ -245,7 +245,7 @@ Settings 只读 `schemaVersion` **8**，经校验的 `appearance.chromeThemes` �
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | `AgentHandoffDefinition` 只是 Copilot 式 UI 声明（label / agent / prompt / send / showContinueOn / requiredSkillIds）。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 触发 `agent.before-handoff` / `after-handoff`，写入 `<sessionPath>/execution-offer.json`，并 persist `session.agentId`。`send: true` 只表示点完后预填并自动发送。不存在 `agent_handoff` 工具，也不存在 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。 |
+| **当前态** | `AgentHandoffDefinition` 只是 Copilot 式 UI 声明（label / labelTranslations / agent / prompt / send / showContinueOn / requiredSkillIds）。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 触发 `agent.before-handoff` / `after-handoff`，写入 `<sessionPath>/execution-offer.json`，并 persist `session.agentId`。`send: true` 表示声明交接确认后显式载荷经同一 Composer 链自动发送，`send: false` 才预填。不存在 `agent_handoff` 工具，也不存在 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。 |
 | **目标态** | 与当前态相同。计划批准写入 offer（source / target / 冻结 plan.uri+hash / 声明 requiredSkillIds）。prepareTurn 仅当本回合 `agentId === targetAgentId` 且 session 批准计划与 offer 同 hash 时预载 Skill。General 就地终答，不自动回 Mission。用户用 Agent pill 或历史建议行切回 Mission。Pill 切换不写 offer、不预载调查 Skill。空 `handoffs` 合法（General 无按钮）。`handoff` / `agent` / `agent_handoff` token 拒绝，不静默映射到 `subagent`。 |
 | **迁移门禁** | 禁止恢复 `agent_handoff`、`HandoffStateStore`、强制 return 或 dual-read 旧 `handoff-state.json`。 |
 
@@ -415,7 +415,7 @@ main-owned `RightRailProjectionService` 为显式 `{ projectId, sessionId }` 组
 
 General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 策略采用 renderdoc-execution 的六块 Markdown 模板，按规模填写；Knowledge 相似性仅是检查线索。
 
-`handoffs` 只驱动建议行和计划门按钮。人点后主进程 `applyDeclaredHandoff` 校验声明属于当前（或刚批准的）profile，写入/确认 session execution offer，触发 `before-handoff` / `after-handoff`，并 persist `session.agentId`。`send: true` 只表示点完后预填并自动发送。不存在 `agent_handoff` 工具、durable `prepared → committed → consumed` 状态机、强制 return 或自动回 Mission。
+`handoffs` 只驱动建议行和计划门按钮。按钮名称来自声明的 `label` 与可选 `labelTranslations`，UI 不按 Agent 身份改写动作语义；译文只负责展示，批准和交接身份仍为 `agent + label`。人点后主进程 `applyDeclaredHandoff` 校验声明属于当前（或刚批准的）profile，写入/确认 session execution offer，触发 `before-handoff` / `after-handoff`，并 persist `session.agentId`。`send: true` 表示声明交接确认后显式载荷经同一 Composer 链自动发送，`send: false` 才预填。不存在 `agent_handoff` 工具、durable `prepared → committed → consumed` 状态机、强制 return 或自动回 Mission。
 
 Plan 经 session artifact plans 类别版本化：同意前覆盖活文件，同意后冻结副本，历史文件不迁移或删除。批准写入 offer（source / target / plan.uri+hash / 声明 requiredSkillIds）。prepareTurn 仅当本回合 `agentId === targetAgentId`、批准 handoff target 与本 Agent 相同、批准计划与 offer 的 URI/hash 一致时，预载声明 Skill，并向 PromptPlan 的 volatile runtime fact 写入已批准的交接身份和冻结计划引用。该事实用于区分历史规划消息与当前执行阶段，不授权工具或设备；权限仍走冻结 catalog 与交集。通用 turn 仅调用 TurnCompletionValidator。Big Loop 由 General 终答写缺口、用户切回 Mission、新计划、再批准、再点 Execute 组成；runtime 不按身份 / depth / 正文开下一轮。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse、不迁移。
 

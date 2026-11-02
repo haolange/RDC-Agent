@@ -93,6 +93,21 @@ describe('applyDeclaredHandoff', () => {
     expect(mocks.dispatchHooks).toHaveBeenCalledWith('agent.before-handoff', expect.any(Object));
     expect(mocks.dispatchHooks).toHaveBeenCalledWith('agent.after-handoff', expect.any(Object));
   });
+  it('does not alias an old approved name to a renamed declaration', async () => {
+    mocks.resolveEnabled.mockImplementation((agentId: string) => agentId === 'general' ? { id: 'general', handoffs: [] }
+      : { id: 'debugger', handoffs: [{ ...declared, label: 'Implement Plan', labelTranslations: { 'zh-CN': '执行计划' } }] });
+    expect(await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label }))
+      .toMatchObject({ success: false, error: expect.stringContaining('DECLARED_HANDOFF_NOT_FOUND') });
+    expect(mocks.offerWrite).not.toHaveBeenCalled(); expect(mocks.updateSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps translations out of execution offers and does not use them for matching', async () => {
+    mocks.resolveEnabled.mockImplementation((agentId: string) => agentId === 'general' ? { id: 'general', handoffs: [] }
+      : { id: 'debugger', handoffs: [{ ...declared, labelTranslations: { 'zh-CN': '执行计划' } }] });
+    expect((await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: '执行计划' })).success).toBe(false);
+    expect((await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label })).success).toBe(true);
+    expect(mocks.offerWrite.mock.calls[0][1]).not.toHaveProperty('labelTranslations');
+  });
   it('rejects changed preparation requirements after approval without rewriting the offer or session', async () => {
     mocks.resolveEnabled.mockImplementation((agentId: string) => agentId === 'general' ? { id: 'general', handoffs: [] }
       : { id: 'debugger', handoffs: [{ ...declared, requiredSkillIds: ['another-method'] }] });

@@ -56,10 +56,35 @@ it('restores persisted effort when a new session arrives while its capability is
       useTurnControlsStore.setState({ capabilityState: { status: 'loading' } });
       render(session);
     });
+    expect(useTurnControlsStore.getState().turnControls).toEqual(session.turnControls);
     await act(async () => useTurnControlsStore.setState({ capabilityState: { status: 'ready', model: selectableOffModel } }));
     expect(host.textContent).toBe('low');
     // The next ordinary render must keep the restored choice instead of a temporary Off.
     await act(async () => render({ ...session }));
     expect(host.textContent).toBe('low');
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
+});
+
+it('retains every conversation control through review remounts, refresh and the target Agent switch', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const capable: EffectiveModel = { ...model,
+    contextTiers: [...model.contextTiers, { id: 'max', label: 'Max', maxPromptTokens: 2000, activation: { kind: 'implicit' }, entitlement: 'granted' }],
+    controls: { ...model.controls, fast: { state: 'fixed', fixedValue: true, entitlement: 'granted' },
+      maxContext: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'max' } } };
+  const selected = { reasoningLevel: 'high' as const, fastModel: true, maxContextMode: true };
+  const persisted = { ...session, modelOverride: { providerId: 'p', modelId: 'm' }, turnControls: selected };
+  useTurnControlsStore.setState({ capabilityState: { status: 'loading' }, controlsByCapabilityKey: {} });
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  const render = (agentId: string, key: string) => root.render(createElement(ComposerTurnControlsProvider,
+    { agentId, currentSession: persisted, children: createElement(Consumer, { key }) }));
+  try {
+    await act(async () => render('debugger', 'editor'));
+    expect(useTurnControlsStore.getState().turnControls).toEqual(selected);
+    await act(async () => useTurnControlsStore.setState({ capabilityState: { status: 'ready', model: capable } }));
+    await act(async () => render('debugger', 'review'));
+    await act(async () => render('debugger', 'review-revised'));
+    await act(async () => useTurnControlsStore.setState({ capabilityState: { status: 'refreshing', model: { ...capable, catalogRevision: 'refreshed' } } }));
+    await act(async () => render('general', 'editor'));
+    expect(useTurnControlsStore.getState().turnControls).toEqual(selected);
   } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });

@@ -27,10 +27,10 @@ vi.mock('./useComposerEffortControl', () => ({ useComposerEffortControl: () => (
 vi.mock('./ComposerModelEffortPanel', () => ({ ComposerModelEffortPanel: ({ onOpenModels }: { onOpenModels: () => void }) =>
   createElement('button', { onClick: onOpenModels, 'data-testid': 'open-models' }, 'Effort') }));
 let root: Root; let host: HTMLDivElement;
-const render = (review = true, scope = 'first') => act(async () => root.render(createElement(ComposerMenuRegistryProvider, {
+const render = (scope = 'first') => act(async () => root.render(createElement(ComposerMenuRegistryProvider, {
   key: scope,
   children: createElement(ComposerModelEffortControl, { agentId: 'debugger', currentSession: null,
-    showAgentDefault: review, onSaveStateChange: (state: ComposerModelSaveState) => mock.save(state) }),
+    onSaveStateChange: (state: ComposerModelSaveState) => mock.save(state) }),
 })));
 const click = (selector: string) => act(async () => host.querySelector<HTMLButtonElement>(selector)!.click());
 beforeEach(() => {
@@ -42,15 +42,15 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
-it('opens effort directly in review while retaining the shared agent-default choice', async () => {
+it('always shows the effective model and effort while retaining the shared Agent-default menu choice', async () => {
   await render();
-  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.textContent).toBe('composer.model.agentDefault');
-  expect(host.querySelector('.composer-model-effort-pill-level')).toBeNull();
+  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.textContent).toBe('ModelLow');
+  expect(host.querySelector('.composer-model-effort-pill-level')?.textContent).toBe('Low');
   await click('[data-testid="composer-model-effort-pill"]');
   expect(host.querySelector('[data-testid="open-models"]')).not.toBeNull();
   await click('[data-testid="open-models"]');
   expect(host.querySelector('[data-testid="composer-model-search"]')).not.toBeNull();
-  expect(host.querySelector('[data-testid="composer-model-agent-default"]')?.textContent).toBe('composer.model.agentDefault');
+  expect(host.querySelector('[data-testid="composer-model-agent-default"]')?.textContent).toContain('composer.model.agentDefault');
   await click('[role="menuitemradio"]:not([data-testid="composer-model-agent-default"])');
   expect(mock.commit).toHaveBeenCalledOnce();
   expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.textContent).toBe('ModelLow');
@@ -59,11 +59,11 @@ it('opens effort directly in review while retaining the shared agent-default cho
   await click('[data-testid="open-models"]');
   await click('[data-testid="composer-model-agent-default"]');
   expect(mock.clear).toHaveBeenCalledOnce();
-  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.textContent).toBe('composer.model.agentDefault');
+  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.textContent).toBe('ModelLow');
   expect(host.querySelector('[data-testid="composer-model-search"]')).toBeNull();
 });
 it('preserves the normal Composer model and effort label without an override', async () => {
-  await render(false);
+  await render();
   expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.textContent).toBe('ModelLow');
   expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.getAttribute('aria-label')).toContain('模型思考：Low');
 });
@@ -86,7 +86,7 @@ it('shows the main-confirmed request while disabled, and hides stale draft label
 
 it('retains the selected model identity when its provider is temporarily unavailable', async () => {
   mock.choice = true; mock.controls.capabilityState.status = 'unavailable';
-  await render(false);
+  await render();
   expect(host.textContent).toBe('Model');
   expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.getAttribute('title')).toContain('composer.model.unavailable');
   expect(mock.clear).not.toHaveBeenCalled();
@@ -102,7 +102,7 @@ it('keeps the save barrier after closing the popup and reports a failed save wit
   expect(host.querySelector<HTMLButtonElement>('[data-testid="composer-model-effort-pill"]')!.disabled).toBe(true);
   await act(async () => finish({ ok: false }));
   expect(mock.save).toHaveBeenLastCalledWith({ saving: false, error: 'composer.model.saveFailed' });
-  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.textContent).toBe('composer.model.agentDefault');
+  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.textContent).toBe('ModelLow');
 });
 
 it('does not deliver an old save failure into the next session or plan revision', async () => {
@@ -110,7 +110,7 @@ it('does not deliver an old save failure into the next session or plan revision'
   mock.commit.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
   await render(); await click('[data-testid="composer-model-effort-pill"]'); await click('[data-testid="open-models"]');
   await click('[role="menuitemradio"]:not([data-testid="composer-model-agent-default"])');
-  await render(true, 'next');
+  await render('next');
   mock.save.mockClear();
   await act(async () => finish({ ok: false }));
   expect(mock.save).not.toHaveBeenCalled();

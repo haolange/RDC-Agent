@@ -4,6 +4,7 @@ import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
 import { isAgentIconPreset } from '@shared/constants/agents';
 import type { AgentHandoffDefinition, AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
 import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '@shared/theme/composeAccent';
+import { handoffLabelTranslationsSchema } from '@shared/utils/handoffLabels';
 
 export interface ManifestParseOk {
   ok: true;
@@ -71,6 +72,11 @@ const readHandoffsStrict = (value: unknown): AgentHandoffDefinition[] | string =
       return `handoffs[${index}].requiredSkillIds must be a string array when present.`;
     }
     const handoff: AgentHandoffDefinition = { label, agent, prompt };
+    if (candidate.labelTranslations !== undefined) {
+      const translated = handoffLabelTranslationsSchema.safeParse(candidate.labelTranslations);
+      if (!translated.success) return `handoffs[${index}].labelTranslations: ${translated.error.message}`;
+      handoff.labelTranslations = translated.data;
+    }
     if (typeof candidate.send === 'boolean') handoff.send = candidate.send;
     if (typeof candidate.showContinueOn === 'boolean') handoff.showContinueOn = candidate.showContinueOn;
     if (typeof candidate.model === 'string' && candidate.model.trim()) handoff.model = candidate.model.trim();

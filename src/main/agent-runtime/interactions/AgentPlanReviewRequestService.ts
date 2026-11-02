@@ -1,7 +1,7 @@
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from './DelegatedInteractionOwner';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
-import type { ConversationPlanReview, PlanReviewHandoffOption } from '@shared/types/planReview';
+import type { ConversationPlanReview, PlanReviewHandoffIdentity } from '@shared/types/planReview';
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
 import { planArtifactWriter, type PlanArtifactWriter } from '../../sessions/sessionPlanArtifact';
 import { planReviewStateStore, type PlanReviewStateStore } from '../../sessions/PlanReviewStateStore';
@@ -50,7 +50,7 @@ export interface AgentPlanReviewRequestInput {
 export type AgentPlanReviewAnswerInput = ConversationAnswerPlanReviewRequest;
 export type AgentPlanReviewAnswerResult = ConversationAnswerPlanReviewResult;
 
-function formatApprovedResult(handoff: PlanReviewHandoffOption, frozenUri: string, hash: string): string {
+function formatApprovedResult(handoff: PlanReviewHandoffIdentity, frozenUri: string, hash: string): string {
   return [
     'approved',
     '已冻结计划并确认声明交接。',

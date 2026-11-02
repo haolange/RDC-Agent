@@ -117,6 +117,7 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
     session: updated ?? session,
     suggestion: {
       label: declared.label,
+      ...(declared.labelTranslations ? { labelTranslations: { ...declared.labelTranslations } } : {}),
       agent: declared.agent,
       prompt: declared.prompt,
       send: declared.send === true,
@@ -146,6 +147,7 @@ export function writeExecutionOfferFromApproval(input: {
   });
   return {
     label: declared.label,
+    ...(declared.labelTranslations ? { labelTranslations: { ...declared.labelTranslations } } : {}),
     agent: declared.agent,
     prompt: declared.prompt,
     send: declared.send === true,

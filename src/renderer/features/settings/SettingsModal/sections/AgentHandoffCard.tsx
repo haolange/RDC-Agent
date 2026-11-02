@@ -64,6 +64,7 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
 }) => {
   const [touched, setTouched] = useState<Record<Field, boolean>>({
     label: false,
+    labelTranslations: false,
     agent: false,
     prompt: false,
     model: false,
@@ -124,8 +125,9 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
       </div>
 
       <div id={bodyId} className="settings-handoff-card-body" hidden={!expanded}>
-        <SettingsField label={t('settings.agentHandoffLabel')} layout="row">
+        <SettingsField label={t('settings.agentHandoffLabel')} htmlFor={`settings-handoff-label-${index}`} layout="row">
           <Input
+            id={`settings-handoff-label-${index}`}
             ref={labelRef}
             value={handoff.label}
             placeholder={t('settings.agentHandoffLabelPlaceholder')}
@@ -136,6 +138,29 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
           />
           {renderErrors('label')}
         </SettingsField>
+
+        {(['zh-CN', 'en'] as const).map((language) => (
+          <SettingsField key={language} label={t(language === 'zh-CN'
+            ? 'settings.agentHandoffLabelChinese' : 'settings.agentHandoffLabelEnglish')}
+            htmlFor={`settings-handoff-label-${language}-${index}`} layout="row">
+            <Input
+              id={`settings-handoff-label-${language}-${index}`}
+              value={handoff.labelTranslations?.[language] ?? ''}
+              placeholder={t('settings.agentHandoffLabelTranslationPlaceholder')}
+              maxLength={200}
+              aria-invalid={visible('labelTranslations').length > 0}
+              aria-describedby={visible('labelTranslations').length > 0 ? errorId('labelTranslations') : undefined}
+              onChange={(event) => {
+                const translations = { ...handoff.labelTranslations };
+                const value = event.currentTarget.value;
+                if (value.trim()) translations[language] = value;
+                else delete translations[language];
+                patch({ labelTranslations: Object.keys(translations).length ? translations : undefined });
+              }}
+            />
+          </SettingsField>
+        ))}
+        {renderErrors('labelTranslations')}
 
         <SettingsField label={t('settings.agentHandoffTarget')} layout="row">
           <Select

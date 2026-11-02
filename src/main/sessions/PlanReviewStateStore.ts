@@ -2,7 +2,7 @@ import { z } from 'zod';
 import * as path from 'node:path';
 import {
   PLAN_REVIEW_STATE_SCHEMA,
-  type PlanReviewHandoffOption,
+  type PlanReviewHandoffIdentity,
   type PlanReviewStateDocument,
   type PlanReviewStatus,
 } from '@shared/types/planReview';
@@ -90,7 +90,7 @@ export class PlanReviewStateStore {
     sessionId: string,
     status: Extract<PlanReviewStatus, 'approved' | 'rejected'>,
     owner: { turnId: string; planId: string; revision: number },
-    extras?: { approvedHash?: string; frozenUri?: string; approvedHandoff?: PlanReviewHandoffOption },
+    extras?: { approvedHash?: string; frozenUri?: string; approvedHandoff?: PlanReviewHandoffIdentity },
   ): PlanReviewStateDocument {
     const current = this.read(sessionId);
     if (!current) {

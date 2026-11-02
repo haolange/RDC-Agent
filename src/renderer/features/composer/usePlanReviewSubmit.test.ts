@@ -4,20 +4,23 @@ import { usePlanReviewSubmit } from './usePlanReviewSubmit';
 import type { PendingPlanReviewRequest } from './planReviewRequestModel';
 import { usePlanReviewStore } from '../../stores/planReviewStore';
 import type { SessionModelOverride } from '@shared/types/session';
+import { useTurnControlsStore } from '../../stores/turnControlsStore';
 
 const mock = vi.hoisted(() => ({
   sessionId: 's', modelOverride: null as SessionModelOverride | null, messages: [] as ConversationMessage[], answer: vi.fn(), queue: vi.fn(), clear: vi.fn(), load: vi.fn(),
   sessionListeners: new Set<() => void>(), conversationListeners: new Set<() => void>(),
   history: vi.fn(),
+  flush: vi.fn(), persist: vi.fn(), sourceRoute: { providerId: 'p', modelId: 'model' },
 }));
+vi.mock('./sessionModelOverride', () => ({ flushSessionModelSaves: mock.flush, persistSessionModelOverride: mock.persist }));
 vi.mock('./useComposerModelPickerOptions', () => ({ loadComposerModelPickerOptions: mock.load }));
 vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: { getState: () => ({ settings: {
-  llm: { providers: [{ id: 'p', enabled: true, isConfigured: true }, { id: 'grok-account', enabled: true, isConfigured: true }] }, agents: { definitions: [{ id: 'general', compiledRoute: { providerId: 'p', modelId: 'model' } }] },
+  llm: { providers: [{ id: 'p', enabled: true, isConfigured: true }, { id: 'grok-account', enabled: true, isConfigured: true }] }, agents: { definitions: [{ id: 'general', compiledRoute: { providerId: 'p', modelId: 'model' } }, { id: 'debugger', compiledRoute: mock.sourceRoute }] },
 } }) } }));
 vi.mock('react', () => ({ useCallback: (fn: unknown) => fn }));
 vi.mock('../../hooks/useElectronApi', () => ({ useElectronApi: () => ({ conversation: { answerPlanReview: mock.answer, getHistory: mock.history } }) }));
 vi.mock('../../stores/projectStore', () => ({ useProjectStore: {
-  getState: () => ({ currentSession: { sessionId: mock.sessionId, modelOverride: mock.modelOverride } }),
+  getState: () => ({ currentSession: { sessionId: mock.sessionId, agentId: 'debugger', modelOverride: mock.modelOverride } }),
   subscribe: (fn: () => void) => { mock.sessionListeners.add(fn); return () => mock.sessionListeners.delete(fn); },
 } }));
 vi.mock('../../stores/conversationStore', () => ({ useConversationStore: {
@@ -55,9 +58,71 @@ function notify() { publishReview(); mock.conversationListeners.forEach((fn) => 
 beforeEach(() => {
   vi.clearAllMocks(); mock.sessionId = 's'; mock.messages = [trace()];
   mock.modelOverride = null; usePlanReviewStore.getState().reset(); publishReview();
+  mock.sourceRoute = { providerId: 'p', modelId: 'model' };
+  useTurnControlsStore.setState({ turnControls: { reasoningLevel: 'high', fastModel: true, maxContextMode: true } });
+  mock.flush.mockReturnValue(undefined);
+  mock.persist.mockImplementation(async (_sessionId, model) => { mock.modelOverride = model; return { ok: true }; });
   mock.load.mockResolvedValue([{ providerId: 'p', modelId: 'model' }, { providerId: 'grok-account', modelId: 'grok-4.7' }]);
   mock.sessionListeners.clear(); mock.conversationListeners.clear();
   mock.answer.mockResolvedValue({ success: true });
+});
+
+it('persists the inherited conversation route before approving instead of using the target default', async () => {
+  mock.sourceRoute = { providerId: 'grok-account', modelId: 'grok-4.7' };
+  await usePlanReviewSubmit()(request, approve);
+  expect(mock.load).toHaveBeenCalledWith([{ id: 'grok-account', enabled: true, isConfigured: true }]);
+  expect(mock.persist).toHaveBeenCalledWith('s', mock.sourceRoute, { reasoningLevel: 'high', fastModel: true, maxContextMode: true });
+  expect(mock.persist.mock.invocationCallOrder[0]).toBeLessThan(mock.answer.mock.invocationCallOrder[0]);
+});
+
+it.each([false, true])('does not approve after a failed model/controls save (inherited=%s)', async (inherited) => {
+  if (!inherited) mock.modelOverride = { providerId: 'p', modelId: 'model' };
+  mock.persist.mockResolvedValueOnce({ ok: false, error: 'MODEL_SAVE_FAILED' });
+  await expect(usePlanReviewSubmit()(request, approve)).rejects.toThrow('MODEL_SAVE_FAILED');
+  expect(mock.answer).not.toHaveBeenCalled(); expect(mock.queue).not.toHaveBeenCalled();
+  await usePlanReviewSubmit()(request, approve);
+  expect(mock.answer).toHaveBeenCalledOnce();
+});
+
+it('waits for queued edits and validates their latest saved model and all controls', async () => {
+  let finish!: () => void;
+  mock.flush.mockReturnValueOnce(new Promise<void>(resolve => { finish = resolve; }));
+  const running = usePlanReviewSubmit()(request, approve);
+  expect(mock.load).not.toHaveBeenCalled();
+  mock.modelOverride = { providerId: 'grok-account', modelId: 'grok-4.7' };
+  const controls = { reasoningLevel: 'low' as const, fastModel: false, maxContextMode: true };
+  useTurnControlsStore.setState({ turnControls: controls });
+  finish(); await running;
+  expect(mock.persist).toHaveBeenCalledWith('s', mock.modelOverride, controls);
+  expect(mock.answer).toHaveBeenCalledOnce();
+});
+
+it('rejects an invalid explicit model without replacing it with either Agent default', async () => {
+  mock.modelOverride = { providerId: 'p', modelId: 'removed' };
+  await expect(usePlanReviewSubmit()(request, approve)).rejects.toThrow('MODEL_UNAVAILABLE');
+  expect(mock.modelOverride.modelId).toBe('removed');
+  expect(mock.persist).not.toHaveBeenCalled(); expect(mock.answer).not.toHaveBeenCalled();
+});
+
+it('does not persist a stale configuration when controls change during catalog validation', async () => {
+  mock.load.mockImplementationOnce(async () => {
+    useTurnControlsStore.setState({ turnControls: { reasoningLevel: 'low', fastModel: false, maxContextMode: false } });
+    return [{ providerId: 'p', modelId: 'model' }];
+  });
+  await expect(usePlanReviewSubmit()(request, approve)).rejects.toThrow('MODEL_SELECTION_CHANGED');
+  expect(mock.persist).not.toHaveBeenCalled(); expect(mock.answer).not.toHaveBeenCalled();
+});
+
+it.each(['session', 'stop', 'revision'])('does not approve when %s changes while the inherited selection saves', async (change) => {
+  let finish!: (value: { ok: boolean }) => void;
+  mock.persist.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const running = usePlanReviewSubmit()(request, approve);
+  await vi.waitFor(() => expect(mock.persist).toHaveBeenCalledOnce());
+  if (change === 'session') mock.sessionId = 'other';
+  if (change === 'stop') mock.messages[0].status = 'stopped';
+  if (change === 'revision') mock.messages = [trace('awaiting', 2)];
+  notify(); finish({ ok: true }); await running;
+  expect(mock.answer).not.toHaveBeenCalled(); expect(mock.queue).not.toHaveBeenCalled();
 });
 
 it('validates the saved Composer override instead of switching to the handoff target default', async () => {

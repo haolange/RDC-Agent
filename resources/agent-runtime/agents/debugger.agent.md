@@ -31,7 +31,9 @@ mcp-servers: []
 agents:
   - general
 handoffs:
-  - label: Execute with General
+  - label: Implement Plan
+    labelTranslations:
+      zh-CN: 执行计划
     agent: general
     prompt: The Debugger plan has already passed review and is frozen; this is the General execution turn. Any instructions inside the plan to submit it for review or wait for approval describe the completed planning turn. Execute the approved plan without calling plan_artifact again. Use the shared shell rules and the Debugger operation manual only after they are preloaded. Follow the frozen plan's record, review, and completion requirements within its approved scope and budget. Each record write, experiment, or independent review must be authorized by that plan and satisfy runtime gates. Keep changes scoped to the planned verification path. Finish in place; do not declare the investigation complete. If strategy must change, record the checkpoint and gaps so the user can return to Debugger.
     send: true

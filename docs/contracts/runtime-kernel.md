@@ -199,7 +199,9 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 ## Declared Continue and Execution Offer
 
-`AgentHandoffDefinition` 只是 Copilot 式 UI 声明（label / agent / prompt / send / showContinueOn / requiredSkillIds）。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 校验选项属于当前（或刚批准的）profile，触发 `agent.before-handoff` / `agent.after-handoff`，写入 `<sessionPath>/execution-offer.json`，并 persist `session.agentId`。不存在 `agent_handoff` 工具，也不存在 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse、不迁移。
+handoff 名称来自声明的 `label` 与可选 `labelTranslations`（`zh-CN` / `en`），UI 不按目标 Agent 替换名称。译文随声明、计划选项及历史建议行冻结，仅用于展示；缺少对应语言时显示基础 label。批准及交接仅提交 agent+label，译文不写入批准身份或 execution offer。声明改名后旧计划若不再匹配，须修订或重新规划并批准；不迁移批准、不匹配旧名称别名。
+
+`AgentHandoffDefinition` 只是 Copilot 式 UI 声明（label / labelTranslations / agent / prompt / send / showContinueOn / requiredSkillIds）。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 校验选项属于当前（或刚批准的）profile，触发 `agent.before-handoff` / `agent.after-handoff`，写入 `<sessionPath>/execution-offer.json`，并 persist `session.agentId`。不存在 `agent_handoff` 工具，也不存在 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse、不迁移。
 
 计划门是另一条人机停顿：`plan_artifact` 写活计划并挂起，`approval.requested kind=plan_review`；拒绝意见回同一 tool result，批准写入 `TurnHandle.approvedPlan`（`approvedHash` + target + frozenUri）并覆盖 execution offer。审批决定的时间权威是匹配 `plan-state` 在 approved 状态下的 `updatedAt`；offer 的 `approvedAt` 从该值生成，后续声明交接必须保留同一批准的时间，不能用点击交接的当前时间补写。prepareTurn 在核对批准状态、target 与计划 URI/hash 后，从该决定投影原时间（epoch milliseconds 与 UTC）到已批准交接事实；历史 offer 的错误交接时间不覆盖审批决定，也不重写历史记录，供执行者核对计划期限，后续回合、重试和重启不续预算。回合成功终态把冻结 `profileHandoffs`（`showContinueOn !== false`）快照到 assistant `handoffSuggestions`。Mission 仅在本回合 workTrace 含真实已批准 `plan_artifact` 时才快照 Execute；General 无声明即无按钮。
 

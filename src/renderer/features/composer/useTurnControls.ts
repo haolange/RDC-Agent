@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { persistSessionModelOverride } from './sessionModelOverride';
+import { persistSessionTurnControls } from './sessionModelOverride';
 import { useProjectStore } from '../../stores/projectStore';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { SessionRecord } from '@shared/types/session';
@@ -58,12 +58,12 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
     pendingSaves.current++;
     setSaveState({ sessionId, saving: true });
     try {
-      const result = await persistSessionModelOverride(sessionId, currentSession?.modelOverride ?? null, controls);
+      const result = await persistSessionTurnControls(sessionId, controls);
       if (revision === saveRevision.current && useProjectStore.getState().currentSession?.sessionId === sessionId) {
         setSaveState({ sessionId, saving: false, error: result.ok ? undefined : result.error });
       }
     } finally { pendingSaves.current--; }
-  }, [sessionId, currentSession?.modelOverride]);
+  }, [sessionId]);
   const sessionControls = currentSession?.turnControls ?? null;
   const capability = resolvedCapability(capabilityState);
   const lastSessionIdRef = useRef<string | null>(null);
@@ -97,7 +97,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
       lastCapabilityKeyRef.current = null;
       if (sessionChanged || sessionControlsChanged) {
         pendingSessionRestoreRef.current = true;
-        setTurnControls(buildInitialTurnControls(null, sessionControls));
+        setTurnControls(sessionControls ?? buildInitialTurnControls(null));
       }
       lastSessionIdRef.current = sessionId;
       lastSessionControlsKeyRef.current = sessionControlsKey;

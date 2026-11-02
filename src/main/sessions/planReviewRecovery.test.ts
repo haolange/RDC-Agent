@@ -35,15 +35,20 @@ beforeEach(() => {
   fixture.freeze.mockReturnValue({ uri: 'session://plans/plan-frozen.md', hash, taskRequirements: [] });
 });
 it('restores awaiting ownership after restart without reviving the old turn and approves once', async () => {
+  fixture.history[0].workTrace!.blocks[0].toolCalls[0].planReview!.handoffOptions = [
+    { agent: 'general', label: 'Execute', labelTranslations: { 'zh-CN': '执行' } },
+  ];
   const service = new AgentPlanReviewRequestService();
   const projection = service.projection('session');
   expect(projection.review).toMatchObject({ recovered: true, agentId: 'debugger' });
+  expect(projection.review?.planReview.handoffOptions[0].labelTranslations).toEqual({ 'zh-CN': '执行' });
   const request = { sessionId: 'session', reviewId: projection.review!.reviewId, decision: { kind: 'approve' as const, handoff: plan.handoffOptions[0] } };
   expect((await service.answer({ ...request, sessionId: 'other' })).success).toBe(false);
   expect(await service.answer(request)).toEqual({ success: true });
   expect((await service.answer(request)).success).toBe(false);
   expect(fixture.freeze).toHaveBeenCalledOnce(); expect(fixture.offer).toHaveBeenCalledOnce();
   expect(fixture.state?.status).toBe('approved'); expect(fixture.history[0].status).toBe('stopped');
+  expect(fixture.state?.approvedHandoff).toEqual({ agent: 'general', label: 'Execute' });
   expect(readReferencedPlan({ ...reference, uri: fixture.state!.frozenUri! })).toMatchObject({ agentId: 'debugger', hash });
   expect(fixture.history[0].workTrace!.blocks[0].toolCalls[0].planReview?.status).toBe('cancelled');
 });

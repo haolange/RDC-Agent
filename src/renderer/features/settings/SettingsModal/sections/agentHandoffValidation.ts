@@ -1,5 +1,6 @@
 import type { AgentHandoffDefinition, AgentManifestDefinition, AgentModelOption } from '@shared/types/agentManifest';
 import { isAgentModelSelectionInvalid } from './AgentModelCascadeSelect';
+import { handoffLabelTranslationsSchema } from '@shared/utils/handoffLabels';
 
 export type AgentHandoffIssueCode =
   | 'label-required'
@@ -8,11 +9,12 @@ export type AgentHandoffIssueCode =
   | 'target-disabled'
   | 'target-self'
   | 'prompt-required'
-  | 'model-invalid';
+  | 'model-invalid'
+  | 'translations-invalid';
 
 export interface AgentHandoffIssue {
   index: number;
-  field: 'label' | 'agent' | 'prompt' | 'model';
+  field: 'label' | 'agent' | 'prompt' | 'model' | 'labelTranslations';
   code: AgentHandoffIssueCode;
 }
 
@@ -24,12 +26,14 @@ export const AGENT_HANDOFF_ISSUE_KEYS = {
   'target-self': 'settings.agentHandoffErrorTargetSelf',
   'prompt-required': 'settings.agentHandoffErrorPromptRequired',
   'model-invalid': 'settings.agentHandoffErrorModelInvalid',
+  'translations-invalid': 'settings.agentHandoffErrorTranslationsInvalid',
 } as const;
 
 export const IMMEDIATE_HANDOFF_ISSUE_CODES: ReadonlySet<AgentHandoffIssueCode> = new Set([
   'target-unknown',
   'target-disabled',
   'model-invalid',
+  'translations-invalid',
 ]);
 
 export function persistAgentHandoff(handoff: AgentHandoffDefinition): AgentHandoffDefinition {
@@ -38,6 +42,7 @@ export function persistAgentHandoff(handoff: AgentHandoffDefinition): AgentHando
     agent: handoff.agent,
     prompt: handoff.prompt,
   };
+  if (handoff.labelTranslations) next.labelTranslations = { ...handoff.labelTranslations };
   if (handoff.send === true) next.send = true;
   if (handoff.showContinueOn === false) next.showContinueOn = false;
   const model = handoff.model?.trim();
@@ -65,6 +70,9 @@ export function validateAgentHandoffs(
   const byId = new Map(ctx.definitions.map((entry) => [entry.id, entry]));
   handoffs.forEach((handoff, index) => {
     if (!handoff.label.trim()) issues.push({ index, field: 'label', code: 'label-required' });
+    if (handoff.labelTranslations !== undefined && !handoffLabelTranslationsSchema.safeParse(handoff.labelTranslations).success) {
+      issues.push({ index, field: 'labelTranslations', code: 'translations-invalid' });
+    }
     const agent = handoff.agent.trim();
     if (!agent) {
       issues.push({ index, field: 'agent', code: 'target-required' });

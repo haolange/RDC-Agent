@@ -121,11 +121,12 @@ export function assertParsedProfileContracts(id, definition) {
   assertIncludesNone(tools, MISSION_FORBIDDEN_TOOLS, `${id} tools`);
   assert(skills.includes(MISSION_SKILL[id]), `${id} must arm ${MISSION_SKILL[id]}`);
   assert(agents.includes('general'), `${id} agents must include general`);
-  const execute = handoffs.find((entry) => entry.agent === 'general' && entry.label === 'Execute with General');
-  assert(execute, `${id} must declare Execute with General`);
-  assert(execute.send === true, `${id} Execute with General must send`);
-  assert(execute.showContinueOn !== false, `${id} Execute with General must show continue`);
-  assert(Array.isArray(execute.requiredSkillIds) && execute.requiredSkillIds.length > 0, `${id} Execute with General must declare requiredSkillIds`);
+  const execute = handoffs.find((entry) => entry.agent === 'general' && entry.label === 'Implement Plan');
+  assert(execute, `${id} must declare Implement Plan`);
+  assert(execute.labelTranslations?.['zh-CN'] === '执行计划', `${id} must declare its Chinese execution label`);
+  assert(execute.send === true, `${id} Implement Plan must send`);
+  assert(execute.showContinueOn !== false, `${id} Implement Plan must show continue`);
+  assert(Array.isArray(execute.requiredSkillIds) && execute.requiredSkillIds.length > 0, `${id} Implement Plan must declare requiredSkillIds`);
 }
 
 export function assertManifestSourceContracts(id, source, filePath) {

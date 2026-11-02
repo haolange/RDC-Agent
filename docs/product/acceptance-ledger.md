@@ -1,5 +1,24 @@
 # Acceptance Ledger
 
+## 计划卡声明式文案收敛与前轮架构裁决（2026-11-02）
+
+- 基线 `50fea33bc49d761fe53a62f630e963061c3fcdd8`，沿当前 main 的未提交修改收敛，不创建分支、不提交、不推送。撤回前轮计划审批 UI 按 General 身份覆盖文案的架构通过结论：两个指向 General 的不同声明动作被显示为同一名称，新增回归先失败。前轮模型/参数继承、unavailable 同症状路径与真实请求证据继续保留；未重建原截图瞬间，仍不宣称其唯一根因已证。
+- 三个内置 Mission 的 `.agent.md` 声明 `label: Implement Plan` 与 `labelTranslations.zh-CN: 执行计划`。可选译文通用于任意 handoff，严格校验语言及文本，贯穿解析/序列化、Settings 自动保存、EffectiveRuntimePlan 冻结、计划及建议行快照；UI 只读取冻结声明，不按 Agent ID、旧文案或正则改名。删除原 General 特判、专用回调及翻译键；批准 IPC、plan-state 与 execution offer 仍只保存 agent+label，不增加 IPC 方法或存储版本迁移。旧单语历史可读，旧名称不再匹配声明时拒绝执行，须修订或重新规划并批准，没有别名匹配。
+- 用户明确确认后，逐份核对路径、无链接、SHA256 及与原内置仅 model 不同的差异，删除 User 的 General/Debugger/Analyzer/Optimizer 四份覆写，恢复内置声明；它们的独立 Agent 默认模型随之移除。Composer/计划卡仍保存会话 modelOverride+turnControls，不写 Agent 文件。注册项目未发现覆写；没有扩大删除范围。原配置、加密凭据及同源 Local State 三项哈希保持不变。
+- 官方 launcher 正式构建、一次性 `/qa` → 同源 `/app`，使用隔离授权及无 Agent 覆写的真实产品会话。Composer 显式选择 Grok 4.7、High、Fast=false、Max=true，Debugger 调用真实 plan_artifact；英文深色显示 Implement Plan，中文浅色显示执行计划，390×844 document scrollWidth=390，Escape 回焦胶囊。Settings UI 为隔离 Analyzer 补英文译文并自动保存，落盘保留中文译文与 requiredSkillIds。新增名称输入与可见 label 关联，针对性 DOM 回归通过。
+- 同一会话冷启动正式原生 Electron，待审卡从历史快照恢复，显示中文声明及原模型参数；实际点击批准后 General 终答“声明式计划执行验收完成”。共两次真实模型调用，规划与执行的主进程冻结 selected/effective model 均为 grok-4.7，controls 均为 High/Fast=false/Max=true；批准身份是 Implement Plan+general，offer 无译文。旧中断历史如实保留，不复活旧 producer；这只是 UI/交接与配置验收，不代表 RDC 调查或设备效果。原生终答由 AX 与持久化回执确认；截图工具一次返回非目标画面，已弃用并删除，不计作原生截图证据。已有 CSP frame-ancestors meta 提示未更改。
+- 最终全量覆盖率 563 文件、4259 项通过，4 项既有跳过；ratchet 通过（lines 78.15%、functions 79.51%、branches 66.48%、statements 75.79%）。完整 gates、typecheck、lint、248 contracts、资源/项目指令/Prompt 专项通过；严格 IPC 及批准身份类型收敛后 21 项回归、表单与计划区 17 项回归通过。最终源码的 typecheck、lint、完整 gates、官方 prepare-only build 与 diff whitespace 复验通过，详见 `.local/plan-review/receipt.json`。没有弱化断言或增加跳过，首轮沙箱 TEMP rename EPERM 不算测试失败，改用系统 TEMP 自动隔离目录执行。
+- 同步架构、runtime kernel、会话投影、Workbench、Agent manifest 与 RenderDoc 主题契约，移除相关过时 seed marker 描述并修正 Mission 示例。根 AGENTS.md 和 DESIGN.md 的长期工程/UX 规则未变，无需修改。最小证据沿用唯一 `.local/plan-review/TASKS.md`、`receipt.json`，补一张中文窄屏图；清理本轮隔离授权、恢复副本、项目及用户数据 85 个文件（逻辑字节 3,997,026，未测实际分配释放），不保留完整会话副本。其余日志与 coverage 等 601 文件已清理，本轮合计 686 文件、20,801,171 逻辑字节；只保留唯一 Tasks/receipt、前轮必要截图及一张新增中文窄屏图。自有 Browser/Electron/launcher 与 QA 端口退出，隔离锁消失，canonical 旧锁 owner 已死且原锁未动，桌面启动权已交还。
+
+## 计划卡完整继承当前对话配置（2026-11-02）
+
+- 基线 `50fea33bc49d761fe53a62f630e963061c3fcdd8`，当前分支原地修改，不创建分支、不提交、不推送。进入计划卡不再提前使用执行目标 Agent 的默认模型，审批与胶囊共用当前对话的能力状态；无覆盖时也保留实际模型、Effort、Fast、Max。批准前通过既有串行会话保存接口一并保存继承模型与参数，等待后续排队编辑，保存失败或选择失效不批准。移除独立目标路由能力检查及计划卡专用“按 Agent 配置”占位分支，没有新增 IPC、schema、计划专属配置或兼容别名。
+- 官方隔离 `/qa`→同源 `/app` 的基线复现：会话模型覆盖为空，Debugger 默认 Grok 4.7 可执行，General 默认指向停用供应商；计划卡显示 General 的模型和 unavailable、执行禁用，Stop 后普通 Composer 回到 Grok/High/Max。新增三条回归先失败再通过。本轮证明这条同症状路径；未还原原用户截图最初瞬间的内存状态，不将其认定为原现场唯一原因。General 执行按钮统一「执行计划」／“Implement Plan”，授权仍提交原声明身份，其它 handoff 呈现保持声明内容。
+- 两条真实 Grok 链路共四次模型调用：第一条由无模型覆盖的正式会话规划、Browser 批准并由 General 返回终答；第二条显式选择同一模型后规划，冷启动正式 Electron，恢复原待审区，实际点击批准并收到 General 终答。两条链路的规划与执行冻结摘要均为 `grok-account / grok-4.7 / High / Fast=false / Max=true`；General 的不可用默认模型没有介入。冷启动保留旧中断历史，没有将旧模型循环伪装成继续运行。这是轻量 UI 冒烟，不代表真实 RDC 调查、工具效果或设备回放验收。
+- 界面通过英文深色、中文浅色、大字号，390×844 窄屏 document scrollWidth=390，参数弹层宽 320 且完全在视口内；Fast 开关保持其余参数，键盘 Medium→High，Escape 回焦模型胶囊。原生正式构建验证待审恢复、模型名称、High/Max、实际批准及终答。没有放宽 CSP；原生已有 `frame-ancestors` meta 提示保留，不作为本轮无警告声明。
+- 最终全量 562 文件、4243 测试通过，4 项既有跳过保持；coverage ratchet 通过（lines 78.12%、functions 79.43%、branches 66.40%、statements 75.76%）。typecheck、lint、248 项 contracts、最终完整 gates、官方 prepare-only 正式构建及 diff whitespace 通过。前两次覆盖率运行发生并发/工作区临时目录下的耗时用例失败；最终在系统 TEMP 的自动隔离目录、两个 worker 下全量通过，未改断言、超时或跳过项。原目标能力测试的有效边界迁入共享能力、审批及保存回归，没有删除验收要求。
+- 合成恢复夹具曾因缺少 session context journal 在模型请求前被 `PREFLIGHT_FAILED` 拒绝，不算模型成功；随后使用产品真实生成的会话完成上述两条链路。临时诊断已移除。最小证据为 `.local/plan-review/TASKS.md`、`receipt.json` 与必要截图；原始配置、加密凭据、Local State 及四份 Agent 文件的七项来源哈希一致。隔离授权/项目、日志、脚本、测试中间产物的清理回执见 receipt；自有 Electron/Vite/launcher 与端口退出，隔离锁不存在、canonical 锁无活 owner，桌面启动权已交还。保留当前依赖与可运行正式构建，不生成发行包。
+
 ## 前三轮修复的架构审查与小范围收敛（2026-11-02）
 
 - 基线 `94e09f36da01f39ba74b77dc1dc6de1726046eac`，审查当前 Fast/Max、计划门/模型目录与 Android 菜单的未提交改动，保留既有实现。模型事实仍归 Manifest/EffectiveCatalog，会话沿用唯一 `modelOverride + turnControls`，刷新经既有主进程接口；设备菜单沿用语义 token 和紧凑单行。本轮不修改 IPC、schema、权限或用户配置，不创建分支、提交、推送或发布。

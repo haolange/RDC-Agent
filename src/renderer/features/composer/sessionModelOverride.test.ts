@@ -31,7 +31,7 @@ vi.mock('../../stores/projectStore', () => ({
   },
 }));
 
-import { clearComposerModelChoice, commitComposerModelChoice, persistSessionModelOverride, flushSessionModelSaves } from './sessionModelOverride';
+import { clearComposerModelChoice, commitComposerModelChoice, persistSessionModelOverride, persistSessionTurnControls, flushSessionModelSaves } from './sessionModelOverride';
 import {
   readComposerDraftModel,
   useComposerModelDraftStore,
@@ -49,7 +49,7 @@ it('serializes controls after the model save and holds approval until all fields
     .mockResolvedValueOnce({ success: true, session: { sessionId: 'session-a' } });
   const first = commitComposerModelChoice({ providerId: 'p', modelId: 'm' }, 'session-a', 'project-a');
   const controls = { reasoningLevel: 'high' as const, fastModel: true, maxContextMode: true };
-  const second = persistSessionModelOverride('session-a', null, controls);
+  const second = persistSessionTurnControls('session-a', controls);
   const barrier = flushSessionModelSaves('session-a');
   expect(persistInvoke).toHaveBeenCalledTimes(1);
   finish({ success: true, session: { sessionId: 'session-a' } });
@@ -57,11 +57,34 @@ it('serializes controls after the model save and holds approval until all fields
   expect(persistInvoke).toHaveBeenLastCalledWith('session-a', null, controls);
 });
 
+it('atomically saves an explicit inherited model together with every turn control', async () => {
+  persistInvoke.mockReset().mockResolvedValue({ success: true, session: { sessionId: 'session-a' } });
+  const model = { providerId: 'p', modelId: 'inherited' };
+  const controls = { reasoningLevel: 'high' as const, fastModel: true, maxContextMode: true };
+  expect(await persistSessionModelOverride('session-a', model, controls)).toEqual({ ok: true });
+  expect(persistInvoke).toHaveBeenCalledExactlyOnceWith('session-a', model, controls);
+});
+
+it('includes later queued controls in an already waiting approval barrier', async () => {
+  let finishFirst!: (value: unknown) => void;
+  let finishSecond!: (value: unknown) => void;
+  persistInvoke.mockReset().mockImplementationOnce(() => new Promise(resolve => { finishFirst = resolve; }))
+    .mockImplementationOnce(() => new Promise(resolve => { finishSecond = resolve; }));
+  const first = commitComposerModelChoice({ providerId: 'p', modelId: 'm' }, 'session-a', 'project-a');
+  let flushed = false;
+  const barrier = flushSessionModelSaves('session-a')!.then(() => { flushed = true; });
+  const second = persistSessionTurnControls('session-a', { reasoningLevel: 'low', fastModel: true, maxContextMode: true });
+  finishFirst({ success: true, session: { sessionId: 'session-a' } }); await first;
+  expect(flushed).toBe(false);
+  finishSecond({ success: true, session: { sessionId: 'session-a' } });
+  await Promise.all([second, barrier]); expect(flushed).toBe(true);
+});
+
 it('cancels queued saves after leaving and returning to the session', async () => {
   let finish!: (value: unknown) => void;
   persistInvoke.mockReset().mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
   const first = commitComposerModelChoice({ providerId: 'p', modelId: 'm' }, 'session-a', 'project-a');
-  const second = persistSessionModelOverride('session-a', null, { reasoningLevel: 'low', fastModel: false, maxContextMode: false });
+  const second = persistSessionTurnControls('session-a', { reasoningLevel: 'low', fastModel: false, maxContextMode: false });
   projection.sessionId = null; projection.listeners.forEach((listener) => listener());
   projection.sessionId = 'session-a'; projection.listeners.forEach((listener) => listener());
   finish({ success: true, session: { sessionId: 'session-a' } });

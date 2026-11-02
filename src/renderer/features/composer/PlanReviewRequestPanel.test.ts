@@ -5,15 +5,17 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { PlanReviewRequestPanel } from './PlanReviewRequestPanel';
 import { planReviewRequestKey, type PendingPlanReviewRequest } from './planReviewRequestModel';
+import type { CapabilityResolutionState } from '../../lib/capabilityResolution';
 
-const mock = vi.hoisted(() => ({ stop: vi.fn(), submit: vi.fn(), availability: 'available', modelSave: (_state: { saving: boolean; error?: string }) => {} }));
+const mock = vi.hoisted(() => ({ language: 'en' as 'en' | 'zh-CN', stop: vi.fn(), submit: vi.fn(), retry: vi.fn(), capabilityState: { status: 'ready' } as CapabilityResolutionState,
+  modelSave: (_state: { saving: boolean; error?: string }) => {} }));
 vi.mock('../../services/planReviewService', () => ({ cancelPlanReview: mock.stop }));
 vi.mock('./usePlanReviewSubmit', () => ({ usePlanReviewSubmit: () => mock.submit }));
-vi.mock('./usePlanReviewModelAvailability', () => ({ usePlanReviewModelAvailability: () => () => mock.availability }));
+vi.mock('./ComposerTurnControlsContext', () => ({ useComposerTurnControls: () => ({ capabilityState: mock.capabilityState, retryCapability: mock.retry }) }));
 vi.mock('./ComposerModelEffortControl', () => ({ ComposerModelEffortControl: (props: {
   onSaveStateChange: typeof mock.modelSave;
 }) => { mock.modelSave = props.onSaveStateChange; return createElement('button', null, 'Model'); } }));
-vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
+vi.mock('../../i18n', () => ({ useI18n: () => ({ language: mock.language, t: (key: string) => key }) }));
 let root: Root;
 let host: HTMLDivElement;
 const request: PendingPlanReviewRequest = { reviewId: 'review', agentId: 'debugger', recovered: false,
@@ -30,24 +32,73 @@ const render = (value = request) => act(async () => {
 });
 const click = (selector: string) => act(async () => { host.querySelector<HTMLButtonElement>(selector)!.click(); });
 beforeEach(() => {
+  mock.language = 'en';
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   useComposerSessionContextStore.getState().clearHandoffSuggestion();
   mock.submit.mockReset().mockResolvedValue(undefined); mock.stop.mockReset().mockResolvedValue(undefined);
-  mock.availability = 'available';
+  mock.capabilityState = { status: 'ready' } as CapabilityResolutionState;
+  mock.retry.mockReset();
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); vi.unstubAllGlobals(); host.remove(); });
 
 it('waits for the shared catalog without claiming the selected model is unavailable', async () => {
-  mock.availability = 'loading';
+  mock.capabilityState = { status: 'loading' };
   await render();
-  expect(host.textContent).toContain('composer.model.loading');
+  expect(host.textContent).toContain('composer.effort.capabilityLoading');
   expect(host.textContent).not.toContain('composer.model.unavailable');
   expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
-  mock.availability = 'available';
+  mock.capabilityState = { status: 'ready' } as CapabilityResolutionState;
   await render();
   expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(false);
+});
+
+it('uses the conversation capability even when the declared target default is unavailable', async () => {
+  await render();
+  expect(host.textContent).not.toContain('composer.model.unavailable');
+  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(false);
+});
+
+it.each(['unavailable', 'error'] as const)('retains the selected model and reports %s with an explicit retry', async (status) => {
+  mock.capabilityState = status === 'error' ? { status, message: 'Discovery failed' }
+    : { status, reason: 'missing-model', message: 'Selected model is not executable' };
+  await render();
+  expect(host.textContent).toContain(mock.capabilityState.message);
+  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
+  const retry = [...host.querySelectorAll('button')].find(button => button.textContent === 'composer.effort.capabilityRetry')!;
+  await act(async () => retry.click());
+  expect(mock.retry).toHaveBeenCalledOnce();
+  expect(mock.submit).not.toHaveBeenCalled();
+});
+
+it('keeps approval available while a previously executable model refreshes', async () => {
+  mock.capabilityState = { status: 'refreshing' } as CapabilityResolutionState;
+  await render();
+  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(false);
+  expect(host.textContent).not.toContain('composer.effort.capabilityUnavailable');
+});
+
+it('preserves distinct declared captions for actions with the same General target', async () => {
+  await render({ ...request, planReview: { ...request.planReview, handoffOptions: [
+    { agent: 'general', label: 'Implement Plan' }, { agent: 'general', label: 'Inspect evidence' },
+  ] } });
+  const buttons = host.querySelectorAll<HTMLButtonElement>('.handoff-action-row__button');
+  expect([...buttons].map(button => button.textContent)).toEqual(['Implement Plan', 'Inspect evidence']);
+  await click('.handoff-action-row__button');
+  expect(mock.submit).toHaveBeenCalledWith(expect.anything(), { kind: 'approve', handoff: { agent: 'general', label: 'Implement Plan' } });
+});
+
+it('uses frozen translations for any target and submits only its original identity', async () => {
+  const option = { agent: 'custom', label: 'Review', labelTranslations: { 'zh-CN': '审阅计划' } };
+  const value = { ...request, planReview: { ...request.planReview, handoffOptions: [option] } };
+  await render(value);
+  expect(host.querySelector('.handoff-action-row__button')?.textContent).toBe('Review');
+  mock.language = 'zh-CN'; await render(value);
+  expect(host.querySelector('.handoff-action-row__button')?.textContent).toBe('审阅计划');
+  await click('.handoff-action-row__button');
+  expect(mock.submit).toHaveBeenCalledExactlyOnceWith(value, { kind: 'approve', handoff: { agent: 'custom', label: 'Review' } });
+  expect(option.label).toBe('Review');
 });
 
 it('starts compact, offers every declared target and submits the selected one exactly once', async () => {

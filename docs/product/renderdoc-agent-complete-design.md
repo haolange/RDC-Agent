@@ -734,7 +734,7 @@ General 的 execution-orchestrator 只定义通用工作方法；三个 Mission 
 
 ### 专业 RDC 手册与真实预载
 
-Debugger / Analyzer / Optimizer 在「Execute with General」声明的 `requiredSkillIds` 中分别绑定领域方法、`renderdoc-execution`、`rdc-tool-shell` 与本方向的 `*-rdc-tool`。prepareTurn 只在 execution offer 的 target 与冻结计划 hash 匹配时加载这些 Skill，不能只依赖按钮 prompt 中的 `$skill` 文本。Debugger 因果方法要求在解释逐片元颜色、alpha 或测试标记前按需读取 `pixel-forensics`；原生 Pixel History 的格式限制、event-final 值和重建标记须区分，不把不完整字段当完整 blend 账本。方法限定不改写原始工具值、不代替当前后端／二进制适用性核验，也不授予额外权限。共享执行方法要求干预前列清主张所需的原始状态控制证据，独立审查 Capsule 按本次主张／控制条件逐项授予必要测量、身份和语义来源；typed 摘要及五阶段回执不自动证明额外控制条件，也不自动扩大读取权限。缺失的历史取证须限定结论，不能在恢复后补造。
+Debugger / Analyzer / Optimizer 在「执行计划」／“Implement Plan” 声明的 `requiredSkillIds` 中分别绑定领域方法、`renderdoc-execution`、`rdc-tool-shell` 与本方向的 `*-rdc-tool`。prepareTurn 只在 execution offer 的 target 与冻结计划 hash 匹配时加载这些 Skill，不能只依赖按钮 prompt 中的 `$skill` 文本。Debugger 因果方法要求在解释逐片元颜色、alpha 或测试标记前按需读取 `pixel-forensics`；原生 Pixel History 的格式限制、event-final 值和重建标记须区分，不把不完整字段当完整 blend 账本。方法限定不改写原始工具值、不代替当前后端／二进制适用性核验，也不授予额外权限。共享执行方法要求干预前列清主张所需的原始状态控制证据，独立审查 Capsule 按本次主张／控制条件逐项授予必要测量、身份和语义来源；typed 摘要及五阶段回执不自动证明额外控制条件，也不自动扩大读取权限。缺失的历史取证须限定结论，不能在恢复后补造。
 
 `resources/agent-runtime/rdc-tool-guide-members.json` 明确三本手册的专业成员；它不是运行时 allowlist。`scripts/generate-rdc-tool-guides.mjs` 从 Tools 2.0 code-owned catalog 生成每项用途、参数约束、结果、影响、前置条件、失败限制和无身份 `shell.rdc` 示例，并校验成员、示例 schema 与 catalog fingerprint。共享 CLI 规则只在 `rdc-tool-shell` 维护一份；专业 SKILL 保持短流程入口，详细参考按需读取。
 

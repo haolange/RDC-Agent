@@ -1138,10 +1138,12 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
     const begin = vi.spyOn(planReviewStateStore, 'beginRevision').mockReturnValue({ planId: 'plan', revision: 1 } as never);
     try {
       const factory = createFactory();
-      const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' }, effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', showContinueOn: true }] } } as never;
+      const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' }, effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', labelTranslations: { 'zh-CN': '执行' }, showContinueOn: true }] } } as never;
       const value = await factory.executePlanArtifactTool({ id: 'plan-call', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: '## Work\nAnalyze.', requiredTaskIds: ['task-real'], metadata: { executionRequirements: { mode: 'direct' } } } }, 'debugger', context);
       expect(value.isError, JSON.stringify(value.content)).toBe(false);
       expect(getTask).toHaveBeenCalledWith('task-real');
+      expect(vi.mocked(agentPlanReviewRequestService.request).mock.calls.at(-1)?.[0].planReview.handoffOptions)
+        .toEqual([{ agent: 'general', label: 'Execute', labelTranslations: { 'zh-CN': '执行' } }]);
       const snapshots = parsePlanTaskRequirements(write.mock.calls[0][1]);
       expect(snapshots[0]).toMatchObject({ taskId: 'task-real', revision: 2, subject: 'Actual analysis', executionRequirements: { mode: 'subagent' } });
       write.mockClear();

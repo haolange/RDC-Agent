@@ -483,7 +483,9 @@ export class ToolExecutorFactory {
       }
       const handoffOptions = (runtimeContext.effectivePlan?.profileHandoffs ?? [])
         .filter((handoff) => isHandoffContinueAction(handoff) && handoff.label.trim() && handoff.agent.trim())
-        .map((handoff) => ({ label: handoff.label.trim(), agent: handoff.agent.trim() }));
+        .map((handoff) => ({ label: handoff.label.trim(), agent: handoff.agent.trim(),
+          ...(handoff.labelTranslations ? { labelTranslations: { ...handoff.labelTranslations } } : {}),
+        }));
       if (handoffOptions.length === 0) {
         throw new Error('PLAN_REVIEW_NO_HANDOFF: plan_artifact requires a declared continue handoff on this profile.');
       }

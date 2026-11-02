@@ -32,6 +32,17 @@ const basePermission = {
 };
 
 describe('EffectiveRuntimePlan', () => {
+  it('freezes declaration translations independently of later profile edits', () => {
+    const translations = { 'zh-CN': '执行计划' };
+    const plan = buildEffectiveRuntimePlan({ agentId: 'general', projectRootPath: null,
+      profile: { skills: [], handoffs: [{ agent: 'custom', label: 'Implement Plan', prompt: 'Go', labelTranslations: translations }] },
+      toolAllowlist: [], permissionConstraints: basePermission, routeCapability, policy: compilePolicyFromRestrictive({}),
+      requestPlan: { executionIdentity: { fingerprint: 'exec' } }, promptPlan: { systemPrompt: 'system' },
+    });
+    translations['zh-CN'] = 'Changed';
+    expect(plan.profileHandoffs[0]).toMatchObject({ label: 'Implement Plan', labelTranslations: { 'zh-CN': '执行计划' } });
+    expect(Object.isFrozen(plan.profileHandoffs[0].labelTranslations)).toBe(true);
+  });
   it('freezes permission/policy/tool allowlist under a stable fingerprint', () => {
     const policy = compilePolicyFromRestrictive({ deniedTools: ['shell'], limits: { maxTurns: 7 } });
     const plan = buildEffectiveRuntimePlan({

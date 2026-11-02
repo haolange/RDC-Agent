@@ -17,7 +17,7 @@ export const HandoffSuggestionRow: React.FC<{
       <p className="handoff-suggestion-row__label">{t('chat.handoffSuggestionTitle')}</p>
       <HandoffActionRow
         disabled={disabled}
-        options={suggestions.map((suggestion) => ({ label: suggestion.label, agent: suggestion.agent }))}
+        options={suggestions}
         onSelect={(option) => {
           const match = suggestions.find((suggestion) => suggestion.agent === option.agent && suggestion.label === option.label);
           if (match) onSelect(match);

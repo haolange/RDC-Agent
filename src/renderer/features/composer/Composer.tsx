@@ -125,14 +125,12 @@ export const Composer: React.FC<ComposerProps> = ({
   }, [composerMarkdown, isComposerBusy]);
 
   const pendingRequest = useComposerPendingRequest();
-  const reviewTargets = pendingRequest?.kind === 'plan-review' ? [...new Set(pendingRequest.request.planReview.handoffOptions.map(option => option.agent))] : [];
-  const controlsAgentId = reviewTargets.length === 1 ? reviewTargets[0] : selectedAgentId;
   return (
-    <ComposerTurnControlsProvider agentId={controlsAgentId} currentSession={currentSession}>
+    <ComposerTurnControlsProvider agentId={selectedAgentId} currentSession={currentSession}>
     <ComposerMenuRegistryProvider key={pendingRequest?.kind === 'plan-review'
       ? `${composerScopeKey}:${planReviewRequestKey(pendingRequest.request)}` : composerScopeKey}>
     {pendingRequest ? <ComposerPendingRequest shellRef={shellRef} pending={pendingRequest} composeAccentStyle={composeAccentStyle}
-      agentId={pendingRequest.kind === 'plan-review' ? controlsAgentId : activeAgentId ?? selectedAgentId} currentSession={currentSession} onReplan={composer.sendExplicitPrompt} /> : <div
+      agentId={pendingRequest.kind === 'plan-review' ? selectedAgentId : activeAgentId ?? selectedAgentId} currentSession={currentSession} onReplan={composer.sendExplicitPrompt} /> : <div
       ref={shellRef} className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}${isDropActive ? ' is-drop-active' : ''}`}
       {...composeAccentStyle}
       onDragOver={attachmentDrop.handleDragOver}

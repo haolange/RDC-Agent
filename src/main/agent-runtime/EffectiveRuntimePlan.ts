@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'crypto';
-import type { AgentManifestDefinition } from '@shared/types/agentManifest';
+import type { AgentManifestDefinition, HandoffLabelTranslations } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { PromptPlan, CompiledPolicy, ResourceProvenance } from '@shared/types/rdcRuntime';
 import type { AgentPermissionSettings } from '@shared/types/settings';
@@ -16,6 +16,7 @@ import { filterMissionPlanOnlyAllowlist, isMissionProfileId } from '@shared/cons
 export interface FrozenHandoffDefinition {
   agent: string;
   label: string;
+  labelTranslations?: HandoffLabelTranslations;
   prompt: string;
   send?: boolean;
   showContinueOn?: boolean;
@@ -178,6 +179,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
   const profileHandoffs = Object.freeze((input.profile?.handoffs ?? []).map((handoff) => Object.freeze({
     agent: handoff.agent,
     label: handoff.label,
+    ...(handoff.labelTranslations ? { labelTranslations: Object.freeze({ ...handoff.labelTranslations }) } : {}),
     prompt: handoff.prompt,
     ...(handoff.send !== undefined ? { send: handoff.send } : {}),
     ...(handoff.showContinueOn !== undefined ? { showContinueOn: handoff.showContinueOn } : {}),

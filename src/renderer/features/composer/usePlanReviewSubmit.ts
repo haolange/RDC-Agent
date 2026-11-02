@@ -6,11 +6,13 @@ import { useElectronApi } from '../../hooks/useElectronApi';
 import { useProjectStore } from '../../stores/projectStore';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
-import { flushSessionModelSaves } from './sessionModelOverride';
+import { flushSessionModelSaves, persistSessionModelOverride } from './sessionModelOverride';
+import { useTurnControlsStore } from '../../stores/turnControlsStore';
 import { loadComposerModelPickerOptions } from './useComposerModelPickerOptions';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { readCompiledComposerRoute, resolveComposerEffectiveModel } from '../../lib/composerEffectiveModel';
 import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
+import { buildSessionTurnControlsKey } from '../../lib/turnControlHelpers';
 
 export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; agentId: string; prompt: string; planSource: import('@shared/types/planReview').PlanReadRequest }) => Promise<unknown>) => {
   const api = useElectronApi();
@@ -36,15 +38,37 @@ export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; ag
     if (decision.kind === 'approve') {
       const settings = useAppSettingsStore.getState().settings;
       const session = useProjectStore.getState().currentSession;
-      const route = resolveComposerEffectiveModel(session?.modelOverride, null, readCompiledComposerRoute(settings, decision.handoff.agent));
+      const sourceAgentId = session?.agentId ?? request.agentId;
+      const route = resolveComposerEffectiveModel(session?.modelOverride, null, readCompiledComposerRoute(settings, sourceAgentId));
+      const controls = { ...useTurnControlsStore.getState().turnControls };
       const provider = settings.llm.providers.find((item) => item.id === route?.providerId);
       const models = await loadComposerModelPickerOptions(provider ? [provider] : []);
       if (invalidated || !isCurrent()) return;
       const currentProvider = useAppSettingsStore.getState().settings.llm.providers.find((item) => item.id === route?.providerId);
-      if (!isProviderExecutable(currentProvider) || currentProvider?.activeAccountId !== provider?.activeAccountId
+      if (!route || !isProviderExecutable(currentProvider) || currentProvider?.activeAccountId !== provider?.activeAccountId
+        || currentProvider?.protocol !== provider?.protocol
         || !models.some((model) => model.providerId === route?.providerId && model.modelId === route.modelId)) {
         throw new Error('MODEL_UNAVAILABLE: Please select an available model before executing the plan.');
       }
+      const assertSelectionCurrent = () => {
+        const latest = useProjectStore.getState().currentSession;
+        const latestSettings = useAppSettingsStore.getState().settings;
+        const latestRoute = resolveComposerEffectiveModel(latest?.modelOverride, null,
+          readCompiledComposerRoute(latestSettings, latest?.agentId ?? request.agentId));
+        const latestProvider = latestSettings.llm.providers.find(item => item.id === route.providerId);
+        if (latestRoute?.providerId !== route.providerId || latestRoute?.modelId !== route.modelId
+          || !isProviderExecutable(latestProvider) || latestProvider?.activeAccountId !== provider?.activeAccountId
+          || latestProvider?.protocol !== provider?.protocol
+          || buildSessionTurnControlsKey(useTurnControlsStore.getState().turnControls) !== buildSessionTurnControlsKey(controls)) {
+          throw new Error('MODEL_SELECTION_CHANGED: Review the current model and controls before executing the plan.');
+        }
+      };
+      assertSelectionCurrent();
+      const saved = await persistSessionModelOverride(request.sessionId, route, controls);
+      if (!saved.ok) throw new Error(saved.error || 'MODEL_SAVE_FAILED');
+      await flushSessionModelSaves(request.sessionId);
+      if (invalidated || !isCurrent()) return;
+      assertSelectionCurrent();
     }
     const continuation = decision.kind === 'approve' && request.sessionId ? {
       sessionId: request.sessionId, agentId: decision.handoff.agent, label: decision.handoff.label, prompt: '', send: true,

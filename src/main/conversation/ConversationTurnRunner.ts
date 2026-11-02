@@ -561,6 +561,7 @@ export async function completeProfileTurn(
         .filter((handoff) => isHandoffContinueAction(handoff) && handoff.label.trim() && handoff.agent.trim())
         .map((handoff) => ({
           label: handoff.label.trim(),
+          ...(handoff.labelTranslations ? { labelTranslations: { ...handoff.labelTranslations } } : {}),
           agent: handoff.agent.trim(),
           prompt: handoff.prompt,
           send: handoff.send === true,

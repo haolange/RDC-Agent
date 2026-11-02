@@ -21,7 +21,7 @@ export function applySessionRecordToStore(session: SessionRecord): void {
 
 async function saveSessionModelOverride(
   sessionId: string | null | undefined,
-  modelOverride: SessionModelOverride | null,
+  modelOverride: SessionModelOverride | null | undefined,
   turnControls?: ConversationTurnControls,
   isCurrent: () => boolean = () => true,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -30,7 +30,8 @@ async function saveSessionModelOverride(
   if (!api) return { ok: false, error: 'BRIDGE_UNAVAILABLE' };
   try {
     const latest = useProjectStore.getState().currentSession;
-    const override = turnControls && latest?.sessionId === sessionId ? latest.modelOverride ?? null : modelOverride;
+    if (modelOverride === undefined && latest?.sessionId !== sessionId) return { ok: false, error: 'MODEL_SAVE_CANCELLED' };
+    const override = modelOverride === undefined ? latest?.modelOverride ?? null : modelOverride;
     const result = turnControls
       ? await api.session.setModelOverride(sessionId, override, turnControls)
       : await api.session.setModelOverride(sessionId, override);
@@ -43,9 +44,9 @@ async function saveSessionModelOverride(
 }
 
 const sessionSaves = new Map<string, Promise<{ ok: boolean; error?: string }>>();
-export function persistSessionModelOverride(
+function enqueueSessionModelSave(
   sessionId: string | null | undefined,
-  modelOverride: SessionModelOverride | null,
+  modelOverride: SessionModelOverride | null | undefined,
   turnControls?: ConversationTurnControls,
 ): Promise<{ ok: boolean; error?: string }> {
   if (!sessionId) return Promise.resolve({ ok: false, error: 'SESSION_MISSING' });
@@ -65,10 +66,32 @@ export function persistSessionModelOverride(
   return pending;
 }
 
+export function persistSessionModelOverride(
+  sessionId: string | null | undefined,
+  modelOverride: SessionModelOverride | null,
+  turnControls?: ConversationTurnControls,
+): Promise<{ ok: boolean; error?: string }> {
+  return enqueueSessionModelSave(sessionId, modelOverride, turnControls);
+}
+
+/** Resolve the model at queue execution time so an earlier model edit is retained. */
+export function persistSessionTurnControls(sessionId: string, turnControls: ConversationTurnControls) {
+  return enqueueSessionModelSave(sessionId, undefined, turnControls);
+}
+
 export function flushSessionModelSaves(sessionId: string): Promise<void> | undefined {
-  return sessionSaves.get(sessionId)?.then((result) => {
-    if (!result.ok) throw new Error(result.error || 'MODEL_SAVE_FAILED');
-  });
+  const first = sessionSaves.get(sessionId);
+  if (!first) return undefined;
+  return (async () => {
+    let pending: typeof first | undefined = first;
+    while (pending) {
+      const result = await pending;
+      if (!result.ok) throw new Error(result.error || 'MODEL_SAVE_FAILED');
+      const latest = sessionSaves.get(sessionId);
+      if (latest === pending) return;
+      pending = latest;
+    }
+  })();
 }
 
 export async function commitComposerModelChoice(

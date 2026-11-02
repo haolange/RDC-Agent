@@ -49,6 +49,16 @@ const valid: AgentHandoffDefinition = {
 };
 
 describe('validateAgentHandoffs', () => {
+  it('retains translations through unrelated edits and diagnoses invalid declarations', () => {
+    const handoff = { ...valid, labelTranslations: { 'zh-CN': '调查' } };
+    const saved = persistAgentHandoff({ ...handoff, prompt: 'New prompt' });
+    expect(saved.labelTranslations).toEqual(handoff.labelTranslations);
+    expect(saved.labelTranslations).not.toBe(handoff.labelTranslations);
+    expect(validateAgentHandoffs([saved], ctx)).toEqual([]);
+    expect(validateAgentHandoffs([{ ...saved, labelTranslations: { en: ' ' } }], ctx)).toEqual([
+      { index: 0, field: 'labelTranslations', code: 'translations-invalid' },
+    ]);
+  });
   it('accepts an empty handoff list as a legal configuration', () => {
     expect(validateAgentHandoffs([], ctx)).toEqual([]);
   });

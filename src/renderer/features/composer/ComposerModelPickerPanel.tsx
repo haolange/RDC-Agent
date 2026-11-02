@@ -38,10 +38,9 @@ export const ComposerModelPickerPanel: React.FC<{
   currentSession: SessionRecord | null;
   popupRef: React.RefObject<HTMLDivElement>;
   popupShiftPx: number;
-  onChosen: (agentDefault?: boolean) => void;
+  onChosen: () => void;
   onSaveStateChange?: (state: ComposerModelSaveState) => void;
-  agentDefaultLabelOnly?: boolean;
-}> = ({ agentId, currentSession, popupRef, popupShiftPx, onChosen, onSaveStateChange, agentDefaultLabelOnly = false }) => {
+}> = ({ agentId, currentSession, popupRef, popupShiftPx, onChosen, onSaveStateChange }) => {
   const { t } = useI18n();
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
@@ -121,7 +120,7 @@ export const ComposerModelPickerPanel: React.FC<{
       setSaveError(t('composer.model.saveFailed'));
       return;
     }
-    onChosen(true);
+    onChosen();
   };
 
   const handleMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -180,12 +179,12 @@ export const ComposerModelPickerPanel: React.FC<{
           data-testid="composer-model-agent-default"
           role="menuitemradio"
           aria-checked={!hasChoice}
-          title={agentDefaultLabelOnly ? t('composer.model.agentDefault') : agentDefaultTitle}
+          title={agentDefaultTitle}
           disabled={saving || !agentDefault.selectable}
           onClick={() => void selectAgentDefault()}
         >
           <span className="composer-model-item-label">{t('composer.model.agentDefault')}</span>
-          {!agentDefaultLabelOnly ? <span className="composer-model-item-meta">{agentDefaultMeta}</span> : null}
+          <span className="composer-model-item-meta">{agentDefaultMeta}</span>
         </Button>
         {saving ? <p className="composer-model-empty" role="status">{t('settings.saving')}</p> : null}
         {failedProviders.length ? <div className="composer-model-errors">{failedProviders.map((provider) => <InlineError key={provider.id}>

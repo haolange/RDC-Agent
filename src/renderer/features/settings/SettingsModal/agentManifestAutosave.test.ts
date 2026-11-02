@@ -33,6 +33,13 @@ const draft = (id: string, model: string): AgentManifestDraft => ({
 });
 
 describe('agent manifest scoped autosave helpers', () => {
+  it('detects translation-only changes and preserves them across unrelated autosaves', () => {
+    const saved = { ...draft('custom', 'deepseek/a'), handoffs: [{ label: 'Go', agent: 'general', prompt: 'Run' }] };
+    const edited = { ...saved, handoffs: [{ ...saved.handoffs[0], labelTranslations: { 'zh-CN': '执行' } }] };
+    expect(getChangedAgentManifestDrafts([edited], [saved])).toEqual([edited]);
+    expect(JSON.parse(serializeAgentManifestDraft({ ...edited, description: 'Edited' })).handoffs[0])
+      .toMatchObject({ label: 'Go', labelTranslations: { 'zh-CN': '执行' } });
+  });
   it('ignores runtime-only fields and detects only persisted changes', () => {
     const saved = draft('ask', 'deepseek/a');
     const runtimeDecorated = {

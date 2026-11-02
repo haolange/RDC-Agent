@@ -1,3 +1,5 @@
+import type { HandoffLabelTranslations } from './agentManifest';
+
 export const PLAN_REVIEW_STATE_SCHEMA = '1' as const;
 
 export type PlanReviewStatus = 'awaiting' | 'approved' | 'rejected' | 'superseded' | 'cancelled';
@@ -7,20 +9,22 @@ export interface PlanReviewSection {
   body: string;
 }
 
-export interface PlanReviewHandoffOption {
+export interface PlanReviewHandoffIdentity {
   label: string;
   agent: string;
 }
 
-export interface PlanReviewHandoffSuggestion {
-  label: string;
-  agent: string;
+export interface PlanReviewHandoffOption extends PlanReviewHandoffIdentity {
+  labelTranslations?: HandoffLabelTranslations;
+}
+
+export interface PlanReviewHandoffSuggestion extends PlanReviewHandoffOption {
   prompt: string;
   send: boolean;
 }
 
 export type PlanReviewDecision =
-  | { kind: 'approve'; handoff: PlanReviewHandoffOption }
+  | { kind: 'approve'; handoff: PlanReviewHandoffIdentity }
   | { kind: 'reject'; feedback: string };
 
 export interface ConversationPlanReview {
@@ -45,7 +49,7 @@ export interface PlanReviewStateDocument {
   status: PlanReviewStatus;
   approvedHash?: string;
   frozenUri?: string;
-  approvedHandoff?: PlanReviewHandoffOption;
+  approvedHandoff?: PlanReviewHandoffIdentity;
   updatedAt: number;
 }
 
