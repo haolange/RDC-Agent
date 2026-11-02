@@ -37,6 +37,7 @@ composer-model-effort-pill
 composer-model-effort-popup
 composer-model-item-${option.providerId}-${option.modelId}
 composer-model-popup
+composer-model-provider-${provider.id}
 composer-model-search
 composer-permission-pill
 composer-skill-chip
@@ -283,6 +284,8 @@ terminal-toggle
 titlebar-getting-started
 titlebar-left-panel-toggle
 titlebar-right-panel-toggle
+utility-device-selector-dropdown
+utility-device-selector-trigger
 work-process
 work-process-approval
 work-process-block

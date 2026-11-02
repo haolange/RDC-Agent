@@ -78,6 +78,7 @@ vi.mock('../tools/RdcCliInvokerService', () => ({
 }));
 
 import { registerProjectSessionHandlers } from './projectSessionHandlers';
+import { rdcSessionService } from '../sessions';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
 describe('session:remove slot sync', () => {
@@ -103,6 +104,7 @@ describe('session:remove slot sync', () => {
     storage.listRuns.mockReturnValue([]);
     storage.listSessions.mockReturnValue([]);
     storage.getProjectById.mockReturnValue({ projectId: 'proj_1', rootPath: 'D:/proj_1' });
+    vi.mocked(rdcSessionService.clearOpenedCaptureForSession).mockReset().mockResolvedValue(true);
   });
 
   it('registers only the exact explicitly supplied reference through the validated IPC boundary', async () => {
@@ -133,6 +135,15 @@ describe('session:remove slot sync', () => {
     const result = await handlers.get('project:remove')!({}, 'proj_1');
     expect(result).toMatchObject({ success: false, error: 'join not confirmed' });
     expect(storage.removeProject).not.toHaveBeenCalled();
+  });
+  it('keeps the project and its visible owner when device installation remains unconfirmed after native cleanup', async () => {
+    storage.listSessions.mockReturnValue([{ sessionId: 'sess_1' }]);
+    vi.mocked(rdcSessionService.clearOpenedCaptureForSession).mockRejectedValueOnce(new Error('RDC_DEVICE_ACTION_UNCONFIRMED'));
+    const state = { currentSessionId: 'sess_1', currentProjectId: 'proj_1', currentRunId: 'run_1' };
+    registerProjectSessionHandlers({ state, broadcastToRenderer: vi.fn() } as unknown as WorkbenchIpcContext);
+    expect(await handlers.get('project:remove')!({}, 'proj_1')).toEqual({ success: false, error: 'RDC_DEVICE_ACTION_UNCONFIRMED' });
+    expect(storage.removeProject).not.toHaveBeenCalled(); expect(storage.removeSession).not.toHaveBeenCalled();
+    expect(state).toEqual({ currentSessionId: 'sess_1', currentProjectId: 'proj_1', currentRunId: 'run_1' });
   });
 
   it('calls syncSessionSlots when removing a session', async () => {

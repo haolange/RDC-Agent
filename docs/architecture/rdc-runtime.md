@@ -97,7 +97,7 @@ Settings 持久化保留 executable、argsPrefix、cwd、env 和 timeout，用�
 
 正式安装来源按发布资产 SHA-256、`RELEASE_MANIFEST.json` / `SBOM.json` 的版本与 `source_revision`、安装文件哈希逐层核对，再通过实际主进程的运行摘要、catalog 和安装验证入口确认同安装绑定。升级使用已验证的正式包，不向安装目录混拷开发源码或重写发行清单；包版本用于来源诊断，不能替代实际能力校验。历史发行记录保留其当时版本和验证边界。
 
-RDC-Tool 的 session worker 对 `rd.session.*` 统一提供 60 秒操作预算，CLI transport 在此基础上增加 5 秒响应缓冲，实际传输门限为 65 秒；RDC-Agent 的默认外层 CLI 进程等待为 120 秒。Settings schema 8 会把旧默认 60000ms 迁移到 120000ms，非默认用户值保留。三层门限均由各自边界负责，调用方不传第二套 session timeout。
+RDC-Tool 的 session worker 对 `rd.session.*` 统一提供 60 秒操作预算，CLI transport 在此基础上增加 5 秒响应缓冲，实际传输门限为 65 秒；RDC-Agent 常规 CLI 调用的本机默认预算为 120 秒。Remote 准备显式传入冻结的本机 native budget，并按 catalog 的 timeout_policy 推导 worker/transport/宿主收口余量，不能把常规120秒外壳门限套在该连接上（见下文 Remote 准备预算）。Settings schema 8 会把旧默认 60000ms 迁移到 120000ms，非默认用户值保留。各层门限由所属边界负责，普通 session 调用不传第二套 session timeout。
 
 `prepareTurn` 冻结 CLI 配置、完整操作定义及其指纹、owning session/context/replay lease 身份。在途 Settings 变化不影响该轮。General 使用已有 shell 的结构化 RDC 模式，普通 command 与 rdc 互斥；轻量发现只返回匹配操作或单个操作说明，不把完整 catalog 展开进每次模型请求。
 
@@ -147,9 +147,9 @@ RDC 接口只维护当前操作契约；包发布号仅用于安装诊断，不�
 
 ## Android 连接与归属
 
-设备选择只更新选择目标；Capture 打开时才由 RdcSessionRuntime 分配 owning context、冻结 CLI 并预留设备，然后调用同一原生连接。无 context 的 device:activate IPC 已删除。Tools 根据实际状态复用已有 helper 或启动自有 helper，应用不另行启停。设备连接状态只在 connect 与 Ping 都成功后建立；startedActivity 才表示本次启动，包名存在不表示 APK 已验证。失败保留真实错误，可重新打开 Capture 重试。关闭、取消与退出均遵循自有资源清理，借用 helper 必须保留。
+设备发现只报告 ADB 可见性；当前活动会话选择 Android 即分配 owning context、冻结同安装 CLI/catalog 并预留设备，调用 Tools 完成准备、连接与 Ping，不等待 Capture 打开。没有活动会话不得连接。Open 复用本会话已准备的同一 context/connection；已有 Capture 换设备先确认关闭并核验旧 context 释放。无 context 的 device:activate IPC 已删除。startedActivity 才表示本次启动，包名存在不等于 APK 或协议已验证。失败由本会话结构化 issue 保留实际原生诊断，通过准备入口恢复，不要求清空进程或反复 Open。完整生命周期见下文“设备选择即准备与同会话打开”。
 
-helper 进程退出不转移已有安装或配置的所有权。Tool 以成功且可解析的包查询区分已安装与缺失；现有安装即使未运行也不替换、卸载或创建配置，包查询失败或未知时拒绝安装。只有确认缺失才非替换安装一次，并且只有本次新安装允许创建缺失的默认配置；安装冲突或签名、版本错误直接报告，不卸载重试。本次启动的 PID 与 forward 仍按实际归属清理，历史 bootstrap 元数据不能授权新的安装或配置修改。协议不兼容须准确报错，不能靠重新安装掩盖。
+helper 进程退出不转移已有安装或配置所有权。Tools 依据可解析的设备/包状态、同安装 APK 的 package/versionCode/hash 和实际握手决定复用与修复。auto_safe 允许缺失安装和保留数据的受支持旧包升级；兼容运行服务仅借用，不修改安装或配置。未知服务停止、签名替换、卸载或降级须经绑定当前状态 fingerprint 的明确确认；状态未知或变化拒绝，busy 不重装、不抢占。正常清理保留借用 helper；明确确认的修复与退出清理是两种不同授权。已有配置不因复用或安全升级被重建，只有新安装可创建缺失默认配置；PID/forward 按实际归属清理，历史 bootstrap 元数据不授予修改权。
 
 远端 replay 必须复用 owning runtime 已持有的 native connection，避免第二条连接触发真实 busy。关闭先经 clear_context 确认所属会话和转发释放，再 `daemon stop` 并确认该 context 的 daemon/worker 退出；清理失败保留恢复信息，不得把 clear 成功或缺失 state 文件当成进程已死。CLI canonical 错误中的原始代码与消息应保留到应用恢复提示。
 
@@ -212,10 +212,24 @@ ADB、所需 Windows DLL 与 SPIR-V 汇编/反汇编工具归 RDC-Tool 安装所
 
 设备 list/refresh 和 statusChanged 使用同一 revision 快照，包含 devices 与 discovery（idle/scanning/ready/failed、失败原因）。首次扫描失败与合法空设备列表分别呈现；ADB 的 device/unauthorized/offline/missing 状态与 RenderDoc 连接状态分别解释。Renderer 丢弃较旧快照。
 
-设备菜单展开立即异步扫描，展开期间正常每 5 秒查询本机 ADB server，失败退避至最多 60 秒；关闭停止并取消所属发现。重新展开及手动刷新允许一次新的 server 启动尝试；并发扫描合并，取消后的结果不能提交。ADB 启动由 ProcessSupervisor 有界管理；正常轮询不派生进程、不重做完整内容哈希，也不后台持续扫描。选择设备不连接，真实连接继续在 owning Capture context 内发生。
+设备菜单展开立即异步扫描，展开期间正常每 5 秒查询本机 ADB server，失败退避至最多 60 秒；关闭停止并取消所属发现。重新展开及手动刷新允许一次新的 server 启动尝试；并发扫描合并，取消后的结果不能提交。ADB 启动由 ProcessSupervisor 有界管理；正常轮询不派生进程、不重做完整内容哈希，也不后台持续扫描。发现不创建连接；用户选择通过下述会话准备流程连接。
 
 Settings 的显式验证执行同安装 doctor，检查 Python、RenderDoc、Android APK 和捆绑主机工具完整性；设备未连接不作为安装损坏。
 
-选择 Remote 只更新目标，不预先创建 helper 或无 owner 的连接。首次打开在分配的 owning context 与冻结 CLI 内完成 helper 准备、服务就绪、forward、握手和 replay 打开；准备条目只允许相同 context 消费，错误/取消或过期身份不可复用。运行态在原生确认前不得显示 connected；失败保留原生错误码与所属连接阶段，并由显式重开先清理本次自有资源。Android 进程启动与服务复用统一由 Tools 负责，Agent 不复制设备进程逻辑。
-
 已选 Android 的首次连接由同一 Tools ADB 先确保 server 就绪，再对冻结 serial 执行 `get-state`；只有 `device` 才进入 helper 准备，不重新枚举或选择其它设备。未指定 serial 的独立 CLI 调用仍按完整设备列表选择，异常空输出不等于合法无设备。两种明确输入语义都共享原有连接 deadline、取消、归属清理及原生错误投影，没有第二份设备进程逻辑或隐式重试。
+
+## 设备选择即准备与同会话打开
+
+设备发现仅报告 ADB 可见性。当前会话的 CaptureReplayState.preparation 是唯一设备目标、阶段和结构化问题来源；顶部 Remote 和 Capture 面板共用 device:prepare/device:cancelPreparation，不各自持有下一次设备权威。选择 Android 即分配本会话 owning context，通过同安装 canonical rd.remote.connect 检查、修复、启动、握手并 Ping；成功后尚未打开 capture，不向 Agent 发布 capture lease。Open 消费同一个连接；同设备替换文件只关闭旧 replay/file，保留远端连接，不重复安装或启动。全局 preparedRemotes/context/remoteId 临时交接与其恢复缓存已删除。
+
+repair_policy 为 auto_safe 或 confirmed，确认只传 Tools 返回的 repair fingerprint；主进程一次性 token 绑定 scope/generation/目标、冻结 CLI/catalog 身份及原生评估，执行前再次核验实际配置，Tools 在修改前重新比较真实设备、安装包和服务身份。旧 CLI 缺少该参数契约时只拒绝远端准备并要求升级，不按包版本判权，也不影响 Local 选择。原始 native error.details 保留在主进程，renderer 按 typed code/stage/recovery 显示短标题及可展开原始诊断，不解析英文异常决定安装。
+
+已有 Capture 变更设备先显示一次确认，取消保持回放和画面；确认后先 clear_context、daemon stop 并核实释放，再连接新设备。准备失败保留目标；取消等待自有原生动作及清理，不声称撤回已完成的 APK 安装。未知服务停止、签名替换、卸载/降级必须明确确认，busy 不抢占。页面切换不释放已准备连接，应用重启不自动连接；明确断开、真实离线、会话删除或退出时清理自有资源，borrowed helper 不关闭。查询发现失败不等于真实断连。
+
+准备阶段仅读取同一 owning daemon 的 status，核验 context、operation、起始时间和已观察 trace 后转发真实 checking/installing/starting/verifying；轮询不与自身重叠，完成或取消时停止并等待最后查询收口。取消后在释放 context 前通过 canonical rd.core.get_operation_history 读取对应已收口操作的安装回执；有事实才投影 installation，缺失回执表示未知，不表示安装回滚。
+
+Remote 准备显式将冻结本机 timeoutMs 作为原生 timeout_ms，不削减用户操作预算。worker、transport 和外壳等待收口的余量来自同一 catalog 定义中的 timeout_policy，由 Tools 唯一策略生成并纳入指纹；主进程按该冻结策略推导单次外壳超时，不复制 Python 常量，也不修改用户设置。缺少此策略的远端契约拒绝执行。原生超时与进程退出是不同事实，必须允许原生先返回结构化结果并收口自有动作。
+
+PackageManager 结果未确认时，typed details.device_action 映射为 issue.deviceAction，保留已确认的卸载事实并禁用盲重试。主进程可以释放自有 context/daemon，但现有会话问题和设备独占不随 cancel/clear 清空；迟到未决结果也使排队的替换准备失效。恢复沿用同设备 device:prepare，在原冻结 CLI/catalog 与目标 APK 身份证据一致时，先通过唯一只读 rd.remote.inspect_installation 核验；pending/unknown、身份变化及查询失败继续保留问题和占用，确知 clear 才继续用户本次明确连接请求。核验使用自有非 default context，不安装、启动、卸载、abandon 或授予 capture lease，不增加 IPC 或设置字段。
+
+Tools 的安装前核验和只读核验共用 PM session 解析。应用重启后的连接仍在真正安装前检查，目标包、未知归属或无法判读的非终态阻止安装；已兼容且无需安装的 helper 不因已知无关包的安装被误阻。包不存在、外壳退出或 context 删除均不是设备安装已结束的证明。

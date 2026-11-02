@@ -34,6 +34,8 @@ export function createProjectApi(transport: RendererApiTransport): ProjectApi {
 
 export function createDeviceApi(transport: RendererApiTransport): DeviceApi {
   return {
+    prepare: (request) => transport.invoke(INVOKE.device.prepare, request),
+    cancelPreparation: (request) => transport.invoke(INVOKE.device.cancelPreparation, request),
     list: () => transport.invoke(INVOKE.device.list),
     refresh: () => transport.invoke(INVOKE.device.refresh),
     watchStart: () => transport.invoke(INVOKE.device.watchStart),

@@ -1,54 +1,92 @@
 // @vitest-environment happy-dom
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DeviceSelector } from './index';
-const mocks = vi.hoisted(() => ({ start: vi.fn(), stop: vi.fn(), select: vi.fn(), adbState: 'device' }));
-vi.mock('../../../stores/deviceStore', () => ({ useDeviceStore: () => ({
-  selectedDevice: 'local', discovery: { status: 'ready' }, refreshDevices: vi.fn(), devices: [
-    { id: 'local', type: 'local', label: 'Local', status: 'connected' },
-    { id: 'loading', type: 'android', label: 'Loading', status: 'loading' },
-    { id: 'remote', type: 'android', label: 'darwin', status: 'offline', adbState: mocks.adbState,
-      serial: 'qa-android-serial', detailText: 'Ready to connect to Android RenderDoc server. transport 1',
-      bootstrap: { packageName: 'org.renderdoc.renderdoccmd.arm64', abi: 'arm64-v8a' } },
-  ], setSelectedDevice: mocks.select, startDeviceWatch: mocks.start, stopDeviceWatch: mocks.stop,
-}) }));
+import { useDeviceStore } from '../../../stores/deviceStore';
+import { useSessionDeviceStore } from '../../../stores/sessionDeviceStore';
+import { replayFixture } from '../../../testing/replayFixture';
+const mocks = vi.hoisted(() => ({ start: vi.fn(), stop: vi.fn(), select: vi.fn(), activeSession: true, unconfirmed: false }));
+vi.mock('../../../stores/projectStore', () => ({ useProjectStore: (selector: (value: unknown) => unknown) => selector({ currentProject: { projectId: 'project' }, currentSession: mocks.activeSession ? { sessionId: 'session' } : null }) }));
+vi.mock('../../../hooks/useSessionDevicePreparation', () => ({ useSessionDevicePreparation: () => ({ state: replayFixture(mocks.unconfirmed ? {
+  preparation: { targetDeviceId: 'remote', phase: 'failed', issue: { code: 'remote_install_unconfirmed', stage: 'installing', diagnostic: 'Pending installation', recovery: 'verify_installation', deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: false } } },
+} : {}), error: null, actionFailure: null }) }));
+vi.mock('../DevicePreparationDialog', () => ({ DevicePreparationDialog: () => null }));
 vi.mock('../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
-vi.mock('../../../lib/useDynStyle', () => ({ useDynStyle: () => ({}) }));
-vi.mock('./useDeviceDropdownPosition', () => ({ useDeviceDropdownPosition: () => ({ left: 0, top: 0, width: 200, ready: true, placement: 'bottom' }) }));
-it('supports option navigation, loading disablement, Escape focus return and watch cleanup', async () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); vi.clearAllMocks();
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); vi.clearAllMocks(); mocks.activeSession = true; mocks.unconfirmed = false;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1; });
+  vi.stubGlobal('cancelAnimationFrame', () => {});
+  useDeviceStore.setState({ startDeviceWatch: mocks.start, stopDeviceWatch: mocks.stop, refreshDevices: vi.fn(), discovery: { status: 'ready' }, devices: [
+    { id: 'local', type: 'local', transport: 'local', label: 'Local', status: 'online' },
+    { id: 'unauthorized', type: 'android', transport: 'adb_android', label: 'Unauthorized', status: 'offline', adbState: 'unauthorized' },
+    { id: 'remote', type: 'android', transport: 'adb_android', label: 'A'.repeat(500), serial: 'b54ed446', status: 'online', adbState: 'device' },
+  ] });
+  useSessionDeviceStore.setState({ prepare: mocks.select });
+});
+afterEach(() => { vi.unstubAllGlobals(); });
+it('blocks device selection while installation is unknown and verifies the owning target explicitly', async () => {
+  mocks.unconfirmed = true;
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  try {
+    await act(async () => root.render(createElement(DeviceSelector)));
+    await act(async () => host.querySelector<HTMLButtonElement>('button')!.click());
+    const options = document.querySelectorAll<HTMLButtonElement>('[role="option"]');
+    expect([...options].every(option => option.disabled)).toBe(true);
+    const verify = [...document.querySelectorAll<HTMLButtonElement>('.device-preparation-actions button')].find(button => button.textContent === 'device.prepare.verifyInstallation');
+    expect(verify?.disabled).toBe(false);
+    await act(async () => verify!.click());
+    expect(mocks.select).toHaveBeenCalledExactlyOnceWith({ projectId: 'project', sessionId: 'session' }, 'remote');
+    expect(document.querySelector('.device-preparation-status')?.textContent).toContain('device.prepare.installUnconfirmed');
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+it('navigates actual device states, starts preparation on selection and returns focus on Escape', async () => {
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   try {
     await act(async () => root.render(createElement(DeviceSelector)));
     const trigger = host.querySelector<HTMLButtonElement>('[data-testid="utility-device-selector-trigger"]')!;
+    expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
     await act(async () => trigger.click());
     const options = document.querySelectorAll<HTMLButtonElement>('[role="option"]');
-    expect(options[2].textContent).toBe('darwindevice.status.disconnected');
-    expect(options[2].textContent).not.toMatch(/transport|qa-android-serial|org\.renderdoc|arm64/u);
-    expect(options[2].title).toContain('qa-android-serial');
-    expect(options[2].title).toContain('org.renderdoc.renderdoccmd.arm64');
-    expect(options[0].textContent?.match(/device.status.connected/gu)).toHaveLength(1);
+    expect(options[2].textContent).toBe('A'.repeat(500) + 'device.discovery.available');
+    expect(options[2].textContent).not.toContain('b54ed446');
+    expect(options[2].title).toContain('b54ed446');
+    expect(document.querySelector('.device-discovery-status')).toBeNull();
     expect(options[1].disabled).toBe(true); expect(document.activeElement).toBe(options[0]);
     await act(async () => options[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
     expect(document.activeElement).toBe(options[2]);
+    await act(async () => options[2].click());
+    expect(mocks.select).toHaveBeenCalledWith({ projectId: 'project', sessionId: 'session' }, 'remote');
+    expect(document.querySelector('[role="listbox"]')!.textContent).not.toContain('CheckRemoteServerConnection');
     await act(async () => options[2].dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     expect(document.querySelector('[role="listbox"]')).toBeNull(); expect(document.activeElement).toBe(trigger);
     expect(mocks.start).toHaveBeenCalledOnce(); expect(mocks.stop).toHaveBeenCalled();
-    await act(async () => trigger.click());
-    await act(async () => document.querySelectorAll<HTMLButtonElement>('[role="option"]')[2].click());
-    expect(mocks.select).toHaveBeenCalledWith('remote'); expect(document.activeElement).toBe(trigger);
-  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+it('requires an active session before connecting and leaves discovery readable', async () => {
+  mocks.activeSession = false;
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  try {
+    await act(async () => root.render(createElement(DeviceSelector)));
+    await act(async () => host.querySelector<HTMLButtonElement>('button')!.click());
+    expect(document.body.textContent).toContain('device.prepare.noSession');
+    const options = document.querySelectorAll<HTMLButtonElement>('[role="option"]');
+    expect([...options].every(option => option.disabled)).toBe(true);
+    expect(mocks.select).not.toHaveBeenCalled();
+  } finally { await act(async () => root.unmount()); host.remove(); }
 });
 
-it.each(['unauthorized', 'offline', 'missing'])('keeps the %s state explicit without diagnostic paragraphs', async (adbState) => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); mocks.adbState = adbState;
+it.each(['unauthorized', 'offline', 'missing'] as const)('keeps %s explicit without diagnostics in option text', async (adbState) => {
+  useDeviceStore.setState(state => ({ devices: state.devices.map(device => device.id === 'remote' ? { ...device, status: 'offline', adbState } : device) }));
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   try {
     await act(async () => root.render(createElement(DeviceSelector)));
     await act(async () => host.querySelector<HTMLButtonElement>('button')!.click());
     const option = document.querySelectorAll<HTMLButtonElement>('[role="option"]')[2];
-    expect(option.textContent).toBe(`darwindevice.status.${adbState === 'unauthorized' ? 'unauthorized' : 'offline'}`);
+    expect(option.textContent).toBe('A'.repeat(500) + (adbState === 'unauthorized' ? 'device.status.unauthorized' : 'device.status.offline'));
     expect(option.querySelector('.device-option-status')?.classList.contains('is-error')).toBe(true);
-  } finally { await act(async () => root.unmount()); host.remove(); mocks.adbState = 'device'; vi.unstubAllGlobals(); }
+    expect(option.disabled).toBe(true);
+    expect(option.textContent).not.toContain('b54ed446');
+    expect(option.title).toContain('b54ed446');
+  } finally { await act(async () => root.unmount()); host.remove(); }
 });

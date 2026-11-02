@@ -20,9 +20,7 @@ function makeDevice(overrides: Partial<ReplayDeviceEntry> = {}): ReplayDeviceEnt
     type: 'android',
     status: 'offline',
     transport: 'adb_android',
-    serial: 'SERIAL1',
-    detailText: 'Ready to connect to Android RenderDoc server',
-    lastSeen: 1_000,
+    serial: 'SERIAL1',    lastSeen: 1_000,
     ...overrides,
   };
 }
@@ -35,9 +33,9 @@ describe('replayDeviceDiff', () => {
     expect(devicesSemanticallyEqual([previous], [next])).toBe(true);
   });
 
-  it('treats status / detail changes as changed', () => {
-    const previous = makeDevice({ status: 'offline', detailText: 'Ready' });
-    const next = makeDevice({ status: 'online', detailText: 'Connected', lastSeen: previous.lastSeen });
+  it('treats discovery authorization changes as changed', () => {
+    const previous = makeDevice({ status: 'offline', adbState: 'unauthorized' });
+    const next = makeDevice({ status: 'online', adbState: 'device', lastSeen: previous.lastSeen });
     expect(devicesSemanticallyEqual([previous], [next])).toBe(false);
   });
 

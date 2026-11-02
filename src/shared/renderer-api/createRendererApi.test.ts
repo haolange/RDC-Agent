@@ -151,6 +151,18 @@ describe('canonical renderer API', () => {
     expect(transport.clearedListeners).toContain('app:themeChanged');
   });
 
+  it('scopes device preparation and carries only main-issued confirmation tokens', async () => {
+    const transport = new RecordingTransport();
+    const api = createRendererApi('win32', transport);
+    const request = { projectId: 'p', sessionId: 's', bindingGeneration: 4, deviceId: 'android', confirmationToken: 'once' };
+    await api.device.prepare(request);
+    await api.device.cancelPreparation({ projectId: 'p', sessionId: 's', bindingGeneration: 4 });
+    expect(transport.invocations).toEqual([
+      { channel: 'device:prepare', args: [request] },
+      { channel: 'device:cancelPreparation', args: [{ projectId: 'p', sessionId: 's', bindingGeneration: 4 }] },
+    ]);
+  });
+
   it('routes the formerly browser-disabled product capabilities through one transport', async () => {
     const transport = new RecordingTransport();
     const api = createRendererApi('win32', transport);

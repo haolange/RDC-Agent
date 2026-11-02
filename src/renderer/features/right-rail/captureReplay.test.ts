@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { CaptureReplayState } from '@shared/types/captureReplay';
-import { acceptsReplayState } from './useCaptureReplay';
+import { acceptsReplayState } from '../../lib/captureReplayIdentity';
 import { CaptureReplayControls } from './CaptureReplayControls';
 import { collectCaptureCallouts, resolveCaptureStatusTone } from './CaptureReplayStatus';
 
 const scope = { projectId: 'project', sessionId: 'session' };
-const replay: CaptureReplayState = { ...scope, generation: 3, operationId: null, revision: 8, phase: 'ready', inputId: 'input', captureHash: 'hash', contextId: 'context', replayDeviceId: 'local', requestedEventId: 42, appliedEventId: 42, imageEventId: 21, events: [{ eventId: 21 }, { eventId: 42 }], targets: [], target: null, isFinalOutput: false, image: null, devicePresentation: { status: 'not_applicable', eventId: null, textureId: null, sequence: null, reason: null }, interactionLock: null, error: null, warning: null, observation: null };
+const replay: CaptureReplayState = { ...scope, generation: 3, preparation: { targetDeviceId: 'local', phase: 'ready', issue: null }, operationId: null, revision: 8, phase: 'ready', inputId: 'input', captureHash: 'hash', contextId: 'context', replayDeviceId: 'local', requestedEventId: 42, appliedEventId: 42, imageEventId: 21, events: [{ eventId: 21 }, { eventId: 42 }], targets: [], target: null, isFinalOutput: false, image: null, devicePresentation: { status: 'not_applicable', eventId: null, textureId: null, sequence: null, reason: null }, interactionLock: null, error: null, warning: null, observation: null };
 describe('capture scoped projection', () => {
   it('rejects other scopes and stale generation or revision', () => {
     expect(acceptsReplayState(replay, { ...replay, sessionId: 'other' }, scope)).toBe(false);
@@ -32,7 +32,7 @@ describe('capture scoped projection', () => {
     expect(resolveCaptureStatusTone({ phase: 'ready', pending: false, partial: true })).toBe('warning');
     expect(resolveCaptureStatusTone({ phase: 'error', pending: false, partial: false })).toBe('error');
     expect(resolveCaptureStatusTone({ phase: 'ready', pending: false, partial: false })).toBe('success');
-    const callouts = collectCaptureCallouts({
+    const callouts = collectCaptureCallouts({ failureTitle: 'Capture action failed',
       warning: { code: 'final_output_unavailable', message: 'Final Present does not identify exactly one swap-buffer resource' },
       finalPresentTitle: 'Final Present is not uniquely identified',
       actionError: null,

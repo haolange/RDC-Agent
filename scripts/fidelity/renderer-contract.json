@@ -204,7 +204,17 @@
     "bootstrap.permissionSubscriptionsTest": "src/renderer/app/bootstrap/permissionSubscriptions.test.ts",
     "stores.runtimePermission": "src/renderer/stores/runtimePermissionStore.ts",
     "stores.runtimePermissionTest": "src/renderer/stores/runtimePermissionStore.test.ts",
-    "composer.permissionSelectorTest": "src/renderer/features/composer/PermissionModeSelector.test.ts"
+    "composer.permissionSelectorTest": "src/renderer/features/composer/PermissionModeSelector.test.ts",
+    "stores.sessionDevice": "src/renderer/stores/sessionDeviceStore.ts",
+    "stores.sessionDeviceTest": "src/renderer/stores/sessionDeviceStore.test.ts",
+    "hooks.sessionDevicePreparation": "src/renderer/hooks/useSessionDevicePreparation.ts",
+    "lib.captureReplayIdentity": "src/renderer/lib/captureReplayIdentity.ts",
+    "patterns.devicePreparationStatus": "src/renderer/patterns/DevicePreparationStatus.tsx",
+    "patterns.devicePreparationStatusCss": "src/renderer/patterns/DevicePreparationStatus.css",
+    "patterns.devicePreparationStatusTest": "src/renderer/patterns/DevicePreparationStatus.test.ts",
+    "captures.devicePreparationDialog": "src/renderer/features/captures/DevicePreparationDialog.tsx",
+    "captures.devicePreparationDialogTest": "src/renderer/features/captures/DevicePreparationDialog.test.ts",
+    "testing.replayFixture": "src/renderer/testing/replayFixture.ts"
   },
   "retired": [
     "src/renderer/styles/themes/oklch-themes.css",
@@ -265,6 +275,7 @@
     "src/renderer/features/settings/SettingsModal/sections/WorkspaceSettings.tsx",
     "src/renderer/hooks/useModalFocus.ts",
     "src/main/ipc/sessionOutputs.ts",
-    "designs/rdc-agent-design-system/Design System Preview.html"
+    "designs/rdc-agent-design-system/Design System Preview.html",
+    "src/renderer/features/captures/DeviceSelector/useDeviceDropdownPosition.ts"
   ]
 }

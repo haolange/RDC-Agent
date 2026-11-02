@@ -32,6 +32,7 @@ import type {
   ConversationTurnResult,
 } from './conversation';
 import type { ReplayDeviceSnapshot, ReplayDeviceStatusChangedPayload } from './device';
+import type { DevicePreparationRequest, DevicePreparationResult } from './captureReplay';
 import type {
   PlanApprovalTokenRequest,
   PlanExportRequest,
@@ -456,6 +457,8 @@ export interface ElectronAPI {
   };
 
   device: {
+    prepare: (request: DevicePreparationRequest) => Promise<DevicePreparationResult>;
+    cancelPreparation: (request: import('./captureReplay').CaptureReplayBindingRequest) => Promise<DevicePreparationResult>;
     list: () => Promise<ReplayDeviceSnapshot>;
     refresh: () => Promise<ReplayDeviceSnapshot>;
     watchStart: () => Promise<void>;
@@ -548,6 +551,7 @@ export interface ElectronAPI {
       success: boolean;
       openedCapture?: OpenedCaptureState;
       contextSnapshot?: ContextSnapshot | null;
+      issue?: import('./device').ReplayDeviceIssue;
       error?: string;
     }>;
     getOpenedState: (scope: SessionScope) => Promise<OpenedCaptureState | null>;

@@ -13,14 +13,6 @@ export function deviceIdentityKey(device: ReplayDeviceEntry): string {
     transport: device.transport,
     serial: device.serial ?? null,
     adbState: device.adbState ?? null,
-    detailText: device.detailText ?? null,
-    lastError: device.lastError ?? null,
-    remoteId: device.remoteId ?? null,
-    bootstrap: device.bootstrap ?? null,
-    activationPhase: device.activationPhase ?? null,
-    activationErrorCode: device.activationErrorCode ?? null,
-    activationErrorMessage: device.activationErrorMessage ?? null,
-    activationUpdatedAt: device.activationUpdatedAt ?? null,
   });
 }
 

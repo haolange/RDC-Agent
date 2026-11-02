@@ -296,4 +296,5 @@ export const enControl = {
   "control.replay.more": "More capture actions",
   "control.replay.noSession": "Create a session first",
   "control.replay.unavailable": "Unavailable",
+  'control.replay.actionFailed': "Capture action failed",
 } as const;

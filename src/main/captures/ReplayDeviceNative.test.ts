@@ -1,50 +1,69 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 const execute = vi.hoisted(() => vi.fn());
-vi.mock('../settings/SettingsService', () => ({ settingsService: { getAll: () => ({ tooling: { rdcCli: { env: {} } } }) } }));
-vi.mock('../tools/withRdcHostRuntimeEnv', () => ({ withRdcHostRuntimeEnv: (value: unknown) => value }));
-vi.mock('electron', () => ({ BrowserWindow: class {} }));
+vi.mock('../settings/SettingsService', () => ({ settingsService: {} }));
 vi.mock('../tools/RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: execute } }));
-vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: {} }));
-vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
-vi.mock('../browserAppBridge/rendererEventHub', () => ({ rendererEventHub: { emit: vi.fn() } }));
-import { ReplayDeviceService } from './ReplayDeviceService';
+import { freezeRdcTurnBinding } from '../tools/RdcTurnBindings';
+import { connectSessionReplayDevice, inspectSessionReplayInstallation } from '../sessions/RdcRemoteConnection';
 const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 };
-const device: ReplayDeviceEntry = { id: 'selected', label: 'Phone', type: 'android', status: 'offline', transport: 'adb_android', serial: 'SERIAL-SELECTED' };
-function service() {
-  const value = new ReplayDeviceService();
-  const internals = value as unknown as { devices: Map<string, ReplayDeviceEntry>; persistResumeCache: () => Promise<void>; broadcast: () => void };
-  internals.devices.set(device.id, device); internals.persistResumeCache = vi.fn(async () => {}); internals.broadcast = vi.fn();
-  return value;
-}
+const binding = freezeRdcTurnBinding(cli, [{ name: 'rd.remote.connect', timeout_policy: { argument: 'timeout_ms', default_timeout_ms: 200000, worker_grace_ms: 85000, transport_grace_ms: 5000, process_grace_ms: 5000 }, input_schema: { properties: { timeout_ms: { type: 'integer' }, options: { properties: {
+  repair_policy: { enum: ['auto_safe', 'confirmed'] }, repair_confirmation: { properties: { fingerprint: { type: 'string' } } },
+} } } } }, { name: 'rd.remote.inspect_installation', scope: 'global', effects: [], input_schema: { properties: { device_serial: { type: 'string' } } } }]);
+const device: ReplayDeviceEntry = { id: 'selected', label: 'Phone', type: 'android', status: 'online', adbState: 'device', transport: 'adb_android', serial: 'SERIAL-SELECTED' };
 const reply = (data: object, kind = 'rd.remote.connect') => ({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: kind, data }), stderr: '', duration_ms: 1 });
 beforeEach(() => execute.mockReset());
-describe('native remote activation', () => {
-  it('uses selected serial, owning context and frozen CLI argv', async () => {
-    execute.mockResolvedValue(reply({ context_id: 'owned', remote_id: 'remote' }));
-    const value = service(); expect((await value.activateDevice('selected', { contextId: 'owned', cli })).status).toBe('online');
+describe('session-owned remote connection', () => {
+  it.each(['clear', 'pending', 'unknown'])('verifies installation through the one read-only canonical operation (%s)', async state => {
+    execute.mockResolvedValue(reply({ context_id: 'owned', device_serial: device.serial, package_name: 'helper', apk_sha256: 'a'.repeat(64),
+      installation_state: state, observation: ({ clear: 'verified', pending: 'pending', unknown: 'unreadable' } as Record<string, string>)[state], sessions: [] }, 'rd.remote.inspect_installation'));
+    expect(await inspectSessionReplayInstallation(device, 'owned', binding)).toMatchObject({ state, deviceSerial: device.serial, packageName: 'helper', apkSha256: 'a'.repeat(64) });
+    expect(execute).toHaveBeenCalledExactlyOnceWith('call', ['rd.remote.inspect_installation', '--args-json', JSON.stringify({ device_serial: device.serial }), '--daemon-context', 'owned'], expect.objectContaining({ contextId: 'owned', settings: cli }));
+  });
+  it('rejects uncorrelated or contradictory read-only inspection facts', async () => {
+    execute.mockResolvedValue(reply({ context_id: 'owned', device_serial: 'OTHER', package_name: 'helper', apk_sha256: 'a'.repeat(64), installation_state: 'clear', observation: 'pending' }, 'rd.remote.inspect_installation'));
+    await expect(inspectSessionReplayInstallation(device, 'owned', binding)).rejects.toThrow('INSTALLATION_PROTOCOL');
+  });
+  it('uses selected serial, owning context, safe repair policy and frozen CLI without global handoff', async () => {
+    execute.mockResolvedValue(reply({ context_id: 'owned', remote_id: 'remote', server_info: { bootstrap: { package_name: 'helper', started_activity: false } } }));
+    const result = await connectSessionReplayDevice(device, 'owned', binding);
+    expect(result).toMatchObject({ contextId: 'owned', remoteId: 'remote', serial: device.serial, bootstrap: { packageName: 'helper', startedActivity: false } });
     const [command, argv, options] = execute.mock.calls[0];
     expect(command).toBe('call'); expect(argv[0]).toBe('rd.remote.connect');
-    expect(JSON.parse(argv[2])).toEqual({ options: { transport: 'adb_android', device_serial: 'SERIAL-SELECTED' } });
-    expect(argv.slice(-2)).toEqual(['--daemon-context', 'owned']); expect(options.settings).toBe(cli);
-    expect(value.peekPreparedRemote('selected')).toMatchObject({ contextId: 'owned', remoteId: 'remote', serial: 'SERIAL-SELECTED' });
-    expect(value.consumePreparedRemote('selected', 'foreign')).toBeNull();
-    expect(value.peekPreparedRemote('selected')).not.toBeNull();
-    expect(value.consumePreparedRemote('selected', 'owned')).toMatchObject({ remoteId: 'remote' });
-    expect(value.consumePreparedRemote('selected', 'owned')).toBeNull();
+    expect(JSON.parse(argv[2])).toEqual({ timeout_ms: 30000, options: { transport: 'adb_android', device_serial: 'SERIAL-SELECTED', repair_policy: 'auto_safe' } });
+    expect(argv.slice(-2)).toEqual(['--daemon-context', 'owned']); expect(options.settings).toEqual(cli);
+    expect(options.timeout).toBe(125000);
   });
   it.each([
     [{ context_id: 'foreign', remote_id: 'remote' }, 'rd.remote.connect'],
     [{ context_id: 'owned' }, 'rd.remote.connect'],
     [{ context_id: 'owned', remote_id: 'remote' }, 'rd.capture.open_replay'],
-  ])('does not prepare invalid native identity %j', async (data, kind) => {
-    execute.mockResolvedValue(reply(data, kind)); const value = service();
-    expect((await value.activateDevice('selected', { contextId: 'owned', cli })).status).not.toBe('online');
-    expect(value.peekPreparedRemote('selected')).toBeNull();
+  ])('rejects invalid native identity %j', async (data, kind) => {
+    execute.mockResolvedValue(reply(data, kind)); await expect(connectSessionReplayDevice(device, 'owned', binding)).rejects.toThrow();
   });
-  it('does not prepare a connect which completes after cancellation', async () => {
+  it('does not publish a connect completed after cancellation', async () => {
     const controller = new AbortController(); execute.mockImplementation(async () => { controller.abort(); return reply({ context_id: 'owned', remote_id: 'remote' }); });
-    const value = service(); await value.activateDevice('selected', { contextId: 'owned', cli, signal: controller.signal });
-    expect(value.peekPreparedRemote('selected')).toBeNull();
+    await expect(connectSessionReplayDevice(device, 'owned', binding, controller.signal)).rejects.toThrow();
+  });
+  it('rejects an old loose options schema before invoking native code', async () => {
+    await expect(connectSessionReplayDevice(device, 'owned', freezeRdcTurnBinding(cli, []))).rejects.toThrow('RDC_REMOTE_UPGRADE_REQUIRED');
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it('passes only the exact confirmed fingerprint rather than renderer-specified actions', async () => {
+    execute.mockResolvedValue(reply({ context_id: 'owned', remote_id: 'remote' }));
+    await connectSessionReplayDevice(device, 'owned', binding, undefined, 'f'.repeat(64));
+    expect(JSON.parse(execute.mock.calls[0][1][2]).options).toMatchObject({ repair_policy: 'confirmed', repair_confirmation: { fingerprint: 'f'.repeat(64) } });
+  });
+  it('derives process grace from the frozen catalog without changing the configured operation budget', async () => {
+    execute.mockResolvedValue(reply({ context_id: 'owned', remote_id: 'remote' }));
+    const definition = { ...binding.definitions[0], timeout_policy: { argument: 'timeout_ms', default_timeout_ms: 200000,
+      worker_grace_ms: 4000, transport_grace_ms: 2000, process_grace_ms: 1000 } };
+    const configured = { ...cli, timeoutMs: 120000 };
+    await connectSessionReplayDevice(device, 'owned', freezeRdcTurnBinding(configured, [definition, binding.definitions[1]]));
+    expect(JSON.parse(execute.mock.calls[0][1][2]).timeout_ms).toBe(120000);
+    expect(execute.mock.calls[0][2]).toMatchObject({ timeout: 127000, settings: { timeoutMs: 120000 } });
+  });
+  it.each([undefined, { argument: 'timeout_ms', worker_grace_ms: 0 }])('rejects an absent or incomplete timeout policy before native execution', async timeout_policy => {
+    await expect(connectSessionReplayDevice(device, 'owned', freezeRdcTurnBinding(cli, [{ ...binding.definitions[0], timeout_policy }]))).rejects.toThrow('UPGRADE_REQUIRED');
+    expect(execute).not.toHaveBeenCalled();
   });
 });

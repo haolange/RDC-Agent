@@ -11,6 +11,7 @@ vi.mock('./OwnedRdcDaemonRegistry', () => ({ rememberOwnedRdcDaemon: ownership.r
 import { rdcCliInvokerService } from '../tools/RdcCliInvokerService';
 import { freezeRdcTurnBinding } from '../tools/RdcTurnBindings';
 import { RdcSessionRuntime } from './RdcSessionRuntime';
+import { remotePreparationBindingIdentity } from './RdcRemoteConnection';
 import { clearRdcContextLeases, getRdcContextLease, grantDelegatedLease, revokeDelegatedLease } from './RdcRuntimeContextRegistry';
 const request: OpenProjectInputRequest = { projectId: 'project', sessionId: 'session', inputId: 'same-file', filePath: '/capture.rdc',
   replayDevice: { id: 'local', type: 'local', label: 'Local', transport: 'local', status: 'online' } };
@@ -168,4 +169,107 @@ it('does not commit a native open completed after cancellation', async () => {
   await expect(runtime.openProjectInput(request, { signal: controller.signal })).rejects.toThrow();
   expect(getRdcContextLease('session')).toBeNull();
   expect(runtime.getContextId()).toMatch(/^rdc-/);
+});
+
+const remoteDevice: OpenProjectInputRequest['replayDevice'] = { id: 'android-PHONE', type: 'android', label: 'Phone', transport: 'adb_android', status: 'online', adbState: 'device', serial: 'PHONE' };
+const remoteBinding = () => freezeRdcTurnBinding({ enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 }, [
+  { name: 'rd.remote.connect', timeout_policy: { argument: 'timeout_ms', default_timeout_ms: 200000, worker_grace_ms: 85000, transport_grace_ms: 5000, process_grace_ms: 5000 }, input_schema: { properties: { timeout_ms: { type: 'integer' }, options: { properties: { repair_policy: { enum: ['auto_safe', 'confirmed'] }, repair_confirmation: { properties: { fingerprint: { type: 'string' } } } } } } } },
+  { name: 'rd.remote.inspect_installation', scope: 'global', effects: [], input_schema: { properties: { device_serial: { type: 'string' } } } },
+]);
+function remoteNative() {
+  nativeStop.mockImplementation(async (command: string, args: string[]) => {
+    const context = args[args.lastIndexOf('--daemon-context') + 1]; const operation = args[0];
+    const parsed = command === 'call' ? JSON.parse(args[args.indexOf('--args-json') + 1]) : {};
+    const data = command === 'daemon' && operation === 'start' ? { context_id: context, owner_pid: process.pid, state: { context_id: context, pid: 4242 } }
+      : command === 'daemon' ? { context_id: context, stopped: true }
+        : operation === 'rd.remote.connect' ? { context_id: context, remote_id: 'remote', server_info: { bootstrap: { package_name: 'helper' } } }
+          : operation === 'rd.capture.open_file' ? { context_id: context, capture_file_id: 'file' }
+            : operation === 'rd.capture.open_replay' ? { context_id: context, session_id: 'replay', capture_file_id: 'file', remote_id: parsed.options.remote_id }
+              : { context_id: context, alive: true };
+    return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: command === 'daemon' ? 'rdc_tool.daemon.' + operation : operation, data }) };
+  });
+}
+describe('selected remote before opening a capture', () => {
+  it('rejects changed native identity before installation inspection starts a daemon', async () => {
+    const runtime = new RdcSessionRuntime();
+    await expect(runtime.inspectReplayDeviceInstallation(scope, remoteDevice, { binding: remoteBinding(), expectedBindingIdentity: 'changed' })).rejects.toThrow('CONFIRMATION_STALE');
+    expect(nativeStop).not.toHaveBeenCalled();
+  });
+  it('uses an owning context for read-only verification without connecting or granting a capture lease', async () => {
+    remoteNative(); const native = nativeStop.getMockImplementation()!; const binding = remoteBinding();
+    nativeStop.mockImplementation(async (command: string, args: string[], options: unknown) => args[0] === 'rd.remote.inspect_installation'
+      ? { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: args[0], data: { context_id: args.at(-1), device_serial: 'PHONE', package_name: 'helper', apk_sha256: 'a'.repeat(64), installation_state: 'clear', observation: 'verified', sessions: [] } }) }
+      : native(command, args, options));
+    const runtime = new RdcSessionRuntime();
+    const result = await runtime.inspectReplayDeviceInstallation(scope, remoteDevice, { binding, expectedBindingIdentity: remotePreparationBindingIdentity(binding) });
+    expect(result.state).toBe('clear'); expect(getRdcContextLease('session')).toBeNull();
+    expect(nativeStop.mock.calls.some(call => call[1][0] === 'rd.remote.connect')).toBe(false);
+    expect(runtime.getContextId()).toMatch(/^rdc-/);
+    await runtime.clearOpenedCaptureForSession(scope); expect(runtime.getContextId()).toBeNull();
+  });
+  it('rejects a stale repair installation identity before starting any daemon', async () => {
+    const runtime = new RdcSessionRuntime();
+    await expect(runtime.prepareReplayDevice(scope, remoteDevice, { binding: remoteBinding(), expectedBindingIdentity: 'changed' })).rejects.toThrow('CONFIRMATION_STALE');
+    expect(nativeStop).not.toHaveBeenCalled();
+  });
+  it('owns a context and connection without inventing a capture lease, then reuses them for Open and same-device file replacement', async () => {
+    remoteNative(); const runtime = new RdcSessionRuntime(); const binding = remoteBinding();
+    await runtime.prepareReplayDevice(scope, remoteDevice, { binding });
+    const contextId = runtime.getContextId(); expect(contextId).toMatch(/^rdc-/);
+    expect(runtime.snapshotOpenedCaptureForSession(scope)).toBeNull();
+    expect(runtime.snapshotContextForSession(scope)).toMatchObject({ contextId, captureDescriptors: [], runtimeContext: null, backend: 'remote' });
+    expect(getRdcContextLease('session')).toBeNull();
+    const opened = await runtime.openProjectInput({ ...request, replayDevice: remoteDevice }, { binding });
+    expect(opened).toMatchObject({ contextId, runtimeContext: { remoteId: 'remote' } });
+    expect(getRdcContextLease('session')?.contextId).toBe(contextId);
+    await runtime.openProjectInput({ ...request, inputId: 'another', replayDevice: remoteDevice }, { binding });
+    const operations = nativeStop.mock.calls.map(call => call[1][0]);
+    expect(operations.filter(value => value === 'start')).toHaveLength(1);
+    expect(operations.filter(value => value === 'rd.remote.connect')).toHaveLength(1);
+    expect(operations).toContain('rd.capture.close_replay');
+    await runtime.clearOpenedCaptureForSession(scope); expect(getRdcContextLease('session')).toBeNull();
+  });
+  it('revalidates an idempotent prepared selection with ping rather than starting again', async () => {
+    remoteNative(); const runtime = new RdcSessionRuntime(); const binding = remoteBinding();
+    await runtime.prepareReplayDevice(scope, remoteDevice, { binding });
+    await runtime.prepareReplayDevice(scope, remoteDevice, { binding });
+    expect(nativeStop.mock.calls.filter(call => call[1][0] === 'rd.remote.connect')).toHaveLength(1);
+    expect(nativeStop.mock.calls.some(call => call[1][0] === 'rd.remote.ping')).toBe(true);
+    await runtime.clearOpenedCaptureForSession(scope);
+  });
+  it('withdraws the closed replay lease if file release fails, retaining context ownership until cleanup', async () => {
+    remoteNative(); const runtime = new RdcSessionRuntime(); const binding = remoteBinding();
+    await runtime.prepareReplayDevice(scope, remoteDevice, { binding });
+    await runtime.openProjectInput({ ...request, replayDevice: remoteDevice }, { binding });
+    const contextId = runtime.getContextId(); const native = nativeStop.getMockImplementation()!;
+    nativeStop.mockImplementation(async (command: string, args: string[], options: unknown) => args[0] === 'rd.capture.close_file'
+      ? { exitCode: 1, stdout: '', stderr: 'file release uncertain' } : native(command, args, options));
+    await expect(runtime.openProjectInput({ ...request, inputId: 'replacement', replayDevice: remoteDevice }, { binding })).rejects.toThrow('CLI_FAILED');
+    expect(getRdcContextLease('session')).toBeNull(); expect(runtime.snapshotOpenedCaptureForSession(scope)).toBeNull();
+    expect(runtime.snapshotContextForSession(scope)).toMatchObject({ contextId, runtimeContext: null, captureDescriptors: [] });
+    await runtime.clearOpenedCaptureForSession(scope); expect(runtime.getContextId()).toBeNull();
+  });
+  it('does not implicitly install/connect on Open or accept an old loose remote schema', async () => {
+    const runtime = new RdcSessionRuntime();
+    await expect(runtime.openProjectInput({ ...request, replayDevice: remoteDevice })).rejects.toThrow('NOT_PREPARED');
+    await expect(runtime.prepareReplayDevice(scope, remoteDevice, { binding: freezeRdcTurnBinding(remoteBinding().cli, []) })).rejects.toThrow('REMOTE_UPGRADE_REQUIRED');
+    expect(nativeStop).not.toHaveBeenCalled();
+  });
+  it('keeps local selection available without a configured native CLI', async () => {
+    const runtime = new RdcSessionRuntime();
+    const originalLoader = vi.mocked(rdcCliInvokerService.loadCatalog).getMockImplementation()!;
+    vi.mocked(rdcCliInvokerService.loadCatalog).mockRejectedValueOnce(new Error('No Tools'));
+    await runtime.prepareReplayDevice(scope, request.replayDevice);
+    expect(runtime.isPreparedFor(scope, 'local')).toBe(true); expect(nativeStop).not.toHaveBeenCalled();
+    vi.mocked(rdcCliInvokerService.loadCatalog).mockReset(); vi.mocked(rdcCliInvokerService.loadCatalog).mockImplementation(originalLoader);
+  });
+});
+
+it('rejects changed CLI identity before opening a file through an already prepared connection', async () => {
+  remoteNative(); const runtime = new RdcSessionRuntime(); const binding = remoteBinding();
+  await runtime.prepareReplayDevice(scope, remoteDevice, { binding }); nativeStop.mockClear();
+  const changed = freezeRdcTurnBinding({ ...binding.cli, command: 'other-install' }, [...binding.definitions]);
+  await expect(runtime.openProjectInput({ ...request, replayDevice: remoteDevice }, { binding: changed })).rejects.toThrow('CLI_BINDING_CHANGED');
+  expect(nativeStop).not.toHaveBeenCalled(); expect(runtime.getContextId()).toMatch(/^rdc-/);
+  await runtime.clearOpenedCaptureForSession(scope);
 });

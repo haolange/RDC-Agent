@@ -109,7 +109,9 @@ if (traceSetCount < 1 || !gateNearTrace) {
   fail('trace projection writes must be gated by payload.sessionId');
 }
 
-const replay = read('src/renderer/features/right-rail/useCaptureReplay.ts');
+const replay = read('src/renderer/lib/captureReplayIdentity.ts');
+if (!read('src/renderer/stores/sessionDeviceStore.ts').includes('acceptsReplayState(current ?? null, next, next)')) fail('Session device projection must use the canonical scope/revision guard');
+if (!read('src/renderer/features/right-rail/useCaptureReplay.ts').includes('useSessionDevicePreparation(scope)')) fail('Capture panel must read the canonical session device projection');
 for (const required of ['next.projectId === scope.projectId', 'next.sessionId === scope.sessionId', 'next.generation', 'next.revision']) {
   if (!replay.includes(required)) fail(`Capture replay must gate scope and revisions: ${required}`);
 }

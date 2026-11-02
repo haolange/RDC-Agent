@@ -2,7 +2,7 @@
 
 # Debugger RDC 工具参考
 
-Current catalog fingerprint: `e1e6fd9158e829d7dd4422726e47189ef3ae992c965474d11b1200a327a5d110`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
+Current catalog fingerprint: `3b632b109c1644c84635dc6cb10f2ae163776d708e2b51d5e2b1278a41fd0dfa`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
 
 所有 `shell.rdc` 示例都省略由主进程注入的 `session_id` / `capture_file_id` / context 身份。不要把示例补成可覆盖其它会话的身份。共享发现、错误恢复、输出与副作用规则见 `$rdc-tool-shell`。
 

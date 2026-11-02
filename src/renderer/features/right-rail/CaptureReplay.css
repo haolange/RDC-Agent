@@ -97,3 +97,5 @@
 .capture-replay-status-row .right-rail-section-heading { flex: 1; display: flex; align-items: center; }
 .capture-workspace-owner { color: var(--token-text-caption); }
 .capture-workspace-owner.is-locked { color: var(--token-status-info); }
+
+.capture-replay-diagnostic { max-width: 100%; max-height: calc(var(--control-height-md) * 5); overflow: auto; overflow-wrap: anywhere; white-space: pre-wrap; font-size: var(--text-xs); }

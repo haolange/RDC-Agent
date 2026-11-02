@@ -2,9 +2,43 @@
  * Device Types - 设备管理相关类型定义
  */
 
-export type ReplayDeviceStatus = 'offline' | 'loading' | 'connected' | 'online';
+export type ReplayDeviceStatus = 'offline' | 'online';
 
 export type ReplayDeviceTransport = 'local' | 'adb_android';
+
+export type DevicePreparationPhase = 'idle' | 'checking' | 'installing' | 'starting' | 'verifying' | 'ready' | 'needs_action' | 'failed' | 'cancelled';
+export interface RemoteRepairAssessment {
+  fingerprint: string;
+  actions: Array<'restart_helper' | 'reinstall_helper' | 'downgrade_helper'>;
+  packageName: string;
+  deviceSerial: string;
+  apkSha256: string;
+  installedIdentity: string;
+  serviceIdentity: string[];
+}
+/** Product copy is derived from code; diagnostic remains the original native report. */
+export interface ReplayDeviceIssue {
+  code: string;
+  stage: DevicePreparationPhase;
+  diagnostic: string;
+  recovery: 'retry' | 'repair' | 'configure_tools' | 'verify_installation' | null;
+  expectedVersion?: string;
+  actualVersion?: string;
+  repair?: RemoteRepairAssessment;
+  deviceAction?: { kind: 'package_install'; outcome: 'unconfirmed'; uninstalledExisting: boolean };
+}
+export interface SessionDevicePreparation {
+  targetDeviceId: string | null;
+  phase: DevicePreparationPhase;
+  issue: ReplayDeviceIssue | null;
+  installation?: RemoteInstallationReceipt;
+}
+/** A completed native installation is not rolled back by cancelling connection. */
+export interface RemoteInstallationReceipt {
+  installedApk: boolean;
+  uninstalledExisting: boolean;
+  installMode: AndroidBootstrapMetadata['installMode'];
+}
 
 export interface AndroidBootstrapMetadata {
   packageName?: string;
@@ -21,7 +55,7 @@ export interface AndroidBootstrapMetadata {
   pushedConfig?: boolean;
   startedActivity?: boolean;
   createdForward?: boolean;
-  installMode?: 'upgrade' | 'force_replace';
+  installMode?: 'existing' | 'install' | 'update' | 'force_replace';
   installReason?: 'fresh_install' | 'mismatched_existing_apk' | 'version_downgrade' | 'signature_mismatch';
   uninstalledExisting?: boolean;
 }
@@ -34,15 +68,7 @@ export interface ReplayDeviceEntry {
   transport: ReplayDeviceTransport;
   serial?: string;
   adbState?: 'device' | 'unauthorized' | 'offline' | 'missing' | 'unknown';
-  detailText?: string;
-  lastError?: string;
   lastSeen?: number;
-  remoteId?: string;
-  bootstrap?: AndroidBootstrapMetadata;
-  activationPhase?: 'idle' | 'connect' | 'ready';
-  activationErrorCode?: string;
-  activationErrorMessage?: string;
-  activationUpdatedAt?: number;
 }
 
 export interface ReplayDeviceSnapshot {

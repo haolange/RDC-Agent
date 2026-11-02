@@ -8,6 +8,7 @@ import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import { replayDeviceIssue } from '../captures/ReplayDeviceIssue';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import {
   CaptureOpenProjectInputArgsSchema,
@@ -15,6 +16,7 @@ import {
   CaptureReplayApplyArgsSchema,
   CaptureReplayBindingArgsSchema,
   SessionScopeArgsSchema,
+  DevicePreparationArgsSchema,
 } from './validation/captureDeviceSchemas';
 
 const envelope = <T>(scope: SessionScope, payload: T): SessionScopedPayload<T> => ({
@@ -144,7 +146,7 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
         projectId: request?.projectId,
         raw: request ? { inputId: request.inputId, replayDeviceId: request.replayDeviceId } : undefined,
       });
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+      return { success: false, error: error instanceof Error ? error.message : String(error), issue: replayDeviceIssue(error) };
     }
   });
 
@@ -191,6 +193,19 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
   ipcMain.handle('device:list', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'device:list', maxBytes: 1024 });
     return replayDeviceService.getSnapshot();
+  });
+
+  ipcMain.handle('device:prepare', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(DevicePreparationArgsSchema, rawArgs, { label: 'device:prepare', maxBytes: 4096 });
+    authorizeReplayScope(request);
+    try { return await rdcSessionService.prepareDevice(request); }
+    catch (error) { return { success: false, state: rdcSessionService.snapshotReplayForSession(request), error: replayDeviceIssue(error) }; }
+  });
+  ipcMain.handle('device:cancelPreparation', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(CaptureReplayBindingArgsSchema, rawArgs, { label: 'device:cancelPreparation', maxBytes: 1024 });
+    authorizeReplayScope(request);
+    try { return await rdcSessionService.cancelDevicePreparation(request); }
+    catch (error) { return { success: false, state: rdcSessionService.snapshotReplayForSession(request), error: replayDeviceIssue(error) }; }
   });
 
   ipcMain.handle('device:refresh', async (_event, ...rawArgs: unknown[]) => {

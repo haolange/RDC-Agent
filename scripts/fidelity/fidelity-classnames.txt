@@ -76,6 +76,7 @@ capture-replay-callout-copy
 capture-replay-callouts
 capture-replay-content
 capture-replay-device-row
+capture-replay-diagnostic
 capture-replay-feedback
 capture-replay-file-row
 capture-replay-image
@@ -348,13 +349,15 @@ device-discovery-status
 device-option-leading
 device-option-name
 device-option-status
-device-selector-arrow
+device-preparation-actions
+device-preparation-diagnostic
+device-preparation-status
 device-selector-container
 device-selector-dropdown
-device-selector-group
 device-selector-option
+device-selector-option-main
+device-selector-session-note
 device-selector-trigger
-device-selector-trigger-icon
 device-selector-trigger-utility
 device-selector-utility-label
 device-type-icon
@@ -672,7 +675,6 @@ panel-resize-handle-
 panel-resize-handle-hit
 panel-resize-handle-left
 panel-resize-handle-right
-placement-
 plan-card
 plan-card__head
 plan-card__preview

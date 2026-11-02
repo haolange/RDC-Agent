@@ -111,13 +111,13 @@ describe('ReplayDeviceService watch lease', () => {
     const service = createService();
     const rows = vi.mocked(adbServerClient.queryAdbDevicesLinesWithServerBootstrap);
     rows.mockResolvedValueOnce(['PHONE\tunauthorized']); await service.refreshDevices();
-    expect(service.getSnapshot().devices[1].lastError).toContain('authorization');
+    expect(service.getSnapshot().devices[1]).toMatchObject({ adbState: 'unauthorized', status: 'offline' });
     rows.mockResolvedValueOnce(['PHONE\tdevice']); await service.refreshDevices();
-    expect(service.getSnapshot().devices[1]).toMatchObject({ adbState: 'device', lastError: undefined });
+    expect(service.getSnapshot().devices[1]).toMatchObject({ adbState: 'device', status: 'online' });
     rows.mockResolvedValueOnce([]); await service.refreshDevices();
     expect(service.getSnapshot().devices[1]).toMatchObject({ adbState: 'missing', status: 'offline' });
     rows.mockResolvedValueOnce(['PHONE\tdevice transport_id:2']); await service.refreshDevices();
-    expect(service.getSnapshot().devices[1]).toMatchObject({ adbState: 'device', lastError: undefined });
+    expect(service.getSnapshot().devices[1]).toMatchObject({ adbState: 'device', status: 'online' });
     service.dispose();
   });
 

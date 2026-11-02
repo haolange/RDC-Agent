@@ -1,226 +1,80 @@
-import { Button } from '../../../ui/Button';
-import React, { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDeviceStore } from '../../../stores/deviceStore';
-import type { ReplayDeviceEntry, ReplayDeviceSnapshot } from '@shared/types/device';
+import { useProjectStore } from '../../../stores/projectStore';
+import { useSessionDeviceStore } from '../../../stores/sessionDeviceStore';
+import { useSessionDevicePreparation } from '../../../hooks/useSessionDevicePreparation';
+import { DevicePreparationStatus, isDeviceInstallationUnconfirmed } from '../../../patterns/DevicePreparationStatus';
 import { useI18n } from '../../../i18n';
-import { useDynStyle } from '../../../lib/useDynStyle';
-import { isTopOverlayLayer, useOverlayLayer } from '../../../lib/overlayStack';
-import {
-  DeviceTypeIcon,
-  getBootstrapSummary,
-  getDeviceStatusKey,
-} from './DeviceSelectorParts';
-import {
-  useDeviceDropdownPosition,
-  type DeviceDropdownPosition,
-} from './useDeviceDropdownPosition';
+import { Button } from '../../../ui/Button';
+import { Popover } from '../../../ui/Popover';
+import { DeviceTypeIcon } from './DeviceSelectorParts';
+import { DevicePreparationDialog } from '../DevicePreparationDialog';
 import './DeviceSelector.css';
 import './DeviceDiscovery.css';
 
-const DeviceSelectorDropdown: React.FC<{
-  menuRef: React.Ref<HTMLDivElement>;
-  dropdownTestId: string;
-  dropdownPosition: DeviceDropdownPosition;
-  devices: ReplayDeviceEntry[];
-  selectedDevice: string;
-  onSelect: (device: ReplayDeviceEntry) => void;
-  discovery: ReplayDeviceSnapshot['discovery'];
-  onRefresh: () => void;
-}> = ({
-  menuRef,
-  dropdownTestId,
-  dropdownPosition,
-  devices,
-  selectedDevice,
-  onSelect,
-  discovery,
-  onRefresh,
-}) => {
+export function DeviceSelector() {
   const { t } = useI18n();
-  const dynStyle = useDynStyle({
-    left: `${dropdownPosition.left}px`,
-    top: `${dropdownPosition.top}px`,
-    width: `${dropdownPosition.width}px`,
-    visibility: dropdownPosition.ready ? 'visible' : 'hidden',
-  });
-  const discoveryMessage = discovery.status === 'failed' ? discovery.error
+  const { devices, discovery, refreshDevices, startDeviceWatch, stopDeviceWatch } = useDeviceStore();
+  const project = useProjectStore((state) => state.currentProject);
+  const session = useProjectStore((state) => state.currentSession);
+  const scope = useMemo(() => project && session ? { projectId: project.projectId, sessionId: session.sessionId } : null, [project, session]);
+  const { state, error, actionFailure } = useSessionDevicePreparation(scope);
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const targetId = state?.preparation.targetDeviceId ?? state?.replayDeviceId ?? 'local';
+  const selected = devices.find((device) => device.id === targetId);
+  const name = targetId === 'local' ? t('device.local') : selected?.label ?? targetId;
+  const locked = Boolean(state?.interactionLock);
+  const installUnconfirmed = isDeviceInstallationUnconfirmed(state?.preparation);
+  useEffect(() => {
+    if (!open) return;
+    void startDeviceWatch();
+    const frame = requestAnimationFrame(() => menuRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]:not(:disabled), [role="option"]:not(:disabled)')?.focus());
+    return () => { cancelAnimationFrame(frame); void stopDeviceWatch(); };
+  }, [open, startDeviceWatch, stopDeviceWatch]);
+  const select = (deviceId: string) => {
+    if (!scope || !state || locked || (installUnconfirmed && deviceId !== targetId)) return;
+    void useSessionDeviceStore.getState().prepare(scope, deviceId);
+  };
+  const discoveryMessage = discovery.status === 'failed' ? t('device.discovery.failed')
     : discovery.status === 'scanning' || discovery.status === 'idle' ? t('device.discovery.scanning')
     : devices.some(device => device.type === 'android' && device.adbState !== 'missing') ? null : t('device.discovery.empty');
-
-  return (
-    <div
-      ref={menuRef}
-      className={`device-selector-dropdown placement-${dropdownPosition.placement}`}
-      data-testid={dropdownTestId}
-      role="dialog"
-      aria-label={t('device.discovery.title')}
-      aria-busy={discovery.status === 'scanning'}
-      onKeyDown={(event) => {
-        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
-        const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button[role="option"]:not(:disabled)'));
-        if (!options.length) return;
-        const current = options.indexOf(document.activeElement as HTMLButtonElement);
-        const index = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1
-          : (current + (event.key === 'ArrowUp' ? -1 : 1) + options.length) % options.length;
-        event.preventDefault(); options[index]?.focus({ preventScroll: true });
-      }}
-      {...dynStyle}
-    >
-      <div role="listbox" aria-label={t('device.discovery.title')}>
-      {devices.map((device) => {
-        const selectable = device.status !== 'loading';
-        const bootstrapSummary = getBootstrapSummary(device, t);
-        const name = device.type === 'local' ? t('device.local') : device.label;
-        const statusKey = getDeviceStatusKey(device);
-        const needsAttention = statusKey === 'device.status.unauthorized' || statusKey === 'device.status.offline';
-        return (
-          <Button variant="ghost" size="sm"
-            key={device.id}
-            className={`device-selector-option ${device.id === selectedDevice ? 'is-selected' : ''}`}
-            onClick={() => onSelect(device)}
-            role="option"
-            disabled={!selectable}
-            aria-selected={device.id === selectedDevice}
-            title={[name, device.serial, device.detailText, bootstrapSummary, device.lastError].filter(Boolean).join('\n')}
-          >
-            <span className="device-option-leading">
-              <DeviceTypeIcon type={device.type} />
-              <span className="device-option-name">{name}</span>
+  return <div className="device-selector-container">
+    <Popover open={open} onOpenChange={setOpen} align="end" className="device-selector-dropdown"
+      trigger={<Button variant="ghost" size="sm" className="device-selector-trigger device-selector-trigger-utility main-utility-toggle"
+        data-testid="utility-device-selector-trigger" aria-haspopup="dialog" title={t('device.sessionDeviceTitle', { summary: name })}>
+        <DeviceTypeIcon type={targetId === 'local' ? 'local' : 'android'} />
+        <span className="device-selector-utility-label">{t('device.sessionDeviceShort', { summary: name })}</span>
+      </Button>}>
+      <div data-testid="utility-device-selector-dropdown" aria-label={t('device.discovery.title')}>
+        {!scope && <p className="device-selector-session-note">{t('device.prepare.noSession')}</p>}
+        <div ref={menuRef} role="listbox" aria-label={t('device.discovery.title')} onKeyDown={(event) => {
+          if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+          const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button[role="option"]:not(:disabled)'));
+          if (!options.length) return;
+          const current = options.indexOf(document.activeElement as HTMLButtonElement);
+          const index = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : (current + (event.key === 'ArrowUp' ? -1 : 1) + options.length) % options.length;
+          event.preventDefault(); options[index]?.focus({ preventScroll: true });
+        }}>
+          {devices.map((device) => <Button key={device.id} variant="ghost" size="sm" role="option"
+            className={`device-selector-option ${device.id === targetId ? 'is-selected' : ''}`} aria-selected={device.id === targetId}
+            disabled={!scope || !state || locked || installUnconfirmed || (device.type === 'android' && device.adbState !== 'device')}
+            onClick={() => select(device.id)} title={[device.type === 'local' ? t('device.local') : device.label, device.serial].filter(Boolean).join('\n')}>
+            <span className="device-selector-option-main"><span className="device-option-leading"><DeviceTypeIcon type={device.type} />
+              <span className="device-option-name">{device.type === 'local' ? t('device.local') : device.label}</span></span>
+              <span className={`device-option-status${device.type === 'android' && device.adbState !== 'device' ? ' is-error' : ''}`}>{t(device.type === 'local' ? 'device.ready' : device.adbState === 'device' ? 'device.discovery.available' : device.adbState === 'unauthorized' ? 'device.status.unauthorized' : 'device.status.offline')}</span>
             </span>
-            <span className={`device-option-status${needsAttention ? ' is-error' : device.status === 'connected' || device.status === 'online' ? ' is-ready' : ''}`}>{t(statusKey)}</span>
-          </Button>
-        );
-      })}
+          </Button>)}
+        </div>
+        {scope && <DevicePreparationStatus preparation={state?.preparation ?? null} issue={actionFailure?.issue} transportError={error} hasCapture={Boolean(state?.inputId && state.contextId)} disabled={locked}
+          onRetry={() => select(installUnconfirmed ? targetId : actionFailure?.deviceId ?? targetId)} onCancel={() => useSessionDeviceStore.getState().cancel(scope)} />}
+        <div className="device-discovery-footer">
+          {discoveryMessage && <span role="status" className={`device-discovery-status ${discovery.status === 'failed' ? 'is-error' : ''}`}>{discoveryMessage}</span>}
+          <Button variant="ghost" size="sm" disabled={discovery.status === 'scanning'} onClick={() => { void refreshDevices(); }}>{t('device.discovery.refresh')}</Button>
+        </div>
       </div>
-      <div className="device-discovery-footer">
-        {discoveryMessage ? <div role="status" className={`device-discovery-status ${discovery.status === 'failed' ? 'is-error' : ''}`}>{discoveryMessage}</div> : null}
-        <Button variant="ghost" size="sm" onClick={onRefresh} disabled={discovery.status === 'scanning'}>
-          {t('device.discovery.refresh')}
-        </Button>
-      </div>
-    </div>
-  );
-};
-
-export const DeviceSelector: React.FC = () => {
-  const { t } = useI18n();
-  const { devices, selectedDevice, discovery, refreshDevices, setSelectedDevice, startDeviceWatch, stopDeviceWatch } = useDeviceStore();
-  const [isOpen, setIsOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const { layerId } = useOverlayLayer(isOpen);
-  const dropdownTestId = 'utility-device-selector-dropdown';
-  const triggerTestId = 'utility-device-selector-trigger';
-
-  const dropdownPosition = useDeviceDropdownPosition({
-    isOpen,
-    triggerRef,
-    menuRef,
-  });
-
-  const selectedEntry = devices.find((device) => device.id === selectedDevice) ?? devices[0];
-  const selectedSummary = selectedEntry?.type === 'local'
-    ? t('device.localReplay')
-    : (selectedEntry?.label ?? t('device.noDevice'));
-  const selectedName = selectedEntry?.type === 'local'
-    ? t('device.local')
-    : (selectedEntry?.label ?? t('device.noDevice'));
-  const utilityLabel = t('device.nextRequestShort', { summary: selectedName });
-  const triggerTitle = t('device.nextRequestDevice', { summary: selectedSummary });
-
-  useEffect(() => {
-    if (!isOpen) return undefined;
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
-      setIsOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !isTopOverlayLayer(layerId)) return;
-      event.preventDefault(); event.stopPropagation();
-      setIsOpen(false); triggerRef.current?.focus({ preventScroll: true });
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      window.removeEventListener('keydown', handleKeyDown, true);
-    };
-  }, [isOpen, layerId]);
-
-  useEffect(() => {
-    if (isOpen && dropdownPosition.ready) menuRef.current?.querySelector<HTMLButtonElement>('button[aria-selected="true"]:not(:disabled), button[role="option"]:not(:disabled)')?.focus({ preventScroll: true });
-  }, [isOpen, dropdownPosition.ready]);
-
-  useEffect(() => {
-    if (isOpen) {
-      void startDeviceWatch();
-      return () => {
-        void stopDeviceWatch();
-      };
-    }
-
-    void stopDeviceWatch();
-    return undefined;
-  }, [isOpen, startDeviceWatch, stopDeviceWatch]);
-
-  const handleToggleOpen = () => {
-    setIsOpen((open) => !open);
-  };
-
-  const handleSelect = (device: ReplayDeviceEntry) => {
-    if (device.status === 'loading') return;
-    // Opening a capture creates the owning context and connects the selected device.
-    setSelectedDevice(device.id);
-    setIsOpen(false);
-    triggerRef.current?.focus({ preventScroll: true });
-  };
-
-  return (
-    <div className="device-selector-container">
-      <div className="device-selector-group">
-        <Button variant="ghost" size="sm"
-          ref={triggerRef}
-          className="device-selector-trigger device-selector-trigger-utility main-utility-toggle"
-          data-testid={triggerTestId}
-          onClick={handleToggleOpen}
-          aria-expanded={isOpen}
-          aria-haspopup="listbox"
-          aria-label={triggerTitle}
-          title={triggerTitle}
-        >
-          <span className="device-selector-trigger-icon">
-            <DeviceTypeIcon type={selectedEntry?.type ?? 'local'} />
-          </span>
-            <>
-              <span className="device-selector-utility-label">{utilityLabel}</span>
-              <svg
-                className={`device-selector-arrow ${isOpen ? 'is-open' : ''}`}
-                viewBox="0 0 12 12"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M6 8L1 3h10l-5 5z" />
-              </svg>
-            </>
-        </Button>
-      </div>
-      {isOpen && createPortal(
-        <DeviceSelectorDropdown
-          menuRef={menuRef}
-          dropdownTestId={dropdownTestId}
-          dropdownPosition={dropdownPosition}
-          devices={devices}
-          selectedDevice={selectedDevice}
-          onSelect={(device) => void handleSelect(device)}
-          discovery={discovery}
-          onRefresh={() => void refreshDevices()}
-        />,
-        document.body,
-      )}
-    </div>
-  );
-};
-
+    </Popover>
+    <DevicePreparationDialog />
+  </div>;
+}
 export default DeviceSelector;

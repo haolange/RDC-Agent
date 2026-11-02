@@ -3,11 +3,9 @@ import type { ReplayDeviceEntry, ReplayDeviceSnapshot, ReplayDeviceStatusChanged
 
 interface DeviceState {
   devices: ReplayDeviceEntry[];
-  selectedDevice: string;
   revision: number;
   discovery: ReplayDeviceSnapshot['discovery'];
 
-  setSelectedDevice: (deviceId: string) => void;
   applyStatusPayload: (payload: ReplayDeviceStatusChangedPayload) => void;
   loadDevices: () => Promise<void>;
   refreshDevices: () => Promise<void>;
@@ -27,37 +25,14 @@ const LOCAL_DEVICE: ReplayDeviceEntry = {
   transport: 'local',
 };
 
-function normalizeDevices(devices: ReplayDeviceEntry[], selectedDevice: string): Pick<DeviceState, 'devices' | 'selectedDevice'> {
-  const nextDevices = devices.length > 0 ? devices : [LOCAL_DEVICE];
-  const hasSelected = nextDevices.some((device) => device.id === selectedDevice);
-  return {
-    devices: nextDevices,
-    selectedDevice: hasSelected ? selectedDevice : 'local',
-  };
-}
-
 export const useDeviceStore = create<DeviceState>((set, get) => ({
   devices: [LOCAL_DEVICE],
-  selectedDevice: 'local',
   revision: -1,
   discovery: { status: 'idle' },
 
-  setSelectedDevice: (deviceId) => set((state) => {
-    const target = state.devices.find((device) => device.id === deviceId);
-    if (!target) {
-      return state;
-    }
-
-    if (target.status === 'loading') {
-      return state;
-    }
-
-    return { selectedDevice: deviceId };
-  }),
-
   applyStatusPayload: (payload) => {
     set((state) => payload.revision < state.revision ? state : ({
-      ...normalizeDevices(payload.devices, state.selectedDevice), revision: payload.revision, discovery: payload.discovery,
+      devices: payload.devices.length ? payload.devices : [LOCAL_DEVICE], revision: payload.revision, discovery: payload.discovery,
     }));
   },
 

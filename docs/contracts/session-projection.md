@@ -161,3 +161,15 @@ Plan 批准的正常退出携带宿主 owning turn 的批准身份；主进程�
 Composer 的待保存选择不是已生效权限；当前 mode/revision 只来自主进程只读快照和变更事件，订阅先于快照读取，迟到旧 revision 不可覆盖新事实。右栏使用同源权限状态。切换保持草稿、焦点、卡片身份和展开状态，并说明全局作用域、尚未准入工具采用新权限及已启动命令继续。
 
 工具开始事件记录实际准入 mode/revision；历史记录不因后续切挡改写，缺失信息显示未知。审批取消使用现有 cancelled 状态与明确原因 PERMISSION_MODE_CHANGED，不伪装成用户拒绝。每次重授权请求有新审批 ID，旧按钮与迟到审核结果不属于新请求；工具调用身份保持不变。主/子审批仍依真实 owner session 和 child turn/request/execution 路由，不能由 renderer 推断批准或授权。
+
+## Remote 服务准备投影
+
+CaptureReplayState.preparation 与 capture phase 分离：targetDeviceId 表示本会话目标，phase 为 idle/checking/installing/starting/verifying/ready/needs_action/failed/cancelled；issue 为主进程类型化的 code、stage、recovery、原始诊断和必要版本/修复事实。只有真实 native progress 才可显示安装/启动阶段，不以计时器模拟。ready 且 inputId=null 只证明会话持有远端连接，不代表 Capture 打开、回放或设备呈现成功。generation/revision 与 projectId/sessionId 共用既有投影门，迟到结果不得覆盖当前选择。
+
+设备发现条目仅表示 ADB 可见性，不含会话 remoteId 或重复 activation error。预检查拒绝可返回 main-issued action error 而保持旧绑定；已接受准备失败写入本会话 issue，界面不得重复显示两处相同主错误。切换确认取消保持旧回放；实际断开取消只适用于没有 Capture 的连接，打开 Capture 时须走明确关闭入口。
+
+取消后的 preparation.installation 仅来自对应原生操作的持久回执，记录安装是否提交、是否卸载旧包和安装方式；连接已取消不代表 APK 已撤回。没有回执时不虚构安装或回滚事实。新的设备准备不会继承旧操作的安装回执。
+
+issue.deviceAction 的 package_install/unconfirmed 表示设备侧动作尚未确认；uninstalledExisting 只记录已观察到的旧包卸载事实。它必须在取消、native 清理及 queued selection 失效后保留；contextId=null 只能表达主进程自有 context 已释放，不能显示设备可重新安装或操作已回滚。原冻结 CLI/catalog 与实际目标 APK 身份证据完整时，recovery=verify_installation 通过同设备 prepare 执行只读核验，只有 clear 才继续本次连接请求；证据不足为 null，不显示盲重试。同阶段轮询不推进 revision，初始空 trace 占位不是运行阶段。
+
+只读核验期间的设备离线或未授权可以取消查询，但不能把未决安装降级成普通离线错误或释放设备占用；发现查询失败也不能清除原事实。未决安装时，关闭生命周期仍可清理自有原生进程，但必须返回明确失败，阻止后续会话或项目删除，让核验入口及其 owner 保持可见。

@@ -443,7 +443,7 @@ Task 可通过通用 `executionRequirements` 声明必要执行方式、必需�
 - 足迹位于 `<project>/.rdc-agent/replay/<sessionId>/<captureSha256>`，内容 SHA-256 与 lease 身份摘要分离。图片最大边 960 px，PNG 保持 alpha；session 256 MiB、project 2 GiB，到限停止保存、不淘汰旧证据。关闭保留历史；重启只恢复选择和历史，不自动打开或占设备。
 - Android 呈现以同安装原生 `remote_display` 回执为准：`presented` 必须匹配实际 EID、目标与新完成序号；`unsupported`、`unavailable` 和本地 `not_applicable` 不表示设备已同步。本地 native observation 通过不代表 Android 屏幕呈现通过；真实验收仍须设备画面与回执，依 acceptance ledger 分项记录。
 
-Android 设备选择不发起脱离 owning context 的连接。连接统一发生在 Capture 会话生命周期中；已有 helper 的借用与自有 helper 的清理由 Tools 实际归属决定，应用不得按设备类型关闭用户服务。确定性 Mission 编排验收与真实模型效果验收分别记录。
+Android 设备选择立即进入当前会话的准备生命周期：冻结同安装 CLI/catalog、分配 owning context、由 Tools 检查并安全修复/启动/连接服务。连接成功但尚未打开 Capture 是合法状态，不发布 capture lease 或伪造回放身份；Open 在同一 context/remote handle 打开文件。没有活动会话不得连接，不使用 default/detached context 或全局 remoteId 交接缓存。已有回放换设备必须先取得一次确认，核实旧 context 释放后再准备新设备；交互锁、恢复和原生退出未确认时禁止切换。设备发现、会话准备与 Capture 绑定分别投影，顶部和右栏只有一份主进程选择权威。缺失 helper 和可保留数据的受支持升级由 Tools 自动处理；签名冲突、降级、卸载或停止未知服务必须确认并绑定实际设备/安装/服务身份；busy 不重装、不抢占。借用服务不因应用退出被停止。连接保留到明确断开/切换/删除会话/实际断连/退出，切换页签不释放，重启不自动重连或安装。确定性编排、真实设备与真实模型效果分别记录。
 
 
 ### 自动审查与计划交接

@@ -82,6 +82,13 @@ describe('sessionLifecycle hooks', () => {
     expect(clearReplayHistory).not.toHaveBeenCalled();
     expect(removeSession).not.toHaveBeenCalled();
   });
+  it('preserves the owning session and its recovery history when a device installation is unresolved after native cleanup', async () => {
+    closeReplay.mockRejectedValueOnce(new Error('RDC_DEVICE_ACTION_UNCONFIRMED'));
+    await expect(removeSessionWithHooks('sess-1')).rejects.toThrow('RDC_DEVICE_ACTION_UNCONFIRMED');
+    expect(closeReplay).toHaveBeenCalledWith({ projectId: 'proj-1', sessionId: 'sess-1' });
+    expect(clearReplayHistory).not.toHaveBeenCalled(); expect(removeSession).not.toHaveBeenCalled();
+    expect(dispatchRuntimeHooks).not.toHaveBeenCalled();
+  });
   it('keeps the session when history cleanup fails so deletion can be retried', async () => {
     clearReplayHistory.mockRejectedValueOnce(new Error('ACCESS_DENIED'));
     await expect(removeSessionWithHooks('sess-1')).rejects.toThrow('ACCESS_DENIED');

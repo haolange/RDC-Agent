@@ -13,7 +13,7 @@ vi.mock('./useCapturePreview', () => ({ useCapturePreview: (_scope: unknown, sou
 }) }));
 const scope = { projectId: 'project', sessionId: 'session' };
 const image = { imagePath: 'live:1:42', width: 16, height: 16, source: 'framebuffer_screenshot' as const, updatedAt: 1 };
-const replay = (): CaptureReplayState => ({ ...scope, generation: 1, operationId: null, revision: 1, phase: 'ready', inputId: 'input', captureHash: 'hash', contextId: 'context', replayDeviceId: 'local',
+const replay = (): CaptureReplayState => ({ ...scope, generation: 1, preparation: { targetDeviceId: 'local', phase: 'ready', issue: null }, operationId: null, revision: 1, phase: 'ready', inputId: 'input', captureHash: 'hash', contextId: 'context', replayDeviceId: 'local',
   requestedEventId: 42, appliedEventId: 42, imageEventId: 42, events: [{ eventId: 21 }, { eventId: 42 }], targets: [{ textureId: 'color', outputSlot: 0 }], target: { textureId: 'color', outputSlot: 0 }, isFinalOutput: false, image,
   devicePresentation: { status: 'presented', eventId: 42, textureId: 'color', sequence: 1, reason: null }, interactionLock: null, error: null, warning: null, observation: null,
 });

@@ -1,6 +1,6 @@
 import { settingsService } from '../settings/SettingsService';
 import { rdcCliInvokerService } from '../tools/RdcCliInvokerService';
-import { parseRdcNativeResult } from '../tools/RdcNativeProtocol';
+import { parseRdcNativeResult, RdcNativeFailure } from '../tools/RdcNativeProtocol';
 import { freezeRdcTurnBinding } from '../tools/RdcTurnBindings';
 import { withRdcHostRuntimeEnv } from '../tools/withRdcHostRuntimeEnv';
 import { shellInvocationService } from '../tools/ShellInvocationService';
@@ -10,7 +10,8 @@ import { shellInvocationService } from '../tools/ShellInvocationService';
 
 import { randomUUID } from 'node:crypto';
 import { withRdcOpenProgress } from './RdcOpenProgress';
-import { replayDeviceService } from '../captures/ReplayDeviceService';
+import { withRdcRemoteProgress, type RdcRemoteProgress } from './RdcRemoteProgress';
+import { assertRemotePreparationContract, connectSessionReplayDevice, inspectSessionReplayInstallation, remotePreparationBindingIdentity, type RdcRemoteConnection, type RemoteInstallationInspection } from './RdcRemoteConnection';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import type {
   CaptureDescriptor,
@@ -56,6 +57,7 @@ async function callNative(
     if (operation === 'rd.capture.open_replay' && payload.data.capture_file_id !== args.capture_file_id) throw new Error('RDC_CAPTURE_MISMATCH: replay capture identity does not match the opened file.');
     return { ok: true, data: payload.data };
   } catch (error) {
+    if (error instanceof RdcNativeFailure) throw error;
     return { ok: false, data: {}, error: error instanceof Error ? error.message : String(error) };
   }
 }
@@ -66,7 +68,7 @@ const emptyPreviewLoadResult = (): PreviewLoadResult => ({
   attempts: [],
 });
 
-export interface RdcLifecycleOptions { expectedGeneration?: number; onStage?: (stage: 'connecting' | 'opening' | 'transferring') => void; contextId?: string; binding?: RdcTurnBinding; signal?: AbortSignal }
+export interface RdcLifecycleOptions extends RdcRemoteProgress { expectedGeneration?: number; onStage?: (stage: 'connecting' | 'opening' | 'transferring') => void; contextId?: string; binding?: RdcTurnBinding; signal?: AbortSignal; repairFingerprint?: string; expectedBindingIdentity?: string }
 
 export class RdcSessionRuntime {
   private contextId: string | null = null;
@@ -81,26 +83,43 @@ export class RdcSessionRuntime {
   private remoteStatus: 'connected' | 'online' | 'disconnected' | 'error' = 'disconnected';
   private openedCapture: OpenedCaptureState | null = null;
   private runtimeContext: RdcRuntimeContext | null = null;
+  private remoteConnection: RdcRemoteConnection | null = null;
 
   async openProjectInput(request: OpenProjectInputRequest, options: RdcLifecycleOptions = {}): Promise<OpenedCaptureState> {
     options.signal?.throwIfAborted();
-    const cli = withRdcHostRuntimeEnv(structuredClone(options.binding?.cli ?? settingsService.getAll().tooling.rdcCli));
-    let lifecycleBinding = options.binding;
-    if (!lifecycleBinding) {
-      const catalog = await rdcCliInvokerService.loadCatalog(cli);
-      options.signal?.throwIfAborted();
-      lifecycleBinding = freezeRdcTurnBinding(cli, catalog.tools);
-    }
-    options.signal?.throwIfAborted();
-    const allocatedContextId = `rdc-${randomUUID()}`;
-    await this.closeOrReplaceOpenedCapture(options);
-    this.lifecycleBinding = lifecycleBinding;
-    options = { ...options, binding: this.lifecycleBinding };
-    await this.ensureOwnedDaemon(allocatedContextId, lifecycleBinding, options.signal);
-    this.contextId = allocatedContextId;
-    this.ownerScope = request.sessionId ? { projectId: request.projectId, sessionId: request.sessionId } : null;
-    let replayDevice = request.replayDevice;
+    const replayDevice = request.replayDevice;
     const isRemoteReplay = replayDevice.type === 'android';
+    const scope = { projectId: request.projectId, sessionId: request.sessionId ?? '' };
+    if (isRemoteReplay) {
+      if (!this.isOwnedBy(scope) || !this.remoteConnection || this.remoteConnection.deviceId !== replayDevice.id) {
+        throw new Error('RDC_DEVICE_NOT_PREPARED');
+      }
+      const currentBinding = await this.resolveBinding(options);
+      if (JSON.stringify(currentBinding.cli) !== JSON.stringify(this.lifecycleBinding?.cli)
+        || currentBinding.definitionsFingerprint !== this.lifecycleBinding?.definitionsFingerprint) throw new Error('RDC_CLI_BINDING_CHANGED');
+      if (this.runtimeContext) {
+        const previous = this.runtimeContext;
+        const closed = await callNative('rd.capture.close_replay', { session_id: previous.replaySessionId }, this.contextId!, currentBinding, options.signal);
+        if (!closed.ok) throw new Error(closed.error ?? 'RDC_CAPTURE_CLOSE_FAILED');
+        // The old replay is now gone even if releasing its file later fails. Keep only context ownership.
+        setRdcRuntimeContextForSession(scope.sessionId, null);
+        this.openedCapture = null; this.runtimeContext = null; this.captures = []; this.activeCaptureId = null;
+        if (previous.captureFileId) {
+          const released = await callNative('rd.capture.close_file', { capture_file_id: previous.captureFileId }, this.contextId!, currentBinding, options.signal);
+          if (!released.ok) throw new Error(released.error ?? 'RDC_CAPTURE_CLOSE_FAILED');
+        }
+      }
+    } else {
+      await this.closeOrReplaceOpenedCapture(options);
+      this.lifecycleBinding = await this.resolveBinding(options);
+      const allocated = 'rdc-' + randomUUID();
+      await this.ensureOwnedDaemon(allocated, this.lifecycleBinding, options.signal);
+      this.contextId = allocated;
+      this.ownerScope = scope;
+    }
+    options = { ...options, binding: this.lifecycleBinding };
+    const allocatedContextId = this.contextId!;
+    const preparedRemote = this.remoteConnection;
     const capture: CaptureDescriptor = {
       id: request.inputId,
       filePath: request.filePath,
@@ -121,14 +140,6 @@ export class RdcSessionRuntime {
     let resultData: Record<string, unknown>;
     let runtimeContext: RdcRuntimeContext;
     try {
-      if (isRemoteReplay) {
-        options.onStage?.('connecting');
-        replayDevice = await this.ensureReplayDeviceReady(replayDevice, { ...options, contextId: allocatedContextId });
-      }
-      const preparedRemote = isRemoteReplay
-        ? replayDeviceService.consumePreparedRemote(replayDevice.id, allocatedContextId)
-        : null;
-
       options.onStage?.('opening');
       if (isRemoteReplay) {
         if (!preparedRemote?.contextId || !preparedRemote.remoteId || preparedRemote.contextId !== allocatedContextId) {
@@ -242,39 +253,69 @@ export class RdcSessionRuntime {
     this.activeCaptureId = captureId;
   }
 
-  private async ensureReplayDeviceReady(device: ReplayDeviceEntry, options: RdcLifecycleOptions): Promise<ReplayDeviceEntry> {
+  private async resolveBinding(options: RdcLifecycleOptions): Promise<RdcTurnBinding> {
+    if (options.binding) return options.binding;
+    const cli = withRdcHostRuntimeEnv(structuredClone(settingsService.getAll().tooling.rdcCli));
+    const catalog = await rdcCliInvokerService.loadCatalog(cli);
+    options.signal?.throwIfAborted();
+    return freezeRdcTurnBinding(cli, catalog.tools);
+  }
+
+  async prepareReplayDevice(scope: SessionScope, device: ReplayDeviceEntry, options: RdcLifecycleOptions = {}): Promise<void> {
+    options.signal?.throwIfAborted();
     if (device.type === 'local') {
-      return device;
+      if (this.openedCapture) {
+        if (this.isOwnedBy(scope) && this.replayDevice?.id === device.id) return;
+        throw new Error('RDC_CAPTURE_CLOSE_REQUIRED');
+      }
+      await this.closeOrReplaceOpenedCapture(options);
+      this.ownerScope = scope; this.replayDevice = device; this.deviceLabel = device.label;
+      return;
     }
-
-    const currentDevice = replayDeviceService.getDeviceById(device.id) ?? device;
-    if (currentDevice.type === 'local') {
-      return currentDevice;
+    const binding = await this.resolveBinding(options);
+    assertRemotePreparationContract(binding);
+    if (options.expectedBindingIdentity && remotePreparationBindingIdentity(binding) !== options.expectedBindingIdentity) {
+      throw new Error('RDC_DEVICE_CONFIRMATION_STALE: native CLI or catalog changed before execution.');
     }
-
-    const preparedRemote = replayDeviceService.peekPreparedRemote(currentDevice.id);
-    if (
-      ['connected', 'online'].includes(currentDevice.status)
-      && preparedRemote?.contextId === options.contextId
-      && preparedRemote?.remoteId
-    ) {
-      return currentDevice;
+    if (this.openedCapture && (!this.isOwnedBy(scope) || this.remoteConnection?.deviceId !== device.id
+      || JSON.stringify(binding.cli) !== JSON.stringify(this.lifecycleBinding?.cli)
+      || binding.definitionsFingerprint !== this.lifecycleBinding?.definitionsFingerprint)) throw new Error('RDC_CAPTURE_CLOSE_REQUIRED');
+    if (this.remoteConnection && this.isOwnedBy(scope) && this.remoteConnection.deviceId === device.id
+      && JSON.stringify(binding.cli) === JSON.stringify(this.lifecycleBinding?.cli)
+      && binding.definitionsFingerprint === this.lifecycleBinding?.definitionsFingerprint) {
+      const ping = await callNative('rd.remote.ping', { remote_id: this.remoteConnection.remoteId }, this.contextId!, binding, options.signal);
+      if (!ping.ok) throw new Error(ping.error ?? 'RDC_REMOTE_NOT_READY');
+      return;
     }
+    await this.closeOrReplaceOpenedCapture(options);
+    this.ownerScope = scope;
+    this.replayDevice = device;
+    this.deviceLabel = device.label;
+    this.lifecycleBinding = binding;
+    const contextId = 'rdc-' + randomUUID();
+    await this.ensureOwnedDaemon(contextId, binding, options.signal);
+    this.contextId = contextId;
+    this.remoteConnection = await withRdcRemoteProgress(contextId, binding.cli, options.signal, options, () =>
+      connectSessionReplayDevice(device, contextId, binding, options.signal, options.repairFingerprint));
+    this.remoteStatus = 'connected';
+  }
 
-    const activatedDevice = await replayDeviceService.activateDevice(currentDevice.id, {
-      signal: options.signal,
-      contextId: options.contextId,
-      cli: options.binding?.cli,
-    });
-    if (activatedDevice.type === 'local' || !['connected', 'online'].includes(activatedDevice.status)) {
-      throw new Error(
-        activatedDevice.activationErrorMessage
-        ?? activatedDevice.lastError
-        ?? `Failed to connect Replay Device ${activatedDevice.label}.`,
-      );
+  async inspectReplayDeviceInstallation(scope: SessionScope, device: ReplayDeviceEntry, options: RdcLifecycleOptions): Promise<RemoteInstallationInspection> {
+    const binding = await this.resolveBinding(options); assertRemotePreparationContract(binding);
+    if (!options.expectedBindingIdentity || remotePreparationBindingIdentity(binding) !== options.expectedBindingIdentity) {
+      throw new Error('RDC_DEVICE_CONFIRMATION_STALE: installation inspection requires the original CLI and catalog.');
     }
+    if (this.openedCapture) throw new Error('RDC_CAPTURE_CLOSE_REQUIRED');
+    await this.closeOrReplaceOpenedCapture(options);
+    this.ownerScope = scope; this.replayDevice = device; this.deviceLabel = device.label; this.lifecycleBinding = binding;
+    const contextId = 'rdc-' + randomUUID();
+    await this.ensureOwnedDaemon(contextId, binding, options.signal); this.contextId = contextId;
+    return inspectSessionReplayInstallation(device, contextId, binding, options.signal);
+  }
 
-    return activatedDevice;
+  isPreparedFor(scope: SessionScope, deviceId: string): boolean {
+    return this.isOwnedBy(scope) && this.replayDevice?.id === deviceId
+      && (this.replayDevice.type === 'local' || this.remoteConnection !== null);
   }
 
   private extractRuntimeContext(
@@ -347,8 +388,8 @@ export class RdcSessionRuntime {
     return {
       contextId: this.contextId ?? '',
       sessionId: activeCapture?.sessionId ?? '',
-      ownerSessionId: this.openedCapture?.ownerSessionId ?? activeCapture?.ownerSessionId ?? null,
-      backend: activeCapture?.backendHint ?? 'local',
+      ownerSessionId: this.ownerScope?.sessionId ?? null,
+      backend: this.replayDevice?.type === 'android' ? 'remote' : 'local',
       remoteStatus: this.replayDevice?.type === 'android' ? this.remoteStatus : undefined,
       runtimeOwner: this.runtimeOwner ?? '',
       ownerLeaseId: this.ownerLeaseId ?? '',
@@ -381,6 +422,7 @@ export class RdcSessionRuntime {
   }
 
   getCliSettings() { return this.lifecycleBinding?.cli; }
+  getPreparationBindingIdentity(): string | null { return this.lifecycleBinding ? remotePreparationBindingIdentity(this.lifecycleBinding) : null; }
   getContextId(): string | null {
     return this.contextId;
   }
@@ -497,6 +539,7 @@ export class RdcSessionRuntime {
 
   private resetRuntimeState(previousCapture: OpenedCaptureState | null): void {
     this.openedCapture = null;
+    this.remoteConnection = null;
     this.contextId = null;
     this.ownerScope = null;
     this.lifecycleBinding = undefined;

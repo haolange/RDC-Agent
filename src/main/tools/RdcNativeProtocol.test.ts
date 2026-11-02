@@ -171,3 +171,11 @@ describe('native failure projection', () => {
     expect(failure).toMatchObject({ replacementNotAttempted: false });
   });
 });
+
+it('retains structured remote repair facts without replacing its native error classification', () => {
+  const details = { remote: { code: 'remote_version_mismatch', stage: 'verifying', device_serial: 'SERIAL', expected_version: '1.45', actual_version: '1.36' } };
+  let error: unknown; try { parseRdcNativeResult({ exitCode: 1, stdout: JSON.stringify({ ok: false, result_kind: 'rd.remote.connect', error: {
+    code: 'remote_version_mismatch', category: 'runtime', message: 'Version mismatch', details } }), stderr: '' } as CLIResult, 'owned', 'rd.remote.connect'); } catch (caught) { error = caught; }
+  expect(error).toBeInstanceOf(RdcNativeFailure);
+  expect((error as RdcNativeFailure).nativeError).toEqual({ code: 'remote_version_mismatch', category: 'runtime', exitCode: 1, details });
+});

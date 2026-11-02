@@ -157,6 +157,8 @@ export const RENDERER_INVOKE_CHANNEL = {
     removeInput: 'project:inputs:remove',
   },
   device: {
+    prepare: 'device:prepare',
+    cancelPreparation: 'device:cancelPreparation',
     list: 'device:list',
     refresh: 'device:refresh',
     watchStart: 'device:watch:start',

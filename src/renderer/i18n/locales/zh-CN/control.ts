@@ -296,4 +296,5 @@ export const zhControl = {
   "control.replay.more": "更多抓帧操作",
   "control.replay.noSession": "请先创建会话",
   "control.replay.unavailable": "不可用",
+  'control.replay.actionFailed': "回放操作失败",
 } as const;

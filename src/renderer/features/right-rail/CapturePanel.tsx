@@ -2,6 +2,8 @@ import { useCallback, useMemo, useState } from 'react';
 import type { RdcContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
 import { copyAppText } from '../../hooks/appShellBridge';
 import { useDeviceStore } from '../../stores/deviceStore';
+import { useSessionDeviceStore } from '../../stores/sessionDeviceStore';
+import { DevicePreparationStatus, isDevicePreparing, isDeviceInstallationUnconfirmed } from '../../patterns/DevicePreparationStatus';
 import { useProjectStore } from '../../stores/projectStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
@@ -27,22 +29,27 @@ const sizeLabel = (size: number) => size >= 1024 ** 3 ? `${(size / 1024 ** 3).to
 
 function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: RdcContextPanelViewModel }) {
   const { t } = useI18n();
-  const { state, selection, error: connectionError, reload, receive } = useCaptureReplay(scope);
+  const { state, selection, error: connectionError, actionFailure, reload, receive } = useCaptureReplay(scope);
   const devices = useDeviceStore((value) => value.devices);
-  const [draft, setDraft] = useState<{ inputId: string; deviceId: string } | null>(null);
+  const [draft, setDraft] = useState<{ inputId: string } | null>(null);
   const [action, setAction] = useState<Action | null>(null);
   const [error, setError] = useState<{ message: string; action: Action } | null>(null);
   const [more, setMore] = useState(false);
   const [copied, setCopied] = useState(false);
   const actualInputId = state?.inputId ?? selection?.inputId ?? capture.availableCaptures[0]?.inputId ?? '';
-  const actualDeviceId = state?.replayDeviceId ?? selection?.deviceId ?? 'local';
-  const chosen = draft ?? { inputId: actualInputId, deviceId: actualDeviceId };
+  const actualDeviceId = state?.replayDeviceId ?? 'local';
+  const targetDeviceId = state?.preparation.targetDeviceId ?? actualDeviceId;
+  const chosen = draft ?? { inputId: actualInputId };
   const selectedInput = capture.availableCaptures.find((input) => input.inputId === chosen.inputId) ?? capture.availableCaptures[0];
-  const open = Boolean(state?.contextId);
-  const pending = open && (chosen.inputId !== actualInputId || chosen.deviceId !== actualDeviceId);
+  const open = Boolean(state?.inputId && state.contextId);
+  const pending = open && chosen.inputId !== actualInputId;
   const phaseBusy = Boolean(state && ['validating', 'connecting', 'transferring', 'opening', 'loading_image', 'closing'].includes(state.phase));
   const locked = Boolean(state?.interactionLock);
-  const disabled = locked || phaseBusy || action !== null || !state;
+  const preparing = state ? isDevicePreparing(state.preparation.phase) : false;
+  const installUnconfirmed = isDeviceInstallationUnconfirmed(state?.preparation);
+  const disabled = locked || installUnconfirmed || phaseBusy || preparing || action !== null || !state;
+  const deviceDisabled = locked || installUnconfirmed || (!preparing && phaseBusy) || action !== null || !state;
+  const deviceReady = targetDeviceId === 'local' || state?.preparation.phase === 'ready';
   const partial = isCapturePartialReady(state);
   const refreshProjection = useCallback(async () => {
     await reload();
@@ -57,8 +64,11 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     setAction(operation); setError(null);
     try {
       if (operation === 'open' && selectedInput) {
-        const result = await openProjectCaptureInput({ ...scope, bindingGeneration: state.generation, inputId: selectedInput.inputId, filePath: selectedInput.filePath, replayDeviceId: chosen.deviceId });
-        if (!result.success) throw new Error(result.error);
+        const result = await openProjectCaptureInput({ ...scope, bindingGeneration: state.generation, inputId: selectedInput.inputId, filePath: selectedInput.filePath, replayDeviceId: targetDeviceId });
+        if (!result.success) {
+          if (result.issue) { setError({ message: result.issue.diagnostic, action: operation }); await reload(); return; }
+          throw new Error(result.error);
+        }
         setDraft(null);
       } else if (operation === 'close') {
         const result = await clearOpenedCapture({ ...scope, bindingGeneration: state.generation });
@@ -75,11 +85,12 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   };
   const statusTone = resolveCaptureStatusTone({ phase: state?.phase, pending, partial });
   const callouts = collectCaptureCallouts({
+    failureTitle: t('control.replay.actionFailed'),
     warning: state?.warning ?? null,
     finalPresentTitle: t('control.replay.finalPresentUnavailable'),
-    actionError: error,
+    actionError: state?.preparation.issue ? null : error,
     connectionError,
-    stateError: state?.error ?? null,
+    stateError: state?.preparation.issue ? null : state?.error ?? null,
     factLabels: {
       no_color_output: t(FACT_LABELS.no_color_output),
       missing_target: t(FACT_LABELS.missing_target),
@@ -104,15 +115,19 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
       <small>{selectedInput ? sizeLabel(selectedInput.sizeBytes) : ''}</small>
     </div>
     <div className="capture-replay-device-row">
-      <Select dataTestId="right-rail-replay-device" ariaLabel={t('control.sessionContextDevice')} value={chosen.deviceId} disabled={disabled}
-        options={devices.map((device) => ({ value: device.id, label: device.type === 'local' ? t('device.local') : device.label, disabled: device.status === 'loading' }))}
-        onChange={(deviceId) => setDraft({ ...chosen, deviceId })} />
+      <Select dataTestId="right-rail-replay-device" ariaLabel={t('control.sessionContextDevice')} value={targetDeviceId} disabled={deviceDisabled}
+        options={[...devices.map((device) => ({ value: device.id, label: device.type === 'local' ? t('device.local') : device.label, disabled: device.type === 'android' && device.adbState !== 'device' })), ...(devices.some((device) => device.id === targetDeviceId) ? [] : [{ value: targetDeviceId, label: targetDeviceId, disabled: true }])]}
+        onChange={(deviceId) => { void useSessionDeviceStore.getState().prepare(scope, deviceId); }} />
       <Button variant="ghost" size="sm" aria-label={t('control.replay.refresh')} aria-busy={action === 'refresh'} disabled={disabled} onClick={() => void run('refresh')}>↻</Button>
-      <Button variant={open ? 'secondary' : 'primary'} size="sm" disabled={disabled || !selectedInput} onClick={() => void run(pending || !open ? 'open' : 'close')}>{t(pending ? 'control.replay.switch' : open ? 'control.replay.close' : 'control.captureOpen')}</Button>
+      <Button variant={open ? 'secondary' : 'primary'} size="sm" disabled={disabled || !selectedInput || (!open && !deviceReady)} onClick={() => void run(pending || !open ? 'open' : 'close')}>{t(pending ? 'control.replay.switch' : open ? 'control.replay.close' : 'control.captureOpen')}</Button>
     </div>
     {pending && <div className="capture-replay-pending"><small>{capture.availableCaptures.find((input) => input.inputId === actualInputId)?.fileName} · {devices.find((device) => device.id === actualDeviceId)?.label}</small><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDraft(null)}>{t('control.replay.cancel')}</Button></div>}
+    <DevicePreparationStatus preparation={state?.preparation ?? null} issue={actionFailure?.issue} hasCapture={open} disabled={locked}
+      onRetry={() => { void useSessionDeviceStore.getState().prepare(scope, installUnconfirmed ? targetDeviceId : actionFailure?.deviceId ?? targetDeviceId); }}
+      onCancel={() => useSessionDeviceStore.getState().cancel(scope)} />
     <CaptureReplayCallouts
       callouts={callouts}
+      detailLabel={t('device.prepare.details')}
       disabled={disabled}
       retryLabels={{ open: t('control.replay.retryOpen'), close: t('control.replay.retryClose'), image: t('control.replay.retryImage') }}
       onRetry={(operation) => void run(operation)}

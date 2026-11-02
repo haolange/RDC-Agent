@@ -8,7 +8,7 @@ import { useLayoutStore } from '../../stores/layoutStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useTurnControlsStore } from '../../stores/turnControlsStore';
-import { useDeviceStore } from '../../stores/deviceStore';
+import { usePreparedSessionDevice } from '../../hooks/useSessionDevicePreparation';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useComposerAttachments } from './useComposerAttachments';
 import { useComposerPendingSkills } from './useComposerPendingSkills';
@@ -60,9 +60,7 @@ export function useComposer(options: {
     void useAppSettingsStore.getState().reloadSettings().catch(() => undefined);
   }, [currentProject?.projectId]);
 
-  const devices = useDeviceStore((state) => state.devices);
-  const selectedDevice = useDeviceStore((state) => state.selectedDevice);
-  const selectedDeviceEntry = devices.find((device) => device.id === selectedDevice);
+  const selectedDeviceEntry = usePreparedSessionDevice(currentProject?.projectId, currentSession?.sessionId);
   const { promptValue, setPromptValue } = useScopedPromptDraft(
     currentProject?.projectId,
     currentSession?.sessionId,

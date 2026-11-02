@@ -138,6 +138,8 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'project:inputs:reference': 'high-impact',
   'project:inputs:prepareRemove': 'high-impact',
   'project:inputs:remove': 'high-impact',
+  'device:prepare': 'high-impact',
+  'device:cancelPreparation': 'mutation',
   'device:list': 'read',
   'device:refresh': 'mutation',
   'device:watch:start': 'mutation',

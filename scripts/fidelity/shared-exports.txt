@@ -400,6 +400,9 @@ DerivedContextView
 describeAgentToolIneligibility
 describeMaterialContext
 DeviceApi
+DevicePreparationPhase
+DevicePreparationRequest
+DevicePreparationResult
 diagnoseManifestToolTokens
 DialogApi
 DiffPreview
@@ -800,14 +803,17 @@ PLAN_REVIEW_STATE_SCHEMA
 PLAN_TASK_REQUIREMENTS_HEADING
 PlanApi
 PlanApprovalTokenRequest
+PlanCancelReviewRequest
 PlanExportRequest
 PlanExportResult
 PlanNode
 PlanReadRequest
 PlanReadResult
+PlanReviewContext
 PlanReviewDecision
 PlanReviewHandoffOption
 PlanReviewHandoffSuggestion
+PlanReviewProjection
 PlanReviewSection
 PlanReviewStateDocument
 PlanReviewStatus
@@ -942,6 +948,8 @@ ReasoningWireProfileSchema
 recolorLogoRgba
 REJECTED_TOOL_TOKENS
 relativeLuminance
+RemoteInstallationReceipt
+RemoteRepairAssessment
 RENDERER_EVENT_CHANNEL
 RENDERER_EVENT_CHANNELS
 RENDERER_INVOKE_CHANNEL
@@ -955,6 +963,7 @@ renderPlanTaskRequirements
 repairConversationBranchState
 ReplayBackendHint
 ReplayDeviceEntry
+ReplayDeviceIssue
 ReplayDeviceSnapshot
 ReplayDeviceStatus
 ReplayDeviceStatusChangedPayload
@@ -1072,6 +1081,7 @@ SessionAttachmentKind
 SessionAttachmentLayer
 SessionAttachmentRecord
 SessionContext
+SessionDevicePreparation
 SessionKnowledgeCandidate
 SessionModelOverride
 SessionRecord

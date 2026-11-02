@@ -549,4 +549,4 @@ Desktop、TUI 和 Agent 可以有不同的信息密度和交互形式，但不�
 
 ## Android Capture 使用
 
-先在顶部选择 Android 设备，再在会话 Capture 入口打开文件。设备选择不会在没有会话身份时提前连接；打开时自动连接，必要时启动 RenderDoc Command。已有 helper 会被复用，不需要用户手动启动或清空进程。连接失败显示实际原因，修复设备或网络条件后重新打开重试。已连接和 APK 安装是不同事实；关闭 Capture 只释放本次会话资源。设备呈现 unsupported 与本地观察 PNG 分别展示。
+在当前活动会话顶部选择 Android 后立即准备服务与连接，再在 Capture 入口打开文件；无活动会话不连接，Open 复用同一 owning context/connection。已有 Capture 换设备先确认关闭，释放后才准备新目标。Tools 自动处理缺失安装与保留数据的受支持升级，兼容运行 helper 仅借用；签名替换、卸载、降级和停止未知服务必须按当前 fingerprint 明确确认，busy 不抢占。界面依据主进程类型化 code/stage/recovery 显示短标题与可展开的原始诊断，不解析英文异常或假设进程占用。不要求用户清空进程；失败后使用准备/修复入口恢复。已连接、APK安装、Capture回放与设备呈现分别记录，unsupported 与本地PNG观察不能混同。

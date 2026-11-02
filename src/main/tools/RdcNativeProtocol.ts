@@ -14,7 +14,7 @@ export class RdcNativeFailure extends Error {
   deliveryResult?: AgentToolResult;
   constructor(message: string, readonly resultKind: string | null,
     readonly replacementNotAttempted: boolean, readonly effectsNotAttempted: boolean,
-    readonly nativeError: { code: string; category: string | null; exitCode: number },
+    readonly nativeError: { code: string; category: string | null; exitCode: number; details?: Record<string, unknown> },
     readonly screenshotTargetRestoration: { contextId: string; sessionId: string; eventId: number } | null = null,
     readonly shaderInspectionRestoration: { contextId: string; sessionId: string; eventId: number } | null = null) {
     super(message);
@@ -79,7 +79,7 @@ export function parseRdcNativeResult(result: CLIResult, expectedContext?: string
         ? { contextId: details.context_id, sessionId: details.session_id, eventId: Number(details.restored_event_id) } : null;
       throw new RdcNativeFailure(`RDC_CLI_FAILED: ${failure.code}: ${failure.message}${suffix}`,
         resultKind, replacementNotAttempted, effectsNotAttempted,
-        { code: failure.code, category: typeof failure.category === 'string' ? failure.category : null, exitCode: result.exitCode },
+        { code: failure.code, category: typeof failure.category === 'string' ? failure.category : null, exitCode: result.exitCode, ...(details ? { details } : {}) },
         screenshotTargetRestoration, shaderInspectionRestoration);
     }
   }

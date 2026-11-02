@@ -8,6 +8,7 @@ import type { InvestigationArtifactRow } from '@shared/types/trace';
 import type { InvestigationReadIpcResult } from '@shared/types/renderdocInvestigation';
 import { SessionRightRail } from './SessionRightRail';
 import { readInvestigationArtifact } from './investigationPreviewActions';
+import { useSessionDeviceStore } from '../../stores/sessionDeviceStore';
 
 const state = vi.hoisted(() => ({
   tracePresentation: null as AgentRunPresentation | null,
@@ -47,7 +48,7 @@ function presentation(): AgentRunPresentation {
 }
 function replay(): CaptureReplayState {
   return {
-    projectId: 'project', sessionId: 'session', generation: 1, revision: 1, operationId: null,
+    projectId: 'project', sessionId: 'session', generation: 1, preparation: { targetDeviceId: 'local', phase: 'ready', issue: null }, revision: 1, operationId: null,
     phase: 'ready', replayDeviceId: 'local', inputId: 'input', captureHash: null, contextId: 'context',
     requestedEventId: 42, appliedEventId: 42, imageEventId: 42, events: [{ eventId: 21 }, { eventId: 42 }],
     targets: [], target: null, isFinalOutput: false, image: null, observation: null,
@@ -63,6 +64,23 @@ beforeEach(() => {
 });
 
 describe('populated session rail', () => {
+  it('blocks Open and target switching while installation is unknown but preserves explicit verification', async () => {
+    state.replay = { ...replay(), inputId: null, contextId: null, phase: 'error', preparation: {
+      targetDeviceId: 'remote', phase: 'failed', issue: { code: 'remote_install_unconfirmed', stage: 'installing', diagnostic: 'Installation still pending', recovery: 'verify_installation', deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: false } },
+    } };
+    const prepare = vi.fn(); useSessionDeviceStore.setState({ prepare });
+    const host = document.createElement('div'); const root = createRoot(host);
+    try {
+      act(() => root.render(createElement(SessionRightRail)));
+      const button = (label: string) => [...host.querySelectorAll('button')].find(entry => entry.textContent === label);
+      expect(button('control.captureOpen')?.disabled).toBe(true);
+      expect(host.querySelector<HTMLButtonElement>('[data-testid="right-rail-replay-device"]')?.disabled).toBe(true);
+      expect(button('device.prepare.verifyInstallation')?.disabled).toBe(false);
+      await act(async () => button('device.prepare.verifyInstallation')!.click());
+      expect(prepare).toHaveBeenCalledExactlyOnceWith({ projectId: 'project', sessionId: 'session' }, 'remote');
+      expect(button('device.prepare.retry')).toBeUndefined();
+    } finally { act(() => root.unmount()); }
+  });
   it('presents an incomplete typed report as seven readable sections without hiding its limits', async () => {
     const reportRow: InvestigationArtifactRow = { ...artifact, kind: 'report', recordType: 'InvestigationReport', status: 'draft', title: 'Event 1248 assessment' };
     const current = presentation();

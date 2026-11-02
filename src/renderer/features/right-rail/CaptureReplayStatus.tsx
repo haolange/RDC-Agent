@@ -1,6 +1,7 @@
 import type { CaptureReplayError, CaptureReplayPhase, CaptureReplayState } from '@shared/types/captureReplay';
 import type { TranslationKey } from '../../i18n';
 import { Button } from '../../ui/Button';
+import { Details } from '../../ui/Details';
 
 export type CaptureRetryAction = 'open' | 'close' | 'refresh' | 'image';
 export type CaptureStatusTone = 'success' | 'warning' | 'error' | 'info';
@@ -45,6 +46,7 @@ export function resolveCaptureStatusTone(args: {
 }
 
 export function collectCaptureCallouts(args: {
+  failureTitle: string;
   warning: { code: string; message: string } | null;
   finalPresentTitle: string;
   actionError: { message: string; action: CaptureRetryAction } | null;
@@ -62,11 +64,11 @@ export function collectCaptureCallouts(args: {
     });
   }
   if (args.actionError) {
-    items.push({ id: 'action', tone: 'error', title: args.actionError.message, retry: args.actionError.action });
+    items.push({ id: 'action', tone: 'error', title: args.failureTitle, detail: args.actionError.message, retry: args.actionError.action });
     return items;
   }
   if (args.connectionError) {
-    items.push({ id: 'connection', tone: 'error', title: args.connectionError, retry: 'refresh' });
+    items.push({ id: 'connection', tone: 'error', title: args.failureTitle, detail: args.connectionError, retry: 'refresh' });
     return items;
   }
   const error = args.stateError;
@@ -79,7 +81,8 @@ export function collectCaptureCallouts(args: {
   items.push({
     id: `error:${error.code}`,
     tone: 'error',
-    title: error.code === 'export_failure' ? args.factLabels.export_failure : error.message,
+    title: error.code === 'export_failure' ? args.factLabels.export_failure : args.failureTitle,
+    detail: error.message,
     retry: error.retry === 'close' ? 'close' : error.retry === 'open' ? 'open' : error.retry === 'apply' ? 'image' : error.retry ?? undefined,
   });
   return items;
@@ -101,11 +104,13 @@ export function CaptureReplayStatusChip({ label, tone }: { label: string; tone: 
 
 export function CaptureReplayCallouts({
   callouts,
+  detailLabel,
   disabled,
   retryLabels,
   onRetry,
 }: {
   callouts: CaptureCallout[];
+  detailLabel: string;
   disabled: boolean;
   retryLabels: Record<'open' | 'close' | 'image', string>;
   onRetry: (action: CaptureRetryAction) => void;
@@ -117,7 +122,7 @@ export function CaptureReplayCallouts({
         <div key={item.id} className={`capture-replay-callout is-${item.tone}`} role={item.tone === 'error' ? 'alert' : 'status'}>
           <div className="capture-replay-callout-copy">
             <strong>{item.title}</strong>
-            {item.detail ? <small>{item.detail}</small> : null}
+            {item.detail ? <Details summary={detailLabel}><pre className="capture-replay-diagnostic">{item.detail}</pre></Details> : null}
           </div>
           {item.retry ? (
             <Button variant="ghost" size="sm" disabled={disabled} onClick={() => onRetry(item.retry!)}>
