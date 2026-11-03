@@ -8,7 +8,7 @@
  * - SigV4 signing via ProviderRequestAuthorizer
  * - Endpoint: https://bedrock-runtime.{region}.amazonaws.com/model/{modelId}/converse-stream
  *
- * 使用原生 fetch + 自实现 SSE 解析，不引入第三方 SDK。
+ * 使用原生 fetch。流式帧走共享 parseSSE，不引入第三方 SDK。
  */
 
 import { EventStream } from '../core/EventStream';
@@ -32,12 +32,10 @@ import {
   composeAbortSignals,
   ensureOk,
   normalizeError,
+  parseSSE,
   ProviderEmptyStreamError,
   ProviderHttpError,
   type ProviderStreamReadOptions,
-  resolveProviderTimeouts,
-  DEFAULT_PROVIDER_MAX_BUFFER_BYTES,
-  ProviderStreamBufferError,
 } from './internal/http';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import type { ProviderRequestAuthorizer } from '../../settings/provider-auth/AwsBedrockCredentials';
@@ -418,142 +416,18 @@ export class BedrockConverseProvider implements ProviderStrategy {
   }
 }
 
-// =====================================================================
-// Bedrock SSE parser (handles event: + data: format)
-// =====================================================================
-
 async function* parseBedrockSSE(
   response: Response,
   signal: AbortSignal | undefined,
   options: ProviderStreamReadOptions,
 ): AsyncGenerator<BedrockStreamEvent> {
-  if (!response.body) {
-    throw new Error('parseBedrockSSE: response.body is null');
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  const timeouts = resolveProviderTimeouts(options);
-  const maxBufferBytes = options.maxBufferBytes ?? DEFAULT_PROVIDER_MAX_BUFFER_BYTES;
-  let buffer = '';
-  let hasReadChunk = false;
-
-  try {
-    while (true) {
-      throwIfAborted(signal);
-      const { done, value } = await readWithTimeout(
-        reader,
-        signal,
-        options.providerApi,
-        hasReadChunk ? 'idle' : 'first-byte',
-        hasReadChunk ? timeouts.streamIdleTimeoutMs : timeouts.firstChunkTimeoutMs,
-      );
-      hasReadChunk = true;
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      if (Buffer.byteLength(buffer, 'utf8') > maxBufferBytes) {
-        const error = new ProviderStreamBufferError(options.providerApi, maxBufferBytes);
-        void reader.cancel(error).catch(() => undefined);
-        throw error;
-      }
-
-      // Bedrock SSE format: events separated by double newlines
-      const events = buffer.split('\n\n');
-      buffer = events.pop() ?? '';
-
-      for (const eventBlock of events) {
-        const lines = eventBlock.split('\n');
-        let data = '';
-        for (const line of lines) {
-          const trimmed = line.replace(/\r$/, '');
-          if (trimmed.startsWith('data:')) {
-            data = trimmed.slice(5).trimStart();
-          }
-        }
-        if (!data || data === '[DONE]') continue;
-        try {
-          const parsed = JSON.parse(data) as BedrockStreamEvent;
-          yield parsed;
-        } catch {
-          // Skip malformed events
-        }
-      }
-    }
-  } finally {
+  for await (const data of parseSSE(response, signal, options)) {
     try {
-      reader.releaseLock();
+      yield JSON.parse(data) as BedrockStreamEvent;
     } catch {
-      // ignore: stream already closed or cancelled
+      // Malformed SSE data is not a Bedrock event.
     }
   }
-}
-
-function throwIfAborted(signal: AbortSignal | undefined): void {
-  if (signal?.aborted) {
-    throw abortErrorFromSignal(signal);
-  }
-}
-
-function abortErrorFromSignal(signal: AbortSignal | undefined): Error {
-  if (signal?.reason instanceof Error) {
-    return signal.reason;
-  }
-  const abortErr = new Error('Provider request aborted');
-  abortErr.name = 'AbortError';
-  return abortErr;
-}
-
-async function readWithTimeout(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  signal: AbortSignal | undefined,
-  providerApi: string,
-  phase: 'first-byte' | 'idle',
-  timeoutMs: number,
-): Promise<ReadableStreamReadResult<Uint8Array>> {
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-    return reader.read();
-  }
-
-  return new Promise<ReadableStreamReadResult<Uint8Array>>((resolve, reject) => {
-    let settled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const cleanup = (): void => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-      signal?.removeEventListener('abort', onAbort);
-    };
-
-    const finish = (callback: () => void): void => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      callback();
-    };
-
-    const onAbort = (): void => {
-      finish(() => reject(abortErrorFromSignal(signal)));
-    };
-
-    if (signal?.aborted) {
-      reject(abortErrorFromSignal(signal));
-      return;
-    }
-
-    signal?.addEventListener('abort', onAbort, { once: true });
-    timeoutId = setTimeout(() => {
-      const { ProviderTimeoutError } = require('./internal/http') as typeof import('./internal/http');
-      const error = new ProviderTimeoutError(providerApi, phase, timeoutMs);
-      void reader.cancel(error).catch(() => undefined);
-      finish(() => reject(error));
-    }, timeoutMs);
-
-    reader.read()
-      .then((result) => finish(() => resolve(result)))
-      .catch((error) => finish(() => reject(error)));
-  });
 }
 
 // =====================================================================

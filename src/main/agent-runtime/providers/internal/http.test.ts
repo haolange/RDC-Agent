@@ -3,6 +3,7 @@ import {
   composeAbortSignals,
   ensureOk,
   parseSSE,
+  parseSSERecords,
   ProviderEmptyStreamError,
   ProviderHttpError,
   ProviderTimeoutError,
@@ -93,5 +94,18 @@ describe('provider http stream helpers', () => {
     expect((composed.signal.reason as ProviderTimeoutError).phase).toBe('total');
     composed.dispose();
     vi.useRealTimers();
+  });
+
+  it('keeps the SSE event name with its data record', async () => {
+    const encoder = new TextEncoder();
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('event: contentBlockDelta\ndata: {"ok":true}\n\n'));
+        controller.close();
+      },
+    }));
+    const records = [];
+    for await (const record of parseSSERecords(response, undefined, { providerApi: 'test-provider' })) records.push(record);
+    expect(records).toEqual([{ event: 'contentBlockDelta', data: '{"ok":true}' }]);
   });
 });

@@ -121,11 +121,24 @@ export function resolveProviderTimeouts(options: ProviderStreamTimeoutOptions = 
   };
 }
 
+export interface SseRecord {
+  event: string | null;
+  data: string;
+}
+
 export async function* parseSSE(
   response: Response,
   signal: AbortSignal | undefined,
   options: ProviderStreamReadOptions,
 ): AsyncGenerator<string> {
+  for await (const record of parseSSERecords(response, signal, options)) yield record.data;
+}
+
+export async function* parseSSERecords(
+  response: Response,
+  signal: AbortSignal | undefined,
+  options: ProviderStreamReadOptions,
+): AsyncGenerator<SseRecord> {
   if (!response.body) {
     throw new Error('parseSSE: response.body is null');
   }
@@ -135,6 +148,7 @@ export async function* parseSSE(
   const maxBufferBytes = options.maxBufferBytes ?? DEFAULT_PROVIDER_MAX_BUFFER_BYTES;
   let buffer = '';
   let hasReadChunk = false;
+  let eventName: string | null = null;
 
   try {
     while (true) {
@@ -161,6 +175,14 @@ export async function* parseSSE(
 
       for (const rawLine of lines) {
         const line = rawLine.replace(/\r$/, '');
+        if (line.startsWith('event:')) {
+          eventName = line.slice('event:'.length).trim();
+          continue;
+        }
+        if (line.length === 0) {
+          eventName = null;
+          continue;
+        }
         if (!line.startsWith('data:')) {
           continue;
         }
@@ -171,7 +193,7 @@ export async function* parseSSE(
         if (data.length === 0) {
           continue;
         }
-        yield data;
+        yield { event: eventName, data };
       }
     }
   } finally {
