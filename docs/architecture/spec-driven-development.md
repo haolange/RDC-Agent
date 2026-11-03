@@ -30,7 +30,7 @@ Open `.rdc`, connect remote, preview, and close runtime use fixed native RDC ope
 
 ## Catalog Contract
 
-The tool catalog is loaded from the same configured CLI using `tools list --full`; catalog metadata is exposed through `tool:getCatalog` and `tool:getRuntimeSummary`.
+The tool catalog is loaded from the same configured CLI using `tools list --full`; the renderer only receives installation verification through `tool:verifyInstallation`; catalog contents are frozen per turn in main and never projected to the UI.
 
 Workbench right rail must **not** render a per-tool `rd.*` inventory, CLI catalog summary, tool count, or namespace counts. The session Capture area consumes the owner-session opened-capture and runtime context snapshot for `.rdc` selection, open/preview state, Replay Device, compact diagnostics, and Copy. contextId/replaySessionId/capture ids, lease/runtime owner, remoteId, and remote status remain owner-scoped agent data. Renderer code cannot invoke arbitrary tools; execution stays on Settings shell actions / shell -> `ShellInvocationService` -> external CLI.
 
@@ -38,7 +38,7 @@ Workbench right rail must **not** render a per-tool `rd.*` inventory, CLI catalo
 
 Debugger and conversation state are projected through Agentic Trace. The renderer-facing APIs are under `trace:*`, and right-panel records use `traceLaneId`.
 
-Trace run export and branch switching belong to `trace:exportRun` and `trace:switchBranch`.
+The only trace read channel is `trace:getProjection`; conversation branch switching belongs to `conversation:switchBranch`.
 
 ## Settings Contract
 

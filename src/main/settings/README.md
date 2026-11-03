@@ -47,7 +47,7 @@ Provider definition 的公开维度是：
 - account provider 的 OAuth bundle 只通过 `ProviderAccountAuthService` 与 `SecretStorageService` 在主进程内流转。
 - preflight 通过 `ProviderRuntimeCredentialService` 创建 opaque lease；typed connection secret、认证 header、Vertex/AWS 临时凭据只存在于该 lease。
 - Adapter 没有 lease handle 必须 fail-closed，运行中不得回读 Settings。401 刷新只替换同一 lease 的 credential material，不改变冻结 route。
-- Settings schema v4 不解析或迁移旧 credential 字段；Effective Catalog v5 直接失效旧缓存。
+- Settings schema v8 不解析或迁移旧 credential 字段；Effective Catalog v8 直接失效旧版本缓存。
 
 ## Plan / Route Boundary
 

@@ -2,14 +2,12 @@ import { readdirSync, readFileSync } from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { parseIpcArgs } from './IpcPayloadGuard';
-import { AgentConfigureArgsSchema, AgentGetStateArgsSchema, AgentSendMessageArgsSchema } from './agentSchemas';
 import { AppCopyTextArgsSchema, AppGetAvatarDataUrlArgsSchema, AppOpenPathArgsSchema } from './shellSchemas';
 import {
   LlmModelCapabilityProbeArgsSchema,
   LlmProviderDraftArgsSchema,
   LlmProviderIdArgsSchema,
 } from './settingsLlmSchemas';
-import { EvidenceGetEventsArgsSchema } from './toolEvidenceSchemas';
 import { InvestigationReadArgsSchema } from './investigationSchemas';
 import { ConversationAnswerPlanReviewArgsSchema } from './conversationSchemas';
 
@@ -40,19 +38,6 @@ describe('IPC schema coverage', () => {
       // Channels must go through ipcMain.handle + parseIpcArgs (not unvalidated listeners).
       expect(source.includes('ipcMain.handle'), `${file} should register via ipcMain.handle`).toBe(true);
     }
-  });
-
-  it('accepts and rejects agent channel args', () => {
-    expect(parseIpcArgs(AgentSendMessageArgsSchema, ['ask', 'hello'])).toEqual(['ask', 'hello']);
-    expect(() => parseIpcArgs(AgentSendMessageArgsSchema, ['', 'hello'])).toThrow();
-    expect(parseIpcArgs(AgentGetStateArgsSchema, ['ask'])).toEqual(['ask']);
-    expect(parseIpcArgs(AgentGetStateArgsSchema, ['ask', 'session-1'])).toEqual(['ask', 'session-1']);
-    expect(parseIpcArgs(AgentConfigureArgsSchema, ['ask', { temperature: 0.2 }])).toEqual([
-      'ask',
-      { temperature: 0.2 },
-    ]);
-    const tooManyKeys = Object.fromEntries(Array.from({ length: 65 }, (_, i) => [`k${i}`, i]));
-    expect(() => parseIpcArgs(AgentConfigureArgsSchema, ['ask', tooManyKeys])).toThrow();
   });
 
   it('accepts shell/app channel args', () => {
@@ -111,10 +96,5 @@ describe('IPC schema coverage', () => {
         expectedHash: hash,
       }])).toThrow();
     }
-  });
-
-  it('accepts optional evidence filter', () => {
-    expect(parseIpcArgs(EvidenceGetEventsArgsSchema, [])).toEqual([]);
-    expect(parseIpcArgs(EvidenceGetEventsArgsSchema, ['tool.completed'])[0]).toBe('tool.completed');
   });
 });

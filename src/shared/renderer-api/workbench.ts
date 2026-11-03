@@ -93,10 +93,6 @@ export function createContextApi(transport: RendererApiTransport): ContextApi {
 
 export function createTraceApi(transport: RendererApiTransport): ElectronAPI['trace'] {
   return {
-    getRun: (runId) => transport.invoke(INVOKE.trace.getRun, runId),
-    getEvents: (runId, afterSeq) => transport.invoke(INVOKE.trace.getEvents, runId, afterSeq),
     getProjection: (sessionId) => transport.invoke(INVOKE.trace.getProjection, sessionId),
-    exportRun: (runId) => transport.invoke(INVOKE.trace.exportRun, runId),
-    switchBranch: (sessionId, branchId) => transport.invoke(INVOKE.trace.switchBranch, sessionId, branchId),
   };
 }

@@ -90,7 +90,7 @@ Appearance 详细规则见 docs/ui/appearance-checklist.md；禁止恢复 transl
 
 prepareTurn 冻结 PromptPlan / EffectiveRuntimePlan 和本机 RDC binding。预载 skill allowed-tools 取交集，只收窄；skill_read 只读方法，不重算在途权限。普通任务留 General；Mission plan-only → `plan_artifact` 计划门（同意即冻结）→ 用户点声明按钮切到 General → General 就地终答 → 用户自行切回 Mission 评估。RDC 共享 shell 手册与三本专业工具手册只提供知识，必须由会话 execution offer 上声明的 requiredSkillIds 真实预载，不能授权操作或替代冻结 catalog。Full access 不绕过 Mission/lease/hard deny。`handoffs` 只驱动建议行和计划门按钮；人点后主进程 `applyDeclaredHandoff` 写/确认 offer 并 persist `session.agentId`。不存在 `agent_handoff` 工具、durable `prepared → committed → consumed` 状态机或自动回 Mission。执行额度权威在 Harness：循环上限、Task/Capsule、policy 由主进程冻结、执行并报告实际消费；计划只引用冻结限制与用户明确限制，阶段分配是可调估算，不是额外硬门或补批前置。
 
-shell.command 与 shell.rdc-agent 互斥；结构化 RDC 仅 owning General，经审批与冻结原生 CLI。实验关闭必须验证主进程签名回执 baseline/intervention/variant/rollback/restored。旧记录可读；权限拒绝、未执行或 capture hash 不变不是回滚证据。旧 verified 不代表当前版本。
+shell.command 与 shell.rdc 互斥；结构化 RDC 仅 owning General，经审批与冻结原生 CLI。实验关闭必须验证主进程签名回执 baseline/intervention/variant/rollback/restored。旧记录可读；权限拒绝、未执行或 capture hash 不变不是回滚证据。旧 verified 不代表当前版本。
 
 ## 验证范围与 Browser QA
 

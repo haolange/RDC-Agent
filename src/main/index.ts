@@ -619,7 +619,7 @@ async function initializeServices(): Promise<void> {
     });
     
     await initializeIpcState();
-    console.log('[Main] DebuggerRuntime initialized');
+    console.log('[Main] IPC state initialized');
 
     await replayDeviceService.initialize();
     console.log('[Main] ReplayDeviceService initialized');

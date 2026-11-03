@@ -23,7 +23,7 @@ import { CaptureOpenProjectInputArgsSchema } from './captureDeviceSchemas';
 import { CommandExecuteArgsSchema } from './commandSchemas';
 import { KnowledgeCardArgsSchema, KnowledgeCandidateCreateArgsSchema } from './knowledgeSchemas';
 import { RdcRuntimeTrustMcpArgsSchema } from './rdcRuntimeSchemas';
-import { TraceGetEventsArgsSchema } from './traceSchemas';
+import { TraceGetProjectionArgsSchema } from './traceSchemas';
 import { WebResolveFaviconArgsSchema } from './webSchemas';
 
 describe('parseIpcArgs', () => {
@@ -187,9 +187,9 @@ describe('parseIpcArgs', () => {
     })).toThrow(IpcValidationError);
   });
 
-  it('rejects trace getEvents with negative afterSeq', () => {
-    expect(() => parseIpcArgs(TraceGetEventsArgsSchema, ['run_1', -1], {
-      label: 'trace:getEvents',
+  it('rejects trace getProjection with a malformed session id', () => {
+    expect(() => parseIpcArgs(TraceGetProjectionArgsSchema, ['../escape'], {
+      label: 'trace:getProjection',
     })).toThrow(IpcValidationError);
   });
 

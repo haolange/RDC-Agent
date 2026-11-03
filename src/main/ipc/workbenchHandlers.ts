@@ -7,7 +7,6 @@ import type { ActionEvent } from '@shared/types/evidence';
 import type { SessionRecord } from '@shared/types/session';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
-import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
 import { runExecutionService } from '../workflow/debugger/RunExecutionService';
 import { settingsService } from '../settings/SettingsService';
 import { storageAdapter } from '../sessions/StorageAdapter';
@@ -16,7 +15,6 @@ import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rdcCliInvokerService } from '../tools/RdcCliInvokerService';
 import { applyProductIcon } from '../window/productIcon';
 import { sessionResumeService } from '../sessions/SessionResumeService';
-import { registerAgentHandlers } from './agentHandlers';
 import { registerMemoryHandlers } from './memoryHandlers';
 import { registerInvestigationHandlers } from './investigationHandlers';
 import { registerKnowledgeHandlers } from './knowledgeHandlers';
@@ -65,8 +63,6 @@ export async function initializeIpcState(): Promise<void> {
     state.currentProjectId = null;
     state.currentRunId = null;
   }
-
-  await debuggerRuntime.recoverInterruptedRuns();
 
   // 检测可恢复的会话
   try {
@@ -273,7 +269,6 @@ export function registerIPCHandlers(): void {
   registerRuntimeTerminalHandlers();
   registerRuntimePermissionHandlers(context);
   registerCaptureDeviceHandlers(context);
-  registerAgentHandlers(context);
   registerMemoryHandlers(context);
   registerKnowledgeHandlers(context);
   registerInvestigationHandlers(context);

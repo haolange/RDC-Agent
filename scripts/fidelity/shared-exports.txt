@@ -4,19 +4,16 @@ AGENT_DISPLAY_NAMES
 AGENT_ICON_PRESETS
 AGENT_MODE_MAP
 AGENT_MODES
-AGENT_NOTE_FILES
 AGENT_ROLES
 AGENT_SEED_ACCENTS
 AGENT_WORKBENCH_COMMAND_CATALOG
 AGENT_WORKBENCH_TOOL_CATALOG
-AgentApi
 AgentApprovalEventPayload
 AgentAssistantCompletedPayload
 AgentAssistantDeltaPayload
 AgentAssistantThinkingPayload
 AgentConfig
 AgentContextCompactedPayload
-AgentConversation
 AgentDefinitionCommitQuery
 AgentDefinitionCommitSnapshot
 agentDefinitionLaneKey
@@ -334,7 +331,6 @@ ConversationWorkBlockKind
 ConversationWorkBlockStatus
 ConversationWorkTrace
 countJsonl
-createAgentApi
 createAppMetaApi
 createAppShellApi
 createCaptureApi
@@ -379,7 +375,6 @@ DEFAULT_ASK_USER_PROMPT
 DEFAULT_CONTEXT_COMPACTION_PERCENT
 DEFAULT_MODEL_ROUTING
 DEFAULT_THEME_PRESET_ID
-DEFAULT_TOKEN_TTL_SECONDS
 DELEGATION_CAPSULE_ERROR
 DELEGATION_CAPSULE_JSON_SCHEMA
 DELEGATION_CAPSULE_MAX_CHARS
@@ -518,6 +513,8 @@ getThemePreset
 HAL_REASONING_LEVELS
 HalReasoningLevel
 halReasoningLevelFromCanonical
+HandoffLabelTranslations
+handoffLabelTranslationsSchema
 hasBridgeChannelCapability
 hasImplementedStructuredToolAdapter
 hasPlanReviewInteraction
@@ -560,7 +557,6 @@ InvestigationRecord
 InvestigationRecordType
 InvestigationReport
 InvestigationReportContract
-INVESTIGATOR_AGENTS
 isAgentIconPreset
 isAgentToolExecutableModel
 isAlphanumeric
@@ -811,6 +807,7 @@ PlanReadRequest
 PlanReadResult
 PlanReviewContext
 PlanReviewDecision
+PlanReviewHandoffIdentity
 PlanReviewHandoffOption
 PlanReviewHandoffSuggestion
 PlanReviewProjection
@@ -971,7 +968,6 @@ ReplayDeviceTransport
 Report
 REPORT_CANDIDATE_STATUSES
 ReportCandidateStatus
-REPORTER_AGENTS
 RequestBranch
 RequestBranchGroup
 RequestBranchStatus
@@ -997,6 +993,7 @@ ResolvedShellSnapshot
 ResolvedTheme
 resolveEffectiveCompactionPercent
 resolveExecutionBinding
+resolveHandoffLabel
 resolveInvestigationKind
 resolveModelControls
 resolveOnSelection
@@ -1104,7 +1101,6 @@ SkillMetadata
 SkillParameter
 SkillSelectionOption
 SkillSelectionProjection
-SpecialistToken
 splitCanonicalAgentModelId
 StatePlan
 StreamingPlan
@@ -1211,7 +1207,6 @@ UserRequest
 UserRequestRevision
 VERIFICATION_LEVELS
 VerificationLevel
-VERIFIER_AGENTS
 VisibleReasoningMode
 VisibleReasoningPacket
 WindowControlsApi

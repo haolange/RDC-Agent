@@ -46,7 +46,17 @@ const forbiddenTracked = tracked.filter((file) => existsSync(path.join(repoRoot,
   || /\.(?:log|tmp|temp|tsbuildinfo)$/.test(file)));
 if (forbiddenTracked.length > 0) fail(`Generated/runtime files are tracked:\n${forbiddenTracked.join('\n')}`);
 
-const forbiddenPaths = ['cli', 'e2e', 'docs/handover'];
+const allowedTrackedRootDirectories = new Set(['.github', '.qoder', 'designs', 'docs', 'patches', 'resources', 'scripts', 'src']);
+const allowedTrackedRootDotFiles = new Set(['.cursorignore', '.eslintrc.cjs', '.gitattributes', '.gitignore']);
+const unexpectedTrackedRoots = [...new Set(tracked.map((file) => file.split('/')[0]))].filter((entry) => {
+  if (tracked.includes(entry)) return entry.startsWith('.') && !allowedTrackedRootDotFiles.has(entry);
+  return !allowedTrackedRootDirectories.has(entry);
+});
+if (unexpectedTrackedRoots.length > 0) {
+  fail(`Unexpected tracked top-level entries (update the hygiene allowlist only for deliberate additions):\n${unexpectedTrackedRoots.join('\n')}`);
+}
+
+const forbiddenPaths = ['cli', 'e2e', 'test', 'docs/handover'];
 for (const relativePath of forbiddenPaths) {
   const absolute = path.join(repoRoot, relativePath);
   const trackedHits = tracked.filter((file) => file === relativePath || file.startsWith(`${relativePath}/`));

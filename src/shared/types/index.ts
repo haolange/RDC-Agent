@@ -1,6 +1,5 @@
 export type { ElectronAPI } from './electron';
 export type {
-  AgentApi,
   AppMetaApi,
   AppShellApi,
   CaptureApi,

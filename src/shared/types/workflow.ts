@@ -21,10 +21,6 @@ export interface WorkflowState {
   caseId: string;
   runId: string;
   sessionId: string;
-  entryMode: 'cli' | 'mcp';
-  backend: 'local' | 'remote';
-  orchestrationMode: 'multi_agent';
-  coordinationMode: 'turn_handoff';
   blockers: Blocker[];
   reasoningSummaries?: ReasoningSummary[];
   recoveryState?: RunRecoveryState | null;

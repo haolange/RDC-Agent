@@ -5,7 +5,6 @@ import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
-import { EvidenceGetEventsArgsSchema } from './validation/toolEvidenceSchemas';
 import { RdcInstallationArgsSchema } from './validation/rdcInstallationSchemas';
 import { detectRdcInstallations, resolveRdcInstallation } from '../tools/RdcInstallationService';
 import { settingsService } from '../settings/SettingsService';
@@ -28,16 +27,6 @@ export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void
     if (!summary.cli.available) throw new Error(summary.cli.unavailableReason);
     parseRdcNativeResult(await rdcCliInvokerService.executeCLI('doctor', ['--json'], { settings }), undefined, 'rdc_tool.doctor');
     return { settings, summary };
-  });
-
-  ipcMain.handle('tool:getCatalog', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'tool:getCatalog', maxBytes: 1024 });
-    return rdcCliInvokerService.loadCatalog();
-  });
-
-  ipcMain.handle('tool:getRuntimeSummary', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'tool:getRuntimeSummary', maxBytes: 1024 });
-    return rdcCliInvokerService.getRuntimeSummary(true);
   });
 
   ipcMain.handle('mcp:getStatusSummary', async (_event, ...rawArgs: unknown[]) => {
@@ -64,21 +53,5 @@ export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void
       events,
       isValid: true,
     };
-  });
-
-  ipcMain.handle('evidence:getEvents', async (_event, ...rawArgs: unknown[]) => {
-    const [eventType] = parseIpcArgs(EvidenceGetEventsArgsSchema, rawArgs, {
-      label: 'evidence:getEvents',
-      maxBytes: 4 * 1024,
-      padTo: 1,
-    });
-    const sessionId = await storageAdapter.getCurrentSessionId();
-    if (!sessionId) return [];
-
-    const events = await storageAdapter.readActionChain(sessionId);
-    if (eventType) {
-      return events.filter((event) => event.event_type === eventType);
-    }
-    return events;
   });
 }

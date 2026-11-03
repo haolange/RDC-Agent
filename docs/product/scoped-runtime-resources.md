@@ -31,7 +31,7 @@ Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导
 
 首次上手说明不会复制官方资源或创建指令文件。已阅读标记属于 Electron 应用状态；用户/项目资源仅承载各自自定义内容。官方 Agent 文件直接位于 `resources/agent-runtime/agents/*.agent.md`。
 
-四个 builtin：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件在 `resources/agent-runtime/agents`，再与 `~/.rdc-agent/agents` 和 `<project-root>/.rdc-agent/agents` 合成 effective snapshot。user/project 只能覆盖这四个 id，或新增无关自定义 id。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`；**无运行通道**（U01 落地 v2 迁移：shadow purge，真正改过正文/工具的 builtin-id 副本 `retained-override`）。迁移 marker 为 v2（U01 已落地）。Mission planner 工具面见裁决 J（plan-only + `rdc_probe`）。
+四个 builtin：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件在 `resources/agent-runtime/agents`，再与 `~/.rdc-agent/agents` 和 `<project-root>/.rdc-agent/agents` 合成 effective snapshot。user/project 只能覆盖这四个 id，或新增无关自定义 id。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`；**无运行通道**。运行时没有 seed 迁移器或 marker，资源读取不改写用户文件。Mission planner 工具面见裁决 J（plan-only + `rdc_probe`）。
 
 自定义 Profile 新建时工具权限为空；运行时按 `AGENT_TOOLS_EMPTY` 拒绝零工具配置。Settings 的配置状态必须同时检查模型路由与至少一项工具授权，零工具时提示用户到「工具权限」选择能力，不显示「可用」。
 
@@ -97,6 +97,6 @@ Agent `max-turns` 属于 profile 资源，按 builtin < user < project 整资源
 
 Mission 必须先经 `plan_artifact` 计划门：用户点声明的 continue handoff 才冻结 Plan 并放行同 hash / 同 target 的 execute。RenderDoc Mission 的 execute 合同固定绑定共享执行方法、对应领域方法、`rdc-tool-shell` 和一本专业工具手册：Debugger 使用 `debugger-rdc-tools`，Analyzer 使用 `analyzer-rdc-tools`，Optimizer 使用 `optimizer-rdc-tools`。General 可发现四本手册；每条 Mission 可按需只读共享手册和对应的专业手册及引用，提前核对参数、输出及调用成本，其它专业手册保持不可见。知识可见性沿用 builtin/user/project 覆盖与来源解析，不自动预载、不授予执行或工作区编辑权限。Mission 的 plan-only、General 的 requiredSkillIds 真正预载与冻结工具交集不变；手册成员表是知识覆盖，不是权限表。未知操作、身份覆盖、路径越界或未满足前置条件仍在主进程执行前拒绝。
 
-专业参数参考由 `scripts/generate-rdc-tool-guides.mjs` 从相邻 RDC-Tool 1.0.0 代码生成 catalog 读取，记录 catalog fingerprint。开发校验使用 `pnpm run check:rdc-tool-guides -- --catalog <RDC-Tool>/spec/tool_catalog.json`；生成内容不作为运行时 catalog，产品执行仍读取 prepareTurn 冻结的同一配置 CLI。
+专业参数参考由 `scripts/generate-rdc-tool-guides.mjs` 从相邻 RDC-Tool 仓库的 code-owned catalog 读取，记录 catalog fingerprint。开发校验使用 `pnpm run check:rdc-tool-guides -- --catalog <RDC-Tool>/spec/tool_catalog.json`；生成内容不作为运行时 catalog，产品执行仍读取 prepareTurn 冻结的同一配置 CLI。
 
 Plan / handoff v2 / 两轮预算 / 领域完成校验的权威约定见 [runtime-kernel.md](../contracts/runtime-kernel.md#通用-harness-与结构化交接2026-09-09)。

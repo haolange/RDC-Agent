@@ -50,7 +50,7 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
       className="settings-agent-icon-popover"
       trigger={(
         <Button variant="secondary" className="settings-agent-icon-trigger" aria-haspopup="menu">
-          <ModeGlyph mode="ask" icon={value} size={16} strokeWidth={1.9} />
+          <ModeGlyph mode="general" icon={value} size={16} strokeWidth={1.9} />
           <span>{t('settings.changeAgentIcon')}</span>
           <Icon name="chevron-down" size={14} />
         </Button>
@@ -74,7 +74,7 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
             title={preset.label}
             onClick={() => chooseIcon(preset.id)}
           >
-            <ModeGlyph mode="ask" icon={preset.id} size={18} strokeWidth={1.9} />
+            <ModeGlyph mode="general" icon={preset.id} size={18} strokeWidth={1.9} />
             {value === preset.id ? (
               <span className="settings-agent-icon-option-check" aria-hidden="true">
                 <Icon name="check" size={12} />

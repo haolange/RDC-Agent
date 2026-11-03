@@ -1,5 +1,4 @@
 import type {
-  AgentApi,
   AppMetaApi,
   AppShellApi,
   CommandApi,
@@ -90,17 +89,6 @@ export function createWorkflowApi(transport: RendererApiTransport): WorkflowApi 
     resume: (sessionId) => transport.invoke(INVOKE.workflow.resume, sessionId),
     stop: (runId) => transport.invoke(INVOKE.workflow.stop, runId),
     getRunUsage: (request) => transport.invoke(INVOKE.workflow.getRunUsage, request),
-    listRuns: () => transport.invoke(INVOKE.workflow.listRuns),
-    listActiveRuns: () => transport.invoke(INVOKE.workflow.listActiveRuns),
-  };
-}
-
-export function createAgentApi(transport: RendererApiTransport): AgentApi {
-  return {
-    sendMessage: (agentId, content) => transport.invoke(INVOKE.agent.sendMessage, agentId, content),
-    getState: (agentId, sessionId) => transport.invoke(INVOKE.agent.getState, agentId, sessionId),
-    getAllStates: () => transport.invoke(INVOKE.agent.getAllStates),
-    configure: (agentId, config) => transport.invoke(INVOKE.agent.configure, agentId, config),
   };
 }
 
@@ -151,8 +139,6 @@ export function createCommandApi(transport: RendererApiTransport): CommandApi {
 
 export function createToolApi(transport: RendererApiTransport): ToolApi {
   return {
-    getCatalog: () => transport.invoke(INVOKE.tools.getCatalog),
-    getRuntimeSummary: () => transport.invoke(INVOKE.tools.getRuntimeSummary),
     detectInstallations: () => transport.invoke(INVOKE.tools.detectInstallations),
     resolveInstallation: (request) => transport.invoke(INVOKE.tools.resolveInstallation, request),
     verifyInstallation: (request) => transport.invoke(INVOKE.tools.verifyInstallation, request),
@@ -166,6 +152,5 @@ export function createMcpApi(transport: RendererApiTransport): McpApi {
 export function createEvidenceApi(transport: RendererApiTransport): EvidenceApi {
   return {
     getChain: () => transport.invoke(INVOKE.tools.getEvidenceChain),
-    getEvents: (eventType) => transport.invoke(INVOKE.tools.getEvidenceEvents, eventType),
   };
 }

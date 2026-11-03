@@ -211,7 +211,7 @@ Settings 只读 `schemaVersion` **8**，经校验的 `appearance.chromeThemes` �
 
 - 不新增平台级 InvestigationGraph、第二 TaskStore 或第二 Agent Runtime。
 - `TaskRecord.metadata`、`AgentProfile.metadata`、`ConversationMessage` 禁止领域字段；垂直记录只能引用 task id。
-- 不把 RDC 操作集合注册成独立模型工具，不把 RDC 做成 MCP。RDC 仍是外部 CLI，无内置副本。**General** 通过 Settings 配置的 CLI 与结构化 `shell.rdc-agent` 执行需要 lease 的 Live RDC 操作。**Mission planner（debugger/analyzer/optimizer）禁止 `shell` 与 `code_interpreter`**；只通过受控只读 `rdc_probe` + `rdc_context`（lease 状态）访问 RDC。
+- 不把 RDC 操作集合注册成独立模型工具，不把 RDC 做成 MCP。RDC 仍是外部 CLI，无内置副本。**General** 通过 Settings 配置的 CLI 与结构化 `shell.rdc` 执行需要 lease 的 Live RDC 操作。**Mission planner（debugger/analyzer/optimizer）禁止 `shell` 与 `code_interpreter`**；只通过受控只读 `rdc_probe` + `rdc_context`（lease 状态）访问 RDC。
 - Knowledge 持久写入仅 human review；`FullAccess` 不可绕过；无自动 Memory / Knowledge / Candidate / Promote。
 - 新结构替代旧结构时直接收敛；默认不保留 legacy / deprecated shim。
 - **禁止恢复** Embedding capability / Semantic lane / `settings.llm.embedding` / `EmbeddingCatalog` / `EmbeddingExecutionService`。Discovery 对 embedding/embeddings modality 继续 fail-closed 剔除。
@@ -239,7 +239,7 @@ Settings 只读 `schemaVersion` **8**，经校验的 `appearance.chromeThemes` �
 | --- | --- |
 | **当前态** | Embedding capability 与 Semantic lane **已删除**。Knowledge 走 markdown-first 六 lane（见裁决 G）。当前 Settings schema 8 拒绝已移除的 embedding 选择。Discovery 对 embedding / embeddings 等非 agent modality **继续** fail-closed 剔除。Embedding 模型不进入 Agent / Composer / subagent picker。真实 OpenAI embed **不再补跑**（U02 已删除 Embedding）。 |
 | **目标态** | 保持删除。禁止恢复 Embedding capability / Semantic lane / `settings.llm.embedding` / `EmbeddingCatalog` / `EmbeddingExecutionService`。Discovery 对 embedding/embeddings modality 继续 fail-closed 剔除。 |
-| **迁移门禁（U02 落地）** | `check:knowledge-system` 为六 lane + `forbidden.embedding-runtime` 零命中。Settings schema 7 一次性删除 embedding 选择；`>7` fail-closed。不得把「未跑真实 OpenAI embed」写成仍待验收的产品缺口。 |
+| **迁移门禁（U02 落地）** | `check:knowledge-system` 为六 lane + `forbidden.embedding-runtime` 零命中。Settings 当前 schema 8 拒绝已删除的 embedding 字段；非 8 的版本 fail-closed 并保留原件。不得把「未跑真实 OpenAI embed」写成仍待验收的产品缺口。 |
 
 ### D. Declared Continue and Execution Offer
 
@@ -261,8 +261,8 @@ Settings 只读 `schemaVersion` **8**，经校验的 `appearance.chromeThemes` �
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | `AgentTool.spec.isConcurrencySafe` 缺省 `false`。`ConcurrentToolScheduler` 只并发同轮连续安全组；unsafe 独占。`shell` / write / task mutation / RDC / MCP / ask / `output_register` 与 `domainExtensions.rdc-agent.requiresLease=true` 的 subagent 串行。offline subagent（未请求 `domainExtensions.rdc-agent`）可进并发组。dispatch 前 `reserveDispatchBudget` 原子扣减；失败整组不开。结果按 `callIndex` 回填；部分失败不连坐已发出调用；abort `allSettled` join。**delegated lease 已落地**：`grantDelegatedLease` / `revokeDelegatedLease`；`domainExtensions.rdc-agent.requiresLease=true` child 在 turn 前取得 parent 上下文副本（`delegatedFrom`），同一 parent 同时只允许一条 live delegated lease，无 parent lease 则 fail-closed；child 完成 / 取消 / 抛错在 `finally` 立即撤销，parent lease 不变。未请求 `domainExtensions.rdc-agent` child 在 allowlist 编译期剔除 `rdc_context` / `rdc_probe`（`shell` 可保留，但不继承 parent lease）。产品级 Browser QA 全矩阵见 U05 / ledger。 |
-| **目标态** | 并发缺省不安全：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。只并发**连续**安全组；unsafe 独占。`shell` / write / task mutation / RDC（含 `rdc_probe`） / MCP / ask / `output_register` 串行。`callIndex` 保持稳定顺序。dispatch 前原子扣减预算。abort 必须 `allSettled` join。部分失败不连坐同组其余已发出调用的结果记录，但不得继续开新组。offline subagent 不请求 `domainExtensions.rdc-agent`。`domainExtensions.rdc-agent.requiresLease=true` 的 child 必须通过显式、受限、生命周期绑定的 delegated lease 取得 parent RDC context 并串行；child 完成/取消立即撤销。未请求 `domainExtensions.rdc-agent` 的 child **在 allowlist 层**就不能拿到 `rdc_context` / `rdc_probe` / `shell` 中的 RDC 路径（不是运行时再报错）。禁止并发 RDC 双 owner。 |
+| **当前态** | `AgentTool.spec.isConcurrencySafe` 缺省 `false`。`ConcurrentToolScheduler` 只并发同轮连续安全组；unsafe 独占。`shell` / write / task mutation / RDC / MCP / ask / `output_register` 与 `domainExtensions.rdc.requiresLease=true` 的 subagent 串行。offline subagent（未请求 `domainExtensions.rdc`）可进并发组。dispatch 前 `reserveDispatchBudget` 原子扣减；失败整组不开。结果按 `callIndex` 回填；部分失败不连坐已发出调用；abort `allSettled` join。**delegated lease 已落地**：`grantDelegatedLease` / `revokeDelegatedLease`；`domainExtensions.rdc.requiresLease=true` child 在 turn 前取得 parent 上下文副本（`delegatedFrom`），同一 parent 同时只允许一条 live delegated lease，无 parent lease 则 fail-closed；child 完成 / 取消 / 抛错在 `finally` 立即撤销，parent lease 不变。未请求 `domainExtensions.rdc` child 在 allowlist 编译期剔除 `rdc_context` / `rdc_probe`（`shell` 可保留，但不继承 parent lease）。产品级 Browser QA 全矩阵见 U05 / ledger。 |
+| **目标态** | 并发缺省不安全：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。只并发**连续**安全组；unsafe 独占。`shell` / write / task mutation / RDC（含 `rdc_probe`） / MCP / ask / `output_register` 串行。`callIndex` 保持稳定顺序。dispatch 前原子扣减预算。abort 必须 `allSettled` join。部分失败不连坐同组其余已发出调用的结果记录，但不得继续开新组。offline subagent 不请求 `domainExtensions.rdc`。`domainExtensions.rdc.requiresLease=true` 的 child 必须通过显式、受限、生命周期绑定的 delegated lease 取得 parent RDC context 并串行；child 完成/取消立即撤销。未请求 `domainExtensions.rdc` 的 child **在 allowlist 层**就不能拿到 `rdc_context` / `rdc_probe` / `shell` 中的 RDC 路径（不是运行时再报错）。禁止并发 RDC 双 owner。 |
 | **迁移门禁** | 实现前不得把并发执行写成已完成能力。RDC lease / shader replace / replay 不得进入并发组。 |
 
 ### G. Knowledge
@@ -303,7 +303,7 @@ T19 逐项裁决（删除 / 保留理由 / 调用方）：
 | `modes.ts` capability table | **已删除** | 只被测试使用且把 analyzer/optimizer 标未实现；保留 `assignDefaultCaptureRoles`。 | `modes.test.ts`；`pnpm run check:legacy-residue` |
 | dead workspace write / intake / gate types | **已删除** | 死类型，不是现行合同。`AgentManifestWriteScope` 是 Settings 作用域，不是本项。 | `pnpm run check:legacy-residue`；`pnpm run check:shared-exports` |
 | `AgentTimelineEntry.type` 收窄 | **已收窄** | 只保留实际发出的 `user` / `agent` / `system` / `tool_call`。 | `src/shared/types/agent.timeline.test.ts`；`pnpm run check:legacy-residue` |
-| `coordinationMode` | **已改为 `turn_handoff`** | shared / main / renderer / 测试同步；中性命名，不是 stage 双轨。 | `src/shared/types/workflow.test.ts`；`pnpm run check:legacy-residue` |
+| `coordinationMode` 等 WorkflowState 常量字段 | **已删除** | 只写不读的常量（entryMode / backend / orchestrationMode / coordinationMode）。 | `pnpm run typecheck` |
 | `check-investigation-system` phase 合同 | **已改写** | 现行 understand/work/summarize phase 合同；禁止再扫旧固定 Plan 相位表。 | `pnpm run check:investigation-system` |
 | unread RDC runtime leak marker | **已删除写入** | 只写不读。改 runtimeLog 诊断 + 现有 `ProcessSupervisor unconfirmed_orphan`；`~/.rdc-agent` 不再有无读者文件。 | `RdcSessionService.test.ts`；`pnpm run check:legacy-residue` |
 | `check:legacy-residue` 零命中 | **已落地** | 每项一条 forbidden pattern/path/导出/动态 import/mock 扫描；合法词用精确上下文白名单。已接入 `check:gates`。`check:acceptance-ledger` 已由 U04 接入 CI / `check:gates`。 | `pnpm run check:legacy-residue`；`pnpm run check:acceptance-ledger` |
@@ -321,7 +321,7 @@ T19 逐项裁决（删除 / 保留理由 / 调用方）：
 | | 裁决 |
 | --- | --- |
 | **当前态** | 三 Mission profile 已为严格 plan-only：token 展开剔除 `shell` / `code_interpreter` / `output_register`，四层 enforcement（profile 解析、冻结 EffectiveRuntimePlan、AgentPermissionPolicy hard deny、tool activation）已落地，Full access 不能绕过。`rdc_probe` 已实现（Settings `tooling.rdcCli` 同安装 CLI 的只读 closed allowlist；lease 仅当前 session；raw `.rdc` bytes 不进模型）。T18 知识导入 已证见下文已证组。产品级 Browser QA 全矩阵见 U05；U06 仅保留历史运行事实；Optimizer 真实实验结论已撤回，见 ledger 更正。 |
-| **目标态** | Mission profiles（`debugger` / `analyzer` / `optimizer`）runtime allowlist **仅允许**下列工具。**General** 通过 Settings 配置的 CLI 与结构化 `shell.rdc-agent` 执行需要 lease 的 Live RDC 操作。 |
+| **目标态** | Mission profiles（`debugger` / `analyzer` / `optimizer`）runtime allowlist **仅允许**下列工具。**General** 通过 Settings 配置的 CLI 与结构化 `shell.rdc` 执行需要 lease 的 Live RDC 操作。 |
 | **迁移门禁** | T00 定稿契约；T03 落地四层 enforcement；T06 落地 delegated lease 与 `rdc_probe` 执行。不得只靠 prompt 文案。Full access 不能绕过。 |
 
 Mission profiles runtime allowlist **仅允许**：
@@ -419,7 +419,7 @@ General 为默认通用工作身份。核心正文只负责可信上下文、授
 
 Plan 经 session artifact plans 类别版本化：同意前覆盖活文件，同意后冻结副本，历史文件不迁移或删除。批准写入 offer（source / target / plan.uri+hash / 声明 requiredSkillIds）。prepareTurn 仅当本回合 `agentId === targetAgentId`、批准 handoff target 与本 Agent 相同、批准计划与 offer 的 URI/hash 一致时，预载声明 Skill，并向 PromptPlan 的 volatile runtime fact 写入已批准的交接身份和冻结计划引用。该事实用于区分历史规划消息与当前执行阶段，不授权工具或设备；权限仍走冻结 catalog 与交集。通用 turn 仅调用 TurnCompletionValidator。Big Loop 由 General 终答写缺口、用户切回 Mission、新计划、再批准、再点 Execute 组成；runtime 不按身份 / depth / 正文开下一轮。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse、不迁移。
 
-普通 Capsule 省略领域扩展且没有 RDC Lease prompt 段；仅 RDC 模块接受 domainExtensions.rdc-agent.requiresLease=true 并注入租约上下文。缺省无 RDC，授权子代理串行且 finally 撤销；旧顶层字段拒绝，不保留双轨。
+普通 Capsule 省略领域扩展且没有 RDC Lease prompt 段；仅 RDC 模块接受 domainExtensions.rdc.requiresLease=true 并注入租约上下文。缺省无 RDC，授权子代理串行且 finally 撤销；旧顶层字段拒绝，不保留双轨。
 
 
 ### Task 预算与取消所有权（2026-09-10）

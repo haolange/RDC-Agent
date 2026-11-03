@@ -61,10 +61,8 @@ export {
   AGENT_DISPLAY_NAMES,
   AGENT_MODE_MAP,
   AGENT_MODES,
-  AGENT_NOTE_FILES,
   AGENT_ROLES,
   DEFAULT_MODEL_ROUTING,
-  DEFAULT_TOKEN_TTL_SECONDS,
   getAgentModeConfig,
 } from './agents';
 export { BLOCKER_CODES, getBlockersByCategory, getBlockersBySeverity } from './blockers';

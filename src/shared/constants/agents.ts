@@ -1,4 +1,4 @@
-import type { AgentId, AgentRole } from '../types/agent';
+import type { AgentId } from '../types/agent';
 import type { AgentManifestDefinition } from '../types/agentManifest';
 import type { ModeConfig } from '../types/layout';
 import { DEFAULT_MODEL_ROUTING, TOP_LEVEL_AGENT_IDS, isTopLevelAgentId } from '../types/agent';
@@ -21,19 +21,6 @@ export const AGENT_DESCRIPTIONS: Record<AgentId, string> = {
   analyzer: 'Planning Orchestrator that maximizes explainability of an unknown rendering system.',
   optimizer: 'Planning Orchestrator that minimizes cost while preserving correctness, quality, and scope.',
 };
-
-export const INVESTIGATOR_AGENTS: AgentRole[] = ['debugger', 'analyzer', 'optimizer'];
-export const VERIFIER_AGENTS: AgentRole[] = [];
-export const REPORTER_AGENTS: AgentRole[] = [];
-
-export const AGENT_NOTE_FILES: Record<AgentId, string> = {
-  general: '',
-  debugger: '',
-  analyzer: '',
-  optimizer: '',
-};
-
-export const DEFAULT_TOKEN_TTL_SECONDS = 1800;
 
 /** Seed accents written into new builtin `.agent.md` files only — not runtime authority. */
 export const AGENT_SEED_ACCENTS: Record<AgentId, string> = {
@@ -82,9 +69,9 @@ export const AGENT_ICON_PRESETS: Array<{
   id: ModeConfig['icon'];
   label: string;
 }> = [
-  { id: 'message-orbit', label: 'Ask' },
-  { id: 'route-plan', label: 'Plan' },
-  { id: 'pencil-edit', label: 'Edit' },
+  { id: 'message-orbit', label: 'Chat' },
+  { id: 'route-plan', label: 'Route' },
+  { id: 'pencil-edit', label: 'Write' },
   { id: 'crosshair-bug', label: 'Debug' },
   { id: 'waveform-gauge', label: 'Analyze' },
   { id: 'spark-tuning', label: 'Optimize' },

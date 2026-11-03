@@ -1,10 +1,11 @@
 import { ipcMain } from 'electron';
 import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
-import type { RunContextUsageReadResult, RunSummary } from '@shared/types/session';
+import type { RunContextUsageReadResult } from '@shared/types/session';
+import type { WorkflowState } from '@shared/types/workflow';
+import { nowIso } from '@shared/utils/id';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { rdcSessionService } from '../sessions';
 import { runExecutionService } from '../workflow/debugger/RunExecutionService';
-import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
@@ -14,6 +15,21 @@ import {
   WorkflowStopArgsSchema,
 } from './validation/ipcSchemas';
 import { readRunContextUsage } from './runContextUsageBoundary';
+
+function readWorkflowState(sessionId: string, runId: string | null): WorkflowState | null {
+  const run = runId
+    ? storageAdapter.listRuns(sessionId).find((entry) => entry.runId === runId) ?? null
+    : storageAdapter.getLatestRun(sessionId);
+  if (!run) return null;
+  return {
+    caseId: run.caseId,
+    runId: run.runId,
+    sessionId: run.sessionId,
+    blockers: [],
+    reasoningSummaries: [],
+    lastUpdated: nowIso(),
+  };
+}
 
 export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;
@@ -25,7 +41,7 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
     }
 
     try {
-      return await debuggerRuntime.getWorkflowState(state.currentSessionId, state.currentRunId || undefined);
+      return readWorkflowState(state.currentSessionId, state.currentRunId);
     } catch (error) {
       console.error('[IPC] Failed to get workflow state:', error);
       return null;
@@ -61,7 +77,9 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
       if (!targetRunId) {
         return { success: false, error: 'No active run.' };
       }
-      const result = await debuggerRuntime.stopRun(targetRunId);
+      const result = runExecutionService.stopRun(targetRunId)
+        ? { success: true }
+        : { success: false, error: 'No active run.' };
       const session = state.currentSessionId ? storageAdapter.readSession(state.currentSessionId) : null;
       if (session) {
         const scope = { projectId: session.projectId, sessionId: session.sessionId };
@@ -88,18 +106,5 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
       padTo: 1,
     });
     return readRunContextUsage(request);
-  });
-
-  ipcMain.handle('workflow:listRuns', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'workflow:listRuns', maxBytes: 1024 });
-    if (!state.currentSessionId) {
-      return { runs: [] as RunSummary[] };
-    }
-    return { runs: storageAdapter.listRuns(state.currentSessionId) };
-  });
-
-  ipcMain.handle('workflow:listActiveRuns', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'workflow:listActiveRuns', maxBytes: 1024 });
-    return { runs: runExecutionService.listActiveRuns() };
   });
 }

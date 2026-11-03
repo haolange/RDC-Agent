@@ -71,7 +71,7 @@ sequenceDiagram
   participant UI as AgentRunView / SessionRightRail
 
   Conversation->>Trace: publish conversation/tool/action events
-  UI->>IPC: trace:getProjection / trace:getRun / trace:getEvents
+  UI->>IPC: trace:getProjection
   IPC->>Trace: build AgentRunPresentation
   Trace-->>IPC: AgentRunPresentation
   IPC-->>UI: trace projection

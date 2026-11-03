@@ -27,13 +27,9 @@ export default defineConfig({
         'src/main/**/index.ts',
         'src/main/ipc/*Handlers.ts',
         'src/main/ipc/handlers.ts',
-        'src/main/ipc/sessionOutputs.ts',
-        'src/main/ipc/channels.ts',
-        'src/main/ipc/HandshakeRegistry.ts',
         // Bridge HTTP server + SSE hub: browser QA / smoke; keep unit coverage on bridgeSecurity + proxy.
         'src/main/browserAppBridge/BrowserAppBridgeServer.ts',
         'src/main/browserAppBridge/rendererEventHub.ts',
-        'src/main/telemetry/**',
         // Worker threads / pool glue — integration / process bound.
         'src/main/workers/turnPreparationWorker.ts',
         'src/main/workers/TurnPreparationWorkerPool.ts',
@@ -50,14 +46,7 @@ export default defineConfig({
         'src/main/settings/ProviderAccountAuthService.ts',
         'src/main/settings/ProviderConnectionService.ts',
         'src/main/settings/providerConnection*.ts',
-        // Unused/legacy registries and thin facades (no production callers / daemon).
-        'src/main/agent-runtime/core/ModelRegistry.ts',
         'src/main/agent-runtime/core/ProviderRegistry.ts',
-        'src/main/agent-runtime/agent/MCPOAuth.ts',
-        'src/main/agent-runtime/providers/ProviderAuth.ts',
-        'src/main/workflow/debugger/DebuggerRuntime.ts',
-        'src/main/daemon/**',
-        'src/main/sdk/**',
         'src/main/reports/**',
         'src/main/testing/faux/**',
         'src/main/commands/**',

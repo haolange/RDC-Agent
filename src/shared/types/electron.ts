@@ -2,13 +2,13 @@ import type { CaptureReplayState, CaptureReplayApplyRequest } from './captureRep
 import type {
   WorkflowState,
 } from './workflow';
-import type { AgentConfig, AgentRole, AgentState } from './agent';
+import type { AgentState } from './agent';
 import type {
   AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
 } from './agentManifest';
-import type { ActionEvent, EventType } from './evidence';
+import type { ActionEvent } from './evidence';
 import type {
   ConversationCancelActiveTurnRequest,
   ConversationCancelActiveTurnResult,
@@ -83,14 +83,11 @@ import type {
   SessionScope,
   SessionScopedPayload,
 } from './session';
-import type { ToolCatalog, ToolRuntimeSummary } from './tool';
+import type { ToolRuntimeSummary } from './tool';
 import type { MCPServerStatusSummary } from './mcp';
 import type { CommandExecuteRequest, CommandListResult, CommandResult } from './command';
-import type { AgentRun, TraceEvent, TraceProjectionChangedPayload } from './agenticTrace';
-import type {
-  TraceBranchSwitchResult,
-  TraceSessionResult,
-} from './trace';
+import type { TraceProjectionChangedPayload } from './agenticTrace';
+import type { TraceSessionResult } from './trace';
 import type { HookEvent, RdcRuntimeOverview, RequestEnvelopeSnapshot, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from './rdcRuntime';
 import type {
   KnowledgeImportResult,
@@ -252,21 +249,6 @@ export interface ElectronAPI {
      * sessionId 用于 Ask 模式（无 debug run，用量以 sessionId 为 store key）。
      */
     getRunUsage: (request: RunContextUsageRequest) => Promise<RunContextUsageReadResult>;
-    listRuns: () => Promise<{ runs: RunSummary[] }>;
-    listActiveRuns: () => Promise<{ runs: Array<{ runId: string; sessionId: string; projectId: string; startedAt: number }> }>;
-  };
-
-  agent: {
-    sendMessage: (agentId: AgentRole, content: string) => Promise<{
-      response?: string;
-      error?: string;
-    }>;
-    getState: (agentId: AgentRole, sessionId?: string) => Promise<AgentState | null>;
-    getAllStates: () => Promise<AgentState[]>;
-    configure: (agentId: AgentRole, config: Partial<AgentConfig>) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
   };
 
   memory: {
@@ -364,8 +346,6 @@ export interface ElectronAPI {
     detectInstallations: () => Promise<import('./rdcInstallation').RdcInstallationCandidate[]>;
     resolveInstallation: (request: import('./rdcInstallation').RdcInstallationRequest) => Promise<import('./settings').RdcCliInvokerSettings>;
     verifyInstallation: (request: import('./rdcInstallation').RdcInstallationRequest) => Promise<{ settings: import('./settings').RdcCliInvokerSettings; summary: ToolRuntimeSummary }>;
-    getCatalog: () => Promise<ToolCatalog>;
-    getRuntimeSummary: () => Promise<ToolRuntimeSummary>;
   };
 
   mcp: {
@@ -379,7 +359,6 @@ export interface ElectronAPI {
       events: ActionEvent[];
       isValid: boolean;
     }>;
-    getEvents: (eventType?: EventType) => Promise<ActionEvent[]>;
   };
 
   llm: {
@@ -567,11 +546,7 @@ export interface ElectronAPI {
   };
 
   trace: {
-    getRun: (runId: string) => Promise<{ run: AgentRun | null }>;
-    getEvents: (runId: string, afterSeq?: number) => Promise<{ events: TraceEvent[] }>;
     getProjection: (sessionId?: string) => Promise<TraceSessionResult>;
-    exportRun: (runId: string) => Promise<{ run: AgentRun | null; events: TraceEvent[] }>;
-    switchBranch: (sessionId: string, branchId: string) => Promise<TraceBranchSwitchResult>;
   };
 
   events: {

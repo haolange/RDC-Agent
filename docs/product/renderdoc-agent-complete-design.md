@@ -118,7 +118,7 @@ Embedding capability / Semantic lane **已删除**，见 `ARCHITECTURE.md` 裁�
 
 ### 3.4 Declared Continue 与 Execution Offer（已落地）
 
-`AgentHandoffDefinition` 只是 Copilot 式 UI 声明。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 校验声明、触发 `before-handoff` / `after-handoff`、写入 `<sessionPath>/execution-offer.json` 并 persist `session.agentId`。计划批准写入 offer（source / target / 冻结 plan.uri+hash / 声明 requiredSkillIds）。prepareTurn 仅在本回合 Agent、批准 handoff target 和 offer target 相同，且冻结计划 URI/hash 与 offer 一致时预载 Skill；同一已核验 offer 作为 volatile runtime fact 说明当前批准状态和计划引用，避免把历史规划消息当成本回合审批要求。该事实不授权操作，General 仍需核对当前 replay 身份并就地终答，不自动回 Mission。不存在 `agent_handoff` 工具或 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。`send: true` 只表示点完后预填并自动发送。
+`AgentHandoffDefinition` 只是 Copilot 式 UI 声明。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 校验声明、触发 `before-handoff` / `after-handoff`、写入 `<sessionPath>/execution-offer.json` 并 persist `session.agentId`。计划批准写入 offer（source / target / 冻结 plan.uri+hash / 声明 requiredSkillIds）。prepareTurn 仅在本回合 Agent、批准 handoff target 和 offer target 相同，且冻结计划 URI/hash 与 offer 一致时预载 Skill；同一已核验 offer 作为 volatile runtime fact 说明当前批准状态和计划引用，避免把历史规划消息当成本回合审批要求。该事实不授权操作，General 仍需核对当前 replay 身份并就地终答，不自动回 Mission。不存在 `agent_handoff` 工具或 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。`send: true` 表示确认交接后显式载荷经同一 Composer 发送链直接发送、不预填输入框；`send: false` 才预填。
 
 ### 3.5 并发（目标态 / 迁移中）
 

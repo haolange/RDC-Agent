@@ -20,7 +20,6 @@ export type IconName =
   | 'more'
   | 'nav-general'
   | 'nav-appearance'
-  | 'nav-workspace'
   | 'nav-models'
   | 'nav-skills'
   | 'nav-agents'
@@ -84,7 +83,6 @@ const ICONS: Record<IconName, readonly IconPart[]> = {
     { c: [12, 12, 4] },
     { d: 'M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8' },
   ],
-  'nav-workspace': [{ d: 'M4 7h6l1.7 2H20v8.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z' }, { d: 'M4 9.5h16' }],
   'nav-models': [{ r: [5, 5, 14, 14, 2.5] }, { d: 'M8.5 9h7M8.5 12h7M8.5 15h4' }],
   'nav-skills': [
     { d: 'M5 5.5h10.5a2.5 2.5 0 0 1 2.5 2.5v10.5H7.5A2.5 2.5 0 0 1 5 16z' },

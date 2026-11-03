@@ -39,11 +39,7 @@ harness `task-board.json` no longer feeds this lane.
 
 Trace APIs:
 
-- `trace:getRun`
-- `trace:getEvents`
 - `trace:getProjection`
-- `trace:exportRun`
-- `trace:switchBranch`
 - `trace:projectionChanged`
 
 Workflow APIs remain responsible for start/approval/revision/restart/stop actions.

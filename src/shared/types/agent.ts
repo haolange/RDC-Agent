@@ -18,20 +18,9 @@ export interface AgentState {
   /** Session or ephemeral execution scope that owns this status projection. */
   sessionId: string;
   status: AgentStatus;
-  token?: SpecialistToken;
   brief?: string;
   lastActivity: string;
   error?: string;
-}
-
-export interface SpecialistToken {
-  token_id: string;
-  agent_id: AgentRole;
-  issued_at: string;
-  expires_at: string;
-  scope: string[];
-  status: 'valid' | 'expired' | 'revoked';
-  runtime_owner: string;
 }
 
 export interface AgentMessage {
@@ -46,16 +35,6 @@ export interface AgentMessage {
     arguments: Record<string, unknown>;
     result?: unknown;
   }[];
-}
-
-export interface AgentConversation {
-  id: string;
-  caseId: string;
-  runId: string;
-  sessionId: string;
-  messages: AgentMessage[];
-  activeAgent: AgentRole;
-  lastUpdated: string;
 }
 
 export const TOP_LEVEL_AGENT_IDS: AgentId[] = ['general', 'debugger', 'analyzer', 'optimizer'];

@@ -42,14 +42,6 @@ export const RENDERER_INVOKE_CHANNEL = {
     resume: 'workflow:resume',
     stop: 'workflow:stop',
     getRunUsage: 'workflow:getRunUsage',
-    listRuns: 'workflow:listRuns',
-    listActiveRuns: 'workflow:listActiveRuns',
-  },
-  agent: {
-    sendMessage: 'agent:sendMessage',
-    getState: 'agent:getState',
-    getAllStates: 'agent:getAllStates',
-    configure: 'agent:configure',
   },
   memory: {
     issueApprovalToken: 'memory:issueApprovalToken',
@@ -105,14 +97,11 @@ export const RENDERER_INVOKE_CHANNEL = {
     execute: 'command:execute',
   },
   tools: {
-    getCatalog: 'tool:getCatalog',
-    getRuntimeSummary: 'tool:getRuntimeSummary',
     detectInstallations: 'tool:detectInstallations',
     resolveInstallation: 'tool:resolveInstallation',
     verifyInstallation: 'tool:verifyInstallation',
     getMcpStatusSummary: 'mcp:getStatusSummary',
     getEvidenceChain: 'evidence:getChain',
-    getEvidenceEvents: 'evidence:getEvents',
   },
   llm: {
     testProviderDraft: 'llm:testProviderDraft',
@@ -198,11 +187,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     get: 'context:get',
   },
   trace: {
-    getRun: 'trace:getRun',
-    getEvents: 'trace:getEvents',
     getProjection: 'trace:getProjection',
-    exportRun: 'trace:exportRun',
-    switchBranch: 'trace:switchBranch',
   },
 } as const;
 
@@ -222,11 +207,9 @@ export const RENDERER_EVENT_CHANNEL = {
   workflow: {
     runStatusChanged: 'workflow:runStatusChanged',
     runUsageChanged: 'workflow:runUsageChanged',
-    blocked: 'workflow:blocked',
     traceProjectionChanged: 'trace:projectionChanged',
   },
   llm: {
-    stream: 'llm:stream',
     effectiveCatalogChanged: 'llm:effectiveCatalogChanged',
   },
   agent: {

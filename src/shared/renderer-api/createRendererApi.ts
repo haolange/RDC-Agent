@@ -1,7 +1,6 @@
 import type { ElectronAPI } from '../types/electron';
 import { isRendererEventChannel } from './channels';
 import {
-  createAgentApi,
   createAppMetaApi,
   createAppShellApi,
   createCommandApi,
@@ -50,7 +49,6 @@ export function createRendererApi(platform: NodeJS.Platform, transport: Renderer
     saveFile: dialog.saveFile,
     workflow: createWorkflowApi(transport),
     trace: createTraceApi(transport),
-    agent: createAgentApi(transport),
     memory: createMemoryApi(transport),
     investigation: createInvestigationApi(transport),
     plan: createPlanApi(transport),

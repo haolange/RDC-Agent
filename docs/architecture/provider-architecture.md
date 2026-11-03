@@ -118,7 +118,7 @@ Structural capability, account entitlement, expiring execution evidence, and tra
 
 ## 凭据与请求事务
 
-Settings schema 当前为 v4，Effective Catalog cache schema 为 v8。运行时投影顺序字段不修改缓存 schema。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。稳定 provider/model/surface ID、secret ref 与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
+Settings schema 当前为 v8，Effective Catalog cache schema 为 v8。运行时投影顺序字段不修改缓存 schema。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。稳定 provider/model/surface ID、secret ref 与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
 
 发送 preflight 创建主进程内 opaque credential lease，冻结 provider 配置、typed connection values、认证 headers、OAuth/Vertex 短时 token 与 AWS Bedrock credentials。认证 header 不进入 `ModelRoute` 或 `RequestPlan`。Adapter 必须持有 lease handle 才能发送；运行中不允许回读 Settings。
 
