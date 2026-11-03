@@ -5,7 +5,8 @@ import { type WorkProcessRow, type WorkProcessToolApproval, type WorkProcessRowS
 import { normalizeToolName, getToolDisplay, getToolFamily, formatMcpTarget } from './workProcessToolCatalog';
 import { createUserInputRow, createPlanReviewShellRow, createPlanReviewRow } from './workProcessDecisionRows';
 import { parsePreview, createDetailLines, prettyPrint, toRecord, readNestedString, isJsonLike, readNestedValue, stringifyPreview, isRawPayloadPreview } from './workProcessContentText';
-import { emptyUnwrappedContent, unwrapToolContentLayer, sanitizeContentText } from './workProcessToolContent';
+import { unwrapToolContentLayer } from './workProcessToolContent';
+import { emptyUnwrappedContent, sanitizeContentText } from './workProcessToolContentShared';
 import { extractWebToolPresentation } from './workProcessWebPresentation';
 import { formatDurationMs, normalizeWorkProcessText, compactText } from './workProcessFormat';
 import { getToolOutcome } from './workProcessOutcome';

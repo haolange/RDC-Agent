@@ -7,14 +7,24 @@ import type {
   KnowledgeScopeAxis,
 } from '@shared/types/knowledge';
 
-export const SCOPE_LABELS: Record<KnowledgeScopeAxis, readonly [string, string]> = {
-  project: ['Project', '项目'], engine: ['Engine', '引擎'], engineVersion: ['Engine version', '引擎版本'],
-  api: ['API', 'API'], platform: ['Platform', '平台'], gpuVendor: ['GPU vendor', 'GPU 厂商'],
-  gpuArch: ['GPU architecture', 'GPU 架构'], device: ['Device', '设备'], driver: ['Driver', '驱动'],
-  capture: ['Capture', '抓帧'], pipelineStage: ['Pipeline stage', '管线阶段'], pass: ['Pass', '渲染通道'],
-  shaderFamily: ['Shader family', '着色器族'], materialFamily: ['Material family', '材质族'],
-  quality: ['Quality', '质量'], resolution: ['Resolution', '分辨率'],
-  featureConfiguration: ['Configuration', '功能配置'],
+export const SCOPE_LABEL_KEYS: Record<KnowledgeScopeAxis, TranslationKey> = {
+  project: 'knowledgeCenter.scope.project',
+  engine: 'knowledgeCenter.scope.engine',
+  engineVersion: 'knowledgeCenter.scope.engineVersion',
+  api: 'knowledgeCenter.scope.api',
+  platform: 'knowledgeCenter.scope.platform',
+  gpuVendor: 'knowledgeCenter.scope.gpuVendor',
+  gpuArch: 'knowledgeCenter.scope.gpuArch',
+  device: 'knowledgeCenter.scope.device',
+  driver: 'knowledgeCenter.scope.driver',
+  capture: 'knowledgeCenter.scope.capture',
+  pipelineStage: 'knowledgeCenter.scope.pipelineStage',
+  pass: 'knowledgeCenter.scope.pass',
+  shaderFamily: 'knowledgeCenter.scope.shaderFamily',
+  materialFamily: 'knowledgeCenter.scope.materialFamily',
+  quality: 'knowledgeCenter.scope.quality',
+  resolution: 'knowledgeCenter.scope.resolution',
+  featureConfiguration: 'knowledgeCenter.scope.featureConfiguration',
 };
 
 export const TYPE_LABEL_KEYS: Record<KnowledgeCardType, TranslationKey> = {

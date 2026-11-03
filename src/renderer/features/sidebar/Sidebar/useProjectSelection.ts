@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProjectStore } from '../../../stores/projectStore';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
+import type { ProjectSelectionHandlerOpsContext } from './projectSelectionContext';
 import {
-  commitSessionRenameOp,
   handleAddProjectOp,
   handleOpenExplorerOp,
-  handleProjectRenameSubmitOp,
   handleProjectSelectOp,
   handleRemoveProjectOp,
+} from './projectSelectionProjectOps';
+import { commitSessionRenameOp, handleProjectRenameSubmitOp } from './projectSelectionRenameOps';
+import {
   handleSessionActivateOp,
   handleSessionCreateOp,
   handleSessionRemoveOp,
-  type ProjectSelectionHandlerOpsContext,
-} from './projectSelectionHandlerOps';
+} from './projectSelectionSessionOps';
 import { useProjectSelectionLoaders } from './useProjectSelectionLoaders';
 
 interface UseProjectSelectionOptions {

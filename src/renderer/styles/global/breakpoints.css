@@ -3,8 +3,9 @@
  * table is the single list and the rules below use the same numbers.
  *
  * 900px  shell hides the docked right rail (responsive.css) and loosens the composer.
- * 720px  shell collapses the left sidebar, and transcript, work process, and the
- *        empty workbench use the same width.
+ * 720px  shell collapses the left sidebar. Transcript, work process, and the
+ *        empty workbench use the same width; work-process rules stay in the
+ *        transcript stylesheets.
  * 640px  dialogs, settings rows, and composer type.
  * 480px  phone menus and confirmation dialogs.
  */
@@ -13,16 +14,6 @@
   .chat-messages {
     padding-left: var(--space-3);
     padding-right: var(--space-3);
-  }
-
-  .work-process-header {
-    flex-wrap: wrap;
-    gap: var(--space-1) var(--space-2);
-  }
-
-  .work-process-tool-card-header,
-  .work-process-tool-card-meta {
-    gap: var(--space-1) var(--space-2);
   }
 
   .empty-workbench-content {

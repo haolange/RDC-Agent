@@ -4,23 +4,13 @@ import type {
   ConversationLoopStopReason,
   ConversationReasoningState,
   ConversationWorkBlock,
-  ConversationToolCall,
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
-import { formatDurationMs, normalizeWorkProcessText } from './workProcessFormat';
-import type {
-  LoopPresentationUnit,
-  PresentationUnit,
-  StandalonePresentationUnit,
-} from './workProcessUnits';
+import type { PresentationUnit } from './workProcessUnits';
 import { aggregateSectionSteps } from './workProcessToolAggregate';
+import { projectLlmTurn } from './workProcessLlmProjection';
+import { pushStandaloneBlock } from './workProcessStandaloneProjection';
 import type { WorkProcessRow } from './workProcessTypes';
-
-function isVisibleToolCall(call: ConversationToolCall): boolean {
-  if (call.approval || call.planReview || call.userInputQuestions) return true;
-  return call.status === 'error' || call.status === 'running' || call.status === 'complete'
-    || call.executionStartedAt !== undefined;
-}
 
 export type { LoopPresentationUnit, PresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
 
@@ -74,8 +64,6 @@ export interface LoopProjectionDeps {
   countToolSteps: (rows: WorkProcessRow[]) => number;
 }
 
-const isTaskLifecycleTool = (toolName: string): boolean => /^task_(?:create|update|get|list|stop)$/u.test(toolName.trim());
-
 export function buildPresentationUnits(
   blocks: ConversationWorkBlock[],
   deps: LoopProjectionDeps,
@@ -93,158 +81,8 @@ export function buildPresentationUnits(
       continue;
     }
 
-    if (block.kind === 'plan_review') {
-      const planReviewRows = ctx.groupProcessRows(block.toolCalls.filter(isVisibleToolCall).map((call) => ctx.createToolRow(call)));
-      if (planReviewRows.length > 0) {
-        ctx.hasVisibleProcessEvidence = true;
-        const lastUnit = units[units.length - 1];
-        if (lastUnit?.kind === 'loop') {
-          const sectionRow = lastUnit.rows.find((row): row is Extract<WorkProcessRow, { type: 'section' }> => row.type === 'section');
-          if (sectionRow) {
-            sectionRow.steps.push(...planReviewRows);
-            sectionRow.stepCount = deps.countToolSteps(sectionRow.steps);
-            if (sectionRow.status === 'complete' && planReviewRows.some((child) => child.status === 'running' || child.status === 'pending')) {
-              sectionRow.status = 'running';
-            }
-            if (planReviewRows.some((child) => child.status === 'error')) {
-              sectionRow.status = 'error';
-              sectionRow.defaultOpen = true;
-            }
-            continue;
-          }
-        }
-        units.push({
-          kind: 'standalone',
-          rows: planReviewRows,
-          loopIds: [],
-        } satisfies StandalonePresentationUnit);
-      }
-      continue;
+    pushStandaloneBlock(block, units, deps, ctx);
     }
-
-    if (block.kind === 'user_input') {
-      const userInputRows = ctx.groupProcessRows(block.toolCalls.filter(isVisibleToolCall).map((call) => ctx.createToolRow(call)));
-      if (userInputRows.length > 0) {
-        ctx.hasVisibleProcessEvidence = true;
-        const lastUnit = units[units.length - 1];
-        if (lastUnit?.kind === 'loop') {
-          const sectionRow = lastUnit.rows.find((row): row is Extract<WorkProcessRow, { type: 'section' }> => row.type === 'section');
-          if (sectionRow) {
-            sectionRow.steps.push(...userInputRows);
-            sectionRow.stepCount = deps.countToolSteps(sectionRow.steps);
-            if (sectionRow.status === 'complete' && userInputRows.some((child) => child.status === 'running' || child.status === 'pending')) {
-              sectionRow.status = 'running';
-            }
-            if (userInputRows.some((child) => child.status === 'error')) {
-              sectionRow.status = 'error';
-              sectionRow.defaultOpen = true;
-            }
-            continue;
-          }
-        }
-        units.push({
-          kind: 'standalone',
-          rows: userInputRows,
-          loopIds: [],
-        } satisfies StandalonePresentationUnit);
-      }
-      continue;
-    }
-
-    if (block.kind === 'output' || shouldSkipStandalone(block, deps)) {
-      continue;
-    }
-
-    if (block.kind === 'approval') {
-      ctx.hasVisibleProcessEvidence = true;
-      units.push({
-        kind: 'standalone',
-        rows: [deps.createApprovalRow(block)],
-        loopIds: [],
-      });
-      continue;
-    }
-
-    if (block.kind === 'compaction') {
-      ctx.hasVisibleProcessEvidence = true;
-      const stats = block.compactionStats;
-      const detailLines: string[] = block.summary ? [block.summary] : [];
-      if (stats?.usage) detailLines.push(t('chat.compactionUsage', { input: stats.usage.inputTokens, output: stats.usage.outputTokens }));
-      if (stats?.sourceUri) detailLines.push(`${stats.sourceUri} sha256:${stats.sourceHash ?? ""}`);
-      if (stats?.messagesBefore != null && stats.messagesAfter != null) {
-        detailLines.push(t('chat.compactionMessages', { before: stats.messagesBefore, after: stats.messagesAfter }));
-      }
-      if (stats?.tokensBefore != null && stats.tokensAfter != null) {
-        detailLines.push(t('chat.compactionTokens', { before: stats.tokensBefore, after: stats.tokensAfter }));
-      } else if (stats?.tokensBefore != null) {
-        detailLines.push(t('chat.compactionTokensBefore', { count: stats.tokensBefore }));
-      }
-      units.push({
-        kind: 'standalone',
-        rows: [{
-          type: 'summary',
-          id: block.id,
-          status: block.status,
-          text: block.status === 'running' ? t('chat.workProcessCompactRunning') : block.status === 'error' ? t('chat.workProcessCompactFailed') : t('chat.workProcessCompactComplete'),
-          detailLines,
-          duration: formatDurationMs(block.startedAt, block.completedAt),
-          compactionProvenance: stats?.provenance,
-        }],
-        loopIds: [block.id],
-      });
-      continue;
-    }
-
-    if (block.kind === 'task_snapshot' && block.taskSnapshot) {
-      ctx.hasVisibleProcessEvidence = true;
-      units.push({
-        kind: 'standalone',
-        rows: [{
-          type: 'taskSnapshot',
-          id: block.id,
-          status: block.status,
-          change: block.taskSnapshot.change,
-          completed: block.taskSnapshot.completed,
-          total: block.taskSnapshot.total,
-          items: block.taskSnapshot.items,
-          duration: formatDurationMs(block.startedAt, block.completedAt),
-        }],
-        loopIds: [block.id],
-      });
-      continue;
-    }
-
-    if (block.kind === 'command') {
-      continue;
-    }
-
-    if (block.kind === 'diagnostic' || block.status === 'error') {
-      ctx.hasVisibleProcessEvidence = true;
-      units.push({
-        kind: 'standalone',
-        rows: [deps.createDiagnosticRow(block)],
-        loopIds: [block.id],
-      });
-      continue;
-    }
-
-    const summaryText = deps.getMeaningfulBlockSummary(block);
-    if (summaryText) {
-      ctx.hasVisibleProcessEvidence = true;
-      units.push({
-        kind: 'standalone',
-        rows: [{
-          type: 'summary',
-          id: block.id,
-          status: block.status,
-          text: summaryText,
-          detailLines: [],
-          duration: formatDurationMs(block.startedAt, block.completedAt),
-        }],
-        loopIds: [block.id],
-      });
-    }
-  }
 
   const sources = new Map(blocks.map((block) => [block.id, block]));
   for (const unit of units) {
@@ -256,172 +94,6 @@ export function buildPresentationUnits(
     }
   }
   return units;
-}
-
-function shouldSkipStandalone(block: ConversationWorkBlock, deps: LoopProjectionDeps): boolean {
-  return deps.shouldSkipBlock(block);
-}
-
-function projectLlmTurn(
-  block: ConversationWorkBlock,
-  deps: LoopProjectionDeps,
-  ctx: BlockProjectionContext,
-): LoopPresentationUnit | StandalonePresentationUnit | null {
-  const outputPhase = deps.resolveOutputPhase(block, ctx.hasVisibleProcessEvidence);
-  const reasoningState = deps.resolveReasoningState(block);
-  const stopReason = block.result?.stopReason;
-  // Successful TaskRegistry mutations already have authoritative snapshots;
-  // pending approval and failed mutations still need their own interaction/error.
-  const steps = ctx.groupProcessRows(
-    block.toolCalls
-      .filter((call) => isVisibleToolCall(call) && (!isTaskLifecycleTool(call.toolName)
-        || call.status === 'error' || Boolean(call.approval && call.approval.status !== 'approved')))
-      .map((call): WorkProcessRow => call.delegation ? {
-        type: 'subagent', id: call.id, status: call.status,
-        profile: call.delegation.profile, task: call.delegation.task, mode: call.delegation.mode,
-        argsPreview: call.argsPreview ?? '', resultPreview: call.resultPreview ?? '',
-        executionId: call.delegation.executionId, generation: call.delegation.generation,
-        duration: formatDurationMs(call.executionStartedAt, call.completedAt),
-      } : ctx.createToolRow(call)),
-  );
-  const loopRows: WorkProcessRow[] = [];
-
-  const isFinalAnswer = outputPhase === 'final_answer' && !deps.isNonFinalStopReason(stopReason);
-
-  if (isFinalAnswer) {
-    // Answer-only turns never create a Reply boundary row. Provider-visible closing
-    // thinking folds into a quiet thinking-only section; otherwise the turn is silent
-    // and the assistant body below the Work Process is the only final-answer surface.
-    // Opaque/hidden reasoning never renders a CoT placeholder — answer body only.
-    if (reasoningState === 'opaque' || reasoningState === 'hidden') {
-      return null;
-    }
-    const thinking = deps.resolveResponseThinking(block);
-    if (!thinking.label && !thinking.preview) {
-      if (!ctx.hasVisibleProcessEvidence) return null;
-      return null;
-    }
-    const sectionThinking = {
-      preview: thinking.preview,
-      label: thinking.label,
-      kind: thinking.kind,
-      source: '',
-      visibility: thinking.visibility,
-      status: thinking.status,
-      expandable: thinking.expandable,
-      openByDefault: thinking.openByDefault,
-    };
-    dedupeSectionThinking(sectionThinking, ctx, deps);
-    if (!sectionThinking.label && !sectionThinking.preview) {
-      return null;
-    }
-    ctx.hasVisibleProcessEvidence = true;
-    return {
-      kind: 'loop',
-      loopId: block.id,
-      rows: [{
-        type: 'section',
-        id: block.id,
-        loopId: block.id,
-        status: block.status,
-        proseText: '',
-        proseStreaming: false,
-        thinkingPreview: sectionThinking.preview,
-        thinkingLabel: sectionThinking.label,
-        thinkingKind: sectionThinking.kind,
-        thinkingSource: sectionThinking.source,
-        thinkingVisibility: sectionThinking.visibility,
-        thinkingStatus: sectionThinking.status,
-        thinkingExpandable: sectionThinking.expandable,
-        thinkingOpenByDefault: sectionThinking.openByDefault,
-        stepCount: 0,
-        duration: formatDurationMs(block.startedAt, block.completedAt),
-        defaultOpen: false,
-        steps: [],
-        visibleSteps: [],
-        outputPhase,
-        stopReason,
-      }],
-      hasDisplayableThinking: sectionThinking.expandable && Boolean(sectionThinking.preview),
-      hasSummaryThinking: sectionThinking.kind === 'summary' && Boolean(sectionThinking.preview),
-    };
-  }
-
-  const sectionProse = deps.resolveSectionProse(block, outputPhase);
-  const sectionThinking = deps.resolveSectionThinking(
-    block,
-    steps.length > 0
-      || reasoningState === 'raw'
-      || reasoningState === 'summary'
-      || reasoningState === 'unknown'
-      || ctx.hasVisibleProcessEvidence
-      || Boolean(normalizeWorkProcessText(block.result?.text ?? '')),
-  );
-  dedupeSectionThinking(sectionThinking, ctx, deps);
-
-  // Opaque/hidden never becomes WP thinking or a placeholder; only real tools/prose/visible thinking remain.
-  const shouldRenderSection = steps.length > 0
-    || Boolean(sectionProse.proseText)
-    || sectionThinking.label
-    || sectionThinking.expandable;
-
-  if (!shouldRenderSection) {
-    return null;
-  }
-
-  if (shouldRenderSection) {
-    loopRows.push({
-      type: 'section',
-      id: block.id,
-      loopId: block.id,
-      status: block.status,
-      proseText: sectionProse.proseText,
-      proseStreaming: sectionProse.proseStreaming,
-      thinkingPreview: sectionThinking.preview,
-      thinkingLabel: sectionThinking.label,
-      thinkingKind: sectionThinking.kind,
-      thinkingSource: sectionThinking.source,
-      thinkingVisibility: sectionThinking.visibility,
-      thinkingStatus: sectionThinking.status,
-      thinkingExpandable: sectionThinking.expandable,
-      thinkingOpenByDefault: sectionThinking.openByDefault,
-      stepCount: deps.countToolSteps(steps),
-      duration: formatDurationMs(block.startedAt, block.completedAt),
-      defaultOpen: false,
-      steps,
-      visibleSteps: steps,
-      outputPhase,
-      stopReason,
-    });
-  }
-
-  ctx.hasVisibleProcessEvidence = true;
-
-  return {
-    kind: 'loop',
-    loopId: block.id,
-    rows: loopRows,
-    hasDisplayableThinking: sectionThinking.expandable && Boolean(sectionThinking.preview),
-    hasSummaryThinking: sectionThinking.kind === 'summary' && Boolean(sectionThinking.preview),
-  };
-}
-
-function dedupeSectionThinking(
-  sectionThinking: ReturnType<LoopProjectionDeps['resolveSectionThinking']>,
-  ctx: BlockProjectionContext,
-  deps: LoopProjectionDeps,
-): void {
-  if (!sectionThinking.preview || sectionThinking.kind === 'raw') return;
-  const thinkingKey = deps.normalizeThinkingDedupKey(sectionThinking.preview);
-  if (ctx.visibleThinkingKeys.has(thinkingKey)) {
-    sectionThinking.preview = '';
-    sectionThinking.label = '';
-    sectionThinking.source = '';
-    sectionThinking.expandable = false;
-    sectionThinking.openByDefault = false;
-    return;
-  }
-  ctx.visibleThinkingKeys.add(thinkingKey);
 }
 
 export function markLastSectionOpen(rows: WorkProcessRow[]): void {

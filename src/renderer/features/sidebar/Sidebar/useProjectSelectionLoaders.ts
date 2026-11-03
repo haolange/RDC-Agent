@@ -13,13 +13,12 @@ import type {
 } from './types';
 import {
   captureSelectionSnapshot,
-  loadProjectsOp,
   loadRunsForSession,
-  loadSessionsOp,
   restoreSelectionSnapshot,
-  selectSessionOp,
   type ProjectSelectionLoaderOpsContext,
-} from './projectSelectionLoaderOps';
+} from './projectSelectionContext';
+import { loadProjectsOp, loadSessionsOp } from './projectSelectionProjectOps';
+import { selectSessionOp } from './projectSelectionSessionOps';
 
 export interface UseProjectSelectionLoadersOptions {
   ensureProjectExpanded: (projectId: string) => void;

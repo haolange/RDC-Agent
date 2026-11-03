@@ -5,7 +5,7 @@
 1. [`DESIGN.md`](../../DESIGN.md) — UI/UX 上位原则；[`ARCHITECTURE.md`](../../ARCHITECTURE.md) — 产品边界与工程不变量
 2. [`workbench-and-transcript.md`](workbench-and-transcript.md) — Workbench / Composer Effort / transcript 产品规格
 3. [`AGENTS.md`](../../AGENTS.md) — token / 按钮 / Appearance 执行纪律
-4. [`src/renderer/styles/design-system.css`](../../src/renderer/styles/design-system.css) — primitive + semantic token 定义
+4. [`src/renderer/styles/design-system.css`](../../src/renderer/styles/design-system.css) — 样式入口；token 在 [`design-tokens.css`](../../src/renderer/styles/design-tokens.css)，动效在 [`design-motion.css`](../../src/renderer/styles/design-motion.css)，基础样式在 [`design-base.css`](../../src/renderer/styles/design-base.css)，系统减少动效在 [`design-reduced-motion.css`](../../src/renderer/styles/design-reduced-motion.css)
 5. [`src/shared/theme/`](../../src/shared/theme/) — preset catalog、`ThemeChromeCompiler`、`rdc-theme-v1`、compose accent 派生
 6. [`designs/rdc-agent-design-system/index.html`](../../designs/rdc-agent-design-system/index.html) — 可交互预览
 
@@ -28,7 +28,7 @@ RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 
 - 单一 accent 只承担 focus / selected / primary CTA；状态色只表达状态。
 - 信息密度优先于留白：同屏能多放一行真实信息，就不要用空白替代。
 
-## 刻度（唯一真值：`src/renderer/styles/design-system.css`）
+## 刻度（唯一真值：`src/renderer/styles/design-tokens.css`）
 
 上手教程中的教学图用于解释真实入口和操作关系，不作为装饰背景。中性底色图卡以实色边框接入深浅主题，关键标注使用可访问的 HTML/i18n；教程以清晰的图文比例与留白辅助阅读，不改变工作台的信息密度。示例状态必须明确区别于当前配置。
 
@@ -95,7 +95,7 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 - 状态类一律 `is-*`：`is-active` / `is-selected` / `is-running` / `is-disabled` / `is-error`，并配对应 `aria-*`。禁止裸 `.active` / `.current`。
 - 任何定义了 `:hover` 的可交互选择器必须同时定义 `:focus-visible`。
 - 焦点环统一 `--token-border-focus`；禁止 `outline: none` 而不提供等效焦点样式。
-- 动效由真实交互与运行生命周期驱动；不提供减少动效设置，不读取系统减少动效偏好，不设置全局停播覆盖。
+- 动效由真实交互与运行生命周期驱动。没有应用内的减少动效开关。系统 `prefers-reduced-motion: reduce` 时，`design-reduced-motion.css` 把时长 token 置零，并停掉 spin、skeleton、子代理点、trace flash 和 agent 菜单运行点。Active Signal 扫光不在这份样式里停，Max 画布由 `EffortMaxField` 自己收束。
 
 ## 双体系（摘要）
 
@@ -111,7 +111,7 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 
 ## CSS 入口
 
-- 唯一全局入口：`src/renderer/main.tsx` → `styles/global.css` → `design-system.css`。
+- 唯一全局入口：`src/renderer/main.tsx` → `styles/global.css` → `design-system.css`。`design-system.css` 只按 token、motion、base、reduced-motion 顺序导入，不在入口文件里写规则。窄屏宽度表在 `styles/global/breakpoints.css`：900 / 720 / 640 / 480。720 与侧栏折叠对齐；feature 选择器留在所属 feature 样式，不写进 global。
 - 禁止恢复 `styles/tokens/*` 或未接线的 `oklch-themes.css`。
 - 生产 CSP：`style-src 'self'`（无 `unsafe-inline`）+ `style-src-attr 'none'`。Appearance chrome（`applyChromeTheme`）与组件动态样式必须走 constructable stylesheet（`adoptedStyleSheets` / `useDynStyle` / `assignDynStyle`），禁止 `<style>.textContent` 或 `element.style` 注入。
 - 当前 Settings 只接受 `schemaVersion` **8**；合法的 `appearance.chromeThemes` 用户配置经主题校验保留，缺版本或旧版本明确报错并保留原文件。历史版本升级的主题重置不属于现行读取路径。
@@ -119,7 +119,7 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 ## Token 使用规则
 
 - **必须**引用语义 token（`--token-*`），禁止在组件 CSS 中直接用 primitive token（`--color-bg-3`、`rgb(var(--color-accent-500))` 等）。
-- `--token-*` 完整定义在 `src/renderer/styles/design-system.css` 的 "Semantic Token Layer" 部分。
+- `--token-*` 完整定义在 `src/renderer/styles/design-tokens.css` 的语义层。
 - 边框 token 已内含 alpha，使用方式为 `rgb(var(--color-border-subtle))`，**禁止**追加额外 alpha：`rgb(var(--color-border-subtle) / 0.65)` 是无效 CSS。
 - 字号必须用 `var(--text-*)` 变量，**禁止** px 字面值。
 - 间距必须用 `var(--space-*)` 变量，**禁止**奇数像素值（3px、7px、9px）。
@@ -127,7 +127,7 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 ## 按钮规则
 
 - 全局唯一按钮系统：`.button`（基类） + `.button-primary / button-secondary / button-ghost / button-danger`，定义在 `src/renderer/ui/Button.css`（由 `styles/global.css` → `ui/kit.css` 导入）。
-- React 层用 `<Button variant="primary|secondary|ghost|danger" size="sm|md|lg">`（`src/renderer/ui/Button.tsx`）。
+- React 层用 `<Button variant="primary|secondary|ghost|danger|reset" size="sm|md|lg">`（`src/renderer/ui/Button.tsx`）。`reset` 去掉按钮铬，只在不会被 `.button` 特异性盖过现有菜单内边距时使用。
 - 普通按钮为中性实色表面与细边框，主要动作使用强调色文字及描边，不铺大面积 accent；单选分段使用低饱和实色选中面。输入和按钮统一小圆角，默认控件高度 md，紧凑工具栏 sm。Composer Send 保留 Agent accent 实色的领域契约。
 - **禁止**新增第三套按钮类名，禁止在 feature CSS 中重复定义按钮样式。
 
@@ -145,7 +145,7 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 - Effort 弹层的 Max mode / Fast mode 是稳定能力槽位，不随模型消失：面板里始终占位；unsupported 显示灰色关闭，fixed 显示灰色开启，selectable 才允许切换。收起胶囊只在对应模式开启时前置图标。
 - Agent accent 必须可配置（`.agent.md` + Settings → Agents GUI）；`AGENT_SEED_ACCENTS` 仅用于 builtin seed 初值，不是运行时权威。
 - `--token-context-*` 色阶专用于 Context breakdown 弹窗的分段条与图例色点，不得挪作其它装饰或背景。
-- 不得引入非 design-system.css / ThemeChromeCompiler 定义的新颜色；需要新颜色时先在 `--token-*` 或 chrome 编译层添加并说明用途。
+- 不得引入非 `design-tokens.css` / ThemeChromeCompiler 定义的新颜色；需要新颜色时先在 `--token-*` 或 chrome 编译层添加并说明用途。
 - Composer 运行态用 `--composer-mode-accent` 驱动 `composerEnergyOrbit`：`composer-motion.css` 注册角度，从 −130° 到 230°，2.85s 一圈；固定圆角遮罩内的锥形渐变产生四角光带伸缩，2px 光环与分层 drop-shadow 保留历史辉光。光层不截获指针，不旋转矩形遮罩，不使用径向光斑沿四边平移。停止后光层消失，accent 同时用于边框、send 与 Effort。
 
 ## 新增组件规则
@@ -265,7 +265,7 @@ pnpm run check:appearance
 pnpm run typecheck
 ```
 
-`check:design-tokens` 豁免仅限 token 定义层 `styles/design-system.css`。新增豁免必须先改本文件再改脚本。
+`check:design-tokens` 豁免仅限 token 与动效定义层：`design-system.css`、`design-tokens.css`、`design-motion.css`、`design-base.css`、`design-reduced-motion.css`。新增豁免必须先改本文件再改脚本。
 
 ### 规则 → 门禁 / 债务批次
 
@@ -282,7 +282,7 @@ pnpm run typecheck
 | Select 禁 backdrop blur | `check:appearance` 要求实色 `--token-bg-shell`、禁止 blur | B1 已反转 |
 | Preview 引用运行时 CSS，删除 `designs/tokens/*` | Preview 已改；副本已删并入 `retired` | **B2** 已落地 |
 | i18n 拆分、硬编码入 i18n、sentence case | key 已拆到 `i18n/locales/{en,zh-CN}/`；硬编码与 sentence case 仍待扫 | **B3** 拆分；**B8** 文案 |
-| `check:architecture` R4 hex exempt | 仅 `design-system.css` | B1 已清空 |
+| `check:architecture` R4 hex exempt | `design-system.css` 及其 token / motion / base / reduced-motion 拆分文件 | B1 已清空 |
 | `pages/`、`styles/base/` 删除 | 两者已删并入 `retired`；`check:renderer-structure` hits=0 | B1 已删 `styles/base`；**B3** 已删 `pages/` |
 
 受门禁锁定的 renderer 文件路径集中登记在 [`scripts/fidelity/renderer-contract.json`](../../scripts/fidelity/renderer-contract.json)：`files` 为必存在锚点，`retired` 为必须保持删除的退役路径。移动或重命名这些文件时只改该 manifest。

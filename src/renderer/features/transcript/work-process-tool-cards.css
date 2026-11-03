@@ -385,3 +385,10 @@
 .work-process-tool-hook-details li + li { margin-top: var(--space-1); }
 .work-process-tool-hook-details li.severity-warning { color: var(--token-status-warning); }
 .work-process-tool-hook-details li.severity-error { color: var(--token-status-error); }
+
+@media (max-width: 720px) {
+  .work-process-tool-card-header,
+  .work-process-tool-card-meta {
+    gap: var(--space-1) var(--space-2);
+  }
+}

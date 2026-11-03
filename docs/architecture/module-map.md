@@ -19,14 +19,14 @@ Rules:
 
 ## Renderer 职责地图
 
-`app/WorkbenchShell` 组装 feature 与 shell；`app/bootstrap/useIpcEventBridge` 单点安装、释放 conversation、session、capture 和 shell 订阅，投影身份检查仍位于原业务边界。Command Palette 的快捷键与业务动作由 app controller 拥有，pattern 仅接收状态与回调。
+`app/WorkbenchShell` 组装 feature 与 shell，底栏字段只传给 `SidebarFooter`。`app/bootstrap` 按事件族拆开：shell 初始化、会话表面、catalog、项目输入、会话恢复，由 `useAppBootstrap` 按这个顺序调用。`app/bootstrap/useIpcEventBridge` 单点安装、释放 conversation、session、capture 和 shell 订阅，投影身份检查仍位于原业务边界。Command Palette 的快捷键与业务动作由 app controller 拥有，pattern 仅接收状态与回调。
 
 | 产品区域 | Canonical 入口与职责 | 状态与验证 |
 | --- | --- | --- |
 | Composer | `features/composer/Composer` 编排；`ComposerEditor` 书写区、`ComposerFooter` 底栏、`ComposerPendingRequest` 待处理请求；专属样式按 shell/editor/toolbar/controls/requests/motion 归属 | `useComposer` 保持发送与草稿协调；request selector 保持审批优先级；IME、菜单、生命周期和请求测试就近维护 |
-| Transcript | `features/transcript/index` 组装消息；`workProcess*Presentation`、`workProcessToolContent` 等按轨迹、内容解释和决策行分工；CSS 按实际消息部件拆分 | main-owned transcript 为权威；解析为纯函数；滚动与虚拟列表测试覆盖定位、离底与内容尺寸变化 |
+| Transcript | `features/transcript/index` 组装消息；`workProcessTracePresentation` 负责轨迹，`workProcessBlockProjection` 编排 block，模型回合和独立块分别在 `workProcessLlmProjection` / `workProcessStandaloneProjection`；`workProcessToolContent` 按 artifact、shell、skill、catalog、file、web、generic 分发，共享清洗在 `workProcessToolContentShared`；CSS 按实际消息部件拆分 | main-owned transcript 为权威；解析为纯函数；滚动与虚拟列表测试覆盖定位、离底与内容尺寸变化 |
 | Right Rail | `features/right-rail/RightRail` → `SessionRightRail` → 各卡；Capture 保持专属交互 | `session-projection` / `right-rail` 门禁；五卡次序和空态不变 |
-| Sidebar / Terminal | feature 入口与专属 hooks 负责业务；就近维护布局、行操作、输出、输入及状态样式 | 继续使用既有 project/session、terminal store，shell 只负责 drawer 与 resize |
+| Sidebar / Terminal | feature 入口与专属 hooks 负责业务。项目选择按选项目、选会话、重命名分文件，快照在 `projectSelectionContext`。就近维护布局、行操作、输出、输入及状态样式 | 继续使用既有 project/session、terminal store，shell 只负责 drawer 与 resize |
 | Settings / Knowledge / Onboarding | 各 feature 入口负责导航与页面；编辑任务复用 TaskDialog | 维持单一查询/选择事实源；异步失效、未保存离开、弹层焦点与教程生命周期就近验证 |
 | Context / Material | `patterns/ContextBreakdownPopover`、`MaterialContextEditor` / `Viewer` 负责展示；Material 使用共享 TaskDialog | Context 展开值和写入回调由 Composer owner 提供；pattern 不写业务 store |
 

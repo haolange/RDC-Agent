@@ -257,3 +257,10 @@
 .work-process-approval {
   padding: var(--transcript-card-padding);
 }
+
+@media (max-width: 720px) {
+  .work-process-header {
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
+  }
+}

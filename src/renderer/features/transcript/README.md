@@ -5,8 +5,9 @@
 ## 职责
 
 - `workProcessTracePresentation`：将 block / loop 投影为消息内工作过程，处理 commentary、thinking、计数和默认展开。
+- `workProcessBlockProjection` 编排 block；`workProcessLlmProjection` 投影模型回合，`workProcessStandaloneProjection` 投影计划、提问、审批、压缩和诊断。
 - `workProcessToolRows`：工具行的状态、标题、目标、审批信息和结果组合；`workProcessDecisionRows` 负责审批、用户提问和计划行。
-- `workProcessToolContent`：按工具语义解释结果；`workProcessContentText` 负责 envelope / 文本 / JSON 解析，`workProcessWebPresentation` 负责来源与网页内容。纯函数只解释结果，不执行工具。
+- `workProcessToolContent` 按工具族分发：artifact、shell、skill、catalog、file、web、generic 各自解释结果，共享清洗在 `workProcessToolContentShared`。`workProcessContentText` 负责 envelope / 文本 / JSON 解析，`workProcessWebPresentation` 负责来源与网页内容。纯函数只解释结果，不执行工具。
 - `workProcessTypes`、`workProcessFormat`、`workProcessStatus`、`workProcessBlockText`：共享行类型、格式与文字判定。消费者直接导入实际模块，不经过转发聚合文件。
 - `WorkProcess*` 组件渲染投影；计划阅读器独立于消息列表挂载，保留弹窗与焦点恢复生命周期。
 - `useTranscriptScroll` 只在读者仍靠近底部时跟随新消息、流式更新与内容尺寸变化；`VirtualMessageList` 保留短列表全量渲染、长列表窗口化与工具定位。

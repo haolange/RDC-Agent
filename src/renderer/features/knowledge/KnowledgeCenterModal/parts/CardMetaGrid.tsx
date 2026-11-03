@@ -1,7 +1,7 @@
 import { Details } from '../../../../ui/Details';
 import { KNOWLEDGE_SCOPE_AXES, type KnowledgeCardDetail } from '@shared/types/knowledge';
 import { useI18n } from '../../../../i18n';
-import { formatKnowledgeTime, LIFECYCLE_LABEL_KEYS, SCOPE_LABELS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
+import { formatKnowledgeTime, LIFECYCLE_LABEL_KEYS, SCOPE_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { Button } from '../../../../ui/Button';
 import { CardBadges } from './CardBadges';
 
@@ -25,7 +25,7 @@ function formatBytes(size: number): string {
  * provenance block (import hash / mtime / size) when the card was ingested.
  */
 export function CardMetaGrid({ card, spaceLabel, onOpenRelation }: CardMetaGridProps) {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const exclusions = card.scope.exclusions ?? {};
   const axes = KNOWLEDGE_SCOPE_AXES.filter((axis) => card.scope[axis] || exclusions[axis]?.length);
   const hasProvenance = Boolean(card.sourceHash || card.sourceMtimeMs != null || card.sourceSize != null);
@@ -72,7 +72,7 @@ export function CardMetaGrid({ card, spaceLabel, onOpenRelation }: CardMetaGridP
               <dl className="knowledge-center-meta knowledge-center-meta--compact">
                 {axes.map((axis) => (
                   <div key={axis}>
-                    <dt title={axis}>{SCOPE_LABELS[axis][language === 'zh-CN' ? 1 : 0]}</dt>
+                    <dt title={axis}>{t(SCOPE_LABEL_KEYS[axis])}</dt>
                     <dd>
                       {card.scope[axis] ?? '—'}
                       {exclusions[axis]?.length ? (

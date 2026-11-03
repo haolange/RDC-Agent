@@ -5,8 +5,6 @@ import { RightRail } from '../features/right-rail/RightRail';
 import { DeviceSelector } from '../features/captures/DeviceSelector';
 import { Sidebar } from '../features/sidebar/Sidebar';
 import { TerminalDrawer } from '../features/terminal/TerminalDrawer';
-import { Button } from '../ui/Button';
-import { ProfileAvatar } from '../patterns/ProfileAvatar';
 import { Composer } from '../features/composer/Composer';
 import type { ComposerController } from '../features/composer/useComposer';
 import type { TranslationKey } from '../i18n';
@@ -14,6 +12,7 @@ import { APP_RESIZE_HANDLE_WIDTH } from '@shared/constants/layout';
 import { useDynStyle } from '../lib/useDynStyle';
 import { isDockedResizeHandleVisible, ResizeHandle } from '../shell/ResizeHandle';
 import { WorkbenchPanelDrawer } from './WorkbenchPanelDrawer';
+import { SidebarFooter } from './SidebarFooter';
 
 type DragSide = 'left' | 'right';
 
@@ -102,57 +101,15 @@ export function WorkbenchShell({
       <Sidebar collapsed={isLeftDrawerMode ? false : effectiveLeftCollapsed} />
     </nav>
     {(isLeftDrawerMode || !effectiveLeftCollapsed) && (
-      <div className="app-sidebar-footer" data-testid="sidebar-footer">
-        <Button
-          variant="ghost"
-          className="footer-entry sidebar-footer-entry"
-          data-testid="sidebar-knowledge-center-trigger"
-          onClick={() => { onCloseLeftDrawer(); onOpenKnowledgeCenter(); }}
-          title={t('knowledgeCenter.title')}
-          aria-label={t('knowledgeCenter.title')}
-        >
-          <span className="footer-entry-main">
-            <span className="sidebar-knowledge-icon" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15z" />
-              </svg>
-            </span>
-            <span className="footer-entry-copy">
-              <span className="footer-entry-title">{t('knowledgeCenter.sidebarLabel')}</span>
-            </span>
-          </span>
-        </Button>
-        <Button
-          variant="ghost"
-          className="footer-entry sidebar-footer-entry"
-          data-testid="sidebar-user-settings-trigger"
-          aria-haspopup="dialog"
-          aria-expanded={isUserMenuOpen}
-          aria-controls={isUserMenuOpen ? 'sidebar-user-menu' : undefined}
-          onClick={(event) => { onCloseLeftDrawer(); onUserMenuToggle(event); }}
-          title={t('sidebar.userSettings')}
-          aria-label={t('sidebar.userSettings')}
-        >
-          <span className="footer-entry-main">
-            <ProfileAvatar
-              className="footer-entry-avatar"
-              avatarPath={avatarPath}
-              nickname={nickname}
-            />
-            <span className="footer-entry-copy">
-              <span className="footer-entry-title">{nickname}</span>
-            </span>
-          </span>
-          <span className="footer-entry-trailing">
-            <span className="footer-entry-chevron">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </span>
-          </span>
-        </Button>
-      </div>
+      <SidebarFooter
+        t={t}
+        nickname={nickname}
+        avatarPath={avatarPath}
+        isUserMenuOpen={isUserMenuOpen}
+        onCloseLeftDrawer={onCloseLeftDrawer}
+        onOpenKnowledgeCenter={onOpenKnowledgeCenter}
+        onUserMenuToggle={onUserMenuToggle}
+      />
     )}
   </>;
 

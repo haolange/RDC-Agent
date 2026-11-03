@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadProjectsOp, loadSessionsOp, selectSessionOp, type ProjectSelectionLoaderOpsContext } from './projectSelectionLoaderOps';
-import { handleProjectSelectOp, handleSessionActivateOp, type ProjectSelectionHandlerOpsContext } from './projectSelectionHandlerOps';
+import type { ProjectSelectionHandlerOpsContext, ProjectSelectionLoaderOpsContext } from './projectSelectionContext';
+import { handleProjectSelectOp, loadProjectsOp, loadSessionsOp } from './projectSelectionProjectOps';
+import { handleSessionActivateOp, selectSessionOp } from './projectSelectionSessionOps';
 import type { ProjectRecord } from '@shared/types/session';
 import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
 
