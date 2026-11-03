@@ -7,9 +7,11 @@ const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname.rep
 const args = process.argv.slice(2);
 const check = args.includes('--check');
 const catalogIndex = args.indexOf('--catalog');
+// Authoring input only: never shipped or used as an executable runtime catalog.
+const catalogSnapshotPath = path.join(repoRoot, 'scripts', 'fidelity', 'rdc-tool-guide-catalog.json');
 const catalogPath = path.resolve(catalogIndex >= 0 && args[catalogIndex + 1]
   ? args[catalogIndex + 1]
-  : path.join(repoRoot, '..', 'RDC-Tool', 'spec', 'tool_catalog.json'));
+  : catalogSnapshotPath);
 const membersPath = path.join(repoRoot, 'resources', 'agent-runtime', 'rdc-tool-guide-members.json');
 
 function readJson(filePath) {
@@ -140,5 +142,8 @@ for (const [profile, guideConfig] of Object.entries(members.guides ?? {})) {
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     fs.writeFileSync(outputPath, output, 'utf8');
   }
+}
+if (!check && catalogPath !== catalogSnapshotPath) {
+  fs.writeFileSync(catalogSnapshotPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');
 }
 console.log(`[rdc-tool-guides] ${check ? 'fresh' : 'generated'}: ${Object.keys(members.guides).length} guides from ${catalog.fingerprint}`);
