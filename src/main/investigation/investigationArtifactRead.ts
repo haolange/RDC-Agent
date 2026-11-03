@@ -1,7 +1,7 @@
 import {
   ARTIFACT_READ_MAX_OUTPUT_LINES, SESSION_ARTIFACT_MAX_FILE_BYTES, SessionArtifactError,
 } from '@shared/types/sessionArtifact';
-import type { SessionArtifactResolver } from '../sessions/SessionArtifactResolver';
+import type { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 
 /** Internal complete JSON reads retain the Resolver's ownership, file bound and hash checks. */
 export function readCompleteInvestigationArtifact(

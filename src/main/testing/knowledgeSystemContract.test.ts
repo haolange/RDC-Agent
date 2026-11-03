@@ -24,8 +24,8 @@ import {
 import {
   combineActiveSkillAllowlists,
   intersectSkillAllowedTools,
-} from '../workflow/debugger/DebuggerRuntimePolicy';
-import { isDeferredToolName, partitionDeferredTools } from '../workflow/debugger/deferredTools';
+} from '../agent-runtime/orchestration/RuntimeToolPolicy';
+import { isDeferredToolName, partitionDeferredTools } from '../agent-runtime/orchestration/deferredTools';
 
 const FIVE_DEFERRED = [
   'knowledge_browse',

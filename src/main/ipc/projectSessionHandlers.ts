@@ -5,11 +5,11 @@ import type {
   RunSummary,
   SessionRecord,
 } from '@shared/types/session';
-import { runExecutionService } from '../workflow/debugger/RunExecutionService';
-import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
-import { storageAdapter } from '../sessions/StorageAdapter';
+import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
+import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
-import { rdcCliInvokerService } from '../tools/RdcCliInvokerService';
+import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
@@ -35,12 +35,12 @@ import {
 import { createSessionWithHooks, removeSessionWithHooks } from '../hooks/sessionLifecycle';
 import { conversationService } from '../conversation/ConversationService';
 import { applyDeclaredHandoff } from '../conversation/applyDeclaredHandoff';
-import { projectSessionForClient } from '../sessions/projectSessionHandoff';
+import { projectSessionForClient } from '../sessions/store/projectSessionHandoff';
 import { resolveEnabledAgentDefinition } from '../conversation/ConversationRoutePreflight';
 import { classifyAgentToolEligibility, describeAgentToolIneligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
-import { resolveEffectiveModel } from '../settings/EffectiveModelResolver';
-import { settingsService } from '../settings/SettingsService';
+import { resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
+import { settingsService } from '../settings/settings-core/SettingsService';
 import { registerProjectInputLifecycleHandlers } from './projectInputLifecycleHandlers';
 import { rdcSessionService } from '../sessions';
 

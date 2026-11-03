@@ -1,5 +1,5 @@
-import { executeRdcShell } from '../../../tools/executeRdcShell';
-import { parseShellRdcInput, type RdcShellInput } from '../../../tools/RdcShellInput';
+import { executeRdcShell } from '../../../rdc/executeRdcShell';
+import { parseShellRdcInput, type RdcShellInput } from '../../../rdc/RdcShellInput';
 /**
  * ShellTool — spawn a fresh interpreter for each call and persist only cwd.
  */
@@ -17,7 +17,7 @@ import {
 import { processSupervisor } from '../../../runtime/ProcessSupervisor';
 import { shellResolver, type ShellKind } from '../../../runtime/ShellResolver';
 import { describeResolvedShell, resolveConfiguredShell } from '../../../runtime/resolveConfiguredShell';
-import { storageAdapter } from '../../../sessions/StorageAdapter';
+import { storageAdapter } from '../../../sessions/store/StorageAdapter';
 import {
   buildAgentShellEnv,
   createShellTrailerMarker,

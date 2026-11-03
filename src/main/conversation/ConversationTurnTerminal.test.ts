@@ -7,8 +7,8 @@ const storage = vi.hoisted(() => ({
   readConversationHistory: vi.fn(),
   readConversationBranchState: vi.fn(),
 }));
-vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: storage }));
-vi.mock('../workflow/debugger/WorkflowProjectionPublisher', () => ({ workflowProjectionPublisher: {} }));
+vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: storage }));
+vi.mock('../agent-runtime/orchestration/WorkflowProjectionPublisher', () => ({ workflowProjectionPublisher: {} }));
 vi.mock('../agent-trace/TraceService', () => ({ traceService: {} }));
 
 import { assertTerminalContextOwnership } from './ConversationTurnTerminal';

@@ -35,7 +35,7 @@ vi.mock('../conversation/attachmentPreview', () => ({
   assertAttachmentPreviewPath,
 }));
 
-vi.mock('../sessions/StorageAdapter', () => ({
+vi.mock('../sessions/store/StorageAdapter', () => ({
   storageAdapter: {
     listSessionAttachments,
     getSessionAttachmentsDir,

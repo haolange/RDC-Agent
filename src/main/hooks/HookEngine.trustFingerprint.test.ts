@@ -44,9 +44,9 @@ describe('HookEngine trust fingerprint', () => {
       'src/main/hooks/sessionLifecycle.ts',
       'src/main/hooks/runtimeHookDispatch.ts',
       'src/main/conversation/applyDeclaredHandoff.ts',
-      'src/main/workflow/debugger/AgentTurnRunner.ts',
-      'src/main/workflow/debugger/ToolExecutorFactory.ts',
-      'src/main/workflow/debugger/RuntimeToolAssembly.ts',
+      'src/main/agent-runtime/orchestration/AgentTurnRunner.ts',
+      'src/main/agent-runtime/orchestration/ToolExecutorFactory.ts',
+      'src/main/agent-runtime/orchestration/RuntimeToolAssembly.ts',
       'src/main/agent-runtime/context/ExecutionContextWindow.ts',
     ].map((relative) => fs.readFileSync(path.join(repoRoot, relative), 'utf8')).join('\n');
     for (const event of CANONICAL_HOOK_EVENTS) {

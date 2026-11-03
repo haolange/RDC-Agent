@@ -1,4 +1,4 @@
-import { RdcExecutionReceipts } from '../tools/RdcExecutionReceipts';
+import { RdcExecutionReceipts } from '../rdc/RdcExecutionReceipts';
 import { assertExecutionEvidence } from './investigationExecutionEvidence';
 import * as path from 'path';
 import { generateEventId } from '@shared/utils/id';
@@ -21,7 +21,7 @@ import {
 } from '@shared/types/renderdocInvestigation';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { readCompleteInvestigationArtifact } from './investigationArtifactRead';
-import { SessionArtifactResolver, sessionArtifactResolver } from '../sessions/SessionArtifactResolver';
+import { SessionArtifactResolver, sessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { InvestigationError, isInvestigationStoreDegraded, toInvestigationError } from './investigationErrors';
 import {
   collectStalePropagation,

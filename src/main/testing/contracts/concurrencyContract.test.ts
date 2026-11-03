@@ -7,7 +7,7 @@ import { mkdtemp, writeFile, rm } from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import type { AgentEvent } from '@shared/types/agentRuntime';
-import { TurnCoordinator } from '../../workflow/debugger/TurnCoordinator';
+import { TurnCoordinator } from '../../agent-runtime/orchestration/TurnCoordinator';
 import { safeResolvePath } from '../../agent-runtime/tools/primitives/_shared';
 
 function makeEvent(id: string, sessionId: string): AgentEvent {

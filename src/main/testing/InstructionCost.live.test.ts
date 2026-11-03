@@ -4,11 +4,11 @@ import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import { PromptPlanBuilder } from '../agent-runtime/prompt/PromptPlanBuilder';
-import { parseAgentMarkdownStrict } from '../settings/agentManifestParse';
+import { parseAgentMarkdownStrict } from '../settings/agent-manifests/agentManifestParse';
 
 vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() } }));
 vi.mock('../runtime/resolveConfiguredShell', () => ({ resolveConfiguredShell: () => { throw new Error('Text-only comparison'); } }));
-vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: { readSessionShellCwd: () => null } }));
+vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { readSessionShellCwd: () => null } }));
 
 const output = process.env.RDC_AGENT_LIVE_COST_OUTPUT;
 const enabled = process.env.RDC_AGENT_LIVE_COST_REQUESTS === '2' && !!output && !!process.env.DEEPSEEK_API_KEY;

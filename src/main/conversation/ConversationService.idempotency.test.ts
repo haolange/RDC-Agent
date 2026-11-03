@@ -4,7 +4,7 @@ vi.mock('../sessions', () => ({
   rdcSessionService: { snapshotOpenedCaptureForSession: vi.fn(() => null) },
 }));
 
-vi.mock('../sessions/StorageAdapter', () => ({
+vi.mock('../sessions/store/StorageAdapter', () => ({
   storageAdapter: {
     readSession: vi.fn(),
     listSessions: vi.fn(() => []),
@@ -17,7 +17,7 @@ vi.mock('../sessions/StorageAdapter', () => ({
   },
 }));
 
-vi.mock('../workflow/debugger/AgentOrchestrator', () => ({
+vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({
   agentOrchestrator: {
     releaseProviderRuntimeCredentials: vi.fn(),
     refreshProviderRuntimeCredentials: vi.fn(),
@@ -32,9 +32,10 @@ vi.mock('../agent-trace/TraceService', () => ({
 }));
 
 import { conversationService } from './ConversationService';
-import { storageAdapter } from '../sessions/StorageAdapter';
-import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
-import { beginRdcLifecycle, getRdcInteractionLock } from '../sessions/RdcOperationCoordinator';
+import '../rdc/registerConversationRdcHost';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { beginRdcLifecycle, getRdcInteractionLock } from '../rdc/RdcOperationCoordinator';
 
 type IdempotentService = {
   runIdempotentTurn: (

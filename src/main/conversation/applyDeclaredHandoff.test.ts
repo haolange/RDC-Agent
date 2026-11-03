@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   compatibility: vi.fn(),
 }));
 
-vi.mock('../sessions/StorageAdapter', () => ({
+vi.mock('../sessions/store/StorageAdapter', () => ({
   storageAdapter: {
     readSession: mocks.readSession,
     getProjectById: mocks.getProjectById,
@@ -23,7 +23,7 @@ vi.mock('../sessions/StorageAdapter', () => ({
     },
   },
 }));
-vi.mock('../sessions/PlanReviewStateStore', () => ({
+vi.mock('../sessions/run/PlanReviewStateStore', () => ({
   planReviewStateStore: { read: mocks.planRead },
 }));
 vi.mock('./ConversationRoutePreflight', () => ({
@@ -32,8 +32,8 @@ vi.mock('./ConversationRoutePreflight', () => ({
 vi.mock('../hooks/runtimeHookDispatch', () => ({
   dispatchRuntimeHooks: mocks.dispatchHooks,
 }));
-vi.mock('../sessions/handoffSkillCompatibility', () => ({ assertDeclaredHandoffSkillCompatibility: mocks.compatibility }));
-vi.mock('../sessions/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: () => ({ markdown: '# Approved plan' }) } }));
+vi.mock('../sessions/run/handoffSkillCompatibility', () => ({ assertDeclaredHandoffSkillCompatibility: mocks.compatibility }));
+vi.mock('../sessions/run/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: () => ({ markdown: '# Approved plan' }) } }));
 
 import { applyDeclaredHandoff, writeExecutionOfferFromApproval } from './applyDeclaredHandoff';
 

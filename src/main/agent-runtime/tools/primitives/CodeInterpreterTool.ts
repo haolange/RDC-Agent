@@ -6,7 +6,7 @@ import type { AgentTool } from '../../agent/AgentTool';
 import { requireMutationWorkspaceRoot, truncateOutput } from './_shared';
 import { SHELL_MAX_OUTPUT_BYTES } from './toolLimits';
 import { processSupervisor, type ProcessExitReason } from '../../../runtime/ProcessSupervisor';
-import { settingsService } from '../../../settings/SettingsService';
+import { settingsService } from '../../../settings/settings-core/SettingsService';
 import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
 import { detectImageMagicMime } from '../../../conversation/ConversationAttachmentMaterializer';
 

@@ -7,7 +7,7 @@ import type {
   Model,
   StreamOptions,
 } from '../core/types';
-import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
+import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {

@@ -1,5 +1,5 @@
 import type { CommandDefinition } from '@shared/types/command';
-import { storageAdapter } from '../../sessions/StorageAdapter';
+import { storageAdapter } from '../../sessions/store/StorageAdapter';
 
 export const costCommand: CommandDefinition = {
   id: 'cost',

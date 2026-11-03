@@ -1,10 +1,10 @@
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { AgentMessage, AssistantMessage, Message, ToolResultMessage } from '../core/types';
-import { storageAdapter } from '../../sessions/StorageAdapter';
-import { planArtifactWriter } from '../../sessions/sessionPlanArtifact';
+import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { redactSecretsDeep } from '../../runtime/secretRedaction';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import { rdcExecutionReceipts } from '../../tools/RdcExecutionReceipts';
+import { rdcExecutionReceipts } from '../../rdc/RdcExecutionReceipts';
 import { fileOperationBoundary } from './FileOperationBoundary';
 
 function boundedObservation(value: unknown, maxChars: number): unknown {

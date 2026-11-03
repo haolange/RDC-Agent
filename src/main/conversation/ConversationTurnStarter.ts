@@ -10,13 +10,13 @@ import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import path from 'node:path';
 import { generateEventId, nowMs } from '@shared/utils/id';
-import { settingsService } from '../settings/SettingsService';
-import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
-import { planEffectiveModelRequest, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
-import { resolveCompactionPercentForSettings } from '../settings/compactionPercent';
+import { settingsService } from '../settings/settings-core/SettingsService';
+import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { planEffectiveModelRequest, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
+import { resolveCompactionPercentForSettings } from '../settings/settings-core/compactionPercent';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
-import { storageAdapter } from '../sessions/StorageAdapter';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { traceService } from '../agent-trace/TraceService';
 import { createDefaultBranchState, resolveVisibleConversationMessages } from './ConversationBranchResolver';
 import { createDraftWorkTrace, finalizeTrace } from './ConversationWorkTrace';
@@ -37,7 +37,7 @@ import {
   resolveEnabledAgentDefinition,
 } from './ConversationRoutePreflight';
 import type { CompleteProfileTurnInput } from './ConversationTurnRunner';
-import type { PolicyBudgetState } from '../workflow/debugger/TurnCoordinator';
+import type { PolicyBudgetState } from '../agent-runtime/orchestration/TurnCoordinator';
 import {
   createContinuationDropNotice,
   shouldAnnounceContinuationDrop,

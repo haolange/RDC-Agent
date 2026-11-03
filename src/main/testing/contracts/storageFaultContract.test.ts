@@ -11,7 +11,7 @@ import {
   readJsonl,
   writeJsonl,
 } from '@shared/utils/jsonl';
-import { StorageIo } from '../../sessions/StorageIo';
+import { StorageIo } from '../../sessions/store/StorageIo';
 
 describe('storageFaultContract: corrupted JSONL', () => {
   let root = '';

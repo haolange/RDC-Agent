@@ -9,7 +9,7 @@ import {
   type ContinuationReplayReason,
 } from '../agent-runtime/reasoning/ContinuationReplayPolicy';
 import { providerStateReuseReason } from '../agent-runtime/reasoning/ProviderStateRefs';
-import { storageAdapter } from '../sessions/StorageAdapter';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { INTERRUPTED_CONVERSATION_SUMMARY } from './DelegatedInteractionRecovery';
 import { normalizeBranchId } from './ConversationBranchResolver';
 

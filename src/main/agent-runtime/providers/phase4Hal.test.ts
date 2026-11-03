@@ -16,7 +16,7 @@ import type {
   ApiKeyAuth,
   OAuthAuth,
   ProviderAuth,
-} from '../../settings/CredentialStoreInterface';
+} from '../../settings/settings-core/CredentialStoreInterface';
 import openrouterManifest from '@shared/provider-catalog/manifests/surfaces/openrouter.json';
 
 // =====================================================================

@@ -2,7 +2,7 @@
  * /skills — 列出或执行当前工作区的 Markdown Skills。
  */
 import type { CommandDefinition } from '@shared/types/command';
-import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
+import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
 
 export const skillsCommand: CommandDefinition = {
   id: 'skills',

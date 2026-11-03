@@ -1,4 +1,4 @@
-vi.mock('../settings/SettingsService', () => ({ settingsService: { getAll: () => ({ appearance: { language: electronState.language } }) } }));
+vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ appearance: { language: electronState.language } }) } }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { dialog } from 'electron';
 

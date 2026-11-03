@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { nowIso } from '@shared/utils/id';
 import type { ArtifactRecord } from '@shared/types/harness';
-import { runScopedStore } from '../workflow/debugger/RunScopedStore';
+import { runScopedStore } from '../agent-runtime/orchestration/RunScopedStore';
 
 export interface ArtifactStoreSnapshot {
   schemaVersion: '1';

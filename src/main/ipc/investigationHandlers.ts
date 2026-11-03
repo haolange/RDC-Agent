@@ -3,7 +3,7 @@ import type { InvestigationReadIpcResult } from '@shared/types/renderdocInvestig
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { InvestigationError, isInvestigationStoreDegraded } from '../investigation/investigationErrors';
 import { investigationArtifactService } from '../investigation/InvestigationArtifactService';
-import { storageAdapter } from '../sessions/StorageAdapter';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { listInvestigationArtifacts } from '../agent-trace/rightRailInvestigationArtifacts';
 import { InvestigationReadArgsSchema, InvestigationListArgsSchema } from './validation/investigationSchemas';

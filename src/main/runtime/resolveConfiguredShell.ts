@@ -1,4 +1,4 @@
-import { settingsService } from '../settings/SettingsService';
+import { settingsService } from '../settings/settings-core/SettingsService';
 import {
   formatShellDialect,
   formatShellInterpreterLabel,

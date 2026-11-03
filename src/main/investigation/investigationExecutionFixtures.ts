@@ -1,5 +1,5 @@
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
-import { RdcExecutionReceipts, rdcDigest, type RdcExecutionReceipt } from '../tools/RdcExecutionReceipts';
+import { RdcExecutionReceipts, rdcDigest, type RdcExecutionReceipt } from '../rdc/RdcExecutionReceipts';
 
 /** Signed fixture results model a successful native A-B-A; never a production evidence source. */
 export function executionReceiptFixtures(sessionId: string, experimentId: string): RdcExecutionReceipt[] {

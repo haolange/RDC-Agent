@@ -3,7 +3,7 @@ import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { SessionScope } from '@shared/types/session';
 import type { TraceSessionResult } from '@shared/types/trace';
 import { traceService } from './TraceService';
-import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
+import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 
 export interface TraceProjectionRefreshDeps {
   getProjection(sessionId: string): Promise<TraceSessionResult>;

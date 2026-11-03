@@ -15,7 +15,7 @@ vi.mock('electron', () => ({
   },
   shell: { openExternal: vi.fn() },
 }));
-vi.mock('../settings/SettingsService', () => ({ settingsService: {
+vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: {
   getAll: () => ({ appearance: { language: state.language } }),
 } }));
 

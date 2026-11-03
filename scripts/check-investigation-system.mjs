@@ -104,7 +104,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
   {
     id: 'investigation.forbidden.ask-plan-edit.seed',
     kind: 'forbidden',
-    file: 'src/main/settings/AgentManifestService.ts',
+    file: 'src/main/settings/agent-manifests/AgentManifestService.ts',
     pattern: "const createSeedDefinition[\\s\\S]*agentId === 'ask'[\\s\\S]*agentId === 'plan'[\\s\\S]*agentId === 'edit'",
     probe: 'source-pattern',
     note: 'Ask/Plan/Edit user seed writer is current debt',
@@ -128,7 +128,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
   {
     id: 'investigation.forbidden.ask-plan-edit.fallback',
     kind: 'forbidden',
-    file: 'src/main/workflow/debugger/AgentSlotRegistry.ts',
+    file: 'src/main/agent-runtime/orchestration/AgentSlotRegistry.ts',
     pattern: "fallbackAgentId[\\s\\S]*'edit'",
     probe: 'source-pattern',
     note: 'unknown agents still fall back to Edit',
@@ -184,7 +184,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
   {
     id: 'investigation.forbidden.task-board',
     kind: 'forbidden',
-    file: 'src/main/workflow/debugger/TaskBoard.ts',
+    file: 'src/main/agent-runtime/orchestration/TaskBoard.ts',
     pattern: 'export class TaskBoard',
     probe: 'source-pattern',
     note: 'TaskBoard is current debt',
@@ -240,7 +240,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
   {
     id: 'investigation.forbidden.session-evidence.schema',
     kind: 'forbidden',
-    file: 'src/main/sessions/storageSchema.ts',
+    file: 'src/main/sessions/store/storageSchema.ts',
     pattern: 'SESSION_EVIDENCE_MIGRATIONS',
     probe: 'source-pattern',
     note: 'session_evidence schema is current debt',
@@ -248,7 +248,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
   {
     id: 'investigation.forbidden.session-evidence.write',
     kind: 'forbidden',
-    file: 'src/main/sessions/SessionRecordStore.ts',
+    file: 'src/main/sessions/store/SessionRecordStore.ts',
     pattern: 'session_evidence\\.yaml',
     probe: 'source-pattern',
     note: 'session_evidence write path is current debt',

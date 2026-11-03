@@ -1,9 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { verifyApprovedPlanExit } from './approvedPlanExit';
 const mock = vi.hoisted(() => ({ state: {} as Record<string, unknown>, offer: {} as Record<string, unknown>, read: vi.fn() }));
-vi.mock('../sessions/PlanReviewStateStore', () => ({ planReviewStateStore: { read: () => mock.state } }));
-vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: { executionOffers: { read: () => mock.offer } } }));
-vi.mock('../sessions/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: mock.read } }));
+vi.mock('../sessions/run/PlanReviewStateStore', () => ({ planReviewStateStore: { read: () => mock.state } }));
+vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { executionOffers: { read: () => mock.offer } } }));
+vi.mock('../sessions/run/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: mock.read } }));
 const approved = { toolCallId: 'c', planId: 'p', frozenUri: 'session://plans/plan-p.md', hash: 'h', target: 'general' };
 beforeEach(() => { vi.clearAllMocks(); mock.state = { status: 'approved', ownerTurnId: 't', planId: 'p', approvedHash: 'h', frozenUri: approved.frozenUri, approvedHandoff: { agent: 'general' } }; mock.offer = { plan: { hash: 'h', uri: approved.frozenUri }, targetAgentId: 'general' }; });
 it('accepts only an owning frozen approval and actually verifies the frozen bytes', () => {

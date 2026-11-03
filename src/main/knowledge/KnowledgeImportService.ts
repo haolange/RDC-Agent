@@ -8,7 +8,7 @@ import type {
   KnowledgeImportResult,
   KnowledgeSpace,
 } from '@shared/types/knowledge';
-import { StorageIo } from '../sessions/StorageIo';
+import { StorageIo } from '../sessions/store/StorageIo';
 import { KnowledgeDraftMigrationConflictError } from './knowledgeErrors';
 import {
   hashKnowledgeImportBytes,

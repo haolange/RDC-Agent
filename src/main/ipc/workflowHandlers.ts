@@ -3,9 +3,9 @@ import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRef
 import type { RunContextUsageReadResult } from '@shared/types/session';
 import type { WorkflowState } from '@shared/types/workflow';
 import { nowIso } from '@shared/utils/id';
-import { storageAdapter } from '../sessions/StorageAdapter';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { rdcSessionService } from '../sessions';
-import { runExecutionService } from '../workflow/debugger/RunExecutionService';
+import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';

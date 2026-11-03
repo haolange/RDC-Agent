@@ -13,9 +13,9 @@ import type {
   Model,
   StreamOptions,
 } from '../core/types';
-import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
-import { CLAUDE_ACCOUNT_WIRE_HEADERS } from '../../settings/ClaudeWire';
-import { COPILOT_WIRE_HEADERS } from '../../settings/CopilotWire';
+import { providerAccountAuthService } from '../../settings/provider-auth/ProviderAccountAuthService';
+import { CLAUDE_ACCOUNT_WIRE_HEADERS } from '../../settings/provider-auth/ClaudeWire';
+import { COPILOT_WIRE_HEADERS } from '../../settings/provider-auth/CopilotWire';
 import { AnthropicProvider } from './AnthropicProvider';
 import { AzureOpenAIResponsesProvider } from './AzureOpenAIResponsesProvider';
 import { BedrockConverseProvider } from './BedrockConverseProvider';
@@ -29,8 +29,8 @@ import { streamWithUnauthorizedRefresh } from './AccountStreamRetry';
 import {
   createAwsBedrockRequestAuthorizerFromCredentials,
   type ProviderRequestAuthorizer,
-} from '../../settings/AwsBedrockCredentials';
-import { providerRuntimeCredentialService } from '../../settings/ProviderRuntimeCredentialService';
+} from '../../settings/provider-auth/AwsBedrockCredentials';
+import { providerRuntimeCredentialService } from '../../settings/provider-auth/ProviderRuntimeCredentialService';
 import { createGitLabDuoProvider, createSapAiCoreProvider } from './DedicatedAiSdkProviders';
 
 const CONFIGURED_PROVIDER_API = 'rdc-agent-configured-provider';

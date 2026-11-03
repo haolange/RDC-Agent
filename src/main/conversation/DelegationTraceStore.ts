@@ -6,9 +6,9 @@ import type { DelegationContentKind, DelegationContentPage, DelegationTraceHeade
 import { finalizeTrace } from './ConversationWorkTrace';
 import { delegationTextPreview } from '@shared/utils/delegationTextPreview';
 import type { DelegationTaskBody } from '@shared/types/delegationTrace';
-import { storageAdapter } from '../sessions/StorageAdapter';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { safeDelegationText as safeText } from './DelegationTraceText';
-import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
+import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 import { createDelegatedProjectionState, projectDelegatedEvent, type DelegatedProjectionState } from './DelegatedWorkProjection';
 
 type TraceEntry =

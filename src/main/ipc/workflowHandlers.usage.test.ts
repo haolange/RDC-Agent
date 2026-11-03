@@ -6,11 +6,11 @@ const { readSession, getSessionContextUsage } = vi.hoisted(() => ({
   getSessionContextUsage: vi.fn(),
 }));
 
-vi.mock('../sessions/StorageAdapter', () => ({
+vi.mock('../sessions/store/StorageAdapter', () => ({
   storageAdapter: { readSession },
 }));
 
-vi.mock('../settings/DebuggerLlmService', () => ({
+vi.mock('../sessions/run/DebuggerLlmService', () => ({
   debuggerLlmService: { getSessionContextUsage },
 }));
 

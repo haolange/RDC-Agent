@@ -7,7 +7,7 @@ const { readSession } = vi.hoisted(() => ({
   readSession: vi.fn(),
 }));
 
-vi.mock('../sessions/StorageAdapter', () => ({
+vi.mock('../sessions/store/StorageAdapter', () => ({
   storageAdapter: { readSession },
 }));
 

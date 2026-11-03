@@ -3,17 +3,17 @@ import type { AgentRole } from '@shared/types/agent';
 import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 import type { ConversationPlanReview, PlanReviewHandoffIdentity } from '@shared/types/planReview';
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
-import { planArtifactWriter, type PlanArtifactWriter } from '../../sessions/sessionPlanArtifact';
-import { planReviewStateStore, type PlanReviewStateStore } from '../../sessions/PlanReviewStateStore';
-import type { TurnHandle } from '../../workflow/debugger/TurnCoordinator';
+import { planArtifactWriter, type PlanArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
+import { planReviewStateStore, type PlanReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
+import type { TurnHandle } from '../orchestration/TurnCoordinator';
 import { assertDeclaredHandoffForPlan, writeExecutionOfferFromApproval } from '../../conversation/applyDeclaredHandoff';
-import { storageAdapter } from '../../sessions/StorageAdapter';
+import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import type { PlanTaskRequirement } from '@shared/types/taskExecution';
 import { TaskRegistry, createSessionTaskStore } from '../tasks';
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
 import { randomUUID } from 'node:crypto';
 import type { PlanReadRequest, PlanReviewContext, PlanReviewProjection, ConversationAnswerPlanReviewRequest, ConversationAnswerPlanReviewResult } from '@shared/types/planReview';
-import { resolveRecoverablePlan } from '../../sessions/planReviewRecovery';
+import { resolveRecoverablePlan } from '../../sessions/run/planReviewRecovery';
 
 interface PendingPlanReviewRequest {
   reviewId: string;

@@ -17,7 +17,7 @@ vi.mock('../investigation/InvestigationArtifactService', () => ({
   investigationArtifactService: { readRecord },
 }));
 
-vi.mock('../sessions/StorageAdapter', () => ({
+vi.mock('../sessions/store/StorageAdapter', () => ({
   storageAdapter: { readSession },
 }));
 

@@ -3,9 +3,9 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { SessionArtifactResolver } from '../../sessions/SessionArtifactResolver';
-import { resetSessionArtifactQuotaLedger } from '../../sessions/SessionArtifactQuota';
-import { assertDelegatedArtifactWrite, grantDelegatedArtifactAccess, resolveDelegatedArtifactRead } from '../../sessions/DelegatedArtifactAccess';
+import { SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
+import { resetSessionArtifactQuotaLedger } from '../../sessions/artifacts/SessionArtifactQuota';
+import { assertDelegatedArtifactWrite, grantDelegatedArtifactAccess, resolveDelegatedArtifactRead } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { artifactizeToolResult } from './ToolResultArtifactizer';
 import { storeToolImage } from './ToolImageArtifact';
 

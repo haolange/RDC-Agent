@@ -12,7 +12,7 @@ vi.mock('electron', () => ({
     getPath: () => process.env.TEMP ?? process.cwd(),
   },
 }));
-vi.mock('../../../sessions/StorageAdapter', () => ({
+vi.mock('../../../sessions/store/StorageAdapter', () => ({
   storageAdapter: {
     readSessionShellCwd: (sessionId: string) => cwdBySession.get(sessionId) ?? null,
     writeSessionShellCwd: (sessionId: string, cwd: string) => {

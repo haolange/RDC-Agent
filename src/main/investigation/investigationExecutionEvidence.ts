@@ -1,7 +1,7 @@
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
-import { RdcExecutionReceipts, rdcDigest, rdcExecutionReceipts, type RdcExecutionReceipt } from '../tools/RdcExecutionReceipts';
+import { RdcExecutionReceipts, rdcDigest, rdcExecutionReceipts, type RdcExecutionReceipt } from '../rdc/RdcExecutionReceipts';
 import { InvestigationError } from './investigationErrors';
-import { parseRdcProcessIdentity } from '../tools/RdcProcessIdentity';
+import { parseRdcProcessIdentity } from '../rdc/RdcProcessIdentity';
 
 function samplingArgsFingerprint(receipt: RdcExecutionReceipt): string {
   if (receipt.evidence.kind !== 'measurement' || receipt.evidence.method !== 'image') return receipt.argsFingerprint;

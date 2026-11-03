@@ -22,11 +22,11 @@ vi.mock('node:fs', () => ({ watch: (_: string, _options: unknown, callback: type
   mocks.changed = callback;
   return { on: vi.fn(), close: mocks.close };
 } }));
-vi.mock('../captures/ProjectInputLifecycle', () => ({ ProjectInputLifecycle: class {
+vi.mock('../rdc/captures/ProjectInputLifecycle', () => ({ ProjectInputLifecycle: class {
   reconcile = vi.fn(); prepare = mocks.prepare; remove = mocks.remove;
 } }));
-vi.mock('../captures/replay/ReplayHistoryStore', () => ({ replayHistoryStore: {} }));
-vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: {
+vi.mock('../rdc/captures/replay/ReplayHistoryStore', () => ({ replayHistoryStore: {} }));
+vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: {
   projects: { setInputReconciler: vi.fn(), setInputCommitListener: vi.fn() },
   listProjects: () => [{ projectId: 'project', rootPath: 'D:/fixture' }],
   refreshProjectInputs: (...args: []) => mocks.refresh(...args),
@@ -34,7 +34,7 @@ vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: {
 vi.mock('../sessions', () => ({ rdcSessionService: {} }));
 vi.mock('../conversation/ConversationService', () => ({ conversationService: {} }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
-vi.mock('../settings/SettingsService', () => ({ settingsService: {
+vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: {
   getAll: () => ({ appearance: { language: mocks.language } }),
 } }));
 

@@ -25,7 +25,7 @@ export function resolveSessionTasksDir(sessionId: string): string {
 /** 创建会话级 FileTaskStore（写入方与投影读取方共用同一路径规则）。 */
 export function createSessionTaskStore(sessionId: string): FileTaskStore {
   return new FileTaskStore(resolveSessionTasksDir(sessionId), async () => {
-    const { readApprovedPlanTasks } = await import('../../sessions/ApprovedPlanTasks');
+    const { readApprovedPlanTasks } = await import('../../sessions/run/ApprovedPlanTasks');
     return readApprovedPlanTasks(sessionId);
   });
 }

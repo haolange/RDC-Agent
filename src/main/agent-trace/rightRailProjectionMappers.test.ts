@@ -3,7 +3,7 @@ import type { ContextSnapshot, OpenedCaptureState, RunSummary } from '@shared/ty
 import type { TraceArtifactRecord } from '@shared/types/trace';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 import { TASK_SCHEMA_VERSION } from '../agent-runtime/tasks/TaskContracts';
-import { dedupeSessionArtifactSources, type SessionArtifactSource } from '../sessions/SessionArtifactSource';
+import { dedupeSessionArtifactSources, type SessionArtifactSource } from '../sessions/artifacts/SessionArtifactSource';
 import { buildRdcContext, buildTaskContext, mapRightRailOutputs, mapRightRailProgress } from './rightRailProjectionMappers';
 
 const task = (id: string, status: TaskRecord['status'], createdAt: number, statusReason?: string): TaskRecord => ({

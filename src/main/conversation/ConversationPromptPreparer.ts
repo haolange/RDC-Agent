@@ -1,15 +1,15 @@
 import { agentAccessCeiling } from '@shared/types/agentManifest';
-import { approvedExecutionOfferForAgent } from '../sessions/handoffSkills';
+import { approvedExecutionOfferForAgent } from '../sessions/run/handoffSkills';
 import { charsToTokens } from '@shared/utils/tokens';
 import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
 import { promptPlanBuilder, resolvePromptClock } from '../agent-runtime/prompt';
-import { settingsService } from '../settings/SettingsService';
-import { agentManifestService } from '../settings/AgentManifestService';
-import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
+import { settingsService } from '../settings/settings-core/SettingsService';
+import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
+import { agentRuntimeConfigService } from '../settings/agent-manifests/AgentRuntimeConfigService';
 import { scopedInstructionResolver } from '../runtime/ScopedInstructionResolver';
 import { appPathService } from '../runtime/AppPathService';
-import { storageAdapter } from '../sessions/StorageAdapter';
-import { combineActiveSkillAllowlists, normalizeToolName, resolveAgentToolAllowlistFromDefinition } from '../workflow/debugger/DebuggerRuntimePolicy';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { combineActiveSkillAllowlists, normalizeToolName, resolveAgentToolAllowlistFromDefinition } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { repairConversationBranchState, resolveVisibleConversationMessages } from './ConversationBranchResolver';
 import type {
   AgentRoutePreflightOk,

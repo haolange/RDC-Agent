@@ -16,7 +16,7 @@ import {
   grantDelegatedLease,
   revokeDelegatedLease,
   setRdcRuntimeContextForSession,
-} from '../../sessions/RdcRuntimeContextRegistry';
+} from '../../rdc/RdcRuntimeContextRegistry';
 import type { RdcRuntimeContext } from '@shared/types/session';
 
 function ctx(id: string): RdcRuntimeContext {

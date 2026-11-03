@@ -5,10 +5,10 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 
 const fixture = vi.hoisted(() => ({ root: '', publish: vi.fn() }));
-vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: {
+vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: {
   readSession: (id: string) => id === 'owner' ? { sessionPath: fixture.root } : null,
 } }));
-vi.mock('../workflow/debugger/WorkflowProjectionPublisher', () => ({ workflowProjectionPublisher: { publish: fixture.publish } }));
+vi.mock('../agent-runtime/orchestration/WorkflowProjectionPublisher', () => ({ workflowProjectionPublisher: { publish: fixture.publish } }));
 import { delegationTraceStore } from './DelegationTraceStore';
 
 afterEach(() => {

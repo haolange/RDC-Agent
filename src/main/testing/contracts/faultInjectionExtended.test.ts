@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { StorageIo } from '../../sessions/StorageIo';
+import { StorageIo } from '../../sessions/store/StorageIo';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -81,9 +81,9 @@ describe('faultInjectionContract: two processes writing project registry', () =>
     io.writeJsonAtomic(filePath, { schemaVersion: '1', projects: [] });
     const workerPath = path.join(root, 'worker.cjs');
     const registerPath = path.resolve(__dirname, '../../../../scripts/register-ts-source.cjs');
-    const lockPath = path.resolve(__dirname, '../../sessions/directoryFileLock.ts');
-    const ioPath = path.resolve(__dirname, '../../sessions/StorageIo.ts');
-    const schemaPath = path.resolve(__dirname, '../../sessions/storageSchema.ts');
+    const lockPath = path.resolve(__dirname, '../../sessions/store/directoryFileLock.ts');
+    const ioPath = path.resolve(__dirname, '../../sessions/store/StorageIo.ts');
+    const schemaPath = path.resolve(__dirname, '../../sessions/store/storageSchema.ts');
     fs.writeFileSync(workerPath, `
 require(${JSON.stringify(registerPath)});
 const { withDirectoryFileLockSync } = require(${JSON.stringify(lockPath)});
@@ -135,7 +135,7 @@ withDirectoryFileLockSync(dir, { lockFileName: '.registry.lock', timeoutCode: 'P
     ]);
     expect(first.code, first.stderr).toBe(0);
     expect(second.code, second.stderr).toBe(0);
-    const { parseStoredDocument, PROJECT_REGISTRY_MIGRATIONS } = await import('../../sessions/storageSchema');
+    const { parseStoredDocument, PROJECT_REGISTRY_MIGRATIONS } = await import('../../sessions/store/storageSchema');
     const parsed = parseStoredDocument(
       JSON.parse(fs.readFileSync(filePath, 'utf8')),
       PROJECT_REGISTRY_MIGRATIONS,

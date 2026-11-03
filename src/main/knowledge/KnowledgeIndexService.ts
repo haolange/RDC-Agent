@@ -3,8 +3,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { KnowledgeSpace } from '@shared/types/knowledge';
 import { appPathService } from '../runtime/AppPathService';
-import { storageAdapter } from '../sessions/StorageAdapter';
-import { StorageIo } from '../sessions/StorageIo';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { StorageIo } from '../sessions/store/StorageIo';
 import { parseKnowledgeFrontmatter } from './knowledgeCardSchema';
 import { KNOWLEDGE_INDEX_MIGRATIONS } from './knowledgeIndexSchema';
 import {

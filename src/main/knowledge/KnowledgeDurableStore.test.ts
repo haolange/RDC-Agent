@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { KnowledgeCardRecord, SessionKnowledgeCandidate } from '@shared/types/knowledge';
-import { acquireDirectoryFileLock, releaseDirectoryFileLock } from '../sessions/directoryFileLock';
+import { acquireDirectoryFileLock, releaseDirectoryFileLock } from '../sessions/store/directoryFileLock';
 import { parseKnowledgeFrontmatter, sourceStatusImpliesVerified } from './knowledgeCardSchema';
 import { KNOWLEDGE_IMPORT_MAX_BYTES, ingestKnowledgeFromPath, sanitizeProvenanceToken } from './knowledgeIngest';
 import {
@@ -36,7 +36,7 @@ import { KnowledgeIndexService } from './KnowledgeIndexService';
 import { KnowledgeWriteService } from './KnowledgeWriteService';
 import { KNOWLEDGE_STATE_LOCK_FILE, KNOWLEDGE_STATE_LOCK_TIMEOUT } from './knowledgeStateSchema';
 import { serializeKnowledgeCard } from './knowledgeCardSchema';
-import { StorageIo } from '../sessions/StorageIo';
+import { StorageIo } from '../sessions/store/StorageIo';
 
 const roots: string[] = [];
 

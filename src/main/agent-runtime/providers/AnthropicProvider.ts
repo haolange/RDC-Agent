@@ -16,7 +16,7 @@ import type {
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
-import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
+import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import type { ReasoningVisibility } from '@shared/types/agentRuntime';
 import { AssistantStreamBuilder, createProviderOutputRef } from './internal/AssistantStreamBuilder';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';

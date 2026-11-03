@@ -6,7 +6,7 @@ import {
   assertSapAiCoreApiUrl,
   createSapAiCoreDestination,
   parseSapAiCoreServiceKey,
-} from '../../settings/SapAiCoreCredentials';
+} from '../../settings/provider-auth/SapAiCoreCredentials';
 import { AiSdkStreamingProvider } from './AiSdkStreamingProvider';
 
 interface DedicatedProviderConfig {

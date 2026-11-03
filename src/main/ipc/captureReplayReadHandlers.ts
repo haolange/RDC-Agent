@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
-import { replayHistoryStore } from '../captures/replay/ReplayHistoryStore';
-import { replayLivePreviewStore } from '../captures/replay/ReplayLivePreviewStore';
-import { storageAdapter } from '../sessions/StorageAdapter';
+import { replayHistoryStore } from '../rdc/captures/replay/ReplayHistoryStore';
+import { replayLivePreviewStore } from '../rdc/captures/replay/ReplayLivePreviewStore';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { SessionScopeArgsSchema } from './validation/captureDeviceSchemas';
 import type { SessionScope } from '@shared/types/session';

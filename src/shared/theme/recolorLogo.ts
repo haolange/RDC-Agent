@@ -1,4 +1,4 @@
-import { hexToRgb, rgbToHsl } from './color.ts';
+import { hexToRgb, rgbToHsl } from './color';
 
 /** Recolor cyan/green ink with the complete accent, shaded only with black/white. */
 export function recolorLogoRgba(pixels: Uint8Array | Uint8ClampedArray, accentHex: string): void {

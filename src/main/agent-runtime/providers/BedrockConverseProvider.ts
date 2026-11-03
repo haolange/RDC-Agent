@@ -25,7 +25,7 @@ import type {
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
-import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
+import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
 import {
@@ -40,7 +40,7 @@ import {
   ProviderStreamBufferError,
 } from './internal/http';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
-import type { ProviderRequestAuthorizer } from '../../settings/AwsBedrockCredentials';
+import type { ProviderRequestAuthorizer } from '../../settings/provider-auth/AwsBedrockCredentials';
 
 const PROVIDER_API = 'bedrock-converse-stream';
 

@@ -949,12 +949,12 @@ describe('investigation system contract', () => {
     expect(MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS).toHaveLength(22);
     expect(GENERAL_SKILL_IDS).toHaveLength(9);
     expect(CANONICAL_SKILL_IDS).toHaveLength(31);
-    const runner = readRepo('src/main/workflow/debugger/AgentTurnRunner.ts');
+    const runner = readRepo('src/main/agent-runtime/orchestration/AgentTurnRunner.ts');
     const conversation = readRepo('src/main/conversation/ConversationTurnRunner.ts');
     expect(runner).toMatch(/validateCompletion/);
     expect(conversation).toMatch(/validateCompletion/);
     expect(readRepo('src/main/conversation/applyDeclaredHandoff.ts')).toMatch(/applyDeclaredHandoff/);
-    expect(readRepo('src/main/sessions/ExecutionOfferStore.ts')).toMatch(/execution-offer\.json/);
+    expect(readRepo('src/main/sessions/run/ExecutionOfferStore.ts')).toMatch(/execution-offer\.json/);
     expect(enforceMissionTurnCompletion({
       profileId: 'general',
       sessionId: SESSION_ID,

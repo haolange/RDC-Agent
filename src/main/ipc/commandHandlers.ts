@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import type { CommandExecuteRequest, CommandListResult } from '@shared/types/command';
-import { getRegistry } from '../commands/index';
+import { getRegistry } from '../commands';
 import { CommandService } from '../commands/CommandService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import {

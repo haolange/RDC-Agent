@@ -12,7 +12,7 @@ import { nowIso } from '@shared/utils/id';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 import type { TaskExecutionRecord } from '../agent-runtime/tasks/TaskContracts';
 import { projectTaskItems } from '../agent-runtime/tasks/taskProjection';
-import type { SessionArtifactSource } from '../sessions/SessionArtifactSource';
+import type { SessionArtifactSource } from '../sessions/artifacts/SessionArtifactSource';
 import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
 import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
 

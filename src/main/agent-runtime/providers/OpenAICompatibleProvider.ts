@@ -24,7 +24,7 @@ import type {
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
-import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
+import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { AssistantStreamBuilder, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
 import {
   AlternatingTextThinkingChannels,
@@ -35,7 +35,7 @@ import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderEmptyS
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import { applyOpenAiCompatibleReasoning } from './reasoningWire';
 import { reasoningProjectionSource } from './reasoningProjection';
-import type { ProviderRequestAuthorizer } from '../../settings/AwsBedrockCredentials';
+import type { ProviderRequestAuthorizer } from '../../settings/provider-auth/AwsBedrockCredentials';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';

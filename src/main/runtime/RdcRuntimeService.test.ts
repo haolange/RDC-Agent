@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
+import { agentRuntimeConfigService } from '../settings/agent-manifests/AgentRuntimeConfigService';
 import { RdcRuntimeService } from './RdcRuntimeService';
 import { HookEngine } from '../hooks/HookEngine';
 import { appPathService } from './AppPathService';

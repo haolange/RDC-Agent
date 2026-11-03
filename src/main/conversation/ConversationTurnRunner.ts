@@ -14,14 +14,14 @@ import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapab
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
 import type { RunSummary, SessionAttachmentRecord } from '@shared/types/session';
 import { nowMs } from '@shared/utils/id';
-import { agentOrchestrator, type PreparedAgentTurnContext } from '../workflow/debugger/AgentOrchestrator';
+import { agentOrchestrator, type PreparedAgentTurnContext } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 import { isHandoffOfferedAtTurnEnd } from '@shared/types/agentManifest';
 import { shouldSnapshotHandoffSuggestions } from './missionHandoffSuggestions';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
-import { storageAdapter } from '../sessions/StorageAdapter';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { canonicalizeSessionContextTurnEntry } from './SessionContextJournal';
 import type { Message as AgentRuntimeMessage } from '../agent-runtime/core/types';
@@ -37,7 +37,7 @@ import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
 import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
 import { reconcileTerminalToolReceipts } from './ConversationTerminalToolReceipts';
 import type { TurnCompletionValidator } from '../agent-runtime/agent/TurnCompletionValidator';
-import type { TurnCompletionDeclaration } from '../workflow/debugger/TurnCoordinator';
+import type { TurnCompletionDeclaration } from '../agent-runtime/orchestration/TurnCoordinator';
 import type {
   ActiveConversationTurn,
   AgentRoutePreflightOk,
@@ -68,7 +68,7 @@ export interface CompleteProfileTurnInput {
     };
     preparedPrompt: PreparedConversationPrompt;
     preparedTurn: PreparedAgentTurnContext;
-    policyBudget?: import('../workflow/debugger/TurnCoordinator').PolicyBudgetState;
+    policyBudget?: import('../agent-runtime/orchestration/TurnCoordinator').PolicyBudgetState;
   }
 
 export interface ConversationTurnRunnerHost {

@@ -5,7 +5,7 @@ import path from 'node:path';
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
 
-const { parseAgentMarkdownStrict } = require('../src/main/settings/agentManifestParse.ts');
+const { parseAgentMarkdownStrict } = require('../src/main/settings/agent-manifests/agentManifestParse.ts');
 const { diagnoseManifestToolTokens } = require('../src/shared/constants/agentToolTokens.ts');
 
 export const BUILTIN_AGENT_IDS = ['general', 'debugger', 'analyzer', 'optimizer'];

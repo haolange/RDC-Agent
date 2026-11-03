@@ -7,8 +7,8 @@ const orchestrator = vi.hoisted(() => ({
   backgroundSubagents: { beforeParentProviderRequestMessages: vi.fn(() => []) },
 }));
 
-vi.mock('../workflow/debugger/AgentOrchestrator', () => ({ agentOrchestrator: orchestrator }));
-vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: { updateSession: vi.fn(), updateRun: vi.fn() } }));
+vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({ agentOrchestrator: orchestrator }));
+vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { updateSession: vi.fn(), updateRun: vi.fn() } }));
 vi.mock('./ConversationAttachmentMaterializer', () => ({ hydrateFrozenUserContent: vi.fn(async () => 'inspect') }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 

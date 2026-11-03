@@ -10,7 +10,7 @@ import type {
 } from '@shared/types/conversation';
 import type { ConversationSwitchBranchRequest } from '@shared/types/conversationBranch';
 import { conversationService } from '../conversation/ConversationService';
-import { storageAdapter } from '../sessions/StorageAdapter';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import {

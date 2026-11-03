@@ -4,15 +4,15 @@ const { read, recordedRequest } = vi.hoisted(() => ({
   read: vi.fn(),
   recordedRequest: vi.fn(),
 }));
-vi.mock('../../../sessions/RecordedRdcRequest', () => ({ materializeRecordedRdcRequest: recordedRequest }));
+vi.mock('../../../rdc/RecordedRdcRequest', () => ({ materializeRecordedRdcRequest: recordedRequest }));
 
-vi.mock('../../../sessions/SessionArtifactResolver', () => ({
+vi.mock('../../../sessions/artifacts/SessionArtifactResolver', () => ({
   sessionArtifactResolver: { read },
 }));
 
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { artifactReadTool } from './ArtifactReadTool';
-import { grantDelegatedArtifactAccess } from '../../../sessions/DelegatedArtifactAccess';
+import { grantDelegatedArtifactAccess } from '../../../sessions/artifacts/DelegatedArtifactAccess';
 
 describe('ArtifactReadTool', () => {
   beforeEach(() => { read.mockReset(); recordedRequest.mockReset(); });

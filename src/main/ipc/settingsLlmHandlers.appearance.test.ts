@@ -20,27 +20,27 @@ vi.mock('electron', () => ({
   ipcMain: { handle: (name: string, fn: (...args: unknown[]) => unknown) => fixture.handlers.set(name, fn) },
 }));
 vi.mock('../runtime/AppPathService', () => ({ appPathService: { getRuntimePaths: () => ({}) } }));
-vi.mock('../settings/SettingsService', () => ({ settingsService: {
+vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: {
   getAll: () => structuredClone(fixture.settings),
   setAll: (patch: { appearance: { theme: string } }) => {
     fixture.settings.appearance = { ...fixture.settings.appearance, ...patch.appearance };
     return structuredClone(fixture.settings);
   },
 } }));
-vi.mock('../settings/AgentManifestService', () => ({ agentManifestService: {
+vi.mock('../settings/agent-manifests/AgentManifestService', () => ({ agentManifestService: {
   modelOptionCatalogProviderIds: () => ['deepseek'],
   projectEffectiveModelOptions: (agents: object, _providers: unknown, _routes: unknown, catalogs: unknown[]) => ({
     ...agents, modelOptions: catalogs.length ? [fixture.modelOption] : [],
   }),
 } }));
-vi.mock('../settings/EffectiveModelResolver', () => ({ resolveEffectiveCatalog: () => fixture.catalog, resolveEffectiveModel: vi.fn() }));
-vi.mock('../settings/EffectiveCatalogService', () => ({ effectiveCatalogService: { setConfigurationValidator: vi.fn(), setDiscoveryLoaderResolver: vi.fn(), subscribe: vi.fn() } }));
+vi.mock('../settings/provider-catalog/EffectiveModelResolver', () => ({ resolveEffectiveCatalog: () => fixture.catalog, resolveEffectiveModel: vi.fn() }));
+vi.mock('../settings/provider-catalog/EffectiveCatalogService', () => ({ effectiveCatalogService: { setConfigurationValidator: vi.fn(), setDiscoveryLoaderResolver: vi.fn(), subscribe: vi.fn() } }));
 vi.mock('../provider-catalog/ProviderCatalogRegistry', () => ({ loadProviderSurface: fixture.load }));
-vi.mock('../settings/compiledAgentRoutes', () => ({ resolveCompiledRouteForAgent: vi.fn() }));
-vi.mock('../settings/resolveRegisteredProjectRoot', () => ({ tryCurrentProjectRoot: vi.fn() }));
-vi.mock('../settings/ProviderConnectionService', () => ({ providerConnectionService: {} }));
-vi.mock('../settings/ProviderCapabilityProbeService', () => ({ providerCapabilityProbeService: {} }));
-vi.mock('../settings/ModelsOverrideService', () => ({ modelsOverrideService: {} }));
+vi.mock('../settings/provider-catalog/compiledAgentRoutes', () => ({ resolveCompiledRouteForAgent: vi.fn() }));
+vi.mock('../settings/settings-core/resolveRegisteredProjectRoot', () => ({ tryCurrentProjectRoot: vi.fn() }));
+vi.mock('../settings/provider-auth/ProviderConnectionService', () => ({ providerConnectionService: {} }));
+vi.mock('../settings/provider-catalog/ProviderCapabilityProbeService', () => ({ providerCapabilityProbeService: {} }));
+vi.mock('../settings/settings-core/ModelsOverrideService', () => ({ modelsOverrideService: {} }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: fixture.log } }));
 vi.mock('../runtime/ShellResolver', () => ({ shellResolver: {}, formatShellInterpreterLabel: vi.fn() }));
 

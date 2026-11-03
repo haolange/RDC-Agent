@@ -1,14 +1,14 @@
 import { ipcMain } from 'electron';
-import { storageAdapter } from '../sessions/StorageAdapter';
-import { rdcCliInvokerService } from '../tools/RdcCliInvokerService';
-import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
+import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import { RdcInstallationArgsSchema } from './validation/rdcInstallationSchemas';
-import { detectRdcInstallations, resolveRdcInstallation } from '../tools/RdcInstallationService';
-import { settingsService } from '../settings/SettingsService';
-import { parseRdcNativeResult } from '../tools/RdcNativeProtocol';
+import { detectRdcInstallations, resolveRdcInstallation } from '../rdc/RdcInstallationService';
+import { settingsService } from '../settings/settings-core/SettingsService';
+import { parseRdcNativeResult } from '../rdc/RdcNativeProtocol';
 
 export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;

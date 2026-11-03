@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 // Scripts live outside tsconfig include; the .mjs is the shared launcher helper.
 // @ts-expect-error -- untyped ESM helper
-import { REQUIRED_PNPM, pnpmCandidates, resolvePnpm } from '../../../scripts/pnpm-resolver.mjs';
+import { REQUIRED_PNPM, pnpmCandidates, resolvePnpm } from '../../../scripts/pnpm-resolver';
 
 describe('pnpm resolver', () => {
   it('keeps REQUIRED_PNPM at 11.7.0', () => {

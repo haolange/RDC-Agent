@@ -4,7 +4,7 @@ import type { AgentPermissionDecision } from './AgentPermissionPolicy';
 import { RuntimePermissionStateService } from './RuntimePermissionStateService';
 import { executeWithPermissionAdmission } from './ToolPermissionAdmission';
 import { AgentToolApprovalRequestService } from './AgentToolApprovalRequestService';
-import { ToolResourceArbiter } from '../../workflow/debugger/ToolResourceArbiter';
+import { ToolResourceArbiter } from '../orchestration/ToolResourceArbiter';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 
 function deferred<T = void>() {

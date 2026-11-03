@@ -1,6 +1,6 @@
 import { installApplicationMenu } from './window/applicationMenu';
 import { nativeMessage } from './window/nativeI18n';
-import { providerAccountAuthService } from './settings/ProviderAccountAuthService';
+import { providerAccountAuthService } from './settings/provider-auth/ProviderAccountAuthService';
 import { appPathService } from './runtime/AppPathService';
 /**
  * Electron Main Process Entry
@@ -14,12 +14,14 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 import { registerIPCHandlers, setMainWindow, initializeIpcState, stopAllActiveRuns } from './ipc/handlers';
-import { storageAdapter } from './sessions/StorageAdapter';
+import { storageAdapter } from './sessions/store/StorageAdapter';
 import { rdcSessionService } from './sessions';
-import { harvestOwnedRdcDaemons } from './sessions/OwnedRdcDaemonRegistry';
-import { settingsService } from './settings/SettingsService';
-import { rdcCliInvokerService } from './tools/RdcCliInvokerService';
-import { replayDeviceService } from './captures/ReplayDeviceService';
+import { harvestOwnedRdcDaemons } from './rdc/OwnedRdcDaemonRegistry';
+import { settingsService } from './settings/settings-core/SettingsService';
+import './rdc/rdcShellPermission';
+import './rdc/registerConversationRdcHost';
+import { rdcCliInvokerService } from './rdc/RdcCliInvokerService';
+import { replayDeviceService } from './rdc/captures/ReplayDeviceService';
 import { runtimeLogService } from './runtime/RuntimeLogService';
 import { rendererEventHub } from './browserAppBridge/rendererEventHub';
 import {
@@ -30,9 +32,9 @@ import {
 import { shutdownCoordinator } from './lifecycle/ShutdownCoordinator';
 import { APP_MIN_WINDOW_HEIGHT, APP_MIN_WINDOW_WIDTH } from '@shared/constants/layout';
 import { conversationService } from './conversation/ConversationService';
-import { agentOrchestrator } from './workflow/debugger/AgentOrchestrator';
+import { agentOrchestrator } from './agent-runtime/orchestration/AgentOrchestrator';
 import { processSupervisor } from './runtime/ProcessSupervisor';
-import { turnCoordinator } from './workflow/debugger/TurnCoordinator';
+import { turnCoordinator } from './agent-runtime/orchestration/TurnCoordinator';
 import {
   bindWindowLayoutPersistence,
   resolveWindowCreationOptions,

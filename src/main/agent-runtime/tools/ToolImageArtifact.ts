@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import { formatSessionArtifactUri, SessionArtifactError } from '@shared/types/sessionArtifact';
-import type { SessionArtifactResolver } from '../../sessions/SessionArtifactResolver';
+import type { SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 
 /** Reuse verified pixels, never a call's provenance or an artifact from another execution namespace. */
 export function storeToolImage(

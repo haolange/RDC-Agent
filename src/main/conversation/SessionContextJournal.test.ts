@@ -13,7 +13,7 @@ import {
   SessionContextJournal,
   type SessionContextTurnEntry,
 } from './SessionContextJournal';
-import { storageAdapter } from '../sessions/StorageAdapter';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
 
 
 afterEach(() => vi.restoreAllMocks());

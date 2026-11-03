@@ -19,12 +19,12 @@ import {
   ProviderStreamProtocolError,
 } from '../../agent-runtime/providers/internal/AssistantStreamBuilder';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
-import { StorageIo } from '../../sessions/StorageIo';
+import { StorageIo } from '../../sessions/store/StorageIo';
 import { StdioRpcClient } from '../../agent-runtime/agent/mcpRpcTransport';
 import { ShutdownCoordinator } from '../../lifecycle/ShutdownCoordinator';
 import { writeTextFileNoFollow } from '../../agent-runtime/tools/primitives/_shared';
 import { hashAttachmentContents } from '../../conversation/ConversationAttachmentHashing';
-import { ConversationHistoryStore } from '../../sessions/ConversationHistoryStore';
+import { ConversationHistoryStore } from '../../sessions/store/ConversationHistoryStore';
 
 const childState = vi.hoisted(() => {
   const listeners = new Map<string, (...args: unknown[]) => void>();
@@ -337,8 +337,8 @@ describe('faultInjectionContract: renderer/main storage recovery', () => {
 
 describe('faultInjectionContract: shutdown with active producers', () => {
   it('aborts real turns and invokes MCP/terminal dispose façades in index.ts phase order', async () => {
-    const { TurnCoordinator } = await import('../../workflow/debugger/TurnCoordinator');
-    const { McpConnectionCoordinator } = await import('../../workflow/debugger/McpConnectionCoordinator');
+    const { TurnCoordinator } = await import('../../agent-runtime/orchestration/TurnCoordinator');
+    const { McpConnectionCoordinator } = await import('../../agent-runtime/orchestration/McpConnectionCoordinator');
     const coordinator = new ShutdownCoordinator();
     const turns = new TurnCoordinator();
     const mcp = new McpConnectionCoordinator();

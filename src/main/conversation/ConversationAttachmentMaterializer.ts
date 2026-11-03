@@ -6,7 +6,7 @@ import type { AttachmentLayer, ConversationAttachmentInput } from '@shared/types
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { SessionAttachmentKind, SessionAttachmentRecord } from '@shared/types/session';
 import type { UserMessage } from '../agent-runtime/core/types';
-import type { FrozenAttachmentManifestEntry } from '../workflow/debugger/orchestratorTypes';
+import type { FrozenAttachmentManifestEntry } from '../agent-runtime/orchestration/orchestratorTypes';
 import {
   MAX_ATTACHMENT_BYTES_PER_FILE,
   MAX_ATTACHMENT_COUNT,

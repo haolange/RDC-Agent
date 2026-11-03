@@ -2,9 +2,8 @@ import * as os from 'os';
 import { matchShellFileToolBypass } from './shellFileToolBypass';
 import * as path from 'path';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
-import type { RdcOperationDefinition } from '@shared/types/tool';
 import type { CompiledPolicy } from '@shared/types/rdcRuntime';
-import type { AgentTool } from '../agent/AgentTool';
+import type { AgentTool, ToolExecutionContext } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import { matchShellHardDeny } from '../tools/primitives/shellHardDeny';
@@ -22,12 +21,8 @@ import { isToolWithinCeiling } from '@shared/constants/toolAccess';
 import { agentAccessCeiling, type AgentAccessCeiling } from '@shared/types/agentManifest';
 import { isKnowledgeReadFileTool } from '../knowledgeReadRoots';
 import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
-import { assertRdcDiscovery, parseShellRdcInput, type RdcShellInput } from '../../tools/RdcShellInput';
-import { assertRdcBindingOwnership, authorizeRdcOperation, rdcCatalogCapabilitySummary, rdcOperationCapability } from '../../tools/RdcOperationPolicy';
-import type { ToolExecutionContext } from '../agent/AgentTool';
 import { safeResolvePath } from '../tools/primitives/_shared';
 import { fileOperationBoundary } from './FileOperationBoundary';
-import { readRdcHostControls } from '../../tools/RdcHostControls';
 
 /**
  * Agent permission risk classifier for tool / shell calls.
@@ -45,6 +40,19 @@ export interface AgentPermissionDecision {
   temporaryPathRoots: string[];
   /** Main-owned operation facts; no executable, environment or credential material. */
   operationFacts?: Record<string, unknown>;
+}
+
+export type RdcShellBaseline = (
+  input: AgentPermissionDecisionInput,
+  mode: AgentPermissionMode,
+  ceiling: AgentAccessCeiling,
+) => AgentPermissionDecision;
+
+let rdcShellBaseline: RdcShellBaseline | null = null;
+
+/** RDC module registers the shell.rdc decision. The permission lattice stays here. */
+export function registerRdcShellBaseline(baseline: RdcShellBaseline): void {
+  rdcShellBaseline = baseline;
 }
 
 export interface AgentPermissionDecisionInput {
@@ -363,14 +371,12 @@ export class AgentPermissionPolicyService {
       return denied(`Policy deniedTools blocked tool "${input.toolCall.name}".`, 'high');
     }
 
-    let rdcRequest: RdcShellInput | null = null;
     if (toolName === 'shell' && input.toolCall.arguments.rdc !== undefined) {
-      try {
-        rdcRequest = parseShellRdcInput(input.toolCall.arguments);
-      } catch (error) {
-        return denied(`SHELL_INPUT_INVALID: ${error instanceof Error ? error.message : String(error)}`, 'high');
-      }
-      if (ceiling !== 'full') return denied('RDC_EXECUTION_DENIED: native RDC execution requires a full access ceiling.', 'high');
+      if (!rdcShellBaseline) return denied('RDC_PERMISSION_UNREGISTERED: shell.rdc has no registered operation policy.', 'high');
+      const rdcBaseline = rdcShellBaseline(input, mode, ceiling);
+      if (!input.compiledPolicy) return rdcBaseline;
+      const floor = resolvePolicyApprovalFloor(input.compiledPolicy, toolName, input.tool.permissionHint);
+      return maxDecision(rdcBaseline, floorAction(floor, input.toolCall.name));
     }
 
     // Catastrophic shell patterns are hard-denied in every mode, including full-access.
@@ -384,7 +390,7 @@ export class AgentPermissionPolicyService {
       if (bypass) return denied(bypass);
     }
 
-    const baseline = this.evaluateBaseline(input, permissions, mode, toolName, workspaceRoot, rdcRequest);
+    const baseline = this.evaluateBaseline(input, permissions, mode, toolName, workspaceRoot);
     if (!input.compiledPolicy) return baseline;
     const floor = resolvePolicyApprovalFloor(
       input.compiledPolicy,
@@ -400,41 +406,7 @@ export class AgentPermissionPolicyService {
     mode: AgentPermissionMode,
     toolName: string,
     workspaceRoot: string,
-    rdcRequest: RdcShellInput | null,
   ): AgentPermissionDecision {
-    if (rdcRequest) {
-        if ('discovery' in rdcRequest) {
-          if (input.executionContext) { try { assertRdcBindingOwnership(input.executionContext); assertRdcDiscovery(rdcRequest.discovery, input.executionContext.rdcBinding!); } catch (error) { return denied(error instanceof Error ? error.message : String(error)); } }
-          return mode === 'full-access' ? { action: 'allow', risk: 'low', temporaryPathRoots: [] }
-            : request(mode, `Frozen RDC catalog ${rdcRequest.discovery.kind}; reads definitions without native execution.`, 'low');
-        }
-        if (!input.executionContext) return request(mode, `Native RDC operation requires verified execution context: ${rdcRequest.operation}`, 'high');
-        try {
-          const lease = assertRdcBindingOwnership(input.executionContext);
-          const admitted = authorizeRdcOperation(rdcRequest.operation, rdcRequest.args, input.executionContext,
-            lease.runtimeContext.replaySessionId!, lease.runtimeContext.captureFileId);
-          const effects = admitted.definition.effects;
-          const changesShader = effects.includes('shader_replacement');
-          const protectedPaths = admitted.definition.path_inputs.some(entry => {
-            const values = admitted.args[entry.name];
-            return (Array.isArray(values) ? values : [values]).some(value => typeof value === 'string' && fileOperationBoundary(value).protected);
-          });
-          const decision = mode === 'full-access' ? { action: 'allow' as const, risk: 'low' as const, temporaryPathRoots: [] }
-            : request(mode, protectedPaths ? 'Protected native filesystem input requires specific authorization.'
-              : changesShader ? 'Owned replay shader change requires authorization review.' : 'Validated operation within the owning replay and workspace.', protectedPaths ? 'high' : changesShader ? 'medium' : 'low');
-          const definitions = input.executionContext.rdcBinding!.definitions as readonly RdcOperationDefinition[];
-          return { ...decision, operationFacts: { operation: admitted.definition.name, scope: admitted.definition.scope,
-            operationContract: { description: admitted.definition.description, inputSchema: admitted.definition.input_schema,
-              pathInputs: admitted.definition.path_inputs, prerequisites: admitted.definition.prerequisites },
-            effects, evidenceKind: admitted.definition.evidence_kind, arguments: admitted.args, experimentId: rdcRequest.experimentId ?? null,
-            catalogFingerprint: input.executionContext.rdcBinding!.definitionsFingerprint,
-            catalogCapabilities: changesShader ? rdcCatalogCapabilitySummary(definitions) : undefined,
-            rollbackContracts: changesShader ? definitions
-              .filter(item => item.evidence_kind === 'rollback' && rdcOperationCapability(item).available) : undefined,
-            hostControls: changesShader || protectedPaths ? readRdcHostControls({ sessionId: input.executionContext.sessionId!, projectId: input.executionContext.projectId!,
-              contextId: lease.contextId, leaseVersion: lease.version }, input.executionContext) : undefined } };
-        } catch (error) { return denied(error instanceof Error ? error.message : String(error)); }
-      }
     if (mode === 'full-access') {
       return { action: 'allow', risk: 'low', temporaryPathRoots: ['*'] };
     }

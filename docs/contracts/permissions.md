@@ -11,6 +11,8 @@ Composer 暴露：`Default`、`Auto-review`、`Full access`、`Custom`。主进�
 - `Full access`：显式信任本地文件与命令；仍受 primitive 硬约束（二进制/`.rdc`、realpath、灾难 shell、SSRF）。
 - `Custom`：在 Default 的审批规则之外，使用已确认的可读根、可写根和命令前缀。这些列表对 Default 与 Auto-review 无效。Full access 仍不能越过 profile 天花板。
 
+Browser QA 代答 `conversation:answerPlanReview`、`conversation:answerToolApproval`、`conversation:answerUserInput` 属于 high-impact，只在 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时放行。桌面 IPC 不受该环境变量限制。
+
 ### 在途权限切换
 
 挡位 mode 是主进程确认的全局授权事实，覆盖所有活动会话及前后台子 Agent。Settings 成功持久化后同步发布新的 mode/revision，再确认切换成功；同值不递增，保存失败不生效。读取/写入根、命令规则、工具目录、Profile/Skill 交集、CompiledPolicy、预算、Provider 路由及 RDC 身份仍在 prepareTurn 冻结。切到 Custom 使用本轮冻结规则，规则修改在新轮生效。
@@ -127,10 +129,10 @@ Decision lattice 为 `allow < auto_review < ask_user < deny`。`approvalFloorByT
 
 - `src/main/browserAppBridge/bridgeSecurity.test.ts`
 - `src/shared/renderer-api/createRendererApi.test.ts`
-- `src/main/settings/SecretStorageService.test.ts`
-- `src/main/settings/AgentRuntimeConfigService.test.ts`（MCP trust）
+- `src/main/settings/settings-core/SecretStorageService.test.ts`
+- `src/main/settings/agent-manifests/AgentRuntimeConfigService.test.ts`（MCP trust）
 - `src/main/ipc/validation/IpcPayloadGuard.test.ts`
-- `src/main/sessions/RdcRuntimeContextRegistry.test.ts`
+- `src/main/rdc/RdcRuntimeContextRegistry.test.ts`
 - `src/main/agent-runtime/permissions/*`
 - `src/main/testing/contracts/securityContract.test.ts`（矩阵入口）
 - 门禁：`pnpm run check:orchestrator-facade`（禁止恢复 `legacyGlobalMirror` / `getRdcRuntimeContext`）

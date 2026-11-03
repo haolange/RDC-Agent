@@ -25,11 +25,11 @@ import {
   isAgentToolExecutableModel,
 } from '@shared/utils/agentToolCapability';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
-import { normalizeToolName } from '../workflow/debugger/DebuggerRuntimePolicy';
+import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
-import { settingsService } from '../settings/SettingsService';
-import { agentManifestService } from '../settings/AgentManifestService';
-import { resolveEffectiveModelSelection } from '../settings/EffectiveModelResolver';
+import { settingsService } from '../settings/settings-core/SettingsService';
+import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
+import { resolveEffectiveModelSelection } from '../settings/provider-catalog/EffectiveModelResolver';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 
 export interface ConversationBranchTurnContext {

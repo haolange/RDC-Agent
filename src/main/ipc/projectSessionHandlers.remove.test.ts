@@ -35,13 +35,13 @@ vi.mock('electron', () => ({
   },
 }));
 
-vi.mock('../sessions/StorageAdapter', () => ({
+vi.mock('../sessions/store/StorageAdapter', () => ({
   storageAdapter: storage,
 }));
 vi.mock('./projectInputLifecycleHandlers', () => ({ registerProjectInputLifecycleHandlers: vi.fn() }));
 vi.mock('../sessions', () => ({ rdcSessionService: { clearOpenedCaptureForSession: vi.fn(async () => true) } }));
 
-vi.mock('../workflow/debugger/AgentOrchestrator', () => ({
+vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({
   agentOrchestrator: { syncSessionSlots, releaseSessionToolState: vi.fn(), backgroundSubagents: { abortSession: abortBackgroundSession } },
 }));
 
@@ -66,14 +66,14 @@ vi.mock('../conversation/AttachmentStagingService', () => ({
   },
 }));
 
-vi.mock('../workflow/debugger/RunExecutionService', () => ({
+vi.mock('../agent-runtime/orchestration/RunExecutionService', () => ({
   runExecutionService: {
     stopRun: vi.fn(),
     listActiveRuns: vi.fn(() => []),
   },
 }));
 
-vi.mock('../tools/RdcCliInvokerService', () => ({
+vi.mock('../rdc/RdcCliInvokerService', () => ({
   rdcCliInvokerService: { abortRun: vi.fn() },
 }));
 

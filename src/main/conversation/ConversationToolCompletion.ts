@@ -2,7 +2,7 @@ import type { ConversationToolCall } from '@shared/types/conversation';
 import type { ToolCallResult } from '@shared/types/tool';
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
 import { redactCredentialLikeText } from '../runtime/secretRedaction';
-import { normalizeToolName } from '../workflow/debugger/DebuggerRuntimePolicy';
+import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { extractConversationToolResourceRefs, extractToolImagePreviews } from './ConversationToolResourceRefs';
 
 /** Shared projection for streamed and stopped-turn canonical tool completions. */

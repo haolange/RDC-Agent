@@ -3,7 +3,7 @@ import {
   releaseDirectoryFileLock,
   withDirectoryFileLock,
   type DirectoryFileLockOwner,
-} from '../../sessions/directoryFileLock';
+} from '../../sessions/store/directoryFileLock';
 
 const LOCK_FILE_NAME = '.memory.lock';
 

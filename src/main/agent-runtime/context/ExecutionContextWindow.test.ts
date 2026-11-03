@@ -6,13 +6,13 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { AgentMessage, AssistantMessage } from '../core/types';
 const mocks = vi.hoisted(() => ({ hook: vi.fn(), save: vi.fn(), verify: vi.fn(), state: vi.fn(), generate: vi.fn(), write: vi.fn(), read: vi.fn(), list: vi.fn(), resolve: vi.fn(), journal: vi.fn(), archive: vi.fn(), project: vi.fn() }));
 vi.mock('../../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: mocks.hook }));
-vi.mock('../../sessions/StorageAdapter', () => ({ storageAdapter: { readSession: () => ({ projectId: 'project' }), readSessionContextJournal: mocks.journal } }));
-vi.mock('../../settings/projectRegistryLookup', () => ({ lookupProjectById: () => ({ rootPath: 'project-root' }) }));
-vi.mock('../../sessions/CompactionAuthoritySource', () => ({ saveCompactionAuthoritySource: mocks.save, verifyCompactionAuthoritySource: mocks.verify, readCompactionAuthorityState: mocks.state, readCompactionAuthorityJournal: mocks.archive, projectCompactionJournalMessages: mocks.project }));
+vi.mock('../../sessions/store/StorageAdapter', () => ({ storageAdapter: { readSession: () => ({ projectId: 'project' }), readSessionContextJournal: mocks.journal } }));
+vi.mock('../../settings/settings-core/projectRegistryLookup', () => ({ lookupProjectById: () => ({ rootPath: 'project-root' }) }));
+vi.mock('../../sessions/store/CompactionAuthoritySource', () => ({ saveCompactionAuthoritySource: mocks.save, verifyCompactionAuthoritySource: mocks.verify, readCompactionAuthorityState: mocks.state, readCompactionAuthorityJournal: mocks.archive, projectCompactionJournalMessages: mocks.project }));
 vi.mock('./CompactionHandoffService', () => ({ generateCompactionSections: mocks.generate }));
 vi.mock('./StructuredHandoffBuilder', () => ({ serializeHandoffSourceTranscript: () => 'originals', assembleDerivedContextView: () => ({}), createStructuredHandoffMessage: () => ({ role: 'user', content: 'retained state', timestamp: 1 }) }));
-vi.mock('../../sessions/DelegatedArtifactAccess', () => ({ delegatedArtifactOwner: () => 'owner', grantDelegatedOutput: vi.fn() }));
-vi.mock('../../sessions/SessionArtifactResolver', () => ({ sessionArtifactResolver: { write: mocks.write, read: mocks.read, list: mocks.list, resolve: mocks.resolve } }));
+vi.mock('../../sessions/artifacts/DelegatedArtifactAccess', () => ({ delegatedArtifactOwner: () => 'owner', grantDelegatedOutput: vi.fn() }));
+vi.mock('../../sessions/artifacts/SessionArtifactResolver', () => ({ sessionArtifactResolver: { write: mocks.write, read: mocks.read, list: mocks.list, resolve: mocks.resolve } }));
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { createExecutionContextWindow } from './ExecutionContextWindow';
 const messages: AgentMessage[] = Array.from({ length: 12 }, (_, i) => ({ role: 'user', content: `source ${i}: ` + 'x'.repeat(100), timestamp: i }));
@@ -61,7 +61,7 @@ it('starts an isolated delegated execution without reading a nonexistent child j
   expect(mocks.list).not.toHaveBeenCalled();
 });
 it('keeps large retained vision bytes in verified sidecars and restores the exact image across executions', async () => {
-  const actual = await vi.importActual<typeof import('../../sessions/CompactionAuthoritySource')>('../../sessions/CompactionAuthoritySource');
+  const actual = await vi.importActual<typeof import('../../sessions/store/CompactionAuthoritySource')>('../../sessions/store/CompactionAuthoritySource');
   mocks.project.mockImplementation(actual.projectCompactionJournalMessages);
   const data = Buffer.alloc(2_639_085, 7).toString('base64');
   const input = structuredClone(messages);

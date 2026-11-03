@@ -13,13 +13,13 @@ vi.mock('electron', () => ({
     handle: (channel: string, handler: (...args: unknown[]) => unknown) => { handlers.set(channel, handler); },
   },
 }));
-vi.mock('../captures/replay/ReplayHistoryStore', () => ({
+vi.mock('../rdc/captures/replay/ReplayHistoryStore', () => ({
   replayHistoryStore: { readSelection: mocks.readSelection },
 }));
-vi.mock('../captures/replay/ReplayLivePreviewStore', () => ({
+vi.mock('../rdc/captures/replay/ReplayLivePreviewStore', () => ({
   replayLivePreviewStore: { read: mocks.readLive },
 }));
-vi.mock('../sessions/StorageAdapter', () => ({
+vi.mock('../sessions/store/StorageAdapter', () => ({
   storageAdapter: { readSession: mocks.readSession, getProjectById: mocks.getProjectById },
 }));
 

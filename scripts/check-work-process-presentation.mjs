@@ -970,7 +970,7 @@ const userInputPanelSource = scriptRead('src/renderer/features/composer/UserInpu
 const userInputSubmitHookSource = scriptRead('src/renderer/features/composer/useUserInputRequestSubmit.ts', 'utf8');
 const toolApprovalPanelSource = scriptRead('src/renderer/features/composer/ToolApprovalRequestPanel.tsx', 'utf8');
 const toolApprovalSubmitHookSource = scriptRead('src/renderer/features/composer/useToolApprovalSubmit.ts', 'utf8');
-const orchestratorSource = scriptRead('src/main/workflow/debugger/AgentOrchestrator.ts', 'utf8');
+const orchestratorSource = scriptRead('src/main/agent-runtime/orchestration/AgentOrchestrator.ts', 'utf8');
 
 assert(presentationSource.includes('resolveSectionProse'), 'commentary should route through resolveSectionProse');
 assert(

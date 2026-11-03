@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { KnowledgeCardDetail, KnowledgeCardSummary, KnowledgeSpace } from '@shared/types/knowledge';
-import { StorageIo } from '../sessions/StorageIo';
+import { StorageIo } from '../sessions/store/StorageIo';
 import type { ParsedKnowledgeSource } from './knowledgeCardSchema';
 import { KnowledgeWriteIntegrityError, KnowledgeWritePathError } from './knowledgeErrors';
 

@@ -22,7 +22,7 @@ import {
   proxyHttpToDevRenderer,
   shouldProxyToDevRenderer,
 } from './devRendererProxy';
-import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/effectiveCatalogTypes';
+import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/provider-catalog/effectiveCatalogTypes';
 import {
   MODELS_DEV_IDENTITY_COUNT,
   MODELS_DEV_SNAPSHOT_SHA256,
@@ -32,7 +32,7 @@ import {
   getProviderCatalogRevision,
   listProviderSummaries,
 } from '../provider-catalog/ProviderCatalogRegistry';
-import { SETTINGS_SCHEMA_VERSION } from '../settings/settingsDefaults';
+import { SETTINGS_SCHEMA_VERSION } from '../settings/settings-core/settingsDefaults';
 
 type BridgeOptions = {
   devRendererUrl: string | null;

@@ -22,12 +22,12 @@ RDC-Agent 是 Electron / React / TypeScript 的通用 Agent workbench，支持 R
 ## 3. 文件结构说明
 
 - `src/main/agent-runtime/interactions/AgentPlanReviewRequestService.ts`：生产审阅门；先持久化后发布批准。
-- `src/main/sessions/PlanReviewStateStore.ts`、`sessionPlanReference.ts`、`planFilePersistence.ts`：严格状态、持久历史身份、原子文件写入。
+- `src/main/sessions/run/PlanReviewStateStore.ts`、`sessionPlanReference.ts`、`planFilePersistence.ts`：严格状态、持久历史身份、原子文件写入。
 - `src/main/ipc/planHandlers.ts`、`validation/planSchemas.ts`：全文读取、保存对话框、固定项目路径及一次性授权。
-- `src/main/conversation/applyDeclaredHandoff.ts`、`src/main/sessions/ExecutionOfferStore.ts`、`RuntimeToolAssembly.ts`：声明续跑、execution offer、Skill 预载。
+- `src/main/conversation/applyDeclaredHandoff.ts`、`src/main/sessions/run/ExecutionOfferStore.ts`、`RuntimeToolAssembly.ts`：声明续跑、execution offer、Skill 预载。
 - `src/renderer/features/composer/useQueuedHandoffSuggestion.ts`：切换成功后的预填/发送事务。
 - `src/renderer/features/transcript/PlanCard.tsx`、`src/renderer/hooks/`：卡片与阅读操作；组件不得直调 IPC。
-- `src/main/sessions/ExecutionOfferStore.test.ts`、`src/main/conversation/applyDeclaredHandoff.test.ts`：确定性 offer / 声明续跑链路；不是产品 provider。
+- `src/main/sessions/run/ExecutionOfferStore.test.ts`、`src/main/conversation/applyDeclaredHandoff.test.ts`：确定性 offer / 声明续跑链路；不是产品 provider。
 - `src/shared/renderer-api/`、`src/shared/types/planReview.ts`：跨层 API/Browser capability。
 - `resources/agent-runtime/`：Mission/Skill/Prompt；`scripts/`：标准 launcher 和门禁；`test/work-process-cot/`：既有演示投影。
 - `out`、`node_modules` 为本机构建/依赖，不手改；`.qoder` 是独立知识文档，不是架构权威。

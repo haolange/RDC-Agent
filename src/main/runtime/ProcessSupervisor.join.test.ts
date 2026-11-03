@@ -32,7 +32,7 @@ vi.mock('child_process', () => ({
 }));
 
 import { withProcessExecutionOwner } from './ResourceExecutionLifetime';
-import { ToolResourceArbiter } from '../workflow/debugger/ToolResourceArbiter';
+import { ToolResourceArbiter } from '../agent-runtime/orchestration/ToolResourceArbiter';
 import { ProcessSupervisor } from './ProcessSupervisor';
 
 describe('ProcessSupervisor bounded join', () => {

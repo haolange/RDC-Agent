@@ -11,7 +11,7 @@ import type {
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
 import { cancelWorkTrace } from '@shared/conversation/cancelWorkTrace';
 import { nowMs } from '@shared/utils/id';
-import { normalizeToolName } from '../workflow/debugger/DebuggerRuntimePolicy';
+import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 
 const WORK_BLOCK_KINDS = new Set<ConversationWorkBlock['kind']>([
   'reasoning',

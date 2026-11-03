@@ -1,7 +1,7 @@
 import type { ConversationToolCall, ConversationWorkTrace } from '@shared/types/conversation';
 import type { PlanReviewDecision } from '@shared/types/planReview';
 import { nowMs } from '@shared/utils/id';
-import { normalizeToolName } from '../workflow/debugger/DebuggerRuntimePolicy';
+import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { supersedePreviousPlanReviews, upsertRuntimeToolCall } from './ConversationWorkTrace';
 
 export function isPlanReviewApprovalPayload(payload: { kind?: string; toolName?: string }): boolean {

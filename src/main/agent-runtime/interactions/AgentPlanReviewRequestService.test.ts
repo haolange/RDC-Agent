@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 const preflight = vi.hoisted(() => vi.fn());
-vi.mock('../../sessions/handoffSkillCompatibility', () => ({ assertDeclaredHandoffSkillCompatibility: preflight }));
+vi.mock('../../sessions/run/handoffSkillCompatibility', () => ({ assertDeclaredHandoffSkillCompatibility: preflight }));
 
-vi.mock('../../sessions/StorageAdapter', () => ({
+vi.mock('../../sessions/store/StorageAdapter', () => ({
   storageAdapter: {
     readSession: () => ({ sessionId: 'sess', projectId: 'proj' }),
     getProjectById: () => ({ rootPath: null }),
@@ -25,9 +25,9 @@ vi.mock('../../conversation/ConversationRoutePreflight', () => ({
 import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 import type { ConversationPlanReview } from '@shared/types/planReview';
 import { AgentPlanReviewRequestService } from './AgentPlanReviewRequestService';
-import type { PlanArtifactWriter } from '../../sessions/sessionPlanArtifact';
-import type { PlanReviewStateStore } from '../../sessions/PlanReviewStateStore';
-import type { TurnHandle } from '../../workflow/debugger/TurnCoordinator';
+import type { PlanArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
+import type { PlanReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
+import type { TurnHandle } from '../orchestration/TurnCoordinator';
 import type { PlanTaskRequirement } from '@shared/types/taskExecution';
 
 const planReview: ConversationPlanReview = {

@@ -1,4 +1,4 @@
-import type { RdcTurnBinding } from '../../tools/RdcTurnBindings';
+import type { RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import type {
   ImageContent,
   JsonSchema,

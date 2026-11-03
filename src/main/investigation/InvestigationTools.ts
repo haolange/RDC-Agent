@@ -1,4 +1,4 @@
-import { delegatedArtifactOwner, resolveDelegatedArtifactRead, grantDelegatedOutput, assertDelegatedArtifactWrite } from '../sessions/DelegatedArtifactAccess';
+import { delegatedArtifactOwner, resolveDelegatedArtifactRead, grantDelegatedOutput, assertDelegatedArtifactWrite } from '../sessions/artifacts/DelegatedArtifactAccess';
 import {
   INVESTIGATION_ARTIFACT_KINDS,
   INVESTIGATION_ARTIFACT_STATUSES,

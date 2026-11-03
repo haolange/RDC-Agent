@@ -1,6 +1,6 @@
 import type { RunContextUsageReadResult, RunContextUsageRequest } from '@shared/types/session';
-import { storageAdapter } from '../sessions/StorageAdapter';
-import { debuggerLlmService } from '../settings/DebuggerLlmService';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { debuggerLlmService } from '../sessions/run/DebuggerLlmService';
 
 export function readRunContextUsage(request: RunContextUsageRequest): RunContextUsageReadResult {
   if (!storageAdapter.readSession(request.sessionId)) {

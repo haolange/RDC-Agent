@@ -1,11 +1,11 @@
-vi.mock('../settings/SettingsService', () => ({ settingsService: { getAll: () => ({ appearance: { language: mocks.language } }) } }));
+vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ appearance: { language: mocks.language } }) } }));
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parse } from 'yaml';
 import { registerPlanHandlers } from './planHandlers';
-import { StorageIo } from '../sessions/StorageIo';
+import { StorageIo } from '../sessions/store/StorageIo';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { conversationService } from '../conversation/ConversationService';
@@ -18,8 +18,8 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('electron', () => ({ ipcMain: { handle: (id: string, fn: (...args: unknown[]) => Promise<any>) => mocks.handlers.set(id, fn) },
   BrowserWindow: { getFocusedWindow: () => ({}) }, dialog: { showSaveDialog: mocks.saveDialog, showMessageBox: mocks.confirm } }));
-vi.mock('../sessions/sessionPlanReference', () => ({ readReferencedPlan: mocks.read }));
-vi.mock('../sessions/StorageAdapter', () => ({ storageAdapter: { sessions: { findSessionLocation: mocks.location }, get io() { return new StorageIo(); } } }));
+vi.mock('../sessions/run/sessionPlanReference', () => ({ readReferencedPlan: mocks.read }));
+vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { sessions: { findSessionLocation: mocks.location }, get io() { return new StorageIo(); } } }));
 vi.mock('../runtime/AppPathService', () => ({ appPathService: { getProjectRdcPaths: mocks.paths } }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('../conversation/ConversationService', () => ({ conversationService: {

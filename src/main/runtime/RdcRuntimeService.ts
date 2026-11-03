@@ -5,8 +5,8 @@ import type { RdcRuntimeOverview, RestrictivePolicy, ScopedResourceDocument, Sco
 import { appPathService } from './AppPathService';
 import { hashScopedResource, scopedResourceResolver } from './ScopedResourceResolver';
 import { hookEngine } from '../hooks/HookEngine';
-import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
-import { mcpTrustService } from '../settings/McpTrustService';
+import { agentRuntimeConfigService } from '../settings/agent-manifests/AgentRuntimeConfigService';
+import { mcpTrustService } from '../settings/settings-core/McpTrustService';
 
 const EXTENSIONS: Partial<Record<ScopedResourceKind, string>> = {
   agent: '.agent.md', mcp: '.mcp.json', hook: '.hook.yml', policy: '.policy.yml', memory: '.md', knowledge: '.md',

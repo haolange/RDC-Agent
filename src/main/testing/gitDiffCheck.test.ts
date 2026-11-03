@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 // Scripts live outside tsconfig include; the .mjs is the CI whitespace gate.
 // @ts-expect-error -- untyped ESM helper
-import { isZeroSha, resolveDiffCheckArgs, runGitDiffCheck } from '../../../scripts/check-git-diff.mjs';
+import { isZeroSha, resolveDiffCheckArgs, runGitDiffCheck } from '../../../scripts/check-git-diff';
 
 const roots: string[] = [];
 afterEach(() => {

@@ -7,8 +7,8 @@ import {
   formatSessionArtifactUri,
   type SessionArtifactizedEnvelope,
 } from '@shared/types/sessionArtifact';
-import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/SessionArtifactResolver';
-import { delegatedArtifactOwner, grantDelegatedOutput } from '../../sessions/DelegatedArtifactAccess';
+import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
+import { delegatedArtifactOwner, grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { ToolResultSummarizer } from './ToolResultSummarizer';
 import { storeToolImage } from './ToolImageArtifact';
 

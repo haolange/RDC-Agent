@@ -4,10 +4,10 @@ import { isHandoffContinueAction } from '@shared/types/planReview';
 import { EXECUTION_OFFER_SCHEMA } from '@shared/types/executionOffer';
 import { dispatchRuntimeHooks } from '../hooks/runtimeHookDispatch';
 import { resolveEnabledAgentDefinition } from './ConversationRoutePreflight';
-import { storageAdapter } from '../sessions/StorageAdapter';
-import { planReviewStateStore } from '../sessions/PlanReviewStateStore';
-import { assertDeclaredHandoffSkillCompatibility } from '../sessions/handoffSkillCompatibility';
-import { planArtifactWriter } from '../sessions/sessionPlanArtifact';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
+import { assertDeclaredHandoffSkillCompatibility } from '../sessions/run/handoffSkillCompatibility';
+import { planArtifactWriter } from '../sessions/run/sessionPlanArtifact';
 import { parsePlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
 
 export interface ApplyDeclaredHandoffInput {

@@ -45,7 +45,7 @@ The only trace read channel is `trace:getProjection`; conversation branch switch
 Any new CLI setting must be wired through:
 
 - `src/shared/types/settings.ts`
-- `src/main/settings/SettingsService.ts`
+- `src/main/settings/settings-core/SettingsService.ts`
 - Settings modal state/actions/UI
 - Architecture and AGENTS documentation
 

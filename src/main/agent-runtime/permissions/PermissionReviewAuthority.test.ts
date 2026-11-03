@@ -1,8 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const mock = vi.hoisted(() => ({ offer: vi.fn(), plan: vi.fn(), receipt: vi.fn() }));
-vi.mock('../../sessions/StorageAdapter', () => ({ storageAdapter: { executionOffers: { read: mock.offer } } }));
-vi.mock('../../sessions/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: mock.plan } }));
-vi.mock('../../tools/RdcExecutionReceipts', () => ({ rdcExecutionReceipts: { read: mock.receipt } }));
+vi.mock('../../sessions/store/StorageAdapter', () => ({ storageAdapter: { executionOffers: { read: mock.offer } } }));
+vi.mock('../../sessions/run/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: mock.plan } }));
+vi.mock('../../rdc/RdcExecutionReceipts', () => ({ rdcExecutionReceipts: { read: mock.receipt } }));
 import { permissionReviewAuthority, permissionReviewEvidence } from './PermissionReviewAuthority';
 const input: Parameters<typeof permissionReviewAuthority>[0] = { sessionId: 'isolated-child', messages: [
   { role: 'user', content: 'Actual request', timestamp: 0 },

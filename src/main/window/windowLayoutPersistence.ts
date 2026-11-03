@@ -6,7 +6,7 @@ import {
   APP_MIN_WINDOW_HEIGHT,
   APP_MIN_WINDOW_WIDTH,
 } from '@shared/constants/layout';
-import { settingsService } from '../settings/SettingsService';
+import { settingsService } from '../settings/settings-core/SettingsService';
 
 const SAVE_DEBOUNCE_MS = 250;
 

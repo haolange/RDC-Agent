@@ -153,7 +153,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(!agentConstants.includes('AGENT_CATEGORIES'), 'AGENT_CATEGORIES must be deleted.');
   assert(!agentConstants.includes('AGENT_WRITE_SCOPES'), 'AGENT_WRITE_SCOPES must be deleted.');
 
-  const agentManifestService = read('src/main/settings/AgentManifestService.ts');
+  const agentManifestService = read('src/main/settings/agent-manifests/AgentManifestService.ts');
   assert(!agentManifestService.includes('createSeedDefinition'), 'AgentManifestService must not write user seeds.');
   assert(!agentManifestService.includes('ensureSeedManifests'), 'AgentManifestService must not ensure user seeds.');
   assert(agentManifestService.includes('resolveEffectiveSnapshot'), 'AgentManifestService must resolve builtin/user/project snapshots.');
@@ -164,11 +164,11 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assertBuiltinProfileContracts(repoRoot);
 
   const orchestrator = [
-    'src/main/workflow/debugger/AgentOrchestrator.ts',
-    'src/main/workflow/debugger/AgentTurnRunner.ts',
-    'src/main/workflow/debugger/AgentSlotFactory.ts',
-    'src/main/workflow/debugger/ToolExecutorFactory.ts',
-    'src/main/workflow/debugger/TurnPreparationService.ts',
+    'src/main/agent-runtime/orchestration/AgentOrchestrator.ts',
+    'src/main/agent-runtime/orchestration/AgentTurnRunner.ts',
+    'src/main/agent-runtime/orchestration/AgentSlotFactory.ts',
+    'src/main/agent-runtime/orchestration/ToolExecutorFactory.ts',
+    'src/main/agent-runtime/orchestration/TurnPreparationService.ts',
     'src/main/agent-runtime/permissions/ToolPermissionAuthorization.ts',
   ].map(read).join('\n');
   assert(orchestrator.includes('configuredRuntimeProvider'), 'AgentOrchestrator must use the configured runtime provider path.');
@@ -215,7 +215,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(configuredProviderSource.includes('const protocol = requestPlan.route.protocol'), 'Configured runtime provider must route only through RequestPlan.');
   assert(!configuredProviderSource.includes('provider.models'), 'Configured runtime provider must not gate requests with a static model list.');
 
-  const credentialService = read('src/main/settings/ProviderRuntimeCredentialService.ts');
+  const credentialService = read('src/main/settings/provider-auth/ProviderRuntimeCredentialService.ts');
   for (const token of ['async freeze(', 'async refresh(', 'connectionHeaders', 'awsBedrockCredentials', 'release(']) {
     assert(credentialService.includes(token), `Frozen credential service must include ${token}.`);
   }
@@ -274,7 +274,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(conversationIpc.includes('toRejectedSendResult'), 'Main IPC must map preflight failures through the structured rejection helper.');
   assert(!conversationIpc.includes('conversation:previewNextRequestContext'), 'Main IPC must not expose draft-time context preview.');
 
-  const settingsService = read('src/main/settings/SettingsService.ts');
+  const settingsService = read('src/main/settings/settings-core/SettingsService.ts');
   assert(settingsService.includes('capabilities: definition?.capabilities'), 'Settings normalization must hydrate builtin provider capabilities.');
   assert(settingsService.includes('agentRuntime'), 'Settings must persist agent runtime permission controls.');
   for (const token of ['saveAgentDefinition(request:', 'agentDefinitionRevisions', 'clientRevision <= latestRevision', 'agentManifestService.routeFromDefinition']) {

@@ -10,11 +10,11 @@ const {
   canonicalAgentModelId,
   splitCanonicalAgentModelId,
 } = require('../src/shared/utils/agentModelRoute.ts');
-const { AgentManifestService } = require('../src/main/settings/AgentManifestService.ts');
+const { AgentManifestService } = require('../src/main/settings/agent-manifests/AgentManifestService.ts');
 const {
   RESERVED_AGENT_IDS,
   isReservedAgentId,
-} = require('../src/main/settings/reservedAgentIds.ts');
+} = require('../src/main/settings/settings-core/reservedAgentIds.ts');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -332,19 +332,19 @@ async function main() {
   assert(settingsModalActions.includes('agentManifestDrafts'), 'Settings route save should include custom manifest drafts.');
   assert(settingsModalActions.includes('saveAgentDefinition'), 'Settings route save should not rebuild the whole settings/workspace state.');
 
-  const agentManifestServiceSource = readSrcFile(path.join(repoRoot, 'src/main/settings/AgentManifestService.ts'), 'utf8');
+  const agentManifestServiceSource = readSrcFile(path.join(repoRoot, 'src/main/settings/agent-manifests/AgentManifestService.ts'), 'utf8');
   assert(!agentManifestServiceSource.includes('Only top-level agent manifests'), 'Agent manifest import should not reject safe custom profiles.');
   assert(agentManifestServiceSource.includes('isSafeAgentProfileId(idFromFileName(entry))'), 'Agent manifest load should accept safe custom profile file ids.');
   assert(agentManifestServiceSource.includes('const routeAgentIds = new Set<string>(AGENT_ROLES)'), 'Agent manifest routes should seed built-ins before adding custom profiles.');
   assert(agentManifestServiceSource.includes('routeAgentIds.add(definition.id)'), 'Agent manifest routes should add custom profile ids.');
 
-  const settingsServiceSource = readSrcFile(path.join(repoRoot, 'src/main/settings/SettingsService.ts'), 'utf8');
+  const settingsServiceSource = readSrcFile(path.join(repoRoot, 'src/main/settings/settings-core/SettingsService.ts'), 'utf8');
   const settingsProviderSanitizeSource = readSrcFile(
-    path.join(repoRoot, 'src/main/settings/settingsProviderSanitize.ts'),
+    path.join(repoRoot, 'src/main/settings/settings-core/settingsProviderSanitize.ts'),
     'utf8',
   );
   const settingsServiceHelpersSource = readSrcFile(
-    path.join(repoRoot, 'src/main/settings/settingsServiceHelpers.ts'),
+    path.join(repoRoot, 'src/main/settings/settings-core/settingsServiceHelpers.ts'),
     'utf8',
   );
   assert(!settingsProviderSanitizeSource.includes('KNOWN_AGENT_IDS'), 'Settings route normalization should not use a built-in Agent allowlist.');
@@ -360,15 +360,15 @@ async function main() {
   assert(conversationRoutePreflightSource.includes('resolveEnabledAgentDefinition'), 'Conversation routing should resolve enabled manifest definitions.');
   assert(!conversationRoutePreflightSource.includes('KNOWN_CONVERSATION_AGENTS'), 'Conversation routing should not be limited to built-in Agent roles.');
 
-  const orchestratorSource = readSrcFile(path.join(repoRoot, 'src/main/workflow/debugger/AgentOrchestrator.ts'), 'utf8');
+  const orchestratorSource = readSrcFile(path.join(repoRoot, 'src/main/agent-runtime/orchestration/AgentOrchestrator.ts'), 'utf8');
   assert(orchestratorSource.includes('getOrCreateAgentConfig'), 'Agent orchestrator should lazily initialize custom Agent config.');
   const agentSlotRegistrySource = readSrcFile(
-    path.join(repoRoot, 'src/main/workflow/debugger/AgentSlotRegistry.ts'),
+    path.join(repoRoot, 'src/main/agent-runtime/orchestration/AgentSlotRegistry.ts'),
     'utf8',
   );
   assert(agentSlotRegistrySource.includes('DEFAULT_AGENT_ID'), 'Custom Agent fallback config should use general, not edit.');
 
-  const runtimePolicySource = readSrcFile(path.join(repoRoot, 'src/main/workflow/debugger/DebuggerRuntimePolicy.ts'), 'utf8');
+  const runtimePolicySource = readSrcFile(path.join(repoRoot, 'src/main/agent-runtime/orchestration/RuntimeToolPolicy.ts'), 'utf8');
   assert(
     runtimePolicySource.includes('finalizeAllowlist')
     && (runtimePolicySource.includes('manifest.tools') || runtimePolicySource.includes('expandMissionPlanOnlyTokens')),

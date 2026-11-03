@@ -15,20 +15,20 @@ const { editProfile } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../settings/SettingsService', () => ({
+vi.mock('../settings/settings-core/SettingsService', () => ({
   settingsService: {
     getAll: vi.fn(),
   },
 }));
 
-vi.mock('../settings/AgentManifestService', () => ({
+vi.mock('../settings/agent-manifests/AgentManifestService', () => ({
   agentManifestService: {
     getEffectiveProfiles: vi.fn(() => [editProfile]),
     resolveEffectiveSnapshot: vi.fn(() => ({ profiles: [editProfile], diagnostics: [] })),
   },
 }));
 
-vi.mock('../settings/EffectiveModelResolver', () => ({
+vi.mock('../settings/provider-catalog/EffectiveModelResolver', () => ({
   resolveEffectiveModelSelection: vi.fn(),
 }));
 
@@ -36,9 +36,9 @@ vi.mock('../runtime/RuntimeLogService', () => ({
   runtimeLogService: { log: vi.fn() },
 }));
 
-import { settingsService } from '../settings/SettingsService';
-import { agentManifestService } from '../settings/AgentManifestService';
-import { resolveEffectiveModelSelection } from '../settings/EffectiveModelResolver';
+import { settingsService } from '../settings/settings-core/SettingsService';
+import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
+import { resolveEffectiveModelSelection } from '../settings/provider-catalog/EffectiveModelResolver';
 import {
   findEffectiveAgentProfile,
   recordOverlayProfileDiagnostics,

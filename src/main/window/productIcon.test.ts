@@ -9,7 +9,7 @@ const f = vi.hoisted(() => ({
 }));
 vi.mock('electron', () => ({ app: f.app, nativeTheme: f.theme,
   nativeImage: { createFromPath: f.fromPath, createFromBitmap: f.fromBitmap } }));
-vi.mock('../settings/SettingsService', () => ({ settingsService: { getAll: () => ({ appearance: f.appearance }) } }));
+vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ appearance: f.appearance }) } }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: f.log } }));
 
 beforeEach(() => {

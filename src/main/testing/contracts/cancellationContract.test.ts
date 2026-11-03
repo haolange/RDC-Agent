@@ -4,7 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ProcessSupervisor } from '../../runtime/ProcessSupervisor';
-import { TurnCoordinator } from '../../workflow/debugger/TurnCoordinator';
+import { TurnCoordinator } from '../../agent-runtime/orchestration/TurnCoordinator';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 
 function spawnLongRunning(supervisor: ProcessSupervisor) {

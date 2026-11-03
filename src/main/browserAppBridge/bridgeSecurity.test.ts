@@ -82,11 +82,11 @@ describe('browserAppBridge security', () => {
   });
 
   it('requires full-access opt-in for high-risk browser channels', () => {
-    for (const channel of ['command:execute', 'settings:set', 'rdc-runtime:trustMcp', 'rdc-runtime:revokeMcp', 'memory:issueApprovalToken', 'device:prepare']) {
+    for (const channel of ['command:execute', 'settings:set', 'rdc-runtime:trustMcp', 'rdc-runtime:revokeMcp', 'memory:issueApprovalToken', 'device:prepare', 'conversation:answerPlanReview', 'conversation:answerToolApproval', 'conversation:answerUserInput']) {
       expect(isBridgeChannelAllowed(channel), channel).toBe(false);
     }
     process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS = '1';
-    for (const channel of ['command:execute', 'settings:set', 'rdc-runtime:trustMcp', 'rdc-runtime:revokeMcp', 'memory:issueApprovalToken', 'device:prepare']) {
+    for (const channel of ['command:execute', 'settings:set', 'rdc-runtime:trustMcp', 'rdc-runtime:revokeMcp', 'memory:issueApprovalToken', 'device:prepare', 'conversation:answerPlanReview', 'conversation:answerToolApproval', 'conversation:answerUserInput']) {
       expect(isBridgeChannelAllowed(channel), channel).toBe(true);
     }
     // desktop-only stays denied even with FULL_ACCESS

@@ -2,13 +2,13 @@ import { registerCaptureReplayReadHandlers } from './captureReplayReadHandlers';
 import { ipcMain } from 'electron';
 import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
 import type { OpenProjectInputRequest, SessionScope, SessionScopedPayload } from '@shared/types/session';
-import { replayDeviceService } from '../captures/ReplayDeviceService';
+import { replayDeviceService } from '../rdc/captures/ReplayDeviceService';
 import { rdcSessionService } from '../sessions';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import { storageAdapter } from '../sessions/StorageAdapter';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
-import { replayDeviceIssue } from '../captures/ReplayDeviceIssue';
+import { replayDeviceIssue } from '../rdc/captures/ReplayDeviceIssue';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import {
   CaptureOpenProjectInputArgsSchema,

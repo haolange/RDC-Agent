@@ -24,7 +24,7 @@ import type {
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
-import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
+import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { AssistantStreamBuilder, createProviderOutputRef, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
 import { ResponsesItemChannels } from './internal/responsesItemChannels';
 import {

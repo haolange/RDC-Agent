@@ -6,13 +6,14 @@ import type { AgentPermissionSettings, AgentPermissionMode } from '@shared/types
 import type { AgentTool } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
 import { AgentPermissionPolicyService } from './AgentPermissionPolicy';
+import '../../rdc/rdcShellPermission';
 import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
 import { compilePolicyFromRestrictive } from './PolicyCompiler';
-import { freezeRdcTurnBinding } from '../../tools/RdcTurnBindings';
-import { DEFAULT_RDC_CLI_INVOKER } from '../../settings/settingsDefaults';
+import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
+import { DEFAULT_RDC_CLI_INVOKER } from '../../settings/settings-core/settingsDefaults';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 const ownership = vi.hoisted(() => ({ lease: vi.fn() }));
-vi.mock('../../sessions/RdcRuntimeContextRegistry', () => ({ assertRdcContextLeaseOwnership: ownership.lease, getRdcContextLease: () => null }));
+vi.mock('../../rdc/RdcRuntimeContextRegistry', () => ({ assertRdcContextLeaseOwnership: ownership.lease, getRdcContextLease: () => null }));
 
 const { mockSettings } = vi.hoisted(() => ({
   mockSettings: {
@@ -34,7 +35,7 @@ const workspaceRoot = path.join(fixtureRoot, 'workspace');
 const externalRoot = path.join(fixtureRoot, 'external');
 const readableRoot = path.join(fixtureRoot, 'shared');
 
-vi.mock('../../settings/SettingsService', () => ({
+vi.mock('../../settings/settings-core/SettingsService', () => ({
   settingsService: {
     getAll: () => mockSettings,
   },

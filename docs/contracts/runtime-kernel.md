@@ -191,7 +191,7 @@ Slash 命令是 runtime 输入，不绕过 profile 权限。基线：`/help` `/c
 allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 ```
 
-空 `allowed-tools` 不收窄。实现：`intersectSkillAllowedTools` + `combineActiveSkillAllowlists`（`DebuggerRuntimePolicy`）。
+空 `allowed-tools` 不收窄。实现：`intersectSkillAllowedTools` + `combineActiveSkillAllowlists`（`RuntimeToolPolicy`）。
 
 ## Hooks
 
@@ -219,9 +219,9 @@ RDC runtime context 仅绑定 per-session lease（`RdcRuntimeContextRegistry`）
 
 ## 相关源码
 
-- `src/main/workflow/debugger/` — Orchestrator façade、TurnCoordinator、DeferredTools
+- `src/main/agent-runtime/orchestration/` — Orchestrator façade、TurnCoordinator、DeferredTools
 - `src/main/agent-runtime/EffectiveRuntimePlan.ts` — schemaVersion 3 冻结 plan
-- `src/main/sessions/RdcRuntimeContextRegistry.ts` — per-session RDC lease
+- `src/main/rdc/RdcRuntimeContextRegistry.ts` — per-session RDC lease
 - `src/main/runtime/ProcessSupervisor.ts`、`src/main/lifecycle/ShutdownCoordinator.ts`
 - `src/main/agent-runtime/` — prompt、providers、permissions、tools
 - `src/main/conversation/` — Conversation、journal、Work Process 策略

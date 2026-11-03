@@ -93,7 +93,7 @@ describe('attachment staging bytes are the commit source', () => {
   });
 
   it('hashes staged bytes then commits them after the original source is replaced', async () => {
-    const { storageAdapter } = await import('../sessions/StorageAdapter');
+    const { storageAdapter } = await import('../sessions/store/StorageAdapter');
     await storageAdapter.initializeWorkspace();
     const projectRoot = path.join(tempRoot, 'project-root');
     fs.mkdirSync(projectRoot, { recursive: true });

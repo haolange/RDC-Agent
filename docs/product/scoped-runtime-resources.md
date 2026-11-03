@@ -68,9 +68,9 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 - Skill 的 `references/` 文本通过同一个 `skill_read(skill_id, reference, offset?, limit?)` 渐进读取，`reference` 相对当前有效 Skill 的 `SKILL.md`，不得相对工作区猜路径。沿用 profile 可见性和 builtin/user/project 覆盖解析，限制精确引用路径、禁止绝对路径/穿越/符号链接，复用文本大小、二进制及分页门禁，返回原文件完整字节 SHA-256、来源与截断状态。读取不执行脚本、不增加普通文件根、不授予 edit_file/read-before-edit 资格，也不刷新在途权限或 RDC 绑定；本次读取的引用 hash 是方法来源观察，不冒称已预载引用正文。
 - 某个 skill 未声明或声明空列表：该 skill **不参与**收窄；
 - 元工具豁免（如 `skills` / `skill_read` / `ask_user` / `tool_search`）由 `intersectSkillAllowedTools` 保留；
-- 实现：`combineActiveSkillAllowlists`（`DebuggerRuntimePolicy.ts`），Orchestrator 执行路径调用。
+- 实现：`combineActiveSkillAllowlists`（`RuntimeToolPolicy.ts`），Orchestrator 执行路径调用。
 
-单测：`DebuggerRuntimePolicy.test.ts`（含多 skill 交集）。
+单测：`RuntimeToolPolicy.test.ts`（含多 skill 交集）。
 
 ## Hooks
 

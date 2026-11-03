@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../settings/SettingsService', () => ({
+vi.mock('../settings/settings-core/SettingsService', () => ({
   settingsService: {
     getAll: () => ({ agents: { definitions: [] } }),
   },

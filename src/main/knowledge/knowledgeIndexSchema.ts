@@ -3,7 +3,7 @@ import {
   KNOWLEDGE_CARD_TYPES,
   KNOWLEDGE_LIFECYCLES,
 } from '@shared/types/knowledge';
-import type { StorageMigration } from '../sessions/storageSchema';
+import type { StorageMigration } from '../sessions/store/storageSchema';
 import { KnowledgeRelationSchema, KnowledgeScopeSchema } from './knowledgeCardSchema';
 import {
   KNOWLEDGE_INDEX_SCHEMA_VERSION,

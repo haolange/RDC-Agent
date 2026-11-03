@@ -10,7 +10,7 @@ const { getAll, spawn } = vi.hoisted(() => ({
   spawn: vi.fn(),
 }));
 
-vi.mock('../../../settings/SettingsService', () => ({
+vi.mock('../../../settings/settings-core/SettingsService', () => ({
   settingsService: { getAll },
 }));
 

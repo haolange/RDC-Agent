@@ -23,7 +23,7 @@ import type {
   ToolDefinition,
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
-import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
+import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   AlternatingTextThinkingChannels,

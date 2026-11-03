@@ -101,7 +101,7 @@ for (const forbidden of ['nodeManifestLoader', 'compileProviderCatalog(', 'src/s
 }
 
 const liveParserSource = fs.readFileSync(
-  path.join(repoRoot, 'src/main/settings/LiveProviderCatalogParsers.ts'),
+  path.join(repoRoot, 'src/main/settings/provider-catalog/LiveProviderCatalogParsers.ts'),
   'utf8',
 );
 for (const forbidden of [
@@ -118,11 +118,11 @@ for (const forbidden of [
   }
 }
 
-const settingsSource = fs.readFileSync(path.join(repoRoot, 'src/main/settings/SettingsService.ts'), 'utf8');
+const settingsSource = fs.readFileSync(path.join(repoRoot, 'src/main/settings/settings-core/SettingsService.ts'), 'utf8');
 if (settingsSource.includes('discoveryPolicyId ===')) {
   fail('SettingsService must derive persistence from the authority matrix, not parser policy ids');
 }
-const connectionSource = fs.readFileSync(path.join(repoRoot, 'src/main/settings/ProviderConnectionService.ts'), 'utf8');
+const connectionSource = fs.readFileSync(path.join(repoRoot, 'src/main/settings/provider-auth/ProviderConnectionService.ts'), 'utf8');
 if (connectionSource.includes("provider.id === 'moonshot'")) {
   fail('Moonshot discovery must use its declarative manifest instead of a Provider id branch');
 }
@@ -132,17 +132,17 @@ const contractTests = [
   'src/shared/provider-catalog/agentToolCapabilityAudit.test.ts',
   'src/shared/utils/agentToolCapability.test.ts',
   'src/shared/utils/modelControls.test.ts',
-  'src/main/settings/RequestPlanner.test.ts',
-  'src/main/settings/RequestPlanner.catalogOutput.test.ts',
-  'src/main/settings/EffectiveModelResolver.test.ts',
+  'src/main/settings/provider-catalog/RequestPlanner.test.ts',
+  'src/main/settings/provider-catalog/RequestPlanner.catalogOutput.test.ts',
+  'src/main/settings/provider-catalog/EffectiveModelResolver.test.ts',
   'src/main/conversation/ConversationRoutePreflight.test.ts',
-  'src/main/settings/AgentManifestService.seed.test.ts',
-  'src/main/settings/ProviderConnectionService.test.ts',
-  'src/main/settings/ProviderRouteUrl.test.ts',
-  'src/main/settings/ProviderCapabilityContract.test.ts',
-  'src/main/settings/LiveProviderCatalogParsers.test.ts',
-  'src/main/settings/CopilotBilling.test.ts',
-  'src/main/settings/EffectiveCatalogService.test.ts',
+  'src/main/settings/agent-manifests/AgentManifestService.seed.test.ts',
+  'src/main/settings/provider-auth/ProviderConnectionService.test.ts',
+  'src/main/settings/provider-catalog/ProviderRouteUrl.test.ts',
+  'src/main/settings/provider-catalog/ProviderCapabilityContract.test.ts',
+  'src/main/settings/provider-catalog/LiveProviderCatalogParsers.test.ts',
+  'src/main/settings/provider-auth/CopilotBilling.test.ts',
+  'src/main/settings/provider-catalog/EffectiveCatalogService.test.ts',
   'src/main/testing/contracts/providerWireFixture.test.ts',
 ];
 const vitest = path.join(repoRoot, 'node_modules/vitest/vitest.mjs');

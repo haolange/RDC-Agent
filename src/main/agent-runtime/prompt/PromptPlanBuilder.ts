@@ -22,11 +22,11 @@ import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { resolveSkillCatalogBudget } from '../capabilities/SkillCatalogBudget';
 import { formatShellInterpreterLabel } from '../../runtime/ShellResolver';
 import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
-import { storageAdapter } from '../../sessions/StorageAdapter';
+import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { applyRequestPlanFacts } from './RequestPlanFacts';
 import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
 import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
-import { getRdcContextLease } from '../../sessions/RdcRuntimeContextRegistry';
+import { getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 
 const CORE_FILES = ['identity-collaboration.md', 'agent-loop.md', 'tool-evidence.md', 'completion.md'];
 

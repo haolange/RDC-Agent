@@ -9,12 +9,12 @@ import type { AgentMessage, AssistantMessage, Message } from '../core/types';
 import { RecoverableContextWindow } from './RecoverableContextWindow';
 import { generateCompactionSections } from './CompactionHandoffService';
 import { assembleDerivedContextView, createStructuredHandoffMessage, serializeHandoffSourceTranscript } from './StructuredHandoffBuilder';
-import { projectCompactionJournalMessages, readCompactionAuthorityJournal, readCompactionAuthorityState, saveCompactionAuthoritySource, verifyCompactionAuthoritySource } from '../../sessions/CompactionAuthoritySource';
+import { projectCompactionJournalMessages, readCompactionAuthorityJournal, readCompactionAuthorityState, saveCompactionAuthoritySource, verifyCompactionAuthoritySource } from '../../sessions/store/CompactionAuthoritySource';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import { sessionArtifactResolver } from '../../sessions/SessionArtifactResolver';
-import { delegatedArtifactOwner, grantDelegatedOutput } from '../../sessions/DelegatedArtifactAccess';
-import { storageAdapter } from '../../sessions/StorageAdapter';
-import { lookupProjectById } from '../../settings/projectRegistryLookup';
+import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
+import { delegatedArtifactOwner, grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
+import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { lookupProjectById } from '../../settings/settings-core/projectRegistryLookup';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 
 const portableContextMessages = (messages: AgentMessage[]): AgentMessage[] => messages.flatMap(message => {

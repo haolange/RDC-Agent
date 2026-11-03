@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const repoRoot = process.cwd();
-const ORCHESTRATOR_REL = 'src/main/workflow/debugger/AgentOrchestrator.ts';
+const ORCHESTRATOR_REL = 'src/main/agent-runtime/orchestration/AgentOrchestrator.ts';
 const MAX_LINES = 800;
 const VALUE_IMPORT_MAX = 10;
 

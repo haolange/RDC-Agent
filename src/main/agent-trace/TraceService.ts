@@ -13,8 +13,8 @@ import type {
   TraceSessionResult,
 } from '@shared/types/trace';
 import { nowIso } from '@shared/utils/id';
-import { storageAdapter } from '../sessions/StorageAdapter';
-import { traceStateStore } from '../workflow/debugger/TraceStateStore';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { traceStateStore } from '../agent-runtime/orchestration/TraceStateStore';
 import { appPathService } from '../runtime/AppPathService';
 import { TraceEventStore, TraceRunStore } from './TraceEventStore';
 import { TraceEventEmitter } from './TraceEventEmitter';

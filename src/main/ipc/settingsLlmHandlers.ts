@@ -1,5 +1,5 @@
 import { refreshApplicationMenu } from '../window/applicationMenu';
-import { providerAccountAuthService } from '../settings/ProviderAccountAuthService';
+import { providerAccountAuthService } from '../settings/provider-auth/ProviderAccountAuthService';
 import { ipcMain } from 'electron';
 import type {
   AppSettings,
@@ -13,14 +13,14 @@ import type {
 } from '@shared/types/settings';
 import type { AgentDefinitionSaveRequest } from '@shared/types/agentManifest';
 import { appPathService } from '../runtime/AppPathService';
-import { agentManifestService } from '../settings/AgentManifestService';
-import { resolveCompiledRouteForAgent } from '../settings/compiledAgentRoutes';
-import { tryCurrentProjectRoot } from '../settings/resolveRegisteredProjectRoot';
-import { providerConnectionService } from '../settings/ProviderConnectionService';
-import { settingsService } from '../settings/SettingsService';
-import { buildEffectiveCatalogRequest, resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
-import { effectiveCatalogService } from '../settings/EffectiveCatalogService';
-import { providerCapabilityProbeService } from '../settings/ProviderCapabilityProbeService';
+import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
+import { resolveCompiledRouteForAgent } from '../settings/provider-catalog/compiledAgentRoutes';
+import { tryCurrentProjectRoot } from '../settings/settings-core/resolveRegisteredProjectRoot';
+import { providerConnectionService } from '../settings/provider-auth/ProviderConnectionService';
+import { settingsService } from '../settings/settings-core/SettingsService';
+import { buildEffectiveCatalogRequest, resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
+import { effectiveCatalogService } from '../settings/provider-catalog/EffectiveCatalogService';
+import { providerCapabilityProbeService } from '../settings/provider-catalog/ProviderCapabilityProbeService';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { applyProductIcon } from '../window/productIcon';
@@ -50,7 +50,7 @@ import {
   SettingsSetModelsOverrideArgsSchema,
 } from './validation/settingsLlmSchemas';
 import type { ModelsOverride } from '@shared/provider-catalog/modelsOverrideSchema';
-import { modelsOverrideService } from '../settings/ModelsOverrideService';
+import { modelsOverrideService } from '../settings/settings-core/ModelsOverrideService';
 
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
   effectiveCatalogService.setConfigurationValidator((request) => {

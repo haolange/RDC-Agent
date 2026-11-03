@@ -2,7 +2,7 @@
  * /help — 列出所有可用命令或查看某个命令的详情。
  */
 import type { CommandDefinition } from '@shared/types/command';
-import { getRegistry } from '../index';
+import { getRegistry } from '..';
 
 export const helpCommand: CommandDefinition = {
   id: 'help',

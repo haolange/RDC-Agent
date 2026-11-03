@@ -1,7 +1,7 @@
-import { acquireRdcPreparationLock, setRdcInteractionLock } from '../sessions/RdcOperationCoordinator';
+import { conversationRdcHost } from './conversationRdcHost';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
-import { readReferencedPlan } from '../sessions/sessionPlanReference';
-import { planReviewStateStore } from '../sessions/PlanReviewStateStore';
+import { readReferencedPlan } from '../sessions/run/sessionPlanReference';
+import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
 import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
 import { enforceMissionTurnCompletion } from '../investigation/missionCompletionContract';
 import { createHash } from 'crypto';
@@ -25,17 +25,15 @@ import type {
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { SessionRecord } from '@shared/types/session';
 import { generateEventId } from '@shared/utils/id';
-import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
+import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import {
   answerConversationPlanReview,
   answerConversationToolApproval,
   answerConversationUserInput,
 } from './ConversationInteractionAnswers';
 import { traceService } from '../agent-trace/TraceService';
-import { replayDeviceService } from '../captures/ReplayDeviceService';
-import { rdcSessionService } from '../sessions';
-import { storageAdapter } from '../sessions/StorageAdapter';
-import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 import { sessionContextJournal } from './SessionContextJournal';
 import {
   createDefaultBranchState,
@@ -219,14 +217,14 @@ export class ConversationService {
   answerToolApproval = answerConversationToolApproval;
   private registerActiveTurn(turn: ActiveConversationTurn): void {
     this.activeTurns.set(turn.turnId, turn);
-    if (turn.sessionId) setRdcInteractionLock(turn.sessionId, turn.turnId, true);
+    if (turn.sessionId) conversationRdcHost().setInteractionLock(turn.sessionId, turn.turnId, true);
   }
   private clearActiveTurn(turnId: string, controller: AbortController): void {
     const active = this.activeTurns.get(turnId);
     if (active?.abortController === controller) {
       const sessionId = active.sessionId;
       this.activeTurns.delete(turnId);
-      if (sessionId) setRdcInteractionLock(sessionId, turnId, false);
+      if (sessionId) conversationRdcHost().setInteractionLock(sessionId, turnId, false);
       // Background Task settlement updates its own projection, not the parent turn.
     }
   }
@@ -432,7 +430,7 @@ export class ConversationService {
       if (scopeOwner && scopeOwner !== requestId) {
         throw new Error('CONVERSATION_BUSY: another request is preparing for this conversation.');
       }
-      if (scopeKey.startsWith('session:')) acquireRdcPreparationLock(scopeKey.slice(8), requestId);
+      if (scopeKey.startsWith('session:')) conversationRdcHost().acquirePreparationLock(scopeKey.slice(8), requestId);
       this.activeSendScopes.set(scopeKey, requestId);
       this.preparingRequests.set(idempotencyKey, {
         requestId,
@@ -456,7 +454,7 @@ export class ConversationService {
         agentOrchestrator.releaseProviderRuntimeCredentials(requestState.credentialHandle);
       }
       this.preparingRequests.delete(idempotencyKey);
-      if (scopeKey.startsWith('session:')) setRdcInteractionLock(scopeKey.slice(8), requestId, false);
+      if (scopeKey.startsWith('session:')) conversationRdcHost().setInteractionLock(scopeKey.slice(8), requestId, false);
       if (this.activeSendScopes.get(scopeKey) === requestId) this.activeSendScopes.delete(scopeKey);
     };
 
@@ -728,10 +726,10 @@ export class ConversationService {
       : null;
     const projectInputs = projectId ? await storageAdapter.listProjectInputs(projectId) : [];
     const openedCapture = projectId && resolvedSessionId
-      ? rdcSessionService.snapshotOpenedCaptureForSession({ projectId, sessionId: resolvedSessionId })
+      ? conversationRdcHost().snapshotOpenedCapture({ projectId, sessionId: resolvedSessionId })
       : null;
     const activeOpenedCapture = openedCapture?.status === 'open' ? openedCapture : null;
-    const replayDevice = replayDeviceService.getDeviceById(input.replayDeviceId || 'local') ?? replayDeviceService.getDeviceById('local');
+    const replayDevice = conversationRdcHost().replayDevice(input.replayDeviceId || 'local') ?? conversationRdcHost().replayDevice('local');
     let planSource: ResolvedConversationContext['planSource'];
     if (input.planSource) {
       if (input.planSource.sessionId !== resolvedSessionId) throw new Error('PLAN_SESSION_DENIED: revision belongs to another session.');
@@ -817,7 +815,7 @@ export class ConversationService {
     configurationCommit?: ConversationSendRequest['configurationCommit'],
     requestFingerprint?: string,
     excludeTurnId?: string,
-    policyBudget?: import('../workflow/debugger/TurnCoordinator').PolicyBudgetState,
+    policyBudget?: import('../agent-runtime/orchestration/TurnCoordinator').PolicyBudgetState,
   ): Promise<ConversationTurnResult> {
     return runStartProfileTurn(
       this.createTurnStarterHost(),

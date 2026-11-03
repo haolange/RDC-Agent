@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
-import { StorageIo } from '../sessions/StorageIo';
+import { StorageIo } from '../sessions/store/StorageIo';
 import { createDisposableCandidateService } from './KnowledgeCandidateService';
 import { KnowledgeCompileService } from './KnowledgeCompileService';
 import { KnowledgeIndexService, contentHashOf } from './KnowledgeIndexService';

@@ -20,7 +20,7 @@ import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { redactCredentialLikeText, redactSecretsDeep } from '../runtime/secretRedaction';
 import { shouldProjectDiagnosticToWorkProcess } from './workProcessDiagnosticPolicy';
-import { normalizeToolName } from '../workflow/debugger/DebuggerRuntimePolicy';
+import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import {
   attachRuntimeHookDiagnostic,
   upsertRuntimeToolApproval,

@@ -88,7 +88,7 @@ function main() {
   );
 
   const agentManifestService = fs.readFileSync(
-    path.join(repoRoot, 'src/main/settings/AgentManifestService.ts'),
+    path.join(repoRoot, 'src/main/settings/agent-manifests/AgentManifestService.ts'),
     'utf8',
   );
   assert(!agentManifestService.includes('createSeedDefinition'), 'AgentManifestService must not write user seeds');
@@ -201,7 +201,7 @@ function main() {
   );
 
   const deferredTools = fs.readFileSync(
-    path.join(repoRoot, 'src/main/workflow/debugger/deferredTools.ts'),
+    path.join(repoRoot, 'src/main/agent-runtime/orchestration/deferredTools.ts'),
     'utf8',
   );
   assert(
@@ -228,28 +228,28 @@ function main() {
     'deferredTools must defer extended builtin tools via BUILTIN_AGENT_TOOL_TIERS',
   );
   assert(
-    !fs.existsSync(path.join(repoRoot, 'src/main/workflow/debugger/mcpDeferredTools.ts')),
+    !fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/orchestration/mcpDeferredTools.ts')),
     'legacy mcpDeferredTools.ts must not exist (converged into deferredTools.ts)',
   );
 
   const orchestrator = fs.readFileSync(
-    path.join(repoRoot, 'src/main/workflow/debugger/AgentOrchestrator.ts'),
+    path.join(repoRoot, 'src/main/agent-runtime/orchestration/AgentOrchestrator.ts'),
     'utf8',
   );
   const turnPreparationService = fs.readFileSync(
-    path.join(repoRoot, 'src/main/workflow/debugger/TurnPreparationService.ts'),
+    path.join(repoRoot, 'src/main/agent-runtime/orchestration/TurnPreparationService.ts'),
     'utf8',
   );
   const runtimeToolAssembly = fs.readFileSync(
-    path.join(repoRoot, 'src/main/workflow/debugger/RuntimeToolAssembly.ts'),
+    path.join(repoRoot, 'src/main/agent-runtime/orchestration/RuntimeToolAssembly.ts'),
     'utf8',
   );
   const toolExecutorFactory = fs.readFileSync(
-    path.join(repoRoot, 'src/main/workflow/debugger/ToolExecutorFactory.ts'),
+    path.join(repoRoot, 'src/main/agent-runtime/orchestration/ToolExecutorFactory.ts'),
     'utf8',
   );
   const runtimePolicy = fs.readFileSync(
-    path.join(repoRoot, 'src/main/workflow/debugger/DebuggerRuntimePolicy.ts'),
+    path.join(repoRoot, 'src/main/agent-runtime/orchestration/RuntimeToolPolicy.ts'),
     'utf8',
   );
   assert(
@@ -282,7 +282,7 @@ function main() {
   );
   assert(
     runtimePolicy.includes('export function intersectSkillAllowedTools'),
-    'DebuggerRuntimePolicy must export intersectSkillAllowedTools for prepareTurn',
+    'RuntimeToolPolicy must export intersectSkillAllowedTools for prepareTurn',
   );
   assert(
     toolExecutorFactory.includes('plan?.skillIntersection')

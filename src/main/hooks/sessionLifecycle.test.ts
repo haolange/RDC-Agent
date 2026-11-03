@@ -18,7 +18,7 @@ const {
   clearReplayHistory: vi.fn(async () => undefined),
 }));
 
-vi.mock('../sessions/StorageAdapter', () => ({
+vi.mock('../sessions/store/StorageAdapter', () => ({
   storageAdapter: {
     getProjectById,
     createSession,
@@ -31,7 +31,7 @@ vi.mock('./runtimeHookDispatch', () => ({
   dispatchRuntimeHooks,
 }));
 vi.mock('../sessions', () => ({ rdcSessionService: { clearOpenedCaptureForSession: closeReplay } }));
-vi.mock('../captures/replay/ReplayHistoryStore', () => ({ replayHistoryStore: { clearSession: clearReplayHistory } }));
+vi.mock('../rdc/captures/replay/ReplayHistoryStore', () => ({ replayHistoryStore: { clearSession: clearReplayHistory } }));
 
 import { createSessionWithHooks, removeSessionWithHooks } from './sessionLifecycle';
 

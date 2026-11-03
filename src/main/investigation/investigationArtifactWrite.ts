@@ -7,7 +7,7 @@ import type {
   InvestigationReport,
   WorldState,
 } from '@shared/types/renderdocInvestigation';
-import type { SessionArtifactResolver } from '../sessions/SessionArtifactResolver';
+import type { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { InvestigationError } from './investigationErrors';
 import type { InvestigationLookup } from './investigationInvariants';
 import { assertNoOpaqueProviderPayload } from './investigationRecordSchemas';
@@ -43,7 +43,7 @@ export interface InvestigationReadResult {
 }
 
 export interface InvestigationArtifactServiceDeps {
-  receiptStore?: import("../tools/RdcExecutionReceipts").RdcExecutionReceipts;
+  receiptStore?: import("../rdc/RdcExecutionReceipts").RdcExecutionReceipts;
   resolver?: SessionArtifactResolver;
   now?: () => Date;
   onPersistBoundary?: (boundary: InvestigationPersistBoundary, info: {

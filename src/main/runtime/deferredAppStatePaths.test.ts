@@ -4,7 +4,7 @@ import path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { appPathService } from './AppPathService';
 import { HookEngine } from '../hooks/HookEngine';
-import { McpTrustService } from '../settings/McpTrustService';
+import { McpTrustService } from '../settings/settings-core/McpTrustService';
 import { RequestSnapshotStore } from '../agent-runtime/prompt/RequestSnapshotStore';
 import { TraceService } from '../agent-trace/TraceService';
 
