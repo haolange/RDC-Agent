@@ -90,7 +90,7 @@ function toAiSdkTools(context: Context): ToolSet | undefined {
   if (!context.tools?.length) return undefined;
   return Object.fromEntries(context.tools.map((entry) => [entry.name, tool({
     description: entry.description,
-    inputSchema: jsonSchema(entry.parameters),
+    inputSchema: jsonSchema(entry.parameters as Parameters<typeof jsonSchema>[0]),
   })]));
 }
 

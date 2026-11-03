@@ -96,7 +96,9 @@ export function parsePlanTaskRequirements(markdown: string): PlanTaskRequirement
   const marker = `${PLAN_TASK_REQUIREMENTS_HEADING}\n\n\`\`\`json\n`;
   const headings = [...markdown.matchAll(/^## Task execution requirements[^\n]*$/gm)];
   if (!headings.length) return [];
-  const index = headings[0].index!;
+  const heading = headings[0];
+  if (!heading || typeof heading.index !== 'number') return [];
+  const index = heading.index;
   if (!markdown.startsWith(marker, index) || headings.length !== 1) {
     throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: malformed or duplicate task contract section.');
   }

@@ -3,7 +3,8 @@ import { BLOCKER_CODES, getBlockersByCategory, getBlockersBySeverity } from './b
 
 describe('blockers', () => {
   it('exposes blocker code catalog', () => {
-    expect(BLOCKER_CODES.BLOCKED_MISSING_CAPTURE.code).toBe('BLOCKED_MISSING_CAPTURE');
+    const missingCapture = BLOCKER_CODES.BLOCKED_MISSING_CAPTURE;
+    expect(missingCapture?.code).toBe('BLOCKED_MISSING_CAPTURE');
     expect(Object.keys(BLOCKER_CODES).length).toBeGreaterThan(5);
   });
 

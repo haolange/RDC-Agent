@@ -24,7 +24,7 @@ import type {
   TextContent,
   ToolDefinition,
 } from '../core/types';
-import { AgentTool, type AgentToolResult } from './AgentTool';
+import { type AgentTool, type AgentToolResult } from './AgentTool';
 import {
   processSupervisor,
   type SupervisedProcess,

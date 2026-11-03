@@ -558,5 +558,5 @@ try {
 } catch (error) {
   console.error('[settings-agents] FAILED');
   console.error(error);
-  process.exitCode = 1;
+  throw error;
 }

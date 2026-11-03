@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
+  },
+  "include": [
+    "src/shared/constants/blockers.ts",
+    "src/shared/constants/blockers.test.ts",
+    "src/shared/constants/rdcProbe.ts"
+  ],
+  "exclude": ["node_modules", "dist", "release"]
+}

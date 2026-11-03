@@ -137,7 +137,11 @@ export function providerAdapterIdForProtocol(protocol: LlmProviderProtocol): Pro
   if (matches.length !== 1) {
     throw new Error(`Protocol ${protocol} must resolve to exactly one runtime adapter; received ${matches.length}.`);
   }
-  return matches[0];
+  const adapterId = matches[0];
+  if (!adapterId) {
+    throw new Error(`Protocol ${protocol} must resolve to exactly one runtime adapter; received 0.`);
+  }
+  return adapterId;
 }
 
 export const PROVIDER_AUTH_SCHEMA_IDS = [

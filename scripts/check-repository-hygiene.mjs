@@ -87,6 +87,8 @@ const allowedRootFiles = new Set([
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
   'tsconfig.json',
+  'tsconfig.strict-next.json',
+  'eslint.config.mjs',
   'electron-builder.json',
   'electron.vite.config.ts',
   'vite.renderer.config.ts',

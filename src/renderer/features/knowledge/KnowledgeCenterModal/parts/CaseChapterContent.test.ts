@@ -2,7 +2,16 @@ import { createElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CaseChapterContent, parseChapterValue } from './CaseChapterContent';
-vi.mock('../../../../i18n', () => ({ useI18n: () => ({ language: 'en' }) }));
+vi.mock('../../../../i18n', () => ({
+  useI18n: () => ({
+    language: 'en',
+    t: (key: string) => ({
+      'knowledgeCenter.case.noItems': 'No items',
+      'knowledgeCenter.case.noFields': 'No fields',
+      'knowledgeCenter.case.sourceDetails': 'Source details',
+    }[key] ?? key),
+  }),
+}));
 
 describe('Case chapter reading', () => {
   it('leaves ordinary Markdown and invalid JSON on the Markdown path', () => {

@@ -1,0 +1,7 @@
+{
+  "id": "renderer-inline-hex",
+  "roots": ["src/renderer"],
+  "extensions": [".tsx"],
+  "pattern": "style=\\{\\{[^}]*#[0-9a-fA-F]{3,8}",
+  "message": "inline hex color; use design tokens"
+}

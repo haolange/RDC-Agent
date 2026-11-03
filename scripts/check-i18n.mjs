@@ -57,6 +57,8 @@ for (const name of ['workProcessUseLabel.ts', 'workProcessCatalogVerbLabels.ts']
   if (fs.existsSync(path.join(root, 'src/renderer/features/transcript', name))) errors.push(`Retired reverse translation path exists: ${name}`);
 }
 if (errors.length) {
-  console.error(errors.map(error => `[i18n] ${error}`).join('\n'));
-  process.exitCode = 1;
-} else console.log(`[i18n] ${Object.keys(englishTranslations).length} bilingual renderer keys, ${Object.keys(nativeEnglish).length} native keys, ${expected.size} builtin tools verified.`);
+  const message = errors.map(error => `[i18n] ${error}`).join('\n');
+  console.error(message);
+  throw new Error(message);
+}
+console.log(`[i18n] ${Object.keys(englishTranslations).length} bilingual renderer keys, ${Object.keys(nativeEnglish).length} native keys, ${expected.size} builtin tools verified.`);

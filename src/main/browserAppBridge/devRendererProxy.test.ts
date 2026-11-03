@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'http';
-import { AddressInfo } from 'net';
+import type { AddressInfo } from 'net';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   isBridgeOwnedPath,

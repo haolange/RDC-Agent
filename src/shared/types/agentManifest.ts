@@ -192,11 +192,12 @@ export function toAgentManifestEditorDraft(
     ...rest
   } = definition;
   const write = resolveAgentWriteTarget(definition, currentProjectId);
+  const sourceHash = definition.provenance?.sourceHash;
   return {
     ...rest,
     writeScope: write.scope,
-    writeProjectId: write.projectId,
-    sourceHash: definition.provenance?.sourceHash,
+    ...(write.projectId !== undefined ? { writeProjectId: write.projectId } : {}),
+    ...(sourceHash !== undefined ? { sourceHash } : {}),
   };
 }
 

@@ -27,7 +27,7 @@ await Promise.all([
 
 const fail = (message) => {
   console.error(`[reasoning-delivery] ${message}`);
-  process.exit(1);
+  throw new Error(message);
 };
 
 const assert = (condition, message) => {

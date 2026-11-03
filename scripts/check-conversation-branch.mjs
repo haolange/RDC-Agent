@@ -12,7 +12,7 @@ const { ROOT_BRANCH_ID } = require('../src/shared/types/conversationBranch.ts');
 
 const fail = (message) => {
   console.error(`[conversation-branch] ${message}`);
-  process.exit(1);
+  throw new Error(message);
 };
 
 const assert = (condition, message) => {

@@ -19,7 +19,7 @@ const now = 1_700_000_000_000;
 
 const fail = (message) => {
   console.error(`[work-process] ${message}`);
-  process.exit(1);
+  throw new Error(message);
 };
 
 const assert = (condition, message) => {

@@ -1,62 +1,52 @@
 import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
-import react from '@vitejs/plugin-react'
 import { providerCatalogVitePlugin } from './src/main/provider-catalog/providerCatalogVitePlugin'
+import rendererConfig from './vite.renderer.config'
 
-const rendererRoot = resolve(__dirname, 'src/renderer')
+const repoRoot = __dirname
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin(), providerCatalogVitePlugin(__dirname)],
+    plugins: [externalizeDepsPlugin(), providerCatalogVitePlugin(repoRoot)],
     resolve: {
       alias: {
-        '@shared': resolve(__dirname, 'src/shared')
-      }
+        '@main': resolve(repoRoot, 'src/main'),
+        '@shared': resolve(repoRoot, 'src/shared'),
+      },
     },
     build: {
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'src/main/index.ts'),
-          turnPreparationWorker: resolve(__dirname, 'src/main/workers/turnPreparationWorker.ts')
-        }
-      }
-    }
+          index: resolve(repoRoot, 'src/main/index.ts'),
+          turnPreparationWorker: resolve(repoRoot, 'src/main/workers/turnPreparationWorker.ts'),
+        },
+      },
+    },
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
     resolve: {
       alias: {
-        '@shared': resolve(__dirname, 'src/shared')
-      }
+        '@main': resolve(repoRoot, 'src/main'),
+        '@shared': resolve(repoRoot, 'src/shared'),
+      },
     },
     build: {
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'src/preload/index.ts')
-        }
-      }
-    }
+          index: resolve(repoRoot, 'src/preload/index.ts'),
+        },
+      },
+    },
   },
   renderer: {
-    root: rendererRoot,
-    server: {
-      host: '127.0.0.1',
-      port: 5173,
-      strictPort: false
-    },
+    ...rendererConfig,
     build: {
       rollupOptions: {
         input: {
-          index: resolve(rendererRoot, 'index.html')
-        }
-      }
+          index: resolve(repoRoot, 'src/renderer/index.html'),
+        },
+      },
     },
-    plugins: [react()],
-    resolve: {
-      alias: {
-        '@renderer': resolve(__dirname, 'src/renderer'),
-        '@shared': resolve(__dirname, 'src/shared')
-      }
-    }
-  }
+  },
 })
