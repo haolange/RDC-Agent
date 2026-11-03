@@ -505,4 +505,6 @@ export const enChat = {
   'chat.previewSourceOne': "{count} source",
   'chat.toolOutcomeToolOne': "{count} tool",
   'chat.listSeparator': ", ",
+  'chat.workProcessCopy': 'Copy',
+  'chat.workProcessCopied': 'Copied',
 } as const;

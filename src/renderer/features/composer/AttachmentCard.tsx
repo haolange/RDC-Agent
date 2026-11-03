@@ -33,7 +33,7 @@ export const AttachmentCard: React.FC<{
   onRemove,
   onMaterialChange,
 }) => {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const failed = Boolean(attachment.error);
@@ -77,7 +77,7 @@ export const AttachmentCard: React.FC<{
         </span>
         <span className="composer-attachment-card-meta">{meta}</span>
       </span>
-      {!failed && <Button variant="ghost" onClick={() => setEditing(true)} aria-label={language === 'zh-CN' ? `说明 ${attachment.fileName}` : `Describe ${attachment.fileName}`}>{language === 'zh-CN' ? '说明' : 'Details'}</Button>}
+      {!failed && <Button variant="ghost" onClick={() => setEditing(true)} aria-label={t('composer.attachment.describe', { fileName: attachment.fileName })}>{t('composer.attachment.details')}</Button>}
       {editing && <MaterialContextEditor fileName={attachment.fileName} previewUrl={previewUrl} value={attachment.material} onSave={value => onMaterialChange(attachment.id, value)} onClose={() => setEditing(false)} />}
       <Button variant="ghost" size="sm"
         type="button"

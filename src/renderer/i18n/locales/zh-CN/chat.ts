@@ -505,4 +505,6 @@ export const zhChat = {
   'chat.previewSourceOne': "{count} 个来源",
   'chat.toolOutcomeToolOne': "{count} 个工具",
   'chat.listSeparator': "、",
+  'chat.workProcessCopy': '复制',
+  'chat.workProcessCopied': '已复制',
 } as const;

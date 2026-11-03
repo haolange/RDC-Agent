@@ -15,10 +15,10 @@ export const isDedicatedFamily = (family: ToolRowModel['family']): boolean => (
 );
 
 export const CopyPathButton: React.FC<{ path: string }> = ({ path }) => {
-  const { language } = useI18n();
+  const { t } = useI18n();
   const [copied, setCopied] = React.useState(false);
-  const copyLabel = language === 'zh-CN' ? '复制' : 'Copy';
-  const copiedLabel = language === 'zh-CN' ? '已复制' : 'Copied';
+  const copyLabel = t('chat.workProcessCopy');
+  const copiedLabel = t('chat.workProcessCopied');
 
   const onCopy = async (event: React.MouseEvent) => {
     event.preventDefault();
