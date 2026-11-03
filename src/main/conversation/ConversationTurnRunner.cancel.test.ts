@@ -11,6 +11,7 @@ vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({ agentOrches
 vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { updateSession: vi.fn(), updateRun: vi.fn() } }));
 vi.mock('./ConversationAttachmentMaterializer', () => ({ hydrateFrozenUserContent: vi.fn(async () => 'inspect') }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
+vi.mock('./approvedPlanExit', () => ({ verifyApprovedPlanExit: (_session: string, _turn: string, approved: unknown) => Boolean(approved) }));
 
 import { completeProfileTurn, type CompleteProfileTurnInput, type ConversationTurnRunnerHost } from './ConversationTurnRunner';
 
@@ -23,7 +24,6 @@ const messageOf = (event: ConversationStreamEvent | undefined): ConversationMess
 function runTurn(): { events: ConversationStreamEvent[]; done: Promise<void> } {
   const events: ConversationStreamEvent[] = [];
   const host: ConversationTurnRunnerHost = {
-    validateCompletion: vi.fn(),
     persistConversationSnapshot: () => null,
     emitConversationEvent: (event) => { events.push(event); },
     publishRunStatus: vi.fn(),
@@ -47,7 +47,7 @@ function runTurn(): { events: ConversationStreamEvent[]; done: Promise<void> } {
     preparedPrompt: { projectRootPath: null, promptPlan: { systemPrompt: '' }, visibleTurnIds: [] },
     preparedTurn: {
       effectiveModel: {}, frozenUserContent: 'inspect', attachmentManifest: null,
-      runtime: { effectivePlan: { profileHandoffs: [] }, mcpLease: null, credentialHandle: null },
+      runtime: { effectivePlan: { fingerprint: 'frozen-plan', profileHandoffs: [] }, mcpLease: null, credentialHandle: null },
     },
   } as unknown as CompleteProfileTurnInput;
   return { events, done: completeProfileTurn(host, input) };
@@ -76,5 +76,38 @@ describe('completeProfileTurn kernel cancellation', () => {
     const { events, done } = runTurn();
     await done;
     expect(messageOf(events.at(-1))?.status).toBe('error');
+  });
+
+  it('consumes the owning Agent receipt without calling a domain validator', async () => {
+    orchestrator.sendProfileMessage.mockImplementationOnce(async (_agent, _content, options) => {
+      options.onTerminalContext({ messages: [], executionIdentity: {}, status: 'complete',
+        completionReceipt: { turnId: 'turn-1', runtimePlanFingerprint: 'frozen-plan', finalAnswerText: 'Canonical final' } });
+      return 'Noncanonical response text';
+    });
+    const { events, done } = runTurn();
+    await done;
+    expect(messageOf(events.at(-1))).toMatchObject({ status: 'complete', content: 'Canonical final' });
+  });
+
+  it('preserves a Mission contract failure as failure', async () => {
+    const { MissionCompletionError } = await import('../investigation/missionCompletionContract');
+    orchestrator.sendProfileMessage.mockImplementationOnce(async (_agent, _content, options) => {
+      options.onTerminalContext({ messages: [], executionIdentity: {}, status: 'error' });
+      throw new MissionCompletionError('missing_report', 'report missing');
+    });
+    const { events, done } = runTurn();
+    await done;
+    expect(messageOf(events.at(-1))).toMatchObject({ status: 'error', diagnostic: { code: 'MISSION_COMPLETION_DENIED' } });
+  });
+
+  it('preserves an approved plan exit without inventing a final answer', async () => {
+    orchestrator.sendProfileMessage.mockImplementationOnce(async (_agent, _content, options) => {
+      options.onTerminalContext({ messages: [], executionIdentity: {}, status: 'complete', approvedPlan: {},
+        completionReceipt: { turnId: 'turn-1', runtimePlanFingerprint: 'frozen-plan', finalAnswerText: '' } });
+      return '';
+    });
+    const { events, done } = runTurn();
+    await done;
+    expect(messageOf(events.at(-1))).toMatchObject({ status: 'complete', content: '' });
   });
 });

@@ -15,3 +15,10 @@ export interface TurnCompletionInput {
   evidenceRefs?: readonly CompletionArtifactRef[];
 }
 export type TurnCompletionValidator = (input: TurnCompletionInput) => unknown;
+
+/** Main-only receipt of the owning Agent turn's successful contract validation. */
+export interface TurnCompletionReceipt {
+  turnId: string;
+  runtimePlanFingerprint: string;
+  finalAnswerText: string;
+}

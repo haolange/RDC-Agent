@@ -91,7 +91,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 
 - **资源优先级**：`builtin < user < project`；整资源替换；policy 只收紧（deny 并集、审批强度只升、数值上限只降）。执行时 `built-in hard deny > user/project policy floor > Full access > tool metadata`；预算值必须是非负整数，`0` 表示禁止对应执行并 fail-closed，即使 Full access 也不能绕过 policy floor。Decision lattice 为 `allow < auto_review < ask_user < deny`；`approvalFloorByTool: user` 无条件 `ask_user`，不得被 Permission Mode（含 Auto-review）降级。
 - **Skill 工具面**：`allowedTools = ∩(skill_i) ∩ runtimeAllowlist`（空声明不收窄）；skill 只能收窄、永不扩展 profile 工具集；元工具豁免见 runtime 契约。
-- **Deferred tools**：未激活 deferred → `TOOL_NOT_ACTIVATED`；`tool_search` 可激活。冻结有效工具集已允许时，计划门、Tasks 以及已批准 Mission execution offer 的 General 调查记录工具可在 `prepareTurn` 预激活；普通 General 不预载调查工具，预激活不扩展角色、Skill 或 Policy 权限。
+- **Deferred tools**：未激活 deferred → `TOOL_NOT_ACTIVATED`；`tool_search` 可激活。冻结有效工具集已允许时，计划门与 Tasks 可在 `prepareTurn` 预激活；`completion-contract: investigation-report` 的回合预激活调查记录工具，交接按声明的 `requiredToolIds` 预激活，不按 Agent 身份判断。预激活不扩展天花板、Skill 或 Policy 权限。
 - **Tasks 能力真值**：Prompt 只描述 route 最终实际注入的工具。只读 route 仅可读 `task_list` / `task_get`；可写 route 仅在其冻结工具集确实包含 mutation 工具时才宣称可写。text-only route 不得列出、模仿或反复搜索 Tasks 工具。可写时 `task_create` 一次批量建全表；开工前仅一条 `in_progress`；完成后立即 `completed` 再开下一条；`blocked` 必须带 `statusReason`；单步或琐碎工作不建任务。
 - **Tool search 无匹配**：返回 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 与有效工具集 fingerprint；fingerprint 未变化时禁止重复同一搜索。
 - **Capability unknown**：`toolCalling.state === unknown` → text-only，且不得进入 Agent/Composer 可执行集合；仅 `supported` 且具备已实现 structured-tool adapter 才 `native-structured`。`unsupported` 保持明确拒绝诊断，不得复用到 unknown。

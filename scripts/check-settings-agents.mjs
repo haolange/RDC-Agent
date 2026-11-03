@@ -362,11 +362,19 @@ async function main() {
 
   const orchestratorSource = readSrcFile(path.join(repoRoot, 'src/main/agent-runtime/orchestration/AgentOrchestrator.ts'), 'utf8');
   assert(orchestratorSource.includes('getOrCreateAgentConfig'), 'Agent orchestrator should lazily initialize custom Agent config.');
-  const agentSlotRegistrySource = readSrcFile(
-    path.join(repoRoot, 'src/main/agent-runtime/orchestration/AgentSlotRegistry.ts'),
-    'utf8',
-  );
-  assert(agentSlotRegistrySource.includes('DEFAULT_AGENT_ID'), 'Custom Agent fallback config should use general, not edit.');
+  const { AgentSlotRegistry } = require('../src/main/agent-runtime/orchestration/AgentSlotRegistry.ts');
+  const slots = new AgentSlotRegistry();
+  slots.initializeDefaults();
+  slots.configureAgent('general', { modelProvider: 'general-provider', modelName: 'general-model' });
+  const customConfig = slots.getOrCreateAgentConfig(customAgentId);
+  assert(customConfig.agentId === customAgentId, 'Custom Agent config must preserve its own id.');
+  assert(customConfig.modelProvider === '' && customConfig.modelName === '', 'A missing custom route must not inherit General or a default model.');
+  slots.applyLlmConfig([route(customAgentId, 'ollama', 'llama3')]);
+  assert(slots.getAgentConfig(customAgentId)?.modelProvider === 'ollama'
+    && slots.getAgentConfig(customAgentId)?.modelName === 'llama3', 'Custom Agent config must use its explicit compiled route.');
+  slots.applyLlmConfig([]);
+  assert(slots.getAgentConfig(customAgentId)?.modelProvider === ''
+    && slots.getAgentConfig(customAgentId)?.modelName === '', 'Removing a compiled route must leave the custom Agent unconfigured.');
 
   const runtimePolicySource = readSrcFile(path.join(repoRoot, 'src/main/agent-runtime/orchestration/RuntimeToolPolicy.ts'), 'utf8');
   assert(

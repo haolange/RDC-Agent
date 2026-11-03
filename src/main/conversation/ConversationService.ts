@@ -3,7 +3,6 @@ import { agentPlanReviewRequestService } from '../agent-runtime/interactions/Age
 import { readReferencedPlan } from '../sessions/run/sessionPlanReference';
 import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
 import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
-import { enforceMissionTurnCompletion } from '../investigation/missionCompletionContract';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -785,7 +784,6 @@ export class ConversationService {
 
   private createTurnRunnerHost(): ConversationTurnRunnerHost {
     return {
-      validateCompletion: enforceMissionTurnCompletion,
       persistConversationSnapshot,
       emitConversationEvent,
       publishRunStatus: (sessionId, runId, status) => workflowProjectionPublisher.publishRunStatus({ sessionId, runId, status }),

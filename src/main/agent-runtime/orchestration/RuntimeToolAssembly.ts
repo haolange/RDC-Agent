@@ -35,7 +35,6 @@ import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
 import { createTaskRuntimeTools as assembleTaskRuntimeTools } from './TaskRuntimeTools';
-import { enforceMissionTurnCompletion } from '../../investigation/missionCompletionContract';
 import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 
 export interface RuntimeToolAssemblyDeps {
@@ -650,15 +649,6 @@ export class RuntimeToolAssembly {
         const missing = task.completionRequirements.filter(key => !declaration.result?.outputs[key]);
         if (missing.length) throw new Error(`TURN_COMPLETION_INVALID: result.outputs must contain these exact Task keys: ${JSON.stringify(missing)}. Correct the structured result before completing.`);
       }
-      enforceMissionTurnCompletion({
-        profileId: agentId,
-        completionContract: turnHandle?.runtimePlan?.completionContract,
-        investigationMission: turnHandle?.runtimePlan?.investigationMission ?? undefined,
-        sessionId,
-        disposition: declaration.disposition,
-        evidenceRefs: declaration.evidenceRefs,
-        finalAnswerText: JSON.stringify(declaration),
-      });
     });
     availableTools.set(turnCompletionTool.name, turnCompletionTool);
     const runtimeContextTool = this.createRuntimeContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);

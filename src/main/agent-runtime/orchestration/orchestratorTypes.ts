@@ -104,6 +104,7 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
     approvedPlan?: import('./TurnCoordinator').TurnHandle['approvedPlan'];
     pendingHandoff?: PendingHandoff;
     completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null;
+    completionReceipt?: import('../agent/TurnCompletionValidator').TurnCompletionReceipt;
   }) => void;
 }
 

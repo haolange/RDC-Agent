@@ -3,6 +3,7 @@
  */
 
 import type { AgentRole } from '@shared/types/agent';
+import { resolveConversationLoopOutputPhase } from '@shared/conversation/loopOutputPhase';
 import { executePermissionReview } from '../permissions/PermissionReviewRuntime';
 import { permissionReviewAuthority, permissionReviewEvidence } from '../permissions/PermissionReviewAuthority';
 import { createHash } from 'node:crypto';
@@ -61,7 +62,7 @@ import type {
   ResolvedRuntimeTools,
   ToolExecutorRuntimeContext,
 } from './orchestratorTypes';
-import type { TurnCompletionValidator } from '../agent/TurnCompletionValidator';
+import type { TurnCompletionReceipt, TurnCompletionValidator } from '../agent/TurnCompletionValidator';
 import { settleJoinedTurnTaskExecutions, settleUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 import { createOrReuseAgentSlot, isSuccessfulProviderResponse, reportedUsageFields, type AgentSlotRequest } from './AgentSlotFactory';
 
@@ -121,7 +122,7 @@ export class AgentTurnRunner {
     initialMessages?: Message[];
     contextDiagnostic?: Record<string, unknown>;
     preparedRuntime?: PreparedAgentRuntime;
-    terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error', pendingHandoff?: import('./TurnCoordinator').PendingHandoff, completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null, approvedPlan?: import('./TurnCoordinator').TurnHandle['approvedPlan']) => void;
+    terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error', pendingHandoff?: import('./TurnCoordinator').PendingHandoff, completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null, approvedPlan?: import('./TurnCoordinator').TurnHandle['approvedPlan'], completionReceipt?: TurnCompletionReceipt) => void;
   }): Promise<string> {
     if (!input.providerId || !input.modelId) {
       throw new Error('No provider/model route is configured for this agent.');
@@ -370,6 +371,7 @@ export class AgentTurnRunner {
     };
 
     let responseText = '';
+    let canonicalFinalAnswerText = '';
     let sawStructuredToolCall = false;
     const structuredToolCallingEvidenceGate = { recorded: false };
     unsubscribe = activeSlot.agent.subscribe((event: CoreAgentEvent) => {
@@ -424,6 +426,13 @@ export class AgentTurnRunner {
           .filter((block) => block.type === 'text')
           .map((block) => (block as { text: string }).text)
           .join('');
+        const outputPhase = resolveConversationLoopOutputPhase({
+          stopReason: event.message.stopReason === 'stop' ? 'end_turn' : undefined,
+          loopHasTools: event.message.content.some((block) => block.type === 'toolCall'),
+          hasPendingContinuation: { handoff: Boolean(turnHandle.pendingHandoff) },
+        });
+        canonicalFinalAnswerText = turnHandle.isLive(turnGeneration) && outputPhase === 'final_answer'
+          ? responseText.trim() : '';
         if (event.message.usage && isSuccessfulProviderResponse(event.message)) {
           // 按当前实际注入的工具定义计量（含本 turn 内新激活的 deferred 工具）；
           // deferred 段仅计未激活 schema 估算，且仅在 >0 时加入。
@@ -553,6 +562,7 @@ export class AgentTurnRunner {
     const initialMessageCount = activeSlot.agent.messages.length;
     const settleDirectTasks = (stopped: boolean) => settleUnfinishedDirectTasks({ sessionId: input.sessionId, turnId: turnHandle.turnId, generation: turnHandle.generation, stopped });
     let terminalStatus: 'complete' | 'stopped' | 'error' = 'complete';
+    let completionReceipt: TurnCompletionReceipt | undefined;
     try {
       await activeSlot.agent.prompt(userMessage);
       if (await settleDirectTasks(false)) throw new Error('TASK_COMPLETION_DENIED: Direct Task executions must be settled before the parent turn completes.');
@@ -565,11 +575,16 @@ export class AgentTurnRunner {
         investigationMission: turnHandle.runtimePlan?.investigationMission ?? undefined,
         turnId: turnHandle.turnId,
         sessionId: executionScopeId,
-        finalAnswerText: responseText,
+        finalAnswerText: canonicalFinalAnswerText,
         disposition: turnHandle.completionDeclaration?.disposition,
         evidenceRefs: turnHandle.completionDeclaration?.evidenceRefs,
       };
       this.deps.validateCompletion(completionInput);
+      completionReceipt = {
+        turnId: turnHandle.turnId,
+        runtimePlanFingerprint: effectivePlan.fingerprint,
+        finalAnswerText: canonicalFinalAnswerText,
+      };
       return responseText;
     } catch (error) {
       terminalStatus = input.options?.signal?.aborted || turnHandle.isAborted ? 'stopped' : 'error';
@@ -612,7 +627,7 @@ export class AgentTurnRunner {
         input.options.signal.removeEventListener('abort', abortListener);
       }
       cancelTurnInteractionRequests(turnHandle.turnId);
-      input.terminalContext?.(activeSlot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus, turnHandle.pendingHandoff ?? undefined, turnHandle.completionDeclaration, terminalStatus === 'complete' ? turnHandle.approvedPlan : null);
+      input.terminalContext?.(activeSlot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus, turnHandle.pendingHandoff ?? undefined, turnHandle.completionDeclaration, terminalStatus === 'complete' ? turnHandle.approvedPlan : null, terminalStatus === 'complete' ? completionReceipt : undefined);
       this.deps.slots.flush(activeSlot);
       if (turnHandle.isAborted) {
         await turnHandle.abortAndJoin({ reason: turnHandle.reason ?? 'user_stop' });

@@ -18,14 +18,17 @@ import {
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 
 describe('Mission turn completion gate', () => {
-  it('is wired on AgentTurnRunner and ConversationTurnRunner', () => {
+  it('validates only at the Agent boundary and passes a receipt to Conversation', () => {
     const runner = readFileSync(path.join(repoRoot, 'src/main/agent-runtime/orchestration/AgentTurnRunner.ts'), 'utf8');
     const conversation = readFileSync(path.join(repoRoot, 'src/main/conversation/ConversationTurnRunner.ts'), 'utf8');
     expect(runner).toMatch(/validateCompletion/);
-    expect(conversation).toMatch(/validateCompletion/);
+    expect(conversation).not.toMatch(/validateCompletion/);
+    expect(conversation).toMatch(/completionReceipt/);
     expect(runner + conversation).not.toMatch(/import.*missionCompletionContract/);
-    for (const file of ['src/main/agent-runtime/orchestration/AgentOrchestrator.ts', 'src/main/conversation/ConversationService.ts']) {
-      expect(readFileSync(path.join(repoRoot, file), 'utf8')).toMatch(/validateCompletion: enforceMissionTurnCompletion/);
+    expect(readFileSync(path.join(repoRoot, 'src/main/agent-runtime/orchestration/AgentOrchestrator.ts'), 'utf8'))
+      .toMatch(/validateCompletion: enforceMissionTurnCompletion/);
+    for (const file of ['src/main/agent-runtime/orchestration/RuntimeToolAssembly.ts', 'src/main/conversation/ConversationService.ts']) {
+      expect(readFileSync(path.join(repoRoot, file), 'utf8')).not.toMatch(/enforceMissionTurnCompletion/);
     }
   });
 

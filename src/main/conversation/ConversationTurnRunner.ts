@@ -36,8 +36,7 @@ import { hydrateFrozenUserContent } from './ConversationAttachmentMaterializer';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
 import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
 import { reconcileTerminalToolReceipts } from './ConversationTerminalToolReceipts';
-import type { TurnCompletionValidator } from '../agent-runtime/agent/TurnCompletionValidator';
-import type { TurnCompletionDeclaration } from '../agent-runtime/orchestration/TurnCoordinator';
+import type { TurnCompletionReceipt } from '../agent-runtime/agent/TurnCompletionValidator';
 import type {
   ActiveConversationTurn,
   AgentRoutePreflightOk,
@@ -72,7 +71,6 @@ export interface CompleteProfileTurnInput {
   }
 
 export interface ConversationTurnRunnerHost {
-  validateCompletion: TurnCompletionValidator;
   persistConversationSnapshot(sessionId: string | null | undefined, message: ConversationMessage): Error | null;
   emitConversationEvent(event: ConversationStreamEvent): void;
   publishRunStatus(sessionId: string, runId: string, status: RunSummary['status']): void;
@@ -120,11 +118,11 @@ export async function completeProfileTurn(
     messages: AgentRuntimeMessage[];
     executionIdentity: ExecutionIdentity;
     status: 'complete' | 'stopped' | 'error';
+    completionReceipt?: TurnCompletionReceipt;
   } | null } = { value: null };
   let approvedPlanExit = false;
   /** Set when the kernel reports cancellation (timeout or parent abort) without a session Stop. */
   let runWasCancelled = false;
-  const terminalCompletion: { value: TurnCompletionDeclaration | null } = { value: null };
 
   const applyAssistantMessagePatch = (
     type: ConversationStreamEvent['type'],
@@ -451,8 +449,8 @@ export async function completeProfileTurn(
               messages: result.messages,
               executionIdentity: result.executionIdentity,
               status: result.status,
+              completionReceipt: result.completionReceipt,
             };
-            terminalCompletion.value = result.completionDeclaration ?? null;
             approvedPlanExit = result.status === 'complete' && verifyApprovedPlanExit(sessionId, assistantMessage.turnId, result.approvedPlan);
           },
           onEvent: createAgentEventHandler({
@@ -467,17 +465,14 @@ export async function completeProfileTurn(
         },
       );
 
+      const receipt = terminalContext.value?.completionReceipt;
+      if (terminalContext.value?.status !== 'complete' || !receipt
+        || receipt.turnId !== assistantMessage.turnId
+        || receipt.runtimePlanFingerprint !== input.preparedTurn.runtime.effectivePlan.fingerprint) {
+        throw new Error('TURN_COMPLETION_RECEIPT_INVALID: the owning Agent turn did not confirm completion.');
+      }
+      canonicalOutput = { finalAnswerText: receipt.finalAnswerText };
       if (!approvedPlanExit) requireCanonicalFinalAnswer(canonicalOutput);
-      host.validateCompletion({
-        profileId: conversationAgentId,
-        completionContract: input.preparedTurn.runtime.effectivePlan.completionContract,
-        investigationMission: input.preparedTurn.runtime.effectivePlan.investigationMission ?? undefined,
-        turnId: assistantMessage.turnId,
-        sessionId,
-        finalAnswerText: canonicalOutput.finalAnswerText,
-        disposition: terminalCompletion.value?.disposition,
-        evidenceRefs: terminalCompletion.value?.evidenceRefs,
-      });
     } catch (error) {
       // A user stop, policy timeout or parent abort can reject the provider call.
       // The terminal stop commit owns the visible message and trace in that case.
