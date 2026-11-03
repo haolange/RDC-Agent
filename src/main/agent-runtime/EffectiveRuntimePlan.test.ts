@@ -320,7 +320,7 @@ describe('EffectiveRuntimePlan', () => {
     const plan = buildEffectiveRuntimePlan({
       agentId: 'debugger',
       projectRootPath: 'D:/Project',
-      profile: { skills: [] },
+      profile: { skills: [], accessCeiling: 'read-only' },
       toolAllowlist: ['read_file', 'shell', 'code_interpreter', 'output_register', 'rdc_probe', 'task_create'],
       permissionConstraints: basePermission,
       routeCapability,
@@ -345,26 +345,26 @@ describe('EffectiveRuntimePlan', () => {
       agentId: 'general',
       projectRootPath: 'D:/Project',
       profile: { skills: [] },
-      toolAllowlist: ['read_file', 'rdc_context', 'rdc_probe', 'rdc', 'shell'],
+      toolAllowlist: ['read_file', 'runtime_context', 'rdc_probe', 'rdc', 'shell'],
       permissionConstraints: basePermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'offline' } },
       promptPlan: { systemPrompt: 'system' },
       policy,
-      skillIntersection: ['read_file', 'rdc_context'],
-      visibleToolNames: ['read_file', 'rdc_context', 'shell'],
+      skillIntersection: ['read_file', 'runtime_context'],
+      visibleToolNames: ['read_file', 'runtime_context', 'shell'],
       activatedDeferredTools: [],
       mcpDescriptorHash: null,
       excludeRdcLeaseTools: true,
     });
     expect(plan.excludeRdcLeaseTools).toBe(true);
-    expect(plan.toolAllowlist).toEqual(['read_file', 'shell']);
-    expect(plan.skillIntersection).toEqual(['read_file']);
-    expect(plan.visibleToolNames).toEqual(['read_file', 'shell']);
+    expect(plan.toolAllowlist).toEqual(['read_file', 'runtime_context', 'shell']);
+    expect(plan.skillIntersection).toEqual(['read_file', 'runtime_context']);
+    expect(plan.visibleToolNames).toEqual(['read_file', 'runtime_context', 'shell']);
     expect(activeToolNamesForPlan([
-      { name: 'rdc_context', description: '', parameters: { type: 'object', properties: {} } },
+      { name: 'runtime_context', description: '', parameters: { type: 'object', properties: {} } },
       { name: 'shell', description: '', parameters: { type: 'object', properties: {} } },
-    ], plan)).toEqual(['shell']);
+    ], plan)).toEqual(['runtime_context', 'shell']);
   });
 
   it('excludes new delegation from every frozen tool view at the depth limit', () => {

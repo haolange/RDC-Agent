@@ -1,3 +1,4 @@
+import { agentAccessCeiling } from '@shared/types/agentManifest';
 import { approvedExecutionOfferForAgent } from '../sessions/handoffSkills';
 import { charsToTokens } from '@shared/utils/tokens';
 import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
@@ -45,7 +46,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${input.agentId}`);
   }
 
-  let allowedToolNames = resolveAgentToolAllowlistFromDefinition(input.agentId, definition.tools)
+  let allowedToolNames = resolveAgentToolAllowlistFromDefinition(input.agentId, definition.tools, agentAccessCeiling(definition))
     .map((toolName) => normalizeToolName(toolName));
   const activePaths = [
     projectRootPath,

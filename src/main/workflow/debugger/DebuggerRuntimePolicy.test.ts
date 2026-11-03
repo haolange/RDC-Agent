@@ -65,7 +65,7 @@ describe('DebuggerRuntimePolicy tool tokens', () => {
     expect(isToolAllowedByFrozenAllowlist('task_create', 'general', general)).toBe(true);
     expect(isToolAllowedByFrozenAllowlist('write_file', 'general', general)).toBe(true);
     expect(isToolAllowedByFrozenAllowlist('output_register', 'general', general)).toBe(true);
-    const mission = resolveAgentToolAllowlistFromDefinition('debugger', ['read', 'task']);
+    const mission = resolveAgentToolAllowlistFromDefinition('debugger', ['read', 'task'], 'read-only');
     expect(isToolAllowedByFrozenAllowlist('task_create', 'debugger', mission)).toBe(true);
     expect(isToolAllowedByFrozenAllowlist('write_file', 'debugger', mission)).toBe(false);
     expect(isToolAllowedByFrozenAllowlist('output_register', 'debugger', mission)).toBe(false);
@@ -80,14 +80,14 @@ describe('DebuggerRuntimePolicy tool tokens', () => {
       'interpreter',
       'task',
       'output',
-      'rdcContext',
+      'runtimeContext',
       'rdc_probe',
-    ]);
+    ], 'read-only');
     expect(expanded).toEqual(expect.arrayContaining([
       'read_file',
       'task_create',
       'task_stop',
-      'rdc_context',
+      'runtime_context',
       'rdc_probe',
     ]));
     expect(expanded).not.toContain('shell');
@@ -184,7 +184,7 @@ describe('combineActiveSkillAllowlists', () => {
       'investigation_write',
       'investigation_list',
       'artifact_read',
-      'rdc_context',
+      'runtime_context',
       'rdc_probe',
       'read_file',
       'read_image',

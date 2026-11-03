@@ -3,7 +3,7 @@ const artifacts = vi.hoisted(() => ({ contents: [] as string[] }));
 vi.mock('electron', () => ({ app: { getPath: () => process.env.TEMP, getAppPath: () => process.cwd() } }));
 vi.mock('../../settings/SettingsService', () => ({ settingsService: { getAll: () => ({ paths: {}, llm: { providers: [], agentRoutes: [] } }) } }));
 vi.mock('../../settings/AgentManifestService', () => ({ agentManifestService: { getEffectiveProfiles: () => [{ id: 'general', enabled: true, instructions: 'General', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'], compiledRoute: { providerId: 'openai', modelId: 'gpt-5.6-sol' } }] } }));
-vi.mock('../../agent-runtime/tasks/sessionTaskStore', () => ({ createSessionTaskStore: () => store }));
+vi.mock('../../agent-runtime/tasks/sessionTaskStore', () => ({ createSessionTaskStore: () => store, releaseScopeTaskStore: () => undefined, taskStoreForExecutionScope: (_scope: string | null, owner?: string | null) => owner ? store : store }));
 vi.mock('../../sessions/SessionArtifactResolver', () => ({ sessionArtifactResolver: { write: (_session: string, uri: string, content: string | Buffer) => { artifacts.contents.push(String(content)); return { uri, hash: 'a'.repeat(64) }; }, read: () => ({ hash: 'a'.repeat(64) }) } }));
 import { grantDelegatedArtifactAccess } from '../../sessions/DelegatedArtifactAccess';
 import { registerDelegatedTaskScope } from '../../agent-runtime/tasks/DelegatedTaskScopes';

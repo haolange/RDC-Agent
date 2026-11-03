@@ -108,35 +108,20 @@ export const MissionPersistedRunSchema = z.object({
 export const PersistedRunRecordV3Schema: ZodType<PersistedRunRecord> = z.discriminatedUnion('kind', [
   ConversationPersistedRunSchema,
   MissionPersistedRunSchema,
-]).superRefine((value, ctx) => {
-  if (value.kind === 'conversation') {
-    if (isMissionAgentId(String(value.profileId))) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'ConversationRun profileId cannot be a Mission identity.',
-      });
-    }
-    return;
-  }
-  if (!isMissionAgentId(String(value.profileId))) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'MissionRun profileId must be debugger, analyzer, or optimizer.',
-    });
-  }
-  if (value.mission !== value.profileId) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'MissionRun mission must equal profileId.',
-    });
-  }
-}) as unknown as ZodType<PersistedRunRecord>;
+]) as unknown as ZodType<PersistedRunRecord>;
 
-export function classifyRunKind(profileId: string): { kind: RunRecord['kind']; mission?: MissionKind } {
-  if (isMissionAgentId(profileId)) {
-    return { kind: 'mission', mission: profileId };
+export function classifyRunKind(
+  profileId: string,
+  declared?: { completionContract?: 'final-answer' | 'investigation-report'; investigationMission?: MissionKind | null },
+): { kind: RunRecord['kind']; mission?: MissionKind } {
+  if (declared?.completionContract === 'investigation-report') {
+    if (!declared.investigationMission) {
+      throw new Error('mission_method: investigation-report requires a declared investigation-mission');
+    }
+    return { kind: 'mission', mission: declared.investigationMission };
   }
-  return { kind: 'conversation' };
+  if (declared?.completionContract === 'final-answer') return { kind: 'conversation' };
+  return isMissionAgentId(profileId) ? { kind: 'mission', mission: profileId } : { kind: 'conversation' };
 }
 
 export function toPersistedRunV3(
@@ -144,9 +129,14 @@ export function toPersistedRunV3(
     profileId: string;
     diagnostics?: string[];
     captures?: PersistedRunRecord['captures'];
+    completionContract?: 'final-answer' | 'investigation-report';
+    investigationMission?: MissionKind | null;
   },
 ): PersistedRunRecord {
-  const classified = classifyRunKind(base.profileId);
+  const classified = classifyRunKind(base.profileId, {
+    completionContract: base.completionContract,
+    investigationMission: base.investigationMission,
+  });
   const runtime = { ...base.runtime };
   assertNoRunV3StageFields({ ...(base as Record<string, unknown>), runtime }, 'toPersistedRunV3');
   const shared = {

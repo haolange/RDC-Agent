@@ -1,6 +1,6 @@
 import { approvedExecutionOfferForAgent } from './handoffSkills';
 import { combineActiveSkillAllowlists, isToolAllowedByFrozenAllowlist, resolveAgentToolAllowlistFromDefinition } from '../workflow/debugger/DebuggerRuntimePolicy';
-import type { AgentManifestDefinition } from '@shared/types/agentManifest';
+import { agentAccessCeiling, type AgentManifestDefinition } from '@shared/types/agentManifest';
 import { parsePlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
 import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
 import { compileEffectivePolicy } from '../agent-runtime/permissions/PolicyCompiler';
@@ -29,7 +29,7 @@ export function assertDeclaredHandoffSkillCompatibility(input: {
     if (!skill) throw new Error(`SKILL_UNAVAILABLE: ${id} is unavailable to ${input.target.id}; no execution was prepared.`);
     return skill;
   });
-  const tools = resolveAgentToolAllowlistFromDefinition(input.target.id, input.target.tools);
+  const tools = resolveAgentToolAllowlistFromDefinition(input.target.id, input.target.tools, agentAccessCeiling(input.target));
   const intersection = combineActiveSkillAllowlists(tools, skills.map(skill => skill.allowedTools ?? []));
   const policy = compileEffectivePolicy(input.projectRoot);
   const requiredTools = ['artifact_read',

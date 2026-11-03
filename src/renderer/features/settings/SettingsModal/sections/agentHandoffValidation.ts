@@ -44,13 +44,15 @@ export function persistAgentHandoff(handoff: AgentHandoffDefinition): AgentHando
   };
   if (handoff.labelTranslations) next.labelTranslations = { ...handoff.labelTranslations };
   if (handoff.send === true) next.send = true;
-  if (handoff.showContinueOn === false) next.showContinueOn = false;
+  if (handoff.surface && handoff.surface !== 'turn-end') next.surface = handoff.surface;
   const model = handoff.model?.trim();
   if (model) next.model = model;
   const requiredSkillIds = (handoff.requiredSkillIds ?? [])
     .map((id) => id.trim())
     .filter(Boolean);
   if (requiredSkillIds.length > 0) next.requiredSkillIds = requiredSkillIds;
+  const requiredToolIds = (handoff.requiredToolIds ?? []).map((id) => id.trim()).filter(Boolean);
+  if (requiredToolIds.length > 0) next.requiredToolIds = requiredToolIds;
   return next;
 }
 

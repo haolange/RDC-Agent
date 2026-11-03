@@ -2,7 +2,8 @@ import path from 'path';
 import YAML from 'yaml';
 import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
 import { isAgentIconPreset } from '@shared/constants/agents';
-import type { AgentHandoffDefinition, AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
+import type { AgentHandoffDefinition, AgentManifestDefinition, AgentManifestDraft, AgentAccessCeiling, AgentCompletionContract, HandoffSurface } from '@shared/types/agentManifest';
+import { AGENT_ACCESS_CEILINGS, AGENT_COMPLETION_CONTRACTS, HANDOFF_SURFACES } from '@shared/types/agentManifest';
 import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '@shared/theme/composeAccent';
 import { handoffLabelTranslationsSchema } from '@shared/utils/handoffLabels';
 
@@ -61,8 +62,11 @@ const readHandoffsStrict = (value: unknown): AgentHandoffDefinition[] | string =
     if (candidate.send !== undefined && typeof candidate.send !== 'boolean') {
       return `handoffs[${index}].send must be a boolean.`;
     }
-    if (candidate.showContinueOn !== undefined && typeof candidate.showContinueOn !== 'boolean') {
-      return `handoffs[${index}].showContinueOn must be a boolean.`;
+    if (candidate.showContinueOn !== undefined) {
+      return `handoffs[${index}].showContinueOn was removed; declare surface as turn-end, plan-gate, or hidden.`;
+    }
+    if (candidate.surface !== undefined && !HANDOFF_SURFACES.includes(candidate.surface as HandoffSurface)) {
+      return `handoffs[${index}].surface must be turn-end, plan-gate, or hidden.`;
     }
     if (candidate.model !== undefined && (typeof candidate.model !== 'string' || !candidate.model.trim())) {
       return `handoffs[${index}].model must be a non-empty string when present.`;
@@ -71,6 +75,10 @@ const readHandoffsStrict = (value: unknown): AgentHandoffDefinition[] | string =
     if (requiredSkillIds === null) {
       return `handoffs[${index}].requiredSkillIds must be a string array when present.`;
     }
+    const requiredToolIds = readStringArray(candidate.requiredToolIds);
+    if (requiredToolIds === null) {
+      return `handoffs[${index}].requiredToolIds must be a string array when present.`;
+    }
     const handoff: AgentHandoffDefinition = { label, agent, prompt };
     if (candidate.labelTranslations !== undefined) {
       const translated = handoffLabelTranslationsSchema.safeParse(candidate.labelTranslations);
@@ -78,9 +86,10 @@ const readHandoffsStrict = (value: unknown): AgentHandoffDefinition[] | string =
       handoff.labelTranslations = translated.data;
     }
     if (typeof candidate.send === 'boolean') handoff.send = candidate.send;
-    if (typeof candidate.showContinueOn === 'boolean') handoff.showContinueOn = candidate.showContinueOn;
+    if (typeof candidate.surface === 'string') handoff.surface = candidate.surface as HandoffSurface;
     if (typeof candidate.model === 'string' && candidate.model.trim()) handoff.model = candidate.model.trim();
     if (requiredSkillIds.length > 0) handoff.requiredSkillIds = requiredSkillIds;
+    if (requiredToolIds.length > 0) handoff.requiredToolIds = requiredToolIds;
     handoffs.push(handoff);
   }
   return handoffs;
@@ -133,6 +142,15 @@ export function parseAgentMarkdownStrict(
     if (record['max-turns'] !== undefined && (typeof record['max-turns'] !== 'number' || record['max-turns'] <= 0)) {
       return { ok: false, reason: 'max-turns must be a positive number when present.' };
     }
+    if (record['access-ceiling'] !== undefined && !AGENT_ACCESS_CEILINGS.includes(record['access-ceiling'] as AgentAccessCeiling)) {
+      return { ok: false, reason: 'access-ceiling must be read-only, workspace-write, or full.' };
+    }
+    if (record['completion-contract'] !== undefined && !AGENT_COMPLETION_CONTRACTS.includes(record['completion-contract'] as AgentCompletionContract)) {
+      return { ok: false, reason: 'completion-contract must be final-answer or investigation-report.' };
+    }
+    if (record.showContinueOn !== undefined) {
+      return { ok: false, reason: 'showContinueOn was removed; declare handoff surface instead.' };
+    }
     return {
       ok: true,
       definition: {
@@ -148,6 +166,8 @@ export function parseAgentMarkdownStrict(
         accent: normalizeAgentAccent(record.accent, COMPOSE_ACCENT_FALLBACK),
         disableModelInvocation,
         userInvocable,
+        ...(typeof record['access-ceiling'] === 'string' ? { accessCeiling: record['access-ceiling'] as AgentAccessCeiling } : {}),
+        ...(typeof record['completion-contract'] === 'string' ? { completionContract: record['completion-contract'] as AgentCompletionContract } : {}),
         tools,
         skills,
         mcpServers,
@@ -183,6 +203,8 @@ export function serializeAgentMarkdown(definition: AgentManifestDraft): string {
     'disable-model-invocation': definition.disableModelInvocation,
     'user-invocable': definition.userInvocable,
     enabled: definition.enabled,
+    ...(definition.accessCeiling ? { 'access-ceiling': definition.accessCeiling } : {}),
+    ...(definition.completionContract ? { 'completion-contract': definition.completionContract } : {}),
     ...(definition.maxTurns ? { 'max-turns': definition.maxTurns } : {}),
     tools: definition.tools,
     skills: definition.skills,

@@ -1,3 +1,4 @@
+import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { sessionArtifactResolver } from '../sessions/SessionArtifactResolver';
 import { PROCESS_TERMINATION_POLICY } from '../runtime/ProcessSupervisor';
@@ -14,7 +15,7 @@ export interface RdcHostControlScope {
 function readReplayIsolation(scope: RdcHostControlScope, context?: ToolExecutionContext) {
   const unavailable = { available: false as const, reason: 'protected_owning_general_turn_not_verified' };
   const identity = context?.rdcBinding?.identity;
-  if (context?.agentId !== 'general' || context.excludeRdcLeaseTools || !context.turnId || !context.rdcBinding?.cli.enabled
+  if (!context || !allowsNativeRdcExecution(context) || context.excludeRdcLeaseTools || !context.turnId || !context.rdcBinding?.cli.enabled
     || identity?.ownerSessionId !== scope.sessionId || identity.contextId !== scope.contextId
     || identity.version !== scope.leaseVersion || !ownsRdcInteractionLock(scope.sessionId, context.turnId)) return unavailable;
   const lease = assertRdcContextLeaseOwnership(scope);

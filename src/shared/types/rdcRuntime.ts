@@ -87,6 +87,10 @@ export interface SkillMetadata {
   name: string;
   description: string;
   allowedTools: string[];
+  /** Profiles that may discover this skill. Empty or omitted means every profile. */
+  audience?: string[];
+  /** Set by a Mission coordinator skill; the kernel does not infer this from a profile id. */
+  investigationMission?: 'debugger' | 'analyzer' | 'optimizer';
   scope: ResourceScope;
   sourcePath: string;
   sourceHash: string;

@@ -91,8 +91,12 @@ export function skillLane(id: string): CanonicalSkillLane | null {
   return null;
 }
 
-/** Mission planning can read shared and matching operation knowledge; execution stays profile-owned. */
-export function isSkillVisibleToProfile(profileId: string, skillId: string): boolean {
+/**
+ * A declared audience wins. Without one, Mission profiles still only see the shared
+ * shell manual and their own specialty manual; every other profile sees the catalog.
+ */
+export function isSkillVisibleToProfile(profileId: string, skillId: string, audience?: readonly string[]): boolean {
+  if (audience && audience.length > 0) return audience.includes('*') || audience.includes(profileId);
   if (!isMissionAgentId(profileId)) return true;
   return !(RDC_OPERATION_MANUAL_SKILL_IDS as readonly string[]).includes(skillId)
     || skillId === 'rdc-tool-shell' || skillId === `${profileId}-rdc-tools`;

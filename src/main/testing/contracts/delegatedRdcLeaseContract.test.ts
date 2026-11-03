@@ -178,7 +178,7 @@ describe('delegatedRdcLeaseContract: stable order', () => {
     expect(results.map((entry) => entry.id)).toEqual(['second', 'first']);
     expect(partitionConsecutiveSafeGroups([
       isToolCallConcurrencySafe({ name: 'read_file', spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, category: 'file', requiresApproval: false } }),
-      isToolCallConcurrencySafe({ name: 'rdc_context' }),
+      isToolCallConcurrencySafe({ name: 'runtime_context' }),
       isToolCallConcurrencySafe({ name: 'rdc_probe' }),
     ])).toEqual([
       { callIndexes: [0], parallel: true },
@@ -189,20 +189,21 @@ describe('delegatedRdcLeaseContract: stable order', () => {
 });
 
 describe('delegatedRdcLeaseContract: offline child allowlist', () => {
-  it('omits rdc_context and rdc_probe from the frozen child plan', () => {
+  it('omits the RDC lease payload tools but keeps generic runtime_context', () => {
     const stripped = stripRdcLeaseToolsFromAllowlist([
       'read_file',
+      'runtime_context',
       'rdc_context',
       'rdc_probe',
       'rdc',
       'shell',
     ]);
-    expect(stripped).toEqual(['read_file', 'shell']);
+    expect(stripped).toEqual(['read_file', 'runtime_context', 'shell']);
     const plan = buildEffectiveRuntimePlan({
       agentId: 'general',
       projectRootPath: 'D:/Project',
       profile: { skills: [] },
-      toolAllowlist: ['read_file', 'rdc_context', 'rdc_probe', 'shell'],
+      toolAllowlist: ['read_file', 'runtime_context', 'rdc_probe', 'shell'],
       permissionConstraints: {
 
         readableRoots: [],
@@ -214,10 +215,11 @@ describe('delegatedRdcLeaseContract: offline child allowlist', () => {
       requestPlan: { executionIdentity: { fingerprint: 'offline-child' } },
       promptPlan: { systemPrompt: 'system' },
       policy: compilePolicyFromRestrictive({ deniedTools: [], limits: { maxTurns: 3 } }),
-      skillIntersection: ['read_file', 'rdc_context'],
-      visibleToolNames: ['read_file', 'rdc_context', 'shell'],
+      skillIntersection: ['read_file', 'runtime_context'],
+      visibleToolNames: ['read_file', 'runtime_context', 'shell'],
       excludeRdcLeaseTools: true,
     });
+    expect(plan.toolAllowlist).toContain('runtime_context');
     expect(plan.toolAllowlist).not.toContain('rdc_context');
     expect(plan.toolAllowlist).not.toContain('rdc_probe');
     expect(plan.toolAllowlist).toContain('shell');

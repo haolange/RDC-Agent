@@ -15,9 +15,12 @@ const headSources = new Map<string, string>();
 let headSkillFiles: string[] | undefined;
 let baselineHead: string;
 function source(file: string, version: 'before' | 'after'): string {
-  if (version === 'after') return readFileSync(file, 'utf8');
-  if (!headSources.has(file)) headSources.set(file, execFileSync('git', ['show', baselineHead + ':' + file], { encoding: 'utf8' }));
-  return headSources.get(file)!;
+  const raw = version === 'after'
+    ? readFileSync(file, 'utf8')
+    : headSources.get(file) ?? headSources.set(file, execFileSync('git', ['show', baselineHead + ':' + file], { encoding: 'utf8' })).get(file)!;
+  return version === 'before'
+    ? raw.replace(/\brdcContext\b/g, 'runtimeContext').replace(/\n([ \t]*)showContinueOn:\s*true\s*\n/g, '\n$1surface: plan-gate\n')
+    : raw;
 }
 function plan(version: 'before' | 'after', id: string, extra: string[] = []) {
   const profileFile = 'resources/agent-runtime/agents/' + id + '.agent.md';
@@ -68,7 +71,7 @@ describe('offline complete PromptPlan comparison', () => {
           const resident = after.segments.filter(segment => ['core-contract', 'agent-profile', 'preloaded-skill'].includes(segment.kind)).map(segment => segment.content).join('\n');
           expect(resident).not.toMatch(/RDC|RenderDoc|Checkpoint/);
           expect(resident).toContain('When this turn is executing an approved Mission plan');
-          expect(resident).toContain('General finishes in place');
+          expect(resident).not.toContain('General finishes in place');
         }
         return { ...test, beforeChars: before.systemPrompt.length, afterChars: after.systemPrompt.length, deltaChars: after.systemPrompt.length - before.systemPrompt.length,
           beforeEstimatedTokens: before.totalTokenEstimate, afterEstimatedTokens: after.totalTokenEstimate, segments: after.segments.map(segment => ({ id: segment.id, chars: segment.content.length })) };

@@ -130,12 +130,12 @@ describe('findProjectedHandoffTargetConflicts', () => {
 });
 
 describe('persistAgentHandoff', () => {
-  it('omits send:false and persists showContinueOn only when false', () => {
-    const cleared = persistAgentHandoff({ ...valid, send: true, showContinueOn: true });
+  it('omits the default turn-end surface and persists an explicit plan-gate surface', () => {
+    const cleared = persistAgentHandoff({ ...valid, send: true, surface: 'turn-end' });
     expect(cleared).toEqual({ ...valid, send: true });
-    expect(persistAgentHandoff({ ...cleared, send: false, showContinueOn: false })).toEqual({
+    expect(persistAgentHandoff({ ...cleared, send: false, surface: 'plan-gate' })).toEqual({
       ...valid,
-      showContinueOn: false,
+      surface: 'plan-gate',
     });
     expect(persistAgentHandoff({ ...cleared, send: undefined, model: '' })).toEqual(valid);
   });

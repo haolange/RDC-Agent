@@ -43,7 +43,7 @@ export const MISSION_PLAN_ONLY_TOOL_IDS = [
   'skills',
   'skill_read',
   'subagent',
-  'rdc_context',
+  'runtime_context',
   'rdc_probe',
 ] as const;
 

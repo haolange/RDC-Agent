@@ -51,16 +51,11 @@ export const MISSION_EXECUTION_TOOL_NAMES = [
 export function preactivateWorkflowTools(
   definitions: readonly { name: string }[],
   activatedNames: Set<string>,
-  needsInvestigationRecords = false,
+  requiredToolIds: readonly string[] = [],
 ): void {
   const available = new Set(definitions.map((definition) => definition.name));
-  for (const name of WORKFLOW_TOOL_NAMES) {
+  for (const name of [...WORKFLOW_TOOL_NAMES, ...requiredToolIds]) {
     if (available.has(name)) activatedNames.add(name);
-  }
-  if (needsInvestigationRecords) {
-    for (const name of MISSION_EXECUTION_TOOL_NAMES) {
-      if (available.has(name)) activatedNames.add(name);
-    }
   }
 }
 

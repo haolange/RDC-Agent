@@ -216,11 +216,28 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
             label={t('settings.agentHandoffSendHelp')}
           />
         </SettingsField>
-        <SettingsField label={t('settings.agentHandoffShowContinueOn')} layout="row">
-          <Checkbox
-            checked={handoff.showContinueOn !== false}
-            onCheckedChange={(checked) => patch({ showContinueOn: checked ? undefined : false })}
-            label={t('settings.agentHandoffShowContinueOnHelp')}
+        <SettingsField label={t('settings.agentHandoffSurface')} layout="row">
+          <Select
+            dataTestId="settings-agent-handoff-surface"
+            ariaLabel={t('settings.agentHandoffSurface')}
+            value={handoff.surface ?? 'turn-end'}
+            onChange={(surface) => patch({ surface: surface === 'turn-end' ? undefined : surface as 'plan-gate' | 'hidden' })}
+            options={[
+              { value: 'turn-end', label: t('settings.agentHandoffSurfaceTurnEnd') },
+              { value: 'plan-gate', label: t('settings.agentHandoffSurfacePlanGate') },
+              { value: 'hidden', label: t('settings.agentHandoffSurfaceHidden') },
+            ]}
+          />
+        </SettingsField>
+        <SettingsField label={t('settings.agentHandoffRequiredTools')} layout="stack">
+          <Textarea
+            sizing="content"
+            value={(handoff.requiredToolIds ?? []).join('\n')}
+            placeholder={t('settings.agentHandoffRequiredToolsHelp')}
+            onChange={(event) => {
+              const requiredToolIds = event.currentTarget.value.split(/\r?\n/).map((id) => id.trim()).filter(Boolean);
+              patch({ requiredToolIds: requiredToolIds.length > 0 ? requiredToolIds : undefined });
+            }}
           />
         </SettingsField>
         <SettingsField label={t('settings.agentHandoffRequiredSkills')} layout="stack">

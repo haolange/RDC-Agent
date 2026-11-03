@@ -197,7 +197,7 @@ export const unwrapToolContentLayer = (
     };
   }
 
-  if (normalized === 'rdc_context') {
+  if (normalized === 'runtime_context') {
     const target = sanitizeContentText(stringifyPreview(
       argsRecord?.target ?? argsRecord?.agent ?? details?.target,
     ));

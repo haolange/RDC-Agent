@@ -49,7 +49,7 @@ export const BUILTIN_AGENT_TOOL_IDS = [
   'skill_read',
   'mcp',
   'subagent',
-  'rdc_context',
+  'runtime_context',
   'rdc_probe',
   'tool_search',
   'code_interpreter',
@@ -119,7 +119,7 @@ export const BUILTIN_AGENT_TOOL_TIERS: Record<BuiltinAgentToolId, BuiltinAgentTo
   skill_read: 'core',
   mcp: 'extended',
   subagent: 'extended',
-  rdc_context: 'core',
+  runtime_context: 'core',
   rdc_probe: 'core',
   tool_search: 'core',
   code_interpreter: 'extended',
@@ -167,8 +167,7 @@ export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
   mcp: ['mcp', 'mcp__*'],
   MCP: ['mcp', 'mcp__*'],
   tool_search: ['tool_search'],
-  rdcContext: ['rdc_context'],
-  rdc: ['rdc_context'],
+  runtimeContext: ['runtime_context'],
   rdcProbe: ['rdc_probe'],
   rdc_probe: ['rdc_probe'],
   subagent: ['subagent'],
@@ -184,6 +183,9 @@ export const REJECTED_TOOL_TOKENS: Record<string, string> = {
   handoff: 'Use declared continue buttons or token "subagent"; token "handoff" was removed.',
   agent: 'Use token "subagent" for delegated agents; token "agent" was removed.',
   agent_handoff: 'Use declared continue buttons; tool "agent_handoff" was removed.',
+  rdcContext: 'Use canonical token "runtimeContext" instead of removed token "rdcContext".',
+  rdc: 'Use canonical token "runtimeContext" instead of removed token "rdc".',
+  rdc_context: 'Use tool id "runtime_context" instead of removed id "rdc_context".',
 };
 
 export interface ToolTokenDiagnostic {

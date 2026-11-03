@@ -65,7 +65,7 @@ describe('ConversationToolResourceRefs', () => {
     };
     expect(extractConversationToolResourceRefs('read_file', failed)).toEqual([]);
     expect(extractConversationToolResourceRefs('task_list', success({ count: 3 }))).toEqual([]);
-    expect(extractConversationToolResourceRefs('rdc_context', success({ contextId: 'internal' }))).toEqual([]);
+    expect(extractConversationToolResourceRefs('runtime_context', success({ contextId: 'internal' }))).toEqual([]);
   });
 
   it('collects a successful knowledge-root file read as an ordinary file resource', () => {

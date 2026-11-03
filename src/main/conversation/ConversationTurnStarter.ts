@@ -464,6 +464,8 @@ export async function startProfileTurn(
         turnId,
         capturePaths: [],
         profileId: conversationAgentId,
+        completionContract: preparedTurn.runtime.effectivePlan.completionContract,
+        investigationMission: preparedTurn.runtime.effectivePlan.investigationMission,
         goal: effectiveMessage,
         status: 'running',
       });

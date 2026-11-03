@@ -251,6 +251,8 @@ export class StorageAdapter implements StorageHost {
     turnId?: string;
     capturePaths: string[];
     profileId: string;
+    completionContract?: 'final-answer' | 'investigation-report';
+    investigationMission?: import('@shared/types/session').MissionKind | null;
     goal?: string;
     captures?: CaptureDescriptor[];
     backend?: 'local' | 'remote';

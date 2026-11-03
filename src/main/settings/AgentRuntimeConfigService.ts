@@ -42,12 +42,19 @@ const parseSkill = (skillDir: string, scope: 'builtin' | 'user' | 'project'): Sk
   const allowedTools = Array.isArray(frontmatter['allowed-tools'])
     ? frontmatter['allowed-tools'].filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim()).filter(Boolean)
     : [];
+  const audience = Array.isArray(frontmatter.audience)
+    ? frontmatter.audience.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim()).filter(Boolean)
+    : [];
+  const mission = frontmatter['investigation-mission'];
+  const investigationMission = mission === 'debugger' || mission === 'analyzer' || mission === 'optimizer' ? mission : undefined;
   const instructions = (match ? match[2] : raw).trim();
   return {
     id,
     name,
     description,
     allowedTools,
+    ...(audience.length > 0 ? { audience } : {}),
+    ...(investigationMission ? { investigationMission } : {}),
     scope,
     sourcePath,
     sourceHash: '',
@@ -96,7 +103,7 @@ export class AgentRuntimeConfigService {
         status: 'ready',
         options: this.listSkillMetadata(projectRoot).map((skill) => ({
           ...skill,
-          unavailableToAgentIds: MISSION_AGENT_IDS.filter((id) => !isSkillVisibleToProfile(id, skill.id)),
+          unavailableToAgentIds: MISSION_AGENT_IDS.filter((id) => !isSkillVisibleToProfile(id, skill.id, skill.audience)),
         })),
       };
     } catch (error) {
@@ -137,7 +144,7 @@ export class AgentRuntimeConfigService {
       effectiveStatus: resource.effectiveStatus,
     }));
     if (!viewerAgentId) return resolved;
-    return resolved.filter((skill) => isSkillVisibleToProfile(viewerAgentId, skill.id));
+    return resolved.filter((skill) => isSkillVisibleToProfile(viewerAgentId, skill.id, skill.audience));
   }
 
   listMcpServers(projectRoot?: string): AgentRuntimeMcpDescriptor[] {

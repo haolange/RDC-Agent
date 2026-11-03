@@ -11,6 +11,7 @@ export interface ExecutionOffer {
   targetAgentId: string;
   plan: ExecutionOfferPlanRef;
   requiredSkillIds: string[];
+  requiredToolIds?: string[];
   label: string;
   prompt: string;
   approvedAt: number;

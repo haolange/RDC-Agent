@@ -18,7 +18,8 @@ import {
   isToolDeniedByPolicy,
   resolvePolicyApprovalFloor,
 } from './PolicyCompiler';
-import { isMissionForbiddenToolId, isMissionProfileId } from '@shared/constants/missionPlanOnly';
+import { isToolWithinCeiling } from '@shared/constants/toolAccess';
+import { agentAccessCeiling, type AgentAccessCeiling } from '@shared/types/agentManifest';
 import { isKnowledgeReadFileTool } from '../knowledgeReadRoots';
 import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
 import { assertRdcDiscovery, parseShellRdcInput, type RdcShellInput } from '../../tools/RdcShellInput';
@@ -52,8 +53,10 @@ export interface AgentPermissionDecisionInput {
   effectiveToolNames?: readonly string[];
   tool: AgentTool;
   toolCall: ToolCall;
-  /** Mission plan-only hard deny uses this; Full access cannot bypass. */
+  /** Profile id, used only to resolve a declared access ceiling when one is not passed. */
   agentId?: string | null;
+  /** Frozen profile ceiling. Full access mode cannot exceed it. */
+  accessCeiling?: AgentAccessCeiling;
   /** 当前激活项目根目录；权限边界以它为准，回退固定 User Scope。 */
   projectRootPath?: string | null;
   /** Frozen constraints, explicitly supplied by the prepared plan. */
@@ -348,9 +351,10 @@ export class AgentPermissionPolicyService {
       || process.cwd(),
     );
 
-    if (input.agentId && isMissionProfileId(input.agentId) && isMissionForbiddenToolId(toolName)) {
+    const ceiling = agentAccessCeiling({ accessCeiling: input.accessCeiling });
+    if (!toolName.endsWith('*') && !isToolWithinCeiling(toolName, ceiling)) {
       return denied(
-        `MISSION_PLAN_ONLY_DENIED: tool "${input.toolCall.name}" is forbidden for ${input.agentId}. Full access cannot bypass.`,
+        `ACCESS_CEILING_DENIED: tool "${input.toolCall.name}" exceeds the ${ceiling} ceiling. Full access cannot bypass.`,
         'high',
       );
     }
@@ -366,7 +370,7 @@ export class AgentPermissionPolicyService {
       } catch (error) {
         return denied(`SHELL_INPUT_INVALID: ${error instanceof Error ? error.message : String(error)}`, 'high');
       }
-      if (input.agentId !== 'general') return denied('RDC_EXECUTION_DENIED: General only.', 'high');
+      if (ceiling !== 'full') return denied('RDC_EXECUTION_DENIED: native RDC execution requires a full access ceiling.', 'high');
     }
 
     // Catastrophic shell patterns are hard-denied in every mode, including full-access.
@@ -435,12 +439,19 @@ export class AgentPermissionPolicyService {
       return { action: 'allow', risk: 'low', temporaryPathRoots: ['*'] };
     }
 
-    if (toolName === 'shell' && isCommandDeniedByRule(extractStringArg(input.toolCall, 'command'), permissions)) {
+    const customRules = mode === 'custom' ? permissions : {
+      ...permissions,
+      readableRoots: [],
+      writableRoots: [],
+      allowedCommandPrefixes: [],
+      deniedCommandPrefixes: [],
+    };
+    if (toolName === 'shell' && isCommandDeniedByRule(extractStringArg(input.toolCall, 'command'), customRules)) {
       return denied('Custom policy denied this command prefix (word-boundary match).');
     }
 
-    const configuredReadableRoots = permissions.readableRoots.map(resolveConfiguredRoot);
-    const configuredWritableRoots = permissions.writableRoots.map(resolveConfiguredRoot);
+    const configuredReadableRoots = customRules.readableRoots.map(resolveConfiguredRoot);
+    const configuredWritableRoots = customRules.writableRoots.map(resolveConfiguredRoot);
     const sessionAttachmentsRoot = input.sessionAttachmentsRoot
       ? path.resolve(input.sessionAttachmentsRoot)
       : null;
@@ -483,7 +494,7 @@ export class AgentPermissionPolicyService {
     if (toolName === 'shell') {
       const command = extractStringArg(input.toolCall, 'command');
       if (!command) return denied('Shell command is empty.', 'medium');
-      if (isCommandAllowedByRule(command, permissions)) {
+      if (isCommandAllowedByRule(command, customRules)) {
         return { action: 'allow', risk: 'low', temporaryPathRoots: [] };
       }
       const analysis = shellCommandRiskAnalyzer.analyze(command);
@@ -493,7 +504,7 @@ export class AgentPermissionPolicyService {
       if (commandUsesExternalPath(command, workspaceRoot, configuredReadableRoots)) {
         return request(mode, `Shell command references paths outside the workspace: ${command}`, 'medium');
       }
-      if (isRoutineCommand(command, permissions)) {
+      if (isRoutineCommand(command, customRules)) {
         return { action: 'allow', risk: 'low', temporaryPathRoots: [] };
       }
       return request(mode, `Shell command is not in the routine command set: ${command}`, 'medium');

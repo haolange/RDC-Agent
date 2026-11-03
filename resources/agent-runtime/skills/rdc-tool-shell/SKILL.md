@@ -1,6 +1,11 @@
 ---
 name: rdc-tool-shell
 description: Plan and interpret RDC operations using shared CLI, identity, output, error, evidence, and side-effect rules. Execution belongs to owning General through the frozen Settings CLI binding.
+audience:
+  - general
+  - debugger
+  - analyzer
+  - optimizer
 ---
 
 # RDC-Tool CLI Shell
@@ -49,13 +54,13 @@ General 先从本 turn 冻结的定义做轻量发现；这不会启动 CLI 或�
 
 省略 `capture_file_id`、`session_id`、context、lease 等身份字段；主进程从当前 owning session 注入并拒绝覆盖。capture 打开关闭、context 切换、remote 控制、daemon 生命周期、全局设置、桌面 preview 和 artifact 清理由应用专门入口管理，不通过普通 Agent 操作手册调用。
 
-判读持久工具输出时，区分身份命名空间：制品包装层 `owner`（`ownerScope=product-session`）是产品对话会话，不是原生 replay。用结果的 `rdcExecutionIdentity.productSessionId` 核对产品会话，用 `contextId`、`replaySessionId`、`captureFileId` 分别核对当前 `rdc_context` 的同名字段；CLI 原生 `session_id` 对应 replay。产品 owner 与 replay ID 不相等是正常关系，不能据此拒绝证据；产品 owner 相等也不能证明 replay 相同。分页或压缩摘要未包含执行身份时，先按 URI/hash 继续读取原输出及其 identity，不把尚未读到字段解释为跨会话。只有同名身份的实际不匹配才构成归属反证；身份未知时保持未知，并在计划权限内补核验，不把仍可读取或执行的检查当成外部阻塞。Checkpoint 中保留各字段名称和已验证关系，不能合并成一个含混的 session ID。
+判读持久工具输出时，区分身份命名空间：制品包装层 `owner`（`ownerScope=product-session`）是产品对话会话，不是原生 replay。用结果的 `rdcExecutionIdentity.productSessionId` 核对产品会话，用 `contextId`、`replaySessionId`、`captureFileId` 分别核对当前 `runtime_context` 的同名字段；CLI 原生 `session_id` 对应 replay。产品 owner 与 replay ID 不相等是正常关系，不能据此拒绝证据；产品 owner 相等也不能证明 replay 相同。分页或压缩摘要未包含执行身份时，先按 URI/hash 继续读取原输出及其 identity，不把尚未读到字段解释为跨会话。只有同名身份的实际不匹配才构成归属反证；身份未知时保持未知，并在计划权限内补核验，不把仍可读取或执行的检查当成外部阻塞。Checkpoint 中保留各字段名称和已验证关系，不能合并成一个含混的 session ID。
 
 恢复 checkpoint 时先核对当前 context/replay 身份；历史记录中的 shader-debug、replacement、remote 等运行时 handle 只属于创建它们的 owning replay。重启或重新打开同一 capture 后，capture/shader hash 相同也不能使旧 handle 重新有效。需要该能力时由当前 replay 建立新的 handle；旧失败保留为历史，不把无效 handle 当成当前调试能力不支持。
 
 实验准入还须核对真实进程连续性。当前 `rd.session.get_context` 的 `data.process_identity` 及每次 canonical 结果的 `meta.process_identity` 提供实际 daemon/worker 的 `pid + start_generation`，来源是 OS 进程出生标识；两者均完整且 status=available 才能确认当前批身份。五阶段须逐项比较完整两进程身份，PID复用、任一世代变化或 unavailable 都不能合格；同context/replay/hash不替代此证明。主进程将实际结果中的 process identity 写入签名回执，新实验关闭门要求五份一致。缺少此字段的历史记录仍可读，不追认当前连续性、不补签；保存具体回执，由工程修复受控投影，不用普通shell、读取daemon私有状态或生命周期旁路取代。
 
-受控现场的排他性从 `rdc_context.hostControls.replayIsolation` 读取：只有 `available=true`、`exclusive=true` 且 session/project/turn/context/leaseVersion/replay/capture 与当前执行及阶段回执一致时，才有主进程依据将该受控范围的 `WorldState.replay.exclusiveLock` 记为 true。该证明来自实际 owning lease 和当前 turn 持有的交互锁；人工操作被阻止，受控操作仍逐项串行。它不是整批 native mutex、系统全局隔离或未来预留，也不授予操作权限，不替代三态 replacement 枚举及其他实际可变路径的控制。baseline、variant、restored 分别保存当前证明及其返回的持久 URI/hash，结合对应阶段记录核对；不可事后追认旧阶段。缺失、漂移或 unavailable 保持 unknown，必要控制未闭合时不干预。不要将本受控范围的排他合同另行扩大为产品未承诺的全局整批锁，再把该不可读条件当外部阻塞。
+受控现场的排他性从 `runtime_context.hostControls.replayIsolation` 读取：只有 `available=true`、`exclusive=true` 且 session/project/turn/context/leaseVersion/replay/capture 与当前执行及阶段回执一致时，才有主进程依据将该受控范围的 `WorldState.replay.exclusiveLock` 记为 true。该证明来自实际 owning lease 和当前 turn 持有的交互锁；人工操作被阻止，受控操作仍逐项串行。它不是整批 native mutex、系统全局隔离或未来预留，也不授予操作权限，不替代三态 replacement 枚举及其他实际可变路径的控制。baseline、variant、restored 分别保存当前证明及其返回的持久 URI/hash，结合对应阶段记录核对；不可事后追认旧阶段。缺失、漂移或 unavailable 保持 unknown，必要控制未闭合时不干预。不要将本受控范围的排他合同另行扩大为产品未承诺的全局整批锁，再把该不可读条件当外部阻塞。
 
 正式 shader 状态合同：`rd.shader.edit_and_replace` 将活动变更登记到所属 replay 的 PatchEngine；`rd.shader.list_replacements` 枚举同一活动集合并附带对应元数据，`rd.shader.revert_replacement` 撤销该集合中的指定项。这里的 shader replacement 和 patch 应用顺序不是两套独立可变状态；WorldState 的 `shaderReplacement` / `patchStack` 可引用同一状态的实际枚举回执，仍须分别在基线、变体、恢复态取得，不能拿本段知识代替观察。该合同是工具实现语义说明，不要求普通 capture 调查额外获得软件源码目录读取权。若当前安装的目录、能力或实际回执与合同冲突，保存冲突并保持 unknown，不自行推断为空。
 
@@ -81,7 +86,7 @@ effects 描述可能的 replay position、artifact write、shader debug/replace 
 
 专业成员、参数与示例分别由 `$debugger-rdc-tools`、`$analyzer-rdc-tools`、`$optimizer-rdc-tools` 提供。只读取当前 handoff 绑定的那一本；运行中使用 `shell.rdc` 的 `describe` 发现核实冻结定义。
 
-`rdc_context.hostControls` 是主进程提供的宿主控制事实，不来自原生 catalog。`artifactCapacity` 包含当前用量、在途预留、实际 limits 和 remaining；按 `measuredAt` 核对，`isReservation=false` 表示没有为整批未来写入预留空间。以保守材料预算和实际每次原子写入检查作计划依据，不把点时余量、某次 PNG 成功或 quota 数字当成未来采证必然成功；失败仍需优先恢复。`cliProcess.timeoutMs` 来自当前匹配 lease 的冻结 CLI 设置，scope 仅一次 invocation；`wholeOperationDeadline=false`，前置核验、调用后 observation、排队、模型及存储另计。终止政策有有限等待，但 `nativeTerminationGuaranteed=false`，必须依据真实 close/error 和原生恢复回执判断，超时不明则隔离。任一字段 unavailable 时保持未知，不能据此宣称原生不支持，也不能擅自放宽已冻结计划的硬门；将具体冲突交回规划审阅。
+`runtime_context.hostControls` 是主进程提供的宿主控制事实，不来自原生 catalog。`artifactCapacity` 包含当前用量、在途预留、实际 limits 和 remaining；按 `measuredAt` 核对，`isReservation=false` 表示没有为整批未来写入预留空间。以保守材料预算和实际每次原子写入检查作计划依据，不把点时余量、某次 PNG 成功或 quota 数字当成未来采证必然成功；失败仍需优先恢复。`cliProcess.timeoutMs` 来自当前匹配 lease 的冻结 CLI 设置，scope 仅一次 invocation；`wholeOperationDeadline=false`，前置核验、调用后 observation、排队、模型及存储另计。终止政策有有限等待，但 `nativeTerminationGuaranteed=false`，必须依据真实 close/error 和原生恢复回执判断，超时不明则隔离。任一字段 unavailable 时保持未知，不能据此宣称原生不支持，也不能擅自放宽已冻结计划的硬门；将具体冲突交回规划审阅。
 
 单 CLI join 的中止等待规划读取 `termination.joinTerminationAdditionalWaitMs`，不自行漏算升级终止；同一政策给出 `maxTreeKillAttempts=2`，取消/timeout/shutdown 合并为一次初始终止加一次升级，首个原因保留。这个附加预算与 `timeoutMs` 合计仍不是整个业务操作的 deadline，也不覆盖事件循环停顿或物理退出。业务恢复账本须包含实际所需的登记、原 binary、独立 context 等核验，不能只计四个主要动作。容量只读取实际提供的维度：`remaining.bytes/toolOutputFiles`、对应 `usage` 和 `limits`；不要把计划自己的总文件数量预算变成不存在的宿主 session 文件数额度。
 

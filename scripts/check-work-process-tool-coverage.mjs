@@ -216,7 +216,7 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ query: 'fs' }),
     resultPreview: toolEnvelope('filesystem', { servers: ['filesystem'] }),
   },
-  rdc_context: {
+  runtime_context: {
     argsPreview: '{}',
     resultPreview: toolEnvelope('capture: demo.rdc', { capturePath: 'demo.rdc' }),
   },

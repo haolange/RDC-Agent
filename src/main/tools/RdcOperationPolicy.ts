@@ -6,6 +6,7 @@ import { safeResolvePath } from '../agent-runtime/tools/primitives/_shared';
 import { operationFingerprint } from './RdcOperationCatalog';
 import { assertFileWriteBoundary } from '../agent-runtime/permissions/FileOperationBoundary';
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../sessions/RdcRuntimeContextRegistry';
+import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
 
 const allowedEffects = new Set(['replay_position', 'replay_position_temporary', 'artifact_write', 'context_metadata', 'shader_debug', 'shader_replacement']);
 const scopes = new Set(['global', 'context', 'replay', 'capture']);
@@ -15,8 +16,8 @@ function denied(message: string): never { throw new Error('RDC_EXECUTION_DENIED:
 
 /** Same ownership check before approval and immediately before native execution. */
 export function assertRdcBindingOwnership(context?: ToolExecutionContext) {
-  if (context?.agentId !== 'general' || context.excludeRdcLeaseTools || !context.sessionId || !context.projectId || !context.turnId) {
-    denied('only the owning General turn may execute native operations.');
+  if (!context || !allowsNativeRdcExecution(context) || context.excludeRdcLeaseTools || !context.sessionId || !context.projectId || !context.turnId) {
+    denied('native RDC execution requires a full access ceiling and the owning turn.');
   }
   const lease = assertRdcContextLeaseOwnership({ sessionId: context.sessionId, projectId: context.projectId });
   const retained = !lease ? getRdcContextLease(context.sessionId) : null;

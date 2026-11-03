@@ -53,7 +53,9 @@ handoffs:
     agent: general
     prompt: Execute the frozen approved plan.
     send: true
-    showContinueOn: true
+    surface: plan-gate
+    requiredToolIds:
+      - investigation_write
     requiredSkillIds:
       - renderdoc-execution
       - debugger-causal-method
@@ -91,9 +93,14 @@ Removed fields (do not restore): `harness` / lean|standard thickness modes. Skil
 - `agent`
 - `prompt`
 - `send`
-- `showContinueOn`（未声明视为 true；Settings 只持久化显式 `false`。为 true 时回合结束后渲染建议按钮，计划门通过也点同一组按钮）
+- `surface`（`turn-end` | `plan-gate` | `hidden`；省略等于 `turn-end`。`turn-end` 在回合结束后和计划门出现，`plan-gate` 只在计划门出现，`hidden` 不出现。Settings 省略默认值）
 - `model`
-- `requiredSkillIds`（批准后由 General prepareTurn 实际预载；不能授权工具）
+- `requiredSkillIds`（批准后由接收回合 prepareTurn 实际预载；不能授权工具）
+- `requiredToolIds`（接收回合在自己的天花板和冻结工具集内预先激活这些 id）
+
+Profile 还可声明通用字段 `access-ceiling`（`read-only` | `workspace-write` | `full`，省略为 `full`）和 `completion-contract`（`final-answer` | `investigation-report`，省略为 `final-answer`）。领域 mission 不写在 profile 上。需要调查报告合同时，预载的 Coordinator Skill frontmatter 声明 `investigation-mission: debugger | analyzer | optimizer`；没有任何预载 Skill 声明时 prepareTurn fail-closed。
+
+自定义规划者不必占用保留 id。例如项目内 `gpu-planner.agent.md` 可以声明 `access-ceiling: read-only`、`completion-contract: investigation-report`，预载一份自有 Skill，并在该 Skill 写 `investigation-mission: debugger`。交接用 `surface: plan-gate` 指向执行 profile。保留 id 仍是 `ask` / `plan` / `edit`，不新增内置 `plan` profile。
 
 译文与声明一同冻结进计划选项及建议行。UI 按当前语言显示译文，缺少该语言时使用基础 label；不按目标 Agent 改写名称。批准/交接仅提交 agent+label，译文不写入批准身份或 execution offer。改名后不迁移历史批准，不接受旧 label 别名；旧计划不再匹配时须修订或重规划并重新批准。
 
@@ -128,7 +135,7 @@ Tasks 能力由 route 与冻结工具集决定，不是独立 profile：只读 r
 
 ## Plan 输出
 
-`planArtifact` token 只给三 Mission。`plan_artifact` 是人机门：提交 `title` + `summary[]` + Markdown `content`，主进程覆盖 `session://plans/plan.md` 并按 `##` 切 `sections[]`。无 `showContinueOn !== false` 的声明则 fail-closed。批准冻结 `plan-<ISO>-<hash8>.md` 并写入 session execution offer（source / target / plan.uri+hash / 声明 requiredSkillIds）；拒绝意见回同一 tool result。用户点声明按钮切到 General。项目副本仅用户点击写入 `<project>/.rdc-agent/plans/<sessionId>/plan.md`。
+`planArtifact` token 只给三 Mission。`plan_artifact` 是人机门：提交 `title` + `summary[]` + Markdown `content`，主进程覆盖 `session://plans/plan.md` 并按 `##` 切 `sections[]`。无 `surface` 不是 `hidden` 的声明则 fail-closed。批准冻结 `plan-<ISO>-<hash8>.md` 并写入 session execution offer（source / target / plan.uri+hash / 声明 requiredSkillIds）；拒绝意见回同一 tool result。用户点声明按钮切到 General。项目副本仅用户点击写入 `<project>/.rdc-agent/plans/<sessionId>/plan.md`。
 
 ## RDC Shell Actions
 

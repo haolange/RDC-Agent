@@ -9,7 +9,8 @@ import { approvedExecutionOfferForAgent } from '../../sessions/handoffSkills';
 
 import { createHash } from 'crypto';
 import { bindRdcTurn, freezeRdcTurnBinding, rdcBindingFingerprint } from '../../tools/RdcTurnBindings';
-import { isMissionAgentId, type AgentRole } from '@shared/types/agent';
+import type { AgentRole } from '@shared/types/agent';
+import { agentCompletionContract } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
@@ -78,19 +79,24 @@ function resolveSkillIntersection(
   projectRootPath: string | null,
   agentId: AgentRole,
   promptPlan: PromptPlan,
-): string[] | null {
+): { intersection: string[] | null; investigationMission: 'debugger' | 'analyzer' | 'optimizer' | null } {
   const skillAllowedLists: string[][] = [];
+  let investigationMission: 'debugger' | 'analyzer' | 'optimizer' | null = null;
   for (const skillId of profileSkills) {
     const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined, agentId);
     if (!skill) throw new Error('SKILL_UNAVAILABLE: ' + skillId);
     const frozen = promptPlan.segments.find(segment => segment.id === 'skill:' + skillId && segment.kind === 'preloaded-skill');
     if (!frozen) throw new Error('SKILL_NOT_PRELOADED: rebuild preparation for ' + skillId);
     if (frozen.sourceHash !== skill.sourceHash) throw new Error('SKILL_SOURCE_CHANGED: rebuild preparation for ' + skillId);
+    if (skill.investigationMission && investigationMission && skill.investigationMission !== investigationMission) {
+      throw new Error('mission_method: preloaded skills declare conflicting investigation-mission values');
+    }
+    investigationMission = skill.investigationMission ?? investigationMission;
     if (skill.allowedTools?.length) {
       skillAllowedLists.push([...skill.allowedTools]);
     }
   }
-  return combineActiveSkillAllowlists(toolAllowlist, skillAllowedLists);
+  return { intersection: combineActiveSkillAllowlists(toolAllowlist, skillAllowedLists), investigationMission };
 }
 
 export interface TurnPreparationServiceDeps {
@@ -189,13 +195,14 @@ export class TurnPreparationService {
     const approvedExecutionOffer = approvedExecutionOfferForAgent(input.sessionId, input.agentId);
     const profile = { ...input.effectiveProfile, skills: [...new Set([...input.effectiveProfile.skills, ...promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)), ...(approvedExecutionOffer?.requiredSkillIds ?? [])])] };
     const profileSkills = profile.skills;
-    const skillIntersection = resolveSkillIntersection(
+    const resolvedSkills = resolveSkillIntersection(
       profileSkills,
       input.toolAllowlist,
       input.projectRootPath,
       input.agentId,
       promptPlan,
     );
+    const skillIntersection = resolvedSkills.intersection;
     assertExecutionOfferSkillCompatibility({
       preloadedSkillIds: promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)),
       sessionId: input.sessionId,
@@ -230,11 +237,14 @@ export class TurnPreparationService {
     const slotKey = agentSlotKey(resolveExecutionScopeId(input.sessionId), input.agentId);
     const toolSignature = this.deps.createToolSignature(runtimeTools.definitions);
     const activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, toolSignature);
+    const investigationTools = ['investigation_schema', 'investigation_read', 'investigation_write', 'investigation_list'];
     preactivateWorkflowTools(
       runtimeTools.definitions,
       activatedDeferredTools,
-      isMissionAgentId(input.agentId)
-        || (approvedExecutionOffer !== null && isMissionAgentId(approvedExecutionOffer.sourceAgentId)),
+      [
+        ...(agentCompletionContract(input.effectiveProfile) === 'investigation-report' ? investigationTools : []),
+        ...(approvedExecutionOffer?.requiredToolIds ?? []),
+      ],
     );
     const { injected, deferredMcp, deferredBuiltin } = partitionDeferredTools(
       runtimeTools.definitions,
@@ -345,6 +355,7 @@ export class TurnPreparationService {
     const effectivePlan = buildEffectiveRuntimePlan({
       rdcBindingFingerprint: rdcBindingFingerprint(rdcBinding),
       agentId: input.agentId,
+      investigationMission: resolvedSkills.investigationMission,
       projectRootPath: input.projectRootPath,
       projectId: input.projectId,
       profile,

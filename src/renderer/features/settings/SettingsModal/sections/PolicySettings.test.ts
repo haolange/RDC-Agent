@@ -11,8 +11,9 @@ vi.mock('./RuntimeScopePanel', () => ({
 }));
 vi.mock('../../../../stores/appSettingsStore', () => ({
   useAppSettingsStore: (selector: (state: unknown) => unknown) => selector({
-    settings: { agentRuntime: { context: { compactionThresholdPercent: 80 } } },
+    settings: { agentRuntime: { context: { compactionThresholdPercent: 80 }, permissions: { readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] } } },
     setCompactionThresholdPercent: vi.fn(),
+    setCustomPermissionRules: vi.fn(),
   }),
 }));
 

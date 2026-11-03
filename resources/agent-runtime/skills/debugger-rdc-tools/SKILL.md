@@ -1,6 +1,9 @@
 ---
 name: debugger-rdc-tools
 description: Operation knowledge for Debugger planning and owning General execution to localize rendering faults, test competing causes, and verify a restored result.
+audience:
+  - debugger
+  - general
 ---
 
 # Debugger RDC-Tool

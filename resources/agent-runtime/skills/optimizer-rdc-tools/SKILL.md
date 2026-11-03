@@ -1,6 +1,9 @@
 ---
 name: optimizer-rdc-tools
 description: Operation knowledge for Optimizer planning and owning General execution to measure costs, run controlled shader interventions, and verify visual and numeric restoration.
+audience:
+  - optimizer
+  - general
 ---
 
 # Optimizer RDC-Tool

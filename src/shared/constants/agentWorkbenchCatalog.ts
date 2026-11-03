@@ -502,7 +502,7 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     approvalRequired: false,
   },
   {
-    id: 'rdc_context',
+    id: 'runtime_context',
     label: 'RDC Context',
     permission: 'readonly',
     inputSchema: { type: 'object', properties: {} },
@@ -716,7 +716,7 @@ export const AGENT_WORKBENCH_COMMAND_CATALOG: AgentWorkbenchCommandDeclaration[]
     command: '/context',
     label: 'Context',
     description: 'Summarize current project, session, captures, and available context.',
-    relatedTools: ['read_file', 'memory_read', 'rdc_context'],
+    relatedTools: ['read_file', 'memory_read', 'runtime_context'],
     permission: 'readonly',
   },
   {
@@ -751,7 +751,7 @@ export const AGENT_WORKBENCH_COMMAND_CATALOG: AgentWorkbenchCommandDeclaration[]
     command: '/status',
     label: 'Status',
     description: 'Summarize runtime, route, tool, and capture status.',
-    relatedTools: ['task_list', 'task_get', 'rdc_context'],
+    relatedTools: ['task_list', 'task_get', 'runtime_context'],
     permission: 'readonly',
   },
   {

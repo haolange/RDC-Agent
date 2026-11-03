@@ -1,6 +1,9 @@
 ---
 name: analyzer-rdc-tools
 description: Operation knowledge for Analyzer planning and owning General execution to reconstruct passes, resources, bindings, shaders, and data flow without overstating author intent.
+audience:
+  - analyzer
+  - general
 ---
 
 # Analyzer RDC-Tool

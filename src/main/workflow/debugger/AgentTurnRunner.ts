@@ -561,6 +561,8 @@ export class AgentTurnRunner {
       }
       const completionInput = {
         profileId: input.agentId,
+        completionContract: turnHandle.runtimePlan?.completionContract,
+        investigationMission: turnHandle.runtimePlan?.investigationMission ?? undefined,
         turnId: turnHandle.turnId,
         sessionId: executionScopeId,
         finalAnswerText: responseText,

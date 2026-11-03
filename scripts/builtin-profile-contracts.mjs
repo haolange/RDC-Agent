@@ -86,7 +86,14 @@ export function assertParsedHandoffs(handoffs, label) {
       assert(typeof handoff.send === 'boolean', `${label} handoffs[${index}].send must be a boolean.`);
     }
     if (handoff.showContinueOn !== undefined) {
-      assert(typeof handoff.showContinueOn === 'boolean', `${label} handoffs[${index}].showContinueOn must be a boolean.`);
+      assert(false, `${label} handoffs[${index}].showContinueOn was removed; declare surface.`);
+    }
+    if (handoff.surface !== undefined) {
+      assert(['turn-end', 'plan-gate', 'hidden'].includes(handoff.surface), `${label} handoffs[${index}].surface is invalid.`);
+    }
+    if (handoff.requiredToolIds !== undefined) {
+      assert(Array.isArray(handoff.requiredToolIds), `${label} handoffs[${index}].requiredToolIds must be an array.`);
+      assert(handoff.requiredToolIds.every((id) => typeof id === 'string' && id.trim()), `${label} handoffs[${index}].requiredToolIds must be non-empty strings.`);
     }
     if (handoff.model !== undefined) {
       assert(typeof handoff.model === 'string' && handoff.model.trim(), `${label} handoffs[${index}].model must be a non-empty string.`);
@@ -116,6 +123,8 @@ export function assertParsedProfileContracts(id, definition) {
     assert(definition.maxTurns === GENERAL_MAX_TURNS, `General max-turns must be ${GENERAL_MAX_TURNS}`);
     assertIncludesAll(agents, MISSION_AGENT_IDS, 'General agents');
     assert(handoffs.length === 0, 'General handoffs must be empty');
+    assert(definition.accessCeiling === undefined, 'General omits access-ceiling and therefore keeps the full ceiling');
+    assert(definition.completionContract === undefined, 'General omits completion-contract and therefore keeps final-answer');
     return;
   }
 
@@ -128,8 +137,11 @@ export function assertParsedProfileContracts(id, definition) {
   assert(execute, `${id} must declare Implement Plan`);
   assert(execute.labelTranslations?.['zh-CN'] === '执行计划', `${id} must declare its Chinese execution label`);
   assert(execute.send === true, `${id} Implement Plan must send`);
-  assert(execute.showContinueOn !== false, `${id} Implement Plan must show continue`);
+  assert(execute.surface === 'plan-gate', `${id} Implement Plan must be offered only at the plan gate`);
+  assert(definition.accessCeiling === 'read-only', `${id} access-ceiling must be read-only`);
+  assert(definition.completionContract === 'investigation-report', `${id} completion-contract must be investigation-report`);
   assert(Array.isArray(execute.requiredSkillIds) && execute.requiredSkillIds.length > 0, `${id} Implement Plan must declare requiredSkillIds`);
+  assert(Array.isArray(execute.requiredToolIds) && execute.requiredToolIds.includes('investigation_write'), `${id} Implement Plan must preactivate investigation writes`);
 }
 
 export function assertManifestSourceContracts(id, source, filePath) {
@@ -156,5 +168,8 @@ export function assertBuiltinProfileContracts(repoRoot) {
     const name = extractFrontmatterScalar(source, 'name');
     assert(name === skillId, `${skillId} name must equal its directory id`);
     assertIncludesNone(extractSkillAllowedTools(source), FORBIDDEN_TOOL_TOKENS, `${skillId} allowed-tools`);
+    if (skillId !== 'execution-orchestrator') {
+      assert(extractFrontmatterScalar(source, 'investigation-mission') === skillId.replace('-coordinator', ''), `${skillId} must declare its investigation-mission`);
+    }
   }
 }

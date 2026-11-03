@@ -161,6 +161,12 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
       if (snapshot) set((state) => ({ settings: withPermissionMode(state.settings, snapshot.mode) }));
     }
   },
+  setCustomPermissionRules: async (rules) => {
+    const nextSettings = await window.electronAPI.settings.set({
+      agentRuntime: { permissions: rules },
+    });
+    set({ settings: nextSettings, hydrated: true });
+  },
   setCompactionThresholdPercent: async (percent) => {
     const previous = get().settings.agentRuntime?.context?.compactionThresholdPercent
       ?? DEFAULT_SETTINGS.agentRuntime.context.compactionThresholdPercent;

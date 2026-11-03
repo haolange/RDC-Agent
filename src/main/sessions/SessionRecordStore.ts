@@ -13,11 +13,11 @@ import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type {
   CaptureDescriptor,
+  MissionKind,
   ProjectRecord,
   RunSummary,
   SessionRecord,
 } from '@shared/types/session';
-import { isMissionAgentId } from '@shared/types/agent';
 import { assertNoRunV3StageFields, toPersistedRunV3 } from './runV3/runRecordSchema';
 import { appPathService } from '../runtime/AppPathService';
 import type { PersistedRunRecord } from './storageTypes';
@@ -405,6 +405,8 @@ export class SessionRecordStore {
     turnId?: string;
     capturePaths: string[];
     profileId: string;
+    completionContract?: 'final-answer' | 'investigation-report';
+    investigationMission?: MissionKind | null;
     goal?: string;
     captures?: CaptureDescriptor[];
     backend?: 'local' | 'remote';
@@ -446,8 +448,10 @@ export class SessionRecordStore {
       sessionId,
       caseId: sessionId,
       profileId: input.profileId,
+      completionContract: input.completionContract,
+      investigationMission: input.investigationMission,
       goal: input.goal || session.goal,
-      captures: isMissionAgentId(input.profileId) ? captures : [],
+      captures,
       startedAt,
       status: input.status || 'queued',
       backend,

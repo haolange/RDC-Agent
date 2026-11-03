@@ -12,6 +12,7 @@ import { Switch } from '../../../../ui/Switch';
 import { Textarea } from '../../../../ui/Textarea';
 import type { AgentSkillCatalog } from './AgentSkillPicker';
 import { SettingsField, SettingsSection } from '../parts';
+import { AgentContractFields } from './AgentContractFields';
 import { AgentIdentityPanel } from './AgentIdentityPanel';
 import { AgentCapabilityPicker, buildAgentCapabilityGroups } from './AgentCapabilityPicker';
 import { AgentHandoffEditor } from './AgentHandoffEditor';
@@ -237,6 +238,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                 </span>
               </label>
             </div>
+            <AgentContractFields agent={selectedAgent} onChange={onUpdateAgent} t={t} />
           </div>
         </SettingsSection>
 

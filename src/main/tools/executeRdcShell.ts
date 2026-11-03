@@ -1,3 +1,4 @@
+import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
 import { assertRdcBindingOwnership, authorizeRdcOperation, isMainOwnedRdcIdentityKey, rdcCapabilityPolicy, rdcCatalogCapabilitySummary, rdcOperationCapability } from './RdcOperationPolicy';
 import { operationFingerprint } from './RdcOperationCatalog';
 import { isUnchangedShaderResult, validateExecutionEvidence, verifyRollbackIdentity } from './RdcValidatedEvidence';
@@ -64,8 +65,8 @@ export async function executeRdcShell(
 ): Promise<AgentToolResult<{ operation: string; exitCode: number; receipt?: import("@shared/types/renderdocInvestigation").InvestigationContentRef }>> {
   const input = RdcShellInputSchema.parse(raw);
   signal?.throwIfAborted();
-  if (context?.agentId !== 'general' || context.excludeRdcLeaseTools || !context.sessionId || !context.projectId || !context.turnId) {
-    throw new Error('RDC_EXECUTION_DENIED: only the owning General turn may execute native operations.');
+  if (!context || !allowsNativeRdcExecution(context) || context.excludeRdcLeaseTools || !context.sessionId || !context.projectId || !context.turnId) {
+    throw new Error('RDC_EXECUTION_DENIED: native RDC execution requires a full access ceiling and the owning turn.');
   }
   const lease = assertRdcBindingOwnership(context);
   const cli = context.rdcBinding!.cli;

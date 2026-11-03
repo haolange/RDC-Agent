@@ -2,15 +2,58 @@ import type { AppLanguage, LlmProviderId } from './settings';
 import type { ModeIconKey } from './layout';
 import type { ModelCost } from '../provider-catalog/modelManifestSchema';
 
+/** Upper bound on what any tool may do for a profile; no permission mode can exceed it. */
+export type AgentAccessCeiling = 'read-only' | 'workspace-write' | 'full';
+export const AGENT_ACCESS_CEILINGS = ['read-only', 'workspace-write', 'full'] as const satisfies readonly AgentAccessCeiling[];
+export const DEFAULT_AGENT_ACCESS_CEILING: AgentAccessCeiling = 'full';
+
+/** Obligation a turn must satisfy before it may declare `turn_complete(completed)`. */
+export type AgentCompletionContract = 'final-answer' | 'investigation-report';
+export const AGENT_COMPLETION_CONTRACTS = ['final-answer', 'investigation-report'] as const satisfies readonly AgentCompletionContract[];
+export const DEFAULT_AGENT_COMPLETION_CONTRACT: AgentCompletionContract = 'final-answer';
+
+/**
+ * Where a declared handoff is offered:
+ * - `turn-end`: after a completed turn and at the plan gate;
+ * - `plan-gate`: only when approving a plan submitted with `plan_artifact`;
+ * - `hidden`: declared but never offered.
+ */
+export type HandoffSurface = 'turn-end' | 'plan-gate' | 'hidden';
+export const HANDOFF_SURFACES = ['turn-end', 'plan-gate', 'hidden'] as const satisfies readonly HandoffSurface[];
+
 export interface AgentHandoffDefinition {
   label: string;
   labelTranslations?: HandoffLabelTranslations;
   agent: string;
   prompt: string;
   send?: boolean;
-  showContinueOn?: boolean;
+  /** Omitted means `turn-end`. */
+  surface?: HandoffSurface;
   model?: string;
+  /** Skills the receiving turn must actually preload after this handoff. */
   requiredSkillIds?: string[];
+  /** Deferred tools the receiving turn pre-activates (within its own frozen tool set). */
+  requiredToolIds?: string[];
+}
+
+export function handoffSurfaceOf(handoff: Pick<AgentHandoffDefinition, 'surface'>): HandoffSurface {
+  return handoff.surface ?? 'turn-end';
+}
+
+export function isHandoffOfferedAtPlanGate(handoff: Pick<AgentHandoffDefinition, 'surface'>): boolean {
+  return handoffSurfaceOf(handoff) !== 'hidden';
+}
+
+export function isHandoffOfferedAtTurnEnd(handoff: Pick<AgentHandoffDefinition, 'surface'>): boolean {
+  return handoffSurfaceOf(handoff) === 'turn-end';
+}
+
+export function agentAccessCeiling(profile: { accessCeiling?: AgentAccessCeiling } | null | undefined): AgentAccessCeiling {
+  return profile?.accessCeiling ?? DEFAULT_AGENT_ACCESS_CEILING;
+}
+
+export function agentCompletionContract(profile: { completionContract?: AgentCompletionContract } | null | undefined): AgentCompletionContract {
+  return profile?.completionContract ?? DEFAULT_AGENT_COMPLETION_CONTRACT;
 }
 
 export type HandoffLabelTranslations = Readonly<Partial<Record<AppLanguage, string>>>;
@@ -29,6 +72,10 @@ export interface AgentManifestDefinition {
   accent: string;
   disableModelInvocation: boolean;
   userInvocable: boolean;
+  /** Omitted means `full`: the profile declares no extra tool ceiling. */
+  accessCeiling?: AgentAccessCeiling;
+  /** Omitted means `final-answer`. */
+  completionContract?: AgentCompletionContract;
   tools: string[];
   skills: string[];
   mcpServers: string[];

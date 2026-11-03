@@ -22,6 +22,8 @@ export interface ToolExecutionContext {
   /** Main-owned, private execution binding; never serialized to the model. */
   rdcBinding?: RdcTurnBinding;
   agentId?: string;
+  /** Frozen profile ceiling. Native RDC execution requires `full`. */
+  accessCeiling?: import('@shared/types/agentManifest').AgentAccessCeiling;
   turnId?: string;
   excludeRdcLeaseTools?: boolean;
   workspaceRoot: string;

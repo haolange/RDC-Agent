@@ -16,6 +16,7 @@ const ExecutionOfferSchema = z.object({
     hash: z.string().trim().min(1),
   }).strict(),
   requiredSkillIds: z.array(z.string().trim().min(1)),
+  requiredToolIds: z.array(z.string().trim().min(1)).optional(),
   label: z.string().trim().min(1),
   prompt: z.string().trim().min(1),
   approvedAt: z.number(),

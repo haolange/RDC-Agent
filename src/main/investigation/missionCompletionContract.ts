@@ -72,8 +72,19 @@ export interface MissionCompletionReceipt {
   reportContentHash: string;
 }
 
+function declaredMission(input: MissionCompletionInput): InvestigationMission | null {
+  if (input.completionContract === 'final-answer') return null;
+  if (input.completionContract === 'investigation-report') {
+    if (!input.investigationMission) {
+      throw new MissionCompletionError('mission_method', 'investigation-report requires a declared investigation-mission');
+    }
+    return input.investigationMission;
+  }
+  return isMissionAgentId(input.profileId) ? input.profileId : null;
+}
+
 export function enforceMissionTurnCompletion(input: MissionCompletionInput): MissionCompletionReceipt | void {
-  if (!isMissionAgentId(input.profileId)) return;
+  if (!declaredMission(input)) return;
   if (!input.disposition) return;
   if (input.disposition === 'partial' || input.disposition === 'blocked' || input.disposition === 'cancelled') return;
   if (allowsBudgetPause(input, input.service ?? investigationArtifactService)) return;
@@ -81,9 +92,9 @@ export function enforceMissionTurnCompletion(input: MissionCompletionInput): Mis
 }
 
 export function assertMissionTurnCompletion(input: MissionCompletionInput): MissionCompletionReceipt {
-  const mission = input.profileId;
-  if (!isMissionAgentId(mission)) {
-    throw new MissionCompletionError('mission_method', `profile ${mission} is not a Mission profile`);
+  const mission = declaredMission(input);
+  if (!mission) {
+    throw new MissionCompletionError('mission_method', `profile ${input.profileId} is not under an investigation-report contract`);
   }
   const sessionId = input.sessionId?.trim();
   if (!sessionId) {

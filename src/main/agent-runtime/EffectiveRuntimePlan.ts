@@ -11,7 +11,8 @@ import { compileEffectivePolicy, emptyCompiledPolicy } from './permissions/Polic
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import { freezeDelegationCapsule } from '@shared/types/delegationCapsule';
 import { isRdcLeaseToolName, stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
-import { filterMissionPlanOnlyAllowlist, isMissionProfileId } from '@shared/constants/missionPlanOnly';
+import { filterToolsWithinCeiling } from '@shared/constants/toolAccess';
+import { agentAccessCeiling, agentCompletionContract, type AgentCompletionContract } from '@shared/types/agentManifest';
 
 export interface FrozenHandoffDefinition {
   agent: string;
@@ -19,9 +20,10 @@ export interface FrozenHandoffDefinition {
   labelTranslations?: HandoffLabelTranslations;
   prompt: string;
   send?: boolean;
-  showContinueOn?: boolean;
+  surface?: 'turn-end' | 'plan-gate' | 'hidden';
   model?: string;
   requiredSkillIds?: readonly string[];
+  requiredToolIds?: readonly string[];
 }
 
 export const EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION = 3 as const;
@@ -35,6 +37,12 @@ export interface EffectiveRuntimePlan {
   /** Provenance of the exact profile resolved before preparation. */
   profileProvenance: ResourceProvenance | null;
   agentId: string;
+  /** Frozen profile ceiling. Omitted profiles are `full`. */
+  accessCeiling: import('@shared/types/agentManifest').AgentAccessCeiling;
+  /** Frozen profile obligation. Omitted profiles are `final-answer`. */
+  completionContract: AgentCompletionContract;
+  /** Mission declared by a preloaded skill. Null unless the contract is `investigation-report`. */
+  investigationMission: 'debugger' | 'analyzer' | 'optimizer' | null;
   profileSkills: readonly string[];
   profileMaxTurns: number | null;
   /** Exact handoff declarations from the resolved profile. */
@@ -90,7 +98,7 @@ export interface BuildEffectiveRuntimePlanInput {
   projectRootPath: string | null;
   projectId?: string | null;
   profileProvenance?: ResourceProvenance | null;
-  profile?: Pick<AgentManifestDefinition, 'skills' | 'maxTurns'> & {
+  profile?: Pick<AgentManifestDefinition, 'skills' | 'maxTurns' | 'accessCeiling' | 'completionContract'> & {
     agents?: AgentManifestDefinition['agents'];
     handoffs?: AgentManifestDefinition['handoffs'];
   } | null;
@@ -103,6 +111,8 @@ export interface BuildEffectiveRuntimePlanInput {
   routeCapability: AgentRouteCapability;
   requestPlan: Pick<RequestPlan, 'executionIdentity'> | { executionIdentity: { fingerprint: string } };
   promptPlan: Pick<PromptPlan, 'systemPrompt'> | { systemPrompt: string };
+  /** Resolved from a preloaded skill when the profile contract is investigation-report. */
+  investigationMission?: 'debugger' | 'analyzer' | 'optimizer' | null;
   /** Optional precompiled policy (tests); otherwise load .policy.yml fail-closed. */
   policy?: CompiledPolicy;
   /** Frozen skill ∩ allowlist; omit to leave null (no narrowing). */
@@ -182,10 +192,13 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     ...(handoff.labelTranslations ? { labelTranslations: Object.freeze({ ...handoff.labelTranslations }) } : {}),
     prompt: handoff.prompt,
     ...(handoff.send !== undefined ? { send: handoff.send } : {}),
-    ...(handoff.showContinueOn !== undefined ? { showContinueOn: handoff.showContinueOn } : {}),
+    ...(handoff.surface !== undefined ? { surface: handoff.surface } : {}),
     ...(handoff.model !== undefined ? { model: handoff.model } : {}),
     ...(handoff.requiredSkillIds && handoff.requiredSkillIds.length > 0
       ? { requiredSkillIds: Object.freeze([...handoff.requiredSkillIds]) }
+      : {}),
+    ...(handoff.requiredToolIds && handoff.requiredToolIds.length > 0
+      ? { requiredToolIds: Object.freeze([...handoff.requiredToolIds]) }
       : {}),
   })));
   const enabledProfileIds = freezeStringList(input.enabledProfileIds);
@@ -195,21 +208,25 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
   const withoutSubagent = (values: readonly string[]): string[] => excludeSubagent
     ? values.filter((name) => name.trim().toLowerCase() !== 'subagent')
     : [...values];
-  const applyMissionFilter = (values: readonly string[]): readonly string[] => (
-    isMissionProfileId(input.agentId) ? filterMissionPlanOnlyAllowlist(values) : [...values]
-  );
+  const ceiling = agentAccessCeiling(input.profile);
+  const completionContract = agentCompletionContract(input.profile);
+  const investigationMission = completionContract === 'investigation-report' ? input.investigationMission ?? null : null;
+  if (completionContract === 'investigation-report' && !investigationMission) {
+    throw new Error('mission_method: investigation-report requires a preloaded skill that declares investigation-mission');
+  }
+  const applyCeiling = (values: readonly string[]): readonly string[] => filterToolsWithinCeiling(values, ceiling);
   const rawAllowlist = excludeRdcLeaseTools
     ? stripRdcLeaseToolsFromAllowlist(input.toolAllowlist)
     : input.toolAllowlist;
-  const toolAllowlist = freezeStringList(withoutSubagent(applyMissionFilter(rawAllowlist)));
+  const toolAllowlist = freezeStringList(withoutSubagent(applyCeiling(rawAllowlist)));
   const skillIntersection = input.skillIntersection === undefined || input.skillIntersection === null
     ? null
-    : freezeStringList(withoutSubagent(applyMissionFilter(
+    : freezeStringList(withoutSubagent(applyCeiling(
       excludeRdcLeaseTools
         ? stripRdcLeaseToolsFromAllowlist(input.skillIntersection)
         : input.skillIntersection,
     )));
-  const visibleToolNames = freezeStringList(withoutSubagent(applyMissionFilter(
+  const visibleToolNames = freezeStringList(withoutSubagent(applyCeiling(
       excludeRdcLeaseTools
         ? stripRdcLeaseToolsFromAllowlist(input.visibleToolNames ?? [])
         : input.visibleToolNames ?? [],
@@ -230,6 +247,9 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
   const fingerprint = stableHash([
     EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION,
     input.agentId,
+    ceiling,
+    completionContract,
+    investigationMission,
     input.projectRootPath,
     input.projectId ?? null,
     input.profileProvenance ?? null,
@@ -264,6 +284,9 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     projectId: input.projectId ?? null,
     profileProvenance: input.profileProvenance ?? null,
     agentId: input.agentId,
+    accessCeiling: ceiling,
+    completionContract,
+    investigationMission,
     profileSkills,
     profileMaxTurns,
     profileHandoffs,

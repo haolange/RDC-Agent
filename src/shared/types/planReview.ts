@@ -134,6 +134,6 @@ export interface ConversationAnswerPlanReviewResult {
   replan?: { agentId: string; source: PlanReadRequest; feedback: string };
 }
 
-export function isHandoffContinueAction(handoff: { showContinueOn?: boolean }): boolean {
-  return handoff.showContinueOn !== false;
+export function isHandoffContinueAction(handoff: { surface?: 'turn-end' | 'plan-gate' | 'hidden' }): boolean {
+  return handoff.surface !== 'hidden';
 }

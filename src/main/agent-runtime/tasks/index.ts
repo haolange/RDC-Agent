@@ -53,6 +53,8 @@ export {
 export {
   resolveSessionTasksDir,
   createSessionTaskStore,
+  taskStoreForExecutionScope,
+  releaseScopeTaskStore,
 } from './sessionTaskStore';
 
 export {

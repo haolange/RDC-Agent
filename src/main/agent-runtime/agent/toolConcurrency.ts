@@ -19,7 +19,7 @@ const ALWAYS_SERIAL_TOOL_NAMES = new Set([
   'task_create',
   'task_update',
   'task_stop',
-  'rdc_context',
+  'runtime_context',
   'rdc_probe',
   'ask_user',
   'plan_artifact',

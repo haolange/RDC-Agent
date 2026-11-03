@@ -9,7 +9,8 @@
 
 import * as path from 'path';
 import { appPathService } from '../../runtime/AppPathService';
-import { FileTaskStore } from './TaskStore';
+import { isTransientScopeId } from '@shared/utils/executionScope';
+import { FileTaskStore, MemoryTaskStore, type TaskStore } from './TaskStore';
 
 /** 将 sessionId 归一化为文件系统安全的目录名。 */
 function safeSegment(sessionId: string): string {
@@ -27,4 +28,30 @@ export function createSessionTaskStore(sessionId: string): FileTaskStore {
     const { readApprovedPlanTasks } = await import('../../sessions/ApprovedPlanTasks');
     return readApprovedPlanTasks(sessionId);
   });
+}
+
+const memoryStores = new Map<string, MemoryTaskStore>();
+
+/**
+ * Durable sessions use the session file store. Ephemeral and subagent scopes
+ * share one in-memory store for that scope until `releaseScopeTaskStore`.
+ * A Task-owned child keeps using its owner session store.
+ */
+export function taskStoreForExecutionScope(
+  scopeId: string | null,
+  delegatedOwnerSessionId?: string | null,
+  durable: (sessionId: string) => TaskStore = createSessionTaskStore,
+): TaskStore {
+  if (delegatedOwnerSessionId) return durable(delegatedOwnerSessionId);
+  if (scopeId && !isTransientScopeId(scopeId)) return durable(scopeId);
+  if (!scopeId) return new MemoryTaskStore();
+  const existing = memoryStores.get(scopeId);
+  if (existing) return existing;
+  const created = new MemoryTaskStore();
+  memoryStores.set(scopeId, created);
+  return created;
+}
+
+export function releaseScopeTaskStore(scopeId: string): void {
+  memoryStores.delete(scopeId);
 }

@@ -17,7 +17,8 @@ import { nowMs } from '@shared/utils/id';
 import { agentOrchestrator, type PreparedAgentTurnContext } from '../workflow/debugger/AgentOrchestrator';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
-import { isHandoffContinueAction, type PlanReviewHandoffSuggestion } from '@shared/types/planReview';
+import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
+import { isHandoffOfferedAtTurnEnd } from '@shared/types/agentManifest';
 import { shouldSnapshotHandoffSuggestions } from './missionHandoffSuggestions';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { storageAdapter } from '../sessions/StorageAdapter';
@@ -469,6 +470,8 @@ export async function completeProfileTurn(
       if (!approvedPlanExit) requireCanonicalFinalAnswer(canonicalOutput);
       host.validateCompletion({
         profileId: conversationAgentId,
+        completionContract: input.preparedTurn.runtime.effectivePlan.completionContract,
+        investigationMission: input.preparedTurn.runtime.effectivePlan.investigationMission ?? undefined,
         turnId: assistantMessage.turnId,
         sessionId,
         finalAnswerText: canonicalOutput.finalAnswerText,
@@ -563,7 +566,7 @@ export async function completeProfileTurn(
       workTrace: traceWithEvidence,
     })
       ? (input.preparedTurn.runtime.effectivePlan.profileHandoffs ?? [])
-        .filter((handoff) => isHandoffContinueAction(handoff) && handoff.label.trim() && handoff.agent.trim())
+        .filter((handoff) => isHandoffOfferedAtTurnEnd(handoff) && handoff.label.trim() && handoff.agent.trim())
         .map((handoff) => ({
           label: handoff.label.trim(),
           ...(handoff.labelTranslations ? { labelTranslations: { ...handoff.labelTranslations } } : {}),

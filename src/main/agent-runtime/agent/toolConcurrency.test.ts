@@ -23,7 +23,7 @@ describe('toolConcurrency', () => {
       'task_create',
       'task_update',
       'task_stop',
-      'rdc_context',
+      'runtime_context',
       'rdc_probe',
       'ask_user',
       'output_register',

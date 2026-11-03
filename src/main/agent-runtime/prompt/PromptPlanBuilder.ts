@@ -15,6 +15,7 @@ import type {
   SkillLoadResult,
   SkillMetadata,
 } from '@shared/types/rdcRuntime';
+import { isEphemeralScopeId, isSubagentScopeId } from '@shared/utils/executionScope';
 import { charsToTokens } from '@shared/utils/tokens';
 import { generateEventId } from '@shared/utils/id';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
@@ -24,6 +25,8 @@ import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { applyRequestPlanFacts } from './RequestPlanFacts';
 import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
+import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
+import { getRdcContextLease } from '../../sessions/RdcRuntimeContextRegistry';
 
 const CORE_FILES = ['identity-collaboration.md', 'agent-loop.md', 'tool-evidence.md', 'completion.md'];
 
@@ -203,6 +206,39 @@ export class PromptPlanBuilder {
       sourceHash: hashScopedResource(runtimeFactsContent),
       stability: 'volatile',
       content: runtimeFactsContent,
+    });
+
+    const scopeId = input.sessionId?.trim() || null;
+    const permissionSnapshot = (() => {
+      try { return runtimePermissionStateService.getSnapshot(); }
+      catch { return null; }
+    })();
+    const scopeKind = !scopeId ? 'none' : isSubagentScopeId(scopeId) ? 'subagent' : isEphemeralScopeId(scopeId) ? 'ephemeral' : 'session';
+    const lease = scopeId ? getRdcContextLease(scopeId) : null;
+    const identityLines = [
+      '# Runtime Identity',
+      'Volatile execution identity. It is not part of the stable instruction prefix and grants no tools or permissions.',
+      `Session: ${scopeId ?? '(none)'}`,
+      `Scope: ${scopeKind}`,
+      'The live permission mode is sampled at each tool admission and is not copied here.',
+      `Permission revision: ${permissionSnapshot?.revision ?? '(not published)'}`,
+    ];
+    if (lease && !lease.quarantineReason) {
+      identityLines.push(
+        `contextId: ${lease.contextId}`,
+        `captureSha256: ${lease.captureHash ?? '(unverified)'}`,
+        `replaySessionId: ${lease.runtimeContext.replaySessionId ?? '(none)'}`,
+      );
+    }
+    const identityContent = identityLines.join('\n');
+    push({
+      id: 'runtime:identity',
+      kind: 'runtime-fact',
+      scope: 'runtime',
+      sourcePath: 'runtime://identity',
+      sourceHash: hashScopedResource(identityContent),
+      stability: 'volatile',
+      content: identityContent,
     });
 
     const catalog = new Map((input.profileCatalog ?? []).filter(profile => profile.enabled).map(profile => [profile.id, profile]));

@@ -46,4 +46,10 @@ export interface AppSettingsState {
   removeProvider: (providerId: string) => Promise<void>;
   setAgentPermissionMode: (mode: AgentPermissionMode) => Promise<void>;
   setCompactionThresholdPercent: (percent: number) => Promise<void>;
+  setCustomPermissionRules: (rules: {
+    readableRoots: string[];
+    writableRoots: string[];
+    allowedCommandPrefixes: string[];
+    deniedCommandPrefixes: string[];
+  }) => Promise<void>;
 }

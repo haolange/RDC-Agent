@@ -1,4 +1,4 @@
-import { rootScopeId, subagentScopeId } from '@shared/utils/executionScope';
+import { isTransientScopeId, rootScopeId, subagentScopeId } from '@shared/utils/executionScope';
 import { withDelegatedInteractionOwner } from '../../agent-runtime/interactions/DelegatedInteractionOwner';
 import { deriveChildPolicyBudget, flushPolicyBudgetObservers, registerPolicyBudgetObserver } from './DelegationBudget';
 import { bindTaskRootBudget } from './TaskRootBudget';
@@ -51,6 +51,7 @@ import {
 import {
   TaskRegistry,
   createSessionTaskStore,
+  releaseScopeTaskStore,
   registerTaskExecutionCancellationOwner,
   type TaskExecutionRecord,
   registerDelegatedTaskScope,
@@ -360,6 +361,7 @@ export class SubagentRunner {
         revokeDelegatedLease(subagentSessionId, { operationStopped: !!lease && !shellInvocationService.hasUnconfirmedProcesses(lease.contextId) });
         releaseArtifacts?.();
         releaseTaskScope?.();
+        if (isTransientScopeId(subagentSessionId)) releaseScopeTaskStore(subagentSessionId);
         unregisterProducer?.();
         if (parentSignal) {
           parentSignal.removeEventListener('abort', onParentAbort);

@@ -341,16 +341,16 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker, getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap: new Map([['rdc_context', { name: 'rdc_context', description: 'owning context',
+      resolveRuntimeTools: () => ({ toolMap: new Map([['runtime_context', { name: 'runtime_context', description: 'owning context',
         parameters: { type: 'object', properties: {} }, execute }]]), definitions: [], deferredDefinitions: [] }),
       isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
     });
     try {
-      const result = await preparedExecutor(factory, 'general', ['rdc_context'], 'context-evidence', {
-        effectivePlan: { toolAllowlist: ['rdc_context'], skillIntersection: null, activatedDeferredTools: [] } as never,
-      }).execute({ type: 'toolCall', id: 'owner-proof', name: 'rdc_context', arguments: {} });
+      const result = await preparedExecutor(factory, 'general', ['runtime_context'], 'context-evidence', {
+        effectivePlan: { toolAllowlist: ['runtime_context'], skillIntersection: null, activatedDeferredTools: [] } as never,
+      }).execute({ type: 'toolCall', id: 'owner-proof', name: 'runtime_context', arguments: {} });
       expect(result.content).toEqual(original.content);
-      expect(pin).toHaveBeenCalledWith(expect.objectContaining({ toolName: 'rdc_context', result: original, pinBelowThreshold: true }));
+      expect(pin).toHaveBeenCalledWith(expect.objectContaining({ toolName: 'runtime_context', result: original, pinBelowThreshold: true }));
     } finally { pin.mockRestore(); }
   });
   it('keeps ordinary small shell stdout inline without adding catalog evidence', async () => {
@@ -1120,7 +1120,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
     const begin = vi.spyOn(planReviewStateStore, 'beginRevision').mockReturnValue({ planId: 'plan', revision: 1 } as never);
     try {
       const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' },
-        effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', showContinueOn: true }] } } as never;
+        effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', surface: 'plan-gate' }] } } as never;
       for (const name of ['AbortError', 'Error']) {
         const error = new Error('review did not complete'); error.name = name;
         vi.mocked(agentPlanReviewRequestService.request).mockRejectedValueOnce(error);
@@ -1138,7 +1138,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
     const begin = vi.spyOn(planReviewStateStore, 'beginRevision').mockReturnValue({ planId: 'plan', revision: 1 } as never);
     try {
       const factory = createFactory();
-      const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' }, effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', labelTranslations: { 'zh-CN': '执行' }, showContinueOn: true }] } } as never;
+      const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' }, effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', labelTranslations: { 'zh-CN': '执行' }, surface: 'plan-gate' }] } } as never;
       const value = await factory.executePlanArtifactTool({ id: 'plan-call', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: '## Work\nAnalyze.', requiredTaskIds: ['task-real'], metadata: { executionRequirements: { mode: 'direct' } } } }, 'debugger', context);
       expect(value.isError, JSON.stringify(value.content)).toBe(false);
       expect(getTask).toHaveBeenCalledWith('task-real');
@@ -1192,7 +1192,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
         toolAllowlist: ['plan_artifact'],
         skillIntersection: ['plan_artifact'],
         activatedDeferredTools: ['plan_artifact'],
-        profileHandoffs: [{ agent: 'general', label: 'Execute', prompt: 'go', showContinueOn: false }],
+        profileHandoffs: [{ agent: 'general', label: 'Execute', prompt: 'go', surface: 'hidden' }],
         projectId: null,
         projectRootPath: null,
       },

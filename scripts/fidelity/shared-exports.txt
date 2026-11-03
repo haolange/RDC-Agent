@@ -1,4 +1,6 @@
 ActionEvent
+AGENT_ACCESS_CEILINGS
+AGENT_COMPLETION_CONTRACTS
 AGENT_DESCRIPTIONS
 AGENT_DISPLAY_NAMES
 AGENT_ICON_PRESETS
@@ -8,10 +10,14 @@ AGENT_ROLES
 AGENT_SEED_ACCENTS
 AGENT_WORKBENCH_COMMAND_CATALOG
 AGENT_WORKBENCH_TOOL_CATALOG
+agentAccessCeiling
+AgentAccessCeiling
 AgentApprovalEventPayload
 AgentAssistantCompletedPayload
 AgentAssistantDeltaPayload
 AgentAssistantThinkingPayload
+agentCompletionContract
+AgentCompletionContract
 AgentConfig
 AgentContextCompactedPayload
 AgentDefinitionCommitQuery
@@ -78,6 +84,7 @@ AgentToolStartedPayload
 AgentWorkbenchCommandDeclaration
 AgentWorkbenchToolDeclaration
 AgentWorkbenchToolPermission
+allowsNativeRdcExecution
 ANALYZER_EXPLANATION_LAYERS
 analyzerExplanationLayer
 AnalyzerExplanationLayer
@@ -177,6 +184,7 @@ CatalogJsonObject
 CatalogJsonPrimitive
 CatalogJsonValue
 CatalogModelDefinition
+ceilingAllowsAccess
 CHALLENGE_KINDS
 CHALLENGE_STATUSES
 CHALLENGE_TARGET_TYPES
@@ -371,6 +379,8 @@ CustomModel
 CustomModelSchema
 DebugSessionStartRequest
 dedicatedToolCallingFactSourceIds
+DEFAULT_AGENT_ACCESS_CEILING
+DEFAULT_AGENT_COMPLETION_CONTRACT
 DEFAULT_AGENT_ID
 DEFAULT_ASK_USER_PROMPT
 DEFAULT_CONTEXT_COMPACTION_PERCENT
@@ -473,6 +483,7 @@ extractDollarSkillRefs
 extractSessionArtifactUris
 filterJsonl
 filterMissionPlanOnlyAllowlist
+filterToolsWithinCeiling
 FinalResponseNode
 findForkForMessage
 findForkForVisibleUserMessage
@@ -515,8 +526,11 @@ getThemePreset
 HAL_REASONING_LEVELS
 HalReasoningLevel
 halReasoningLevelFromCanonical
+HANDOFF_SURFACES
 HandoffLabelTranslations
 handoffLabelTranslationsSchema
+HandoffSurface
+handoffSurfaceOf
 hasBridgeChannelCapability
 hasImplementedStructuredToolAdapter
 hasPlanReviewInteraction
@@ -570,6 +584,8 @@ isEffectiveModelPickerSelectable
 isEligibleMaxContextTier
 isEphemeralScopeId
 isHandoffContinueAction
+isHandoffOfferedAtPlanGate
+isHandoffOfferedAtTurnEnd
 isHexColor
 isLlmProviderProtocol
 isMissionAgentId
@@ -590,6 +606,7 @@ isSessionArtifactUri
 isSkillVisibleToProfile
 isSubagentScopeId
 isThemePresetId
+isToolWithinCeiling
 isTopLevelAgentId
 isTransientScopeId
 isWorldStateMutated
@@ -1159,7 +1176,10 @@ TimelineImportance
 TimelineNode
 TimelineProjection
 toAgentManifestEditorDraft
+TOOL_ACCESS
 TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES
+ToolAccess
+toolAccessOf
 ToolActionNode
 ToolApi
 ToolArtifact

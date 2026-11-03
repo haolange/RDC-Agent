@@ -276,7 +276,7 @@ export interface ConversationMessage {
   variantIndex?: number;
   /** Frozen preflight summary persisted on both turn messages for restart-safe idempotency and trace audit. */
   preparedContext?: PreparedTurnContextSummary;
-  /** Turn-end continue actions from the frozen profile handoffs (`showContinueOn !== false`). */
+  /** Turn-end continue actions from frozen profile handoffs whose surface is `turn-end`. */
   handoffSuggestions?: PlanReviewHandoffSuggestion[];
 }
 

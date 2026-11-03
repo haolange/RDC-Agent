@@ -2,6 +2,7 @@
  * RuntimeToolAssembly — resolveRuntimeTools / workbench / MCP catalog tools.
  */
 
+import { isEphemeralScopeId, isSubagentScopeId } from '@shared/utils/executionScope';
 import type { AgentRole } from '@shared/types/agent';
 import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from '@shared/types/taskExecution';
 import path from 'node:path';
@@ -15,6 +16,7 @@ import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/too
 import { readFileTool } from '../../agent-runtime/tools/primitives/ReadFileTool';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../../agent-runtime/tasks';
+import { runtimePermissionStateService } from '../../agent-runtime/permissions/RuntimePermissionStateService';
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../sessions/RdcRuntimeContextRegistry';
 import { rdcSessionService } from '../../sessions';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
@@ -136,11 +138,11 @@ export class RuntimeToolAssembly {
     };
   }
 
-  createRdcContextTool(sessionId?: string | null, projectId?: string | null): AgentTool<Record<string, never>, { available: boolean }> {
+  createRuntimeContextTool(sessionId?: string | null, projectId?: string | null): AgentTool<Record<string, never>, { available: boolean }> {
     return {
-      name: 'rdc_context',
-      label: 'RDC Context',
-      description: 'Read the owning RDC runtime context, main-verified captureContentSha256, current session artifact capacity, and frozen CLI deadline controls. Capacity is a point-in-time snapshot, not a future reservation. CLI timeout covers one invocation, not the whole operation or guaranteed native exit. Missing controls remain explicitly unavailable.',
+      name: 'runtime_context',
+      label: 'Runtime Context',
+      description: 'Read this execution\'s session, scope, working directory, and live permission mode and revision. When this turn owns a capture lease, the rdc field adds the verified replay identity, captureContentSha256, artifact capacity, and frozen CLI deadline controls. Offline children omit rdc. Capacity is a point-in-time snapshot, not a future reservation. CLI timeout covers one invocation, not the whole operation or guaranteed native exit.',
       pollable: true,
       parameters: {
         type: 'object',
@@ -149,6 +151,20 @@ export class RuntimeToolAssembly {
       permissionHint: 'readonly',
       spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'system', requiresApproval: false },
       async execute(_toolCallId, _args, _signal, _onUpdate, executionContext) {
+        const permission = runtimePermissionStateService.getSnapshot();
+        const scopeId = sessionId ?? null;
+        const identity = {
+          sessionId: scopeId,
+          scopeId,
+          scopeKind: !scopeId ? 'none' : isSubagentScopeId(scopeId) ? 'subagent' : isEphemeralScopeId(scopeId) ? 'ephemeral' : 'session',
+          projectId: projectId ?? null,
+          cwd: executionContext?.workspaceRoot ?? null,
+          permissionMode: permission.mode,
+          permissionRevision: permission.revision,
+        };
+        if (executionContext?.excludeRdcLeaseTools) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify(identity, null, 2) }], details: { available: true } };
+        }
         const lease = assertRdcContextLeaseOwnership({
           sessionId,
           projectId,
@@ -158,15 +174,13 @@ export class RuntimeToolAssembly {
           const retainedLease = sessionId ? getRdcContextLease(sessionId) : null;
           const requiresRecovery = !!retainedLease && retainedLease.ownerSessionId === sessionId
             && retainedLease.ownerProjectId === projectId && !!retainedLease.quarantineReason;
+          const note = requiresRecovery
+            ? 'The capture is open, but replay requires controlled recovery. Close it in Capture, confirm that close succeeds, then reopen before further RDC operations. Preserve the confirmed goal and earlier evidence.'
+            : sessionId
+              ? 'The capture is not open in this session. Ask the user to select the capture and click Open in the Capture section. Preserve the confirmed goal; do not describe internal leases or diagnose a rendering cause.'
+              : 'RDC replay identity requires an owning sessionId (no global fallback).';
           return {
-            content: [{
-              type: 'text',
-              text: requiresRecovery
-                ? 'The capture is open, but replay requires controlled recovery. Close it in Capture, confirm that close succeeds, then reopen before further RDC operations. Preserve the confirmed goal and earlier evidence.'
-                : sessionId
-                ? 'The capture is not open in this session. Ask the user to select the capture and click Open in the Capture section. Preserve the confirmed goal; do not describe internal leases or diagnose a rendering cause.'
-                : 'RDC runtime context requires an owning sessionId (no global fallback).',
-            }],
+            content: [{ type: 'text', text: JSON.stringify({ ...identity, rdc: { available: false, requiresRecovery, note } }, null, 2) }],
             details: { available: false, requiresRecovery },
           };
         }
@@ -182,10 +196,10 @@ export class RuntimeToolAssembly {
           && opened.replaySessionId === runtimeContext.replaySessionId && /^[a-f0-9]{64}$/.test(binding?.captureHash ?? '')
           ? binding!.captureHash : null;
         return {
-          content: [{ type: 'text', text: JSON.stringify({ ...runtimeContext, captureContentSha256,
+          content: [{ type: 'text', text: JSON.stringify({ ...identity, rdc: { ...runtimeContext, captureContentSha256,
             hostControls: ownerSessionId && projectId ? readRdcHostControls({ sessionId: ownerSessionId,
               projectId, contextId: runtimeContext.contextId, leaseVersion: lease.version }, executionContext) : null,
-          }, null, 2) }],
+          } }, null, 2) }],
           details: { available: true },
         };
       },
@@ -352,7 +366,7 @@ export class RuntimeToolAssembly {
     return {
       name: 'memory_write',
       label: 'Write Memory',
-      description: 'Persist a memory only after explicit user intent or interactive approval. Scope must be declared.',
+      description: 'Persist a memory only after explicit user intent or interactive approval. Scope must be declared. type must be user, feedback, project, or reference; other types are rejected.',
       parameters: {
         type: 'object',
         required: ['scope', 'name', 'description', 'type', 'content', 'approved'],
@@ -371,7 +385,10 @@ export class RuntimeToolAssembly {
         if (args.approved !== true) {
           return { content: [{ type: 'text', text: 'Memory write requires explicit user approval.' }], isError: true, details: { scope: args.scope, name: args.name, created: false } };
         }
-        const type = validTypes.has(args.type) ? (args.type as 'user' | 'feedback' | 'project' | 'reference') : 'project';
+        if (!validTypes.has(args.type)) {
+          return { content: [{ type: 'text', text: `Memory type must be one of ${[...validTypes].join(', ')}.` }], isError: true, details: { scope: args.scope, name: args.name, created: false } };
+        }
+        const type = args.type as 'user' | 'feedback' | 'project' | 'reference';
         const record = await resolveStore(args.scope, context?.projectRootPath).writeMemory({
           name: args.name.trim(),
           description: args.description.trim(),
@@ -633,12 +650,20 @@ export class RuntimeToolAssembly {
         const missing = task.completionRequirements.filter(key => !declaration.result?.outputs[key]);
         if (missing.length) throw new Error(`TURN_COMPLETION_INVALID: result.outputs must contain these exact Task keys: ${JSON.stringify(missing)}. Correct the structured result before completing.`);
       }
-      enforceMissionTurnCompletion({ profileId: agentId, sessionId, disposition: declaration.disposition, evidenceRefs: declaration.evidenceRefs, finalAnswerText: JSON.stringify(declaration) });
+      enforceMissionTurnCompletion({
+        profileId: agentId,
+        completionContract: turnHandle?.runtimePlan?.completionContract,
+        investigationMission: turnHandle?.runtimePlan?.investigationMission ?? undefined,
+        sessionId,
+        disposition: declaration.disposition,
+        evidenceRefs: declaration.evidenceRefs,
+        finalAnswerText: JSON.stringify(declaration),
+      });
     });
     availableTools.set(turnCompletionTool.name, turnCompletionTool);
+    const runtimeContextTool = this.createRuntimeContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);
+    availableTools.set(runtimeContextTool.name, runtimeContextTool);
     if (!excludeRdcLeaseTools) {
-      const rdcContextTool = this.createRdcContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);
-      availableTools.set(rdcContextTool.name, rdcContextTool);
       const rdcProbeTool = createRdcProbeTool(
         sessionId,
         projectId ?? turnHandle?.eventSink?.projectId ?? null,

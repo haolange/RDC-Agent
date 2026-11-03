@@ -4,15 +4,16 @@
  * `rdc_probe` is reserved even before the tool is registered.
  */
 
-export const RDC_LEASE_TOOL_IDS = ['rdc_context', 'rdc_probe'] as const;
+export const RDC_LEASE_TOOL_IDS = ['rdc_probe'] as const;
 
 const RDC_LEASE_TOOL_ID_SET = new Set<string>(RDC_LEASE_TOOL_IDS);
 
 const RDC_LEASE_TOKEN_ALIASES = new Set([
   ...RDC_LEASE_TOOL_IDS,
-  'rdc',
-  'rdcContext',
   'rdcProbe',
+  'rdc_context',
+  'rdcContext',
+  'rdc',
 ]);
 
 export function isRdcLeaseToolName(toolName: string): boolean {

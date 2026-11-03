@@ -1,15 +1,12 @@
 import type { AgentRole } from '@shared/types/agent';
-import { isMissionAgentId } from '@shared/types/agent';
+import { agentAccessCeiling, DEFAULT_AGENT_ACCESS_CEILING, type AgentAccessCeiling } from '@shared/types/agentManifest';
 import {
   BUILTIN_AGENT_TOOL_ID_SET,
   CANONICAL_TOOL_TOKEN_EXPANSIONS,
   diagnoseManifestToolTokens,
   expandCanonicalToolToken,
 } from '@shared/constants/agentToolTokens';
-import {
-  expandMissionPlanOnlyTokens,
-  isMissionForbiddenToolId,
-} from '@shared/constants/missionPlanOnly';
+import { filterToolsWithinCeiling } from '@shared/constants/toolAccess';
 import { executionProfileService } from '../../settings/ExecutionProfileService';
 import { settingsService } from '../../settings/SettingsService';
 
@@ -62,9 +59,8 @@ const RUNTIME_TOOL_ALIASES: Record<string, string> = {
   skill_read: 'skill_read',
   mcp: 'mcp',
   MCP: 'mcp',
-  rdcContext: 'rdc_context',
-  rdc: 'rdc_context',
-  rdc_context: 'rdc_context',
+  runtimeContext: 'runtime_context',
+  runtime_context: 'runtime_context',
   rdcProbe: 'rdc_probe',
   rdc_probe: 'rdc_probe',
   tool_search: 'tool_search',
@@ -82,10 +78,8 @@ function expandToken(toolName: string): string[] {
   return [normalizeToolName(toolName)];
 }
 
-function finalizeAllowlist(agentId: AgentRole, profileTools: readonly string[]): string[] {
-  const unique = isMissionAgentId(String(agentId))
-    ? expandMissionPlanOnlyTokens(profileTools)
-    : Array.from(new Set(profileTools.flatMap(expandToken)));
+function finalizeAllowlist(agentId: AgentRole, profileTools: readonly string[], ceiling: AgentAccessCeiling = DEFAULT_AGENT_ACCESS_CEILING): string[] {
+  const unique = filterToolsWithinCeiling(Array.from(new Set(profileTools.flatMap(expandToken))), ceiling);
   if (unique.length === 0) {
     throw new Error(`AGENT_TOOLS_EMPTY: profile ${agentId} has an empty tools list and cannot execute.`);
   }
@@ -95,8 +89,9 @@ function finalizeAllowlist(agentId: AgentRole, profileTools: readonly string[]):
 export function resolveAgentToolAllowlistFromDefinition(
   agentId: AgentRole,
   definitionTools: readonly string[],
+  ceiling?: AgentAccessCeiling,
 ): string[] {
-  return finalizeAllowlist(agentId, definitionTools);
+  return finalizeAllowlist(agentId, definitionTools, ceiling);
 }
 
 export function resolveAgentToolAllowlist(agentId: AgentRole): string[] {
@@ -108,18 +103,11 @@ export function resolveAgentToolAllowlist(agentId: AgentRole): string[] {
     : runtimeProfile.toolAllowlist?.length
       ? runtimeProfile.toolAllowlist
       : [];
-  return finalizeAllowlist(agentId, profileTools);
+  return finalizeAllowlist(agentId, profileTools, agentAccessCeiling(manifest));
 }
 
-export function isBuiltinToolAllowedForAgent(toolName: string, agentId: AgentRole): boolean {
-  const normalizedToolName = normalizeToolName(toolName);
-  if (SHADER_EDIT_TOOLS.includes(normalizedToolName)) {
-    return false;
-  }
-  if (isMissionAgentId(String(agentId)) && isMissionForbiddenToolId(normalizedToolName)) {
-    return false;
-  }
-  return true;
+export function isBuiltinToolAllowedForAgent(toolName: string, _agentId: AgentRole): boolean {
+  return !SHADER_EDIT_TOOLS.includes(normalizeToolName(toolName));
 }
 
 export function isToolAllowedByFrozenAllowlist(

@@ -277,6 +277,7 @@ export class ToolExecutorFactory {
           successfulFileReads: this.sessionFileReads(runtimeContext?.sessionId ?? sessionId),
           rdcBinding: plan ? getRdcTurnBinding(plan) : undefined,
           agentId,
+          accessCeiling: plan?.accessCeiling,
           turnId: runtimeContext?.turnId,
           excludeRdcLeaseTools: plan?.excludeRdcLeaseTools,
           workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
@@ -377,7 +378,7 @@ export class ToolExecutorFactory {
                 result,
                 pinBelowThreshold: (normalizedName === 'read_file' && (validatedToolCall.arguments.mode === 'audit'
                   || validatedToolCall.arguments.pinEvidence === true))
-                  || normalizedName === 'rdc_context' || toolCall.name === 'code_interpreter' || (toolCall.name === 'shell'
+                  || normalizedName === 'runtime_context' || toolCall.name === 'code_interpreter' || (toolCall.name === 'shell'
                   && typeof result.details === 'object' && result.details !== null
                   && 'operation' in result.details && typeof result.details.operation === 'string'
                   && (result.details.operation.startsWith('rd.')

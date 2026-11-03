@@ -3,6 +3,7 @@ import { SessionArtifactError, SESSION_ARTIFACT_MAX_FILE_BYTES, isSessionArtifac
 import { sessionContextJournal, type SessionContextJournal } from '../conversation/SessionContextJournal';
 import { canonicalJson } from '../tools/RdcOperationCatalog';
 import { containsSensitiveRequestKey } from '../tools/RdcInvocationRecord';
+import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
 import { delegatedArtifactOwner } from './DelegatedArtifactAccess';
 import { sessionArtifactResolver, type SessionArtifactResolver } from './SessionArtifactResolver';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
@@ -31,7 +32,7 @@ export function materializeRecordedRdcRequest(
   operationIndex = false,
 ): { uri: string; hash: string; qualification: RecordedRequestQualification } {
   const sessionId = context.sessionId;
-  if (!sessionId || context.agentId !== 'general' || context.excludeRdcLeaseTools || delegatedArtifactOwner(sessionId)) {
+  if (!sessionId || !allowsNativeRdcExecution(context) || context.excludeRdcLeaseTools || delegatedArtifactOwner(sessionId)) {
     throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', 'Recorded request lookup requires the owning root General; child grants do not grant journal access.');
   }
   if (!expectedHash) throw new SessionArtifactError('ARTIFACT_HASH_REQUIRED', 'Recorded request lookup requires the original output hash.');

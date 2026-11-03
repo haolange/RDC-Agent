@@ -10,6 +10,7 @@ import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
 import { DEFAULT_SETTINGS } from '../../../../stores/defaultAppSettings';
 import { Select } from '../../../../ui/Select';
 import { SettingsField, SettingsSection } from '../parts';
+import { CustomPermissionFields } from './CustomPermissionFields';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
 
 const COMPACTION_PERCENT_OPTIONS: number[] = (() => {
@@ -77,6 +78,7 @@ export const PolicySettings: React.FC<{
           />
         </SettingsField>
       </SettingsSection>
+      <CustomPermissionFields />
     </section>
   );
 };

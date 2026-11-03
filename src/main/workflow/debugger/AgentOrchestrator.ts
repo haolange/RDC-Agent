@@ -1,3 +1,4 @@
+import { agentAccessCeiling } from '@shared/types/agentManifest';
 import { enforceMissionTurnCompletion } from '../../investigation/missionCompletionContract';
 /**
  * AgentOrchestrator — façade over turn preparation, tool assembly, executor,
@@ -240,7 +241,7 @@ export class AgentOrchestrator {
       }
 
       const resolvedAllowlist = preparedTurn?.toolAllowlist
-        ?? resolveAgentToolAllowlistFromDefinition(agentId, effectiveProfile.tools);
+        ?? resolveAgentToolAllowlistFromDefinition(agentId, effectiveProfile.tools, agentAccessCeiling(effectiveProfile));
       const toolAllowlist = resolveProfileToolAllowlist(resolvedAllowlist, options, preparedTurn);
       const routeProviderId = config.modelProvider;
       const routeModelId = config.modelName;

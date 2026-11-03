@@ -4,12 +4,12 @@
 
 ## Permission Mode
 
-Composer 暴露：`Default`、`Auto-review`、`Full access`、`Custom(config.toml)`。主进程 `AgentPermissionPolicy` 为权威，结合 profile allowlist、permission mode、workspace root、readable/writable roots、command allow/deny、tool metadata、`CompiledPolicy`。
+Composer 暴露：`Default`、`Auto-review`、`Full access`、`Custom`。主进程 `AgentPermissionPolicy` 为权威，结合 profile 天花板、permission mode、workspace root、tool metadata、`CompiledPolicy`。可读根、可写根、允许/拒绝命令前缀只在 Custom 生效，在 Settings 的 Custom 规则中编辑；保存等待主进程确认，不乐观生效。
 
 - `Default`：例行 workspace 只读可自动；外部文件、网络、变更、破坏性 shell、未知命令需审批。
 - `Auto-review`：先执行确定性规则；已验证的低风险操作记录规则批准，其余可审操作提交一次独立、无工具的模型审核。没有有效批准不执行；不自动切人工或 Full access。
 - `Full access`：显式信任本地文件与命令；仍受 primitive 硬约束（二进制/`.rdc`、realpath、灾难 shell、SSRF）。
-- `Custom`：按配置根与命令列表。
+- `Custom`：在 Default 的审批规则之外，使用已确认的可读根、可写根和命令前缀。这些列表对 Default 与 Auto-review 无效。Full access 仍不能越过 profile 天花板。
 
 ### 在途权限切换
 

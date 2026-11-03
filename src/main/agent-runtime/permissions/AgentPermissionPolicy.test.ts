@@ -499,6 +499,7 @@ describe('AgentPermissionPolicyService shell risk classifier', () => {
   });
 
   it('denies chained rm after echo via word-boundary denied prefix (startsWith bypass)', () => {
+    mockSettings.agentRuntime.permissions.mode = 'custom';
     mockSettings.agentRuntime.permissions.deniedCommandPrefixes = ['rm'];
     const decision = service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
       tool: shellTool,
@@ -515,6 +516,7 @@ describe('AgentPermissionPolicyService shell risk classifier', () => {
   });
 
   it('does not deny rmdir when denied prefix is rm (false startsWith positive)', () => {
+    mockSettings.agentRuntime.permissions.mode = 'custom';
     mockSettings.agentRuntime.permissions.deniedCommandPrefixes = ['rm'];
     const decision = service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
       tool: shellTool,
@@ -531,6 +533,7 @@ describe('AgentPermissionPolicyService shell risk classifier', () => {
   });
 
   it('denies path-prefixed /bin/rm against denied prefix rm', () => {
+    mockSettings.agentRuntime.permissions.mode = 'custom';
     mockSettings.agentRuntime.permissions.deniedCommandPrefixes = ['rm'];
     const decision = service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
       tool: shellTool,
@@ -576,10 +579,11 @@ describe('AgentPermissionPolicyService shell risk classifier', () => {
         arguments: { command: 'echo ok' },
       },
       agentId: 'debugger',
+      accessCeiling: 'read-only',
       projectRootPath: workspaceRoot,
     });
     expect(decision.action).toBe('deny');
-    expect(decision.reason).toMatch(/MISSION_PLAN_ONLY_DENIED/);
+    expect(decision.reason).toMatch(/ACCESS_CEILING_DENIED/);
   });
 
   it('hard-denies mkfs via shellHardDeny even in full-access', () => {

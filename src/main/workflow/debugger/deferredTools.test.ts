@@ -35,7 +35,7 @@ describe('isDeferredToolName', () => {
     expect(isDeferredToolName('tool_search')).toBe(false);
     expect(isDeferredToolName('skills')).toBe(false);
     expect(isDeferredToolName('skill_read')).toBe(false);
-    expect(isDeferredToolName('rdc_context')).toBe(false);
+    expect(isDeferredToolName('runtime_context')).toBe(false);
     expect(isDeferredToolName('custom_unknown_tool')).toBe(false);
   });
 });
@@ -90,7 +90,7 @@ describe('preactivateWorkflowTools', () => {
     expect([...ordinary]).toEqual(['task_list']);
 
     const declared = new Set<string>();
-    preactivateWorkflowTools(definitions, declared, true);
+    preactivateWorkflowTools(definitions, declared, ['investigation_schema', 'investigation_write', 'investigation_read', 'investigation_list']);
     expect([...declared]).toEqual(['task_list', 'investigation_schema', 'investigation_write']);
     expect(declared.has('investigation_read')).toBe(false);
     expect(declared.has('investigation_list')).toBe(false);

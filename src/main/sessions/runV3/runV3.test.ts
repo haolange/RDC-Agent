@@ -70,14 +70,21 @@ describe('Run v3 schema', () => {
     expect(mission.kind).toBe('mission');
     if (mission.kind === 'mission') expect(mission.mission).toBe('debugger');
     expect(PersistedRunRecordV3Schema.safeParse(mission).success).toBe(true);
-    expect(PersistedRunRecordV3Schema.safeParse({ ...mission, mission: 'analyzer' }).success).toBe(false);
+    expect(PersistedRunRecordV3Schema.safeParse({ ...mission, mission: 'analyzer' }).success).toBe(true);
     expect(PersistedRunRecordV3Schema.safeParse({ ...mission, kind: 'conversation' }).success).toBe(false);
   });
 
-  it('uses the builtin mission identity even when a custom profile has the same name', () => {
-    const mission = toPersistedRunV3({ ...v3Base(), profileId: 'debugger' });
+  it('derives mission from the declared investigation, not from profileId', () => {
+    const mission = toPersistedRunV3({
+      ...v3Base(),
+      profileId: 'gpu-planner',
+      completionContract: 'investigation-report',
+      investigationMission: 'debugger',
+    });
     expect(mission.kind).toBe('mission');
-    expect(PersistedRunRecordV3Schema.safeParse({ ...mission, kind: 'conversation', mission: undefined }).success).toBe(false);
+    if (mission.kind === 'mission') expect(mission.mission).toBe('debugger');
+    expect(PersistedRunRecordV3Schema.safeParse(mission).success).toBe(true);
+    expect(PersistedRunRecordV3Schema.safeParse({ ...mission, mission: 'not-a-mission' }).success).toBe(false);
   });
 });
 

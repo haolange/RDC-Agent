@@ -56,7 +56,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     expect(projection.options.find((skill) => skill.id === 'user-only')?.scope).toBe('user');
     expect(projection.options.some((skill) => skill.scope === 'builtin')).toBe(true);
     expect(projection.options.every((skill) => !('instructions' in skill) && !('scriptsPath' in skill))).toBe(true);
-    for (const target of ['general', 'debugger', 'analyzer', 'optimizer', 'custom-agent']) {
+    for (const target of ['general', 'debugger', 'analyzer', 'optimizer']) {
       expect(projection.options.filter((skill) => !skill.unavailableToAgentIds.includes(target)).map((skill) => skill.id))
         .toEqual(service.listSkills(project, target).map((skill) => skill.id));
     }

@@ -53,8 +53,8 @@ export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<BuiltinAgentToolId, WorkP
   skills: { icon: 'skillsList', groupKind: 'runtime', category: 'chat.toolDisplay.skills.category', groupTitle: 'chat.workProcessGroupSkills', groupUnit: 'chat.toolDisplay.grep.groupUnit', completeVerb: 'chat.workProcessVerb.skillsComplete', runningVerb: 'chat.workProcessVerb.skillsRunning' },
   skill_read: { icon: 'skillRead', groupKind: 'runtime', category: 'chat.toolDisplay.skill_read.category', groupTitle: 'chat.workProcessGroupSkills', groupUnit: 'chat.toolDisplay.memory_read.groupUnit', completeVerb: 'chat.workProcessVerb.skillReadComplete', runningVerb: 'chat.workProcessVerb.skillReadRunning' },
   mcp: { icon: 'plug', groupKind: 'mcp', category: 'chat.workProcessGroupMcp', groupTitle: 'chat.workProcessGroupMcp', groupUnit: 'chat.toolDisplay.mcp.groupUnit', completeVerb: 'chat.workProcessVerb.mcpComplete', runningVerb: 'chat.workProcessVerb.mcpRunning' },
-  rdc_context: { icon: 'monitor', groupKind: 'runtime', category: 'chat.toolDisplay.rdc_context.category', groupTitle: 'chat.workProcessGroupRdc', groupUnit: 'chat.toolDisplay.memory_read.groupUnit', completeVerb: 'chat.workProcessVerb.rdcContextComplete', runningVerb: 'chat.workProcessVerb.rdcContextRunning' },
-  rdc_probe: { icon: 'rdcProbe', groupKind: 'runtime', category: 'chat.toolDisplay.rdc_context.category', groupTitle: 'chat.toolDisplay.rdc_probe.groupTitle', groupUnit: 'chat.toolDisplay.rdc_probe.groupUnit', completeVerb: 'chat.toolDisplay.rdc_probe.completeVerb', runningVerb: 'chat.toolDisplay.rdc_probe.runningVerb' },
+  runtime_context: { icon: 'monitor', groupKind: 'runtime', category: 'chat.toolDisplay.runtime_context.category', groupTitle: 'chat.workProcessGroupRdc', groupUnit: 'chat.toolDisplay.memory_read.groupUnit', completeVerb: 'chat.workProcessVerb.runtimeContextComplete', runningVerb: 'chat.workProcessVerb.runtimeContextRunning' },
+  rdc_probe: { icon: 'rdcProbe', groupKind: 'runtime', category: 'chat.toolDisplay.runtime_context.category', groupTitle: 'chat.toolDisplay.rdc_probe.groupTitle', groupUnit: 'chat.toolDisplay.rdc_probe.groupUnit', completeVerb: 'chat.toolDisplay.rdc_probe.completeVerb', runningVerb: 'chat.toolDisplay.rdc_probe.runningVerb' },
   subagent: { icon: 'brain', groupKind: 'collaboration', category: 'chat.workProcessGroupSubagent', groupTitle: 'chat.workProcessGroupSubagent', groupUnit: 'chat.toolDisplay.subagent.groupUnit', completeVerb: 'chat.workProcessVerb.subagentComplete', runningVerb: 'chat.workProcessVerb.subagentRunning' },
   subagent_report: { icon: 'subagentReport', groupKind: 'collaboration', category: 'chat.toolDisplay.subagent_report.category', groupTitle: 'chat.workProcessGroupSubagent', groupUnit: 'chat.toolDisplay.subagent_report.groupUnit', completeVerb: 'chat.toolDisplay.subagent_report.completeVerb', runningVerb: 'chat.toolDisplay.subagent_report.runningVerb' },
   task_create: { icon: 'taskCreate', groupKind: 'task', category: 'chat.toolDisplay.task_create.category', groupTitle: 'chat.workProcessGroupTask', groupUnit: 'chat.toolDisplay.task_create.groupUnit', completeVerb: 'chat.workProcessVerb.taskCreateComplete', runningVerb: 'chat.workProcessVerb.taskCreateRunning', mutation: true },
@@ -152,7 +152,7 @@ export const getToolFamily = (toolName: string): WorkProcessToolFamily => {
     normalized === 'tool_search'
     || normalized === 'plan_artifact'
     || normalized === 'output_register'
-    || normalized === 'rdc_context'
+    || normalized === 'runtime_context'
     || normalized === 'rdc_probe'
     || normalized.startsWith('knowledge_')
     || normalized.startsWith('investigation_')
