@@ -1,5 +1,5 @@
-import * as crypto from 'crypto';
 import * as fs from 'fs';
+import { sha256Hex } from '../../runtime/contentHash';
 import type { AgentToolResult } from '../agent/AgentTool';
 import {
   SessionArtifactError,
@@ -34,9 +34,6 @@ function serializeResult(result: AgentToolResult): string {
   });
 }
 
-function sha256Hex(bytes: Buffer): string {
-  return crypto.createHash('sha256').update(bytes).digest('hex');
-}
 
 function serializeEnvelope(
   sessionId: string,

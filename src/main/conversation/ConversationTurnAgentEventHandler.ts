@@ -435,7 +435,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 const delegatedRequest = { ...payload.delegatedRequest, toolCallId: originalToolCallId };
                 const pending = payload.status === 'pending';
                 const rejected = payload.status === 'rejected' || payload.status === 'cancelled';
-                if (event.sessionId !== sessionId) return;
+                if (event.sessionId !== sessionId && event.sessionId !== delegatedRequest.childSessionId) return;
                 const message = { ...turnStreamState.assistantMessage, updatedAt: nowMs(),
                   workTrace: upsertRuntimeToolCall(turnStreamState.assistantMessage.workTrace, {
                     id: `${delegatedRequest.childSessionId}::${originalToolCallId}`,

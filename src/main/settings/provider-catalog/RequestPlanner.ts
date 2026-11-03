@@ -6,7 +6,7 @@ import type {
   ToolLoopPhase,
   JsonObject,
   JsonValue,
-  ModelRoute,
+  CatalogModelRoute,
   ModelSelection,
   RequestPlan,
   RequestPlanningErrorCode,
@@ -101,7 +101,7 @@ function planningError(
   return { ok: false, code, message, controls };
 }
 
-function routeMatches(left: ModelRoute, right: ModelRoute): boolean {
+function routeMatches(left: CatalogModelRoute, right: CatalogModelRoute): boolean {
   return left.protocol === right.protocol && left.baseUrl === right.baseUrl;
 }
 
@@ -146,7 +146,7 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
   let effectiveModelId = model.modelId;
   let effectiveModel = model;
   let modelSelection: ModelSelection = model.selection ?? { pickerVisibility: 'primary' };
-  let route: ModelRoute = {
+  let route: CatalogModelRoute = {
     ...model.route,
     headers: model.route.headers ? { ...model.route.headers } : undefined,
   };

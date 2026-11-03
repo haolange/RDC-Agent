@@ -6,7 +6,6 @@ import type {
   Context,
   Message,
   Model,
-  ProviderOutputRef,
   ProviderContinuationArtifact,
   StopReason,
   StreamOptions,
@@ -18,7 +17,8 @@ import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import type { ReasoningVisibility } from '@shared/types/agentRuntime';
-import { AssistantStreamBuilder, createProviderOutputRef } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { StreamChannelRefs } from './internal/streamChannelRefs';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import {
   composeAbortSignals,
@@ -186,10 +186,13 @@ export class AnthropicProvider implements ProviderStrategy {
 
       let responseId: string | undefined;
       const thinkingArtifactsByIndex = new Map<number, ProviderContinuationArtifact | undefined>();
-      const blockRefs = new Map<number, ProviderOutputRef>();
+      const channels = new StreamChannelRefs(PROVIDER_API);
       const blockKinds = new Map<number, 'text' | 'thinking' | 'tool_call'>();
-      const refFor = (index: number): ProviderOutputRef => blockRefs.get(index) ?? createProviderOutputRef({
-        protocol: PROVIDER_API, responseId, providerBlockKey: `content:${index}`, sourceIndex: index, contentIndex: index,
+      const refFor = (index: number) => channels.ref({
+        providerBlockKey: `content:${index}`,
+        sourceIndex: index,
+        responseId,
+        contentIndex: index,
       });
       const thinkingKind = resolveAnthropicThinkingKind(options.reasoningVisibility);
       const thinkingVisibility = resolveAnthropicThinkingVisibility(options.reasoningVisibility);
@@ -241,8 +244,7 @@ export class AnthropicProvider implements ProviderStrategy {
           case 'content_block_start': {
             const evt = event as AnthropicContentBlockStart;
             const block = evt.content_block;
-            const blockRef = createProviderOutputRef({ protocol: PROVIDER_API, responseId, providerBlockKey: `content:${evt.index}`, sourceIndex: evt.index, contentIndex: evt.index });
-            blockRefs.set(evt.index, blockRef);
+            const blockRef = refFor(evt.index);
             if (block.type === 'text') {
               builder.startText(blockRef);
               blockKinds.set(evt.index, 'text');

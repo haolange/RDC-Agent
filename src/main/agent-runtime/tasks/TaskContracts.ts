@@ -1,8 +1,9 @@
+import type { ConversationTaskStatus } from '@shared/types/conversation';
 import type { TaskExecutionRequirements, TaskExecutionPreparation, TaskIndependentSource } from '@shared/types/taskExecution';
 
 export const TASK_SCHEMA_VERSION = 2 as const;
 
-export type TaskStatus = 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
+export type TaskStatus = ConversationTaskStatus;
 export type TaskDisposition = 'completed' | 'partial' | 'blocked' | 'cancelled';
 export type TaskExecutionStatus =
   | 'queued'

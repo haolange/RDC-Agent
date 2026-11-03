@@ -166,6 +166,7 @@ export const SelectionStateSchema = z.object({
 });
 
 export const SessionRecordSchema: ZodType<SessionRecord> = z.object({
+  schemaVersion: z.unknown().optional(),
   sessionId: z.string().min(1),
   projectId: z.string().min(1),
   title: z.string(),
@@ -178,13 +179,24 @@ export const SessionRecordSchema: ZodType<SessionRecord> = z.object({
     reasoningLevel: z.string(),
     maxContextMode: z.boolean(),
     fastModel: z.boolean(),
-  }).optional(),
+  }).strict().optional(),
   modelOverride: z.object({
     providerId: z.string().min(1),
     modelId: z.string().min(1),
-  }).nullable().optional(),
+  }).strict().nullable().optional(),
   agentId: z.string().min(1).optional(),
-}).passthrough() as ZodType<SessionRecord>;
+}).passthrough().superRefine((value, ctx) => {
+  const allowed = new Set([
+    'schemaVersion', 'sessionId', 'projectId', 'title', 'goal', 'sessionPath', 'createdAt', 'updatedAt',
+    'lastRunId', 'turnControls', 'modelOverride', 'agentId',
+  ]);
+  if (value.schemaVersion !== '1' || Object.keys(value).some((key) => !allowed.has(key))) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'STORAGE_SCHEMA_UNSUPPORTED: session.json requires schemaVersion 1',
+    });
+  }
+}).transform((value) => ({ ...value, schemaVersion: '1' as const })) as ZodType<SessionRecord>;
 
 export const ConversationTurnCommitV1Schema = z.object({
   schemaVersion: z.literal('1'),

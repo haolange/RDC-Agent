@@ -3,8 +3,8 @@
  * 不走 workspace safeResolvePath，也不进入 attachments 自动授权。
  */
 
-import * as crypto from 'crypto';
 import * as fs from 'fs';
+import { sha256Hex } from '../../runtime/contentHash';
 import * as path from 'path';
 import {
   ARTIFACT_READ_MAX_OUTPUT_BYTES,
@@ -241,9 +241,6 @@ function looksLikeUtf8Text(bytes: Buffer): boolean {
   }
 }
 
-function sha256Hex(bytes: Buffer): string {
-  return crypto.createHash('sha256').update(bytes).digest('hex');
-}
 
 function walkFiles(root: string, visitor: (filePath: string, stat: fs.Stats) => void): void {
   if (!fs.existsSync(root)) {

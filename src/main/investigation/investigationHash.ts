@@ -1,10 +1,7 @@
-import * as crypto from 'crypto';
 import { bareInvestigationHash, formatInvestigationContentHash } from '@shared/types/renderdocInvestigation';
+import { sha256Hex } from '../runtime/contentHash';
 
-export function sha256Hex(bytes: Buffer | string): string {
-  const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes, 'utf8');
-  return crypto.createHash('sha256').update(buffer).digest('hex');
-}
+export { sha256Hex };
 
 export function sha256Prefixed(bytes: Buffer | string): string {
   return formatInvestigationContentHash(sha256Hex(bytes));

@@ -116,6 +116,7 @@ export class SessionRecordStore {
 
     const timestamp = nowMs();
     const session: SessionRecord = {
+      schemaVersion: '1',
       sessionId: `sess_${generateShortId()}`,
       projectId,
       title: this.normalizeSessionTitle(projectId, title),
@@ -166,6 +167,7 @@ export class SessionRecordStore {
     );
     return {
       session: {
+        schemaVersion: '1',
         sessionId,
         projectId,
         title: this.normalizeSessionTitle(projectId, title),

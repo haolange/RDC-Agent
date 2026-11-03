@@ -4,7 +4,7 @@ import type {
   CapabilityState,
   DiscoveryCapabilityMapping,
   DiscoveryStrategy,
-  ModelRoute,
+  CatalogModelRoute,
 } from '@shared/types/providerCapability';
 import type { LlmProviderProtocol } from '@shared/types/settings';
 import { isLlmProviderProtocol } from '@shared/constants/llm';
@@ -20,7 +20,7 @@ export interface DeclarativeDiscoveredModel {
   contextWindowAuthority: 'account-effective' | 'model-catalog';
   maxOutputTokens?: number;
   protocol?: LlmProviderProtocol;
-  route?: Omit<ModelRoute, 'source'>;
+  route?: Omit<CatalogModelRoute, 'source'>;
   modality?: string | string[];
   toolCalling?: CapabilityState;
   visionInput?: CapabilityState;
@@ -74,7 +74,7 @@ function capabilityState(value: unknown, mapping: DiscoveryCapabilityMapping | u
 function resolveRouteRule(
   modelId: string,
   discovery: JsonCatalogDiscovery,
-): Omit<ModelRoute, 'source'> | undefined {
+): Omit<CatalogModelRoute, 'source'> | undefined {
   const rule = discovery.routeRules?.find((candidate) => (
     candidate.allowPatterns.some((pattern) => globMatches(modelId, pattern))
   ));
@@ -167,8 +167,8 @@ export function parseDeclarativeCatalog(
 
 export function discoveredModelRoute(
   model: DeclarativeDiscoveredModel,
-  fallback: Omit<ModelRoute, 'source'>,
-): ModelRoute {
+  fallback: Omit<CatalogModelRoute, 'source'>,
+): CatalogModelRoute {
   return {
     ...fallback,
     ...(model.route ?? {}),
@@ -179,7 +179,7 @@ export function discoveredModelRoute(
 
 export function toDeclarativeCatalogContributions(
   models: DeclarativeDiscoveredModel[],
-  fallbackRoute: Omit<ModelRoute, 'source'>,
+  fallbackRoute: Omit<CatalogModelRoute, 'source'>,
 ): CatalogModelContribution[] {
   return models.map((model) => ({
     modelId: model.id,

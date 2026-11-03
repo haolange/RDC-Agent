@@ -1,3 +1,4 @@
+import type { RendererEventChannel } from '../renderer-api/channels';
 import type { CaptureReplayState, CaptureReplayApplyRequest } from './captureReplay';
 import type {
   WorkflowState,
@@ -580,6 +581,6 @@ export interface ElectronAPI {
     isMaximized: () => Promise<boolean>;
   };
 
-  on: (channel: string, callback: (...args: unknown[]) => void) => void;
-  off: (channel: string, callback: (...args: unknown[]) => void) => void;
+  on: (channel: RendererEventChannel, callback: (...args: unknown[]) => void) => void;
+  off: (channel: RendererEventChannel, callback: (...args: unknown[]) => void) => void;
 }

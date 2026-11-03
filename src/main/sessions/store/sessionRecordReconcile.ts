@@ -14,11 +14,27 @@ export function readProjectSessions(
   }
 
   return fs.readdirSync(sessionsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
     .map((entry) => {
       const sessionPath = path.join(sessionsRoot, entry.name);
-      const session = host.io.readJson(path.join(sessionPath, 'session.json'), SessionRecordSchema);
-      return session ? { session, sessionPath } : null;
+      try {
+        const session = host.io.readJson(path.join(sessionPath, 'session.json'), SessionRecordSchema);
+        return session ? { session, sessionPath } : null;
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.includes('STORAGE_SCHEMA_UNSUPPORTED')) throw error;
+        const session: SessionRecord = {
+          schemaVersion: '1',
+          storageDiagnostic: 'unsupported-schema',
+          sessionId: entry.name,
+          projectId: project.projectId,
+          title: entry.name,
+          goal: '',
+          sessionPath,
+          createdAt: 0,
+          updatedAt: 0,
+        };
+        return { session, sessionPath };
+      }
     })
     .filter((entry): entry is { session: SessionRecord; sessionPath: string } => entry !== null);
 }
@@ -59,7 +75,7 @@ export function reconcileProjectSessionTitles(
 
   for (const { sessionPath } of storedSessions) {
     const session = normalizedSessions.find((entry) => entry.sessionPath === sessionPath);
-    if (!session) {
+    if (!session || session.storageDiagnostic) {
       continue;
     }
 

@@ -12,7 +12,7 @@ import type {
   EffectiveModel,
   ExecutionBindingDefinition,
   ModelRouteRecommendation,
-  ModelRoute,
+  CatalogModelRoute,
   RequestPlan,
   RequestPlanningResult,
 } from '@shared/types/providerCapability';
@@ -58,9 +58,9 @@ function executionBindingMatchesPlan(binding: ExecutionBindingDefinition, plan: 
 
 function routeFor(
   provider: LlmProviderEntry,
-  modelRoute?: ModelRoute,
+  modelRoute?: CatalogModelRoute,
   selectedProtocol = modelRoute?.protocol ?? provider.protocol,
-): ModelRoute {
+): CatalogModelRoute {
   const surface = getLoadedProviderSurface(provider.id);
   const targetProtocol = selectedProtocol;
   const catalogRoute = surface?.routes.find((route) => route.protocol === targetProtocol)

@@ -2,7 +2,7 @@ import { ipcMain, shell } from 'electron';
 import type { HookEvent, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdcRuntime';
 import { hookEngine } from '../hooks/HookEngine';
 import { requestSnapshotStore } from '../agent-runtime/prompt';
-import { rdcRuntimeService } from '../runtime/RdcRuntimeService';
+import { scopedRuntimeService } from '../runtime/ScopedRuntimeService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import {
   RdcRuntimeDeleteArgsSchema,
@@ -25,12 +25,12 @@ function mutateHookTrust(
   mutate: (hookId: string, trustRoot?: string) => void,
 ) {
   const overviewRoot = projectRoot || undefined;
-  hookEngine.load(rdcRuntimeService.overview(overviewRoot).userPaths.hooksPath, overviewRoot);
+  hookEngine.load(scopedRuntimeService.overview(overviewRoot).userPaths.hooksPath, overviewRoot);
   const hook = hookEngine.list().find((entry) => entry.definition.id === hookId);
   // Same rule as renderer resolveHookTrustProjectRoot: only project-scope mutations receive a root.
   const trustRoot = hook?.scope === 'project' ? overviewRoot : undefined;
   mutate(hookId, trustRoot);
-  return rdcRuntimeService.overview(overviewRoot);
+  return scopedRuntimeService.overview(overviewRoot);
 }
 
 export function registerRdcRuntimeHandlers(): void {
@@ -40,7 +40,7 @@ export function registerRdcRuntimeHandlers(): void {
       maxBytes: 8 * 1024,
       padTo: 1,
     });
-    return rdcRuntimeService.overview(projectRoot);
+    return scopedRuntimeService.overview(projectRoot);
   });
 
   ipcMain.handle('rdc-runtime:validate', (_event, ...rawArgs: unknown[]) => {
@@ -48,7 +48,7 @@ export function registerRdcRuntimeHandlers(): void {
       label: 'rdc-runtime:validate',
       maxBytes: 2 * 1024 * 1024,
     }) as [ScopedResourceWriteRequest];
-    const diagnostics = rdcRuntimeService.validate(request);
+    const diagnostics = scopedRuntimeService.validate(request);
     return { valid: diagnostics.length === 0, diagnostics };
   });
 
@@ -57,8 +57,8 @@ export function registerRdcRuntimeHandlers(): void {
       label: 'rdc-runtime:upsert',
       maxBytes: 2 * 1024 * 1024,
     }) as [ScopedResourceWriteRequest];
-    rdcRuntimeService.upsert(request);
-    return rdcRuntimeService.overview(request.projectRoot);
+    scopedRuntimeService.upsert(request);
+    return scopedRuntimeService.overview(request.projectRoot);
   });
 
   ipcMain.handle('rdc-runtime:import', (_event, ...rawArgs: unknown[]) => {
@@ -66,8 +66,8 @@ export function registerRdcRuntimeHandlers(): void {
       label: 'rdc-runtime:import',
       maxBytes: 16 * 1024,
     }) as [ScopedResourceImportRequest];
-    const document = rdcRuntimeService.importFromFile(request);
-    return { overview: rdcRuntimeService.overview(request.projectRoot), id: document.id };
+    const document = scopedRuntimeService.importFromFile(request);
+    return { overview: scopedRuntimeService.overview(request.projectRoot), id: document.id };
   });
 
   ipcMain.handle('rdc-runtime:delete', (_event, ...rawArgs: unknown[]) => {
@@ -76,8 +76,8 @@ export function registerRdcRuntimeHandlers(): void {
       maxBytes: 8 * 1024,
       padTo: 4,
     });
-    rdcRuntimeService.delete(kind as ScopedResourceKind, scope, id, projectRoot);
-    return rdcRuntimeService.overview(projectRoot);
+    scopedRuntimeService.delete(kind as ScopedResourceKind, scope, id, projectRoot);
+    return scopedRuntimeService.overview(projectRoot);
   });
 
   ipcMain.handle('rdc-runtime:reveal', async (_event, ...rawArgs: unknown[]) => {
@@ -120,7 +120,7 @@ export function registerRdcRuntimeHandlers(): void {
       label: 'rdc-runtime:trustMcp',
       maxBytes: 8 * 1024,
     });
-    return rdcRuntimeService.trustProjectMcp(projectRoot, descriptorId);
+    return scopedRuntimeService.trustProjectMcp(projectRoot, descriptorId);
   });
 
   ipcMain.handle('rdc-runtime:revokeMcp', (_event, ...rawArgs: unknown[]) => {
@@ -128,7 +128,7 @@ export function registerRdcRuntimeHandlers(): void {
       label: 'rdc-runtime:revokeMcp',
       maxBytes: 8 * 1024,
     });
-    return rdcRuntimeService.revokeProjectMcp(projectRoot, descriptorId);
+    return scopedRuntimeService.revokeProjectMcp(projectRoot, descriptorId);
   });
 
   ipcMain.handle('rdc-runtime:testHook', (_event, ...rawArgs: unknown[]) => {
@@ -137,7 +137,7 @@ export function registerRdcRuntimeHandlers(): void {
       maxBytes: 8 * 1024,
       padTo: 3,
     });
-    const overview = rdcRuntimeService.overview(projectRoot);
+    const overview = scopedRuntimeService.overview(projectRoot);
     const context = {
       event: hookEvent as HookEvent,
       projectRoot,

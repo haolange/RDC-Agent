@@ -150,7 +150,7 @@ export type {
   CatalogModelDefinition,
   ModelModeAction,
   ModelPresence,
-  ModelRoute,
+  CatalogModelRoute,
   ModelRouteOption,
   ModelSelection,
   ProviderAccountKey,

@@ -21,7 +21,7 @@ const assertInside = (root: string, target: string): void => {
   if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('Resource path escaped its scope root.');
 };
 
-export class RdcRuntimeService {
+export class ScopedRuntimeService {
   constructor(private readonly hooks = hookEngine) {}
 
   private rootFor(kind: ScopedResourceKind, scope: 'user' | 'project', projectRoot?: string): string {
@@ -303,4 +303,4 @@ export class RdcRuntimeService {
   }
 }
 
-export const rdcRuntimeService = new RdcRuntimeService();
+export const scopedRuntimeService = new ScopedRuntimeService();

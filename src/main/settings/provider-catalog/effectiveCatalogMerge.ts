@@ -3,7 +3,7 @@ import type {
   CapabilityEvidence,
   ContextTier,
   EffectiveModel,
-  ModelRoute,
+  CatalogModelRoute,
   JsonValue,
 } from '@shared/types/providerCapability';
 import type { LlmProviderCatalogOwnership } from '@shared/types/settings';
@@ -36,7 +36,7 @@ export function revisionFor(value: unknown): string {
   return createHash('sha256').update(stableJson(value), 'utf8').digest('hex');
 }
 
-function routeRevision(route: ModelRoute, optionId?: string): string {
+function routeRevision(route: CatalogModelRoute, optionId?: string): string {
   return revisionFor({ optionId: optionId ?? null, route });
 }
 
@@ -57,7 +57,7 @@ function createUnknownReasoning(): ReasoningControl {
 function createConservativeModel(
   providerId: string,
   modelId: string,
-  fallbackRoute: ModelRoute,
+  fallbackRoute: CatalogModelRoute,
   observedAt: string,
 ): EffectiveModel {
   const evidence = (field: string): CapabilityEvidence => ({

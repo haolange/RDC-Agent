@@ -91,6 +91,8 @@ export const zhComposer = {
   'composer.commandDescription.cost': "查看当前会话的运行统计和费用信息",
   'composer.commandDescription.config': "打开设置或查看、修改配置",
   'composer.commandDescription.help': "列出可用命令或查看命令详情",
+  'composer.commandDescription.context': "汇总当前项目、会话、捕获和可用上下文",
+  'composer.commandDescription.memory': "查看当前配置可访问的记忆",
   'composer.commandDescription.export': "将当前对话导出为 Markdown 或 JSON",
   'composer.commandDescription.model': "查看或切换对话模型；default 表示按 Agent 配置",
   'composer.commandDescription.mcp': "管理 MCP 服务连接",

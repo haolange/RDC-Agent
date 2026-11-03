@@ -38,6 +38,7 @@ import {
   readAttachmentFilePreviewDataUrl,
 } from '../conversation/attachmentPreview';
 import { NATIVE_IMAGE_MIME_TYPES } from '../conversation/attachmentClassify';
+import { requireActiveSessionOwner } from './sessionOwnerGate';
 import { delegationTraceStore } from '../conversation/DelegationTraceStore';
 import { toRejectedSendResult } from '../conversation/conversationSendRejection';
 
@@ -144,6 +145,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       label: 'conversation:switchBranch',
       maxBytes: 4 * 1024,
     }) as [ConversationSwitchBranchRequest];
+    requireActiveSessionOwner(state, request.sessionId);
     return conversationService.switchConversationBranch(request);
   });
 
@@ -156,6 +158,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       if (!sessionId) {
         return { success: false, messages: [], error: 'No session selected.' };
       }
+      requireActiveSessionOwner(state, sessionId);
       return { success: true, messages: await conversationService.clearHistory(sessionId) };
     } catch (error) {
       return { success: false, messages: [], error: error instanceof Error ? error.message : String(error) };
@@ -171,6 +174,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       if (!sessionId) {
         return { success: false, messages: [], error: 'No session selected.' };
       }
+      requireActiveSessionOwner(state, sessionId);
       return { success: true, messages: await conversationService.undoLastTurn(sessionId) };
     } catch (error) {
       return { success: false, messages: [], error: error instanceof Error ? error.message : String(error) };
@@ -183,7 +187,8 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       maxBytes: 4 * 1024,
       padTo: 1,
     }) as [ConversationCancelActiveTurnRequest | undefined];
-    return conversationService.cancelActiveTurn(request);
+    const sessionId = requireActiveSessionOwner(state, request?.sessionId ?? state.currentSessionId);
+    return conversationService.cancelActiveTurn({ ...request, sessionId });
   });
 
   ipcMain.handle('conversation:answerUserInput', async (_event, ...rawArgs: unknown[]) => {
@@ -191,7 +196,8 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       label: 'conversation:answerUserInput',
       maxBytes: 256 * 1024,
     }) as [ConversationAnswerUserInputRequest];
-    return conversationService.answerUserInput(request);
+    const sessionId = requireActiveSessionOwner(state, request.sessionId ?? state.currentSessionId);
+    return conversationService.answerUserInput({ ...request, sessionId });
   });
 
   ipcMain.handle('conversation:answerPlanReview', async (_event, ...rawArgs: unknown[]) => {
@@ -208,7 +214,8 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       label: 'conversation:answerToolApproval',
       maxBytes: 8 * 1024,
     }) as [ConversationAnswerToolApprovalRequest];
-    return conversationService.answerToolApproval(request);
+    const sessionId = requireActiveSessionOwner(state, request.sessionId ?? state.currentSessionId);
+    return conversationService.answerToolApproval({ ...request, sessionId });
   });
 
   ipcMain.handle('conversation:getToolImagePreview', async (_event, ...rawArgs: unknown[]) => {

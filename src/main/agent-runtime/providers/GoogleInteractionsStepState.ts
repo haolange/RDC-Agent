@@ -1,9 +1,7 @@
 import type { RequestPlan } from '@shared/types/providerCapability';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
-import {
-  AssistantStreamBuilder,
-  createProviderOutputRef,
-} from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { StreamChannelRefs } from './internal/streamChannelRefs';
 import { ProviderHttpError } from './internal/http';
 import { reasoningProjectionSource } from './reasoningProjection';
 
@@ -11,7 +9,7 @@ const PROVIDER_API = 'google-interactions';
 
 interface ActiveStep {
   type: 'model_output' | 'thought' | 'function_call';
-  ref: ReturnType<typeof createProviderOutputRef>;
+  ref: ReturnType<StreamChannelRefs['ref']>;
   raw: Record<string, unknown>;
   summary: Record<string, unknown>[];
   signature?: string;
@@ -19,6 +17,7 @@ interface ActiveStep {
 
 export class GoogleInteractionsStepState {
   private readonly active = new Map<number, ActiveStep>();
+  private readonly channels = new StreamChannelRefs(PROVIDER_API);
   private sawOutput = false;
   private sawToolCall = false;
 
@@ -40,8 +39,7 @@ export class GoogleInteractionsStepState {
         `Unsupported Google Interactions step type: ${type || 'unknown'}.`,
       );
     }
-    const ref = createProviderOutputRef({
-      protocol: PROVIDER_API,
+    const ref = this.channels.ref({
       responseId: this.interactionId(),
       providerBlockKey: `step:${index}`,
       sourceIndex: index,

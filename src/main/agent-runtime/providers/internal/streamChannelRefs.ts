@@ -8,6 +8,8 @@ export interface StreamChannelRefInput {
   sourceIndex?: number;
   itemId?: string;
   responseId?: string;
+  /** Stable protocol index. Omitted values are assigned in first-seen order. */
+  contentIndex?: number;
 }
 
 export class StreamChannelRefs {
@@ -28,15 +30,16 @@ export class StreamChannelRefs {
     ].join('\u0000');
     const existing = this.refs.get(key);
     if (existing) return existing;
+    const contentIndex = input.contentIndex ?? this.nextContentIndex;
     const created = createProviderOutputRef({
       protocol: this.protocol,
       providerBlockKey: input.providerBlockKey,
-      contentIndex: this.nextContentIndex,
+      contentIndex,
       ...(input.sourceIndex !== undefined ? { sourceIndex: input.sourceIndex } : {}),
       ...(input.itemId ? { itemId: input.itemId } : {}),
       ...(input.responseId ? { responseId: input.responseId } : {}),
     });
-    this.nextContentIndex += 1;
+    this.nextContentIndex = Math.max(this.nextContentIndex, contentIndex + 1);
     this.refs.set(key, created);
     return created;
   }

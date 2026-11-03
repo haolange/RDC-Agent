@@ -64,6 +64,7 @@ const baseTurn = (): ConversationTurnResult => ({
     },
   ],
   session: {
+    schemaVersion: '1',
     sessionId: 'session-a',
     projectId: 'project-1',
     title: 'A',
@@ -82,6 +83,7 @@ describe('applyConversationTurnResult session isolation', () => {
     useProjectStore.setState({
       rightRailTarget: 'project',
       currentSession: {
+        schemaVersion: '1',
         sessionId: 'session-a',
         projectId: 'project-1',
         title: 'A',
@@ -126,6 +128,7 @@ describe('applyConversationTurnResult session isolation', () => {
   it('routes background session turn into projection cache', async () => {
     useProjectStore.setState({
       currentSession: {
+        schemaVersion: '1',
         sessionId: 'session-b',
         projectId: 'project-1',
         title: 'B',

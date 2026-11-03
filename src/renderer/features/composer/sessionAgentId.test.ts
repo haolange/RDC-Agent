@@ -38,6 +38,7 @@ describe('session agentId pill hydrate', () => {
 
   it('hydrates the Composer pill from SessionRecord.agentId', () => {
     hydrateComposerAgentFromSession({
+      schemaVersion: '1',
       sessionId: 'sess_1',
       projectId: 'proj_1',
       title: 't',
@@ -52,6 +53,7 @@ describe('session agentId pill hydrate', () => {
 
   it('falls back to general when session.agentId is missing', () => {
     hydrateComposerAgentFromSession({
+      schemaVersion: '1',
       sessionId: 'sess_1',
       projectId: 'proj_1',
       title: 't',

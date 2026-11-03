@@ -775,7 +775,7 @@ ModelPresence
 ModelPresencePolicy
 ModelProviderBackendKind
 ModelProviderCapabilityMatrix
-ModelRoute
+CatalogModelRoute
 ModelRouteOption
 ModelRouteOptionSchema
 ModelRouteRecommendation

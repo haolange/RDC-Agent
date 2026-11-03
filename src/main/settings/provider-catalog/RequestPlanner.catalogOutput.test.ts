@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { compileProviderCatalog } from '@shared/provider-catalog/compiler';
 import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
 import { loadProviderCatalogManifestInput } from '@shared/provider-catalog/nodeManifestLoader';
-import type { EffectiveModel, ModelRoute } from '@shared/types/providerCapability';
+import type { EffectiveModel, CatalogModelRoute } from '@shared/types/providerCapability';
 import type { LlmProviderProtocol } from '@shared/types/settings';
 import { resolveTurnOutputTokens } from '@shared/utils/contextBudget';
 import {
@@ -67,7 +67,7 @@ function mergeModels(input: {
   userOverride?: CatalogModelContribution[];
   catalogOwnership?: EffectiveCatalogRequest['catalogOwnership'];
 }): EffectiveModel[] {
-  const fallbackRoute: ModelRoute = {
+  const fallbackRoute: CatalogModelRoute = {
     protocol: input.protocol,
     baseUrl: input.baseUrl,
     source: 'catalog',

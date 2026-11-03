@@ -31,7 +31,7 @@ export function generateEventId(prefix: string = 'evt'): string {
  */
 export function generateCaseId(): string {
   const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const random = Math.random().toString(36).slice(2, 6);
+  const random = randomBytes(4).toString('hex');
   return `case_${timestamp}_${random}`;
 }
 

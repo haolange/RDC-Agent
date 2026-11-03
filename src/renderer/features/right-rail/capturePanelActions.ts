@@ -1,6 +1,8 @@
 import type { CaptureReplayApplyRequest, CaptureReplayBindingRequest } from '@shared/types/captureReplay';
+import type { SessionScope } from '@shared/types/session';
 import { getElectronApi } from '../../platform/getElectronApi';
-export type CaptureScope = { projectId: string; sessionId: string };
+
+export type CaptureScope = SessionScope;
 const api = () => {
   const bridge = getElectronApi();
   if (!bridge) throw new Error('Application connection is unavailable');

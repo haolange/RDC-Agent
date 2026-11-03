@@ -139,8 +139,8 @@ describe('canonical renderer API', () => {
       api.off(channel, callback);
     }
     const addedBeforeUnknown = transport.addedListeners.length;
-    api.on('internal:event', callback);
-    api.off('internal:event', callback);
+    api.on('internal:event' as RendererEventChannel, callback);
+    api.off('internal:event' as RendererEventChannel, callback);
 
     expect(transport.invocations.map(({ channel }) => channel).sort()).toEqual(
       [...RENDERER_INVOKE_CHANNELS].sort(),

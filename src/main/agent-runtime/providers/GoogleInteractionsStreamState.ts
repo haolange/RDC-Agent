@@ -3,9 +3,9 @@ import type { StopReason } from '../core/types';
 import { createProviderStateRef } from '../reasoning/ProviderStateRefs';
 import {
   AssistantStreamBuilder,
-  createProviderOutputRef,
   ProviderStreamProtocolError,
 } from './internal/AssistantStreamBuilder';
+import { StreamChannelRefs } from './internal/streamChannelRefs';
 import { ProviderHttpError } from './internal/http';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import { GoogleInteractionsStepState } from './GoogleInteractionsStepState';
@@ -19,8 +19,8 @@ export interface GoogleInteractionsOutcome {
 }
 
 export class GoogleInteractionsStreamState {
-  private readonly terminalRef = createProviderOutputRef({
-    protocol: PROVIDER_API,
+  private readonly channels = new StreamChannelRefs(PROVIDER_API);
+  private readonly terminalRef = this.channels.ref({
     providerBlockKey: 'interaction:terminal',
     contentIndex: 1_000_000,
   });

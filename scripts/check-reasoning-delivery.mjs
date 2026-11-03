@@ -124,7 +124,10 @@ assert(resolveProviderReasoningContract(noReasoningProvider, effectiveModel(noRe
 
 const fs = require('node:fs');
 const openaiCompatibleSource = fs.readFileSync('src/main/agent-runtime/providers/OpenAICompatibleProvider.ts', 'utf8');
-const openaiResponsesSource = fs.readFileSync('src/main/agent-runtime/providers/OpenAIResponsesProvider.ts', 'utf8');
+const openaiResponsesSource = [
+  fs.readFileSync('src/main/agent-runtime/providers/OpenAIResponsesProvider.ts', 'utf8'),
+  fs.readFileSync('src/main/agent-runtime/providers/internal/responsesShared.ts', 'utf8'),
+].join('\n');
 const anthropicSource = fs.readFileSync('src/main/agent-runtime/providers/AnthropicProvider.ts', 'utf8');
 const contextManagerSource = fs.readFileSync('src/main/agent-runtime/agent/ContextManager.ts', 'utf8');
 

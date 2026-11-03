@@ -218,6 +218,7 @@ describe('StorageIo schema-backed readJson', () => {
     const root = tempRoot();
     const filePath = path.join(root, 'session.json');
     const record = {
+      schemaVersion: '1',
       sessionId: 'sess_1',
       projectId: 'proj_1',
       title: 't',
@@ -228,6 +229,23 @@ describe('StorageIo schema-backed readJson', () => {
     };
     io.writeJsonAtomic(filePath, record);
     expect(io.readJson(filePath, SessionRecordSchema)).toMatchObject({ sessionId: 'sess_1' });
+  });
+
+  it('keeps an unversioned session.json and fails closed', () => {
+    const root = tempRoot();
+    const filePath = path.join(root, 'session.json');
+    const legacy = {
+      sessionId: 'sess_1',
+      projectId: 'proj_1',
+      title: 't',
+      goal: '',
+      sessionPath: filePath,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    fs.writeFileSync(filePath, JSON.stringify(legacy), 'utf8');
+    expect(() => io.readJson(filePath, SessionRecordSchema)).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+    expect(JSON.parse(fs.readFileSync(filePath, 'utf8'))).toEqual(legacy);
   });
 
   it('quarantines structurally invalid JSON under a schema', () => {
@@ -250,6 +268,7 @@ describe('StorageIo schema-backed readJson', () => {
 });
 
 const legalSession = {
+  schemaVersion: '1' as const,
   sessionId: 'sess_1',
   projectId: 'proj_1',
   title: 't',
@@ -402,7 +421,15 @@ describe('storage schema store quartet', () => {
       file: 'session.json',
       legal: legalSession,
       corrupt: { sessionId: 1 },
-      missingOrLegacy: legalSession,
+      missingOrLegacy: {
+        sessionId: 'sess_1',
+        projectId: 'proj_1',
+        title: 't',
+        goal: '',
+        sessionPath: 'D:/sess',
+        createdAt: 1,
+        updatedAt: 1,
+      },
       higher: { ...legalSession, schemaVersion: '99' },
       read: (filePath: string) => io.readJson(filePath, SessionRecordSchema),
     },
@@ -516,7 +543,7 @@ describe('storage schema store quartet', () => {
       it('handles a second document according to the current store version contract', () => {
         const filePath = path.join(tempRoot(), store.file);
         io.writeJsonAtomic(filePath, store.missingOrLegacy);
-        if (store.name === 'settings') {
+        if (store.name === 'settings' || store.name === 'session record') {
           const original = fs.readFileSync(filePath, 'utf8');
           expect(() => store.read(filePath)).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
           expect(fs.readFileSync(filePath, 'utf8')).toBe(original);

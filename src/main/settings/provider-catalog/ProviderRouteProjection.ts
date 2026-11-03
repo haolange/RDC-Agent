@@ -3,16 +3,16 @@ import type {
   CatalogModelContribution,
 } from './effectiveCatalogTypes';
 import type {
-  ModelRoute,
+  CatalogModelRoute,
   ProviderProtocolOverride,
 } from '@shared/types/providerCapability';
 import type { LlmProviderProtocol } from '@shared/types/settings';
 
 export function resolveModelRoutePrecedence(input: {
-  modelRoute?: ModelRoute;
-  catalogRoute: Omit<ModelRoute, 'source'>;
-}): ModelRoute {
-  const withCatalogHeaders = <T extends Omit<ModelRoute, 'source'> | ModelRoute>(route: T): T => ({
+  modelRoute?: CatalogModelRoute;
+  catalogRoute: Omit<CatalogModelRoute, 'source'>;
+}): CatalogModelRoute {
+  const withCatalogHeaders = <T extends Omit<CatalogModelRoute, 'source'> | CatalogModelRoute>(route: T): T => ({
     ...route,
     contracts: route.contracts ?? input.catalogRoute.contracts,
     headers: {
@@ -47,6 +47,6 @@ export function projectModelProtocolOverlays(
     : undefined;
 }
 
-export function isModelRouteLocked(route: ModelRoute): boolean {
+export function isModelRouteLocked(route: CatalogModelRoute): boolean {
   return route.source === 'model';
 }

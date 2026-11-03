@@ -91,6 +91,8 @@ export const enComposer = {
   'composer.commandDescription.cost': "Show persisted run statistics and cost availability for the current session",
   'composer.commandDescription.config': "Open settings or view/modify a configuration value",
   'composer.commandDescription.help': "List all available commands or get details for a specific command",
+  'composer.commandDescription.context': "Summarize the current project, session, captures, and available context",
+  'composer.commandDescription.memory': "Inspect memory visible to the current profile",
   'composer.commandDescription.export': "Export the current conversation to Markdown or JSON",
   'composer.commandDescription.model': "View or switch the current conversation model; use default to follow the Agent configuration",
   'composer.commandDescription.mcp': "Manage MCP server connections (list, connect, disconnect)",

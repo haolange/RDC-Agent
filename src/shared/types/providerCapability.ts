@@ -57,7 +57,7 @@ export interface ContextTier {
   entitlement: EntitlementState;
 }
 
-export interface ModelRoute {
+export interface CatalogModelRoute {
   protocol: LlmProviderProtocol;
   baseUrl?: string;
   headers?: Record<string, string>;
@@ -69,7 +69,7 @@ export interface ModelRoute {
 export interface ModelRouteOption {
   id: string;
   label?: string;
-  route: ModelRoute;
+  route: CatalogModelRoute;
   routeRevision?: string;
   availability: EffectiveAvailability;
   unavailableReason?: string;
@@ -171,7 +171,7 @@ export interface EffectiveModel {
   aliases: string[];
   /** User selection state; capability availability remains provider/account evidence. */
   enabled: boolean;
-  route: ModelRoute;
+  route: CatalogModelRoute;
   catalogRevision?: string;
   routeRevision?: string;
   routeOptions?: ModelRouteOption[];
@@ -297,7 +297,7 @@ export interface RequestPlan {
   effectiveModelId: string;
   appliedBindingIds: string[];
   modelSelection?: ModelSelection;
-  route: ModelRoute;
+  route: CatalogModelRoute;
   contracts: ProviderContractBundle;
   executionIdentity: ExecutionIdentity;
   statePlan: StatePlan;

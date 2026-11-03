@@ -1,6 +1,6 @@
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
-import type { CapabilityState, ModelRoute, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
+import type { CapabilityState, CatalogModelRoute, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
 import type {
   NamedReasoningLevel,
   ReasoningControl,
@@ -33,8 +33,8 @@ export interface LiveModelObservation {
 
 function withRouteContracts(
   surface: ProviderSurfaceDefinition,
-  route: ModelRoute,
-): ModelRoute {
+  route: CatalogModelRoute,
+): CatalogModelRoute {
   const surfaceRoute = surface.routes.find((candidate) => candidate.protocol === route.protocol);
   return {
     ...route,

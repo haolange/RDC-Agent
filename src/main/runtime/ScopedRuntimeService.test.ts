@@ -3,13 +3,13 @@ import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentRuntimeConfigService } from '../settings/agent-manifests/AgentRuntimeConfigService';
-import { RdcRuntimeService } from './RdcRuntimeService';
+import { ScopedRuntimeService } from './ScopedRuntimeService';
 import { HookEngine } from '../hooks/HookEngine';
 import { appPathService } from './AppPathService';
 
 let home = '';
 let userData = '';
-const service = new RdcRuntimeService();
+const service = new ScopedRuntimeService();
 
 beforeEach(() => {
   home = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-runtime-home-'));
@@ -23,7 +23,7 @@ afterEach(() => {
   delete process.env.RDC_AGENT_HOME; delete process.env.RDC_AGENT_USER_DATA;
 });
 
-describe('RdcRuntimeService', () => {
+describe('ScopedRuntimeService', () => {
   it('projects a real skill-directory read failure through overview without claiming an empty catalog', () => {
     // An existing non-directory passes existsSync but makes the real readdirSync fail.
     const builtinRoot = path.join(userData, 'unreadable-builtin');
@@ -86,7 +86,7 @@ describe('RdcRuntimeService', () => {
     const project = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-runtime-diagnostics-'));
     const trustPath = path.join(userData, 'hook-trust.json');
     const hooks = new HookEngine(trustPath);
-    const hookService = new RdcRuntimeService(hooks);
+    const hookService = new ScopedRuntimeService(hooks);
     try {
       const invalidPolicyPath = path.join(home, 'policies', 'broken.policy.yml');
       fs.mkdirSync(path.dirname(invalidPolicyPath), { recursive: true });
@@ -111,7 +111,7 @@ describe('RdcRuntimeService', () => {
     const project = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-runtime-hook-'));
     const trustPath = path.join(userData, 'hook-trust.json');
     const hooks = new HookEngine(trustPath);
-    const hookService = new RdcRuntimeService(hooks);
+    const hookService = new ScopedRuntimeService(hooks);
     try {
       hookService.upsert({ kind: 'hook', scope: 'project', projectRoot: project, id: 'verify', content: 'id: verify\nenabled: true\nevent: tool.before-call\ncommand: node\nargs: []\ntimeoutMs: 1000\nfailurePolicy: warn' });
       hooks.load(path.join(home, '.rdc-agent', 'hooks'), project);

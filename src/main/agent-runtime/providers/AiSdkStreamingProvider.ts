@@ -16,11 +16,11 @@ import type {
   Context,
   Message,
   Model,
-  ProviderOutputRef,
   StopReason,
   StreamOptions,
 } from '../core/types';
-import { AssistantStreamBuilder, createProviderOutputRef } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { StreamChannelRefs } from './internal/streamChannelRefs';
 import { composeAbortSignals, normalizeError } from './internal/http';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 
@@ -146,25 +146,13 @@ async function consumeFullStream(
   builder: AssistantStreamBuilder,
   model: Model,
 ): Promise<void> {
-  const indexes = new Map<string, number>();
-  const refs = new Map<string, ProviderOutputRef>();
+  const channels = new StreamChannelRefs(model.api);
   const startedKinds = new Map<string, 'text' | 'thinking' | 'tool_call'>();
   const toolBuffers = new Map<string, string>();
-  let nextIndex = 0;
-  const refFor = (id: string): ProviderOutputRef => {
-    const existing = refs.get(id);
-    if (existing) return existing;
-    const index = indexes.get(id) ?? nextIndex++;
-    indexes.set(id, index);
-    const ref = createProviderOutputRef({
-      protocol: model.api,
-      providerBlockKey: `part:${id}`,
-      itemId: id,
-      contentIndex: index,
-    });
-    refs.set(id, ref);
-    return ref;
-  };
+  const refFor = (id: string) => channels.ref({
+    providerBlockKey: `part:${id}`,
+    itemId: id,
+  });
   const thinkingInput = {
     kind: 'unknown' as const,
     source: 'unknown' as const,

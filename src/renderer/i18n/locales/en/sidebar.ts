@@ -21,6 +21,7 @@ export const enSidebar = {
   'sidebar.menuNewSession': 'New Session',
   'sidebar.menuDelete': 'Delete',
   'sidebar.sessions': 'Sessions',
+  'sidebar.sessionSchemaUnsupported': 'This session was saved by an older build and cannot be opened. The file was left unchanged.',
   'sidebar.addSession': 'New Session',
   'sidebar.removeSession': 'Remove Session',
   'sidebar.removeSessionFailed': 'Failed to remove session.',

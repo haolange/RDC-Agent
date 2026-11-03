@@ -27,6 +27,17 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
 }) => {
   const { t } = useI18n();
 
+  if (session.storageDiagnostic === 'unsupported-schema') {
+    return (
+      <div className="session-item session-subitem is-disabled" role="status">
+        <div className="session-item-header">
+          <span className="session-item-title">{session.title}</span>
+        </div>
+        <span className="session-item-title">{t('sidebar.sessionSchemaUnsupported')}</span>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`session-item session-subitem ${isSessionRailActive ? 'is-selected' : ''}`}

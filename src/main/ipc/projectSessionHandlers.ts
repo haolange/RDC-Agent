@@ -11,6 +11,7 @@ import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
 import type { WorkbenchIpcContext } from './workbenchContext';
+import { requireActiveSessionOwner } from './sessionOwnerGate';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import {
@@ -361,6 +362,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         label: 'session:setModelOverride',
         maxBytes: 4 * 1024,
       });
+      requireActiveSessionOwner(state, id);
       const session = storageAdapter.readSession(id);
       if (!session) {
         return { success: false, error: `Session not found: ${id}` };
@@ -398,6 +400,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         label: 'session:setAgentId',
         maxBytes: 4 * 1024,
       });
+      requireActiveSessionOwner(state, id);
       const session = storageAdapter.readSession(id);
       if (!session) {
         return { success: false, error: `Session not found: ${id}` };
@@ -420,6 +423,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         label: 'session:applyDeclaredHandoff',
         maxBytes: 4 * 1024,
       });
+      requireActiveSessionOwner(state, id);
       return applyDeclaredHandoff({ sessionId: id, agent, label });
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };

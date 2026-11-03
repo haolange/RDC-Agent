@@ -16,7 +16,13 @@ export const LlmProviderDraftArgsSchema = z.tuple([
     protocol: ipcString(64, 'protocol').optional(),
     connectionValues: z.record(z.string().max(200), ipcString(16_000, 'connectionValue')).optional(),
     // Large catalogs (OpenRouter etc.) routinely exceed 512; keep a hard cap for IPC DoS only.
-    modelPreferences: z.array(z.record(z.string().max(200), z.unknown())).max(10_000).optional(),
+    modelPreferences: z.array(z.object({
+      id: ipcNonEmptyString(256, 'id'),
+      enabled: z.boolean(),
+      defaultReasoningSelection: ipcString(64, 'defaultReasoningSelection').optional(),
+      defaultBudgetTokens: z.number().int().positive().optional(),
+      preferredRouteOptionId: ipcString(200, 'preferredRouteOptionId').optional(),
+    }).strict()).max(10_000).optional(),
   }).strict(),
 ]);
 

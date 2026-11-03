@@ -1,5 +1,4 @@
-import type { AgentRole } from './agent';
-import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
+import type { LlmAgentRoute, LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
 
 /** Provider-neutral tool call projection used by shared runtime events. */
 export interface ToolCall {
@@ -34,11 +33,7 @@ export interface LLMProviderConfig {
   docsUrl?: string;
 }
 
-export interface LLMAgentRouteConfig {
-  agentId: AgentRole;
-  providerId: LlmProviderId;
-  modelId: string;
-}
+export type LLMAgentRouteConfig = LlmAgentRoute;
 
 /** Runtime provider credentials plus user-selected agent routes. */
 export interface LLMConfig {

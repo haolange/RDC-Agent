@@ -277,5 +277,16 @@
     "src/main/ipc/sessionOutputs.ts",
     "designs/rdc-agent-design-system/Design System Preview.html",
     "src/renderer/features/captures/DeviceSelector/useDeviceDropdownPosition.ts"
+  ],
+  "protectedEffects": [
+    { "id": "active-signal-shimmer", "file": "src/renderer/styles/design-system.css", "anchor": "@keyframes active-signal-shimmer" },
+    { "id": "composer-energy-orbit", "file": "src/renderer/features/composer/composer-motion.css", "anchor": "@keyframes composerEnergyOrbit" },
+    { "id": "effort-max-canvas", "file": "src/renderer/features/composer/EffortMaxField.tsx", "anchor": "getContext('2d'" },
+    { "id": "subagent-progress-dots", "file": "src/renderer/features/transcript/work-process-subagent.css", "anchor": "@keyframes subagent-progress-breathe" },
+    { "id": "agent-menu-pulse", "file": "src/renderer/features/composer/composer-responsive.css", "anchor": "@keyframes composer-agent-running-pulse" },
+    { "id": "startup-shimmer", "file": "src/renderer/shell/AppShell.misc.css", "anchor": "@keyframes loading-shimmer" },
+    { "id": "work-process-pulse", "file": "src/renderer/features/transcript/work-process-layout.css", "anchor": "@keyframes work-process-dot-pulse" },
+    { "id": "streaming-cursor", "file": "src/renderer/features/transcript/message-layout.css", "anchor": "@keyframes conversationCursorBlink" },
+    { "id": "trace-flash", "file": "src/renderer/features/right-rail/RightRailResources.css", "anchor": "@keyframes trace-flash" }
   ]
 }

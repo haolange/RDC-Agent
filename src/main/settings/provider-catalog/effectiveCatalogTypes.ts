@@ -7,7 +7,7 @@ import type {
   EffectiveCatalogSnapshot,
   EffectiveModel,
   ExecutionBindingDefinition,
-  ModelRoute,
+  CatalogModelRoute,
   ProviderAvailability,
 } from '@shared/types/providerCapability';
 import type { ModelCost } from '@shared/provider-catalog/modelManifestSchema';
@@ -28,7 +28,7 @@ export interface CatalogModelContribution {
   label?: string;
   aliases?: string[];
   enabled?: boolean;
-  route?: Partial<ModelRoute>;
+  route?: Partial<CatalogModelRoute>;
   routeOptions?: EffectiveModel['routeOptions'];
   preferredRouteOptionId?: string;
   selection?: EffectiveModel['selection'];
@@ -95,7 +95,7 @@ export interface EffectiveCatalogRequest {
   protocol?: LlmProviderProtocol;
   catalogOwnership: LlmProviderCatalogOwnership;
   discoveryAuthority: 'authoritative-list' | 'candidate-validation' | 'additive' | 'entitlement-overlay';
-  fallbackRoute: ModelRoute;
+  fallbackRoute: CatalogModelRoute;
   catalog: CatalogLayerContribution;
   discovery?: CatalogLayerContribution;
   overlay?: CatalogLayerContribution;

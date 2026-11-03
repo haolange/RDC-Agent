@@ -213,6 +213,16 @@ requireCssContract(
   'Context Usage metrics must be equal-width cards in one row above 38rem; only the narrow metric query may stack them.',
 );
 
+const contract = JSON.parse(fs.readFileSync(path.join(fidelityDir, 'renderer-contract.json'), 'utf8'));
+for (const effect of contract.protectedEffects ?? []) {
+  const source = fs.readFileSync(path.join(repoRoot, effect.file), 'utf8');
+  if (!source.includes(effect.anchor)) {
+    console.error(`[fidelity] Protected effect ${effect.id} lost anchor ${effect.anchor} in ${effect.file}`);
+    process.exitCode = 1;
+  }
+}
+if (process.exitCode) process.exit(process.exitCode);
+
 console.log(
   `[fidelity] OK (baseline: ${baselineClasses.size} classes, ${baselineTestIds.size} testids; `
   + `added: +${addedClasses} classes, +${addedTestIds} testids allowed)`,

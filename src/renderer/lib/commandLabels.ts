@@ -1,11 +1,36 @@
+import { AGENT_WORKBENCH_COMMAND_CATALOG } from '@shared/constants/agentWorkbenchCatalog';
 import type { CommandListResult } from '@shared/types/command';
 import type { Translator, TranslationKey } from '../i18n/messages';
+
+export const WORKBENCH_COMMAND_DESCRIPTION_KEYS: Record<string, TranslationKey> = {
+  '/help': 'composer.commandDescription.help',
+  '/context': 'composer.commandDescription.context',
+  '/memory': 'composer.commandDescription.memory',
+  '/agents': 'composer.commandDescription.agents',
+  '/skills': 'composer.commandDescription.skills',
+  '/mcp': 'composer.commandDescription.mcp',
+  '/status': 'composer.commandDescription.status',
+  '/model': 'composer.commandDescription.model',
+};
+
+export function workbenchCommandDescriptionKey(command: string): TranslationKey {
+  const key = WORKBENCH_COMMAND_DESCRIPTION_KEYS[command];
+  if (!key) throw new Error(`WORKBENCH_COMMAND_COPY_MISSING: ${command}`);
+  return key;
+}
+
+export function assertWorkbenchCommandCopy(): void {
+  for (const entry of AGENT_WORKBENCH_COMMAND_CATALOG) workbenchCommandDescriptionKey(entry.command);
+}
+
 const DESCRIPTION_KEYS: Record<string, TranslationKey> = {
   agents: 'composer.commandDescription.agents',
   clear: 'composer.commandDescription.clear',
   cost: 'composer.commandDescription.cost',
   config: 'composer.commandDescription.config',
   help: 'composer.commandDescription.help',
+  context: 'composer.commandDescription.context',
+  memory: 'composer.commandDescription.memory',
   export: 'composer.commandDescription.export',
   model: 'composer.commandDescription.model',
   mcp: 'composer.commandDescription.mcp',

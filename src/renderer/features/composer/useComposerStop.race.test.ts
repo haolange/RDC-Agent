@@ -11,6 +11,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 
 const session: SessionRecord = {
+  schemaVersion: '1',
   sessionId: 'session-a', projectId: 'project-a', title: 'A', goal: '', sessionPath: '/a', createdAt: 1, updatedAt: 1,
 };
 const ownership = {
