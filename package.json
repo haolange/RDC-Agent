@@ -80,7 +80,7 @@
     "start:prepare": "node scripts/launch-rdc-agent.mjs --mode prepare-only",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --project node --coverage",
+    "test:coverage": "vitest run --project node --coverage && node scripts/write-coverage-summary.mjs coverage/coverage-final.json coverage/coverage-summary.json",
     "test:coverage:renderer": "vitest run --project renderer --coverage && node scripts/write-coverage-summary.mjs",
     "check:identity": "node scripts/check-identity.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",

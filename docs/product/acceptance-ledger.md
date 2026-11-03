@@ -2,6 +2,14 @@
 
 历史过程文档已收进本账本后删除。条目正文仍是证据；文中旧文件名只作历史出处，不再指向现存文档。
 
+## 全方位收敛 W6 收口（2026-11-03）
+
+- 工程门禁对应 `b9836593`。当前分支 main，不推送。本记录与 `test:coverage` 在 node 覆盖率之后写出 `coverage/coverage-summary.json` 的脚本改动同一次提交。Vitest 4 只落 `coverage-final.json`，ratchet 读的是 writer 转出的 `{total.*.pct}`。
+- `tsc --noEmit` 与 `tsconfig.strict-next.json` 均为 0 错误；`eslint src --quiet` 为 0；`check:gates` 退出 0。node `vitest run --project node --coverage` 为 369 个文件通过、4 个跳过，3414 项通过、4 项跳过。writer 之后 ratchet 对照 lines 77.63、functions 77.65、branches 65.6、statements 75.19 通过。contracts 为 10 个文件、248 项通过。`electron-vite build` 退出 0。Renderer 套件在 `CaseChapterContent` 的 i18n mock 补上 `t` 之后为 195 个文件、851 项通过；随后 node coverage 写回了 `coverage/coverage-final.json`，本轮没有再跑 renderer coverage，不把那次 node 报告当成 renderer 覆盖率。
+- Disposable Browser QA：隔离 userData `qa-1793715393918-0c64de000db6cc0a`，主进程日志 `hasConfiguredProvider: false`。页内带 cookie 的一次性 bootstrap 之后进入同源 `/app`，关闭上手指南。临时项目 `proj_a472b012b335`、会话 `sess_a6f73d3ffddb`。会话右栏五张标题为进度、调查制品、输出文件、上下文、抓帧，各自空态可见；进度空态为「任务展开后在此显示步骤」。权限菜单四项为默认、自动审查、完全访问、自定义。点自定义后触发器显示「正在应用…」，随后回到「默认」；本轮没有填写规则，不把 Custom 保持选中标成已验收。设置 → 策略可见「Custom 权限规则」和「保存 Custom 规则」。权限菜单打开时触发器为 focused，Escape 后菜单项消失。720 CSS px 下 `documentElement.scrollWidth` 为 720，无横向溢出，左侧栏 class 为 `app-sidebar-left collapsed`。Composer textarea 获得焦点后 Tab 仍留在该输入框。
+- 这次隔离会话没有已配置 Provider，不把 plan → 批准 → Execute、规划工具选择或 `runtime_context` 标成已验收。本机没有 Android 设备回执，不把 Remote/Android 标绿。
+- 收口删除本轮 qa 目录和临时项目 `rdc-agent-w6-project`，并停止该 launcher 的 node/Electron 树。canonical `%APPDATA%/rdc-agent/instance.lock` 仍是 2026-11-02 的 desktop owner pid 69772，本轮未改；该 pid 已死，下次桌面启动会回收。桌面启动权已交还。
+
 ## 执行额度收敛：General 200 与额度权威回归 Harness（2026-11-03）
 
 - 基线 `50db04ce2ff1d77d23372a4d66839070e21fd9d4`，当前分支原地修改，不创建分支、不提交、不推送。内置 General `max-turns` 由 50 改为 200；Mission 保持 50，未声明默认 25。核对生效链：builtin < user < project 整资源替换（用户与项目当前均无 Agent 覆写）→ prepareTurn 以同一 `resolveAgentMaxTurns` 取 profile 与 policy 较小值，冻结进 `runtime:execution-limits` 与执行循环。子执行按自身 profile 解析，不继承父数值；Capsule 工具数/墙钟/子执行数及 `maxChildDepth` 不变。新值只在后续 prepareTurn 冻结，在途回合、消费、期限与历史不变，无自动重启或续跑。
