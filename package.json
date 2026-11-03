@@ -43,7 +43,7 @@
     "check:browser-capability": "node scripts/check-browser-capability.mjs",
     "check:provider-system": "node scripts/check-provider-system.mjs",
     "check:agent-tool-capability": "node scripts/check-agent-tool-capability.mjs",
-    "check:provider-catalog": "vitest run src/shared/provider-catalog/compiler.test.ts src/shared/provider-catalog/agentToolCapabilityAudit.test.ts src/shared/utils/agentToolCapability.test.ts && node scripts/check-agent-tool-capability.mjs",
+    "check:provider-catalog": "vitest run src/shared/provider-catalog/compiler.test.ts && node scripts/check-agent-tool-capability.mjs",
     "check:settings-agents": "node scripts/check-settings-agents.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",
     "check:appearance": "node scripts/check-appearance.mjs",

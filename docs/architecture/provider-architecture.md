@@ -263,7 +263,7 @@ Bedrock 使用 `cachePoint: { type: 'default' }` 标记 stable prefix。`partiti
 ## 验证门禁
 
 - `pnpm run check:provider-catalog`：strict schema、166 identity、确定 hash、route/control/binding/secret-free 语义。
-- `pnpm run check:provider-system`：编译后的语义对象、Resolver、Planner、Discovery 与最终 wire 契约。
+- `pnpm run check:provider-system`：编译后的语义对象、Resolver、Discovery 与 route 契约。Agent 工具资格、Planner 与 wire fixture 由 `check:agent-tool-capability` 覆盖，`check:agent-runtime` 在门禁里调用它一次。
 - `pnpm run check:agent-runtime`：冻结 RequestPlan/credential lease、PromptPlan 与 adapter 边界。
 - `pnpm run check:settings-agents`：`.agent.md` 单一持久化真值与 scoped save。
 - `pnpm run typecheck`、`pnpm test`、架构/保真/共享导出/仓库卫生门禁与 `pnpm run build`。
