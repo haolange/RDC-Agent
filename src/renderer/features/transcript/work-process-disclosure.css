@@ -246,18 +246,6 @@
   min-width: 0;
 }
 
-@media (max-width: 760px) {
-  .work-process-header {
-    flex-wrap: wrap;
-    gap: var(--space-1) var(--space-2);
-  }
-
-  .work-process-tool-card-header,
-  .work-process-tool-card-meta {
-    gap: var(--space-1) var(--space-2);
-  }
-}
-
 /* Keep the process rail left-anchored while calibrating the visible card edge
  * against its existing left hierarchy gutter. The agent-chat container owns
  * these breakpoints so a resized work area follows its actual width. */

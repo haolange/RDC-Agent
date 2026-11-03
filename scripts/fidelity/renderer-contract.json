@@ -4,6 +4,11 @@
     "ui.select": "src/renderer/ui/Select/index.tsx",
     "workProcessTrackCss": "src/renderer/features/transcript/work-process-track.css",
     "styles.designSystem": "src/renderer/styles/design-system.css",
+    "styles.designTokens": "src/renderer/styles/design-tokens.css",
+    "styles.designMotion": "src/renderer/styles/design-motion.css",
+    "styles.designBase": "src/renderer/styles/design-base.css",
+    "styles.designReducedMotion": "src/renderer/styles/design-reduced-motion.css",
+    "styles.breakpoints": "src/renderer/styles/global/breakpoints.css",
     "styles.appShell": "src/renderer/styles/global/app-shell.css",
     "shell.appShellCss": "src/renderer/shell/AppShell.css",
     "shell.appShellMiscCss": "src/renderer/shell/AppShell.misc.css",
@@ -279,14 +284,14 @@
     "src/renderer/features/captures/DeviceSelector/useDeviceDropdownPosition.ts"
   ],
   "protectedEffects": [
-    { "id": "active-signal-shimmer", "file": "src/renderer/styles/design-system.css", "anchor": "@keyframes active-signal-shimmer" },
+    { "id": "active-signal-shimmer", "file": "src/renderer/styles/design-motion.css", "anchor": "@keyframes active-signal-shimmer" },
     { "id": "composer-energy-orbit", "file": "src/renderer/features/composer/composer-motion.css", "anchor": "@keyframes composerEnergyOrbit" },
     { "id": "effort-max-canvas", "file": "src/renderer/features/composer/EffortMaxField.tsx", "anchor": "getContext('2d'" },
     { "id": "subagent-progress-dots", "file": "src/renderer/features/transcript/work-process-subagent.css", "anchor": "@keyframes subagent-progress-breathe" },
     { "id": "agent-menu-pulse", "file": "src/renderer/features/composer/composer-responsive.css", "anchor": "@keyframes composer-agent-running-pulse" },
     { "id": "startup-shimmer", "file": "src/renderer/shell/AppShell.misc.css", "anchor": "@keyframes loading-shimmer" },
     { "id": "work-process-pulse", "file": "src/renderer/features/transcript/work-process-layout.css", "anchor": "@keyframes work-process-dot-pulse" },
-    { "id": "streaming-cursor", "file": "src/renderer/features/transcript/message-layout.css", "anchor": "@keyframes conversationCursorBlink" },
+    { "id": "streaming-cursor", "file": "src/renderer/features/transcript/message-bubbles.css", "anchor": "@keyframes conversationCursorBlink" },
     { "id": "trace-flash", "file": "src/renderer/features/right-rail/RightRailResources.css", "anchor": "@keyframes trace-flash" }
   ]
 }

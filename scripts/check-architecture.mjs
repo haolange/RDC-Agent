@@ -236,6 +236,10 @@ for (const filePath of walk(rendererRoot, [], /\.(tsx|ts)$/)) {
 // Token definition layer may contain hex inside compiled/preview helpers.
 const r4CssExempt = (relativePath) => (
   relativePath === 'src/renderer/styles/design-system.css'
+  || relativePath === 'src/renderer/styles/design-tokens.css'
+  || relativePath === 'src/renderer/styles/design-motion.css'
+  || relativePath === 'src/renderer/styles/design-base.css'
+  || relativePath === 'src/renderer/styles/design-reduced-motion.css'
 );
 
 for (const filePath of walk(rendererRoot, [], /\.(tsx|css)$/)) {

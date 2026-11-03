@@ -40,6 +40,10 @@ const walk = (dir, files = []) => {
 // Token definition layer may reference primitives.
 const EXEMPT_PREFIXES = [
   'src/renderer/styles/design-system.css',
+  'src/renderer/styles/design-tokens.css',
+  'src/renderer/styles/design-motion.css',
+  'src/renderer/styles/design-base.css',
+  'src/renderer/styles/design-reduced-motion.css',
 ];
 
 const isExempt = (rel) => EXEMPT_PREFIXES.some((prefix) => (

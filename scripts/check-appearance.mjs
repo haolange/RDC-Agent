@@ -110,7 +110,7 @@ assert(
   'Composer ring must stay on while a footer menu is expanded, not only :focus-within',
 );
 
-const checkboxTokenSource = scriptRead('src/renderer/styles/design-system.css');
+const checkboxTokenSource = scriptRead('src/renderer/styles/design-tokens.css');
 const checkPillCss = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/CheckPill.css'), 'utf8');
 const knowledgeSidebarCss = fs.readFileSync(
   path.join(repoRoot, 'src/renderer/features/knowledge/KnowledgeCenterModal/knowledge-center-sidebar.css'),

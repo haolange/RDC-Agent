@@ -1,0 +1,147 @@
+/** Shared focus, scrollbar, badge, and skeleton rules. */
+
+/* Focus states */
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--color-bg-0)), 0 0 0 4px rgb(var(--color-accent-500) / 0.5);
+}
+
+/* Scrollbar styling */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--color-bg-5)) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-bg-5));
+  border-radius: var(--radius-full);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-text-muted));
+}
+
+/* Selection */
+::selection {
+  background: rgb(var(--color-accent-500) / 0.3);
+  color: rgb(var(--color-text-primary));
+}
+
+/* ─── Shared Component Utilities ─── */
+
+/* Badge */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-normal);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.ui-badge--primary {
+  background: rgb(var(--color-primary-500) / 0.15);
+  color: rgb(var(--color-primary-400));
+}
+
+.ui-badge--accent {
+  background: rgb(var(--color-accent-500) / 0.15);
+  color: rgb(var(--color-accent-400));
+}
+
+.ui-badge--success {
+  background: rgb(var(--color-success) / 0.15);
+  color: rgb(var(--color-success));
+}
+
+.ui-badge--warning {
+  background: rgb(var(--color-warning) / 0.15);
+  color: rgb(var(--color-warning));
+}
+
+.ui-badge--error {
+  background: rgb(var(--color-error) / 0.15);
+  color: rgb(var(--color-error));
+}
+
+/* Icon Button */
+.ui-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  border: none;
+  border-radius: var(--control-radius);
+  background: transparent;
+  color: rgb(var(--color-text-secondary));
+  cursor: pointer;
+  transition: all var(--transition-fast) var(--ease-standard);
+  flex-shrink: 0;
+}
+
+.ui-icon-btn:hover {
+  background: rgb(var(--color-bg-3));
+  color: rgb(var(--color-text-primary));
+}
+
+.ui-icon-btn:active {
+  transform: scale(0.95);
+}
+
+.ui-icon-btn--sm {
+  width: 24px;
+  height: 24px;
+}
+
+.ui-icon-btn--lg {
+  width: 40px;
+  height: 40px;
+}
+
+/* Skeleton Loading */
+.ui-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--color-bg-3)) 25%,
+    rgb(var(--color-bg-2)) 50%,
+    rgb(var(--color-bg-3)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer var(--animation-shimmer) var(--ease-standard) infinite;
+  border-radius: var(--radius-md);
+}
+
+.ui-skeleton--text {
+  height: 14px;
+  margin-bottom: 8px;
+}
+
+.ui-skeleton--text-sm {
+  height: 10px;
+  margin-bottom: 6px;
+}
+
+.ui-skeleton--circle {
+  border-radius: var(--radius-full);
+}
+
+.ui-skeleton--card {
+  height: 56px;
+  border-radius: var(--radius-card);
+}
+
+.ui-skeleton--card-stack {
+  margin-bottom: var(--space-2);
+}

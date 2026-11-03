@@ -3,10 +3,10 @@
  */
 
 @import './design-system.css';
-@import './design-motion.css';
 @import '../ui/kit.css';
 
 @import './global/base.css';
 @import './global/app-shell.css';
 @import './global/responsive.css';
+@import './global/breakpoints.css';
 @import './global/pointer-cursors.css';

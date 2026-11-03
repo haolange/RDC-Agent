@@ -1,23 +1,78 @@
-/**
- * Reduced motion shortens tokenized motion and stops the named CSS effects.
- * The Max effort canvas is not included; EffortMaxField settles that loop itself.
- */
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --duration-fast: 0ms;
-    --duration-base: 0ms;
-    --duration-slow: 0ms;
-    --transition-fast: 0ms linear;
-    --transition-base: 0ms linear;
-    --transition-slow: 0ms linear;
-  }
+/** Keyframes and the active-signal shimmer. Reduced motion is a separate file. */
 
-  .active-signal-text.is-active,
-  .animate-spin,
-  .ui-skeleton,
-  .work-process-subagent-dots.is-active > span,
-  .is-trace-flash,
-  .composer-agent-menu-item-running-dot {
-    animation: none;
+/* ========== Animation Keyframes ========== */
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes active-signal-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ========== Utility Classes ========== */
+
+.animate-spin { animation: spin 1s linear infinite; }
+/* Active runtime signal text — left-to-right energy shimmer on live phrases */
+.active-signal-text {
+  --active-signal-highlight: var(--token-text-heading);
+  color: inherit;
+}
+
+.active-signal-text.tone-info {
+  --active-signal-highlight: var(--token-status-info);
+}
+
+.active-signal-text.tone-interaction {
+  --active-signal-highlight: var(--token-accent-primary);
+}
+
+.active-signal-text.tone-response {
+  --active-signal-highlight: var(--token-text-body);
+}
+
+.active-signal-text.is-active {
+  display: inline-block;
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 0%,
+    var(--active-signal-highlight) 46%,
+    color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: repeat-x;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: active-signal-shimmer 1.6s linear infinite;
 }

@@ -68,7 +68,7 @@ if (missingClasses.length > 0 || missingTestIds.length > 0) {
 const addedClasses = [...currentClasses].filter((item) => !baselineClasses.has(item)).length;
 const addedTestIds = [...currentTestIds].filter((item) => !baselineTestIds.has(item)).length;
 
-const appShellCss = scriptRead('src/renderer/styles/global/app-shell.css');
+const appShellCss = scriptReadCssBundle('src/renderer/styles/global/app-shell.css');
 const composerChromeCss = scriptReadCssBundle('src/renderer/features/composer/composer-chrome.css');
 const contextBreakdownCss = [
   scriptRead('src/renderer/patterns/ContextBreakdownPopover.css'),
@@ -76,7 +76,7 @@ const contextBreakdownCss = [
   scriptRead('src/renderer/patterns/ContextBreakdownLegend.css'),
 ].join('\n');
 const settingsModalCss = scriptReadCssBundle('src/renderer/features/settings/SettingsModal/SettingsModal.css');
-const designSystemCss = scriptRead('src/renderer/styles/design-system.css');
+const designSystemCss = scriptRead('src/renderer/styles/design-tokens.css');
 const contextUsageIndicator = scriptRead('src/renderer/patterns/ContextUsageIndicator.tsx');
 const contextBreakdownPopover = scriptRead('src/renderer/patterns/ContextBreakdownPopover.tsx');
 const contextRunMeterBand = scriptRead('src/renderer/patterns/ContextRunMeterBand.tsx');

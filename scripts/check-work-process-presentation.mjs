@@ -28,7 +28,7 @@ const assert = (condition, message) => {
 
 const readSource = (relativePath) => scriptRead(relativePath);
 const activeSignalSource = readSource('src/renderer/ui/ActiveSignalText.tsx');
-const activeSignalStyles = readSource('src/renderer/styles/design-system.css');
+const activeSignalStyles = readSource('src/renderer/styles/design-motion.css');
 const activeSignalHelper = readSource('src/renderer/features/transcript/workProcessActiveSignal.ts');
 const activeSignalRenderSource = [
   'src/renderer/features/transcript/WorkProcessSectionRow.tsx',

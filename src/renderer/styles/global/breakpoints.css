@@ -1,0 +1,45 @@
+/**
+ * Narrow layout widths. Media queries cannot read custom properties, so this
+ * table is the single list and the rules below use the same numbers.
+ *
+ * 900px  shell hides the docked right rail (responsive.css) and loosens the composer.
+ * 720px  shell collapses the left sidebar, and transcript, work process, and the
+ *        empty workbench use the same width.
+ * 640px  dialogs, settings rows, and composer type.
+ * 480px  phone menus and confirmation dialogs.
+ */
+
+@media (max-width: 720px) {
+  .chat-messages {
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
+
+  .work-process-header {
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
+  }
+
+  .work-process-tool-card-header,
+  .work-process-tool-card-meta {
+    gap: var(--space-1) var(--space-2);
+  }
+
+  .empty-workbench-content {
+    width: min(100%, calc(100% - var(--space-10)));
+    gap: var(--space-8);
+    padding: var(--space-6) 0;
+  }
+
+  .empty-workbench-content[data-variant='no-project'] .empty-workbench-title {
+    font-size: var(--text-3xl);
+  }
+
+  .empty-workbench-title {
+    font-size: var(--text-2xl);
+  }
+
+  .empty-workbench-subtitle {
+    font-size: var(--text-sm);
+  }
+}

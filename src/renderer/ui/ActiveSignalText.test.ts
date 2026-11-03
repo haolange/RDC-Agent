@@ -18,7 +18,7 @@ describe('ActiveSignalText', () => {
   });
 
   it('uses clipped-gradient energy shimmer for the active state', () => {
-    const cssPath = path.resolve(process.cwd(), 'src/renderer/styles/design-system.css');
+    const cssPath = path.resolve(process.cwd(), 'src/renderer/styles/design-motion.css');
     const css = fs.readFileSync(cssPath, 'utf8');
     const activeBlock = css.match(/\.active-signal-text\.is-active\s*\{[\s\S]*?\}/)?.[0] ?? '';
 

@@ -177,26 +177,6 @@
   font-size: var(--text-3xl);
 }
 
-@media (max-width: 760px) {
-  .empty-workbench-content {
-    width: min(100%, calc(100% - var(--space-10)));
-    gap: var(--space-8);
-    padding: var(--space-6) 0;
-  }
-
-  .empty-workbench-content[data-variant='no-project'] .empty-workbench-title {
-    font-size: var(--text-3xl);
-  }
-
-  .empty-workbench-title {
-    font-size: var(--text-2xl);
-  }
-
-  .empty-workbench-subtitle {
-    font-size: var(--text-sm);
-  }
-}
-
 @container empty-workbench (max-width: 560px) {
   .empty-workbench-tool-grid {
     grid-template-columns: minmax(0, 1fr);
