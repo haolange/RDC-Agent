@@ -80,51 +80,22 @@ Appearance 详细规则见 docs/ui/appearance-checklist.md；禁止恢复 transl
 
 ## 按任务读取权威与验证
 
-模块字段、历史阶段和完整验收矩阵在主题文档维护，根文件不重复：
-- 运行时/安全：ARCHITECTURE.md、docs/contracts/runtime-kernel.md、permissions.md、failure-model.md、docs/architecture/agent-runtime-kernel.md。
-- Agent/Skill/Hook/Memory：docs/product/scoped-runtime-resources.md；RenderDoc 调查与 handoff：docs/product/renderdoc-agent-complete-design.md。
-- RDC 原生协议：docs/architecture/rdc-runtime.md；Browser bridge：docs/architecture/browser-qa-surface.md。
-- UI/Composer/Settings：docs/ui/workbench-and-transcript.md、design-system.md、appearance-checklist.md；session gate：docs/contracts/session-projection.md。
+模块字段和验收证据在主题文档，根文件不重复。运行时、权限、失败模型和投影见 `ARCHITECTURE.md` 与 `docs/contracts/`。Agent、Skill、Hook、Memory 与调查目标见 `docs/product/scoped-runtime-resources.md` 和 `docs/product/renderdoc-agent-complete-design.md`。RDC 与回放见 `docs/architecture/rdc-runtime.md`。UI 见 `docs/ui/design-system.md`。现场证据只写入 `docs/product/acceptance-ledger.md`。
 
-关键边界不得回退：IPC parseIpcArgs + 单次 approvalToken；safeStorage fail-closed、无明文 secret IPC；sandbox:true + CSP 禁 inline；Hook/MCP trust 内容/路径/执行身份变更需 retrust；ProcessSupervisor 未观察 close/error 不移除；Turn generation 丢弃迟到事件；只投影 currentSession；RDC per-session lease 无全局镜像，离线 child 不得获得 RDC，unsafe 工具串行；Run 唯一 v3；Memory 活 pid 锁不回收；Knowledge 单一 main-owned 六 lane 五服务、无 Embedding、无自动 Candidate/Memory；Investigation provenance/hash/事务和认识论边界不放宽。
+关键边界以 ARCHITECTURE 核心 Invariant 为准，这里不另写一份。Plan 与 generation：Mission 计划门冻结后，用户点声明按钮进入 General，General 就地终答，用户自行切回 Mission。`handoffs` 只驱动建议行和计划门；不存在 `agent_handoff` 工具或自动回 Mission。
 
-prepareTurn 冻结 PromptPlan / EffectiveRuntimePlan 和本机 RDC binding。预载 skill allowed-tools 取交集，只收窄；skill_read 只读方法，不重算在途权限。普通任务留 General；Mission plan-only → `plan_artifact` 计划门（同意即冻结）→ 用户点声明按钮切到 General → General 就地终答 → 用户自行切回 Mission 评估。RDC 共享 shell 手册与三本专业工具手册只提供知识，必须由会话 execution offer 上声明的 requiredSkillIds 真实预载，不能授权操作或替代冻结 catalog。Full access 不绕过 Mission/lease/hard deny。`handoffs` 只驱动建议行和计划门按钮；人点后主进程 `applyDeclaredHandoff` 写/确认 offer 并 persist `session.agentId`。不存在 `agent_handoff` 工具、durable `prepared → committed → consumed` 状态机或自动回 Mission。执行额度权威在 Harness：循环上限、Task/Capsule、policy 由主进程冻结、执行并报告实际消费；计划只引用冻结限制与用户明确限制，阶段分配是可调估算，不是额外硬门或补批前置。
+## 验证矩阵
 
-shell.command 与 shell.rdc 互斥；结构化 RDC 仅 owning General，经审批与冻结原生 CLI。实验关闭必须验证主进程签名回执 baseline/intervention/variant/rollback/restored。旧记录可读；权限拒绝、未执行或 capture hash 不变不是回滚证据。旧 verified 不代表当前版本。
+局部改动运行受影响单测、`pnpm run typecheck`、`pnpm run lint` 和对应 `check:*`。跨层改动补 `pnpm run test:coverage`、`pnpm run check:coverage-ratchet`、`pnpm run check:gates` 和 `pnpm run build`。行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。行数与分层由 ESLint `max-lines` / `no-restricted-imports` 执行。发布配置才 pack。
 
-## 验证范围与 Browser QA
+Browser QA 用 disposable `pnpm run start:agent-browser`，只消费一次 `/qa?qaBootstrap=...`，进入同源 `/app`。不直开 Vite，不把 token 留在 URL。high-impact 需要 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`。无设备的 Remote/Android 记阻塞，不以本地成功代替。
 
-- 不得删除测试、弱化断言或跳过必需验收制造通过；判断实现、测试或契约哪一方错误后修正。未受新改动影响的绿色证据直接沿用，新改动只复验受影响范围；旧绿色不能证明新行为，已完成真实链路不无故重复演示。
-- 构建、测试、真实回放、窗口可见、设备呈现、模型效果分别记录；合法空结果、读取失败和不支持必须区分，不以空值、固定零值或假成功掩盖失败，观察与推断分别表达。
-- 阻塞记录具体错误、触发条件、受影响验收和解除条件；核对错误是否由自身逻辑引起，不能凭错误名宣称外部占用。缺少外部条件时完成其余工作，不反复空转；用户明确延期的验收记为后续范围，不虚标通过或继续当成本轮阻塞。
-- 确定性的 Skill 覆盖、参数示例、交接/preload、权限、身份、取消、恢复和回执测试必须完成；真实模型选工具、解释结果及回评估另有实测证据。集成测试不能冒充模型效果，模型运行的可用条件或延期安排不能成为削弱工程验证的理由。
+人类入口与 QA 共享 `%APPDATA%/rdc-agent/instance.lock`。活 owner 不回收。本轮若启动过 QA 或 Electron，结束前停掉本轮进程，并报告桌面启动权是否交还。
 
-局部改动运行受影响单测、typecheck、lint 和专项 check；跨层集成补完整 tests/coverage ratchet、check:gates、build；发布配置改动才 pack 并检查产物清洁。resource/instruction/prompt/skill/hook/memory 分别执行 check:scoped-resources、check:project-instructions、check:prompt-plan-snapshot、check:skills、check:hooks、check:memory-policy。安全/并发/取消/存储/provider wire 补 check:contracts。模型/tool/Knowledge/Investigation 改动补对应 check:*。AgentOrchestrator façade 必须 <800 行。
+## RDC 与 Capture
 
-main/preload/IPC/workspace/RDC 变更补真实启动或 Browser QA；UI 局部测受影响入口、交互、窄屏/键盘/焦点/disabled/selected/running，集成测跨层链，发布才完整产品矩阵。不得用 Playwright/Electron E2E 作门禁，不造 renderer demo。无设备的 Remote/Android 如实记录阻塞，不以本地成功代替。
-
-Browser QA 默认 disposable start:agent-browser，使用完整 one-time /qa?qaBootstrap=... 进入同源 /app，不直开 Vite，不接受 URL token。仅显式要求真实账号/canonical/T15–T18 才用真实 userData。debug-only bridge 共用 ElectronAPI factory/manifest/handler，未知/内部/明文 secret/desktop-only fail-closed；high-impact 需 QA full access。性能按原生 Event Timing p95/Long Task，不按工具往返或 RAF。
-
-人类入口 `scripts/start-rdc-agent.cmd` / `pnpm run start:human` / `start:human:dev` 与 QA/Electron 共享 canonical `%APPDATA%/rdc-agent/instance.lock`；活 owner 永不回收。启动过 QA/Electron，结束前停止本轮 launcher 及自有子进程，确认 lock 不存在或 owner 已死；不得停止用户的其他进程。改 launcher/main/window/userData 或跑 QA 后验证桌面不因占锁失败，并报告「桌面启动权已交还」。验收写 docs/product/acceptance-ledger.md，保留历史来源、SHA、日期；只标记实际通过的对应场景。
-
-会话投影变更运行 `pnpm run check:session-projection`，右栏变更运行 `pnpm run check:right-rail`。界面文案或语言切换变更运行 `pnpm run check:i18n`，本地化边界见 `docs/ui/workbench-and-transcript.md`。
+操作契约、lease、回放身份和 Android 回执以 `docs/architecture/rdc-runtime.md` 与 ARCHITECTURE 的 Session Capture 节为准。Skill 只提供知识，不能授权。空项目保持原空态。`unsupported` 不能标成设备已呈现。
 
 ## Right Rail single-track gate
 
-Session rail 为 Progress / Artifacts / Outputs / Context / Capture，投影契约见 `docs/contracts/session-projection.md`。
-
-## RDC 操作契约
-
-RDC 接口只维护当前操作契约；包发布号仅用于安装诊断，不设 major-version 权限门槛。接入必须校验真实 catalog 指纹、参数、能力和 JSON 格式，手册引用当前生成定义，不绑定 V1/V2。
-
-操作定义、参数约束、scope、effects 与证据类型来自配置 CLI 的完整 catalog；prepareTurn 冻结目录指纹、CLI 配置和 owning lease。应用固定生命周期通过原生调用边界生成 argv，不恢复自定义生命周期命令、catalogPath 或 JSON 模式配置。普通执行由主进程校验能力、身份、路径和前置条件；Skill 只提供知识，不能授权。专业手册参考通过生成器更新，Mission 声明续跑上的 requiredSkillIds 必须在 General prepareTurn 实际加载。详见 docs/architecture/rdc-runtime.md。
-
-专业 Agent 只需完整掌握职责内的工具集合；用途、参数、结果解释、示例和限制由明确成员清单与生成参考覆盖，不复制全部工具箱。共享 CLI/身份/输出/恢复知识只维护一份，专业手册引用；Mission → General → Mission 复用现有交接，不能仅用提示词中的 Skill 名称代替实际加载。
-
-软件固定生命周期、身份与结果校验由主进程负责；普通工具知识不做名称白名单或额外配置表。CLI、catalog 和执行必须来自同一安装，手册不授权，设备/会话/路径等安全约束不因目录声明而绕过。
-
-## Capture replay 改动门禁
-
-项目 RDC 为空的原空态必须保持。修改 Capture 时同时核对 per-session runtime、context 串行执行、Agent 生命周期锁、requested/applied/image EID 和内容 hash。内嵌回放不得恢复应用 human-preview 窗口或旧 Settings action；不要删除 Tools 独立 CLI 的有效窗口能力。足迹与用户 capture/正式证据分开管理。Android 设备呈现必须有真实回执，`unsupported` 不能标绿。除既有专项门禁，运行 `RdcSessionRuntime`、`RdcSessionService`、`executeRdcShell`、ReplayHistoryStore 的受影响测试。
-
-软件应处理用户正常环境，不要求连接前清空设备进程。Android helper 的启动、已有服务连接、就绪检查和自有资源清理由 Tools 统一实现，Agent 复用并展示准确状态与恢复入口，不另写一套设备进程逻辑。进程存在不等于服务被占用；复用用户 helper 不代表取得关闭、重装或修改配置的权限。
+Session rail 为 Progress / Artifacts / Outputs / Context / Capture。投影契约见 `docs/contracts/session-projection.md`。

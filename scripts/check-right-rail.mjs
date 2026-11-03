@@ -292,7 +292,7 @@ const docs = {
   uiSpec: read('docs/ui/workbench-and-transcript.md'),
   traceProtocol: read('docs/architecture/agentic-trace-protocol.md'),
   sessionProjectionContract: read('docs/contracts/session-projection.md'),
-  specDrivenDevelopment: read('docs/architecture/spec-driven-development.md'),
+  specDrivenDevelopment: read('docs/architecture/rdc-runtime.md'),
   agents: read('AGENTS.md'),
 };
 for (const [source, requiredTextValue, label] of [

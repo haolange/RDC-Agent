@@ -19,8 +19,3 @@
 - `agentic-trace-protocol.md`：Trace、Progress 与 right-panel projection。
 - `provider-architecture.md`：Catalog / EffectiveModel / RequestPlan / credential lease。
 - `browser-qa-surface.md`：Browser（debug-only）与 Desktop 的单轨 API、transport、安全及状态 parity。
-- `spec-driven-development.md`：跨层规范与执行约束。
-
-## 对照资料
-
-- `codepilot-comparison.md`：外部架构对照与迁移边界，不作为运行时事实来源。

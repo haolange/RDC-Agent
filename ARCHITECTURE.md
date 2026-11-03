@@ -76,7 +76,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 | Fail-closed 三分类与标注点 | [`docs/contracts/failure-model.md`](docs/contracts/failure-model.md) |
 | Orchestrator façade 行数 / 职责外提 | 本文件 Invariant + `pnpm run check:orchestrator-facade` |
 | Profiles / Skills / Hooks / Memory / RDC 产品规格 | [`docs/product/`](docs/product/) |
-| RenderDoc 垂直目标设计（非第二权威） | [`docs/product/renderdoc-agent-complete-design.md`](docs/product/renderdoc-agent-complete-design.md) |
+| RenderDoc 领域目标权威 | [`docs/product/renderdoc-agent-complete-design.md`](docs/product/renderdoc-agent-complete-design.md) |
 | Workbench / Transcript / Composer | [`docs/ui/workbench-and-transcript.md`](docs/ui/workbench-and-transcript.md) |
 | Design System（Token / 按钮 / 颜色 / 组件） | [`docs/ui/design-system.md`](docs/ui/design-system.md) |
 | Work Process UI 验收 checklist | [`docs/ui/work-process-checklist.md`](docs/ui/work-process-checklist.md) |
@@ -113,7 +113,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 - **结构化压缩**：仅自动压缩；产品不提供按钮、菜单、`/compact` 或 `/summary`。会话准备和执行途中复用 `PromptPlan → RequestEnvelope → adapter` 单轮、无工具的 model-generated `StructuredHandoff`（`derivation: 'model-generated'`）。LLM 失败显式报错（Availability recoverable），不静默回退确定性抽取。低于阈值或可见回合过短时返回 `status: 'noop'`，不写 `complete` 压缩工作块。
 - **MCP transport**：仅 `stdio` / `streamable-http`；`sse` 配置 fail-closed（`MCP_TRANSPORT_UNSUPPORTED`）。Pool identity：`realpath + projectId + descriptorHash`；失败缓存指数退避；orphan pool quarantine。
 - **ToolValidator**：严格 JSON Schema 子集；只接受 `SUPPORTED_SCHEMA_KEYS` 白名单；未声明字段与未实现关键字编译期 `UNSUPPORTED_TOOL_SCHEMA` fail-closed。
-- **Orchestrator façade**：`AgentOrchestrator.ts` 保持 façade（**少于 800 行**）；turn 准备、tool 装配、executor、turn/subagent runner、prompt-plan、memory UI 等职责外提到协作单元；门禁 `pnpm run check:orchestrator-facade`（亦挂在 `check:architecture`）。
+- **Orchestrator façade**：`AgentOrchestrator.ts` 保持 façade（少于 800 行，ESLint `max-lines`）；turn 准备、tool 装配、executor、turn/subagent runner、prompt-plan、memory UI 等职责外提到协作单元；值 import 预算见 `pnpm run check:orchestrator-facade`。
 - **CSP**：生产 `script-src` 无 `unsafe-inline`；`style-src 'self'`（无 `unsafe-inline`）；`style-src-attr 'none'`；动态样式经 constructable stylesheet（`useDynStyle` / `assignDynStyle` / Appearance `applyChromeTheme`），禁止依赖 inline style attributes 或 `<style>` textContent 注入。Appearance chrome 权威见 [`docs/ui/design-system.md`](docs/ui/design-system.md)；当前 Settings schema 8 保留经校验的用户主题配置。
 - **IPC Zod**：全部 IPC handler 经 `parseIpcArgs`；非法 payload fail-closed；`approvalToken` 单次消费。
 - **RDC context lease**：仅 per-session lease（`setRdcRuntimeContextForSession` / `getRdcContextLease` / `assertRdcContextLeaseOwnership`）；**禁止** RDC global mirror、`legacyGlobalMirror`、`getRdcRuntimeContext` 全局 API。
@@ -378,38 +378,9 @@ Right Rail 有两个按选择对象区分的表面。选中 Project 时**只**�
 
 main-owned `RightRailProjectionService` 为显式 `{ projectId, sessionId }` 组装 `RightPanelViewModel`；renderer 只消费投影，不从 action events、全局 capture、工作目录扫描或 tool catalog 重建 Progress / Artifacts / Outputs / Context / Capture。Progress 是单一规范列表（`RightPanelViewModel.progress: ProgressTask[]`），创建序，已完成项就地保留，并与 transcript `taskProjection` 同序同态。Context 只含被冻结 Prompt 段或成功 tool result 证明的具体任务资源。Capture 在 session 中始终可见：诚实空态或 owner-session 操作面。Outputs 拒绝 inputs 与 plan。Investigation Artifacts 不得混进 Outputs。卡外壳在 empty / populated 之间不变；空内容用安静线框插图，有内容只增高本卡并在兄弟行间使用内部 hairline。Dock 在紧凑桌面宽度仍可用，仅在 `RIGHT_RAIL_DRAWER_BREAKPOINT`（920px）及以下或无法保住最小工作面时变为共享 overlay drawer。静态门禁：`pnpm run check:right-rail`，只认五卡。
 
-## T18 现场取证（2026-09-03）
+现场取证、硬件阻塞和已撤回实验只记在 [`docs/product/acceptance-ledger.md`](docs/product/acceptance-ledger.md)。未证项不得在本文件标成已验收。
 
-每行对应 [`docs/product/acceptance-ledger.md`](docs/product/acceptance-ledger.md) 行 id。事实保留原证；未证与硬件阻塞不得标成已验收。产品级 Browser QA 全矩阵见 U05；U06 仅保留历史运行事实；Optimizer 真实实验结论已撤回，见 ledger 更正。
-
-### 已证
-
-| Ledger | 项 | 状态 | 证据 |
-| --- | --- | --- | --- |
-| `T18-colddata-draft` | 知识导入 → session Draft | 已证 | `knowledge:import` 两份桌面案例；`candidateCreated: false`；`sourceStatus: fixed`；`verified: false`；再导入 `conflict` |
-| `T18-colddata-source` | 知识导入 源不变 | 已证 | `BugFull案例01.txt` SHA256 `b3885f07…c381d0`；`BugFull案例02.txt` `bfa12c54…7e35e5`；与 Draft `sourceHash` 一致 |
-| `T18-colddata-userspace` | user-space 持久化 | 已证 | `~/.rdc-agent/knowledge/cases/AIRD-20260207-000{1,2}.md`；index `cardCount: 2`；Center **User space 2**；中文标题完整 |
-| `T18-chinese-capture-open` | 中文 1.57GB capture | open+preview 已证 | `眼睛泪腺白点.rdc` SHA256 `0A79926A92E7E659989BEFC2322DC93B65782252FC5BE2DE33496142735A4094`；size `1647684424`；`openProjectInput` `status: open`；`openHumanPreview` `success`；hash 2026-09-04 复测仍不变 |
-| `T18-t15-debugger-neg` | T15 Debugger 负路径 | 已证 | 无 capture：`sess_df6be27d58a5` → `MISSION_COMPLETION_DENIED`（`debugger cannot complete without a dereferenceable MissionCheckpoint`），未伪装 completed。Settings RDC CLI 已配置；未配置 fail-closed 单测在 `adafa804`。WhiteHair 正路径被 `LOCAL_REPLAY_UNSUPPORTED` 挡住（正路径见硬件阻塞组 `T18-whitehair-open`） |
-| `T18-t16-analyzer-blocked` | T16 Analyzer 闭环 | Blocked 诚实收口 | `sess_5be2b0c52a58` / `proj_a99a24c68de3`；`rdc_probe version` ok（schema 3.0.0）；`preview_status` exit 2；`investigation_write` 写出 world/evidence/claim/checkpoint + ready report `invart-55a27b669134-1788459010567`（`sha256:3fc09696feae39145fd4c94c66c9260dda460f1da610e0d618789328aba4c5e3`）；source claim `cl_t16` 仍为 draft 未被 supersede；`reportContract.status=Blocked` → turn `MISSION_COMPLETION_DENIED`（`Blocked cannot complete`），未伪装 completed。伴随修复：`ToolValidator` 省略 `properties` 的 object 作 opaque bag；`report` 不再占用 cited `claimId`（`a37c107e`） |
-| `T18-t17-optimizer-blocked` | T17 Optimizer 闭环 | Blocked 诚实收口 | `sess_a73c57d0d2a5` / `proj_a99a24c68de3`；plan-only；`rdc_probe version` ok；`preview_status` exit 2；未写 Experiment / 未 mutate 工程；ready world `invart-9c0432fc5f8d-1788459329316`、claim `cl_t17` `invart-654177b47a50-1788459452297`（仍 ready，未被 report supersede）、checkpoint `cp_t17` `invart-85907a5d7764-1788459462807`、ready report `invart-71244190ba45-1788459648111`（`sha256:335d77de70a9a196f150330f7ae703366dd240b6723c9714e57eb6bc4ab10bbd`，`reportContract.status=Blocked`）→ `MISSION_COMPLETION_DENIED`（`Blocked cannot complete`） |
-| `T18-semantic` | Semantic / 真实 OpenAI embed | 已关闭 | 真实 OpenAI embed **不再补跑**（U02 已删除 Embedding capability / Semantic lane）。 |
-| `U06-t15-completed` | T15 Debugger 正路径 | 已证 | Android adb `e38b8019` / `android-e38b8019` 打开 WhiteHair；`sess_257be2c23d01` `run_2dad9f141f927f53` `completed`；checkpoint `cp-whitehair-eid167`；ready report `invart-173a94986fc4-1788550214355`（`sha256:3316c40ecc39baeed4a9c591fbcd539254f5cb4f908ec6317d4261b39b62cce5`，`reportContract.status=complete`）；final_answer 引用该报告。Local WhiteHair 仍见硬件阻塞组。 |
-| `U06-t16-completed` | T16 Analyzer 正路径 | 已证 | `sess_cff62330e3a7` `run_0f8e5559dec166c5` `completed`；三层 claim `observed_fact` / `derived_structure` / `semantic_inference`；ready report `invart-e924efb74e67-1788553110003`（`sha256:a38491c36d4079f987b1ec80e3df64a7dd715096f70203998d61cc8a530d8ce9`，`complete`）；`cancelActiveTurn` 后 index 无迟到写入。 |
-| `U06-t17-completed` | T17 Optimizer 历史完成记录 | 已撤回真实实验结论 | `sess_db9dfe15578b` `run_85f6c28295a4e8b7` `completed`；Experiment `exp-opt-lacrimal-aba` `rolled_back` 且 rollback 三条件成立；Mission 侧 shell/write 被拒；工程目录 manifest 前后一致；ready report `invart-report-opt-lacrimal-ready`（`sha256:11792293953c9ba73da74668a29baebd61f91596edab28f7499113bed1f426f6`，`complete`）。 |
-
-### 未证
-
-无剩余未证项。`T18-semantic` 已关闭，见上表。硬件阻塞见下一组。
-
-### 硬件阻塞
-
-| Ledger | 项 | 状态 | 证据 |
-| --- | --- | --- | --- |
-| `T18-whitehair-open` | WhiteHair open | 硬件 BLOCKED | `sess_17b59bc0131c` `openProjectInput(input_whitehair)` → `LOCAL_REPLAY_UNSUPPORTED`（Adreno 650 `VK_EXT_fragment_density_map` vs RTX 5090）；SHA256 仍为 `03DF08D14E6D5819E5173209D9AC1218C2F740010104EC911A7873E97A258D42`；size `168591424`。正路径 Local replay 本机不可做，不空等。T15 Debugger 正路径闭环改由 U06 在 Android adb 设备上补跑，本行不得标 verified。 |
-
-
-## 通用 Harness 与声明续跑（2026-09-15）
+## Plan 与 generation
 
 独立审查结论、父级记录更新与最终接受是不同责任：通过现有Task与Investigation版本化交付，不建立额外结算状态机。工具正文投影已存的版本关系而不扩展读取授权。审批主进程来源/故障元数据仅解释结果，不改变授权或领域证明；历史未知不得推断为新资格。
 
@@ -422,7 +393,7 @@ Plan 经 session artifact plans 类别版本化：同意前覆盖活文件，同
 普通 Capsule 省略领域扩展且没有 RDC Lease prompt 段；仅 RDC 模块接受 domainExtensions.rdc.requiresLease=true 并注入租约上下文。缺省无 RDC，授权子代理串行且 finally 撤销；旧顶层字段拒绝，不保留双轨。
 
 
-### Task 预算与取消所有权（2026-09-10）
+### Task 预算与取消
 
 Task 可通过通用 `executionRequirements` 声明必要执行方式、必需方法与独立性来源；`plan_artifact` 绑定必需 Task，并把主进程读取的要求快照纳入批准 hash。启动、实际准备和结算核对同一义务与执行来源，不以描述或 metadata 充当保证。正常重规划可在原计划门显式提出同一 Task 的定义修订，批准后保留原执行、root、消费和期限，不重开已完成 Task。此为新增的可选合同，历史记录不追认；字段、修订和完成门见 runtime-kernel，真实产品验收以 acceptance-ledger 为准。
 
@@ -432,7 +403,7 @@ Task 可通过通用 `executionRequirements` 声明必要执行方式、必需�
 
 任务取消终态须在实际 producer 与所属进程退出后保存；同 turn 取消请求不 self-join。用户在后续 owning 回合明确续跑时，可显式为同一 cancelled Task 创建下一 generation，旧执行终态、原预算与消费不变；禁止同回合复活、自动恢复子树或重开 completed Task。声明续跑切 Agent 后的新回合是独立 turn，不继承未完成 handoff 取消令牌。字段与调用合同以 [runtime-kernel](docs/contracts/runtime-kernel.md) 的 Task 执行章节为准，领域调查策略仍由实际加载的指令决定。
 
-## Session Capture 内嵌回放裁决（2026-09-13）
+## Session Capture 内嵌回放
 
 - 项目 RDC 列表为空时保持原 Capture 空态外观、文案与交互；不挂载新控件、历史或画面。非空时右下角五卡结构不变，Capture 内提供文件、设备、打开/关闭和唯一实际 EID 回放轨道。
 - 人工与 Agent 共用同一个 CaptureReplayState、当前图片、事件列表和控件，不设双 Tab 或独立足迹浏览/播放界面。Agent 接管仅锁定人工操作，控件原位显示并跟随实际回放，释放后恢复操作且不自动 apply。后台证据存档保留，不能作为第二套回放投影。Progress 不再提供额外的会话级停止按钮，沿用 Composer Stop。

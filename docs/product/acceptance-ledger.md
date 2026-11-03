@@ -1,5 +1,7 @@
 # Acceptance Ledger
 
+历史过程文档已收进本账本后删除。条目正文仍是证据；文中旧文件名只作历史出处，不再指向现存文档。
+
 ## 执行额度收敛：General 200 与额度权威回归 Harness（2026-11-03）
 
 - 基线 `50db04ce2ff1d77d23372a4d66839070e21fd9d4`，当前分支原地修改，不创建分支、不提交、不推送。内置 General `max-turns` 由 50 改为 200；Mission 保持 50，未声明默认 25。核对生效链：builtin < user < project 整资源替换（用户与项目当前均无 Agent 覆写）→ prepareTurn 以同一 `resolveAgentMaxTurns` 取 profile 与 policy 较小值，冻结进 `runtime:execution-limits` 与执行循环。子执行按自身 profile 解析，不继承父数值；Capsule 工具数/墙钟/子执行数及 `maxChildDepth` 不变。新值只在后续 prepareTurn 冻结，在途回合、消费、期限与历史不变，无自动重启或续跑。
