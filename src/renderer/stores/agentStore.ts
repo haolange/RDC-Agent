@@ -4,6 +4,7 @@
  * 追踪各 Agent 角色的运行状态，由 IPC 事件 `agent:statusChanged` 驱动更新。
  * 键为 sessionId::agentId，避免跨 session 串台。
  */
+import { isTransientScopeId } from '@shared/utils/executionScope';
 import { create } from 'zustand';
 import type { AgentState } from '@shared/types/agent';
 
@@ -27,7 +28,7 @@ interface AgentStoreState {
 export const useAgentStore = create<AgentStoreState>((set, get) => ({
   agents: {},
   updateAgentState: (state) => {
-    if (state.sessionId.startsWith('ephemeral:') || state.sessionId.includes('::subagent::')) {
+    if (isTransientScopeId(state.sessionId)) {
       return;
     }
     set((s) => ({

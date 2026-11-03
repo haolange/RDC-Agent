@@ -35,7 +35,7 @@ const App: React.FC = () => {
   const [userMenuAnchor, setUserMenuAnchor] = useState<{ element: HTMLButtonElement; rect: DOMRect } | null>(null);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [knowledgeCenterOpen, setKnowledgeCenterOpen] = useState(false);
-  const [runtimeTestMode, setRuntimeTestMode] = useState<boolean | null>(null);
+  const [shellReady, setShellReady] = useState(false);
 
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentRun = useSessionStore((state) => state.currentRun);
@@ -97,8 +97,8 @@ const App: React.FC = () => {
   useAppBootstrap({
     setIsLoading,
     setConnectionStatus,
-    runtimeTestMode,
-    setRuntimeTestMode,
+    shellReady,
+    setShellReady,
     setWindowMaximized,
     resolvedTheme,
   });

@@ -1,9 +1,10 @@
+import { rootScopeId } from '@shared/utils/executionScope';
 import { withResourceLifetime } from '../../runtime/ResourceExecutionLifetime';
 import { canonicalRealpath } from '../../hooks/hookTrustFingerprint';
 
 export function toolResourceKey(projectRoot: string | null | undefined, sessionId: string): string {
   const canonical = projectRoot ? canonicalRealpath(projectRoot) : '';
-  return canonical ? `project::${process.platform === 'win32' ? canonical.toLowerCase() : canonical}` : `session::${sessionId.split('::subagent::', 1)[0]}`;
+  return canonical ? `project::${process.platform === 'win32' ? canonical.toLowerCase() : canonical}` : `session::${rootScopeId(sessionId)}`;
 }
 
 /**

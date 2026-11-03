@@ -33,6 +33,7 @@ import { verifyApprovedPlanExit } from './approvedPlanExit';
 import { EMPTY_CANONICAL_ASSISTANT_OUTPUT, requireCanonicalFinalAnswer } from './CanonicalAssistantOutput';
 import { hydrateFrozenUserContent } from './ConversationAttachmentMaterializer';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
+import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
 import { reconcileTerminalToolReceipts } from './ConversationTerminalToolReceipts';
 import type { TurnCompletionValidator } from '../agent-runtime/agent/TurnCompletionValidator';
 import type { TurnCompletionDeclaration } from '../workflow/debugger/TurnCoordinator';
@@ -43,7 +44,6 @@ import type {
   ResolvedConversationContext,
 } from './ConversationRoutePreflight';
 import {
-  createTurnFailedDiagnostic,
   getAgentLabel,
   isActiveRun,
   recordLlmDiagnostic,
@@ -121,6 +121,8 @@ export async function completeProfileTurn(
     status: 'complete' | 'stopped' | 'error';
   } | null } = { value: null };
   let approvedPlanExit = false;
+  /** Set when the kernel reports cancellation (timeout or parent abort) without a session Stop. */
+  let runWasCancelled = false;
   const terminalCompletion: { value: TurnCompletionDeclaration | null } = { value: null };
 
   const applyAssistantMessagePatch = (
@@ -331,7 +333,6 @@ export async function completeProfileTurn(
   };
   let errorViewModel: ConversationTurnResult['errorViewModel'] = null;
   let llmDiagnostic: ConversationMessageDiagnostic | null = null;
-  let runWasCancelled = false;
   const seenCompactionSummaries = new Set<string>();
   const turnStreamState = {} as import('./ConversationTurnAgentEventHandler').TurnStreamState;
   Object.defineProperty(turnStreamState, 'currentLoopText', { get: () => currentLoopText, set: (value) => { currentLoopText = value; } });
@@ -475,9 +476,13 @@ export async function completeProfileTurn(
         evidenceRefs: terminalCompletion.value?.evidenceRefs,
       });
     } catch (error) {
-      // A user stop can reject the provider call after the stop request. Let the
-      // terminal stop commit own the visible message and trace in that case.
+      // A user stop, policy timeout or parent abort can reject the provider call.
+      // The terminal stop commit owns the visible message and trace in that case.
       if (abortController.signal.aborted) return;
+      if (terminalContext.value?.status === 'stopped') {
+        runWasCancelled = true;
+        return;
+      }
       llmDiagnostic = createTurnFailedDiagnostic(routePreflight, error);
       errorViewModel = {
         code: llmDiagnostic.code,
@@ -580,13 +585,15 @@ export async function completeProfileTurn(
   });
 
   } finally {
-    if (abortController.signal.aborted && !conversationPersistenceError && assistantMessage.status === 'streaming') {
+    const cancelled = abortController.signal.aborted || runWasCancelled;
+    if (cancelled && !conversationPersistenceError && assistantMessage.status === 'streaming') {
       try {
         commitStoppedMessage();
       } catch (error) {
         console.error('[ConversationService] terminal stop commit failed:', error);
       }
     }
+    streamScheduler?.close();
     if (sessionId && deferredTerminalEventType && !conversationPersistenceError) {
       const terminalStatus = assistantMessage.status === 'stopped'
         ? 'stopped'

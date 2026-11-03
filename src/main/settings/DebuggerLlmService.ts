@@ -1,3 +1,4 @@
+import { isSubagentScopeId } from '@shared/utils/executionScope';
 import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type {
@@ -113,7 +114,7 @@ function hasMaterialProviderUsageTelemetry(usage: {
 
 
 function isSubagentSessionId(sessionId: string | null | undefined): boolean {
-  return Boolean(sessionId && sessionId.includes('::subagent::'));
+  return Boolean(sessionId && isSubagentScopeId(sessionId));
 }
 
 /**

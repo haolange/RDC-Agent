@@ -1,3 +1,4 @@
+import { rootScopeId, subagentScopeId } from '@shared/utils/executionScope';
 import { withDelegatedInteractionOwner } from '../../agent-runtime/interactions/DelegatedInteractionOwner';
 import { deriveChildPolicyBudget, flushPolicyBudgetObservers, registerPolicyBudgetObserver } from './DelegationBudget';
 import { bindTaskRootBudget } from './TaskRootBudget';
@@ -129,8 +130,8 @@ export class SubagentRunner {
     } catch (error) {
       const text = error instanceof Error ? error.message : String(error);
       const subagentId = generateEventId('subagent');
-      const childSessionId = input.childSessionId ?? `${input.parentSessionId ?? 'ephemeral'}::subagent::${subagentId}`;
-      const ownerSessionId = input.parentSessionId?.split('::subagent::')[0];
+      const childSessionId = input.childSessionId ?? subagentScopeId(input.parentSessionId ?? createEphemeralScopeId(), subagentId);
+      const ownerSessionId = (input.parentSessionId ? rootScopeId(input.parentSessionId) : undefined);
       if (ownerSessionId) {
         delegationTraceStore.start(ownerSessionId, {
           parentToolCallId: input.parentToolCallId, task, profile: input.targetProfile,
@@ -170,7 +171,7 @@ export class SubagentRunner {
     const subagentId = generateEventId('subagent');
     // 子 agent 用独立 sessionId 段隔离 context/messages（不污染父线程持久化）。
     const subagentSessionId = input.childSessionId ?? (input.parentSessionId
-      ? `${input.parentSessionId}::subagent::${subagentId}`
+      ? subagentScopeId(input.parentSessionId, subagentId)
       : createEphemeralScopeId());
 
     const childAbort = new AbortController();
@@ -190,7 +191,7 @@ export class SubagentRunner {
       else parentSignal.addEventListener('abort', onParentAbort, { once: true });
     }
 
-    const ownerSessionId = input.parentSessionId?.split('::subagent::')[0] ?? null;
+    const ownerSessionId = (input.parentSessionId ? rootScopeId(input.parentSessionId) : null);
     const traceIdentity = `${subagentSessionId}\u0000${input.executionId ?? ''}\u0000${input.taskExecutionGeneration ?? ''}`;
     if (ownerSessionId) delegationTraceStore.start(ownerSessionId, {
       parentToolCallId: input.parentToolCallId, task, profile: input.targetProfile,

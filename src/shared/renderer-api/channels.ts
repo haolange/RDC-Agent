@@ -213,7 +213,6 @@ export const RENDERER_EVENT_CHANNEL = {
     effectiveCatalogChanged: 'llm:effectiveCatalogChanged',
   },
   agent: {
-    message: 'agent:message',
     statusChanged: 'agent:statusChanged',
   },
   tools: {

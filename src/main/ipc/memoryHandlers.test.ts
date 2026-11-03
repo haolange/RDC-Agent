@@ -35,7 +35,6 @@ import { registerMemoryHandlers } from './memoryHandlers';
 describe('memory mutation approval boundaries', () => {
   beforeEach(() => {
     handlers.clear();
-    delete process.env.RDC_AGENT_TEST_MODE;
     delete process.env.RDC_AGENT_BROWSER_QA;
     delete process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS;
     electronState.focused = undefined;
@@ -92,7 +91,6 @@ describe('memory mutation approval boundaries', () => {
 });
 
 it.each([['zh-CN', '确认更改记忆', '取消'], ['en', 'Confirm memory change', 'Cancel']])('localizes %s native confirmation and issues no token after cancellation', async (language, title, cancel) => {
-  delete process.env.RDC_AGENT_TEST_MODE;
   delete process.env.RDC_AGENT_BROWSER_QA;
   registerMemoryHandlers({} as never);
   electronState.focused = {};

@@ -1,3 +1,4 @@
+import { isSubagentScopeId } from '@shared/utils/executionScope';
 import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
 import { createTaskTools, TaskRegistry, MemoryTaskStore, createSessionTaskStore, getDelegatedTaskScope } from '../../agent-runtime/tasks';
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
@@ -15,7 +16,7 @@ export function createTaskRuntimeTools(input: {
 }): AgentTool[] {
   const resolvedSessionId = input.sessionId ?? input.turnHandle?.eventSink?.sessionId ?? null;
   const delegatedScope = resolvedSessionId ? getDelegatedTaskScope(resolvedSessionId) : null;
-  const isSubagent = resolvedSessionId?.includes('::subagent::') ?? false;
+  const isSubagent = resolvedSessionId ? isSubagentScopeId(resolvedSessionId) : false;
   const store = delegatedScope ? createSessionTaskStore(delegatedScope.ownerSessionId)
     : isSubagent || !resolvedSessionId ? new MemoryTaskStore() : createSessionTaskStore(resolvedSessionId);
   const ownerSessionId = delegatedScope?.ownerSessionId ?? resolvedSessionId;

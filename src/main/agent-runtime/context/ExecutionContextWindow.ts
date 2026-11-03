@@ -1,3 +1,4 @@
+import { isSubagentScopeId } from '@shared/utils/executionScope';
 import fs from 'fs';
 import crypto from 'crypto';
 import { ContextManager, type ContextManagerConfig } from '../agent/ContextManager';
@@ -86,7 +87,7 @@ export function createExecutionContextWindow(input: {
       // A delegated execution has an isolated, non-persistent session identity.
       // Its window can be reused within this execution, but there is no child
       // session journal from which a later execution could authorize restore.
-      if (input.sessionId.includes('::subagent::')) return null;
+      if (isSubagentScopeId(input.sessionId)) return null;
       const priorRoutes = routeIdentity ? new Map<string, ExecutionIdentity>() : null;
       if (priorRoutes) storageAdapter.readSessionContextJournal(input.sessionId, entry => {
         priorRoutes.set(entry.executionIdentity.fingerprint, entry.executionIdentity);

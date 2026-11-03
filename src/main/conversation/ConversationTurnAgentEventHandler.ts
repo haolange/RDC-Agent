@@ -1,3 +1,4 @@
+import { rootScopeId } from '@shared/utils/executionScope';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 import type {
   ConversationLoopOutputPhase,
@@ -399,7 +400,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                   ...(isSubagent ? {
                     delegation: {
                       task: redactCredentialLikeText(String((event.payload.args as Record<string, unknown> | undefined)?.task ?? '')),
-                      profile: String((event.payload.args as Record<string, unknown> | undefined)?.profile ?? 'general'),
+                      profile: String((event.payload.args as Record<string, unknown> | undefined)?.profile ?? event.agentId ?? ''),
                       mode: (event.payload.args as Record<string, unknown> | undefined)?.mode === 'background' ? 'background' as const : 'wait' as const,
                     },
                   } : {}),
@@ -624,7 +625,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
             if (event.type === 'tool.completed') {
               const result = event.payload.result as ToolCallResult | undefined;
               if (sessionId && normalizeToolName(String(event.payload.toolName)) === 'subagent') {
-                delegationTraceStore.setParentReceipt(sessionId.split('::subagent::')[0]!,
+                delegationTraceStore.setParentReceipt(rootScopeId(sessionId),
                   String(event.payload.toolCallId), result ?? {});
               }
               const isAskUserTool = normalizeToolName(String(event.payload.toolName)) === 'ask_user';

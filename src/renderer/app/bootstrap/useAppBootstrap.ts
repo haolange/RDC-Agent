@@ -22,16 +22,16 @@ import { useWorkflowStore } from '../../stores/workflowStore';
 export function useAppBootstrap(options: {
   setIsLoading: (loading: boolean) => void;
   setConnectionStatus: (status: 'connected' | 'degraded' | 'offline') => void;
-  runtimeTestMode: boolean | null;
-  setRuntimeTestMode: (mode: boolean | null) => void;
+  shellReady: boolean;
+  setShellReady: (ready: boolean) => void;
   setWindowMaximized: (maximized: boolean) => void;
   resolvedTheme: ResolvedTheme;
 }): void {
   const {
     setIsLoading,
     setConnectionStatus,
-    runtimeTestMode,
-    setRuntimeTestMode,
+    shellReady,
+    setShellReady,
     setWindowMaximized,
     resolvedTheme,
   } = options;
@@ -72,7 +72,7 @@ export function useAppBootstrap(options: {
 
         hydrateSettings(appSettings, appMeta.systemTheme);
         hydrateLayout(appSettings);
-        setRuntimeTestMode(appMeta.testMode);
+        setShellReady(true);
         setWindowMaximized(isMaximized);
         setConnectionStatus('connected');
       } catch (error) {
@@ -84,7 +84,7 @@ export function useAppBootstrap(options: {
     };
 
     void initApp();
-  }, [hydrateLayout, hydrateSettings, setConnectionStatus, setIsLoading, setRuntimeTestMode, setWindowMaximized]);
+  }, [hydrateLayout, hydrateSettings, setConnectionStatus, setIsLoading, setShellReady, setWindowMaximized]);
 
   useEffect(() => {
     setActiveTerminalContext({
@@ -112,7 +112,7 @@ export function useAppBootstrap(options: {
       return;
     }
 
-    if (runtimeTestMode === null) {
+    if (!shellReady) {
       return;
     }
 
@@ -123,8 +123,7 @@ export function useAppBootstrap(options: {
         (message) => message.sessionId === currentSession.sessionId,
       );
       const traceAlreadyBound = useWorkflowStore.getState().tracePresentation?.sessionId === currentSession.sessionId;
-      const restoreWillRun = !(navigator.webdriver && runtimeTestMode);
-      const skipEvidenceIpc = restoreWillRun && historyAlreadyBound;
+      const skipEvidenceIpc = historyAlreadyBound;
       const [historyResult, evidenceResult, traceResult] = await Promise.all([
         historyAlreadyBound
           ? Promise.resolve(null)
@@ -146,21 +145,13 @@ export function useAppBootstrap(options: {
           ),
           historyResult.branchState ?? null,
         );
-      } else if (!restoreWillRun) {
-        setConversationSnapshot(
-          hydrateMessagesWithActionEvents(
-            useConversationStore.getState().allConversationMessages,
-            (evidenceResult.events ?? []) as ActionEvent[],
-          ),
-          useConversationStore.getState().branchState,
-        );
       }
       if (traceResult) {
         setTracePresentation(traceResult.presentation ?? null);
       }
     })();
     return () => { cancelled = true; };
-  }, [currentSession?.sessionId, runtimeTestMode, setConversationSnapshot, setTracePresentation]);
+  }, [currentSession?.sessionId, shellReady, setConversationSnapshot, setTracePresentation]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
@@ -221,11 +212,11 @@ export function useAppBootstrap(options: {
     }
   }, [settings.llm.providers, settings.llm.agentRoutes]);
 
-  useProjectInputsBootstrap(runtimeTestMode);
-  useSessionRestoreBootstrap(runtimeTestMode);
+  useProjectInputsBootstrap(shellReady);
+  useSessionRestoreBootstrap(shellReady);
 }
 
-function useProjectInputsBootstrap(runtimeTestMode: boolean | null): void {
+function useProjectInputsBootstrap(shellReady: boolean): void {
   const currentProject = useProjectStore((state) => state.currentProject);
 
   useEffect(() => {
@@ -235,15 +226,7 @@ function useProjectInputsBootstrap(runtimeTestMode: boolean | null): void {
       return;
     }
 
-    if (runtimeTestMode === null) {
-      return;
-    }
-
-    if (navigator.webdriver && runtimeTestMode) {
-      const seededInputs = currentProject.inputs?.length
-        ? currentProject.inputs
-        : useProjectStore.getState().projectInputs;
-      useProjectStore.getState().updateProjectInputs(currentProject.projectId, seededInputs);
+    if (!shellReady) {
       return;
     }
 
@@ -259,19 +242,15 @@ function useProjectInputsBootstrap(runtimeTestMode: boolean | null): void {
       .catch(() => {
         useProjectStore.getState().updateProjectInputs(currentProject.projectId, currentProject.inputs ?? []);
       });
-  }, [currentProject, runtimeTestMode]);
+  }, [currentProject, shellReady]);
 }
 
-function useSessionRestoreBootstrap(runtimeTestMode: boolean | null): void {
+function useSessionRestoreBootstrap(shellReady: boolean): void {
   const currentSession = useProjectStore((state) => state.currentSession);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
-    if (runtimeTestMode === null) {
-      return;
-    }
-
-    if (navigator.webdriver && runtimeTestMode) {
+    if (!shellReady) {
       return;
     }
 
@@ -322,5 +301,5 @@ function useSessionRestoreBootstrap(runtimeTestMode: boolean | null): void {
           useWorkflowStore.getState().setTracePresentation(null);
         });
     }
-  }, [currentSession, runtimeTestMode]);
+  }, [currentSession, shellReady]);
 }

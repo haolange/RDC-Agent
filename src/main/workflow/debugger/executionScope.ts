@@ -4,9 +4,10 @@
  */
 
 import { randomUUID } from 'crypto';
+import { ephemeralScopeId } from '@shared/utils/executionScope';
 
 export function createEphemeralScopeId(): string {
-  return `ephemeral:${randomUUID()}`;
+  return ephemeralScopeId(randomUUID());
 }
 
 export function resolveExecutionScopeId(
@@ -26,10 +27,4 @@ export function requireExecutionScopeId(scopeId: string | null | undefined): str
     throw new Error('EXECUTION_SCOPE_REQUIRED: a non-empty session or ephemeral scope id is required.');
   }
   return value;
-}
-
-/** Execution metadata that must not outlive the turn that created it. */
-export function isTransientExecutionScope(scopeId: string): boolean {
-  const value = scopeId.trim();
-  return value.startsWith('ephemeral:') || value.includes('::subagent::');
 }

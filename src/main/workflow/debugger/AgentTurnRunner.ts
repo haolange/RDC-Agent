@@ -1,7 +1,5 @@
-import { runtimePermissionStateService } from '../../agent-runtime/permissions/RuntimePermissionStateService';
-import { RUNTIME_PERMISSION_TOKEN_RESERVE } from '../../agent-runtime/permissions/RuntimePermissionContext';
 /**
- * AgentTurnRunner — runAgentTurn + agent slot creation/reuse.
+ * AgentTurnRunner — runs one prepared agent turn; slot construction lives in AgentSlotFactory.
  */
 
 import type { AgentRole } from '@shared/types/agent';
@@ -9,33 +7,17 @@ import { executePermissionReview } from '../../agent-runtime/permissions/Permiss
 import { permissionReviewAuthority, permissionReviewEvidence } from '../../agent-runtime/permissions/PermissionReviewAuthority';
 import { createHash } from 'node:crypto';
 import { delegatedArtifactReferences } from '../../sessions/DelegatedArtifactAccess';
-import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { ContextUsageBreakdownEntry } from '@shared/types/session';
-import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdcRuntime';
+import type { EffectiveAgentProfile } from '@shared/types/rdcRuntime';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
-import { resolveTurnOutputTokens } from '@shared/utils/contextBudget';
-import { Agent } from '../../agent-runtime/agent/Agent';
-import { resolveAgentMaxTurns } from '../../agent-runtime/agent/ExecutionLimits';
-import { createExecutionContextManager } from '../../agent-runtime/context/ExecutionContextWindow';
 import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
-import { ErrorRecovery } from '../../agent-runtime/agent/ErrorRecovery';
 import type { ToolExecutor } from '../../agent-runtime/agent/AgentLoop';
-import {
-  requestEnvelopeBuilder,
-  requestSnapshotStore,
-} from '../../agent-runtime/prompt';
-import { promptCacheCompiler } from '../../agent-runtime/prompt/PromptCacheCompiler';
-import {
-  encodeAgentModel,
-  configuredRuntimeProvider,
-} from '../../agent-runtime/providers/ConfiguredRuntimeProvider';
 import {
   claimStructuredToolCallingEvidence,
   describeRouteCapabilityDiagnostic,
   isExplicitStructuredToolCallingRejection,
-  resolveAgentRouteCapability,
 } from '../../agent-runtime/capabilities/RouteCapabilityResolver';
 import {
   buildDiagnosticAgentEvent,
@@ -46,7 +28,6 @@ import {
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { cancelTurnInteractionRequests } from './cancelTurnInteractionRequests';
 import type {
-  AssistantMessage,
   AgentEvent as CoreAgentEvent,
   Message,
   StreamOptions,
@@ -55,10 +36,8 @@ import type {
 } from '../../agent-runtime/core/types';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import {
-  recordEffectivePlanSuccess,
   recordObservedToolCallingSupport,
   recordObservedToolCallingUnsupported,
-  resolveEffectiveModel,
 } from '../../settings/EffectiveModelResolver';
 import { debuggerLlmService } from '../../settings/DebuggerLlmService';
 import { settingsService } from '../../settings/SettingsService';
@@ -78,21 +57,13 @@ import {
 } from './deferredTools';
 import type {
   AgentTurnOptions,
-  AgentProfileTurnOptions,
   PreparedAgentRuntime,
   ResolvedRuntimeTools,
   ToolExecutorRuntimeContext,
 } from './orchestratorTypes';
 import type { TurnCompletionValidator } from '../../agent-runtime/agent/TurnCompletionValidator';
 import { settleJoinedTurnTaskExecutions, settleUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
-
-export function hasActualProviderUsage(message: AssistantMessage): boolean {
-  return message.stopReason !== 'error';
-}
-
-export function shouldWarnEmptyAssistantCompletion(message: AssistantMessage): boolean {
-  return message.stopReason !== 'error';
-}
+import { createOrReuseAgentSlot, isSuccessfulProviderResponse, reportedUsageFields, type AgentSlotRequest } from './AgentSlotFactory';
 
 export interface AgentTurnRunnerDeps {
   validateCompletion: TurnCompletionValidator;
@@ -123,187 +94,8 @@ export interface AgentTurnRunnerDeps {
 export class AgentTurnRunner {
   constructor(private readonly deps: AgentTurnRunnerDeps) {}
 
-  getOrCreateAgentSlot(
-    agentId: AgentRole,
-    providerId: string,
-    modelId: string,
-    systemPrompt: string,
-    streamOptions: StreamOptions,
-    tools: ToolDefinition[] = [],
-    toolExecutor = this.deps.createToolExecutor(agentId, [], undefined),
-    turnSignature = '',
-    sessionId: string = '',
-    contextWindow: number | undefined,
-    contextTokenLimit: number,
-    promptPlan?: PromptPlan,
-    initialMessages: Message[] = [],
-    contextDiagnostic?: Record<string, unknown>,
-    /** 用于 slot cache key；默认与注入 tools 相同。应传入全部可用工具以稳定复用。 */
-    signatureTools?: ToolDefinition[],
-    routeCapabilityOverride?: AgentRouteCapability,
-    policyMaxTurns?: number,
-    profileMaxTurns?: number | null,
-    beforeRequestMessages?: import('../../agent-runtime/agent/AgentLoop').AgentLoopConfig['beforeRequestMessages'],
-    onProviderRequestCommitted?: AgentProfileTurnOptions['onProviderRequestCommitted'],
-  ): AgentSlot {
-    if (!promptPlan) {
-      throw new Error('PromptPlan is required before creating an agent runtime slot.');
-    }
-    const executionScopeId = requireExecutionScopeId(sessionId);
-    const slotKey = agentSlotKey(executionScopeId, agentId);
-    if (this.deps.slots.isQuarantined(slotKey)) {
-      throw new Error(`AGENT_SLOT_QUARANTINED: ${slotKey} is still owned by an orphaned turn.`);
-    }
-    const toolSignature = this.deps.createToolSignature(signatureTools ?? tools);
-    const activeContextWindow = contextWindow ?? streamOptions.requestPlan.contextWindowTokens;
-    const requestCompactionThreshold = contextTokenLimit;
-    const fixedPromptTokens = promptPlan.totalTokenEstimate + charsToTokens(JSON.stringify(tools).length);
-    const resolvedContextTokenLimit = requestCompactionThreshold - fixedPromptTokens;
-    if (resolvedContextTokenLimit <= 0) {
-      throw new Error('PROMPT_OVERHEAD_EXCEEDS_BUDGET: system prompt and tool schemas leave no conversation budget.');
-    }
-    const existing = this.deps.slots.getSlot(slotKey);
-    if (existing?.agent.isStreaming) {
-      throw new Error(`AGENT_SLOT_BUSY: ${slotKey} has not completed its previous provider loop.`);
-    }
-    if (
-      existing
-      && existing.providerId === providerId
-      && existing.modelId === modelId
-      && existing.systemPrompt === systemPrompt
-      && existing.toolSignature === toolSignature
-      && existing.turnSignature === turnSignature
-      && existing.contextTokenLimit === resolvedContextTokenLimit
-      && !existing.agent.isStreaming
-    ) {
-      // 复用 slot：从磁盘权威 history rehydrate，再同步 tools（COW）。
-      existing.activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, toolSignature);
-      this.deps.slots.rehydrate(existing, initialMessages as import('../../agent-runtime/core/types').AgentMessage[]);
-      existing.agent.setTools(tools);
-      return existing;
-    }
-
-    // Every turn starts from the active branch materialized by the canonical
-    // session journal. The in-memory slot is only an execution cache.
-    const agentModel = encodeAgentModel(providerId, modelId, {
-      contextWindow: activeContextWindow,
-      maxOutputTokens: streamOptions.requestPlan.maxOutputTokens,
-    });
-    const routeProvider = settingsService.getAll().llm.providers.find((provider) => provider.id === providerId);
-    const reasoningContract = (routeCapabilityOverride ?? resolveAgentRouteCapability(
-      routeProvider,
-      modelId,
-      resolveEffectiveModel(providerId, modelId, settingsService.getAll()),
-    )).reasoningContract;
-
-    const contextManager = createExecutionContextManager({
-      sessionId: executionScopeId, provider: routeProvider,
-      model: resolveEffectiveModel(providerId, modelId, settingsService.getAll()),
-      plan: streamOptions.requestPlan, credentialHandle: streamOptions.credentialHandle,
-      config: { modelId, contextTokenLimit: resolvedContextTokenLimit, tokenizer: this.deps.tokenizerService },
-    });
-
-    // ErrorRecovery：错误分类与恢复策略（retry/reactive_compact/continue/abort）。
-    const errorRecovery = new ErrorRecovery({ primaryModel: agentModel });
-
-    const agent: Agent = new Agent({
-      initialState: {
-        model: agentModel,
-        systemPrompt,
-        systemPromptSegments: promptPlan.segments,
-        tools,
-        messages: initialMessages,
-      },
-      provider: configuredRuntimeProvider,
-      resolvePermissionState: () => runtimePermissionStateService.getSnapshot(),
-      toolExecutor,
-      streamOptions,
-      maxTurns: resolveAgentMaxTurns(policyMaxTurns, profileMaxTurns),
-      transformContext: (messages, signal, onProgress) => {
-        contextManager.setRequestTokenLimit(requestCompactionThreshold - promptPlan.totalTokenEstimate - RUNTIME_PERMISSION_TOKEN_RESERVE - charsToTokens(JSON.stringify(agent.state.tools).length));
-        return contextManager.compress(messages, signal, onProgress);
-      },
-      errorRecovery,
-      resolveMaxTokens: (messages) => resolveTurnOutputTokens({
-        contextWindowTokens: streamOptions.requestPlan.contextWindowTokens,
-        maxOutputTokens: streamOptions.requestPlan.maxOutputTokens,
-        promptTokens: promptPlan.totalTokenEstimate + RUNTIME_PERMISSION_TOKEN_RESERVE + charsToTokens(JSON.stringify(agent.state.tools).length) + this.deps.tokenizerService.countMessagesTokens(messages, modelId),
-      }),
-      onRequest: async ({ model, context: requestContext, streamOptions: requestOptions, mailboxDeliveries }) => {
-        const callIndex = requestSnapshotStore.nextCallIndex(executionScopeId, turnSignature || undefined);
-        const snapshot = requestEnvelopeBuilder.build({
-          promptPlan,
-          sessionId: executionScopeId,
-          turnId: turnSignature || undefined,
-          callIndex,
-          route: {
-            providerId,
-            modelId: requestOptions.requestPlan.effectiveModelId,
-            protocol: requestOptions.requestPlan.route.protocol ?? routeProvider?.protocol ?? model.api,
-          },
-          requestPlan: requestOptions.requestPlan,
-          messages: requestContext.messages,
-          mailboxDeliveries,
-          tools: requestContext.tools ?? [],
-          controls: {
-            temperature: requestOptions.temperature,
-            maxTokens: requestOptions.maxTokens,
-            topP: requestOptions.topP,
-            reasoningSelection: requestOptions.reasoning?.selection,
-            contextDiagnostic,
-            runtimePermissionContext: requestContext.systemPromptSegments?.find(segment => segment.id === 'runtime:permission'),
-          },
-          reasoning: reasoningContract,
-          cache: requestOptions.promptCache ?? streamOptions.promptCache ?? promptCacheCompiler.compile({
-            promptPlan,
-            requestPlan: requestOptions.requestPlan,
-            tools: requestContext.tools ?? [],
-          }),
-        });
-        requestSnapshotStore.write(snapshot);
-        await onProviderRequestCommitted?.(snapshot.id);
-        return snapshot.id;
-      },
-      onResponse: (requestId, message) => {
-        if (!requestId || !hasActualProviderUsage(message)) return;
-        recordEffectivePlanSuccess(providerId, modelId, settingsService.getAll(), streamOptions.requestPlan);
-        requestSnapshotStore.complete(requestId, executionScopeId, turnSignature || undefined, {
-          inputTokens: message.usage.inputTokens,
-          outputTokens: message.usage.outputTokens,
-          ...(typeof message.usage.cacheReadTokens === 'number'
-            ? { cacheReadTokens: message.usage.cacheReadTokens }
-            : {}),
-          ...(typeof message.usage.cacheWriteTokens === 'number'
-            ? { cacheWriteTokens: message.usage.cacheWriteTokens }
-            : {}),
-          ...(typeof message.usage.cacheHitTokens === 'number'
-            ? { cacheHitTokens: message.usage.cacheHitTokens }
-            : {}),
-          ...(typeof message.usage.cacheMissTokens === 'number'
-            ? { cacheMissTokens: message.usage.cacheMissTokens }
-            : {}),
-          ...(typeof message.usage.reasoningTokens === 'number'
-            ? { reasoningTokens: message.usage.reasoningTokens }
-            : {}),
-          estimated: false,
-        });
-      },
-      beforeRequestMessages,
-    });
-
-    const slot: AgentSlot = {
-      agent,
-      contextManager,
-      providerId,
-      modelId,
-      systemPrompt,
-      toolSignature,
-      turnSignature,
-      contextTokenLimit: resolvedContextTokenLimit,
-      activatedDeferredTools: this.deps.deferredActivation.resolveActivatedSet(slotKey, toolSignature),
-    };
-    this.deps.slots.setSlot(slotKey, slot);
-    return slot;
+  getOrCreateAgentSlot(request: AgentSlotRequest): AgentSlot {
+    return createOrReuseAgentSlot(this.deps, request);
   }
 
   async runAgentTurn(input: {
@@ -542,30 +334,30 @@ export class AgentTurnRunner {
         }));
       }
     }
-    slot = this.getOrCreateAgentSlot(
-      input.agentId,
-      input.providerId,
-      input.modelId,
-      promptPlan.systemPrompt,
+    slot = this.getOrCreateAgentSlot({
+      agentId: input.agentId,
+      providerId: input.providerId,
+      modelId: input.modelId,
+      systemPrompt: promptPlan.systemPrompt,
       streamOptions,
-      activeToolDefinitions,
+      tools: activeToolDefinitions,
       toolExecutor,
-      input.turnId ?? '',
-      executionScopeId,
-      input.contextWindow,
-      input.contextTokenLimit,
+      turnSignature: input.turnId ?? '',
+      sessionId: executionScopeId,
+      contextWindow: input.contextWindow,
+      contextTokenLimit: input.contextTokenLimit,
       promptPlan,
-      input.initialMessages,
-      input.contextDiagnostic,
-      runtimeTools.definitions,
-      routeCapability,
-      effectivePlan.policy.maxTurns === Number.MAX_SAFE_INTEGER
+      initialMessages: input.initialMessages ?? [],
+      contextDiagnostic: input.contextDiagnostic,
+      signatureTools: runtimeTools.definitions,
+      routeCapabilityOverride: routeCapability,
+      policyMaxTurns: effectivePlan.policy.maxTurns === Number.MAX_SAFE_INTEGER
         ? undefined
         : effectivePlan.policy.maxTurns,
-      effectivePlan.profileMaxTurns,
-      input.options?.beforeProviderRequestMessages,
-      input.options?.onProviderRequestCommitted,
-    );
+      profileMaxTurns: effectivePlan.profileMaxTurns,
+      beforeRequestMessages: input.options?.beforeProviderRequestMessages,
+      onProviderRequestCommitted: input.options?.onProviderRequestCommitted,
+    });
     if (!slot) {
       throw new Error('Agent slot setup did not produce a slot.');
     }
@@ -632,7 +424,7 @@ export class AgentTurnRunner {
           .filter((block) => block.type === 'text')
           .map((block) => (block as { text: string }).text)
           .join('');
-        if (event.message.usage && hasActualProviderUsage(event.message)) {
+        if (event.message.usage && isSuccessfulProviderResponse(event.message)) {
           // 按当前实际注入的工具定义计量（含本 turn 内新激活的 deferred 工具）；
           // deferred 段仅计未激活 schema 估算，且仅在 >0 时加入。
           const injectedDefs = activeSlot.agent.state.tools ?? [];
@@ -705,32 +497,19 @@ export class AgentTurnRunner {
             modelId: input.modelId,
             inputTokens: event.message.usage.inputTokens,
             outputTokens: event.message.usage.outputTokens,
-            ...(typeof event.message.usage.cacheReadTokens === 'number'
-              ? { cacheReadTokens: event.message.usage.cacheReadTokens }
-              : {}),
-            ...(typeof event.message.usage.cacheWriteTokens === 'number'
-              ? { cacheWriteTokens: event.message.usage.cacheWriteTokens }
-              : {}),
-            ...(typeof event.message.usage.cacheHitTokens === 'number'
-              ? { cacheHitTokens: event.message.usage.cacheHitTokens }
-              : {}),
-            ...(typeof event.message.usage.cacheMissTokens === 'number'
-              ? { cacheMissTokens: event.message.usage.cacheMissTokens }
-              : {}),
-            ...(typeof event.message.usage.reasoningTokens === 'number'
-              ? { reasoningTokens: event.message.usage.reasoningTokens }
-              : {}),
+            ...reportedUsageFields(event.message.usage),
             ...(event.message.usage.cost ? { cost: event.message.usage.cost } : {}),
             precomputedBreakdown,
           });
         }
-        if (shouldWarnEmptyAssistantCompletion(event.message) && !sawStructuredToolCall && !responseText.trim()) {
+        const diagnosticIsLive = turnHandle.isLive(turnGeneration);
+        if (diagnosticIsLive && isSuccessfulProviderResponse(event.message) && !sawStructuredToolCall && !responseText.trim()) {
           input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
             code: 'empty_response_without_tool_call',
             severity: 'warning',
             message: 'Provider returned an empty assistant message without a structured tool call.',
           }));
-        } else if (shouldWarnEmptyAssistantCompletion(event.message) && !sawStructuredToolCall && mentionsTextualToolCall(responseText)) {
+        } else if (diagnosticIsLive && isSuccessfulProviderResponse(event.message) && !sawStructuredToolCall && mentionsTextualToolCall(responseText)) {
           input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
             code: 'textual_tool_call_not_executed',
             severity: 'warning',

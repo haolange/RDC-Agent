@@ -1,3 +1,4 @@
+import { subagentScopeId } from '@shared/utils/executionScope';
 import type { AgentRole } from '@shared/types/agent';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
@@ -69,7 +70,7 @@ export class BackgroundSubagentService {
       const execution = await registry.getExecution(executionId);
       if (!execution || execution.generation !== owner.generation) continue;
       delegationTraceStore.setExecutionStatus(sessionId, owner.parentToolCallId,
-        `${sessionId}::subagent::${executionId}\u0000${executionId}\u0000${owner.generation}`, execution.status);
+        `${subagentScopeId(sessionId, executionId)}\u0000${executionId}\u0000${owner.generation}`, execution.status);
       if (['completed', 'partial', 'blocked', 'failed', 'cancelled', 'interrupted'].includes(execution.status)) {
         this.executionTraceOwners.delete(executionId);
       }
@@ -171,7 +172,7 @@ export class BackgroundSubagentService {
     };
     const beforeProviderRequestMessages = async () => {
       await checkpointBudget();
-      const childSessionId = `${input.sessionId}::subagent::${execution.id}`;
+      const childSessionId = subagentScopeId(input.sessionId, execution.id);
       const committed = this.listMailboxDeliveries(childSessionId);
       const recoveredThrough = committed
         .filter((delivery) => delivery.executionId === execution.id && delivery.generation === execution.generation && delivery.direction === 'to_child')
@@ -426,7 +427,7 @@ export function createBackgroundSubagentService(subagents: SubagentRunner, depen
   return new BackgroundSubagentService(async (input) => subagents.runSubagent({
     parentAgentId: input.parentAgentId, parentToolCallId: input.parentToolCallId, targetProfile: input.targetProfile,
     capsule: input.capsule, model: input.capsule.model, parentSessionId: input.originSessionId ?? input.sessionId, projectRootPath: input.projectRootPath,
-    projectId: input.projectId, signal: input.signal, detached: true, childSessionId: `${input.sessionId}::subagent::${input.executionId}`,
+    projectId: input.projectId, signal: input.signal, detached: true, childSessionId: subagentScopeId(input.sessionId, input.executionId),
     // Detached execution progress belongs to TaskRegistry and its durable mailbox,
     // not the originating reply's synchronous subagent continuation or trace.
     parentOnEvent: (event) => { if (!event.type.startsWith('subagent.')) input.parentOnEvent?.(event); },

@@ -65,6 +65,25 @@ describe('TurnCoordinator', () => {
     expect(received).toEqual(['early']);
   });
 
+  it('detaches the parent abort listener once the turn closes', async () => {
+    const parent = new AbortController();
+    const handle = new TurnHandle({ sessionKey: 's', turnId: 't', generation: 1, parentSignal: parent.signal });
+    handle.close();
+    parent.abort();
+    await Promise.resolve();
+    expect(handle.isAborted).toBe(false);
+    expect(handle.reason).toBeNull();
+  });
+
+  it('propagates parent abort while the turn is open', async () => {
+    const parent = new AbortController();
+    const handle = new TurnHandle({ sessionKey: 's', turnId: 't', generation: 1, parentSignal: parent.signal });
+    parent.abort();
+    await handle.whenSettled();
+    expect(handle.isAborted).toBe(true);
+    expect(handle.reason).toBe('parent_abort');
+  });
+
   it('abortAndJoin waits for registered producers', async () => {
     const handle = await coordinator.beginTurn({ sessionKey: 's', turnId: 't' });
     let joined = false;

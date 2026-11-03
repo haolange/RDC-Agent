@@ -62,7 +62,8 @@ const FIXTURES = [
   "apiKey: 'secret'",
 ].join('\n');
 
-describe('provider key literal gate', () => {
+// Each case spawns real git processes against a temp repository.
+describe('provider key literal gate', { timeout: 30_000 }, () => {
   it('treats all-zero SHAs as unusable', () => {
     expect(isZeroSha('0000000')).toBe(true);
     expect(isZeroSha('0000000000000000000000000000000000000000')).toBe(true);

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { AgentSlotRegistry, agentSlotKey } from './AgentSlotRegistry';
 import type { AgentSlot } from './AgentSlotRegistry';
-import { createEphemeralScopeId, isTransientExecutionScope } from './executionScope';
+import { createEphemeralScopeId } from './executionScope';
+import { isTransientScopeId } from '@shared/utils/executionScope';
 
 function mockSlot(): AgentSlot {
   return {
@@ -100,8 +101,8 @@ describe('AgentSlotRegistry agent state lifecycle', () => {
   });
 
   it('treats ephemeral and subagent scopes as transient', () => {
-    expect(isTransientExecutionScope(createEphemeralScopeId())).toBe(true);
-    expect(isTransientExecutionScope('sess::subagent::abc')).toBe(true);
-    expect(isTransientExecutionScope('durable-session')).toBe(false);
+    expect(isTransientScopeId(createEphemeralScopeId())).toBe(true);
+    expect(isTransientScopeId('sess::subagent::abc')).toBe(true);
+    expect(isTransientScopeId('durable-session')).toBe(false);
   });
 });

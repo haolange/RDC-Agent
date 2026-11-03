@@ -166,6 +166,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   const orchestrator = [
     'src/main/workflow/debugger/AgentOrchestrator.ts',
     'src/main/workflow/debugger/AgentTurnRunner.ts',
+    'src/main/workflow/debugger/AgentSlotFactory.ts',
     'src/main/workflow/debugger/ToolExecutorFactory.ts',
     'src/main/workflow/debugger/TurnPreparationService.ts',
     'src/main/agent-runtime/permissions/ToolPermissionAuthorization.ts',

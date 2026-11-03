@@ -3,14 +3,12 @@ import { enforceMissionTurnCompletion } from '../../investigation/missionComplet
  * AgentOrchestrator — façade over turn preparation, tool assembly, executor,
  * turn runner, subagent runner, and prompt-plan helpers.
  *
- * Public contract: `sendMessage` / `sendProfileMessage` / `getAgentState` /
- * `configureAgent` / `prepareTurnContext`. LLM streaming and tool gating stay
+ * Public contract: `prepareTurnContext` / `sendProfileMessage` / `abortAndJoin`. LLM streaming and tool gating stay
  * in AgentTurnRunner; permissions stay in AgentPermissionPolicy.
  */
 
 import type {
   AgentConfig,
-  AgentMessage,
   AgentRole,
   AgentState,
 } from '@shared/types/agent';
@@ -21,21 +19,14 @@ import {
   AGENT_DISPLAY_NAMES,
   AgentSlotRegistry,
   AgentTurnRunner,
-  createProfileTestResponse,
-  createTestModeStub,
   DeferredToolActivationTracker,
-  executionProfileService,
   freezeProviderRuntimeCredentials,
-  generateEventId,
-  isToolAllowedForAgent,
   isTopLevelAgentId,
   McpConnectionCoordinator,
   MemoryStore,
-  nowMs,
   planEffectiveModelRequest,
   PromptPlanForTurn,
   providerRuntimeCredentialService,
-  resolveAgentToolAllowlist,
   resolveAgentToolAllowlistFromDefinition,
   resolveCompactionPercentForSettings,
   resolveEffectiveModel,
@@ -46,7 +37,6 @@ import {
   compiledRoutesFromDefinitions,
   settingsService,
   storageAdapter,
-  streamTestModeStub,
   SubagentRunner,
   createBackgroundSubagentService,
   type BackgroundSubagentService,
@@ -59,12 +49,11 @@ import {
   OrchestratorMemoryUi,
   resolveExecutionScopeId,
   createEphemeralScopeId,
-  isTransientExecutionScope,
+  isSubagentScopeId,
+  isTransientScopeId,
   workflowProjectionPublisher,
   type AbortReason,
   type AgentProfileTurnOptions,
-  type AgentTurnContext,
-  type AgentTurnOptions,
   type PreparedAgentTurnContext,
   type TurnHandle,
 } from './AgentOrchestrator.deps';
@@ -141,34 +130,10 @@ export class AgentOrchestrator {
     });
   }
 
-  getAgentState(sessionOrScopeId: string, agentId: AgentRole): AgentState | null {
-    return this.slots.getAgentState(sessionOrScopeId, agentId);
-  }
-
-  getAllAgentStates(): AgentState[] {
-    return this.slots.getAllAgentStates();
-  }
-
-  configureAgent(agentId: AgentRole, config: Partial<AgentConfig>): void {
-    this.slots.configureAgent(agentId, config);
-  }
-
-  getAgentConfig(agentId: AgentRole): AgentConfig | null {
-    return this.slots.getAgentConfig(agentId);
-  }
-
   applyLlmConfig(_config: LLMConfig): void {
     this.slots.applyLlmConfig(
       compiledRoutesFromDefinitions(settingsService.getAll().agents.definitions),
     );
-  }
-
-  getToolsForRole(agentId: AgentRole): string[] {
-    return resolveAgentToolAllowlist(agentId);
-  }
-
-  isToolAllowedForRole(toolName: string, agentId: AgentRole): boolean {
-    return isToolAllowedForAgent(toolName, agentId);
   }
 
   syncSessionSlots(sessionId: string): void {
@@ -177,7 +142,7 @@ export class AgentOrchestrator {
   }
 
   private releaseTransientAgentState(scopeId: string): void {
-    if (!isTransientExecutionScope(scopeId)) return;
+    if (!isTransientScopeId(scopeId)) return;
     this.toolExecutors.releaseSession(scopeId);
     this.slots.purgeAgentStatesForScope(scopeId);
   }
@@ -189,178 +154,6 @@ export class AgentOrchestrator {
 
   private sessionTurnKey(sessionId?: string | null, ephemeralScopeId?: string | null): string {
     return resolveExecutionScopeId(sessionId, ephemeralScopeId);
-  }
-
-  async sendMessage(
-    agentId: AgentRole,
-    content: string,
-    context?: AgentTurnContext,
-    options?: AgentTurnOptions,
-  ): Promise<string> {
-    const executionScopeId = resolveExecutionScopeId(context?.sessionId, createEphemeralScopeId());
-    const fallbackConfig = this.getOrCreateAgentConfig(agentId);
-    let ownedCredentialHandle: string | undefined;
-    let preparedLeaseRelease: (() => Promise<void>) | undefined;
-
-    this.updateAgentStatus(executionScopeId, agentId, 'thinking');
-
-    try {
-      const stub = createTestModeStub(agentId, content, this.getAgentDisplayName(agentId));
-      let runtimeProfile = this.resolveRuntimeProfile(agentId);
-      let effectiveSnapshot = this.resolveEffectiveAgentProfileSnapshot(agentId, context?.projectRootPath);
-      let effectiveProfile = effectiveSnapshot.profile;
-      if (!stub) {
-        const credentialProviderId = runtimeProfile.providerId;
-        ownedCredentialHandle = await this.refreshProviderRuntimeCredentials(credentialProviderId);
-        runtimeProfile = this.resolveRuntimeProfile(agentId);
-        effectiveSnapshot = this.resolveEffectiveAgentProfileSnapshot(agentId, context?.projectRootPath);
-        effectiveProfile = effectiveSnapshot.profile;
-        if (runtimeProfile.providerId !== credentialProviderId) {
-          providerRuntimeCredentialService.release(ownedCredentialHandle);
-          ownedCredentialHandle = await this.refreshProviderRuntimeCredentials(runtimeProfile.providerId);
-        }
-      }
-      const config: AgentConfig = {
-        ...fallbackConfig,
-        systemPrompt: effectiveProfile?.instructions || runtimeProfile.systemPrompt,
-        modelProvider: runtimeProfile.providerId,
-        modelName: runtimeProfile.modelId,
-        temperature: runtimeProfile.temperature ?? fallbackConfig.temperature,
-      };
-
-      await this.recordMessage(agentId, 'user', content, context);
-
-      if (stub) {
-        const responseText = await streamTestModeStub(stub, options);
-        const finalContent = await this.finalizeRecordedAssistantMessage(
-          agentId,
-          responseText,
-          responseText,
-          context,
-        );
-        this.updateAgentStatus(executionScopeId, agentId, 'complete');
-        return finalContent;
-      }
-
-      if (!effectiveProfile) {
-        throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${agentId}`);
-      }
-      const settings = settingsService.getAll();
-      const sessionRecord = context?.sessionId ? storageAdapter.readSession(context.sessionId) : null;
-      const toolAllowlist = resolveAgentToolAllowlistFromDefinition(agentId, effectiveProfile.tools);
-      const planning = planEffectiveModelRequest({
-        providerId: config.modelProvider,
-        modelId: config.modelName,
-        settings,
-        controls: {
-          ...(sessionRecord?.turnControls ?? {}),
-          ...(options?.turnControls ?? {}),
-          ...(options?.reasoning
-            ? { reasoningLevel: options.reasoning.selection === 'unknown' ? 'off' : options.reasoning.selection }
-            : {}),
-        },
-        requestedTemperature: config.temperature,
-        compactionThresholdPercent: resolveCompactionPercentForSettings(
-          settings,
-          context?.projectRootPath ?? null,
-        ),
-      });
-      if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
-      const capability = resolveEffectiveModel(config.modelProvider, config.modelName, settings);
-      if (!capability) throw new Error(`MODEL_UNAVAILABLE: ${config.modelProvider}/${config.modelName}`);
-      const activeContextWindow = planning.plan.contextWindowTokens;
-      const promptPlan = this.promptPlan.buildPromptPlanForAgentTurn({
-        agentId,
-        sessionId: context?.sessionId ?? null,
-        projectRootPath: context?.projectRootPath ?? null,
-        providerId: config.modelProvider,
-        modelId: config.modelName,
-        toolAllowlist,
-        contextWindowTokens: activeContextWindow,
-        capability, requestPlan: planning.plan,
-        systemPrompt: config.systemPrompt,
-        messageText: content,
-        preloadSkillIds: options?.preloadSkillIds,
-        effectiveProfile,
-        effectiveProfiles: effectiveSnapshot.profiles,
-      });
-      if (!promptPlan) {
-        throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
-      }
-      const preparedBundle = await this.profilePrep.prepare({
-        agentId,
-        content,
-        systemPrompt: promptPlan.systemPrompt,
-        providerId: config.modelProvider,
-        modelId: config.modelName,
-        toolAllowlist,
-        promptPlan,
-        effectiveProfile,
-        effectiveProfileIds: effectiveSnapshot.enabledProfileIds,
-        projectRootPath: context?.projectRootPath ?? null,
-        projectId: context?.projectId ?? null,
-        sessionId: context?.sessionId ?? null,
-        turnId: context?.turnId,
-        credentialHandle: ownedCredentialHandle!,
-        requestPlan: planning.plan,
-        turnControls: planning.controls,
-        temperature: config.temperature,
-        signal: options?.signal,
-        isolateContext: !context?.sessionId,
-      });
-      preparedLeaseRelease = async () => {
-        await preparedBundle.prepared.runtime.mcpLease?.release({ discardIfIdle: true });
-      };
-      const responseText = await this.turnRunner.runAgentTurn({
-        agentId,
-        content,
-        providerId: config.modelProvider,
-        modelId: config.modelName,
-        temperature: planning.plan.temperature,
-        profileId: agentId,
-        runId: context?.runId,
-        sessionId: executionScopeId,
-        turnId: context?.turnId ?? preparedBundle.prepared.summary.turnId,
-        toolAllowlist: preparedBundle.prepared.toolAllowlist,
-        options: {
-          ...options,
-          reasoning: planning.plan.reasoningWire,
-          turnControls: planning.controls,
-          requestPlan: planning.plan,
-        },
-        projectRootPath: context?.projectRootPath ?? null,
-        projectId: context?.projectId ?? null,
-        effectiveModel: preparedBundle.effectiveModel,
-        effectiveProfile,
-        effectiveProfileIds: effectiveSnapshot.enabledProfileIds,
-        credentialHandle: ownedCredentialHandle,
-        contextWindow: activeContextWindow,
-        contextTokenLimit: preparedBundle.prepared.summary.compactionThresholdTokens,
-        initialMessages: preparedBundle.prepared.initialMessages,
-        contextDiagnostic: preparedBundle.prepared.contextDiagnostic,
-        preparedRuntime: preparedBundle.prepared.runtime,
-      });
-      preparedLeaseRelease = undefined;
-
-      const finalContent = await this.finalizeRecordedAssistantMessage(
-        agentId,
-        responseText,
-        responseText,
-        context,
-      );
-
-      this.updateAgentStatus(executionScopeId, agentId, 'complete');
-      return finalContent;
-    } catch (error) {
-      this.updateAgentStatus(executionScopeId, agentId, 'error');
-      throw error;
-    } finally {
-      this.releaseTransientAgentState(executionScopeId);
-      if (preparedLeaseRelease) {
-        await preparedLeaseRelease().catch(() => undefined);
-      }
-      providerRuntimeCredentialService.release(ownedCredentialHandle);
-    }
   }
 
   async refreshProviderRuntimeCredentials(providerId: LlmProviderId): Promise<string> {
@@ -419,7 +212,7 @@ export class AgentOrchestrator {
         ?? preparedTurn?.summary.route.providerId
         ?? modelOverride?.providerId
         ?? route?.providerId;
-      if (credentialProviderId && !preparedTurn && process.env.RDC_AGENT_TEST_MODE !== '1') {
+      if (credentialProviderId && !preparedTurn) {
         ownedCredentialHandle = await this.refreshProviderRuntimeCredentials(credentialProviderId);
         settings = settingsService.getAll();
         const refreshed = this.resolveEffectiveAgentProfileSnapshot(agentId, options?.projectRootPath);
@@ -441,12 +234,6 @@ export class AgentOrchestrator {
         systemPrompt: options?.systemPrompt || effectiveProfile?.instructions || fallbackConfig.systemPrompt,
         temperature: options?.temperature ?? fallbackConfig.temperature,
       };
-
-      if (process.env.RDC_AGENT_TEST_MODE === '1') {
-        const finalStub = await createProfileTestResponse(agentId, content, options);
-        this.updateAgentStatus(executionScopeId, agentId, 'complete');
-        return finalStub;
-      }
 
       if (!effectiveProfile) {
         throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${agentId}`);
@@ -517,7 +304,7 @@ export class AgentOrchestrator {
         promptPlan = applyDelegationCapsuleToPromptPlan(promptPlan, options.extraPromptSegments);
       }
 
-      const isSubagentSession = Boolean(options?.sessionId?.includes('::subagent::'));
+      const isSubagentSession = Boolean(options?.sessionId && isSubagentScopeId(options.sessionId));
       if (!preparedTurn) {
         const preparedBundle = await this.profilePrep.prepare({
           agentId,
@@ -701,25 +488,9 @@ export class AgentOrchestrator {
     };
   }
 
-  private resolveRuntimeProfile(agentId: AgentRole) {
-    const settings = settingsService.getAll();
-    return executionProfileService.resolveAgentRuntimeProfile(settings, agentId);
-  }
-
   private getAgentDisplayName(agentId: AgentRole): string {
     const definition = settingsService.getAll().agents.definitions.find((entry) => entry.id === agentId);
     return definition?.name || (isTopLevelAgentId(agentId) ? AGENT_DISPLAY_NAMES[agentId] : agentId);
-  }
-
-  private async finalizeRecordedAssistantMessage(
-    agentId: AgentRole,
-    streamedContent: string,
-    fallbackContent: string,
-    context?: AgentTurnContext,
-  ): Promise<string> {
-    const finalContent = streamedContent || fallbackContent;
-    await this.recordMessage(agentId, 'assistant', finalContent, context);
-    return finalContent;
   }
 
   private updateAgentStatus(sessionOrScopeId: string, agentId: AgentRole, status: AgentState['status']): void {
@@ -740,59 +511,6 @@ export class AgentOrchestrator {
     workflowProjectionPublisher.publishAgentStatus(state);
   }
 
-  private async recordMessage(
-    agentId: AgentRole,
-    role: 'user' | 'assistant' | 'system',
-    content: string,
-    context?: { caseId?: string; runId?: string; sessionId?: string; turnId?: string },
-  ): Promise<void> {
-    if (!context?.sessionId) return;
-
-    const message: AgentMessage = {
-      id: generateEventId('msg'),
-      agentId,
-      role,
-      content,
-      timestamp: nowMs(),
-    };
-
-    if (context.runId) {
-      await storageAdapter.appendActionEvent(context.sessionId, storageAdapter.createActionEvent({
-        runId: context.runId,
-        sessionId: context.sessionId,
-        agentId,
-        eventType: role === 'user' ? 'user_message' : role === 'assistant' ? 'agent_summary' : 'system',
-        status: role === 'system' ? 'warning' : 'ok',
-        turnId: context.turnId,
-        payload: {
-          role,
-          content,
-          message_id: message.id,
-        },
-      }));
-    }
-
-    this.notifyMessage(message, context?.sessionId);
-  }
-
-  private notifyMessage(message: AgentMessage, sessionId?: string): void {
-    runtimeLogService.log({
-      scope: sessionId ? 'session' : 'app',
-      namespace: 'agent',
-      severity: message.role === 'system' ? 'warning' : 'info',
-      title: this.getAgentDisplayName(message.agentId),
-      summary: message.content.slice(0, 120) || 'Empty message.',
-      sessionId,
-      raw: {
-        agentId: message.agentId,
-        role: message.role,
-        messageId: message.id,
-        content: message.content,
-      },
-      timestamp: message.timestamp,
-    });
-    workflowProjectionPublisher.publishAgentMessage(message);
-  }
 }
 
 export const agentOrchestrator = new AgentOrchestrator();

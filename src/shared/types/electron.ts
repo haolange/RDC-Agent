@@ -158,7 +158,6 @@ export interface ElectronAPI {
       version: string;
       productName: string;
       systemTheme: ResolvedTheme;
-      testMode: boolean;
     }>;
   };
 
@@ -559,7 +558,6 @@ export interface ElectronAPI {
     onDelegationTraceChanged: (callback: (payload: { sessionId: string; parentToolCallId: string; revision: number }) => void) => () => void;
     onEffectiveCatalogChanged: (callback: (snapshot: EffectiveCatalogSnapshot) => void) => () => void;
     onPlanReviewChanged: (callback: (projection: PlanReviewProjection) => void) => () => void;
-    onAgentMessage: (callback: (msg: unknown) => void) => () => void;
     onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;
     onToolExecutionComplete: (callback: (trace: unknown) => void) => () => void;
     onEvidenceEventAdded: (callback: (event: ActionEvent) => void) => () => void;

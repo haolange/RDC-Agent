@@ -24,7 +24,6 @@ const storeFor = (scope: 'user' | 'project', projectRoot?: string): MemoryStore 
 };
 
 async function confirmMemoryMutation(action: 'memory.write' | 'memory.delete', scope: 'user' | 'project', name?: string): Promise<boolean> {
-  if (process.env.RDC_AGENT_TEST_MODE === '1') return true;
   if (process.env.RDC_AGENT_BROWSER_QA === '1') {
     const owner = BrowserWindow.getFocusedWindow() ?? undefined;
     if (!owner && process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS === '1') {

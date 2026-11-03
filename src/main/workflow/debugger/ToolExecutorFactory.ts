@@ -1,3 +1,4 @@
+import { childScopePrefix, rootScopeId } from '@shared/utils/executionScope';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { AgentPermissionDecision } from '../../agent-runtime/permissions/AgentPermissionPolicy';
 import { executeWithPermissionAdmission } from '../../agent-runtime/permissions/ToolPermissionAdmission';
@@ -80,7 +81,7 @@ export class ToolExecutorFactory {
   releaseSession(sessionId: string): void {
     this.successfulFileReads.delete(sessionId);
     for (const key of this.successfulFileReads.keys()) {
-      if (key.startsWith(`${sessionId}::subagent::`)) this.successfulFileReads.delete(key);
+      if (key.startsWith(childScopePrefix(sessionId))) this.successfulFileReads.delete(key);
     }
   }
 
@@ -320,7 +321,7 @@ export class ToolExecutorFactory {
           // Unsafe effects from parent and detached children share the same
           // session/project gate. The subagent call itself is orchestration;
           // locking it here would deadlock while awaiting child effects.
-          const ownerSessionId = (runtimeContext?.sessionId ?? sessionId ?? 'ephemeral').split('::subagent::', 1)[0];
+          const ownerSessionId = rootScopeId(runtimeContext?.sessionId ?? sessionId ?? 'ephemeral');
           // Project files/shell state are shared across sessions; use the
           // canonical project root when available and fall back to session
           // ownership only for ephemeral/no-project execution.

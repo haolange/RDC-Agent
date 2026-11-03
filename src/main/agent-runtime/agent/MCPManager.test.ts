@@ -3,12 +3,8 @@
  * 测试核心逻辑：工具名称前缀、解析、工具注册/发现。
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  MCPManager,
-  buildMcpPrefixedName,
-  decodeMcpNameSegment,
-  encodeMcpNameSegment,
-} from './MCPManager';
+import { MCPManager } from './MCPManager';
+import { buildMcpPrefixedName, decodeMcpNameSegment, encodeMcpNameSegment } from './mcpToolNames';
 
 describe('MCPManager', () => {
   let manager: MCPManager;

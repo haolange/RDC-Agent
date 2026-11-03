@@ -196,3 +196,65 @@ export class StdioRpcClient {
     this.onClose(new Error('MCP client closed'));
   }
 }
+
+interface JsonRpcPost {
+  url: string;
+  method: string;
+  params: unknown;
+  timeoutMs: number;
+  signal?: AbortSignal;
+}
+
+async function withRpcDeadline<T>(request: JsonRpcPost, run: (signal: AbortSignal, id: number) => Promise<T>): Promise<T> {
+  const timeout = AbortSignal.timeout(request.timeoutMs);
+  const signal = request.signal ? AbortSignal.any([timeout, request.signal]) : timeout;
+  const id = Date.now() + Math.floor(Math.random() * 1000);
+  return run(signal, id);
+}
+
+/** http transport: one JSON-RPC POST, one JSON response body. */
+export function postJsonRpc(url: string, method: string, params: unknown, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+  return withRpcDeadline({ url, method, params, timeoutMs, signal }, async (linked, id) => {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+      signal: linked,
+    });
+    if (!res.ok) throw new Error(`MCP HTTP ${res.status} ${res.statusText}`);
+    const body = parseJsonRpcResponse(await readBoundedResponseBody(res, MAX_MCP_BUFFER_BYTES));
+    if (!body) throw new Error('MCP HTTP returned invalid JSON-RPC');
+    if (body.error) throw new Error(`MCP error ${body.error.code}: ${body.error.message}`);
+    return body.result;
+  });
+}
+
+/** streamable-http transport: POST with an NDJSON response; returns the frame matching the request id. */
+export function postStreamableJsonRpc(url: string, method: string, params: unknown, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+  return withRpcDeadline({ url, method, params, timeoutMs, signal }, async (linked, id) => {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+      body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+      signal: linked,
+    });
+    if (!res.ok) throw new Error(`MCP streamable-http ${res.status} ${res.statusText}`);
+    // Read once; the bounded reader caps the cumulative stream so many small
+    // NDJSON frames cannot bypass the response limit.
+    const rawBody = await readBoundedResponseBody(res, MAX_MCP_BUFFER_BYTES);
+    let sawJsonRpcMessage = false;
+    for (const line of rawBody.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const msg = parseJsonRpcResponse(trimmed);
+      if (!msg) throw new Error('MCP streamable-http returned invalid JSON-RPC');
+      if (msg.error) throw new Error(`MCP error ${msg.error.code}: ${msg.error.message}`);
+      if (typeof msg.id === 'number' || typeof msg.id === 'string') {
+        sawJsonRpcMessage = true;
+        if (msg.id === id) return msg.result;
+      }
+    }
+    if (!sawJsonRpcMessage) throw new Error('MCP streamable-http returned no JSON-RPC response');
+    throw new Error('MCP streamable-http response id mismatch');
+  });
+}

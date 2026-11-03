@@ -23,7 +23,7 @@ export function buildConversationToolCompletion(
     const details = (result?.data?.details ?? result?.error?.details) as Record<string, unknown> | undefined;
     patch.delegation = {
       task: existing?.delegation?.task ?? '',
-      profile: existing?.delegation?.profile ?? String(details?.profile ?? 'general'),
+      profile: typeof details?.profile === 'string' && details.profile ? details.profile : existing?.delegation?.profile ?? '',
       mode: existing?.delegation?.mode ?? 'wait',
       executionId: typeof details?.executionId === 'string' ? details.executionId : existing?.delegation?.executionId,
       generation: typeof details?.generation === 'number' ? details.generation : existing?.delegation?.generation,

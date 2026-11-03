@@ -81,7 +81,7 @@ export function projectDelegatedEvent(state: DelegatedProjectionState, event: Ag
       status: 'running', executionStartedAt: event.timestamp, argsPreview: safeText(payload.args ?? {}), startedAt: event.timestamp,
       ...(toolName === 'subagent' ? { delegation: {
         task: safeText((payload.args as Record<string, unknown> | undefined)?.task ?? ''),
-        profile: String((payload.args as Record<string, unknown> | undefined)?.profile ?? 'general'),
+        profile: String((payload.args as Record<string, unknown> | undefined)?.profile ?? event.agentId ?? ''),
         mode: (payload.args as Record<string, unknown> | undefined)?.mode === 'background' ? 'background' as const : 'wait' as const,
       } } : {}),
     }, loopOptions());

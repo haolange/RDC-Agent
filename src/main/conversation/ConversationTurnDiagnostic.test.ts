@@ -8,7 +8,7 @@ vi.mock('../settings/SettingsService', () => ({
 import { AgentRecoveryAbortError } from '../agent-runtime/agent/ErrorRecovery';
 import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
 import { ProviderEmptyStreamError, ProviderHttpError, ProviderWireFailureError } from '../agent-runtime/providers/internal/http';
-import { createTurnFailedDiagnostic } from './ConversationRoutePreflight';
+import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
 import { MissionCompletionError } from '../investigation/missionCompletionContract';
 import { InvestigationError } from '../investigation/investigationErrors';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';

@@ -16,7 +16,6 @@ import { agentPlanReviewRequestService } from '../agent-runtime/interactions/Age
 import { conversationService } from '../conversation/ConversationService';
 
 async function confirmPlanMutation(action: 'plan.saveToProject' | 'plan.export', sessionId: string): Promise<boolean> {
-  if (process.env.RDC_AGENT_TEST_MODE === '1') return true;
   if (process.env.RDC_AGENT_BROWSER_QA === '1') {
     const owner = BrowserWindow.getFocusedWindow() ?? undefined;
     if (!owner && process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS === '1') {

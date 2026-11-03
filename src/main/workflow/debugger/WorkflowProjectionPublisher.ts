@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron';
-import type { AgentMessage, AgentState } from '@shared/types/agent';
+import type { AgentState } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
 import type { RunContextUsageSummary, RunSummary, SessionScope } from '@shared/types/session';
@@ -53,9 +53,6 @@ export class WorkflowProjectionPublisher {
     this.publish('agent:statusChanged', state);
   }
 
-  publishAgentMessage(message: AgentMessage): void {
-    this.publish('agent:message', message);
-  }
 }
 
 export const workflowProjectionPublisher = new WorkflowProjectionPublisher();

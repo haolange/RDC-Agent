@@ -57,7 +57,8 @@ describe('SessionArtifactResolver', () => {
     expect(() => resolver.getQuotaCapacity('foreign')).toThrow('ARTIFACT_SESSION_DENIED');
   });
 
-  it('retains long-session evidence past 1024 files and rejects the finite 2048-file boundary', () => {
+  // Creates 2048 real files; fs throughput, not logic, bounds its duration.
+  it('retains long-session evidence past 1024 files and rejects the finite 2048-file boundary', { timeout: 30_000 }, () => {
     const a = makeSession('long-history');
     const outputRoot = path.join(a.sessionPath, 'session-artifacts', 'tool-outputs');
     fs.mkdirSync(outputRoot, { recursive: true });

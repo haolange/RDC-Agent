@@ -1,3 +1,4 @@
+import { isSubagentScopeId } from '@shared/utils/executionScope';
 import * as fs from 'fs';
 import * as path from 'path';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '@shared/utils/jsonl';
@@ -23,7 +24,7 @@ export class SessionContextStore {
   }
 
   readSessionUsage(sessionId: string): RunContextUsageSummary | null {
-    if (sessionId.includes('::subagent::')) {
+    if (isSubagentScopeId(sessionId)) {
       return null;
     }
     const usagePath = this.getSessionUsagePath(sessionId);
@@ -38,7 +39,7 @@ export class SessionContextStore {
   }
 
   readSessionShellCwd(sessionId: string): string | null {
-    if (sessionId.includes('::subagent::')) {
+    if (isSubagentScopeId(sessionId)) {
       return null;
     }
     const statePath = this.getSessionShellStatePath(sessionId);
@@ -47,7 +48,7 @@ export class SessionContextStore {
   }
 
   writeSessionShellCwd(sessionId: string, cwd: string): void {
-    if (sessionId.includes('::subagent::')) {
+    if (isSubagentScopeId(sessionId)) {
       return;
     }
     const statePath = this.getSessionShellStatePath(sessionId);
@@ -58,7 +59,7 @@ export class SessionContextStore {
   }
 
   writeSessionUsage(sessionId: string, usage: RunContextUsageSummary): void {
-    if (sessionId.includes('::subagent::')) {
+    if (isSubagentScopeId(sessionId)) {
       return;
     }
     const usagePath = this.getSessionUsagePath(sessionId);

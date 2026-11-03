@@ -1,3 +1,4 @@
+import { isSubagentScopeId } from '@shared/utils/executionScope';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { SessionScope } from '@shared/types/session';
 import type { TraceSessionResult } from '@shared/types/trace';
@@ -21,7 +22,7 @@ export class TraceProjectionRefreshService {
   constructor(private readonly deps: TraceProjectionRefreshDeps = defaultDeps) {}
 
   schedule(sessionId: string): void {
-    if (!sessionId || sessionId.includes('::subagent::') || this.pending.has(sessionId)) {
+    if (!sessionId || isSubagentScopeId(sessionId) || this.pending.has(sessionId)) {
       return;
     }
     const timer = setTimeout(() => {

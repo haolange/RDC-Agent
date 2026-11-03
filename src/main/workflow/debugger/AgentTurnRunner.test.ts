@@ -27,7 +27,8 @@ vi.mock('../../settings/SettingsService', () => ({
 }));
 
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
-import { AgentTurnRunner, hasActualProviderUsage, shouldWarnEmptyAssistantCompletion } from './AgentTurnRunner';
+import { AgentTurnRunner } from './AgentTurnRunner';
+import { isSuccessfulProviderResponse } from './AgentSlotFactory';
 import { resolveExecutionScopeId } from './executionScope';
 import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
 import type { AssistantMessage, ToolResultMessage } from '../../agent-runtime/core/types';
@@ -83,10 +84,8 @@ describe('AgentTurnRunner', () => {
       stopReason: 'stop',
     };
 
-    expect(hasActualProviderUsage(errorMessage)).toBe(false);
-    expect(hasActualProviderUsage(completedMessage)).toBe(true);
-    expect(shouldWarnEmptyAssistantCompletion(errorMessage)).toBe(false);
-    expect(shouldWarnEmptyAssistantCompletion(completedMessage)).toBe(true);
+    expect(isSuccessfulProviderResponse(errorMessage)).toBe(false);
+    expect(isSuccessfulProviderResponse(completedMessage)).toBe(true);
   });
 
   it('does not emit empty_response_without_tool_call when stopReason is error', () => {
@@ -99,7 +98,7 @@ describe('AgentTurnRunner', () => {
       stopReason: 'error',
       timestamp: 0,
     };
-    expect(shouldWarnEmptyAssistantCompletion(errorMessage)).toBe(false);
+    expect(isSuccessfulProviderResponse(errorMessage)).toBe(false);
   });
 
   it('resolveMaxTurns prefers finite policy capped by profile', () => {
@@ -130,20 +129,20 @@ describe('AgentTurnRunner', () => {
 
   it('getOrCreateAgentSlot requires PromptPlan', () => {
     const runner = createRunner();
-    expect(() => runner.getOrCreateAgentSlot(
-      'ask',
-      'provider',
-      'model',
-      'system',
-      { requestPlan: {} as RequestPlan },
-      [],
-      undefined,
-      '',
-      'test-scope',
-      1000,
-      800,
-      undefined,
-    )).toThrow(/PromptPlan is required/);
+    expect(() => runner.getOrCreateAgentSlot({
+      agentId: 'general',
+      providerId: 'provider',
+      modelId: 'model',
+      systemPrompt: 'system',
+      streamOptions: { requestPlan: {} as RequestPlan },
+      tools: [],
+      toolExecutor: { execute: async () => { throw new Error('unused'); } } as never,
+      turnSignature: '',
+      sessionId: 'test-scope',
+      contextWindow: 1000,
+      contextTokenLimit: 800,
+      initialMessages: [],
+    })).toThrow(/PromptPlan is required/);
   });
 
   it('rejects runAgentTurn without preparedRuntime', async () => {
@@ -285,8 +284,8 @@ describe('AgentTurnRunner', () => {
       expect(observedBudget?.budget.maxAggregateWallMs).toBe(maxWallTimeMs);
     }
 
-    expect(setup.mock.calls[0]?.[3]).toBe('prepared-system');
-    expect(setup.mock.calls[0]?.[11]).toBe(preparedRuntime.promptPlan);
+    expect(setup.mock.calls[0]?.[0].systemPrompt).toBe('prepared-system');
+    expect(setup.mock.calls[0]?.[0].promptPlan).toBe(preparedRuntime.promptPlan);
 
     expect(release).toHaveBeenCalledWith({ discardIfIdle: false });
     expect(turnCoordinator.getActive('setup-session')).toBeNull();

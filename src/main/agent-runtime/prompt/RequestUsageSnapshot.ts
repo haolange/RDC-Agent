@@ -1,3 +1,4 @@
+import { childScopePrefix } from '@shared/utils/executionScope';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -16,7 +17,7 @@ export interface RequestUsageSnapshot {
  */
 export function readRequestUsage(rootPath: string, scopeId: string): RequestUsageSnapshot {
   const scopeKey = scopeId.replace(/[^a-zA-Z0-9._-]/g, '-');
-  const childPrefix = `${scopeId}::subagent::`.replace(/[^a-zA-Z0-9._-]/g, '-');
+  const childPrefix = childScopePrefix(scopeId).replace(/[^a-zA-Z0-9._-]/g, '-');
   const scopes: RequestUsageSnapshot['scopes'] = [];
   const entries = fs.existsSync(rootPath) ? fs.readdirSync(rootPath, { withFileTypes: true }) : [];
   for (const scope of entries) {

@@ -44,16 +44,12 @@ export { RuntimeToolAssembly } from './RuntimeToolAssembly';
 export { ToolExecutorFactory } from './ToolExecutorFactory';
 export { TurnPreparationService } from './TurnPreparationService';
 export { ProfileTurnPreparation, resolveProfileToolAllowlist } from './ProfileTurnPreparation';
-export { resolveExecutionScopeId, createEphemeralScopeId, isTransientExecutionScope } from './executionScope';
+export { resolveExecutionScopeId, createEphemeralScopeId } from './executionScope';
+export { isSubagentScopeId, isTransientScopeId } from '@shared/utils/executionScope';
 export { OrchestratorMemoryUi } from './OrchestratorMemoryUi';
 export { AgentTurnRunner } from './AgentTurnRunner';
 export { SubagentRunner } from './SubagentRunner';
 export { createBackgroundSubagentService, type BackgroundSubagentService } from './BackgroundSubagentService';
-export {
-  createProfileTestResponse,
-  createTestModeStub,
-  streamTestModeStub,
-} from './OrchestratorTestStubs';
 export {
   countContinuationDecisions,
   type AgentProfileTurnOptions,

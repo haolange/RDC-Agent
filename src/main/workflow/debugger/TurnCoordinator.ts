@@ -267,6 +267,7 @@ export class TurnHandle {
   private closed = false;
   private orphaned = false;
   private wallTimer: ReturnType<typeof setTimeout> | null = null;
+  private detachParentSignal: (() => void) | null = null;
 
   constructor(input: {
     sessionKey: string;
@@ -300,15 +301,20 @@ export class TurnHandle {
         this.aborted = true;
         this.abortReason = 'parent_abort';
       } else {
-        input.parentSignal.addEventListener(
-          'abort',
-          () => {
-            void this.abortAndJoin({ reason: 'parent_abort' });
-          },
-          { once: true },
-        );
+        const parentSignal = input.parentSignal;
+        const onParentAbort = (): void => {
+          void this.abortAndJoin({ reason: 'parent_abort' });
+        };
+        parentSignal.addEventListener('abort', onParentAbort, { once: true });
+        this.detachParentSignal = () => parentSignal.removeEventListener('abort', onParentAbort);
       }
     }
+  }
+
+  private releaseTimers(): void {
+    if (this.wallTimer) { clearTimeout(this.wallTimer); this.wallTimer = null; }
+    this.detachParentSignal?.();
+    this.detachParentSignal = null;
   }
 
   get signal(): AbortSignal {
@@ -493,7 +499,7 @@ export class TurnHandle {
       if (await waitFor(graceMs)) {
         this.closed = true;
         this.producers.clear();
-        if (this.wallTimer) { clearTimeout(this.wallTimer); this.wallTimer = null; }
+        this.releaseTimers();
         return;
       }
 
@@ -502,7 +508,7 @@ export class TurnHandle {
       if (await waitFor(forceAfterMs)) {
         this.closed = true;
         this.producers.clear();
-        if (this.wallTimer) { clearTimeout(this.wallTimer); this.wallTimer = null; }
+        this.releaseTimers();
         return;
       }
 
@@ -513,7 +519,7 @@ export class TurnHandle {
       void joinUntilStable().then(() => {
         this.closed = true;
         this.producers.clear();
-        if (this.wallTimer) { clearTimeout(this.wallTimer); this.wallTimer = null; }
+        this.releaseTimers();
       });
     })();
 
@@ -522,7 +528,7 @@ export class TurnHandle {
 
   close(): void {
     this.closed = true;
-    if (this.wallTimer) { clearTimeout(this.wallTimer); this.wallTimer = null; }
+    this.releaseTimers();
     this.eventSink = null;
     this.deferredActivation = null;
   }

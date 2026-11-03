@@ -187,6 +187,7 @@ ChallengeTargetRef
 ChallengeTargetType
 CHANNEL_CAPABILITY
 charsToTokens
+childScopePrefix
 ChromeThemesConfig
 CLAIM_DECISIONS
 CLAIM_KINDS
@@ -418,6 +419,7 @@ EffectiveResourceStatus
 ElectronAPI
 EntitlementState
 EntitlementStateSchema
+ephemeralScopeId
 EPISTEMIC_RANK
 EPISTEMIC_STATUSES
 epistemicRank
@@ -566,6 +568,7 @@ isCausalOrCounterfactualClaim
 isClosedExperimentStatus
 isEffectiveModelPickerSelectable
 isEligibleMaxContextTier
+isEphemeralScopeId
 isHandoffContinueAction
 isHexColor
 isLlmProviderProtocol
@@ -585,8 +588,10 @@ isSessionArtifactizedEnvelope
 isSessionArtifactSourceRef
 isSessionArtifactUri
 isSkillVisibleToProfile
+isSubagentScopeId
 isThemePresetId
 isTopLevelAgentId
+isTransientScopeId
 isWorldStateMutated
 JsonlDiagnostic
 JsonlReadResult
@@ -1015,6 +1020,7 @@ RIGHT_PANEL_MIN_WIDTH
 RIGHT_RAIL_DRAWER_BREAKPOINT
 RightPanelViewModel
 ROOT_BRANCH_ID
+rootScopeId
 RunApi
 RunContextUsageReadResult
 RunContextUsageRequest
@@ -1113,6 +1119,7 @@ StructuredHandoffKind
 StructuredHandoffProgress
 StructuredHandoffResourceRef
 SubAgentNode
+subagentScopeId
 SystemToolName
 TablePreview
 TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA

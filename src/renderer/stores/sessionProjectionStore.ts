@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { ContextSnapshot, OpenedCaptureState, RunContextUsageSummary } from '@shared/types/session';
@@ -29,7 +28,6 @@ interface SessionProjectionStoreState {
   projectTrace: (sessionId: string, presentation: AgentRunPresentation) => void;
   projectContextSnapshot: (sessionId: string, snapshot: ContextSnapshot | null) => void;
   projectOpenedCapture: (sessionId: string, openedCapture: OpenedCaptureState | null) => void;
-  projectTimelineEntry: (sessionId: string, entry: AgentTimelineEntry) => void;
   activateSession: (sessionId: string) => boolean;
   evictSession: (sessionId: string) => void;
   reset: () => void;
@@ -144,17 +142,6 @@ export const useSessionProjectionStore = create<SessionProjectionStoreState>((se
         ...projection,
         openedCapture,
       })),
-    }));
-  },
-
-  projectTimelineEntry: (sessionId, entry) => {
-    if (!sessionId) return;
-    set((state) => ({
-      bySessionId: updateSessionProjectionMap(state.bySessionId, sessionId, (projection) => (
-        projection.timeline.some((item) => item.id === entry.id)
-          ? projection
-          : { ...projection, timeline: [...projection.timeline, entry] }
-      )),
     }));
   },
 

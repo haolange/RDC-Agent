@@ -1,4 +1,4 @@
-import type { AgentState, AgentTimelineEntry } from '@shared/types/agent';
+import type { AgentState } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { RunSummary } from '@shared/types/session';
 import {
@@ -18,18 +18,6 @@ import { useWorkflowStore } from '../../stores/workflowStore';
 import type { ElectronAPI } from '@shared/types/electron';
 import type { EventBridgeOptions } from './eventBridgeOptions';
 const projection = () => useSessionProjectionStore.getState();
-
-/** 类型守卫：判断 IPC 入站对象是否符合 agent:message 的最小契约。 */
-const isAgentMessagePayload = (
-  value: unknown,
-): value is { id?: string; agentRole?: AgentTimelineEntry['agentRole']; content?: string; sessionId?: string } => {
-  if (!value || typeof value !== 'object') return false;
-  const obj = value as Record<string, unknown>;
-  if (obj.id !== undefined && typeof obj.id !== 'string') return false;
-  if (obj.content !== undefined && typeof obj.content !== 'string') return false;
-  if (obj.sessionId !== undefined && typeof obj.sessionId !== 'string') return false;
-  return true;
-};
 
 /** 类型守卫：判断 IPC 入站对象是否符合 AgentState 的最小契约。 */
 const isAgentStatePayload = (value: unknown): value is AgentState => {
@@ -65,32 +53,6 @@ export function subscribeTraceProjectionChanged(electronAPI: ElectronAPI) {
       return;
     }
     useWorkflowStore.getState().setTracePresentation(payload.presentation);
-  });
-}
-
-export function subscribeAgentMessage(electronAPI: ElectronAPI) {
-  return electronAPI.events.onAgentMessage((rawMsg) => {
-    if (!isAgentMessagePayload(rawMsg)) {
-      return;
-    }
-    if (rawMsg.sessionId !== undefined && !isActiveSessionEvent(rawMsg.sessionId)) {
-      projection().projectTimelineEntry(rawMsg.sessionId, {
-        id: rawMsg.id || Date.now().toString(),
-        type: 'agent',
-        agentRole: rawMsg.agentRole,
-        content: rawMsg.content ?? '',
-        timestamp: Date.now(),
-      });
-      return;
-    }
-    const entry: AgentTimelineEntry = {
-      id: rawMsg.id || Date.now().toString(),
-      type: 'agent',
-      agentRole: rawMsg.agentRole,
-      content: rawMsg.content ?? '',
-      timestamp: Date.now(),
-    };
-    useConversationStore.getState().addTimelineEntry(entry);
   });
 }
 

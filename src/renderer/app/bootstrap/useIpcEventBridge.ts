@@ -11,7 +11,6 @@ import { createCaptureProjection, subscribeCaptureStatusChanged, subscribeDevice
 import { subscribeConversation, subscribeToolExecutionComplete } from './conversationSubscriptions';
 import type { EventBridgeOptions } from './eventBridgeOptions';
 import {
-  subscribeAgentMessage,
   subscribeAgentStatusChanged,
   subscribeEvidenceEventAdded,
   subscribeProjectInputsChanged,
@@ -74,7 +73,6 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
 
     const conversation = subscribeConversation(electronAPI, showNotice, t);
     const unsubscribeToolExecutionComplete = subscribeToolExecutionComplete(electronAPI);
-    const unsubscribeAgentMessage = subscribeAgentMessage(electronAPI);
     const unsubscribeAgentStatusChanged = subscribeAgentStatusChanged(electronAPI);
     const unsubscribeCaptureStatusChanged = subscribeCaptureStatusChanged(electronAPI, projectScopedContext);
     const unsubscribeEvidenceEventAdded = subscribeEvidenceEventAdded(electronAPI, addActionEvent);
@@ -98,7 +96,6 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
       unsubscribeTraceProjectionChanged();
       unsubscribeContextChanged();
       unsubscribeToolExecutionComplete();
-      unsubscribeAgentMessage();
       unsubscribeAgentStatusChanged();
       unsubscribeCaptureStatusChanged();
       unsubscribeEvidenceEventAdded();

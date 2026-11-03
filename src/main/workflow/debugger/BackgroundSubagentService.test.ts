@@ -167,9 +167,10 @@ describe('BackgroundSubagentService', () => {
     let observedWaiting = false;
     const { service, registry } = harness(async (input) => {
       input.parentOnEvent?.({ id: 'approval-1', type: 'approval.requested', timestamp: Date.now(), sessionId: 's1', agentId: 'general', payload: { approvalId: 'a1', toolCallId: 't1', toolName: 'shell', args: {} } });
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      const current = (await registry('s1').listExecutions()).at(-1);
-      observedWaiting = current?.status === 'waiting';
+      await vi.waitFor(async () => {
+        expect((await registry('s1').listExecutions()).at(-1)?.status).toBe('waiting');
+      });
+      observedWaiting = true;
       input.parentOnEvent?.({ id: 'approval-2', type: 'approval.answered', timestamp: Date.now(), sessionId: 's1', agentId: 'general', payload: { approvalId: 'a1', toolCallId: 't1', toolName: 'shell', approved: true } as never });
       return { status: 'complete', text: 'done', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'done', outputs: {}, counterevidence: [], unresolved: [], scope: 'test', sideEffects: [], recoveryState: [] } } };
     });

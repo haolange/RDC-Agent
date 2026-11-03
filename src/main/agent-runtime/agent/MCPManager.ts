@@ -30,11 +30,11 @@ import {
   type SupervisedProcess,
 } from '../../runtime/ProcessSupervisor';
 import {
-  MAX_MCP_BUFFER_BYTES,
-  parseJsonRpcResponse,
-  readBoundedResponseBody,
+  postJsonRpc,
+  postStreamableJsonRpc,
   StdioRpcClient,
 } from './mcpRpcTransport';
+import { buildMcpPrefixedName, decodeMcpNameSegment } from './mcpToolNames';
 
 const MCP_ENV_ALLOWLIST = [
   'PATH',
@@ -173,75 +173,6 @@ function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
     throw new DOMException('The operation was aborted', 'AbortError');
   }
-}
-
-function linkAbortSignals(
-  primary: AbortSignal,
-  external?: AbortSignal,
-): { signal: AbortSignal; cleanup: () => void } {
-  if (!external) {
-    return { signal: primary, cleanup: () => {} };
-  }
-  if (primary.aborted || external.aborted) {
-    const controller = new AbortController();
-    controller.abort();
-    return { signal: controller.signal, cleanup: () => {} };
-  }
-  if (typeof AbortSignal.any === 'function') {
-    return { signal: AbortSignal.any([primary, external]), cleanup: () => {} };
-  }
-  const controller = new AbortController();
-  const onAbort = () => controller.abort();
-  primary.addEventListener('abort', onAbort, { once: true });
-  external.addEventListener('abort', onAbort, { once: true });
-  return {
-    signal: controller.signal,
-    cleanup: () => {
-      primary.removeEventListener('abort', onAbort);
-      external.removeEventListener('abort', onAbort);
-    },
-  };
-}
-
-/** Encode an identity segment for tool names: reversible base64url of utf8. */
-export function encodeMcpNameSegment(value: string): string {
-  return encodeNameSegment(value);
-}
-
-/** Decode a name segment; null when encode(decode(x)) !== x. */
-export function decodeMcpNameSegment(encoded: string): string | null {
-  return decodeNameSegment(encoded);
-}
-
-function encodeNameSegment(value: string): string {
-  return Buffer.from(value, 'utf8')
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '');
-}
-
-function decodeNameSegment(encoded: string): string | null {
-  try {
-    const padded = encoded.replace(/-/g, '+').replace(/_/g, '/');
-    const padLen = (4 - (padded.length % 4)) % 4;
-    const base64 = padded + '='.repeat(padLen);
-    const decoded = Buffer.from(base64, 'base64').toString('utf8');
-    // Fail-closed: only accept segments that survive encode(decode(x)) === x.
-    if (encodeNameSegment(decoded) !== encoded) return null;
-    return decoded;
-  } catch {
-    return null;
-  }
-}
-
-/** Build reversible prefixed tool name: mcp__{encode(serverId)}__{encode(toolName)}. */
-export function buildMcpPrefixedName(serverId: string, toolName: string): string {
-  return buildPrefixedName(serverId, toolName);
-}
-
-function buildPrefixedName(serverId: string, toolName: string): string {
-  return `mcp__${encodeNameSegment(serverId)}__${encodeNameSegment(toolName)}`;
 }
 
 /**
@@ -423,7 +354,7 @@ export class MCPManager {
       }
       const conn: MCPConnection = { config, tools: [] };
       throwIfAborted(signal);
-      await this.httpRpc(
+      await postJsonRpc(
         config.url,
         'initialize',
         {
@@ -436,7 +367,7 @@ export class MCPManager {
       );
 
       throwIfAborted(signal);
-      const listResult = (await this.httpRpc(
+      const listResult = (await postJsonRpc(
         config.url,
         'tools/list',
         {},
@@ -462,7 +393,7 @@ export class MCPManager {
       // streamable-http: 使用 POST + streaming response (NDJSON)
       const conn: MCPConnection = { config, tools: [] };
       throwIfAborted(signal);
-      await this.streamableHttpRpc(
+      await postStreamableJsonRpc(
         config.url,
         'initialize',
         {
@@ -475,7 +406,7 @@ export class MCPManager {
       );
 
       throwIfAborted(signal);
-      const listResult = (await this.streamableHttpRpc(
+      const listResult = (await postStreamableJsonRpc(
         config.url,
         'tools/list',
         {},
@@ -645,7 +576,7 @@ export class MCPManager {
           throw new Error('server url missing');
         }
         if (conn.config.type === 'streamable-http') {
-          result = await this.streamableHttpRpc(
+          result = await postStreamableJsonRpc(
             conn.config.url,
             'tools/call',
             { name: tool.originalName, arguments: args },
@@ -653,7 +584,7 @@ export class MCPManager {
             signal,
           );
         } else {
-          result = await this.httpRpc(
+          result = await postJsonRpc(
             conn.config.url,
             'tools/call',
             { name: tool.originalName, arguments: args },
@@ -688,8 +619,8 @@ export class MCPManager {
     const serverPart = rest.slice(0, sepIdx);
     const toolPart = rest.slice(sepIdx + 2);
     if (!serverPart || !toolPart) return null;
-    const decodedServer = decodeNameSegment(serverPart);
-    const decodedTool = decodeNameSegment(toolPart);
+    const decodedServer = decodeMcpNameSegment(serverPart);
+    const decodedTool = decodeMcpNameSegment(toolPart);
     if (decodedServer === null || decodedTool === null) return null;
     return {
       serverId: decodedServer,
@@ -719,7 +650,7 @@ export class MCPManager {
       serverId,
       serverName: serverId,
       originalName,
-      prefixedName: buildPrefixedName(serverId, originalName),
+      prefixedName: buildMcpPrefixedName(serverId, originalName),
       description,
       inputSchema,
     };
@@ -791,101 +722,4 @@ export class MCPManager {
     }
     return { content, isError };
   }
-
-  /** http 模式下发送 JSON-RPC 请求。 */
-  private async httpRpc(
-    url: string,
-    method: string,
-    params: unknown,
-    timeoutMs: number,
-    externalSignal?: AbortSignal,
-  ): Promise<unknown> {
-    const timeoutController = new AbortController();
-    const timer = setTimeout(() => timeoutController.abort(), timeoutMs);
-    const { signal, cleanup } = linkAbortSignals(timeoutController.signal, externalSignal);
-    try {
-      const id = Date.now() + Math.floor(Math.random() * 1000);
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
-        signal,
-      });
-      if (!res.ok) {
-        throw new Error(`MCP HTTP ${res.status} ${res.statusText}`);
-      }
-      const rawBody = await readBoundedResponseBody(res, MAX_MCP_BUFFER_BYTES);
-      const body = parseJsonRpcResponse(rawBody);
-      if (!body) {
-        throw new Error('MCP HTTP returned invalid JSON-RPC');
-      }
-      if (body.error) {
-        throw new Error(
-          `MCP error ${body.error.code}: ${body.error.message}`,
-        );
-      }
-      return body.result;
-    } finally {
-      clearTimeout(timer);
-      cleanup();
-    }
-  }
-
-  /** streamable-http 模式：POST + 流式 NDJSON 响应。 */
-  private async streamableHttpRpc(
-    url: string,
-    method: string,
-    params: unknown,
-    timeoutMs: number,
-    externalSignal?: AbortSignal,
-  ): Promise<unknown> {
-    const timeoutController = new AbortController();
-    const timer = setTimeout(() => timeoutController.abort(), timeoutMs);
-    const { signal, cleanup } = linkAbortSignals(timeoutController.signal, externalSignal);
-    try {
-      const id = Date.now() + Math.floor(Math.random() * 1000);
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/x-ndjson',
-        },
-        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
-        signal,
-      });
-      if (!res.ok) {
-        throw new Error(`MCP streamable-http ${res.status} ${res.statusText}`);
-      }
-
-      // Read the response exactly once. The bounded reader accounts for the
-      // cumulative stream size, so a sequence of small NDJSON frames cannot
-      // bypass the response cap.
-      const rawBody = await readBoundedResponseBody(res, MAX_MCP_BUFFER_BYTES);
-      const lines = rawBody.split(/\r?\n/);
-      let sawJsonRpcMessage = false;
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        const msg = parseJsonRpcResponse(trimmed);
-        if (!msg) {
-          throw new Error('MCP streamable-http returned invalid JSON-RPC');
-        }
-        if (msg.error) {
-          throw new Error(`MCP error ${msg.error.code}: ${msg.error.message}`);
-        }
-        if (typeof msg.id === 'number' || typeof msg.id === 'string') {
-          sawJsonRpcMessage = true;
-          if (msg.id === id) return msg.result;
-        }
-      }
-      if (!sawJsonRpcMessage) {
-        throw new Error('MCP streamable-http returned no JSON-RPC response');
-      }
-      throw new Error('MCP streamable-http response id mismatch');
-    } finally {
-      clearTimeout(timer);
-      cleanup();
-    }
-  }
-
 }

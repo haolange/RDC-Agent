@@ -100,7 +100,6 @@ describe('knowledge mutation approval boundaries', () => {
     writeMocks.promote.mockClear();
     vi.mocked(knowledgeImportService.importToSpace).mockClear();
     vi.mocked(knowledgeImportService.migrateSessionDrafts).mockClear();
-    delete process.env.RDC_AGENT_TEST_MODE;
     delete process.env.RDC_AGENT_BROWSER_QA;
     delete process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS;
     electronState.focused = undefined;
@@ -162,7 +161,7 @@ describe('knowledge mutation approval boundaries', () => {
   });
 
   it('rejects a project A token when writing the same path in project B', async () => {
-    process.env.RDC_AGENT_TEST_MODE = '1';
+    electronState.focused = {};
     const issued = await handlers.get('knowledge:issueApprovalToken')!({}, {
       action: 'knowledge.write',
       spaceId: 'project:a',
@@ -207,7 +206,6 @@ describe('knowledge mutation approval boundaries', () => {
 });
 
 it.each([['zh-CN', '确认更改知识', '取消'], ['en', 'Confirm knowledge change', 'Cancel']])('localizes %s native confirmation and issues no token after cancellation', async (language, title, cancel) => {
-  delete process.env.RDC_AGENT_TEST_MODE;
   delete process.env.RDC_AGENT_BROWSER_QA;
   registerKnowledgeHandlers({} as never);
   electronState.focused = {};

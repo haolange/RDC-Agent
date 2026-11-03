@@ -103,6 +103,9 @@ export function publishConversationTrace(
     void traceService.buildConversationPresentation(traceSessionId, messages)
       .then((presentation) => {
         workflowProjectionPublisher.publishTraceProjectionChanged({ projectId: presentation.projectId, sessionId: presentation.sessionId }, presentation);
+      })
+      .catch((error) => {
+        console.error('[ConversationService] Failed to publish ephemeral trace projection:', error);
       });
   }
 

@@ -39,7 +39,6 @@ export function createEventSubscriptionApi(transport: RendererApiTransport): Eve
         callback(snapshot as Parameters<typeof callback>[0])
       ))
     ),
-    onAgentMessage: (callback) => transport.subscribe(EVENT.agent.message, (message) => callback(message)),
     onAgentStatusChanged: (callback) => (
       transport.subscribe(EVENT.agent.statusChanged, (state) => callback(state as Parameters<typeof callback>[0]))
     ),
