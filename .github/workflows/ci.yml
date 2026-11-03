@@ -34,7 +34,7 @@ jobs:
       - run: pnpm run test:coverage
       - run: pnpm run check:coverage-ratchet
       - run: pnpm run test:coverage:renderer
-      - run: pnpm run check:coverage-ratchet -- coverage/renderer/coverage-summary.json scripts/fidelity/coverage-ratchet-renderer.json
+      - run: pnpm run check:coverage-ratchet coverage/renderer/coverage-summary.json scripts/fidelity/coverage-ratchet-renderer.json
       - name: Check gates
         env:
           RDC_SYSTEM_DEBT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}

@@ -183,8 +183,8 @@ describe('recorded RDC requests', () => {
     expect(() => materializeRecordedRdcRequest(context, uri, hash, deps)).toThrow('ARTIFACT_HASH_MISMATCH');
     expect(readEntries).not.toHaveBeenCalled();
   });
-  it('denies Mission and all children including a General child with an exact output grant', () => {
-    expect(() => materializeRecordedRdcRequest({ ...context, agentId: 'debugger' }, uri, hash, deps)).toThrow('ARTIFACT_SESSION_DENIED');
+  it('denies a read-only ceiling and all children including a General child with an exact output grant', () => {
+    expect(() => materializeRecordedRdcRequest({ ...context, accessCeiling: 'read-only' }, uri, hash, deps)).toThrow('ARTIFACT_SESSION_DENIED');
     const release = grantDelegatedArtifactAccess('child', 'parent', [uri], { read });
     try { expect(() => materializeRecordedRdcRequest({ ...context, sessionId: 'child' }, uri, hash, deps)).toThrow('ARTIFACT_SESSION_DENIED'); }
     finally { release(); }

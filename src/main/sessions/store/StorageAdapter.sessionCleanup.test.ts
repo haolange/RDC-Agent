@@ -91,6 +91,28 @@ vi.mock('../../runtime/AppPathService', () => {
 });
 
 describe('StorageAdapter.removeSession side-channel cleanup', () => {
+  it('keeps an unsupported session visible without recovering or rewriting it during startup', async () => {
+    const { storageAdapter } = await import('./StorageAdapter');
+    const projectRoot = path.join(tempRoot, 'unsupported-startup');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = await storageAdapter.createProject(projectRoot);
+    const session = storageAdapter.createSession(project.projectId, 'Old session');
+    const oldSession = { ...session } as Partial<typeof session>;
+    delete oldSession.schemaVersion;
+    const original = JSON.stringify(oldSession);
+    const file = path.join(session.sessionPath, 'session.json');
+    const journal = path.join(session.sessionPath, 'turn-commit.json');
+    fs.writeFileSync(file, original);
+    fs.writeFileSync(journal, 'Unsupported session journal must remain untouched');
+    await expect(storageAdapter.initializeWorkspace()).resolves.toBeUndefined();
+    expect(storageAdapter.listSessions(project.projectId)).toContainEqual(expect.objectContaining({
+      sessionId: session.sessionId, storageDiagnostic: 'unsupported-schema',
+    }));
+    expect(() => storageAdapter.updateSession(session.sessionId, { title: 'Changed' })).toThrow('STORAGE_SCHEMA_UNSUPPORTED');
+    expect(fs.readFileSync(file, 'utf8')).toBe(original);
+    expect(fs.readFileSync(journal, 'utf8')).toBe('Unsupported session journal must remain untouched');
+    fs.rmSync(session.sessionPath, { recursive: true, force: true });
+  });
   it('removes tasks, llm-calls, and matching trace run files for the session', async () => {
     const { storageAdapter } = await import('./StorageAdapter');
     const { appPathService } = await import('../../runtime/AppPathService');
@@ -252,6 +274,8 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
       sessionId: session.sessionId,
       capturePaths: [],
       profileId: 'debugger',
+      completionContract: 'investigation-report',
+      investigationMission: 'debugger',
     });
     await storageAdapter.updateRun(session.sessionId, run.runId, {
       kind: 'conversation',

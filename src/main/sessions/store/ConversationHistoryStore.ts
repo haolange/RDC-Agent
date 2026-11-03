@@ -27,6 +27,7 @@ import {
   toSessionAttachmentManifest,
 } from './storageSchema';
 import { applyTerminalAppend, prepareTerminalAppend } from './ConversationTerminalAppend';
+import { readProjectSessions } from './sessionRecordReconcile';
 
 export type {
   ExistingConversationTurnCommit,
@@ -567,11 +568,11 @@ export class ConversationHistoryStore {
           fs.rmSync(entryPath, { recursive: true, force: true });
           continue;
         }
-        const session = this.host.io.readJson(path.join(entryPath, 'session.json'), SessionRecordSchema);
-        if (session) {
-          this.recoverSessionTurnCommit(session.sessionId);
-          this.recoverSessionTerminalCommit(session.sessionId);
-        }
+      }
+      for (const { session } of readProjectSessions(this.host, project)) {
+        if (session.storageDiagnostic) continue;
+        this.recoverSessionTurnCommit(session.sessionId);
+        this.recoverSessionTerminalCommit(session.sessionId);
       }
     }
   }

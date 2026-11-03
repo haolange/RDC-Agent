@@ -50,7 +50,7 @@ describe('RDC host controls projection', () => {
     'does not attest exclusivity with %s state', (failure) => {
       quota(); const test = protectedTurn();
       if (failure === 'turn') test.execution.turnId = 'foreign-turn';
-      if (failure === 'planner') test.execution.agentId = 'debugger';
+      if (failure === 'planner') Object.assign(test.execution, { accessCeiling: 'read-only' });
       if (failure === 'excluded') Object.assign(test.execution, { excludeRdcLeaseTools: true });
       if (failure === 'capture' || failure === 'replay') test.execution.rdcBinding = freezeRdcTurnBinding(
         test.execution.rdcBinding!.cli, [], { ...test.lease, runtimeContext: { ...test.lease.runtimeContext,

@@ -157,9 +157,13 @@ describe('structured RDC shell', () => {
     });
     expect(result.details).toMatchObject({ invocation: { args: { session_id: 'native-replay' }, argsFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/) } });
   });
-  it.each(['debugger', 'analyzer', 'optimizer', 'custom'])('denies %s even with a valid lease', async (agentId) => {
-    await expect(executeRdcShell(input, 'call', undefined, { ...context, agentId })).rejects.toThrow(/DENIED/);
+  it.each(['read-only', 'workspace-write'] as const)('denies the %s ceiling even with a valid lease', async (accessCeiling) => {
+    await expect(executeRdcShell(input, 'call', undefined, { ...context, accessCeiling })).rejects.toThrow(/DENIED/);
     expect(mock.execute).not.toHaveBeenCalled();
+  });
+  it('allows a custom identity with a full ceiling and the owning lease', async () => {
+    await expect(executeRdcShell(input, 'call', undefined, { ...context, agentId: 'custom', accessCeiling: 'full' })).resolves.toMatchObject({ details: { exitCode: 0 } });
+    expect(mock.execute).toHaveBeenCalledOnce();
   });
   it('denies offline children and foreign/default contexts', async () => {
     await expect(executeRdcShell(input, 'call', undefined, { ...context, excludeRdcLeaseTools: true })).rejects.toThrow();
