@@ -10,6 +10,7 @@ import {
 import { applyChromeTheme } from '../theme/applyChromeTheme';
 import { reconcileCatalogProviders, startCatalogProjection, useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
 import { usePlanReviewStore } from '../../stores/planReviewStore';
+import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useEvidenceStore } from '../../stores/evidenceStore';
@@ -137,16 +138,17 @@ export function useAppBootstrap(options: {
       ]);
       if (cancelled) return;
       if (historyResult) {
-        if ('planReview' in historyResult && historyResult.planReview) usePlanReviewStore.getState().accept(historyResult.planReview);
-        setConversationSnapshot(
-          hydrateMessagesWithActionEvents(
+        hydrateLoadedSessionSurface({
+          messages: hydrateMessagesWithActionEvents(
             historyResult.messages ?? [],
             (evidenceResult.events ?? []) as ActionEvent[],
           ),
-          historyResult.branchState ?? null,
-        );
-      }
-      if (traceResult) {
+          branchState: historyResult.branchState ?? null,
+          planReview: 'planReview' in historyResult ? historyResult.planReview ?? null : null,
+          tracePresentation: traceResult ? traceResult.presentation ?? null : undefined,
+          applyTrace: Boolean(traceResult),
+        });
+      } else if (traceResult) {
         setTracePresentation(traceResult.presentation ?? null);
       }
     })();

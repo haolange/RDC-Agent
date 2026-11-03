@@ -19,18 +19,30 @@ export const selectConversationMessageCount = (state: ConversationState): number
   state.conversationMessages.length;
 
 export const selectLatestMessageActivityAt = (state: ConversationState): number =>
-  state.conversationMessages.reduce<number>((max, message) => {
-    const candidate = message.updatedAt ?? message.createdAt;
-    return candidate > max ? candidate : max;
-  }, 0);
+  state.latestMessageActivityAt;
+
+const messageActivityAt = (message: ConversationMessage): number => message.updatedAt ?? message.createdAt ?? 0;
+
+const latestActivityAt = (messages: readonly ConversationMessage[]): number => {
+  let max = 0;
+  for (const message of messages) {
+    const candidate = messageActivityAt(message);
+    if (candidate > max) max = candidate;
+  }
+  return max;
+};
 
 const projectMessages = (
   allConversationMessages: ConversationMessage[],
   branchState: ConversationState['branchState'],
-) => ({
-  allConversationMessages,
-  conversationMessages: projectVisibleMessages(allConversationMessages, branchState),
-});
+) => {
+  const conversationMessages = projectVisibleMessages(allConversationMessages, branchState);
+  return {
+    allConversationMessages,
+    conversationMessages,
+    latestMessageActivityAt: latestActivityAt(conversationMessages),
+  };
+};
 
 export const useConversationStore = create<ConversationState>((set, get) => ({
   ...initialConversationState,
@@ -39,10 +51,14 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     const allConversationMessages = sortConversationMessages(messages);
     return projectMessages(allConversationMessages, state.branchState);
   }),
-  setBranchState: (branchState) => set((state) => ({
-    branchState,
-    conversationMessages: projectVisibleMessages(state.allConversationMessages, branchState),
-  })),
+  setBranchState: (branchState) => set((state) => {
+    const conversationMessages = projectVisibleMessages(state.allConversationMessages, branchState);
+    return {
+      branchState,
+      conversationMessages,
+      latestMessageActivityAt: latestActivityAt(conversationMessages),
+    };
+  }),
   setConversationSnapshot: (messages, branchState) => set((state) => {
     const nextBranchState = branchState === undefined ? state.branchState : branchState;
     const allConversationMessages = sortConversationMessages(messages);

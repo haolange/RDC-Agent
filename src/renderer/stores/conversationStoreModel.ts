@@ -65,6 +65,7 @@ export interface ConversationState {
   monotonicStoppedTurnIds: string[];
   monotonicStoppedRequestIds: string[];
   revokedRequestIds: string[];
+  latestMessageActivityAt: number;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   setBranchState: (branchState: ConversationBranchState | null) => void;
   setConversationSnapshot: (messages: ConversationMessage[], branchState?: ConversationBranchState | null) => void;
@@ -93,4 +94,5 @@ export const initialConversationState = {
   monotonicStoppedTurnIds: [] as string[],
   monotonicStoppedRequestIds: [] as string[],
   revokedRequestIds: [] as string[],
+  latestMessageActivityAt: 0,
 };

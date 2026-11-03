@@ -7,8 +7,7 @@ import {
   shouldShowForkNavigatorForMessage,
 } from '@shared/conversation/conversationBranchResolver';
 import { switchConversationBranch } from '../../hooks/conversationPreview';
-import { useConversationStore } from '../../stores/conversationStore';
-import { useWorkflowStore } from '../../stores/workflowStore';
+import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
 import { useI18n } from '../../i18n';
 
 interface MessageVariantNavigatorProps {
@@ -21,8 +20,6 @@ export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = (
   branchState,
 }) => {
   const { t } = useI18n();
-  const setConversationSnapshot = useConversationStore((state) => state.setConversationSnapshot);
-  const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
 
   const fork = useMemo(() => {
     if (!branchState || !shouldShowForkNavigatorForMessage(branchState, message)) {
@@ -61,11 +58,13 @@ export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = (
     });
     if (!result) return;
     if (!result.success) return;
-    setConversationSnapshot(result.messages, result.branchState ?? null);
-    if (result.tracePresentation) {
-      setTracePresentation(result.tracePresentation);
-    }
-  }, [fork, message.sessionId, navigator, setConversationSnapshot, setTracePresentation]);
+    hydrateLoadedSessionSurface({
+      messages: result.messages,
+      branchState: result.branchState ?? null,
+      tracePresentation: result.tracePresentation ?? null,
+      applyTrace: Boolean(result.tracePresentation),
+    });
+  }, [fork, message.sessionId, navigator]);
 
   if (!navigator) return null;
 

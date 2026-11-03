@@ -1,10 +1,8 @@
-import { usePlanReviewStore } from '../../../stores/planReviewStore';
+import { hydrateLoadedSessionSurface } from '../../../stores/sessionProjectionHydration';
 import { useCaptureStore } from '../../../stores/captureStore';
-import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 import { useSessionProjectionStore } from '../../../stores/sessionProjectionStore';
-import { useWorkflowStore } from '../../../stores/workflowStore';
 import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
 import { hydrateComposerAgentFromSession } from '../../../stores/sessionAgentHydration';
 import type { TranslationKey } from '../../../i18n';
@@ -119,13 +117,15 @@ export async function selectSessionOp(
   ctx.setCurrentSession(result.session);
   hydrateComposerAgentFromSession(result.session);
   const history = await window.electronAPI.conversation.getHistory(result.session.sessionId).catch(() => null);
-  if (history && ctx.isLatestSelectionRequest(options.requestId)) {
-    if (history.planReview) usePlanReviewStore.getState().accept(history.planReview);
-    useConversationStore.getState().setConversationSnapshot(history.messages ?? [], history.branchState ?? null);
-  }
   const trace = await window.electronAPI.trace.getProjection(result.session.sessionId).catch(() => null);
-  if (trace?.presentation && ctx.isLatestSelectionRequest(options.requestId)) {
-    useWorkflowStore.getState().setTracePresentation(trace.presentation);
+  if (history && ctx.isLatestSelectionRequest(options.requestId)) {
+    hydrateLoadedSessionSurface({
+      messages: history.messages ?? [],
+      branchState: history.branchState ?? null,
+      planReview: history.planReview ?? null,
+      tracePresentation: trace?.presentation ?? null,
+      applyTrace: Boolean(trace?.presentation),
+    });
   }
   ctx.setRightRailTarget('session');
   ctx.setCurrentRun(result.currentRun ?? null);
