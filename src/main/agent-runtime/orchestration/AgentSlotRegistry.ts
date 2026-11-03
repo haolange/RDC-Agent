@@ -8,15 +8,10 @@
 
 import type {
   AgentConfig,
-  AgentId,
   AgentRole,
   AgentState,
 } from '@shared/types/agent';
-import { DEFAULT_AGENT_ID, isTopLevelAgentId } from '@shared/types/agent';
-import {
-  AGENT_ROLES,
-  DEFAULT_MODEL_ROUTING,
-} from '@shared/constants/agents';
+import { AGENT_ROLES } from '@shared/constants/agents';
 import type { LLMAgentRouteConfig } from '@shared/types/llm';
 import { nowIso } from '@shared/utils/id';
 import type { Agent } from '../agent/Agent';
@@ -111,13 +106,11 @@ export class AgentSlotRegistry {
   }
 
   createDefaultAgentConfig(agentId: AgentRole): AgentConfig {
-    const fallbackAgentId: AgentId = isTopLevelAgentId(agentId) ? agentId : DEFAULT_AGENT_ID;
-    const defaultRouting = DEFAULT_MODEL_ROUTING[fallbackAgentId];
     return {
       agentId,
       systemPrompt: '',
-      modelProvider: defaultRouting.provider,
-      modelName: defaultRouting.model,
+      modelProvider: '',
+      modelName: '',
       temperature: 0.7,
     };
   }

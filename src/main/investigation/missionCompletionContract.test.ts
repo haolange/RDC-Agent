@@ -54,12 +54,28 @@ describe('missionCompletionContract', () => {
   });
 
   it.each(MISSIONS)('%s can clarify an intent without claiming investigation completion', profileId => {
-    expect(() => enforceMissionTurnCompletion({ profileId, sessionId: SESSION_ID, finalAnswerText: 'What should this area look like?' })).not.toThrow();
-    expect(() => enforceMissionTurnCompletion({ profileId, sessionId: SESSION_ID, finalAnswerText: 'Done.', disposition: 'completed', service: createInvestigationHarness().service })).toThrow(MissionCompletionError);
+    expect(() => enforceMissionTurnCompletion({ profileId, completionContract: 'investigation-report', investigationMission: profileId, sessionId: SESSION_ID, finalAnswerText: 'What should this area look like?' })).not.toThrow();
+    expect(() => enforceMissionTurnCompletion({ profileId, completionContract: 'investigation-report', investigationMission: profileId, sessionId: SESSION_ID, finalAnswerText: 'Done.', disposition: 'completed', service: createInvestigationHarness().service })).toThrow(MissionCompletionError);
+  });
+
+  it('does not infer a mission from the profile id', () => {
+    expect(enforceMissionTurnCompletion({
+      profileId: 'debugger',
+      sessionId: SESSION_ID,
+      finalAnswerText: 'Done.',
+      disposition: 'completed',
+    })).toBeUndefined();
   });
 
   it.each(['partial', 'blocked', 'cancelled'] as const)('allows honest %s without promoting a report', disposition => {
-    expect(() => enforceMissionTurnCompletion({ profileId: 'debugger', sessionId: SESSION_ID, finalAnswerText: 'Unresolved.', disposition })).not.toThrow();
+    expect(() => enforceMissionTurnCompletion({
+      profileId: 'debugger',
+      completionContract: 'investigation-report',
+      investigationMission: 'debugger',
+      sessionId: SESSION_ID,
+      finalAnswerText: 'Unresolved.',
+      disposition,
+    })).not.toThrow();
   });
 
   it.each(MISSIONS)('%s cannot complete without a report', (mission) => {
@@ -67,6 +83,8 @@ describe('missionCompletionContract', () => {
     seedCheckpoint(service, mission);
     expect(() => assertMissionTurnCompletion({
       profileId: mission,
+      completionContract: 'investigation-report',
+      investigationMission: mission,
       sessionId: SESSION_ID,
       finalAnswerText: 'Mission finished in prose only.',
       service,
@@ -74,6 +92,8 @@ describe('missionCompletionContract', () => {
     try {
       assertMissionTurnCompletion({
         profileId: mission,
+      completionContract: 'investigation-report',
+      investigationMission: mission,
         sessionId: SESSION_ID,
         finalAnswerText: 'Mission finished in prose only.',
         service,
@@ -97,6 +117,8 @@ describe('missionCompletionContract', () => {
     const finalAnswer = `See ${report.manifest.artifactId} ${report.contentHash}`;
     expect(() => assertMissionTurnCompletion({
       profileId: mission,
+      completionContract: 'investigation-report',
+      investigationMission: mission,
       sessionId: SESSION_ID,
       finalAnswerText: finalAnswer,
       service,
@@ -104,6 +126,8 @@ describe('missionCompletionContract', () => {
     try {
       assertMissionTurnCompletion({
         profileId: mission,
+      completionContract: 'investigation-report',
+      investigationMission: mission,
         sessionId: SESSION_ID,
         finalAnswerText: finalAnswer,
         service,
@@ -127,6 +151,8 @@ describe('missionCompletionContract', () => {
     });
     expect(() => assertMissionTurnCompletion({
       profileId: mission,
+      completionContract: 'investigation-report',
+      investigationMission: mission,
       sessionId: SESSION_ID,
       finalAnswerText: 'I registered report.md via output_register.',
       service,
@@ -135,6 +161,8 @@ describe('missionCompletionContract', () => {
     expect(finalAnswerCitesReport(finalAnswer, report.manifest.artifactId, report.contentHash)).toBe(true);
     const receipt = assertMissionTurnCompletion({
       profileId: mission,
+      completionContract: 'investigation-report',
+      investigationMission: mission,
       sessionId: SESSION_ID,
       finalAnswerText: finalAnswer,
       service,
@@ -164,6 +192,8 @@ describe('missionCompletionContract', () => {
     });
     expect(() => assertMissionTurnCompletion({
       profileId: 'debugger',
+      completionContract: 'investigation-report',
+      investigationMission: 'debugger',
       sessionId: SESSION_ID,
       finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`,
       service,
@@ -181,6 +211,8 @@ describe('missionCompletionContract', () => {
     });
     expect(() => assertMissionTurnCompletion({
       profileId: 'analyzer',
+      completionContract: 'investigation-report',
+      investigationMission: 'analyzer',
       sessionId: SESSION_ID,
       finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`,
       service,
@@ -191,6 +223,8 @@ describe('missionCompletionContract', () => {
     const { service } = createInvestigationHarness();
     expect(enforceMissionTurnCompletion({
       profileId: 'debugger',
+      completionContract: 'investigation-report',
+      investigationMission: 'debugger',
       sessionId: SESSION_ID,
       finalAnswerText: 'still planning',
       service,

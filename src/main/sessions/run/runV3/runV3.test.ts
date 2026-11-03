@@ -66,7 +66,14 @@ describe('Run v3 schema', () => {
     expect(PersistedRunRecordV3Schema.safeParse({ ...conversation, mission: 'debugger' }).success).toBe(false);
     expect(PersistedRunRecordV3Schema.safeParse({ ...conversation, captures: v3Base().captures }).success).toBe(false);
 
-    const mission = toPersistedRunV3({ ...v3Base(), profileId: 'debugger' });
+    const undeclared = toPersistedRunV3({ ...v3Base(), profileId: 'debugger' });
+    expect(undeclared.kind).toBe('conversation');
+    const mission = toPersistedRunV3({
+      ...v3Base(),
+      profileId: 'debugger',
+      completionContract: 'investigation-report',
+      investigationMission: 'debugger',
+    });
     expect(mission.kind).toBe('mission');
     if (mission.kind === 'mission') expect(mission.mission).toBe('debugger');
     expect(PersistedRunRecordV3Schema.safeParse(mission).success).toBe(true);

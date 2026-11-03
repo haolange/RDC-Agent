@@ -1,6 +1,5 @@
 import { allowsBudgetPause } from './missionBudgetPause';
 import { type TurnCompletionInput } from '../agent-runtime/agent/TurnCompletionValidator';
-import { isMissionAgentId } from '@shared/types/agent';
 import {
   ANALYZER_EXPLANATION_LAYERS,
   analyzerExplanationLayer,
@@ -80,7 +79,7 @@ function declaredMission(input: MissionCompletionInput): InvestigationMission | 
     }
     return input.investigationMission;
   }
-  return isMissionAgentId(input.profileId) ? input.profileId : null;
+  return null;
 }
 
 export function enforceMissionTurnCompletion(input: MissionCompletionInput): MissionCompletionReceipt | void {

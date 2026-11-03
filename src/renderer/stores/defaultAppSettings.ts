@@ -6,12 +6,12 @@ import {
   RIGHT_PANEL_DEFAULT_WIDTH,
   TERMINAL_DEFAULT_HEIGHT,
 } from '@shared/constants/layout';
-import { DEFAULT_MODEL_ROUTING } from '@shared/types/agent';
+import { TOP_LEVEL_AGENT_IDS } from '@shared/types/agent';
 import { createDefaultUiPreferences } from '@shared/theme/uiPreferences';
 
 const createEmptyAgentRoutes = (): LlmAgentRoute[] =>
-  Object.keys(DEFAULT_MODEL_ROUTING).map((agentId) => ({
-    agentId: agentId as LlmAgentRoute['agentId'],
+  TOP_LEVEL_AGENT_IDS.map((agentId) => ({
+    agentId,
     providerId: '',
     modelId: '',
   }));

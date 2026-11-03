@@ -1,5 +1,4 @@
 import { z, type ZodType } from 'zod';
-import { isMissionAgentId } from '@shared/types/agent';
 import type { MissionKind, RunRecord } from '@shared/types/session';
 import type { PersistedRunRecord } from '../../store/storageTypes';
 
@@ -111,7 +110,7 @@ export const PersistedRunRecordV3Schema: ZodType<PersistedRunRecord> = z.discrim
 ]) as unknown as ZodType<PersistedRunRecord>;
 
 export function classifyRunKind(
-  profileId: string,
+  _profileId: string,
   declared?: { completionContract?: 'final-answer' | 'investigation-report'; investigationMission?: MissionKind | null },
 ): { kind: RunRecord['kind']; mission?: MissionKind } {
   if (declared?.completionContract === 'investigation-report') {
@@ -120,8 +119,7 @@ export function classifyRunKind(
     }
     return { kind: 'mission', mission: declared.investigationMission };
   }
-  if (declared?.completionContract === 'final-answer') return { kind: 'conversation' };
-  return isMissionAgentId(profileId) ? { kind: 'mission', mission: profileId } : { kind: 'conversation' };
+  return { kind: 'conversation' };
 }
 
 export function toPersistedRunV3(

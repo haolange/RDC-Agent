@@ -10,7 +10,7 @@ import type {
   LlmProviderModelPreference,
 } from '@shared/types/settings';
 import { isReasoningSelection } from '@shared/types/modelCapability';
-import { DEFAULT_MODEL_ROUTING, isSafeAgentProfileId } from '@shared/types/agent';
+import { TOP_LEVEL_AGENT_IDS, isSafeAgentProfileId } from '@shared/types/agent';
 import {
   createProviderEntryFromCatalog,
   createProviderEntriesFromCatalog,
@@ -327,8 +327,8 @@ export function resolveProviderModels(providerId: string, persistedModels: unkno
 }
 
 export function createEmptyAgentRoutes(): LlmAgentRoute[] {
-  return Object.keys(DEFAULT_MODEL_ROUTING).map((agentId) => ({
-    agentId: agentId as LlmAgentRoute['agentId'],
+  return TOP_LEVEL_AGENT_IDS.map((agentId) => ({
+    agentId,
     providerId: '',
     modelId: '',
   }));

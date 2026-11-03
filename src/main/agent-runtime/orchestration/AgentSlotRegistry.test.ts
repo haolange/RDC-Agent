@@ -27,7 +27,7 @@ describe('AgentSlotRegistry compiledRoute apply', () => {
   it('applies compiledRoute and does not use leftover agentRoutes or DEFAULT_MODEL_ROUTING', () => {
     const registry = new AgentSlotRegistry();
     registry.initializeDefaults();
-    expect(registry.getAgentConfig('general')?.modelProvider).toBe('openrouter');
+    expect(registry.getAgentConfig('general')).toMatchObject({ modelProvider: '', modelName: '' });
 
     registry.applyLlmConfig([
       { agentId: 'general', providerId: 'real', modelId: 'real-model' },

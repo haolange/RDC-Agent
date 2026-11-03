@@ -225,7 +225,6 @@ describe('AgentRuntimeConfigService scoped resources', () => {
       skillCallEntry,
       skillLane,
     } = await import('@shared/constants/canonicalSkills');
-    const { MISSION_FORBIDDEN_TOOL_IDS } = await import('@shared/constants/missionPlanOnly');
     const service = new AgentRuntimeConfigService();
     const metadata = service.listSkillMetadata();
     const ids = metadata.map((skill) => skill.id).sort();
@@ -283,9 +282,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
       expect(skill?.allowedTools).toEqual([]);
     }
     const coordinator = service.loadSkill('debugger-coordinator');
-    expect(coordinator?.allowedTools.some((tool) => (
-      (MISSION_FORBIDDEN_TOOL_IDS as readonly string[]).includes(tool)
-    ))).toBe(false);
+    expect(coordinator?.allowedTools).toEqual([]);
   });
 
   it('discovers shared and matching Mission manuals as knowledge while isolating other specialties', async () => {
@@ -296,14 +293,15 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     for (const mission of ['debugger', 'analyzer', 'optimizer'] as const) {
       for (const skillId of manuals) {
         const visible = skillId === 'rdc-tool-shell' || skillId === `${mission}-rdc-tools`;
-        expect(isSkillVisibleToProfile(mission, skillId)).toBe(visible);
+        const audience = service.loadSkill(skillId)?.audience;
+        expect(isSkillVisibleToProfile(mission, skillId, audience)).toBe(visible);
         expect(service.listSkills(undefined, mission).some((skill) => skill.id === skillId)).toBe(visible);
         expect(service.listSkillMetadata(undefined, mission).some((skill) => skill.id === skillId)).toBe(visible);
         expect(service.loadSkill(skillId, undefined, mission)?.id ?? null).toBe(visible ? skillId : null);
       }
     }
     for (const skillId of manuals) {
-      expect(isSkillVisibleToProfile('general', skillId)).toBe(true);
+      expect(isSkillVisibleToProfile('general', skillId, service.loadSkill(skillId)?.audience)).toBe(true);
       expect(service.listSkills(undefined, 'general').map((skill) => skill.id)).toContain(skillId);
       expect(service.loadSkill(skillId, undefined, 'general')?.id).toBe(skillId);
       expect(service.loadSkill(skillId)?.id).toBe(skillId);

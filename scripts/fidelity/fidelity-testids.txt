@@ -155,9 +155,12 @@ runtime-terminal-resize-handle
 runtime-terminal-scope
 runtime-terminal-search
 runtime-terminal-severity
+settings-agent-access-ceiling
 settings-agent-autosave-status
+settings-agent-completion-contract
 settings-agent-config-status
 settings-agent-handoff-card-${index}
+settings-agent-handoff-surface
 settings-agent-handoffs
 settings-agent-identity
 settings-agent-manifest-diagnostics
@@ -182,6 +185,7 @@ settings-code-interpreter
 settings-code-interpreter-enabled
 settings-code-interpreter-env
 settings-compaction-threshold
+settings-custom-permissions
 settings-hook-detail
 settings-hook-detail-edit
 settings-hook-detail-test

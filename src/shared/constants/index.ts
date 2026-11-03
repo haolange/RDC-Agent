@@ -41,15 +41,6 @@ export type {
   SkillCallEntry,
 } from './canonicalSkills';
 export {
-  MISSION_FORBIDDEN_TOOL_IDS,
-  MISSION_PLAN_ONLY_TOOL_IDS,
-  expandMissionPlanOnlyTokens,
-  filterMissionPlanOnlyAllowlist,
-  isMissionForbiddenToolId,
-  isMissionPlanOnlyToolId,
-  isMissionProfileId,
-} from './missionPlanOnly';
-export {
   RDC_PROBE_ACTIONS,
   RDC_PROBE_READONLY_CLI_ACTIONS,
   RdcProbeInputSchema,
@@ -62,7 +53,6 @@ export {
   AGENT_MODE_MAP,
   AGENT_MODES,
   AGENT_ROLES,
-  DEFAULT_MODEL_ROUTING,
   getAgentModeConfig,
 } from './agents';
 export { BLOCKER_CODES, getBlockersByCategory, getBlockersBySeverity } from './blockers';

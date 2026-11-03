@@ -4,7 +4,7 @@ export type CompletionDisposition = 'completed' | 'partial' | 'blocked' | 'cance
 
 export interface TurnCompletionInput {
   profileId: string;
-  /** Frozen profile contract. Omitted only for direct contract tests of builtin mission ids. */
+  /** Frozen profile contract. Omitted means this turn is not an investigation report. */
   completionContract?: 'final-answer' | 'investigation-report';
   /** Mission declared by a preloaded skill when the contract is investigation-report. */
   investigationMission?: 'debugger' | 'analyzer' | 'optimizer';

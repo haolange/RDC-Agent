@@ -969,6 +969,8 @@ describe('investigation system contract', () => {
       }), { mission });
       expect(() => assertMissionTurnCompletion({
         profileId: mission,
+        completionContract: 'investigation-report',
+        investigationMission: mission,
         sessionId: SESSION_ID,
         finalAnswerText: 'output_register report.md',
         service,
@@ -977,6 +979,8 @@ describe('investigation system contract', () => {
       writeDraft(empty.service, 'world_state', baselineWorld(), { mission });
       expect(() => assertMissionTurnCompletion({
         profileId: mission,
+        completionContract: 'investigation-report',
+        investigationMission: mission,
         sessionId: SESSION_ID,
         finalAnswerText: 'final without checkpoint',
         service: empty.service,
@@ -999,13 +1003,16 @@ describe('investigation system contract', () => {
     });
     expect(() => assertMissionTurnCompletion({
       profileId: 'analyzer',
+      completionContract: 'investigation-report',
+      investigationMission: 'analyzer',
       sessionId: SESSION_ID,
       finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`,
       service,
     })).toThrow(/mission_method|MISSION_COMPLETION_DENIED/);
-    expect(isSkillVisibleToProfile('debugger', 'rdc-tool-shell')).toBe(true);
-    expect(isSkillVisibleToProfile('debugger', 'debugger-rdc-tools')).toBe(true);
-    expect(isSkillVisibleToProfile('debugger', 'optimizer-rdc-tools')).toBe(false);
-    expect(isSkillVisibleToProfile('general', 'rdc-tool-shell')).toBe(true);
+    expect(isSkillVisibleToProfile('debugger', 'rdc-tool-shell', ['general', 'debugger', 'analyzer', 'optimizer'])).toBe(true);
+    expect(isSkillVisibleToProfile('debugger', 'debugger-rdc-tools', ['debugger', 'general'])).toBe(true);
+    expect(isSkillVisibleToProfile('debugger', 'optimizer-rdc-tools', ['optimizer', 'general'])).toBe(false);
+    expect(isSkillVisibleToProfile('debugger', 'optimizer-rdc-tools')).toBe(true);
+    expect(isSkillVisibleToProfile('general', 'rdc-tool-shell', ['general', 'debugger', 'analyzer', 'optimizer'])).toBe(true);
   });
 });

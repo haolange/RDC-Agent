@@ -161,7 +161,7 @@ Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（当前 57 ids，含 `shell` 
 
 `investigation_list` 的 `kind` / `status` 可选；传 `any` 或省略即包含全部对应值，其他允许值作精确过滤。工具目录列出允许值，未知值须明确拒绝，不能把错误输入解释成“本会话无调查产物”。
 
-Run **当前实现**唯一活跃 `schemaVersion` 为 `'3'`（`src/main/sessions/runV3/`）：discriminated union `kind: conversation|mission` + `profileId`，新写无 `mode` / `lastStage` / `runtime.workflow_stage`。产品只读 `run.json` v3；仅有 `run.yaml`、缺版本、旧版本或未知版本时明确报 `STORAGE_SCHEMA_UNSUPPORTED`，保留源文件，不在读取时迁移。`kind: mission` 来自冻结的 `completion-contract: investigation-report`，`mission` 来自预载 Skill 的 `investigation-mission`，不必等于 `profileId`。未带合同的历史调用仍把内置 `debugger` / `analyzer` / `optimizer` 写成 mission。conversation 的 `captures=[]` 且不消费 investigation sidecar。既有 v3 文件（profileId 与 mission 同为三 Mission 之一）仍然合法。既有一次性本机转换备份仅供核验，不参与 Run 枚举、IPC、UI 或 Right Rail。见 `ARCHITECTURE.md` 裁决 I。
+Run **当前实现**唯一活跃 `schemaVersion` 为 `'3'`（`src/main/sessions/runV3/`）：discriminated union `kind: conversation|mission` + `profileId`，新写无 `mode` / `lastStage` / `runtime.workflow_stage`。产品只读 `run.json` v3；仅有 `run.yaml`、缺版本、旧版本或未知版本时明确报 `STORAGE_SCHEMA_UNSUPPORTED`，保留源文件，不在读取时迁移。`kind: mission` 来自冻结的 `completion-contract: investigation-report`，`mission` 来自预载 Skill 的 `investigation-mission`，不必等于 `profileId`。没有该合同时新写为 conversation，不按 profile id 推断。conversation 的 `captures=[]` 且不消费 investigation sidecar。既有 v3 文件（profileId 与 mission 同为三 Mission 之一）仍然合法。既有一次性本机转换备份仅供核验，不参与 Run 枚举、IPC、UI 或 Right Rail。见 `ARCHITECTURE.md` 裁决 I。
 
 Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only route 的有效工具集为空，不得列出或模仿工具调用。`tool_search` 无结果时返回 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 与工具集 fingerprint；fingerprint 未变化时重复同一搜索属于无进展。
 

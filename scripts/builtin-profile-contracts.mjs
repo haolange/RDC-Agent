@@ -9,7 +9,6 @@ const { parseAgentMarkdownStrict } = require('../src/main/settings/agent-manifes
 const { diagnoseManifestToolTokens } = require('../src/shared/constants/agentToolTokens.ts');
 
 export const BUILTIN_AGENT_IDS = ['general', 'debugger', 'analyzer', 'optimizer'];
-export const MISSION_AGENT_IDS = ['debugger', 'analyzer', 'optimizer'];
 export const ROOT_SKILL_IDS = [
   'execution-orchestrator',
   'debugger-coordinator',
@@ -121,7 +120,7 @@ export function assertParsedProfileContracts(id, definition) {
     assertIncludesAll(tools, GENERAL_REQUIRED_TOOLS, 'General tools');
     assert(skills.includes('execution-orchestrator'), 'General must arm execution-orchestrator');
     assert(definition.maxTurns === GENERAL_MAX_TURNS, `General max-turns must be ${GENERAL_MAX_TURNS}`);
-    assertIncludesAll(agents, MISSION_AGENT_IDS, 'General agents');
+    assertIncludesAll(agents, ['debugger', 'analyzer', 'optimizer'], 'General agents');
     assert(handoffs.length === 0, 'General handoffs must be empty');
     assert(definition.accessCeiling === undefined, 'General omits access-ceiling and therefore keeps the full ceiling');
     assert(definition.completionContract === undefined, 'General omits completion-contract and therefore keeps final-answer');

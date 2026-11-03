@@ -1,10 +1,10 @@
 import type { AgentId } from '../types/agent';
 import type { AgentManifestDefinition } from '../types/agentManifest';
 import type { ModeConfig } from '../types/layout';
-import { DEFAULT_MODEL_ROUTING, TOP_LEVEL_AGENT_IDS, isTopLevelAgentId } from '../types/agent';
+import { TOP_LEVEL_AGENT_IDS, isTopLevelAgentId } from '../types/agent';
 import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '../theme/composeAccent';
 
-export { DEFAULT_MODEL_ROUTING, isTopLevelAgentId };
+export { isTopLevelAgentId };
 
 export const AGENT_ROLES: AgentId[] = [...TOP_LEVEL_AGENT_IDS];
 

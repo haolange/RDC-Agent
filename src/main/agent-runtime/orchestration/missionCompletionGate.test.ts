@@ -48,6 +48,8 @@ describe('Mission turn completion gate', () => {
       }), { mission });
       expect(() => assertMissionTurnCompletion({
         profileId: mission,
+        completionContract: 'investigation-report',
+        investigationMission: mission,
         sessionId: SESSION_ID,
         finalAnswerText: 'hook text and output_register are not enough',
         service: missingReport.service,
@@ -57,6 +59,8 @@ describe('Mission turn completion gate', () => {
       writeDraft(missingCheckpoint.service, 'world_state', baselineWorld(), { mission });
       expect(() => assertMissionTurnCompletion({
         profileId: mission,
+        completionContract: 'investigation-report',
+        investigationMission: mission,
         sessionId: SESSION_ID,
         finalAnswerText: 'final without checkpoint',
         service: missingCheckpoint.service,

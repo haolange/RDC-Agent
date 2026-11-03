@@ -1,4 +1,4 @@
-import type { AgentAccessCeiling } from '../types/agentManifest';
+import { agentAccessCeiling, type AgentAccessCeiling } from '../types/agentManifest';
 import { BUILTIN_AGENT_TOOL_ID_SET, type BuiltinAgentToolId } from './agentToolTokens';
 
 /**
@@ -97,8 +97,8 @@ export function filterToolsWithinCeiling(toolNames: readonly string[], ceiling: 
   return toolNames.filter((name) => name.endsWith('*') ? ceiling === 'full' : isToolWithinCeiling(name, ceiling));
 }
 
-/** Native RDC execution. A missing ceiling keeps the historical General-only behavior for callers that have not copied the frozen plan yet. */
-export function allowsNativeRdcExecution(context?: { accessCeiling?: AgentAccessCeiling; agentId?: string }): boolean {
-  if (context?.accessCeiling) return context.accessCeiling === 'full';
-  return context?.agentId === 'general';
+/** Native RDC execution. Omitted ceiling is the profile default (`full`); a missing context is denied. */
+export function allowsNativeRdcExecution(context?: { accessCeiling?: AgentAccessCeiling } | null): boolean {
+  if (!context) return false;
+  return agentAccessCeiling(context) === 'full';
 }

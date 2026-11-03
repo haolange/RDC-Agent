@@ -7,7 +7,7 @@ import type {
 } from '@shared/types/agentRuntime';
 import { MCP_TRANSPORTS as MCP_TRANSPORT_LIST, type MCPTransport } from '@shared/types/mcp';
 import type { ScopedResourceCandidate, SkillLoadResult, SkillMetadata, SkillSelectionProjection } from '@shared/types/rdcRuntime';
-import { MISSION_AGENT_IDS } from '@shared/types/agent';
+import { TOP_LEVEL_AGENT_IDS } from '@shared/types/agent';
 import { appPathService } from '../../runtime/AppPathService';
 import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
 import {
@@ -103,7 +103,7 @@ export class AgentRuntimeConfigService {
         status: 'ready',
         options: this.listSkillMetadata(projectRoot).map((skill) => ({
           ...skill,
-          unavailableToAgentIds: MISSION_AGENT_IDS.filter((id) => !isSkillVisibleToProfile(id, skill.id, skill.audience)),
+          unavailableToAgentIds: TOP_LEVEL_AGENT_IDS.filter((id) => !isSkillVisibleToProfile(id, skill.id, skill.audience)),
         })),
       };
     } catch (error) {

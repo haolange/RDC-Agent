@@ -184,6 +184,7 @@ CatalogJsonObject
 CatalogJsonPrimitive
 CatalogJsonValue
 CatalogModelDefinition
+CatalogModelRoute
 ceilingAllowsAccess
 CHALLENGE_KINDS
 CHALLENGE_STATUSES
@@ -384,7 +385,6 @@ DEFAULT_AGENT_COMPLETION_CONTRACT
 DEFAULT_AGENT_ID
 DEFAULT_ASK_USER_PROMPT
 DEFAULT_CONTEXT_COMPACTION_PERCENT
-DEFAULT_MODEL_ROUTING
 DEFAULT_THEME_PRESET_ID
 DELEGATION_CAPSULE_ERROR
 DELEGATION_CAPSULE_JSON_SCHEMA
@@ -465,7 +465,6 @@ ExecutionIdentity
 ExecutionOffer
 ExecutionOfferPlanRef
 expandCanonicalToolToken
-expandMissionPlanOnlyTokens
 EXPERIMENT_ACTION_CLASSES
 EXPERIMENT_PROTOCOLS
 EXPERIMENT_STATUSES
@@ -482,7 +481,6 @@ ExperimentVisualValidation
 extractDollarSkillRefs
 extractSessionArtifactUris
 filterJsonl
-filterMissionPlanOnlyAllowlist
 filterToolsWithinCeiling
 FinalResponseNode
 findForkForMessage
@@ -588,10 +586,6 @@ isHandoffOfferedAtPlanGate
 isHandoffOfferedAtTurnEnd
 isHexColor
 isLlmProviderProtocol
-isMissionAgentId
-isMissionForbiddenToolId
-isMissionPlanOnlyToolId
-isMissionProfileId
 isNamedReasoningLevel
 isProviderExecutable
 isRdcLeaseToolName
@@ -740,18 +734,11 @@ MemorySummary
 MemoryWriteRequest
 mergeTurnPreloadSkillIds
 mergeUiPreferences
-MISSION_AGENT_IDS
-MISSION_FORBIDDEN_TOOL_ID_SET
-MISSION_FORBIDDEN_TOOL_IDS
 MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS
-MISSION_PLAN_ONLY_TOOL_ID_SET
-MISSION_PLAN_ONLY_TOOL_IDS
 MISSION_PLANNING_AGENT_IDS
-MissionAgentId
 MissionCheckpoint
 MissionId
 MissionKind
-MissionPlanOnlyToolId
 MissionRunRecord
 mixRgb
 ModeConfig
@@ -775,7 +762,6 @@ ModelPresence
 ModelPresencePolicy
 ModelProviderBackendKind
 ModelProviderCapabilityMatrix
-CatalogModelRoute
 ModelRouteOption
 ModelRouteOptionSchema
 ModelRouteRecommendation
