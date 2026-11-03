@@ -1,0 +1,23 @@
+/**
+ * Reduced motion shortens tokenized motion and stops the named CSS effects.
+ * The Max effort canvas is not included; EffortMaxField settles that loop itself.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+    --transition-fast: 0ms linear;
+    --transition-base: 0ms linear;
+    --transition-slow: 0ms linear;
+  }
+
+  .active-signal-text.is-active,
+  .animate-spin,
+  .ui-skeleton,
+  .work-process-subagent-dots.is-active > span,
+  .is-trace-flash,
+  .composer-agent-menu-item-running-dot {
+    animation: none;
+  }
+}

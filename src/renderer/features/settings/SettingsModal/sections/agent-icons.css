@@ -94,7 +94,7 @@
 .settings-page-agents .settings-agent-icon-popover {
   top: calc(100% + var(--space-2));
   right: 0;
-  z-index: 8;
+  z-index: var(--z-local-8);
   width: min(22rem, calc(100vw - var(--space-16)));
   max-height: min(24rem, calc(100vh - var(--space-16)));
   grid-template-columns: repeat(auto-fit, minmax(var(--space-12), 1fr));

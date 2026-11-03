@@ -102,3 +102,25 @@
   padding: var(--btn-padding-lg);
   font-size: var(--text-md);
 }
+
+.button.button-reset {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  gap: 0;
+  white-space: inherit;
+}
+
+.button.button-reset:hover:not(:disabled),
+.button.button-reset:focus-visible:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+}
+
+.button.button-reset:active:not(:disabled) {
+  transform: none;
+}

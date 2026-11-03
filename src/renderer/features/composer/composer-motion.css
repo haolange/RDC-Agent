@@ -17,7 +17,7 @@
   padding: var(--composer-energy-stroke);
   border-radius: calc(var(--composer-shell-radius) + var(--composer-energy-stroke));
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-local-1);
   content: "";
   background:
     conic-gradient(

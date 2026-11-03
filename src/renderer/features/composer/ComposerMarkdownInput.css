@@ -15,7 +15,7 @@
   position: absolute;
   top: 0;
   right: var(--space-3);
-  z-index: 4;
+  z-index: var(--z-local-4);
   --ui-tabs-accent: var(--composer-mode-accent);
   transform: translateY(calc(-100% - var(--space-2)));
 }

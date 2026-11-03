@@ -48,7 +48,7 @@
 
 .composer-effort-slider-track {
   position: absolute;
-  z-index: 0;
+  z-index: var(--z-base);
   left: 0;
   right: 0;
   top: 50%;
@@ -95,7 +95,7 @@
 .composer-effort-slider-field {
   display: block;
   position: absolute;
-  z-index: 2;
+  z-index: var(--z-local-2);
   left: 0;
   right: 0;
   top: 50%;

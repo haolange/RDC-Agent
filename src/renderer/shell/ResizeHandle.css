@@ -1,7 +1,7 @@
 /* Visible seam is the adjacent sidebar 1px border. This column only owns cursor + grip. */
 .panel-resize-handle {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-local-1);
   width: 100%;
   min-width: 0;
   overflow: visible;

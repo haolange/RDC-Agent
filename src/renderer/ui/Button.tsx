@@ -3,7 +3,7 @@ import { cn } from '../lib/cn';
 import './Button.css';
 import { Spinner } from './Spinner';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'reset';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -18,6 +18,7 @@ const variantClass: Record<ButtonVariant, string> = {
   secondary: 'button button-secondary',
   ghost: 'button button-ghost',
   danger: 'button button-danger',
+  reset: 'button button-reset',
 };
 
 const sizeClass: Record<ButtonSize, string> = {

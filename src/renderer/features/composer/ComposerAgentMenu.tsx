@@ -64,12 +64,6 @@ export const ComposerAgentMenu: React.FC<{
     );
     if (items.length === 0) return;
 
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      closeAndRestoreFocus();
-      return;
-    }
-
     const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
     let targetIndex: number | null = null;
     if (event.key === 'ArrowDown') {

@@ -14,7 +14,7 @@
 
 .empty-workbench-content {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-local-1);
   display: flex;
   flex-direction: column;
   align-items: center;

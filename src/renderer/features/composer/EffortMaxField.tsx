@@ -216,6 +216,13 @@ export const EffortMaxField: React.FC<{
       }
       if (frame.running) frameRequest = window.requestAnimationFrame(tick);
     };
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) {
+      const activeTimeline = timelineRef.current;
+      const settled = paintRef.current(activeTimeline.startedAt + Math.max(activeTimeline.durationMs, 1));
+      if (settled?.complete) completeRef.current(activeTimeline.revision);
+      return undefined;
+    }
     frameRequest = window.requestAnimationFrame(tick);
     return () => {
       if (frameRequest) window.cancelAnimationFrame(frameRequest);

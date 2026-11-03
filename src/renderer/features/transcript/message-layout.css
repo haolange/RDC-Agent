@@ -21,7 +21,7 @@
   left: 0;
   right: 0;
   height: var(--chat-top-hard-stop-height);
-  z-index: 2;
+  z-index: var(--z-local-2);
   pointer-events: none;
   background: linear-gradient(180deg, var(--token-bg-app), color-mix(in srgb, var(--token-bg-app) 92%, transparent));
   }
@@ -37,7 +37,7 @@
   left: 0;
   right: 0;
   height: var(--chat-top-transition-height);
-  z-index: 2;
+  z-index: var(--z-local-2);
   pointer-events: none;
   background:
     linear-gradient(
@@ -63,7 +63,7 @@
   gap: var(--space-5);
   padding: calc(var(--space-3) + var(--chat-top-safe-zone)) var(--chat-inline-padding) var(--control-height-lg);
   position: relative;
-  z-index: 0;
+  z-index: var(--z-base);
 }
 
 .chat-messages.chat-messages-empty {

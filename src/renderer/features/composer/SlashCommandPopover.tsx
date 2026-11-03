@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useCommandCatalog } from '../../hooks/useCommandCatalog';
 import { useI18n } from '../../i18n';
 import { Kbd } from '../../ui/Kbd';
+import { useOverlayDismiss } from '../../lib/overlayStack';
 import './SlashCommandPopover.css';
 
 
@@ -55,14 +56,12 @@ export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({
             onSelect(filtered[selectedIndex].name);
           }
           break;
-        case 'Escape':
-          e.preventDefault();
-          onDismiss();
-          break;
       }
     },
-    [filtered, selectedIndex, onSelect, onDismiss],
+    [filtered, selectedIndex, onSelect],
   );
+
+  useOverlayDismiss(filtered.length > 0 && !loading && !error, onDismiss);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);

@@ -3,6 +3,7 @@
  */
 
 @import './design-system.css';
+@import './design-motion.css';
 @import '../ui/kit.css';
 
 @import './global/base.css';

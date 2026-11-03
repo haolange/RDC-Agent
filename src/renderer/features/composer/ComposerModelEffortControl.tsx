@@ -10,6 +10,7 @@ import { OverflowFade } from '../../ui/OverflowFade';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useComposerMenu } from './useComposerMenuRegistry';
+import { useOverlayDismiss } from '../../lib/overlayStack';
 import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
 import { buildModelEffortCapsulePresentation, ChevronIcon } from './effortControlParts';
 import { useComposerEffortControl } from './useComposerEffortControl';
@@ -102,17 +103,9 @@ export const ComposerModelEffortControl: React.FC<{
     }
   }, [open, view]);
 
-  useEffect(() => {
-    if (!open || view !== 'models') return undefined;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopPropagation();
-      setView((current) => nextComposerModelEffortView(current, 'escape'));
-    };
-    window.addEventListener('keydown', onKeyDown, true);
-    return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [open, view]);
+  useOverlayDismiss(open && view === 'models', () => {
+    setView((current) => nextComposerModelEffortView(current, 'escape'));
+  });
 
   return (
     <div ref={assignMenuRoot} className="composer-model-effort-menu">

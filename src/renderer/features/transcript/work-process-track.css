@@ -28,7 +28,7 @@
   width: var(--space-4);
   height: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-local-1);
 }
 
 .work-process-rail-marker {

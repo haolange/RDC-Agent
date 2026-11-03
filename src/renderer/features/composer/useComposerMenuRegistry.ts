@@ -12,6 +12,7 @@ import {
   reduceComposerMenu,
   type ComposerMenuId,
 } from './composerMenuState';
+import { useOverlayDismiss } from '../../lib/overlayStack';
 
 export interface ComposerMenuRegistryApi {
   activeId: ComposerMenuId | null;
@@ -99,18 +100,11 @@ export function ComposerMenuRegistryProvider({ children }: { children: React.Rea
       }
       close(current);
     };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      close(activeIdRef.current ?? undefined);
-    };
     window.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown);
-    };
+    return () => window.removeEventListener('pointerdown', onPointerDown);
   }, [activeId, close]);
+
+  useOverlayDismiss(activeId !== null, () => close(activeIdRef.current ?? undefined), 'layout');
 
   const value = useMemo<ComposerMenuRegistryApi>(() => ({
     activeId,

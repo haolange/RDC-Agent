@@ -1,6 +1,6 @@
 .session-rename-popover {
   position: fixed;
-  z-index: 40;
+  z-index: var(--z-sidebar-popover);
   width: min(320px, calc(100vw - 24px));
   display: flex;
   flex-direction: column;
@@ -53,7 +53,7 @@
 
 .sidebar-context-menu {
   position: fixed;
-  z-index: 40;
+  z-index: var(--z-sidebar-popover);
   display: flex;
   flex-direction: column;
   width: 12.5rem;
