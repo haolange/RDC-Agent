@@ -86,7 +86,7 @@ Appearance 详细规则见 docs/ui/appearance-checklist.md；禁止恢复 transl
 
 ## 验证矩阵
 
-局部改动运行受影响单测、`pnpm run typecheck`、`pnpm run lint` 和对应 `check:*`。跨层改动补 `pnpm run test:coverage`、`pnpm run check:coverage-ratchet`、`pnpm run check:gates` 和 `pnpm run build`。行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。行数与分层由 ESLint `max-lines` / `no-restricted-imports` 执行。发布配置才 pack。
+局部改动运行受影响单测、`pnpm run typecheck`、`pnpm run lint` 和对应 `check:*`。会话投影跑 `pnpm run check:session-projection`，右栏跑 `pnpm run check:right-rail`。跨层改动补 `pnpm run test:coverage`、`pnpm run check:coverage-ratchet`、`pnpm run check:gates` 和 `pnpm run build`。行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。行数与分层由 ESLint `max-lines` / `no-restricted-imports` 执行。发布配置才 pack。
 
 Browser QA 用 disposable `pnpm run start:agent-browser`，只消费一次 `/qa?qaBootstrap=...`，进入同源 `/app`。不直开 Vite，不把 token 留在 URL。high-impact 需要 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`。无设备的 Remote/Android 记阻塞，不以本地成功代替。
 
