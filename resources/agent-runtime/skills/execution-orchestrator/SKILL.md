@@ -23,7 +23,7 @@ Capsule 为数据合同：goal/task/scope、acceptedFacts(statement/sourceRefs/q
 需要跟踪交付时，以 task_create 定义目标、blockedBy 依赖和 completionRequirements 输出键；先检查用户交付要求是否全部被任务覆盖。通用代码只校验已经声明的要求，不会替你发现漏建的调查步骤。直接工作通过 task_update 开始并提交结构化 result；部分完成使用 partial 及 missingRequirements，不能将未完成必需工作写成 completed。
 
 需要核验执行／恢复／审查资源时读取已有 Task 的 `task_get.budgetSnapshot`：`root`/`rootRemaining` 是持久根账本，当前同根活跃执行的 `live.remainingPolicy` 才包括实际 policy 祖先链的收窄限制；旧执行计数、null 或 unavailableReason 不代表当前可用额度。`subagentTreeAdmission` 仅说明该树的现有派发检查，还须遵守 policy 和真正接受的 Capsule budget。快照不是未来预留或 Provider 配额证明，读取工具自身也正常计费；不能用计划文本额度替代实际分配，不能为看预算先占用待委派的 Task 或新建同义 Task 清消费。
-需要核对实际模型请求消费时，读取同一 `task_get.requestUsage`：它按当前调用 scope 及后代的 turn 列出主进程已提交请求尝试，包含辅助压缩、失败和重试，未启动 Task 也可查询。按批准计划将实际 scope/turn 归入对应阶段，保留原有消费；session 总数不是某一阶段的已用数。此观察不是 Provider 接收、计费或剩余配额证明，也不是新的预算授权；null 或读取错误不能当零。子执行只见自身及后代，父级负责合并本轮规划、执行、审查与回评，不能通过新建 Task 或切换回合重置。
+需要核对实际模型请求消费时，读取同一 `task_get.requestUsage`：它按当前调用 scope 及后代的 turn 列出主进程已提交请求尝试，包含辅助压缩、失败和重试，未启动 Task 也可查询。用它核对实际消费并安排剩余工作，保留原有消费；session 总数不是当前 scope 的已用数，计划中的阶段估算也不是额外额度。此观察不是 Provider 接收、计费或剩余配额证明，也不是新的预算授权；null 或读取错误不能当零。子执行只见自身及后代，父级负责合并本轮规划、执行、审查与回评，不能通过新建 Task 或切换回合重置。
 
 `budget_paused` 必须有当前回合的预算依据：例如 runtime 注入的临近请求上限提示，或明确的预算拒绝回执。Task/policy 工具预算、模型请求轮数、Context 容量、Provider 配额与计划中的成本估算是不同量，不能互相替代；旧回合的暂停理由、摘要或累计计数不能证明本回合临近请求上限。没有当前预算依据时继续已授权且仍可执行的工作，不因完成部分工作或保存阶段进度就宣称预算暂停。若现有方法不能继续验证判断，说明具体方法限制并请求必要的计划回评；若外部条件确实缺失，说明对应回执及受影响项，不换成预算理由，也不要求重置账本。
 

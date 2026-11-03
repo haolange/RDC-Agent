@@ -70,6 +70,18 @@ describe('investigation system contract', () => {
     expect(method).toContain('父级按需抽查关键原文');
   });
 
+  it('keeps execution quotas with the Harness and plan phase figures as adjustable estimates', () => {
+    const method = readRepo('resources/agent-runtime/skills/renderdoc-execution/SKILL.md');
+    expect(method).toContain('额度权威在 Harness');
+    expect(method).toMatch(/task_get\.budgetSnapshot/);
+    expect(method).toContain('用户明确规定的限制');
+    expect(method).toContain('不自编阶段配额');
+    expect(method).toMatch(/plan_artifact\.taskRevisions` 正常修订，不静默删除/);
+    expect(method).not.toMatch(/阶段账表|分配阶段预算|阶段写成硬限/);
+    const orchestrator = readRepo('resources/agent-runtime/skills/execution-orchestrator/SKILL.md');
+    expect(orchestrator).not.toMatch(/归入对应阶段/);
+  });
+
   it('investigation.contract.schema.namespace-fields', () => {
     expect.hasAssertions();
     expect(INVESTIGATION_SCHEMA_NAMESPACE).toBe('rdc.investigation.v1');

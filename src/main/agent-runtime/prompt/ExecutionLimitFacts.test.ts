@@ -19,6 +19,13 @@ describe('frozen execution limit facts', () => {
     expect(plan.systemPrompt).toContain(`prepared turn: ${expected}`);
     expect(plan.systemPrompt).toContain('not a remaining balance or a tool-call budget');
     expect(plan.systemPrompt).toContain('compaction must be accounted for separately');
+    expect(plan.systemPrompt).toContain('runaway-loop safety stop, not a planning budget');
+    expect(plan.systemPrompt).toContain('through task_get');
+  });
+
+  it('projects the builtin General ceiling of 200 under an unconstrained policy', () => {
+    const plan = applyExecutionLimitFacts(base, { policyMaxTurns: Number.MAX_SAFE_INTEGER, profileMaxTurns: 200 });
+    expect(plan.systemPrompt).toContain('prepared turn: 200');
   });
 
   it('rejects zero policy before preparing executable facts', () => {

@@ -1,5 +1,13 @@
 # Acceptance Ledger
 
+## 执行额度收敛：General 200 与额度权威回归 Harness（2026-11-03）
+
+- 基线 `50db04ce2ff1d77d23372a4d66839070e21fd9d4`，当前分支原地修改，不创建分支、不提交、不推送。内置 General `max-turns` 由 50 改为 200；Mission 保持 50，未声明默认 25。核对生效链：builtin < user < project 整资源替换（用户与项目当前均无 Agent 覆写）→ prepareTurn 以同一 `resolveAgentMaxTurns` 取 profile 与 policy 较小值，冻结进 `runtime:execution-limits` 与执行循环。子执行按自身 profile 解析，不继承父数值；Capsule 工具数/墙钟/子执行数及 `maxChildDepth` 不变。新值只在后续 prepareTurn 冻结，在途回合、消费、期限与历史不变，无自动重启或续跑。
+- 参照 Claude Code、Codex CLI、OpenAI Agents SDK 与 Gemini CLI 的公开行为，`maxTurns` 定位为防失控安全停止而非规划预算；保留现有最后五次请求的临时余量提示与最后一次无工具诚实终答，不改为每次请求注入。`renderdoc-execution` 删除阶段账表、阶段预算分配与“阶段写成硬限须重过计划门”段落，改为：额度权威在 Harness，计划只引用冻结限制与用户明确限制，阶段调用数为可调估算；真实硬限制触及时沿用 Checkpoint、Partial/`budget_paused` 与正常计划修订，已批准的用户限制及旧冻结计划中的硬限不静默删除。`execution-orchestrator` 不再要求把 requestUsage 归入计划阶段。`runtime:execution-limits` 补充安全停止语义与 `task_get` 读取实际消费。同步 AGENTS、ARCHITECTURE、agent-runtime-kernel、complete-design 与 scoped-runtime-resources；DESIGN.md 无需修改。
+- 受影响 14 文件、138 项测试通过（新增 General=200 漂移失败、200 事实投影、方法文本收敛三项回归），check:agent-runtime（含 9 文件 161 项）、investigation-system、settings-agents、legacy-residue、typecheck、全量 lint 与官方 prepare-only 构建通过。未跑全量 coverage 及无关矩阵。
+- 真实执行：官方 `start:agent-browser`，显式隔离 `RDC_AGENT_USER_DATA`/`RDC_AGENT_HOME`，只复制 Provider 配置、加密凭据、同源 Local State 与当前 catalog-v4，不复制会话；经一次性 `/qa` 进入同源 `/app`，通过正式 Bridge 登记临时项目。Settings 显示内置 General「Turns per execution」为 200。Composer 选 ChatGPT 订阅 GPT-6-Luna、Low 发送 General 小任务：两次真实 Provider 请求（chatgpt-account/gpt-6-luna/low、Fast=false），一次 read_file，正常终答读出文件第二行并引用冻结上限 200；两次请求快照均含 200 事实与安全停止语义，未出现临近上限提示，预载 execution-orchestrator 为新正文。证据 `.local/max-turns/receipt.json` 与两张截图。这只证明配置冻结与普通回合链路，不代表长任务、RDC 调查或模型规划质量已验收。
+- 首个 Browser 标签处于工具侧元素选择模式，窗口捕获阶段拦截点击，新标签恢复正常，非产品缺陷。收口：自有 launcher/Electron 进程树退出、5127 无监听；隔离锁 owner 已死并随隔离根删除（50 文件、1,130,733 逻辑字节），本轮 18 张临时截图（2,687,237 字节）删除，只保留上述三项证据。四份来源文件哈希复核不变；canonical `instance.lock` 为前一日已死 owner 的既有文件，未改动，桌面启动权已交还。用户真实目录中的旧 `catalog-v2.json`/`catalog-v3.json` 已不被当前代码引用，属用户数据，未删除。
+
 ## 计划卡声明式文案收敛与前轮架构裁决（2026-11-02）
 
 - 基线 `50fea33bc49d761fe53a62f630e963061c3fcdd8`，沿当前 main 的未提交修改收敛，不创建分支、不提交、不推送。撤回前轮计划审批 UI 按 General 身份覆盖文案的架构通过结论：两个指向 General 的不同声明动作被显示为同一名称，新增回归先失败。前轮模型/参数继承、unavailable 同症状路径与真实请求证据继续保留；未重建原截图瞬间，仍不宣称其唯一根因已证。

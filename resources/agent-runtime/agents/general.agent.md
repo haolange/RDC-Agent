@@ -9,7 +9,7 @@ accent: "#33d1ff"
 disable-model-invocation: false
 user-invocable: true
 enabled: true
-max-turns: 50
+max-turns: 200
 tools:
   - read
   - search

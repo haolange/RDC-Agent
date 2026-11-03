@@ -43,6 +43,8 @@ Agent 达到 `maxTurns` 时，只有已经获得 canonical final 才能正常完
 
 `ExecutionLimits.resolveAgentMaxTurns` 是循环配置与 Prompt 额度事实的共同解析入口。`TurnPreparationService` 在固定输入估算前把实际 profile/policy 上限写入 `runtime:execution-limits`；prepared runtime 持有同一最终 PromptPlan，其缓存、Context 指标和 EffectiveRuntimePlan fingerprint 与执行器一致。规划所见 `runtime:profile-limits` 来自当前已解析 catalog 快照，仅为 profile 上界，不代表未来回合的实际 policy 或剩余预算；辅助压缩请求与普通循环分开计。不得为了满足模型提出的纸面预算修改这些上限。
 
+`maxTurns` 是防失控的安全停止，不是规划预算：内置 General 为 200，三个 Mission 为 50（plan-only），未声明 `max-turns` 的 profile 默认 25；最终值仍取 profile 与 policy 的较小者。子执行按其自身 profile 解析，不继承父级数值；Capsule 的工具数、墙钟与子执行数，以及 `maxChildDepth`、`maxSubagents` 另行约束。新配置只在后续 prepareTurn 冻结时生效，在途回合、已有 Task 消费、期限与历史不变，也不因此自动重启或续跑。临近上限的剩余请求只由 runtime 在最后几次请求临时告知；计划引用这些冻结限制与用户明确限制，阶段调用数仅为可调整估算，不另设停止门。
+
 `turn_complete` 在接受声明前核对本回合 direct Task 执行是否均已由所属 Task 结算；未结算时返回可操作的 `TASK_COMPLETION_DENIED`，不给模型制造“已声明完成”的假回执。若模型绕过声明直接终答，父回合最终门禁仍将遗留执行标为 blocked，并以本地 Task 完整性诊断收口，不归咎 Provider。
 
 `AgentLoop` 在 Provider 流失败时从本轮内存上下文移除未提交的 partial assistant，再应用既有恢复决策；UI 已收到的流式事件仍用于失败诊断。这样重试不会将尚未执行的工具调用作为缺失结果的历史调用发往下一个 Provider 请求。

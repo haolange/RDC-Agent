@@ -93,6 +93,8 @@ Account providers 是登录产品。Grok Subscription：xAI 公共 native-client
 
 General 默认只预载 execution-orchestrator；renderdoc-investigation 按真实调查目标匹配，简单问答不路由。显式 Skill、profile 默认 Skill 和 execute 合同的 requiredSkillIds 合并去重；prepareTurn 校验可用性与工具权限交集，冻结来源，来源变化要求重新准备。skill_read 仍只读方法，不重算在途权限。
 
+Agent `max-turns` 属于 profile 资源，按 builtin < user < project 整资源替换解析，再与 policy 取较小者冻结进 prepareTurn；内置 General 为 200。Skill 方法只引用这些冻结额度与用户明确限制，不在计划中另设阶段配额硬门。
+
 Mission 必须先经 `plan_artifact` 计划门：用户点声明的 continue handoff 才冻结 Plan 并放行同 hash / 同 target 的 execute。RenderDoc Mission 的 execute 合同固定绑定共享执行方法、对应领域方法、`rdc-tool-shell` 和一本专业工具手册：Debugger 使用 `debugger-rdc-tools`，Analyzer 使用 `analyzer-rdc-tools`，Optimizer 使用 `optimizer-rdc-tools`。General 可发现四本手册；每条 Mission 可按需只读共享手册和对应的专业手册及引用，提前核对参数、输出及调用成本，其它专业手册保持不可见。知识可见性沿用 builtin/user/project 覆盖与来源解析，不自动预载、不授予执行或工作区编辑权限。Mission 的 plan-only、General 的 requiredSkillIds 真正预载与冻结工具交集不变；手册成员表是知识覆盖，不是权限表。未知操作、身份覆盖、路径越界或未满足前置条件仍在主进程执行前拒绝。
 
 专业参数参考由 `scripts/generate-rdc-tool-guides.mjs` 从相邻 RDC-Tool 1.0.0 代码生成 catalog 读取，记录 catalog fingerprint。开发校验使用 `pnpm run check:rdc-tool-guides -- --catalog <RDC-Tool>/spec/tool_catalog.json`；生成内容不作为运行时 catalog，产品执行仍读取 prepareTurn 冻结的同一配置 CLI。

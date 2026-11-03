@@ -42,6 +42,13 @@ describe('builtin profile contracts', () => {
     expect(() => assertBuiltinProfileContracts(root)).toThrow(/debugger tools must not include write|must arm debugger-coordinator/);
   });
 
+  it('fails when the builtin General loop ceiling drifts from 200', () => {
+    const root = copyBuiltinRuntime();
+    const generalPath = path.join(root, 'resources', 'agent-runtime', 'agents', 'general.agent.md');
+    writeFileSync(generalPath, readFileSync(generalPath, 'utf8').replace('max-turns: 200\n', 'max-turns: 50\n'), 'utf8');
+    expect(() => assertBuiltinProfileContracts(root)).toThrow(/General max-turns must be 200/);
+  });
+
   it('fails closed on unknown tool tokens and malformed handoffs via the runtime parser', () => {
     const unknownToken = `---
 name: General

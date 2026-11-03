@@ -22,6 +22,8 @@
 
 通用 runtime 强制任务依赖、执行实例、代次、资源所有权、预算、取消/join 和明确返回绑定。领域工具校验原生绑定、签名回执和调查记录。方法选择、Challenge 补证和战略改变由模型依指令决定；Hook 不按身份/depth 反推 Big Loop，不自动选择最近 Checkpoint。部分结果通过结构化 disposition/evidenceRefs 声明，不通过正文关键词触发隐藏流程。
 
+执行额度的权威在 Harness：provider 循环上限、Task root/Capsule 的工具数、子执行数与 deadline、policy 墙钟由主进程冻结、执行并记录实际消费，余量通过 `task_get` 读取。Plan 的预算节只引用这些冻结限制和用户明确规定的限制（实验次数、费用、修改范围），并据实际余量判断必要工作能否覆盖；阶段调用数是可调整估算，不成为额外停止门或补批前置。真正触及硬限制时沿用 Checkpoint、Partial/`budget_paused` 与正常计划修订；已批准的用户限制不得静默删除。
+
 验证状态以 acceptance-ledger 的本轮记录为准；历史 T18/U06 不能为后来 diff、后台合同或当前原生实验提供验证证明。
 
 ---

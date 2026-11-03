@@ -29,6 +29,8 @@ const MISSION_NAMES = {
   optimizer: 'Optimizer',
 };
 
+const GENERAL_MAX_TURNS = 200;
+
 const FORBIDDEN_TOOL_TOKENS = ['todo', 'bash', 'search_codebase', 'handoff', 'agent', 'agent_handoff'];
 const MISSION_FORBIDDEN_TOOLS = [
   'write', 'edit', 'git', 'file-manage',
@@ -111,6 +113,7 @@ export function assertParsedProfileContracts(id, definition) {
     assert(definition.name === 'General', 'general name must be General');
     assertIncludesAll(tools, GENERAL_REQUIRED_TOOLS, 'General tools');
     assert(skills.includes('execution-orchestrator'), 'General must arm execution-orchestrator');
+    assert(definition.maxTurns === GENERAL_MAX_TURNS, `General max-turns must be ${GENERAL_MAX_TURNS}`);
     assertIncludesAll(agents, MISSION_AGENT_IDS, 'General agents');
     assert(handoffs.length === 0, 'General handoffs must be empty');
     return;
