@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'crypto';
 import { isSafeAgentProfileId } from '@shared/types/agent';
 import type {
   AgentManifestDefinition,
+  AgentManifestDiagnostic,
   AgentManifestDraft,
   AgentManifestSettings,
   AgentManifestWriteScope,
@@ -181,9 +182,9 @@ export class AgentManifestService {
   resolveEffectiveSnapshot(
     paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
     projectRoot?: string,
-  ): { profiles: EffectiveAgentProfile[]; diagnostics: string[] } {
+  ): { profiles: EffectiveAgentProfile[]; diagnostics: AgentManifestDiagnostic[] } {
     const candidates: Array<ScopedResourceCandidate<AgentManifestDefinition>> = [];
-    const diagnostics: string[] = [];
+    const diagnostics: AgentManifestDiagnostic[] = [];
 
     const builtinPath = appPathService.getBuiltinAgentsPath();
     if (!fs.existsSync(builtinPath)) {
@@ -197,12 +198,9 @@ export class AgentManifestService {
       const reserved = reservedAgentIdsForCandidate(loaded.candidate);
       if (reserved.length > 0) {
         diagnostics.push(
-          `AGENT_ID_RESERVED_HISTORICAL: user agent '${reserved[0]}' is a reserved historical id (${loaded.candidate.sourcePath})`,
+          { code: 'AGENT_ID_RESERVED_HISTORICAL', severity: 'error', scope: 'user', agentId: reserved[0], sourcePath: loaded.candidate.sourcePath, message: `Agent id '${reserved[0]}' is reserved.` },
         );
         continue;
-      }
-      if (loaded.candidate.invalid) {
-        diagnostics.push(`USER_AGENT_MANIFEST_INVALID: ${loaded.candidate.sourcePath}: ${loaded.candidate.invalidReason}`);
       }
       candidates.push(loaded.candidate);
     }
@@ -213,19 +211,25 @@ export class AgentManifestService {
         const reserved = reservedAgentIdsForCandidate(loaded.candidate);
         if (reserved.length > 0) {
           diagnostics.push(
-            `AGENT_ID_RESERVED_HISTORICAL: project agent '${reserved[0]}' is a reserved historical id (${loaded.candidate.sourcePath})`,
+            { code: 'AGENT_ID_RESERVED_HISTORICAL', severity: 'error', scope: 'project', agentId: reserved[0], sourcePath: loaded.candidate.sourcePath, message: `Agent id '${reserved[0]}' is reserved.` },
           );
           continue;
-        }
-        if (loaded.candidate.invalid) {
-          diagnostics.push(`PROJECT_AGENT_MANIFEST_INVALID: ${loaded.candidate.sourcePath}: ${loaded.candidate.invalidReason}`);
         }
         candidates.push(loaded.candidate);
       }
     }
 
     const resolved = scopedResourceResolver.resolve(candidates);
-    diagnostics.push(...resolved.diagnostics.map((entry) => `${entry.code}: ${entry.message}`));
+    for (const entry of resolved.diagnostics) {
+      const candidate = candidates.find(value => value.sourcePath === entry.sourcePath);
+      if (!candidate) throw new Error('AGENT_DIAGNOSTIC_SOURCE_MISSING');
+      diagnostics.push({ ...entry, scope: candidate.scope, agentId: candidate.id, sourcePath: candidate.sourcePath });
+    }
+    const uniqueDiagnostics = [...new Map(diagnostics.map(issue => {
+      const normalized = path.resolve(issue.sourcePath);
+      const source = process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+      return [JSON.stringify([source, issue.code, issue.message]), issue] as const;
+    })).values()].sort((a, b) => a.scope.localeCompare(b.scope) || a.sourcePath.localeCompare(b.sourcePath) || a.code.localeCompare(b.code));
     const profiles = resolved.resources.map((resource) => ({
       ...resource.value,
       builtin: resource.provenance.scope === 'builtin',
@@ -236,7 +240,7 @@ export class AgentManifestService {
       },
       compiledRoute: this.routeFromDefinition(resource.value),
     }));
-    return { profiles, diagnostics };
+    return { profiles, diagnostics: uniqueDiagnostics };
   }
 
   getSettings(

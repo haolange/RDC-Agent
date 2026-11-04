@@ -357,3 +357,12 @@ Progress 标题采用 text-sm / normal / leading-normal，固定单行，剩余�
 - Popover、Select、ContextMenu 共用 `lib/anchoredSurface`：安全边距、翻转和视口约束按实测尺寸计算。内容/锚点尺寸变化、窗口缩放、字体加载重新定位；菜单内部负责超高内容滚动。Escape 只消费顶层，关闭后恢复触发焦点。
 - Settings 独立约束宽高，不以宽高比例决定高度。桌面列表与编辑器分配剩余空间；窄容器改为顺序布局时正文由页面滚动，不能再给同一编辑正文独立高度上限。TaskDialog 头部和操作区不收缩，正文负责滚动。
 - 受保护动效包括 ActiveSignalText 左到右扫光、Composer `composerEnergyOrbit` 角度绕光/柔和外沿，以及 Max 档位的 `EffortMaxField` 粒子场、进入/退出与滑杆联动。它们只有一个生产实现；Max 的控制器、时间线和绘制仍归 Composer，基础组件不理解模型档位。活文档可复用效果组件，但不能以展示样例替代真实模型验证。
+
+### 回放设备面板
+
+设备选择使用共享 Popover、Button、IconButton 与 Details，宽度约 360px 并按 viewport 约束。标题和刷新在一行；名称、序列号与唯一当前状态按列对齐。当前目标的检查/安装/启动/连接/成功/失败来自 Session preparation，非目标展示 ADB 可见性，禁止已连接条目仍标 Available。准备中使用真实活动标记；正常进度不用错误红。所属说明保持紧凑，失败原因和重试常驻，版本/构建标识及原始输出按需展开。连接成功仅显示“已连接”，断开为次要操作；设备面板不提供 Capture 导航或打开动作，统一使用右侧 Capture 区域。普通连接无修复确认弹窗；已有回放切换继续复用 ConfirmationDialog。
+
+
+### Agent 配置诊断
+
+Agent 设置的问题摘要使用共享 Button，详情使用大尺寸 TaskDialog；标题与底部操作固定，正文单独滚动、路径换行并允许原生文本框选。每条标注 Agent、作用域、完整来源与未生效状态，代码和原始原因复用 Details。复制反馈经可访问状态区域呈现，失败不关闭弹窗。Settings 仅在真实遮罩按下且自身为顶层时关闭，跨边界拖选释放不关闭；Escape 仅关闭顶层并返回焦点，未保存修改保护不变。

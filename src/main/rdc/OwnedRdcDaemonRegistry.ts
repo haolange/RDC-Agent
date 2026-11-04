@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import { appPathService } from '../runtime/AppPathService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { resolveRdcInstallation } from './RdcInstallationService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
@@ -88,6 +89,7 @@ type OwnedRdcDaemonHarvestOptions = OwnedRdcDaemonStoreOptions & {
   signal?: AbortSignal;
   readCommandLine?: (pid: number) => string;
   killPid?: (pid: number) => boolean;
+  isProcessAlive?: (pid: number) => boolean;
 };
 
 export async function harvestOwnedRdcDaemons(
@@ -116,7 +118,14 @@ export async function harvestOwnedRdcDaemons(
     if (!isAppRdcContextId(record.contextId)) continue;
     try {
       options.signal?.throwIfAborted();
-      await stopOwnedDaemon(record, options);
+      const alive = options.isProcessAlive ?? isProcessAlive;
+      if (record.ownerPid !== process.pid && record.ownerPid > 0 && alive(record.ownerPid)) {
+        throw new Error(`RDC_OWNERSHIP_BUSY: owner ${record.ownerPid} is still alive.`);
+      }
+      const stateFile = path.join(record.intermediateRoot, 'runtime', 'rdc_cli', `daemon_state_${record.contextId}.json`);
+      const dead = [record.ownerPid, record.daemonPid, record.workerPid].every(pid => pid <= 0 || !alive(pid));
+      // A dead owner, no native processes and no endpoint state need no CLI mutation.
+      if (!dead || fs.existsSync(stateFile)) await stopOwnedDaemon(record, options);
       forgetOwnedRdcDaemon(record.contextId, options);
       released.push(record.contextId);
     } catch (error) {
@@ -146,8 +155,11 @@ async function stopOwnedDaemon(
     killVerifiedOwnedPids(record, options);
     return;
   }
+  const binding = path.isAbsolute(command)
+    ? resolveRdcInstallation({ root: path.resolve(path.dirname(command), '..', '..', '..', '..'), timeoutMs: current.timeoutMs, env: current.env })
+    : current;
   const settings = withRdcHostRuntimeEnv({
-    ...current,
+    ...binding,
     enabled: true,
     command,
     env: { ...current.env, [RDC_INTERMEDIATE_ROOT_ENV]: record.intermediateRoot || current.env[RDC_INTERMEDIATE_ROOT_ENV] },
@@ -204,6 +216,23 @@ function killVerifiedOwnedPids(
 
 function hostIntermediateRoot(settings?: RdcCliInvokerSettings): string {
   return withRdcHostRuntimeEnv(settings ?? settingsService.getAll().tooling.rdcCli).env[RDC_INTERMEDIATE_ROOT_ENV] ?? '';
+}
+
+function isProcessAlive(pid: number): boolean {
+  if (pid === process.pid) return true;
+  if (process.platform === 'win32') {
+    const result = spawnSync('powershell.exe', ['-NoProfile', '-Command',
+      `$ErrorActionPreference='Stop'; if (Get-CimInstance Win32_Process -Filter "ProcessId=${pid}") { 'alive' } else { 'absent' }`,
+    ], { windowsHide: true, encoding: 'utf8' });
+    const state = result.stdout?.trim();
+    if (result.status !== 0 || (state !== 'alive' && state !== 'absent')) throw new Error(`RDC_PROCESS_QUERY_FAILED: ${pid}`);
+    return state === 'alive';
+  }
+  try { process.kill(pid, 0); return true; }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false;
+    throw error;
+  }
 }
 
 function readRegistry(registryPath?: string): RegistryDocument {

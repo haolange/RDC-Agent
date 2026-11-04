@@ -66,7 +66,7 @@ beforeEach(() => {
 describe('populated session rail', () => {
   it('blocks Open and target switching while installation is unknown but preserves explicit verification', async () => {
     state.replay = { ...replay(), inputId: null, contextId: null, phase: 'error', preparation: {
-      targetDeviceId: 'remote', phase: 'failed', issue: { code: 'remote_install_unconfirmed', stage: 'installing', diagnostic: 'Installation still pending', recovery: 'verify_installation', deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: false } },
+      targetDeviceId: 'remote', phase: 'failed', issue: { code: 'remote_install_unconfirmed', stage: 'installing', diagnostic: 'Installation still pending', recovery: 'retry', deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: false } },
     } };
     const prepare = vi.fn(); useSessionDeviceStore.setState({ prepare });
     const host = document.createElement('div'); const root = createRoot(host);
@@ -75,10 +75,10 @@ describe('populated session rail', () => {
       const button = (label: string) => [...host.querySelectorAll('button')].find(entry => entry.textContent === label);
       expect(button('control.captureOpen')?.disabled).toBe(true);
       expect(host.querySelector<HTMLButtonElement>('[data-testid="right-rail-replay-device"]')?.disabled).toBe(true);
-      expect(button('device.prepare.verifyInstallation')?.disabled).toBe(false);
-      await act(async () => button('device.prepare.verifyInstallation')!.click());
+      expect(button('device.prepare.retry')?.disabled).toBe(false);
+      await act(async () => button('device.prepare.retry')!.click());
       expect(prepare).toHaveBeenCalledExactlyOnceWith({ projectId: 'project', sessionId: 'session' }, 'remote');
-      expect(button('device.prepare.retry')).toBeUndefined();
+      expect(button('Verify and reconnect')).toBeUndefined();
     } finally { act(() => root.unmount()); }
   });
   it('presents an incomplete typed report as seven readable sections without hiding its limits', async () => {

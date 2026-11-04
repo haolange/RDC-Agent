@@ -1,3 +1,5 @@
+import type { AgentManifestDiagnostic } from '@shared/types/agentManifest';
+import { formatAgentManifestDiagnostic } from '@shared/utils/agentManifestDiagnostic';
 import type {
   ConversationMessage,
   ConversationMessageDiagnostic,
@@ -71,7 +73,7 @@ export interface PreparedConversationPrompt {
   allowedToolNames: string[];
   promptPlan: PromptPlan;
   visibleTurnIds: string[];
-  overlayDiagnostics?: string[];
+  overlayDiagnostics?: AgentManifestDiagnostic[];
 }
 
 export interface ActiveConversationTurn {
@@ -194,12 +196,6 @@ export function createConversationMessage(
   };
 }
 
-function isOverlayDiagnosticForProfile(entry: string, agentId: string): boolean {
-  return entry.includes(`${agentId}.agent.md`)
-    || ((entry.includes('PROJECT_AGENT_MANIFEST_INVALID') || entry.includes('USER_AGENT_MANIFEST_INVALID'))
-      && entry.includes(agentId));
-}
-
 export function findEffectiveAgentProfile(agentId: string, projectRootPath?: string | null) {
   const settings = settingsService.getAll();
   if (!settings.paths) {
@@ -220,7 +216,7 @@ export function findEffectiveAgentProfile(agentId: string, projectRootPath?: str
 export function resolveEffectiveAgentSnapshot(agentId: string, projectRootPath?: string | null) {
   const settings = settingsService.getAll();
   if (!settings.paths) {
-    return { profile: null, overlayDiagnostics: [] as string[], diagnostics: [] as string[] };
+    return { profile: null, overlayDiagnostics: [] as AgentManifestDiagnostic[], diagnostics: [] as AgentManifestDiagnostic[] };
   }
   const snapshot = agentManifestService.resolveEffectiveSnapshot(
     settings.paths,
@@ -229,7 +225,7 @@ export function resolveEffectiveAgentSnapshot(agentId: string, projectRootPath?:
   const profile = snapshot.profiles.find((entry) => entry.id === agentId && entry.enabled) ?? null;
   return {
     profile,
-    overlayDiagnostics: snapshot.diagnostics.filter((entry) => isOverlayDiagnosticForProfile(entry, agentId)),
+    overlayDiagnostics: snapshot.diagnostics.filter((entry) => entry.agentId === agentId && entry.scope !== 'builtin'),
     diagnostics: snapshot.diagnostics,
   };
 }
@@ -250,14 +246,14 @@ export interface AgentRoutePreflightOk {
   providerId: string;
   modelId: string;
   routeCapability: AgentRouteCapability;
-  overlayDiagnostics?: string[];
+  overlayDiagnostics?: AgentManifestDiagnostic[];
   aliasRemap?: { from: string; to: string };
 }
 
 export interface AgentRoutePreflightBlocked {
   ok: false;
   diagnostic: ConversationMessageDiagnostic;
-  overlayDiagnostics?: string[];
+  overlayDiagnostics?: AgentManifestDiagnostic[];
 }
 
 export type AgentRoutePreflight = AgentRoutePreflightOk | AgentRoutePreflightBlocked;
@@ -426,7 +422,7 @@ export function resolveAgentRoutePreflight(
 export function recordOverlayProfileDiagnostics(
   context: ResolvedConversationContext,
   agentId: AgentRole,
-  overlayDiagnostics: string[] | undefined,
+  overlayDiagnostics: AgentManifestDiagnostic[] | undefined,
   continuedWithLowerScope: boolean,
 ): void {
   if (!overlayDiagnostics?.length) return;
@@ -436,9 +432,9 @@ export function recordOverlayProfileDiagnostics(
       code: 'CONVERSATION_PROFILE_OVERLAY_INVALID',
       severity: 'warning',
       userMessage: continuedWithLowerScope
-        ? `当前项目的 profile 覆盖无效，已继续使用较低 scope 的有效 profile。${entry}`
-        : `当前项目的 profile 覆盖无效，且当前没有可用的较低 scope 路由。${entry}`,
-      technicalMessage: entry,
+        ? `${entry.scope === 'user' ? '用户' : '项目'}的 profile 覆盖无效，已继续使用较低 scope 的有效 profile。${formatAgentManifestDiagnostic(entry)}`
+        : `${entry.scope === 'user' ? '用户' : '项目'}的 profile 覆盖无效，且当前没有可用的较低 scope 路由。${formatAgentManifestDiagnostic(entry)}`,
+      technicalMessage: formatAgentManifestDiagnostic(entry),
     }));
   }
 }

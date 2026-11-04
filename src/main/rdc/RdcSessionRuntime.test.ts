@@ -173,7 +173,7 @@ it('does not commit a native open completed after cancellation', async () => {
 
 const remoteDevice: OpenProjectInputRequest['replayDevice'] = { id: 'android-PHONE', type: 'android', label: 'Phone', transport: 'adb_android', status: 'online', adbState: 'device', serial: 'PHONE' };
 const remoteBinding = () => freezeRdcTurnBinding({ enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 }, [
-  { name: 'rd.remote.connect', timeout_policy: { argument: 'timeout_ms', default_timeout_ms: 200000, worker_grace_ms: 85000, transport_grace_ms: 5000, process_grace_ms: 5000 }, input_schema: { properties: { timeout_ms: { type: 'integer' }, options: { properties: { repair_policy: { enum: ['auto_safe', 'confirmed'] }, repair_confirmation: { properties: { fingerprint: { type: 'string' } } } } } } } },
+  { name: 'rd.remote.connect', preparation_policy: 'automatic', timeout_policy: { argument: 'timeout_ms', default_timeout_ms: 200000, worker_grace_ms: 85000, transport_grace_ms: 5000, process_grace_ms: 5000 }, input_schema: { properties: { timeout_ms: { type: 'integer' }, options: { properties: { transport: { enum: ['adb_android'] } } } } } },
   { name: 'rd.remote.inspect_installation', scope: 'global', effects: [], input_schema: { properties: { device_serial: { type: 'string' } } } },
 ]);
 function remoteNative() {

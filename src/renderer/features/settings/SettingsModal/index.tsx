@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { AppSettings } from '@shared/types/settings';
 import { useModalFocus } from '../../../lib/useModalFocus';
-import { useOverlayLayer } from '../../../lib/overlayStack';
+import { isTopOverlayLayer, useOverlayLayer } from '../../../lib/overlayStack';
 import { useSettingsModal } from './useSettingsModal';
 import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
 import { SettingsCenterNav } from './SettingsCenterNav';
@@ -81,7 +81,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
   return createPortal(
     <>
-      <div className="settings-modal-backdrop" onClick={requestClose}>
+      <div className="settings-modal-backdrop" onMouseDown={(event) => {
+        if (event.target === event.currentTarget && isTopOverlayLayer(layerId)) requestClose();
+      }}>
         <div
           ref={dialogRef}
           className="settings-modal settings-center"

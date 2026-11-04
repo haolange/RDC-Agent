@@ -954,7 +954,6 @@ recolorLogoRgba
 REJECTED_TOOL_TOKENS
 relativeLuminance
 RemoteInstallationReceipt
-RemoteRepairAssessment
 RENDERER_EVENT_CHANNEL
 RENDERER_EVENT_CHANNELS
 RENDERER_INVOKE_CHANNEL

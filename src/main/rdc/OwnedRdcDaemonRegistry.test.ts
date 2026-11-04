@@ -80,6 +80,38 @@ describe('OwnedRdcDaemonRegistry', () => {
     })).toBe(true);
   });
 
+  it('retires a proven dead registration without invoking an obsolete installation', async () => {
+    const root = makeRoot(); const registryPath = path.join(root, 'owned-rdc-daemons.json');
+    rememberOwnedRdcDaemon({ contextId, command: 'retired', intermediateRoot: root, ownerPid: 91, daemonPid: 92, workerPid: 0, startedAt: 1 }, { registryPath });
+    const execute = vi.fn();
+    const result = await harvestOwnedRdcDaemons({ registryPath, intermediateRoot: root, isProcessAlive: () => false, execute });
+    expect(result).toEqual({ released: [contextId], failed: [] });
+    expect(execute).not.toHaveBeenCalled(); expect(listOwnedRdcDaemons({ registryPath })).toEqual([]);
+  });
+
+  it('never clears another live owner even when its endpoint file is absent', async () => {
+    const root = makeRoot(); const registryPath = path.join(root, 'owned-rdc-daemons.json');
+    rememberOwnedRdcDaemon({ contextId, command: 'rdc', intermediateRoot: root, ownerPid: 91, daemonPid: 92, workerPid: 0, startedAt: 1 }, { registryPath });
+    const execute = vi.fn(); const killPid = vi.fn();
+    const result = await harvestOwnedRdcDaemons({ registryPath, intermediateRoot: root, isProcessAlive: () => true, execute, killPid });
+    expect(result.failed[0].error).toContain('RDC_OWNERSHIP_BUSY');
+    expect(execute).not.toHaveBeenCalled(); expect(killPid).not.toHaveBeenCalled();
+    expect(listOwnedRdcDaemons({ registryPath })).toHaveLength(1);
+  });
+
+  it('uses the recorded installation as a whole rather than the current CLI entry', async () => {
+    const root = makeRoot(); const registryPath = path.join(root, 'owned-rdc-daemons.json');
+    const command = path.join(root, 'binaries/windows/x64/python/python.exe');
+    const entry = path.join(root, 'cli/run_cli.py');
+    for (const file of [command, entry]) { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, 'fixture'); }
+    rememberOwnedRdcDaemon({ contextId, command, intermediateRoot: root, ownerPid: process.pid, daemonPid: 0, workerPid: 0, startedAt: 1 }, { registryPath });
+    const execute = vi.fn(async (verb: string) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: verb === 'context' ? 'rdc_tool.context.clear' : 'rdc_tool.daemon.stop', data: { context_id: contextId, stopped: true } }), stderr: '', duration_ms: 1 }));
+    const result = await harvestOwnedRdcDaemons({ registryPath, intermediateRoot: root, execute: execute as never });
+    expect(result.failed).toEqual([]);
+    const options = (execute.mock.calls[0] as unknown as [string, string[], { settings: { command: string; argsPrefix: string[]; workingDirectory: string } }])[2];
+    expect(options.settings).toMatchObject({ command, argsPrefix: [entry], workingDirectory: root });
+  });
+
   it('kills only command-line verified leftover pids when the recorded CLI is gone', async () => {
     const root = makeRoot();
     const registryPath = path.join(root, 'owned-rdc-daemons.json');

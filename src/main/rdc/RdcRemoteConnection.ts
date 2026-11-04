@@ -4,9 +4,6 @@ import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
 import { parseRemoteBootstrap } from './captures/replayDeviceParse';
 import { createHash } from 'node:crypto';
-import { settingsService } from '../settings/settings-core/SettingsService';
-import { withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
-import { freezeRdcTurnBinding } from './RdcTurnBindings';
 
 export interface RdcRemoteConnection {
   deviceId: string;
@@ -22,24 +19,17 @@ export interface RemoteInstallationInspection {
 export function remotePreparationBindingIdentity(binding: RdcTurnBinding): string {
   return createHash('sha256').update(JSON.stringify({ cli: binding.cli, catalog: binding.definitionsFingerprint })).digest('hex');
 }
-export async function configuredRemotePreparationIdentity(): Promise<string> {
-  const cli = withRdcHostRuntimeEnv(structuredClone(settingsService.getAll().tooling.rdcCli));
-  const catalog = await rdcCliInvokerService.loadCatalog(cli);
-  return remotePreparationBindingIdentity(freezeRdcTurnBinding(cli, catalog.tools));
-}
-
 export function assertRemotePreparationContract(binding: RdcTurnBinding): void {
   const definition = binding.definitions.find(value => value.name === 'rd.remote.connect');
   const schema = definition?.input_schema as { properties?: { options?: { properties?: {
-    repair_policy?: { enum?: string[] }; repair_confirmation?: { properties?: { fingerprint?: { type?: string } } };
+    transport?: { enum?: string[] };
   } }; timeout_ms?: { type?: string } } } | undefined;
-  const options = schema?.properties?.options?.properties;
   const inspection = binding.definitions.find(value => value.name === 'rd.remote.inspect_installation');
   const inspectionSchema = inspection?.input_schema as { properties?: { device_serial?: { type?: string } } } | undefined;
   const policy = definition?.timeout_policy as Record<string, unknown> | undefined;
-  if (!options?.repair_policy?.enum?.includes('auto_safe') || !options.repair_policy.enum.includes('confirmed')
-    || options.repair_confirmation?.properties?.fingerprint?.type !== 'string') {
-    throw new Error('RDC_REMOTE_UPGRADE_REQUIRED: configured Tools lacks the remote preparation and repair contract.');
+  if (!schema?.properties?.options?.properties?.transport?.enum?.includes('adb_android')
+    || definition?.preparation_policy !== 'automatic') {
+    throw new Error('RDC_REMOTE_UPGRADE_REQUIRED: configured Tools lacks automatic Android preparation.');
   }
   if (schema?.properties?.timeout_ms?.type !== 'integer' || policy?.argument !== 'timeout_ms' || !['default_timeout_ms', 'worker_grace_ms', 'transport_grace_ms', 'process_grace_ms']
     .every(key => Number.isSafeInteger(policy[key]) && Number(policy[key]) > 0)) {
@@ -71,7 +61,7 @@ export async function inspectSessionReplayInstallation(device: ReplayDeviceEntry
 
 /** A connection is returned directly to its owning runtime, never to global discovery. */
 export async function connectSessionReplayDevice(device: ReplayDeviceEntry, contextId: string,
-  binding: RdcTurnBinding, signal?: AbortSignal, repairFingerprint?: string): Promise<RdcRemoteConnection> {
+  binding: RdcTurnBinding, signal?: AbortSignal): Promise<RdcRemoteConnection> {
   if (device.type !== 'android' || !device.serial || !contextId || contextId === 'default') throw new Error('RDC_REMOTE_CONTEXT_REQUIRED');
   assertRemotePreparationContract(binding);
   if (device.adbState && device.adbState !== 'device') throw new Error(device.adbState === 'unauthorized' ? 'remote_unauthorized' : 'remote_device_offline');
@@ -84,8 +74,6 @@ export async function connectSessionReplayDevice(device: ReplayDeviceEntry, cont
   const payload = parseRdcNativeResult(await rdcCliInvokerService.executeCLI('call', [
     'rd.remote.connect', '--args-json', JSON.stringify({ timeout_ms: timeoutMs, options: {
       transport: 'adb_android', device_serial: device.serial,
-      repair_policy: repairFingerprint ? 'confirmed' : 'auto_safe',
-      ...(repairFingerprint ? { repair_confirmation: { fingerprint: repairFingerprint } } : {}),
     } }), '--daemon-context', contextId,
   ], { contextId, abortSignal: signal, settings: binding.cli, timeout: processTimeout }), contextId, 'rd.remote.connect');
   signal?.throwIfAborted();

@@ -8,6 +8,7 @@ import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { Icon } from '../../../../ui/Icon';
 import { SettingsScopeBar } from '../parts';
+import { AgentManifestDiagnostics } from './AgentManifestDiagnostics';
 import { AgentAutosaveStatus } from './AgentAutosaveStatus';
 import { AgentListItem } from './AgentListItem';
 import { AgentManifestEditor, type AgentProvenanceScope } from './AgentManifestEditor';
@@ -173,6 +174,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
         />
       </div>
 
+      <AgentManifestDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} diagnostics={diagnostics} t={t} />
       <div className="settings-manifest-layout">
         <div className="settings-manifest-list-column">
           <div className="settings-manifest-toolbar settings-manifest-list-toolbar">
@@ -211,22 +213,17 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
 
           {diagnostics.length > 0 ? (
             <div className="settings-agent-tool-diagnostics settings-agent-diagnostics-row" data-testid="settings-agent-manifest-diagnostics">
-              <button
-                type="button"
+              <Button
+                variant="secondary" size="sm" aria-haspopup="dialog"
                 className="settings-agent-diagnostics-toggle"
                 aria-expanded={diagnosticsOpen}
-                onClick={() => setDiagnosticsOpen((current) => !current)}
+                onClick={() => setDiagnosticsOpen(true)}
               >
                 <Icon name="warning" size={14} className="settings-agent-diagnostics-icon" />
                 <span>{t('settings.agentDiagnosticsCount', { count: diagnostics.length })}</span>
-                <span className="settings-agent-diagnostics-link">{diagnosticsOpen ? t('settings.collapse') : t('settings.view')}</span>
-                <Icon name={diagnosticsOpen ? 'chevron-down' : 'chevron-right'} size={14} />
-              </button>
-              {diagnosticsOpen ? (
-                <ul className="settings-agent-tool-diagnostics-list">
-                  {diagnostics.map((entry) => <li key={entry}>{entry}</li>)}
-                </ul>
-              ) : null}
+                <span className="settings-agent-diagnostics-link">{t('settings.agentDiagnosticsView')}</span>
+                <Icon name="chevron-right" size={14} />
+              </Button>
             </div>
           ) : null}
         </div>

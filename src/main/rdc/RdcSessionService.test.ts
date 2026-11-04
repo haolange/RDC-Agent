@@ -2,7 +2,7 @@ import { clearRdcContextLeases, setRdcRuntimeContextForSession, quarantineRdcCon
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OpenProjectInputRequest } from '@shared/types/session';
 import type { ReplayDeviceSnapshot } from '@shared/types/device';
-const mocks = vi.hoisted(() => ({ deviceSubscribers: new Set<(snapshot: ReplayDeviceSnapshot) => void>(), identity: vi.fn(), inspect: vi.fn(), prepare: vi.fn(), close: vi.fn(), observe: vi.fn(), events: vi.fn(), append: vi.fn(), hash: vi.fn(), saveSelection: vi.fn(), liveRead: vi.fn(), liveClear: vi.fn(), project: vi.fn(), reference: vi.fn() }));
+const mocks = vi.hoisted(() => ({ deviceSubscribers: new Set<(snapshot: ReplayDeviceSnapshot) => void>(), inspect: vi.fn(), prepare: vi.fn(), close: vi.fn(), observe: vi.fn(), events: vi.fn(), append: vi.fn(), hash: vi.fn(), saveSelection: vi.fn(), liveRead: vi.fn(), liveClear: vi.fn(), project: vi.fn(), reference: vi.fn() }));
 vi.mock('./captures/replay/captureContentHash', () => ({ hashCaptureFile: mocks.hash }));
 vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { getProjectById: mocks.project } }));
 vi.mock('./captures/ExternalCaptureReference', () => ({ verifyExternalCaptureReference: mocks.reference }));
@@ -17,7 +17,6 @@ vi.mock('./captures/ReplayDeviceService', () => ({ replayDeviceService: {
   subscribe: (listener: (snapshot: ReplayDeviceSnapshot) => void) => { mocks.deviceSubscribers.add(listener); return () => mocks.deviceSubscribers.delete(listener); },
   getDeviceById: (id: string) => ({ id, label: id, type: id === 'local' ? 'local' : 'android', status: 'online', transport: id === 'local' ? 'local' : 'adb_android', adbState: 'device', serial: 'SERIAL' }),
 } }));
-vi.mock('./RdcRemoteConnection', () => ({ configuredRemotePreparationIdentity: mocks.identity }));
 vi.mock('./RdcSessionRuntime', () => ({ RdcSessionRuntime: class {
   opened: Record<string, unknown> | null = null;
   contextId: string | null = null; deviceId: string | null = null;
@@ -50,7 +49,7 @@ async function openRemote(service: RdcSessionService, sessionId = 's1') {
   await service.prepareDevice({projectId:value.projectId,sessionId,deviceId:value.replayDevice.id,bindingGeneration:service.snapshotReplayForSession(value).generation});
   return service.openProjectInput(value);
 }
-beforeEach(() => { clearRdcContextLeases(); vi.clearAllMocks(); mocks.project.mockReturnValue({ rootPath: '/project' }); mocks.reference.mockReset(); mocks.hash.mockReset(); mocks.hash.mockResolvedValue({ sha256: 'a'.repeat(64) }); mocks.close.mockResolvedValue(undefined); mocks.prepare.mockReset(); mocks.prepare.mockResolvedValue(undefined); mocks.identity.mockResolvedValue('binding-old');
+beforeEach(() => { clearRdcContextLeases(); vi.clearAllMocks(); mocks.project.mockReturnValue({ rootPath: '/project' }); mocks.reference.mockReset(); mocks.hash.mockReset(); mocks.hash.mockResolvedValue({ sha256: 'a'.repeat(64) }); mocks.close.mockResolvedValue(undefined); mocks.prepare.mockReset(); mocks.prepare.mockResolvedValue(undefined);
   mocks.deviceSubscribers.clear();
   mocks.inspect.mockReset(); mocks.inspect.mockResolvedValue({ state: 'pending', deviceSerial: 'SERIAL', packageName: 'helper', apkSha256: 'a'.repeat(64) });
   mocks.events.mockResolvedValue([{ eventId: 1 }, { eventId: 9 }]);
@@ -297,7 +296,7 @@ describe('selecting a session device before Capture Open', () => {
   it.each([false, true])('reselecting the opened capture device preserves replay even when current CLI settings changed (remote=%s)', async remote => {
     const service = new RdcSessionService();
     if (remote) await openRemote(service); else await service.openProjectInput(request());
-    mocks.prepare.mockClear(); mocks.close.mockClear(); mocks.identity.mockResolvedValue('new-cli');
+    mocks.prepare.mockClear(); mocks.close.mockClear();
     const before = service.snapshotReplayForSession(scope);
     const result = await choose(service, remote ? 'android' : 'local');
     expect(result.success).toBe(true); expect(result.state).toEqual(before);
@@ -394,27 +393,6 @@ describe('selecting a session device before Capture Open', () => {
   });
 });
 
-it('binds human repair to the selected device/native assessment and consumes a token once', async () => {
-  const assessment = { fingerprint: 'f'.repeat(64), actions: ['reinstall_helper'], package_name: 'helper', device_serial: 'SERIAL',
-    apk_sha256: 'a'.repeat(64), installed_identity: 'old-install', service_identity: [] };
-  mocks.prepare.mockRejectedValueOnce(new RdcNativeFailure('Needs repair', 'rd.remote.connect', false, false,
-    { code: 'remote_repair_required', category: 'runtime', exitCode: 1, details: { remote: { code: 'remote_repair_required', stage: 'checking', repair: assessment } } }));
-  const service = new RdcSessionService(); const first = await service.prepareDevice({ ...scope, bindingGeneration: 0, deviceId: 'android' });
-  expect(first.state.preparation).toMatchObject({ targetDeviceId: 'android', phase: 'needs_action', issue: { code: 'remote_repair_required', recovery: 'repair' } });
-  expect(first.confirmation).toMatchObject({ kind: 'repair', issue: { repair: { fingerprint: assessment.fingerprint, deviceSerial: 'SERIAL' } } });
-  const generation = first.state.generation;
-  const fixed = await service.prepareDevice({ ...scope, bindingGeneration: generation, deviceId: 'android', confirmationToken: first.confirmation!.token });
-  expect(fixed.success).toBe(true); expect(mocks.prepare.mock.calls[1][2]).toMatchObject({ repairFingerprint: assessment.fingerprint });
-  await expect(service.prepareDevice({ ...scope, bindingGeneration: fixed.state.generation, deviceId: 'android', confirmationToken: first.confirmation!.token })).rejects.toThrow('CONFIRMATION_STALE');
-});
-it('refuses a repair assessment for another device and never forwards its permission', async () => {
-  mocks.prepare.mockRejectedValueOnce(new RdcNativeFailure('Wrong device', 'rd.remote.connect', false, false,
-    { code: 'remote_repair_required', category: 'runtime', exitCode: 1, details: { remote: { code: 'remote_repair_required', stage: 'checking', repair: {
-      fingerprint: 'f'.repeat(64), actions: ['restart_helper'], package_name: 'helper', device_serial: 'FOREIGN', apk_sha256: 'a'.repeat(64), installed_identity: 'old', service_identity: [] } } } }));
-  const service = new RdcSessionService(); const result = await service.prepareDevice({ ...scope, deviceId: 'android', bindingGeneration: 0 });
-  expect(result.confirmation).toBeUndefined(); expect(result.error).toMatchObject({ code: 'RDC_REMOTE_REPAIR_IDENTITY_MISMATCH', recovery: 'configure_tools' });
-  expect(service.getDeviceOwner('android')).toBeNull();
-});
 it('retains the primary owner failure, recovery guidance and device reservation when preparation cleanup also fails', async () => {
   const details = { context_id: 'context-s1', state_path: '/private/owner-state', reason: 'owner_identity_unavailable',
     recovery_hint: 'Inspect the owner before recovering this context.' };
@@ -461,15 +439,6 @@ it('atomically reserves a device across two session queues after both old contex
   const winner = outcomes.find(result => result.success)!.state;
   expect(service.getDeviceOwner('android')).toEqual({ projectId: winner.projectId, sessionId: winner.sessionId });
 });
-it('invalidates repair confirmation when the configured native installation or catalog changes', async () => {
-  mocks.prepare.mockRejectedValueOnce(new RdcNativeFailure('Needs repair', 'rd.remote.connect', false, false,
-    { code: 'remote_repair_required', category: 'runtime', exitCode: 1, details: { remote: { code: 'remote_repair_required', stage: 'checking', repair: {
-      fingerprint: 'f'.repeat(64), actions: ['reinstall_helper'], package_name: 'helper', device_serial: 'SERIAL', apk_sha256: 'a'.repeat(64), installed_identity: 'old', service_identity: [] } } } }));
-  const service = new RdcSessionService(); const offer = await service.prepareDevice({ ...scope, deviceId: 'android', bindingGeneration: 0 });
-  mocks.identity.mockResolvedValue('different-native-install');
-  await expect(service.prepareDevice({ ...scope, deviceId: 'android', bindingGeneration: offer.state.generation, confirmationToken: offer.confirmation!.token })).rejects.toThrow('CONFIRMATION_STALE');
-  expect(mocks.prepare).toHaveBeenCalledOnce(); expect(service.getDeviceOwner('android')).toBeNull();
-});
 
 function unconfirmedInstall() {
   return new RdcNativeFailure('PackageManager result is unconfirmed', 'rd.remote.connect', false, false, {
@@ -483,7 +452,7 @@ function unconfirmedInstall() {
 it('keeps unconfirmed device actions and exclusivity after native cleanup, cancel and clear, blocking new prepare/Open/repair', async () => {
   mocks.prepare.mockRejectedValueOnce(unconfirmedInstall()); const service = new RdcSessionService();
   const result = await service.prepareDevice({ ...scope, deviceId: 'android', bindingGeneration: 0 });
-  expect(result.state.preparation.issue).toMatchObject({ recovery: 'verify_installation', deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: true } });
+  expect(result.state.preparation.issue).toMatchObject({ recovery: 'retry', deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: true } });
   expect(result.state.contextId).toBeNull(); expect(mocks.close).toHaveBeenCalledOnce(); expect(service.getDeviceOwner('android')).toEqual(scope);
   const generation = result.state.generation;
   const retry = await service.prepareDevice({ ...scope, deviceId: 'android', bindingGeneration: generation });
@@ -545,7 +514,7 @@ it('joins a cancelled read-only inspection without clearing the unresolved insta
   const checking = service.prepareDevice({ ...scope, deviceId: 'android', bindingGeneration: first.state.generation }); await started;
   const cancelled = await service.cancelDevicePreparation({ ...scope, bindingGeneration: service.snapshotReplayForSession(scope).generation }); await checking;
   expect(cancelled.success).toBe(false); expect(cancelled.state.contextId).toBeNull();
-  expect(cancelled.state.preparation).toMatchObject({ phase: 'failed', issue: { recovery: 'verify_installation', deviceAction: { outcome: 'unconfirmed' } } });
+  expect(cancelled.state.preparation).toMatchObject({ phase: 'failed', issue: { recovery: 'retry', deviceAction: { outcome: 'unconfirmed' } } });
   expect(service.getDeviceOwner('android')).toEqual(scope); expect(mocks.prepare).toHaveBeenCalledOnce();
 });
 it.each(['offline', 'unauthorized', 'unknown'] as const)('retains unresolved installation facts and the device claim when discovery reports %s during read-only verification', async adbState => {
@@ -562,6 +531,6 @@ it.each(['offline', 'unauthorized', 'unknown'] as const)('retains unresolved ins
   release({ state: adbState === 'unknown' ? 'pending' : 'clear', deviceSerial: 'SERIAL', packageName: 'helper', apkSha256: 'a'.repeat(64) });
   const result = await checking;
   expect(result.success).toBe(false); expect(result.state.contextId).toBeNull(); expect(mocks.prepare).toHaveBeenCalledOnce();
-  expect(result.state.preparation.issue).toMatchObject({ code: 'remote_install_unconfirmed', recovery: 'verify_installation', deviceAction: { outcome: 'unconfirmed', uninstalledExisting: true } });
+  expect(result.state.preparation.issue).toMatchObject({ code: 'remote_install_unconfirmed', recovery: 'retry', deviceAction: { outcome: 'unconfirmed', uninstalledExisting: true } });
   expect(service.getDeviceOwner('android')).toEqual(scope);
 });

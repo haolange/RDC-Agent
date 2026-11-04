@@ -68,7 +68,7 @@ const emptyPreviewLoadResult = (): PreviewLoadResult => ({
   attempts: [],
 });
 
-export interface RdcLifecycleOptions extends RdcRemoteProgress { expectedGeneration?: number; onStage?: (stage: 'connecting' | 'opening' | 'transferring') => void; contextId?: string; binding?: RdcTurnBinding; signal?: AbortSignal; repairFingerprint?: string; expectedBindingIdentity?: string }
+export interface RdcLifecycleOptions extends RdcRemoteProgress { expectedGeneration?: number; onStage?: (stage: 'connecting' | 'opening' | 'transferring') => void; contextId?: string; binding?: RdcTurnBinding; signal?: AbortSignal; expectedBindingIdentity?: string }
 
 export class RdcSessionRuntime {
   private contextId: string | null = null;
@@ -296,7 +296,7 @@ export class RdcSessionRuntime {
     await this.ensureOwnedDaemon(contextId, binding, options.signal);
     this.contextId = contextId;
     this.remoteConnection = await withRdcRemoteProgress(contextId, binding.cli, options.signal, options, () =>
-      connectSessionReplayDevice(device, contextId, binding, options.signal, options.repairFingerprint));
+      connectSessionReplayDevice(device, contextId, binding, options.signal));
     this.remoteStatus = 'connected';
   }
 

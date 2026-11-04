@@ -226,15 +226,15 @@ Settings 的显式验证执行同安装 doctor，检查 Python、RenderDoc、And
 
 设备发现仅报告 ADB 可见性。当前会话的 CaptureReplayState.preparation 是唯一设备目标、阶段和结构化问题来源；顶部 Remote 和 Capture 面板共用 device:prepare/device:cancelPreparation，不各自持有下一次设备权威。选择 Android 即分配本会话 owning context，通过同安装 canonical rd.remote.connect 检查、修复、启动、握手并 Ping；成功后尚未打开 capture，不向 Agent 发布 capture lease。Open 消费同一个连接；同设备替换文件只关闭旧 replay/file，保留远端连接，不重复安装或启动。全局 preparedRemotes/context/remoteId 临时交接与其恢复缓存已删除。
 
-repair_policy 为 auto_safe 或 confirmed，确认只传 Tools 返回的 repair fingerprint；主进程一次性 token 绑定 scope/generation/目标、冻结 CLI/catalog 身份及原生评估，执行前再次核验实际配置，Tools 在修改前重新比较真实设备、安装包和服务身份。旧 CLI 缺少该参数契约时只拒绝远端准备并要求升级，不按包版本判权，也不影响 Local 选择。原始 native error.details 保留在主进程，renderer 按 typed code/stage/recovery 显示短标题及可展开原始诊断，不解析英文异常决定安装。
+设备选择授权同安装 Tools 自动准备目标 RenderDoc helper：缺失安装、兼容启动/借用、不兼容覆盖，必要时降级或卸载重装（可能清除辅助程序自身数据）。变更前重新核对设备、包和服务身份；busy 与未知归属不抢占。rd.remote.connect 的 preparation_policy=automatic 是能力标识，不保留人工修复策略或确认指纹。主进程仅为已有 Capture 切换签发一次关闭确认。旧 Tools 缺少自动准备合同时要求同步升级，不按包版本判权；Local 不受影响。原始 native error.details 保留，renderer 仅按结构化问题展示，不解析英文异常决定安装。
 
-已有 Capture 变更设备先显示一次确认，取消保持回放和画面；确认后先 clear_context、daemon stop 并核实释放，再连接新设备。准备失败保留目标；取消等待自有原生动作及清理，不声称撤回已完成的 APK 安装。未知服务停止、签名替换、卸载/降级必须明确确认，busy 不抢占。页面切换不释放已准备连接，应用重启不自动连接；明确断开、真实离线、会话删除或退出时清理自有资源，borrowed helper 不关闭。查询发现失败不等于真实断连。
+已有 Capture 变更设备先显示一次确认，取消保持回放和画面；确认后先 clear_context、daemon stop 并核实释放，再连接新设备。准备失败保留目标；取消等待自有原生动作及清理，不声称撤回已完成的 APK 安装。目标辅助程序的必要替换由选择设备授权；未知归属服务和 busy 不抢占。页面切换不释放已准备连接，应用重启不自动连接；明确断开、真实离线、会话删除或退出时清理自有资源，borrowed helper 不关闭。查询发现失败不等于真实断连。
 
 准备阶段仅读取同一 owning daemon 的 status，核验 context、operation、起始时间和已观察 trace 后转发真实 checking/installing/starting/verifying；轮询不与自身重叠，完成或取消时停止并等待最后查询收口。取消后在释放 context 前通过 canonical rd.core.get_operation_history 读取对应已收口操作的安装回执；有事实才投影 installation，缺失回执表示未知，不表示安装回滚。
 
 Remote 准备显式将冻结本机 timeoutMs 作为原生 timeout_ms，不削减用户操作预算。worker、transport 和外壳等待收口的余量来自同一 catalog 定义中的 timeout_policy，由 Tools 唯一策略生成并纳入指纹；主进程按该冻结策略推导单次外壳超时，不复制 Python 常量，也不修改用户设置。缺少此策略的远端契约拒绝执行。原生超时与进程退出是不同事实，必须允许原生先返回结构化结果并收口自有动作。
 
-PackageManager 结果未确认时，typed details.device_action 映射为 issue.deviceAction，保留已确认的卸载事实并禁用盲重试。主进程可以释放自有 context/daemon，但现有会话问题和设备独占不随 cancel/clear 清空；迟到未决结果也使排队的替换准备失效。恢复沿用同设备 device:prepare，在原冻结 CLI/catalog 与目标 APK 身份证据一致时，先通过唯一只读 rd.remote.inspect_installation 核验；pending/unknown、身份变化及查询失败继续保留问题和占用，确知 clear 才继续用户本次明确连接请求。核验使用自有非 default context，不安装、启动、卸载、abandon 或授予 capture lease，不增加 IPC 或设置字段。
+Tools 在同次连接预算内每秒串行核验缺失/矛盾安装回执，只有 PackageManager 结束且目标 APK 身份匹配后才继续启动与握手，不凭退出码或空安装会话宣布成功，不盲目重复安装。预算耗尽后，typed details.device_action 映射为 issue.deviceAction，保留已确认的卸载事实并禁用盲重试。主进程可以释放自有 context/daemon，但现有会话问题和设备独占不随 cancel/clear 清空；迟到未决结果也使排队的替换准备失效。用户的统一重试连接沿用同设备 device:prepare，在原冻结 CLI/catalog 与目标 APK 身份证据一致时，先通过唯一只读 rd.remote.inspect_installation 核验；pending/unknown、身份变化及查询失败继续保留问题和占用，确知 clear 才继续用户本次明确连接请求。核验使用自有非 default context，不安装、启动、卸载、abandon 或授予 capture lease，不增加 IPC 或设置字段。
 
 Tools 的安装前核验和只读核验共用 PM session 解析。应用重启后的连接仍在真正安装前检查，目标包、未知归属或无法判读的非终态阻止安装；已兼容且无需安装的 helper 不因已知无关包的安装被误阻。包不存在、外壳退出或 context 删除均不是设备安装已结束的证明。
 
@@ -242,3 +242,10 @@ Tools 的安装前核验和只读核验共用 PM session 解析。应用重启�
 
 Workbench Right Rail has two target-specific forms: a selected Project shows only `Import .rdc` and project inputs; a selected Session shows `Progress / Artifacts / Outputs / Context / Capture`, with Capture always visible. Artifacts project only main-owned Investigation records; Outputs still require explicit `output_register`. It must not render a per-tool `rd.*` inventory, standalone Memory panel, duplicate Skills catalog, CLI catalog summary, tool count, or namespace counts. Context only presents real task resources: attachments, references, tools, and used capabilities. Capture presents an honest empty state when no project input exists; otherwise it presents owner-session `.rdc` selection/open/preview/refresh/copy/clear and Replay Device. contextId/replaySessionId/capture ids, lease/runtime owner, and remoteId/remote status remain owner-scoped runtime data for agent consumption rather than visible inventory. Diagnostics stay deduplicated and actionable. CLI unavailable is only a diagnostic for failed open/preview shell actions; the sidebar does not expose CLI catalog metadata. Renderer code cannot invoke arbitrary tools or reconstruct runtime state; execution stays on Settings shell actions / shell -> `ShellInvocationService` -> external CLI. Attachments and uploads are Task Context inputs; Outputs require explicit `output_register` publication of a completed project file into the owning run and use only user-facing source labels.
 
+
+Android 启动沿唯一明确 Loader activity，正常系统授权等待使用原连接总预算，不另设 15 秒启动截止或以其它启动器覆盖原始结果。主进程调用同安装捆绑 Python 时，真正移除环境中的 PYTHONHOME/PYTHONPATH（包括环境继承），不能以空字符串代替删除；Shell 内部 env 的 undefined 只用于子进程 unset，不扩展 Settings/IPC 的配置模型。诊断详情保留有界 command/returncode/stdout/stderr，短标题不据英文错误猜测安装。
+
+
+### 退出登记回收
+
+OwnedRdcDaemonRegistry 回收前核验登记 owner：其他存活 owner 的资源保留，不 clear/stop 或抢占。只有登记 owner、daemon、worker 全部已退出且原生 endpoint 状态不存在时，才无需 CLI 注销死亡登记；进程核验失败不当作死亡。仍需原生释放时，由登记安装解析完整 Python、CLI 入口和工作目录，不拼接当前设置的另一安装入口；先释放 context，再确认 daemon stop，失败保留登记与具体原因。

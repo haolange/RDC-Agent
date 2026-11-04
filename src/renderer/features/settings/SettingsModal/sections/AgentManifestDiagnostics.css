@@ -1,0 +1,11 @@
+.agent-diagnostics-dialog .task-dialog-body { overflow: hidden; }
+.agent-diagnostics-content { min-height: 0; overflow-y: auto; user-select: text; overflow-wrap: anywhere; padding: var(--space-1); }
+.agent-diagnostics-content:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: calc(-1 * var(--space-1)); border-radius: var(--radius-sm); }
+.agent-diagnostics-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
+.agent-diagnostics-item { min-width: 0; padding: var(--space-3); border: 1px solid var(--token-border-muted); border-radius: var(--radius-md); background: var(--token-surface-sunken); }
+.agent-diagnostics-item p { margin: var(--space-2) 0; }
+.agent-diagnostics-item-header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.agent-diagnostics-item-header .button { margin-inline-start: auto; }
+.agent-diagnostics-scope { color: var(--token-text-caption); font-size: var(--text-xs); }
+.agent-diagnostics-path, .agent-diagnostics-item code { font-family: var(--font-mono); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.agent-diagnostics-path { color: var(--token-text-caption); }

@@ -127,12 +127,21 @@ export interface AgentModelOption {
   custom?: boolean;
 }
 
+export interface AgentManifestDiagnostic {
+  code: string;
+  severity: 'warning' | 'error';
+  scope: 'builtin' | 'user' | 'project';
+  agentId: string;
+  sourcePath: string;
+  message: string;
+}
+
 export interface AgentManifestSettings {
   directoryPath: string;
   definitions: AgentManifestDefinition[];
   modelOptions: AgentModelOption[];
   globalInstructions: string;
-  diagnostics: string[];
+  diagnostics: AgentManifestDiagnostic[];
 }
 
 export type AgentManifestWriteScope = 'user' | 'project';

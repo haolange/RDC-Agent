@@ -135,6 +135,10 @@ it('injects the host intermediate root into every CLI spawn env', async () => {
   const service = new RdcCliInvokerService({ invoke } as never);
   await service.executeCLI('version', ['--json'], { settings: cli });
   expect(invoke.mock.calls[0][0].env.RDC_TOOL_INTERMEDIATE_ROOT).toMatch(/rdc-tool-intermediate$/u);
+  // Undefined deletes inherited Python settings at spawn. Empty values remain
+  // present in Windows environment blocks and caused real ADB stdout loss.
+  expect(invoke.mock.calls[0][0].env).toHaveProperty('PYTHONHOME', undefined);
+  expect(invoke.mock.calls[0][0].env).toHaveProperty('PYTHONPATH', undefined);
 });
 
 it('lifts owner-pid for context-scoped CLI invocations', async () => {

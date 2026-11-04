@@ -5,13 +5,26 @@ vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService
 vi.mock('../RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: execute } }));
 import { freezeRdcTurnBinding } from '../RdcTurnBindings';
 import { connectSessionReplayDevice, inspectSessionReplayInstallation } from '../RdcRemoteConnection';
+import { replayDeviceIssue } from './ReplayDeviceIssue';
+import { RdcNativeFailure } from '../RdcNativeProtocol';
 const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 };
-const binding = freezeRdcTurnBinding(cli, [{ name: 'rd.remote.connect', timeout_policy: { argument: 'timeout_ms', default_timeout_ms: 200000, worker_grace_ms: 85000, transport_grace_ms: 5000, process_grace_ms: 5000 }, input_schema: { properties: { timeout_ms: { type: 'integer' }, options: { properties: {
-  repair_policy: { enum: ['auto_safe', 'confirmed'] }, repair_confirmation: { properties: { fingerprint: { type: 'string' } } },
+const binding = freezeRdcTurnBinding(cli, [{ name: 'rd.remote.connect', preparation_policy: 'automatic', timeout_policy: { argument: 'timeout_ms', default_timeout_ms: 200000, worker_grace_ms: 85000, transport_grace_ms: 5000, process_grace_ms: 5000 }, input_schema: { properties: { timeout_ms: { type: 'integer' }, options: { properties: {
+  transport: { enum: ['adb_android'] },
 } } } } }, { name: 'rd.remote.inspect_installation', scope: 'global', effects: [], input_schema: { properties: { device_serial: { type: 'string' } } } }]);
 const device: ReplayDeviceEntry = { id: 'selected', label: 'Phone', type: 'android', status: 'online', adbState: 'device', transport: 'adb_android', serial: 'SERIAL-SELECTED' };
 const reply = (data: object, kind = 'rd.remote.connect') => ({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: kind, data }), stderr: '', duration_ms: 1 });
 beforeEach(() => execute.mockReset());
+
+it('preserves empty ADB output and exit zero as diagnostics instead of implying the device is offline', () => {
+  const issue = replayDeviceIssue(new RdcNativeFailure('Invalid device state', 'rd.remote.connect', false, false, {
+    code: 'adb_device_invalid_response', category: 'runtime', exitCode: 1,
+    details: { command: ['adb', '-s', device.serial, 'get-state'], returncode: 0, stdout: '', stderr: '' },
+  }));
+  expect(issue.code).toBe('adb_device_invalid_response');
+  expect(issue.diagnostic).toContain('get-state');
+  expect(issue.diagnostic).toContain('"returncode": 0');
+  expect(issue.diagnostic).toContain('"stdout": ""');
+});
 describe('session-owned remote connection', () => {
   it.each(['clear', 'pending', 'unknown'])('verifies installation through the one read-only canonical operation (%s)', async state => {
     execute.mockResolvedValue(reply({ context_id: 'owned', device_serial: device.serial, package_name: 'helper', apk_sha256: 'a'.repeat(64),
@@ -29,7 +42,7 @@ describe('session-owned remote connection', () => {
     expect(result).toMatchObject({ contextId: 'owned', remoteId: 'remote', serial: device.serial, bootstrap: { packageName: 'helper', startedActivity: false } });
     const [command, argv, options] = execute.mock.calls[0];
     expect(command).toBe('call'); expect(argv[0]).toBe('rd.remote.connect');
-    expect(JSON.parse(argv[2])).toEqual({ timeout_ms: 30000, options: { transport: 'adb_android', device_serial: 'SERIAL-SELECTED', repair_policy: 'auto_safe' } });
+    expect(JSON.parse(argv[2])).toEqual({ timeout_ms: 30000, options: { transport: 'adb_android', device_serial: 'SERIAL-SELECTED' } });
     expect(argv.slice(-2)).toEqual(['--daemon-context', 'owned']); expect(options.settings).toEqual(cli);
     expect(options.timeout).toBe(125000);
   });
@@ -48,10 +61,10 @@ describe('session-owned remote connection', () => {
     await expect(connectSessionReplayDevice(device, 'owned', freezeRdcTurnBinding(cli, []))).rejects.toThrow('RDC_REMOTE_UPGRADE_REQUIRED');
     expect(execute).not.toHaveBeenCalled();
   });
-  it('passes only the exact confirmed fingerprint rather than renderer-specified actions', async () => {
+  it('connects automatically without a repair policy or renderer-specified mutation', async () => {
     execute.mockResolvedValue(reply({ context_id: 'owned', remote_id: 'remote' }));
-    await connectSessionReplayDevice(device, 'owned', binding, undefined, 'f'.repeat(64));
-    expect(JSON.parse(execute.mock.calls[0][1][2]).options).toMatchObject({ repair_policy: 'confirmed', repair_confirmation: { fingerprint: 'f'.repeat(64) } });
+    await connectSessionReplayDevice(device, 'owned', binding);
+    expect(JSON.parse(execute.mock.calls[0][1][2]).options).toEqual({ transport: 'adb_android', device_serial: device.serial });
   });
   it('derives process grace from the frozen catalog without changing the configured operation budget', async () => {
     execute.mockResolvedValue(reply({ context_id: 'owned', remote_id: 'remote' }));

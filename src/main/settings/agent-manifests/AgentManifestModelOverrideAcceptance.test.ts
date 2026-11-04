@@ -21,7 +21,7 @@ it('preserves an explicit builtin General model-only user override through save 
  expect(general.compiledRoute).toEqual({agentId:'general',providerId:'openai-codex',modelId:'gpt-5.6-luna'});
  expect(general.provenance.scope).toBe('user');
  expect(general.instructions).toBe(builtin.instructions);
- expect(reloaded.diagnostics.some(message=>message.includes('purged-shadow'))).toBe(false);
+ expect(reloaded.diagnostics.some(message=>message.agentId === 'purged-shadow')).toBe(false);
 });
 
 it('rejects atomic replacement failure and preserves the previously committed user model bytes', async()=>{

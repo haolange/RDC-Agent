@@ -18,6 +18,18 @@ describe('ShellInvocationService exit codes', () => {
   });
 });
 
+it('removes inherited environment keys when the invocation explicitly unsets them', async () => {
+  vi.stubEnv('PYTHONHOME', 'ambient-python');
+  vi.stubEnv('PYTHONPATH', 'ambient-modules');
+  try {
+    const result = await new ShellInvocationService().invoke({ command: process.execPath,
+      args: ['-e', 'console.log(JSON.stringify([Object.hasOwn(process.env,"PYTHONHOME"),Object.hasOwn(process.env,"PYTHONPATH")]))'],
+      env: { PYTHONHOME: undefined, PYTHONPATH: undefined }, timeoutMs: 5000 });
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual([false, false]);
+  } finally { vi.unstubAllEnvs(); }
+});
+
 it('retains an unconfirmed process until actual close and keeps it cancellable', async () => {
   let close!: (info: ProcessExitInfo) => void;
   const exit = new Promise<ProcessExitInfo>(resolve => { close = resolve; });

@@ -1,3 +1,4 @@
+import { formatAgentManifestDiagnostic } from '@shared/utils/agentManifestDiagnostic';
 import type {
   ConversationAttachmentInput,
   ConversationMessage,
@@ -129,7 +130,7 @@ export async function startProfileTurn(
   let routePreflight = resolveAgentRoutePreflight(conversationAgentId, undefined, modelOverride, pendingProjectRootPath);
   if (!routePreflight.ok) {
     recordOverlayProfileDiagnostics(context, conversationAgentId, routePreflight.overlayDiagnostics, false);
-    const overlay = routePreflight.overlayDiagnostics?.join(' ') ?? '';
+    const overlay = routePreflight.overlayDiagnostics?.map(formatAgentManifestDiagnostic).join(' ') ?? '';
     const code = routePreflight.diagnostic.code === 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
       ? 'PROVIDER_UNAVAILABLE'
       : 'MODEL_UNAVAILABLE';
@@ -151,7 +152,7 @@ export async function startProfileTurn(
   routePreflight = resolveAgentRoutePreflight(conversationAgentId, undefined, modelOverride, pendingProjectRootPath);
   if (!routePreflight.ok) {
     recordOverlayProfileDiagnostics(context, conversationAgentId, routePreflight.overlayDiagnostics, false);
-    const overlay = routePreflight.overlayDiagnostics?.join(' ') ?? '';
+    const overlay = routePreflight.overlayDiagnostics?.map(formatAgentManifestDiagnostic).join(' ') ?? '';
     const code = routePreflight.diagnostic.code === 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
       ? 'PROVIDER_UNAVAILABLE'
       : 'MODEL_UNAVAILABLE';
@@ -313,7 +314,7 @@ export async function startProfileTurn(
     signal: preparationController.signal,
   });
   if (routePreflight.overlayDiagnostics?.length) {
-    preparedTurn.summary.runtimeDiagnostics = [...routePreflight.overlayDiagnostics];
+    preparedTurn.summary.runtimeDiagnostics = routePreflight.overlayDiagnostics.map(formatAgentManifestDiagnostic);
     recordOverlayProfileDiagnostics(context, conversationAgentId, routePreflight.overlayDiagnostics, true);
   }
   throwIfPreparationCancelled();

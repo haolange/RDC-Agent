@@ -6,25 +6,15 @@ export type ReplayDeviceStatus = 'offline' | 'online';
 
 export type ReplayDeviceTransport = 'local' | 'adb_android';
 
-export type DevicePreparationPhase = 'idle' | 'checking' | 'installing' | 'starting' | 'verifying' | 'ready' | 'needs_action' | 'failed' | 'cancelled';
-export interface RemoteRepairAssessment {
-  fingerprint: string;
-  actions: Array<'restart_helper' | 'reinstall_helper' | 'downgrade_helper'>;
-  packageName: string;
-  deviceSerial: string;
-  apkSha256: string;
-  installedIdentity: string;
-  serviceIdentity: string[];
-}
+export type DevicePreparationPhase = 'idle' | 'checking' | 'installing' | 'starting' | 'verifying' | 'ready' | 'failed' | 'cancelled';
 /** Product copy is derived from code; diagnostic remains the original native report. */
 export interface ReplayDeviceIssue {
   code: string;
   stage: DevicePreparationPhase;
   diagnostic: string;
-  recovery: 'retry' | 'repair' | 'configure_tools' | 'verify_installation' | null;
+  recovery: 'retry' | 'configure_tools' | null;
   expectedVersion?: string;
   actualVersion?: string;
-  repair?: RemoteRepairAssessment;
   deviceAction?: { kind: 'package_install'; outcome: 'unconfirmed'; uninstalledExisting: boolean };
 }
 export interface SessionDevicePreparation {

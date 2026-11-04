@@ -33,6 +33,10 @@ Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导
 
 四个 builtin：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件在 `resources/agent-runtime/agents`，再与 `~/.rdc-agent/agents` 和 `<project-root>/.rdc-agent/agents` 合成 effective snapshot。user/project 只能覆盖这四个 id，或新增无关自定义 id。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`；**无运行通道**。运行时没有 seed 迁移器或 marker，资源读取不改写用户文件。Mission planner 工具面见裁决 J（plan-only + `rdc_probe`）。
 
+Agent 配置诊断使用单一结构化契约 `AgentManifestDiagnostic`：`code / severity / scope / agentId / sourcePath / message`。无效候选由资源解析器报告，主进程汇总时按规范化绝对来源路径、代码和原因去重；同一文件的不同原因保持独立。运行前检查按 Agent ID 与作用域定位，不解析英文文案或文件名子串。Settings 列表仅显示唯一问题数量，现有 TaskDialog 承载 User / Project 来源、完整路径与“这份配置未生效”的说明，原始原因按需展开；不推测替代定义。详情正文可滚动、框选和复制单条/全部，刷新为零条时不自动关闭已打开的详情。
+
+User 覆盖保持整资源替换。人工整理旧覆盖时，以当前内置定义为基准保留有效的模型绑定和显式执行上限，严格校验候选并防止并发覆盖；不引入字段继承、旧字段别名、启动写入或自动迁移器。
+
 自定义 Profile 新建时工具权限为空；运行时按 `AGENT_TOOLS_EMPTY` 拒绝零工具配置。Settings 的配置状态必须同时检查模型路由与至少一项工具授权，零工具时提示用户到「工具权限」选择能力，不显示「可用」。
 
 Settings 的 Agents「新建智能体」沿当前 User/Project 作用域创建；Project 草稿冻结创建时的项目 ID，自动保存到该项目的 `.rdc-agent/agents`，切换项目不会把待保存草稿改写到新项目。User 草稿写入用户资源根；作用域切换只过滤所显示的定义，不暗中改变已有草稿的写入归属。

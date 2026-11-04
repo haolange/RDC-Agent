@@ -74,7 +74,7 @@ it('preserves an unconfirmed device mutation from the joined cancelled operation
   ] }));
   await withRdcRemoteProgress('context', cli, controller.signal, { onDeviceAction, onInstallation }, async () => { controller.abort(); });
   expect(onDeviceAction).toHaveBeenCalledExactlyOnceWith({ code: 'remote_install_unconfirmed', stage: 'installing',
-    diagnostic: 'Installation outcome is not confirmed', recovery: 'verify_installation',
+    diagnostic: 'Installation outcome is not confirmed', recovery: 'retry',
     deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: true } },
   { deviceSerial: 'PHONE', packageName: 'helper', apkSha256: 'a'.repeat(64) });
   expect(onInstallation).not.toHaveBeenCalled();

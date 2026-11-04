@@ -15,36 +15,36 @@ it.each(['en', 'zh-CN'] as const)('uses a short localized failure with raw diagn
   locale.language = language;
   const diagnostic = 'CheckRemoteServerConnection(127.0.0.1:51867) failed: '.repeat(30);
   const html = renderToStaticMarkup(createElement(DevicePreparationStatus, {
-    preparation: { targetDeviceId: 'android', phase: 'failed', issue: { code: 'remote_version_mismatch', stage: 'verifying', diagnostic, recovery: 'repair', expectedVersion: '1.45', actualVersion: '1.36' } }, onRetry: () => {}, onCancel: () => {},
+    preparation: { targetDeviceId: 'android', phase: 'failed', issue: { code: 'remote_version_mismatch', stage: 'verifying', diagnostic, recovery: 'retry', expectedVersion: '1.45', actualVersion: '1.36' } }, onRetry: () => {}, onCancel: () => {},
   }));
   expect(html).toContain(translate(language, 'device.issue.version'));
   expect(html).toContain('<details'); expect(html).toContain('<pre');
   expect(html).not.toMatch(/<p role="status"[^>]*>CheckRemoteServerConnection/);
-  expect(html).toContain(translate(language, 'device.prepare.repair'));
+  expect(html).toContain(translate(language, 'device.prepare.retry'));
 });
 it.each(['en', 'zh-CN'] as const)('offers only explicit installation verification while outcome is unknown (%s)', (language) => {
   locale.language = language;
-  const issue: ReplayDeviceIssue = { code: 'remote_install_unconfirmed', stage: 'installing', diagnostic: 'Package Manager did not settle', recovery: 'verify_installation', deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: true } };
+  const issue: ReplayDeviceIssue = { code: 'remote_install_unconfirmed', stage: 'installing', diagnostic: 'Package Manager did not settle', recovery: 'retry', deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: true } };
   const render = (code: string, recovery: ReplayDeviceIssue['recovery'], phase: 'failed' | 'cancelled' | 'verifying' = 'failed') => renderToStaticMarkup(createElement(DevicePreparationStatus, {
     preparation: { targetDeviceId: 'android', phase, issue: { ...issue, code, recovery } },
     issue: { code: 'remote_busy', stage: 'checking', diagnostic: 'Different target rejected', recovery: 'retry' },
     onRetry: () => {}, onCancel: () => {},
   }));
   for (const code of ['remote_install_unconfirmed', 'RDC_DEVICE_ACTION_UNCONFIRMED']) {
-    const html = render(code, 'verify_installation');
+    const html = render(code, 'retry');
     expect(html).toContain(translate(language, 'device.issue.installUnconfirmed'));
     expect(html).toContain(translate(language, 'device.prepare.installUnconfirmed'));
     expect(html).toContain(translate(language, 'device.prepare.previousHelperRemoved'));
-    expect(html).toContain(translate(language, 'device.prepare.verifyInstallation'));
+    expect(html).toContain(translate(language, 'device.prepare.retry'));
     expect(html).toContain('<pre class="device-preparation-diagnostic">Package Manager did not settle</pre>');
     expect(html.match(/<button/g)).toHaveLength(1);
     const container = document.createElement('div'); container.innerHTML = html;
     const actionLabels = [...container.querySelectorAll('button')].map(button => button.textContent);
-    expect(actionLabels).not.toContain(translate(language, 'device.prepare.retry'));
-    expect(actionLabels).not.toContain(translate(language, 'device.prepare.repair'));
+    expect(actionLabels).toEqual([translate(language, 'device.prepare.retry')]);
+    expect(html).not.toContain('Verify and reconnect');
   }
   expect(render(issue.code, null, 'cancelled')).not.toContain('<button');
-  const pending = render(issue.code, 'verify_installation', 'verifying');
+  const pending = render(issue.code, 'retry', 'verifying');
   expect(pending.match(/<button/g)).toHaveLength(1);
   expect(pending).toContain('aria-busy="true"');
   expect(pending).toContain('aria-disabled="true"');
@@ -52,7 +52,7 @@ it.each(['en', 'zh-CN'] as const)('offers only explicit installation verificatio
 it('keeps the focused verification button mounted through pending and unknown results while rejecting repeated clicks', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const onRetry = vi.fn(); const onCancel = vi.fn();
-  const issue: ReplayDeviceIssue = { code: 'remote_install_unconfirmed', stage: 'installing', diagnostic: 'Installation pending', recovery: 'verify_installation', deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: false } };
+  const issue: ReplayDeviceIssue = { code: 'remote_install_unconfirmed', stage: 'installing', diagnostic: 'Installation pending', recovery: 'retry', deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: false } };
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   const render = (phase: 'failed' | 'verifying') => act(async () => root.render(createElement(DevicePreparationStatus, {
     preparation: { targetDeviceId: 'android', phase, issue }, onRetry, onCancel,
@@ -141,4 +141,17 @@ it.each(['en', 'zh-CN'] as const)('reports a committed installation after cancel
   expect(render('cancelled', false)).not.toContain(note);
   expect(render('cancelled')).not.toContain(note);
   expect(render('ready', true)).not.toContain(note);
+});
+
+it.each(['en', 'zh-CN'] as const)('keeps only disconnect after connecting and explains possible phone authorization (%s)', language => {
+  locale.language = language;
+  const render = (phase: 'starting' | 'ready') => renderToStaticMarkup(createElement(DevicePreparationStatus, {
+    preparation: { targetDeviceId: 'android', phase, issue: null },
+    onRetry: () => {}, onCancel: () => {},
+  }));
+  expect(render('starting')).toContain(translate(language, 'device.prepare.phoneAuthorization'));
+  const html = render('ready');
+  expect(html.match(/<button/g)).toHaveLength(1);
+  expect(html).toContain(translate(language, 'device.prepare.disconnect'));
+  expect(html).not.toContain('Choose Capture');
 });

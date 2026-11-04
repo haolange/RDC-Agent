@@ -31,7 +31,7 @@ it('resubmits a confirmation once, scoped to the main generation and selected de
   const state = replayFixture({ generation: 7 });
   const prepare = vi.fn().mockResolvedValue({ success: true, state: replayFixture({ generation: 8 }) });
   window.electronAPI.device.prepare = prepare;
-  useSessionDeviceStore.setState({ states: { [sessionDeviceKey(scope)]: state }, confirmation: { scope, deviceId: 'android', result: { success: false, state, confirmation: { token: 'once', kind: 'repair' } } } });
+  useSessionDeviceStore.setState({ states: { [sessionDeviceKey(scope)]: state }, confirmation: { scope, deviceId: 'android', result: { success: false, state, confirmation: { token: 'once', kind: 'close_capture' } } } });
   await Promise.all([useSessionDeviceStore.getState().confirm(), useSessionDeviceStore.getState().confirm()]);
   expect(prepare).toHaveBeenCalledExactlyOnceWith({ ...scope, deviceId: 'android', bindingGeneration: 7, confirmationToken: 'once' });
 });
@@ -41,7 +41,7 @@ it('does not surface a late confirmation from an earlier choice', async () => {
   useSessionDeviceStore.getState().receive(replayFixture());
   const first = useSessionDeviceStore.getState().prepare(scope, 'android');
   await useSessionDeviceStore.getState().prepare(scope, 'local');
-  resolve({ success: false, state: replayFixture({ generation: 2 }), confirmation: { token: 'stale', kind: 'repair' } });
+  resolve({ success: false, state: replayFixture({ generation: 2 }), confirmation: { token: 'stale', kind: 'close_capture' } });
   await first;
   expect(useSessionDeviceStore.getState().confirmation).toBeNull();
   expect(useSessionDeviceStore.getState().states[sessionDeviceKey(scope)].generation).toBe(3);

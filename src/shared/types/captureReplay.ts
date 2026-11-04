@@ -26,7 +26,7 @@ export interface DevicePreparationRequest extends CaptureReplayBindingRequest { 
 export interface DevicePreparationResult {
   success: boolean;
   state: CaptureReplayState;
-  confirmation?: { token: string; kind: 'close_capture' | 'repair'; issue?: ReplayDeviceIssue };
+  confirmation?: { token: string; kind: 'close_capture' };
   error?: ReplayDeviceIssue;
 }
 export interface CaptureReplayApplyRequest extends CaptureReplayBindingRequest { eventId: number; target?: { textureId?: string; outputSlot?: number } }

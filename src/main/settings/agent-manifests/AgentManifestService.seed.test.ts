@@ -310,7 +310,26 @@ describe('AgentManifestService effective builtin snapshot', () => {
     const general = settings.definitions.find((definition) => definition.id === 'general');
     expect(general?.builtin).toBe(true);
     expect(general?.tools).toContain('write');
-    expect(settings.diagnostics.some((entry) => entry.includes('PROJECT_AGENT_MANIFEST_INVALID'))).toBe(true);
+    expect(settings.diagnostics).toEqual([expect.objectContaining({ code: 'resource.invalid', scope: 'project', agentId: 'general', sourcePath: path.join(projectAgents, 'general.agent.md') })]);
+  });
+
+  it('reports four invalid user files once each and preserves a same-id project diagnostic', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-diagnostics-'));
+    roots.push(root);
+    const agentsPath = path.join(root, 'agents');
+    const projectRoot = path.join(root, 'project');
+    const projectAgents = path.join(projectRoot, '.rdc-agent', 'agents');
+    await mkdir(agentsPath, { recursive: true }); await mkdir(projectAgents, { recursive: true });
+    for (const id of ['general', 'debugger', 'analyzer', 'optimizer']) await writeFile(path.join(agentsPath, `${id}.agent.md`), 'invalid user manifest', 'utf8');
+    const service = agentManifestService;
+    const paths = { agentsPath, instructionsPath: path.join(root, 'RDC.md') };
+    expect(service.resolveEffectiveSnapshot(paths).diagnostics).toHaveLength(4);
+    await writeFile(path.join(projectAgents, 'general.agent.md'), 'invalid project manifest', 'utf8');
+    const result = service.resolveEffectiveSnapshot(paths, projectRoot);
+    expect(result.diagnostics).toHaveLength(5);
+    expect(result.diagnostics.filter(issue => issue.agentId === 'general').map(issue => issue.scope).sort()).toEqual(['project', 'user']);
+    expect(result.profiles).toHaveLength(4);
+    expect(result.profiles.every(profile => profile.provenance.scope === 'builtin')).toBe(true);
   });
 
   it('drops reserved historical ids from effective snapshot and diagnoses both scopes', async () => {
@@ -359,10 +378,10 @@ reserved
     expect(settings.definitions.map((definition) => definition.id)).not.toContain('ask');
     expect(settings.definitions.map((definition) => definition.id)).not.toContain('plan');
     expect(settings.diagnostics.some((entry) => (
-      entry.includes('AGENT_ID_RESERVED_HISTORICAL') && entry.includes('user')
+      entry.code === 'AGENT_ID_RESERVED_HISTORICAL' && entry.scope === 'user'
     ))).toBe(true);
     expect(settings.diagnostics.some((entry) => (
-      entry.includes('AGENT_ID_RESERVED_HISTORICAL') && entry.includes('project')
+      entry.code === 'AGENT_ID_RESERVED_HISTORICAL' && entry.scope === 'project'
     ))).toBe(true);
     expect(fs.existsSync(path.join(projectAgents, 'plan.agent.md'))).toBe(true);
   });

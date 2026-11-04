@@ -5,12 +5,16 @@
 .device-selector-utility-label { white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .device-selector-dropdown.ui-popover { width: min(360px, calc(100vw - var(--space-4))); max-height: calc(100dvh - var(--space-4)); overflow-x: hidden; }
 .device-selector-dropdown [role='listbox'] { min-width: 0; }
-.button.device-selector-option { display: grid; gap: var(--space-1); width: 100%; height: auto; min-height: var(--control-height-md); padding: var(--space-3); border-radius: var(--radius-md); white-space: normal; text-align: left; }
-.device-selector-option.is-selected { background: color-mix(in srgb, var(--token-accent-primary) 12%, var(--token-bg-panel)); }
+.button.device-selector-option { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); width: 100%; height: auto; min-height: var(--control-height-md); padding: var(--space-3); border-radius: var(--radius-md); white-space: normal; text-align: left; }
+.device-selector-option.is-selected { background: var(--token-interactive-hover); }
 .device-selector-option:hover, .device-selector-option:focus-visible { background: var(--token-bg-raised); }
 .device-selector-option-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); width: 100%; }
 .device-option-leading { display: flex; gap: var(--space-2); align-items: center; min-width: 0; }
 .device-option-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-semibold); }
-.device-option-status { white-space: nowrap; font-size: var(--text-xs); color: var(--token-text-caption); }
+.device-option-status { display: flex; align-items: center; gap: var(--space-2); white-space: nowrap; font-size: var(--text-xs); color: var(--token-text-caption); }
 .device-selector-session-note { margin: 0; padding: var(--space-3); font-size: var(--text-sm); }
 .device-option-status.is-error { color: var(--token-status-error); }
+.device-selector-header { display: flex; align-items: center; justify-content: space-between; padding: var(--space-2) var(--space-3); gap: var(--space-2); border-bottom: 1px solid var(--token-border-muted); font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--token-text-heading); }
+.device-option-identity { display: grid; min-width: 0; gap: var(--space-1); }
+.device-option-serial { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--token-text-caption); overflow-wrap: anywhere; }
+.device-selector-option[aria-busy='true'] .device-option-status { color: var(--token-accent-primary); }

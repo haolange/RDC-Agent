@@ -59,7 +59,7 @@ export async function withRdcRemoteProgress<T>(contextId: string, cli: RdcCliInv
           const identity = deviceInstallationIdentity(details ?? undefined);
           if (deviceAction) progress.onDeviceAction?.({ code: 'remote_install_unconfirmed', stage: 'installing',
             diagnostic: typeof stage?.message === 'string' ? stage.message : 'Native PackageManager result remains unconfirmed.',
-            recovery: identity ? 'verify_installation' : null, deviceAction }, identity);
+            recovery: identity ? 'retry' : null, deviceAction }, identity);
           if (typeof receipt?.installed_apk !== 'boolean' || typeof receipt.uninstalled_existing !== 'boolean'
             || !['existing', 'install', 'update', 'force_replace'].includes(String(receipt.install_mode))) continue;
           progress.onInstallation?.({ installedApk: receipt.installed_apk, uninstalledExisting: receipt.uninstalled_existing,

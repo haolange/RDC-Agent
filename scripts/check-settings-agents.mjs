@@ -499,13 +499,13 @@ Reserved historical filename.
     }
     assert(
       reservedSettings.diagnostics.some((entry) => (
-        entry.includes('AGENT_ID_RESERVED_HISTORICAL') && entry.includes('user') && entry.includes('ask')
+        entry.code === 'AGENT_ID_RESERVED_HISTORICAL' && entry.scope === 'user' && entry.agentId === 'ask'
       )),
       'User reserved historical ids must emit AGENT_ID_RESERVED_HISTORICAL.',
     );
     assert(
       reservedSettings.diagnostics.some((entry) => (
-        entry.includes('AGENT_ID_RESERVED_HISTORICAL') && entry.includes('project')
+        entry.code === 'AGENT_ID_RESERVED_HISTORICAL' && entry.scope === 'project'
       )),
       'Project reserved historical ids must emit AGENT_ID_RESERVED_HISTORICAL.',
     );

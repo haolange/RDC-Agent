@@ -2,7 +2,7 @@
 
 # Analyzer RDC 工具参考
 
-Current catalog fingerprint: `980d49d70062196bbd25bac30730e46de952d02556645528cc95b7087a41c90f`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
+Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49bec3027a0ed6d7`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
 
 所有 `shell.rdc` 示例都省略由主进程注入的 `session_id` / `capture_file_id` / context 身份。不要把示例补成可覆盖其它会话的身份。共享发现、错误恢复、输出与副作用规则见 `$rdc-tool-shell`。
 

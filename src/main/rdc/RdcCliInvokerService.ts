@@ -214,7 +214,7 @@ export class RdcCliInvokerService {
       command: invocation.command,
       args: invocation.args,
       cwd: options.cwd || settings.workingDirectory || undefined,
-      env: { ...settings.env, PYTHONHOME: '', PYTHONPATH: '', RDC_TOOL_ROOT: path.resolve(path.dirname(settings.command), '..', '..', '..', '..') },
+      env: { ...settings.env, PYTHONHOME: undefined, PYTHONPATH: undefined, RDC_TOOL_ROOT: path.resolve(path.dirname(settings.command), '..', '..', '..', '..') },
       timeoutMs: options.timeout ?? settings.timeoutMs,
       outputBufferBytes: 8 * 1024 * 1024,
       runId: options.runId,

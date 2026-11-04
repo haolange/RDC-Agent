@@ -7,7 +7,6 @@ import { replayDeviceService } from './captures/ReplayDeviceService';
 import { replayDeviceIssue, deviceInstallationIdentity, type DeviceInstallationIdentity } from './captures/ReplayDeviceIssue';
 import { RdcNativeFailure } from './RdcNativeProtocol';
 import { ipcApprovalTokenService } from '../ipc/validation/IpcApprovalTokenService';
-import { configuredRemotePreparationIdentity } from './RdcRemoteConnection';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { replayHistoryStore } from './captures/replay/ReplayHistoryStore';
 import { hashCaptureFile } from './captures/replay/captureContentHash';
@@ -26,7 +25,7 @@ const keyOf = (scope: SessionScope) => JSON.stringify([scope.projectId, scope.se
 interface Binding { runtime: RdcSessionRuntime; state: CaptureReplayState; deviceId: string | null;
   installationEvidence?: DeviceInstallationIdentity & { bindingIdentity: string };
   preparation?: { deviceId: string; baseGeneration: number; controller: AbortController; pending: Promise<DevicePreparationResult> };
-  confirmation?: { token: string; name: string; generation: number; deviceId: string; kind: 'close_capture' | 'repair'; issue?: ReplayDeviceIssue; bindingIdentity?: string };
+  confirmation?: { token: string; name: string; generation: number; deviceId: string; kind: 'close_capture' };
 }
 const empty = (scope: SessionScope): CaptureReplayState => ({ ...scope, generation: 0, revision: 0, operationId: null,
   phase: 'closed', preparation: { targetDeviceId: null, phase: 'idle', issue: null }, replayDeviceId: null, inputId: null, captureHash: null, contextId: null,
@@ -139,13 +138,13 @@ export class RdcSessionService {
     if (binding.confirmation) ipcApprovalTokenService.revoke(binding.confirmation.token);
     binding.confirmation = undefined;
   }
-  private preparationConfirmation(binding: Binding, deviceId: string, kind: 'close_capture' | 'repair', issue?: ReplayDeviceIssue, bindingIdentity?: string): DevicePreparationResult {
+  private preparationConfirmation(binding: Binding, deviceId: string, kind: 'close_capture'): DevicePreparationResult {
     this.revokePreparationConfirmation(binding);
     const name = createHash('sha256').update(JSON.stringify({ scope: keyOf(binding.state), generation: binding.state.generation,
-      deviceId, contextId: binding.runtime.getContextId(), captureHash: binding.state.captureHash, issue: issue?.repair, bindingIdentity })).digest('hex');
+      deviceId, contextId: binding.runtime.getContextId(), captureHash: binding.state.captureHash })).digest('hex');
     const token = ipcApprovalTokenService.issue({ action: 'device.prepare', scope: 'project', projectRoot: binding.state.projectId, name });
-    binding.confirmation = { token, name, generation: binding.state.generation, deviceId, kind, issue, bindingIdentity };
-    return { success: false, state: this.snapshotReplayForSession(binding.state), confirmation: { token, kind, ...(issue ? { issue } : {}) } };
+    binding.confirmation = { token, name, generation: binding.state.generation, deviceId, kind };
+    return { success: false, state: this.snapshotReplayForSession(binding.state), confirmation: { token, kind } };
   }
   async prepareDevice(request: DevicePreparationRequest): Promise<DevicePreparationResult> {
     const scope = { projectId: request.projectId, sessionId: request.sessionId };
@@ -164,7 +163,6 @@ export class RdcSessionService {
       && (device.type === 'local' || binding.state.preparation.phase === 'ready')) {
       return { success: true, state: this.snapshotReplayForSession(scope) };
     }
-    let repairFingerprint: string | undefined;
     let expectedBindingIdentity: string | undefined;
     let closeConfirmed = false;
     if (request.confirmationToken) {
@@ -174,20 +172,10 @@ export class RdcSessionService {
         this.revokePreparationConfirmation(binding);
         throw new Error('RDC_DEVICE_CONFIRMATION_STALE');
       }
-      if (confirmation.kind === 'repair') {
-        const identity = await configuredRemotePreparationIdentity();
-        this.assertInteraction(binding); this.assertGeneration(binding, request.bindingGeneration);
-        if (binding.confirmation !== confirmation || !confirmation.bindingIdentity || identity !== confirmation.bindingIdentity) {
-          this.revokePreparationConfirmation(binding);
-          throw new Error('RDC_DEVICE_CONFIRMATION_STALE: native CLI or catalog changed.');
-        }
-      }
       binding.confirmation = undefined;
       if (!ipcApprovalTokenService.consume({ token: request.confirmationToken, action: 'device.prepare', scope: 'project',
         projectRoot: scope.projectId, name: confirmation.name })) throw new Error('RDC_DEVICE_CONFIRMATION_STALE');
       closeConfirmed = confirmation.kind === 'close_capture';
-      repairFingerprint = confirmation.issue?.repair?.fingerprint;
-      expectedBindingIdentity = confirmation.bindingIdentity;
     } else if (binding.runtime.snapshotOpenedCaptureForSession(scope)
       && (binding.state.replayDeviceId !== device.id || binding.state.preparation.phase !== 'ready')) {
       return Promise.resolve(this.preparationConfirmation(binding, device.id, 'close_capture'));
@@ -237,7 +225,7 @@ export class RdcSessionService {
           if (currentOwner && currentOwner !== keyOf(scope)) throw new Error('RDC_DEVICE_IN_USE');
           this.devices.set(device.id, keyOf(scope)); binding.deviceId = device.id;
         }
-        await binding.runtime.prepareReplayDevice(scope, device, { signal: controller.signal, repairFingerprint, expectedBindingIdentity,
+        await binding.runtime.prepareReplayDevice(scope, device, { signal: controller.signal, expectedBindingIdentity,
           onPreparationStage: phase => {
             if (current() && binding.state.preparation.phase !== phase) this.publish(binding, { preparation: { ...binding.state.preparation, phase } });
           },
@@ -278,12 +266,7 @@ export class RdcSessionService {
           throw new Error(retainedIssue.diagnostic, { cause: error });
         }
         if (!current()) return { success: false, state: this.snapshotReplayForSession(scope) };
-        if (issue.repair && issue.repair.deviceSerial !== device.serial) issue = {
-          code: 'RDC_REMOTE_REPAIR_IDENTITY_MISMATCH', stage: issue.stage,
-          diagnostic: 'Native repair assessment does not belong to the selected device.', recovery: 'configure_tools',
-        };
-        this.publish(binding, { contextId: null, preparation: { targetDeviceId: device.id, phase: issue.repair ? 'needs_action' : 'failed', issue } });
-        if (issue.repair) return this.preparationConfirmation(binding, device.id, 'repair', issue, bindingIdentity ?? undefined);
+        this.publish(binding, { contextId: null, preparation: { targetDeviceId: device.id, phase: 'failed', issue } });
         return { success: false, state: this.snapshotReplayForSession(scope), error: issue };
       }
     }).finally(() => { if (binding.preparation?.controller === controller) binding.preparation = undefined; });

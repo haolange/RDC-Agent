@@ -169,8 +169,8 @@ Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；�
 
 自动审查以主进程 reviewer=auto_review 识别，只在 Work Process 展示规则/独立审核及真实结论，不是人工待回答请求。Composer 只提供真实人工请求的批准入口，混合请求分别结算，不改变人工 policy floor。审核来源不从命令文本、风险或 ID 格式推测。
 
-## 人工 Remote 准备与修复
+## 会话 Remote 自动准备
 
-设备准备通过会话 scope、binding generation、设备独占、Agent/恢复/原生进程锁和冻结 CLI/catalog 校验，不通过权限挡位绕过。rd.remote.connect 的自动修复只涵盖缺失安装和可保留数据的受支持升级；对未知服务停止、卸载、签名替换、降级，由主进程发出绑定实际评估的一次性确认。Full access 不自动代答此确认。确认 token 不能跨目标、会话、generation 或原生修复 fingerprint 复用，取消/关闭撤销未使用 token；Tools 再核对真实状态后执行，busy 始终不抢占。renderer 不能提交任意 adb 参数或自行断言已确认。
+设备选择是会话 rd.remote.connect 自动准备的明确入口，包含替换所选设备上目标 RenderDoc 辅助包的授权：必要时覆盖、降级、卸载重装及辅助包自身数据清除，无额外桌面修复确认。Tools 每次变更前核对设备、包和同安装 APK 身份；设备独占、未知归属、busy、Agent/恢复/原生进程锁与冻结 CLI/catalog 边界不变。手机系统授权由用户完成。renderer 不能提交任意 adb 参数或绕过主进程准入。已有 Capture 切换设备仍由主进程发出绑定 scope、generation 和目标的一次性关闭确认，取消或关闭撤销未使用 token。
 
-未确认的设备安装不能通过取消、context 释放或更换目标清除。显式“核验安装状态”复用同设备准备入口，经原冻结 CLI/catalog 和目标 APK 证据执行只读 rd.remote.inspect_installation；核验不安装、停止服务或放弃 PM session，也不消费或替代修复确认。只有明确 clear 才继续该次连接；需要破坏性修复时仍重新诊断并请求原有一次性确认。
+安装回执缺失或矛盾时，Tools 在同一次连接预算内串行只读核验，只有设备安装结束且目标包身份确认后才继续启动与握手；无活动安装会话本身不证明安装成功。预算耗尽仍未确认的安装不能通过取消、context 释放或更换目标清除。用户统一“重试连接”复用同设备准备入口，经原冻结 CLI/catalog 和目标 APK 证据先执行只读 rd.remote.inspect_installation；pending/unknown 保留占用，clear 才进入 Tools 自动准备。只读检查不安装、停止服务或放弃 PM session，不存在独立面向用户的核验操作或旧修复 token。

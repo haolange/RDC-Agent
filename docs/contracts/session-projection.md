@@ -164,12 +164,12 @@ Composer 的待保存选择不是已生效权限；当前 mode/revision 只来�
 
 ## Remote 服务准备投影
 
-CaptureReplayState.preparation 与 capture phase 分离：targetDeviceId 表示本会话目标，phase 为 idle/checking/installing/starting/verifying/ready/needs_action/failed/cancelled；issue 为主进程类型化的 code、stage、recovery、原始诊断和必要版本/修复事实。只有真实 native progress 才可显示安装/启动阶段，不以计时器模拟。ready 且 inputId=null 只证明会话持有远端连接，不代表 Capture 打开、回放或设备呈现成功。generation/revision 与 projectId/sessionId 共用既有投影门，迟到结果不得覆盖当前选择。
+CaptureReplayState.preparation 与 capture phase 分离：targetDeviceId 表示本会话目标，phase 为 idle/checking/installing/starting/verifying/ready/failed/cancelled；issue 为主进程类型化的 code、stage、recovery、原始诊断和必要版本/安装事实。只有真实 native progress 才可显示安装/启动阶段，不以计时器模拟。ready 且 inputId=null 只证明会话持有远端连接，不代表 Capture 打开、回放或设备呈现成功。generation/revision 与 projectId/sessionId 共用既有投影门，迟到结果不得覆盖当前选择。
 
 设备发现条目仅表示 ADB 可见性，不含会话 remoteId 或重复 activation error。预检查拒绝可返回 main-issued action error 而保持旧绑定；已接受准备失败写入本会话 issue，界面不得重复显示两处相同主错误。切换确认取消保持旧回放；实际断开取消只适用于没有 Capture 的连接，打开 Capture 时须走明确关闭入口。
 
 取消后的 preparation.installation 仅来自对应原生操作的持久回执，记录安装是否提交、是否卸载旧包和安装方式；连接已取消不代表 APK 已撤回。没有回执时不虚构安装或回滚事实。新的设备准备不会继承旧操作的安装回执。
 
-issue.deviceAction 的 package_install/unconfirmed 表示设备侧动作尚未确认；uninstalledExisting 只记录已观察到的旧包卸载事实。它必须在取消、native 清理及 queued selection 失效后保留；contextId=null 只能表达主进程自有 context 已释放，不能显示设备可重新安装或操作已回滚。原冻结 CLI/catalog 与实际目标 APK 身份证据完整时，recovery=verify_installation 通过同设备 prepare 执行只读核验，只有 clear 才继续本次连接请求；证据不足为 null，不显示盲重试。同阶段轮询不推进 revision，初始空 trace 占位不是运行阶段。
+issue.deviceAction 的 package_install/unconfirmed 表示设备侧动作尚未确认；uninstalledExisting 只记录已观察到的旧包卸载事实。它必须在取消、native 清理及 queued selection 失效后保留；contextId=null 只能表达主进程自有 context 已释放，不能显示设备可重新安装或操作已回滚。原冻结 CLI/catalog 与实际目标 APK 身份证据完整时，recovery=retry 通过同设备 prepare 先只读核验，只有 clear 才继续本次连接请求；证据不足为 null，不显示盲重试。同阶段轮询不推进 revision，初始空 trace 占位不是运行阶段。顶部和右栏消费同一准备投影；当前目标的运行状态优先于发现状态，只显示一个条目状态，普通连接无修复弹窗或 Verify 操作。
 
 只读核验期间的设备离线或未授权可以取消查询，但不能把未决安装降级成普通离线错误或释放设备占用；发现查询失败也不能清除原事实。未决安装时，关闭生命周期仍可清理自有原生进程，但必须返回明确失败，阻止后续会话或项目删除，让核验入口及其 owner 保持可见。
