@@ -15,6 +15,32 @@ describe('native failure projection', () => {
     const result = { exitCode: 1, stdout: JSON.stringify({ ok: false, error: { code, message: 'Device connection failed' } }), stderr: '' } as CLIResult;
     expect(() => parseRdcNativeResult(result)).toThrow(`${code}: Device connection failed`);
   });
+  it('preserves a global owner startup failure without live process metadata and exposes only recovery guidance', () => {
+    const details = { context_id: 'owned-context', state_path: '/private/state.json', reason: 'owner_identity_unavailable',
+      recovery_hint: 'Keep the existing owner state and inspect the owning process.', token: 'PRIVATE_TOKEN' };
+    const result = { exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: 'rdc_tool.cli',
+      ok: false, error: { code: 'daemon_owner_unavailable', category: 'runtime', message: 'Daemon ownership is unavailable', details } }), stderr: '' } as CLIResult;
+    let failure: unknown;
+    try { parseRdcNativeResult(result, 'owned-context', 'rd.remote.connect'); } catch (error) { failure = error; }
+    expect(failure).toBeInstanceOf(RdcNativeFailure);
+    expect(failure).toMatchObject({ resultKind: 'rdc_tool.cli', replacementNotAttempted: false, effectsNotAttempted: false,
+      nativeError: { code: 'daemon_owner_unavailable', category: 'runtime', exitCode: 1, details } });
+    expect((failure as Error).message).toContain('Daemon ownership is unavailable');
+    expect((failure as Error).message).toContain('reason: owner_identity_unavailable');
+    expect((failure as Error).message).toContain(details.recovery_hint);
+    expect((failure as Error).message).not.toMatch(/PRIVATE_TOKEN|private\/state|unexpected result_kind|PROCESS_IDENTITY/);
+  });
+  it('does not project owner guidance from other errors or unbounded control-bearing fields', () => {
+    for (const change of [
+      { code: 'other_runtime_error', category: 'runtime', details: { reason: 'PRIVATE_REASON', recovery_hint: 'PRIVATE_HINT' } },
+      { code: 'daemon_owner_unavailable', category: 'validation', details: { reason: 'PRIVATE_REASON', recovery_hint: 'PRIVATE_HINT' } },
+      { code: 'daemon_owner_unavailable', category: 'runtime', details: { reason: 'PRIVATE_REASON\ncontrol', recovery_hint: 'PRIVATE_HINT' + 'x'.repeat(512) } },
+    ]) {
+      const result = { exitCode: 1, stdout: JSON.stringify({ ok: false, error: { message: 'Original failure', ...change } }), stderr: '' } as CLIResult;
+      expect(() => parseRdcNativeResult(result)).toThrow('Original failure');
+      expect(() => parseRdcNativeResult(result)).not.toThrow(/PRIVATE_REASON|PRIVATE_HINT/);
+    }
+  });
   it('does not accept an ok envelope from a failed process', () => {
     expect(() => parseRdcNativeResult({ exitCode: 1, stdout: JSON.stringify({ ok: true, result_kind: 'rd.remote.connect', data: {} }), stderr: '' } as CLIResult)).toThrow('RDC_CLI_FAILED');
   });
@@ -73,6 +99,46 @@ describe('native failure projection', () => {
       try { parseRdcNativeResult({ exitCode: 1, stdout: JSON.stringify({ ...envelope, ...change }), stderr: '' } as CLIResult,
         undefined, 'rd.pipeline.get_state'); } catch (error) { rejected = error; }
       expect(rejected).toMatchObject({ effectsNotAttempted: false });
+    }
+  });
+  it.each(['get_shader', 'get_stage_state', 'get_constant_buffers', 'get_resource_bindings'])(
+    'retains exact pre-effect capability rejection for pipeline %s', action => {
+      const operation = `rd.pipeline.${action}`;
+      const result = { exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
+        result_kind: operation, ok: false, error: { code: 'shader_stage_unsupported', category: 'capability',
+          message: 'RT stage is unsupported', details: { failure_stage: 'validate_stage',
+            effects_attempted: false, context_preserved: true } } }), stderr: '' } as CLIResult;
+      let failure: unknown;
+      try { parseRdcNativeResult(result, undefined, operation); } catch (error) { failure = error; }
+      expect(failure).toMatchObject({ effectsNotAttempted: true, replacementNotAttempted: false });
+    },
+  );
+  it('does not trust a broader capability claim or incomplete stage rejection', () => {
+    const operation = 'rd.pipeline.get_stage_state';
+    const details = { failure_stage: 'validate_stage', effects_attempted: false, context_preserved: true };
+    const error = { code: 'shader_stage_unsupported', category: 'capability', message: 'Unsupported stage', details };
+    const envelope = { schema_version: '3.0.0', result_kind: operation, ok: false, error };
+    for (const change of [
+      { schema_version: '2.0.0' }, { result_kind: 'rd.pipeline.get_state' },
+      { error: { ...error, code: 'other_capability_error' } },
+      { error: { ...error, category: 'runtime' } },
+      { error: { ...error, details: { ...details, failure_stage: 'after_operation' } } },
+      { error: { ...error, details: { failure_stage: 'validate_stage', context_preserved: true } } },
+      { error: { ...error, details: { failure_stage: 'validate_stage', effects_attempted: false } } },
+    ]) {
+      let failure: unknown;
+      try { parseRdcNativeResult({ exitCode: 1, stdout: JSON.stringify({ ...envelope, ...change }), stderr: '' } as CLIResult,
+        undefined, operation); } catch (caught) { failure = caught; }
+      expect(failure).toMatchObject({ effectsNotAttempted: false });
+    }
+    for (const [kind, expectedKind, exitCode] of [
+      ['rd.pipeline.get_state', 'rd.pipeline.get_state', 1],
+      [operation, undefined, 1], [operation, operation, 0],
+    ] as const) {
+      let failure: unknown;
+      try { parseRdcNativeResult({ exitCode, stdout: JSON.stringify({ ...envelope, result_kind: kind }), stderr: '' } as CLIResult,
+        undefined, expectedKind); } catch (caught) { failure = caught; }
+      expect(failure).toMatchObject({ effectsNotAttempted: false });
     }
   });
   it('retains only exact failed screenshot target restoration proof', () => {

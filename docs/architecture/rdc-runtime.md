@@ -9,7 +9,7 @@ RDC Runtime 是 RDC-Agent 的资源解析、Prompt 构建与运行期可观测�
 - 应用内部状态位于 `${userData}/state`，Secret、日志和缓存位于 OS `userData` 下。
 - Project `inputs/`、`artifacts/`、`memory/` 与 runtime state 默认不进入 Git。
 - RDC-Tool CLI 安装位置、参数前缀、工作目录、环境与超时是 User/Device 配置，Project 资源不能覆盖本机执行入口。
-- 桌面调用原生 CLI 时，若 Settings `env` 未写 `RDC_TOOL_INTERMEDIATE_ROOT`，主进程注入用户资源根下的 `rdc-intermediate`。Settings 已写则原样使用。CLI 可执行文件仍只来自 Settings，不探测安装包或源码树，不把 Tools 默认 `intermediate` 当作产品 fallback。关闭本会话 lease 必须先 `rd.session.clear_context` / `context clear`，再对该 `rdc-<uuid>` 执行 `daemon stop`；clear 不代替 stop。限额以 Tools 的活占用为准。启动与退出只收割 App 中间根下已确认归属的 `rdc-*`，不扫安装目录 `intermediate`，不碰 `default` 或其他 context。
+- 桌面调用原生 CLI 时，若 Settings `env` 未写 `RDC_TOOL_INTERMEDIATE_ROOT`，主进程注入用户资源根下的 `rdc-tool-intermediate`。Settings 已写则原样使用。CLI 可执行文件仍只来自 Settings，不探测安装包或源码树，不把 Tools 默认 `intermediate` 当作产品 fallback。关闭本会话 lease 必须先 `rd.session.clear_context` / `context clear`，再对该 `rdc-<uuid>` 执行 `daemon stop`；clear 不代替 stop。限额以 Tools 的活占用为准。启动与退出只收割 App 中间根下已确认归属的 `rdc-*`，不扫安装目录 `intermediate`，不碰 `default` 或其他 context。
 
 `ScopedResourceResolver` 对 Agent、Skill、MCP、Hook 使用 `builtin < user < project` 的 whole-resource override，同 ID 的 Project disabled resource 可以隐藏继承项。Policy 只允许收紧；放宽、无效或不可比较的配置 fail-closed。
 
@@ -17,9 +17,13 @@ RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`�
 
 原生 controller 发生 fatal 错误后可能继续返回默认零值或空对象。Tool 在非生命周期操作实际访问 controller 时及结果发布前检查 `GetFatalErrorStatus`；语义参数校验仍先于原生访问，生命周期清理入口保留。`replay_fatal_error` 与无法核验健康的 `replay_health_unavailable` 都不是有效测量或恢复证明，主进程按原有未知结果规则隔离 owning lease，不发布成功证据。健康控制器的合法零值不受此规则影响；瞬时健康回执也不保证之后的连接或实验恢复。
 
+`daemon_owner_unavailable` 属于 runtime 基础设施失败。主进程仅将有长度限制的单行 `reason` 和 `recovery_hint` 附到原生错误提示；`state_path` 及其他原生 details 留在主进程内部。没有可核验的无效果和恢复证明时，仍按未知结果规则隔离 owning lease。准备阶段清理未确认时保留首次 issue、错误码、恢复信息和原始 native error，附加清理诊断，并保留设备 reservation 与 owning context，直至清理得到确认。
+
 管线 `sections` 的资格只覆盖实际请求并返回的字段。未采集 section 的模型默认空值不能降级已返回的 bindings，也不能据此声称已核验被省略的 shader 或输出状态；真实请求字段缺失仍保留对应降级原因。
 
 每项 resolved resource 携带 `scope`、`sourcePath`、`sourceHash`、`overriddenSource` 与 `effectiveStatus`。Renderer 通过 `rdcRuntime` preload API 获取这些信息，不直接访问文件系统、Secret 或任意 shell。
+
+管线 stage 查询的已知能力拒绝只在 `rd.pipeline.get_shader`、`get_stage_state`、`get_constant_buffers`、`get_resource_bindings` 返回同操作 canonical `capability/shader_stage_unsupported`，并同时证明 `failure_stage=validate_stage`、`effects_attempted=false`、`context_preserved=true` 时，进入现有无效果拒绝核验路径。主进程仍须在收到拒绝后重新核对冻结 owning lease 的版本、context、capture 和 replay 身份，核验成功才保留可查询状态；原始结果仍是失败，不产生实验回执、不重试。其它能力错误、缺失证明、取消或身份漂移仍隔离，不按错误文字推断安全。
 
 ## Project Instructions
 

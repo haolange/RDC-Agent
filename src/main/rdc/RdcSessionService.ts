@@ -270,8 +270,12 @@ export class RdcSessionService {
         // A cancelled consumer cannot release a newer context: this serial section owns cleanup until it exits.
         try { await this.closeBinding(scope, binding, {}); }
         catch (cleanupError) {
-          if (binding.state.generation === generation) this.publish(binding, { preparation: { targetDeviceId: device.id, phase: 'failed', issue: replayDeviceIssue(cleanupError) } });
-          throw cleanupError;
+          const retainedIssue = { ...issue,
+            diagnostic: `${issue.diagnostic}\nCleanup not confirmed: ${replayDeviceIssue(cleanupError).diagnostic}` };
+          if (binding.state.generation === generation) this.publish(binding, { preparation: { targetDeviceId: device.id, phase: 'failed', issue: retainedIssue } });
+          // Keep the primary native error and its details; failed cleanup retains ownership.
+          if (error instanceof Error) { error.message = retainedIssue.diagnostic; throw error; }
+          throw new Error(retainedIssue.diagnostic, { cause: error });
         }
         if (!current()) return { success: false, state: this.snapshotReplayForSession(scope) };
         if (issue.repair && issue.repair.deviceSerial !== device.serial) issue = {

@@ -83,6 +83,29 @@ it.each(['replay_fatal_error', 'replay_health_unavailable'])(
   },
 );
 describe('structured RDC shell', () => {
+  it('keeps owner startup diagnostics and quarantines the frozen lease without executing or retrying the requested read', async () => {
+    const query: RdcOperationDefinition = { ...definition, name: 'rd.shader.get_source', namespace: 'shader', evidence_kind: null };
+    const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };
+    mock.execute.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
+      result_kind: 'rdc_tool.cli', ok: false, error: { code: 'daemon_owner_unavailable', category: 'runtime',
+        message: 'Daemon ownership is unavailable', details: { context_id: 'owned-context', reason: 'owner_identity_unavailable',
+          recovery_hint: 'Inspect the owner before recovering this context.', state_path: '/private/state', token: 'PRIVATE_TOKEN' } } }) });
+    const failure = await executeRdcShell({ operation: query.name, args: {} }, 'owner-unavailable', undefined, bound).catch(error => error);
+    expect(failure.nativeError).toMatchObject({ code: 'daemon_owner_unavailable', category: 'runtime',
+      details: { context_id: 'owned-context', reason: 'owner_identity_unavailable', state_path: '/private/state' } });
+    expect(failure.deliveryResult.details).toMatchObject({
+      nativeFailure: { code: 'daemon_owner_unavailable', category: 'runtime', resultKind: 'rdc_tool.cli', proof: {} },
+      mainValidation: { preservationVerified: false, leaseState: 'quarantined' },
+      invocation: { operation: 'rd.session.get_context', args: {} },
+    });
+    expect(failure.deliveryResult.details.nativeFailure.message).toContain('Inspect the owner before recovering this context.');
+    expect(JSON.stringify(failure.deliveryResult)).not.toMatch(/PRIVATE_TOKEN|private\/state|RDC_PROCESS_IDENTITY_REQUIRED/);
+    expect(mock.execute).toHaveBeenCalledOnce();
+    expect(mock.execute.mock.calls[0]?.[1]?.[0]).toBe('rd.session.get_context');
+    expect(mock.quarantine).toHaveBeenCalledOnce();
+    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.any(String));
+    expect(mock.write).not.toHaveBeenCalled(); expect(mock.observe).not.toHaveBeenCalled();
+  });
   it('records the failed native preflight rather than claiming the requested shader call ran', async () => {
     const query: RdcOperationDefinition = { ...definition, name: 'rd.shader.get_source', namespace: 'shader', evidence_kind: null };
     const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };
@@ -285,6 +308,66 @@ describe('structured RDC shell', () => {
       .resolves.toBeDefined();
     expect(mock.write).not.toHaveBeenCalled();
   });
+  it.each(['get_shader', 'get_stage_state', 'get_constant_buffers', 'get_resource_bindings'])(
+    'rechecks the frozen owning lease after pipeline %s stage rejection without retrying', async action => {
+      const query: RdcOperationDefinition = { ...definition, name: `rd.pipeline.${action}`, namespace: 'pipeline',
+        effects: ['replay_position'], evidence_kind: null, input_schema: { type: 'object',
+          properties: { session_id: { type: 'string' }, stage: { type: 'string' } },
+          required: ['session_id', 'stage'], additionalProperties: false } };
+      const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };
+      const order: string[] = [];
+      mock.lease.mockImplementation(() => { order.push('lease'); return lease; });
+      mock.execute.mockImplementationOnce(async () => {
+        order.push('native-rejection');
+        return { exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: query.name, ok: false,
+          error: { code: 'shader_stage_unsupported', category: 'capability', message: 'RT stage is unsupported',
+            details: { failure_stage: 'validate_stage', effects_attempted: false, context_preserved: true } } }) };
+      });
+      const failure = await executeRdcShell({ operation: query.name, args: { stage: 'RT' } }, 'unsupported-stage', undefined, bound)
+        .catch(error => error);
+      expect(order).toEqual(['lease', 'lease', 'native-rejection', 'lease']);
+      expect(failure.deliveryResult).toMatchObject({ isError: true, details: {
+        mainValidation: { preservationVerified: true, leaseState: 'retained' },
+        nativeFailure: { code: 'shader_stage_unsupported', category: 'capability',
+          proof: { effects_attempted: false, context_preserved: true } },
+      } });
+      expect(mock.execute).toHaveBeenCalledOnce();
+      expect(mock.quarantine).not.toHaveBeenCalled();
+      expect(mock.write).not.toHaveBeenCalled();
+      expect(mock.observe).not.toHaveBeenCalled();
+      mock.execute.mockResolvedValueOnce({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: query.name,
+        data: { stage_state: { stage: 'PS' } } }) });
+      await expect(executeRdcShell({ operation: query.name, args: { stage: 'PS' } }, 'explicit-next-query', undefined, bound))
+        .resolves.toBeDefined();
+      expect(mock.execute).toHaveBeenCalledTimes(2);
+      expect(mock.quarantine).not.toHaveBeenCalled();
+    },
+  );
+  it.each(['missing-proof', 'unknown-code', 'post-effect', 'capture-drift'])(
+    'quarantines unqualified stage capability rejection: %s', async variant => {
+      const query: RdcOperationDefinition = { ...definition, name: 'rd.pipeline.get_stage_state', namespace: 'pipeline',
+        effects: ['replay_position'], evidence_kind: null };
+      const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };
+      if (variant === 'capture-drift') mock.lease.mockReturnValueOnce(lease).mockReturnValueOnce(lease)
+        .mockReturnValueOnce({ ...lease, runtimeContext: { ...lease.runtimeContext, captureFileId: 'foreign-capture' } });
+      mock.execute.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
+        result_kind: query.name, ok: false, error: {
+          code: variant === 'unknown-code' ? 'other_capability_error' : 'shader_stage_unsupported',
+          category: 'capability', message: 'Stage unavailable', details: {
+            failure_stage: variant === 'post-effect' ? 'after_operation' : 'validate_stage',
+            context_preserved: true, ...(variant === 'missing-proof' ? {} : { effects_attempted: false }),
+          } } }) });
+      const failure = await executeRdcShell({ operation: query.name, args: {} }, 'stage-failure', undefined, bound)
+        .catch(error => error);
+      expect(failure.deliveryResult).toMatchObject({ isError: true, details: {
+        mainValidation: { preservationVerified: false, leaseState: 'quarantined' }, nativeFailure: { proof: {} },
+      } });
+      expect(mock.quarantine).toHaveBeenCalledOnce();
+      expect(mock.execute).toHaveBeenCalledOnce();
+      expect(mock.write).not.toHaveBeenCalled();
+      expect(mock.observe).not.toHaveBeenCalled();
+    },
+  );
   it.each([true, false])('requires explicit pre-effect proof for a mesh resource miss: %s', async proven => {
     const query: RdcOperationDefinition = { ...definition, name: 'rd.mesh.decode_index_data', namespace: 'mesh', evidence_kind: null };
     const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };

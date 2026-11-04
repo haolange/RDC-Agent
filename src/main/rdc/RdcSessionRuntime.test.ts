@@ -190,6 +190,21 @@ function remoteNative() {
   });
 }
 describe('selected remote before opening a capture', () => {
+  it('retains a global owner startup failure before remote connect, process checks or lease allocation', async () => {
+    nativeStop.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: 'rdc_tool.cli',
+      ok: false, error: { code: 'daemon_owner_unavailable', category: 'runtime', message: 'Owner identity unavailable',
+        details: { context_id: 'startup-context', reason: 'owner_identity_unavailable', recovery_hint: 'Inspect the owner first.' } } }) });
+    const runtime = new RdcSessionRuntime();
+    const failure = await runtime.prepareReplayDevice(scope, remoteDevice, { binding: remoteBinding() }).catch(error => error);
+    expect(failure).toMatchObject({ nativeError: { code: 'daemon_owner_unavailable', category: 'runtime',
+      details: { reason: 'owner_identity_unavailable' } } });
+    expect(failure.message).toContain('Inspect the owner first.');
+    expect(failure.message).not.toMatch(/owner_pid|PROCESS_IDENTITY|unexpected result_kind/);
+    expect(nativeStop).toHaveBeenCalledOnce(); expect(nativeStop.mock.calls[0]?.[0]).toBe('daemon');
+    expect(nativeStop.mock.calls[0]?.[1]?.[0]).toBe('start');
+    expect(ownership.remember).not.toHaveBeenCalled(); expect(getRdcContextLease('session')).toBeNull();
+    expect(runtime.getContextId()).toBeNull(); expect(runtime.isPreparedFor(scope, remoteDevice.id)).toBe(false);
+  });
   it('rejects changed native identity before installation inspection starts a daemon', async () => {
     const runtime = new RdcSessionRuntime();
     await expect(runtime.inspectReplayDeviceInstallation(scope, remoteDevice, { binding: remoteBinding(), expectedBindingIdentity: 'changed' })).rejects.toThrow('CONFIRMATION_STALE');

@@ -39,7 +39,7 @@ vi.mock('./RdcSessionRuntime', () => ({ RdcSessionRuntime: class {
 } }));
 import { harvestOwnedRdcDaemons } from './OwnedRdcDaemonRegistry';
 import { RdcSessionService } from './RdcSessionService';
-import { RdcNativeFailure } from './RdcNativeProtocol';
+import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
 import { setRdcInteractionLock, runRdcOperation } from './RdcOperationCoordinator';
 const scope = { projectId: 'p', sessionId: 's1' };
 const request = (sessionId = 's1', remote = false): OpenProjectInputRequest => ({ projectId: 'p', sessionId,
@@ -415,6 +415,27 @@ it('refuses a repair assessment for another device and never forwards its permis
   expect(result.confirmation).toBeUndefined(); expect(result.error).toMatchObject({ code: 'RDC_REMOTE_REPAIR_IDENTITY_MISMATCH', recovery: 'configure_tools' });
   expect(service.getDeviceOwner('android')).toBeNull();
 });
+it('retains the primary owner failure, recovery guidance and device reservation when preparation cleanup also fails', async () => {
+  const details = { context_id: 'context-s1', state_path: '/private/owner-state', reason: 'owner_identity_unavailable',
+    recovery_hint: 'Inspect the owner before recovering this context.' };
+  let primary: unknown;
+  try { parseRdcNativeResult({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: 'rdc_tool.cli',
+    ok: false, error: { code: 'daemon_owner_unavailable', category: 'runtime', message: 'Original owner failure', details } }),
+    stderr: '', duration_ms: 1 }, undefined, 'rd.remote.connect'); } catch (error) { primary = error; }
+  mocks.prepare.mockRejectedValueOnce(primary); mocks.close.mockRejectedValueOnce(new Error('cleanup owner exit remains unconfirmed'));
+  const service = new RdcSessionService();
+  await expect(service.prepareDevice({ ...scope, deviceId: 'android', bindingGeneration: 0 })).rejects.toBe(primary);
+  expect(primary).toMatchObject({ nativeError: { code: 'daemon_owner_unavailable', details } });
+  const failed = service.snapshotReplayForSession(scope);
+  expect(failed.preparation).toMatchObject({ phase: 'failed', issue: { code: 'daemon_owner_unavailable', recovery: 'retry' } });
+  expect(failed.preparation.issue?.diagnostic).toContain('Original owner failure');
+  expect(failed.preparation.issue?.diagnostic).toContain(details.recovery_hint);
+  expect(failed.preparation.issue?.diagnostic).toContain('Cleanup not confirmed: cleanup owner exit remains unconfirmed');
+  expect(service.getDeviceOwner('android')).toEqual(scope);
+  expect(mocks.prepare).toHaveBeenCalledOnce(); expect(mocks.close).toHaveBeenCalledOnce();
+  await expect(service.prepareDevice({ projectId: 'p', sessionId: 's2', deviceId: 'android', bindingGeneration: 0 })).rejects.toThrow('DEVICE_IN_USE');
+});
+
 it('retains reservations if failed preparation cannot confirm its native cleanup', async () => {
   mocks.prepare.mockRejectedValueOnce(new Error('connect failed')); mocks.close.mockRejectedValueOnce(new Error('exit unconfirmed'));
   const service = new RdcSessionService();

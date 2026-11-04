@@ -52,11 +52,16 @@ export function parseRdcNativeResult(result: CLIResult, expectedContext?: string
       const suffix = typeof detailCode === 'string' && /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/.test(detailCode)
         ? ` (${detailLabel}: ${detailCode})` : '';
       const resultKind = typeof envelope.result_kind === 'string' ? envelope.result_kind : null;
-      const canonicalValidation = envelope.schema_version === '3.0.0' && result.exitCode !== 0
-        && resultKind !== null && resultKind === expectedKind && failure.category === 'validation';
+      const canonicalFailure = envelope.schema_version === '3.0.0' && result.exitCode !== 0
+        && resultKind !== null && resultKind === expectedKind;
+      const canonicalValidation = canonicalFailure && failure.category === 'validation';
+      const pipelineStageRejection = canonicalFailure && failure.category === 'capability'
+        && failure.code === 'shader_stage_unsupported' && details?.failure_stage === 'validate_stage'
+        && ['rd.pipeline.get_shader', 'rd.pipeline.get_stage_state',
+          'rd.pipeline.get_constant_buffers', 'rd.pipeline.get_resource_bindings'].includes(resultKind!);
       const replacementNotAttempted = canonicalValidation
         && details?.replacement_attempted === false && details?.context_preserved === true;
-      const effectsNotAttempted = canonicalValidation
+      const effectsNotAttempted = (canonicalValidation || pipelineStageRejection)
         && details?.effects_attempted === false && details?.context_preserved === true;
       const screenshotTargetRestoration = envelope.schema_version === '3.0.0' && result.exitCode !== 0
         && resultKind === 'rd.export.screenshot' && resultKind === expectedKind
@@ -77,7 +82,16 @@ export function parseRdcNativeResult(result: CLIResult, expectedContext?: string
         && typeof details?.context_id === 'string' && typeof details?.session_id === 'string'
         && Number.isSafeInteger(details?.restored_event_id) && Number(details?.restored_event_id) > 0
         ? { contextId: details.context_id, sessionId: details.session_id, eventId: Number(details.restored_event_id) } : null;
-      throw new RdcNativeFailure(`RDC_CLI_FAILED: ${failure.code}: ${failure.message}${suffix}`,
+      // Only this infrastructure failure exposes its bounded recovery guidance.
+      // Arbitrary native details (including state paths and credentials) stay internal.
+      const ownerGuidance = failure.code === 'daemon_owner_unavailable' && failure.category === 'runtime'
+        ? ['reason', 'recovery_hint'].flatMap(key => {
+          const value = details?.[key];
+          return typeof value === 'string' && value.trim().length > 0 && value.length <= 512
+            && !/[\u0000-\u001f\u007f]/u.test(value) ? [`${key}: ${value.trim()}`] : [];
+        }) : [];
+      const guidance = ownerGuidance.length ? ` (${ownerGuidance.join('; ')})` : '';
+      throw new RdcNativeFailure(`RDC_CLI_FAILED: ${failure.code}: ${failure.message}${suffix}${guidance}`,
         resultKind, replacementNotAttempted, effectsNotAttempted,
         { code: failure.code, category: typeof failure.category === 'string' ? failure.category : null, exitCode: result.exitCode, ...(details ? { details } : {}) },
         screenshotTargetRestoration, shaderInspectionRestoration);

@@ -2,7 +2,7 @@
 
 # Analyzer RDC 工具参考
 
-Current catalog fingerprint: `3b632b109c1644c84635dc6cb10f2ae163776d708e2b51d5e2b1278a41fd0dfa`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
+Current catalog fingerprint: `980d49d70062196bbd25bac30730e46de952d02556645528cc95b7087a41c90f`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
 
 所有 `shell.rdc` 示例都省略由主进程注入的 `session_id` / `capture_file_id` / context 身份。不要把示例补成可覆盖其它会话的身份。共享发现、错误恢复、输出与副作用规则见 `$rdc-tool-shell`。
 
@@ -240,16 +240,16 @@ Current catalog fingerprint: `3b632b109c1644c84635dc6cb10f2ae163776d708e2b51d5e2
 
 ## `rd.pipeline.get_stage_state`
 
-获取指定 Shader Stage 的 Pipeline 子状态。
+获取指定 Shader Stage 的 Pipeline 子状态；RT 明确返回不支持，不映射为 Pixel Stage。
 
 | 参数 | 必需 | 约束 |
 |---|---:|---|
 | `session_id` | 是 | string; session_id (str) |
-| `stage` | 是 | string; stage (str): 'VS'\|'HS'\|'DS'\|'GS'\|'PS'\|'CS'\|'AS'\|'MS'\|'RT' |
+| `stage` | 是 | string; Case-insensitive VS/HS/DS/GS/PS/CS/AS/MS. RT is recognized but unsupported; unknown names are rejected before replay access. |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 | `max_bytes` | 否 | integer; min=0 |
 
-**结果解释：** ok (bool); data (dict): {stage_state}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {stage_state}; artifacts (list); error (dict\|null): unknown stages return validation/invalid_shader_stage; RT or a missing native stage enum returns capability/shader_stage_unsupported. Stage rejection precedes replay access and includes effects_attempted=false, context_preserved=true, failure_stage=validate_stage.; meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -375,7 +375,7 @@ Current catalog fingerprint: `3b632b109c1644c84635dc6cb10f2ae163776d708e2b51d5e2
 | 参数 | 必需 | 约束 |
 |---|---:|---|
 | `session_id` | 是 | string; session_id (str) |
-| `stage` | 是 | string; enum=vs,hs,ds,gs,ps,cs,ms,as; Use canonical shader stage: vs, hs, ds, gs, ps, cs, ms, or as. Pixel shader is ps. |
+| `stage` | 是 | string; Case-insensitive VS/HS/DS/GS/PS/CS/MS/AS. Pixel shader is PS. RT is recognized but unsupported; stage names are validated before replay access with structured errors. |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
 **结果解释：** ok (bool); data (dict): {shader}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
@@ -390,7 +390,7 @@ Current catalog fingerprint: `3b632b109c1644c84635dc6cb10f2ae163776d708e2b51d5e2
 **`shell.rdc` 示例：**
 
 ```json
-{"rdc":{"operation":"rd.pipeline.get_shader","args":{"stage":"vs"}}}
+{"rdc":{"operation":"rd.pipeline.get_shader","args":{"stage":"ps"}}}
 ```
 
 ## `rd.resource.list_all`
