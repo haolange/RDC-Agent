@@ -79,6 +79,8 @@ export interface AssistantMessage {
   model: string;
   /** Provider id（与 `Model.provider` 对应）。 */
   provider: string;
+  /** Actual server response metadata; never inferred from the requested model/tier. */
+  execution?: { modelId?: string; serviceTier?: string };
   /** Token 使用统计。 */
   usage: Usage;
   /** 助手消息结束的原因。 */
@@ -349,6 +351,8 @@ import type { RequestPlan } from '@shared/types/providerCapability';
 
 /** 调用 Provider 流式生成时的可选参数。 */
 export interface StreamOptions {
+  /** Explicit one-shot capability check; no account retry after a failed request. */
+  capabilityProbe?: boolean;
   temperature?: number;
   maxTokens?: number;
   topP?: number;

@@ -48,6 +48,10 @@ export function createRdcRuntimeApi(transport: RendererApiTransport): ElectronAP
 export function createLlmApi(transport: RendererApiTransport): LlmApi {
   return {
     testProviderDraft: (request) => transport.invoke(INVOKE.llm.testProviderDraft, request),
+    prepareProbeBatch: request => transport.invoke(INVOKE.llm.prepareProbeBatch, request),
+    startProbeBatch: id => transport.invoke(INVOKE.llm.startProbeBatch, id),
+    cancelProbeBatch: id => transport.invoke(INVOKE.llm.cancelProbeBatch, id),
+    getProbeBatch: () => transport.invoke(INVOKE.llm.getProbeBatch),
     testModelCapability: (request) => transport.invoke(INVOKE.llm.testModelCapability, request),
     connectProvider: (request) => transport.invoke(INVOKE.llm.connectProvider, request),
     refreshProviderModels: (providerId) => transport.invoke(INVOKE.llm.refreshProviderModels, providerId),

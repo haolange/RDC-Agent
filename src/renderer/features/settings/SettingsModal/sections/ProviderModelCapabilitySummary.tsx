@@ -14,6 +14,7 @@ import { buildCapabilityChips } from '../modelCapabilitySummaryUtils';
 import { ProviderModelProbe } from './ProviderModelProbe';
 import { ProviderModelPreferences } from './ProviderModelPreferences';
 import { ProviderModelDetails } from './ProviderModelDetails';
+import { providerProbeResultText } from './providerProbeResultText';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -46,6 +47,8 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
     'default',
     ...(contextChoices?.maxTier ? ['max-context' as const] : []),
     ...(effectiveModel.controls.fast.state === 'selectable' ? ['fast' as const] : []),
+    ...(effectiveModel.executionBindings?.some(binding => binding.when.fast === true && binding.when.maxContext === true)
+      ? ['fast-max-context' as const] : []),
   ] : [];
   const runProbe = async (mode: LlmModelCapabilityProbeMode) => {
     setProbeMode(mode);
@@ -77,7 +80,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
       setProbeMode(null);
     }
   };
-  const probeStatus = probeResult ? t(`settings.providers.capability.probeStatus.${probeResult.status}`) : '';
+  const probeText = probeResult ? providerProbeResultText(probeResult, t) : null;
 
   return (
     <div className="settings-model-capability-panel" data-testid={`settings-provider-model-capability-panel-${model.id}`}>
@@ -106,13 +109,14 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
             <ProviderModelDetails {...{ model, effectiveModel, provider, t }} />
             <ProviderModelProbe {...{ model, provider, t, probeMode, probeModes, runProbe }} />
           </Details>
-          {probeResult ? (
+          {probeResult && probeText ? (
             <div
               className={`settings-model-capability-probe-result settings-model-capability-probe-result--${probeResult.status}`}
               role="status"
             >
-              <strong>{probeStatus}</strong>
-              {probeResult.detail ? <span>{probeResult.detail}</span> : null}
+              <strong>{probeText.status}</strong>
+              {probeText.detail ? <span>{probeText.detail}</span> : null}
+              {probeText.tiers ? <span>{probeText.tiers}</span> : null}
             </div>
           ) : null}
           {snapshot?.refreshing ? <div className="settings-model-capability-note">{t('settings.providers.capability.refreshing')}</div> : null}

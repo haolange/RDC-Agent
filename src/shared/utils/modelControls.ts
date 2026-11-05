@@ -292,7 +292,7 @@ export function resolveModelControls(
         disabled: true,
         reason: 'Max mode tier is missing a numeric window.',
       };
-    } else if (!isEligibleMaxContextTier(tier, normalTier)) {
+    } else if (!isEligibleMaxContextTier(tier, normalTier, model.defaultBudgetTokens)) {
       maxContext = {
         ...maxContext,
         state: 'blocked',

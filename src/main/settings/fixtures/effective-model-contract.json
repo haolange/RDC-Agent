@@ -1,12 +1,12 @@
 [
   {
     "providerId": "chatgpt-account",
-    "modelId": "gpt-5.5",
+    "modelId": "gpt-6.1-terra",
     "protocol": "OpenAIResponses",
-    "defaultBudgetTokens": 272000,
-    "normalPromptCapTokens": 272000,
-    "maxTierPromptCapTokens": null,
-    "maxTierActivation": null,
+    "defaultBudgetTokens": 500000,
+    "normalPromptCapTokens": 500000,
+    "maxTierPromptCapTokens": 872000,
+    "maxTierActivation": "implicit",
     "fastState": "selectable"
   },
   {

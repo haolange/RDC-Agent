@@ -1,3 +1,5 @@
+import type { ProviderSurfaceManifest } from '@shared/provider-catalog/catalogManifestSchema';
+import { isRetiredModel } from '@shared/provider-catalog/modelLifecycle';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import type { CapabilityState, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
 import type {
@@ -15,6 +17,7 @@ import { projectLiveModelObservations, type LiveModelObservation } from './LiveP
 
 export interface GrokBuilderCatalogDiagnostic {
   envelopeKind: 'root-array' | 'models-array' | 'models-map' | 'data-array' | 'items-array' | 'unknown';
+  complete: boolean;
   candidateCount: number;
   admittedCount: number;
   filtered: {
@@ -305,7 +308,7 @@ export function parseKimiCodeCatalog(
   return asResult(projectLiveModelObservations(surface, observations));
 }
 /** Account discovery reports availability and windows; structural capabilities remain manifest-owned. */
-export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog {
+export function parseChatGptAccountCatalog(payload: unknown, surface?: Pick<ProviderSurfaceManifest, 'models'>): ParsedLiveCatalog {
   const root = record(payload);
   const values = Array.isArray(root.models) ? root.models : [];
   return asResult(values.flatMap((candidate): CatalogModelContribution[] => {
@@ -315,11 +318,14 @@ export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog 
     if (
       !id
       || !identity
+      || isRetiredModel('chatgpt-account', id)
       || value.supported_in_api === false
       || (text(value.visibility) && text(value.visibility) !== 'list')
       || /(?:^|-)pro$/i.test(id)
       || /(?:auto-review|compaction)/i.test(id)
     ) return [];
+    const definition = surface?.models.find(model => model.modelId === id);
+    const maxControl = definition?.controls.maxContext;
     const contextWindow = positiveInteger(value.context_window);
     const maxContextWindow = positiveInteger(value.max_context_window);
     const observedOutputTokens = outputTokens(value);
@@ -327,7 +333,7 @@ export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog 
     const contextTiers: NonNullable<CatalogModelContribution['contextTiers']> = [{
       id: 'default',
       label: 'Codex service limit',
-      ...(effectiveContextWindow ? { maxPromptTokens: effectiveContextWindow } : {}),
+      ...(effectiveContextWindow ? { maxPromptTokens: effectiveContextWindow, maxTotalTokens: effectiveContextWindow } : {}),
       ...(observedOutputTokens ? { maxOutputTokens: observedOutputTokens } : {}),
       activation: { kind: 'implicit' },
       entitlement: 'granted',
@@ -337,18 +343,24 @@ export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog 
         id: 'max',
         label: 'Maximum Codex limit',
         maxPromptTokens: maxContextWindow,
+        maxTotalTokens: maxContextWindow,
         ...(observedOutputTokens ? { maxOutputTokens: observedOutputTokens } : {}),
         activation: { kind: 'implicit' },
-        entitlement: 'unknown',
+        entitlement: 'granted',
       });
     }
     return [{
       modelId: identity.id,
-      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
+      aliases: identity.aliases.filter(alias => !isRetiredModel('chatgpt-account', alias)),
       label: text(value.display_name) ?? text(value.name) ?? id,
       availability: 'available',
       route: { protocol: 'OpenAIResponses', baseUrl: 'https://chatgpt.com/backend-api/codex', source: 'model' },
       contextTiers,
+      ...(contextTiers.length > 1 && maxControl?.state === 'selectable' && maxControl.tierId === 'max' ? {
+        controls: { maxContext: { ...maxControl, entitlement: 'granted' as const } },
+        executionBindings: definition?.executionBindings?.map(binding => binding.when.maxContext === true
+          ? { ...binding, entitlement: 'granted' as const } : binding),
+      } : {}),
       ...(effectiveContextWindow ? { defaultBudgetTokens: effectiveContextWindow } : {}),
     }];
   }));
@@ -620,8 +632,7 @@ export function parseGrokBuilderCatalog(
     const wrapper = record(candidate);
     const info = record(wrapper.info);
     const value = Object.keys(info).length > 0 ? info : wrapper;
-    const observation = observationFromCatalogRow(value);
-    if (!observation) {
+    if (!modelId(value)) {
       filtered.invalidIdentity += 1;
       return [];
     }
@@ -633,13 +644,17 @@ export function parseGrokBuilderCatalog(
       filtered.unsupportedInApi += 1;
       return [];
     }
-    return [observation];
+    const observation = observationFromCatalogRow(value);
+    return observation ? [observation] : [];
   });
   const contributions = projectLiveModelObservations(surface, observations);
   return {
     ...asResult(contributions),
     diagnostic: {
       envelopeKind: envelope.kind,
+      complete: envelope.kind !== 'unknown' && filtered.invalidIdentity === 0
+        && root.has_more !== true && root.partial !== true
+        && !root.next && !root.next_cursor && !root.next_page_token,
       candidateCount: envelope.candidates.length,
       admittedCount: contributions.length,
       filtered,

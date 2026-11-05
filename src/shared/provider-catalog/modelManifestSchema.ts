@@ -417,7 +417,7 @@ const LiveReasoningProjectionSchema = z.object({
 }).strict();
 
 const EntitlementDenialMatcherSchema = z.object({
-  mode: z.enum(['fast', 'max-context']),
+  mode: z.enum(['default', 'fast', 'max-context', 'fast-max-context']),
   statuses: z.array(z.number().int().min(400).max(599)).min(1),
   protocols: z.array(ProviderProtocolSchema).min(1).optional(),
   messageIncludes: z.string().min(1).optional(),

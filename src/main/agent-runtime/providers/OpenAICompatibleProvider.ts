@@ -69,6 +69,8 @@ interface OpenAIStreamChoice {
 }
 
 interface OpenAIStreamChunk {
+  model?: string;
+  service_tier?: string;
   id?: string;
   choices?: OpenAIStreamChoice[];
   usage?: {
@@ -204,6 +206,10 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
           continue;
         }
 
+        builder.setExecution({
+          ...(typeof chunk.model === 'string' ? { modelId: chunk.model } : {}),
+          ...(typeof chunk.service_tier === 'string' ? { serviceTier: chunk.service_tier } : {}),
+        });
         if (chunk.usage) {
           const cacheReadTokens = chunk.usage.prompt_tokens_details?.cached_tokens;
           const cacheWriteTokens = chunk.usage.prompt_tokens_details?.cache_write_tokens;

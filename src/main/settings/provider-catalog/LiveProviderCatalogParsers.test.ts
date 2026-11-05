@@ -1,3 +1,4 @@
+import { loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
@@ -288,7 +289,6 @@ describe('live Provider Catalog parsers', () => {
   it('parses account-visible ChatGPT ids without duplicating manifest controls', () => {
     const parsed = parseChatGptAccountCatalog(fixture('chatgpt-account.json'));
     expect(parsed.models.map((model) => model.id)).toEqual([
-      'gpt-5.5',
       'gpt-5.6-luna',
       'gpt-5.6-sol',
       'gpt-5.6-terra',
@@ -300,7 +300,7 @@ describe('live Provider Catalog parsers', () => {
       defaultBudgetTokens: 272_000,
       contextTiers: [
         { id: 'default', maxPromptTokens: 272_000 },
-        { id: 'max', maxPromptTokens: 872_000, entitlement: 'unknown' },
+        { id: 'max', maxPromptTokens: 872_000, entitlement: 'granted' },
       ],
     });
     expect(sol?.controls).toBeUndefined();
@@ -309,20 +309,20 @@ describe('live Provider Catalog parsers', () => {
 
   it.each([undefined, ['text'], ['text', 'image']])('keeps ChatGPT structure manifest-owned for modalities %j', (input_modalities) => {
     const parsed = parseChatGptAccountCatalog({ models: [
-      { slug: 'gpt-5.5', visibility: 'list', supported_in_api: true, input_modalities },
+      { slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true, input_modalities },
     ] });
     expect(parsed.contributions[0].visionInput).toBeUndefined();
     expect(parsed.contributions[0].toolCalling).toBeUndefined();
     expect(parsed.contributions[0].structuredOutput).toBeUndefined();
   });
 
-  it('excludes hidden and API-unavailable ChatGPT rows', () => {
+  it('excludes retired, hidden and API-unavailable ChatGPT rows', () => {
     const parsed = parseChatGptAccountCatalog({ models: [
       { slug: 'hidden-model', visibility: 'hide', supported_in_api: true },
       { slug: 'unavailable-model', visibility: 'list', supported_in_api: false },
       { slug: 'gpt-5.5', visibility: 'list', supported_in_api: true },
     ] });
-    expect(parsed.models.map((model) => model.id)).toEqual(['gpt-5.5']);
+    expect(parsed.models).toEqual([]);
   });
 
   it('accepts a Codex Max window below one million when it is larger than the default', () => {
@@ -332,7 +332,7 @@ describe('live Provider Catalog parsers', () => {
     }] });
     expect(parsed.contributions[0].contextTiers).toEqual([
       expect.objectContaining({ id: 'default', maxPromptTokens: 272_000 }),
-      expect.objectContaining({ id: 'max', maxPromptTokens: 872_000, entitlement: 'unknown' }),
+      expect.objectContaining({ id: 'max', maxPromptTokens: 872_000, entitlement: 'granted' }),
     ]);
   });
 
@@ -344,8 +344,8 @@ describe('live Provider Catalog parsers', () => {
     expect(parsed.contributions[0]).toMatchObject({
       modelId: 'future-live-model',
       contextTiers: [
-        { id: 'default', maxPromptTokens: 256_000 },
-        { id: 'max', maxPromptTokens: 1_000_000, entitlement: 'unknown' },
+        expect.objectContaining({ id: 'default', maxPromptTokens: 256_000, maxTotalTokens: 256_000 }),
+        expect.objectContaining({ id: 'max', maxPromptTokens: 1_000_000, maxTotalTokens: 1_000_000, entitlement: 'granted' }),
       ],
     });
     expect(parsed.contributions[0].controls).toBeUndefined();
@@ -435,7 +435,7 @@ describe('live Provider Catalog parsers', () => {
 
   it('writes ChatGPT output caps only when the live row reports them', () => {
     const parsed = parseChatGptAccountCatalog({ models: [{
-      slug: 'gpt-5.5', visibility: 'list', supported_in_api: true,
+      slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true,
       context_window: 272_000,
     }] });
     expect(parsed.contributions[0].contextTiers?.[0]).toEqual(expect.objectContaining({
@@ -444,7 +444,7 @@ describe('live Provider Catalog parsers', () => {
     expect(parsed.contributions[0].contextTiers?.[0]).not.toHaveProperty('maxOutputTokens');
 
     const withOutput = parseChatGptAccountCatalog({ models: [{
-      slug: 'gpt-5.5', visibility: 'list', supported_in_api: true,
+      slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true,
       context_window: 272_000, max_output_tokens: 16_384,
     }] });
     expect(withOutput.contributions[0].contextTiers).toEqual([
@@ -460,5 +460,33 @@ describe('live Provider Catalog parsers', () => {
       { id: 'grok-imagine-video-1.5', output_modalities: ['video'] },
     ] });
     expect(parsed.models.map((model) => model.id)).toEqual(['grok-4.7']);
+    expect(parsed.diagnostic?.complete).toBe(true);
+  });
+
+  it.each([
+    { models: [{ id: 'grok-4.7' }], next_cursor: 'next' },
+    { models: [{ id: 'grok-4.7' }, {}] },
+  ])('does not treat an incomplete Grok payload as authority for absent models', payload => {
+    expect(parseGrokBuilderCatalog(payload).diagnostic?.complete).toBe(false);
+  });
+});
+
+
+it('grants only manifest-declared ChatGPT Max controls from explicit current-account windows', async () => {
+  const surface = await loadProviderSurface('chatgpt-account');
+  const parsed = parseChatGptAccountCatalog({ models: [{ slug: 'gpt-6.1-terra', context_window: 500000, max_context_window: 872000 }] }, surface!);
+  expect(parsed.contributions[0]).toMatchObject({
+    controls: { maxContext: { state: 'selectable', tierId: 'max', entitlement: 'granted' } },
+    contextTiers: [ { id: 'default', maxTotalTokens: 500000 }, { id: 'max', maxTotalTokens: 872000, entitlement: 'granted' } ],
+  });
+});
+
+
+it('aligns fixed Max entitlement with the explicitly observed default window', async () => {
+  await loadProviderSurface('kimi-coding-plan');
+  const parsed = parseKimiCodeCatalog({ data: [{ id: 'kimi-for-coding', context_length: 1048576 }] });
+  expect(parsed.contributions.find(m => m.modelId === 'kimi-for-coding')).toMatchObject({
+    controls: { maxContext: { state: 'fixed', entitlement: 'granted' } },
+    contextTiers: [{ id: 'default', entitlement: 'granted' }],
   });
 });

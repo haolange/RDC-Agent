@@ -1,5 +1,7 @@
+import { ProviderProbeBatchPanel } from './ProviderProbeBatchPanel';
 import React, { useEffect, useMemo, useState } from 'react';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
+import { isRetiredModel } from '@shared/provider-catalog/modelLifecycle';
 import type { useI18n } from '../../../../i18n';
 import { catalogScopeKey, useEffectiveCatalogStore } from '../../../../stores/effectiveCatalogStore';
 import { projectProviderModels } from '../providerModelProjection';
@@ -42,8 +44,9 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   useEffect(() => { void useEffectiveCatalogStore.getState().load(scope, false, true); }, [scope]);
 
   const resolvedModels = useMemo(
-    () => projectProviderModels(provider.catalogOwnership, models, snapshot),
-    [models, provider.catalogOwnership, snapshot],
+    () => projectProviderModels(provider.catalogOwnership,
+      models.filter(model => !isRetiredModel(provider.id, model.id)), snapshot),
+    [models, provider.id, provider.catalogOwnership, snapshot],
   );
   const availableModelCount = useMemo(
     () => resolvedModels.filter(({ model, effectiveModel }) => (
@@ -76,6 +79,10 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
           })}
         </span>
       </div>
+      <ProviderProbeBatchPanel providerIds={[provider.id]} disabled={disabled || !provider.isConfigured} t={t} />
+      {snapshot?.lastRefreshError ? (
+        <div className="settings-provider-notice" role="status">{snapshot.lastRefreshError}</div>
+      ) : null}
       {allUnavailable ? (
         <div className="settings-provider-notice" data-testid="settings-provider-connect-unavailable-hint">
           {t('settings.providers.allModelsUnavailableHint')}

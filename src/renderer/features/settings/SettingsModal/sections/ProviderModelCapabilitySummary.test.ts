@@ -3,9 +3,33 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import type { EffectiveModel } from '@shared/types/providerCapability';
+import { translate } from '../../../../i18n/messages';
 import { ProviderModelCapabilitySummary, type ProviderModelCapabilitySummaryProps } from './ProviderModelCapabilitySummary';
 import { testModelCapability } from './providerCatalogActions';
+import { providerProbeResultText } from './providerProbeResultText';
 vi.mock('./providerCatalogActions', () => ({ testModelCapability: vi.fn() }));
+
+it.each([
+  ['en', 'The provider reported default; actual Fast processing is unconfirmed.', 'Requested priority · Reported default'],
+  ['zh-CN', '服务端回报 default，实际 Fast 状态未确认。', '请求档位 priority · 服务端回报 default'],
+] as const)('formats the actual Fast tier receipt in %s', (language, detail, tiers) => {
+  const text = providerProbeResultText({
+    success: false,
+    status: 'inconclusive',
+    requestSent: true,
+    detailCode: 'fast-tier-default',
+    evidence: {
+      protocol: 'OpenAIResponses',
+      effectiveModelId: 'gpt-6.1-terra',
+      observedAt: '2026-11-05T05:32:53.918Z',
+      requestedServiceTier: 'priority',
+      serviceTier: 'default',
+      usage: { inputTokens: 31, outputTokens: 5, totalTokens: 36 },
+    },
+  }, (key, params) => translate(language, key, params));
+  expect(text).toMatchObject({ detail, tiers });
+});
+
 const reasoning = {
   kind: 'toggle' as const,
   supportsOff: true,

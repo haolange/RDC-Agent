@@ -26,6 +26,7 @@ import { finalizeProviderUsage } from './normalizeCacheUsage';
 export const RESPONSES_REASONING_INCLUDE = 'reasoning.encrypted_content';
 
 interface ResponsesCompletedPayload {
+  service_tier?: string;
   id?: string;
   model?: string;
   status?: string;
@@ -482,6 +483,10 @@ function toResponsesTool(tool: ToolDefinition): Record<string, unknown> {
 }
 
 function applyCompletedUsage(builder: AssistantStreamBuilder, payload: ResponsesCompletedPayload): void {
+  builder.setExecution({
+    ...(typeof payload.model === 'string' ? { modelId: payload.model } : {}),
+    ...(typeof payload.service_tier === 'string' ? { serviceTier: payload.service_tier } : {}),
+  });
   if (!payload.usage) return;
   const cacheReadTokens = payload.usage.input_tokens_details?.cached_tokens;
   const cacheWriteTokens = payload.usage.input_tokens_details?.cache_write_tokens;

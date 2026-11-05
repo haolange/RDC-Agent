@@ -82,6 +82,7 @@ export class AssistantStreamBuilder {
   private readonly providerId: string;
   private usage: Usage = { ...EMPTY_USAGE };
   private providerState: ProviderStateRef | undefined;
+  private execution: AssistantMessage['execution'];
   private started = false;
   private finished = false;
 
@@ -238,6 +239,10 @@ export class AssistantStreamBuilder {
       ...state,
       origin: { ...state.origin, bindingIds: [...state.origin.bindingIds] },
     };
+  }
+
+  setExecution(execution: NonNullable<AssistantMessage['execution']>): void {
+    this.execution = { ...this.execution, ...execution };
   }
 
   setUsage(partial: Partial<Usage>): void {
@@ -444,6 +449,7 @@ export class AssistantStreamBuilder {
       model: this.modelId,
       provider: this.providerId,
       usage: { ...this.usage },
+      ...(this.execution ? { execution: { ...this.execution } } : {}),
       stopReason: reason,
       ...(this.providerState ? {
         providerState: {

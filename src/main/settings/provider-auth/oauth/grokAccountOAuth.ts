@@ -190,6 +190,7 @@ export async function discoverGrokCatalog(
       Authorization: `Bearer ${token}` },
   });
   const parsed = parseGrokBuilderCatalog(payload, surface);
+  if (!parsed.diagnostic?.complete) throw new Error('Grok subscription returned an incomplete model catalog. Refresh to check current availability.');
   if (!parsed.models.length) throw new Error('Grok subscription returned no supported agent models. Check account access or sign in again.');
   return { ...parsed, detail: 'Grok subscription model catalog' };
 }

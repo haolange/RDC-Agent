@@ -1,3 +1,4 @@
+import { isProbeAvailabilityDenied } from './ProviderProbeEvidence';
 import type {
   CatalogLayerContribution,
   CatalogModelContribution,
@@ -311,7 +312,9 @@ export function applyDiscoveryAuthority(
     completed.push({
       modelId: definition.modelId,
       availability: 'unavailable',
-      unavailableReason: 'This account-scoped model was absent from the authoritative provider catalog.',
+      unavailableReason: provider.id === 'grok-account'
+        ? 'The last successful Grok subscription catalog did not list this model.'
+        : 'This account-scoped model was absent from the authoritative provider catalog.',
     });
   }
   return completed;
@@ -660,19 +663,21 @@ export function planEffectiveModelCapabilityProbe(input: {
         getLoadedProviderSurface(input.providerId)?.recommendedModels,
       )
     : null;
-  if (!snapshot || !selection?.model) return planEffectiveModelRequest(input);
+  const retryModel = snapshot?.models.find(model => model.modelId === input.modelId && model.enabled && isProbeAvailabilityDenied(model));
+  if (!snapshot || (!selection?.model && !retryModel)) return planEffectiveModelRequest(input);
 
-  const selected = structuredClone(selection.model);
+  const selected = structuredClone(selection?.model ?? retryModel!);
+  if (isProbeAvailabilityDenied(selected)) selected.availability = 'available';
   const models = snapshot.models.map((candidate) => (
     candidate.modelId === selected.modelId ? selected : structuredClone(candidate)
   ));
-  if (input.mode === 'fast' && selected.controls.fast.state === 'selectable') {
+  if ((input.mode === 'fast' || input.mode === 'fast-max-context') && selected.controls.fast.state === 'selectable') {
     selected.controls.fast.entitlement = 'granted';
     selected.executionBindings = selected.executionBindings?.map((binding) => (
       binding.when.fast === true ? { ...binding, entitlement: 'granted' as const } : binding
     ));
   }
-  if (input.mode === 'max-context' && selected.controls.maxContext.state === 'selectable') {
+  if (((input.mode === 'max-context' || input.mode === 'fast-max-context') && selected.controls.maxContext.state === 'selectable') || selected.controls.maxContext.state === 'fixed') {
     selected.controls.maxContext.entitlement = 'granted';
     const maxTierId = selected.controls.maxContext.tierId;
     selected.contextTiers = selected.contextTiers.map((tier) => (

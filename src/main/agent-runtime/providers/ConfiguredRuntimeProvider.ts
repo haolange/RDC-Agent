@@ -337,7 +337,7 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
       }
     };
 
-    if (provider.authMode !== 'account') return createAttempt();
+    if (provider.authMode !== 'account' || options.capabilityProbe) return createAttempt();
     return streamWithUnauthorizedRefresh({
       createAttempt,
       refresh: async () => {

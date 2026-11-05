@@ -1,3 +1,4 @@
+import { registerProviderProbeHandlers } from './providerProbeHandlers';
 import { refreshApplicationMenu } from '../window/applicationMenu';
 import { providerAccountAuthService } from '../settings/provider-auth/ProviderAccountAuthService';
 import { ipcMain } from 'electron';
@@ -53,6 +54,7 @@ import type { ModelsOverride } from '@shared/provider-catalog/modelsOverrideSche
 import { modelsOverrideService } from '../settings/settings-core/ModelsOverrideService';
 
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
+  registerProviderProbeHandlers(context);
   effectiveCatalogService.setConfigurationValidator((request) => {
     const provider = settingsService.getAll().llm.providers.find(entry => entry.id === request.providerId);
     return !!provider && buildEffectiveCatalogRequest(provider).configurationRevision === request.configurationRevision;
@@ -105,6 +107,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       label: 'llm:testModelCapability',
       maxBytes: 8 * 1024,
     }) as [LlmModelCapabilityProbeRequest];
+    await loadProviderSurface(request.providerId);
     return providerCapabilityProbeService.test(request);
   });
 

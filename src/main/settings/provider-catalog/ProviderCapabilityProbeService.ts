@@ -1,3 +1,19 @@
+import { getLoadedProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
+import { settingsService } from '../settings-core/SettingsService';
+import {
+  freezeProviderRuntimeCredentials,
+  releaseProviderRuntimeCredentials,
+} from '../provider-auth/ProviderRuntimeCredentialLease';
+import { effectiveCatalogService } from './EffectiveCatalogService';
+import { buildProbeFailurePatch, buildProbeSuccessPatch, classifyCapabilityProbeFailure, probeConfirmation, isProbeAvailabilityDenied } from './ProviderProbeEvidence';
+import {
+  executeCapabilityProbe,
+  type CapabilityProbeExecution,
+} from './ProviderCapabilityProbeRuntime';
+import {
+  planEffectiveModelCapabilityProbe,
+  resolveEffectiveCatalog,
+} from './EffectiveModelResolver';
 import type { AssistantMessage } from '../../agent-runtime/core/types';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
 import type {
@@ -10,53 +26,8 @@ import type {
   LlmModelCapabilityProbeResult,
   LlmProviderEntry,
 } from '@shared/types/settings';
-import { resolveContextTierChoices } from '@shared/utils/contextTiers';
-import { effectiveCatalogService } from './EffectiveCatalogService';
-import type { CatalogModelContribution } from './effectiveCatalogTypes';
-import {
-  planEffectiveModelCapabilityProbe,
-  recordEffectivePlanSuccess,
-  resolveEffectiveModel,
-} from './EffectiveModelResolver';
-import { getLoadedProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
-import { settingsService } from '../settings-core/SettingsService';
-import {
-  executeCapabilityProbe,
-  type CapabilityProbeExecution,
-} from './ProviderCapabilityProbeRuntime';
-import {
-  freezeProviderRuntimeCredentials,
-  releaseProviderRuntimeCredentials,
-} from '../provider-auth/ProviderRuntimeCredentialLease';
 const OBSERVED_ENTITLEMENT_TTL_MS = 24 * 60 * 60 * 1000;
 const PROBE_QUOTA_RETRY_MS = 60 * 1000;
-
-export type CapabilityProbeFailureKind =
-  | 'entitlement-denied'
-  | 'quota-exhausted'
-  | 'authentication-failed'
-  | 'route-unavailable'
-  | 'unknown';
-
-export function classifyCapabilityProbeFailure(
-  status: number,
-  manifestDeclaresEntitlementDenial = false,
-  detail = '',
-): CapabilityProbeFailureKind {
-  if (manifestDeclaresEntitlementDenial) return 'entitlement-denied';
-  if (status === 401) return 'authentication-failed';
-  if (status === 404) return 'route-unavailable';
-  if (status === 429) return 'quota-exhausted';
-  const normalizedDetail = detail.toLowerCase();
-  if (status === 402 && (
-    normalizedDetail.includes('quota_exceeded')
-    || normalizedDetail.includes('quota exceeded')
-    || normalizedDetail.includes('usage limit')
-    || normalizedDetail.includes('out of budget')
-  )) return 'quota-exhausted';
-  return 'unknown';
-}
-
 
 export interface ResolvedProbeTarget {
   provider: LlmProviderEntry;
@@ -106,86 +77,13 @@ function manifestDeclaresEntitlementDenial(
   )) ?? false;
 }
 
-export function buildProbeSuccessPatch(
-  request: LlmModelCapabilityProbeRequest,
-  target: ResolvedProbeTarget,
-  plan: RequestPlan,
-): CatalogModelContribution | null {
-  const availability = target.model.availability === 'unknown' ? 'available' as const : undefined;
-  if (request.mode === 'fast' && target.model.controls.fast.state === 'selectable') {
-    return {
-      modelId: target.model.modelId,
-      ...(availability ? { availability } : {}),
-      controls: { fast: { ...target.model.controls.fast, entitlement: 'granted' } },
-      executionBindings: target.model.executionBindings?.map((binding) => (
-        plan.appliedBindingIds.includes(binding.id)
-          ? { ...binding, entitlement: 'granted' }
-          : binding
-      )),
-    };
-  }
-  if (request.mode === 'max-context') {
-    return {
-      modelId: target.model.modelId,
-      ...(availability ? { availability } : {}),
-      controls: target.model.controls.maxContext.state === 'selectable'
-        ? { maxContext: { ...target.model.controls.maxContext, entitlement: 'granted' } }
-        : undefined,
-      contextTiers: target.model.contextTiers.map((tier) => (
-        tier.id === plan.activeTierId ? { ...tier, entitlement: 'granted' } : tier
-      )),
-      executionBindings: target.model.executionBindings?.map((binding) => (
-        plan.appliedBindingIds.includes(binding.id)
-          ? { ...binding, entitlement: 'granted' }
-          : binding
-      )),
-    };
-  }
-  return availability ? { modelId: target.model.modelId, availability } : null;
-}
-
-export function buildProbeFailurePatch(
-  request: LlmModelCapabilityProbeRequest,
-  target: ResolvedProbeTarget,
-  plan: RequestPlan,
-  status: number,
-  manifestMatchesDenial = false,
-): CatalogModelContribution | null {
-  const kind = classifyCapabilityProbeFailure(status, manifestMatchesDenial);
-  if (request.mode === 'max-context' && kind === 'entitlement-denied') {
-    return {
-      modelId: target.model.modelId,
-      controls: target.model.controls.maxContext.state === 'selectable'
-        ? { maxContext: { ...target.model.controls.maxContext, entitlement: 'denied' } }
-        : undefined,
-      contextTiers: [{ id: plan.activeTierId, entitlement: 'denied' }],
-      executionBindings: target.model.executionBindings?.map((binding) => (
-        plan.appliedBindingIds.includes(binding.id)
-          ? { ...binding, entitlement: 'denied' }
-          : binding
-      )),
-    };
-  }
-  if (request.mode === 'fast' && kind === 'entitlement-denied'
-    && target.model.controls.fast.state === 'selectable') {
-    return {
-      modelId: target.model.modelId,
-      controls: { fast: { ...target.model.controls.fast, entitlement: 'denied' } },
-      executionBindings: target.model.executionBindings?.map((binding) => (
-        plan.appliedBindingIds.includes(binding.id)
-          ? { ...binding, entitlement: 'denied' }
-          : binding
-      )),
-    };
-  }
-  return null;
-}
-
 const productionDependencies: ProviderCapabilityProbeDependencies = {
   resolve: (request) => {
     const settings = settingsService.getAll();
     const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
-    const model = resolveEffectiveModel(request.providerId, request.modelId, settings);
+    const model = resolveEffectiveCatalog(request.providerId, settings)?.models.find(candidate =>
+      candidate.selection?.pickerVisibility !== 'internal'
+      && (candidate.modelId === request.modelId || candidate.aliases.includes(request.modelId)));
     return provider && provider.isConfigured && model ? { provider, model } : null;
   },
   plan: (request, controls) => planEffectiveModelCapabilityProbe({
@@ -203,7 +101,6 @@ const productionDependencies: ProviderCapabilityProbeDependencies = {
       'capability-probe', target.model.modelId, request.mode, plan.route.protocol,
       plan.appliedBindingIds.join(',') || 'default',
     ].join(':');
-    recordEffectivePlanSuccess(request.providerId, request.modelId, settingsService.getAll(), plan);
     const patch = buildProbeSuccessPatch(request, target, plan);
     if (patch) {
       effectiveCatalogService.recordObserved(
@@ -211,6 +108,7 @@ const productionDependencies: ProviderCapabilityProbeDependencies = {
         evidenceId,
         [patch],
         'Explicit model capability probe succeeded',
+        OBSERVED_ENTITLEMENT_TTL_MS,
       );
     }
   },
@@ -265,6 +163,9 @@ function probeEvidence(
     protocol: plan.route.protocol,
     effectiveModelId: plan.effectiveModelId || target.model.modelId,
     observedAt: new Date().toISOString(),
+    observedModelId: message.execution?.modelId,
+    requestedServiceTier: typeof plan.bodyPatch.service_tier === 'string' ? plan.bodyPatch.service_tier : undefined,
+    serviceTier: message.execution?.serviceTier,
     usage: {
       inputTokens: message.usage.inputTokens,
       outputTokens: message.usage.outputTokens,
@@ -274,79 +175,90 @@ function probeEvidence(
   };
 }
 
+function targetFingerprint(target: ResolvedProbeTarget | null): string {
+  if (!target) return '';
+  return JSON.stringify([target.provider.activeAccountId, target.provider.secretRef, target.provider.connectionValues,
+    target.provider.protocol, target.provider.baseUrl, target.provider.enabled, target.provider.isConfigured,
+    target.model.routeRevision, target.model.catalogRevision, target.model.enabled]);
+}
+
 export class ProviderCapabilityProbeService {
+  private active = false;
   constructor(private readonly dependencies = productionDependencies) {}
 
-  async test(request: LlmModelCapabilityProbeRequest): Promise<LlmModelCapabilityProbeResult> {
+  async test(request: LlmModelCapabilityProbeRequest, callerSignal?: AbortSignal): Promise<LlmModelCapabilityProbeResult> {
+    if (this.active) return { success: false, status: 'failed', requestSent: false, detail: 'A capability request is already running.' };
+    this.active = true;
+    const timeout = new AbortController();
+    const timer = setTimeout(() => timeout.abort(new Error('Capability request timed out after 60s.')), 60_000);
+    const signal = callerSignal ? AbortSignal.any([callerSignal, timeout.signal]) : timeout.signal;
+    try { return await this.run(request, signal); }
+    finally { clearTimeout(timer); this.active = false; }
+  }
+
+  private async run(request: LlmModelCapabilityProbeRequest, signal: AbortSignal): Promise<LlmModelCapabilityProbeResult> {
     const target = this.dependencies.resolve(request);
-    if (!target || target.model.availability === 'unavailable' || !target.model.enabled) {
+    if (!target || (target.model.availability === 'unavailable' && !isProbeAvailabilityDenied(target.model)) || !target.model.enabled) {
       return { success: false, status: 'failed', requestSent: false, detail: 'Model is not configured and available.' };
     }
-    const choices = resolveContextTierChoices(target.model);
-    if (request.mode === 'max-context') {
-      if (!choices.maxTier) {
-        return { success: false, status: 'denied', requestSent: false, detail: 'No selectable Max mode.' };
-      }
+    const fingerprint = targetFingerprint(target);
+    const wantsMax = request.mode === 'max-context' || request.mode === 'fast-max-context';
+    const wantsFast = request.mode === 'fast' || request.mode === 'fast-max-context';
+    if (wantsMax && !('tierId' in target.model.controls.maxContext)) {
+      return { success: false, status: 'denied', requestSent: false, detail: 'No selectable Max mode.' };
     }
-    if (request.mode === 'fast' && target.model.controls.fast.state !== 'selectable') {
+    if (wantsFast && target.model.controls.fast.state !== 'selectable') {
       return { success: false, status: 'denied', requestSent: false, detail: 'Fast activation is not selectable.' };
     }
-
-    const controls = {
-      reasoningLevel: target.model.controls.reasoning.supportsOff
-        ? 'off' as const
-        : target.model.controls.reasoning.defaultSelection,
-      maxContextMode: request.mode === 'max-context',
-      fastModel: request.mode === 'fast',
-    };
-    const planning = this.dependencies.plan(request, controls);
-    if (!planning.ok) {
-      return { success: false, status: 'failed', requestSent: false, detail: planning.message };
-    }
-    if ((request.mode === 'max-context' && !planning.controls.maxContextMode)
-      || (request.mode === 'fast' && !planning.controls.fastModel)) {
+    const reasoning = target.model.controls.reasoning;
+    const planning = this.dependencies.plan(request, {
+      reasoningLevel: reasoning.supportsOff ? 'off' : reasoning.levels[0] ?? reasoning.defaultSelection,
+      maxContextMode: wantsMax,
+      fastModel: wantsFast,
+    });
+    if (!planning.ok) return { success: false, status: 'failed', requestSent: false, detail: planning.message };
+    if ((wantsMax && !planning.controls.maxContextMode) || (wantsFast && !planning.controls.fastModel)) {
       return { success: false, status: 'denied', requestSent: false, detail: 'The active model constraints rejected this mode.' };
     }
 
     let credentialHandle: string | undefined;
+    let requestSent = false;
     try {
+      signal.throwIfAborted();
       credentialHandle = await this.dependencies.freezeCredentials(request.providerId);
-    } catch (error) {
-      return {
-        success: false,
-        status: 'failed',
-        requestSent: false,
-        detail: errorDetail(error),
-      };
-    }
-
-    try {
-      const message = await this.dependencies.execute({ request, ...target, plan: planning.plan, credentialHandle });
-      const evidence = probeEvidence(target, planning.plan, message);
-      if (request.mode === 'fast' && message.usage.speed !== 'fast') {
-        return {
-          success: false,
-          status: 'inconclusive',
-          requestSent: true,
-          detail: 'Provider did not confirm usage.speed=fast for this request.',
-          evidence,
-        };
+      signal.throwIfAborted();
+      if (fingerprint !== targetFingerprint(this.dependencies.resolve(request))) {
+        return { success: false, status: 'inconclusive', requestSent, detail: 'Provider configuration changed before dispatch.' };
       }
+      requestSent = true;
+      const message = await this.dependencies.execute({ request, ...target, plan: planning.plan, credentialHandle, signal });
+      const evidence = probeEvidence(target, planning.plan, message);
+      signal.throwIfAborted();
+      if (fingerprint !== targetFingerprint(this.dependencies.resolve(request))) {
+        return { success: false, status: 'inconclusive', requestSent, evidence, detail: 'Provider configuration changed; result discarded.' };
+      }
+      const issue = probeConfirmation(request, target, planning.plan, message);
+      if (issue) return { success: false, status: 'inconclusive', requestSent, ...issue, evidence };
       this.dependencies.recordSuccess(request, target, planning.plan);
-      return { success: true, status: 'verified', requestSent: true, evidence };
+      return { success: true, status: 'verified', requestSent, evidence };
     } catch (error) {
+      if (signal.aborted) {
+        return { success: false, status: signal.reason?.name === 'AbortError' ? 'cancelled' : 'failed', requestSent,
+          detail: signal.reason instanceof Error ? signal.reason.message : 'Capability request cancelled.' };
+      }
       const status = statusFromError(error);
       const detail = errorDetail(error);
-      const recorded = status !== undefined
+      const current = fingerprint === targetFingerprint(this.dependencies.resolve(request));
+      const recorded = current && requestSent && status !== undefined
         && this.dependencies.recordFailure(request, target, planning.plan, status, detail);
       return {
-        success: false,
-        status: recorded ? 'denied' : 'failed',
-        requestSent: true,
+        success: false, status: recorded ? 'denied' : 'failed', requestSent,
+        ...(recorded ? { failureKind: 'entitlement-denied' as const } : status
+          ? { failureKind: classifyCapabilityProbeFailure(status, false, detail) as LlmModelCapabilityProbeResult['failureKind'] } : {}),
         detail: recorded ? 'Not available for current account.' : detail,
       };
     } finally {
-      this.dependencies.releaseCredentials(credentialHandle);
+      if (credentialHandle) this.dependencies.releaseCredentials(credentialHandle);
     }
   }
 }

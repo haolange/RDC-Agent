@@ -70,19 +70,22 @@ export function contextTierBudgetTokens(tier: ContextTier, requestedBudget: numb
 
 /**
  * Distinct Max tier: the control-pointed tier exists, is not denied, both sides have
- * numeric windows, and the Max window is strictly larger than the normal tier.
+ * numeric windows, and Max increases the full window or the normal input budget.
  * A single always-on tier may still serve both modes when the control points at it.
  */
 export function isEligibleMaxContextTier(
   maxTier: ContextTier,
   normalTier: ContextTier,
+  normalBudgetTokens?: number,
 ): boolean {
   if (maxTier.entitlement === 'denied') return false;
   const maxWindow = contextTierWindowTokens(maxTier);
   const normalWindow = contextTierWindowTokens(normalTier);
   if (maxWindow === undefined || normalWindow === undefined) return false;
   if (maxTier.id === normalTier.id) return true;
-  return maxWindow > normalWindow;
+  const normalBudget = normalBudgetTokens && normalBudgetTokens > 0
+    ? Math.min(normalBudgetTokens, contextTierPromptCap(normalTier) ?? normalWindow) : normalWindow;
+  return maxWindow > normalWindow || (contextTierPromptCap(maxTier) ?? maxWindow) > normalBudget;
 }
 
 function highestTier(tiers: ContextTier[], sourceOrder: Map<string, number>): ContextTier | undefined {
@@ -100,12 +103,13 @@ function highestTier(tiers: ContextTier[], sourceOrder: Map<string, number>): Co
 
 /**
  * Resolves normal and explicit Max modes. A distinct Max tier must have a numeric
- * window strictly larger than the normal tier. A control may also point at the
+ * window/input budget larger than the normal tier budget. A control may also point at the
  * sole/normal tier for always-on Max.
  */
 export function resolveContextTierChoices(
   model: {
     contextTiers: readonly ContextTier[];
+    defaultBudgetTokens?: number;
     controls: Pick<EffectiveModel['controls'], 'maxContext'>;
   },
 ): ContextTierChoices {
@@ -127,7 +131,7 @@ export function resolveContextTierChoices(
   const explicitTier = explicitTierId
     ? usable.find((tier) => tier.id === explicitTierId)
     : undefined;
-  const eligible = explicitTier && isEligibleMaxContextTier(explicitTier, normalTier)
+  const eligible = explicitTier && isEligibleMaxContextTier(explicitTier, normalTier, model.defaultBudgetTokens)
     ? [explicitTier]
     : [];
   const grantedEligible = eligible.filter((tier) => tier.entitlement === 'granted');

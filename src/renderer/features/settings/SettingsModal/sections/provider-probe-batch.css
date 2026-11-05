@@ -1,0 +1,33 @@
+.settings-provider-probe {
+  padding: var(--space-3);
+  margin-block: var(--space-3);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-panel);
+}
+
+.settings-provider-probe .settings-model-preferences-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.settings-provider-probe-results {
+  display: grid;
+  gap: var(--space-2);
+  max-height: calc(var(--control-height-md) * 8);
+  padding: var(--space-2);
+  overflow: auto;
+  list-style: none;
+}
+
+.settings-provider-probe-results li {
+  display: grid;
+  gap: var(--space-1);
+  padding-block: var(--space-2);
+  border-bottom: 1px solid var(--token-border-default);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}

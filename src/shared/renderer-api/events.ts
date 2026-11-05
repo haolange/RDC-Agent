@@ -34,6 +34,8 @@ export function createEventSubscriptionApi(transport: RendererApiTransport): Eve
         callback(payload as TraceProjectionChangedPayload)
       ))
     ),
+    onProbeBatchChanged: callback => transport.subscribe(EVENT.llm.probeBatchChanged,
+      payload => callback(payload as Parameters<typeof callback>[0])),
     onEffectiveCatalogChanged: (callback) => (
       transport.subscribe(EVENT.llm.effectiveCatalogChanged, (snapshot) => (
         callback(snapshot as Parameters<typeof callback>[0])

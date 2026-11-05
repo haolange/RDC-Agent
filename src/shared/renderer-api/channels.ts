@@ -106,6 +106,10 @@ export const RENDERER_INVOKE_CHANNEL = {
   llm: {
     testProviderDraft: 'llm:testProviderDraft',
     testModelCapability: 'llm:testModelCapability',
+    prepareProbeBatch: 'llm:prepareProbeBatch',
+    startProbeBatch: 'llm:startProbeBatch',
+    cancelProbeBatch: 'llm:cancelProbeBatch',
+    getProbeBatch: 'llm:getProbeBatch',
     connectProvider: 'llm:connectProvider',
     refreshProviderModels: 'llm:refreshProviderModels',
     disconnectProvider: 'llm:disconnectProvider',
@@ -211,6 +215,7 @@ export const RENDERER_EVENT_CHANNEL = {
   },
   llm: {
     effectiveCatalogChanged: 'llm:effectiveCatalogChanged',
+    probeBatchChanged: 'llm:probeBatchChanged',
   },
   agent: {
     statusChanged: 'agent:statusChanged',

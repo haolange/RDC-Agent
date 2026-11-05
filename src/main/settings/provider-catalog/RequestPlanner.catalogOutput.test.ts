@@ -163,7 +163,7 @@ describe('catalog output planning', () => {
   it('plans ChatGPT Account live rows that only report an input window', () => {
     const parsed = parseChatGptAccountCatalog({
       models: [{
-        slug: 'gpt-5.5',
+        slug: 'gpt-5.6-sol',
         visibility: 'list',
         supported_in_api: true,
         context_window: 272_000,
@@ -187,8 +187,8 @@ describe('catalog output planning', () => {
   });
 
   it.each([undefined, ['text'], ['text', 'image']])('preserves manifest vision through ChatGPT discovery %j', (input_modalities) => {
-    const definition = compiledCatalog.surfaces.get('chatgpt-account')!.surface.models.find((model) => model.modelId === 'gpt-5.5')!;
-    const live = parseChatGptAccountCatalog({ models: [{ slug: 'gpt-5.5', visibility: 'list', supported_in_api: true, input_modalities }] });
+    const definition = compiledCatalog.surfaces.get('chatgpt-account')!.surface.models.find((model) => model.modelId === 'gpt-5.6-sol')!;
+    const live = parseChatGptAccountCatalog({ models: [{ slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true, input_modalities }] });
     const [model] = mergeModels({
       providerId: 'chatgpt-account', protocol: 'OpenAIResponses', baseUrl: definition.route.baseUrl!,
       catalog: [definition], discovery: live.contributions,
@@ -201,7 +201,7 @@ describe('catalog output planning', () => {
   it('keeps a compiled output cap when live ChatGPT rows omit max_output_tokens', () => {
     const live = parseChatGptAccountCatalog({
       models: [{
-        slug: 'gpt-5.5',
+        slug: 'gpt-5.6-sol',
         visibility: 'list',
         supported_in_api: true,
         context_window: 272_000,
@@ -212,7 +212,7 @@ describe('catalog output planning', () => {
       protocol: 'OpenAIResponses',
       baseUrl: 'https://chatgpt.com/backend-api/codex',
       catalog: [{
-        modelId: 'gpt-5.5',
+        modelId: 'gpt-5.6-sol',
         availability: 'available',
         contextTiers: [{
           id: 'default',

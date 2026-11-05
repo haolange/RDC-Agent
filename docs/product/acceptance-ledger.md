@@ -4436,3 +4436,22 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 实际验收：官方launcher加载最终构建与真实User资源，点击产品Close正常退出后三条登记由产品回收为空；desktop-final.log无RDC_CLOSE_FAILED/harvest failed。窗口、主进程与实例锁退出，未手工删除登记文件。根因与回执集中在 `.local/rdc-shutdown/acceptance.json`。本轮临时pytest依赖和重复构建日志验收后清理；保留最小证据，不清用户其他历史资源。两库已有联动改动一并按本轮上传授权提交、推送，不创建分支或发布发行包。
 
 - 上传收口：RDC-Tool `ef5b314` 已推送 main，先快进吸收远端两次不重叠提交；RDC-Agent 将本轮退出修复与此前已验收的联动/UI诊断改动一并提交。自建进程和实例锁复查通过，临时pytest依赖已删除；没有触碰其他会话或用户历史输入。
+
+
+## 2026-11-05 — Provider 能力探测与 GPT-6.1 Terra（provider-capability-20261105）
+
+- **源码与证据：**当前 main 工作树，未提交/推送；本轮代码 hash、初扫结果、最终聚焦复验、目录回读与清理回执集中在 `.local/provider-capability/receipt.json`，任务收口见同目录 `TASKS.md`。真实调用使用 canonical UserSpace 的既有凭据及受限 Browser Bridge，Full access 关闭；无凭据复制或明文落盘。界面 QA 使用独立 disposable profile，不将空环境 UI 验收冒充真实账号资格。
+- **窗口裁决：**官方 Codex `ModelInfo.max_context_window` 是配置覆盖允许的窗口 cap，`with_config_overrides` 对其取 min；effective headroom 与自动压缩另算。没有来源证明 872000 是 1000000−128000 的输入预留，亦不以 API 1.05M 替换 OAuth 上限。本库显式保存完整窗口/输入上限/输出 ceiling，输出按实际剩余窗口限制，压缩继续按输入预算和独立百分比计算。应用账号目录 client_version=1.0.0 与本地 Codex 0.166.0 缓存给出的默认窗口有差异，执行采用应用当前账号目录，不能由缓存覆盖；本轮账号 Max 仍为 872000。OpenAI 选择此服务数值的产品原因未建立，不声称已证明 1M 长输入可运行。
+- **模型与能力：**Terra 精确 ID 已进入 ChatGPT OAuth manifest、推荐列表和有效目录，默认及 Max 最小请求成功；Max 资格由当前账号明确窗口佐证。Fast 按服务端 speed、priority tier 或目标 model 的实际 binding 验证，不使用请求值伪造回执。Kimi 正常输入预算低于目录容量时，Max 按实际预算提升判断；固定 Max 与显式观察到的默认窗口资格同步。
+- **真实结果：**初扫覆盖四个已配置 Provider 的 25 个公开目录条目（包含目录中尚不可执行的基线项），计划 50 个请求项，实际发送 40 次；失败修正后仅复核失败路径 14 次，共 54 次。初扫 25 项 verified，34 个响应回报合计 7900 tokens，其余 20 个错误响应无用量，不将其计为零成本。ChatGPT 八款当前模型的默认/Max 已验证，八次 Fast 请求冻结为 priority，响应均明确回报 default，实际 Fast 执行保持 inconclusive；Grok 4.7 默认/Max/Fast/组合通过，4.6 默认/Max 通过，4.5 默认通过、Max 最小输出截断为 inconclusive。DeepSeek 两款模型返回余额不足；最终复验将其归类 quota，未改成不支持。Kimi K3/K3.1 当前套餐明确拒绝，最终目录为 unavailable/可选 Max denied；Kimi for Coding 固定 Max 为 granted、Fast 为当前账号 denied；K3 256K 默认请求通过。非当前可执行的 Grok 基线项在 preflight 停止，无模型请求。
+- **验证：**最终 Node 3464 passed/4 skipped，Renderer 856 passed；受影响目录/规划/探测/adapter/UI 测试通过。typecheck、lint（0 errors；仓库既有 import-order warnings）、gates、build、coverage ratchet 通过。disposable Browser QA 验证中文深色、英文浅色、480px 窄屏、准备清单与取消；没有用 UI 空清单取代真实调用回执。初轮 sandbox 的祖先路径 realpath 限制和并发超时通过本轮 workspace TEMP/TMP 与有限 worker 解决，没有修改生产路径安全检查。
+- **收尾：**本轮两个 disposable profile、workspace test-temp、coverage 报告已清理；自有 main 已退出，canonical instance.lock 的 owner 经独立进程核验后移除，桌面启动权已交还。仅保留最小脱敏回执/Task 与产品真实请求审计，当前 build/依赖保持可用。未打包发布、未操作 capture 或设备。
+
+### 2026-11-05 ChatGPT Fast 与 Grok 订阅目录复核
+
+- **ChatGPT 真实执行：**同一 UserSpace 的 Terra 默认档正常结束，服务端回报 `default`，31 input + 5 output tokens。Fast 请求冻结并发送 `service_tier: priority`，服务端仍回报 `default`，31 input + 5 output tokens。回执显示「本次按标准档处理」，保留 Fast 可选资格。Codex 与 Hermes 上游均支持请求 Priority，Codex 源码存在 Responses WebSocket 与 HTTP 回退，现有证据无法把载体差异定为回落原因。未取得同一账号从 Codex 或 Hermes 返回的实际档位回执。[Codex Fast](https://learn.chatgpt.com/docs/agent-configuration/speed) · [Codex 请求路径](https://github.com/openai/codex/blob/main/codex-rs/core/src/client.rs) · [Hermes 订阅 Fast](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/configuring-models.md#subscription-speed-and-extended-context)
+- **退役清理：**ChatGPT OAuth `gpt-5.5` 从活动 manifest、推荐、实时发现及旧缓存投影移除。真实目录刷新与 Settings 均无该项。保留历史会话模型记录。独立 API 同名型号经目录回归确认仍可解析。[OpenAI 退役公告](https://learn.chatgpt.com/docs/changelog?date=2026-10-15#gpt-55-retirement-in-codex)
+- **Grok 真实目录：**4.7、4.6、4.5 可用，`grok-4.7-build-fast` 保持内部目标。三个 `4.20-0309` 变体、`grok-4.3`、`grok-build-0.1`、`grok-composer-2.5-fast` 均未列于完整目录，显示原因并由批量计划跳过。Grok 4.5 Max 聚焦复验正常完成，实际回报 `grok-4.5-build`，230 input + 42 output tokens，扩窗资格仍由账号目录证明。
+- **计量与验证：**本轮 3 次模型请求共 344 tokens（292 input + 52 output）。批量只准备并取消，未派发整个清单。Node 3470 passed / 4 skipped，typecheck、lint（0 errors）、覆盖率 ratchet、gates、正式构建通过。首次 coverage 的临时目录祖先路径受 sandbox 限制，使用工作区 TEMP/TMP 和有限 worker 重跑通过。逐项脱敏回执见 `.local/provider-capability/followup-receipt.json`。
+- **界面与清理：**真实 Settings 触发 Terra 默认与 Fast，Grok 4.3 显示不可用及目录缺席原因。最终档位文案用真实翻译函数覆盖英文和中文，Renderer 全量 856 项通过后新增两项文案回归通过。Composer 有过滤与投影测试证据，真实 Browser 启动页无活跃 Composer，未完成该入口的现场复核。隔离 Browser 冒烟的 bootstrap、同源、授权和 IPC 断言通过，脚本在 Windows 自动删除隔离 profile 时遇到 EPERM；已在核对路径后删除该 profile、coverage、脚本和日志。QA 进程已停止，端口关闭，canonical 启动锁不存在。
+- **Fast 回执更正：**上述现场界面曾显示「本次按标准档处理」。Codex 维护者说明 ChatGPT 登录的 Codex 路由中，终态 `service_tier=default` 无法可靠判定 Fast 实际状态，因此现已改为显示服务端回报及实际 Fast 状态未确认。公开 API 的档位说明和订阅路由分别适用。来源 https://github.com/openai/codex/issues/14204

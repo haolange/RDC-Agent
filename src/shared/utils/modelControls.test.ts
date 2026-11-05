@@ -245,3 +245,14 @@ describe('resolveModelControls', () => {
       .toBe('fast+1m');
   });
 });
+
+
+it('uses the normal input budget consistently with context tier selection', () => {
+  const m = model({ contextTiers: [
+    { id: 'default', label: 'Default', maxPromptTokens: 1048576, activation: { kind: 'implicit' }, entitlement: 'granted' },
+    { id: 'max', label: 'Max', maxPromptTokens: 1000000, activation: { kind: 'implicit' }, entitlement: 'granted' },
+  ], controls: { ...model().controls, maxContext: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'max' } } });
+  const result = resolveModelControls(m, { maxContextMode: true });
+  expect(result.controls.maxContextMode).toBe(true);
+  expect(result.error).toBeUndefined();
+});

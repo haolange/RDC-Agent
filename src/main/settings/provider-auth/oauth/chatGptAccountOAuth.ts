@@ -1,3 +1,4 @@
+import { loadProviderSurface } from '../../../provider-catalog/ProviderCatalogRegistry';
 import { randomUUID } from 'crypto';
 import { createServer } from 'http';
 import type { LlmProviderModel } from '@shared/types/settings';
@@ -100,7 +101,7 @@ export async function discoverChatGptCatalog(bundle: OAuthSecretBundle): Promise
       },
     },
   );
-  const parsed = parseChatGptAccountCatalog(payload);
+  const parsed = parseChatGptAccountCatalog(payload, await loadProviderSurface('chatgpt-account') ?? undefined);
   if (parsed.models.length > 0) return parsed;
   throw new Error('ChatGPT Codex catalog returned no agent-routable models.');
 }

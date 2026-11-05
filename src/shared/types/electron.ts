@@ -1,3 +1,4 @@
+import type { ProviderProbeBatch, ProviderProbeBatchRequest } from './providerProbe';
 import type { RendererEventChannel } from '../renderer-api/channels';
 import type { CaptureReplayState, CaptureReplayApplyRequest } from './captureReplay';
 import type {
@@ -362,6 +363,10 @@ export interface ElectronAPI {
   };
 
   llm: {
+    prepareProbeBatch: (request: ProviderProbeBatchRequest) => Promise<ProviderProbeBatch>;
+    startProbeBatch: (runId: string) => Promise<ProviderProbeBatch>;
+    cancelProbeBatch: (runId: string) => Promise<ProviderProbeBatch | null>;
+    getProbeBatch: () => Promise<ProviderProbeBatch | null>;
     testProviderDraft: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
     testModelCapability: (request: LlmModelCapabilityProbeRequest) => Promise<LlmModelCapabilityProbeResult>;
     connectProvider: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
@@ -557,6 +562,7 @@ export interface ElectronAPI {
     ) => () => void;
     onTraceProjectionChanged: (callback: (payload: TraceProjectionChangedPayload) => void) => () => void;
     onDelegationTraceChanged: (callback: (payload: { sessionId: string; parentToolCallId: string; revision: number }) => void) => () => void;
+    onProbeBatchChanged: (callback: (batch: ProviderProbeBatch) => void) => () => void;
     onEffectiveCatalogChanged: (callback: (snapshot: EffectiveCatalogSnapshot) => void) => () => void;
     onPlanReviewChanged: (callback: (projection: PlanReviewProjection) => void) => () => void;
     onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;

@@ -1,3 +1,4 @@
+import { buildProbeFailurePatch, buildProbeSuccessPatch, classifyCapabilityProbeFailure } from './ProviderProbeEvidence';
 import { describe, expect, it, vi } from 'vitest';
 import type { EffectiveModel, RequestPlan, RequestPlanningResult } from '@shared/types/providerCapability';
 import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implementationRegistry';
@@ -5,9 +6,6 @@ import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import type { LlmModelCapabilityProbeRequest, LlmProviderEntry } from '@shared/types/settings';
 import type { AssistantMessage } from '../../agent-runtime/core/types';
 import {
-  buildProbeFailurePatch,
-  buildProbeSuccessPatch,
-  classifyCapabilityProbeFailure,
   ProviderCapabilityProbeService,
   type ProviderCapabilityProbeDependencies,
   type ResolvedProbeTarget,
@@ -75,7 +73,8 @@ function plan(
     headers: request.mode === 'max-context' && maxTier.activation.kind === 'header'
       ? maxTier.activation.headers
       : {},
-    bodyPatch: {},
+    bodyPatch: request.mode === 'fast' && effectiveModel.executionBindings?.[0]?.actions[0]?.kind === 'request-patch'
+      ? effectiveModel.executionBindings[0].actions[0].patch : {},
     contextBudgetTokens: request.mode === 'max-context'
       ? Math.min(1_000_000, maxTier.maxPromptTokens ?? effectiveModel.defaultBudgetTokens)
       : effectiveModel.defaultBudgetTokens,
@@ -168,7 +167,7 @@ describe('ProviderCapabilityProbeService', () => {
       success: false,
       status: 'inconclusive',
       requestSent: true,
-      detail: expect.stringContaining('usage.speed=fast'),
+      detail: expect.stringContaining('selected Fast speed or target model'),
       evidence: { usage: { totalTokens: 4 } },
     });
     expect(fixture.recordSuccess).not.toHaveBeenCalled();
@@ -218,7 +217,7 @@ describe('ProviderCapabilityProbeService', () => {
     const service = new ProviderCapabilityProbeService(fixture.value);
 
     await expect(service.test({ providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' })).resolves.toMatchObject({
-      success: true, status: 'verified', requestSent: true,
+      success: false, status: 'inconclusive', requestSent: true,
     });
     expect(fixture.execute).toHaveBeenCalledOnce();
   });
@@ -352,4 +351,110 @@ describe('ProviderCapabilityProbeService', () => {
     expect(fixture.recordFailure).toHaveBeenCalledWith(request, fixture.resolved, expect.any(Object), 429, 'HTTP 429');
     expect(buildProbeFailurePatch(request, fixture.resolved, plan(request, effectiveModel).plan, 429)).toBeNull();
   });
+});
+
+
+describe('capability evidence and lifecycle', () => {
+  it.each([
+    ['default', 'fast-tier-default'],
+    [undefined, 'fast-tier-missing'],
+    ['flex', 'fast-tier-other'],
+  ] as const)('keeps requested priority distinct from the returned tier %s', async (serviceTier, detailCode) => {
+    const m = model();
+    m.controls.fast = { state: 'selectable', defaultValue: false, entitlement: 'granted' };
+    m.executionBindings = [{
+      id: 'fast', when: { fast: true }, entitlement: 'granted',
+      actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
+    }];
+    const f = dependencies(m);
+    const response = await f.execute();
+    f.execute.mockResolvedValue({ ...response, execution: { serviceTier } });
+    await expect(new ProviderCapabilityProbeService(f.value).test({ providerId: 'provider-a', modelId: 'model-a', mode: 'fast' }))
+      .resolves.toMatchObject({
+        status: 'inconclusive', detailCode, requestSent: true,
+        evidence: { requestedServiceTier: 'priority', serviceTier },
+      });
+    expect(f.recordSuccess).not.toHaveBeenCalled();
+    expect(f.recordFailure).not.toHaveBeenCalled();
+  });
+
+  it.each(['priority', 'target'] as const)('uses the %s binding response instead of Anthropic-only speed', async kind => {
+    const m = model();
+    m.controls.fast = { state: 'selectable', defaultValue: false, entitlement: 'unknown' };
+    m.executionBindings = [{ id: 'fast', when: { fast: true }, entitlement: 'unknown', actions: kind === 'priority'
+      ? [{ kind: 'request-patch', patch: { service_tier: 'priority' } }]
+      : [{ kind: 'model-switch', targetModelId: 'fast-target' }] }];
+    const f = dependencies(m);
+    const response = await f.execute();
+    f.execute.mockResolvedValue({ ...response, execution: kind === 'priority' ? { serviceTier: 'priority' } : { modelId: 'fast-target' } });
+    f.execute.mockClear();
+    await expect(new ProviderCapabilityProbeService(f.value).test({ providerId: 'provider-a', modelId: 'model-a', mode: 'fast' }))
+      .resolves.toMatchObject({ success: true, status: 'verified' });
+    expect(f.execute).toHaveBeenCalledOnce();
+  });
+
+  it.each(['length', 'refusal', 'toolUse'] as const)('never grants a capability on %s termination', async stopReason => {
+    const f = dependencies(model());
+    const response = await f.execute();
+    f.execute.mockResolvedValue({ ...response, stopReason });
+    await expect(new ProviderCapabilityProbeService(f.value).test({ providerId: 'provider-a', modelId: 'model-a', mode: 'default' }))
+      .resolves.toMatchObject({ success: false, status: 'inconclusive' });
+    expect(f.recordSuccess).not.toHaveBeenCalled();
+  });
+
+  it('discards late success and releases the lease after cancellation settles', async () => {
+    const f = dependencies(model());
+    const response = await f.execute();
+    let finish!: (value: AssistantMessage) => void;
+    f.execute.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const controller = new AbortController();
+    const pending = new ProviderCapabilityProbeService(f.value).test({ providerId: 'provider-a', modelId: 'model-a', mode: 'default' }, controller.signal);
+    await Promise.resolve();
+    controller.abort();
+    expect(f.releaseCredentials).not.toHaveBeenCalled();
+    finish(response);
+    await expect(pending).resolves.toMatchObject({ status: 'cancelled', success: false });
+    expect(f.releaseCredentials).toHaveBeenCalledOnce();
+    expect(f.recordSuccess).not.toHaveBeenCalled();
+  });
+
+  it('discards success belonging to a changed account', async () => {
+    const f = dependencies(model());
+    const response = await f.execute();
+    f.execute.mockImplementation(async () => {
+      f.resolved.provider = { ...f.resolved.provider, activeAccountId: 'new-account' };
+      return response;
+    });
+    await expect(new ProviderCapabilityProbeService(f.value).test({ providerId: 'provider-a', modelId: 'model-a', mode: 'default' }))
+      .resolves.toMatchObject({ status: 'inconclusive', detail: expect.stringContaining('configuration changed') });
+    expect(f.recordSuccess).not.toHaveBeenCalled();
+  });
+});
+
+
+it('classifies explicit insufficient balance as quota without inventing subscription denial', () => {
+  expect(classifyCapabilityProbeFailure(402, false, 'Insufficient Balance (insufficient_balance_error)')).toBe('quota-exhausted');
+  expect(classifyCapabilityProbeFailure(402, false, 'payment required')).toBe('unknown');
+});
+
+it('records an explicit model subscription denial without downgrading structural capabilities', () => {
+  const t = target(model());
+  const request = { providerId: 'provider-a', modelId: 'model-a', mode: 'default' } as const;
+  expect(buildProbeFailurePatch(request, t, plan(request, t.model).plan, 403, true)).toMatchObject({
+    availability: 'unavailable', factSource: { sourceRevision: 'capability-probe:availability-denied' },
+  });
+  expect(buildProbeFailurePatch(request, t, plan(request, t.model).plan, 403, false)).toBeNull();
+});
+
+
+it('allows an explicit retry of an account-scoped probe denial while keeping ordinary unavailable models closed', async () => {
+  const denied = model({ availability: 'unavailable', provenance: [{ field: 'availability', source: 'observed',
+    observedAt: '2026-11-05', sourceRevision: 'capability-probe:availability-denied' }] });
+  const f = dependencies(denied);
+  const request = { providerId: 'provider-a', modelId: 'model-a', mode: 'default' } as const;
+  await expect(new ProviderCapabilityProbeService(f.value).test(request)).resolves.toMatchObject({ success: true });
+  expect(buildProbeSuccessPatch(request, f.resolved, plan(request, denied).plan)).toMatchObject({ availability: 'available' });
+  const ordinary = dependencies(model({ availability: 'unavailable' }));
+  await expect(new ProviderCapabilityProbeService(ordinary.value).test(request)).resolves.toMatchObject({ requestSent: false });
+  expect(ordinary.execute).not.toHaveBeenCalled();
 });

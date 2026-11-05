@@ -469,7 +469,7 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
         defaultBudgetTokens: 272000,
         contextTiers: expect.arrayContaining([
           expect.objectContaining({ id: 'default', maxPromptTokens: 272000, entitlement: 'granted' }),
-          expect.objectContaining({ id: 'max', maxPromptTokens: 1000000, entitlement: 'unknown' }),
+          expect.objectContaining({ id: 'max', maxPromptTokens: 1000000, maxTotalTokens: 1000000, entitlement: 'granted' }),
         ]),
       }),
     ]);

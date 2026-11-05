@@ -18,7 +18,7 @@ import type {
 import type { ReasoningControl } from '@shared/types/modelCapability';
 
 export const DISCOVERY_TTL_MS = 24 * 60 * 60 * 1000;
-export const EFFECTIVE_CATALOG_SCHEMA_VERSION = 8 as const;
+export const EFFECTIVE_CATALOG_SCHEMA_VERSION = 9 as const;
 
 export type PartialContextTier = Partial<ContextTier> & Pick<ContextTier, 'id'>;
 

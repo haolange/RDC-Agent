@@ -161,7 +161,7 @@
     }
   ],
   "discovery": {
-    "authority": "entitlement-overlay",
+    "authority": "authoritative-list",
     "strategy": {
       "kind": "custom-parser",
       "parserId": "grok-account-catalog"

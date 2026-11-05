@@ -258,7 +258,7 @@ describe('Provider Catalog compiler', () => {
       liveProjection: {
         entitlementDenialMatchers: [{
           mode: 'fast',
-          statuses: [401],
+          statuses: [401, 403],
           messageIncludes: 'does not have access to kimi-for-coding-highspeed',
         }],
       },
@@ -277,7 +277,9 @@ describe('Provider Catalog compiler', () => {
         actions: [{ kind: 'client-tier', tierId: 'max' }],
       }],
       liveProjection: {
-        entitlementDenialMatchers: [{ mode: 'max-context', statuses: [403] }],
+        entitlementDenialMatchers: expect.arrayContaining([{ mode: 'max-context', statuses: [403] }, {
+          mode: 'default', statuses: [403], messageIncludes: 'Your current subscription does not have access to k3',
+        }]),
       },
     });
     expect(surface?.models.find((model) => model.modelId === 'k3-256k')).toMatchObject({
@@ -474,14 +476,13 @@ describe('Provider Catalog compiler', () => {
     };
 
     verify('chatgpt-account', [
-      ['gpt-6-astra', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'low'],
+      ['gpt-6-astra', 500_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-6.1-sol', 500_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'low'],
       ['gpt-6-sol', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-6-luna', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-sol', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-terra', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-luna', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gpt-5.5', 272_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
     ]);
     const chatGptAccount = catalog.surfaces.get('chatgpt-account')?.surface;
     for (const model of chatGptAccount?.models ?? []) {

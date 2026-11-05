@@ -63,6 +63,12 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       models: applyDiscoveryAuthority(grok, [{ modelId: 'grok-4.7', availability: 'available' }]),
     };
     const models = mergeEffectiveCatalog(request);
+    expect(models.find(model => model.modelId === 'grok-4.3')).toMatchObject({
+      availability: 'unavailable',
+      unavailableReason: 'The last successful Grok subscription catalog did not list this model.',
+    });
+    expect(mergeEffectiveCatalog({ ...request, discovery: undefined }).find(model => model.modelId === 'grok-4.3'))
+      .toMatchObject({ availability: 'unknown' });
     const base = models.find((model) => model.modelId === 'grok-4.7')!;
     expect(planModelRequest({
       model: base, catalogModels: models, controls: { fastModel: false, maxContextMode: true },
@@ -129,21 +135,36 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
   it('loads ChatGPT controls and execution binding from the manifest', () => {
     const contribution = buildCatalogModelContribution(
       provider('chatgpt-account', 'OpenAIResponses'),
-      'gpt-5.5',
+      'gpt-6.1-terra',
     );
     expect(contribution).toMatchObject({
-      modelId: 'gpt-5.5',
-      presencePolicy: 'account-entitled',
+      modelId: 'gpt-6.1-terra',
+      presencePolicy: 'maintained',
       controls: {
         fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
-        maxContext: { state: 'unsupported', fixedValue: false },
-        reasoning: { levels: ['low', 'medium', 'high', 'xhigh'], defaultSelection: 'medium' },
+        maxContext: { state: 'selectable', entitlement: 'unknown', tierId: 'max' },
+        reasoning: { levels: ['low', 'medium', 'high', 'xhigh', 'max'], defaultSelection: 'low' },
       },
       executionBindings: [
         { id: 'route:chatgpt-codex-parameter-policy' },
         { id: 'fast:activation' },
       ],
     });
+  });
+
+  it('keeps retired ChatGPT ids out of cached discovery, evidence and preferences while preserving the API model', async () => {
+    await loadProviderSurface('openai');
+    const retired = { modelId: 'gpt-5.5', availability: 'available' as const };
+    const request = buildEffectiveCatalogRequest(provider('chatgpt-account', 'OpenAIResponses'), retired.modelId);
+    const discovery = { source: 'discovery' as const, observedAt: '2026-11-02T00:00:00.000Z', models: [retired] };
+    const models = mergeEffectiveCatalog({
+      ...request, discovery,
+      observed: { ...discovery, source: 'observed' },
+      userOverride: { ...discovery, source: 'user', models: [{ ...retired, custom: true }] },
+    });
+    expect(models.some(model => model.modelId === retired.modelId || model.aliases.includes(retired.modelId))).toBe(false);
+    const api = buildEffectiveCatalogRequest(provider('openai', 'OpenAIResponses'), retired.modelId);
+    expect(mergeEffectiveCatalog({ ...api, discovery }).some(model => model.modelId === retired.modelId)).toBe(true);
   });
 
   it('projects account-scoped structure before entitlement refresh while planning stays fail-closed', () => {
@@ -338,7 +359,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     }]);
     expect(completed).toContainEqual(expect.objectContaining({ modelId: 'gpt-5.4', availability: 'available' }));
     expect(completed).toContainEqual({
-      modelId: 'gpt-5.5',
+      modelId: 'gpt-5.6-sol',
       availability: 'unavailable',
       unavailableReason: 'This account-scoped model was absent from the authoritative provider catalog.',
     });

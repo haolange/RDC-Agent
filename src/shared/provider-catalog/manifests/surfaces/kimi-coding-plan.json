@@ -60,6 +60,16 @@
       "refreshedAt": "2026-10-25",
       "surface": "kimi-coding-plan",
       "accountScope": "surface-specific"
+    },
+    {
+      "id": "rdc-agent:kimi-probe-denials-20261105",
+      "sourceKind": "runtime-observation",
+      "sourceRevision": "User-requested minimal account capability probes@2026-11-05",
+      "observedAt": "2026-11-05",
+      "refreshedAt": "2026-11-05",
+      "surface": "kimi-coding-plan",
+      "accountScope": "current-account-only",
+      "surfaceBuild": "Explicit HTTP 403 permission_error with named model and current subscription denial; not a global structural capability change."
     }
   ],
   "defaultFactSourceId": "rdc-agent:kimi-coding-plan:0",
@@ -274,6 +284,13 @@
             "statuses": [
               403
             ]
+          },
+          {
+            "mode": "default",
+            "statuses": [
+              403
+            ],
+            "messageIncludes": "Your current subscription does not have access to k3.1-pro"
           }
         ],
         "context": {
@@ -446,6 +463,13 @@
             "statuses": [
               403
             ]
+          },
+          {
+            "mode": "default",
+            "statuses": [
+              403
+            ],
+            "messageIncludes": "Your current subscription does not have access to k3.1-pro-highspeed"
           }
         ],
         "context": {
@@ -608,7 +632,8 @@
           {
             "mode": "fast",
             "statuses": [
-              401
+              401,
+              403
             ],
             "messageIncludes": "does not have access to kimi-for-coding-highspeed"
           }
@@ -787,6 +812,13 @@
             "statuses": [
               403
             ]
+          },
+          {
+            "mode": "default",
+            "statuses": [
+              403
+            ],
+            "messageIncludes": "Your current subscription does not have access to k3"
           }
         ],
         "context": {
@@ -959,6 +991,15 @@
           "toolCalling",
           "visionInput",
           "structuredOutput"
+        ],
+        "entitlementDenialMatchers": [
+          {
+            "mode": "default",
+            "statuses": [
+              403
+            ],
+            "messageIncludes": "Your current subscription does not have access to k3-256k"
+          }
         ]
       },
       "fieldFactSourceIds": {

@@ -18,6 +18,7 @@ export interface CapabilityProbeExecution {
   model: EffectiveModel;
   plan: RequestPlan;
   credentialHandle: string;
+  signal?: AbortSignal;
 }
 
 function buildProbePromptPlan(): PromptPlan {
@@ -92,6 +93,8 @@ export async function executeCapabilityProbe(input: CapabilityProbeExecution): P
     },
     {
       requestPlan: input.plan,
+      signal: input.signal,
+      capabilityProbe: true,
       promptCache,
       credentialHandle: input.credentialHandle,
       reasoning: input.plan.reasoningWire,

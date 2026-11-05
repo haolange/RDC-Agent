@@ -81,6 +81,7 @@ interface AnthropicMessageDelta extends AnthropicEventBase {
 interface AnthropicMessageStart extends AnthropicEventBase {
   type: 'message_start';
   message: {
+    model?: string;
     id?: string;
     usage?: {
       input_tokens?: number;
@@ -219,6 +220,7 @@ export class AnthropicProvider implements ProviderStrategy {
           case 'message_start': {
             const evt = event as AnthropicMessageStart;
             responseId = evt.message.id?.trim() || responseId;
+            if (typeof evt.message.model === 'string') builder.setExecution({ modelId: evt.message.model });
             inputTokens = evt.message.usage?.input_tokens ?? inputTokens;
             outputTokens = evt.message.usage?.output_tokens ?? outputTokens;
             if (typeof evt.message.usage?.cache_read_input_tokens === 'number') {

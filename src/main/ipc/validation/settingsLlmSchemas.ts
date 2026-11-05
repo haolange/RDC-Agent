@@ -30,7 +30,7 @@ export const LlmModelCapabilityProbeArgsSchema = z.tuple([
   z.object({
     providerId: ipcNonEmptyString(200, 'providerId'),
     modelId: ipcNonEmptyString(200, 'modelId'),
-    mode: z.enum(['default', 'max-context', 'fast']),
+    mode: z.enum(['default', 'max-context', 'fast', 'fast-max-context']),
   }).strict(),
 ]);
 

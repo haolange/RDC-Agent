@@ -622,7 +622,7 @@ export interface LlmProviderConnectionResult {
   error?: string;
 }
 
-export type LlmModelCapabilityProbeMode = 'default' | 'max-context' | 'fast';
+export type LlmModelCapabilityProbeMode = 'default' | 'max-context' | 'fast' | 'fast-max-context';
 
 export interface LlmModelCapabilityProbeRequest {
   providerId: LlmProviderId;
@@ -632,13 +632,18 @@ export interface LlmModelCapabilityProbeRequest {
 
 export interface LlmModelCapabilityProbeResult {
   success: boolean;
-  status: 'verified' | 'inconclusive' | 'denied' | 'failed';
+  status: 'verified' | 'inconclusive' | 'denied' | 'failed' | 'cancelled';
+  failureKind?: 'entitlement-denied' | 'authentication-failed' | 'quota-exhausted' | 'route-unavailable' | 'unknown';
   requestSent: boolean;
   detail?: string;
+  detailCode?: 'fast-tier-default' | 'fast-tier-missing' | 'fast-tier-other';
   evidence?: {
     protocol: LlmProviderProtocol;
     effectiveModelId: string;
     observedAt: string;
+    observedModelId?: string;
+    requestedServiceTier?: string;
+    serviceTier?: string;
     usage: {
       inputTokens: number;
       outputTokens: number;

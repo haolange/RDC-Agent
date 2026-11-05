@@ -136,3 +136,13 @@ describe('resolveContextTierChoices', () => {
     })).maxTier).toBeUndefined();
   });
 });
+
+
+it('offers a larger input budget when the normal model capacity already includes the Max budget', () => {
+  const base = input([
+    tier('default', { maxPromptTokens: 1048576 }, 'granted'),
+    tier('max', { maxPromptTokens: 1000000 }, 'unknown'),
+  ], { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'max' });
+  expect(resolveContextTierChoices({ ...base, defaultBudgetTokens: 256000 }).maxTier?.id).toBe('max');
+  expect(resolveContextTierChoices({ ...base, defaultBudgetTokens: 1048576 }).maxTier).toBeUndefined();
+});

@@ -1,3 +1,4 @@
+import { ProviderProbeBatchPanel } from './ProviderProbeBatchPanel';
 import { Details } from '../../../../ui/Details';
 import { SectionHeader } from '../../../../ui/SectionHeader';
 import React, { useMemo, useState } from 'react';
@@ -95,6 +96,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
 
   return (
     <>
+      <ProviderProbeBatchPanel t={t} />
       <SearchField
         className="settings-provider-search"
         value={query}

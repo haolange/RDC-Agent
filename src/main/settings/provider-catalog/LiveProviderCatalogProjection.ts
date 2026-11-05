@@ -179,7 +179,11 @@ function projectContext(
         }
       : tier
   ));
-  if (!policy.maxTierId) return { contextTiers };
+  if (!policy.maxTierId) return {
+    contextTiers,
+    ...(model.controls.maxContext.state === 'fixed' && model.controls.maxContext.tierId === observedTier.id
+      ? { controls: { maxContext: { ...model.controls.maxContext, entitlement: 'granted' as const } } } : {}),
+  };
   const maxTier = model.contextTiers.find((tier) => tier.id === policy.maxTierId);
   if (!maxTier) return { contextTiers };
   const defaultWindow = contextTierWindowTokens(

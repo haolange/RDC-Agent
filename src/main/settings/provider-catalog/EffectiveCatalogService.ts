@@ -79,6 +79,7 @@ function catalogProjectionRevision(request: EffectiveCatalogRequest): string {
   return revisionFor({
     providerId: request.providerId,
     protocol: request.protocol ?? null,
+    discoveryAuthority: request.discoveryAuthority,
     models: request.catalog.models,
   });
 }
