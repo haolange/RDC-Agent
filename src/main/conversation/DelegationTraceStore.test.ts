@@ -154,9 +154,9 @@ it('keeps execution failure separate from final reply and rejects cross-executio
     childSessionId: 'child', executionId: 'run', generation: 2,
     invocation: '{}', status: 'running', startedAt: Date.now(),
   });
-  delegationTraceStore.finish('owner', 'failed', identity, 'failed', 'Provider failed');
+  delegationTraceStore.finish('owner', 'failed', identity, 'failed', 'Provider failed', 'MODEL_UNAVAILABLE');
   const header = delegationTraceStore.read('owner', 'failed', 0, 0).header;
-  expect(header).toMatchObject({ status: 'failed', error: 'Provider failed' });
+  expect(header).toMatchObject({ status: 'failed', error: 'Provider failed', configurationError: 'MODEL_UNAVAILABLE' });
   expect(header?.finalAvailable).toBeUndefined();
   expect(() => delegationTraceStore.readContent('owner', 'failed',
     { childSessionId: 'child', executionId: 'run', generation: 2 }, 'final', 0)).toThrow(/UNAVAILABLE/);

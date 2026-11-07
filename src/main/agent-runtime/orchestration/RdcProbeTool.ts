@@ -6,8 +6,6 @@ import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type { CLIResult } from '@shared/types/tool';
 import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
 import { parseRdcNativeResult } from '../../rdc/RdcNativeProtocol';
-import { openProbeLease, closeProbeLease } from '../../rdc/RdcProbeLifecycle';
-import type { RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { assertRdcContextLeaseOwnership, getRdcContextLease, type RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 
 const probeQueryParameters: JsonSchema = {
@@ -51,17 +49,17 @@ const probeParameters: JsonSchema = {
       properties: { action: { const: 'probe' }, args: probeQueryParameters },
     },
     {
-      type: 'object', required: ['action', 'capturePath'], additionalProperties: false,
-      properties: { action: { const: 'lease_open' }, capturePath: { type: 'string', minLength: 1 } },
+      type: 'object', required: ['action', 'inputId'], additionalProperties: false,
+      properties: { action: { const: 'capture_select' }, inputId: { type: 'string', minLength: 1, maxLength: 256 } },
     },
-    ...(['enumerate', 'doctor', 'version', 'lease_close', 'preview_status'] as const).map((action) => ({
+    ...(['enumerate', 'doctor', 'version', 'capture_restore', 'capture_recover', 'preview_status'] as const).map((action) => ({
       type: 'object', required: ['action'], additionalProperties: false,
       properties: { action: { const: action } },
     })),
   ],
   properties: {
     action: { type: 'string', enum: [...RDC_PROBE_ACTIONS] },
-    capturePath: { type: 'string', minLength: 1, description: 'Only lease_open, using a registered project capture.' },
+    inputId: { type: 'string', minLength: 1, maxLength: 256, description: 'Only capture_select, using an input frozen in the approved plan.' },
     args: probeQueryParameters,
   },
 };
@@ -70,8 +68,6 @@ export interface RdcProbeToolDeps {
   getRdcCliSettings?: () => RdcCliInvokerSettings;
   executeCli?: (command: string, args?: string[], options?: { abortSignal?: AbortSignal; settings?: RdcCliInvokerSettings; contextId?: string }) => Promise<CLIResult>;
   getLease?: (sessionId: string | null | undefined) => RdcContextLease | null;
-  openLease?: typeof openProbeLease;
-  closeLease?: typeof closeProbeLease;
 }
 function fail(error: unknown): AgentToolResult<Record<string, unknown>> {
   const message = error instanceof Error ? error.message : String(error);
@@ -85,7 +81,7 @@ export function createRdcProbeTool(
   const getLease = deps.getLease ?? getRdcContextLease;
   return {
     name: 'rdc_probe', label: 'RDC Probe',
-    description: 'Read native RDC JSON through the frozen session binding. Use only the fields for the chosen action; never send placeholders. Event list: {"action":"probe","args":{"action":"event_list"}}. Event detail: {"action":"probe","args":{"action":"event_show","eventId":"1248"}}. The owning context is supplied by the runtime; this tool never mutates capture bytes.',
+    description: 'Read native RDC JSON through the frozen session binding. Successful probe queries expose a session evidence URI/hash for explicit delegation; check truncated before treating the returned observation as complete. For an approved capture plan, the owning General may select a frozen inputId, recover a quarantined same-input failure, or restore the original capture and position. Join relevant child executions and close interrupted experiments before recovery; repeated identical failures stop. The runtime checks the owning device, permissions, identity and receipts; never supply filesystem paths or context IDs. Event list: {"action":"probe","args":{"action":"event_list"}}.',
     parameters: probeParameters,
     permissionHint: 'readonly',
     spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'system', requiresApproval: false },
@@ -102,29 +98,40 @@ export function createRdcProbeTool(
         if (!settings?.enabled || !settings.command.trim()) throw new Error('RDC_PROBE_UNCONFIGURED: no frozen native CLI binding.');
         const ownerSession = sessionId ?? context?.sessionId ?? null;
         const ownerProject = projectId ?? context?.projectId ?? null;
-        const lifecycle = input.action === 'lease_open' || input.action === 'lease_close';
-        let lease = getLease(ownerSession);
-        if (!deps.getLease && lease && !assertRdcContextLeaseOwnership({ sessionId: ownerSession, projectId: ownerProject })
-          && !(lifecycle && lease.quarantineReason && !lease.delegatedFrom)) {
+        if (input.action === 'capture_select' || input.action === 'capture_restore' || input.action === 'capture_recover') {
+          if (!ownerSession || !ownerProject || context?.sessionId !== ownerSession || context.projectId !== ownerProject
+            || context.agentId !== 'general' || context.accessCeiling !== 'full' || !context.turnId || !context.captureControl) {
+            throw new Error('RDC_CAPTURE_SCOPE_DENIED: the approved owning General turn is required.');
+          }
+          const changed = input.action === 'capture_select'
+            ? await context.captureControl.select(input.inputId!, signal)
+            : input.action === 'capture_recover' ? await context.captureControl.recover(signal)
+              : { ...await context.captureControl.restore(signal), current: undefined };
+          signal?.throwIfAborted();
+          const current = changed.current ? {
+            inputId: changed.current.inputId, contentSha256: changed.current.contentSha256,
+            deviceId: changed.current.deviceId, eventId: changed.current.native.eventId, target: changed.current.target,
+          } : null;
+          const payload = { action: input.action, changed: changed.changed, ...(changed.receipt ? { receipt: changed.receipt } : {}),
+            ...(input.action === 'capture_select' || input.action === 'capture_recover' ? { current } : {}) };
+          return { content: [{ type: 'text', text: JSON.stringify(payload) }], details: payload };
+        }
+        const lease = getLease(ownerSession);
+        if (!deps.getLease && lease && !assertRdcContextLeaseOwnership({ sessionId: ownerSession, projectId: ownerProject })) {
           throw new Error('RDC_PROBE_OWNER: control is delegated or the binding requires recovery.');
         }
-        if (lease && (lease.ownerSessionId !== ownerSession || lease.ownerProjectId !== ownerProject
-          || (input.contextId && input.contextId !== lease.contextId))) {
+        if (lease && (lease.ownerSessionId !== ownerSession || lease.ownerProjectId !== ownerProject)) {
           throw new Error('RDC_PROBE_OWNER: lease ownership/context mismatch.');
         }
-        if (lifecycle && !ownerSession) throw new Error('RDC_PROBE_SESSION_REQUIRED: lease lifecycle requires an owning session.');
-        if (input.action === 'lease_open' && (!lease || lease.quarantineReason)) {
-          if (!binding) throw new Error('RDC_PROBE_UNCONFIGURED: lifecycle needs a frozen action binding.');
-          await (deps.openLease ?? openProbeLease)(input, ownerSession!, ownerProject, binding, signal);
-          lease = getLease(ownerSession);
-        }
         const compiled = compileRdcProbe(input);
-        if ((compiled.needsContext || lifecycle) && (!lease || lease.contextId === 'default')) {
+        if (compiled.needsContext && (!lease || lease.contextId === 'default')) {
           throw new Error('RDC_PROBE_OWNER: no non-default daemon context is owned by this session.');
         }
-        if (!deps.getLease && compiled.needsContext && !lifecycle && lease) {
+        if (!deps.getLease && compiled.needsContext && lease) {
           const identity = binding?.identity;
-          if (!identity || identity.ownerSessionId !== ownerSession || identity.version !== lease.version || identity.contextId !== lease.contextId) {
+          if (!identity || identity.ownerSessionId !== ownerSession || identity.version !== lease.version || identity.contextId !== lease.contextId
+            || identity.runtimeContext?.captureFileId !== lease.runtimeContext.captureFileId
+            || identity.runtimeContext?.replaySessionId !== lease.runtimeContext.replaySessionId) {
             throw new Error('RDC_PROBE_OWNER: binding changed since prepareTurn; prepare a new turn.');
           }
         }
@@ -138,38 +145,17 @@ export function createRdcProbeTool(
         if (lease && (!current || current.version !== lease.version || current.contextId !== lease.contextId)) {
           throw new Error('RDC_PROBE_OWNER: lease changed during the call.');
         }
-        if (input.action === 'lease_close') {
-          if (!binding) throw new Error('RDC_PROBE_UNCONFIGURED: lifecycle needs a frozen action binding.');
-          await (deps.closeLease ?? closeProbeLease)(ownerSession!, ownerProject, binding as RdcTurnBinding, signal);
-        }
-        const after = getLease(ownerSession);
-        const reprepareRequired = lifecycle && !sameIdentity(binding?.identity ?? null, after);
-        const responsePayload = reprepareRequired
-          ? {
-              ...(payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : { result: payload }),
-              reprepareRequired: true,
-              message: 'RDC runtime identity changed. Prepare a new turn before any further RDC operation.',
-            }
-          : payload;
-        const text = JSON.stringify(responsePayload);
+        const text = JSON.stringify(payload);
         const stdout = truncateOutput(text, 16 * 1024);
         return {
           content: [{ type: 'text', text: stdout }],
           details: {
             action: input.action, cliAction: compiled.command, exitCode: cli.exitCode, stdout,
             truncated: stdout !== text, durationMs: cli.duration_ms,
-            reprepareRequired,
-            worldStateStamp: { sessionId: ownerSession, contextId: after?.contextId ?? null, version: after?.version ?? null },
+            worldStateStamp: { sessionId: ownerSession, contextId: current?.contextId ?? null, version: current?.version ?? null },
           },
         };
       } catch (error) { return fail(error); }
     },
   };
-}
-
-function sameIdentity(identity: RdcTurnBinding['identity'], lease: RdcContextLease | null): boolean {
-  if (!identity || !lease) return identity === null && lease === null;
-  return identity.ownerSessionId === lease.ownerSessionId
-    && identity.contextId === lease.contextId
-    && identity.version === lease.version;
 }

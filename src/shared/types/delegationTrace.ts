@@ -24,6 +24,8 @@ export interface DelegationTraceHeader {
   taskAvailable: boolean;
   invocationAvailable: boolean;
   profile: string;
+  /** Main-owned prepared request facts; absent until preparation succeeded. */
+  preparedRoute?: { providerId: string; modelId: string; reasoningLevel: string };
   mode: 'wait' | 'background';
   executionId?: string;
   generation?: number;
@@ -40,6 +42,8 @@ export interface DelegationTraceHeader {
   finalAvailable?: boolean;
   finalUnavailableReason?: string;
   error?: string;
+  /** Structured main-process request-preparation failure, never inferred from model output. */
+  configurationError?: import('./providerCapability').RequestPlanningErrorCode | 'AGENT_PROFILE_UNAVAILABLE' | 'MODEL_ROUTE_REQUIRED' | 'DELEGATION_REASONING_UNSUPPORTED';
   parentReceiptPreview?: string;
   parentReceiptAvailable?: boolean;
   latestAction?: string;

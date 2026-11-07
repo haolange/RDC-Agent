@@ -103,7 +103,7 @@ describe('structured RDC shell', () => {
     expect(mock.execute).toHaveBeenCalledOnce();
     expect(mock.execute.mock.calls[0]?.[1]?.[0]).toBe('rd.session.get_context');
     expect(mock.quarantine).toHaveBeenCalledOnce();
-    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.any(String));
+    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.any(String), expect.objectContaining({ operation: query.name, code: 'daemon_owner_unavailable' }));
     expect(mock.write).not.toHaveBeenCalled(); expect(mock.observe).not.toHaveBeenCalled();
   });
   it('records the failed native preflight rather than claiming the requested shader call ran', async () => {
@@ -207,7 +207,7 @@ describe('structured RDC shell', () => {
     mock.execute.mockResolvedValue(result);
     await expect(executeRdcShell(input, 'call', undefined, context)).rejects.toThrow();
     expect(mock.write).not.toHaveBeenCalled();
-    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.stringContaining('uncertain'));
+    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.stringContaining('uncertain'), expect.objectContaining({ operation: input.operation }));
   });
   it.each(['shader_patch_op_unsupported_for_encoding', 'shader_patch_diff_failed'])('keeps the owning lease usable after canonical %s before shader replacement', async code => {
     const replacement: RdcOperationDefinition = { ...definition, name: 'rd.shader.edit_and_replace', namespace: 'shader',
@@ -450,7 +450,7 @@ describe('structured RDC shell', () => {
       mainValidation: { preservationVerified: false, leaseState: 'quarantined' }, nativeFailure: { proof: {} },
     } });
     expect(failure.deliveryResult.details.nativeFailure.proof).not.toHaveProperty('context_preserved');
-    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.stringContaining('uncertain'));
+    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.stringContaining('uncertain'), expect.any(Object));
   });
   it('quarantines when a no-replacement error cannot be tied to the unchanged owning lease', async () => {
     const replacement: RdcOperationDefinition = { ...definition, name: 'rd.shader.edit_and_replace', namespace: 'shader',
@@ -462,7 +462,7 @@ describe('structured RDC shell', () => {
         category: 'validation', message: 'Source encoding is not safely editable',
         details: { replacement_attempted: false, context_preserved: true } } }) });
     await expect(executeRdcShell({ operation: replacement.name, args: {} }, 'edit', undefined, bound)).rejects.toThrow();
-    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.stringContaining('uncertain'));
+    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.stringContaining('uncertain'), expect.any(Object));
   });
   it('does not issue a receipt if cancelled or ownership changes while running', async () => {
     const controller = new AbortController();

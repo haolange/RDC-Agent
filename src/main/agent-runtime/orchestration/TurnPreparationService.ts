@@ -3,6 +3,10 @@ import { withRdcHostRuntimeEnv } from '../../rdc/withRdcHostRuntimeEnv';
 import { assertRdcContextLeaseOwnership } from '../../rdc/RdcRuntimeContextRegistry';
 import { assertExecutionOfferSkillCompatibility } from '../../sessions/run/handoffSkillCompatibility';
 import { approvedExecutionOfferForAgent } from '../../sessions/run/handoffSkills';
+import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
+import { approvedInvestigationContract } from '../../sessions/run/approvedInvestigationContract';
+import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
+import { approvedExecutionOfferFact } from '../prompt/PromptPlanBuilder';
 /**
  * TurnPreparationService — prepareTurnContext (compaction / cache / effectivePlan freeze).
  */
@@ -193,6 +197,16 @@ export class TurnPreparationService {
       compiledPolicy.contextCompactionPercent,
     );
     const approvedExecutionOffer = approvedExecutionOfferForAgent(input.sessionId, input.agentId);
+    const offerSegment = promptPlan.segments.find(segment => segment.id === 'runtime:approved-execution-offer');
+    if (Boolean(approvedExecutionOffer) !== Boolean(offerSegment)
+      || (approvedExecutionOffer && offerSegment?.sourceHash !== hashScopedResource(approvedExecutionOfferFact(approvedExecutionOffer)))) {
+      throw new Error('APPROVED_PLAN_CHANGED: rebuild the prompt and preparation for the current plan.');
+    }
+    const approvedExecution = approvedExecutionOffer && input.sessionId ? {
+      offer: structuredClone(approvedExecutionOffer),
+      investigation: approvedInvestigationContract(approvedExecutionOffer, planArtifactWriter.readMarkdown(input.sessionId,
+        approvedExecutionOffer.plan.uri, approvedExecutionOffer.plan.hash).markdown),
+    } : null;
     const profile = { ...input.effectiveProfile, skills: [...new Set([...input.effectiveProfile.skills, ...promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)), ...(approvedExecutionOffer?.requiredSkillIds ?? [])])] };
     const profileSkills = profile.skills;
     const resolvedSkills = resolveSkillIntersection(
@@ -461,6 +475,7 @@ export class TurnPreparationService {
         credentialHandle: input.credentialHandle,
         promptCache,
         effectivePlan,
+        approvedExecution,
       },
     };
     } catch (error) {

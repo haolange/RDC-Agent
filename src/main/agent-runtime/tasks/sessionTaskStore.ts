@@ -11,6 +11,7 @@ import * as path from 'path';
 import { appPathService } from '../../runtime/AppPathService';
 import { isTransientScopeId } from '@shared/utils/executionScope';
 import { FileTaskStore, MemoryTaskStore, type TaskStore } from './TaskStore';
+import { verifyTaskReviewArtifact } from './TaskReviewArtifact';
 
 /** 将 sessionId 归一化为文件系统安全的目录名。 */
 function safeSegment(sessionId: string): string {
@@ -27,6 +28,18 @@ export function createSessionTaskStore(sessionId: string): FileTaskStore {
   return new FileTaskStore(resolveSessionTasksDir(sessionId), async () => {
     const { readApprovedPlanTasks } = await import('../../sessions/run/ApprovedPlanTasks');
     return readApprovedPlanTasks(sessionId);
+  }, async (uri, hash) => {
+    const { sessionArtifactResolver } = await import('../../sessions/artifacts/SessionArtifactResolver');
+    const { investigationArtifactService } = await import('../../investigation/InvestigationArtifactService');
+    return verifyTaskReviewArtifact(sessionId, uri, hash, sessionArtifactResolver, investigationArtifactService);
+  }, async (epoch, preparation) => {
+    try {
+      const { rdcLifecycleReceipts } = await import('../../rdc/RdcLifecycleReceipts');
+      const receipt = rdcLifecycleReceipts.read(sessionId, epoch.receipt);
+      return receipt.event === 'transition' && receipt.sessionId === preparation.sessionId && receipt.turnId === preparation.turnId
+        && receipt.previousFingerprint === epoch.previousFingerprint && receipt.runtimeFingerprint === epoch.runtimeFingerprint
+        && receipt.recordedAt === epoch.recordedAt;
+    } catch { return false; }
   });
 }
 

@@ -1,10 +1,13 @@
 // @vitest-environment happy-dom
-import { createElement } from 'react';
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { SubagentRow } from './SubagentRow';
+import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
 
-const state = vi.hoisted(() => ({ expanded: false, taskLoading: false, taskError: false, headerLoading: false, headerMissing: false }));
+const state = vi.hoisted(() => ({ expanded: false, taskLoading: false, taskError: false, headerLoading: false, headerMissing: false,
+  configurationError: false }));
 const task = 'Use glob to inspect the project root.';
 const body = JSON.stringify({ capsule: {
   task, goal: task, scope: '', outputRequirements: '', stopConditions: [], acceptedFacts: [], hypotheses: [],
@@ -21,7 +24,8 @@ vi.mock('./useSubagentDisclosure', () => ({ useSubagentDisclosure: () => ({
   factsOpen: false, constraintsOpen: false, toggle: () => {}, openCard: () => {},
 }) }));
 vi.mock('./useDelegationTrace', () => ({ useDelegationTrace: () => ({
-  page: { header: state.headerLoading || state.headerMissing ? null : { task, profile: 'general', status: 'complete', mode: 'wait', startedAt: 1,
+  page: { header: state.headerLoading || state.headerMissing ? null : { task, profile: 'general', status: state.configurationError ? 'failed' : 'complete', mode: 'wait', startedAt: 1,
+    ...(state.configurationError ? { configurationError: 'MODEL_UNAVAILABLE', error: 'Model unavailable' } : {}),
     completedAt: 1000, taskAvailable: true }, steps: [], total: 0, revision: 1 },
   loading: false, headerLoading: state.headerLoading, hasEarlier: false, loadEarlier: async () => {}, retry: () => {},
 }) }));
@@ -75,6 +79,29 @@ it('presents the frozen task once in each card state and unmounts the preview on
   expect(pending.body.textContent).not.toContain('chat.subagentNoActions');
   expect(pending.body.textContent).not.toContain('chat.subagentNoFinal');
   state.headerLoading = false;
+});
+
+it('offers the exact Agent settings for trusted configuration failures', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  state.expanded = true;
+  state.configurationError = true;
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(createElement(SubagentRow, { row, sessionId: 'config' })));
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Model unavailable');
+    const button = [...host.querySelectorAll('button')].find((element) => element.textContent === 'chat.subagentOpenAgentSettings');
+    expect(button).toBeDefined();
+    await act(async () => button!.click());
+    expect(useSettingsNavigationStore.getState().agentRequest?.agentId).toBe('general');
+    state.configurationError = false;
+    await act(async () => root.render(createElement(SubagentRow, { row, sessionId: 'config' })));
+    expect([...host.querySelectorAll('button')].some((element) => element.textContent === 'chat.subagentOpenAgentSettings')).toBe(false);
+  } finally {
+    await act(async () => root.unmount()); host.remove();
+    useSettingsNavigationStore.getState().clearAgentRequest(); vi.unstubAllGlobals();
+    state.expanded = false; state.configurationError = false;
+  }
 });
 
 it('shows the parent receipt and task when admission fails before a child trace exists', () => {

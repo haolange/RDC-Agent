@@ -2,7 +2,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { orderTasks } from './taskProjection';
-import { TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, TaskIndependentSourceSchema, type PlanTaskRequirement } from '@shared/types/taskExecution';
+import { TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, TaskIndependentSourceSchema, TaskRuntimeEpochSchema, type PlanTaskRequirement, type TaskExecutionPreparation, type TaskRuntimeEpoch } from '@shared/types/taskExecution';
 import {
   TASK_SCHEMA_VERSION,
   type TaskExecutionMessage,
@@ -29,6 +29,8 @@ export interface TaskStoreCommit {
 
 export interface TaskStore {
   readApprovedRequirements?: () => Promise<PlanTaskRequirement[]>;
+  verifyReviewArtifact?: (uri: string, hash: string) => Promise<boolean>;
+  verifyRuntimeEpoch?: (epoch: TaskRuntimeEpoch, preparation: TaskExecutionPreparation) => Promise<boolean>;
   loadTask(id: string): Promise<TaskRecord | null>;
   saveTask(task: TaskRecord): Promise<void>;
   listTasks(): Promise<TaskRecord[]>;
@@ -51,7 +53,12 @@ export class FileTaskStore implements TaskStore {
   private readonly root: string;
   private readonly statePath: string;
 
-  constructor(tasksDir: string, readonly readApprovedRequirements?: () => Promise<PlanTaskRequirement[]>) {
+  constructor(
+    tasksDir: string,
+    readonly readApprovedRequirements?: () => Promise<PlanTaskRequirement[]>,
+    readonly verifyReviewArtifact?: (uri: string, hash: string) => Promise<boolean>,
+    readonly verifyRuntimeEpoch?: (epoch: TaskRuntimeEpoch, preparation: TaskExecutionPreparation) => Promise<boolean>,
+  ) {
     this.root = path.resolve(tasksDir);
     this.statePath = path.join(this.root, 'task-state.json');
   }
@@ -284,6 +291,15 @@ function validateState(state: TaskStateDocument): void {
   }
   for (const [id, execution] of Object.entries(state.executions)) {
     if (execution.preparation !== undefined) TaskExecutionPreparationSchema.parse(execution.preparation);
+    if (execution.runtimeEpochs !== undefined) {
+      if (!Array.isArray(execution.runtimeEpochs) || !execution.preparation) throw new Error(`Malformed runtime epochs: ${id}.`);
+      let previous = execution.preparation.runtimeFingerprint;
+      for (const epoch of execution.runtimeEpochs) {
+        TaskRuntimeEpochSchema.parse(epoch);
+        if (epoch.previousFingerprint !== previous || epoch.runtimeFingerprint === previous) throw new Error(`Broken runtime epoch chain: ${id}.`);
+        previous = epoch.runtimeFingerprint;
+      }
+    }
     if (execution.independentSources !== undefined) {
       if (!Array.isArray(execution.independentSources)) throw new Error(`Malformed independent source binding: ${id}.`);
       execution.independentSources.forEach(source => TaskIndependentSourceSchema.parse(source));

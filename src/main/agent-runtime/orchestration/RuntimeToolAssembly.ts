@@ -19,6 +19,7 @@ import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../
 import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcSessionService } from '../../sessions';
+import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { createKnowledgeTools } from '../../knowledge/KnowledgeTools';
 import { createInvestigationTools } from '../../investigation/InvestigationTools';
@@ -35,7 +36,8 @@ import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
 import { createTaskRuntimeTools as assembleTaskRuntimeTools } from './TaskRuntimeTools';
-import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
+import { listActiveDelegations, listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
+import { completionBudgetEvidence } from './CompletionBudgetEvidence';
 
 export interface RuntimeToolAssemblyDeps {
   mcp: McpConnectionCoordinator;
@@ -141,7 +143,7 @@ export class RuntimeToolAssembly {
     return {
       name: 'runtime_context',
       label: 'Runtime Context',
-      description: 'Read this execution\'s session, scope, working directory, and live permission mode and revision. When this turn owns a capture lease, the rdc field adds the verified replay identity, captureContentSha256, artifact capacity, and frozen CLI deadline controls. Offline children omit rdc. Capacity is a point-in-time snapshot, not a future reservation. CLI timeout covers one invocation, not the whole operation or guaranteed native exit.',
+      description: 'Read this execution\'s session, scope, working directory, and live permission mode and revision. The owning session can see registered capture IDs and its selected device for a plan. When it owns a capture lease, rdc contains replay identity, captureContentSha256, artifact capacity, and frozen CLI deadline controls. An approved owning General turn may also see captureRestoration, its signed frozen entry baseline, which is not the live replay position. Use rdc_probe for current observations. Offline children omit rdc and the baseline. Capacity is a point-in-time snapshot, not a future reservation.',
       pollable: true,
       parameters: {
         type: 'object',
@@ -164,6 +166,20 @@ export class RuntimeToolAssembly {
         if (executionContext?.excludeRdcLeaseTools) {
           return { content: [{ type: 'text' as const, text: JSON.stringify(identity, null, 2) }], details: { available: true } };
         }
+        const baseline = executionContext?.sessionId === sessionId && executionContext?.projectId === projectId
+          ? executionContext?.captureControl?.restorationBaselineFor(executionContext) : null;
+        const captureRestoration = baseline ? { captureRestoration: baseline } : {};
+        const ownedProject = sessionId && projectId && !isSubagentScopeId(sessionId)
+          && storageAdapter.sessions.readSession(sessionId)?.projectId === projectId
+          ? storageAdapter.getProjectById(projectId) : null;
+        const state = ownedProject && sessionId && projectId
+          ? rdcSessionService.snapshotReplayForSession({ sessionId, projectId }) : null;
+        const capturePlanning = ownedProject ? {
+          inputs: ownedProject.inputs.map(input => ({ inputId: input.inputId, fileName: input.fileName,
+            contentSha256: input.contentSha256 ?? null, source: input.source })),
+          deviceId: state?.replayDeviceId ?? state?.preparation.targetDeviceId ?? null,
+          devicePreparation: state?.preparation.phase ?? 'idle',
+        } : null;
         const lease = assertRdcContextLeaseOwnership({
           sessionId,
           projectId,
@@ -179,7 +195,7 @@ export class RuntimeToolAssembly {
               ? 'The capture is not open in this session. Ask the user to select the capture and click Open in the Capture section. Preserve the confirmed goal; do not describe internal leases or diagnose a rendering cause.'
               : 'RDC replay identity requires an owning sessionId (no global fallback).';
           return {
-            content: [{ type: 'text', text: JSON.stringify({ ...identity, rdc: { available: false, requiresRecovery, note } }, null, 2) }],
+            content: [{ type: 'text', text: JSON.stringify({ ...identity, capturePlanning, ...captureRestoration, rdc: { available: false, requiresRecovery, note } }, null, 2) }],
             details: { available: false, requiresRecovery },
           };
         }
@@ -194,8 +210,9 @@ export class RuntimeToolAssembly {
           && opened.contextId === runtimeContext.contextId && opened.captureFileId === runtimeContext.captureFileId
           && opened.replaySessionId === runtimeContext.replaySessionId && /^[a-f0-9]{64}$/.test(binding?.captureHash ?? '')
           ? binding!.captureHash : null;
+        const { raw: _openTimePayload, ...runtimeIdentity } = runtimeContext;
         return {
-          content: [{ type: 'text', text: JSON.stringify({ ...identity, rdc: { ...runtimeContext, captureContentSha256,
+          content: [{ type: 'text', text: JSON.stringify({ ...identity, capturePlanning, ...captureRestoration, rdc: { ...runtimeIdentity, captureContentSha256,
             hostControls: ownerSessionId && projectId ? readRdcHostControls({ sessionId: ownerSessionId,
               projectId, contextId: runtimeContext.contextId, leaseVersion: lease.version }, executionContext) : null,
           } }, null, 2) }],
@@ -267,7 +284,7 @@ export class RuntimeToolAssembly {
   }
 
   createPlanArtifactTool(sessionId?: string | null): AgentTool<
-    { title?: string; summary?: string[]; content?: string; requiredTaskIds?: string[]; taskRevisions?: unknown[] },
+    { title?: string; summary?: string[]; content?: string; requiredTaskIds?: string[]; taskRevisions?: unknown[]; captureScope?: unknown },
     { sessionId: string | null }
   > {
     return {
@@ -288,6 +305,10 @@ export class RuntimeToolAssembly {
           },
           content: { type: 'string', description: 'Markdown plan body. Use ## headings for sections.' },
           requiredTaskIds: { type: 'array', maxItems: 128, items: { type: 'string', minLength: 1 }, description: 'Existing owning-session Tasks required by this plan; canonical owner planner only, not delegated Capsules. Main freezes goals, output keys, dependencies and executionRequirements into the reviewed hash. Bind mandatory direct, isolated-analysis and independent-review work. Later in-scope detail Tasks remain possible; do not place task contracts in Markdown or metadata.' },
+          captureScope: { type: 'object', additionalProperties: false, required: ['inputIds', 'deviceId', 'comparisonGoal'], description: 'For any planned live RDC work, including a single current capture and its recovery or restoration, list the intended registered project input IDs, the already selected replay device ID, and the investigation goal. Read these IDs from runtime_context.capturePlanning. The host verifies and freezes their content hashes for user review. Offline-only plans may omit this field.', properties: {
+            inputIds: { type: 'array', minItems: 1, maxItems: 32, items: { type: 'string', minLength: 1 } },
+            deviceId: { type: 'string', minLength: 1 }, comparisonGoal: { type: 'string', minLength: 1, maxLength: 4000 },
+          } },
           taskRevisions: { type: 'array', maxItems: 128, description: 'Explicit proposed changes to existing required Tasks, installed only after user approval. Preserve history, consumed budgets and deadlines; stop/join active work first. Completed Tasks cannot reopen.', items: {
             type: 'object', additionalProperties: false, required: ['taskId', 'expectedRevision'], properties: {
               taskId: { type: 'string' }, expectedRevision: { type: 'integer', minimum: 1 },
@@ -640,8 +661,20 @@ export class RuntimeToolAssembly {
         }
       }
       const scope = sessionId ? getDelegatedTaskScope(sessionId) : null;
-      if (sessionId && !scope && declaration.disposition === 'completed') {
+      if (sessionId && !scope && turnHandle?.requiresApprovedGoalClosure && declaration.disposition === 'completed') {
         await new TaskRegistry(createSessionTaskStore(sessionId)).assertApprovedTasksCompleted();
+      }
+      if (turnHandle?.requiresApprovedGoalClosure && ['partial', 'blocked', 'budget_paused'].includes(declaration.disposition)
+        && (!declaration.result?.summary?.trim() || !Array.isArray(declaration.result.unresolved)
+          || !declaration.result.unresolved.some(item => typeof item === 'string' && item.trim()))) {
+        throw new Error('TURN_COMPLETION_INVALID: partial, blocked and budget-paused goals require a summary and concrete unresolved work and reason.');
+      }
+      if (turnHandle?.requiresApprovedGoalClosure && declaration.disposition === 'budget_paused' && !completionBudgetEvidence(turnHandle)) {
+        throw new Error('TURN_COMPLETION_INVALID: no current root budget limit has been observed.');
+      }
+      if (sessionId && turnHandle?.requiresApprovedGoalClosure && declaration.disposition === 'completed') {
+        const active = await listActiveDelegations(sessionId);
+        if (active.length) throw new Error(`TASK_COMPLETION_DENIED: Join active delegated executions before completing the approved goal: ${active.map(item => item.id).join(', ')}.`);
       }
       if (scope && declaration.disposition === 'completed') {
         const task = await new TaskRegistry(createSessionTaskStore(scope.ownerSessionId)).getTask(scope.rootTaskId);
@@ -649,6 +682,7 @@ export class RuntimeToolAssembly {
         const missing = task.completionRequirements.filter(key => !declaration.result?.outputs[key]);
         if (missing.length) throw new Error(`TURN_COMPLETION_INVALID: result.outputs must contain these exact Task keys: ${JSON.stringify(missing)}. Correct the structured result before completing.`);
       }
+      await turnHandle?.validateCompletionReadiness?.(declaration);
     });
     availableTools.set(turnCompletionTool.name, turnCompletionTool);
     const runtimeContextTool = this.createRuntimeContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);

@@ -62,12 +62,18 @@ import type {
   ResolvedRuntimeTools,
   ToolExecutorRuntimeContext,
 } from './orchestratorTypes';
-import type { TurnCompletionReceipt, TurnCompletionValidator } from '../agent/TurnCompletionValidator';
+import type { TurnCompletionReadinessValidator, TurnCompletionReceipt, TurnCompletionValidator } from '../agent/TurnCompletionValidator';
 import { settleJoinedTurnTaskExecutions, settleUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
+import { approvedGoalContinuation } from './ApprovedGoalContinuation';
+import { assertApprovedExecutionCurrent } from '../../sessions/run/handoffSkills';
+import { completionBudgetEvidence } from './CompletionBudgetEvidence';
 import { createOrReuseAgentSlot, isSuccessfulProviderResponse, reportedUsageFields, type AgentSlotRequest } from './AgentSlotFactory';
+import { ApprovedCaptureController } from './ApprovedCaptureController';
+import { createApprovedCaptureHost } from './ApprovedCaptureHost';
 
 export interface AgentTurnRunnerDeps {
   validateCompletion: TurnCompletionValidator;
+  validateCompletionReadiness: TurnCompletionReadinessValidator;
   slots: AgentSlotRegistry;
   mcp: McpConnectionCoordinator;
   deferredActivation: DeferredToolActivationTracker;
@@ -192,11 +198,31 @@ export class AgentTurnRunner {
     let turnEnded = false;
     let setupCleanupComplete = false;
     try {
+    turnHandle.requiresApprovedGoalClosure = Boolean(preparedRuntime.approvedExecution);
+    turnHandle.requiresApprovedCaptureScope = Boolean(preparedRuntime.approvedExecution?.investigation
+      && !preparedRuntime.approvedExecution.investigation.captureScope);
+    turnHandle.validateCompletionReadiness = (declaration) => this.deps.validateCompletionReadiness({
+        profileId: input.agentId,
+        completionContract: preparedRuntime.approvedExecution?.investigation ? 'investigation-report' : preparedRuntime.effectivePlan.completionContract,
+        investigationMission: preparedRuntime.approvedExecution?.investigation?.mission ?? preparedRuntime.effectivePlan.investigationMission ?? undefined,
+        sessionId: executionScopeId, turnId: turnHandle.turnId,
+        disposition: declaration.disposition, evidenceRefs: declaration.evidenceRefs,
+        budgetEvidence: completionBudgetEvidence(turnHandle),
+      });
     slotKey = agentSlotKey(executionScopeId, input.agentId);
     const capsule = preparedRuntime.effectivePlan.delegationCapsule;
     turnHandle.taskPreparation = {
       sessionId: executionScopeId, turnId: turnHandle.turnId,
       runtimeFingerprint: preparedRuntime.effectivePlan.fingerprint,
+      profileId: preparedRuntime.effectivePlan.agentId,
+      ...(preparedRuntime.effectivePlan.profileProvenance?.sourceHash
+        ? { profileSourceHash: preparedRuntime.effectivePlan.profileProvenance.sourceHash } : {}),
+      ...(preparedRuntime.effectivePlan.profileProvenance
+        ? { profileSource: { scope: preparedRuntime.effectivePlan.profileProvenance.scope,
+          path: preparedRuntime.effectivePlan.profileProvenance.sourcePath } } : {}),
+      providerId: requestPlan.providerId,
+      modelId: requestPlan.effectiveModelId,
+      reasoningLevel: requestPlan.reasoningWire.selection,
       skills: promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => ({
         id: segment.id.replace(/^skill:/, ''), hash: segment.sourceHash.replace(/^sha256:/, ''),
       })),
@@ -265,6 +291,19 @@ export class AgentTurnRunner {
     turnHandle.agentSlotKey = slotKey;
     const effectivePlan = preparedRuntime.effectivePlan;
     turnHandle.runtimePlan = effectivePlan;
+    turnHandle.promptPlan = promptPlan;
+    const approvedCapture = preparedRuntime.approvedExecution?.investigation?.captureScope;
+    if (approvedCapture) {
+      if (!input.sessionId || !input.projectId || input.agentId !== 'general' || !preparedRuntime.approvedExecution?.investigation) {
+        throw new Error('RDC_CAPTURE_SCOPE_INVALID: approved capture work requires the owning General session.');
+      }
+      const approved = preparedRuntime.approvedExecution;
+      const host = createApprovedCaptureHost({ sessionId: executionScopeId, projectId: input.projectId,
+        offer: approved.offer, contract: approved.investigation!, turn: turnHandle });
+      turnHandle.captureControl = new ApprovedCaptureController({ sessionId: executionScopeId, projectId: input.projectId,
+        planUri: approved.offer.plan.uri, planHash: approved.offer.plan.hash, captureScope: approvedCapture, turn: turnHandle, host });
+      await turnHandle.captureControl.initialize();
+    }
     // native-structured：执行器用 plan 冻结 allowlist；其它路由与注入列表一致。
     const executorAllowlist = routeCapability.toolCallingMode === 'native-structured'
       ? [...effectivePlan.toolAllowlist]
@@ -335,6 +374,7 @@ export class AgentTurnRunner {
         }));
       }
     }
+    let captureRestoreFailure: string | null = null;
     slot = this.getOrCreateAgentSlot({
       agentId: input.agentId,
       providerId: input.providerId,
@@ -356,6 +396,45 @@ export class AgentTurnRunner {
         ? undefined
         : effectivePlan.policy.maxTurns,
       profileMaxTurns: effectivePlan.profileMaxTurns,
+      onLoopBudget: (remaining, limit) => { turnHandle.providerLoopBudget = { remaining, limit }; },
+      resolvePromptPlan: () => turnHandle.promptPlan ?? promptPlan,
+      resolveRuntimeFingerprint: () => turnHandle.runtimePlan?.fingerprint ?? effectivePlan.fingerprint,
+      beforeTerminalResponse: input.sessionId && turnHandle.requiresApprovedGoalClosure
+        ? async (message) => {
+          const incomplete = await approvedGoalContinuation(turnHandle, executionScopeId);
+          if (incomplete) return incomplete;
+          if (turnHandle.captureControl) {
+            const disposition = turnHandle.completionDeclaration?.disposition;
+            captureRestoreFailure = turnHandle.captureControl.lastRestoreError ?? captureRestoreFailure;
+            const acknowledged = captureRestoreFailure && disposition !== 'completed'
+              && turnHandle.completionDeclaration?.result?.recoveryState.some(value => value.includes(captureRestoreFailure!));
+            if (!acknowledged) {
+              try {
+                const status = await turnHandle.captureControl.restorationStatus(turnHandle.signal);
+                if (!status.restored) {
+                  turnHandle.completionDeclaration = null;
+                  return `# Capture Restoration Required\nFrozen signed entry baseline: ${JSON.stringify({ receipt: status.receipt, original: status.original })}\nHost-observed current position: ${JSON.stringify(status.current)}\nUse rdc_probe capture_restore under the current permission mode to restore the signed entry position. The previous completion declaration is no longer active; call turn_complete again after restoration. If restore fails, record the actual failure and remaining recovery in turn_complete.result.recoveryState and unresolved.`;
+                }
+                captureRestoreFailure = null;
+              } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                captureRestoreFailure = /^[A-Z][A-Z0-9_]{0,127}/u.exec(message)?.[0] ?? 'RDC_RESTORE_UNCONFIRMED';
+                turnHandle.completionDeclaration = null;
+                return `# Capture Restoration Unconfirmed\n${message}\nDo not declare completed. Record ${captureRestoreFailure} and the actual remaining recovery in turn_complete.result.recoveryState and unresolved, then report a partial or blocked outcome.`;
+              }
+            }
+          }
+          return approvedGoalContinuation(turnHandle, executionScopeId, () => {
+          if (preparedRuntime.approvedExecution) assertApprovedExecutionCurrent(executionScopeId, input.agentId, preparedRuntime.approvedExecution.offer);
+          const mission = preparedRuntime.approvedExecution?.investigation?.mission;
+          if (!mission || !['completed', 'budget_paused'].includes(turnHandle.completionDeclaration?.disposition ?? '')) return;
+          this.deps.validateCompletion({ profileId: input.agentId, completionContract: 'investigation-report', investigationMission: mission,
+            sessionId: executionScopeId, turnId: turnHandle.turnId, disposition: turnHandle.completionDeclaration!.disposition,
+            evidenceRefs: turnHandle.completionDeclaration!.evidenceRefs, budgetEvidence: completionBudgetEvidence(turnHandle),
+            finalAnswerText: message.content.filter(block => block.type === 'text').map(block => block.text).join('').trim() });
+          });
+        }
+        : undefined,
       beforeRequestMessages: input.options?.beforeProviderRequestMessages,
       onProviderRequestCommitted: input.options?.onProviderRequestCommitted,
     });
@@ -569,20 +648,34 @@ export class AgentTurnRunner {
       if (turnHandle.completionDeclaration?.disposition === 'cancelled' && !turnHandle.isAborted) {
         throw new Error('TURN_COMPLETION_INVALID: cancelled requires an actual abort and joined execution.');
       }
+      if (turnHandle.completionDeclaration?.disposition === 'completed' && preparedRuntime.approvedExecution) {
+        assertApprovedExecutionCurrent(executionScopeId, input.agentId, preparedRuntime.approvedExecution.offer);
+      }
       const completionInput = {
         profileId: input.agentId,
-        completionContract: turnHandle.runtimePlan?.completionContract,
-        investigationMission: turnHandle.runtimePlan?.investigationMission ?? undefined,
+        completionContract: preparedRuntime.approvedExecution?.investigation ? 'investigation-report' as const : turnHandle.runtimePlan?.completionContract,
+        investigationMission: preparedRuntime.approvedExecution?.investigation?.mission ?? turnHandle.runtimePlan?.investigationMission ?? undefined,
         turnId: turnHandle.turnId,
         sessionId: executionScopeId,
         finalAnswerText: canonicalFinalAnswerText,
         disposition: turnHandle.completionDeclaration?.disposition,
         evidenceRefs: turnHandle.completionDeclaration?.evidenceRefs,
+        budgetEvidence: completionBudgetEvidence(turnHandle),
       };
       this.deps.validateCompletion(completionInput);
+      if (turnHandle.captureControl) {
+        let restored = false;
+        try { restored = await turnHandle.captureControl.recordTerminalRestoration(turnHandle.signal); }
+        catch (error) { if (turnHandle.completionDeclaration?.disposition === 'completed') throw error; }
+        if (!restored && turnHandle.completionDeclaration?.disposition === 'completed') {
+          throw new Error('RDC_RESTORE_UNCONFIRMED: the original capture position has no verified terminal receipt.');
+        }
+      }
       completionReceipt = {
         turnId: turnHandle.turnId,
-        runtimePlanFingerprint: effectivePlan.fingerprint,
+        initialRuntimePlanFingerprint: effectivePlan.fingerprint,
+        runtimePlanFingerprint: turnHandle.runtimePlan?.fingerprint ?? effectivePlan.fingerprint,
+        runtimeEpochs: structuredClone(turnHandle.runtimeEpochs),
         finalAnswerText: canonicalFinalAnswerText,
       };
       return responseText;

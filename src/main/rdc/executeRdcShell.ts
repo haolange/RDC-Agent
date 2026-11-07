@@ -226,7 +226,11 @@ export async function executeRdcShell(
       } catch { /* An unverified restoration remains quarantined. */ }
     }
     if (!nativeStateVerifiedSafe) {
-      quarantineRdcContext(sessionId, lease.version, 'Native operation outcome is uncertain; inspect and recover through the capture lifecycle before further execution.');
+      const reportedCode = error instanceof RdcNativeFailure ? error.nativeError.code
+        : error instanceof Error ? (/^[A-Z][A-Z0-9_]{0,127}/u.exec(error.message)?.[0] ?? error.name) : 'unknown';
+      const code = /^[A-Za-z][A-Za-z0-9_]{0,127}$/u.test(reportedCode) ? reportedCode : 'unknown';
+      quarantineRdcContext(sessionId, lease.version, 'Native operation outcome is uncertain; inspect and recover through the capture lifecycle before further execution.',
+        signal?.aborted ? undefined : { operation: input.operation, argsFingerprint: rdcDigest(input.args), code });
     }
     if (error instanceof RdcNativeFailure) {
       // Deliver the qualified outcome, not arbitrary private native details or

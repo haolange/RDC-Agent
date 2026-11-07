@@ -38,6 +38,10 @@ export function CardMetaGrid({ card, spaceLabel, onOpenRelation }: CardMetaGridP
             <dd>{card.type ? t(TYPE_LABEL_KEYS[card.type]) : '—'}</dd>
           </div>
           <div>
+            <dt>{t('knowledgeCenter.metaTopics')}</dt>
+            <dd>{card.topics?.map(topic => topic.label).join(', ') || '—'}</dd>
+          </div>
+          <div>
             <dt>{t('knowledgeCenter.metaLifecycle')}</dt>
             <dd>{card.lifecycle ? t(LIFECYCLE_LABEL_KEYS[card.lifecycle]) : '—'}</dd>
           </div>

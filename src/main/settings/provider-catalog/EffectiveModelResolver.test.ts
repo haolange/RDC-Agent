@@ -50,6 +50,9 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       loadProviderSurface('minimax-global'),
       loadProviderSurface('cortecs'),
       loadProviderSurface('custom-endpoint'),
+      loadProviderSurface('ollama'),
+      loadProviderSurface('amazon-bedrock'),
+      loadProviderSurface('anthropic-thirdparty'),
       loadProviderSurface('cline-pass'),
       loadProviderSurface('grok-account'),
     ]);
@@ -418,6 +421,53 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       { id: 'OpenAICompatibleChatCompletions', route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'http://localhost:4312/v1' } },
       { id: 'OpenAIResponses', route: { protocol: 'OpenAIResponses', baseUrl: 'http://localhost:4312/v1' } },
     ]);
+  });
+
+  it('plans a discovered local model against the saved editable provider endpoint', () => {
+    const configured = {
+      ...provider('ollama', 'OllamaOpenAICompatibleChatCompletions'),
+      catalogOwnership: 'user-managed' as const,
+      baseUrl: 'http://127.0.0.1:56606/v1',
+      models: [{ id: 'local-model', label: 'Local model', enabled: true, defaultBudgetTokens: 65_536 }],
+    };
+    const request = buildEffectiveCatalogRequest(configured);
+    request.observed = {
+      source: 'observed', observedAt: '2026-11-06T00:00:00.000Z',
+      models: [{ modelId: 'local-model', toolCalling: { state: 'supported' } }],
+    };
+    const models = mergeEffectiveCatalog(request);
+    const model = models.find((candidate) => candidate.modelId === 'local-model')!;
+    expect(planModelRequest({
+      model, catalogModels: models, controls: { fastModel: false, maxContextMode: false },
+    })).toMatchObject({ ok: true, plan: { route: { baseUrl: 'http://127.0.0.1:56606/v1', source: 'user' } } });
+  });
+
+  it('does not use an arbitrary saved endpoint for a non-editable provider', () => {
+    const configured = {
+      ...provider('chatgpt-account', 'OpenAIResponses'),
+      baseUrl: 'http://127.0.0.1:56606/v1',
+    };
+    expect(buildEffectiveCatalogRequest(configured).fallbackRoute.baseUrl)
+      .toBe('https://chatgpt.com/backend-api/codex');
+  });
+
+  it('preserves protocol-specific routes for provider-managed cloud services', () => {
+    const configured = {
+      ...provider('amazon-bedrock', 'OpenAIResponses'),
+      catalogOwnership: 'provider-managed' as const,
+      baseUrl: 'https://bedrock-mantle.us-east-1.api.aws/v1',
+    };
+    expect(buildEffectiveCatalogRequest(configured).fallbackRoute.baseUrl)
+      .toBe('https://bedrock-mantle.${AWS_REGION}.api.aws/openai/v1');
+  });
+
+  it('preserves templated routes for non-local user-managed providers', () => {
+    const configured = {
+      ...provider('anthropic-thirdparty', 'AnthropicMessages'),
+      catalogOwnership: 'user-managed' as const,
+      baseUrl: 'https://thirdparty.example',
+    };
+    expect(buildEffectiveCatalogRequest(configured).fallbackRoute.baseUrl).toBe('${baseUrl}/v1');
   });
 
   it('projects a surface-level service tier onto every discovered model without changing model identity', async () => {

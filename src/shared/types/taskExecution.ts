@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { REASONING_SELECTIONS } from './modelCapability';
 
 /** Read-only dependency explanation, never a lifecycle state or execution grant. */
 export interface TaskDependencyWait {
@@ -13,6 +14,7 @@ const hash = z.string().regex(/^[a-f0-9]{64}$/);
 /** Caller-declared constraints, never an execution proof or permission grant. */
 export const TaskExecutionRequirementsSchema = z.object({
   mode: z.enum(['direct', 'subagent']),
+  profileId: id.optional(),
   requiredSkillIds: z.array(id).max(32).default([]),
   independentOfTaskIds: z.array(id).max(32).default([]),
 }).strict().superRefine((value, context) => {
@@ -28,6 +30,16 @@ export const TaskExecutionPreparationSchema = z.object({
   turnId: id,
   // EffectiveRuntimePlan uses a 24-character SHA-256 prefix, not a content hash.
   runtimeFingerprint: z.string().regex(/^[a-f0-9]{24}$/),
+  profileId: id.optional(),
+  profileSourceHash: hash.optional(),
+  /** Absent on historical records that cannot prove their original source. */
+  profileSource: z.object({
+    scope: z.enum(['builtin', 'user', 'project']),
+    path: z.string().min(1),
+  }).strict().optional(),
+  providerId: id.optional(),
+  modelId: id.optional(),
+  reasoningLevel: z.enum([...REASONING_SELECTIONS, 'unknown']).optional(),
   skills: z.array(z.object({ id, hash }).strict()),
   inputArtifacts: z.array(z.object({ uri: z.string().min(1).max(2048), hash }).strict()),
   selectedTurnCount: z.number().int().nonnegative().nullable(),
@@ -36,8 +48,19 @@ export const TaskExecutionPreparationSchema = z.object({
 }).strict();
 export type TaskExecutionPreparation = z.infer<typeof TaskExecutionPreparationSchema>;
 
+/** Main-signed transition within one Task execution; preparation remains immutable. */
+export const TaskRuntimeEpochSchema = z.object({
+  previousFingerprint: z.string().regex(/^[a-f0-9]{24}$/),
+  runtimeFingerprint: z.string().regex(/^[a-f0-9]{24}$/),
+  receipt: z.object({ uri: z.string().min(1).max(2048), expectedHash: z.string().regex(/^sha256:[a-f0-9]{64}$/) }).strict(),
+  recordedAt: z.number().int().nonnegative(),
+}).strict();
+export type TaskRuntimeEpoch = z.infer<typeof TaskRuntimeEpochSchema>;
+
 export const TaskIndependentSourceSchema = z.object({
   taskId: id, executionId: id, generation: z.number().int().positive(), taskRevision: z.number().int().positive(),
+  // Historical executions remain readable, but absent provenance cannot satisfy a new review.
+  resultRef: z.string().min(1).max(2048).optional(), resultHash: hash.optional(),
 }).strict();
 export type TaskIndependentSource = z.infer<typeof TaskIndependentSourceSchema>;
 
@@ -45,10 +68,11 @@ export const TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA = {
   type: 'object', additionalProperties: false, required: ['mode'],
   properties: {
     mode: { type: 'string', enum: ['direct', 'subagent'] },
+    profileId: { type: 'string', minLength: 1, maxLength: 256 },
     requiredSkillIds: { type: 'array', maxItems: 32, items: { type: 'string', minLength: 1, maxLength: 256 } },
     independentOfTaskIds: { type: 'array', maxItems: 32, items: { type: 'string', minLength: 1, maxLength: 256 } },
   },
-  description: 'Explicit execution constraints only. requiredSkillIds means methods that must actually be preloaded and frozen before this execution; explain why preparation is necessary in the Task description. Ordinary method guidance belongs in the description and is discovered/read with skill_read before use, not automatically a preload requirement. An empty list is valid. Independent work must use subagent with source Task ids, an isolated Capsule and no shared live domain capability. Constraints never grant permissions.',
+  description: 'Explicit execution constraints only. requiredSkillIds means methods that must actually be preloaded and frozen before this execution; explain why preparation is necessary in the Task description. Ordinary method guidance belongs in the description and is discovered/read with skill_read before use, not automatically a preload requirement. An empty list is valid. Independent work must use subagent with source Task ids, an isolated Capsule and no shared live domain capability. Each source must first settle with a resultRef and resultHash; grant that exact resultRef in the Capsule inputArtifactRefs. Constraints never grant permissions.',
 };
 
 export const PlanTaskRequirementSchema = z.object({

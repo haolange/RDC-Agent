@@ -2,7 +2,7 @@ import {
   TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, PlanTaskRevisionSchema,
   type PlanTaskRequirement, type TaskExecutionPreparation, type TaskIndependentSource,
 } from '@shared/types/taskExecution';
-import type { StartTaskExecutionOptions, TaskExecutionRecord, TaskRecord } from './TaskContracts';
+import type { StartTaskExecutionOptions, TaskCompletionResult, TaskExecutionRecord, TaskRecord } from './TaskContracts';
 import type { TaskStore } from './TaskStore';
 import { createHash } from 'node:crypto';
 
@@ -24,6 +24,9 @@ export async function assertTaskExecutionStart(task: TaskRecord, options: StartT
   if (!requirement) return;
   TaskExecutionRequirementsSchema.parse(requirement);
   if (requirement.mode !== options.mode) denied(`Task requires ${requirement.mode}; requested ${options.mode}.`);
+  if (requirement.profileId && requirement.profileId !== (options.preparation?.profileId ?? options.requestedProfileId)) {
+    denied(`Task requires profile ${requirement.profileId}.`);
+  }
   const skills = options.mode === 'direct' ? options.preparation?.skills.map(item => item.id) ?? [] : options.requiredSkillIds ?? [];
   if (requirement.requiredSkillIds.some(id => !skills.includes(id))) denied('Required methods are missing from the requested execution.');
   for (const id of requirement.independentOfTaskIds) {
@@ -39,6 +42,11 @@ export async function assertTaskExecutionPreparation(
   const requirement = task.executionRequirements;
   if (!requirement) return;
   if (mode !== requirement.mode) denied('Prepared execution mode differs from the Task.');
+  if (requirement.profileId && (preparation.profileId !== requirement.profileId || !preparation.profileSourceHash
+    || !preparation.profileSource || !preparation.providerId || !preparation.modelId
+    || !preparation.reasoningLevel || preparation.reasoningLevel === 'unknown')) {
+    denied('Prepared execution does not prove the required profile and model configuration.');
+  }
   if (requirement.requiredSkillIds.some(id => !preparation.skills.some(skill => skill.id === id))) {
     denied('Required methods were not actually preloaded.');
   }
@@ -55,18 +63,29 @@ export async function assertTaskExecutionPreparation(
       denied('Independence requires a different actually prepared execution from the generating Task.');
     }
   }
+  const sources = await readIndependentTaskSources(task, store);
+  for (const source of sources) {
+    if (!preparation.inputArtifacts.some(artifact => artifact.uri === source.resultRef && artifact.hash === source.resultHash)) {
+      denied('Independent review requires the authorized source result and its exact content hash.');
+    }
+  }
 }
 
 export async function assertTaskExecutionCompletion(task: TaskRecord, execution: TaskExecutionRecord, store: TaskStore): Promise<void> {
+  for (const epoch of execution.runtimeEpochs ?? []) {
+    if (!execution.preparation || !store.verifyRuntimeEpoch || !await store.verifyRuntimeEpoch(epoch, execution.preparation)) {
+      denied('Runtime identity transition lacks its signed owning-turn receipt.');
+    }
+  }
   if (!task.executionRequirements) return;
   if (execution.mode !== task.executionRequirements.mode) denied('Completion mode differs from the required execution.');
-  if (execution.mode === 'subagent' || task.executionRequirements.requiredSkillIds.length) {
-    if (!execution.preparation) denied('Completion is missing runtime preparation proof.');
-    await assertTaskExecutionPreparation(task, execution.mode, execution.preparation!, store);
-  }
   if (task.executionRequirements.independentOfTaskIds.length
     && JSON.stringify(execution.independentSources) !== JSON.stringify(await readIndependentTaskSources(task, store))) {
     denied('The generating Task execution changed after review preparation; an old review cannot satisfy the new generation.');
+  }
+  if (execution.mode === 'subagent' || task.executionRequirements.requiredSkillIds.length || task.executionRequirements.profileId) {
+    if (!execution.preparation) denied('Completion is missing runtime preparation proof.');
+    await assertTaskExecutionPreparation(task, execution.mode, execution.preparation!, store);
   }
 }
 
@@ -76,9 +95,49 @@ export async function readIndependentTaskSources(task: TaskRecord, store: TaskSt
     const source = await store.loadTask(taskId);
     const execution = source?.currentExecutionId ? await store.loadExecution(source.currentExecutionId) : null;
     if (!source || !execution?.preparation || execution.taskRevision !== source.revision) denied('Independent source execution is missing, unprepared or stale.');
-    sources.push({ taskId, executionId: execution!.id, generation: execution!.generation, taskRevision: source!.revision });
+    if (!['completed', 'partial'].includes(execution!.status) || !execution!.settledAt || !execution!.result?.resultRef || !execution!.result.resultHash) {
+      denied('Independent source must be settled with a versioned result reference and hash.');
+    }
+    const resultRef = execution!.result!.resultRef!;
+    const resultHash = execution!.result!.resultHash!;
+    if (!store.verifyReviewArtifact || !await store.verifyReviewArtifact(resultRef, resultHash)) {
+      denied('Independent source result is unavailable, changed or no longer current.');
+    }
+    sources.push({ taskId, executionId: execution!.id, generation: execution!.generation, taskRevision: source!.revision, resultRef, resultHash });
   }
   return sources;
+}
+
+/** A review source must be usable before its execution becomes immutable. */
+export async function assertIndependentReviewResult(task: TaskRecord, result: TaskCompletionResult, store: TaskStore): Promise<void> {
+  const dependedOn = (await store.listTasks()).some(candidate => candidate.executionRequirements?.independentOfTaskIds.includes(task.id));
+  if (!dependedOn) return;
+  if (!result.resultRef || !result.resultHash) denied('A Task used by independent review requires resultRef and resultHash in its execution result.');
+  if (!store.verifyReviewArtifact || !await store.verifyReviewArtifact(result.resultRef!, result.resultHash!)) {
+    denied('The independent review result reference is unavailable, changed or cannot be verified.');
+  }
+}
+
+/** A completed Task can run again only to repair an invalidated review dependency. */
+export async function canReexecuteInvalidatedTask(task: TaskRecord, store: TaskStore): Promise<boolean> {
+  if (task.status !== 'completed' || !task.currentExecutionId) return false;
+  const execution = await store.loadExecution(task.currentExecutionId);
+  if (!execution || execution.status !== 'completed') return false;
+  if (task.executionRequirements?.independentOfTaskIds.length) {
+    try {
+      const current = await readIndependentTaskSources(task, store);
+      return JSON.stringify(current) !== JSON.stringify(execution.independentSources);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('TASK_EXECUTION_REQUIREMENTS:')) return false;
+      throw error;
+    }
+  }
+  const ref = execution.result?.resultRef;
+  const hash = execution.result?.resultHash;
+  const dependedOn = (await store.listTasks()).some(candidate => candidate.executionRequirements?.independentOfTaskIds.includes(task.id));
+  if (!dependedOn) return false;
+  if (!ref || !hash) return true;
+  return Boolean(store.verifyReviewArtifact && !await store.verifyReviewArtifact(ref, hash));
 }
 
 export function snapshotTaskRequirement(task: TaskRecord): PlanTaskRequirement {

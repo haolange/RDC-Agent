@@ -7,6 +7,7 @@ vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: {
 vi.mock('./captures/replay/replayPngCodec', () => ({ replayPngCodec: { encode: mocks.encode } }));
 vi.mock('./captures/replay/ReplayLivePreviewStore', () => ({ replayLivePreviewStore: { write: mocks.write } }));
 import { observeReplay, readReplayEvents } from './RdcReplayObservation';
+import { RdcNativeFailure } from './RdcNativeProtocol';
 const owner = { contextId: 'context', replaySessionId: 'replay', runtimeOwner: 'app', ownerLeaseId: 'lease', backend: 'local' as const, updatedAt: 0 };
 const live = { sessionId: 'session-1', generation: 3 };
 const preview = { imagePath: 'live:3:9', width: 100, height: 100, source: 'framebuffer_screenshot' as const, updatedAt: 1 };
@@ -100,4 +101,15 @@ it('requests the full context event index and projects event IDs only', async ()
   mocks.execute.mockResolvedValue({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rd.session.get_replay_events', data: { context_id: 'context', session_id: 'replay', complete: true, events: [{ event_id: 1, name: 'Draw' }] } }) });
   expect(await readReplayEvents(owner)).toEqual([{ eventId: 1 }]);
   expect(JSON.parse(mocks.execute.mock.calls[0][1][2])).toEqual({});
+});
+it('preserves a native fatal replay error and releases the temporary image directory', async () => {
+  mocks.execute.mockImplementationOnce(async (_operation, argv) => {
+    exportedPath = JSON.parse(argv[2]).out_path;
+    return { exitCode: 1, stdout: JSON.stringify({ ok: false, schema_version: '3.0.0', result_kind: 'rd.session.observe',
+      error: { code: 'replay_fatal_error', category: 'runtime', message: 'Connection lost to remote server' } }) };
+  });
+  const error = await observeReplay(owner, {}, undefined, live).catch(value => value);
+  expect(error).toBeInstanceOf(RdcNativeFailure);
+  expect(error.nativeError.code).toBe('replay_fatal_error');
+  await expect(fs.stat(path.dirname(exportedPath))).rejects.toHaveProperty('code', 'ENOENT');
 });

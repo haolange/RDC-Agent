@@ -12,14 +12,17 @@ import { replayHistoryStore } from './captures/replay/ReplayHistoryStore';
 import { hashCaptureFile } from './captures/replay/captureContentHash';
 import { verifyExternalCaptureReference } from './captures/ExternalCaptureReference';
 import type { SessionScope, OpenProjectInputRequest, OpenedCaptureState } from '@shared/types/session';
-import type { CaptureReplayState, CaptureReplayApplyRequest, CaptureReplayBindingRequest } from '@shared/types/captureReplay';
+import type { CaptureReplayState, CaptureReplayApplyRequest, CaptureReplayBindingRequest, CaptureReplayTarget } from '@shared/types/captureReplay';
 import { RdcSessionRuntime, type RdcLifecycleOptions } from './RdcSessionRuntime';
 import { getDelegatedChildSessionId, getRdcContextLease } from './RdcRuntimeContextRegistry';
 import { shellInvocationService } from '../tools/ShellInvocationService';
-import { beginRdcLifecycle, getRdcInteractionLock, runRdcOperation, subscribeRdcInteractionLock } from './RdcOperationCoordinator';
+import { beginRdcLifecycle, getRdcInteractionLock, ownsRdcInteractionLock, runRdcOperation, subscribeRdcInteractionLock } from './RdcOperationCoordinator';
+import { assertRdcContextLeaseOwnership } from './RdcRuntimeContextRegistry';
+import { freezeRdcTurnBinding, type RdcTurnBinding } from './RdcTurnBindings';
 import { harvestOwnedRdcDaemons } from './OwnedRdcDaemonRegistry';
 import { replayLivePreviewStore } from './captures/replay/ReplayLivePreviewStore';
 import { observeReplay, readReplayEvents } from './RdcReplayObservation';
+import { quarantineFatalReplayFailure, replayObservationLease } from './RdcReplayFailure';
 
 const keyOf = (scope: SessionScope) => JSON.stringify([scope.projectId, scope.sessionId]);
 interface Binding { runtime: RdcSessionRuntime; state: CaptureReplayState; deviceId: string | null;
@@ -103,7 +106,8 @@ export class RdcSessionService {
   }
   private assertReplayAvailable(binding: Binding): void {
     if (getRdcContextLease(binding.state.sessionId)?.quarantineReason) {
-      this.publish(binding, { phase: 'error', error: { code: 'RDC_CONTEXT_QUARANTINED', message: 'Replay outcome is uncertain; close and reopen the capture.', retry: 'close' } });
+      this.publish(binding, { phase: 'error', error: binding.state.error?.retry === 'close' ? binding.state.error
+        : { code: 'RDC_CONTEXT_QUARANTINED', message: 'Replay outcome is uncertain; close and reopen the capture.', retry: 'close' } });
       throw new Error('RDC_CONTEXT_QUARANTINED');
     }
     if (!['ready', 'applying'].includes(binding.state.phase)) throw new Error('RDC_REPLAY_BUSY');
@@ -134,6 +138,17 @@ export class RdcSessionService {
   }
   snapshotContextForSession(scope: SessionScope) { return this.bindings.get(keyOf(scope))?.runtime.snapshotContextForSession(scope) ?? null; }
   snapshotOpenedCaptureForSession(scope: SessionScope) { return this.bindings.get(keyOf(scope))?.runtime.snapshotOpenedCaptureForSession(scope) ?? null; }
+  /** Main-only binding of the currently owned context, including a quarantined one. */
+  recoveryBinding(scope: SessionScope): RdcTurnBinding | null {
+    const owner = this.bindings.get(keyOf(scope)); const contextId = owner?.runtime.getContextId();
+    if (!owner || !contextId) return null;
+    if (owner.runtime.snapshotContextForSession(scope)?.contextId !== contextId) throw new Error('RDC_RECOVERY_OWNER_INVALID');
+    const cli = owner.runtime.getCliSettings(); const lease = getRdcContextLease(scope.sessionId);
+    if (!cli || (lease && (lease.ownerSessionId !== scope.sessionId || lease.ownerProjectId !== scope.projectId || lease.contextId !== contextId))) {
+      throw new Error('RDC_RECOVERY_OWNER_INVALID');
+    }
+    return freezeRdcTurnBinding(cli, [], lease);
+  }
   private revokePreparationConfirmation(binding: Binding): void {
     if (binding.confirmation) ipcApprovalTokenService.revoke(binding.confirmation.token);
     binding.confirmation = undefined;
@@ -147,9 +162,25 @@ export class RdcSessionService {
     return { success: false, state: this.snapshotReplayForSession(binding.state), confirmation: { token, kind } };
   }
   async prepareDevice(request: DevicePreparationRequest): Promise<DevicePreparationResult> {
+    return this.prepareDeviceWithAuthority(request);
+  }
+  /** The owning turn may reconnect its already approved device with its frozen CLI. */
+  async prepareAgentDevice(request: DevicePreparationRequest, authority: {
+    binding: RdcTurnBinding; turnId: string; signal?: AbortSignal; assertAuthorized: () => void;
+  }): Promise<DevicePreparationResult> {
+    return this.prepareDeviceWithAuthority(request, authority);
+  }
+  private async prepareDeviceWithAuthority(request: DevicePreparationRequest, authority?: {
+    binding: RdcTurnBinding; turnId: string; signal?: AbortSignal; assertAuthorized: () => void;
+  }): Promise<DevicePreparationResult> {
     const scope = { projectId: request.projectId, sessionId: request.sessionId };
     const binding = this.binding(scope);
-    this.assertInteraction(binding); this.assertPreparationGeneration(binding, request.bindingGeneration, Boolean(request.confirmationToken));
+    const assertAuthorized = () => {
+      authority?.signal?.throwIfAborted(); authority?.assertAuthorized();
+      if (authority && !ownsRdcInteractionLock(scope.sessionId, authority.turnId)) throw new Error('RDC_RECOVERY_OWNER_INVALID');
+      this.assertInteraction(binding, authority);
+    };
+    assertAuthorized(); this.assertPreparationGeneration(binding, request.bindingGeneration, Boolean(request.confirmationToken));
     const recoveringIssue = binding.state.preparation.issue?.deviceAction ? binding.state.preparation.issue : null;
     if (recoveringIssue && (request.deviceId !== binding.state.preparation.targetDeviceId || request.confirmationToken || !binding.installationEvidence)) {
       return { success: false, state: this.snapshotReplayForSession(scope), error: recoveringIssue };
@@ -186,6 +217,9 @@ export class RdcSessionService {
     const baseGeneration = binding.preparation?.baseGeneration ?? binding.state.generation;
     binding.preparation?.controller.abort();
     const controller = new AbortController();
+    const abortFromOwner = () => controller.abort();
+    if (authority?.signal?.aborted) abortFromOwner();
+    else authority?.signal?.addEventListener('abort', abortFromOwner, { once: true });
     const generation = binding.state.generation + 1;
     let unconfirmedIssue: ReplayDeviceIssue | undefined;
     let installationIdentity: DeviceInstallationIdentity | undefined;
@@ -195,7 +229,7 @@ export class RdcSessionService {
       const current = () => binding.state.generation === generation && !controller.signal.aborted;
       try {
         if (!current()) return { success: false, state: this.snapshotReplayForSession(scope) };
-        this.assertInteraction(binding);
+        assertAuthorized();
         if (recoveringIssue) {
           const evidence = binding.installationEvidence!;
           const inspected = await binding.runtime.inspectReplayDeviceInstallation(scope, device, {
@@ -213,7 +247,7 @@ export class RdcSessionService {
         }
         const previousTarget = binding.deviceId;
         if (!binding.runtime.isPreparedFor(scope, device.id)) {
-          await this.closeBinding(scope, binding, {});
+          await this.closeBinding(scope, binding, authority ? { binding: authority.binding } : {});
           this.publish(binding, { phase: 'closed', contextId: null, replayDeviceId: null, inputId: null, captureHash: null,
             image: null, observation: null, requestedEventId: null, appliedEventId: null, imageEventId: null, events: [], targets: [], target: null });
         } else if (previousTarget && previousTarget !== device.id) throw new Error('RDC_DEVICE_BINDING_MISMATCH');
@@ -225,7 +259,8 @@ export class RdcSessionService {
           if (currentOwner && currentOwner !== keyOf(scope)) throw new Error('RDC_DEVICE_IN_USE');
           this.devices.set(device.id, keyOf(scope)); binding.deviceId = device.id;
         }
-        await binding.runtime.prepareReplayDevice(scope, device, { signal: controller.signal, expectedBindingIdentity,
+        assertAuthorized();
+        await binding.runtime.prepareReplayDevice(scope, device, { signal: controller.signal, expectedBindingIdentity, binding: authority?.binding,
           onPreparationStage: phase => {
             if (current() && binding.state.preparation.phase !== phase) this.publish(binding, { preparation: { ...binding.state.preparation, phase } });
           },
@@ -237,6 +272,7 @@ export class RdcSessionService {
           onDeviceAction: (issue, identity) => { unconfirmedIssue = issue; installationIdentity = identity; },
         });
         if (!current()) throw controller.signal.reason ?? new Error('RDC_DEVICE_PREPARATION_CANCELLED');
+        assertAuthorized();
         this.publish(binding, { contextId: binding.runtime.getContextId(), preparation: { targetDeviceId: device.id, phase: 'ready', issue: null } });
         return { success: true, state: this.snapshotReplayForSession(scope) };
       } catch (error) {
@@ -251,12 +287,12 @@ export class RdcSessionService {
           binding.preparation?.controller.abort(); this.revokePreparationConfirmation(binding);
           this.publish(binding, { generation: binding.state.generation + 1,
             preparation: { targetDeviceId: device.id, phase: 'failed', issue } });
-          await this.closeBinding(scope, binding, {});
+          await this.closeBinding(scope, binding, authority ? { binding: authority.binding } : {});
           this.publish(binding, { contextId: binding.runtime.getContextId() });
           return { success: false, state: this.snapshotReplayForSession(scope), error: issue };
         }
         // A cancelled consumer cannot release a newer context: this serial section owns cleanup until it exits.
-        try { await this.closeBinding(scope, binding, {}); }
+        try { await this.closeBinding(scope, binding, authority ? { binding: authority.binding } : {}); }
         catch (cleanupError) {
           const retainedIssue = { ...issue,
             diagnostic: `${issue.diagnostic}\nCleanup not confirmed: ${replayDeviceIssue(cleanupError).diagnostic}` };
@@ -269,7 +305,10 @@ export class RdcSessionService {
         this.publish(binding, { contextId: null, preparation: { targetDeviceId: device.id, phase: 'failed', issue } });
         return { success: false, state: this.snapshotReplayForSession(scope), error: issue };
       }
-    }).finally(() => { if (binding.preparation?.controller === controller) binding.preparation = undefined; });
+    }).finally(() => {
+      authority?.signal?.removeEventListener('abort', abortFromOwner);
+      if (binding.preparation?.controller === controller) binding.preparation = undefined;
+    });
     binding.preparation = { deviceId: device.id, baseGeneration, controller, pending };
     return pending;
   }
@@ -306,6 +345,8 @@ export class RdcSessionService {
       const reusePrepared = Boolean(remoteId && binding.state.preparation.phase === 'ready'
         && binding.state.preparation.targetDeviceId === remoteId && binding.runtime.isPreparedFor(scope, remoteId));
       if (remoteId && !reusePrepared) throw new Error('RDC_DEVICE_NOT_PREPARED');
+      const previousState = structuredClone(binding.state);
+      const previousCapture = binding.runtime.snapshotOpenedCaptureForSession(scope);
       if (remoteId) this.devices.set(remoteId, key);
       this.publish(binding, { phase: 'validating', operationId: randomUUID(), generation: binding.state.generation + 1, error: null });
       try {
@@ -318,15 +359,18 @@ export class RdcSessionService {
           return { sha256: verified.contentSha256! };
         };
         const hashed = await verifyInput();
+        if (options.expectedCaptureSha256 && hashed.sha256 !== options.expectedCaptureSha256) {
+          throw new Error('RDC_APPROVED_CAPTURE_CHANGED: capture bytes differ from the approved plan.');
+        }
         this.assertInteraction(binding, options);
         if (!reusePrepared) await this.closeBinding(scope, binding, options, remoteId);
-        this.publish(binding, { captureHash: hashed.sha256, contextId: reusePrepared ? binding.runtime.getContextId() : null,
+        this.publish(binding, { inputId: request.inputId, captureHash: hashed.sha256, contextId: reusePrepared ? binding.runtime.getContextId() : null,
           replayDeviceId: null, image: null, observation: null, imageEventId: null, appliedEventId: null, requestedEventId: null, events: [], targets: [], target: null });
         if (project) await replayHistoryStore.saveSelection(project.rootPath, scope.sessionId, { inputId: request.inputId, captureSha256: hashed.sha256, deviceId: request.replayDevice.id });
         this.assertInteraction(binding, options);
         binding.deviceId = remoteId;
         if (remoteId) this.devices.set(remoteId, key);
-        this.publish(binding, { phase: remoteId ? 'connecting' : 'opening', inputId: request.inputId });
+        this.publish(binding, { phase: remoteId ? 'connecting' : 'opening' });
         const opened = await binding.runtime.openProjectInput(request, { ...options, onStage: phase => this.publish(binding, { phase }) });
         let verified: { sha256: string };
         try { verified = await verifyInput(); }
@@ -340,23 +384,40 @@ export class RdcSessionService {
           await this.closeBinding(scope, binding, options);
           throw new Error('CAPTURE_CHANGED_DURING_OPEN: source bytes changed; reopen the current capture.');
         }
-        this.publish(binding, { phase: 'loading_image', contextId: opened.contextId, replayDeviceId: request.replayDevice.id });
+        this.publish(binding, { phase: 'loading_image', contextId: opened.contextId, replayDeviceId: request.replayDevice.id,
+          ...(request.replayDevice.type === 'local' ? { preparation: { targetDeviceId: request.replayDevice.id, phase: 'ready' as const, issue: null } } : {}) });
         const owner = opened.runtimeContext;
         if (owner) {
+          const lease = replayObservationLease(scope, owner);
+          let operation: 'rd.session.get_replay_events' | 'rd.session.observe' = 'rd.session.get_replay_events';
+          let operationArgs: Record<string, unknown> = {};
           try {
             await runRdcOperation(owner.contextId, async () => {
               this.publish(binding, { events: await readReplayEvents(owner, binding.runtime.getCliSettings()) });
-              this.publish(binding, await observeReplay(owner, { final_output: true }, binding.runtime.getCliSettings(), {
+              operation = 'rd.session.observe';
+              operationArgs = { final_output: true };
+              this.publish(binding, await observeReplay(owner, operationArgs, binding.runtime.getCliSettings(), {
                 sessionId: scope.sessionId, generation: binding.state.generation,
               }));
             });
-          } catch (error) { this.publish(binding, { error: { code: 'RDC_IMAGE_FAILED', message: String(error), retry: 'image' } }); }
+          } catch (error) {
+            const fatal = quarantineFatalReplayFailure(scope, lease, error, operation, operationArgs);
+            if (fatal) { this.publish(binding, { phase: 'error', error: fatal }); throw error; }
+            this.publish(binding, { error: { code: 'RDC_IMAGE_FAILED', message: String(error), retry: 'image' } });
+          }
         }
         this.publish(binding, { phase: 'ready' });
         return opened;
       } catch (error) {
         // Do not release a reservation if the native lifecycle still owns a context.
         if (remoteId && this.devices.get(remoteId) === key && (!binding.runtime.getContextId() || binding.deviceId !== remoteId)) this.devices.delete(remoteId);
+        if (error instanceof RdcNativeFailure && binding.state.phase === 'error'
+          && binding.state.error?.retry === 'close' && binding.state.error.code === error.nativeError.code) throw error;
+        if (error instanceof Error && error.message.startsWith('RDC_APPROVED_CAPTURE_CHANGED:') && previousCapture) {
+          this.publish(binding, { ...previousState, generation: binding.state.generation, revision: binding.state.revision,
+            error: { code: 'RDC_APPROVED_CAPTURE_CHANGED', message: error.message, retry: 'open' } });
+          throw error;
+        }
         const issue = replayDeviceIssue(error);
         this.publish(binding, { phase: 'error', contextId: binding.runtime.getContextId(),
           ...(remoteId ? { preparation: { targetDeviceId: remoteId, phase: 'failed', issue } } : {}),
@@ -456,6 +517,38 @@ export class RdcSessionService {
     this.publish(binding, { requestedEventId: request.eventId, operationId });
     return this.observe(request, { event_id: request.eventId, ...(request.target ? { target: { texture_id: request.target.textureId, rt_index: request.target.outputSlot } } : {}) }, true, undefined, false, operationId);
   }
+  /** Main-only restoration under the same owning turn and newly prepared lease. */
+  async restoreAgentPosition(request: CaptureReplayBindingRequest & { eventId: number; target: CaptureReplayTarget | null; isFinalOutput: boolean }, options: {
+    binding: RdcTurnBinding; turnId: string; signal?: AbortSignal;
+  }): Promise<CaptureReplayState> {
+    const binding = this.binding(request);
+    const authorize = () => {
+      options.signal?.throwIfAborted();
+      const lease = assertRdcContextLeaseOwnership({ sessionId: request.sessionId, projectId: request.projectId });
+      const identity = options.binding.identity;
+      if (!ownsRdcInteractionLock(request.sessionId, options.turnId) || !lease || lease.delegatedFrom || !identity
+        || identity.ownerSessionId !== request.sessionId || identity.contextId !== lease.contextId || identity.version !== lease.version
+        || identity.runtimeContext?.captureFileId !== lease.runtimeContext.captureFileId
+        || identity.runtimeContext?.replaySessionId !== lease.runtimeContext.replaySessionId) {
+        throw new Error('RDC_RESTORE_OWNER_INVALID: the prepared owning turn and replay are required.');
+      }
+      this.assertInteraction(binding, options); this.assertGeneration(binding, request.bindingGeneration); this.assertReplayAvailable(binding);
+    };
+    authorize();
+    if (!binding.state.events.some(event => event.eventId === request.eventId)) throw new Error('RDC_EVENT_INVALID');
+    const operationId = randomUUID();
+    this.publish(binding, { requestedEventId: request.eventId, operationId });
+    const args = request.isFinalOutput ? { final_output: true } : { event_id: request.eventId,
+      ...(request.target ? { target: { texture_id: request.target.textureId,
+        ...(request.target.outputSlot === null ? {} : { rt_index: request.target.outputSlot }) } } : {}) };
+    const state = await this.observe(request, args, true, options.binding.cli, false, operationId, { ...options, authorize });
+    authorize();
+    if (state.operationId !== operationId || state.appliedEventId !== request.eventId || state.isFinalOutput !== request.isFinalOutput
+      || JSON.stringify(state.target) !== JSON.stringify(request.target ?? null)) {
+      throw new Error('RDC_RESTORE_UNCONFIRMED: replay position or target does not match the saved state.');
+    }
+    return state;
+  }
   async refreshFrameForSession(scope: CaptureReplayBindingRequest): Promise<CaptureReplayState> {
     const binding = this.binding(scope); this.assertGeneration(binding, scope.bindingGeneration);
     this.assertReplayAvailable(binding); return this.observe(scope, {}, true);
@@ -483,25 +576,32 @@ export class RdcSessionService {
         error: { code: 'REPLAY_SAVE_FAILED', message: String(error), retry: null } });
     }
   }
-  private async observe(scope: SessionScope, args: Record<string, unknown>, human: boolean, frozenCli?: RdcCliInvokerSettings, alreadySerialized = false, operationId = randomUUID()): Promise<CaptureReplayState> {
-    const binding = this.binding(scope); if (human) this.assertInteraction(binding);
+  private async observe(scope: SessionScope, args: Record<string, unknown>, human: boolean, frozenCli?: RdcCliInvokerSettings, alreadySerialized = false, operationId = randomUUID(),
+    agentRestore?: { binding: RdcTurnBinding; signal?: AbortSignal; authorize: () => void }): Promise<CaptureReplayState> {
+    const binding = this.binding(scope); if (human) this.assertInteraction(binding, agentRestore);
     const owner = binding.runtime.snapshotOpenedCaptureForSession(scope)?.runtimeContext;
     if (!owner) throw new Error('RDC_NOT_OPEN');
     const generation = binding.state.generation;
     const operation = async () => {
       if (generation !== binding.state.generation) return;
-      if (human) { this.assertInteraction(binding); this.assertReplayAvailable(binding); }
+      if (human) { this.assertInteraction(binding, agentRestore); this.assertReplayAvailable(binding); agentRestore?.authorize(); }
       // A queued slider request superseded by a newer position must not mutate the context.
       if (args.event_id !== undefined && args.event_id !== binding.state.requestedEventId) return;
+      const lease = replayObservationLease(scope, owner);
       this.publish(binding, { phase: 'applying', operationId, error: null });
       try {
-        const observed = await observeReplay(owner, args, frozenCli ?? binding.runtime.getCliSettings(), {
-          sessionId: scope.sessionId, generation,
-        });
+        const live = { sessionId: scope.sessionId, generation };
+        const observed = agentRestore
+          ? await observeReplay(owner, args, frozenCli ?? binding.runtime.getCliSettings(), live, agentRestore.signal)
+          : await observeReplay(owner, args, frozenCli ?? binding.runtime.getCliSettings(), live);
         if (generation === binding.state.generation) this.publish(binding, { ...observed, operationId,
           ...(!human ? { requestedEventId: observed.appliedEventId ?? null } : {}), phase: 'ready' });
       }
-      catch (error) { if (generation === binding.state.generation) this.publish(binding, { operationId, ...(!human ? { requestedEventId: null } : {}), image: null, observation: null, imageEventId: null, appliedEventId: null, target: null, targets: [], isFinalOutput: false, phase: 'ready', error: { code: 'RDC_OBSERVE_FAILED', message: String(error), retry: 'image' } }); }
+      catch (error) {
+        const fatal = quarantineFatalReplayFailure(scope, lease, error, 'rd.session.observe', args);
+        if (generation === binding.state.generation) this.publish(binding, { operationId, ...(!human ? { requestedEventId: null } : {}), image: null, observation: null, imageEventId: null, appliedEventId: null, target: null, targets: [], isFinalOutput: false,
+          phase: fatal ? 'error' : 'ready', error: fatal ?? { code: 'RDC_OBSERVE_FAILED', message: String(error), retry: 'image' } });
+      }
     };
     if (alreadySerialized) await operation(); else await runRdcOperation(owner.contextId, operation);
     return this.snapshotReplayForSession(scope);

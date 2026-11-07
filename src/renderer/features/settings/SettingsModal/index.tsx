@@ -15,6 +15,7 @@ import { UnsavedChangesDialog } from '../../../ui/UnsavedChangesDialog';
 import { useSettingsNavigation } from './useSettingsNavigation';
 import { SettingsPageContent } from './SettingsPageContent';
 import './SettingsModal.css';
+import { useSettingsNavigationStore } from '../../../stores/settingsNavigationStore';
 
 interface SettingsModalProps {
   open: boolean;
@@ -30,6 +31,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const panelRef = useRef<HTMLDivElement>(null);
   const runtime = useRdcRuntimeOverview(open);
   const [resourceScope, setResourceScope] = useState<'user' | 'project'>('user');
+  const agentRequest = useSettingsNavigationStore((state) => state.agentRequest);
+  const clearAgentRequest = useSettingsNavigationStore((state) => state.clearAgentRequest);
   const {
     t,
     activeSection,
@@ -75,6 +78,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     panelRef.current?.scrollTo({ top: 0, left: 0 });
   }, [activeSection, open]);
 
+  useEffect(() => {
+    if (open && agentRequest) setActiveSection('agents');
+  }, [open, agentRequest, setActiveSection]);
+
   if (!open) return null;
 
   const activeSectionMeta = sections.find((section) => section.id === activeSection);
@@ -106,7 +113,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
             <SettingsCenterNav
               sections={sections}
               activeSection={activeSection}
-              onSelectSection={(section) => guardLeave(() => setActiveSection(section))}
+              onSelectSection={(section) => guardLeave(() => {
+                if (section !== 'agents') clearAgentRequest();
+                setActiveSection(section);
+              })}
               t={t}
             />
 

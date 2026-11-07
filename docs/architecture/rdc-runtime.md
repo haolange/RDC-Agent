@@ -37,7 +37,9 @@ RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`�
 
 ## Agent、Skill、MCP 与 Hook
 
-`rdc_context` 在确认 owning lease 后，按同一 project/session（合法委托使用父 session）核对主进程已打开的 context、captureFileId 和 replaySessionId，并返回 `captureContentSha256`。其来源是打开前后验证一致的实际 capture 文件字节哈希；不匹配、未打开或缺少验证哈希时返回 `null`，不采用 handle 的派生摘要或模型传入值。它只暴露现有主进程身份事实，不授予 capture 生命周期操作权限，也不证明实验已经回滚。
+`runtime_context` 在确认 owning lease 后，按同一 project/session（合法委托使用父 session）核对主进程已打开的 context、captureFileId 和 replaySessionId，并返回 `captureContentSha256`。其来源是打开前后验证一致的实际 capture 文件字节哈希；不匹配、未打开或缺少验证哈希时返回 `null`，不采用 handle 的派生摘要或模型传入值。打开时的原始响应不会作为实时事件或目标暴露；实时位置须另行查询。它只暴露现有主进程身份事实，不授予 capture 生命周期操作权限，也不证明实验已经回滚。
+
+获批 Mission 计划需要实时 RDC 时，`plan_artifact.captureScope` 须冻结拟使用的已登记输入和当前设备，包括只使用当前一份 capture 的情况。正文提及抓帧不生成该合同。缺少 scope 的获批执行仍可处理离线材料和查询目录，但实时 RDC 操作及 live lease 委派被拒绝，须回 Mission 经计划门修订；历史计划不被补写。已冻结范围的 owning General 在相同 session、project、turn 和 full ceiling 下可读取 `captureRestoration`：入口时主进程观察并签名的原始位置及回执 URI/hash，或明确的初始化失败。空位置是已验证的空基线，不等于初始化失败；这份冻结基线不随 capture 切换更新，也不是当前现场。离线子执行和其他 scope 不获得该基线。终答前发现位置不一致时，反馈包含签名基线和当次实际观察，要求通过 `capture_restore` 恢复并重新声明；只有再次实际核验和终态签名才能闭合恢复。
 
 同一响应的 `hostControls` 提供宿主的可复查控制事实。`artifactCapacity` 来自现有 SessionArtifactResolver quota ledger，包含磁盘用量、在途预留、实际单文件/图像/session/文件数上限及扣除在途预留后的当前余量；`measuredAt` 标明读取时间，`isReservation=false`。它不是整批未来空间预留、物理磁盘剩余量或未来写入成功保证；每次写入仍走既有原子预留、限额和事务。计划据此核算保守材料预算，实际失败时保留已发生效果并按恢复合同处理，不把一个 baseline 导出成功当后续容量证明。
 
@@ -78,7 +80,7 @@ Composer 的 context usage 环与弹窗由 `RunContextUsageSummary` 驱动：占
 
 Memory 只有 `memory_search`、`memory_read`、`memory_write`、`memory_delete` 四个 scoped tool。Write 需要明确用户意图或批准，Delete 需要确认；没有自动抽取、turn counter、consolidation 或全索引 Prompt 注入。
 
-Knowledge Center 是三列 UI，只消费 Query / Index / Compile / Candidate / Write。知识库只有 user `~/.rdc-agent/knowledge` 与 project `<项目>/.rdc-agent/knowledge`，会话不是知识库。IPC 为 `knowledge:overview` / `query` / `card` / `compile` / `index:rebuild` / `candidates` / `candidateCreate` / `import` / `image` / `write` / `promote`。持久写入必须显式人类确认；`knowledge:import` 在同一次点击里签发并消费 `knowledge.write` token，写入所选空间 draft，不自动创建 Candidate。生成引擎另立设计。
+Knowledge Center 是三列 UI，消费 Query / Index / Compile / Candidate / Read / Topics / Write。知识库只有 user `~/.rdc-agent/knowledge` 与 project `<项目>/.rdc-agent/knowledge`，会话不是知识库。查询可按 scope、时间和索引版本分页；读取可取简介、章节、行范围或全文，并以原文 hash 约束版本。图片引用仍须实际进入读图链路。主题及同义词可以批量提议、预览和确认，提议本身不改写分类；正文仍以 Markdown 为唯一来源。主要 IPC 为 `knowledge:overview` / `query` / `card` / `read` / `compile` / `index:rebuild` / `candidates` / `candidateCreate` / `import` / `image` / `write` / `promote` / `topics:*`。持久写入必须显式人类确认；`knowledge:import` 在同一次点击里签发并消费 `knowledge.write` token，写入所选空间 draft，不自动创建 Candidate。生成引擎另立设计。
 
 Reasoning 使用 `raw | summary | opaque | none | unknown`。语义来自 Provider/Model contract，不从 OpenAI/Anthropic compatibility protocol 推断。App-managed 且有文档证据的 DeepSeek / Kimi / GLM / MiniMax / MiMo 等解析为 `raw`；真正未核实的第三方路由才是 `unknown`。Work Process 顶层用「工作中 / 工作过程」，loop thinking 用「正在思考 / 已思考 · {duration}」（前置 quiet icon，不用「深度思考」），不展示「语义未验证」。commentary 渲染为 markdown 散文（`proseText`），永不顶 thinking 槽；最终答案仅在 assistant message body 中以 full-bleed prose 呈现，不用 raised bubble。
 
@@ -139,7 +141,7 @@ shader replacement 返回一致的 `status=noop`（顶层与 replacement 的身�
 
 `executeRdcShell` 与人工操作共享 context 队列；native 返回及签名回执完成后，只有 catalog 声明改变回放位置或 shader replacement 的操作才观察并记录足迹，使用该 turn 的冻结 CLI。只读查询不触发额外 replay/export；测量操作是自包含的 awaited 调用，观察不会插入 sampling 内部。是否刷新由操作影响决定，不按工具名称特判。多条命令构成的 experiment 是证据生命周期，不是持续采样事务：有状态操作之间的观察会执行 replay/export，不承诺整个 experiment 零扰动。
 
-`rdc_context.hostControls.replayIsolation` 是 Main 对当前受控 context 的点时排他证明，读取实际 owning lease、冻结身份和该 turn 持有的交互锁；非 owning General、漂移、隔离、委派、同 context 重复 lease 或未持锁均返回 unavailable。成功来源固定为 main-owned-lease-and-turn-lock，绑定 session/project/turn/context/leaseVersion/capture/replay，范围仅 rdc-agent-context。`WorldState.replay.exclusiveLock` 在此受控范围内有该来源支撑，仍须三态分别保存并与阶段回执核对；不是整批 native mutex 或外部进程排除证明，不免除实际变更状态及恢复校验。context 小结果沿既有制品路径保留 inline 正文和持久 URI/hash；不能据新的证明回填旧实验资格。
+`runtime_context.rdc.hostControls.replayIsolation` 是 Main 对当前受控 context 的点时排他证明，读取实际 owning lease、冻结身份和该 turn 持有的交互锁；非 owning General、漂移、隔离、委派、同 context 重复 lease 或未持锁均返回 unavailable。成功来源固定为 main-owned-lease-and-turn-lock，绑定 session/project/turn/context/leaseVersion/capture/replay，范围仅 rdc-agent-context。`WorldState.replay.exclusiveLock` 在此受控范围内有该来源支撑，仍须三态分别保存并与阶段回执核对；不是整批 native mutex 或外部进程排除证明，不免除实际变更状态及恢复校验。context 小结果沿既有制品路径保留 inline 正文和持久 URI/hash；不能据新的证明回填旧实验资格。
 
 远程打开期间通过冻结 CLI 查询所属 daemon 的 `active_operation`；只有原生 transfer stage 才显示传输阶段，查询失败不推测进度。足迹记录原生 `revision`、实际替换/恢复状态和显示参数。观察无法确认 EID 时保存无图片的失败事实；人工与 Agent 操作统一更新同一当前回放状态和图片，不再保留 Agent 专属图片镜像；实际 image EID 与 observation 元数据来自同一次原生观察。后台操作证据继续保存，不作为第二套回放 UI。
 
@@ -202,7 +204,11 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 
 普通结构化 RDC 调用成功后，主进程在结果正文和 details 同时附带 `invocation`：`main-validated-cli-arguments`、operation、实际送入冻结 CLI 的参数和 canonical SHA-256 指纹，含主进程解析注入的 replay 身份；不包含 transport 环境或凭据。敏感参数键存在时显式省略参数正文并标记原因。它说明本次调用参数，不替代原生结果、签名实验回执或恢复证明。历史结果不回填；原模型请求只能通过 owning root General 的 hash-bound `artifact_read.includeRecordedRequest` 从 SessionContextJournal 生成独立限定来源凭据，再显式授予审查者。
 
-原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。`rdc_context` 对同一 session/project 的隔离身份返回明确的受控恢复状态，不将仍打开的 capture 误报为未打开，也不向其他 scope 泄露保留的 lease。新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化。失败没有取得可信恢复证明时仍 fail-closed；恢复通过应用生命周期重新建立 owning capture/replay/context 身份。
+原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。`runtime_context` 对同一 session/project 的隔离身份返回明确的受控恢复状态，不将仍打开的 capture 误报为未打开，也不向其他 scope 泄露保留的 lease。新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化。失败没有取得可信恢复证明时仍 fail-closed；恢复通过应用生命周期重新建立 owning capture/replay/context 身份。
+
+获批调查可在同一 owning session 内通过 `rdc_probe` 的 `capture_select` 选择计划中经主进程冻结的 input ID、内容 hash 与设备，不能传任意路径或切换到未经批准的设备。切换前核验实际 replay、事件、替换和进程身份，结束相关子执行及实验；完成旧 context 释放和 daemon stop 后打开目标，并以原冻结权限、模型、catalog 和消费重新准备。`capture_restore` 恢复进入调查前的输入及位置，实际观察一致后才能作为恢复事实；切换、停止和新身份通过主进程签名回执关联。操作仍受当前权限模式约束，不能用能力声明代替授权。
+
+同输入、设备及权限的原生故障可请求 `capture_recover`：只处理实际失败而隔离的 lease，中断并 join 持该 lease 的相关子执行，核对原 daemon/worker 身份，按 clear context → 确认 daemon stop → 重开和重新准备的顺序进行。相同失败条件重复或进程退出、权限、安装状态无法确认时停止并保留隔离，不伪造恢复。任务进入前的位置由签名 baseline 记录；中断或重启后未闭合记录在 Capture 显示，由用户触发恢复，不自动续跑模型。恢复前复核输入 hash、设备、替换和旧进程，只有重新观察到原位置才签 resolved。历史结果不被补签，不跨新旧现场拼接实验。
 
 Android 的 remote_display 由同一远程连接的原生呈现确认驱动，核对当前事件、目标纹理及新鲜序号；后台窗口、原生失败或缺失能力不得显示 presented。无颜色输出清除手机旧画面并表达无输出，应用 PNG 与手机屏幕状态分别判断。
 
@@ -224,7 +230,7 @@ Settings 的显式验证执行同安装 doctor，检查 Python、RenderDoc、And
 
 ## 设备选择即准备与同会话打开
 
-设备发现仅报告 ADB 可见性。当前会话的 CaptureReplayState.preparation 是唯一设备目标、阶段和结构化问题来源；顶部 Remote 和 Capture 面板共用 device:prepare/device:cancelPreparation，不各自持有下一次设备权威。选择 Android 即分配本会话 owning context，通过同安装 canonical rd.remote.connect 检查、修复、启动、握手并 Ping；成功后尚未打开 capture，不向 Agent 发布 capture lease。Open 消费同一个连接；同设备替换文件只关闭旧 replay/file，保留远端连接，不重复安装或启动。全局 preparedRemotes/context/remoteId 临时交接与其恢复缓存已删除。
+设备发现仅报告 ADB 可见性。当前会话的 CaptureReplayState.preparation 是唯一设备目标、阶段和结构化问题来源；顶部 Remote 和 Capture 面板共用 device:prepare/device:cancelPreparation，不各自持有下一次设备权威。Local 可从 Capture 直接打开：原文件验证和原生打开成功后，主进程与 replay 设备身份一起发布 Local ready，供界面与调查入口使用。选择 Android 即分配本会话 owning context，通过同安装 canonical rd.remote.connect 检查、修复、启动、握手并 Ping；成功后尚未打开 capture，不向 Agent 发布 capture lease。Open 消费同一个连接；同设备替换文件只关闭旧 replay/file，保留远端连接，不重复安装或启动。全局 preparedRemotes/context/remoteId 临时交接与其恢复缓存已删除。
 
 设备选择授权同安装 Tools 自动准备目标 RenderDoc helper：缺失安装、兼容启动/借用、不兼容覆盖，必要时降级或卸载重装（可能清除辅助程序自身数据）。变更前重新核对设备、包和服务身份；busy 与未知归属不抢占。rd.remote.connect 的 preparation_policy=automatic 是能力标识，不保留人工修复策略或确认指纹。主进程仅为已有 Capture 切换签发一次关闭确认。旧 Tools 缺少自动准备合同时要求同步升级，不按包版本判权；Local 不受影响。原始 native error.details 保留，renderer 仅按结构化问题展示，不解析英文异常决定安装。
 

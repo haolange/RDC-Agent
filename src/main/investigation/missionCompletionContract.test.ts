@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { InvestigationError } from './investigationErrors';
 import {
   assertMissionTurnCompletion,
+  enforceMissionTurnReadiness,
   enforceMissionTurnCompletion,
   finalAnswerCitesReport,
   isAllowedMissionCompletionStatus,
@@ -19,11 +21,14 @@ import {
   projectClaim,
   recordedExperiment,
   sampleCheckpoint,
+  sampleChallenge,
+  sampleReport,
   sampleReportContract,
   seedNote,
   writeDraft,
   writeReadyReport,
 } from './investigationTestFixtures';
+import type { InvestigationArtifactService } from './InvestigationArtifactService';
 
 const MISSIONS = ['debugger', 'analyzer', 'optimizer'] as const;
 
@@ -40,6 +45,22 @@ function seedHypothesis(service: ReturnType<typeof createInvestigationHarness>['
 }
 
 describe('missionCompletionContract', () => {
+  it('rejects missing completion artifacts at declaration time while leaving final citation to the terminal gate', () => {
+    const { service } = createInvestigationHarness();
+    const input = { profileId: 'general', completionContract: 'investigation-report' as const,
+      investigationMission: 'debugger' as const, sessionId: SESSION_ID, disposition: 'completed' as const, service };
+    expect(() => enforceMissionTurnReadiness(input)).toThrow(/dereferenceable MissionCheckpoint/);
+    seedCheckpoint(service, 'debugger');
+    expect(() => enforceMissionTurnReadiness(input)).toThrow(/ready kind=report/);
+    const claim = seedHypothesis(service, 'debugger');
+    writeReadyReport(service, { mission: 'debugger', source: claim,
+      claims: [projectClaim(claim.record as never, 'claim-readiness-proj')] });
+    expect(() => enforceMissionTurnReadiness(input)).not.toThrow();
+    expect(() => assertMissionTurnCompletion({ ...input, finalAnswerText: 'The report is not cited.' }))
+      .toThrow(/canonical final_answer must cite/);
+    expect(() => enforceMissionTurnReadiness({ ...input, disposition: 'partial', sessionId: null })).not.toThrow();
+  });
+
   it('does not constrain General', () => {
     expect(enforceMissionTurnCompletion({
       profileId: 'general',
@@ -157,6 +178,21 @@ describe('missionCompletionContract', () => {
       finalAnswerText: 'I registered report.md via output_register.',
       service,
     })).toThrow(/final_not_bound|MISSION_COMPLETION_DENIED/);
+    try {
+      assertMissionTurnCompletion({
+        profileId: mission,
+        completionContract: 'investigation-report',
+        investigationMission: mission,
+        sessionId: SESSION_ID,
+        finalAnswerText: `${report.manifest.artifactId} SHA-256 ${report.contentHash.replace('sha256:', '')}`,
+        service,
+      });
+      throw new Error('Bare digest unexpectedly accepted');
+    } catch (error) {
+      expect(error).toBeInstanceOf(MissionCompletionError);
+      expect((error as MissionCompletionError).reason).toBe('final_not_bound');
+      expect((error as Error).message).toContain(`${report.manifest.artifactId} ${report.contentHash}`);
+    }
     const finalAnswer = `Canonical final cites ${report.manifest.artifactId} at ${report.contentHash}.`;
     expect(finalAnswerCitesReport(finalAnswer, report.manifest.artifactId, report.contentHash)).toBe(true);
     const receipt = assertMissionTurnCompletion({
@@ -190,6 +226,10 @@ describe('missionCompletionContract', () => {
       claims: [projectClaim(claim.record as never, 'claim-status-pending')],
       reportContract: sampleReportContract([claim.manifest.artifactId], { status: 'Pending' }),
     });
+    expect(() => enforceMissionTurnReadiness({
+      profileId: 'debugger', completionContract: 'investigation-report', investigationMission: 'debugger',
+      sessionId: SESSION_ID, disposition: 'completed', service,
+    })).toThrow(/report.status/);
     expect(() => assertMissionTurnCompletion({
       profileId: 'debugger',
       completionContract: 'investigation-report',
@@ -200,7 +240,7 @@ describe('missionCompletionContract', () => {
     })).toThrow(/non_complete_status|MISSION_COMPLETION_DENIED/);
   });
 
-  it('refuses Analyzer completion when any explanation layer is missing', () => {
+  it('allows an appropriately scoped Analyzer report without inventing other explanation layers', () => {
     const { service } = createInvestigationHarness();
     seedCheckpoint(service, 'analyzer');
     const observed = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-analyzer-obs'), { mission: 'analyzer' });
@@ -216,7 +256,84 @@ describe('missionCompletionContract', () => {
       sessionId: SESSION_ID,
       finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`,
       service,
-    })).toThrow(/mission_method|Reconstructed|Authoring|MISSION_COMPLETION_DENIED/);
+    })).not.toThrow();
+  });
+
+  it('blocks completion for an open Challenge against the reported source, not an unrelated finding', { timeout: 15_000 }, () => {
+    const { service } = createInvestigationHarness();
+    seedCheckpoint(service, 'debugger');
+    const source = seedHypothesis(service, 'debugger');
+    const unrelated = writeDraft(service, 'claim', hypothesisClaim('ws-baseline', 'claim-unrelated'));
+    const unrelatedChallenge = writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'unrelated-challenge', targetId: (unrelated.record as { claimId: string }).claimId }));
+    const report = writeReadyReport(service, { mission: 'debugger', source,
+      claims: [projectClaim(source.record as never, 'projected-conclusion')] });
+    const input = { profileId: 'debugger', completionContract: 'investigation-report' as const,
+      investigationMission: 'debugger' as const, sessionId: SESSION_ID,
+      finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`, service };
+    const readiness = { ...input, disposition: 'completed' as const };
+    expect(() => enforceMissionTurnReadiness(readiness)).not.toThrow();
+    expect(() => assertMissionTurnCompletion(input)).not.toThrow();
+    const challenge = writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'source-challenge', targetId: (source.record as { claimId: string }).claimId }));
+    expect(() => enforceMissionTurnReadiness(readiness)).toThrow('source-challenge');
+    expect(() => assertMissionTurnCompletion(input)).toThrow('source-challenge');
+    writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'source-challenge', targetId: (source.record as { claimId: string }).claimId,
+      status: 'resolved', resolutionClaimId: (source.record as { claimId: string }).claimId }), { supersedes: challenge.manifest.artifactId });
+    expect(service.readRecord(SESSION_ID, unrelatedChallenge.manifest.artifactId).record).toMatchObject({ status: 'open' });
+    expect(() => enforceMissionTurnReadiness(readiness)).not.toThrow();
+    expect(() => assertMissionTurnCompletion(input)).not.toThrow();
+  });
+
+  it('allows a declaration when another ready report satisfies the contract', { timeout: 15_000 }, () => {
+    const { service } = createInvestigationHarness();
+    seedCheckpoint(service, 'debugger');
+    const claim = seedHypothesis(service, 'debugger');
+    const claims = [projectClaim(claim.record as never, 'claim-multiple-reports')];
+    const pending = writeReadyReport(service, { mission: 'debugger', source: claim, claims,
+      reportContract: sampleReportContract([claim.manifest.artifactId], { status: 'Pending' }) });
+    const complete = writeReadyReport(service, { mission: 'debugger', source: claim, claims });
+    const input = { profileId: 'debugger', completionContract: 'investigation-report' as const,
+      investigationMission: 'debugger' as const, sessionId: SESSION_ID, service };
+    expect(() => enforceMissionTurnReadiness({ ...input, disposition: 'completed' })).not.toThrow();
+    expect(() => assertMissionTurnCompletion({ ...input, finalAnswerText: `${pending.manifest.artifactId} ${pending.contentHash}` }))
+      .toThrow(/report.status/);
+    expect(() => assertMissionTurnCompletion({ ...input, finalAnswerText: `${complete.manifest.artifactId} ${complete.contentHash}` }))
+      .not.toThrow();
+  });
+
+  it.each([
+    new Error('unexpected report lookup failure'),
+    new InvestigationError('INVESTIGATION_STORAGE_FAILED', 'report storage unavailable'),
+  ])('propagates unexpected report validation failures instead of trying another report: %s', failure => {
+    const source = hypothesisClaim('ws-baseline', 'claim-lookup');
+    const record = sampleReport({ mission: 'debugger', claims: [projectClaim(source, 'claim-lookup-projected')],
+      reportContract: sampleReportContract(['source-artifact']) });
+    const lookup = { getArtifact: (artifactId: string) => ({ artifactId }), getClaim: () => source,
+      getWorldState: () => null, getEvidence: () => null, getExperiment: () => null };
+    const service = {
+      list: (_sessionId: string, filter: { kind: string }) => filter.kind === 'checkpoint'
+        ? [{ artifactId: 'checkpoint', status: 'draft' }]
+        : filter.kind === 'report' ? [{ artifactId: 'report-a', status: 'ready' }, { artifactId: 'report-b', status: 'ready' }] : [],
+      readRecord: (_sessionId: string, artifactId: string) => artifactId === 'checkpoint'
+        ? { manifest: { artifactId, status: 'draft', mission: 'debugger' }, record: { checkpointId: 'checkpoint' } }
+        : { manifest: { artifactId, status: 'ready', kind: 'report', mission: 'debugger' }, record },
+      createLookup: vi.fn().mockImplementationOnce(() => { throw failure; }).mockReturnValue(lookup),
+    } as unknown as InvestigationArtifactService;
+    expect(() => enforceMissionTurnReadiness({
+      profileId: 'general', completionContract: 'investigation-report', investigationMission: 'debugger',
+      sessionId: SESSION_ID, disposition: 'completed', service,
+    })).toThrow(failure.message);
+  });
+
+  it('rejects an Optimizer declaration when no ready report has a qualifying experiment', { timeout: 15_000 }, () => {
+    const { service } = createInvestigationHarness();
+    seedCheckpoint(service, 'optimizer');
+    const claim = seedHypothesis(service, 'optimizer');
+    writeReadyReport(service, { mission: 'optimizer', source: claim,
+      claims: [projectClaim(claim.record as never, 'claim-optimizer-no-experiment')] });
+    expect(() => enforceMissionTurnReadiness({
+      profileId: 'general', completionContract: 'investigation-report', investigationMission: 'optimizer',
+      sessionId: SESSION_ID, disposition: 'completed', service,
+    })).toThrow(/Optimizer completion requires/);
   });
 
   it('does not treat an ordinary Mission reply as completed', () => {

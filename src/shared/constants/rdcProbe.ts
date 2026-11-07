@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const RDC_PROBE_ACTIONS = ['enumerate', 'doctor', 'version', 'probe', 'lease_open', 'lease_close', 'preview_status'] as const;
+export const RDC_PROBE_ACTIONS = ['enumerate', 'doctor', 'version', 'probe', 'capture_select', 'capture_restore', 'capture_recover', 'preview_status'] as const;
 export type RdcProbeAction = (typeof RDC_PROBE_ACTIONS)[number];
 export const RDC_PROBE_ACTION_SET = new Set<string>(RDC_PROBE_ACTIONS);
 
@@ -19,18 +19,17 @@ const QueryArgs = z.object({
 
 export const RdcProbeInputSchema = z.object({
   action: z.enum(RDC_PROBE_ACTIONS),
-  capturePath: optionalField(z.string().min(1)),
-  contextId: optionalField(z.string().min(1)),
+  inputId: optionalField(z.string().min(1).max(256)),
   args: QueryArgs.optional(),
 }).strict().superRefine((input, ctx) => {
-  if (input.action === 'lease_open' && !input.capturePath) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'lease_open requires capturePath.' });
+  if (input.action === 'capture_select' && !input.inputId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'capture_select requires inputId.' });
   }
   if (input.action !== 'probe' && input.args && Object.keys(input.args).length > 0) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Only probe accepts query args.' });
   }
-  if (input.capturePath && input.action !== 'lease_open') {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Only lease_open accepts capturePath.' });
+  if (input.inputId && input.action !== 'capture_select') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Only capture_select accepts inputId.' });
   }
   if (input.action === 'probe') {
     const query = input.args?.action ?? 'context_status';
@@ -59,6 +58,9 @@ export type RdcProbeInput = z.infer<typeof RdcProbeInputSchema>;
 /** Compile only parser-backed native rdc commands. Global args are added by the invoker. */
 export function compileRdcProbe(input: RdcProbeInput): { command: string; args: string[]; needsContext: boolean } {
   const parsed = RdcProbeInputSchema.parse(input);
+  if (parsed.action === 'capture_select' || parsed.action === 'capture_restore' || parsed.action === 'capture_recover') {
+    throw new Error('RDC_PROBE_LIFECYCLE: capture lifecycle is not a CLI probe query.');
+  }
   if (parsed.action === 'version' || parsed.action === 'doctor') {
     return { command: parsed.action, args: parsed.action === 'version' ? ['--json'] : [], needsContext: false };
   }

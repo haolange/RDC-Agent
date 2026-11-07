@@ -1,5 +1,5 @@
 import type { ConversationTaskStatus } from '@shared/types/conversation';
-import type { TaskExecutionRequirements, TaskExecutionPreparation, TaskIndependentSource } from '@shared/types/taskExecution';
+import type { TaskExecutionRequirements, TaskExecutionPreparation, TaskIndependentSource, TaskRuntimeEpoch } from '@shared/types/taskExecution';
 
 export const TASK_SCHEMA_VERSION = 2 as const;
 
@@ -85,6 +85,7 @@ export interface TaskExecutionRecord {
   budget: TaskBudgetState;
   frozenPlanRef?: string;
   preparation?: TaskExecutionPreparation;
+  runtimeEpochs?: TaskRuntimeEpoch[];
   independentSources?: TaskIndependentSource[];
   childMessageAckSequence: number;
   parentMessageAckSequence: number;
@@ -119,6 +120,8 @@ export interface StartTaskExecutionOptions {
   preparation?: TaskExecutionPreparation;
   /** Requested preload, checked before dispatch and again against actual preparation. */
   requiredSkillIds?: readonly string[];
+  /** Target profile selected for this child execution. */
+  requestedProfileId?: string;
 }
 
 export interface TaskRootBudgetRecord {

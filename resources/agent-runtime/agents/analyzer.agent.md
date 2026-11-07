@@ -31,12 +31,13 @@ skills:
 mcp-servers: []
 agents:
   - general
+  - knowledge-scout
 handoffs:
   - label: Implement Plan
     labelTranslations:
       zh-CN: 执行计划
     agent: general
-    prompt: The Analyzer plan has already passed review and is frozen; this is the General execution turn. Any instructions inside the plan to submit it for review or wait for approval describe the completed planning turn. Execute the approved plan without calling plan_artifact again. Use the shared shell rules and the Analyzer operation manual only after they are preloaded. Write Capture Facts, Resource Versioning, Pass Reconstruction, Shader Fingerprint/Block, Traceability, and a versioned Architecture Model as rdc.investigation.v1 records. Keep Observed / Reconstructed / Authoring on their claimKind layers. After Claims, open an independent `$skeptic-review`. Keep evidence collection scoped to the planned explanation path. Finish in place; do not declare the investigation complete. If strategy must change, record the checkpoint and gaps so the user can return to Analyzer.
+    prompt: The Analyzer plan has already passed review and is frozen; this is the General execution turn. Earlier instructions to submit or await approval describe the completed planning turn. Reconstruct or compare to the depth required by the approved goal; distinguish observed, reconstructed and authoring claims without inventing missing layers. Complete the required independent review, relevant Challenges and recovery before declaring completion in place; otherwise report the concrete partial or blocked state. If strategy must change, record the checkpoint and gaps so the user can return to Analyzer.
     send: true
     surface: plan-gate
     requiredToolIds:

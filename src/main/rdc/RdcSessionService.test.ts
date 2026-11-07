@@ -1,8 +1,9 @@
-import { clearRdcContextLeases, setRdcRuntimeContextForSession, quarantineRdcContext } from './RdcRuntimeContextRegistry';
+import { assertRdcContextLeaseOwnership, clearRdcContextLeases, getRdcContextLease, setRdcRuntimeContextForSession, quarantineRdcContext } from './RdcRuntimeContextRegistry';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { OpenProjectInputRequest } from '@shared/types/session';
+import type { OpenProjectInputRequest, ProjectRecord } from '@shared/types/session';
 import type { ReplayDeviceSnapshot } from '@shared/types/device';
-const mocks = vi.hoisted(() => ({ deviceSubscribers: new Set<(snapshot: ReplayDeviceSnapshot) => void>(), inspect: vi.fn(), prepare: vi.fn(), close: vi.fn(), observe: vi.fn(), events: vi.fn(), append: vi.fn(), hash: vi.fn(), saveSelection: vi.fn(), liveRead: vi.fn(), liveClear: vi.fn(), project: vi.fn(), reference: vi.fn() }));
+import { ProjectInputLifecycle, type ProjectInputLifecycleHost } from './captures/ProjectInputLifecycle';
+const mocks = vi.hoisted(() => ({ deviceSubscribers: new Set<(snapshot: ReplayDeviceSnapshot) => void>(), opened: vi.fn(), inspect: vi.fn(), prepare: vi.fn(), close: vi.fn(), observe: vi.fn(), events: vi.fn(), append: vi.fn(), hash: vi.fn(), saveSelection: vi.fn(), liveRead: vi.fn(), liveClear: vi.fn(), project: vi.fn(), reference: vi.fn() }));
 vi.mock('./captures/replay/captureContentHash', () => ({ hashCaptureFile: mocks.hash }));
 vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { getProjectById: mocks.project } }));
 vi.mock('./captures/ExternalCaptureReference', () => ({ verifyExternalCaptureReference: mocks.reference }));
@@ -26,7 +27,9 @@ vi.mock('./RdcSessionRuntime', () => ({ RdcSessionRuntime: class {
   async openProjectInput(request: OpenProjectInputRequest) {
     this.contextId = 'context-' + request.sessionId; this.deviceId = request.replayDevice.id;
     this.opened = { ...request, ownerSessionId: request.sessionId, contextId: `context-${request.sessionId}`,
-      runtimeContext: { contextId: `context-${request.sessionId}`, replaySessionId: `native-${request.sessionId}` } };
+      runtimeContext: { contextId: `context-${request.sessionId}`, replaySessionId: `native-${request.sessionId}`,
+        captureFileId: 'file', runtimeOwner: 'app', ownerLeaseId: 'owner', backend: 'local', updatedAt: 1 } };
+    mocks.opened(request);
     return this.opened;
   }
   getPreparationBindingIdentity() { return 'binding-old'; }
@@ -38,18 +41,26 @@ vi.mock('./RdcSessionRuntime', () => ({ RdcSessionRuntime: class {
 } }));
 import { harvestOwnedRdcDaemons } from './OwnedRdcDaemonRegistry';
 import { RdcSessionService } from './RdcSessionService';
+import { selectedProbeDeviceId } from './RdcProbeLifecycle';
 import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
+import { rdcDigest } from './RdcExecutionReceipts';
 import { setRdcInteractionLock, runRdcOperation } from './RdcOperationCoordinator';
+import { freezeRdcTurnBinding } from './RdcTurnBindings';
+import type { ReplayHistoryStore } from './captures/replay/ReplayHistoryStore';
 const scope = { projectId: 'p', sessionId: 's1' };
 const request = (sessionId = 's1', remote = false): OpenProjectInputRequest => ({ projectId: 'p', sessionId,
   inputId: 'capture', filePath: '/project/capture.rdc', replayDevice: { id: remote ? 'android' : 'local',
     type: remote ? 'android' : 'local', label: 'device', status: 'online', transport: 'local' } });
+const replayLease = () => setRdcRuntimeContextForSession('s1', { contextId: 'context-s1', replaySessionId: 'native-s1',
+  captureFileId: 'file', runtimeOwner: 'app', ownerLeaseId: 'owner', backend: 'local', updatedAt: 1 }, { projectId: 'p' })!;
+const replayFailure = (code: string) => new RdcNativeFailure(`RDC_CLI_FAILED: ${code}: native connection lost`,
+  null, false, false, { code, category: 'runtime', exitCode: 1 });
 async function openRemote(service: RdcSessionService, sessionId = 's1') {
   const value = request(sessionId, true);
   await service.prepareDevice({projectId:value.projectId,sessionId,deviceId:value.replayDevice.id,bindingGeneration:service.snapshotReplayForSession(value).generation});
   return service.openProjectInput(value);
 }
-beforeEach(() => { clearRdcContextLeases(); vi.clearAllMocks(); mocks.project.mockReturnValue({ rootPath: '/project' }); mocks.reference.mockReset(); mocks.hash.mockReset(); mocks.hash.mockResolvedValue({ sha256: 'a'.repeat(64) }); mocks.close.mockResolvedValue(undefined); mocks.prepare.mockReset(); mocks.prepare.mockResolvedValue(undefined);
+beforeEach(() => { clearRdcContextLeases(); vi.clearAllMocks(); mocks.opened.mockReset(); mocks.project.mockReturnValue({ rootPath: '/project' }); mocks.reference.mockReset(); mocks.hash.mockReset(); mocks.hash.mockResolvedValue({ sha256: 'a'.repeat(64) }); mocks.close.mockResolvedValue(undefined); mocks.prepare.mockReset(); mocks.prepare.mockResolvedValue(undefined);
   mocks.deviceSubscribers.clear();
   mocks.inspect.mockReset(); mocks.inspect.mockResolvedValue({ state: 'pending', deviceSerial: 'SERIAL', packageName: 'helper', apkSha256: 'a'.repeat(64) });
   mocks.events.mockResolvedValue([{ eventId: 1 }, { eventId: 9 }]);
@@ -73,6 +84,7 @@ describe('per-session capture lifecycle', () => {
     await expect(service.openProjectInput(request())).rejects.toThrow('CAPTURE_REFERENCE_CHANGED');
     expect(mocks.close).toHaveBeenCalledTimes(1);
     expect(service.snapshotOpenedCaptureForSession(scope)).toBeNull();
+    expect(service.snapshotReplayForSession(scope).preparation.phase).toBe('idle');
     expect(mocks.events).not.toHaveBeenCalled();
   });
   it('keeps same capture independent across sessions', async () => {
@@ -96,11 +108,75 @@ describe('per-session capture lifecycle', () => {
     expect(mocks.observe).toHaveBeenCalledWith(expect.anything(), { final_output: true }, undefined, expect.objectContaining({ sessionId: 's1' }));
     expect(service.snapshotReplayForSession(scope).phase).toBe('ready');
   });
+  it('makes a directly opened Local replay available to investigation without separate device preparation', async () => {
+    const service = new RdcSessionService();
+    const published = vi.fn(); service.subscribe(published);
+    await service.openProjectInput(request());
+    const state = service.snapshotReplayForSession(scope);
+    expect(state.preparation).toEqual({ targetDeviceId: 'local', phase: 'ready', issue: null });
+    expect(selectedProbeDeviceId(state)).toBe('local');
+    expect(published.mock.calls.filter(([value]) => value.replayDeviceId === 'local')
+      .every(([value]) => value.preparation.targetDeviceId === 'local' && value.preparation.phase === 'ready')).toBe(true);
+    expect(mocks.prepare).not.toHaveBeenCalled();
+  });
+  it('keeps the input identity consistent when a project refresh overlaps a capture switch', async () => {
+    const oldHash = 'a'.repeat(64); const newHash = 'b'.repeat(64);
+    const inputs: ProjectRecord['inputs'] = [
+      { inputId: 'capture', fileName: 'capture.rdc', filePath: '/project/capture.rdc', contentSha256: oldHash,
+        size: 1, discoveredAt: 1, lastModifiedAt: 1, source: 'project_resource' },
+      { inputId: 'replacement', fileName: 'replacement.rdc', filePath: '/project/replacement.rdc', contentSha256: newHash,
+        size: 1, discoveredAt: 1, lastModifiedAt: 1, source: 'project_resource' },
+    ];
+    const project: ProjectRecord = { projectId: 'p', name: 'project', rootPath: '/project', inputsPath: '/project/inputs',
+      resourcePath: '/project', knowledgePath: '', slug: 'project', inputsUpdatedAt: 1, createdAt: 1, updatedAt: 1, inputs };
+    mocks.project.mockReturnValue(project);
+    mocks.hash.mockImplementation(async (filePath: string) => ({ sha256: filePath.includes('replacement') ? newHash : oldHash }));
+    const service = new RdcSessionService(); await service.openProjectInput(request());
+    const stop = vi.fn(async () => undefined); const close = vi.fn(async () => undefined);
+    const host: ProjectInputLifecycleHost = { getProject: () => project, refresh: async () => inputs,
+      detachReference: async () => inputs, bindings: () => service.listBindingsForProject('p'), close,
+      rebind: vi.fn(async () => undefined), block: async (_project, _input, operation) => operation(), stop };
+    const history = { reconcileCaptureReferences: vi.fn(async () => undefined), reconcileInputSelections: vi.fn(async () => undefined) };
+    const lifecycle = new ProjectInputLifecycle(host, history as unknown as ReplayHistoryStore);
+    const binding = freezeRdcTurnBinding({ enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 });
+    mocks.saveSelection.mockImplementationOnce(async () => { await lifecycle.reconcile(project, inputs); });
+    setRdcInteractionLock('s1', 'test', true);
+    try {
+      await service.openProjectInput({ ...request(), inputId: 'replacement', filePath: '/project/replacement.rdc' }, { binding });
+      expect(stop).not.toHaveBeenCalled(); expect(close).not.toHaveBeenCalled();
+      expect(service.snapshotReplayForSession(scope)).toMatchObject({ phase: 'ready', inputId: 'replacement', captureHash: newHash });
+      expect(history.reconcileInputSelections).toHaveBeenCalledOnce();
+    } finally { setRdcInteractionLock('s1', 'test', false); }
+  });
   it('retains opened context when image loading fails', async () => {
     mocks.observe.mockRejectedValueOnce(new Error('image unavailable'));
     const service = new RdcSessionService(); await service.openProjectInput(request());
     expect(service.snapshotOpenedCaptureForSession(scope)).not.toBeNull();
     expect(service.snapshotReplayForSession(scope).error?.retry).toBe('image');
+  });
+  it.each([
+    ['events', 'replay_fatal_error', 'rd.session.get_replay_events', {}],
+    ['observe', 'replay_fatal_error', 'rd.session.observe', { final_output: true }],
+    ['observe', 'replay_health_unavailable', 'rd.session.observe', { final_output: true }],
+  ] as const)('quarantines the owning lease when initial %s reports %s', async (stage, code, operation, args) => {
+    mocks.opened.mockImplementationOnce(replayLease);
+    (stage === 'events' ? mocks.events : mocks.observe).mockRejectedValueOnce(replayFailure(code));
+    const service = new RdcSessionService();
+    await expect(service.openProjectInput(request())).rejects.toThrow(code);
+    expect(service.snapshotReplayForSession(scope)).toMatchObject({ phase: 'error',
+      error: { code, message: expect.stringContaining('native connection lost'), retry: 'close' } });
+    expect(getRdcContextLease('s1')?.quarantineCause).toEqual({ operation, argsFingerprint: rdcDigest(args), code });
+    expect(assertRdcContextLeaseOwnership(scope)).toBeNull();
+    await expect(service.refreshFrameForSession({ ...scope, bindingGeneration: 1 })).rejects.toThrow('QUARANTINED');
+    expect(service.snapshotReplayForSession(scope).error?.message).toContain('native connection lost');
+    expect(await service.clearOpenedCaptureForSession(scope)).toBe(true);
+  });
+  it('fails closed on a fatal observation even if no matching lease is available', async () => {
+    mocks.observe.mockRejectedValueOnce(replayFailure('replay_fatal_error'));
+    const service = new RdcSessionService(); await expect(service.openProjectInput(request())).rejects.toThrow('replay_fatal_error');
+    expect(service.snapshotReplayForSession(scope)).toMatchObject({ phase: 'error', error: { retry: 'close' } });
+    await expect(service.refreshFrameForSession({ ...scope, bindingGeneration: 1 })).rejects.toThrow('RDC_REPLAY_BUSY');
+    expect(await service.clearOpenedCaptureForSession(scope)).toBe(true);
   });
   it('locks UI throughout Agent preparation and broadcasts lock changes', async () => {
     const service = new RdcSessionService(); await service.openProjectInput(request());
@@ -131,6 +207,21 @@ describe('per-session capture lifecycle', () => {
   });
 });
 
+it('allows only the owning live turn to prepare its device with the frozen binding', async () => {
+  const service = new RdcSessionService();
+  const binding = freezeRdcTurnBinding({ enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 });
+  const authority = { binding, turnId: 'test', assertAuthorized: vi.fn() };
+  const input = { ...scope, deviceId: 'android', bindingGeneration: 0 };
+  await expect(service.prepareAgentDevice(input, authority)).rejects.toThrow('RDC_RECOVERY_OWNER_INVALID');
+  setRdcInteractionLock('s1', 'test', true);
+  try {
+    const result = await service.prepareAgentDevice(input, authority);
+    expect(result.success).toBe(true);
+    expect(mocks.prepare).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: 'android' }), expect.objectContaining({ binding }));
+    expect(authority.assertAuthorized).toHaveBeenCalled();
+  } finally { setRdcInteractionLock('s1', 'test', false); }
+});
+
 it('drops an in-flight old observation when replacement has advanced the generation', async () => {
   const service = new RdcSessionService(); await service.openProjectInput(request());
   let release!: (value: unknown) => void;
@@ -145,6 +236,32 @@ it('drops an in-flight old observation when replacement has advanced the generat
   await Promise.all([apply, replacement]);
   expect(states.filter(state => state.generation === 2).some(state => state.appliedEventId === 1)).toBe(false);
 });
+it('quarantines an event observation failure and keeps its diagnostic until close', async () => {
+  const service = new RdcSessionService(); await service.openProjectInput(request()); replayLease();
+  mocks.observe.mockRejectedValueOnce(replayFailure('replay_fatal_error'));
+  const state = await service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 1 });
+  expect(state).toMatchObject({ phase: 'error', image: null, appliedEventId: null,
+    error: { code: 'replay_fatal_error', message: expect.stringContaining('native connection lost'), retry: 'close' } });
+  expect(getRdcContextLease('s1')?.quarantineCause).toEqual({ operation: 'rd.session.observe',
+    argsFingerprint: rdcDigest({ event_id: 1 }), code: 'replay_fatal_error' });
+  expect(assertRdcContextLeaseOwnership(scope)).toBeNull();
+  await expect(service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 9 })).rejects.toThrow('QUARANTINED');
+  expect(service.snapshotReplayForSession(scope).error?.message).toContain('native connection lost');
+  expect(await service.clearOpenedCaptureForSession(scope)).toBe(true);
+});
+it('does not quarantine a replacement lease when an older observation fails late', async () => {
+  const service = new RdcSessionService(); await service.openProjectInput(request()); replayLease();
+  let fail!: (error: Error) => void;
+  mocks.observe.mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
+  const apply = service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 1 });
+  await vi.waitFor(() => expect(fail).toBeTypeOf('function'));
+  const replacement = setRdcRuntimeContextForSession('s1', { contextId: 'context-new', replaySessionId: 'native-new',
+    captureFileId: 'file-new', runtimeOwner: 'app', ownerLeaseId: 'new-owner', backend: 'local', updatedAt: 2 }, { projectId: 'p' })!;
+  fail(replayFailure('replay_fatal_error')); await apply;
+  expect(assertRdcContextLeaseOwnership(scope)?.version).toBe(replacement.version);
+  expect(getRdcContextLease('s1')?.quarantineReason).toBeUndefined();
+  expect(service.snapshotReplayForSession(scope)).toMatchObject({ phase: 'error', error: { retry: 'close' } });
+});
 it('closes and invalidates an opened capture if source bytes changed during native opening', async () => {
   mocks.hash.mockResolvedValueOnce({ sha256: 'a'.repeat(64) }).mockResolvedValueOnce({ sha256: 'b'.repeat(64) });
   const service = new RdcSessionService();
@@ -152,6 +269,37 @@ it('closes and invalidates an opened capture if source bytes changed during nati
   expect(service.snapshotReplayForSession(scope).captureHash).toBeNull();
   expect(service.snapshotOpenedCaptureForSession(scope)).toBeNull();
   expect(mocks.observe).not.toHaveBeenCalled();
+});
+
+it('rejects changed approved capture bytes before releasing the current replay', async () => {
+  const service = new RdcSessionService();
+  await service.openProjectInput(request());
+  mocks.hash.mockResolvedValue({ sha256: 'b'.repeat(64) });
+  const previous = service.snapshotOpenedCaptureForSession(scope);
+  await expect(service.openProjectInput({ ...request(), inputId: 'replacement' }, { expectedCaptureSha256: 'a'.repeat(64) }))
+    .rejects.toThrow('RDC_APPROVED_CAPTURE_CHANGED');
+  expect(mocks.close).not.toHaveBeenCalled();
+  expect(service.snapshotOpenedCaptureForSession(scope)).toEqual(previous);
+  expect(service.snapshotReplayForSession(scope)).toMatchObject({ phase: 'ready', inputId: 'capture', captureHash: 'a'.repeat(64) });
+});
+
+it('restores a saved event and target only under the owning turn and current replay binding', async () => {
+  const service = new RdcSessionService(); await service.openProjectInput(request());
+  const lease = setRdcRuntimeContextForSession('s1', { contextId: 'context-s1', runtimeOwner: 'owner', ownerLeaseId: 'lease',
+    replaySessionId: 'native-s1', captureFileId: 'file', backend: 'local', updatedAt: 1 }, { projectId: 'p' })!;
+  const binding = freezeRdcTurnBinding({ enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 }, [], lease);
+  const target = { textureId: 'texture', outputSlot: null };
+  const restore = { ...scope, bindingGeneration: service.snapshotReplayForSession(scope).generation, eventId: 1, target, isFinalOutput: false };
+  mocks.observe.mockResolvedValueOnce({ appliedEventId: 1, imageEventId: null, target, isFinalOutput: false, error: null });
+  setRdcInteractionLock('s1', 'owner-turn', true);
+  try {
+    await expect(service.restoreAgentPosition(restore, { binding, turnId: 'other-turn' })).rejects.toThrow('RDC_RESTORE_OWNER_INVALID');
+    await expect(service.restoreAgentPosition(restore, { binding, turnId: 'owner-turn' })).resolves.toMatchObject({ appliedEventId: 1, target });
+    expect(mocks.observe).toHaveBeenLastCalledWith(expect.anything(), { event_id: 1, target: { texture_id: 'texture' } },
+      binding.cli, expect.objectContaining({ sessionId: 's1' }), undefined);
+    setRdcRuntimeContextForSession('s1', { ...lease.runtimeContext, replaySessionId: 'new-replay' }, { projectId: 'p' });
+    await expect(service.restoreAgentPosition(restore, { binding, turnId: 'owner-turn' })).rejects.toThrow('RDC_RESTORE_OWNER_INVALID');
+  } finally { setRdcInteractionLock('s1', 'owner-turn', false); }
 });
 
 it('rejects old binding generation for apply and close after a replacement', async () => {

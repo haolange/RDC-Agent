@@ -70,6 +70,8 @@ Electron Vite 构建调用同一编译器，产出轻量 summary index 和按 su
 
 协议选择只来自 model-level `routeOptions`。多协议模型显示 enum，单协议显示只读值，不支持的组合禁用并 fail-closed。偏好按 provider surface + account + model 保存 `preferredRouteOptionId`。Provider 列表行对 `routes.length > 1` 的 surface 只摘要「多协议 · 默认 {protocol}」，不提供 Provider 级协议切换。LongCat 属于兼容接入，并显式提供 OpenAI Chat 与 Anthropic Messages；Vertex 属于 Cloud，Vertex Gemini、Vertex Anthropic 与精确获准的 OpenAI-compatible route 分开声明。Vertex Gemini 只有从 OpenAI-compatible `/models` 实际发现的模型才投影该兼容 route；Vertex Anthropic 从原生 Model Garden publisher catalog 发现候选，项目 entitlement 未经验证时保持 `unknown`，禁止借 Gemini OpenAI endpoint 伪造 Claude 可用性。
 
+可编辑地址的用户自管本地服务，在没有显式 model-level 地址时，将已保存的服务地址冻结进默认 `EffectiveModel` 与 `RequestPlan`；不得在发现模型时使用已保存地址、执行时退回目录默认地址。显式 model-level route 仍优先，Cloud 与其他带模板的 endpoint 沿用各自已声明的路由规则。
+
 ## Plan 拆分判据
 
 Coding/Token Plan 与 Compatible Access 按**产品表面**拆分，不按公司品牌或 wire 格式：

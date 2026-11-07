@@ -37,6 +37,7 @@ import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
 import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
 import { reconcileTerminalToolReceipts } from './ConversationTerminalToolReceipts';
 import type { TurnCompletionReceipt } from '../agent-runtime/agent/TurnCompletionValidator';
+import { assertTurnRuntimeEpochs } from './TurnRuntimeEpochs';
 import type {
   ActiveConversationTurn,
   AgentRoutePreflightOk,
@@ -119,6 +120,7 @@ export async function completeProfileTurn(
     executionIdentity: ExecutionIdentity;
     status: 'complete' | 'stopped' | 'error';
     completionReceipt?: TurnCompletionReceipt;
+    completionDeclaration?: import('../agent-runtime/orchestration/TurnCoordinator').TurnCompletionDeclaration | null;
   } | null } = { value: null };
   let approvedPlanExit = false;
   /** Set when the kernel reports cancellation (timeout or parent abort) without a session Stop. */
@@ -450,6 +452,7 @@ export async function completeProfileTurn(
               executionIdentity: result.executionIdentity,
               status: result.status,
               completionReceipt: result.completionReceipt,
+              completionDeclaration: result.completionDeclaration,
             };
             approvedPlanExit = result.status === 'complete' && verifyApprovedPlanExit(sessionId, assistantMessage.turnId, result.approvedPlan);
           },
@@ -467,10 +470,12 @@ export async function completeProfileTurn(
 
       const receipt = terminalContext.value?.completionReceipt;
       if (terminalContext.value?.status !== 'complete' || !receipt
-        || receipt.turnId !== assistantMessage.turnId
-        || receipt.runtimePlanFingerprint !== input.preparedTurn.runtime.effectivePlan.fingerprint) {
+        || receipt.turnId !== assistantMessage.turnId) {
         throw new Error('TURN_COMPLETION_RECEIPT_INVALID: the owning Agent turn did not confirm completion.');
       }
+      assertTurnRuntimeEpochs({ sessionId, turnId: assistantMessage.turnId,
+        initialFingerprint: input.preparedTurn.runtime.effectivePlan.fingerprint, receipt,
+        offer: input.preparedTurn.runtime.approvedExecution?.offer });
       canonicalOutput = { finalAnswerText: receipt.finalAnswerText };
       if (!approvedPlanExit) requireCanonicalFinalAnswer(canonicalOutput);
     } catch (error) {
@@ -527,7 +532,7 @@ export async function completeProfileTurn(
     ? llmDiagnostic.code === 'CONVERSATION_LLM_ROUTE_MISSING'
       ? 'Model route unavailable; configuration diagnostic returned.'
       : llmDiagnostic.code === 'CONVERSATION_AGENT_LOOP_STALLED'
-        ? 'Agent loop stopped after three identical tool rounds.'
+        ? 'Agent loop stopped after no progress.'
         : llmDiagnostic.code === 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED'
           ? 'Agent loop stopped at the configured turn limit.'
           : llmDiagnostic.code === 'CONVERSATION_TASK_COMPLETION_DENIED'
@@ -641,6 +646,16 @@ export async function completeProfileTurn(
           messages: capturedContext.messages,
           createdAt: input.userMessage.createdAt,
           completedAt: assistantMessage.updatedAt ?? nowMs(),
+          ...(terminalStatus === 'complete' && capturedContext.status === 'complete'
+            && terminalContext.value?.completionDeclaration?.disposition === 'completed'
+            && input.preparedTurn.runtime.approvedExecution ? {
+              approvedExecutionCompletion: {
+                ...(input.preparedTurn.runtime.approvedExecution.offer.offerId
+                  ? { offerId: input.preparedTurn.runtime.approvedExecution.offer.offerId } : {}),
+                planUri: input.preparedTurn.runtime.approvedExecution.offer.plan.uri,
+                planHash: input.preparedTurn.runtime.approvedExecution.offer.plan.hash,
+              },
+            } : {}),
         });
         storageAdapter.commitConversationTerminal(
           sessionId,

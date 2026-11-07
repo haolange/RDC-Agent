@@ -8,11 +8,18 @@ import {
 import { cancelOwnedTaskExecution } from './TaskExecutionOwners';
 import { projectTaskItems, type ProjectedTaskItem } from './taskProjection';
 import { taskDependencyWait } from './taskDependencies';
-import { TaskExecutionRequirementsSchema, type TaskExecutionRequirements, type TaskExecutionPreparation, type PlanTaskRequirement } from '@shared/types/taskExecution';
-import { assertApprovedTaskRequirement, assertTaskExecutionStart, assertTaskExecutionPreparation, assertTaskExecutionCompletion, readIndependentTaskSources, hashTaskRequirement } from './TaskExecutionRequirements';
+import { TaskExecutionRequirementsSchema, TaskRuntimeEpochSchema, type TaskExecutionRequirements, type TaskExecutionPreparation, type TaskRuntimeEpoch, type PlanTaskRequirement } from '@shared/types/taskExecution';
+import { assertApprovedTaskRequirement, assertTaskExecutionStart, assertTaskExecutionPreparation, assertTaskExecutionCompletion, assertIndependentReviewResult, readIndependentTaskSources, hashTaskRequirement, canReexecuteInvalidatedTask } from './TaskExecutionRequirements';
 
 const TASK_RUNTIME_INSTANCE_ID = crypto.randomUUID();
 const CANCELLING_TASK_TREES = new Set<string>();
+class TaskCompletionUnavailable extends Error {
+  constructor(message: string) {
+    super(message.startsWith('TASK_EXECUTION_REQUIREMENTS:') ? message : `TASK_EXECUTION_REQUIREMENTS: ${message}`);
+  }
+}
+const isCompletionUnavailable = (error: unknown): error is Error => error instanceof TaskCompletionUnavailable
+  || (error instanceof Error && error.message.startsWith('TASK_EXECUTION_REQUIREMENTS:'));
 
 export type { TaskCompletionResult, TaskExecutionMessage, TaskExecutionRecord, TaskRecord, TaskStatus } from './TaskContracts';
 
@@ -116,11 +123,15 @@ export class TaskRegistry {
 
   async startExecution(taskId: string, options: StartTaskExecutionOptions): Promise<TaskExecutionRecord> {
     return this.store.withLock('state', async () => {
-      const task = await this.requireTask(taskId); if (task.parentTaskId && await this.hasUnavailableAncestor(task.parentTaskId)) throw new Error('Task ancestor is terminal or cancelling.'); if (await this.hasCancellingAncestor(taskId)) throw new Error('Task or ancestor cancellation is in progress.'); if (!await this.canStart(taskId)) throw new Error('Task dependencies are not completed with verified results.');
+      const task = await this.requireTask(taskId);
+      const invalidated = await this.canContinueInvalidatedTask(task);
+      if (task.parentTaskId && await this.hasUnavailableAncestor(task.parentTaskId, invalidated)) throw new Error('Task ancestor is terminal or cancelling.');
+      if (await this.hasCancellingAncestor(taskId)) throw new Error('Task or ancestor cancellation is in progress.');
+      if (!await this.canStart(taskId)) throw new Error('Task dependencies are not completed with verified results.');
       await this.assertApprovedRequirement(task);
       await assertTaskExecutionStart(task, options, this.store);
       if (options.resumeCancelled) await this.assertCancelledContinuation(task, options);
-      else if (terminalTask(task.status)) throw new Error(`Terminal task cannot start another execution: ${task.status}.`);
+      else if (terminalTask(task.status) && !invalidated) throw new Error(`Terminal task cannot start another execution: ${task.status}.`);
       if (task.status === 'in_progress') throw new Error('An in-progress task cannot start another execution. Settle or cancel and join its current execution first; a delegated runner starts its own execution.');
       if (task.currentExecutionId) { const current = await this.store.loadExecution(task.currentExecutionId); if (current && !terminal(current.status)) throw new Error(`Task already has an active execution: ${current.id}. Settle or cancel and join it first; setting pending does not release it.`); }
       const previous = await this.store.listExecutions(taskId);
@@ -165,7 +176,8 @@ export class TaskRegistry {
       if (options.result.disposition === 'completed') {
         await this.assertApprovedRequirement(task);
         await assertTaskExecutionCompletion(task, execution, this.store);
-        await this.assertCompletionClosure(task, options.result);
+        await assertIndependentReviewResult(task, options.result, this.store);
+        await this.assertCompletionClosure(task);
       }
       execution.status = options.status; execution.result = options.result; execution.updatedAt = Date.now(); execution.settledAt = execution.updatedAt;
       task.status = options.result.disposition === 'completed' ? 'completed' : options.result.disposition === 'cancelled' ? 'cancelled' : 'blocked';
@@ -190,6 +202,34 @@ export class TaskRegistry {
       if (execution.independentSources && JSON.stringify(execution.independentSources) !== JSON.stringify(independentSources)) throw new Error('TASK_EXECUTION_REQUIREMENTS: independent sources are immutable.');
       if (independentSources.length) execution.independentSources = independentSources;
       await this.store.saveExecution(execution);
+    });
+  }
+
+  /** Append a host-signed identity transition to all direct executions owned by this turn. */
+  async appendRuntimeEpochForTurn(turnId: string, generation: number, input: TaskRuntimeEpoch): Promise<number> {
+    const epoch = TaskRuntimeEpochSchema.parse(input);
+    const turnRef = `turn:${turnId}:generation:${generation}`;
+    return this.store.withLock('state', async () => {
+      const executions = (await this.store.listExecutions()).filter(execution => execution.mode === 'direct'
+        && execution.frozenPlanRef === turnRef && (execution.status === 'running' || execution.status === 'waiting'));
+      const changed: TaskExecutionRecord[] = [];
+      for (const execution of executions) {
+        const task = await this.requireTask(execution.taskId);
+        this.assertCurrent(task, execution, execution.generation);
+        const previous = execution.runtimeEpochs?.at(-1);
+        if (previous && JSON.stringify(previous) === JSON.stringify(epoch)) continue;
+        if (!execution.preparation || execution.preparation.turnId !== turnId
+          || (previous?.runtimeFingerprint ?? execution.preparation.runtimeFingerprint) !== epoch.previousFingerprint
+          || epoch.previousFingerprint === epoch.runtimeFingerprint || !this.store.verifyRuntimeEpoch
+          || !await this.store.verifyRuntimeEpoch(epoch, execution.preparation)) {
+          throw new Error('TASK_EXECUTION_REQUIREMENTS: invalid or unsigned runtime identity transition.');
+        }
+        execution.runtimeEpochs = [...(execution.runtimeEpochs ?? []), epoch];
+        execution.updatedAt = Date.now();
+        changed.push(execution);
+      }
+      if (changed.length) await this.store.commit({ executions: changed });
+      return changed.length;
     });
   }
 
@@ -294,6 +334,49 @@ export class TaskRegistry {
       return active;
     });
   }
+  /** Stop one owned child for replay recovery without turning its logical Task into a user cancellation. */
+  async interruptExecutionForRecovery(id: string, expectedGeneration: number): Promise<void> {
+    const initial = await this.requireExecution(id);
+    if (CANCELLING_TASK_TREES.has(initial.taskId)) throw new Error('TASK_RECOVERY_INTERRUPT_BUSY');
+    CANCELLING_TASK_TREES.add(initial.taskId);
+    try {
+      const intent = await this.store.withLock('state', async () => {
+        const execution = await this.requireExecution(id); const task = await this.requireTask(execution.taskId);
+        this.assertCurrent(task, execution, expectedGeneration);
+        if (terminal(execution.status)) return null;
+        if (execution.mode !== 'subagent' || execution.status === 'cancelling') throw new Error('TASK_RECOVERY_INTERRUPT_DENIED');
+        const previousStatus = execution.status; const previousReason = task.statusReason;
+        execution.status = 'cancelling'; execution.updatedAt = Date.now();
+        task.statusReason = 'Stopping the affected child before replay recovery.'; task.updatedAt = execution.updatedAt;
+        await this.store.commit({ tasks: [task], executions: [execution] }); await this.emitTaskChange('updated', task);
+        return { execution, previousStatus, previousReason };
+      });
+      if (!intent) return;
+      const owned = this.options.onCancelExecution
+        ? (await this.options.onCancelExecution(intent.execution), true) : await cancelOwnedTaskExecution(intent.execution);
+      if (!owned) {
+        await this.store.withLock('state', async () => {
+          const execution = await this.requireExecution(id); const task = await this.requireTask(execution.taskId);
+          this.assertCurrent(task, execution, expectedGeneration);
+          if (execution.status !== 'cancelling') throw new Error('TASK_RECOVERY_INTERRUPT_CHANGED');
+          execution.status = intent.previousStatus; task.statusReason = intent.previousReason;
+          execution.updatedAt = task.updatedAt = Date.now();
+          await this.store.commit({ tasks: [task], executions: [execution] }); await this.emitTaskChange('updated', task);
+        });
+        throw new Error('TASK_RECOVERY_INTERRUPT_OWNER_MISSING: child abort and join ownership is unavailable.');
+      }
+      await this.store.withLock('state', async () => {
+        const execution = await this.requireExecution(id); const task = await this.requireTask(execution.taskId);
+        this.assertCurrent(task, execution, expectedGeneration);
+        if (execution.status !== 'cancelling') throw new Error('TASK_RECOVERY_INTERRUPT_CHANGED');
+        const summary = 'Child execution interrupted and joined for replay recovery; retry this Task with the remaining budget.';
+        execution.status = 'interrupted'; execution.result = { disposition: 'blocked', summary, outputs: {} };
+        execution.updatedAt = task.updatedAt = Date.now(); execution.settledAt = execution.updatedAt;
+        task.status = 'blocked'; task.disposition = 'blocked'; task.statusReason = summary;
+        await this.store.commit({ tasks: [task], executions: [execution] }); await this.emitTaskChange('updated', task);
+      });
+    } finally { CANCELLING_TASK_TREES.delete(initial.taskId); }
+  }
   async cancelTask(taskId: string, reason = 'Cancelled by task owner.'): Promise<TaskRecord> {
     if (CANCELLING_TASK_TREES.has(taskId)) throw new Error('Task cancellation is already in progress.');
     CANCELLING_TASK_TREES.add(taskId);
@@ -388,9 +471,9 @@ export class TaskRegistry {
   async listTasks(): Promise<TaskRecord[]> { return this.store.listTasks(); }
   private async emitTaskChange(type: 'created' | 'updated', task: TaskRecord): Promise<void> {
     if (!this.onTaskChange) return;
-    this.onTaskChange({ type, task, snapshot: projectTaskItems(await this.store.listTasks(), await this.store.listExecutions()) });
+    this.onTaskChange({ type, task, snapshot: projectTaskItems(await this.currentTaskProjection(), await this.store.listExecutions()) });
   }
-  async readConsistentSnapshot(): Promise<{ tasks: TaskRecord[]; executions: TaskExecutionRecord[] }> { return this.store.withLock('state', async () => ({ tasks: await this.store.listTasks(), executions: await this.store.listExecutions() })); }
+  async readConsistentSnapshot(): Promise<{ tasks: TaskRecord[]; executions: TaskExecutionRecord[] }> { return this.store.withLock('state', async () => ({ tasks: await this.currentTaskProjection(), executions: await this.store.listExecutions() })); }
   async deleteTask(id: string): Promise<void> { await this.store.withLock('state', async () => { const task = await this.requireTask(id); if (task.executionIds.length) throw new Error('Executed tasks retain their durable results and cannot be deleted.'); const related = (await this.store.listTasks()).filter((candidate) => candidate.id !== id && (candidate.blockedBy.includes(id) || candidate.blocks.includes(id) || candidate.parentTaskId === id)); if (related.some((candidate) => candidate.parentTaskId === id)) throw new Error('Cannot delete a task while child tasks still exist.'); for (const candidate of related) { if (candidate.currentExecutionId) { const active = await this.store.loadExecution(candidate.currentExecutionId); if (active && !terminal(active.status)) throw new Error(`Cannot revise graph for active task: ${candidate.id}`); } candidate.blockedBy = candidate.blockedBy.filter((entry) => entry !== id); candidate.blocks = candidate.blocks.filter((entry) => entry !== id); candidate.revision += 1; candidate.updatedAt = Date.now(); } await this.store.commit({ tasks: related, deletedTaskIds: [id] }); }); }
   async canStart(id: string): Promise<boolean> {
     const task = await this.store.loadTask(id);
@@ -399,6 +482,13 @@ export class TaskRegistry {
       const dependency = await this.store.loadTask(dependencyId);
       const proof = dependency?.currentExecutionId ? await this.store.loadExecution(dependency.currentExecutionId) : undefined;
       if (taskDependencyWait(dependencyId, dependency, proof)) return false;
+      if (dependency) {
+        try { await this.assertCanComplete(dependency, undefined, new Set([task.id])); }
+        catch (error) {
+          if (isCompletionUnavailable(error)) return false;
+          throw error;
+        }
+      }
     }
     return true;
   }
@@ -422,26 +512,66 @@ export class TaskRegistry {
     }
   }
 
-  private async assertCanComplete(task: TaskRecord, result?: TaskCompletionResult): Promise<void> {
+  private async assertCanComplete(task: TaskRecord, result?: TaskCompletionResult, visiting = new Set<string>()): Promise<void> {
+    if (visiting.has(task.id)) throw new TaskCompletionUnavailable('TASK_EXECUTION_REQUIREMENTS: cyclic Task completion dependency.');
+    visiting.add(task.id);
+    try {
     await this.assertApprovedRequirement(task);
-    if (!task.executionRequired) return;
-    if (!task.currentExecutionId) throw new Error('Executable task cannot complete without an execution.');
+    if (!task.executionRequired) { await this.assertCompletionClosure(task, visiting); return; }
+    if (!task.currentExecutionId) throw new TaskCompletionUnavailable('Executable task cannot complete without an execution.');
     const execution = await this.requireExecution(task.currentExecutionId);
-    if (!terminal(execution.status)) throw new Error('Task execution has not settled.');
+    if (!terminal(execution.status)) throw new TaskCompletionUnavailable('Task execution has not settled.');
     if (execution.taskRevision !== task.revision || execution.status !== 'completed' || execution.result?.disposition !== 'completed') {
-      throw new Error('Task completion requires a completed execution result for the current task revision.');
+      throw new TaskCompletionUnavailable('Task completion requires a completed execution result for the current task revision.');
     }
     if (result && JSON.stringify(result) !== JSON.stringify(execution.result)) {
-      throw new Error('Task completion result cannot replace the execution owner result.');
+      if (await canReexecuteInvalidatedTask(task, this.store)) {
+        throw new TaskCompletionUnavailable('Task completion result cannot replace the execution owner result; start a new execution and settle it with a verifiable resultRef and resultHash.');
+      }
+      throw new TaskCompletionUnavailable('Task completion result cannot replace the execution owner result.');
     }
     const effective = execution.result;
     await assertTaskExecutionCompletion(task, execution, this.store);
+    await assertIndependentReviewResult(task, effective, this.store);
     const missing = task.completionRequirements.filter((key) => !effective.outputs[key]);
-    if (missing.length) throw new Error(`Task result is missing requirements: ${missing.join(', ')}`);
-    await this.assertCompletionClosure(task, effective);
-    if (this.options.validateResultRef && !await this.options.validateResultRef(task, effective)) throw new Error('Task result reference validation failed.');
+    if (missing.length) throw new TaskCompletionUnavailable(`Task result is missing requirements: ${missing.join(', ')}`);
+    await this.assertCompletionClosure(task, visiting);
+    if (this.options.validateResultRef && !await this.options.validateResultRef(task, effective)) throw new TaskCompletionUnavailable('Task result reference validation failed.');
+    } finally { visiting.delete(task.id); }
   }
-  private async assertCompletionClosure(task: TaskRecord, _result: TaskCompletionResult): Promise<void> { if (!await this.canStart(task.id)) throw new Error('Task dependencies are not completed with verified results.'); const children = (await this.listTasks()).filter((candidate) => candidate.parentTaskId === task.id); const unresolved = children.filter((child) => child.status !== 'completed' && child.status !== 'cancelled'); if (unresolved.length) throw new Error(`Task has unresolved child tasks: ${unresolved.map((child) => child.id).join(', ')}`); const unsuccessful = children.filter((child) => child.status === 'cancelled' || child.disposition !== 'completed'); if (unsuccessful.length) throw new Error('Parent task with partial, blocked, or cancelled child work cannot be completed.'); }
+  private async assertCompletionClosure(task: TaskRecord, visiting = new Set([task.id])): Promise<void> {
+    for (const id of task.blockedBy) {
+      const dependency = await this.store.loadTask(id);
+      const proof = dependency?.currentExecutionId ? await this.store.loadExecution(dependency.currentExecutionId) : undefined;
+      if (taskDependencyWait(id, dependency, proof)) throw new TaskCompletionUnavailable('Task dependencies are not completed with verified results.');
+      if (dependency) await this.assertCanComplete(dependency, undefined, visiting);
+    }
+    const children = (await this.store.listTasks()).filter(candidate => candidate.parentTaskId === task.id);
+    const unresolved = children.filter(child => child.status !== 'completed' && child.status !== 'cancelled');
+    if (unresolved.length) throw new TaskCompletionUnavailable(`Task has unresolved child tasks: ${unresolved.map(child => child.id).join(', ')}`);
+    if (children.some(child => child.status === 'cancelled' || child.disposition !== 'completed')) {
+      throw new TaskCompletionUnavailable('Parent task with partial, blocked, or cancelled child work cannot be completed.');
+    }
+    for (const child of children) await this.assertCanComplete(child, undefined, visiting);
+  }
+  private async currentTaskProjection(): Promise<TaskRecord[]> {
+    const tasks = await this.store.listTasks();
+    return Promise.all(tasks.map(async task => {
+      if (task.status !== 'completed') return task;
+      try { await this.assertCanComplete(task); return task; }
+      catch (error) {
+        if (!isCompletionUnavailable(error)) throw error;
+        return { ...task, status: 'blocked' as const, statusReason: `Completion requires revalidation: ${error.message}` };
+      }
+    }));
+  }
+  private async canContinueInvalidatedTask(task: TaskRecord): Promise<boolean> {
+    if (await canReexecuteInvalidatedTask(task, this.store)) return true;
+    if (task.status !== 'blocked') return false;
+    const executions = await this.store.listExecutions(task.id);
+    const previous = executions.filter(execution => execution.status === 'completed').at(-1);
+    return previous ? canReexecuteInvalidatedTask({ ...task, status: 'completed', currentExecutionId: previous.id }, this.store) : false;
+  }
   private assertCurrent(task: TaskRecord, execution: TaskExecutionRecord, generation: number): void { if (execution.generation !== generation || task.currentExecutionId !== execution.id || execution.taskRevision !== task.revision) throw new Error('Stale task execution generation or revision.'); }
   private async updateLinks(task: TaskRecord, updates: UpdateTaskOptions): Promise<TaskRecord[]> { const changed = new Map<string, TaskRecord>(); const dependencies = dedupe(updates.addBlockedBy ?? []); await this.assertDependenciesExist(dependencies); await this.assertNoDependencyCycle(task.id, dependencies); for (const id of appendUnique(task.blockedBy, dependencies)) { const upstream = await this.requireTask(id); if (!upstream.blocks.includes(task.id)) { upstream.blocks.push(task.id); upstream.updatedAt = Date.now(); changed.set(upstream.id, upstream); } } for (const id of dedupe(updates.addBlocks ?? [])) { await this.assertDependenciesExist([id]); await this.assertNoDependencyCycle(id, [task.id]); const downstream = await this.requireTask(id); if (terminalTask(downstream.status)) throw new Error(`Cannot revise dependency graph for terminal task: ${downstream.id}`); if (downstream.currentExecutionId) { const active = await this.store.loadExecution(downstream.currentExecutionId); if (active && !terminal(active.status)) throw new Error(`Cannot revise dependency graph for active task: ${downstream.id}`); } if (appendUnique(task.blocks, [id]).length && !downstream.blockedBy.includes(task.id)) { downstream.blockedBy.push(task.id); downstream.revision += 1; downstream.updatedAt = Date.now(); changed.set(downstream.id, downstream); } } return [...changed.values()]; }
   private async assertDependenciesExist(ids: string[]): Promise<void> { for (const id of ids) if (!await this.store.loadTask(id)) throw new Error(`Task dependency not found: ${id}`); }
@@ -450,7 +580,7 @@ export class TaskRegistry {
   private async requireTask(id: string): Promise<TaskRecord> { const task = await this.store.loadTask(id); if (!task) throw new Error(`Task not found: ${id}`); return task; }
   private async requireExecution(id: string): Promise<TaskExecutionRecord> { const value = await this.store.loadExecution(id); if (!value) throw new Error(`Task execution not found: ${id}`); return value; }
   private async hasCancellingAncestor(taskId: string): Promise<boolean> { let current: string | undefined = taskId; while (current) { if (CANCELLING_TASK_TREES.has(current)) return true; current = (await this.store.loadTask(current))?.parentTaskId; } return false; }
-  private async hasUnavailableAncestor(taskId: string): Promise<boolean> { let current: string | undefined = taskId; while (current) { const task = await this.store.loadTask(current); if (!task || terminalTask(task.status) || CANCELLING_TASK_TREES.has(current)) return true; if (task.currentExecutionId && (await this.store.loadExecution(task.currentExecutionId))?.status === 'cancelling') return true; current = task.parentTaskId; } return false; }
+  private async hasUnavailableAncestor(taskId: string, allowCompleted = false): Promise<boolean> { let current: string | undefined = taskId; while (current) { const task = await this.store.loadTask(current); if (!task || task.status === 'cancelled' || (task.status === 'completed' && !allowCompleted) || CANCELLING_TASK_TREES.has(current)) return true; if (task.currentExecutionId && (await this.store.loadExecution(task.currentExecutionId))?.status === 'cancelling') return true; current = task.parentTaskId; } return false; }
   private id(prefix: string, now: number): string { return `${prefix}_${now}_${crypto.randomBytes(4).toString('hex')}`; }
 }
 

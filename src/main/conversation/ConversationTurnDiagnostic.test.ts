@@ -34,6 +34,16 @@ describe('conversation turn failure classification', () => {
     expect(diagnostic.userMessage).not.toContain(String.fromCodePoint(0xfffd));
   });
 
+  it('does not describe an unchanged approved obligation as repeated tool calls', () => {
+    const diagnostic = createTurnFailedDiagnostic(ROUTE, new AgentLoopTerminationError(
+      'AGENT_NO_PROGRESS', 'The approved obligation remained unchanged after a continuation without tool work.',
+      { turn: 3, noProgressReason: 'approved-obligation' },
+    ));
+    expect(diagnostic.code).toBe('CONVERSATION_AGENT_LOOP_STALLED');
+    expect(diagnostic.userMessage).toContain('未完成条件');
+    expect(diagnostic.userMessage).not.toContain('连续三轮');
+  });
+
   it('classifies pending continuation at max turns independently from provider failures', () => {
     const diagnostic = createTurnFailedDiagnostic(
       ROUTE,

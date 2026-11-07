@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { KnowledgeLaneHit, KnowledgeSpace } from '@shared/types/knowledge';
+import type { KnowledgeLaneHit, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
 import type {
   KnowledgeExportFormat,
   KnowledgeExportResult,
@@ -19,6 +19,9 @@ export function useKnowledgeExport(options: {
   active: boolean;
   spaces: KnowledgeSpace[];
   hits: KnowledgeLaneHit[];
+  queryRequest: KnowledgeQueryRequest;
+  queryRevision?: string;
+  filteredCount?: number;
   selected: { spaceId: string; relativePath: string } | null;
 }) {
   const { t } = useI18n();
@@ -47,8 +50,9 @@ export function useKnowledgeExport(options: {
   const counts = useMemo(() => knowledgeExportScopeCounts({
     selected: options.selected,
     hits: options.hits,
+    filteredCount: options.filteredCount,
     spaceCount,
-  }), [options.hits, options.selected, spaceCount]);
+  }), [options.filteredCount, options.hits, options.selected, spaceCount]);
 
   const canExport = options.hits.length > 0 || Boolean(options.selected) || spaceCount > 0;
   const pendingCount = counts[scope];
@@ -84,9 +88,13 @@ export function useKnowledgeExport(options: {
         extension: EXTENSION[format],
       });
       if (!targetPath || !request.isCurrent(seq)) return;
+      const filtered = scope === 'filtered'
+        ? await window.electronAPI.knowledge.query({ ...options.queryRequest, ...(options.queryRevision ? { expectedRevision: options.queryRevision } : {}) })
+        : null;
+      if (!request.isCurrent(seq)) return;
       const cardRefs = scope === 'selected'
         ? (options.selected ? [options.selected] : [])
-        : options.hits.map((hit) => ({ spaceId: hit.spaceId, relativePath: hit.relativePath }));
+        : (filtered?.hits ?? []).map((hit) => ({ spaceId: hit.spaceId, relativePath: hit.relativePath }));
       const exported = await window.electronAPI.knowledge.export({
         format,
         scope,
@@ -105,7 +113,7 @@ export function useKnowledgeExport(options: {
       inFlight.current = false;
       if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [format, options.hits, options.selected, request, scope, spaceId, t]);
+  }, [format, options.queryRequest, options.queryRevision, options.selected, request, scope, spaceId, t]);
 
   return {
     open,

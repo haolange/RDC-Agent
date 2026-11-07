@@ -47,10 +47,10 @@ export interface KnowledgeIndexSnapshot {
 }
 
 export function knowledgeCorpusHash(
-  cards: readonly Pick<KnowledgeIndexEntry, 'cardId' | 'contentHash' | 'relativePath'>[],
+  cards: readonly Pick<KnowledgeIndexEntry, 'cardId' | 'contentHash' | 'relativePath' | 'updatedAt'>[],
 ): string {
   const ordered = [...cards].sort((left, right) => left.relativePath.localeCompare(right.relativePath));
   return createHash('sha256')
-    .update(ordered.map((card) => `${card.cardId}:${card.contentHash}`).join('|'), 'utf8')
+    .update(ordered.map((card) => `${card.cardId}:${card.contentHash}:${card.updatedAt}`).join('|'), 'utf8')
     .digest('hex');
 }

@@ -23,6 +23,7 @@ export type AbortReason =
   | 'timeout'
   | 'policy_revoke'
   | 'parent_abort'
+  | 'replay_recovery'
   | 'unknown';
 
 export interface TurnEventSink {
@@ -142,9 +143,9 @@ export interface SubagentBudget {
 
 export const DEFAULT_SUBAGENT_BUDGET: SubagentBudget = {
   maxDepth: 3,
-  maxChildren: 5,
-  maxAggregateToolCalls: 40,
-  maxAggregateWallMs: 300_000,
+  maxChildren: Number.MAX_SAFE_INTEGER,
+  maxAggregateToolCalls: Number.MAX_SAFE_INTEGER,
+  maxAggregateWallMs: Number.MAX_SAFE_INTEGER,
 };
 
 export type SubagentResultStatus = 'complete' | 'cancelled' | 'failed';
@@ -225,6 +226,8 @@ export type TurnProducer = {
   join: () => Promise<void>;
 };
 
+export const APPROVED_CAPTURE_SCOPE_REQUIRED = 'APPROVED_CAPTURE_SCOPE_REQUIRED: This approved Mission has no frozen capture scope. Return to the Mission and submit plan_artifact.captureScope with the intended registered inputs and selected device for review before using live RDC.';
+
 export interface AbortAndJoinOptions {
   graceMs?: number;
   forceAfterMs?: number;
@@ -243,9 +246,20 @@ export class TurnHandle {
   readonly policyBudget: PolicyBudgetState;
   /** Frozen runtime authority installed before any tool can execute. */
   runtimePlan: EffectiveRuntimePlan | null = null;
+  promptPlan: import('@shared/types/rdcRuntime').PromptPlan | null = null;
   taskPreparation: import('@shared/types/taskExecution').TaskExecutionPreparation | null = null;
+  runtimeEpochs: import('@shared/types/taskExecution').TaskRuntimeEpoch[] = [];
+  captureControl: import('./ApprovedCaptureController').ApprovedCaptureController | null = null;
   /** Structured model-declared completion, populated only by turn_complete. */
   completionDeclaration: TurnCompletionDeclaration | null = null;
+  /** Frozen domain preconditions checked before a completion declaration is recorded. */
+  validateCompletionReadiness: ((declaration: TurnCompletionDeclaration) => void | Promise<void>) | null = null;
+  /** This turn executes an approved plan and must not complete while delegated work remains active. */
+  requiresApprovedGoalClosure = false;
+  /** A Mission without a reviewed capture scope may continue offline but cannot use live RDC. */
+  requiresApprovedCaptureScope = false;
+  /** Current ordinary provider-loop budget, observed at the request boundary. */
+  providerLoopBudget: { remaining: number; limit: number } | null = null;
 
   eventSink: TurnEventSink | null = null;
   deferredActivation: TurnDeferredActivation | null = null;
@@ -413,6 +427,16 @@ export class TurnHandle {
     return () => {
       this.producers.delete(producer.id);
     };
+  }
+
+  /** Abort only a named child; the owning turn and its budget remain live. */
+  async abortProducerForRecovery(id: string): Promise<boolean> {
+    if (!this.isLive(this.generation)) throw new Error('RDC_TURN_NOT_ACTIVE');
+    const producer = this.producers.get(id);
+    if (!producer) return false;
+    producer.abort('replay_recovery');
+    await producer.join();
+    return true;
   }
 
   async abortAndJoin(options: AbortAndJoinOptions = {}): Promise<void> {

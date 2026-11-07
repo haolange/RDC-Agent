@@ -23,6 +23,8 @@ import { SubagentProgressDots } from './SubagentProgressDots';
 import { WorkDisclosure, FadingPreview } from './WorkDisclosure';
 import { useI18n } from '../../i18n';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
+import { Button } from '../../ui/Button';
+import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
 
 type SubagentWorkRow = Extract<WorkProcessRow, { type: 'subagent' }>;
 
@@ -46,6 +48,7 @@ function DelegationBody({ sessionId, parentToolCallId, childSessionId, execution
 
 export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | null }> = ({ row, sessionId }) => {
   const { t } = useI18n();
+  const openAgentSettings = useSettingsNavigationStore((state) => state.openAgent);
   const { expanded, workOpen, finalOpen, detailsOpen, factsOpen, constraintsOpen, toggle, openCard } = useSubagentDisclosure(sessionId, row.id);
   const contentId = React.useId();
   const cardRef = React.useRef<HTMLLIElement>(null);
@@ -106,7 +109,7 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
     <div className={`work-process-step-content work-process-subagent is-${status}${expanded ? ' is-expanded' : ''}`} data-testid="work-process-subagent">
     <WorkCardHeader onClick={() => openCard(active)} expanded={expanded} controls={contentId}
       icon={<ModeGlyph mode={mode} icon={definition?.icon ?? undefined} className="work-process-tool-card-icon" />}
-      title={`${t('chat.subagentIdentity')} · ${agentLabel}`} duration={headerLoading ? undefined : duration}
+      title={`${t('chat.subagentIdentity')} · ${agentLabel}${header?.preparedRoute ? ` · ${header.preparedRoute.providerId}/${header.preparedRoute.modelId} · ${header.preparedRoute.reasoningLevel}` : ''}`} duration={headerLoading ? undefined : duration}
       status={<span className={`work-process-subagent-status is-${status}`}>
         {status === 'queued' ? t('chat.subagentQueued')
           : status === 'waiting' ? t('chat.subagentWaiting')
@@ -121,6 +124,10 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
       trailingPreview={expanded ? undefined : progressDots} />
     {expanded ? <div id={contentId} className="work-process-subagent-body">
       {page.error ? <p className="work-process-subagent-receipt-error" role="status">{t('chat.subagentTraceUnavailable')}</p> : null}
+      {header?.status === 'failed' && header.configurationError ? <div role="alert">
+        <p className="work-process-subagent-receipt-error">{header.error}</p>
+        <Button size="sm" onClick={() => openAgentSettings(header.profile)}>{t('chat.subagentOpenAgentSettings')}</Button>
+      </div> : null}
       {!headerLoading && !header && status === 'failed' && row.resultPreview
         ? <p className="work-process-subagent-receipt-error" role="alert">{row.resultPreview}</p> : null}
       <div className="work-process-subagent-task" aria-label={t('chat.subagentTask')}>

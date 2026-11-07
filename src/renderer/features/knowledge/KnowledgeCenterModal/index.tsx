@@ -13,10 +13,12 @@ import { DetailColumn } from './columns/DetailColumn';
 import { ImportKnowledgeDialog } from './panels/ImportKnowledgeDialog';
 import { ExportKnowledgeDialog } from './panels/ExportKnowledgeDialog';
 import { WriteConfirmDialog } from './panels/WriteConfirmDialog';
+import { KnowledgeTopicsDialog } from './panels/KnowledgeTopicsDialog';
 import { useKnowledgeCenter } from './useKnowledgeCenter';
 import { useKnowledgeImport } from './useKnowledgeImport';
 import { useKnowledgeExport } from './useKnowledgeExport';
 import { useKnowledgeWriteConfirm } from './useKnowledgeWriteConfirm';
+import { useKnowledgeTopics } from './useKnowledgeTopics';
 import { detailToRecord } from './knowledgeCenterModel';
 import { firstImportedSpaceCard } from './knowledgeImportExportModel';
 import './KnowledgeCenterModal.css';
@@ -47,6 +49,9 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
     active: open,
     spaces: state.spaces,
     hits: state.hits,
+    queryRequest: state.queryRequest,
+    queryRevision: state.page.revision,
+    filteredCount: state.page.total,
     selected: state.viewMode === 'cards' && state.selectedCard
       ? { spaceId: state.selectedCard.spaceId, relativePath: state.selectedCard.relativePath }
       : null,
@@ -62,9 +67,16 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
       await importer.refreshInbox();
     },
   });
+  const topics = useKnowledgeTopics(open, async () => {
+    await state.refreshOverview();
+    await state.refreshQuery();
+    if (state.viewMode === 'cards' && state.selectedCard) {
+      await state.selectCard(state.selectedCard.spaceId, state.selectedCard.relativePath, state.selectedCard.cardId);
+    }
+  });
   const dialogRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const busy = state.loadingOverview || state.loadingQuery || importer.busy || write.busy || exporter.busy;
+  const busy = state.loadingOverview || state.loadingQuery || importer.busy || write.busy || exporter.busy || topics.busy;
   // Sub-dialogs register their own overlay layers, so Escape here only ever
   // closes the Knowledge Center itself.
   const { layerId } = useOverlayLayer(open);
@@ -112,6 +124,9 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
               </h2>
             </div>
             <div className="knowledge-center-topbar-actions">
+              <Button variant="secondary" size="sm" onClick={() => void topics.openPanel()} data-testid="knowledge-topics-open">
+                {t('knowledgeCenter.topicsTitle')}
+              </Button>
               <Button
                 variant="primary"
                 size="sm"
@@ -172,7 +187,9 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
                 candidateError={importer.candidateError?.cardId === state.selectedCard?.cardId
                   ? importer.candidateError?.message ?? null : null}
                 onCreateCandidate={() => {
-                  if (state.selectedCard) void importer.createCandidate(detailToRecord(state.selectedCard));
+                  void state.ensureFullCard().then(card => {
+                    if (card) return importer.createCandidate(detailToRecord(card));
+                  });
                 }}
               />
             )}
@@ -183,6 +200,7 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
       <ImportKnowledgeDialog importer={importer} spaces={state.spaces} />
       <ExportKnowledgeDialog exporter={exporter} spaces={state.spaces} />
       <WriteConfirmDialog write={write} />
+      <KnowledgeTopicsDialog topics={topics} />
     </>,
     document.body,
   );

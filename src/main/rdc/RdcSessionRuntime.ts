@@ -68,7 +68,7 @@ const emptyPreviewLoadResult = (): PreviewLoadResult => ({
   attempts: [],
 });
 
-export interface RdcLifecycleOptions extends RdcRemoteProgress { expectedGeneration?: number; onStage?: (stage: 'connecting' | 'opening' | 'transferring') => void; contextId?: string; binding?: RdcTurnBinding; signal?: AbortSignal; expectedBindingIdentity?: string }
+export interface RdcLifecycleOptions extends RdcRemoteProgress { expectedGeneration?: number; expectedCaptureSha256?: string; onStage?: (stage: 'connecting' | 'opening' | 'transferring') => void; onDaemonStopped?: (receipt: { contextId: string; stopped: true }) => void | Promise<void>; contextId?: string; binding?: RdcTurnBinding; signal?: AbortSignal; expectedBindingIdentity?: string }
 
 export class RdcSessionRuntime {
   private contextId: string | null = null;
@@ -509,6 +509,7 @@ export class RdcSessionRuntime {
       }), this.contextId, 'rdc_tool.daemon.stop');
       options.signal?.throwIfAborted();
       if (response.data.stopped !== true) throw new Error('RDC_CLOSE_FAILED: daemon shutdown was not confirmed.');
+      await options.onDaemonStopped?.({ contextId: this.contextId, stopped: true });
       forgetOwnedRdcDaemon(this.contextId);
     }
   }

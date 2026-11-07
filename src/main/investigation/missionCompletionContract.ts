@@ -1,9 +1,6 @@
 import { allowsBudgetPause } from './missionBudgetPause';
 import { type TurnCompletionInput } from '../agent-runtime/agent/TurnCompletionValidator';
 import {
-  ANALYZER_EXPLANATION_LAYERS,
-  analyzerExplanationLayer,
-  type AnalyzerExplanationLayer,
   type InvestigationMission,
   type InvestigationReport,
   type MissionCheckpoint,
@@ -12,6 +9,7 @@ import { InvestigationArtifactService, investigationArtifactService } from './In
 import type { InvestigationReadResult } from './investigationArtifactWrite';
 import { InvestigationError } from './investigationErrors';
 import { assertOptimizerExperimentClose, assertReportContractPresent } from './investigationInvariants';
+import { openReportChallenges } from './reportChallengeEligibility';
 
 export const MISSION_COMPLETION_DENIED = 'MISSION_COMPLETION_DENIED';
 
@@ -22,6 +20,8 @@ export type MissionCompletionDenialReason =
   | 'incomplete_chapters'
   | 'final_not_bound'
   | 'non_complete_status'
+  | 'open_challenge'
+  | 'budget_evidence'
   | 'mission_method';
 
 export class MissionCompletionError extends Error {
@@ -64,6 +64,8 @@ export interface MissionCompletionInput extends TurnCompletionInput {
   service?: InvestigationArtifactService;
 }
 
+type MissionReadinessInput = Omit<MissionCompletionInput, 'finalAnswerText'>;
+
 export interface MissionCompletionReceipt {
   checkpointId: string;
   checkpointArtifactId: string;
@@ -71,7 +73,7 @@ export interface MissionCompletionReceipt {
   reportContentHash: string;
 }
 
-function declaredMission(input: MissionCompletionInput): InvestigationMission | null {
+function declaredMission(input: MissionReadinessInput): InvestigationMission | null {
   if (input.completionContract === 'final-answer') return null;
   if (input.completionContract === 'investigation-report') {
     if (!input.investigationMission) {
@@ -86,11 +88,37 @@ export function enforceMissionTurnCompletion(input: MissionCompletionInput): Mis
   if (!declaredMission(input)) return;
   if (!input.disposition) return;
   if (input.disposition === 'partial' || input.disposition === 'blocked' || input.disposition === 'cancelled') return;
-  if (allowsBudgetPause(input, input.service ?? investigationArtifactService)) return;
+  if (input.disposition === 'budget_paused') {
+    if (allowsBudgetPause(input, input.service ?? investigationArtifactService)) return;
+    throw new MissionCompletionError('budget_evidence', 'budget pause requires a current root limit and a referenced current checkpoint with unresolved work.');
+  }
   return assertMissionTurnCompletion(input);
 }
 
-export function assertMissionTurnCompletion(input: MissionCompletionInput): MissionCompletionReceipt {
+/** Check current report eligibility before a completed declaration; final text is checked later. */
+export function enforceMissionTurnReadiness(input: MissionReadinessInput): void {
+  if (!declaredMission(input) || input.disposition !== 'completed') return;
+  const { mission, sessionId, service, readyReports } = requireMissionCompletionArtifacts(input);
+  let denial: MissionCompletionError | undefined;
+  for (const report of readyReports) {
+    try {
+      assertReportEligible(report, mission, service, sessionId);
+      return;
+    } catch (error) {
+      if (!isMissionCompletionError(error)) throw error;
+      denial ??= error;
+    }
+  }
+  throw denial ?? new MissionCompletionError('missing_report', `${mission} has no eligible ready report`);
+}
+
+function requireMissionCompletionArtifacts(input: MissionReadinessInput): {
+  mission: InvestigationMission;
+  sessionId: string;
+  service: InvestigationArtifactService;
+  checkpoint: InvestigationReadResult;
+  readyReports: InvestigationReadResult[];
+} {
   const mission = declaredMission(input);
   if (!mission) {
     throw new MissionCompletionError('mission_method', `profile ${input.profileId} is not under an investigation-report contract`);
@@ -100,7 +128,6 @@ export function assertMissionTurnCompletion(input: MissionCompletionInput): Miss
     throw new MissionCompletionError('missing_report', 'Mission completion requires a session-owned investigation store');
   }
   const service = input.service ?? investigationArtifactService;
-  const finalAnswer = input.finalAnswerText ?? '';
 
   let checkpoint: InvestigationReadResult | null;
   try {
@@ -138,13 +165,21 @@ export function assertMissionTurnCompletion(input: MissionCompletionInput): Miss
     );
   }
 
+  return { mission, sessionId, service, checkpoint, readyReports };
+}
+
+export function assertMissionTurnCompletion(input: MissionCompletionInput): MissionCompletionReceipt {
+  const { mission, sessionId, service, checkpoint, readyReports } = requireMissionCompletionArtifacts(input);
+  const finalAnswer = input.finalAnswerText ?? '';
+
   const cited = readyReports.filter((entry) => (
     finalAnswerCitesReport(finalAnswer, entry.manifest.artifactId, entry.contentHash)
   ));
   if (cited.length < 1) {
+    const reportRefs = readyReports.map((entry) => `${entry.manifest.artifactId} ${entry.contentHash}`);
     throw new MissionCompletionError(
       'final_not_bound',
-      'canonical final_answer must cite the ready report artifactId and contentHash',
+      `canonical final_answer must cite one ready report artifactId and its exact contentHash, including the sha256: prefix. Ready report references: ${reportRefs.join('; ')}`,
       {
         mission,
         reportArtifactIds: readyReports.map((entry) => entry.manifest.artifactId),
@@ -153,10 +188,26 @@ export function assertMissionTurnCompletion(input: MissionCompletionInput): Miss
   }
 
   const report = cited[cited.length - 1]!;
+  assertReportEligible(report, mission, service, sessionId);
+
+  return {
+    checkpointId: (checkpoint.record as MissionCheckpoint).checkpointId,
+    checkpointArtifactId: checkpoint.manifest.artifactId,
+    reportArtifactId: report.manifest.artifactId,
+    reportContentHash: report.contentHash,
+  };
+}
+
+function assertReportEligible(
+  report: InvestigationReadResult,
+  mission: InvestigationMission,
+  service: InvestigationArtifactService,
+  sessionId: string,
+): void {
   if (report.manifest.status !== 'ready' || report.manifest.kind !== 'report') {
     throw new MissionCompletionError(
       'report_not_ready',
-      'cited report must be kind=report and status=ready',
+      'report must be kind=report and status=ready',
       { artifactId: report.manifest.artifactId, status: report.manifest.status },
     );
   }
@@ -165,10 +216,13 @@ export function assertMissionTurnCompletion(input: MissionCompletionInput): Miss
   try {
     assertReportContractPresent(body, service.createLookup(sessionId), { mission });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    if (!(error instanceof InvestigationError)
+      || (error.code !== 'INVESTIGATION_INVARIANT_VIOLATION' && error.code !== 'INVESTIGATION_REF_UNRESOLVED')) {
+      throw error;
+    }
     throw new MissionCompletionError(
       'incomplete_chapters',
-      `ready report is missing required chapters: ${message}`,
+      `ready report is missing required chapters: ${error.message}`,
       { artifactId: report.manifest.artifactId },
     );
   }
@@ -177,19 +231,16 @@ export function assertMissionTurnCompletion(input: MissionCompletionInput): Miss
   if (reportStatusForbidsCompleted(statusChapter)) {
     throw new MissionCompletionError(
       'non_complete_status',
-      `report.status must be one of ${MISSION_COMPLETION_STATUS_VALUES.join('|')}; ${statusChapter || '(empty)'} cannot complete`,
+      `report.status must be one of ${MISSION_COMPLETION_STATUS_VALUES.join('|')}; ${statusChapter || '(empty)'} cannot complete (artifact ${report.manifest.artifactId})`,
       { status: statusChapter, artifactId: report.manifest.artifactId },
     );
   }
 
   assertMissionMethodSurface(mission, body, service, sessionId);
-
-  return {
-    checkpointId: (checkpoint.record as MissionCheckpoint).checkpointId,
-    checkpointArtifactId: checkpoint.manifest.artifactId,
-    reportArtifactId: report.manifest.artifactId,
-    reportContentHash: report.contentHash,
-  };
+  const openChallenges = openReportChallenges(service, sessionId, body);
+  if (openChallenges.length) {
+    throw new MissionCompletionError('open_challenge', `report ${report.manifest.artifactId} has unresolved relevant Challenges: ${openChallenges.join(', ')}`, { openChallenges });
+  }
 }
 
 function resolveMissionCheckpoint(
@@ -200,8 +251,10 @@ function resolveMissionCheckpoint(
   const entries = service.list(sessionId, { kind: 'checkpoint' });
   const resolved: InvestigationReadResult[] = [];
   for (const entry of entries) {
+    if (entry.status !== 'ready' && entry.status !== 'draft') continue;
     try {
       const result = service.readRecord(sessionId, entry.artifactId);
+      if (result.manifest.status !== 'ready' && result.manifest.status !== 'draft') continue;
       if (result.manifest.mission !== mission) continue;
       const record = result.record as MissionCheckpoint;
       if (!record.checkpointId?.trim()) continue;
@@ -239,22 +292,6 @@ function assertMissionMethodSurface(
   for (const id of report.experimentIds) {
     const experiment = service.createLookup(sessionId).getExperiment(id);
     if (experiment) service.assertExecutionEvidence(sessionId, experiment);
-  }
-  if (mission === 'analyzer') {
-    const present = new Set<AnalyzerExplanationLayer>();
-    for (const claim of report.claims) {
-      const layer = analyzerExplanationLayer(claim.claimKind);
-      if (layer) present.add(layer);
-    }
-    const missing = ANALYZER_EXPLANATION_LAYERS.filter((layer) => !present.has(layer));
-    if (missing.length > 0) {
-      throw new MissionCompletionError(
-        'mission_method',
-        `Analyzer completion requires Observed / Reconstructed / Authoring layers; missing ${missing.join(', ')}`,
-        { missing },
-      );
-    }
-    return;
   }
   if (mission === 'optimizer') {
     if (report.experimentIds.length < 1) {

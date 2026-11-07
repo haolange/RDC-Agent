@@ -157,10 +157,13 @@ export interface KnowledgeCardSummary {
 export interface KnowledgeCardDetail extends KnowledgeCardSummary {
   /** SHA-256 of the exact Markdown source returned by the card read. */
   contentHash?: string;
+  /** Exact Markdown source, including frontmatter; contentHash covers these bytes. */
   content: string;
   body: string;
   scope: KnowledgeScope;
   relations: KnowledgeRelation[];
+  /** Topics explicitly confirmed for this exact source version. */
+  topics?: KnowledgeTopic[];
   sourceStatus?: string;
   caseId?: string;
   chapters?: KnowledgeCaseChapters;
@@ -171,6 +174,25 @@ export interface KnowledgeCardDetail extends KnowledgeCardSummary {
   sourceHash?: string;
   sourceMtimeMs?: number;
   sourceSize?: number;
+}
+
+export interface KnowledgeReadRequest {
+  spaceId: string;
+  relativePath: string;
+  mode: 'summary' | 'section' | 'range' | 'full';
+  contentHash?: string;
+  heading?: string;
+  headingLine?: number;
+  startLine?: number;
+  endLine?: number;
+}
+
+export interface KnowledgeReadResult {
+  card: Omit<KnowledgeCardDetail, 'content' | 'body' | 'chapters'>;
+  content: string;
+  range: string;
+  headings: Array<{ title: string; line: number; level: number }>;
+  lineCount: number;
 }
 
 export interface KnowledgeHumanConfirmation {
@@ -212,6 +234,10 @@ export interface KnowledgeLaneHit {
   updatedAt?: number;
   score: number;
   lanes: KnowledgeRetrievalLane[];
+  /** Declared relations from this exact card version, not inferred relationships. */
+  relations?: KnowledgeRelation[];
+  /** Current user-confirmed topics; stale assignments are excluded. */
+  topics?: KnowledgeTopic[];
   chunkIndex?: number;
 }
 
@@ -231,11 +257,18 @@ export interface KnowledgeQueryRequest {
   relationTargetCardId?: string;
   asOf?: number;
   lanes?: KnowledgeRetrievalLane[];
+  offset?: number;
+  limit?: number;
+  expectedRevision?: string;
 }
 
 export interface KnowledgeQueryResult {
   hits: KnowledgeLaneHit[];
   lanes: KnowledgeLaneResult[];
+  revision?: string;
+  total?: number;
+  nextOffset?: number;
+  queryFingerprint?: string;
 }
 
 export interface KnowledgeIndexOverview {
@@ -248,6 +281,55 @@ export interface KnowledgeIndexOverview {
 export interface KnowledgeOverviewResult {
   spaces: KnowledgeSpace[];
   index: KnowledgeIndexOverview | null;
+}
+
+/** User-confirmed topic metadata; Markdown remains the sole content source. */
+export interface KnowledgeTopic {
+  id: string;
+  label: string;
+  synonyms: string[];
+}
+
+export interface KnowledgeTopicAssignment {
+  cardId: string;
+  contentHash: string;
+  topicIds: string[];
+}
+
+export interface KnowledgeTopicDocument {
+  schemaVersion: 1;
+  topics: KnowledgeTopic[];
+  assignments: KnowledgeTopicAssignment[];
+}
+
+export interface KnowledgeTopicSuggestion {
+  topic: KnowledgeTopic;
+  existing: boolean;
+  cards: Array<{ cardId: string; title: string; relativePath: string; contentHash: string; matchedTerms: string[] }>;
+}
+
+export interface KnowledgeTopicChanges {
+  expectedRevision: string;
+  expectedCorpusRevision: string;
+  topics: KnowledgeTopic[];
+  assignments: KnowledgeTopicAssignment[];
+  merges?: Array<{ sourceId: string; targetId: string }>;
+}
+
+export interface KnowledgeTopicProposal {
+  revision: string;
+  corpusRevision: string;
+  current: KnowledgeTopicDocument;
+  suggestions: KnowledgeTopicSuggestion[];
+}
+
+export interface KnowledgeTopicPreview {
+  revision: string;
+  corpusRevision: string;
+  changeHash: string;
+  topics: KnowledgeTopic[];
+  merges: Array<{ source: KnowledgeTopic; target: KnowledgeTopic }>;
+  cards: Array<{ cardId: string; title: string; relativePath: string; before: string[]; after: string[]; stale: boolean }>;
 }
 
 export interface KnowledgeCompiledHit extends KnowledgeLaneHit {

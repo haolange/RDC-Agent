@@ -24,7 +24,7 @@ Do not write engine semantics as `observed_fact`. Do not write an inferred label
 Shape: one `ClaimSet` (`kind: claim_set`) titled Architecture Model.
 
 1. Collect Observed facts with `$capture-facts`, versions with `$resource-versioning`, pass topology with `$pass-graph-analysis`, shader fingerprints / blocks with `$shader-ir-analysis`, and traces with `$cross-capture-alignment`.
-2. Write the model as a `claim_set` whose items stay on their layers. Include at least one Observed fact, one Reconstructed structure, and an explicit Unknown Frontier (`limitation` or Authoring hypothesis marked unknown).
+2. Write the needed model as a `claim_set` whose items stay on their source layers. Include the observations and reconstructions needed by the approved question and an explicit Unknown Frontier where applicable; do not invent an Authoring hypothesis merely to fill a layer.
 3. Version by `supersedes` on the previous Architecture Model artifact. Do not silent-overwrite. The new version is a comparison Artifact: name what changed, what stayed, and what remains unknown.
 4. Mark `ready` only with provenance (`$artifact-provenance`).
 
@@ -32,12 +32,12 @@ Shape: one `ClaimSet` (`kind: claim_set`) titled Architecture Model.
 
 Do not persist Knowledge. Do not call `memory_write`. Do not write these fields into Tasks, Profiles, or Messages. RDC runs only through the Settings-configured CLI.
 
-## 双 capture：由应用管理身份
+## 多 capture：由应用管理身份
 
-1. 用户通过应用 Capture 入口顺序打开 A、B；每份 capture 使用各自 owning Agent session。应用管理 open/close 和 lease。General 不调用 open_replay，不覆盖 session/context/lease 身份。
-2. 在 A 的 owning session，General 经已预载的共享 Skill 和 Analyzer 手册，用 shell.rdc 读取完整事件索引、action details、父链、pipeline shader hash/debug_name 和附件。把原始事实保存为带 capture hash、session、event、operation、证据引用的产物。
-3. 在 B 的 owning session 重复读取并保存独立身份事实。比较时读取两份已保存产物，不跨 session 借用 live lease；不在一个 shell.rdc 中伪造另一份 session_id。
-4. 再用 $cross-capture-alignment 对齐已有事实。marker_path 缺失保留 null；重复 marker 不唯一。shader 内容 SHA-256 与非自动 debug_name 也可能缺失，不用跨文件 ResourceId 充当稳定键。无 marker 时只能提出由拓扑、附件、事件邻域支持的启发式，并保留反证和歧义。
+1. 使用批准计划冻结的 inputId、内容 hash 和设备，由拥有现场的 General 在同一产品 session 内按需通过 `rdc_probe` 的 `capture_select(inputId)` 串行切换。应用负责现场释放、身份重准备和签名回执；遵守 `$renderdoc-execution` 的权限及恢复要求，不传文件路径或 context ID，不直接调用 open_replay。
+2. 每次切换准备完成后，在当前身份和实际权限内使用 `rdc_probe` 只读查询或 `shell.rdc`，采集计划所需的事件索引、action details、父链、pipeline shader hash/debug_name 和附件。保存每份原始事实及其 capture hash、产品 session、原生 replay 身份、event、operation 和证据引用。
+3. 每份 capture 保持独立的 World State 与原生 replay 绑定。比较已保存材料，不跨身份借用 live lease，也不伪造 session/context/lease。调查结束时通过 `capture_restore` 恢复进入执行时的 capture、事件和目标，核对实际状态与回执；恢复失败须保留缺口。
+4. 用 $cross-capture-alignment 对齐已有事实。marker_path 缺失保留 null；重复 marker 不唯一。shader 内容 SHA-256 与非自动 debug_name 也可能缺失，不用跨文件 ResourceId 充当稳定键。无 marker 时只能提出由拓扑、附件、事件邻域支持的启发式，并保留反证和歧义。
 
 usage 的 is_read/is_write 可以为 null；binding-only 无法从 usage 确认。按真实事件和 color/depth attachment 在知识层组织资源版本和依赖假设，不能从空 usage 宣称“未使用”。回归对照先声明预期事实，保留原始结果、身份与 unsupported，再报告观察和推断。证据包仅是这些已有产物的组织方式，不创建宏或新的调查类型。
 

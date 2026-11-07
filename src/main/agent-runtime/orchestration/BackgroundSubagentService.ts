@@ -117,11 +117,12 @@ export class BackgroundSubagentService {
       subagents: 0,
       maxChildDepth: input.policyBudget?.maxChildDepth,
       childDepth: (input.subagentBudget?.depth ?? 0) + 1,
-      deadlineAt: now + input.capsule.budget.maxWallTimeMs,
+      deadlineAt: input.capsule.budget.maxWallTimeMs === undefined ? undefined : now + input.capsule.budget.maxWallTimeMs,
     };
     const execution = await registry.startExecution(input.taskId, {
       mode: 'subagent', parentExecutionId: input.parentExecutionId, rootBudgetId: durableRoot ? rootBudgetId : undefined, budget,
       requiredSkillIds: input.capsule.requiredSkillIds,
+      requestedProfileId: input.targetProfile,
     });
     const restoredPolicyBudget: PolicyBudgetState = {
       toolCalls: execution.budget.toolCalls,
@@ -426,7 +427,7 @@ export function createBackgroundSubagentService(subagents: SubagentRunner, depen
 }): BackgroundSubagentService {
   return new BackgroundSubagentService(async (input) => subagents.runSubagent({
     parentAgentId: input.parentAgentId, parentToolCallId: input.parentToolCallId, targetProfile: input.targetProfile,
-    capsule: input.capsule, model: input.capsule.model, parentSessionId: input.originSessionId ?? input.sessionId, projectRootPath: input.projectRootPath,
+    capsule: input.capsule, parentSessionId: input.originSessionId ?? input.sessionId, projectRootPath: input.projectRootPath,
     projectId: input.projectId, signal: input.signal, detached: true, childSessionId: subagentScopeId(input.sessionId, input.executionId),
     // Detached execution progress belongs to TaskRegistry and its durable mailbox,
     // not the originating reply's synchronous subagent continuation or trace.

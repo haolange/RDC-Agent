@@ -4,6 +4,7 @@ import {
   parseDelegationCapsule,
   type DelegationCapsule,
 } from '@shared/types/delegationCapsule';
+import { investigationMethodCapsule } from '../../testing/fixtures/investigationMethodCases';
 import {
   applyDelegationCapsuleToPromptPlan,
   compileDelegationCapsule,
@@ -113,4 +114,16 @@ it('does not elevate injected source text to the child system prefix and retains
 });
 it('rejects oversized capsule content rather than truncating facts silently', () => {
   expect(() => parseDelegationCapsule(validCapsule({ hypotheses: Array.from({ length: 10 }, () => 'x'.repeat(3000)) }))).toThrow(/externalize/);
+});
+
+it('carries synthetic competing explanations, qualified negatives and stop conditions into child data', () => {
+  const capsule = parseDelegationCapsule(investigationMethodCapsule);
+  const rendered = renderDelegationCapsuleInput(capsule);
+  const data = JSON.parse(rendered.slice(rendered.indexOf('\n') + 1));
+  expect(data.acceptedFacts[0]).toEqual(investigationMethodCapsule.acceptedFacts[0]);
+  expect(data.hypotheses).toEqual(investigationMethodCapsule.hypotheses);
+  expect(data.negativePaths[0]).toEqual(investigationMethodCapsule.negativePaths[0]);
+  expect(data.challengeRefs).toEqual(investigationMethodCapsule.challengeRefs);
+  expect(data.stopConditions).toEqual(investigationMethodCapsule.stopConditions);
+  expect(renderDelegationCapsulePrompt(compileDelegationCapsule(capsule))).not.toContain(data.acceptedFacts[0].statement);
 });

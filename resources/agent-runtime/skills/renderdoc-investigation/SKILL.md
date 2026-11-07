@@ -7,3 +7,5 @@ description: Route RenderDoc capture investigations of incorrect rendering, rend
 
 仅当任务需要对 capture 进行证据驱动调查时使用本入口。错误渲染或根因定位交给 Debugger；渲染架构解释交给 Analyzer；GPU 成本与保真优化交给 Optimizer。术语解释、普通代码问题和无需调查的简单查询由 General 直接完成。
 在终答里写清应使用哪一只 Mission，由用户通过 UI 切换；不要调用已删除的交接工具，也不要假装已经切到了 Mission。不要在入口重复执行领域调查方法；由接收方规划，用户批准后再点 Execute with General。
+
+如果你是处理已批准计划的 Generator 子执行，规划和交接已经发生：在获授材料与任务范围内执行调查分析，形成可检验的解释和下一项检查，不要求用户重新切换 Mission。live RDC 操作由 General 拥有；必要证据由 General 采集并明确授权。

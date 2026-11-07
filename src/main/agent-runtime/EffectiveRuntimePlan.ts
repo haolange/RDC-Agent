@@ -314,6 +314,35 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
   };
 }
 
+/** Rebuild an existing frozen plan for a new RDC identity without re-reading settings or widening authority. */
+export function rebuildEffectiveRuntimePlan(
+  previous: EffectiveRuntimePlan,
+  input: { rdcBindingFingerprint: string; systemPrompt: string },
+): EffectiveRuntimePlan {
+  return buildEffectiveRuntimePlan({
+    agentId: previous.agentId, projectRootPath: previous.projectRootPath, projectId: previous.projectId,
+    profileProvenance: previous.profileProvenance,
+    profile: { skills: [...previous.profileSkills], ...(previous.profileMaxTurns !== null ? { maxTurns: previous.profileMaxTurns } : {}),
+      accessCeiling: previous.accessCeiling, completionContract: previous.completionContract,
+      agents: [...previous.profileDelegates], handoffs: previous.profileHandoffs.map(handoff => {
+        const { requiredSkillIds, requiredToolIds, ...rest } = handoff;
+        return { ...rest, ...(requiredSkillIds ? { requiredSkillIds: [...requiredSkillIds] } : {}),
+          ...(requiredToolIds ? { requiredToolIds: [...requiredToolIds] } : {}) };
+      }) },
+    enabledProfileIds: previous.enabledProfileIds, profileDelegates: previous.profileDelegates,
+    toolAllowlist: previous.toolAllowlist, permissionConstraints: previous.permissionConstraints,
+    knowledgeReadRoots: previous.knowledgeReadRoots, policy: previous.policy,
+    routeCapability: previous.routeCapability, requestPlan: { executionIdentity: { fingerprint: previous.requestPlanFingerprint } },
+    promptPlan: { systemPrompt: input.systemPrompt }, investigationMission: previous.investigationMission,
+    skillIntersection: previous.skillIntersection, visibleToolNames: previous.visibleToolNames,
+    activatedDeferredTools: previous.activatedDeferredTools, mcpDescriptorHash: previous.mcpDescriptorHash,
+    compactionThresholdPercent: previous.contextCompactionPercent,
+    attachmentManifestFingerprint: previous.attachmentManifestFingerprint,
+    excludeRdcLeaseTools: previous.excludeRdcLeaseTools, excludeSubagent: previous.excludeSubagent,
+    delegationCapsule: previous.delegationCapsule, rdcBindingFingerprint: input.rdcBindingFingerprint,
+  });
+}
+
 export function activeToolNamesForPlan(
   definitions: readonly ToolDefinition[],
   plan: EffectiveRuntimePlan,

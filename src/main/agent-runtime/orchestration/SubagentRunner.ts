@@ -1,4 +1,6 @@
 import { isTransientScopeId, rootScopeId, subagentScopeId } from '@shared/utils/executionScope';
+import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
+import { agentAccessCeiling } from '@shared/types/agentManifest';
 import { withDelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
 import { deriveChildPolicyBudget, flushPolicyBudgetObservers, registerPolicyBudgetObserver } from './DelegationBudget';
 import { bindTaskRootBudget } from './TaskRootBudget';
@@ -23,6 +25,7 @@ import type { AgentTool } from '../agent/AgentTool';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
 import {
+  APPROVED_CAPTURE_SCOPE_REQUIRED,
   assertSubagentBudgetAllowsChild,
   consumeReservedSubagentSlot,
   createSubagentBudgetState,
@@ -36,7 +39,6 @@ import {
 } from './TurnCoordinator';
 import type { AgentProfileTurnOptions } from './orchestratorTypes';
 import { createEphemeralScopeId } from './executionScope';
-import { resolveSubagentModelOverride } from './subagentModelArg';
 import {
   DELEGATION_CAPSULE_JSON_SCHEMA,
   freezeDelegationCapsule,
@@ -61,6 +63,7 @@ import type { BackgroundSubagentStart } from './BackgroundSubagentService';
 import { createHash } from 'node:crypto';
 import { normalizeSubagentResult, persistSubagentResult, projectSubagentResult } from './SubagentResultEnvelope';
 import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
+import { DelegationConfigurationError } from './DelegationConfigurationError';
 
 export interface SubagentRunnerDeps {
   sendProfileMessage: (
@@ -97,7 +100,6 @@ export class SubagentRunner {
     onPolicyBudget?: (budget: TurnHandle['policyBudget']) => void;
     subagentBudget?: TurnHandle['subagentBudget'];
     signal?: AbortSignal | null;
-    model?: string;
     childSessionId?: string;
     taskId?: string;
     executionId?: string;
@@ -107,6 +109,10 @@ export class SubagentRunner {
   }): Promise<{ text: string; status: SubagentResultStatus; subagentId: string; policyBudget?: TurnHandle['policyBudget']; completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null }> {
     const capsule = input.capsule;
     const rdcDelegation = resolveRdcDelegation(capsule.domainExtensions);
+    const parentTurn = input.parentTurn ?? this.deps.getActiveTurn(input.parentSessionId);
+    if (rdcDelegation.requiresLease && parentTurn?.requiresApprovedCaptureScope) {
+      throw new Error(APPROVED_CAPTURE_SCOPE_REQUIRED);
+    }
     const task = capsule.task;
     // Resolve and authorize the exact project profile before mutating parent budgets or emitting a child event.
     const childSettings = settingsService.getAll();
@@ -118,18 +124,7 @@ export class SubagentRunner {
           input.projectRootPath ?? undefined,
         )
       : [];
-    const definition = effectiveProfiles.find((entry) => entry.id === input.targetProfile && entry.enabled);
-    if (!definition) {
-      throw new Error('AGENT_PROFILE_UNAVAILABLE: ' + input.targetProfile);
-    }
-    let modelOverride: { providerId: string; modelId: string } | undefined;
-    try {
-      modelOverride = resolveSubagentModelOverride(input.model, childSettings);
-      if (!modelOverride && (!definition.compiledRoute?.providerId || !definition.compiledRoute.modelId)) {
-        throw new Error(`MODEL_ROUTE_REQUIRED: ${input.targetProfile} has no configured model route; set capsule.model to an available providerId:modelId (colon separator).`);
-      }
-    } catch (error) {
-      const text = error instanceof Error ? error.message : String(error);
+    const rejectConfiguration = (code: DelegationConfigurationError['code'], text: string) => {
       const subagentId = generateEventId('subagent');
       const childSessionId = input.childSessionId ?? subagentScopeId(input.parentSessionId ?? createEphemeralScopeId(), subagentId);
       const ownerSessionId = (input.parentSessionId ? rootScopeId(input.parentSessionId) : undefined);
@@ -141,9 +136,20 @@ export class SubagentRunner {
           childSessionId, invocation: JSON.stringify(capsule), status: 'running', startedAt: nowMs(),
         });
         delegationTraceStore.finish(ownerSessionId, input.parentToolCallId,
-          `${childSessionId}\u0000${input.executionId ?? ''}\u0000${input.taskExecutionGeneration ?? ''}`, 'failed', text);
+          `${childSessionId}\u0000${input.executionId ?? ''}\u0000${input.taskExecutionGeneration ?? ''}`, 'failed', text, code);
       }
-      return { text, status: 'failed', subagentId };
+      return { text, status: 'failed' as const, subagentId };
+    };
+    const definition = effectiveProfiles.find((entry) => entry.id === input.targetProfile && entry.enabled);
+    if (!definition) {
+      return rejectConfiguration('AGENT_PROFILE_UNAVAILABLE', 'AGENT_PROFILE_UNAVAILABLE: ' + input.targetProfile);
+    }
+    if (rdcDelegation.requiresLease && !definition.tools.some(tool => isRdcLeaseToolName(tool)
+      || (tool === 'shell' && agentAccessCeiling(definition) === 'full'))) {
+      throw new Error('RDC_LEASE_DELEGATE_DENIED: target Agent has no live RDC capability.');
+    }
+    if (!definition.compiledRoute?.providerId || !definition.compiledRoute.modelId) {
+      return rejectConfiguration('MODEL_ROUTE_REQUIRED', `MODEL_ROUTE_REQUIRED: ${input.targetProfile} has no configured model route; configure this Agent in Settings.`);
     }
     const effectiveProfileIds = effectiveProfiles.filter((entry) => entry.enabled).map((entry) => entry.id);
     const systemPrompt = definition.instructions?.trim() || this.deps.systemPromptForAgent(input.targetProfile);
@@ -176,9 +182,16 @@ export class SubagentRunner {
       : createEphemeralScopeId());
 
     const childAbort = new AbortController();
-    const remainingWallMs = childPolicyBudget.wallStartedAt + childPolicyBudget.maxWallTimeMs - Date.now();
-    const deadlineTimer = setTimeout(() => childAbort.abort(new Error('POLICY_LIMIT_EXCEEDED: maxWallTimeMs')), Math.max(0, Math.min(remainingWallMs, 2_147_000_000)));
-    deadlineTimer.unref?.();
+    let deadlineTimer: NodeJS.Timeout | undefined;
+    const armDeadline = () => {
+      const remaining = childPolicyBudget.wallStartedAt + childPolicyBudget.maxWallTimeMs - Date.now();
+      deadlineTimer = setTimeout(() => {
+        if (remaining > 2_147_000_000) armDeadline();
+        else childAbort.abort(new Error('POLICY_LIMIT_EXCEEDED: maxWallTimeMs'));
+      }, Math.max(0, Math.min(remaining, 2_147_000_000)));
+      deadlineTimer.unref?.();
+    };
+    if (childPolicyBudget.maxWallTimeMs < Number.MAX_SAFE_INTEGER) armDeadline();
     const parentSignal = input.detached ? (input.signal ?? null) : (input.signal ?? input.parentTurn?.signal ?? null);
     const onParentAbort = () => {
       try {
@@ -205,6 +218,7 @@ export class SubagentRunner {
     // 组装子 agent system prompt（目标 profile instructions）
     let resultText = '';
     let resultStatus: SubagentResultStatus = 'complete';
+    let configurationError: DelegationConfigurationError['code'] | undefined;
     let childPromise: Promise<string> | null = null;
     let completionDeclaration: import('./TurnCoordinator').TurnCompletionDeclaration | null = null;
     const seenToolCallIds = new Set<string>();
@@ -216,12 +230,12 @@ export class SubagentRunner {
     }, parentBudget.depth + 1);
     childBudget.aggregateToolCalls = parentBudget.aggregateToolCalls;
 
+    let finishLifecycle!: () => void;
+    const lifecycleFinished = new Promise<void>(resolve => { finishLifecycle = resolve; });
     const unregisterProducer = input.detached ? undefined : input.parentTurn?.registerProducer({
-      id: subagentId,
+      id: subagentSessionId,
       abort: () => onParentAbort(),
-      join: async () => {
-        if (childPromise) await childPromise.catch(() => undefined);
-      },
+      join: () => lifecycleFinished,
     });
 
     let releaseArtifacts: (() => void) | undefined;
@@ -292,17 +306,24 @@ export class SubagentRunner {
           signal: childAbort.signal,
           policyBudget: childPolicyBudget,
           subagentBudget: childBudget,
-          modelOverride: modelOverride ?? null,
-          ...(frozenCapsule.reasoningLevel ? { turnControls: { reasoningLevel: frozenCapsule.reasoningLevel, maxContextMode: false, fastModel: false } } : {}),
+          // This is the resolved child Agent's frozen route, not a parent-supplied override.
+          modelOverride: { providerId: definition.compiledRoute!.providerId, modelId: definition.compiledRoute!.modelId },
+          ...(definition.reasoningLevel ? { turnControls: { reasoningLevel: definition.reasoningLevel, maxContextMode: false, fastModel: false } } : {}),
           extraPromptSegments: capsuleSegments,
           frozenDelegationCapsule: frozenCapsule,
           preloadSkillIds: frozenCapsule.requiredSkillIds,
           onTaskPreparation: async (preparation) => {
-            if (!ownedTask || !input.executionId || input.taskExecutionGeneration === undefined) return;
-            const capsuleHash = createHash('sha256').update(JSON.stringify(frozenCapsule)).digest('hex');
-            if (preparation.capsuleHash !== capsuleHash) throw new Error('TASK_EXECUTION_REQUIREMENTS: prepared Capsule differs from dispatched work.');
-            await new TaskRegistry(createSessionTaskStore(inheritedTaskScope?.ownerSessionId ?? input.parentSessionId!))
-              .bindExecutionPreparation(input.executionId, input.taskExecutionGeneration, preparation);
+            if (ownedTask && input.executionId && input.taskExecutionGeneration !== undefined) {
+              const capsuleHash = createHash('sha256').update(JSON.stringify(frozenCapsule)).digest('hex');
+              if (preparation.capsuleHash !== capsuleHash) throw new Error('TASK_EXECUTION_REQUIREMENTS: prepared Capsule differs from dispatched work.');
+              await new TaskRegistry(createSessionTaskStore(inheritedTaskScope?.ownerSessionId ?? input.parentSessionId!))
+                .bindExecutionPreparation(input.executionId, input.taskExecutionGeneration, preparation);
+            }
+            if (ownerSessionId && preparation.providerId && preparation.modelId && preparation.reasoningLevel) {
+              delegationTraceStore.setPreparedRoute(ownerSessionId, input.parentToolCallId, traceIdentity, {
+                providerId: preparation.providerId, modelId: preparation.modelId, reasoningLevel: preparation.reasoningLevel,
+              });
+            }
           },
           beforeProviderRequestMessages: input.beforeProviderRequestMessages,
           onProviderRequestCommitted: input.onProviderRequestCommitted,
@@ -349,13 +370,14 @@ export class SubagentRunner {
       const aborted = childAbort.signal.aborted
         || (error instanceof Error && error.name === 'AbortError');
       resultStatus = aborted ? 'cancelled' : 'failed';
+      if (!aborted && error instanceof DelegationConfigurationError) configurationError = error.code;
       const reason = childAbort.signal.reason;
       resultText = aborted && reason instanceof Error && reason.message.startsWith('POLICY_LIMIT_EXCEEDED: maxWallTimeMs')
         ? reason.message
         : error instanceof Error ? error.message : String(error);
     } finally {
       try {
-        clearTimeout(deadlineTimer);
+        if (deadlineTimer) clearTimeout(deadlineTimer);
         await processSupervisor.joinExecutionProcesses(subagentSessionId);
         const lease = getRdcContextLease(subagentSessionId);
         revokeDelegatedLease(subagentSessionId, { operationStopped: !!lease && !shellInvocationService.hasUnconfirmedProcesses(lease.contextId) });
@@ -373,10 +395,11 @@ export class SubagentRunner {
         );
       } finally {
         finishSubagentBudgetChild(parentBudget);
+        finishLifecycle();
       }
     }
 
-    if (ownerSessionId) delegationTraceStore.finish(ownerSessionId, input.parentToolCallId, traceIdentity, resultStatus, resultText);
+    if (ownerSessionId) delegationTraceStore.finish(ownerSessionId, input.parentToolCallId, traceIdentity, resultStatus, resultText, configurationError);
 
     return { text: resultText, status: resultStatus, subagentId, policyBudget: childPolicyBudget, completionDeclaration };
   }
@@ -392,7 +415,7 @@ export class SubagentRunner {
     > = {
       name: 'subagent',
       label: 'Subagent',
-      description: 'Delegate a structured Delegation Capsule to an isolated sub-agent. Required fields include goal, task, scope, qualified acceptedFacts, hypotheses, challengeRefs, conditional negativePaths, inputArtifactRefs, requiredSkillIds, stopConditions, outputRequirements and budget. For every parent record the child must read, include its exact session:// contentUri in inputArtifactRefs or a fact sourceRef; a record ID in scope is not a grant. Budget for the required reads, writes and completion. mode=wait waits; mode=background requires taskId and returns its execution id. Capability requests do not grant authority; domain admission and tool resource locks enforce exclusive effects. Set model to an available canonical providerId:modelId when the child profile has no configured route; the child never inherits the parent session override. Use reasoningLevel separately for effort.',
+      description: 'Delegate a structured Delegation Capsule to an isolated sub-agent. Include the goal, scope, evidence, challenges, required methods, output and stopping conditions. Grant the exact session:// references the child must read; an ID is not a grant. mode=wait waits; mode=background requires taskId. Capability requests do not grant authority. The selected Agent supplies its own model and reasoning configuration.',
       parameters: {
         ...DELEGATION_CAPSULE_JSON_SCHEMA,
         properties: {
@@ -501,6 +524,7 @@ export class SubagentRunner {
           const startedAt = Date.now();
           execution = await registry.startExecution(taskId, {
             mode: 'subagent',
+            requestedProfileId: targetProfile,
             requiredSkillIds: capsule.requiredSkillIds,
             parentExecutionId: effectiveParentExecutionId,
             rootBudgetId,
@@ -512,8 +536,10 @@ export class SubagentRunner {
               subagents: 0,
               maxChildDepth: turn?.policyBudget?.maxChildDepth,
               childDepth: (turn?.subagentBudget.depth ?? 0) + 1,
-              deadlineAt: Math.min(startedAt + capsule.budget.maxWallTimeMs,
-                turn?.policyBudget ? turn.policyBudget.wallStartedAt + turn.policyBudget.maxWallTimeMs : Number.POSITIVE_INFINITY),
+              deadlineAt: capsule.budget.maxWallTimeMs === undefined && (!turn?.policyBudget || turn.policyBudget.maxWallTimeMs === Number.MAX_SAFE_INTEGER)
+                ? undefined
+                : Math.min(capsule.budget.maxWallTimeMs === undefined ? Infinity : startedAt + capsule.budget.maxWallTimeMs,
+                  turn?.policyBudget ? turn.policyBudget.wallStartedAt + turn.policyBudget.maxWallTimeMs : Infinity),
             },
           });
           unregisterOwner = registerTaskExecutionCancellationOwner(execution.id, async () => {
@@ -529,7 +555,6 @@ export class SubagentRunner {
             parentToolCallId: toolCallId,
             targetProfile,
             capsule,
-            model: capsule.model,
             parentSessionId: sessionId ?? null,
             parentOnEvent: turn?.eventSink?.onEvent,
             projectRootPath: turn?.eventSink?.projectRootPath ?? null,
@@ -590,7 +615,7 @@ export class SubagentRunner {
           if (execution && ownerSessionId) {
             const registry = new TaskRegistry(createSessionTaskStore(ownerSessionId));
             const current = await registry.getExecution(execution.id);
-            if (current?.status !== 'cancelling') {
+            if (current && !['completed', 'partial', 'blocked', 'failed', 'cancelled', 'interrupted', 'cancelling'].includes(current.status)) {
               if (result.policyBudget) {
                 await registry.updateExecutionBudget(execution.id, {
                   expectedGeneration: execution.generation,

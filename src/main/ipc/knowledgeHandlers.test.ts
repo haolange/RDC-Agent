@@ -2,7 +2,7 @@ vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: {
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { dialog } from 'electron';
 
-const { handlers, electronState, knowledgeState, writeMocks } = vi.hoisted(() => {
+const { handlers, electronState, knowledgeState, writeMocks, topicMocks } = vi.hoisted(() => {
   const registered = new Map<string, (...args: unknown[]) => Promise<unknown>>();
   return {
     handlers: registered,
@@ -21,6 +21,10 @@ const { handlers, electronState, knowledgeState, writeMocks } = vi.hoisted(() =>
     writeMocks: {
       write: vi.fn(async (input: { card: unknown }) => input.card),
       promote: vi.fn(async (input: { card: unknown }) => input.card),
+    },
+    topicMocks: {
+      preview: vi.fn(async () => ({ changeHash: 'a'.repeat(64), topics: [{ label: 'Texture' }], cards: [] })),
+      apply: vi.fn(async () => ({ revision: 'b'.repeat(64) })),
     },
   };
 });
@@ -52,6 +56,8 @@ vi.mock('../knowledge/KnowledgeWriteService', () => ({
     promote: writeMocks.promote,
   },
 }));
+
+vi.mock('../knowledge/KnowledgeTopicService', () => ({ knowledgeTopicService: topicMocks }));
 
 vi.mock('../knowledge/KnowledgeCandidateService', () => ({
   knowledgeCandidateService: {
@@ -98,12 +104,30 @@ describe('knowledge mutation approval boundaries', () => {
     handlers.clear();
     writeMocks.write.mockClear();
     writeMocks.promote.mockClear();
+    topicMocks.preview.mockClear();
+    topicMocks.apply.mockClear();
     vi.mocked(knowledgeImportService.importToSpace).mockClear();
     vi.mocked(knowledgeImportService.migrateSessionDrafts).mockClear();
     delete process.env.RDC_AGENT_BROWSER_QA;
     delete process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS;
     electronState.focused = undefined;
     registerKnowledgeHandlers({} as never);
+  });
+
+  it('requires a matching preview and main-process human confirmation before applying topic changes', async () => {
+    const changes = { expectedRevision: 'c'.repeat(64), expectedCorpusRevision: 'd'.repeat(64),
+      topics: [{ id: 'texture', label: 'Texture', synonyms: ['纹理'] }], assignments: [] };
+    const request = { changes, changeHash: 'a'.repeat(64), confirmation: { explicitHumanConfirmation: true } };
+    const apply = handlers.get('knowledge:topics:apply')!;
+    await expect(apply({}, { ...request, confirmation: { explicitHumanConfirmation: false } })).rejects.toThrow();
+    await expect(apply({}, { ...request, changeHash: 'b'.repeat(64) })).rejects.toThrow('PREVIEW_CHANGED');
+    expect(topicMocks.apply).not.toHaveBeenCalled();
+    expect(await apply({}, request)).toEqual({ cancelled: true });
+    expect(topicMocks.apply).not.toHaveBeenCalled();
+    electronState.focused = {};
+    vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 0, checkboxChecked: false });
+    expect(await apply({}, request)).toEqual({ revision: 'b'.repeat(64) });
+    expect(topicMocks.apply).toHaveBeenCalledOnce();
   });
 
   it('rejects headless Browser QA knowledge approval without full access', async () => {

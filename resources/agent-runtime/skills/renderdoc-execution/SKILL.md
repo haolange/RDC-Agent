@@ -11,6 +11,8 @@ General 消费本次会话 execution offer 冻结的 Plan URI/hash 与 requiredS
 
 Plan 为按任务规模填写的 Markdown 策略。Mission 用 plan_artifact 提交当前计划等待用户审阅；拒绝按意见修订同一份；批准后本回合结束，用户点声明按钮才会切到 General。必须说明以下六块，可明确标注不适用原因：
 
+计划需要实时 RDC 时，即使只调查当前一份 capture，也须在 `plan_artifact.captureScope` 中填写拟使用的已登记 `inputIds`、当前 `deviceId` 和调查目标；从 `runtime_context.capturePlanning` 读取身份。主进程校验并把内容 hash 冻结在用户审阅的计划里，用于入口基线、恢复和现场准入。仅离线分析可省略；正文提及 capture 不等于冻结授权。若获批计划遗漏该字段，应回 Mission 按正常计划门修订，不能用其他事件操作冒充签名恢复。
+
 1. **目标与边界**：用户目标、成功标准、范围、质量约束、能力上限、输入缺口。
 2. **输入与参考依据**：输入引用、已知事实、未知项；Knowledge 来源、适用条件、反例、失败经验和冲突。相似度只帮助选检查方向，不构成事实或因果证据。
 3. **候选方向与选择依据**：方向及来源、待验证预测、最小区分检查、进入／排除／转向条件。不固定候选数量。
@@ -35,8 +37,10 @@ General 就地终答，不自动切回 Mission，也不要求 return 合同。�
 
 ## 执行与证据
 
+跨 capture 调查使用批准计划中的 inputId；由拥有现场的 General 调用 `rdc_probe` 的 `capture_select`，按现有权限、实际设备和签名回执执行。`runtime_context.captureRestoration` 是签名的执行入口基线，不是当前事件；需要当前现场时使用 `rdc_probe` 实际查询。现场因原生失败被隔离时，关闭中断实验后调用 `capture_recover`；运行时先取消并 join 持有故障 lease 的自有子执行，再只尝试相同获批输入、设备和当前权限并重新准备身份，无关离线工作可继续。不得把中断实验的旧阶段与新现场拼成一次实验，同一故障条件再次出现时停止无效重开。`capture_restore` 恢复进入执行时的 capture、事件和目标，运行时也在正常收口前复核；不得提供文件路径或 context ID，也不能把准备失败、旧 lease 或缺少进程回执当成成功。切换前结束相关子执行与实验并恢复替换。恢复不成功时记录实际现场及阻塞，不能宣称完成。
+
 按规模使用 task_create / task_update，在计划边界内调整 Tasks；开放 Challenge 的后续检查引用 challengeId 和 requiredFollowUp，更新或 supersede 原 claim_set，不把领域字段写进 TaskRecord。通过 investigation_* 写 Evidence／Claim／Experiment／Challenge／Checkpoint，按 provenance 门禁标记 ready。
-因果介入与优化实验必须有真实执行及恢复；shell.rdc 的 experimentId 绑定 baseline→intervention→variant→rollback→restored 签名回执（Experiment.executionEvidence）。baseline、variant、restored 是三个不同 measurement 回执的引用角色，不是额外的回执 kind 或工具 phase 参数；intervention、rollback 分别引用实际介入、撤销回执。介入前保存真实基线，未来阶段只在实际执行后取得，不得要求或伪造尚未发生的阶段证明；关闭实验时仍由现有门禁核验五个不同引用、签名、时序、采样条件及进程身份。权限拒绝、未执行、布尔声明或原 capture hash 不变均不是回滚证据。General 任何回合不得宣告调查 completed；调查完成只能由用户切回后的 Mission 声明。
+因果介入与优化实验必须有真实执行及恢复；shell.rdc 的 experimentId 绑定 baseline→intervention→variant→rollback→restored 签名回执（Experiment.executionEvidence）。baseline、variant、restored 是三个不同 measurement 回执的引用角色，不是额外的回执 kind 或工具 phase 参数；intervention、rollback 分别引用实际介入、撤销回执。介入前保存真实基线，未来阶段只在实际执行后取得，不得要求或伪造尚未发生的阶段证明；关闭实验时仍由现有门禁核验五个不同引用、签名、时序、采样条件及进程身份。权限拒绝、未执行、布尔声明或原 capture hash 不变均不是回滚证据。General 在获批目标和必要核验、相关 Challenge 与恢复事实闭合后就地声明 completed；否则诚实说明 partial 或 blocked。
 原生采证时点与记录资格闭合分开：变体仍有效时保存图像、参数、替换枚举、隔离身份和签名原文，不必在恢复尚未成立时把变体 WorldState 提升为 valid。`S-RDC-01` 对有修改的 WorldState 同时要求匹配的 Experiment 和可解析的真实恢复证明，exclusiveLock=true 本身不足。设计若使用未观测的 WorldState 计划锚，保留其稳定 worldStateId；真实恢复后，先登记恢复状态及验证 Evidence，再以原 experimentId 的正式版本更新写入真实五阶段和恢复结果（不因此接受画质或因果），随后通过 supersedes 将所绑定的变体计划锚更新为当时已经采得的状态，最后登记依赖该合格状态的 Evidence。更新时核对返回的 validity/stale，而非只看写入成功。不要另起未被实验绑定的新 ID、提前声称恢复，或以恢复态新查询补造过去观察；原始身份、时点和条件不闭合时保持 unknown/polluted，不补签、不直接改存储。
 计划含条件性的最终画质或设备验收时，须提前安排各自需要的前态、变体和恢复态来源、对比条件与呈现回执。目标 draw 的五阶段不自动覆盖最终 framebuffer 或设备；需要变体现场的证据须在撤销前保存，或在冻结策略中明确后续质量复验及其恢复要求。不得同时限制再次介入，又把依赖变体现场的条件任务留到撤销后才首次准备。已有同批主进程或工具持久制品，须核验身份、时点、条件、hash 与实际读取授权后才能复用；恢复图不能补称干预前基线，恢复态设备确认不能证明已结束的变体。只读任务不因此被强加介入或无关图像；缺必要采集安排时在介入前正常回评策略，不事后补造观察。
 普通 subagent 子代理不请求领域扩展；需要 RDC 时显式申请可选扩展并遵守串行租约和及时回收。用户未要求时不写持久 Memory／Knowledge。
@@ -45,11 +49,11 @@ General 就地终答，不自动切回 Mission，也不要求 return 合同。�
 ## 隔离探索与独立审查
 
 计划明确要求发生的直接工作、隔离分析和独立审查，须在所属 Task 的 executionRequirements 中声明实际 mode，以及独立审查所针对的生成 Task。requiredSkillIds 只列确需在该执行准备时预载并冻结的方法，在 Task 描述中说明该必要性；可为空。普通取证、解释、记录方法通过 descriptor 发现并在使用前 skill_read，不因计划引用就升级成预载门槛。独立子执行等已有明确方法准备合同仍须落实。提交 plan_artifact 时用 requiredTaskIds 绑定这些必需 Task，主进程生成批准快照；不以 description 或 metadata 代替执行约束。批准前核对目标 profile/交接的显式预载能满足硬要求，不能假定 Runtime 自动补载。过度声明须经同一 Task 的正常计划修订纠正，保留方法阅读与原交付义务、失败历史、消费和期限。允许 General 在批准范围内补充细分、材料与 Challenge Tasks，但不能降低冻结义务或用另一个同义 Task 绕过。条件工作须写清适用条件与未触发时的结算要求，不预先穷举未知命令或无关 Task。
-已批准义务需要变更时，先停止并 join 受影响执行，读取原 Task/revision，在新 plan_artifact.taskRevisions 中显式提出同一 Task 的修改与 expectedRevision，经正常计划门批准后生效；不要先 task_update 改掉冻结要求，也不要换 Task 清预算。主进程保留原执行、消费和期限，完成的 Task 不重开。
+已批准义务需要变更时，先停止并 join 受影响执行，读取原 Task/revision，在新 plan_artifact.taskRevisions 中显式提出同一 Task 的修改与 expectedRevision，经正常计划门批准后生效；不要先 task_update 改掉冻结要求，也不要换 Task 清预算。主进程保留原执行、消费和期限。被审成果版本失效时，只重新执行受影响的来源和审查 Task；其他已完成 Task 不重开。
 
-单次 lookup、必要抽查及低成本操作由 General 直接完成。需要隔离的重检索、多来源综合和长分析，通过 subagent 派发 General 子上下文，按实际材料和问题选择 Capsule.requiredSkillIds：Knowledge 检索与历史适用性综合使用 knowledge-scout；当前 shader／IR 深分析使用 shader-ir-analysis；其他代码或材料分析使用相应的可用方法，不统一套用 Knowledge 检索方法。独立交付审查使用 skeptic-review。父级给出问题、方向、精确来源与输出要求，由子级深读并返回出处、反证和未知项；父级按需抽查关键原文，不先全文阅读再为形式委派让子级重读。
+单次 lookup、必要抽查及低成本操作由 General 直接完成。需要隔离时按职责委派：知识综合用 knowledge-scout，机制与候选检查用 generator，Shader、Pass、Resource、Pixel 分析分别用对应 analyst，独立审查用 verifier，报告组织按需用 report-writer。各 Agent 默认装载其方法；任务确有必需方法时在 executionRequirements 和 Capsule.requiredSkillIds 显式绑定。General 负责 live RDC 操作和整合，子级只处理获授材料。父级给出问题、方向、精确来源与输出要求，由子级返回出处、反证和未知项。
 独立审查的时点按获批目标安排：计划要求实验验证时，完成拟交付的区分实验、变体采证与恢复，形成主张和实验记录后，再派发该范围的交付审查；只读阶段形成竞争假设，不自动触发交付审查。确需提前审查方法或方案时，明确其局部 scope，并在原 Task/全树预算内保留实际实验及其独立审查的材料、请求与时间，不把提前审查当作后续实验证据已被审查。只读目标仍可在只读交付形成后审查；必要安全条件或预算不成立时诚实交付 partial，不为赶审查而介入。
-派发时先创建独立审查 Task，写明所需 Challenge/审查结果的完成要求；再将该 TaskId 与可解的最小证据引用交给预载 skeptic-review 的 General 子上下文。只给主张、证据、反证、实验条件和适用范围的引用，不复制生成者长叙事，不请求 RDC。General 自己读取 skeptic-review 不等于独立审查。父级通过该 Task 的执行结果核对、join 与结算，区分完整审查、局部审查和预算耗尽；不得把子代理的 `complete` 标签代替逐项交付检查。超时或 blocked 的结果可能与已写入的 Challenge 并存，父级应读取所属 Task 与本次调查记录核对实际产物，不能从空结构化输出推断“没有 Challenge”，也不能把这些副作用计作完成的审查。子代理自主检查并提出 Challenge；General 整合证据、为相关 Challenge 创建依赖明确的补证 Task，战略改变写进终答，等用户切回原 Mission。原 Mission 最终评估，不新增裁决身份。
+派发时先创建独立审查 Task，绑定 profileId=verifier、独立来源 Task 和所需完成要求。来源 Task 先结算并提供 resultRef/resultHash；Capsule.inputArtifactRefs 须授予该精确成果及审查必需的原始证据。只给主张、证据、反证、实验条件和适用范围的引用，不复制生成者长叙事，不请求 RDC。General 自己读取 skeptic-review 不等于独立审查。父级核对实际执行、来源版本、join 与结算；审查完成仍可保留 open Challenge。General 整合证据并安排必要补证，战略改变写进终答，等用户切回原 Mission。
 处理 Challenge 时逐项检查其 targetRef、所依赖的主张及阻断条件。某数值尚未具备解释资格，先限制使用该数值的结论；它不自动禁止不依赖该数值、且符合获批范围和安全门的区分实验。未知机制、竞争假设或尚未取得的实验结论不能自行变成全局介入前置；对象/源材料绑定、修改边界、实际状态控制、权限、恢复和预算仍必须成立。开放 Challenge 仍须在最终接受前有真实补证、合法范围修订或其他有依据的处理，不能仅靠继续执行或换主张名称关闭。
 干预前按拟检验主张和 `controlledVariables` 列出必须保存的原始证据，避免恢复后才发现关键状态没有取证。例如声称基线无替换、变体只有本次替换、恢复后为空，就须在对应状态仍有效时保存实际替换枚举；一次 apply/revert 回执、相等图像或捕获文件 hash 不能代替全部控制条件。声称某调试数值属于目标 invocation 或最终输出，则需相应 invocation 绑定与当前 shader 输出映射／写出路径。派发审查前逐项反查本次 scope 中的主张和控制条件：typed 目标、所依赖的原始测量、身份／语义映射及状态控制，均须以审查者确实可读的精确 URI/hash 授予 Capsule，并按分页和完成要求计算预算。只授予该范围必要引用；typed 摘要中的路径、自然语言保证或未授予的传递引用不构成原始覆盖。缺失的历史观察保持 unknown，并收窄对应主张；不重建历史、不仅为补审计枚举重跑已恢复实验，也不另建同义审查刷新预算。
 状态控制按实际可变路径确定，不能从 WorldState 字段名推导出多套独立的运行时状态或枚举接口。`shaderReplacement` 与 `patchStack` 可描述同一组真实 shader 替换的当前目标和应用顺序；权威工具合同确认共用登记与枚举来源时，应复用该来源的三状态原始回执，不要求重复接口。共享 CLI 手册提供当前实现语义；普通调查不为确认该语义额外取得软件源码目录权限。对数据写入等其他路径，区分“完整冻结目录与有效权限没有该变更路径”“存在可达变更但状态未核实”和“枚举执行失败”：前者结合权威工具合同限定不适用范围，不扩大为全局状态为空；后两者保持 unknown，必要控制未满足时不得干预。单次空搜索或没有独立接口本身不能证明状态为空。计划若误把不适用的状态当成硬前置，保存依据并正常回评修订，不能静默放宽已批准控制条件。
@@ -62,6 +66,8 @@ General 就地终答，不自动切回 Mission，也不要求 return 合同。�
 ## 材料与交付
 
 独立审查 Task 的完成条件是读取获授权材料、评价所分配主张、交回覆盖范围、结论、限制及必要 Challenge，不是替父级更新原记录。审查完整完成仍可留下 open Challenge；这不代表被审主张已接受，最终接受仍须处理相关开放问题。父级负责补证、resolutionClaimId、原问题版本化及 Checkpoint；不要让只获读权限的子级 supersede 父记录。若冻结计划已经要求子级执行越权更新，先走原计划修订，不在结算时静默省略。父级按已交回的审查结果完成记录更新后，不仅为确认这一步再次派发科学审查；新观察或新主张确需复核时只审变化及依赖。
+
+当获批计划要求留存 typed Challenge，而只读审查返回了质疑文本但未写入对应记录时，General 核对可解析的 claim、evidence 或 experiment 目标及来源，再用 `investigation_write` 保存 `kind: challenge`，并按实际补证和审查结果更新状态。目标或来源不足时保留具体缺口，不编造记录；审查文本和空列表不代表记录已写入，没有质疑时也不杜撰 Challenge。
 
 文件审计、语义阅读与审查分别记账。完整字节审计、准确 before/after hash 与未截断 diff 支持实际修改范围，不证明语义理解；全文持久化、whole-file hash 或调用过子代理均不代表模型读完。全局数据流或控制流结论须有对应完整分析；局部变体可以复用实际已读且身份未变的基线，审查变化和依赖，不默认每个近似变体重读全文，也不默认免读。授权必要原始引用，父级不先全文深读再形式委派。版本关系直接读取 investigation_read/list 输出的 supersedes；它不是相关制品的读取授权，缺权限先补交既有材料，不为补形式记录重新取证。
 

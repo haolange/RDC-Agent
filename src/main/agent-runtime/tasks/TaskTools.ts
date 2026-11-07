@@ -184,7 +184,7 @@ export function createTaskUpdateTool(
   return {
     name: 'task_update',
     label: 'Update Task',
-    description: 'Update an existing Task. Unfinished prerequisites keep a Task pending; blocked records a real obstacle or incomplete execution result, not ordinary dependency waiting. status=in_progress starts a new direct execution; call it once per execution, never as a progress note or before dispatching Task-owned delegated work. After the user explicitly requests continuation in a later turn, resumeCancelled=true can continue the same cancelled goal after all producers joined; history and consumed budgets remain. Completed Tasks and old executions cannot reopen. The delegated runner claims its own execution in both wait and background modes. Do the Task work before status=completed or blocked settles its direct execution; a partial result leaves the Task blocked. status=pending cannot release an active execution. Use task_get to inspect currentExecutionId before starting again. Omit status for description or metadata edits.',
+    description: 'Update an existing Task. Unfinished prerequisites keep a Task pending; blocked records a real obstacle or incomplete execution result, not ordinary dependency waiting. status=in_progress starts a new direct execution; call it once per execution, never as a progress note or before dispatching Task-owned delegated work. After the user explicitly requests continuation in a later turn, resumeCancelled=true can continue the same cancelled goal after all producers joined; history and consumed budgets remain. Completed Tasks stay closed except when a reviewed source becomes invalid or a review is bound to a superseded source; reexecuting that same Task preserves its prior executions and consumption. The delegated runner claims its own execution in both wait and background modes. Do the Task work before status=completed or blocked settles its direct execution; a partial result leaves the Task blocked. When another Task independently reviews this result, provide its verifiable session artifact URI and exact hash as result.resultRef and result.resultHash before completion. status=pending cannot release an active execution. Use task_get to inspect currentExecutionId before starting again. Omit status for description or metadata edits.',
     parameters: {
       type: 'object',
       properties: {
@@ -383,7 +383,7 @@ export function createTaskListTool(
 
     async execute(_toolCallId, _params, signal) {
       throwIfAborted(signal);
-      const allTasks = await registry.listTasks();
+      const { tasks: allTasks } = await registry.readConsistentSnapshot();
       const tasks = context.scopeRootTaskId ? allTasks.filter((task) => isTaskInScope(task.id, context.scopeRootTaskId!, allTasks, false)) : allTasks;
       if (tasks.length === 0) {
         return {
@@ -583,7 +583,8 @@ function formatTaskLine(task: TaskRecord): string {
     task.blockedBy.length > 0
       ? ` (blockedBy: ${task.blockedBy.join(', ')})`
       : '';
-  return `  ${icon} ${task.id}: ${task.subject} [${task.status}]${owner}${deps}`;
+  const reason = task.statusReason ? ` — ${task.statusReason}` : '';
+  return `  ${icon} ${task.id}: ${task.subject} [${task.status}]${owner}${deps}${reason}`;
 }
 
 const STATUS_ICON: Record<TaskStatus, string> = {

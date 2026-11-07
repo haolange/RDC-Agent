@@ -1,187 +1,129 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-vi.mock('electron', () => ({
-  app: { getPath: () => process.env.TEMP ?? process.cwd(), getAppPath: () => process.cwd() },
-  safeStorage: { isEncryptionAvailable: () => false, decryptString: () => '', encryptString: (v: string) => Buffer.from(v) },
-}));
+vi.mock('electron', () => ({ app: { getPath: () => process.env.TEMP ?? process.cwd(), getAppPath: () => process.cwd() },
+  safeStorage: { isEncryptionAvailable: () => false, decryptString: () => '', encryptString: (v: string) => Buffer.from(v) } }));
 import { createRdcProbeTool, type RdcProbeToolDeps } from './RdcProbeTool';
+import type { ApprovedCaptureController } from './ApprovedCaptureController';
 import { toolToDefinition } from '../agent/AgentTool';
 import { ToolValidator } from '../core/ToolValidator';
 import { clearRdcContextLeases, getRdcContextLease, setRdcRuntimeContextForSession, grantDelegatedLease, quarantineRdcContext } from '../../rdc/RdcRuntimeContextRegistry';
+import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import type { RdcProbeInput } from '@shared/constants/rdcProbe';
 import { compileRdcProbe, RdcProbeInputSchema } from '@shared/constants/rdcProbe';
-import type { RdcCliInvokerSettings } from '@shared/types/settings';
-import type { RdcTurnBinding } from '../../rdc/RdcTurnBindings';
-const settings: RdcCliInvokerSettings = {
-  enabled: true, command: 'configured-rdc-tool.exe', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000,
-};
-const binding = { cli: settings, definitions: [], definitionsFingerprint: '', identity: { contextId: 'ctx', version: 1, ownerSessionId: 's' } } as RdcTurnBinding;
-const context = { sessionId: 's', projectId: 'p', workspaceRoot: '.', projectRootPath: '.', rdcBinding: binding };
-function own() {
-  setRdcRuntimeContextForSession('s', { contextId: 'ctx', runtimeOwner: 'rdc-agent', ownerLeaseId: 'lease-s', backend: 'local', updatedAt: 1 }, { projectId: 'p' });
+
+const settings = { enabled: true, command: 'configured-rdc-tool.exe', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 };
+function context() {
+  const lease = setRdcRuntimeContextForSession('s', { contextId: 'ctx', runtimeOwner: 'owner', ownerLeaseId: 'lease', backend: 'local',
+    replaySessionId: 'replay', captureFileId: 'file', updatedAt: 1 }, { projectId: 'p' })!;
+  return { sessionId: 's', projectId: 'p', workspaceRoot: '.', projectRootPath: '.', rdcBinding: freezeRdcTurnBinding(settings, [], lease) };
 }
 function result(exitCode = 0, body: unknown = { ok: true, result_kind: 'rd.session.get_context', data: { context_id: 'ctx' } }) {
   return { exitCode, stdout: typeof body === 'string' ? body : JSON.stringify(body), stderr: '', duration_ms: 1 };
 }
 afterEach(clearRdcContextLeases);
+
 describe('native RDC probe', () => {
-  it('advertises action-specific input modes without unrelated placeholder fields', () => {
+  it('exposes bounded query and approved capture actions without paths or context overrides', () => {
     const definition = toolToDefinition(createRdcProbeTool('s', 'p'));
     const validator = new ToolValidator();
-    for (const input of [
-      { action: 'enumerate' },
-      { action: 'probe', args: { action: 'event_list' } },
-      { action: 'probe', args: { action: 'event_show', eventId: '1248' } },
-      { action: 'probe', args: { action: 'pipeline_show' } },
-      { action: 'probe', args: { action: 'vfs_ls', path: '/draws' } },
-      { action: 'lease_open', capturePath: '/registered.rdc' },
-    ]) {
+    for (const input of [{ action: 'enumerate' }, { action: 'probe', args: { action: 'event_list' } },
+      { action: 'probe', args: { action: 'event_show', eventId: '1248' } }, { action: 'probe', args: { action: 'pipeline_show' } },
+      { action: 'probe', args: { action: 'vfs_ls', path: '/draws' } }, { action: 'capture_select', inputId: 'registered' }, { action: 'capture_restore' }, { action: 'capture_recover' }]) {
       expect(validator.validate(definition, input)).toEqual(input);
     }
-    for (const input of [
-      { action: 'probe', capturePath: 'active', args: { action: 'event_show', eventId: '1248', path: '/' } },
-      { action: 'probe', args: { action: 'event_show', eventId: '1248', path: '/' } },
-      { action: 'enumerate', args: { action: 'event_list' } },
-      { action: 'probe', contextId: 'active', args: { action: 'event_list' } },
-    ]) {
+    for (const input of [{ action: 'capture_select', capturePath: '/file.rdc' }, { action: 'capture_select' },
+      { action: 'probe', contextId: 'foreign', args: { action: 'event_list' } },
+      { action: 'probe', args: { action: 'event_show', eventId: '1248', path: '/' } }, { action: 'enumerate', args: { action: 'event_list' } }]) {
       expect(() => validator.validate(definition, input)).toThrow();
     }
+    expect(() => compileRdcProbe({ action: 'capture_select', inputId: 'x' })).toThrow('RDC_PROBE_LIFECYCLE');
   });
-  it('does not probe or close a parent while delegated execution owns its live context', async () => {
-    own();
-    grantDelegatedLease({ parentSessionId: 's', childSessionId: 'child', ownerTurnId: 'turn' });
-    const executeCli = vi.fn();
-    const closeLease = vi.fn();
-    const tool = createRdcProbeTool('s', 'p', { executeCli, closeLease });
-    for (const action of ['probe', 'lease_close'] as const) {
-      expect((await tool.execute('t', { action }, undefined, undefined, context)).isError).toBe(true);
+
+  it('routes selection only to the main-owned approved General controller', async () => {
+    const current = context();
+    const select = vi.fn(async () => ({ changed: true, receipt: { uri: 'session://tool-outputs/r.json', expectedHash: `sha256:${'a'.repeat(64)}` },
+      current: { inputId: 'b', contentSha256: 'b'.repeat(64), deviceId: 'device', native: { eventId: 9 }, target: null } }));
+    const restore = vi.fn(async () => ({ changed: true }));
+    const recover = vi.fn(async () => ({ changed: true, current: { inputId: 'b', contentSha256: 'b'.repeat(64), deviceId: 'device', native: { eventId: 9 }, target: null } }));
+    const captureControl = { select, restore, recover } as unknown as ApprovedCaptureController;
+    const tool = createRdcProbeTool('s', 'p');
+    for (const denied of [current, { ...current, agentId: 'general', accessCeiling: 'read-only' as const, turnId: 't', captureControl },
+      { ...current, agentId: 'general', accessCeiling: 'full' as const, turnId: 't', captureControl, projectId: 'other' }]) {
+      expect((await tool.execute('select', { action: 'capture_select', inputId: 'b' }, undefined, undefined, denied)).isError).toBe(true);
     }
+    expect(select).not.toHaveBeenCalled();
+    const owning = { ...current, agentId: 'general', accessCeiling: 'full' as const, turnId: 't', captureControl };
+    const selected = await tool.execute('select', { action: 'capture_select', inputId: 'b' }, undefined, undefined, owning);
+    expect(selected.isError).not.toBe(true);
+    expect(selected.details).toMatchObject({ current: { inputId: 'b', eventId: 9 }, changed: true });
+    expect(select).toHaveBeenCalledWith('b', undefined);
+    const restored = await tool.execute('restore', { action: 'capture_restore' }, undefined, undefined, owning);
+    expect(restored.details).toEqual({ action: 'capture_restore', changed: true });
+    expect(restore).toHaveBeenCalledOnce();
+    const recovered = await tool.execute('recover', { action: 'capture_recover' }, undefined, undefined, owning);
+    expect(recovered.details).toMatchObject({ action: 'capture_recover', changed: true, current: { inputId: 'b' } });
+    expect(recover).toHaveBeenCalledOnce();
+  });
+
+  it('does not probe the parent while a child holds its lease or while it is quarantined', async () => {
+    const current = context(); grantDelegatedLease({ parentSessionId: 's', childSessionId: 'child', ownerTurnId: 'turn' });
+    const executeCli = vi.fn();
+    const tool = createRdcProbeTool('s', 'p', { executeCli });
+    expect((await tool.execute('t', { action: 'probe' }, undefined, undefined, current)).isError).toBe(true);
     expect(executeCli).not.toHaveBeenCalled();
-    expect(closeLease).not.toHaveBeenCalled();
-  });
-  it('routes quarantined recovery through the controlled lifecycle, then reads the rebound identity', async () => {
-    own();
-    quarantineRdcContext('s', getRdcContextLease('s')!.version, 'response lost');
-    const openLease = vi.fn(async () => { own(); });
-    const executeCli = vi.fn(async () => result());
-    const tool = createRdcProbeTool('s', 'p', { openLease, executeCli });
-    expect((await tool.execute('t', { action: 'probe' }, undefined, undefined, context)).isError).toBe(true);
+    clearRdcContextLeases(); const next = context(); quarantineRdcContext('s', getRdcContextLease('s')!.version, 'uncertain');
+    expect((await tool.execute('t', { action: 'probe' }, undefined, undefined, next)).isError).toBe(true);
     expect(executeCli).not.toHaveBeenCalled();
-    expect((await tool.execute('t', { action: 'lease_open', capturePath: '/registered.rdc' }, undefined, undefined, context)).isError).not.toBe(true);
-    expect(openLease).toHaveBeenCalledOnce();
-    expect(getRdcContextLease('s')?.quarantineReason).toBeUndefined();
   });
-  it('signals reprepare after first lease identity allocation and rejects old-turn reads', async () => {
-    const initialBinding = { ...binding, identity: null } as RdcTurnBinding;
-    const initialContext = { ...context, rdcBinding: initialBinding };
-    const openLease = vi.fn(async () => { own(); });
-    const executeCli = vi.fn(async () => result());
-    const tool = createRdcProbeTool('s', 'p', { openLease, executeCli });
-    const opened = await tool.execute('open', { action: 'lease_open', capturePath: '/registered.rdc' }, undefined, undefined, initialContext);
-    expect(opened.isError).not.toBe(true);
-    expect(opened.details).toMatchObject({ reprepareRequired: true, worldStateStamp: { contextId: 'ctx' } });
-    expect(opened.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('Prepare a new turn') });
-    const staleRead = await tool.execute('read', { action: 'probe' }, undefined, undefined, initialContext);
-    expect(staleRead.isError).toBe(true);
-    expect(JSON.stringify(staleRead)).toContain('binding changed since prepareTurn');
-    expect(executeCli).toHaveBeenCalledTimes(1);
-  });
-  it('requires a configured frozen binding', async () => {
+
+  it('requires a configured binding and compiles only parser-backed native commands', async () => {
     expect((await createRdcProbeTool('s', 'p').execute('t', { action: 'doctor' })).isError).toBe(true);
-  });
-  it('compiles parser-backed commands and passes no application session id', async () => {
+    const current = context();
     const executeCli = vi.fn<NonNullable<RdcProbeToolDeps['executeCli']>>(async () => result());
     const tool = createRdcProbeTool('s', 'p', { executeCli });
-    for (const action of ['doctor', 'version', 'enumerate'] as const) {
-      expect((await tool.execute('t', { action }, undefined, undefined, context)).isError).not.toBe(true);
-    }
-    expect(executeCli.mock.calls.map(([command, args]) => [command, args])).toEqual([
-      ['doctor', []], ['version', ['--json']], ['tools', ['list']],
-    ]);
-    expect(executeCli.mock.calls[0]?.[2]?.settings?.argsPrefix).toEqual([]);
+    for (const action of ['doctor', 'version', 'enumerate'] as const) expect((await tool.execute('t', { action }, undefined, undefined, current)).isError).not.toBe(true);
+    expect(executeCli.mock.calls.map(([command, args]) => [command, args])).toEqual([['doctor', []], ['version', ['--json']], ['tools', ['list']]]);
     expect(compileRdcProbe({ action: 'preview_status' }).args).toEqual(['preview', 'status']);
-  });
-  it.each([
-    { action: 'probe', args: { action: 'shader-replace' } },
-    { action: 'probe', args: { action: 'context_status', argv: '--evil' } },
-    { action: 'probe', args: { action: 'vfs_cat', path: '/resources' } },
-    { action: 'probe', args: { action: 'vfs_ls', path: '/../secret' } },
-    { action: 'probe', args: { action: 'event_show' } },
-    { action: 'doctor', args: { action: 'context_status' } },
-  ])('rejects unapproved or unbounded queries: %j', async (input) => {
-    const executeCli = vi.fn();
-    const r = await createRdcProbeTool('s', 'p', { executeCli }).execute('t', input as RdcProbeInput, undefined, undefined, context);
-    expect(r.isError).toBe(true);
-    expect(executeCli).not.toHaveBeenCalled();
-  });
-  it.each([result(2), result(0, ''), result(0, 'RDOC\u0000capture'), result(0, { ok: false }), result(0, { ok: true })])(
-    'does not clear ownership after a failed CLI result', async (cli) => {
-      own();
-      const closeLease = vi.fn();
-      const r = await createRdcProbeTool('s', 'p', { executeCli: vi.fn(async () => cli), closeLease })
-        .execute('t', { action: 'lease_close' }, undefined, undefined, context);
-      expect(r.isError).toBe(true);
-      expect(closeLease).not.toHaveBeenCalled();
-      expect(getRdcContextLease('s')?.contextId).toBe('ctx');
-      expect(JSON.stringify(r)).not.toContain('RDOC');
-    },
-  );
-  it('rejects foreign context and never uses default', async () => {
-    own();
-    const executeCli = vi.fn();
-    const tool = createRdcProbeTool('s', 'p', { executeCli });
-    expect((await tool.execute('t', { action: 'probe', contextId: 'foreign' }, undefined, undefined, context)).isError).toBe(true);
-    expect(executeCli).not.toHaveBeenCalled();
-    clearRdcContextLeases();
-    expect((await tool.execute('t', { action: 'probe' }, undefined, undefined, context)).isError).toBe(true);
-  });
-  it('validates context status before closing the product lifecycle', async () => {
-    own();
-    const closeLease = vi.fn(async () => { setRdcRuntimeContextForSession('s', null); });
-    const executeCli = vi.fn<NonNullable<RdcProbeToolDeps['executeCli']>>(async () => result());
-    const r = await createRdcProbeTool('s', 'p', { closeLease, executeCli })
-      .execute('t', { action: 'lease_close' }, undefined, undefined, context);
-    expect(r.isError).not.toBe(true);
-    expect(executeCli).toHaveBeenCalledWith('context', ['status', '--daemon-context', 'ctx'], expect.anything());
-    expect(closeLease).toHaveBeenCalledWith('s', 'p', binding, undefined);
-    expect(getRdcContextLease('s')).toBeNull();
-    expect(r.details).toMatchObject({ reprepareRequired: true, worldStateStamp: { contextId: null } });
-  });
-  it('rejects a mismatched response or cancellation without clearing a lease', async () => {
-    own();
-    const closeLease = vi.fn();
-    const abort = new AbortController();
-    const executeCli = vi.fn(async () => { abort.abort(); return result(); });
-    const r = await createRdcProbeTool('s', 'p', { closeLease, executeCli })
-      .execute('t', { action: 'lease_close' }, abort.signal, undefined, context);
-    expect(r.isError).toBe(true);
-    expect(closeLease).not.toHaveBeenCalled();
-    const bad = createRdcProbeTool('s', 'p', { executeCli: vi.fn(async () => result(0, { ok: true, result_kind: 'context', data: { context_id: 'other' } })) });
-    expect((await bad.execute('t', { action: 'probe' }, undefined, undefined, context)).isError).toBe(true);
-  });
-  it('requires bounded query args', () => {
-    expect(RdcProbeInputSchema.safeParse({ action: 'probe', args: { action: 'event_show', eventId: '42' } }).success).toBe(true);
     expect(compileRdcProbe({ action: 'probe', args: { action: 'event_show', eventId: '42' } })).toMatchObject({ command: 'event', args: ['show', '--event-id', '42'] });
   });
-  it('treats empty optional probe fields as omission without relaxing required identity or query fields', async () => {
-    const observed = {
-      action: 'probe', capturePath: '', contextId: 'ctx',
-      args: { action: 'event_show', eventId: '1248', path: '' },
-    } as const;
-    expect(RdcProbeInputSchema.parse(observed)).toEqual({
-      action: 'probe', contextId: 'ctx', args: { action: 'event_show', eventId: '1248' },
+
+  it.each([
+    { action: 'probe', args: { action: 'shader-replace' } }, { action: 'probe', args: { action: 'context_status', argv: '--evil' } },
+    { action: 'probe', args: { action: 'vfs_cat', path: '/resources' } }, { action: 'probe', args: { action: 'vfs_ls', path: '/../secret' } },
+    { action: 'probe', args: { action: 'event_show' } }, { action: 'doctor', args: { action: 'context_status' } },
+    { action: 'capture_select', inputId: '' }, { action: 'lease_open', capturePath: '/file.rdc' },
+  ])('rejects an invalid or unbounded request: %j', async input => {
+    const executeCli = vi.fn();
+    const response = await createRdcProbeTool('s', 'p', { executeCli }).execute('t', input as RdcProbeInput, undefined, undefined, context());
+    expect(response.isError).toBe(true); expect(executeCli).not.toHaveBeenCalled();
+  });
+
+  it.each([result(2), result(0, ''), result(0, 'RDOC\u0000capture'), result(0, { ok: false }), result(0, { ok: true })])(
+    'never treats malformed native output as success', async cli => {
+      const response = await createRdcProbeTool('s', 'p', { executeCli: vi.fn(async () => cli) }).execute('t', { action: 'probe' }, undefined, undefined, context());
+      expect(response.isError).toBe(true); expect(JSON.stringify(response)).not.toContain('RDOC');
     });
-    expect(compileRdcProbe(observed)).toMatchObject({ command: 'event', args: ['show', '--event-id', '1248'] });
-    expect(compileRdcProbe({ action: 'probe', capturePath: '', args: { action: 'event_list', eventId: '', path: '' } }))
-      .toMatchObject({ command: 'event', args: ['list'] });
-    expect(compileRdcProbe({ action: 'probe', args: { action: 'context_status', eventId: '', path: '' } }))
-      .toMatchObject({ command: 'context', args: ['status'] });
-    expect(RdcProbeInputSchema.safeParse({ action: 'lease_open', capturePath: '' }).success).toBe(false);
+
+  it('rejects stale bindings, foreign responses, and cancellation without mutating ownership', async () => {
+    const old = context(); context();
+    const executeCli = vi.fn(async () => result());
+    const tool = createRdcProbeTool('s', 'p', { executeCli });
+    expect((await tool.execute('t', { action: 'probe' }, undefined, undefined, old)).isError).toBe(true);
+    expect(executeCli).not.toHaveBeenCalled();
+    const current = context();
+    const bad = createRdcProbeTool('s', 'p', { executeCli: vi.fn(async () => result(0, { ok: true, result_kind: 'context', data: { context_id: 'other' } })) });
+    expect((await bad.execute('t', { action: 'probe' }, undefined, undefined, current)).isError).toBe(true);
+    const abort = new AbortController(); abort.abort();
+    expect((await tool.execute('t', { action: 'probe' }, abort.signal, undefined, current)).isError).toBe(true);
+    expect(getRdcContextLease('s')?.contextId).toBe('ctx');
+  });
+
+  it('treats empty optional query values as omission while requiring specific event identities', async () => {
+    const request = { action: 'probe', args: { action: 'event_show', eventId: '1248', path: '' } } as const;
+    expect(RdcProbeInputSchema.parse(request)).toEqual({ action: 'probe', args: { action: 'event_show', eventId: '1248' } });
     expect(RdcProbeInputSchema.safeParse({ action: 'probe', args: { action: 'event_show', eventId: '' } }).success).toBe(false);
     expect(RdcProbeInputSchema.safeParse({ action: 'probe', args: { action: 'event_show', eventId: '1248', path: '/secret' } }).success).toBe(false);
-    own();
     const executeCli = vi.fn(async () => result());
-    const response = await createRdcProbeTool('s', 'p', { executeCli })
-      .execute('t', observed, undefined, undefined, context);
+    const response = await createRdcProbeTool('s', 'p', { executeCli }).execute('t', request, undefined, undefined, context());
     expect(response.isError).not.toBe(true);
     expect(executeCli).toHaveBeenCalledWith('event', ['show', '--event-id', '1248', '--daemon-context', 'ctx'], expect.anything());
   });

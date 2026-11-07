@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { persistSessionTurnControls } from './sessionModelOverride';
 import { useProjectStore } from '../../stores/projectStore';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import { clampReasoningSelection } from '@shared/types/modelCapability';
 import type { SessionRecord } from '@shared/types/session';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useTurnControlsStore } from '../../stores/turnControlsStore';
@@ -24,6 +25,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const rememberControls = useTurnControlsStore((state) => state.rememberControls);
   const clearRememberedControls = useTurnControlsStore((state) => state.clearRememberedControls);
   const settings = useAppSettingsStore((state) => state.settings);
+  const agentReasoning = settings.agents?.definitions.find((definition) => definition.id === agentId)?.reasoningLevel;
   const { effective } = useComposerEffectiveModel(agentId, currentSession);
   const providerId = effective?.providerId;
   const modelId = effective?.modelId;
@@ -71,6 +73,9 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const lastSessionControlsKeyRef = useRef<string>('none');
   const lastRouteIdentityRef = useRef<string | null>(null);
   const pendingSessionRestoreRef = useRef(false);
+  const lastAgentRef = useRef<string | null>(null);
+  const lastAgentReasoningRef = useRef(agentReasoning);
+  const explicitReasoningRef = useRef(false);
   const retryCapability = useEffectiveModelCapability(
     agentId,
     routeFingerprint,
@@ -84,14 +89,21 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
     : null;
   const sessionControlsKey = buildSessionTurnControlsKey(sessionControls);
   const routeIdentity = capability ? `${capability.providerId}:${capability.modelId}:${capability.route.protocol}` : null;
-
+  const preserveUnavailableAgentReasoning = useCallback((requested: ConversationTurnControls, normalized: ConversationTurnControls) => {
+    const control = capability?.controls.reasoning;
+    return agentReasoning && requested.reasoningLevel === agentReasoning && control
+      && (control.kind === 'unknown' || clampReasoningSelection(agentReasoning, control) !== agentReasoning)
+      ? { ...normalized, reasoningLevel: agentReasoning } : normalized;
+  }, [agentReasoning, capability]);
   useEffect(() => {
     const sessionChanged = lastSessionIdRef.current !== sessionId;
+    const agentChanged = lastAgentRef.current !== agentId;
+    const agentReasoningChanged = lastAgentReasoningRef.current !== agentReasoning;
     const sessionControlsChanged = lastSessionControlsKeyRef.current !== sessionControlsKey && pendingSaves.current === 0;
     const previousCapabilityKey = lastCapabilityKeyRef.current;
     const store = useTurnControlsStore.getState();
 
-    if (sessionChanged) clearRememberedControls();
+    if (sessionChanged) { clearRememberedControls(); explicitReasoningRef.current = false; }
     if (!capability || !capabilityKey) {
       if (!sessionChanged && previousCapabilityKey) rememberControls(previousCapabilityKey, store.turnControls);
       lastCapabilityKeyRef.current = null;
@@ -112,7 +124,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
       rememberControls(previousCapabilityKey, store.turnControls);
     }
     const rememberedControls = useTurnControlsStore.getState().controlsByCapabilityKey[capabilityKey];
-    setTurnControls(resolveTurnControlsForCapabilityChange({
+    let nextControls = resolveTurnControlsForCapabilityChange({
       previousCapabilityKey,
       nextCapabilityKey: capabilityKey,
       sessionChanged,
@@ -122,15 +134,27 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
       currentControls: store.turnControls,
       rememberedControls,
       sameModelRoute: lastRouteIdentityRef.current === routeIdentity,
-    }));
+    });
+    if (!sessionControls && !explicitReasoningRef.current && (agentChanged || agentReasoningChanged || sessionChanged || pendingSessionRestoreRef.current) && agentReasoning) {
+      nextControls = { ...nextControls, reasoningLevel: agentReasoning };
+    }
+    const originallyRequested = sessionChanged || sessionControlsChanged || pendingSessionRestoreRef.current
+      ? sessionControls ?? nextControls : store.turnControls;
+    nextControls = preserveUnavailableAgentReasoning(originallyRequested, nextControls);
+    setTurnControls(nextControls);
     pendingSessionRestoreRef.current = false;
 
     lastSessionIdRef.current = sessionId;
     lastCapabilityKeyRef.current = capabilityKey;
     lastRouteIdentityRef.current = routeIdentity;
+    lastAgentRef.current = agentId;
+    lastAgentReasoningRef.current = agentReasoning;
     lastSessionControlsKeyRef.current = sessionControlsKey;
   }, [
     sessionId,
+    agentId,
+    agentReasoning,
+    preserveUnavailableAgentReasoning,
     sessionControlsKey,
     sessionControls,
     capability,
@@ -142,20 +166,23 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   ]);
 
   useEffect(() => {
-    if (capability) setTurnControls((current) => sanitizeTurnControls(current, capability));
-  }, [capability, setTurnControls]);
+    if (capability) setTurnControls((current) => preserveUnavailableAgentReasoning(current, sanitizeTurnControls(current, capability)));
+  }, [capability, preserveUnavailableAgentReasoning, setTurnControls]);
 
   const updateTurnControls = useCallback((patch: Partial<ConversationTurnControls>) => {
     if (!capability || !capabilityKey) return;
-    const next = sanitizeTurnControls({ ...useTurnControlsStore.getState().turnControls, ...patch }, capability);
+    if (patch.reasoningLevel !== undefined) explicitReasoningRef.current = true;
+    const requested = { ...useTurnControlsStore.getState().turnControls, ...patch };
+    const next = preserveUnavailableAgentReasoning(requested, sanitizeTurnControls(requested, capability));
     rememberControls(capabilityKey, next);
     setTurnControls(next);
     void saveControls(next);
-  }, [capability, capabilityKey, rememberControls, setTurnControls, saveControls]);
+  }, [capability, capabilityKey, preserveUnavailableAgentReasoning, rememberControls, setTurnControls, saveControls]);
   const retrySave = useCallback(() => { void saveControls(useTurnControlsStore.getState().turnControls); }, [saveControls]);
 
   return {
     turnControls,
+    agentReasoning,
     capability,
     capabilityState,
     retryCapability,
@@ -164,7 +191,8 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
     updateTurnControls,
     setTurnControls: (next: ConversationTurnControls) => {
       if (!capability || !capabilityKey) return;
-      const sanitized = sanitizeTurnControls(next, capability);
+      explicitReasoningRef.current = true;
+      const sanitized = preserveUnavailableAgentReasoning(next, sanitizeTurnControls(next, capability));
       rememberControls(capabilityKey, sanitized);
       setTurnControls(sanitized);
     },

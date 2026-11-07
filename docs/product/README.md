@@ -1,5 +1,8 @@
 # Product Docs
 
+- [垂直调查设计分析原文](rdc-agent-investigation-design-analysis.md)：本轮需求与基线分析；现行实现以架构合同和验收账本为准。
+- [垂直调查最小工程回执](vertical-investigation-validation.json)：已记录工程结果和相关源码哈希，不含本机账号及原始会话。
+
 - `scoped-runtime-resources.md`：Scope、Profiles、Skills（含多 skill `∩` 语义）、Hooks、Memory、Project Instructions。
 - `vertical-debugger-overview.md`：Debugger 作为真实主链的产品总览与设计边界。
 - `renderdoc-agent-complete-design.md`：领域目标权威。工程落地冲突以根目录 `ARCHITECTURE.md` 裁决。

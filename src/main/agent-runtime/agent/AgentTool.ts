@@ -21,6 +21,8 @@ export interface ToolExecutionContext {
   successfulFileReads?: Set<string>;
   /** Main-owned, private execution binding; never serialized to the model. */
   rdcBinding?: RdcTurnBinding;
+  /** Main-owned approved capture lifecycle; never serialized as a tool argument. */
+  captureControl?: import('../orchestration/ApprovedCaptureController').ApprovedCaptureController;
   agentId?: string;
   /** Frozen profile ceiling. Native RDC execution requires `full`. */
   accessCeiling?: import('@shared/types/agentManifest').AgentAccessCeiling;

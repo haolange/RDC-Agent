@@ -103,6 +103,11 @@ import type {
   KnowledgePack,
   KnowledgeQueryRequest,
   KnowledgeQueryResult,
+  KnowledgeReadRequest,
+  KnowledgeReadResult,
+  KnowledgeTopicChanges,
+  KnowledgeTopicPreview,
+  KnowledgeTopicProposal,
   SessionKnowledgeCandidate,
 } from './knowledge';
 import type { KnowledgeExportRequest, KnowledgeExportResult } from './knowledgeExport';
@@ -276,8 +281,12 @@ export interface ElectronAPI {
 
   knowledge: {
     overview: () => Promise<KnowledgeOverviewResult>;
+    topicSuggest: () => Promise<KnowledgeTopicProposal>;
+    topicPreview: (changes: KnowledgeTopicChanges) => Promise<KnowledgeTopicPreview>;
+    topicApply: (request: { changes: KnowledgeTopicChanges; changeHash: string; confirmation: KnowledgeHumanConfirmation }) => Promise<{ revision: string } | { cancelled: true }>;
     query: (request: KnowledgeQueryRequest) => Promise<KnowledgeQueryResult>;
     card: (spaceId: string, relativePath: string) => Promise<{ card: KnowledgeCardDetail | null }>;
+    read: (request: KnowledgeReadRequest) => Promise<KnowledgeReadResult>;
     compile: (request: KnowledgeQueryRequest & { limit?: number }) => Promise<KnowledgePack>;
     indexRebuild: () => Promise<Pick<KnowledgeIndexOverview, 'revision' | 'builtAt' | 'cardCount'>>;
     candidates: (sessionId: string) => Promise<KnowledgeCandidatesResult>;
@@ -522,6 +531,8 @@ export interface ElectronAPI {
     getReplaySelection: (scope: SessionScope) => Promise<import('./captureReplay').CaptureReplaySelection | null>;
     readLivePreview: (scope: SessionScope) => Promise<Uint8Array>;
     getReplayState: (scope: SessionScope) => Promise<CaptureReplayState>;
+    getRecovery: (scope: SessionScope) => Promise<import('./captureReplay').CaptureRecoveryStatus | null>;
+    restorePrevious: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<{ success: boolean; state?: CaptureReplayState; error?: string }>;
     applyReplayEvent: (request: CaptureReplayApplyRequest) => Promise<CaptureReplayState>;
     refreshFrame: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<CaptureReplayState>;
     list: (scope: SessionScope) => Promise<{ captures: CaptureDescriptor[] }>;

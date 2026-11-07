@@ -21,7 +21,7 @@ A report is a View over Investigation State, not a new source of truth. `View` d
    - `artifactIds` (non-empty Artifact links)
    - `candidateStatus` (`none` / `session-created` / `not-requested`)
 
-   Canonical `outputPhase=final_answer` must cite the ready report `artifactId` and `contentHash`. Hook text, model prose, or `output_register` alone cannot complete a Mission.
+   Canonical `outputPhase=final_answer` must cite the ready report `artifactId` and exact `contentHash`, including its `sha256:` prefix. A bare digest does not satisfy this contract. Hook text, model prose, or `output_register` alone cannot complete a Mission. If the final check invalidates a completed declaration, address its feedback and call `turn_complete` again before the final response.
 
 When the investigation is partial, inconclusive, or blocked, keep the report `draft` and state the exact missing verification. A draft can describe the known facts and limits without manufacturing a causal Claim or a completed experiment. Declare `turn_complete` as `partial` or `blocked`, never `completed`. If a write fails, inspect that error and the relevant schema; do not restart the same unchanged read/list sequence until the turn limit is exhausted.
 

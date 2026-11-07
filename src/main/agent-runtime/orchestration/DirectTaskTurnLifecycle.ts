@@ -1,8 +1,33 @@
-import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../tasks';
+import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope, type TaskExecutionRecord } from '../tasks';
 import { processSupervisor } from '../../runtime/ProcessSupervisor';
 import { TASK_STATUS_REASONS } from '@shared/constants/taskStatusReasons';
 
 const TERMINAL = new Set(['completed', 'partial', 'blocked', 'failed', 'cancelled', 'interrupted']);
+
+/** Active delegated executions belonging to this owner or this child's descendants. */
+export function activeDelegations(executions: readonly TaskExecutionRecord[], parentExecutionId?: string): TaskExecutionRecord[] {
+  const byId = new Map(executions.map(execution => [execution.id, execution]));
+  const belongsToParent = (execution: TaskExecutionRecord): boolean => {
+    if (!parentExecutionId) return true;
+    const visited = new Set<string>();
+    let parent = execution.parentExecutionId;
+    while (parent && !visited.has(parent)) {
+      if (parent === parentExecutionId) return true;
+      visited.add(parent);
+      parent = byId.get(parent)?.parentExecutionId;
+    }
+    return false;
+  };
+  return executions.filter(execution => execution.mode === 'subagent' && !TERMINAL.has(execution.status)
+    && execution.id !== parentExecutionId && belongsToParent(execution));
+}
+
+export async function listActiveDelegations(sessionId: string): Promise<TaskExecutionRecord[]> {
+  const scope = getDelegatedTaskScope(sessionId);
+  if (scope && !scope.executionId) throw new Error('TASK_SCOPE_UNVERIFIED: delegated execution identity is missing.');
+  const registry = new TaskRegistry(createSessionTaskStore(scope?.ownerSessionId ?? sessionId));
+  return activeDelegations(await registry.listExecutions(), scope?.executionId);
+}
 
 export async function listUnfinishedDirectTasks(input: {
   sessionId?: string | null;

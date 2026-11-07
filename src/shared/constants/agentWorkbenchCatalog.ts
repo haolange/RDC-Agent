@@ -1,4 +1,5 @@
 import { DELEGATION_CAPSULE_JSON_SCHEMA } from '../types/delegationCapsule';
+import { RDC_PROBE_ACTIONS } from './rdcProbe';
 export type AgentWorkbenchToolPermission =
   | 'readonly'
   | 'mutation'
@@ -437,16 +438,16 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
       properties: {
         action: {
           type: 'string',
-          enum: ['enumerate', 'doctor', 'version', 'probe', 'lease_open', 'lease_close', 'preview_status'],
+          enum: [...RDC_PROBE_ACTIONS],
         },
-        capturePath: { type: 'string' },
-        contextId: { type: 'string' },
+        inputId: { type: 'string' },
         args: {
           type: 'object',
           additionalProperties: false,
           properties: {
             action: { type: 'string' },
-            name: { type: 'string' },
+            eventId: { type: 'string' },
+            path: { type: 'string' },
           },
         },
       },
@@ -503,6 +504,12 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
       properties: {
         spaceId: { type: 'string' },
         relativePath: { type: 'string' },
+        mode: { type: 'string', enum: ['summary', 'section', 'range', 'full'] },
+        contentHash: { type: 'string', description: 'Required for section, range and full; use the current search or summary hash.' },
+        heading: { type: 'string' },
+        headingLine: { type: 'integer', minimum: 1 },
+        startLine: { type: 'integer', minimum: 1 },
+        endLine: { type: 'integer', minimum: 1 },
       },
     },
     icon: 'library-book',

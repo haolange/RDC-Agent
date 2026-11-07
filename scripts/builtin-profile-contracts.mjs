@@ -8,7 +8,18 @@ require('./register-ts-source.cjs');
 const { parseAgentMarkdownStrict } = require('../src/main/settings/agent-manifests/agentManifestParse.ts');
 const { diagnoseManifestToolTokens } = require('../src/shared/constants/agentToolTokens.ts');
 
-export const BUILTIN_AGENT_IDS = ['general', 'debugger', 'analyzer', 'optimizer'];
+export const BUILTIN_AGENT_IDS = ['general', 'debugger', 'analyzer', 'optimizer',
+  'generator', 'verifier', 'knowledge-scout', 'report-writer', 'shader-analyst', 'pass-analyst', 'resource-analyst', 'pixel-analyst'];
+const INTERNAL_PROFILE_SKILLS = {
+  generator: ['renderdoc-investigation', 'artifact-provenance'],
+  verifier: ['skeptic-review', 'artifact-provenance'],
+  'knowledge-scout': ['knowledge-scout'],
+  'report-writer': ['report-composition', 'artifact-provenance'],
+  'shader-analyst': ['shader-ir-analysis'],
+  'pass-analyst': ['pass-graph-analysis'],
+  'resource-analyst': ['resource-versioning', 'cross-capture-alignment'],
+  'pixel-analyst': ['pixel-forensics'],
+};
 export const ROOT_SKILL_IDS = [
   'execution-orchestrator',
   'debugger-coordinator',
@@ -28,7 +39,6 @@ const MISSION_NAMES = {
   optimizer: 'Optimizer',
 };
 
-const GENERAL_MAX_TURNS = 200;
 
 const FORBIDDEN_TOOL_TOKENS = ['todo', 'bash', 'search_codebase', 'handoff', 'agent', 'agent_handoff'];
 const MISSION_FORBIDDEN_TOOLS = [
@@ -115,11 +125,20 @@ export function assertParsedProfileContracts(id, definition) {
   assertIncludesNone(tools, FORBIDDEN_TOOL_TOKENS, `${id} tools`);
   assertParsedHandoffs(handoffs, id);
 
+  if (Object.hasOwn(INTERNAL_PROFILE_SKILLS, id)) {
+    assert(definition.userInvocable === false, `${id} must be an internal Agent`);
+    assert(definition.accessCeiling === 'read-only', `${id} must have a read-only ceiling`);
+    assertIncludesAll(skills, INTERNAL_PROFILE_SKILLS[id], `${id} skills`);
+    assertIncludesNone(tools, ['shell', 'rdc_probe', 'subagent'], `${id} tools`);
+    assert(handoffs.length === 0 && agents.length === 0, `${id} must not delegate or hand off`);
+    return;
+  }
+
   if (id === 'general') {
     assert(definition.name === 'General', 'general name must be General');
     assertIncludesAll(tools, GENERAL_REQUIRED_TOOLS, 'General tools');
     assert(skills.includes('execution-orchestrator'), 'General must arm execution-orchestrator');
-    assert(definition.maxTurns === GENERAL_MAX_TURNS, `General max-turns must be ${GENERAL_MAX_TURNS}`);
+    assert(definition.maxTurns === undefined, 'General must not impose a default max-turns ceiling');
     assertIncludesAll(agents, ['debugger', 'analyzer', 'optimizer'], 'General agents');
     assert(handoffs.length === 0, 'General handoffs must be empty');
     assert(definition.accessCeiling === undefined, 'General omits access-ceiling and therefore keeps the full ceiling');

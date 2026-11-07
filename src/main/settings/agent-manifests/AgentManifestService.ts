@@ -17,6 +17,7 @@ import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/typ
 import { AGENT_ROLES } from '@shared/constants/agents';
 import { canonicalAgentModelId, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
+import { getReasoningSelectionOrder } from '@shared/types/modelCapability';
 import { appPathService } from '../../runtime/AppPathService';
 import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
 import { parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
@@ -513,10 +514,12 @@ export class AgentManifestService {
       seen.add(option.canonicalId);
       options.push(option);
     };
-    const providerUnavailableReason = (provider: LlmProviderEntry): string | undefined => (
-      provider.unavailableReason
-      ?? (!provider.enabled ? 'Provider is disabled.' : !provider.isConfigured ? 'Provider is not connected.' : undefined)
-    );
+    const providerIssue = (provider: LlmProviderEntry): Pick<AgentModelOption, 'providerIssue' | 'disabledReason'> => {
+      const state = provider.status === 'unconfigured' || provider.status === 'failed'
+        ? provider.status : 'unavailable';
+      const detail = state === 'failed' ? provider.lastError : state === 'unavailable' ? provider.unavailableReason : undefined;
+      return { providerIssue: state, ...(detail ? { disabledReason: detail } : {}) };
+    };
     const fromEffectiveModel = (provider: LlmProviderEntry, model: EffectiveModel): AgentModelOption => {
       const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
       const providerUnavailable = !isProviderExecutable(provider);
@@ -534,7 +537,7 @@ export class AgentManifestService {
               ? 'ready'
               : 'model-unverified';
       const disabledReason = status === 'provider-unavailable'
-        ? providerUnavailableReason(provider)
+        ? undefined
         : status === 'model-disabled'
           ? 'Model is disabled.'
           : status === 'model-unavailable'
@@ -562,7 +565,9 @@ export class AgentManifestService {
         modelLabel: model.label || model.modelId,
         configured: status === 'ready',
         status,
-        ...(disabledReason ? { disabledReason } : {}),
+        reasoningSelections: model.controls.reasoning.kind === 'unknown'
+          ? null : getReasoningSelectionOrder(model.controls.reasoning),
+        ...(status === 'provider-unavailable' ? providerIssue(provider) : disabledReason ? { disabledReason } : {}),
         ...(model.cost ? { cost: model.cost } : {}),
         ...(isUserOverride ? { custom: true } : {}),
       };
@@ -620,7 +625,7 @@ export class AgentManifestService {
           configured: false,
           status,
           ...(status === 'provider-unavailable'
-            ? { disabledReason: providerUnavailableReason(provider) }
+            ? providerIssue(provider)
             : status === 'model-disabled'
               ? { disabledReason: 'Model is disabled.' }
               : { disabledReason: 'Native tool calling is not confirmed for this provider route, so the model is not an Agent-executable choice.' }),
@@ -640,8 +645,9 @@ export class AgentManifestService {
         modelId: parsed.modelId,
         modelLabel: parsed.modelId,
         configured: false,
-        status: 'missing',
-        disabledReason: 'This model is not present in the current account catalog.',
+        ...(provider && !isProviderExecutable(provider)
+          ? { status: 'provider-unavailable' as const, ...providerIssue(provider) }
+          : { status: 'missing' as const, disabledReason: 'This model is not present in the current account catalog.' }),
       });
     }
 

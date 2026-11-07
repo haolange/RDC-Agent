@@ -9,6 +9,7 @@ import type { SessionAttachmentRecord } from '@shared/types/session';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
+import { assertAgentReasoningHonored, conversationTurnControlInput } from './ConversationTurnControls';
 import path from 'node:path';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { settingsService } from '../settings/settings-core/SettingsService';
@@ -177,17 +178,16 @@ export async function startProfileTurn(
   if (configurationCommit?.routeRevision && effectiveModel.routeRevision !== configurationCommit.routeRevision) {
     throw new Error('MODEL_UNAVAILABLE: the selected model route changed before preflight.');
   }
+  const requestedControls = conversationTurnControlInput(effectiveSnapshot.reasoningLevel, context.session?.turnControls, requestTurnControls);
   const planning = planEffectiveModelRequest({
     providerId: routePreflight.providerId,
     modelId: routePreflight.modelId,
     settings,
-    controls: {
-      ...(context.session?.turnControls ?? {}),
-      ...(requestTurnControls ?? {}),
-    },
+    controls: requestedControls,
     compactionThresholdPercent: resolveCompactionPercentForSettings(settings, pendingProjectRootPath),
   });
   if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
+  assertAgentReasoningHonored(effectiveSnapshot.reasoningLevel, requestedControls, planning.plan.reasoningWire.selection);
   const plannedRouteCapability = resolveAgentRouteCapability(
     settings.llm.providers.find((entry) => entry.id === routePreflight.providerId),
     routePreflight.modelId,

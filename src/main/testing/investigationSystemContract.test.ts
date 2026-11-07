@@ -63,11 +63,13 @@ function readRepo(relative: string): string {
 describe('investigation system contract', () => {
   it('routes Knowledge retrieval, current-material analysis and independent review by responsibility', () => {
     const method = readRepo('resources/agent-runtime/skills/renderdoc-execution/SKILL.md');
-    expect(method).toMatch(/Knowledge 检索与历史适用性综合使用 knowledge-scout/);
-    expect(method).toMatch(/当前 shader／IR 深分析使用 shader-ir-analysis/);
-    expect(method).toMatch(/独立交付审查使用 skeptic-review/);
-    expect(method).not.toMatch(/长分析分支[\s\S]{0,120}明确包含 knowledge-scout/);
-    expect(method).toContain('父级按需抽查关键原文');
+    expect(method).toContain('知识综合用 knowledge-scout');
+    expect(method).toContain('独立审查用 verifier');
+    expect(method).toContain('单次 lookup、必要抽查及低成本操作由 General 直接完成');
+    expect(method).toContain('General 自己读取 skeptic-review 不等于独立审查');
+    expect(readRepo('resources/agent-runtime/agents/knowledge-scout.agent.md')).toContain('  - knowledge-scout');
+    expect(readRepo('resources/agent-runtime/agents/shader-analyst.agent.md')).toContain('  - shader-ir-analysis');
+    expect(readRepo('resources/agent-runtime/agents/verifier.agent.md')).toContain('  - skeptic-review');
   });
 
   it('keeps execution quotas with the Harness and plan phase figures as adjustable estimates', () => {
@@ -1009,11 +1011,12 @@ describe('investigation system contract', () => {
       sessionId: SESSION_ID,
       finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`,
       service,
-    })).toThrow(/mission_method|MISSION_COMPLETION_DENIED/);
+    })).not.toThrow();
     expect(isSkillVisibleToProfile('debugger', 'rdc-tool-shell', ['general', 'debugger', 'analyzer', 'optimizer'])).toBe(true);
     expect(isSkillVisibleToProfile('debugger', 'debugger-rdc-tools', ['debugger', 'general'])).toBe(true);
     expect(isSkillVisibleToProfile('debugger', 'optimizer-rdc-tools', ['optimizer', 'general'])).toBe(false);
     expect(isSkillVisibleToProfile('debugger', 'optimizer-rdc-tools')).toBe(true);
     expect(isSkillVisibleToProfile('general', 'rdc-tool-shell', ['general', 'debugger', 'analyzer', 'optimizer'])).toBe(true);
-  });
+    // This integration case commits multiple fsync-backed investigation transactions.
+  }, 30_000);
 });

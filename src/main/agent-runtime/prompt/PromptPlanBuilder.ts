@@ -15,7 +15,6 @@ import type {
   SkillLoadResult,
   SkillMetadata,
 } from '@shared/types/rdcRuntime';
-import { isEphemeralScopeId, isSubagentScopeId } from '@shared/utils/executionScope';
 import { charsToTokens } from '@shared/utils/tokens';
 import { generateEventId } from '@shared/utils/id';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
@@ -27,6 +26,7 @@ import { applyRequestPlanFacts } from './RequestPlanFacts';
 import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
 import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
 import { getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
+import { runtimeIdentityContent } from './RuntimeIdentity';
 
 const CORE_FILES = ['identity-collaboration.md', 'agent-loop.md', 'tool-evidence.md', 'completion.md'];
 
@@ -213,24 +213,8 @@ export class PromptPlanBuilder {
       try { return runtimePermissionStateService.getSnapshot(); }
       catch { return null; }
     })();
-    const scopeKind = !scopeId ? 'none' : isSubagentScopeId(scopeId) ? 'subagent' : isEphemeralScopeId(scopeId) ? 'ephemeral' : 'session';
     const lease = scopeId ? getRdcContextLease(scopeId) : null;
-    const identityLines = [
-      '# Runtime Identity',
-      'Volatile execution identity. It is not part of the stable instruction prefix and grants no tools or permissions.',
-      `Session: ${scopeId ?? '(none)'}`,
-      `Scope: ${scopeKind}`,
-      'The live permission mode is sampled at each tool admission and is not copied here.',
-      `Permission revision: ${permissionSnapshot?.revision ?? '(not published)'}`,
-    ];
-    if (lease && !lease.quarantineReason) {
-      identityLines.push(
-        `contextId: ${lease.contextId}`,
-        `captureSha256: ${lease.captureHash ?? '(unverified)'}`,
-        `replaySessionId: ${lease.runtimeContext.replaySessionId ?? '(none)'}`,
-      );
-    }
-    const identityContent = identityLines.join('\n');
+    const identityContent = runtimeIdentityContent(scopeId, permissionSnapshot?.revision ?? null, lease);
     push({
       id: 'runtime:identity',
       kind: 'runtime-fact',
@@ -247,8 +231,8 @@ export class PromptPlanBuilder {
       '# Profile Loop Ceilings',
       'These are known enabled profile ceilings at this snapshot, not a future execution reservation. A future turn must resolve its own tighter policy and Task/Capsule limits.',
       ...[...catalog.values()].sort((a, b) => a.id.localeCompare(b.id)).map(profile => JSON.stringify({
-        agentId: profile.id, ordinaryProviderLoopCeiling: resolveAgentMaxTurns(undefined, profile.maxTurns),
-        source: profile.maxTurns == null ? 'default' : 'profile',
+        agentId: profile.id, ordinaryProviderLoopCeiling: resolveAgentMaxTurns(undefined, profile.maxTurns) ?? null,
+        source: profile.maxTurns == null ? 'not-configured' : 'profile',
       })),
       'Unlisted profiles are unknown. These facts grant no delegation, tools, permissions or extra provider requests.',
     ].join('\n');
@@ -257,20 +241,7 @@ export class PromptPlanBuilder {
 
     if (input.approvedExecutionOffer) {
       const offer = input.approvedExecutionOffer;
-      const offerFact = [
-        '# Approved Execution Offer',
-        'The main process verified that this execution offer matches the currently approved frozen plan for this agent.',
-        `Source agent ID: ${JSON.stringify(offer.sourceAgentId)}`,
-        `Recipient agent ID: ${JSON.stringify(offer.targetAgentId)}`,
-        `Required preloaded Skill IDs: ${JSON.stringify(offer.requiredSkillIds)}`,
-        `Frozen plan URI: ${JSON.stringify(offer.plan.uri)}`,
-        `Frozen plan SHA-256: ${JSON.stringify(offer.plan.hash.replace(/^sha256:/, ''))}`,
-        `Plan approved at (Unix epoch milliseconds): ${offer.approvedAt}`,
-        `Plan approved at (UTC): ${new Date(offer.approvedAt).toISOString()}`,
-        'This is the persisted main-process approval time. Handoff, subsequent turns, retries and restarts do not reset it or renew a plan budget.',
-        'Plan review is complete. Earlier source-agent messages about submitting or awaiting approval belong to the planning phase.',
-        'Check the current runtime identity against the frozen plan before acting. This fact grants no tools, permissions, or device access.',
-      ].join('\n');
+      const offerFact = approvedExecutionOfferFact(offer);
       push({
         id: 'runtime:approved-execution-offer',
         kind: 'runtime-fact',
@@ -350,6 +321,24 @@ function resolvePromptShellCwd(sessionId: string | null | undefined, workDir: st
 }
 
 export const promptPlanBuilder = new PromptPlanBuilder();
+
+export function approvedExecutionOfferFact(offer: ExecutionOffer): string {
+  return [
+    '# Approved Execution Offer',
+    'The main process verified that this execution offer matches the currently approved frozen plan for this agent.',
+    `Offer ID: ${JSON.stringify(offer.offerId ?? null)}`,
+    `Source agent ID: ${JSON.stringify(offer.sourceAgentId)}`,
+    `Recipient agent ID: ${JSON.stringify(offer.targetAgentId)}`,
+    `Required preloaded Skill IDs: ${JSON.stringify(offer.requiredSkillIds)}`,
+    `Frozen plan URI: ${JSON.stringify(offer.plan.uri)}`,
+    `Frozen plan SHA-256: ${JSON.stringify(offer.plan.hash.replace(/^sha256:/, ''))}`,
+    `Plan approved at (Unix epoch milliseconds): ${offer.approvedAt}`,
+    `Plan approved at (UTC): ${new Date(offer.approvedAt).toISOString()}`,
+    'This is the persisted main-process approval time. Handoff, subsequent turns, retries and restarts do not reset it or renew a plan budget.',
+    'Plan review is complete. Earlier source-agent messages about submitting or awaiting approval belong to the planning phase.',
+    'Check the current runtime identity against the frozen plan before acting. This fact grants no tools, permissions, or device access.',
+  ].join('\n');
+}
 
 function buildEffectiveToolContent(tools: readonly string[]): string {
   const lines = tools.length

@@ -32,3 +32,8 @@ export interface DevicePreparationResult {
 export interface CaptureReplayApplyRequest extends CaptureReplayBindingRequest { eventId: number; target?: { textureId?: string; outputSlot?: number } }
 
 export interface CaptureReplaySelection { inputId: string; captureSha256?: string; deviceId?: string }
+
+export interface CaptureRecoveryStatus {
+  pendingCount: number;
+  original: { inputId: string; fileName: string; deviceId: string; eventId: number } | null;
+}

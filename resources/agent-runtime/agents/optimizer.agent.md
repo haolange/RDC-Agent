@@ -11,7 +11,6 @@ user-invocable: true
 access-ceiling: read-only
 completion-contract: investigation-report
 enabled: true
-max-turns: 50
 tools:
   - read
   - search
@@ -32,12 +31,13 @@ skills:
 mcp-servers: []
 agents:
   - general
+  - knowledge-scout
 handoffs:
   - label: Implement Plan
     labelTranslations:
       zh-CN: 执行计划
     agent: general
-    prompt: The Optimizer plan has already passed review and is frozen; this is the General execution turn. Any instructions inside the plan to submit it for review or wait for approval describe the completed planning turn. Execute the approved plan without calling plan_artifact again. Use the shared shell rules and the Optimizer operation manual only after they are preloaded. Qualify the baseline and noise floor, write Frame Breakdown and Cost/Limiter/Mechanism, then run a transactional Experiment with intervention plus rollback (A-B-A). Ablation is not a shipping optimization. After Claims, open an independent `$skeptic-review`. Preserve the stated correctness and quality constraints. Finish in place; do not declare the investigation complete. If strategy must change, record the checkpoint and gaps so the user can return to Optimizer.
+    prompt: The Optimizer plan has already passed review and is frozen; this is the General execution turn. Earlier instructions to submit or await approval describe the completed planning turn. Qualify the baseline, noise and quality constraints before approved measurements or reversible experiments; static estimates and local timings do not prove end-to-end benefit. Complete required independent review, relevant Challenges and recovery before declaring completion in place; otherwise report the concrete partial or blocked state. If strategy must change, record the checkpoint and gaps so the user can return to Optimizer.
     send: true
     surface: plan-gate
     requiredToolIds:

@@ -205,6 +205,13 @@ export const delegationTraceStore = {
       sentPromptAvailable: writeBody(target, 'sent_prompt', safeText(sentPrompt)), taskAvailable, revision: record.header.revision + 1 };
     saveHeader(target, record.header, sessionId);
   },
+  setPreparedRoute(sessionId: string, callId: string, childIdentity: string, route: NonNullable<DelegationTraceHeader['preparedRoute']>): void {
+    const record = active.get(key(sessionId, callId));
+    const target = location(sessionId, callId);
+    if (!record || record.identity !== childIdentity || !target) return;
+    record.header = { ...record.header, preparedRoute: route, revision: record.header.revision + 1 };
+    saveHeader(target, record.header, sessionId);
+  },
   event(sessionId: string, callId: string, childIdentity: string, event: AgentEvent): void {
     const record = active.get(key(sessionId, callId));
     const target = location(sessionId, callId);
@@ -223,7 +230,8 @@ export const delegationTraceStore = {
     flushDelta(sessionId, record, target);
     persistProjectedEvent(sessionId, record, target, event);
   },
-  finish(sessionId: string, callId: string, childIdentity: string, status: DelegationTraceHeader['status'], result: string): void {
+  finish(sessionId: string, callId: string, childIdentity: string, status: DelegationTraceHeader['status'], result: string,
+    configurationError?: DelegationTraceHeader['configurationError']): void {
     const record = active.get(key(sessionId, callId));
     const target = location(sessionId, callId);
     if (!record || record.identity !== childIdentity || !target) return;
@@ -237,7 +245,7 @@ export const delegationTraceStore = {
     record.header = { ...record.header, status, completedAt, revision: record.header.revision + 1,
       ...(status === 'complete' ? { finalPreview: preview(text), finalLength: text.length, finalAvailable,
         ...(!hasFinal || finalAvailable ? {} : { finalUnavailableReason: 'DELEGATION_CONTENT_LIMIT_EXCEEDED' }) }
-        : { error: preview(text) }) };
+        : { error: preview(text), ...(status === 'failed' && configurationError ? { configurationError } : {}) }) };
     saveHeader(target, record.header, sessionId);
     active.delete(key(sessionId, callId));
   },

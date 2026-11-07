@@ -31,7 +31,7 @@ Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导
 
 首次上手说明不会复制官方资源或创建指令文件。已阅读标记属于 Electron 应用状态；用户/项目资源仅承载各自自定义内容。官方 Agent 文件直接位于 `resources/agent-runtime/agents/*.agent.md`。
 
-四个 builtin：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件在 `resources/agent-runtime/agents`，再与 `~/.rdc-agent/agents` 和 `<project-root>/.rdc-agent/agents` 合成 effective snapshot。user/project 只能覆盖这四个 id，或新增无关自定义 id。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`；**无运行通道**。运行时没有 seed 迁移器或 marker，资源读取不改写用户文件。Mission planner 工具面见裁决 J（plan-only + `rdc_probe`）。
+四个默认入口是 `general`、`debugger`、`analyzer`、`optimizer`；另有八个默认内部 Agent（详见 ARCHITECTURE 裁决 A）。官方文件与 user/project 资源经同一优先级合成 effective snapshot；内部 Agent 默认不作为顶层入口。每个 Agent 的模型、推理档位与默认 Skill 随其配置解析，子执行不继承父回合模型覆盖。历史非法 ID 继续诊断 `AGENT_ID_RESERVED_HISTORICAL`；资源读取不改写用户文件。
 
 Agent 配置诊断使用单一结构化契约 `AgentManifestDiagnostic`：`code / severity / scope / agentId / sourcePath / message`。无效候选由资源解析器报告，主进程汇总时按规范化绝对来源路径、代码和原因去重；同一文件的不同原因保持独立。运行前检查按 Agent ID 与作用域定位，不解析英文文案或文件名子串。Settings 列表仅显示唯一问题数量，现有 TaskDialog 承载 User / Project 来源、完整路径与“这份配置未生效”的说明，原始原因按需展开；不推测替代定义。详情正文可滚动、框选和复制单条/全部，刷新为零条时不自动关闭已打开的详情。
 
@@ -86,6 +86,8 @@ Memory：显式 search/read/write/delete；写入需用户意图或交互审批�
 
 Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / Index / Compile / Candidate / Write；独立 `knowledge` IPC。目标拓扑 **六 lane** markdown-first；canonical 读根对 `read_file` / `read_image` / `glob` / `grep` 免审批（U02 落地）。持久写入须显式人类确认；知识导入 摄入为 staging / Draft，不自动 Candidate。不生成、不自动注入 prompt。**当前态**：Candidate/Draft/review 已落到 session durable store；知识导入 记录并复核源 hash/mtime/size；写路径 realpath + 原子替换。Embedding capability / Semantic lane **已由 U02 删除**，禁止恢复。**T18 知识导入 已证**。产品级 Browser QA 全矩阵见 U05。目标态见 `ARCHITECTURE.md` 裁决 C / G。
 
+Agent 与 Knowledge Center 共用版本读取规则：`summary` 可不带 hash 首次读取；`section`、`range` 和 `full` 必须携带当前搜索或摘要返回的 `contentHash`，缺失或变化时明确要求刷新。`knowledge_read` 省略 mode 时仍是 `full`，所以同样需要 hash；返回的章节标题、层级、行号和总行数与该次读取的正文版本一致，供后续精确选择。
+
 `knowledge_read` 在 Agent 主动读取卡片后，为声明图片保留知识根相对路径和角色，并仅在当前空间 realpath 与冻结 Knowledge 读根匹配、图片 realpath 未越界时返回可直接交给 `read_image` 的 `readImageArgs`。知识相对路径不按工程路径解释；缺失读范围、文件消失或链接越界分别显式返回 `readError`，不猜根、不回退。该参数不新增授权，也不代表像素已读；实际图像、类型及 hash 仍以正常 `read_image` 成功结果为准。卡片和图片不会因此自动注入初始 Prompt，持久内容/schema 不变。
 
 ## Provider Account（产品）
@@ -103,4 +105,4 @@ Mission 必须先经 `plan_artifact` 计划门：用户点声明的 continue han
 
 专业参数参考由 `scripts/generate-rdc-tool-guides.mjs` 生成并记录 catalog fingerprint。默认生成与 `pnpm run check:rdc-tool-guides` 使用本库 `scripts/fidelity/rdc-tool-guide-catalog.json` 源快照，独立检出不依赖相邻仓库。更新时显式执行 `node scripts/generate-rdc-tool-guides.mjs --catalog <RDC-Tool>/spec/tool_catalog.json`，同次刷新参考与源快照；`--check --catalog <path>` 只读核对指定来源。快照仅供开发生成校验，不随应用分发，不作为运行时 catalog；产品执行仍读取 prepareTurn 冻结的同一配置 CLI。
 
-Plan / handoff v2 / 两轮预算 / 领域完成校验的权威约定见 [runtime-kernel.md](../contracts/runtime-kernel.md#通用-harness-与结构化交接2026-09-09)。
+Plan、声明交接、显式预算与领域完成校验见 [runtime-kernel.md](../contracts/runtime-kernel.md#通用-harness-与声明续跑2026-09-15)。

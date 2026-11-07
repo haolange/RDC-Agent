@@ -8,7 +8,7 @@ const stale = Symbol('permission-revision-stale');
 export interface PermissionAdmissionInput<T> {
   authorize: (state: RuntimePermissionState, signal: AbortSignal) => Promise<AgentPermissionDecision>;
   beforeExecute: () => Promise<void>;
-  withResource: (operation: () => Promise<T | typeof stale>) => Promise<T | typeof stale>;
+  withResource: (operation: () => Promise<T | typeof stale>, state: RuntimePermissionState) => Promise<T | typeof stale>;
   execute: (decision: AgentPermissionDecision, state: RuntimePermissionState) => Promise<T>;
   assertLive: () => void;
   signal?: AbortSignal;
@@ -48,7 +48,7 @@ export async function executeWithPermissionAdmission<T>(input: PermissionAdmissi
       // The snapshot/decision are consumed once by this invocation. The
       // callback announces the committed admission before invoking the effect.
       return input.execute(decision, snapshot);
-    });
+    }, snapshot);
     if (result !== stale) return result;
   }
 }

@@ -9,10 +9,10 @@ allowed-tools: [subagent_report, turn_complete, artifact_read, knowledge_browse,
 Use this skill for Knowledge retrieval that is larger than a single deterministic lookup: multi-lane search, conflict synthesis, similar-case disambiguation, and historical evolution.
 
 1. Search first with `knowledge_search` across the six markdown-first lanes: Identity/Path, Scope/Metadata, Lexical, Structural, Relation/Graph, Temporal/Version.
-2. Use knowledge_read for the full card. It lists knowledge-root relative image paths and roles; inspect pixels with `read_image` on those paths. If file evidence is still missing, report the gap; the caller collects it in a separate authorized step.
+2. Read the versioned preview or relevant sections first and the full card when needed. For `knowledge_read`, an unversioned first read must use `mode: summary`; section, range and full require the current `contentHash` from search or summary. Use the returned headings and line count to select source ranges. If the version changed, search or read the summary again. Follow pagination with the returned index revision. Declared images include scoped `read_image` arguments; pixels remain unobserved until that call succeeds.
 3. Read only the cards needed to answer the question. Cite `cardId` and `contentHash` for every used card.
 4. Compile a sourced Brief or Pack with match reasons and lane hits.
-5. Return the Pack or card refs. Do not dump the full retrieval transcript.
+5. Return the source versions, applicability, counterexamples and concrete checks that distinguish the relevant mechanisms. Do not dump the full retrieval transcript.
 
 Do not create session candidates from this skill. Do not persist or promote cards.
 

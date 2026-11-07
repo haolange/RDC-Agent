@@ -1,0 +1,205 @@
+{
+  "asOfLocalDate": "2026-11-08",
+  "baseline": "36306dbd3d5ca1f6663bcedda43ba6e25a0d0ba4",
+  "description": "Portable summary of recorded local validation; this file is not a new test run, cloud CI result or product configuration.",
+  "originalReceipts": [
+    {
+      "kind": "node",
+      "originalLocalPath": ".local/vertical-investigation/scope-final-validation-evidence.json",
+      "sha256": "1a60e980f8db51ea904bc07b22ddd617d4e218559e25d20bc6819835093b2fb6"
+    },
+    {
+      "kind": "renderer",
+      "originalLocalPath": ".local/vertical-investigation/renderer-final-validation-evidence.json",
+      "sha256": "53e712708e41b03312d97846b381e4617d96da43bbca9269a3baa73e5ab49f2c"
+    },
+    {
+      "kind": "luna",
+      "originalLocalPath": ".local/vertical-investigation/luna-request-check-evidence.json",
+      "sha256": "6e73bdc785c2a0de3301f17a2513d74417f1a3cc58d5900ac2ef0447c50d67b5"
+    }
+  ],
+  "node": {
+    "command": "pnpm 11.7.0 exec vitest run --project node --coverage --maxWorkers=2",
+    "filesPassed": 391,
+    "filesSkipped": 4,
+    "testsPassed": 3591,
+    "testsSkipped": 4,
+    "durationSeconds": 163.88,
+    "exitCode": 0,
+    "outputSha256": "c5e767a32a1ee5cd74759b4038be5864449feca6d0c3b92818247d3be4eea28e",
+    "ratchet": {
+      "lines": 78.62,
+      "functions": 78.22,
+      "branches": 67,
+      "statements": 76.01,
+      "exitCode": 0
+    }
+  },
+  "renderer": {
+    "command": "pnpm 11.7.0 exec vitest run --project renderer --coverage --maxWorkers=2",
+    "testFilesPassed": 200,
+    "testsPassed": 868,
+    "durationSeconds": 94.36,
+    "exitCode": 0,
+    "ratchet": {
+      "total": {
+        "lines": {
+          "pct": 65.2
+        },
+        "functions": {
+          "pct": 58.06
+        },
+        "branches": {
+          "pct": 56.31
+        },
+        "statements": {
+          "pct": 63.07
+        }
+      }
+    }
+  },
+  "typecheck": {
+    "exitCode": 0,
+    "outputSha256": "5a3973f79ed9becd5f23c4feff467513814de7ea381d75a4d2e339aa8b8edca9"
+  },
+  "lint": {
+    "exitCode": 0,
+    "errors": 0,
+    "warnings": 2151,
+    "outputSha256": "b3a92188b73c007386709313ebe786de9bfe356eee529eb61b90e9ffa858d5071"
+  },
+  "gates": {
+    "exitCode": 0,
+    "systemDebtBaseRef": "36306dbd3d5ca1f6663bcedda43ba6e25a0d0ba4",
+    "secretsBase": "36306dbd3d5ca1f6663bcedda43ba6e25a0d0ba4",
+    "outputSha256": "1a3fc3d0eff26cb71aad0acdf6e35b87966f420f1f7267323454ab1b7a696100",
+    "firstRun": "Full gates exited 0 but skipped the two historical comparisons because the wrong environment variable was supplied; the whole command was rerun using RDC_SYSTEM_DEBT_BASE_REF and passed."
+  },
+  "build": {
+    "exitCode": 0,
+    "mainSha256": "754d964eeebf2185ba0a1043e23a955c26111e1bc9196adfd0c2eb74975f9218",
+    "outputSha256": "09ca50082ddd2cd862c4d1780686d6a3ba9d8b7a5b54313e6505abadedac1262"
+  },
+  "luna": {
+    "kind": "offline-production-request-compilation",
+    "dispatched": false,
+    "selection": {
+      "providerId": "chatgpt-account",
+      "modelId": "gpt-6-luna",
+      "reasoningEffort": "medium",
+      "fastMode": false
+    },
+    "unavailableModelRejected": true,
+    "validation": {
+      "packageManager": "pnpm@11.7.0",
+      "command": "pnpm exec vitest run --config .local/vertical-investigation/luna-request-check.config.ts --maxWorkers=2",
+      "passedFiles": 4,
+      "passedTests": 56,
+      "durationSeconds": 2.16,
+      "initialAttempt": "Four suites failed before collection because sandbox system TEMP rename returned EPERM; no tests ran.",
+      "resolution": "Set TEMP, TMP and TMPDIR to a disposable workspace directory before launching Vitest; no production source or security policy changed.",
+      "networkRequests": 0,
+      "credentialsRead": false,
+      "boundary": "Offline request compilation only; not a successful model response or full Mission acceptance."
+    }
+  },
+  "sourceHashes": {
+    "src/main/agent-runtime/orchestration/TurnCoordinator.ts": "e36158b35469e220e7528b4054651e9dad5ec506a8f097bcd098f9e7d4bbf496",
+    "src/main/agent-runtime/orchestration/AgentTurnRunner.ts": "87def808060a6f6578418859f1b14b1b70b08f599f0ce7872cab6159f485e5ae",
+    "src/main/agent-runtime/orchestration/ToolExecutorFactory.ts": "26489ca67b30b52d276b75501c5c471cc040ddd7adb82a08c345b455b5e7be4f",
+    "src/main/agent-runtime/orchestration/SubagentRunner.ts": "52015ef0d3313895b68765252e12c581595d261febbcab87bd84d9895c289704",
+    "src/main/agent-runtime/orchestration/RuntimeToolAssembly.ts": "3dd0e7c691f584f92d2a63d91593640a5fb4ceeac2804e771246326063882700",
+    "src/main/agent-runtime/orchestration/RuntimeToolAssembly.test.ts": "276488817f91cb284e746dadcce3348553685fec3515ec9eb672caa9073a3481",
+    "src/main/agent-runtime/orchestration/ToolExecutorFactory.test.ts": "4ae77f3e3fedd9557ded78a13afd6e49a5f9b667343fef5286b7b33cfd6d2013",
+    "src/main/agent-runtime/orchestration/SubagentRunner.test.ts": "a5bf59f6321fba773c3c99480557a197d0ae6bf68a8442177d0dd4f7daa0b83f",
+    "resources/agent-runtime/skills/renderdoc-execution/SKILL.md": "78a7cdb3c49e60516d3dc81bdd81001485047eca12fe7f1bbc45e4c7aececb46",
+    "src/renderer/app/App.tsx": "38045e3c239d7e1e6dea87a885cd240ec93d62cd2dfcf8c7f7c1e185cfa37e9e",
+    "src/renderer/features/composer/ComposerTurnControlsContext.test.ts": "638e90a57968cf16895d61a1459b99415c7be39e1fea4769f77ef8418605a327",
+    "src/renderer/features/composer/useComposerEffortControl.ts": "fc64913ec2a7c85ff23b811a36b3f50598a50f7f1a57d5b260a6cfd8beec59d5",
+    "src/renderer/features/composer/useTurnControls.ts": "83593f97a0452dfb4f3ecf36a31748bc35bf384090805ad378dd431712941c08",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/columns/DetailColumn.tsx": "038ef9fe55d4803e06396169671a1410ff7163c6af8638b3353f13dfb7daf962",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/columns/ListColumn.test.ts": "ef699356e6a2a960dda0ea6b20f5ba2e736722403a439cbe55df626a9a4886c6",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/columns/ListColumn.tsx": "2f6d58f20e1a5d8d860189e68d58b60f7f30fded2989d6da1cc164738fdba32d",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/index.tsx": "8e1d4d615fd88c71841778aff23b4aa1953bc8f261654f3683c9ddb6e0785551",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/knowledgeCenterQuery.ts": "4675e83645299b9ab338c8a429f81b4072cbaeaa1f69492b5e09f473775d35b4",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/knowledgeImportExportModel.ts": "85650c3d766360c78d000a058c584475808aa356f086d674cc7f8fb2133d5503",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/knowledgeTopicChanges.test.ts": "8834e33f10f28dabf2a729cc8c898b19dcfaaa01c1697c8df4847903489ed396",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/knowledgeTopicChanges.ts": "b6d161fdda00c0e25390251a548217aca813e0acd56e8bc8027a3202e4e6b39a",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/panels/KnowledgeTopicsDialog.tsx": "7f3e8c25c9ceaac832af4b846ac2fb061b3651e8034c1115896aabd1bca07a2e",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/parts/CardMetaGrid.tsx": "cfda5a7c44a6deb86e9570c0eb3d6236a6af25ace1e1078a3064df52b22e183a",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/parts/KnowledgeReadPanel.tsx": "e73f45b73339a695dab90af342e056bb209cbc9086e7276077658400f9b51cf2",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeCenter.ts": "38613335d366dc37870f396adc72368d11ea5d6f9d1208f639864c8642ba64a2",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeExport.ts": "1c68a05809c6cdc8a3cae4bf93764192ee429482f3ee46f51db550fee8b6188d",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeLoadMore.ts": "47946b1cc8831d490f3e5f63094f17fdc52a4cef230d898dc9318afe1eed1d64",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeQueryRunner.ts": "89120fb0b22a3ba9b7328e5fd48e5e917b35bd3b2208f05e8e6b238dfd6804fe",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeSelection.test.ts": "51befb600374a544027eb019dd14760be9872ba0338b2a4967b8d80802c35746",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeSelection.ts": "2b63a062df5e34bde47b5923619dfcb8fb0f09ec9725284c1ba5fb4057c9f810",
+    "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeTopics.ts": "c359ce1a4d77cf1f360190cf162889769a2929a70f80a9ff2cc4358268bf826d",
+    "src/renderer/features/right-rail/CapturePanel.tsx": "4a3a6888158a136605cc91dc514b2eb4d97469bf3b8ce5511aa5ba8ae704bdac",
+    "src/renderer/features/right-rail/SessionRightRailPopulated.test.ts": "a1a841bfa9b974807d8b35b39282699b98f4d2c4609f016d8e18eed3a40008aa",
+    "src/renderer/features/right-rail/capturePanelActions.ts": "16292279a98e419b7738a4647b730a65a361703dc786a465471f9b761c3992ad",
+    "src/renderer/features/right-rail/useCaptureRecovery.test.ts": "a031552427b59337e1be9af185fd2d6d892978943ed5654efbb21e8a1fa67ea8",
+    "src/renderer/features/right-rail/useCaptureRecovery.ts": "8f42b4b93d71cca412c6dfa259c87b40ddbb3e3b9306bf893867f0b3698e95e2",
+    "src/renderer/features/settings/SettingsModal/SettingsPageContent.tsx": "8bc09d53e2c6675d1a37c4539d4f7f455c2c86df7d1cc7ddc7c002c532cd9b66",
+    "src/renderer/features/settings/SettingsModal/agentManifestAutosaveState.ts": "c6ddf094d66d9ef32d36d540de177bfa4e670f2511bba9ca733f9fe3e84c4227",
+    "src/renderer/features/settings/SettingsModal/index.tsx": "8142f3015488655a1483474da8fd5c1ea2e5d46e06a8fd16ab4545e43cc47543",
+    "src/renderer/features/settings/SettingsModal/sections/AgentConfigurationStatus.test.ts": "77caf69c3e63548307ca239f3e4e241567c28bbe007dbcd811387a02d81ea3c1",
+    "src/renderer/features/settings/SettingsModal/sections/AgentContractFields.tsx": "f1eff59e0ee3ffb5e567356dfc3079a2c351e483d133bd1f75418661d87b9a7a",
+    "src/renderer/features/settings/SettingsModal/sections/AgentManifestEditor.tsx": "1de7764333c4c0bf9a82635553286a256ddf00c1232265c61d38a196c2363feb",
+    "src/renderer/features/settings/SettingsModal/sections/AgentModelCascadeSelect.test.ts": "c9f58b30e0945a3fd1927fe15612f1104735a29cd1a977009f47e9ecd7139aeb",
+    "src/renderer/features/settings/SettingsModal/sections/AgentModelCascadeSelect.tsx": "30a88c6a2539dbefa200b72b8609df534ed2322e77f8a23ff6f1ed91f591692f",
+    "src/renderer/features/settings/SettingsModal/sections/AgentsSettings.navigation.test.ts": "cbcfe976078464c0fe1cfc35bddbb9e2dd73958fa576d1b7c8c0e7b098bdb545",
+    "src/renderer/features/settings/SettingsModal/sections/AgentsSettings.tsx": "aec215431324b968a8f7203e478ebf2ed41a76140858f6cdae3b5a4f4851d4f4",
+    "src/renderer/features/transcript/DelegationTaskDocument.tsx": "1562906d167cc876c48eed495e60b642e9e2a45b366f251fe28da9d7ebdd69bd",
+    "src/renderer/features/transcript/SubagentRow.presentation.test.ts": "1202651a48746ed250ff1480891c44a27bf8f09eb9b4dd45e9f0d15bdf797140",
+    "src/renderer/features/transcript/SubagentRow.tsx": "468ddd6786dfa93be81254ae12c5a1c55a70acacf4f12ea8030367559f70ddf9",
+    "src/renderer/features/transcript/WorkCardPresentation.test.ts": "cd74cf05261312c76a4f1aefd27b2657a2415e5ef41fda4d3cc0bf89c1bd2e0a",
+    "src/renderer/i18n/locales/en/chat.ts": "ff8ae90ded3768f668c86a25a93c9f0bd5a553a792363f0c053d0693b50c26c9",
+    "src/renderer/i18n/locales/en/composer.ts": "7f4a9695fe1c6f258f7608194130d7efe6b924bcd9d87d2a0d1e264d8e7780cd",
+    "src/renderer/i18n/locales/en/control.ts": "f2f71c0c6b4b11218ecf61221b236d564618918766860ba7c5368b5858311cf5",
+    "src/renderer/i18n/locales/en/knowledgeCenter.ts": "24efb4c5b504fe4d421a329f8a0caffab01b84b8401daf644e32b89226614881",
+    "src/renderer/i18n/locales/en/settings.ts": "43558c16d84a597f3fcd61b2480b5d238d5c46dc16bb658fea994a3e86ac05a3",
+    "src/renderer/i18n/locales/zh-CN/chat.ts": "7801e7a41a68298e0459aa0fb7472d1f039e4d98687f04c85636e17805681efb",
+    "src/renderer/i18n/locales/zh-CN/composer.ts": "35595eda54b0aacba31e77bc3dc1aa0d9bbf4ce6475c2705038203e4523795b1",
+    "src/renderer/i18n/locales/zh-CN/control.ts": "55be0d92d7639410ebb09bc525f4d508cf0872c43be850f648af70c69051e81b",
+    "src/renderer/i18n/locales/zh-CN/knowledgeCenter.ts": "ac98d42e7f047e9052874222f385e79c98d19c88ab12ca303e81dc16c939f24f",
+    "src/renderer/i18n/locales/zh-CN/settings.ts": "7bca3882d44b4ce139f3728db4f376339dee0762460fe67f0ea946c977cc2e2d",
+    "src/renderer/lib/turnControlHelpers.ts": "247c5094b6b2560f3cff322b72b67419e4f968e95584a31d09b698afe3f4e1e1",
+    "src/renderer/stores/settingsNavigationStore.ts": "910230f455e02cd5b29fc80eff49ada3e948ec45a1f9a150a911fcd6d9209ea1",
+    "src/shared/provider-catalog/manifests/surfaces/chatgpt-account.json": "67373bc50da4746d53d5964fbb43685dd902a066f5a04ded086cb98cdb42728c",
+    "src/main/settings/provider-catalog/EffectiveModelResolver.ts": "0d484daa48ad3308b944696e0ab7f9fa20be2c5284a00de7c64510c9ff434202",
+    "src/main/settings/provider-catalog/effectiveCatalogMerge.ts": "8a1a73014d4510212fbeafdadde5301e42d990302d29d2dc7ebfc4ba6b097f2d",
+    "src/main/settings/provider-catalog/RequestPlanner.ts": "168eef470197f3d00a4e32983b4250b087b665f90473c9878c197f25b46ed33d",
+    "src/main/agent-runtime/providers/internal/responsesShared.ts": "9bb29842dca57d0a99bfd0e5f4a95339323728f986c8e40974bbb5365726aae1",
+    "src/main/agent-runtime/providers/reasoningWire.ts": "aade9694242ad256fc7d07776dbf86463b8b9bcea1710879d7d1ed705b519b96",
+    "src/main/agent-runtime/providers/requestPlanWire.ts": "ab1f1d606226d0c9973330ee876f39df5054b7ce9bc957e7a68325bb43068ceb"
+  },
+  "boundaries": [
+    "Source hashes cover only files listed by these receipts; they are not an exhaustive timestamped snapshot of every source file.",
+    "Original model conversations, signatures, keys, runtime profiles and captures remain on the original machine and are not included.",
+    "Local Analysis passed only the recorded two-public-capture scenario with human plan and tool approvals.",
+    "Android replay, controlled short/detailed prompt comparison, unfamiliar-case generalization and historical in-app archive verification are not passed.",
+    "Luna result proves offline production request construction and related regressions; it does not prove a successful Luna response."
+  ],
+  "publicationChecks": {
+    "localDate": "2026-11-08",
+    "secrets": "passed using RDC_DIFF_BASE=36306dbd3d5ca1f6663bcedda43ba6e25a0d0ba4",
+    "repositoryHygiene": "passed",
+    "architecture": "passed",
+    "acceptanceLedger": "passed",
+    "stagedDiff": "passed after removal of extra EOF blank lines in eight new Agent manifests; body unchanged",
+    "relativeDocumentationLinks": 9,
+    "sourceHashesRechecked": 69,
+    "agentRuntime": {
+      "command": "node scripts/check-agent-runtime.mjs",
+      "testFilesPassed": 9,
+      "testsPassed": 161,
+      "exitCode": 0,
+      "firstAttempt": "System TEMP rename EPERM before collection; no tests ran.",
+      "resolution": "Workspace-owned TEMP/TMP/TMPDIR; product security policy unchanged."
+    },
+    "newModelRequests": 0,
+    "newReplayRequests": 0
+  }
+}

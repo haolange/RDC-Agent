@@ -4,6 +4,7 @@ import { createNoneReasoningContract } from '@shared/provider-catalog/providerCo
 import {
   activeToolNamesForPlan,
   buildEffectiveRuntimePlan,
+  rebuildEffectiveRuntimePlan,
   policyFingerprintOf,
 } from './EffectiveRuntimePlan';
 import { compilePolicyFromRestrictive } from './permissions/PolicyCompiler';
@@ -32,6 +33,25 @@ const basePermission = {
 };
 
 describe('EffectiveRuntimePlan', () => {
+  it('rebuilds only the RDC identity and prompt while preserving frozen authority', () => {
+    const original = buildEffectiveRuntimePlan({ agentId: 'general', projectRootPath: 'D:/Project', projectId: 'p',
+      profile: { skills: ['inspect'], maxTurns: 17, agents: ['verifier'], handoffs: [{ agent: 'general', label: 'Execute', prompt: 'Go', requiredSkillIds: ['inspect'] }] },
+      toolAllowlist: ['read_file', 'rdc_probe'], permissionConstraints: basePermission, routeCapability,
+      requestPlan: { executionIdentity: { fingerprint: 'request' } }, promptPlan: { systemPrompt: 'old identity' },
+      policy: compilePolicyFromRestrictive({ limits: { maxTurns: 20 } }), rdcBindingFingerprint: 'old-rdc',
+      skillIntersection: ['read_file'], visibleToolNames: ['read_file'], activatedDeferredTools: ['investigation_read'],
+      mcpDescriptorHash: 'mcp', attachmentManifestFingerprint: 'attachments' });
+    const same = rebuildEffectiveRuntimePlan(original, { rdcBindingFingerprint: 'old-rdc', systemPrompt: 'old identity' });
+    expect(same.fingerprint).toBe(original.fingerprint);
+    const next = rebuildEffectiveRuntimePlan(original, { rdcBindingFingerprint: 'new-rdc', systemPrompt: 'new identity' });
+    expect(next.fingerprint).not.toBe(original.fingerprint);
+    expect(next.planId).not.toBe(original.planId);
+    expect(next).toMatchObject({ profileSkills: original.profileSkills, profileMaxTurns: 17, profileDelegates: original.profileDelegates,
+      permissionConstraints: original.permissionConstraints, policyFingerprint: original.policyFingerprint,
+      toolAllowlist: original.toolAllowlist, skillIntersection: original.skillIntersection,
+      requestPlanFingerprint: original.requestPlanFingerprint, rdcBindingFingerprint: 'new-rdc' });
+    expect(original.rdcBindingFingerprint).toBe('old-rdc');
+  });
   it('freezes declaration translations independently of later profile edits', () => {
     const translations = { 'zh-CN': '执行计划' };
     const plan = buildEffectiveRuntimePlan({ agentId: 'general', projectRootPath: null,

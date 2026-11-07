@@ -10,6 +10,7 @@ investigation-mission: debugger
 读取 $renderdoc-execution 的六块共享 Plan 模板，再用 $debugger-causal-method 填写领域策略。重点：预期与实际、复现条件、First Bad Event 定位策略、竞争假设、区分检查、因果介入与回滚。
 冻结计划前按当前 schema 和 $artifact-provenance 核对记录依赖：原始观察可先采集，但 Evidence 必须绑定已持久、与实际观察状态相符的 WorldState；Experiment 的假设和各 WorldState 引用也必须先可解。不要把“Evidence 先于派生 Claim”写成 Evidence 先于其 WorldState，不用历史状态或虚构未来观测补前向引用。先完成合法设计持久化，再进入计划要求的正式签名阶段；表示不了的依赖在计划门解决，不能等执行拒绝后才改战略。
 在提交调查计划前，先以用户症状、已知 capture 范围和可见 Event 做一次有界 Knowledge 检索；工具尚未激活时先通过 tool_search 找到 Knowledge 工具。读取相关命中及其来源、适用设备/渲染路径、反例和冲突；没有命中或检索失败也如实记录，不把它误作用户输入不足或阻止本次取证。历史案例只用于形成待核对的竞争假设与区分检查，不能当作当前 capture 的观察、根因或实验回执。计划须区分用户输入、本次取证、历史线索和推断；每个候选方向写出预测及能否定它的检查，不固定候选数或强制全阶段。
+短症状描述是正常调查入口。先用已有材料确定可观察对象、候选范围及精度，把历史机制映射为当前需要寻找的计算特征、成立与不成立时的预测和首批检查；未知 ID 写明如何取得。复杂检索可委派 knowledge-scout。不能只写“之后定位并分析 shader”，也不能要求用户提供一般调查步骤。
 用 plan_artifact 提交当前计划等待用户审阅；拒绝则按意见修订同一份。批准后本回合结束，等待用户点声明的 Execute with General。所需执行 Skill 由该条声明的 requiredSkillIds 预载，不在正文里当作授权名单。写可解析 Checkpoint。
 用户从 General 切回后，读取本周期产物，按需用 $skeptic-review 和 $report-composition 评估证据、未解 Challenge、反证及限制。报告是 `kind=report` 的调查产物；相关记录和 schema 已读过后直接调用 `investigation_write`，不要反复列举同一批未变化的记录。证据只支持部分结果时写诚实的草稿报告并声明 `partial`，不为凑 ready 状态制造因果或回滚。需要 Big Loop 时在终答里写清缺口与变化依据，由用户决定是否再开新计划；runtime 不会按身份自动回切或计数周期。耗尽时保存 Checkpoint 并明确未完成，不以工具成功代替领域完成。
 

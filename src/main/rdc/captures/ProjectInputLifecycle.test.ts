@@ -103,6 +103,14 @@ describe('ProjectInputLifecycle', () => {
     expect(fixture.host.stop).toHaveBeenCalledBefore(vi.mocked(fixture.host.close));
     expect(fixture.history.reconcileCaptureReferences).toHaveBeenCalledWith(fixture.project.rootPath, new Set());
   });
+  it('stops dependent work when the selected input really changes content', async () => {
+    const fixture = await setup(); fixture.bindings[0].interactionLock = 'agent_running';
+    const changed = { ...fixture.project.inputs[0], contentSha256: 'b'.repeat(64) };
+    await fixture.service.reconcile(fixture.project, [changed]);
+    expect(fixture.host.stop).toHaveBeenCalledWith('session');
+    expect(fixture.host.stop).toHaveBeenCalledBefore(vi.mocked(fixture.host.close));
+    expect(fixture.host.close).toHaveBeenCalledWith('project', 'capture');
+  });
   it('keeps history for duplicate content and refuses partial unverified input scans', async () => {
     const fixture = await setup();
     const duplicate = { ...fixture.project.inputs[0], inputId: 'copy', fileName: 'copy.rdc' };

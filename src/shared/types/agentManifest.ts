@@ -1,6 +1,7 @@
 import type { AppLanguage, LlmProviderId } from './settings';
 import type { ModeIconKey } from './layout';
 import type { ModelCost } from '../provider-catalog/modelManifestSchema';
+import type { ReasoningSelection } from './modelCapability';
 
 /** Upper bound on what any tool may do for a profile; no permission mode can exceed it. */
 export type AgentAccessCeiling = 'read-only' | 'workspace-write' | 'full';
@@ -67,6 +68,8 @@ export interface AgentManifestDefinition {
   argumentHint: string;
   target: string;
   models: string[];
+  /** Agent's default reasoning selection; user-turn controls can override it. */
+  reasoningLevel?: ReasoningSelection;
   icon: ModeIconKey;
   /** Compose accent (#RRGGBB). Drives composer shell glow and Effort slider. */
   accent: string;
@@ -120,7 +123,11 @@ export interface AgentModelOption {
   modelLabel: string;
   configured: boolean;
   status: 'ready' | 'provider-unavailable' | 'model-disabled' | 'model-unavailable' | 'model-unverified' | 'missing';
+  /** Connection state projected by main when the provider is not executable. */
+  providerIssue?: 'unconfigured' | 'failed' | 'unavailable';
   disabledReason?: string;
+  /** Explicitly selectable request reasoning values; null means the catalog has not verified them. */
+  reasoningSelections?: import('./modelCapability').ReasoningSelection[] | null;
   /** 每百万 token 定价（美元）；模型无定价信息时缺省。 */
   cost?: ModelCost;
   /** 来自 models.json 的用户自定义 / 覆盖模型。 */

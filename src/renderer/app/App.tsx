@@ -25,6 +25,7 @@ import { useWindowControls } from '../hooks/useWindowControls';
 import type { ResolvedTheme } from '@shared/types/settings';
 import { resolveActiveChrome } from './theme/applyChromeTheme';
 import { ProductLogo } from '../ui/ProductLogo';
+import { useSettingsNavigationStore } from '../stores/settingsNavigationStore';
 
 const App: React.FC = () => {
   const { t } = useI18n();
@@ -36,6 +37,12 @@ const App: React.FC = () => {
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [knowledgeCenterOpen, setKnowledgeCenterOpen] = useState(false);
   const [shellReady, setShellReady] = useState(false);
+  const agentSettingsRequest = useSettingsNavigationStore((state) => state.agentRequest);
+  const clearAgentSettingsRequest = useSettingsNavigationStore((state) => state.clearAgentRequest);
+
+  useEffect(() => {
+    if (agentSettingsRequest) setSettingsModalOpen(true);
+  }, [agentSettingsRequest]);
 
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentRun = useSessionStore((state) => state.currentRun);
@@ -234,7 +241,7 @@ const App: React.FC = () => {
         <SettingsModal
           open={settingsModalOpen}
           settings={settings}
-          onClose={() => setSettingsModalOpen(false)}
+          onClose={() => { clearAgentSettingsRequest(); setSettingsModalOpen(false); }}
         />
 
         <KnowledgeCenterModal

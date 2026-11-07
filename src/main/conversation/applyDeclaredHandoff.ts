@@ -1,4 +1,5 @@
 import type { SessionRecord } from '@shared/types/session';
+import { randomUUID } from 'node:crypto';
 import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 import { isHandoffContinueAction } from '@shared/types/planReview';
 import { EXECUTION_OFFER_SCHEMA } from '@shared/types/executionOffer';
@@ -99,6 +100,7 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
   if (approved?.status === 'approved' && approved.approvedHash && approved.frozenUri) {
     storageAdapter.executionOffers.write(input.sessionId, {
       schemaVersion: EXECUTION_OFFER_SCHEMA,
+      offerId: randomUUID(),
       sourceAgentId,
       targetAgentId: input.agent,
       plan: { uri: approved.frozenUri, hash: approved.approvedHash },
@@ -136,8 +138,12 @@ export function writeExecutionOfferFromApproval(input: {
 }): PlanReviewHandoffSuggestion | null {
   const declared = findDeclaredHandoff(input.sourceAgentId, input.projectRoot, input.handoff.agent, input.handoff.label);
   if (!declared) return null;
+  const existing = storageAdapter.executionOffers.read(input.sessionId);
+  const sameApproval = existing?.plan.uri === input.plan.uri && existing.plan.hash === input.plan.hash
+    && existing.sourceAgentId === input.sourceAgentId && existing.targetAgentId === declared.agent;
   storageAdapter.executionOffers.write(input.sessionId, {
     schemaVersion: EXECUTION_OFFER_SCHEMA,
+    offerId: (sameApproval && existing.offerId) || randomUUID(),
     sourceAgentId: input.sourceAgentId,
     targetAgentId: declared.agent,
     plan: input.plan,

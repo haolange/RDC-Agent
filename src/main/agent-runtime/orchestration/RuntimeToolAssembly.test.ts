@@ -27,11 +27,13 @@ vi.mock('../../rdc/RdcRuntimeContextRegistry', () => ({
 vi.mock('../../sessions', () => ({ rdcSessionService: {
   listBindingsForProject: vi.fn(() => []),
   snapshotOpenedCaptureForSession: vi.fn(() => null),
+  snapshotReplayForSession: vi.fn(() => ({ replayDeviceId: null, preparation: { targetDeviceId: null, phase: 'idle' } })),
 } }));
 
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcSessionService } from '../../sessions';
 import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
+import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { resolveAgentToolAllowlistFromDefinition } from './RuntimeToolPolicy';
 import { combineActiveSkillAllowlists, isToolAllowedByFrozenAllowlist } from './RuntimeToolPolicy';
@@ -42,10 +44,16 @@ import { toolValidator } from '../core/ToolValidator';
 import { toolToDefinition } from '../agent/AgentTool';
 import { TaskRegistry, FileTaskStore, createSessionTaskStore, registerDelegatedTaskScope, resolveSessionTasksDir } from '../tasks';
 import { TurnHandle } from './TurnCoordinator';
+import { approvedGoalContinuation } from './ApprovedGoalContinuation';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
 import type { SkillLoadResult } from '@shared/types/rdcRuntime';
 import { requestSnapshotStore } from '../prompt/RequestSnapshotStore';
+import { enforceMissionTurnReadiness, MissionCompletionError } from '../../investigation/missionCompletionContract';
+import {
+  SESSION_ID, baselineWorld, createInvestigationHarness, hypothesisClaim, projectClaim,
+  sampleChallenge, sampleCheckpoint, writeDraft, writeReadyReport,
+} from '../../investigation/investigationTestFixtures';
 
 function createAssembly(): RuntimeToolAssembly {
   return new RuntimeToolAssembly({
@@ -265,6 +273,49 @@ describe('RuntimeToolAssembly', () => {
     expect(turn.completionDeclaration?.disposition).toBe('partial');
   });
 
+  it('rejects a missing Mission artifact through the assembled completion tool before recording success', async () => {
+    const turn = new TurnHandle({ sessionKey: 'mission-readiness', turnId: 'turn-readiness', generation: 1 });
+    const validate = vi.fn((declaration: { disposition: string }) => {
+      if (declaration.disposition === 'completed') throw new Error('MISSION_COMPLETION_DENIED: checkpoint missing');
+    });
+    turn.validateCompletionReadiness = validate;
+    const tool = createAssembly().resolveRuntimeTools('general', ['*'], undefined, turn).toolMap.get('turn_complete')!;
+    await expect(tool.execute('premature', { disposition: 'completed' })).rejects.toThrow('MISSION_COMPLETION_DENIED: checkpoint missing');
+    expect(turn.completionDeclaration).toBeNull();
+    await tool.execute('partial', { disposition: 'partial' });
+    expect(turn.completionDeclaration?.disposition).toBe('partial');
+    expect(validate).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns an unresolved report challenge through the assembled completion tool', { timeout: 15_000 }, async () => {
+    const { service, sessionPath } = createInvestigationHarness();
+    try {
+      writeDraft(service, 'world_state', baselineWorld('ws-baseline'), { mission: 'debugger' });
+      writeDraft(service, 'checkpoint', sampleCheckpoint({ currentWorldStateId: 'ws-baseline' }), { mission: 'debugger' });
+      const source = writeDraft(service, 'claim', hypothesisClaim('ws-baseline', 'claim-assembly'), { mission: 'debugger' });
+      writeReadyReport(service, { mission: 'debugger', source,
+        claims: [projectClaim(source.record as never, 'claim-assembly-projected')] });
+      writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'challenge-assembly', targetId: 'claim-assembly' }));
+      const turn = new TurnHandle({ sessionKey: SESSION_ID, turnId: 'turn-assembly', generation: 1 });
+      turn.validateCompletionReadiness = declaration => enforceMissionTurnReadiness({
+        profileId: 'general', completionContract: 'investigation-report', investigationMission: 'debugger',
+        sessionId: SESSION_ID, disposition: declaration.disposition, service,
+      });
+      const tool = createAssembly().resolveRuntimeTools('general', ['*'], undefined, turn).toolMap.get('turn_complete')!;
+      await expect(tool.execute('premature', { disposition: 'completed' })).rejects.toThrow('challenge-assembly');
+      expect(turn.completionDeclaration).toBeNull();
+      await tool.execute('partial', { disposition: 'partial' });
+      expect(turn.completionDeclaration?.disposition).toBe('partial');
+    } finally {
+      const tempRoot = fs.realpathSync(os.tmpdir());
+      const realSessionPath = fs.realpathSync(sessionPath);
+      const relativeSessionPath = path.relative(tempRoot, realSessionPath);
+      if (!relativeSessionPath || relativeSessionPath.startsWith('..') || path.isAbsolute(relativeSessionPath)
+        || fs.lstatSync(sessionPath).isSymbolicLink()) throw new Error('Unexpected investigation fixture path');
+      await rm(sessionPath, { recursive: true, force: true });
+    }
+  });
+
   it('rejects turn_complete while a direct Task is running, then accepts it after settlement', async () => {
     const sessionId = `completion-${randomUUID()}`;
     const turn = new TurnHandle({ sessionKey: sessionId, turnId: `turn-${randomUUID()}`, generation: 1 });
@@ -286,6 +337,80 @@ describe('RuntimeToolAssembly', () => {
     } finally {
       await rm(resolveSessionTasksDir(sessionId), { recursive: true, force: true });
     }
+  });
+
+  it('does not complete an approved goal while a delegated execution is still running', async () => {
+    const sessionId = `completion-child-${randomUUID()}`;
+    const turn = new TurnHandle({ sessionKey: sessionId, turnId: `turn-${randomUUID()}`, generation: 1 });
+    turn.requiresApprovedGoalClosure = true;
+    const registry = new TaskRegistry(createSessionTaskStore(sessionId));
+    try {
+      const task = await registry.createTask('Independent work');
+      const execution = await registry.startExecution(task.id, { mode: 'subagent' });
+      const tool = createAssembly().resolveRuntimeTools('general', ['*'], sessionId, turn).toolMap.get('turn_complete')!;
+      await expect(tool.execute('premature', { disposition: 'completed' })).rejects.toThrow(execution.id);
+      expect(turn.completionDeclaration).toBeNull();
+      await registry.settleExecution(execution.id, { expectedGeneration: execution.generation, status: 'completed',
+        result: { disposition: 'completed', summary: 'done', outputs: {} } });
+      await tool.execute('settled', { disposition: 'completed' });
+      expect(turn.completionDeclaration?.disposition).toBe('completed');
+    } finally {
+      await rm(resolveSessionTasksDir(sessionId), { recursive: true, force: true });
+    }
+  });
+
+  it('rechecks an earlier completion declaration when a child starts afterward', async () => {
+    const sessionId = `completion-recheck-${randomUUID()}`;
+    const turn = new TurnHandle({ sessionKey: sessionId, turnId: `turn-${randomUUID()}`, generation: 1 });
+    const registry = new TaskRegistry(createSessionTaskStore(sessionId));
+    try {
+      turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [] };
+      const task = await registry.createTask('Late child');
+      const execution = await registry.startExecution(task.id, { mode: 'subagent' });
+      expect(await approvedGoalContinuation(turn, sessionId)).toContain(execution.id);
+      expect(turn.completionDeclaration).toBeNull();
+      turn.completionDeclaration = { disposition: 'partial', evidenceRefs: [] };
+      expect(await approvedGoalContinuation(turn, sessionId)).toBeUndefined();
+      await registry.settleExecution(execution.id, { expectedGeneration: execution.generation, status: 'completed',
+        result: { disposition: 'completed', summary: 'done', outputs: {} } });
+      turn.completionDeclaration = null;
+      expect(await approvedGoalContinuation(turn, sessionId)).toContain('turn_complete');
+    } finally {
+      await rm(resolveSessionTasksDir(sessionId), { recursive: true, force: true });
+    }
+  });
+
+  it('tells the agent to redeclare after a final-answer rejection invalidates completion', async () => {
+    const sessionId = `completion-final-${randomUUID()}`;
+    const turn = new TurnHandle({ sessionKey: sessionId, turnId: `turn-${randomUUID()}`, generation: 1 });
+    const tool = createAssembly().createTurnCompletionTool(turn);
+    try {
+      await tool.execute('first-declaration', { disposition: 'completed' });
+      const feedback = await approvedGoalContinuation(turn, sessionId, () => {
+        throw new MissionCompletionError('final_not_bound', 'Use report-1 sha256:abcdef in the final answer.');
+      });
+      expect(feedback).toContain('report-1 sha256:abcdef');
+      expect(feedback).toContain('previous completed declaration is no longer active');
+      expect(feedback).toContain('call turn_complete again');
+      expect(turn.completionDeclaration).toBeNull();
+      await tool.execute('corrected-declaration', { disposition: 'completed' });
+      expect(await approvedGoalContinuation(turn, sessionId, () => undefined)).toBeUndefined();
+    } finally {
+      await rm(resolveSessionTasksDir(sessionId), { recursive: true, force: true });
+    }
+  });
+
+  it('requires a concrete unresolved reason for partial and blocked approved goals', async () => {
+    const sessionId = `completion-partial-${randomUUID()}`;
+    const turn = new TurnHandle({ sessionKey: sessionId, turnId: `turn-${randomUUID()}`, generation: 1 });
+    turn.requiresApprovedGoalClosure = true;
+    const tool = createAssembly().resolveRuntimeTools('general', ['*'], sessionId, turn).toolMap.get('turn_complete')!;
+    try {
+      await expect(tool.execute('empty', { disposition: 'partial' })).rejects.toThrow('concrete unresolved');
+      await tool.execute('qualified', { disposition: 'partial', result: { summary: 'Device unavailable', outputs: {},
+        counterevidence: [], unresolved: ['Android device offline; replay and restore remain unverified.'], scope: 'one capture', sideEffects: [], recoveryState: [] } });
+      expect(turn.completionDeclaration?.disposition).toBe('partial');
+    } finally { await rm(resolveSessionTasksDir(sessionId), { recursive: true, force: true }); }
   });
 
   it('createToolSignature sorts tool names', () => {
@@ -355,6 +480,21 @@ describe('RuntimeToolAssembly', () => {
     expect(result.content[0]).toMatchObject({ text: expect.stringContaining('not open') });
   });
 
+  it('shows the owning planner registered capture identities and selected device without paths', async () => {
+    const session = vi.spyOn(storageAdapter.sessions, 'readSession').mockReturnValue({ projectId: 'proj-1' } as never);
+    const project = vi.spyOn(storageAdapter, 'getProjectById').mockReturnValue({ inputs: [{ inputId: 'capture-1', fileName: 'one.rdc',
+      filePath: 'D:/private/one.rdc', source: 'external_reference', contentSha256: 'a'.repeat(64) }] } as never);
+    vi.mocked(rdcSessionService.snapshotReplayForSession).mockReturnValueOnce({ replayDeviceId: null,
+      preparation: { targetDeviceId: 'android-1', phase: 'ready', issue: null } } as never);
+    try {
+      const result = await createAssembly().createRuntimeContextTool('sess-1', 'proj-1').execute('inventory', {});
+      const body = JSON.parse((result.content[0] as { text: string }).text);
+      expect(body.capturePlanning).toEqual({ inputs: [{ inputId: 'capture-1', fileName: 'one.rdc', source: 'external_reference', contentSha256: 'a'.repeat(64) }],
+        deviceId: 'android-1', devicePreparation: 'ready' });
+      expect(JSON.stringify(body)).not.toContain('D:/private');
+    } finally { session.mockRestore(); project.mockRestore(); }
+  });
+
   it('createRuntimeContextTool returns runtime context when lease exists', async () => {
     vi.mocked(assertRdcContextLeaseOwnership).mockReturnValueOnce({
       runtimeContext: { capture: 'demo.rdc' },
@@ -364,6 +504,44 @@ describe('RuntimeToolAssembly', () => {
     const result = await tool.execute('tc-1', {});
     expect(result.details).toEqual({ available: true });
     expect(result.content[0]).toMatchObject({ type: 'text' });
+  });
+
+  it('omits the stale open-time payload and exposes the owning turn\'s frozen restoration baseline separately', async () => {
+    vi.mocked(assertRdcContextLeaseOwnership).mockReturnValueOnce({
+      runtimeContext: { contextId: 'context', captureFileId: 'capture', replaySessionId: 'replay', raw: { active_event_id: 11 } },
+    } as never);
+    const restorationBaselineFor = vi.fn(() => ({ available: true, original: { native: { eventId: 14 } },
+      receipt: { uri: 'session://tool-outputs/baseline.json', expectedHash: `sha256:${'a'.repeat(64)}` } }));
+    const context = { workspaceRoot: '/project', projectRootPath: '/project', projectId: 'proj-1', sessionId: 'sess-1',
+      turnId: 'turn-1', agentId: 'general', accessCeiling: 'full', captureControl: { restorationBaselineFor } } as never;
+    const result = await createAssembly().createRuntimeContextTool('sess-1', 'proj-1').execute('context', {}, undefined, undefined, context);
+    const body = JSON.parse((result.content[0] as { text: string }).text);
+    expect(body.rdc).not.toHaveProperty('raw');
+    expect(body.captureRestoration).toMatchObject({ available: true, original: { native: { eventId: 14 } },
+      receipt: { uri: 'session://tool-outputs/baseline.json' } });
+    expect(restorationBaselineFor).toHaveBeenCalledWith(context);
+  });
+
+  it('does not expose a controller baseline to an unrelated or offline tool context', async () => {
+    const restorationBaselineFor = vi.fn(() => ({ available: true, original: null }));
+    const tool = createAssembly().createRuntimeContextTool('sess-1', 'proj-1');
+    const base = { workspaceRoot: '/project', projectRootPath: '/project', projectId: 'proj-1', sessionId: 'foreign',
+      turnId: 'turn-1', agentId: 'general', accessCeiling: 'full', captureControl: { restorationBaselineFor } };
+    for (const context of [base, { ...base, sessionId: 'sess-1', excludeRdcLeaseTools: true }]) {
+      const result = await tool.execute('context', {}, undefined, undefined, context as never);
+      expect(JSON.parse((result.content[0] as { text: string }).text)).not.toHaveProperty('captureRestoration');
+    }
+    expect(restorationBaselineFor).not.toHaveBeenCalled();
+  });
+
+  it('keeps a verified empty entry baseline visible to its owner when no capture is open', async () => {
+    const restorationBaselineFor = vi.fn(() => ({ available: true, original: null, receipt: { uri: 'session://tool-outputs/baseline.json' } }));
+    const context = { workspaceRoot: '/project', projectRootPath: '/project', projectId: 'proj-1', sessionId: 'sess-1',
+      turnId: 'turn-1', agentId: 'general', accessCeiling: 'full', captureControl: { restorationBaselineFor } } as never;
+    const result = await createAssembly().createRuntimeContextTool('sess-1', 'proj-1').execute('context', {}, undefined, undefined, context);
+    expect(JSON.parse((result.content[0] as { text: string }).text)).toMatchObject({
+      captureRestoration: { available: true, original: null }, rdc: { available: false },
+    });
   });
 
   it('passes the actual execution binding to the owning host-control projection', async () => {

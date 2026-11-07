@@ -40,9 +40,10 @@ export function resolveTurnControlsForCapabilityChange(input: {
   if (previousCapabilityKey === null && input.sameModelRoute) return sanitizeTurnControls(input.currentControls, capability);
   if (previousCapabilityKey === null) return rememberedControls ? sanitizeTurnControls(rememberedControls, capability) : buildInitialTurnControls(capability, sessionControls);
   if (previousCapabilityKey !== nextCapabilityKey) {
+    if (input.sameModelRoute) return sanitizeTurnControls(input.currentControls, capability);
     return rememberedControls
       ? sanitizeTurnControls(rememberedControls, capability)
-      : input.sameModelRoute ? sanitizeTurnControls(input.currentControls, capability) : buildInitialTurnControls(capability, null);
+      : buildInitialTurnControls(capability, null);
   }
   return sanitizeTurnControls(input.currentControls, capability);
 }

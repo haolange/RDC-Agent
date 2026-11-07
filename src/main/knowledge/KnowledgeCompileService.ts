@@ -22,20 +22,24 @@ export class KnowledgeCompileService {
       .slice(0, limit);
     const hits: KnowledgeCompiledHit[] = ranked.map((hit) => ({
       ...hit,
-      reasons: hit.lanes.map((lane) => `${lane}:${hit.score}`),
+      reasons: hit.lanes.map((lane) => {
+        const score = query.lanes.find(result => result.lane === lane)?.hits.find(item => item.cardId === hit.cardId)?.score;
+        return score === undefined ? lane : `${lane}:${score}`;
+      }),
     }));
     const conflicts: KnowledgePackConflict[] = [];
     for (const left of hits) {
       for (const right of hits) {
         if (left.cardId >= right.cardId) continue;
-        const contradicts = left.lanes.includes('Relation/Graph') && right.lanes.includes('Relation/Graph');
-        if (contradicts && left.title !== right.title) {
+        const contradicts = left.relations?.some(relation => relation.kind === 'contradicts' && relation.targetCardId === right.cardId)
+          || right.relations?.some(relation => relation.kind === 'contradicts' && relation.targetCardId === left.cardId);
+        if (contradicts) {
           conflicts.push({ leftCardId: left.cardId, rightCardId: right.cardId, kind: 'contradicts' });
         }
       }
     }
     const digest = createHash('sha256')
-      .update(hits.map((hit) => hit.cardId).join('|'), 'utf8')
+      .update(JSON.stringify({ query: query.queryFingerprint ?? null, hits: hits.map(hit => [hit.cardId, hit.contentHash]) }), 'utf8')
       .digest('hex')
       .slice(0, 16);
     return {

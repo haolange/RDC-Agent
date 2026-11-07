@@ -9,6 +9,7 @@ export const REMOVED_HANDOFF_STATE_FILE = 'handoff-state.json';
 
 const ExecutionOfferSchema = z.object({
   schemaVersion: z.literal(EXECUTION_OFFER_SCHEMA),
+  offerId: z.string().uuid().optional(),
   sourceAgentId: z.string().trim().min(1),
   targetAgentId: z.string().trim().min(1),
   plan: z.object({

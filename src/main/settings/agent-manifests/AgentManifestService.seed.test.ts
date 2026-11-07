@@ -19,7 +19,34 @@ const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
 describe('AgentManifestService effective builtin snapshot', () => {
-  it('loads four builtins without creating or changing user resources', async () => {
+  it('projects provider connection state without confusing derived enabled=false with user disablement', () => {
+    const settings = {
+      directoryPath: '', definitions: [{ id: 'general', models: ['provider:model'] }],
+      modelOptions: [], globalInstructions: '', diagnostics: [],
+    } as unknown as AgentManifestSettings;
+    const base = {
+      id: 'provider', label: 'Provider', catalogOwnership: 'user-managed',
+      enabled: false, isConfigured: false, models: [{ id: 'model', enabled: true }],
+    } as unknown as LlmProviderEntry;
+    const project = (provider: LlmProviderEntry) => agentManifestService
+      .projectEffectiveModelOptions(settings, [provider], [], []).modelOptions[0];
+
+    expect(project({ ...base, status: 'unconfigured' })).toMatchObject({
+      status: 'provider-unavailable', providerIssue: 'unconfigured',
+    });
+    expect(project({ ...base, status: 'unconfigured' })).not.toHaveProperty('disabledReason');
+    expect(project({ ...base, status: 'failed', lastError: 'HTTP 401: account denied' })).toMatchObject({
+      providerIssue: 'failed', disabledReason: 'HTTP 401: account denied',
+    });
+    expect(project({ ...base, status: 'unavailable', unavailableReason: 'Account route is restricted' })).toMatchObject({
+      providerIssue: 'unavailable', disabledReason: 'Account route is restricted',
+    });
+    expect(project({ ...base, status: 'unconfigured', models: [] })).toMatchObject({
+      status: 'provider-unavailable', providerIssue: 'unconfigured',
+    });
+  });
+
+  it('loads all builtins without creating or changing user resources', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-seeds-'));
     roots.push(root);
     const agentsPath = path.join(root, 'agents');
@@ -34,16 +61,17 @@ describe('AgentManifestService effective builtin snapshot', () => {
     expect(fs.existsSync(agentsPath)).toBe(false);
 
     expect(settings.definitions.map((definition) => definition.id).sort()).toEqual(
-      ['analyzer', 'debugger', 'general', 'optimizer'],
+      ['analyzer', 'debugger', 'general', 'generator', 'knowledge-scout', 'optimizer', 'pass-analyst', 'pixel-analyst', 'report-writer', 'resource-analyst', 'shader-analyst', 'verifier'],
     );
     expect(settings.definitions.every((definition) => definition.builtin)).toBe(true);
     for (const definition of settings.definitions) {
       expect(definition.tools).not.toContain('todo');
       expect(definition.tools).not.toContain('search_codebase');
-      expect(definition.tools).toContain('knowledge');
       expect(definition.tools).toContain('tool_search');
     }
     const byId = new Map(settings.definitions.map((definition) => [definition.id, definition]));
+    for (const id of ['general', 'debugger', 'analyzer', 'optimizer']) expect(byId.get(id)?.tools).toContain('knowledge');
+    for (const id of ['generator', 'verifier', 'knowledge-scout', 'report-writer', 'shader-analyst', 'pass-analyst', 'resource-analyst', 'pixel-analyst']) expect(byId.get(id)?.userInvocable).toBe(false);
     expect(byId.get('general')?.tools).toContain('file-manage');
     expect(byId.get('debugger')?.tools).not.toContain('write');
     expect(byId.get('debugger')?.tools).toContain('planArtifact');
@@ -89,7 +117,9 @@ describe('AgentManifestService effective builtin snapshot', () => {
       scopeGeneration: 'fixture', projectionVersion: 1,
       generatedAt: '2026-07-14T00:00:00.000Z', stale: false, refreshing: false,
       models: [
-        { ...baseModel, modelId: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', availability: 'available' as const },
+        { ...baseModel, modelId: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', availability: 'available' as const,
+          controls: { ...baseModel.controls, reasoning: { kind: 'levels' as const, supportsOff: false, levels: ['low' as const, 'high' as const],
+            defaultSelection: 'high' as const, wireProfile: { kind: 'none' as const } } } },
         { ...baseModel, modelId: 'unknown-tools', label: 'Unknown tools', availability: 'available' as const, toolCalling: { state: 'unknown' as const } },
         {
           ...baseModel,
@@ -111,8 +141,8 @@ describe('AgentManifestService effective builtin snapshot', () => {
       [catalog],
     );
     expect(projected.modelOptions).toEqual([
-      expect.objectContaining({ modelId: 'gemini-3.1-pro-preview', configured: true, status: 'ready' }),
-      expect.objectContaining({ modelId: 'claude-sonnet-5', configured: false, status: 'model-unavailable', disabledReason: 'Not returned by this account.' }),
+      expect.objectContaining({ modelId: 'gemini-3.1-pro-preview', configured: true, status: 'ready', reasoningSelections: ['low', 'high'] }),
+      expect.objectContaining({ modelId: 'claude-sonnet-5', configured: false, status: 'model-unavailable', disabledReason: 'Not returned by this account.', reasoningSelections: null }),
     ]);
     expect(projected.modelOptions.some((option) => option.modelId === 'persisted-only')).toBe(false);
     expect(projected.modelOptions.some((option) => option.modelId === 'unknown-tools')).toBe(false);
@@ -328,7 +358,7 @@ describe('AgentManifestService effective builtin snapshot', () => {
     const result = service.resolveEffectiveSnapshot(paths, projectRoot);
     expect(result.diagnostics).toHaveLength(5);
     expect(result.diagnostics.filter(issue => issue.agentId === 'general').map(issue => issue.scope).sort()).toEqual(['project', 'user']);
-    expect(result.profiles).toHaveLength(4);
+    expect(result.profiles).toHaveLength(12);
     expect(result.profiles.every(profile => profile.provenance.scope === 'builtin')).toBe(true);
   });
 

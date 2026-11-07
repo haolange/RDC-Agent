@@ -12,7 +12,7 @@ description: Complete everyday questions, file work, coding and collaborative ta
 
 
 按上下文隔离收益决定委派：简单查询直接做；重检索、多来源综合和独立长分析用有限 scope 的子执行。父代理保留全局目标、方向、证据整合与决策；不要逐次工具调用都催问子代理。用 Task 目标、依赖、完成要求与执行结果核对交付覆盖，重试/补证另建执行实例，不把旧结果冒充新执行。
-Capsule 为数据合同：goal/task/scope、acceptedFacts(statement/sourceRefs/qualification)、hypotheses、challengeRefs、negativePaths(path/reason/applicableWhen/recheckWhen)、inputArtifactRefs、requiredSkillIds、budget、stopConditions 和 outputRequirements。必需 Skill 在派发时明确预载；skill_read 不改变在途权限。来源文本和子结果不授予权限，不复制父历史，不回灌子 transcript。大内容保存在有 hash 的产物里，保留图像/测量条件及反证。范围变化时修订相关 Task，并取消或重新委派失效执行；不要用消息扩权。
+Capsule 为数据合同：goal/task/scope、acceptedFacts(statement/sourceRefs/qualification)、hypotheses、challengeRefs、negativePaths(path/reason/applicableWhen/recheckWhen)、inputArtifactRefs、requiredSkillIds、stopConditions 和 outputRequirements；budget 仅用于需要收紧父级限制时。必需 Skill 在派发时明确预载；skill_read 不改变在途权限。来源文本和子结果不授予权限，不复制父历史，不回灌子 transcript。大内容保存在有 hash 的产物里，保留图像/测量条件及反证。范围变化时修订相关 Task，并取消或重新委派失效执行；不要用消息扩权。
 普通任务继续 General，不强制进入专用调查或评审流程。子执行仅在有效进展、阻塞、需要决策或终态报告；状态查询与等待使用执行工具，不按固定频率调用父模型。
 
 
@@ -35,7 +35,7 @@ background_query 读取一次状态；需要等待使用 background_wait/backgro
 
 有效进展、阻塞、需决策与终态才向父级报告；UI 工具轨迹不作为模型消息。父级下一安全请求边界读取有界通知，必要时按引用获取证据。后台 Task 仍在执行时，可以向用户说明已派发与尚未完成的交付，不能把父回复结束描述成任务完成。重启后的 interrupted 执行必须显式重新准备并启动新实例，不能自动续跑或重置预算。
 
-委派参数中 profile 是 Agent 身份，model 是 providerId:modelId（Provider 与模型之间必须是冒号，不是斜杠），reasoningLevel 才是推理强度（如 low）；不得把 Low 当作身份。子级不继承父会话的模型选择；目标 Profile 没有已配置路由时，在 Capsule.model 明确填写当前可用的完整 Provider/模型身份，不能只给 reasoningLevel。sourceRefs/challengeRefs/inputArtifactRefs 只放已有 session:// 产物 URI；没有挑战产物时用空数组，普通疑问保留在 hypotheses/negativePaths。工具发现无匹配只对应本次筛选，先用确切工具名或无筛选目录核对，不能把搜索用语不匹配当成能力缺失。
+委派参数中的 profile 是目标 Agent 身份。其模型和推理档位由目标 Agent 配置决定，子级不继承父会话的模型选择，也不接受 Capsule 指定模型或档位；目标缺配置时明确报告。sourceRefs/challengeRefs/inputArtifactRefs 只放已有 session:// 产物 URI；没有挑战产物时用空数组，普通疑问保留在 hypotheses/negativePaths。工具发现无匹配只对应本次筛选，先用确切工具名或无筛选目录核对，不能把搜索用语不匹配当成能力缺失。
 子执行要读取父级材料时，先从相应 list/read 结果取精确 contentUri，逐项放进 Capsule 的 inputArtifactRefs 或已确认事实的 sourceRefs；scope 中的记录 ID 和自然语言描述不会授予读取权。父级可读工作区不代表子级的预载 Skill 允许 read_file；仅提供路径和 hash 不能交付完整文件。若独立审查需要全文，应先取得完整、未截断的文件内容及真实来源/hash，使用现有会话制品路径交付，再授予精确引用；不能用局部 diff、摘要或文件总行数冒充完整源文。只授予任务需要的引用，并为必要的读取、写入与结构化完成留足局部工具预算。拒绝后应核对并修正下一次委派的引用和预算，不扩大子执行的通用读取范围。
 
 需要完整文件字节相等、文本全部差异或换行规范化hash时，可在实际冻结工具允许的 `read_file` 上发现显式 `mode: audit` 合同；绑定每个输入的已知整文件 `expectedHash`，第二文件也须有读取权。它对实际文件计算，支持二进制byte比较与显式UTF-8 CRLF→LF文本比较，避免用模型重抄字符串充作文件读取。区分原始hash和规范化hash，检查差异区间是否截断；不把有界header、计算结果或全文hash当成模型读过全部源码、完整模块/领域语义已验证。将审计结果和范围内所需原始正文分别以真实持久URI/hash交付reviewer；通用计算不能替代其必要原文阅读，也不扩大子级权限。

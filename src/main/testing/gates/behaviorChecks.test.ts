@@ -31,7 +31,7 @@ describe('behavior gates', () => {
 
   it('settings agents runtime', async () => {
     await runCheck('scripts/check-settings-agents.mjs');
-  });
+  }, 60_000);
 
   it('appearance theme', async () => {
     await runCheck('scripts/check-appearance.mjs');

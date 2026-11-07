@@ -18,7 +18,7 @@
 
 ### 2026-09-09 Harness 边界收敛
 
-本设计中的 Mission → General → Scout/Skeptic → 补证 → 回评估是实际 .agent/Skill 中的领域方法，不能成为通用 runtime 固定拓扑。普通 General 任务直接完成；单次 lookup 不强制委派。Scout 和 Skeptic 是隔离 General 子执行的职责，分别通过 requiredSkillIds 预载 knowledge-scout / skeptic-review；Skeptic 不继承生成者叙事或 RDC lease。原 Mission 保留最终评估。
+Mission 规划、General 编排、专业委派、独立核验与补证是领域方法，不是通用 runtime 固定拓扑。普通 General 任务直接完成，单次 lookup 不强制委派。`knowledge-scout` 与 `verifier` 是可配置的独立内部 Agent，默认加载各自方法；Verifier 不继承生成者叙事或 live RDC lease。已批准调查由 General 完成合同闭合后就地交付，战略改变由用户切回 Mission。
 
 通用 runtime 强制任务依赖、执行实例、代次、资源所有权、预算、取消/join 和明确返回绑定。领域工具校验原生绑定、签名回执和调查记录。方法选择、Challenge 补证和战略改变由模型依指令决定；Hook 不按身份/depth 反推 Big Loop，不自动选择最近 Checkpoint。部分结果通过结构化 disposition/evidenceRefs 声明，不通过正文关键词触发隐藏流程。
 
@@ -69,7 +69,7 @@ Goal → Observed Facts → Structure / Hypotheses → Evidence
 
 ```text
 Control Plane          Plan / Tasks / 声明式 Handoff / Small·Big Loop / Skeptic
-Execution Plane        四个 builtin Profile / Sub-Agent / Skill / Tool / 并发组
+Execution Plane        四个默认入口 + 八个内部 builtin / Sub-Agent / Skill / Tool / 并发组
 Investigation State    WorldState / Evidence / Claim / Experiment / Challenge / Manifest
 Context Plane          L0–L5 选择 / Delegation Capsule / 三层 Compaction / 可恢复引用
 Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negative
@@ -83,7 +83,7 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 | Context | 这次推理看什么、如何压缩、如何 drilldown | PromptPlan + Artifactization + Mission Checkpoint |
 | Knowledge | 可复用什么、Scope、验证等级、冲突 | 五服务 + 六 lane markdown-first；canonical 仍在 `~/.rdc-agent/knowledge` 或 `<project-root>/.rdc-agent/knowledge`；读根免审批见 U02 / 裁决 G |
 
-端到端生命周期：用户选择 Mission → Planning Orchestrator → 有限探测与 Knowledge 检索 → `plan_artifact` 用户审阅（拒绝修订同一份，批准冻结）→ 人点声明 handoff 切到 General → General Execution Orchestrator 就地终答 → Tasks 展开 → Live RDC 串行 + Offline 可并行 → 垂直记录 → Skeptic → 用户自行切回 Mission 做 Small Loop 或 Big Loop → 报告。Session Candidate **不是**默认产物：仅当用户显式点击 / 命令，或 Agent 在本轮得到明确用户意图后显式调用 `knowledge_candidate_create` 才创建。持久 Promote 仍只能 human review。
+端到端生命周期：用户选择 Mission → 有限探测与 Knowledge 检索 → `plan_artifact` 用户审阅并冻结 → 人点声明切到 General → Task、串行 Live RDC 与可并行离线分析 → 独立核验、补证及恢复 → General 就地报告。战略变化由用户切回 Mission 再规划。Session Candidate 只在明确用户意图下创建，持久 Promote 仍须 human review。
 
 ---
 
@@ -91,11 +91,11 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 
 权威表在 `ARCHITECTURE.md`「Current / Target / Migration Adjudications」。此处只列实现时不得走样的合同。
 
-### 3.1 四个 builtin Profile
+### 3.1 默认入口与内部 builtin Profile
 
-- 官方文件只放 `resources/agent-runtime/agents`，scope = builtin。只有四 builtin：`general` / `debugger` / `analyzer` / `optimizer`。
+- 官方文件位于 `resources/agent-runtime/agents`。四个默认顶层入口为 `general` / `debugger` / `analyzer` / `optimizer`；八个默认内部身份为 `generator` / `verifier` / `knowledge-scout` / `report-writer` / `shader-analyst` / `pass-analyst` / `resource-analyst` / `pixel-analyst`。
 - 生效优先级 **`builtin < user < project`**，整资源替换。运行时**不再写 user seed**。
-- user/project 只能覆盖这四个 id，或新增无关自定义 id。
+- user/project 可覆盖合法 ID 或新增合法自定义 ID；内部 Agent 默认 `user-invocable: false`，其模型和推理档位经现有 Agents 设置管理。
 - `general` = Execution Orchestrator；`debugger` / `analyzer` / `optimizer` = Planning Orchestrator。
 - 空 `handoffs` 合法（General 无建议按钮）；空 `agents` 仅表示可委托自身。
 - 不新增 `mission` / `orchestratorType` / `investigationMode` 等 Profile 领域字段。
@@ -495,7 +495,7 @@ Analyzer 是认知基础，**不是**强制前置模式。Debugger / Optimizer �
 
 Planning：Triage & Taxonomy → Capture Report → Knowledge Retrieval → plan。Execution：First Bad Event → 竞争 Hypothesis → Evidence → Experiment → Skeptic。
 
-落地方式（Wave 5 前半）：接到已有 Profile / Skill / Hook / 声明续跑 / `investigation_*` / `task_*`，不新建 Runtime。First Bad Event / Hypothesis Matrix / Counterfactual Artifact 的记录形状与步骤在 `$debugger-causal-method`（现有 `evidence` / `claim` / `claim_set` / `experiment` kind，无新 Registry 项）。没有用户标注 ROI 时，General 先检查本次 capture 的可用图像，自主选候选区域，再用原生输出纹理及片元证据核对；无法读取或映射才保留精确缺口，不能以缺用户坐标直接停止。`$debugger-coordinator` 负责规划与 Small / Big Loop；独立 `$skeptic-review` 由 General 先建审查 Task、在 Capsule 中绑定 TaskId 并核对交付与结算，Skeptic 只写 `ChallengeRecord`；General 再用 `task_create` 把 `requiredFollowUp` 变成补证 Task。
+落地方式：接到已有 Profile / Skill / Hook / 声明续跑 / `investigation_*` / `task_*`，不新建 Runtime。First Bad Event / Hypothesis Matrix / Counterfactual Artifact 的记录形状与步骤在 `$debugger-causal-method`。没有用户标注 ROI 时先检查可用图像并核对候选区域，无法读取或映射才保留精确缺口。General 为独立 `verifier` 创建审查 Task 并授予必要来源；Verifier 交回覆盖、限制与 Challenge，General 负责更新父级记录和补证。
 
 | 结局 | 条件 |
 | --- | --- |
@@ -623,7 +623,7 @@ assets:
 
 ## 15. Knowledge 读路径
 
-Agent 侧 Knowledge 走 deferred `knowledge_*` Tool 与主进程五服务（单一事实源：`KnowledgeIndexService`）。canonical 读根 `realpath(~/.rdc-agent/knowledge)` + `realpath(<projectRoot>/.rdc-agent/knowledge)` 对 `read_file` / `read_image` / `glob` / `grep` 免审批（**U02 落地**）；写入仍经 `knowledge_*` + human review。grep/glob/read 只是补充证据，禁止第二索引或 renderer 事实源。Planning Orchestrator 只做小规模直接查询，大范围检索委托 Knowledge Scout Sub-Agent（调用者 Profile + `$knowledge-scout`，不是第五个顶层 Profile）。Scout 先六 lane `knowledge_search`，再 grep/glob/read 全文，引用 cardId + contentHash；父 Context 不接收子 transcript。Embedding capability 已废止，见 §3.3 / 裁决 C。
+Agent 侧 Knowledge 走 deferred `knowledge_*` Tool 与主进程服务。canonical 读根为 user/project Knowledge，写入仍经 human review；禁止第二份知识正文或 renderer 事实源。简单查询可直接完成，复杂多来源检索可委派内部 `knowledge-scout`，按需要渐进读取原文并交回 cardId、contentHash、适用条件和检查建议。Embedding capability 已废止。
 
 ---
 
@@ -714,11 +714,11 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 知识�
 
 ## 22. 与当前实现的差距（非实现清单）
 
-已落地：四个 builtin profile、Coordinator Skills、effective snapshot、Run schema **v3**（见裁决 I，不得双读）、IPC `investigation:read`、投影完整 `contentHash`、`rdc.investigation.v1` + `InvestigationArtifactService` + 三个 deferred Investigation 工具、15 个垂直方法 Skill、4 个 builtin Hook 模板、Session rail 五卡、声明续跑与 execution offer、三条 Mission 方法面（Skill / Hook / Capsule）、Knowledge 五服务 / 五个 deferred 工具 / Center 三列 UI、T18 知识导入 user-space 持久化。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。
+现有实现包括四个默认入口和八个内部 builtin、Coordinator Skills、effective snapshot、Run schema **v3**、`investigation:read`、垂直 Session Artifact、五卡 Session rail、声明续跑及 Knowledge 服务。各项真实运行和泛化验收以 ledger 为准。
 
 下游才改代码：
 
-- **U01**：四 builtin 和 user/project 覆盖采用同一资源解析路径；本机旧 seed 已分类并保留真实用户覆盖。旧官方 ID 被明确拒绝；运行时无 seed 迁移器、marker 写入、历史指纹或旧 manifest fallback。
+- **U01 历史**：当时四个入口与 user/project 覆盖采用同一资源解析路径；旧 seed 分类和历史拒绝 ID 的原事实保留。当前 builtin 集合见 §3.1。
 - **U02**：删除 Embedding / Semantic lane / `llm.embedding`；Knowledge 收敛六 lane markdown-first + 读根免审批。
 - **U03**：legacy 二次清扫 + `check:legacy-residue` 零命中。
 - **U04**：`check:acceptance-ledger` 接入 CI。
@@ -730,7 +730,7 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 知识�
 
 ## 垂直指令与执行真实性收敛（2026-09-09）
 
-以 ARCHITECTURE.md 的同名裁决为准。General 直接处理普通代码调试、解释与性能修复；只把明确 RenderDoc/capture 调查转 Mission。标准闭环为 Mission 规划 → 用户点声明按钮切到 General → General 就地终答 → 用户自行切回 Mission 评估与报告。General 任何回合不得宣告调查 `completed`。深度不足或能力缺失保留 checkpoint 与未完成位置，由用户决定是否切回。
+以 ARCHITECTURE.md 的同名裁决为准。General 处理普通工作；RenderDoc 调查经 Mission 规划、用户批准和声明交接后，由 General 在完成必要核验与恢复后就地交付。深度不足或能力缺失保留 checkpoint 与未完成位置；战略变化由用户决定是否切回 Mission。
 
 General 的 execution-orchestrator 只定义通用工作方法；三个 Mission coordinator 保存目标、计划产物、声明续跑与方法路由；共享执行/Small Loop/Big Loop/capsule 只在 renderdoc-execution 维护。报告按需读对应 Mission 章节。先获取可安全读取的上下文，再问不可获取输入或必需决策；不重复已授权步骤。相似案例只在相关历史问题时检索，单次 lookup 不强制 Scout。canonical Skill 共 31 个：22 个 Mission / Knowledge / Coordinator 与 9 个 General，其中新增三本专业 RDC 工具手册；读取方法不重新武装本轮权限。
 
@@ -747,7 +747,7 @@ Experiment 可选 executionEvidence 五阶段引用的字段、签名、顺序�
 
 ### 2026-09-10 实施边界补充
 
-通用 Task/执行及后台工具遵守 docs/contracts/runtime-kernel.md，不增建 Investigation store。RDC 证据仍以所属 Session Artifact 的调查记录为权威，子执行输入只读授权不允许覆盖父产物。Scout/Skeptic 为 General 的受约束独立子上下文和冻结 Skill，非新增官方身份。General 创建补证 Task 并局部推进；战略变化回交原 Mission，原 Mission 保留最终评估，没有隐藏总裁决模型。
+通用 Task/执行及后台工具遵守 docs/contracts/runtime-kernel.md，不增建 Investigation store。RDC 证据仍以所属 Session Artifact 的调查记录为权威，子执行输入只读授权不允许覆盖父产物。内部 `knowledge-scout` / `verifier` 使用各自冻结配置与方法；General 整合有效 Challenge 并局部补证，战略变化由用户切回 Mission，没有隐藏总裁决模型。
 
 进程退出、RDC 状态已知与实验恢复是三项不同证据。确认进程退出才可结束资源清理；验证新 binding 才能恢复受控访问；baseline/intervention/variant/rollback/restored 回执才支持实验恢复结论。重新打开 capture 不代替 rollback。参见 acceptance-ledger.md 的各次实际验证范围，静态契约、受控 Provider fixture、真实 native CLI 和真实模型不得互相替代。
 
@@ -767,7 +767,7 @@ RDC 委派沿用通用 root/child-local 双层预算，不独立计费或恢复�
 
 本轮真实 Debugger 材料为眼睛泪腺白点 capture；没有参考图，事件 6152 仅为线索，IBL/specular/leakage 仅为竞争假设。必须保留正常高光，不能以整体压暗或局部未复现宣称修复。真实项目 Ground Truth 继续按已约定分期；受控 fixture、真实模型请求与原生 RDC 证据分别登记。Debugger 不替代 Analyzer/Optimizer 的旅程验收。实现及实测边界见 acceptance ledger。
 
-普通澄清、材料确认和下一步回复不自动宣告调查完成。领域扩展仅在显式 `turn_complete(completed)` 时校验完整报告；逻辑 Task 的必需执行与交付要求仍独立强制。文本里的“完成”不构成运行时完成证据。
+普通澄清、材料确认和下一步回复不自动宣告调查完成。显式 `turn_complete(completed)` 在记录声明前检查可解引用的 Checkpoint 和至少一份符合领域合同的 ready report，包括状态、所需实验和相关未解 Challenge；最终答复产生后再核验实际引用报告的完整性、版本和答复引用。逻辑 Task 的必需执行与交付要求仍独立强制，声明和文本里的“完成”都不构成终态完成证据。
 
 
 材料交互保留原始文件、来源 hash、用户意图、归一化 ROI、文档位置、音视频时间范围和比较组/角色/条件。Composer 可选择区域并补充描述，transcript 原位打开原图与条件，比较按同组材料展开；这些是用户标注，不自动升级为工具观察。派生视图不得覆盖原图或把人工示意图标成 capture 证据。任务来源与用户后续修订分别进入 Journal 和委派，模型必须说明来源差异。

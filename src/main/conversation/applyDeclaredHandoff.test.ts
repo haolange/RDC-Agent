@@ -122,6 +122,7 @@ describe('applyDeclaredHandoff', () => {
     await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
     expect(mocks.offerWrite).toHaveBeenCalledTimes(2);
     for (const [, offer] of mocks.offerWrite.mock.calls) expect(offer.approvedAt).toBe(1234);
+    expect(mocks.offerWrite.mock.calls[0][1].offerId).not.toBe(mocks.offerWrite.mock.calls[1][1].offerId);
   });
 
   it.each([null, 9876])('uses the approved decision time even when the offer time is %s', async (offerTime) => {

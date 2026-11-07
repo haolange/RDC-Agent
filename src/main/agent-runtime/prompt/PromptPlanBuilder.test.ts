@@ -59,7 +59,7 @@ describe('PromptPlanBuilder', () => {
     const profileLimits = limitsPlan.segments.find(segment => segment.id === 'runtime:profile-limits');
     expect(profileLimits).toMatchObject({ kind: 'runtime-fact', stability: 'volatile' });
     expect(profileLimits?.content).toContain('"agentId":"executor","ordinaryProviderLoopCeiling":50');
-    expect(profileLimits?.content).toContain('"agentId":"ask","ordinaryProviderLoopCeiling":25');
+    expect(profileLimits?.content).toContain('"agentId":"ask","ordinaryProviderLoopCeiling":null');
     expect(profileLimits?.content).not.toContain('disabled-profile');
     expect(profileLimits?.content).toContain('not a future execution reservation');
     expect(limitsPlan.stablePrefix.fingerprint).toBe(plan.stablePrefix.fingerprint);

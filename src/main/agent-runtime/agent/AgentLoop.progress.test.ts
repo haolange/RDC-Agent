@@ -1,4 +1,9 @@
 import { RuntimePermissionStateService } from '../permissions/RuntimePermissionStateService';
+import { randomUUID } from 'node:crypto';
+import { existsSync, lstatSync, realpathSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { EventStream } from '../core/EventStream';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
@@ -13,6 +18,11 @@ import type {
   ToolResultMessage,
 } from '../core/types';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
+import { assertMissionTurnCompletion } from '../../investigation/missionCompletionContract';
+import { SESSION_ID, baselineWorld, createInvestigationHarness, observedClaim, projectClaim, sampleCheckpoint, writeDraft, writeReadyReport } from '../../investigation/investigationTestFixtures';
+import { approvedGoalContinuation } from '../orchestration/ApprovedGoalContinuation';
+import { TurnHandle } from '../orchestration/TurnCoordinator';
+import { resolveSessionTasksDir } from '../tasks';
 import { agentLoop, type AgentContext, type ToolExecutor } from './AgentLoop';
 import {
   AgentLoopTerminationError,
@@ -138,6 +148,23 @@ const toolExecutor = {
 };
 
 describe('AgentLoop progress termination', () => {
+  it('uses the newly prepared identity on the next request without creating a user message', async () => {
+    let current = 'old context';
+    let calls = 0;
+    const requests: Context[] = [];
+    const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: (_model, request) => {
+      requests.push(request);
+      return providerStream(++calls === 1 ? toolUseMessage(1)
+        : { ...toolUseMessage(2), content: [{ type: 'text', text: 'done' }], stopReason: 'stop' });
+    } };
+    const executor: ToolExecutor = { execute: async call => { current = 'new context'; return toolExecutor.execute(call); } };
+    const { stream } = agentLoop([], createContext(), { model: TEST_MODEL, convertToLlm: messages => messages as Message[],
+      streamOptions: { requestPlan: TEST_REQUEST_PLAN }, resolvePromptPlan: () => ({ systemPrompt: current, segments: [] }) }, provider, executor);
+    await consume(stream);
+    expect(requests.map(request => request.systemPrompt)).toEqual(['old context', 'new context']);
+    expect(requests[1].messages.filter(message => message.role === 'user')).toHaveLength(1);
+  });
+
   it.each([true, false])('starts and times only the actual tool effect (admitted=%s)', async (admitted) => {
     let now = 1_000;
     const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
@@ -416,4 +443,91 @@ it('ends at a host-confirmed tool boundary without another provider request or l
   expect(events.some(event => event.type === 'agent_end')).toBe(true);
   const ended = events.find(event => event.type === 'turn_end');
   expect(ended?.type === 'turn_end' && ended.toolResults?.[1].details).toMatchObject({ reason: 'turn completed after tool' });
+});
+
+it('continues an incomplete runtime obligation without adding a user message', async () => {
+  const requests: Context[] = [];
+  let decisions = 0;
+  const response = { ...toolUseMessage(1), content: [{ type: 'text' as const, text: 'done' }], stopReason: 'stop' as const };
+  const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: (_model, context) => { requests.push(context); return providerStream(response); } };
+  const context = createContext();
+  const { stream } = agentLoop([], context, {
+    model: TEST_MODEL, convertToLlm: messages => messages as Message[], streamOptions: { requestPlan: TEST_REQUEST_PLAN },
+    beforeTerminalResponse: async () => decisions++ === 0 ? 'Approved Task remains incomplete.' : undefined,
+  }, provider, toolExecutor);
+  await consume(stream);
+  expect(requests).toHaveLength(2);
+  expect(requests[1].systemPrompt).toContain('Approved Task remains incomplete.');
+  expect(requests[1].messages.filter(message => message.role === 'user')).toHaveLength(1);
+  expect(JSON.stringify(context.messages)).not.toContain('Approved Task remains incomplete.');
+});
+
+it('recovers a bare report hash by redeclaring and citing the exact reference', { timeout: 30_000 }, async () => {
+  const sessionId = `completion-reference-${randomUUID()}`;
+  const { service, sessionPath } = createInvestigationHarness('rdc-final-reference-');
+  const turn = new TurnHandle({ sessionKey: sessionId, turnId: `turn-${randomUUID()}`, generation: 1 });
+  try {
+    writeDraft(service, 'world_state', baselineWorld('ws-baseline'), { mission: 'analyzer' });
+    writeDraft(service, 'checkpoint', sampleCheckpoint({ currentWorldStateId: 'ws-baseline' }), { mission: 'analyzer' });
+    const source = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-retry'), { mission: 'analyzer' });
+    const report = writeReadyReport(service, { mission: 'analyzer', source,
+      claims: [projectClaim(source.record as never, 'claim-retry-projected')] });
+    const id = report.manifest.artifactId;
+    const hash = report.contentHash;
+    const requests: Context[] = [];
+    let calls = 0;
+    turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [] };
+    const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: (_model, request) => {
+      requests.push(request);
+      calls++;
+      if (calls === 1) return providerStream({ ...toolUseMessage(calls),
+        content: [{ type: 'text', text: `${id} SHA-256 ${hash.replace('sha256:', '')}` }], stopReason: 'stop' });
+      if (calls === 2) return providerStream({ ...toolUseMessage(calls), content: [{ type: 'toolCall',
+        id: 'redeclare', name: 'turn_complete', arguments: { disposition: 'completed' } }] });
+      return providerStream({ ...toolUseMessage(calls), content: [{ type: 'text', text: `${id} ${hash}` }], stopReason: 'stop' });
+    } };
+    const context = createContext();
+    context.runtime!.current.activeTools = [{ name: 'turn_complete', description: 'Declare completion', parameters: { type: 'object' } }];
+    const { stream } = agentLoop([], context, {
+      model: TEST_MODEL, convertToLlm: messages => messages as Message[], streamOptions: { requestPlan: TEST_REQUEST_PLAN },
+      beforeTerminalResponse: message => approvedGoalContinuation(turn, sessionId, () => {
+        assertMissionTurnCompletion({ profileId: 'general', completionContract: 'investigation-report',
+          investigationMission: 'analyzer', sessionId: SESSION_ID, service,
+          finalAnswerText: message.content.filter(block => block.type === 'text').map(block => block.text).join('') });
+      }),
+    }, provider, { execute: async call => {
+      expect(call.name).toBe('turn_complete');
+      turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [] };
+      return toolExecutor.execute(call);
+    } });
+    await consume(stream);
+    expect(requests).toHaveLength(3);
+    expect(requests[1].systemPrompt).toContain(`${id} ${hash}`);
+    expect(requests[1].systemPrompt).toContain('call turn_complete again');
+    expect(requests[1].messages.filter(message => message.role === 'user')).toHaveLength(1);
+    expect(turn.completionDeclaration?.disposition).toBe('completed');
+  } finally {
+    const relativeSession = path.relative(realpathSync(tmpdir()), realpathSync(sessionPath));
+    if (!relativeSession || relativeSession.startsWith('..') || path.isAbsolute(relativeSession)
+      || lstatSync(sessionPath).isSymbolicLink()) throw new Error('Unexpected investigation fixture path');
+    await rm(sessionPath, { recursive: true, force: true });
+    const taskDir = resolveSessionTasksDir(sessionId);
+    if (existsSync(taskDir)) {
+      const relativeTask = path.relative(realpathSync(path.dirname(taskDir)), realpathSync(taskDir));
+      if (relativeTask !== sessionId || lstatSync(taskDir).isSymbolicLink()) throw new Error('Unexpected task fixture path');
+      await rm(taskDir, { recursive: true, force: true });
+    }
+  }
+});
+
+it('stops repeated terminal responses that leave the same obligation unchanged', async () => {
+  const response = { ...toolUseMessage(1), content: [{ type: 'text' as const, text: 'done' }], stopReason: 'stop' as const };
+  let calls = 0;
+  const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: () => { calls++; return providerStream(response); } };
+  const { stream } = agentLoop([], createContext(), {
+    model: TEST_MODEL, convertToLlm: messages => messages as Message[], streamOptions: { requestPlan: TEST_REQUEST_PLAN },
+    beforeTerminalResponse: async () => 'Approved Task remains incomplete.',
+  }, provider, toolExecutor);
+  await expect(consume(stream)).rejects.toThrow(/AGENT_NO_PROGRESS|obligation remained unchanged/);
+  expect(calls).toBe(2);
 });

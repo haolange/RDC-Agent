@@ -74,15 +74,22 @@ function routeFor(
       source: 'user',
     };
   }
-  return resolveModelRoutePrecedence({
-    modelRoute: modelRoute?.source === 'model' ? modelRoute : undefined,
+  const explicitModelRoute = modelRoute?.source === 'model' ? modelRoute : undefined;
+  const configuredBaseUrl = surface.baseUrlEditable && surface.endpointClass === 'local-service'
+    && provider.catalogOwnership === 'user-managed'
+    ? provider.baseUrl?.trim()
+    : undefined;
+  const hasConfiguredOverride = Boolean(configuredBaseUrl && configuredBaseUrl !== catalogRoute?.baseUrl);
+  const route = resolveModelRoutePrecedence({
+    modelRoute: explicitModelRoute,
     catalogRoute: {
       protocol: catalogRoute?.protocol ?? targetProtocol,
-      baseUrl: catalogRoute?.baseUrl ?? provider.baseUrl,
+      baseUrl: hasConfiguredOverride ? configuredBaseUrl : catalogRoute?.baseUrl ?? provider.baseUrl,
       headers: { ...(catalogRoute?.headers ?? {}) },
       contracts: catalogRoute?.contracts,
     },
   });
+  return hasConfiguredOverride && !explicitModelRoute ? { ...route, source: 'user' } : route;
 }
 
 export function buildCatalogModelContribution(

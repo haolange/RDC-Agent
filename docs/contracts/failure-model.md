@@ -59,7 +59,9 @@
 | `PROVIDER_STREAM_*` 协议违规 | Integrity | 不重试；`CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION`；不得误报账号/额度 |
 | Agent 连续三轮相同工具结果 | Integrity | `AGENT_NO_PROGRESS` → `CONVERSATION_AGENT_LOOP_STALLED`；不得误报 Provider failure |
 | Agent 达到 maxTurns 仍要求 continuation | Integrity | `AGENT_MAX_TURNS_EXCEEDED` → `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；不得静默完成 |
-| 本回合 direct Task 未结算即声明完成 | Integrity | `turn_complete` 先拒绝并指明待结算 Task；若仍直接终答，自动标 blocked 并以 `CONVERSATION_TASK_COMPLETION_DENIED` 报告，不误报 Provider failure |
+| 本回合 direct Task 未结算即声明完成 | Integrity | `turn_complete` 拒绝并指明待结算 Task；获批调查的普通提前终答将可处理的缺口反馈到同一逻辑执行，真实限制、取消或无进展仍按对应原因终止，不误报 Provider failure |
+| Investigation 声明完成时缺 Checkpoint 或没有符合领域合同的 ready report | Integrity | `turn_complete` 返回 `MISSION_COMPLETION_DENIED` 而不记录 completed；报告状态、所需实验和相关 open Challenge 在声明前检查，存储或意外错误直接上报；部分或受阻可按原合同声明，最终答复仍复核实际引用的制品 |
+| 获批 capture 切换／恢复的身份或退出无法核实 | Security + Integrity | 停止现场操作并隔离；保留签名 baseline 和未恢复状态，不能将 context clear 当成 daemon 已退出，也不将新现场补入旧实验 |
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |
 | Storage schema 损坏 | Integrity | quarantine + `STORAGE_CORRUPT` |
 | Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，不 quarantine |

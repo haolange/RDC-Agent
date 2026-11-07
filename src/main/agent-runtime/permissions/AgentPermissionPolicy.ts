@@ -371,6 +371,16 @@ export class AgentPermissionPolicyService {
       return denied(`Policy deniedTools blocked tool "${input.toolCall.name}".`, 'high');
     }
 
+    if (toolName === 'rdc_probe' && ['capture_select', 'capture_restore', 'capture_recover']
+      .includes(String(input.toolCall.arguments.action))) {
+      if (ceiling !== 'full') return denied('RDC_EXECUTION_DENIED: replay lifecycle requires a full access ceiling.');
+      const baseline = mode === 'full-access'
+        ? { action: 'allow' as const, risk: 'low' as const, temporaryPathRoots: [] }
+        : request(mode, 'Changing the owning replay requires authorization under the current permission mode.', 'medium');
+      const floor = input.compiledPolicy ? resolvePolicyApprovalFloor(input.compiledPolicy, toolName, 'mutation') : 'none';
+      return maxDecision(baseline, floorAction(floor, input.toolCall.name));
+    }
+
     if (toolName === 'shell' && input.toolCall.arguments.rdc !== undefined) {
       if (!rdcShellBaseline) return denied('RDC_PERMISSION_UNREGISTERED: shell.rdc has no registered operation policy.', 'high');
       const rdcBaseline = rdcShellBaseline(input, mode, ceiling);

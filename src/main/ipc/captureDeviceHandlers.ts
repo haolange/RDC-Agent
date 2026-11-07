@@ -9,6 +9,7 @@ import { storageAdapter } from '../sessions/store/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { replayDeviceIssue } from '../rdc/captures/ReplayDeviceIssue';
+import { captureRecoveryStatus, restorePreviousCapture } from '../rdc/RdcCaptureRecovery';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import {
   CaptureOpenProjectInputArgsSchema,
@@ -63,6 +64,27 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
   const broadcastOpenedCapture = (scope: SessionScope, payload: ReturnType<typeof rdcSessionService.snapshotOpenedCaptureForSession>) => {
     context.broadcastToRenderer('capture:openedStateChanged', envelope(scope, payload));
   };
+
+  ipcMain.handle('capture:getRecovery', (_event, ...rawArgs: unknown[]) => {
+    const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, { label: 'capture:getRecovery', maxBytes: 1024 });
+    authorizeReplayScope(scope);
+    return captureRecoveryStatus(scope);
+  });
+  ipcMain.handle('capture:restorePrevious', async (_event, ...rawArgs: unknown[]) => {
+    const [scope] = parseIpcArgs(CaptureReplayBindingArgsSchema, rawArgs, { label: 'capture:restorePrevious', maxBytes: 1024 });
+    authorizeReplayScope(scope);
+    try {
+      const state = await restorePreviousCapture(scope);
+      broadcastOpenedCapture(scope, rdcSessionService.snapshotOpenedCaptureForSession(scope));
+      broadcastContext(scope, rdcSessionService.snapshotContextForSession(scope));
+      context.broadcastToRenderer('capture:replayChanged', state);
+      return { success: true, state };
+    } catch (error) {
+      broadcastOpenedCapture(scope, rdcSessionService.snapshotOpenedCaptureForSession(scope));
+      broadcastContext(scope, rdcSessionService.snapshotContextForSession(scope));
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
 
   ipcMain.handle('context:get', async (_event, ...rawArgs: unknown[]) => {
     const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, { label: 'context:get', maxBytes: 1024 });

@@ -7,6 +7,8 @@ export interface ExecutionOfferPlanRef {
 
 export interface ExecutionOffer {
   schemaVersion: typeof EXECUTION_OFFER_SCHEMA;
+  /** Identity of this explicit offer; absent on older saved offers. */
+  offerId?: string;
   sourceAgentId: string;
   targetAgentId: string;
   plan: ExecutionOfferPlanRef;

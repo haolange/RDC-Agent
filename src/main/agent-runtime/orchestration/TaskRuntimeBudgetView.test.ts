@@ -59,6 +59,7 @@ describe('active Task budget observation', () => {
 
   it('shows a refused subagent-tree admission separately without modifying current policy capacity', async () => {
     const { policy, turn } = await fixture();
+    turn.subagentBudget.budget = { ...turn.subagentBudget.budget, maxChildren: 5 };
     turn.subagentBudget.childrenSpawned = turn.subagentBudget.budget.maxChildren;
     const snapshot = readLiveTaskBudget(turn, 'root-a');
     expect(snapshot?.subagentTreeAdmission).toMatchObject({ allowed: false, reason: expect.stringContaining('maxChildren') });
@@ -69,7 +70,7 @@ describe('active Task budget observation', () => {
 
   it('does not spend child active-wall admission time during idle parent work', async () => {
     const { turn } = await fixture(3_000_000);
-    turn.subagentBudget.budget.maxAggregateWallMs = 5_000;
+    turn.subagentBudget.budget = { ...turn.subagentBudget.budget, maxAggregateWallMs: 5_000 };
     const started = Date.now();
     startSubagentBudgetChild(turn.subagentBudget, started);
     vi.setSystemTime(started + 1_000);
