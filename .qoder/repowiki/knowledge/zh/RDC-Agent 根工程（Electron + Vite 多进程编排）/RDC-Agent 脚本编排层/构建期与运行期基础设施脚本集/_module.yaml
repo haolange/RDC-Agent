@@ -11,5 +11,23 @@ scope:
 source_files: []
 depends_on: []
 related_to:
-    - path: resources
     - path: scripts/fidelity_and_extraction
+    - path: resources
+kk_module_id: ef9e1145-05e7-b745-45ff-cf1c44e05b1c
+kk_ordinal: 2
+kk_cards:
+    architecture_design:
+        id: 8d8d08ed-5720-96b2-b5ef-491a2bb66d8a
+        title: 构建期与运行期基础设施脚本集
+    coding_conventions:
+        id: dc7a294f-81fa-cc89-825f-c5a94ccf7fdf
+        title: 构建期与运行期基础设施脚本集
+    overview:
+        id: 42407613-9045-2d14-fcb9-875c6802cae6
+        title: 构建期与运行期基础设施脚本集
+    tech_stack:
+        id: b355b3df-10d2-f97e-6b35-c249e64a4bf9
+        title: 构建期与运行期基础设施脚本集
+    unique_setup_and_commands:
+        id: 411f078d-929b-492b-ac3f-f77db054768c
+        title: 构建期与运行期基础设施脚本集

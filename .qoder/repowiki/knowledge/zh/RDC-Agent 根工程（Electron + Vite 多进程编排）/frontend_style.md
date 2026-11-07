@@ -1,23 +1,3 @@
----
-kind: frontend_style
-name: RDC-Agent 前端样式体系：CSS 变量 + 设计令牌 + Appearance 主题编译
-category: frontend_style
-scope:
-    - '**'
-source_files:
-    - src/renderer/styles/design-system.css
-    - src/renderer/styles/global.css
-    - src/renderer/styles/global/base.css
-    - src/renderer/styles/global/app-shell.css
-    - src/shared/theme/index.ts
-    - src/shared/theme/presets.ts
-    - src/shared/theme/compiler.ts
-    - scripts/check-design-tokens.mjs
-    - scripts/check-appearance.mjs
-    - src/renderer/ui/kit.css
-    - patches/style-mod@4.1.3.patch
----
-
 ## 1. 系统/方法概述
 
 RDC-Agent 的渲染层（Electron renderer）采用 **纯 CSS 自定义属性（CSS Custom Properties）+ 三层设计令牌（Design Tokens）+ 运行时 Appearance 主题编译器** 的前端风格体系，不依赖 Tailwind、Styled Components 等原子化或 CSS-in-JS 框架。构建工具链使用 Vite + electron-vite，样式通过 `src/renderer/styles/global.css` 统一导入，最终由 `shared/theme/compiler.ts` 在运行时将用户选择的 Appearance preset（如 rdc、dracula、github 等）编译为覆盖 `:root` 的 CSS 变量注入。

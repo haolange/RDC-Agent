@@ -8,3 +8,21 @@ source_files: []
 depends_on: []
 related_to:
     - path: scripts/fidelity_and_extraction
+kk_module_id: bee73ad3-1901-e5ef-383f-9f89de111d7c
+kk_ordinal: 1
+kk_cards:
+    architecture_design:
+        id: 635dbe2e-4cec-96d6-1588-a60870f61a33
+        title: 代码质量与架构门禁脚本集
+    coding_conventions:
+        id: 0f8c1919-a5ff-a070-e84c-079ffc99fce6
+        title: 代码质量与架构门禁脚本集
+    overview:
+        id: ad5a90f2-1dfd-7145-fba1-eb91ae4d2075
+        title: 代码质量与架构门禁脚本集
+    tech_stack:
+        id: a4ece7ac-ca4c-75f7-f76d-b47efe9c6cb8
+        title: 代码质量与架构门禁脚本集
+    unique_setup_and_commands:
+        id: aba8840b-21d6-a80b-31cb-63c0a883567c
+        title: 代码质量与架构门禁脚本集

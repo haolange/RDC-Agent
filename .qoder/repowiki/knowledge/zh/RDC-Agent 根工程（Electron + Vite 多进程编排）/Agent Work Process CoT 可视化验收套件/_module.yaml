@@ -7,3 +7,21 @@ source_files: []
 depends_on: []
 related_to:
     - path: scripts/launchers_and_smoke_tests
+kk_module_id: d441f987-540f-0143-d0b7-986a2955a1f0
+kk_ordinal: 1
+kk_cards:
+    architecture_design:
+        id: 6ee09fee-48de-a7a6-f0ee-28005b1cd527
+        title: Agent Work Process CoT 可视化验收套件
+    coding_conventions:
+        id: 538affe3-2108-c0c1-933c-f543f9a48563
+        title: Agent Work Process CoT 可视化验收套件
+    overview:
+        id: fec2e3e5-d47a-d180-f52f-2ffb1eab00ce
+        title: Agent Work Process CoT 可视化验收套件
+    tech_stack:
+        id: d7ebcafd-8c8f-4676-c361-c9dd93c4176c
+        title: Agent Work Process CoT 可视化验收套件
+    unique_setup_and_commands:
+        id: 3993696d-0ed7-a4d0-c377-bfb1cd400514
+        title: Agent Work Process CoT 可视化验收套件

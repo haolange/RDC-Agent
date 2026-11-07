@@ -6,3 +6,20 @@ scope:
 source_files: []
 depends_on: []
 related_to: []
+kk_module_id: 42ef841d-c27f-e0b5-aa2d-06bd31308bb6
+kk_cards:
+    architecture_design:
+        id: 62b5c034-4cad-e2ae-383d-2a5b5adfcb69
+        title: 第三方依赖补丁（style-mod）
+    coding_conventions:
+        id: f3bc52c2-f328-8b0d-6b18-06d212fa7cc6
+        title: 第三方依赖补丁（style-mod）
+    overview:
+        id: 9ce26079-5eff-d183-9d94-0165f519fe66
+        title: 第三方依赖补丁（style-mod）
+    tech_stack:
+        id: bbddaeab-9716-3bb5-7a40-3b2a1f2c9a67
+        title: 第三方依赖补丁（style-mod）
+    unique_setup_and_commands:
+        id: cacb9dc2-490b-597f-049c-0fb551b8e86b
+        title: 第三方依赖补丁（style-mod）

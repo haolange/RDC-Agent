@@ -21,3 +21,130 @@ scope:
 source_files: []
 depends_on: []
 related_to: []
+kk_module_id: e3b0c442-98fc-1c14-9afb-f4c8996fb924
+kk_cards:
+    architecture_design:
+        id: 0e2ec174-9f45-1330-eed1-58b2cccc41e1
+        title: RDC-Agent 根工程（Electron + Vite 多进程编排）
+    coding_conventions:
+        id: 826830c1-7d4b-f322-da2d-44a81468ab64
+        title: RDC-Agent 根工程（Electron + Vite 多进程编排）
+    overview:
+        id: 09b0a70e-cbd7-0430-e139-f64a29e9fdea
+        title: RDC-Agent 根工程（Electron + Vite 多进程编排）
+    tech_stack:
+        id: caddc19d-ebf1-94c8-df62-4a04b448822c
+        title: RDC-Agent 根工程（Electron + Vite 多进程编排）
+    unique_setup_and_commands:
+        id: 563340fe-ae9c-5b77-5c0e-0be4794d00eb
+        title: RDC-Agent 根工程（Electron + Vite 多进程编排）
+    build_system:
+        id: 2ddc643f-d04b-932a-509b-921fea40fd68
+        title: Electron + Vite 多进程构建与发布流水线
+        meta:
+            category: build_system
+            scope:
+                - "**"
+            sourceFiles:
+                - package.json
+                - electron.vite.config.ts
+                - vite.renderer.config.ts
+                - vitest.config.ts
+                - electron-builder.json
+                - scripts/launch-rdc-agent.mjs
+                - scripts/start-rdc-agent.cmd
+                - scripts/start-rdc-agent.sh
+                - .github/workflows/ci.yml
+                - scripts/release/generate-checksums.mjs
+                - scripts/release/generate-sbom.mjs
+    configuration_system:
+        id: c13ae431-b03c-cffa-e433-37dfc0b4129b
+        title: RDC-Agent 配置系统：JSON 持久化 + Electron safeStorage 密钥管理 + 多源资源目录编排
+        meta:
+            category: configuration_system
+            scope:
+                - "**"
+            sourceFiles:
+                - src/main/settings/SettingsService.ts
+                - src/main/settings/settingsDefaults.ts
+                - src/main/settings/settingsServiceHelpers.ts
+                - src/main/settings/SecretStorageService.ts
+                - src/main/runtime/AppPathService.ts
+                - src/main/settings/ExecutionProfileService.ts
+                - src/main/settings/AgentRuntimeConfigService.ts
+                - src/main/settings/settingsSanitize.ts
+                - src/main/settings/settingsProviderSanitize.ts
+                - src/main/settings/ProviderCatalogService.ts
+                - src/main/settings/EffectiveModelResolver.ts
+                - src/main/settings/compiledAgentRoutes.ts
+    dependency_management:
+        id: 8ca6c404-995a-e407-a4ea-b1d61556e0af
+        title: pnpm 单仓依赖管理与补丁/覆盖策略
+        meta:
+            category: dependency_management
+            scope:
+                - "**"
+            sourceFiles:
+                - package.json
+                - pnpm-workspace.yaml
+                - pnpm-lock.yaml
+                - patches/style-mod@4.1.3.patch
+                - .github/workflows/ci.yml
+                - scripts/pnpm-resolver.mjs
+    error_handling:
+        id: 1f60dffd-7127-5da0-bac7-640bc89a4af4
+        title: RDC-Agent 错误处理体系：三分类失败模型与领域错误类型
+        meta:
+            category: error_handling
+            scope:
+                - "**"
+            sourceFiles:
+                - docs/contracts/failure-model.md
+                - src/main/agent-runtime/agent/ErrorRecovery.ts
+                - src/main/agent-runtime/providers/internal/http.ts
+                - src/main/investigation/investigationErrors.ts
+                - src/main/knowledge/knowledgeErrors.ts
+                - src/main/ipc/validation/IpcPayloadGuard.ts
+                - src/shared/types/captureReplay.ts
+                - src/shared/types/delegationCapsule.ts
+    frontend_style:
+        id: 94d8cc2f-d26d-4f1d-5dbe-a94f9a7aedcb
+        title: RDC-Agent 前端样式体系：CSS 变量 + 设计令牌 + Appearance 主题编译
+        meta:
+            category: frontend_style
+            scope:
+                - "**"
+            sourceFiles:
+                - src/renderer/styles/design-system.css
+                - src/renderer/styles/global.css
+                - src/renderer/styles/global/base.css
+                - src/renderer/styles/global/app-shell.css
+                - src/shared/theme/index.ts
+                - src/shared/theme/presets.ts
+                - src/shared/theme/compiler.ts
+                - scripts/check-design-tokens.mjs
+                - scripts/check-appearance.mjs
+                - src/renderer/ui/kit.css
+                - patches/style-mod@4.1.3.patch
+    logging_system:
+        id: 10972070-a011-8849-a282-a84e113750b0
+        title: RDC-Agent 运行期日志系统（RuntimeLogService + Sentry）
+        meta:
+            category: logging_system
+            scope:
+                - "**"
+            sourceFiles:
+                - src/shared/types/runtimeLog.ts
+                - src/main/runtime/RuntimeLogService.ts
+                - src/main/index.ts
+                - src/renderer/app/bootstrap/shellSubscriptions.ts
+                - src/renderer/features/terminal/TerminalDrawer/terminalFormatters.ts
+                - src/renderer/stores/terminalStore.ts
+                - src/main/telemetry/SentryService.ts
+kk_repo_cards:
+    - build_system
+    - configuration_system
+    - dependency_management
+    - error_handling
+    - frontend_style
+    - logging_system

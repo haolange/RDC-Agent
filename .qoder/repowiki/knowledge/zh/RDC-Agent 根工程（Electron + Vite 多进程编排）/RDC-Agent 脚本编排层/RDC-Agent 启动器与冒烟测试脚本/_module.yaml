@@ -10,3 +10,21 @@ source_files: []
 depends_on: []
 related_to:
     - path: tests_and_coverage
+kk_module_id: 27d4654e-f14d-75d4-bc82-b272b49c859c
+kk_ordinal: 3
+kk_cards:
+    architecture_design:
+        id: 695b8394-56ea-f356-0d1f-9d8f93258ec6
+        title: RDC-Agent 启动器与冒烟测试脚本
+    coding_conventions:
+        id: f7e09f0d-aae9-3e14-509c-8c7699eaeb05
+        title: RDC-Agent 启动器与冒烟测试脚本
+    overview:
+        id: 209d8b24-9d17-64af-9d9f-8dfec4a12076
+        title: RDC-Agent 启动器与冒烟测试脚本
+    tech_stack:
+        id: ab85a18c-ee40-cd29-9888-e40bd817a9eb
+        title: RDC-Agent 启动器与冒烟测试脚本
+    unique_setup_and_commands:
+        id: 32b2c002-799e-0109-6fbc-4df0a41dd713
+        title: RDC-Agent 启动器与冒烟测试脚本

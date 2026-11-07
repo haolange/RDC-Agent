@@ -7,3 +7,21 @@ scope:
 source_files: []
 depends_on: []
 related_to: []
+kk_module_id: 46b42b42-29cd-7a39-c564-e780bb665a8b
+kk_ordinal: 4
+kk_cards:
+    architecture_design:
+        id: 83a0a9c1-f8b7-67c6-d007-c9d2aa8d076a
+        title: RDC-Agent 设计文档与 Design System 预览
+    coding_conventions:
+        id: 2f37c6bd-b444-3b1c-0a81-00dab1f77beb
+        title: RDC-Agent 设计文档与 Design System 预览
+    overview:
+        id: 613d1030-b038-811a-6bc1-e0a98bc3c369
+        title: RDC-Agent 设计文档与 Design System 预览
+    tech_stack:
+        id: 76253c94-71cb-c876-badd-af674c9aad80
+        title: RDC-Agent 设计文档与 Design System 预览
+    unique_setup_and_commands:
+        id: aad2cfe2-3b3a-d990-bd7f-5834bc70b5e6
+        title: RDC-Agent 设计文档与 Design System 预览

@@ -1,24 +1,3 @@
----
-kind: configuration_system
-name: RDC-Agent 配置系统：JSON 持久化 + Electron safeStorage 密钥管理 + 多源资源目录编排
-category: configuration_system
-scope:
-    - '**'
-source_files:
-    - src/main/settings/SettingsService.ts
-    - src/main/settings/settingsDefaults.ts
-    - src/main/settings/settingsServiceHelpers.ts
-    - src/main/settings/SecretStorageService.ts
-    - src/main/runtime/AppPathService.ts
-    - src/main/settings/ExecutionProfileService.ts
-    - src/main/settings/AgentRuntimeConfigService.ts
-    - src/main/settings/settingsSanitize.ts
-    - src/main/settings/settingsProviderSanitize.ts
-    - src/main/settings/ProviderCatalogService.ts
-    - src/main/settings/EffectiveModelResolver.ts
-    - src/main/settings/compiledAgentRoutes.ts
----
-
 ## 1. 整体方案
 
 RDC-Agent 的配置系统由三部分组成：

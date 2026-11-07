@@ -1,18 +1,3 @@
----
-kind: dependency_management
-name: pnpm 单仓依赖管理与补丁/覆盖策略
-category: dependency_management
-scope:
-    - '**'
-source_files:
-    - package.json
-    - pnpm-workspace.yaml
-    - pnpm-lock.yaml
-    - patches/style-mod@4.1.3.patch
-    - .github/workflows/ci.yml
-    - scripts/pnpm-resolver.mjs
----
-
 ## 1. 使用的系统与方法
 
 - **包管理器**：pnpm（版本锁定在 `package.json` 的 `packageManager: "pnpm@11.7.0"`，CI 通过 `pnpm/action-setup@v4` 固定安装相同版本）。

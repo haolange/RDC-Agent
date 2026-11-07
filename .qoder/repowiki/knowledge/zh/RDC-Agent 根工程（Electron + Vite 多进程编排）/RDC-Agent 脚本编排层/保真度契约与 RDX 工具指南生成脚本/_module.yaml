@@ -10,3 +10,20 @@ related_to:
     - path: resources
     - path: scripts/quality_checks
     - path: scripts/runtime_helpers
+kk_module_id: 0a96cf5c-03db-e65d-ed60-9b0fa1092c2b
+kk_cards:
+    architecture_design:
+        id: 2a1c335e-cc11-3341-7cba-30c96eebab52
+        title: 保真度契约与 RDX 工具指南生成脚本
+    coding_conventions:
+        id: 106468a8-5b6c-7808-14e2-1ddc574c5094
+        title: 保真度契约与 RDX 工具指南生成脚本
+    overview:
+        id: ec8002a0-6420-63dc-fb5d-b17ff51de53e
+        title: 保真度契约与 RDX 工具指南生成脚本
+    tech_stack:
+        id: b6135b6c-de2f-c05f-b42e-01f35d9a90a7
+        title: 保真度契约与 RDX 工具指南生成脚本
+    unique_setup_and_commands:
+        id: 5f403501-d0d4-56a6-af8d-0825e8caa202
+        title: 保真度契约与 RDX 工具指南生成脚本

@@ -1,23 +1,3 @@
----
-kind: build_system
-name: Electron + Vite 多进程构建与发布流水线
-category: build_system
-scope:
-    - '**'
-source_files:
-    - package.json
-    - electron.vite.config.ts
-    - vite.renderer.config.ts
-    - vitest.config.ts
-    - electron-builder.json
-    - scripts/launch-rdc-agent.mjs
-    - scripts/start-rdc-agent.cmd
-    - scripts/start-rdc-agent.sh
-    - .github/workflows/ci.yml
-    - scripts/release/generate-checksums.mjs
-    - scripts/release/generate-sbom.mjs
----
-
 ## 1. 使用的系统与工具
 
 - **包管理器**：pnpm（`packageManager: pnpm@11.7.0`，`pnpm-workspace.yaml` 声明 workspace），CI 通过 `pnpm/action-setup@v4` 固定版本安装。

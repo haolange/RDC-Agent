@@ -8,3 +8,21 @@ depends_on: []
 related_to:
     - path: scripts/fidelity_and_extraction
     - path: scripts/runtime_helpers
+kk_module_id: 41d311a6-0552-0fc7-b8b9-a980a79437a2
+kk_ordinal: 2
+kk_cards:
+    architecture_design:
+        id: cc0a3232-dbb5-7a0f-2c6a-14b82df1e178
+        title: RDC Agent 运行时静态资源（Agent/Skill/Prompt/Hook/图标）
+    coding_conventions:
+        id: 8cb50e5a-881e-2c88-b008-14c613aa284c
+        title: RDC Agent 运行时静态资源（Agent/Skill/Prompt/Hook/图标）
+    overview:
+        id: b240226c-d5b3-6728-23d3-77f7a6347fe2
+        title: RDC Agent 运行时静态资源（Agent/Skill/Prompt/Hook/图标）
+    tech_stack:
+        id: ab42aff6-ea3e-cf89-063d-d79a50da2b93
+        title: RDC Agent 运行时静态资源（Agent/Skill/Prompt/Hook/图标）
+    unique_setup_and_commands:
+        id: 45d0b7dd-1b60-1384-54cf-c045b62fd93e
+        title: RDC Agent 运行时静态资源（Agent/Skill/Prompt/Hook/图标）

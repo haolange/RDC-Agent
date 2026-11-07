@@ -6,3 +6,21 @@ scope:
 source_files: []
 depends_on: []
 related_to: []
+kk_module_id: 8c5967fd-8486-f344-9371-0cc39b240aad
+kk_ordinal: 3
+kk_cards:
+    architecture_design:
+        id: 0bf1a68b-0ae8-cd8b-1f91-444cb19cb2f0
+        title: RDC-Agent 脚本编排层
+    coding_conventions:
+        id: 2276b0e8-b32c-a1b2-80de-517ae69cc981
+        title: RDC-Agent 脚本编排层
+    overview:
+        id: 7bacfd44-da17-cc60-d54c-146432ae0c4b
+        title: RDC-Agent 脚本编排层
+    tech_stack:
+        id: 185647da-5c09-15b6-9f21-f4cdb9536769
+        title: RDC-Agent 脚本编排层
+    unique_setup_and_commands:
+        id: e25be9f5-4a12-f997-7d70-78cb7b967095
+        title: RDC-Agent 脚本编排层

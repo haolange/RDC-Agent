@@ -1,9 +1,9 @@
 # 知识卡导出索引文件
 schema_version: 1
 locale: zh-CN
+commit: 36306dbd3d5ca1f6663bcedda43ba6e25a0d0ba4
 branch: main
-nodes_managed: true
-exported_at: "2026-09-24T10:50:23Z"
+exported_at: "2026-11-07T09:10:04Z"
 modules:
     "":
         dir_name: RDC-Agent 根工程（Electron + Vite 多进程编排）
@@ -128,8 +128,8 @@ modules:
         children: []
         depends_on: []
         related_to:
-            - path: resources
             - path: scripts/fidelity_and_extraction
+            - path: resources
     tests_and_coverage:
         dir_name: Agent Work Process CoT 可视化验收套件
         title: Agent Work Process CoT 可视化验收套件

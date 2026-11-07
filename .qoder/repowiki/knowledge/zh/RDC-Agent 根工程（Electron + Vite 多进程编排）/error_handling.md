@@ -1,20 +1,3 @@
----
-kind: error_handling
-name: RDC-Agent 错误处理体系：三分类失败模型与领域错误类型
-category: error_handling
-scope:
-    - '**'
-source_files:
-    - docs/contracts/failure-model.md
-    - src/main/agent-runtime/agent/ErrorRecovery.ts
-    - src/main/agent-runtime/providers/internal/http.ts
-    - src/main/investigation/investigationErrors.ts
-    - src/main/knowledge/knowledgeErrors.ts
-    - src/main/ipc/validation/IpcPayloadGuard.ts
-    - src/shared/types/captureReplay.ts
-    - src/shared/types/delegationCapsule.ts
----
-
 ## 1. 总体方案
 
 仓库采用「文档驱动 + 领域 Error 类 + 统一恢复策略」的错误处理体系，核心依据是 `docs/contracts/failure-model.md` 定义的 **fail-closed 三分类**（Security / Integrity / Availability），并在代码中通过专用 Error 子类、常量 code 枚举和集中式恢复器实现。

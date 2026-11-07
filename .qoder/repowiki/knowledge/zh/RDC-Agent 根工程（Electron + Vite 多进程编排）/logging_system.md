@@ -1,19 +1,3 @@
----
-kind: logging_system
-name: RDC-Agent 运行期日志系统（RuntimeLogService + Sentry）
-category: logging_system
-scope:
-    - '**'
-source_files:
-    - src/shared/types/runtimeLog.ts
-    - src/main/runtime/RuntimeLogService.ts
-    - src/main/index.ts
-    - src/renderer/app/bootstrap/shellSubscriptions.ts
-    - src/renderer/features/terminal/TerminalDrawer/terminalFormatters.ts
-    - src/renderer/stores/terminalStore.ts
-    - src/main/telemetry/SentryService.ts
----
-
 ## 1. 使用的系统与框架
 
 本仓库没有引入通用第三方日志库（如 winston、pino、bunyan、debug），而是实现了一套**自研的运行时结构化日志子系统**，核心位于 `src/main/runtime/RuntimeLogService.ts`。该服务将日志作为**内存中的结构化事件**收集，并通过 Electron IPC / Renderer Event Hub 广播到渲染进程，最终在 UI 的 Terminal Drawer 中呈现。
