@@ -65,7 +65,7 @@
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |
 | Storage schema 损坏 | Integrity | quarantine + `STORAGE_CORRUPT` |
 | Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，不 quarantine |
-| Memory 跨进程锁超时 | Availability | `.memory.lock` / `.registry.lock` 活 pid 永不抢锁；死 pid 或损坏锁回收；超时 `MEMORY_LOCK_TIMEOUT` / `PROJECT_REGISTRY_LOCK_TIMEOUT` |
+| Memory 跨进程锁超时 | Availability | `.memory.lock` / `.registry.lock` 活 pid 永不抢锁；可识别的死 pid 锁经独占回收标记串行回收，owner 无法读取或回收标记无法安全确认失主时等待并超时，避免抢占正在初始化或新取得的锁；超时 `MEMORY_LOCK_TIMEOUT` / `PROJECT_REGISTRY_LOCK_TIMEOUT` |
 | Session attachments.json | Integrity | 现写 `{ schemaVersion, attachments }`；缺版本纯数组仍 Zod 校验；未知更高 `schemaVersion` 不 quarantine |
 | Session shell-state.json | Integrity | 现写 `{ schemaVersion: '1', state: { cwd } }`；只存 cwd 不存 env；缺版本 / 损坏 quarantine 或 `STORAGE_SCHEMA`；未知更高 `schemaVersion` 不 quarantine |
 | 非法历史 `workTrace` → null | Integrity | 读边界丢弃 |

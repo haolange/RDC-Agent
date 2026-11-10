@@ -5,7 +5,7 @@
 import type { AgentRole } from '@shared/types/agent';
 import { resolveConversationLoopOutputPhase } from '@shared/conversation/loopOutputPhase';
 import { executePermissionReview } from '../permissions/PermissionReviewRuntime';
-import { permissionReviewAuthority, permissionReviewEvidence } from '../permissions/PermissionReviewAuthority';
+import { permissionReviewAuthority, permissionReviewCaptureBaseline, permissionReviewEvidence } from '../permissions/PermissionReviewAuthority';
 import { createHash } from 'node:crypto';
 import { delegatedArtifactReferences } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import type { ContextUsageBreakdownEntry } from '@shared/types/session';
@@ -356,7 +356,12 @@ export class AgentTurnRunner {
       policyBudget: turnHandle.policyBudget,
       reviewPermission: (action, signal) => executePermissionReview({
         sessionId: executionScopeId, plan: requestPlan, credentialHandle: preparedRuntime.credentialHandle,
-        reasoning: routeCapability.reasoningContract, evidence: permissionReviewEvidence(slot?.agent.messages ?? [], executionScopeId, action.arguments),
+        reasoning: routeCapability.reasoningContract, evidence: {
+          ...permissionReviewEvidence(slot?.agent.messages ?? [], executionScopeId, action.arguments),
+          ...(action.tool === 'rdc_probe' && action.arguments.action === 'capture_restore'
+            ? { captureBaseline: permissionReviewCaptureBaseline({ controller: turnHandle.captureControl, sessionId: executionScopeId,
+              projectId: input.projectId, turnId: turnHandle.turnId, agentId: input.agentId, accessCeiling: effectivePlan.accessCeiling }) } : {}),
+        },
         authority: permissionReviewAuthority({ sessionId: executionScopeId, messages: input.initialMessages ?? [],
           currentRequest: input.content, promptPlan, workspace: effectivePlan.projectRootPath, agentId: input.agentId,
           delegated: !!effectivePlan.delegationCapsule }), action, signal,

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, openSync, closeSync, writeFileSync, unlinkSync, readFileSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import type { FileHandle } from 'node:fs/promises';
 
 const DEFAULT_MAX_LOCK_ATTEMPTS = 40;
 
@@ -61,34 +62,58 @@ function readLockOwnerSync(lockPath: string): DirectoryFileLockOwner | null {
 }
 
 /**
- * Recover only when the owner is dead or the lock file is unreadable.
- * A live pid must never lose the lock, regardless of age.
+ * Recover only when the recorded owner is dead. An unreadable lock may be
+ * between exclusive creation and its owner's write, so it must not be stolen.
  */
 async function recoverStaleLock(lockPath: string): Promise<boolean> {
   const owner = await readLockOwner(lockPath);
-  if (owner && isProcessAlive(owner.pid)) {
+  if (!owner || isProcessAlive(owner.pid)) {
     return false;
   }
+  // Only one contender may decide and remove a dead owner's lock. Otherwise a
+  // delayed contender can unlink the new owner's lock after another recovers it.
+  const recoveryPath = `${lockPath}.recovery`;
+  let recovery: FileHandle;
+  try { recovery = await fs.open(recoveryPath, 'wx'); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
+    throw error;
+  }
   try {
-    await fs.unlink(lockPath);
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
-    return false;
+    const current = await readLockOwner(lockPath);
+    if (!current || isProcessAlive(current.pid)) return false;
+    try { await fs.unlink(lockPath); return true; }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
+      return false;
+    }
+  } finally {
+    try { await recovery.close(); } finally { await fs.unlink(recoveryPath); }
   }
 }
 
 function recoverStaleLockSync(lockPath: string): boolean {
   const owner = readLockOwnerSync(lockPath);
-  if (owner && isProcessAlive(owner.pid)) {
+  if (!owner || isProcessAlive(owner.pid)) {
     return false;
   }
+  const recoveryPath = `${lockPath}.recovery`;
+  let recovery: number;
+  try { recovery = openSync(recoveryPath, 'wx'); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
+    throw error;
+  }
   try {
-    unlinkSync(lockPath);
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
-    return false;
+    const current = readLockOwnerSync(lockPath);
+    if (!current || isProcessAlive(current.pid)) return false;
+    try { unlinkSync(lockPath); return true; }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
+      return false;
+    }
+  } finally {
+    try { closeSync(recovery); } finally { unlinkSync(recoveryPath); }
   }
 }
 

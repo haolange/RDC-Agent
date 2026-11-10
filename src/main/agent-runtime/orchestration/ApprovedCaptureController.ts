@@ -129,6 +129,13 @@ export class ApprovedCaptureController {
       if (!from || from.native.replacementFingerprint !== this.original.native.replacementFingerprint) {
         throw new Error('RDC_ORIGINAL_REPLACEMENTS_UNRESTORABLE: replacement state differs from the saved state.');
       }
+      // Event observation selects a target automatically; reopening can recover a
+      // signed entry with no selected target without claiming that target was cleared.
+      if (!this.original.target && !this.original.isFinalOutput && !this.original.native.replacementCount) {
+        await this.input.host.verifyDestination(destinationOf(this.original));
+        const transition = await this.transition(from, destinationOf(this.original), true, signal);
+        return { changed: true, receipt: transition.receipt };
+      }
       this.input.host.prepareReceipts();
       const operationId = randomUUID(); const base = this.base(operationId);
       const intent = this.input.host.writeReceipt({ ...base, event: 'intent', original: this.original, from,
@@ -235,7 +242,9 @@ export class ApprovedCaptureController {
       signal?.throwIfAborted();
       const next = await this.input.host.reprepare(previous, signal);
       const opened = await this.input.host.snapshot(next.binding, signal);
-      if (restored && this.original) await this.input.host.restorePosition(this.original, next.binding, signal);
+      if (restored && this.original && !samePosition(opened, this.original)) {
+        await this.input.host.restorePosition(this.original, next.binding, signal);
+      }
       const to = restored && this.original ? await this.input.host.snapshot(next.binding, signal) : opened;
       if (opened && to && (opened.native.contextId !== to.native.contextId || opened.native.leaseVersion !== to.native.leaseVersion
         || JSON.stringify(opened.native.processIdentity) !== JSON.stringify(to.native.processIdentity))) throw new Error('RDC_RESTORE_PROCESS_MISMATCH');

@@ -91,6 +91,38 @@ it('restores position without inventing a new runtime epoch when the capture did
   expect(f.receipts.at(-1)).toMatchObject({ event: 'position-restored', to: { native: { eventId: 42 } } });
 });
 
+it('restores an entry with no target by reopening and verifying the same approved capture', async () => {
+  const f = fixture(); const original = point('a', 42); original.target = null; f.setCurrent(original);
+  await f.controller.initialize(); f.setCurrent(point('a', 7));
+  const budget = f.turn.policyBudget;
+  vi.mocked(f.host.open).mockImplementationOnce(async (_destination, _binding, _signal, onStopped) => {
+    onStopped('context-a');
+    const reopened = structuredClone(original); reopened.native.contextId = 'context-reopened';
+    reopened.native.leaseVersion = 2; reopened.native.replaySessionId = 'replay-reopened';
+    reopened.native.captureFileId = 'file-reopened'; f.setCurrent(reopened);
+  });
+  expect(await f.controller.restore()).toMatchObject({ changed: true });
+  expect(f.host.verifyDestination).toHaveBeenCalledWith({ inputId: 'a', contentSha256: 'a'.repeat(64), deviceId: 'device' });
+  expect(f.host.restorePosition).not.toHaveBeenCalled();
+  expect(f.turn.policyBudget).toBe(budget);
+  expect(f.turn.runtimeEpochs).toHaveLength(1);
+  expect(f.receipts.at(-1)).toMatchObject({ event: 'transition', restored: true,
+    to: { target: null, native: { contextId: 'context-reopened', eventId: 42 } } });
+  expect(await f.controller.recordTerminalRestoration()).toBe(true);
+});
+
+it('does not claim a reopened empty-target entry was restored if its observed position differs', async () => {
+  const f = fixture(); const original = point('a', 42); original.target = null; f.setCurrent(original);
+  await f.controller.initialize(); f.setCurrent(point('a', 7));
+  vi.mocked(f.host.open).mockImplementationOnce(async (_destination, _binding, _signal, onStopped) => {
+    onStopped('context-a'); const reopened = point('a', 9); reopened.native.contextId = 'context-reopened'; f.setCurrent(reopened);
+  });
+  vi.mocked(f.host.restorePosition).mockResolvedValueOnce();
+  await expect(f.controller.restore()).rejects.toThrow('RDC_RESTORE_UNCONFIRMED');
+  expect(f.receipts.at(-1)).toMatchObject({ event: 'failed', code: 'RDC_RESTORE_UNCONFIRMED' });
+  expect(f.host.quarantineChanged).toHaveBeenCalled();
+});
+
 it('exposes an immutable signed baseline only to the owning full-access General turn', async () => {
   const f = fixture();
   const owner = { sessionId: 's', projectId: 'p', turnId: 't', agentId: 'general', accessCeiling: 'full' } as const;

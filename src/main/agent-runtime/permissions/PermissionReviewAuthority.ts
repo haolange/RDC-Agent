@@ -1,11 +1,15 @@
 import type { PromptPlan } from '@shared/types/rdcRuntime';
+import { isDeepStrictEqual } from 'node:util';
 import type { AgentMessage, AssistantMessage, Message, ToolResultMessage } from '../core/types';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { redactSecretsDeep } from '../../runtime/secretRedaction';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { rdcExecutionReceipts } from '../../rdc/RdcExecutionReceipts';
+import { rdcLifecycleReceipts } from '../../rdc/RdcLifecycleReceipts';
 import { fileOperationBoundary } from './FileOperationBoundary';
+import type { AgentAccessCeiling } from '@shared/types/agentManifest';
+import type { ApprovedCaptureController } from '../orchestration/ApprovedCaptureController';
 
 function boundedObservation(value: unknown, maxChars: number): unknown {
   const safe = redactSecretsDeep(value).value;
@@ -19,6 +23,22 @@ function observedText(message: ToolResultMessage): unknown[] {
     // Preserve structured redaction for JSON tool results before bounding their presentation.
     try { return JSON.parse(block.text) as unknown; } catch { return block.text; }
   });
+}
+
+/** Give the reviewer the owning turn's verified entry position, not an approval. */
+export function permissionReviewCaptureBaseline(input: {
+  controller: ApprovedCaptureController | null; sessionId: string; projectId: string | null | undefined;
+  turnId: string; agentId: string; accessCeiling: AgentAccessCeiling;
+}) {
+  if (!input.controller || !input.projectId) return undefined;
+  const baseline = input.controller.restorationBaselineFor({ ...input, projectId: input.projectId });
+  if (!baseline?.available) return undefined;
+  const receipt = rdcLifecycleReceipts.read(input.sessionId, baseline.receipt);
+  if (receipt.event !== 'baseline' || receipt.projectId !== input.projectId || receipt.turnId !== input.turnId
+    || !isDeepStrictEqual(receipt.original, baseline.original)) {
+    throw new Error('PERMISSION_REVIEW_EVIDENCE_INVALID: capture baseline does not match the owning execution.');
+  }
+  return { ref: baseline.receipt, original: receipt.original, verifiedBy: 'main-lifecycle-signature-and-owner-check' };
 }
 
 /** Observations from the actual slot, never assistant claims or inherited parent history. */

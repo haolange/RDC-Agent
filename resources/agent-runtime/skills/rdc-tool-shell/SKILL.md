@@ -76,7 +76,7 @@ General 先从本 turn 冻结的定义做轻量发现；这不会启动 CLI 或�
 
 `rd.core.get_capabilities` 的 remote capability matrix 中，事件绑定检查只针对查询时的 active event。当前事件没有绑定 shader 时，`not_currently_probed` 不说明其它目标 draw 被阻断；要在目标事件读取 shader/disassembly 的实际回执与 `edit_plan` 后判断。`rd.shader.get_source` 的原始调试源码不可用也不等于可替换输入都不可用；若回执提供格式明确的 fallback，先验证 fallback 的实际结果。任何总览能力或 fallback 建议都不能代替安全干预与恢复回执。
 
-默认在内存或 stdout 处理统计、直方图、纹理差异和小型读回。只有用户或 Plan 明确要求证据保存时才提供输出路径；大结果先分页、区域化或限制数量。VFS 与 CLI facade 面向人类和受限浏览，不用 raw `.rdc` 或整树展开绕过主进程路径边界。
+默认在内存或 stdout 处理统计、直方图、纹理差异和小型读回。只有用户或 Plan 明确要求证据保存时才提供输出路径；需要临时图像等文件时，结合 runtime 的工作区和实际权限选择受允许的位置，保留来源并在不再需要时清理。路径被拒绝只说明该路径不可用；若计划内仍有获准的位置，换用该位置继续，不扩大权限。大结果先分页、区域化或限制数量。VFS 与 CLI facade 面向人类和受限浏览，不用 raw `.rdc` 或整树展开绕过主进程路径边界。
 
 `rd.export.screenshot` 和 `rd.texture.render_overlay` 是展示画面：输出尺寸可由渲染窗口决定，不能将 PNG 像素坐标直接当成源纹理坐标。需要在原生纹理坐标上选 ROI 或读取像素时，先核对事件、目标 texture、subresource 与尺寸；可按冻结 catalog 使用不带 channels/remap/flip_y 显示控制的 `rd.export.texture` 导出原生纹理，再在该图定位区域并用原生读取操作复核。导出图像及坐标仍只证明所属事件与纹理，不自动证明 Present 或物理设备屏幕呈现。
 

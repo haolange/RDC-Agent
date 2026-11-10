@@ -124,6 +124,20 @@ describe('hash-bound artifact text views and searches', () => {
     expect(positions.at(-1)).toBe(source.lastIndexOf('needle'));
   });
 
+  it('retains surrounding fields of a matched record in a long single-line tool result', () => {
+    const { resolver } = fixture();
+    const record = { event_id: 17, pre_mod: { color_rgba: [0, 0, 0, 1] }, shader_out: { color_rgba: [1, 1, 1, 0] },
+      post_mod: { color_rgba: [0, 0, 0, 1] }, depth_test_failed: true };
+    const source = JSON.stringify({ history: [{ padding: 'x'.repeat(20000) }, record] });
+    const saved = resolver.write('owner', 'session://tool-outputs/history.json', JSON.stringify(toolResult([{ type: 'text', text: source }], false)));
+    const result = resolver.read('owner', saved.uri, { expectedHash: saved.hash, search: '"event_id":17', maxBytes: 16 * 1024 });
+    const matches = JSON.parse(result.text!).matches as Array<{ excerpt: string }>;
+    expect(matches).toHaveLength(1);
+    expect(matches[0].excerpt).toContain(JSON.stringify(record).slice(1, -1));
+    expect(result.textView).toMatchObject({ pointer: '/content/0/text', sha256: sha(source) });
+    expect(Buffer.byteLength(result.text!)).toBeLessThanOrEqual(16 * 1024);
+  });
+
   it('keeps owner/hash/MIME/pointer validation ahead of derived access', () => {
     const { resolver, uri, write, pointers } = fixture();
     const saved = write('text');

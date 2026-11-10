@@ -12,6 +12,9 @@ import { readImageTool } from './ReadImageTool';
 import { withTemporaryPathAccess } from './_shared';
 import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
 
+const imageMock = vi.hoisted(() => ({ create: vi.fn() }));
+vi.mock('electron', () => ({ nativeImage: { createFromBuffer: imageMock.create },
+  app: { getAppPath: () => process.cwd(), getPath: () => process.env.TEMP ?? process.cwd() } }));
 vi.mock('../../../conversation/ToolImagePreviewStore', () => ({
   recordToolImagePreview: vi.fn(async () => ({
     previewId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
@@ -27,6 +30,18 @@ const PNG_1X1 = Buffer.from(
   '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082',
   'hex',
 );
+function solidPng(width: number, height: number): Buffer {
+  const chunk = (name: string, data: Buffer) => {
+    const body = Buffer.concat([Buffer.from(name), data]);
+    const length = Buffer.alloc(4); length.writeUInt32BE(data.length);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([length, body, crc]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0); header.writeUInt32BE(height, 4); header[8] = 8; header[9] = 6;
+  return Buffer.concat([PNG_1X1.subarray(0, 8), chunk('IHDR', header),
+    chunk('IDAT', deflateSync(Buffer.alloc((width * 4 + 1) * height))), chunk('IEND', Buffer.alloc(0))]);
+}
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
@@ -42,6 +57,31 @@ function context(root: string, vision: 'native' | 'disabled' = 'native'): ToolEx
 }
 
 describe('ReadImageTool', () => {
+  it('returns a bounded region with both source and delivered-image identities', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-image-region-')); roots.push(root);
+    const sourceBytes = solidPng(2, 2); await writeFile(path.join(root, 'frame.png'), sourceBytes);
+    const crop = vi.fn(() => ({ isEmpty: () => false, getSize: () => ({ width: 1, height: 1 }), toPNG: () => PNG_1X1 }));
+    imageMock.create.mockReturnValueOnce({ isEmpty: () => false, getSize: () => ({ width: 2, height: 2 }), crop });
+    const region = { x: 1, y: 0, width: 1, height: 1 };
+    const result = await readImageTool.execute('region', { path: 'frame.png', region }, undefined, undefined, context(root));
+    expect(crop).toHaveBeenCalledWith(region);
+    expect(result.content[1]).toEqual({ type: 'image', mimeType: 'image/png', data: PNG_1X1.toString('base64') });
+    expect(result.details).toMatchObject({ sha256: createHash('sha256').update(PNG_1X1).digest('hex'),
+      source: { sha256: createHash('sha256').update(sourceBytes).digest('hex'), width: 2, height: 2, region } });
+    expect(result.content[0]).toMatchObject({ text: expect.stringContaining('source size=2x2') });
+    expect(recordToolImagePreview).toHaveBeenLastCalledWith(expect.objectContaining({ bytes: PNG_1X1, fileName: 'frame-region.png' }));
+  });
+
+  it('rejects out-of-bounds regions without producing an image', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-image-region-invalid-')); roots.push(root);
+    await writeFile(path.join(root, 'frame.png'), PNG_1X1);
+    const crop = vi.fn();
+    imageMock.create.mockReturnValueOnce({ isEmpty: () => false, getSize: () => ({ width: 1, height: 1 }), crop });
+    await expect(readImageTool.execute('region', { path: 'frame.png', region: { x: 1, y: 0, width: 1, height: 1 } }, undefined, undefined, context(root)))
+      .rejects.toThrow('IMAGE_REGION_INVALID');
+    expect(crop).not.toHaveBeenCalled();
+  });
+
   it('delivers native 1552×720 PNG bytes through the tool-image bridge into Responses independently of the UI preview', async () => {
     const chunk = (name: string, data: Buffer) => {
       const body = Buffer.concat([Buffer.from(name), data]);
