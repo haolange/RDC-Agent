@@ -1,5 +1,7 @@
 # 垂直调查：上传说明与后续需求 Prompt
 
+> **历史交接（2026-11-08）**：本文保留当时的需求、问答与计划背景，不作为当前测试指令或设备状态。较新的事实以[任务清单](vertical-investigation-tasks.md)和[验收账本](../product/acceptance-ledger.md)为准；我方后续已决定放弃同 session 重启验证，本文较早的相关表述不再是当前验收要求。
+
 本次交接日期：2026-11-08。分支：`codex/vertical-investigation-convergence`；开发基线：`36306dbd3d5ca1f6663bcedda43ba6e25a0d0ba4`。这是一批实现、修复和验收记录的上传，不是全部真实验收通过，也不是安装包发布。最终提交 SHA 以该分支 Git 记录为准。
 
 ## 阅读入口

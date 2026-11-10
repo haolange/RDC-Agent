@@ -6,6 +6,176 @@
 
 - **设计复审前工程复核（2026-11-11）：**在既有功能分支整理 Planner 粗定位、人工介入与自主续跑的证据边界，并在原计划列出 T0–T7 状态索引；不改写既有验收结论。以 pnpm 11.7.0 重跑 typecheck、lint、指定 `0bc961a5` 基线的完整 gates 和 build，均通过；lint 为 0 errors／2152 warnings。此前 Node 3685 项与 Renderer 872 项及各自棘轮的范围见下方工程回执；本次仅复核文档和既有实现，没有重新开展真实模型或设备验收。
 
+### 本机真实调查的文字材料（2026-11-10）
+
+以下为本地材料的可读摘录，用于复核目标、规划与结果的关系；标注的 SHA-256 是本机完整来源文件的字节摘要。计划只摘录叙述部分，省去后续 JSON 执行合同；报告保留文字原文。换行作统一处理。图片、JSON、原始会话、capture 和签名密钥没有上传；文中引用的这些本地材料在其他机器可能不可用。案例标识、事件和历史知识只用于说明当时证据，不是通用调查规则。
+
+#### PC 第三轮：获批计划文字摘录
+
+这是第三轮计划的叙述部分；实际执行及最终 partial 的边界以本节账本条目为准。
+
+本机原文：`.local/vertical-investigation/20261110-region-live/session/session-artifacts/plans/plan.md`；完整文件 SHA-256：`a2a081808f9a5aa2551bd40c451bec70d7174d34bb09e949269d9287078da36d`。
+
+```text
+# 调查角色眼部泪腺白点（修订）
+
+- 范围固定为眼睛泪腺白点.rdc（input_unknown）与 local 设备，不使用其他 capture。
+- 定位白点及首个异常事件，区分竞争原因；按实际证据形成有边界的结论。
+- 独立核验实际形成的定位/因果主张及其原始证据；无主张则说明未执行缘由与未决缺口，并恢复入口现场。
+
+## 1. 目标与边界
+
+用户目标：调查角色眼睛泪腺处白点的原因。用户未给参考截图、坐标、期望像素值或复现条件；“白点”是用户描述，不等于已观测像素或已知材质问题。成功标准：在指定捕获中找到相符可见区域（若可定位），映射到输出纹理、事件/片元及最早可见差异；比较竞争解释，给出有边界的判断或未知项，并恢复进入时的捕获与回放位置。相关性不等同因果。
+
+范围严格固定为 `input_unknown`（眼睛泪腺白点.rdc）和 `local` 设备；不使用 BlackHair、WhiteHair 或任何其他 capture。只读检查允许必要事件导航/回放选择，并须恢复签名入口现场。未经本计划许可不得 shader/data 修改、资源替换或其他干预。批准不替代实际权限。
+
+## 2. 输入与参考依据
+
+- 用户描述（非工具观察）：角色眼睛泪腺有白点；没有 ROI、参考外观或复现条件。
+- 运行时登记输入：`input_unknown` / 眼睛泪腺白点.rdc，SHA-256 `0a79926a92e7e659989befc2322dc93b65782252fc5be2de33496142735a4094`；设备 local、准备状态 ready。获批 capture scope 只冻结这一输入。
+- 事件树初始结果包含 MobileSceneRender 等移动端渲染阶段；工具报告查询遍历 1656 节点且查询自身未截断，但模型收到的文本被截断，尚不能声称已找到眼部绘制或完整掌握流水线。
+- 已检索用户与项目 Knowledge 空间：`eye white spot`、`lacrimal white`、`character eye` 及拆词 `eye`、`white`、`shader` 均无命中；项目空间目录当前无卡片。仅为检索记录，不是机制证据。
+- 未知：最终图像的准确位置/尺寸/颜色、目标资源与事件、是否有高光/透明层、捕获是否对应用户所指状态。不得虚构 ROI、像素值、WorldState 或历史原因。
+
+## 3. 候选方向与区分检查
+
+候选都是待验方向，按实际证据调整：
+
+1. **眼部贴图/UV/采样**：成立时，眼部材质对应纹理采样在白点位置已有亮斑、浅色像素、错位或异常 mip/采样，邻近控制点不呈同样特征；若源纹理及正确映射无亮斑而着色/合成阶段首次生成，则削弱此项。
+2. **几何/法线/材质或 shader/光照高亮**：成立时，眼部几何存活片元在该位置产生集中高值，着色输出/输入能解释亮斑，控制区域表现不同；若该片元未产生/保留亮点，而后续独立层首次引入，则削弱此项。
+3. **透明度/混合/深度遮挡/后处理**：成立时，眼部原始着色无白点，后续叠加、混合、resolve 或颜色处理首次引入/显著改变它；若该阶段之前已有且后续没有首次差异，则削弱此项。
+4. **对象或观察状态未对应**：若最终图像无法对应用户所指角色/区域，或结论依赖未知条件，则不归因；若可闭合输出区域到纹理、primitive、事件链则削弱此项。
+
+最小区分策略：先实际获取当前最终输出图像并自主定位 ROI，核对图像来源、capture、事件、尺寸与坐标；由输出目标反向缩小眼部事件及像素历史；在同一纹理/subresource/坐标读取目标点前后与邻近控制点，检查有效/通过、shader 输出、前后修改等原生字段，再追踪纹理绑定/采样、primitive、着色及后续合成。字段缺失/格式限制时保留 unknown。符合预测只增加支持，不单独证明因果。
+
+## 4. 执行策略与依赖
+
+获批后 General 为唯一 live RDC 执行方：
+
+1. 只使用获批 `input_unknown` 和 local，核对入口基线；从最终输出图像定位区域。优先使用当前受控图像输出/观察能力并核对来源身份。暂不可见时检查允许的导出路径，不拼接猜测路径，也不因单一路径失败即认定不可取得。
+2. 对目标输出做有界事件搜索、详情、管线/资源关系与像素历史；必要时检查纹理、绑定、采样、几何/primitive、shader 或后续合成。实际使用前按需读取 `$pixel-forensics`、`$capture-facts`、`$artifact-provenance`、`$rdc-tool-shell` 等方法。不对全场景无差别导出。
+3. 记录实况并先持久化相符 WorldState，再写绑定该状态的 Evidence；不得把新观察绑定历史状态。形成假设 Claim 时至少保留可区分对手、各自预测与削弱/排除观察。先判断只读证据能否区分。
+4. **条件性最小可逆干预**：只有只读证据不足以区分且针对已定位对象有区分力时才考虑。执行前实际核验对象/源身份、有效权限、精确修改边界、当前状态/基线、非目标安全、回滚和恢复能力；任一条件不成立即不干预，保留未知。若执行，真实记录基线、必要控制状态、变体观察并撤销，以实测/签名证据核验恢复；不预写未来观察或声称计划锚为实况。
+5. WorldState、Evidence、Claim、Experiment 按真实来源与依赖顺序写入。只有真实执行并满足回执及恢复契约的实验支撑因果 Claim；资格不足则降级，不制造来源。
+6. 完成调查后恢复入口 capture 与事件，检查主进程的实际 `restoration.restored` 与比较。终态签名由运行时完成，不伪称当下已有；恢复未确认不得声明完成。
+
+任务绑定：调查 Task `task_1794316662727_a67e5abe`。另有独立审查 Task `task_1794316827786_74f808c2`，绑定为 `verifier` 子执行并独立于调查 Task；仅在确实形成定位或因果主张时核验主张及必要原始证据覆盖、反证、适用条件和限制，不请求 live RDC、不改父级记录。若没有可核验主张，须准确报告未执行原因与未决缺口；不得把未执行写成“无 Challenge/已通过”。
+
+## 5. 决策与循环
+
+- **Small Loop**：区域/事件映射不清时缩小输出目标、事件与控制点；字段欠语义时补读实际纹理、管线或输出路径；仍有获批只读区分检查时继续，不因首次查询无命中而结束。
+- **保留未知/不介入**：图像/区域映射失败、字段缺失、输入身份不闭合或权限、边界、基线、回滚条件不满足时不干预，报告具体缺口。
+- **Big Loop**：需要其他 capture、修改超出此计划范围或战略改变时，保存可解析 Checkpoint（事实、候选、已完成检查、未解前沿与现场状态），停止越界操作，由用户决定是否另行修订计划。不得以其他 capture 暂代。
+- 遵守实时权限、冻结 Task/Capsule/CLI 与真实限制，不自行编造配额；CLI 不确定结果按运行时隔离/恢复政策处理。只有关键外部事实无法由当前捕获判定且会改变目标/验收时再询问用户；未给坐标不是停止条件。
+
+## 6. 交付与重新对齐
+
+General 就地交付：是否定位到白点；最早可验证差异的事件/资源/片元及原始来源；竞争方向如何被支持/削弱；结论属于观察、推断还是有真实干预与恢复支撑的因果判断；是否干预、撤销和恢复结果；未验证项及捕获条件限制。独立 Verifier 核验实际形成的定位/因果主张及所需原始证据；若未执行，说明准确原因与未决缺口。无法定位/区分时说明未知和下一个最小检查，不用外观猜测填充因果结论。按证据资格引用 WorldState/Evidence/Claim/Experiment/Checkpoint 并选择 ready/draft。恢复签名入口现场后交付；若战略变化必要，附可解析 Checkpoint 供用户决定下一步。
+```
+
+#### Android：Planner 只读补核后的计划文字摘录
+
+这是两次人工方法反馈后的 Planner 只读补核文本，不是目标对象已定位或 General 因果调查通过的证明；历史 Knowledge 是候选线索，不是当前根因。
+
+本机原文：`.local/vertical-investigation/20261110-machine-evidence/planner-readonly/session/session-artifacts/plans/plan.md`；完整文件 SHA-256：`f56d6ca6bcd5a883d7a2a218ae66ec0e5e47453f67f6f3d0191ffa24e964d917`。
+
+```text
+# BlackHair 角色头发发黑调查
+
+- 已对 Pass 10 的普通目录 draw event 403 读取事件详情及 VFS 管线快照；记录 API、shader、输出目标与截断限制。
+- 该 draw 仍无头发/角色对象语义，不能视为症状范围已定位；计划将明确区分普通样本与对象辨识证据。
+- 执行阶段再从画面与像素/事件链定位头发 First Bad Event，并在必要时按安全门控进行区分验证及恢复。
+
+## 1. 目标与边界
+用户描述“角色头发发黑”。调查目标是定位当前 capture 中实际头发区域的绘制/输出链及最早可验证分歧；原因须留待执行证据与独立核验，不预先断言。
+
+当前计划范围为已登记 `input_blackhair`（`BlackHair.rdc`，SHA-256 `a1d2a989f5f54badbe4a0b676863a9804a814327614a90b1bc4dbd0261b5960a`）与设备 `android-b54ed446`（当前标签 RMX3551）。执行时重新校验实际输入、设备、回放身份和入口基线。允许只读现场导航并须恢复 capture 与位置；不得超出计划及工具权限修改 shader/data。若只读证据无法区分因果方向，可有条件评估最小可逆实验；执行前身份、权限、对象绑定、修改边界、真实基线、可撤销性和恢复证据都须成立，否则不介入。
+
+成功标准：用可审计证据确认目标头发区域和 draw/output（或明确记录最窄可确认范围）；确定 First Bad Event 或诚实保留未知；对竞争假设取得区分性观察及削弱证据；因果表述仅在实际合格干预/恢复支持时提出；独立核验拟接受主张。用户未提供 ROI、对照截图、复现步骤或光照验收细节，先用当前 capture 自主选择候选区域。
+
+## 2. 输入与参考依据
+### 用户输入
+- “角色头发发黑”。这是症状描述，不是本次观察或原因。
+
+### 本次只读观察及身份
+- `runtime_context.capturePlanning` 显示登记了 `input_unknown`、`input_blackhair`、`input_whitehair`。本次实际回放内容哈希为 `a1d2a989f5f54badbe4a0b676863a9804a814327614a90b1bc4dbd0261b5960a`，与 `input_blackhair` 相符；设备 ID `android-b54ed446`、标签 RMX3551、远端在线。回放/session 的本次动态身份以 runtime_context 回执为准，执行时重新检查。
+- `event_list`/`/draws` action tree 报告 592 根节点、返回 256、`truncated:true`，工具展示文本也截断。可见事件含 dispatch 与 indexed-indirect draws；未辨认出头发对象。
+- `/passes` 返回 25 个 Pass。Pass 10（VFS `/passes/9`）是 event 377–1684、279 draws；Pass 11 是 1691–2136、87 draws。它们只是大范围目录，不是头发语义证据。
+- `/passes/9/draws` 只读返回 Pass 10 下 draw 条目；工具摘要截断。event 403 是其中一个可见普通目录样本，名字 `vkCmdDrawIndexedIndirect(1) => <12,108>`。
+- `event_show(403)` 返回 12 indices、108 instances、12 vertices，颜色输出资源 ID `800497`、`804373`、`800504`、`800506`，depth target `800499`；parent_chain 空、marker_path null。该结果确认的是 draw 结构，不是对象身份。
+- 对 event 403 实际读取 `pipeline_show(403)`：明确 `resolved_event_id=403`、API Vulkan、`summary_status=verified`、`binding_truth_level=binding_verified`、`visual_truth_level=not_applicable`、`evidence_truth_level=structured_evidence`；选定 event output slot 0 是 `ResourceId::800497`，格式 `R11G11B10_FLOAT`、1920×860，`export_target_available=true`。列出 VS `ResourceId::688832`（hash `62743e…`）及 PS `ResourceId::688833`（hash `6fa5e1…`），均无 debug name/source files；另列 CS module `8730`。颜色附件另有 `804373`（R10G10B10A2_UNORM）、`800504`（B8G8R8A8_UNORM）、`800506`（B8G8R8A8_SRGB）；深度 `800499`（D24S8）。视口/剪裁 1917×860。该快照没有材质、头发或角色对象标识，也没有视觉观测；它是可绑定的普通 draw 样本，不是症状范围已收窄的证据。
+- `resource_list` 的身份目录标记 complete，但显示文本截断；`/textures` 返回大量匿名 `tex_*` 且被截断。当前未将任何纹理、shader 或 draw 归属给头发。
+- 本阶段只读；未选择其他输入、未干预。
+
+### Knowledge 历史线索（非本次事实）
+- 有界搜索：`hair`、`character` 命中两个 user draft 案例；`black hair`、`hair rendering` 未命中。读取发黑卡 `user:cases/AIRD-20260207-0002.md`（历史案例称 Adreno 740/Vulkan、UE Mobile Hair Shading 中 KajiyaDiffuse/RelaxedPrecision 与非负 clamp 相关）和发白卡 `user:cases/AIRD-20260207-0001.md`（历史案例称 Adreno 650/Vulkan 的局部光照颜色 unpack/精度相关）。本次设备/API/引擎/着色配置未确认；案例图片未读取。它们只给出可证伪的候选检查方向，不能作为当前证据或根因。
+- 若目标头发 shader 的确含类似 Kajiya-Kay `1-abs(dot(N,L))`、半精度/RelaxedPrecision 与后续 clamp/散射路径，则检查目标 invocation 中间值是否首次异常并关联输出；若没有该路径或值正常，则削弱该方向。
+- 若目标确实经过打包局部光照数据，则检查实际绑定、解包及访问值；路径不经过该输入或其值正常则削弱该方向。
+
+## 3. 候选方向与选择依据
+1. **头发计算/精度或符号边界异常**（历史发黑案例启发，未证实）：支持预测是已证实属于头发的目标 draw 使用相关运算，代表性目标 invocation 的中间值/后续 clamp 与输出黑化有连续数据流。削弱条件是目标不使用该计算，或链路值正常、异常早于/晚于该处发生。
+2. **光照输入、解包或资源绑定异常**（替代方向）：支持预测是目标 draw 实际访问该光照路径且实际绑定/值存在能解释变暗的偏差。削弱条件是该路径不参与目标输出，或访问值正确且差异已在其他阶段形成。
+3. **对象归属、纹理/几何映射、遮挡/混合或后续输出阶段**：支持预测由目标区域像素 history 与输出链发现首次偏离点。削弱条件是阶段输出与控制像素均一致，且变暗已存在于更早输入。不得把 draw 数量、资源 ID、shader module 或 Pass 相关性当成头发身份。
+
+## 4. 执行策略与依赖
+- General 先核对冻结输入、设备、capture 与回放身份/基线。可以从 event 403 的已知输出目标作普通候选入口，但必须经当前最终画面、目标区域 pixel history 或其他对象辨识依据验证是否与头发相关；若无关联就放弃该样本并继续搜索，不能沿用其身份假设。
+- 获取当前 capture 可用最终输出图像/受控观测，从画面自主选取发黑头发区域；确认事件、目标、图像尺寸与来源。对该区域和邻近控制点做必要 pixel history/事件前后配对，按返回的有效性/格式限制识别最早异常写入。历史字段缺失或不完整时限定结论。
+- 一旦目标 draw/对象映射有实据，再读取必要 event details、真实类型化参数、相关 pipeline sections、blend/depth 状态、shader/reflection、资源绑定和少量必要资源详情。具体检查范围由返回证据驱动，不扫全资源、不把绑定核验当视觉/对象证明。
+- 至少保持两条互相可区分假设，各自列成立预测及可削弱/排除观察。只读区分充分时不实验；若因果仍未区分且目标必要，按安全门评估最小可逆干预，保存实际基线、变体必要差异/图像及真实撤销恢复证据；任何门槛不满足则继续只读或收窄交付。
+- 将实测事实、推断及原因区分记录；Evidence 绑定真实观测 WorldState。只在真实合格 Experiment 与恢复闭合后作因果主张。拟接受的定位/归因/因果主张和相关有效 Challenge 交独立 Verifier 核验其确实可读的原始材料；不请求其操作 RDC。
+- 收尾恢复原 capture 与位置并核对当次恢复观察。保留实际输入、回放身份、查询范围、结果和每项截断情况。
+- General 执行 Task：`task_1794307593111_25c5ab39`。独立 Verifier Task：`task_1794307593112_0098ea96`，绑定来源 Task 且仅在有可审主张时执行；无主张则记录不适用，而非空审查。
+
+## 5. 决策与循环
+- Small Loop：对目录分页或更窄搜索继续；以图像/像素/输出绑定确定头发目标后再读对应 pipeline、资源和 shader；候选若被反证则更换/收窄假设。必要时再次复核同一现场的相关事件，不因 Pass 10/403 的偶然样本固定路径。
+- 实验前门禁包括身份、权限、对象与源绑定、最小修改范围、基线、可撤销性、区分预测、恢复方法和必要状态控制；失败则不修改，仍可交付可行的只读发现。
+- 换 capture/device、改变目标或引入计划未含操作时停止并保存 Checkpoint，交由用户决定是否调整策略。权限拒绝不等于能力不存在；重复无进展时停止。
+- 只有当现有画面/事件无法自主决定对象/区域并且歧义阻断观察方案或验收时，才询问用户；否则先继续自主定位。
+- 服从实时权限与执行限制；现场恢复、证据资格和收口优先，不自拟额度。
+
+## 6. 交付与重新对齐
+General 就地交付：实际 inputId/hash、执行时 capture/device/replay 身份；只读事件/Pass/resource/VFS 查询及结果/截断；普通样本与真正对象辨识依据的区别；头发区域、draw/output 与 First Bad Event（无法确认则明确未知）；竞争假设、支持/削弱观察；是否干预及真实变体/撤销证据；独立审查意见/Challenge；引用与 provenance。event 403 管线信息只能作为普通样本事实，不得写成头发定位或原因。
+
+未完成时交付最窄有效结果、Checkpoint、已尝试路径和明确缺口；如需战略变化由用户决定是否另开计划。
+```
+
+#### PC 较早一轮：partial 原始报告
+
+这是较早一轮的报告；其恢复未完成描述只适用于该轮，后续恢复复验另见本节账本记录。
+
+本机原文：`.local/vertical-investigation/20261110-goal-loop-evidence/report.md`；完整文件 SHA-256：`57e21063df61c923653cafcc8d45d359481d0c4555688ec3f2dc36f89f953afc`。
+
+```text
+# 泪腺白点渲染调查（部分结果）
+
+## 结论
+
+目前**没有定位或解释用户所述的泪腺白点**。已直接查看问题捕获中的原生输出图像，但无法可靠地把白点描述映射到具体原生纹理像素；自行尝试的候选坐标读回是肤色，因此不构成对白点的像素证据。不得据此断言问题不存在，也不能断言源贴图、材质、照明或后处理是根因。
+
+本次确认了一个与最终图像相关的后处理路径：捕获输出纹理 `ResourceId::2002006`（2131×1909，B8G8R8A8_TYPELESS）由事件 7389 输出；其像素历史在候选点 `x=1320,y=1015` 与 `x=1340,y=1015` 均指向 draw 7343。事件 7343 属于 marker 7334：`FidelityFX-RCAS Sharpness=0.00 OutputDevice=0 GrainIntensity=0 (PS)`，是写入 `ResourceId::2002006` 的三顶点全屏 draw；Pixel Shader `MainPS` 绑定输入纹理 `ResourceId::2051334`。输入纹理已导出并查看。以上只证明这段输出管线与整幅图像的可读路径，并不证明 RCAS 产生、放大或无关泪腺白点。
+
+事件 7389 的截图导出因最终 Present 无法唯一选定交换缓冲区，回退为 event-output 纹理（`target_source=event_output_fallback`，`visual_truth_level=visual_valid`，`evidence_truth_level=visual_evidence_only`）。当前没有可用的 Present 目标证据。
+
+## 证据与观察边界
+
+- 捕获输入：`input_unknown`，`眼睛泪腺白点.rdc`，冻结内容 SHA-256 `0a79926a92e7e659989befc2322dc93b65782252fc5be2de33496142735a4094`，本地回放身份为 `sess_106400d8cb7e` / `capf_70357d6ae1d9`。
+- 输出截图：`session://tool-outputs/image-c5625c16ea4b8c60c9498b52095a1572a7d5cdd7c8f01babca94a10b37c23c1f.png`，SHA-256 `c5625c16ea4b8c60c9498b52095a1572a7d5cdd7c8f01babca94a10b37c23c1f`；1920×1080 的截图回退图，不能当作原生纹理坐标。输出原生纹理已保存为 `session://tool-outputs/image-f82f953f29247b192428386ebc46c799ffe9d93be2334410499a88e8ac74d8e7.png`，SHA-256 `f82f953f29247b192428386ebc46c799ffe9d93be2334410499a88e8ac74d8e7`；原生尺寸 2131×1909。
+- 输入纹理：`session://tool-outputs/image-b694bf8e1f30216e21fb00df05a14645d65aca844e7d8eda09d8df1faa9545cc.png`，SHA-256 `b694bf8e1f30216e21fb00df05a14645d65aca844e7d8eda09d8df1faa9545cc`；由事件 7343 的资源绑定确认其为 PS 输入 `Texture2D0`。
+- 原始结构化回执：截图/输出相关 `session://tool-outputs/call_5871339ad9344af19064cdecc0151766.json`；原生输出导出 `session://tool-outputs/call_c2dab5a14acd461daf6878df596b7888.json`；输入纹理绑定 `session://tool-outputs/call_7c3d2f40cb8a44b0be0d9f80064a1884.json`；事件 7343 详情 `session://tool-outputs/call_6227c55841d1497ab79af72a6078ed2c.json`；7343 管线状态 `session://tool-outputs/call_d7c78ce2a06244219c41f330e0281a32.json`；像素历史候选点 `session://tool-outputs/call_a15cee5fe95347418b2805ace0d90a94.json`；实际读回候选点颜色 `session://tool-outputs/call_3f34d6176c3a46218707120fddb99a66.json`。
+- 两个试测点在最终纹理的读回颜色分别为 `(0.4471,0.3137,0.2588,1)` 与 `(0.4588,0.3373,0.2784,1)`，与皮肤色相符；像素历史的 pre-mod/shader-out/post-mod 颜色字段为 unknown/null，故不能把该历史当作完整 blend ledger，也不能解释为目标白点像素。
+- 无独立 First Bad Event、WorldState、Evidence、假设 Claim/ClaimSet 或因果实验记录；因未可靠定位目标像素，不构造这些记录或虚构 ROI。
+- 未修改 shader 或 data，未执行干预；没有回滚动作。
+
+## 恢复与未完成项
+
+捕获入口基线为事件 147，`runtime_context` 的当前状态在查询时为事件 7389，shader replacement 数量为 0。已调用计划提供的 `capture_restore`，但主机返回 `AUTO_REVIEW_DENIED`：计划允许的是计划内干预后的恢复；由于没有已验证干预或 baseline 收据，当前 replay-changing 恢复动作未获准。之后未尝试用普通事件导航替代签名恢复。故本次未获得入口恢复成功回执，捕获当前回放位置仍需由授权机制处理。
+
+## 下一步
+
+若继续在同一批准范围内调查，需先获准恢复/获得新的合法回放状态，然后使用原生输出坐标明确识别泪腺白点候选 ROI，在同一 capture 配对目标点与邻近控制点的读值及像素历史；再从事件 7343 的输入 `ResourceId::2051334` 继续追踪白点是否在上游已存在。只有观察定位及只读取证仍无法区分原因时，才评估满足实际安全与恢复门槛的条件性实验。当前无可审的定位或因果主张，不触发科学结论的独立审查；原因结论和恢复均保持未完成。```
+
+### 过程、工程与现场记录
+
 - **获批只读前沿复核（2026-11-10）：**第三轮 PC 的冻结计划要求区域／事件映射不清时继续缩小目标及控制点；已归档原始调用显示模型读取了若干候选单点，但未执行 `rd.texture.get_region_values`。模型曾发现按资源追踪的 `rd.resource.get_usage`，实际失败的是按事件读取资源摘要的 `rd.event.get_resource_usage`；前者没有实际调用，不能推断它一定成功或失败。本机 RDC-Tool 工作树中两者分别调用管线快照和资源使用查询，但本轮回放进程的加载产物身份未核对，源码差异不是实际替代路径成功证据。这些是可能有价值的不同只读检查，不证明候选点即用户症状，也不授权重复相同 native 故障。现有 Debugger 工具 Skill 补充矩形读数与两种查询的语义和证据边界，不写入案例标识或答案、不扩大权限。pnpm 11.7.0 下 Skill 门禁 16 项、Agent runtime 门禁 162 项、typecheck、lint（0 errors／2152 warnings）通过；首次 Agent 门禁因沙箱临时目录 rename 失败、测试未收集，使用工作区临时目录重跑通过。修订方法尚未真实模型复验，不能作为问题已解决或泛化通过的证据。
 - **Skill 来源复核：**第三轮 General 的实际首个 RequestPlan 加载了仓库内 `debugger-rdc-tools`，旧资源 hash 为 `df34e0ed3696a5911b4a2241da7a237f1ba91af27bbfe6b4556317650a7731f8`；当前工作树该 Skill 的文件 SHA-256 为 `e9de3c0a40b0cf238e033429df72204c72e9b4114e126885b0fd65dbdac3db56`，与解析后资源 hash 不是同一种哈希。本机 User 和该项目当前均无同名 Skill 覆盖；使用隔离 User/appdata、当前项目及产品 Skill 解析服务取得 builtin 资源 hash `ba2594cc2d90ef510a09bc4c1e5bee577f12ad4af1397d215fee6277df63526a`，正文包含两项修订方法。这是本地解析，不是实际模型请求；新的隔离配置仍须以新 RequestPlan 中的来源、hash 和内容核验，不能把旧请求回填为修订后的真实模型验证。
 

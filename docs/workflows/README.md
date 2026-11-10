@@ -1,6 +1,9 @@
 # Workflow Docs
 
-- [垂直调查接续 Prompt 与上传说明](vertical-investigation-continuation.md)：需求／问答／Plan 的已定选择、当前证据、跨设备准备和剩余验收。
-- [垂直调查批准 Plan 原文](vertical-investigation-plan.md)：历史批准范围；最新状态与模型要求见接续说明和验收账本。
+- [垂直调查设计分析](../product/rdc-agent-investigation-design-analysis.md)：目标、架构选择及验收原则。
+- [垂直调查批准 Plan](vertical-investigation-plan.md)：已批准的实施方向和 T0–T7 验收要求。
+- [垂直调查任务清单](vertical-investigation-tasks.md)：唯一持久 Task、进度快照及历史工作记录。
+- [垂直调查验收账本](../product/acceptance-ledger.md)：真实运行、工程证据、文字材料及其限制。
+- [垂直调查历史接续说明](vertical-investigation-continuation.md)：2026-11-08 的需求、问答与接续背景；不作为当前设备状态或最新测试要求。
 
 - Agentic Trace 验证入口以 `fixtures/traces/agentic-trace-basic.json`、`pnpm run start:agent-browser` 打开的真实浏览器会话和必要时的人类可见 Electron 启动检查为准。
