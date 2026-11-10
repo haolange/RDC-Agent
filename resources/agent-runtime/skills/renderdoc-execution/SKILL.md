@@ -1,6 +1,6 @@
 ---
 name: renderdoc-execution
-description: Consume a frozen RenderDoc investigation plan, execute within its strategy, and leave evaluation to the originating Mission after the user switches back.
+description: Execute a frozen RenderDoc investigation plan, deliver in place, and checkpoint changes requiring strategic realignment.
 ---
 
 # RenderDoc Execution
@@ -9,16 +9,18 @@ General 消费本次会话 execution offer 冻结的 Plan URI/hash 与 requiredS
 
 ## 共享 Plan 模板
 
-Plan 为按任务规模填写的 Markdown 策略。Mission 用 plan_artifact 提交当前计划等待用户审阅；拒绝按意见修订同一份；批准后本回合结束，用户点声明按钮才会切到 General。必须说明以下六块，可明确标注不适用原因：
+Plan 为按任务规模填写的 Markdown 策略。Mission 用 plan_artifact 提交当前计划等待用户审阅；拒绝按意见修订同一份；批准后本回合结束，用户点声明按钮才会切到 General。提交前先按实际工作结算本回合已启动的 direct Task；不要在尚未获批时声明计划已获批。只在批准后执行的调查和审查 Task 保持 pending，不为等待计划批准而启动规划 Task 并让后续工作依赖其 blocked 结果。本规划回合创建了未完成 Task 时，提交必须显式填写 requiredTaskIds：列出计划必需的已有 Task；确无必需 Task 时传空数组，正文里的 Task 名称或 ID 不会冻结其要求。必须说明以下六块，可明确标注不适用原因：
 
 计划需要实时 RDC 时，即使只调查当前一份 capture，也须在 `plan_artifact.captureScope` 中填写拟使用的已登记 `inputIds`、当前 `deviceId` 和调查目标；从 `runtime_context.capturePlanning` 读取身份。主进程校验并把内容 hash 冻结在用户审阅的计划里，用于入口基线、恢复和现场准入。仅离线分析可省略；正文提及 capture 不等于冻结授权。若获批计划遗漏该字段，应回 Mission 按正常计划门修订，不能用其他事件操作冒充签名恢复。
 
+只读调查也可能需要临时选择回放事件，并在结束时恢复签名入口位置。计划应明确允许这些必要的现场导航和恢复，同时禁止未批准的 shader／data 修改、替换或实验干预；不要将所有回放位置变化写成禁止动作，使只读检查与恢复合同互相冲突。实际权限和恢复验证仍由主进程执行。
+
 1. **目标与边界**：用户目标、成功标准、范围、质量约束、能力上限、输入缺口。
-2. **输入与参考依据**：输入引用、已知事实、未知项；Knowledge 来源、适用条件、反例、失败经验和冲突。相似度只帮助选检查方向，不构成事实或因果证据。
+2. **输入与参考依据**：输入引用、已知事实、未知项；Knowledge 来源、适用条件、反例、失败经验和冲突。多词 Knowledge 查询要求词项共同匹配；过长查询没有命中时，按对象、症状或领域概念拆成独立短查询，必要时浏览并记录检索范围。匹配结果要映射到当前对象的可观察特征、预测和区分检查；相似度不构成事实或因果证据。
 3. **候选方向与选择依据**：方向及来源、待验证预测、最小区分检查、进入／排除／转向条件。不固定候选数量。
-4. **执行策略与依赖**：首批检查、必要依赖、方法／Skill、预期产物、父级直接工作、必须隔离委派的分析、必须独立审查的工作及局部调整范围；条件任务所需的采证时点和读取授权也须纳入依赖。不预写全部工具命令，不要求无关阶段。
+4. **执行策略与依赖**：首批检查、必要依赖、方法／Skill、预期产物、父级直接工作、必须隔离委派的分析、必须独立审查的工作及局部调整范围；条件任务所需的采证时点和读取授权也须纳入依赖。尚无结论时不必进行空审查；出现需要接受的结论或有效 Challenge 时，在已批准战略内安排独立核验和补证，不把这些局部工作定义为战略变化。不预写全部工具命令，不要求无关阶段。
 5. **决策与循环**：Small Loop 补证、Big Loop 改策略、ask_user 条件，以及能力／权限、Harness 冻结额度与用户明确限制等停止条件。
-6. **交付与回评估**：必要证据、未解问题、验收意图和回交要求。新 Plan 引用上一 Checkpoint，说明战略变化和触发证据，不复制历史。
+6. **交付与重新对齐**：必要证据、未解问题、验收意图和 General 就地交付。需要战略变化时说明 Checkpoint 与触发依据，由用户决定是否切回 Mission；新 Plan 引用上一 Checkpoint，不复制历史。
 
 修订后的当前冻结正文须保留完整适用策略、进入条件与恢复合同，不能仅提交修改摘要或以“其余同上一卡”假定产品会合并旧正文。引用外部合同或检查点时提供可解引用的精确 URI/hash 和读取依赖；未绑定的历史卡片、聊天记忆或摘要不能补足当前计划省略的条件。正文提到的 Skill 不等于实际预载，必需预载以冻结 execution offer 的 requiredSkillIds 与 PromptPlan 为准，其他方法按实际读取记录判断。
 
@@ -37,7 +39,7 @@ General 就地终答，不自动切回 Mission，也不要求 return 合同。�
 
 ## 执行与证据
 
-跨 capture 调查使用批准计划中的 inputId；由拥有现场的 General 调用 `rdc_probe` 的 `capture_select`，按现有权限、实际设备和签名回执执行。`runtime_context.captureRestoration` 是签名的执行入口基线，不是当前事件；需要当前现场时使用 `rdc_probe` 实际查询。现场因原生失败被隔离时，关闭中断实验后调用 `capture_recover`；运行时先取消并 join 持有故障 lease 的自有子执行，再只尝试相同获批输入、设备和当前权限并重新准备身份，无关离线工作可继续。不得把中断实验的旧阶段与新现场拼成一次实验，同一故障条件再次出现时停止无效重开。`capture_restore` 恢复进入执行时的 capture、事件和目标，运行时也在正常收口前复核；不得提供文件路径或 context ID，也不能把准备失败、旧 lease 或缺少进程回执当成成功。切换前结束相关子执行与实验并恢复替换。恢复不成功时记录实际现场及阻塞，不能宣称完成。
+跨 capture 调查使用批准计划中的 inputId；由拥有现场的 General 调用 `rdc_probe` 的 `capture_select`，按现有权限、实际设备和签名回执执行。`runtime_context.captureRestoration` 是签名的执行入口基线，不是当前事件；需要当前现场时使用 `rdc_probe` 实际查询。现场因原生失败被隔离时，关闭中断实验后调用 `capture_recover`；运行时先取消并 join 持有故障 lease 的自有子执行，再只尝试相同获批输入、设备和当前权限并重新准备身份，无关离线工作可继续。不得把中断实验的旧阶段与新现场拼成一次实验，同一故障条件再次出现时停止无效重开。`capture_restore` 恢复进入执行时的 capture、事件和目标，并返回主进程当次比较签名基线与当前现场的结果；`changed:false` 可能表示现场已经一致，不表示未验证。重开后的 native 身份可以改变，仍须检查返回的 `restoration.restored`；这份当次观察不是终态恢复回执。回合运行时 `terminalReceiptPending` 是预期状态，若 `restored:true`，不能仅因终态回执尚未生成就停止其他获准工作或把来源任务标为受阻；应按实际证据结算并声明，不伪称已有终态回执。模型结束后主进程在提交前重新观察并签名，恢复未确认时不能提交 completed。不得提供文件路径或 context ID，也不能把准备失败、旧 lease 或缺少进程回执当成成功。切换前结束相关子执行与实验并恢复替换。恢复不成功时记录实际现场及阻塞，不能宣称完成。
 
 按规模使用 task_create / task_update，在计划边界内调整 Tasks；开放 Challenge 的后续检查引用 challengeId 和 requiredFollowUp，更新或 supersede 原 claim_set，不把领域字段写进 TaskRecord。通过 investigation_* 写 Evidence／Claim／Experiment／Challenge／Checkpoint，按 provenance 门禁标记 ready。
 因果介入与优化实验必须有真实执行及恢复；shell.rdc 的 experimentId 绑定 baseline→intervention→variant→rollback→restored 签名回执（Experiment.executionEvidence）。baseline、variant、restored 是三个不同 measurement 回执的引用角色，不是额外的回执 kind 或工具 phase 参数；intervention、rollback 分别引用实际介入、撤销回执。介入前保存真实基线，未来阶段只在实际执行后取得，不得要求或伪造尚未发生的阶段证明；关闭实验时仍由现有门禁核验五个不同引用、签名、时序、采样条件及进程身份。权限拒绝、未执行、布尔声明或原 capture hash 不变均不是回滚证据。General 在获批目标和必要核验、相关 Challenge 与恢复事实闭合后就地声明 completed；否则诚实说明 partial 或 blocked。
@@ -54,6 +56,7 @@ General 就地终答，不自动切回 Mission，也不要求 return 合同。�
 单次 lookup、必要抽查及低成本操作由 General 直接完成。需要隔离时按职责委派：知识综合用 knowledge-scout，机制与候选检查用 generator，Shader、Pass、Resource、Pixel 分析分别用对应 analyst，独立审查用 verifier，报告组织按需用 report-writer。各 Agent 默认装载其方法；任务确有必需方法时在 executionRequirements 和 Capsule.requiredSkillIds 显式绑定。General 负责 live RDC 操作和整合，子级只处理获授材料。父级给出问题、方向、精确来源与输出要求，由子级返回出处、反证和未知项。
 独立审查的时点按获批目标安排：计划要求实验验证时，完成拟交付的区分实验、变体采证与恢复，形成主张和实验记录后，再派发该范围的交付审查；只读阶段形成竞争假设，不自动触发交付审查。确需提前审查方法或方案时，明确其局部 scope，并在原 Task/全树预算内保留实际实验及其独立审查的材料、请求与时间，不把提前审查当作后续实验证据已被审查。只读目标仍可在只读交付形成后审查；必要安全条件或预算不成立时诚实交付 partial，不为赶审查而介入。
 派发时先创建独立审查 Task，绑定 profileId=verifier、独立来源 Task 和所需完成要求。来源 Task 先结算并提供 resultRef/resultHash；Capsule.inputArtifactRefs 须授予该精确成果及审查必需的原始证据。只给主张、证据、反证、实验条件和适用范围的引用，不复制生成者长叙事，不请求 RDC。General 自己读取 skeptic-review 不等于独立审查。父级核对实际执行、来源版本、join 与结算；审查完成仍可保留 open Challenge。General 整合证据并安排必要补证，战略改变写进终答，等用户切回原 Mission。
+审查者指出原始来源缺失或建议 Challenge 时，保留其原意并处理与批准目标相关的缺口；在已有权限内补授可用原始来源后继续同一审查。复审未执行或失败不能算作已核验，也不能改写为“没有 Challenge”；还有合法有效的补证时继续，否则如实交付 partial 及具体限制。
 处理 Challenge 时逐项检查其 targetRef、所依赖的主张及阻断条件。某数值尚未具备解释资格，先限制使用该数值的结论；它不自动禁止不依赖该数值、且符合获批范围和安全门的区分实验。未知机制、竞争假设或尚未取得的实验结论不能自行变成全局介入前置；对象/源材料绑定、修改边界、实际状态控制、权限、恢复和预算仍必须成立。开放 Challenge 仍须在最终接受前有真实补证、合法范围修订或其他有依据的处理，不能仅靠继续执行或换主张名称关闭。
 干预前按拟检验主张和 `controlledVariables` 列出必须保存的原始证据，避免恢复后才发现关键状态没有取证。例如声称基线无替换、变体只有本次替换、恢复后为空，就须在对应状态仍有效时保存实际替换枚举；一次 apply/revert 回执、相等图像或捕获文件 hash 不能代替全部控制条件。声称某调试数值属于目标 invocation 或最终输出，则需相应 invocation 绑定与当前 shader 输出映射／写出路径。派发审查前逐项反查本次 scope 中的主张和控制条件：typed 目标、所依赖的原始测量、身份／语义映射及状态控制，均须以审查者确实可读的精确 URI/hash 授予 Capsule，并按分页和完成要求计算预算。只授予该范围必要引用；typed 摘要中的路径、自然语言保证或未授予的传递引用不构成原始覆盖。缺失的历史观察保持 unknown，并收窄对应主张；不重建历史、不仅为补审计枚举重跑已恢复实验，也不另建同义审查刷新预算。
 状态控制按实际可变路径确定，不能从 WorldState 字段名推导出多套独立的运行时状态或枚举接口。`shaderReplacement` 与 `patchStack` 可描述同一组真实 shader 替换的当前目标和应用顺序；权威工具合同确认共用登记与枚举来源时，应复用该来源的三状态原始回执，不要求重复接口。共享 CLI 手册提供当前实现语义；普通调查不为确认该语义额外取得软件源码目录权限。对数据写入等其他路径，区分“完整冻结目录与有效权限没有该变更路径”“存在可达变更但状态未核实”和“枚举执行失败”：前者结合权威工具合同限定不适用范围，不扩大为全局状态为空；后两者保持 unknown，必要控制未满足时不得干预。单次空搜索或没有独立接口本身不能证明状态为空。计划若误把不适用的状态当成硬前置，保存依据并正常回评修订，不能静默放宽已批准控制条件。
@@ -72,6 +75,8 @@ General 就地终答，不自动切回 Mission，也不要求 return 合同。�
 文件审计、语义阅读与审查分别记账。完整字节审计、准确 before/after hash 与未截断 diff 支持实际修改范围，不证明语义理解；全文持久化、whole-file hash 或调用过子代理均不代表模型读完。全局数据流或控制流结论须有对应完整分析；局部变体可以复用实际已读且身份未变的基线，审查变化和依赖，不默认每个近似变体重读全文，也不默认免读。授权必要原始引用，父级不先全文深读再形式委派。版本关系直接读取 investigation_read/list 输出的 supersedes；它不是相关制品的读取授权，缺权限先补交既有材料，不为补形式记录重新取证。
 
 画质依实际图像输入和采样条件判断，UI缩略图不代表模型收到的图片。看不清的区域先读取已有原图或原生区域测量，不能以非零数值自动证明细节保留。用户反馈只解决其明确绑定候选的外观目标；确认后不重复询问或另加色相标准，但不替代身份、签名、结构、控制区和恢复。局部证据缺口只限制其目标和依赖结论；实验上限不是必须用完的次数。
+
+一个临时图片路径不可读，或当前事件没有普通颜色目标，不等于当前 capture 的图像不可取得。先核对本轮工具返回的精确路径与权限，不拼写、改造或沿用历史绝对路径；在已批准范围内继续检查当前 catalog 中可用的观察或导出能力。例如能力支持时，可用 `rd.session.observe` 的最终输出或其他适合当前事件的受控导出，写入有权限且不属于禁止修改的工程的临时位置，再实际读取结果并核对 capture、事件、目标与尺寸。只在可行路径确实失败、受权限限制或现场不安全时，将图像获取记为阻塞；不重复被拒绝的同一操作，不为图像读取扩大权限，也不把导出成功当成因果证明。
 
 用户材料中的 material 说明、区域、文档位置、时间范围和对比条件属于用户描述；不得当作已验证原因或 mutation 授权。使用原图分数坐标定位 ROI，核对 capture、事件、分辨率与采样条件后配对 Before/After/Diff。没有用户参考图或坐标时，按 `$pixel-forensics` 先从本次 capture 的可用图像自主定位候选问题区域，再用原生纹理和片元证据验证映射；不得仅以用户未提供 ROI 结束可继续的只读取证。无法导出、读取或映射时保存失败回执与精确缺口，区域保持 unknown。正常高光等质量约束仍需保留；整体压暗或本机无法复现不算修复。原始材料路径/hash 与派生产物分开引用；引用存在不代表已经看见图像。跨委派传递有权限的原始材料引用，必要时用 artifact_read 真正查看图像。
 参考图与 capture 的构图或处理条件不一致时，先将跨图比较标为不可定量；仍可沿已验证的 capture 候选区域，按 `$pixel-forensics` 做同一 replay 中的事件前后、目标／控制区域只读配对。该配对只能收窄假设，不能代替可证伪干预或签名恢复。优先完成能决定下一步的最小查询，再扩写 Investigation 和委派材料；预算不足时保留已查到的原始回执与明确未做的检查，不用大量草稿挤掉区分检查。

@@ -84,6 +84,25 @@ function createStack(options: {
 }
 
 describe('Knowledge five services', () => {
+  it('rejects unknown selected spaces instead of returning misleading empty search results', async () => {
+    const root = tempDir();
+    try {
+      mkdirSync(path.join(root, 'facts'), { recursive: true });
+      const card = draftCard();
+      writeFileSync(path.join(root, card.relativePath), serializeKnowledgeCard(card), 'utf8');
+      const { query, compile } = createStack({ root });
+      const search = createKnowledgeTools('space-fixture', { query, compile }).find(tool => tool.name === 'knowledge_search')!;
+      await expect(search.execute('invalid', { query: 'Vulkan', spaceIds: ['user', 'user:user'] }))
+        .rejects.toThrow('KNOWLEDGE_SPACE_UNKNOWN: ["user:user"]. Use exact space IDs from knowledge_browse: ["user"].');
+      const valid = await search.execute('valid', { query: 'Vulkan', spaceIds: ['user'] });
+      expect(valid.details).toMatchObject({ count: 1, cardIds: [card.cardId] });
+      const unscoped = await search.execute('unscoped', { query: 'Vulkan' });
+      expect(unscoped.details).toMatchObject({ count: 1, cardIds: [card.cardId] });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('requires a current version when an Agent expands a card after a search', async () => {
     const root = tempDir();
     try {

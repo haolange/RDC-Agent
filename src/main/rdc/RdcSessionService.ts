@@ -371,7 +371,12 @@ export class RdcSessionService {
         binding.deviceId = remoteId;
         if (remoteId) this.devices.set(remoteId, key);
         this.publish(binding, { phase: remoteId ? 'connecting' : 'opening' });
-        const opened = await binding.runtime.openProjectInput(request, { ...options, onStage: phase => this.publish(binding, { phase }) });
+        const open = () => {
+          this.assertInteraction(binding, options);
+          return binding.runtime.openProjectInput(request, { ...options, onStage: phase => this.publish(binding, { phase }) });
+        };
+        const contextId = reusePrepared ? binding.runtime.getContextId() : null;
+        const opened = contextId ? await runRdcOperation(contextId, open) : await open();
         let verified: { sha256: string };
         try { verified = await verifyInput(); }
         catch (error) {

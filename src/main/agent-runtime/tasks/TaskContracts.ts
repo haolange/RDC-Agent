@@ -122,6 +122,8 @@ export interface StartTaskExecutionOptions {
   requiredSkillIds?: readonly string[];
   /** Target profile selected for this child execution. */
   requestedProfileId?: string;
+  /** Explicit artifact URIs requested by the new delegation; actual grants are checked separately. */
+  requestedInputArtifactRefs?: readonly string[];
 }
 
 export interface TaskRootBudgetRecord {

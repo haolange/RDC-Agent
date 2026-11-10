@@ -25,7 +25,50 @@ function fixture() {
   return { resolver, uri, write, pointers: ['/content/0/text'] };
 }
 
+function toolResult(content: unknown[], truncated: boolean) {
+  return { owner: 'owner', source: { toolName: 'test', toolCallId: 'source' }, hash: 'f'.repeat(64),
+    size: 16, mime: 'application/json', content, details: { truncated } };
+}
+
 describe('hash-bound artifact text views and searches', () => {
+  it('searches the sole text of a chunked tool result with separate source and view provenance', () => {
+    const { resolver } = fixture();
+    const source = '第一行\r\n{"truncated":false,"value":"needle"}\r\nneedle';
+    const content = JSON.stringify(toolResult([{ type: 'text', text: source }], true));
+    const file = JSON.stringify({ encoding: 'json-chunks', chunks: [content.slice(0, 23), content.slice(23)] });
+    const saved = resolver.write('owner', 'session://tool-outputs/result.json', file);
+    const first = resolver.read('owner', saved.uri, { expectedHash: saved.hash, search: 'needle', limit: 1 });
+    expect(first.hash).toBe(saved.hash);
+    expect(first.textView).toMatchObject({ pointer: '/content/0/text', sha256: sha(source), bytes: Buffer.byteLength(source), sourceResultTruncated: true });
+    expect(first.textView?.layers.map((layer) => layer.kind)).toEqual(['file', 'json-chunks', 'json-string']);
+    expect(first.textView?.layers[0].sha256).toBe(sha(file));
+    expect(first.search).toMatchObject({ totalMatches: 2, returnedMatches: 1 });
+    expect(first.next).toBeDefined();
+    const next = resolver.read('owner', saved.uri, { expectedHash: saved.hash, search: 'needle', limit: 1, ...first.next });
+    expect(next.search).toMatchObject({ totalMatches: 2, returnedMatches: 1 });
+    expect(next.next).toBeUndefined();
+    const quoted = resolver.read('owner', saved.uri, { expectedHash: saved.hash, search: '"truncated":false' });
+    expect(quoted.search?.totalMatches).toBe(1);
+    expect(quoted.textView?.sourceResultTruncated).toBe(true);
+    expect(() => resolver.read('other', saved.uri, { expectedHash: saved.hash, search: 'needle' })).toThrow('ARTIFACT_SESSION_DENIED');
+    expect(() => resolver.read('owner', saved.uri, { expectedHash: '0'.repeat(64), search: 'needle' })).toThrow('ARTIFACT_HASH_MISMATCH');
+  });
+
+  it('requires explicit selection for ambiguous tool results and leaves ordinary JSON unchanged', () => {
+    const { resolver } = fixture();
+    const multi = resolver.write('owner', 'session://tool-outputs/multi.json', JSON.stringify(toolResult([
+      { type: 'text', text: 'first needle' }, { type: 'text', text: 'second needle' },
+    ], false)));
+    expect(() => resolver.read('owner', multi.uri, { expectedHash: multi.hash, search: 'needle' })).toThrow('ARTIFACT_JSON_POINTER_INVALID');
+    const selected = resolver.read('owner', multi.uri, { expectedHash: multi.hash, textPointer: '/content/1/text', search: 'needle' });
+    expect(selected.textView).toMatchObject({ pointer: '/content/1/text', sha256: sha('second needle'), sourceResultTruncated: false });
+    expect(selected.search?.totalMatches).toBe(1);
+    const plain = resolver.write('owner', 'session://tool-outputs/plain.json', '{"value":"needle"}');
+    const result = resolver.read('owner', plain.uri, { expectedHash: plain.hash, search: 'needle' });
+    expect(result.search?.totalMatches).toBe(1);
+    expect(result.textView).toBeUndefined();
+  });
+
   it('searches the complete decoded string, distinguishes hashes, and treats regex syntax literally', () => {
     const { resolver, uri, write, pointers } = fixture();
     const source = 'prefix a.*b\n' + 'unrelated text\n'.repeat(4000) + 'suffix a.*b\n';

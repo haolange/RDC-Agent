@@ -36,6 +36,13 @@ it('never returns exploratory final text when structured completion is absent or
   expect(result.disposition).not.toBe('completed');
  }
 });
+it('returns the actionable trusted preparation conflict to the parent without promoting a failed result', () => {
+ const artifact = { uri: 'session://tool-outputs/result.json', hash: 'a'.repeat(64) };
+ const text = 'DELEGATION_PREPARATION_CONFLICT: verifier cannot use turn_complete, artifact_read under the prepared Profile, Skill intersection or policy.';
+ expect(projectSubagentResult(normalizeSubagentResult(text, 'failed', undefined, artifact))).toMatchObject({
+  disposition: 'blocked', summary: text, error: 'DELEGATION_PREPARATION_CONFLICT', resultRef: artifact.uri, resultHash: artifact.hash,
+ });
+});
 it('distinguishes a wall-time limit from an explicit subagent cancellation', () => {
  const artifact = { uri: 'session://tool-outputs/result.json', hash: 'a'.repeat(64) };
  expect(normalizeSubagentResult('POLICY_LIMIT_EXCEEDED: maxWallTimeMs', 'cancelled', undefined, artifact))

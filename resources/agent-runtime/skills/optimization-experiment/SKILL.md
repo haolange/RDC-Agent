@@ -8,6 +8,7 @@ description: Run cost experiments with a real intervention, exclusive World Stat
 Use this skill to change cost under an explicit correctness constraint.
 
 1. Name the cost, the constraint that must not regress, and the measurement. Qualify the baseline and the noise floor first.
+   If full-frame timing is unavailable, keep end-to-end gain unverified and do not repeat the same failed measurement. Check whether other permitted, independently available event-level timings or counters can still support a bounded diagnosis; record their scope, sampling and noise, and continue only when the replay is safely prepared. A local timing is not a frame baseline or proof of end-to-end benefit, and it does not relax the experiment's qualification or recovery gates.
 2. Write Frame Breakdown, then Cost / Limiter / Mechanism as separate Claims. The slowest pass is not automatically the root bottleneck.
 3. Choose one action class before mutating: Ablation (`C` / diagnostic), Equivalent (semantics-preserving), or Trade-off (explicit quality/scope concession). Ablation is not a shipping optimization.
 4. Write an `ExperimentRecord` with `intervention.type != none`, exclusive World State, and a rollback plan before mutating.

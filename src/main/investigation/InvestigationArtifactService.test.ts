@@ -17,12 +17,14 @@ import {
   overwriteInvestigationManifest,
   overwriteInvestigationRecordBody,
   plantInvestigationRecord,
+  projectClaim,
   recordedExperiment,
   sampleChallenge,
   sampleCheckpoint,
   sampleReport,
   seedNote,
   writeDraft,
+  writeReadyReport,
 } from './investigationTestFixtures';
 import { toolToDefinition } from '../agent-runtime/agent/AgentTool';
 import { toolValidator } from '../agent-runtime/core/ToolValidator';
@@ -38,6 +40,40 @@ function toolErrorCode(result: { details?: unknown }): string | undefined {
 }
 
 describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
+  it('rejects a copied wrong evidence hash with a correction path and accepts the verified original', () => {
+    const { resolver, service } = createInvestigationHarness();
+    const note = seedNote(resolver);
+    writeDraft(service, 'world_state', baselineWorld('ws-hash-correction'));
+    const evidence = evidenceOf('ws-hash-correction', note, 'ev-hash-correction');
+    const wrong = `sha256:${'0'.repeat(65)}`;
+    expect(() => writeDraft(service, 'evidence', { ...evidence,
+      artifactRefs: [{ uri: note.uri, expectedHash: wrong }] }))
+      .toThrow(/INVESTIGATION_HASH_MISMATCH: content .*64 hexadecimal.*artifact_read.*omit expectedHash.*original source/);
+    expect(service.list(SESSION_ID).some(item => item.kind === 'evidence')).toBe(false);
+    expect(writeDraft(service, 'evidence', evidence).record).toMatchObject({ evidenceId: 'ev-hash-correction' });
+  });
+
+  it('derives packed evidence hashes while preserving previously stored records', () => {
+    const { resolver, service } = createInvestigationHarness();
+    const note = seedNote(resolver);
+    writeDraft(service, 'world_state', baselineWorld('ws-evidence-input'));
+    const historical = { ...evidenceOf('ws-evidence-input', note, 'ev-historical'), contentHashes: [note.hash] };
+    plantInvestigationRecord(resolver, {
+      artifactId: 'art-historical', kind: 'evidence', recordType: 'EvidenceRecord',
+      recordKey: historical.evidenceId, record: historical,
+    });
+    const before = resolver.read(SESSION_ID, 'session://investigation/records/art-historical.json').hash;
+    expect(service.readRecord(SESSION_ID, 'art-historical').record).toEqual(historical);
+    const packed = writeDraft(service, 'evidence_pack', {
+      items: [evidenceOf('ws-evidence-input', note, 'ev-packed-input')],
+    });
+    expect(packed.record).toMatchObject({ items: [{ artifactRefs: [{ expectedHash: note.hash }], contentHashes: [note.hash] }] });
+    expect(() => writeDraft(service, 'evidence_pack', {
+      items: [{ ...evidenceOf('ws-evidence-input', note, 'ev-packed-duplicate'), contentHashes: [note.hash] }],
+    })).toThrow(/INVESTIGATION_SCHEMA_INVALID/);
+    expect(resolver.read(SESSION_ID, 'session://investigation/records/art-historical.json').hash).toBe(before);
+  });
+
   it('qualifies captured variant evidence only after closing the linked experiment restoration', () => {
     const { resolver, service } = createInvestigationHarness();
     const note = seedNote(resolver);
@@ -126,11 +162,11 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
   it('archives a superseded false evidence claim without accepting it as current evidence', () => {
     const { resolver, service } = createInvestigationHarness();
     writeDraft(service, 'world_state', baselineWorld('ws-corrected'));
-    const unsupported = {
+    const unsupportedInput = {
       ...evidenceOf('ws-corrected', seedNote(resolver), 'ev-corrected'),
       artifactRefs: [],
-      contentHashes: [],
     };
+    const unsupported = { ...unsupportedInput, contentHashes: [] };
     plantInvestigationRecord(resolver, {
       artifactId: 'art-unsupported-evidence',
       kind: 'evidence',
@@ -141,7 +177,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     expect(() => service.list(SESSION_ID)).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
 
     const correction = writeDraft(service, 'evidence', {
-      ...unsupported,
+      ...unsupportedInput,
       epistemicStatus: 'unknown',
       strength: 'weak',
       stale: true,
@@ -305,6 +341,36 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     expect(formatInvestigationContentHash(written.contentHash.replace(/^sha256:/, ''))).toBe(written.contentHash);
   });
 
+  it('distinguishes a written evidence record key from its artifact identity for reports', async () => {
+    const { resolver, service } = createInvestigationHarness();
+    writeDraft(service, 'world_state', baselineWorld('ws-report-evidence'));
+    const note = seedNote(resolver);
+    const tools = Object.fromEntries(createInvestigationTools(SESSION_ID, { service }).map((tool) => [tool.name, tool]));
+    const written = await tools.investigation_write.execute('write-evidence', {
+      kind: 'evidence', mission: 'debugger', title: 'observation', summary: 'observation',
+      record: evidenceOf('ws-report-evidence', note, 'ev-report-evidence'),
+    });
+    expect(written.isError).not.toBe(true);
+    expect((written.details as { record: { contentHashes: string[] } }).record.contentHashes).toEqual([note.hash]);
+    expect(written.content).toEqual(expect.arrayContaining([
+      expect.objectContaining({ text: expect.stringContaining('recordKey=ev-report-evidence') }),
+    ]));
+    const artifactId = (written.details as { manifest: { artifactId: string } }).manifest.artifactId;
+    const rejected = await tools.investigation_write.execute('bad-report', {
+      kind: 'report', mission: 'debugger', title: 'report', summary: 'report',
+      record: sampleReport({ claims: [], evidenceIds: [artifactId] }),
+    });
+    expect(rejected.isError).toBe(true);
+    expect(rejected.content).toEqual(expect.arrayContaining([
+      expect.objectContaining({ text: expect.stringMatching(/EvidenceRecord\.evidenceId.*not artifactId/) }),
+    ]));
+    const corrected = await tools.investigation_write.execute('correct-report', {
+      kind: 'report', mission: 'debugger', title: 'report', summary: 'report',
+      record: sampleReport({ claims: [], evidenceIds: ['ev-report-evidence'] }),
+    });
+    expect(corrected.isError).not.toBe(true);
+  });
+
   it('lets investigation_write record bodies pass ToolValidator as an opaque object', () => {
     const { resolver, service } = createInvestigationHarness();
     const note = seedNote(resolver);
@@ -326,18 +392,25 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const schemaTool = createInvestigationTools(SESSION_ID).find((tool) => tool.name === 'investigation_schema')!;
     const world = await schemaTool.execute('world', { kind: 'world_state' });
     const evidence = await schemaTool.execute('evidence', { kind: 'evidence' });
+    const evidencePack = await schemaTool.execute('evidence-pack', { kind: 'evidence_pack' });
     const claimSet = await schemaTool.execute('claim-set', { kind: 'claim_set' });
+    const report = await schemaTool.execute('report', { kind: 'report' });
     expect(world.isError).not.toBe(true);
     expect(evidence.isError).not.toBe(true);
     expect(claimSet.isError).not.toBe(true);
+    expect(report.isError).not.toBe(true);
     const worldSchema = (world.details as { schema: { required: string[]; properties: Record<string, unknown> } }).schema;
     const evidenceSchema = (evidence.details as { schema: { required: string[]; properties: Record<string, unknown> } }).schema;
     expect(worldSchema.required).toContain('worldStateId');
     expect(worldSchema.properties.replay).toBeDefined();
     expect(evidenceSchema.required).toContain('evidenceId');
     expect(evidenceSchema.properties.observationKind).toMatchObject({ enum: expect.arrayContaining(['pixel_history']) });
+    expect(evidenceSchema.properties.contentHashes).toBeUndefined();
+    const packSchema = (evidencePack.details as { schema: { properties: { items: { items: { properties: Record<string, unknown> } } } } }).schema;
+    expect(packSchema.properties.items.items.properties.contentHashes).toBeUndefined();
+    expect((evidence.details as { recordIdPolicy: string }).recordIdPolicy).toContain('service derives stored contentHashes');
     expect((world.details as { nextStep: string }).nextStep).toContain('tool_search query=investigation_read');
-    expect((claimSet.details as { recordIdPolicy: string }).recordIdPolicy).toContain('new ClaimRecord definitions');
+    expect((claimSet.details as { recordIdPolicy: string }).recordIdPolicy).toContain('define ClaimRecords');
     const schemaContent = world.content[0];
     expect(schemaContent?.type).toBe('text');
     if (schemaContent?.type !== 'text') throw new Error('investigation_schema did not return text');
@@ -345,8 +418,62 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const claimSetContent = claimSet.content[0];
     expect(claimSetContent?.type).toBe('text');
     if (claimSetContent?.type !== 'text') throw new Error('claim_set schema did not return text');
-    expect(JSON.parse(claimSetContent.text).recordIdPolicy).toContain('unique across the session');
+    const claimSetSchema = JSON.parse(claimSetContent.text);
+    expect(claimSetSchema.recordIdPolicy).toContain('retain the IDs of continuing claims');
+    expect(claimSetSchema.schema.properties.items.items.properties.projectionKind.description).toContain('null for an original Claim');
+    expect(claimSetSchema.schema.properties.items.items.properties.compactProvenance.description).toContain('a projection, including a report Claim');
+    const reportSchema = (report.details as { schema: { properties: Record<string, unknown> } }).schema;
+    expect(JSON.stringify(reportSchema.properties.claims)).toContain('Current ClaimSet items are valid sources');
+    expect(JSON.stringify(reportSchema.properties.evidenceIds)).toContain('EvidenceRecord.evidenceId');
+    expect(JSON.stringify(reportSchema.properties.reportContract)).toContain('exactly verified, conclusive or complete');
     expect((await schemaTool.execute('invalid', { kind: 'not_a_kind' })).isError).toBe(true);
+  });
+
+  it('explains how to correct original Claim fields without accepting an unproven projection', async () => {
+    const { service } = createInvestigationHarness();
+    writeDraft(service, 'world_state', baselineWorld('ws-original-claim'));
+    const write = createInvestigationTools(SESSION_ID, { service }).find((tool) => tool.name === 'investigation_write')!;
+    const original = observedClaim('ws-original-claim', 'claim-original');
+    const omitted: Partial<ClaimRecord> = { ...original };
+    delete omitted.projectionKind;
+    delete omitted.compactProvenance;
+    const args = {
+      kind: 'claim_set', mission: 'analyzer', title: 'Architecture Model', summary: 'Observed structure',
+    };
+    const missing = await write.execute('missing-fields', { ...args, record: { items: [omitted] } });
+    expect(missing.isError).toBe(true);
+    expect(JSON.stringify(missing.content)).toContain('null for an original Claim');
+    const projected = await write.execute('empty-projection', {
+      ...args, record: { items: [{ ...original, projectionKind: 'compact', compactProvenance: [] }] },
+    });
+    expect(projected.isError).toBe(true);
+    expect(JSON.stringify(projected.content)).toContain('original Claim uses null for both');
+    expect(service.list(SESSION_ID).some((item) => item.kind === 'claim_set')).toBe(false);
+    const corrected = await write.execute('original', { ...args, record: { items: [original] } });
+    expect(corrected.isError).not.toBe(true);
+    expect(corrected.details).toMatchObject({ ok: true });
+  });
+
+  it('finds report sources inside a current ClaimSet even when no standalone Claim artifact matches', async () => {
+    const { service } = createInvestigationHarness();
+    const world = writeDraft(service, 'world_state', baselineWorld('ws-model'));
+    const claim = observedClaim('ws-model', 'claim-model');
+    const model = writeDraft(service, 'claim_set', { items: [claim] }, {
+      mission: 'analyzer', status: 'ready',
+      sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
+    });
+    const list = createInvestigationTools(SESSION_ID, { service }).find((tool) => tool.name === 'investigation_list')!;
+    const filtered = await list.execute('standalone-claims', { kind: 'claim', status: 'any' });
+    expect(filtered.details).toMatchObject({ count: 0 });
+    expect(JSON.stringify(filtered.content)).toContain('No Investigation artifacts match the requested filters');
+    expect(JSON.stringify(filtered.content)).toContain('ClaimSet items');
+    expect(() => writeReadyReport(service, { mission: 'analyzer', source: model, claims: [] }))
+      .toThrow(/ClaimSet items/);
+    const report = writeReadyReport(service, {
+      mission: 'analyzer', source: model, claims: [projectClaim(claim, 'claim-report')],
+    });
+    expect(report.manifest.status).toBe('ready');
+    expect(service.createLookup(SESSION_ID).getClaim(claim.claimId)).toMatchObject(claim);
   });
 
   it('records an explicitly unmeasured debugger benchmark without weakening optimizer baselines', () => {
@@ -663,6 +790,38 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     expect(service.readAllRecords(SESSION_ID).map(item => item.manifest.artifactId)).toContain(experiment.manifest.artifactId);
     expect(service.createLookup(SESSION_ID).getClaim('claim-retired')).toBeNull();
     expect(service.createLookup(SESSION_ID).getClaim('claim-current')).toMatchObject({ claimId: 'claim-current' });
+  });
+
+  it('does not commit a ready replacement against evidence changed by the same transaction', () => {
+    const { resolver, service } = createInvestigationHarness();
+    const world = writeDraft(service, 'world_state', baselineWorld('ws-replacement-source'));
+    const oldSet = writeDraft(service, 'claim_set', {
+      items: [hypothesisClaim('ws-replacement-source', 'claim-before')],
+    });
+    const evidence = writeDraft(service, 'evidence', {
+      ...evidenceOf('ws-replacement-source', seedNote(resolver), 'ev-replacement-source'),
+      claimIds: ['claim-before'],
+    }, { status: 'ready', sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }] });
+
+    expect(() => writeDraft(service, 'claim_set', {
+      items: [hypothesisClaim('ws-replacement-source', 'claim-after')],
+    }, {
+      status: 'ready', supersedes: oldSet.manifest.artifactId,
+      sourceRefs: [{ artifactId: evidence.manifest.artifactId, expectedHash: evidence.contentHash }],
+    })).toThrow(/source .* changes during this write/);
+
+    expect(service.readRecord(SESSION_ID, oldSet.manifest.artifactId).manifest.status).toBe('draft');
+    expect(service.readRecord(SESSION_ID, evidence.manifest.artifactId, evidence.contentHash)).toMatchObject({
+      manifest: { status: 'ready' }, record: { stale: false },
+    });
+    expect(service.list(SESSION_ID)).toHaveLength(3);
+    const replacement = writeDraft(service, 'claim_set', {
+      items: [{ ...hypothesisClaim('ws-replacement-source', 'claim-before'), statement: 'A revised hypothesis.' }],
+    }, {
+      status: 'ready', supersedes: oldSet.manifest.artifactId,
+      sourceRefs: [{ artifactId: evidence.manifest.artifactId, expectedHash: evidence.contentHash }],
+    });
+    expect(service.readRecord(SESSION_ID, replacement.manifest.artifactId).manifest.status).toBe('ready');
   });
 
   it.each(['claim', 'experiment'] as const)('stales checkpoint references through a retired %s challenge without losing audit records', (targetType) => {
@@ -1027,7 +1186,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     expect(packed.supersededArtifactId).toBe(evidence.manifest.artifactId);
   });
 
-  it('P1-D closes evidence claimIds/contentHashes and claim supports/contradicts', () => {
+  it('P1-D closes evidence references and claim supports/contradicts', () => {
     const { resolver, service } = createInvestigationHarness();
     const note = seedNote(resolver);
     writeDraft(service, 'world_state', baselineWorld('ws-refs'));
@@ -1050,16 +1209,15 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     })).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
     expect(() => writeDraft(service, 'evidence', {
       ...evidenceOf('ws-refs', note, 'ev-hash-mismatch'),
-      contentHashes: ['sha256:deadbeefdeadbeefdeadbeefdeadbeef'],
+      artifactRefs: [{ uri: note.uri, expectedHash: 'f'.repeat(64) }],
     })).toThrow(/INVESTIGATION_HASH_MISMATCH/);
     expect(() => writeDraft(service, 'evidence', {
       ...evidenceOf('ws-refs', note, 'ev-hash-len'),
       contentHashes: [],
-    })).toThrow(/INVESTIGATION_HASH_MISMATCH/);
+    })).toThrow(/INVESTIGATION_SCHEMA_INVALID/);
     expect(() => writeDraft(service, 'evidence', {
       ...evidenceOf('ws-refs', note, 'ev-unanchored-tool'),
       artifactRefs: [],
-      contentHashes: [],
     })).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
     expect(() => writeDraft(service, 'claim', {
       ...hypothesisClaim('ws-refs', 'claim-ghost-sup'),

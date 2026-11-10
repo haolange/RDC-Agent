@@ -126,7 +126,7 @@ Embedding capability / Semantic lane **已删除**，见 `ARCHITECTURE.md` 裁�
 
 ### 3.6 Knowledge 与 Investigation 门禁
 
-门禁脚本：`pnpm run check:knowledge-system`、`pnpm run check:investigation-system`。**ratchet 已建立**；Investigation schema / Service / contract suite / 五卡已清零。三条 Mission 方法面已接到 Skill / Hook / Capsule。禁止用空壳测试、skip/todo 或只加类名绕过。债务 allowlist 已空（hits=0）。Investigation 目标态：record/manifest/index/supersede/stale-propagation 同一事务；renderer 唯一读取通道 `investigation:read({ sessionId, artifactId, expectedHash })`；Mission 正常 `completed` 须可解引用 `MissionCheckpoint` + `kind=report`/`status=ready` + 完整章节 + `outputPhase=final_answer` 引用该 report（见 `ARCHITECTURE.md` 裁决 E / L）。**当前态**：事务已落地（journal / temp-set / commit marker / atomic replace）；完成合同已落地（turn 收口：checkpoint + ready report + 完整章节 + `final_answer` 引用）；IPC `investigation:read({ sessionId, artifactId, expectedHash })` **已落地**；投影携带完整 `contentHash`（renderer 只缩显）。T18 知识导入 已证见 `ARCHITECTURE.md` T18 已证组。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。
+门禁脚本：`pnpm run check:knowledge-system`、`pnpm run check:investigation-system`。**ratchet 已建立**；Investigation schema / Service / contract suite / 五卡已清零。三条 Mission 方法面已接到 Skill / Hook / Capsule。禁止用空壳测试、skip/todo 或只加类名绕过。债务 allowlist 已空（hits=0）。Investigation 目标态：record/manifest/index/supersede/stale-propagation 同一事务；renderer 唯一读取通道 `investigation:read({ sessionId, artifactId, expectedHash })`；Mission 正常 `completed` 须可解引用 `MissionCheckpoint`、`kind=report`/`status=ready` 及完整章节，并由 `turn_complete.evidenceRefs` 精确绑定当前报告 URI 和内容哈希，终答存在且交付结果（见 `ARCHITECTURE.md` 裁决 E / L）。**当前态**：事务已落地（journal / temp-set / commit marker / atomic replace）；完成合同在声明及终答提交时复核结构化报告引用与资格；IPC `investigation:read({ sessionId, artifactId, expectedHash })` **已落地**；投影携带完整 `contentHash`（renderer 只缩显）。T18 知识导入 已证见 `ARCHITECTURE.md` T18 已证组。产品级 Browser QA 全矩阵见 U05；历史 Mission 运行见 U06。
 
 ### 3.7 Mission Plan-Only 与 Run Schema
 
@@ -251,16 +251,16 @@ Confidence 与 Verification **分离**，禁止用单个 `0.92` 代替二者。
 | `epistemicStatus` | 偏序四值之一 |
 | `worldStateId` | 必填；`S-STATE-01` |
 | `source` | tool / 人工 / 外部文档，含参数指纹 |
-| `artifactRefs` | 可解引用的 Session Artifact |
-| `contentHashes` | 对应内容 sha256 |
+| `artifactRefs` | 可解引用的 Session Artifact URI 与内容 sha256；写入时提供 |
+| `contentHashes` | 存储记录中由 `artifactRefs` 确定性生成的对应摘要；写入时不提供 |
 | `taskRef` | 可选通用 task id |
 | `claimIds` | 支撑或反驳的 Claim |
 | `experimentId` | 可选；若存在必须可解引用 `ExperimentRecord` |
-
-`source.kind=tool`、`epistemicStatus=observed` 且 `strength=strong` 的非 stale Evidence 必须有至少一组可解引用的 `artifactRefs` / `contentHashes`。没有原始回执时只能记为未知或较弱的待核观察，不能把工具名称和参数指纹当成执行证明。
 | `region` | 像素 / event / 资源范围 |
 | `strength` | 对所引 Claim 的支持强度 |
 | `stale` | World State 失效后必须为 true |
+
+`source.kind=tool`、`epistemicStatus=observed` 且 `strength=strong` 的非 stale Evidence 必须有至少一组可解引用且摘要匹配的 `artifactRefs`。Evidence 与 EvidencePack 的写入只接收这组来源；领域服务生成记录的 `contentHashes` 并保持原有读取校验。历史记录和签名不改写。没有原始回执时只能记为未知或较弱的待核观察，不能把工具名称和参数指纹当成执行证明。
 
 ### 8.4 `ClaimRecord`
 
@@ -389,6 +389,8 @@ Kind Registry（闭集，无悬空 `kind`）。`kind` 必须解析到唯一 `{ r
 1. `sourceRefs.length >= 1`，每项为 `ArtifactSourceRef`，`artifactId` 可解引用
 2. 每个 `expectedHash` 与该源当前内容 sha256 匹配；本条 `contentHash` 与 `contentRef` 正文 sha256 匹配
 3. `kind` 经 Registry 得到 `recordType + schema`，且正文按该 schema 通过
+
+提交 `ready` 更新时按事务中完成失效传播后的来源 hash 再核对一次；若该更新自身会改变引用来源，则拒绝整笔写入并保留原版本，不能提交一条立即失效的 ready 记录。
 
 版本更新把旧清单标 `superseded`，`supersedes` 指向旧 `artifactId`，保留历史引用。若 WorldState 的替代版本使用不同 `worldStateId`，同一事务将仍绑定旧 ID 的记录及其依赖标为 `stale`，不自动把旧证据重绑到新状态；Claim／ClaimSet 或 Evidence／EvidencePack 替代时若旧 `claimId`／`evidenceId` 不再由现行记录拥有，也须在同一事务将其当前语义依赖标为 `stale`：包括实验的假设和恢复验证证据、Challenge 目标、Report 证据及下游记录，包括经已失效 Challenge 的 `openChallenges` 或已失效 Experiment 的 `completedExperiments` 关联的 Checkpoint，不能让旧记录因失去活动假设而阻断列表或上下文归档。既有遗漏传播的记录在列表、读取或右栏投影前核实索引和旧状态后以同样事务修复，也须传播索引中已经失效的 Challenge／Experiment；投影须使用修复后的状态与内容 hash。新 Checkpoint 的当前语义引用不得复活失效的 Challenge／Experiment；`criticalArtifactRefs` 与来源引用仍可保留经 hash 核验的历史制品作审计。已取代或失效记录仍须通过索引、清单、schema 和内容 hash 校验，供审计与上下文完整归档；它们不再承担当前语义不变量，也不得作为当前结论的有效证据。现行记录继续执行完整引用和领域不变量校验。原始 Provider opaque payload 不进 Artifact。引用解析失败、hash 不一致或 `kind` 未登记则不得标 `ready`。
 

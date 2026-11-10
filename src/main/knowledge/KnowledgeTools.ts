@@ -96,7 +96,7 @@ function createKnowledgeBrowseTool(deps: KnowledgeToolDependencies): AgentTool {
         const spaces = deps.query.listSpaces();
         const lines = spaces.map((space) => `${space.spaceId}\t${space.kind}\t${space.label}`);
         return textResult(
-          lines.length > 0 ? `spaces\t${spaces.length}\n${lines.join('\n')}` : 'No Knowledge spaces are available.',
+          lines.length > 0 ? `spaces\t${spaces.length}\n${lines.join('\n')}\nSpace list only; pass a spaceId to list its cards.` : 'No Knowledge spaces are available.',
           { count: spaces.length, spaceIds: spaces.map((space) => space.spaceId) },
         );
       }
@@ -140,8 +140,14 @@ function createKnowledgeSearchTool(deps: KnowledgeToolDependencies): AgentTool {
         `${(request.offset ?? 0) + index + 1}. ${hit.title} · ${hit.type ?? 'unknown'} · ${hit.lifecycle ?? 'unknown'} · ${hit.lanes.join('+')} · ${hit.cardId} · sha256:${hit.contentHash} · ${hit.spaceId}/${hit.relativePath}${hit.topics?.length ? ` · topics: ${hit.topics.map(topic => topic.label).join(', ')}` : ''}${hit.preview ? `\n   ${hit.preview.replace(/\s+/gu, ' ')}` : ''}`
       ));
       const header = `${result.total ?? result.hits.length} hits${result.nextOffset !== undefined ? ` · next offset ${result.nextOffset} · revision ${result.revision}` : ''}`;
+      const emptyTextHint = request.text && (result.total ?? result.hits.length) === 0
+        ? '\nNo matches for the current query and filters. Multiword text queries require all terms; try individual terms or browse a selected space before concluding that related cards are absent.'
+        : '';
+      const scopedEmptyHint = emptyTextHint && request.spaceIds?.length
+        ? '\nOnly the selected spaces were searched; other spaces were not searched. If relevant, omit spaceIds to search accessible spaces.'
+        : '';
       return textResult(
-        lines.length > 0 ? `${header}\n${lines.join('\n')}` : header,
+        lines.length > 0 ? `${header}\n${lines.join('\n')}` : `${header}${emptyTextHint}${scopedEmptyHint}`,
         {
           count: result.total ?? result.hits.length,
           revision: result.revision,

@@ -144,6 +144,21 @@ it('records a same-input recovery epoch and stops if the same native failure rec
   expect(f.host.reopenAfterFailure).toHaveBeenCalledOnce();
 });
 
+it('verifies the entry position after recovery without claiming a terminal receipt early', async () => {
+  const f = fixture(); await f.controller.initialize();
+  await f.controller.prepareRecovery(1);
+  const recovered = await f.controller.recover();
+  const returned = structuredClone(recovered.current); returned.native.eventId = 42; f.setCurrent(returned);
+  expect(await f.controller.restore()).toEqual({ changed: false });
+  expect(await f.controller.restorationStatus()).toMatchObject({ restored: true,
+    original: { native: { contextId: 'context-a', eventId: 42 } },
+    current: { native: { contextId: 'context-a-reopened', eventId: 42 } },
+    receipt: { uri: 'session://tool-outputs/1.json' } });
+  expect(f.receipts.some(receipt => receipt.event === 'resolved')).toBe(false);
+  expect(await f.controller.recordTerminalRestoration()).toBe(true);
+  expect(f.receipts.at(-1)).toMatchObject({ event: 'resolved', observed: { native: { contextId: 'context-a-reopened' } } });
+});
+
 it('does not reopen when the permission or verification guard fails', async () => {
   const f = fixture(); await f.controller.initialize();
   vi.mocked(f.host.inspectRecovery).mockRejectedValueOnce(new Error('RDC_RECOVERY_PROCESS_CHANGED'));

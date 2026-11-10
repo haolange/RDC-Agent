@@ -51,6 +51,84 @@ describe('FileTaskStore', () => {
     await expect(store.listTasks()).resolves.toEqual([]);
   });
 
+  it('does not recreate or fail on an empty Task scope removed during a projection read', async () => {
+    const parent = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-store-')); roots.push(parent);
+    const dir = path.join(parent, 'session');
+    await fsPromises.mkdir(dir);
+    const statePath = path.join(dir, 'task-state.json');
+    const realReadFile = (await vi.importActual<typeof import('fs/promises')>('fs/promises')).readFile;
+    let enter!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>(resolve => { enter = resolve; });
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const spy = vi.spyOn(fsPromises, 'readFile').mockImplementation(async (...args: Parameters<typeof fsPromises.readFile>) => {
+      if (args[0] === statePath) { enter(); await gate; }
+      return realReadFile(...args);
+    });
+    try {
+      const read = new FileTaskStore(dir).listTasks();
+      await entered;
+      await rm(dir, { recursive: true });
+      release();
+      await expect(read).resolves.toEqual([]);
+      await expect(fsPromises.stat(dir)).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+      release();
+      spy.mockRestore();
+    }
+  });
+
+  it('does not create Task storage when reading an empty or deleted session', async () => {
+    const parent = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-store-')); roots.push(parent);
+    const dir = path.join(parent, 'session');
+    const store = new FileTaskStore(dir);
+    await expect(store.listTasks()).resolves.toEqual([]);
+    await expect(fsPromises.stat(dir)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('reads consistently when the first Task write starts during an empty read', async () => {
+    const parent = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-store-')); roots.push(parent);
+    const dir = path.join(parent, 'session');
+    const target = path.join(dir, 'task-state.json');
+    const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises');
+    let startRead!: () => void; let releaseRead!: () => void;
+    let startRename!: () => void; let releaseRename!: () => void;
+    let readDirectory!: () => void;
+    const readStarted = new Promise<void>(resolve => { startRead = resolve; });
+    const readGate = new Promise<void>(resolve => { releaseRead = resolve; });
+    const renameStarted = new Promise<void>(resolve => { startRename = resolve; });
+    const renameGate = new Promise<void>(resolve => { releaseRename = resolve; });
+    const directoryRead = new Promise<void>(resolve => { readDirectory = resolve; });
+    let firstRead = true; let firstRename = true;
+    const readSpy = vi.spyOn(fsPromises, 'readFile').mockImplementation(async (...args: Parameters<typeof fsPromises.readFile>) => {
+      if (args[0] === target && firstRead) { firstRead = false; startRead(); await readGate; }
+      return actual.readFile(...args);
+    });
+    const renameSpy = vi.spyOn(fsPromises, 'rename').mockImplementation(async (from, to) => {
+      if (to === target && firstRename) { firstRename = false; startRename(); await renameGate; }
+      return actual.rename(from, to);
+    });
+    const readdirSpy = vi.spyOn(fsPromises, 'readdir').mockImplementation(async (...args: Parameters<typeof fsPromises.readdir>) => {
+      const entries = await actual.readdir(...args);
+      if (args[0] === dir && entries.some(entry => String(entry).endsWith('.tmp'))) readDirectory();
+      return entries;
+    });
+    try {
+      const store = new FileTaskStore(dir);
+      const read = store.listTasks();
+      await readStarted;
+      const write = store.commit({});
+      await renameStarted;
+      releaseRead();
+      await directoryRead;
+      releaseRename();
+      await expect(Promise.all([read, write])).resolves.toEqual([[], undefined]);
+    } finally {
+      releaseRead(); releaseRename();
+      readSpy.mockRestore(); renameSpy.mockRestore(); readdirSpy.mockRestore();
+    }
+  });
+
   it('rejects malformed canonical records and dangling execution references', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-store-'));
     roots.push(dir);

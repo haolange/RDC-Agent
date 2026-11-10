@@ -1,4 +1,5 @@
 import type {
+  ArtifactSourceRef,
   InvestigationArtifactManifest,
   InvestigationRecord,
   WorldState,
@@ -72,6 +73,20 @@ export function assertTripleContentHash(
 export function isReadySourceDriftError(error: unknown): boolean {
   return error instanceof InvestigationError
     && (error.code === 'INVESTIGATION_HASH_MISMATCH' || error.code === 'INVESTIGATION_REF_UNRESOLVED');
+}
+
+/** Propagation may change a source after the initial ready check but before commit. */
+export function assertReadySourcesUnchanged(sources: readonly ArtifactSourceRef[], staged: InvestigationIndexDocument): void {
+  for (const source of sources) {
+    const entry = staged.artifacts.find((item) => item.artifactId === source.artifactId);
+    if (!entry || !hashesEqual(source.expectedHash, entry.contentHash)) {
+      throw new InvestigationError(
+        'INVESTIGATION_HASH_MISMATCH',
+        `source ${source.artifactId} changes during this write; no records were committed. Read the source and replacement, then preserve referenced logical IDs or use evidence that remains valid.`,
+        { invariantId: 'S-CTX-01' },
+      );
+    }
+  }
 }
 
 export function assertInvestigationIndexIntegrity(

@@ -62,6 +62,14 @@ function valuesEqual(left: JsonValue, right: JsonValue): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function modelIdentityProvenance(model: EffectiveModel) {
+  // Freshness is validated during catalog resolution; renewal alone does not
+  // change the source or executable model facts bound to a continuation.
+  return model.provenance.map(evidence => Object.fromEntries(
+    Object.entries(evidence).filter(([key]) => !['observedAt', 'refreshedAt', 'expiresAt'].includes(key)),
+  ));
+}
+
 function mergePatch(target: JsonObject, patch: JsonObject, prefix = ''): string | undefined {
   for (const [key, value] of Object.entries(patch)) {
     const field = prefix ? `${prefix}.${key}` : key;
@@ -399,7 +407,7 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
   const catalogRevision = model.catalogRevision ?? revisionFor({
     providerId: model.providerId,
     modelId: model.modelId,
-    provenance: model.provenance,
+    provenance: modelIdentityProvenance(model),
   });
   const appliedBindingIds = binding ? [binding.id] : [];
   const contextMode = maxMode ? 'one-million' as const : 'normal' as const;
@@ -429,7 +437,7 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
       catalogRevision,
       routeRevision: selectedRouteRevision,
       effectiveModelId,
-      provenance: effectiveModel.provenance,
+      provenance: modelIdentityProvenance(effectiveModel),
     }),
     compatibilityGroup: contracts.compatibilityGroup,
     bindingIds: appliedBindingIds,

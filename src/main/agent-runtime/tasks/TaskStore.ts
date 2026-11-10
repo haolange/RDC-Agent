@@ -139,8 +139,30 @@ export class FileTaskStore implements TaskStore {
   }
 
   private async readState(): Promise<TaskStateDocument> {
-    await this.ensureInitialized();
-    return this.readStateFile();
+    const pending = initializations.get(this.root);
+    if (pending) await pending;
+    try {
+      return await this.readStateFile();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    let entries: string[];
+    try {
+      entries = await fs.readdir(this.root);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return emptyState();
+      throw error;
+    }
+    // A first writer may have started while the missing state was being read.
+    const current = initializations.get(this.root);
+    if (current && current !== pending) {
+      await current;
+      return this.readStateFile();
+    }
+    if (entries.length) {
+      throw new Error('TASK_STORAGE_REQUIRES_CONVERSION: nonempty task storage has no current task-state.json; original files were preserved.');
+    }
+    return emptyState();
   }
 
   private async ensureInitialized(): Promise<void> {

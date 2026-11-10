@@ -3,14 +3,14 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationPlanReview, PlanReviewStateDocument } from '@shared/types/planReview';
 const fixture = vi.hoisted(() => ({ state: null as PlanReviewStateDocument | null, history: [] as ConversationMessage[],
-  content: 'A verified plan', failWrite: false, freeze: vi.fn(), offer: vi.fn() }));
+  content: 'A verified plan', failWrite: false, freeze: vi.fn(), offer: vi.fn(), readOffer: vi.fn() }));
 vi.mock('../store/StorageAdapter', () => ({ storageAdapter: {
   sessions: { findSessionLocation: () => ({ sessionPath: '/session' }) },
   io: { readJson: () => fixture.state, writeJsonAtomic: (_path: string, state: PlanReviewStateDocument) => {
     if (fixture.failWrite) throw new Error('disk failed'); fixture.state = structuredClone(state);
   } }, readConversationHistory: () => fixture.history, readConversationBranchState: () => null,
   readSession: () => ({ sessionId: 'session', projectId: 'project' }), getProjectById: () => ({ rootPath: '/project' }),
-  executionOffers: { clear: vi.fn() },
+  executionOffers: { clear: vi.fn(), read: fixture.readOffer },
 } }));
 vi.mock('./sessionPlanArtifact', () => ({ planArtifactWriter: {
   readMarkdown: (_session: string, uri: string, hash: string) => {
@@ -18,7 +18,7 @@ vi.mock('./sessionPlanArtifact', () => ({ planArtifactWriter: {
     return { markdown: fixture.content, hash, uri };
   }, freezeApprovedPlan: (...args: unknown[]) => fixture.freeze(...args),
 } }));
-vi.mock('../../conversation/applyDeclaredHandoff', () => ({ assertDeclaredHandoffForPlan: vi.fn(), writeExecutionOfferFromApproval: (...args: unknown[]) => fixture.offer(...args) }));
+vi.mock('../../conversation/applyDeclaredHandoff', () => ({ assertDeclaredHandoffForPlan: vi.fn(() => ({ agent: 'general', label: 'Execute', prompt: 'Continue', send: true, requiredSkillIds: [], requiredToolIds: [] })), writeExecutionOfferFromApproval: (...args: unknown[]) => fixture.offer(...args) }));
 import { AgentPlanReviewRequestService } from '../../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { readReferencedPlan } from './sessionPlanReference';
 const hash = createHash('sha256').update('A verified plan').digest('hex');
@@ -66,6 +66,17 @@ it('keeps Stop durable, reopens only explicitly, and rejects an earlier review i
 it.each(['approved', 'rejected', 'superseded'] as const)('does not restore %s state', status => {
   fixture.state!.status = status;
   expect(new AgentPlanReviewRequestService().projection('session').review).toBeNull();
+});
+it('projects an approved but unsent handoff after restart without reopening review or sending', () => {
+  fixture.state = { ...fixture.state!, status: 'approved', approvedHash: hash, frozenUri: 'session://plans/frozen.md',
+    approvedHandoff: { agent: 'general', label: 'Execute' }, updatedAt: 10 };
+  fixture.readOffer.mockReturnValue({ schemaVersion: '1', sourceAgentId: 'debugger', targetAgentId: 'general',
+    plan: { uri: fixture.state.frozenUri, hash }, label: 'Execute', prompt: 'Continue',
+    requiredSkillIds: [], requiredToolIds: [], approvedAt: 10 });
+  const projection = new AgentPlanReviewRequestService().projection('session');
+  expect(projection.review).toBeNull();
+  expect(projection.approvedHandoff).toMatchObject({ agent: 'general', label: 'Execute', planHash: hash });
+  expect(fixture.state.status).toBe('approved'); expect(fixture.offer).not.toHaveBeenCalled();
 });
 it.each(['hash', 'owner', 'branch', 'revision'])('fails closed after %s changes', async change => {
   const service = new AgentPlanReviewRequestService(); const review = service.projection('session').review!;

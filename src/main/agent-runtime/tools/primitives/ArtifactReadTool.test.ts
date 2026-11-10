@@ -31,11 +31,19 @@ describe('ArtifactReadTool', () => {
       expect(result.content[0]).toMatchObject({ text: expect.stringContaining(`utf8-sha256=${textView.sha256}`) });
       expect(recordedRequest).not.toHaveBeenCalled();
       read.mockClear();
+      const automatic = await artifactReadTool.execute('automatic', { uri, search: 'needle' }, undefined, undefined, context);
+      expect(read).toHaveBeenCalledWith('parent-text', uri, expect.objectContaining({ expectedHash: hash, search: 'needle' }));
+      expect(read.mock.calls[0][2]).not.toHaveProperty('textPointer');
+      expect(automatic.details).toMatchObject({ hash, textView });
+      expect(automatic.content[0]).toMatchObject({ text: expect.stringContaining(`utf8-sha256=${textView.sha256}`) });
+      read.mockClear();
       const denied = await artifactReadTool.execute('denied', { uri: 'session://tool-outputs/private.json', textPointer: '/source', search: 'needle' }, undefined, undefined, context);
       expect(denied.isError).toBe(true);
+      expect(denied.content[0]).toMatchObject({ text: expect.stringContaining('ARTIFACT_SESSION_DENIED') });
       expect(read).not.toHaveBeenCalled();
       const changed = await artifactReadTool.execute('changed', { uri, expectedHash: '0'.repeat(64), textPointer: '/source', search: 'needle' }, undefined, undefined, context);
       expect(changed.isError).toBe(true);
+      expect(changed.content[0]).toMatchObject({ text: expect.stringContaining('ARTIFACT_HASH_MISMATCH') });
       expect(read).not.toHaveBeenCalled();
     } finally { release(); }
   });

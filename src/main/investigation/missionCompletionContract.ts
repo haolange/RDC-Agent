@@ -8,6 +8,7 @@ import {
 import { InvestigationArtifactService, investigationArtifactService } from './InvestigationArtifactService';
 import type { InvestigationReadResult } from './investigationArtifactWrite';
 import { InvestigationError } from './investigationErrors';
+import { hashesEqual } from './investigationHash';
 import { assertOptimizerExperimentClose, assertReportContractPresent } from './investigationInvariants';
 import { openReportChallenges } from './reportChallengeEligibility';
 
@@ -18,7 +19,8 @@ export type MissionCompletionDenialReason =
   | 'missing_report'
   | 'report_not_ready'
   | 'incomplete_chapters'
-  | 'final_not_bound'
+  | 'report_not_bound'
+  | 'missing_final_answer'
   | 'non_complete_status'
   | 'open_challenge'
   | 'budget_evidence'
@@ -28,7 +30,6 @@ export class MissionCompletionError extends Error {
   readonly code = MISSION_COMPLETION_DENIED;
   readonly reason: MissionCompletionDenialReason;
   readonly details?: Record<string, unknown>;
-
   constructor(
     reason: MissionCompletionDenialReason,
     message: string,
@@ -54,10 +55,6 @@ export function isAllowedMissionCompletionStatus(statusChapter: string): boolean
 
 export function reportStatusForbidsCompleted(statusChapter: string): boolean {
   return !isAllowedMissionCompletionStatus(statusChapter);
-}
-
-export function finalAnswerCitesReport(text: string, artifactId: string, contentHash: string): boolean {
-  return text.includes(artifactId) && text.includes(contentHash);
 }
 
 export interface MissionCompletionInput extends TurnCompletionInput {
@@ -95,21 +92,12 @@ export function enforceMissionTurnCompletion(input: MissionCompletionInput): Mis
   return assertMissionTurnCompletion(input);
 }
 
-/** Check current report eligibility before a completed declaration; final text is checked later. */
+/** Check the declared report before completion and check it again at the terminal boundary. */
 export function enforceMissionTurnReadiness(input: MissionReadinessInput): void {
   if (!declaredMission(input) || input.disposition !== 'completed') return;
   const { mission, sessionId, service, readyReports } = requireMissionCompletionArtifacts(input);
-  let denial: MissionCompletionError | undefined;
-  for (const report of readyReports) {
-    try {
-      assertReportEligible(report, mission, service, sessionId);
-      return;
-    } catch (error) {
-      if (!isMissionCompletionError(error)) throw error;
-      denial ??= error;
-    }
-  }
-  throw denial ?? new MissionCompletionError('missing_report', `${mission} has no eligible ready report`);
+  const report = requireReferencedReport(input, mission, readyReports);
+  assertReportEligible(report, mission, service, sessionId);
 }
 
 function requireMissionCompletionArtifacts(input: MissionReadinessInput): {
@@ -170,24 +158,10 @@ function requireMissionCompletionArtifacts(input: MissionReadinessInput): {
 
 export function assertMissionTurnCompletion(input: MissionCompletionInput): MissionCompletionReceipt {
   const { mission, sessionId, service, checkpoint, readyReports } = requireMissionCompletionArtifacts(input);
-  const finalAnswer = input.finalAnswerText ?? '';
-
-  const cited = readyReports.filter((entry) => (
-    finalAnswerCitesReport(finalAnswer, entry.manifest.artifactId, entry.contentHash)
-  ));
-  if (cited.length < 1) {
-    const reportRefs = readyReports.map((entry) => `${entry.manifest.artifactId} ${entry.contentHash}`);
-    throw new MissionCompletionError(
-      'final_not_bound',
-      `canonical final_answer must cite one ready report artifactId and its exact contentHash, including the sha256: prefix. Ready report references: ${reportRefs.join('; ')}`,
-      {
-        mission,
-        reportArtifactIds: readyReports.map((entry) => entry.manifest.artifactId),
-      },
-    );
+  if (!input.finalAnswerText.trim()) {
+    throw new MissionCompletionError('missing_final_answer', 'Mission completion requires a canonical final answer.');
   }
-
-  const report = cited[cited.length - 1]!;
+  const report = requireReferencedReport(input, mission, readyReports);
   assertReportEligible(report, mission, service, sessionId);
 
   return {
@@ -196,6 +170,22 @@ export function assertMissionTurnCompletion(input: MissionCompletionInput): Miss
     reportArtifactId: report.manifest.artifactId,
     reportContentHash: report.contentHash,
   };
+}
+
+function requireReferencedReport(
+  input: MissionReadinessInput,
+  mission: InvestigationMission,
+  readyReports: InvestigationReadResult[],
+): InvestigationReadResult {
+  const referenced = readyReports.filter(report => (input.evidenceRefs ?? []).some(ref => (
+    ref.uri === report.contentUri && hashesEqual(ref.hash, report.contentHash)
+  )));
+  const report = referenced.at(-1);
+  if (report) return report;
+  const reportRefs = readyReports.map(entry => `${entry.contentUri} ${entry.contentHash}`);
+  throw new MissionCompletionError('report_not_bound',
+    `turn_complete evidenceRefs must include the exact URI and contentHash of a current ready report. Ready report references: ${reportRefs.join('; ')}`,
+    { mission, reportArtifactIds: readyReports.map(entry => entry.manifest.artifactId) });
 }
 
 function assertReportEligible(

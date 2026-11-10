@@ -92,21 +92,22 @@ export class RuntimeToolAssembly {
     return {
       name: 'turn_complete',
       label: 'Complete Turn',
-      description: 'Declare structured turn completion. Use only when the requested work is complete, partial, blocked, cancelled, or paused by budget.',
+      description: 'Declare structured turn completion. For partial or blocked work, identify the remaining checks and the actual reason they cannot proceed now; an unknown or unfinished result alone is not a blocker. Continue useful, authorized checks when possible. Preserve genuine cancellation, limits, failures, and no-progress stops.',
       parameters: {
         type: 'object',
         required: ['disposition'],
         properties: {
           disposition: { type: 'string', enum: ['completed', 'partial', 'blocked', 'cancelled', 'budget_paused'] },
           evidenceRefs: {
-            type: 'array', items: { type: 'object', required: ['uri', 'hash'], properties: { uri: { type: 'string' }, hash: { type: 'string' } } },
+            type: 'array', description: 'Exact URI and hash of artifacts supporting this declaration; use the values returned by the artifact tools.',
+            items: { type: 'object', required: ['uri', 'hash'], properties: { uri: { type: 'string' }, hash: { type: 'string' } } },
           },
           result: {
             type: 'object', required: ['summary', 'outputs', 'counterevidence', 'unresolved', 'scope', 'sideEffects', 'recoveryState'], additionalProperties: false,
             properties: {
               summary: { type: 'string', maxLength: 4000 }, outputs: { type: 'object', description: 'Named string outputs matching the Task completion requirements. Serialize structured values as strings.' },
               counterevidence: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
-              unresolved: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
+              unresolved: { type: 'array', description: 'Remaining work and the concrete reason it cannot proceed now; distinguish an unperformed check from a failed or unavailable one.', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
               scope: { type: 'string', maxLength: 4000 }, sideEffects: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
               recoveryState: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
             },
@@ -290,7 +291,7 @@ export class RuntimeToolAssembly {
     return {
       name: 'plan_artifact',
       label: 'Submit Plan for Review',
-      description: 'Submit the current session plan for in-loop human review. Title, a 1-4 item summary, and Markdown content are required. The runtime writes session://plans/plan.md and pauses until the user approves or rejects. Approval freezes the plan; the user clicks a declared continue action to proceed.',
+      description: 'Submit the current session plan for in-loop human review. Title, a 1-4 item summary, and Markdown content are required. Settle current direct Tasks with their actual results first; approval ends the planning turn. Keep post-approval work pending rather than starting it during planning. The runtime writes session://plans/plan.md and pauses until the user approves or rejects. Approval freezes the plan; the user clicks a declared continue action to proceed.',
       parameters: {
         type: 'object',
         required: ['title', 'summary', 'content'],
@@ -304,7 +305,7 @@ export class RuntimeToolAssembly {
             description: 'One to four concise summary lines. Do not put the full plan here.',
           },
           content: { type: 'string', description: 'Markdown plan body. Use ## headings for sections.' },
-          requiredTaskIds: { type: 'array', maxItems: 128, items: { type: 'string', minLength: 1 }, description: 'Existing owning-session Tasks required by this plan; canonical owner planner only, not delegated Capsules. Main freezes goals, output keys, dependencies and executionRequirements into the reviewed hash. Bind mandatory direct, isolated-analysis and independent-review work. Later in-scope detail Tasks remain possible; do not place task contracts in Markdown or metadata.' },
+          requiredTaskIds: { type: 'array', maxItems: 128, items: { type: 'string', minLength: 1 }, description: 'Existing owning-session Tasks required by this plan; canonical owner planner only, not delegated Capsules. If this planning turn created unfinished Tasks, explicitly supply the required IDs or [] when none are required. Main freezes goals, output keys, dependencies and executionRequirements into the reviewed hash. Bind mandatory direct, isolated-analysis and independent-review work. Later in-scope detail Tasks remain possible; do not place task contracts in Markdown or metadata.' },
           captureScope: { type: 'object', additionalProperties: false, required: ['inputIds', 'deviceId', 'comparisonGoal'], description: 'For any planned live RDC work, including a single current capture and its recovery or restoration, list the intended registered project input IDs, the already selected replay device ID, and the investigation goal. Read these IDs from runtime_context.capturePlanning. The host verifies and freezes their content hashes for user review. Offline-only plans may omit this field.', properties: {
             inputIds: { type: 'array', minItems: 1, maxItems: 32, items: { type: 'string', minLength: 1 } },
             deviceId: { type: 'string', minLength: 1 }, comparisonGoal: { type: 'string', minLength: 1, maxLength: 4000 },
@@ -657,7 +658,7 @@ export class RuntimeToolAssembly {
           generation: turnHandle.generation,
         });
         if (unfinished.length > 0) {
-          throw new Error(`TASK_COMPLETION_DENIED: Settle direct Tasks before turn_complete with task_update(status=completed or blocked): ${unfinished.map((item) => item.taskId).join(', ')}.`);
+          throw new Error(`TASK_COMPLETION_DENIED: Settle direct Tasks before turn_complete with task_update(status=completed or blocked): ${unfinished.map((item) => item.taskId).join(', ')}. If useful work remains executable, keep its Task in progress and continue; mark it blocked only for a concrete reason that prevents further work, not merely because the result is unknown or unfinished.`);
         }
       }
       const scope = sessionId ? getDelegatedTaskScope(sessionId) : null;

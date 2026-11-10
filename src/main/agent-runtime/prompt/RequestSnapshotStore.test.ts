@@ -124,6 +124,17 @@ describe('RequestSnapshotStore', () => {
     expect(() => store.readUsage('session-a')).toThrow('REQUEST_USAGE_SCOPE_NOT_DIRECTORY');
   });
 
+  it('does not follow a linked child scope or delete the owning session when cleanup cannot verify it', () => {
+    store.write(sampleSnapshot());
+    const target = path.join(rootPath, 'foreign');
+    fs.mkdirSync(target);
+    fs.writeFileSync(path.join(target, 'keep.txt'), 'untouched');
+    fs.symlinkSync(target, path.join(rootPath, 'session-a--subagent--child'), 'junction');
+    expect(() => store.removeSession('session-a')).toThrow('REQUEST_SNAPSHOT_SCOPE_NOT_DIRECTORY');
+    expect(store.list('session-a')).toHaveLength(1);
+    expect(fs.readFileSync(path.join(target, 'keep.txt'), 'utf8')).toBe('untouched');
+  });
+
   it('rejects linked turn inventories and non-file commits instead of silently undercounting', () => {
     store.write(sampleSnapshot());
     const scope = path.join(rootPath, 'session-a');

@@ -208,7 +208,7 @@ export async function readCompactionAuthorityState(sessionId: string): Promise<s
   });
   return JSON.stringify({ tasks: taskRecords, executions, artifactRefs, investigation });
 }
-export async function saveCompactionAuthoritySource(sessionId: string, journalMessages: Message[]): Promise<{ uri: string; hash: string; context: string; stateHash: string; parts: Array<{ uri: string; hash: string }>; journalPrefix?: { uri: string; hash: string; count: number } }> {
+export async function saveCompactionAuthoritySource(sessionId: string, journalMessages: Message[]): Promise<{ uri: string; hash: string; context: string; stateHash: string; artifactRefs: AuthorityState['artifactRefs']; parts: Array<{ uri: string; hash: string }>; journalPrefix?: { uri: string; hash: string; count: number } }> {
   const owner = delegatedArtifactOwner(sessionId) ?? sessionId;
   const authorityContext = await readCompactionAuthorityState(sessionId);
   const uri = `session://tool-outputs/compaction-authority/${generateShortId()}.json`;
@@ -266,7 +266,7 @@ export async function saveCompactionAuthoritySource(sessionId: string, journalMe
     ? (parts.push(write(uri.replace('.json', `-part-${parts.length}.json`), JSON.stringify({ chunks: group }, null, 2))), { encoding: 'json-chunk-parts', reconstruction: 'Read each part by URI/hash in order, join all chunks without separators, then parse JSON.', parts })
     : { encoding: 'json-chunks', reconstruction: 'Join chunks without separators, then parse JSON.', chunks };
   const saved = write(uri, JSON.stringify(body, null, 2));
-  return { ...saved, context, stateHash, parts: [...parts, ...media.map(({ uri, hash }) => ({ uri, hash }))], journalPrefix };
+  return { ...saved, context, stateHash, artifactRefs: fullState.artifactRefs, parts: [...parts, ...media.map(({ uri, hash }) => ({ uri, hash }))], journalPrefix };
 }
 export function verifyCompactionAuthoritySource(sessionId: string, ref: { uri: string; hash: string; parts?: Array<{ uri: string; hash: string }>; journalPrefix?: { uri: string; hash: string; count: number } }): void {
   const owner = delegatedArtifactOwner(sessionId) ?? sessionId;

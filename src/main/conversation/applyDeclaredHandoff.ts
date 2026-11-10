@@ -15,6 +15,7 @@ export interface ApplyDeclaredHandoffInput {
   sessionId: string;
   agent: string;
   label: string;
+  expectedPlanHash?: string;
 }
 
 export interface ApplyDeclaredHandoffResult {
@@ -67,6 +68,16 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
     return { success: false, error: 'DECLARED_HANDOFF_NOT_FOUND: continue action is not declared on the current or offering profile.' };
   }
   const approved = planReviewStateStore.read(input.sessionId);
+  if (input.expectedPlanHash && (approved?.status !== 'approved' || approved.approvedHash !== input.expectedPlanHash)) {
+    return { success: false, error: 'PLAN_APPROVAL_CHANGED: the approved handoff is no longer the unsent plan.' };
+  }
+  const approvalChanged = () => {
+    if (!input.expectedPlanHash) return false;
+    const latest = planReviewStateStore.read(input.sessionId);
+    return latest?.status !== 'approved' || latest.approvedHash !== input.expectedPlanHash
+      || storageAdapter.readConversationHistory(input.sessionId).some(message => message.role === 'user' && message.createdAt >= latest.updatedAt);
+  };
+  if (approvalChanged()) return { success: false, error: 'PLAN_APPROVAL_CHANGED: the approved handoff is no longer the unsent plan.' };
   if (approved?.status === 'approved' && approved.approvedHash && approved.frozenUri) {
     try {
       if (approved.approvedHandoff?.agent !== input.agent || approved.approvedHandoff.label !== input.label) {
@@ -97,6 +108,7 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
   if (!await dispatchRuntimeHooks('agent.before-handoff', hookContext)) {
     return { success: false, error: 'HOOK_DENIED: agent.before-handoff' };
   }
+  if (approvalChanged()) return { success: false, error: 'PLAN_APPROVAL_CHANGED: the approved handoff is no longer the unsent plan.' };
   if (approved?.status === 'approved' && approved.approvedHash && approved.frozenUri) {
     storageAdapter.executionOffers.write(input.sessionId, {
       schemaVersion: EXECUTION_OFFER_SCHEMA,

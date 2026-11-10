@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { TaskRegistry } from './TaskRegistry';
 import { createTaskTools } from './TaskTools';
+import { snapshotTaskRequirement } from './TaskExecutionRequirements';
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
@@ -14,6 +15,80 @@ function textOf(result: { content: Array<{ type: string; text?: string }> }): st
 }
 
 describe('TaskTools', () => {
+  it('does not acknowledge a result without settling its execution', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-tools-'));
+    roots.push(dir);
+    const registry = new TaskRegistry(dir);
+    const task = await registry.createTask('Investigate before review');
+    const update = createTaskTools(registry).find(tool => tool.name === 'task_update')!;
+    const result = { disposition: 'partial' as const, summary: 'Observed a limited result', outputs: { investigation: 'partial evidence' },
+      resultRef: 'session://tool-outputs/result.json', resultHash: 'a'.repeat(64) };
+
+    await update.execute('start', { taskId: task.id, status: 'in_progress' });
+    const firstId = (await registry.getTask(task.id))!.currentExecutionId!;
+    const deadline = Date.now() + 60_000;
+    await registry.updateExecutionBudget(firstId, { expectedGeneration: 1, toolCalls: 4, maxToolCalls: 10, deadlineAt: deadline });
+    await expect(update.execute('result-alone-running', { taskId: task.id, result })).rejects.toThrow('result must accompany');
+    await expect(registry.updateTask(task.id, { result })).rejects.toThrow('execution');
+    expect(await registry.getExecution(firstId)).toMatchObject({ status: 'running' });
+    expect((await registry.getTask(task.id))?.disposition).toBeUndefined();
+    const pending = await registry.createTask('Not started');
+    await expect(update.execute('start-with-result', { taskId: pending.id, status: 'in_progress', result }))
+      .rejects.toThrow('result must accompany');
+    expect((await registry.getTask(pending.id))?.status).toBe('pending');
+
+    await update.execute('blocked', { taskId: task.id, status: 'blocked', statusReason: 'Evidence still missing' });
+    await expect(update.execute('result-alone-settled', { taskId: task.id, result })).rejects.toThrow('result must accompany');
+    expect(await registry.getTask(task.id)).toMatchObject({ status: 'blocked', disposition: 'blocked' });
+    expect(await registry.getExecution(firstId)).toMatchObject({ status: 'blocked', result: { summary: 'Evidence still missing' } });
+
+    await update.execute('resume', { taskId: task.id, status: 'in_progress' });
+    const resumedId = (await registry.getTask(task.id))!.currentExecutionId!;
+    await update.execute('settle-partial', { taskId: task.id, status: 'blocked', result });
+    expect(await registry.getExecution(resumedId)).toMatchObject({ generation: 2, status: 'partial', result,
+      budget: { toolCalls: 4, maxToolCalls: 10, deadlineAt: deadline } });
+    expect(await registry.getTask(task.id)).toMatchObject({ status: 'blocked', disposition: 'partial' });
+  });
+
+  it('keeps a direct Task active when its result reference is invalid and allows correction', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-tools-'));
+    roots.push(dir);
+    const registry = new TaskRegistry(dir, { validateResultRef: async (_task, result) => result.resultRef === 'session://tool-outputs/result.json' && result.resultHash === 'a'.repeat(64) });
+    const task = await registry.createTask('Produce reviewable result');
+    const update = createTaskTools(registry).find(tool => tool.name === 'task_update')!;
+    await update.execute('start', { taskId: task.id, status: 'in_progress' });
+    const result = { disposition: 'completed', summary: 'Result prepared', outputs: { result: 'actual result' },
+      resultRef: 'reports/result.md', resultHash: 'a'.repeat(64) };
+    await expect(update.execute('invalid', { taskId: task.id, status: 'completed', result })).rejects.toThrow('result being reviewed');
+    expect((await registry.getTask(task.id))?.status).toBe('in_progress');
+    await update.execute('corrected', { taskId: task.id, status: 'completed', result: {
+      ...result, resultRef: 'session://tool-outputs/result.json', resultHash: `sha256:${'A'.repeat(64)}`,
+    } });
+    expect((await registry.getTask(task.id))?.status).toBe('completed');
+    const execution = await registry.getExecution((await registry.getTask(task.id))!.currentExecutionId!);
+    expect(execution?.result?.resultHash).toBe('a'.repeat(64));
+  });
+
+  it('explains and preserves dependencies between tasks created in the same batch', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-tools-'));
+    roots.push(dir);
+    const registry = new TaskRegistry(dir);
+    const byName = Object.fromEntries(createTaskTools(registry).map((tool) => [tool.name, tool]));
+    const created = await byName.task_create!.execute('batch', {
+      tasks: [{ subject: 'Collect evidence' }, { subject: 'Review evidence' }],
+    });
+    const [sourceId, reviewId] = (created.details as { ids: string[] }).ids;
+    expect(textOf(created)).toContain('task_update');
+    expect(textOf(created)).toContain('addBlockedBy');
+    expect(textOf(created)).toContain('independentOfTaskIds');
+    await byName.task_update!.execute('link', { taskId: reviewId, addBlockedBy: [sourceId],
+      executionRequirements: { mode: 'subagent', profileId: 'verifier', independentOfTaskIds: [sourceId] } });
+    const review = (await registry.getTask(reviewId!))!;
+    expect(snapshotTaskRequirement(review).blockedBy).toEqual([sourceId]);
+    expect(snapshotTaskRequirement(review).executionRequirements?.independentOfTaskIds).toEqual([sourceId]);
+    expect(await registry.canStart(reviewId!)).toBe(false);
+  });
+
   it('executes all five task tools', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-tools-'));
     roots.push(dir);

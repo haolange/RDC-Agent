@@ -9,10 +9,12 @@ import { cancelOwnedTaskExecution } from './TaskExecutionOwners';
 import { projectTaskItems, type ProjectedTaskItem } from './taskProjection';
 import { taskDependencyWait } from './taskDependencies';
 import { TaskExecutionRequirementsSchema, TaskRuntimeEpochSchema, type TaskExecutionRequirements, type TaskExecutionPreparation, type TaskRuntimeEpoch, type PlanTaskRequirement } from '@shared/types/taskExecution';
-import { assertApprovedTaskRequirement, assertTaskExecutionStart, assertTaskExecutionPreparation, assertTaskExecutionCompletion, assertIndependentReviewResult, readIndependentTaskSources, hashTaskRequirement, canReexecuteInvalidatedTask } from './TaskExecutionRequirements';
+import { assertApprovedTaskRequirement, assertTaskExecutionStart, assertTaskExecutionPreparation, assertTaskExecutionCompletion, assertIndependentReviewResult, readIndependentTaskSources, hashTaskRequirement, canReexecuteInvalidatedTask, canContinueReviewedSource, canContinueReviewWithNewSources } from './TaskExecutionRequirements';
 
 const TASK_RUNTIME_INSTANCE_ID = crypto.randomUUID();
 const CANCELLING_TASK_TREES = new Set<string>();
+const INVALID_RESULT_REFERENCE = 'Task result reference validation failed: provide an accessible owning-session URI and exact hash for the result being reviewed. A supporting receipt is not the result unless it is the actual work product.';
+export const INVALIDATED_REVIEW_GUIDANCE = 'To revise a reviewed result, reexecute the source Task with its unchanged definition (for direct work use task_update status=in_progress), settle it with the new resultRef and resultHash, then dispatch the same review Task with that current source; preserve consumption and deadlines.';
 class TaskCompletionUnavailable extends Error {
   constructor(message: string) {
     super(message.startsWith('TASK_EXECUTION_REQUIREMENTS:') ? message : `TASK_EXECUTION_REQUIREMENTS: ${message}`);
@@ -81,13 +83,19 @@ export class TaskRegistry {
   }
 
   async updateTask(taskId: string, updates: UpdateTaskOptions): Promise<TaskRecord> {
+    if (updates.result && updates.status !== 'completed') {
+      throw new Error('Task execution results must be settled by their execution owner; a Task update cannot replace an execution result.');
+    }
     if (updates.status === 'cancelled') return this.cancelTask(taskId, updates.statusReason);
     return this.store.withLock('state', async () => {
       const task = await this.requireTask(taskId); const next = updates.status ?? task.status;
       if (terminalTask(task.status) && next !== task.status) throw new Error(`Terminal task cannot transition from ${task.status} to ${next}.`);
       const semanticsChanged = updates.subject !== undefined || updates.description !== undefined || updates.completionRequirements !== undefined || updates.executionRequirements !== undefined || Boolean(updates.addBlockedBy?.length) || Boolean(updates.addBlocks?.length);
       if (terminalTask(task.status) && semanticsChanged) {
-        throw new Error('Terminal task semantics are immutable; create or reopen a new task revision explicitly.');
+        if (task.status === 'completed') {
+          throw new Error(`Completed Task definitions cannot change. ${INVALIDATED_REVIEW_GUIDANCE}`);
+        }
+        throw new Error('Cancelled Task definitions cannot change; explicitly resume the same Task only in a later user-requested turn.');
       }
       if (next === 'blocked' && !(updates.statusReason ?? task.statusReason)?.trim()) throw new Error('Blocked tasks require a statusReason.');
       if (next === 'in_progress' && !await this.canStart(taskId)) throw new Error('Task dependencies are not completed with verified results.');
@@ -124,15 +132,19 @@ export class TaskRegistry {
   async startExecution(taskId: string, options: StartTaskExecutionOptions): Promise<TaskExecutionRecord> {
     return this.store.withLock('state', async () => {
       const task = await this.requireTask(taskId);
-      const invalidated = await this.canContinueInvalidatedTask(task);
-      if (task.parentTaskId && await this.hasUnavailableAncestor(task.parentTaskId, invalidated)) throw new Error('Task ancestor is terminal or cancelling.');
+      const continuation = await this.canContinueInvalidatedTask(task) || await canContinueReviewedSource(task, this.store)
+        || await canContinueReviewWithNewSources(task, options, this.store);
+      if (task.parentTaskId && await this.hasUnavailableAncestor(task.parentTaskId, continuation)) throw new Error('Task ancestor is terminal or cancelling.');
       if (await this.hasCancellingAncestor(taskId)) throw new Error('Task or ancestor cancellation is in progress.');
       if (!await this.canStart(taskId)) throw new Error('Task dependencies are not completed with verified results.');
       await this.assertApprovedRequirement(task);
       await assertTaskExecutionStart(task, options, this.store);
       if (options.resumeCancelled) await this.assertCancelledContinuation(task, options);
-      else if (terminalTask(task.status) && !invalidated) throw new Error(`Terminal task cannot start another execution: ${task.status}.`);
-      if (task.status === 'in_progress') throw new Error('An in-progress task cannot start another execution. Settle or cancel and join its current execution first; a delegated runner starts its own execution.');
+      else if (terminalTask(task.status) && !continuation) {
+        const guidance = task.status === 'completed' && task.executionRequirements?.independentOfTaskIds.length ? ` ${INVALIDATED_REVIEW_GUIDANCE}` : '';
+        throw new Error(`Terminal task cannot start another execution: ${task.status}.${guidance}`);
+      }
+      if (task.status === 'in_progress') throw new Error('An in-progress task cannot start another execution. To delegate distinct work while this parent stays active, create a child Task with parentTaskId and dispatch that child. To retry the same Task, settle or cancel and join its current execution first; a delegated runner starts its own execution.');
       if (task.currentExecutionId) { const current = await this.store.loadExecution(task.currentExecutionId); if (current && !terminal(current.status)) throw new Error(`Task already has an active execution: ${current.id}. Settle or cancel and join it first; setting pending does not release it.`); }
       const previous = await this.store.listExecutions(taskId);
       const generation = Math.max(0, ...previous.map((x) => x.generation)) + 1;
@@ -162,12 +174,12 @@ export class TaskRegistry {
       this.assertCurrent(task, execution, options.expectedGeneration);
       if (terminal(execution.status)) {
         if (sameSettlement(execution, options)) return execution;
-        throw new Error('Task execution is already settled with a different terminal result.');
+        throw new Error('Task execution is already settled with a different terminal result. Inspect the Task with task_get; to continue useful work, start a new execution of the same Task with status=in_progress, preserving its consumption and deadline.');
       }
       if (execution.status === 'cancelling' && options.status !== 'cancelled') throw new Error('Task execution cancellation is in progress.');
       if (!terminal(options.status)) throw new Error('Execution status is not terminal.');
       validateResult(options.result, options.status);
-      if (this.options.validateResultRef && !await this.options.validateResultRef(task, options.result)) throw new Error('Task result reference validation failed.');
+      if (this.options.validateResultRef && !await this.options.validateResultRef(task, options.result)) throw new Error(INVALID_RESULT_REFERENCE);
       const missing = task.completionRequirements.filter((key) => !options.result.outputs[key]);
       if (options.result.disposition === 'completed' && missing.length) throw new Error(`Task result is missing requirements: ${missing.join(', ')}`);
       if (options.result.disposition === 'completed' && options.result.missingRequirements?.length) {
@@ -536,7 +548,7 @@ export class TaskRegistry {
     const missing = task.completionRequirements.filter((key) => !effective.outputs[key]);
     if (missing.length) throw new TaskCompletionUnavailable(`Task result is missing requirements: ${missing.join(', ')}`);
     await this.assertCompletionClosure(task, visiting);
-    if (this.options.validateResultRef && !await this.options.validateResultRef(task, effective)) throw new TaskCompletionUnavailable('Task result reference validation failed.');
+    if (this.options.validateResultRef && !await this.options.validateResultRef(task, effective)) throw new TaskCompletionUnavailable(INVALID_RESULT_REFERENCE);
     } finally { visiting.delete(task.id); }
   }
   private async assertCompletionClosure(task: TaskRecord, visiting = new Set([task.id])): Promise<void> {

@@ -13,7 +13,7 @@ Shape: one `EvidenceRecord` (`kind: evidence`) plus an optional companion `Claim
 
 1. Name expected result, observed result, and the earliest event or pixel region where they diverge.
 2. Collect the observation through the Settings-configured RDC-Tool CLI (`$rdc-tool-shell`) and `$pixel-forensics` / `$capture-facts`. Read `$pixel-forensics` before interpreting per-fragment color, alpha or test flags; native history fields can be reconstructed or format-limited rather than complete blend inputs.
-3. Persist the WorldState for the observed state before its Evidence, following `$artifact-provenance` record dependencies; raw observations may be collected first. Do not bind fresh observations to a historical WorldState merely to make the reference resolve. Then write Evidence before any companion Claim: `mission: debugger`, `epistemicStatus: observed`, `region.kind` in `{event, pixel}`, `contentHashes` matching artifact bytes, `worldStateId` resolvable. Unknown fields remain honest under the schema; a draft does not assert safety or completed future observations.
+3. Persist the WorldState for the observed state before its Evidence, following `$artifact-provenance` record dependencies; raw observations may be collected first. Do not bind fresh observations to a historical WorldState merely to make the reference resolve. Then write Evidence before any companion Claim: `mission: debugger`, `epistemicStatus: observed`, `region.kind` in `{event, pixel}`, `artifactRefs` with their actual content hashes, and a resolvable `worldStateId`. Unknown fields remain honest under the schema; a draft does not assert safety or completed future observations.
 4. The companion Claim may repeat the event id in `scope.eventId`. It stays `observed_fact`. It must not set `declaresCounterfactual` or a causal `experimentId`.
 
 A prose guess is not a First Bad Event. Do not mark `ready` without provenance (`$artifact-provenance`).
@@ -22,9 +22,9 @@ A prose guess is not a First Bad Event. Do not mark `ready` without provenance (
 
 Shape: one `ClaimSet` (`kind: claim_set`) of competing `hypothesis` Claims.
 
-1. Check whether the approved plan records a bounded Knowledge retrieval. If it does not, search by the observed symptom and capture scope before writing the matrix; read relevant hits and their applicability or record the empty/failed result. Treat historical cases only as leads to test against this capture. Write at least two mutually distinguishable hypotheses. Each item is a `ClaimRecord` with `claimKind: hypothesis`, `epistemic: inferred`, `experimentId: null`, and a non-empty `scope`.
+1. Check whether the approved plan records a useful bounded Knowledge retrieval. If it is absent or only an over-constrained empty query, search with separate short terms for the observed object, symptom or domain before writing the matrix; read relevant hits and their applicability or record the searches and empty/failed result. Map each historical lead to observable features and predictions to test against this capture; do not treat it as current evidence. Write at least two mutually distinguishable hypotheses. Each item is a `ClaimRecord` with `claimKind: hypothesis`, `epistemic: inferred`, `experimentId: null`, and a non-empty `scope`.
 2. Link rivals with `supports` / `contradicts` using resolvable `claimId`s. Keep evidence-backed, distinguishable alternative explanations visible until checked; do not invent a driver-blame hypothesis.
-3. Name the smallest check that would confirm one row and reject another. That check becomes a Task subject later; do not write the matrix into `TaskRecord`.
+3. Name the smallest check that would distinguish rows, and check that the supporting prediction and the disconfirming observation for each row do not contradict one another. An observation matching a prediction supports that row but does not alone prove causation; if outcomes cannot distinguish the rows, retain the uncertainty. That check becomes a Task subject later; do not write the matrix into `TaskRecord`.
 
 Do not promote a matrix row to `causal_conclusion` here.
 

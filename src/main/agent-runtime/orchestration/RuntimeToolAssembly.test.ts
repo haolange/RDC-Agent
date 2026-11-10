@@ -44,12 +44,12 @@ import { toolValidator } from '../core/ToolValidator';
 import { toolToDefinition } from '../agent/AgentTool';
 import { TaskRegistry, FileTaskStore, createSessionTaskStore, registerDelegatedTaskScope, resolveSessionTasksDir } from '../tasks';
 import { TurnHandle } from './TurnCoordinator';
-import { approvedGoalContinuation } from './ApprovedGoalContinuation';
+import { createApprovedGoalContinuation } from './ApprovedGoalContinuation';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
 import type { SkillLoadResult } from '@shared/types/rdcRuntime';
 import { requestSnapshotStore } from '../prompt/RequestSnapshotStore';
-import { enforceMissionTurnReadiness, MissionCompletionError } from '../../investigation/missionCompletionContract';
+import { assertMissionTurnCompletion, enforceMissionTurnReadiness, MissionCompletionError } from '../../investigation/missionCompletionContract';
 import {
   SESSION_ID, baselineWorld, createInvestigationHarness, hypothesisClaim, projectClaim,
   sampleChallenge, sampleCheckpoint, writeDraft, writeReadyReport,
@@ -293,19 +293,26 @@ describe('RuntimeToolAssembly', () => {
       writeDraft(service, 'world_state', baselineWorld('ws-baseline'), { mission: 'debugger' });
       writeDraft(service, 'checkpoint', sampleCheckpoint({ currentWorldStateId: 'ws-baseline' }), { mission: 'debugger' });
       const source = writeDraft(service, 'claim', hypothesisClaim('ws-baseline', 'claim-assembly'), { mission: 'debugger' });
-      writeReadyReport(service, { mission: 'debugger', source,
+      const report = writeReadyReport(service, { mission: 'debugger', source,
         claims: [projectClaim(source.record as never, 'claim-assembly-projected')] });
-      writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'challenge-assembly', targetId: 'claim-assembly' }));
+      const challenge = writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'challenge-assembly', targetId: 'claim-assembly' }));
       const turn = new TurnHandle({ sessionKey: SESSION_ID, turnId: 'turn-assembly', generation: 1 });
       turn.validateCompletionReadiness = declaration => enforceMissionTurnReadiness({
         profileId: 'general', completionContract: 'investigation-report', investigationMission: 'debugger',
-        sessionId: SESSION_ID, disposition: declaration.disposition, service,
+        sessionId: SESSION_ID, disposition: declaration.disposition, evidenceRefs: declaration.evidenceRefs, service,
       });
       const tool = createAssembly().resolveRuntimeTools('general', ['*'], undefined, turn).toolMap.get('turn_complete')!;
-      await expect(tool.execute('premature', { disposition: 'completed' })).rejects.toThrow('challenge-assembly');
+      await expect(tool.execute('premature', { disposition: 'completed',
+        evidenceRefs: [{ uri: report.contentUri, hash: report.contentHash }] })).rejects.toThrow('challenge-assembly');
       expect(turn.completionDeclaration).toBeNull();
       await tool.execute('partial', { disposition: 'partial' });
       expect(turn.completionDeclaration?.disposition).toBe('partial');
+      writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'challenge-assembly', targetId: 'claim-assembly',
+        status: 'resolved', resolutionClaimId: 'claim-assembly' }), { supersedes: challenge.manifest.artifactId });
+      await tool.execute('completed', { disposition: 'completed', evidenceRefs: [{ uri: report.contentUri, hash: report.contentHash }] });
+      expect(assertMissionTurnCompletion({ profileId: 'general', completionContract: 'investigation-report',
+        investigationMission: 'debugger', sessionId: SESSION_ID, finalAnswerText: 'See the report.',
+        evidenceRefs: turn.completionDeclaration?.evidenceRefs, service }).reportArtifactId).toBe(report.manifest.artifactId);
     } finally {
       const tempRoot = fs.realpathSync(os.tmpdir());
       const realSessionPath = fs.realpathSync(sessionPath);
@@ -326,7 +333,9 @@ describe('RuntimeToolAssembly', () => {
         mode: 'direct', frozenPlanRef: `turn:${turn.turnId}:generation:${turn.generation}`,
       });
       const tool = createAssembly().resolveRuntimeTools('general', ['*'], sessionId, turn).toolMap.get('turn_complete')!;
-      await expect(tool.execute('premature', { disposition: 'partial' })).rejects.toThrow(`TASK_COMPLETION_DENIED: Settle direct Tasks before turn_complete with task_update(status=completed or blocked): ${task.id}`);
+      await expect(tool.execute('premature', { disposition: 'partial' })).rejects.toThrow(
+        `TASK_COMPLETION_DENIED: Settle direct Tasks before turn_complete with task_update(status=completed or blocked): ${task.id}. If useful work remains executable, keep its Task in progress and continue`,
+      );
       expect(turn.completionDeclaration).toBeNull();
       await registry.settleExecution(execution.id, {
         expectedGeneration: execution.generation, status: 'blocked',
@@ -363,38 +372,37 @@ describe('RuntimeToolAssembly', () => {
     const sessionId = `completion-recheck-${randomUUID()}`;
     const turn = new TurnHandle({ sessionKey: sessionId, turnId: `turn-${randomUUID()}`, generation: 1 });
     const registry = new TaskRegistry(createSessionTaskStore(sessionId));
+    const approvedGoalContinuation = createApprovedGoalContinuation(turn, sessionId);
     try {
       turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [] };
       const task = await registry.createTask('Late child');
       const execution = await registry.startExecution(task.id, { mode: 'subagent' });
-      expect(await approvedGoalContinuation(turn, sessionId)).toContain(execution.id);
+      expect(await approvedGoalContinuation()).toContain(execution.id);
       expect(turn.completionDeclaration).toBeNull();
       turn.completionDeclaration = { disposition: 'partial', evidenceRefs: [] };
-      expect(await approvedGoalContinuation(turn, sessionId)).toBeUndefined();
+      expect(await approvedGoalContinuation()).toBeUndefined();
       await registry.settleExecution(execution.id, { expectedGeneration: execution.generation, status: 'completed',
         result: { disposition: 'completed', summary: 'done', outputs: {} } });
       turn.completionDeclaration = null;
-      expect(await approvedGoalContinuation(turn, sessionId)).toContain('turn_complete');
+      expect(await approvedGoalContinuation()).toContain('turn_complete');
     } finally {
       await rm(resolveSessionTasksDir(sessionId), { recursive: true, force: true });
     }
   });
 
-  it('tells the agent to redeclare after a final-answer rejection invalidates completion', async () => {
+  it('invalidates a declaration if its report reference is no longer valid', async () => {
     const sessionId = `completion-final-${randomUUID()}`;
     const turn = new TurnHandle({ sessionKey: sessionId, turnId: `turn-${randomUUID()}`, generation: 1 });
     const tool = createAssembly().createTurnCompletionTool(turn);
+    const approvedGoalContinuation = createApprovedGoalContinuation(turn, sessionId);
     try {
       await tool.execute('first-declaration', { disposition: 'completed' });
-      const feedback = await approvedGoalContinuation(turn, sessionId, () => {
-        throw new MissionCompletionError('final_not_bound', 'Use report-1 sha256:abcdef in the final answer.');
+      const feedback = await approvedGoalContinuation(() => {
+        throw new MissionCompletionError('report_not_bound', 'The declared report version is no longer current.');
       });
-      expect(feedback).toContain('report-1 sha256:abcdef');
-      expect(feedback).toContain('previous completed declaration is no longer active');
+      expect(feedback).toContain('declared report version is no longer current');
       expect(feedback).toContain('call turn_complete again');
       expect(turn.completionDeclaration).toBeNull();
-      await tool.execute('corrected-declaration', { disposition: 'completed' });
-      expect(await approvedGoalContinuation(turn, sessionId, () => undefined)).toBeUndefined();
     } finally {
       await rm(resolveSessionTasksDir(sessionId), { recursive: true, force: true });
     }

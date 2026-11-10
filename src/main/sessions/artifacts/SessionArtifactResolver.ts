@@ -4,7 +4,7 @@
  */
 
 import * as fs from 'fs';
-import { sha256Hex } from '../../runtime/contentHash';
+import { normalizeSha256, sha256Hex } from '../../runtime/contentHash';
 import * as path from 'path';
 import {
   ARTIFACT_READ_MAX_OUTPUT_BYTES,
@@ -27,7 +27,7 @@ import {
 import { generateShortId } from '@shared/utils/id';
 import { StorageIo } from '../store/StorageIo';
 import { storageAdapter } from '../store/StorageAdapter';
-import { inspectArtifactJson, readArtifactJsonText, type ArtifactJsonInspection, type ArtifactJsonTextView } from './SessionArtifactJsonInspection';
+import { inspectArtifactJson, readArtifactJsonText, readDefaultToolResultText, type ArtifactJsonInspection, type ArtifactJsonTextView } from './SessionArtifactJsonInspection';
 import { searchArtifactText, type ArtifactTextSearch } from './SessionArtifactTextSearch';
 import {
   commitSessionArtifactReservation,
@@ -420,7 +420,7 @@ export class SessionArtifactResolver {
     const mimeType = record.mimeType ?? fileMimeType;
     const byteLength = record.bytes ?? bytes.length;
     if (options?.expectedHash) {
-      const expected = options.expectedHash.trim().toLowerCase().replace(/^sha256:/, '');
+      const expected = normalizeSha256(options.expectedHash);
       if (expected !== hash && expected !== fileHash) {
         throw new SessionArtifactError('ARTIFACT_HASH_MISMATCH', 'sha256 does not match expectedHash.');
       }
@@ -433,7 +433,10 @@ export class SessionArtifactResolver {
     if ((options?.search !== undefined || options?.textPointer !== undefined) && mimeType.startsWith('image/')) {
       throw new SessionArtifactError('ARTIFACT_MIME_DENIED', 'Text selection and search do not read image pixels.');
     }
-    const view = options?.textPointer === undefined ? undefined : readArtifactJsonText(bytes, options.jsonTextPointers ?? [], options.textPointer);
+    const view = options?.textPointer !== undefined
+      ? readArtifactJsonText(bytes, options.jsonTextPointers ?? [], options.textPointer)
+      : options?.search !== undefined && options.jsonTextPointers === undefined && resolved.category === 'tool-outputs' && fileMimeType === 'application/json'
+        ? readDefaultToolResultText(bytes) : undefined;
     const jsonInspection = options?.jsonTextPointers === undefined || view ? undefined : inspectArtifactJson(bytes, options.jsonTextPointers);
     const offset = Math.max(1, Math.floor(options?.offset ?? 1));
     const limit = Math.max(

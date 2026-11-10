@@ -258,7 +258,7 @@ export function assertReportContractPresent(
   if (report.claims.length < 1) {
     throw new InvestigationError(
       'INVESTIGATION_INVARIANT_VIOLATION',
-      'ready report requires projected conclusion claims that satisfy S-CLAIM-01',
+      'ready report requires projected conclusion claims that satisfy S-CLAIM-01. Current ClaimSet items are resolvable sources: read the ClaimSet and project each source claimId, epistemic and verification into compactProvenance; standalone Claim artifacts are not required.',
       { invariantId: 'S-CLAIM-01' },
     );
   }
@@ -307,7 +307,7 @@ export function assertReportRecordRefs(
   const mission = options?.mission ?? report.mission;
   for (const evidenceId of report.evidenceIds) {
     if (!lookup.getEvidence(evidenceId)) {
-      throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `report evidence ${evidenceId}`);
+      throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `report evidence ${evidenceId} is not resolvable; evidenceIds use EvidenceRecord.evidenceId (or an EvidencePack item), not artifactId. Read the evidence artifact to inspect its record key.`);
     }
   }
   for (const experimentId of report.experimentIds) {

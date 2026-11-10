@@ -57,9 +57,13 @@ Scoped Runtime Resolution
 
 仅自动压缩；产品不提供按钮、菜单、`/compact` 或 `/summary`。会话准备和执行途中复用同一条 LLM 结构化 handoff：`PromptPlan → RequestEnvelope → adapter`，单轮、无工具、禁用 cache write，`StructuredHandoff.derivation = 'model-generated'`。LLM 失败显式报错，不静默回退确定性抽取。低于压缩线原样继续且不生成压缩工作块。首条超大输入先完整外置并核验，不调用摘要模型，也不静默删减。
 
+压缩候选中明确配对的 session URI／摘要若与本次权威来源中该 URI 的已授权摘要不一致，保留不一致提示和可用来源摘要，要求重读原文，不将两者当成同一版本；不明确或未授权的引用不猜测修正。完整权威索引用于此核对，即使送给摘要模型的索引被截短；原始记录、授权和后续读取的哈希校验不变。
+
 发送是 next-turn 事务：`preparing → committing → running → terminal`。Preflight 冻结 catalog/route/controls/`PromptPlan`/tools/attachments，并创建主进程 opaque credential lease。失败/取消的 preflight 不留 Session/journal/lease 残渣。Composer 附件先经 `conversation:stageAttachments` 写入 `{userData}/state/staging/attachments/`（进程启动清空）；turn commit 才拷进 session `attachments/`。`ConversationAttachmentMaterializer` 按 image / text / pdf / binary 四层物化：image 走 native vision；text/pdf 按 `min(固定上限, contextBudgetTokens * ratio)` 均分后 inline，prepare 冻结最终 session 逻辑路径与正文，run 只补 image 字节；binary 只给元数据。扫描件 PDF 无文本层写诊断；加载失败 / 加密不伪装成扫描件。SVG 硬拒。
 
 实际执行的 PromptPlan 以 volatile `runtime:request-plan` 投影同一主进程 RequestPlan 的 provider、selected/effective model、protocol、resolved reasoning selection/control/wire kind 和 execution fingerprint；普通会话与 Profile/子执行均传入各自已规划的 RequestPlan。不得从 Settings 默认值、用户正文或父路由推断控制值，unknown/off 分别保留。投影不包含 endpoint、headers、bodyPatch、凭据或推理正文，不扩大权限；它证明本机规划的请求控制，不冒称 Provider 内部计算。离线指令成本构建没有 Provider 请求，不生成这项执行事实。fact 不进入稳定缓存前缀，全文/预算/快照仍消费同一 PromptPlan。
+
+模型快照身份绑定已解析的目录／路由版本、实际模型与能力来源事实；来源的观察、刷新和到期时间用于当前目录准入与审计，不因等价刷新而改变延续身份。来源版本、hash、能力或有效目录变化仍影响身份；过期证据先按现有目录规则失效，不能凭旧身份继续取得权限。旧请求和其身份保持原值；无法与新身份匹配的历史原生延续材料仍按现有合同拒绝使用，不改写历史或引入兼容双读。
 
 回合额度使用同一执行解析规则：profile 与已编译 policy 明确设置的 Provider 循环上限取较小值，均省略时不设总轮数上限，policy 为零拒绝执行。准备阶段在估算、缓存和 fingerprint 之前生成 volatile `runtime:execution-limits`，并把最终 PromptPlan 随 prepared runtime 交给执行器。实际消费、用户限制、期限和局部 Capsule 收紧仍生效；压缩等辅助请求另计实际 Provider 消费。计划文本不能抬高宿主上限，也不能用新建同义 Task 重置消费。
 
@@ -127,7 +131,13 @@ interface AssistantMessageDiagnostic {
 
 `isRetryableAssistantError(message)` 遍历 `diagnostics` 并对每个 `error` 调用 `classifyProviderError`，任一 retryable 则整条消息可重试。诊断信息不进入 IPC / renderer / Trace，仅供主进程重试决策与脱敏日志使用。
 
-Agent loop 终止与 Provider 失败互斥：`AGENT_NO_PROGRESS` → `CONVERSATION_AGENT_LOOP_STALLED`；`AGENT_MAX_TURNS_EXCEEDED` → `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；`PROVIDER_STREAM_*` → `CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION`。未结算的本回合 direct Task 先在 `turn_complete` 拒绝，要求模型用 `task_update` 明确完成或受阻；若模型仍直接终答，运行时将该执行结算为 blocked，并以 `CONVERSATION_TASK_COMPLETION_DENIED` 报告本地完整性失败。只有真实网络、鉴权、配额或 wire 故障才产生 `CONVERSATION_LLM_REQUEST_FAILED`。
+Agent loop 终止与 Provider 失败互斥：`AGENT_NO_PROGRESS` → `CONVERSATION_AGENT_LOOP_STALLED`；`AGENT_MAX_TURNS_EXCEEDED` → `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；`PROVIDER_STREAM_*` → `CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION`。未结算的本回合 direct Task 在 `turn_complete` 被拒绝；计划批准会结束规划回合，故 `plan_artifact` 在展示审阅前也先要求结算该回合 direct Task，不自动推断结果或预先声明批准。若模型直接终答，运行时在同一执行内反馈未结算任务，要求继续可执行工作或以真实原因结算受阻，不重置消费或期限。重复无进展、取消及明确限制仍可终止；回合异常结束时未结算执行记为 blocked，并报告对应的本地失败。只有真实网络、鉴权、配额或 wire 故障才产生 `CONVERSATION_LLM_REQUEST_FAILED`。
+
+获批调查的 partial／blocked 声明若因现场位置不符被要求恢复，主进程之后确认已回到签名入口时，会向同一执行反馈这一状态变化，要求重新判断未完成任务是否仍有可执行工作；其他真实阻塞仍可据实部分交付。反馈不自动启动任务、不改变权限，也不清零消费或延长原期限；未确认恢复和取消／硬限制继续按原合同处理。
+
+获批目标声明 partial／blocked 时，若存在未完成的获批 Task 或未满足的获批执行合同、没有仍在后台运行的委派且明确请求上限内仍有可重新声明的工具请求，运行时在同一回合反馈实际状态和记录原因，要求 Agent 对照计划与证据区分可执行工作和真实阻塞；存在合法且有价值的检查时应续用原 Task 并实际执行，不能只列出后结束。同一任务修订、执行代次和状态或同一合同错误只反馈一次。没有继续调用工具时保留原声明，避免把真实部分结果变成无进展错误；继续调用工具后必须重新声明，以免用旧结果覆盖新增工作。Agent 可以据实维持部分交付，也可以在原批准范围内继续；反馈不推断专业结论、不自动重复失败操作、不改变权限或预算。取消、交接及明确限额仍按各自合同处理。
+
+已批准 Task 均已结算但 partial 声明仍列出未决工作时，也按同一组证据 URI／hash 反馈一次整体目标复评，避免将局部结算当作目标完成；证据版本变化后可重新判断。明确 blocked 仍按真实阻塞处理。
 
 ## Tools 与 Permission（执行侧）
 
@@ -139,7 +149,7 @@ Agent loop 终止与 Provider 失败互斥：`AGENT_NO_PROGRESS` → `CONVERSATI
 
 成功的 `rdc_probe(action: probe)` 只读结果也复用该制品化路径，即使小于自动卸货阈值仍提供会话 URI/hash；保存的是实际返回内容和身份、`truncated` 等元数据，不补全原生截断内容，也不是签名生命周期回执。子执行仍须显式获得精确引用授权；写入配额失败按既有工具结果交付失败合同处理，不重复执行原生查询。
 
-`artifact_read.search` 对完整选定文本作区分大小写、非重叠的单行字面量检索（1–256 UTF-16 字符，不执行正则或代码）。可检索显式 JSON 文本视图，或原普通文本视图；图片拒绝。返回全视图匹配计数及最多64个有行/UTF-16列定位的摘录，并服从16KiB工具页上限；`limit` 可进一步收窄匹配数量，`next` 指向首个未返回匹配。继续检索必须沿用 URI/hash、全部视图选择参数与同一查询；摘录不等于整行/整份源码覆盖，需按返回定位读取必要原文。合法零匹配、源生产截断、分页截断与读取拒绝分别表达；计数只证明该有界文本中的字面匹配，不证明控制流、原生执行或领域主张。检索同样要求 `expectedHash`，不增加文件、journal、RDC 或跨会话访问权。
+`artifact_read.search` 对完整选定文本作区分大小写、非重叠的单行字面量检索（1–256 UTF-16 字符，不执行正则或代码）。未指定 JSON 选择器时，产品工具结果若只有一个文本块，直接搜索解码后的文本并返回指针、文本及文件层摘要和已知源截断状态；没有唯一文本块须显式选择，不能猜测。其他普通文本沿原视图搜索，图片拒绝。也可检索显式 JSON 文本视图。返回全视图匹配计数及最多64个有行/UTF-16列定位的摘录，并服从16KiB工具页上限；`limit` 可进一步收窄匹配数量，`next` 指向首个未返回匹配。继续检索必须沿用 URI/hash、全部视图选择参数与同一查询；摘录不等于整行/整份源码覆盖，需按返回定位读取必要原文。合法零匹配、源生产截断、分页截断与读取拒绝分别表达；计数只证明该有界文本中的字面匹配，不证明控制流、原生执行或领域主张。检索同样要求 `expectedHash`，不增加文件、journal、RDC 或跨会话访问权。
 
 `read_file` 与 `read_image` 成功读取时在正文和 details 返回原始文件字节的 SHA-256（小写 hex）与字节数。文本按行展示仍对同一次完整读取流计算摘要，包含 BOM、原换行与未展示的行；摘要不属于带行号的展示文本。图片摘要对应实际送入模型的 image block 解码字节，不属于缩略图或重编码结果。它们只证明该次读取内容，不能追认历史执行所用的文件；执行前后绑定须有对应时点的来源。取消或读取失败不返回成功摘要，默认文本读取仍拒绝二进制，capture、vision 和路径权限限制不放宽，不用 Shell 文件访问补旁路。
 
@@ -174,6 +184,12 @@ Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only
 同轮工具并发：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。`ConcurrentToolScheduler` 只并发**连续**安全组；`shell` / write / task mutation / RDC（含 `rdc_probe`） / MCP / ask / handoff / `output_register` 与需要 RDC lease 的 `subagent` 一律串行。offline `subagent` 不请求 `domainExtensions.rdc`，且 **在 allowlist 层**就不能拿到 `rdc_probe` 或 `shell` 中的 RDC 路径；`runtime_context` 保留，但不返回 `rdc` 载荷。`domainExtensions.rdc.requiresLease=true` 的 child 必须经显式、受限、生命周期绑定的 delegated lease 取得 parent 上下文并串行。禁止并发 RDC 双 owner。`callIndex` 稳定回填。`reserveDispatchBudget` 在 dispatch 前原子扣减 `maxToolCalls` / `maxSubagents` / wall clock；失败整组不开。组内部分失败不连坐已发出调用，但不得继续开新组。abort 必须 `Promise.allSettled` join。
 
 `subagent` 只接受有界 Delegation Capsule：goal/task/scope、带 sourceRefs/qualification 的 acceptedFacts、hypotheses、challengeRefs、带理由/适用/重验条件的 negativePaths、inputArtifactRefs、outputRequirements、stopConditions、requiredSkillIds 和 budget；可选 domainExtensions 仅申请能力。缺字段、超限或非法引用 fail-closed。父级需把子级实际要读的精确 `session://` contentUri 放入冻结引用；调查记录 ID 或 scope 正文不是读取授权，缺引用的子级读取继续拒绝。局部预算须覆盖计划内的读、写与完成调用。compiler 只向 system PromptPlan 加入 runtime 编写的解释规则，完整 Capsule 数据进入隔离子执行的 user 输入，不复制父历史。必需 Skill 在 prepareTurn 预载并冻结。
+
+子执行输入同时提供主进程实际冻结的获授 URI／hash 对照，供读取和后续引用；它只投影已有授权，不授予新来源，也不接受不匹配的 hash。
+
+建立委派来源授权时，主进程确认某个来源不存在，须在同步结果或后台结果中直接返回 `ARTIFACT_NOT_FOUND` 与原诊断，并保留完整执行制品；不得自动删去或替换该引用。子执行自身的任意失败文本仍不提升为主进程诊断。
+
+子执行读取未授予的 URI 返回 `ARTIFACT_SESSION_DENIED`；URI 已授予但请求的 expectedHash 与冻结版本不同则返回 `ARTIFACT_HASH_MISMATCH`。两种情况均不读取内容，也不自动改写引用或降低版本校验。
 
 Temporary 外部路径只经当前 `ToolExecutionContext.temporaryAllowedPathRoots`，不得全局泄漏。
 
@@ -247,7 +263,7 @@ Plan 经 session artifact plans 类别版本化：同意前覆盖 `session://pla
 
 子执行 artifact_read 只读取显式授予且 hash 冻结的同一所属 Session 引用，嵌套委派取子集。子执行调查输出保存到原调查，输入引用的读权限不授予覆盖权限；只能更新本子执行新建的输出。退出撤销临时访问权，已保存产物继续归原 Session 所有。
 
-Compact 使用原始 Journal、Task/执行记录及应用层组装的领域记录，不由通用 compactor 猜测调查步骤。压缩前保存可按行读取的分块 JSON 权威 Checkpoint；模型看到有界权威记录，以及首次的原始文本或经来源与路由核验的已安装窗口加新增原始文本。权威索引本身超出模型输入上限时，模型只接收明确标注总数、收录数和遗漏数的部分索引；完整 Task、执行、产物和调查记录仍在带 URI/hash 的权威 Checkpoint 中，需要依赖遗漏项时须读取原件。已校验的旧 Checkpoint 若与当前 Journal 前缀一致，新 Checkpoint 只存新增原文及旧源 URI/hash/count；读取或恢复时校验完整引用链，未匹配时保留完整原文分块。完整原始前缀始终可按 URI/hash 复原，不逐条截去长消息尾部。保存失败、hash 复核失败或该增量输入仍超过安全界限时保留原 view，禁止静默丢失。原始图像/测量产物按 URI/hash 保留，摘要须保留来源资格、适用条件和反证的重验条件。
+Compact 使用原始 Journal、Task/执行记录及应用层组装的领域记录，不由通用 compactor 猜测调查步骤。压缩提示要求区分获批计划中未执行的义务与实际工作；摘要无法完整保留时须引用原计划并标示需要重读。获批执行在安装派生 Checkpoint 后，应按冻结 URI/hash 重读计划并与 Task、证据状态对照，不把摘要遗漏当成完成。压缩前保存可按行读取的分块 JSON 权威 Checkpoint；模型看到有界权威记录，以及首次的原始文本或经来源与路由核验的已安装窗口加新增原始文本。权威索引本身超出模型输入上限时，模型只接收明确标注总数、收录数和遗漏数的部分索引；完整 Task、执行、产物和调查记录仍在带 URI/hash 的权威 Checkpoint 中，需要依赖遗漏项时须读取原件。已校验的旧 Checkpoint 若与当前 Journal 前缀一致，新 Checkpoint 只存新增原文及旧源 URI/hash/count；读取或恢复时校验完整引用链，未匹配时保留完整原文分块。完整原始前缀始终可按 URI/hash 复原，不逐条截去长消息尾部。保存失败、hash 复核失败或该增量输入仍超过安全界限时保留原 view，禁止静默丢失。原始图像/测量产物按 URI/hash 保留，摘要须保留来源资格、适用条件和反证的重验条件。
 
 跨回合复用的压缩窗口必须通过原始 Journal 前缀、归档 hash 和已提交的来源执行身份核验，并与当前认证路由匹配（Provider、credential scope、endpoint、协议、binding、contract 不变）。同一路由内仅模型、推理档位或聚合 Catalog revision 改变，不使已验证的可移植文本/图片失效；恢复时再次剥离旧 thinking、Provider response 与 output block 引用，当前 PromptPlan、工具目录和权限约束仍重新冻结；挡位 mode/revision 由主进程动态提供。不匹配的认证/路由或未知来源执行仍拒绝复用，不能通过重放全历史绕过来源验证。稳定 hash 使用有界增量序列化，保持原规范化字节与历史 hash；执行身份查询逐行扫描但不额外保留消息正文，不能为降低内存跳过坏行或来源校验。
 
@@ -260,21 +276,31 @@ RDC delegated lease 暂停父控制权，父级 rebind/clear/close 必须先 joi
 
 计划的必需 Task 绑定和定义修订由 canonical owning planner session 提交；委派 Capsule 不取得修改所属父计划义务的权限，新增计划绑定/修订参数在委派调用中明确拒绝。委派仍可按已有 Task 子树合同组织自身范围内的工作；本扩展不宣称实现嵌套计划义务覆盖或扩大子执行权力。
 
-Task 可声明严格类型的 `executionRequirements`（`mode: direct|subagent`、`profileId`、`requiredSkillIds`、`independentOfTaskIds`）。准备记录实际 Profile 来源/hash、Skill、模型/推理与被审成果版本；独立审查须读取获授的当前成果。省略要求不代表历史记录已证明独立性。`plan_artifact.requiredTaskIds` 从所属 TaskStore 生成目标、依赖与要求快照并纳入批准 hash；批准绑定不能通过修改 Task、换同义 Task 或旧结果削弱，改变义务须走原计划修订。
+Task 可声明严格类型的 `executionRequirements`（`mode: direct|subagent`、`profileId`、`requiredSkillIds`、`independentOfTaskIds`）。准备记录实际 Profile 来源/hash、Skill、模型/推理与被审成果版本；独立审查须读取获授的当前成果。省略要求不代表历史记录已证明独立性。`plan_artifact.requiredTaskIds` 从所属 TaskStore 生成目标、依赖与要求快照并纳入批准 hash；本规划回合创建的 Task 仍为 pending／blocked 时，必须显式传入必需 Task ID 或空数组，正文提及 Task 不自动建立绑定，也不把所有 Task 猜成必需。提交审阅前核对独立来源 Task 存在且不是审查任务自身，执行时仍核对实际成果版本。批准绑定不能通过修改 Task、换同义 Task 或旧结果削弱，改变义务须走原计划修订。
 
 启动门检查当前 Task、批准快照、依赖与实际执行方式；`subagent` 必需工作拒绝父级 direct 启动。必需 Skill 必须出现在真实准备后的 PromptPlan，不能仅凭 Capsule 声明或事后 skill_read 满足。独立执行绑定不同的实际 child session、当前 execution/generation 与最小 Capsule 输入，不继承生成者历史或共享 live domain 授权。结算重复验证 runtime 产生的准备证明、结果来源和必需输出，模型不能通过结果或 metadata 自报执行证明。材料可读和实际读取范围分别验证；科学正确性与审查完整性仍由领域方法和验收判断，不从 mode、空 Challenge 或 completed 标签推断。
 
 已被 `independentOfTaskIds` 引用的来源任务在完成结算前，须在执行结果中提供可核验的 `resultRef` 和 `resultHash`；正文中提及引用不能替代这两个字段。缺失或不匹配时保留当前执行以便修正。若审查关系是在来源完成后建立，而该成果缺少结构化引用，则来源投影为待重验，允许在原任务上开启新执行代次并保留原结果与预算；不得事后改写原执行。
 
+运行时核对所选引用的可读性、内容 hash、来源执行代次和授予范围；它不能仅凭这些事实判断模型所选引用在语义上确实是待审成果。执行者须固定并授予实际成果版本，不能用辅助回执代替报告；修改成果后，原版本的审查不自动覆盖新版本。来源已被实际独立审查后，执行者可以在原来源 Task 上显式开始下一执行代，即使原始不可变快照仍可读取；结算新成果后必须由原审查 Task 针对新来源重新独立核验。旧执行和审查保持不变，原消费与期限继续生效。
+
 此为向当前单一 Task/计划路径增加的可选合同，旧记录不迁移、不重写、不补造证明；取消/join、持久 root/child-local 预算、重启 interrupted 与原消费/期限规则继续生效。
 
 `requiredSkillIds` 不是方法阅读清单。普通方法经 descriptor 发现、首次使用前 `skill_read`，不要求预载；只有明确合同或实际准备需要才声明必须预载的方法，并在 Task 描述说明必要性。Runtime 不理解领域语义，也不根据方法名称或 allowed-tools 判定重要性。计划提交和批准对照目标 profile/声明交接，声明交接再次核对 hash-bound direct Task 要求；子执行方法留在自身 Capsule。prepareTurn 比较真实 PromptPlan、来源 hash 和工具交集，不自动补载或重启；不相容应经现有显式准备入口或同 Task 的正常计划修订处理，保留消费、期限与批准历史。批准前检查不代表未来准备证明，普通 General 不因此新增计划门。
 
-正常重规划使用 `plan_artifact.taskRevisions` 显式提出对同一必需 Task 的变更，携带 expectedRevision；主进程读取当前定义并生成下一修订及前一修订/hash，展示在同一计划快照中。批准前不修改 Task，批准后按同一 TaskStore 原子安装定义修订，再发布批准；活执行须先取消/join，已完成 Task 不重开。CAS 冲突不安装候选或发布批准；同一提案重试不重复增代。原 execution、root、消费及期限不修改，新执行仍从原记录继承预算。取消或持久化失败不得发布迟到批准；已获用户点击授权但尚未完成批准发布的定义变更保持不可执行，正常重提计划可恢复，不手改状态。
+委派执行必须能够提交 `turn_complete`；Capsule 明确要求读取的会话产物还必须有对应读取工具。准备阶段对照 Profile、Skill 交集和策略，若上述工具不可用，在获取 MCP 连接及发送子模型请求前将具体准备冲突返回父执行；不会放宽权限、自动移除方法或替换 Profile。仅用于说明已接受事实来源的引用不自动转成必读要求。
+
+正常重规划使用 `plan_artifact.taskRevisions` 显式提出对同一必需 Task 的变更，携带 expectedRevision；主进程读取当前定义并生成下一修订及前一修订/hash，展示在同一计划快照中。批准前不修改 Task，批准后按同一 TaskStore 原子安装定义修订，再发布批准；活执行须先取消/join，重规划不修改已完成 Task 的定义。CAS 冲突不安装候选或发布批准；同一提案重试不重复增代。原 execution、root、消费及期限不修改，新执行仍从原记录继承预算。取消或持久化失败不得发布迟到批准；已获用户点击授权但尚未完成批准发布的定义变更保持不可执行，正常重提计划可恢复，不手改状态。
 
 单一 TaskStore 的 canonical 文件为 `task-state.json`（仅当前 schema）。Task 保存目标、依赖、父任务、完成要求、修订与执行关联；TaskExecution 独立保存 executionId、taskRevision、generation、父执行、运行状态、共享预算快照、结果及可选冻结计划引用。取消或修订不会让旧结果覆盖新实例。不存在全局唯一 in_progress 限制；依赖存在、无环、已满足，以及完成要求的输出键与执行终态由 TaskRegistry 校验。要求覆盖是否完整、科学结论是否成立仍由模型及领域证据合同负责。
 
+`task_create` 批量创建时，`blockedBy` 只能引用已存在的 Task ID；同批任务的 ID 在返回后才可用于 `task_update.addBlockedBy`。任务或计划正文里的顺序不会自动生成结构化依赖，需在启动或提交计划前建立，冻结快照才会包含该关系。
+
 task_update(in_progress)只启动调用者自己的direct execution；Task托管的subagent在wait/background两种模式都由runner独占启动，父级不得先占用同一Task。活跃执行未结算或取消并join之前不能改成pending，也不能再次派发；错误提示保留当前归属并说明恢复边界。误启动的direct execution只能诚实结算未完成结果，重试保留历史、generation和已消费预算，不移除互斥检查或自动改派。
+
+`task_update.result` 必须与同一次 `status=completed` 或 `status=blocked` 一起提交，由当前 direct execution 原子结算；单独提交结果、在启动或其他状态更新时附带结果均明确拒绝，不改变 Task 投影或执行记录。已结算的执行结果不可替换；仍有可执行工作时可在既有合同内重新启动同一 Task 的下一代，继承消费和期限。部分结果不使要求完整完成的依赖自动解锁。
+
+已完成的独立审查若结构化结果仍有 `unresolved`，父级可向同一 Task 的下一代明确补充此前未获授的来源，继续核验原成果；无需为了补授来源而重跑未改变的生成任务。新来源仍须经过正常的 session、权限和精确 hash 授权，审查准备仍绑定当前来源代次、实际 Profile 和 Skill；旧结果保留，消费和期限不刷新。仅重复相同输入或无未解决项不因这一规则重启已完成任务；是否还有有价值的调查由 Agent 和领域方法判断。
 
 Stop 后的 cancelled execution 保持不可变。用户在后续回合明确要求继续同一目标时，owning 非委派回合可通过 `task_update(status=in_progress, resumeCancelled=true)` 创建原 Task 的下一 generation；未显式声明、同一冻结回合身份、仍有未 join producer、completed Task 和委派 scope 均拒绝恢复。依赖、原 root、最严格限制、原 deadline 与累计消费仍经同一启动门禁；不修改旧 execution/result、不新建同义 Task，也不自动恢复已取消的子任务树。
 
@@ -286,7 +312,11 @@ subagent（mode=background） 必须绑定 Task，持久化启动状态后返回
 
 每个父 `subagent` tool call 只绑定一份所属 session 的子代理可见记录；child session、Task execution ID 与 generation 约束归属并隔离迟到事件。子事件按主 `ConversationWorkBlock` 语义增量投影可见 loop、消息、工具、审批和诊断，不复制 opaque / 隐藏推理。冻结 capsule 的结构化任务正文、实际发送载荷、实际 final、父工具回执、调用参数及子工具长回执分别保存；final 不与结构化完成声明或执行错误混用。后台头部另存 Task Execution 生命周期状态，不能用 child turn 结束或 Task aggregate 状态代替；等待、取消中、部分完成、受阻与终态由实际 Execution 更新。正文受会话所有权、身份和大小上限约束，超限明确标记不可完整读取。renderer 收起时仅取头部，展开后分页读取步骤、按 revision 合并活跃项并按需分块读取正文。子执行记录不复制进父 `workTrace`，后台完成不修改父回复的 continuation。
 
-后台 subagent 的生命周期由持久 Task 与 mailbox 投影，不进入父回复的同步 subagent continuation，也不由父回复 finalizeTrace 提前结束；审批/信息请求仍走受控入口。结构化 turn_complete 的 disposition、evidenceRefs 位于顶层，result 包含 summary、outputs、counterevidence、unresolved、scope、sideEffects、recoveryState。声明 completed 前调用冻结领域合同检查当时可核验的制品前置条件；调查合同须有至少一份当前合格报告，报告自身不合格可继续检查其他报告，存储或意外错误直接上报。终答仍复核实际引用的报告及其完整合同，已记录的声明本身不是终态回执。unresolved 表达认识与适用条件，不自动成为 missingRequirements；完成要求仍由 Task 的必需输出及执行状态校验，不能由通用 runtime 推测科学结论。
+删除 session 时先停止并 join 所属执行，再按请求快照的同一 scope 编码删除根及嵌套子执行快照、相关内存缓存和该 session 的运行序列文件；相邻 scope 不删除，遇到非目录或链接时明确失败，不沿链接清理。
+
+后台 subagent 的生命周期由持久 Task 与 mailbox 投影，不进入父回复的同步 subagent continuation，也不由父回复 finalizeTrace 提前结束；审批/信息请求仍走受控入口。结构化 turn_complete 的 disposition、evidenceRefs 位于顶层，result 包含 summary、outputs、counterevidence、unresolved、scope、sideEffects、recoveryState。声明 completed 时，调查合同要求 evidenceRefs 精确指向当前 ready 报告的 contentUri 和 contentHash，并检查其完整领域合同；存储或意外错误直接上报。终答提交前重新核验同一结构化引用及报告资格，已记录的声明本身不是终态回执。用户终答仍须存在并交付调查结果，无须在正文重复内部 ID 和哈希。unresolved 表达认识与适用条件，不自动成为 missingRequirements；完成要求仍由 Task 的必需输出及执行状态校验，不能由通用 runtime 推测科学结论。
+
+提交前重新核验批准任务、现场恢复和完整领域合同；报告引用失效或其他资格缺口使 completed 声明失效，须按实际工作重新声明。无进展及取消规则保持有效。
 
 后台 Task 的 `progress`、`blocked`、`decision_required` 与终态结果先写持久 mailbox，再投影到所属卡片。它们不发起新的父模型请求、不附加空 user turn，也不撤回已完成的父回复；用户下一次显式请求时，现有 request commit 边界负责投递并确认尚未消费的 mailbox 内容。子执行的审批和信息请求仍按 owner 入口处理。
 

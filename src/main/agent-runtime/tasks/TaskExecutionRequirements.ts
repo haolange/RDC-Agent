@@ -25,7 +25,11 @@ export async function assertTaskExecutionStart(task: TaskRecord, options: StartT
   TaskExecutionRequirementsSchema.parse(requirement);
   if (requirement.mode !== options.mode) denied(`Task requires ${requirement.mode}; requested ${options.mode}.`);
   if (requirement.profileId && requirement.profileId !== (options.preparation?.profileId ?? options.requestedProfileId)) {
-    denied(`Task requires profile ${requirement.profileId}.`);
+    const requested = options.preparation?.profileId ?? options.requestedProfileId ?? 'unspecified';
+    const correction = options.mode === 'subagent'
+      ? ` Set subagent.profile to ${requirement.profileId} and retry this same Task if authorized; preserve its existing limits and consumption.`
+      : '';
+    denied(`Task requires profile ${requirement.profileId}; requested ${requested}.${correction}`);
   }
   const skills = options.mode === 'direct' ? options.preparation?.skills.map(item => item.id) ?? [] : options.requiredSkillIds ?? [];
   if (requirement.requiredSkillIds.some(id => !skills.includes(id))) denied('Required methods are missing from the requested execution.');
@@ -118,7 +122,7 @@ export async function assertIndependentReviewResult(task: TaskRecord, result: Ta
   }
 }
 
-/** A completed Task can run again only to repair an invalidated review dependency. */
+/** A completed Task can run again to repair an invalidated review dependency. */
 export async function canReexecuteInvalidatedTask(task: TaskRecord, store: TaskStore): Promise<boolean> {
   if (task.status !== 'completed' || !task.currentExecutionId) return false;
   const execution = await store.loadExecution(task.currentExecutionId);
@@ -138,6 +142,33 @@ export async function canReexecuteInvalidatedTask(task: TaskRecord, store: TaskS
   if (!dependedOn) return false;
   if (!ref || !hash) return true;
   return Boolean(store.verifyReviewArtifact && !await store.verifyReviewArtifact(ref, hash));
+}
+
+/** Continue an incomplete review when the caller supplies a previously ungranted source. */
+export async function canContinueReviewWithNewSources(
+  task: TaskRecord, options: StartTaskExecutionOptions, store: TaskStore,
+): Promise<boolean> {
+  if (task.status !== 'completed' || options.mode !== 'subagent' || !task.currentExecutionId
+    || !task.executionRequirements?.independentOfTaskIds.length) return false;
+  const execution = await store.loadExecution(task.currentExecutionId);
+  if (execution?.status !== 'completed' || !execution.result?.unresolved?.some(item => item.trim())
+    || !execution.preparation) return false;
+  const previous = new Set(execution.preparation.inputArtifacts.map(item => item.uri));
+  return options.requestedInputArtifactRefs?.some(uri => !previous.has(uri)) ?? false;
+}
+
+/** A reviewed snapshot can remain readable while its owner prepares a corrected version. */
+export async function canContinueReviewedSource(task: TaskRecord, store: TaskStore): Promise<boolean> {
+  if (task.status !== 'completed' || !task.currentExecutionId) return false;
+  if ((await store.loadExecution(task.currentExecutionId))?.status !== 'completed') return false;
+  for (const review of await store.listTasks()) {
+    if (!['completed', 'blocked'].includes(review.status) || !review.currentExecutionId
+      || !review.executionRequirements?.independentOfTaskIds.includes(task.id)) continue;
+    const execution = await store.loadExecution(review.currentExecutionId);
+    if (execution && ['completed', 'partial'].includes(execution.status) && execution.independentSources?.some(source =>
+      source.taskId === task.id && source.executionId === task.currentExecutionId)) return true;
+  }
+  return false;
 }
 
 export function snapshotTaskRequirement(task: TaskRecord): PlanTaskRequirement {
@@ -173,6 +204,13 @@ export async function preparePlanTaskRequirements(
     if (!Object.values(updates).some(value => value !== undefined)) denied('Task revision proposal contains no changes.');
     snapshots.push({ ...snapshotTaskRequirement({ ...task!, ...updates, revision: task!.revision + 1 }),
       replacesRevision: task!.revision, previousRequirementHash: hashTaskRequirement(task!) });
+  }
+  for (const task of snapshots) {
+    for (const sourceId of task.executionRequirements?.independentOfTaskIds ?? []) {
+      if (sourceId === task.taskId || !await registry.getTask(sourceId)) {
+        denied('Independent source Task must exist and differ from the review Task before plan review.');
+      }
+    }
   }
   return snapshots;
 }

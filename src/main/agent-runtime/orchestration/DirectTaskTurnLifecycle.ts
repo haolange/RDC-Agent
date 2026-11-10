@@ -1,6 +1,6 @@
-import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope, type TaskExecutionRecord } from '../tasks';
-import { processSupervisor } from '../../runtime/ProcessSupervisor';
 import { TASK_STATUS_REASONS } from '@shared/constants/taskStatusReasons';
+import { TaskRegistry, taskStoreForExecutionScope, getDelegatedTaskScope, type TaskExecutionRecord } from '../tasks';
+import { processSupervisor } from '../../runtime/ProcessSupervisor';
 
 const TERMINAL = new Set(['completed', 'partial', 'blocked', 'failed', 'cancelled', 'interrupted']);
 
@@ -25,7 +25,7 @@ export function activeDelegations(executions: readonly TaskExecutionRecord[], pa
 export async function listActiveDelegations(sessionId: string): Promise<TaskExecutionRecord[]> {
   const scope = getDelegatedTaskScope(sessionId);
   if (scope && !scope.executionId) throw new Error('TASK_SCOPE_UNVERIFIED: delegated execution identity is missing.');
-  const registry = new TaskRegistry(createSessionTaskStore(scope?.ownerSessionId ?? sessionId));
+  const registry = new TaskRegistry(taskStoreForExecutionScope(sessionId, scope?.ownerSessionId));
   return activeDelegations(await registry.listExecutions(), scope?.executionId);
 }
 
@@ -36,7 +36,7 @@ export async function listUnfinishedDirectTasks(input: {
 }): Promise<Array<{ executionId: string; taskId: string }>> {
   if (!input.sessionId) return [];
   const delegatedScope = getDelegatedTaskScope(input.sessionId);
-  const registry = new TaskRegistry(createSessionTaskStore(delegatedScope?.ownerSessionId ?? input.sessionId));
+  const registry = new TaskRegistry(taskStoreForExecutionScope(input.sessionId, delegatedScope?.ownerSessionId));
   const frozenPlanRef = `turn:${input.turnId}:generation:${input.generation}`;
   return (await registry.listExecutions())
     .filter((execution) => execution.mode === 'direct' && execution.frozenPlanRef === frozenPlanRef && !TERMINAL.has(execution.status))
@@ -51,7 +51,7 @@ export async function settleUnfinishedDirectTasks(input: {
 }): Promise<number> {
   if (!input.sessionId) return 0;
   const delegatedScope = getDelegatedTaskScope(input.sessionId);
-  const registry = new TaskRegistry(createSessionTaskStore(delegatedScope?.ownerSessionId ?? input.sessionId));
+  const registry = new TaskRegistry(taskStoreForExecutionScope(input.sessionId, delegatedScope?.ownerSessionId));
   const unfinished = await listUnfinishedDirectTasks(input);
   for (const execution of unfinished) {
     const current = await registry.getExecution(execution.executionId);
@@ -104,7 +104,7 @@ export async function settleJoinedTurnTaskExecutions(input: {
   if (input.orphaned) return;
   if (!input.sessionId) return;
   const delegatedScope = getDelegatedTaskScope(input.sessionId);
-  const registry = new TaskRegistry(createSessionTaskStore(delegatedScope?.ownerSessionId ?? input.sessionId));
+  const registry = new TaskRegistry(taskStoreForExecutionScope(input.sessionId, delegatedScope?.ownerSessionId));
   const frozenPlanRef = `turn:${input.turnId}:generation:${input.generation}`;
   const hasDirectExecution = (await registry.listExecutions()).some((execution) => (
     execution.mode === 'direct' && execution.frozenPlanRef === frozenPlanRef && !TERMINAL.has(execution.status)

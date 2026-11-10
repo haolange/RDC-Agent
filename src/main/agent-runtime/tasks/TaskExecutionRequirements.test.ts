@@ -113,7 +113,7 @@ it('binds a Task to the actual prepared Agent and its model provenance', async (
   const { registry } = await fixture();
   const task = await registry.createTask('Review', { executionRequirements: { ...delegated, profileId: 'verifier' } });
   await expect(registry.startExecution(task.id, { mode: 'subagent', requiredSkillIds: ['analysis-method'], requestedProfileId: 'generator' }))
-    .rejects.toThrow('requires profile verifier');
+    .rejects.toThrow('requires profile verifier; requested generator. Set subagent.profile to verifier and retry this same Task');
   const execution = await registry.startExecution(task.id, { mode: 'subagent', requiredSkillIds: ['analysis-method'], requestedProfileId: 'verifier' });
   await expect(registry.bindExecutionPreparation(execution.id, execution.generation, preparation())).rejects.toThrow('does not prove');
   const prepared = {
@@ -198,11 +198,17 @@ it('reexecutes only invalidated source and review Tasks, preserving their histor
   const dependent = await registry.createTask('Use reviewed findings', { blockedBy: [review.id] });
   expect(await registry.canStart(dependent.id)).toBe(true);
   approve([snapshotTaskRequirement((await registry.getTask(source.id))!), snapshotTaskRequirement((await registry.getTask(review.id))!)]);
-  await expect(registry.startExecution(source.id, { mode: 'direct', preparation: preparation('parent') })).rejects.toThrow('Terminal task');
   await expect(registry.startExecution(review.id, { mode: 'subagent', requiredSkillIds: ['analysis-method'] })).rejects.toThrow('Terminal task');
+  await expect(registry.startExecution(review.id, { mode: 'subagent', requiredSkillIds: ['analysis-method'],
+    requestedInputArtifactRefs: [sourceArtifact.uri, 'session://tool-outputs/new-input.json'] })).rejects.toThrow('Terminal task');
 
   live = nextArtifact;
   expect(await registry.canStart(dependent.id)).toBe(false);
+  const update = createTaskTools(registry).find(tool => tool.name === 'task_update')!;
+  await expect(update.execute('revise-with-status', { taskId: review.id, status: 'pending', description: 'Review the new source' }))
+    .rejects.toThrow('reexecute the source Task');
+  await expect(update.execute('revise', { taskId: review.id, description: 'Review the new source' }))
+    .rejects.toThrow('reexecute the source Task');
   const next = await registry.startExecution(source.id, { mode: 'direct', preparation: preparation('parent-next'), budget: { toolCalls: 0, maxToolCalls: 100 } });
   expect(next).toMatchObject({ generation: 2, budget: { toolCalls: 4, maxToolCalls: 10 } });
   await registry.settleExecution(next.id, { expectedGeneration: 2, status: 'completed', result: { ...result, resultRef: live.uri, resultHash: live.hash } });
@@ -215,6 +221,57 @@ it('reexecutes only invalidated source and review Tasks, preserving their histor
   expect(await registry.canStart(dependent.id)).toBe(true);
   expect((await registry.getExecution(generated.id))?.result).toEqual(sourceResult);
   expect((await registry.getExecution(reviewed.id))?.independentSources?.[0]?.resultHash).toBe(sourceArtifact.hash);
+});
+
+it('continues a reviewed source when both its original and revised snapshots remain readable', async () => {
+  const revised = { uri: 'session://tool-outputs/findings-revised.json', hash: 'e'.repeat(64) };
+  const { registry, approve } = await fixture(async (uri, hash) =>
+    [sourceArtifact, revised].some(artifact => artifact.uri === uri && artifact.hash === hash));
+  const source = await registry.createTask('Generate findings');
+  const deadlineAt = Date.now() + 60_000;
+  const first = await registry.startExecution(source.id, { mode: 'direct', preparation: preparation('parent'),
+    budget: { toolCalls: 4, maxToolCalls: 10, deadlineAt } });
+  await registry.settleExecution(first.id, { expectedGeneration: 1, status: 'completed', result: sourceResult });
+  const review = await registry.createTask('Independent review', { blockedBy: [source.id],
+    executionRequirements: { ...delegated, independentOfTaskIds: [source.id] } });
+  await expect(registry.startExecution(source.id, { mode: 'direct', preparation: preparation('parent') }))
+    .rejects.toThrow('Terminal task');
+  const reviewed = await registry.startExecution(review.id, { mode: 'subagent', requiredSkillIds: ['analysis-method'] });
+  await registry.bindExecutionPreparation(reviewed.id, 1, reviewPreparation());
+  await registry.settleExecution(reviewed.id, { expectedGeneration: 1, status: 'completed',
+    result: { ...result, counterevidence: ['A source claim needs correction.'] } });
+  approve([snapshotTaskRequirement((await registry.getTask(source.id))!), snapshotTaskRequirement((await registry.getTask(review.id))!)]);
+  await expect(registry.startExecution(review.id, { mode: 'subagent', requiredSkillIds: ['analysis-method'] }))
+    .rejects.toThrow('reexecute the source Task');
+  const next = await registry.startExecution(source.id, { mode: 'direct', preparation: preparation('parent-next'),
+    budget: { toolCalls: 0, maxToolCalls: 100, deadlineAt: deadlineAt + 60_000 } });
+  expect(next).toMatchObject({ generation: 2, budget: { toolCalls: 4, maxToolCalls: 10, deadlineAt, startedAt: first.budget.startedAt } });
+  await expect(registry.assertApprovedTasksCompleted()).rejects.toThrow();
+  await registry.settleExecution(next.id, { expectedGeneration: 2, status: 'completed',
+    result: { ...result, resultRef: revised.uri, resultHash: revised.hash } });
+  await expect(registry.assertApprovedTasksCompleted()).rejects.toThrow('changed after review preparation');
+  const rereview = await registry.startExecution(review.id, { mode: 'subagent', requiredSkillIds: ['analysis-method'] });
+  await registry.bindExecutionPreparation(rereview.id, 2, { ...preparation('reviewer-next'), inputArtifacts: [revised] });
+  await registry.settleExecution(rereview.id, { expectedGeneration: 2, status: 'completed', result });
+  await registry.assertApprovedTasksCompleted();
+  expect((await registry.getExecution(first.id))?.result).toEqual(sourceResult);
+  expect((await registry.getExecution(reviewed.id))?.independentSources?.[0]?.resultHash).toBe(sourceArtifact.hash);
+});
+
+it('continues a source after an independent partial review returns useful findings', async () => {
+  const { registry } = await fixture();
+  const source = await registry.createTask('Generate findings');
+  const first = await registry.startExecution(source.id, { mode: 'direct', preparation: preparation('parent') });
+  await registry.settleExecution(first.id, { expectedGeneration: 1, status: 'completed', result: sourceResult });
+  const review = await registry.createTask('Independent review', { blockedBy: [source.id],
+    executionRequirements: { ...delegated, independentOfTaskIds: [source.id] } });
+  const reviewed = await registry.startExecution(review.id, { mode: 'subagent', requiredSkillIds: ['analysis-method'] });
+  await registry.bindExecutionPreparation(reviewed.id, 1, reviewPreparation());
+  await registry.settleExecution(reviewed.id, { expectedGeneration: 1, status: 'partial',
+    result: { ...result, disposition: 'partial', unresolved: ['Check the cited source.'] } });
+  expect(await registry.getTask(review.id)).toMatchObject({ status: 'blocked' });
+  expect(await registry.startExecution(source.id, { mode: 'direct', preparation: preparation('parent-next') }))
+    .toMatchObject({ generation: 2 });
 });
 
 it('revalidates and repairs stale review work inside a completed parent without rerunning unrelated work', async () => {
@@ -345,4 +402,21 @@ it('rejects active, stale, unrelated and completed revision proposals', async ()
   await expect(preparePlanTaskRequirements(registry, [task.id], [{ taskId: task.id, expectedRevision: 1, description: 'New' }])).rejects.toThrow('Cancel and join');
   await registry.settleExecution(execution.id, { expectedGeneration: 1, status: 'completed', result });
   await expect(preparePlanTaskRequirements(registry, [task.id], [{ taskId: task.id, expectedRevision: 1, description: 'New' }])).rejects.toThrow('completed');
+});
+
+it('refuses to freeze an independent review with a missing or self-referencing source Task', async () => {
+  const { registry } = await fixture();
+  const source = await registry.createTask('Generate findings');
+  const review = await registry.createTask('Independent review', {
+    executionRequirements: { ...delegated, independentOfTaskIds: ['missing-source'] },
+  });
+  await expect(preparePlanTaskRequirements(registry, [source.id, review.id])).rejects.toThrow('Independent source Task');
+  await registry.updateTask(review.id, { executionRequirements: { ...delegated, independentOfTaskIds: [review.id] } });
+  await expect(preparePlanTaskRequirements(registry, [source.id, review.id])).rejects.toThrow('Independent source Task');
+  await registry.updateTask(review.id, { executionRequirements: { ...delegated, independentOfTaskIds: [source.id] } });
+  const snapshot = await preparePlanTaskRequirements(registry, [source.id, review.id]);
+  expect(snapshot.find(item => item.taskId === review.id)?.executionRequirements?.independentOfTaskIds).toEqual([source.id]);
+  const revision = { taskId: review.id, expectedRevision: 3,
+    executionRequirements: { ...delegated, independentOfTaskIds: ['missing-source'] } };
+  await expect(preparePlanTaskRequirements(registry, [source.id, review.id], [revision])).rejects.toThrow('Independent source Task');
 });

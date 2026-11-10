@@ -30,10 +30,11 @@ export async function applyDeclaredHandoffOnClient(
   agent: string,
   label: string,
   isCurrent: () => boolean,
+  expectedPlanHash?: string,
 ): Promise<{ ok: boolean; error?: string; suggestion?: PlanReviewHandoffSuggestion }> {
   const api = getElectronApi();
   if (!api) return { ok: false, error: 'BRIDGE_UNAVAILABLE' };
-  const result = await api.session.applyDeclaredHandoff(sessionId, agent, label);
+  const result = await api.session.applyDeclaredHandoff(sessionId, agent, label, expectedPlanHash);
   if (!result.success) {
     return { ok: false, error: result.error || 'DECLARED_HANDOFF_FAILED' };
   }

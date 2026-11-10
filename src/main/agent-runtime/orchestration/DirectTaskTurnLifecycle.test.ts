@@ -1,6 +1,10 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MemoryTaskStore, TaskRegistry } from '../tasks';
-import { activeDelegations, cancelPendingCreatedTasks } from './DirectTaskTurnLifecycle';
+import { subagentScopeId } from '@shared/utils/executionScope';
+import { MemoryTaskStore, TaskRegistry, taskStoreForExecutionScope, releaseScopeTaskStore, resolveSessionTasksDir } from '../tasks';
+import { activeDelegations, cancelPendingCreatedTasks, listUnfinishedDirectTasks, settleUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 
 describe('stopped turn Task cleanup', () => {
   it('cancels only unstarted Tasks created by the stopped turn', async () => {
@@ -46,4 +50,26 @@ it('identifies active children without treating a sibling or the current child a
   expect(activeDelegations(executions, first.id).map(item => item.id)).toEqual([nestedExecution.id]);
   await registry.settleExecution(nestedExecution.id, { expectedGeneration: 1, status: 'completed', result: { disposition: 'completed', summary: 'done', outputs: {} } });
   expect(activeDelegations(await registry.listExecutions(), first.id)).toEqual([]);
+});
+
+it('settles an unowned child turn in its transient Task store without creating an on-disk child scope', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-transient-task-'));
+  const originalUserData = process.env.RDC_AGENT_USER_DATA;
+  process.env.RDC_AGENT_USER_DATA = root;
+  const scope = subagentScopeId('sess_parent', 'child');
+  try {
+    const registry = new TaskRegistry(taskStoreForExecutionScope(scope));
+    const task = await registry.createTask('Transient work');
+    const execution = await registry.startExecution(task.id, { mode: 'direct', frozenPlanRef: 'turn:child:generation:1' });
+    expect(await listUnfinishedDirectTasks({ sessionId: scope, turnId: 'child', generation: 1 }))
+      .toEqual([{ executionId: execution.id, taskId: task.id }]);
+    expect(await settleUnfinishedDirectTasks({ sessionId: scope, turnId: 'child', generation: 1, stopped: true })).toBe(1);
+    expect((await registry.getExecution(execution.id))?.status).toBe('cancelled');
+    expect(fs.existsSync(resolveSessionTasksDir(scope))).toBe(false);
+  } finally {
+    releaseScopeTaskStore(scope);
+    if (originalUserData === undefined) delete process.env.RDC_AGENT_USER_DATA;
+    else process.env.RDC_AGENT_USER_DATA = originalUserData;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

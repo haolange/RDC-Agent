@@ -7,9 +7,10 @@
  * runtime binding. A purely ephemeral child without a Task owner uses memory.
  */
 
+import * as fs from 'fs';
 import * as path from 'path';
+import { childScopePrefix, isTransientScopeId } from '@shared/utils/executionScope';
 import { appPathService } from '../../runtime/AppPathService';
-import { isTransientScopeId } from '@shared/utils/executionScope';
 import { FileTaskStore, MemoryTaskStore, type TaskStore } from './TaskStore';
 import { verifyTaskReviewArtifact } from './TaskReviewArtifact';
 
@@ -21,6 +22,18 @@ function safeSegment(sessionId: string): string {
 /** 解析会话级任务目录：`${userData}/state/tasks/{sessionId}`。 */
 export function resolveSessionTasksDir(sessionId: string): string {
   return path.join(appPathService.getAppStatePaths().tasksPath, safeSegment(sessionId));
+}
+
+/** Remove only the deleted session's own and nested child Task scopes. */
+export function removeSessionTasks(sessionId: string): void {
+  const base = appPathService.getAppStatePaths().tasksPath;
+  if (!fs.existsSync(base)) return;
+  const own = safeSegment(sessionId);
+  const childPrefix = safeSegment(childScopePrefix(sessionId));
+  const entries = fs.readdirSync(base, { withFileTypes: true })
+    .filter(entry => entry.name === own || entry.name.startsWith(childPrefix));
+  if (entries.some(entry => !entry.isDirectory())) throw new Error('TASK_SCOPE_NOT_DIRECTORY');
+  for (const entry of entries) fs.rmSync(path.join(base, entry.name), { recursive: true, force: true });
 }
 
 /** 创建会话级 FileTaskStore（写入方与投影读取方共用同一路径规则）。 */

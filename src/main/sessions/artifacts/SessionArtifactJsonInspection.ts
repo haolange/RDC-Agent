@@ -92,6 +92,25 @@ export function readArtifactJsonText(bytes: Buffer, textPointers: string[], poin
   } };
 }
 
+/** Select the sole text block of a recognized tool result for ordinary search. */
+export function readDefaultToolResultText(bytes: Buffer): { text: string; view: ArtifactJsonTextView } | undefined {
+  let outer: unknown;
+  try { outer = JSON.parse(bytes.toString('utf8')); } catch { return undefined; }
+  const chunked = outer && typeof outer === 'object' && !Array.isArray(outer)
+    && (outer as Record<string, unknown>).encoding === 'json-chunks';
+  if (!chunked && !isSessionArtifactizedEnvelope(outer)) return undefined;
+  const { value } = decodeArtifactJson(bytes, []);
+  if (!isSessionArtifactizedEnvelope(value)) return undefined;
+  const blocks = Array.isArray(value.content) ? value.content : [];
+  const indexes = blocks.flatMap((block, index) => block && typeof block === 'object'
+    && (block as Record<string, unknown>).type === 'text'
+    && typeof (block as Record<string, unknown>).text === 'string' ? [index] : []);
+  if (indexes.length !== 1) {
+    throw new SessionArtifactError('ARTIFACT_JSON_POINTER_INVALID', 'Tool result has no unique text block; select one with textPointer.');
+  }
+  return readArtifactJsonText(bytes, [], `/content/${indexes[0]}/text`);
+}
+
 export function inspectArtifactJson(bytes: Buffer, textPointers: string[]): ArtifactJsonInspection {
   const { value, layers, sourceResultTruncated } = decodeArtifactJson(bytes, textPointers);
   const result: ArtifactJsonInspection = {

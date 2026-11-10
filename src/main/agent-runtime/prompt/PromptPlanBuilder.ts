@@ -336,6 +336,7 @@ export function approvedExecutionOfferFact(offer: ExecutionOffer): string {
     `Plan approved at (UTC): ${new Date(offer.approvedAt).toISOString()}`,
     'This is the persisted main-process approval time. Handoff, subsequent turns, retries and restarts do not reset it or renew a plan budget.',
     'Plan review is complete. Earlier source-agent messages about submitting or awaiting approval belong to the planning phase.',
+    'After a derived context checkpoint is installed, reread this exact frozen plan once for that checkpoint and compare its obligations with actual Task and evidence state; a summary omitting a step does not establish that it was completed.',
     'Check the current runtime identity against the frozen plan before acting. This fact grants no tools, permissions, or device access.',
   ].join('\n');
 }
@@ -362,6 +363,9 @@ function buildEffectiveToolContent(tools: readonly string[]): string {
       'Create the full multi-step list in one task_create call. Do not create Tasks one by one.',
       'For work you perform directly, task_update(status=in_progress) starts its direct execution. Settle that execution when the work is done; dependencies govern which Tasks may run.',
       'blocked requires a statusReason. Do not create Tasks for single-step or trivial work.',
+    );
+    if (toolSet.has('task_create') && toolSet.has('task_update')) lines.push(
+      'For prerequisites among Tasks created in the same batch, use the returned IDs with task_update(addBlockedBy) before starting work or submitting a plan; descriptions alone do not establish dependencies. If a Task independently reviews another, also update its executionRequirements.independentOfTaskIds with the returned source IDs while preserving its mode, profile and required Skills; a prerequisite alone does not bind independence.',
     );
     if (toolSet.has('subagent')) lines.push(
       'For Task-owned subagent work in either mode=wait or mode=background, pass taskId without first starting a direct execution. The subagent runner claims and settles its own execution.',

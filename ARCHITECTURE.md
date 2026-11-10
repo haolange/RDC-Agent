@@ -371,7 +371,7 @@ Enforcement 必须同时发生在：(1) profile allowlist 解析（token 展开�
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | 普通对话不因自然终答自动完成 Investigation 或 Task。获批 Mission 计划由 General 继承对应领域完成合同；`completed` 需检查必要 Task、当前版本核验、相关 open Challenge、活动子执行、Checkpoint、ready report 与原现场恢复。`turn_complete` 在记录 completed 声明前检查可解引用的 Checkpoint，以及至少一份符合领域合同的 ready report，包括报告状态、所需实验与相关未解 Challenge，并将缺口作为工具错误返回；终答时仍核验实际引用的当前制品与完整合同。提前终答的具体缺口返回同一执行；真实停止或阻塞保留对应 disposition。普通未继承调查合同的 General 不受垂直门禁约束。历史 U06 事实及撤回项见 ledger。 |
+| **当前态** | 普通对话不因自然终答自动完成 Investigation 或 Task。获批 Mission 计划由 General 继承对应领域完成合同；`completed` 需检查必要 Task、当前版本核验、相关 open Challenge、活动子执行、Checkpoint、ready report 与原现场恢复。`turn_complete.evidenceRefs` 必须精确引用当前 ready report 的 URI 和内容哈希；声明前检查该报告的完整领域合同，包括报告状态、所需实验与相关未解 Challenge，并将缺口作为工具错误返回；终答提交时重新核验相同引用与合同，用户正文不必重复内部标识。提前终答的具体缺口返回同一执行；真实停止或阻塞保留对应 disposition。普通未继承调查合同的 General 不受垂直门禁约束。历史 U06 事实及撤回项见 ledger。 |
 | **目标态** | 合同闭合后 General 可就地交付报告；需战略改变时保存缺口并由用户切回 Mission。`partial` / `blocked` / `cancelled` / `budget_paused` 不得伪装完成，不能只靠 Hook、模型文本或 `output_register`。实际模型、Android 与泛化验收仍需各自证据。 |
 | **迁移门禁** | 实现必须把完成门禁放进 turn / Mission 收口，不得只加 hook 或提示词。 |
 

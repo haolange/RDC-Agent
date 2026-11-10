@@ -1,13 +1,14 @@
 import { isTransientScopeId, rootScopeId, subagentScopeId } from '@shared/utils/executionScope';
 import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
 import { agentAccessCeiling } from '@shared/types/agentManifest';
+import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { withDelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
 import { deriveChildPolicyBudget, flushPolicyBudgetObservers, registerPolicyBudgetObserver } from './DelegationBudget';
 import { bindTaskRootBudget } from './TaskRootBudget';
-import { grantDelegatedArtifactAccess } from '../../sessions/artifacts/DelegatedArtifactAccess';
+import { delegatedArtifactReferences, grantDelegatedArtifactAccess } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { shellInvocationService } from '../../tools/ShellInvocationService';
 import { getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
-import { renderDelegationCapsuleInput } from '../prompt/DelegationCapsuleCompiler';
+import { delegationCapsuleArtifactRefs, renderDelegationCapsuleInput } from '../prompt/DelegationCapsuleCompiler';
 import { processSupervisor } from '../../runtime/ProcessSupervisor';
 import { resolveRdcDelegation } from '../../rdc/RdcDelegation';
 /**
@@ -61,7 +62,7 @@ import {
 } from '../tasks';
 import type { BackgroundSubagentStart } from './BackgroundSubagentService';
 import { createHash } from 'node:crypto';
-import { normalizeSubagentResult, persistSubagentResult, projectSubagentResult } from './SubagentResultEnvelope';
+import { normalizeSubagentResult, persistSubagentResult, projectSubagentResult, type DelegationSourceFailure } from './SubagentResultEnvelope';
 import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
 import { DelegationConfigurationError } from './DelegationConfigurationError';
 
@@ -106,7 +107,7 @@ export class SubagentRunner {
     taskExecutionGeneration?: number;
     beforeProviderRequestMessages?: AgentProfileTurnOptions['beforeProviderRequestMessages'];
     onProviderRequestCommitted?: AgentProfileTurnOptions['onProviderRequestCommitted'];
-  }): Promise<{ text: string; status: SubagentResultStatus; subagentId: string; policyBudget?: TurnHandle['policyBudget']; completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null }> {
+  }): Promise<{ text: string; status: SubagentResultStatus; subagentId: string; policyBudget?: TurnHandle['policyBudget']; completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null; sourceFailure?: DelegationSourceFailure }> {
     const capsule = input.capsule;
     const rdcDelegation = resolveRdcDelegation(capsule.domainExtensions);
     const parentTurn = input.parentTurn ?? this.deps.getActiveTurn(input.parentSessionId);
@@ -218,6 +219,7 @@ export class SubagentRunner {
     // 组装子 agent system prompt（目标 profile instructions）
     let resultText = '';
     let resultStatus: SubagentResultStatus = 'complete';
+    let sourceFailure: DelegationSourceFailure | undefined;
     let configurationError: DelegationConfigurationError['code'] | undefined;
     let childPromise: Promise<string> | null = null;
     let completionDeclaration: import('./TurnCoordinator').TurnCompletionDeclaration | null = null;
@@ -260,10 +262,14 @@ export class SubagentRunner {
       input.onPolicyBudget?.(childPolicyBudget);
       const frozenCapsule = freezeDelegationCapsule(capsule);
       if (input.parentSessionId) {
-        releaseArtifacts = grantDelegatedArtifactAccess(subagentSessionId, input.parentSessionId, [...new Set([
-          ...frozenCapsule.inputArtifactRefs, ...frozenCapsule.challengeRefs,
-          ...frozenCapsule.acceptedFacts.flatMap(fact => fact.sourceRefs),
-        ])]);
+        try {
+          releaseArtifacts = grantDelegatedArtifactAccess(subagentSessionId, input.parentSessionId, delegationCapsuleArtifactRefs(frozenCapsule));
+        } catch (error) {
+          if (error instanceof SessionArtifactError && error.code === 'ARTIFACT_NOT_FOUND') {
+            sourceFailure = { code: error.code, message: error.message };
+          }
+          throw error;
+        }
       } else if (frozenCapsule.inputArtifactRefs.length || frozenCapsule.challengeRefs.length || frozenCapsule.acceptedFacts.some(fact => fact.sourceRefs.length)) {
         throw new Error('ARTIFACT_SESSION_DENIED: delegation references require a parent session.');
       }
@@ -274,9 +280,14 @@ export class SubagentRunner {
         taskId: ownedTask.id, completionRequirements: ownedTask.completionRequirements,
         rule: 'Return every completionRequirements string verbatim as a key in turn_complete.result.outputs. Values are complete strings. Runtime persists the result; do not invent its reference.',
       }) : '';
+      const artifactReferences = delegatedArtifactReferences(subagentSessionId) ?? [];
+      const artifactInput = artifactReferences.length
+        ? `Runtime-frozen artifact references (URI, SHA-256):\n${artifactReferences.map(ref => `${ref.uri} ${ref.hash}`).join('\n')}\n`
+        : '';
+      const childInput = artifactInput + renderDelegationCapsuleInput(frozenCapsule) + taskContract;
       if (ownerSessionId) delegationTraceStore.updateTask(ownerSessionId, input.parentToolCallId, traceIdentity,
         { capsule: frozenCapsule, completionRequirements: ownedTask?.completionRequirements ?? [] },
-        renderDelegationCapsuleInput(frozenCapsule) + taskContract);
+        childInput);
       const capsuleSegments = [...compileDelegationCapsule(frozenCapsule), ...rdcDelegation.segments];
       if (rdcDelegation.requiresLease) {
         if (!input.parentSessionId?.trim()) {
@@ -295,7 +306,7 @@ export class SubagentRunner {
       }
       childPromise = withDelegatedInteractionOwner({ ownerSessionId: input.parentSessionId ?? subagentSessionId, childSessionId: subagentSessionId, executionId: input.executionId ?? subagentId }, () => this.deps.sendProfileMessage(
         input.targetProfile,
-        renderDelegationCapsuleInput(frozenCapsule) + taskContract,
+        childInput,
         {
           sessionId: subagentSessionId,
           projectRootPath: input.projectRootPath,
@@ -401,7 +412,8 @@ export class SubagentRunner {
 
     if (ownerSessionId) delegationTraceStore.finish(ownerSessionId, input.parentToolCallId, traceIdentity, resultStatus, resultText, configurationError);
 
-    return { text: resultText, status: resultStatus, subagentId, policyBudget: childPolicyBudget, completionDeclaration };
+    return { text: resultText, status: resultStatus, subagentId, policyBudget: childPolicyBudget, completionDeclaration,
+      ...(resultStatus === 'failed' && sourceFailure ? { sourceFailure } : {}) };
   }
 
   createSubagentTools(parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
@@ -415,12 +427,12 @@ export class SubagentRunner {
     > = {
       name: 'subagent',
       label: 'Subagent',
-      description: 'Delegate a structured Delegation Capsule to an isolated sub-agent. Include the goal, scope, evidence, challenges, required methods, output and stopping conditions. Grant the exact session:// references the child must read; an ID is not a grant. mode=wait waits; mode=background requires taskId. Capability requests do not grant authority. The selected Agent supplies its own model and reasoning configuration.',
+      description: 'Delegate a structured Delegation Capsule to an isolated sub-agent. Include the goal, scope, evidence, challenges, required methods, output and stopping conditions. Set profile to the required Agent ID: naming an Agent in task text does not select it, and omitting profile selects the caller. A Task with a required profile must use that exact profile. Grant the exact session:// references the child must read; an ID is not a grant. mode=wait waits; mode=background requires taskId. Capability requests do not grant authority. The selected Agent supplies its own model and reasoning configuration.',
       parameters: {
         ...DELEGATION_CAPSULE_JSON_SCHEMA,
         properties: {
           ...DELEGATION_CAPSULE_JSON_SCHEMA.properties,
-          taskId: { type: 'string', description: 'Optional logical Task to own this execution. In either wait or background mode, leave it unclaimed: do not start a direct execution with task_update(in_progress) first. Settle an existing execution before dispatching another.' },
+          taskId: { type: 'string', description: 'Optional logical Task to own this execution. For the same Task across delegations or evidence follow-up, pass its existing taskId each time; repeating a role or goal does not bind executions. In either wait or background mode, leave it unclaimed: do not start a direct execution with task_update(in_progress) first. Settle an existing execution before dispatching another.' },
           parentExecutionId: { type: 'string', description: 'Optional parent Task execution.' },
           mode: { type: 'string', enum: ['wait', 'background'], description: 'Wait for the result or return a durable execution id immediately.' },
         },
@@ -526,6 +538,7 @@ export class SubagentRunner {
             mode: 'subagent',
             requestedProfileId: targetProfile,
             requiredSkillIds: capsule.requiredSkillIds,
+            requestedInputArtifactRefs: delegationCapsuleArtifactRefs(capsule),
             parentExecutionId: effectiveParentExecutionId,
             rootBudgetId,
             frozenPlanRef: `capsule:sha256:${createHash('sha256').update(JSON.stringify(capsule)).digest('hex')}`,
@@ -610,7 +623,7 @@ export class SubagentRunner {
         }
         const envelope = resultPersistenceError
           ? { disposition: 'blocked' as const, summary: 'Subagent result persistence failed.', outputs: {}, error: resultPersistenceError instanceof Error ? resultPersistenceError.message : String(resultPersistenceError), missingRequirements: ['Durable result artifact'] }
-          : normalizeSubagentResult(result.text, result.status, result.completionDeclaration, resultArtifact);
+          : normalizeSubagentResult(result.text, result.status, result.completionDeclaration, resultArtifact, result.sourceFailure);
         try {
           if (execution && ownerSessionId) {
             const registry = new TaskRegistry(createSessionTaskStore(ownerSessionId));
@@ -669,7 +682,8 @@ export class SubagentRunner {
             executionId: execution?.id,
             generation: execution?.generation,
             errorCode: envelope.error === 'POLICY_LIMIT_EXCEEDED: maxWallTimeMs' ? 'POLICY_LIMIT_EXCEEDED'
-              : result.status === 'cancelled' ? 'SUBAGENT_CANCELLED' : result.status === 'failed' ? 'SUBAGENT_FAILED' : undefined,
+              : result.status === 'cancelled' ? 'SUBAGENT_CANCELLED' : result.status === 'failed'
+                ? envelope.error === 'ARTIFACT_NOT_FOUND' ? envelope.error : 'SUBAGENT_FAILED' : undefined,
           },
         };
       },

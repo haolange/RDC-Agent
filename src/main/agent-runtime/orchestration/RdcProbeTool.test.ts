@@ -42,9 +42,13 @@ describe('native RDC probe', () => {
     const current = context();
     const select = vi.fn(async () => ({ changed: true, receipt: { uri: 'session://tool-outputs/r.json', expectedHash: `sha256:${'a'.repeat(64)}` },
       current: { inputId: 'b', contentSha256: 'b'.repeat(64), deviceId: 'device', native: { eventId: 9 }, target: null } }));
-    const restore = vi.fn(async () => ({ changed: true }));
+    const restore = vi.fn(async () => ({ changed: false }));
+    const restorationStatus = vi.fn(async () => ({ restored: true,
+      original: { inputId: 'a', native: { contextId: 'old', eventId: 42 } },
+      current: { inputId: 'a', native: { contextId: 'reopened', eventId: 42 } },
+      receipt: { uri: 'session://tool-outputs/baseline.json', expectedHash: `sha256:${'c'.repeat(64)}` } }));
     const recover = vi.fn(async () => ({ changed: true, current: { inputId: 'b', contentSha256: 'b'.repeat(64), deviceId: 'device', native: { eventId: 9 }, target: null } }));
-    const captureControl = { select, restore, recover } as unknown as ApprovedCaptureController;
+    const captureControl = { select, restore, recover, restorationStatus } as unknown as ApprovedCaptureController;
     const tool = createRdcProbeTool('s', 'p');
     for (const denied of [current, { ...current, agentId: 'general', accessCeiling: 'read-only' as const, turnId: 't', captureControl },
       { ...current, agentId: 'general', accessCeiling: 'full' as const, turnId: 't', captureControl, projectId: 'other' }]) {
@@ -57,11 +61,32 @@ describe('native RDC probe', () => {
     expect(selected.details).toMatchObject({ current: { inputId: 'b', eventId: 9 }, changed: true });
     expect(select).toHaveBeenCalledWith('b', undefined);
     const restored = await tool.execute('restore', { action: 'capture_restore' }, undefined, undefined, owning);
-    expect(restored.details).toEqual({ action: 'capture_restore', changed: true });
+    expect(restored.details).toEqual({ action: 'capture_restore', changed: false, restoration: {
+      restored: true, original: { inputId: 'a', native: { contextId: 'old', eventId: 42 } },
+      current: { inputId: 'a', native: { contextId: 'reopened', eventId: 42 } },
+      baselineReceipt: { uri: 'session://tool-outputs/baseline.json', expectedHash: `sha256:${'c'.repeat(64)}` },
+      terminalReceiptPending: true,
+    } });
     expect(restore).toHaveBeenCalledOnce();
+    expect(restorationStatus).toHaveBeenCalledOnce();
     const recovered = await tool.execute('recover', { action: 'capture_recover' }, undefined, undefined, owning);
     expect(recovered.details).toMatchObject({ action: 'capture_recover', changed: true, current: { inputId: 'b' } });
     expect(recover).toHaveBeenCalledOnce();
+  });
+
+  it('does not report restoration when the post-restore observation differs or fails', async () => {
+    const current = context();
+    const restorationStatus = vi.fn(async () => ({ restored: false, original: null, current: { inputId: 'other' },
+      receipt: { uri: 'session://tool-outputs/baseline.json', expectedHash: `sha256:${'c'.repeat(64)}` } }));
+    const captureControl = { restore: vi.fn(async () => ({ changed: true })), restorationStatus } as unknown as ApprovedCaptureController;
+    const owning = { ...current, agentId: 'general', accessCeiling: 'full' as const, turnId: 't', captureControl };
+    const tool = createRdcProbeTool('s', 'p');
+    const observed = await tool.execute('restore', { action: 'capture_restore' }, undefined, undefined, owning);
+    expect(observed.details).toMatchObject({ changed: true, restoration: { restored: false, terminalReceiptPending: true } });
+    restorationStatus.mockRejectedValueOnce(new Error('RDC_RESTORE_UNCONFIRMED: cannot observe current position'));
+    const failed = await tool.execute('restore-failed', { action: 'capture_restore' }, undefined, undefined, owning);
+    expect(failed.isError).toBe(true);
+    expect(failed.details).toMatchObject({ code: 'RDC_RESTORE_UNCONFIRMED' });
   });
 
   it('does not probe the parent while a child holds its lease or while it is quarantined', async () => {

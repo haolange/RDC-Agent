@@ -72,9 +72,40 @@ describe('KnowledgeTools', () => {
     const spacesResult = await byName.knowledge_browse.execute('c1', {});
     expect(spacesResult.isError).toBeFalsy();
     expect(spacesResult.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('user') });
+    expect(spacesResult.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('spaceId') });
     const cardsResult = await byName.knowledge_browse.execute('c2', { spaceId: 'user' });
     expect(query.listCards).toHaveBeenCalledWith('user');
     expect(cardsResult.details).toMatchObject({ spaceId: 'user', count: 1 });
+  });
+
+  it('explains the scope of an empty text search without changing or repeating the query', async () => {
+    const { byName, query } = createTools();
+    vi.mocked(query.query).mockResolvedValueOnce({ hits: [], lanes: [], total: 0, revision: 'current' });
+    const result = await byName.knowledge_search.execute('empty', { query: 'object symptom', spaceIds: ['user'] });
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0]).toMatchObject({ text: expect.stringContaining('individual terms') });
+    expect(result.content[0]).toMatchObject({ text: expect.stringContaining('current query and filters') });
+    expect(result.content[0]).toMatchObject({ text: expect.stringContaining('other spaces were not searched') });
+    expect(result.content[0]).toMatchObject({ text: expect.stringContaining('omit spaceIds') });
+    expect(result.details).toMatchObject({ count: 0, revision: 'current', cardIds: [], hits: [] });
+    expect(query.query).toHaveBeenCalledTimes(1);
+    expect(query.query).toHaveBeenCalledWith(expect.objectContaining({ text: 'object symptom', spaceIds: ['user'] }));
+  });
+
+  it('does not claim spaces were excluded when the search did not restrict them', async () => {
+    const { byName, query } = createTools();
+    vi.mocked(query.query).mockResolvedValueOnce({ hits: [], lanes: [], total: 0, revision: 'current' });
+    const result = await byName.knowledge_search.execute('unscoped', { query: 'object symptom' });
+    expect(result.content[0]).not.toMatchObject({ text: expect.stringContaining('other spaces were not searched') });
+    expect(query.query).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not describe an empty later page as an empty search', async () => {
+    const { byName, query } = createTools();
+    vi.mocked(query.query).mockResolvedValueOnce({ hits: [], lanes: [], total: 1, revision: 'current' });
+    const result = await byName.knowledge_search.execute('page', { query: 'object symptom', offset: 20 });
+    expect(result.content[0]).not.toMatchObject({ text: expect.stringContaining('individual terms') });
+    expect(result.details).toMatchObject({ count: 1, revision: 'current' });
   });
 
   it('searches and compiles sourced packs from markdown-first lanes', async () => {

@@ -8,6 +8,8 @@ import {
   nowMs,
   sanitizeToken,
 } from '@shared/utils/id';
+import { requestSnapshotStore } from '../../agent-runtime/prompt/RequestSnapshotStore';
+import { removeSessionTasks } from '../../agent-runtime/tasks/sessionTaskStore';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
@@ -71,16 +73,8 @@ export class SessionRecordStore {
 
   private removeSessionSideChannels(sessionId: string, runIds: string[]): void {
     const paths = appPathService.getAppStatePaths();
-    const safeSessionId = sessionId.replace(/[^\w.-]/g, '_');
-    const sideDirs = [
-      path.join(paths.tasksPath, safeSessionId),
-      path.join(paths.llmCallsPath, safeSessionId),
-    ];
-    for (const dir of sideDirs) {
-      if (fs.existsSync(dir)) {
-        fs.rmSync(dir, { recursive: true, force: true });
-      }
-    }
+    requestSnapshotStore.removeSession(sessionId);
+    removeSessionTasks(sessionId);
 
     const tracesRunsDir = path.join(paths.tracesPath, 'runs');
     const tracesEventsDir = path.join(paths.tracesPath, 'events');
@@ -91,6 +85,7 @@ export class SessionRecordStore {
         path.join(tracesRunsDir, `${runId}.json`),
         path.join(tracesEventsDir, `${safeRunId}.jsonl`),
         path.join(tracesEventsDir, `${runId}.jsonl`),
+        path.join(tracesEventsDir, `${safeRunId}.seq.lock`),
       ]) {
         if (fs.existsSync(filePath)) {
           fs.rmSync(filePath, { force: true });

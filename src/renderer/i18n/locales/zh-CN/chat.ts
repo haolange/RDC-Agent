@@ -279,6 +279,7 @@ export const zhChat = {
   'chat.planReviewReopen': '重新审批',
   'chat.planReviewReopened': '已恢复计划审批',
   'chat.handoffSuggestionTitle': '继续',
+  'chat.approvedPlanReady': '已批准的计划可以继续执行。',
   'chat.subagentComplete': '已完成',
   'chat.subagentQueued': '排队中',
   'chat.subagentWaiting': '等待中',

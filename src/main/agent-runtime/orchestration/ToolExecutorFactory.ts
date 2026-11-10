@@ -53,6 +53,7 @@ import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { artifactizeToolResult } from '../tools/ToolResultArtifactizer';
 import { RdcNativeFailure } from '../../rdc/RdcNativeProtocol';
 import { toolResourceArbiter, toolResourceKey } from './ToolResourceArbiter';
+import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 
 export interface ToolExecutorFactoryDeps {
   slots: AgentSlotRegistry;
@@ -524,14 +525,30 @@ export class ToolExecutorFactory {
         throw new Error('PLAN_REVIEW_NO_HANDOFF: plan_artifact requires a declared continue handoff on this profile.');
       }
       const turnHandle = this.deps.getActiveTurn(sessionId);
-      if (turnHandle) turnHandle.approvedPlan = null;
+      if (turnHandle) {
+        if (turnHandle.turnId !== runtimeContext.turnId) throw new Error('PLAN_TURN_CHANGED: the planning turn is no longer active.');
+        const unfinished = await listUnfinishedDirectTasks({ sessionId, turnId: turnHandle.turnId, generation: turnHandle.generation });
+        if (unfinished.length) {
+          throw new Error(`PLAN_DIRECT_TASKS_UNSETTLED: Plan approval ends this planning turn, but direct Tasks are still active: ${unfinished.map(item => item.taskId).join(', ')}. Settle each with its actual result before submitting the plan. Do not claim that approval has already happened; keep work that begins after approval pending, and do not make it depend on a blocked planning task merely waiting for approval.`);
+        }
+      }
       const requiredTaskIds = args.requiredTaskIds;
-      if (getDelegatedTaskScope(sessionId) && (requiredTaskIds !== undefined || args.taskRevisions !== undefined)) {
+      const delegatedScope = getDelegatedTaskScope(sessionId);
+      if (delegatedScope && (requiredTaskIds !== undefined || args.taskRevisions !== undefined)) {
         throw new Error('TASK_SCOPE_DENIED: approved Task bindings and revisions belong to the owning planner session, not a delegated Capsule.');
       }
       if (requiredTaskIds !== undefined && (!Array.isArray(requiredTaskIds) || requiredTaskIds.length > 128
         || requiredTaskIds.some(id => typeof id !== 'string' || !id.trim()) || new Set(requiredTaskIds).size !== requiredTaskIds.length)) {
         throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: requiredTaskIds must be distinct existing Task ids.');
+      }
+      if (turnHandle && !delegatedScope && requiredTaskIds === undefined) {
+        const registry = new TaskRegistry(createSessionTaskStore(sessionId));
+        const turnRef = `turn:${turnHandle.turnId}:generation:${turnHandle.generation}`;
+        const unsettled = (await registry.listTasks()).filter(task => task.creationTurnRef === turnRef
+          && (task.status === 'pending' || task.status === 'blocked'));
+        if (unsettled.length) {
+          throw new Error(`PLAN_TASK_BINDINGS_UNDECLARED: This planning turn created unfinished Tasks: ${unsettled.map(task => task.id).join(', ')}. Explicitly set requiredTaskIds to the existing Tasks required by this plan, or [] if none are required. Task names or IDs in Markdown do not freeze their requirements.`);
+        }
       }
       const registry = Array.isArray(requiredTaskIds) && requiredTaskIds.length ? new TaskRegistry(createSessionTaskStore(sessionId)) : null;
       if (args.taskRevisions !== undefined && !registry) throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: taskRevisions requires requiredTaskIds.');
@@ -550,6 +567,7 @@ export class ToolExecutorFactory {
       for (const handoff of handoffOptions) assertDeclaredHandoffForPlan({ sourceAgentId: agentId,
         projectRoot: runtimeContext.projectRootPath ?? runtimeContext.effectivePlan?.projectRootPath ?? null, handoff, tasks: taskRequirements });
       const markdown = composePlanMarkdown({ title, summary, content, taskRequirements, investigation });
+      if (turnHandle) turnHandle.approvedPlan = null;
       onExecutionStart?.();
       const written = planArtifactWriter.writeLivePlan(sessionId, markdown);
       const revision = planReviewStateStore.beginRevision(sessionId, runtimeContext.turnId);

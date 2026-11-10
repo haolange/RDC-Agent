@@ -3,6 +3,7 @@ import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import { withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
+import { closeOwnedRemoteCapture } from './RdcCaptureClose';
 import { shellInvocationService } from '../tools/ShellInvocationService';
 /**
  * RdcSessionService - RDC runtime context state and fixed native CLI lifecycle.
@@ -11,7 +12,7 @@ import { shellInvocationService } from '../tools/ShellInvocationService';
 import { randomUUID } from 'node:crypto';
 import { withRdcOpenProgress } from './RdcOpenProgress';
 import { withRdcRemoteProgress, type RdcRemoteProgress } from './RdcRemoteProgress';
-import { assertRemotePreparationContract, connectSessionReplayDevice, inspectSessionReplayInstallation, remotePreparationBindingIdentity, type RdcRemoteConnection, type RemoteInstallationInspection } from './RdcRemoteConnection';
+import { assertRemotePreparationContract, connectSessionReplayDevice, inspectSessionReplayInstallation, remotePreparationBindingIdentity, revalidateSessionReplayDevice, type RdcRemoteConnection, type RemoteInstallationInspection } from './RdcRemoteConnection';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import type {
   CaptureDescriptor,
@@ -99,15 +100,15 @@ export class RdcSessionRuntime {
         || currentBinding.definitionsFingerprint !== this.lifecycleBinding?.definitionsFingerprint) throw new Error('RDC_CLI_BINDING_CHANGED');
       if (this.runtimeContext) {
         const previous = this.runtimeContext;
-        const closed = await callNative('rd.capture.close_replay', { session_id: previous.replaySessionId }, this.contextId!, currentBinding, options.signal);
-        if (!closed.ok) throw new Error(closed.error ?? 'RDC_CAPTURE_CLOSE_FAILED');
-        // The old replay is now gone even if releasing its file later fails. Keep only context ownership.
-        setRdcRuntimeContextForSession(scope.sessionId, null);
-        this.openedCapture = null; this.runtimeContext = null; this.captures = []; this.activeCaptureId = null;
-        if (previous.captureFileId) {
-          const released = await callNative('rd.capture.close_file', { capture_file_id: previous.captureFileId }, this.contextId!, currentBinding, options.signal);
-          if (!released.ok) throw new Error(released.error ?? 'RDC_CAPTURE_CLOSE_FAILED');
-        }
+        if (!previous.captureFileId || !previous.replaySessionId) throw new Error('RDC_SWITCH_IDENTITY_INVALID: capture and replay identities are required.');
+        await closeOwnedRemoteCapture({ scope, contextId: this.contextId!, replaySessionId: previous.replaySessionId,
+          captureFileId: previous.captureFileId, binding: currentBinding, signal: options.signal,
+          onReplayClosed: () => {
+            setRdcRuntimeContextForSession(scope.sessionId, null);
+            this.openedCapture = null; this.runtimeContext = null; this.captures = []; this.activeCaptureId = null;
+          },
+          onUnconfirmed: () => { if (this.openedCapture) this.openedCapture = { ...this.openedCapture, status: 'error' }; },
+        });
       }
     } else {
       await this.closeOrReplaceOpenedCapture(options);
@@ -283,8 +284,12 @@ export class RdcSessionRuntime {
     if (this.remoteConnection && this.isOwnedBy(scope) && this.remoteConnection.deviceId === device.id
       && JSON.stringify(binding.cli) === JSON.stringify(this.lifecycleBinding?.cli)
       && binding.definitionsFingerprint === this.lifecycleBinding?.definitionsFingerprint) {
-      const ping = await callNative('rd.remote.ping', { remote_id: this.remoteConnection.remoteId }, this.contextId!, binding, options.signal);
-      if (!ping.ok) throw new Error(ping.error ?? 'RDC_REMOTE_NOT_READY');
+      const connection = this.remoteConnection;
+      if (connection.contextId !== this.contextId || connection.serial !== device.serial) throw new Error('RDC_REMOTE_IDENTITY_MISMATCH: prepared remote binding changed.');
+      await revalidateSessionReplayDevice(connection, binding, options.signal);
+      if (this.remoteConnection !== connection || this.contextId !== connection.contextId || !this.isOwnedBy(scope)) {
+        throw new Error('RDC_REMOTE_IDENTITY_MISMATCH: prepared remote binding changed during verification.');
+      }
       return;
     }
     await this.closeOrReplaceOpenedCapture(options);

@@ -11,8 +11,8 @@ const stringArray = (value: unknown): string[] | undefined => {
 
 const scopeProperties = Object.fromEntries(KNOWLEDGE_SCOPE_AXES.map(axis => [axis, { type: 'string' }]));
 export const knowledgeQueryProperties = {
-  query: { type: 'string' },
-  spaceIds: { type: 'array', items: { type: 'string' } },
+  query: { type: 'string', description: 'All word terms must match. An empty result applies only to the current query and filters; try individual terms or browse a selected space if needed.' },
+  spaceIds: { type: 'array', items: { type: 'string' }, description: 'Exact space IDs returned by knowledge_browse; omit to search all accessible spaces.' },
   type: { type: 'array', items: { type: 'string', enum: [...KNOWLEDGE_CARD_TYPES] } },
   lifecycle: { type: 'array', items: { type: 'string', enum: [...KNOWLEDGE_LIFECYCLES] } },
   lanes: { type: 'array', items: { type: 'string', enum: [...KNOWLEDGE_RETRIEVAL_LANES] } },

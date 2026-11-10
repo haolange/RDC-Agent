@@ -10,6 +10,8 @@ vi.mock('../artifacts/SessionArtifactResolver', () => ({ sessionArtifactResolver
 vi.mock('../../agent-runtime/tasks/sessionTaskStore', () => ({ createSessionTaskStore: () => ({ withLock: async (_key: string, action: () => Promise<unknown>) => action(), listTasks: async () => authority.tasks, listExecutions: async () => authority.executions }) }));
 vi.mock('../../investigation/InvestigationArtifactService', () => ({ investigationArtifactService: { readAllRecords: () => authority.investigation.map(item => ({ ...item, manifest: item.manifest })) } }));
 import { serializeHandoffSourceTranscript } from '../../agent-runtime/context/StructuredHandoffBuilder';
+import { registerDelegatedTaskScope } from '../../agent-runtime/tasks/DelegatedTaskScopes';
+import { grantDelegatedArtifactAccess } from '../artifacts/DelegatedArtifactAccess';
 import { projectCompactionJournalMessages, readCompactionAuthorityJournal, saveCompactionAuthoritySource, verifyCompactionAuthoritySource } from './CompactionAuthoritySource';
 beforeEach(() => { vi.clearAllMocks(); authority.tasks = []; authority.executions = []; authority.investigation = []; io.list.mockReturnValue([]); io.write.mockReturnValue({ hash: 'a'.repeat(64) }); io.read.mockReturnValue({ hash: 'a'.repeat(64) }); });
 describe('authoritative compaction checkpoint', () => {
@@ -44,6 +46,21 @@ describe('authoritative compaction checkpoint', () => {
     await expect(saveCompactionAuthoritySource('session', [])).rejects.toThrow(/disk full/);
     io.read.mockImplementationOnce(() => { throw new Error('hash mismatch'); });
     await expect(saveCompactionAuthoritySource('session', [])).rejects.toThrow(/hash mismatch/);
+  });
+  it('returns only the delegated execution\'s granted references for compaction', async () => {
+    const child = 'owner::subagent::scope';
+    const allowed = 'session://tool-outputs/granted.json';
+    const releaseGrant = grantDelegatedArtifactAccess(child, 'session', [allowed], io);
+    const releaseScope = registerDelegatedTaskScope(child, { ownerSessionId: 'session', rootTaskId: 'task-root' });
+    io.list.mockReturnValue(['session://tool-outputs/private.json']);
+    try {
+      const saved = await saveCompactionAuthoritySource(child, []);
+      expect(saved.artifactRefs).toEqual([{ uri: allowed, hash: 'a'.repeat(64) }]);
+      expect(JSON.stringify(saved)).not.toContain('private.json');
+    } finally {
+      releaseScope();
+      releaseGrant();
+    }
   });
   it('keeps an oversized task failure in the archived source while bounding the model context', async () => {
     const failure = 'signed replay recovery failed; '.repeat(4_000);
@@ -115,6 +132,7 @@ describe('authoritative compaction checkpoint', () => {
     expect(context.authorityArchive).toBe(saved.uri);
     expect(context.indexCoverage.complete).toBe(false);
     expect(context.indexCoverage.artifactRefs.total).toBe(420);
+    expect(saved.artifactRefs).toHaveLength(420);
     expect(context.indexCoverage.investigation.total).toBe(150);
     expect(context.tasks.some((task: { id: string }) => task.id === 'task-41')).toBe(true);
     const envelope = JSON.parse(io.write.mock.calls.at(-1)![2] as string);

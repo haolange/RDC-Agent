@@ -5,13 +5,10 @@ import type { PlanReviewSection } from '@shared/types/planReview';
 import { PLAN_TASK_REQUIREMENTS_HEADING, renderPlanTaskRequirements, parsePlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
 import { PLAN_INVESTIGATION_HEADING, renderInvestigationPlanContract, parseInvestigationPlanContract, type InvestigationPlanContract } from '@shared/types/planInvestigation';
 import { sessionArtifactResolver, type SessionArtifactResolver, type SessionArtifactWriteResult } from '../artifacts/SessionArtifactResolver';
+import { normalizeSha256 } from '../../runtime/contentHash';
 
 export const LIVE_PLAN_RELATIVE_PATH = 'plan.md';
 export const LIVE_PLAN_URI = formatSessionArtifactUri('plans', LIVE_PLAN_RELATIVE_PATH);
-
-export function normalizeArtifactHash(hash: string): string {
-  return hash.trim().toLowerCase().replace(/^sha256:/, '');
-}
 
 export function composePlanMarkdown(input: { title: string; summary: string[]; content: string; taskRequirements?: PlanTaskRequirement[]; investigation?: InvestigationPlanContract | null }): string {
   const title = input.title.trim();
@@ -62,7 +59,7 @@ export class PlanArtifactWriter {
     }
     const bytes = fs.readFileSync(resolved.absolutePath);
     const hash = crypto.createHash('sha256').update(bytes).digest('hex');
-    if (normalizeArtifactHash(expectedHash) !== hash) {
+    if (normalizeSha256(expectedHash) !== hash) {
       throw new Error('PLAN_HASH_MISMATCH: sha256 does not match expectedHash.');
     }
     return { markdown: bytes.toString('utf8'), hash, uri: resolved.uri };

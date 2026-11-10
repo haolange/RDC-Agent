@@ -182,6 +182,13 @@ export class KnowledgeQueryService {
   }
 
   async query(request: KnowledgeQueryRequest = {}): Promise<KnowledgeQueryResult> {
+    if (request.spaceIds?.length) {
+      const available = this.deps.listSpaces().map(space => space.spaceId);
+      const unknown = request.spaceIds.filter(spaceId => !available.includes(spaceId));
+      if (unknown.length) {
+        throw new Error(`KNOWLEDGE_SPACE_UNKNOWN: ${JSON.stringify(unknown)}. Use exact space IDs from knowledge_browse: ${JSON.stringify(available)}.`);
+      }
+    }
     const [snapshot, vocabulary] = await Promise.all([this.deps.index.getOrRebuild(), this.deps.readTopics()]);
     const revision = createHash('sha256').update(JSON.stringify([snapshot.revision, vocabulary.revision, BUILTIN_KNOWLEDGE_SYNONYMS])).digest('hex');
     const synonyms: KnowledgeSynonymGroup[] = [...BUILTIN_KNOWLEDGE_SYNONYMS, ...vocabulary.document.topics.map(topic => ({ terms: [topic.label, ...topic.synonyms] }))];

@@ -504,6 +504,7 @@ export interface ElectronAPI {
       id: string,
       agent: string,
       label: string,
+      expectedPlanHash?: string,
     ) => Promise<{
       success: boolean;
       session?: SessionRecord;

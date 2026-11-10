@@ -3,7 +3,7 @@ beforeEach(() => { runtimePermissionStateService.initialize('default'); runtimeP
 import { registerPolicyBudgetObserver } from './DelegationBudget';
 const handoffPreflight = vi.hoisted(() => vi.fn());
 vi.mock('../../conversation/applyDeclaredHandoff', () => ({ assertDeclaredHandoffForPlan: handoffPreflight }));
-import { createPolicyBudgetState } from './TurnCoordinator';
+import { createPolicyBudgetState, type TurnHandle } from './TurnCoordinator';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -1258,6 +1258,79 @@ it('durably saves reserved cost before effects and rejects effects when durable 
 });
 
 describe('ToolExecutorFactory plan_artifact gate', () => {
+  it('requires the current planning turn to settle direct Tasks before showing a review', async () => {
+    const list = vi.spyOn(TaskRegistry.prototype, 'listExecutions').mockResolvedValueOnce([
+      { id: 'execution', taskId: 'planning-task', mode: 'direct', status: 'running', frozenPlanRef: 'turn:turn:generation:7' },
+      { id: 'other', taskId: 'other-turn-task', mode: 'direct', status: 'running', frozenPlanRef: 'turn:other:generation:7' },
+    ] as never).mockResolvedValueOnce([]);
+    const tasks = vi.spyOn(TaskRegistry.prototype, 'listTasks').mockResolvedValue([]);
+    const write = vi.spyOn(planArtifactWriter, 'writeLivePlan').mockReturnValue({ uri: 'session://plans/plan.md', hash: 'a'.repeat(64) } as never);
+    const begin = vi.spyOn(planReviewStateStore, 'beginRevision').mockReturnValue({ planId: 'plan', revision: 1 } as never);
+    const review = vi.mocked(agentPlanReviewRequestService.request);
+    review.mockClear();
+    try {
+      const turn = { turnId: 'turn', generation: 7, approvedPlan: null } as TurnHandle;
+      const factory = createFactory(turn);
+      const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' },
+        effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', surface: 'plan-gate' }] } } as never;
+      const call = { id: 'plan-call', type: 'toolCall' as const, name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: 'Work' } };
+      const denied = await factory.executePlanArtifactTool(call, 'debugger', context);
+      expect(denied.isError).toBe(true);
+      expect(JSON.stringify(denied.content)).toContain('PLAN_DIRECT_TASKS_UNSETTLED');
+      expect(JSON.stringify(denied.content)).toContain('planning-task');
+      expect(JSON.stringify(denied.content)).not.toContain('other-turn-task');
+      expect(write).not.toHaveBeenCalled();
+      expect(review).not.toHaveBeenCalled();
+
+      const submitted = await factory.executePlanArtifactTool(call, 'debugger', context);
+      expect(submitted.isError).toBe(false);
+      expect(write).toHaveBeenCalledTimes(1);
+      expect(review).toHaveBeenCalledTimes(1);
+    } finally { list.mockRestore(); tasks.mockRestore(); write.mockRestore(); begin.mockRestore(); review.mockClear(); }
+  });
+
+  it('requires an explicit binding decision for unfinished Tasks created by this planning turn', async () => {
+    const listExecutions = vi.spyOn(TaskRegistry.prototype, 'listExecutions').mockResolvedValue([]);
+    const task = { id: 'required-task', revision: 1, subject: 'Required work', description: 'Complete the goal', status: 'pending',
+      creationTurnRef: 'turn:turn:generation:7', blockedBy: [], completionRequirements: ['result'],
+      executionRequirements: { mode: 'direct', requiredSkillIds: [], independentOfTaskIds: [] } };
+    const listTasks = vi.spyOn(TaskRegistry.prototype, 'listTasks').mockResolvedValue([
+      task, { ...task, id: 'other-turn-task', creationTurnRef: 'turn:other:generation:7' },
+      { ...task, id: 'done-task', status: 'completed' },
+    ] as never);
+    const getTask = vi.spyOn(TaskRegistry.prototype, 'getTask').mockResolvedValue(task as never);
+    const write = vi.spyOn(planArtifactWriter, 'writeLivePlan').mockReturnValue({ uri: 'session://plans/plan.md', hash: 'a'.repeat(64) } as never);
+    const begin = vi.spyOn(planReviewStateStore, 'beginRevision').mockReturnValue({ planId: 'plan', revision: 1 } as never);
+    const review = vi.mocked(agentPlanReviewRequestService.request); review.mockClear();
+    try {
+      const turn = { turnId: 'turn', generation: 7, approvedPlan: null } as TurnHandle;
+      const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' },
+        effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', surface: 'plan-gate' }] } } as never;
+      const factory = createFactory(turn);
+      const call = { id: 'plan-call', type: 'toolCall' as const, name: 'plan_artifact',
+        arguments: { title: 'Plan', summary: ['Work'], content: 'The task is described in prose.' } };
+      const omitted = await factory.executePlanArtifactTool(call, 'analyzer', context);
+      expect(omitted.isError).toBe(true);
+      expect(JSON.stringify(omitted.content)).toContain('PLAN_TASK_BINDINGS_UNDECLARED');
+      expect(JSON.stringify(omitted.content)).toContain('required-task');
+      expect(JSON.stringify(omitted.content)).not.toContain('other-turn-task');
+      expect(write).not.toHaveBeenCalled(); expect(review).not.toHaveBeenCalled();
+
+      const bound = await factory.executePlanArtifactTool({ ...call, arguments: { ...call.arguments, requiredTaskIds: ['required-task'] } }, 'analyzer', context);
+      expect(bound.isError, JSON.stringify(bound.content)).toBe(false);
+      expect(parsePlanTaskRequirements(write.mock.calls.at(-1)![1])).toEqual([expect.objectContaining({ taskId: 'required-task', revision: 1 })]);
+      const explicitNone = await factory.executePlanArtifactTool({ ...call, arguments: { ...call.arguments, requiredTaskIds: [] } }, 'analyzer', context);
+      expect(explicitNone.isError, JSON.stringify(explicitNone.content)).toBe(false);
+      expect(parsePlanTaskRequirements(write.mock.calls.at(-1)![1])).toEqual([]);
+
+      listTasks.mockResolvedValue([{ ...task, id: 'other-turn-task', creationTurnRef: 'turn:other:generation:7' }] as never);
+      expect((await factory.executePlanArtifactTool(call, 'analyzer', context)).isError).toBe(false);
+    } finally {
+      listExecutions.mockRestore(); listTasks.mockRestore(); getTask.mockRestore();
+      write.mockRestore(); begin.mockRestore(); review.mockClear();
+    }
+  });
+
   it('includes the prepared Mission contract in the exact Markdown sent for user review', async () => {
     const write = vi.spyOn(planArtifactWriter, 'writeLivePlan').mockReturnValue({ uri: 'session://plans/plan.md', hash: 'a'.repeat(64) } as never);
     const begin = vi.spyOn(planReviewStateStore, 'beginRevision').mockReturnValue({ planId: 'plan', revision: 1 } as never);
@@ -1327,11 +1400,11 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
     execute: async () => ({ content: [{ type: 'text' as const, text: 'stub' }] }),
   };
 
-  function createFactory() {
+  function createFactory(turn: TurnHandle | null = null) {
     return new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
+      getActiveTurn: () => turn,
       resolveRuntimeTools: () => ({
         toolMap: new Map([['plan_artifact', planTool]]),
         definitions: [],

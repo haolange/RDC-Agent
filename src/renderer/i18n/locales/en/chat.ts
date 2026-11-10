@@ -295,6 +295,7 @@ export const enChat = {
   'chat.planReviewReopen': 'Review again',
   'chat.planReviewReopened': 'Plan review restored',
   'chat.handoffSuggestionTitle': 'Continue',
+  'chat.approvedPlanReady': 'An approved plan is ready to continue.',
   'chat.subagentComplete': 'Completed',
   'chat.subagentQueued': 'Queued',
   'chat.subagentWaiting': 'Waiting',

@@ -99,6 +99,8 @@ Outputs use the same session-owned projection path. `output_register` writes an 
 
 `project:inputsChanged` 反映完整扫描确认并持久化的当前输入，发布不等待回放清理成功。清理错误与待办通过独立 `replayCleanupPending` 和 `project:inputsError` 保留；renderer 不从清理待办、旧 capture binding 或历史足迹恢复已确认不存在的 RDC。最后一个输入删除后，重新挂载或重启仍显示原空态。
 
+Right Rail 的轨迹刷新读取最近一次持久化的项目输入快照，不因每条进度事件触发新的 capture 扫描或哈希。该快照只用于投影；计划冻结和打开输入仍各自核验当前文件身份与内容，不能以显示在列表中代替准入检查。
+
 Agent preparing 与 active turn 使用独立锁 owner，准备转入运行时不能出现解锁间隙；delegation 和 native process 未确认退出仍为锁定。运行中同一画面和 EID 控件继续投影实际状态，禁止人工打开/关闭/切文件/切设备/事件 apply。
 
 Capture 的人工与 Agent 控制共用同一当前回放状态、图片、原生事件列表与控件，不按控制者选择图片来源，不提供独立历史滑条。interactionLock 仅决定人工操作可用性，不卸载控件；Agent 观察成功时 requestedEventId 同步该次 appliedEventId，失败时不保留旧 requested/image 归属。图片刷新包含 image.updatedAt，避免同 EID replacement 留旧图；迟到图片与状态仍按 scope/generation/revision 隔离。既有操作证据保留在主进程存档，不向 renderer 暴露第二套图片镜像。
@@ -138,6 +140,8 @@ Composer 与计划审批使用同一目录能力状态解析：尚在加载/刷�
 主进程以 plan-state.json 加持久历史、可见分支和计划 hash 验证归属，签发 PlanReviewProjection 与运行时 reviewId；getHistory 和 plan:reviewChanged 共用同一投影。Renderer 不从 streaming 或工具历史重建审批权限。answerPlanReview 仅接受 sessionId/reviewId/decision；reopenReview 与 cancelReview 共用来源和决定处理链。
 
 Stop 后 cancelled 只提供阅读器“重新审批”，有效 awaiting 在进入所属 session 时恢复原 Composer 审批区，不执行模型。approved/rejected/superseded、草稿不自动恢复；文件、hash、owner 或分支证明无效时拒绝恢复。存在其他请求禁止重开，重复或旧 reviewId 不能提交。重开不改旧历史；批准沿既有冻结、Task、offer 与声明 handoff，恢复不重启旧循环。决定响应不确定时读取当前状态，不自动重发或执行。
+
+已批准计划尚未发出后续用户请求时，重进会话可显式显示其声明交接：主进程核对当前可见来源、owner、冻结文件与 hash、批准状态、offer、Agent 声明和必需准备要求；用户点按钮才沿现有 handoff／Composer 链继续。点击时再次核对预期计划 hash 与没有后续请求；批准变化、出现后续请求或来源不可证时拒绝，不能自动重发。该投影不新增持久 handoff 状态，也不重写历史取消记录或重置任务消费。
 
 EffectiveCatalogSnapshot 的 scopeGeneration 由主进程配置代次签发，projectionVersion 在代次内单调，generatedAt 只审计。IPC 返回和事件进入同一接收器，失效后以有效读取绑定代次并吸收同代次暂存事件。菜单打开与会话进入只读重验证合并在途读取；Retry 才强制刷新 Provider，保持 TTL 与退避，无定时轮询。
 

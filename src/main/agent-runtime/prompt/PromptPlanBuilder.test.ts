@@ -97,6 +97,8 @@ describe('PromptPlanBuilder', () => {
     expect(offerFact?.content).toContain('1970-01-01T00:00:00.001Z');
     expect(offerFact?.content).toContain('do not reset it or renew a plan budget');
     expect(offerFact?.content).toContain('session://plans/plan-approved.md');
+    expect(offerFact?.content).toContain('After a derived context checkpoint is installed');
+    expect(offerFact?.content).toContain('summary omitting a step does not establish that it was completed');
     expect(offerFact?.content).toContain('grants no tools, permissions, or device access');
     expect(offeredPlan.stablePrefix.fingerprint).toBe(plan.stablePrefix.fingerprint);
     expect(offeredPlan.segments.find(segment => segment.id === 'runtime:tools')?.content)
@@ -147,6 +149,8 @@ describe('PromptPlanBuilder', () => {
     });
     expect(plan.systemPrompt).toContain('Tasks are writable in this turn.');
     expect(plan.systemPrompt).toContain('Create the full multi-step list in one task_create call.');
+    expect(plan.systemPrompt).toContain('use the returned IDs with task_update(addBlockedBy)');
+    expect(plan.systemPrompt).toContain('independentOfTaskIds');
     expect(plan.systemPrompt).toContain('For work you perform directly');
     expect(plan.systemPrompt).not.toContain('mark exactly one task in_progress');
     expect(plan.systemPrompt.includes('For Task-owned subagent work in either mode=wait or mode=background')).toBe(includeSubagent);

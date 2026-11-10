@@ -47,7 +47,7 @@ export function createTurnFailedDiagnostic(
         : 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED',
       severity: 'error',
       userMessage: isNoProgress
-        ? error.noProgressReason === 'approved-obligation'
+        ? error.noProgressReason === 'runtime-obligation'
           ? `${label} 在收到未完成条件后没有继续处理或声明实际阻塞，本次执行已停止。现有结果已保留，请补齐缺口或继续处理。`
           : `${label} 连续三轮执行了相同的工具、参数并得到相同结果。本次 Agent Loop 已停止，以免继续无效消耗。请调整任务或改用具备所需工具的 Agent 后重试。`
         : `${label} 在 ${error.maxTurns ?? error.turn} 轮上限内仍需要继续调用工具。本次 Agent Loop 已停止；请缩小任务范围或调整 Agent 的轮次策略后重试。`,

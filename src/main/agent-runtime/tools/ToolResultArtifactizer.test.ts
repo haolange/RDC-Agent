@@ -160,7 +160,7 @@ describe('ToolResultArtifactizer', () => {
       expect(envelope.source).toEqual({ toolName: 'code_interpreter', toolCallId: 'cpu-call' });
       expect(envelope.content).toEqual(original.content);
       expect(envelope.details).toEqual(original.details);
-      expect(() => resolveDelegatedArtifactRead('cpu-review', ref.ref, '0'.repeat(64))).toThrow('ARTIFACT_SESSION_DENIED');
+      expect(() => resolveDelegatedArtifactRead('cpu-review', ref.ref, '0'.repeat(64))).toThrow('ARTIFACT_HASH_MISMATCH');
       expect(() => resolveDelegatedArtifactRead('cpu-review', 'session://tool-outputs/ungranted.json')).toThrow('ARTIFACT_SESSION_DENIED');
     } finally { release(); }
   });
@@ -347,7 +347,7 @@ describe('ToolResultArtifactizer', () => {
     try {
       const access = resolveDelegatedArtifactRead('image-reviewer', imageRef, imageHash);
       expect(resolver.read(access.sessionId, imageRef, { expectedHash: access.expectedHash, includeImageData: true }).imageData).toBe(image.data);
-      expect(() => resolveDelegatedArtifactRead('image-reviewer', imageRef, '0'.repeat(64))).toThrow('ARTIFACT_SESSION_DENIED');
+      expect(() => resolveDelegatedArtifactRead('image-reviewer', imageRef, '0'.repeat(64))).toThrow('ARTIFACT_HASH_MISMATCH');
     } finally { releaseImage(); }
   });
 

@@ -1,8 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import type { PromptPlan, RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
+import { childScopePrefix } from '@shared/utils/executionScope';
 import { appPathService } from '../../runtime/AppPathService';
 import { readRequestUsage } from './RequestUsageSnapshot';
+import type { PromptPlan, RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 
 const safeSegment = (value: string): string => value.replace(/[^a-zA-Z0-9._-]/g, '-');
 
@@ -24,6 +25,24 @@ export class RequestSnapshotStore {
 
   readUsage(scopeId: string) {
     return readRequestUsage(this.rootPath, scopeId);
+  }
+
+  /** Delete the owning session and every nested child scope after their producers have stopped. */
+  removeSession(sessionId: string): void {
+    const base = this.rootPath;
+    if (!fs.existsSync(base)) return;
+    const own = safeSegment(sessionId);
+    const childPrefix = safeSegment(childScopePrefix(sessionId));
+    const entries = fs.readdirSync(base, { withFileTypes: true })
+      .filter(entry => entry.name === own || entry.name.startsWith(childPrefix));
+    if (entries.some(entry => !entry.isDirectory())) throw new Error('REQUEST_SNAPSHOT_SCOPE_NOT_DIRECTORY');
+    for (const entry of entries) {
+      const scopePath = path.join(base, entry.name);
+      fs.rmSync(scopePath, { recursive: true, force: true });
+      for (const cache of [this.promptSegmentsCache, this.mailboxDeliveriesCache]) {
+        for (const key of cache.keys()) if (key.startsWith(`${scopePath}${path.sep}`)) cache.delete(key);
+      }
+    }
   }
 
   write(snapshot: RequestEnvelopeSnapshot): void {

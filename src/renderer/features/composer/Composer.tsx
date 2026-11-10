@@ -23,6 +23,7 @@ import { ComposerMenuRegistryProvider } from './useComposerMenuRegistry';
 import { ComposerTurnControlsProvider } from './ComposerTurnControlsContext';
 import { ComposerAttachIngest } from './ComposerAttachIngest';
 import { ComposerAttachmentTray } from './ComposerAttachmentTray';
+import { ApprovedPlanHandoff } from './ApprovedPlanHandoff';
 import { buildComposerSessionScopeKey } from '../../lib/composerSessionScope';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { useComposerAttachmentDrop } from './useComposerAttachmentDrop';
@@ -138,6 +139,7 @@ export const Composer: React.FC<ComposerProps> = ({
       onDrop={attachmentDrop.handleDrop}
       onPaste={attachmentDrop.handlePaste}
     >
+      <ApprovedPlanHandoff sessionId={currentSession?.sessionId} disabled={isComposerBusy} />
       <ComposerAttachIngest
         fileInputRef={fileInputRef}
         isDropActive={isDropActive}

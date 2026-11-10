@@ -8,6 +8,13 @@ import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import { charsToTokens } from '@shared/utils/tokens';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 
+export function delegationCapsuleArtifactRefs(capsule: DelegationCapsule): string[] {
+  return [...new Set([
+    ...capsule.inputArtifactRefs, ...capsule.challengeRefs,
+    ...capsule.acceptedFacts.flatMap(fact => fact.sourceRefs),
+  ])];
+}
+
 function pushSegment(
   segments: PromptSegment[],
   id: string,

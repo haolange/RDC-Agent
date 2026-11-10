@@ -63,8 +63,8 @@ import type {
   ToolExecutorRuntimeContext,
 } from './orchestratorTypes';
 import type { TurnCompletionReadinessValidator, TurnCompletionReceipt, TurnCompletionValidator } from '../agent/TurnCompletionValidator';
-import { settleJoinedTurnTaskExecutions, settleUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
-import { approvedGoalContinuation } from './ApprovedGoalContinuation';
+import { listUnfinishedDirectTasks, settleJoinedTurnTaskExecutions, settleUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
+import { createApprovedGoalContinuation } from './ApprovedGoalContinuation';
 import { assertApprovedExecutionCurrent } from '../../sessions/run/handoffSkills';
 import { completionBudgetEvidence } from './CompletionBudgetEvidence';
 import { createOrReuseAgentSlot, isSuccessfulProviderResponse, reportedUsageFields, type AgentSlotRequest } from './AgentSlotFactory';
@@ -197,11 +197,32 @@ export class AgentTurnRunner {
     let abortListener: (() => void) | null = null;
     let turnEnded = false;
     let setupCleanupComplete = false;
+    let captureRestoreFailure: string | null = null;
+    let captureRestorationNeededForPartial = false;
     try {
     turnHandle.requiresApprovedGoalClosure = Boolean(preparedRuntime.approvedExecution);
     turnHandle.requiresApprovedCaptureScope = Boolean(preparedRuntime.approvedExecution?.investigation
       && !preparedRuntime.approvedExecution.investigation.captureScope);
-    turnHandle.validateCompletionReadiness = (declaration) => this.deps.validateCompletionReadiness({
+    const captureRestorationFeedback = async (declaration: import('./TurnCoordinator').TurnCompletionDeclaration | null): Promise<string | undefined> => {
+      const control = turnHandle.captureControl;
+      if (!control) return undefined;
+      captureRestoreFailure = control.lastRestoreError ?? captureRestoreFailure;
+      const acknowledged = captureRestoreFailure && declaration?.disposition !== 'completed'
+        && declaration?.result?.recoveryState.some(value => value.includes(captureRestoreFailure!));
+      if (acknowledged) return undefined;
+      try {
+        const status = await control.restorationStatus(turnHandle.signal);
+        if (!status.restored) return `# Capture Restoration Required\nFrozen signed entry baseline: ${JSON.stringify({ receipt: status.receipt, original: status.original })}\nHost-observed current position: ${JSON.stringify(status.current)}\nUse rdc_probe capture_restore under the current permission mode to restore the signed entry position. If restore fails, record the actual failure and remaining recovery in turn_complete.result.recoveryState and unresolved.`;
+        captureRestoreFailure = null;
+        return undefined;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        captureRestoreFailure = /^[A-Z][A-Z0-9_]{0,127}/u.exec(message)?.[0] ?? 'RDC_RESTORE_UNCONFIRMED';
+        return `# Capture Restoration Unconfirmed\n${message}\nDo not declare completed. Record ${captureRestoreFailure} and the actual remaining recovery in turn_complete.result.recoveryState and unresolved, then report a partial or blocked outcome.`;
+      }
+    };
+    turnHandle.validateCompletionReadiness = async (declaration) => {
+      await this.deps.validateCompletionReadiness({
         profileId: input.agentId,
         completionContract: preparedRuntime.approvedExecution?.investigation ? 'investigation-report' : preparedRuntime.effectivePlan.completionContract,
         investigationMission: preparedRuntime.approvedExecution?.investigation?.mission ?? preparedRuntime.effectivePlan.investigationMission ?? undefined,
@@ -209,6 +230,20 @@ export class AgentTurnRunner {
         disposition: declaration.disposition, evidenceRefs: declaration.evidenceRefs,
         budgetEvidence: completionBudgetEvidence(turnHandle),
       });
+      const feedback = await captureRestorationFeedback(declaration);
+      if (feedback) {
+        if (preparedRuntime.approvedExecution && ['partial', 'blocked'].includes(declaration.disposition)) {
+          captureRestorationNeededForPartial = true;
+        }
+        throw new Error(feedback);
+      }
+      if (captureRestorationNeededForPartial && turnHandle.captureControl && !captureRestoreFailure) {
+        captureRestorationNeededForPartial = false;
+        if (['partial', 'blocked'].includes(declaration.disposition)) {
+          throw new Error('# Approved Goal After Capture Restoration\nThe host now verifies the signed entry position. Reassess the unfinished approved Tasks: continue useful work that is now possible, using the existing Task and preserving its consumption and deadline. If another concrete condition still prevents progress, report it accurately in a new partial or blocked declaration.');
+        }
+      }
+    };
     slotKey = agentSlotKey(executionScopeId, input.agentId);
     const capsule = preparedRuntime.effectivePlan.delegationCapsule;
     turnHandle.taskPreparation = {
@@ -374,7 +409,7 @@ export class AgentTurnRunner {
         }));
       }
     }
-    let captureRestoreFailure: string | null = null;
+    const approvedGoalContinuation = createApprovedGoalContinuation(turnHandle, executionScopeId);
     slot = this.getOrCreateAgentSlot({
       agentId: input.agentId,
       providerId: input.providerId,
@@ -399,32 +434,30 @@ export class AgentTurnRunner {
       onLoopBudget: (remaining, limit) => { turnHandle.providerLoopBudget = { remaining, limit }; },
       resolvePromptPlan: () => turnHandle.promptPlan ?? promptPlan,
       resolveRuntimeFingerprint: () => turnHandle.runtimePlan?.fingerprint ?? effectivePlan.fingerprint,
-      beforeTerminalResponse: input.sessionId && turnHandle.requiresApprovedGoalClosure
+      beforeTerminalResponse: input.sessionId
         ? async (message) => {
-          const incomplete = await approvedGoalContinuation(turnHandle, executionScopeId);
-          if (incomplete) return incomplete;
-          if (turnHandle.captureControl) {
-            const disposition = turnHandle.completionDeclaration?.disposition;
-            captureRestoreFailure = turnHandle.captureControl.lastRestoreError ?? captureRestoreFailure;
-            const acknowledged = captureRestoreFailure && disposition !== 'completed'
-              && turnHandle.completionDeclaration?.result?.recoveryState.some(value => value.includes(captureRestoreFailure!));
-            if (!acknowledged) {
-              try {
-                const status = await turnHandle.captureControl.restorationStatus(turnHandle.signal);
-                if (!status.restored) {
-                  turnHandle.completionDeclaration = null;
-                  return `# Capture Restoration Required\nFrozen signed entry baseline: ${JSON.stringify({ receipt: status.receipt, original: status.original })}\nHost-observed current position: ${JSON.stringify(status.current)}\nUse rdc_probe capture_restore under the current permission mode to restore the signed entry position. The previous completion declaration is no longer active; call turn_complete again after restoration. If restore fails, record the actual failure and remaining recovery in turn_complete.result.recoveryState and unresolved.`;
-                }
-                captureRestoreFailure = null;
-              } catch (error) {
-                const message = error instanceof Error ? error.message : String(error);
-                captureRestoreFailure = /^[A-Z][A-Z0-9_]{0,127}/u.exec(message)?.[0] ?? 'RDC_RESTORE_UNCONFIRMED';
-                turnHandle.completionDeclaration = null;
-                return `# Capture Restoration Unconfirmed\n${message}\nDo not declare completed. Record ${captureRestoreFailure} and the actual remaining recovery in turn_complete.result.recoveryState and unresolved, then report a partial or blocked outcome.`;
-              }
-            }
+          if (turnHandle.isAborted) return undefined;
+          const unfinished = await listUnfinishedDirectTasks({
+            sessionId: input.sessionId, turnId: turnHandle.turnId, generation: turnHandle.generation,
+          });
+          if (unfinished.length) {
+            const redeclare = turnHandle.completionDeclaration
+              ? '\nThe previous completion declaration is no longer active; declare completion again after settling the Tasks.' : '';
+            turnHandle.completionDeclaration = null;
+            return `# Unsettled Direct Tasks\nThe current turn still owns unfinished direct Tasks: ${unfinished.map(item => item.taskId).join(', ')}. Continue useful work within the authorized scope, or use task_update to record a concrete blocker. Settle the Tasks before ending the turn; do not reset consumption or alter the deadline.${redeclare}`;
           }
-          return approvedGoalContinuation(turnHandle, executionScopeId, () => {
+          if (capsule && !turnHandle.completionDeclaration?.result) {
+            return '# Delegated Result Required\nThe delegated execution has not declared a structured result. Use turn_complete with result.summary, result.outputs (including the Task completion keys), counterevidence, unresolved, scope, sideEffects and recoveryState. Preserve the actual evidence and choose an honest partial or blocked disposition when work cannot be completed. Do not invent results, reset consumption or alter the deadline.';
+          }
+          if (!turnHandle.requiresApprovedGoalClosure) return undefined;
+          const incomplete = await approvedGoalContinuation();
+          if (incomplete) return incomplete;
+          const restorationFeedback = await captureRestorationFeedback(turnHandle.completionDeclaration);
+          if (restorationFeedback) {
+            turnHandle.completionDeclaration = null;
+            return `${restorationFeedback}\nThe previous completion declaration is no longer active; call turn_complete again.`;
+          }
+          return approvedGoalContinuation(() => {
           if (preparedRuntime.approvedExecution) assertApprovedExecutionCurrent(executionScopeId, input.agentId, preparedRuntime.approvedExecution.offer);
           const mission = preparedRuntime.approvedExecution?.investigation?.mission;
           if (!mission || !['completed', 'budget_paused'].includes(turnHandle.completionDeclaration?.disposition ?? '')) return;

@@ -82,6 +82,8 @@ Memory 只有 `memory_search`、`memory_read`、`memory_write`、`memory_delete`
 
 Knowledge Center 是三列 UI，消费 Query / Index / Compile / Candidate / Read / Topics / Write。知识库只有 user `~/.rdc-agent/knowledge` 与 project `<项目>/.rdc-agent/knowledge`，会话不是知识库。查询可按 scope、时间和索引版本分页；读取可取简介、章节、行范围或全文，并以原文 hash 约束版本。图片引用仍须实际进入读图链路。主题及同义词可以批量提议、预览和确认，提议本身不改写分类；正文仍以 Markdown 为唯一来源。主要 IPC 为 `knowledge:overview` / `query` / `card` / `read` / `compile` / `index:rebuild` / `candidates` / `candidateCreate` / `import` / `image` / `write` / `promote` / `topics:*`。持久写入必须显式人类确认；`knowledge:import` 在同一次点击里签发并消费 `knowledge.write` token，写入所选空间 draft，不自动创建 Candidate。生成引擎另立设计。
 
+查询指定不存在的空间 ID 时明确报错并返回可用 ID，不把错误范围当作空检索结果。
+
 Reasoning 使用 `raw | summary | opaque | none | unknown`。语义来自 Provider/Model contract，不从 OpenAI/Anthropic compatibility protocol 推断。App-managed 且有文档证据的 DeepSeek / Kimi / GLM / MiniMax / MiMo 等解析为 `raw`；真正未核实的第三方路由才是 `unknown`。Work Process 顶层用「工作中 / 工作过程」，loop thinking 用「正在思考 / 已思考 · {duration}」（前置 quiet icon，不用「深度思考」），不展示「语义未验证」。commentary 渲染为 markdown 散文（`proseText`），永不顶 thinking 槽；最终答案仅在 assistant message body 中以 full-bleed prose 呈现，不用 raised bubble。
 
 ## 受控 API
@@ -202,13 +204,15 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 
 ## 回放隔离与恢复投影
 
-普通结构化 RDC 调用成功后，主进程在结果正文和 details 同时附带 `invocation`：`main-validated-cli-arguments`、operation、实际送入冻结 CLI 的参数和 canonical SHA-256 指纹，含主进程解析注入的 replay 身份；不包含 transport 环境或凭据。敏感参数键存在时显式省略参数正文并标记原因。它说明本次调用参数，不替代原生结果、签名实验回执或恢复证明。历史结果不回填；原模型请求只能通过 owning root General 的 hash-bound `artifact_read.includeRecordedRequest` 从 SessionContextJournal 生成独立限定来源凭据，再显式授予审查者。
+普通结构化 RDC 调用成功后，主进程在结果正文和 details 同时附带 `invocation`：`main-validated-cli-arguments`、operation、实际送入冻结 CLI 的参数和 canonical SHA-256 指纹，含主进程解析注入的 replay 身份；不包含 transport 环境或凭据。敏感参数键存在时显式省略参数正文并标记原因。它说明本次调用参数，不替代原生结果、签名实验回执或恢复证明。历史结果不回填；原模型请求只能通过 owning root General 的 hash-bound `artifact_read.includeRecordedRequest` 从已提交的 SessionContextJournal 生成独立限定来源凭据，再显式授予审查者。正在执行的 turn 尚未提交，同一 turn 内重复查询不能取回其原请求；不可用时不从 native 参数或其他来源伪造模型请求。
 
 原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。`runtime_context` 对同一 session/project 的隔离身份返回明确的受控恢复状态，不将仍打开的 capture 误报为未打开，也不向其他 scope 泄露保留的 lease。新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化。失败没有取得可信恢复证明时仍 fail-closed；恢复通过应用生命周期重新建立 owning capture/replay/context 身份。
 
-获批调查可在同一 owning session 内通过 `rdc_probe` 的 `capture_select` 选择计划中经主进程冻结的 input ID、内容 hash 与设备，不能传任意路径或切换到未经批准的设备。切换前核验实际 replay、事件、替换和进程身份，结束相关子执行及实验；完成旧 context 释放和 daemon stop 后打开目标，并以原冻结权限、模型、catalog 和消费重新准备。`capture_restore` 恢复进入调查前的输入及位置，实际观察一致后才能作为恢复事实；切换、停止和新身份通过主进程签名回执关联。操作仍受当前权限模式约束，不能用能力声明代替授权。
+获批调查可在同一 owning session 内通过 `rdc_probe` 的 `capture_select` 选择计划中经主进程冻结的 input ID、内容 hash 与设备，不能传任意路径或切换到未经批准的设备。切换前核验实际 replay、事件、替换和进程身份，结束相关子执行及实验；完成旧 context 释放和 daemon stop 后打开目标，并以原冻结权限、模型、catalog 和消费重新准备。`capture_restore` 恢复进入调查前的输入及位置，并返回当次主进程观察的入口基线、当前现场和一致性结果；即使无需移动也返回该比较。重开可改变 native 身份，不能仅凭 ID 不同判定用户位置未恢复；当次观察不是终态 resolved 回执。回合运行期间终态回执待生成是预期状态：模型结束后，主进程提交前重新核验并签名，恢复未确认时不能提交 completed。仅终态回执待生成不能成为已观察恢复成功后停止其他获准工作的理由，也不能伪称回执已经存在。切换、停止和新身份通过主进程签名回执关联。操作仍受当前权限模式约束，不能用能力声明代替授权。
 
 同输入、设备及权限的原生故障可请求 `capture_recover`：只处理实际失败而隔离的 lease，中断并 join 持该 lease 的相关子执行，核对原 daemon/worker 身份，按 clear context → 确认 daemon stop → 重开和重新准备的顺序进行。相同失败条件重复或进程退出、权限、安装状态无法确认时停止并保留隔离，不伪造恢复。任务进入前的位置由签名 baseline 记录；中断或重启后未闭合记录在 Capture 显示，由用户触发恢复，不自动续跑模型。恢复前复核输入 hash、设备、替换和旧进程，只有重新观察到原位置才签 resolved。历史结果不被补签，不跨新旧现场拼接实验。
+
+获批调查的 `turn_complete` 在记录声明前检查入口位置是否恢复；现场无法核验时，把主进程观察到的错误返回工具调用，让模型据此如实声明 partial／blocked 及剩余恢复，而不是先接受声明再要求它猜测错误。终答仍重新核验恢复状态；已声明的 partial 不升级为成功，恢复回执仍以实际现场为准。
 
 Android 的 remote_display 由同一远程连接的原生呈现确认驱动，核对当前事件、目标纹理及新鲜序号；后台窗口、原生失败或缺失能力不得显示 presented。无颜色输出清除手机旧画面并表达无输出，应用 PNG 与手机屏幕状态分别判断。
 
@@ -231,6 +235,10 @@ Settings 的显式验证执行同安装 doctor，检查 Python、RenderDoc、And
 ## 设备选择即准备与同会话打开
 
 设备发现仅报告 ADB 可见性。当前会话的 CaptureReplayState.preparation 是唯一设备目标、阶段和结构化问题来源；顶部 Remote 和 Capture 面板共用 device:prepare/device:cancelPreparation，不各自持有下一次设备权威。Local 可从 Capture 直接打开：原文件验证和原生打开成功后，主进程与 replay 设备身份一起发布 Local ready，供界面与调查入口使用。选择 Android 即分配本会话 owning context，通过同安装 canonical rd.remote.connect 检查、修复、启动、握手并 Ping；成功后尚未打开 capture，不向 Agent 发布 capture lease。Open 消费同一个连接；同设备替换文件只关闭旧 replay/file，保留远端连接，不重复安装或启动。全局 preparedRemotes/context/remoteId 临时交接与其恢复缓存已删除。
+
+重复准备同一 Android 连接时，`rd.remote.ping` 的成功结果可能不含 context ID。主进程先后读取 owning context，核对 live remote ID、设备 serial、严格 context 归属及 daemon／worker 进程身份，并核对 ping 回执中的 remote ID、连接状态和同一进程；任何身份变化或无法确认均拒绝继续。不能把无 context 字段的 ping 单独当作身份凭证。
+
+同设备替换在 owning context 操作队列中串行执行。关闭前核对 lease、replay、file、进程身份和 replacement 状态；关闭 replay 和 file 后分别重新观察同一 context 与进程及其实际关闭状态。原生关闭成功回执可以不含 context 字段，但不能代替这些前后身份检查；关闭结果或身份无法确认时隔离或撤销旧 lease 并要求清理，不继续打开新输入。
 
 设备选择授权同安装 Tools 自动准备目标 RenderDoc helper：缺失安装、兼容启动/借用、不兼容覆盖，必要时降级或卸载重装（可能清除辅助程序自身数据）。变更前重新核对设备、包和服务身份；busy 与未知归属不抢占。rd.remote.connect 的 preparation_policy=automatic 是能力标识，不保留人工修复策略或确认指纹。主进程仅为已有 Capture 切换签发一次关闭确认。旧 Tools 缺少自动准备合同时要求同步升级，不按包版本判权；Local 不受影响。原始 native error.details 保留，renderer 仅按结构化问题展示，不解析英文异常决定安装。
 

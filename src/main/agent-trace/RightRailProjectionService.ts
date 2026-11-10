@@ -76,7 +76,10 @@ export class RightRailProjectionService {
       attachments: sources, resources: taskResources,
       permissionMode: permissionState.mode,
     });
-    const projectInputs = await storageAdapter.listProjectInputs(session.projectId);
+    // Projection consumes the last committed scan; it must not enqueue a new
+    // full capture hash for every trace update. Opening and plan approval
+    // independently verify the selected input's current identity.
+    const projectInputs = project?.inputs ?? [];
     const rdc = buildRdcContext({
       openedCapture,
       contextSnapshot,

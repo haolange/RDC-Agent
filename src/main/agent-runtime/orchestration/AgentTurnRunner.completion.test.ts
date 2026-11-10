@@ -9,9 +9,10 @@ vi.mock('../../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi
 vi.mock('../../sessions/run/DebuggerLlmService', () => ({ debuggerLlmService: { recordAgentTurnUsage: vi.fn() } }));
 vi.mock('../../sessions/run/handoffSkills', () => ({ assertApprovedExecutionCurrent: vi.fn() }));
 vi.mock('./DirectTaskTurnLifecycle', () => ({
+  listUnfinishedDirectTasks: vi.fn(async () => []),
   settleUnfinishedDirectTasks: vi.fn(async () => 0), settleJoinedTurnTaskExecutions: vi.fn(async () => undefined),
 }));
-vi.mock('./ApprovedGoalContinuation', () => ({ approvedGoalContinuation: vi.fn(async () => undefined) }));
+vi.mock('./ApprovedGoalContinuation', () => ({ createApprovedGoalContinuation: () => vi.fn(async () => undefined) }));
 
 import { AgentTurnRunner, type AgentTurnRunnerDeps } from './AgentTurnRunner';
 import type { AgentSlot } from './AgentSlotRegistry';
@@ -22,6 +23,7 @@ import type { AgentSlotRequest } from './AgentSlotFactory';
 import type { TurnCompletionReadinessValidator, TurnCompletionValidator } from '../agent/TurnCompletionValidator';
 import { MissionCompletionError } from '../../investigation/missionCompletionContract';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
+import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 
 function harness(scope: string, validateCompletion: TurnCompletionValidator, approvedPlan = false,
   validateCompletionReadiness: TurnCompletionReadinessValidator = () => undefined,
@@ -142,6 +144,50 @@ describe('Agent turn completion boundary', () => {
     expect(validate).toHaveBeenCalledWith(expect.objectContaining({ completionContract: 'final-answer', investigationMission: undefined }));
   });
 
+  it('continues an ordinary session with an unsettled direct Task before accepting its final answer', async () => {
+    const unfinished = vi.mocked(listUnfinishedDirectTasks);
+    unfinished.mockResolvedValueOnce([{ executionId: 'execution', taskId: 'unfinished-task' }]).mockResolvedValueOnce([]);
+    const { run, preparedRuntime } = harness('completion-direct-task', vi.fn(), false, () => undefined, async (turn, request) => {
+      const budget = turn.policyBudget;
+      turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [] };
+      const feedback = await request.beforeTerminalResponse?.({ content: [] } as never);
+      expect(feedback).toContain('unfinished-task');
+      expect(feedback).toContain('Continue useful work');
+      expect(feedback).toContain('concrete blocker');
+      expect(feedback).toContain('previous completion declaration is no longer active');
+      expect(turn.completionDeclaration).toBeNull();
+      expect(turn.policyBudget).toBe(budget);
+      expect(unfinished).toHaveBeenLastCalledWith({ sessionId: 'completion-direct-task', turnId: 'owning-turn', generation: turn.generation });
+      expect(await request.beforeTerminalResponse?.({ content: [] } as never)).toBeUndefined();
+      expect(turn.policyBudget).toBe(budget);
+    });
+    preparedRuntime.effectivePlan = { ...preparedRuntime.effectivePlan, completionContract: 'final-answer', investigationMission: null };
+    await run();
+  });
+
+  it('feeds a missing delegated result back to the same execution and accepts an honest partial declaration', async () => {
+    const { run, preparedRuntime } = harness('completion-delegated-result', vi.fn(), false, () => undefined, async (turn, request) => {
+      const budget = turn.policyBudget;
+      turn.completionDeclaration = null;
+      const feedback = await request.beforeTerminalResponse?.({ content: [] } as never);
+      expect(feedback).toContain('turn_complete');
+      expect(feedback).toContain('result.outputs');
+      expect(feedback).toContain('blocked');
+      expect(turn.policyBudget).toBe(budget);
+      const aborted = vi.spyOn(turn, 'isAborted', 'get').mockReturnValue(true);
+      expect(await request.beforeTerminalResponse?.({ content: [] } as never)).toBeUndefined();
+      aborted.mockRestore();
+      turn.completionDeclaration = { disposition: 'partial', evidenceRefs: [], result: {
+        summary: 'Evidence is missing', outputs: {}, counterevidence: [], unresolved: ['Missing source'],
+        scope: 'Delegated scope', sideEffects: [], recoveryState: [],
+      } };
+      expect(await request.beforeTerminalResponse?.({ content: [] } as never)).toBeUndefined();
+      expect(turn.policyBudget).toBe(budget);
+    });
+    preparedRuntime.effectivePlan = { ...preparedRuntime.effectivePlan, delegationCapsule: {} as never };
+    await run();
+  });
+
   it('uses the approved plan Mission contract for the General execution instead of the General profile default', async () => {
     const validate = vi.fn();
     const { run, preparedRuntime } = harness('completion-approved-goal', validate);
@@ -192,5 +238,52 @@ describe('Agent turn completion boundary', () => {
     expect(feedback).toContain('"eventId":11');
     expect(feedback).toContain('capture_restore');
     expect(feedback).toContain('turn_complete');
+  });
+
+  it('reports a lost capture binding at declaration time so a partial can acknowledge the actual recovery failure', async () => {
+    const { run, preparedRuntime } = harness('completion-quarantined-capture', vi.fn(), false, () => undefined, async turn => {
+      const status = vi.fn(async () => { throw new Error('RDC_SWITCH_BINDING_CHANGED: the prepared replay binding is no longer owned.'); });
+      turn.captureControl = { lastRestoreError: null, restorationStatus: status, recordTerminalRestoration: async () => false } as never;
+      const partial = { disposition: 'partial' as const, evidenceRefs: [], result: {
+        summary: 'Replay is quarantined', outputs: {}, counterevidence: [],
+        unresolved: ['Recovery was denied and the replay remains quarantined'], scope: 'Approved capture', sideEffects: [],
+        recoveryState: ['Recovery was denied; the replay remains quarantined'],
+      } };
+      await expect(turn.validateCompletionReadiness?.(partial)).rejects.toThrow(/RDC_SWITCH_BINDING_CHANGED.*recoveryState/s);
+      expect(turn.completionDeclaration).toBeNull();
+      await expect(turn.validateCompletionReadiness?.({ ...partial, result: {
+        ...partial.result, recoveryState: [...partial.result.recoveryState, 'RDC_SWITCH_BINDING_CHANGED: recovery remains unconfirmed'],
+      } })).resolves.toBeUndefined();
+      expect(status).toHaveBeenCalledTimes(1);
+      await expect(turn.validateCompletionReadiness?.({ ...partial, disposition: 'completed', result: {
+        ...partial.result, recoveryState: ['RDC_SWITCH_BINDING_CHANGED'],
+      } })).rejects.toThrow('RDC_SWITCH_BINDING_CHANGED');
+      turn.captureControl = null;
+    });
+    preparedRuntime.approvedExecution = { offer: {} as never, investigation: { schemaVersion: 1, mission: 'debugger' } };
+    await run();
+  });
+
+  it('asks the same approved execution to reassess work when a capture mismatch has been restored', async () => {
+    const { run, preparedRuntime } = harness('completion-recovered-goal', vi.fn(), false, () => undefined, async turn => {
+      let restored = false;
+      const status = vi.fn(async () => ({ restored, original: { inputId: 'capture' },
+        current: { inputId: 'capture' }, receipt: { uri: 'session://tool-outputs/baseline.json', expectedHash: 'a'.repeat(64) } }));
+      turn.captureControl = { lastRestoreError: null, restorationStatus: status, recordTerminalRestoration: async () => true } as never;
+      const partial = { disposition: 'partial' as const, evidenceRefs: [], result: {
+        summary: 'Work remains', outputs: {}, counterevidence: [], unresolved: ['A required check is unfinished'],
+        scope: 'Approved capture', sideEffects: [], recoveryState: [],
+      } };
+      const budget = turn.policyBudget;
+      await expect(turn.validateCompletionReadiness?.(partial)).rejects.toThrow('Capture Restoration Required');
+      restored = true;
+      await expect(turn.validateCompletionReadiness?.(partial)).rejects.toThrow('continue useful work that is now possible');
+      expect(turn.policyBudget).toBe(budget);
+      await expect(turn.validateCompletionReadiness?.(partial)).resolves.toBeUndefined();
+      expect(status).toHaveBeenCalledTimes(3);
+      turn.captureControl = null;
+    });
+    preparedRuntime.approvedExecution = { offer: {} as never, investigation: { schemaVersion: 1, mission: 'analyzer' } };
+    await run();
   });
 });

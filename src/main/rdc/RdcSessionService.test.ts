@@ -347,6 +347,17 @@ it('retains Android reservation across same-device replacement while selection p
   release(); await replacing;
   expect(service.getDeviceOwner('android')).toEqual(scope);
 });
+it('waits for the owning context queue before replacing an Android capture', async () => {
+  const service = new RdcSessionService(); await openRemote(service); mocks.opened.mockClear();
+  let release!: () => void;
+  const busy = runRdcOperation('context-s1', () => new Promise<void>(resolve => { release = resolve; }));
+  await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+  const replacing = service.openProjectInput(request('s1', true), { expectedGeneration: service.snapshotReplayForSession(scope).generation });
+  await vi.waitFor(() => expect(service.snapshotReplayForSession(scope).phase).toBe('connecting'));
+  expect(mocks.opened).not.toHaveBeenCalled();
+  release(); await busy; await replacing;
+  expect(mocks.opened).toHaveBeenCalledTimes(1);
+});
 it('rejects stale incoming open and select without altering the replacement', async () => {
   const service = new RdcSessionService(); await service.openProjectInput(request());
   await expect(service.openProjectInput(request(), { expectedGeneration: 0 })).rejects.toThrow('BINDING_CHANGED');

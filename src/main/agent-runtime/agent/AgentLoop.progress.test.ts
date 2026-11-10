@@ -20,9 +20,10 @@ import type {
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { assertMissionTurnCompletion } from '../../investigation/missionCompletionContract';
 import { SESSION_ID, baselineWorld, createInvestigationHarness, observedClaim, projectClaim, sampleCheckpoint, writeDraft, writeReadyReport } from '../../investigation/investigationTestFixtures';
-import { approvedGoalContinuation } from '../orchestration/ApprovedGoalContinuation';
+import { createApprovedGoalContinuation } from '../orchestration/ApprovedGoalContinuation';
 import { TurnHandle } from '../orchestration/TurnCoordinator';
-import { resolveSessionTasksDir } from '../tasks';
+import { FileTaskStore, TaskRegistry, resolveSessionTasksDir } from '../tasks';
+import { snapshotTaskRequirement } from '../tasks/TaskExecutionRequirements';
 import { agentLoop, type AgentContext, type ToolExecutor } from './AgentLoop';
 import {
   AgentLoopTerminationError,
@@ -462,7 +463,100 @@ it('continues an incomplete runtime obligation without adding a user message', a
   expect(JSON.stringify(context.messages)).not.toContain('Approved Task remains incomplete.');
 });
 
-it('recovers a bare report hash by redeclaring and citing the exact reference', { timeout: 30_000 }, async () => {
+it('feeds an unfinished approved Task back into the same loop and accepts its later completion', async () => {
+  const sessionId = `completion-partial-feedback-${randomUUID()}`;
+  const taskDir = resolveSessionTasksDir(sessionId);
+  let approved: ReturnType<typeof snapshotTaskRequirement>[] = [];
+  const registry = new TaskRegistry(new FileTaskStore(taskDir, async () => approved));
+  const turn = new TurnHandle({ sessionKey: sessionId, turnId: randomUUID(), generation: 1 });
+  try {
+    const task = await registry.createTask('Finish approved investigation');
+    approved = [snapshotTaskRequirement(task)];
+    const deadlineAt = Date.now() + 60_000;
+    const first = await registry.startExecution(task.id, { mode: 'direct', budget: { toolCalls: 2, maxToolCalls: 10, deadlineAt } });
+    await registry.settleExecution(first.id, { expectedGeneration: 1, status: 'blocked',
+      result: { disposition: 'blocked', summary: 'One branch was not inspected.', outputs: {} } });
+    turn.completionDeclaration = { disposition: 'partial', evidenceRefs: [] };
+    const requests: Context[] = [];
+    const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: (_model, request) => {
+      requests.push(request);
+      const step = requests.length;
+      if (step === 2 || step === 3) return providerStream({ ...toolUseMessage(step), content: [{
+        type: 'toolCall', id: `step-${step}`, name: step === 2 ? 'task_update' : 'turn_complete', arguments: {},
+      }] });
+      return providerStream({ ...toolUseMessage(step), content: [{ type: 'text', text: 'Final response' }], stopReason: 'stop' });
+    } };
+    const context = createContext();
+    context.runtime!.current.activeTools = ['task_update', 'turn_complete'].map(name => ({
+      name, description: name, parameters: { type: 'object' },
+    }));
+    const check = createApprovedGoalContinuation(turn, sessionId, registry);
+    const { stream } = agentLoop([], context, {
+      model: TEST_MODEL, convertToLlm: messages => messages as Message[], streamOptions: { requestPlan: TEST_REQUEST_PLAN },
+      beforeTerminalResponse: () => check(),
+    }, provider, { execute: async call => {
+      if (call.name === 'task_update') {
+        const next = await registry.startExecution(task.id, { mode: 'direct' });
+        expect(next.budget).toMatchObject({ toolCalls: 2, maxToolCalls: 10, deadlineAt });
+        await registry.settleExecution(next.id, { expectedGeneration: 2, status: 'completed',
+          result: { disposition: 'completed', summary: 'Inspected the remaining branch.', outputs: {} } });
+      } else {
+        expect(call.name).toBe('turn_complete');
+        turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [] };
+      }
+      return toolExecutor.execute(call);
+    } });
+    await consume(stream);
+    expect(requests).toHaveLength(4);
+    expect(requests[1].systemPrompt).toContain('Approved Goal Reassessment');
+    expect(requests[1].systemPrompt).toContain(task.id);
+    expect(requests[1].messages.filter(message => message.role === 'user')).toHaveLength(1);
+    expect(turn.completionDeclaration?.disposition).toBe('completed');
+    expect((await registry.getTask(task.id))?.status).toBe('completed');
+  } finally {
+    if (existsSync(taskDir)) {
+      const relativeTask = path.relative(realpathSync(path.dirname(taskDir)), realpathSync(taskDir));
+      if (relativeTask !== sessionId || lstatSync(taskDir).isSymbolicLink()) throw new Error('Unexpected task fixture path');
+      await rm(taskDir, { recursive: true, force: true });
+    }
+  }
+});
+
+it('keeps an honest partial when reassessment ends without further tool work', async () => {
+  const sessionId = `completion-partial-unchanged-${randomUUID()}`;
+  const taskDir = resolveSessionTasksDir(sessionId);
+  let approved: ReturnType<typeof snapshotTaskRequirement>[] = [];
+  const registry = new TaskRegistry(new FileTaskStore(taskDir, async () => approved));
+  const turn = new TurnHandle({ sessionKey: sessionId, turnId: randomUUID(), generation: 1 });
+  try {
+    const task = await registry.createTask('Finish approved investigation');
+    approved = [snapshotTaskRequirement(task)];
+    const declaration = { disposition: 'partial' as const, evidenceRefs: [] };
+    turn.completionDeclaration = declaration;
+    const requests: Context[] = [];
+    const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: (_model, request) => {
+      requests.push(request);
+      return providerStream({ ...toolUseMessage(requests.length), content: [{ type: 'text', text: 'Remaining work is blocked.' }], stopReason: 'stop' });
+    } };
+    const check = createApprovedGoalContinuation(turn, sessionId, registry);
+    const { stream } = agentLoop([], createContext(), {
+      model: TEST_MODEL, convertToLlm: messages => messages as Message[], streamOptions: { requestPlan: TEST_REQUEST_PLAN },
+      beforeTerminalResponse: () => check(),
+    }, provider, toolExecutor);
+    await consume(stream);
+    expect(requests).toHaveLength(2);
+    expect(requests[1].systemPrompt).toContain('Approved Goal Reassessment');
+    expect(turn.completionDeclaration).toBe(declaration);
+  } finally {
+    if (existsSync(taskDir)) {
+      const relativeTask = path.relative(realpathSync(path.dirname(taskDir)), realpathSync(taskDir));
+      if (relativeTask !== sessionId || lstatSync(taskDir).isSymbolicLink()) throw new Error('Unexpected task fixture path');
+      await rm(taskDir, { recursive: true, force: true });
+    }
+  }
+});
+
+it('accepts a normal final answer when the declaration binds the exact report', { timeout: 30_000 }, async () => {
   const sessionId = `completion-reference-${randomUUID()}`;
   const { service, sessionPath } = createInvestigationHarness('rdc-final-reference-');
   const turn = new TurnHandle({ sessionKey: sessionId, turnId: `turn-${randomUUID()}`, generation: 1 });
@@ -472,39 +566,26 @@ it('recovers a bare report hash by redeclaring and citing the exact reference', 
     const source = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-retry'), { mission: 'analyzer' });
     const report = writeReadyReport(service, { mission: 'analyzer', source,
       claims: [projectClaim(source.record as never, 'claim-retry-projected')] });
-    const id = report.manifest.artifactId;
-    const hash = report.contentHash;
     const requests: Context[] = [];
-    let calls = 0;
-    turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [] };
+    turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [{ uri: report.contentUri, hash: report.contentHash }] };
     const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: (_model, request) => {
       requests.push(request);
-      calls++;
-      if (calls === 1) return providerStream({ ...toolUseMessage(calls),
-        content: [{ type: 'text', text: `${id} SHA-256 ${hash.replace('sha256:', '')}` }], stopReason: 'stop' });
-      if (calls === 2) return providerStream({ ...toolUseMessage(calls), content: [{ type: 'toolCall',
-        id: 'redeclare', name: 'turn_complete', arguments: { disposition: 'completed' } }] });
-      return providerStream({ ...toolUseMessage(calls), content: [{ type: 'text', text: `${id} ${hash}` }], stopReason: 'stop' });
+      return providerStream({ ...toolUseMessage(1), content: [{ type: 'text', text: 'Analysis complete. Read the report.' }], stopReason: 'stop' });
     } };
     const context = createContext();
     context.runtime!.current.activeTools = [{ name: 'turn_complete', description: 'Declare completion', parameters: { type: 'object' } }];
+    const approvedGoalContinuation = createApprovedGoalContinuation(turn, sessionId);
     const { stream } = agentLoop([], context, {
       model: TEST_MODEL, convertToLlm: messages => messages as Message[], streamOptions: { requestPlan: TEST_REQUEST_PLAN },
-      beforeTerminalResponse: message => approvedGoalContinuation(turn, sessionId, () => {
+      beforeTerminalResponse: message => approvedGoalContinuation(() => {
         assertMissionTurnCompletion({ profileId: 'general', completionContract: 'investigation-report',
           investigationMission: 'analyzer', sessionId: SESSION_ID, service,
+          evidenceRefs: turn.completionDeclaration?.evidenceRefs,
           finalAnswerText: message.content.filter(block => block.type === 'text').map(block => block.text).join('') });
       }),
-    }, provider, { execute: async call => {
-      expect(call.name).toBe('turn_complete');
-      turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [] };
-      return toolExecutor.execute(call);
-    } });
+    }, provider, toolExecutor);
     await consume(stream);
-    expect(requests).toHaveLength(3);
-    expect(requests[1].systemPrompt).toContain(`${id} ${hash}`);
-    expect(requests[1].systemPrompt).toContain('call turn_complete again');
-    expect(requests[1].messages.filter(message => message.role === 'user')).toHaveLength(1);
+    expect(requests).toHaveLength(1);
     expect(turn.completionDeclaration?.disposition).toBe('completed');
   } finally {
     const relativeSession = path.relative(realpathSync(tmpdir()), realpathSync(sessionPath));

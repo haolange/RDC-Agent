@@ -81,7 +81,7 @@ export function createRdcProbeTool(
   const getLease = deps.getLease ?? getRdcContextLease;
   return {
     name: 'rdc_probe', label: 'RDC Probe',
-    description: 'Read native RDC JSON through the frozen session binding. Successful probe queries expose a session evidence URI/hash for explicit delegation; check truncated before treating the returned observation as complete. For an approved capture plan, the owning General may select a frozen inputId, recover a quarantined same-input failure, or restore the original capture and position. Join relevant child executions and close interrupted experiments before recovery; repeated identical failures stop. The runtime checks the owning device, permissions, identity and receipts; never supply filesystem paths or context IDs. Event list: {"action":"probe","args":{"action":"event_list"}}.',
+    description: 'Read native RDC JSON through the frozen session binding. Successful probe queries expose a session evidence URI/hash for explicit delegation; check truncated before treating the returned observation as complete. For an approved capture plan, the owning General may select a frozen inputId, recover a quarantined same-input failure, or restore the original capture and position. A capture_restore result includes the host-observed comparison with the signed entry baseline, even when changed is false; this is a current observation, not the terminal restoration receipt. While the turn is active, terminalReceiptPending is expected and is not by itself a blocker when restored is true: continue other permitted work and declare the actual outcome without inventing a terminal receipt. The runtime reobserves and signs during terminalization, and a completed outcome cannot commit if restoration is unconfirmed. Join relevant child executions and close interrupted experiments before recovery; repeated identical failures stop. The runtime checks the owning device, permissions, identity and receipts; never supply filesystem paths or context IDs. Event list: {"action":"probe","args":{"action":"event_list"}}.',
     parameters: probeParameters,
     permissionHint: 'readonly',
     spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'system', requiresApproval: false },
@@ -107,13 +107,17 @@ export function createRdcProbeTool(
             ? await context.captureControl.select(input.inputId!, signal)
             : input.action === 'capture_recover' ? await context.captureControl.recover(signal)
               : { ...await context.captureControl.restore(signal), current: undefined };
+          const restoration = input.action === 'capture_restore'
+            ? await context.captureControl.restorationStatus(signal) : undefined;
           signal?.throwIfAborted();
           const current = changed.current ? {
             inputId: changed.current.inputId, contentSha256: changed.current.contentSha256,
             deviceId: changed.current.deviceId, eventId: changed.current.native.eventId, target: changed.current.target,
           } : null;
           const payload = { action: input.action, changed: changed.changed, ...(changed.receipt ? { receipt: changed.receipt } : {}),
-            ...(input.action === 'capture_select' || input.action === 'capture_recover' ? { current } : {}) };
+            ...(input.action === 'capture_select' || input.action === 'capture_recover' ? { current } : {}),
+            ...(restoration ? { restoration: { restored: restoration.restored, original: restoration.original,
+              current: restoration.current, baselineReceipt: restoration.receipt, terminalReceiptPending: true } } : {}) };
           return { content: [{ type: 'text', text: JSON.stringify(payload) }], details: payload };
         }
         const lease = getLease(ownerSession);

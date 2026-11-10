@@ -1,4 +1,5 @@
 import { subagentScopeId } from '@shared/utils/executionScope';
+import { delegationCapsuleArtifactRefs } from '../prompt/DelegationCapsuleCompiler';
 import type { AgentRole } from '@shared/types/agent';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import type { AgentTool } from '../agent/AgentTool';
@@ -10,7 +11,7 @@ import type { SubagentRunner } from './SubagentRunner';
 import { requestSnapshotStore } from '../prompt';
 import { grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { policyBudgetChain, registerPolicyBudgetObserver } from './DelegationBudget';
-import { bounded, normalizeSubagentResult, persistSubagentResult, projectSubagentExecution } from './SubagentResultEnvelope';
+import { bounded, normalizeSubagentResult, persistSubagentResult, projectSubagentExecution, type DelegationSourceFailure } from './SubagentResultEnvelope';
 import { bindTaskRootBudget } from './TaskRootBudget';
 import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
 
@@ -43,7 +44,7 @@ export class BackgroundSubagentService {
   private accepting = true;
 
   constructor(
-    private readonly run: (input: BackgroundSubagentStart & { executionId: string; taskExecutionGeneration: number; signal: AbortSignal; restoredPolicyBudget?: PolicyBudgetState; onPolicyBudget?: (budget: PolicyBudgetState) => void; onProviderRequestCommitted?: (requestId: string) => Promise<void> | void; beforeProviderRequestMessages?: () => Promise<{ messages: import('../core/types').Message[]; mailboxDeliveries?: import('@shared/types/rdcRuntime').RequestEnvelopeSnapshot['mailboxDeliveries']; commit?: () => Promise<void> }> }) => Promise<{ text: string; status: 'complete' | 'failed' | 'cancelled'; policyBudget?: PolicyBudgetState; completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null }>,
+    private readonly run: (input: BackgroundSubagentStart & { executionId: string; taskExecutionGeneration: number; signal: AbortSignal; restoredPolicyBudget?: PolicyBudgetState; onPolicyBudget?: (budget: PolicyBudgetState) => void; onProviderRequestCommitted?: (requestId: string) => Promise<void> | void; beforeProviderRequestMessages?: () => Promise<{ messages: import('../core/types').Message[]; mailboxDeliveries?: import('@shared/types/rdcRuntime').RequestEnvelopeSnapshot['mailboxDeliveries']; commit?: () => Promise<void> }> }) => Promise<{ text: string; status: 'complete' | 'failed' | 'cancelled'; policyBudget?: PolicyBudgetState; completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null; sourceFailure?: DelegationSourceFailure }>,
     private readonly createRegistry: (sessionId: string, onCancel: (execution: TaskExecutionRecord) => Promise<void>) => TaskRegistry =
       (sessionId, onCancel) => new TaskRegistry(createSessionTaskStore(sessionId), { onCancelExecution: onCancel }),
     private readonly persistResult: (sessionId: string, executionId: string, value: unknown) => { uri: string; hash: string } = persistSubagentResult,
@@ -123,6 +124,7 @@ export class BackgroundSubagentService {
       mode: 'subagent', parentExecutionId: input.parentExecutionId, rootBudgetId: durableRoot ? rootBudgetId : undefined, budget,
       requiredSkillIds: input.capsule.requiredSkillIds,
       requestedProfileId: input.targetProfile,
+      requestedInputArtifactRefs: delegationCapsuleArtifactRefs(input.capsule),
     });
     const restoredPolicyBudget: PolicyBudgetState = {
       toolCalls: execution.budget.toolCalls,
@@ -152,7 +154,7 @@ export class BackgroundSubagentService {
   private async execute(registry: TaskRegistry, execution: TaskExecutionRecord, input: BackgroundSubagentStart, signal: AbortSignal): Promise<void> {
     await registry.appendExecutionMessage(execution.id, { expectedGeneration: execution.generation, kind: 'progress', direction: 'to_parent', body: 'Background subagent started.' });
     const capsule = { ...input.capsule, outputRequirements: `${input.capsule.outputRequirements}\nBefore returning, call turn_complete with top-level disposition and evidenceRefs, and result containing summary, outputs, counterevidence, unresolved, scope, sideEffects, and recoveryState.` };
-    let value: { text: string; status: 'complete' | 'failed' | 'cancelled'; policyBudget?: PolicyBudgetState; completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null };
+    let value: { text: string; status: 'complete' | 'failed' | 'cancelled'; policyBudget?: PolicyBudgetState; completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null; sourceFailure?: DelegationSourceFailure };
     let livePolicyBudget: PolicyBudgetState | undefined;
     let releaseChildBudgetObserver: (() => void) | undefined;
     const parentExecution = input.parentExecutionId ? await registry.getExecution(input.parentExecutionId) : null;
@@ -273,7 +275,7 @@ export class BackgroundSubagentService {
     }
     catch (error) { artifactError = error instanceof Error ? error.message : String(error); }
     const envelope = savedResult
-      ? normalizeSubagentResult(value.text, value.status, value.completionDeclaration, savedResult)
+      ? normalizeSubagentResult(value.text, value.status, value.completionDeclaration, savedResult, value.sourceFailure)
       : { disposition: 'blocked' as const, summary: 'Background result persistence failed.', outputs: {}, error: bounded(artifactError ?? 'Unknown artifact persistence failure.', 2_000), missingRequirements: ['Durable result artifact'] };
     const status = value.status === 'complete' || value.status === 'cancelled'
       ? envelope.disposition : value.status;

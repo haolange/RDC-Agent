@@ -1010,6 +1010,7 @@ describe('investigation system contract', () => {
       investigationMission: 'analyzer',
       sessionId: SESSION_ID,
       finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`,
+      evidenceRefs: [{ uri: report.contentUri, hash: report.contentHash }],
       service,
     })).not.toThrow();
     expect(isSkillVisibleToProfile('debugger', 'rdc-tool-shell', ['general', 'debugger', 'analyzer', 'optimizer'])).toBe(true);

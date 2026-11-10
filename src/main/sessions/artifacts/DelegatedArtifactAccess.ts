@@ -36,7 +36,10 @@ export function resolveDelegatedArtifactRead(sessionId: string, uri: string, exp
   const grant = grants.get(sessionId);
   if (!grant) return { sessionId, expectedHash };
   const hash = grant.refs.get(uri);
-  if (!hash || (expectedHash && expectedHash.replace(/^sha256:/, '') !== hash.replace(/^sha256:/, ''))) throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', 'artifact is not in the frozen delegation grant');
+  if (!hash) throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', 'artifact is not in the frozen delegation grant');
+  if (expectedHash && expectedHash.replace(/^sha256:/, '') !== hash.replace(/^sha256:/, '')) {
+    throw new SessionArtifactError('ARTIFACT_HASH_MISMATCH', 'expected hash does not match the frozen delegation grant');
+  }
   return { sessionId: grant.ownerSessionId, expectedHash: hash };
 }
 /** New child outputs are already durable in the owning session before granting readback. */

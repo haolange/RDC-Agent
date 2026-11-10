@@ -62,6 +62,7 @@ export const SessionApplyDeclaredHandoffArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),
   ipcNonEmptyString(128, 'agent'),
   ipcNonEmptyString(200, 'label'),
+  z.string().regex(/^[a-f0-9]{64}$/).optional(),
 ]);
 
 

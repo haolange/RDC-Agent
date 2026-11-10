@@ -12,8 +12,9 @@ describe('delegated artifact grants', () => {
       grantDelegatedOutput('child', 'session://investigation/new.json', hash);
       expect(() => assertDelegatedArtifactWrite('child', 'session://investigation/new.json')).not.toThrow();
       expect(resolveDelegatedArtifactRead('child', uri)).toEqual({ sessionId: 'root', expectedHash: hash });
-      expect(() => resolveDelegatedArtifactRead('child', 'session://tool-outputs/sibling.md')).toThrow(/frozen delegation/);
-      expect(() => resolveDelegatedArtifactRead('child', uri, 'b'.repeat(64))).toThrow();
+      expect(() => resolveDelegatedArtifactRead('child', 'session://tool-outputs/sibling.md', 'b'.repeat(64))).toThrow(/ARTIFACT_SESSION_DENIED/);
+      expect(() => resolveDelegatedArtifactRead('child', uri, 'b'.repeat(64))).toThrow(/ARTIFACT_HASH_MISMATCH/);
+      expect(resolveDelegatedArtifactRead('child', uri, `sha256:${hash}`)).toEqual({ sessionId: 'root', expectedHash: hash });
       expect(() => grantDelegatedArtifactAccess('grandchild', 'child', ['session://tool-outputs/sibling.md'], { read })).toThrow(/exceeds/);
     } finally { release(); }
     expect(resolveDelegatedArtifactRead('child', uri).sessionId).toBe('child');

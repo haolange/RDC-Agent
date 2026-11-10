@@ -83,7 +83,7 @@ export function materializeRecordedRdcRequest(
         messageTimestamp: message.timestamp, executionFingerprint: entry.executionIdentity.fingerprint }];
     });
   }));
-  if (!candidates.length) fail('Original request is unavailable in the owning session journal; no alternate source or native re-execution is used.');
+  if (!candidates.length) fail('Original request is unavailable in the committed owning session journal; active-turn requests are not committed until the turn ends. No alternate source or native re-execution is used.');
   const fingerprint = digest(candidates[0].request);
   if (candidates.some(candidate => digest(candidate.request) !== fingerprint)) {
     throw new SessionArtifactError('ARTIFACT_REQUEST_CONFLICT', 'Conflicting recorded requests share this tool call id.');

@@ -25,8 +25,10 @@ Shape: one `ClaimSet` (`kind: claim_set`) titled Architecture Model.
 
 1. Collect Observed facts with `$capture-facts`, versions with `$resource-versioning`, pass topology with `$pass-graph-analysis`, shader fingerprints / blocks with `$shader-ir-analysis`, and traces with `$cross-capture-alignment`.
 2. Write the needed model as a `claim_set` whose items stay on their source layers. Include the observations and reconstructions needed by the approved question and an explicit Unknown Frontier where applicable; do not invent an Authoring hypothesis merely to fill a layer.
-3. Version by `supersedes` on the previous Architecture Model artifact. Do not silent-overwrite. The new version is a comparison Artifact: name what changed, what stayed, and what remains unknown.
+3. Version by `supersedes` on the previous Architecture Model artifact. Do not silent-overwrite. Preserve a continuing claim's logical `claimId` across artifact versions; use a new ID only for a genuinely new claim. Before retiring an ID, inspect dependent evidence and use sources that remain valid through the replacement. The new version is a comparison Artifact: name what changed, what stayed, and what remains unknown.
 4. Mark `ready` only with provenance (`$artifact-provenance`).
+
+Before treating the approved analysis as complete, compare its requested coverage with the actual observations and unresolved relationships. If a major relationship within that goal is still unknown and an available, authorized query can distinguish its plausible connections, perform that check or record the concrete reason it cannot run. When a relevant result is already available but its needed pages or tail have not been read, follow its actual continuation or search the relevant portion; unread material alone is not a blocker. An Unknown Frontier describes what remains uncertain; it does not by itself establish that required coverage is complete. This does not require tracing every minor resource or inventing unavailable engine semantics.
 
 ## Bounds
 

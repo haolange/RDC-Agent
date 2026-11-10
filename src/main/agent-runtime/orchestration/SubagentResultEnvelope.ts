@@ -4,6 +4,7 @@ import { sessionArtifactResolver, type SessionArtifactResolver } from '../../ses
 import { formatSessionArtifactUri } from '@shared/types/sessionArtifact';
 
 export interface PersistedSubagentResult { uri: string; hash: string }
+export interface DelegationSourceFailure { code: 'ARTIFACT_NOT_FOUND'; message: string }
 export function persistSubagentResult(sessionId: string, executionId: string, value: unknown, resolver: Pick<SessionArtifactResolver, 'write' | 'read'> = sessionArtifactResolver): PersistedSubagentResult {
   const serialized = JSON.stringify(value);
   const chunks = Array.from({ length: Math.ceil(serialized.length / 4_000) }, (_, index) => serialized.slice(index * 4_000, (index + 1) * 4_000));
@@ -12,7 +13,7 @@ export function persistSubagentResult(sessionId: string, executionId: string, va
   if (verified.hash !== saved.hash) throw new Error('SUBAGENT_RESULT_VERIFY_FAILED: persisted result hash differs on readback.');
   return { uri: saved.uri, hash: saved.hash };
 }
-export function normalizeSubagentResult(text: string, status: 'complete' | 'failed' | 'cancelled', declaration: TurnCompletionDeclaration | null | undefined, artifact?: PersistedSubagentResult): TaskCompletionResult {
+export function normalizeSubagentResult(text: string, status: 'complete' | 'failed' | 'cancelled', declaration: TurnCompletionDeclaration | null | undefined, artifact?: PersistedSubagentResult, sourceFailure?: DelegationSourceFailure): TaskCompletionResult {
   const resultRef = artifact?.uri; const resultHash = artifact?.hash;
   if (status === 'cancelled') {
     if (text.startsWith('POLICY_LIMIT_EXCEEDED: maxWallTimeMs')) return {
@@ -21,7 +22,15 @@ export function normalizeSubagentResult(text: string, status: 'complete' | 'fail
     };
     return { disposition: 'cancelled', summary: 'Subagent execution cancelled.', outputs: {}, resultRef, resultHash };
   }
-  if (status === 'failed') return { disposition: 'blocked', summary: 'Subagent execution failed; inspect the durable result artifact.', outputs: {}, error: 'SUBAGENT_EXECUTION_FAILED', resultRef, resultHash };
+  if (status === 'failed') {
+    if (sourceFailure) return {
+      disposition: 'blocked', summary: sourceFailure.message, outputs: {}, error: sourceFailure.code, resultRef, resultHash,
+    };
+    if (text.startsWith('DELEGATION_PREPARATION_CONFLICT:')) return {
+      disposition: 'blocked', summary: text, outputs: {}, error: 'DELEGATION_PREPARATION_CONFLICT', resultRef, resultHash,
+    };
+    return { disposition: 'blocked', summary: 'Subagent execution failed; inspect the durable result artifact.', outputs: {}, error: 'SUBAGENT_EXECUTION_FAILED', resultRef, resultHash };
+  }
   if (declaration?.result) { const result = declaration.result; return { disposition: declaration.disposition === 'budget_paused' ? 'blocked' : declaration.disposition, summary: result.summary, outputs: { ...result.outputs }, resultRef, resultHash, evidenceRefs: [...declaration.evidenceRefs], counterevidence: [...result.counterevidence], unresolved: [...result.unresolved], scope: result.scope, sideEffects: [...result.sideEffects], recoveryState: [...result.recoveryState] }; }
   void text; // Unstructured transcript is preserved in the result artifact, never promoted into parent input.
   return { disposition: 'partial', summary: 'No structured result was returned; inspect the durable result artifact.', outputs: {}, error: 'SUBAGENT_STRUCTURED_RESULT_MISSING', resultRef, resultHash, unresolved: ['Structured result envelope missing'], missingRequirements: ['Structured result envelope'] };

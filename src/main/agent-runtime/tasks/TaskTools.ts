@@ -16,8 +16,10 @@
  *    便于测试时注入临时目录。
  */
 
+import { normalizeSha256 } from '../../runtime/contentHash';
 import type { AgentTool, AgentToolResult } from '../agent/AgentTool';
 import {
+  INVALIDATED_REVIEW_GUIDANCE,
   TaskRegistry,
   type TaskRecord,
   type TaskStatus,
@@ -84,7 +86,7 @@ export function createTaskCreateTool(
   return {
     name: 'task_create',
     label: 'Create Tasks',
-    description: 'Create the full task list for this turn in one call',
+    description: 'Create the full task list for this turn in one call. blockedBy accepts only existing Task IDs; Tasks created together receive their IDs in the result. If task_update is available, use those returned IDs with addBlockedBy to link same-batch prerequisites. For independent review, also set executionRequirements.independentOfTaskIds to the returned source IDs; waiting for a prerequisite alone does not bind independent review. Do this before starting work or submitting a plan.',
     parameters: {
       type: 'object',
       properties: {
@@ -105,7 +107,7 @@ export function createTaskCreateTool(
               blockedBy: {
                 type: 'array',
                 items: { type: 'string' },
-                description: 'Prerequisite Task IDs. Waiting for these keeps the new Task pending; dependencies are not a blocked execution outcome.',
+                description: 'Existing prerequisite Task IDs only. Link prerequisites created in this same batch afterward using task_update and the returned IDs. Waiting for these keeps the new Task pending; dependencies are not a blocked execution outcome.',
               },
               completionRequirements: {
                 type: 'array',
@@ -136,7 +138,7 @@ export function createTaskCreateTool(
       }
       const creationTurnRef = context.getCreationTurnRef?.();
       const created = await registry.createTasks(items.map((item) => ({ ...item, creationTurnRef })));
-      const text = created
+      let text = created
         .map((task) => {
           const depsText = task.blockedBy.length > 0
             ? ` (blockedBy: ${task.blockedBy.join(', ')})`
@@ -144,6 +146,7 @@ export function createTaskCreateTool(
           return `Created ${task.id}: ${task.subject}${depsText}`;
         })
         .join('\n');
+      if (created.length > 1) text += '\nIf task_update is available, link prerequisites among these new Tasks using their returned IDs and addBlockedBy before starting work or submitting a plan. For independent review, also set executionRequirements.independentOfTaskIds to the source IDs while preserving the review mode, profile and required Skills; blockedBy alone is not independence.';
 
       return {
         content: [{ type: 'text', text }],
@@ -184,7 +187,7 @@ export function createTaskUpdateTool(
   return {
     name: 'task_update',
     label: 'Update Task',
-    description: 'Update an existing Task. Unfinished prerequisites keep a Task pending; blocked records a real obstacle or incomplete execution result, not ordinary dependency waiting. status=in_progress starts a new direct execution; call it once per execution, never as a progress note or before dispatching Task-owned delegated work. After the user explicitly requests continuation in a later turn, resumeCancelled=true can continue the same cancelled goal after all producers joined; history and consumed budgets remain. Completed Tasks stay closed except when a reviewed source becomes invalid or a review is bound to a superseded source; reexecuting that same Task preserves its prior executions and consumption. The delegated runner claims its own execution in both wait and background modes. Do the Task work before status=completed or blocked settles its direct execution; a partial result leaves the Task blocked. When another Task independently reviews this result, provide its verifiable session artifact URI and exact hash as result.resultRef and result.resultHash before completion. status=pending cannot release an active execution. Use task_get to inspect currentExecutionId before starting again. Omit status for description or metadata edits.',
+    description: 'Update an existing Task. Unfinished prerequisites keep a Task pending; blocked records a real obstacle or incomplete execution result, not ordinary dependency waiting. status=in_progress starts a new direct execution; call it once per execution, never as a progress note or before dispatching Task-owned delegated work. After the user explicitly requests continuation in a later turn, resumeCancelled=true can continue the same cancelled goal after all producers joined; history and consumed budgets remain. A completed source Task may run again after its actual result has been independently reviewed, including when the original snapshot remains readable; settle the new execution with the revised resultRef and resultHash, then dispatch the same review Task against that version. A source that became invalid or a review bound to a superseded source can also be reexecuted. Prior executions, consumption and deadlines remain. The delegated runner claims its own execution in both wait and background modes. Do the Task work before status=completed or blocked settles its direct execution; a partial result leaves the Task blocked. Send result in the same call as status=completed or blocked; a settled execution cannot be rewritten. To continue useful work, start a new execution of the same Task with its existing consumption and deadline. For independent review, result.resultRef and result.resultHash must identify the actual result being reviewed, not merely a supporting receipt. For a workspace text result, a permitted read_file with pinEvidence=true can provide a session URI/hash for the returned window; verify completeness and explicitly grant every needed window. A later revision is a different result version. status=pending cannot release an active execution. Use task_get to inspect currentExecutionId before starting again. Omit status for description or metadata edits.',
     parameters: {
       type: 'object',
       properties: {
@@ -198,7 +201,7 @@ export function createTaskUpdateTool(
         subject: { type: 'string' },
         description: { type: 'string' },
         owner: { type: 'string' },
-        addBlockedBy: { type: 'array', items: { type: 'string' } },
+        addBlockedBy: { type: 'array', items: { type: 'string' }, description: 'Existing prerequisite Task IDs, including IDs returned by the same task_create batch. Add dependencies before starting work or submitting a plan; omit status in this update.' },
         addBlocks: { type: 'array', items: { type: 'string' } },
         metadata: { type: 'object' },
         executionRequirements: TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA,
@@ -209,8 +212,8 @@ export function createTaskUpdateTool(
             summary: { type: 'string' },
             outputs: { type: 'object' },
             missingRequirements: { type: 'array', items: { type: 'string' } },
-            resultRef: { type: 'string' },
-            resultHash: { type: 'string' },
+            resultRef: { type: 'string', description: 'Owning-session reference to the actual result under review, not an unrelated supporting receipt.' },
+            resultHash: { type: 'string', description: 'Exact SHA-256 of that result reference, with or without the sha256: prefix; do not substitute a source capture or another artifact hash.' },
           },
           required: ['disposition', 'summary', 'outputs'],
         },
@@ -250,9 +253,18 @@ export function createTaskUpdateTool(
           : undefined;
 
       const result = readCompletionResult(params.result);
+      if (result && status !== 'completed' && status !== 'blocked') {
+        throw new Error('Task result must accompany status=completed or blocked when settling a direct execution. A settled execution cannot be rewritten; start a new execution of the same Task to continue.');
+      }
       const hasSemanticUpdates = subject !== undefined || description !== undefined || owner !== undefined
         || Boolean(addBlockedBy?.length) || Boolean(addBlocks?.length) || metadata !== undefined || executionRequirements !== undefined;
-      if (status && hasSemanticUpdates) throw new Error('Status transitions cannot be combined with task definition updates.');
+      if (status && hasSemanticUpdates) {
+        const task = await registry.getTask(taskId);
+        if (task?.status === 'completed' && task.executionRequirements?.independentOfTaskIds.length) {
+          throw new Error(`Completed review Task definitions cannot change. ${INVALIDATED_REVIEW_GUIDANCE}`);
+        }
+        throw new Error('Status transitions cannot be combined with task definition updates.');
+      }
       let updated: TaskRecord;
       if (status === 'in_progress') {
         const startOptions = await context.startOptions?.(taskId);
@@ -536,7 +548,8 @@ function readCompletionResult(value: unknown): TaskUpdateParams['result'] {
   if (!outputsValue || typeof outputsValue !== 'object' || Array.isArray(outputsValue)) throw new Error('参数 "result.outputs" 必须是对象');
   const outputs: Record<string, string> = {};
   for (const [key, item] of Object.entries(outputsValue)) { if (typeof item !== 'string') throw new Error('参数 "result.outputs" 的值必须是字符串'); outputs[key] = item; }
-  return { disposition, summary, outputs, missingRequirements: readStringArray(record, 'missingRequirements'), resultRef: readString(record, 'resultRef', false), resultHash: readString(record, 'resultHash', false) };
+  const resultHash = readString(record, 'resultHash', false);
+  return { disposition, summary, outputs, missingRequirements: readStringArray(record, 'missingRequirements'), resultRef: readString(record, 'resultRef', false), resultHash: resultHash ? normalizeSha256(resultHash) : undefined };
 }
 
 /** 从未知入参中读取字符串数组字段。 */

@@ -9,12 +9,12 @@ export class AgentLoopTerminationError extends Error {
   readonly code: AgentLoopTerminationCode;
   readonly turn: number;
   readonly maxTurns?: number;
-  readonly noProgressReason?: 'approved-obligation';
+  readonly noProgressReason?: 'runtime-obligation';
 
   constructor(
     code: AgentLoopTerminationCode,
     message: string,
-    options: { turn: number; maxTurns?: number; noProgressReason?: 'approved-obligation' },
+    options: { turn: number; maxTurns?: number; noProgressReason?: 'runtime-obligation' },
   ) {
     super(message);
     this.name = 'AgentLoopTerminationError';
