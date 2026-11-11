@@ -142,6 +142,37 @@ describe('native RDC probe', () => {
     expect(getRdcContextLease('s')?.contextId).toBe('ctx');
   });
 
+  it('pages and searches the event tree through read-only catalog operations bound to the owned replay', async () => {
+    expect(compileRdcProbe({ action: 'probe', args: { action: 'event_list', offset: 256, limit: 100, maxDepth: 2, nameContains: 'Eye' } }, 'replay'))
+      .toEqual({ command: 'call', operation: 'rd.event.get_action_tree', needsContext: true, args: ['rd.event.get_action_tree', '--args-json',
+        JSON.stringify({ session_id: 'replay', offset: 256, limit: 100, max_depth: 2, filter: { name_contains: 'Eye' } })] });
+    expect(compileRdcProbe({ action: 'probe', args: { action: 'event_search', eventIdMin: 300, eventIdMax: 500, flagsInclude: ['Drawcall'] } }, 'replay').args)
+      .toEqual(['rd.event.search_actions', '--args-json', JSON.stringify({ session_id: 'replay', query: { event_id_min: 300, event_id_max: 500, flags_include: ['Drawcall'] } })]);
+    expect(() => compileRdcProbe({ action: 'probe', args: { action: 'event_list' } })).toThrow('RDC_PROBE_OWNER');
+    for (const args of [{ action: 'event_show', eventId: '1', offset: 2 }, { action: 'event_list', flagsInclude: ['Drawcall'] },
+      { action: 'event_search' }, { action: 'event_search', nameContains: 'x', path: '/' }]) {
+      expect(RdcProbeInputSchema.safeParse({ action: 'probe', args }).success, JSON.stringify(args)).toBe(false);
+    }
+
+    const tree = { ok: true, result_kind: 'rd.event.get_action_tree',
+      data: { session_id: 'replay', nodes: Array.from({ length: 400 }, (_, id) => ({ event_id: id, name: 'vkCmdDrawIndexed'.repeat(4) })),
+        pagination: { total_root_count: 592, truncated: true } } };
+    const executeCli = vi.fn(async () => result(0, tree));
+    const listed = await createRdcProbeTool('s', 'p', { executeCli }).execute('t', { action: 'probe', args: { action: 'event_list', limit: 400 } }, undefined, undefined, context());
+    expect(listed.isError).not.toBe(true);
+    expect(executeCli).toHaveBeenCalledWith('call', ['rd.event.get_action_tree', '--args-json', JSON.stringify({ session_id: 'replay', limit: 400 }),
+      '--daemon-context', 'ctx'], expect.anything());
+    const text = (listed.content[0] as { text: string }).text;
+    expect(text.length).toBeGreaterThan(16 * 1024);
+    expect(JSON.parse(text)).toEqual(tree);
+
+    for (const foreign of [{ ...tree, result_kind: 'rd.event.search_actions' }, { ...tree, data: { ...tree.data, session_id: 'other' } }]) {
+      const rejected = await createRdcProbeTool('s', 'p', { executeCli: vi.fn(async () => result(0, foreign)) })
+        .execute('t', { action: 'probe', args: { action: 'event_list' } }, undefined, undefined, context());
+      expect(rejected.isError).toBe(true);
+    }
+  });
+
   it('treats empty optional query values as omission while requiring specific event identities', async () => {
     const request = { action: 'probe', args: { action: 'event_show', eventId: '1248', path: '' } } as const;
     expect(RdcProbeInputSchema.parse(request)).toEqual({ action: 'probe', args: { action: 'event_show', eventId: '1248' } });

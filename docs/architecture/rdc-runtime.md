@@ -208,6 +208,8 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 
 原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。`runtime_context` 对同一 session/project 的隔离身份返回明确的受控恢复状态，不将仍打开的 capture 误报为未打开，也不向其他 scope 泄露保留的 lease。新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化。失败没有取得可信恢复证明时仍 fail-closed；恢复通过应用生命周期重新建立 owning capture/replay/context 身份。
 
+`rdc_probe` 的 `probe` 是只读语义查询闭集（context、事件树、事件搜索、事件详情、管线摘要、资源目录、受控 VFS），规划与执行身份都可使用；像素历史、Shader 调试、替换和导出不在其中。事件树与事件搜索经冻结 CLI 的 `call` 执行对应只读目录操作，由主进程注入 owning replay 身份并核对返回的 result_kind 与 session。结果完整返回，超过阈值时按普通工具结果保存为可分页检索的会话制品，不在工具内截断。
+
 获批调查可在同一 owning session 内通过 `rdc_probe` 的 `capture_select` 选择计划中经主进程冻结的 input ID、内容 hash 与设备，不能传任意路径或切换到未经批准的设备。切换前核验实际 replay、事件、替换和进程身份，结束相关子执行及实验；完成旧 context 释放和 daemon stop 后打开目标，并以原冻结权限、模型、catalog 和消费重新准备。`capture_restore` 恢复进入调查前的输入及位置，并返回当次主进程观察的入口基线、当前现场和一致性结果；即使无需移动也返回该比较。重开可改变 native 身份，不能仅凭 ID 不同判定用户位置未恢复；当次观察不是终态 resolved 回执。回合运行期间终态回执待生成是预期状态：模型结束后，主进程提交前重新核验并签名，恢复未确认时不能提交 completed。仅终态回执待生成不能成为已观察恢复成功后停止其他获准工作的理由，也不能伪称回执已经存在。切换、停止和新身份通过主进程签名回执关联。操作仍受当前权限模式约束，不能用能力声明代替授权。
 
 同输入、设备及权限的原生故障可请求 `capture_recover`：只处理实际失败而隔离的 lease，中断并 join 持该 lease 的相关子执行，核对原 daemon/worker 身份，按 clear context → 确认 daemon stop → 重开和重新准备的顺序进行。相同失败条件重复或进程退出、权限、安装状态无法确认时停止并保留隔离，不伪造恢复。任务进入前的位置由签名 baseline 记录；中断或重启后未闭合记录在 Capture 显示，由用户触发恢复，不自动续跑模型。恢复前复核输入 hash、设备、替换和旧进程，只有重新观察到原位置才签 resolved。历史结果不被补签，不跨新旧现场拼接实验。

@@ -21,14 +21,15 @@ describe.skipIf(!root || !python)('external native parser contract (explicit ins
     vi.spyOn(invoker, 'loadCatalog').mockResolvedValue({} as never);
     const inputs: RdcProbeInput[] = [
       { action: 'version' }, { action: 'doctor' }, { action: 'enumerate' }, { action: 'preview_status' },
-      ...['context_status', 'event_list', 'event_show', 'pipeline_show', 'resource_list', 'vfs_ls', 'vfs_cat'].map((action) => ({
+      ...['context_status', 'event_list', 'event_search', 'event_show', 'pipeline_show', 'resource_list', 'vfs_ls', 'vfs_cat'].map((action) => ({
         action: 'probe' as const, args: { action: action as NonNullable<RdcProbeInput['args']>['action'],
           ...(action === 'event_show' || action === 'pipeline_show' ? { eventId: '1' } : {}),
+          ...(action === 'event_search' ? { nameContains: 'draw' } : {}),
           ...(action.startsWith('vfs_') ? { path: '/draws/1' } : {}) },
       })),
     ];
     for (const input of inputs) {
-      const command = compileRdcProbe(input);
+      const command = compileRdcProbe(input, 'qa-parser-session');
       await invoker.executeCLI(command.command, [...command.args, ...(command.needsContext ? ['--daemon-context', 'qa-parser-context'] : [])],
         { settings: { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, command: python!, argsPrefix: [path.resolve(root!, 'cli/run_cli.py')] } });
     }

@@ -1,6 +1,5 @@
 import type { AgentTool, AgentToolResult } from '../agent/AgentTool';
 import type { JsonSchema } from '../core/types';
-import { truncateOutput } from '../tools/primitives/_shared';
 import { RDC_PROBE_ACTIONS, RDC_PROBE_READONLY_CLI_ACTIONS, RdcProbeInputSchema, compileRdcProbe, type RdcProbeInput } from '@shared/constants/rdcProbe';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type { CLIResult } from '@shared/types/tool';
@@ -13,10 +12,33 @@ const probeQueryParameters: JsonSchema = {
   required: ['action'],
   additionalProperties: false,
   oneOf: [
-    ...(['context_status', 'event_list', 'resource_list'] as const).map((action) => ({
+    ...(['context_status', 'resource_list'] as const).map((action) => ({
       type: 'object', required: ['action'], additionalProperties: false,
       properties: { action: { const: action } },
     })),
+    {
+      type: 'object', required: ['action'], additionalProperties: false,
+      properties: {
+        action: { const: 'event_list' },
+        eventId: { type: 'string', pattern: '^\\d+$', description: 'Return only this event and its subtree.' },
+        offset: { type: 'integer', minimum: 0, description: 'Root-node page offset; continue from the returned pagination.' },
+        limit: { type: 'integer', minimum: 1, maximum: 1000, description: 'Root nodes per page (native default 256).' },
+        maxDepth: { type: 'integer', minimum: 0, maximum: 64 },
+        nameContains: { type: 'string', minLength: 1, maxLength: 256, description: 'Case-insensitive action-name filter.' },
+      },
+    },
+    {
+      type: 'object', required: ['action'], additionalProperties: false,
+      properties: {
+        action: { const: 'event_search' },
+        nameContains: { type: 'string', minLength: 1, maxLength: 256 },
+        eventIdMin: { type: 'integer', minimum: 0 },
+        eventIdMax: { type: 'integer', minimum: 0 },
+        flagsInclude: { type: 'array', minItems: 1, maxItems: 8, items: { type: 'string', pattern: '^[A-Za-z]+$' },
+          description: 'RenderDoc ActionFlags names that must all be present, e.g. ["Drawcall"].' },
+        maxResults: { type: 'integer', minimum: 1, maximum: 1000 },
+      },
+    },
     {
       type: 'object', required: ['action', 'eventId'], additionalProperties: false,
       properties: { action: { const: 'event_show' }, eventId: { type: 'string', pattern: '^\\d+$' } },
@@ -36,8 +58,16 @@ const probeQueryParameters: JsonSchema = {
   ],
   properties: {
     action: { type: 'string', enum: [...RDC_PROBE_READONLY_CLI_ACTIONS] },
-    eventId: { type: 'string', pattern: '^\\d+$', description: 'Only event_show or pipeline_show.' },
+    eventId: { type: 'string', pattern: '^\\d+$', description: 'Only event_list, event_show or pipeline_show.' },
     path: { type: 'string', minLength: 1, maxLength: 512, description: 'Only vfs_ls or vfs_cat.' },
+    offset: { type: 'integer', minimum: 0, description: 'Only event_list.' },
+    limit: { type: 'integer', minimum: 1, maximum: 1000, description: 'Only event_list.' },
+    maxDepth: { type: 'integer', minimum: 0, maximum: 64, description: 'Only event_list.' },
+    nameContains: { type: 'string', minLength: 1, maxLength: 256, description: 'Only event_list or event_search.' },
+    eventIdMin: { type: 'integer', minimum: 0, description: 'Only event_search.' },
+    eventIdMax: { type: 'integer', minimum: 0, description: 'Only event_search.' },
+    flagsInclude: { type: 'array', items: { type: 'string' }, description: 'Only event_search.' },
+    maxResults: { type: 'integer', minimum: 1, maximum: 1000, description: 'Only event_search.' },
   },
 };
 
@@ -81,7 +111,7 @@ export function createRdcProbeTool(
   const getLease = deps.getLease ?? getRdcContextLease;
   return {
     name: 'rdc_probe', label: 'RDC Probe',
-    description: 'Read native RDC JSON through the frozen session binding. Successful probe queries expose a session evidence URI/hash for explicit delegation; check truncated before treating the returned observation as complete. For an approved capture plan, the owning General may select a frozen inputId, recover a quarantined same-input failure, or restore the original capture and position. A capture_restore result includes the host-observed comparison with the signed entry baseline, even when changed is false; this is a current observation, not the terminal restoration receipt. While the turn is active, terminalReceiptPending is expected and is not by itself a blocker when restored is true: continue other permitted work and declare the actual outcome without inventing a terminal receipt. The runtime reobserves and signs during terminalization, and a completed outcome cannot commit if restoration is unconfirmed. Join relevant child executions and close interrupted experiments before recovery; repeated identical failures stop. The runtime checks the owning device, permissions, identity and receipts; never supply filesystem paths or context IDs. Event list: {"action":"probe","args":{"action":"event_list"}}.',
+    description: 'Read native RDC JSON through the frozen session binding. Successful probe queries expose a session evidence URI/hash for explicit delegation; the full native result is kept, and a large one is stored as an artifact you can page and search with artifact_read. Native results report their own pagination: page event_list with offset/limit (or narrow it with eventId, maxDepth, nameContains) until pagination.truncated is false, and use event_search for name, ActionFlags or event-id-range queries. For an approved capture plan, the owning General may select a frozen inputId, recover a quarantined same-input failure, or restore the original capture and position. A capture_restore result includes the host-observed comparison with the signed entry baseline, even when changed is false; this is a current observation, not the terminal restoration receipt. While the turn is active, terminalReceiptPending is expected and is not by itself a blocker when restored is true: continue other permitted work and declare the actual outcome without inventing a terminal receipt. The runtime reobserves and signs during terminalization, and a completed outcome cannot commit if restoration is unconfirmed. Join relevant child executions and close interrupted experiments before recovery; repeated identical failures stop. The runtime checks the owning device, permissions, identity and receipts; never supply filesystem paths or context IDs. Event list: {"action":"probe","args":{"action":"event_list","limit":100}}; draws in a range: {"action":"probe","args":{"action":"event_search","eventIdMin":300,"eventIdMax":500,"flagsInclude":["Drawcall"]}}.',
     parameters: probeParameters,
     permissionHint: 'readonly',
     spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'system', requiresApproval: false },
@@ -127,7 +157,7 @@ export function createRdcProbeTool(
         if (lease && (lease.ownerSessionId !== ownerSession || lease.ownerProjectId !== ownerProject)) {
           throw new Error('RDC_PROBE_OWNER: lease ownership/context mismatch.');
         }
-        const compiled = compileRdcProbe(input);
+        const compiled = compileRdcProbe(input, lease?.runtimeContext.replaySessionId);
         if (compiled.needsContext && (!lease || lease.contextId === 'default')) {
           throw new Error('RDC_PROBE_OWNER: no non-default daemon context is owned by this session.');
         }
@@ -144,18 +174,18 @@ export function createRdcProbeTool(
         const cli = await executeCli(compiled.command, args, { abortSignal: signal, settings, contextId: lease?.contextId });
         signal?.throwIfAborted();
         const expectedContext = compiled.command === 'context' ? lease?.contextId : undefined;
-        const payload = parseRdcNativeResult(cli, expectedContext);
+        const payload = parseRdcNativeResult(cli, expectedContext, compiled.operation);
+        if (compiled.operation && payload.data.session_id !== undefined && payload.data.session_id !== lease?.runtimeContext.replaySessionId) {
+          throw new Error('RDC_CLI_PROTOCOL: replay session mismatch in native result.');
+        }
         const current = getLease(ownerSession);
         if (lease && (!current || current.version !== lease.version || current.contextId !== lease.contextId)) {
           throw new Error('RDC_PROBE_OWNER: lease changed during the call.');
         }
-        const text = JSON.stringify(payload);
-        const stdout = truncateOutput(text, 16 * 1024);
         return {
-          content: [{ type: 'text', text: stdout }],
+          content: [{ type: 'text', text: JSON.stringify(payload) }],
           details: {
-            action: input.action, cliAction: compiled.command, exitCode: cli.exitCode, stdout,
-            truncated: stdout !== text, durationMs: cli.duration_ms,
+            action: input.action, cliAction: compiled.operation ?? compiled.command, exitCode: cli.exitCode, durationMs: cli.duration_ms,
             worldStateStamp: { sessionId: ownerSession, contextId: current?.contextId ?? null, version: current?.version ?? null },
           },
         };
