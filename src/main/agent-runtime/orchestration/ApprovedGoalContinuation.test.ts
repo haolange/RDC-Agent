@@ -188,3 +188,42 @@ it('reports a changed approved requirement once while still allowing an honest p
   turn.completionDeclaration = { disposition: 'partial', evidenceRefs: [] };
   expect(await check()).toBeUndefined();
 });
+
+it('restates the recorded frontier and open Challenge follow-ups in a single reassessment', async () => {
+  const { registry, turn, approve } = await fixture();
+  const task = await registry.createTask('Investigate the approved symptom');
+  approve([snapshotTaskRequirement(task)]);
+  const execution = await registry.startExecution(task.id, { mode: 'direct' });
+  await registry.settleExecution(execution.id, { expectedGeneration: 1, status: 'completed',
+    result: { disposition: 'completed', summary: 'Partial evidence.', outputs: {} } });
+  const entry = (artifactId: string, kind: string, status: string, createdAt = '2026-11-11T00:00:00Z') =>
+    ({ artifactId, kind, status, createdAt });
+  const records: Record<string, unknown> = {
+    old: { checkpointId: 'cp-old', unresolvedFrontier: 'stale frontier' },
+    cp1: { checkpointId: 'cp-1', unresolvedFrontier: 'Read native values around the candidate region.' },
+    cp2: { checkpointId: 'cp-2', unresolvedFrontier: 'Confirm which draw covers the candidate region.' },
+    ch1: { challengeId: 'ch-1', targetRef: { type: 'claim', id: 'claim-anchor' }, statement: 'Anchor unproven.',
+      requiredFollowUp: 'Compare the draw-call overlay with the candidate rectangle.', status: 'open' },
+    ch2: { challengeId: 'ch-2', targetRef: { type: 'evidence', id: 'ev-1' }, statement: 'Settled.', status: 'resolved' },
+  };
+  const index = [entry('old', 'checkpoint', 'superseded', '2026-11-12T00:00:00Z'), entry('cp1', 'checkpoint', 'ready'),
+    entry('cp2', 'checkpoint', 'draft', '2026-11-11T01:00:00Z'), entry('ch1', 'challenge', 'ready'), entry('ch2', 'challenge', 'ready')];
+  const investigation = {
+    list: (_session: string, filter: { kind: string }) => index.filter(item => item.kind === filter.kind),
+    readRecord: (_session: string, artifactId: string) => ({ record: records[artifactId] }),
+  } as never;
+  const check = createApprovedGoalContinuation(turn, 'session', registry, investigation);
+  turn.completionDeclaration = { disposition: 'partial', evidenceRefs: [],
+    result: { summary: 'Anchor not established.', outputs: {}, counterevidence: [], unresolved: ['Anchor the symptom.'],
+      scope: 'approved goal', sideEffects: [], recoveryState: [] } };
+  const feedback = await check();
+  expect(feedback).toContain('cp-2');
+  expect(feedback).toContain('Confirm which draw covers the candidate region.');
+  expect(feedback).toContain('ch-1 on claim claim-anchor: Compare the draw-call overlay with the candidate rectangle.');
+  expect(feedback).not.toMatch(/stale frontier|cp-1|ch-2/u);
+  expect(await check()).toBeUndefined();
+
+  const unreadable = createApprovedGoalContinuation(turn, 'session', registry,
+    { list: () => { throw new Error('INVESTIGATION_STORE_CORRUPT: index unreadable'); } } as never);
+  expect(await unreadable()).toContain('Recorded investigation work could not be read: INVESTIGATION_STORE_CORRUPT');
+});

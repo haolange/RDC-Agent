@@ -1,11 +1,21 @@
 import { TaskRegistry, createSessionTaskStore } from '../tasks';
+import { investigationArtifactService, type InvestigationArtifactService } from '../../investigation/InvestigationArtifactService';
+import { describeOpenInvestigationWork } from '../../investigation/openInvestigationWork';
 import { listActiveDelegations } from './DirectTaskTurnLifecycle';
 import type { TurnHandle } from './TurnCoordinator';
 
 /** Provide facts about the approved goal without deciding whether the Agent can progress. */
 export function createApprovedGoalContinuation(
   turn: TurnHandle, sessionId: string, registry = new TaskRegistry(createSessionTaskStore(sessionId)),
+  investigation: InvestigationArtifactService = investigationArtifactService,
 ): (validate?: () => void) => Promise<string | undefined> {
+  const openWork = () => {
+    try { return describeOpenInvestigationWork(investigation, sessionId); }
+    catch (error) {
+      // Reassessment still proceeds; the gap in recorded facts is stated rather than hidden.
+      return `\n## Open work you recorded\nRecorded investigation work could not be read: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  };
   const reassessed = new Set<string>();
   let pendingReassessment: { declaration: NonNullable<TurnHandle['completionDeclaration']>; toolCalls: number } | undefined;
   return async (validate) => {
@@ -37,7 +47,7 @@ export function createApprovedGoalContinuation(
         reassessed.add(key);
         pendingReassessment = { declaration: turn.completionDeclaration!, toolCalls: turn.policyBudget.toolCalls };
         const status = task ? ` Current status: ${task.status}; reason: ${task.statusReason || 'not recorded'}.` : '';
-        return `# Approved Goal Reassessment\n${message}${status}\nCompare the unfinished approved work with the actual evidence; an unproved result or a partial Task is not itself a blocker. If a useful, permitted check remains within the approved scope, resume the same Task if needed and perform the next check now; do not stop after merely listing or acknowledging it. If a derived context may have omitted approved work, reread the frozen plan by its verified URI and hash before deciding. Do not repeat an unchanged failed or denied action, expand permissions, reset consumption or extend the deadline. After further tool work, call turn_complete again with the updated result. If no useful permitted work remains, preserve the existing partial or blocked declaration and report the concrete blocker and remaining work accurately.`;
+        return `# Approved Goal Reassessment\n${message}${status}\nCompare the unfinished approved work with the actual evidence; an unproved result or a partial Task is not itself a blocker. If a useful, permitted check remains within the approved scope, resume the same Task if needed and perform the next check now; do not stop after merely listing or acknowledging it. If a derived context may have omitted approved work, reread the frozen plan by its verified URI and hash before deciding. Do not repeat an unchanged failed or denied action, expand permissions, reset consumption or extend the deadline. After further tool work, call turn_complete again with the updated result. If no useful permitted work remains, preserve the existing partial or blocked declaration and report the concrete blocker and remaining work accurately.${openWork()}`;
       }
       if (disposition === 'partial' && turn.completionDeclaration?.result?.unresolved.some(item => item.trim())) {
         const references = turn.completionDeclaration.evidenceRefs.map(ref => `${ref.uri}\u0000${ref.hash}`).sort();
@@ -45,7 +55,7 @@ export function createApprovedGoalContinuation(
         if (!reassessed.has(key)) {
           reassessed.add(key);
           pendingReassessment = { declaration: turn.completionDeclaration, toolCalls: turn.policyBudget.toolCalls };
-          return '# Approved Goal Reassessment\nThe approved Tasks are settled, but the partial result still lists unresolved work. Compare it with the approved goal and actual evidence. If a useful, permitted action remains within the approved scope, perform it now; do not stop after merely listing it. If no such action remains, retain the partial result and report the concrete blocker. Do not repeat unchanged failures, expand permissions, reset consumption or extend the deadline. After further tool work, declare the updated result again.';
+          return '# Approved Goal Reassessment\nThe approved Tasks are settled, but the partial result still lists unresolved work. Compare it with the approved goal and actual evidence. If a useful, permitted action remains within the approved scope, perform it now; do not stop after merely listing it. If no such action remains, retain the partial result and report the concrete blocker. Do not repeat unchanged failures, expand permissions, reset consumption or extend the deadline. After further tool work, declare the updated result again.' + openWork();
         }
       }
       return undefined;
