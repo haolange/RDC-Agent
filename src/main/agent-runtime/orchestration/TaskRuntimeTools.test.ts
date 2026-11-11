@@ -57,6 +57,39 @@ describe('direct Task runtime root selection', () => {
     expect(await registry.listTasks()).toHaveLength(1);
   });
 
+  it('continues a blocked Task in a later user turn without resetting consumption, start or deadline', async () => {
+    vi.useFakeTimers({ now: Date.parse('2026-11-11T08:00:00Z') });
+    try {
+      const registry = new TaskRegistry(state.store);
+      const task = await registry.createTask('Anchor the symptom');
+      const first = policy(7);
+      await runtimeUpdate(first, 'first-turn').execute('start', { taskId: task.id, status: 'in_progress' });
+      const [initial] = await registry.listExecutions(task.id);
+      await registry.settleExecution(initial!.id, { expectedGeneration: initial!.generation, status: 'blocked',
+        result: { disposition: 'blocked', summary: 'Anchor not established.', outputs: {} } });
+      const root = await registry.getRootBudget(initial!.rootBudgetId!);
+
+      vi.setSystemTime(Date.parse('2026-11-11T08:05:00Z'));
+      const later = policy(2);
+      expect(later.wallStartedAt).toBeGreaterThan(first.wallStartedAt);
+      await runtimeUpdate(later, 'continue-turn').execute('continue', { taskId: task.id, status: 'in_progress' });
+      const continued = (await registry.listExecutions(task.id)).at(-1)!;
+      expect(continued).toMatchObject({ generation: 2, rootBudgetId: initial!.rootBudgetId,
+        budget: { toolCalls: 9, startedAt: initial!.budget.startedAt, deadlineAt: root!.deadlineAt } });
+      expect(later.toolCalls).toBe(9);
+      expect(later.wallStartedAt).toBe(first.wallStartedAt);
+      expect(later.wallStartedAt + later.maxWallTimeMs).toBe(root!.deadlineAt);
+      await expect(registry.getRootBudget(initial!.rootBudgetId!)).resolves.toMatchObject({ toolCalls: 9, startedAt: root!.startedAt, deadlineAt: root!.deadlineAt });
+
+      await registry.settleExecution(continued.id, { expectedGeneration: continued.generation, status: 'blocked',
+        result: { disposition: 'blocked', summary: 'Still not anchored.', outputs: {} } });
+      vi.setSystemTime(root!.deadlineAt + 60_000);
+      await expect(runtimeUpdate(policy(0), 'after-deadline').execute('late', { taskId: task.id, status: 'in_progress' }))
+        .rejects.toThrow('Root Task budget is exhausted.');
+      expect(await registry.listExecutions(task.id)).toHaveLength(2);
+    } finally { vi.useRealTimers(); }
+  });
+
   it('keeps the original root when explicitly resuming a cancelled delegated Task as direct work', async () => {
     const registry = new TaskRegistry(state.store, { onCancelExecution: async () => undefined });
     const inherited = policy(7, 16);

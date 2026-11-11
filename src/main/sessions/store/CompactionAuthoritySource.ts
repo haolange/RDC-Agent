@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { sessionArtifactResolver } from '../artifacts/SessionArtifactResolver';
 import { TaskRegistry } from '../../agent-runtime/tasks/TaskRegistry';
+import { collectOpenInvestigationWork } from '../../investigation/openInvestigationWork';
 import type { TaskExecutionRecord, TaskRecord } from '../../agent-runtime/tasks/TaskContracts';
 import { createSessionTaskStore } from '../../agent-runtime/tasks/sessionTaskStore';
 import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
@@ -89,9 +90,13 @@ export function readCompactionAuthorityJournal(sessionId: string, uri: string, e
 /** Keep the complete state in the source artifact while bounding what enters the model prompt. */
 function compactAuthorityState(state: AuthorityState, archiveUri: string, stateHash: string): Record<string, unknown> {
   const active = (status: TaskRecord['status']): boolean => status === 'pending' || status === 'in_progress' || status === 'blocked';
+  const openWork = collectOpenInvestigationWork(state.investigation.map(item => ({
+    kind: item.manifest.kind, status: item.manifest.status, createdAt: item.manifest.createdAt, record: item.record })));
   return {
     authorityArchive: archiveUri,
     authorityStateHash: stateHash,
+    // Content, not only an index entry: a summary must not drop recorded but unperformed checks.
+    ...(openWork ? { openInvestigationWork: openWork } : {}),
     authorityStateOmittedFromPrompt: true,
     tasks: state.tasks.map(task => ({
       id: task.id, subject: task.subject, status: task.status, parentTaskId: task.parentTaskId,

@@ -141,6 +141,29 @@ describe('authoritative compaction checkpoint', () => {
     expect(original.fullAuthorityState.investigation).toHaveLength(150);
     expect(original.fullAuthorityState.investigation[149].record.body).toBe('original evidence 149');
   });
+
+  it('keeps recorded open checks and Challenge follow-ups as content even when the record index is trimmed', async () => {
+    const record = (artifactId: string, kind: string, status: string, createdAt: string, body: unknown) => ({
+      manifest: { artifactId, kind, status, title: artifactId, createdAt,
+        sourceRefs: Array.from({ length: 5 }, (_, source) => ({ uri: `session://tool-outputs/${artifactId}-${source}.json`, hash: 'c'.repeat(64) })) }, record: body,
+      contentUri: `session://investigation/records/${artifactId}.json`, contentHash: 'e'.repeat(64) });
+    authority.investigation = [
+      ...Array.from({ length: 150 }, (_, index) => record(`ev-${index}`, 'evidence', 'draft', '2026-11-10T00:00:00Z', { body: 'x'.repeat(400) })),
+      record('cp-old', 'checkpoint', 'superseded', '2026-11-11T09:00:00Z', { checkpointId: 'cp-old', unresolvedFrontier: 'stale frontier' }),
+      record('cp-1', 'checkpoint', 'ready', '2026-11-11T08:00:00Z', { checkpointId: 'cp-1', unresolvedFrontier: 'Compare the draw-call overlay with the candidate rectangle.' }),
+      record('ch-1', 'challenge', 'ready', '2026-11-11T08:30:00Z', { challengeId: 'ch-1', targetRef: { type: 'claim', id: 'anchor' },
+        statement: 'Anchor unproven.', requiredFollowUp: 'Read native values around the candidate.', status: 'open' }),
+      record('ch-2', 'challenge', 'ready', '2026-11-11T08:31:00Z', { challengeId: 'ch-2', targetRef: { type: 'claim', id: 'old' }, statement: 'Done.', status: 'resolved' }),
+    ];
+    io.list.mockReturnValue(Array.from({ length: 420 }, (_, index) => `session://tool-outputs/result-${index}.json`));
+    const context = JSON.parse((await saveCompactionAuthoritySource('session', [])).context);
+    expect(context.indexCoverage.complete).toBe(false);
+    expect(context.openInvestigationWork).toEqual({
+      frontier: { checkpointId: 'cp-1', text: 'Compare the draw-call overlay with the candidate rectangle.' },
+      challenges: [{ challengeId: 'ch-1', target: 'claim anchor', followUp: 'Read native values around the candidate.' }],
+      omittedChallenges: 0,
+    });
+  });
 });
 
 it('archives original images as native readable references and excludes private provider state', async () => {
