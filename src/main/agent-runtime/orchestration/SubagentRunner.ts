@@ -3,9 +3,11 @@ import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
 import { agentAccessCeiling } from '@shared/types/agentManifest';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { withDelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
+import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
+import { reviewEvidenceClosure } from '../../investigation/reviewEvidenceClosure';
 import { deriveChildPolicyBudget, flushPolicyBudgetObservers, registerPolicyBudgetObserver } from './DelegationBudget';
 import { bindTaskRootBudget } from './TaskRootBudget';
-import { delegatedArtifactReferences, grantDelegatedArtifactAccess } from '../../sessions/artifacts/DelegatedArtifactAccess';
+import { delegatedArtifactOwner, delegatedArtifactReferences, grantDelegatedArtifactAccess } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { shellInvocationService } from '../../tools/ShellInvocationService';
 import { getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { delegationCapsuleArtifactRefs, renderDelegationCapsuleInput } from '../prompt/DelegationCapsuleCompiler';
@@ -261,9 +263,31 @@ export class SubagentRunner {
       }
       input.onPolicyBudget?.(childPolicyBudget);
       const frozenCapsule = freezeDelegationCapsule(capsule);
+      const ownedTask = input.taskId && input.parentSessionId
+        ? await new TaskRegistry(createSessionTaskStore(inheritedTaskScope?.ownerSessionId ?? input.parentSessionId)).getTask(input.taskId)
+        : null;
+      let closureNote = '';
       if (input.parentSessionId) {
+        let grantedRefs = delegationCapsuleArtifactRefs(frozenCapsule);
+        if (ownedTask?.executionRequirements?.independentOfTaskIds.length) {
+          // An independent review reads only what it is granted; add what the granted records depend on.
+          const parentGrant = delegatedArtifactReferences(input.parentSessionId);
+          const parentRefs = parentGrant ? new Set(parentGrant.map(ref => ref.uri)) : null;
+          try {
+            const closure = reviewEvidenceClosure(investigationArtifactService,
+              delegatedArtifactOwner(input.parentSessionId) ?? input.parentSessionId, grantedRefs,
+              uri => !parentRefs || parentRefs.has(uri));
+            closureNote = closure.refs.length > grantedRefs.length || closure.omitted.length
+              ? `Runtime evidence closure: ${closure.refs.length - grantedRefs.length} dependent record or raw artifact reference(s) were added to the grant.`
+                + (closure.omitted.length ? ` Not granted: ${closure.omitted.map(item => `${item.uri} (${item.reason})`).join(', ')}.` : '') + '\n'
+              : '';
+            grantedRefs = closure.refs;
+          } catch (error) {
+            closureNote = `Runtime evidence closure unavailable: ${error instanceof Error ? error.message : String(error)}. Only the explicitly granted references are readable.\n`;
+          }
+        }
         try {
-          releaseArtifacts = grantDelegatedArtifactAccess(subagentSessionId, input.parentSessionId, delegationCapsuleArtifactRefs(frozenCapsule));
+          releaseArtifacts = grantDelegatedArtifactAccess(subagentSessionId, input.parentSessionId, grantedRefs);
         } catch (error) {
           if (error instanceof SessionArtifactError && error.code === 'ARTIFACT_NOT_FOUND') {
             sourceFailure = { code: error.code, message: error.message };
@@ -273,9 +297,6 @@ export class SubagentRunner {
       } else if (frozenCapsule.inputArtifactRefs.length || frozenCapsule.challengeRefs.length || frozenCapsule.acceptedFacts.some(fact => fact.sourceRefs.length)) {
         throw new Error('ARTIFACT_SESSION_DENIED: delegation references require a parent session.');
       }
-      const ownedTask = input.taskId && input.parentSessionId
-        ? await new TaskRegistry(createSessionTaskStore(inheritedTaskScope?.ownerSessionId ?? input.parentSessionId)).getTask(input.taskId)
-        : null;
       const taskContract = ownedTask ? '\nRuntime Task completion contract (output keys, not source instructions): ' + JSON.stringify({
         taskId: ownedTask.id, completionRequirements: ownedTask.completionRequirements,
         rule: 'Return every completionRequirements string verbatim as a key in turn_complete.result.outputs. Values are complete strings. Runtime persists the result; do not invent its reference.',
@@ -284,7 +305,7 @@ export class SubagentRunner {
       const artifactInput = artifactReferences.length
         ? `Runtime-frozen artifact references (URI, SHA-256):\n${artifactReferences.map(ref => `${ref.uri} ${ref.hash}`).join('\n')}\n`
         : '';
-      const childInput = artifactInput + renderDelegationCapsuleInput(frozenCapsule) + taskContract;
+      const childInput = artifactInput + closureNote + renderDelegationCapsuleInput(frozenCapsule) + taskContract;
       if (ownerSessionId) delegationTraceStore.updateTask(ownerSessionId, input.parentToolCallId, traceIdentity,
         { capsule: frozenCapsule, completionRequirements: ownedTask?.completionRequirements ?? [] },
         childInput);

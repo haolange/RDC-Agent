@@ -23,6 +23,7 @@ import { createSessionTaskStore } from '../tasks/sessionTaskStore';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import { delegatedArtifactReferences, resolveDelegatedArtifactRead } from '../../sessions/artifacts/DelegatedArtifactAccess';
+import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
 import { SubagentRunner } from './SubagentRunner';
 import { createBackgroundSubagentService } from './BackgroundSubagentService';
 import type { AgentProfileTurnOptions } from './orchestratorTypes';
@@ -193,6 +194,54 @@ it.each([
     expect((await registry.listExecutions(generator.id))).toHaveLength(1);
     expect(sendProfileMessage).toHaveBeenCalledTimes(2);
   } finally {
+    if (originalUserData === undefined) delete process.env.RDC_AGENT_USER_DATA;
+    else process.env.RDC_AGENT_USER_DATA = originalUserData;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it('grants an independent review the evidence its granted records depend on', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-review-closure-'));
+  const originalUserData = process.env.RDC_AGENT_USER_DATA;
+  process.env.RDC_AGENT_USER_DATA = root;
+  const readAll = vi.spyOn(investigationArtifactService, 'readAllRecords');
+  try {
+    const projectRoot = path.join(root, 'project'); fs.mkdirSync(projectRoot);
+    const project = await storageAdapter.createProject(projectRoot);
+    const sessionId = storageAdapter.createSession(project.projectId).sessionId;
+    const source = sessionArtifactResolver.write(sessionId, 'session://tool-outputs/findings.json', '{"finding":"anchor"}');
+    const claim = sessionArtifactResolver.write(sessionId, 'session://investigation/claim-anchor.json', '{"claimId":"anchor"}');
+    const evidence = sessionArtifactResolver.write(sessionId, 'session://investigation/ev-anchor.json', '{"evidenceId":"ev-anchor"}');
+    const raw = sessionArtifactResolver.write(sessionId, 'session://tool-outputs/history.json', '{"history":[]}');
+    readAll.mockReturnValue([
+      { contentUri: claim.uri, contentHash: claim.hash, manifest: { kind: 'claim', status: 'ready' },
+        record: { claimId: 'anchor', worldStateId: 'ws-none', experimentId: null, compactProvenance: null } },
+      { contentUri: evidence.uri, contentHash: evidence.hash, manifest: { kind: 'evidence', status: 'ready' },
+        record: { evidenceId: 'ev-anchor', worldStateId: 'ws-none', claimIds: ['anchor'], artifactRefs: [{ uri: raw.uri, expectedHash: raw.hash }] } },
+    ] as never);
+    const registry = new TaskRegistry(createSessionTaskStore(sessionId));
+    const generator = await registry.createTask('Produce findings');
+    const review = await registry.createTask('Review findings', { blockedBy: [generator.id],
+      completionRequirements: ['review'], executionRequirements: { mode: 'subagent', requiredSkillIds: [], independentOfTaskIds: [generator.id] } });
+    const generation = await registry.startExecution(generator.id, { mode: 'direct', preparation: {
+      sessionId, turnId: 'source-turn', runtimeFingerprint: 'a'.repeat(24), skills: [], inputArtifacts: [],
+      selectedTurnCount: 0, requestsDomainCapability: false } });
+    await registry.settleExecution(generation.id, { expectedGeneration: generation.generation, status: 'completed', result: {
+      disposition: 'completed', summary: 'Findings available', outputs: {}, resultRef: source.uri, resultHash: source.hash } });
+    let granted: Array<{ uri: string; hash: string }> = [];
+    const sendProfileMessage = vi.fn(async (_profile: string, _content: string, options?: AgentProfileTurnOptions) => {
+      granted = delegatedArtifactReferences(options!.sessionId!)!;
+      return 'not reviewed';
+    });
+    const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'Review', getActiveTurn: () => null });
+    await runner.createSubagentTools('general', sessionId)[0]!.execute('review-closure', {
+      goal: 'Review findings', task: 'Review', scope: 'fixture', acceptedFacts: [], hypotheses: [], challengeRefs: [], negativePaths: [],
+      inputArtifactRefs: [source.uri, claim.uri], requiredSkillIds: [], stopConditions: [], outputRequirements: 'Review',
+      budget: {}, taskId: review.id, profile: 'general', mode: 'wait' } as never);
+    expect(granted.map(ref => ref.uri)).toEqual([source.uri, claim.uri, evidence.uri, raw.uri]);
+    expect(sendProfileMessage.mock.calls[0]![1]).toContain('Runtime evidence closure: 2 dependent record or raw artifact reference(s) were added');
+  } finally {
+    readAll.mockRestore();
     if (originalUserData === undefined) delete process.env.RDC_AGENT_USER_DATA;
     else process.env.RDC_AGENT_USER_DATA = originalUserData;
     fs.rmSync(root, { recursive: true, force: true });
