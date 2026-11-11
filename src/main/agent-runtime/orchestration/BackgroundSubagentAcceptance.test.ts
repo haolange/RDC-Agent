@@ -12,7 +12,7 @@ function fixture(failSave: boolean, qualified = false) {
  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'background-independent-')); roots.push(root);
  let registry!: TaskRegistry;
  const outputs: Record<string, string> = qualified ? { analysis: 'Twelve test designs delivered.' } : {};
- const service = new BackgroundSubagentService(async () => ({ status: 'complete', text: 'complete', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'complete', outputs, counterevidence: [], unresolved: qualified ? ['Implementation ordering policy needs confirmation before executing these designs.'] : [], scope: 'test design only', sideEffects: [], recoveryState: [] } } }), (_session, onCancel) => { registry = new TaskRegistry(root, { onCancelExecution: onCancel }); return registry; }, () => { if (failSave) throw new Error('disk full'); return { uri: 'session://tool-outputs/result.json', hash: 'fixture-hash' }; });
+ const service = new BackgroundSubagentService(async () => ({ status: 'complete', text: 'complete', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'complete', outputs, counterevidence: [], unresolved: qualified ? [{ gap: 'Implementation ordering policy needs confirmation before executing these designs.', attempted: 'Fixture attempt.', blocker: 'not_required' as const, resumeWhen: 'Fixture condition.' }] : [], scope: 'test design only', sideEffects: [], recoveryState: [] } } }), (_session, onCancel) => { registry = new TaskRegistry(root, { onCancelExecution: onCancel }); return registry; }, () => { if (failSave) throw new Error('disk full'); return { uri: 'session://tool-outputs/result.json', hash: 'fixture-hash' }; });
  return { service, registry: () => registry };
 }
 it('completes delivered requirements without promoting unresolved scope conditions into missing outputs', async () => {
@@ -20,7 +20,7 @@ it('completes delivered requirements without promoting unresolved scope conditio
  const task = await registry().createTask('design tests', { completionRequirements: ['analysis'] });
  const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 'owner', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule });
  await service.join(execution.id);
- expect((await service.query('owner', execution.id))?.result).toMatchObject({ disposition: 'completed', outputs: { analysis: 'Twelve test designs delivered.' }, unresolved: ['Implementation ordering policy needs confirmation before executing these designs.'], scope: 'test design only' });
+ expect((await service.query('owner', execution.id))?.result).toMatchObject({ disposition: 'completed', outputs: { analysis: 'Twelve test designs delivered.' }, unresolved: [{ gap: 'Implementation ordering policy needs confirmation before executing these designs.', attempted: 'Fixture attempt.', blocker: 'not_required' as const, resumeWhen: 'Fixture condition.' }], scope: 'test design only' });
  expect(JSON.stringify((await service.messages('owner', execution.id)).messages)).toContain('Implementation ordering policy');
 });
 it('never publishes completion or leaves an unmanaged running execution when result storage fails', async () => {
@@ -61,7 +61,7 @@ it('keeps nested result events with the live immediate parent then transfers onl
  const gate = new Promise<void>((resolve) => { release = resolve; });
  const service = new BackgroundSubagentService(async (input) => {
   if (!input.parentExecutionId) await gate;
-  return { status: 'complete', text: 'private exploration '.repeat(10000), completionDeclaration: { disposition: 'partial', evidenceRefs: [], result: { summary: 'qualified finding', outputs: {}, counterevidence: ['counterexample'], unresolved: ['unmeasured'], scope: 'capture A only', sideEffects: [], recoveryState: ['restored'] } } };
+  return { status: 'complete', text: 'private exploration '.repeat(10000), completionDeclaration: { disposition: 'partial', evidenceRefs: [], result: { summary: 'qualified finding', outputs: {}, counterevidence: ['counterexample'], unresolved: [{ gap: 'unmeasured', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }], scope: 'capture A only', sideEffects: [], recoveryState: ['restored'] } } };
  }, (_session, onCancel) => { registry = new TaskRegistry(root, { onCancelExecution: onCancel }); return registry; }, (_session, id) => ({ uri: `session://tool-outputs/${id}.json`, hash: `hash-${id}` }));
  await service.query('owner', 'none');
  const parentTask = await registry.createTask('parent');
@@ -86,7 +86,7 @@ it('retains new-parent spending when retry joins an older task root budget', asy
  let registry!: TaskRegistry; const observed: number[] = [];
  const service = new BackgroundSubagentService(async (input) => {
   observed.push(input.policyBudget!.toolCalls);
-  return { status: 'complete', text: 'partial', completionDeclaration: { disposition: 'partial', evidenceRefs: [], result: { summary: 'bounded partial', outputs: {}, counterevidence: [], unresolved: ['more'], scope: 'test', sideEffects: [], recoveryState: [] } } };
+  return { status: 'complete', text: 'partial', completionDeclaration: { disposition: 'partial', evidenceRefs: [], result: { summary: 'bounded partial', outputs: {}, counterevidence: [], unresolved: [{ gap: 'more', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }], scope: 'test', sideEffects: [], recoveryState: [] } } };
  }, (_session, onCancel) => { registry = new TaskRegistry(root, { onCancelExecution: onCancel }); return registry; }, (_session, id) => ({ uri: `session://tool-outputs/${id}.json`, hash: `hash-${id}` }));
  await service.query('owner', 'none'); const task = await registry.createTask('retry with prior spending');
  const started = Date.now();

@@ -33,7 +33,7 @@ export function normalizeSubagentResult(text: string, status: 'complete' | 'fail
   }
   if (declaration?.result) { const result = declaration.result; return { disposition: declaration.disposition === 'budget_paused' ? 'blocked' : declaration.disposition, summary: result.summary, outputs: { ...result.outputs }, resultRef, resultHash, evidenceRefs: [...declaration.evidenceRefs], counterevidence: [...result.counterevidence], unresolved: [...result.unresolved], scope: result.scope, sideEffects: [...result.sideEffects], recoveryState: [...result.recoveryState] }; }
   void text; // Unstructured transcript is preserved in the result artifact, never promoted into parent input.
-  return { disposition: 'partial', summary: 'No structured result was returned; inspect the durable result artifact.', outputs: {}, error: 'SUBAGENT_STRUCTURED_RESULT_MISSING', resultRef, resultHash, unresolved: ['Structured result envelope missing'], missingRequirements: ['Structured result envelope'] };
+  return { disposition: 'partial', summary: 'No structured result was returned; inspect the durable result artifact.', outputs: {}, error: 'SUBAGENT_STRUCTURED_RESULT_MISSING', resultRef, resultHash, unresolved: [{ gap: 'The child returned no structured result.', attempted: 'Read the delegated turn outcome.', blocker: 'external', resumeWhen: 'The durable result artifact is inspected or the delegation is repeated with a structured turn_complete.' }], missingRequirements: ['Structured result envelope'] };
 }
 /** Bounded parent data: omitted fields are explicit and remain recoverable in resultRef. */
 export function projectSubagentResult(result: TaskCompletionResult) {

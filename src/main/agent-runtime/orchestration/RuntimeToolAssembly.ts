@@ -2,6 +2,7 @@
  * RuntimeToolAssembly — resolveRuntimeTools / workbench / MCP catalog tools.
  */
 
+import { UNRESOLVED_BLOCKERS, parseUnresolvedItems } from '@shared/types/unresolvedWork';
 import { isEphemeralScopeId, isSubagentScopeId } from '@shared/utils/executionScope';
 import type { AgentRole } from '@shared/types/agent';
 import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from '@shared/types/taskExecution';
@@ -107,7 +108,13 @@ export class RuntimeToolAssembly {
             properties: {
               summary: { type: 'string', maxLength: 4000 }, outputs: { type: 'object', description: 'Named string outputs matching the Task completion requirements. Serialize structured values as strings.' },
               counterevidence: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
-              unresolved: { type: 'array', description: 'Remaining work and the concrete reason it cannot proceed now; distinguish an unperformed check from a failed or unavailable one.', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
+              unresolved: { type: 'array', maxItems: 32, description: 'One item per remaining piece of work. An item with no real blocker is work to continue now, not a reason to stop; use not_required only for work outside what the goal needs.',
+                items: { type: 'object', required: ['gap', 'attempted', 'blocker', 'resumeWhen'], additionalProperties: false, properties: {
+                  gap: { type: 'string', maxLength: 1000, description: 'What remains unknown or undone.' },
+                  attempted: { type: 'string', maxLength: 1000, description: 'What was tried, including failed attempts, or that nothing was tried and why.' },
+                  blocker: { type: 'string', enum: [...UNRESOLVED_BLOCKERS], description: 'What prevents it now: capability, permission, budget (limit or deadline), strategy (outside the approved strategy or scope), external (input, device or condition outside this session), or not_required.' },
+                  resumeWhen: { type: 'string', maxLength: 1000, description: 'The concrete condition under which it can proceed.' },
+                } } },
               scope: { type: 'string', maxLength: 4000 }, sideEffects: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
               recoveryState: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
             },
@@ -127,13 +134,16 @@ export class RuntimeToolAssembly {
             && typeof (ref as Record<string, unknown>).hash === 'string'
         ));
         if (turnHandle) {
-          const rawResult = args.result as TurnCompletionDeclaration['result'] | undefined;
-          if (rawResult && Object.values(rawResult.outputs ?? {}).some((value) => typeof value !== 'string')) {
+          const supplied = args.result as (Omit<NonNullable<TurnCompletionDeclaration['result']>, 'unresolved'> & { unresolved?: unknown }) | undefined;
+          if (supplied && Object.values(supplied.outputs ?? {}).some((value) => typeof value !== 'string')) {
             throw new Error('TURN_COMPLETION_INVALID: result.outputs values must be strings.');
           }
+          const rawResult = supplied ? { ...supplied, unresolved: parseUnresolvedItems(supplied.unresolved ?? []) } : undefined;
           const declaration = { disposition: disposition as TurnCompletionDeclaration['disposition'], evidenceRefs, ...(rawResult ? { result: rawResult } : {}) };
           await validate?.(declaration);
           turnHandle.completionDeclaration = declaration;
+          return { content: [{ type: 'text', text: `Turn completion recorded: ${String(disposition)}.` }],
+            details: { disposition, unresolved: declaration.result?.unresolved ?? [] } };
         }
         return { content: [{ type: 'text', text: `Turn completion recorded: ${String(disposition)}.` }] };
       },
@@ -666,9 +676,8 @@ export class RuntimeToolAssembly {
         await new TaskRegistry(createSessionTaskStore(sessionId)).assertApprovedTasksCompleted();
       }
       if (turnHandle?.requiresApprovedGoalClosure && ['partial', 'blocked', 'budget_paused'].includes(declaration.disposition)
-        && (!declaration.result?.summary?.trim() || !Array.isArray(declaration.result.unresolved)
-          || !declaration.result.unresolved.some(item => typeof item === 'string' && item.trim()))) {
-        throw new Error('TURN_COMPLETION_INVALID: partial, blocked and budget-paused goals require a summary and concrete unresolved work and reason.');
+        && (!declaration.result?.summary?.trim() || !declaration.result.unresolved.some(item => item.blocker !== 'not_required'))) {
+        throw new Error('TURN_COMPLETION_INVALID: partial, blocked and budget-paused goals require a summary and at least one unresolved item whose blocker prevents the work now (capability, permission, budget, strategy or external). If nothing blocks a remaining item, continue it instead of stopping.');
       }
       if (turnHandle?.requiresApprovedGoalClosure && declaration.disposition === 'budget_paused' && !completionBudgetEvidence(turnHandle)) {
         throw new Error('TURN_COMPLETION_INVALID: no current root budget limit has been observed.');

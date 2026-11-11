@@ -178,7 +178,7 @@ describe('Agent turn completion boundary', () => {
       expect(await request.beforeTerminalResponse?.({ content: [] } as never)).toBeUndefined();
       aborted.mockRestore();
       turn.completionDeclaration = { disposition: 'partial', evidenceRefs: [], result: {
-        summary: 'Evidence is missing', outputs: {}, counterevidence: [], unresolved: ['Missing source'],
+        summary: 'Evidence is missing', outputs: {}, counterevidence: [], unresolved: [{ gap: 'Missing source', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }],
         scope: 'Delegated scope', sideEffects: [], recoveryState: [],
       } };
       expect(await request.beforeTerminalResponse?.({ content: [] } as never)).toBeUndefined();
@@ -246,7 +246,7 @@ describe('Agent turn completion boundary', () => {
       turn.captureControl = { lastRestoreError: null, restorationStatus: status, recordTerminalRestoration: async () => false } as never;
       const partial = { disposition: 'partial' as const, evidenceRefs: [], result: {
         summary: 'Replay is quarantined', outputs: {}, counterevidence: [],
-        unresolved: ['Recovery was denied and the replay remains quarantined'], scope: 'Approved capture', sideEffects: [],
+        unresolved: [{ gap: 'Recovery was denied and the replay remains quarantined', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }], scope: 'Approved capture', sideEffects: [],
         recoveryState: ['Recovery was denied; the replay remains quarantined'],
       } };
       await expect(turn.validateCompletionReadiness?.(partial)).rejects.toThrow(/RDC_SWITCH_BINDING_CHANGED.*recoveryState/s);
@@ -271,7 +271,7 @@ describe('Agent turn completion boundary', () => {
         current: { inputId: 'capture' }, receipt: { uri: 'session://tool-outputs/baseline.json', expectedHash: 'a'.repeat(64) } }));
       turn.captureControl = { lastRestoreError: null, restorationStatus: status, recordTerminalRestoration: async () => true } as never;
       const partial = { disposition: 'partial' as const, evidenceRefs: [], result: {
-        summary: 'Work remains', outputs: {}, counterevidence: [], unresolved: ['A required check is unfinished'],
+        summary: 'Work remains', outputs: {}, counterevidence: [], unresolved: [{ gap: 'A required check is unfinished', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }],
         scope: 'Approved capture', sideEffects: [], recoveryState: [],
       } };
       const budget = turn.policyBudget;

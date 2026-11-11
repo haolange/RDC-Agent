@@ -1,11 +1,12 @@
 import { INVESTIGATION_ARTIFACT_KINDS, INVESTIGATION_ARTIFACT_STATUSES } from '@shared/types/renderdocInvestigation';
 import type { InvestigationArtifactKind, InvestigationArtifactStatus } from '@shared/types/renderdocInvestigation';
+import { UNRESOLVED_BLOCKERS, type UnresolvedItem } from '@shared/types/unresolvedWork';
 import { parsePreview, toRecord } from './workProcessContentText';
 import { getDetailsRecord } from './workProcessWebPresentation';
 
 export type ToolOutcome =
   | { type: 'investigation'; title: string; kind?: InvestigationArtifactKind; status?: InvestigationArtifactStatus }
-  | { type: 'completion'; disposition: 'completed' | 'partial' | 'blocked' | 'cancelled' | 'budget_paused' }
+  | { type: 'completion'; disposition: 'completed' | 'partial' | 'blocked' | 'cancelled' | 'budget_paused'; unresolved?: UnresolvedItem[] }
   | { type: 'toolSearch'; count: number; names: string[] };
 
 const text = (value: unknown): string => typeof value === 'string' ? value.trim() : '';
@@ -30,7 +31,14 @@ export function getToolOutcome(toolName: string, parsed: unknown, argsPreview?: 
     const disposition = args?.disposition;
     if (disposition === 'completed' || disposition === 'partial' || disposition === 'blocked'
       || disposition === 'cancelled' || disposition === 'budget_paused') {
-      return { type: 'completion', disposition };
+      // Structured items come from the recorded declaration; older results carry none and show only the disposition.
+      const unresolved = Array.isArray(details?.unresolved) ? details.unresolved.flatMap(item => {
+        const entry = toRecord(item);
+        const blocker = UNRESOLVED_BLOCKERS.find(value => value === entry?.blocker);
+        return entry && blocker && text(entry.gap)
+          ? [{ gap: text(entry.gap), attempted: text(entry.attempted), blocker, resumeWhen: text(entry.resumeWhen) }] : [];
+      }) : [];
+      return unresolved.length ? { type: 'completion', disposition, unresolved } : { type: 'completion', disposition };
     }
   }
   if (toolName === 'tool_search' && Array.isArray(details?.matches)) {

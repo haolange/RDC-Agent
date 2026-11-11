@@ -154,7 +154,7 @@ it.each([
         executionIdentity: {} as never, completionDeclaration: { disposition: hasRaw ? 'completed' : firstDisposition, evidenceRefs: [], result: {
           summary: hasRaw ? 'Raw source reviewed' : 'Raw source missing', outputs: hasRaw ? { review: 'Checked original samples.' }
             : firstDisposition === 'completed' ? { review: 'Bounded review; raw source missing.' } : {},
-          counterevidence: [], unresolved: hasRaw ? [] : ['Raw measurements were not granted'], scope: 'fixture', sideEffects: [], recoveryState: [],
+          counterevidence: [], unresolved: hasRaw ? [] : [{ gap: 'Raw measurements were not granted', attempted: 'Read granted refs.', blocker: 'external' as const, resumeWhen: 'The raw measurements are granted.' }], scope: 'fixture', sideEffects: [], recoveryState: [],
         } } });
       return hasRaw ? 'Checked original samples.' : 'Raw measurements were not granted.';
     });

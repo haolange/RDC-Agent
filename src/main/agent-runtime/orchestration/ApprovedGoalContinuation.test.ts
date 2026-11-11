@@ -85,7 +85,7 @@ it('reassesses an unresolved partial goal after its approved Tasks settle', asyn
     result: { disposition: 'completed', summary: 'Review done.', outputs: {} } });
   const check = createApprovedGoalContinuation(turn, 'session', registry);
   const declaration = { disposition: 'partial' as const, evidenceRefs: [{ uri: 'session://tool-outputs/result.json', hash: 'a'.repeat(64) }],
-    result: { summary: 'One claim still needs revision.', outputs: {}, counterevidence: [], unresolved: ['Revise the claim.'],
+    result: { summary: 'One claim still needs revision.', outputs: {}, counterevidence: [], unresolved: [{ gap: 'Revise the claim.', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }],
       scope: 'approved goal', sideEffects: [], recoveryState: [] } };
   turn.completionDeclaration = declaration;
   expect(await check()).toContain('approved Tasks are settled');
@@ -214,7 +214,7 @@ it('restates the recorded frontier and open Challenge follow-ups in a single rea
   } as never;
   const check = createApprovedGoalContinuation(turn, 'session', registry, investigation);
   turn.completionDeclaration = { disposition: 'partial', evidenceRefs: [],
-    result: { summary: 'Anchor not established.', outputs: {}, counterevidence: [], unresolved: ['Anchor the symptom.'],
+    result: { summary: 'Anchor not established.', outputs: {}, counterevidence: [], unresolved: [{ gap: 'Anchor the symptom.', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }],
       scope: 'approved goal', sideEffects: [], recoveryState: [] } };
   const feedback = await check();
   expect(feedback).toContain('cp-2');

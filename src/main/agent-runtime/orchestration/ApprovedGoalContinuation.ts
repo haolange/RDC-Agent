@@ -49,7 +49,7 @@ export function createApprovedGoalContinuation(
         const status = task ? ` Current status: ${task.status}; reason: ${task.statusReason || 'not recorded'}.` : '';
         return `# Approved Goal Reassessment\n${message}${status}\nCompare the unfinished approved work with the actual evidence; an unproved result or a partial Task is not itself a blocker. If a useful, permitted check remains within the approved scope, resume the same Task if needed and perform the next check now; do not stop after merely listing or acknowledging it. If a derived context may have omitted approved work, reread the frozen plan by its verified URI and hash before deciding. Do not repeat an unchanged failed or denied action, expand permissions, reset consumption or extend the deadline. After further tool work, call turn_complete again with the updated result. If no useful permitted work remains, preserve the existing partial or blocked declaration and report the concrete blocker and remaining work accurately.${openWork()}`;
       }
-      if (disposition === 'partial' && turn.completionDeclaration?.result?.unresolved.some(item => item.trim())) {
+      if (disposition === 'partial' && turn.completionDeclaration?.result?.unresolved.length) {
         const references = turn.completionDeclaration.evidenceRefs.map(ref => `${ref.uri}\u0000${ref.hash}`).sort();
         const key = JSON.stringify(['settled-goal', references]);
         if (!reassessed.has(key)) {

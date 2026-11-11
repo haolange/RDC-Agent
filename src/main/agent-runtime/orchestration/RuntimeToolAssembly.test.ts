@@ -408,16 +408,26 @@ describe('RuntimeToolAssembly', () => {
     }
   });
 
-  it('requires a concrete unresolved reason for partial and blocked approved goals', async () => {
+  it('requires structured unresolved items with a real blocker for partial and blocked approved goals', async () => {
     const sessionId = `completion-partial-${randomUUID()}`;
     const turn = new TurnHandle({ sessionKey: sessionId, turnId: `turn-${randomUUID()}`, generation: 1 });
     turn.requiresApprovedGoalClosure = true;
     const tool = createAssembly().resolveRuntimeTools('general', ['*'], sessionId, turn).toolMap.get('turn_complete')!;
     try {
-      await expect(tool.execute('empty', { disposition: 'partial' })).rejects.toThrow('concrete unresolved');
-      await tool.execute('qualified', { disposition: 'partial', result: { summary: 'Device unavailable', outputs: {},
-        counterevidence: [], unresolved: ['Android device offline; replay and restore remain unverified.'], scope: 'one capture', sideEffects: [], recoveryState: [] } });
+      const result = (unresolved: unknown[]) => ({ summary: 'Device unavailable', outputs: {}, counterevidence: [], unresolved,
+        scope: 'one capture', sideEffects: [], recoveryState: [] });
+      const offline = { gap: 'Replay and restore remain unverified.', attempted: 'Opened the capture remotely; the connection dropped.',
+        blocker: 'external', resumeWhen: 'The Android device is back online.' };
+      await expect(tool.execute('empty', { disposition: 'partial' })).rejects.toThrow('blocker prevents the work now');
+      await expect(tool.execute('string', { disposition: 'partial', result: result(['Android device offline.']) })).rejects.toThrow('result.unresolved[0]');
+      await expect(tool.execute('no-blocker', { disposition: 'partial', result: result([{ ...offline, blocker: 'none' }]) })).rejects.toThrow('not a reason to stop');
+      await expect(tool.execute('not-required', { disposition: 'blocked', result: result([{ ...offline, blocker: 'not_required' }]) }))
+        .rejects.toThrow('blocker prevents the work now');
+      expect(turn.completionDeclaration).toBeNull();
+      const recorded = await tool.execute('qualified', { disposition: 'partial', result: result([offline]) });
       expect(turn.completionDeclaration?.disposition).toBe('partial');
+      expect(turn.completionDeclaration?.result?.unresolved).toEqual([offline]);
+      expect(recorded.details).toEqual({ disposition: 'partial', unresolved: [offline] });
     } finally { await rm(resolveSessionTasksDir(sessionId), { recursive: true, force: true }); }
   });
 

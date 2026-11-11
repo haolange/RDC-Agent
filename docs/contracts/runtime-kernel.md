@@ -314,7 +314,7 @@ subagent（mode=background） 必须绑定 Task，持久化启动状态后返回
 
 删除 session 时先停止并 join 所属执行，再按请求快照的同一 scope 编码删除根及嵌套子执行快照、相关内存缓存和该 session 的运行序列文件；相邻 scope 不删除，遇到非目录或链接时明确失败，不沿链接清理。
 
-后台 subagent 的生命周期由持久 Task 与 mailbox 投影，不进入父回复的同步 subagent continuation，也不由父回复 finalizeTrace 提前结束；审批/信息请求仍走受控入口。结构化 turn_complete 的 disposition、evidenceRefs 位于顶层，result 包含 summary、outputs、counterevidence、unresolved、scope、sideEffects、recoveryState。声明 completed 时，调查合同要求 evidenceRefs 精确指向当前 ready 报告的 contentUri 和 contentHash，并检查其完整领域合同；存储或意外错误直接上报。终答提交前重新核验同一结构化引用及报告资格，已记录的声明本身不是终态回执。用户终答仍须存在并交付调查结果，无须在正文重复内部 ID 和哈希。unresolved 表达认识与适用条件，不自动成为 missingRequirements；完成要求仍由 Task 的必需输出及执行状态校验，不能由通用 runtime 推测科学结论。
+后台 subagent 的生命周期由持久 Task 与 mailbox 投影，不进入父回复的同步 subagent continuation，也不由父回复 finalizeTrace 提前结束；审批/信息请求仍走受控入口。结构化 turn_complete 的 disposition、evidenceRefs 位于顶层，result 包含 summary、outputs、counterevidence、unresolved、scope、sideEffects、recoveryState。unresolved 的每一项为 `{ gap, attempted, blocker, resumeWhen }`，blocker 取 capability／permission／budget／strategy／external／not_required，任一项不合格则整次声明被拒；获批目标的 partial／blocked／budget_paused 至少要有一项 blocker 不为 not_required。旧 Task 结果中的字符串项只读保留，不迁移。声明 completed 时，调查合同要求 evidenceRefs 精确指向当前 ready 报告的 contentUri 和 contentHash，并检查其完整领域合同；存储或意外错误直接上报。终答提交前重新核验同一结构化引用及报告资格，已记录的声明本身不是终态回执。用户终答仍须存在并交付调查结果，无须在正文重复内部 ID 和哈希。unresolved 表达认识与适用条件，不自动成为 missingRequirements；完成要求仍由 Task 的必需输出及执行状态校验，不能由通用 runtime 推测科学结论。
 
 提交前重新核验批准任务、现场恢复和完整领域合同；报告引用失效或其他资格缺口使 completed 声明失效，须按实际工作重新声明。无进展及取消规则保持有效。
 

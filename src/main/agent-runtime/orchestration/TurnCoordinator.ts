@@ -1,4 +1,5 @@
 import { policyBudgetChain } from './DelegationBudget';
+import type { UnresolvedItem } from '@shared/types/unresolvedWork';
 /**
  * TurnCoordinator — per-session turn handles; eliminates turn-global mutable state.
  *
@@ -42,7 +43,7 @@ export interface TurnCompletionDeclaration {
     summary: string;
     outputs: Record<string, string>;
     counterevidence: readonly string[];
-    unresolved: readonly string[];
+    unresolved: readonly UnresolvedItem[];
     scope: string;
     sideEffects: readonly string[];
     recoveryState: readonly string[];

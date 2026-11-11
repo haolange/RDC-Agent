@@ -151,7 +151,7 @@ export async function canContinueReviewWithNewSources(
   if (task.status !== 'completed' || options.mode !== 'subagent' || !task.currentExecutionId
     || !task.executionRequirements?.independentOfTaskIds.length) return false;
   const execution = await store.loadExecution(task.currentExecutionId);
-  if (execution?.status !== 'completed' || !execution.result?.unresolved?.some(item => item.trim())
+  if (execution?.status !== 'completed' || !execution.result?.unresolved?.some(item => typeof item !== 'string' || item.trim())
     || !execution.preparation) return false;
   const previous = new Set(execution.preparation.inputArtifacts.map(item => item.uri));
   return options.requestedInputArtifactRefs?.some(uri => !previous.has(uri)) ?? false;

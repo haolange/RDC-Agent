@@ -1,3 +1,4 @@
+import type { UnresolvedItem } from '@shared/types/unresolvedWork';
 import type { ConversationTaskStatus } from '@shared/types/conversation';
 import type { TaskExecutionRequirements, TaskExecutionPreparation, TaskIndependentSource, TaskRuntimeEpoch } from '@shared/types/taskExecution';
 
@@ -28,7 +29,8 @@ export interface TaskCompletionResult {
   resultHash?: string;
   evidenceRefs?: Array<{ uri: string; hash: string }>;
   counterevidence?: string[];
-  unresolved?: string[];
+  /** Structured items; plain strings only appear in results recorded before items were structured. */
+  unresolved?: Array<UnresolvedItem | string>;
   scope?: string;
   sideEffects?: string[];
   recoveryState?: string[];
