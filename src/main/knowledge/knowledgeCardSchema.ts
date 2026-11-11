@@ -36,7 +36,7 @@ export const KnowledgeScopeSchema = z.object({
   quality: optionalString,
   resolution: optionalString,
   featureConfiguration: optionalString,
-  exclusions: z.record(z.enum(KNOWLEDGE_SCOPE_AXES), z.array(z.string().trim().min(1))).optional(),
+  exclusions: z.partialRecord(z.enum(KNOWLEDGE_SCOPE_AXES), z.array(z.string().trim().min(1))).optional(),
 }).strict();
 
 export const KnowledgeRelationSchema = z.object({

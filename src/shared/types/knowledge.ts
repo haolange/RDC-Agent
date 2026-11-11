@@ -238,6 +238,8 @@ export interface KnowledgeLaneHit {
   relations?: KnowledgeRelation[];
   /** Current user-confirmed topics; stale assignments are excluded. */
   topics?: KnowledgeTopic[];
+  /** Declared applicability of this card version; absent when the card declares none. */
+  scope?: KnowledgeScope;
   chunkIndex?: number;
 }
 

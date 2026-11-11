@@ -84,6 +84,26 @@ function createStack(options: {
 }
 
 describe('Knowledge five services', () => {
+  it('shows the declared applicability of each hit without reading the card body', async () => {
+    const root = tempDir();
+    try {
+      mkdirSync(path.join(root, 'facts'), { recursive: true });
+      const scoped = { ...draftCard('facts/scoped.md'), title: 'Scoped Vulkan fact',
+        scope: { api: 'Vulkan', gpuVendor: 'Qualcomm', exclusions: { driver: ['512.0', '615.2'] } } };
+      const open = { ...draftCard('facts/open.md'), title: 'Open Vulkan fact', scope: {} };
+      for (const card of [scoped, open]) writeFileSync(path.join(root, card.relativePath), serializeKnowledgeCard(card), 'utf8');
+      const { query, compile } = createStack({ root });
+      const search = createKnowledgeTools('scope-fixture', { query, compile }).find(tool => tool.name === 'knowledge_search')!;
+      const result = await search.execute('scope', { query: 'Vulkan' });
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toMatch(/Scoped Vulkan fact[^\n]*\n {3}applies to: api=Vulkan, gpuVendor=Qualcomm · excludes: driver=512.0, driver=615.2/u);
+      expect(text).toMatch(/Open Vulkan fact[^\n]*\n {3}applies to: not declared/u);
+      expect((result.details as { hits: Array<{ cardId: string; scope?: unknown }> }).hits)
+        .toEqual(expect.arrayContaining([expect.objectContaining({ cardId: scoped.cardId, scope: scoped.scope }),
+          expect.objectContaining({ cardId: open.cardId, scope: undefined })]));
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   it('rejects unknown selected spaces instead of returning misleading empty search results', async () => {
     const root = tempDir();
     try {

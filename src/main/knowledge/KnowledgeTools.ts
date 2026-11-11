@@ -56,6 +56,14 @@ function slugPath(title: string): string {
   return `candidates/${slug || 'untitled'}.md`;
 }
 
+/** Declared conditions only; an axis the card does not declare is unknown, not a match. */
+function formatKnowledgeScope(scope: KnowledgeScope | undefined): string {
+  const applies = Object.entries(scope ?? {}).flatMap(([axis, value]) => axis !== 'exclusions' && typeof value === 'string' && value.trim() ? [`${axis}=${value}`] : []);
+  const excludes = Object.entries(scope?.exclusions ?? {}).flatMap(([axis, values]) => (values ?? []).map(value => `${axis}=${value}`));
+  if (!applies.length && !excludes.length) return 'applies to: not declared';
+  return `applies to: ${applies.length ? applies.join(', ') : 'not declared'}${excludes.length ? ` · excludes: ${excludes.join(', ')}` : ''}`;
+}
+
 export function createKnowledgeTools(
   sessionId?: string | null,
   overrides: Partial<KnowledgeToolDependencies> = {},
@@ -137,7 +145,8 @@ function createKnowledgeSearchTool(deps: KnowledgeToolDependencies): AgentTool {
       const request = toKnowledgeQueryRequest(args, true);
       const result = await deps.query.query(request);
       const lines = result.hits.map((hit, index) => (
-        `${(request.offset ?? 0) + index + 1}. ${hit.title} · ${hit.type ?? 'unknown'} · ${hit.lifecycle ?? 'unknown'} · ${hit.lanes.join('+')} · ${hit.cardId} · sha256:${hit.contentHash} · ${hit.spaceId}/${hit.relativePath}${hit.topics?.length ? ` · topics: ${hit.topics.map(topic => topic.label).join(', ')}` : ''}${hit.preview ? `\n   ${hit.preview.replace(/\s+/gu, ' ')}` : ''}`
+        `${(request.offset ?? 0) + index + 1}. ${hit.title} · ${hit.type ?? 'unknown'} · ${hit.lifecycle ?? 'unknown'} · ${hit.lanes.join('+')} · ${hit.cardId} · sha256:${hit.contentHash} · ${hit.spaceId}/${hit.relativePath}${hit.topics?.length ? ` · topics: ${hit.topics.map(topic => topic.label).join(', ')}` : ''}`
+        + `\n   ${formatKnowledgeScope(hit.scope)}${hit.preview ? `\n   ${hit.preview.replace(/\s+/gu, ' ')}` : ''}`
       ));
       const header = `${result.total ?? result.hits.length} hits${result.nextOffset !== undefined ? ` · next offset ${result.nextOffset} · revision ${result.revision}` : ''}`;
       const emptyTextHint = request.text && (result.total ?? result.hits.length) === 0
@@ -153,7 +162,7 @@ function createKnowledgeSearchTool(deps: KnowledgeToolDependencies): AgentTool {
           revision: result.revision,
           nextOffset: result.nextOffset,
           cardIds: result.hits.map((hit) => hit.cardId),
-          hits: result.hits.map((hit) => ({ cardId: hit.cardId, contentHash: hit.contentHash, spaceId: hit.spaceId, relativePath: hit.relativePath, preview: hit.preview, topics: hit.topics })),
+          hits: result.hits.map((hit) => ({ cardId: hit.cardId, contentHash: hit.contentHash, spaceId: hit.spaceId, relativePath: hit.relativePath, preview: hit.preview, topics: hit.topics, scope: hit.scope })),
         },
       );
     },

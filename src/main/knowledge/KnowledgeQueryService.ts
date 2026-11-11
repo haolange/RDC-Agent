@@ -102,7 +102,14 @@ function toHit(entry: KnowledgeIndexEntry, lanes: KnowledgeRetrievalLane[], scor
     lanes,
     relations: entry.relations,
     ...(topics.length ? { topics } : {}),
+    ...(hasDeclaredScope(entry.scope) ? { scope: entry.scope } : {}),
   };
+}
+
+function hasDeclaredScope(scope: KnowledgeIndexEntry['scope']): boolean {
+  return Object.entries(scope).some(([axis, value]) => axis === 'exclusions'
+    ? Object.values(value as Record<string, string[]>).some(values => values.length > 0)
+    : typeof value === 'string' && value.trim().length > 0);
 }
 
 function currentTopics(document: KnowledgeTopicDocument, cardId: string, spaceId: string, contentHash: string): KnowledgeTopic[] {
