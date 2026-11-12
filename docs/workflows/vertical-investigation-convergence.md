@@ -2,7 +2,9 @@
 
 本文自足：按它执行不需要先读其他文档。读者是在本机替用户监工的执行方，下文称"监工"。
 
-架构边界的权威是[垂直调查设计](../product/rdc-agent-investigation-design-analysis.md)。本计划的工作都在该边界之内；若某一步必须越过它（新增存储、模型路由、Agent、固定流程或扩大权限），停下并报告，不自行决定。
+理想架构的权威是[RenderDoc Agent 完整设计书](<../product/RenderDoc Agent 完整设计书.md>)。它写于产品实现之前，描述目标而不描述现状；遇到本计划没有覆盖的问题时去读它的对应章节。它与当前产品不一致的地方见第 8 节，以第 8 节和 `ARCHITECTURE.md` 为准。执行约束以本计划为准。
+
+若某一步必须新增存储、模型路由、Agent、固定流程或扩大权限，停下并报告，不自行决定。
 
 ## 1. 目标
 
@@ -35,8 +37,8 @@
    |---|---|
    | 锚定 | 证明某个原生纹理区域和 draw 就是用户所说的对象 |
    | 首次异常 | 找到异常最早出现的事件，有读数为证 |
-   | 区分 | 至少一个竞争解释被观察削弱或排除 |
-   | 因果 | 结论有可恢复的对照实验支持。回放设备确实不支持所需干预时，这一步可以是经事后重放证实的能力阻塞 |
+   | 区分 | 替代解释都得到处理：被观察削弱、排除，或说明为何仍无法区分 |
+   | 因果 | 结论有可恢复的对照实验支持：最小干预后结果恢复，撤销后回到基线，并写明适用范围。回放设备确实不支持所需干预时，这一步可以是经事后重放证实的能力阻塞 |
    | 核验 | 独立审查读过当前版本的原始证据，没有未处理的质疑 |
 
 3. **历史知识经过验证**：结论引用历史案例时，必须有当前 capture 上的读数或实验支持它；只复述历史案例的原因不算。
@@ -101,7 +103,22 @@
 - 不为了通过某个案例降低通过条件，也不修改本文的通过条件。
 - 不把工程检查通过当作调查通过。
 
-## 8. 当前状态
+## 8. 设计书与当前产品的对应
+
+设计书先于产品写成。下列各项以当前产品为准，不按设计书原文实现：
+
+| 设计书 | 当前产品 |
+|---|---|
+| Planning Orchestrator 经 Agent Handoff 自动交给执行方；Big Loop 自动交回规划方 | 用户批准计划并点击执行后才进入 General；需要重规划时 General 就地交付缺口，由用户切回 Mission。没有自动交接 |
+| 领域职责名称（Triage、Capture Report、pass_graph_pipeline、pixel_value_forensics、shader_ir、Skeptic 等） | 四个用户入口（General、Debugger、Analyzer、Optimizer）和八个内部 Agent（generator、verifier、knowledge-scout、report-writer、shader／pass／resource／pixel-analyst）。Skeptic 即 verifier；其余职责由 Skill 承载 |
+| 完成状态 Complete／Partial／Inconclusive／Blocked／Replanned | completed／partial／blocked／cancelled／budget_paused。Inconclusive 表达为 partial，并逐项写明未能区分的解释 |
+| 检索含 Semantic／Embedding 作为补充 | 不使用 Embedding。Markdown 原文为唯一来源，六条检索通道 |
+| 模型未作规定 | 模型与推理档位归各 Agent 配置；子执行不继承父对话的选择 |
+| Debug Workflow 的 Reproduction Qualification、Pass／Resource Localization、Pixel／Value Trace | 对应本计划主线的"锚定"：先证明 capture 里的某个对象就是用户所说的症状，再往下查 |
+
+设计书的以下内容直接适用，是判断调查质量的依据：中心因果闭环（1.3）、系统级不变量（3.3）、Live 与 Offline Task 的划分（4.7）、Small／Big Loop 的适用情形（5.5、5.6）、证据与结论的类型和验证等级（第 7 章）、Root Cause 的七段结构（7.4）、实验的事务性（7.6）、Debugger 完整设计（第 10 章）。
+
+## 9. 当前状态
 
 当前分支已包含：以"锚定 → 解释与预测 → 区分检查 → 决策点记录 → 独立核验 → 继续或交付"为主线的方法文本；规划阶段事件树的分页与搜索；partial 后列出具体待做项的复评反馈；独立审查的证据自动补授；逐条结构化的未决项；知识搜索结果中的适用条件；压缩时保留待做检查。这些通过了工程检查，都没有经过真实调查验证。
 
