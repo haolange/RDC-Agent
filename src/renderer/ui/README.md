@@ -4,9 +4,7 @@
 
 ## 组件
 
-原子：`Button`、`IconButton`、`Icon`、`Switch`、`Checkbox`、`Kbd`、`Divider`、`Spinner`、`Toast`。
-
-分子：`Pill`、`SectionHeader`、`Popover`、`Menu`、`Input`、`Textarea`、`SearchField`、`Select`、`ListRow`、`OverflowFade`、`Panel`、`EmptyState`、`InlineError`、`Tabs`、`ColorField`。
+清单以 `src/renderer/ui/index.ts` 的公开导出与 `designs/rdc-agent-design-system/consumers.md`（`node scripts/check-component-catalog.mjs --write` 生成）为准。
 
 `Select` 是唯一单选下拉入口（`Select/index.tsx`），公开 `SelectProps` / `SelectOption`。
 

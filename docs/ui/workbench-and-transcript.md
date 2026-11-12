@@ -1,8 +1,6 @@
 # Workbench 与 Transcript UI
 
-> 产品/架构裁决：`ARCHITECTURE.md`。视觉 token 与 Appearance：[`design-system.md`](design-system.md)。本文承载原架构文中的的 **Workbench / Work Process / Composer / Markdown** 产品规格（中文摘要 + 稳定英文术语）。
-
-标题栏、启动闪屏、Settings 产品标记和运行中的任务栏图标使用 `resources/brand/rdc-agent-logo.png`。饱和青绿像素换成当前主题的完整 accent RGB；主色精确匹配，阴影和高光仅与黑白混合，白字和近黑底保持原样。安装包里的 `resources/icons` 是默认深色主题色 `#33d1ff` 的静态图，资源管理器中的 exe 图标不随运行中的主题变化。标题栏旁仍显示「RDC-Agent」文字，窄屏单行省略避免挤压窗口控制。三个 renderer 入口复用无 store/IPC 依赖的 `ui/ProductLogo`，canvas 在有限分辨率上重绘，不写内联 style。主进程在窗口创建、Appearance 保存和系统主题变化时更新缓存图标；缺失/解码失败写诊断，不反向失败已成功保存的设置。`pnpm run brand:icons` 从唯一源图生成平滑缩放的多尺寸 Windows ICO 与既有 PNG/ICNS 资产。所有入口沿源图圆环采用抗锯齿圆形轮廓，外部透明；缩放与原生位图按预乘 alpha 处理，避免黑边。
+> 产品/架构裁决：`ARCHITECTURE.md`。视觉 token 与 Appearance：[`design-system.md`](design-system.md)。本文承载 **Workbench / Work Process / Composer / Markdown** 产品规格（中文摘要 + 稳定英文术语）。
 
 ## 界面语言
 
@@ -78,7 +76,7 @@ Active Signal：`active-signal-shimmer` clipped-gradient 能量扫光（`1.6s li
 
 ## Composer 控件
 
-计划卡采用既有Transcript实色卡壳；标题最多两行，完整名称保留于可访问名称及阅读器。正文预览最多`min(6lh, 28dvh)`，真实溢出以DOM Range定位最后可见文字，在该文字末尾2lh由100%前缓后快地淡至透明，等距四分点不透明度为100%/94%/75%/44%/0%，过渡长度不超过可见正文高度的一半；不让Markdown段落/标题留白吞掉淡出；内容、字号、字体和宽度变化重测。短内容不遮罩、不撑高。标题、状态与背景不参与淡出；预览卡不再设置独立阅读按钮，整卡支持点击、Tab/Enter/Space及焦点返回，文本选中不打开。历史拒绝/替代/取消计划保留紧凑工具壳与按需阅读，不重复摘要。
+计划卡采用既有Transcript实色卡壳；标题最多两行，完整名称保留于可访问名称及阅读器。正文预览最多`min(6lh, 28dvh)`，真实溢出以DOM Range定位最后可见文字，在该文字末尾2lh由100%前缓后快地淡至透明，等距四分点不透明度为100%/94%/75%/44%/0%，过渡长度不超过可见正文高度的一半；不让Markdown段落/标题留白吞掉淡出；内容、字号、字体和宽度变化重测。短内容不遮罩、不撑高。标题、状态与背景不参与淡出；整卡是唯一阅读入口，支持点击、Tab/Enter/Space及焦点返回，文本选中不打开。历史拒绝/替代/取消计划保留紧凑工具壳与按需阅读，不重复摘要。
 
 计划待审区沿用Composer壳与菜单注册表：顶部标题及停止方块 IconButton（可访问名称/悬停为“停止当前请求”），按声明顺序的紧凑handoff行（无末尾箭头）、常驻自适应修改意见输入（仅保留向上提交图标）；二者使用相同32px最小高度、md圆角、边框和表面。随后是左下角模型胶囊。意见Enter提交、Shift+Enter换行、IME不提交；失败保留输入。低高度时仅内容区滚动，模型弹层不被裁切。无会话模型覆盖时胶囊显示“按Agent配置”并直接打开既有模型列表，不展示当前Agent默认模型作为所有交接目标的模型；选定后复用原Effort/Fast/Max，清除后恢复缺省标签。
 
@@ -123,27 +121,27 @@ Settings → Appearance 为权威。双体系：全局 chrome vs Composer agent 
 ## 验证
 
 - `pnpm run check:work-process`、`check:work-process-tool-coverage`、`check:appearance`
-- 浏览器真实会话清单见 `AGENTS.md`
+- Browser QA 流程见 `AGENTS.md` §5
 
 ## Right Rail
 
 左右停靠栏最大宽度同为 520px。最小宽度与默认宽度仍按各自内容下限，不跟着上限一起改。
 
-The right rail has two explicit target surfaces. A selected Project shows only `Import .rdc` and its project-scoped capture inputs. A selected Session always shows `Progress / Artifacts / Outputs / Context / Capture`. Empty sessions keep all five sections with honest empty states; they never fall back to Classic, Working Directory, Memory, Skills/MCP, Capture Library, or other retired panels.
+右栏有两个明确的目标面。选中 Project 时只显示 `Import .rdc` 与项目级 capture 输入；选中 Session 时恒为 `Progress / Artifacts / Outputs / Context / Capture` 五卡。空会话保留全部五卡并给出如实空态，不回退到 Classic、Working Directory、Memory、Skills/MCP、Capture Library 或其他已退役面板。
 
-- **Progress**: only projects real session-scoped `TaskRegistry` tasks through `taskProjection`. Simple read-only asks may remain empty. The list is a single creation-order array; completed and cancelled items stay in place. Clicking a task locates and focuses the corresponding Work Process snapshot. Its lifecycle state and blocked reason remain the TaskRegistry truth even after the surrounding turn completes; stage, harness, or UI-synthesized progress is forbidden. Runtime-owned Stop reasons are translated only when displayed; the stored reason and user-authored reasons remain unchanged. Stop settles unstarted Tasks created by the stopped turn as cancelled after producer join; older Tasks without known turn ownership remain unchanged.
-- **Artifacts**: only projects main-owned `rdc.investigation.v1` records. The renderer never rebuilds this inventory from action events, working-directory scans, or tool catalogs. Row actions copy the ID or open a read-only preview through the owning session's `investigation:read` and expected content hash. Report preview presents the existing typed record in seven readable groups, marks omitted data as unrecorded, and keeps raw JSON secondary; it does not create another report schema or upgrade a Claim. Investigation records never enter Outputs.
-- **Outputs**: only shows user-recognizable output files that can be opened or copied. A finished project file enters this lane only through the explicit `output_register` action, which copies it into the active run; it never discovers arbitrary workspace paths. UI source labels are limited to `Report`, `Evidence`, `Image`, `Document`, `Data`, and `Other`. Backend stores remain implementation details; the rail does not surface live or frozen session plans, scan arbitrary action payload paths, or expose artifact-store/run-report/action-output producer names. Attachments and uploads are Task Context inputs, not output artifacts. Missing files stay visible as `failed` without internal store names.
-- **Context**: contains only concrete attachments, files, directories, preloaded Skill sources, invoked MCP tools, and web references proven by frozen Prompt segments or successful tool results. It never turns `Shell / Files / Runtime lookup` tool categories or configured-but-unused Skill/MCP entries into resources, and renderer never reconstructs resources from preview strings. Rows show the concrete name plus parent path/server/source metadata. Without resources it uses the quiet contextual-card empty state and one normal-size sentence.
-- **Capture**: is always-visible in a selected session. Without inputs it explains that a `.rdc` must first be imported to the project; with an input it is the application-owned, owner-session interaction surface. It owns capture selection, Replay Device, open/close, the shared human/Agent inline event replay, refresh, and one deduplicated actionable diagnostic. Agent operation evidence stays in the main-owned archive; there is no separate history browser or playback surface. contextId, replaySessionId, capture IDs, runtime owner, lease, remoteId, and remote status stay owner-scoped for agent consumption, not as human-facing inventory. CLI unavailable is only a failed shell-action diagnostic; the rail never shows a CLI catalog, tool count, or namespace inventory.
+- **Progress**：只投影会话内真实的 `TaskRegistry` 任务（经 `taskProjection`），简单只读提问可以为空。列表是单一创建序数组，完成与取消项原位保留；点击任务定位并聚焦对应的 Work Process 快照。生命周期状态与阻塞原因始终是 TaskRegistry 的事实，即使所属回合已结束也不改写；禁止由阶段、harness 或 UI 合成进度。runtime 自带的 Stop 原因只在显示时翻译，存储值和用户原文不变。Stop 在 producer join 之后把被停止回合创建、尚未开始的任务结算为 cancelled；没有可知回合归属的旧任务保持不变。
+- **Artifacts**：只投影主进程持有的 `rdc.investigation.v1` 记录。renderer 不得从 action 事件、工作目录扫描或工具目录重建该清单。行操作为复制 ID，或经所属会话的 `investigation:read` 与期望内容 hash 打开只读预览。报告预览把既有类型化记录分成七个可读分组，缺失数据标为未记录，原始 JSON 为次级；不新增报告 schema，也不提升 Claim 等级。调查记录永不进入 Outputs。
+- **Outputs**：只显示用户可识别、可打开或复制的输出文件。项目内已完成的文件只经显式的 `output_register` 动作进入该栏（复制到当前 run），不扫描任意工作区路径。界面来源标签仅限 `Report`、`Evidence`、`Image`、`Document`、`Data`、`Other`；后端存储属于实现细节，右栏不展示实时或冻结的会话计划，不扫描 action 载荷路径，也不暴露 artifact-store / run-report 等生产方名称。附件与上传属于 Task Context 输入，不是输出制品。文件缺失时保持可见并标 `failed`，不出现内部存储名。
+- **Context**：只包含由冻结 Prompt 段落或成功工具结果证明的具体附件、文件、目录、预载 Skill 来源、已调用 MCP 工具与 web 引用。它不会把 `Shell / Files / Runtime lookup` 之类的工具类别、或已配置但未使用的 Skill/MCP 条目当作资源，renderer 也不从预览字符串重建资源。行显示具体名称与上级路径 / server / 来源元信息；无资源时使用安静的卡内空态与一句常规字号文案。
+- **Capture**：在选中的会话中始终可见。没有输入时说明需先把 `.rdc` 导入项目；有输入时是应用持有、归属会话的交互面，负责 capture 选择、Replay Device、打开/关闭、人工与 Agent 共享的内联事件回放、刷新和一条去重的可操作诊断。Agent 操作证据留在主进程归档中，没有独立的历史浏览或回放面。contextId、replaySessionId、capture ID、runtime owner、lease、remoteId 与 remote 状态只在 owner 作用域内供 Agent 使用，不作为面向人的清单。CLI 不可用只是一条失败的 shell 动作诊断；右栏不显示 CLI 目录、工具数量或命名空间清单。
 
-The visual form follows a quiet cowork inspector. Project import and Session inspector share one `.right-rail` shell: four-side padding is `--space-3`. Session card gap is the same `--space-3` so the corridor around a card equals the corridor between cards. Project import is a single card and keeps `gap: 0`. The resize-handle visible stroke stays in the 8px column / sidebar 1px border and must not paint into card radii; the pointer hit may still overlap the seam. Progress, Artifacts, Outputs, Context, and Capture are always five separate, non-collapsible rounded cards: their background, border, title treatment, padding, and inter-card spacing never change when content arrives. Empty sections span the docked rail inline-size during resize, stay compact in block size without flex-expanding dock height, and pair one isometric frosted-glass illustration (`RightRailEmptyVisuals.tsx`, token-backed gradient stops, multi-color translucent blocks with soft ground shadows) with one honest sentence as two deliberate vertical anchors. Populated content only grows its own card and uses hairlines between sibling rows inside that card. Output files use a neutral file mark rather than internal source initials. Context stays silent until real resources exist. Capture shows its selected file name and size in the picker, then Replay Device and Open/Reopen on a compact second row; full paths remain tooltip and accessibility information, while runtime identifiers stay in the owner-scoped projection for agent consumption and never become sidebar inventory. Diagnostics are one short actionable line, never a raw error wall. The docked rail remains resizable through compact desktop widths; at or below the shared `RIGHT_RAIL_DRAWER_BREAKPOINT` (920px), or when the layout cannot retain its minimum main work surface, it moves into the same overlay drawer. The drawer supports mask close, Escape, focus trap, focus return, keyboard navigation, and no horizontal overflow.
+视觉上遵循安静的 cowork inspector。Project 导入与 Session inspector 共用一个 `.right-rail` 外壳，四边内边距 `--space-3`；Session 卡间距同为 `--space-3`，使卡片外围留白与卡间留白一致。Project 导入是单卡，`gap: 0`。拖拽柄的可见线保持在 8px 列 / 侧栏 1px 边框内，不得画进卡片圆角，指针命中区可以与接缝重叠。Progress、Artifacts、Outputs、Context、Capture 恒为五张独立、不可折叠的圆角卡：背景、边框、标题样式、内边距与卡间距不因内容到达而改变。空卡片在拖拽停靠栏时横向铺满栏宽，纵向保持紧凑、不撑高停靠栏，并以一幅中性单线线框 SVG（`RightRailEmptyVisuals.tsx`：无填充、无渐变、无阴影，仅一处强调描边）加一句如实文案作为上下两个锚点。有内容时只增高自己的卡片，卡内同级行之间用细线分隔。输出文件使用中性文件标记，不用内部来源首字母。Context 在出现真实资源前保持静默。Capture 在选择器里显示所选文件名与大小，Replay Device 与 Open/Reopen 位于紧凑的第二行；完整路径只在 tooltip 与无障碍信息中出现，运行时标识留在 owner 作用域投影里，不成为侧栏清单。诊断是一行简短、可操作的提示，不展示原始错误墙。停靠的右栏在紧凑桌面宽度下仍可拖拽调整；宽度不超过共享常量 `RIGHT_RAIL_DRAWER_BREAKPOINT`（920px），或布局无法保留主工作面的最小宽度时，右栏改为同一套覆盖式抽屉。抽屉支持遮罩关闭、Escape、焦点约束、焦点返回、键盘导航，且无横向溢出。
 
 ## 右下角 Capture 内容
 
 设备选择由当前会话持有：选择即检查、修复并连接服务，成功后即使尚未打开 Capture 也显示已连接；Open 复用同一 owning context。无会话时可查看发现结果但不能连接，已有回放换设备先确认关闭，取消保持旧回放；会话页签切换不释放连接，应用重启不自动重连或安装。主进程结构化失败与恢复动作驱动两入口，未知安装结果只允许核验后继续连接，不盲重试。
 
-设备选择菜单只展示类型图标、设备名称和一份简短状态；Local 与 Android 使用同一紧凑单行布局。名称可省略，状态不换行，正常待连接使用次级文字，未授权或离线才突出异常。序列号保留在 tooltip，不占选择行；会话准备阶段、修复按钮与有界诊断详情位于选中设备状态区，原始诊断不进入 option。健康的发现监听不重复显示常驻说明，扫描、失败与无设备仍有明确反馈。
+设备选择菜单每项显示类型图标、设备名称（可省略）、序列号（等宽字体、名称下第二行，仅有序列号时出现）和一份简短状态；Local 与 Android 使用同一紧凑布局。状态不换行，正常待连接使用次级文字，未授权或离线才突出异常。会话准备阶段、修复按钮与有界诊断详情位于选中设备状态区，原始诊断不进入 option。健康的发现监听不重复显示常驻说明，扫描、失败与无设备仍有明确反馈。
 
 RDC 非空时保留固定卡片：文件与大小、实际设备与打开/关闭、紧凑控制权状态、唯一等比完整画面、颜色输出与 EID 控件、唯一原生事件滑条和简短反馈。人工与 Agent 共享同一套实际 EID 回放，不设双 Tab、Agent 足迹折叠区、历史播放或返回当前入口。EID 输入和滑条操作实际回放，不浏览历史快照。
 
@@ -151,9 +149,9 @@ Agent preparing/running、委派和原生退出未确认均以主进程 interact
 
 项目 RDC 为零时保持改造前原空态，不显示选择器、画面或历史。右栏宽度、drawer、五卡顺序不变；不恢复独立 preview 窗口，不加最小窗口宽度。Progress 只展示任务与定位入口，不提供额外的「停止此会话全部工作」按钮；停止执行沿用 Composer 的会话级 Stop 生命周期。
 
-计划卡是文档预览入口：类型和真实状态、左对齐标题、摘要与章节的有界 Markdown 摘录、独立公共阅读 Button。短内容自然收缩，长内容裁切且不产生卡内滚动；预览不含链接、代码复制等次级交互，卡片空白可打开阅读器，选择文字不触发打开。不展示内部 URI，不在卡片内批准或折叠分节。
+计划卡是文档预览入口，整卡是一个按钮：类型和真实状态、左对齐标题、摘要与章节的有界 Markdown 摘录。短内容自然收缩，长内容裁切且不产生卡内滚动；预览不含链接、代码复制等次级交互，点击或键盘（Tab/Enter/Space）打开阅读器，选择文字不触发打开。不展示内部 URI，不在卡片内批准或折叠分节。
 
-Composer 计划门只显示“实施此计划？”、当前计划声明的全部执行目标及默认收起的修改意见入口。`HandoffActionRow` 的 decisions 展示逐项列出目标；普通续跑建议保留 buttons 展示。展开修改意见后聚焦 Textarea，空意见不可提交，提交期间禁止重复操作，失败保留意见。会话、turn/tool call 和计划 revision/hash 共同隔离本地状态；切换会话、Stop、替换或撤销请求后丢弃迟到续跑，批准事件先于 IPC 返回也不误丢合法续跑。
+Composer 计划门只显示“实施此计划？”、当前计划声明的全部执行目标及常驻的修改意见 Textarea。`HandoffActionRow` 的 decisions 展示逐项列出目标；普通续跑建议保留 buttons 展示。空意见不可提交，提交期间禁止重复操作，失败保留意见。会话、turn/tool call 和计划 revision/hash 共同隔离本地状态；切换会话、Stop、替换或撤销请求后丢弃迟到续跑，批准事件先于 IPC 返回也不误丢合法续跑。
 
 工作区内唯一 `PlanReaderHost` 承载阅读器，避免 Transcript 行重挂载打断阅读。WorkBench 布局通过 renderer 内部上下文提供主工作区和 Composer 外壳边界；阅读器左右与外壳对齐，上下占满主工作区并保留 `--space-4`（窄屏 `--space-2`）安全边距。ResizeObserver、布局状态和视口通知驱动 `useDynStyle`，不猜测侧栏宽度、不设置固定阅读宽高上限、不写内联样式。
 
@@ -164,7 +162,7 @@ Composer 计划门只显示“实施此计划？”、当前计划声明的全�
 
 ## 右栏紧凑列表与完整浏览
 
-Progress 保持创建序，序号来自原始 order，状态图标占独立列；标题最多两行，完整名称可聚焦查看，完成不划线。定位动作揭示最新匹配历史快照及其原因，不改写快照状态。
+Progress 保持创建序，序号来自原始 order，状态图标占独立列；标题单行（共享 `OverflowFade`，仅在真实溢出时末尾渐隐，title 保留完整原文），完成不划线。定位动作揭示最新匹配历史快照及其原因，不改写快照状态。
 
 调查制品默认显示最新五项，创建时间及同时间稳定 ID 均倒序；上下文保留原序前五项。两者默认行仅图标、原名与进入指示，不展示元数据或重复操作。超过五项才显示「查看全部 N 项」。列表使用 md 控件最小高度、space-4 图标与原正文刻度，不按设计概念图放大。
 
@@ -209,11 +207,11 @@ Progress 标题采用 text-sm / normal / leading-normal，固定单行，剩余�
 
 主时间线独立 Tasks 历史卡使用与 section 内容相同的 space-4 节点槽位和 space-1 间隔；嵌套列表不再次缩进。所有工具共用 WorkCardHeader，状态与标题同义时只保留标题。任务列表状态对齐首行；可展开原因的箭头位于右端，不将标题向右挤出共同起始线，标题采用常规字重。
 
-技能收起态只显示技能名称正文，不使用孤立胶囊，不暴露完整磁盘路径；说明与可复制路径保留在展开详情。工具搜索以一行实际匹配名称和返回总数展示，溢出名称复用 OverflowFade 与完整 title，全部名称可在详情查看。调查 read/write/schema 从结构化结果提取标题、类型与实际就绪状态；写入请求的 title 只作为对象名称，不能替代返回 manifest 的 status。ID、hash 和协议回执只在展开详情/Raw 中显示。turn_complete 卡头为“已记录本轮结果”，正文分别表示完成、部分完成、受阻、取消或预算暂停；成功记录声明不等于任务完成。失败或跳过不投影成功结果摘要。窄容器的次级元信息自然换到下一行，主体标题保持单行溢出渐隐。
+技能收起态只显示技能名称正文，不使用孤立胶囊，不暴露完整磁盘路径；说明与可复制路径保留在展开详情。工具搜索以一行实际匹配名称和返回总数展示，溢出名称复用 OverflowFade 与完整 title，全部名称可在详情查看。调查 read/write/schema 从结构化结果提取标题、类型与实际就绪状态；写入请求的 title 只作为对象名称，不能替代返回 manifest 的 status。ID、hash 和协议回执只在展开详情/Raw 中显示。turn_complete 卡头为「已记录本轮声明」，正文为「声明已完成 / 声明部分完成 / 声明受阻 / 声明已取消 / 声明因预算暂停」；声明含 `unresolved` 时在下方列出「剩余工作」，每项显示 gap、阻塞类型，以及「已尝试 · 恢复条件」；旧结果没有该字段时只显示声明。声明不等于任务完成。失败或跳过不投影成功结果摘要。窄容器的次级元信息自然换到下一行，主体标题保持单行溢出渐隐。
 
 ### 工作过程连续轨道与节点
 
-每个 WorkProcessContent 的过程容器拥有一条连续轨道，起始节点中心至最后已显示事件底边；工具、Tasks、审批、Plan 和加载入口不打断轨道，最终答复在外。单个可见事件只留起始节点；整段折叠时内部轨道隐藏。section 与事件身份/顺序保留，模型轮次和无叙述工具续接不另打灰点。
+每个 WorkProcessContent 的过程容器拥有一条连续轨道，起始节点中心至最后已显示事件底边；工具、Tasks、审批、Plan 和加载入口不打断轨道，最终答复在外。单个可见事件只留起始节点；整段折叠时内部轨道隐藏。section 与事件身份/顺序保留，模型轮次和无叙述工具续接不另打灰点。 轨道为 1px `--token-border-muted` 实线，节点直径 6px，终点无箭头、拐角或装饰圆点。
 
 灰点标识起始入口和真实 commentary/可见 thinking 的入口，同段叙述共用一个节点。实际运行工具或流式叙述使用蓝点，pending/等待审批/回答不据此变蓝；临时活动结束后消失，结构节点恢复中性。节点使用不透明语义色，线不透圆心；16px槽位、4px内容间隔约束光环，普通事件8px、真实叙述入口12px。
 
@@ -222,42 +220,24 @@ Progress 标题采用 text-sm / normal / leading-normal，固定单行，剩余�
 
 ### 自动审查与计划交接
 
-审批区由主进程 PlanReviewProjection 决定，和普通 Composer、Settings 共用目录投影及会话模型覆盖。有效 awaiting 计划在重启进入所属会话后恢复原审批区，不执行模型；明确 Stop 保持取消，在历史计划阅读器的操作区点击“重新审批”才能恢复。已批准、已拒绝、被替代或未提交的草稿不自动恢复；来源、文件/hash、所属分支无效时只读展示具体原因，其他请求运行时不能重开。重开复用现有 Button、overlay 和焦点，不新增审批模态。
+审批区由主进程 PlanReviewProjection 决定，和普通 Composer、Settings 共用目录投影及会话模型覆盖。有效 awaiting 计划在重启进入所属会话后恢复原审批区，不执行模型；明确 Stop 保持取消，在历史计划阅读器的操作区点击“重新审批”才能恢复，重新审批本身不执行计划。已批准、已拒绝、被替代或未提交的草稿不自动恢复；来源、文件/hash、所属分支无效时只读展示具体原因，其他请求运行时不能重开。重开复用现有 Button、overlay 和焦点，不新增审批模态。
 
-活跃审批的修改意见回到当前规划循环；恢复审批的修改意见是用户实际提交的新规划请求，由原创建 Agent 使用主进程核验的计划引用处理。旧停止/中断消息和工具记录不改回运行态。批准沿统一冻结与声明交接链；响应不确定只读取当前状态，不自动重发执行。相同会话的重验证保留审批和交接状态，只有真正切换会话才执行会话清理。
+活跃审批的修改意见回到当前规划循环；恢复审批的修改意见是用户实际提交的新规划请求，由原创建 Agent 使用主进程核验的计划引用处理。旧停止/中断消息和工具记录不改回运行态。批准沿统一冻结与声明交接链：批准结果直接结束规划回合，清理既有资源后进入交接，不再让规划模型额外应答；批准响应先于界面事件到达时按钮保持锁定，避免重开或重复发送。响应不确定只读取当前状态，不自动重发执行。相同会话的重验证保留审批和交接状态，只有真正切换会话才执行会话清理。
 
-待审区直接打开 Effort，点击模型名进入模型列表。只保留一套会话 modelOverride 与 turnControls，所有声明方向共享；计划卡完整沿用当前对话的模型、Effort、Fast、Max，无覆盖时也不改取接手 Agent 默认模型。仅调参数不创建模型覆盖，批准前将当前继承模型与全部参数一并保存，确保交接后实际请求一致。相同模型的刷新、审批修订及 Agent 切换保留参数；加载中保留原选择，读取失败提供明确原因和重试，明确不可用阻止批准。内置 Mission 的执行声明使用 label: Implement Plan 与 labelTranslations.zh-CN: 执行计划；审批区及建议行通用读取冻结声明，不按 General 或其它 Agent 身份替换名称。自定义动作同样可以声明中英文译文；未提供当前语言时显示基础名称。Settings 编辑默认名称与可选中英文名称，保存时保留全部声明字段。译文不改变交接身份或授权，语言切换不重写历史和模型输出。模型胶囊保留名称、参数及 Fast/Max 图标，另用紧凑状态行显示确认计划、交接、准备请求；收到冻结摘要后显示实际请求。自动审查只占 Work Process，人工请求才替换 Composer。
+待审区直接打开 Effort，点击模型名进入模型列表。只保留一套会话 modelOverride 与 turnControls，所有声明方向共享；计划卡完整沿用当前对话的模型、Effort、Fast、Max，无覆盖时也不改取接手 Agent 默认模型。按钮置灰可能来自模型不支持、档位固定或权限未确认，界面不得绕过这些能力限制。仅调参数不创建模型覆盖，批准前将当前继承模型与全部参数一并保存，确保交接后实际请求一致。相同模型的刷新、审批修订及 Agent 切换保留参数；加载中保留原选择，读取失败提供明确原因和重试，明确不可用阻止批准。内置 Mission 的执行声明使用 label: Implement Plan 与 labelTranslations.zh-CN: 执行计划；审批区及建议行通用读取冻结声明，不按 General 或其它 Agent 身份替换名称。自定义动作同样可以声明中英文译文；未提供当前语言时显示基础名称。Settings 编辑默认名称与可选中英文名称，保存时保留全部声明字段。译文不改变交接身份或授权，语言切换不重写历史和模型输出。模型胶囊保留名称、参数及 Fast/Max 图标，另用紧凑状态行显示确认计划、交接、准备请求；收到冻结摘要后显示实际请求。自动审查只占 Work Process，人工请求才替换 Composer。
 
-
-### 这次修正解决了什么（2026-10-30）
-
-自动审核是在后台替当前这一次操作作判断，并不等于向用户发出授权问题。之前两者用了同一种待处理事件，界面把后台审核也画成了“批准一次”；用户点击时，主进程自然找不到人工授权请求。现在后台审核留在工作过程里，只有真实人工请求才显示授权按钮。
-
-计划审批处的模型和参数决定接下来的执行请求，不会修改已经发给规划模型的请求。用户可以直接调思考强度、Fast、Max；不必先换一个模型来打开参数面板。未明确选模型时继续按执行 Agent 的配置运行。按钮灰色也可能来自模型不支持、档位固定或权限未确认，不能靠界面覆盖绕过这些能力限制。
-
-点击执行以后，原来还要等待规划模型额外回答一次“计划已同意”，才轮到执行模型。现在批准结果直接结束规划回合，完成已有资源清理后进入交接。界面保留模型与参数，并明确显示确认、交接和准备阶段；后端校验和准备仍需要时间。批准响应先到、界面事件后到时，按钮也会保持锁定，避免短暂重开或重复发送。
-
-真实跨模型验证已覆盖 GPT 到 DeepSeek、Grok 和 GPT-Luna，以及不换模型、只开启Fast的路径。Kimi K3双向验证因订阅访问权限返回403，用户确认延期；不能把这两组描述成已通过。详细工程验证、性能样本限制及证据边界见 acceptance ledger 的同日记录。
 
 ## 组件复用与窗口归属
 
-### 这轮界面整理解决了什么
+### 披露、设置与会话加载
 
-随着功能增加，同一种操作逐渐出现了不同做法：有的高级设置使用浏览器默认三角，有的自己画展开区；菜单各自计算位置，窗口变窄后容易贴边；有些短页面被撑得很空，长编辑内容又挤在多层滚动区域里。这轮整理把这些重复做法收敛到现有组件体系，让设置、素材、知识和调查详情遵循一致的展开、焦点与布局规则。
+主要信息和动作直接显示；协议来源、原始记录、位置与比较条件等附属内容在所属详情里展开。错误、权限限制、未保存状态和写入确认保持可见。设置窗口的宽高分别随可用空间调整，长正文在内容区域滚动；菜单按屏幕边界调整位置，Escape 逐层关闭并返回触发按钮。长附件名按实际宽度渐隐，完整名称保留在 title，不按字符数裁剪。
 
-使用时，主要信息和动作仍直接显示；协议来源、原始记录、位置与比较条件等附属内容在所属详情里展开。错误、权限限制、未保存状态和写入确认继续保持可见。设置窗口的宽高分别随可用空间调整，长正文在内容区域滚动；菜单会按屏幕边界调整位置，按 Escape 逐层关闭并返回原来的按钮。长附件名按实际宽度渐隐，完整名称仍可查看。
+普通配置、素材、Knowledge 和调查原始信息披露统一使用 `ui/Details`。Transcript 受控工作轨道保留 `ScopedWorkDisclosure`。`PlanCard` 只接收计划与 `onOpen`；生产 `PlanReviewRow` 将动作交给既有 `PlanReaderHost`，读取/审批身份仍由领域链路校验。
 
-工作区仍沿用现有布局、颜色与控件刻度。Agent 正在工作的从左到右扫光、输入框边缘绕光，以及 Max 滑条进入、持续和退出的特殊效果继续使用原实现。会话加载还修正了一处参数显示问题：能力信息未到达时，不再把已保存的 Low 错误显示成 Off。
+Settings 以独立宽高上限适应视口；桌面 Agent 列表与编辑区各自滚动，窄容器顺序布局由正文区滚动。短空态不撑出额外空洞，Skill 全文编辑器填满已分配余高。TaskDialog 操作区固定，超高正文内部滚动。
 
-开发者现在可运行 `pnpm run design:dev` 打开生产组件活文档，在同一处查找组件、查看深浅主题和不同字号、试用加载失败与键盘交互，并找到真实使用位置。示例只修改页面内的展示状态。后续改组件应同步维护交互契约和消费者索引，避免文档里的控件与产品逐渐分成两套。
-
-本轮工程检查、Browser 页面交互、Low 模型流式停止和原生窗口调整已分别验证，详细记录见[验收台账](../product/acceptance-ledger.md)。历史计划与调查记录的隔离样本用于验证阅读器、滚动和来源校验；设备调查能力仍以对应真实设备回执为准。
-
-普通配置、素材、Knowledge 和调查原始信息披露统一使用 `ui/Details`。Transcript 受控工作轨道保留 `ScopedWorkDisclosure`，历史 Plan 顺序、多项 handoff、任务展开记忆与 selected/running 语义不受控件迁移影响。`PlanCard` 只接收计划与 `onOpen`；生产 `PlanReviewRow` 将动作交给既有 `PlanReaderHost`，读取/审批身份仍由领域链路校验。
-
-Settings 以独立宽高上限适应视口；桌面 Agent 列表与编辑区各自滚动，窄容器顺序布局由正文区滚动。短空态不撑出额外空洞，Skill 全文编辑器继续填满已分配余高。TaskDialog 操作区固定，超高正文内部滚动。Composer 的素材文件名按实际宽度渐隐，不按字符数裁剪。
-
-Max 档位效果由 `useMaxVisualController`、`maxVisual` 与 `EffortMaxField` 共同维护；主题颜色、轨道尺寸和进入/退出生命周期通过现有契约连接，禁止把这一领域效果复制到基础控件。内部活文档位于 `designs/rdc-agent-design-system`，只复用生产视图，不连接真实模型或 RDC。
+Max 档位效果由 `useMaxVisualController`、`maxVisual` 与 `EffortMaxField` 共同维护；主题颜色、轨道尺寸和进入/退出生命周期通过现有契约连接，禁止把这一领域效果复制到基础控件。生产组件活文档位于 `designs/rdc-agent-design-system`（`pnpm run design:dev`），只复用生产视图，不连接真实模型或 RDC，示例只修改页面内的展示状态。
 
 会话切换期间能力目录尚未就绪时，Composer 保留待恢复的持久控制值；目录到达后再按真实能力解析，不能让加载阶段的临时 Off 覆盖会话中的 Low。用户在同一会话里的正常编辑仍优先，不因普通重渲染重置。
 
@@ -269,11 +249,3 @@ Max 档位效果由 `useMaxVisualController`、`maxVisual` 与 `EffortMaxField` 
 Composer 权限挡位是全局设置。保存中展示 pending，只有主进程确认后显示已生效；失败与迟到响应按主进程事实恢复，不让乐观选择冒充执行权限。提示“尚未开始的工具使用新权限”，同时说明已启动命令继续，需要停止时使用现有 Stop。自定义读写根与命令规则仍在新轮生效。右栏与 Composer 使用同一权限事实。
 
 切挡可以取消并替换待审批控件，不能丢失原工具卡片身份、展开状态、草稿或焦点。历史审批保留真实 approved/rejected/cancelled，切挡取消明确表达权限变化，不能显示成用户拒绝或工具失败。前后台子 Agent 使用同一事实，但受自身冻结限制。验收覆盖双语长文案、窄屏、大字号、深浅主题、键盘操作与焦点返回。
-
-### 使用上的变化
-
-- 模型列表：普通 Composer、计划审批和 Settings 会读取同一份目录。重新打开列表会核对最新状态；遇到目录读取或刷新错误时，使用列表里的 Retry 重新获取，不必换一个会话规避。后台刷新期间，已确认可执行的模型继续保留；不可用时保留原模型名称并说明原因。
-- 继续计划：关闭应用前仍在等待审批的有效计划，重启进入原会话后会重新显示审批区，等待你决定。点击 Stop 则保持取消；要继续时，展开历史计划，打开全文阅读器，再点击“重新审批”。重新打开本身不会执行计划。
-- 修改计划：原规划请求仍活跃时，修改意见交回该请求；停止或重启后恢复的审批，会把你提交的意见作为新的规划请求，交给原创建 Agent，旧停止记录仍然保留。
-- 批准执行：点击计划声明的执行按钮后，应用冻结计划，再完成 Agent 交接和执行准备。重复点击、旧审批或不确定的响应不会自动重复执行。已批准、已拒绝、被替代的计划不会在重启后再次弹出审批。
-- 恢复失败：计划文件缺失、内容被改动、创建来源无法证明或不属于当前分支时，界面会说明原因并拒绝恢复。存在其他运行请求时不能抢占它来重开旧审批。

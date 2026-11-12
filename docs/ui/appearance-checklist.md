@@ -4,12 +4,11 @@
 
 ## Appearance 面板
 
-- System/Light/Dark 迷你窗口磁贴。
+- System/Light/Dark 分段 `Tabs`（`variant="segmented"`）。
 - 双栏视觉预览（非 JSON/代码块）。
 - Light/Dark 编辑卡跟随 App chrome。
 - 圆角色板+hex。
 - 可读预设下拉（统一 pill Aa+名称触发体、菜单右缘贴合并向左延伸、caret 衔接 tip、实色 overlay 菜单、每项 Aa+勾选、足够宽度）。
-- 多选 `Checkbox` / `CheckPill` 共用空心方框 + 字色勾；`Switch` 才是 accent 胶囊。
 - Import/Copy `rdc-theme-v1:`。
 - Preferences。
 
@@ -18,11 +17,6 @@
 - 全局预览跟 chrome。
 - Composer/Effort 仍跟 agent accent。
 - Context Usage 弹层底色跟 chrome 编译的 `--color-surface-overlay` / `--token-bg-overlay`（分段色点仍用全局 `--token-context-*`）。
-
-## 禁止项
-
-- 不得残留验收脏色（如纯 `#ff0000`）。
-- 不得残留伪 `ThemePreview: ThemeConfig` 文案。
 
 ## Provider/Model/Composer 控件验收
 
@@ -41,28 +35,12 @@
   - 圆环环面只显示 `%` / `—` / `…`，阶段文案仅在 title/aria 与 Context breakdown 弹层。
   - 分段条显示压缩线刻度，圆环不标压缩位置；说明行拼接压缩线、条件完整窗口与本轮可生成。
   - 弹层始终使用同一 hero、分段条、Tokens | Cache | Reasoning 和 Details 结构：Preparing 尚无新快照时保留最近真实计量，Current request 显示 prepared 预估，完全无遥测显示 `—`，不制造假 0 或切换到独立空态。
-- Actual / Last actual 在弹层宽度大于 `33rem` 时保持等宽三列独立圆角卡片 Tokens | Cache | Reasoning（Cache：省 tokens、最近一轮%、累计%、命中/未命中；缺遥测显示 `—`，禁止假 0 / 假 0%；Cache 卡内 stats 可折成 2×2）；卡片间距用 `--space-3`，禁止分隔线连体与 `clamp` 归零 gap；只有真实窄屏才纵向单列堆叠。
+- Actual / Last actual 在弹层宽度大于 `38rem` 时保持等宽三列独立圆角卡片 Tokens | Cache | Reasoning（Cache：省 tokens、最近一轮%、累计%、命中/未命中；缺遥测显示 `—`，禁止假 0 / 假 0%；Cache 卡内 stats 可折成 2×2）；卡片间距用 `--space-3`，禁止分隔线连体与 `clamp` 归零 gap；只有真实窄屏才纵向单列堆叠。
 - 缩窗只在发送 preflight 内派生压缩视图而不提前改写历史。
-
-- Composer 底栏 model-effort 与 Agent / Permission / Usage 互斥；390px 不越界。
-- Settings 左侧导航可搜索并跳转高亮；八项顺序为 常规 → 外观 → Provider → Agents → Skills → Tools → Hooks → Policy，没有 Workspace 一级项。
-- 常规页不再提供「资源与诊断」入口；Skills / Tools / Hooks / Policy 各自的资源位置仍可查看，根路径不可编辑，不提供迁移。
-- 动作按钮为中性实色细边框，主要动作使用强调色文字与描边；单选分段控件为低饱和选中态。Composer 保留 Agent accent 契约。
-- 用户菜单使用实色表面；紧凑头像/名称头部下三行偏好共享标签列，右侧 `Tabs` 等宽铺满，设置按钮铺满。语言选项无论当前界面语言均显示自称 `简体中文` / `English`。中文大字号与英文在约 390px viewport 内无裁切，弹层按实测尺寸定位、超高时自身滚动，并保留外部点击、Escape 与焦点返回。
-- Agents 列表名称与说明各固定单行；空说明仍保留同样行高，说明仅在真实溢出时渐隐并保留完整 `title`。
-- Agent 行使用 feature 内 `AgentListItem` 组合共享组件：18px 图形 / 28px 透明图标列，没有内嵌底座；中性实色细边框行以 `--space-1` 分隔。标题为 sm/medium、描述 xs/正文次级色，文字间距 space-0-5、上下 padding 实测各 space-2。检查全局 kit 后加载时 padding 仍有效；同字号行高差不超过 1 CSS px，空描述占位，选中不改变尺寸。深浅主题、中英文、三档字号及宽屏/390px 下分别观察普通、hover、focus、selected；无裁切和横向溢出，且每条仍清楚分隔、图标边框不抢注意力。旧等高证据不代表当前视觉比例通过。
-- 普通多行输入从一行自动增长至八行，之后内部滚动；删除、异步加载、宽度/字号变化及折叠展开后重新测量，禁止手动拖拽角。
-- Agent 指令最小两行，随内容增长至 45vh 后内部滚动；收缩、切换 Agent 与展开后高度正确。
-- Settings HelpTip 在标签旁，通过悬停/聚焦/点击可读，Escape 仅关闭提示。模型偏好统一标签/控件列，详情默认折叠；异常状态不被隐藏，下拉菜单使用共享 Select 且不被模态裁切。
-- 技能/策略等全文编辑区填满剩余高度；窄屏列表限高，正文、关闭和保存均可达。
-- 交接预载技能与能力配置使用真实解析候选，可搜索多选；缺失/目标不可用的已选 ID 明示且不丢失，读取失败不显示为没有技能。
-- 资源空态使用有边界的共享紧凑/填充面板；MCP 紧凑空态不遮蔽本机工具；策略资源在全局运行设置之前。
-- Provider 总览卡片在同一视口下等宽等高；测试连接前 / 中 / 后卡片几何与按钮基线不变；未配置为中性色，只有真实失败才用 error；长错误折成摘要 + 展开。
 
 ## Composer Effort 滑杆
 
-- First visible Effort popup frame must use measured inset geometry; measurement correction must not transition left or transform, while normal snap and Max lifecycle timing remain unchanged.
-
+- 弹层首帧使用实测 inset 几何，测量修正不对 left / transform 做过渡；常规吸附与 Max 生命周期时序不变。
 - 圆形滑块全程落在 track 内（inset 几何，无端点 transform 突变）。
 - 弹层拖拽无横向滚动条与布局跳动。
 - 松手仍 snap 到最近档位并短动画回位。
@@ -74,17 +52,15 @@
 - 「粘贴并清理格式」去掉 zero-width / NBSP / 智能引号 / 全角标点，且与「粘贴」不是同义重复。
 - 390px 窄屏菜单完整位于 viewport 内并在边缘翻转；Arrow / Home / End / Enter / Escape 与焦点返回正确；入场动画保持正常播放。
 
+## 组件与窗口验收
+
+- Settings 八页逐页检查，特别是列表/编辑器在断点前后的滚动所有权、固定动作区和低高度窗口。
+- 深浅主题、三档字号、中英文按代表性与极端组合检查。实际宽度溢出使用 OverflowFade 与完整 title，正文/错误合理换行。
+- ActiveSignalText、Composer 绕光、Max 特殊滑条分别检查。Max 保持 Composer 专属控制器与绘制模块；不引入全局停播或第二套动画实现。
+- 活文档、Browser、模型、原生 Electron/DPI 是独立证据。原生最大化/恢复必须实际操作，截图尺寸不替代设备证据。
+
 ## 验证命令
 
 ```bash
 pnpm run check:appearance
 ```
-
-## 组件与窗口验收
-
-- 普通详情使用 Details，检查独立展开、默认状态、折叠后草稿、键盘焦点。原生 select 不作为产品下拉框入口。
-- Settings 八页逐页检查，特别是列表/编辑器在断点前后的滚动所有权、固定动作区和低高度窗口。
-- 浮层检查四边、安全边距、长内容、异步增高、父区域滚动与字体加载；Escape 一次只关闭顶层。
-- 深浅主题、三档字号、中英文按代表性与极端组合检查。实际宽度溢出使用 OverflowFade 与完整 title，正文/错误合理换行。
-- ActiveSignalText、Composer 绕光、Max 特殊滑条分别检查。Max 保持 Composer 专属控制器与绘制模块；不引入全局停播或第二套动画实现。
-- 活文档、Browser、模型、原生 Electron/DPI 是独立证据。原生最大化/恢复必须实际操作，截图尺寸不替代设备证据。

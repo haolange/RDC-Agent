@@ -1,19 +1,22 @@
 # Knowledge Center
 
-知识中心是 Workbench 左侧边栏底部、用户条上方的常驻入口，打开居中实色分层模态（在 `88vw × 86vh`、硬顶 `120rem × 70rem` 内接最大 16:10，backdrop `--modal-workbench-inset`；`≤960px` 时三列切换，`≤640px` 全屏）。它只消费已落地的五服务：`Query` / `Index` / `Compile` / `Candidate` / `Write`，不另开 browse 双轨或派生存储。
+知识中心是 Workbench 左侧边栏底部、用户条上方的常驻入口，打开居中实色分层模态（在 `88vw × 86vh`、硬顶 `120rem × 70rem` 内接最大 16:10，backdrop `--modal-workbench-inset`；`≤960px` 时三列切换，`≤640px` 全屏）。它消费 `Query` / `Index` / `Compile` / `Candidate` / `Write` 五个核心服务，以及 `Read`（渐进读取）、`Topic`（主题与同义词）、`Import` / `Export`，不另开 browse 双轨或派生存储。
 
 ## 信息架构
 
-三列网格：`224px / minmax(280px, 0.8fr) / 1.2fr`；中列可换行。
+三列网格：`14rem minmax(17.5rem, 0.65fr) minmax(0, 1.35fr)`；中列可换行。
 
-顶部标题栏提供全局「导入知识 / 导出知识」两个动作，两者都打开任务子弹窗。
+顶部标题栏提供全局「主题与同义词」「导入知识」「导出知识」三个动作，均打开任务子弹窗。
 
 1. **Spaces / 控制列**：Brand、Cards / Candidates / Conflicts 三段切换、User + 已注册 Project 多选（默认全选）、「索引维护」折叠面板：当前状态 / 卡片数 / 构建时间三行、完整 revision 加复制按钮、重建为次级按钮并附说明；索引是可重建的派生数据。Semantic lane 与 Settings Embedding 重建入口已删除。
-2. **List**：Cards 视图有搜索框（300ms debounce）驱动 `knowledge:query`；类型 / 生命周期 / 六条检索通道收进「筛选」`Popover`，以 `CheckPill` 表达多选。Cards 行渲染标题 + 类型/生命周期徽章、一行预览（来自索引 `preview`，未重建索引时缺省）与 `updatedAt`（本地 `YYYY-MM-DD HH:mm`），顺序按服务返回的 `hits`，渲染层不得重排。Candidates / Conflicts 视图把搜索与筛选换成列表头（标题 + 计数 + 一句说明）：Candidates 只列 `listCandidates`，行尾「待审核」徽章，行内显示来源（`sourceStatus` · `caseId`）与时间；Conflicts 只渲染当前 pack 的 `contradicts`，每行为「左标题 ↔ 右标题」+ 两个 cardId + 「待核对」徽章，标题从 `pack.hits` 解析。导入身份占用不进 Conflicts。Cards 列表为空时把「导入知识」放在列表内容起始区，不只留在左下；该空态文案不属于 Candidates。
+2. **List**：Cards 视图有搜索框（300ms debounce）驱动 `knowledge:query`；类型 / 生命周期 / 六条检索通道收进「筛选」`Popover`，以 `CheckPill` 表达多选。Cards 行渲染标题 + 类型/生命周期徽章、一行预览（来自索引 `preview`，未重建索引时缺省）与 `updatedAt`（本地 `YYYY-MM-DD HH:mm`），顺序按服务返回的 `hits`，渲染层不得重排。结果超过一页时列表底部显示「加载更多」：每页 50 条，以上一页的 `nextOffset` 与 `expectedRevision` 续取。Candidates / Conflicts 视图把搜索与筛选换成列表头（标题 + 计数 + 一句说明）：Candidates 只列 `listCandidates`，行尾「待审核」徽章，行内显示来源（`sourceStatus` · `caseId`）与时间；Conflicts 只渲染当前 pack 的 `contradicts`，每行为「左标题 ↔ 右标题」+ 两个 cardId + 「待核对」徽章，标题从 `pack.hits` 解析。导入身份占用不进 Conflicts。Cards 列表为空时把「导入知识」放在列表内容起始区，不只留在左下；该空态文案不属于 Candidates。
 3. **Detail**：`h1` 标题 + 元信息行（徽章 · 更新于 · 空间；候选视图追加「待审核」与来源）、右侧「卡片信息」开关、卡片 `images[]` 预览（`knowledge:image`；缺失标「对照图未入库」）、`KnowledgeMarkdown` 正文、写操作。「卡片信息」展开为两列：类型 / 生命周期 / 来源状态 / 案例 ID / 更新时间 / 存储空间 / 相对路径，右列为范围（含排除）与关系（关系目标可点开）；底部「Provenance / Hash」默认折叠，仅当卡片带 `sourceHash` / `sourceMtimeMs` / `sourceSize`（由 `knowledge:card` 追加投影）时显示来源哈希 / 修改时间 / 大小，否则说明「没有导入来源记录」。空态说明「导入后可在此阅读知识卡片」。`sourceStatus === 'fixed'` 永远带 “≠ verified”。候选视图的主操作文案为「保存为草稿」（仍走 `persist-draft` 确认）。任一写操作只打开写入确认弹窗，不直接落盘。
+   - **渐进读取**：详情经 `knowledge:read` 先读「简介」，再按「章节」「行范围」「全文」切换读取范围（Tabs），章节来自卡片标题目录，行范围校验起止行；面板显示当前范围与总行数，读取不改变知识事实。
    - **Conflicts 详情**：选中一对 `contradicts` 后，右栏显示「卡片 A / 卡片 B」并排对比（来源 · 标题 · 内容 · 更新时间），两卡通过现有 `knowledge:card` 按 `pack.hits` 解析加载；「查看相关卡片」跳回 Cards 视图打开该卡。核对是人工动作，没有自动裁决。
 
-导入、导出与写入确认都是 `TaskDialog`（见 `docs/ui/design-system.md`「任务子弹窗」），叠在三列之上：背景空间、筛选、选择与滚动位置保留，关闭后恢复原阅读状态；Escape 只作用最上层。导入的文件 / 粘贴 / 结果是同一个弹窗内的状态，不逐层叠窗：文件模式分开显示文件名与完整路径并标「待校验」；粘贴模式字段为「知识内容 (YAML)」，有内容即出现「待校验」提示；结果态每条显示标题 + `caseId` + 真实状态句（写入空间草稿 / 已在该空间 / 隔离未写 / 目标空间已有此卡片），禁止写死 Processing details。导入成功后切 Cards、刷新 overview/query，并选中第一条写入的卡。写入确认的差异块带「− 变更前 (n) / + 变更后 (n)」图例。
+「主题与同义词」是 `TaskDialog`：由 `knowledge:topics:suggest` 根据用户空间原文给出主题建议，用户勾选要分类的卡片并编辑同义词、合并目标或新增主题，先经 `knowledge:topics:preview` 显示完整预览（受影响卡片与差异，原始 Markdown 不改写），确认后才由 `knowledge:topics:apply` 应用；预览页可返回修改。
+
+导入、导出、写入确认与上述主题弹窗都是 `TaskDialog`（见 `docs/ui/design-system.md`「任务子弹窗」），叠在三列之上：背景空间、筛选、选择与滚动位置保留，关闭后恢复原阅读状态；Escape 只作用最上层。导入的文件 / 粘贴 / 结果是同一个弹窗内的状态，不逐层叠窗：文件模式分开显示文件名与完整路径并标「待校验」；粘贴模式字段为「知识内容 (YAML)」，有内容即出现「待校验」提示；结果态每条显示标题 + `caseId` + 真实状态句（写入空间草稿 / 已在该空间 / 隔离未写 / 目标空间已有此卡片），禁止写死 Processing details。导入成功后切 Cards、刷新 overview/query，并选中第一条写入的卡。写入确认的差异块带「− 变更前 (n) / + 变更后 (n)」图例。
 
 窄屏 `≤960px` 只渲染一列，顶部三段 Spaces / List / Detail 与常驻关闭；选中卡片进入 Detail，Detail 提供返回。`≤640px` 任务子弹窗全屏。
 
@@ -38,6 +41,6 @@
 | Renderer API | `src/shared/renderer-api/core.ts`（Desktop / Browser 共用） |
 | 类型 | `src/shared/types/knowledge.ts`、`src/shared/types/knowledgeExport.ts` |
 
-IPC 通道：`knowledge:overview` / `query` / `card` / `compile` / `index:rebuild` / `candidates` / `candidateCreate` / `import` / `image` / `issueApprovalToken` / `write` / `promote` / `export`。写/提升必须消费 Main 签发的 `approvalToken`，并带 `explicitHumanConfirmation`；`knowledge:export` 为 `high-impact`，目标路径由 `dialog:saveFile` 的系统保存对话框返回（知识包扩展名 zip），renderer 不得自行拼绝对路径。知识导入选文件走 `dialog:selectKnowledgeImport`（zip / yaml / yml），不走 `dialog:selectFiles`。已删除 browse-only 的 `knowledge:listSpaces` / `listCards` / `getCard`。
+IPC 通道：`knowledge:overview` / `knowledge:topics:suggest` / `knowledge:topics:preview` / `knowledge:topics:apply` / `query` / `card` / `read` / `compile` / `index:rebuild` / `candidates` / `candidateCreate` / `import` / `image` / `issueApprovalToken` / `write` / `promote` / `export`。写/提升必须消费 Main 签发的 `approvalToken`，并带 `explicitHumanConfirmation`；`knowledge:export` 为 `high-impact`，目标路径由 `dialog:saveFile` 的系统保存对话框返回（知识包扩展名 zip），renderer 不得自行拼绝对路径。知识导入选文件走 `dialog:selectKnowledgeImport`（zip / yaml / yml），不走 `dialog:selectFiles`。已删除 browse-only 的 `knowledge:listSpaces` / `listCards` / `getCard`。
 
-权威产品边界见根目录 `ARCHITECTURE.md`「Knowledge」。
+权威产品边界见根目录 `ARCHITECTURE.md`「G. Knowledge」。
