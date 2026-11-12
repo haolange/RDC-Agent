@@ -11,6 +11,7 @@
 
 # 目录
 
+0. 产品裁决与实现对应  
 1. 系统定义与中心思想  
 2. 设计原则与外部工程经验校验  
 3. 总体架构  
@@ -31,6 +32,42 @@
 18. 风险、失败模式与防护  
 19. 最终验收标准  
 20. 附录：关键语义对象示例
+
+---
+
+# 0. 产品裁决与实现对应
+
+本书最初写于产品实现之前，描述理想架构。产品落地后形成了一组裁决；本章列出它们，正文中与之不同的表述以本章为准。本书是 RenderDoc 领域目标的权威；跨层工程合同以 `ARCHITECTURE.md` 和 `docs/contracts/` 为准，冲突时由 `ARCHITECTURE.md` 裁决并回改本书。
+
+## 0.1 裁决
+
+| 主题 | 正文的表述 | 裁决 |
+|---|---|---|
+| 交接 | Planning Orchestrator 经 Agent Handoff 交给执行方；Big Loop 交回规划方 | 用户批准计划并点击执行后才进入 General。需要重规划时，General 就地交付缺口与 Checkpoint，由用户切回原 Mission。不存在自动交接，runtime 不按身份、深度或正文开下一轮 |
+| 身份 | 以领域职责命名的 Sub-Agent（Triage、Capture Report、pass_graph_pipeline、pixel_value_forensics、shader_ir、Skeptic 等） | 四个用户入口：General、Debugger、Analyzer、Optimizer。八个内部 Agent：generator、verifier、knowledge-scout、report-writer、shader-analyst、pass-analyst、resource-analyst、pixel-analyst。Skeptic 即 verifier。其余职责由 Skill 承载，按任务需要调用 |
+| 规划身份的能力 | 可调用前置 Sub-Agent 做调查 | Mission 只读：通过受控的只读探测访问 RDC，不运行 shell 或解释器。Live RDC 的操作与实验只由 General 执行 |
+| 模型 | 未规定 | 模型与推理档位归各 Agent 配置。子执行读取目标 Agent 的配置，不继承父对话的选择；配置不可用时明确失败 |
+| 完成状态 | Complete／Partial／Inconclusive／Blocked／Replanned | completed／partial／blocked／cancelled／budget_paused。Inconclusive 表达为 partial，并逐项写明未能区分的解释及所需信息 |
+| 请求上限 | 未规定 | 不以固定默认总轮数收口，由目标与核验闭环决定继续和完成。用户显式限制、期限、取消和无进展检测始终有效；续跑、压缩、恢复和重新委派沿用累计消费与原期限 |
+| 检索 | Lexical／Semantic Retrieval，Embedding 作为补充 | 不使用 Embedding 或 Semantic 通道。Markdown 原文是唯一来源，六条检索通道：Identity／Path、Scope／Metadata、Lexical、Structural、Relation／Graph、Temporal／Version |
+| 知识沉淀 | 任务结束后产生 Knowledge Candidate 并进入 Promotion | 知识产物默认留在本次调查的记录里。只有用户明确要求时才创建 Candidate；不自动写入 Memory 或 Knowledge，不由模型自治晋升。主题分类由 Agent 提议、用户批量确认 |
+| 调查范围 | 可验证修复 | 止于 capture、replay、授权材料与可恢复实验。不修改 Unity／Unreal 工程或原始 capture，不把 replay 结果称为生产修复已完成 |
+| 多 capture | 未规定 | 同一 owning session 串行切换已批准的 capture，结束时恢复可恢复的入口现场 |
+
+## 0.2 实现对应
+
+- 八种调查对象存放在同一套调查记录里（`rdc.investigation.v1`）。Hypothesis 是 Claim 的一种类型，Decision 内嵌于 Claim，不另建平台类型。字段定义以 `src/shared/types/renderdocInvestigation.ts` 和 `investigation_schema` 工具为准。
+- 领域字段不写入通用的 Task、Agent Profile 或会话消息；调查记录只引用 Task ID。
+- Coordinator 不是新的 Runtime，是 Profile 指令、Skill、Hook、通用 Task、调查记录和声明式交接的组合。
+- RenderDoc 能力经外部 CLI 提供。模型按需发现操作，不把整份目录展开成工具定义；手册知识不授予权限。
+- 回放、租约、身份与回执的合同见 `docs/architecture/rdc-runtime.md`；运行内核、权限、失败模型与界面投影见 `docs/contracts/`。
+
+## 0.3 不做
+
+- 平台级调查图、第二套 Task 存储、第二套 Agent Runtime、第二套模型路由。
+- 固定的 workflow 阶段引擎。第 10 章等处的 Workflow 是调查的判断顺序，不是必须逐格执行的流水线。
+- 恢复自动交接、Embedding、自动知识晋升。
+- 用提示词代替身份、权限、消费和来源的校验；这些由代码强制。
 
 ---
 
@@ -430,6 +467,8 @@ RenderDoc 是基于 Frame Capture 的 Graphics Debugger，官方项目当前覆�
 ---
 
 ## 3.2 端到端生命周期
+
+> 交接方式以 0.1 为准：计划经用户批准并点击执行后进入 General；Big Loop 由用户切回 Mission。
 
 ```text
 User selects Mission
@@ -938,9 +977,21 @@ Small Loop 不应重新规划整个 Mission。
 - Visual Regression 未验证；
 - Timing Sample 不足。
 
+### 调查者自身的推进
+
+上面的 Small Loop 从 Verifier 的 Challenge 开始。但调查在形成任何 Candidate Claim 之前就可能停下，这时没有东西可供质疑。所以推进不能只靠 Verifier，调查者每得到一个结果都要自己回答三个问题：
+
+1. 当前对象是否已经锚定（见 10.4）？没有，下一步就是确立或否定锚点。
+2. 现有解释里，哪一项合法、可执行的检查最能区分它们？
+3. 结果回来后，谁被支持、削弱、排除或暂缓？
+
+只要批准范围内还有这样的检查，就继续，不把"下一步尚未检查"当成阻塞。确实不能继续时，逐项交代：缺口是什么、试过什么、被什么阻止（能力、权限、预算或期限、战略边界、外部条件）、什么条件下可以恢复。说不出阻塞的条目是应继续的工作，不是停止的理由。
+
 ---
 
 ## 5.6 Big Loop
+
+> 交接方式以 0.1 为准：General 就地交付缺口与 Mission Checkpoint，由用户决定是否切回 Mission 重新规划。
 
 Big Loop 用于原调查战略已经失效。
 
@@ -1279,6 +1330,22 @@ Capability Limitations
 Mission Checkpoint 回答：
 
 > 旧战略为什么已经不够，以及新 Planner 必须继承什么。
+
+---
+
+## 6.7.1 读取时机
+
+记录的价值在于被读到并改变下一步。只写不读的记录是成本。下列时刻必须把对应内容读回决策：
+
+| 时刻 | 必须读回 |
+|---|---|
+| 准备声明完成或 Partial | Unresolved Frontier、未解决的 Challenge 及其所需行动 |
+| Context Compact 之后 | 原 Plan、Mission Checkpoint、Unresolved Frontier、未解决的 Challenge |
+| 委派独立审查 | 被审 Claim，以及它依赖的原始 Evidence、World State 和 Experiment 回执 |
+| Big Loop 重新规划 | Mission Checkpoint 全文 |
+| 现场恢复之后 | 仍然有效的 Evidence 与需要重新核验的状态（见 7.7） |
+
+Verifier 只能读到被授予的内容，所以原始证据须随被审主张一并授予。Compact 与委派保留的是这些内容本身，不只是它们的索引。
 
 ---
 
@@ -1627,6 +1694,24 @@ Verify Baseline Restored
 ```
 
 任何 Task 不能默认继承前一个实验的 Shader 状态。
+
+---
+
+## 7.7 现场故障后的证据规则
+
+回放可能崩溃、断连或进入不确定状态。一次查询失败、现场被隔离、原战略已无可行取证路径是三件事，前两者不自动证明第三者。
+
+同一 Capture、同一设备、原目标和权限范围内，可以请求受控恢复并继续原计划，不要求用户重新描述症状或重新规划。换设备、扩大权限或改变目标找用户。同一失败条件重复出现时停止无效重开。
+
+| 内容 | 恢复后的处理 |
+|---|---|
+| 有来源的截图、IR、资源表、完整 Experiment | 条件仍成立时继续作为历史事实使用 |
+| 当前 Event、连接、替换、能力和测量条件 | 在新现场重新核验 |
+| 未返回可靠结果的步骤 | 保持未知，按需补做 |
+| 中断 Experiment 的已保存阶段 | 保留为历史事实，不与新现场拼成一次完整 Experiment |
+| 仍要验证的原 Hypothesis | 在新现场建立 Baseline 并完成新的实验链 |
+
+相同的 Capture 内容只说明文件相同，不说明设备、Event、替换、驱动或性能条件相同。现场被隔离期间，已保存的材料足以推进离线分析时继续，否则诚实等待恢复。
 
 ---
 
@@ -2122,7 +2207,7 @@ RenderDoc Agent 应优先利用：
 - Trigger；
 - Compiler Statistics。
 
-纯 Embedding 只是补充。
+纯 Embedding 只是补充。（裁决见 0.1：产品不使用 Embedding 或 Semantic 通道。）
 
 ### Contradiction Injection
 
@@ -2539,7 +2624,7 @@ General Execution Orchestrator 根据 Plan 创建 Tasks。
 ```text
 Triage
   ↓
-Reproduction Qualification
+Symptom Anchoring
   ↓
 Differential Plan
   ↓
@@ -2562,12 +2647,38 @@ Skeptic
 Report and Knowledge
 ```
 
+这是判断顺序，不是固定流水线。定位帮助判断 Knowledge 是否适用，Knowledge 也帮助选择值得定位的对象；低成本的绑定或计算特征核对可以提前做。
+
+### Symptom Anchoring
+
+后面每一步都默认"哪里错了"是已知的。实际拿到的往往只有一份 Capture 和一句症状，没有正确参照。所以调查的第一件事是锚定：证明 Capture 里的某个原生纹理区域、某个 Event 或 Draw 就是用户所说的对象，并说明"错"是相对什么而言。
+
+**"应该是什么"的来源。** 没有参照就无法定义异常。可用的来源按可得性排列：
+
+| 来源 | 说明 |
+|---|---|
+| 用户指认 | 用户指出区域、给出参考图或描述期望。这是只有用户掌握的事实，不是让用户提供方法；属于用户标注，不等于工具观察 |
+| 同帧对照 | 同一 Capture 中未受影响的邻近区域、同类对象或同一像素在更早 Event 的值 |
+| Invariant | 无须参照即可判定的规则：数值有限、范围合法、守恒关系、格式与精度约束 |
+| 跨 Capture 参照 | 正常设备或正常版本的对应 Capture |
+| Knowledge 给出的特征 | 历史机制预测的可观察特征，只作待核对的线索 |
+
+**两条路径互相印证。**
+
+- Image side：从最终输出找到候选区域，映射到原生纹理坐标，读取区域数值，用 Pixel History 得到写入该区域的 Event。
+- Object side：对这些 Event，查看 Draw 实际覆盖的范围和内容，结合 Mesh、绑定的 Texture 与 Shader 判断它画的是什么。
+
+Image side 的区域落在 Object side 某个 Draw 的覆盖内，且该 Draw 的内容与用户描述的对象一致，锚点才算确立。
+
+**锚点的依据分三档：** 用户确认；两条路径互相印证；仅候选。锚点仍是"仅候选"时，First Bad Event、Hypothesis 区分和 Counterfactual 都没有成立的基础，此时下一步优先选择能确立或否定它的检查。对象或区域确有歧义且现有材料无法判定时，问用户一次，比长时间猜测更好。展示截图的尺寸可能不同于原生纹理，坐标以原生纹理为准。
+
 ---
 
 ## 10.5 Debugger 完成条件
 
 ### Complete
 
+- Symptom Anchor 已确立（用户确认或两条路径互相印证）；
 - First Bad Event 已定位；
 - Root Cause 已拆分；
 - 替代 Hypothesis 已处理；
@@ -3992,6 +4103,40 @@ Not Project Ground Truth
 
 ---
 
+## 16.5 历史案例导入归一化
+
+历史 Debug Case 服务冷启动，是可选的 Candidate 原料，不是已验证的 Knowledge，也不会自动成为 Candidate。
+
+### 摄入边界
+
+- 只接受显式指定的 case 文件及其声明的附件闭包；拒绝 `.rdc`、可执行文件、SVG、目录扫描和闭包外路径。
+- 附件按内容哈希寻址入库，绝对路径不入库；源文件名匿名化为稳定的内容 ID，原文件名不进仓库和卡片正文。
+- 含 Secret 或凭据时整单不入库。
+- Shader diff 外置为独立附件，卡片只保留锚点与哈希。
+- 文件破损时隔离，不解析半份。缺附件时保持 Draft，不能创建 Candidate、标记 Verified 或 Promoted。
+
+### 字段映射
+
+| 源字段 | 卡片或调查记录 |
+|---|---|
+| 身份与标题 | Case 身份；标题作为 Claim 陈述的起点 |
+| 状态 | 源状态。`fixed` 只是 Fix 章的事实，不等于 Verified |
+| 环境 | Scope 多轴（平台、API、GPU、引擎、渲染路径） |
+| 复现条件 | Symptoms 与 Exclusions |
+| 症状 | Symptoms |
+| 证据 | Evidence 章 |
+| 调查过程 | Derived，不升格为 Observed |
+| 根因 | Root Cause 七段；缺项标 unknown，不补写 |
+| 修复与 diff | Fix；diff 外置 |
+| 验证计划 | Experiment 与 Verification；历史计划不等于已复跑的 Experiment |
+| 泛化建议 | Derived；推荐流程只是候选 Procedure |
+
+### Case Card 最低章节
+
+Claim、Scope 与 Exclusions、Symptoms、Evidence、Root Cause、Experiment 与 Verification、Fix、Negative、Open Challenges、Derived。缺章不得标 Verified。同一家族的 Pattern 可能在 GPU 轴上互斥，Scope 不得从个别型号扩大为整个厂商。
+
+---
+
 # 17. 实施路线与 Codex 落地原则
 
 ## 17.1 Release 目标
@@ -4284,6 +4429,7 @@ RenderDoc 官方明确将其定位为调试自行开发程序的工具。
 ## 19.2 Debugger
 
 - 可从现象形成 Plan；
+- 可确立 Symptom Anchor；
 - 可定位 First Bad Event；
 - 可建立 Root Cause；
 - 可完成 Counterfactual；

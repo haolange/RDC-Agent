@@ -82,7 +82,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 | Fail-closed 三分类与标注点 | [`docs/contracts/failure-model.md`](docs/contracts/failure-model.md) |
 | Orchestrator façade 行数 / 职责外提 | 本文件 Invariant + `pnpm run check:orchestrator-facade` |
 | Profiles / Skills / Hooks / Memory / RDC 产品规格 | [`docs/product/`](docs/product/) |
-| RenderDoc 领域目标权威 | [`docs/product/renderdoc-agent-complete-design.md`](docs/product/renderdoc-agent-complete-design.md) |
+| RenderDoc 领域目标权威 | [`docs/product/RenderDoc Agent 完整设计书.md`](<docs/product/RenderDoc Agent 完整设计书.md>)（第 0 章为产品裁决） |
 | Workbench / Transcript / Composer | [`docs/ui/workbench-and-transcript.md`](docs/ui/workbench-and-transcript.md) |
 | Design System（Token / 按钮 / 颜色 / 组件） | [`docs/ui/design-system.md`](docs/ui/design-system.md) |
 | Work Process UI 验收 checklist | [`docs/ui/work-process-checklist.md`](docs/ui/work-process-checklist.md) |
@@ -144,7 +144,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 
 - [`docs/product/scoped-runtime-resources.md`](docs/product/scoped-runtime-resources.md) — Scope、Profiles、Skills、Hooks、Memory、Project Instructions
 - [`docs/product/vertical-debugger-overview.md`](docs/product/vertical-debugger-overview.md)
-- [`docs/product/renderdoc-agent-complete-design.md`](docs/product/renderdoc-agent-complete-design.md) — 受本文件裁决的详细目标设计；目标态未全部实现
+- [`docs/product/RenderDoc Agent 完整设计书.md`](<docs/product/RenderDoc Agent 完整设计书.md>) — RenderDoc 领域的理想架构；第 0 章列出产品裁决，工程合同冲突由本文件裁决；目标未全部实现
 - [`docs/product/acceptance-ledger.md`](docs/product/acceptance-ledger.md) — Verifier 结论落盘（U00–U07 / T18）
 - 其它：`docs/product/README.md`
 
@@ -211,7 +211,7 @@ Settings 只读 `schemaVersion` **8**，经校验的 `appearance.chromeThemes` �
 
 ## Current / Target / Migration Adjudications
 
-本节是 Wave 0 原子裁决。凡写「当前态」即仓库现有实现；「目标态」即后续 Wave 必须收敛到的单一路径；「迁移门禁」是实现该目标时的数据/契约约束。目标态未实现前，不得把目标模块写成已完成，也不得为旧路径增加兼容双轨。详细字段与领域流程见 [`docs/product/renderdoc-agent-complete-design.md`](docs/product/renderdoc-agent-complete-design.md)；该文件受本裁决约束，不是第二产品权威。
+本节是 Wave 0 原子裁决。凡写「当前态」即仓库现有实现；「目标态」即后续 Wave 必须收敛到的单一路径；「迁移门禁」是实现该目标时的数据/契约约束。目标态未实现前，不得把目标模块写成已完成，也不得为旧路径增加兼容双轨。详细字段与领域流程见 [`docs/product/RenderDoc Agent 完整设计书.md`](docs/product/RenderDoc Agent 完整设计书.md)；该文件受本裁决约束，不是第二产品权威。
 
 非侵入硬约束（当前态与目标态共同成立）：
 

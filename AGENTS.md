@@ -82,7 +82,7 @@ Appearance 详细规则见 docs/ui/appearance-checklist.md；禁止恢复 transl
 
 ## 按任务读取权威与验证
 
-模块字段和验收证据在主题文档，根文件不重复。运行时、权限、失败模型和投影见 `ARCHITECTURE.md` 与 `docs/contracts/`。Agent、Skill、Hook、Memory 与调查目标见 `docs/product/scoped-runtime-resources.md` 和 `docs/product/renderdoc-agent-complete-design.md`。RDC 与回放见 `docs/architecture/rdc-runtime.md`。UI 见 `docs/ui/design-system.md`。现场证据只写入 `docs/product/acceptance-ledger.md`。
+模块字段和验收证据在主题文档，根文件不重复。运行时、权限、失败模型和投影见 `ARCHITECTURE.md` 与 `docs/contracts/`。Agent、Skill、Hook、Memory 与调查目标见 `docs/product/scoped-runtime-resources.md` 和 `docs/product/RenderDoc Agent 完整设计书.md`。RDC 与回放见 `docs/architecture/rdc-runtime.md`。UI 见 `docs/ui/design-system.md`。现场证据只写入 `docs/product/acceptance-ledger.md`。
 
 关键边界以 ARCHITECTURE 核心 Invariant 为准，这里不另写一份。Plan 与 generation：Mission 计划门冻结后，用户点声明按钮进入 General，General 就地终答，用户自行切回 Mission。`handoffs` 只驱动建议行和计划门；不存在 `agent_handoff` 工具或自动回 Mission。
 
