@@ -5,7 +5,7 @@ description: Diagnose pixel history, overdraw, and color errors from region-scop
 
 # Pixel Forensics
 
-Use this skill when a region of the image, a pixel's history, or overdraw is the question.
+Use this skill when a region of the image, a pixel's history, or overdraw is the question. Live steps belong to General; an analyst works on the granted images and records and returns any missing check in `unresolved`.
 
 ## 1. Anchor the region from two sides
 
@@ -13,7 +13,7 @@ A region is anchored when you can name the native texture, subresource, pixel re
 
 - **Image side.** Export the current output and inspect it with `read_image`; use a source-pixel `region` to enlarge areas that are too small to judge, and keep the returned source hash, dimensions and rectangle. Pick a candidate rectangle from the reported visual feature. A display screenshot can differ in size from the native texture, so map the candidate onto the native output (event, resource, subresource, dimensions) before reading values. Read a bounded rectangle of native values, the target point and a nearby unaffected control point, then take the pixel history to learn which events wrote there.
 - **Object side.** For the events that wrote the candidate rectangle, look at what each draw actually paints: a draw-call overlay or the output difference across that event, the mesh it submits, and the textures and shader it binds. This tells you which object the pixels belong to.
-- **Agreement.** The anchor is established when the image-side rectangle lies inside what an object-side draw covers and that draw's content matches the object the user described. With only one side, keep it a candidate and choose the next check that could confirm or refute it. A region the user points out or confirms is established by that confirmation; still map it to the native texture.
+- **Agreement.** The anchor is established when the image-side rectangle lies inside what an object-side draw covers and that draw's content matches the object the user described. Label the anchor at the start of its Evidence summary: `cross-validated` when both sides agree, `candidate` with only one side (choose the next check that could confirm or refute it), `user-confirmed` when the user points out or confirms the region; still map it to the native texture.
 
 Missing coordinates are not a reason to stop. If the image or the mapping cannot be obtained, record the exact failed step. If the object or region stays ambiguous after looking, ask the user once.
 

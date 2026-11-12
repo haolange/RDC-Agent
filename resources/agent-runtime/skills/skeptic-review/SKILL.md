@@ -24,7 +24,7 @@ status               open | resolved | wont_fix
 resolutionClaimId    required when status == resolved; must resolve to a ClaimRecord
 ```
 
-1. Read the cited Claims, Evidence, and Experiments. Prefer negatives and contradictions from Knowledge.
+1. Read the cited Claims, Evidence, and Experiments, including the dependencies the runtime granted with them.
 2. Ask whether each Claim is supported, scoped, and (if causal or counterfactual) backed by a qualifying Experiment (`S-CAUSAL-01`).
 3. Write one Challenge per gap. `requiredFollowUp` must be a concrete check (event, pixel region, intervention, or missing artifact), not a new narrative.
 4. Leave accepted Claims untouched. Request more evidence instead of inventing a replacement cause.
@@ -36,7 +36,7 @@ For `rd.resource.get_usage`, distinguish the requested resource to which the usa
 
 `ChallengeRecord` is the `record` body, not the entire `investigation_write` envelope. For a `ready` Challenge, supply non-empty envelope `sourceRefs: [{ artifactId, expectedHash }]` from the granted Investigation artifacts actually read. `investigation_read` returns the manifest artifactId and exact contentHash; `investigation_list` returns the same identity/hash within the granted scope. A `targetRef`, `worldStateId`, or content URI alone does not supply manifest provenance. Keep the artifact readiness (`status: ready`) separate from the open review issue (`record.status: open`). Do not copy a native tool-output hash or guess a source hash. Granted content that is readable but whose metadata has not yet been read is a remaining retrieval step, not missing external input; reserve the metadata read before writing. If access is denied or the remaining budget cannot cover it, return Partial with the exact failed or unperformed step, without resetting the review budget.
 
-Before accepting a bounded Capsule, count its required artifact reads plus tool discovery, `investigation_schema`, each intended `investigation_write`, one correction, and `turn_complete`. A five-source review that may need a typed Challenge needs at least ten tool calls and a wall deadline that covers actual Provider latency. If the supplied budget cannot cover that sequence, report the exact missing step as partial/blocked; do not equate an unwritten Challenge with no warranted challenge. Prefer the exact supplied content URIs and hashes over broad searches.
+If the supplied budget cannot cover the granted reads, the intended writes and `turn_complete`, report the exact missing step as partial/blocked; an unwritten Challenge is not the same as no warranted challenge. Prefer the exact supplied content URIs and hashes over broad searches.
 
 ## Small Loop handoff to General
 
@@ -50,7 +50,7 @@ For substantive multi-step quantitative claims, check the actual inputs, units, 
 
 Skeptic does not call `task_create`. After Challenges are written, General (via `$renderdoc-execution`) creates one Task per `open` Challenge. The Task subject quotes `challengeId` and `requiredFollowUp`. Domain fields stay on the Challenge, not on `TaskRecord`.
 
-General evaluates follow-up evidence and updates its own Challenge/Checkpoint records with resolutionClaimId, or writes a new version through the owning investigation. An independent reviewer creates new Challenge outputs and does not replace parent records. Then General increments the Iteration Memory Artifact. Do not call `memory_write` unless the user asked.
+General evaluates follow-up evidence and updates its own Challenge/Checkpoint records with resolutionClaimId, or writes a new version through the owning investigation. An independent reviewer creates new Challenge outputs and does not replace parent records. Do not call `memory_write` unless the user asked.
 
 ## Bounds
 
