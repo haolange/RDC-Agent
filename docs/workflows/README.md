@@ -1,6 +1,6 @@
 # Workflow Docs
 
-- [垂直调查设计分析](../product/rdc-agent-investigation-design-analysis.md)：目标、架构选择及验收原则。
+- [垂直调查设计](../product/rdc-agent-investigation-design-analysis.md)：目标架构、调查主线、信息流、完成资格与已定裁决。
 - [垂直调查批准 Plan](vertical-investigation-plan.md)：已批准的实施方向和 T0–T7 验收要求。
 - [垂直调查收敛计划](vertical-investigation-convergence.md)：当前执行用的自足计划，按阶段给出顺序、完成标准与停止条件。
 - [垂直调查任务清单](vertical-investigation-tasks.md)：唯一持久 Task、进度快照及历史工作记录。

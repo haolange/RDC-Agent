@@ -6,7 +6,7 @@
 
 ## 阅读入口
 
-- [设计分析原文](../product/rdc-agent-investigation-design-analysis.md)：用户要求上传的 design-analysis 文档，保留原文和基线复现，不把历史行为当成当前行为。
+- [设计分析原文](../product/rdc-agent-investigation-design-analysis.md)：现为重写后的目标架构设计；当时上传的原文与基线复现见 Git 历史。
 - [用户批准的完整 Plan](vertical-investigation-plan.md)：保留当时批准的原文；后续测试模型要求以本文最新说明为准。
 - [当前架构权威](../../ARCHITECTURE.md)及其 Authority Map：裁决现行产品、运行、权限和投影合同。
 - [验收账本](../product/acceptance-ledger.md)：搜索“垂直调查收敛”，查看实际结果与失败边界。
