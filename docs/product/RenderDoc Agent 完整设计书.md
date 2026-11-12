@@ -1578,6 +1578,8 @@ Tool 返回或视觉观察到的原始现象。
 - Cross-Device；
 - Expert-Reviewed。
 
+产品自身能达到的最高等级是 Replay-Counterfactual。Runtime-Counterfactual、Cross-Scene、Cross-Device 需要在真实工程里运行，不在产品范围内；它们保留在等级表里，用来标注用户带入的外部验证结果。
+
 不能用一个 `0.92` 同时代替二者。
 
 ---
