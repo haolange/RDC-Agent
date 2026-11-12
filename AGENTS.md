@@ -17,7 +17,7 @@
 - **自主推进**。已授权且在安全边界内的工作一路做完，不在中途询问"是否继续"。
 - **阻塞隔离**。遇到真实外部阻塞（缺密钥、硬件不可用、权限受限）时，先把不依赖它的部分全部做完，最后一次性列出阻塞点与最小解阻条件。
 - **收口**。用户要求收口时冻结范围，沿最短依赖链完成剩余项；只有明确的验收失败、可复现错误或实际权限漏洞才扩大修复。
-- **计划与进度**。垂直调查的当前计划是 `docs/workflows/vertical-investigation-convergence.md`，进度写在它的状态表里。状态只用 `待执行 / 执行中 / 待验证 / 通过 / 阻塞`；代码完成是"待验证"，真实验证通过才是"通过"。不另建计划、交接或总结文档。
+- **计划与进度**。垂直调查的当前计划是 `docs/workflows/vertical-investigation-convergence.md`，进度写在它的状态表里。状态词以该文件为准；代码完成不等于通过，真实调查经用户确认才是"通过"。不另建计划、交接或总结文档。
 
 ## 2. 架构与代码工程铁律
 
@@ -28,7 +28,8 @@
 - **边界校验一次**。在系统入口、外部输入和跨模块边界做严格的契约校验（schema validation、type guard、assert）。本仓库的边界是：IPC handler、preload 暴露的 API、模型 tool 入参、RDC-Tool CLI 返回、磁盘读回的持久记录、Provider 响应。
 - **内部信任契约**。边界之内的核心路径直接信任已校验的数据，不重复判空，不写推测性的防御分支。
 - **异常就失败或重置**。错误路径用 fail-fast、transaction rollback、generation／lease 失效或外层状态重置处理。本仓库已有的原语优先复用：调查记录的事务提交、Task execution 的 generation、RDC lease 的 quarantine 与受控恢复、capture 入口位置恢复。
-- **不写 silent fallback**。不为了"不报错"吞掉异常、返回空值或替换成默认值。本层处理不了的失败按 `docs/contracts/failure-model.md` 向上报告；重试或兜底须有该契约里的明确依据。数据无法解释时在返回里显式标注，不伪造。
+- **不写 silent fallback**。不为了"不报错"吞掉异常、返回空值或替换成默认值。数据无法解释时在返回里显式标注，不伪造。
+- **失败按三类处理**（`docs/contracts/failure-model.md`）：Security 类 fail-closed；Integrity 类保留可验证的子集并明示缺口；Availability 类按该契约的表重试或恢复。表里没有的重试和兜底不加。
 - **一处修正优先于逐项加判断**。准备给多种情形分别加分支时，先找到负责该行为的那一处，让这些情形自然正确。只有需求、契约或已复现的问题要求区别对待时才单设分支。
 
 ### 2.2 Evidence-Only
@@ -42,7 +43,7 @@
 - `main / preload / renderer / shared` 联动：角色、阶段、IPC、共享类型的改动须同时核对 runtime 与 UI，并覆盖调用方、数据结构、序列化与配置、状态释放和配套测试。
 - 新路径替代旧路径时，同步处理入口、配置、类型、UI、测试和文档，旧路径**当场删除**。不保留 legacy／deprecated alias、兼容 shim、双写双读、平行实现或 feature flag。
 - 确实无法直接迁移时，说明具体约束并按用户明确决定执行，不自行留下双轨。
-- **转换已有数据**：只处理能可信映射的部分，先备份、预览、验证，再原子替换；正常运行只读新格式。历史签名、原始日志和原始记录不改写；无法可信转换的旧记录保留原件。
+- **转换已有数据**：运行时不做迁移，正常运行只读新格式。确需转换时写成用户触发的一次性工具：只处理能可信映射的部分，先备份、预览、验证，再原子替换。历史签名、原始日志和原始记录不改写；无法可信转换的旧记录保留原件。
 
 ### 2.4 版本控制与环境红线
 
@@ -100,7 +101,8 @@
 | 局部 | 受影响单测、`pnpm run typecheck`、`pnpm run lint`、对应 `check:*` |
 | 会话投影 | 另加 `pnpm run check:session-projection` |
 | 右栏 | 另加 `pnpm run check:right-rail` |
-| 跨层（main / preload / renderer / shared） | 另加 `pnpm run test:coverage`、`pnpm run check:coverage-ratchet`、`pnpm run check:gates`、`pnpm run build` |
+| 跨层（main / preload / renderer / shared） | 另加 `pnpm test`、`pnpm run check:contracts`、`pnpm run test:coverage`、`pnpm run check:coverage-ratchet`、`pnpm run check:gates`、`pnpm run build` |
+| 提交前 | `pnpm run check:git-diff`（需 `RDC_DIFF_BASE`） |
 | 发布配置 | 才执行 pack |
 
 行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。行数与分层由 ESLint `max-lines` / `no-restricted-imports` 执行。
@@ -109,7 +111,7 @@
 
 **Browser QA**：用 disposable `pnpm run start:agent-browser`，只消费一次 `/qa?qaBootstrap=...`，进入同源 `/app`。不直开 Vite，不把 token 留在 URL。high-impact 需要 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`。没有设备的 Remote／Android 验证记为阻塞，不以本地成功代替。
 
-**实例锁**：人类入口与 QA 共享 `%APPDATA%/rdc-agent/instance.lock`，活 owner 不回收。本轮启动过 QA 或 Electron 时，结束前停掉本轮进程并交还桌面启动权。
+**实例锁**：锁文件是 `<userData>/instance.lock`，活 owner 不回收。Browser QA 默认使用临时 userData，与桌面应用互不占用；只有显式指定 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 时才共享真实数据和同一把锁。本轮启动过 QA 或 Electron 时，结束前停掉本轮进程。细节见 `docs/architecture/browser-qa-surface.md`。
 
 ### 交付时的状态
 
@@ -121,7 +123,7 @@
 
 - **结论先行**。第一句给出完成状态、核心根因或最终决断。简单任务几句话说清；复杂任务用清晰的层级和紧凑表格呈现改动与验证结果。
 - **说具体行为**。汇报聚焦于改了哪里的什么契约、解决了什么根因、验证结果如何。不只报 Task 编号或术语，不倾倒搜索过程和终端输出。
-- **验收账本**。现场证据只写入 `docs/product/acceptance-ledger.md`，每轮一条，不超过 10 行：做了什么、结果、证据位置、人工介入。不写清理流水账、字节数和进程号。
+- **验收账本**。现场证据只写入 `docs/product/acceptance-ledger.md`，每次真实运行（一次调查或一次实机验证）一条，不超过 10 行：做了什么、结果、证据位置、人工介入。不写清理流水账、字节数和进程号。
 
 ## 7. 仓库结构与权威
 
@@ -144,7 +146,7 @@
 | RenderDoc 领域目标与三种 Mission 的设计 | `docs/product/RenderDoc Agent 完整设计书.md`（第 0 章为产品裁决） |
 | Agent、Skill、Hook、Memory | `docs/product/scoped-runtime-resources.md` |
 | RDC 操作契约、lease、回放身份、Android 回执 | `docs/architecture/rdc-runtime.md` 与 `ARCHITECTURE.md` 的 Session Capture 节 |
-| UI/UX | `DESIGN.md`，详细视觉权威是 `docs/ui/design-system.md` |
+| UI/UX | `DESIGN.md`（原则），`docs/ui/design-system.md`（token 与组件） |
 | 右栏投影 | `docs/contracts/session-projection.md` |
 
 文档约定：
@@ -152,25 +154,34 @@
 - 根目录只放入口和长期跨层约定；领域规则归稳定的主题文档。临时禁令、机器路径、PID、某轮进度不写成永久规则。
 - 路径相对本库。文档中文为主，保留必要技术术语。上游仓库概念只作标记明确的对照，不成为运行前提。
 - 标准 Electron 布局，不恢复顶层 Config／Saved／Intermediate／Binaries。
-- 关键边界以 `ARCHITECTURE.md` 的核心 Invariant 为准。Plan 与 generation：Mission 计划门冻结后，用户点声明按钮进入 General，General 就地终答，用户自行切回 Mission。`handoffs` 只驱动建议行和计划门；不存在 `agent_handoff` 工具或自动回 Mission。
-- Session rail 为 Progress / Artifacts / Outputs / Context / Capture 单轨。
+- 关键边界以 `ARCHITECTURE.md` 的核心 Invariant 为准。动手前记住这几条：
+  - IPC 入参经 `parseIpcArgs` 校验；组件不直调 `window.electronAPI`。
+  - 审批 token 单次使用；凭据经 safeStorage，不可用时 fail-closed。
+  - Provider 与模型事实只在 JSON manifest 里，不写进代码或文档。
+  - 实验的五份签名回执（baseline、intervention、variant、rollback、restored）缺一不成立。
+  - RDC 现场没有全局镜像，只经 owning session 的 lease 访问；只有 General 操作 live 回放。
+  - Mission 只规划，不执行；没有自动回 Mission 的路径。
+  - CSP 不放行 inline style。
+  - 文件行数上限由 ESLint `max-lines` 执行。
+-Plan 与 generation：Mission 计划门冻结后，用户点声明按钮进入 General，General 就地终答，用户自行切回 Mission。`handoffs` 只驱动建议行和计划门；不存在 `agent_handoff` 工具或自动回 Mission。
 - Prompt 调用经 PromptPlan。
 
 ## 8. 设计系统约束（写 CSS 必读）
 
-Appearance 详细规则见 `docs/ui/appearance-checklist.md`；禁止恢复 translucent / semi-transparent sidebar。
+权威链：`ARCHITECTURE.md` → `DESIGN.md`（原则）→ [`docs/ui/design-system.md`](docs/ui/design-system.md)（token、尺度、组件）→ `docs/ui/` 下的专题文档。本节只列写代码时最常碰到的规则。
 
-**权威文件**：[`docs/ui/design-system.md`](docs/ui/design-system.md)。本节只保留高层原则。
-
-- **视觉定位**：restrained、高密度、实色分层的精密工具风。不使用装饰性特效或插画；backdrop blur 只允许模态遮罩 `--modal-backdrop-filter`，Dropdown / chrome 仍为实色；单一 accent 只用于 focus / selected / primary CTA。
-- **Token**：必须引用语义 token（`--token-*`），禁止直接用 primitive token；字号用 `var(--text-*)`，间距用 `var(--space-*)`，圆角用 `var(--radius-*)`，控件高度用 `var(--control-height-*)`。门禁：`pnpm run check:design-tokens`。
-- **按钮**：全局唯一按钮系统 `.button` + variant 修饰类；React 层用 `<Button>`。
-- **颜色**：全局 chrome 与 Composer agent accent 是两个体系，见 `docs/ui/design-system.md` 与 `docs/ui/appearance-checklist.md`。
-- **状态类**：一律 `is-*`（`is-active` / `is-selected` / `is-running` / `is-disabled`）并配对应 `aria-*`；禁止裸 `.active` / `.current`。
-- **焦点**：任何 `:hover` 必须配 `:focus-visible`；禁止 `outline: none` 而不提供等效焦点样式。
-- **新组件**：覆盖所有交互状态，通过 CSS 变量控制 variant，不使用内联 style，文件行数 ≤300/200。
-- **渲染层分层**由 `pnpm run check:renderer-structure` 与 ESLint `no-restricted-imports` 强制：`ui → lib`；`patterns → ui/lib/stores`（可读 store，不得写 store、不得直调 IPC）；`features` 不得横向 import 其他 feature，也不得 import `app` / `shell`；`stores` / `services` / `hooks` 不得 import `features` / `ui` / `patterns`；组件（`.tsx`）不得直调 `window.electronAPI` / `getElectronApi`。
+- **Appearance**：规则见 `docs/ui/design-system.md` 的「双体系」，验收见 `docs/ui/appearance-checklist.md`；禁止恢复 translucent / semi-transparent sidebar。
+- **Token**：引用语义 token（`--token-*`），不直接用 primitive token；字号、间距、圆角、控件高度分别用 `var(--text-*)`、`var(--space-*)`、`var(--radius-*)`、`var(--control-height-*)`。门禁：`pnpm run check:design-tokens`。
+- **按钮**：动作按钮用 `<Button>`（`.button` + variant）。
+- **状态类**：一律 `is-*` 并配对应 `aria-*`。
+- **焦点**：`:hover` 配 `:focus-visible`；去掉 outline 时提供等效焦点样式。
+- **新组件**：覆盖所有交互状态，variant 经 CSS 变量控制，不用内联 style。
+- **渲染层分层**由 `pnpm run check:renderer-structure` 与 ESLint `no-restricted-imports` 强制：`ui → lib`；`patterns → ui / lib / stores / hooks / services / i18n`（可读 store，不写 store、不直调 IPC）；`features` 不横向 import 其他 feature，也不 import `app` / `shell`；`stores` / `services` / `hooks` 不 import `features` / `ui` / `patterns`；组件（`.tsx`）不直调 `window.electronAPI` / `getElectronApi`。
 - 视觉参考：`designs/rdc-agent-design-system/index.html`。
+
+## Right Rail single-track gate
+
+Session 右栏是 Progress / Artifacts / Outputs / Context / Capture 单轨，投影契约见 `docs/contracts/session-projection.md`。改动右栏后运行 `pnpm run check:right-rail`。
 
 ## 9. 产物、依赖与命名
 
