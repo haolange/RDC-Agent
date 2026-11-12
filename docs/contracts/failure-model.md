@@ -38,7 +38,7 @@
 | Sandbox / permission deny-by-default | Security | Electron 面 |
 | CSP 绕过（`style-src`/`script-src` unsafe-inline、style attr） | Security | 生产无 unsafe-inline；`style-src-attr 'none'`；动态样式走 `useDynStyle` |
 | RDC context 无 session / lease 所有权不匹配 | Security | 仅 per-session lease；禁止 global mirror |
-| 在途 turn 读可变 Settings / 未冻结 plan | Integrity | `EffectiveRuntimePlan` schemaVersion 3 完整冻结 |
+| 在途 turn 读可变 Settings / 未冻结 plan | Integrity | `EffectiveRuntimePlan` schemaVersion 3 冻结权限约束、路由、工具面；当前 permission mode/revision 由主进程动态发布 |
 | SSRF / private DNS（`web_fetch`/`web_search`） | Security | 每跳校验 + pin |
 | Web 来源超完整字节界 / 非法 UTF-8 / 续页来源 hash 不符 | Integrity | 明确拒绝；不将前缀、替换字符或变化后的来源拼为完整资料。页面截断有可校验续读游标，不是不存在匹配资料的证据 |
 | Attachment SVG 脚本 / 超限媒体 | Security | `ATTACHMENT_MEDIA_UNSUPPORTED` |
@@ -61,13 +61,14 @@
 | Agent 达到 maxTurns 仍要求 continuation | Integrity | `AGENT_MAX_TURNS_EXCEEDED` → `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；不得静默完成 |
 | 本回合 direct Task 未结算即声明完成 | Integrity | `turn_complete` 拒绝并指明待结算 Task；获批调查的普通提前终答将可处理的缺口反馈到同一逻辑执行，真实限制、取消或无进展仍按对应原因终止，不误报 Provider failure |
 | Investigation 声明完成时缺 Checkpoint 或没有符合领域合同的 ready report | Integrity | `turn_complete` 返回 `MISSION_COMPLETION_DENIED` 而不记录 completed；报告状态、所需实验和相关 open Challenge 在声明前检查，存储或意外错误直接上报；部分或受阻可按原合同声明，最终答复仍复核实际引用的制品 |
+| RDC delegated lease 退出未确认 | Security + Integrity | 隔离 parent lease（`revokeDelegatedLease` 缺停止证明即 quarantine）；不得回退 parent 或并发第二 owner |
 | 获批 capture 切换／恢复的身份或退出无法核实 | Security + Integrity | 停止现场操作并隔离；保留签名 baseline 和未恢复状态，不能将 context clear 当成 daemon 已退出，也不将新现场补入旧实验 |
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |
 | Storage schema 损坏 | Integrity | quarantine + `STORAGE_CORRUPT` |
 | Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，不 quarantine |
 | Memory 跨进程锁超时 | Availability | `.memory.lock` / `.registry.lock` 活 pid 永不抢锁；可识别的死 pid 锁经独占回收标记串行回收，owner 无法读取或回收标记无法安全确认失主时等待并超时，避免抢占正在初始化或新取得的锁；超时 `MEMORY_LOCK_TIMEOUT` / `PROJECT_REGISTRY_LOCK_TIMEOUT` |
-| Session attachments.json | Integrity | 现写 `{ schemaVersion, attachments }`；缺版本纯数组仍 Zod 校验；未知更高 `schemaVersion` 不 quarantine |
-| Session shell-state.json | Integrity | 现写 `{ schemaVersion: '1', state: { cwd } }`；只存 cwd 不存 env；缺版本 / 损坏 quarantine 或 `STORAGE_SCHEMA`；未知更高 `schemaVersion` 不 quarantine |
+| Session attachments.json | Integrity | 写入 `{ schemaVersion, attachments }`；缺版本纯数组仍 Zod 校验；未知更高 `schemaVersion` 不 quarantine |
+| Session shell-state.json | Integrity | 写入 `{ schemaVersion: '1', state: { cwd } }`；只存 cwd 不存 env；缺版本 / 损坏 quarantine 或 `STORAGE_SCHEMA`；未知更高 `schemaVersion` 不 quarantine |
 | 非法历史 `workTrace` → null | Integrity | 读边界丢弃 |
 | Context 无法装入 → `CONTEXT_CANNOT_FIT` | Integrity | hard degrade 后仍失败则报错 |
 | 配置文件单文件 invalid + diagnostics | Integrity | 逐文件隔离，不拖垮列表 |
@@ -96,8 +97,11 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 | category | 行为 |
 | --- | --- |
 | `empty_stream` | 最多重试 **1** 次后 abort；**不**归入 `server_error` |
-| `server_error` | 真实 HTTP 5xx；最多 **3** 次重试 |
-| `overloaded` | HTTP **503/529**，或文案含 `at capacity` / `high demand` / `overloaded` / `service unavailable`；现有 `switch_model` 路径 |
+| `rate_limit` / `network_error` / `server_error` | 均最多 **3** 次重试（`DEFAULT_MAX_RETRIES`），耗尽后 abort；`server_error` 为真实 HTTP 5xx |
+| `overloaded` | HTTP **503/529**，或文案含 `at capacity` / `high demand` / `overloaded` / `service unavailable`；最多 **3** 次重试（`DEFAULT_MAX_RETRIES`）；连续 **3** 次（`OVERLOAD_SWITCH_THRESHOLD`）命中且存在不同的 fallback model 时 `switch_model` 并清零计数；无 fallback 则重试耗尽后 abort |
+| `prompt_too_long` | 先做一次 reactive compact；仍超长则 abort |
+| `max_tokens` | 输出上限决策：先 reactive compact（未尝试时），再 `continue_prompt` 最多 **2** 次（`DEFAULT_MAX_RECOVERY_RETRIES`），耗尽后 abort |
+| `unknown` | 立即 abort |
 | `auth_error` | **401/403**；立即 abort |
 | `stream_protocol` | `PROVIDER_STREAM_*` 协议违规；不重试 |
 

@@ -11,6 +11,8 @@ Composer 暴露：`Default`、`Auto-review`、`Full access`、`Custom`。主进�
 - `Full access`：显式信任本地文件与命令；仍受 primitive 硬约束（二进制/`.rdc`、realpath、灾难 shell、SSRF）。
 - `Custom`：在 Default 的审批规则之外，使用已确认的可读根、可写根和命令前缀。这些列表对 Default 与 Auto-review 无效。Full access 仍不能越过 profile 天花板。
 
+工具按 observe / record / mutate / execute 分类（`src/shared/constants/toolAccess.ts`）；`read-only` = observe + record，`workspace-write` 再加 mutate，`full` 再加 execute；未知工具与 MCP 按 execute；Full access 权限模式不能抬高 profile 天花板；原生 `shell.rdc` 要求 `full`。
+
 Browser QA 代答 `conversation:answerPlanReview`、`conversation:answerToolApproval`、`conversation:answerUserInput` 属于 high-impact，只在 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时放行。桌面 IPC 不受该环境变量限制。
 
 ### 在途权限切换
@@ -33,9 +35,9 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 
 `read_file` 的显式 `mode: audit` 沿用该工具的冻结可用性与读取权限；`path` 和 `compareWith.path` 分别提取并审批，第一路径在工程内不自动授权第二路径。执行层对两者分别 realpath/根边界校验，且校验各自预期hash；不由模型脚本直接读磁盘，不增加新工具身份或向受限reviewer授予 `read_file`。审计只返回有界字节信息和整文件比较结果，不授予编辑前置读取资格。capture拒绝、8MiB输入上限和取消合同见 runtime-kernel。
 
-canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `knowledgeReadRoots = [realpath(~/.rdc-agent/knowledge), realpath(<projectRoot>/.rdc-agent/knowledge)]`（仅存在且为真实目录；根自身 symlink/junction → 排除 + 诊断）。`AgentPermissionPolicy` **仅**对 `read_file` / `read_image` / `glob` / `grep` 把它们并入免审批读根。`write` / `edit` / `delete` / `shell` / `code_interpreter` 在策略层与执行层双重拒绝。sibling 越界（如 `~/.rdc-agent/memory`、`~/.rdc-agent/agents`）拒。写入 Knowledge 仍只经 `knowledge_*` + human review。见 `ARCHITECTURE.md` 裁决 G。
+canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `knowledgeReadRoots = [realpath(~/.rdc-agent/knowledge), realpath(<projectRoot>/.rdc-agent/knowledge)]`（仅存在且为真实目录；根自身 symlink/junction → 排除 + 诊断）。`AgentPermissionPolicy` **仅**对 `read_file` / `read_image` / `glob` / `grep` 把它们并入免审批读根。`write` / `edit` / `delete` / `shell` / `code_interpreter` 在策略层与执行层双重拒绝。sibling 越界（如 `~/.rdc-agent/memory`、`~/.rdc-agent/agents`）拒。写入 Knowledge 仍只经 `knowledge_*` + human review。见 `ARCHITECTURE.md` 裁决 G。
 
-## Electron Sandbox（Phase 6）
+## Electron Sandbox
 
 - BrowserWindow：`sandbox: true`。
 - Preload：仅 `contextBridge` + `ipcRenderer` 受控暴露。
@@ -44,7 +46,7 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 
 ## IPC Schema（Zod）
 
-**全量** IPC handler 经 `parseIpcArgs`（含 settings / terminal / workflow / memory / conversation / project / capture / shell / rdc-runtime / trace / web 等）。非法 payload fail-closed。`approvalToken` 单次消费（`IpcApprovalTokenService`）。契约测试：`IpcPayloadGuard.test.ts`。Renderer 读取 Investigation 正文的唯一通道是 IPC `investigation:read({ sessionId, artifactId, expectedHash })`：分类 `read`；active project/session owner gate；内部唯一调用 `InvestigationArtifactService.readRecord`；只返回既有 max-bytes 内完整 record，超限 fail-closed；不接受 URI / 绝对路径 / generic artifact。见 `ARCHITECTURE.md` 裁决 B / E。**该 IPC 已落地**。T18 知识导入已证见 `ARCHITECTURE.md` T18 已证组；产品级 Browser QA 全矩阵见 U05 / [`docs/product/acceptance-ledger.md`](../product/acceptance-ledger.md)。
+**全量** IPC handler 经 `parseIpcArgs`（含 settings / terminal / workflow / memory / conversation / project / capture / shell / rdc-runtime / trace / web 等）。非法 payload fail-closed。`approvalToken` 单次消费（`IpcApprovalTokenService`）。契约测试：`IpcPayloadGuard.test.ts`。Renderer 读取 Investigation 正文的唯一通道是 IPC `investigation:read({ sessionId, artifactId, expectedHash })`：分类 `read`；active project/session owner gate；内部唯一调用 `InvestigationArtifactService.readRecord`；只返回既有 max-bytes 内完整 record，超限 fail-closed；不接受 URI / 绝对路径 / generic artifact。见 `ARCHITECTURE.md` 裁决 B / E。产品级 Browser QA 的现场证据见 [`docs/product/acceptance-ledger.md`](../product/acceptance-ledger.md)。
 
 ## Browser Bridge（QA-only / debug-only）
 - /qa is a QA bootstrap surface: the launcher logs a one-time qaBootstrap, which is consumed before minting the bridge cookie. It isolates browser origins; it is not authentication against a malicious local process.
@@ -74,7 +76,7 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 - **禁止** RDC global mirror、`legacyGlobalMirror`、`getRdcRuntimeContext` 全局 API。
 - 工具读上下文前必须校验 lease 所有权；空 `sessionId` fail-closed（不写任何全局镜像）。
 - UI 无 session 摘要可经 `getMostRecentRdcContextLease`；工具路径仍须显式 `sessionId` + ownership assert。
-- **Delegated lease**：parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease（`delegatedFrom`），使 `domainExtensions.rdc.requiresLease=true` 的 child 取得 parent RDC context 并串行；同一 parent 同时只允许一条 live delegated lease；无 parent lease 则 fail-closed，不得静默创建。child 完成/取消/抛错立即 `revokeDelegatedLease`，parent lease 不变。child lease 不可再转授。未请求 RDC 领域扩展 的 child **在 allowlist 层**就不能拿到 `rdc_context` / `rdc_probe`（`shell` 可保留，但不继承 parent lease）。禁止并发 RDC 双 owner。Mission 只读面走 `rdc_probe`，不得获得 generic shell。
+- **Delegated lease**：parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease（`delegatedFrom`），使 `domainExtensions.rdc.requiresLease=true` 的 child 取得 parent RDC context 并串行；同一 parent 同时只允许一条 live delegated lease；无 parent lease 则 fail-closed，不得静默创建。child 结束后须携带实际停止证明调用 `revokeDelegatedLease`；缺证明或存在 quarantine 时隔离 parent lease。child lease 不可再转授。未请求 RDC 领域扩展的 child **在 allowlist 层**不能拿到 `rdc_probe`（`runtime_context` 保留但不返回 rdc 载荷；`shell` 可保留，但 `shell.rdc` 在执行入口拒绝，且不继承 parent lease）。禁止并发 RDC 双 owner。Mission 只读面走 `rdc_probe`，不得获得 generic shell。
 
 ## Hook Trust
 
@@ -82,7 +84,7 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 - builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。
 - 旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。
 - 12 canonical events 保持单一 `HookEngine` 路径。见 `ARCHITECTURE.md` 裁决 K。
-- **当前态**：上述条款已由 `HookEngine` + `hook-trust.json` schemaVersion 2 落地；信任匹配只认 `trustFingerprint`，不再接受 YAML-only `sourceHash`。
+- 信任记录存于 `hook-trust.json`（schemaVersion 2），匹配只认 `trustFingerprint`，不接受 YAML-only `sourceHash`。
 
 ## MCP Trust
 
@@ -98,7 +100,7 @@ canonical knowledge 读根（**U02 落地**）：`EffectiveRuntimePlan` 在 `pre
 - RDC / 通用 shell 经 `ShellInvocationService`；exitCode：`code ?? (signal ? 128+n : 1)`。
 - `ShellCommandRiskAnalyzer`：结构分析 + denied 词边界与路径前缀；最高分档为 `high`，只做审批路由，没有 `critical` 档位。
 - **风险分类器不是安全边界**；真正边界是 PermissionPolicy + `shellHardDeny` + 原生身份/路径等执行检查与操作系统权限。Electron renderer sandbox 不隔离主进程派生的普通 shell；不得宣称存在命令级 OS sandbox。
-- shell.rdc 与 shell.command 互斥。严格合法的 search/describe/list 仅读冻结目录，按 low risk 审核；原生操作先复用执行边界验证 owning General、冻结 binding/catalog、lease、scope/effects、参数与路径。已验证的读取、测量、受控 artifact 写入及可恢复 replay 位置操作按 low risk；shader replacement 按 medium 进入独立审核，敏感配置路径按 high。未知效果、身份覆盖、非法参数或越权直接拒绝，不由审核模型补授权。实际执行再次验证，保留串行、取消、恢复及签名证据合同。
+- shell.rdc 与 shell.command 互斥。严格合法的 search/describe/list 仅读冻结目录，按 low risk 审核；原生操作先复用执行边界验证 owning root 的 full 天花板 profile、冻结 binding/catalog、lease、scope/effects、参数与路径。已验证的读取、测量、受控 artifact 写入及可恢复 replay 位置操作按 low risk；shader replacement 按 medium 进入独立审核，敏感配置路径按 high。未知效果、身份覆盖、非法参数或越权直接拒绝，不由审核模型补授权。实际执行再次验证，保留串行、取消、恢复及签名证据合同。
 - 普通 shell 的例行/允许前缀必须覆盖每个静态简单子命令；一个 `git status` 不授权后续 `git reset --hard`。仓库脚本不因 typecheck/check 名称免审；动态展开、重定向、引用或无法确认的组合进入审核；灾难和文件/RDC 旁路硬拒绝优先。专用 Git 工具仍经原权限入口，shell 不增加 Git 权限。
 - project 内普通 write_file/edit_file 可按 low risk 自动批准；执行层仍要求 realpath、无链接写入、文本大小及覆盖前同 session 成功读取。capture 输入、Git 元数据与 canonical knowledge 不作为通用写入目标；Agent/Skill/Hook/Policy/MCP/Memory、secret 与环境配置需要明确审核，不获得通用自动编辑许可。
 
@@ -140,7 +142,7 @@ Decision lattice 为 `allow < auto_review < ask_user < deny`。`approvalFloorByT
 
 ## 原生 RDC 执行证据
 
-shell 的 command 与 rdc 互斥；ToolValidator oneOf/not 与执行入口双重检查。结构化模式仍进入 shell 的同一审批入口；low 分类须来自已验证的具体语义，不能仅凭工具名称或模型声称只读。General 之外即使 Full access 也拒绝；本机冻结配置、owning project/session lease、非 default context、非 delegated/offline child 同时成立才执行。模型不可传 capture/replay/context identity。操作权限按冻结 catalog 的 scope、effects、前置条件、参数和路径声明校验，不按命名空间授权。未知操作或影响 fail-closed；生命周期、remote、全局配置、窗口及销毁仍由应用专门入口管理。Skill 仅提供知识，不能扩权。
+shell 的 command 与 rdc 互斥；ToolValidator oneOf/not 与执行入口双重检查。结构化模式仍进入 shell 的同一审批入口；low 分类须来自已验证的具体语义，不能仅凭工具名称或模型声称只读。原生 RDC 执行要求 owning root turn 的 `full` 天花板 profile（内置为 General），Full access 权限模式不能抬高天花板，天花板不足即拒绝；仅 `capture_select` / `capture_restore` / `capture_recover` 另要求 agentId 为 general；本机冻结配置、owning project/session lease、非 default context、非 delegated/offline child 同时成立才执行。模型不可传 capture/replay/context identity。操作权限按冻结 catalog 的 scope、effects、前置条件、参数和路径声明校验，不按命名空间授权。未知操作或影响 fail-closed；生命周期、remote、全局配置、窗口及销毁仍由应用专门入口管理。Skill 仅提供知识，不能扩权。
 
 执行回执仅由主进程在真实原生成功调用后签名，key 在 safeStorage；模型提交的 result JSON、普通 shell 输出或 artifact hash 本身不具备 provenance。签名校验与 SessionArtifactResolver 所有权/hash 同时成立才可引用。实验关闭和新完成必须满足五阶段真实调用与同 replacement 的回滚；旧记录只保留可读性。详见 docs/architecture/rdc-runtime.md。
 
@@ -165,7 +167,7 @@ plan:* 以当前查看 session + planId/revision/URI/hash 定位持久历史 too
 Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDC_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。
 
 
-### 自动审查与计划交接
+### 自动审查展示
 
 自动审查以主进程 reviewer=auto_review 识别，只在 Work Process 展示规则/独立审核及真实结论，不是人工待回答请求。Composer 只提供真实人工请求的批准入口，混合请求分别结算，不改变人工 policy floor。审核来源不从命令文本、风险或 ID 格式推测。
 

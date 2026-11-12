@@ -2,8 +2,6 @@
 
 > 产品边界与不变量以根目录 `ARCHITECTURE.md` 为 SSOT。本文是从架构文分拆出的 **Runtime / Prompt / Provider / Tool / Session** 稳定契约；实现细节见 `docs/architecture/agent-runtime-kernel.md` 与源码，二者冲突时以 `ARCHITECTURE.md` + 本文为准并修正架构文。
 
-历史压缩的冗余计数按整个 session journal 的实际记录数与有效消息数恢复和累计，新消息或 append-only 终态不得无条件清零。终态触发的历史维护只能在 WAL 已完成并移除后执行，不能改写仍受恢复前缀校验保护的文件。
-
 ## Agent Loop
 
 会话终态提交沿同一存储事务路径执行。当前内部 terminal WAL v2 只保存本回合追加、原文件字节边界及 SHA256；固定 owning session 的 history/context 路径不从日志输入。恢复先验证两份前缀与可识别的部分追加，再按 prepared 回滚、committing/committed 前滚，数据 fsync 后才移除日志；未知尾部或前缀变化 fail-closed，不截断无关数据。仍有效的 v1 快照事务保留恢复解释，正常提交只写 v2；conversation/context JSONL 数据格式与既有记录不迁移、不删减。Context journal 逐行校验，物化与重复检查只保留所需 turn，未选记录的语法/结构错误不得隐去；终态不得把所有历史 context 重复序列化为 before/after 大对象。
@@ -22,7 +20,7 @@
 
 Work Process 的工具摘要只由 runtime tool result 计算 `succeeded / failed / skipped`，不得采信模型自述。可恢复的中途失败仍保留可见证据，产品不能显示“全部成功”的合成结论。
 
-## 关键编排模块（Phase 1–4）
+## 关键编排模块
 
 | 模块 | 职责 |
 | --- | --- |
@@ -51,13 +49,15 @@ Scoped Runtime Resolution
   -> Provider Wire Request
 ```
 
-`PromptPlan` 每段含 id、kind、scope、source path/hash、precedence、content、token estimate、`stable|volatile`。稳定前缀指纹锚定 prompt-cache。Session 重建路径：`conversation.jsonl` + `conversation-branches.json` + `session-context.jsonl`。`context-view.json` 现写 `{ schemaVersion: '1', view }`；缺版本裸 view 走 `SESSION_CONTEXT_VIEW_MIGRATIONS`。`shell-state.json` 现写 `{ schemaVersion: '1', state: { cwd } }`，只存 cwd；缺版本或损坏 fail-closed / quarantine，未知更高版本 `STORAGE_SCHEMA_UNSUPPORTED`。
+`PromptPlan` 每段含 id、kind、scope、source path/hash、precedence、content、token estimate、`stable|volatile`。稳定前缀指纹锚定 prompt-cache。Session 重建路径：`conversation.jsonl` + `conversation-branches.json` + `session-context.jsonl`。`context-view.json` 写入 `{ schemaVersion: '1', view }`；缺版本裸 view 走 `SESSION_CONTEXT_VIEW_MIGRATIONS`。`shell-state.json` 写入 `{ schemaVersion: '1', state: { cwd } }`，只存 cwd；缺版本或损坏 fail-closed / quarantine，未知更高版本 `STORAGE_SCHEMA_UNSUPPORTED`。
 
 切模型不自动 compact、不写迁移事务。`ContinuationReplayPolicy` 按 compiled execution identity 决定同绑定回放 / 跨绑定 drop；普通 Send 与 rewrite 在将丢弃 continuation 制品时插入同一条系统通知。optional 制品保留最近 8 个可见 turn；`requirement: required` 制品不受该窗口过期，只随 compaction 边界终止。
 
 仅自动压缩；产品不提供按钮、菜单、`/compact` 或 `/summary`。会话准备和执行途中复用同一条 LLM 结构化 handoff：`PromptPlan → RequestEnvelope → adapter`，单轮、无工具、禁用 cache write，`StructuredHandoff.derivation = 'model-generated'`。LLM 失败显式报错，不静默回退确定性抽取。低于压缩线原样继续且不生成压缩工作块。首条超大输入先完整外置并核验，不调用摘要模型，也不静默删减。
 
 压缩候选中明确配对的 session URI／摘要若与本次权威来源中该 URI 的已授权摘要不一致，保留不一致提示和可用来源摘要，要求重读原文，不将两者当成同一版本；不明确或未授权的引用不猜测修正。完整权威索引用于此核对，即使送给摘要模型的索引被截短；原始记录、授权和后续读取的哈希校验不变。
+
+历史压缩的冗余计数按整个 session journal 的实际记录数与有效消息数恢复和累计，新消息或 append-only 终态不得无条件清零。终态触发的历史维护只能在 WAL 已完成并移除后执行，不能改写仍受恢复前缀校验保护的文件。
 
 发送是 next-turn 事务：`preparing → committing → running → terminal`。Preflight 冻结 catalog/route/controls/`PromptPlan`/tools/attachments，并创建主进程 opaque credential lease。失败/取消的 preflight 不留 Session/journal/lease 残渣。Composer 附件先经 `conversation:stageAttachments` 写入 `{userData}/state/staging/attachments/`（进程启动清空）；turn commit 才拷进 session `attachments/`。`ConversationAttachmentMaterializer` 按 image / text / pdf / binary 四层物化：image 走 native vision；text/pdf 按 `min(固定上限, contextBudgetTokens * ratio)` 均分后 inline，prepare 冻结最终 session 逻辑路径与正文，run 只补 image 字节；binary 只给元数据。扫描件 PDF 无文本层写诊断；加载失败 / 加密不伪装成扫描件。SVG 硬拒。
 
@@ -135,7 +135,7 @@ Agent loop 终止与 Provider 失败互斥：`AGENT_NO_PROGRESS` → `CONVERSATI
 
 获批调查的 partial／blocked 声明若因现场位置不符被要求恢复，主进程之后确认已回到签名入口时，会向同一执行反馈这一状态变化，要求重新判断未完成任务是否仍有可执行工作；其他真实阻塞仍可据实部分交付。反馈不自动启动任务、不改变权限，也不清零消费或延长原期限；未确认恢复和取消／硬限制继续按原合同处理。
 
-获批目标声明 partial／blocked 时，若存在未完成的获批 Task 或未满足的获批执行合同、没有仍在后台运行的委派且明确请求上限内仍有可重新声明的工具请求，运行时在同一回合反馈实际状态和记录原因，要求 Agent 对照计划与证据区分可执行工作和真实阻塞；存在合法且有价值的检查时应续用原 Task 并实际执行，不能只列出后结束。同一任务修订、执行代次和状态或同一合同错误只反馈一次。没有继续调用工具时保留原声明，避免把真实部分结果变成无进展错误；继续调用工具后必须重新声明，以免用旧结果覆盖新增工作。Agent 可以据实维持部分交付，也可以在原批准范围内继续；反馈不推断专业结论、不自动重复失败操作、不改变权限或预算。取消、交接及明确限额仍按各自合同处理。
+获批目标声明 partial／blocked 时，若存在未完成的获批 Task 或未满足的获批执行合同、没有仍在后台运行的委派且明确请求上限内仍有可重新声明的工具请求，运行时在同一回合反馈实际状态和记录原因，要求 Agent 对照计划与证据区分可执行工作和真实阻塞；反馈同时列出最新有效 Checkpoint 的 unresolvedFrontier 与开放 Challenge 的 requiredFollowUp（Challenge 最多 12 项，余量提示用 `investigation_list`），要求逐项执行下一步检查或说明具体阻碍条件；存在合法且有价值的检查时应续用原 Task 并实际执行，不能只列出后结束。同一任务修订、执行代次和状态或同一合同错误只反馈一次。没有继续调用工具时保留原声明，避免把真实部分结果变成无进展错误；继续调用工具后必须重新声明，以免用旧结果覆盖新增工作。Agent 可以据实维持部分交付，也可以在原批准范围内继续；反馈不推断专业结论、不自动重复失败操作、不改变权限或预算。取消、交接及明确限额仍按各自合同处理。
 
 已批准 Task 均已结算但 partial 声明仍列出未决工作时，也按同一组证据 URI／hash 反馈一次整体目标复评，避免将局部结算当作目标完成；证据版本变化后可重新判断。明确 blocked 仍按真实阻塞处理。
 
@@ -147,21 +147,21 @@ Agent loop 终止与 Provider 失败互斥：`AGENT_NO_PROGRESS` → `CONVERSATI
 
 小文本的 `read_file(pinEvidence: true)` 显式复用既有制品化路径，保留内联结果并返回该读取窗口的会话 URI/hash；默认不额外落盘。整文件 hash/totalLines 不代表窗口已包含全文，截断与分页语义保持。图片制品化在模型结果中直接列出实际图片叶子的 URI/hash；包装 JSON 与图片是独立制品，委派者须逐个显式授予必需叶子，不递归推断授权、不放宽 hash/路径/容量边界。
 
-成功的 `rdc_probe(action: probe)` 只读结果也复用该制品化路径，即使小于自动卸货阈值仍提供会话 URI/hash；保存的是实际返回内容和身份、`truncated` 等元数据，不补全原生截断内容，也不是签名生命周期回执。子执行仍须显式获得精确引用授权；写入配额失败按既有工具结果交付失败合同处理，不重复执行原生查询。
+成功的 `rdc_probe(action: probe)` 只读结果也复用该制品化路径，即使小于自动卸货阈值仍提供会话 URI/hash；保存的是实际返回内容和身份，也不是签名生命周期回执。`event_list`（eventId/offset/limit/maxDepth/nameContains）与 `event_search`（nameContains/eventIdMin/eventIdMax/flagsInclude/maxResults，至少一个过滤条件）经 CLI `call` 以 owning replay session 调用；`rdc_probe` 不截断原生结果，超阈值整体制品化，分页依据原生 `pagination.truncated`。子执行仍须显式获得精确引用授权；写入配额失败按既有工具结果交付失败合同处理，不重复执行原生查询。
 
-`artifact_read.search` 对完整选定文本作区分大小写、非重叠的单行字面量检索（1–256 UTF-16 字符，不执行正则或代码）。未指定 JSON 选择器时，产品工具结果若只有一个文本块，直接搜索解码后的文本并返回指针、文本及文件层摘要和已知源截断状态；没有唯一文本块须显式选择，不能猜测。其他普通文本沿原视图搜索，图片拒绝。也可检索显式 JSON 文本视图。返回全视图匹配计数及最多64个有行/UTF-16列定位的摘录，并服从16KiB工具页上限；`limit` 可进一步收窄匹配数量，`next` 指向首个未返回匹配。继续检索必须沿用 URI/hash、全部视图选择参数与同一查询；摘录不等于整行/整份源码覆盖，需按返回定位读取必要原文。合法零匹配、源生产截断、分页截断与读取拒绝分别表达；计数只证明该有界文本中的字面匹配，不证明控制流、原生执行或领域主张。检索同样要求 `expectedHash`，不增加文件、journal、RDC 或跨会话访问权。
+`artifact_read.search` 对完整选定文本作区分大小写、非重叠的单行字面量检索（1–256 UTF-16 字符，不执行正则或代码）。未指定 JSON 选择器时，产品工具结果若只有一个文本块，直接搜索解码后的文本并返回指针、文本及文件层摘要和已知源截断状态；没有唯一文本块须显式选择，不能猜测。其他普通文本沿原视图搜索，图片拒绝。也可检索显式 JSON 文本视图。返回全视图匹配计数及最多64个有行/UTF-16列定位的摘录，并服从16KiB工具页上限；`limit` 可进一步收窄匹配数量，`next` 指向首个未返回匹配。继续检索必须沿用 URI/hash、全部视图选择参数与同一查询；摘录不等于整行/整份源码覆盖，需按返回定位读取必要原文。合法零匹配、源生产截断、分页截断与读取拒绝分别表达；计数只证明该有界文本中的字面匹配。检索同样要求 `expectedHash`，不增加文件、journal、RDC 或跨会话访问权。
 
 `read_file` 与 `read_image` 成功读取时在正文和 details 返回原始文件字节的 SHA-256（小写 hex）与字节数。文本按行展示仍对同一次完整读取流计算摘要，包含 BOM、原换行与未展示的行；摘要不属于带行号的展示文本。图片摘要对应实际送入模型的 image block 解码字节，不属于缩略图或重编码结果。它们只证明该次读取内容，不能追认历史执行所用的文件；执行前后绑定须有对应时点的来源。取消或读取失败不返回成功摘要，默认文本读取仍拒绝二进制，capture、vision 和路径权限限制不放宽，不用 Shell 文件访问补旁路。
 
-`read_file(mode: audit)` 是同一权限路径上的显式只读文件计算，每个输入必须绑定 `expectedHash`（64位 SHA-256，可带 `sha256:`）。可选 `compareWith: {path, expectedHash}` 的第二路径独立经过权限与 realpath 检查。每份实际读取最多8MiB；文件类型、超限、hash不匹配、取消均拒绝。`.rdc` 与 RDOC capture magic 始终拒绝。返回实际原始字节数/hash、前64字节 hex；比较实际完整 Buffer，返回相等与否、首差异偏移和有界 hex 窗口。不执行文件或调用原生，不把 header 解释为完整模块验证。显式 `textComparison: true` 要求全部输入为无NUL合法UTF-8，仅 CRLF→LF，保留 BOM、裸CR及其它字符，另给规范化hash、精确相等判断、共同前后缀行数及有界中间区间。中间区间超限明确 `truncated`，不能冒称完整diff；未截断时所有变化均包含在中间区间，区间外逐行相等。摘要与比较基于实际读取快照，不声明磁盘随后不变，也不声明模型已消费全文或领域语义正确。审计模式不接受分页，不授予 read-before-edit；默认文本模式不接受审计参数，禁止静默改变读取语义。既有会话制品化机制持久化审计结果，reviewer仍需精确URI/hash授权。
+`read_file(mode: audit)` 是同一权限路径上的显式只读文件计算，每个输入必须绑定 `expectedHash`（64位 SHA-256，可带 `sha256:`）。可选 `compareWith: {path, expectedHash}` 的第二路径独立经过权限与 realpath 检查。每份实际读取最多8MiB；文件类型、超限、hash不匹配、取消均拒绝。`.rdc` 与 RDOC capture magic 始终拒绝。返回实际原始字节数/hash、前64字节 hex；比较实际完整 Buffer，返回相等与否、首差异偏移和有界 hex 窗口。不执行文件或调用原生，不把 header 解释为完整模块验证。显式 `textComparison: true` 要求全部输入为无NUL合法UTF-8，仅 CRLF→LF，保留 BOM、裸CR及其它字符，另给规范化hash、精确相等判断、共同前后缀行数及有界中间区间。中间区间超限明确 `truncated`，不能冒称完整diff；未截断时所有变化均包含在中间区间，区间外逐行相等。摘要与比较基于实际读取快照，不声明磁盘随后不变。审计模式不接受分页，不授予 read-before-edit；默认文本模式不接受审计参数，禁止静默改变读取语义。既有会话制品化机制持久化审计结果，reviewer仍需精确URI/hash授权。
 
 `grep` 对可搜索文件的原始完整行执行 JavaScript 正则；含超长行的文件在独立线程内匹配，超时或取消终止线程并返回错误，不把行首片段的未命中当作整行未命中。匹配长行只返回围绕命中位置的有界预览，正文标明预览被截断，details 的 `truncated` 为 true；它不代表模型读到了整行。原有 2 MiB 文件大小、二进制跳过和结果数量／字节上限不变，搜索结果不能证明被跳过的文件没有匹配。
 
-文本工具判别 RenderDoc 文件头时匹配其实际 64 位 magic；以可打印 `RDOC` 开头的诊断文本仍按普通文本读取。`.rdc` 扩展名、NUL、异常控制字节和大小限制独立生效，改名为日志的二进制 capture 仍拒绝，不能按文件名或特定案例豁免。
+文本工具判别 RenderDoc 文件头时匹配其实际 64 位 magic；以可打印 `RDOC` 开头的诊断文本仍按普通文本读取。`.rdc` 扩展名、NUL、异常控制字节和大小限制独立生效，改名为日志的二进制 capture 仍拒绝。
 
-`artifact_read.includeRecordedRequest=true` 只允许 owning root General 对绑定 `expectedHash` 的原生 RDC 工具结果使用。主进程校验原结果 owner/source、operation 与 native identity，再从同一 SessionContextJournal 精确匹配 toolCallId，生成单独的 `recorded-model-rdc-request` URI/hash；默认读取不查询 journal。重复回放的同一请求保留来源，参数冲突、缺失、敏感键或不匹配明确拒绝，不扫描其他会话、请求快照或私有 native 文件，不重跑原生操作，不改写旧输出。凭据只证明原模型记录请求，不能证明原生默认参数解析、实际效果、当前 replay 或实验签名。所有子执行（包括 General）不得访问 journal；父级须显式将新凭据引用授予审查者，旧结果授权不隐式包含新凭据。
+`artifact_read.includeRecordedRequest=true` 只允许 owning root 的 full 天花板 profile（内置为 General）对绑定 `expectedHash` 的原生 RDC 工具结果使用。主进程校验原结果 owner/source、operation 与 native identity，再从同一 SessionContextJournal 精确匹配 toolCallId，生成单独的 `recorded-model-rdc-request` URI/hash；默认读取不查询 journal。重复回放的同一请求保留来源，参数冲突、缺失、敏感键或不匹配明确拒绝，不扫描其他会话、请求快照或私有 native 文件，不重跑原生操作，不改写旧输出。凭据只证明原模型记录请求，不能证明原生默认参数解析、实际效果、当前 replay 或实验签名。所有子执行不得访问 journal；父级须显式将新凭据引用授予审查者，旧结果授权不隐式包含新凭据。
 
-同一原生结果可用互斥的 `artifact_read.includeRecordedOperationIndex=true` 生成同 operation 的请求索引。操作名仅来自已校验的锚点，不接受任意 journal 查询；仍只限 owning root General。索引覆盖该次读取的全部已提交 SessionContextJournal 内结构化 `shell.rdc.operation/args`，去重 toolCallId 并保留来源、experimentId、记录返回错误及可用原结果引用；同 ID 参数冲突或敏感参数拒绝整个索引，不挑选较新记录。coverage 明示请求结构、条目数、锚点请求是否存在、当前 active turn 排除和其他 conversation turn 的 journal 缺口。可见 conversation history 仅提供覆盖元数据，不充当参数备用来源。索引独立 URI/hash 受原配额限制，不能等同全原生调用目录；legacy/unstructured shell、其他工具、UI 生命周期调用及未提交中断段不在其覆盖内，返回状态与引用须另外验证。索引不判断记录相关性、实验额度、GPU算术或领域完成。审查者只可通过另行授予的精确索引引用读取，不获得 journal 权限。
+同一原生结果可用互斥的 `artifact_read.includeRecordedOperationIndex=true` 生成同 operation 的请求索引。操作名仅来自已校验的锚点，不接受任意 journal 查询；仍只限 owning root 的 full 天花板 profile（内置为 General）。索引覆盖该次读取的全部已提交 SessionContextJournal 内结构化 `shell.rdc.operation/args`，去重 toolCallId 并保留来源、experimentId、记录返回错误及可用原结果引用；同 ID 参数冲突或敏感参数拒绝整个索引，不挑选较新记录。coverage 明示请求结构、条目数、锚点请求是否存在、当前 active turn 排除和其他 conversation turn 的 journal 缺口。可见 conversation history 仅提供覆盖元数据，不充当参数备用来源。索引独立 URI/hash 受原配额限制，不能等同全原生调用目录；legacy/unstructured shell、其他工具、UI 生命周期调用及未提交中断段不在其覆盖内，返回状态与引用须另外验证。索引不判断记录相关性。审查者只可通过另行授予的精确索引引用读取，不获得 journal 权限。
 
 索引保留同操作的非法参数请求和错误返回，`request` 为原记录的结构化 RDC 请求，`argumentsShape` 仅说明 object/array/null/missing 等形状，不宣称参数或权限有效；无 args 不补 null/零值。请求指纹覆盖原记录请求（含 experimentId 与额外字段），相同 callId 的请求变化不会被去重掩盖。非法请求数量不等于执行数量。
 
@@ -175,17 +175,19 @@ Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（当前 57 ids，含 `shell` 
 
 `investigation_list` 的 `kind` / `status` 可选；传 `any` 或省略即包含全部对应值，其他允许值作精确过滤。工具目录列出允许值，未知值须明确拒绝，不能把错误输入解释成“本会话无调查产物”。
 
-Run **当前实现**唯一活跃 `schemaVersion` 为 `'3'`（`src/main/sessions/runV3/`）：discriminated union `kind: conversation|mission` + `profileId`，新写无 `mode` / `lastStage` / `runtime.workflow_stage`。产品只读 `run.json` v3；仅有 `run.yaml`、缺版本、旧版本或未知版本时明确报 `STORAGE_SCHEMA_UNSUPPORTED`，保留源文件，不在读取时迁移。`kind: mission` 来自冻结的 `completion-contract: investigation-report`，`mission` 来自预载 Skill 的 `investigation-mission`，不必等于 `profileId`。没有该合同时新写为 conversation，不按 profile id 推断。conversation 的 `captures=[]` 且不消费 investigation sidecar。既有 v3 文件（profileId 与 mission 同为三 Mission 之一）仍然合法。既有一次性本机转换备份仅供核验，不参与 Run 枚举、IPC、UI 或 Right Rail。见 `ARCHITECTURE.md` 裁决 I。
+Run 的 `schemaVersion` 为 `'3'`（`src/main/sessions/run/runV3/`）：discriminated union `kind: conversation|mission` + `profileId`，新写无 `mode` / `lastStage` / `runtime.workflow_stage`。产品只读 `run.json` v3；仅有 `run.yaml`、缺版本、旧版本或未知版本时明确报 `STORAGE_SCHEMA_UNSUPPORTED`，保留源文件，不在读取时迁移。`kind: mission` 来自冻结的 `completion-contract: investigation-report`，`mission` 来自预载 Skill 的 `investigation-mission`，不必等于 `profileId`。没有该合同时新写为 conversation，不按 profile id 推断。conversation 的 `captures=[]` 且不消费 investigation sidecar。既有一次性本机转换备份仅供核验，不参与 Run 枚举、IPC、UI 或 Right Rail。见 `ARCHITECTURE.md` 裁决 I。
 
 Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only route 的有效工具集为空，不得列出或模仿工具调用。`tool_search` 无结果时返回 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 与工具集 fingerprint；fingerprint 未变化时重复同一搜索属于无进展。
 
 执行前先经 `toolValidator.validate` 和工具自身的语义参数校验，再进入 Permission/人工审批；两类校验失败都返回 `TOOL_SCHEMA_VIOLATION`，无效请求不展示审批。`shell` 的 provider 参数根保持普通 object，但只能提供非空 `command` 或 `rdc` 其中之一；同一规则在执行入口再次校验。`CompiledPolicy.deniedTools` 进入 Permission + Executor。非法 policy → fail-closed。
 
-同轮工具并发：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。`ConcurrentToolScheduler` 只并发**连续**安全组；`shell` / write / task mutation / RDC（含 `rdc_probe`） / MCP / ask / handoff / `output_register` 与需要 RDC lease 的 `subagent` 一律串行。offline `subagent` 不请求 `domainExtensions.rdc`，且 **在 allowlist 层**就不能拿到 `rdc_probe` 或 `shell` 中的 RDC 路径；`runtime_context` 保留，但不返回 `rdc` 载荷。`domainExtensions.rdc.requiresLease=true` 的 child 必须经显式、受限、生命周期绑定的 delegated lease 取得 parent 上下文并串行。禁止并发 RDC 双 owner。`callIndex` 稳定回填。`reserveDispatchBudget` 在 dispatch 前原子扣减 `maxToolCalls` / `maxSubagents` / wall clock；失败整组不开。组内部分失败不连坐已发出调用，但不得继续开新组。abort 必须 `Promise.allSettled` join。
+同轮工具并发：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。`ConcurrentToolScheduler` 只并发**连续**安全组；`ALWAYS_SERIAL_TOOL_NAMES`（`toolConcurrency.ts`）与 `mcp__*` 恒串行；其余仅 `isConcurrencySafe===true` 可并行；需 RDC lease 的 `subagent` 由 lease 独占串行。offline `subagent` 不请求 `domainExtensions.rdc`，allowlist 编译期只剥离 `rdc_probe`，`shell.rdc` 在执行入口被拒绝；`runtime_context` 保留，但不返回 `rdc` 载荷。`domainExtensions.rdc.requiresLease=true` 的 child 必须经显式、受限、生命周期绑定的 delegated lease 取得 parent 上下文并串行。禁止并发 RDC 双 owner。`callIndex` 稳定回填。`reserveDispatchBudget` 在 dispatch 前原子扣减 `maxToolCalls` / `maxSubagents` / wall clock；失败整组不开。组内部分失败不连坐已发出调用，但不得继续开新组。abort 必须 `Promise.allSettled` join。
 
 `subagent` 只接受有界 Delegation Capsule：goal/task/scope、带 sourceRefs/qualification 的 acceptedFacts、hypotheses、challengeRefs、带理由/适用/重验条件的 negativePaths、inputArtifactRefs、outputRequirements、stopConditions、requiredSkillIds 和 budget；可选 domainExtensions 仅申请能力。缺字段、超限或非法引用 fail-closed。父级需把子级实际要读的精确 `session://` contentUri 放入冻结引用；调查记录 ID 或 scope 正文不是读取授权，缺引用的子级读取继续拒绝。局部预算须覆盖计划内的读、写与完成调用。compiler 只向 system PromptPlan 加入 runtime 编写的解释规则，完整 Capsule 数据进入隔离子执行的 user 输入，不复制父历史。必需 Skill 在 prepareTurn 预载并冻结。
 
 子执行输入同时提供主进程实际冻结的获授 URI／hash 对照，供读取和后续引用；它只投影已有授权，不授予新来源，也不接受不匹配的 hash。
+
+子执行 artifact_read 只读取显式授予且 hash 冻结的同一所属 Session 引用，嵌套委派取子集。调查记录 ID 不是读取授权，唯一例外是下述独立审查闭包：执行要求声明 `independentOfTaskIds` 的独立审查派发时，主进程从已授予的调查记录沿引用关系补授其依赖的有效记录与原始制品（证据的 WorldState 与工具输出、实验的签名执行回执与验证证据、Challenge 与报告的目标），每次最多补 64 项（`REVIEW_CLOSURE_MAX_ADDED_REFS`）；嵌套委派只补父级已获授的引用，未补授项及原因写入子执行输入。子执行调查输出保存到原调查，输入引用的读权限不授予覆盖权限；只能更新本子执行新建的输出。退出撤销临时访问权，已保存产物继续归原 Session 所有。
 
 建立委派来源授权时，主进程确认某个来源不存在，须在同步结果或后台结果中直接返回 `ARTIFACT_NOT_FOUND` 与原诊断，并保留完整执行制品；不得自动删去或替换该引用。子执行自身的任意失败文本仍不提升为主进程诊断。
 
@@ -215,7 +217,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 ## Hooks
 
-唯一引擎是 `HookEngine`。分发根：`resources/agent-runtime/hooks`（builtin）< `~/.rdc-agent/hooks` < `<project>/.rdc-agent/hooks`，与 `ScopedResourceResolver` 同序。Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity；任一变化 → `needsRetrust`。builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。接线事件（12 canonical）：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。禁止第二套 `AgentHooks`。
+唯一引擎是 `HookEngine`。分发根：`resources/agent-runtime/hooks`（builtin）< `~/.rdc-agent/hooks` < `<project>/.rdc-agent/hooks`，与 `ScopedResourceResolver` 同序。Hook trust 指纹、builtin/user/project 信任规则与旧 trust 失效见 [permissions.md](permissions.md)「Hook Trust」。接线事件（12 canonical）：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。禁止第二套 `AgentHooks`。
 
 ## Declared Continue and Execution Offer
 
@@ -229,9 +231,9 @@ handoff 名称来自声明的 `label` 与可选 `labelTranslations`（`zh-CN` / 
 
 ## RDC / Capture
 
-无内置 RDC toolchain。Settings `tooling.rdcCli` 配对同安装捆绑 Python 与 `cli/run_cli.py`，`shell.rdc` 按冻结 catalog、权限和 owning lease 执行；`shell.command` 不得调用 RDC。获批 Mission 的实时 RDC 工作还须在计划中冻结 capture scope；缺少时允许离线工作和目录查询，不允许实时操作或委派 live lease。`read-only` profile 仅可使用 `rdc_probe` 只读查询；获批 General 的 `capture_select`、`capture_restore`、`capture_recover` 还须通过 full ceiling、当前 permission mode 与 mutation policy floor。选择只接收批准的 inputId；路径、设备、context 和 lease 由主进程核验，不由模型填写。身份变化后重新准备，并以签名 epoch 链保留原计划与消费。仓库不硬编码本机安装路径；Local + Android-origin capture 不得静默 fallback remote。
+无内置 RDC toolchain。Settings `tooling.rdcCli` 配对同安装捆绑 Python 与 `cli/run_cli.py`，`shell.rdc` 按冻结 catalog、权限和 owning lease 执行；`shell.command` 不得调用 RDC。获批 Mission 的实时 RDC 工作还须在计划中冻结 capture scope；缺少时允许离线工作和目录查询，不允许实时操作或委派 live lease。`read-only` profile 仅可使用 `rdc_probe` 只读查询；原生 RDC 执行（`shell.rdc`）要求 owning root turn 的 `accessCeiling === 'full'`（内置 General 为 full，其他 profile 取决于声明）；仅获批 General 的 `capture_select`、`capture_restore`、`capture_recover` 另要求 agentId 为 general，并还须通过当前 permission mode 与 mutation policy floor。选择只接收批准的 inputId；路径、设备、context 和 lease 由主进程核验，不由模型填写。身份变化后重新准备，并以签名 epoch 链保留原计划与消费。仓库不硬编码本机安装路径；Local + Android-origin capture 不得静默 fallback remote。
 
-RDC runtime context 仅绑定 per-session lease（`RdcRuntimeContextRegistry`）。禁止恢复 `legacyGlobalMirror` / `getRdcRuntimeContext` 全局 API；工具路径经 `assertRdcContextLeaseOwnership`，不得回退 parent。parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease；child 结束经实际停止确认后 `revokeDelegatedLease`；未确认时父资源保持隔离。未请求 `domainExtensions.rdc` 的 child 在 allowlist 编译期不得看到 `rdc_context` / `rdc_probe`。
+RDC runtime context 仅绑定 per-session lease（`RdcRuntimeContextRegistry`），工具路径经 `assertRdcContextLeaseOwnership`，不得回退 parent。delegated lease 的授予、撤销证明与隔离，以及禁止恢复 `legacyGlobalMirror` / `getRdcRuntimeContext` 全局 API，见 [permissions.md](permissions.md)「RDC Context Lease」。未请求 `domainExtensions.rdc` 的 child 在 allowlist 编译期不得看到 `rdc_probe`（`runtime_context` 保留但不返回 rdc 载荷）。
 
 ## Model Capability（摘要）
 
@@ -248,20 +250,18 @@ RDC runtime context 仅绑定 per-session lease（`RdcRuntimeContextRegistry`）
 - 门禁：`pnpm run check:orchestrator-facade`（挂于 `check:architecture`）
 
 
-## 通用 Harness 与声明续跑（2026-09-15）
+## 通用 Harness 与声明续跑
 
 General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 策略采用 renderdoc-execution 的六块 Markdown 模板，按规模填写；Knowledge 相似性仅是检查线索。
 
-Plan 经 session artifact plans 类别版本化：同意前覆盖 `session://plans/plan.md`，同意后冻结 `plan-<ISO>-<hash8>.md`，历史文件不迁移或删除。批准写入 execution offer；prepareTurn 仅当 hash 与 target 匹配时预载声明 Skill。通用 turn 仅调用 TurnCompletionValidator。Big Loop 由 General 终答写缺口、用户切回 Mission、新计划、再批准、再点 Execute 组成；runtime 不按身份 / depth / 正文开下一轮。 Mission 额度耗尽但未完成时可通过 `budget_paused` 结束 turn，绝不提升领域报告状态。
+Plan 经 session artifact plans 类别版本化：同意前覆盖 `session://plans/plan.md`，同意后冻结 `plan-<ISO>-<hash8>.md`，历史文件不迁移或删除。批准写入 execution offer；prepareTurn 仅当 hash 与 target 匹配时预载声明 Skill。通用 turn 仅调用 TurnCompletionValidator。Big Loop 由 General 终答写缺口、用户切回 Mission、新计划、再批准、再点 Execute 组成；runtime 不按身份 / depth / 正文开下一轮。 Mission 额度耗尽但未完成时可通过 `budget_paused` 结束 turn，绝不提升领域报告状态；准入条件见「Task 执行、消息与资源生命周期」中 `turn_complete` 一节。
 
 普通 Capsule 省略领域扩展且没有 RDC Lease prompt 段；仅 RDC 模块接受 domainExtensions.rdc.requiresLease=true 并注入租约上下文。缺省无 RDC；同一 live context 的租约独占覆盖完整子执行区间，其他安全工作仍可并行；finally 撤销须携带停止证明，否则隔离父资源；旧顶层字段拒绝，不保留双轨。
 
 
-### Harness / 领域与上下文边界（2026-09-09 收敛）
+### Harness、领域与上下文边界
 
 通用完成检查不按身份或 depth 推断 Big Loop。handoff Hook 只在人点声明续跑时触发。获批计划携带主进程生成的 Mission 合同，General 执行时继承领域完成校验；普通 General 对话不受垂直门禁影响。Checkpoint、实验回执和相关 Challenge 在领域服务校验；partial/blocked/cancelled 不提升报告。自然语言前缀不控制终态。
-
-子执行 artifact_read 只读取显式授予且 hash 冻结的同一所属 Session 引用，嵌套委派取子集。执行要求声明 `independentOfTaskIds` 的独立审查派发时，主进程从已授予的调查记录沿引用关系补授其依赖的有效记录与原始制品（证据的 WorldState 与工具输出、实验的签名执行回执与验证证据、Challenge 与报告的目标），每次最多补 64 项；嵌套委派只补父级已获授的引用，未补授项及原因写入子执行输入。子执行调查输出保存到原调查，输入引用的读权限不授予覆盖权限；只能更新本子执行新建的输出。退出撤销临时访问权，已保存产物继续归原 Session 所有。
 
 Compact 使用原始 Journal、Task/执行记录及应用层组装的领域记录，不由通用 compactor 猜测调查步骤。根会话的压缩输入除记录索引外，另带调查自己记录的未决工作内容：最新有效 Checkpoint 的 unresolvedFrontier 与开放 Challenge 的目标和 requiredFollowUp（有界），索引被裁剪时也保留。压缩提示要求区分获批计划中未执行的义务与实际工作；摘要无法完整保留时须引用原计划并标示需要重读。获批执行在安装派生 Checkpoint 后，应按冻结 URI/hash 重读计划并与 Task、证据状态对照，不把摘要遗漏当成完成。压缩前保存可按行读取的分块 JSON 权威 Checkpoint；模型看到有界权威记录，以及首次的原始文本或经来源与路由核验的已安装窗口加新增原始文本。权威索引本身超出模型输入上限时，模型只接收明确标注总数、收录数和遗漏数的部分索引；完整 Task、执行、产物和调查记录仍在带 URI/hash 的权威 Checkpoint 中，需要依赖遗漏项时须读取原件。已校验的旧 Checkpoint 若与当前 Journal 前缀一致，新 Checkpoint 只存新增原文及旧源 URI/hash/count；读取或恢复时校验完整引用链，未匹配时保留完整原文分块。完整原始前缀始终可按 URI/hash 复原，不逐条截去长消息尾部。保存失败、hash 复核失败或该增量输入仍超过安全界限时保留原 view，禁止静默丢失。原始图像/测量产物按 URI/hash 保留，摘要须保留来源资格、适用条件和反证的重验条件。
 
@@ -274,7 +274,7 @@ RDC delegated lease 暂停父控制权，父级 rebind/clear/close 必须先 joi
 
 ### Task 执行、消息与资源生命周期
 
-计划的必需 Task 绑定和定义修订由 canonical owning planner session 提交；委派 Capsule 不取得修改所属父计划义务的权限，新增计划绑定/修订参数在委派调用中明确拒绝。委派仍可按已有 Task 子树合同组织自身范围内的工作；本扩展不宣称实现嵌套计划义务覆盖或扩大子执行权力。
+计划的必需 Task 绑定和定义修订由 canonical owning planner session 提交；委派 Capsule 不取得修改所属父计划义务的权限，新增计划绑定/修订参数在委派调用中明确拒绝。委派仍可按已有 Task 子树合同组织自身范围内的工作。
 
 Task 可声明严格类型的 `executionRequirements`（`mode: direct|subagent`、`profileId`、`requiredSkillIds`、`independentOfTaskIds`）。准备记录实际 Profile 来源/hash、Skill、模型/推理与被审成果版本；独立审查须读取获授的当前成果。省略要求不代表历史记录已证明独立性。`plan_artifact.requiredTaskIds` 从所属 TaskStore 生成目标、依赖与要求快照并纳入批准 hash；本规划回合创建的 Task 仍为 pending／blocked 时，必须显式传入必需 Task ID 或空数组，正文提及 Task 不自动建立绑定，也不把所有 Task 猜成必需。提交审阅前核对独立来源 Task 存在且不是审查任务自身，执行时仍核对实际成果版本。批准绑定不能通过修改 Task、换同义 Task 或旧结果削弱，改变义务须走原计划修订。
 
@@ -284,7 +284,7 @@ Task 可声明严格类型的 `executionRequirements`（`mode: direct|subagent`�
 
 运行时核对所选引用的可读性、内容 hash、来源执行代次和授予范围；它不能仅凭这些事实判断模型所选引用在语义上确实是待审成果。执行者须固定并授予实际成果版本，不能用辅助回执代替报告；修改成果后，原版本的审查不自动覆盖新版本。来源已被实际独立审查后，执行者可以在原来源 Task 上显式开始下一执行代，即使原始不可变快照仍可读取；结算新成果后必须由原审查 Task 针对新来源重新独立核验。旧执行和审查保持不变，原消费与期限继续生效。
 
-此为向当前单一 Task/计划路径增加的可选合同，旧记录不迁移、不重写、不补造证明；取消/join、持久 root/child-local 预算、重启 interrupted 与原消费/期限规则继续生效。
+旧记录不迁移、不重写、不补造证明；取消/join、持久 root/child-local 预算、重启 interrupted 与原消费/期限规则继续生效。
 
 `requiredSkillIds` 不是方法阅读清单。普通方法经 descriptor 发现、首次使用前 `skill_read`，不要求预载；只有明确合同或实际准备需要才声明必须预载的方法，并在 Task 描述说明必要性。Runtime 不理解领域语义，也不根据方法名称或 allowed-tools 判定重要性。计划提交和批准对照目标 profile/声明交接，声明交接再次核对 hash-bound direct Task 要求；子执行方法留在自身 Capsule。prepareTurn 比较真实 PromptPlan、来源 hash 和工具交集，不自动补载或重启；不相容应经现有显式准备入口或同 Task 的正常计划修订处理，保留消费、期限与批准历史。批准前检查不代表未来准备证明，普通 General 不因此新增计划门。
 
@@ -314,7 +314,7 @@ subagent（mode=background） 必须绑定 Task，持久化启动状态后返回
 
 删除 session 时先停止并 join 所属执行，再按请求快照的同一 scope 编码删除根及嵌套子执行快照、相关内存缓存和该 session 的运行序列文件；相邻 scope 不删除，遇到非目录或链接时明确失败，不沿链接清理。
 
-后台 subagent 的生命周期由持久 Task 与 mailbox 投影，不进入父回复的同步 subagent continuation，也不由父回复 finalizeTrace 提前结束；审批/信息请求仍走受控入口。结构化 turn_complete 的 disposition、evidenceRefs 位于顶层，result 包含 summary、outputs、counterevidence、unresolved、scope、sideEffects、recoveryState。unresolved 的每一项为 `{ gap, attempted, blocker, resumeWhen }`，blocker 取 capability／permission／budget／strategy／external／not_required，任一项不合格则整次声明被拒；获批目标的 partial／blocked／budget_paused 至少要有一项 blocker 不为 not_required。旧 Task 结果中的字符串项只读保留，不迁移。声明 completed 时，调查合同要求 evidenceRefs 精确指向当前 ready 报告的 contentUri 和 contentHash，并检查其完整领域合同；存储或意外错误直接上报。终答提交前重新核验同一结构化引用及报告资格，已记录的声明本身不是终态回执。用户终答仍须存在并交付调查结果，无须在正文重复内部 ID 和哈希。unresolved 表达认识与适用条件，不自动成为 missingRequirements；完成要求仍由 Task 的必需输出及执行状态校验，不能由通用 runtime 推测科学结论。
+后台 subagent 的生命周期由持久 Task 与 mailbox 投影，不进入父回复的同步 subagent continuation，也不由父回复 finalizeTrace 提前结束；审批/信息请求仍走受控入口。结构化 turn_complete 的 disposition、evidenceRefs 位于顶层，result 包含 summary、outputs、counterevidence、unresolved、scope、sideEffects、recoveryState，其中 summary 必填。unresolved 最多 32 项，每项为 `{ gap, attempted, blocker, resumeWhen }`，四个文本字段均非空且各最多 1000 字符，blocker 取 capability／permission／budget／strategy／external／not_required，任一项不合格则整次声明被拒；`not_required` 表示不属于目标所需的工作，不满足真实阻塞要求。获批目标的 partial／blocked／budget_paused 须有 summary，且至少一项 blocker 不为 not_required。`budget_paused` 另须同时满足：（1）运行时观察到当前 root 预算证据——Provider 轮次剩余 1–5（且不超过上限），或工具调用消耗已达有限上限；未观察到 root 预算上限则拒绝；（2）同一 mission 存在 ready/draft Checkpoint，其 `unresolvedFrontier` 非空，且 `evidenceRefs` 以 uri+hash 引用该 Checkpoint。旧 Task 结果中的字符串项只读保留，不迁移。声明 completed 时，调查合同要求 evidenceRefs 精确指向当前 ready 报告的 contentUri 和 contentHash，并检查其完整领域合同；存储或意外错误直接上报。终答提交前重新核验同一结构化引用及报告资格，已记录的声明本身不是终态回执。用户终答仍须存在并交付调查结果，无须在正文重复内部 ID 和哈希。unresolved 表达认识与适用条件，不自动成为 missingRequirements；完成要求仍由 Task 的必需输出及执行状态校验，不能由通用 runtime 推测科学结论。
 
 提交前重新核验批准任务、现场恢复和完整领域合同；报告引用失效或其他资格缺口使 completed 声明失效，须按实际工作重新声明。无进展及取消规则保持有效。
 
@@ -360,7 +360,7 @@ Small/Big Loop、专业委派和补证方向由实际加载的 Skill 与模型�
 
 冻结 RDC 目录的 `search` / `describe` / `list` 成功结果也经同一工具结果归档器提供 owning session 的 URI/hash；小结果仍保留内联正文。归档记录保留实际 catalog fingerprint、完整结果及 toolCallId，沿既有 owner/hash、委派引用与配额规则读取；目录材料不是原生观察或五阶段签名。持久化失败仍给错误且不生成假引用。搜索按关键词相关度保留部分匹配，`total` / `truncated` 仅表示本次候选覆盖，不能用于断言全目录没有某能力。`list` 以绑定 fingerprint 的游标有界分页，提供全冻结目录的 scope/effects/prerequisites 静态准入汇总及同源策略；不替代参数、路径、身份、审批和运行期检查，不授予权限，也不证明外部原生状态为空。
 
-超阈值的原生 RDC `shell` 回执保留完整 session artifact 引用和文件 hash；模型可见摘要从同一主进程校验后的结果提取四项 execution identity、原生 result kind/ok/trace。Pixel History 另投影目标、事件、历史/片元/通过/有效 shader 数量和少量通过的 primitive ID。摘要仅是可追溯的事实索引，不替代完整 payload、五阶段签名回执或领域结论；身份不一致时显式报错，不生成看似可信的正常摘要。
+超阈值的原生 RDC `shell` 回执保留完整 session artifact 引用和文件 hash；模型可见摘要从同一主进程校验后的结果提取四项 execution identity、原生 result kind/ok/trace。Pixel History 另投影目标、事件、历史/片元/通过/有效 shader 数量和少量通过的 primitive ID。摘要仅是可追溯的事实索引，不替代完整 payload；身份不一致时显式报错，不生成看似可信的正常摘要。
 
 Capsule 的 `profile` 选择 Agent 身份，不提供自由 `model` / `reasoningLevel`。子执行从目标 Agent 配置解析模型和推理档位，不继承父会话覆盖；缺失或不可用时明确失败，不回退父模型。`sourceRefs`、`challengeRefs`、`inputArtifactRefs` 只接受已有受控 URI；自然语言质疑属于 hypotheses/negativePaths。工具搜索无匹配只证明当前筛选无匹配。
 
@@ -385,7 +385,7 @@ Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；�
 
 任务依赖准入与等待投影共用 taskDependencyWait：依赖须 completed/disposition=completed，需要执行的任务还须匹配当前任务 ID、revision、currentExecutionId 的 completed 执行与结果。waitingOn 只描述 pending 的依赖等待，不转换为 blocked，不放宽准入。事件快照在已有写锁中读取任务/执行，右栏通过一致性读取获取同一对数据，不嵌套存储锁。blockedBy 表示先后依赖；正常等待不应写成 blocked。
 
-独立权限审核是同一冻结 Provider 路由的一次无工具辅助请求，经 PromptPlan/RequestEnvelope/快照记录实际尝试与用量；没有第二执行器或恢复状态机。硬性 policy/user floor、Task 准入、Skill 工具交集与 owning lease 均不被审核批准替代。待审批调用保留原预算与期限，取消、过期 generation 或审核失败不执行。有效 profile 的声明交接及 requiredSkillIds 必须呈现在 PromptPlan，批准后的声明变更需重新审阅，不能沿用旧 offer 改写准备合同。
+独立权限审核见 [permissions.md](permissions.md)「独立权限审核」；硬性 policy/user floor、Task 准入、Skill 工具交集与 owning lease 均不被审核批准替代。有效 profile 的声明交接及 requiredSkillIds 必须呈现在 PromptPlan，批准后的声明变更需重新审阅，不能沿用旧 offer 改写准备合同。
 
 
 ## 工具权限最终准入
