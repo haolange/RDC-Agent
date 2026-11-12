@@ -7,15 +7,18 @@
 - [`../contracts/runtime-kernel.md`](../contracts/runtime-kernel.md)
 - [`../contracts/permissions.md`](../contracts/permissions.md)
 - [`../contracts/failure-model.md`](../contracts/failure-model.md)
-- [`../product/scoped-runtime-resources.md`](../product/scoped-runtime-resources.md)
+
+## 产品规格
+
+- [`../product/scoped-runtime-resources.md`](../product/scoped-runtime-resources.md)：Scope、Skills、Hooks、Memory、Knowledge 的产品规格。
 
 ## 本目录文档
 
 - `overview.md`：Electron / React / Debugger 主链架构总览。
 - `module-map.md`：能力域到源码、共享类型、IPC/preload、UI 与测试入口的地图。
 - `data-flow.md`：Project、Session、Capture、Agent、Trace 与 RDC shell action 的端到端数据流。
-- `agent-runtime-kernel.md`：实现向 kernel 说明（契约以 contracts/runtime-kernel 为准）。
-- `rdc-runtime.md`：Scope、资源覆盖、Instructions、Skills、Hooks、Memory（产品规格见 product/scoped-runtime-resources）。
+- `agent-runtime-kernel.md`：实现导览，从属于 `docs/contracts/runtime-kernel.md`。
+- `rdc-runtime.md`：RDC 操作契约：CLI 绑定、lease/隔离、回执、capture_select/restore/recover、Android 连接与回放观察。
 - `agentic-trace-protocol.md`：Trace、Progress 与 right-panel projection。
 - `provider-architecture.md`：Catalog / EffectiveModel / RequestPlan / credential lease。
 - `browser-qa-surface.md`：Browser（debug-only）与 Desktop 的单轨 API、transport、安全及状态 parity。

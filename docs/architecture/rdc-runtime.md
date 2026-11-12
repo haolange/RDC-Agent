@@ -2,16 +2,10 @@
 
 RDC Runtime 是 RDC-Agent 的资源解析、Prompt 构建与运行期可观测性边界。产品与工程决策以根目录 `ARCHITECTURE.md` 为 SSOT；本文描述对应的稳定实现契约。
 
-## Scope 与存储边界
+## 原生 CLI 配置与输出边界
 
-- User Scope 固定为 `~/.rdc-agent`。`RDC_AGENT_HOME` 只供测试与 disposable Browser QA 隔离使用，不是用户配置入口。
-- Project Scope 固定为 `<project-root>/.rdc-agent`。
-- 应用内部状态位于 `${userData}/state`，Secret、日志和缓存位于 OS `userData` 下。
-- Project `inputs/`、`artifacts/`、`memory/` 与 runtime state 默认不进入 Git。
 - RDC-Tool CLI 安装位置、参数前缀、工作目录、环境与超时是 User/Device 配置，Project 资源不能覆盖本机执行入口。
 - 桌面调用原生 CLI 时，若 Settings `env` 未写 `RDC_TOOL_INTERMEDIATE_ROOT`，主进程注入用户资源根下的 `rdc-tool-intermediate`。Settings 已写则原样使用。CLI 可执行文件仍只来自 Settings，不探测安装包或源码树，不把 Tools 默认 `intermediate` 当作产品 fallback。关闭本会话 lease 必须先 `rd.session.clear_context` / `context clear`，再对该 `rdc-<uuid>` 执行 `daemon stop`；clear 不代替 stop。限额以 Tools 的活占用为准。启动与退出只收割 App 中间根下已确认归属的 `rdc-*`，不扫安装目录 `intermediate`，不碰 `default` 或其他 context。
-
-`ScopedResourceResolver` 对 Agent、Skill、MCP、Hook 使用 `builtin < user < project` 的 whole-resource override，同 ID 的 Project disabled resource 可以隐藏继承项。Policy 只允许收紧；放宽、无效或不可比较的配置 fail-closed。
 
 RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`、`"Infinity"`、`"-Infinity"`，保留其异常事实而不伪造 0；有限数值仍为 JSON number。主进程严格解析 JSON，缺失、非法输出和截断分别报错并隔离不确定的 replay/context。字符串标记不能当作有效数值参与因果或性能结论。
 
@@ -21,21 +15,9 @@ RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`�
 
 管线 `sections` 的资格只覆盖实际请求并返回的字段。未采集 section 的模型默认空值不能降级已返回的 bindings，也不能据此声称已核验被省略的 shader 或输出状态；真实请求字段缺失仍保留对应降级原因。
 
-每项 resolved resource 携带 `scope`、`sourcePath`、`sourceHash`、`overriddenSource` 与 `effectiveStatus`。Renderer 通过 `rdcRuntime` preload API 获取这些信息，不直接访问文件系统、Secret 或任意 shell。
-
 管线 stage 查询的已知能力拒绝只在 `rd.pipeline.get_shader`、`get_stage_state`、`get_constant_buffers`、`get_resource_bindings` 返回同操作 canonical `capability/shader_stage_unsupported`，并同时证明 `failure_stage=validate_stage`、`effects_attempted=false`、`context_preserved=true` 时，进入现有无效果拒绝核验路径。主进程仍须在收到拒绝后重新核对冻结 owning lease 的版本、context、capture 和 replay 身份，核验成功才保留可查询状态；原始结果仍是失败，不产生实验回执、不重试。其它能力错误、缺失证明、取消或身份漂移仍隔离，不按错误文字推断安全。
 
-## Project Instructions
-
-`ScopedInstructionResolver` 按确定性顺序加载：
-
-1. `~/.rdc-agent/RDC.md`
-2. Project 根目录 `RDC.md`
-3. 从 Project 根到目标目录逐级出现的 `RDC.md`
-
-目标目录来自 session cwd、附件或当前 capture。带路径的工具调用会重新解析新增目录链。越界、symlink escape、解析错误和预算截断进入诊断，不静默忽略。不自动读取 `AGENTS.md` 或 `CLAUDE.md`。
-
-## Agent、Skill、MCP 与 Hook
+## runtime_context 与宿主控制事实
 
 `runtime_context` 在确认 owning lease 后，按同一 project/session（合法委托使用父 session）核对主进程已打开的 context、captureFileId 和 replaySessionId，并返回 `captureContentSha256`。其来源是打开前后验证一致的实际 capture 文件字节哈希；不匹配、未打开或缺少验证哈希时返回 `null`，不采用 handle 的派生摘要或模型传入值。打开时的原始响应不会作为实时事件或目标暴露；实时位置须另行查询。它只暴露现有主进程身份事实，不授予 capture 生命周期操作权限，也不证明实验已经回滚。
 
@@ -48,14 +30,6 @@ RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`�
 真实进程连续性使用同一受控 CLI 的 `rd.session.get_context.data.process_identity` 和每次 canonical 结果的 `meta.process_identity`。Tool 仅在实际 daemon child 中读取自身与父 daemon 的 OS 进程出生标识，分别返回 `pid + start_generation`；Windows 为进程创建 FILETIME，Linux 为 boot ID 与进程启动 tick。父身份不符、读取失败或平台不支持时明确 unavailable，不用持久逻辑 ID、缓存或零值替代。每个实验阶段须比较完整 daemon/worker 身份，PID 复用或任一世代变化使连续性失效；该字段进入既有主进程签名结果，不自动证明因果、恢复或设备呈现，不增加生命周期权限。
 
 状态控制的实现语义随共享 CLI 方法分发，不能要求每次 capture 调查访问上游源码仓库。RDC-Tool 的 shader 编辑、活动 patch 枚举和撤销共用 PatchEngine 的 session 活动集合；元数据是同一集合的投影，`shaderReplacement` / `patchStack` 不代表两个独立变更接口。对照权威实现为上游 `rdc_tool/server_runtime.py` 的 `_list_replacement_payloads` / `_store_replacement_payload` 及 shader dispatch、`rdc_tool/core/patch_engine.py` 的 `list_patches`；这些位置用于工程核对，不是用户运行前提。实际三状态枚举、冻结身份和五阶段签名仍必需。数据写入控制只在完整冻结目录和有效权限确实没有该可达路径时限定为不适用；关键词空搜索、未知效果或查询失败不能证明无状态，也不能声明外部修改不存在。`shell.rdc.discovery.list` 从同一冻结定义有界分页，游标绑定目录指纹，提供完整静态准入汇总及同源 scope/effects/prerequisites 策略；参数、路径、身份、审批和运行期检查仍由既有执行路径完成。目录汇总不授予权限，也不是 live 原生状态观察。工具安装语义与方法合同冲突时保存实际反证，回到所属计划或工程修复，不放宽安全门。
-
-- `.agent.md` 是 Agent Profile 的唯一来源，使用 YAML frontmatter + Markdown。
-- Skill 使用 `<skill-id>/SKILL.md` 与可选的 `scripts/`、`references/`、`assets/`。
-- Progressive Skill：非空 metadata catalog 一律注入短索引（`SkillCatalogBudget`）；`.agent.md` `skills`、composer `$skill-id`、以及 session-scoped `/skills` 武装在首次 LLM 调用前全文 preload（缺失 fail-closed）；其余 Skill 经 core `skills` / `skill_read` 渐进加载。禁止 lean/standard harness 档位。
-- MCP 由 scoped `.mcp.json` 与 exact effective Agent profile 决定；pool 按 `projectRoot + descriptorHash` 隔离，以 ref-counted lease 保证 Project 切换不关闭在用连接。 The leased pool key is passed through tool assembly and execution.
-- Hook 使用 `.hook.yml`、结构化 command/args、`shell: false`、timeout 与 `block | warn` failure policy。分发根为 `resources/agent-runtime/hooks`（builtin）+ `~/.rdc-agent/hooks` + `<project>/.rdc-agent/hooks`，顺序 `builtin < user < project`。
-- 运行时接线：`session.*`、`turn.*`、`tool.*`、`context.*`、`agent.*`、`permission.denied`。唯一引擎是 `HookEngine`。
-- Project Hook 按 `project + content hash` 授信，内容变化或资源删除自动撤销授信。
 
 ## Prompt 与请求管线
 
@@ -72,20 +46,6 @@ Scoped Runtime Resolution
 
 每次 `llm_turn` 保存脱敏 `RequestEnvelopeSnapshot`，包含 effective instructions、messages、tools、resource provenance、provider/model/protocol、usage 与 redaction metadata。Credential、capture binary 和 provider protected payload 不落盘；protected payload 只保留 hash 与脱敏原因。快照经 `RequestSnapshotStore` 落盘，并由 `rdc-runtime:listSnapshots` / `getSnapshot` 提供给日后专用 Debug View（Copilot Chat Debug View 级）消费；当前无 Settings Diagnostics 产品入口，也不得挂到默认 Session/Trace 右侧面板或嵌入 Work Process 消息流。快照是 provider-neutral 脱敏信封，不是 Work Process loop meta，也不是 Terminal runtime log。
 
-## Context Usage 计量
-
-Composer 的 context usage 环与弹窗由 `RunContextUsageSummary` 驱动：占用率分母是 `promptBudgetTokens`（可执行 prompt 上限，例如 DeepSeek V4 1M 窗口为 1M，不再扣模型输出上限），完整窗口写入 `contextWindowTokens`，模型输出上限写入 `maxOutputTokens`，压缩线写入 `compactionThresholdTokens`。窗口占用率与本 run In/Out 来自 provider 上报的真实 usage。Settings 切换 agent model 或 Composer 切换 1M/Max tier 后、下一次发送前，renderer 用当前 `EffectiveModel` 的 `contextBudgetTokens` 对 `lastKnownUsage.occupiedTokens` 做纯派生预览（圆环与弹窗百分比带 `~`，明细 token 绝对值保留、`free` 按新分母重算或补齐，并同步投影完整窗口、输出上限与压缩线），不写 store、不发 IPC、不改 `usage.json`。idle 无用量时环回退 `profile.contextBudgetTokens`，不得显示完整窗口。`current`（prepared）高于该预览；`preparing` 圆环保持 `…`，弹窗与环进度仍沿用切换后估算，避免弹回旧窗口。发送后 prepared 与 `workflow:runUsageChanged` 的真实 usage 无缝接管。hero 下显示压缩线、条件完整窗口（仅 window > budget）与本轮可生成；分段条带压缩线刻度，圆环不标压缩位置。弹窗 Actual / Last actual 为同行三张独立圆角卡片：`Tokens`（In / Out / Total）、`Cache`、`Reasoning`；Cost 为同语言全宽卡。Cache 统计范围是当前 Agent Run（不是跨 session 累计，也不是 Token Economy 压缩节省）：`cacheSavedTokens` = 累计 hit；`lastTurnCacheHitRate` / `cumulativeCacheHitRate` = `hit / (hit + miss)`（百分数，分母为 0 时缺省）；命中/未命中为 token 计数。归一化在 provider usage 出口完成：优先原生 `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`，否则 `hit = cacheRead`、`miss = max(input − hit, 0)`；无原生且无 cacheRead 时不产出 hit/miss。UI 固定三栏，Cache / Reasoning 缺遥测时显示 `—`（不造假 0 / 0%）。wire 层仍可保留 `cacheReadTokens` / `cacheWriteTokens` 供诊断，主展示不再用 Cache read 双轨。分类 breakdown（system_prompt、memory_files、skills、system_tools、mcp_tools、mcp_tools_deferred、builtin_tools_deferred、subagent_definitions、summarized_conversation、conversation、free）为 chars/4 估算，按 provider `inputTokens` 缩放对齐。`memory_files` 段覆盖 RDC.md scoped instruction 链；`mcp_tools_deferred` / `builtin_tools_deferred` 段仅计未激活 deferred schema 的估算量，不参与缩放、不占用堆叠条与 free 计算。Debug 与 Composer/Ask 路径均经 `PromptPlanBuilder` 产出可拆分的 metrics。`workflow:getRunUsage` 使用唯一对象参数 `{ sessionId, runId? }`，并校验 run/session ownership；`workflow:runUsageChanged` 是 `SessionScopedPayload<RunContextUsageSummary>`。Debug 按 `runId` 聚合，普通对话按顶层 `turnId` 聚合；每次 provider call 更新 effective provider/model，同时累计本轮 Tokens、Cache 与 Reasoning。最新快照随 session 落盘至 `<sessionDir>/usage.json`（subagent 隔离 session 不落盘），格式为 `{ schemaVersion: '2', usage }`；只读 schemaVersion 2，缺版本、旧版本（含 `outputReserveTokens` 字段）与未知版本一律 `STORAGE_SCHEMA_UNSUPPORTED` fail-closed 并保留原件，不迁移。应用重启或内存 miss 回读时才标记 stale。active 与 background session 都经同一 projection reducer，迟到事件按 session + turn/run identity 丢弃。terminal 不清空 `lastKnownUsage`，也不改变回读查询身份；仅从未取得真实快照的新 session 显示「暂无用量」。
-
-## Memory、Knowledge 与 Reasoning
-
-Memory 只有 `memory_search`、`memory_read`、`memory_write`、`memory_delete` 四个 scoped tool。Write 需要明确用户意图或批准，Delete 需要确认；没有自动抽取、turn counter、consolidation 或全索引 Prompt 注入。
-
-Knowledge Center 是三列 UI，消费 Query / Index / Compile / Candidate / Read / Topics / Write。知识库只有 user `~/.rdc-agent/knowledge` 与 project `<项目>/.rdc-agent/knowledge`，会话不是知识库。查询可按 scope、时间和索引版本分页；读取可取简介、章节、行范围或全文，并以原文 hash 约束版本。图片引用仍须实际进入读图链路。主题及同义词可以批量提议、预览和确认，提议本身不改写分类；正文仍以 Markdown 为唯一来源。主要 IPC 为 `knowledge:overview` / `query` / `card` / `read` / `compile` / `index:rebuild` / `candidates` / `candidateCreate` / `import` / `image` / `write` / `promote` / `topics:*`。持久写入必须显式人类确认；`knowledge:import` 在同一次点击里签发并消费 `knowledge.write` token，写入所选空间 draft，不自动创建 Candidate。生成引擎另立设计。
-
-查询指定不存在的空间 ID 时明确报错并返回可用 ID，不把错误范围当作空检索结果。
-
-Reasoning 使用 `raw | summary | opaque | none | unknown`。语义来自 Provider/Model contract，不从 OpenAI/Anthropic compatibility protocol 推断。App-managed 且有文档证据的 DeepSeek / Kimi / GLM / MiniMax / MiMo 等解析为 `raw`；真正未核实的第三方路由才是 `unknown`。Work Process 顶层用「工作中 / 工作过程」，loop thinking 用「正在思考 / 已思考 · {duration}」（前置 quiet icon，不用「深度思考」），不展示「语义未验证」。commentary 渲染为 markdown 散文（`proseText`），永不顶 thinking 槽；最终答案仅在 assistant message body 中以 full-bleed prose 呈现，不用 raised bubble。
-
 ## 受控 API
 
 `rdcRuntime` preload domain 提供：
@@ -95,7 +55,6 @@ Reasoning 使用 `raw | summary | opaque | none | unknown`。语义来自 Provid
 - Request snapshot list / detail
 
 Memory 与 Knowledge 使用独立 scoped preload domain（`memory` / `knowledge`）。Renderer 不获得任意 tool execute、任意 shell、Secret 或 provider protected payload 接口。
-
 
 ## 原生 CLI、能力与执行回执
 
@@ -163,10 +122,9 @@ helper 进程退出不转移已有安装或配置所有权。Tools 依据可解�
 
 `clear_context` 失败时，Capture 错误态保留 owning lease，并显示 Tool 返回的有界清理原因代码；应用运行记录保留同一错误，禁止用关闭界面或重启进程代替 native 清理回执。Android helper 的进程归属和 ADB forward 由 Tool 核验，应用不自行清理设备进程。
 
+### Capture 查询与临时回放证据
 
-### Capture queries and temporary replay evidence
-
-Frozen turn identity includes the owning capture and replay identities. Capture-scoped queries receive the application's capture ID; model overrides are rejected. Temporary replay queries hold the serial lease while the main process reads context before and after, verifies the restored event and result proof, and rejects identity drift. They do not trigger final-state refresh. Restoration failure quarantines execution.
+冻结的 turn 身份包含 owning capture 与 replay 身份。Capture 作用域的查询使用应用分配的 capture ID，模型传入的覆盖值被拒绝。临时回放查询持有串行 lease，主进程在查询前后读取 context，核验已恢复的 event 与结果证明，并拒绝身份漂移；它们不触发终态刷新。恢复失败会隔离后续执行。
 
 原生 shader 替换失败只有在同安装 CLI 返回 canonical `validation` 错误、结果种类匹配本次冻结操作、明确 `replacement_attempted:false` 且 `context_preserved:true`，并且主进程再次确认原 lease/capture/replay 身份未变时，才保留可查询的 context。此类拒绝没有 intervention 回执，不代表修复或 rollback。退出超时、取消、协议损坏、未知错误、已尝试替换或身份变化仍隔离，必须经 Capture 生命周期恢复。
 
@@ -184,7 +142,7 @@ shader-debug handle 属于创建它的 replay session，重启/reopen 不延续�
 
 `rd.shader.get_source` 在指定事件没有绑定 shader 时仍返回 `shader_binding_lookup_failed`，不会把“无 shader”伪装成可用源码。Tool 在返回前恢复原 event；main 仅接受同操作、同身份、明确 `resolve_binding` 失败与 `replay_state_restored/restored_event_id` 证明，并再次读取原 event 核对后保留 lease。恢复失败返回 `shader_inspection_recovery_failed`；缺证明、取消或身份变化继续隔离。
 
-Frame-timing evidence validates the complete single-queue GPU replay method, seconds, range, samples/warmup, capture and actual replacement set. These checks supplement main-process signed receipts and the existing five-phase experiment validation; catalog claims cannot replace execution proof. Specialist references are generated from the same frozen CLI definitions.
+Frame-timing 证据校验完整的单队列 GPU replay 方法、秒数、范围、samples/warmup、capture 及实际 replacement 集合。这些检查补充主进程签名回执与既有五阶段实验验收；catalog 声明不能替代执行证明。专业参考由同一份冻结 CLI 定义生成。
 
 Android 回放使用匹配的 Tools/native 服务。服务端在等待用户下一条操作时保持连接，只有开始接收包后才应用接收超时；应用不通过后台抢占或重启用户 helper 来维持会话。Android 文件传输由同一 CLI 以 ADB 和 SHA256 校验完成，已验证设备副本可复用；连接只拥有本次新建的副本。Capture 的图像导出成功与设备实际呈现分别投影，无设备确认时仍显示同步不可用。
 
@@ -208,7 +166,7 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 
 原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。`runtime_context` 对同一 session/project 的隔离身份返回明确的受控恢复状态，不将仍打开的 capture 误报为未打开，也不向其他 scope 泄露保留的 lease。新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化。失败没有取得可信恢复证明时仍 fail-closed；恢复通过应用生命周期重新建立 owning capture/replay/context 身份。
 
-`rdc_probe` 的 `probe` 是只读语义查询闭集（context、事件树、事件搜索、事件详情、管线摘要、资源目录、受控 VFS），规划与执行身份都可使用；像素历史、Shader 调试、替换和导出不在其中。事件树与事件搜索经冻结 CLI 的 `call` 执行对应只读目录操作，由主进程注入 owning replay 身份并核对返回的 result_kind 与 session。结果完整返回，超过阈值时按普通工具结果保存为可分页检索的会话制品，不在工具内截断。
+`rdc_probe` 的 `probe` 是只读语义查询闭集：`context_status`、`resource_list`、`event_list`、`event_search`、`event_show`、`pipeline_show`、`vfs_ls`、`vfs_cat`，规划与执行身份都可使用；像素历史、Shader 调试、替换和导出不在其中。`event_list` 按 `offset/limit` 分页，`pagination.truncated=false` 才是完整；`event_search` 支持名称、ActionFlags、事件范围。事件树与事件搜索经冻结 CLI 的 `call` 执行对应只读目录操作，由主进程注入 owning replay 身份并核对返回的 result_kind 与 session。结果完整返回，超过阈值时按普通工具结果保存为可分页检索的会话制品，不在工具内截断。
 
 获批调查可在同一 owning session 内通过 `rdc_probe` 的 `capture_select` 选择计划中经主进程冻结的 input ID、内容 hash 与设备，不能传任意路径或切换到未经批准的设备。切换前核验实际 replay、事件、替换和进程身份，结束相关子执行及实验；完成旧 context 释放和 daemon stop 后打开目标，并以原冻结权限、模型、catalog 和消费重新准备。`capture_restore` 恢复进入调查前的输入及位置，并返回当次主进程观察的入口基线、当前现场和一致性结果；即使无需移动也返回该比较。重开可改变 native 身份，不能仅凭 ID 不同判定用户位置未恢复；当次观察不是终态 resolved 回执。回合运行期间终态回执待生成是预期状态：模型结束后，主进程提交前重新核验并签名，恢复未确认时不能提交 completed。仅终态回执待生成不能成为已观察恢复成功后停止其他获准工作的理由，也不能伪称回执已经存在。切换、停止和新身份通过主进程签名回执关联。操作仍受当前权限模式约束，不能用能力声明代替授权。
 
@@ -256,11 +214,9 @@ Tools 的安装前核验和只读核验共用 PM session 解析。应用重启�
 
 ## Right Rail projection
 
-Workbench Right Rail has two target-specific forms: a selected Project shows only `Import .rdc` and project inputs; a selected Session shows `Progress / Artifacts / Outputs / Context / Capture`, with Capture always visible. Artifacts project only main-owned Investigation records; Outputs still require explicit `output_register`. It must not render a per-tool `rd.*` inventory, standalone Memory panel, duplicate Skills catalog, CLI catalog summary, tool count, or namespace counts. Context only presents real task resources: attachments, references, tools, and used capabilities. Capture presents an honest empty state when no project input exists; otherwise it presents owner-session `.rdc` selection/open/preview/refresh/copy/clear and Replay Device. contextId/replaySessionId/capture ids, lease/runtime owner, and remoteId/remote status remain owner-scoped runtime data for agent consumption rather than visible inventory. Diagnostics stay deduplicated and actionable. CLI unavailable is only a diagnostic for failed open/preview shell actions; the sidebar does not expose CLI catalog metadata. Renderer code cannot invoke arbitrary tools or reconstruct runtime state; execution stays on Settings shell actions / shell -> `ShellInvocationService` -> external CLI. Attachments and uploads are Task Context inputs; Outputs require explicit `output_register` publication of a completed project file into the owning run and use only user-facing source labels.
-
+Session Right Rail 固定为 `Progress / Artifacts / Outputs / Context / Capture` 五卡，Project 只显示 `Import .rdc` 与项目输入；投影合同见 [`docs/contracts/session-projection.md`](../contracts/session-projection.md)，owner-scoped 的 RDC 身份数据只供 agent 使用，不进入 rail 清单。
 
 Android 启动沿唯一明确 Loader activity，正常系统授权等待使用原连接总预算，不另设 15 秒启动截止或以其它启动器覆盖原始结果。主进程调用同安装捆绑 Python 时，真正移除环境中的 PYTHONHOME/PYTHONPATH（包括环境继承），不能以空字符串代替删除；Shell 内部 env 的 undefined 只用于子进程 unset，不扩展 Settings/IPC 的配置模型。诊断详情保留有界 command/returncode/stdout/stderr，短标题不据英文错误猜测安装。
-
 
 ### 退出登记回收
 

@@ -7,7 +7,7 @@
 - 事实只来自严格 JSON manifest；TypeScript 只实现 Schema、编译器、Registry、Resolver、Planner、Adapter、认证和 Discovery 行为。
 - 唯一链路是“声明 → 构建期编译 → 运行时解析”。禁止 TS 数据 preset、factory 推导、renderer 静态表或按名称猜测形成第二真值。
 - `EffectiveModel` 是能力真值；`RequestPlan` 是一次请求的冻结执行真值。Adapter 不得重算 Fast、Max、1M、route、temperature 或 context budget。
-- Conversation/Agent 调用不得注入隐藏的默认 	emperature；只有 manifest/route 明确固定的值或调用方显式选择才进入 RequestPlan，否则省略并交由 Provider 管理。
+- Conversation/Agent 调用不得注入隐藏的默认 temperature；只有 manifest/route 明确固定的值或调用方显式选择才进入 RequestPlan，否则省略并交由 Provider 管理。
 - 认证秘密不进入 manifest、`EffectiveModel`、`RequestPlan`、IPC、renderer、会话、journal 或 Trace。
 - 未证实字段保持 `unknown`（Composer UI 呈现为灰掉的 `Disabled` / `禁用`，不发明档位；Settings 的能力摘要与默认档明确显示“未知”，不显示为关闭）；不得补写 256K、按后缀关联 variant，或按 provider 名、上游 SDK 包元数据、endpoint hostname 推断分类与协议。
 - 当前账号 discovery、policy 和 entitlement 只能收窄账号可用性，不能把 manifest 中已证实的结构能力改成全局不支持。
@@ -31,14 +31,14 @@ manifests/surfaces/*.json
 
 Manifest 使用 Zod strict schema。未知字段、重复 ID、失效引用、未注册实现、敏感 header/body key 或不闭合的执行路径均使构建失败。禁止 YAML、继承、anchor、动态模块路径、任意脚本和隐式名称规则。
 
-Canonical identity 输入固定为 models.dev 2026-07-15 的 166 个 identity，SHA256 为 `d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733`。RDC 专属 OAuth、Cloud 与 Coding Plan surface 可以额外存在，但必须有独立 provenance；每个 models.dev identity 恰好有一个明确 surface owner。
+Canonical identity 输入固定为 models.dev 的固定快照（见 manifest 中的 hash）。RDC 专属 OAuth、Cloud 与 Coding Plan surface 可以额外存在，但必须有独立 provenance；每个 models.dev identity 恰好有一个明确 surface owner。
 
 ## 编译与加载
 
 Catalog compiler 负责：
 
 - Schema 与跨文件闭集引用校验；
-- 166 identity 精确覆盖；
+- identity 快照精确覆盖；
 - route、adapter、auth、discovery、wire implementation 覆盖；
 - stable surface 的 endpoint、Connection Test 和最终操作 URL 闭环；
 - model-level route matrix、internal target、协议兼容与 binding 冲突校验；
@@ -97,7 +97,7 @@ Fast、1M 和 reasoning 的执行方式只在 `ExecutionBinding` 中声明一次
 
 `ModelSelection.pickerVisibility` 与 execution role 解耦。Doubao Lite 可以既是 primary model，又作为其他模型的执行 target；Kimi highspeed、Opus Fast 等纯内部 target 才隐藏。关联必须来自 live metadata 或精确 manifest fact，禁止后缀猜测。Agent/Composer 可执行集合再叠加共享 `isAgentToolExecutableModel` gate：只有 source-backed `toolCalling.supported` 且 route 有已实现 structured-tool adapter 的模型可被选择；Settings catalog 仍展示完整事实。
 
-禁止恢复 Embedding capability / Semantic lane / `settings.llm.embedding`。Discovery 继续 fail-closed 剔除非 agent modality（含 embedding/embeddings）。不得把 `EmbeddingCatalog` / `EmbeddingExecutionService` 写成现行产品能力；U02 删除这些源码。
+禁止恢复 Embedding capability / Semantic lane / `settings.llm.embedding`。Discovery 继续 fail-closed 剔除非 agent modality（含 embedding/embeddings）。不得把 `EmbeddingCatalog` / `EmbeddingExecutionService` 写成现行产品能力；这些源码已删除。
 
 `ResolvedModelControls` 由 UI 与 Planner 共用。selectable control 若没有执行路径、target 缺失或 denied、route 不兼容，则统一解析为 `blocked`；Composer 与发送阶段必须返回相同原因。`RequestPlan` 记录 selected/effective model、adapter、binding IDs、protocol、catalog/route revision 与公开 wire patch。
 
@@ -109,7 +109,7 @@ Discovery authority 为 `authoritative-list`、`candidate-validation`、`additiv
 - `discovered`：完整 authoritative list 的缺席可以判定不可用；
 - `account-entitled`：由账号完整列表决定访问权。
 
-Catalog ownership 只用于审计，不能决定 discovery 缺席语义。Kimi Coding Plan 维护六个精确 model id：`k3.1-pro`、`k3.1-pro-highspeed`、`k3`、`k3-256k`、`kimi-for-coding`、`kimi-for-coding-highspeed`。前五者是 primary；`kimi-for-coding-highspeed` 是 `kimi-for-coding` 的 internal Fast target。`k3` 的 1M 是同一 model id 的 client-side context tier，禁止恢复虚构的 `k3[1m]` target。六个 live identity 均按 `account-entitled` 处理，缺席会 tombstone；internal target 不进入 selector 或持久化配置，已引用 primary route 保持 fail-closed。Anthropic-compatible base URL 固定为 `/coding`，OpenAI-compatible base URL 固定为 `/coding/v1`。后台版本名只可进入 provenance/脱敏诊断，禁止生成 selector、alias、持久化 route 或跨 surface 映射。
+Catalog ownership 只用于审计，不能决定 discovery 缺席语义。Kimi Coding Plan 的精确 model id 以 manifest 为准：其 live identity 均按 `account-entitled` 处理，缺席会 tombstone；internal Fast target 不进入 selector 或持久化配置，已引用 primary route 保持 fail-closed；K3 的 1M 是同一 model id 的 client-side context tier，禁止虚构 `[1m]` target。Anthropic-compatible base URL 固定为 `/coding`，OpenAI-compatible base URL 固定为 `/coding/v1`。后台版本名只可进入 provenance/脱敏诊断，禁止生成 selector、alias、持久化 route 或跨 surface 映射。
 
 Grok 订阅的 Builder `/models` 使用 `authoritative-list`。完整有效的响应才能判定已知型号缺席。分页、残缺、无法识别或没有受支持模型的响应按刷新失败处理，沿既有缓存和错误链路呈现。仍可看到基线模型及其缺席原因，Composer 只提供当前可用项。该规则独立于 xAI API 目录。
 Credential-scoped live discovery follows one path: `parser -> LiveModelObservation -> manifest.liveProjection -> CatalogModelContribution -> Effective Catalog`. Parsers report only explicit upstream identity, availability, context, protocol, reasoning metadata, and capability evidence. Product labels, selection, routes, tiers, controls, bindings, and Fast targets remain compiled-manifest facts. `liveProjection` declares allowed fields and authority; it is never exposed through IPC or Settings persistence.
@@ -122,7 +122,7 @@ Structural capability, account entitlement, expiring execution evidence, and tra
 
 ## 凭据与请求事务
 
-Settings schema 当前为 v8，Effective Catalog cache schema 为 v9。运行时投影顺序字段不修改缓存 schema。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。稳定 provider/model/surface ID、secret ref 与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
+版本见 `SETTINGS_SCHEMA_VERSION` / `EFFECTIVE_CATALOG_SCHEMA_VERSION`。运行时投影顺序字段不修改缓存 schema。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。稳定 provider/model/surface ID、secret ref 与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
 
 发送 preflight 创建主进程内 opaque credential lease，冻结 provider 配置、typed connection values、认证 headers、OAuth/Vertex 短时 token 与 AWS Bedrock credentials。认证 header 不进入 `ModelRoute` 或 `RequestPlan`。Adapter 必须持有 lease handle 才能发送；运行中不允许回读 Settings。
 
@@ -142,16 +142,15 @@ Preflight 失败或取消不得留下 Session、Turn、branch、attachment、jou
 
 ## 重点事实契约
 
-- OpenAI Direct API：GPT-6 Sol/Luna 为 1.05M input / 128K output，支持视觉、工具和结构化输出；Fast 使用 `service_tier=priority`，EU data residency route 仅允许标准处理。ChatGPT Account 是独立 surface：GPT-6 Sol/Luna 属于维护型账户目录模型，Codex 模型目录定义其 272K 默认、872K Max 和 Fast priority tier；账户 discovery 可补充动态资格，但过期或刷新失败的目录不得因缺席撤销这两款已维护型号，API 窗口与 Fast binding 不跨 surface 覆盖。
-- ChatGPT Account 的 GPT-6.1 Sol 独立维护：2026-10-19 官方账户发布文档与实际 Codex 目录确认精确型号 `gpt-6.1-sol`、文本/图像和 Responses 工具调用；账户目录默认 500K、Max 872K，不能套用 API 的 1.05M。默认 low、标准速度；可选 low/medium/high/xhigh/max 和已有 Fast priority binding。Ultra 为客户端编排能力，不写为 Provider reasoning 值；实际账户资格仍由请求验证。
-- ChatGPT OAuth：现行 Codex `models.json` 里 `gpt-6-astra`、`gpt-6-sol`、`gpt-6-luna`、`gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna` 的 `input_modalities` 都包含 `image`。GPT-6 Sol/Luna 在维护目录中保持可选；HTTP 401 或过期 `/models` 快照不能把它们误判为账户不支持。其余 account-entitled 型号仍按成功获取的账户目录判定。`gpt-5.4-mini` 与 `gpt-5.3-codex-spark` 已不在当前可选目录中，不保留 text-only 特例或 alias。GPT-6 与 GPT-5.6 的 Fast 均由该 surface 的 Codex priority binding 驱动。5.6 支持 Low/Medium/High/Extra/Max。`gpt-5.4` 的 Codex `upgrade.retirement_at` 为 2026-08-31，已从 OAuth 清单移除；OpenAI API 同名模型独立维护。`gpt-5.5` 已于 2026-10-14 从 ChatGPT 登录的 Codex 退役，活动目录与发现均排除该精确 ID。[Codex 退役公告](https://learn.chatgpt.com/docs/changelog?date=2026-10-15#gpt-55-retirement-in-codex) ChatGPT discovery 不覆盖 manifest 的视觉、工具和结构化输出基线。
-- Anthropic Direct：`claude-opus-5` 为 1M input / 128K output、$5/$25、Low/Medium/High/Extra/Max（默认 High）并显式支持 Off。`claude-opus-5-5` 为 1M / 128K、$4/$20，Low/Medium/High/Extra/Max（默认 Medium），adaptive thinking 始终开启。Fast 是 `speed=fast` + `anthropic-beta: fast-mode-2026-02-01` 的 API request binding；只有真实 usage 返回 `speed=fast` 才授予 entitlement。该 Fast preview 不继承到 Claude Account OAuth 或第三方托管面。
-- Copilot：结构能力由 manifest/user-observed fact 保留，账号 `/models` 的 `supported_reasoning_efforts`、`capabilities.supports`、默认/long-context billing tier、endpoint 与 policy 是当前账户的覆盖真值。支持扩展上下文的模型必须呈现“默认窗口 + 可选 1M”，禁止再把 Claude/GPT 扩展窗口写成固定 1M。`claude-opus-5` 只有在当前账户 discovery 精确返回 model id 和 agent endpoint 时可选，不继承 Direct API Fast。
-- Kimi Coding Plan：账户目录接纳 `k3.1-pro`、`k3.1-pro-highspeed`、`k3`、`k3-256k`、`kimi-for-coding`、`kimi-for-coding-highspeed`，各型号资格按当前账号验证。`kimi-for-coding` 为固定 1M，推理 Off/Low/High/Max（默认 Max），模型对应 K2.8 Preview。K3 两个精确 ID 均为 Low/High/Max（默认 High）；关闭 Thinking 会路由到 K2.8 Preview，因此 K3 UI 不暴露 Off。`k3` 的 1M entitlement、HighSpeed Fast 与各模型多模态能力分别服从该 surface 的 live contract，不从名称或其他 Moonshot surface 推断。
-- GLM-5.2：固定 1M、High/Max、默认 High、无 Off/Fast；不同协议使用不同 wire profile。
-- DeepSeek Direct：`deepseek-flash`（V4.1 Flash）与 `deepseek-v4-pro` 都固定 1M、默认 High，UI 为 Off/Low/High/Max。两者都支持 Responses（默认）、Chat Completions 与 Anthropic。Flash 有原生视觉；Pro 视觉为 unsupported。兼容输入 `minimal/medium/xhigh` 只在 wire 折叠，不渲染成额外档位。Thinking 开启时无效的 temperature / presence_penalty / frequency_penalty 从 wire 删除；top_p 保留，其有效范围由服务端限制为 0.95–1。`deepseek-v4-flash` / `deepseek-v4-flash-vision-exp` 已退役且不保留 alias；`deepseek-chat` / `deepseek-reasoner` 已删除。
-- Grok 4.20 non-reasoning、reasoning、multi-agent 是三个独立模型；multi-agent 推理控件 fail-closed（UI=`Disabled`），不提供 reasoning toggle。Grok 4.3 是固定 1M 的 Max mode。Grok 4.7 与 Grok 4.6 都是 500K、Low/Medium/High/Extra、默认 High，视觉与工具按当前 surface 事实为 supported；Grok 订阅的 Grok 4.5 也支持视觉与结构化输出。xAI API 的 Grok 4.7 Fast 使用 `service_tier=priority`；Grok 订阅的 Fast 使用 live catalog 验证的 `grok-4.7-build-fast` 模型切换，二者不共享 entitlement。Grok Build 0.1 为 256K。`grok-code-fast-1` 已于 2026-05-15 退役，不保留 alias。
-- canonical wire 保留 `xhigh`，产品统一显示 `Extra`；不存在 Ultra 档位。
+具体模型的窗口、价格、推理档位与 Fast 资格以 `src/shared/provider-catalog/manifests` 为准，本文只保留跨模型的不变量：
+
+- 同一厂商的不同 surface 独立建模并独立维护事实：OpenAI Direct API、ChatGPT Account、Copilot、Kimi API 与 Kimi Coding Plan、xAI API 与 Grok 订阅互不继承窗口、Fast binding 或 entitlement。
+- ChatGPT Account 的维护型号在 discovery 过期、401 或刷新失败时不因缺席被撤销，其余 account-entitled 型号仍按成功获取的账户目录判定；discovery 不覆盖 manifest 的视觉、工具和结构化输出基线。
+- Copilot 的账号 `/models`（`supported_reasoning_efforts`、`capabilities.supports`、billing tier、endpoint、policy）是当前账户的覆盖真值；支持扩展上下文的模型呈现“默认窗口 + 可选扩展”，不写成固定窗口，也不继承 Direct API 的 Fast。
+- Fast 是否生效只认真实回执：Anthropic `speed=fast`、OpenAI/xAI `service_tier=priority` 或实际 Fast model id；请求参数不能充当 entitlement。
+- 多协议模型各协议使用各自的 wire profile；兼容输入档位（如 `minimal/medium`）只在 wire 折叠，不渲染成额外档位。Thinking 开启时无效的采样参数从 wire 删除。
+- canonical wire 保留 `xhigh`，产品统一显示 `Extra`；不存在 Ultra 档位，Ultra 属客户端编排能力，不写为 Provider reasoning 值。
+- 已退役的模型 ID 不保留 alias，历史会话保留原模型记录，继续使用时需重选模型。
 
 ## Adapter 边界
 
@@ -169,7 +168,7 @@ Connection Test、Connect 的贡献经 `refreshEffectiveCatalogDiscovery` 写入
 
 ## HAL Adapter 实现注册
 
-实现注册表（`src/shared/provider-catalog/implementationRegistry.ts`）当前包含 **16 个** adapter：
+实现注册表见 `src/shared/provider-catalog/implementationRegistry.ts`，adapter 清单以该文件为准，下表为概览：
 
 | adapterId | 协议 | transport |
 | --- | --- | --- |
@@ -190,9 +189,9 @@ Connection Test、Connect 的贡献经 `refreshEffectiveCatalogDiscovery` 写入
 | `sap-ai-core-foundation-models` | SapAiCoreFoundationModels | sdk |
 | `sap-ai-core-orchestration` | SapAiCoreOrchestration | sdk |
 
-Phase 7 新增的三个 HAL adapter：
+以下 adapter 的实现说明：
 
-- **Mistral Conversations**（`MistralProvider.ts`）：adapter 源码仍在，但当前没有 compiled selectable surface；产品面保持不可选，不得把它写成已上线续接能力。
+- **Mistral Conversations**（`MistralProvider.ts`）：adapter 源码仍在，但当前没有 compiled selectable surface；产品面保持不可选，该 adapter 不是已上线的续接能力。
 - **Azure OpenAI Responses**（`AzureOpenAIResponsesProvider.ts`）：只保留 Azure URL（`api-version`）和 `api-key` 鉴权。Responses 请求体与 SSE 事件循环在 `providers/internal/responsesShared.ts`，与 OpenAI Responses 共用。
 - **Bedrock Converse Stream**（`BedrockConverseProvider.ts`）：适配 AWS Bedrock Converse Stream API，使用 SigV4 签名、`cachePoint` 缓存标记，流式帧走共享 `parseSSE` / `StreamChannelRefs`。
 
@@ -266,7 +265,7 @@ Bedrock 使用 `cachePoint: { type: 'default' }` 标记 stable prefix。`partiti
 
 ## 验证门禁
 
-- `pnpm run check:provider-catalog`：strict schema、166 identity、确定 hash、route/control/binding/secret-free 语义。
+- `pnpm run check:provider-catalog`：strict schema、identity 快照覆盖、确定 hash、route/control/binding/secret-free 语义。
 - `pnpm run check:provider-system`：编译后的语义对象、Resolver、Discovery 与 route 契约。Agent 工具资格、Planner 与 wire fixture 由 `check:agent-tool-capability` 覆盖，`check:agent-runtime` 在门禁里调用它一次。
 - `pnpm run check:agent-runtime`：冻结 RequestPlan/credential lease、PromptPlan 与 adapter 边界。
 - `pnpm run check:settings-agents`：`.agent.md` 单一持久化真值与 scoped save。
@@ -279,7 +278,7 @@ Bedrock 使用 `cachePoint: { type: 'default' }` 标记 stable prefix。`partiti
 
 目录发现明确返回 HTTP 401 时，将当前 provider/account/protocol 的模型投影为不可执行，直到同一 scope 的发现成功；随后临时网络失败不能清除已知认证拒绝。这表示凭据当前不可用，不改变模型结构能力或订阅 entitlement。普通网络/5xx 目录刷新失败保留已有可执行事实并单独报告错误，不把暂时刷新失败当作账号断连；配置中的模型引用不被删除或自动替换。
 
-Grok 订阅保留系统默认浏览器 PKCE 登录一种方式：动态 loopback callback、同一 state、nonce 与 ES256/JWKS 身份校验；取消、替换、超时和退出释放监听器并隔离迟到提交；外部浏览器标签页不由应用管理。主进程 `llm:cancelProviderAccountLogin` 仅取消待登录流程，不登出、不吊销既有凭据。订阅请求携带 `X-XAI-Token-Auth: xai-grok-cli`，目录只读取订阅代理，不合并公共 API。独立 xAI API Key 路径保持独立计费和权限，不互相 fallback。现有令牌不满足当前协议时要求重新登录。
+Grok 订阅使用 xAI 公共 native-client + PKCE，仅保留系统默认浏览器登录一种方式，无设备码、手动粘贴或 CLI 凭据复用模式，不导入 `~/.grok/auth.json` 或共享 refresh token；xAI (Grok) API-key 是独立 provider，不作订阅失败的 fallback。动态 loopback callback、同一 state、nonce 与 ES256/JWKS 身份校验；取消、替换、超时和退出释放监听器并隔离迟到提交；外部浏览器标签页不由应用管理。主进程 `llm:cancelProviderAccountLogin` 仅取消待登录流程，不登出、不吊销既有凭据。订阅请求携带 `X-XAI-Token-Auth: xai-grok-cli`，目录只读取订阅代理，不合并公共 API。独立 xAI API Key 路径保持独立计费和权限，不互相 fallback。现有令牌不满足当前协议时要求重新登录。
 
 默认浏览器打开请求完成后返回待授权状态，不等待网页加载；打开失败通过所属 flow 投影明确错误并释放回调。待授权期间允许重新打开同一有效授权页；关闭外部标签页不等同取消，取消入口、超时与退出负责收口，迟到结果不覆盖终态。账号显示使用服务端真实身份，缺失时仅用中性账号名称；认证协议名不写入套餐字段，不推断套餐或余额。历史证据中的原始套餐名称保留来源与日期，不成为当前账号事实。
 

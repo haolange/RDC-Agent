@@ -117,7 +117,7 @@ pnpm run check:gates
 pnpm run build
 ```
 
-Read the [design and architecture guide](./ARCHITECTURE.md) for the product boundary, the [RDC runtime contract](./docs/architecture/rdc-runtime.md) for native operations, and the [acceptance ledger](./docs/product/acceptance-ledger.md) for evidence and unverified boundaries.
+Start from the [documentation index](./docs/README.md); the [RenderDoc Agent design book](<docs/product/RenderDoc Agent 完整设计书.md>) (Chinese) is the domain authority. Read the [design and architecture guide](./ARCHITECTURE.md) for the product boundary, the [RDC runtime contract](./docs/architecture/rdc-runtime.md) for native operations, and the [acceptance ledger](./docs/product/acceptance-ledger.md) for evidence and unverified boundaries.
 
 This repository is evolving quickly. Please report reproducible problems with the smallest safe reproduction you can share. Never upload private `.rdc` captures, provider keys, user data, or logs containing sensitive paths.
 

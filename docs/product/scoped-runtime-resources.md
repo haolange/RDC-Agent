@@ -4,7 +4,7 @@
 
 ## Scope 与存储
 
-用户资源根：`~/.rdc-agent`。项目资源根：`<project-root>/.rdc-agent`。无配置 workspace root、无旧目录 fallback、无静默迁移。
+用户资源根：`~/.rdc-agent`。项目资源根：`<project-root>/.rdc-agent`。无配置 workspace root、无旧目录 fallback、无静默迁移。`RDC_AGENT_HOME` 只供测试与 disposable Browser QA 隔离使用，不是用户配置入口。
 
 ```text
 ~/.rdc-agent/
@@ -23,7 +23,7 @@
 
 应用拥有的 session / task / trace / UI / log / cache / secret 在 Electron OS data 下，不得写入 `~/.rdc-agent` 或项目仓库。Project `.rdc-agent/.gitignore` 排除 `inputs`、`artifacts`、`memory` 与 runtime state；`plans/` 不排除。
 
-优先级：`builtin < user < project`。整资源替换。Project disabled override 可故意遮蔽继承资源。Policy 只收紧。`.policy.yml` `limits.contextCompactionPercent` 默认 100（不设限）；Settings → Policy 在自定义策略资源下方提供独立的全局运行设置，压缩阈值为 50–90、步长 5，作用于全部会话，不随 User / Project 资源切换改变归属；生效值为 `min(用户设置, policy)`。RDC-Tool CLI actions 与 secret 属本机边界，不能被 project 覆盖。
+优先级：`builtin < user < project`。整资源替换。Project disabled override 可故意遮蔽继承资源。Policy 只收紧；放宽、无效或不可比较的配置 fail-closed。每项 resolved resource 携带 `scope`、`sourcePath`、`sourceHash`、`overriddenSource` 与 `effectiveStatus`，Renderer 经 `rdcRuntime` preload API 读取，不直接访问文件系统、Secret 或任意 shell。`.policy.yml` `limits.contextCompactionPercent` 默认 100（不设限）；Settings → Policy 在自定义策略资源下方提供独立的全局运行设置，压缩阈值为 50–90、步长 5，作用于全部会话，不随 User / Project 资源切换改变归属；生效值为 `min(用户设置, policy)`。RDC-Tool CLI actions 与 secret 属本机边界，不能被 project 覆盖。
 
 Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导航：User | Project 作用域行 + Import/New + 详情编辑器。禁止装饰性 “RDC Runtime” kicker；禁止 Settings Diagnostics 导航。
 
@@ -68,7 +68,7 @@ prepareTurn 冻结多个预载 skill 时：
 allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 ```
 
-- `skill_read` 只读取方法，不重新收窄本轮冻结工具集；
+- `skill_read` 只读取方法，不重新收窄本回合冻结工具集；
 - Skill 的 `references/` 文本通过同一个 `skill_read(skill_id, reference, offset?, limit?)` 渐进读取，`reference` 相对当前有效 Skill 的 `SKILL.md`，不得相对工作区猜路径。沿用 profile 可见性和 builtin/user/project 覆盖解析，限制精确引用路径、禁止绝对路径/穿越/符号链接，复用文本大小、二进制及分页门禁，返回原文件完整字节 SHA-256、来源与截断状态。读取不执行脚本、不增加普通文件根、不授予 edit_file/read-before-edit 资格，也不刷新在途权限或 RDC 绑定；本次读取的引用 hash 是方法来源观察，不冒称已预载引用正文。
 - 某个 skill 未声明或声明空列表：该 skill **不参与**收窄；
 - 元工具豁免（如 `skills` / `skill_read` / `ask_user` / `tool_search`）由 `intersectSkillAllowedTools` 保留；
@@ -84,25 +84,40 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 Memory：显式 search/read/write/delete；写入需用户意图或交互审批；删除需确认；禁止轮次自动抽取/consolidation/全索引注入。
 
-Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / Index / Compile / Candidate / Write；独立 `knowledge` IPC。目标拓扑 **六 lane** markdown-first；canonical 读根对 `read_file` / `read_image` / `glob` / `grep` 免审批（U02 落地）。持久写入须显式人类确认；知识导入 摄入为 staging / Draft，不自动 Candidate。不生成、不自动注入 prompt。**当前态**：Candidate/Draft/review 已落到 session durable store；知识导入 记录并复核源 hash/mtime/size；写路径 realpath + 原子替换。Embedding capability / Semantic lane **已由 U02 删除**，禁止恢复。**T18 知识导入 已证**。产品级 Browser QA 全矩阵见 U05。目标态见 `ARCHITECTURE.md` 裁决 C / G。
+Knowledge Center 是三列 UI（Spaces / List / Detail），消费 Query / Index / Compile / Candidate / Read / Topics / Write；独立 `knowledge` IPC，主要通道为 `knowledge:overview` / `query` / `card` / `read` / `compile` / `index:rebuild` / `candidates` / `candidateCreate` / `import` / `image` / `write` / `promote` / `topics:*`。知识库只有 user `~/.rdc-agent/knowledge` 与 project `<项目>/.rdc-agent/knowledge`，会话不是知识库。拓扑为 **六 lane** markdown-first，正文以 Markdown 为唯一来源；canonical 读根对 `read_file` / `read_image` / `glob` / `grep` 免审批。查询可按 scope、时间和索引版本分页，指定不存在的空间 ID 时明确报错并返回可用 ID；主题及同义词可批量提议、预览和确认，提议本身不改写分类。持久写入须显式人类确认：`knowledge:import` 在同一次点击里签发并消费 `knowledge.write` token，把源 hash/mtime/size 复核后的内容写入所选空间 staging / Draft，不自动 Candidate。Candidate / Draft / review 落在 session durable store；写路径 realpath + 原子替换。不生成、不自动注入 prompt。Embedding capability / Semantic lane 已删除，**禁止恢复**。目标态见 `ARCHITECTURE.md` 裁决 C / G。
 
 Agent 与 Knowledge Center 共用版本读取规则：`summary` 可不带 hash 首次读取；`section`、`range` 和 `full` 必须携带当前搜索或摘要返回的 `contentHash`，缺失或变化时明确要求刷新。`knowledge_read` 省略 mode 时仍是 `full`，所以同样需要 hash；返回的章节标题、层级、行号和总行数与该次读取的正文版本一致，供后续精确选择。
 
 `knowledge_read` 在 Agent 主动读取卡片后，为声明图片保留知识根相对路径和角色，并仅在当前空间 realpath 与冻结 Knowledge 读根匹配、图片 realpath 未越界时返回可直接交给 `read_image` 的 `readImageArgs`。知识相对路径不按工程路径解释；缺失读范围、文件消失或链接越界分别显式返回 `readError`，不猜根、不回退。该参数不新增授权，也不代表像素已读；实际图像、类型及 hash 仍以正常 `read_image` 成功结果为准。卡片和图片不会因此自动注入初始 Prompt，持久内容/schema 不变。
 
-## Provider Account（产品）
+## Provider Account
 
-Account providers 是登录产品。Grok Subscription：xAI 公共 native-client + PKCE；仅系统默认浏览器登录，动态 loopback 自动完成；无设备码、手动粘贴或 CLI 凭据复用模式。外部标签页不归应用管理；取消、替换、超时及退出释放当前回调并隔离迟到结果。不得导入 `~/.grok/auth.json` 或共享 refresh token。xAI (Grok) API-key 为独立 provider，不作订阅失败的 fallback。
+Provider 账号登录、Catalog 与凭据模型见 [`docs/architecture/provider-architecture.md`](../architecture/provider-architecture.md)。
 
+## MCP
+
+MCP 由 scoped `.mcp.json` 与 exact effective Agent profile 决定；pool 按 `projectRoot + descriptorHash` 隔离，以 ref-counted lease 保证 Project 切换不关闭在用连接，leased pool key 贯穿工具装配与执行。
+
+## Context Usage
+
+Composer 的 context usage 环与弹窗由 `RunContextUsageSummary` 驱动：占用率分母是 `promptBudgetTokens`（可执行 prompt 上限，不再扣模型输出上限），完整窗口写入 `contextWindowTokens`，输出上限写入 `maxOutputTokens`，压缩线写入 `compactionThresholdTokens`。窗口占用率与本 run In/Out 来自 provider 上报的真实 usage。切换 agent model 或 1M/Max tier 后、下一次发送前，renderer 用当前 `EffectiveModel` 的 `contextBudgetTokens` 对 `lastKnownUsage.occupiedTokens` 做纯派生预览（百分比带 `~`），不写 store、不发 IPC、不改 `usage.json`；发送后由 prepared 与 `workflow:runUsageChanged` 的真实 usage 接管。
+
+Cache 统计范围是当前 Agent Run：`cacheSavedTokens` 为累计 hit，命中率为 `hit / (hit + miss)`（分母为 0 时缺省）。归一化在 provider usage 出口完成：优先原生 `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`，否则 `hit = cacheRead`、`miss = max(input − hit, 0)`；无原生且无 cacheRead 时不产出 hit/miss，缺遥测时 UI 不伪造 0。分类 breakdown（system_prompt、memory_files、skills、system_tools、mcp_tools、mcp_tools_deferred、builtin_tools_deferred、subagent_definitions、summarized_conversation、conversation、free）为 chars/4 估算并按 provider `inputTokens` 缩放；`memory_files` 覆盖 RDC.md 指令链，两个 deferred 段只计未激活 schema 的估算量，不缩放、不占 free。
+
+`workflow:getRunUsage` 使用唯一对象参数 `{ sessionId, runId? }` 并校验 run/session ownership；`workflow:runUsageChanged` 是 `SessionScopedPayload<RunContextUsageSummary>`。最新快照落盘至 `<sessionDir>/usage.json`（subagent 隔离 session 不落盘），格式 `{ schemaVersion: '2', usage }`；缺版本、旧版本与未知版本一律 `STORAGE_SCHEMA_UNSUPPORTED` fail-closed 并保留原件，不迁移。active 与 background session 经同一 projection reducer，迟到事件按 session + turn/run identity 丢弃；terminal 不清空 `lastKnownUsage`。
+
+## Reasoning
+
+Reasoning 使用 `raw | summary | opaque | none | unknown`。语义来自 Provider/Model contract，不从 OpenAI/Anthropic compatibility protocol 推断；有文档证据的 App-managed 路由解析为 `raw`，真正未核实的第三方路由才是 `unknown`。Work Process 展示规则见 [`docs/ui/workbench-and-transcript.md`](../ui/workbench-and-transcript.md)。
 
 ## 任务匹配与交接预载
 
 General 默认只预载 execution-orchestrator；renderdoc-investigation 按真实调查目标匹配，简单问答不路由。显式 Skill、profile 默认 Skill 和 execute 合同的 requiredSkillIds 合并去重；prepareTurn 校验可用性与工具权限交集，冻结来源，来源变化要求重新准备。skill_read 仍只读方法，不重算在途权限。
 
-Agent `max-turns` 属于 profile 资源，按 builtin < user < project 整资源替换解析，再与 policy 取较小者冻结进 prepareTurn；内置 General 为 200。Skill 方法只引用这些冻结额度与用户明确限制，不在计划中另设阶段配额硬门。
+Agent `max-turns` 属于 profile 资源，按 builtin < user < project 整资源替换解析，再与 policy 取较小者冻结进 prepareTurn；未声明 `max-turns` 时不设固定上限。Skill 方法只引用这些冻结额度与用户明确限制，不在计划中另设阶段配额硬门。
 
 Mission 必须先经 `plan_artifact` 计划门：用户点声明的 continue handoff 才冻结 Plan 并放行同 hash / 同 target 的 execute。RenderDoc Mission 的 execute 合同固定绑定共享执行方法、对应领域方法、`rdc-tool-shell` 和一本专业工具手册：Debugger 使用 `debugger-rdc-tools`，Analyzer 使用 `analyzer-rdc-tools`，Optimizer 使用 `optimizer-rdc-tools`。General 可发现四本手册；每条 Mission 可按需只读共享手册和对应的专业手册及引用，提前核对参数、输出及调用成本，其它专业手册保持不可见。知识可见性沿用 builtin/user/project 覆盖与来源解析，不自动预载、不授予执行或工作区编辑权限。Mission 的 plan-only、General 的 requiredSkillIds 真正预载与冻结工具交集不变；手册成员表是知识覆盖，不是权限表。未知操作、身份覆盖、路径越界或未满足前置条件仍在主进程执行前拒绝。
 
 专业参数参考由 `scripts/generate-rdc-tool-guides.mjs` 生成并记录 catalog fingerprint。默认生成与 `pnpm run check:rdc-tool-guides` 使用本库 `scripts/fidelity/rdc-tool-guide-catalog.json` 源快照，独立检出不依赖相邻仓库。更新时显式执行 `node scripts/generate-rdc-tool-guides.mjs --catalog <RDC-Tool>/spec/tool_catalog.json`，同次刷新参考与源快照；`--check --catalog <path>` 只读核对指定来源。快照仅供开发生成校验，不随应用分发，不作为运行时 catalog；产品执行仍读取 prepareTurn 冻结的同一配置 CLI。
 
-Plan、声明交接、显式预算与领域完成校验见 [runtime-kernel.md](../contracts/runtime-kernel.md#通用-harness-与声明续跑2026-09-15)。
+Plan、声明交接、显式预算与领域完成校验见 [runtime-kernel.md](../contracts/runtime-kernel.md#通用-harness-与声明续跑)。

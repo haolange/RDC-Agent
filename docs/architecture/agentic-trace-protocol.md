@@ -25,15 +25,7 @@ Right-panel records use `traceLaneId`.
 
 ## Progress lane
 
-The right-panel Progress lane (`RightPanelViewModel.progress`) is projected from the
-session-scoped agent task registry at `${userData}/state/tasks/{sessionId}` (`TaskRegistry` with the
-`task_create` / `task_update` / `task_list` tools), mapped to `ProgressTask[]` by
-`mapRightRailProgress` via `taskProjection`. It is session-scoped rather than per-run, so it stays populated
-under the conversation-driven projection path (`buildConversationPresentation`). The list is a single
-creation-order array; completed items stay in place. Agent task changes emit
-`task.created` / `task.updated`, which republish `trace:projectionChanged` and refresh the lane in
-place. Subagents keep their tasks in an in-memory store and never write to the session lane. The
-harness `task-board.json` no longer feeds this lane.
+Progress lane（`RightPanelViewModel.progress`）只由 session 作用域的 `TaskRegistry`（`${userData}/state/tasks/{sessionId}`，工具 `task_create` / `task_update` / `task_list`）经 `taskProjection` 与 `mapRightRailProgress` 映射为 `ProgressTask[]`。`RightRailProjectionService` 不会从 UI 阶段、harness 记录或 plan 文本合成任务。它按 session 而非 run 作用域，因此在 conversation 驱动的投影路径（`buildConversationPresentation`）下同样有内容；列表是单一创建顺序数组，已完成项原位保留。Task 变化发出 `task.created` / `task.updated`，重新发布 `trace:projectionChanged` 并原位刷新该 lane。子代理的 task 只在内存 store 中，不写入 session lane。Progress 与 transcript live snapshot 共用同一 `taskProjection`，Work Process 仍是事件定位目标；task work-trace 块携带 `TaskRegistry` 的同一生命周期状态与 blocked 原因，回合结束不得把 pending 或 blocked 的 task 转成 completed 行。
 
 ## IPC
 
@@ -42,19 +34,15 @@ Trace APIs:
 - `trace:getProjection`
 - `trace:projectionChanged`
 
-Workflow APIs remain responsible for start/approval/revision/restart/stop actions.
+工作流生命周期走独立通道 `workflow:getState` / `workflow:resume` / `workflow:stop` / `workflow:getRunUsage`，不经 trace API。
 
 ## Renderer
 
-Renderer presentation is built from `AgentRunView`, `SessionRightRail`, and renderer registry cards. Renderer code consumes projected state; it does not reconstruct raw trace storage or execute RDC tools.
+Renderer presentation 由 `ConversationThread`（`src/renderer/features/transcript`）、`SessionRightRail`（`src/renderer/features/right-rail`）及 renderer registry cards 构建。 Renderer code consumes projected state; it does not reconstruct raw trace storage or execute RDC tools.
 
 ## Verification
 
 Use `pnpm run check:fidelity` for `trace-*` anchors, `pnpm run typecheck` for shared contracts, and browser-session smoke for renderer projection changes.
-
-## Progress lane
-
-Progress is projected from session-scoped `TaskRegistry` records only. `RightRailProjectionService` does not synthesize tasks from UI stages, harness records, or plan text. Progress and the transcript live snapshot share one `taskProjection`; Work Process remains the event location target. Task work-trace blocks carry the same lifecycle status and blocked reason from `TaskRegistry`; ending a turn must not convert a pending or blocked task into a completed trace row.
 
 ## Artifacts lane
 

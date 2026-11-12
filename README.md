@@ -141,7 +141,9 @@ pnpm run build
 
 ## 文档入口
 
+- [文档索引](./docs/README.md)
 - [产品与架构裁决](./ARCHITECTURE.md)
+- [RenderDoc Agent 完整设计书](<docs/product/RenderDoc Agent 完整设计书.md>)
 - [运行时与权限契约](./docs/contracts/runtime-kernel.md)
 - [RDC 运行时](./docs/architecture/rdc-runtime.md)
 - [Workbench / Transcript / Composer](./docs/ui/workbench-and-transcript.md)
