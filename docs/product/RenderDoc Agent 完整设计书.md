@@ -2,21 +2,19 @@
 
 ## Debugger / Analyzer / Optimizer、Unified Knowledge Engine 与 Long-Horizon Context Engineering
 
-**设计状态：** Architecture Design v1.0  
 **产品边界：** RenderDoc-first，Backend-Agnostic  
-**主要读者：** Graphics Engineer、Technical Artist、Engine Engineer、Agent System Engineer、负责落地实现的 Codex/Agent  
-**设计目标：** 人类可以用它理解完整系统，Agent 可以据此阅读现有仓库真源并实现完整体系
+**定位：** RenderDoc 领域目标的权威。描述调查系统应当怎样工作；工程合同见 `ARCHITECTURE.md` 与 `docs/contracts/`
 
 ---
 
 # 目录
 
-0. 产品裁决与实现对应  
+0. 裁决与工程合同  
 1. 系统定义与中心思想  
 2. 设计原则与外部工程经验校验  
 3. 总体架构  
-4. 三个 Main Orchestrator 与 Sub-Agent 体系  
-5. Tasks API、Handoff 与执行控制  
+4. Mission、General 与内部 Agent  
+5. 计划、执行控制与循环  
 6. Context Engineering 与长任务 Memory  
 7. Evidence、Claim、Hypothesis 与 Experiment  
 8. Unified Knowledge Engine  
@@ -26,48 +24,46 @@
 12. Optimizer 完整设计  
 13. 三大模式的共享、协作与边界  
 14. 报告与可视化交付  
-15. Evaluation、Benchmark 与质量体系  
+15. 评价  
 16. 冷启动方案  
-17. 实施路线与 Codex 落地原则  
+17. 落地原则  
 18. 风险、失败模式与防护  
 19. 最终验收标准  
 20. 附录：关键语义对象示例
 
 ---
 
-# 0. 产品裁决与实现对应
+# 0. 裁决与工程合同
 
-本书最初写于产品实现之前，描述理想架构。产品落地后形成了一组裁决；本章列出它们，正文中与之不同的表述以本章为准。本书是 RenderDoc 领域目标的权威；跨层工程合同以 `ARCHITECTURE.md` 和 `docs/contracts/` 为准，冲突时由 `ARCHITECTURE.md` 裁决并回改本书。
+本书是 RenderDoc 领域目标的权威：三种 Mission 要回答什么、调查怎样推进、证据与结论怎样分级、知识怎样使用。跨层工程合同（运行内核、权限、失败模型、界面投影、回放生命周期）以 `ARCHITECTURE.md` 和 `docs/contracts/` 为准；两者冲突时由 `ARCHITECTURE.md` 裁决并回改本书。代码是实现的最终事实。
 
-## 0.1 裁决
+## 0.1 已定裁决
 
-| 主题 | 正文的表述 | 裁决 |
-|---|---|---|
-| 交接 | Planning Orchestrator 经 Agent Handoff 交给执行方；Big Loop 交回规划方 | 用户批准计划并点击执行后才进入 General。需要重规划时，General 就地交付缺口与 Checkpoint，由用户切回原 Mission。不存在自动交接，runtime 不按身份、深度或正文开下一轮 |
-| 身份 | 以领域职责命名的 Sub-Agent（Triage、Capture Report、pass_graph_pipeline、pixel_value_forensics、shader_ir、Skeptic 等） | 四个用户入口：General、Debugger、Analyzer、Optimizer。八个内部 Agent：generator、verifier、knowledge-scout、report-writer、shader-analyst、pass-analyst、resource-analyst、pixel-analyst。Skeptic 即 verifier。其余职责由 Skill 承载，按任务需要调用 |
-| 规划身份的能力 | 可调用前置 Sub-Agent 做调查 | Mission 只读：通过受控的只读探测访问 RDC，不运行 shell 或解释器。Live RDC 的操作与实验只由 General 执行 |
-| 模型 | 未规定 | 模型与推理档位归各 Agent 配置。子执行读取目标 Agent 的配置，不继承父对话的选择；配置不可用时明确失败 |
-| 完成状态 | Complete／Partial／Inconclusive／Blocked／Replanned | completed／partial／blocked／cancelled／budget_paused。Inconclusive 表达为 partial，并逐项写明未能区分的解释及所需信息 |
-| 请求上限 | 未规定 | 不以固定默认总轮数收口，由目标与核验闭环决定继续和完成。用户显式限制、期限、取消和无进展检测始终有效；续跑、压缩、恢复和重新委派沿用累计消费与原期限 |
-| 检索 | Lexical／Semantic Retrieval，Embedding 作为补充 | 不使用 Embedding 或 Semantic 通道。Markdown 原文是唯一来源，六条检索通道：Identity／Path、Scope／Metadata、Lexical、Structural、Relation／Graph、Temporal／Version |
-| 知识沉淀 | 任务结束后产生 Knowledge Candidate 并进入 Promotion | 知识产物默认留在本次调查的记录里。只有用户明确要求时才创建 Candidate；不自动写入 Memory 或 Knowledge，不由模型自治晋升。主题分类由 Agent 提议、用户批量确认 |
-| 调查范围 | 可验证修复 | 止于 capture、replay、授权材料与可恢复实验。不修改 Unity／Unreal 工程或原始 capture，不把 replay 结果称为生产修复已完成 |
-| 多 capture | 未规定 | 同一 owning session 串行切换已批准的 capture，结束时恢复可恢复的入口现场 |
+| 主题 | 裁决 |
+|---|---|
+| 交接 | Mission 规划，用户批准计划并点击执行后才进入 General。需要重规划时，General 就地交付缺口与 Checkpoint，由用户切回原 Mission。没有自动交接；runtime 不按身份、深度或正文开下一轮 |
+| 身份 | 四个用户入口：General、Debugger、Analyzer、Optimizer。八个内部 Agent：generator、verifier、knowledge-scout、report-writer、shader-analyst、pass-analyst、resource-analyst、pixel-analyst。其余领域职责由 Skill 承载，按任务需要调用 |
+| 规划身份的能力 | Mission 只读：通过受控的只读探测访问 RDC，不运行 shell 或解释器，只可委派 knowledge-scout。Live RDC 的操作与实验只由 General 执行 |
+| 模型 | 模型与推理档位归各 Agent 配置。子执行读取目标 Agent 的配置，不继承父对话的选择；配置不可用时明确失败 |
+| 完成状态 | completed／partial／blocked／cancelled／budget_paused。多个解释无法区分时是 partial，逐项写明未能区分的解释及所需信息 |
+| 请求上限 | 不以固定默认总轮数收口，由目标与核验闭环决定继续和完成。用户显式限制、期限、取消和无进展检测始终有效；续跑、压缩、恢复和重新委派沿用累计消费与原期限 |
+| 检索 | 不使用 Embedding 或 Semantic 通道。Markdown 原文是唯一来源，六条检索通道：Identity／Path、Scope／Metadata、Lexical、Structural、Relation／Graph、Temporal／Version |
+| 知识沉淀 | 知识产物默认留在本次调查的记录里。只有用户明确要求时才创建 Candidate；写入、晋升和主题变更都须用户确认；不自动写入 Memory 或 Knowledge |
+| 调查范围 | 止于 capture、replay、授权材料与可恢复实验。不修改 Unity／Unreal 工程或原始 capture，不把 replay 结果称为生产修复已完成 |
+| 多 capture | 同一 owning session 串行切换已批准的 capture，结束时恢复可恢复的入口现场 |
 
-## 0.2 实现对应
+## 0.2 与实现的对应
 
-- 八种调查对象存放在同一套调查记录里（`rdc.investigation.v1`）。认识等级有偏序 `unknown < inferred < derived < observed`，压缩、报告和视图不得抬高源结论的等级；因果结论必须绑定一个已回滚并验证的 Experiment。记录的版本取代、失效传播和各字段的合同由代码强制，摘要见 `ARCHITECTURE.md` 裁决 E。Hypothesis 是 Claim 的一种类型，Decision 内嵌于 Claim，不另建平台类型。字段定义以 `src/shared/types/renderdocInvestigation.ts` 和 `investigation_schema` 工具为准。
+- 7.1 的调查对象存放在同一套调查记录里（`rdc.investigation.v1`）：WorldState、Evidence、Claim、Experiment、Challenge、MissionCheckpoint 和 Report 各有记录；Observation 内嵌于 Evidence，Hypothesis 是 Claim 的一种类型，Decision 内嵌于 Claim，Artifact 由记录的清单表达。字段以 `src/shared/types/renderdocInvestigation.ts` 和 `investigation_schema` 工具为准，摘要见 `ARCHITECTURE.md` 裁决 E。
 - 领域字段不写入通用的 Task、Agent Profile 或会话消息；调查记录只引用 Task ID。
-- Coordinator 不是新的 Runtime，是 Profile 指令、Skill、Hook、通用 Task、调查记录和声明式交接的组合。
-- RenderDoc 能力经外部 CLI 提供。模型按需发现操作，不把整份目录展开成工具定义；手册知识不授予权限。
-- 回放、租约、身份与回执的合同见 `docs/architecture/rdc-runtime.md`；运行内核、权限、失败模型与界面投影见 `docs/contracts/`。
+- RenderDoc 能力经外部的 RDC-Tool CLI 提供。模型按需发现操作，不把整份目录展开成工具定义。
+- 回放、租约、身份与回执的合同见 `docs/architecture/rdc-runtime.md`。
 
 ## 0.3 不做
 
 - 平台级调查图、第二套 Task 存储、第二套 Agent Runtime、第二套模型路由。
-- 固定的 workflow 阶段引擎。第 10 章等处的 Workflow 是调查的判断顺序，不是必须逐格执行的流水线。
-- 恢复自动交接、Embedding、自动知识晋升。
-- 用提示词代替身份、权限、消费和来源的校验；这些由代码强制。
+- 固定的 workflow 阶段引擎。书中的 Workflow 都是调查的判断顺序，不是必须逐格执行的流水线。
+- 自动交接、Embedding、自动知识晋升。
 
 ---
 
@@ -77,11 +73,11 @@
 
 我把 RenderDoc Agent 定义为：
 
-> **一个以 Graphics Capture 为主要事实源，能够自动重建渲染系统、调查正确性问题、定位性能机制、执行可验证实验，并持续沉淀领域知识的 Agentic Rendering Investigation System。**
+> **一个以 Graphics Capture 为主要事实源，能够自动重建渲染系统、调查正确性问题、定位性能机制、执行可验证实验，并在用户要求时沉淀领域知识的 Agentic Rendering Investigation System。**
 
 它不是简单的 RenderDoc Copilot，也不是“用自然语言包装 RenderDoc UI”。
 
-RenderDoc 和 `rdc-cli` 提供的是：
+RenderDoc 和 RDC-Tool CLI 提供的是：
 
 - Observation；
 - Replay；
@@ -102,14 +98,14 @@ RenderDoc Agent 真正提供的是：
 - Evidence Reasoning；
 - Counterfactual Experiment；
 - Verification；
-- Knowledge Evolution；
+- Knowledge Distillation（用户要求时）；
 - Human-readable Report。
 
 整个产品由三个用户明确选择的模式组成：
 
 | 模式 | 核心问题 | 主要目标 |
 |---|---|---|
-| Debugger | 为什么结果错了？ | Root Cause 与可验证修复 |
+| Debugger | 为什么结果错了？ | Root Cause 与 Replay 内可验证的修复方向 |
 | Analyzer | 这个未知渲染系统怎样工作？ | Rendering World Model 与 Traceability |
 | Optimizer | 性能成本在哪里，怎样降低？ | Bottleneck Mechanism 与可验证优化 |
 
@@ -134,36 +130,35 @@ subject\ to\ Correctness,\ Quality,\ Scope
 ## 1.2 一句话架构
 
 ```text
-Three Planning Orchestrators
-Debugger / Analyzer / Optimizer
+Debugger / Analyzer / Optimizer（只读规划）
                 │
                 ▼
-        plan.md + Handoff
+     plan.md → 用户批准并点击执行
                 │
                 ▼
-   General Execution Orchestrator
+        General（执行与编排）
                 │
                 ▼
-      Tasks API + Sub-Agents
+        Tasks + 内部 Agent
                 │
                 ▼
- rdc-cli / Offline Artifacts / Web
+ RDC-Tool CLI / Offline Artifacts / Web
                 │
                 ▼
 Evidence → Verification → Report
                 │
                 ▼
-       Unified Knowledge Engine
+ Unified Knowledge Engine（用户要求时沉淀）
 ```
 
 其中：
 
-- Debugger、Analyzer、Optimizer 是 **Planning Orchestrator**；
-- Handoff 后的 General Agent 是 **Execution Orchestrator**；
-- Tasks API 负责执行过程的确定性推进；
-- Sub-Agent 负责隔离领域调查、局部推理和 Context；
-- `rdc-cli` 是 RenderDoc Capability Layer；
-- Knowledge Engine 是三大模式共享的长期知识系统；
+- Debugger、Analyzer、Optimizer 是三个 Mission，只读规划并评估；
+- General 执行获批的计划，是唯一操作 Live RDC 的身份；
+- Tasks 负责执行过程的确定性推进；
+- 内部 Agent 负责隔离的领域分析、独立核验和 Context；
+- RDC-Tool CLI 是 RenderDoc Capability Layer；
+- Knowledge Engine 是三种 Mission 共享的长期知识系统；
 - Context Engineering 决定每次推理真正看到什么。
 
 ---
@@ -188,9 +183,9 @@ Experiment / Verification
 Accepted Claims
   ↓
 Report
-  ↓
-Knowledge Distillation
 ```
+
+知识沉淀不是每次调查的收尾步骤，只在用户明确要求时发生。
 
 三者只是关注点不同：
 
@@ -236,16 +231,14 @@ Budget Violation → Cost Location → Limiting Mechanism
 
 ### 可验证性
 
-凡是涉及 Root Cause 或 Optimization Causality 的结论，都应尽可能通过：
+凡是涉及 Root Cause 或 Optimization Causality 的结论，必须通过下列手段验证，否则不标为因果已验证：
 
 - Differential；
 - Minimal Intervention；
 - Shader Replace；
 - Replay；
 - A/B/A；
-- Visual Regression；
-
-进行验证。
+- Visual Regression。
 
 ### 可泛化性
 
@@ -271,7 +264,7 @@ Budget Violation → Cost Location → Limiting Mechanism
 - Model；
 - Negative Knowledge；
 
-但知识只能经过明确的验证、冲突检查和 Promotion 后进入长期 Knowledge。
+这些产物默认留在本次调查的记录里。只有用户明确要求时才创建 Candidate，经冲突检查和用户确认后进入长期 Knowledge。
 
 ---
 
@@ -284,7 +277,7 @@ Budget Violation → Cost Location → Limiting Mechanism
 3. 在缺少 Counter 时强行断言 GPU 硬件瓶颈；
 4. 让 LLM 直接阅读所有 Event JSON 后自由发挥；
 5. 用三个模式复制三套 Capture Parser、Evidence 与 Knowledge；
-6. 让现有 Agent Platform 适配一套外部臆造的配置格式；
+6. 为调查另造一套平台配置格式或 Agent Runtime；
 7. 允许未经验证的 Agent 结论直接污染 Universal Knowledge；
 8. 在没有授权的情况下分析第三方程序或 Capture。
 
@@ -304,7 +297,7 @@ Context Engineering 不只是“压缩 Prompt”，而是每次推理前重新�
 
 ## 2.2 Multi-Agent 的价值是 Context 隔离，不是角色扮演
 
-独立 Sub-Agent 可以使用独立 Context Window，适合：
+独立的内部 Agent 可以使用独立 Context Window，适合：
 
 - 并行调查；
 - 隔离竞争假设；
@@ -317,7 +310,7 @@ Context Engineering 不只是“压缩 Prompt”，而是每次推理前重新�
 
 - RDC Live Operation 默认串行；
 - Offline Artifact Analysis 可以并行；
-- Sub-Agent 按调查价值创建，不按组织岗位机械创建。
+- 内部 Agent 按调查价值创建，不按组织岗位机械创建。
 
 ---
 
@@ -350,7 +343,7 @@ Qoder 使用高密度 Knowledge Card、Repo Wiki 与 Conversation Memory，让 A
 
 RenderDoc Agent 会借鉴“高密度 Agent-Native Knowledge”这一思想，但不会把所有知识压成一种 Card：
 
-> **Canonical Knowledge Record 是真源；Agent Card 和 Human View 是不同消费视图。**
+> **Markdown 原文是真源；简介、章节、全文与图片是不同深度的读取视图。**
 
 渲染调查比 Coding Knowledge 更依赖：
 
@@ -366,9 +359,9 @@ RenderDoc Agent 会借鉴“高密度 Agent-Native Knowledge”这一思想，�
 
 ## 2.6 Agent Profile 只描述领域职责，不规定平台重构
 
-GitHub Copilot 的 Custom Agent 采用 `.agent.md` 描述专门职责，Sub-Agent 拥有独立 Context，用于减少主 Agent 的 Context 污染。
+GitHub Copilot 的 Custom Agent 采用 `.agent.md` 描述专门职责，子 Agent 拥有独立 Context，用于减少主 Agent 的 Context 污染。
 
-本设计同样以现有 `agent.md`、Skill、Tool、Hook、Task、Handoff 为真源，但不会规定新的平台配置格式。后续实现必须先阅读现有仓库，再将本设计中的领域职责映射到真实机制。
+本设计以 `.agent.md`、Skill、Tool、Hook、Task 和声明式交接为载体，不规定新的平台配置格式。书中的领域职责由 0.1 的身份和 Skill 承载。
 
 ---
 
@@ -380,7 +373,7 @@ RenderDoc 是基于 Frame Capture 的 Graphics Debugger，官方项目当前覆�
 
 因此：
 
-- 第一实现完全建立在 `rdc-cli` 上；
+- 当前实现建立在 RDC-Tool CLI 上；
 - 上层领域概念不直接绑定 RenderDoc 内部对象；
 - 未来 Backend 扩展只增强 Evidence，不改变三大模式的因果框架。
 
@@ -395,10 +388,10 @@ RenderDoc 是基于 Frame Capture 的 Graphics Debugger，官方项目当前覆�
 ```text
 ┌──────────────────────────────────────────────────┐
 │ 1. Control Plane                                 │
-│ Plan / Tasks / Handoff / Loop / Review           │
+│ Plan / Tasks / 交接 / Loop / Review              │
 ├──────────────────────────────────────────────────┤
 │ 2. Execution Plane                               │
-│ Main Agents / Sub-Agents / Skills / Tools        │
+│ Mission / General / 内部 Agent / Skills / Tools  │
 ├──────────────────────────────────────────────────┤
 │ 3. Investigation State Plane                     │
 │ Evidence / Claims / Experiments / World State    │
@@ -408,7 +401,7 @@ RenderDoc 是基于 Frame Capture 的 Graphics Debugger，官方项目当前覆�
 ├──────────────────────────────────────────────────┤
 │ 5. Knowledge Plane                               │
 │ Facts / Constraints / Patterns / Procedures      │
-│ Cases / Models / Version / Promotion             │
+│ Cases / Models / Version / 晋升                  │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -421,7 +414,7 @@ RenderDoc 是基于 Frame Capture 的 Graphics Debugger，官方项目当前覆�
 - 谁负责？
 - Task 是否完成？
 - Verifier 是否通过？
-- 需要局部 Retry 还是整体 Replan？
+- 需要局部 Retry 还是回到 Mission 重新规划？
 
 ### Execution Plane
 
@@ -468,40 +461,32 @@ RenderDoc 是基于 Frame Capture 的 Graphics Debugger，官方项目当前覆�
 
 ## 3.2 端到端生命周期
 
-> 交接方式以 0.1 为准：计划经用户批准并点击执行后进入 General；Big Loop 由用户切回 Mission。
-
 ```text
-User selects Mission
+用户选择 Mission
         ↓
-Planning Orchestrator
-        ↓
-Pre-planning Investigation / Knowledge Retrieval
+Mission 只读探测 / Knowledge 检索
         ↓
 plan.md
         ↓
-Agent Handoff
+用户批准并点击执行
         ↓
-General Execution Orchestrator
+General
         ↓
-Tasks API expands and executes task graph
+Tasks 展开并执行
         ↓
-Live RDC Tasks + Offline Tasks
+Live RDC Tasks（串行）+ Offline Tasks（可并行）
         ↓
 Evidence / Claims / Artifacts / Experiments
         ↓
-Skeptic Verification
-        ├─ Pass
-        ├─ Small Loop
-        └─ Big Loop → Planning Orchestrator
+Verifier 独立核验
+        ├─ 通过
+        ├─ Small Loop（批准范围内补证）
+        └─ 战略失效 → General 交付缺口与 Checkpoint → 用户切回 Mission
         ↓
-Accepted Outcome
-        ↓
-Developer Report / Visual Report
-        ↓
-Knowledge Candidate / Knowledge Patch
-        ↓
-Knowledge Validation and Promotion
+General 就地交付 / Report
 ```
+
+知识产物留在本次调查的记录里；用户明确要求时才创建 Candidate。
 
 ---
 
@@ -519,11 +504,11 @@ Knowledge Validation and Promotion
 
 ### S-CLAIM-01：推断等级不升级
 
-Compact、Summary 或 Report 不能把 `Inferred` 自动改写为 `Observed`。
+认识等级有偏序 `unknown < inferred < derived < observed`。Compact、Summary、Report 和视图不得抬高源结论的等级。
 
 ### S-CAUSAL-01：因果结论需要 Intervention
 
-没有 Differential 或 Counterfactual 支持的结论不能标记为 Causally Verified。
+因果结论必须引用一个已回滚并验证基线恢复的 Experiment，否则不得标为 Causally Verified。
 
 ### S-KNOW-01：Knowledge 可追溯
 
@@ -531,7 +516,7 @@ Compact、Summary 或 Report 不能把 `Inferred` 自动改写为 `Observed`。
 
 ### S-KNOW-02：知识冲突不可静默覆盖
 
-新旧知识冲突时必须保留冲突关系或明确 Supersede 原因。
+新旧知识冲突时必须保留冲突关系，或写明 retire 原因。
 
 ### S-RDC-01：可变 RDC 状态必须隔离
 
@@ -565,107 +550,82 @@ Compact、Summary 或 Report 不能把 `Inferred` 自动改写为 `Observed`。
 
 ---
 
-# 4. 三个 Main Orchestrator 与 Sub-Agent 体系
+# 4. Mission、General 与内部 Agent
 
-## 4.1 两级 Orchestration
+## 4.1 规划与执行分开
 
-当前架构中存在两级 Orchestration，二者职责必须严格区分。
+### Mission：只读规划与评估
 
-### Planning Orchestrator
+由 Debugger、Analyzer、Optimizer 承担。
 
-分别由：
-
-- Debugger；
-- Analyzer；
-- Optimizer；
-
-承担。
-
-职责：
-
-- 理解 User Intent；
-- 判断输入是否足够；
-- 检索 Knowledge；
-- 调用前置 Sub-Agent；
-- 形成 Investigation Strategy；
-- 生成 `plan.md`；
+- 理解用户意图，判断输入是否足够；
+- 通过受控的只读探测查看 Capture；
+- 检索 Knowledge，复杂检索可委派 knowledge-scout；
+- 形成调查策略，生成 `plan.md`；
 - 定义成功条件与验证要求；
-- 决定可能使用哪些 Specialist。
+- 执行结束后，用户切回时评估成果。
 
-### Execution Orchestrator
+Mission 不运行 shell 或解释器，不做 Pixel History、Shader Debug、替换或实验。
 
-由 Handoff 后的 General Agent 承担。
+### General：执行与编排
 
-职责：
+用户批准计划并点击执行后，由 General 承担。它是唯一操作 Live RDC 的身份。
 
-- 根据 `plan.md` 创建 Tasks；
-- 维护 Task Dependency；
-- 委托 Sub-Agent；
-- 调用 Live RDC Tool；
-- 根据新 Evidence 局部调整 Task；
-- 汇总结构化输出；
-- 调用 Skeptic；
-- 驱动 Small Loop；
-- 在必要时触发 Big Loop Handoff。
+- 根据 `plan.md` 创建 Tasks，维护依赖；
+- 调用 Live RDC 工具，委派内部 Agent 处理离线材料；
+- 根据新 Evidence 在批准范围内调整 Task；
+- 请 verifier 独立核验，驱动 Small Loop；
+- 战略失效时交付缺口与 Checkpoint，由用户决定是否切回 Mission。
 
-Planning Orchestrator 负责“怎样调查”。
-
-Execution Orchestrator 负责“把调查推进完成”。
+Mission 负责"怎样调查"，General 负责"把调查推进完成"。
 
 ---
 
-## 4.2 Sub-Agent 的创建原则
+## 4.2 什么值得成为独立 Agent
 
-不是每个领域名词都需要独立 Agent。
-
-只有满足以下条件之一，才适合成为 Sub-Agent：
+不是每个领域名词都需要独立 Agent。满足以下条件之一才适合：
 
 1. 需要独立 Context 隔离；
 2. 需要长时间深入分析单个目标；
 3. 能产生稳定、可复用的 Artifact；
 4. 能与其他工作并行；
 5. 需要独立挑战主 Agent 的结论；
-6. 能显著减少 Main Orchestrator 的 Context 压力。
+6. 能显著减少 General 的 Context 压力。
 
-以下内容更适合 Skill 或 Tool：
+固定 Checklist、公式计算、Shader 导出、Event 查询、Knowledge 检索、Image Diff、Timing 统计和确定性的 Graph 构建，更适合做成 Skill 或 Tool。
 
-- 固定 Checklist；
-- 公式计算；
-- Shader 导出；
-- Event 查询；
-- Knowledge Retrieval；
-- Image Diff；
-- Timing 统计；
-- 确定性的 Graph 构建。
+八个内部 Agent 及其方法：
 
-本设计中出现的 Agent 名称表达的是**领域职责**，不是强制的文件名、注册表或平台 Schema。最终实现应根据现有 `agent.md` 与代码真源决定复用、合并或拆分。
+| 内部 Agent | 职责 | 主要 Skill |
+|---|---|---|
+| generator | 综合证据、形成竞争解释、设计检查和候选实验 | renderdoc-investigation |
+| verifier | 独立核验来源、方法、覆盖、反例与结论资格 | skeptic-review |
+| knowledge-scout | 多来源检索、适用条件比较、机制与检查建议 | knowledge-scout |
+| report-writer | 根据有效成果组织报告 | report-composition |
+| shader-analyst | Shader／IR、数据流、数值计算和语义重建 | shader-ir-analysis |
+| pass-analyst | Pass、执行关系与管线结构重建 | pass-graph-analysis |
+| resource-analyst | 资源版本、依赖和跨 Capture 对应 | resource-versioning、cross-capture-alignment |
+| pixel-analyst | 图像、区域、片元材料与质量差异分析 | pixel-forensics |
+
+内部 Agent 只读取获授权的材料、写自己的成果，不持有 Live RDC。verifier 不修改父级记录，report-writer 不重新评级证据。
 
 ---
 
-## 4.3 三大模式共享的 Agent 能力
+## 4.3 三种 Mission 共享的能力
 
-| 能力 | Debugger | Analyzer | Optimizer |
-|---|---:|---:|---:|
-| Capture Report | 核心 | 核心 | 核心 |
-| Pass Graph / Pipeline | 核心 | 核心 | 核心 |
-| Shader / IR | 常用 | 核心 | 核心 |
-| Pixel / Value Forensics | 核心 | 核心 | 可选 |
-| Cross-Capture Alignment | 常用 | 核心 | 常用 |
-| Device / Driver Research | 常用 | 可选 | 常用 |
-| Visual Evidence | 常用 | 常用 | 核心 |
-| Experiment Execution | 核心 | 可选 | 核心 |
-| Skeptic | 核心 | 核心 | 核心 |
-| Report / Knowledge Curation | 核心 | 核心 | 核心 |
+| 能力 | 承载 | Debugger | Analyzer | Optimizer |
+|---|---|---:|---:|---:|
+| Capture 概况 | Skill（capture-facts、capture-preflight） | 核心 | 核心 | 核心 |
+| Pass Graph／Pipeline | pass-analyst | 核心 | 核心 | 核心 |
+| Shader／IR | shader-analyst | 常用 | 核心 | 核心 |
+| Pixel／Value Forensics | pixel-analyst | 核心 | 核心 | 可选 |
+| Cross-Capture Alignment | resource-analyst | 常用 | 核心 | 常用 |
+| 设备与驱动资料 | knowledge-scout | 常用 | 可选 | 常用 |
+| 实验执行 | General | 核心 | 可选 | 核心 |
+| 独立核验 | verifier | 核心 | 核心 | 核心 |
+| 报告 | report-writer | 核心 | 核心 | 核心 |
 
-共享意味着：
-
-- 领域能力相同；
-- Tool 与 Artifact 可复用；
-- 输入输出语义一致；
-
-但调查目标不同。
-
-例如 `shader_ir`：
+能力相同、Tool 与 Artifact 可复用、输入输出语义一致，但调查目标不同。以 Shader／IR 为例：
 
 ```text
 Debug Lens:
@@ -678,15 +638,13 @@ Optimize Lens:
 识别 ALU、Texture、Branch、Register 与 Patch Opportunity
 ```
 
-不应复制成三套几乎相同的 Agent。
+不复制成三套几乎相同的 Agent。
 
 ---
 
-## 4.4 Debugger 专属职责
+## 4.4 Debugger 的调查内容
 
-### Triage & Taxonomy
-
-负责：
+### Triage 与 Taxonomy（规划阶段，由 Skill 承载）
 
 - Symptom 分类；
 - Trigger 分类；
@@ -695,19 +653,13 @@ Optimize Lens:
 - 初始 Hypothesis；
 - 需要用户补充的信息。
 
-### Root Cause Investigation
+### Root Cause Investigation（执行阶段）
 
-主要由现有 Debugger Planning Orchestrator 设计，并在 Execution 阶段调用：
-
-- `pass_graph_pipeline`；
-- `pixel_value_forensics`；
-- `shader_ir`；
-- `device_driver`；
-- Experiment。
+Debugger 在规划阶段设计，General 在执行阶段按需调用 pass-analyst、pixel-analyst、shader-analyst、knowledge-scout 并执行 Experiment。完整设计见第 10 章。
 
 ---
 
-## 4.5 Analyzer 专属职责
+## 4.5 Analyzer 的调查内容
 
 ### Analysis Scope Decomposition
 
@@ -761,7 +713,7 @@ Optimize Lens:
 
 ---
 
-## 4.6 Optimizer 专属职责
+## 4.6 Optimizer 的调查内容
 
 ### Performance Scope & Budget
 
@@ -837,7 +789,7 @@ Optimize Lens:
 - Timing；
 - Framebuffer Capture。
 
-默认必须串行。
+只由 General 执行，必须串行。多个 Capture 由同一 owning session 串行切换，结束时恢复入口现场。
 
 ### Offline Task
 
@@ -858,65 +810,50 @@ Optimize Lens:
 - Background；
 - 并行；
 - 使用独立 Context；
-- 多个 Sub-Agent 同时分析。
-
-`Offline Worker` 不是强制的新平台 Primitive，而是一种 Task 执行属性。
+- 由内部 Agent 离线分析。
 
 ---
 
-# 5. Tasks API、Handoff 与执行控制
+# 5. 计划、执行控制与循环
 
 ## 5.1 plan.md 的定位
 
 `plan.md` 是：
 
 - 人类可读的调查策略；
-- Planning Orchestrator 的主要交付；
-- Handoff 的核心输入；
-- 任务执行的战略基线。
+- Mission 的主要交付；
+- 用户批准的对象，也是 General 执行的战略基线。
 
-但 `plan.md` 不应承担所有动态状态。
+用户批准后 `plan.md` 冻结。执行中的事实由 Tasks、Artifacts、Evidence、Experiment 和 Challenge 共同保存。
 
-执行中的事实应由：
-
-- Tasks；
-- Artifacts；
-- Evidence；
-- Experiment State；
-- Review Challenges；
-
-共同保存。
-
-原则是：
-
-> `plan.md` 表达调查意图，Tasks API 表达执行现实。
+> `plan.md` 表达调查意图，Tasks 表达执行现实。
 
 ---
 
 ## 5.2 Plan 应包含的领域信息
 
-不规定文件格式，但语义上必须覆盖：
+不规定文件格式，语义上覆盖：
 
 1. User Goal；
 2. Mission 类型；
-3. 已知输入；
-4. 初始事实；
+3. 已知输入与批准范围（哪些 Capture、哪些设备、允许哪类实验）；
+4. 初始事实，以及对象锚点的状态：用户确认、两条独立路径互相印证、仅候选，或尚未建立；
 5. 初始 Hypothesis 或分析方向；
-6. 推荐调查阶段；
-7. 可能使用的 Sub-Agent；
+6. 建议的检查顺序；
+7. 可能委托的内部 Agent；
 8. 任务依赖；
 9. 必须执行的验证；
 10. 成功条件；
 11. 停止条件；
 12. 当前能力上限；
 13. 已知风险；
-14. 可触发 Replan 的条件。
+14. 哪些情况说明战略已失效，需要回到 Mission。
 
 ---
 
 ## 5.3 Task 的领域契约
 
-每个 Task 至少应明确：
+每个 Task 明确：
 
 - 目标；
 - 为什么需要；
@@ -931,68 +868,58 @@ Optimize Lens:
 - 失败条件；
 - 后继建议。
 
-具体如何映射到现有 Tasks API，由实现时读取平台真源决定。
-
 ---
 
 ## 5.4 Task Graph 的动态调整
 
-Execution Orchestrator 可以：
+`plan.md` 冻结后，General 调整的是 Task，不是计划正文。General 可以：
 
 - 新增补充 Task；
 - 拆分过大的 Task；
 - 合并重复 Task；
 - 标记无效 Task；
 - 调整顺序；
-- 委托 Sub-Agent；
-- 将某个结论送入独立 Review。
+- 委托内部 Agent；
+- 将某个结论送入独立审查。
 
-但不应在没有记录原因的情况下：
+以下情况必须留下原因：
 
-- 静默改变 Mission；
-- 删除失败实验；
-- 覆盖旧 Plan；
-- 把未验证结论标记为完成。
+- 偏离批准的范围或目标；
+- 放弃一个失败的实验；
+- 把未验证的结论标记为完成。
 
-每次结构性变更都应说明：
+每次结构性调整说明：
 
 ```text
-Changed:
-为什么调整
-
-Evidence:
-什么新信息触发调整
-
-Impact:
-原 Plan 哪些部分失效
-
-Plan Version:
-新旧关系
+Changed:    调整了什么
+Evidence:   什么新信息触发调整
+Impact:     原计划哪些部分因此失效
+Deviation:  是否仍在批准范围内
 ```
+
+调整超出批准范围时，进入 Big Loop（5.6）。
 
 ---
 
 ## 5.5 Small Loop
 
-Small Loop 用于局部调查未通过 Verifier 的情况。
+Small Loop 是批准范围内的补证：一个结论没有通过审查，针对缺口补做检查，不重新规划。
 
 ```text
 Task Execution
       ↓
 Candidate Claims
       ↓
-Skeptic Review
+Verifier Review
       ↓
 Challenge Set
       ↓
 Targeted Follow-up Tasks
       ↓
-Update Iteration Memory
+更新 Iteration Memory
       ↓
-Retry
+再次审查
 ```
-
-Small Loop 不应重新规划整个 Mission。
 
 适用情况：
 
@@ -1003,19 +930,80 @@ Small Loop 不应重新规划整个 Mission。
 - Visual Regression 未验证；
 - Timing Sample 不足。
 
+预算或期限耗尽时，按 5.7 以 `budget_paused` 收口，不靠缩小结论来凑完成。
+
+---
+
+## 5.6 Big Loop
+
+Big Loop 用于原调查战略已经失效。它由用户手动完成：General 就地交付缺口与 Mission Checkpoint，用户决定是否切回 Mission 重新规划。系统不自动回到 Mission。
+
+触发条件：
+
+1. 初始 Bug Family 判断错误；
+2. Analyzer 发现原有结构假设不成立；
+3. Optimizer 发现最耗时 Pass 不在可执行范围；
+4. 当前 Backend 缺少关键能力；
+5. 多轮审查都指出同一个结构性缺口；
+6. 新 Evidence 将问题升级为新的 Mission Scope；
+7. 用户目标发生变化。
+
+```text
+General 就地交付：缺口 + Mission Checkpoint
+      ↓
+用户切回 Mission
+      ↓
+Mission 读取 Checkpoint，重新检索 Knowledge
+      ↓
+新的 plan.md
+      ↓
+用户批准并点击执行
+```
+
+---
+
+## 5.7 完成状态
+
+一轮结束时，General 声明以下之一：
+
+| 状态 | 含义 |
+|---|---|
+| `completed` | 达到 Mission 的完成条件 |
+| `partial` | 产出有价值，但有必需项未完成。例如 Optimizer 找到 Cost Location，却无法执行 Counterfactual；或竞争 Hypothesis 仍无法区分 |
+| `blocked` | 缺少 Capture、Backend Capability、合法权限或必要输入 |
+| `cancelled` | 用户取消 |
+| `budget_paused` | 预算或期限耗尽，已写 Checkpoint，可在补充预算后继续 |
+
+`partial`、`blocked`、`budget_paused` 必须逐项列出未决工作：缺口是什么、试过什么、被什么阻止、什么条件下可以恢复。
+
+`completed` 的条件：必需覆盖完成；结论达到所声明的验证等级；没有开放的 Challenge；交付写清结论、证据、验证覆盖与未决项；正式报告由 Mission 在用户切回评估时产出，或按需委托 Report Writer；已写 Mission Checkpoint；回放现场已恢复到进入时的位置。
+
+四种"完成"不等价：
+
+1. Tool 调用成功：取得一个结果。
+2. 局部 Task 完成：完成所分配的交付物。
+3. 审查完成：核查了指定内容，可以留下仍然开放的问题。
+4. 目标达到完成条件：即上面的 `completed`。
+
+完成一次实验不等于验证了 Root Cause。Verifier 完成审查并指出缺口，父任务不能把它当成已解决。模型没有调用工具就给出的终答，不算目标完成。
+
+---
+
+## 5.8 推进与收口
+
 ### 调查者自身的推进
 
-上面的 Small Loop 从 Verifier 的 Challenge 开始。但调查在形成任何 Candidate Claim 之前就可能停下，这时没有东西可供质疑。所以推进不能只靠 Verifier，调查者每得到一个结果都要自己回答三个问题：
+Small Loop 从 Verifier 的 Challenge 开始。但调查在形成任何 Candidate Claim 之前就可能停下，这时没有东西可供质疑。所以推进不能只靠 Verifier，调查者每得到一个结果都要自己回答三个问题：
 
 1. 当前对象是否已经锚定（见 10.4）？没有，下一步就是确立或否定锚点。
 2. 现有解释里，哪一项合法、可执行的检查最能区分它们？
 3. 结果回来后，谁被支持、削弱、排除或暂缓？
 
-只要批准范围内还有这样的检查，就继续，不把"下一步尚未检查"当成阻塞。确实不能继续时，逐项交代：缺口是什么、试过什么、被什么阻止（能力、权限、预算或期限、战略边界、外部条件）、什么条件下可以恢复。说不出阻塞的条目是应继续的工作，不是停止的理由。
+只要批准范围内还有这样的检查，就继续，不把"下一步尚未检查"当成阻塞。确实不能继续时，按 5.7 逐项交代。说不出阻塞的条目是应继续的工作，不是停止的理由。
 
 ### Verifier 的边界
 
-Verifier 不拥有最终目标，不提高验收标准，不改目标或扩大权限。Orchestrator 把有效的缺口变成可执行的工作；认为某项审查要求不适用时给出依据并保留可审计的处理，不直接忽略。独立上下文和不同模型是两个维度：同一模型的独立执行可以满足隔离；审查是否严谨，看材料覆盖和错误检出能力，不看换没换模型。
+Verifier 不拥有最终目标，不提高验收标准，不改目标或扩大权限。General 把有效的缺口变成可执行的工作；认为某项审查要求不适用时给出依据并保留可审计的处理，不直接忽略。独立上下文和不同模型是两个维度：同一模型的独立执行可以满足隔离；审查是否严谨，看材料覆盖和错误检出能力，不看换没换模型。
 
 ### 防止空转
 
@@ -1025,90 +1013,12 @@ Verifier 不拥有最终目标，不提高验收标准，不改目标或扩大�
 | 调用不同，但没有新增证据、解释区分或完成项变化 | 说明下一步为何仍有信息价值，否则收口 |
 | 同一证据版本反复送审 | 复用已完成的审查；新审查须有新增材料或范围变化 |
 | Verifier 与调查者反复争论同一缺口 | 查清分歧需要什么证据；取不到时保留分歧 |
-| 所有有效检查都依赖缺失的能力或材料 | 真实的 Blocked 或 Partial，列出恢复条件 |
+| 所有有效检查都依赖缺失的能力或材料 | 真实的 `blocked` 或 `partial`，列出恢复条件 |
 | 目标已满足，还想继续提高质量 | 非必需的改进不阻止完成 |
 | 只有记录格式或引用错误 | 修正记录，不重跑有效实验 |
 | 有活跃的子执行或设备操作 | 等待或取消并 join，不在后台仍在变更现场时宣告完成 |
 
 是否有语义进展由模型判断；"新写了一条记录"不算进展。
-
----
-
-## 5.6 Big Loop
-
-> 交接方式以 0.1 为准：General 就地交付缺口与 Mission Checkpoint，由用户决定是否切回 Mission 重新规划。
-
-Big Loop 用于原调查战略已经失效。
-
-触发条件：
-
-1. 初始 Bug Family 判断错误；
-2. Analyzer 发现原有结构假设不成立；
-3. Optimizer 发现最耗时 Pass 不在可执行范围；
-4. 当前 Backend 缺少关键能力；
-5. 多轮 Verifier 都指出同一个结构性缺口；
-6. 新 Evidence 将问题升级为新的 Mission Scope；
-7. 用户目标发生变化；
-8. Context 即将耗尽且原 Plan 已高度偏离现实。
-
-Big Loop 流程：
-
-```text
-Execution State
-      ↓
-Mission Checkpoint
-      ↓
-Handoff to Planning Orchestrator
-      ↓
-Knowledge Re-retrieval
-      ↓
-New plan.md Version
-      ↓
-Handoff to Execution
-```
-
----
-
-## 5.6.1 四种完成
-
-1. Tool 调用成功：取得一个结果。
-2. 局部 Task 完成：完成所分配的交付物。
-3. 审查完成：核查了指定内容，可以留下仍然开放的问题。
-4. 目标达到完成条件：必需覆盖完成，结论获得足够支持，并按交接合同交付。
-
-四者不等价。完成一次实验不等于验证了 Root Cause；Verifier 完成审查并指出 Blocker，不允许父任务把它当成已解决。模型没有调用工具就给出终答，不能直接提升为目标完成。
-
----
-
-## 5.7 完成状态
-
-任务不能只有“成功 / 失败”。
-
-建议领域上区分：
-
-### Complete
-
-满足 Mission 的完整成功标准。
-
-### Partial
-
-产出有价值，但未达到全部验证要求。
-
-例如 Optimizer 找到了 Cost Location，却无法执行 Counterfactual。
-
-### Inconclusive
-
-完成了合理调查，但证据无法区分竞争 Hypothesis。
-
-### Blocked
-
-缺少 Capture、Backend Capability、合法权限或必要输入。
-
-### Replanned
-
-当前执行结束，已移交新 Plan。
-
-这可以映射到现有平台状态，不要求新增相同枚举。
 
 ---
 
@@ -1216,7 +1126,7 @@ L5：默认外置、按需读取
 
 ## 6.3 Delegation Context Capsule
 
-每次委托 Sub-Agent 时，都应即时编译一份 Task-specific Context Capsule。
+每次委托内部 Agent 时，都应即时编译一份 Task-specific Context Capsule。
 
 它在语义上包含：
 
@@ -1235,7 +1145,7 @@ L5：默认外置、按需读取
 13. 输出要求；
 14. 原始 Evidence 的可恢复引用。
 
-这不是要求平台新增某种文件，而是 Context 构造必须满足的领域契约。
+Capsule 的字段见 20.A。
 
 ---
 
@@ -1243,28 +1153,28 @@ L5：默认外置、按需读取
 
 | 角色 | Context 特征 |
 |---|---|
-| Planning Orchestrator | 宽语义、低 Raw Detail |
-| Execution Orchestrator | 全局进度、Accepted Facts、Task State |
-| Specialist | 窄范围、深证据、明确目标 |
-| Skeptic | 宽但干净，只看 Claims、Evidence、Alternatives |
-| Report Agent | 最终事实、关键 Artifact、验证等级 |
-| Knowledge Curator | Accepted Outcome、失败经验、Scope、Provenance |
+| Mission（规划） | 宽语义、低 Raw Detail |
+| General（执行） | 全局进度、Accepted Facts、Task State |
+| Analyst（shader / pass / resource / pixel） | 窄范围、深证据、明确目标 |
+| Verifier | 宽但干净，只看 Claims、Evidence、Alternatives |
+| Report Writer | 最终事实、关键 Artifact、验证等级 |
+| Knowledge Scout | 当前问题的 Scope、已有读数、要回答的具体问题 |
 
-### Planning Orchestrator 不需要
+### Mission 不需要
 
 - 数百行 Pipeline JSON；
 - 完整 Shader Debug Trace；
 - 所有 Tool Log；
-- 每个 Sub-Agent 的完整思考过程。
+- 每个内部 Agent 的完整思考过程。
 
-### Specialist 不需要
+### Analyst 不需要
 
 - 整段用户历史；
 - 无关 Pass；
 - 无关知识；
 - 其他 Task 的全部 Transcript。
 
-### Skeptic 不应被 Generator 叙事污染
+### Verifier 不应被 Generator 叙事污染
 
 优先输入：
 
@@ -1359,7 +1269,7 @@ Challenge 类型包括：
 
 ## 6.7 Mission Checkpoint
 
-Big Loop 或 Context Compact 前必须生成 Mission Checkpoint。
+声明 `completed`、`budget_paused`，进入 Big Loop，或 Context Compact 之前，必须写 Mission Checkpoint。
 
 最低内容：
 
@@ -1374,7 +1284,7 @@ Accepted Claims
 Rejected Hypotheses
 Completed Experiments
 Verifier Challenges
-Why Replanning Is Required
+Reason for Replan
 Unresolved Frontier
 Critical Artifact References
 Current World State
@@ -1385,23 +1295,24 @@ Capability Limitations
 
 Mission Checkpoint 回答：
 
-> 旧战略为什么已经不够，以及新 Planner 必须继承什么。
+> 调查走到了哪里，还剩什么没做；需要重新规划时，旧战略为什么不够，新的规划必须继承什么。
 
 ---
 
-## 6.7.1 读取时机
+### 读取时机
 
 记录的价值在于被读到并改变下一步。只写不读的记录是成本。下列时刻必须把对应内容读回决策：
 
 | 时刻 | 必须读回 |
 |---|---|
-| 准备声明完成或 Partial | Unresolved Frontier、未解决的 Challenge 及其所需行动 |
+| 准备声明 `completed` | 全部 Challenge 的状态、报告引用的 Claim 与 Evidence |
+| 准备声明 `partial` 或 `blocked` | Unresolved Frontier、未解决的 Challenge 及其所需行动 |
 | Context Compact 之后 | 原 Plan、Mission Checkpoint、Unresolved Frontier、未解决的 Challenge |
 | 委派独立审查 | 被审 Claim，以及它依赖的原始 Evidence、World State 和 Experiment 回执 |
 | Big Loop 重新规划 | Mission Checkpoint 全文 |
 | 现场恢复之后 | 仍然有效的 Evidence 与需要重新核验的状态（见 7.7） |
 
-Verifier 只能读到被授予的内容，所以原始证据须随被审主张一并授予。Compact 与委派保留的是这些内容本身，不只是它们的索引。
+Verifier 只能读到被授予的内容，所以原始证据随被审主张一并授予，Verifier 经可解引用的 Artifact 读回原文。Compact 保留待做检查的原文，不只是索引。
 
 ---
 
@@ -1613,7 +1524,7 @@ Tool 返回或视觉观察到的原始现象。
 
 ### Hypothesis
 
-尚待验证的机制解释。
+尚待验证的机制解释。记录为 `hypothesis` 类型的 Claim。
 
 ### Experiment
 
@@ -1625,7 +1536,7 @@ Tool 返回或视觉观察到的原始现象。
 
 ### Decision
 
-为什么接受、拒绝、降级或延期一个 Claim。
+为什么接受、拒绝、降级或延期一个 Claim。记录在该 Claim 的裁决字段里，不单独成类。
 
 ---
 
@@ -1634,6 +1545,7 @@ Tool 返回或视觉观察到的原始现象。
 | 类型 | 示例 |
 |---|---|
 | Observed Fact | Event 1834 写入 SceneColor |
+| Hypothesis | 该亮度来自某一路贡献的越界，尚待区分 |
 | Derived Structure | Events 1800–1860 构成一个 Lighting Pass |
 | Semantic Inference | 该 Pass 很可能是 Deferred Lighting |
 | Causal Conclusion | FP16 Overflow 是异常颜色的直接机制 |
@@ -1790,9 +1702,9 @@ Knowledge Engine 必须同时服务：
 - Debugger 的 Bug、Invariant、排查流程；
 - Analyzer 的 Pass、Shader Block、Architecture Model；
 - Optimizer 的 Cost Pattern、Experiment 与 Optimization；
-- Planner 的冷启动；
-- Specialist 的即时检索；
-- Skeptic 的反例检索；
+- Mission 规划前的检索；
+- 内部 Agent 的即时检索；
+- Verifier 的反例检索；
 - 人类工程师的学习、编辑与审核。
 
 它必须：
@@ -1831,7 +1743,7 @@ Evidence 不是 Knowledge。
 
 ### Compiled Context Plane
 
-为当前 Planner 或 Specialist 即时生成最相关的 Knowledge Pack。
+为当前 Mission 或内部 Agent 即时生成最相关的 Knowledge Pack。
 
 ```text
 Mission
@@ -1849,38 +1761,22 @@ Task-specific Knowledge Pack
 
 ## 8.3 Knowledge Card 的正确定位
 
-每条知识存在三种表示：
+Markdown 原文是唯一来源（0.1）。一张卡是一份带 frontmatter 的 Markdown 文件：frontmatter 记录类型、生命周期、Scope、Relations 与图片引用，正文承载内容。Agent 与人类读同一份原文，不维护两套知识。
 
-```text
-Canonical Knowledge Record
-        ├─ Agent Card
-        └─ Human View
-```
+### 读取方式
 
-### Canonical Record
+渐进读取，由浅入深：
 
-真源，保存：
+| 方式 | 内容 |
+|---|---|
+| 简介 | 这张卡讲什么、何时适用、有什么限制 |
+| 章节 | 按需读取某一章，例如 Case 的 Evidence 或 Fix |
+| 全文 | 完整原文 |
+| 图片 | 卡片附带的图片；须实际读图才算观察到 |
 
-- 完整 Claim；
-- Evidence；
-- Scope；
-- Verification；
-- Version；
-- Relations；
-- Conflict；
-- Lifecycle。
+简介由原文派生，原文变化后随之失效。
 
-### Agent Card
-
-高密度、低 Token、面向任务消费。
-
-### Human View
-
-包含解释、图表、案例和历史变更。
-
-所以：
-
-> Card 是 Projection，不是 Storage Ontology。
+> Card 是原文的读取视图，不是独立的存储本体。
 
 ---
 
@@ -1972,7 +1868,7 @@ Project → Engine → Platform → Universal
 
 因为 Engine、Platform、API 与 GPU 是正交维度。
 
-Canonical Scope 应能够表达：
+Scope 表达以下维度：
 
 ```text
 Project
@@ -1993,6 +1889,8 @@ Quality Level
 Resolution
 Feature Configuration
 ```
+
+适用条件之外还可以写明不适用条件；检索结果同时显示两者。不适用条件写在 `exclusions` 中，按 Scope 轴逐项列出。
 
 Generalization 是扩大一个或多个维度的适用范围，而不是简单“升级一层”。
 
@@ -2016,7 +1914,7 @@ D3D12 + NVIDIA
 
 ---
 
-## 8.5.1 知识的五个维度与主题治理
+### 知识的五个维度与主题治理
 
 一份知识同时有五个互不替代的维度：
 
@@ -2025,7 +1923,7 @@ D3D12 + NVIDIA
 | Knowledge Type | 这是什么形式的知识？ | 六种类型已够用。失败经验用 Case、Constraint 或 Procedure 表达，保留失败原因、证据和重试条件 |
 | 领域主题 | 它讲什么？ | 可多主题，允许同义词和确有上下位关系时的浅层级 |
 | 任务用途 | 现在能帮我做什么决定？ | 可跨 Mission |
-| Scope | 在哪些条件下成立？ | 见 8.5，多轴交叉 |
+| Scope | 在哪些条件下成立？ | 见上文，多轴交叉 |
 | 来源与验证 | 有什么证据、反例和限制？ | 导入案例写着 fixed，不自动取得 Verified |
 
 "发黑"是症状，"精度损失"是可能的机制，"某型号 GPU"是环境条件，三者不串成唯一路径。Debug 要把症状和 Root Cause 分开，允许一个症状通向多个竞争机制。同一份原文可以帮 Debug 提出假设、帮 Analysis 识别计算、帮 Optimize 做质量回归，只保留一份原文和来源，不按 Mission 复制。三种 Mission 的侧重不同，不为了对称而要求相同的字段、步骤或检索次数。
@@ -2034,13 +1932,11 @@ D3D12 + NVIDIA
 
 | 动作 | 影响 | 谁能做 |
 |---|---|---|
-| 给卡片建议已有主题 | 局部 | Agent |
+| 给卡片建议已有主题 | 局部 | Agent 提议，用户确认 |
 | 在本次任务里临时组织假设 | 仅本次调查 | Agent |
 | 修改全库的正式分类 | 以后所有人的检索 | Agent 提议，用户预览并批量确认 |
 
 正式主题从少量真实资料开始。是否新增主题，看现有词或同义词能否表达、边界能否讲清、是否改善检索或改变检查方法；数量只作参考。未知机制保持未知，未归类的卡片仍须能被检索到。审核知识内容（Candidate）与确认主题分类是两件事。
-
-**渐进读取。** 先看简介（这张卡讲什么、何时适用、有什么限制），值得深入时再读所需章节、全文或图片。简介、章节和全文来自同一份有版本的原文，原文变化后派生的简介随之失效，不维护两套知识。图片须实际读图才算观察到。
 
 六种 Knowledge Type 描述知识，检索通道用来找资料，Context 的 L0–L5 决定模型这一步实际看到什么。三者是不同维度，不互相替代。
 
@@ -2048,7 +1944,7 @@ D3D12 + NVIDIA
 
 ## 8.6 Knowledge Relations
 
-Knowledge Engine 至少支持以下语义关系：
+Knowledge Engine 支持以下语义关系：
 
 ```text
 supports
@@ -2073,36 +1969,38 @@ failed_in
 ## 8.7 Knowledge Lifecycle
 
 ```text
-Draft
+draft
   ↓
-Candidate
+candidate
   ↓
-Verified
+verified
   ↓
-Promoted
+promoted
   ↓
-Deprecated / Superseded
+retired
 ```
 
-### Draft
+### `draft`
 
 Agent 或人类刚创建。
 
-### Candidate
+### `candidate`
 
 通过基本完整性检查，但尚未充分验证。
 
-### Verified
+### `verified`
 
 在明确 Scope 内有可靠 Evidence。
 
-### Promoted
+### `promoted`
 
 扩大 Scope，成为 Engine、Platform 或更通用知识。
 
-### Deprecated
+### `retired`
 
 不再推荐，但保留历史。
+
+进入 candidate 及之后的每次状态变化都由用户确认。
 
 默认不物理删除，除非涉及：
 
@@ -2113,7 +2011,9 @@ Agent 或人类刚创建。
 
 ---
 
-## 8.8 不同 Knowledge Type 的 Promotion 规则
+## 8.8 晋升的证据门槛
+
+各类知识晋升所需的证据不同。任何层级的晋升都由用户确认，门槛只决定什么时候可以提请确认。
 
 ### Case
 
@@ -2163,16 +2063,15 @@ Universal Constraint 需要：
 必须标记：
 
 - Predicted；
-- Replay-Validated；
-- Runtime-Validated；
-- Cross-Scene；
-- Cross-Device。
+- Replay-Validated。
+
+Runtime-Validated、Cross-Scene、Cross-Device 不在范围内。
 
 ---
 
 ## 8.9 Human 与 Agent 的权限
 
-人类工程师可以：
+Agent 只提议：在用户要求沉淀时起草 Candidate，或提出合并、特化、泛化、标记冲突、retire 的建议。人类审核、编辑并决定：
 
 - Add；
 - Edit；
@@ -2181,10 +2080,8 @@ Universal Constraint 需要：
 - Generalize；
 - Contradict；
 - Supersede；
-- Deprecate；
+- Retire；
 - Delete。
-
-Agent 也可以提出这些操作，但默认生成 Knowledge Patch。
 
 关键原则：
 
@@ -2209,42 +2106,29 @@ Agent 也可以提出这些操作，但默认生成 Knowledge Patch。
 
 ---
 
-## 8.10 知识自进化流程
+## 8.10 知识沉淀
+
+知识沉淀由用户在调查之后的请求触发；调查本身不以沉淀收尾（0.1）。
 
 ```text
-Completed Mission
-      ↓
-Investigation Distillation
-      ↓
-Knowledge Candidate Set
-      ↓
-Deduplication
-      ↓
-Conflict Detection
-      ↓
-Scope Validation
-      ↓
-Evidence Validation
-      ↓
-Knowledge Patch
-      ↓
-Auto Rule / Human Review
-      ↓
-Versioned Knowledge Store
+调查结束，用户要求沉淀
+        ↓
+Agent 起草 Candidate 卡
+        ↓
+冲突检查
+        ↓
+用户审核、编辑
+        ↓
+用户确认后写入知识库
 ```
 
-Knowledge Patch 支持：
+Candidate 卡带：
 
-- Add；
-- Update；
-- Merge；
-- Link；
-- Specialize；
-- Generalize；
-- Contradict；
-- Supersede；
-- Deprecate；
-- Reject。
+- 来源：调查记录中的 Claim、Evidence、Experiment 引用；
+- Scope：成立的多轴条件，以及不适用条件；
+- 类型：各 Mission 可沉淀的类型见 10.7、11.11、12.13。
+
+没有自动规则：调查完成、重复命中或统计达标都不会自动写入或晋升。用户不要求时，知识产物留在调查记录里。
 
 ---
 
@@ -2275,23 +2159,22 @@ Do Not Retry Unless
 
 ## 8.12 Knowledge Retrieval
 
-检索顺序：
+六条检索通道（0.1）按任务需要组合，顺序不固定：
 
-```text
-1. Scope Filter
-2. Structural Match
-3. Lexical / Semantic Retrieval
-4. Graph Expansion
-5. Verification Ranking
-6. Freshness Check
-7. Contradiction Injection
-8. Diversity Selection
-9. Context Compilation
-```
+| 通道 | 找什么 |
+|---|---|
+| Identity／Path | 已知的卡片 ID 或路径 |
+| Scope／Metadata | 按 Scope 轴、类型、生命周期过滤 |
+| Lexical | 关键词与术语 |
+| Structural | 指纹与结构特征（见下） |
+| Relation／Graph | 沿 Relations 展开 |
+| Temporal／Version | 新鲜度与版本 |
+
+检索结果再经验证等级排序、Contradiction Injection、多样性选择，编译成 Context。不做向量检索。
 
 ### Structural Match
 
-RenderDoc Agent 应优先利用：
+RenderDoc Agent 优先利用：
 
 - Shader Fingerprint；
 - Pass Fingerprint；
@@ -2303,7 +2186,6 @@ RenderDoc Agent 应优先利用：
 - Trigger；
 - Compiler Statistics。
 
-纯 Embedding 只是补充。（裁决见 0.1：产品不使用 Embedding 或 Semantic 通道。）
 
 ### Contradiction Injection
 
@@ -2317,11 +2199,11 @@ Knowledge Pack 不能只返回支持当前 Hypothesis 的内容。
 - Conflicting Knowledge；
 - Scope Mismatch。
 
-这对 Skeptic 尤其重要。
+这对 Verifier 尤其重要。
 
 ---
 
-## 8.12.1 Knowledge 怎样改变决策
+### Knowledge 怎样改变决策
 
 读到的 Knowledge 要完成三步转换，才算被使用：
 
@@ -2331,13 +2213,13 @@ Knowledge Pack 不能只返回支持当前 Hypothesis 的内容。
 
 报告里能说出历史案例的名称，只证明线索被识别，不证明这三步发生过。
 
-处于 Draft 的历史卡不能继承其验证资格，但仍可提供检查方法。条件未知先核对，已证伪才排除。历史的 Event ID、Resource ID 或 Shader ID 不能套到当前 Capture。
+处于 draft 的历史卡不能继承其验证资格，但仍可提供检查方法。条件未知先核对，已证伪才排除。历史的 Event ID、Resource ID 或 Shader ID 不能套到当前 Capture。
 
 检索次数不固定：规划前可从症状和对象检索，执行中发现新计算或异常值后可再次检索；材料足以选择下一项检查，或继续检索的价值低于直接取证时停止。零命中不是失败：换 Knowledge Type 继续找，或依据领域知识和当前观察提出可检验的解释。Tool 失败与零命中分别报告。
 
 规划阶段使用 Knowledge 的目标，是选出能减少不确定性的第一步，而不是比较谁调用了搜索工具。三种 Mission 的产出不同：Debugger 得到可区分的假设，Analyzer 得到可识别的结构，Optimizer 得到可验证的优化实验。
 
-现象模糊时渐进澄清。以"画面闪"为例：先看已有的截图和 Capture；仍不能判断时再问用户"整个画面还是局部边缘""镜头静止时是否发生""有没有正常参考"。这是澄清可观察的现象，不要求用户诊断原因。放宽设备或项目条件后召回的结果，保留条件差异，不当作完全适用。
+现象模糊时先读已有的截图和 Capture，仍不能判断再向用户澄清可观察的现象（见 10.4），不要求用户诊断原因。放宽设备或项目条件后召回的结果，保留条件差异，不当作完全适用。
 
 需要防止的通用错误：
 
@@ -2352,7 +2234,7 @@ Knowledge Pack 不能只返回支持当前 Hypothesis 的内容。
 
 ## 8.13 Knowledge Pack
 
-三个 Planner 使用同一个 Knowledge Engine，但获得不同 Pack。
+三种 Mission 使用同一个 Knowledge Engine，但获得不同 Pack。
 
 ### Debug Pack
 
@@ -2380,27 +2262,7 @@ Knowledge Pack 不能只返回支持当前 Hypothesis 的内容。
 - Optimization Procedures；
 - Experiment Templates；
 - Platform Constraints；
-- Validated Gains。
-
----
-
-## 8.14 Knowledge Usage Trace
-
-系统应记录：
-
-```text
-Knowledge K-102
-      ↓ used by
-Planning Decision P-14
-      ↓ created
-Task T-08
-      ↓ produced
-Evidence E-302
-      ↓ supported
-Claim C-91
-```
-
-这样可以测量知识的真实价值，而不只是“被检索了几次”。
+- Replay-Validated Gains。
 
 ---
 
@@ -2679,16 +2541,14 @@ Debugger 的目标是：
 - Differential-first；
 - Evidence-driven；
 - Counterfactual-required；
-- Skeptic-reviewed；
-- Knowledge-evolving。
+- Verifier-reviewed；
+- 结论可在用户要求时沉淀为 Knowledge。
 
 ---
 
 ## 10.2 Planning 阶段
 
-Debugger 本身是 Planning Orchestrator。
-
-前置 Sub-Agent：
+Debugger 是 Mission：只读规划，交付 `plan.md`。下面三件事由 Debugger 自己依靠 Skill 和只读探测完成；知识综合可以委托 Knowledge Scout。
 
 ### Triage & Taxonomy
 
@@ -2743,17 +2603,16 @@ Debugger 本身是 Planning Orchestrator。
 
 ## 10.3 Execution 阶段
 
-General Execution Orchestrator 根据 Plan 创建 Tasks。
+用户批准计划并点击执行后，General 根据 Plan 创建 Tasks。回放上的取证和实验由 General 自己串行完成；离线分析可以委托内部 Agent：
 
-可能调用：
-
-- Pass Graph / Pipeline；
-- Pixel / Value Forensics；
-- Shader / IR；
-- Device / Driver；
-- Cross-Capture；
-- Experiment；
-- Visual Analysis。
+- Pass Analyst：Pass 结构与 Pipeline 状态；
+- Pixel Analyst：像素历史、区域数值与外观判断；
+- Shader Analyst：Shader 与 IR；
+- Resource Analyst：Resource 版本与跨 Capture 对齐；
+- Generator：提出可区分的 Hypothesis；
+- Knowledge Scout：综合历史知识；
+- Verifier：独立审查；
+- Report Writer：撰写报告。
 
 ---
 
@@ -2780,10 +2639,12 @@ Minimal Intervention
   ↓
 Counterfactual Replay
   ↓
-Skeptic
+Verifier
   ↓
-Report and Knowledge
+Report
 ```
+
+主线可以压成五步，每一步都要在调查记录里留下依据：锚定 → 首次异常 → 区分 → 因果 → 核验。
 
 这是判断顺序，不是固定流水线。定位帮助判断 Knowledge 是否适用，Knowledge 也帮助选择值得定位的对象；低成本的绑定或计算特征核对可以提前做。
 
@@ -2821,34 +2682,67 @@ Composer 里可以选择区域并补充描述，对话中可原位打开原图�
 
 ---
 
-## 10.5 Debugger 完成条件
+## 10.5 主线各步的判定
 
-### Complete
+### 症状先在回放里复现
+
+锚定之前先确认：用户描述的现象在当前回放的输出里看得到。看不到时，问题可能出在回放与设备的差异上，先解决这个，不在看不到症状的画面上找原因。
+
+### 没有参照时怎样判定"错"
+
+没有参考图或正常 Capture 时，"错"由两类依据成立：违反 Invariant（数值非有限、超出格式或物理合法范围、守恒关系不成立），或与同帧对照不一致（同类对象、邻近未受影响区域、同一像素在更早 Event 的值）。两者都没有时，这是一个需要用户补充期望的问题，不靠亮度或观感猜测。
+
+### First Bad Event
+
+First Bad Event 是写入目标区域的 Event 中，最早一个使被观察量从"符合期望"变为"不符合"的 Event。取得方式：
+
+1. 用 Pixel History 取得写入该区域的 Event 序列，逐个比较写入前后的值；
+2. Pixel History 不可用或返回未知值时，沿 Resource 的版本链做二分：在候选 Event 之前和之后读取同一原生区域的值，缩小区间；
+3. 异常来自上游 Resource 时，对该 Resource 重复同样的过程。
+
+每一步保留读数和所在 Event。读不到的值保持未知，不当成零。
+
+### 区分 Hypothesis
+
+至少保留两个可以被同一次检查区分的解释，并在检查之前写下各自预测的读数。结果回来后，逐个记录被支持、削弱、排除或暂缓。证据已经排除其余解释时，一个就够。无法设计出能区分它们的检查时，说明原因并保留为未决。
+
+### 最小干预
+
+一次实验只改一个变量，改动范围尽量小（一个 Shader 分支、一个状态、一个绑定），并验证改动确实生效。实验顺序是 baseline → 干预 → 观察 → 撤销 → 确认回到 baseline。干预后异常消失且撤销后重现，因果成立；同时写明这个结论适用的范围。
+
+### 用户跳过澄清
+
+用户跳过或回答不知道时，调查继续，锚点保持"仅候选"，优先做能确立或否定它的检查。锚点最终仍是"仅候选"时，结论最高为 `partial`。
+
+---
+
+## 10.6 Debugger 完成条件
+
+### `completed`
 
 - Symptom Anchor 已确立（用户确认或两条路径互相印证）；
 - First Bad Event 已定位；
 - Root Cause 已拆分；
 - 替代 Hypothesis 已处理；
-- 至少一个 Counterfactual；
-- Patch 后结果恢复；
+- 至少一个 Counterfactual：干预后结果恢复，撤销后回到 baseline；
 - Scope 明确；
-- Skeptic 无 Blocker。
+- Verifier 读过当前版本的原始证据，没有开放的 Challenge。
 
-### Partial
+交付的是回放内验证过的原因和修复方向，不是对项目源码的修改。
 
-- 已定位错误范围；
-- 有强 Hypothesis；
-- 但 Backend 不支持充分 Counterfactual。
+### `partial`
 
-### Inconclusive
+- 已定位错误范围，有强 Hypothesis，但 Backend 不支持充分的 Counterfactual；
+- 或多个机制仍无法区分，Evidence 不足；
+- 或锚点仍是"仅候选"。
 
-- 多个机制仍无法区分；
-- Evidence 不足；
-- 明确给出下一步所需信息。
+逐项给出未决工作和恢复条件（见 5.7）。
 
 ---
 
-## 10.6 Debugger 知识产物
+## 10.7 可沉淀的知识类型
+
+仅在用户要求时沉淀，经用户确认后进入知识库：
 
 - Debug Case；
 - Bug Pattern；
@@ -2856,22 +2750,8 @@ Composer 里可以选择区域并补充描述，对话中可原位打开原图�
 - Debug Procedure；
 - Device / Driver Fact；
 - Negative Knowledge；
-- Project Mapping。
-
----
-
-## 10.7 对现有 Debugger 的增强
-
-不推翻现有流程，只增加：
-
-1. Unified Context Capsule；
-2. World-State Provenance；
-3. Challenge Memory；
-4. Small / Big Loop Checkpoint；
-5. Unified Knowledge Engine；
-6. Shared Analyzer World Model；
-7. 统一 Evidence 与 Experiment；
-8. 更严格的 Knowledge Promotion。
+- Project Mapping；
+- Symptom Anchor 的做法（某类对象怎样从画面定位到 Draw）。
 
 ---
 
@@ -2927,7 +2807,7 @@ Observed、Reconstructed、Authoring Hypothesis 三层说明"结论凭什么成�
 
 ## 11.3 Planning 阶段
 
-Analyzer Planning Orchestrator 调用：
+Analyzer 是 Mission，依靠 Skill 与只读探测完成下面三件事，知识综合可以委托 Knowledge Scout：
 
 ### Analysis Scope
 
@@ -2959,7 +2839,7 @@ Analyzer Planning Orchestrator 调用：
 
 - 分析目标；
 - 重建范围；
-- 需要的 Specialist；
+- 需要的内部 Agent 与 Skill；
 - 预期 Model；
 - Coverage 标准；
 - Unknown 处理规则。
@@ -2968,7 +2848,9 @@ Analyzer Planning Orchestrator 调用：
 
 ## 11.4 Analyzer 执行阶段
 
-### 阶段一：Observed Model
+以下八项是判断顺序，不是固定流水线；已有的结构可以跳过，发现缺口时回到前面的项。
+
+### Observed Model
 
 提取：
 
@@ -2982,15 +2864,15 @@ Analyzer Planning Orchestrator 调用：
 - Timing；
 - Marker。
 
-### 阶段二：Resource Versioning
+### Resource Versioning
 
 建立 Resource Producer / Consumer。
 
-### 阶段三：Pass Reconstruction
+### Pass Reconstruction
 
 聚类 Event，生成 Hierarchical Pass Graph。
 
-### 阶段四：Shader Reconstruction
+### Shader Reconstruction
 
 建立：
 
@@ -2999,11 +2881,11 @@ Analyzer Planning Orchestrator 调用：
 - Block Graph；
 - Semantic Candidate。
 
-### 阶段五：Traceability
+### Traceability
 
 形成 Pixel / Resource / Pass Provenance。
 
-### 阶段六：Cross-Capture
+### Cross-Capture
 
 对齐：
 
@@ -3013,11 +2895,11 @@ Analyzer Planning Orchestrator 调用：
 - Feature；
 - Graph Neighborhood。
 
-### 阶段七：Architecture Synthesis
+### Architecture Synthesis
 
 形成项目级 Rendering Model。
 
-### 阶段八：Skeptic
+### Verifier 审查
 
 检查：
 
@@ -3033,7 +2915,7 @@ Analyzer Planning Orchestrator 调用：
 
 Pass Boundary 不能由 LLM 单独判断。
 
-建议使用：
+使用：
 
 \[
 PassScore =
@@ -3045,7 +2927,7 @@ w_m Marker
 +w_g GraphNeighborhood
 \]
 
-具体权重可以通过 Benchmark 学习，不写死在设计书。
+权重不在设计书中固定。
 
 Pass 输出：
 
@@ -3241,9 +3123,9 @@ Capture 4:
 
 ---
 
-## 11.10 Analyzer 成功标准
+## 11.10 Analyzer 完成条件
 
-### 最低完整标准
+### `completed`
 
 - 主要 Pass 可用；
 - Resource Dependency 清晰；
@@ -3251,9 +3133,18 @@ Capture 4:
 - 用户目标 Trace 可回答；
 - Observed / Derived / Inferred 分离；
 - Unknown Frontier 明确；
-- Skeptic 无结构性 Blocker。
+- Verifier 读过当前版本的原始证据，没有结构性 Blocker 与开放的 Challenge。
 
-### Coverage 指标
+### `partial`
+
+- 用户目标已部分回答，但某些 Pass、Shader 或 Trace 因 Backend 能力或材料缺失无法重建；
+- 或语义标签仍只是候选。
+
+逐项给出未决工作和恢复条件（见 5.7）。
+
+### Coverage
+
+Coverage 说明已重建的范围：
 
 - Top GPU Work Pass Coverage；
 - Top Resource Coverage；
@@ -3264,7 +3155,7 @@ Capture 4:
 
 ---
 
-## 11.11 Analyzer 输出
+## 11.11 Analyzer 的交付物
 
 ### Architecture Model
 
@@ -3292,7 +3183,9 @@ Capture 4:
 - Changed；
 - Unresolved。
 
-### Knowledge
+### 可沉淀的知识
+
+仅在用户要求时沉淀，经用户确认后进入知识库：
 
 - Model；
 - Pattern；
@@ -3304,19 +3197,9 @@ Capture 4:
 
 ## 11.12 无 Debug Tag Capture 的分析策略
 
-冷启动时可以使用人工量化出的真实项目 Rendering Structure 作为 Ground Truth。
+没有 Marker 的 Capture 靠结构与数据流重建：Event 与 Attachment 的变化划分 Pass，Resource 的生产与消费确定依赖，Shader 的数据流与 Fingerprint 给出语义候选。
 
-Agent 输入只看到无 Marker Capture，输出后与人工版图比较：
-
-- Pass Segmentation；
-- Pass Semantic；
-- Resource Edge；
-- Major Feature；
-- Hierarchy；
-- Unknown；
-- False Inference。
-
-这会成为 Analyzer 最重要的真实 Evaluation Case。
+用户已有的 Rendering Structure 是增强输入，不是前提。结果中事实、推断与 Unknown 分开，每个语义标签带 Confidence 与 Evidence，不命名证据不足的 Feature。过度推断和隐藏 Unknown 是主要的错误方向。
 
 ---
 
@@ -3410,15 +3293,15 @@ Optimizer 首先判断当前输入能达到什么验证层级。
 
 支持更强的 Hardware Limiter 归因。
 
-### O5：Runtime A/B
+### O5：Runtime A/B（不在范围内）
 
 可改游戏配置、重新运行与 Capture。
 
-### O6：Cross-Scene / Device
+### O6：Cross-Scene / Device（不在范围内）
 
 可验证项目级收益与回归。
 
-当前默认 RenderDoc 工作流重点覆盖 O1–O3。
+RenderDoc 工作流重点覆盖 O1–O3。
 
 ---
 
@@ -3541,15 +3424,15 @@ Compiler、Invocation 或 Resource 数据支持某机制。
 
 Shader Replace 改变机制后 Timing 改善。
 
-### P4：Runtime-Counterfactual
+### P4：Runtime-Counterfactual（不在范围内）
 
 真实运行时 A/B。
 
-### P5：Regression-Validated
+### P5：Regression-Validated（不在范围内）
 
 跨场景、Quality、平台无回归。
 
-当前默认完整 Optimizer 至少应争取 P3。
+完成条件要求至少 P3（见 12.12）。
 
 ---
 
@@ -3599,6 +3482,8 @@ Measured Replay Gain
 Projected Runtime Gain
 Unvalidated Engine Opportunity
 ```
+
+R 类与 E 类动作不在调查内执行，只作为建议写入报告，并标明未验证。
 
 ---
 
@@ -3656,23 +3541,19 @@ Unvalidated Engine Opportunity
 
 单次 Timing 不构成 Evidence。
 
-推荐：
+协议是 A-B-A：
 
 ```text
 Warm-up
    ↓
-A Baseline Samples
+A  Baseline Samples
    ↓
-B Variant Samples
+B  Variant Samples
    ↓
-A Baseline Recheck
+A  Restored（回到 Baseline 后复测）
 ```
 
-或：
-
-```text
-A B A B A B
-```
+噪声使单轮不足以判定时，重复该序列（A-B-A-B-A-B）。
 
 记录：
 
@@ -3737,52 +3618,50 @@ LocalGain
 - Local Replay Gain；
 - Frame-level Estimated Range；
 - Critical Path Assumption；
-- Runtime Validation Requirement；
+- Runtime 未验证说明；
 - Confidence。
 
 ---
 
 ## 12.12 Optimizer 完成条件
 
-### Complete
+### `completed`
 
 - Frame Breakdown；
 - Top Cost Location；
 - Mechanism 达到支持等级；
-- 至少一个 Counterfactual Experiment；
+- 至少一个 P3（Replay-Counterfactual）实验，已回滚并验证基线恢复；
 - Timing 高于 Noise；
 - Visual Regression 已检查；
 - Scope 与 Verification Ceiling 明确；
-- Skeptic 无 Blocker。
+- Verifier 读过当前版本的原始证据，没有开放的 Challenge。
 
-### Partial
+### `partial`
 
-- 已定位 Cost Location；
-- 给出强 Mechanism；
-- 但缺少可执行 Experiment。
+- 已定位 Cost Location，有强 Mechanism，但缺少可执行的 Experiment，此时不能称为“已验证优化”；
+- 或 Replay 噪声过高、Counter 不足、多种 Limiter 无法区分。
 
-此时不能称为“已验证优化”。
-
-### Inconclusive
-
-- Replay 噪声过高；
-- Counter 不足；
-- 多种 Limiter 无法区分。
+逐项给出未决工作和恢复条件（见 5.7）。
 
 ---
 
-## 12.13 Optimizer 输出
+## 12.13 Optimizer 的交付物
 
 - Performance Model；
 - Frame Breakdown；
 - Bottleneck Report；
 - Experiment Record；
 - Before / After；
+- 未验证事项：Runtime 与跨场景收益不在范围内，作为限制写明。
+
+### 可沉淀的知识
+
+仅在用户要求时沉淀，经用户确认后进入知识库：
+
 - Optimization Case；
 - Optimization Pattern；
 - Budget Constraint；
-- Negative Result；
-- Runtime Validation Plan。
+- Negative Knowledge。
 
 ---
 
@@ -3810,6 +3689,8 @@ Optimizer investigates efficiency
 
 ## 13.2 模式之间的协作
 
+模式之间不自动切换。一个 Mission 发现另一类问题时可以建议，是否切换由用户决定。
+
 ### Debugger 使用 Analyzer
 
 - Pass Graph；
@@ -3830,13 +3711,13 @@ Optimizer investigates efficiency
 
 - 标记 Suspicious Finding；
 - 保存 Evidence；
-- 建议启动 Debugger；
+- 建议用户启动 Debugger；
 
 而不是擅自把 Analyzer 任务改成 Debug Mission。
 
 ### Analyzer 发现性能问题
 
-同理，输出 Optimization Opportunity，不自动切换。
+同理，输出 Optimization Opportunity，建议用户切换到 Optimizer，不自动切换。
 
 ---
 
@@ -3856,9 +3737,11 @@ Optimizer investigates efficiency
 
 ## 14.1 报告不是事实真源
 
-报告是 Investigation State 的 View。
+报告是 Investigation State 的 View，记录与报告的对应见 0.2。
 
-最终 Claim、Evidence、Experiment、Artifact 和 Knowledge Patch 应先确定，再生成报告。
+最终 Claim、Evidence、Experiment 和 Artifact 先确定，再生成报告。
+
+General 就地交付写清结论、证据、验证覆盖与未决项；正式报告由 Mission 在用户切回评估时产出，或按需委托 Report Writer。报告不是 General 完成的前置条件。
 
 Visual Design Skill 只能改变：
 
@@ -3889,9 +3772,9 @@ Visual Design Skill 只能改变：
 - Evidence；
 - Claims；
 - Experiments；
-- Skeptic Challenges；
+- Verifier Challenges；
 - Limitations；
-- Knowledge Patch；
+- Knowledge Candidate（仅在用户要求时）；
 - Artifact Index。
 
 ### Debugger
@@ -3900,7 +3783,7 @@ Visual Design Skill 只能改变：
 - First Bad Event；
 - Root Cause；
 - Counterfactual；
-- Fix。
+- 回放内验证过的修复方向。
 
 ### Analyzer
 
@@ -3954,16 +3837,15 @@ Visual Design Skill 只能改变：
 
 每个关键结论带一个短标签，正文不再重复限定语：一条结论一个标签，不写成段的免责说明。
 
-每个关键结论应带：
-
 ```text
 Observed
 Derived
 Inferred
 Replay-Validated
-Runtime-Validated
 Unresolved
 ```
+
+标签与 Verification Level（7.3）的对应：Observed = Observed；Derived = Reconstructed；Replay-Validated = Differential-Supported 或 Replay-Counterfactual（因果结论须为后者）；Inferred 与 Unresolved 没有对应的验证等级，由 Claim 类型与 Confidence 表达。
 
 Optimizer 必须明确：
 
@@ -3979,163 +3861,9 @@ Reconstructed Model ≠ Original Authoring Model
 
 ---
 
-# 15. Evaluation、Benchmark 与质量体系
+# 15. 评价
 
-## 15.1 评价方法
-
-Agent Evaluation 不应只看最终文案。
-
-应组合：
-
-- Code-based Grader；
-- Model-based Grader；
-- Human SME；
-- End-state Evaluation。
-
-Anthropic 的 Agent Eval 实践同样建议组合确定性检查、模型评分和人工审核，并根据任务选择 Outcome 或 Transcript 评价。
-
----
-
-## 15.2 Debugger 指标
-
-- Root Cause Accuracy；
-- First Bad Event Accuracy；
-- Evidence Precision；
-- Evidence Recall；
-- Counterfactual Validity；
-- Alternative Hypothesis Coverage；
-- False Driver Blame Rate；
-- Loop Count；
-- Tool Cost；
-- Expert Acceptance。
-
----
-
-## 15.3 Analyzer 指标
-
-- Pass Segmentation Precision / Recall；
-- Pass Hierarchy Accuracy；
-- Resource Edge Precision / Recall；
-- Shader Family Clustering；
-- Semantic Label Accuracy；
-- Trace Completeness；
-- Trace Correctness；
-- Unknown Calibration；
-- Cross-Capture Match Accuracy；
-- Architecture Model Coverage。
-
----
-
-## 15.4 Optimizer 指标
-
-- Top Cost Localization；
-- Limiter Accuracy；
-- Mechanism Accuracy；
-- Experiment Reproducibility；
-- Predicted vs Measured Gain；
-- False Positive Optimization；
-- Visual Regression Detection；
-- Runtime Transfer Error；
-- Critical Path Accuracy；
-- Noise Handling。
-
----
-
-## 15.5 Knowledge Engine 指标
-
-- Retrieval Precision；
-- Retrieval Recall；
-- Scope Match；
-- Stale Knowledge Detection；
-- Conflict Preservation；
-- Promotion Precision；
-- Knowledge-caused Error Rate；
-- Effective Knowledge Usage；
-- Procedure Success Rate；
-- Negative Knowledge Reuse。
-
----
-
-## 15.6 Context Engineering 指标
-
-- Token / Successful Task；
-- Critical Omission；
-- Stale Context；
-- Duplicate Context；
-- Compact Retention；
-- State Mismatch；
-- Rehydration Success；
-- Small Loop Repetition；
-- Big Loop Recovery；
-- Sub-Agent Result Loss。
-
----
-
-## 15.7 Benchmark 数据集
-
-### Synthetic Ground Truth
-
-人工构造：
-
-- NaN；
-- Precision Overflow；
-- Resource Hazard；
-- Wrong Blend；
-- Texture Format；
-- Overdraw；
-- Shader Loop；
-- Sample Redundancy；
-- Known Pass Graph。
-
-### Historical Cases
-
-来自真实：
-
-- BugCard；
-- Invariant；
-- SOP；
-- Optimization；
-- Human Debug Report。
-
-### Real Project Capture
-
-包括：
-
-- 无 Debug Tag；
-- 人工 Pipeline Structure Ground Truth；
-- Feature Variants；
-- Platform Variants；
-- Quality Variants。
-
-### Adversarial Cases
-
-- 模糊现象；
-- 多 Root Cause；
-- Capture Corruption；
-- Unsupported Shader Debug；
-- Async Compute；
-- Stale Knowledge；
-- 错误人工知识；
-- Web Prompt Injection；
-- Noisy Timing；
-- Shader Patch State Pollution。
-
----
-
-## 15.8 End-state Evaluation
-
-由于 Shader Replace 与 Knowledge Update 会改变持久状态，评估重点应放在最终状态：
-
-- Baseline 是否恢复；
-- Knowledge 是否被错误修改；
-- Evidence 是否来自正确状态；
-- 报告是否与最终 Claim 一致；
-- Artifact 是否可复现；
-- Task 是否真正达到成功条件。
-
----
-
-## 15.9 自主性与泛化的判定
+## 15.1 自主性与泛化的判定
 
 短症状是正常入口。用户不需要提供 Event ID、Shader ID、Tool 顺序或 Root Cause 提示。
 
@@ -4160,11 +3888,47 @@ Anthropic 的 Agent Eval 实践同样建议组合确定性检查、模型评分�
 
 ---
 
+## 15.2 观察指标
+
+以下是评价时要看的内容，不是通过门槛。
+
+- Debugger：Root Cause 与 First Bad Event 是否正确，Evidence 是否精确完整，Counterfactual 是否有效，替代 Hypothesis 是否被处理，是否误怪驱动；
+- Analyzer：Pass 分段与层级、Resource Edge、语义标签是否准确，Trace 是否完整正确，Unknown 是否校准，跨 Capture 匹配是否正确；
+- Optimizer：Top Cost 定位，Limiter 与 Mechanism 判断，实验可复现性，预测与实测收益的差距，视觉回归检出，Noise 处理；
+- Knowledge：检索是否命中并匹配 Scope，冲突是否保留，知识是否改变了决策；
+- Context：关键信息是否丢失，是否出现过期或重复的 Context，压缩后保留了什么，内部 Agent 的成果是否丢失。
+
+---
+
+## 15.3 评价材料
+
+评价材料是用户提供的真实 Capture 及其已知的结论。合成材料与对抗材料可选：合成材料检验机制和边界，对抗材料检验模糊现象、多 Root Cause、Capture 损坏、不支持的 Shader Debug、Async Compute、过期或错误的知识、Web Prompt Injection、噪声 Timing 与 Patch 状态污染。不建立数据集。
+
+---
+
+## 15.4 终态检查
+
+评价组合确定性检查、模型评分和人工审核。Shader Replace 会改变回放状态，评价重点放在最终状态：
+
+- Baseline 是否恢复；
+- Evidence 是否来自正确状态；
+- 报告是否与最终 Claim 一致；
+- Artifact 是否可复现；
+- Task 是否真正达到成功条件。
+
+---
+
+## 15.5 通过的定义
+
+一次调查通过，当且仅当主线五步——锚定 → 首次异常 → 区分 → 因果 → 核验——每一步都在调查记录里留有依据，并且用户确认结论正确。
+
+---
+
 # 16. 冷启动方案
 
 ## 16.1 冷启动资产
 
-初始 Knowledge 来源：
+初始 Knowledge 的来源由用户导入：
 
 1. 现有 Bug Case；
 2. Existing Invariant；
@@ -4174,18 +3938,17 @@ Anthropic 的 Agent Eval 实践同样建议组合确定性检查、模型评分�
 6. RenderDoc Tool Description；
 7. 项目知识；
 8. 人工 Rendering Structure；
-9. 通用 Graphics Knowledge；
-10. 合成 Benchmark。
+9. 通用 Graphics Knowledge。
 
 ---
 
 ## 16.2 真实项目 Rendering Structure 的价值
 
-人工分析出的无 Debug Tag Pipeline 版图同时承担：
+用户人工分析出的无 Debug Tag Pipeline 版图，经用户确认后同时承担：
 
 ### Ground Truth
 
-评价 Analyzer。
+评价 Analyzer（见第 15 章）。
 
 ### Seed Architecture Model
 
@@ -4210,73 +3973,9 @@ Anthropic 的 Agent Eval 实践同样建议组合确定性检查、模型评分�
 
 ---
 
-## 16.3 冷启动步骤
+## 16.3 合成 Knowledge 的规则
 
-### Step 1：资产盘点
-
-识别：
-
-- 哪些是事实；
-- 哪些是人类判断；
-- 哪些已验证；
-- 哪些仅为经验。
-
-### Step 2：标准化
-
-统一转换为：
-
-- Fact；
-- Constraint；
-- Pattern；
-- Procedure；
-- Case；
-- Model。
-
-### Step 3：Scope 标注
-
-标记：
-
-- Project；
-- API；
-- Platform；
-- GPU；
-- Engine；
-- Version。
-
-### Step 4：Evidence Link
-
-能链接到 Capture 的必须链接。
-
-不能链接的知识标记为 Human-authored。
-
-### Step 5：Seed Agent Card
-
-为 Planner 和 Specialist 生成高密度视图。
-
-### Step 6：Benchmark
-
-运行：
-
-- Debug；
-- Analyze；
-- Optimize；
-
-三类基准。
-
-### Step 7：人工校准
-
-重点检查：
-
-- Analyzer 过度推断；
-- Optimizer 假瓶颈；
-- Knowledge Scope 过宽；
-- Compact 丢失关键信息。
-
----
-
-## 16.4 合成 Knowledge 的规则
-
-缺少真实资产时，可以生成冷启动示例，但必须标记：
+缺少真实资产时，经用户确认可以生成冷启动示例，但必须标记：
 
 ```text
 Synthetic
@@ -4289,11 +3988,20 @@ Not Project Ground Truth
 
 ---
 
-## 16.5 历史案例导入归一化
+## 16.4 历史案例导入归一化
 
-历史 Debug Case 服务冷启动，是可选的 Candidate 原料，不是已验证的 Knowledge，也不会自动成为 Candidate。
+历史 Debug Case 服务冷启动，是可选的 Candidate 原料，不是已验证的 Knowledge，也不会自动成为 Candidate。导入由用户发起并确认。
+
+### 导入步骤
+
+1. 资产盘点：区分事实、人类判断、已验证与仅为经验；
+2. 标准化：转换为 Fact、Constraint、Pattern、Procedure、Case、Model 之一；
+3. Scope 标注：Project、API、Platform、GPU、Engine、Version；
+4. Evidence Link：能链接到 Capture 的必须链接，不能链接的标记为 Human-authored；
+5. 用户校准：重点检查 Analyzer 过度推断、Optimizer 假瓶颈、Scope 过宽、压缩丢失关键信息。
 
 ### 摄入边界
+
 
 - 只接受显式指定的 case 文件及其声明的附件闭包；拒绝 `.rdc`、可执行文件、SVG、目录扫描和闭包外路径。
 - 附件按内容哈希寻址入库，绝对路径不入库；源文件名匿名化为稳定的内容 ID，原文件名不进仓库和卡片正文。
@@ -4323,164 +4031,20 @@ Claim、Scope 与 Exclusions、Symptoms、Evidence、Root Cause、Experiment 与
 
 ---
 
-# 17. 实施路线与 Codex 落地原则
+# 17. 落地原则
 
-## 17.1 Release 目标
+三种 Mission 同时完整，不等于三条线各写一套：它们共享同一套调查基础。
 
-第一版产品范围同时包含：
+- 以现有仓库为真源，先理解再修改；本书的对象是领域语义，不为对应本书而新建同名的类或文件，目标是语义一致。
+- 不新建与现有平台并行的第二套平台；复用现有的 Tasks、Artifacts 与权限。
+- 代码、Skill 与 Knowledge 里不写针对某个案例的逻辑。
+- 新机制有测试，Context、Knowledge 与 Experiment 可审计；不为“架构一致”引入没有实际价值的中间层。
+- 改动在真实 Capture 上验证，构建通过或 Schema 合法不替代真实运行。
+- 除非真源证明无法渐进演化，不做大规模重写。
 
-- Debugger；
-- Analyzer；
-- Optimizer。
+接入新的 Backend（PIX、Nsight Graphics、Xcode Metal Debugger、AGI、Snapdragon Profiler、Mali 工具）按实际价值进行：先扩展 Evidence Capability，不重写 Mission 逻辑。
 
-但实现顺序仍应遵循依赖关系。
-
-“同时完整”不等于“三条线各写一套”。
-
----
-
-## 17.2 Phase 0：读取仓库真源
-
-Codex 必须先阅读：
-
-- Agent Platform；
-- 现有 Debugger `agent.md`；
-- Sub-Agent；
-- Skill；
-- Hook；
-- Tasks API；
-- Handoff；
-- Compact；
-- Runtime Context；
-- `rdc-cli`；
-- Knowledge 目录；
-- Report 产物。
-
-输出：
-
-- 现有能力图；
-- 可复用组件；
-- 缺口；
-- 迁移计划；
-- 不应改变的兼容边界。
-
----
-
-## 17.3 Phase 1：抽取共享调查基础
-
-在不破坏 Debugger 的前提下统一：
-
-- Evidence；
-- Artifact；
-- World State；
-- Experiment；
-- Challenge；
-- Mission Checkpoint；
-- Context Capsule；
-- Knowledge 引用。
-
-不要求新建与本设计同名的类或文件。
-
-目标是语义一致。
-
----
-
-## 17.4 Phase 2：Context 与 Knowledge
-
-完成：
-
-- Task-specific Context；
-- Iteration Memory；
-- Big Loop Checkpoint；
-- Artifactization；
-- Knowledge Types；
-- Scope；
-- Version；
-- Retrieval；
-- Knowledge Patch；
-- Human Edit；
-- Conflict。
-
----
-
-## 17.5 Phase 3：Analyzer 与 Optimizer 并行建设
-
-### Analyzer
-
-- Pass Graph；
-- Resource Version；
-- Shader Fingerprint；
-- Trace；
-- Cross-Capture；
-- Architecture Model。
-
-### Optimizer
-
-- Timing Baseline；
-- Frame Breakdown；
-- Cost Mechanism；
-- Experiment；
-- Replay Benchmark；
-- Visual Regression。
-
----
-
-## 17.6 Phase 4：统一验证与报告
-
-完成：
-
-- Skeptic Challenge；
-- Developer Report；
-- Executive Visual Report；
-- Artifact Manifest；
-- Evaluation Harness；
-- Benchmark Corpus。
-
----
-
-## 17.7 Phase 5：知识自进化
-
-完成：
-
-- Distillation；
-- Candidate；
-- Conflict；
-- Promotion；
-- Negative Knowledge；
-- Procedure Metrics；
-- Knowledge Usage Trace。
-
----
-
-## 17.8 Phase 6：Backend 扩展
-
-根据实际价值接入：
-
-- PIX；
-- Nsight Graphics；
-- Xcode Metal Debugger；
-- AGI；
-- Snapdragon Profiler；
-- Mali 工具。
-
-先扩展 Evidence Capability，不重写 Mission 逻辑。
-
----
-
-## 17.9 Codex 实现约束
-
-负责落地的 Codex 必须遵守：
-
-1. 现有仓库是真源；
-2. 先理解再修改；
-3. 优先复用现有 Debugger；
-4. 不要求平台适配外部虚构 Schema；
-5. 本设计中的对象是领域语义，不一定是一对一代码类型；
-6. 不进行大规模重写，除非真源证明无法渐进演化；
-7. 所有迁移需要兼容旧 Debugger；
-8. 新机制必须有测试；
-9. Context、Knowledge 与 Experiment 必须可审计；
-10. 不允许为了“架构一致”引入无实际价值的中间层。
+执行计划见 `docs/workflows/vertical-investigation-convergence.md`。
 
 ---
 
@@ -4510,7 +4074,7 @@ Codex 必须先阅读：
 ## 18.4 Shader Ablation 被当作正式优化
 
 **风险：** Compiler 删除大量上游逻辑，收益不可落地。  
-**防护：** Diagnostic、Semantic-preserving、Quality Trade-off 分级。
+**防护：** Diagnostic、Semantic-preserving、Quality Trade-off 分级；动作按 C / R / E 分类（12.7），只有 C 类在回放内实验，R、E 类只作建议并标明未验证。
 
 ---
 
@@ -4531,28 +4095,28 @@ Codex 必须先阅读：
 ## 18.7 Compact 提升推断等级
 
 **风险：** “可能”被压缩成“确定”。  
-**防护：** Claim Type 与 Verification Level 必须保留。
+**防护：** Claim Type 与 Verification Level 必须保留，记录对应见 0.2。
 
 ---
 
 ## 18.8 Multi-Agent 共享 RDC 冲突
 
 **风险：** 多 Agent 修改同一个 Replay State。  
-**防护：** Live RDC 串行，Offline Artifact 并行。
+**防护：** Live RDC 只由 General 串行操作，内部 Agent 只读离线 Artifact。
 
 ---
 
 ## 18.9 Knowledge Poisoning
 
 **风险：** 一次误判成为长期 SOP。  
-**防护：** Candidate、Scope、Promotion、Conflict、Negative Usage。
+**防护：** 用户批准、Provenance、Scope、retire。
 
 ---
 
 ## 18.10 Confirmation Bias
 
 **风险：** Knowledge Retrieval 全部支持当前 Hypothesis。  
-**防护：** Contradiction Injection 与独立 Skeptic。
+**防护：** Contradiction Injection；Verifier 在独立 Context 中读原始证据。
 
 ---
 
@@ -4563,30 +4127,44 @@ Codex 必须先阅读：
 
 ---
 
-## 18.12 Benchmark 过拟合
+## 18.12 对已知案例过拟合
 
-**风险：** Agent 记住固定案例。  
-**防护：** Synthetic、Historical、Real、Adversarial、Hidden Set。
+**风险：** Agent 记住已知案例的特征，在新问题上套用。  
+**防护：** 修复与方法必须与案例无关；由用户用未参与调整的案例检验。
 
 ---
 
 ## 18.13 Cost 失控
 
-**风险：** 所有 Task 都启动昂贵 Sub-Agent。  
+**风险：** 所有 Task 都启动昂贵的内部 Agent。  
 **防护：**
 
 - 仅在 Context 隔离有价值时委托；
 - Knowledge Retrieval 优先 Tool；
 - Offline 并行只用于高价值工作；
-- 记录 Token、Tool、Loop 与 Information Gain。
+- Task 根预算约束整棵委派树，耗尽时 `budget_paused` 并写 Checkpoint（5.7）。
 
 ---
 
-## 18.14 未授权 Capture
+## 18.14 锚定失败
+
+**风险：** 对象没有锚定就开始找原因，后续每一步都建立在错误的对象上。  
+**防护：** 先锚定（10.4）；锚点仅为候选时，结论最高为 `partial`。
+
+---
+
+## 18.15 回放故障被当成调查结论
+
+**风险：** 回放崩溃或断连被写成“无法取证”。  
+**防护：** 崩溃、断连不等于无法取证；受控恢复后继续原计划（7.7）。
+
+---
+
+## 18.16 未授权 Capture
 
 RenderDoc 官方明确将其定位为调试自行开发程序的工具。
 
-系统应要求：
+系统要求：
 
 - Capture 来源合法；
 - 项目授权；
@@ -4601,26 +4179,29 @@ RenderDoc 官方明确将其定位为调试自行开发程序的工具。
 ## 19.1 系统级
 
 - 一个 Agent Platform；
-- 三个 Planning Orchestrator；
-- 一个 Execution Orchestrator 机制；
+- 四个用户入口：General，以及 Debugger、Analyzer、Optimizer 三个 Mission；
+- 八个内部 Agent，其余领域职责由 Skill 承载；
 - 一套 Tasks API；
 - 一套 Context Engineering；
 - 一套 Evidence / Experiment；
 - 一个 Knowledge Engine；
-- 三类 Mission；
-- 统一 Report 与 Evaluation。
+- 统一的报告与评价：报告由 Mission 在用户切回评估时产出，或按需委托 Report Writer（5.7、14.1）；评价见第 15 章。
 
 ---
 
 ## 19.2 Debugger
 
+满足 10.6 的 `completed` 条件：
+
 - 可从现象形成 Plan；
-- 可确立 Symptom Anchor；
-- 可定位 First Bad Event；
-- 可建立 Root Cause；
-- 可完成 Counterfactual；
-- 可通过 Skeptic；
-- 可生成 Debug Case 和 Report。
+- Symptom Anchor 已确立（用户确认或两条路径互相印证）；
+- First Bad Event 已定位；
+- Root Cause 已拆分，替代 Hypothesis 已处理；
+- 至少一个 Counterfactual：干预后结果恢复，撤销后回到 baseline；
+- Scope 明确；
+- Verifier 读过当前版本的原始证据，没有开放的 Challenge。
+
+不满足时按 `partial` 收口，逐项给出未决工作。Debug Case 仅在用户要求时沉淀。
 
 ---
 
@@ -4631,7 +4212,8 @@ RenderDoc 官方明确将其定位为调试自行开发程序的工具。
 - 高频 Shader Block 可聚类；
 - Pixel / Resource Trace 可用；
 - Observed / Inferred 分离；
-- 可增量形成 Architecture Model。
+- 可增量形成 Architecture Model；
+- Verifier 无结构性 Blocker。
 
 ---
 
@@ -4640,20 +4222,21 @@ RenderDoc 官方明确将其定位为调试自行开发程序的工具。
 - 生成 Frame Breakdown；
 - 定位 Top Cost；
 - 解释 Mechanism；
-- 完成至少一个 Replay Experiment；
+- 完成至少一个 P3 Replay Experiment，已回滚；
 - 统计结果高于 Noise；
 - 检查视觉差异；
-- 明确验证上限和 Runtime 风险。
+- 明确验证上限，Runtime 与跨场景收益作为限制写明。
 
 ---
 
 ## 19.5 Context
 
-- 每个 Sub-Agent 只获得 Task-relevant Context；
+- 每个内部 Agent 只获得 Task-relevant Context；
 - 原始 Artifact 可恢复；
 - Small Loop 不重复完整历史；
 - Big Loop 能通过 Mission Checkpoint 恢复；
-- Patch 后旧 Evidence 不会错误复用。
+- Patch 后旧 Evidence 不会错误复用；
+- 回放现场恢复有回执。
 
 ---
 
@@ -4661,199 +4244,163 @@ RenderDoc 官方明确将其定位为调试自行开发程序的工具。
 
 - 六类 Knowledge 可统一管理；
 - Scope 多轴表达；
-- Agent 与人类均可编辑；
+- 人类可编辑，Agent 只提议；
 - 冲突不静默覆盖；
-- Promotion 有规则；
+- 晋升由用户确认，不自动晋升；
 - Negative Knowledge 可检索；
-- 每条知识可追溯到来源。
+- 每条知识可追溯到来源；
+- 评价方法与通过的定义见第 15 章。
 
 ---
 
 # 20. 附录：关键语义对象示例
 
-以下示例只表达领域语义，不规定 Agent Platform 必须采用 YAML、JSON、类或特定目录。
+字段名与 `src/shared/types` 及 `src/main/knowledge` 中的实现一致，取值为通用示意。
 
 ---
 
 ## A. Delegation Context Capsule
 
+对应 `DelegationCapsule`（`src/shared/types/delegationCapsule.ts`）。
+
 ```yaml
-mission:
-  type: optimize
-  goal: identify primary cost mechanism
-
-task:
-  target: lighting shader
-  reason: dominant event group in frame breakdown
-
-accepted_facts:
-  - lighting pass contributes 31% of replay critical path
-  - target shader executes at full resolution
-
-active_hypotheses:
-  - repeated texture sampling is dominant
-  - register pressure may hide texture latency
-
-rejected:
-  - excessive draw call count
-  - reason: pass contains one fullscreen draw
-
-world_state:
-  capture: CAP-01
-  patch: baseline
-  replay_environment: ENV-02
-
-artifacts:
-  - shader_ir
-  - compiler_statistics
-  - timing_samples
-  - framebuffer
-
-knowledge:
-  - texture-cost-pattern
-  - fullscreen-lighting-optimization-procedure
-
-required_output:
-  - block-level cost hypotheses
-  - supporting evidence
-  - experimental patch candidates
-  - unresolved mechanisms
+goal: 找出目标 Pass 的主要成本机制
+task: 分析该 Pass 的主 Shader，区分采样成本与寄存器压力
+scope: 当前 Capture 的光照 Pass；不修改任何 Shader
+acceptedFacts:
+  - statement: 该 Pass 占回放关键路径的 31%
+    sourceRefs: [session://investigation/evidence-timing-01.json]
+    qualification: 回放内 Timing，中位数，噪声已测
+hypotheses:
+  - 重复纹理采样是主要成本
+  - 寄存器压力掩盖了纹理延迟
+challengeRefs: []
+negativePaths:
+  - path: 绘制调用数量过多
+    reason: 该 Pass 只有一次全屏绘制
+    applicableWhen: 全屏 Pass
+    recheckWhen: Pass 拆分方式改变
+inputArtifactRefs:
+  - session://investigation/evidence-shader-ir-01.json
+  - session://investigation/evidence-compiler-stats-01.json
+outputRequirements: 给出块级成本假设、支撑证据、候选实验与未决机制
+stopConditions:
+  - 两个假设都有可比较的读数
+  - 缺少所需材料时说明缺口并停止
+requiredSkillIds: [shader-ir-analysis]
+budget:
+  maxToolCalls: 40
+  maxWallTimeMs: 600000
+  maxSubagents: 0
+profile: shader-analyst
 ```
 
 ---
 
 ## B. Mission Checkpoint
 
+对应 `MissionCheckpoint`（`src/shared/types/renderdocInvestigation.ts`）。
+
 ```yaml
-goal:
-  diagnose character skin color anomaly
-
-current_plan:
-  version: 3
-
+checkpointId: ckpt-03
+goal: 定位目标区域出现非有限值的原因
+planVersion: plan-v3
 established:
-  - anomaly first appears in lighting pass
-  - source texture is normal
-  - first non-finite value appears in lighting multiplication
-
+  - claim-02：异常首先出现在光照 Pass
+  - claim-03：输入纹理读数正常
 rejected:
-  - texture corruption
-  - blend state error
-
-completed_experiments:
-  - full FP32 replacement
-  - targeted precision fence
-
-open_challenges:
-  - verify that codegen change is not sole cause
-
-reason_for_replan:
-  original plan assumed texture decode failure
-
-current_world_state:
-  baseline restored
-
-critical_artifacts:
-  - pixel_trace
-  - shader_ir_diff
-  - before_after_images
-
-unresolved_frontier:
-  - driver-specific lowering scope
+  - claim-04：纹理数据损坏
+  - claim-05：混合状态错误
+completedExperiments:
+  - exp-01
+  - exp-02
+openChallenges:
+  - chal-02：尚未排除编译器代码生成变化是唯一原因
+reasonForReplan: 原计划假设纹理解码失败，证据已将其排除
+currentWorldStateId: ws-restored-02
+criticalArtifactRefs:
+  - session://investigation/evidence-pixel-history-01.json
+  - session://investigation/evidence-shader-diff-01.json
+unresolvedFrontier: 驱动相关的降级范围尚未确定
 ```
 
 ---
 
-## C. Canonical Knowledge Record
+## C. Knowledge Card
 
-```yaml
-type: pattern
-title: FP16 HDR Intermediate Overflow
+对应 `KnowledgeCardRecord`（`src/shared/types/knowledge.ts`），存为带 frontmatter 的 Markdown，字段由 `knowledgeCardSchema` 校验。
 
-summary:
-  relaxed precision on an HDR lighting path can produce non-finite
-  intermediate values when the numerical range exceeds FP16.
+```markdown
+---
+cardId: "user:patterns/fp16-hdr-intermediate-overflow.md"
+type: "pattern"
+lifecycle: "verified"
+title: "FP16 HDR 中间量溢出"
+scope: {"pipelineStage":"lighting","shaderFamily":"deferred-lighting","exclusions":{"shaderFamily":["编译器保留 FP32 的变体"]}}
+relations: [{"kind":"contradicts","targetCardId":"user:cases/bounded-lighting-case.md"}]
+---
 
-scope:
-  stage: lighting
-  precision: fp16
-  api: any
-  gpu: unspecified
+# FP16 HDR 中间量溢出
 
-preconditions:
-  - HDR intermediate
-  - actual FP16 lowering
-  - value range exceeds finite FP16
+HDR 光照路径上的 relaxed precision，在数值范围超过 FP16 时可能产生非有限的中间值。
 
-exclusions:
-  - compiler retains FP32
-  - value range remains bounded
+## 适用条件
 
-evidence:
-  - debug-case-021
-  - experiment-044
+- 中间量为 HDR；
+- 实际发生 FP16 降级；
+- 数值范围超过 FP16 的有限范围。
 
-verification:
-  level: replay-counterfactual
+## 不适用条件
 
-relations:
-  - violates: finite-value-constraint
-  - recommends: precision-fence-procedure
-  - contradicted_by: bounded-lighting-case
-
-lifecycle:
-  status: verified
+- 编译器保留 FP32；
+- 数值范围保持有界。
 ```
 
 ---
 
 ## D. Optimization Experiment
 
+对应 `ExperimentRecord`（`src/shared/types/renderdocInvestigation.ts`）。
+
 ```yaml
-hypothesis:
-  repeated shadow texture samples dominate target shader cost
-
-baseline:
-  world_state: CAP-01/BASELINE
-
+experimentId: exp-07
+hypothesisClaimId: claim-11
 intervention:
-  replace repeated samples with one reused sample
-
-controlled:
-  - capture
-  - event
-  - resolution
-  - pipeline state
-
+  type: shader_replace
+  payload: {description: 将重复的阴影采样替换为一次复用采样}
+baselineWorldStateId: ws-baseline-01
+variantWorldStateId: ws-variant-01
+restoredWorldStateId: ws-restored-01
+controlledVariables: [capture, event, resolution, pipeline state]
+changedVariables: [shader]
 metrics:
-  - event timing
-  - shader instructions
-  - registers
-  - framebuffer difference
-
+  - {name: event_gpu_time, kind: timing, unit: ms}
+  - {name: instruction_count, kind: compiler_statistics}
 protocol:
-  warmup: required
-  sequence: A-B-A
-  statistic: median
-  noise_threshold: measured
-
+  kind: A-B-A
+  warmup: 5
+  noiseThreshold: 0.02
+visualValidation:
+  before: session://investigation/evidence-fb-before-01.json
+  after: session://investigation/evidence-fb-after-01.json
+  diff: session://investigation/evidence-fb-diff-01.json
+  region: 目标区域
 result:
-  local_replay_gain: 11%
-  frame_estimated_gain: 1.8% to 2.4%
-  visual_difference: none detected in target capture
-
-verification:
-  replay-counterfactual
-
-limitations:
-  runtime and cross-scene validation required
+  summary: 局部回放收益约 11%，整帧估计 1.8%–2.4%；目标 Capture 内未检出视觉差异
+  accepted: true
+rollback:
+  executed: true
+  baselineRestored: true
+  verifyEvidenceIds: [ev-31]
+actionClass: C
+status: rolled_back
 ```
 
 ---
 
 # 结论
 
-我将 RenderDoc Agent 的最终形态定义为：
+RenderDoc Agent 的最终形态：
 
 ```text
 One Agent Runtime
@@ -4862,10 +4409,9 @@ One Investigation State
 One Context Engineering System
 One Unified Knowledge Engine
 
-Three Explicit Missions:
-Debugger
-Analyzer
-Optimizer
+四个用户入口：
+General（执行）
+Debugger / Analyzer / Optimizer（Mission：只读规划）
 ```
 
 它的核心竞争力不只是“Agent 会使用 RenderDoc”，而是：
@@ -4873,14 +4419,14 @@ Optimizer
 1. 能从 Capture 中重建一个可解释的 Rendering World；
 2. 能把正确性问题转化为可验证的因果调查；
 3. 能把性能问题转化为可测量的 Intervention；
-4. 能让每个 Sub-Agent 只获得正确、足够、可恢复的 Context；
+4. 能让每个内部 Agent 只获得正确、足够、可恢复的 Context；
 5. 能让多轮 Verifier Loop 保留有效 Memory，而不是堆积 History；
-6. 能把一次任务沉淀为有 Scope、有 Evidence、有版本的组织知识；
+6. 能在用户要求时把一次调查沉淀为有 Scope、有 Evidence、有版本的候选知识，经用户确认后进入知识库；
 7. 能让人类理解、审核、修改和推翻 Agent 的任何结论；
 8. 能在缺少 Engine Source、Debug Tag 和项目知识时仍然工作；
-9. 能随真实项目与长期任务持续进化；
+9. 能随真实项目与长期任务积累：知识由用户确认后增长，不自动演化；
 10. 能在未来扩展到 PIX、Nsight、Xcode、AGI 等 Backend，而不推翻领域架构。
 
-最终系统不是三个 Agent 的简单拼接，而是一套完整的：
+最终系统不是几个 Agent 的简单拼接，而是一套完整的：
 
 > **Rendering Investigation Runtime + Capture World Model + Evidence & Experiment System + Context Compiler + Knowledge Engine。**
