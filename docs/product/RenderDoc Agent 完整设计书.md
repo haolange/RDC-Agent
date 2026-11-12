@@ -56,7 +56,7 @@
 
 ## 0.2 实现对应
 
-- 八种调查对象存放在同一套调查记录里（`rdc.investigation.v1`）。Hypothesis 是 Claim 的一种类型，Decision 内嵌于 Claim，不另建平台类型。字段定义以 `src/shared/types/renderdocInvestigation.ts` 和 `investigation_schema` 工具为准。
+- 八种调查对象存放在同一套调查记录里（`rdc.investigation.v1`）。认识等级有偏序 `unknown < inferred < derived < observed`，压缩、报告和视图不得抬高源结论的等级；因果结论必须绑定一个已回滚并验证的 Experiment。记录的版本取代、失效传播和各字段的合同由代码强制，摘要见 `ARCHITECTURE.md` 裁决 E。Hypothesis 是 Claim 的一种类型，Decision 内嵌于 Claim，不另建平台类型。字段定义以 `src/shared/types/renderdocInvestigation.ts` 和 `investigation_schema` 工具为准。
 - 领域字段不写入通用的 Task、Agent Profile 或会话消息；调查记录只引用 Task ID。
 - Coordinator 不是新的 Runtime，是 Profile 指令、Skill、Hook、通用 Task、调查记录和声明式交接的组合。
 - RenderDoc 能力经外部 CLI 提供。模型按需发现操作，不把整份目录展开成工具定义；手册知识不授予权限。
@@ -2669,6 +2669,15 @@ Report and Knowledge
 - Object side：对这些 Event，查看 Draw 实际覆盖的范围和内容，结合 Mesh、绑定的 Texture 与 Shader 判断它画的是什么。
 
 Image side 的区域落在 Object side 某个 Draw 的覆盖内，且该 Draw 的内容与用户描述的对象一致，锚点才算确立。
+
+**澄清是目标形成。** 先读可获取的材料，再用少量、渐进的问题确认区域、期望、参考和验收；允许用户回答不知道、跳过非必需问题或自由补充。回答进入计划和 Task 的修订；它是用户描述，不升级为工具观察、已验证的原因或修改授权。
+
+**用户材料。** 用户可以提供参考图、圈出的区域和对比条件，产品保留：
+
+- 原始附件及其内容哈希、用户意图、归一化的 ROI、文档位置、音视频的时间范围；
+- 比较组及每份材料的角色与条件（Before／Reference／After／Diff）。同一会话内分多条消息上传的同组材料一起对照展示，不跨会话聚合。
+
+Composer 里可以选择区域并补充描述，对话中可原位打开原图与条件。这些都是用户标注：派生视图不覆盖原图，人工示意图不标成 Capture 证据。存在引用不表示模型已经看见，需要实际读图。用户修订与工具事实分开保留；来源变化后，冻结的附件读取失败而不是静默换成新内容。
 
 **锚点的依据分三档：** 用户确认；两条路径互相印证；仅候选。锚点仍是"仅候选"时，First Bad Event、Hypothesis 区分和 Counterfactual 都没有成立的基础，此时下一步优先选择能确立或否定它的检查。对象或区域确有歧义且现有材料无法判定时，问用户一次，比长时间猜测更好。展示截图的尺寸可能不同于原生纹理，坐标以原生纹理为准。
 
