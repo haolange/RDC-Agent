@@ -42,6 +42,7 @@
 - `main / preload / renderer / shared` 联动：角色、阶段、IPC、共享类型的改动须同时核对 runtime 与 UI，并覆盖调用方、数据结构、序列化与配置、状态释放和配套测试。
 - 新路径替代旧路径时，同步处理入口、配置、类型、UI、测试和文档，旧路径**当场删除**。不保留 legacy／deprecated alias、兼容 shim、双写双读、平行实现或 feature flag。
 - 确实无法直接迁移时，说明具体约束并按用户明确决定执行，不自行留下双轨。
+- **转换已有数据**：只处理能可信映射的部分，先备份、预览、验证，再原子替换；正常运行只读新格式。历史签名、原始日志和原始记录不改写；无法可信转换的旧记录保留原件。
 
 ### 2.4 版本控制与环境红线
 
@@ -103,6 +104,8 @@
 | 发布配置 | 才执行 pack |
 
 行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。行数与分层由 ESLint `max-lines` / `no-restricted-imports` 执行。
+
+完整 gates 的历史比较需要基线：`RDC_SYSTEM_DEBT_BASE_REF=<本轮起点提交>`，secrets 与 diff 检查用 `RDC_DIFF_BASE` 指向同一提交；不指定时历史比较被跳过。Windows 上测试遇到系统 TEMP 的 rename 权限错误时，把 `TEMP`／`TMP`／`TMPDIR` 指到本轮自有的工作区临时目录，不放宽产品的路径检查。
 
 **Browser QA**：用 disposable `pnpm run start:agent-browser`，只消费一次 `/qa?qaBootstrap=...`，进入同源 `/app`。不直开 Vite，不把 token 留在 URL。high-impact 需要 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`。没有设备的 Remote／Android 验证记为阻塞，不以本地成功代替。
 
