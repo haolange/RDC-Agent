@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import type { AgentEvent } from '@shared/types/agentRuntime';
+import type { AgentAssistantDeltaPayload, AgentEvent } from '@shared/types/agentRuntime';
 import type { DelegationContentKind, DelegationContentPage, DelegationTraceHeader, DelegationTracePage, DelegationTraceStep } from '@shared/types/delegationTrace';
 import { finalizeTrace } from './ConversationWorkTrace';
 import { delegationTextPreview } from '@shared/utils/delegationTextPreview';
@@ -21,9 +21,8 @@ interface ActiveTrace {
   header: DelegationTraceHeader;
   projection: DelegatedProjectionState;
   blocks: Map<string, DelegationTraceStep>;
-  pendingDelta: string;
+  pendingDelta?: AgentEvent;
   pendingTimer?: ReturnType<typeof setTimeout>;
-  pendingTimestamp: number;
 }
 
 interface ParsedTrace {
@@ -164,13 +163,9 @@ function persistProjectedEvent(sessionId: string, record: ActiveTrace, target: s
 function flushDelta(sessionId: string, record: ActiveTrace, target: string): void {
   if (record.pendingTimer) clearTimeout(record.pendingTimer);
   record.pendingTimer = undefined;
-  const text = record.pendingDelta;
-  record.pendingDelta = '';
-  if (!text) return;
-  persistProjectedEvent(sessionId, record, target, {
-    id: `delta-${record.header.revision + 1}`, type: 'assistant.delta', timestamp: record.pendingTimestamp,
-    payload: { text } as AgentEvent['payload'],
-  });
+  const event = record.pendingDelta;
+  record.pendingDelta = undefined;
+  if (event) persistProjectedEvent(sessionId, record, target, event);
 }
 
 export const delegationTraceStore = {
@@ -189,7 +184,7 @@ export const delegationTraceStore = {
       invocationAvailable, total: 0, revision: 0, updatedAt: Date.now() };
     delete (header as DelegationTraceHeader & { invocation?: string }).invocation;
     const record: ActiveTrace = { identity: identity(header), header,
-      projection: createDelegatedProjectionState(), blocks: new Map(), pendingDelta: '', pendingTimestamp: 0 };
+      projection: createDelegatedProjectionState(), blocks: new Map() };
     active.set(key(sessionId, header.parentToolCallId), record);
     if (input.mode === 'background') activeExecutions.add(key(sessionId, header.parentToolCallId));
     append(target, { kind: 'start', header });
@@ -217,10 +212,15 @@ export const delegationTraceStore = {
     const target = location(sessionId, callId);
     if (!record || record.identity !== childIdentity || !target) return;
     if (event.type === 'assistant.delta') {
-      const chunk = (event.payload as { text?: string }).text;
-      if (!chunk) return;
-      record.pendingDelta += chunk;
-      record.pendingTimestamp = event.timestamp;
+      const payload = event.payload as AgentAssistantDeltaPayload;
+      if (!payload.text) return;
+      const previous = record.pendingDelta?.payload as AgentAssistantDeltaPayload | undefined;
+      if (previous && (JSON.stringify(previous.providerOutputRef) !== JSON.stringify(payload.providerOutputRef)
+        || previous.phase !== payload.phase)) flushDelta(sessionId, record, target);
+      if (record.pendingDelta) {
+        const queued = record.pendingDelta.payload as AgentAssistantDeltaPayload;
+        record.pendingDelta = { ...record.pendingDelta, payload: { ...queued, text: queued.text + payload.text } };
+      } else record.pendingDelta = event;
       if (!record.pendingTimer) {
         record.pendingTimer = setTimeout(() => flushDelta(sessionId, record, target), 120);
         record.pendingTimer.unref?.();

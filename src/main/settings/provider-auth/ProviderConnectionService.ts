@@ -200,10 +200,13 @@ export class ProviderConnectionService {
     }
   }
 
-  async refreshProviderModels(providerId: LlmProviderId): Promise<LlmProviderConnectionResult> {
+  async refreshProviderModels(providerId: LlmProviderId, scope?: { accountId: string; protocol: LlmProviderEntry['protocol'] }): Promise<LlmProviderConnectionResult> {
     try {
       const provider = this.getProvider(providerId);
       const request = buildEffectiveCatalogRequest(provider);
+      if (scope && (scope.accountId !== request.accountId || scope.protocol !== request.protocol)) {
+        throw new ProviderConnectionError('Provider account or protocol changed before refreshing.');
+      }
       const loader = this.createEffectiveCatalogDiscoveryLoader(request);
       if (!loader) throw new ProviderConnectionError('Provider is not configured for catalog discovery.');
       const snapshot = await effectiveCatalogService.refreshDiscovery(request, loader);

@@ -268,8 +268,8 @@ assert(
 assert(
   conversationTurnRunner.includes('turnHadAskPause')
     && conversationTurnRunner.includes('resolveStreamingOutputPhase')
-    && conversationTurnRunner.includes('syncVisibleResponseForStreaming'),
-  'terminal runner must stamp streaming outputPhase and gate bubble writes after ask pauses',
+    && fs.readFileSync(path.join(process.cwd(), 'src/main/conversation/ConversationTurnAgentEventHandler.ts'), 'utf8').includes('upsertLoopOutputItem'),
+  'terminal runner must retain pause boundaries and item-scoped streaming output',
 );
 const conversationStore = fs.readFileSync(
   path.join(process.cwd(), 'src/renderer/stores/conversationStore.ts'),

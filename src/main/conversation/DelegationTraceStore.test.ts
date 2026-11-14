@@ -21,6 +21,21 @@ const event = (type: AgentEvent['type'], payload: object, timestamp: number): Ag
   id: `event-${timestamp}`, type, timestamp, payload: payload as AgentEvent['payload'],
 });
 
+it('batches child text without combining distinct provider output items', () => {
+  fixture.root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-delegation-trace-'));
+  const identity = 'child\u0000\u0000';
+  delegationTraceStore.start('owner', { parentToolCallId: 'items', task: 'Inspect', profile: 'general',
+    mode: 'wait', childSessionId: 'child', invocation: '{}', status: 'running', startedAt: 1 });
+  const ref = (index: number) => ({ protocol: 'test', providerBlockKey: `text:${index}`, contentIndex: index });
+  delegationTraceStore.event('owner', 'items', identity, event('assistant.delta', { text: 'First', providerOutputRef: ref(0) }, 2));
+  delegationTraceStore.event('owner', 'items', identity, event('assistant.delta', { text: ' item', providerOutputRef: ref(0) }, 3));
+  delegationTraceStore.event('owner', 'items', identity, event('assistant.delta', { text: 'Second', providerOutputRef: ref(1) }, 4));
+  delegationTraceStore.event('owner', 'items', identity, event('assistant.text_end', { text: 'Second', providerOutputRef: ref(1) }, 5));
+  const page = delegationTraceStore.read('owner', 'items', 0, 40);
+  expect(page.steps[0].block.outputItems?.map((item) => item.text)).toEqual(['First item', 'Second']);
+  delegationTraceStore.finish('owner', 'items', identity, 'complete', 'Done');
+});
+
 it('stores a single owned child process with revision updates and separate final and parent receipt', () => {
   fixture.root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-delegation-trace-'));
   const id = 'child\u0000execution\u00001';

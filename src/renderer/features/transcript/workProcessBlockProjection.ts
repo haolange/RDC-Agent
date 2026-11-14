@@ -71,17 +71,36 @@ export function buildPresentationUnits(
 ): PresentationUnit[] {
   const units: PresentationUnit[] = [];
   const { t } = ctx;
+  const snapshotsByLoop = new Map<string, ConversationWorkBlock[]>();
+  const interactionsByLoop = new Map<string, ConversationWorkBlock[]>();
+  let previousLoop: string | undefined;
+  for (const block of blocks) {
+    if (block.kind === 'llm_turn') previousLoop = block.id;
+    if (block.kind === 'user_input' || block.kind === 'plan_review') {
+      const owner = block.parentLoopId;
+      if (owner && blocks.some((candidate) => candidate.kind === 'llm_turn' && candidate.id === owner)) {
+        interactionsByLoop.set(owner, [...(interactionsByLoop.get(owner) ?? []), block]);
+      }
+      continue;
+    }
+    if (block.kind !== 'task_snapshot') continue;
+    const owner = block.parentLoopId ?? previousLoop;
+    if (!owner || !blocks.some((candidate) => candidate.kind === 'llm_turn' && candidate.id === owner)) continue;
+    snapshotsByLoop.set(owner, [...(snapshotsByLoop.get(owner) ?? []), block]);
+  }
+  const groupedSnapshots = new Set([...snapshotsByLoop.values()].flat().map((block) => block.id));
+  const groupedInteractions = new Set([...interactionsByLoop.values()].flat().map((block) => block.id));
 
   for (let blockIndex = 0; blockIndex < blocks.length; blockIndex += 1) {
     const block = blocks[blockIndex];
 
     if (block.kind === 'llm_turn') {
-      const unit = projectLlmTurn(block, deps, ctx);
+      const unit = projectLlmTurn(block, deps, ctx, snapshotsByLoop.get(block.id), interactionsByLoop.get(block.id));
       if (unit) units.push(unit);
       continue;
     }
 
-    pushStandaloneBlock(block, units, deps, ctx);
+    if (!groupedSnapshots.has(block.id) && !groupedInteractions.has(block.id)) pushStandaloneBlock(block, units, deps, ctx);
     }
 
   const sources = new Map(blocks.map((block) => [block.id, block]));

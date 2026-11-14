@@ -63,6 +63,7 @@ import type {
   LlmProviderConnectionResult,
   LlmProviderDraftRequest,
   LlmProviderId,
+  LlmProviderProtocol,
   LlmModelCapabilityProbeRequest,
   LlmModelCapabilityProbeResult,
   ProviderDefinitionCommitSnapshot,
@@ -379,7 +380,7 @@ export interface ElectronAPI {
     testProviderDraft: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
     testModelCapability: (request: LlmModelCapabilityProbeRequest) => Promise<LlmModelCapabilityProbeResult>;
     connectProvider: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
-    refreshProviderModels: (providerId: LlmProviderId) => Promise<LlmProviderConnectionResult>;
+    refreshProviderModels: (providerId: LlmProviderId, scope?: { accountId: string; protocol: LlmProviderProtocol }) => Promise<LlmProviderConnectionResult>;
     disconnectProvider: (providerId: LlmProviderId) => Promise<LlmProviderConnectionResult>;
     startProviderAccountLogin: (request: LlmProviderAccountLoginStartRequest) => Promise<LlmProviderAccountStatus>;
     getProviderAccountStatus: (providerId: LlmProviderId) => Promise<LlmProviderAccountStatus>;

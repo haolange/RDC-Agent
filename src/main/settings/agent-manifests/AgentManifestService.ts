@@ -486,8 +486,7 @@ export class AgentManifestService {
         .filter((providerId): providerId is string => Boolean(providerId)),
       ...providers
         .filter((provider) => (
-          provider.catalogOwnership !== 'user-managed'
-          && provider.enabled
+          provider.enabled
           && provider.isConfigured
         ))
         .map((provider) => provider.id),
@@ -549,7 +548,7 @@ export class AgentManifestService {
             : status === 'model-unverified'
               ? missingVerifiedBudget
                 ? 'Model has no verified positive context budget and cannot be executed safely.'
-                : eligibility === 'unknown'
+                : eligibility === 'tools-unknown'
                   ? 'Native tool calling is not confirmed for this provider route, so the model is not an Agent-executable choice.'
                   : 'Model availability has not been verified for this account and route.'
               : undefined;
@@ -595,6 +594,7 @@ export class AgentManifestService {
       const snapshot = catalogs.find((catalog) => (
         catalog.providerId === provider.id
         && catalog.accountId === (provider.activeAccountId ?? `anonymous:${provider.id}`)
+        && catalog.protocol === provider.protocol
       ));
       for (const model of provider.models) {
         const canonicalId = canonicalAgentModelId(provider.id, model.id);

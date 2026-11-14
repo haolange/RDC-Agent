@@ -262,6 +262,7 @@ export async function completeProfileTurn(
   };
 
   const commitThinkingTrace = (workTrace: ConversationWorkTrace) => {
+    assistantMessage = { ...assistantMessage, workTrace };
     streamScheduler?.queueTrace({ workTrace });
   };
 
@@ -280,8 +281,6 @@ export async function completeProfileTurn(
   let loopHasTools = false;
   let pendingNewLoop = false;
   let currentLoopOutputPhase: ConversationLoopOutputPhase | undefined;
-  /** Once true for this turn, process commentary must not stream into the answer bubble. */
-  let turnHasProcessEvidence = false;
   /** After ask_user pause, subsequent assistant content must not reuse the ask commentary loop. */
   let turnHadAskPause = false;
   const pendingContinuation: ConversationLoopContinuationState = {
@@ -290,14 +289,10 @@ export async function completeProfileTurn(
     planReview: false,
     handoff: false,
   };
-  const markProcessEvidence = () => {
-    turnHasProcessEvidence = true;
-  };
   const markLoopCommentary = () => {
     // Commentary evidence is monotonic within a loop. Final-answer phase is
     // assigned only by assistant.completed after the stop reason is known.
     currentLoopOutputPhase = 'commentary';
-    markProcessEvidence();
   };
   const hasPendingContinuation = () => (
     pendingContinuation.approval
@@ -307,30 +302,6 @@ export async function completeProfileTurn(
   );
   const resolveStreamingOutputPhase = (): ConversationLoopOutputPhase | undefined => {
     return currentLoopOutputPhase;
-  };
-  const syncVisibleResponseForStreaming = () => {
-    const phase = resolveStreamingOutputPhase();
-    const thinkingInFlight = currentLoopThinkingStatus === 'streaming';
-    // Stream into the bubble only for clear finals — never while thinking/tools/ask are active.
-    if (
-      phase === 'final_answer'
-      && !thinkingInFlight
-      && !loopHasTools
-      && !hasPendingContinuation()
-    ) {
-      visibleResponse = currentLoopText;
-    } else if (
-      phase === undefined
-      && !turnHasProcessEvidence
-      && !loopHasTools
-      && !currentLoopThinking
-      && !hasPendingContinuation()
-      && !turnHadAskPause
-    ) {
-      visibleResponse = currentLoopText;
-    } else if (visibleResponse) {
-      visibleResponse = '';
-    }
   };
   let errorViewModel: ConversationTurnResult['errorViewModel'] = null;
   let llmDiagnostic: ConversationMessageDiagnostic | null = null;
@@ -347,7 +318,6 @@ export async function completeProfileTurn(
   Object.defineProperty(turnStreamState, 'loopSeq', { get: () => loopSeq, set: (value) => { loopSeq = value; } });
   Object.defineProperty(turnStreamState, 'pendingNewLoop', { get: () => pendingNewLoop, set: (value) => { pendingNewLoop = value; } });
   Object.defineProperty(turnStreamState, 'currentLoopOutputPhase', { get: () => currentLoopOutputPhase, set: (value) => { currentLoopOutputPhase = value; } });
-  Object.defineProperty(turnStreamState, 'turnHasProcessEvidence', { get: () => turnHasProcessEvidence, set: (value) => { turnHasProcessEvidence = value; } });
   Object.defineProperty(turnStreamState, 'turnHadAskPause', { get: () => turnHadAskPause, set: (value) => { turnHadAskPause = value; } });
   Object.defineProperty(turnStreamState, 'assistantMessage', { get: () => assistantMessage, set: (value) => { assistantMessage = value; } });
   Object.defineProperty(turnStreamState, 'errorViewModel', { get: () => errorViewModel, set: (value) => { errorViewModel = value; } });
@@ -459,8 +429,8 @@ export async function completeProfileTurn(
           onEvent: createAgentEventHandler({
             host, sessionId, input, agentLabel, turnStreamState,
             commitAssistantMessage, commitVisibleAssistantText, commitThinkingTrace,
-            beginAssistantContentLoop, markProcessEvidence, markLoopCommentary,
-            currentLoopId, resolveStreamingOutputPhase, syncVisibleResponseForStreaming,
+            beginAssistantContentLoop, markLoopCommentary,
+            currentLoopId, resolveStreamingOutputPhase,
             seenCompactionSummaries, showWorkTrace, withWorkTrace, recordProviderOutputRefs,
             currentLoopOptions, pendingContinuation,
             hasPendingContinuation: () => Boolean(hasPendingContinuation()),

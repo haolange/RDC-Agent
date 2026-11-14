@@ -549,7 +549,8 @@ export class AgentTurnRunner {
           hasPendingContinuation: { handoff: Boolean(turnHandle.pendingHandoff) },
         });
         canonicalFinalAnswerText = turnHandle.isLive(turnGeneration) && outputPhase === 'final_answer'
-          ? responseText.trim() : '';
+          ? event.message.content.map(block => block.type === 'text' && block.phase !== 'commentary' ? block.text : '')
+            .join('').trim() : '';
         if (event.message.usage && isSuccessfulProviderResponse(event.message)) {
           // 按当前实际注入的工具定义计量（含本 turn 内新激活的 deferred 工具）；
           // deferred 段仅计未激活 schema 估算，且仅在 >0 时加入。

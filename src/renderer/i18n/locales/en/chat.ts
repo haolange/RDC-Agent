@@ -332,6 +332,7 @@ export const enChat = {
   'chat.subagentTask': 'Delegated task',
   'chat.subagentProcess': 'Work process',
   'chat.subagentFinal': 'Final reply',
+  'chat.subagentFinalShownAbove': 'The reply is shown above.',
   'chat.subagentDetails': 'Call details',
   'chat.subagentDetailsPreview': 'Parameters, parent tool receipt, and execution IDs',
   'chat.subagentStepCount': '{count} steps',

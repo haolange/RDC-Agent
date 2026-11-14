@@ -26,6 +26,7 @@ interface TextItemState {
   key: string;
   started: boolean;
   closed: boolean;
+  phase?: 'commentary' | 'final_answer';
 }
 
 export class ResponsesItemChannels {
@@ -156,10 +157,18 @@ export class ResponsesItemChannels {
     const state = this.textState(identity);
     if (state.closed) return;
     if (!state.started) {
-      this.builder.startText(this.textRef(state));
+      this.builder.startText(this.textRef(state), state.phase);
       state.started = true;
     }
     if (delta) this.builder.appendText(this.textRef(state), delta);
+  }
+
+  setTextPhase(identity: ResponsesItemIdentity, phase: 'commentary' | 'final_answer' | undefined): void {
+    if (!phase) return;
+    const state = this.textState(identity);
+    if (state.phase && state.phase !== phase) throw new Error('Provider changed an output item phase.');
+    state.phase = phase;
+    if (state.started && !state.closed) this.builder.updateTextPhase(this.textRef(state), phase);
   }
 
   closeText(identity: ResponsesItemIdentity): void {

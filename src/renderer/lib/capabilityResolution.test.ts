@@ -50,6 +50,15 @@ describe('capability resolution state', () => {
     expect(resolveCatalogCapability(route, { ...projection, error: 'offline' }).status).toBe('error');
     expect(resolveCatalogCapability(route, undefined).status).toBe('loading');
   });
+  it('reports discovery errors for unknown tool evidence and recovers when evidence arrives', () => {
+    const route = { providerId: 'provider-b', modelId: 'model-b' };
+    const snapshot = { models: [effectiveModel({ toolCalling: { state: 'unknown' } })], refreshing: true } as import('@shared/types/providerCapability').EffectiveCatalogSnapshot;
+    expect(resolveCatalogCapability(route, { snapshot, loading: false }).status).toBe('loading');
+    snapshot.refreshing = false;
+    expect(resolveCatalogCapability(route, { snapshot, loading: false, error: 'HTTP 401' })).toEqual({ status: 'error', message: 'HTTP 401' });
+    snapshot.models[0] = effectiveModel();
+    expect(resolveCatalogCapability(route, { snapshot, loading: false }).status).toBe('ready');
+  });
   it('accepts only a revisioned model matching the committed Agent route', () => {
     const result = validateCapabilityResolution(
       { providerId: 'provider-b', modelId: 'model-b' },

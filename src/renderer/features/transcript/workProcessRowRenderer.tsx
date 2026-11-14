@@ -1,5 +1,4 @@
 import React from 'react';
-import type { WorkProcessRow } from './workProcessTypes';
 import { SubagentRow } from './SubagentRow';
 import { TaskSnapshotCard } from './TaskSnapshotCard';
 import {
@@ -13,6 +12,9 @@ import {
 import { WorkProcessSectionRow } from './WorkProcessSectionRow';
 import { ToolAggregateRow } from './ToolAggregateRow';
 import { WorkProcessImageRow } from './WorkProcessImageRow';
+import { WorkProcessOutputRow } from './WorkProcessOutputRow';
+import { WorkProcessThinkingRow } from './WorkProcessThinking';
+import type { WorkProcessRow } from './workProcessTypes';
 
 export function createWorkProcessRowRenderer(
   sessionId?: string | null,
@@ -20,6 +22,8 @@ export function createWorkProcessRowRenderer(
   density: 'normal' | 'compact' = 'normal',
 ) {
   const renderRow = (row: WorkProcessRow): React.ReactNode => {
+    if (row.type === 'thinking') return <WorkProcessThinkingRow key={row.id} row={row} />;
+    if (row.type === 'output') return <WorkProcessOutputRow key={row.id} row={row} />;
     if (row.type === 'tool' && row.imageCalls) return <WorkProcessImageRow key={row.id} row={row} renderToolDetail={renderToolDetail} />;
     if (row.type === 'tool') return <ToolRow key={row.id} row={row} extraDetail={renderToolDetail?.(row)} density={density} />;
     if (row.type === 'toolAggregate') return <ToolAggregateRow key={row.id} row={row} renderToolDetail={renderToolDetail} density={density} />;

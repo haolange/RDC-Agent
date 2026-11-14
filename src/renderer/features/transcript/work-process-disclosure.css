@@ -173,6 +173,11 @@
   padding-top: 0;
 }
 
+.work-process-section-list > .work-process-thinking-row + .work-process-step,
+.work-process-section-list > .work-process-output + .work-process-step {
+  padding-top: var(--space-3);
+}
+
 
 
 .work-process-path-chip {

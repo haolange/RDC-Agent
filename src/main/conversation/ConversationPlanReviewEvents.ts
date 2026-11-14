@@ -15,6 +15,7 @@ export function applyPlanReviewRequested(input: {
     planReview?: ConversationToolCall['planReview'];
   };
   workTrace: ConversationWorkTrace | null | undefined;
+  loopId?: string;
 }): ConversationWorkTrace | null {
   const planReview = input.payload.planReview;
   if (!planReview) return input.workTrace ?? null;
@@ -37,6 +38,7 @@ export function applyPlanReviewRequested(input: {
       argsPreview: [planReview.title, ...planReview.summary].join(' | ').slice(0, 600),
       startedAt: nowMs(),
     },
+    input.loopId ? { loopId: input.loopId } : undefined,
   );
 }
 

@@ -21,7 +21,7 @@ export const ToolAggregateRow: React.FC<{ row: ToolAggregateRowModel;
       <WorkProcessRailIcon row={row} active={false} />
       <div className="work-process-step-content work-process-tool-aggregate-content">
         <details className="work-process-tool-aggregate-details" open={expanded}>
-          <summary className="work-process-tool-aggregate-summary" onClick={(event) => { event.preventDefault(); toggle(); }}>
+          <summary className="work-process-tool-aggregate-summary" data-work-node-heading onClick={(event) => { event.preventDefault(); toggle(); }}>
             <span className="work-process-row-caret work-process-aggregate-caret" aria-hidden="true" />
             <span className="work-process-tool-aggregate-text">{row.summary}</span>
             {row.duration ? <span className="work-process-tool-inline-meta">{row.duration}</span> : null}

@@ -44,6 +44,7 @@ import {
   LlmProviderAccountLoginStartArgsSchema,
   LlmProviderDraftArgsSchema,
   LlmProviderIdArgsSchema,
+  LlmRefreshProviderModelsArgsSchema,
   SettingsGetAgentDefinitionCommitArgsSchema,
   SettingsSaveAgentDefinitionArgsSchema,
   SettingsSaveProviderDefinitionArgsSchema,
@@ -73,7 +74,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     );
     await Promise.all(catalogProviderIds.map((providerId) => loadProviderSurface(providerId)));
     const catalogs = settings.llm.providers.flatMap((provider) => {
-      if (provider.catalogOwnership === 'user-managed' || !catalogProviderIds.includes(provider.id)) return [];
+      if (!catalogProviderIds.includes(provider.id)) return [];
       const snapshot = resolveEffectiveCatalog(provider.id, settings);
       return snapshot ? [snapshot] : [];
     });
@@ -125,11 +126,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   });
 
   ipcMain.handle('llm:refreshProviderModels', async (_event, ...rawArgs: unknown[]) => {
-    const [providerId] = parseIpcArgs(LlmProviderIdArgsSchema, rawArgs, {
+    const [providerId, scope] = parseIpcArgs(LlmRefreshProviderModelsArgsSchema, rawArgs, {
       label: 'llm:refreshProviderModels',
       maxBytes: 4 * 1024,
-    }) as [LlmProviderId];
-    const result = await providerConnectionService.refreshProviderModels(providerId);
+    });
+    const result = await providerConnectionService.refreshProviderModels(providerId, scope);
     if (result.success) {
       context.applyCurrentLlmConfig();
       // Shared discovery published the versioned catalog; refresh agent option projection.

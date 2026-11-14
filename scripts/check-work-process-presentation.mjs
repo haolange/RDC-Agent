@@ -32,6 +32,7 @@ const activeSignalStyles = readSource('src/renderer/styles/design-motion.css');
 const activeSignalHelper = readSource('src/renderer/features/transcript/workProcessActiveSignal.ts');
 const activeSignalRenderSource = [
   'src/renderer/features/transcript/WorkProcessSectionRow.tsx',
+  'src/renderer/features/transcript/WorkProcessThinking.tsx',
   'src/renderer/features/transcript/ToolAggregateRow.tsx',
   'src/renderer/features/transcript/WorkProcessRows.tsx',
   'src/renderer/features/transcript/SubagentRow.tsx',
@@ -932,6 +933,7 @@ const componentSource = [
   scriptRead('src/renderer/features/transcript/WorkProcess.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/WorkProcessContent.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/WorkProcessSectionRow.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/WorkProcessThinking.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/ToolAggregateRow.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/workProcessRowRenderer.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/WorkProcessRows.tsx', 'utf8'),
@@ -1001,12 +1003,12 @@ assert(
     const source = readSource('src/main/conversation/ConversationTurnAgentEventHandler.ts');
     return source.includes('turnHadAskPause')
       && source.includes('resolveStreamingOutputPhase')
-      && source.includes('syncVisibleResponseForStreaming')
+      && source.includes('upsertLoopOutputItem')
       && source.includes("outputPhase === 'commentary'")
       && source.includes("stopReason === 'tool_use'")
       && /pendingNewLoop\s*=\s*true/.test(source);
   })(),
-  'ask/commentary pauses must set pendingNewLoop, stamp streaming outputPhase, and avoid CoT final flash',
+  'ask/commentary pauses must set pendingNewLoop and preserve item-scoped streaming output',
 );
 assert(
   /\.work-process-user-input-transcript\s*\{[^}]*gap:\s*var\(--space-4\)/.test(cssSource),
@@ -1144,8 +1146,8 @@ assert(
 );
 assert(!componentSource.includes('setRawOpen(true);\n      setPreviewOpen(true);'), 'failed tools must not force-open preview and raw together on error');
 assert(componentSource.includes('<details'), 'thinking should render as a user-collapsible top disclosure');
-assert(componentSource.includes('handleThinkingSummaryClick'), 'thinking disclosure must accept user summary-click gestures');
-assert(componentSource.includes('useScopedWorkDisclosure(`thinking-${row.id}`, row.thinkingOpenByDefault)'),
+assert(componentSource.includes('event.preventDefault(); toggle();'), 'thinking disclosure must accept user summary-click gestures');
+assert(componentSource.includes('useScopedWorkDisclosure(`thinking-${row.id}`, row.openByDefault)'),
   'thinking disclosure must sticky-override policy after user gesture');
 assert(!componentSource.includes('open={row.thinkingOpenByDefault}'), 'thinking disclosure must not bind open solely to policy without local state');
 assert(!componentSource.includes('onToggle={handleThinkingToggle}'), 'thinking must not use details onToggle for sticky override (programmatic open fires toggle)');
@@ -1302,7 +1304,7 @@ assert(
 assert(cssSource.includes('.work-process-tool-approval'), 'tool approval styling should exist');
 assert(cssSource.includes('.work-process-disclosure:not([open]) > :not(summary)'), 'closed disclosure must not render expanded body content');
 assert(
-  componentSource.includes('<MessageMarkdown content={row.thinkingPreview} deferHeavyPlugins={thinkingActive} />'),
+  componentSource.includes('<MessageMarkdown content={row.preview} deferHeavyPlugins={active} />'),
   'thinking preview must render through MessageMarkdown',
 );
 assert(

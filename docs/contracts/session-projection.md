@@ -54,6 +54,7 @@ interface ActiveTurnContext {
 ```
 
 - Session 切换时清空 context 与 `isPromptSending`；Agent 运行态只读取当前 context 的 `agentId`，禁止扫描历史 draft/streaming 消息推断。
+- Work Process 的模型段落内，文本项、thinking、工具、审批和 Tasks 快照以首次可见顺序排列，更新按输出项身份或 toolCallId 原位落位；子代理过程沿用相同规则。同回合新增记录使用主进程记录的顺序，旧记录只按已有时间及存储顺序投影。中性流式文本的阶段确认不重建或搬移节点；Stop 与终态不得复活流式动效。
 - Stop 只读当前 session 的 context；禁止依赖跨 session 的 stale `activeRequestIdRef`。
 - Send、Rewrite、Stop 与运行中菜单状态都按 `sessionId + requestId + agentId` 投影。Monotonic stop 以 **`requestId` 为主**、`turnId` 为辅：optimistic → real turnId 替换后，已停止的 request 仍拒绝迟到 `draft`/`streaming` patch。
 

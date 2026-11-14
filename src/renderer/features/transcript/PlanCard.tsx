@@ -49,7 +49,7 @@ export const PlanCard: React.FC<{
           <span>{t('chat.planReviewCardKind')}</span>
           <span>{t(STATUS_KEY[plan.status])}</span>
         </div>
-        <h3 className="plan-card__title" title={plan.title}>{plan.title}</h3>
+        <h3 className="plan-card__title" title={plan.title} data-work-node-prose>{plan.title}</h3>
         <div ref={previewRef} className={`plan-card__preview${overflowing ? ' is-overflowing' : ''}`}>
           <MessageMarkdown content={preview} deferHeavyPlugins interactive={false} />
         </div>

@@ -41,7 +41,9 @@ export const useEffectiveCatalogStore = create<CatalogState>((set, get) => ({
     const startedAt = generation;
     set((state) => ({ entries: { ...state.entries, [key]: { ...previous, snapshot: previous?.snapshot ?? null, loading: true, error: undefined } } }));
     const read = () => readEffectiveCatalog(getElectronApi(), scope.id, scope.activeAccountId || `anonymous:${scope.id}`);
-    const request: Promise<EffectiveCatalogSnapshot | null> = (retry ? refreshEffectiveCatalog(getElectronApi(), scope.id).then(() => (
+    const request: Promise<EffectiveCatalogSnapshot | null> = (retry ? refreshEffectiveCatalog(getElectronApi(), scope.id, {
+      accountId: scope.activeAccountId || `anonymous:${scope.id}`, protocol: scope.protocol,
+    }).then(() => (
       startedAt === generation && requests.get(key) === request ? read() : null
     )) : read())
       .then((snapshot) => {

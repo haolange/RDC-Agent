@@ -43,7 +43,7 @@ describe('effective catalog projection', () => {
     const duplicate = store().load(scope, true);
     expect(first).toBe(duplicate);
     await first;
-    expect(refresh).toHaveBeenCalledExactlyOnceWith(undefined, 'grok-account');
+    expect(refresh).toHaveBeenCalledExactlyOnceWith(undefined, 'grok-account', { accountId: 'a', protocol: 'OpenAIResponses' });
     expect(read).toHaveBeenCalledTimes(2);
     expect(store().entries[catalogScopeKey(scope)].error).toBeUndefined();
   });

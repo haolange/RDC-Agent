@@ -26,10 +26,12 @@ export function resolveCatalogCapability(
   projection: { snapshot: EffectiveCatalogSnapshot | null; loading: boolean; error?: string } | undefined,
 ): CapabilityResolutionState {
   const model = projection?.snapshot?.models.find((entry) => entry.modelId === expected.modelId) ?? null;
-  if (!projection || ((projection.loading || projection.snapshot?.refreshing) && (!model || model.availability === 'unknown'))) {
+  const eligibility = model ? classifyAgentToolEligibility(model) : undefined;
+  const unresolved = !model || eligibility === 'availability-unknown' || eligibility === 'tools-unknown';
+  if (!projection || ((projection.loading || projection.snapshot?.refreshing) && unresolved)) {
     return { status: 'loading' };
   }
-  if (projection.error && (!model || model.availability === 'unknown')) return { status: 'error', message: projection.error };
+  if (projection.error && unresolved) return { status: 'error', message: projection.error };
   const next = validateCapabilityResolution(expected, model);
   return next.status === 'ready' && (projection.loading || projection.snapshot?.refreshing)
     ? { status: 'refreshing', model: next.model } : next;

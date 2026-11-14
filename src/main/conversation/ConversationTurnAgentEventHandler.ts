@@ -1,5 +1,6 @@
 import { rootScopeId } from '@shared/utils/executionScope';
 import type { AgentEvent } from '@shared/types/agentRuntime';
+import { normalizeTaskSnapshotItems } from './ConversationTaskSnapshot';
 import type {
   ConversationLoopOutputPhase,
   ConversationLoopStopReason,
@@ -26,6 +27,7 @@ import {
   upsertRuntimeToolApproval,
   upsertRuntimeToolCall,
   upsertLoopResult,
+  upsertLoopOutputItem,
   upsertWorkBlock,
 } from './ConversationWorkTrace';
 import {
@@ -62,7 +64,6 @@ export interface TurnStreamState {
   loopSeq: number;
   pendingNewLoop: boolean;
   currentLoopOutputPhase: ConversationLoopOutputPhase | undefined;
-  turnHasProcessEvidence: boolean;
   turnHadAskPause: boolean;
   assistantMessage: ConversationMessage;
   errorViewModel: { code: string; message: string; technicalMessage?: string } | null;
@@ -83,11 +84,9 @@ export interface AgentEventHandlerDeps {
   commitVisibleAssistantText: () => void;
   commitThinkingTrace: (workTrace: ConversationWorkTrace) => void;
   beginAssistantContentLoop: () => void;
-  markProcessEvidence: () => void;
   markLoopCommentary: () => void;
   currentLoopId: () => string;
   resolveStreamingOutputPhase: () => ConversationLoopOutputPhase | undefined;
-  syncVisibleResponseForStreaming: () => void;
   seenCompactionSummaries: Set<string>;
   showWorkTrace: boolean;
   withWorkTrace: (workTrace: ConversationWorkTrace) => Partial<ConversationMessage>;
@@ -107,8 +106,8 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
   const {
     host, sessionId, input, agentLabel, turnStreamState,
     commitAssistantMessage, commitVisibleAssistantText, commitThinkingTrace,
-    beginAssistantContentLoop, markProcessEvidence, markLoopCommentary,
-    currentLoopId, resolveStreamingOutputPhase, syncVisibleResponseForStreaming,
+    beginAssistantContentLoop, markLoopCommentary,
+    currentLoopId, resolveStreamingOutputPhase,
     seenCompactionSummaries, recordProviderOutputRefs,
     currentLoopOptions, pendingContinuation, hasPendingContinuation,
   } = deps;
@@ -187,15 +186,16 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               }
             }
             if (event.type === 'assistant.delta') {
-              const payload = event.payload as { text?: string; providerOutputRef?: ProviderOutputRef };
+              const payload = event.payload as { text?: string; phase?: ConversationLoopOutputPhase; providerOutputRef: ProviderOutputRef };
               const chunk = typeof payload.text === 'string' ? payload.text : '';
               if (chunk) {
                 recordProviderOutputRefs(payload.providerOutputRef ? [payload.providerOutputRef] : undefined);
                 beginAssistantContentLoop();
                 turnStreamState.currentLoopText += chunk;
-                syncVisibleResponseForStreaming();
-                commitVisibleAssistantText();
-                commitThinkingTrace(upsertLoopResult(
+                const previous = turnStreamState.assistantMessage.workTrace?.blocks.find((block) => block.id === currentLoopId())
+                  ?.outputItems?.find((item) => item.providerOutputRef.providerBlockKey === payload.providerOutputRef.providerBlockKey
+                    && item.providerOutputRef.contentIndex === payload.providerOutputRef.contentIndex);
+                const trace = upsertLoopResult(
                   turnStreamState.assistantMessage.workTrace,
                   currentLoopId(),
                   turnStreamState.currentLoopText,
@@ -206,13 +206,20 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                   resolveStreamingOutputPhase(),
                   undefined,
                   turnStreamState.currentLoopProviderOutputRefs,
-                ));
+                );
+                commitThinkingTrace(upsertLoopOutputItem(trace, currentLoopId(), payload.providerOutputRef,
+                  (previous?.text ?? '') + chunk, payload.phase, 'streaming'));
               }
+            }
+            if (event.type === 'assistant.text_end') {
+              const payload = event.payload as { text: string; phase?: ConversationLoopOutputPhase; providerOutputRef: ProviderOutputRef };
+              const trace = turnStreamState.assistantMessage.workTrace;
+              if (trace) commitThinkingTrace(upsertLoopOutputItem(trace, currentLoopId(), payload.providerOutputRef,
+                payload.text, payload.phase, 'complete'));
             }
             if (event.type === 'assistant.thinking_delta') {
               const payload = event.payload as { text?: string; thinking?: ThinkingArtifact };
               beginAssistantContentLoop();
-              markProcessEvidence();
               turnStreamState.currentLoopThinking = mergeThinkingPayload(
                 turnStreamState.currentLoopThinking,
                 payload.thinking,
@@ -220,13 +227,6 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               );
               if (turnStreamState.currentLoopThinking) {
                 turnStreamState.currentLoopThinkingStatus = 'streaming';
-                // Thinking owns the process area; clear any optimistic bubble text.
-                // Do not force outputPhase=commentary — that flashes final tokens into WP prose
-                // when text deltas arrive on the same loop before completed reclassifies.
-                if (turnStreamState.visibleResponse) {
-                  turnStreamState.visibleResponse = '';
-                  commitVisibleAssistantText();
-                }
                 commitThinkingTrace(upsertLoopResult(
                   turnStreamState.assistantMessage.workTrace,
                   currentLoopId(),
@@ -244,16 +244,11 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
             if (event.type === 'assistant.thinking_end') {
               const payload = event.payload as { text?: string; thinking?: ThinkingArtifact };
               beginAssistantContentLoop();
-              markProcessEvidence();
               turnStreamState.currentLoopThinking = mergeThinkingPayload(
                 turnStreamState.currentLoopThinking,
                 payload.thinking,
                 typeof payload.text === 'string' ? payload.text : '',
               );
-              if (turnStreamState.visibleResponse) {
-                turnStreamState.visibleResponse = '';
-                commitVisibleAssistantText();
-              }
               if (turnStreamState.currentLoopThinking) {
                 turnStreamState.currentLoopThinkingStatus = 'complete';
                 commitThinkingTrace(upsertLoopResult(
@@ -343,31 +338,30 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 providerOutputRef?: ProviderOutputRef;
               };
               if (payload.toolCall?.id && payload.toolCall.name) {
-                const loopScoped = isLoopTool(String(payload.toolCall.name));
-                if (loopScoped) {
-                  beginAssistantContentLoop();
-                  turnStreamState.loopHasTools = true;
-                  markLoopCommentary();
-                  // Tool loops keep commentary in Work Process; clear bubble flash.
-                  if (turnStreamState.visibleResponse) {
-                    turnStreamState.visibleResponse = '';
-                    commitVisibleAssistantText();
-                  }
-                  // Stamp commentary explicitly so projection does not hide pre-tool narrative.
-                  if (turnStreamState.currentLoopText.trim()) {
-                    commitThinkingTrace(upsertLoopResult(
-                      turnStreamState.assistantMessage.workTrace,
-                      currentLoopId(),
-                      turnStreamState.currentLoopText,
-                      turnStreamState.currentLoopThinking,
-                      turnStreamState.currentLoopThinkingStatus,
-                      'streaming',
-                      undefined,
-                      'commentary',
-                      undefined,
-                      turnStreamState.currentLoopProviderOutputRefs,
-                    ));
-                  }
+                beginAssistantContentLoop();
+                turnStreamState.loopHasTools = true;
+                markLoopCommentary();
+                let trace = turnStreamState.assistantMessage.workTrace;
+                const items = trace?.blocks.find((block) => block.id === currentLoopId())?.outputItems ?? [];
+                for (const item of items) {
+                  if (trace && !item.phase) trace = upsertLoopOutputItem(trace, currentLoopId(), item.providerOutputRef,
+                    item.text, 'commentary', item.status);
+                }
+                if (trace && items.length) commitThinkingTrace(trace);
+                // Stamp commentary explicitly so projection does not hide pre-tool narrative.
+                if (turnStreamState.currentLoopText.trim()) {
+                  commitThinkingTrace(upsertLoopResult(
+                    turnStreamState.assistantMessage.workTrace,
+                    currentLoopId(),
+                    turnStreamState.currentLoopText,
+                    turnStreamState.currentLoopThinking,
+                    turnStreamState.currentLoopThinkingStatus,
+                    'streaming',
+                    undefined,
+                    'commentary',
+                    undefined,
+                    turnStreamState.currentLoopProviderOutputRefs,
+                  ));
                 }
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertRuntimeToolCall(turnStreamState.assistantMessage.workTrace, {
@@ -377,7 +371,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                     providerOutputRef: payload.providerOutputRef ? { ...payload.providerOutputRef } : undefined,
                     argsPreview: JSON.stringify(payload.toolCall.arguments ?? {}).slice(0, 600),
                     startedAt: nowMs(),
-                  }, loopScoped ? currentLoopOptions() : undefined),
+                  }, currentLoopOptions()),
                 });
               }
             }
@@ -496,6 +490,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                   workTrace: applyPlanReviewRequested({
                     payload,
                     workTrace: turnStreamState.assistantMessage.workTrace,
+                    loopId: currentLoopId(),
                   }),
                 });
                 return;
@@ -523,7 +518,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                       userInputQuestions: questions,
                       argsPreview: questions.map((question) => question.prompt).join(' | ').slice(0, 600),
                       startedAt: nowMs(),
-                    }),
+                    }, currentLoopOptions()),
                     currentLoopId(),
                     turnStreamState.currentLoopText || undefined,
                     turnStreamState.currentLoopThinking,
@@ -665,6 +660,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               commitAssistantMessage('message_patched', {
                 workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, snapshotId, {
                   kind: 'task_snapshot',
+                  parentLoopId: currentLoopId(),
                   title: event.type === 'task.created' ? 'Tasks added' : 'Tasks updated',
                   stage: 'task',
                   status: 'complete',
@@ -678,6 +674,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
             if (event.type === 'assistant.completed') {
               const payload = event.payload as {
                 text?: string;
+                textItems?: Array<{ text: string; phase?: ConversationLoopOutputPhase; providerOutputRef: ProviderOutputRef }>;
                 thinking?: ThinkingArtifact[];
                 providerOutputRefs?: ProviderOutputRef[];
                 stopReason?: ConversationLoopStopReason;
@@ -702,24 +699,34 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 completedThinking,
                 input.preparedTurn.runtime.routeCapability.reasoningDelivery,
               );
+              let completedTrace = turnStreamState.assistantMessage.workTrace;
               if (loopResult || turnStreamState.currentLoopThinking || stopReason || outputPhase) {
+                let trace = upsertLoopResult(
+                  turnStreamState.assistantMessage.workTrace,
+                  currentLoopId(), loopResult || undefined, turnStreamState.currentLoopThinking,
+                  turnStreamState.currentLoopThinkingStatus, 'complete', stopReason, outputPhase,
+                  reasoningState, turnStreamState.currentLoopProviderOutputRefs,
+                );
+                const existingItems = trace.blocks.find((block) => block.id === currentLoopId())?.outputItems ?? [];
+                for (const item of payload.textItems ?? existingItems) {
+                  const existingPhase = existingItems.find((candidate) =>
+                    candidate.providerOutputRef.providerBlockKey === item.providerOutputRef.providerBlockKey
+                    && candidate.providerOutputRef.contentIndex === item.providerOutputRef.contentIndex)?.phase;
+                  const itemPhase = item.phase ?? existingPhase ?? (stopReason === 'end_turn' && outputPhase === 'final_answer'
+                    ? 'final_answer' : outputPhase === 'commentary' && stopReason === 'tool_use' ? 'commentary' : undefined);
+                  trace = upsertLoopOutputItem(trace, currentLoopId(), item.providerOutputRef, item.text, itemPhase, 'complete');
+                }
+                completedTrace = trace;
                 commitAssistantMessage('message_patched', {
-                  workTrace: upsertLoopResult(
-                    turnStreamState.assistantMessage.workTrace,
-                    currentLoopId(),
-                    loopResult || undefined,
-                    turnStreamState.currentLoopThinking,
-                    turnStreamState.currentLoopThinkingStatus,
-                    'complete',
-                    stopReason,
-                    outputPhase,
-                    reasoningState,
-                    turnStreamState.currentLoopProviderOutputRefs,
-                  ),
+                  workTrace: trace,
                 });
               }
               if (outputPhase === 'final_answer') {
-                turnStreamState.canonicalOutput = reduceCanonicalAssistantOutput(turnStreamState.canonicalOutput, loopResult, outputPhase);
+                const finalItems = completedTrace?.blocks.find((block) => block.id === currentLoopId())?.outputItems;
+                const finalText = finalItems?.length
+                  ? finalItems.filter((item) => item.phase === 'final_answer').map((item) => item.text).join('')
+                  : loopResult;
+                turnStreamState.canonicalOutput = reduceCanonicalAssistantOutput(turnStreamState.canonicalOutput, finalText, outputPhase);
                 turnStreamState.visibleResponse = turnStreamState.canonicalOutput.finalAnswerText;
               } else {
                 // Commentary stays in Work Process; never leave process text in the bubble.
@@ -776,34 +783,4 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               turnStreamState.runWasCancelled = true;
             }
   };
-}
-
-function normalizeTaskSnapshotItems(payload: {
-  taskId?: string;
-  title?: string;
-  status?: string;
-  statusReason?: string;
-  snapshot?: ConversationTaskSnapshotItem[];
-}): ConversationTaskSnapshotItem[] {
-  if (Array.isArray(payload.snapshot) && payload.snapshot.length > 0) {
-    return payload.snapshot.map((item, index) => ({
-      taskId: item.taskId,
-      title: item.title,
-      status: item.status,
-      statusReason: item.statusReason,
-      waitingOn: item.waitingOn?.map(wait => ({ ...wait })),
-      order: typeof item.order === 'number' ? item.order : index,
-    }));
-  }
-  const taskId = payload.taskId?.trim() || 'runtime-tasks';
-  return [{
-    taskId,
-    title: payload.title?.trim() || taskId,
-    status: payload.status === 'in_progress' || payload.status === 'blocked'
-      || payload.status === 'completed' || payload.status === 'cancelled'
-      ? payload.status
-      : 'pending',
-    statusReason: payload.statusReason,
-    order: 0,
-  }];
 }

@@ -316,6 +316,7 @@ export const zhChat = {
   'chat.subagentTask': '委派任务',
   'chat.subagentProcess': '工作过程',
   'chat.subagentFinal': '最终回复',
+  'chat.subagentFinalShownAbove': '回复已在上方显示。',
   'chat.subagentDetails': '调用详情',
   'chat.subagentDetailsPreview': '参数、父工具回执与执行标识',
   'chat.subagentStepCount': '{count} 个步骤',

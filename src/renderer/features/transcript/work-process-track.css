@@ -1,15 +1,15 @@
 .work-process-track {
   position: relative;
-  --work-track-display: none;
+  --work-track-gutter: calc(var(--space-3) + var(--space-4) + var(--space-1));
   --work-track-start: 0px;
+  --work-track-length: 0px;
 }
 
 .work-process-track::before {
   content: '';
-  display: var(--work-track-display);
   position: absolute;
   top: var(--work-track-start);
-  bottom: 0;
+  height: var(--work-track-length);
   left: calc(var(--space-3) + var(--space-2));
   width: 1px;
   transform: translateX(-50%);
@@ -19,7 +19,7 @@
 
 .work-process-track > .work-process-narrative-stream,
 .work-process-track-leading {
-  padding-left: calc(var(--space-3) + var(--space-4) + var(--space-1));
+  padding-left: var(--work-track-gutter);
 }
 
 .work-process-event-anchor {
@@ -29,6 +29,18 @@
   height: 0;
   pointer-events: none;
   z-index: var(--z-local-1);
+  visibility: hidden;
+}
+
+.work-process-event-anchor::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  right: 0;
+  height: 1px;
+  transform: translateY(-50%);
+  background: var(--token-border-muted);
 }
 
 .work-process-rail-marker {
@@ -60,6 +72,26 @@
 .work-process-tool-aggregate-body { padding-left: 0; }
 .work-process-track-leading { padding-bottom: var(--space-2); }
 .work-process-track .work-process-step.is-appear { animation: none; }
+
+.work-process.is-collapsed .work-process-summary,
+.work-process.is-collapsed .work-process-track::before,
+.work-process.is-collapsed .work-process-section > .work-process-event-anchor,
+.work-process.is-collapsed .work-process-section > .work-process-step-content > :not(.work-process-section-list),
+.work-process.is-collapsed .work-process-step:not(.work-process-section):not(.kind-output-final_answer) {
+  display: none;
+}
+
+.work-process.is-collapsed .work-process-section,
+.work-process.is-collapsed .work-process-section-list {
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.work-process-body:not(.is-embedded) .work-process-narrative-stream > .work-process-section:last-child
+  > .work-process-step-content > .work-process-section-list > .kind-output-final_answer:not(:has(~ :not(.kind-output-final_answer))) {
+  margin-left: calc(var(--work-track-gutter) * -1);
+  margin-right: calc(var(--work-process-inline-end-inset) * -1);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .work-process-rail-marker.is-running::after { animation: none; }

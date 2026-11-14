@@ -7,7 +7,7 @@ import { SubagentRow } from './SubagentRow';
 import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
 
 const state = vi.hoisted(() => ({ expanded: false, taskLoading: false, taskError: false, headerLoading: false, headerMissing: false,
-  configurationError: false }));
+  configurationError: false, workOpen: false, finalOpen: false, projectedFinal: false }));
 const task = 'Use glob to inspect the project root.';
 const body = JSON.stringify({ capsule: {
   task, goal: task, scope: '', outputRequirements: '', stopConditions: [], acceptedFacts: [], hypotheses: [],
@@ -20,17 +20,22 @@ vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({ MessageMarkdown: ({ 
 vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: (selector: (state: unknown) => unknown) =>
   selector({ settings: { agents: { definitions: [] } } }) }));
 vi.mock('./useSubagentDisclosure', () => ({ useSubagentDisclosure: () => ({
-  expanded: state.expanded, workOpen: false, finalOpen: false, detailsOpen: false,
+  expanded: state.expanded, workOpen: state.workOpen, finalOpen: state.finalOpen, detailsOpen: false,
   factsOpen: false, constraintsOpen: false, toggle: () => {}, openCard: () => {},
 }) }));
 vi.mock('./useDelegationTrace', () => ({ useDelegationTrace: () => ({
   page: { header: state.headerLoading || state.headerMissing ? null : { task, profile: 'general', status: state.configurationError ? 'failed' : 'complete', mode: 'wait', startedAt: 1,
     ...(state.configurationError ? { configurationError: 'MODEL_UNAVAILABLE', error: 'Model unavailable' } : {}),
-    completedAt: 1000, taskAvailable: true }, steps: [], total: 0, revision: 1 },
+    completedAt: 1000, taskAvailable: true, finalAvailable: state.projectedFinal },
+    steps: state.projectedFinal ? [{ id: 'loop', revision: 1, block: { id: 'loop', kind: 'llm_turn', title: 'Loop',
+      status: 'complete', startedAt: 1, toolCalls: [], outputItems: [{ providerOutputRef: {
+        protocol: 'test', providerBlockKey: 'text', contentIndex: 0 }, text: 'Final child reply',
+        phase: 'final_answer', status: 'complete', displayOrder: 1 }] } }] : [], total: state.projectedFinal ? 1 : 0, revision: 1 },
   loading: false, headerLoading: state.headerLoading, hasEarlier: false, loadEarlier: async () => {}, retry: () => {},
 }) }));
 vi.mock('./useDelegationContent', () => ({ useDelegationContent: (input: { kind: string; available: boolean }) => ({
-  text: input.available && input.kind === 'task' && !state.taskLoading && !state.taskError ? body : '',
+  text: input.available && input.kind === 'final' ? 'Final child reply'
+    : input.available && input.kind === 'task' && !state.taskLoading && !state.taskError ? body : '',
   hasMore: false, loading: state.taskLoading, error: state.taskError,
   loadMore: async () => {}, retry: () => {},
 }) }));
@@ -79,6 +84,19 @@ it('presents the frozen task once in each card state and unmounts the preview on
   expect(pending.body.textContent).not.toContain('chat.subagentNoActions');
   expect(pending.body.textContent).not.toContain('chat.subagentNoFinal');
   state.headerLoading = false;
+});
+
+it('shows a child final once while preserving both disclosure controls', () => {
+  state.expanded = true; state.workOpen = true; state.finalOpen = true; state.projectedFinal = true;
+  try {
+    const open = new DOMParser().parseFromString(renderToStaticMarkup(createElement(SubagentRow, { row, sessionId: 's1' })), 'text/html');
+    expect(open.body.textContent?.split('Final child reply')).toHaveLength(2);
+    expect(open.body.textContent).toContain('chat.subagentFinalShownAbove');
+    state.workOpen = false;
+    const folded = new DOMParser().parseFromString(renderToStaticMarkup(createElement(SubagentRow, { row, sessionId: 's1' })), 'text/html');
+    expect(folded.body.textContent?.split('Final child reply')).toHaveLength(2);
+    expect(folded.body.textContent).not.toContain('chat.subagentFinalShownAbove');
+  } finally { state.expanded = false; state.workOpen = false; state.finalOpen = false; state.projectedFinal = false; }
 });
 
 it('offers the exact Agent settings for trusted configuration failures', async () => {

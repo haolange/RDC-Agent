@@ -125,8 +125,34 @@ function cloneWorkBlock(block: ConversationWorkBlock): ConversationWorkBlock {
     ...(thinking ? { thinking } : {}),
     ...(thinkingStatus ? { thinkingStatus } : {}),
     ...(result ? { result } : {}),
+    outputItems: block.outputItems?.map((item) => ({ ...item, providerOutputRef: { ...item.providerOutputRef } })),
     toolCalls,
   };
+}
+
+export function upsertLoopOutputItem(
+  trace: ConversationWorkTrace,
+  loopId: string,
+  ref: ProviderOutputRef,
+  text: string,
+  phase: ConversationLoopOutputPhase | undefined,
+  status: 'streaming' | 'complete',
+): ConversationWorkTrace {
+  const nextTrace = cloneTrace(trace);
+  const block = nextTrace.blocks.find((entry) => entry.id === loopId && entry.kind === 'llm_turn');
+  if (!block || nextTrace.status === 'stopped') return nextTrace;
+  const items = block.outputItems ?? [];
+  const existing = items.find((item) => providerOutputRefKey(item.providerOutputRef) === providerOutputRefKey(ref));
+  if (existing) {
+    existing.text = text;
+    existing.phase = phase ?? existing.phase;
+    existing.status = status;
+  } else {
+    items.push({ providerOutputRef: { ...ref }, text, phase, status, displayOrder: nextDisplayOrder(nextTrace) });
+  }
+  block.outputItems = items;
+  if (block.result) delete block.result.text;
+  return nextTrace;
 }
 
 function cloneTrace(trace: ConversationWorkTrace | null | undefined): ConversationWorkTrace {
@@ -141,6 +167,14 @@ function cloneTrace(trace: ConversationWorkTrace | null | undefined): Conversati
         blocks: [],
         updatedAt: nowMs(),
       };
+}
+
+function nextDisplayOrder(trace: ConversationWorkTrace): number {
+  return trace.blocks.reduce((highest, block) => {
+    const withBlock = Math.max(highest, block.displayOrder ?? 0, block.thinkingDisplayOrder ?? 0);
+    const withTools = block.toolCalls.reduce((value, call) => Math.max(value, call.displayOrder ?? 0), withBlock);
+    return (block.outputItems ?? []).reduce((value, item) => Math.max(value, item.displayOrder), withTools);
+  }, 0) + 1;
 }
 
 export function upsertWorkBlock(
@@ -163,6 +197,7 @@ export function upsertWorkBlock(
     nextTrace.blocks.push(cloneWorkBlock({
       ...createWorkBlock(blockId, patch.title || blockId, patch.stage, kind),
       ...patch,
+      ...(kind === 'task_snapshot' ? { displayOrder: patch.displayOrder ?? nextDisplayOrder(nextTrace) } : {}),
       kind,
       toolCalls: patch.toolCalls ? patch.toolCalls.map(cloneToolCall) : [],
     }));
@@ -233,6 +268,7 @@ export function finalizeTrace(
         ...(block.thinkingStatus ? { thinkingStatus: 'complete' as const } : {}),
         completedAt: blockCompletedAt,
         ...(result ? { result } : {}),
+        outputItems: block.outputItems?.map((item) => ({ ...item, status: 'complete' as const })),
         toolCalls,
       };
     });
@@ -253,6 +289,12 @@ export function upsertRuntimeToolCall(
   if (nextTrace.status === 'stopped') return nextTrace;
   const blockMeta = getRuntimeToolBlockMeta(patch.toolName, patch.id, options?.loopId);
   const blockId = blockMeta.id;
+  if (options?.loopId && (blockMeta.kind === 'user_input' || blockMeta.kind === 'plan_review')
+    && !nextTrace.blocks.some((entry) => entry.id === options.loopId)) {
+    const owner = createWorkBlock(options.loopId, 'LLM turn', 'model', 'llm_turn');
+    owner.status = 'running';
+    nextTrace.blocks.push(owner);
+  }
   const existingBlock = nextTrace.blocks.find((entry) => (
     entry.toolCalls.some((toolCall) => toolCall.id === patch.id)
   ));
@@ -262,10 +304,15 @@ export function upsertRuntimeToolCall(
     block.status = 'running';
     nextTrace.blocks.push(block);
   }
+  if (options?.loopId && (block.kind === 'user_input' || block.kind === 'plan_review')) {
+    block.parentLoopId ??= options.loopId;
+  }
   if (options?.loopId && blockId === options.loopId) {
     applyLoopFields(block, options);
   }
   const toolIndex = block.toolCalls.findIndex((toolCall) => toolCall.id === patch.id);
+  const becomesVisible = Boolean(patch.approval || patch.planReview || patch.userInputQuestions
+    || patch.executionStartedAt !== undefined || patch.status === 'running' || patch.status === 'complete' || patch.status === 'error');
   if (toolIndex >= 0) {
     const existingToolCall = block.toolCalls[toolIndex];
     const nextApproval = patch.approval
@@ -276,6 +323,7 @@ export function upsertRuntimeToolCall(
     block.toolCalls[toolIndex] = {
       ...existingToolCall,
       ...patch,
+      displayOrder: existingToolCall.displayOrder ?? (becomesVisible ? nextDisplayOrder(nextTrace) : undefined),
       executionStartedAt: existingToolCall.executionStartedAt ?? patch.executionStartedAt,
       status: existingToolCall.completedAt || (existingToolCall.executionStartedAt && patch.status === 'pending')
         ? existingToolCall.status : patch.status ?? existingToolCall.status,
@@ -314,6 +362,7 @@ export function upsertRuntimeToolCall(
       error: patch.error,
       approval: patch.approval ? { ...patch.approval } : undefined,
       executionStartedAt: patch.executionStartedAt,
+      displayOrder: becomesVisible ? nextDisplayOrder(nextTrace) : undefined,
       startedAt: patch.startedAt ?? nowMs(),
       completedAt: patch.completedAt,
     });
@@ -452,7 +501,7 @@ function applyLoopFields(block: ConversationWorkBlock, options: LoopTraceOptions
   if (block.kind === 'llm_turn') {
     const result = ensureLoopResult(block);
     const nextText = options.loopResultText?.trim();
-    if (nextText && (!result.text || nextText.length >= result.text.length)) {
+    if (!block.outputItems?.length && nextText && (!result.text || nextText.length >= result.text.length)) {
       result.text = nextText;
     }
     if (options.loopResultStatus) {
@@ -523,6 +572,9 @@ export function upsertLoopResult(
     loopThinking: thinking,
     loopThinkingStatus: thinkingStatus,
   });
+  if (block.thinking?.text && block.thinking.visibility !== 'hidden' && block.thinkingDisplayOrder === undefined) {
+    block.thinkingDisplayOrder = nextDisplayOrder(nextTrace);
+  }
   const hasActiveTools = block.toolCalls.some((call) => call.status === 'pending' || call.status === 'running');
   if (resultStatus === 'streaming' || hasActiveTools) {
     block.status = 'running';
@@ -668,9 +720,18 @@ export function sanitizeStoredWorkTrace(
     if (typeof block.id !== 'string' || !block.id.trim()) return null;
     if (!['pending', 'running', 'complete', 'error', 'cancelled'].includes(block.status)) return null;
     if (!Array.isArray(block.toolCalls)) return null;
+    if (block.displayOrder !== undefined && (!Number.isSafeInteger(block.displayOrder) || block.displayOrder < 1)) return null;
+    if (block.thinkingDisplayOrder !== undefined && (!Number.isSafeInteger(block.thinkingDisplayOrder) || block.thinkingDisplayOrder < 1)) return null;
+    if (block.parentLoopId !== undefined && (typeof block.parentLoopId !== 'string' || !block.parentLoopId)) return null;
+    if (block.outputItems !== undefined && (!Array.isArray(block.outputItems) || !block.outputItems.every((item) => item
+      && isProviderOutputRef(item.providerOutputRef) && typeof item.text === 'string'
+      && (item.phase === undefined || item.phase === 'commentary' || item.phase === 'final_answer')
+      && (item.status === 'streaming' || item.status === 'complete')
+      && Number.isSafeInteger(item.displayOrder) && item.displayOrder > 0))) return null;
     for (const call of block.toolCalls) {
       if (!call || typeof call !== 'object') return null;
       if (call.executionStartedAt !== undefined && (!Number.isFinite(call.executionStartedAt) || call.executionStartedAt < 0)) return null;
+      if (call.displayOrder !== undefined && (!Number.isSafeInteger(call.displayOrder) || call.displayOrder < 1)) return null;
       if (call.hookDiagnostics !== undefined && (
         !Array.isArray(call.hookDiagnostics)
         || !call.hookDiagnostics.every((diagnostic) => diagnostic

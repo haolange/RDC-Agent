@@ -131,6 +131,28 @@ describe('OpenAI Responses item-scoped stream channels', () => {
     responsesContracts(),
   );
 
+  it('retains a phase announced only at item completion and replays separate text items', async () => {
+    vi.stubGlobal('fetch', async () => sse(
+      { type: 'response.output_item.added', output_index: 0, item: { type: 'message', id: 'm1' } },
+      { type: 'response.output_text.delta', output_index: 0, item_id: 'm1', delta: 'Checking.' },
+      { type: 'response.output_item.done', output_index: 0, item: { type: 'message', id: 'm1', phase: 'commentary' } },
+      { type: 'response.output_item.added', output_index: 1, item: { type: 'message', id: 'm2', phase: 'final_answer' } },
+      { type: 'response.output_text.delta', output_index: 1, item_id: 'm2', delta: 'Done.' },
+      { type: 'response.output_item.done', output_index: 1, item: { type: 'message', id: 'm2', phase: 'final_answer' } },
+      { type: 'response.completed', response: { id: 'resp', status: 'completed' } },
+    ));
+    const message = await new OpenAIResponsesProvider({ apiKey: 'secret' })
+      .stream(model('openai-responses'), context, { requestPlan }).result();
+    expect(textBlocks(message)).toMatchObject([
+      { text: 'Checking.', phase: 'commentary' }, { text: 'Done.', phase: 'final_answer' },
+    ]);
+    const replay = openaiTesting.toResponsesInput({ messages: [message] }, requestPlan);
+    expect(replay).toEqual([
+      { type: 'message', role: 'assistant', content: 'Checking.', phase: 'commentary' },
+      { type: 'message', role: 'assistant', content: 'Done.', phase: 'final_answer' },
+    ]);
+  });
+
   it('keeps one reasoning item open across multiple summary parts', async () => {
     vi.stubGlobal('fetch', async () => sse(
       { type: 'response.output_item.added', output_index: 0, item: { type: 'reasoning', id: 'rs_1' } },

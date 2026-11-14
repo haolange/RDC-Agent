@@ -251,7 +251,7 @@ describe('AgentManifestService effective builtin snapshot', () => {
     expect(projected.modelOptions).toEqual([]);
   });
 
-  it('loads catalogs for configured app-managed providers and referenced diagnostics only', () => {
+  it('loads catalogs for all configured providers and referenced diagnostics only', () => {
     const provider = (id: string, overrides: Partial<LlmProviderEntry> = {}): LlmProviderEntry => ({
       id,
       label: id,
@@ -278,12 +278,33 @@ describe('AgentManifestService effective builtin snapshot', () => {
     expect(agentManifestService.modelOptionCatalogProviderIds(
       [copilot, referencedDisconnected, unusedDisconnected, userManaged],
       routes,
-    )).toEqual(['referenced-provider', 'github-copilot']);
+    )).toEqual(['referenced-provider', 'github-copilot', 'custom-provider']);
 
     expect(agentManifestService.modelOptionCatalogProviderIds(
       [{ ...copilot, isConfigured: false }, unusedDisconnected],
       [],
     )).toEqual([]);
+  });
+
+  it('selects a user-managed model only from its current account and protocol catalog', () => {
+    const provider = { id: 'local', label: 'Local', protocol: 'OpenAICompatibleChatCompletions',
+      catalogOwnership: 'user-managed', enabled: true, isConfigured: true,
+      models: [{ id: 'model', label: 'Model', enabled: true }] } as unknown as LlmProviderEntry;
+    const settings = { directoryPath: '', definitions: [], modelOptions: [], globalInstructions: '', diagnostics: [] } satisfies AgentManifestSettings;
+    const catalog = { providerId: 'local', accountId: 'anonymous:local', protocol: 'OpenAICompatibleChatCompletions',
+      catalogRevision: 'revision', scopeGeneration: 'generation', projectionVersion: 1,
+      generatedAt: '2026-11-13T00:00:00Z', stale: false, refreshing: false,
+      models: [{ providerId: 'local', modelId: 'model', label: 'Model', aliases: [], enabled: true,
+        availability: 'available', presencePolicy: 'discovered', defaultBudgetTokens: 128_000,
+        route: { protocol: 'OpenAICompatibleChatCompletions', source: 'catalog' }, contextTiers: [],
+        controls: { fast: { state: 'unknown', defaultValue: false }, maxContext: { state: 'unsupported', fixedValue: false },
+          reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } } },
+        toolCalling: { state: 'supported' }, visionInput: { state: 'unknown' }, structuredOutput: { state: 'unknown' }, provenance: [],
+      }] } satisfies EffectiveCatalogSnapshot;
+    expect(agentManifestService.projectEffectiveModelOptions(settings, [provider], [], [catalog]).modelOptions)
+      .toEqual([expect.objectContaining({ modelId: 'model', status: 'ready' })]);
+    expect(agentManifestService.projectEffectiveModelOptions(settings, [provider], [], [{ ...catalog, protocol: 'OpenAIResponses' }]).modelOptions)
+      .toEqual([]);
   });
 
   it('rejects saving general into debugger.agent.md and does not delete debugger', async () => {

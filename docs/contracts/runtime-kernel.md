@@ -85,7 +85,7 @@ Renderer 的 EffectiveCatalog store 只是主进程快照镜像：按 provider/a
 
 Provider 请求失败或本地响应提交失败时，本次尚未交给工具执行器的 assistant 流式内容只保留为可见诊断，不进入下一次请求的 Agent 上下文；尤其不能重放没有对应 tool result 的 `tool_call`。仅成功结束的响应才进入正常工具循环。
 
-仅显式 thinking block 可创建 `ThinkingArtifact`；普通 assistant text 永不合成 thinking。仅 `outputPhase='commentary'` 写 Work Process commentary；仅 `final_answer` 写正文与 final trace。正常结束但无 canonical final → fail-closed。
+仅显式 thinking block 可创建 `ThinkingArtifact`；普通 assistant text 永不合成 thinking。每个 assistant text item 保留 `ProviderOutputRef` 与 provider 实际声明的 phase；缺少 phase 时先在原位中性流式呈现，工具调用或正常终止才能确认语义，阶段确认不搬移文本节点。新记录以输出项为文本源，不再双写模型段落的合并 `result.text`；历史记录按原数据读取。显式 commentary 不进入 canonical final；只有正常结束确认的 final 进入正文与 final trace。Responses 同源历史按原项顺序回放已声明的 phase。正常结束但无 canonical final → fail-closed。
 
 ## Provider 错误模型契约
 

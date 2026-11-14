@@ -7,6 +7,7 @@
 - 顶层标题「工作中 / Working」+ Active Signal clipped-gradient 能量扫光（`active-signal-shimmer`，1.6s / 200% / 36% wash，循环整格平铺）。
 - loop thinking 运行态默认展开（summary/raw/unknown 与 final-answer/收束 thinking 同一生命周期）。
 - Active Signal「正在思考 / Thinking」。
+- 每个有可见内容的模型段落各有一个活动节点；纯工具段也有节点。执行中的工具标题扫光，审批等待、失败、取消和完成后停止。
 - `.work-process-label.status-running` **不得**设置 `color`（仅 `--active-signal-highlight`）；运行标签 shimmer 依赖 `color: transparent` + `background-clip: text`，任何后续规则覆盖 `color` 都会冻结为透明。
 - `.work-process-label` 与 collapsed / header hover 只能给 `:not(.is-active)` 设 `color`；`.active-signal-text.is-active` 用 `inline-block`。
 
@@ -20,6 +21,7 @@
 ## Commentary
 
 - commentary 散文（markdown，不进 thinking 槽）。
+- 未确认阶段文本立即增量显示；确认 commentary 或 final 不移动原节点。Tasks 快照、工具和文本按首次可见顺序排列，相同时间戳也保持事件顺序。
 
 ## 统一卡壳
 
@@ -102,7 +104,7 @@
 - 意见栏单行32px与大字号/多行自然增高；点阵4px/4px且不撑高卡片；容器宽高与缩放变化均检查，不以生成图尺寸验收。
 - 依赖等待：pending 灰色空心圆/等待前置任务；真实blocked黄色。前置取消/受阻/完成证明失效、依赖解除不自动启动、历史快照保真分别验证。
 - 交接：send:true不预填、不夹带草稿附件Skill；明确未提交才重试，不明结果先对账；旧请求释放后出现真实新用户锚点。
-- 连续轨道：纯工具、两段说明、Tasks/审批/Plan混排、单工具运行、真实并行和子代理六类；单事件不画短线、终点对齐末事件，节点不透底且光环不侵入内容。
+- 连续轨道：纯工具、两段说明、Tasks/审批/Plan 混排、单工具运行、真实并行和子代理六类。节点对齐标题或首行，展开卡片不改变其锚定；横线止于文字前，竖线只连节点圆心，单节点无竖线。核对换行的 commentary 与已确认 final 不穿过轨道。
 - 动态边界：7→8聚合、24→25窗口化、连续新增/结算、展开/收起、子过程分页，检查逻辑起点、连续线、8/12px间距和用户披露状态；有运行项时保持平铺，全部终止后只聚合一次；真实并发可同时亮蓝，pending、审批和依赖等待不误蓝。
 
 ## 验证命令

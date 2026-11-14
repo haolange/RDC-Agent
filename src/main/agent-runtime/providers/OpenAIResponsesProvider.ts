@@ -34,6 +34,8 @@ export interface OpenAIResponsesProviderOptions {
   apiKey?: string;
   accountId?: string;
   headers?: Record<string, string>;
+  /** Explicitly configured local runtimes may accept requests without credentials. */
+  allowAnonymous?: boolean;
   /** Body-aware authorization, used by transports such as AWS SigV4. */
   requestAuthorizer?: ProviderRequestAuthorizer;
 }
@@ -44,6 +46,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
   private readonly defaultApiKey: string | undefined;
   private readonly accountId: string | undefined;
   private readonly defaultHeaders: Record<string, string>;
+  private readonly allowAnonymous: boolean;
   private readonly requestAuthorizer: ProviderRequestAuthorizer | undefined;
 
   constructor(options: OpenAIResponsesProviderOptions = {}) {
@@ -51,6 +54,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
     this.defaultApiKey = options.apiKey;
     this.accountId = options.accountId?.trim() || undefined;
     this.defaultHeaders = { ...(options.headers ?? {}) };
+    this.allowAnonymous = options.allowAnonymous === true;
     this.requestAuthorizer = options.requestAuthorizer;
   }
 
@@ -82,7 +86,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
     const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API, ...options });
     try {
       builder.start();
-      if (!apiKey && !this.requestAuthorizer) {
+      if (!this.allowAnonymous && !apiKey && !this.requestAuthorizer) {
         throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for OpenAI Responses provider');
       }
       const url = buildOpenAIResponsesUrl(baseUrl);

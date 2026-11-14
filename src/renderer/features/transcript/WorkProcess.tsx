@@ -66,7 +66,7 @@ const WorkProcessInner: React.FC<WorkProcessProps> = ({ trace, sessionId, messag
         </button>
       </div>
 
-      {expanded && hasBody ? <WorkProcessContent presentation={presentation} sessionId={sessionId}
+      {hasBody ? <WorkProcessContent presentation={presentation} sessionId={sessionId}
         disclosureScope={`${sessionId ?? ''}\u0000${messageId}`} /> : null}
     </section>
   );
