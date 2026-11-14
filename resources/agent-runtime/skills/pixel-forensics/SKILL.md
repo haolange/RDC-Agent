@@ -9,11 +9,12 @@ Use this skill when a region of the image, a pixel's history, or overdraw is the
 
 ## 1. Anchor the region from two sides
 
-A region is anchored when you can name the native texture, subresource, pixel rectangle and event, and say why it is the thing the user means. Work from both sides and let them confirm each other.
+Anchor the native texture, subresource, rectangle and event by agreeing image and object evidence.
 
 - **Image side.** Export and inspect the output with `read_image`, enlarging a source-pixel `region` when needed; retain its hash, dimensions and rectangle. Map the candidate rectangle to the native output (event, resource, subresource, dimensions). Read bounded native values at the target and a nearby unaffected control, then inspect pixel history. When a writer composites the image, establish the region mapping to its input and repeat history until an object-producing draw; if history is unavailable, compare the same native region before and after candidate events.
 - **Object side.** Select a draw with passed fragments in the candidate's pixel history when available. Overlay it on its event-bound output, or compare that output before and after; inspect coverage, mesh, textures and shader to identify the object.
-- **Agreement.** Anchor when the image rectangle lies within a draw covering the described object. Record an `observed_fact` Claim linking native region to draw; cite history or before/after values and coverage, mesh or bindings in its Evidence. Label the Evidence `cross-validated` when both sides agree, `user-confirmed` on user confirmation, or `candidate` with one side (choose the next check); map to the native texture.
+- **Agreement.** Anchor when the image rectangle lies within a draw covering the described object. Cite history or before/after values and coverage, mesh or bindings in the Evidence; prefix its summary `cross-validated` when both sides agree, `user-confirmed` on confirmation, or `candidate` with one side (choose the next check). Map to native texture.
+- **Record.** After anchored Evidence, write an `observed_fact` Claim mapping region to draw, even if expected appearance or First Bad Event is unknown.
 
 Missing coordinates are not a reason to stop. If the image or the mapping cannot be obtained, record the exact failed step. If the object or region stays ambiguous after looking, ask the user once.
 
