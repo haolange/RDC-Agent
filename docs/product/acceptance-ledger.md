@@ -4890,3 +4890,11 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - General 在输入附件 Pixel History 不可用后使用事件前后值和 draw 覆盖继续；另一次 shader 调试导致远程断连，产品重开同一 capture 后继续。可逆实验完成并撤销；独立 verifier 因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支记录。
 - 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-a3bede59-7902-4c62-8615-563adf480377.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
 - 规划约 3 分 18 秒、执行约 23 分 1 秒；规划 8 次、General 62 次 Provider 请求，另有 5 次自动审查；General input 9631428／output 24514 token（input 含缓存读取 2019456）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-06-sources.zip`，SHA-256 `a6ff110dc2acfedb59b9fdc3bf7c745e5376adfb06818ba8af68b828d7060764`。
+
+### 2026-11-15：M1 第七轮，停在锚定
+- 骁龙 865／Android remote，十二个 Agent 来源均为内置，隔离 Memory 为空、Knowledge 保持原样；新会话使用 GPT-6.1 Sol／Medium，capture 已打开且画面与设备一致。
+- 监工只输入短症状，对超出已知事实的澄清选一次“不知道”，原样批准并执行计划。General 写了 `cross-validated` Evidence，却没有区域到 draw 的 Claim，首个未满足步骤仍为锚定。
+- Trace 确认 General 实际收到上轮方法修改，写完锚点 Evidence 后直接转写假设，并表示没有正常参考而无法确认 First Bad Event；锚点 Claim 指令混在 Agreement 段中且未明确与 First Bad Event 分离，直接原因归方法文本层。
+- Pixel History 不可用后模型使用前后值与覆盖继续；shader 调试在不同于第六轮的像素坐标上断连，产品重开 capture 后继续并完成可逆实验。verifier 仍因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支保留。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-8c897419-1f7e-45c8-a2ce-79596a01eccf.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
+- 规划约 2 分 59 秒、执行约 28 分 17 秒；规划 7 次、General 108 次 Provider 请求，另有 8 次自动审查；General input 15702127／output 28822 token（input 含缓存读取 5356032）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-07-sources.zip`，SHA-256 `b509c37d6f90c1c04c93f212e1653cfe4dd5892e1a1ec68515cd29aa9a109bd5`。
