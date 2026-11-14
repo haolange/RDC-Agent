@@ -4829,4 +4829,12 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 本轮真实工具回执 `call_783b7940f8b54da2b09e1f0e57605c74.json` 显示请求终点绑定仍为 degraded、写入事件 1779 的绑定为 verified，证明第一轮工具返回修复已进入产品真实路径。
 - 监工在回合结束后用产品入口恢复位置，再关闭回放；恢复回执 `rdc-lifecycle-50261541-ed0b-45ef-bda9-183aa43875db.json`，EID 3029。自有 daemon／worker／helper 和设备转发已释放；设备配置原字节及属性已恢复。
 - 规划约 1分40秒、执行 10分42秒；47 次 Provider 请求，input 3666625／output 17515 token（input 含缓存读取 865280）。失败原始返回 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_f22b378108f1/session-artifacts/tool-outputs/call_608fb687e8e04a76a9df1f0ae31f5a91.json`，SHA-256 `3fa80be1e12b4bb050d2771913652695a0a724d60ba28e004d1bb14167f06112`。
-- 条件更正：隔离 User Space 带了旧 Agent 覆盖，未满足内置配置要求；本轮停点不计入连续三轮。
+- 按 3.6 取设备现场一次：22:41:26 `renderdoccmd` 发生 SIGSEGV／SEGV_MAPERR，栈含 `VulkanColorAndStencilCallback::ReplayDraw`、`PreDraw` 和 `VulkanReplay::PixelHistory`；本地 `.local/vertical-investigation-20261108/evidence/m1-20261114-device-crash-logcat.txt`，SHA-256 `027bdf2eb7082cde65e02af752d0645a3dba9e82c785e9bdd75e6d53f474e45b`。
+- 条件更正：隔离 User Space 带了旧 Agent 覆盖，本轮不计入连续三轮；清除覆盖后在 Settings 的 Agents 页逐一确认 4 个入口及 8 个内部 Agent 均显示“内置”。
+
+### 2026-11-14：M1 Pixel History 回放故障对照
+- 同一资源改到 EID 1248，单次 Pixel History 仍断连并隔离 lease；同一 EID 1716 换目标资源后单次调用成功，历史写入及绑定均有返回。原始返回分别为 `call_94f2b30c80594451aa7413d48aef0962.json`、`call_889627a92f304c499fc2da2535ab5428.json`。
+- 原资源实际只有一个 mip、一个 sample；sample 1 经 `rd.texture.get_data` 单次校验返回 `validation_error: Invalid texture subresource`，无有效的第三个子资源可供 Pixel History 对照。原始返回 `call_0c0d9c6696b34a7aa7c9f4c1b7c8253c.json`。
+- 当前 capture 的原生创建记录显示 usage 23、mip 1、sample 1；资源使用记录显示输入附件与颜色目标在同一事件同时使用。结合本轮设备栈和 11-08 Vulkan 校验现场，故障位于 RenderDoc Vulkan Pixel History／设备驱动的回放路径，无法将单一触发原因归为驱动。创建与使用原始返回 `call_4ab3d522ed3747e4858d2ff545c3e758.json`、`call_6b01cebebe6f4e698c36089e40bd2aa2.json`。
+- 监工输入三项对照及只读创建／使用查询；最终恢复到 EID 3029、设备画面同步后关闭回放，ADB 转发已释放。设备配置先备份、临时单线程编译，结束后原字节及属性已恢复；全部原始返回位于 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_a23752ccdaea/session-artifacts/tool-outputs/`。
+- General 使用 ChatGPT Account／gpt-6-luna／Medium，诊断约 10 分钟，input 595113／output 4345 token（input 含缓存读取 190592）；该诊断不是调查轮。
