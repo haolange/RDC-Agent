@@ -11,8 +11,8 @@ Use this skill during Debugger execution. Do not invent a new kind, Profile, or 
 
 Shape: one `EvidenceRecord` (`kind: evidence`) and a companion `ClaimRecord` (`claimKind: observed_fact`).
 
-1. Name expected result, observed result, and the earliest event or pixel region where they diverge.
-2. Collect the observation through the Settings-configured RDC-Tool CLI (`$rdc-tool-shell`) and `$pixel-forensics` / `$capture-facts`. Read `$pixel-forensics` before interpreting per-fragment color, alpha or test flags; native history fields can be reconstructed or format-limited rather than complete blend inputs.
+1. Trace when the reported feature first appears with same-capture target/control event pairs, even without a normal reference. State event coverage and expected look when known.
+2. Collect observations with `$rdc-tool-shell`, `$pixel-forensics` and `$capture-facts`. Read `$pixel-forensics` before interpreting per-fragment values or test flags: native history may be reconstructed or format-limited.
 3. Persist the WorldState for the observed state before its Evidence, following `$artifact-provenance` record dependencies; raw observations may be collected first. Do not bind fresh observations to a historical WorldState merely to make the reference resolve. Then write Evidence before any companion Claim: `mission: debugger`, `epistemicStatus: observed`, `region.kind` in `{event, pixel}`, `artifactRefs` with their actual content hashes, and a resolvable `worldStateId`. Unknown fields remain honest under the schema; a draft does not assert safety or completed future observations.
 4. The companion Claim may repeat the event id in `scope.eventId`. It stays `observed_fact`. It must not set `declaresCounterfactual` or a causal `experimentId`.
 
