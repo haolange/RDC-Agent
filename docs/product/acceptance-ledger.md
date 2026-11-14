@@ -4906,3 +4906,11 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - Trace 中预载方法要求先写预期结果，没有说明正常参考未知时如何沿同一 capture 追踪症状首次出现；直接原因归方法文本层。已有签名实验完成并回滚，verifier 因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支保留。
 - 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-7ffa3844-dfe3-4f8a-8d42-2a7d9c790453.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
 - 规划约 3 分 45 秒、执行约 25 分 22 秒；规划 9 次、General 92 次 Provider 请求，另有 7 次自动审查；General input 13112467／output 25344 token（input 含缓存读取 6329344）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-08-sources.zip`，SHA-256 `dd6f70a0e34935b2f632586357fac0220021c1951bcdd61a73ae9c7de16ed5e9`。
+
+### 2026-11-15：M1 第九轮，停在首次异常
+- 预检时系统 ADB 在线而产品返回 `adb_device_invalid_response`；重启 ADB 后产品首次重试连接成功。骁龙 865／Android remote，新会话 GPT-6.1 Sol／Medium，十二个 Agent 内置、Memory 为空、Knowledge 保持原样，回放画面与设备一致。
+- 监工只输入短症状，对超出已知事实的澄清选一次“不知道”，原样批准并执行计划。锚定 Evidence 与 `observed_fact` Claim 已写；记录明确 EID 1242→1248 只是对象写入边界，未确立 First Bad Event，首个停点仍为首次异常。
+- Trace 显示计划安排了沿资源链回溯、事件搜索及目标／对照前后值，General 实际执行后 shader 调试返回 `replay_fatal_error`。设备栈 `.local/vertical-investigation-20261108/evidence/m1-round09-shader-debug-logcat.txt` 显示 shader 调试进入 Pixel History 并在 Adreno Vulkan 驱动崩溃。
+- 第三轮前已按 3.6 对同资源换事件、同事件换目标及换 mip／sample 各试一次；较早事件也断连。直接原因属工具／回放层：shader 调试未复用 Pixel History 已知冲突检查，原检查还错误地按查询事件截断用法。产品重开 capture 后完成可逆实验；verifier 因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支保留。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-1edc4c74-0123-491c-a26b-a7e41421b69d.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
+- 规划约 3 分 6 秒、执行约 27 分 45 秒；规划 8 次、General 108 次 Provider 请求，另有 7 次自动审查；General input 16669362／output 26716 token（input 含缓存读取 4370432）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-09-sources.zip`，SHA-256 `1a2190a2ce2d4ea109bd92f6b0c4f479776e481150bfafe8053723bf0a701b32`。
