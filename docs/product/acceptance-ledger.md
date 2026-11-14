@@ -4822,6 +4822,7 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 用户要求再次经产品路径复现；新隔离会话在同一 Android capture 和相同参数下调用一次 `rd.texture.get_pixel_history`，返回一条历史，`binding_truth_level=binding_degraded`，原因含 `binding_unavailable`、`event_bound_pipeline_state_partial`、`summary_degraded`。
 - 监工输入指定操作和参数；前后均为 EID 3029、设备显示同步，结束后归属 daemon、worker、helper 已退出。设备配置先备份并临时启用单线程编译，结束后原字节及属性已恢复。
 - General 使用 ChatGPT Account／gpt-6-luna／Medium，耗时 1分17秒，input 173971／output 1764 token；原始返回 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_18650d0a9397/session-artifacts/tool-outputs/call_964285f0c5004c51854fdd3135f74c7d.json`，SHA-256 `1b1b6cebcc44604683fab338e2ab47882e9841d99eb57df67a74a2d18b691bd7`。
+- 证据位置更正：2026-11-15 收口时该隔离会话路径已不存在，现有归档未找到这份单独复验返回；首次诊断归档仍保留。
 
 ### 2026-11-14：M1 第二轮，重复断连停在锚定
 - Snapdragon 865／Android remote，新隔离会话仅输入“角色头发发白”，原样批准计划；capture 打开且产品预览与设备一致。模型自行执行到上游 Pixel History，未建立区域到发丝 draw 的交叉验证记录，首个未满足步骤仍为锚定。
@@ -4831,6 +4832,7 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 规划约 1分40秒、执行 10分42秒；47 次 Provider 请求，input 3666625／output 17515 token（input 含缓存读取 865280）。失败原始返回 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_f22b378108f1/session-artifacts/tool-outputs/call_608fb687e8e04a76a9df1f0ae31f5a91.json`，SHA-256 `3fa80be1e12b4bb050d2771913652695a0a724d60ba28e004d1bb14167f06112`。
 - 按 3.6 取设备现场一次：22:41:26 `renderdoccmd` 发生 SIGSEGV／SEGV_MAPERR，栈含 `VulkanColorAndStencilCallback::ReplayDraw`、`PreDraw` 和 `VulkanReplay::PixelHistory`；本地 `.local/vertical-investigation-20261108/evidence/m1-20261114-device-crash-logcat.txt`，SHA-256 `027bdf2eb7082cde65e02af752d0645a3dba9e82c785e9bdd75e6d53f474e45b`。
 - 条件更正：隔离 User Space 带了旧 Agent 覆盖，本轮不计入连续三轮；清除覆盖后在 Settings 的 Agents 页逐一确认 4 个入口及 8 个内部 Agent 均显示“内置”。
+- 证据位置更正：2026-11-15 收口时该隔离会话路径已不存在，现有归档未找到本轮 `call_608fb687e8e04a76a9df1f0ae31f5a91.json`；设备崩溃日志和 3.6 对照归档仍保留。
 
 ### 2026-11-14：M1 Pixel History 回放故障对照
 - 同一资源改到 EID 1248，单次 Pixel History 仍断连并隔离 lease；同一 EID 1716 换目标资源后单次调用成功，历史写入及绑定均有返回。原始返回分别为 `call_94f2b30c80594451aa7413d48aef0962.json`、`call_889627a92f304c499fc2da2535ab5428.json`。
@@ -4874,3 +4876,9 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 ### 2026-11-15：M1 第五轮覆盖图映射的单次复验
 - 按 3.3 在独立会话重放本轮覆盖图检查一次：画布为 1920×1080，原生纹理为 1520×700；工具返回 `scale=0`，缺少原生纹理尺寸、有效缩放和画布内容矩形。原始返回 `call_aa71339af23144a9a8763668a51186c0.json`，SHA-256 `b80c0f7298d1030e40a9edf025b64f7866b47a12ddd55028c225703bf90af391`。
 - 监工仅输入该项复验操作和参数；回放前后为事件 3029 且设备画面同步，关闭后转发释放，设备配置原字节及属性已恢复。模型执行约 37 秒、6 次 Provider 请求，input 123093／output 658 token；原始返回、图片和 Trace 归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-05-tool-check.zip`，SHA-256 `a2adf5daf448ea737113bd94e820bd7c43696d398a3f137deec09d700ae11149`。
+
+### 2026-11-15：M1 第六轮启动前设备不可用
+- ADB 显示 `e38b8019` 在线、亮屏且未锁屏；隔离实例已确认十二个 Agent 均为内置，并选择 `WhiteHair.rdc` 与 Android 设备，但产品连接显示“设备不可用”，capture 未打开，未启动调查。
+- 产品原文：`RDC_CLI_FAILED: adb_device_invalid_response: Selected Android device query returned an invalid state`；`D:\Projects\RDX\RDC-Tool\binaries\windows\x64\adb\adb.exe -s e38b8019 get-state` 返回 `returncode: 0`、`stdout: ""`、`stderr: ""`。按 3.5 设备不可用停下，未重试。
+- 启动前先备份并临时启用单线程编译；本轮结束已恢复设备配置原字节及属性，ADB 转发已释放。监工未输入症状或调用模型，token 为 0。
+- 空预检会话归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-06-preflight-session.zip`，SHA-256 `446d4f9362a30ca7b7b970ee35677d3cc05d8584e0308f562881b15c406d1e65`；产品错误原文如上。
