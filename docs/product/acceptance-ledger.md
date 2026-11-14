@@ -4836,5 +4836,7 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 同一资源改到 EID 1248，单次 Pixel History 仍断连并隔离 lease；同一 EID 1716 换目标资源后单次调用成功，历史写入及绑定均有返回。原始返回分别为 `call_94f2b30c80594451aa7413d48aef0962.json`、`call_889627a92f304c499fc2da2535ab5428.json`。
 - 原资源实际只有一个 mip、一个 sample；sample 1 经 `rd.texture.get_data` 单次校验返回 `validation_error: Invalid texture subresource`，无有效的第三个子资源可供 Pixel History 对照。原始返回 `call_0c0d9c6696b34a7aa7c9f4c1b7c8253c.json`。
 - 当前 capture 的原生创建记录显示 usage 23、mip 1、sample 1；资源使用记录显示输入附件与颜色目标在同一事件同时使用。结合本轮设备栈和 11-08 Vulkan 校验现场，故障位于 RenderDoc Vulkan Pixel History／设备驱动的回放路径，无法将单一触发原因归为驱动。创建与使用原始返回 `call_4ab3d522ed3747e4858d2ff545c3e758.json`、`call_6b01cebebe6f4e698c36089e40bd2aa2.json`。
-- 监工输入三项对照及只读创建／使用查询；最终恢复到 EID 3029、设备画面同步后关闭回放，ADB 转发已释放。设备配置先备份、临时单线程编译，结束后原字节及属性已恢复；全部原始返回位于 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_a23752ccdaea/session-artifacts/tool-outputs/`。
+- 监工输入三项对照及只读创建／使用查询；最终恢复到 EID 3029、设备画面同步后关闭回放，ADB 转发已释放。设备配置先备份、临时单线程编译，结束后原字节及属性已恢复；原始返回和 Trace 归档 `.local/vertical-investigation-20261108/evidence/m1-20261114-pixel-history-diagnostic.zip`，SHA-256 `1be9bf8019b0ba8ed2659147d00fe8f3952fe2327b8f1c8ef18868c292a6a378`。
 - General 使用 ChatGPT Account／gpt-6-luna／Medium，诊断约 10 分钟，input 595113／output 4345 token（input 含缓存读取 190592）；该诊断不是调查轮。
+- 第三轮准备：内置 General／Debugger 仍开放 Memory 工具，实际诊断 Trace 的工具清单包含 Memory；清空隔离及项目 Memory 目录不能关闭工具。当前设置无独立关闭项，使用 Agent／Policy 覆盖又不符合 2.1；按 3.5 停在第三轮前。
+- 旁支：内置 Verifier 的模型列表为空；子 Agent 启动要求自身编译后的模型路由。该问题尚未经过本轮调查触发，未查修。
