@@ -4792,3 +4792,25 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - **计量与验证：**本轮 3 次模型请求共 344 tokens（292 input + 52 output）。批量只准备并取消，未派发整个清单。Node 3470 passed / 4 skipped，typecheck、lint（0 errors）、覆盖率 ratchet、gates、正式构建通过。首次 coverage 的临时目录祖先路径受 sandbox 限制，使用工作区 TEMP/TMP 和有限 worker 重跑通过。逐项脱敏回执见 `.local/provider-capability/followup-receipt.json`。
 - **界面与清理：**真实 Settings 触发 Terra 默认与 Fast，Grok 4.3 显示不可用及目录缺席原因。最终档位文案用真实翻译函数覆盖英文和中文，Renderer 全量 856 项通过后新增两项文案回归通过。Composer 有过滤与投影测试证据，真实 Browser 启动页无活跃 Composer，未完成该入口的现场复核。隔离 Browser 冒烟的 bootstrap、同源、授权和 IPC 断言通过，脚本在 Windows 自动删除隔离 profile 时遇到 EPERM；已在核对路径后删除该 profile、coverage、脚本和日志。QA 进程已停止，端口关闭，canonical 启动锁不存在。
 - **Fast 回执更正：**上述现场界面曾显示「本次按标准档处理」。Codex 维护者说明 ChatGPT 登录的 Codex 路由中，终态 `service_tier=default` 无法可靠判定 Fast 实际状态，因此现已改为显示服务端回报及实际 Fast 状态未确认。公开 API 的档位说明和订阅路由分别适用。来源 https://github.com/openai/codex/issues/14204
+
+### 2026-11-14：M1 启动前实机预检阻塞
+- `e38b8019` 在 ADB 设备列表中在线；通过隔离产品实例选择测试工程、`WhiteHair.rdc` 和 Android 设备后，设备连接失败，capture 未打开，画面对照未执行。
+- 产品原文：`RDC_CLI_FAILED: adb_device_invalid_response: Selected Android device query returned an invalid state`；命令为 `D:\Projects\RDX\RDC-Tool\binaries\windows\x64\adb\adb.exe -s e38b8019 get-state`，`returncode: 0`、`stdout: ""`、`stderr: ""`。
+- 人工介入仅为预检选择；设备 RenderDoc 配置未调整。调查未启动，模型 token 为 0；预检及准备约 7 分钟。
+
+### 2026-11-14：M1 解锁后启动前实机预检通过
+- `e38b8019` 在线且亮屏，隔离实例通过 Android remote 打开 `WhiteHair.rdc`，EID 3029 显示 `Device display synchronized`；设备实拍与产品预览一致。证据：`.local/vertical-investigation-20261108/evidence/m1-20261114-{device,replay}-preflight.png`。
+- 预检前备份并校验设备原始 RenderDoc 配置，临时将 `SingleThreadedCompilation` 设为 `true`；本轮结束后已恢复原字节与属性。仅进行预检选择，未调用模型。
+
+### 2026-11-14：M1 第一轮，停在锚定
+- Android remote 的新隔离会话以“角色头发发白”启动；首次未满足步骤为锚定：仅有 `candidate` Evidence，未将原生区域与 draw 确证对应，也无锚点 Claim。
+- Trace 显示 General 已收到像素历史与 draw 覆盖交叉核验方法，但未执行这些检查即耗尽 50 轮；直接观察为模型选择与预算耗尽。同一产品工具要求活跃 owning turn，用户随后授权的单点独立复验见下条。
+- 监工输入：短症状、跳过超出已知事实的澄清、原样批准计划并执行；停止后经产品恢复入口位置。恢复回执 `rdc-lifecycle-5d682a13-38eb-4863-b120-7fc6866feccb.json`；设备临时单线程编译配置的原字节及属性已恢复。
+- 规划 2分57秒、执行 5分32秒；68 次模型请求，input 4351376／output 8237 token（input 含缓存读取 1673984）。本地证据 `.local/vertical-investigation-20261108/evidence/m1-20261114-round-01-sources.zip`，SHA-256 `47099d16fd8dae6fff11d5ea2dd6b8f0ea9d39f8dcfcb3f68f6e7a6caefd3e79`。
+- 旁支：`rdc-tool-shell/references/tools.md` 读取返回 ENOENT；隔离的 General 用户配置可调用列表未列 verifier。两项均未查修。
+
+### 2026-11-14：M1 第一轮锚定检查的单次诊断复验
+- 用户授权独立诊断会话输入操作与参数；同一 Android capture 的候选点经产品路径恰好调用一次 `rd.texture.get_pixel_history`，返回成功及一条历史记录，`binding_truth_level=binding_degraded`，不能单靠该结果确证对象归属。
+- 第一轮 Trace 显示模型读完 `pixel-forensics` 后转查候选 draw 的 shader／资源，未选择像素历史而耗尽预算；当前证据指向模型选择，未发现该次查询的工具故障，也未证明方法文本的单一修改可消除障碍。
+- 前后产品画面均为 EID 3029 且设备显示同步；关闭回放后归属 daemon／worker／helper 已退出。设备配置先备份、临时启用单线程编译，结束后原字节及属性恢复。
+- General 使用 ChatGPT Account／gpt-6-luna／Medium，10 次请求，耗时 1分10秒，input 194097／output 1750 token。本地证据 `.local/vertical-investigation-20261108/evidence/m1-20261114-diagnostic-sources.zip`，SHA-256 `dfbeeca1f9256482bff244907917e8e76f8a1cf5fb438d6a180aad3abfdc2d57`。
