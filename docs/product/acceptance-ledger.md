@@ -4810,6 +4810,7 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 监工输入：短症状、跳过超出已知事实的澄清、原样批准计划并执行；停止后经产品恢复入口位置。恢复回执 `rdc-lifecycle-5d682a13-38eb-4863-b120-7fc6866feccb.json`；设备临时单线程编译配置的原字节及属性已恢复。
 - 规划 2分57秒、执行 5分32秒；68 次模型请求，input 4351376／output 8237 token（input 含缓存读取 1673984）。本地证据 `.local/vertical-investigation-20261108/evidence/m1-20261114-round-01-sources.zip`，SHA-256 `47099d16fd8dae6fff11d5ea2dd6b8f0ea9d39f8dcfcb3f68f6e7a6caefd3e79`。
 - 旁支：`rdc-tool-shell/references/tools.md` 读取返回 ENOENT；隔离的 General 用户配置可调用列表未列 verifier。两项均未查修。
+- 条件更正：隔离 User Space 带了旧 Agent 覆盖，未满足内置配置要求；本轮停点不计入连续三轮。
 
 ### 2026-11-14：M1 第一轮锚定检查的单次诊断复验
 - 用户授权独立诊断会话输入操作与参数；同一 Android capture 的候选点经产品路径恰好调用一次 `rd.texture.get_pixel_history`，返回成功及一条历史记录，`binding_truth_level=binding_degraded`，不能单靠该结果确证对象归属。
@@ -4824,7 +4825,8 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 
 ### 2026-11-14：M1 第二轮，重复断连停在锚定
 - Snapdragon 865／Android remote，新隔离会话仅输入“角色头发发白”，原样批准计划；capture 打开且产品预览与设备一致。模型自行执行到上游 Pixel History，未建立区域到发丝 draw 的交叉验证记录，首个未满足步骤仍为锚定。
-- 同一设备、capture、单线程配置、资源 `ResourceId::208592` 和事件 1716 下再次发生远程连接丢失，触发计划 3.5；本次坐标 `(690,70)`，11-09 现场为 `(681,78)`。错误原文：`RDC_CLI_FAILED: replay_fatal_error: Native replay fatal error: Connection lost to remote server`，lease quarantined。
+- 同一设备、capture、单线程配置、资源 `ResourceId::208592` 和事件 1716 下再次发生远程连接丢失；本次坐标 `(690,70)`，11-09 现场为 `(681,78)`。错误原文：`RDC_CLI_FAILED: replay_fatal_error: Native replay fatal error: Connection lost to remote server`，lease quarantined。按更新后的 3.5，有替代路径时继续。
 - 本轮真实工具回执 `call_783b7940f8b54da2b09e1f0e57605c74.json` 显示请求终点绑定仍为 degraded、写入事件 1779 的绑定为 verified，证明第一轮工具返回修复已进入产品真实路径。
 - 监工在回合结束后用产品入口恢复位置，再关闭回放；恢复回执 `rdc-lifecycle-50261541-ed0b-45ef-bda9-183aa43875db.json`，EID 3029。自有 daemon／worker／helper 和设备转发已释放；设备配置原字节及属性已恢复。
 - 规划约 1分40秒、执行 10分42秒；47 次 Provider 请求，input 3666625／output 17515 token（input 含缓存读取 865280）。失败原始返回 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_f22b378108f1/session-artifacts/tool-outputs/call_608fb687e8e04a76a9df1f0ae31f5a91.json`，SHA-256 `3fa80be1e12b4bb050d2771913652695a0a724d60ba28e004d1bb14167f06112`。
+- 条件更正：隔离 User Space 带了旧 Agent 覆盖，未满足内置配置要求；本轮停点不计入连续三轮。
