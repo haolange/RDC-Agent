@@ -4863,3 +4863,14 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 依次对本轮候选 draw 的实际绑定输出、已确认写入的末端事件、像素历史中通过的场景事件各调用一次 Drawcall overlay；前两张分别为黑图和全屏覆盖，第三张显示头发轮廓，三次工具均成功。第三项原始返回 `call_e466f237f37c42b8b3653e8720ed1dd7.json`，SHA-256 `4587f541ee20b70a23d8b6a43806bd64c230b257404b2a01d1f9cab4da0bacdd`。
 - 监工输入各次操作和参数；复验前误选另一抓帧并在传输期间中止，释放本机进程及转发后改选 `WhiteHair.rdc`。复验后回到事件 3029、设备画面同步；关闭回放并释放转发，设备配置原字节及属性已恢复。
 - 三回合模型执行约 86 秒、12 次 Provider 请求，input 294883／output 1518 token；原始返回、图片和 Trace 归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-04-tool-check.zip`，SHA-256 `c9cad8140fbfedc221be0c36ac0d9bc0800af998b51a30646b3616714ae0c99f`。
+
+### 2026-11-15：M1 第五轮，停在锚定
+- 骁龙 865／Android remote，新隔离会话只输入“角色头发发白”；十二个 Agent 来源均为内置，用户及项目 Memory 目录为空，Knowledge 与用户目录 6 个文件哈希一致。设备在线、抓帧打开，画面与设备一致。
+- 监工原样批准计划；General 三次询问预期颜色或区域，均回答“不知道”。产品追踪至上游并生成候选 Evidence，但因覆盖图画布和原生纹理尺寸不同、缺少映射信息，未建立原生区域与头发 draw 的交叉锚定；首个未满足步骤为锚定。3.3 单点复验确认直接原因在工具返回层，见下。
+- 修复：RDC-Tool 的覆盖图返回原生尺寸、有效缩放、画布内容矩形与翻转状态；尺寸不可得时明确标记不可用，并同步操作契约。
+- 本轮产品路径触发已知 Pixel History 不支持条件，返回 `pixel_history_unsupported_input_attachment`，主进程确认原事件已恢复且 lease 保留；无远程断连。最终恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-265fe4d2-84cf-4175-8133-a22e1c883e03.json`；关闭回放后转发已释放，设备配置原字节及属性已恢复。
+- 规划约 1 分 52 秒、执行约 39 分 34 秒；规划 15 次、General 119 次 Provider 请求，另有 3 次压缩和 7 次自动审查；General 回报 input 8907523／output 65305 token（input 含缓存读取 3736576）。原始会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-05-sources.zip`，SHA-256 `6a4280a76992e45e78a7a595e08f5dcbc9e23cb70ca4daef15e38263cf81b204`。
+
+### 2026-11-15：M1 第五轮覆盖图映射的单次复验
+- 按 3.3 在独立会话重放本轮覆盖图检查一次：画布为 1920×1080，原生纹理为 1520×700；工具返回 `scale=0`，缺少原生纹理尺寸、有效缩放和画布内容矩形。原始返回 `call_aa71339af23144a9a8763668a51186c0.json`，SHA-256 `b80c0f7298d1030e40a9edf025b64f7866b47a12ddd55028c225703bf90af391`。
+- 监工仅输入该项复验操作和参数；回放前后为事件 3029 且设备画面同步，关闭后转发释放，设备配置原字节及属性已恢复。模型执行约 37 秒、6 次 Provider 请求，input 123093／output 658 token；原始返回、图片和 Trace 归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-05-tool-check.zip`，SHA-256 `a2adf5daf448ea737113bd94e820bd7c43696d398a3f137deec09d700ae11149`。
