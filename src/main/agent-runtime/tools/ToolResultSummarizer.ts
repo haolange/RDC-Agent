@@ -51,6 +51,20 @@ function nativeShellSummary(result: AgentToolResult): string | null {
     parts.push(`history=${history.length}`, `eventFragments=${eventHistory.length}`, `passed=${passed.length}`, `shaderValid=${validShader.length}`);
     const primitives = passed.map((item) => item.primitive_id).filter((value) => Number.isSafeInteger(value));
     if (primitives.length > 0) parts.push(`passedPrimitiveIds=${primitives.slice(0, 8).join(',')}${primitives.length > 8 ? ',…' : ''}`);
+    const writers = [...new Set(history.map((item) => item.event_id).filter((value) => Number.isSafeInteger(value)))];
+    if (writers.length > 0) parts.push(`writerEvents=${writers.slice(0, 8).join(',')}${writers.length > 8 ? ',…' : ''}`);
+    if (typeof data.history_bindings_status === 'string') parts.push(`writerBindingsStatus=${data.history_bindings_status}`);
+    if (Array.isArray(data.history_bindings)) {
+      const bindings = data.history_bindings.map(asRecord).filter(
+        (item): item is Record<string, unknown> => item !== null && Number.isSafeInteger(item.event_id),
+      );
+      const summary = bindings.slice(0, 8).map((item) => {
+        const level = item.binding_truth_level === 'binding_verified' ? 'verified'
+          : item.binding_truth_level === 'binding_degraded' ? 'degraded' : 'unknown';
+        return `${item.event_id}:${level}`;
+      });
+      if (summary.length > 0) parts.push(`writerBindings=${summary.join(',')}${bindings.length > 8 ? ',…' : ''}`);
+    }
     if (typeof data.binding_truth_level === 'string') parts.push(`binding=${data.binding_truth_level}`);
     if (typeof data.evidence_truth_level === 'string') parts.push(`evidence=${data.evidence_truth_level}`);
     if (Array.isArray(data.summary_degraded_reasons) && data.summary_degraded_reasons.length > 0) {

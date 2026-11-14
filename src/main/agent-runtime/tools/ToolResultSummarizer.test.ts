@@ -39,6 +39,10 @@ describe('ToolResultSummarizer', () => {
         result_kind: 'rd.texture.get_pixel_history', ok: true,
         data: { resolved_event_id: 15, target_metadata: { texture_id: 'ResourceId::3', x: 7, y: 11 },
           history, binding_truth_level: 'binding_verified', evidence_truth_level: 'structured_readback',
+          history_bindings_status: 'complete', history_bindings: [
+            { event_id: 12, binding_truth_level: 'binding_verified' },
+            { event_id: 15, binding_truth_level: 'binding_degraded' },
+          ],
           summary_degraded_reasons: [] },
         meta: { trace_id: 'trc-current' },
       },
@@ -52,6 +56,7 @@ describe('ToolResultSummarizer', () => {
     expect(summary).toContain('session=sess-owner context=rdc-context replay=sess-replay capture=capf-capture');
     expect(summary).toContain('event=15 target=ResourceId::3 pixel=(7,11)');
     expect(summary).toContain('history=80 eventFragments=75 passed=2 shaderValid=75 passedPrimitiveIds=7,9');
+    expect(summary).toContain('writerEvents=12,15 writerBindingsStatus=complete writerBindings=12:verified,15:degraded');
     expect(summary).toContain('binding=binding_verified evidence=structured_readback');
     expect(summary).toContain('trace=trc-current');
     expect(summary!.length).toBeLessThan(500);

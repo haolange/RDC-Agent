@@ -2,7 +2,7 @@
 
 # Debugger RDC 工具参考
 
-Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49bec3027a0ed6d7`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
+Current catalog fingerprint: `cae6e6f2ff83940e19625361aadd4a3e9cb98cf5c9ae1e4ef5bf159f0c016987`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
 
 所有 `shell.rdc` 示例都省略由主进程注入的 `session_id` / `capture_file_id` / context 身份。不要把示例补成可覆盖其它会话的身份。共享发现、错误恢复、输出与副作用规则见 `$rdc-tool-shell`。
 
@@ -628,7 +628,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `target` | 否 | object |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): {history, resolved_event_id, texture_id, target_metadata, binding_truth_level, evidence_truth_level}. Each history item includes pre_mod, shader_out and post_mod with native validity, format-aware color_rgba, depth and stencil. Non-finite color channels are null and listed in non_finite_channels; missing or invalid values are explicit. pre_mod is unavailable for non-first fragments. shader_out maps RenderDoc PixelModification.shaderOut: native fragment shader output, not a shader-input trace. Its depth is copied from ModificationValue.depth. Native validity does not establish bit-exact equality to input FragCoord.z, original invocation correspondence, or a numerical error bound; these require separate backend-specific qualification. Depth-test flag reconstruction or quantization must not be treated as an error bound on shader_out.depth.; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {history, history_bindings, history_bindings_status, resolved_event_id, texture_id, target_metadata, binding_truth_level, evidence_truth_level}. When include_shaders is true, history_bindings contains shader and output-target bindings or an explicit error per writer event; top-level binding truth applies to resolved_event_id. Each history item preserves native validity, format-aware color_rgba, depth and stencil. Non-finite channels are null and listed in non_finite_channels; missing or invalid values are explicit. pre_mod is unavailable for non-first fragments. shader_out is native fragment output, not shader input; depth is ModificationValue.depth. Validity does not prove bit-exact FragCoord.z, invocation correspondence, or a numerical error bound; reconstructed depth-test flags and quantization do not supply that bound.; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 

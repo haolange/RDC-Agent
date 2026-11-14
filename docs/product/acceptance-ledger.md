@@ -4804,13 +4804,20 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 
 ### 2026-11-14：M1 第一轮，停在锚定
 - Android remote 的新隔离会话以“角色头发发白”启动；首次未满足步骤为锚定：仅有 `candidate` Evidence，未将原生区域与 draw 确证对应，也无锚点 Claim。
-- Trace 显示 General 已收到像素历史与 draw 覆盖交叉核验方法，但未执行这些检查即耗尽 50 轮；预算用途和直接原因待按计划 3.3 核查。同一产品工具要求活跃 owning turn，用户随后授权的单点独立复验见下条。
+- Trace 显示 General 已收到像素历史与 draw 覆盖交叉核验方法，但未执行这些检查即耗尽 50 次 Provider 请求；上限来自隔离 User Space 的 General `max-turns: 50`，不是计划正文、工具调用数或期限。
+- 全轮 80 次工具调用：读方法 8、知识 5、取图读图 7、事件／管线／Shader 24、写记录 2、其他 34。直接原因按 3.3 判为工具返回层：像素历史只附查询终点的绑定等级，缺少历史写入事件的绑定；单点复验见下。
+- 修复：RDC-Tool `22f2518` 返回各写入事件的 shader／输出目标绑定和各自的真实状态，保留查询终点的原始降级；产品长结果摘要保留写入事件与绑定状态。
 - 监工输入：短症状、跳过超出已知事实的澄清、原样批准计划并执行；停止后经产品恢复入口位置。恢复回执 `rdc-lifecycle-5d682a13-38eb-4863-b120-7fc6866feccb.json`；设备临时单线程编译配置的原字节及属性已恢复。
 - 规划 2分57秒、执行 5分32秒；68 次模型请求，input 4351376／output 8237 token（input 含缓存读取 1673984）。本地证据 `.local/vertical-investigation-20261108/evidence/m1-20261114-round-01-sources.zip`，SHA-256 `47099d16fd8dae6fff11d5ea2dd6b8f0ea9d39f8dcfcb3f68f6e7a6caefd3e79`。
 - 旁支：`rdc-tool-shell/references/tools.md` 读取返回 ENOENT；隔离的 General 用户配置可调用列表未列 verifier。两项均未查修。
 
 ### 2026-11-14：M1 第一轮锚定检查的单次诊断复验
 - 用户授权独立诊断会话输入操作与参数；同一 Android capture 的候选点经产品路径恰好调用一次 `rd.texture.get_pixel_history`，返回成功及一条历史记录，`binding_truth_level=binding_degraded`，不能单靠该结果确证对象归属。
-- 第一轮 Trace 显示模型读完 `pixel-forensics` 后转查候选 draw 的 shader／资源，未选择像素历史而耗尽预算；单点复验的绑定信息降级，待按计划 3.3 复现并定位。
+- 第一轮 Trace 显示模型读完 `pixel-forensics` 后转查候选 draw 的 shader／资源，未选择像素历史而耗尽预算；单点复验的绑定信息降级，再次复现与定位见下。
 - 前后产品画面均为 EID 3029 且设备显示同步；关闭回放后归属 daemon／worker／helper 已退出。设备配置先备份、临时启用单线程编译，结束后原字节及属性恢复。
 - General 使用 ChatGPT Account／gpt-6-luna／Medium，10 次请求，耗时 1分10秒，input 194097／output 1750 token。本地证据 `.local/vertical-investigation-20261108/evidence/m1-20261114-diagnostic-sources.zip`，SHA-256 `dfbeeca1f9256482bff244907917e8e76f8a1cf5fb438d6a180aad3abfdc2d57`。
+
+### 2026-11-14：M1 锚定检查绑定降级的单次复验
+- 用户要求再次经产品路径复现；新隔离会话在同一 Android capture 和相同参数下调用一次 `rd.texture.get_pixel_history`，返回一条历史，`binding_truth_level=binding_degraded`，原因含 `binding_unavailable`、`event_bound_pipeline_state_partial`、`summary_degraded`。
+- 监工输入指定操作和参数；前后均为 EID 3029、设备显示同步，结束后归属 daemon、worker、helper 已退出。设备配置先备份并临时启用单线程编译，结束后原字节及属性已恢复。
+- General 使用 ChatGPT Account／gpt-6-luna／Medium，耗时 1分17秒，input 173971／output 1764 token；原始返回 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_18650d0a9397/session-artifacts/tool-outputs/call_964285f0c5004c51854fdd3135f74c7d.json`，SHA-256 `1b1b6cebcc44604683fab338e2ab47882e9841d99eb57df67a74a2d18b691bd7`。
