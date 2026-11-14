@@ -138,6 +138,7 @@ export async function executeRdcShell(
     const temporaryReplayRead = definition.effects.includes('replay_position_temporary');
     originalEvent = temporaryReplayRead || input.operation === 'rd.export.screenshot'
       || input.operation === 'rd.shader.get_source' || input.operation === 'rd.shader.get_constant_buffer_contents'
+      || input.operation === 'rd.texture.get_pixel_history'
       ? await readReplayEvent() : undefined;
     lastInvocation = rdcInvocationRecord(input.operation, args);
     const result = await rdcCliInvokerService.executeCLI('call', [
@@ -214,9 +215,9 @@ export async function executeRdcShell(
       } catch { /* An unverified restoration remains quarantined. */ }
     }
     if (!nativeStateVerifiedSafe && error instanceof RdcNativeFailure
-      && originalEvent !== undefined && originalEvent > 0 && error.shaderInspectionRestoration?.eventId === originalEvent
-      && error.shaderInspectionRestoration.contextId === lease.contextId
-      && error.shaderInspectionRestoration.sessionId === replaySessionId && !signal?.aborted) {
+      && originalEvent !== undefined && originalEvent > 0 && error.inspectionRestoration?.eventId === originalEvent
+      && error.inspectionRestoration.contextId === lease.contextId
+      && error.inspectionRestoration.sessionId === replaySessionId && !signal?.aborted) {
       try {
         const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
         nativeStateVerifiedSafe = current?.version === lease.version && current.contextId === lease.contextId
@@ -239,7 +240,7 @@ export async function executeRdcShell(
       if (nativeStateVerifiedSafe) {
         if (error.effectsNotAttempted) Object.assign(proof, { effects_attempted: false, context_preserved: true });
         if (error.replacementNotAttempted) Object.assign(proof, { replacement_attempted: false, context_preserved: true });
-        const restored = error.screenshotTargetRestoration ?? error.shaderInspectionRestoration;
+        const restored = error.screenshotTargetRestoration ?? error.inspectionRestoration;
         if (restored) Object.assign(proof, { replay_state_restored: true, restored_event_id: restored.eventId });
       }
       const details = {

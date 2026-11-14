@@ -16,7 +16,7 @@ export class RdcNativeFailure extends Error {
     readonly replacementNotAttempted: boolean, readonly effectsNotAttempted: boolean,
     readonly nativeError: { code: string; category: string | null; exitCode: number; details?: Record<string, unknown> },
     readonly screenshotTargetRestoration: { contextId: string; sessionId: string; eventId: number } | null = null,
-    readonly shaderInspectionRestoration: { contextId: string; sessionId: string; eventId: number } | null = null) {
+    readonly inspectionRestoration: { contextId: string; sessionId: string; eventId: number } | null = null) {
     super(message);
     this.name = 'RdcNativeFailure';
   }
@@ -70,14 +70,17 @@ export function parseRdcNativeResult(result: CLIResult, expectedContext?: string
         && typeof details?.context_id === 'string' && typeof details?.session_id === 'string'
         && Number.isSafeInteger(details?.restored_event_id) && Number(details?.restored_event_id) > 0
         ? { contextId: details.context_id, sessionId: details.session_id, eventId: Number(details.restored_event_id) } : null;
-      const knownShaderInspectionFailure = (resultKind === 'rd.shader.get_source'
+      const knownInspectionFailure = failure.category === 'runtime' && ((resultKind === 'rd.shader.get_source'
         && failure.code === 'shader_binding_lookup_failed' && details?.failure_stage === 'resolve_binding'
         && ['stage_unbound', 'shader_id_not_bound'].includes(String(details?.failure_reason)))
         || (resultKind === 'rd.shader.get_constant_buffer_contents' && failure.code === 'constant_buffer_data_unavailable'
           && details?.failure_stage === 'decode_constant_buffer'
-          && ['slot_unavailable', 'reflection_unavailable_without_raw_fallback'].includes(String(details?.failure_reason)));
-      const shaderInspectionRestoration = envelope.schema_version === '3.0.0' && result.exitCode !== 0
-        && resultKind === expectedKind && failure.category === 'runtime' && knownShaderInspectionFailure
+          && ['slot_unavailable', 'reflection_unavailable_without_raw_fallback'].includes(String(details?.failure_reason))))
+        || (resultKind === 'rd.texture.get_pixel_history' && failure.category === 'capability'
+          && failure.code === 'pixel_history_unsupported_input_attachment'
+          && details?.failure_stage === 'validate_input_attachment');
+      const inspectionRestoration = envelope.schema_version === '3.0.0' && result.exitCode !== 0
+        && resultKind === expectedKind && knownInspectionFailure
         && details?.replay_state_restored === true
         && typeof details?.context_id === 'string' && typeof details?.session_id === 'string'
         && Number.isSafeInteger(details?.restored_event_id) && Number(details?.restored_event_id) > 0
@@ -94,7 +97,7 @@ export function parseRdcNativeResult(result: CLIResult, expectedContext?: string
       throw new RdcNativeFailure(`RDC_CLI_FAILED: ${failure.code}: ${failure.message}${suffix}${guidance}`,
         resultKind, replacementNotAttempted, effectsNotAttempted,
         { code: failure.code, category: typeof failure.category === 'string' ? failure.category : null, exitCode: result.exitCode, ...(details ? { details } : {}) },
-        screenshotTargetRestoration, shaderInspectionRestoration);
+        screenshotTargetRestoration, inspectionRestoration);
     }
   }
   if (result.exitCode !== 0) throw new Error('RDC_CLI_FAILED: native rdc exited with code ' + result.exitCode);

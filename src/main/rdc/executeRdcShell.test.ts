@@ -686,6 +686,29 @@ it.each([
   expect(mock.execute).toHaveBeenCalledTimes(proofEvent === 1248 ? 3 : 2);
 });
 
+it.each([11, 19])('retains an unavailable Pixel History lease only after verifying restored event %s', async after => {
+  const query: RdcOperationDefinition = { ...definition, name: 'rd.texture.get_pixel_history', namespace: 'texture',
+    input_schema: { type: 'object', properties: { session_id: { type: 'string' } },
+      required: ['session_id'], additionalProperties: false }, effects: ['replay_position'], evidence_kind: null };
+  const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };
+  const snapshot = (event: number) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true,
+    result_kind: 'rd.session.get_context', data: { context_id: lease.contextId,
+      current_session_id: 'native-replay', runtime: { active_event_id: event } } }) });
+  mock.execute.mockReset();
+  mock.execute.mockResolvedValueOnce(snapshot(11)).mockResolvedValueOnce({ exitCode: 1,
+    stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: query.name, ok: false,
+      error: { code: 'pixel_history_unsupported_input_attachment', category: 'capability', message: 'Unavailable',
+        details: { context_id: lease.contextId, session_id: 'native-replay', failure_stage: 'validate_input_attachment',
+          replay_state_restored: true, restored_event_id: 11 } } })
+  }).mockResolvedValueOnce(snapshot(after));
+  const failure = await executeRdcShell({ operation: query.name, args: {} }, 'history', undefined, bound).catch(error => error);
+  expect(failure.deliveryResult.details).toMatchObject({
+    nativeFailure: { code: 'pixel_history_unsupported_input_attachment', category: 'capability' },
+    mainValidation: { preservationVerified: after === 11, leaseState: after === 11 ? 'retained' : 'quarantined' },
+  });
+  expect(mock.quarantine).toHaveBeenCalledTimes(after === 11 ? 0 : 1);
+});
+
 it.each([false, true])('retains the lease after stale-debug rejection only with no native effects: %s', async (effectsAttempted) => {
   const debug: RdcOperationDefinition = { ...definition, name: 'rd.shader.get_debug_state', namespace: 'shader', evidence_kind: null };
   const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [debug], lease) };
