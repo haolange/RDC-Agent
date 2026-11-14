@@ -686,8 +686,13 @@ it.each([
   expect(mock.execute).toHaveBeenCalledTimes(proofEvent === 1248 ? 3 : 2);
 });
 
-it.each([11, 19])('retains an unavailable Pixel History lease only after verifying restored event %s', async after => {
-  const query: RdcOperationDefinition = { ...definition, name: 'rd.texture.get_pixel_history', namespace: 'texture',
+it.each([
+  { name: 'rd.texture.get_pixel_history', namespace: 'texture', after: 11 },
+  { name: 'rd.texture.get_pixel_history', namespace: 'texture', after: 19 },
+  { name: 'rd.shader.debug_start', namespace: 'shader', after: 11 },
+  { name: 'rd.shader.debug_start', namespace: 'shader', after: 19 },
+])('retains an unavailable Pixel History lease only after verifying restored event: %j', async ({ name, namespace, after }) => {
+  const query: RdcOperationDefinition = { ...definition, name, namespace,
     input_schema: { type: 'object', properties: { session_id: { type: 'string' } },
       required: ['session_id'], additionalProperties: false }, effects: ['replay_position'], evidence_kind: null };
   const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };

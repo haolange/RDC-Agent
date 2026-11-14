@@ -76,7 +76,7 @@ export function parseRdcNativeResult(result: CLIResult, expectedContext?: string
         || (resultKind === 'rd.shader.get_constant_buffer_contents' && failure.code === 'constant_buffer_data_unavailable'
           && details?.failure_stage === 'decode_constant_buffer'
           && ['slot_unavailable', 'reflection_unavailable_without_raw_fallback'].includes(String(details?.failure_reason))))
-        || (resultKind === 'rd.texture.get_pixel_history' && failure.category === 'capability'
+        || (['rd.texture.get_pixel_history', 'rd.shader.debug_start'].includes(resultKind!) && failure.category === 'capability'
           && failure.code === 'pixel_history_unsupported_input_attachment'
           && details?.failure_stage === 'validate_input_attachment');
       const inspectionRestoration = envelope.schema_version === '3.0.0' && result.exitCode !== 0
