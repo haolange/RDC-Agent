@@ -4898,3 +4898,11 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - Pixel History 不可用后模型使用前后值与覆盖继续；shader 调试在不同于第六轮的像素坐标上断连，产品重开 capture 后继续并完成可逆实验。verifier 仍因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支保留。
 - 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-8c897419-1f7e-45c8-a2ce-79596a01eccf.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
 - 规划约 2 分 59 秒、执行约 28 分 17 秒；规划 7 次、General 108 次 Provider 请求，另有 8 次自动审查；General input 15702127／output 28822 token（input 含缓存读取 5356032）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-07-sources.zip`，SHA-256 `b509c37d6f90c1c04c93f212e1653cfe4dd5892e1a1ec68515cd29aa9a109bd5`。
+
+### 2026-11-15：M1 第八轮，停在首次异常
+- 骁龙 865／Android remote，新会话使用 GPT-6.1 Sol／Medium；十二个 Agent 来源均为内置，隔离 Memory 为空、Knowledge 保持原样，capture 已打开且画面与设备一致。
+- 监工只输入短症状，对正常颜色选“不知道”，原样批准并执行计划。规划读取了第六轮在测试工程写出的结果文件并将其标为旧线索；General 在当前 capture 重做了锚点与对照。两份跨轮结果文本原样归档 `.local/vertical-investigation-20261108/evidence/m1-project-test-results.zip`。
+- 本轮写出 `cross-validated` Evidence 和区域到 draw 的 `observed_fact` Claim，锚定通过；只确认 EID 1248 为最早已抽查的对象输出边界，未证明异常最早出现事件，首个未满足步骤前移到首次异常。
+- Trace 中预载方法要求先写预期结果，没有说明正常参考未知时如何沿同一 capture 追踪症状首次出现；直接原因归方法文本层。已有签名实验完成并回滚，verifier 因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支保留。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-7ffa3844-dfe3-4f8a-8d42-2a7d9c790453.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
+- 规划约 3 分 45 秒、执行约 25 分 22 秒；规划 9 次、General 92 次 Provider 请求，另有 7 次自动审查；General input 13112467／output 25344 token（input 含缓存读取 6329344）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-08-sources.zip`，SHA-256 `dd6f70a0e34935b2f632586357fac0220021c1951bcdd61a73ae9c7de16ed5e9`。
