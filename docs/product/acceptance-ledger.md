@@ -4821,3 +4821,10 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 用户要求再次经产品路径复现；新隔离会话在同一 Android capture 和相同参数下调用一次 `rd.texture.get_pixel_history`，返回一条历史，`binding_truth_level=binding_degraded`，原因含 `binding_unavailable`、`event_bound_pipeline_state_partial`、`summary_degraded`。
 - 监工输入指定操作和参数；前后均为 EID 3029、设备显示同步，结束后归属 daemon、worker、helper 已退出。设备配置先备份并临时启用单线程编译，结束后原字节及属性已恢复。
 - General 使用 ChatGPT Account／gpt-6-luna／Medium，耗时 1分17秒，input 173971／output 1764 token；原始返回 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_18650d0a9397/session-artifacts/tool-outputs/call_964285f0c5004c51854fdd3135f74c7d.json`，SHA-256 `1b1b6cebcc44604683fab338e2ab47882e9841d99eb57df67a74a2d18b691bd7`。
+
+### 2026-11-14：M1 第二轮，重复断连停在锚定
+- Snapdragon 865／Android remote，新隔离会话仅输入“角色头发发白”，原样批准计划；capture 打开且产品预览与设备一致。模型自行执行到上游 Pixel History，未建立区域到发丝 draw 的交叉验证记录，首个未满足步骤仍为锚定。
+- 同一设备、capture、单线程配置、资源 `ResourceId::208592` 和事件 1716 下再次发生远程连接丢失，触发计划 3.5；本次坐标 `(690,70)`，11-09 现场为 `(681,78)`。错误原文：`RDC_CLI_FAILED: replay_fatal_error: Native replay fatal error: Connection lost to remote server`，lease quarantined。
+- 本轮真实工具回执 `call_783b7940f8b54da2b09e1f0e57605c74.json` 显示请求终点绑定仍为 degraded、写入事件 1779 的绑定为 verified，证明第一轮工具返回修复已进入产品真实路径。
+- 监工在回合结束后用产品入口恢复位置，再关闭回放；恢复回执 `rdc-lifecycle-50261541-ed0b-45ef-bda9-183aa43875db.json`，EID 3029。自有 daemon／worker／helper 和设备转发已释放；设备配置原字节及属性已恢复。
+- 规划约 1分40秒、执行 10分42秒；47 次 Provider 请求，input 3666625／output 17515 token（input 含缓存读取 865280）。失败原始返回 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_f22b378108f1/session-artifacts/tool-outputs/call_608fb687e8e04a76a9df1f0ae31f5a91.json`，SHA-256 `3fa80be1e12b4bb050d2771913652695a0a724d60ba28e004d1bb14167f06112`。
