@@ -4838,5 +4838,16 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 当前 capture 的原生创建记录显示 usage 23、mip 1、sample 1；资源使用记录显示输入附件与颜色目标在同一事件同时使用。结合本轮设备栈和 11-08 Vulkan 校验现场，故障位于 RenderDoc Vulkan Pixel History／设备驱动的回放路径，无法将单一触发原因归为驱动。创建与使用原始返回 `call_4ab3d522ed3747e4858d2ff545c3e758.json`、`call_6b01cebebe6f4e698c36089e40bd2aa2.json`。
 - 监工输入三项对照及只读创建／使用查询；最终恢复到 EID 3029、设备画面同步后关闭回放，ADB 转发已释放。设备配置先备份、临时单线程编译，结束后原字节及属性已恢复；原始返回和 Trace 归档 `.local/vertical-investigation-20261108/evidence/m1-20261114-pixel-history-diagnostic.zip`，SHA-256 `1be9bf8019b0ba8ed2659147d00fe8f3952fe2327b8f1c8ef18868c292a6a378`。
 - General 使用 ChatGPT Account／gpt-6-luna／Medium，诊断约 10 分钟，input 595113／output 4345 token（input 含缓存读取 190592）；该诊断不是调查轮。
-- 第三轮准备：内置 General／Debugger 仍开放 Memory 工具，实际诊断 Trace 的工具清单包含 Memory；清空隔离及项目 Memory 目录不能关闭工具。当前设置无独立关闭项，使用 Agent／Policy 覆盖又不符合 2.1；按 3.5 停在第三轮前。
+- 第三轮准备更正：用户明确“Memory 关闭”指隔离环境不使用已有 Memory，目录为空即可；隔离 User Space 和测试工程的 Memory 目录均为空，内置工具可保留。此前因此判定阻塞不成立，继续第三轮。
 - 旁支：内置 Verifier 的模型列表为空；子 Agent 启动要求自身编译后的模型路由。该问题尚未经过本轮调查触发，未查修。
+
+### 2026-11-15：M1 第三轮，停在锚定
+- 骁龙 865／Android remote，新隔离会话只输入“角色头发发白”；十二个 Agent 来源均为内置，用户及项目 Memory 目录为空，Knowledge 与用户目录的 6 个文件哈希一致。设备在线、抓帧打开，画面与设备一致。
+- Debugger 提问整体或局部白化，监工按 2.2 选择“不知道”，原样批准计划；General 追踪候选点至后处理输入并写入 draft Evidence，但未把候选区域与实际头发 draw 交叉验证，首个未满足步骤为锚定。3.3 单点复验成功，直接原因归为方法文本：未明确要求沿合成输入继续查询写入事件。
+- General 主动恢复入口事件 3029、capture 和设备，签名回执 `rdc-lifecycle-99af6399-9418-49ed-b885-cf8e2de5f169.json`；关闭回放后 ADB 转发已释放。设备配置先备份、临时单线程编译，结束后原字节及属性已恢复。
+- 规划约 7 分 24 秒、执行约 10 分 08 秒；规划 13 次、General 47 次 Provider 请求，另有 2 次自动审查请求；General 回报 input 3819616／output 13904 token（input 含缓存读取 913280）。原始会话、Trace、Task 与回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-03-sources.zip`，SHA-256 `c6c45dbd8583e986b974d9334e58382ba4c23d20d509aaa0e76fd09295121c91`。
+
+### 2026-11-15：M1 第三轮锚定的单次工具复验
+- 按 3.3 在独立隔离会话复验上游纹理的 Pixel History；首次因 General 把 RDC 操作当作独立工具搜索而未发起调用，监工指出产品的 `rdc-tool-shell` 入口后仅调用一次，返回写入事件 1716、写入绑定 `binding_verified`、`history_bindings_status=complete`。
+- 该资源、坐标和事件已由第三轮实际查询得到，General 当时没有选择其像素历史；本次没有调用已禁止的崩溃参数。原始返回 `call_60412085ca294128bf52411f16f84713.json`，SHA-256 `8abeeb023d322555075a61657b7bc8508050cd865ddb281f942a19fa1f49733e`。
+- 前后产品画面均恢复 EID 3029 且设备显示同步，关闭回放后转发已释放；设备配置先备份、临时单线程编译，结束后原字节及属性已恢复。两回合约 1 分 41 秒，共 13 次 Provider 请求，第二回合 input 111631／output 1126 token。原始会话与 Trace 归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-03-tool-check.zip`，SHA-256 `1207bd83f689d7455688c5f0bf7ed1e2a24cd65e133fb8452d7254fad923a693`。
