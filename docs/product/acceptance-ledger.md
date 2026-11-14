@@ -4851,3 +4851,15 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 按 3.3 在独立隔离会话复验上游纹理的 Pixel History；首次因 General 把 RDC 操作当作独立工具搜索而未发起调用，监工指出产品的 `rdc-tool-shell` 入口后仅调用一次，返回写入事件 1716、写入绑定 `binding_verified`、`history_bindings_status=complete`。
 - 该资源、坐标和事件已由第三轮实际查询得到，General 当时没有选择其像素历史；本次没有调用已禁止的崩溃参数。原始返回 `call_60412085ca294128bf52411f16f84713.json`，SHA-256 `8abeeb023d322555075a61657b7bc8508050cd865ddb281f942a19fa1f49733e`。
 - 前后产品画面均恢复 EID 3029 且设备显示同步，关闭回放后转发已释放；设备配置先备份、临时单线程编译，结束后原字节及属性已恢复。两回合约 1 分 41 秒，共 13 次 Provider 请求，第二回合 input 111631／output 1126 token。原始会话与 Trace 归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-03-tool-check.zip`，SHA-256 `1207bd83f689d7455688c5f0bf7ed1e2a24cd65e133fb8452d7254fad923a693`。
+
+### 2026-11-15：M1 第四轮，停在锚定
+- 骁龙 865／Android remote，新隔离会话只输入“角色头发发白”；十二个 Agent 来源均为内置，隔离用户及项目 Memory 目录为空，Knowledge 保持原样。设备在线、抓帧打开，画面与设备一致。
+- Debugger 两个问题超出已知事实，监工均选“不知道”，原样批准计划。General 取得上游像素历史和候选 draw 覆盖，但未把候选区域与头发 draw 交叉验证，首个未满足步骤仍为锚定；3.3 复验见下，直接原因在方法文本：未明确把历史中通过的片元与该事件绑定输出上的覆盖检查连起来。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-c1554f41-e6f6-4ac1-85e8-7a3ad7afe358.json`；关闭回放后转发已释放。设备配置先备份、临时单线程编译，结束后原字节及属性已恢复。
+- 规划约 4 分 44 秒、执行约 13 分 13 秒；规划 20 次、General 54 次 Provider 请求，General 回报 input 4547299／output 19130 token（input 含缓存读取 1150208）。会话、Trace、Task 与回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-04-sources.zip`，SHA-256 `a0f0a768476f12be1f0bf83025005166549e4156402e4fc9db9c157b7284fd86`。
+- 旁支：规划期间 `task_create` 和 `plan_artifact` 各失败一次，产品随后自行提交计划；未另查修。
+
+### 2026-11-15：M1 第四轮锚定检查的三项复验
+- 依次对本轮候选 draw 的实际绑定输出、已确认写入的末端事件、像素历史中通过的场景事件各调用一次 Drawcall overlay；前两张分别为黑图和全屏覆盖，第三张显示头发轮廓，三次工具均成功。第三项原始返回 `call_e466f237f37c42b8b3653e8720ed1dd7.json`，SHA-256 `4587f541ee20b70a23d8b6a43806bd64c230b257404b2a01d1f9cab4da0bacdd`。
+- 监工输入各次操作和参数；复验前误选另一抓帧并在传输期间中止，释放本机进程及转发后改选 `WhiteHair.rdc`。复验后回到事件 3029、设备画面同步；关闭回放并释放转发，设备配置原字节及属性已恢复。
+- 三回合模型执行约 86 秒、12 次 Provider 请求，input 294883／output 1518 token；原始返回、图片和 Trace 归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-04-tool-check.zip`，SHA-256 `c9cad8140fbfedc221be0c36ac0d9bc0800af998b51a30646b3616714ae0c99f`。
