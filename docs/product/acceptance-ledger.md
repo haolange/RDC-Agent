@@ -4882,3 +4882,4 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 产品原文：`RDC_CLI_FAILED: adb_device_invalid_response: Selected Android device query returned an invalid state`；`D:\Projects\RDX\RDC-Tool\binaries\windows\x64\adb\adb.exe -s e38b8019 get-state` 返回 `returncode: 0`、`stdout: ""`、`stderr: ""`。按 3.5 设备不可用停下，未重试。
 - 启动前先备份并临时启用单线程编译；本轮结束已恢复设备配置原字节及属性，ADB 转发已释放。监工未输入症状或调用模型，token 为 0。
 - 空预检会话归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-06-preflight-session.zip`，SHA-256 `446d4f9362a30ca7b7b970ee35677d3cc05d8584e0308f562881b15c406d1e65`；产品错误原文如上。
+- 按计划更新后的定义，系统 ADB 在线而产品连接失败属于产品连接层缺陷；M1 改回执行中，先重启 ADB 并经产品重试。
