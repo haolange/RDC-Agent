@@ -13,7 +13,7 @@ A region is anchored when you can name the native texture, subresource, pixel re
 
 - **Image side.** Export and inspect the output with `read_image`, enlarging a source-pixel `region` when needed; retain its hash, dimensions and rectangle. Map the candidate rectangle to the native output (event, resource, subresource, dimensions). Read bounded native values at the target and a nearby unaffected control, then inspect pixel history. When a writer composites the image, establish the region mapping to its input and repeat history until an object-producing draw; if history is unavailable, compare the same native region before and after candidate events.
 - **Object side.** Select a draw with passed fragments in the candidate's pixel history when available. Overlay it on its event-bound output, or compare that output before and after; inspect coverage, mesh, textures and shader to identify the object.
-- **Agreement.** The anchor is established when the image-side rectangle lies inside what an object-side draw covers and that draw's content matches the object the user described. Label the anchor at the start of its Evidence summary: `cross-validated` when both sides agree, `candidate` with only one side (choose the next check that could confirm or refute it), `user-confirmed` when the user points out or confirms the region; still map it to the native texture.
+- **Agreement.** Anchor when the image rectangle lies within a draw covering the described object. Record an `observed_fact` Claim linking native region to draw; cite history or before/after values and coverage, mesh or bindings in its Evidence. Label the Evidence `cross-validated` when both sides agree, `user-confirmed` on user confirmation, or `candidate` with one side (choose the next check); map to the native texture.
 
 Missing coordinates are not a reason to stop. If the image or the mapping cannot be obtained, record the exact failed step. If the object or region stays ambiguous after looking, ask the user once.
 
@@ -32,4 +32,4 @@ Missing coordinates are not a reason to stop. If the image or the mapping cannot
 
 ## 4. Record
 
-When the anchored region is the earliest divergence, write it as the Debugger First Bad Event (`$debugger-causal-method`): an `EvidenceRecord` with `region.kind` in `{event, pixel}` and an optional `observed_fact` Claim. Evidence comes first; causal claims wait for a qualifying Experiment.
+When the anchored region is the earliest divergence, record the Debugger First Bad Event (`$debugger-causal-method`) as an `EvidenceRecord` with `region.kind` in `{event, pixel}` and an `observed_fact` Claim. Evidence comes first; causal Claims need a qualifying Experiment.

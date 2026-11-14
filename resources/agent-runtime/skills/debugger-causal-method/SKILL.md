@@ -9,7 +9,7 @@ Use this skill during Debugger execution. Do not invent a new kind, Profile, or 
 
 ## First Bad Event
 
-Shape: one `EvidenceRecord` (`kind: evidence`) plus an optional companion `ClaimRecord` (`claimKind: observed_fact`).
+Shape: one `EvidenceRecord` (`kind: evidence`) and a companion `ClaimRecord` (`claimKind: observed_fact`).
 
 1. Name expected result, observed result, and the earliest event or pixel region where they diverge.
 2. Collect the observation through the Settings-configured RDC-Tool CLI (`$rdc-tool-shell`) and `$pixel-forensics` / `$capture-facts`. Read `$pixel-forensics` before interpreting per-fragment color, alpha or test flags; native history fields can be reconstructed or format-limited rather than complete blend inputs.
