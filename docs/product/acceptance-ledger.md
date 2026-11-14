@@ -4883,3 +4883,10 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 启动前先备份并临时启用单线程编译；本轮结束已恢复设备配置原字节及属性，ADB 转发已释放。监工未输入症状或调用模型，token 为 0。
 - 空预检会话归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-06-preflight-session.zip`，SHA-256 `446d4f9362a30ca7b7b970ee35677d3cc05d8584e0308f562881b15c406d1e65`；产品错误原文如上。
 - 按计划更新后的定义，系统 ADB 在线而产品连接失败属于产品连接层缺陷；M1 改回执行中，先重启 ADB 并经产品重试。
+
+### 2026-11-15：M1 第六轮，停在锚定
+- 重启 ADB 后产品首次重试即连接；骁龙 865／Android remote、新隔离会话、十二个 Agent 均为内置、Memory 为空、Knowledge 保持原样，`WhiteHair.rdc` 画面与设备一致。按用户最新指定使用 ChatGPT Account／GPT-6.1 Sol／Medium。
+- 监工只输入短症状，对超出已知事实的澄清选一次“不知道”，原样批准并执行计划。General 写入 `cross-validated` Evidence，但未写区域到 draw 的 Claim；首个未满足步骤为锚定。Trace 中两份预载方法将 `observed_fact` Claim 写成可选，直接原因是方法文本。
+- General 在输入附件 Pixel History 不可用后使用事件前后值和 draw 覆盖继续；另一次 shader 调试导致远程断连，产品重开同一 capture 后继续。可逆实验完成并撤销；独立 verifier 因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支记录。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-a3bede59-7902-4c62-8615-563adf480377.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
+- 规划约 3 分 18 秒、执行约 23 分 1 秒；规划 8 次、General 62 次 Provider 请求，另有 5 次自动审查；General input 9631428／output 24514 token（input 含缓存读取 2019456）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-06-sources.zip`，SHA-256 `a6ff110dc2acfedb59b9fdc3bf7c745e5376adfb06818ba8af68b828d7060764`。

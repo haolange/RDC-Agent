@@ -32,7 +32,7 @@ M1 和 M2 只走 Android 远程回放，不在 PC 本机回放顶替。每次开
 | Agent 与方法 | 使用仓库内置的 Profile、Skill 和 Hook。隔离的用户资源目录里不放 `agents/`、`skills/`、`hooks/`、`policies/` 的任何覆盖，只带登录凭据和 RDC 工具配置。启动前在 Settings 的 Agents 页确认四个入口和八个内部 Agent 的来源都是内置 |
 | 轮次上限 | 不设（内置 Profile 不声明 `max-turns`） |
 | 会话 | 每轮新建，不复用上一轮的会话 |
-| 模型 | ChatGPT Account / gpt-6-luna / Medium；Fast 与 Max 关闭 |
+| 模型 | ChatGPT Account / gpt-6.1-sol / Medium；Fast 与 Max 关闭 |
 | 权限模式 | 自动审核（应用默认） |
 | Memory | 关闭 |
 | Knowledge | 按里程碑表 |
