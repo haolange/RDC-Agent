@@ -4986,9 +4986,10 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 2026-11-16 M3 第二轮复验一：监工经独立产品会话各执行一次原像素历史和同一 primitive 的 debug、continue、`_OUT` 读取及 finish，复现历史 shader-out 与终态 debug 输出不一致；恢复入口 EID 147 后关闭回放。原始返回归档 `m3-round02-debug-product-reproduction.zip`，SHA-256 `35ea1bb3af76a075107ae576ec6e52c35deb12fbd3588fd31200de15edbec76c`。
 - 2026-11-16 M3 第二轮复验二：同一独立产品会话重开 capture，各执行一次 debug、continue、`_IN` 读取及 finish，原始返回 `variables=[]、truncated=false`；恢复入口 EID 147 后关闭回放。原始返回归档 `m3-round02-input-product-reproduction.zip`，SHA-256 `8a26500856918ee08684b1813c4ed55fea8e12a80b5ba70d1e962218bbcc795c`。
 
-### 2026-11-16：M3 第三轮，继续调查
-- PC 本机、新会话；十二个 Agent 均为内置，GPT-6.1 Sol／Medium，Fast、Max 关闭，隔离 Memory 为空。监工只输入短症状，对超出已知事实的澄清答“不知道”，原样批准计划。
+### 2026-11-16：M3 第三轮，停在因果
+- PC 本机、新会话；十二个 Agent 均为内置，GPT-6.1 Sol／Medium，Fast、Max 关闭，隔离 Memory 为空。监工只输入短症状，对超出已知事实的澄清答“不知道”，原样批准计划；模型把工程中前轮报告作为线索，并在当前 capture 上复核。
 - 产品读回修复后的 `_IN`：7 个成员、`variable_origin=trace_input`、未截断；泪腺 draw 覆盖与事件前后读数支持限定场景点，最终白点采样链仍有疑点。
-- 产品声明 `partial`，没有 Experiment 或五份因果回执，尚不满足交付条件；待按 3.3 复验干预能力。产品自动审核拒绝运行计算脚本，理由为审核材料中的脚本内容被截断、无法确定完整命令和主机影响；模型将相关精确数值降级为未独立复算估计。
+- 产品声明 `partial`，没有 Experiment 或五份因果回执，尚不满足交付条件；按 3.3 复验后判定目标管线状态干预超出现有权限，见下。产品自动审核拒绝运行计算脚本，理由为审核材料中的脚本内容被截断、无法确定完整命令和主机影响；模型将相关精确数值降级为未独立复算估计。
 - 终态回执 `rdc-lifecycle-14346da4-683e-4030-be11-9479081c8cd3.json` 确认同一 capture／本机／入口 EID 147、replacement 0；监工随后关闭回放并停止本轮进程。
 - 规划约 3 分 25 秒、执行约 52 分 25 秒；General 回报 input 12577362／output 56446 token（input 含缓存读取 2698752）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m3-20261116-round-03-sources.zip`，SHA-256 `792dd2b014df455971009ddd5a93762362ba81cac2e5cd833f8e681aef5bcbb4`；工程增量产物归档 `m3-20261116-round-03-project-output-delta.zip`，SHA-256 `93893763b325a8b7593e6f091256d87f043e4a0c9187f8453a6da94cf88aa2e8`，与第二轮工程产物合用。
+- 2026-11-16 M3 第三轮因果复验：独立会话经产品冻结目录核对 129 项，允许效果不含单 draw shading-rate 状态写入；目标 `rd.shader.get_source` 一次有效查询返回 `source_available=false`、`can_build=false`、`can_replace=false`。监工最初误给大写 `PS`，主进程校验拒绝且未触达回放；更正为小写 `ps` 后查询一次。新增该管线状态干预需扩大产品允许的效果及相应恢复／回执边界，按 3.5 阻塞；未将源码缺失当作 capture 不可用。诊断回到 EID 147 后关闭回放；原始返回、Trace 与会话归档 `m3-round03-intervention-product-recheck.zip`，SHA-256 `4ceeb59f18923e7bbd0c95b63b291f6fa8f82eeaae5dbfabe77cbb01a44e23c5`。
