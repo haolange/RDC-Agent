@@ -76,6 +76,9 @@ export function parseRdcNativeResult(result: CLIResult, expectedContext?: string
         || (resultKind === 'rd.shader.get_constant_buffer_contents' && failure.code === 'constant_buffer_data_unavailable'
           && details?.failure_stage === 'decode_constant_buffer'
           && ['slot_unavailable', 'reflection_unavailable_without_raw_fallback'].includes(String(details?.failure_reason))))
+        || (['rd.texture.get_data', 'rd.texture.get_region_values', 'rd.texture.get_histogram',
+          'rd.texture.compute_stats', 'rd.texture.diff'].includes(resultKind!) && failure.category === 'validation'
+          && failure.code === 'texture_readback_decode_failed' && details?.failure_stage === 'decode_texture_readback')
         || (['rd.texture.get_pixel_history', 'rd.shader.debug_start'].includes(resultKind!) && failure.category === 'capability'
           && failure.code === 'pixel_history_unsupported_input_attachment'
           && details?.failure_stage === 'validate_input_attachment');

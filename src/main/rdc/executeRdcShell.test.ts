@@ -714,6 +714,32 @@ it.each([
   expect(mock.quarantine).toHaveBeenCalledTimes(after === 11 ? 0 : 1);
 });
 
+it.each([
+  ...['get_data', 'get_region_values', 'get_histogram', 'compute_stats', 'diff'].map(name =>
+    ({ name: `rd.texture.${name}`, code: 'texture_readback_decode_failed', category: 'validation', after: 11, retained: true })),
+  { name: 'rd.texture.get_region_values', code: 'texture_readback_decode_failed', category: 'validation', after: 19, retained: false },
+  { name: 'rd.texture.get_region_values', code: 'replay_fatal_error', category: 'runtime', after: 11, retained: false },
+])('retains a failed texture read only after verified replay restoration: %j', async ({ name, code, category, after, retained }) => {
+  const query: RdcOperationDefinition = { ...definition, name,
+    namespace: 'texture', evidence_kind: null };
+  const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };
+  const snapshot = (event: number) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true,
+    result_kind: 'rd.session.get_context', data: { context_id: lease.contextId,
+      current_session_id: 'native-replay', runtime: { active_event_id: event } } }) });
+  mock.execute.mockReset();
+  mock.execute.mockResolvedValueOnce(snapshot(11)).mockResolvedValueOnce({ exitCode: 1,
+    stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: query.name, ok: false,
+      error: { code, category, message: 'Texture read failed', details: { context_id: lease.contextId,
+        session_id: 'native-replay', failure_stage: 'decode_texture_readback',
+        replay_state_restored: true, restored_event_id: 11 } } })
+  }).mockResolvedValueOnce(snapshot(after));
+  const failure = await executeRdcShell({ operation: query.name, args: {} }, 'region', undefined, bound).catch(error => error);
+  expect(failure.deliveryResult.details.mainValidation).toEqual({
+    preservationVerified: retained, leaseState: retained ? 'retained' : 'quarantined',
+  });
+  expect(mock.quarantine).toHaveBeenCalledTimes(retained ? 0 : 1);
+});
+
 it.each([false, true])('retains the lease after stale-debug rejection only with no native effects: %s', async (effectsAttempted) => {
   const debug: RdcOperationDefinition = { ...definition, name: 'rd.shader.get_debug_state', namespace: 'shader', evidence_kind: null };
   const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [debug], lease) };

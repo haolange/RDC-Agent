@@ -138,7 +138,10 @@ export async function executeRdcShell(
     const temporaryReplayRead = definition.effects.includes('replay_position_temporary');
     originalEvent = temporaryReplayRead || input.operation === 'rd.export.screenshot'
       || input.operation === 'rd.shader.get_source' || input.operation === 'rd.shader.get_constant_buffer_contents'
-      || input.operation === 'rd.texture.get_pixel_history' || input.operation === 'rd.shader.debug_start'
+      || input.operation === 'rd.texture.get_pixel_history'
+      || ['rd.texture.get_data', 'rd.texture.get_region_values', 'rd.texture.get_histogram',
+        'rd.texture.compute_stats', 'rd.texture.diff'].includes(input.operation)
+      || input.operation === 'rd.shader.debug_start'
       ? await readReplayEvent() : undefined;
     lastInvocation = rdcInvocationRecord(input.operation, args);
     const result = await rdcCliInvokerService.executeCLI('call', [
