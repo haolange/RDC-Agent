@@ -4938,3 +4938,11 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 目标 Pixel History 与 shader 调试均返回 `pixel_history_unsupported_input_attachment`，主进程核验恢复并保留 lease，模型改用事件前后值和 draw 覆盖；原始 shader 调试返回 `call_16f28bb01ca941cdb578a5b399ed2f5d.json`。
 - 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-41916a04-945b-48c7-b26c-8144c5f9e84a.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
 - 规划约 3 分 49 秒、执行约 54 分 29 秒；规划 9 次、General 151 次 Provider 请求，另有 1 次压缩和 19 次自动审查；General input 25238162／output 46895 token（input 含缓存读取 7351680）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-12-sources.zip`，SHA-256 `ed68393634a2bed2cbb91a3eb97860b87795c7301858b27b6a2c891a381b6aec`；工程导出另存 `m1-round12-project-outputs.zip`。
+
+### 2026-11-15：M1 用户指定补跑（第十三轮），停在首次异常
+- 骁龙 865／Android remote，新会话 GPT-6.1 Sol／Medium；十二个 Agent 来源均为内置，隔离 Memory 为空、Knowledge 保持原样，抓帧已打开且回放画面与设备一致。
+- 监工仅输入短症状，对正常颜色及范围的澄清答“不知道”，原样批准并执行计划。模型写出交叉锚点 Evidence 与区域到 draw 的 Claim，但明确只证明 EID 1242→1248 的抽样亮色边界，未排除全部更早写入，首个未满足步骤为首次异常。
+- 监工判断直接原因在方法文本：模型实际收到检查更早写入的指引，只在 EID 1176、1216、1242 等处抽样；指引未明确要求覆盖并排除全部更早候选写入。此前已满 12 轮，本次为用户指定补跑，按 3.5 停止。
+- 内置 verifier 两次实际使用 ChatGPT Account／GPT-6.1 Sol／Medium；首次因证据授权缺口返回 partial，General 补充授权后第二次完成审查，两条 Challenge 更新为 resolved。两次完成声明曾因缺 Checkpoint／报告被拒，补齐后最终声明为 completed。
+- 目标 Pixel History 返回 `pixel_history_unsupported_input_attachment`，主进程核验恢复并保留 lease，模型使用事件前后值与覆盖继续。可逆精度实验五份回执齐全并回滚，产品终态回执 `rdc-lifecycle-765d6638-2c6c-43f9-8aa9-8d708606656f.json` 回到入口 capture 与 EID 3029；关闭回放后转发释放，设备配置原字节及属性已恢复。
+- 规划约 5 分 06 秒、执行约 35 分 15 秒；规划 7 次、General 97 次、两次 verifier 共 25 次及自动审查 4 次 Provider 请求，共 input 14958155／output 49109 token（input 含缓存读取 4842240）。会话、子 Agent Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-13-sources.zip`，SHA-256 `67a8148ccbd68a2850fe43560d736fbfcb9531e2fcccbbd56c5ac1e0e230ce18`；工程导出另存 `m1-round13-project-outputs.zip`。
