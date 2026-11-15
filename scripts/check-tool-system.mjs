@@ -38,6 +38,7 @@ function main() {
   } = require('../src/shared/constants/agentToolTokens.ts');
   const { AGENT_WORKBENCH_TOOL_CATALOG } = require('../src/shared/constants/agentWorkbenchCatalog.ts');
   const { WORK_PROCESS_TOOL_DISPLAY_CATALOG } = require('../src/renderer/features/transcript/workProcessToolCatalog.ts');
+  const { parseAgentMarkdownStrict } = require('../src/main/settings/agent-manifests/agentManifestParse.ts');
 
   assert(
     BUILTIN_AGENT_TOOL_IDS.length === 57,
@@ -92,11 +93,14 @@ function main() {
     'utf8',
   );
   assert(!agentManifestService.includes('createSeedDefinition'), 'AgentManifestService must not write user seeds');
-  const generalManifest = fs.readFileSync(path.join(repoRoot, 'resources/agent-runtime/agents/general.agent.md'), 'utf8');
+  const generalPath = path.join(repoRoot, 'resources/agent-runtime/agents/general.agent.md');
+  const generalManifest = fs.readFileSync(generalPath, 'utf8');
+  const generalProfile = parseAgentMarkdownStrict(generalManifest, generalPath, 'general', 't', true);
+  assert(generalProfile.ok, `General builtin manifest must parse: ${generalProfile.reason}`);
   assert(generalManifest.includes('task'), 'General builtin must include task');
   assert(!generalManifest.includes('todo'), 'General builtin must not include todo');
   assert(!generalManifest.includes('search_codebase'), 'General builtin must not include search_codebase');
-  assert(/\n  - knowledge\n/.test(generalManifest), 'General builtin must grant canonical knowledge token');
+  assert(generalProfile.definition.tools.includes('knowledge'), 'General builtin must grant canonical knowledge token');
   assert(
     !/\bknowledge_(?:browse|search|read|compile|candidate_create)\b/.test(generalManifest),
     'General builtin must expose Knowledge via token expansion, not individual knowledge_* ids',
