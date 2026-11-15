@@ -4975,3 +4975,11 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 模型内 `capture_restore` 返回 `RDC_SWITCH_BINDING_CHANGED`；终答后监工通过产品“恢复原位置”回到同一 capture／本机／EID 147，签名回执 `rdc-lifecycle-404aadab-1611-46e8-a104-1b3b15c74e5c.json`，随后关闭回放并停止本轮进程。
 - 规划约 3 分 41 秒、执行约 27 分 59 秒；规划 8 次、General 78 次、子 Agent 10 次及自动审查 2 次 Provider 请求，共 input 10250239／output 33456 token（input 含缓存读取 1916160）。会话、Trace、Task、回执和阶段性报告归档 `.local/vertical-investigation-20261108/evidence/m3-20261115-round-01-sources.zip`，SHA-256 `f74e8f7c5edecb6e5071c1ff9744566f73f3d68451b61327d1e9252fe88189f9`。
 - 2026-11-16 M3 第一轮单点复验：独立会话经产品在 EID 2720 对 `ResourceId::2051270` 执行一次原区域读取，复现 `Unsupported texture component type: B8G8R8A8_TYPELESS`；主进程因无状态恢复凭据隔离 lease，之后通过产品关闭回放。原始返回 `.local/vertical-investigation-20261108/evidence/m3-round01-typeless-product-reproduction.json`，SHA-256 `f39d960ba36459fecbc43e85c7ec126145f21e5d5894bbdace2f69af058ffec6`；无人工介入。
+
+### 2026-11-16：M3 第二轮，继续调查
+- PC 本机、新会话；十二个 Agent 来源均为内置，ChatGPT Account／GPT-6.1 Sol／Medium 可用，Fast、Max 关闭。隔离 Memory 为空；模型读取了测试工程内第一轮报告及旧图，询问位置时监工答“不知道”，原样批准计划。
+- 产品成功按 `B8G8R8A8_UNORM` 视图读取 `B8G8R8A8_TYPELESS` 区域；调查记录以像素历史、区域前后读数及 draw 覆盖交叉定位泪腺候选区域，并保留最终画面经后处理映射的限制。
+- 独立审查提出四项 Challenge，General 补证后将其关闭并取得复审；目标片元 debug 输出与 Pixel History 不一致、目标输入／lane 未核实；capture 无可编译 shader 源，未执行可恢复因果实验，按 2.3 不能交付，继续按 3.3 查因果停点。
+- 产品接受 `turn_complete` 的 `partial`；随后显示模型请求失败，技术信息为 `PROVIDER_STREAM_MISSING_FINAL_ANSWER`，请求轨迹中保存了模型的 final_answer；未据此认定账号或额度不可用。第一轮 `RDC_SWITCH_BINDING_CHANGED` 本轮未见再次发生。
+- 现场恢复回执 `rdc-lifecycle-90ee1335-328f-43f5-a256-080282234ca5.json` 确认同一 capture／本机／入口 EID 147、replacement 0；随后监工通过产品关闭回放并停止本轮进程。
+- 会话、Task、模型请求、Trace 和回执归档 `.local/vertical-investigation-20261108/evidence/m3-20261116-round-02-sources.zip`，SHA-256 `da719ce1357c0ef045faf5787c7c32a01f9b49c72d88360f72b6fc308503486e`；测试工程产物另存 `m3-20261116-round-02-project-output.zip`，SHA-256 `566b18bdbca1edf4def2bba631ac215e2856200f4777672db5e11c39830a705a`。
