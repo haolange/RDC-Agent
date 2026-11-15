@@ -6,17 +6,21 @@ vi.mock('electron', () => ({app:{getPath:()=>os.tmpdir(),getAppPath:()=>process.
 import { AgentManifestService } from './AgentManifestService';
 const roots: string[]=[];
 afterEach(()=>{vi.restoreAllMocks();for(const root of roots.splice(0))fs.rmSync(root,{recursive:true,force:true});});
-it('loads the builtin verifier with its configured model and reasoning level',()=>{
+it('loads every builtin agent with the configured model and reasoning level',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'rdc-agent-verifier-route-'));roots.push(root);
  const paths={agentsPath:path.join(root,'agents'),instructionsPath:path.join(root,'RDC.md')};
- const verifier=new AgentManifestService().resolveEffectiveSnapshot(paths).profiles.find(profile=>profile.id==='verifier');
- expect(verifier).toMatchObject({
-  builtin:true,
-  provenance:{scope:'builtin'},
-  compiledRoute:{agentId:'verifier',providerId:'chatgpt-account',modelId:'gpt-6.1-sol'},
-  reasoningLevel:'medium',
-  accessCeiling:'read-only',
- });
+ const profiles=new AgentManifestService().resolveEffectiveSnapshot(paths).profiles;
+ const ids=['analyzer','debugger','general','optimizer','generator','knowledge-scout','pass-analyst',
+  'pixel-analyst','report-writer','resource-analyst','shader-analyst','verifier'];
+ for(const id of ids){
+  expect(profiles.find(profile=>profile.id===id)).toMatchObject({
+   builtin:true,
+   provenance:{scope:'builtin'},
+   compiledRoute:{agentId:id,providerId:'chatgpt-account',modelId:'gpt-6.1-sol'},
+   reasoningLevel:'medium',
+  });
+ }
+ expect(profiles.find(profile=>profile.id==='verifier')).toMatchObject({accessCeiling:'read-only'});
 });
 it('preserves an explicit builtin General model-only user override through save and fresh service reload', async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'rdc-agent-model-cow-'));roots.push(root);

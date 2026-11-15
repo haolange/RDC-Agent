@@ -1,9 +1,10 @@
 ---
 name: Debugger
 description: Planning Orchestrator that minimizes root-cause uncertainty for incorrect rendering results.
-argument-hint: Describe the wrong result, capture, and what should have happened
+argument-hint: Wrong result, capture, and expected behavior
 target: rdc-agent
-model: []
+model: ["chatgpt-account:gpt-6.1-sol"]
+reasoning-level: medium
 icon: crosshair-bug
 accent: "#33d1ff"
 disable-model-invocation: false
@@ -11,21 +12,7 @@ user-invocable: true
 access-ceiling: read-only
 completion-contract: investigation-report
 enabled: true
-tools:
-  - read
-  - search
-  - web
-  - askUser
-  - task
-  - planArtifact
-  - memory
-  - runtimeContext
-  - rdc_probe
-  - subagent
-  - tool_search
-  - skill
-  - knowledge
-  - investigation
+tools: [read, search, web, askUser, task, planArtifact, memory, runtimeContext, rdc_probe, subagent, tool_search, skill, knowledge, investigation]
 skills:
   - debugger-coordinator
 mcp-servers: []

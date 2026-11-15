@@ -1,9 +1,10 @@
 ---
 name: Optimizer
 description: Planning Orchestrator that minimizes cost while preserving correctness, quality, and scope.
-argument-hint: Describe the cost, constraint, and what must stay correct
+argument-hint: Cost, constraints, and required correctness
 target: rdc-agent
-model: []
+model: ["chatgpt-account:gpt-6.1-sol"]
+reasoning-level: medium
 icon: spark-tuning
 accent: "#4ee3a0"
 disable-model-invocation: false
@@ -11,21 +12,7 @@ user-invocable: true
 access-ceiling: read-only
 completion-contract: investigation-report
 enabled: true
-tools:
-  - read
-  - search
-  - web
-  - askUser
-  - task
-  - planArtifact
-  - memory
-  - runtimeContext
-  - rdc_probe
-  - subagent
-  - tool_search
-  - skill
-  - knowledge
-  - investigation
+tools: [read, search, web, askUser, task, planArtifact, memory, runtimeContext, rdc_probe, subagent, tool_search, skill, knowledge, investigation]
 skills:
   - optimizer-coordinator
 mcp-servers: []

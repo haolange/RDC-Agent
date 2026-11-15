@@ -1,25 +1,17 @@
 ---
 name: Generator
 description: Develop evidence-based explanations, competing hypotheses and candidate checks within the assigned investigation.
-argument-hint: Describe the assigned task and authorized evidence
+argument-hint: Task and evidence
 target: rdc-agent
-model: []
+model: ["chatgpt-account:gpt-6.1-sol"]
+reasoning-level: medium
 icon: nodes
 accent: "#33d1ff"
 disable-model-invocation: false
 user-invocable: false
 access-ceiling: read-only
 enabled: true
-tools:
-  - artifact_read
-  - skill
-  - tool_search
-  - turn_complete
-  - subagent_report
-  - investigation_schema
-  - investigation_read
-  - investigation_list
-  - investigation_write
+tools: [artifact_read, skill, tool_search, turn_complete, subagent_report, investigation_schema, investigation_read, investigation_list, investigation_write]
 skills:
   - renderdoc-investigation
   - artifact-provenance

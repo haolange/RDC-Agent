@@ -1,26 +1,17 @@
 ---
 name: Knowledge Scout
 description: Find relevant knowledge, compare scope and contrary material, and identify applicable checks with versioned sources.
-argument-hint: Describe the assigned task and authorized evidence
+argument-hint: Task and evidence
 target: rdc-agent
-model: []
+model: ["chatgpt-account:gpt-6.1-sol"]
+reasoning-level: medium
 icon: nodes
 accent: "#33d1ff"
 disable-model-invocation: false
 user-invocable: false
 access-ceiling: read-only
 enabled: true
-tools:
-  - artifact_read
-  - read_image
-  - skill
-  - tool_search
-  - turn_complete
-  - subagent_report
-  - knowledge_browse
-  - knowledge_search
-  - knowledge_read
-  - knowledge_compile
+tools: [artifact_read, read_image, skill, tool_search, turn_complete, subagent_report, knowledge_browse, knowledge_search, knowledge_read, knowledge_compile]
 skills:
   - knowledge-scout
 mcp-servers: []

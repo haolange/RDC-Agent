@@ -1,9 +1,10 @@
 ---
 name: Analyzer
 description: Planning Orchestrator that maximizes explainability of an unknown rendering system.
-argument-hint: Describe the system, capture, or behavior you want explained
+argument-hint: System, capture, or behavior to explain
 target: rdc-agent
-model: []
+model: ["chatgpt-account:gpt-6.1-sol"]
+reasoning-level: medium
 icon: waveform-gauge
 accent: "#8d8bff"
 disable-model-invocation: false
@@ -11,21 +12,7 @@ user-invocable: true
 access-ceiling: read-only
 completion-contract: investigation-report
 enabled: true
-tools:
-  - read
-  - search
-  - web
-  - askUser
-  - task
-  - planArtifact
-  - memory
-  - runtimeContext
-  - rdc_probe
-  - subagent
-  - tool_search
-  - skill
-  - knowledge
-  - investigation
+tools: [read, search, web, askUser, task, planArtifact, memory, runtimeContext, rdc_probe, subagent, tool_search, skill, knowledge, investigation]
 skills:
   - analyzer-coordinator
 mcp-servers: []

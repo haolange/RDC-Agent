@@ -3,35 +3,14 @@ name: General
 description: Execution Orchestrator for ordinary read, write, search, shell, and tool work.
 argument-hint: Describe the task you want executed
 target: rdc-agent
-model: []
+model: ["chatgpt-account:gpt-6.1-sol"]
+reasoning-level: medium
 icon: nodes
 accent: "#33d1ff"
 disable-model-invocation: false
 user-invocable: true
 enabled: true
-tools:
-  - read
-  - search
-  - web
-  - shell
-  - interpreter
-  - write
-  - edit
-  - git
-  - file-manage
-  - askUser
-  - task
-  - output
-  - memory
-  - memory-write
-  - skill
-  - mcp
-  - subagent
-  - runtimeContext
-  - rdcProbe
-  - tool_search
-  - knowledge
-  - investigation
+tools: [read, search, web, shell, interpreter, write, edit, git, file-manage, askUser, task, output, memory, memory-write, skill, mcp, subagent, runtimeContext, rdcProbe, tool_search, knowledge, investigation]
 skills:
   - execution-orchestrator
 mcp-servers: []
