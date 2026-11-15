@@ -4949,3 +4949,4 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 2026-11-15 M1 第十三轮 verifier 授权旁查（只读）：审查 Task 有 `independentOfTaskIds`；首次委派输入的闭包提示新增 24 个引用、未列 `Not granted`；锚定与 IR 两份 Evidence 的 `claimIds` 均为空且未显式授予，导致其记录和相应读数、覆盖图、IR 原始材料未进入首次授权；补授后复审完成。证据为上述第十三轮源归档中的首次委派输入、Task、结果及两条 Challenge。
 - 2026-11-15 M2 启动前核对：隔离实例 Settings 中十二个 Agent 来源均为内置；Verifier 的 GPT-6.1 Sol 路由显示可用，其他十一个显示未选择模型。系统 ADB 仅有 `e38b8019`（`kona`），骁龙 8 Gen 1 未在线，按计划 3.5 阻塞；未新建调查会话或调整设备配置。
 - 2026-11-15 M2 再次启动前核对：隔离实例 Settings 的十二个 Agent 均为内置，GPT-6.1 Sol 路由均显示可用，默认档位为 Medium；用户解锁手机并重新开启 USB 调试后，Windows 可见手机与通用 WinUSB ADB 接口，系统 ADB 在重启及独立 libusb 复核后仍无设备，产品设备列表仅有本地；未新建调查会话或调整设备配置，M2 仍阻塞。
+- 2026-11-15 M2 设备接入：备份原 Windows 设备参数后，为该手机现有 Microsoft WinUSB 接口注册 ADB 标识并只重启该接口；用户在手机允许 USB 调试，ADB 显示 `b54ed446` 在线、`SM8475`，用户确认骁龙 8+ Gen 1 可用于 M2。用户放入的 `HairBlack_Mobile.rdc` 的 SHA-256 与账本登记的发黑 capture 一致。
