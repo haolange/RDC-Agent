@@ -4922,3 +4922,11 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 目标 Pixel History 返回 `pixel_history_unsupported_input_attachment`，主进程核验恢复后保留租约；模型使用区域前后读数和覆盖继续，完成并回滚签名实验。verifier 因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支保留。
 - 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-19a5bac5-a328-46c2-8b3c-08eaf71f3df7.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
 - 规划约 3 分 10 秒、执行约 20 分 35 秒；规划 9 次、General 85 次 Provider 请求，另有 4 次自动审查；General input 11153388／output 21047 token（input 含缓存读取 3802880）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-10-sources.zip`，SHA-256 `1a8d56e27b825c5538e48df315cf92fa4ade8949ea32913eb3cd196bb318822a`；工程导出另存 `m1-round10-project-outputs.zip`。
+
+### 2026-11-15：M1 第十一轮，停在首次异常
+- 骁龙 865／Android remote，新会话 GPT-6.1 Sol／Medium；十二个 Agent 来源均为内置，隔离 Memory 为空、Knowledge 保持原样，capture 已打开且回放画面与设备一致。
+- 监工只输入短症状，对正常颜色及范围的澄清答“不知道”，原样批准并执行计划。模型写出交叉锚点 Evidence 和区域到 draw 的 `observed_fact` Claim，但明确未确立 First Bad Event，首个停点仍为首次异常。
+- Trace 确认模型收到上轮方法修改，搜索较早绘制并读取更早事件；它因缺正常颜色参考而未把可观察的症状出现记录为首次异常。方法未明确区分症状首次出现与预期正确性，直接原因归方法文本层。
+- 目标 Pixel History 标明不可用，模型经前后读数和覆盖继续，并完成及回滚签名实验；verifier 因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支保留。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-24274a08-6699-4f81-9364-0a6ee58b176c.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
+- 规划约 3 分 5 秒、执行约 25 分 19 秒；规划 8 次、General 99 次 Provider 请求，另有 5 次自动审查；General input 14221762／output 26713 token（input 含缓存读取 5819392）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-11-sources.zip`，SHA-256 `0ab8466fbea431bd342eefaab2621cfdb6cb69ad33240bfd2a7152dac2bbc944`；工程导出另存 `m1-round11-project-outputs.zip`。
