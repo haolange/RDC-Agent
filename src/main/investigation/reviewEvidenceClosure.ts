@@ -26,7 +26,8 @@ export function reviewEvidenceClosure(
 ): ReviewEvidenceClosure {
   const nodes = new Map<string, Node>();
   const byId = { claim: new Map<string, string[]>(), evidence: new Map<string, string>(), experiment: new Map<string, string>(),
-    worldState: new Map<string, string>(), evidenceForClaim: new Map<string, string[]>() };
+    worldState: new Map<string, string>(), evidenceForClaim: new Map<string, string[]>(),
+    evidenceForWorldState: new Map<string, string[]>() };
   const push = <K>(map: Map<K, string[]>, key: K, uri: string) => map.set(key, [...(map.get(key) ?? []), uri]);
   for (const read of service.readAllRecords(ownerSessionId)) {
     if (read.manifest.status !== 'ready' && read.manifest.status !== 'draft') continue;
@@ -38,6 +39,7 @@ export function reviewEvidenceClosure(
       : read.manifest.kind === 'evidence_pack' ? (record as EvidencePack).items : [];
     for (const evidence of evidenceItems) {
       byId.evidence.set(evidence.evidenceId, uri);
+      push(byId.evidenceForWorldState, evidence.worldStateId, uri);
       for (const claimId of evidence.claimIds) push(byId.evidenceForClaim, claimId, uri);
     }
     if (read.manifest.kind === 'experiment') byId.experiment.set((record as ExperimentRecord).experimentId, uri);
@@ -68,6 +70,7 @@ export function reviewEvidenceClosure(
     if (item.experimentId) visit(byId.experiment.get(item.experimentId));
     for (const source of item.compactProvenance ?? []) claim(source.sourceClaimId);
     for (const uri of byId.evidenceForClaim.get(item.claimId) ?? []) visit(uri);
+    for (const uri of byId.evidenceForWorldState.get(item.worldStateId) ?? []) visit(uri);
   };
   while (queue.length) {
     const node = nodes.get(queue.shift()!);

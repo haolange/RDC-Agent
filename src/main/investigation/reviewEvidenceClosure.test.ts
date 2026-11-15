@@ -39,6 +39,16 @@ describe('review evidence closure', () => {
     expect(closure.refs).not.toContain('session://tool-outputs/old.json');
   });
 
+  it('includes evidence and its artifacts when it shares a claim world state without a claim link', () => {
+    const earlierEvidence = { name: 'ev-earlier', kind: 'evidence', record: {
+      evidenceId: 'ev-earlier', worldStateId: 'ws-obs', claimIds: [],
+      artifactRefs: [{ uri: 'session://tool-outputs/earlier.json', expectedHash: 'f' }],
+    } };
+    const closure = reviewEvidenceClosure(service([...records, earlierEvidence]), 'owner', [uri('claim-anchor')]);
+    expect(closure.refs).toContain(uri('ev-earlier'));
+    expect(closure.refs).toContain('session://tool-outputs/earlier.json');
+  });
+
   it('reports dependencies a nested parent cannot grant instead of granting them', () => {
     const closure = reviewEvidenceClosure(service(records), 'owner', [uri('claim-anchor')], ref => !ref.endsWith('history.json'));
     expect(closure.refs).toEqual([uri('claim-anchor'), uri('ws-obs'), uri('ev-anchor')]);
