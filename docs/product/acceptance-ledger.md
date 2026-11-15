@@ -4964,3 +4964,13 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 交付门禁：General 模型配置将 `tools` 改为 YAML 行内数组后，旧门禁仍按多行文本匹配导致误报；门禁改用运行时严格解析器核对 `knowledge` token，完整门禁通过。
 - 终态回执 `rdc-lifecycle-204dab9b-d48c-496c-bd9e-2d13b6cef2b0.json` 确认恢复入口 capture、设备及 EID 2653；关闭回放后 ADB 转发为空，用户授权生成的默认配置哈希与调查前一致，未作临时配置调整。
 - 规划约 4 分 13 秒、执行约 45 分 42 秒；规划 8 次、General 102 次、verifier 32 次及自动审查 5 次 Provider 请求，共 input 20788132／output 60240 token（input 含缓存读取 5992192）。会话、Trace、Task、回执和最小工程输出归档 `.local/vertical-investigation-20261108/evidence/m2-20261115-round-01-sources.zip`，SHA-256 `93fd0fed5f4f8e950d0cb1b2b3bb4d779c8c659b740334097da35a3b60c2a2ef`。
+
+- 2026-11-15 M3 首轮预检：基线 `6c6e80835c6245e74c5efe8afc552029ad170786`；十二个 Agent 均为内置且 GPT-6.1 Sol 可用，隔离 Memory 与项目知识目录为空。隔离知识副本与真实库逐文件一致，仅有发白 `AIRD-20260207-0001` 和发黑 `AIRD-20260207-0002` 两张卡片，未发现眼部白点材料，移除 0 张；真实知识库未改动。
+- PC 本机已打开眼部 capture，产品显示“部分就绪”，诊断为 `Final Present does not identify exactly one swap-buffer resource`，入口 EID 147 暂无可用画面；M2 测试会话已在归档校验后删除，用户此前要求保留的 M1 会话仍保留。
+
+### 2026-11-15：M3 第一轮，部分结果待用户判断
+- PC 本机、新会话、GPT-6.1 Sol／Medium；监工仅输入短症状，对位置及正常外观的澄清答“不知道”，原样批准并执行计划。
+- 首个未闭合步骤为锚定：模型观察到候选点由 EID 2720 写入，但未证明该点与最终白点的精确映射；未完成首次异常、竞争解释区分、因果实验和独立核验。
+- 两次 `rd.texture.get_region_values` 分别在不同事件和资源返回 `Unsupported texture component type: B8G8R8A8_TYPELESS`，两次租约均被隔离；来源任务声明 `partial`，最终声明为 `blocked`，未按相同条件重试或开始下一轮。
+- 模型内 `capture_restore` 返回 `RDC_SWITCH_BINDING_CHANGED`；终答后监工通过产品“恢复原位置”回到同一 capture／本机／EID 147，签名回执 `rdc-lifecycle-404aadab-1611-46e8-a104-1b3b15c74e5c.json`，随后关闭回放并停止本轮进程。
+- 规划约 3 分 41 秒、执行约 27 分 59 秒；规划 8 次、General 78 次、子 Agent 10 次及自动审查 2 次 Provider 请求，共 input 10250239／output 33456 token（input 含缓存读取 1916160）。会话、Trace、Task、回执和阶段性报告归档 `.local/vertical-investigation-20261108/evidence/m3-20261115-round-01-sources.zip`，SHA-256 `f74e8f7c5edecb6e5071c1ff9744566f73f3d68451b61327d1e9252fe88189f9`。
