@@ -4955,3 +4955,12 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 2026-11-15 M2 连接与配置缺失：用户重启手机后活动安装会话为空；产品准备匹配服务时卸载原 RenderDocCmd，用户完成手机系统扫描后新服务已安装（versionCode 149），但原 `/sdcard/Android/media/org.renderdoc.renderdoccmd.arm64/files/renderdoc.conf` 已不存在。监工此前只记录原文件 SHA-256 `d235f48e90e4e8e486b5719dba0d2da28928eca9eff6059011cbbe613ea27466` 和属性，未保存文件副本；已查找设备及本机候选，未找到哈希一致的副本。回放未打开、无转发残留，等待用户决定恢复方式。
 - 2026-11-15 M2 继续：用户确认没有原配置备份，允许重新生成默认配置并保留旧测试会话；手机在线、活动安装会话为空，沿用尚未发起调查的 M2 空白会话。
 - 2026-11-15 M2 首轮预检：RenderDocCmd 生成的默认配置 SHA-256 为 `6a0ecaa762d1bba2ee80d0bdb201cc584195f11f66d0a1412322ef0b6834b349`，已保存副本；用户关闭手机系统提示后，产品连接 `RMX3551` 并打开发黑 capture，EID 2653 的产品预览与手机画面一致且显示设备画面已同步，手机画面保存在 `.local/m2-adb-interface-20261115/device-replay.png`；未临时调整设备配置。
+
+### 2026-11-15：M2 第一轮，待用户确认
+- 骁龙 8+ Gen 1／Android remote，十二个 Agent 内置、GPT-6.1 Sol／Medium，隔离 Memory 为空、Knowledge 保持原样；用户授权保留旧会话。监工仅输入短症状、对超出已知事实的澄清答“不知道”，原样批准并执行计划。
+- EID 2065 头发覆盖与前后区域读数、竞争解释和 `exp-hair732` 可恢复 A-B-A 实验支持头部局部结论；五份签名回执齐全，verifier 完成独立核验，两条 Challenge resolved、一条对不再使用的 645 视觉锚点降域为 wont_fix，当前无 open Challenge。
+- 按 2.3 实质判断交付并保留疑点：EID 2059→2065 两侧均偏暗，未确立异常首次出现边界；肩部仍黑，产品最终声明为 `partial` 而非 completed。历史线索经当前 capture 实验验证，结论只覆盖头部局部。
+- 旁支：补授 645 小图时一次 verifier 委派返回 `ARTIFACT_NOT_FOUND`，后续降域并完成限定版核验；该问题未成为本轮停点。
+- 交付门禁：General 模型配置将 `tools` 改为 YAML 行内数组后，旧门禁仍按多行文本匹配导致误报；门禁改用运行时严格解析器核对 `knowledge` token，完整门禁通过。
+- 终态回执 `rdc-lifecycle-204dab9b-d48c-496c-bd9e-2d13b6cef2b0.json` 确认恢复入口 capture、设备及 EID 2653；关闭回放后 ADB 转发为空，用户授权生成的默认配置哈希与调查前一致，未作临时配置调整。
+- 规划约 4 分 13 秒、执行约 45 分 42 秒；规划 8 次、General 102 次、verifier 32 次及自动审查 5 次 Provider 请求，共 input 20788132／output 60240 token（input 含缓存读取 5992192）。会话、Trace、Task、回执和最小工程输出归档 `.local/vertical-investigation-20261108/evidence/m2-20261115-round-01-sources.zip`，SHA-256 `93fd0fed5f4f8e950d0cb1b2b3bb4d779c8c659b740334097da35a3b60c2a2ef`。
