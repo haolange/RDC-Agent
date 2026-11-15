@@ -4960,7 +4960,7 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 骁龙 8+ Gen 1／Android remote，十二个 Agent 内置、GPT-6.1 Sol／Medium，隔离 Memory 为空、Knowledge 保持原样；用户授权保留旧会话。监工仅输入短症状、对超出已知事实的澄清答“不知道”，原样批准并执行计划。
 - EID 2065 头发覆盖与前后区域读数、竞争解释和 `exp-hair732` 可恢复 A-B-A 实验支持头部局部结论；五份签名回执齐全，verifier 完成独立核验，两条 Challenge resolved、一条对不再使用的 645 视觉锚点降域为 wont_fix，当前无 open Challenge。
 - 按 2.3 实质判断交付并保留疑点：EID 2059→2065 两侧均偏暗，未确立异常首次出现边界；肩部仍黑，产品最终声明为 `partial` 而非 completed。历史线索经当前 capture 实验验证，结论只覆盖头部局部。
-- 旁支：补授 645 小图时一次 verifier 委派返回 `ARTIFACT_NOT_FOUND`，后续降域并完成限定版核验；该问题未成为本轮停点。
+- 旁支：首个 verifier 因三项原始材料授权缺口建议总体 `partial`；补授后两项解决，一项随 645 视觉主张降域。补授 645 小图的一次委派另返回 `ARTIFACT_NOT_FOUND`；最终限定版核验完成，这些问题未成为本轮停点。
 - 交付门禁：General 模型配置将 `tools` 改为 YAML 行内数组后，旧门禁仍按多行文本匹配导致误报；门禁改用运行时严格解析器核对 `knowledge` token，完整门禁通过。
 - 终态回执 `rdc-lifecycle-204dab9b-d48c-496c-bd9e-2d13b6cef2b0.json` 确认恢复入口 capture、设备及 EID 2653；关闭回放后 ADB 转发为空，用户授权生成的默认配置哈希与调查前一致，未作临时配置调整。
 - 规划约 4 分 13 秒、执行约 45 分 42 秒；规划 8 次、General 102 次、verifier 32 次及自动审查 5 次 Provider 请求，共 input 20788132／output 60240 token（input 含缓存读取 5992192）。会话、Trace、Task、回执和最小工程输出归档 `.local/vertical-investigation-20261108/evidence/m2-20261115-round-01-sources.zip`，SHA-256 `93fd0fed5f4f8e950d0cb1b2b3bb4d779c8c659b740334097da35a3b60c2a2ef`。
