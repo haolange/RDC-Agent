@@ -1,5 +1,13 @@
 # Acceptance Ledger
 
+## 2026-11-17：RDC-Tool 重构对接，验证未完成
+
+- RDC-Tool `3e6a56be2431149b1d8d3c80a05ebc43330f1d10` 经正式流程打包与验包通过；隔离 Settings 验证 `1.1.2 / 129`，操作名无增删，三份手册及 catalog 指纹 `05322468c3e39db23a671fdd20747d52b8db11e455979fbf2c6ba2e523254042` 一致。
+- 工具全测 1267 passed、1 failed、12 skipped、2 subtests passed；失败原文 `assert payload["ok"] is False`。本次使用的捆绑 Python 通过 `python314._pth` 显式加入 site-packages，测试的 `-S` 未移除依赖；未改 Tool 或重复全测。
+- 产品 `src/main/rdc` 与 `src/main/tools`：492 passed、3 skipped；`check:contracts`：248 passed。真实新 worker 回收复现 `RDC_CLOSE_FAILED: ... is not a confirmed rdc.runtime_worker`，产品修复 `9fcba4ea` 后受影响模块 9 passed，typecheck、lint 通过。
+- PC 打开与关闭均返回 `RDC_CLI_FAILED: runtime_error: Replay worker request failed; outcome unknown; clear context before retrying: DaemonOwnerUnavailable: Daemon owner unavailable for context 'rdc-86d58166-e6a9-4887-85ef-2323dc43b0a5': invalid_state`。旧状态采用 `pipe_name`、缺少新工具所需 `endpoint`，被新 context 的容量扫描读到；其记录的三个进程均已退出，旧文件保留。失败后确认本次 daemon 无 capture、session 或 worker，再定向停止并移除本次已退出的登记。
+- 监工通过隔离实例选择工具、打开 PC capture 并记录错误；尚未完成其余实机风险项、M1 回归或 M3。
+
 ## RDC-Tool main 发现与只读回放（2026-11-16）
 
 - 隔离 Browser QA 在设置中选择并验证合并后的 RDC-Tool main，显示 1.1.2、129 操作；未使用真实用户设置或凭据。独立的 `RdcNativeRead.test.ts` 以同一安装和仓库 Vulkan fixture 经 Agent 主进程加载 catalog、冻结 lease，list/describe 均匹配快照 fingerprint `05322468c3e39db23a671fdd20747d52b8db11e455979fbf2c6ba2e523254042`，实际资源读取成功；输入哈希不变，daemon/worker 已退出。通过 UI 选择和自动执行测试，无人工代答；未发起真实模型请求。
