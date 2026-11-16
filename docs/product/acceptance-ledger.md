@@ -6,7 +6,9 @@
 - 工具全测 1267 passed、1 failed、12 skipped、2 subtests passed；失败原文 `assert payload["ok"] is False`。本次使用的捆绑 Python 通过 `python314._pth` 显式加入 site-packages，测试的 `-S` 未移除依赖；未改 Tool 或重复全测。
 - 产品 `src/main/rdc` 与 `src/main/tools`：492 passed、3 skipped；`check:contracts`：248 passed。真实新 worker 回收复现 `RDC_CLOSE_FAILED: ... is not a confirmed rdc.runtime_worker`，产品修复 `9fcba4ea` 后受影响模块 9 passed，typecheck、lint 通过。
 - PC 打开与关闭均返回 `RDC_CLI_FAILED: runtime_error: Replay worker request failed; outcome unknown; clear context before retrying: DaemonOwnerUnavailable: Daemon owner unavailable for context 'rdc-86d58166-e6a9-4887-85ef-2323dc43b0a5': invalid_state`。旧状态采用 `pipe_name`、缺少新工具所需 `endpoint`，被新 context 的容量扫描读到；其记录的三个进程均已退出，旧文件保留。失败后确认本次 daemon 无 capture、session 或 worker，再定向停止并移除本次已退出的登记。
-- 监工通过隔离实例选择工具、打开 PC capture 并记录错误；尚未完成其余实机风险项、M1 回归或 M3。
+- Android 白发单次对接：隔离实例使用新运行目录，回放就绪、设备画面同步；E1248 SPIR-V ASM 与 60,612 字节二进制读取成功。模型创建实验前先引用了不存在的 WorldState，原文 `INVESTIGATION_REF_UNRESOLVED: Evidence.worldStateId ws_acceptance_baseline is not resolvable [S-STATE-01]`；未执行替换或撤销，五份回执未生成。监工输入测试步骤，未重试该实验；原始会话及图像见 `.local/vertical-investigation-20261108/evidence/rdc-integration-20261117-android-shader.zip`。
+- 白发回放恢复入口 E3029 后经产品关闭，daemon/worker 退出、登记为空；手机临时设 `SingleThreadedCompilation=true`，事前备份、事后恢复并核对原文件 SHA-256 `6a0ecaa762d1bba2ee80d0bdb201cc584195f11f66d0a1412322ef0b6834b349` 与权限属主。
+- 尚未完成解码错误与崩溃隔离的实机复验、PC 余项、M1 回归或 M3。
 
 ## RDC-Tool main 发现与只读回放（2026-11-16）
 
