@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
@@ -130,7 +131,7 @@ describe('OwnedRdcDaemonRegistry', () => {
       intermediateRoot: path.join(root, 'rdc-tool-intermediate'),
       readCommandLine: (pid) => pid === 91
         ? `python -m rdc_tool.daemon.server --daemon-context ${contextId}`
-        : `python -m rdc.runtime_worker --context-id ${contextId}`,
+        : `python -m rdc_tool.runtime.worker_main --context-id ${contextId}`,
       killPid: (pid) => {
         killed.push(pid);
         return true;
@@ -138,6 +139,49 @@ describe('OwnedRdcDaemonRegistry', () => {
     });
     expect(result.failed).toEqual([]);
     expect(killed.sort()).toEqual([91, 92]);
+  });
+
+  it.skipIf(!process.env.RDC_NATIVE_PYTHON)('reaps a real refactored worker after its owner is unavailable', { timeout: 45_000 }, async () => {
+    const root = makeRoot();
+    const registryPath = path.join(root, 'owned-rdc-daemons.json');
+    const intermediateRoot = path.join(root, 'rdc-tool-intermediate');
+    const python = process.env.RDC_NATIVE_PYTHON!;
+    const installation = path.resolve(path.dirname(python), '../../../..');
+    const worker = spawn(python, ['-m', 'rdc_tool.runtime.worker_main', '--context-id', contextId], {
+      cwd: installation,
+      windowsHide: true,
+      env: { ...process.env, RDC_TOOL_INTERMEDIATE_ROOT: intermediateRoot, RDC_TOOL_DAEMON_PID: '0', RDC_TOOL_DAEMON_BIRTH: '' },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const exited = new Promise<void>((resolve) => { worker.once('exit', () => resolve()); worker.once('error', () => resolve()); });
+    const waitForExit = () => new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Worker did not exit')), 5_000);
+      void exited.then(() => { clearTimeout(timer); resolve(); });
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Worker did not become ready')), 30_000);
+        let output = '';
+        worker.stdout.on('data', (chunk: Buffer) => {
+          output += chunk.toString();
+          if (output.includes('"kind": "ready"')) { clearTimeout(timer); resolve(); }
+        });
+        worker.once('error', (error) => { clearTimeout(timer); reject(error); });
+        worker.once('exit', () => { clearTimeout(timer); reject(new Error(`Worker exited before ready: ${output}`)); });
+        worker.stderr.resume();
+      });
+      expect(worker.pid).toBeGreaterThan(0);
+      rememberOwnedRdcDaemon({ contextId, command: path.join(root, 'missing-rdc-tool.exe'), intermediateRoot,
+        ownerPid: process.pid, daemonPid: 0, workerPid: worker.pid!, startedAt: 1 }, { registryPath });
+      const result = await harvestOwnedRdcDaemons({ registryPath, intermediateRoot });
+      expect(result.failed).toEqual([]);
+      expect(result.released).toEqual([contextId]);
+      await waitForExit();
+      expect(listOwnedRdcDaemons({ registryPath })).toEqual([]);
+    } finally {
+      if (worker.exitCode === null && worker.signalCode === null) worker.kill();
+      await waitForExit();
+    }
   });
 
   it('keeps the record when leftover pids are not a confirmed owned daemon', async () => {

@@ -201,7 +201,7 @@ function killVerifiedOwnedPids(
   const remaining: number[] = [];
   for (const [pid, expected] of [
     [record.daemonPid, 'rdc_tool.daemon.server'],
-    [record.workerPid, 'rdc.runtime_worker'],
+    [record.workerPid, 'rdc_tool.runtime.worker_main'],
   ] as const) {
     if (pid <= 0) continue;
     const commandLine = readCommandLine(pid);
