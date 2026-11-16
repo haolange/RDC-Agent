@@ -19,6 +19,7 @@
 ## 2026-11-17：新工具错误分类与异常退出
 
 - Android 单次 ASTC 区域读数返回 `texture_readback_decode_failed: Unsupported texture readback format: ASTC_UNORM`，分类 `validation`；主进程核验 E3029 已恢复且 `leaseState=retained`，后续会话状态查询成功。
+- 36 处显式 `runtime_error` 在重构前使用同一默认码；静态风险：`rd.event.get_action_details` 的事件不存在返回该通用码且不带保全证明，产品按不确定状态隔离。该情形未实机复现，不能据此确认 36 处均分类正确。
 - 受控终止本次独占 worker 后的单次读数返回 `session_requires_restart: Replay requires controlled recovery; close and reopen the capture`，`leaseState=quarantined`；这验证进程异常退出，不等同于真实原生崩溃。
 - 产品清理隔离 context 失败，原文 `RDC_CLI_FAILED: context_cleanup_failed: Context cleanup failed (cleanup: session_cleanup_failed)`。工具恢复将失联会话保留为 `requires_restart`，而清理分支只接受 `deferred/degraded`，故未能清掉会话；现场及原始会话已归档 `.local/vertical-investigation-20261108/evidence/rdc-integration-20261117-error-classification.zip`。
 - 监工核对本轮独占归属后释放其 ADB 转发并停止其 helper，手机配置恢复至原哈希与属性；隔离 QA、daemon、worker 已退出，未清掉的 context 登记保留。未继续做真实 Android 断连测试。
