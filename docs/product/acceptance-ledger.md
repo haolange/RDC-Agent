@@ -8,7 +8,13 @@
 - PC 打开与关闭均返回 `RDC_CLI_FAILED: runtime_error: Replay worker request failed; outcome unknown; clear context before retrying: DaemonOwnerUnavailable: Daemon owner unavailable for context 'rdc-86d58166-e6a9-4887-85ef-2323dc43b0a5': invalid_state`。旧状态采用 `pipe_name`、缺少新工具所需 `endpoint`，被新 context 的容量扫描读到；其记录的三个进程均已退出，旧文件保留。失败后确认本次 daemon 无 capture、session 或 worker，再定向停止并移除本次已退出的登记。
 - Android 白发单次对接：隔离实例使用新运行目录，回放就绪、设备画面同步；E1248 SPIR-V ASM 与 60,612 字节二进制读取成功。模型创建实验前先引用了不存在的 WorldState，原文 `INVESTIGATION_REF_UNRESOLVED: Evidence.worldStateId ws_acceptance_baseline is not resolvable [S-STATE-01]`；未执行替换或撤销，五份回执未生成。监工输入测试步骤，未重试该实验；原始会话及图像见 `.local/vertical-investigation-20261108/evidence/rdc-integration-20261117-android-shader.zip`。
 - 白发回放恢复入口 E3029 后经产品关闭，daemon/worker 退出、登记为空；手机临时设 `SingleThreadedCompilation=true`，事前备份、事后恢复并核对原文件 SHA-256 `6a0ecaa762d1bba2ee80d0bdb201cc584195f11f66d0a1412322ef0b6834b349` 与权限属主。
-- 尚未完成解码错误与崩溃隔离的实机复验、PC 余项、M1 回归或 M3。
+- 尚未完成解码错误与崩溃隔离的实机复验、PC 余项或 M3；M1 回归见下一条。
+
+## 2026-11-17：新工具 M1 回归
+
+- `3e6a56be` / Android 骁龙 865 / WhiteHair：M1 自主回归按 2.3 实质满足前四条；E1242→E1248 的零值到头发写入不是已证明的正常外观，也不声明全帧最早异常。模型输入仅“角色头发发白”，澄清回答“不知道”，原计划获批后执行；General 32m28s，规划 3m11s，General 用量 13,860,538 tokens。
+- E1248 覆盖和前后读数建立锚点；单次 SPIR-V `%493` 精度替换、画面变化、撤销与原生画面精确恢复，五份签名回执哈希匹配，Verifier 补授后完成审查、质疑已解决，产品接受 `completed`。入口 E3029 恢复后关闭，daemon/worker 退出、登记为空；前述独立诊断的二进制提取与本次实验共同覆盖 Android shader 往返。
+- 十二个 Agent 来源内置且模型可用；隔离 Knowledge 与原库六文件哈希一致、Memory 空。手机临时启用 `SingleThreadedCompilation`，事前备份、事后按原 SHA-256 和属性恢复；证据归档 `.local/vertical-investigation-20261108/evidence/rdc-integration-20261117-m1-regression.zip`。Pixel History 对 E1716/input-attachment 返回 capability 并保留 lease，调查自主改走区域读数与覆盖图。
 
 ## RDC-Tool main 发现与只读回放（2026-11-16）
 
