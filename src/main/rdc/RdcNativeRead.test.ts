@@ -103,7 +103,14 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
         turnId: 'read-turn', projectRootPath: directory, workspaceRoot: directory,
         rdcBinding: freezeRdcTurnBinding(settings, catalog.tools, frozenLease) };
       const before = processes.length;
-      await executeRdcShell({ discovery: { kind: 'describe', operation: 'rd.resource.list_all' } }, 'discovery', undefined, context);
+      const guideSnapshot = JSON.parse(readFileSync(path.join(process.cwd(), 'scripts/fidelity/rdc-tool-guide-catalog.json'), 'utf8')) as { fingerprint: string; tool_count: number };
+      expect(catalog.fingerprint).toBe(guideSnapshot.fingerprint);
+      expect(catalog.tools).toHaveLength(guideSnapshot.tool_count);
+      const listed = await executeRdcShell({ discovery: { kind: 'list', limit: 10 } }, 'discovery-list', undefined, context);
+      const described = await executeRdcShell({ discovery: { kind: 'describe', operation: 'rd.resource.list_all' } }, 'discovery-describe', undefined, context);
+      const discoveryPayload = (result: typeof listed) => JSON.parse((result.content[0] as { text: string }).text) as { fingerprint: string; data: Record<string, unknown> };
+      expect(discoveryPayload(listed)).toMatchObject({ fingerprint: guideSnapshot.fingerprint, data: { total: guideSnapshot.tool_count } });
+      expect(discoveryPayload(described)).toMatchObject({ fingerprint: guideSnapshot.fingerprint, data: { name: 'rd.resource.list_all' } });
       expect(processes).toHaveLength(before);
       const results = [];
       for (const kind of ['texture', 'buffer']) {

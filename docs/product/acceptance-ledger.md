@@ -1,5 +1,9 @@
 # Acceptance Ledger
 
+## RDC-Tool main 发现与只读回放（2026-11-16）
+
+- 隔离 Browser QA 在设置中选择并验证合并后的 RDC-Tool main，显示 1.1.2、129 操作；未使用真实用户设置或凭据。独立的 `RdcNativeRead.test.ts` 以同一安装和仓库 Vulkan fixture 经 Agent 主进程加载 catalog、冻结 lease，list/describe 均匹配快照 fingerprint `05322468c3e39db23a671fdd20747d52b8db11e455979fbf2c6ba2e523254042`，实际资源读取成功；输入哈希不变，daemon/worker 已退出。通过 UI 选择和自动执行测试，无人工代答；未发起真实模型请求。
+
 ## Provider 与 Working 时间线（2026-11-14）
 
 - **本机 GPT-6 Luna 实时复验：**正式 Browser QA 使用本机 ChatGPT Account（Medium），未复制凭据。首轮 Shell 文件规则拒绝混合命令；沿用同一待办补测，完成独立 Shell 暂停、`read_file` 和任务结算。界面顺序为待办启动 → Shell → 读文件 → 一次缺少结果字段的结算失败 → 任务完成，无回执倒插。审核等待和排队时无蓝点/扫光；Shell 执行时一个可见蓝点及标题 `active-signal-shimmer`，终态五个静态灰点。DOM 在流式光标存续时先后读到 124、293、599 字符（分别为一、二、三段）；最终单一 final 项 726 字符，实际截图可见第二段开始后第三段尚未出现。两轮含自动审核共 13 次调用，173,066 input、1,485 output tokens；无人工代答。
