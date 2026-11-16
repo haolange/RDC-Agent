@@ -14,6 +14,7 @@
 
 - `3e6a56be` / Android 骁龙 865 / WhiteHair：M1 自主回归按 2.3 实质满足前四条；E1242→E1248 的零值到头发写入不是已证明的正常外观，也不声明全帧最早异常。模型输入仅“角色头发发白”，澄清回答“不知道”，原计划获批后执行；General 32m28s，规划 3m11s，General 用量 13,860,538 tokens。
 - E1248 覆盖和前后读数建立锚点；单次 SPIR-V `%493` 精度替换、画面变化、撤销与原生画面精确恢复，五份签名回执哈希匹配，Verifier 补授后完成审查、质疑已解决，产品接受 `completed`。入口 E3029 恢复后关闭，daemon/worker 退出、登记为空；前述独立诊断的二进制提取与本次实验共同覆盖 Android shader 往返。
+- 一次 `FILE_AUDIT_HASH_MISMATCH` 来自工具保存 shader 文本时的换行转换：内容哈希为 LF 的 `9df46a8ce5b9d74384789c4bcb7ab629272c41eceae35568a32a56fcfbabae47`，Windows 保存文件的 CRLF 字节哈希为 `a9a2e3bef1881af62a43e19c7f12e4a5b455de02be3c71e3e0e526401abacc1c`；归一化后相等，模型随后用文件实际哈希完成审计。
 - 十二个 Agent 来源内置且模型可用；隔离 Knowledge 与原库六文件哈希一致、Memory 空。手机临时启用 `SingleThreadedCompilation`，事前备份、事后按原 SHA-256 和属性恢复；证据归档 `.local/vertical-investigation-20261108/evidence/rdc-integration-20261117-m1-regression.zip`。Pixel History 对 E1716/input-attachment 返回 capability 并保留 lease，调查自主改走区域读数与覆盖图。
 
 ## 2026-11-17：新工具错误分类与异常退出
