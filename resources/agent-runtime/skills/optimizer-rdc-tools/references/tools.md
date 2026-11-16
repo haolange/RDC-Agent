@@ -2,7 +2,7 @@
 
 # Optimizer RDC 工具参考
 
-Current catalog fingerprint: `7da248b9df024bad8d7bca65fe32d44a1b65456f277a793985805dd91d95ba04`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
+Current catalog fingerprint: `05322468c3e39db23a671fdd20747d52b8db11e455979fbf2c6ba2e523254042`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
 
 所有 `shell.rdc` 示例都省略由主进程注入的 `session_id` / `capture_file_id` / context 身份。不要把示例补成可覆盖其它会话的身份。共享发现、错误恢复、输出与副作用规则见 `$rdc-tool-shell`。
 
