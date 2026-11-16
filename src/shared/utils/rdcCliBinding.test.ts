@@ -14,7 +14,7 @@ it.each(['C:\\Tools\\rdc.bat', 'rdc.bat'])('rejects bat with a stable token', co
 });
 it('rejects redirection, missing prefix and another installation', () => {
   for (const patch of [{ argsPrefix: [] }, { argsPrefix: ['C:\\other\\cli\\run_cli.py'] },
-    { env: { RDC_TOOL_ROOT: 'C:\\other' } }, { argsPrefix: ['-File', 'C:\\Tools\\scripts\\rdc_bat_launcher.ps1'] }]) {
+    { env: { PYTHONPATH: 'C:\\other' } }, { argsPrefix: ['-File', 'C:\\Tools\\scripts\\rdc_bat_launcher.ps1'] }]) {
     expect(() => assertRdcCliBinding({ ...cli, ...patch })).toThrow();
   }
 });

@@ -2,7 +2,7 @@
 
 # Analyzer RDC 工具参考
 
-Current catalog fingerprint: `cae6e6f2ff83940e19625361aadd4a3e9cb98cf5c9ae1e4ef5bf159f0c016987`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
+Current catalog fingerprint: `7da248b9df024bad8d7bca65fe32d44a1b65456f277a793985805dd91d95ba04`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
 
 所有 `shell.rdc` 示例都省略由主进程注入的 `session_id` / `capture_file_id` / context 身份。不要把示例补成可覆盖其它会话的身份。共享发现、错误恢复、输出与副作用规则见 `$rdc-tool-shell`。
 
@@ -597,7 +597,7 @@ Current catalog fingerprint: `cae6e6f2ff83940e19625361aadd4a3e9cb98cf5c9ae1e4ef5
 | `as_type` | 否 | string; as_type (str, 可选, 默认 'float') |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): {values, values_status, inline_value_limit, values_path, stats, resolved_event_id, texture_id, target_metadata}; values 为 stride/as_type 后完整嵌套数值数组，最多256标量；values_status=complete；超限为values=null/omitted_limit，不截断或伪造空列表。完整同数组仍导出NPZ到values_path。stats反映同一采样数组，含shape/dtype/stride、总体与逐rgba通道有限值min/max/mean和nan/inf_count；通道指解码数组分量，不证明纹理存在物理alpha。非有限值使用NaN/Infinity/-Infinity字符串，不转成0。; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {values, values_status, inline_value_limit, values_path, stats, resolved_event_id, texture_id, target_metadata}; values 为 stride/as_type 后完整嵌套数值数组，最多256标量；values_status=complete；超限为values=null/omitted_limit，不截断或伪造空列表。完整同数组仍导出NPZ到values_path。stats反映同一采样数组，含shape/dtype/stride、总体与逐rgba通道有限值min/max/mean和nan/inf_count；TYPELESS 按查询事件绑定的唯一 view 格式解码；没有唯一 view 时保留原始无符号整数并在 stats 标注，忽略 as_type。确定性解码失败在恢复原事件后返回 texture_readback_decode_failed。通道指解码数组分量，不证明纹理存在物理alpha。非有限值使用NaN/Infinity/-Infinity字符串，不转成0。; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 

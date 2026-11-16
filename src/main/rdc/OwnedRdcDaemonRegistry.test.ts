@@ -41,7 +41,7 @@ describe('OwnedRdcDaemonRegistry', () => {
 
   it('lists only rdc-* daemon state files from the App intermediate root', () => {
     const intermediateRoot = path.join(makeRoot(), 'rdc-tool-intermediate');
-    const runtime = path.join(intermediateRoot, 'runtime', 'rdc_cli');
+    const runtime = path.join(intermediateRoot, 'runtime', 'rdc_tool_cli');
     fs.mkdirSync(runtime, { recursive: true });
     fs.writeFileSync(path.join(runtime, `daemon_state_${contextId}.json`), '{}');
     fs.writeFileSync(path.join(runtime, 'daemon_state.json'), '{}');

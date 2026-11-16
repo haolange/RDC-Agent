@@ -26,7 +26,7 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
     const settings = { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, timeoutMs: 30000, workingDirectory: root!,
       command: path.join(root!, 'binaries/windows/x64/python/python.exe'),
       argsPrefix: [path.join(root!, 'cli/run_cli.py')],
-      env: { RDC_TOOL_ROOT: root!, RDC_TOOL_INTERMEDIATE_ROOT: directory, PYTHONDONTWRITEBYTECODE: '1' } };
+      env: { RDC_TOOL_INTERMEDIATE_ROOT: directory, PYTHONDONTWRITEBYTECODE: '1' } };
     const processes: Array<Record<string, unknown>> = [];
     const stageResults: Array<{ exitCode: number; envelope: Record<string, unknown> }> = [];
     const receipt: Record<string, unknown> = { toolsRoot: root, capture, inputSha256: inputHash, contextId, sessionId };
