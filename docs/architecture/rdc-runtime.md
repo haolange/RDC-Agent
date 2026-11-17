@@ -15,7 +15,7 @@ RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`�
 
 管线 `sections` 的资格只覆盖实际请求并返回的字段。未采集 section 的模型默认空值不能降级已返回的 bindings，也不能据此声称已核验被省略的 shader 或输出状态；真实请求字段缺失仍保留对应降级原因。
 
-管线 stage 查询的已知能力拒绝只在 `rd.pipeline.get_shader`、`get_stage_state`、`get_constant_buffers`、`get_resource_bindings` 返回同操作 canonical `capability/shader_stage_unsupported`，并同时证明 `failure_stage=validate_stage`、`effects_attempted=false`、`context_preserved=true` 时，进入现有无效果拒绝核验路径。主进程仍须在收到拒绝后重新核对冻结 owning lease 的版本、context、capture 和 replay 身份，核验成功才保留可查询状态；原始结果仍是失败，不产生实验回执、不重试。其它能力错误、缺失证明、取消或身份漂移仍隔离，不按错误文字推断安全。
+管线 stage 拒绝与其他操作共用同一无效果证明判定；主进程不按错误 category 或错误码推断保全。它仍须核对 canonical 结果种类、冻结 owning lease 的版本、context、capture 和 replay 身份；缺失证明、取消或身份漂移仍隔离，失败不产生实验回执。
 
 ## runtime_context 与宿主控制事实
 
@@ -126,19 +126,19 @@ helper 进程退出不转移已有安装或配置所有权。Tools 依据可解�
 
 冻结的 turn 身份包含 owning capture 与 replay 身份。Capture 作用域的查询使用应用分配的 capture ID，模型传入的覆盖值被拒绝。临时回放查询持有串行 lease，主进程在查询前后读取 context，核验已恢复的 event 与结果证明，并拒绝身份漂移；它们不触发终态刷新。恢复失败会隔离后续执行。
 
-原生 shader 替换失败只有在同安装 CLI 返回 canonical `validation` 错误、结果种类匹配本次冻结操作、明确 `replacement_attempted:false` 且 `context_preserved:true`，并且主进程再次确认原 lease/capture/replay 身份未变时，才保留可查询的 context。此类拒绝没有 intervention 回执，不代表修复或 rollback。退出超时、取消、协议损坏、未知错误、已尝试替换或身份变化仍隔离，必须经 Capture 生命周期恢复。
+原生 shader 替换失败沿用统一无效果证明与身份核验；`replacement_attempted:false` 仅说明未尝试替换，不能单独证明事件和其他状态未变。没有完整证明时隔离，必须经 Capture 生命周期恢复。
 
-其中 `shader_patch_diff_failed` 只在文本 diff 应用失败、尚未编译或替换时附带上述证明。调用可能已导航到目标事件，因此不声明 `effects_attempted:false`，也不声明恢复原事件；模型须修正与当前源码不匹配的 diff，不能把拒绝当实验干预。
+其中 `shader_patch_diff_failed` 可说明文本 diff 在编译或替换之前失败。调用可能已导航到目标事件，因此未替换信息不是无效果或恢复证明，也不是实验干预。
 
 RDC 的不可变内容地址制品可能没有文件扩展名。`read_image` 对无扩展名文件通过既有图像字节识别和尺寸校验确认 PNG/JPEG/GIF/WebP，直接读取原制品；不要求重导出或复制改名。已有扩展名仍须匹配声明格式，SVG、可执行扩展名、非图像内容、越权路径与非视觉路由仍拒绝。制品 MIME 或文件名本身不替代真实 raster 校验。
 
-常量缓冲 `slot` 对应 shader reflection `constantBlocks` 的零基索引，与原生 `GetConstantBlock` / `GetCBufferVariableContents` 一致，不读取已移除的 `bindPoint` 或把固定 API 绑定号当索引。原生解码传递该stage实际绑定的ResourceId对象，序列化ID只用于协议；raw fallback必须保留decode_status/decode_error，不能当作结构化解码已成功。`rd.shader.get_constant_buffer_contents` 的已知 `constant_buffer_data_unavailable` 失败须由 Tool 恢复原事件，并返回精确 `decode_constant_buffer` 阶段、失败原因及 context/session/restored-event 证明。main 仅对 schema、操作、错误、阶段、原因和冻结身份全匹配的证明，在串行 lease 内再次读取原事件后保留 context；错误仍返回模型，不签发成功或实验回滚回执。缺证明、未知错误、取消、恢复失败或身份漂移继续隔离。
+常量缓冲 `slot` 对应 shader reflection `constantBlocks` 的零基索引，与原生 `GetConstantBlock` / `GetCBufferVariableContents` 一致，不读取已移除的 `bindPoint` 或把固定 API 绑定号当索引。原生解码传递该stage实际绑定的ResourceId对象，序列化ID只用于协议；raw fallback必须保留decode_status/decode_error，不能当作结构化解码已成功。`rd.shader.get_constant_buffer_contents` 的受控恢复须由 Tool 恢复原事件，并返回精确 `decode_constant_buffer` 阶段、失败原因及 context/session/restored-event 证明。main 核验 schema、操作、阶段、原因及冻结身份，并在串行 lease 内比较原事件、进程出生身份和 replacement 登记；缺证明、取消、恢复失败或身份漂移继续隔离。
 
-shader-debug handle 属于创建它的 replay session，重启/reopen 不延续其有效性。Tool 对 `rd.shader.get_debug_state` 及 `rd.debug.*` 的无效/越属 handle，在获取 controller 或应用 event 前返回 canonical `shader_debug_handle_invalid` validation 错误及 `effects_attempted:false/context_preserved:true`。main 复用既有无效果拒绝的冻结 lease 身份复核；此错误不是当前 shader 调试不支持，也不是实验回滚。通过校验后发生的原生失败不取得该证明。
+shader-debug handle 属于创建它的 replay session，重启/reopen 不延续其有效性。Tool 对 `rd.shader.get_debug_state` 及 `rd.debug.*` 的无效/越属 handle 在获取 controller 或应用 event 前拒绝；证明条件见 [RDC-Tool 公共契约](https://github.com/haolange/RDC-Tool/blob/main/docs/public-contract.md#rejection-proof)。此错误不是当前 shader 调试不支持，也不是实验回滚。
 
-原生操作在任何 replay 效果之前拒绝时，Tool 可在 canonical `validation` 错误中提供 `effects_attempted:false` 与 `context_preserved:true`。main 仅在结果种类与冻结操作相符、CLI 非零退出、未取消且 lease/capture/replay 身份复核不变时保留 context；错误仍返回调用者，不生成成功或实验回执。该证明由 Tool 的实际前置检查路径给出，普通运行时错误、部分执行与缺少任一证明字段仍隔离。未知 shader disassembly target 属于此类前置拒绝；Tool 在应用 event 之前检验 target，并返回当前可用 target 名称。
+原生操作拒绝的证明规则以 [RDC-Tool 公共契约](https://github.com/haolange/RDC-Tool/blob/main/docs/public-contract.md#rejection-proof)为准。main 接受完整的 `effects_attempted:false` 与 `context_preserved:true`，不依赖 category 或错误码；结果种类、非零退出、取消状态和冻结 lease/capture/replay 身份仍须核验。不完整或相互矛盾的证明继续隔离。
 
-`rd.export.screenshot` 查找目标时可能暂时改变 active event。目标查找失败后，Tool 须实际恢复原 event；只有非零退出的同操作 canonical runtime 错误携带 `failure_stage:resolve_visual_target`、`replay_state_restored:true`、`restored_event_id` 和 `artifact_write_attempted:false`，且 main 在串行 lease 下复核原 event、context/replay/capture 身份均未变，才保留可查询的 context。失败仍如实返回，不能签发截图或实验回执；无原 event、恢复失败、身份漂移、取消及其它阶段失败继续隔离。
+`rd.export.screenshot` 查找目标时可能暂时改变 active event。目标查找失败后，Tool 须实际恢复原 event；只有非零退出的同操作 canonical 错误携带 `failure_stage:resolve_visual_target`、`replay_state_restored:true`、`restored_event_id` 和 `artifact_write_attempted:false`，且 main 在串行 lease 下复核原 event、context/replay/capture、daemon/worker 出生身份及 replacement 登记均未变，才保留可查询的 context。失败仍如实返回，不能签发截图或实验回执；缺少可核验身份、恢复失败、取消及其它阶段失败继续隔离。
 
 `rd.shader.get_source` 在指定事件没有绑定 shader 时仍返回 `shader_binding_lookup_failed`，不会把“无 shader”伪装成可用源码。Tool 在返回前恢复原 event；main 仅接受同操作、同身份、明确 `resolve_binding` 失败与 `replay_state_restored/restored_event_id` 证明，并再次读取原 event 核对后保留 lease。恢复失败返回 `shader_inspection_recovery_failed`；缺证明、取消或身份变化继续隔离。
 
@@ -148,7 +148,7 @@ Android 回放使用匹配的 Tools/native 服务。服务端在等待用户下�
 
 ### 原生失败的受控交付
 
-`RdcNativeFailure` 必须在 owning 执行路径完成既有身份、取消与恢复检查后，将限定失败投影交付给模型和 UI，不能只留下错误字符串。投影标记 `ok:false` / `source:main-qualified-native-failure`，包含实际 CLI exitCode、错误种类、main-owned 调用参数/身份及 `mainValidation.preservationVerified` / `leaseState`。仅主进程已复核安全时，`nativeFailure.proof` 才表达 canonical `effects_attempted:false/context_preserved:true`、未替换或已复核恢复的对应事实；缺证明、身份漂移或取消时不对外宣称上下文保持，lease 仍按原规则隔离。
+`RdcNativeFailure` 必须在 owning 执行路径完成既有身份、取消与恢复检查后，将限定失败投影交付给模型和 UI，不能只留下错误字符串。投影标记 `ok:false` / `source:main-qualified-native-failure`，包含实际 CLI exitCode、错误种类、main-owned 调用参数/身份及 `mainValidation.preservationVerified` / `leaseState`。仅主进程已复核安全时，`nativeFailure.proof` 才表达 canonical `effects_attempted:false/context_preserved:true` 或已复核恢复的对应事实；缺证明、身份漂移或取消时不对外宣称上下文保持，lease 仍按原规则隔离。
 
 这是主进程资格化的失败记录，不是完整原始 CLI stdout，也不是成功、实验或 rollback 签名。`operation` 是产品请求；`invocation` 记录实际失败的原生命令，内置状态前置查询失败时不得声称产品请求已经执行，后续恢复复核也不得覆盖原失败调用。任意私有 native details、二进制 stdout 与 stderr 不透传。执行器只接收 owning shell 路径绑定到该异常的投影，保留 `isError:true` 并经现有 ToolResultArtifactizer 固定保存，即使小于卸货阈值也提供 session owner/ref/hash；普通异常或其它工具不能通过同名属性冒充原生证明。持久化失败保留已返回的错误和可验证交付子集，不以落盘失败重试原生操作。后续真正需要的合法查询仍须通过正常冻结权限/lease 门禁，其连续性另行核验。
 

@@ -1,5 +1,15 @@
 # Acceptance Ledger
 
+## 2026-11-17：事件拒绝保全，修复后复验
+
+- 用仓库 Vulkan `vkcube.rdc` 经 Agent 的 `executeRdcShell` 生产执行路径，在同一隔离 lease 中调用无效 `rd.event.set_active` 和 `rd.pipeline.get_state`；两者均返回 `event_not_found`、`validation`、`effects_attempted=false` 与 `context_preserved=true`，主进程核验后保留 lease。随后合法事件读取成功，capture/session、活动事件及 daemon/worker 身份不变。
+- Tool 与 Agent 的 129 项 catalog fingerprint 均为 `20281df5b5f0c62aa3037c1ff3c382ed8ebe685e79533950b4405efe06164298`；产品发现与真实资源读取通过。独立 native preview 可打开、保持、关闭。本次属于 Vitest 驱动的产品主进程执行路径，不是 Electron 界面或真实模型测试。
+- capture SHA-256 `00797a27e6316a0cf4369327f9db30a21635fa757673b3f9712af07989145ba8` 前后一致；各测试独占的 daemon、worker 和 context 已清理。[工具 PR](https://github.com/haolange/RDC-Tool/pull/4) 记录逐项盘点和修复前原始 envelope。
+
+## 2026-11-17：事件拒绝保全，修复前复现
+
+- 以原 Tool `5310e89f01d5642deaeddcd37867214a341af387`、同一 Vulkan fixture 和 Agent 生产执行路径，在独立 lease 中分别调用无效的 `rd.event.set_active`、`rd.pipeline.get_state`；两者均返回 `event_not_found`、`not_found` 且无保全证明，Agent 分别隔离 lease。两次独占的 context、daemon 和 worker 均已清理，原始 envelope 保留在[工具 PR](https://github.com/haolange/RDC-Tool/pull/4)。
+
 ## 2026-11-17：RDC-Tool 修复后对接复验，未通过
 
 - RDC-Tool `5310e89f01d5642deaeddcd37867214a341af387` 正式打包、验包通过，隔离 Settings 验证 1.1.2／129 操作；新旧操作名一致，三份参考手册检查通过。

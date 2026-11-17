@@ -54,7 +54,7 @@ const request = (sessionId = 's1', remote = false): OpenProjectInputRequest => (
 const replayLease = () => setRdcRuntimeContextForSession('s1', { contextId: 'context-s1', replaySessionId: 'native-s1',
   captureFileId: 'file', runtimeOwner: 'app', ownerLeaseId: 'owner', backend: 'local', updatedAt: 1 }, { projectId: 'p' })!;
 const replayFailure = (code: string) => new RdcNativeFailure(`RDC_CLI_FAILED: ${code}: native connection lost`,
-  null, false, false, { code, category: 'runtime', exitCode: 1 });
+  null, false, { code, category: 'runtime', exitCode: 1 });
 async function openRemote(service: RdcSessionService, sessionId = 's1') {
   const value = request(sessionId, true);
   await service.prepareDevice({projectId:value.projectId,sessionId,deviceId:value.replayDevice.id,bindingGeneration:service.snapshotReplayForSession(value).generation});
@@ -600,7 +600,7 @@ it('atomically reserves a device across two session queues after both old contex
 });
 
 function unconfirmedInstall() {
-  return new RdcNativeFailure('PackageManager result is unconfirmed', 'rd.remote.connect', false, false, {
+  return new RdcNativeFailure('PackageManager result is unconfirmed', 'rd.remote.connect', false, {
     code: 'remote_install_unconfirmed', category: 'runtime', exitCode: 1, details: {
       remote: { code: 'remote_install_unconfirmed', stage: 'installing', device_serial: 'SERIAL' },
       device_action: { kind: 'android_install', state: 'unconfirmed', device_serial: 'SERIAL', package_name: 'helper', apk_sha256: 'a'.repeat(64) },

@@ -125,7 +125,7 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
         'unsupported-stage', undefined, context).catch((error: unknown) => error);
       expect(rejected).toBeInstanceOf(RdcNativeFailure);
       expect((rejected as RdcNativeFailure).deliveryResult).toMatchObject({ isError: true, details: {
-        nativeFailure: { code: 'shader_stage_unsupported', category: 'capability',
+        nativeFailure: { code: 'shader_stage_unsupported', category: 'validation',
           proof: { effects_attempted: false, context_preserved: true } },
         mainValidation: { preservationVerified: true, leaseState: 'retained' },
       } });
@@ -144,7 +144,7 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
         result_kind: 'rd.pipeline.get_stage_state', data: { stage_state: { stage: 'PS' }, resolved_event_id: original.eventId } } });
       expect(stageResults).toHaveLength(2);
       expect(stageResults[0]).toMatchObject({ exitCode: 1, envelope: { ok: false, error: {
-        code: 'shader_stage_unsupported', category: 'capability', details: {
+        code: 'shader_stage_unsupported', category: 'validation', details: {
           failure_stage: 'validate_stage', effects_attempted: false, context_preserved: true } } } });
       for (const stage of stageResults) expect(parseRdcProcessIdentity(
         (stage.envelope.meta as Record<string, unknown>).process_identity)).toEqual(original.processIdentity);

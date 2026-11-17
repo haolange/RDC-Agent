@@ -16,7 +16,7 @@ const reply = (data: object, kind = 'rd.remote.connect') => ({ exitCode: 0, stdo
 beforeEach(() => execute.mockReset());
 
 it('preserves empty ADB output and exit zero as diagnostics instead of implying the device is offline', () => {
-  const issue = replayDeviceIssue(new RdcNativeFailure('Invalid device state', 'rd.remote.connect', false, false, {
+  const issue = replayDeviceIssue(new RdcNativeFailure('Invalid device state', 'rd.remote.connect', false, {
     code: 'adb_device_invalid_response', category: 'runtime', exitCode: 1,
     details: { command: ['adb', '-s', device.serial, 'get-state'], returncode: 0, stdout: '', stderr: '' },
   }));

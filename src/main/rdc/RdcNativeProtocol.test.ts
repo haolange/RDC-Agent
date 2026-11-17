@@ -23,7 +23,7 @@ describe('native failure projection', () => {
     let failure: unknown;
     try { parseRdcNativeResult(result, 'owned-context', 'rd.remote.connect'); } catch (error) { failure = error; }
     expect(failure).toBeInstanceOf(RdcNativeFailure);
-    expect(failure).toMatchObject({ resultKind: 'rdc_tool.cli', replacementNotAttempted: false, effectsNotAttempted: false,
+    expect(failure).toMatchObject({ resultKind: 'rdc_tool.cli', effectsNotAttempted: false,
       nativeError: { code: 'daemon_owner_unavailable', category: 'runtime', exitCode: 1, details } });
     expect((failure as Error).message).toContain('Daemon ownership is unavailable');
     expect((failure as Error).message).toContain('reason: owner_identity_unavailable');
@@ -68,7 +68,7 @@ describe('native failure projection', () => {
     expect(() => parseRdcNativeResult(result)).toThrow('Context cleanup failed (cleanup: expired_remote_cleanup_failed)');
     expect(() => parseRdcNativeResult(result)).not.toThrow('private device details');
   });
-  it('retains only canonical proof that a replacement was never attempted', () => {
+  it('does not treat a no-replacement claim as proof of an unchanged replay', () => {
     const result = { exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
       result_kind: 'rd.shader.edit_and_replace', ok: false, error: {
         code: 'shader_patch_op_unsupported_for_encoding', category: 'validation', message: 'Source cannot be edited',
@@ -77,7 +77,7 @@ describe('native failure projection', () => {
     let failure: unknown;
     try { parseRdcNativeResult(result, undefined, 'rd.shader.edit_and_replace'); } catch (error) { failure = error; }
     expect(failure).toBeInstanceOf(RdcNativeFailure);
-    expect(failure).toMatchObject({ resultKind: 'rd.shader.edit_and_replace', replacementNotAttempted: true });
+    expect(failure).toMatchObject({ resultKind: 'rd.shader.edit_and_replace', effectsNotAttempted: false });
     expect((failure as Error).message).not.toContain('private_path');
   });
   it('retains only canonical proof that no native effect was attempted', () => {
@@ -91,7 +91,6 @@ describe('native failure projection', () => {
     expect((failure as Error).message).not.toContain('private_path');
     for (const change of [
       { schema_version: '2.0.0' }, { result_kind: 'rd.pipeline.other' },
-      { error: { ...envelope.error, category: 'runtime' } },
       { error: { ...envelope.error, details: { effects_attempted: true, context_preserved: true } } },
       { error: { ...envelope.error, details: { effects_attempted: false, context_preserved: false } } },
     ]) {
@@ -100,6 +99,15 @@ describe('native failure projection', () => {
         undefined, 'rd.pipeline.get_state'); } catch (error) { rejected = error; }
       expect(rejected).toMatchObject({ effectsNotAttempted: false });
     }
+  });
+  it.each(['validation', 'capability', 'runtime', 'not_found'])('does not use category %s to decide preservation', category => {
+    const envelope = { schema_version: '3.0.0', result_kind: 'rd.pipeline.get_state', ok: false,
+      error: { code: 'arbitrary_code', category, message: 'Rejected',
+        details: { effects_attempted: false, context_preserved: true } } };
+    let failure: unknown;
+    try { parseRdcNativeResult({ exitCode: 1, stdout: JSON.stringify(envelope), stderr: '' } as CLIResult,
+      undefined, envelope.result_kind); } catch (error) { failure = error; }
+    expect(failure).toMatchObject({ effectsNotAttempted: true });
   });
   it.each(['get_shader', 'get_stage_state', 'get_constant_buffers', 'get_resource_bindings'])(
     'retains exact pre-effect capability rejection for pipeline %s', action => {
@@ -110,19 +118,16 @@ describe('native failure projection', () => {
             effects_attempted: false, context_preserved: true } } }), stderr: '' } as CLIResult;
       let failure: unknown;
       try { parseRdcNativeResult(result, undefined, operation); } catch (error) { failure = error; }
-      expect(failure).toMatchObject({ effectsNotAttempted: true, replacementNotAttempted: false });
+      expect(failure).toMatchObject({ effectsNotAttempted: true });
     },
   );
-  it('does not trust a broader capability claim or incomplete stage rejection', () => {
+  it('does not trust an incomplete stage rejection or mismatched canonical envelope', () => {
     const operation = 'rd.pipeline.get_stage_state';
     const details = { failure_stage: 'validate_stage', effects_attempted: false, context_preserved: true };
     const error = { code: 'shader_stage_unsupported', category: 'capability', message: 'Unsupported stage', details };
     const envelope = { schema_version: '3.0.0', result_kind: operation, ok: false, error };
     for (const change of [
       { schema_version: '2.0.0' }, { result_kind: 'rd.pipeline.get_state' },
-      { error: { ...error, code: 'other_capability_error' } },
-      { error: { ...error, category: 'runtime' } },
-      { error: { ...error, details: { ...details, failure_stage: 'after_operation' } } },
       { error: { ...error, details: { failure_stage: 'validate_stage', context_preserved: true } } },
       { error: { ...error, details: { failure_stage: 'validate_stage', effects_attempted: false } } },
     ]) {
@@ -132,7 +137,6 @@ describe('native failure projection', () => {
       expect(failure).toMatchObject({ effectsNotAttempted: false });
     }
     for (const [kind, expectedKind, exitCode] of [
-      ['rd.pipeline.get_state', 'rd.pipeline.get_state', 1],
       [operation, undefined, 1], [operation, operation, 0],
     ] as const) {
       let failure: unknown;
@@ -162,7 +166,8 @@ describe('native failure projection', () => {
     }
     expect(parse({ ...envelope, schema_version: '2.0.0' }).screenshotTargetRestoration).toBeNull();
     expect(parse({ ...envelope, result_kind: 'rd.export.texture' }).screenshotTargetRestoration).toBeNull();
-    expect(parse({ ...envelope, error: { ...envelope.error, category: 'validation' } }).screenshotTargetRestoration).toBeNull();
+    expect(parse({ ...envelope, error: { ...envelope.error, category: 'validation' } }).screenshotTargetRestoration)
+      .toEqual({ contextId: 'owned-context', sessionId: 'native-replay', eventId: 11 });
     expect(parse(envelope, 0).screenshotTargetRestoration).toBeNull();
   });
   it('retains only exact shader-source binding restoration proof', () => {
@@ -186,7 +191,8 @@ describe('native failure projection', () => {
       expect(parse({ ...envelope, error: { ...envelope.error, details } }).inspectionRestoration).toBeNull();
     }
     expect(parse({ ...envelope, result_kind: 'rd.shader.get_disassembly' }).inspectionRestoration).toBeNull();
-    expect(parse({ ...envelope, error: { ...envelope.error, code: 'shader_inspection_recovery_failed' } }).inspectionRestoration).toBeNull();
+    expect(parse({ ...envelope, error: { ...envelope.error, code: 'other_code' } }).inspectionRestoration)
+      .toEqual({ contextId: 'owned-context', sessionId: 'native-replay', eventId: 1248 });
     expect(parse(envelope, 0).inspectionRestoration).toBeNull();
   });
   it('accepts only exact constant-buffer failure restoration proof', () => {
@@ -208,10 +214,9 @@ describe('native failure projection', () => {
       expect(parse({ ...envelope, error: { ...envelope.error, details: { ...details, ...change } } })
         .inspectionRestoration).toBeNull();
     }
-    for (const change of [
-      { code: 'shader_inspection_recovery_failed' }, { category: 'validation' },
-    ]) {
-      expect(parse({ ...envelope, error: { ...envelope.error, ...change } }).inspectionRestoration).toBeNull();
+    for (const change of [{ code: 'other_code' }, { category: 'validation' }]) {
+      expect(parse({ ...envelope, error: { ...envelope.error, ...change } }).inspectionRestoration)
+        .toEqual({ contextId: 'owned-context', sessionId: 'native-replay', eventId: 11 });
     }
     expect(parse({ ...envelope, schema_version: '2.0.0' }).inspectionRestoration).toBeNull();
     expect(parse({ ...envelope, result_kind: 'rd.shader.get_source' }).inspectionRestoration).toBeNull();
@@ -234,7 +239,7 @@ describe('native failure projection', () => {
     try { parseRdcNativeResult({ exitCode, stdout: JSON.stringify(envelope), stderr: '' } as CLIResult,
       undefined, 'rd.shader.edit_and_replace'); } catch (error) { failure = error; }
     expect(failure).toBeInstanceOf(RdcNativeFailure);
-    expect(failure).toMatchObject({ replacementNotAttempted: false });
+    expect(failure).toMatchObject({ effectsNotAttempted: false });
   });
 });
 
