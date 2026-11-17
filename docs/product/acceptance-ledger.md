@@ -1,5 +1,12 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 眼部 DXIL 完整替代往返复验
+
+- 隔离产品本机回放使用与工具 `1a761473` 源码一致的 candidate；E6152／PS 的独立 65 字节 HLSL 测试 shader 编译成功，原 capture 的 HLSL 源码不可用。
+- 对该 PS 完成一次完整替代 A-B-A：baseline、intervention、variant、rollback、restored 五份产品签名回执齐全；变体眼部显示洋红，撤销后图片 SHA-256 与基线同为 `f3fec7c85630c478a5819f66db7e1cd1f679d1b7f73e1e57a7fc2406be6aa059`，替换集合为空。
+- 三态为 E6152 指定纹理的展示截图，不是最终 Present 或逐像素读数；测试源码不是原 shader 的还原，也不作为 M3 因果结论。产品查询确认入口 E147；监工指定独立工程诊断，未重试失败调用。
+- 原始编译、五阶段返回与回执、实验记录及图像归档 `.local/vertical-investigation-20261108/evidence/m3-dxil-full-replacement-recheck-20261118.zip`，SHA-256 `23f6e8d99846f8a5a7d72ece19f5c4f8caf7d2e593de807de67856ca1b8a5e14`。
+
 - 2026-11-18 工具侧分类修复：`1a761473` 已提交并推送至 RDC-Tool `main`；确定性纹理解码错误在事件恢复成功时归为 `capability` 并给出替代读取操作，恢复失败仍为 `runtime`。受影响 178 项测试及 catalog／参考文档检查通过；此前隔离 candidate 的 diff SHA-256 与该提交相对 `b998498c` 的 diff 一致。
 
 - 2026-11-18 M3 第三轮记录复查：先前将停点直接记为“因果”过早。VRS、光照和后处理解释均有检查，但有效着色率与执行位置未证实，光照各项贡献未拆分，最终像素映射及后处理影响未闭合；三条 hypothesis 未给最终裁决。依据第三轮 `ClaimSet` 与 `execution-analysis.md` 归档，后续按 2.3 从锚定起核对，再按 3.3 确定区分停点的直接原因。
