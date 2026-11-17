@@ -1,5 +1,10 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 第三轮控制点输出资格复验
+
+- 按 3.3 对眼部 E6152／`ResourceId::308658` 的控制点 `(517,455)`、primitive 100 各做一次 Pixel History 和 pixel debug。两者均成功，但 history shader-out `(0.08621,0.10134,0.05632,0.10399)` 与 debug `_OUT` `(0.02371,0.03048,0.03118,0.10113)` 不一致；trace 输入位置为 `(517.5,455.5)`，该 trace 尚不能定量拆分实际输出贡献，差异原因未定。
+- 调试已 finish、替换集合为空，产品查询确认回到入口 E147；监工指定本次检查参数，无失败重试。原始返回归档 `.local/vertical-investigation-20261108/evidence/m3-round03-control-debug-recheck-20261118.zip`，SHA-256 `6836172795d14b26f5ce6fb08975fd736fb829b38c86397494afc6a12e6aebda`。
+
 ## 2026-11-18：M3 眼部 DXIL 完整替代往返复验
 
 - 隔离产品本机回放使用与工具 `1a761473` 源码一致的 candidate；E6152／PS 的独立 65 字节 HLSL 测试 shader 编译成功，原 capture 的 HLSL 源码不可用。
