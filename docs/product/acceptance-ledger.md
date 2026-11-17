@@ -1,5 +1,13 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 第四轮，停在区分
+
+- PC 本机、新隔离会话，十二个 Agent 均为内置且使用 GPT-6.1 Sol／Medium；Memory 为空，隔离 Knowledge 无本案例材料。监工只输入短症状，对两个超出已知事实的澄清答“不知道”，原样批准计划；模型将测试工程里的前轮材料作为线索，并在当前 capture 上复核。
+- E6152 的泪液 draw、像素历史和覆盖支持限定场景区域；目标像素在 E6128→E6152 的 RGB 由 `(0.0674, 0.0366, 0.0332)` 升至 `(0.4688, 0.4922, 0.5625)`，随后被 E6501 衰减。VRS 的实际调用未证、光照贡献未拆分、后处理足迹未闭合，首个未满足步骤为区分。
+- 独立 verifier 接受限定定位但未认证根因；General 的 `turn_complete` 以 `partial` 被产品接受，没有因果实验，也没有满足能力阻塞所需的独有差分特征，不能交付。`code_interpreter` 返回 `CODE_INTERPRETER_DISABLED`；末次答复已在 Trace 中生成，随后界面被一次模型请求错误覆盖，具体技术错误待查。
+- 签名恢复回执 `rdc-lifecycle-3dfd6827-bfe8-458e-9102-c0fc1544d4f0.json` 确认同一 capture／本机／入口 E147、replacement 0；产品关闭回放，归属 daemon 和 worker 已退出。
+- 规划 10 次、General 42 次及自动审查 3 次 Provider 请求；General input 5839903／output 20849 token（input 含缓存读取 764800）。本轮会话、请求、Trace、回执及工程输出归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-04-sources.zip`，SHA-256 `50e6c526934ea19ba027e84c4d71a5c33c501b25eaf0a8f90d5e8524c2cb689e`。
+
 ## 2026-11-18：M3 第三轮审核证据修复复验
 
 - 第三轮区分所需的有界计算两次遭自动审核拒绝：General 已完整读取 3934 字节脚本，但审核请求把该读取结果截断到 1600 字符，审核器无法核实完整命令和影响。直接原因在运行时的送审证据投影；修复 `a60609c4` 保留被待审命令引用的有界完整读取，仍脱敏并保留审核、保护路径和历史观察边界。
