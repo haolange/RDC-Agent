@@ -1,5 +1,11 @@
 # Acceptance Ledger
 
+## 2026-11-18：原生失败详情透传实机复验
+
+- 产品 `5221b597`、工具本机 candidate（基于 `b998498c` 的工作区修复），隔离会话使用 PC 眼部 capture；监工指定 E6152／PS 的 `target=DXIL` 单次复现 `shader_disassembly_unavailable`。
+- 模型实际收到的失败详情包含 14 个 `available_targets`，包括 `DXBC/DXIL` 与 `DXC DXIL`，以及 `failure_stage=validate_target`、`effects_attempted=false`、`context_preserved=true`；主进程核验后 `leaseState=retained`。下一次模型请求快照同样包含完整列表。
+- 监工指定诊断参数，未重试或更改 capture；同一隔离回放继续用于块压缩检查。原始返回与模型请求归档 `.local/vertical-investigation-20261108/evidence/m3-failure-details-recheck-20261118.zip`，SHA-256 `54298b8bc358f55175ce4950ed0bdf1cbb9e35224af4beb55820a950d407c1aa`。
+
 ## 2026-11-18：PR #4 读数解码错误分类复验
 
 - 工具 `b998498c`，隔离产品会话打开 PC 眼部 capture；监工对 E2720／`ResourceId::622` 的 `BC1_TYPELESS` 纹理执行一次区域读数，返回 `texture_readback_decode_failed: Unsupported texture readback format: BC1_TYPELESS`，原生错误分类为 `runtime`。
