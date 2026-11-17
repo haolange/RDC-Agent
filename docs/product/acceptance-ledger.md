@@ -1,5 +1,13 @@
 # Acceptance Ledger
 
+## 2026-11-17：RDC-Tool PR #4 合入后对接复验，未完成
+
+- 工具 `b998498c74acb3825b23f261fdc7cb0702396d4d` 正式打包、验包及隔离 Settings 验证通过；操作名仍为 129 个，三份工具手册检查通过。工具全测 1339 passed、12 skipped、2 subtests passed；产品 RDC／工具测试 497 passed、5 skipped，契约测试 248 passed，真实 worker 回收测试通过。
+- PC 眼部 capture 经产品打开；无效 `rd.event.set_active(0)` 返回 `validation` 和无效果证明，主进程保留 lease，后续合法查询成功。TYPELESS 已知视图与未知视图区域读取均成功；像素调试读到未截断的 trace `_IN` 并结束。
+- DXIL 项未完成：诊断 Agent 请求 `target=DXIL`，工具在执行反汇编前返回 `shader_disassembly_unavailable: Requested disassembly target is unavailable: DXIL`；该参数需为原生可用的反汇编目标，不能把此次拒绝判为 DXIL 读取缺陷。按单次复验要求未重试。
+- 诊断结束时产品读取确认已回到入口 EID 147，随后关闭回放，本轮 daemon／worker 与登记已释放。另一次独立 General 的 `capture_restore` 被 `RDC_CAPTURE_SCOPE_DENIED: the approved owning General turn is required.` 拒绝，未取得签名恢复回执。
+- 监工指定了上述对接测试和恢复核验，未调整手机配置；Android 实机余项及 M1 回归未执行，M3 继续暂停。隔离会话与原始工具返回归档 `.local/vertical-investigation-20261108/evidence/rdc-tool-pr4-20261117-eye.zip`，SHA-256 `8975f4bd33597b52fad6a4f58cd525d98a37aa11c33b4f6d07820c7a33da156d`。
+
 ## 2026-11-17：事件拒绝保全，修复后复验
 
 - 用仓库 Vulkan `vkcube.rdc` 经 Agent 的 `executeRdcShell` 生产执行路径，在同一隔离 lease 中调用无效 `rd.event.set_active` 和 `rd.pipeline.get_state`；两者均返回 `event_not_found`、`validation`、`effects_attempted=false` 与 `context_preserved=true`，主进程核验后保留 lease。随后合法事件读取成功，capture/session、活动事件及 daemon/worker 身份不变。
