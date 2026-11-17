@@ -1,5 +1,7 @@
 # Acceptance Ledger
 
+- 2026-11-18 M3 第三轮记录复查：先前将停点直接记为“因果”过早。VRS、光照和后处理解释均有检查，但有效着色率与执行位置未证实，光照各项贡献未拆分，最终像素映射及后处理影响未闭合；三条 hypothesis 未给最终裁决。依据第三轮 `ClaimSet` 与 `execution-analysis.md` 归档，后续按 2.3 从锚定起核对，再按 3.3 确定区分停点的直接原因。
+
 ## 2026-11-18：块压缩二维与立方体读取
 
 - 隔离产品会话使用眼部 capture 与工具 candidate（基线 `b998498c`，工作区 diff SHA-256 `ee79edbfe143cc9f3bce75a8a5a99dbeec8286a692d616984c85ff2b9c0ed0e4`）；资源清单和描述符分别确认二维 `ResourceId::622`／BC1 与立方体 `ResourceId::338813`／BC6、六面。
