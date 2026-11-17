@@ -1,5 +1,13 @@
 # Acceptance Ledger
 
+## 2026-11-18：PR #4 的 M1 自主回归
+
+- 工具 `b998498c`、骁龙 865／WhiteHair，独立新会话 `sess_786e69599d70`；设备在线，回放与手机画面一致。十二个 Agent 来源内置且 GPT-6.1 Sol／Medium 可用，Fast／Max 关闭，Memory 空，Knowledge 与原库六文件哈希一致。仅输入“角色头发发白”，两项超出已知事实的澄清回答“不知道”，原计划未修改即批准执行。
+- 模型以最终画面、像素历史、事件前后读数及图像追到 E1248 的头发主体；E1242 的黑色是尚未绘制，并非已证明的正常参考，不能据此声明全帧最早数值故障。E1716 的 input-attachment Pixel History 被工具标为不可用且保留 lease，模型转用读数和图像。
+- `%493` 单点精度替换及仅注释重编译对照各有五份签名回执并撤销：前者变体改变头发、控制点不变，后者三态图像一致；两者恢复图像均与基线哈希一致。因果结论限定当前捕获、设备与回放，未判断美术标准或驱动责任。
+- Verifier 独立于调查任务，读取定位、因果和两份实验当前版本，关键记录哈希一致，无 open Challenge；补齐检查点和报告后产品接受 `completed`。恢复回执确认 WhiteHair／E3029、无替换；关闭后本次 daemon／worker、ADB 转发与登记已释放。
+- 手机配置事前备份并临时启用 `SingleThreadedCompilation`，事后恢复原 SHA-256 `6a0ecaa762d1bba2ee80d0bdb201cc584195f11f66d0a1412322ef0b6834b349` 及权限属主；保留此前两个隔离会话。会话、请求、回执、审查与派生图像归档 `.local/vertical-investigation-20261108/evidence/rdc-pr4-m1-regression-20261118.zip`，SHA-256 `fccfbaf4897180052c15485cd5a686bb585aee24ae4b074d847a4d56ad75127c`。
+
 ## 2026-11-17：PR #4 Android 白发 shader 往返
 
 - 隔离产品使用工具 `b998498c` 在骁龙 865 打开 WhiteHair，入口 E3029 回放就绪，产品预览与手机场景一致。E1248／PS 的 SPIR-V ASM 与 60,612 字节二进制读取成功。
