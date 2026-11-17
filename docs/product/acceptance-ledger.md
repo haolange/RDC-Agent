@@ -1,5 +1,12 @@
 # Acceptance Ledger
 
+## 2026-11-18：PR #4 原生崩溃与断连隔离
+
+- 工具 `b998498c`、骁龙 865／WhiteHair；监工核对本次独占 helper 的 socket 和 capture 后受控发送 SIGSEGV，设备日志记录 `Fatal signal 11 (SIGSEGV), code 0 (SI_USER)`。单次纹理读取返回 `replay_fatal_error: Native replay fatal error: Connection lost to remote server`，主进程标记 `leaseState=quarantined`。
+- 重开独立回放后对本次独占 helper 发送 SIGTERM，远端服务退出；单次像素读取返回同一远端断连错误，主进程同样隔离。两次均非自然驱动崩溃或拔线；未重复相同失败调用。
+- 两次通过产品关闭后，各自 daemon／worker 已退出、ADB 转发为空，context 的 session／capture 均为空。手机配置事前备份并临时启用 `SingleThreadedCompilation`，事后恢复原 SHA-256 `6a0ecaa762d1bba2ee80d0bdb201cc584195f11f66d0a1412322ef0b6834b349` 及权限属主。
+- 监工指定诊断操作并发送信号；设备崩溃日志、工具原始返回、请求快照和清理状态归档 `.local/vertical-investigation-20261108/evidence/rdc-pr4-fault-boundaries-20261118.zip`，SHA-256 `0dec2d8fad8cdc9a3d47e95d8b679e7e5bbeb4680302fafabacc85f1fff45666`。
+
 ## 2026-11-18：PR #4 的 M1 自主回归
 
 - 工具 `b998498c`、骁龙 865／WhiteHair，独立新会话 `sess_786e69599d70`；设备在线，回放与手机画面一致。十二个 Agent 来源内置且 GPT-6.1 Sol／Medium 可用，Fast／Max 关闭，Memory 空，Knowledge 与原库六文件哈希一致。仅输入“角色头发发白”，两项超出已知事实的澄清回答“不知道”，原计划未修改即批准执行。
