@@ -11,7 +11,7 @@ RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`�
 
 原生 controller 发生 fatal 错误后可能继续返回默认零值或空对象。Tool 在非生命周期操作实际访问 controller 时及结果发布前检查 `GetFatalErrorStatus`；语义参数校验仍先于原生访问，生命周期清理入口保留。`replay_fatal_error` 与无法核验健康的 `replay_health_unavailable` 都不是有效测量或恢复证明，主进程按原有未知结果规则隔离 owning lease，不发布成功证据。健康控制器的合法零值不受此规则影响；瞬时健康回执也不保证之后的连接或实验恢复。
 
-`daemon_owner_unavailable` 属于 runtime 基础设施失败。主进程仅将有长度限制的单行 `reason` 和 `recovery_hint` 附到原生错误提示；`state_path` 及其他原生 details 留在主进程内部。没有可核验的无效果和恢复证明时，仍按未知结果规则隔离 owning lease。准备阶段清理未确认时保留首次 issue、错误码、恢复信息和原始 native error，附加清理诊断，并保留设备 reservation 与 owning context，直至清理得到确认。
+`daemon_owner_unavailable` 属于 runtime 基础设施失败。主进程将有长度限制的单行 `reason` 和 `recovery_hint` 附到原生错误提示；可交付的 details 按下方原生失败合同提供，凭据和私有 owner 路径不对外暴露。没有可核验的无效果和恢复证明时，仍按未知结果规则隔离 owning lease。准备阶段清理未确认时保留首次 issue、错误码、恢复信息和原始 native error，附加清理诊断，并保留设备 reservation 与 owning context，直至清理得到确认。
 
 管线 `sections` 的资格只覆盖实际请求并返回的字段。未采集 section 的模型默认空值不能降级已返回的 bindings，也不能据此声称已核验被省略的 shader 或输出状态；真实请求字段缺失仍保留对应降级原因。
 
@@ -150,7 +150,7 @@ Android 回放使用匹配的 Tools/native 服务。服务端在等待用户下�
 
 `RdcNativeFailure` 必须在 owning 执行路径完成既有身份、取消与恢复检查后，将限定失败投影交付给模型和 UI，不能只留下错误字符串。投影标记 `ok:false` / `source:main-qualified-native-failure`，包含实际 CLI exitCode、错误种类、main-owned 调用参数/身份及 `mainValidation.preservationVerified` / `leaseState`。仅主进程已复核安全时，`nativeFailure.proof` 才表达 canonical `effects_attempted:false/context_preserved:true` 或已复核恢复的对应事实；缺证明、身份漂移或取消时不对外宣称上下文保持，lease 仍按原规则隔离。
 
-这是主进程资格化的失败记录，不是完整原始 CLI stdout，也不是成功、实验或 rollback 签名。`operation` 是产品请求；`invocation` 记录实际失败的原生命令，内置状态前置查询失败时不得声称产品请求已经执行，后续恢复复核也不得覆盖原失败调用。任意私有 native details、二进制 stdout 与 stderr 不透传。执行器只接收 owning shell 路径绑定到该异常的投影，保留 `isError:true` 并经现有 ToolResultArtifactizer 固定保存，即使小于卸货阈值也提供 session owner/ref/hash；普通异常或其它工具不能通过同名属性冒充原生证明。持久化失败保留已返回的错误和可验证交付子集，不以落盘失败重试原生操作。后续真正需要的合法查询仍须通过正常冻结权限/lease 门禁，其连续性另行核验。
+这是主进程资格化的失败记录，不是完整原始 CLI stdout，也不是成功、实验或 rollback 签名。`operation` 是产品请求；`invocation` 记录实际失败的原生命令，内置状态前置查询失败时不得声称产品请求已经执行，后续恢复复核也不得覆盖原失败调用。`nativeFailure.details` 保留可交付的原生诊断（包括可用取值、建议参数及原生证明声称），与经过主进程核验的 `proof` 和 `mainValidation` 分开；凭据与私有 owner 路径被移除时标记 `detailsRedacted`。二进制 stdout 与 stderr 不透传。执行器只接收 owning shell 路径绑定到该异常的投影，保留 `isError:true` 并经现有 ToolResultArtifactizer 固定保存，即使小于卸货阈值也提供 session owner/ref/hash；超出阈值则保存完整结果并提供 `artifact_read` 的精确读取选择。普通异常或其它工具不能通过同名属性冒充原生证明。持久化失败保留已返回的错误和可验证交付子集，不以落盘失败重试原生操作。后续真正需要的合法查询仍须通过正常冻结权限/lease 门禁，其连续性另行核验。
 
 ## 同安装 Python 绑定与 Tool batch
 

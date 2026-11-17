@@ -1,5 +1,10 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
+import { artifactizeToolResult } from '../agent-runtime/tools/ToolResultArtifactizer';
+import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { DEFAULT_RDC_CLI_INVOKER } from '../settings/settings-core/settingsDefaults';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import type { RdcOperationDefinition } from '@shared/types/tool';
@@ -83,6 +88,43 @@ it.each(['replay_fatal_error', 'replay_health_unavailable'])(
   },
 );
 describe('structured RDC shell', () => {
+  it('delivers native disassembly target guidance in the model-visible failure', async () => {
+    const query: RdcOperationDefinition = { ...definition, name: 'rd.shader.get_disassembly', namespace: 'shader',
+      effects: [], evidence_kind: null, input_schema: { type: 'object', properties: {
+        session_id: { type: 'string' }, target: { type: 'string' },
+      }, required: ['session_id'], additionalProperties: false } };
+    const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };
+    const nativeDetails = { session_id: 'native-replay', requested_target: 'DXIL', available_targets: ['DXBC/DXIL'],
+      failure_stage: 'validate_target', failure_reason: 'target_unavailable', effects_attempted: false, context_preserved: true };
+    mock.execute.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
+      result_kind: query.name, ok: false, error: { code: 'shader_disassembly_unavailable', category: 'validation',
+        message: 'Requested disassembly target is unavailable: DXIL', details: nativeDetails } }) });
+    const failure = await executeRdcShell({ operation: query.name, args: { target: 'DXIL' } }, 'target-miss', undefined, bound)
+      .catch(error => error);
+    const delivered = JSON.parse(failure.deliveryResult.content[0].text);
+    expect(delivered.nativeFailure.details).toEqual(nativeDetails);
+    expect(delivered.mainValidation).toEqual({ preservationVerified: true, leaseState: 'retained' });
+
+    const largeDetails = { ...nativeDetails, available_targets: Array.from({ length: 2400 }, (_, index) => `native-target-${index}`) };
+    mock.execute.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
+      result_kind: query.name, ok: false, error: { code: 'shader_disassembly_unavailable', category: 'validation',
+        message: 'Requested disassembly target is unavailable: DXIL', details: largeDetails } }) });
+    const largeFailure = await executeRdcShell({ operation: query.name, args: { target: 'DXIL' } }, 'large-target-miss', undefined, bound)
+      .catch(error => error);
+    const sessionPath = mkdtempSync(path.join(tmpdir(), 'rdc-native-details-'));
+    try {
+      writeFileSync(path.join(sessionPath, 'session.json'), '{}');
+      const resolver = new SessionArtifactResolver({ resolveSessionPath: () => sessionPath });
+      const result = artifactizeToolResult({ sessionId: 'session', toolCallId: 'large-target-miss', toolName: 'shell',
+        result: largeFailure.deliveryResult, resolver, pinBelowThreshold: true });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]).toMatchObject({ text: expect.stringContaining('artifact_read') });
+      const ref = result.details as { ref: string; hash: string };
+      const stored = JSON.parse(resolver.read('session', ref.ref, { expectedHash: ref.hash }).text!);
+      const envelope = JSON.parse(stored.chunks.join(''));
+      expect(JSON.parse(envelope.content[0].text).nativeFailure.details).toEqual(largeDetails);
+    } finally { rmSync(sessionPath, { recursive: true, force: true }); }
+  });
   it('keeps owner startup diagnostics and quarantines the frozen lease without executing or retrying the requested read', async () => {
     const query: RdcOperationDefinition = { ...definition, name: 'rd.shader.get_source', namespace: 'shader', evidence_kind: null };
     const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };

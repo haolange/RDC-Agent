@@ -1,5 +1,30 @@
+import { redactCredentialLikeText } from '../runtime/secretRedaction';
 import type { CLIResult } from '@shared/types/tool';
 import type { AgentToolResult } from '../agent-runtime/agent/AgentTool';
+
+/** Preserve native diagnostics while keeping credentials and private owner paths out of model results. */
+export function modelVisibleRdcFailureDetails(details: Record<string, unknown>): { value: Record<string, unknown>; redacted: boolean } {
+  let redacted = false;
+  const visit = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      const safe = redactCredentialLikeText(value);
+      if (safe !== value) redacted = true;
+      return safe;
+    }
+    if (Array.isArray(value)) return value.map(visit);
+    if (value === null || typeof value !== 'object') return value;
+    const result: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value)) {
+      if (/(?:password|secret|token|authorization|credential|api[_-]?key|cookie)|^(?:private|state)_path$/i.test(key)) {
+        redacted = true;
+      } else {
+        result[key] = visit(child);
+      }
+    }
+    return result;
+  };
+  return { value: visit(details) as Record<string, unknown>, redacted };
+}
 
 export interface RdcNativeEnvelope {
   ok: true;

@@ -7,7 +7,7 @@ import { assertRdcDiscovery, RdcShellInputSchema, type RdcShellInput } from './R
 import type { AgentToolResult, ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { assertRdcContextLeaseOwnership, quarantineRdcContext } from './RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
-import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
+import { modelVisibleRdcFailureDetails, parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
 import { rdcDigest, rdcExecutionReceipts } from './RdcExecutionReceipts';
 import { rdcInvocationRecord } from './RdcInvocationRecord';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
@@ -251,19 +251,20 @@ export async function executeRdcShell(
         signal?.aborted ? undefined : { operation: input.operation, argsFingerprint: rdcDigest(input.args), code });
     }
     if (error instanceof RdcNativeFailure) {
-      // Deliver the qualified outcome, not arbitrary private native details or
-      // binary stdout. A native claim alone never asserts a usable owning lease.
+      // Native details remain distinct from main-qualified proof and lease state.
       const proof: Record<string, unknown> = {};
       if (nativeStateVerifiedSafe) {
         if (error.effectsNotAttempted) Object.assign(proof, { effects_attempted: false, context_preserved: true });
         const restored = error.screenshotTargetRestoration ?? error.inspectionRestoration;
         if (restored) Object.assign(proof, { replay_state_restored: true, restored_event_id: restored.eventId });
       }
+      const nativeDetails = error.nativeError.details && modelVisibleRdcFailureDetails(error.nativeError.details);
       const details = {
         ok: false, source: 'main-qualified-native-failure',
         operation: input.operation, exitCode: error.nativeError.exitCode,
         nativeFailure: { code: error.nativeError.code, category: error.nativeError.category,
-          resultKind: error.resultKind, message: error.message, proof },
+          resultKind: error.resultKind, message: error.message, proof,
+          ...(nativeDetails ? { details: nativeDetails.value, ...(nativeDetails.redacted ? { detailsRedacted: true } : {}) } : {}) },
         mainValidation: { preservationVerified: nativeStateVerifiedSafe,
           leaseState: nativeStateVerifiedSafe ? 'retained' : 'quarantined' },
         rdcExecutionIdentity: { productSessionId: sessionId, contextId: lease.contextId,
