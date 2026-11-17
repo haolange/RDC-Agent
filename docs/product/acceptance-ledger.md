@@ -1,5 +1,12 @@
 # Acceptance Ledger
 
+## 2026-11-18：块压缩二维与立方体读取
+
+- 隔离产品会话使用眼部 capture 与工具 candidate（基线 `b998498c`，工作区 diff SHA-256 `ee79edbfe143cc9f3bce75a8a5a99dbeec8286a692d616984c85ff2b9c0ed0e4`）；资源清单和描述符分别确认二维 `ResourceId::622`／BC1 与立方体 `ResourceId::338813`／BC6、六面。
+- 二维 E6010、mip0／slice0、坐标 (0,0)：单点读取 RGBA `(0.41960785, 0.54117650, 0.54901963, 1)`；PNG 导出和 `read_image` 成功，导出像素为 `(107,138,140,255)`。
+- 立方体 E6174、mip0／slice3（零起）、坐标 (0,0)：单点读取 RGBA `(0.8359375,0.8359375,0.8359375,1)`；PNG 导出和 `read_image` 成功，导出像素为 `(213,213,213,255)`。四个组合各调用一次，均无错误；PNG 数值为图像表示，不替代原生浮点。
+- 监工初次误加非零 mip 条件，发现该立方体只有 mip0 后更正；两次诊断结束均查询恢复入口 E147。工具返回、图像与模型请求归档 `.local/vertical-investigation-20261108/evidence/m3-bc-read-recheck-20261118.zip`，SHA-256 `456e98f4f78c2d6807361e99ab3b35e373d94fd58410872a3a75cfbdcd0d9c44`。
+
 ## 2026-11-18：原生失败详情透传实机复验
 
 - 产品 `5221b597`、工具本机 candidate（基于 `b998498c` 的工作区修复），隔离会话使用 PC 眼部 capture；监工指定 E6152／PS 的 `target=DXIL` 单次复现 `shader_disassembly_unavailable`。
