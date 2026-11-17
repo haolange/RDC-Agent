@@ -1,9 +1,16 @@
 # Acceptance Ledger
 
+## 2026-11-17：PR #4 Android 白发 shader 往返
+
+- 隔离产品使用工具 `b998498c` 在骁龙 865 打开 WhiteHair，入口 E3029 回放就绪，产品预览与手机场景一致。E1248／PS 的 SPIR-V ASM 与 60,612 字节二进制读取成功。
+- 一次最小 shader 替换及撤销生成五份签名回执，绑定同一实验与 daemon／worker 身份；变体图像哈希不同，撤销后与基线同为 `de646dcd3c2e1af856543753230672a777318f94db5cebb5fe4d56154ad5eb1f`。截图使用 E1248 输出回退，非最终 swapchain；替换集合恢复为空，入口 E3029 经查询确认。
+- 产品关闭后本次 daemon／worker、ADB 转发和归属登记已释放。手机临时启用 `SingleThreadedCompilation`，事前备份，事后恢复并核对原 SHA-256 `6a0ecaa762d1bba2ee80d0bdb201cc584195f11f66d0a1412322ef0b6834b349`、权限及属主。
+- 监工指定诊断参数；一次 Evidence 写入因 WorldState 尚未建立被拒，模型补建前置记录后继续。隔离会话、请求快照、原始返回、签名回执与图像归档 `.local/vertical-investigation-20261108/evidence/rdc-tool-pr4-20261117-continuation.zip`，SHA-256 `208814dc1bfebc8f8bc88fa9fbd705a5455a49e7a261fb2d9325cb44b16bc8e0`。
+
 ## 2026-11-17：PR #4 眼部 DXIL 补验
 
 - 经隔离产品会话对眼部 capture 的 E6152／PS 省略 target 读取，返回非空反汇编，目标 `DXBC/DXIL`、容器 `dxil`；同一 shader 的二进制容器为 22,840 字节，SHA-256 `709e91a09fa4ca23b5144c58a111975832d422136061270e506da14787f1bc41`。
-- 诊断前入口 E147；查询并恢复后再次读取 E147，产品关闭回放后本次 daemon、worker 退出且 context 无活动登记。监工指定补验参数；完整工具返回保存在隔离会话 `sess_7f57b98240f6`。
+- 诊断前入口 E147；查询并恢复后再次读取 E147，产品关闭回放后本次 daemon、worker 退出且 context 无活动登记。监工指定补验参数；完整工具返回及请求快照保存在上述隔离会话归档中。
 - 旁支：上次 `target=DXIL` 被拒时，产品保存的错误结果及下一次模型请求快照均不含 `available_targets`；工具源码会构造该列表，产品限定错误时未传递 `details`。当次工具原生 stdout 未留存，未改代码。
 
 ## 2026-11-17：RDC-Tool PR #4 合入后对接复验，未完成
