@@ -107,6 +107,37 @@ it('keeps only the latest result of each kind and bounds untrusted text with its
   expect(evidence.recent.at(-1)?.content).toMatchObject({ truncated: true, originalChars: 5004, hash: expect.any(String) });
 });
 
+it('retains a bounded complete read of the file referenced by a pending command', () => {
+  const source = `Whole file: 3934 bytes\n${'x'.repeat(3900)}\nlast line`;
+  const messages = [{ role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id: 'script', name: 'read_file',
+    arguments: { path: 'analysis/calculate.ps1' } }] },
+  { role: 'toolResult', toolName: 'read_file', toolCallId: 'script', timestamp: 2, isError: false,
+    content: [{ type: 'text', text: source }], details: { path: '/project/analysis/calculate.ps1', sha256: 'a'.repeat(64) } },
+  ...Array.from({ length: 20 }, (_, index) => ({ role: 'toolResult', toolName: 'shell', toolCallId: `noise-${index}`,
+    timestamp: index + 3, isError: false, content: [{ type: 'text', text: 'other' }], details: {} }))] as never;
+  const evidence = permissionReviewEvidence(messages, 'isolated-child', { command: "& '.\\analysis\\calculate.ps1'" });
+  const read = evidence.recent.find(item => item.toolCallId === 'script');
+  expect(read?.content).toEqual([source]);
+  expect(read?.facts).toMatchObject({ file: { sha256: 'a'.repeat(64) } });
+  expect(evidence.recent).toHaveLength(16);
+  expect(evidence.trust).toContain('not proof of current file contents');
+
+  const overLimit = permissionReviewEvidence([{ role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id: 'large', name: 'read_file',
+    arguments: { path: 'analysis/large.ps1' } }] },
+  { role: 'toolResult', toolName: 'read_file', toolCallId: 'large', timestamp: 2, isError: false,
+    content: [{ type: 'text', text: 'x'.repeat(9000) }], details: { path: '/project/analysis/large.ps1' } }] as never,
+  'isolated-child', { command: '& analysis/large.ps1' });
+  expect(overLimit.recent[0].content).toMatchObject({ truncated: true, originalChars: 9004, hash: expect.any(String) });
+
+  const protectedRead = permissionReviewEvidence([{ role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id: 'protected-script', name: 'read_file',
+    arguments: { path: '.env' } }] },
+  { role: 'toolResult', toolName: 'read_file', toolCallId: 'protected-script', timestamp: 2, isError: false,
+    content: [{ type: 'text', text: 'do-not-send' }], details: { path: '/project/.env' } }] as never,
+  'isolated-child', { command: '& .env' });
+  expect(protectedRead.recent[0].content).toBeUndefined();
+  expect(protectedRead.recent[0].facts).toEqual({ protectedPath: true, contentsOmitted: true });
+});
+
 it('redacts structured credentials inside the actual JSON tool result', () => {
   const evidence = permissionReviewEvidence([{ role: 'toolResult', toolName: 'artifact_read', toolCallId: 'json',
     content: [{ type: 'text', text: '{"password":"never-send-this","result":"bounded observation"}' }],
