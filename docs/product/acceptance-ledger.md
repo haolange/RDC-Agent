@@ -1,5 +1,11 @@
 # Acceptance Ledger
 
+## 2026-11-17：PR #4 眼部 DXIL 补验
+
+- 经隔离产品会话对眼部 capture 的 E6152／PS 省略 target 读取，返回非空反汇编，目标 `DXBC/DXIL`、容器 `dxil`；同一 shader 的二进制容器为 22,840 字节，SHA-256 `709e91a09fa4ca23b5144c58a111975832d422136061270e506da14787f1bc41`。
+- 诊断前入口 E147；查询并恢复后再次读取 E147，产品关闭回放后本次 daemon、worker 退出且 context 无活动登记。监工指定补验参数；完整工具返回保存在隔离会话 `sess_7f57b98240f6`。
+- 旁支：上次 `target=DXIL` 被拒时，产品保存的错误结果及下一次模型请求快照均不含 `available_targets`；工具源码会构造该列表，产品限定错误时未传递 `details`。当次工具原生 stdout 未留存，未改代码。
+
 ## 2026-11-17：RDC-Tool PR #4 合入后对接复验，未完成
 
 - 工具 `b998498c74acb3825b23f261fdc7cb0702396d4d` 正式打包、验包及隔离 Settings 验证通过；操作名仍为 129 个，三份工具手册检查通过。工具全测 1339 passed、12 skipped、2 subtests passed；产品 RDC／工具测试 497 passed、5 skipped，契约测试 248 passed，真实 worker 回收测试通过。
