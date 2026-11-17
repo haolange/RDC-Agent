@@ -1,5 +1,10 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 第三轮上邻点历史复验
+
+- 按 3.3 在同一回放对 E6152／`ResourceId::308658` 的上邻点 `(518,454)` 查询一次 Pixel History；没有该事件的片元，无法与目标点 primitive 91 比较输出，VRS 邻域机制仍未知。
+- 产品查询确认恢复入口 E147，无 shader 替换及失败重试；监工指定本次检查参数。原始返回归档 `.local/vertical-investigation-20261108/evidence/m3-round03-upper-neighbor-recheck-20261118.zip`，SHA-256 `84831b4b16c1922e68fbac810eb3bea3d34b86b3bc237675d835d80b01d5df09`。
+
 ## 2026-11-18：M3 第三轮相邻像素历史复验
 
 - 按 3.3 在同一回放对 E6152／`ResourceId::308658` 的 `(518,455)` 与 `(519,455)` 各查询一次 Pixel History；前者命中 primitive 91 且 passed，后者没有该事件的片元，无法比较同 primitive 的输出，VRS 邻域机制仍未知。
