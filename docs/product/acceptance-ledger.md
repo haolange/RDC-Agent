@@ -1,5 +1,14 @@
 # Acceptance Ledger
 
+## 2026-11-17：RDC-Tool 修复后对接复验，未通过
+
+- RDC-Tool `5310e89f01d5642deaeddcd37867214a341af387` 正式打包、验包通过，隔离 Settings 验证 1.1.2／129 操作；新旧操作名一致，三份参考手册检查通过。
+- 工具全测 1312 passed、7 failed、12 skipped、2 subtests passed；本次自建 Windows venv 的 Python 启动器另生子进程，进程身份与锁测试的 PID 不一致。原文含 `DaemonOwnerUnavailable: ... response_owner_changed` 与 `assert None is not None`；未重复全测。
+- 产品 `src/main/rdc` 和 `src/main/tools` 为 492 passed、4 skipped；`check:contracts` 为 248 passed；使用新包的真实 worker 回收测试单独执行并通过。
+- PC 眼部 capture 经产品打开；E2720 的 `B8G8R8A8_TYPELESS` 区域按 `B8G8R8A8_UNORM` 视图读取成功。General 寻找未绑定视图时调用 `rd.event.set_active(event_id=0)`，返回 `event_not_found: Event not found: 0`、`proof={}`，产品将 lease 标记为 `quarantined`。
+- 工具的 `set_active` 在 `SetFrameEvent` 前校验事件，却走未提供保全证明的 `not_found` 分支；产品按缺少证明隔离。监工指定复验步骤、使用既有隔离诊断会话并关闭回放，入口位置未能核验恢复；本次 daemon／worker 已退出，旧隔离登记保留。
+- 视图未知读数、像素调试、DXIL、Android 剩余实机项目及 M1 回归未执行，M3 继续暂停；手机配置未调整且哈希与属性未变。原始工具返回、隔离测试会话及全测输出归档 `.local/vertical-investigation-20261108/evidence/rdc-tool-revalidation-20261117-eye.zip`，SHA-256 `be037b8d1f9bd5955e41c88da8f16fe2d587e5e1a04681466c01d3c6cac9be61`。
+
 ## 2026-11-17：RDC-Tool 重构对接，验证未完成
 
 - RDC-Tool `3e6a56be2431149b1d8d3c80a05ebc43330f1d10` 经正式流程打包与验包通过；隔离 Settings 验证 `1.1.2 / 129`，操作名无增删，三份手册及 catalog 指纹 `05322468c3e39db23a671fdd20747d52b8db11e455979fbf2c6ba2e523254042` 一致。
