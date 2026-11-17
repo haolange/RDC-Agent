@@ -1,5 +1,12 @@
 # Acceptance Ledger
 
+## 2026-11-18：PR #4 读数解码错误分类复验
+
+- 工具 `b998498c`，隔离产品会话打开 PC 眼部 capture；监工对 E2720／`ResourceId::622` 的 `BC1_TYPELESS` 纹理执行一次区域读数，返回 `texture_readback_decode_failed: Unsupported texture readback format: BC1_TYPELESS`，原生错误分类为 `runtime`。
+- 产品核验事件已恢复后保留 lease（`preservationVerified=true`、`leaseState=retained`）；后续当前事件查询成功并返回入口 E147。产品关闭后本次 daemon／worker 已退出，context 的 session／capture 均为空。
+- 工具的纹理解码分支原本返回 `validation` 和恢复证明，但 `_guard_rejection` 将缺少“未尝试效果”证明的返回改为 `runtime`；现有解码测试检查错误码和恢复字段，未断言分类。归属工具侧，未修改；M3 继续暂停。
+- 监工指定单次操作，未重试该失败调用；手机配置未调整。原始工具返回、请求快照和清理状态归档 `.local/vertical-investigation-20261108/evidence/rdc-pr4-decode-classification-20261118.zip`，SHA-256 `780b912c3476137db6988e155483f440f74641d872fa958e2724eb7507d1242b`。
+
 ## 2026-11-18：PR #4 原生崩溃与断连隔离
 
 - 工具 `b998498c`、骁龙 865／WhiteHair；监工核对本次独占 helper 的 socket 和 capture 后受控发送 SIGSEGV，设备日志记录 `Fatal signal 11 (SIGSEGV), code 0 (SI_USER)`。单次纹理读取返回 `replay_fatal_error: Native replay fatal error: Connection lost to remote server`，主进程标记 `leaseState=quarantined`。
