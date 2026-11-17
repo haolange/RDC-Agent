@@ -1,12 +1,19 @@
 # Acceptance Ledger
 
-## 2026-11-18：M3 第四轮，停在区分
+## 2026-11-18：M3 第四轮，停在锚定
 
 - PC 本机、新隔离会话，十二个 Agent 均为内置且使用 GPT-6.1 Sol／Medium；Memory 为空，隔离 Knowledge 无本案例材料。监工只输入短症状，对两个超出已知事实的澄清答“不知道”，原样批准计划；模型将测试工程里的前轮材料作为线索，并在当前 capture 上复核。
-- E6152 的泪液 draw、像素历史和覆盖支持限定场景区域；目标像素在 E6128→E6152 的 RGB 由 `(0.0674, 0.0366, 0.0332)` 升至 `(0.4688, 0.4922, 0.5625)`，随后被 E6501 衰减。VRS 的实际调用未证、光照贡献未拆分、后处理足迹未闭合，首个未满足步骤为区分。
+- E6152 的泪液 draw、像素历史和覆盖支持限定场景区域；目标像素在 E6128→E6152 的 RGB 由 `(0.0674, 0.0366, 0.0332)` 升至 `(0.4688, 0.4922, 0.5625)`，随后被 E6501 衰减。该场景区域与最终症状的采样映射未闭合，Claim 和 verifier 均将用户症状保留为 candidate；首个未满足步骤为锚定。VRS 的实际调用未证，光照贡献也未拆分。
 - 独立 verifier 接受限定定位但未认证根因；General 的 `turn_complete` 以 `partial` 被产品接受，没有因果实验，也没有满足能力阻塞所需的独有差分特征，不能交付。`code_interpreter` 返回 `CODE_INTERPRETER_DISABLED`；末次答复已在 Trace 中生成，随后界面被一次模型请求错误覆盖，具体技术错误待查。
 - 签名恢复回执 `rdc-lifecycle-3dfd6827-bfe8-458e-9102-c0fc1544d4f0.json` 确认同一 capture／本机／入口 E147、replacement 0；产品关闭回放，归属 daemon 和 worker 已退出。
 - 规划 10 次、General 42 次及自动审查 3 次 Provider 请求；General input 5839903／output 20849 token（input 含缓存读取 764800）。本轮会话、请求、Trace、回执及工程输出归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-04-sources.zip`，SHA-256 `50e6c526934ea19ba027e84c4d71a5c33c501b25eaf0a8f90d5e8524c2cb689e`。
+
+## 2026-11-18：M3 第四轮单点复验与锚定修正
+
+- 监工最初把停点误判为区分并发起控制点检查；复查实际 Claim、verifier 和计划 2.3 后，纠正为锚定。经产品单次查询 `ResourceId::2051334` 的 usage，E7330 为写入、E7343 为读取；这是可执行的资源链检查，不单独证明采样坐标或最终像素映射。
+- 两项已发起的旁支检查保留：`(518,456)` 的 Pixel History 与 debug 输出不一致，native 实际选择的 primitive 未独立确认；`(597,460)` 没有 E6152 片元，不能与目标点比较。每项单次调用，未重试；诊断回到 E147 后关闭回放，归属进程退出。
+- 直接原因归方法文本：预载 `pixel-forensics` 的 Agreement 将“图像矩形落在覆盖 draw 内”作为锚定条件，未限定该矩形须与症状区域跨合成环节对应；General 因而只交叉定位场景局部，最终症状仍为 candidate。修复 `6271b96a` 明确该映射，文件由 4253 减至 4251 字节；16 项 Skill 测试、162 项 runtime 测试、typecheck 与 lint 通过。
+- 三项复验的请求、原始返回与现场证据归档 `.local/vertical-investigation-20261108/evidence/m3-round04-product-rechecks-20261118.zip`，SHA-256 `d71e040475643a88884dcf6ed646ea31ef77482ed458027b4fb2dc61dbea17d0`。自动审批拒绝删除已归档的隔离会话 `new session 3`，理由是没有针对该会话的单独删除确认；会话保留，下一轮未启动。
 
 ## 2026-11-18：M3 第三轮审核证据修复复验
 
