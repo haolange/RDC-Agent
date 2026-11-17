@@ -1,5 +1,10 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 第三轮相邻像素历史复验
+
+- 按 3.3 在同一回放对 E6152／`ResourceId::308658` 的 `(518,455)` 与 `(519,455)` 各查询一次 Pixel History；前者命中 primitive 91 且 passed，后者没有该事件的片元，无法比较同 primitive 的输出，VRS 邻域机制仍未知。
+- 产品查询确认恢复入口 E147，无 shader 替换及失败重试；监工指定本次检查参数。原始返回归档 `.local/vertical-investigation-20261108/evidence/m3-round03-neighbor-history-recheck-20261118.zip`，SHA-256 `5824a17af496b492c47ebdf7d8bbc3f680bd0a07d6e2b00bea9ee0b7a8bb330a`。
+
 ## 2026-11-18：M3 第三轮控制点输出资格复验
 
 - 按 3.3 对眼部 E6152／`ResourceId::308658` 的控制点 `(517,455)` 各做一次 Pixel History 和 pixel debug；history 命中 primitive 100，debug 请求也指定该 primitive。两者均成功，但 history shader-out `(0.08621,0.10134,0.05632,0.10399)` 与 debug `_OUT` `(0.02371,0.03048,0.03118,0.10113)` 不一致；trace 输入位置为 `(517.5,455.5)`。本机配对的 RenderDoc 源码显示找不到指定 primitive 时可回退其他命中，trace 未暴露实际选中值；因此该 trace 尚不能定量拆分实际输出贡献，差异原因未定。
