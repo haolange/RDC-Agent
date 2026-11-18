@@ -1,5 +1,12 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 DXIL 原样往返（9.5 第一步）
+
+- 隔离本机 RenderDoc `1.48` 读取眼部 capture 的 E6152 原始 PS 容器；`dxc -dumpbin` 输出未经修改，经官方 `IDxcAssembler` 装回、`IDxcValidator` 校验签名，再以 `dxv` 验证通过。未改 RDC-Tool 或原始 capture。
+- 将签名容器以 DXIL 交给 `BuildTargetShader` 并替换原 shader；回放反射的实际 shader 字节 SHA-256 与提交的签名容器一致，入口为 `Main`。
+- E6152 输出 `ResourceId::308658`、`R11G11B10_FLOAT`、`1444×1276`、7,370,176 字节；基线、替换后和撤销后的完整纹理字节均相同，SHA-256 `c854389fe4661da20b0f0b5c5afc4ce69721e608a29b019c82ade84dff84dfe4`。
+- 验证脚本撤销替换、恢复入口 E147、释放回放并退出；原始回放日志和签名容器的校验记录保存在 `.local/m3-dxil-dxc-20261118/roundtrip-native.jsonl` 及同目录。
+
 ## 2026-11-18：M3 DXIL 工具链 9.4 查证
 
 - 选用微软官方 DXC `v1.9.2609` 的 `dxc_2026_09_29.zip`，SHA-256 `ad31b1fc8443175d204f77a611fdb3ef2ec42759bdc2f1167368de24a4a7e7f1` 与发布记录一致；Windows x64 包含 `dxc.exe`、`dxcompiler.dll`、`dxil.dll`、`dxv.exe`、头文件和许可文本，无独立 IR 装配器。
