@@ -201,4 +201,73 @@ M1 和 M2 只走 Android 远程回放，不在 PC 本机回放顶替。每次开
 |---|---|
 | M1 头发发白 | 通过（第十三轮，用户确认结论正确：2026-11-15） |
 | M2 头发发黑 | 通过（第一轮，用户确认头部结论正确、干预后外观即预期：2026-11-15；另一处由不同 draw 绘制，产品已如实列为未决） |
-| M3 眼部白点 | 阻塞（第十二轮停在因果，达到轮数上限） |
+| M3 眼部白点 | 执行中（前十二轮停在因果：无源码的 DXIL 不能做单项修改；先按第 9 节补能力，完成后从第十三轮继续，新增上限 6 轮） |
+
+## 9. 能力补全：DXIL 中间表示的编辑与替换
+
+### 9.1 要解决的问题
+
+区分和因果需要单项修改：保留原 shader 的全部逻辑，只改其中一处。SPIR-V 已经能这样做。DXIL 目前只读，唯一的替换方式是提供一整份 HLSL。capture 里没有源码时，PC 上没有任何单项干预手段。
+
+本节在 RDC-Tool 里补上"DXIL 文本中间表示 → 修改 → 装回 → 替换"，做法与现有的 SPIR-V 路径逐项对应。它属于现有 shader 替换能力的补全：不新增操作，不新增效果类型，回执和恢复边界不变。
+
+### 9.2 与 SPIR-V 路径的对应
+
+| 环节 | SPIR-V（已有） | DXIL（新增） |
+|---|---|---|
+| 可编辑的反汇编目标 | `SPIR-V ASM` | `DXIL ASM` |
+| 文本来源 | 用 `spirv-dis` 反汇编 shader 的原始字节 | 用 DirectX Shader Compiler 工具链反汇编 shader 的原始容器字节，得到 LLVM IR 文本 |
+| 文本识别 | `_looks_like_raw_spirv_asm` | 新增对应判定：文本含 LLVM IR 的函数定义和 `dx.op` 调用，仅有注释或诊断不算 |
+| 编辑计划 | `input_kind=text_ir`，可编辑、可构建、可替换 | 相同；`requires_toolchain` 列出实际用到的工具，`build_input_kind=binary_dxil` |
+| 允许的输入 | `source_text`、`diff_text`、`ops` | `source_text`、`diff_text`；本期不提供结构化 `ops`，`allowed_ops` 为空 |
+| 构建 | `spirv-as` 装成二进制 | 装回 DXIL 容器，再经校验器校验并签名 |
+| 交给回放 | `BuildTargetShader`（SPIR-V 编码）后替换 | `BuildTargetShader`（DXIL 编码，输入为容器字节）后替换 |
+| 工具来源 | 随安装捆绑，`RDC_TOOL_SPIRV_TOOLS_PATH` 可覆盖 | 随安装捆绑，新增 `RDC_TOOL_DXC_TOOLS_PATH` 可覆盖 |
+
+### 9.3 对外契约
+
+- `rd.shader.get_disassembly`：shader 编码为 DXIL 时，接受 `target="DXIL ASM"`（或 `source_encoding="dxilasm"`），返回 LLVM IR 文本及其 `edit_plan` 和文本哈希。原生目标 `DXBC/DXIL` 的行为不变，仍然只读。
+- `rd.shader.get_source`：DXIL 无源码时，`fallback_args` 指向 `DXIL ASM`；`blocked_reason` 改为说明这条可编辑路径，不再写"不要把反汇编交给 edit_and_replace"。
+- `rd.shader.edit_and_replace` 与 `rd.shader.compile`：接受 `dxilasm` 文本。沿用 `expected_source_hash`，修改必须绑定到刚读到的那份文本。
+- `rd.export.shader_bundle`：`disassembly_target="DXIL ASM"` 时导出可装配的文本，manifest 如实标注。
+- 旧式 DXBC 字节码（非 DXIL）保持只读，`edit_plan` 明确说明原因。
+- 非 Windows 主机不捆绑该工具链；`edit_plan` 照常返回，构建时以 `host_tool_unavailable` 拒绝。
+
+失败一律在替换之前返回，带 `effects_attempted=false`、`context_preserved=true`：
+
+| 情形 | code | category | details 里必须有 |
+|---|---|---|---|
+| 工具链缺失 | `host_tool_unavailable` | capability | 缺哪个文件、在哪里找过 |
+| 文本装配失败 | `shader_assembly_failed` | validation | 装配器的原始诊断，含行号 |
+| 校验或签名失败 | `shader_validation_failed` | validation | 校验器的原始诊断 |
+| 回放拒绝构建结果 | 沿用现有的构建失败 | 沿用 | 回放返回的消息 |
+
+不写静默回退：装配或校验失败时不改用其他目标、不跳过校验、不提交未签名的容器。
+
+### 9.4 需要先查证的事实
+
+以下几点我没有在这个工具链上验证过。动手前对照 DirectX Shader Compiler 的官方文档和所选发行包的实际内容确认，结果记入账本：
+
+1. 反汇编：用哪个命令或接口从容器得到可重新装配的 LLVM IR 文本；输出里的注释头是否会妨碍装配。
+2. 装配：发行包里是否带装配用的可执行文件。不带时，经 `dxcompiler` 的装配接口实现，不另找第三方工具。
+3. 完整性：装回的容器是否带齐回放创建管线所需的各个部分（签名、资源绑定信息等）。只含 IR 部分时，从原容器保留其余部分的做法是否成立。
+4. 校验与签名：未签名的容器能否被回放的 D3D12 设备接受；校验器如何签名，是否依赖随发行包分发的校验库，该库的再分发许可是什么。
+5. 回放：`BuildTargetShader` 以 DXIL 编码接收容器字节时的行为，以及替换后的 shader 是否沿用原 shader 的入口和签名。
+
+任何一点走不通，停下把原文报给用户，不绕行。
+
+### 9.5 实现顺序
+
+每一步通过后再做下一步。前两步只在隔离环境里手工验证，不改 RDC-Tool。
+
+1. **原样往返**：从眼部 capture 取出一个 DXIL 像素 shader 的容器，反汇编，不改动，装回并校验签名，替换，确认该 draw 的输出与基线逐像素一致，撤销。
+2. **最小修改**：把文本里一个浮点常量改成另一个值，装回、替换，确认输出发生变化；撤销后回到基线。
+3. **接入工具**：按 9.2 和 9.3 实现。新增的工具链解析放进现有的主机工具契约（`host_tools`、主机布局、运行清单的来源与许可记录、doctor 的状态报告），打包脚本按钉住的版本和哈希取得。不改动运行时拆分后的模块边界。
+4. **测试**：编辑计划（DXIL 有工具链、DXIL 无工具链、旧式 DXBC）；装配失败和校验失败各一条，断言 code、category 和保全字段；文本识别正反各一条。真实回放的往返放进需显式开启的真实回放测试。
+5. **产品侧对接**：产品把 `RDC_TOOL_DXC_TOOLS_PATH` 与现有两个工具路径变量一并透传；刷新工具目录快照与三份工具参考手册。方法文本由用户侧改写，监工不改。
+6. **产品路径验收**：在眼部 capture 上经产品做一次原样往返和一次最小修改，五份回执齐全，撤销后与基线一致。
+
+### 9.6 完成后
+
+M3 从第十三轮继续，条件与此前相同，新增上限 6 轮。前十二轮的停点记录保留，不再计入"连续三轮"。
+
