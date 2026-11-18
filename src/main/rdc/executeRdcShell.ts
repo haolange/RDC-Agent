@@ -121,6 +121,9 @@ export async function executeRdcShell(
   const startedAt = Date.now();
   let lastInvocation: ReturnType<typeof rdcInvocationRecord> | undefined;
   let lastReplayState: { process: ReturnType<typeof parseRdcProcessIdentity>; replacements: string } | null = null;
+  const verifyTruncatedBufferRead = input.operation === 'rd.pipeline.get_constant_buffers'
+    && args.include_contents === true && definition.effects.length === 1 && definition.effects[0] === 'replay_position';
+  let truncatedBufferRead = false;
   const readReplayEvent = async (): Promise<number> => {
       lastInvocation = rdcInvocationRecord('rd.session.get_context', {});
       const response = await rdcCliInvokerService.executeCLI('call', [
@@ -148,7 +151,7 @@ export async function executeRdcShell(
   let originalReplayState: typeof lastReplayState = null;
   try {
     const temporaryReplayRead = definition.effects.includes('replay_position_temporary');
-    originalEvent = temporaryReplayRead || input.operation === 'rd.export.screenshot'
+    originalEvent = temporaryReplayRead || verifyTruncatedBufferRead || input.operation === 'rd.export.screenshot'
       || input.operation === 'rd.shader.get_source' || input.operation === 'rd.shader.get_constant_buffer_contents'
       || input.operation === 'rd.texture.get_pixel_history'
       || ['rd.texture.get_data', 'rd.texture.get_region_values', 'rd.texture.get_histogram',
@@ -160,6 +163,7 @@ export async function executeRdcShell(
     const result = await rdcCliInvokerService.executeCLI('call', [
       input.operation, '--args-json', JSON.stringify(args), '--daemon-context', lease.contextId,
     ], { abortSignal: signal, contextId: lease.contextId, settings: cli });
+    truncatedBufferRead = verifyTruncatedBufferRead && result.exitCode === 0 && result.stdoutTruncated === true;
     signal?.throwIfAborted();
     const payload = parseRdcNativeResult(result, undefined, input.operation);
     if (payload.result_kind !== input.operation
@@ -242,6 +246,23 @@ export async function executeRdcShell(
           && await readReplayEvent() === originalEvent && lastReplayState !== null
           && rdcDigest(lastReplayState) === rdcDigest(originalReplayState);
       } catch { /* An unverified restoration remains quarantined. */ }
+    }
+    if (!nativeStateVerifiedSafe && truncatedBufferRead && originalReplayState && !signal?.aborted) {
+      try {
+        const event = await readReplayEvent();
+        const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
+        nativeStateVerifiedSafe = current?.version === lease.version && current.contextId === lease.contextId
+          && current.runtimeContext.replaySessionId === replaySessionId && current.runtimeContext.captureFileId === frozenCaptureId
+          && lastReplayState !== null && rdcDigest(lastReplayState) === rdcDigest(originalReplayState)
+          && (event === originalEvent || event === args.event_id);
+        if (nativeStateVerifiedSafe) {
+          const { rdcSessionService } = await import('../sessions');
+          await rdcSessionService.observeAgentOperation({ sessionId, projectId }, input.operation, toolCallId, cli, true);
+          const observed = assertRdcContextLeaseOwnership({ sessionId, projectId });
+          nativeStateVerifiedSafe = !signal?.aborted && observed?.version === lease.version && observed.contextId === lease.contextId;
+          if (nativeStateVerifiedSafe && error instanceof Error) error.message += ` Replay verified at event ${event}; select a reflection slot.`;
+        }
+      } catch { nativeStateVerifiedSafe = false; }
     }
     if (!nativeStateVerifiedSafe) {
       const reportedCode = error instanceof RdcNativeFailure ? error.nativeError.code
