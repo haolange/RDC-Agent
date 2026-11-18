@@ -489,6 +489,7 @@ export class AgentTurnRunner {
 
     let responseText = '';
     let canonicalFinalAnswerText = '';
+    let partialFinalSnapshot: { text: string; declaration: NonNullable<import('./TurnCoordinator').TurnHandle['completionDeclaration']>; toolCalls: number } | undefined;
     let sawStructuredToolCall = false;
     const structuredToolCallingEvidenceGate = { recorded: false };
     unsubscribe = activeSlot.agent.subscribe((event: CoreAgentEvent) => {
@@ -548,9 +549,23 @@ export class AgentTurnRunner {
           loopHasTools: event.message.content.some((block) => block.type === 'toolCall'),
           hasPendingContinuation: { handoff: Boolean(turnHandle.pendingHandoff) },
         });
-        canonicalFinalAnswerText = turnHandle.isLive(turnGeneration) && outputPhase === 'final_answer'
+        const finalText = turnHandle.isLive(turnGeneration) && outputPhase === 'final_answer'
           ? event.message.content.map(block => block.type === 'text' && block.phase !== 'commentary' ? block.text : '')
             .join('').trim() : '';
+        const declaration = turnHandle.completionDeclaration;
+        if (finalText) {
+          canonicalFinalAnswerText = finalText;
+          partialFinalSnapshot = declaration && ['partial', 'blocked'].includes(declaration.disposition)
+            ? { text: finalText, declaration, toolCalls: turnHandle.policyBudget.toolCalls } : undefined;
+        } else if (turnHandle.isLive(turnGeneration) && outputPhase === 'final_answer'
+          && partialFinalSnapshot && declaration === partialFinalSnapshot.declaration
+          && turnHandle.policyBudget.toolCalls === partialFinalSnapshot.toolCalls) {
+          // A reassessment can end without text after the same partial was already reported.
+          canonicalFinalAnswerText = partialFinalSnapshot.text;
+        } else {
+          canonicalFinalAnswerText = '';
+          partialFinalSnapshot = undefined;
+        }
         if (event.message.usage && isSuccessfulProviderResponse(event.message)) {
           // 按当前实际注入的工具定义计量（含本 turn 内新激活的 deferred 工具）；
           // deferred 段仅计未激活 schema 估算，且仅在 >0 时加入。

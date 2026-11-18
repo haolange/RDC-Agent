@@ -27,7 +27,8 @@ import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 
 function harness(scope: string, validateCompletion: TurnCompletionValidator, approvedPlan = false,
   validateCompletionReadiness: TurnCompletionReadinessValidator = () => undefined,
-  onPrompt?: (turn: TurnHandle, request: AgentSlotRequest) => Promise<void>) {
+  onPrompt?: (turn: TurnHandle, request: AgentSlotRequest) => Promise<void>,
+  onEvents?: (turn: TurnHandle, emit: (event: AgentEvent) => void, assistant: (text: string, withTool?: boolean) => AssistantMessage, messages: AssistantMessage[]) => void) {
   const terminal = vi.fn();
   const preparedRuntime = {
     promptPlan: { systemPrompt: 'Frozen instructions', segments: [] },
@@ -60,6 +61,10 @@ function harness(scope: string, validateCompletion: TurnCompletionValidator, app
         if (approvedPlan) {
           turn.completionDeclaration = null;
           turn.approvedPlan = { toolCallId: 'plan-call', hash: 'hash', target: 'general', frozenUri: 'session://plans/plan.md', planId: 'plan' };
+        }
+        if (onEvents) {
+          onEvents(turn, emit, assistant, messages);
+          return;
         }
         const declaration = assistant('Report id and hash in tool commentary', true);
         messages.push(declaration);
@@ -99,6 +104,37 @@ function harness(scope: string, validateCompletion: TurnCompletionValidator, app
 }
 
 describe('Agent turn completion boundary', () => {
+  it('keeps an existing partial final after empty reassessment only when no later tool work changed it', async () => {
+    const exercise = async (withLaterTool: boolean) => {
+      const validate = vi.fn();
+      const { run, terminal } = harness(`completion-reassessment-${withLaterTool}`, validate, false, () => undefined, undefined,
+        (turn, emit, assistant, messages) => {
+          turn.completionDeclaration = { disposition: 'partial', evidenceRefs: [] };
+          const final = assistant('Saved partial final answer');
+          messages.push(final);
+          emit({ type: 'message_end', message: final });
+          if (withLaterTool) {
+            turn.policyBudget.toolCalls++;
+            const tool = assistant('', true);
+            messages.push(tool);
+            emit({ type: 'message_end', message: tool });
+          }
+          const empty = assistant('');
+          messages.push(empty);
+          emit({ type: 'message_end', message: empty });
+        });
+      await run();
+      return { validate, receipt: terminal.mock.calls[0]?.[5] };
+    };
+    const unchanged = await exercise(false);
+    expect(unchanged.validate).toHaveBeenCalledWith(expect.objectContaining({
+      disposition: 'partial', finalAnswerText: 'Saved partial final answer',
+    }));
+    expect(unchanged.receipt).toMatchObject({ finalAnswerText: 'Saved partial final answer' });
+    const changed = await exercise(true);
+    expect(changed.receipt).toMatchObject({ finalAnswerText: '' });
+  });
+
   it.each(['completion-root', 'completion-root::subagent::child'])(
     'validates the frozen contract exactly once for %s and issues its receipt', async (scope) => {
       const validate = vi.fn();
