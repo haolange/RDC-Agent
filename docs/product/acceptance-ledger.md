@@ -1,5 +1,13 @@
 # Acceptance Ledger
 
+## 2026-11-19：M3 第十三轮，停在区分
+
+- 隔离会话 `sess_b47acc80d8a8`／眼部 capture／local／入口 E147；Settings 核对十二个 Agent 均为内置且模型可用，GPT-6.1 Sol／Medium、自动审查，隔离 Memory 和覆盖为空，Knowledge 无眼部案例。
+- 仅输入短症状，主动澄清两题均答“不知道”，原样批准计划。General 以区域读数、Pixel History 和 draw 覆盖将候选亮点定位到 E6152；候选机制未区分、未执行干预，产品声明 `partial`。
+- `rd.pipeline.get_constant_buffers(include_contents=true)` 返回 `RDC_CLI_OUTPUT_TRUNCATED: native result exceeded the bounded stdout buffer (11412043 bytes).`；此后回放需要恢复，自动审查拒绝未经现场核实的恢复请求。直接原因待按 3.3 复验。
+- 回合结束后监工通过产品恢复入口 E147、replacement 0，签名回执 `rdc-lifecycle-7b968b34-0dc4-40f5-bd92-f371010f26d4.json`，再关闭回放；无设备配置调整。会话、请求快照、调查记录和工具结果保留于 `.local/m1-20261114/user-data/state/`。
+- 规划约 3m20s、执行约 30m54s；Provider 累计输入 13,338,859、输出 38,805 tokens（含自动审查和 Shader Analyst），不把累计输入当作上下文占用。
+
 ## 2026-11-19：M3 DXIL 产品路径验收（9.5 第六步）
 
 - 隔离实例 Settings 验证并应用 RDC-Tool `c6706c7`，目录 129 项；十二个 Agent 来源均为内置，Verifier 为 GPT-6.1 Sol／Medium。独立诊断会话 `sess_fcb0b0412f99` 在眼部 capture／local 完成 A 原样和 B 单常量两组真实 `applied` 替换，各有独立 experimentId 与五份主进程签名回执。
