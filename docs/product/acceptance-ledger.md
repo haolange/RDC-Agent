@@ -1,5 +1,13 @@
 # Acceptance Ledger
 
+## 2026-11-19：M3 DXIL 产品路径验收（9.5 第六步）
+
+- 隔离实例 Settings 验证并应用 RDC-Tool `c6706c7`，目录 129 项；十二个 Agent 来源均为内置，Verifier 为 GPT-6.1 Sol／Medium。独立诊断会话 `sess_fcb0b0412f99` 在眼部 capture／local 完成 A 原样和 B 单常量两组真实 `applied` 替换，各有独立 experimentId 与五份主进程签名回执。
+- 产品完整 raw 审计：A 的 baseline、variant、restored 逐字节相等；B variant 不同、restored 等于 baseline，后者 SHA-256 为 `c854389fe4661da20b0f0b5c5afc4ce69721e608a29b019c82ade84dff84dfe4`。B 在 `(518,455)` 的 RGB 从 `(0.46875,0.4921875,0.5625)` 变为 `(0,0,0)`，撤销后恢复原值。
+- 首次 B 替换被自动审查拒绝，因比较文件一侧的原始审计未进入审查窗口；产品补充该审计并以独立 B2 实验完成五阶段。产品侧 `bf785469` 修复两侧文件的证据关联，保护文件仍不透传内容。
+- 入口恢复回执 `rdc-lifecycle-7c72f1ee-e3d2-40a0-abc4-6ecdaa4a686d.json` 确认 E147、replacement 0；关闭回放后归属登记为空。诊断不建立正式 MissionCheckpoint，产品因此声明 `partial`；两组实验和现场恢复的验收结果已具备，本次非 M3 正式调查轮。
+- 监工指定诊断参数并批准计划；会话、Trace 和签名回执保留于 `.local/m1-20261114/user-data/state/`，三次诊断的工程文件移至 `.local/m3-dxil-implementation/product-acceptance-20261119/`，避免被后续调查当作线索；会话中登记的原工程文件路径因此不再直接可打开。
+
 ## 2026-11-19：M3 DXIL 输入分派缺陷复现
 
 - 更新后的隔离产品会话 `sess_add1a1541ab5` 中，自动审查已看到原样字节审计并批准 A；RDC-Tool 随后返回 `shader_source_mismatch: Cannot verify expected_source_hash: Captured entry source is unavailable.`，`failure_stage=validate_source`、`replacement_attempted=false`、现场保全。原始返回 `session://tool-outputs/call_b0d08906ceba48cd9f83b2c09b111d79.json`；B 未执行。
