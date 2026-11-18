@@ -1,5 +1,12 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 DXIL 单常量修改（9.5 第二步未通过）
+
+- 在隔离回放的 E6152 像素 shader LLVM IR 中，仅把 `%2348` 的浮点常量 `0x3FF0A3D700000000` 改为 `0.000000e+00`；官方装配和校验签名成功，`dxv` 返回 `Validation succeeded.`。
+- 已签名容器经 DXIL `BuildTargetShader` 替换，回放反射的 shader 字节 SHA-256 与修改版容器一致；E6152 输出 `ResourceId::308658` 的完整纹理与基线相同，变化像素数为 0。
+- 验证脚本原文：`RuntimeError: one-constant modification produced no output change`；此结果未查明无变化的原因，按 9.5 停止，不尝试其他修改。
+- 撤销后完整纹理与基线逐字节一致，SHA-256 `c854389fe4661da20b0f0b5c5afc4ce69721e608a29b019c82ade84dff84dfe4`；已恢复入口 E147、关闭回放。原始日志及校验结果保存在 `.local/m3-dxil-dxc-20261118/`。
+
 ## 2026-11-18：M3 DXIL 原样往返（9.5 第一步）
 
 - 隔离本机 RenderDoc `1.48` 读取眼部 capture 的 E6152 原始 PS 容器；`dxc -dumpbin` 输出未经修改，经官方 `IDxcAssembler` 装回、`IDxcValidator` 校验签名，再以 `dxv` 验证通过。未改 RDC-Tool 或原始 capture。
