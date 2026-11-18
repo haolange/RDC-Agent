@@ -121,7 +121,8 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
         execution: boundedObservation({ status: details.status, executionId: details.executionId,
           generation: details.generation, subagentId: details.subagentId }, 800),
       },
-      content: protectedPath ? undefined : boundedObservation(observedText(message), referencedFileRead(message) ? 8192 : 1600),
+      content: protectedPath ? undefined : boundedObservation(observedText(message),
+        referencedFileRead(message) || related.includes(message) ? 8192 : 1600),
       facts: protectedPath ? { protectedPath: true, contentsOmitted: true } : boundedObservation({
         file: { path: details.path, hash: details.hash, sha256: details.sha256, bytesRead: details.bytesRead,
           comparison: (details.comparison as Record<string, unknown> | undefined)?.text, delta: details.delta },

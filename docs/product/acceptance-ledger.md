@@ -1,5 +1,12 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 DXIL 产品路径验收首次尝试
+
+- 隔离实例通过 Settings 验证并应用 RDC-Tool `82ca8aa`，目录为 129 项；独立诊断会话在眼部 capture 的 E6152 将原样和单常量 DXIL ASM 分别装配构建，产物均为 `validated-dxil-build-input`。
+- 原样实验以 DDS 做签名基线时返回 `RDC_EVIDENCE_INVALID: native result does not provide supported execution evidence.`，未替换；单常量实验以截图取得签名基线后，替换被自动审核拒绝，理由是审核材料未证明修改后的 DXIL validator 成功，亦未执行替换。
+- 原始 compile 返回包含校验后的构建产物标签和哈希；审核请求中的对应结果在 1600 字符处截断，未包含该标签。两次实验分别缺少 5／4 份回执，产品声明 `partial`；已恢复同一 capture／local／E147，replacement 为 0。
+- 会话与回执保留于 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_9681aafe51f2/`，审核请求保留于同一 userData 的 `state/llm-calls/sess_9681aafe51f2/`；监工输入限定的诊断目标并批准原计划。
+
 ## 2026-11-18：M3 DXIL 工具路径真实回放测试（9.5 第四步）
 
 - 显式开启 RDC-Tool `test_dxil_real_replay.py`，使用眼部 capture、隔离运行库和固定版本 DXC；经工具实现反汇编、装配、校验签名后，以 DXIL 替换 E6152 的像素 shader，测试结果 `1 passed`。

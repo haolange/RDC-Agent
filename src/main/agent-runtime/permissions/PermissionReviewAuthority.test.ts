@@ -187,3 +187,18 @@ it('retains actual same-target and explicitly referenced prerequisites beyond ro
   expect(permissionReviewEvidence(messages, 'isolated-child', { intent: 'call_forged' }).recent
     .some(item => item.toolCallId === 'call_forged')).toBe(false);
 });
+
+it('retains a related build result through its validation evidence within the bounded review context', () => {
+  const args = { event_id: 12, stage: 'ps', source_path: '/project/shader.ll' };
+  const build = { result: { result_kind: 'rd.shader.compile', ok: true, data: {
+    build_input: { sha256: 'a'.repeat(64) }, diagnostics: 'x'.repeat(2400), artifact_kind: 'validated-dxil-build-input',
+  } } };
+  const messages = [{ role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id: 'compile', name: 'shell',
+    arguments: { rdc: { operation: 'rd.shader.compile', args } } }] },
+  { role: 'toolResult', toolName: 'shell', toolCallId: 'compile', timestamp: 2, isError: false,
+    content: [{ type: 'text', text: JSON.stringify(build) }],
+    details: { operation: 'rd.shader.compile', invocation: { operation: 'rd.shader.compile', args } } }] as never;
+  const evidence = permissionReviewEvidence(messages, 'session', { rdc: { operation: 'rd.shader.edit_and_replace', args } });
+  expect(evidence.recent[0].content).toEqual([build]);
+  expect(evidence.recent[0]).toMatchObject({ origin: 'executed-tool-result', facts: { operation: 'rd.shader.compile' } });
+});
