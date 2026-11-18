@@ -1,10 +1,25 @@
 # Acceptance Ledger
 
+## 2026-11-19：M3 第十三轮后的 32 KiB 整批读取复验
+
+- 独立诊断会话 `sess_38c54b3eae3e` 经产品执行 E6152／ps 的 `rd.pipeline.get_constant_buffers(include_contents=true,max_bytes=32768)` 一次，仍返回 `RDC_CLI_OUTPUT_TRUNCATED: native result exceeded the bounded stdout buffer (11411997 bytes).`；错误记录 `call_e2bb2bd081ad47049847df097cd733dc`。
+- 产品要求恢复后自行恢复入口 E147，回执 `rdc-lifecycle-8391ac0f-4168-403c-bc10-1ac266f518d3.json`；监工指定复验参数并批准计划，随后关闭回放。会话与 Trace 保留于隔离 userData。
+
+## 2026-11-19：M3 第十三轮后的单块读取复验
+
+- 独立诊断会话 `sess_264f840b6780` 经产品对 E6152／ps 的 reflection slot 7 执行 `rd.shader.get_constant_buffer_contents(max_bytes=464)` 一次，返回实际解码值、`decode_status=decoded`、`complete_range_permitted=true`，输入 464 字节；原始返回 `call_ef58681fd1e248098fd5af6e0721e174.json`。
+- 产品恢复入口 E147，回执 `rdc-lifecycle-0591702b-b72d-4cff-be3b-1dcff33ecc00.json`；监工指定复验参数并批准计划，随后关闭回放。会话与 Trace 保留于隔离 userData。
+
+## 2026-11-19：M3 第十三轮后的 64 字节整批读取复验
+
+- 独立诊断会话 `sess_ec5a301fdd69` 经产品执行 E6152／ps 的 `rd.pipeline.get_constant_buffers(include_contents=true,max_bytes=64)` 一次；返回可读但八块均为 `budget_limited`／`decode_status=unavailable`，原始返回 `call_9980f6431c2c4f539e268734ac6f2d8b.json`。
+- 产品恢复入口 E147，回执 `rdc-lifecycle-d7701956-1f30-4258-88e9-cfd7f5f86c6e.json`；监工指定复验参数并批准计划，随后关闭回放。会话与 Trace 保留于隔离 userData。
+
 ## 2026-11-19：M3 第十三轮，停在区分
 
 - 隔离会话 `sess_b47acc80d8a8`／眼部 capture／local／入口 E147；Settings 核对十二个 Agent 均为内置且模型可用，GPT-6.1 Sol／Medium、自动审查，隔离 Memory 和覆盖为空，Knowledge 无眼部案例。
 - 仅输入短症状，主动澄清两题均答“不知道”，原样批准计划。General 以区域读数、Pixel History 和 draw 覆盖将候选亮点定位到 E6152；候选机制未区分、未执行干预，产品声明 `partial`。
-- `rd.pipeline.get_constant_buffers(include_contents=true)` 返回 `RDC_CLI_OUTPUT_TRUNCATED: native result exceeded the bounded stdout buffer (11412043 bytes).`；此后回放需要恢复，自动审查拒绝未经现场核实的恢复请求。直接原因待按 3.3 复验。
+- `rd.pipeline.get_constant_buffers(include_contents=true)` 返回 `RDC_CLI_OUTPUT_TRUNCATED: native result exceeded the bounded stdout buffer (11412043 bytes).`；产品无法从截断结果验证回放并隔离 lease，自动审查拒绝未经现场核实的恢复请求，阻断了后续单块读取。三项产品复验见上。
 - 回合结束后监工通过产品恢复入口 E147、replacement 0，签名回执 `rdc-lifecycle-7b968b34-0dc4-40f5-bd92-f371010f26d4.json`，再关闭回放；无设备配置调整。会话、请求快照、调查记录和工具结果保留于 `.local/m1-20261114/user-data/state/`。
 - 规划约 3m20s、执行约 30m54s；Provider 累计输入 13,338,859、输出 38,805 tokens（含自动审查和 Shader Analyst），不把累计输入当作上下文占用。
 
