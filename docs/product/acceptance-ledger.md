@@ -1,5 +1,11 @@
 # Acceptance Ledger
 
+## 2026-11-19：M3 DXIL 产品路径审查证据复验
+
+- 独立诊断会话 `sess_5f4a37601744` 的 A 组原样 DXIL ASM 装配成功，取得签名 baseline；真实替换被自动审查拒绝，原文为 `The observed compile validates A/original.dxilasm but does not establish its byte equality with the product-exported original. Only model-authored records claim that audit passed; the exact original-text replacement prerequisite remains unverified.` B 组未执行。
+- 产品 `read_file` 的 `call_a0f6da8c3f464257a5b8c74bd8575246` 实际返回 `bytesEqual=true`，但本次审查请求快照未包含该结果：待执行 RDC 的 `source_path` 与已解析的审计 `path` 未关联，后续读取将审计挤出最近窗口。修复提交 `6a1975c0` 保留真实审计结果供原有自动审查判断，未改变权限。
+- 监工指定两组诊断实验并澄清产品 RDC 入口；会话、请求快照和原始结果保留于 `.local/m1-20261114/user-data/state/` 对应目录。产品恢复 E147 后关闭回放，归属 daemon 登记为空；本次非 M3 正式调查轮。
+
 ## 2026-11-19：M3 回放位置恢复产品复验
 
 - 眼部 capture／local／入口 E147；独立诊断会话 `sess_f10c6395f095` 的规划阶段依次查询原生状态、E6152 pipeline、原生状态，得到 E147→E6152→E147，界面始终显示入口 E147，同一 replay 和 capture 身份保持一致。
