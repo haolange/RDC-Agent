@@ -1,5 +1,15 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 第六轮，停在区分
+
+- PC 本机、新隔离会话 `sess_5d4e208e888c`，内置 Agent／GPT-6.1 Sol／Medium，隔离 Memory 为空；监工只输入短症状，位置和预期两项答“不知道”，原样批准计划。旧会话均保留。
+- 产品将 E7343 输出候选 `(1165,1024)` 逐级对应到 SceneColor `ResourceId::308658`／`(518,455)`；E6128 至 E6152 从 `(0.06738,0.03662,0.03320)` 变为 `(0.46875,0.49219,0.5625)`，draw 标记为泪液材质。verifier 接受限定锚点及首次亮写入；两项证据授权 Challenge 补授后解决，产品声明 `partial`，无因果实验。
+- 区分所需的真实像素贡献未拆出：目标 primitive 91 的 Pixel History shader-out 为 `(0.86240,0.93273,1.09876,0.50878)`，debugger `_OUT` 为 `(0.04348,0.04592,0.04033,0.18280)`；候选机制仍待验证，不能交付因果成立或能力阻塞。
+- 按 3.3 经产品复验三项：另一片元 primitive 307 的位置和深度相符而 RGB 仍不符；E7343 合成 draw 的同类比较仅差一个 float32 ULP；两 draw 基础着色率分别 2×2 和 1×1，shader 不同，不能归因。第一项曾把 `view` 误填为对象，返回 `int() argument must be a string, a bytes-like object or a real number, not 'dict'` 并隔离；重开后更正参数，未重复失败调用。
+- 直接障碍在工具返回层：目标 draw 的 debugger 输出与原生写入记录不一致；现有三项产品路径复验尚不能区分工具状态投影与 RenderDoc 原生调试结果。进一步直接对照原生 trace 超出 3.3 的同产品路径及三项上限，需用户决定是否扩大诊断范围；本轮未改代码。
+- 签名恢复回执 `rdc-lifecycle-4356bef0-510b-41b7-bd0d-257bbcf1e5da.json` 确认恢复 E147；诊断回放关闭、归属进程退出，无配置调整。规划约 3 分 38 秒、执行约 45 分 49 秒；规划 8 次、General 63 次、子 Agent 77 次及自动审查 4 次 Provider 请求；General input 9287521／output 33381 token（含缓存读取 1235328）。
+- 会话、模型请求、Trace、诊断和输出归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-06-sources.zip`，SHA-256 `dfa19461fd9547bcbfb5ff0963b00a3b492642ce9773f32cb9a97a5f89dd033b`。
+
 ## 2026-11-18：M3 第五轮，停在锚定
 
 - PC 本机、新隔离会话 `sess_21e39ed907de`；十二个 Agent 为内置且模型可用，Memory 为空、Knowledge 不含本案例。监工只输入短症状，两项澄清答“不知道”，原样批准计划；保留所有旧隔离会话。
