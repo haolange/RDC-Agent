@@ -1,5 +1,15 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 第七轮，停在锚定
+
+- PC 本机、新隔离会话 `sess_47e2c3cddf52`；十二个 Agent 均为内置且 GPT-6.1 Sol 可用，Medium、Fast／Max 关闭，Memory 为空、Knowledge 不含本案例。监工仅输入短症状、对位置及外观答“不知道”，原样批准计划；旧会话均保留。
+- 产品观察最终输出候选及 E6152 场景色 `(518,455)` 的泪液 draw，写入场景局部 `cross-validated` Evidence 与 Claim；最终症状到场景位置的逐级对应仍被记录为 candidate。首个停点为锚定；无实验，verifier 因来源任务 partial 未满足依赖而未启动。
+- 模型实际收到请求 2×2 的原生 debug 限定及另供完整 HLSL 替换能力；捕获内 DXIL 反汇编仍只读，没有与原 shader 匹配的源码。两项真实返回分别为 `call_2b73487d0f574514a9412d31ebb51dba`、`call_4ffa0abd925a47e7be8b04b2789f54f5`。
+- 按 3.3 经独立产品会话单次复验 E7330／`ResourceId::2051334` 的 `(1163,1027,5,5)`：`values_status=complete`，视图 `B8G8R8A8_UNORM`；工具返回及请求归档 `m3-round07-region-product-recheck-20261118.zip`，SHA-256 `ddea212ec972682bbd8ca71c4b147d4e2e7b7aca46c11bdfcb0616e0587c90c1`。
+- 直接原因在方法文本：General 读到了跨合成逐级读数方法，但因滤波／重投影的精确采样位置未解而未读取对应输入区域；方法未说明怎样以区域读数建立有限对应并保留采样不确定。`7dcb1d7a` 在 `pixel-forensics` 第 2 节补充一般做法，第 1 节未改且文件净缩短；162 项 runtime 检查通过。
+- 产品记录 `partial` 后 UI 显示模型请求失败；Trace 的技术原文为 `PROVIDER_STREAM_MISSING_FINAL_ANSWER`，请求已有模型答复，不按账号不可用处理。终态回执 `rdc-lifecycle-1509fc0c-05e9-43b6-9bef-c9824b5b5636.json` 确认入口 E147、无替换；回放关闭、归属进程退出，未调整回放配置。
+- 规划约 2 分 52 秒、执行约 26 分 21 秒；规划 8 次、General 70 次及自动审查 2 次 Provider 请求；General input 10562432／output 20356 token（含缓存读取 1555072）。会话、请求、Trace、回执和最小输出归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-07-sources.zip`，SHA-256 `df04db261403a4ac1e877eb31d7a1033296ac9e9a3af4bc64abd309bf744919c`。
+
 ## 2026-11-18：M3 第六轮，停在区分
 
 - PC 本机、新隔离会话 `sess_5d4e208e888c`，内置 Agent／GPT-6.1 Sol／Medium，隔离 Memory 为空；监工只输入短症状，位置和预期两项答“不知道”，原样批准计划。旧会话均保留。
