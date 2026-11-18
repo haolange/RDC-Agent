@@ -1,5 +1,11 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 DXIL 单常量修改复验通过（9.5 第二步）
+
+- 隔离本机回放的 E6152 PS LLVM IR 仅将 `%2340` 的浮点常量 `0x3FF0A3D700000000` 改为 `0.000000e+00`；官方 DXC 装配、校验签名通过，`dxv` 返回 `Validation succeeded.`。
+- 已签名容器经 DXIL `BuildTargetShader` 替换，实际绑定容器 SHA-256 `469777b186c53abda8728af811424f6b406aee99cc66094397a26bad20692559`；输出有 222 个像素变化，目标像素 RGB 从 `(0.46875,0.4921875,0.5625)` 变为 `(0,0,0)`。
+- 撤销后完整纹理与基线逐字节一致，SHA-256 `c854389fe4661da20b0f0b5c5afc4ce69721e608a29b019c82ade84dff84dfe4`；已恢复入口 E147、关闭回放。原始日志及校验结果保存在 `.local/m3-dxil-dxc-20261118/one-constant-retry-native.jsonl` 及同目录。
+
 ## 2026-11-18：M3 DXIL 单常量无效原因核查
 
 - 在隔离回放中以官方 DXC 签名后替换诊断 shader：将 E6152 PS 的红色输出改为零，目标像素 shader 红色从 `0.8624011` 变为 `0`，完整输出有 222 个像素变化，证实替换进入实际 draw。
