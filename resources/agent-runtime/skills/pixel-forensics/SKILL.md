@@ -11,18 +11,18 @@ Use this skill when a region of the image, a pixel's history, or overdraw is the
 
 Anchor the native texture, subresource, rectangle and event by agreeing image and object evidence.
 
-- **Image side.** Export and inspect the output with `read_image`, enlarging a source-pixel `region` when needed; retain its hash, dimensions and rectangle. Map the candidate rectangle to the native output (event, resource, subresource, dimensions). Read bounded native values at the target and a nearby unaffected control, then inspect pixel history. When a writer composites the image, establish the region mapping to its input and repeat history until an object-producing draw; if history is unavailable, compare the same native region before and after candidate events.
+- **Image side.** Export and inspect the output with `read_image`, enlarging a source-pixel `region` when needed; retain its hash, dimensions and rectangle. Map the candidate rectangle to the native output (event, resource, subresource, dimensions). Read bounded native values at the target and a nearby unaffected control, then inspect pixel history. When the writer is a full-screen composite, the region continues in its input at the same normalized position (scale by the two texture sizes): read there, confirm the feature is present, and repeat on that input until an object-producing draw. A feature absent from every input was created by that pass. If history is unavailable, compare the same native region before and after candidate events.
 - **Object side.** Select a draw with passed fragments in the candidate's pixel history when available. Overlay it on its event-bound output, or compare that output before and after; inspect coverage, mesh, textures and shader to identify the object.
 - **Agreement.** Anchor when the symptom region maps through intervening composites to a draw covering the described object. Cite history or before/after values and coverage, mesh or bindings; prefix Evidence `cross-validated` when both sides agree, `user-confirmed` on confirmation, or `candidate` while mapping is incomplete (choose the next check).
 - **Record.** After anchored Evidence, write an `observed_fact` Claim mapping region to draw, even if expected appearance or First Bad Event is unknown.
 
-Missing coordinates are not a reason to stop. If the image or the mapping cannot be obtained, record the exact failed step. If the object or region stays ambiguous after looking, ask the user once.
+If the image or the mapping cannot be obtained, record the exact failed step. If the object or region stays ambiguous after looking, ask the user once.
 
 ## 2. Read history and values correctly
 
 - Use the history's actual event ids and its valid pre-mod / shader-out / post-mod fields. A missing value is unknown, not zero. Find neighbouring events through action search or the history itself, not by guessing adjacent integers.
 - Compare event-before and event-after values at the target and at the control point in the same native texture and subresource.
-- Check the backend, output format and what the native fields mean before building a per-fragment blend account. Some backends zero shader-out channels beyond the target's component count, keep an event-final post-mod value on the last fragment, or reconstruct depth-test flags. When a channel or a fragment's attribution cannot be established on the active build, keep it unknown and corroborate with event-bound texture reads, pipeline state, shader outputs or a reversible experiment.
+- Check the backend, output format and what the native fields mean before building a per-fragment blend account. When a channel or a fragment's attribution cannot be established on the active build, keep it unknown and corroborate with event-bound texture reads, pipeline state, shader outputs or a reversible experiment.
 - Regional statistics and brightness describe the image; alone they establish neither an anomaly nor a cause.
 
 ## 3. Judge appearance
