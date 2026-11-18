@@ -1,5 +1,14 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 第五轮，停在锚定
+
+- PC 本机、新隔离会话 `sess_21e39ed907de`；十二个 Agent 为内置且模型可用，Memory 为空、Knowledge 不含本案例。监工只输入短症状，两项澄清答“不知道”，原样批准计划；保留所有旧隔离会话。
+- 最终图 E7343／`ResourceId::2002006` 的眼部裁图为 `(1010,970,475,95)`；General 从旧线索复核场景 `ResourceId::308658` 的 `(518,455)`、`(597,461)` 和 E6152 泪液 draw，但未读取中间输入纹理的对应区域。独立 verifier 核验限定场景定位，最终症状对应仍为 candidate；未做因果实验，产品声明 `partial`。
+- 按 3.3 在独立产品会话对 E7343 输入 `ResourceId::2051334` 的 `(1161,1028,5,5)` 读一次，`values_status=complete`、视图格式 `B8G8R8A8_UNORM`；该读数只证明检查可用。原始返回 `call_27656e036d9c440fbd27daba4dc8e8ae.json`，SHA-256 `a59d4804680315718b42d131ad272517a23897697a68295d34c8c6fdc8518fd9`。
+- 直接原因在方法文本：规划回合未读 `pixel-forensics`，冻结计划未明确逐级输入区域读数，执行虽收到更新方法和图像，仍沿场景候选展开。`c0e3f94a` 调整 `debugger-coordinator` 在需要跨合成对应时按需引用该方法并安排首批读数；不改 `pixel-forensics`。受影响 21 项测试、typecheck、lint 通过。
+- 本轮签名恢复回执 `rdc-lifecycle-035be3e8-79f7-42fb-8b3f-765910407878.json` 确认入口 E147；诊断会话的通用恢复被自动审查拒绝，明确设置 E147 成功。两次回放均关闭、归属进程退出，未调整回放配置。
+- 规划约 5 分 38 秒、执行约 32 分；规划 10 次、General 72 次、verifier 25 次及自动审查 2 次 Provider 请求；General input 10772653／output 28768 token（input 含缓存读取 1794432）。会话、请求、Trace、回执与项目输出归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-05-sources.zip`，SHA-256 `0b851787281e3a94cb1b7d0f4f4ef56f2d5f81b3d815c1dcf3cdd931b87ac346`。
+
 ## 2026-11-18：M3 第四轮，停在锚定
 
 - PC 本机、新隔离会话，十二个 Agent 均为内置且使用 GPT-6.1 Sol／Medium；Memory 为空，隔离 Knowledge 无本案例材料。监工只输入短症状，对两个超出已知事实的澄清答“不知道”，原样批准计划；模型将测试工程里的前轮材料作为线索，并在当前 capture 上复核。
