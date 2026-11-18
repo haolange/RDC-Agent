@@ -1,5 +1,11 @@
 # Acceptance Ledger
 
+## 2026-11-19：M3 DXIL 输入分派缺陷复现
+
+- 更新后的隔离产品会话 `sess_add1a1541ab5` 中，自动审查已看到原样字节审计并批准 A；RDC-Tool 随后返回 `shader_source_mismatch: Cannot verify expected_source_hash: Captured entry source is unavailable.`，`failure_stage=validate_source`、`replacement_attempted=false`、现场保全。原始返回 `session://tool-outputs/call_b0d08906ceba48cd9f83b2c09b111d79.json`；B 未执行。
+- 直接原因是显式 DXIL ASM 输入同时携带 shader model target 时，被误分派到捕获源码替换路径；RDC-Tool `c6706c7` 修正分派，145 项相关测试通过，catalog 与参考手册检查通过。
+- 监工停止诊断以修复已复现的缺陷，停止打断了进行中的恢复；随后通过产品恢复同一 capture／local／E147、replacement 0，回执 `rdc-lifecycle-42c3ee80-0147-4954-ae88-cd9c6987f5a8.json`，关闭回放后归属登记为空。本次非 M3 正式调查轮。
+
 ## 2026-11-19：M3 DXIL 产品路径审查证据复验
 
 - 独立诊断会话 `sess_5f4a37601744` 的 A 组原样 DXIL ASM 装配成功，取得签名 baseline；真实替换被自动审查拒绝，原文为 `The observed compile validates A/original.dxilasm but does not establish its byte equality with the product-exported original. Only model-authored records claim that audit passed; the exact original-text replacement prerequisite remains unverified.` B 组未执行。
