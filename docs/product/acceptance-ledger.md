@@ -1,5 +1,16 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 DXIL 工具链 9.4 查证
+
+- 选用微软官方 DXC `v1.9.2609` 的 `dxc_2026_09_29.zip`，SHA-256 `ad31b1fc8443175d204f77a611fdb3ef2ec42759bdc2f1167368de24a4a7e7f1` 与发布记录一致；Windows x64 包含 `dxc.exe`、`dxcompiler.dll`、`dxil.dll`、`dxv.exe`、头文件和许可文本，无独立 IR 装配器。
+- 反汇编：`dxc -dumpbin <container>` 得到 LLVM IR；眼部 E6152 原始容器 `709e91a09fa4ca23b5144c58a111975832d422136061270e506da14787f1bc41` 的输出以分号注释头开头，原文直接送官方 `IDxcAssembler::AssembleToContainer` 成功，注释没有妨碍装配。
+- 装配：所选发行包由 `dxcompiler.dll` 暴露 `IDxcAssembler`；微软接口文档和 [v1.9.2609 装配实现](https://github.com/microsoft/DirectXShaderCompiler/blob/v1.9.2609/tools/clang/tools/dxcompiler/dxcassembler.cpp) 均表明接受 LLVM IR 文本或 bitcode，未使用第三方装配器。
+- 完整性：原容器有 `SFI0/ISG1/OSG1/PSV0/ILDN/HASH/DXIL`；装回结果有 `SFI0/ISG1/OSG1/PSV0/STAT/HASH/DXIL`，其中 `SFI0/ISG1/OSG1/PSV0` 与原件逐字节一致，`ILDN` 调试名未保留。官方实现会从 IR 重建签名与 PSV；能否创建原管线由 9.5 实机往返验证，不擅自拼接旧部件。
+- 校验与签名：装配结果的容器摘要为零；`IDxcValidator::Validate` 返回成功后摘要为 `eecd15e3684908d6bb70b5b196f7f5f7`，`dxv` 复核返回 `Validation succeeded.`。无 `dxil.dll` 的隔离目录中内置校验器仍得到相同签名容器；[微软文档](https://github.com/microsoft/DirectXShaderCompiler/wiki/Running-Shaders)说明未签名 shader 通常需要实验模式，未把未签名容器送入回放。
+- 许可：对应 [微软 NuGet 发行说明](https://www.nuget.org/packages/Microsoft.Direct3D.DXC/1.9.2609.5) 将 `dxcompiler.dll` 等编译器文件列为 `LICENSE-LLVM`；ZIP 另含 `dxil.dll` 和 `LICENSE-MS.txt`，后者的重分发条款引用的文件清单不在 ZIP 中。本次已验证不依赖该 DLL，不把其重分发许可推定为无限制。
+- 回放：隔离运行库来源记录对应 RenderDoc `dde88226a1cf8145edfe7094a67cbcdab6363d46`；D3D12 实现支持 `ShaderEncoding::DXIL`，以容器字节创建 shader，并以替换 shader 重建原 pipeline。原始和装回 IR 的入口均为 `Main`、签名部件一致；该接口不自动把原签名补进新容器，设备接受及画面等价留待 9.5 验证。
+- 原始命令输出、官方包、离线装配和校验记录保存在 `.local/m3-dxil-dxc-20261118/`；本次只读既有原始 shader 制品，未启动调查轮、修改 RDC-Tool 或替换回放。
+
 ## 2026-11-18：M3 第十二轮，停在因果
 
 - PC 本机、新隔离会话 `sess_3a7256f5905b`；十二个 Agent 均为内置且 GPT-6.1 Sol 可用，Medium、Fast／Max 关闭、自动审查，Memory 为空、Knowledge 不含本案例。监工先向 General 输入短症状，按其提示切换 Debugger 后重复同一句，未知位置和外观答“不知道”，原样批准计划；未提供区域、事件或方法，旧会话均保留。
