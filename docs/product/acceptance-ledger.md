@@ -1,5 +1,16 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 第八轮，停在因果
+
+- PC 本机、新隔离会话 `sess_d3b0954cb3e2`，十二个 Agent 为内置且模型可用，GPT-6.1 Sol／Medium，Memory 为空、Knowledge 不含本案例；监工只输入短症状，两项澄清答“不知道”，原样批准计划，保留旧会话。
+- 产品读取最终输出和中间输入对应区域，将候选眼角亮点追至 `ResourceId::308658`／`(518,455)` 的 E6152 draw；E6128 至 E6152 的前后读数与像素历史、覆盖一致，最终对应仍受滤波和时间采样限制。三个候选解释暂缓并写明后续检查，无可恢复实验。
+- 独立 verifier 两次审查，补读环境路径绑定和常量后解决 Challenge；读数只说明路径未被禁用，尚无该机制独有的差分读数。产品接受 `partial`，未达到因果实验或能力阻塞交付条件。
+- 按 3.3 经独立产品会话复验原 DXIL 操作一次：返回 `shader_patch_op_unsupported_for_encoding`，阶段 `validate_edit_plan`、`replacement_attempted=false`，却因入口事件未恢复而隔离 lease。自动审核拒绝诊断会话的 `capture_recover`；该操作未执行，现场最终位置未核验，随后关闭回放。原始返回归档 `m3-round08-dxil-product-recheck-20261118.zip`，SHA-256 `1545a397304051ccd7c406932216a4e356f0023642f321a0ba39f17f02093327`。
+- 直接原因属工具返回层：切事件后确定性拒绝没有恢复入口并提供可核验的保全证明。RDC-Tool `b2e1c7a` 恢复入口并保留失败信息；产品 `ce19cc2a` 复核 lease、回放位置、进程和替换身份，不能核验时仍隔离。相关测试 137 项、产品 RDC 测试 495 项和契约测试 248 项通过。
+- 本轮签名恢复回执 `rdc-lifecycle-87216362-955b-4e75-851d-cf68687e5965.json` 确认入口 E147、无替换；回放及诊断回放关闭、归属进程退出，未调整回放配置。隔离 Settings 已验证候选工具 `b2e1c7a`，129 个操作。
+- 规划约 3 分 32 秒、执行约 47 分；规划 7 次、General 70 次 Provider 请求，另有 Shader Analyst 16 次、两次 verifier 共 47 次和自动审查 3 次；General input 10652412／output 30215 token（含缓存读取 1199232）。
+- 会话、请求、Trace、Task、回执及输出归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-08-sources.zip`，SHA-256 `e7c8d557dbb16631130a7eadd7bc6cd7d26af7584753a0c91f50d08531ba74f4`；UI 仍显示 `PROVIDER_STREAM_MISSING_FINAL_ANSWER`，最终文本与声明已记录，列为旁支。
+
 ## 2026-11-18：M3 第七轮，停在锚定
 
 - PC 本机、新隔离会话 `sess_47e2c3cddf52`；十二个 Agent 均为内置且 GPT-6.1 Sol 可用，Medium、Fast／Max 关闭，Memory 为空、Knowledge 不含本案例。监工仅输入短症状、对位置及外观答“不知道”，原样批准计划；旧会话均保留。
