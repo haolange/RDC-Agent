@@ -1,5 +1,15 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 第十二轮，停在因果
+
+- PC 本机、新隔离会话 `sess_3a7256f5905b`；十二个 Agent 均为内置且 GPT-6.1 Sol 可用，Medium、Fast／Max 关闭、自动审查，Memory 为空、Knowledge 不含本案例。监工先向 General 输入短症状，按其提示切换 Debugger 后重复同一句，未知位置和外观答“不知道”，原样批准计划；未提供区域、事件或方法，旧会话均保留。
+- 交叉锚点 Evidence `invart-0113088f6739-1795001979310` 和 Claim `invart-a134bfb960b1-1795001998757` 将左侧候选亮点定位至 `ResourceId::308658`／`(518,455)`／E6152；E6128→E6152 的 RGB 为 `(0.06738,0.03662,0.03320)`→`(0.46875,0.49219,0.5625)`，邻近控制点不变。
+- 反射、局部光和采样机制分别保留未验证及其理由；verifier 指出错误的互斥关系和采样资格，两项 Challenge 更新为 `resolved` 并经新版复审。按 2.3 允许有理由的暂缓，本轮区分记录已处理，不等于确定机制。
+- 首个未满足步骤为因果：产品接受 `partial`，检查点 `invart-50088c233a8f-1795003393879` 的 `completedExperiments=[]`。调试结果与实际写入不一致，已有完整源码替换能力需要匹配 HLSL，而本 capture 未提供；模型因此未建立安全的单项干预。其他现有干预能否达到同样效果未被证明全部不可用，也无剩余某机制独有的差分读数，未满足能力阻塞三条件。
+- 模型请求已包含 `ac3bccd9` 指明的 post-transform 操作，但本轮只读取有界顶点输入，没有调用该操作；第十一轮独立产品复验已证明索引窗口可读，其本身不证明片元插值、实际贡献或可恢复干预。按 3.5 满 12 轮停止，不再修复或新开调查。
+- 终态回执 `rdc-lifecycle-b168ed54-6720-45fa-930a-6733c5731b96.json` 确认同一 capture／local／入口 E147、零替换；回放关闭、归属进程退出，无配置调整。产品记录 `partial` 后界面显示 `PROVIDER_STREAM_MISSING_FINAL_ANSWER`，有效终答及声明均留存，记为旁支。
+- General 转接约 58 秒、Debugger 规划约 2 分 29 秒、General 执行约 37 分 24 秒；各 3／7／85 次 Provider 请求，两次 verifier 共 23 次、自动审查 1 次，另有 1 次压缩；General input 12463399／output 28380 token（含缓存读取 3127168）。会话、请求、审查、回执和图像归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-12-sources.zip`，SHA-256 `657c8c1a897a4c09790edf25c02ec5bc3ef0b57e3c776567eb2bd2a326bd4627`。
+
 ## 2026-11-18：M3 第十一轮，停在区分
 
 - PC 本机、新隔离会话 `sess_6d8e1074630a`；十二个 Agent 均为内置且 GPT-6.1 Sol 可用，Medium、自动审查，Memory 为空、Knowledge 不含本案例。监工仅输入短症状，未知眼侧和外观答“不知道”，原样批准计划；旧会话均保留。
