@@ -1,11 +1,17 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 DXIL 产品路径 EXR 预检
+
+- 隔离实例中新建诊断会话，E6152 上 `rd.export.texture` 以原生 `SaveTexture` 成功导出 EXR；原样和单常量 DXIL 分别独立构建成功。产品报告 `CODE_INTERPRETER_DISABLED: enable the interpreter in Settings → Tools.`，其冻结计划要求解码全图后才干预，因而两次替换和五阶段回执均未执行。
+- 只读检查导出文件：完整 dataWindow 为 `1444×1276`，四个 HALF 通道、无压缩，未发现 NaN、Inf 或负零；原始纹理格式为 `R11G11B10_FLOAT`。可用现有原始 readback 和逐字节文件审计继续验证，不需要开启解释器。
+- 产品声明 `partial`，恢复同一 capture／local／E147、replacement 0 后关闭回放；会话保留于 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_a51f8865eb85/`，工作文件保留于 `.local/m3-dxil-implementation/product-acceptance-preflight/`。监工输入限定的诊断目标并批准原计划。
+
 ## 2026-11-18：M3 DXIL 产品路径验收首次尝试
 
 - 隔离实例通过 Settings 验证并应用 RDC-Tool `82ca8aa`，目录为 129 项；独立诊断会话在眼部 capture 的 E6152 将原样和单常量 DXIL ASM 分别装配构建，产物均为 `validated-dxil-build-input`。
 - 原样实验以 DDS 做签名基线时返回 `RDC_EVIDENCE_INVALID: native result does not provide supported execution evidence.`，未替换；单常量实验以截图取得签名基线后，替换被自动审核拒绝，理由是审核材料未证明修改后的 DXIL validator 成功，亦未执行替换。
 - 原始 compile 返回包含校验后的构建产物标签和哈希；审核请求中的对应结果在 1600 字符处截断，未包含该标签。两次实验分别缺少 5／4 份回执，产品声明 `partial`；已恢复同一 capture／local／E147，replacement 为 0。
-- 会话与回执保留于 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_9681aafe51f2/`，审核请求保留于同一 userData 的 `state/llm-calls/sess_9681aafe51f2/`；监工输入限定的诊断目标并批准原计划。
+- 会话与回执保留于 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_9681aafe51f2/`，审核请求保留于同一 userData 的 `state/llm-calls/sess_9681aafe51f2/`，工作文件保留于 `.local/m3-dxil-implementation/product-acceptance-first/`；监工输入限定的诊断目标并批准原计划。
 
 ## 2026-11-18：M3 DXIL 工具路径真实回放测试（9.5 第四步）
 
