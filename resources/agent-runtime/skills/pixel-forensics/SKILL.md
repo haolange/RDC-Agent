@@ -20,10 +20,11 @@ If the image or the mapping cannot be obtained, record the exact failed step. If
 
 ## 2. Read history and values correctly
 
-- Use the history's actual event ids and its valid pre-mod / shader-out / post-mod fields. A missing value is unknown, not zero. Find neighbouring events through action search or the history itself, not by guessing adjacent integers.
-- Compare event-before and event-after values at the target and at the control point in the same native texture and subresource.
-- Check the backend, output format and what the native fields mean before building a per-fragment blend account. When a channel or a fragment's attribution cannot be established on the active build, keep it unknown and corroborate with event-bound texture reads, pipeline state, shader outputs or a reversible experiment.
-- Regional statistics and brightness describe the image; alone they establish neither an anomaly nor a cause.
+- Use actual history event ids and valid pre-mod / shader-out / post-mod fields; missing is unknown, not zero. Find neighbours through action search or history.
+- Compare event-before and event-after target/control values in the same native texture and subresource.
+- For filtered/reprojected composites, read target/control regions in color inputs and outputs using active viewport extents. Matching localized features support region correspondence; leave exact taps unknown.
+- Check backend, format and native field semantics for per-fragment blend. If channel or fragment attribution is unknown, corroborate with event-bound reads, pipeline, shader outputs or a reversible experiment.
+- Brightness and regional statistics alone prove neither anomaly nor cause.
 
 ## 3. Judge appearance
 
