@@ -9,6 +9,8 @@
 - 直接障碍在工具返回层：目标 draw 的 debugger 输出与原生写入记录不一致；现有三项产品路径复验尚不能区分工具状态投影与 RenderDoc 原生调试结果。进一步直接对照原生 trace 超出 3.3 的同产品路径及三项上限，需用户决定是否扩大诊断范围；本轮未改代码。
 - 签名恢复回执 `rdc-lifecycle-4356bef0-510b-41b7-bd0d-257bbcf1e5da.json` 确认恢复 E147；诊断回放关闭、归属进程退出，无配置调整。规划约 3 分 38 秒、执行约 45 分 49 秒；规划 8 次、General 63 次、子 Agent 77 次及自动审查 4 次 Provider 请求；General input 9287521／output 33381 token（含缓存读取 1235328）。
 - 会话、模型请求、Trace、诊断和输出归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-06-sources.zip`，SHA-256 `dfa19461fd9547bcbfb5ff0963b00a3b492642ce9773f32cb9a97a5f89dd033b`。
+- 2026-11-18 原生只读对照：同一 2×2 块仅 `(518,455)` 有 E6152 片元；原生 `SV_Position` 为像素中心 `(518.5,455.5)`，最终 `_OUT` 与工具保存值逐位一致，均不同于 Pixel History；实际着色率及差异机制未知。原始 trace 和脚本归档 `.local/vertical-investigation-20261108/evidence/m3-round06-native-20261118.zip`，SHA-256 `3201b1a53bc8b8527b2e011aaa59d786a16e7b0f44acbb2734b4265ebe17913b`。
+- 区分停点复查：模型收到捕获内 DXIL 源缺失和反汇编只读的编辑计划，考虑过单项贡献替换但缺少匹配源码而未做；独立 HLSL 完整替换已实证，不能证明单项语义。工具 `b151630` 对请求粗着色率的调试结果标注原生限制，`b7ef5db` 区分捕获源码编辑与另供完整源码替换；分别通过 45 项和 134 项相关测试。
 
 ## 2026-11-18：M3 第五轮，停在锚定
 
