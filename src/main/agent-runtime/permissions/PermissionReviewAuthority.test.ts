@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { beforeEach, expect, it, vi } from 'vitest';
 const mock = vi.hoisted(() => ({ offer: vi.fn(), plan: vi.fn(), receipt: vi.fn(), lifecycle: vi.fn() }));
 vi.mock('../../sessions/store/StorageAdapter', () => ({ storageAdapter: { executionOffers: { read: mock.offer } } }));
@@ -201,4 +202,23 @@ it('retains a related build result through its validation evidence within the bo
   const evidence = permissionReviewEvidence(messages, 'session', { rdc: { operation: 'rd.shader.edit_and_replace', args } });
   expect(evidence.recent[0].content).toEqual([build]);
   expect(evidence.recent[0]).toMatchObject({ origin: 'executed-tool-result', facts: { operation: 'rd.shader.compile' } });
+});
+
+it('retains the audited source file referenced by a pending structured operation after later reads', () => {
+  const sourcePath = path.resolve('project', 'candidate.dxilasm');
+  const audit = { path: sourcePath, comparison: { bytesEqual: true } };
+  const messages = [{ role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id: 'audit', name: 'read_file',
+    arguments: { path: 'candidate.dxilasm', mode: 'audit' } }] },
+  { role: 'toolResult', toolName: 'read_file', toolCallId: 'audit', timestamp: 2, isError: false,
+    content: [{ type: 'text', text: JSON.stringify(audit) }], details: { path: sourcePath } },
+  ...Array.from({ length: 20 }, (_, index) => ({ role: 'toolResult', toolName: 'read_file',
+    toolCallId: `noise-${index}`, timestamp: index + 3, isError: false, content: [], details: {} }))] as never;
+  const pending = { rdc: { operation: 'generic.replace', args: { source_path: sourcePath } } };
+  const evidence = permissionReviewEvidence(messages, 'isolated-child', pending);
+  expect(evidence.recent.find(item => item.toolCallId === 'audit')).toMatchObject({
+    origin: 'executed-tool-result', content: [audit],
+  });
+  expect(evidence.recent).toHaveLength(16);
+  expect(permissionReviewEvidence(messages, 'isolated-child', { rdc: { args: { source_path: `${sourcePath}.other` } } }).recent
+    .some(item => item.toolCallId === 'audit')).toBe(false);
 });

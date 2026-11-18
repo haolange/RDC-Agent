@@ -1,5 +1,6 @@
-import type { PromptPlan } from '@shared/types/rdcRuntime';
+import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { AgentMessage, AssistantMessage, Message, ToolResultMessage } from '../core/types';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
@@ -92,6 +93,16 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
     const file = args.path.replace(/\\/g, '/').replace(/^\.\//, '');
     return file.length > 0 && pendingCommand.includes(file);
   };
+  const referencedFileAudit = (message: ToolResultMessage): boolean => {
+    const args = requests.get(message.toolCallId) as Record<string, unknown> | undefined;
+    const file = (message.details as Record<string, unknown> | undefined)?.path;
+    if (message.isError || message.toolName !== 'read_file' || args?.mode !== 'audit' || typeof file !== 'string') return false;
+    const normalize = (value: string): string => {
+      const normalized = path.normalize(value);
+      return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+    };
+    return pendingScalars.some(([, value]) => typeof value === 'string' && normalize(value) === normalize(file));
+  };
   const relatedKinds = new Set<string>();
   const related = distinct.filter(message => {
     if (message.isError) return false;
@@ -103,7 +114,7 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
     const observed = scalars(invocation?.args ?? requests.get(message.toolCallId));
     const matches = pendingScalars.some(([key, value]) => observed.some(([otherKey, otherValue]) => key === otherKey && value === otherValue));
     const kind = `${message.toolName}:${invocation?.operation ?? details.operation ?? ''}`;
-    if (!explicit && !referencedFileRead(message) && (!matches || relatedKinds.has(kind))) return false;
+    if (!explicit && !referencedFileRead(message) && !referencedFileAudit(message) && (!matches || relatedKinds.has(kind))) return false;
     relatedKinds.add(kind);
     return true;
   }).slice(0, 8);
