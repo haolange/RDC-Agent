@@ -1,5 +1,20 @@
 # Acceptance Ledger
 
+## 2026-11-19：回放位置偏差历史旁查
+
+- 只读对照：RDC-Tool 重构前的 `22f2518` 已由 `_dispatch_pipeline` 调用 `_ensure_event` 切换并保存原生事件；同期产品 `RdcProbeTool` 直接调用工具，未恢复入口。该行为并非运行时拆分引入。
+- M1 第十三轮、M2 第一轮及 M3 第七至十二轮，规划阶段均未调用带事件的 `pipeline_show`；General 签名入口分别为 E3029、E2653 和 E147。
+- 首次成功图像／读数：M1 E3029，M2 E2653；M3 第七至十轮 E7389、第十一和十二轮 E7343。M3 先尝试的 E147 最终输出均无图像；第八、九轮显式导出 E7389 后界面记录仍为 E147。
+- M3 执行阶段：第八轮 `pipeline_show` 曾使界面 E147／原生 E7295，及界面 E7295／原生 E5663；第九轮为 E7389／E7343；第十一轮为 E7343／E7312、E7343／E5663。后续相关读取显式指定事件并在返回中标明实际事件。
+- M1 第十三轮回滚前界面 E3029，回滚明确指定 E1248，完成后界面 E1248；用户确认这是显式事件操作执行中的正常先后。用户确认 M1、M2 的通过不受该缺陷影响，不重跑。
+- M2 归档未包含逐操作界面回放历史；首次图像和五份实验回执保留于 `.local/vertical-investigation-20261108/evidence/m2-20261115-round-01-sources.zip`。各轮会话和工具返回保留于同目录对应的 M1 第十三轮及 M3 第七至十二轮 sources 归档。
+
+## 2026-11-18：M3 DXIL 产品路径入口位置复验
+
+- 独立诊断会话的规划阶段先读到原生 E147，再以 `rdc_probe` 查询 E6152 的 pipeline；界面仍显示 E147，获批 General 因 `RDC_INITIAL_STATE_UNVERIFIED: RDC_SWITCH_STATE_UNVERIFIED: native and displayed event positions differ.` 未进入实验。
+- 监工经产品只读查询确认同一 replay 的原生位置实际为 E6152；随后在产品回放控件中依次应用 E140、E147，再以只读查询确认原生 E147、capture 身份不变，关闭回放。未发生 shader 替换。
+- 规划、失败、两次状态查询及恢复的会话证据保留于 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_17eb2d21485f/`；监工批准诊断计划并输入两次有界状态查询。
+
 ## 2026-11-18：M3 DXIL 产品路径 EXR 预检
 
 - 隔离实例中新建诊断会话，E6152 上 `rd.export.texture` 以原生 `SaveTexture` 成功导出 EXR；原样和单常量 DXIL 分别独立构建成功。产品报告 `CODE_INTERPRETER_DISABLED: enable the interpreter in Settings → Tools.`，其冻结计划要求解码全图后才干预，因而两次替换和五阶段回执均未执行。

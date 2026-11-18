@@ -6,6 +6,7 @@ import type { CLIResult } from '@shared/types/tool';
 import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
 import { parseRdcNativeResult } from '../../rdc/RdcNativeProtocol';
 import { assertRdcContextLeaseOwnership, getRdcContextLease, type RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
+import { executePreservedPipelineProbe } from '../../rdc/RdcProbePipeline';
 
 const probeQueryParameters: JsonSchema = {
   type: 'object',
@@ -171,7 +172,9 @@ export function createRdcProbeTool(
         }
         const args = [...compiled.args];
         if (lease && compiled.needsContext) args.push('--daemon-context', lease.contextId);
-        const cli = await executeCli(compiled.command, args, { abortSignal: signal, settings, contextId: lease?.contextId });
+        const cli = input.action === 'probe' && input.args?.action === 'pipeline_show' && lease
+          ? await executePreservedPipelineProbe({ lease, settings, args, signal, execute: executeCli })
+          : await executeCli(compiled.command, args, { abortSignal: signal, settings, contextId: lease?.contextId });
         signal?.throwIfAborted();
         const expectedContext = compiled.command === 'context' ? lease?.contextId : undefined;
         const payload = parseRdcNativeResult(cli, expectedContext, compiled.operation);

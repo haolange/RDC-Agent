@@ -100,6 +100,63 @@ describe('native RDC probe', () => {
     expect(executeCli).not.toHaveBeenCalled();
   });
 
+  it('restores the entry event after a pipeline query and quarantines an unconfirmed restoration', async () => {
+    const current = context();
+    const processIdentity = { status: 'available', daemon: { pid: 10, start_generation: 'windows-filetime:1' },
+      worker: { pid: 11, start_generation: 'windows-filetime:2' } };
+    let active = 42; let failRestore = false;
+    const executeCli = vi.fn<NonNullable<RdcProbeToolDeps['executeCli']>>(async (command, args = []) => {
+      if (command === 'pipeline') {
+        active = 77;
+        return result(0, { ok: true, result_kind: 'rd.pipeline.get_state', meta: { process_identity: processIdentity }, data: { resolved_event_id: 77 } });
+      }
+      if (args[0] === 'rd.event.set_active') {
+        if (failRestore) throw new Error('restore failed');
+        active = JSON.parse(args[2]).event_id;
+        return result(0, { ok: true, result_kind: 'rd.event.set_active', data: { active_event_id: active } });
+      }
+      return result(0, { ok: true, result_kind: 'rd.session.get_context', meta: { process_identity: processIdentity }, data: {
+        context_id: 'ctx', current_session_id: 'replay', runtime: { session_id: 'replay', capture_file_id: 'file', active_event_id: active },
+        sessions: [{ session_id: 'replay', capture_file_id: 'file', shader_replacements: [] }],
+      } });
+    });
+    const tool = createRdcProbeTool('s', 'p', { executeCli });
+    const query = { action: 'probe', args: { action: 'pipeline_show', eventId: '77' } } as const;
+    const observed = await tool.execute('pipeline', query, undefined, undefined, current);
+    expect(observed.isError).not.toBe(true);
+    expect(JSON.parse((observed.content[0] as { text: string }).text).data.resolved_event_id).toBe(77);
+    expect(active).toBe(42);
+    expect(getRdcContextLease('s')?.quarantineReason).toBeUndefined();
+
+    failRestore = true;
+    const failed = await tool.execute('pipeline-failed', query, undefined, undefined, current);
+    expect(failed.isError).toBe(true);
+    expect(failed.details?.code).toBe('RDC_PROBE_RESTORE_UNCONFIRMED');
+    expect(getRdcContextLease('s')?.quarantineReason).toContain('could not prove restoration');
+  });
+
+  it.each([
+    { code: 'event_not_found', preserved: true, quarantined: false, stage: 'pipeline' },
+    { code: 'replay_fatal_error', preserved: false, quarantined: true, stage: 'pipeline' },
+    { code: 'replay_fatal_error', preserved: false, quarantined: true, stage: 'context' },
+  ])('retains only proven unchanged pipeline failures: $stage/$code', async ({ code, preserved, quarantined, stage }) => {
+    const current = context();
+    const processIdentity = { status: 'available', daemon: { pid: 10, start_generation: 'windows-filetime:1' },
+      worker: { pid: 11, start_generation: 'windows-filetime:2' } };
+    const executeCli = vi.fn<NonNullable<RdcProbeToolDeps['executeCli']>>(async (command) => command === stage || (stage === 'context' && command === 'call')
+      ? result(1, { schema_version: '3.0.0', ok: false, result_kind: stage === 'context' ? 'rd.session.get_context' : 'rd.pipeline.get_state',
+        error: { code, category: preserved ? 'validation' : 'runtime', message: 'query failed',
+          details: preserved ? { effects_attempted: false, context_preserved: true } : {} } })
+      : result(0, { ok: true, result_kind: 'rd.session.get_context', meta: { process_identity: processIdentity }, data: {
+        context_id: 'ctx', current_session_id: 'replay', runtime: { session_id: 'replay', capture_file_id: 'file', active_event_id: 42 },
+        sessions: [{ session_id: 'replay', capture_file_id: 'file', shader_replacements: [] }],
+      } }));
+    const observed = await createRdcProbeTool('s', 'p', { executeCli }).execute('failure',
+      { action: 'probe', args: { action: 'pipeline_show', eventId: '77' } }, undefined, undefined, current);
+    expect(observed.isError).toBe(true);
+    expect(Boolean(getRdcContextLease('s')?.quarantineReason)).toBe(quarantined);
+  });
+
   it('requires a configured binding and compiles only parser-backed native commands', async () => {
     expect((await createRdcProbeTool('s', 'p').execute('t', { action: 'doctor' })).isError).toBe(true);
     const current = context();

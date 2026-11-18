@@ -102,6 +102,8 @@ shader replacement 返回一致的 `status=noop`（顶层与 replacement 的身�
 
 `executeRdcShell` 与人工操作共享 context 队列；native 返回及签名回执完成后，只有 catalog 声明改变回放位置或 shader replacement 的操作才观察并记录足迹，使用该 turn 的冻结 CLI。只读查询不触发额外 replay/export；测量操作是自包含的 awaited 调用，观察不会插入 sampling 内部。是否刷新由操作影响决定，不按工具名称特判。多条命令构成的 experiment 是证据生命周期，不是持续采样事务：有状态操作之间的观察会执行 replay/export，不承诺整个 experiment 零扰动。
 
+规划用的 `rdc_probe pipeline_show` 可临时访问指定事件；主进程在同一 context 队列内保存并核对原生位置、执行查询、恢复入口事件，再核对回放身份与替换集合。恢复无法确认时隔离 lease，不把旧界面位置当作原生恢复证明。
+
 `runtime_context.rdc.hostControls.replayIsolation` 是 Main 对当前受控 context 的点时排他证明，读取实际 owning lease、冻结身份和该 turn 持有的交互锁；非 owning General、漂移、隔离、委派、同 context 重复 lease 或未持锁均返回 unavailable。成功来源固定为 main-owned-lease-and-turn-lock，绑定 session/project/turn/context/leaseVersion/capture/replay，范围仅 rdc-agent-context。`WorldState.replay.exclusiveLock` 在此受控范围内有该来源支撑，仍须三态分别保存并与阶段回执核对；不是整批 native mutex 或外部进程排除证明，不免除实际变更状态及恢复校验。context 小结果沿既有制品路径保留 inline 正文和持久 URI/hash；不能据新的证明回填旧实验资格。
 
 远程打开期间通过冻结 CLI 查询所属 daemon 的 `active_operation`；只有原生 transfer stage 才显示传输阶段，查询失败不推测进度。足迹记录原生 `revision`、实际替换/恢复状态和显示参数。观察无法确认 EID 时保存无图片的失败事实；人工与 Agent 操作统一更新同一当前回放状态和图片，不再保留 Agent 专属图片镜像；实际 image EID 与 observation 元数据来自同一次原生观察。后台操作证据继续保存，不作为第二套回放 UI。
