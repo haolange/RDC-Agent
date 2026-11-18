@@ -1,5 +1,15 @@
 # Acceptance Ledger
 
+## 2026-11-19：M3 第十四轮，可恢复实验待用户确认
+
+- 隔离会话 `sess_60d672e14cde`／眼部 capture／local／入口 E147；Settings 确认十二个 Agent 均为内置且模型可用，GPT-6.1 Sol／Medium、自动审查，Memory 和覆盖为空，Knowledge 无眼部案例。
+- 仅输入短症状，对主动澄清答“不知道”并原样批准计划；General 将 E7343 输出的候选点经合成绑定链追到 `ResourceId::308658` 的 `(518,455)`，以 Pixel History、前后读数和覆盖图定位 E6152 泪液 draw。
+- 原生目标 RGB 从 E6128 的 `(0.06738,0.03662,0.03320)` 变为 E6152 的 `(0.46875,0.4921875,0.5625)`；相邻控制点不变。粗糙度下限对照使目标降至 `(0.34375,0.36328125,0.421875)`，亮点仍在。
+- 单独切除末段反射 RGB 加入项后，目标降至 `(0.03271484,0.01782227,0.01611328)`，控制点不变；两项 A-B-A 各有五份签名回执，撤销后区域数值和 PNG 回到基线。记录 `invart-8ce8a0505f62-1795038036386`、`invart-50b500a6db66-1795038816092`。
+- Verifier 首次指出中间绑定链材料缺口；General 补授后复审并关闭 Challenge，产品接受 `completed`。候选点是否为用户所指、正常外观及反射为何集中仍待判断；精确 filter tap 未证。
+- 产品自行恢复同一 capture／local／E147、replacement 0，签名回执 `rdc-lifecycle-be07b567-eeea-470e-af4d-d97befbcec7a.json`；监工随后关闭回放。无设备配置调整，会话、Trace、调查记录、回执及图像保留于隔离 userData 和测试工程。
+- 第十三轮的截断恢复修复为 `14613ee8`；本轮直接读取单块 constant buffer，未触发该截断路径。规划约 2m48s、执行约 58m47s；Provider 累计输入 23,622,293、输出 73,286 tokens（含自动审查、Shader Analyst、Verifier 和压缩）。
+
 ## 2026-11-19：M3 第十三轮后的 32 KiB 整批读取复验
 
 - 独立诊断会话 `sess_38c54b3eae3e` 经产品执行 E6152／ps 的 `rd.pipeline.get_constant_buffers(include_contents=true,max_bytes=32768)` 一次，仍返回 `RDC_CLI_OUTPUT_TRUNCATED: native result exceeded the bounded stdout buffer (11411997 bytes).`；错误记录 `call_e2bb2bd081ad47049847df097cd733dc`。
