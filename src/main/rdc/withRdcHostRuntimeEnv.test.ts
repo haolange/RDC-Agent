@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { appPathService } from '../runtime/AppPathService';
 import { RDC_INTERMEDIATE_ROOT_ENV, hostRdcIntermediateRoot, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
 
@@ -29,5 +29,16 @@ describe('withRdcHostRuntimeEnv', () => {
       env: { [RDC_INTERMEDIATE_ROOT_ENV]: override },
     });
     expect(resolved.env[RDC_INTERMEDIATE_ROOT_ENV]).toBe(override);
+  });
+
+  it('forwards the DXC host directory while preserving the Settings override', () => {
+    vi.stubEnv('RDC_TOOL_DXC_TOOLS_PATH', 'host-dxc');
+    try {
+      expect(withRdcHostRuntimeEnv(cli).env.RDC_TOOL_DXC_TOOLS_PATH).toBe('host-dxc');
+      expect(withRdcHostRuntimeEnv({ ...cli, env: { RDC_TOOL_DXC_TOOLS_PATH: 'settings-dxc' } })
+        .env.RDC_TOOL_DXC_TOOLS_PATH).toBe('settings-dxc');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
