@@ -95,13 +95,16 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
   };
   const referencedFileAudit = (message: ToolResultMessage): boolean => {
     const args = requests.get(message.toolCallId) as Record<string, unknown> | undefined;
-    const file = (message.details as Record<string, unknown> | undefined)?.path;
-    if (message.isError || message.toolName !== 'read_file' || args?.mode !== 'audit' || typeof file !== 'string') return false;
+    const details = (message.details ?? {}) as Record<string, unknown>;
+    const comparison = details.comparison as Record<string, unknown> | undefined;
+    const comparedFile = comparison?.file as Record<string, unknown> | undefined;
+    const files = [details.path, comparedFile?.path].filter((value): value is string => typeof value === 'string');
+    if (message.isError || message.toolName !== 'read_file' || args?.mode !== 'audit') return false;
     const normalize = (value: string): string => {
       const normalized = path.normalize(value);
       return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
     };
-    return pendingScalars.some(([, value]) => typeof value === 'string' && normalize(value) === normalize(file));
+    return pendingScalars.some(([, value]) => typeof value === 'string' && files.some(file => normalize(value) === normalize(file)));
   };
   const relatedKinds = new Set<string>();
   const related = distinct.filter(message => {
@@ -121,7 +124,9 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
   const selected = [...new Set([...related, ...distinct])].slice(0, 16).reverse();
   const recent = selected.map(message => {
     const details = (message.details ?? {}) as Record<string, unknown>;
-    const protectedPath = typeof details.path === 'string' && fileOperationBoundary(details.path).protected;
+    const comparison = details.comparison as Record<string, unknown> | undefined;
+    const comparedFile = comparison?.file as Record<string, unknown> | undefined;
+    const protectedPath = [details.path, comparedFile?.path].some(file => typeof file === 'string' && fileOperationBoundary(file).protected);
     const manifest = details.manifest as Record<string, unknown> | undefined;
     return { toolCallId: message.toolCallId, toolName: message.toolName, isError: message.isError,
       origin: 'executed-tool-result', timestamp: message.timestamp,

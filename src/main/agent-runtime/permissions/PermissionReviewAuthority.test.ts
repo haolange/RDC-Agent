@@ -78,9 +78,13 @@ it('omits protected file observations and never transmits raw record credential 
   const evidence = permissionReviewEvidence([{ role: 'toolResult', toolName: 'read_file', toolCallId: 'protected',
     content: [{ type: 'text', text: 'do-not-send' }], timestamp: 0, isError: false, details: { path: '/project/.env', secret: 'do-not-send' } },
   { role: 'toolResult', toolName: 'investigation_read', toolCallId: 'record', timestamp: 1, content: [], isError: false,
-    details: { record: { password: 'do-not-send' } } }], 'isolated-child');
+    details: { record: { password: 'do-not-send' } } },
+  { role: 'toolResult', toolName: 'read_file', toolCallId: 'protected-comparison', timestamp: 2, isError: false,
+    content: [{ type: 'text', text: 'do-not-send' }],
+    details: { path: '/project/safe.txt', comparison: { file: { path: '/project/.env' } } } }], 'isolated-child');
   expect(JSON.stringify(evidence)).not.toContain('do-not-send');
   expect(evidence.recent[0].facts).toEqual({ protectedPath: true, contentsOmitted: true });
+  expect(evidence.recent[2].facts).toEqual({ protectedPath: true, contentsOmitted: true });
 });
 
 it('preserves actual operation results across repeated reads without converting claims into proof', () => {
@@ -207,12 +211,13 @@ it('retains a related build result through its validation evidence within the bo
 it('retains the audited source file referenced by a pending structured operation after later reads', () => {
   const sourcePath = path.resolve('project', 'candidate.dxilasm');
   const audit = { path: sourcePath, comparison: { bytesEqual: true } };
+  const laterReads = Array.from({ length: 20 }, (_, index) => ({ role: 'toolResult', toolName: 'read_file',
+    toolCallId: `noise-${index}`, timestamp: index + 3, isError: false, content: [], details: {} }));
   const messages = [{ role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id: 'audit', name: 'read_file',
     arguments: { path: 'candidate.dxilasm', mode: 'audit' } }] },
   { role: 'toolResult', toolName: 'read_file', toolCallId: 'audit', timestamp: 2, isError: false,
     content: [{ type: 'text', text: JSON.stringify(audit) }], details: { path: sourcePath } },
-  ...Array.from({ length: 20 }, (_, index) => ({ role: 'toolResult', toolName: 'read_file',
-    toolCallId: `noise-${index}`, timestamp: index + 3, isError: false, content: [], details: {} }))] as never;
+  ...laterReads] as never;
   const pending = { rdc: { operation: 'generic.replace', args: { source_path: sourcePath } } };
   const evidence = permissionReviewEvidence(messages, 'isolated-child', pending);
   expect(evidence.recent.find(item => item.toolCallId === 'audit')).toMatchObject({
@@ -221,4 +226,12 @@ it('retains the audited source file referenced by a pending structured operation
   expect(evidence.recent).toHaveLength(16);
   expect(permissionReviewEvidence(messages, 'isolated-child', { rdc: { args: { source_path: `${sourcePath}.other` } } }).recent
     .some(item => item.toolCallId === 'audit')).toBe(false);
+
+  const comparison = { path: path.resolve('project', 'original.dxilasm'), comparison: { file: { path: sourcePath }, bytesEqual: false } };
+  const comparisonMessages = [{ role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id: 'comparison', name: 'read_file',
+    arguments: { path: 'original.dxilasm', mode: 'audit', compareWith: { path: 'candidate.dxilasm' } } }] },
+  { role: 'toolResult', toolName: 'read_file', toolCallId: 'comparison', timestamp: 2, isError: false,
+    content: [{ type: 'text', text: JSON.stringify(comparison) }], details: comparison }, ...laterReads] as never;
+  expect(permissionReviewEvidence(comparisonMessages, 'isolated-child', pending).recent
+    .find(item => item.toolCallId === 'comparison')).toMatchObject({ origin: 'executed-tool-result', content: [comparison] });
 });
