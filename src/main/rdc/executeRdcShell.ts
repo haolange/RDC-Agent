@@ -153,7 +153,7 @@ export async function executeRdcShell(
       || input.operation === 'rd.texture.get_pixel_history'
       || ['rd.texture.get_data', 'rd.texture.get_region_values', 'rd.texture.get_histogram',
         'rd.texture.compute_stats', 'rd.texture.diff'].includes(input.operation)
-      || input.operation === 'rd.shader.debug_start'
+      || input.operation === 'rd.shader.debug_start' || input.operation === 'rd.shader.edit_and_replace'
       ? await readReplayEvent() : undefined;
     originalReplayState = lastReplayState;
     lastInvocation = rdcInvocationRecord(input.operation, args);

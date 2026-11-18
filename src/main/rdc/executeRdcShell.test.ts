@@ -32,8 +32,12 @@ const lease = { contextId: 'owned-context', version: 7, ownerProjectId: 'project
 const input = { operation: 'rd.perf.get_event_durations', args: {}, experimentId: 'experiment' };
 const processIdentity = { status: 'available', daemon: { pid: 31, start_generation: 'windows-filetime:100' },
   worker: { pid: 32, start_generation: 'windows-filetime:200' } };
+const editEntrySnapshot = { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rd.session.get_context',
+  meta: { process_identity: processIdentity }, data: { context_id: lease.contextId, current_session_id: 'native-replay',
+    runtime: { active_event_id: 11 }, sessions: [{ session_id: 'native-replay', capture_file_id: 'native-capture', shader_replacements: [] }] } }) };
 beforeEach(() => {
   vi.clearAllMocks();
+  mock.execute.mockReset();
   mock.lease.mockReturnValue(lease);
   mock.retainedLease.mockReturnValue(null);
   mock.execute.mockResolvedValue({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: input.operation,
@@ -257,7 +261,7 @@ describe('structured RDC shell', () => {
     const replacement: RdcOperationDefinition = { ...definition, name: 'rd.shader.edit_and_replace', namespace: 'shader',
       effects: ['shader_replacement', 'replay_position', 'artifact_write'], evidence_kind: 'intervention' };
     const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [replacement], lease) };
-    mock.execute.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
+    mock.execute.mockResolvedValueOnce(editEntrySnapshot).mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
       result_kind: replacement.name, ok: false, error: { code,
         category: 'validation', message: 'Source encoding is not safely editable',
         details: { replacement_attempted: false, context_preserved: true } } }) });
@@ -268,14 +272,14 @@ describe('structured RDC shell', () => {
     mock.lease.mockReturnValue(null);
     await expect(executeRdcShell({ discovery: { kind: 'describe', operation: replacement.name } }, 'next', undefined, bound))
       .rejects.toThrow();
-    expect(mock.execute).toHaveBeenCalledTimes(1);
+    expect(mock.execute).toHaveBeenCalledTimes(2);
   });
   it('permits a native query after a proven pre-effect rejection without signing an intervention', async () => {
     const replacement: RdcOperationDefinition = { ...definition, name: 'rd.shader.edit_and_replace', namespace: 'shader',
       effects: ['shader_replacement', 'replay_position'], evidence_kind: 'intervention' };
     const query: RdcOperationDefinition = { ...definition, name: 'rd.event.get_active', namespace: 'event', effects: [], evidence_kind: null };
     const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [replacement, query], lease) };
-    mock.execute.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
+    mock.execute.mockResolvedValueOnce(editEntrySnapshot).mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
       result_kind: replacement.name, ok: false, error: { code: 'shader_patch_diff_failed', category: 'validation',
         message: 'Diff removal does not match', details: { failure_stage: 'validate_request',
           effects_attempted: false, context_preserved: true } } }) });
@@ -284,7 +288,7 @@ describe('structured RDC shell', () => {
     mock.execute.mockResolvedValueOnce({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: query.name,
       data: { session_id: 'native-replay', active_event_id: 1248 } }) });
     await expect(executeRdcShell({ operation: query.name, args: {} }, 'read', undefined, bound)).resolves.toBeDefined();
-    expect(mock.execute).toHaveBeenCalledTimes(2);
+    expect(mock.execute).toHaveBeenCalledTimes(3);
     expect(mock.quarantine).not.toHaveBeenCalled();
     expect(mock.write).not.toHaveBeenCalled();
     expect(mock.observe).not.toHaveBeenCalled();
@@ -299,7 +303,7 @@ describe('structured RDC shell', () => {
       replacement: { replacement_id: 'not-applied', status: 'noop', resolved_event_id: 7,
         original_shader_id: 'ResourceId::9', original_shader_hash: hash, applied_to_shader_hash: hash,
         compile: { build_input: { status: 'unavailable', reason: 'No successful shader build and replacement observed.' } } } };
-    mock.execute.mockResolvedValueOnce({ exitCode: 0, stdout: JSON.stringify({ schema_version: '3.0.0',
+    mock.execute.mockResolvedValueOnce(editEntrySnapshot).mockResolvedValueOnce({ exitCode: 0, stdout: JSON.stringify({ schema_version: '3.0.0',
       ok: true, result_kind: replacement.name, meta: { process_identity: processIdentity }, data }) });
     const result = await executeRdcShell({ operation: replacement.name, args: {}, experimentId: 'noop-exp' }, 'noop', undefined, bound);
     expect(JSON.parse(result.content[0].type === 'text' ? result.content[0].text : '')).toMatchObject({ result: { data },
@@ -331,6 +335,7 @@ describe('structured RDC shell', () => {
       if (failure === 'lease') mock.lease.mockReturnValueOnce(lease).mockReturnValueOnce(lease).mockReturnValueOnce({ ...lease, version: 8 });
       if (failure === 'observe') mock.observe.mockRejectedValueOnce(new Error('observation failed'));
       const controller = new AbortController();
+      mock.execute.mockResolvedValueOnce(editEntrySnapshot);
       mock.execute.mockImplementationOnce(async () => {
         if (failure === 'cancel') controller.abort();
         return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: replacement.name, data }) };
@@ -756,6 +761,33 @@ it.each(['process', 'replacement', 'missing-identity'])('quarantines restored-ev
   const failure = await executeRdcShell({ operation: source.name, args: {} }, 'source', undefined, bound).catch(error => error);
   expect(failure.deliveryResult.details.mainValidation).toEqual({ preservationVerified: false, leaseState: 'quarantined' });
   expect(mock.quarantine).toHaveBeenCalledOnce();
+  expect(mock.write).not.toHaveBeenCalled();
+});
+
+it.each([
+  { attempted: false, after: 11, retained: true },
+  { attempted: false, after: 19, retained: false },
+  { attempted: true, after: 11, retained: false },
+])('retains an unsupported shader edit only after validating restoration: %j', async ({ attempted, after, retained }) => {
+  const edit: RdcOperationDefinition = { ...definition, name: 'rd.shader.edit_and_replace', namespace: 'shader',
+    effects: ['replay_position', 'shader_replacement'], evidence_kind: null };
+  const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [edit], lease) };
+  const snapshot = (event: number) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true,
+    result_kind: 'rd.session.get_context', meta: { process_identity: processIdentity }, data: { context_id: lease.contextId,
+      current_session_id: 'native-replay', runtime: { active_event_id: event },
+      sessions: [{ session_id: 'native-replay', capture_file_id: 'native-capture', shader_replacements: [] }] } }) });
+  mock.execute.mockReset();
+  mock.execute.mockResolvedValueOnce(snapshot(11)).mockResolvedValueOnce({ exitCode: 1,
+    stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: edit.name, ok: false,
+      error: { code: 'shader_patch_op_unsupported_for_encoding', category: 'validation', message: 'Unsupported encoding',
+        details: { context_id: lease.contextId, session_id: 'native-replay', failure_stage: 'validate_edit_plan',
+          failure_reason: 'source_encoding_not_safely_replaceable', replacement_attempted: attempted,
+          replay_state_restored: true, restored_event_id: 11 } } }) }).mockResolvedValueOnce(snapshot(after));
+  const failure = await executeRdcShell({ operation: edit.name, args: {} }, 'edit', undefined, bound).catch(error => error);
+  expect(failure.deliveryResult.details.mainValidation).toEqual({
+    preservationVerified: retained, leaseState: retained ? 'retained' : 'quarantined',
+  });
+  expect(mock.quarantine).toHaveBeenCalledTimes(retained ? 0 : 1);
   expect(mock.write).not.toHaveBeenCalled();
 });
 

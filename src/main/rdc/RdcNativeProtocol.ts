@@ -97,7 +97,12 @@ export function parseRdcNativeResult(result: CLIResult, expectedContext?: string
           'rd.texture.compute_stats', 'rd.texture.diff'].includes(resultKind!)
           && details?.failure_stage === 'decode_texture_readback')
         || (['rd.texture.get_pixel_history', 'rd.shader.debug_start'].includes(resultKind!)
-          && details?.failure_stage === 'validate_input_attachment');
+          && details?.failure_stage === 'validate_input_attachment')
+        || (resultKind === 'rd.shader.edit_and_replace'
+          && failure.code === 'shader_patch_op_unsupported_for_encoding'
+          && details?.failure_stage === 'validate_edit_plan'
+          && details?.failure_reason === 'source_encoding_not_safely_replaceable'
+          && details?.replacement_attempted === false);
       const inspectionRestoration = canonicalFailure && details?.recovery_required !== true && knownInspectionFailure
         && details?.replay_state_restored === true
         && typeof details?.context_id === 'string' && typeof details?.session_id === 'string'
