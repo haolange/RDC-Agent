@@ -1,5 +1,16 @@
 # Acceptance Ledger
 
+## 2026-11-18：M3 第十一轮，停在区分
+
+- PC 本机、新隔离会话 `sess_6d8e1074630a`；十二个 Agent 均为内置且 GPT-6.1 Sol 可用，Medium、自动审查，Memory 为空、Knowledge 不含本案例。监工仅输入短症状，未知眼侧和外观答“不知道”，原样批准计划；旧会话均保留。
+- 产品把候选亮点交叉定位到 `ResourceId::308658`／`(518,455)`／E6152，并以 E6128 前后读数、Pixel History 和覆盖支持局部写入；模型读取了测试工程中的既有报告并在当前 capture 复核。两个 Cube 分支经常量读数限定排除，其他候选仍待区分。
+- 首个停点为区分：片元 trace 与历史写入不匹配、顶点输入不足后，模型只搜索并读取 `rd.mesh.get_drawcall_mesh_config`，没有选择可用的 post-transform 索引窗口；没有可恢复实验，也无剩余某机制独有的差分特征，不满足能力阻塞交付条件。
+- 按 3.3 在独立产品会话复验 `rd.mesh.get_post_transform_data` 一次：E6152 的索引 270–275 窗口与五个引用的 VS 输出行可读，法线和 UV 语义标为 `unsupported`；窗口本身不证明片元插值或覆盖。原始返回、Trace 归档 `m3-round11-mesh-product-recheck-20261118.zip`，SHA-256 `51e11c0c66c0c40135ceb5db95d960ed599d79b96d177b98b66387b15aeae008`。
+- 直接原因归方法文本：模型已收到读取 post-transform 窗口的通用指引，但该位置未给出对应操作名；`ac3bccd9` 补足操作名并净缩短，`pixel-forensics` 第 1 节未改。相关 44 项测试、162 项 runtime 检查、typecheck 和 lint 通过。
+- 产品接受 `partial`；新增分支证据在来源任务更新后未能复审，依赖门拒绝将旧审查用于新 generation；界面另显示 `PROVIDER_STREAM_MISSING_FINAL_ANSWER`，均记为旁支。
+- 终态回执 `rdc-lifecycle-c9ea2158-d33a-4730-948f-53d426b80864.json` 确认入口 E147、零替换；诊断后也回到 E147，两次回放关闭、归属进程退出，未调整回放配置。
+- 规划约 3 分 25 秒、执行约 41 分 33 秒；规划 8 次、General 84 次、两次 verifier 共 21 次及自动审查 3 次 Provider 请求，另有 1 次压缩；General input 12301865／output 35664 token（含缓存读取 1976704）。会话、请求、审查、回执和图像归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-11-sources.zip`，SHA-256 `d4b30beb3fac0a42f0c0bdf301d05a868673818742194207396af7e1b3191c4d`。
+
 ## 2026-11-18：M3 第十轮，停在区分
 
 - PC 本机、新隔离会话 `sess_c09c66e1e138`，Settings 逐一确认十二个 Agent 均为内置、GPT-6.1 Sol 可用；Medium、自动审查，Memory 为空、Knowledge 不含本案例。监工只输入短症状，未知眼侧和外观答“不知道”，原样批准计划；保留旧会话。
