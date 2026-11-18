@@ -1,5 +1,11 @@
 # Acceptance Ledger
 
+## 2026-11-19：M3 回放位置恢复产品复验
+
+- 眼部 capture／local／入口 E147；独立诊断会话 `sess_f10c6395f095` 的规划阶段依次查询原生状态、E6152 pipeline、原生状态，得到 E147→E6152→E147，界面始终显示入口 E147，同一 replay 和 capture 身份保持一致。
+- 原样批准计划后 General 入口校验通过，并在执行阶段独立重复同一组查询，仍为 E147→E6152→E147；终态恢复回执 `rdc-lifecycle-384ce76d-4a4e-4121-8cbb-8d65ae6d4c9e.json` 核实 E147。诊断计划不含正式调查报告，运行时要求 report 后产品如实声明 `partial`，不影响上述位置复验。
+- 六份原始工具返回和回执保留于 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_f10c6395f095/`；监工输入限定诊断指令并批准计划，关闭回放后归属进程退出、登记为空。
+
 ## 2026-11-19：回放位置偏差历史旁查
 
 - 只读对照：RDC-Tool 重构前的 `22f2518` 已由 `_dispatch_pipeline` 调用 `_ensure_event` 切换并保存原生事件；同期产品 `RdcProbeTool` 直接调用工具，未恢复入口。该行为并非运行时拆分引入。
